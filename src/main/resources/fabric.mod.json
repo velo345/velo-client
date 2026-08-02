@@ -1,0 +1,34 @@
+{
+	"schemaVersion": 1,
+	"id": "velo-client",
+	"version": "${version}",
+	"name": "Velo Client",
+	"description": "Cheat-free, anti-cheat-safe all-in-one QoL/performance/server-testing client. Everything you're allowed to have, nothing you're not.",
+	"authors": [
+		"Velo Client Contributors"
+	],
+	"contact": {
+		"homepage": "https://github.com/velo-client/velo-client",
+		"sources": "https://github.com/velo-client/velo-client",
+		"issues": "https://github.com/velo-client/velo-client/issues"
+	},
+	"license": "MIT",
+	"environment": "client",
+	"mixins": [
+		"velo-client.client.mixins.json"
+	],
+	"entrypoints": {
+		"main": [
+			"net.veloclient.velo.VeloClient"
+		],
+		"client": [
+			"net.veloclient.velo.client.VeloClientMod"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"fabric-api": "*",
+		"minecraft": "~1.21.11",
+		"java": ">=21"
+	}
+}

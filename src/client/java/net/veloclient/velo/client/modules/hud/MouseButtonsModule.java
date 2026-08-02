@@ -1,0 +1,75 @@
+package net.veloclient.velo.client.modules.hud;
+
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.option.GameOptions;
+import net.veloclient.velo.client.hud.HudModule;
+import net.veloclient.velo.client.hud.HudPosition;
+import net.veloclient.velo.client.theme.Theme;
+import net.veloclient.velo.client.theme.ThemeManager;
+import net.veloclient.velo.module.AbstractModule;
+import net.veloclient.velo.module.ModuleCategory;
+import net.veloclient.velo.module.SafetyTag;
+
+/**
+ * Mouse button state with live CPS (split out of {@link KeystrokesModule} so
+ * it can be positioned/scaled independently) - three flat opacity boxes
+ * (left button, right button, body) and the CPS numbers, no outline shape
+ * behind them.
+ */
+public final class MouseButtonsModule extends AbstractModule implements HudModule {
+
+	private static final int MOUSE_WIDTH = 34;
+	private static final int MOUSE_HEIGHT = 54;
+	private final HudPosition position = new HudPosition(0.02f, 0.66f);
+
+	public MouseButtonsModule() {
+		super("mouse-buttons", "Mouse Buttons", "Shows left/right mouse button state with live CPS.",
+				ModuleCategory.HUD, SafetyTag.ALWAYS_SAFE, false);
+		CpsTracker.ensureRegistered();
+	}
+
+	@Override
+	public HudPosition position() {
+		return position;
+	}
+
+	@Override
+	public void render(DrawContext context, int x, int y, float tickDelta) {
+		Theme theme = ThemeManager.active();
+		MinecraftClient client = MinecraftClient.getInstance();
+		GameOptions options = client.options;
+		boolean leftPressed = options.attackKey.isPressed();
+		boolean rightPressed = options.useKey.isPressed();
+
+		int inset = 2;
+		int bodyW = MOUSE_WIDTH - inset * 2;
+		int halfW = bodyW / 2;
+		int topH = MOUSE_HEIGHT / 2 - inset;
+
+		int leftColor = leftPressed ? theme.accentStart() : (theme.surfaceWithOpacity() & 0x00FFFFFF) | 0xCC000000;
+		int rightColor = rightPressed ? theme.accentStart() : (theme.surfaceWithOpacity() & 0x00FFFFFF) | 0xCC000000;
+		int bottomColor = (theme.surfaceWithOpacity() & 0x00FFFFFF) | 0x88000000;
+
+		context.fill(x + inset, y + inset, x + inset + halfW - 1, y + inset + topH, leftColor);
+		context.fill(x + inset + halfW + 1, y + inset, x + MOUSE_WIDTH - inset, y + inset + topH, rightColor);
+		context.fill(x + inset, y + inset + topH + 2, x + MOUSE_WIDTH - inset, y + MOUSE_HEIGHT - inset, bottomColor);
+
+		String leftCps = String.valueOf(CpsTracker.leftCps());
+		String rightCps = String.valueOf(CpsTracker.rightCps());
+		context.drawTextWithShadow(client.textRenderer, leftCps,
+				x + inset + (halfW - client.textRenderer.getWidth(leftCps)) / 2, y + inset + topH / 2 - 3, 0xFFFFFFFF);
+		context.drawTextWithShadow(client.textRenderer, rightCps,
+				x + inset + halfW + 2 + (halfW - client.textRenderer.getWidth(rightCps)) / 2, y + inset + topH / 2 - 3, 0xFFFFFFFF);
+	}
+
+	@Override
+	public int width() {
+		return MOUSE_WIDTH;
+	}
+
+	@Override
+	public int height() {
+		return MOUSE_HEIGHT;
+	}
+}

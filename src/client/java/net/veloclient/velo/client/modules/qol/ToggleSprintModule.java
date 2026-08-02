@@ -1,0 +1,41 @@
+package net.veloclient.velo.client.modules.qol;
+
+import net.minecraft.client.MinecraftClient;
+import net.veloclient.velo.module.AbstractModule;
+import net.veloclient.velo.module.ModuleCategory;
+import net.veloclient.velo.module.SafetyTag;
+
+/**
+ * Makes sprint a toggle instead of hold. Vanilla already has this built in
+ * (Options &gt; Controls &gt; "Toggle Sprint") - this module previously tried
+ * to reimplement it by forcing the sprint keybinding's pressed state every
+ * tick, fighting vanilla's own input handling and the physical key's real
+ * GLFW state, which is a losing battle: releasing the key fires vanilla's
+ * own callback immediately and always wins the next frame. Flipping
+ * vanilla's real toggle option instead means vanilla's own, already-correct
+ * logic does the actual work - there's nothing left to fight.
+ */
+public final class ToggleSprintModule extends AbstractModule {
+
+	private Boolean previousValue;
+
+	public ToggleSprintModule() {
+		super("toggle-sprint", "Toggle Sprint", "Press sprint once to toggle it on/off instead of holding it.",
+				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
+	}
+
+	@Override
+	public void onEnable() {
+		var option = MinecraftClient.getInstance().options.getSprintToggled();
+		previousValue = option.getValue();
+		option.setValue(true);
+	}
+
+	@Override
+	public void onDisable() {
+		if (previousValue != null) {
+			MinecraftClient.getInstance().options.getSprintToggled().setValue(previousValue);
+			previousValue = null;
+		}
+	}
+}

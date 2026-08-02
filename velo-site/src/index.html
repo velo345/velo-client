@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{site.name}} — {{site.taglineMain}} {{site.taglineAccent}}</title>
+<meta name="description" content="{{site.description}}">
+<meta name="theme-color" content="{{site.themeColor}}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><rect width=%2216%22 height=%2216%22 fill=%22%23ff3b3b%22/><rect x=%223%22 y=%223%22 width=%2210%22 height=%2210%22 fill=%22%230d0707%22/></svg>">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="/"><span class="brand-mark"></span>{{site.name}}</a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#profiles">Profiles</a>
+      <a href="#launcher">Launcher</a>
+      <a href="#install">Install</a>
+    </div>
+    {{#if status.downloadsEnabled}}
+    <a class="nav-cta" href="#install">Download</a>
+    {{/if}}
+    {{#ifnot status.downloadsEnabled}}
+    <span class="nav-cta nav-cta-disabled">In Development</span>
+    {{/ifnot}}
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-inner">
+    <span class="eyebrow">FABRIC · {{minecraft.version}} · JAVA {{minecraft.javaVersion}}</span>
+    <h1>{{site.taglineMain}} <span>{{site.taglineAccent}}</span></h1>
+    <p>{{site.name}} is a free Fabric mod and companion launcher: real FPS gains, a full HUD suite, tools built for server admins, and every setting saved per-profile.</p>
+    <div class="cta-row">
+      {{#if status.downloadsEnabled}}
+      <a class="btn btn-primary" href="downloads/{{minecraft.modJarFile}}" download>⬇ Download {{minecraft.modJarFile}}</a>
+      {{/if}}
+      {{#ifnot status.downloadsEnabled}}
+      <span class="btn btn-disabled" aria-disabled="true">🚧 In Development — Download Coming Soon</span>
+      {{/ifnot}}
+      <a class="btn btn-ghost" href="#features">See what's inside</a>
+    </div>
+    <p class="hero-note">Requires Fabric Loader + Fabric API for {{minecraft.version}} · Java {{minecraft.javaVersion}}+</p>
+  </div>
+</header>
+
+<section class="shot-section">
+  <div class="wrap">
+    <div class="shot-frame">
+      <img src="assets/screenshot-modules.jpg" alt="{{site.name}}'s in-game module panel, showing the Performance category with Performance Boost and PolyBlur enabled">
+    </div>
+    <p class="shot-caption">The actual in-game panel — not a mockup.</p>
+  </div>
+</section>
+
+<section class="section" id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Where the FPS actually comes from</h2>
+      <p>Three features worth trying first.</p>
+    </div>
+
+    <div class="highlights">
+      <div class="highlight">
+        <span class="num">01</span>
+        <h4>Performance Boost</h4>
+        <p>Presets plus granular control over view distance, entities, particles, VSync mode (Off / On / Adaptive), mipmaps and HUD update rate — all applied live, no reload needed.</p>
+      </div>
+      <div class="highlight">
+        <span class="num">02</span>
+        <h4>PolyBlur</h4>
+        <p>Motion blur that only kicks in when you're actually turning or moving fast, built on Minecraft's own tested blur shader instead of untested custom GLSL.</p>
+      </div>
+      <div class="highlight">
+        <span class="num">03</span>
+        <h4>Command Keybinds</h4>
+        <p>Bind any key to instantly run a command — <code>/spawn</code>, <code>/home</code>, whatever you type ten times an hour. Add, edit, and delete as many as you want.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Organized the way you'd actually look for it</h2>
+      <p>Eight categories, scrollable, searchable — nothing overflows off screen.</p>
+    </div>
+
+    <div class="cat-grid">
+      <div class="cat">
+        <h3>Performance</h3>
+        <ul>
+          <li><b>Performance Boost</b><small>presets + granular FPS tuning</small></li>
+          <li><b>PolyBlur</b><small>motion-triggered blur</small></li>
+          <li><b>Particle Limiter</b></li>
+          <li><b>Frame Time Graph</b></li>
+          <li><b>GPU Utilization</b></li>
+          <li><b>Memory &amp; GC Monitor</b></li>
+          <li><b>Optimization Mod Detector</b><small>flags Sodium / Lithium / Iris / Starlight</small></li>
+        </ul>
+      </div>
+      <div class="cat">
+        <h3>Rendering</h3>
+        <ul>
+          <li><b>FOV</b><small>separate sliders: movement, nausea, damage tilt</small></li>
+          <li><b>Full Bright</b></li>
+        </ul>
+      </div>
+      <div class="cat">
+        <h3>HUD</h3>
+        <ul>
+          <li><b>Armor &amp; Durability</b><small>customizable bar &amp; text size</small></li>
+          <li><b>Coordinates, Clock, FPS, Ping, CPS</b></li>
+          <li><b>Mouse Buttons, Keystrokes, Held Item</b></li>
+          <li><b>Potion Effect Timers</b></li>
+          <li><b>Session Stats</b><small>deaths / playtime, local only</small></li>
+          <li><b>Action Bar Log</b></li>
+          <li><b>Waypoints</b><small>manual, never auto-populated</small></li>
+        </ul>
+      </div>
+      <div class="cat">
+        <h3>Server Tools</h3>
+        <ul>
+          <li><b>Client Log Viewer</b><small>filter, wrap, copy, export</small></li>
+          <li><b>TPS &amp; Tick Graph</b></li>
+          <li><b>Entity Count Overlay</b></li>
+          <li><b>Packet Traffic Monitor</b></li>
+          <li><b>Particle Debug Overlay</b></li>
+          <li><b>Chunk Boundary Overlay</b></li>
+          <li><b>World Border Visualizer</b></li>
+          <li><b>Hitbox Visualizer</b></li>
+          <li><b>Light Level Overlay</b><small>mob-spawn-relevant lighting</small></li>
+        </ul>
+      </div>
+      <div class="cat">
+        <h3>QoL</h3>
+        <ul>
+          <li><b>Zoom</b><small>deep range, never corrupts your real FOV</small></li>
+          <li><b>Toggle Sneak</b></li>
+          <li><b>Toggle Sprint</b></li>
+        </ul>
+      </div>
+      <div class="cat">
+        <h3>Utility</h3>
+        <ul>
+          <li><b>Command Keybinds</b><small>bind a key, run a command</small></li>
+          <li><b>Copy Coordinates</b></li>
+        </ul>
+      </div>
+      <div class="cat">
+        <h3>Debug</h3>
+        <ul>
+          <li><b>Block/Entity Inspector</b><small>registry id, NBT, UUID</small></li>
+          <li><b>Keybind Conflict Checker</b></li>
+          <li><b>Resource/Shader Reload Hotkeys</b></li>
+        </ul>
+      </div>
+      <div class="cat">
+        <h3>Cosmetics</h3>
+        <ul>
+          <li><b>Cosmetic Capes</b><small>cloth-physics, client-rendered only</small></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="profiles">
+  <div class="wrap band-inner">
+    <div>
+      <h2>Every setting, saved per-profile</h2>
+      <p>Module states and your whole HUD layout live inside named profiles — not one global config. Switch instantly, and nothing bleeds between them.</p>
+      <ul class="checklist">
+        <li>Create, rename, and delete profiles from an in-game tab</li>
+        <li>HUD element positions and scale saved per-profile</li>
+        <li>Switching profiles applies everything at once, live</li>
+        <li>A new profile starts from your current setup, not from scratch</li>
+      </ul>
+    </div>
+    <div class="mock-panel">
+      <div class="mock-row"><span class="active">Survival Grind</span><span class="pill">ACTIVE</span></div>
+      <div class="mock-row"><span>Recording / Clean HUD</span><span></span></div>
+      <div class="mock-row"><span>PvP</span><span></span></div>
+      <div class="mock-row"><span>Building</span><span></span></div>
+    </div>
+  </div>
+</section>
+
+<section class="shot-section" style="padding-top:80px">
+  <div class="wrap">
+    <div class="shot-frame">
+      <img src="assets/screenshot-settings.jpg" alt="Performance Boost's settings screen, showing presets, VSync mode, and live sliders for view distance, entities, and particles">
+    </div>
+    <p class="shot-caption">Every slider applies immediately — no re-toggling a module to see a change take effect.</p>
+  </div>
+</section>
+
+<section class="section" id="launcher">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>{{site.name}} Launcher</h2>
+      <p>A companion app for the parts that shouldn't need to be in-game.</p>
+    </div>
+    <div class="highlights">
+      <div class="highlight">
+        <span class="num">→</span>
+        <h4>Microsoft sign-in</h4>
+        <p>Standard device-code login. No credentials stored, no third-party auth server.</p>
+      </div>
+      <div class="highlight">
+        <span class="num">→</span>
+        <h4>Saved servers</h4>
+        <p>Your server list with live ping and MOTD, outside of Minecraft's own multiplayer screen.</p>
+      </div>
+      <div class="highlight">
+        <span class="num">→</span>
+        <h4>Cape library</h4>
+        <p>Import and manage capes from one place, shared with the in-game cosmetics module.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="install">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Requirements</h2>
+    </div>
+    <div class="req-grid" style="margin-bottom:56px">
+      <div class="req"><div class="label">Minecraft</div><div class="value">{{minecraft.version}}</div></div>
+      <div class="req"><div class="label">Mod Loader</div><div class="value">Fabric Loader</div></div>
+      <div class="req"><div class="label">Dependency</div><div class="value">Fabric API</div></div>
+      <div class="req"><div class="label">Runtime</div><div class="value">Java {{minecraft.javaVersion}}+</div></div>
+    </div>
+
+    {{#if status.downloadsEnabled}}
+    <div class="section-head">
+      <h2>Install</h2>
+    </div>
+    <div class="install-steps">
+      <div class="install-step"><p>Install <a href="{{links.fabricInstaller}}">Fabric Loader</a> for Minecraft {{minecraft.version}} if you haven't already.</p></div>
+      <div class="install-step"><p>Get <a href="{{links.fabricApi}}">Fabric API</a> — {{site.name}} depends on it and won't load without it.</p></div>
+      <div class="install-step"><p>Download <code>{{minecraft.modJarFile}}</code> below and drop both files into your <code>.minecraft/mods</code> folder.</p></div>
+      <div class="install-step"><p>Launch with the Fabric profile. Press <code>Right Shift</code> in-game to open the panel.</p></div>
+    </div>
+    <div class="cta-row" style="margin-top:40px">
+      <a class="btn btn-primary" href="downloads/{{minecraft.modJarFile}}" download>⬇ Download {{minecraft.modJarFile}}</a>
+      <a class="btn btn-ghost" href="{{links.fabricApi}}">Get Fabric API</a>
+    </div>
+    <p class="hero-note" style="margin-top:18px">{{site.name}} Launcher (the companion desktop app) isn't packaged for standalone download yet — the mod above is fully independent and doesn't need it.</p>
+    {{/if}}
+    {{#ifnot status.downloadsEnabled}}
+    <div class="section-head">
+      <h2>Not ready yet</h2>
+      <p>{{site.name}} is still in active development — there's no downloadable build yet. This page will get a real download link the moment one's ready.</p>
+    </div>
+    {{/ifnot}}
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-links">
+      <a href="#features">Features</a>
+      <a href="#profiles">Profiles</a>
+      <a href="#launcher">Launcher</a>
+      <a href="#install">Install</a>
+      <a href="impressum.html">Imprint</a>
+      <a href="datenschutz.html">Privacy Policy</a>
+      <a href="terms.html">Terms of Service</a>
+    </div>
+    <p><b>NOT AN OFFICIAL MINECRAFT PRODUCT.</b> NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</p>
+    <p>Minecraft is a trademark of Mojang Synergies AB. "{{site.name}}" is an independent, community-made Fabric mod.</p>
+  </div>
+</footer>
+
+</body>
+</html>

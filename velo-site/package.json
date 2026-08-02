@@ -1,0 +1,12 @@
+{
+  "name": "velo-site",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Marketing site for Velo Client, built from src/*.html + site.config.json.",
+  "scripts": {
+    "build": "node build.js",
+    "preview": "npm run build && npx --yes serve dist",
+    "deploy:preview": "npm run build && vercel",
+    "deploy:prod": "npm run build && vercel --prod"
+  }
+}

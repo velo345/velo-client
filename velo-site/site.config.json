@@ -1,0 +1,36 @@
+{
+  "site": {
+    "name": "Velo Client",
+    "url": "https://velo-client.example.com",
+    "taglineMain": "Performance, HUD, and server tools —",
+    "taglineAccent": "in one Fabric mod.",
+    "description": "Velo Client: a free Fabric mod + companion launcher for Minecraft 1.21.11. Real FPS gains, a full HUD suite, server-admin tools, and per-profile settings.",
+    "themeColor": "#ff4747"
+  },
+  "status": {
+    "_comment": "downloadsEnabled controls both the CTA buttons AND whether the jar is even copied into dist/ - flip to true once there's a real build ready to hand out.",
+    "downloadsEnabled": false
+  },
+  "minecraft": {
+    "version": "1.21.11",
+    "javaVersion": "21",
+    "modVersion": "0.1.0",
+    "modJarFile": "velo-client-0.1.0.jar"
+  },
+  "links": {
+    "fabricInstaller": "https://fabricmc.net/use/installer/",
+    "fabricApi": "https://modrinth.com/mod/fabric-api",
+    "github": "",
+    "discord": ""
+  },
+  "legal": {
+    "_comment": "",
+    "operatorName": "David Seibert",
+    "addressLine1": "In der Au 25A",
+    "addressLine2": "53545,Linz am Rhein",
+    "country": "Germany",
+    "email": "davidseibert20@gmail.com",
+    "responsiblePersonName": "David Seibert",
+    "lastUpdated": "2026-08-02"
+  }
+}

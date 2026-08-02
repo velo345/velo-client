@@ -1,0 +1,182 @@
+/* Clean, modern, Minecraft-adjacent styling for the Velo Client launcher. */
+
+.root {
+	/*
+	 * Fallback values for the theme's custom lookup colors. LauncherApp
+	 * overrides these with an inline style on the main window's root to
+	 * reflect the active theme; dialogs (Dialog/Alert) render in their own
+	 * scene graph and never see that inline override, so they fall back to
+	 * these defaults instead of failing CSS color lookups.
+	 */
+	-velo-background: #0f0a0a;
+	-velo-surface: #1e1212;
+	-velo-accent-start: #ff4444;
+	-velo-accent-end: #b71c1c;
+	-velo-text: #ffffff;
+	-velo-hover: #2a1a1a;
+	-velo-hairline: rgba(255, 255, 255, 0.08);
+	-fx-font-family: "Segoe UI", "Inter", "Helvetica Neue", sans-serif;
+	-fx-background-color: -velo-background;
+}
+
+.dialog-pane {
+	-fx-background-color: -velo-background;
+}
+
+.dialog-pane .label {
+	-fx-text-fill: -velo-text;
+}
+
+.dialog-pane .content {
+	-fx-background-color: -velo-background;
+}
+
+.sidebar {
+	-fx-background-color: -velo-surface;
+	-fx-border-color: transparent -velo-hairline transparent transparent;
+	-fx-border-width: 0 1 0 0;
+}
+
+.sidebar-title {
+	-fx-font-size: 15px;
+	-fx-font-weight: bold;
+	-fx-letter-spacing: 2px;
+}
+
+.nav-button {
+	-fx-background-color: transparent;
+	-fx-text-fill: -velo-text;
+	-fx-alignment: CENTER_LEFT;
+	-fx-padding: 10 14 10 14;
+	-fx-background-radius: 8;
+	-fx-cursor: hand;
+	-fx-font-size: 13px;
+}
+
+.nav-button:hover {
+	-fx-background-color: -velo-hover;
+}
+
+.nav-button-active {
+	-fx-background-color: -velo-hover;
+	-fx-border-color: -velo-accent-start;
+	-fx-border-width: 0 0 0 3;
+}
+
+.title-screen {
+	-fx-background-color: transparent;
+}
+
+.velo-title {
+	-fx-font-size: 64px;
+	-fx-font-weight: bold;
+	-fx-letter-spacing: 4px;
+}
+
+.velo-tagline {
+	-fx-font-size: 14px;
+	-fx-opacity: 0.75;
+}
+
+.velo-splash {
+	-fx-font-size: 12px;
+	-fx-font-weight: bold;
+	-fx-font-style: italic;
+	-fx-text-fill: #FFDE55;
+	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 2, 0.4, 0, 1);
+}
+
+.title-menu-button {
+	-fx-background-color: -velo-surface;
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 14px;
+	-fx-padding: 12 28 12 28;
+	-fx-background-radius: 10;
+	-fx-border-radius: 10;
+	-fx-border-color: -velo-hairline;
+	-fx-border-width: 1;
+	-fx-cursor: hand;
+	-fx-min-width: 260px;
+}
+
+.title-menu-button:hover {
+	-fx-border-color: -velo-accent-start;
+}
+
+.title-menu-button-primary {
+	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
+	-fx-text-fill: white;
+	-fx-font-weight: bold;
+	-fx-border-width: 0;
+}
+
+.title-menu-button-primary:hover {
+	-fx-opacity: 0.92;
+}
+
+.glass-panel {
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+	-fx-border-color: -velo-hairline;
+	-fx-border-width: 1;
+	-fx-padding: 18;
+}
+
+.section-heading {
+	-fx-font-size: 22px;
+	-fx-font-weight: bold;
+}
+
+.section-subtitle {
+	-fx-font-size: 13px;
+	-fx-opacity: 0.8;
+}
+
+.version-tag {
+	-fx-font-size: 11px;
+	-fx-opacity: 0.55;
+}
+
+.account-badge {
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 24;
+	-fx-border-radius: 24;
+	-fx-border-color: -velo-hairline;
+	-fx-border-width: 1;
+	-fx-padding: 6 16 6 6;
+	-fx-cursor: hand;
+}
+
+.avatar-circle {
+	-fx-background-radius: 100;
+	-fx-min-width: 32px;
+	-fx-min-height: 32px;
+	-fx-max-width: 32px;
+	-fx-max-height: 32px;
+	-fx-alignment: CENTER;
+}
+
+.dialog-code {
+	-fx-font-size: 28px;
+	-fx-font-weight: bold;
+	-fx-letter-spacing: 4px;
+}
+
+.scroll-pane, .scroll-pane .viewport {
+	-fx-background-color: transparent;
+}
+
+.text-field {
+	-fx-background-color: -velo-hover;
+	-fx-text-fill: -velo-text;
+	-fx-background-radius: 8;
+	-fx-border-radius: 8;
+	-fx-border-color: -velo-hairline;
+	-fx-prompt-text-fill: derive(-velo-text, -40%);
+}
+
+.button {
+	-fx-background-radius: 8;
+	-fx-cursor: hand;
+}

@@ -1,0 +1,165 @@
+package net.veloclient.launcher.data;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
+
+/**
+ * Full read/write cape library for the launcher, byte-for-byte compatible
+ * with the mod's {@code CapeManager} - same {@code .velocape} bundle format
+ * (texture.png + physics.json + meta.json) and the same
+ * {@code config/cosmetics-cape.json} equip-state file, so importing/equipping
+ * a cape here is immediately visible in-game and vice versa (design spec
+ * section 6.5 / section 8's single-source-of-truth config).
+ */
+public final class CapeLibrary {
+
+	public static final int TEXTURE_WIDTH = 64;
+	public static final int TEXTURE_HEIGHT = 32;
+
+	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+	private static final String EQUIP_STATE_FILE = "cosmetics-cape.json";
+
+	private CapeLibrary() {
+	}
+
+	public static List<CapeEntry> listAll() {
+		VeloPaths.ensureDirectories();
+		List<CapeEntry> capes = new ArrayList<>();
+		try (var files = Files.list(VeloPaths.capes())) {
+			for (Path file : files.filter(p -> p.toString().endsWith(".velocape")).toList()) {
+				readMetadata(file).ifPresent(capes::add);
+			}
+		} catch (IOException ignored) {
+			// Empty/missing directory - no capes yet.
+		}
+		return capes;
+	}
+
+	/** Validates the PNG is exactly {@value #TEXTURE_WIDTH}x{@value #TEXTURE_HEIGHT} before importing. */
+	public static CapeEntry importPng(String name, Path pngFile, CapePhysicsPresetData preset) throws IOException {
+		BufferedImage image = ImageIO.read(pngFile.toFile());
+		if (image == null) {
+			throw new IOException("Not a readable PNG file.");
+		}
+		if (image.getWidth() != TEXTURE_WIDTH || image.getHeight() != TEXTURE_HEIGHT) {
+			throw new IOException("Cape textures must be exactly " + TEXTURE_WIDTH + "x" + TEXTURE_HEIGHT
+					+ " (got " + image.getWidth() + "x" + image.getHeight() + ").");
+		}
+
+		VeloPaths.ensureDirectories();
+		String id = UUID.randomUUID().toString();
+		Path bundleFile = VeloPaths.capes().resolve(sanitize(name) + "-" + id.substring(0, 8) + ".velocape");
+		try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(bundleFile))) {
+			zip.putNextEntry(new ZipEntry("texture.png"));
+			Files.copy(pngFile, zip);
+			zip.closeEntry();
+
+			zip.putNextEntry(new ZipEntry("physics.json"));
+			zip.write(GSON.toJson(preset).getBytes(StandardCharsets.UTF_8));
+			zip.closeEntry();
+
+			zip.putNextEntry(new ZipEntry("meta.json"));
+			zip.write(GSON.toJson(new Meta(id, name)).getBytes(StandardCharsets.UTF_8));
+			zip.closeEntry();
+		}
+		return new CapeEntry(id, name, bundleFile, preset);
+	}
+
+	public static void exportBundle(CapeEntry entry, Path destination) throws IOException {
+		Files.copy(entry.bundleFile(), destination, StandardCopyOption.REPLACE_EXISTING);
+	}
+
+	public static void delete(CapeEntry entry) throws IOException {
+		Files.deleteIfExists(entry.bundleFile());
+		if (entry.id().equals(equippedCapeId().orElse(null))) {
+			unequip();
+		}
+	}
+
+	public static Optional<String> equippedCapeId() {
+		Path file = VeloPaths.config().resolve(EQUIP_STATE_FILE);
+		if (!Files.exists(file)) {
+			return Optional.empty();
+		}
+		try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+			EquipState state = GSON.fromJson(reader, EquipState.class);
+			return state == null ? Optional.empty() : Optional.ofNullable(state.equippedCapeId);
+		} catch (IOException e) {
+			return Optional.empty();
+		}
+	}
+
+	public static void equip(String capeId) {
+		saveEquipState(capeId);
+	}
+
+	public static void unequip() {
+		saveEquipState(null);
+	}
+
+	private static void saveEquipState(String capeId) {
+		VeloPaths.ensureDirectories();
+		Path file = VeloPaths.config().resolve(EQUIP_STATE_FILE);
+		try (var writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+			GSON.toJson(new EquipState(capeId), writer);
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to save cape equip state", e);
+		}
+	}
+
+	private static Optional<CapeEntry> readMetadata(Path bundleFile) {
+		Meta meta = null;
+		CapePhysicsPresetData preset = CapePhysicsPresetData.defaults();
+		try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(bundleFile))) {
+			ZipEntry entry;
+			while ((entry = zip.getNextEntry()) != null) {
+				if (entry.getName().equals("meta.json")) {
+					meta = GSON.fromJson(new InputStreamReader(zip, StandardCharsets.UTF_8), Meta.class);
+				} else if (entry.getName().equals("physics.json")) {
+					preset = GSON.fromJson(new InputStreamReader(zip, StandardCharsets.UTF_8), CapePhysicsPresetData.class);
+				}
+			}
+		} catch (IOException e) {
+			return Optional.empty();
+		}
+		return meta == null ? Optional.empty() : Optional.of(new CapeEntry(meta.id, meta.name, bundleFile, preset));
+	}
+
+	private static String sanitize(String name) {
+		return name.toLowerCase().replaceAll("[^a-z0-9_-]+", "-");
+	}
+
+	private static final class Meta {
+		String id;
+		String name;
+
+		Meta(String id, String name) {
+			this.id = id;
+			this.name = name;
+		}
+	}
+
+	private static final class EquipState {
+		String equippedCapeId;
+
+		EquipState(String equippedCapeId) {
+			this.equippedCapeId = equippedCapeId;
+		}
+	}
+}
