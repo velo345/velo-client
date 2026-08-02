@@ -127,29 +127,6 @@ Privacy Policy required for a project with an identifiable operator.
 - **Stress-test/benchmark scripting** and the **network latency simulator**
   from the design brief aren't implemented yet.
 
-## Setting up account sign-in
-
-The launcher's Microsoft sign-in ([`launcher/auth/MicrosoftAuth.java`](launcher/src/main/java/net/veloclient/launcher/auth/MicrosoftAuth.java))
-needs a client id compiled into `LauncherApp.MICROSOFT_CLIENT_ID`. Getting one:
-
-1. **Register a free Azure AD (Entra ID) app** — portal.azure.com → Microsoft
-   Entra ID → App registrations → New registration. Supported account types:
-   "Personal Microsoft accounts only". Under Authentication, add a "Mobile
-   and desktop applications" platform with the redirect URI
-   `https://login.microsoftonline.com/common/oauth2/nativeclient`, and
-   enable "Allow public client flows". This costs nothing — it doesn't need
-   a paid Azure subscription, and the resulting client id isn't a secret
-   (it's meant to be compiled into a public client app like this one).
-2. **Get it onto Mojang's allow-list.** Since 2025, having a valid Azure app
-   isn't enough by itself — Mojang manually reviews and approves every new
-   third-party app before `api.minecraftservices.com` will accept it, to
-   cut down on phishing tools. See the notice linked from
-   `https://aka.ms/AppRegInfo` for the current request form. Until this is
-   approved, sign-in fails at the last step with
-   `"Invalid app registration"` even though the Azure config is correct —
-   don't waste time re-checking Azure settings if you see that error with a
-   freshly-registered app; it's almost certainly this allow-list step.
-
 ## Building
 
 Requires network access on first build (Gradle downloads Minecraft,
