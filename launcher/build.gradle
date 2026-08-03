@@ -155,10 +155,20 @@ tasks.register("jpackageDist") {
 				// wherever it puts --input's contents (where the javafx-*.jar
 				// files already are), not a literal env var.
 				"--java-options", "--module-path=\$APPDIR",
-				"--java-options", "--add-modules=javafx.controls,javafx.graphics"
+				"--java-options", "--add-modules=javafx.controls,javafx.graphics",
+				// jpackage's own default --jlink-options include
+				// --strip-native-commands, which deletes bin/java (and every
+				// other CLI launcher) from the bundled runtime - fine for the
+				// app itself (its native launcher stub doesn't need bin/java),
+				// but GameLauncher needs a real "java" binary to start
+				// Minecraft as a child process. Overriding with our own list
+				// (everything except that flag) keeps bin/java present.
+				"--jlink-options", "--strip-debug --no-header-files --no-man-pages"
 		]
 		if (isWindows) {
 			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser"]
+		} else if (!isMac) {
+			command += ["--linux-shortcut"]
 		}
 		// Plain ProcessBuilder rather than Gradle's own exec APIs - Project.exec()
 		// was removed in Gradle 9 and its replacement (injected ExecOperations)

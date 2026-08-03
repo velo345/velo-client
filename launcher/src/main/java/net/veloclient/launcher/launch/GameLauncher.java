@@ -171,10 +171,22 @@ public final class GameLauncher {
 		return classpath.toString();
 	}
 
-	private static String javaBinary() {
+	private static String javaBinary() throws IOException {
 		String javaHome = System.getProperty("java.home");
 		String exe = OsRules.currentOsName().equals("windows") ? "java.exe" : "java";
-		return Path.of(javaHome, "bin", exe).toString();
+		Path path = Path.of(javaHome, "bin", exe);
+		if (!Files.exists(path)) {
+			// Bit us once already: a packaged (jpackage) build's bundled
+			// runtime can be built without this binary (jpackage strips
+			// native command-line launchers, including "java" itself, from
+			// the runtime it bundles unless explicitly told to keep them -
+			// see launcher/build.gradle's jpackageDist task) - ProcessBuilder's
+			// own error for a missing executable is a bare, unhelpful native
+			// CreateProcess/errno message, so fail with the actual path here.
+			throw new IOException("No Java runtime found at " + path
+					+ " - this build of the launcher is missing its own java binary, needed to start Minecraft.");
+		}
+		return path.toString();
 	}
 
 	private static List<String> resolveArguments(JsonArray argsArray, Map<String, String> values) {
