@@ -65,16 +65,41 @@ tasks.register("bundleGameJars") {
 	}
 }
 
+// Bundles a plain copy of the building JDK's own "java" launcher binary as an
+// ordinary jar resource (net.veloclient.launcher.launch.JavaRuntimeFallback
+// reads it back at runtime) - jpackage's bundled runtime doesn't reliably
+// have this binary (see jpackageDist's comment for why patching it in at
+// build/install time turned out to be a dead end), so the app carries its
+// own spare copy and self-heals into a cache directory it's guaranteed to be
+// able to write to, the first time it actually needs to launch Minecraft.
+def javaRuntimeResourceRoot = layout.buildDirectory.dir("generated/javaruntime")
+
+tasks.register("bundleJavaRuntimeFallback") {
+	group = "build"
+	description = "Bundles a spare copy of this JDK's own java binary as a launcher resource."
+	def isWindows = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win")
+	def sourceBinary = new File(new File(System.getProperty("java.home"), "bin"), isWindows ? "java.exe" : "java")
+	def outDir = javaRuntimeResourceRoot.map { it.dir("net/veloclient/launcher/javaruntime") }
+	inputs.file(sourceBinary)
+	outputs.dir(outDir)
+	doLast {
+		def dir = outDir.get().asFile
+		dir.mkdirs()
+		new File(dir, sourceBinary.name).bytes = sourceBinary.bytes
+	}
+}
+
 sourceSets {
 	main {
 		resources {
 			srcDir(gameJarsResourceRoot)
+			srcDir(javaRuntimeResourceRoot)
 		}
 	}
 }
 
 tasks.named("processResources") {
-	dependsOn("bundleGameJars")
+	dependsOn("bundleGameJars", "bundleJavaRuntimeFallback")
 }
 
 // The javafx plugin's "run" task reaches into Project internals
@@ -134,31 +159,23 @@ tasks.register("jpackageDist") {
 		// jpackage binary explicitly rather than "jpackage" off PATH, since a
 		// machine can have several JDKs installed with PATH pointing elsewhere
 		// (that's the case on the box this was developed on).
-		File javaHomeDir = new File(System.getProperty("java.home"))
-		String jpackageBin = new File(new File(javaHomeDir, "bin"), isWindows ? "jpackage.exe" : "jpackage").absolutePath
+		String jpackageBin = new File(new File(System.getProperty("java.home"), "bin"), isWindows ? "jpackage.exe" : "jpackage").absolutePath
 
-		// Two stages, not one straight-to-installer jpackage call:
-		//
-		// jpackage's default --jlink-options strip every native command-line
-		// tool, including "java" itself, from the bundled runtime (fine for
-		// the app itself - its native launcher stub doesn't need bin/java -
-		// but GameLauncher needs a real "java" binary to start Minecraft as a
-		// child process). Overriding --jlink-options to keep ALL of them
-		// (javac/javadoc/jshell/keytool/...) got the exe past that, but broke
-		// the Windows installer outright (crashed immediately on launch,
-		// before this was narrowed down further) - so instead: build the
-		// app-image with jpackage's untouched defaults (the exact composition
-		// that was already known to install fine), patch in only the one
-		// binary actually needed, then package *that* into the installer.
-		def appImageDir = layout.buildDirectory.dir("jpackage-appimage").get().asFile
-		appImageDir.deleteDir()
-		appImageDir.mkdirs()
-
-		runJpackage([
+		// Deliberately NOT touching the bundled runtime's bin/ here (no
+		// --jlink-options override, no post-build patching of the app-image)
+		// after two different ways of doing that both broke the Windows
+		// installer itself (crashed immediately instead of installing, for
+		// reasons that didn't show up in jpackage's own output) - this is
+		// exactly jpackage's own untouched default recipe, which is known to
+		// produce an installer that actually installs. GameLauncher handles
+		// the resulting missing "java" binary itself at first run instead
+		// (see JavaRuntimeFallback) rather than this task fighting jpackage/
+		// WiX over it.
+		List<String> command = [
 				jpackageBin,
-				"--type", "app-image",
+				"--type", installerType,
 				"--input", staging.absolutePath,
-				"--dest", appImageDir.absolutePath,
+				"--dest", dist.absolutePath,
 				"--name", "Velo Client Launcher",
 				"--app-version", launcherAppVersion,
 				"--vendor", "Velo Client",
@@ -174,28 +191,6 @@ tasks.register("jpackageDist") {
 				// files already are), not a literal env var.
 				"--java-options", "--module-path=\$APPDIR",
 				"--java-options", "--add-modules=javafx.controls,javafx.graphics"
-		])
-
-		File appImageRoot = new File(appImageDir, "Velo Client Launcher")
-		File runtimeBinDir = isMac
-				? new File(appImageRoot, "Contents/runtime/Contents/Home/bin")
-				: (isWindows ? new File(appImageRoot, "runtime/bin") : new File(appImageRoot, "lib/runtime/bin"))
-		runtimeBinDir.mkdirs()
-		File sourceJavaBinary = new File(new File(javaHomeDir, "bin"), isWindows ? "java.exe" : "java")
-		new File(runtimeBinDir, sourceJavaBinary.name).bytes = sourceJavaBinary.bytes
-		if (!isWindows) {
-			new File(runtimeBinDir, sourceJavaBinary.name).setExecutable(true)
-		}
-
-		List<String> command = [
-				jpackageBin,
-				"--type", installerType,
-				"--app-image", appImageRoot.absolutePath,
-				"--dest", dist.absolutePath,
-				"--name", "Velo Client Launcher",
-				"--app-version", launcherAppVersion,
-				"--vendor", "Velo Client",
-				"--description", "Launch Minecraft with your Velo Client mod profiles"
 		]
 		if (isWindows) {
 			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser"]
