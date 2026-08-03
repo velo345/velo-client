@@ -167,7 +167,7 @@
 	-fx-background-color: transparent;
 }
 
-.text-field {
+.text-field, .text-area, .text-area .content {
 	-fx-background-color: -velo-hover;
 	-fx-text-fill: -velo-text;
 	-fx-background-radius: 8;
@@ -179,4 +179,271 @@
 .button {
 	-fx-background-radius: 8;
 	-fx-cursor: hand;
+	-fx-background-color: -velo-hover;
+	-fx-text-fill: -velo-text;
+	-fx-border-color: -velo-hairline;
+	-fx-border-radius: 8;
+	-fx-border-width: 1;
+}
+
+.button:hover {
+	-fx-border-color: -velo-accent-start;
+}
+
+.button:default, .button:default:hover {
+	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
+	-fx-text-fill: white;
+	-fx-border-width: 0;
+}
+
+/* ---- ComboBox ---- */
+
+.combo-box, .combo-box-base {
+	-fx-background-color: -velo-hover;
+	-fx-background-radius: 8;
+	-fx-border-radius: 8;
+	-fx-border-color: -velo-hairline;
+	-fx-border-width: 1;
+	-fx-mark-color: -velo-text;
+}
+
+.combo-box .list-cell {
+	-fx-background-color: transparent;
+	-fx-text-fill: -velo-text;
+	-fx-padding: 4 8 4 10;
+}
+
+.combo-box .arrow-button {
+	-fx-background-color: transparent;
+}
+
+.combo-box .arrow {
+	-fx-background-color: -velo-text;
+}
+
+.combo-box-popup .list-view {
+	-fx-background-color: -velo-surface;
+	-fx-border-color: -velo-hairline;
+	-fx-border-width: 1;
+	-fx-background-radius: 8;
+	-fx-border-radius: 8;
+}
+
+/* ---- ListView / cells (combo popups, choice dialogs, mod lists) ---- */
+
+.list-view {
+	-fx-background-color: -velo-surface;
+	-fx-control-inner-background: -velo-surface;
+}
+
+.list-cell {
+	-fx-background-color: transparent;
+	-fx-text-fill: -velo-text;
+}
+
+.list-cell:filled:hover {
+	-fx-background-color: -velo-hover;
+}
+
+.list-cell:filled:selected {
+	-fx-background-color: -velo-accent-start;
+	-fx-text-fill: white;
+}
+
+/* ---- CheckBox / RadioButton ---- */
+
+.check-box, .radio-button {
+	-fx-text-fill: -velo-text;
+}
+
+.check-box .box {
+	-fx-background-color: -velo-hover;
+	-fx-border-color: -velo-hairline;
+	-fx-border-radius: 4;
+	-fx-background-radius: 4;
+}
+
+.check-box:selected .box {
+	-fx-background-color: -velo-accent-start;
+	-fx-border-color: -velo-accent-start;
+}
+
+.check-box:selected .mark {
+	-fx-background-color: white;
+}
+
+.radio-button .radio {
+	-fx-background-color: -velo-hover;
+	-fx-border-color: -velo-hairline;
+}
+
+.radio-button:selected .radio .dot {
+	-fx-background-color: -velo-accent-start;
+}
+
+/* ---- ScrollBar ---- */
+
+.scroll-bar {
+	-fx-background-color: transparent;
+}
+
+.scroll-bar .track {
+	-fx-background-color: transparent;
+	-fx-background-radius: 6;
+}
+
+.scroll-bar .thumb {
+	-fx-background-color: -velo-hover;
+	-fx-background-radius: 6;
+}
+
+.scroll-bar .thumb:hover, .scroll-bar .thumb:pressed {
+	-fx-background-color: derive(-velo-hover, 20%);
+}
+
+.scroll-bar .increment-button, .scroll-bar .decrement-button {
+	-fx-background-color: transparent;
+	-fx-padding: 0;
+}
+
+.scroll-bar .increment-arrow, .scroll-bar .decrement-arrow {
+	-fx-background-color: -velo-text;
+}
+
+/* ---- ProgressBar / ProgressIndicator ---- */
+
+.progress-bar .track {
+	-fx-background-color: -velo-hover;
+	-fx-background-radius: 8;
+}
+
+.progress-bar .bar {
+	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
+	-fx-background-radius: 8;
+	-fx-padding: 4;
+}
+
+.progress-indicator .percentage {
+	-fx-fill: -velo-text;
+}
+
+/* ---- Slider ---- */
+
+.slider .track {
+	-fx-background-color: -velo-hover;
+	-fx-background-radius: 4;
+}
+
+.slider .thumb {
+	-fx-background-color: -velo-accent-start;
+	-fx-background-radius: 100;
+}
+
+.slider .axis {
+	-fx-tick-label-fill: -velo-text;
+}
+
+/* ---- Tooltip / Separator / TitledPane ---- */
+
+.tooltip {
+	-fx-background-color: -velo-surface;
+	-fx-text-fill: -velo-text;
+	-fx-background-radius: 6;
+	-fx-border-color: -velo-hairline;
+	-fx-border-radius: 6;
+	-fx-border-width: 1;
+}
+
+.separator .line {
+	-fx-border-color: -velo-hairline;
+}
+
+.titled-pane, .titled-pane > .title, .titled-pane > .content {
+	-fx-background-color: -velo-surface;
+	-fx-text-fill: -velo-text;
+}
+
+.titled-pane > .title {
+	-fx-background-radius: 8;
+}
+
+/* ---- Dialog chrome (Alert/Dialog header + button bar) ---- */
+
+.dialog-pane > .header-panel {
+	-fx-background-color: -velo-surface;
+}
+
+.dialog-pane > .header-panel .label {
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 16px;
+	-fx-font-weight: bold;
+}
+
+.dialog-pane .content.label {
+	-fx-text-fill: -velo-text;
+}
+
+.dialog-pane .button-bar .button {
+	-fx-background-color: -velo-hover;
+}
+
+/* ---- Profile cards / icon picker (Profiles section) ---- */
+
+.field-label {
+	-fx-font-size: 12px;
+	-fx-opacity: 0.75;
+	-fx-text-fill: -velo-text;
+}
+
+.instance-card {
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+	-fx-border-color: -velo-hairline;
+	-fx-border-width: 1;
+	-fx-padding: 16;
+}
+
+.instance-card-new {
+	-fx-border-style: dashed;
+	-fx-cursor: hand;
+	-fx-opacity: 0.8;
+}
+
+.instance-card-new:hover {
+	-fx-opacity: 1;
+	-fx-border-color: -velo-accent-start;
+}
+
+.instance-icon-button {
+	-fx-cursor: hand;
+}
+
+.instance-icon-button:hover {
+	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 8, 0.3, 0, 2);
+}
+
+.instance-icon-custom {
+	-fx-background-radius: 14;
+	-fx-border-radius: 14;
+}
+
+.icon-picker-tile {
+	-fx-background-color: -velo-hover;
+	-fx-background-radius: 10;
+	-fx-border-radius: 10;
+	-fx-border-color: -velo-hairline;
+	-fx-border-width: 1;
+	-fx-padding: 4;
+}
+
+.icon-picker-tile:selected {
+	-fx-border-color: -velo-accent-start;
+	-fx-border-width: 2;
+}
+
+.mod-row {
+	-fx-background-color: -velo-hover;
+	-fx-background-radius: 8;
+	-fx-padding: 8 12 8 12;
 }

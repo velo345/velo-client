@@ -28,3 +28,60 @@ dependencies {
 test {
 	useJUnitPlatform()
 }
+
+// Bundles each supported Minecraft version's built velo-client jar straight
+// into the launcher's own resources, so it's a fully self-contained app that
+// can always install the right jar into a profile's mods folder without
+// needing the rest of this monorepo checked out alongside it.
+def gameVersions = ["1.21.11", "26.1", "26.2"]
+// Resolved eagerly at configuration time (plain java.io.File, not a live
+// Project reference) so the doLast below stays configuration-cache-safe.
+def libsDirs = gameVersions.collectEntries { v -> [(v): rootProject.file("versions/${v}/build/libs")] }
+def gameJarsResourceRoot = layout.buildDirectory.dir("generated/gamejars")
+def gameJarsOutputDir = gameJarsResourceRoot.map { it.dir("net/veloclient/launcher/gamejars") }
+
+tasks.register("bundleGameJars") {
+	group = "build"
+	description = "Copies each supported Minecraft version's built velo-client jar into launcher resources."
+	// Selects and copies a sibling project's build output after it builds -
+	// not something the configuration cache can track precisely.
+	notCompatibleWithConfigurationCache("Copies a sibling project's build output jar, resolved after that project builds")
+	gameVersions.each { v -> dependsOn(":${v}:build") }
+	gameVersions.each { v ->
+		inputs.files(fileTree(libsDirs[v]) { include "velo-client-*.jar"; exclude "*-sources.jar" })
+	}
+	outputs.dir(gameJarsOutputDir)
+	doLast {
+		def outDir = gameJarsOutputDir.get().asFile
+		outDir.mkdirs()
+		gameVersions.each { v ->
+			def libsDir = libsDirs[v]
+			def matches = libsDir.listFiles({ f -> f.name.startsWith("velo-client-") && f.name.endsWith(".jar") && !f.name.contains("-sources") } as FileFilter)
+			if (matches == null || matches.length != 1) {
+				throw new GradleException("Expected exactly one built velo-client jar for Minecraft ${v} in ${libsDir}, found ${matches == null ? 0 : matches.length}")
+			}
+			new File(outDir, "${v}.jar").bytes = matches[0].bytes
+		}
+	}
+}
+
+sourceSets {
+	main {
+		resources {
+			srcDir(gameJarsResourceRoot)
+		}
+	}
+}
+
+tasks.named("processResources") {
+	dependsOn("bundleGameJars")
+}
+
+// The javafx plugin's "run" task reaches into Project internals
+// (Task.extensions/SourceSetContainer) at execution time to wire up JavaFX's
+// module path, which Gradle 9's configuration cache can't serialize - without
+// this, "./gradlew :launcher:run" fails outright unless you remember to pass
+// --no-configuration-cache every time.
+tasks.named("run") {
+	notCompatibleWithConfigurationCache("org.openjfx.javafxplugin wires the module path via Task.extensions at execution time")
+}
