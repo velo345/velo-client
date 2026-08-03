@@ -164,10 +164,18 @@ tasks.register("jpackageDist") {
 		// was removed in Gradle 9 and its replacement (injected ExecOperations)
 		// needs a proper task class to receive via constructor injection, which
 		// is more ceremony than this ad-hoc task warrants.
-		Process process = new ProcessBuilder(command).inheritIO().start()
+		//
+		// Deliberately not inheritIO(): with the Gradle daemon (the default),
+		// "inherited" file descriptors are the daemon's own, not this build
+		// invocation's console, so a failing jpackage's actual error message
+		// never reaches the terminal at all - capture and print it explicitly
+		// instead, and fold it into the exception so it survives even -q.
+		Process process = new ProcessBuilder(command).redirectErrorStream(true).start()
+		String output = process.inputStream.getText("UTF-8")
 		int exitCode = process.waitFor()
+		println(output)
 		if (exitCode != 0) {
-			throw new GradleException("jpackage exited with code ${exitCode}")
+			throw new GradleException("jpackage exited with code ${exitCode}:\n${output}")
 		}
 	}
 }
