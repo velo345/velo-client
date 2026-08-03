@@ -116,6 +116,7 @@ stonecutter parameters {
 			replace("net.minecraft.sound.SoundCategory", "net.minecraft.sounds.SoundSource")
 			replace("net.minecraft.sound.SoundEvents", "net.minecraft.sounds.SoundEvents")
 			replace("net.minecraft.text.MutableText", "net.minecraft.network.chat.MutableComponent")
+			replace("net.minecraft.text.Style", "net.minecraft.network.chat.Style")
 			replace("net.minecraft.text.Text", "net.minecraft.network.chat.Component")
 			replace("net.minecraft.util.hit.BlockHitResult", "net.minecraft.world.phys.BlockHitResult")
 			replace("net.minecraft.util.hit.EntityHitResult", "net.minecraft.world.phys.EntityHitResult")
@@ -566,6 +567,33 @@ stonecutter parameters {
 			replace("Heightmap.Type", "Heightmap.Types")
 			replace("world.getTopY(", "world.getHeight(")
 			replace("world.getLightLevel(", "world.getBrightness(")
+			// MapColor (MinimapModule's column-color sampling) - verified via
+			// javap. Package moved, CLEAR->NONE, and the render-color method
+			// itself was renamed (its real Mojmap name, "calculateARGBColor",
+			// also confirms the return value really is a packed ARGB int).
+			// Scoped to the "mapColor." receiver actually used in this
+			// codebase rather than a bare ".getRenderColor(" - specific
+			// enough to be safe on its own, but no reason not to be extra
+			// precise here too.
+			replace("net.minecraft.block.MapColor", "net.minecraft.world.level.material.MapColor")
+			replace("MapColor.CLEAR", "MapColor.NONE")
+			replace("mapColor.getRenderColor(", "mapColor.calculateARGBColor(")
+			// BlockPos.Mutable -> BlockPos.MutableBlockPos - verified via
+			// javap (both 26.1 and 26.2 keep the same nested-class name).
+			replace("BlockPos.Mutable", "BlockPos.MutableBlockPos")
+			// Entity#getBlockPos -> #blockPosition, scoped to the receiver
+			// this codebase actually uses - a bare ".getBlockPos(" rule
+			// would be wrong, since BlockHitResult#getBlockPos (used
+			// elsewhere, e.g. LookingAtInspectorModule) keeps that exact
+			// name unchanged in Mojmap (verified via javap on both types).
+			replace("client.player.getBlockPos()", "client.player.blockPosition()")
+			// Font#wrapLines -> #split (the Wavey Capes note in
+			// CapeEditScreen, and VeloLabel's general-purpose wrapped-text
+			// row widget) - verified via javap. Two receiver forms actually
+			// used in this codebase, both scoped rather than a bare
+			// ".wrapLines(" rule.
+			replace("this.textRenderer.wrapLines(", "this.font.split(")
+			replace("textRenderer.wrapLines(", "textRenderer.split(")
 			replace("blockEntity.createNbt(", "blockEntity.saveWithFullMetadata(")
 			replace("BuiltInRegistries.BLOCK.getId(", "BuiltInRegistries.BLOCK.getKey(")
 			replace("BuiltInRegistries.ENTITY_TYPE.getId(", "BuiltInRegistries.ENTITY_TYPE.getKey(")
@@ -773,6 +801,13 @@ stonecutter parameters {
 			replace(".writeTo(", ".writeToFile(")
 			replace("registerTexture(", "register(")
 			replace("destroyTexture(", "release(")
+			// NativeImageBackedTexture#getImage/#setImage -> DynamicTexture#
+			// getPixels/#setPixels (MinimapManager's texture-update path) -
+			// verified via javap. Scoped to the receiver this codebase
+			// actually uses, since "getImage"/"setImage" alone would be too
+			// generic to risk leaving bare.
+			replace("texture.getImage(", "texture.getPixels(")
+			replace("texture.setImage(", "texture.setPixels(")
 			replace(".getMatrices(", ".pose(")
 			// TextRenderer#getWidth/#fontHeight -> Font#width/#lineHeight -
 			// NativeImage keeps getWidth()/getHeight() unchanged in 26.1
@@ -791,9 +826,11 @@ stonecutter parameters {
 			replace("getTextureManager", "getTextureManager")
 			replace("getEffectTexture", "getEffectTexture")
 			replace("OverlayTexture", "OverlayTexture")
-			// ClientAsset.ResourceTexture (LocalPlayerSkinCapeMixin's 26.1+
-			// branch, used to build a substitute cape texture asset).
+			// ClientAsset.ResourceTexture/.Texture (LocalPlayerSkinCapeMixin's
+			// 26.1+ branch, used to build/hold a substitute cape/elytra
+			// texture asset).
 			replace("ResourceTexture", "ResourceTexture")
+			replace("ClientAsset.Texture", "ClientAsset.Texture")
 
 			// --- The generic renames. Deliberately last and deliberately
 			// narrow: by this point every real vanilla identifier that

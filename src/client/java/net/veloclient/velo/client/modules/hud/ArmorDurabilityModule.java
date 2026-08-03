@@ -34,7 +34,10 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 	private boolean showIcon = true;
 	private boolean showBar = true;
 	private boolean showText = true;
-	private int barWidth = 60;
+	// Matches ICON_SIZE by default so the bar lines up directly under the
+	// armor icon above it (the default layout, barBelowIcon=true) instead of
+	// visibly overhanging both sides of a much narrower icon.
+	private int barWidth = ICON_SIZE;
 	private int barHeight = 3;
 	private float textScale = 1.0f;
 	// Default layout: bar sits below its armor icon (inventory-style stacked
@@ -199,7 +202,7 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 				new ConfigField.ToggleField("Show Icon", () -> showIcon, v -> showIcon = v),
 				new ConfigField.ToggleField("Show Bar", () -> showBar, v -> showBar = v),
 				new ConfigField.ToggleField("Show Text", () -> showText, v -> showText = v),
-				new ConfigField.SliderField("Bar Width", 20, 120, () -> barWidth, v -> barWidth = (int) v, v -> String.valueOf((int) v)),
+				new ConfigField.SliderField("Bar Width", 8, 120, () -> barWidth, v -> barWidth = (int) v, v -> String.valueOf((int) v)),
 				new ConfigField.SliderField("Bar Height", 2, 10, () -> barHeight, v -> barHeight = (int) v, v -> String.valueOf((int) v)),
 				new ConfigField.SliderField("Text Size", 0.5, 2.0, () -> textScale, v -> textScale = (float) v, v -> Math.round(v * 100) + "%"),
 				new ConfigField.ToggleField("Bar Below Icon", () -> barBelowIcon, v -> barBelowIcon = v),

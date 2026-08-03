@@ -1,0 +1,11 @@
+{
+	"providers": [
+		{
+			"type": "bitmap",
+			"file": "velo-client:font/badge_glyph.png",
+			"ascent": 7,
+			"height": 8,
+			"chars": [""]
+		}
+	]
+}

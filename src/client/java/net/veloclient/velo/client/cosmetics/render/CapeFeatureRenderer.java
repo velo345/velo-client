@@ -134,6 +134,12 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 		if (equipped.isEmpty()) {
 			return;
 		}
+		// Same rule vanilla's own cape and Wavey Capes both already follow -
+		// a real elytra equipped in the chestplate slot always takes over
+		// from the cape, never both at once.
+		if (localPlayer.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).getItem() == net.minecraft.item.Items.ELYTRA) {
+			return;
+		}
 		CapeDefinition definition = equipped.get();
 		advanceSimulation(definition, localPlayer);
 
@@ -166,6 +172,9 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 		}
 		var equipped = CapeManager.equipped();
 		if (equipped.isEmpty()) {
+			return;
+		}
+		if (localPlayer.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem() == net.minecraft.world.item.Items.ELYTRA) {
 			return;
 		}
 		CapeDefinition definition = equipped.get();

@@ -17,6 +17,7 @@ import net.veloclient.velo.client.modules.hud.CpsCounterModule;
 import net.veloclient.velo.client.modules.hud.FpsCounterModule;
 import net.veloclient.velo.client.modules.hud.HeldItemModule;
 import net.veloclient.velo.client.modules.hud.KeystrokesModule;
+import net.veloclient.velo.client.modules.hud.MinimapModule;
 import net.veloclient.velo.client.modules.hud.MouseButtonsModule;
 import net.veloclient.velo.client.modules.hud.PingDisplayModule;
 import net.veloclient.velo.client.modules.hud.PotionTimersModule;
@@ -85,6 +86,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ToggleSneakModule());
 		ModuleRegistry.register(new ZoomModule());
 		ModuleRegistry.register(new CustomCrosshairModule());
+		ModuleRegistry.register(new MinimapModule());
 
 		// Cosmetics (section 6.5)
 		ModuleRegistry.register(new CapeCosmeticsModule());

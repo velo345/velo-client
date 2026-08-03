@@ -5,12 +5,14 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"ActionBarOverlayMixin",
+		"ChatHudMixin",
 		"ClientConnectionMixin",
 		"FullBrightMixin",
 		"GameRendererFovMixin",
 		"LocalPlayerSkinCapeMixin",
 		"MouseScrollMixin",
-		"PlayerListHudMixin"
+		"PlayerListHudMixin",
+		"PlayerNameTagBadgeMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
