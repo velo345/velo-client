@@ -4,7 +4,7 @@
     "url": "https://velo-client.example.com",
     "taglineMain": "Performance, HUD, and server tools —",
     "taglineAccent": "in one Fabric mod.",
-    "description": "Velo Client: a free Fabric mod + companion launcher for Minecraft 1.21.11. Real FPS gains, a full HUD suite, server-admin tools, and per-profile settings.",
+    "description": "Velo Client: a free Fabric mod + companion launcher for Minecraft 1.21.11, 26.1, and 26.2. Real FPS gains, a full HUD suite, server-admin tools, and per-profile settings.",
     "themeColor": "#ff4747"
   },
   "status": {
@@ -12,15 +12,15 @@
     "downloadsEnabled": false
   },
   "minecraft": {
-    "version": "1.21.11",
-    "javaVersion": "21",
+    "version": "1.21.11 · 26.1 · 26.2",
+    "javaVersion": "21+ / 25+",
     "modVersion": "0.1.0",
     "modJarFile": "velo-client-0.1.0.jar"
   },
   "links": {
     "fabricInstaller": "https://fabricmc.net/use/installer/",
     "fabricApi": "https://modrinth.com/mod/fabric-api",
-    "github": "",
+    "github": "https://github.com/velo345/velo-client",
     "discord": ""
   },
   "legal": {

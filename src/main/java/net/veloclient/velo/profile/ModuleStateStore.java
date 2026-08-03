@@ -41,6 +41,8 @@ public final class ModuleStateStore {
 						fields.put(text.label(), text.get().get());
 					} else if (field instanceof ConfigField.ChoiceField choice) {
 						fields.put(choice.label(), choice.get().get());
+					} else if (field instanceof ConfigField.ColorField color) {
+						fields.put(color.label(), color.get().getAsInt());
 					}
 				}
 			}
@@ -69,6 +71,8 @@ public final class ModuleStateStore {
 						text.set().accept(str);
 					} else if (field instanceof ConfigField.ChoiceField choice && value instanceof String str) {
 						choice.set().accept(str);
+					} else if (field instanceof ConfigField.ColorField color && value instanceof Number number) {
+						color.set().accept(number.intValue());
 					}
 				}
 			}

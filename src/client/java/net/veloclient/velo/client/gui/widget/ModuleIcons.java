@@ -54,6 +54,8 @@ public final class ModuleIcons {
 		ICONS.put("keybind-conflict-checker", Items.OAK_BUTTON);
 		ICONS.put("looking-at-inspector", Items.OBSERVER);
 		ICONS.put("command-keybinds", Items.COMMAND_BLOCK);
+		ICONS.put("scoreboard-hud", Items.PAPER);
+		ICONS.put("custom-crosshair", Items.SPECTRAL_ARROW);
 	}
 
 	private ModuleIcons() {

@@ -3,7 +3,13 @@ package net.veloclient.velo.client.modules.hud;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
+//? if <26.1 {
 import net.minecraft.client.gui.hud.InGameHud;
+//?} else if <26.2 {
+/*import net.minecraft.client.gui.Gui;
+*///?} else {
+/*import net.minecraft.client.gui.Hud;
+*///?}
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.veloclient.velo.client.hud.HudModule;
 import net.veloclient.velo.client.hud.HudPosition;
@@ -42,8 +48,16 @@ public final class PotionTimersModule extends AbstractModule implements HudModul
 		}
 		int rowY = y;
 		for (StatusEffectInstance effect : client.player.getStatusEffects()) {
+			//? if <26.1 {
 			context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, InGameHud.getEffectTexture(effect.getEffectType()),
 					x, rowY + (ROW_HEIGHT - ICON_SIZE) / 2, ICON_SIZE, ICON_SIZE);
+			//?} else if <26.2 {
+			/*context.blitSprite(RenderPipelines.GUI_TEXTURED, Gui.getMobEffectSprite(effect.getEffect()),
+					x, rowY + (ROW_HEIGHT - ICON_SIZE) / 2, ICON_SIZE, ICON_SIZE);
+			*///?} else {
+			/*context.blitSprite(RenderPipelines.GUI_TEXTURED, Hud.getMobEffectSprite(effect.getEffect()),
+					x, rowY + (ROW_HEIGHT - ICON_SIZE) / 2, ICON_SIZE, ICON_SIZE);
+			*///?}
 
 			String name = effect.getEffectType().value().getName().getString();
 			String amplifier = effect.getAmplifier() > 0 ? " " + (effect.getAmplifier() + 1) : "";

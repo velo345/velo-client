@@ -57,9 +57,19 @@ public final class CommandKeybindsModule extends AbstractModule {
 		// (chat, inventory, this mod's own menus, ...) is open, so typing
 		// numbers/letters into a text field can't accidentally run a command.
 		var networkHandler = client.getNetworkHandler();
+		//? if <26.1 {
 		if (client.player == null || networkHandler == null || client.currentScreen != null) {
 			return;
 		}
+		//?} else if <26.2 {
+		/*if (client.player == null || networkHandler == null || client.screen != null) {
+			return;
+		}
+		*///?} else {
+		/*if (client.player == null || networkHandler == null || client.gui.screen() != null) {
+			return;
+		}
+		*///?}
 		long handle = client.getWindow().getHandle();
 		List<CommandKeybindEntry> current = entries();
 		for (int i = 0; i < current.size(); i++) {

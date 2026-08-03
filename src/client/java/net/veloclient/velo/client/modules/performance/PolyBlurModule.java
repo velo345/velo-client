@@ -117,7 +117,13 @@ public final class PolyBlurModule extends AbstractModule implements Configurable
 			PostEffectProcessor processor = LOADED.computeIfAbsent(effectId,
 					id -> client.getShaderLoader().loadPostEffect(id, DefaultFramebufferSet.MAIN_ONLY));
 			if (processor != null) {
+				//? if <26.1 {
 				processor.render(client.getFramebuffer(), ObjectAllocator.TRIVIAL);
+				//?} else if <26.2 {
+				/*processor.process(client.getMainRenderTarget(), GraphicsResourceAllocator.UNPOOLED);
+				*///?} else {
+				/*processor.process(client.gameRenderer.mainRenderTarget(), GraphicsResourceAllocator.UNPOOLED);
+				*///?}
 			}
 		} catch (Throwable t) {
 			broken = true;

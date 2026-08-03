@@ -32,13 +32,53 @@ public final class HudManager {
 				vanilla.render(context, tickCounter);
 			}
 		});
+		// Replaces (rather than mixin-cancels) vanilla's own crosshair
+		// element while a custom one is equipped and enabled - the crosshair
+		// used to be a dedicated, directly mixin-able InGameHud method, but
+		// the current HUD renderer draws every vanilla element (including
+		// the crosshair) through this same registry, so replacing the
+		// registered element is both the simpler and the only remaining way
+		// to override it.
+		HudElementRegistry.replaceElement(VanillaHudElements.CROSSHAIR, vanilla -> (context, tickCounter) -> {
+			var module = ModuleRegistry.get("custom-crosshair").orElse(null);
+			MinecraftClient client = MinecraftClient.getInstance();
+			if (!(module instanceof net.veloclient.velo.client.modules.qol.CustomCrosshairModule) || !module.isEnabled()
+					|| !client.options.getPerspective().isFirstPerson()) {
+				vanilla.render(context, tickCounter);
+				return;
+			}
+			boolean hit = client.targetedEntity instanceof net.minecraft.entity.LivingEntity && client.targetedEntity.isAlive();
+			net.veloclient.velo.client.modules.qol.CustomCrosshairModule.renderIfEquipped(context,
+					context.getScaledWindowWidth(), context.getScaledWindowHeight(), hit);
+		});
+		// Same reasoning as CROSSHAIR above - vanilla's scoreboard sidebar
+		// used to be a directly mixin-cancelable InGameHud method, but it's
+		// drawn through this same registry now. Suppressed (not replaced)
+		// while our own ScoreboardHudModule is enabled, so it doesn't draw
+		// twice in two different positions/styles at once.
+		HudElementRegistry.replaceElement(VanillaHudElements.SCOREBOARD, vanilla -> (context, tickCounter) -> {
+			boolean handled = ModuleRegistry.get("scoreboard-hud").map(Module::isEnabled).orElse(false);
+			if (!handled) {
+				vanilla.render(context, tickCounter);
+			}
+		});
 	}
 
 	private static void onHudRender(DrawContext context, net.minecraft.client.render.RenderTickCounter tickCounter) {
 		MinecraftClient client = MinecraftClient.getInstance();
+		//? if <26.1 {
 		if (client.options.hudHidden) {
 			return;
 		}
+		//?} else if <26.2 {
+		/*if (client.options.hideGui) {
+			return;
+		}
+		*///?} else {
+		/*if (client.gui.hud.isHidden()) {
+			return;
+		}
+		*///?}
 		// World (and the hotbar, since we're attached right after it) has
 		// already drawn to the framebuffer by this point in the frame, but
 		// every other vanilla HUD element (health/food/XP/chat/etc) and all

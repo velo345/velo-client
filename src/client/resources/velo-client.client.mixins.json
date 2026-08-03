@@ -4,10 +4,13 @@
 	"package": "net.veloclient.velo.client.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
+		"ActionBarOverlayMixin",
 		"ClientConnectionMixin",
 		"FullBrightMixin",
 		"GameRendererFovMixin",
-		"MouseScrollMixin"
+		"LocalPlayerSkinCapeMixin",
+		"MouseScrollMixin",
+		"PlayerListHudMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

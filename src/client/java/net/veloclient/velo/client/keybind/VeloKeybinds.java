@@ -38,7 +38,13 @@ public final class VeloKeybinds {
 
 	private static void onClientTick(MinecraftClient client) {
 		while (OPEN_MOD_MENU.wasPressed()) {
+			//? if <26.1 {
 			Screen current = client.currentScreen;
+			//?} else if <26.2 {
+			/*Screen current = client.screen;
+			*///?} else {
+			/*Screen current = client.gui.screen();
+			*///?}
 			if (current == null) {
 				client.setScreen(new ModMenuScreen());
 			} else if (current instanceof VeloWindow window) {

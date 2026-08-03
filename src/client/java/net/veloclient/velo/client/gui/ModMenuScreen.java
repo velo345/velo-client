@@ -86,6 +86,11 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		addSelectableChild(hudLayoutButton);
 		sidebarRegion.addRow(hudLayoutButton);
 
+		VeloButton crosshairsButton = new VeloButton(sidebarX, 0, SIDEBAR_WIDTH, 20, Text.literal("Crosshairs"),
+				b -> this.client.setScreen(new CrosshairSelectScreen(this)));
+		addSelectableChild(crosshairsButton);
+		sidebarRegion.addRow(crosshairsButton);
+
 		VeloButton modsFolderButton = new VeloButton(sidebarX, 0, SIDEBAR_WIDTH, 20, Text.literal("Open Mods Folder"),
 				b -> openInFileManager(FabricLoader.getInstance().getGameDir().resolve("mods").toFile()));
 		addSelectableChild(modsFolderButton);

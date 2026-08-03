@@ -57,6 +57,10 @@ public final class VeloPaths {
 		return ROOT.resolve("capes");
 	}
 
+	public static Path crosshairs() {
+		return ROOT.resolve("crosshairs");
+	}
+
 	public static Path logs() {
 		return ROOT.resolve("logs");
 	}
@@ -67,7 +71,7 @@ public final class VeloPaths {
 
 	/** Creates the whole directory tree if it doesn't exist yet. Safe to call repeatedly. */
 	public static void ensureDirectories() {
-		for (Path dir : new Path[] {root(), config(), profiles(), savedProfiles(), capes(), logs()}) {
+		for (Path dir : new Path[] {root(), config(), profiles(), savedProfiles(), capes(), crosshairs(), logs()}) {
 			try {
 				Files.createDirectories(dir);
 			} catch (IOException e) {

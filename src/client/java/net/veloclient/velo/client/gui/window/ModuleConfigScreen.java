@@ -126,6 +126,13 @@ public final class ModuleConfigScreen extends VeloWindow {
 			widget.setChangedListener(text.set());
 			return widget;
 		}
+		if (field instanceof ConfigField.ColorField color) {
+			Text swatch = Text.literal("●").styled(s -> s.withColor(color.get().getAsInt() | 0xFF000000));
+			Text buttonText = Text.literal(color.label() + ": ").append(swatch).append(Text.literal("  Edit"));
+			return new VeloButton(contentX(), y, contentWidth(), 20, buttonText,
+					b -> this.client.setScreen(new net.veloclient.velo.client.gui.VeloColorPickerScreen(
+							this, color.label(), color.get().getAsInt(), color.includeAlpha(), color.set()::accept)));
+		}
 		throw new IllegalStateException("Unknown ConfigField type: " + field.getClass());
 	}
 

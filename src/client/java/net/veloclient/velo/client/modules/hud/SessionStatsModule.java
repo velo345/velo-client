@@ -39,7 +39,13 @@ public final class SessionStatsModule extends AbstractModule implements HudModul
 		if (!isEnabled()) {
 			return;
 		}
+		//? if <26.1 {
 		boolean deathScreenOpen = client.currentScreen instanceof DeathScreen;
+		//?} else if <26.2 {
+		/*boolean deathScreenOpen = client.screen instanceof DeathScreen;
+		*///?} else {
+		/*boolean deathScreenOpen = client.gui.screen() instanceof DeathScreen;
+		*///?}
 		if (deathScreenOpen && !wasDeathScreenOpen) {
 			deaths++;
 		}

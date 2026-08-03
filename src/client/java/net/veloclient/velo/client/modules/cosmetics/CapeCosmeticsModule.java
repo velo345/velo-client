@@ -40,7 +40,13 @@ public final class CapeCosmeticsModule extends AbstractModule implements Configu
 			return;
 		}
 		while (OPEN_CAPE_MENU.wasPressed()) {
+			//? if <26.1 {
 			if (client.currentScreen == null) {
+			//?} else if <26.2 {
+			/*if (client.screen == null) {
+			*///?} else {
+			/*if (client.gui.screen() == null) {
+			*///?}
 				client.setScreen(new CapeEquipScreen(null));
 			}
 		}

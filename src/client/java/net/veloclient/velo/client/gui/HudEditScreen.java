@@ -58,7 +58,11 @@ public final class HudEditScreen extends Screen {
 	private List<HudModule> enabledHudModules() {
 		List<HudModule> modules = new ArrayList<>();
 		for (Module module : ModuleRegistry.all()) {
-			if (module instanceof HudModule hud && hud.isEnabled()) {
+			// width()/height() of 0 means "nothing to show right now" (e.g.
+			// the scoreboard module when the server hasn't set one) rather
+			// than a real zero-size element, so it's skipped here instead of
+			// showing an empty, meaningless draggable box.
+			if (module instanceof HudModule hud && hud.isEnabled() && hud.width() > 0 && hud.height() > 0) {
 				modules.add(hud);
 			}
 		}
@@ -93,8 +97,12 @@ public final class HudEditScreen extends Screen {
 					x, y - 12, 0xFFFFFF00);
 
 			if (hovered) {
-				int badgeX = x + w - BADGE_SIZE + 4;
-				int badgeY = y - BADGE_SIZE - 2;
+				// Inside the box's own top-right corner, not above it -
+				// sitting outside the bounding box meant the badge vanished
+				// (hovered flipped false) the moment the mouse moved off the
+				// element to actually reach it.
+				int badgeX = x + w - BADGE_SIZE - 2;
+				int badgeY = y + 2;
 				boolean badgeHovered = isInside(mouseX, mouseY, badgeX, badgeY, BADGE_SIZE, BADGE_SIZE);
 				VeloDraw.fillRounded(context, badgeX, badgeY, BADGE_SIZE, BADGE_SIZE, 2, badgeHovered ? 0xFFFF5555 : 0xAAFF5555);
 				context.drawTextWithShadow(this.textRenderer, "x", badgeX + 3, badgeY + 2, 0xFFFFFFFF);
@@ -140,8 +148,8 @@ public final class HudEditScreen extends Screen {
 			int x = hud.position().resolveX(this.width, w);
 			int y = hud.position().resolveY(this.height, h);
 
-			int badgeX = x + w - BADGE_SIZE + 4;
-			int badgeY = y - BADGE_SIZE - 2;
+			int badgeX = x + w - BADGE_SIZE - 2;
+			int badgeY = y + 2;
 			if (isInside(mouseX, mouseY, badgeX, badgeY, BADGE_SIZE, BADGE_SIZE)) {
 				hud.setEnabled(false);
 				return true;

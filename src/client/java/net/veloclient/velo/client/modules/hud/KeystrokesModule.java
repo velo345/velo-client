@@ -7,11 +7,13 @@ import net.minecraft.client.option.KeyBinding;
 import net.veloclient.velo.client.gui.widget.VeloDraw;
 import net.veloclient.velo.client.hud.HudModule;
 import net.veloclient.velo.client.hud.HudPosition;
-import net.veloclient.velo.client.theme.Theme;
-import net.veloclient.velo.client.theme.ThemeManager;
 import net.veloclient.velo.module.AbstractModule;
+import net.veloclient.velo.module.ConfigField;
+import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+
+import java.util.List;
 
 /**
  * Classic KeystrokeMod-style WASD + sneak/jump/sprint grid, reading only your
@@ -23,11 +25,16 @@ import net.veloclient.velo.module.SafetyTag;
  * in the separate {@link MouseButtonsModule} so each can be moved/scaled on
  * its own.
  */
-public final class KeystrokesModule extends AbstractModule implements HudModule {
+public final class KeystrokesModule extends AbstractModule implements HudModule, Configurable {
 
 	private static final int KEY_SIZE = 20;
 	private static final int GAP = 3;
 	private final HudPosition position = new HudPosition(0.02f, 0.53f);
+
+	private boolean showLabels = true;
+	private boolean showExtendedKeys = true;
+	private int pressedColor = 0xFFFF4444;
+	private int idleColor = 0x99101010;
 
 	public KeystrokesModule() {
 		super("keystrokes", "Keystrokes", "Shows WASD, sneak, jump and sprint key state.",
@@ -48,20 +55,24 @@ public final class KeystrokesModule extends AbstractModule implements HudModule 
 		drawKey(context, x, y + KEY_SIZE + GAP, options.leftKey);
 		drawKey(context, x + (wasdWidth - KEY_SIZE) / 2, y + KEY_SIZE + GAP, options.backKey);
 		drawKey(context, x + 2 * (KEY_SIZE + GAP), y + KEY_SIZE + GAP, options.rightKey);
-		drawKey(context, x, y + 2 * (KEY_SIZE + GAP), options.sneakKey);
-		drawKey(context, x + (wasdWidth - KEY_SIZE) / 2, y + 2 * (KEY_SIZE + GAP), options.jumpKey);
-		drawKey(context, x + 2 * (KEY_SIZE + GAP), y + 2 * (KEY_SIZE + GAP), options.sprintKey);
+		if (showExtendedKeys) {
+			drawKey(context, x, y + 2 * (KEY_SIZE + GAP), options.sneakKey);
+			drawKey(context, x + (wasdWidth - KEY_SIZE) / 2, y + 2 * (KEY_SIZE + GAP), options.jumpKey);
+			drawKey(context, x + 2 * (KEY_SIZE + GAP), y + 2 * (KEY_SIZE + GAP), options.sprintKey);
+		}
 	}
 
 	private void drawKey(DrawContext context, int x, int y, KeyBinding binding) {
-		Theme theme = ThemeManager.active();
 		MinecraftClient client = MinecraftClient.getInstance();
 		boolean pressed = binding.isPressed();
-		int background = pressed ? theme.accentStart() : (theme.surfaceWithOpacity() & 0x00FFFFFF) | 0x99000000;
+		int background = pressed ? pressedColor : idleColor;
 		VeloDraw.fillRounded(context, x, y, KEY_SIZE, KEY_SIZE, 3, background);
 
+		if (!showLabels) {
+			return;
+		}
 		String label = shortKeyLabel(binding);
-		int textColor = pressed ? 0xFFFFFFFF : theme.text();
+		int textColor = 0xFFFFFFFF;
 		int textWidth = client.textRenderer.getWidth(label);
 		float scale = textWidth > KEY_SIZE - 4 ? (KEY_SIZE - 4) / (float) textWidth : 1f;
 		int scaledWidth = Math.round(textWidth * scale);
@@ -97,6 +108,16 @@ public final class KeystrokesModule extends AbstractModule implements HudModule 
 
 	@Override
 	public int height() {
-		return 3 * (KEY_SIZE + GAP) - GAP;
+		int rows = showExtendedKeys ? 3 : 2;
+		return rows * (KEY_SIZE + GAP) - GAP;
+	}
+
+	@Override
+	public List<ConfigField> configFields() {
+		return List.of(
+				new ConfigField.ToggleField("Show Key Labels", () -> showLabels, v -> showLabels = v),
+				new ConfigField.ToggleField("Show Sneak/Jump/Sprint Row", () -> showExtendedKeys, v -> showExtendedKeys = v),
+				new ConfigField.ColorField("Pressed Color", () -> pressedColor, v -> pressedColor = v, true),
+				new ConfigField.ColorField("Idle Color", () -> idleColor, v -> idleColor = v, true));
 	}
 }

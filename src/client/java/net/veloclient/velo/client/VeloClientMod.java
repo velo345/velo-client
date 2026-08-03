@@ -20,6 +20,7 @@ import net.veloclient.velo.client.modules.hud.KeystrokesModule;
 import net.veloclient.velo.client.modules.hud.MouseButtonsModule;
 import net.veloclient.velo.client.modules.hud.PingDisplayModule;
 import net.veloclient.velo.client.modules.hud.PotionTimersModule;
+import net.veloclient.velo.client.modules.hud.ScoreboardHudModule;
 import net.veloclient.velo.client.modules.hud.SessionStatsModule;
 import net.veloclient.velo.client.modules.hud.WaypointsModule;
 import net.veloclient.velo.client.modules.performance.FovModule;
@@ -31,6 +32,7 @@ import net.veloclient.velo.client.modules.performance.OptimizationModCompatModul
 import net.veloclient.velo.client.modules.performance.ParticleLimiterModule;
 import net.veloclient.velo.client.modules.performance.PerformanceBoostModule;
 import net.veloclient.velo.client.modules.performance.PolyBlurModule;
+import net.veloclient.velo.client.modules.qol.CustomCrosshairModule;
 import net.veloclient.velo.client.modules.qol.ToggleSneakModule;
 import net.veloclient.velo.client.modules.qol.ToggleSprintModule;
 import net.veloclient.velo.client.modules.qol.ZoomModule;
@@ -78,9 +80,11 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ActionBarLogModule());
 		ModuleRegistry.register(new SessionStatsModule());
 		ModuleRegistry.register(new WaypointsModule());
+		ModuleRegistry.register(new ScoreboardHudModule());
 		ModuleRegistry.register(new ToggleSprintModule());
 		ModuleRegistry.register(new ToggleSneakModule());
 		ModuleRegistry.register(new ZoomModule());
+		ModuleRegistry.register(new CustomCrosshairModule());
 
 		// Cosmetics (section 6.5)
 		ModuleRegistry.register(new CapeCosmeticsModule());

@@ -8,9 +8,9 @@
 		"Velo Client Contributors"
 	],
 	"contact": {
-		"homepage": "https://github.com/velo-client/velo-client",
-		"sources": "https://github.com/velo-client/velo-client",
-		"issues": "https://github.com/velo-client/velo-client/issues"
+		"homepage": "https://github.com/velo345/velo-client",
+		"sources": "https://github.com/velo345/velo-client",
+		"issues": "https://github.com/velo345/velo-client/issues"
 	},
 	"license": "MIT",
 	"environment": "client",
@@ -28,7 +28,10 @@
 	"depends": {
 		"fabricloader": ">=0.19.3",
 		"fabric-api": "*",
-		"minecraft": "~1.21.11",
-		"java": ">=21"
+		"minecraft": "${minecraft_dependency}",
+		"java": ">=${java_version}"
+	},
+	"suggests": {
+		"waveycapes": "*"
 	}
 }

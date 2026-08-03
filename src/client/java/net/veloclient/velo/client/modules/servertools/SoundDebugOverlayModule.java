@@ -40,6 +40,8 @@ public final class SoundDebugOverlayModule extends AbstractModule implements Hud
 	private boolean showPlayers = true;
 	private boolean showBlocks = true;
 	private boolean showWeatherAmbient = true;
+	private boolean showNoteblocks = true;
+	private boolean showRedstone = true;
 
 	public SoundDebugOverlayModule() {
 		super("sound-debug-overlay", "Sound Radar", "Shows the direction nearby sounds are coming from on a rotating radar circle.",
@@ -70,7 +72,7 @@ public final class SoundDebugOverlayModule extends AbstractModule implements Hud
 		float playerYaw = client.player.getYaw();
 
 		List<SoundRadarTracker.Blip> visible = SoundRadarTracker.activeBlips().stream()
-				.filter(b -> categoryAllowed(b.category()))
+				.filter(this::allowed)
 				.toList();
 		if (visible.isEmpty()) {
 			// Stays fully invisible with no matching sounds nearby - a
@@ -100,11 +102,11 @@ public final class SoundDebugOverlayModule extends AbstractModule implements Hud
 			int px = centerX + (int) Math.round(Math.sin(rad) * (radius - 6));
 			int py = centerY - (int) Math.round(Math.cos(rad) * (radius - 6));
 
-			int dotColor = (categoryColor(blip.category()) & 0x00FFFFFF) | (alpha << 24);
+			int dotColor = (categoryColor(blip) & 0x00FFFFFF) | (alpha << 24);
 			VeloDraw.fillRounded(context, px - 2, py - 2, 4, 4, 2, dotColor);
 
 			if (showIcon) {
-				ItemStack icon = new ItemStack(categoryIcon(blip.category()));
+				ItemStack icon = new ItemStack(categoryIcon(blip));
 				context.getMatrices().pushMatrix();
 				context.getMatrices().translate(px + LABEL_OFFSET, py - 4);
 				context.getMatrices().scale(0.5f, 0.5f);
@@ -119,7 +121,18 @@ public final class SoundDebugOverlayModule extends AbstractModule implements Hud
 		}
 	}
 
-	private boolean categoryAllowed(SoundCategory category) {
+	// Vanilla files both noteblocks and every redstone-component sound
+	// (pistons, dispensers, comparators, levers, buttons...) under the same
+	// generic SoundCategory.BLOCKS - there's no dedicated category to filter
+	// on, so these two are detected from the sound event's own id instead.
+	private boolean allowed(SoundRadarTracker.Blip blip) {
+		if (isNoteblock(blip.soundId())) {
+			return showNoteblocks;
+		}
+		if (isRedstone(blip.soundId())) {
+			return showRedstone;
+		}
+		SoundCategory category = blip.category();
 		if (category == SoundCategory.HOSTILE) {
 			return showHostile;
 		}
@@ -138,6 +151,16 @@ public final class SoundDebugOverlayModule extends AbstractModule implements Hud
 		return true;
 	}
 
+	private static boolean isNoteblock(String soundId) {
+		return soundId.contains("note_block");
+	}
+
+	private static boolean isRedstone(String soundId) {
+		return soundId.contains("redstone") || soundId.contains("piston") || soundId.contains("dispenser")
+				|| soundId.contains("comparator") || soundId.contains("lever") || soundId.contains("button")
+				|| soundId.contains("pressure_plate");
+	}
+
 	private static double wrapDegrees(double degrees) {
 		double d = degrees % 360;
 		if (d < -180) {
@@ -149,7 +172,14 @@ public final class SoundDebugOverlayModule extends AbstractModule implements Hud
 		return d;
 	}
 
-	private static int categoryColor(SoundCategory category) {
+	private static int categoryColor(SoundRadarTracker.Blip blip) {
+		if (isNoteblock(blip.soundId())) {
+			return 0xFFFFAA00;
+		}
+		if (isRedstone(blip.soundId())) {
+			return 0xFFFF4433;
+		}
+		SoundCategory category = blip.category();
 		if (category == SoundCategory.HOSTILE) {
 			return 0xFFFF5555;
 		}
@@ -165,7 +195,14 @@ public final class SoundDebugOverlayModule extends AbstractModule implements Hud
 		return 0xFFCCCCCC;
 	}
 
-	private static Item categoryIcon(SoundCategory category) {
+	private static Item categoryIcon(SoundRadarTracker.Blip blip) {
+		if (isNoteblock(blip.soundId())) {
+			return Items.NOTE_BLOCK;
+		}
+		if (isRedstone(blip.soundId())) {
+			return Items.REDSTONE;
+		}
+		SoundCategory category = blip.category();
 		if (category == SoundCategory.HOSTILE) {
 			return Items.ZOMBIE_SPAWN_EGG;
 		}
@@ -210,6 +247,8 @@ public final class SoundDebugOverlayModule extends AbstractModule implements Hud
 				new ConfigField.ToggleField("Show Neutral Mobs", () -> showNeutral, v -> showNeutral = v),
 				new ConfigField.ToggleField("Show Players", () -> showPlayers, v -> showPlayers = v),
 				new ConfigField.ToggleField("Show Blocks", () -> showBlocks, v -> showBlocks = v),
-				new ConfigField.ToggleField("Show Weather/Ambient", () -> showWeatherAmbient, v -> showWeatherAmbient = v));
+				new ConfigField.ToggleField("Show Weather/Ambient", () -> showWeatherAmbient, v -> showWeatherAmbient = v),
+				new ConfigField.ToggleField("Show Noteblocks", () -> showNoteblocks, v -> showNoteblocks = v),
+				new ConfigField.ToggleField("Show Redstone", () -> showRedstone, v -> showRedstone = v));
 	}
 }

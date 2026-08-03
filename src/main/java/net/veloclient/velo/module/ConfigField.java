@@ -6,6 +6,7 @@ import java.util.function.DoubleConsumer;
 import java.util.function.DoubleFunction;
 import java.util.function.DoubleSupplier;
 import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
 /** One adjustable setting a {@link Configurable} module exposes to the per-module config screen. */
@@ -36,5 +37,9 @@ public sealed interface ConfigField {
 
 	/** A dropdown/cycle choice between a small fixed set of named presets. */
 	record ChoiceField(String label, java.util.List<String> options, Supplier<String> get, Consumer<String> set) implements ConfigField {
+	}
+
+	/** A packed ARGB color (0xAARRGGBB), edited via a real HSV picker rather than raw component sliders. */
+	record ColorField(String label, IntSupplier get, IntConsumer set, boolean includeAlpha) implements ConfigField {
 	}
 }

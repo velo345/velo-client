@@ -28,6 +28,7 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 	};
 	private static final int ICON_SIZE = 16;
 	private static final int ROW_GAP = 3;
+	private static final int ICON_BAR_GAP = 2;
 
 	private final HudPosition position = new HudPosition(0.02f, 0.17f);
 	private boolean showIcon = true;
@@ -36,6 +37,12 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 	private int barWidth = 60;
 	private int barHeight = 3;
 	private float textScale = 1.0f;
+	// Default layout: bar sits below its armor icon (inventory-style stacked
+	// rows read awkwardly wide when everything's crammed onto one line) -
+	// the text position relative to the bar is still configurable since
+	// "below" doesn't imply a side.
+	private boolean barBelowIcon = true;
+	private boolean textOnLeft = false;
 
 	public ArmorDurabilityModule() {
 		super("armor-durability", "Armor & Durability", "Shows each equipped armor piece's durability, inventory-style.",
@@ -54,43 +61,49 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 			return;
 		}
 		int rowHeight = rowHeight();
+		int lineCenterYOffset = lineCenterYOffset();
+		int lineXOffset = lineXOffset();
 		int rowY = y;
 		for (EquipmentSlot slot : SLOTS) {
 			ItemStack stack = client.player.getEquippedStack(slot);
 			if (stack.isEmpty()) {
 				continue;
 			}
-			int cursorX = x;
-			int centerY = rowY + rowHeight / 2;
 			if (showIcon) {
 				context.getMatrices().pushMatrix();
-				context.getMatrices().translate(cursorX, centerY - ICON_SIZE / 2f);
+				context.getMatrices().translate(x, rowY);
 				context.drawItemWithoutEntity(stack, 0, 0);
 				context.getMatrices().popMatrix();
-				cursorX += ICON_SIZE + 5;
 			}
+			int lineX = x + lineXOffset;
+			int centerY = rowY + lineCenterYOffset;
 			if (stack.isDamageable()) {
 				int maxDamage = stack.getMaxDamage();
 				int remaining = maxDamage - stack.getDamage();
 				float fraction = maxDamage > 0 ? (float) remaining / maxDamage : 1f;
 				int color = durabilityColor(fraction);
 				if (showBar) {
+					String barText = remaining + "/" + maxDamage;
+					int barX = lineX;
+					if (showText && textOnLeft) {
+						drawScaledText(context, client, barText, lineX, centerY, 0xFFFFFFFF);
+						barX = lineX + scaledTextWidth(client, barText) + 4;
+					}
 					int barY = centerY - barHeight / 2;
-					VeloDraw.fillRounded(context, cursorX, barY, barWidth, barHeight, Math.min(1, barHeight / 2), 0x66000000);
+					VeloDraw.fillRounded(context, barX, barY, barWidth, barHeight, Math.min(1, barHeight / 2), 0x66000000);
 					int filled = Math.round(barWidth * fraction);
 					if (filled > 0) {
-						VeloDraw.fillRounded(context, cursorX, barY, filled, barHeight, Math.min(1, barHeight / 2), color);
+						VeloDraw.fillRounded(context, barX, barY, filled, barHeight, Math.min(1, barHeight / 2), color);
 					}
-					if (showText) {
-						String text = remaining + "/" + maxDamage;
-						drawScaledText(context, client, text, cursorX + barWidth + 4, centerY, 0xFFFFFFFF);
+					if (showText && !textOnLeft) {
+						drawScaledText(context, client, barText, barX + barWidth + 4, centerY, 0xFFFFFFFF);
 					}
 				} else if (showText) {
 					String text = stack.getName().getString() + ": " + remaining + "/" + maxDamage;
-					drawScaledText(context, client, text, cursorX, centerY, color);
+					drawScaledText(context, client, text, lineX, centerY, color);
 				}
 			} else if (showText) {
-				drawScaledText(context, client, stack.getName().getString(), cursorX, centerY, 0xFFFFFFFF);
+				drawScaledText(context, client, stack.getName().getString(), lineX, centerY, 0xFFFFFFFF);
 			}
 			rowY += rowHeight + ROW_GAP;
 		}
@@ -116,27 +129,62 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 		context.getMatrices().popMatrix();
 	}
 
+	private int scaledTextWidth(MinecraftClient client, String text) {
+		return Math.round(client.textRenderer.getWidth(text) * textScale);
+	}
+
 	private int textLineHeight() {
 		return Math.round(MinecraftClient.getInstance().textRenderer.fontHeight * textScale);
 	}
 
+	/** Height of the bar+text line alone, independent of the icon. */
+	private int barTextRowHeight() {
+		int h = 0;
+		if (showBar) {
+			h = Math.max(h, barHeight);
+		}
+		if (showText) {
+			h = Math.max(h, textLineHeight());
+		}
+		return h;
+	}
+
 	private int rowHeight() {
-		int textHeight = textLineHeight();
-		int contentHeight = showIcon ? ICON_SIZE : (showBar ? barHeight : textHeight);
-		return Math.max(contentHeight, textHeight);
+		int iconRowHeight = showIcon ? ICON_SIZE : 0;
+		int barTextHeight = barTextRowHeight();
+		if (barBelowIcon) {
+			int gap = showIcon && (showBar || showText) ? ICON_BAR_GAP : 0;
+			return iconRowHeight + gap + barTextHeight;
+		}
+		return Math.max(iconRowHeight, barTextHeight);
+	}
+
+	/** Vertical offset from the row's top to the center of the bar/text line. */
+	private int lineCenterYOffset() {
+		int barTextHeight = barTextRowHeight();
+		if (barBelowIcon) {
+			int iconRowHeight = showIcon ? ICON_SIZE : 0;
+			int gap = showIcon && (showBar || showText) ? ICON_BAR_GAP : 0;
+			return iconRowHeight + gap + barTextHeight / 2;
+		}
+		return rowHeight() / 2;
+	}
+
+	/** Horizontal offset from the row's left edge to the bar/text line - only nonzero when the icon sits beside it, not above it. */
+	private int lineXOffset() {
+		return !barBelowIcon && showIcon ? ICON_SIZE + 5 : 0;
 	}
 
 	@Override
 	public int width() {
-		int w = 0;
-		if (showIcon) {
-			w += ICON_SIZE + 5;
-		}
-		w += showBar ? barWidth : 90;
+		int barLineWidth = showBar ? barWidth : (showText ? 90 : 0);
 		if (showBar && showText) {
-			w += 44;
+			barLineWidth += 44;
 		}
-		return w;
+		if (barBelowIcon) {
+			return Math.max(showIcon ? ICON_SIZE : 0, barLineWidth);
+		}
+		return (showIcon ? ICON_SIZE + 5 : 0) + barLineWidth;
 	}
 
 	@Override
@@ -153,6 +201,9 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 				new ConfigField.ToggleField("Show Text", () -> showText, v -> showText = v),
 				new ConfigField.SliderField("Bar Width", 20, 120, () -> barWidth, v -> barWidth = (int) v, v -> String.valueOf((int) v)),
 				new ConfigField.SliderField("Bar Height", 2, 10, () -> barHeight, v -> barHeight = (int) v, v -> String.valueOf((int) v)),
-				new ConfigField.SliderField("Text Size", 0.5, 2.0, () -> textScale, v -> textScale = (float) v, v -> Math.round(v * 100) + "%"));
+				new ConfigField.SliderField("Text Size", 0.5, 2.0, () -> textScale, v -> textScale = (float) v, v -> Math.round(v * 100) + "%"),
+				new ConfigField.ToggleField("Bar Below Icon", () -> barBelowIcon, v -> barBelowIcon = v),
+				new ConfigField.ChoiceField("Text Side", java.util.List.of("Right", "Left"),
+						() -> textOnLeft ? "Left" : "Right", v -> textOnLeft = v.equals("Left")));
 	}
 }

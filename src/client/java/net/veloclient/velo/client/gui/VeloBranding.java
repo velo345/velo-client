@@ -2,10 +2,11 @@ package net.veloclient.velo.client.gui;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.GameMenuScreen;
 import net.minecraft.client.gui.screen.TitleScreen;
-import net.veloclient.velo.client.gui.widget.VeloDraw;
+import net.minecraft.util.Identifier;
 import net.veloclient.velo.client.theme.Theme;
 import net.veloclient.velo.client.theme.ThemeManager;
 
@@ -16,6 +17,13 @@ import net.veloclient.velo.client.theme.ThemeManager;
  * vanilla's own layout/buttons/mod-compatibility aren't touched.
  */
 public final class VeloBranding {
+
+	private static final Identifier LOGO_TEXTURE = Identifier.of("velo-client", "textures/icon/logo.png");
+	// The source PNG is 500x500 - drawTexture's regionWidth/regionHeight
+	// must be set to that, not the on-screen draw size, or scaling it down
+	// samples UV coordinates the same wrong way the crosshair icons did
+	// before that bug was fixed (see CustomCrosshairModule/VeloCrosshairTile).
+	private static final int LOGO_SOURCE_SIZE = 500;
 
 	private static final String VERSION = FabricLoader.getInstance()
 			.getModContainer("velo-client")
@@ -37,14 +45,13 @@ public final class VeloBranding {
 		Theme theme = ThemeManager.active();
 		int x = 8;
 		int y = 8;
-		int iconSize = 14;
+		int iconSize = 16;
 
-		VeloDraw.fillRounded(context, x, y, iconSize, iconSize, 3, theme.accentStart());
+		context.drawTexture(RenderPipelines.GUI_TEXTURED, LOGO_TEXTURE, x, y, 0f, 0f,
+				iconSize, iconSize, LOGO_SOURCE_SIZE, LOGO_SOURCE_SIZE, LOGO_SOURCE_SIZE, LOGO_SOURCE_SIZE);
+
 		var textRenderer = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
-		context.drawTextWithShadow(textRenderer, "V", x + (iconSize - textRenderer.getWidth("V")) / 2,
-				y + (iconSize - textRenderer.fontHeight) / 2, 0xFFFFFFFF);
-
-		String label = "VELO CLIENT  v" + VERSION;
+		String label = "Velo Client " + VERSION;
 		context.drawTextWithShadow(textRenderer, label, x + iconSize + 6, y + (iconSize - textRenderer.fontHeight) / 2, theme.text());
 	}
 }

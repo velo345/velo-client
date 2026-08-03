@@ -41,7 +41,13 @@ public final class ClientLogViewerModule extends AbstractModule implements Confi
 			return;
 		}
 		while (OPEN_LOG_VIEWER.wasPressed()) {
+			//? if <26.1 {
 			if (client.currentScreen == null) {
+			//?} else if <26.2 {
+			/*if (client.screen == null) {
+			*///?} else {
+			/*if (client.gui.screen() == null) {
+			*///?}
 				client.setScreen(new LogViewerScreen(null));
 			}
 		}

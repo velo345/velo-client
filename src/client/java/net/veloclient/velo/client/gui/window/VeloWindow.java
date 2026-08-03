@@ -102,7 +102,13 @@ public abstract class VeloWindow extends Screen {
 			if (onClosed != null) {
 				onClosed.run();
 			}
+			//? if <26.1 {
 			if (this.client.currentScreen == this) {
+			//?} else if <26.2 {
+			/*if (this.minecraft.screen == this) {
+			*///?} else {
+			/*if (this.minecraft.gui.screen() == this) {
+			*///?}
 				this.client.setScreen(returnScreen);
 			}
 			return;

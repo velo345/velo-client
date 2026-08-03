@@ -218,17 +218,37 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	 */
 	private static void refreshRendering() {
 		MinecraftClient client = MinecraftClient.getInstance();
+		//? if <26.1 {
 		if (client.worldRenderer != null) {
 			client.worldRenderer.scheduleTerrainUpdate();
 		}
+		//?} else if <26.2 {
+		/*if (client.levelRenderer != null) {
+			client.levelRenderer.needsUpdate();
+		}
+		*///?} else {
+		/*if (client.levelExtractor != null) {
+			client.levelExtractor.allChanged();
+		}
+		*///?}
 	}
 
 	/** Mipmap levels change the texture atlas itself, not just how it's rendered - that needs the heavier full reload, not just a terrain re-queue. */
 	private static void reloadRendering() {
 		MinecraftClient client = MinecraftClient.getInstance();
+		//? if <26.1 {
 		if (client.worldRenderer != null) {
 			client.worldRenderer.reload();
 		}
+		//?} else if <26.2 {
+		/*if (client.levelRenderer != null) {
+			client.levelRenderer.allChanged();
+		}
+		*///?} else {
+		/*if (client.levelExtractor != null) {
+			client.levelExtractor.allChanged();
+		}
+		*///?}
 	}
 
 	/**

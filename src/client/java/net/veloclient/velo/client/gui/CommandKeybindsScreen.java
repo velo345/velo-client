@@ -34,6 +34,7 @@ public final class CommandKeybindsScreen extends VeloWindow {
 	private int selectedIndex = -1;
 	private int pendingKeyCode = GLFW.GLFW_KEY_UNKNOWN;
 	private boolean listeningForKey;
+	private int commandLabelY;
 
 	public CommandKeybindsScreen(Screen parent) {
 		super(Text.literal("Command Keybinds"), 360, 400);
@@ -52,9 +53,13 @@ public final class CommandKeybindsScreen extends VeloWindow {
 		int addSaveY = doneY - 24 - 16;
 		int keyY = addSaveY - 24;
 		int commandY = keyY - 24;
+		this.commandLabelY = commandY - 11;
 
 		int y = contentY();
-		int listHeight = Math.max(40, commandY - 8 - y);
+		// Extra headroom above the command box for the "what to type here"
+		// label drawn in render() - it was easy to mistake for decorative
+		// static text rather than an actual input field before this.
+		int listHeight = Math.max(40, commandY - 20 - y);
 		scrollRegion = new VeloScrollRegion(contentX(), y, contentWidth(), listHeight);
 		for (int i = 0; i < entries.size(); i++) {
 			CommandKeybindEntry entry = entries.get(i);
@@ -73,7 +78,11 @@ public final class CommandKeybindsScreen extends VeloWindow {
 
 		commandBox = new TextFieldWidget(this.textRenderer, contentX(), commandY, contentWidth(), 18, Text.literal("Command"));
 		commandBox.setPlaceholder(Text.literal("/spawn"));
-		commandBox.setDrawsBackground(false);
+		// Unlike the borderless name fields elsewhere in this mod's menus,
+		// this one keeps its background/border so it visibly reads as a real
+		// text input rather than blending into the panel - it's easy to
+		// mistake for a static label otherwise.
+		commandBox.setDrawsBackground(true);
 		if (selectedIndex >= 0 && selectedIndex < entries.size()) {
 			commandBox.setText(entries.get(selectedIndex).command());
 		}
@@ -171,6 +180,7 @@ public final class CommandKeybindsScreen extends VeloWindow {
 			scrollRegion.renderScrollbar(context, ROW_HEIGHT, 2);
 		}
 		Theme theme = ThemeManager.active();
+		context.drawTextWithShadow(this.textRenderer, "Command to run (e.g. /spawn):", contentX(), commandLabelY, theme.text());
 		// Sits in the 16px gap reserved above Done in layoutContent().
 		context.drawTextWithShadow(this.textRenderer, status, contentX(), contentBottom() - 30, theme.text());
 	}
