@@ -134,13 +134,31 @@ tasks.register("jpackageDist") {
 		// jpackage binary explicitly rather than "jpackage" off PATH, since a
 		// machine can have several JDKs installed with PATH pointing elsewhere
 		// (that's the case on the box this was developed on).
-		String jpackageBin = new File(new File(System.getProperty("java.home"), "bin"), isWindows ? "jpackage.exe" : "jpackage").absolutePath
+		File javaHomeDir = new File(System.getProperty("java.home"))
+		String jpackageBin = new File(new File(javaHomeDir, "bin"), isWindows ? "jpackage.exe" : "jpackage").absolutePath
 
-		List<String> command = [
+		// Two stages, not one straight-to-installer jpackage call:
+		//
+		// jpackage's default --jlink-options strip every native command-line
+		// tool, including "java" itself, from the bundled runtime (fine for
+		// the app itself - its native launcher stub doesn't need bin/java -
+		// but GameLauncher needs a real "java" binary to start Minecraft as a
+		// child process). Overriding --jlink-options to keep ALL of them
+		// (javac/javadoc/jshell/keytool/...) got the exe past that, but broke
+		// the Windows installer outright (crashed immediately on launch,
+		// before this was narrowed down further) - so instead: build the
+		// app-image with jpackage's untouched defaults (the exact composition
+		// that was already known to install fine), patch in only the one
+		// binary actually needed, then package *that* into the installer.
+		def appImageDir = layout.buildDirectory.dir("jpackage-appimage").get().asFile
+		appImageDir.deleteDir()
+		appImageDir.mkdirs()
+
+		runJpackage([
 				jpackageBin,
-				"--type", installerType,
+				"--type", "app-image",
 				"--input", staging.absolutePath,
-				"--dest", dist.absolutePath,
+				"--dest", appImageDir.absolutePath,
 				"--name", "Velo Client Launcher",
 				"--app-version", launcherAppVersion,
 				"--vendor", "Velo Client",
@@ -155,37 +173,55 @@ tasks.register("jpackageDist") {
 				// wherever it puts --input's contents (where the javafx-*.jar
 				// files already are), not a literal env var.
 				"--java-options", "--module-path=\$APPDIR",
-				"--java-options", "--add-modules=javafx.controls,javafx.graphics",
-				// jpackage's own default --jlink-options include
-				// --strip-native-commands, which deletes bin/java (and every
-				// other CLI launcher) from the bundled runtime - fine for the
-				// app itself (its native launcher stub doesn't need bin/java),
-				// but GameLauncher needs a real "java" binary to start
-				// Minecraft as a child process. Overriding with our own list
-				// (everything except that flag) keeps bin/java present.
-				"--jlink-options", "--strip-debug --no-header-files --no-man-pages"
+				"--java-options", "--add-modules=javafx.controls,javafx.graphics"
+		])
+
+		File appImageRoot = new File(appImageDir, "Velo Client Launcher")
+		File runtimeBinDir = isMac
+				? new File(appImageRoot, "Contents/runtime/Contents/Home/bin")
+				: (isWindows ? new File(appImageRoot, "runtime/bin") : new File(appImageRoot, "lib/runtime/bin"))
+		runtimeBinDir.mkdirs()
+		File sourceJavaBinary = new File(new File(javaHomeDir, "bin"), isWindows ? "java.exe" : "java")
+		new File(runtimeBinDir, sourceJavaBinary.name).bytes = sourceJavaBinary.bytes
+		if (!isWindows) {
+			new File(runtimeBinDir, sourceJavaBinary.name).setExecutable(true)
+		}
+
+		List<String> command = [
+				jpackageBin,
+				"--type", installerType,
+				"--app-image", appImageRoot.absolutePath,
+				"--dest", dist.absolutePath,
+				"--name", "Velo Client Launcher",
+				"--app-version", launcherAppVersion,
+				"--vendor", "Velo Client",
+				"--description", "Launch Minecraft with your Velo Client mod profiles"
 		]
 		if (isWindows) {
 			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser"]
 		} else if (!isMac) {
 			command += ["--linux-shortcut"]
 		}
-		// Plain ProcessBuilder rather than Gradle's own exec APIs - Project.exec()
-		// was removed in Gradle 9 and its replacement (injected ExecOperations)
-		// needs a proper task class to receive via constructor injection, which
-		// is more ceremony than this ad-hoc task warrants.
-		//
-		// Deliberately not inheritIO(): with the Gradle daemon (the default),
-		// "inherited" file descriptors are the daemon's own, not this build
-		// invocation's console, so a failing jpackage's actual error message
-		// never reaches the terminal at all - capture and print it explicitly
-		// instead, and fold it into the exception so it survives even -q.
-		Process process = new ProcessBuilder(command).redirectErrorStream(true).start()
-		String output = process.inputStream.getText("UTF-8")
-		int exitCode = process.waitFor()
-		println(output)
-		if (exitCode != 0) {
-			throw new GradleException("jpackage exited with code ${exitCode}:\n${output}")
-		}
+		runJpackage(command)
+	}
+}
+
+// Plain ProcessBuilder rather than Gradle's own exec APIs - Project.exec()
+// was removed in Gradle 9 and its replacement (injected ExecOperations) needs
+// a proper task class to receive via constructor injection, which is more
+// ceremony than this ad-hoc task warrants.
+//
+// Deliberately not inheritIO(): with the Gradle daemon (the default),
+// "inherited" file descriptors are the daemon's own, not this build
+// invocation's console, so a failing jpackage's actual error message never
+// reaches the terminal at all - capture and print it explicitly instead, and
+// fold it into the exception so it survives even -q.
+void runJpackage(List<String> command) {
+	Process process = new ProcessBuilder(command).redirectErrorStream(true).start()
+	String output = process.inputStream.getText("UTF-8")
+	int exitCode = process.waitFor()
+	println(output)
+	if (exitCode != 0) {
+		throw new GradleException("jpackage exited with code ${exitCode}:\n${output}")
 	}
 }
