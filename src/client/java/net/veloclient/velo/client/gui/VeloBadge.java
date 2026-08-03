@@ -77,7 +77,23 @@ public final class VeloBadge {
 				SIZE, SIZE, LOGO_SOURCE_SIZE, LOGO_SOURCE_SIZE, LOGO_SOURCE_SIZE, LOGO_SOURCE_SIZE);
 	}
 
-	/** Prepends the badge glyph (custom bitmap font, see class doc) to a chat line. */
+	/**
+	 * Prepends the badge glyph (custom bitmap font, see class doc) to a chat
+	 * line or nametag.
+	 *
+	 * <p>The glyph and {@code original} are added as two independent
+	 * children of a neutral empty root, NOT as {@code glyph.append(original)}
+	 * directly - Minecraft's real text style resolution has the badge's
+	 * custom-font style cascade down into any component nested inside it
+	 * (the same mechanism that makes {@code Text.literal("a").formatted(RED)
+	 * .append("b")} render "b" in red too), and the badge font has no glyphs
+	 * defined for anything but the one private-use character - so
+	 * {@code original} inherited it and rendered as unreadable
+	 * missing-glyph boxes for every real letter. As two siblings under a
+	 * plain, unstyled root instead of one being the other's ancestor, only
+	 * the glyph itself resolves the custom font - {@code original} falls
+	 * through to the normal default one, untouched.
+	 */
 	public static Text prefixWithBadge(Text original) {
 		Identifier fontId = Identifier.of("velo-client", "badge");
 		//? if <26.1 {
@@ -85,7 +101,9 @@ public final class VeloBadge {
 		//?} else {
 		/*Style badgeStyle = Style.EMPTY.withFont(new net.minecraft.network.chat.FontDescription.Resource(fontId));
 		*///?}
-		MutableText prefix = Text.literal(GLYPH).setStyle(badgeStyle);
-		return prefix.append(original);
+		MutableText result = Text.empty();
+		result.append(Text.literal(GLYPH).setStyle(badgeStyle));
+		result.append(original);
+		return result;
 	}
 }
