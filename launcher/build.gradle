@@ -85,3 +85,89 @@ tasks.named("processResources") {
 tasks.named("run") {
 	notCompatibleWithConfigurationCache("org.openjfx.javafxplugin wires the module path via Task.extensions at execution time")
 }
+
+// Packages this app as a single native installer file for whoever's running
+// this task's OS, via the JDK's own jpackage tool - no separate Java install
+// needed by whoever downloads the result, since jpackage bundles a private
+// copy of the JDK that ran it. jpackage cannot cross-compile (a Windows
+// installer can only be built by running this ON Windows, etc.) - see
+// .github/workflows/package-launcher.yml, which runs this task on a
+// windows-latest/macos-latest/ubuntu-latest matrix to produce all three.
+def launcherAppVersion = "0.2.0"
+
+tasks.register("jpackageDist") {
+	group = "distribution"
+	description = "Builds a native installer for this OS (exe/msi on Windows, dmg on macOS, deb on Linux) via jpackage."
+	notCompatibleWithConfigurationCache("Uses project.copy/project.exec at execution time to stage inputs and invoke jpackage")
+	dependsOn(tasks.named("jar"))
+
+	def stagingDir = layout.buildDirectory.dir("jpackage-input")
+	def distDir = layout.buildDirectory.dir("jpackage-dist")
+	def runtimeClasspath = configurations.runtimeClasspath
+	def jarFile = tasks.named("jar").flatMap { it.archiveFile }
+	def rootDir = rootProject.projectDir
+
+	inputs.files(runtimeClasspath)
+	inputs.file(jarFile)
+	outputs.dir(distDir)
+
+	doLast {
+		def staging = stagingDir.get().asFile
+		staging.deleteDir()
+		staging.mkdirs()
+		project.copy {
+			from(runtimeClasspath)
+			from(jarFile)
+			into(staging)
+		}
+
+		def dist = distDir.get().asFile
+		dist.deleteDir()
+		dist.mkdirs()
+
+		String osName = System.getProperty("os.name").toLowerCase(Locale.ROOT)
+		boolean isWindows = osName.contains("win")
+		boolean isMac = osName.contains("mac")
+		String installerType = isWindows ? "exe" : (isMac ? "dmg" : "deb")
+		File iconFile = isWindows ? new File(rootDir, "Logo.ico") : (isMac ? new File(rootDir, "Logo.icns") : new File(rootDir, "Logo.png"))
+		// jpackage bundles whatever JDK is running it - use that same JDK's own
+		// jpackage binary explicitly rather than "jpackage" off PATH, since a
+		// machine can have several JDKs installed with PATH pointing elsewhere
+		// (that's the case on the box this was developed on).
+		String jpackageBin = new File(new File(System.getProperty("java.home"), "bin"), isWindows ? "jpackage.exe" : "jpackage").absolutePath
+
+		List<String> command = [
+				jpackageBin,
+				"--type", installerType,
+				"--input", staging.absolutePath,
+				"--dest", dist.absolutePath,
+				"--name", "Velo Client Launcher",
+				"--app-version", launcherAppVersion,
+				"--vendor", "Velo Client",
+				"--description", "Launch Minecraft with your Velo Client mod profiles",
+				"--main-jar", jarFile.get().asFile.name,
+				"--main-class", "net.veloclient.launcher.LauncherApp",
+				"--icon", iconFile.absolutePath,
+				// The app runs off the classpath (--main-jar/--main-class, no
+				// module-info), but JavaFX's own launch check still requires
+				// javafx.controls/javafx.graphics to be resolvable as modules -
+				// $APPDIR is a jpackage placeholder resolved at install time to
+				// wherever it puts --input's contents (where the javafx-*.jar
+				// files already are), not a literal env var.
+				"--java-options", "--module-path=\$APPDIR",
+				"--java-options", "--add-modules=javafx.controls,javafx.graphics"
+		]
+		if (isWindows) {
+			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser"]
+		}
+		// Plain ProcessBuilder rather than Gradle's own exec APIs - Project.exec()
+		// was removed in Gradle 9 and its replacement (injected ExecOperations)
+		// needs a proper task class to receive via constructor injection, which
+		// is more ceremony than this ad-hoc task warrants.
+		Process process = new ProcessBuilder(command).inheritIO().start()
+		int exitCode = process.waitFor()
+		if (exitCode != 0) {
+			throw new GradleException("jpackage exited with code ${exitCode}")
+		}
+	}
+}

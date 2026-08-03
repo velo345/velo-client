@@ -1,0 +1,64 @@
+name: Package Launcher
+
+# Builds a single native installer for the Velo Client Launcher on each OS via
+# jpackage (see launcher/build.gradle's jpackageDist task) - jpackage can't
+# cross-compile, so this has to run on a real instance of each target OS
+# rather than all from one machine. Triggered manually (to build/inspect
+# without cutting a release) or on a version tag push (also uploads the
+# results straight onto that tag's GitHub release).
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset-glob: launcher/build/jpackage-dist/*.deb
+          - os: windows-latest
+            asset-glob: launcher/build/jpackage-dist/*.exe
+          - os: macos-latest
+            asset-glob: launcher/build/jpackage-dist/*.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: "25"
+
+      # jpackage's --type exe needs WiX v3's candle.exe/light.exe, which
+      # windows-latest runners don't ship with by default.
+      - name: Install WiX Toolset
+        if: runner.os == 'Windows'
+        run: choco install wixtoolset -y
+
+      - name: Build mod jars (all 3 supported Minecraft versions)
+        shell: bash
+        run: ./gradlew :1.21.11:build :26.1:build :26.2:build -q
+
+      - name: Build launcher installer
+        shell: bash
+        run: ./gradlew :launcher:jpackageDist -q
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: velo-client-launcher-${{ matrix.os }}
+          path: ${{ matrix.asset-glob }}
+          if-no-files-found: error
+
+      - name: Attach to the tag's release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release upload "${{ github.ref_name }}" ${{ matrix.asset-glob }} --clobber
