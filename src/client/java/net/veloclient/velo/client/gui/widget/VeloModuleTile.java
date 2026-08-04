@@ -1,14 +1,15 @@
 package net.veloclient.velo.client.gui.widget;
 
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.client.gui.screen.narration.NarrationPart;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.item.ItemStack;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import net.veloclient.velo.client.theme.Theme;
 import net.veloclient.velo.client.theme.ThemeManager;
 import net.veloclient.velo.module.Module;
@@ -34,7 +35,8 @@ public final class VeloModuleTile extends ClickableWidget {
 	private float hoverProgress;
 	private float knobProgress = -1;
 	private long lastNanos = -1;
-	private final ItemStack iconStack;
+	private final Identifier iconTexture;
+	private static final int ICON_SOURCE_SIZE = 1024;
 	private final long spawnNanos = System.nanoTime();
 
 	public VeloModuleTile(int x, int y, int size, Module module, Runnable onOpenSettings) {
@@ -43,7 +45,7 @@ public final class VeloModuleTile extends ClickableWidget {
 		this.onOpenSettings = onOpenSettings;
 		this.getter = module::isEnabled;
 		this.setter = module::setEnabled;
-		this.iconStack = ModuleIcons.stackFor(module.id());
+		this.iconTexture = ModuleIcons.textureFor(module.id());
 	}
 
 	private int iconAreaHeight() {
@@ -101,7 +103,9 @@ public final class VeloModuleTile extends ClickableWidget {
 		context.getMatrices().pushMatrix();
 		context.getMatrices().translate(iconCenterX, iconCenterY);
 		context.getMatrices().scale(iconScale, iconScale);
-		context.drawItemWithoutEntity(iconStack, -8, -8);
+		int iconTint = enabled ? (0xFF000000 | (theme.text() & 0xFFFFFF)) : 0xAAFFFFFF;
+		context.drawTexture(RenderPipelines.GUI_TEXTURED, iconTexture, -8, -8, 0f, 0f, 16, 16,
+				ICON_SOURCE_SIZE, ICON_SOURCE_SIZE, ICON_SOURCE_SIZE, ICON_SOURCE_SIZE, iconTint);
 		context.getMatrices().popMatrix();
 		if (!enabled) {
 			VeloDraw.fillRounded(context, getX() + 3, getY() + 3, getWidth() - 6, iconHeight - 15, 4, 0x77000000);

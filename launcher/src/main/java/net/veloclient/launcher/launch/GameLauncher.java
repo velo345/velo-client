@@ -3,6 +3,7 @@ package net.veloclient.launcher.launch;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import net.veloclient.launcher.AppVersion;
 import net.veloclient.launcher.auth.MinecraftSession;
 import net.veloclient.launcher.instance.Instance;
 import net.veloclient.launcher.instance.InstancePaths;
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -31,14 +33,18 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class GameLauncher {
 
 	private static final String LAUNCHER_NAME = "velo-client-launcher";
-	private static final String LAUNCHER_VERSION = "0.1.0";
-	private static final String DEFAULT_MAX_MEMORY_MB = "4096";
-	private static final String DEFAULT_MIN_MEMORY_MB = "1024";
+	private static final int DEFAULT_MAX_MEMORY_MB = 4096;
+	private static final int DEFAULT_MIN_MEMORY_MB = 1024;
 
 	private GameLauncher() {
 	}
 
 	public static Process launch(Instance instance, MinecraftSession session, LaunchProgressListener listener) throws IOException {
+		return launch(instance, session, listener, null);
+	}
+
+	/** @param quickPlayServerAddress nullable "host:port" - when present, launches straight into that server via Mojang's Quick Play Multiplayer feature instead of to the title screen. */
+	public static Process launch(Instance instance, MinecraftSession session, LaunchProgressListener listener, String quickPlayServerAddress) throws IOException {
 		GameVersion version = GameVersion.byId(instance.mcVersion());
 		GameDataPaths.ensureDirectories(version.id());
 		InstancePaths.ensureDirectories(instance.id());
@@ -81,7 +87,7 @@ public final class GameLauncher {
 		listener.onProgress(1.0);
 
 		listener.onPhase("Starting Minecraft...");
-		return startProcess(instance, version, vanilla, fabric, libraries, clientJar, nativesDir, session);
+		return startProcess(instance, version, vanilla, fabric, libraries, clientJar, nativesDir, session, quickPlayServerAddress);
 	}
 
 	private static void downloadLibraries(List<LibraryResolver.ResolvedLibrary> libraries, LaunchProgressListener listener) throws IOException {
@@ -111,7 +117,8 @@ public final class GameLauncher {
 	}
 
 	private static Process startProcess(Instance instance, GameVersion version, JsonObject vanilla, JsonObject fabric,
-			List<LibraryResolver.ResolvedLibrary> libraries, Path clientJar, Path nativesDir, MinecraftSession session) throws IOException {
+			List<LibraryResolver.ResolvedLibrary> libraries, Path clientJar, Path nativesDir, MinecraftSession session,
+			String quickPlayServerAddress) throws IOException {
 		String classpath = buildClasspath(libraries, clientJar);
 		String mainClass = fabric.get("mainClass").getAsString();
 		Path gameDir = InstancePaths.gameDir(instance.id());
@@ -130,21 +137,34 @@ public final class GameLauncher {
 		values.put("version_type", vanilla.has("type") ? vanilla.get("type").getAsString() : "release");
 		values.put("natives_directory", nativesDir.toAbsolutePath().toString());
 		values.put("launcher_name", LAUNCHER_NAME);
-		values.put("launcher_version", LAUNCHER_VERSION);
+		values.put("launcher_version", AppVersion.VERSION);
 		values.put("classpath", classpath);
+		Set<String> activeFeatures = Set.of();
+		if (quickPlayServerAddress != null && !quickPlayServerAddress.isBlank()) {
+			values.put("quickPlayMultiplayer", quickPlayServerAddress);
+			activeFeatures = Set.of("is_quick_play_multiplayer");
+		}
+
+		int maxMemoryMb = instance.ramMaxMb() != null ? instance.ramMaxMb() : DEFAULT_MAX_MEMORY_MB;
+		int minMemoryMb = instance.ramMinMb() != null ? instance.ramMinMb() : DEFAULT_MIN_MEMORY_MB;
 
 		List<String> jvmArgs = new ArrayList<>();
-		jvmArgs.add("-Xmx" + DEFAULT_MAX_MEMORY_MB + "m");
-		jvmArgs.add("-Xms" + DEFAULT_MIN_MEMORY_MB + "m");
-		jvmArgs.addAll(resolveArguments(vanilla.getAsJsonObject("arguments").getAsJsonArray("jvm"), values));
+		jvmArgs.add("-Xmx" + maxMemoryMb + "m");
+		jvmArgs.add("-Xms" + minMemoryMb + "m");
+		if (instance.extraJvmArgs() != null && !instance.extraJvmArgs().isBlank()) {
+			for (String arg : instance.extraJvmArgs().trim().split("\\s+")) {
+				jvmArgs.add(arg);
+			}
+		}
+		jvmArgs.addAll(resolveArguments(vanilla.getAsJsonObject("arguments").getAsJsonArray("jvm"), values, activeFeatures));
 		if (fabric.has("arguments") && fabric.getAsJsonObject("arguments").has("jvm")) {
-			jvmArgs.addAll(resolveArguments(fabric.getAsJsonObject("arguments").getAsJsonArray("jvm"), values));
+			jvmArgs.addAll(resolveArguments(fabric.getAsJsonObject("arguments").getAsJsonArray("jvm"), values, activeFeatures));
 		}
 
 		List<String> gameArgs = new ArrayList<>();
-		gameArgs.addAll(resolveArguments(vanilla.getAsJsonObject("arguments").getAsJsonArray("game"), values));
+		gameArgs.addAll(resolveArguments(vanilla.getAsJsonObject("arguments").getAsJsonArray("game"), values, activeFeatures));
 		if (fabric.has("arguments") && fabric.getAsJsonObject("arguments").has("game")) {
-			gameArgs.addAll(resolveArguments(fabric.getAsJsonObject("arguments").getAsJsonArray("game"), values));
+			gameArgs.addAll(resolveArguments(fabric.getAsJsonObject("arguments").getAsJsonArray("game"), values, activeFeatures));
 		}
 
 		List<String> command = new ArrayList<>();
@@ -184,7 +204,7 @@ public final class GameLauncher {
 		return path.toString();
 	}
 
-	private static List<String> resolveArguments(JsonArray argsArray, Map<String, String> values) {
+	private static List<String> resolveArguments(JsonArray argsArray, Map<String, String> values, Set<String> activeFeatures) {
 		List<String> result = new ArrayList<>();
 		if (argsArray == null) {
 			return result;
@@ -195,7 +215,7 @@ public final class GameLauncher {
 				continue;
 			}
 			JsonObject conditional = element.getAsJsonObject();
-			if (conditional.has("rules") && !OsRules.isAllowed(conditional.getAsJsonArray("rules"), OsRules.NO_FEATURES)) {
+			if (conditional.has("rules") && !OsRules.isAllowed(conditional.getAsJsonArray("rules"), activeFeatures)) {
 				continue;
 			}
 			JsonElement value = conditional.get("value");

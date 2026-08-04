@@ -52,19 +52,19 @@ public final class ThemeEditScreen extends VeloWindow {
 		addColorRow("Text", active.text(), c -> withTheme(t -> new Theme(t.name(), t.background(), t.surface(),
 				t.accentStart(), t.accentEnd(), c, t.cornerRadius(), t.blurIntensity(), t.animationSpeed(), t.panelOpacity())));
 
-		addSliderRow("Corner Radius", 0, 16, () -> active.cornerRadius(),
+		addSliderRow("Corner Radius", 0, 16, () -> ThemeManager.active().cornerRadius(),
 				v -> withTheme(t -> new Theme(t.name(), t.background(), t.surface(), t.accentStart(), t.accentEnd(),
 						t.text(), (int) v, t.blurIntensity(), t.animationSpeed(), t.panelOpacity())),
 				v -> String.valueOf((int) v));
-		addSliderRow("Blur Intensity", 0, 1, () -> active.blurIntensity(),
+		addSliderRow("Blur Intensity", 0, 1, () -> ThemeManager.active().blurIntensity(),
 				v -> withTheme(t -> new Theme(t.name(), t.background(), t.surface(), t.accentStart(), t.accentEnd(),
 						t.text(), t.cornerRadius(), (float) v, t.animationSpeed(), t.panelOpacity())),
 				v -> Math.round(v * 100) + "%");
-		addSliderRow("Animation Speed", 0, 2, () -> active.animationSpeed(),
+		addSliderRow("Animation Speed", 0, 2, () -> ThemeManager.active().animationSpeed(),
 				v -> withTheme(t -> new Theme(t.name(), t.background(), t.surface(), t.accentStart(), t.accentEnd(),
 						t.text(), t.cornerRadius(), t.blurIntensity(), (float) v, t.panelOpacity())),
 				v -> String.format("%.1fx", v));
-		addSliderRow("Panel Opacity", 0, 1, () -> active.panelOpacity(),
+		addSliderRow("Panel Opacity", 0, 1, () -> ThemeManager.active().panelOpacity(),
 				v -> withTheme(t -> new Theme(t.name(), t.background(), t.surface(), t.accentStart(), t.accentEnd(),
 						t.text(), t.cornerRadius(), t.blurIntensity(), t.animationSpeed(), (float) v)),
 				v -> Math.round(v * 100) + "%");

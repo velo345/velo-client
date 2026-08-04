@@ -42,6 +42,14 @@ public final class InstancePaths {
 		return gameDir(instanceId).resolve("mods");
 	}
 
+	public static Path resourcePacksDir(String instanceId) {
+		return gameDir(instanceId).resolve("resourcepacks");
+	}
+
+	public static Path shaderPacksDir(String instanceId) {
+		return gameDir(instanceId).resolve("shaderpacks");
+	}
+
 	public static Path logsDir(String instanceId) {
 		return gameDir(instanceId).resolve("logs");
 	}
@@ -55,7 +63,8 @@ public final class InstancePaths {
 	}
 
 	public static void ensureDirectories(String instanceId) {
-		for (Path dir : new Path[] {root(), dir(instanceId), modsDir(instanceId), logsDir(instanceId)}) {
+		for (Path dir : new Path[] {root(), dir(instanceId), modsDir(instanceId), resourcePacksDir(instanceId),
+				shaderPacksDir(instanceId), logsDir(instanceId)}) {
 			try {
 				Files.createDirectories(dir);
 			} catch (IOException e) {

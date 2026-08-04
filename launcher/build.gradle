@@ -14,15 +14,29 @@ java {
 
 javafx {
 	version = "21.0.11"
-	modules = ['javafx.controls', 'javafx.graphics']
+	// javafx.swing pulls in SwingFXUtils, needed only to convert an ImageIO
+	// BufferedImage (see RemoteIconLoader) into a javafx.scene.image.Image -
+	// nothing here actually opens a Swing window.
+	modules = ['javafx.controls', 'javafx.graphics', 'javafx.swing']
 }
 
 application {
 	mainClass = 'net.veloclient.launcher.LauncherApp'
+	// webp-imageio (RemoteIconLoader) loads a native decoder via System.load()
+	// - silences the JDK's restricted-native-access warning now, and avoids
+	// it becoming a hard failure on a future JDK that blocks this by default.
+	applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
 }
 
 dependencies {
 	implementation 'com.google.code.gson:gson:2.11.0'
+	// Modrinth's CDN serves almost all project icons as WebP - javafx.scene.image.Image
+	// can't decode that format at all (silent load failure), so every one of
+	// those icons fell back to the generic logo. This registers a WebP
+	// ImageIO reader so RemoteIconLoader can decode them like any other
+	// format. Pure ImageIO SPI plugin, no extra runtime setup needed beyond
+	// being on the classpath.
+	implementation 'org.sejda.imageio:webp-imageio:0.1.6'
 }
 
 test {
@@ -89,17 +103,38 @@ tasks.register("bundleJavaRuntimeFallback") {
 	}
 }
 
+// This launcher's single source of truth for its own version - AppVersion.java
+// reads it back as a classpath resource at runtime instead of independently
+// hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
+// below reuses the same value for the native installer's version.
+def launcherAppVersion = "0.3.0"
+def launcherVersionResourceRoot = layout.buildDirectory.dir("generated/launcherversion")
+
+tasks.register("writeLauncherVersion") {
+	group = "build"
+	description = "Writes launcherAppVersion into a version.properties resource for AppVersion to read at runtime."
+	def outDir = launcherVersionResourceRoot.map { it.dir("net/veloclient/launcher") }
+	inputs.property("version", launcherAppVersion)
+	outputs.dir(outDir)
+	doLast {
+		def dir = outDir.get().asFile
+		dir.mkdirs()
+		new File(dir, "version.properties").text = "version=${launcherAppVersion}\n"
+	}
+}
+
 sourceSets {
 	main {
 		resources {
 			srcDir(gameJarsResourceRoot)
 			srcDir(javaRuntimeResourceRoot)
+			srcDir(launcherVersionResourceRoot)
 		}
 	}
 }
 
 tasks.named("processResources") {
-	dependsOn("bundleGameJars", "bundleJavaRuntimeFallback")
+	dependsOn("bundleGameJars", "bundleJavaRuntimeFallback", "writeLauncherVersion")
 }
 
 // The javafx plugin's "run" task reaches into Project internals
@@ -118,8 +153,6 @@ tasks.named("run") {
 // installer can only be built by running this ON Windows, etc.) - see
 // .github/workflows/package-launcher.yml, which runs this task on a
 // windows-latest/macos-latest/ubuntu-latest matrix to produce all three.
-def launcherAppVersion = "0.2.0"
-
 tasks.register("jpackageDist") {
 	group = "distribution"
 	description = "Builds a native installer for this OS (exe/msi on Windows, dmg on macOS, deb on Linux) via jpackage."
@@ -190,7 +223,8 @@ tasks.register("jpackageDist") {
 				// wherever it puts --input's contents (where the javafx-*.jar
 				// files already are), not a literal env var.
 				"--java-options", "--module-path=\$APPDIR",
-				"--java-options", "--add-modules=javafx.controls,javafx.graphics"
+				"--java-options", "--add-modules=javafx.controls,javafx.graphics,javafx.swing",
+				"--java-options", "--enable-native-access=ALL-UNNAMED"
 		]
 		if (isWindows) {
 			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser"]

@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * Implements the standard Minecraft Server List Ping protocol (the same
@@ -27,7 +28,7 @@ public final class ServerPinger {
 	private ServerPinger() {
 	}
 
-	public record PingResult(String motd, int onlinePlayers, int maxPlayers, String versionName, long latencyMillis) {
+	public record PingResult(List<MotdText.Segment> motd, int onlinePlayers, int maxPlayers, String versionName, long latencyMillis) {
 	}
 
 	public static PingResult ping(String host, int port) throws IOException {
@@ -50,7 +51,7 @@ public final class ServerPinger {
 			long latency = System.currentTimeMillis() - start;
 
 			JsonObject root = GSON.fromJson(json, JsonObject.class);
-			String motd = extractMotd(root);
+			List<MotdText.Segment> motd = MotdText.parse(root.has("description") ? root.get("description") : null);
 			int online = 0;
 			int max = 0;
 			if (root.has("players")) {
@@ -63,18 +64,6 @@ public final class ServerPinger {
 					: "unknown";
 			return new PingResult(motd, online, max, version, latency);
 		}
-	}
-
-	private static String extractMotd(JsonObject root) {
-		if (!root.has("description")) {
-			return "";
-		}
-		var description = root.get("description");
-		if (description.isJsonPrimitive()) {
-			return description.getAsString();
-		}
-		JsonObject obj = description.getAsJsonObject();
-		return obj.has("text") ? obj.get("text").getAsString() : "";
 	}
 
 	private static byte[] handshakePacket(String host, int port) throws IOException {

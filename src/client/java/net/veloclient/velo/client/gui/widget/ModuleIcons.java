@@ -1,67 +1,43 @@
 package net.veloclient.velo.client.gui.widget;
 
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
+import net.minecraft.util.Identifier;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Set;
 
-/** Maps each module id to a vanilla item whose icon reads as a recognizable stand-in - no custom texture assets needed. */
+/**
+ * Maps each module id to a custom Lucide-derived icon texture (see
+ * NOTICE.md) instead of a vanilla item stand-in - a uniform, modern icon set
+ * that recolors live with the active theme (the source PNGs are white
+ * strokes on transparent, tinted at draw time by {@link VeloModuleTile}) or
+ * {@link #DEFAULT} if a module id has none registered.
+ */
 public final class ModuleIcons {
 
-	private static final Map<String, Item> ICONS = new HashMap<>();
+	// A real dedicated fallback asset - not a reference to one of the named
+	// module icons above, which previously pointed at a filename ("target")
+	// that only ever existed under its own module id ("custom-crosshair.png"),
+	// making the fallback itself resolve to a missing texture.
+	public static final Identifier DEFAULT = texture("default");
 
-	static {
-		ICONS.put("fps-counter", Items.REDSTONE);
-		ICONS.put("ping-display", Items.LIGHTNING_ROD);
-		ICONS.put("coordinates", Items.COMPASS);
-		ICONS.put("clock", Items.CLOCK);
-		ICONS.put("cps-counter", Items.STICK);
-		ICONS.put("armor-durability", Items.DIAMOND_CHESTPLATE);
-		ICONS.put("potion-timers", Items.POTION);
-		ICONS.put("held-item", Items.ITEM_FRAME);
-		ICONS.put("keystrokes", Items.LEVER);
-		ICONS.put("actionbar-log", Items.PAPER);
-		ICONS.put("session-stats", Items.EXPERIENCE_BOTTLE);
-		ICONS.put("waypoints", Items.FILLED_MAP);
-		ICONS.put("toggle-sprint", Items.RABBIT_FOOT);
-		ICONS.put("toggle-sneak", Items.LEATHER_BOOTS);
-		ICONS.put("zoom", Items.SPYGLASS);
-		ICONS.put("cape-cosmetics", Items.ELYTRA);
-		ICONS.put("frame-time-graph", Items.COMPARATOR);
-		ICONS.put("memory-monitor", Items.CHEST);
-		ICONS.put("gpu-utilization", Items.REDSTONE_BLOCK);
-		ICONS.put("particle-limiter", Items.FIREWORK_ROCKET);
-		ICONS.put("performance-boost", Items.NETHER_STAR);
-		ICONS.put("polyblur", Items.ENDER_EYE);
-		ICONS.put("optimization-mod-compat", Items.ANVIL);
-		ICONS.put("full-bright", Items.GLOWSTONE);
-		ICONS.put("fov", Items.GLASS_PANE);
-		ICONS.put("mouse-buttons", Items.STICK);
-		ICONS.put("copy-coordinates", Items.WRITABLE_BOOK);
-		ICONS.put("entity-count-overlay", Items.SPAWNER);
-		ICONS.put("chunk-border-overlay", Items.BARRIER);
-		ICONS.put("hitbox-visualizer", Items.TARGET);
-		ICONS.put("world-border-visualizer", Items.BEDROCK);
-		ICONS.put("light-level-overlay", Items.TORCH);
-		ICONS.put("tps-tick-graph", Items.REPEATER);
-		ICONS.put("packet-traffic-monitor", Items.TRIPWIRE_HOOK);
-		ICONS.put("particle-debug-overlay", Items.GLOW_INK_SAC);
-		ICONS.put("sound-debug-overlay", Items.NOTE_BLOCK);
-		ICONS.put("client-log-viewer", Items.WRITTEN_BOOK);
-		ICONS.put("resource-reload-hotkeys", Items.ENCHANTED_BOOK);
-		ICONS.put("keybind-conflict-checker", Items.OAK_BUTTON);
-		ICONS.put("looking-at-inspector", Items.OBSERVER);
-		ICONS.put("command-keybinds", Items.COMMAND_BLOCK);
-		ICONS.put("scoreboard-hud", Items.PAPER);
-		ICONS.put("custom-crosshair", Items.SPECTRAL_ARROW);
-	}
+	private static final Set<String> KNOWN_IDS = Set.of(
+			"fps-counter", "ping-display", "coordinates", "clock", "cps-counter", "armor-durability",
+			"potion-timers", "held-item", "keystrokes", "actionbar-log", "session-stats", "waypoints",
+			"toggle-sprint", "toggle-sneak", "zoom", "cape-cosmetics", "frame-time-graph", "memory-monitor",
+			"gpu-utilization", "particle-limiter", "performance-boost", "polyblur", "optimization-mod-compat",
+			"full-bright", "fov", "mouse-buttons", "copy-coordinates", "entity-count-overlay", "chunk-border-overlay",
+			"hitbox-visualizer", "world-border-visualizer", "light-level-overlay", "tps-tick-graph",
+			"packet-traffic-monitor", "particle-debug-overlay", "sound-debug-overlay", "client-log-viewer",
+			"resource-reload-hotkeys", "keybind-conflict-checker", "looking-at-inspector", "command-keybinds",
+			"scoreboard-hud", "custom-crosshair", "minimap");
 
 	private ModuleIcons() {
 	}
 
-	public static ItemStack stackFor(String moduleId) {
-		return new ItemStack(ICONS.getOrDefault(moduleId, Items.PAPER));
+	public static Identifier textureFor(String moduleId) {
+		return KNOWN_IDS.contains(moduleId) ? texture(moduleId) : DEFAULT;
+	}
+
+	private static Identifier texture(String id) {
+		return Identifier.of("velo-client", "textures/icon/module/" + id + ".png");
 	}
 }

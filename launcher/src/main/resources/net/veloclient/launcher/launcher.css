@@ -157,6 +157,35 @@
 	-fx-alignment: CENTER;
 }
 
+/* ---- Styled crash/error dialog (ErrorDialog) - deliberately not a bland default Alert ---- */
+
+.error-dialog-icon {
+	-fx-font-size: 28px;
+}
+
+.error-dialog-title {
+	-fx-font-size: 17px;
+	-fx-font-weight: bold;
+	-fx-text-fill: #ff6b6b;
+}
+
+.error-dialog-message {
+	-fx-font-size: 13px;
+	-fx-opacity: 0.9;
+}
+
+.error-details-area {
+	-fx-font-family: "Consolas", "Menlo", "Monospace";
+	-fx-font-size: 11px;
+	-fx-control-inner-background: -velo-surface;
+	-fx-text-fill: -velo-text;
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 8;
+	-fx-border-color: -velo-hairline;
+	-fx-border-radius: 8;
+	-fx-border-width: 1;
+}
+
 .dialog-code {
 	-fx-font-size: 28px;
 	-fx-font-weight: bold;
@@ -194,6 +223,74 @@
 	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
 	-fx-text-fill: white;
 	-fx-border-width: 0;
+}
+
+/* ---- In-window modal overlay (e.g. the Modrinth version/dependency picker) ---- */
+
+.modal-backdrop {
+	-fx-background-color: rgba(0, 0, 0, 0.6);
+}
+
+.modal-card {
+	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 24, 0.3, 0, 6);
+	-fx-padding: 20;
+}
+
+.button-compact {
+	-fx-min-width: 0;
+	-fx-padding: 8 16 8 16;
+	-fx-font-size: 12px;
+}
+
+/* ---- TabPane (instance detail workspace: Mods / Resource Packs / Shader Packs) ---- */
+
+.tab-pane {
+	-fx-background-color: transparent;
+	-fx-open-tab-animation: NONE;
+	-fx-close-tab-animation: NONE;
+}
+
+.tab-pane .tab-header-area {
+	-fx-padding: 0 0 6 0;
+}
+
+.tab-pane .tab-header-background {
+	-fx-background-color: transparent;
+}
+
+.tab-pane .tab-header-area .headers-region .tab {
+	-fx-background-color: transparent;
+	-fx-background-radius: 8 8 0 0;
+	-fx-border-color: transparent transparent -velo-hairline transparent;
+	-fx-border-width: 0 0 2 0;
+	-fx-padding: 8 18 8 18;
+	-fx-cursor: hand;
+}
+
+.tab-pane .tab-header-area .headers-region .tab:hover {
+	-fx-background-color: -velo-hover;
+}
+
+.tab-pane .tab-header-area .headers-region .tab:selected {
+	-fx-border-color: transparent transparent -velo-accent-start transparent;
+}
+
+.tab-pane .tab-label {
+	-fx-text-fill: derive(-velo-text, -25%);
+	-fx-font-size: 13px;
+}
+
+.tab-pane .tab:selected .tab-label {
+	-fx-text-fill: -velo-text;
+	-fx-font-weight: bold;
+}
+
+.tab-pane .tab-content-area {
+	-fx-background-color: transparent;
+}
+
+.tab-pane > .tab-header-area > .tab-header-background {
+	-fx-opacity: 0;
 }
 
 /* ---- ComboBox ---- */
@@ -443,7 +540,29 @@
 }
 
 .mod-row {
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 10;
+	-fx-border-color: -velo-hairline;
+	-fx-border-radius: 10;
+	-fx-border-width: 1;
+	-fx-padding: 10 14 10 14;
+}
+
+.mod-row:hover {
 	-fx-background-color: -velo-hover;
-	-fx-background-radius: 8;
-	-fx-padding: 8 12 8 12;
+	-fx-border-color: -velo-accent-start;
+}
+
+.search-card {
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 12;
+	-fx-border-color: -velo-hairline;
+	-fx-border-radius: 12;
+	-fx-border-width: 1;
+	-fx-padding: 12;
+	-fx-cursor: hand;
+}
+
+.search-card:hover {
+	-fx-border-color: -velo-accent-start;
 }

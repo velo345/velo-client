@@ -23,7 +23,8 @@ public final class CapeImportDialog {
 
 	public static Optional<Result> show(Stage owner) {
 		FileChooser chooser = new FileChooser();
-		chooser.setTitle("Choose a " + CapeLibrary.TEXTURE_WIDTH + "x" + CapeLibrary.TEXTURE_HEIGHT + " cape texture (PNG)");
+		chooser.setTitle("Choose a cape texture (PNG, 2:1 ratio, " + CapeLibrary.TEXTURE_WIDTH + "x" + CapeLibrary.TEXTURE_HEIGHT
+				+ " up to " + CapeLibrary.MAX_TEXTURE_WIDTH + "x" + CapeLibrary.MAX_TEXTURE_HEIGHT + ")");
 		chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG image", "*.png"));
 		File file = chooser.showOpenDialog(owner);
 		if (file == null) {

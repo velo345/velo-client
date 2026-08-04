@@ -52,9 +52,9 @@ public final class SavedServerStore {
 		}
 	}
 
-	public static SavedServer add(String name, String host, int port) {
+	public static SavedServer add(String name, String host, int port, String instanceId) {
 		List<SavedServer> servers = loadAll();
-		SavedServer entry = new SavedServer(UUID.randomUUID().toString(), name, host, port);
+		SavedServer entry = new SavedServer(UUID.randomUUID().toString(), name, host, port, instanceId);
 		servers.add(entry);
 		saveAll(servers);
 		return entry;

@@ -29,8 +29,12 @@ import java.util.zip.ZipOutputStream;
  */
 public final class CapeLibrary {
 
+	/** Base vanilla cape template size - still the minimum accepted, and what preview/UV crop math is proportioned against. */
 	public static final int TEXTURE_WIDTH = 64;
 	public static final int TEXTURE_HEIGHT = 32;
+	/** HD cape textures are accepted at any multiple of the base 2:1 template up to this size (matches vanilla's UV normalization, which is resolution-independent). */
+	public static final int MAX_TEXTURE_WIDTH = 512;
+	public static final int MAX_TEXTURE_HEIGHT = 256;
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final String EQUIP_STATE_FILE = "cosmetics-cape.json";
@@ -57,9 +61,18 @@ public final class CapeLibrary {
 		if (image == null) {
 			throw new IOException("Not a readable PNG file.");
 		}
-		if (image.getWidth() != TEXTURE_WIDTH || image.getHeight() != TEXTURE_HEIGHT) {
-			throw new IOException("Cape textures must be exactly " + TEXTURE_WIDTH + "x" + TEXTURE_HEIGHT
-					+ " (got " + image.getWidth() + "x" + image.getHeight() + ").");
+		int width = image.getWidth();
+		int height = image.getHeight();
+		// Vanilla's cape model UV is baked as fractions of a 64x32 template, so
+		// the GPU samples proportionally regardless of the bound texture's real
+		// resolution - any multiple of that 2:1 ratio "just works" for HD capes,
+		// not only the exact base size.
+		boolean validRatio = width == height * 2;
+		boolean withinBounds = width >= TEXTURE_WIDTH && height >= TEXTURE_HEIGHT
+				&& width <= MAX_TEXTURE_WIDTH && height <= MAX_TEXTURE_HEIGHT;
+		if (!validRatio || !withinBounds) {
+			throw new IOException("Cape textures must keep the 2:1 cape ratio (e.g. 64x32, 128x64, ... up to "
+					+ MAX_TEXTURE_WIDTH + "x" + MAX_TEXTURE_HEIGHT + ") - got " + width + "x" + height + ".");
 		}
 
 		VeloPaths.ensureDirectories();
@@ -83,6 +96,19 @@ public final class CapeLibrary {
 
 	public static void exportBundle(CapeEntry entry, Path destination) throws IOException {
 		Files.copy(entry.bundleFile(), destination, StandardCopyOption.REPLACE_EXISTING);
+	}
+
+	/** Raw {@code texture.png} bytes from the bundle, for rendering a live preview (e.g. as a JavaFX {@code Image}). */
+	public static byte[] textureBytes(CapeEntry entry) throws IOException {
+		try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(entry.bundleFile()))) {
+			ZipEntry zipEntry;
+			while ((zipEntry = zip.getNextEntry()) != null) {
+				if (zipEntry.getName().equals("texture.png")) {
+					return zip.readAllBytes();
+				}
+			}
+		}
+		throw new IOException("Cape bundle is missing its texture.png: " + entry.bundleFile());
 	}
 
 	public static void delete(CapeEntry entry) throws IOException {

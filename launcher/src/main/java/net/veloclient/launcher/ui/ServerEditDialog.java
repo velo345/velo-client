@@ -2,24 +2,28 @@ package net.veloclient.launcher.ui;
 
 import javafx.geometry.Insets;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
+import net.veloclient.launcher.instance.Instance;
 
+import java.util.List;
 import java.util.Optional;
 
-/** Add/edit dialog for a saved server entry: name, host, port. */
+/** Add/edit dialog for a saved server entry: name, host, port, and which mod profile "Connect" should launch with. */
 public final class ServerEditDialog {
 
-	public record Result(String name, String host, int port) {
+	public record Result(String name, String host, int port, String instanceId) {
 	}
 
 	private ServerEditDialog() {
 	}
 
-	public static Optional<Result> show(Stage owner, String title, String initialName, String initialHost, int initialPort) {
+	public static Optional<Result> show(Stage owner, String title, String initialName, String initialHost, int initialPort,
+			List<Instance> instances, String initialInstanceId) {
 		Dialog<Result> dialog = new Dialog<>();
 		dialog.initOwner(owner);
 		dialog.setTitle(title);
@@ -33,6 +37,23 @@ public final class ServerEditDialog {
 		TextField portField = new TextField(initialPort > 0 ? String.valueOf(initialPort) : "25565");
 		portField.setPromptText("25565");
 
+		ComboBox<Instance> instanceBox = new ComboBox<>();
+		instanceBox.getItems().add(null);
+		instanceBox.getItems().addAll(instances);
+		instanceBox.setConverter(new javafx.util.StringConverter<>() {
+			@Override
+			public String toString(Instance instance) {
+				return instance == null ? "None - just save the address" : instance.name() + "  (Minecraft " + instance.mcVersion() + ")";
+			}
+
+			@Override
+			public Instance fromString(String string) {
+				return null;
+			}
+		});
+		instances.stream().filter(i -> i.id().equals(initialInstanceId)).findFirst()
+				.ifPresentOrElse(instanceBox::setValue, () -> instanceBox.setValue(null));
+
 		GridPane grid = new GridPane();
 		grid.setHgap(10);
 		grid.setVgap(10);
@@ -40,6 +61,7 @@ public final class ServerEditDialog {
 		grid.addRow(0, new Label("Name"), nameField);
 		grid.addRow(1, new Label("Address"), hostField);
 		grid.addRow(2, new Label("Port"), portField);
+		grid.addRow(3, new Label("Launch with"), instanceBox);
 
 		dialog.getDialogPane().setContent(grid);
 		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -59,7 +81,8 @@ public final class ServerEditDialog {
 			if (host.isEmpty()) {
 				return null;
 			}
-			return new Result(name, host, port);
+			Instance selected = instanceBox.getValue();
+			return new Result(name, host, port, selected != null ? selected.id() : null);
 		});
 
 		return dialog.showAndWait();

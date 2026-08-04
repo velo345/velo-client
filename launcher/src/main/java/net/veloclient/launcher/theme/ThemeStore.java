@@ -31,7 +31,9 @@ public final class ThemeStore {
 			if (persisted == null) {
 				return LauncherThemePresets.VELO_DARK;
 			}
-			return LauncherThemePresets.all().getOrDefault(persisted.themeName, LauncherThemePresets.VELO_DARK);
+			Map<String, LauncherTheme> all = new LinkedHashMap<>(LauncherThemePresets.all());
+			all.putAll(LauncherCustomThemeStore.asMap(LauncherCustomThemeStore.load()));
+			return all.getOrDefault(persisted.themeName, LauncherThemePresets.VELO_DARK);
 		} catch (IOException e) {
 			return LauncherThemePresets.VELO_DARK;
 		}
@@ -39,6 +41,13 @@ public final class ThemeStore {
 
 	public static void save(LauncherTheme theme) {
 		VeloPaths.ensureDirectories();
+		// Editing a custom theme's colors/sliders calls this with the same
+		// name each time - keep the persisted custom-themes list in sync too
+		// (mirroring the mod's own ThemeManager.setActive), or edits would be
+		// lost the moment a different theme got selected.
+		if (!LauncherCustomThemeStore.isBuiltIn(theme.name())) {
+			LauncherCustomThemeStore.update(theme);
+		}
 		var file = VeloPaths.config().resolve("theme.json");
 		Persisted persisted = new Persisted(theme.name(), new LinkedHashMap<>());
 		try (Writer writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {

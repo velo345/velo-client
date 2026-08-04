@@ -67,6 +67,15 @@ public final class SignInDialog {
 		Scene scene = new Scene(box);
 		scene.setFill(Color.TRANSPARENT);
 		stage.setScene(scene);
+		// This is a raw Stage (needed for StageStyle.TRANSPARENT), not a
+		// Dialog, so it doesn't get DialogStyling's owner-centering - without
+		// this it was landing at a fixed position on whatever the OS
+		// considers the "primary" screen rather than over the actual main
+		// window on a multi-monitor setup.
+		stage.setOnShown(e -> {
+			stage.setX(owner.getX() + (owner.getWidth() - stage.getWidth()) / 2);
+			stage.setY(owner.getY() + (owner.getHeight() - stage.getHeight()) / 2);
+		});
 
 		var executor = Executors.newVirtualThreadPerTaskExecutor();
 		var future = executor.submit(() -> {

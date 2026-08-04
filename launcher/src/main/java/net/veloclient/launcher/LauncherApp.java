@@ -17,10 +17,9 @@ import javafx.stage.Stage;
 import net.veloclient.launcher.auth.AuthSession;
 import net.veloclient.launcher.auth.MicrosoftAuth;
 import net.veloclient.launcher.auth.MinecraftSession;
-import net.veloclient.launcher.data.ManifestReader;
-import net.veloclient.launcher.data.ModuleInfo;
-import net.veloclient.launcher.data.ProfileData;
-import net.veloclient.launcher.data.ProfileStore;
+import net.veloclient.launcher.auth.SkinFetcher;
+import net.veloclient.launcher.data.SavedServer;
+import net.veloclient.launcher.data.SavedServerStore;
 import net.veloclient.launcher.data.VeloPaths;
 import net.veloclient.launcher.instance.BuiltinIcons;
 import net.veloclient.launcher.instance.Instance;
@@ -34,24 +33,28 @@ import net.veloclient.launcher.launch.GameVersion;
 import net.veloclient.launcher.launch.LaunchProgressListener;
 import net.veloclient.launcher.net.ServerPinger;
 import net.veloclient.launcher.theme.LauncherTheme;
-import net.veloclient.launcher.theme.LauncherThemePresets;
 import net.veloclient.launcher.theme.ThemeStore;
+import net.veloclient.launcher.ui.AccountProfileView;
+import net.veloclient.launcher.ui.CosmeticsView;
 import net.veloclient.launcher.ui.DialogStyling;
+import net.veloclient.launcher.ui.ErrorDialog;
+import net.veloclient.launcher.ui.InstanceDetailView;
 import net.veloclient.launcher.ui.InstanceEditDialog;
-import net.veloclient.launcher.ui.InstanceModsDialog;
+import net.veloclient.launcher.ui.InstanceSettingsDialog;
 import net.veloclient.launcher.ui.ParticleBackground;
+import net.veloclient.launcher.ui.PlayerHeadView;
+import net.veloclient.launcher.ui.ServerEditDialog;
 import net.veloclient.launcher.ui.SignInDialog;
+import net.veloclient.launcher.ui.ThemeEditorView;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 /**
  * Standalone launcher shell (design spec section 4): a Minecraft-style
@@ -91,7 +94,7 @@ public final class LauncherApp extends Application {
 	private MinecraftSession session;
 	private Label accountLabel;
 	private Button accountButton;
-	private Button navHome, navInstances, navMods, navCosmetics, navServerProfiles, navTheme, navSettings;
+	private Button navHome, navInstances, navCosmetics, navTheme, navSettings;
 
 	public static void main(String[] args) {
 		launch(args);
@@ -166,18 +169,16 @@ public final class LauncherApp extends Application {
 
 		navHome = navButton("Home", this::showHome);
 		navInstances = navButton("Profiles", this::showInstances);
-		navMods = navButton("Mods", this::showMods);
 		navCosmetics = navButton("Cosmetics", this::showCosmetics);
-		navServerProfiles = navButton("Server Profiles", this::showServerProfiles);
 		navTheme = navButton("Theme Editor", this::showThemeEditor);
 		navSettings = navButton("Settings", this::showSettings);
 
-		sidebar.getChildren().addAll(title, navHome, navInstances, navMods, navCosmetics, navServerProfiles, navTheme, navSettings);
+		sidebar.getChildren().addAll(title, navHome, navInstances, navCosmetics, navTheme, navSettings);
 		VBox spacer = new VBox();
 		VBox.setVgrow(spacer, Priority.ALWAYS);
 		sidebar.getChildren().add(spacer);
 
-		Label version = new Label("v0.1.0 · MC 1.21.11");
+		Label version = new Label("v" + AppVersion.VERSION);
 		version.getStyleClass().add("version-tag");
 		version.setTextFill(textColor());
 		sidebar.getChildren().add(version);
@@ -197,7 +198,7 @@ public final class LauncherApp extends Application {
 	}
 
 	private void markActiveNav(Button active) {
-		for (Button b : List.of(navHome, navInstances, navMods, navCosmetics, navServerProfiles, navTheme, navSettings)) {
+		for (Button b : List.of(navHome, navInstances, navCosmetics, navTheme, navSettings)) {
 			b.getStyleClass().remove("nav-button-active");
 		}
 		active.getStyleClass().add("nav-button-active");
@@ -246,17 +247,17 @@ public final class LauncherApp extends Application {
 		play.setMaxWidth(Double.MAX_VALUE);
 		play.setOnAction(e -> { showInstances(); markActiveNav(navInstances); });
 
-		Button mods = new Button("Mods");
-		mods.getStyleClass().add("title-menu-button");
-		mods.setMaxWidth(Double.MAX_VALUE);
-		mods.setOnAction(e -> { showMods(); markActiveNav(navMods); });
-
 		Button servers = new Button("My Servers");
 		servers.getStyleClass().add("title-menu-button");
 		servers.setMaxWidth(Double.MAX_VALUE);
 		servers.setOnAction(e -> showServers());
 
-		menu.getChildren().addAll(play, mods, servers);
+		Button quit = new Button("Quit");
+		quit.getStyleClass().add("title-menu-button");
+		quit.setMaxWidth(Double.MAX_VALUE);
+		quit.setOnAction(e -> Platform.exit());
+
+		menu.getChildren().addAll(play, servers, quit);
 		center.getChildren().addAll(title, tagline, menu);
 
 		titleScreen.getChildren().add(center);
@@ -271,19 +272,12 @@ public final class LauncherApp extends Application {
 			if (session == null) {
 				beginSignIn();
 			} else {
-				signOut();
+				showAccountProfile();
 			}
 		});
 		StackPane.setAlignment(accountButton, Pos.BOTTOM_LEFT);
 		StackPane.setMargin(accountButton, new Insets(0, 0, 18, 18));
 		titleScreen.getChildren().add(accountButton);
-
-		Label versionTag = new Label("Velo Client 0.1.0  ·  Minecraft 1.21.11  ·  Fabric");
-		versionTag.getStyleClass().add("version-tag");
-		versionTag.setTextFill(textColor());
-		StackPane.setAlignment(versionTag, Pos.BOTTOM_RIGHT);
-		StackPane.setMargin(versionTag, new Insets(0, 18, 18, 0));
-		titleScreen.getChildren().add(versionTag);
 
 		refreshAccountBadge();
 		setContent(titleScreen);
@@ -293,46 +287,89 @@ public final class LauncherApp extends Application {
 	private Node buildAccountBadgeContent() {
 		HBox box = new HBox(10);
 		box.setAlignment(Pos.CENTER_LEFT);
-		Label avatar = new Label();
-		avatar.getStyleClass().add("avatar-circle");
-		avatar.setStyle("-fx-background-color: linear-gradient(to bottom right, " + cssColor(theme.accentStart()) + ", " + cssColor(theme.accentEnd()) + ");");
-		avatar.setTextFill(Color.WHITE);
+		StackPane avatarHolder = new StackPane();
+		avatarHolder.setPrefSize(32, 32);
+		avatarHolder.setMinSize(32, 32);
+		avatarHolder.setMaxSize(32, 32);
+		Label avatarFallback = new Label();
+		avatarFallback.getStyleClass().add("avatar-circle");
+		avatarFallback.setStyle("-fx-background-color: linear-gradient(to bottom right, " + cssColor(theme.accentStart()) + ", " + cssColor(theme.accentEnd()) + ");");
+		avatarFallback.setTextFill(Color.WHITE);
+		avatarHolder.getChildren().add(avatarFallback);
 		accountLabel.setTextFill(textColor());
-		box.getChildren().addAll(avatar, accountLabel);
+		box.getChildren().addAll(avatarHolder, accountLabel);
 		return box;
 	}
 
 	private void refreshAccountBadge() {
 		HBox box = (HBox) accountButton.getGraphic();
-		Label avatar = (Label) box.getChildren().get(0);
+		StackPane holder = (StackPane) box.getChildren().get(0);
+		Label fallback = (Label) holder.getChildren().get(0);
 		if (session != null) {
-			avatar.setText(session.username().substring(0, 1).toUpperCase());
+			fallback.setText(session.username().substring(0, 1).toUpperCase());
 			accountLabel.setText(session.username());
+			CompletableFuture.supplyAsync(() -> SkinFetcher.fetch(session), Executors.newVirtualThreadPerTaskExecutor())
+					.thenAccept(skin -> Platform.runLater(() -> {
+						StackPane head = skin == null ? null : PlayerHeadView.build(skin.pngBytes(), 32);
+						if (head != null && holder.getChildren().contains(fallback)) {
+							holder.getChildren().setAll(head.getChildren());
+						}
+					}));
 		} else {
-			avatar.setText("?");
+			fallback.setText("?");
 			accountLabel.setText("Not signed in - click to sign in");
 		}
 	}
 
+	private void showAccountProfile() {
+		setContent((Node) AccountProfileView.build(new AccountProfileView.Host() {
+			@Override
+			public Stage owner() {
+				return stage;
+			}
+
+			@Override
+			public LauncherTheme theme() {
+				return theme;
+			}
+
+			@Override
+			public MinecraftSession session() {
+				return session;
+			}
+
+			@Override
+			public void signOut() {
+				LauncherApp.this.signOut();
+				showHome();
+			}
+
+			@Override
+			public void goBack() {
+				showHome();
+			}
+		}));
+	}
+
 	private void showServers() {
 		VBox box = sectionBox("My Servers");
-		box.getChildren().add(sectionSubtitle("Saved servers, pinged live for status - separate from your in-game server list."));
+		box.getChildren().add(sectionSubtitle("Saved servers, pinged live for status. Assign a mod profile to each one to launch straight into it."));
 
 		Button addButton = new Button("+ Add Server");
 		addButton.getStyleClass().add("title-menu-button");
-		addButton.setOnAction(e -> net.veloclient.launcher.ui.ServerEditDialog.show(stage, "Add Server", "", "", 25565)
+		addButton.setOnAction(e -> ServerEditDialog.show(stage, "Add Server", "", "", 25565, InstanceStore.loadAll(), null)
 				.ifPresent(result -> {
-					net.veloclient.launcher.data.SavedServerStore.add(result.name(), result.host(), result.port());
+					SavedServerStore.add(result.name(), result.host(), result.port(), result.instanceId());
 					showServers();
 				}));
 		box.getChildren().add(addButton);
 
-		VBox list = new VBox(8);
-		List<net.veloclient.launcher.data.SavedServer> servers = net.veloclient.launcher.data.SavedServerStore.loadAll();
+		VBox list = new VBox(10);
+		List<SavedServer> servers = SavedServerStore.loadAll();
 		if (servers.isEmpty()) {
 			list.getChildren().add(sectionSubtitle("No servers saved yet - add one above."));
 		}
-		for (net.veloclient.launcher.data.SavedServer server : servers) {
+		for (SavedServer server : servers) {
 			list.getChildren().add(buildServerRow(server));
 		}
 		ScrollPane scroll = new ScrollPane(list);
@@ -343,8 +380,8 @@ public final class LauncherApp extends Application {
 		setContent(box);
 	}
 
-	private Node buildServerRow(net.veloclient.launcher.data.SavedServer server) {
-		VBox card = new VBox(4);
+	private Node buildServerRow(SavedServer server) {
+		VBox card = new VBox(6);
 		card.getStyleClass().add("glass-panel");
 
 		HBox headerRow = new HBox(10);
@@ -359,40 +396,112 @@ public final class LauncherApp extends Application {
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		headerRow.getChildren().addAll(name, address, spacer);
 
-		Label status = new Label("Pinging...");
-		status.getStyleClass().add("section-subtitle");
-		status.setTextFill(textColor());
+		javafx.scene.text.TextFlow motd = new javafx.scene.text.TextFlow(pingingText());
 
-		HBox actions = new HBox(8);
+		Label statusLine = new Label();
+		statusLine.getStyleClass().add("section-subtitle");
+		statusLine.setTextFill(textColor());
+		statusLine.setWrapText(true);
+
+		List<Instance> instances = InstanceStore.loadAll();
+		ComboBox<Instance> profilePicker = new ComboBox<>();
+		profilePicker.getItems().add(null);
+		profilePicker.getItems().addAll(instances);
+		profilePicker.setConverter(new javafx.util.StringConverter<>() {
+			@Override
+			public String toString(Instance instance) {
+				return instance == null ? "No profile assigned" : instance.name();
+			}
+
+			@Override
+			public Instance fromString(String string) {
+				return null;
+			}
+		});
+		instances.stream().filter(i -> i.id().equals(server.instanceId())).findFirst()
+				.ifPresentOrElse(profilePicker::setValue, () -> profilePicker.setValue(null));
+
+		ProgressBar progressBar = new ProgressBar(0);
+		progressBar.setMaxWidth(Double.MAX_VALUE);
+		progressBar.setVisible(false);
+		progressBar.setManaged(false);
+		Label launchStatus = new Label();
+		launchStatus.getStyleClass().add("version-tag");
+		launchStatus.setTextFill(textColor());
+		launchStatus.setVisible(false);
+		launchStatus.setManaged(false);
+		launchStatus.setWrapText(true);
+
 		Button connect = new Button("Connect");
-		connect.setOnAction(e -> showPlaceholderAlert("Connect",
-				"Installing/launching the game isn't implemented yet, so Velo Client can't join "
-				+ server.name() + " directly - once game launching lands, this button will connect straight to it."));
+		connect.getStyleClass().addAll("title-menu-button", "title-menu-button-primary");
+		Runnable refreshConnectButton = () -> {
+			Instance selected = profilePicker.getValue();
+			if (selected == null) {
+				connect.setDisable(true);
+				connect.setText("Connect");
+				connect.setTooltip(new Tooltip("Assign a mod profile above first."));
+			} else if (session == null) {
+				connect.setDisable(false);
+				connect.setText("Sign In to Connect");
+				connect.setTooltip(new Tooltip("Sign in with your Microsoft account first - this won't connect until you do."));
+			} else {
+				connect.setDisable(false);
+				connect.setText("Connect");
+				connect.setTooltip(new Tooltip("Launch straight into " + server.name()));
+			}
+		};
+		refreshConnectButton.run();
+
+		profilePicker.valueProperty().addListener((obs, oldVal, newVal) -> {
+			SavedServerStore.update(new SavedServer(server.id(), server.name(), server.host(), server.port(),
+					newVal != null ? newVal.id() : null));
+			refreshConnectButton.run();
+		});
+
+		connect.setOnAction(e -> {
+			Instance instance = profilePicker.getValue();
+			if (instance == null) {
+				return;
+			}
+			if (session == null) {
+				SignInDialog.show(stage, MICROSOFT_CLIENT_ID, newSession -> { onSignedIn(newSession); showServers(); },
+						error -> showPlaceholderAlert("Sign-in failed", error));
+				return;
+			}
+			launchWithProgress(instance, server.address(), connect, progressBar, launchStatus);
+		});
+
 		Button refresh = new Button("Refresh");
 		refresh.setOnAction(e -> {
-			status.setText("Pinging...");
-			pingInto(server, status);
+			motd.getChildren().setAll(pingingText());
+			statusLine.setText("");
+			pingInto(server, motd, statusLine);
 		});
 		Button edit = new Button("Edit");
-		edit.setOnAction(e -> net.veloclient.launcher.ui.ServerEditDialog.show(stage, "Edit Server", server.name(), server.host(), server.port())
+		edit.setOnAction(e -> ServerEditDialog.show(stage, "Edit Server", server.name(), server.host(), server.port(),
+				InstanceStore.loadAll(), server.instanceId())
 				.ifPresent(result -> {
-					net.veloclient.launcher.data.SavedServerStore.update(new net.veloclient.launcher.data.SavedServer(
-							server.id(), result.name(), result.host(), result.port()));
+					SavedServerStore.update(new SavedServer(server.id(), result.name(), result.host(), result.port(), result.instanceId()));
 					showServers();
 				}));
 		Button remove = new Button("Remove");
 		remove.setOnAction(e -> {
-			net.veloclient.launcher.data.SavedServerStore.remove(server);
+			SavedServerStore.remove(server);
 			showServers();
 		});
-		actions.getChildren().addAll(connect, refresh, edit, remove);
 
-		card.getChildren().addAll(headerRow, status, actions);
-		pingInto(server, status);
+		HBox profileRow = new HBox(8, new Label("Launch with:"), profilePicker, connect);
+		profileRow.setAlignment(Pos.CENTER_LEFT);
+		((Label) profileRow.getChildren().get(0)).setTextFill(textColor());
+
+		HBox actions = new HBox(8, refresh, edit, remove);
+
+		card.getChildren().addAll(headerRow, motd, statusLine, profileRow, progressBar, launchStatus, actions);
+		pingInto(server, motd, statusLine);
 		return card;
 	}
 
-	private void pingInto(net.veloclient.launcher.data.SavedServer server, Label status) {
+	private void pingInto(SavedServer server, javafx.scene.text.TextFlow motd, Label statusLine) {
 		CompletableFuture
 				.supplyAsync(() -> {
 					try {
@@ -403,12 +512,40 @@ public final class LauncherApp extends Application {
 				}, Executors.newVirtualThreadPerTaskExecutor())
 				.thenAccept(result -> Platform.runLater(() -> {
 					if (result instanceof ServerPinger.PingResult ping) {
-						status.setText(String.format("%s  ·  %d/%d players  ·  %dms  ·  %s",
-								ping.versionName(), ping.onlinePlayers(), ping.maxPlayers(), ping.latencyMillis(), ping.motd()));
+						boolean hasMotd = !net.veloclient.launcher.net.MotdText.plainText(ping.motd()).isBlank();
+						motd.getChildren().setAll(hasMotd ? motdTexts(ping.motd()) : List.of());
+						motd.setVisible(hasMotd);
+						motd.setManaged(hasMotd);
+						statusLine.setText(String.format("%s  ·  %d/%d players  ·  %dms",
+								ping.versionName(), ping.onlinePlayers(), ping.maxPlayers(), ping.latencyMillis()));
 					} else {
-						status.setText("Offline or unreachable (" + ((Exception) result).getMessage() + ")");
+						motd.getChildren().setAll(new javafx.scene.text.Text("Offline or unreachable"));
+						((javafx.scene.text.Text) motd.getChildren().get(0)).setFill(textColor());
+						statusLine.setText(((Exception) result).getMessage());
 					}
 				}));
+	}
+
+	private javafx.scene.text.Text pingingText() {
+		javafx.scene.text.Text text = new javafx.scene.text.Text("Pinging...");
+		text.setFill(textColor());
+		return text;
+	}
+
+	/** Renders each MOTD segment as its own styled {@code Text} run - real color/bold/italic/underline/strikethrough, matching how it actually looks in vanilla's multiplayer screen instead of a flat wall of white text. */
+	private List<javafx.scene.text.Text> motdTexts(List<net.veloclient.launcher.net.MotdText.Segment> segments) {
+		List<javafx.scene.text.Text> texts = new java.util.ArrayList<>();
+		for (net.veloclient.launcher.net.MotdText.Segment segment : segments) {
+			javafx.scene.text.Text text = new javafx.scene.text.Text(segment.text());
+			text.setFill(Color.rgb((segment.argbColor() >> 16) & 0xFF, (segment.argbColor() >> 8) & 0xFF, segment.argbColor() & 0xFF));
+			javafx.scene.text.FontWeight weight = segment.bold() ? FontWeight.BOLD : FontWeight.NORMAL;
+			javafx.scene.text.FontPosture posture = segment.italic() ? javafx.scene.text.FontPosture.ITALIC : javafx.scene.text.FontPosture.REGULAR;
+			text.setFont(Font.font("System", weight, posture, 13));
+			text.setUnderline(segment.underlined());
+			text.setStrikethrough(segment.strikethrough());
+			texts.add(text);
+		}
+		return texts;
 	}
 
 	// ---- Sign-in ----
@@ -458,6 +595,7 @@ public final class LauncherApp extends Application {
 
 	private void showPlaceholderAlert(String title, String message) {
 		Alert alert = new Alert(Alert.AlertType.INFORMATION);
+		alert.initOwner(stage);
 		alert.setTitle(title);
 		alert.setHeaderText(title);
 		alert.setContentText(message);
@@ -465,138 +603,50 @@ public final class LauncherApp extends Application {
 		alert.showAndWait();
 	}
 
-	// ---- Mods ----
-
-	private void showMods() {
-		VBox box = sectionBox("Mods");
-		List<ModuleInfo> modules = ManifestReader.read();
-		if (modules.isEmpty()) {
-			box.getChildren().add(sectionSubtitle(
-					"No manifest.json found yet - launch the game at least once so the mod can export its module list."));
-			setContent(box);
-			return;
-		}
-		box.getChildren().add(sectionSubtitle(modules.size() + " modules installed (read-only browser; toggle them in-game or via a profile)"));
-
-		Map<String, List<ModuleInfo>> byCategory = modules.stream().collect(Collectors.groupingBy(ModuleInfo::category));
-		ScrollPane scroll = new ScrollPane();
-		VBox list = new VBox(10);
-		for (var entry : byCategory.entrySet()) {
-			Label categoryLabel = new Label(entry.getKey());
-			categoryLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
-			categoryLabel.setTextFill(accentColor());
-			list.getChildren().add(categoryLabel);
-			for (ModuleInfo module : entry.getValue()) {
-				Label row = new Label(module.displayName() + "  [" + module.safetyTag() + "]");
-				row.setTextFill(textColor());
-				row.setTooltip(new Tooltip(module.description()));
-				list.getChildren().add(row);
-			}
-		}
-		scroll.setContent(list);
-		scroll.setFitToWidth(true);
-		scroll.getStyleClass().add("scroll-pane");
-		VBox.setVgrow(scroll, Priority.ALWAYS);
-		box.getChildren().add(wrapGlass(scroll));
-		setContent(box);
-	}
-
-	// ---- Cosmetics ----
+	// ---- Cosmetics (capes) ----
 
 	private void showCosmetics() {
-		VBox box = sectionBox("Cosmetics");
-		box.getChildren().add(sectionSubtitle("Cape library - shared with the in-game Capes menu; import, equip, or delete here."));
+		setContent(CosmeticsView.build(stage, new CosmeticsView.Host() {
+			@Override
+			public LauncherTheme activeTheme() {
+				return theme;
+			}
 
-		Button importButton = new Button("Import Cape...");
-		importButton.getStyleClass().add("title-menu-button");
-		importButton.setOnAction(e -> {
-			net.veloclient.launcher.ui.CapeImportDialog.show(stage).ifPresent(result -> {
-				try {
-					net.veloclient.launcher.data.CapeLibrary.importPng(result.name(), result.pngFile(), result.preset());
-					showCosmetics();
-				} catch (Exception ex) {
-					showPlaceholderAlert("Import failed", ex.getMessage());
-				}
-			});
-		});
-		box.getChildren().add(importButton);
-
-		VBox list = new VBox(8);
-		List<net.veloclient.launcher.data.CapeEntry> capes = net.veloclient.launcher.data.CapeLibrary.listAll();
-		String equippedId = net.veloclient.launcher.data.CapeLibrary.equippedCapeId().orElse(null);
-		if (capes.isEmpty()) {
-			list.getChildren().add(sectionSubtitle("No capes imported yet. Textures must be exactly "
-					+ net.veloclient.launcher.data.CapeLibrary.TEXTURE_WIDTH + "x"
-					+ net.veloclient.launcher.data.CapeLibrary.TEXTURE_HEIGHT + " PNGs."));
-		}
-		for (net.veloclient.launcher.data.CapeEntry cape : capes) {
-			boolean equipped = cape.id().equals(equippedId);
-			HBox row = new HBox(10);
-			row.setAlignment(Pos.CENTER_LEFT);
-			Label label = new Label(cape.name() + (equipped ? "  (equipped)" : ""));
-			label.setTextFill(equipped ? accentColor() : textColor());
-			Button equipButton = new Button(equipped ? "Unequip" : "Equip");
-			equipButton.setOnAction(e -> {
-				if (equipped) {
-					net.veloclient.launcher.data.CapeLibrary.unequip();
-				} else {
-					net.veloclient.launcher.data.CapeLibrary.equip(cape.id());
-				}
+			@Override
+			public void rebuild() {
 				showCosmetics();
-			});
-			Button deleteButton = new Button("Delete");
-			deleteButton.setOnAction(e -> {
-				try {
-					net.veloclient.launcher.data.CapeLibrary.delete(cape);
-					showCosmetics();
-				} catch (Exception ex) {
-					showPlaceholderAlert("Delete failed", ex.getMessage());
-				}
-			});
-			row.getChildren().addAll(label, equipButton, deleteButton);
-			list.getChildren().add(row);
-		}
-		ScrollPane scroll = new ScrollPane(list);
-		scroll.setFitToWidth(true);
-		scroll.getStyleClass().add("scroll-pane");
-		VBox.setVgrow(scroll, Priority.ALWAYS);
-		box.getChildren().add(wrapGlass(scroll));
-		setContent(box);
+			}
+		}));
 	}
 
-	// ---- Server Profiles (in-game safe-mode presets - unrelated to the mod "Profiles" below) ----
+	// ---- Theme editor ----
 
-	private void showServerProfiles() {
-		VBox box = sectionBox("Server Profiles");
-		box.getChildren().add(sectionSubtitle("Per-server safe-mode presets from the in-game panel - not the same as the mod profiles you launch from Play."));
-		List<ProfileData> profiles = ProfileStore.loadAll();
-		VBox list = new VBox(8);
-		if (profiles.isEmpty()) {
-			list.getChildren().add(sectionSubtitle("No saved server profiles yet - save one from the in-game panel."));
-		}
-		for (ProfileData profile : profiles) {
-			HBox row = new HBox(10);
-			row.setAlignment(Pos.CENTER_LEFT);
-			Label label = new Label(profile.name() + "  (" + String.join(", ", profile.addressPatterns()) + ")"
-					+ (profile.safeMode() ? "  [Safe Mode]" : ""));
-			label.setTextFill(textColor());
-			Button delete = new Button("Delete");
-			delete.setOnAction(e -> {
-				ProfileStore.delete(profile);
-				showServerProfiles();
-			});
-			row.getChildren().addAll(label, delete);
-			list.getChildren().add(row);
-		}
-		box.getChildren().add(wrapGlass(list));
-		setContent(box);
+	private void showThemeEditor() {
+		setContent(ThemeEditorView.build(new ThemeEditorView.Host() {
+			@Override
+			public LauncherTheme activeTheme() {
+				return theme;
+			}
+
+			@Override
+			public void setActiveTheme(LauncherTheme newTheme) {
+				theme = newTheme;
+				ThemeStore.save(theme);
+				applyTheme();
+			}
+
+			@Override
+			public void rebuild() {
+				showThemeEditor();
+			}
+		}));
 	}
 
 	// ---- Profiles (mod loadouts you launch with Play) ----
 
 	private void showInstances() {
 		VBox box = sectionBox("Profiles");
-		box.getChildren().add(sectionSubtitle("Each profile is its own mods folder + Minecraft version. Click its icon to manage mods, or press Play to install and launch it."));
+		box.getChildren().add(sectionSubtitle("Each profile is its own mods folder + Minecraft version. Click its icon to manage mods/resource packs/shaders, the gear for RAM settings, or press Play to install and launch it."));
 
 		FlowPane grid = new FlowPane(16, 16);
 		for (Instance instance : InstanceStore.loadAll()) {
@@ -620,7 +670,7 @@ public final class LauncherApp extends Application {
 
 		Node icon = renderInstanceIcon(instance, 72);
 		icon.getStyleClass().add("instance-icon-button");
-		icon.setOnMouseClicked(e -> InstanceModsDialog.show(stage, instance.name(), InstancePaths.modsDir(instance.id())));
+		icon.setOnMouseClicked(e -> showInstanceDetail(instance));
 
 		Label name = new Label(instance.name());
 		name.setFont(Font.font("System", FontWeight.BOLD, 15));
@@ -631,9 +681,21 @@ public final class LauncherApp extends Application {
 		version.getStyleClass().add("version-tag");
 		version.setTextFill(textColor());
 
-		Button playButton = new Button("Play");
+		HBox playRow = new HBox(6);
+		boolean signedIn = session != null;
+		Button playButton = new Button(signedIn ? "Play" : "Sign In to Play");
 		playButton.getStyleClass().addAll("title-menu-button", "title-menu-button-primary");
 		playButton.setMaxWidth(Double.MAX_VALUE);
+		playButton.setTooltip(new Tooltip(signedIn ? "Install and launch " + instance.name()
+				: "Sign in with your Microsoft account first - this won't launch anything until you do."));
+		HBox.setHgrow(playButton, Priority.ALWAYS);
+		Button settingsButton = new Button("⚙");
+		settingsButton.setTooltip(new Tooltip("RAM & JVM settings"));
+		settingsButton.setOnAction(e -> InstanceSettingsDialog.show(stage, instance).ifPresent(updated -> {
+			InstanceStore.save(updated);
+			showInstances();
+		}));
+		playRow.getChildren().addAll(playButton, settingsButton);
 
 		ProgressBar progressBar = new ProgressBar(0);
 		progressBar.setMaxWidth(Double.MAX_VALUE);
@@ -646,7 +708,14 @@ public final class LauncherApp extends Application {
 		statusLabel.setManaged(false);
 		statusLabel.setWrapText(true);
 
-		playButton.setOnAction(e -> launchInstance(instance, playButton, progressBar, statusLabel));
+		playButton.setOnAction(e -> {
+			if (session == null) {
+				SignInDialog.show(stage, MICROSOFT_CLIENT_ID, newSession -> { onSignedIn(newSession); showInstances(); },
+						error -> showPlaceholderAlert("Sign-in failed", error));
+			} else {
+				launchInstance(instance, playButton, progressBar, statusLabel);
+			}
+		});
 
 		HBox actions = new HBox(6);
 		actions.setAlignment(Pos.CENTER);
@@ -656,8 +725,12 @@ public final class LauncherApp extends Application {
 		deleteButton.setOnAction(e -> confirmDeleteInstance(instance));
 		actions.getChildren().addAll(editButton, deleteButton);
 
-		card.getChildren().addAll(icon, name, version, playButton, progressBar, statusLabel, actions);
+		card.getChildren().addAll(icon, name, version, playRow, progressBar, statusLabel, actions);
 		return card;
+	}
+
+	private void showInstanceDetail(Instance instance) {
+		setContent(InstanceDetailView.build(stage, instance, theme, this::showInstances));
 	}
 
 	private VBox buildNewInstanceTile() {
@@ -690,7 +763,8 @@ public final class LauncherApp extends Application {
 				.ifPresent(result -> {
 					Instance updated = new Instance(instance.id(),
 							result.name().isBlank() ? instance.name() : result.name(),
-							result.mcVersion(), result.icon(), instance.createdAtEpochMillis());
+							result.mcVersion(), result.icon(), instance.createdAtEpochMillis(),
+							instance.ramMinMb(), instance.ramMaxMb(), instance.extraJvmArgs());
 					InstanceStore.save(updated);
 					applyIconChoice(updated, result);
 					installModLoaderJars(updated);
@@ -733,6 +807,7 @@ public final class LauncherApp extends Application {
 
 	private void confirmDeleteInstance(Instance instance) {
 		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+		alert.initOwner(stage);
 		alert.setTitle("Delete Profile");
 		alert.setHeaderText("Delete \"" + instance.name() + "\"?");
 		alert.setContentText("This deletes its mods, saves, and config. This can't be undone.");
@@ -759,8 +834,13 @@ public final class LauncherApp extends Application {
 	}
 
 	private void launchInstance(Instance instance, Button playButton, ProgressBar progressBar, Label statusLabel) {
+		launchWithProgress(instance, null, playButton, progressBar, statusLabel);
+	}
+
+	/** @param quickPlayTarget nullable "host:port" - when present, launches straight into that server (My Servers' Connect). */
+	private void launchWithProgress(Instance instance, String quickPlayTarget, Button triggerButton, ProgressBar progressBar, Label statusLabel) {
 		requireSignedIn(activeSession -> {
-			playButton.setDisable(true);
+			triggerButton.setDisable(true);
 			progressBar.setProgress(0);
 			progressBar.setVisible(true);
 			progressBar.setManaged(true);
@@ -783,34 +863,45 @@ public final class LauncherApp extends Application {
 				}
 			};
 
+			long startedAt = System.currentTimeMillis();
 			Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
 				try {
-					Process process = GameLauncher.launch(instance, activeSession, listener);
+					Process process = GameLauncher.launch(instance, activeSession, listener, quickPlayTarget);
 					Platform.runLater(() -> {
 						statusLabel.setText("Running - " + instance.name());
 						progressBar.setProgress(1.0);
 					});
 					int exitCode = process.waitFor();
+					boolean crashedEarly = exitCode != 0 && (System.currentTimeMillis() - startedAt) < 15_000;
 					Platform.runLater(() -> {
-						playButton.setDisable(false);
+						triggerButton.setDisable(false);
 						progressBar.setVisible(false);
 						progressBar.setManaged(false);
 						statusLabel.setText(exitCode == 0 ? "" : "Minecraft exited with code " + exitCode);
 						statusLabel.setVisible(exitCode != 0);
 						statusLabel.setManaged(exitCode != 0);
+						if (exitCode != 0) {
+							ErrorDialog.showLaunchFailure(stage, instance, exitCode, crashedEarly);
+						}
 					});
 				} catch (Exception e) {
 					Platform.runLater(() -> {
-						playButton.setDisable(false);
+						triggerButton.setDisable(false);
 						progressBar.setVisible(false);
 						progressBar.setManaged(false);
 						statusLabel.setVisible(false);
 						statusLabel.setManaged(false);
-						showPlaceholderAlert("Couldn't launch " + instance.name(), e.getMessage());
+						ErrorDialog.show(stage, "Couldn't launch " + instance.name(), e.getMessage(), stackTraceOf(e), null);
 					});
 				}
 			});
 		});
+	}
+
+	private static String stackTraceOf(Throwable t) {
+		java.io.StringWriter sw = new java.io.StringWriter();
+		t.printStackTrace(new java.io.PrintWriter(sw));
+		return sw.toString();
 	}
 
 	/** Runs {@code action} with a signed-in, non-expired session - signing in (or refreshing) first if needed. */
@@ -861,55 +952,6 @@ public final class LauncherApp extends Application {
 		}
 		box.getChildren().add(wrapGlass(list));
 		setContent(box);
-	}
-
-	// ---- Theme editor ----
-
-	private void showThemeEditor() {
-		VBox box = sectionBox("Theme Editor");
-		FlowPane presets = new FlowPane(8, 8);
-		for (LauncherTheme preset : LauncherThemePresets.all().values()) {
-			Button button = new Button(preset.name() + (preset.name().equals(theme.name()) ? " (active)" : ""));
-			button.setOnAction(e -> {
-				theme = preset;
-				ThemeStore.save(theme);
-				applyTheme();
-				showThemeEditor();
-			});
-			presets.getChildren().add(button);
-		}
-		box.getChildren().add(presets);
-
-		VBox sliders = new VBox(10);
-		sliders.getChildren().add(sectionSubtitle("Corner Radius: " + theme.cornerRadius()));
-		sliders.getChildren().add(slider(0, 16, theme.cornerRadius(), v -> withTheme(t -> new LauncherTheme(
-				t.name(), t.background(), t.surface(), t.accentStart(), t.accentEnd(), t.text(), (int) v,
-				t.blurIntensity(), t.animationSpeed(), t.panelOpacity()))));
-
-		sliders.getChildren().add(sectionSubtitle("Blur Intensity: " + theme.blurIntensity()));
-		sliders.getChildren().add(slider(0, 1, theme.blurIntensity(), v -> withTheme(t -> new LauncherTheme(
-				t.name(), t.background(), t.surface(), t.accentStart(), t.accentEnd(), t.text(), t.cornerRadius(),
-				(float) v, t.animationSpeed(), t.panelOpacity()))));
-
-		sliders.getChildren().add(sectionSubtitle("Panel Opacity: " + theme.panelOpacity()));
-		sliders.getChildren().add(slider(0, 1, theme.panelOpacity(), v -> withTheme(t -> new LauncherTheme(
-				t.name(), t.background(), t.surface(), t.accentStart(), t.accentEnd(), t.text(), t.cornerRadius(),
-				t.blurIntensity(), t.animationSpeed(), (float) v))));
-		box.getChildren().add(wrapGlass(sliders));
-
-		setContent(box);
-	}
-
-	private Slider slider(double min, double max, double value, java.util.function.DoubleConsumer onChange) {
-		Slider slider = new Slider(min, max, value);
-		slider.valueProperty().addListener((obs, oldVal, newVal) -> onChange.accept(newVal.doubleValue()));
-		return slider;
-	}
-
-	private void withTheme(java.util.function.Function<LauncherTheme, LauncherTheme> mutator) {
-		theme = mutator.apply(theme);
-		ThemeStore.save(theme);
-		applyTheme();
 	}
 
 	// ---- Shared styling helpers ----
