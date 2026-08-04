@@ -162,6 +162,15 @@ public final class GameLauncher {
 		List<String> jvmArgs = new ArrayList<>();
 		jvmArgs.add("-Xmx" + maxMemoryMb + "m");
 		jvmArgs.add("-Xms" + minMemoryMb + "m");
+		// Windows' dual-stack connection ordering can spend the whole
+		// connect timeout on a broken/unreachable IPv6 route before ever
+		// falling back to IPv4 for a specific host, timing the connection
+		// out entirely even though the server is reachable and up - Linux's
+		// stack doesn't exhibit this the same way, which is why this only
+		// shows up for some players/some servers on Windows. Forcing the
+		// JVM to resolve IPv4-only sidesteps it; it's the standard fix for
+		// this exact class of intermittent Minecraft connection timeout.
+		jvmArgs.add("-Djava.net.preferIPv4Stack=true");
 		if (instance.extraJvmArgs() != null && !instance.extraJvmArgs().isBlank()) {
 			for (String arg : instance.extraJvmArgs().trim().split("\\s+")) {
 				jvmArgs.add(arg);

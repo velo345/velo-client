@@ -65,6 +65,13 @@ public final class VeloClientMod implements ClientModInitializer {
 		CapeFeatureRenderer.register();
 		net.veloclient.velo.client.gui.VeloBranding.register();
 		net.veloclient.velo.client.profile.VeloProfileStore.loadActiveDeferred();
+		// Previously only loaded lazily the first time the Crosshair select
+		// screen was opened, so the persisted "equipped" crosshair never
+		// actually rendered on a fresh launch - CustomCrosshairModule reads
+		// CrosshairManager.equipped() every frame, which stayed null until
+		// then, until the user opened that screen (which happened to load
+		// it) at least once.
+		net.veloclient.velo.client.crosshair.CrosshairManager.loadLibrary();
 		ModuleRegistry.exportManifest();
 		VeloClient.LOGGER.info("Velo Client ready ({} modules registered)", ModuleRegistry.all().size());
 	}
