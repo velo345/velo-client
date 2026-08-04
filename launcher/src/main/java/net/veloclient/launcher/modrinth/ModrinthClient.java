@@ -99,8 +99,13 @@ public final class ModrinthClient {
 			int offset, int limit) throws IOException {
 		JsonArray facets = new JsonArray();
 		facets.add(singleFacet("project_type:" + projectType));
-		facets.add(singleFacet("versions:" + gameVersion));
 		if ("mod".equals(projectType)) {
+			// Resource packs/shaders aren't loader-specific and plenty of them
+			// never bother tagging every individual game version (especially
+			// this project's own less-common target versions), so a strict
+			// versions: facet there returned nothing installable at all - only
+			// mods actually need this to be filtered this tightly.
+			facets.add(singleFacet("versions:" + gameVersion));
 			facets.add(singleFacet("categories:fabric"));
 		}
 
@@ -119,12 +124,25 @@ public final class ModrinthClient {
 		return new SearchResult(hits, total);
 	}
 
-	/** Versions of {@code projectId} compatible with {@code gameVersion} on Fabric, newest first (Modrinth's own default order). */
+	/** Versions of {@code projectId} compatible with {@code gameVersion} on Fabric, newest first (Modrinth's own default order). Mods only - see {@link #versions(String, String, String)} for resource packs/shaders. */
 	public static List<ProjectVersion> versions(String projectId, String gameVersion) throws IOException {
-		String url = API_BASE + "/project/" + encode(projectId) + "/version"
-				+ "?game_versions=" + encode("[\"" + gameVersion + "\"]")
-				+ "&loaders=" + encode("[\"fabric\"]");
-		JsonObject response = wrapArray(getRaw(url));
+		return versions(projectId, gameVersion, "mod");
+	}
+
+	/**
+	 * @param projectType same version/loader-filtering exception as {@link #search}:
+	 *                    resource packs and shaders aren't Fabric-loader-specific and
+	 *                    often don't tag every game version, so only "mod" actually
+	 *                    filters by {@code gameVersion}/{@code fabric} - everything
+	 *                    else returns every published version, unfiltered.
+	 */
+	public static List<ProjectVersion> versions(String projectId, String gameVersion, String projectType) throws IOException {
+		StringBuilder url = new StringBuilder(API_BASE).append("/project/").append(encode(projectId)).append("/version");
+		if ("mod".equals(projectType)) {
+			url.append("?game_versions=").append(encode("[\"" + gameVersion + "\"]"))
+					.append("&loaders=").append(encode("[\"fabric\"]"));
+		}
+		JsonObject response = wrapArray(getRaw(url.toString()));
 		List<ProjectVersion> versions = new ArrayList<>();
 		for (var element : response.getAsJsonArray("array")) {
 			versions.add(GSON.fromJson(element, ProjectVersion.class));

@@ -317,7 +317,7 @@ public final class InstanceDetailView {
 			Path folder, InstalledAsset asset, Label updateBadge, ProgressBar progress, Runnable refresh) {
 		CompletableFuture.supplyAsync(() -> {
 			try {
-				return ModrinthClient.versions(asset.projectId(), instance.mcVersion());
+				return ModrinthClient.versions(asset.projectId(), instance.mcVersion(), kind.modrinthProjectType());
 			} catch (IOException e) {
 				return List.<ModrinthClient.ProjectVersion>of();
 			}
@@ -369,14 +369,25 @@ public final class InstanceDetailView {
 		root.getChildren().add(searchRow);
 
 		FlowPane results = new FlowPane(14, 14);
-		ScrollPane resultsScroll = new ScrollPane(results);
+		Button loadMore = new Button("Load More");
+		loadMore.getStyleClass().add("button-compact");
+		loadMore.setMaxWidth(Double.MAX_VALUE);
+		loadMore.setVisible(false);
+		loadMore.setManaged(false);
+		VBox resultsColumn = new VBox(14, results, loadMore);
+		ScrollPane resultsScroll = new ScrollPane(resultsColumn);
 		resultsScroll.setFitToWidth(true);
 		resultsScroll.getStyleClass().add("scroll-pane");
 		VBox.setVgrow(resultsScroll, Priority.ALWAYS);
 		root.getChildren().add(resultsScroll);
 
-		Runnable runSearch = () -> {
-			results.getChildren().setAll(loadingLabel(theme));
+		int[] offset = {0};
+		int pageSize = 40;
+
+		Runnable[] loadPage = new Runnable[1];
+		loadPage[0] = () -> {
+			boolean firstPage = offset[0] == 0;
+			loadMore.setDisable(true);
 			String sortIndex = switch (sort.getValue()) {
 				case "Downloads" -> "downloads";
 				case "Follows" -> "follows";
@@ -386,27 +397,49 @@ public final class InstanceDetailView {
 			};
 			CompletableFuture.supplyAsync(() -> {
 				try {
-					return ModrinthClient.search(query.getText(), kind.modrinthProjectType(), instance.mcVersion(), sortIndex, 0, 40);
+					return ModrinthClient.search(query.getText(), kind.modrinthProjectType(), instance.mcVersion(), sortIndex, offset[0], pageSize);
 				} catch (IOException e) {
 					return e;
 				}
 			}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
-				results.getChildren().clear();
+				loadMore.setDisable(false);
 				if (result instanceof Exception ex) {
-					results.getChildren().add(messageLabel("Search failed: " + ex.getMessage(), theme));
+					if (firstPage) {
+						results.getChildren().setAll(messageLabel("Search failed: " + ex.getMessage(), theme));
+					}
+					loadMore.setVisible(false);
+					loadMore.setManaged(false);
 					return;
 				}
 				@SuppressWarnings("unchecked")
 				ModrinthClient.SearchResult search = (ModrinthClient.SearchResult) result;
-				if (search.hits().isEmpty()) {
-					results.getChildren().add(messageLabel("No results.", theme));
-					return;
+				if (firstPage) {
+					results.getChildren().clear();
+					if (search.hits().isEmpty()) {
+						results.getChildren().add(messageLabel("No results.", theme));
+						loadMore.setVisible(false);
+						loadMore.setManaged(false);
+						return;
+					}
 				}
 				for (ModrinthClient.SearchHit hit : search.hits()) {
-					results.getChildren().add(buildSearchResultCard(owner, overlayHost, instance, theme, kind, folder, hit, onBack));
+					results.getChildren().add(buildSearchResultCard(owner, overlayHost, instance, theme, kind, folder, hit));
 				}
+				offset[0] += search.hits().size();
+				boolean hasMore = !search.hits().isEmpty() && offset[0] < search.totalHits();
+				loadMore.setVisible(hasMore);
+				loadMore.setManaged(hasMore);
 			}));
 		};
+
+		Runnable runSearch = () -> {
+			offset[0] = 0;
+			results.getChildren().setAll(loadingLabel(theme));
+			loadMore.setVisible(false);
+			loadMore.setManaged(false);
+			loadPage[0].run();
+		};
+		loadMore.setOnAction(e -> loadPage[0].run());
 		searchButton.setOnAction(e -> runSearch.run());
 		query.setOnAction(e -> runSearch.run());
 		sort.setOnAction(e -> runSearch.run());
@@ -417,7 +450,7 @@ public final class InstanceDetailView {
 	}
 
 	private static Node buildSearchResultCard(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
-			Path folder, ModrinthClient.SearchHit hit, Runnable refreshInstalledAfterInstall) {
+			Path folder, ModrinthClient.SearchHit hit) {
 		VBox card = new VBox(8);
 		card.getStyleClass().add("search-card");
 		card.setPrefWidth(190);
@@ -466,24 +499,33 @@ public final class InstanceDetailView {
 				install.setDisable(true);
 				CompletableFuture.supplyAsync(() -> {
 					try {
-						return ModrinthClient.versions(hit.projectId(), instance.mcVersion());
+						return ModrinthClient.versions(hit.projectId(), instance.mcVersion(), kind.modrinthProjectType());
 					} catch (IOException ex) {
 						return ex;
 					}
 				}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
-					install.setDisable(false);
 					if (result instanceof Exception ex) {
+						install.setDisable(false);
 						error(owner, "Couldn't load versions", ex.getMessage());
 						return;
 					}
 					@SuppressWarnings("unchecked")
 					List<ModrinthClient.ProjectVersion> versions = (List<ModrinthClient.ProjectVersion>) result;
 					if (versions.isEmpty()) {
-						error(owner, "No compatible version", hit.title() + " has no version published for Minecraft " + instance.mcVersion() + " on Fabric.");
+						install.setDisable(false);
+						error(owner, "No compatible version", hit.title() + " has no version published"
+								+ ("mod".equals(kind.modrinthProjectType()) ? " for Minecraft " + instance.mcVersion() + " on Fabric." : " at all."));
 						return;
 					}
+					// Stay on the search results after installing (so browsing
+					// and installing several things in a row doesn't keep
+					// kicking you back to the installed list) - just flip this
+					// card's own button once it's done, instead of navigating.
 					showVersionPicker(overlayHost, theme, instance, hit.title(), versions, plan ->
-							installWithDependencies(owner, instance, kind, folder, plan, null, progress, refreshInstalledAfterInstall));
+							installWithDependencies(owner, instance, kind, folder, plan, null, progress, () -> {
+								install.setText("Installed");
+								install.setDisable(true);
+							}));
 				}));
 			});
 		}

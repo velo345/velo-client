@@ -149,6 +149,9 @@ public final class PlayerSkin3DView {
 		wrapper.addEventHandler(ScrollEvent.SCROLL, e -> {
 			double z = camera.getTranslateZ() + e.getDeltaY() * 0.15;
 			camera.setTranslateZ(Math.max(-180, Math.min(-35, z)));
+			// Without this, the scroll also bubbled up to whatever ScrollPane
+			// this viewer sits inside (the profile page) and scrolled that too.
+			e.consume();
 		});
 
 		return wrapper;
