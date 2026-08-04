@@ -216,6 +216,25 @@ tasks.register("jpackageDist") {
 				"--main-jar", jarFile.get().asFile.name,
 				"--main-class", "net.veloclient.launcher.LauncherApp",
 				"--icon", iconFile.absolutePath,
+				// Without this, jpackage runs jdeps against only the
+				// launcher's *own* classpath (JavaFX/our own GUI code) to
+				// decide which JDK modules to bundle into the runtime image
+				// - and GameLauncher runs the actual downloaded Minecraft
+				// jars under this exact same bundled runtime (java.home),
+				// not a separate JDK. That trimmed image is missing modules
+				// Minecraft itself needs but the launcher's own code never
+				// touches - confirmed in a real crash log: vanilla's own DNS
+				// SRV redirect resolver needs jdk.naming.dns
+				// (com.sun.jndi.dns.DnsContextFactory), which jdeps has no
+				// way to see coming since it's loaded by fully-qualified
+				// class name at runtime, not a static reference. There's no
+				// way to enumerate everything an arbitrary downloaded
+				// Minecraft/Fabric version might need, so bundle the whole
+				// JDK's module set instead of guessing - this is jpackage's
+				// own supported flag for that (unlike the two approaches
+				// referenced above, it doesn't touch the runtime after the
+				// fact or fight jpackage's own build).
+				"--add-modules", "ALL-MODULE-PATH",
 				// The app runs off the classpath (--main-jar/--main-class, no
 				// module-info), but JavaFX's own launch check still requires
 				// javafx.controls/javafx.graphics to be resolvable as modules -
