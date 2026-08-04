@@ -23,9 +23,15 @@ public final class MouseButtonsModule extends AbstractModule implements HudModul
 
 	private static final int MOUSE_WIDTH = 34;
 	private static final int MOUSE_HEIGHT = 54;
+	private static final int INSET = 2;
+	private static final int TOP_HEIGHT = MOUSE_HEIGHT / 2 - INSET;
 	private final HudPosition position = new HudPosition(0.02f, 0.66f);
 
 	private boolean showCps = true;
+	// Off by default - the plain body box below the two buttons is mostly
+	// dead space and most CPS/click overlays (this one included, before this
+	// setting existed) look cleaner without it.
+	private boolean showBodyBox = false;
 	private int pressedColor = 0xFFFF4444;
 	private int idleColor = 0xCC1E1212;
 
@@ -47,18 +53,20 @@ public final class MouseButtonsModule extends AbstractModule implements HudModul
 		boolean leftPressed = options.attackKey.isPressed();
 		boolean rightPressed = options.useKey.isPressed();
 
-		int inset = 2;
+		int inset = INSET;
 		int bodyW = MOUSE_WIDTH - inset * 2;
 		int halfW = bodyW / 2;
-		int topH = MOUSE_HEIGHT / 2 - inset;
+		int topH = TOP_HEIGHT;
 
 		int leftColor = leftPressed ? pressedColor : idleColor;
 		int rightColor = rightPressed ? pressedColor : idleColor;
-		int bottomColor = (idleColor & 0x00FFFFFF) | 0x88000000;
 
 		context.fill(x + inset, y + inset, x + inset + halfW - 1, y + inset + topH, leftColor);
 		context.fill(x + inset + halfW + 1, y + inset, x + MOUSE_WIDTH - inset, y + inset + topH, rightColor);
-		context.fill(x + inset, y + inset + topH + 2, x + MOUSE_WIDTH - inset, y + MOUSE_HEIGHT - inset, bottomColor);
+		if (showBodyBox) {
+			int bottomColor = (idleColor & 0x00FFFFFF) | 0x88000000;
+			context.fill(x + inset, y + inset + topH + 2, x + MOUSE_WIDTH - inset, y + MOUSE_HEIGHT - inset, bottomColor);
+		}
 
 		if (showCps) {
 			String leftCps = String.valueOf(CpsTracker.leftCps());
@@ -77,13 +85,14 @@ public final class MouseButtonsModule extends AbstractModule implements HudModul
 
 	@Override
 	public int height() {
-		return MOUSE_HEIGHT;
+		return showBodyBox ? MOUSE_HEIGHT : TOP_HEIGHT + INSET * 2;
 	}
 
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
 				new ConfigField.ToggleField("Show CPS Numbers", () -> showCps, v -> showCps = v),
+				new ConfigField.ToggleField("Show Body Box", () -> showBodyBox, v -> showBodyBox = v),
 				new ConfigField.ColorField("Pressed Color", () -> pressedColor, v -> pressedColor = v, true),
 				new ConfigField.ColorField("Idle Color", () -> idleColor, v -> idleColor = v, true));
 	}

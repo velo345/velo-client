@@ -28,7 +28,9 @@ public final class ServerPinger {
 	private ServerPinger() {
 	}
 
-	public record PingResult(List<MotdText.Segment> motd, int onlinePlayers, int maxPlayers, String versionName, long latencyMillis) {
+	/** @param faviconPngBase64 nullable - the raw base64 payload of the server's 64x64 favicon PNG (the "favicon" field vanilla's own multiplayer screen shows), without the {@code data:image/png;base64,} prefix. */
+	public record PingResult(List<MotdText.Segment> motd, int onlinePlayers, int maxPlayers, String versionName,
+			long latencyMillis, String faviconPngBase64) {
 	}
 
 	public static PingResult ping(String host, int port) throws IOException {
@@ -62,7 +64,13 @@ public final class ServerPinger {
 			String version = root.has("version") && root.getAsJsonObject("version").has("name")
 					? root.getAsJsonObject("version").get("name").getAsString()
 					: "unknown";
-			return new PingResult(motd, online, max, version, latency);
+			String favicon = null;
+			if (root.has("favicon") && !root.get("favicon").isJsonNull()) {
+				String raw = root.get("favicon").getAsString();
+				int comma = raw.indexOf(',');
+				favicon = comma >= 0 ? raw.substring(comma + 1) : raw;
+			}
+			return new PingResult(motd, online, max, version, latency, favicon);
 		}
 	}
 

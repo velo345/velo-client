@@ -13,7 +13,10 @@ import net.veloclient.velo.module.SafetyTag;
 /** Shows round-trip latency to the server, same value vanilla shows next to your name in the tab list. */
 public final class PingDisplayModule extends AbstractModule implements HudModule {
 
-	private final HudPosition position = new HudPosition(0.98f, 0.07f);
+	// Stacked just under Clock (also bottom-right by default) rather than
+	// top-right, which Scoreboard (also on by default) owns and can grow
+	// tall into.
+	private final HudPosition position = new HudPosition(0.98f, 0.95f);
 
 	public PingDisplayModule() {
 		super("ping-display", "Ping Display", "Shows your connection latency to the server.",

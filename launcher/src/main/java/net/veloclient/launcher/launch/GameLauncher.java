@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.UUID;
 
 /**
  * Resolves and downloads everything a profile needs, then launches Minecraft
@@ -36,15 +37,25 @@ public final class GameLauncher {
 	private static final int DEFAULT_MAX_MEMORY_MB = 4096;
 	private static final int DEFAULT_MIN_MEMORY_MB = 1024;
 
+	/**
+	 * @param process the running game process
+	 * @param logFile this run's own launcher log ({@code logs/launcher_<runId>.log}) - not shared with any other
+	 *                concurrent run of the same (or another) instance, so multiple instances/runs can be live-tailed independently
+	 * @param runId   unique per launch attempt, even for two concurrent launches of the same {@link Instance}
+	 */
+	public record LaunchResult(Process process, Path logFile, String runId) {
+	}
+
 	private GameLauncher() {
 	}
 
-	public static Process launch(Instance instance, MinecraftSession session, LaunchProgressListener listener) throws IOException {
+	public static LaunchResult launch(Instance instance, MinecraftSession session, LaunchProgressListener listener) throws IOException {
 		return launch(instance, session, listener, null);
 	}
 
 	/** @param quickPlayServerAddress nullable "host:port" - when present, launches straight into that server via Mojang's Quick Play Multiplayer feature instead of to the title screen. */
-	public static Process launch(Instance instance, MinecraftSession session, LaunchProgressListener listener, String quickPlayServerAddress) throws IOException {
+	public static LaunchResult launch(Instance instance, MinecraftSession session, LaunchProgressListener listener, String quickPlayServerAddress) throws IOException {
+		String runId = UUID.randomUUID().toString();
 		GameVersion version = GameVersion.byId(instance.mcVersion());
 		GameDataPaths.ensureDirectories(version.id());
 		InstancePaths.ensureDirectories(instance.id());
@@ -87,7 +98,7 @@ public final class GameLauncher {
 		listener.onProgress(1.0);
 
 		listener.onPhase("Starting Minecraft...");
-		return startProcess(instance, version, vanilla, fabric, libraries, clientJar, nativesDir, session, quickPlayServerAddress);
+		return startProcess(instance, version, vanilla, fabric, libraries, clientJar, nativesDir, session, quickPlayServerAddress, runId);
 	}
 
 	private static void downloadLibraries(List<LibraryResolver.ResolvedLibrary> libraries, LaunchProgressListener listener) throws IOException {
@@ -116,9 +127,9 @@ public final class GameLauncher {
 		}
 	}
 
-	private static Process startProcess(Instance instance, GameVersion version, JsonObject vanilla, JsonObject fabric,
+	private static LaunchResult startProcess(Instance instance, GameVersion version, JsonObject vanilla, JsonObject fabric,
 			List<LibraryResolver.ResolvedLibrary> libraries, Path clientJar, Path nativesDir, MinecraftSession session,
-			String quickPlayServerAddress) throws IOException {
+			String quickPlayServerAddress, String runId) throws IOException {
 		String classpath = buildClasspath(libraries, clientJar);
 		String mainClass = fabric.get("mainClass").getAsString();
 		Path gameDir = InstancePaths.gameDir(instance.id());
@@ -174,12 +185,12 @@ public final class GameLauncher {
 		command.addAll(gameArgs);
 
 		Files.createDirectories(gameDir);
-		Path logFile = InstancePaths.logsDir(instance.id()).resolve("latest_launcher.log");
+		Path logFile = InstancePaths.logsDir(instance.id()).resolve("launcher_" + runId + ".log");
 		ProcessBuilder builder = new ProcessBuilder(command)
 				.directory(gameDir.toFile())
 				.redirectOutput(logFile.toFile())
 				.redirectErrorStream(true);
-		return builder.start();
+		return new LaunchResult(builder.start(), logFile, runId);
 	}
 
 	private static String buildClasspath(List<LibraryResolver.ResolvedLibrary> libraries, Path clientJar) {

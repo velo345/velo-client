@@ -18,6 +18,7 @@ import net.veloclient.launcher.auth.AuthSession;
 import net.veloclient.launcher.auth.MicrosoftAuth;
 import net.veloclient.launcher.auth.MinecraftSession;
 import net.veloclient.launcher.auth.SkinFetcher;
+import net.veloclient.launcher.data.QuickLaunchStore;
 import net.veloclient.launcher.data.SavedServer;
 import net.veloclient.launcher.data.SavedServerStore;
 import net.veloclient.launcher.data.VeloPaths;
@@ -26,6 +27,7 @@ import net.veloclient.launcher.instance.Instance;
 import net.veloclient.launcher.instance.InstanceIcon;
 import net.veloclient.launcher.instance.InstancePaths;
 import net.veloclient.launcher.instance.InstanceStore;
+import net.veloclient.launcher.instance.RunningInstanceManager;
 import net.veloclient.launcher.launch.FabricApiInstaller;
 import net.veloclient.launcher.launch.GameJars;
 import net.veloclient.launcher.launch.GameLauncher;
@@ -43,7 +45,9 @@ import net.veloclient.launcher.ui.InstanceEditDialog;
 import net.veloclient.launcher.ui.InstanceSettingsDialog;
 import net.veloclient.launcher.ui.ParticleBackground;
 import net.veloclient.launcher.ui.PlayerHeadView;
+import net.veloclient.launcher.ui.RunningInstanceView;
 import net.veloclient.launcher.ui.ServerEditDialog;
+import net.veloclient.launcher.ui.ServerFaviconCache;
 import net.veloclient.launcher.ui.SignInDialog;
 import net.veloclient.launcher.ui.ThemeEditorView;
 
@@ -95,6 +99,8 @@ public final class LauncherApp extends Application {
 	private Label accountLabel;
 	private Button accountButton;
 	private Button navHome, navInstances, navCosmetics, navTheme, navSettings;
+	private VBox runningSection;
+	private VBox quickLaunchSection;
 
 	public static void main(String[] args) {
 		launch(args);
@@ -160,7 +166,7 @@ public final class LauncherApp extends Application {
 		VBox sidebar = new VBox(4);
 		sidebar.getStyleClass().add("sidebar");
 		sidebar.setPadding(new Insets(22, 12, 16, 12));
-		sidebar.setPrefWidth(170);
+		sidebar.setPrefWidth(190);
 
 		Label title = new Label("VELO CLIENT");
 		title.getStyleClass().add("sidebar-title");
@@ -174,15 +180,182 @@ public final class LauncherApp extends Application {
 		navSettings = navButton("Settings", this::showSettings);
 
 		sidebar.getChildren().addAll(title, navHome, navInstances, navCosmetics, navTheme, navSettings);
-		VBox spacer = new VBox();
-		VBox.setVgrow(spacer, Priority.ALWAYS);
-		sidebar.getChildren().add(spacer);
+
+		// "Running" (live instances) and "Quick Launch" (recent one-click
+		// shortcuts) - deliberately separated from the fixed nav above by
+		// their own scrollable region, since either can grow past the
+		// window's height once several profiles/servers are in play.
+		runningSection = new VBox(4);
+		quickLaunchSection = new VBox(4);
+		VBox extras = new VBox(12, runningSection, quickLaunchSection);
+		extras.setPadding(new Insets(14, 0, 0, 0));
+		ScrollPane extrasScroll = new ScrollPane(extras);
+		extrasScroll.setFitToWidth(true);
+		extrasScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		extrasScroll.getStyleClass().add("sidebar-scroll");
+		VBox.setVgrow(extrasScroll, Priority.ALWAYS);
+		sidebar.getChildren().add(extrasScroll);
 
 		Label version = new Label("v" + AppVersion.VERSION);
 		version.getStyleClass().add("version-tag");
 		version.setTextFill(textColor());
 		sidebar.getChildren().add(version);
+
+		RunningInstanceManager.running().addListener((javafx.collections.ListChangeListener<RunningInstanceManager.RunningInstance>) c -> refreshRunningSidebar());
+		refreshRunningSidebar();
+		refreshQuickLaunchSidebar();
 		return sidebar;
+	}
+
+	// ---- Sidebar: Running instances ----
+
+	private void refreshRunningSidebar() {
+		runningSection.getChildren().clear();
+		List<RunningInstanceManager.RunningInstance> running = List.copyOf(RunningInstanceManager.running());
+		if (running.isEmpty()) {
+			return;
+		}
+		Label header = new Label("RUNNING");
+		header.getStyleClass().add("sidebar-section-title");
+		header.setTextFill(textColor());
+		runningSection.getChildren().add(header);
+		for (RunningInstanceManager.RunningInstance ri : running) {
+			runningSection.getChildren().add(buildRunningRow(ri));
+		}
+	}
+
+	private Node buildRunningRow(RunningInstanceManager.RunningInstance ri) {
+		HBox row = new HBox(8);
+		row.getStyleClass().add("sidebar-mini-row");
+		row.setAlignment(Pos.CENTER_LEFT);
+		Node icon = buildSidebarIcon(ri.instance(), ri.serverAddress(), 22);
+
+		Label name = new Label(ri.instance().name());
+		name.setTextFill(textColor());
+		name.setMaxWidth(96);
+
+		String target = describeRunningTarget(ri);
+		Label subtitle = new Label(target);
+		subtitle.getStyleClass().add("sidebar-mini-subtitle");
+		subtitle.setTextFill(textColor());
+		subtitle.setMaxWidth(96);
+
+		VBox textBox = new VBox(1, name, subtitle);
+		HBox.setHgrow(textBox, Priority.ALWAYS);
+
+		Button stop = new Button("✕");
+		stop.getStyleClass().add("sidebar-mini-stop");
+		stop.setTooltip(new Tooltip("Stop " + ri.instance().name()));
+		stop.setOnAction(e -> {
+			e.consume();
+			ri.stop();
+		});
+		row.getChildren().addAll(icon, textBox, stop);
+		// Hovering swaps the subtitle to a "click to view" hint rather than
+		// showing both at once - there's only room for one line there, and
+		// this row's own click target is the whole card anyway.
+		row.setOnMouseEntered(e -> subtitle.setText("Click to view"));
+		row.setOnMouseExited(e -> subtitle.setText(target));
+		row.setOnMouseClicked(e -> showRunningInstance(ri));
+		return row;
+	}
+
+	/** "Singleplayer" is the best-effort default when no Quick Play target is known - the launcher can't see what a player does once inside a plain launch (host their own world vs. connect manually elsewhere), only what it launched them into. */
+	private String describeRunningTarget(RunningInstanceManager.RunningInstance ri) {
+		String address = ri.serverAddress();
+		if (address == null) {
+			return "Singleplayer";
+		}
+		return SavedServerStore.loadAll().stream().filter(s -> s.address().equals(address)).findFirst()
+				.map(SavedServer::name).orElse(address);
+	}
+
+	private void showRunningInstance(RunningInstanceManager.RunningInstance ri) {
+		clearActiveNav();
+		setContent(RunningInstanceView.build(ri, theme, this::showInstances, this::refreshRunningSidebar));
+	}
+
+	private void clearActiveNav() {
+		for (Button b : List.of(navHome, navInstances, navCosmetics, navTheme, navSettings)) {
+			b.getStyleClass().remove("nav-button-active");
+		}
+	}
+
+	// ---- Sidebar: Quick Launch ----
+
+	private void refreshQuickLaunchSidebar() {
+		quickLaunchSection.getChildren().clear();
+		List<Instance> instances = InstanceStore.loadAll();
+		List<Node> rows = new java.util.ArrayList<>();
+		for (QuickLaunchStore.Entry entry : QuickLaunchStore.loadAll()) {
+			instances.stream().filter(i -> i.id().equals(entry.instanceId())).findFirst()
+					.ifPresent(instance -> rows.add(buildQuickLaunchRow(instance, entry)));
+		}
+		if (rows.isEmpty()) {
+			return;
+		}
+		Label header = new Label("QUICK LAUNCH");
+		header.getStyleClass().add("sidebar-section-title");
+		header.setTextFill(textColor());
+		quickLaunchSection.getChildren().add(header);
+		quickLaunchSection.getChildren().addAll(rows);
+	}
+
+	private Node buildQuickLaunchRow(Instance instance, QuickLaunchStore.Entry entry) {
+		VBox container = new VBox(3);
+
+		HBox row = new HBox(8);
+		row.getStyleClass().add("sidebar-mini-row");
+		row.setAlignment(Pos.CENTER_LEFT);
+		String serverAddress = entry.serverAddress();
+		Node icon = buildSidebarIcon(instance, serverAddress, 22);
+		String label = serverAddress != null
+				? SavedServerStore.loadAll().stream().filter(s -> s.address().equals(serverAddress)).findFirst()
+						.map(SavedServer::name).orElse(serverAddress)
+				: instance.name();
+		Label text = new Label(label);
+		text.setTextFill(textColor());
+		text.setMaxWidth(96);
+		HBox.setHgrow(text, Priority.ALWAYS);
+
+		Label playIcon = new Label("▶");
+		playIcon.getStyleClass().add("sidebar-mini-play");
+
+		// A real, visible loading bar directly driven by the same
+		// onPhase/onProgress callbacks a Profile/Server card's own Play/
+		// Connect button uses - not a separate hand-rolled "is it busy"
+		// flag - so its own visibility IS the launch state, with nothing
+		// else to fall out of sync with it.
+		ProgressBar progressBar = new ProgressBar(0);
+		progressBar.getStyleClass().add("sidebar-mini-progress");
+		progressBar.setMaxWidth(Double.MAX_VALUE);
+		progressBar.setVisible(false);
+		progressBar.setManaged(false);
+
+		Button hiddenTrigger = new Button();
+		Runnable startLaunch = () -> {
+			if (progressBar.isVisible()) {
+				// Already launching this one - ignore extra clicks instead
+				// of stacking up duplicate launches.
+				return;
+			}
+			launchWithProgress(instance, serverAddress, hiddenTrigger, progressBar, new Label());
+		};
+		// The whole card is clickable, not just the tiny play glyph - it's
+		// styled and hover-highlighted as one clickable row (same as the
+		// Running rows), so restricting the actual click target to just the
+		// glyph meant most clicks on it did nothing.
+		row.setOnMouseClicked(e -> {
+			e.consume();
+			startLaunch.run();
+		});
+
+		row.getChildren().addAll(icon, text, playIcon);
+		Tooltip.install(row, new Tooltip(serverAddress != null
+				? "Launch " + instance.name() + " straight into " + serverAddress
+				: "Launch " + instance.name()));
+		container.getChildren().addAll(row, progressBar);
+		return container;
 	}
 
 	private Button navButton(String label, Runnable action) {
@@ -263,7 +436,14 @@ public final class LauncherApp extends Application {
 		titleScreen.getChildren().add(center);
 		StackPane.setAlignment(center, Pos.CENTER);
 
-		// Bottom-left account badge (Minecraft-style nametag corner).
+		// Bottom-left account badge (Minecraft-style nametag corner) - a
+		// single Button (a bare Region/Pane placed directly in a StackPane
+		// gets stretched to fill it and can end up covering/blocking
+		// whatever's behind it, which is why this is one real Button rather
+		// than a Button wrapped in an extra HBox) whose own graphic ends in
+		// a small dropdown-arrow "hot zone": that zone consumes the click
+		// before it bubbles up to the Button's own action, so clicking the
+		// arrow opens the account switcher instead of the account profile.
 		accountLabel = new Label();
 		accountButton = new Button();
 		accountButton.getStyleClass().add("account-badge");
@@ -275,6 +455,7 @@ public final class LauncherApp extends Application {
 				showAccountProfile();
 			}
 		});
+
 		StackPane.setAlignment(accountButton, Pos.BOTTOM_LEFT);
 		StackPane.setMargin(accountButton, new Insets(0, 0, 18, 18));
 		titleScreen.getChildren().add(accountButton);
@@ -282,6 +463,59 @@ public final class LauncherApp extends Application {
 		refreshAccountBadge();
 		setContent(titleScreen);
 		markActiveNav(navHome);
+	}
+
+	/** Dropdown listing every saved account (a player head + name each, active one checked) plus an "Add Account" entry at the bottom. */
+	private void showAccountSwitcher(Node anchor) {
+		ContextMenu menu = new ContextMenu();
+		menu.getStyleClass().add("account-switcher-menu");
+
+		List<MinecraftSession> accounts = AuthSession.loadAllAccounts();
+		if (accounts.isEmpty()) {
+			MenuItem none = new MenuItem("No saved accounts yet");
+			none.setDisable(true);
+			menu.getItems().add(none);
+		}
+		for (MinecraftSession account : accounts) {
+			boolean active = session != null && session.uuid().equals(account.uuid());
+			MenuItem item = new MenuItem(account.username());
+			item.setGraphic(buildAccountMenuRowGraphic(account, active));
+			item.setOnAction(e -> {
+				if (!active) {
+					switchAccount(account);
+				}
+			});
+			menu.getItems().add(item);
+		}
+		menu.getItems().add(new SeparatorMenuItem());
+		MenuItem addAccount = new MenuItem("+ Add Account");
+		addAccount.setOnAction(e -> beginSignIn());
+		menu.getItems().add(addAccount);
+
+		menu.show(anchor, javafx.geometry.Side.TOP, 0, 0);
+	}
+
+	private Node buildAccountMenuRowGraphic(MinecraftSession account, boolean active) {
+		StackPane headHolder = new StackPane();
+		headHolder.setPrefSize(20, 20);
+		headHolder.setMinSize(20, 20);
+		headHolder.getStyleClass().add("instance-icon-custom");
+		Label placeholder = new Label(account.username().substring(0, 1).toUpperCase());
+		placeholder.setTextFill(Color.WHITE);
+		placeholder.setFont(Font.font("System", FontWeight.BOLD, 10));
+		headHolder.getChildren().add(placeholder);
+		CompletableFuture.supplyAsync(() -> SkinFetcher.fetch(account), Executors.newVirtualThreadPerTaskExecutor())
+				.thenAccept(skin -> Platform.runLater(() -> {
+					StackPane head = skin == null ? null : PlayerHeadView.build(skin.pngBytes(), 20);
+					if (head != null) {
+						headHolder.getChildren().setAll(head.getChildren());
+					}
+				}));
+		Label check = new Label(active ? "✓" : "");
+		check.setMinWidth(14);
+		HBox row = new HBox(8, headHolder, check);
+		row.setAlignment(Pos.CENTER_LEFT);
+		return row;
 	}
 
 	private Node buildAccountBadgeContent() {
@@ -297,7 +531,37 @@ public final class LauncherApp extends Application {
 		avatarFallback.setTextFill(Color.WHITE);
 		avatarHolder.getChildren().add(avatarFallback);
 		accountLabel.setTextFill(textColor());
-		box.getChildren().addAll(avatarHolder, accountLabel);
+
+		Separator separator = new Separator(javafx.geometry.Orientation.VERTICAL);
+		separator.getStyleClass().add("account-badge-separator");
+
+		// A drawn chevron (not a font glyph - "▾" renders as a tiny,
+		// inconsistently-shaped triangle depending on the system font) in a
+		// deliberately oversized hit area, so it's actually easy to click
+		// rather than a couple of pixels of glyph.
+		javafx.scene.shape.Polyline chevron = new javafx.scene.shape.Polyline(0, 0, 4, 4, 8, 0);
+		chevron.getStyleClass().add("account-switcher-chevron");
+		chevron.setStrokeWidth(1.8);
+		chevron.setStrokeLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
+		chevron.setStrokeLineJoin(javafx.scene.shape.StrokeLineJoin.ROUND);
+		StackPane arrowHit = new StackPane(chevron);
+		arrowHit.getStyleClass().add("account-switcher-arrow-glyph");
+		arrowHit.setPrefSize(26, 26);
+		arrowHit.setMinSize(26, 26);
+		arrowHit.setMaxSize(26, 26);
+		// Consuming here (not just on the eventual click) stops the event
+		// before it bubbles up to the Button's own press/release handling,
+		// which is what actually decides whether the Button fires its
+		// action - consuming only the later synthesized CLICKED event would
+		// be too late, since Button already reacts on MOUSE_RELEASED.
+		arrowHit.setOnMousePressed(javafx.event.Event::consume);
+		arrowHit.setOnMouseReleased(javafx.event.Event::consume);
+		arrowHit.setOnMouseClicked(e -> {
+			e.consume();
+			showAccountSwitcher(accountButton);
+		});
+
+		box.getChildren().addAll(avatarHolder, accountLabel, separator, arrowHit);
 		return box;
 	}
 
@@ -340,8 +604,11 @@ public final class LauncherApp extends Application {
 
 			@Override
 			public void signOut() {
+				// LauncherApp.this.signOut() already navigates home itself
+				// (and, per its own doc, switches straight into another
+				// saved account if one remains rather than always landing
+				// on "not signed in").
 				LauncherApp.this.signOut();
-				showHome();
 			}
 
 			@Override
@@ -386,6 +653,15 @@ public final class LauncherApp extends Application {
 
 		HBox headerRow = new HBox(10);
 		headerRow.setAlignment(Pos.CENTER_LEFT);
+		StackPane serverIconHolder = new StackPane();
+		serverIconHolder.setPrefSize(36, 36);
+		serverIconHolder.setMinSize(36, 36);
+		serverIconHolder.getStyleClass().add("instance-icon-custom");
+		ImageView serverIconView = new ImageView(fallbackServerIcon());
+		serverIconView.setFitWidth(36);
+		serverIconView.setFitHeight(36);
+		serverIconView.setPreserveRatio(true);
+		serverIconHolder.getChildren().add(serverIconView);
 		Label name = new Label(server.name());
 		name.setFont(Font.font("System", FontWeight.BOLD, 15));
 		name.setTextFill(accentColor());
@@ -394,7 +670,7 @@ public final class LauncherApp extends Application {
 		address.setTextFill(textColor());
 		HBox spacer = new HBox();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		headerRow.getChildren().addAll(name, address, spacer);
+		headerRow.getChildren().addAll(serverIconHolder, name, address, spacer);
 
 		javafx.scene.text.TextFlow motd = new javafx.scene.text.TextFlow(pingingText());
 
@@ -475,7 +751,7 @@ public final class LauncherApp extends Application {
 		refresh.setOnAction(e -> {
 			motd.getChildren().setAll(pingingText());
 			statusLine.setText("");
-			pingInto(server, motd, statusLine);
+			pingInto(server, motd, statusLine, serverIconView);
 		});
 		Button edit = new Button("Edit");
 		edit.setOnAction(e -> ServerEditDialog.show(stage, "Edit Server", server.name(), server.host(), server.port(),
@@ -497,11 +773,11 @@ public final class LauncherApp extends Application {
 		HBox actions = new HBox(8, refresh, edit, remove);
 
 		card.getChildren().addAll(headerRow, motd, statusLine, profileRow, progressBar, launchStatus, actions);
-		pingInto(server, motd, statusLine);
+		pingInto(server, motd, statusLine, serverIconView);
 		return card;
 	}
 
-	private void pingInto(SavedServer server, javafx.scene.text.TextFlow motd, Label statusLine) {
+	private void pingInto(SavedServer server, javafx.scene.text.TextFlow motd, Label statusLine, ImageView iconView) {
 		CompletableFuture
 				.supplyAsync(() -> {
 					try {
@@ -518,12 +794,37 @@ public final class LauncherApp extends Application {
 						motd.setManaged(hasMotd);
 						statusLine.setText(String.format("%s  ·  %d/%d players  ·  %dms",
 								ping.versionName(), ping.onlinePlayers(), ping.maxPlayers(), ping.latencyMillis()));
+						applyServerFavicon(iconView, ping.faviconPngBase64());
 					} else {
 						motd.getChildren().setAll(new javafx.scene.text.Text("Offline or unreachable"));
 						((javafx.scene.text.Text) motd.getChildren().get(0)).setFill(textColor());
 						statusLine.setText(((Exception) result).getMessage());
+						// Leave the fallback icon in place - a server that's
+						// merely offline right now still has a real favicon
+						// worth showing next time it answers.
 					}
 				}));
+	}
+
+	/** The server list's per-row icon before a real favicon has (or ever) arrives - the app's own logo, same fallback style as installed-mod rows elsewhere in the launcher. */
+	private Image fallbackServerIcon() {
+		return new Image(getClass().getResourceAsStream("/net/veloclient/launcher/images/logo.png"), 36, 36, true, true);
+	}
+
+	/** Decodes a Server List Ping favicon (raw base64 PNG payload, no data-URI prefix) into {@code iconView}; leaves the current (fallback) image alone if it's missing or fails to decode. */
+	private void applyServerFavicon(ImageView iconView, String faviconPngBase64) {
+		if (faviconPngBase64 == null || faviconPngBase64.isBlank()) {
+			return;
+		}
+		try {
+			byte[] bytes = java.util.Base64.getDecoder().decode(faviconPngBase64);
+			Image image = new Image(new java.io.ByteArrayInputStream(bytes), 36, 36, true, true);
+			if (!image.isError()) {
+				iconView.setImage(image);
+			}
+		} catch (IllegalArgumentException ignored) {
+			// Malformed base64 - keep the fallback icon.
+		}
 	}
 
 	private javafx.scene.text.Text pingingText() {
@@ -566,7 +867,19 @@ public final class LauncherApp extends Application {
 				MinecraftSession finalSession = restored;
 				Platform.runLater(() -> onSignedIn(finalSession));
 			} catch (Exception e) {
-				Platform.runLater(AuthSession::clear);
+				// Only this account's refresh token is actually dead - drop
+				// just that one rather than every saved account, and fall
+				// back to whichever other one (if any) is now active.
+				String deadUuid = cached.get().uuid();
+				Platform.runLater(() -> {
+					Optional<MinecraftSession> next = AuthSession.remove(deadUuid);
+					if (next.isPresent()) {
+						this.session = next.get();
+						if (accountButton != null) {
+							refreshAccountBadge();
+						}
+					}
+				});
 			}
 		});
 	}
@@ -587,10 +900,26 @@ public final class LauncherApp extends Application {
 		}
 	}
 
+	/** Signs out of the current account only - switches straight into another saved account if one remains, otherwise drops back to "not signed in". */
 	private void signOut() {
-		session = null;
-		AuthSession.clear();
+		if (session == null) {
+			showHome();
+			return;
+		}
+		Optional<MinecraftSession> next = AuthSession.remove(session.uuid());
+		session = next.orElse(null);
 		showHome();
+	}
+
+	/** Switches to an already-saved account (from the account switcher dropdown) - no re-authentication needed unless its token has since expired. */
+	private void switchAccount(MinecraftSession target) {
+		AuthSession.switchTo(target.uuid());
+		this.session = target;
+		if (content.getChildren().stream().anyMatch(n -> n.getStyleClass().contains("title-screen"))) {
+			showHome();
+		} else if (accountButton != null) {
+			refreshAccountBadge();
+		}
 	}
 
 	private void showPlaceholderAlert(String title, String message) {
@@ -833,6 +1162,45 @@ public final class LauncherApp extends Application {
 				size, accentColor(), accentColor().deriveColor(0, 1, 0.7, 1));
 	}
 
+	/** The sidebar's Running/Quick Launch icon: the target server's own favicon for a server launch (matching My Servers), the profile's own icon for a plain launch. */
+	private Node buildSidebarIcon(Instance instance, String serverAddress, double size) {
+		if (serverAddress == null) {
+			return renderInstanceIcon(instance, size);
+		}
+		StackPane holder = new StackPane();
+		holder.setPrefSize(size, size);
+		holder.setMinSize(size, size);
+		holder.getStyleClass().add("instance-icon-custom");
+		ImageView view = new ImageView();
+		view.setFitWidth(size);
+		view.setFitHeight(size);
+		view.setPreserveRatio(true);
+		holder.getChildren().add(view);
+
+		Optional<SavedServer> saved = SavedServerStore.loadAll().stream().filter(s -> s.address().equals(serverAddress)).findFirst();
+		String host = saved.map(SavedServer::host).orElseGet(() -> parseHost(serverAddress));
+		int port = saved.map(SavedServer::port).orElseGet(() -> parsePort(serverAddress));
+		ServerFaviconCache.loadInto(view, host, port, fallbackServerIcon());
+		return holder;
+	}
+
+	private static String parseHost(String address) {
+		int colon = address.lastIndexOf(':');
+		return colon > 0 ? address.substring(0, colon) : address;
+	}
+
+	private static int parsePort(String address) {
+		int colon = address.lastIndexOf(':');
+		if (colon <= 0) {
+			return 25565;
+		}
+		try {
+			return Integer.parseInt(address.substring(colon + 1));
+		} catch (NumberFormatException e) {
+			return 25565;
+		}
+	}
+
 	private void launchInstance(Instance instance, Button playButton, ProgressBar progressBar, Label statusLabel) {
 		launchWithProgress(instance, null, playButton, progressBar, statusLabel);
 	}
@@ -866,24 +1234,32 @@ public final class LauncherApp extends Application {
 			long startedAt = System.currentTimeMillis();
 			Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
 				try {
-					Process process = GameLauncher.launch(instance, activeSession, listener, quickPlayTarget);
+					GameLauncher.LaunchResult result = GameLauncher.launch(instance, activeSession, listener, quickPlayTarget);
+					RunningInstanceManager.RunningInstance running =
+							RunningInstanceManager.register(instance, result.process(), result.logFile(), quickPlayTarget);
+					QuickLaunchStore.recordLaunch(instance.id(), quickPlayTarget);
 					Platform.runLater(() -> {
-						statusLabel.setText("Running - " + instance.name());
-						progressBar.setProgress(1.0);
-					});
-					int exitCode = process.waitFor();
-					boolean crashedEarly = exitCode != 0 && (System.currentTimeMillis() - startedAt) < 15_000;
-					Platform.runLater(() -> {
+						// Re-enable right away (not "not until it exits") -
+						// multi-instancing means this exact button may need
+						// pressing again for another concurrent copy of the
+						// same profile while this one is still running; the
+						// sidebar's "Running" section is now the source of
+						// truth for what's actually up.
 						triggerButton.setDisable(false);
 						progressBar.setVisible(false);
 						progressBar.setManaged(false);
-						statusLabel.setText(exitCode == 0 ? "" : "Minecraft exited with code " + exitCode);
-						statusLabel.setVisible(exitCode != 0);
-						statusLabel.setManaged(exitCode != 0);
-						if (exitCode != 0) {
-							ErrorDialog.showLaunchFailure(stage, instance, exitCode, crashedEarly);
-						}
+						statusLabel.setVisible(false);
+						statusLabel.setManaged(false);
+						refreshRunningSidebar();
+						refreshQuickLaunchSidebar();
 					});
+					int exitCode = result.process().waitFor();
+					boolean crashedEarly = exitCode != 0 && (System.currentTimeMillis() - startedAt) < 15_000;
+					// A non-zero exit after a deliberate Stop is expected
+					// (destroy()'d processes don't exit 0) - not a crash.
+					if (exitCode != 0 && !running.wasStopped()) {
+						Platform.runLater(() -> ErrorDialog.showLaunchFailure(stage, instance, exitCode, crashedEarly, result.logFile()));
+					}
 				} catch (Exception e) {
 					Platform.runLater(() -> {
 						triggerButton.setDisable(false);
@@ -920,10 +1296,20 @@ public final class LauncherApp extends Application {
 						action.accept(refreshed);
 					});
 				} catch (Exception e) {
+					// Only this account's refresh token is dead - drop just
+					// that one and fall back to another saved account if one
+					// exists, same as a manual sign-out.
 					Platform.runLater(() -> {
-						AuthSession.clear();
-						session = null;
-						beginSignIn();
+						Optional<MinecraftSession> next = AuthSession.remove(session.uuid());
+						session = next.orElse(null);
+						if (session != null) {
+							// Re-enter rather than using it directly - the
+							// fallback account's own cached token may also
+							// be expired and need its own refresh first.
+							requireSignedIn(action);
+						} else {
+							beginSignIn();
+						}
 					});
 				}
 			});

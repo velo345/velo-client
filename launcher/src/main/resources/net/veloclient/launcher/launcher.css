@@ -63,6 +63,74 @@
 	-fx-border-width: 0 0 0 3;
 }
 
+.sidebar-scroll, .sidebar-scroll .viewport {
+	-fx-background-color: transparent;
+}
+
+.sidebar-section-title {
+	-fx-font-size: 10px;
+	-fx-font-weight: bold;
+	-fx-letter-spacing: 1px;
+	-fx-opacity: 0.55;
+	-fx-padding: 6 6 2 6;
+}
+
+.sidebar-mini-row {
+	-fx-padding: 6 8 6 8;
+	-fx-background-radius: 6;
+	-fx-cursor: hand;
+}
+
+.sidebar-mini-row:hover {
+	-fx-background-color: -velo-hover;
+}
+
+.sidebar-mini-subtitle {
+	-fx-font-size: 10px;
+	-fx-opacity: 0.55;
+}
+
+.sidebar-mini-stop {
+	-fx-background-color: transparent;
+	-fx-text-fill: -velo-text;
+	-fx-opacity: 0.6;
+	-fx-padding: 0 4 0 4;
+	-fx-font-size: 11px;
+	-fx-cursor: hand;
+}
+
+.sidebar-mini-stop:hover {
+	-fx-opacity: 1;
+	-fx-text-fill: #ff6b6b;
+}
+
+.sidebar-mini-play {
+	-fx-text-fill: -velo-accent-start;
+	-fx-opacity: 0.75;
+	-fx-font-size: 10px;
+	-fx-cursor: hand;
+}
+
+.sidebar-mini-play:hover {
+	-fx-opacity: 1;
+}
+
+.sidebar-mini-progress {
+	-fx-pref-height: 4px;
+	-fx-max-height: 4px;
+}
+
+.sidebar-mini-progress .track {
+	-fx-background-color: -velo-hover;
+	-fx-background-radius: 4;
+}
+
+.sidebar-mini-progress .bar {
+	-fx-background-color: -velo-accent-start;
+	-fx-background-radius: 4;
+	-fx-padding: 2px;
+}
+
 .title-screen {
 	-fx-background-color: transparent;
 }
@@ -146,6 +214,54 @@
 	-fx-border-width: 1;
 	-fx-padding: 6 16 6 6;
 	-fx-cursor: hand;
+}
+
+.account-badge-separator {
+	-fx-opacity: 0.5;
+	-fx-padding: 0 0 0 4;
+}
+
+.account-switcher-arrow-glyph {
+	-fx-opacity: 0.75;
+	-fx-cursor: hand;
+	-fx-background-radius: 8;
+}
+
+.account-switcher-arrow-glyph:hover {
+	-fx-opacity: 1;
+	-fx-background-color: -velo-hover;
+}
+
+.account-switcher-chevron {
+	-fx-stroke: -velo-text;
+	-fx-fill: transparent;
+}
+
+.account-switcher-menu {
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 10;
+	-fx-border-radius: 10;
+	-fx-border-color: -velo-hairline;
+	-fx-border-width: 1;
+	-fx-padding: 4;
+}
+
+.account-switcher-menu .menu-item {
+	-fx-background-color: transparent;
+	-fx-background-radius: 6;
+	-fx-padding: 6 10 6 10;
+}
+
+.account-switcher-menu .menu-item .label {
+	-fx-text-fill: -velo-text;
+}
+
+.account-switcher-menu .menu-item:focused {
+	-fx-background-color: -velo-hover;
+}
+
+.account-switcher-menu .separator .line {
+	-fx-border-color: -velo-hairline;
 }
 
 .avatar-circle {

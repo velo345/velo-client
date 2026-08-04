@@ -107,7 +107,7 @@ tasks.register("bundleJavaRuntimeFallback") {
 // reads it back as a classpath resource at runtime instead of independently
 // hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
 // below reuses the same value for the native installer's version.
-def launcherAppVersion = "0.3.0"
+def launcherAppVersion = "0.4.0"
 def launcherVersionResourceRoot = layout.buildDirectory.dir("generated/launcherversion")
 
 tasks.register("writeLauncherVersion") {

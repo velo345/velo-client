@@ -5,12 +5,15 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"ActionBarOverlayMixin",
+		"CameraFreeLookMixin",
 		"ChatHudMixin",
 		"ClientConnectionMixin",
+		"FreeLookInputMixin",
 		"FullBrightMixin",
 		"GameRendererFovMixin",
 		"LocalPlayerSkinCapeMixin",
 		"MouseScrollMixin",
+		"NickHiderMixin",
 		"PlayerListHudMixin",
 		"PlayerNameTagBadgeMixin"
 	],

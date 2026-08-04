@@ -7,6 +7,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
@@ -202,26 +203,64 @@ public final class InstanceDetailView {
 		var known = InstalledAssetStore.asMap(InstalledAssetStore.loadAll(instance.id(), kind));
 		for (Path file : files) {
 			String fileName = file.getFileName().toString();
-			InstalledAsset asset = known.get(fileName);
+			boolean disabled = isDisabled(fileName);
+			InstalledAsset asset = known.get(enabledName(fileName));
 			if (asset != null) {
-				list.getChildren().add(buildKnownRow(owner, overlayHost, instance, theme, kind, folder, file, asset, refresh));
+				list.getChildren().add(buildKnownRow(owner, overlayHost, instance, theme, kind, folder, file, disabled, asset, refresh));
 			} else {
-				list.getChildren().add(buildUnknownRow(instance, theme, kind, folder, file, identifyAttempted, refresh));
+				list.getChildren().add(buildUnknownRow(instance, theme, kind, folder, file, disabled, identifyAttempted, refresh));
 				autoIdentify(instance, kind, file, identifyAttempted, refresh);
 			}
 		}
 	}
 
+	// ---- Enable/disable (renames the extension so Fabric Loader/resource pack scanning never sees it, without deleting it) ----
+
+	private static final String DISABLED_SUFFIX = ".disabled";
+
+	private static boolean isDisabled(String fileName) {
+		return fileName.endsWith(DISABLED_SUFFIX);
+	}
+
+	/** The filename this file would have (and is recorded under in {@link InstalledAssetStore}) while enabled. */
+	private static String enabledName(String fileName) {
+		return isDisabled(fileName) ? fileName.substring(0, fileName.length() - DISABLED_SUFFIX.length()) : fileName;
+	}
+
+	private static CheckBox buildEnabledToggle(Path file, boolean disabled, Runnable refresh) {
+		CheckBox toggle = new CheckBox();
+		toggle.setSelected(!disabled);
+		toggle.setTooltip(new Tooltip(disabled ? "Disabled - click to enable" : "Enabled - click to disable without removing it"));
+		toggle.setOnAction(e -> setFileEnabled(file, toggle.isSelected(), refresh));
+		return toggle;
+	}
+
+	/** Renames {@code file} to add/strip the {@value #DISABLED_SUFFIX} suffix so it does/doesn't get loaded, then refreshes the list. */
+	private static void setFileEnabled(Path file, boolean enable, Runnable refresh) {
+		String fileName = file.getFileName().toString();
+		String targetName = enable ? enabledName(fileName) : (isDisabled(fileName) ? fileName : fileName + DISABLED_SUFFIX);
+		if (!targetName.equals(fileName)) {
+			try {
+				Files.move(file, file.resolveSibling(targetName), StandardCopyOption.REPLACE_EXISTING);
+			} catch (IOException ignored) {
+				// Best-effort - the row just keeps its old state if this fails.
+			}
+		}
+		refresh.run();
+	}
+
 	private static Node buildKnownRow(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind, Path folder,
-			Path file, InstalledAsset asset, Runnable refresh) {
+			Path file, boolean disabled, InstalledAsset asset, Runnable refresh) {
 		HBox row = new HBox(12);
 		row.getStyleClass().add("mod-row");
 		row.setAlignment(Pos.CENTER_LEFT);
+		row.setOpacity(disabled ? 0.5 : 1.0);
 
+		row.getChildren().add(buildEnabledToggle(file, disabled, refresh));
 		row.getChildren().add(iconView(asset.iconUrl(), 48));
 
 		VBox info = new VBox(2);
-		Label title = new Label(asset.title());
+		Label title = new Label(asset.title() + (disabled ? "  (disabled)" : ""));
 		title.setFont(Font.font("System", FontWeight.BOLD, 13));
 		title.setTextFill(text(theme));
 		Label meta = new Label("v" + asset.versionNumber());
@@ -246,7 +285,7 @@ public final class InstanceDetailView {
 		remove.setOnAction(e -> {
 			try {
 				Files.deleteIfExists(file);
-				InstalledAssetStore.forget(instance.id(), kind, file.getFileName().toString());
+				InstalledAssetStore.forget(instance.id(), kind, enabledName(file.getFileName().toString()));
 			} catch (IOException ignored) {
 				// Best-effort.
 			}
@@ -257,8 +296,8 @@ public final class InstanceDetailView {
 	}
 
 	private static Node buildUnknownRow(Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind, Path folder,
-			Path file, Set<String> identifyAttempted, Runnable refresh) {
-		String fileName = file.getFileName().toString();
+			Path file, boolean disabled, Set<String> identifyAttempted, Runnable refresh) {
+		String fileName = enabledName(file.getFileName().toString());
 		boolean isVeloClient = fileName.startsWith("velo-client-");
 		boolean isFabricApi = fileName.startsWith("fabric-api-");
 		boolean protectedFile = kind == InstalledAssetStore.Kind.MOD && (isVeloClient || isFabricApi);
@@ -266,11 +305,16 @@ public final class InstanceDetailView {
 		HBox row = new HBox(12);
 		row.getStyleClass().add("mod-row");
 		row.setAlignment(Pos.CENTER_LEFT);
+		row.setOpacity(disabled ? 0.5 : 1.0);
 
+		if (!protectedFile) {
+			row.getChildren().add(buildEnabledToggle(file, disabled, refresh));
+		}
 		row.getChildren().add(iconView(null, 48));
 
 		VBox info = new VBox(2);
-		Label name = new Label(fileName + (isVeloClient ? "  (Velo Client)" : isFabricApi ? "  (Fabric API - required)" : ""));
+		Label name = new Label(fileName + (isVeloClient ? "  (Velo Client)" : isFabricApi ? "  (Fabric API - required)" : "")
+				+ (disabled ? "  (disabled)" : ""));
 		name.setTextFill(text(theme));
 		Label size = new Label(protectedFile ? sizeOf(file) : sizeOf(file) + "  ·  not on Modrinth");
 		size.getStyleClass().add("version-tag");
@@ -297,14 +341,15 @@ public final class InstanceDetailView {
 	/** Looks the file up on Modrinth by sha1 automatically (no button) the first time it's seen as unrecognized; silently stays a plain row if Modrinth doesn't know it. */
 	private static void autoIdentify(Instance instance, InstalledAssetStore.Kind kind, Path file, Set<String> identifyAttempted, Runnable refresh) {
 		String fileName = file.getFileName().toString();
-		if (fileName.startsWith("velo-client-") || fileName.startsWith("fabric-api-") || !identifyAttempted.add(fileName)) {
+		String enabledFileName = enabledName(fileName);
+		if (enabledFileName.startsWith("velo-client-") || enabledFileName.startsWith("fabric-api-") || !identifyAttempted.add(fileName)) {
 			return;
 		}
 		CompletableFuture.runAsync(() -> {
 			try {
 				String sha1 = Downloader.sha1Of(file);
 				ModrinthClient.versionByFileSha1(sha1).ifPresent(v -> ModrinthClient.getProject(v.projectId()).ifPresent(project ->
-						InstalledAssetStore.record(instance.id(), kind, new InstalledAsset(project.id(), v.id(), fileName,
+						InstalledAssetStore.record(instance.id(), kind, new InstalledAsset(project.id(), v.id(), enabledFileName,
 								project.title(), project.description(), project.iconUrl(), v.versionNumber(), kind.modrinthProjectType()))));
 			} catch (IOException ignored) {
 				// Stays an unknown row.

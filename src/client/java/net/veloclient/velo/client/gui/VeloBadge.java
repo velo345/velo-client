@@ -35,7 +35,13 @@ import net.minecraft.util.Identifier;
  */
 public final class VeloBadge {
 
-	public static final int SIZE = 11;
+	// Tab list rows are only ~9px tall (font height) - 11px visibly
+	// overflowed the row. 6px sits cleanly inside it without looking
+	// pixelated, since this is still sampled down from the real 500x500
+	// source texture rather than a small pre-shrunk one. PlayerListHudMixin
+	// centers it against the actual row height using this constant, so it
+	// stays centered at any size.
+	public static final int SIZE = 6;
 
 	private static final Identifier LOGO_TEXTURE = Identifier.of("velo-client", "textures/icon/logo.png");
 	private static final int LOGO_SOURCE_SIZE = 500;

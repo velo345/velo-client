@@ -90,8 +90,8 @@ public final class ErrorDialog {
 		dialog.showAndWait();
 	}
 
-	/** Looks for the most recent crash report in the instance's game directory, falling back to the launcher log tail if none exists yet. */
-	public static void showLaunchFailure(Stage owner, Instance instance, int exitCode, boolean crashedEarly) {
+	/** Looks for the most recent crash report in the instance's game directory, falling back to this run's own launcher log tail if none exists yet. */
+	public static void showLaunchFailure(Stage owner, Instance instance, int exitCode, boolean crashedEarly, Path runLogFile) {
 		Path gameDir = InstancePaths.gameDir(instance.id());
 		Path crashReportsDir = gameDir.resolve("crash-reports");
 		String details = null;
@@ -101,11 +101,8 @@ public final class ErrorDialog {
 		if (latestCrashReport != null) {
 			details = readHead(latestCrashReport, 80);
 			folderToOpen = crashReportsDir;
-		} else {
-			Path logFile = InstancePaths.logsDir(instance.id()).resolve("latest_launcher.log");
-			if (Files.exists(logFile)) {
-				details = readTail(logFile, 80);
-			}
+		} else if (runLogFile != null && Files.exists(runLogFile)) {
+			details = readTail(runLogFile, 80);
 		}
 
 		String message = crashedEarly

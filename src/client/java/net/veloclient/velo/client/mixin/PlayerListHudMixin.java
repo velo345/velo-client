@@ -40,8 +40,11 @@ public abstract class PlayerListHudMixin {
 		// Before the name (like Lunar/NoRisk), not after it - the name
 		// itself is shifted right by the badge's width plus a gap so
 		// nothing overlaps, matching how those clients reserve the space.
+		// Vertically centered against the actual row/font height rather
+		// than a fixed offset, so it stays centered regardless of VeloBadge.SIZE.
 		int shift = VeloBadge.SIZE + 3;
-		VeloBadge.draw(context, x, y - 1);
+		int badgeY = y + (textRenderer.fontHeight - VeloBadge.SIZE) / 2;
+		VeloBadge.draw(context, x, badgeY);
 		context.drawTextWithShadow(textRenderer, text, x + shift, y, color);
 	}
 }
