@@ -3,6 +3,9 @@ package net.veloclient.launcher.net;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
+import javax.naming.directory.Attribute;
+import javax.naming.directory.Attributes;
+import javax.naming.directory.InitialDirContext;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -10,6 +13,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Hashtable;
 import java.util.List;
 
 /**
@@ -35,13 +39,36 @@ public final class ServerPinger {
 
 	public static PingResult ping(String host, int port) throws IOException {
 		long start = System.currentTimeMillis();
+		// Vanilla resolves a `_minecraft._tcp.<host>` SRV record whenever no
+		// explicit port was given and connects to whatever host:port that
+		// points at instead - a lot of larger networks rely on this to run
+		// off a non-default port or a separate load-balanced frontend
+		// without every player needing to type ":port". The launcher's own
+		// "My Servers" port field always has *some* number in it (defaults
+		// to 25565 in the edit dialog), so there's no way to tell "the user
+		// really meant 25565" from "this field is just at its default" -
+		// attempting SRV whenever the port is exactly 25565 covers the
+		// overwhelming real-world case (servers relying on SRV do so
+		// specifically because they're *not* on the default port) while
+		// never overriding a genuinely-non-default port the user set.
+		InetSocketAddress connectTarget = new InetSocketAddress(host, port);
+		if (port == 25565) {
+			InetSocketAddress srvTarget = resolveSrv(host);
+			if (srvTarget != null) {
+				connectTarget = srvTarget;
+			}
+		}
 		try (Socket socket = new Socket()) {
-			socket.connect(new InetSocketAddress(host, port), TIMEOUT_MILLIS);
+			socket.connect(connectTarget, TIMEOUT_MILLIS);
 			socket.setSoTimeout(TIMEOUT_MILLIS);
 			DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 			DataInputStream in = new DataInputStream(socket.getInputStream());
 
-			writePacket(out, handshakePacket(host, port));
+			// The *original* host (not the SRV target) goes in the
+			// handshake - virtual-host-routing proxies (BungeeCord/Velocity
+			// backends behind one shared frontend) key off this field, and
+			// it should still be what the player actually typed/connected to.
+			writePacket(out, handshakePacket(host, connectTarget.getPort()));
 			writePacket(out, new byte[] {0x00});
 
 			int length = readVarInt(in);
@@ -71,6 +98,41 @@ public final class ServerPinger {
 				favicon = comma >= 0 ? raw.substring(comma + 1) : raw;
 			}
 			return new PingResult(motd, online, max, version, latency, favicon);
+		}
+	}
+
+	/** @return the SRV record's (target, port), or null if there isn't one/the lookup fails - never throws, since this is a best-effort hint layered on top of a plain host:port connect that must still work without it. */
+	private static InetSocketAddress resolveSrv(String host) {
+		Hashtable<String, String> env = new Hashtable<>();
+		env.put("java.naming.factory.initial", "com.sun.jndi.dns.DnsContextFactory");
+		env.put("java.naming.provider.url", "dns:");
+		env.put("com.sun.jndi.dns.timeout.initial", "1500");
+		env.put("com.sun.jndi.dns.timeout.retries", "1");
+		try {
+			InitialDirContext ctx = new InitialDirContext(env);
+			try {
+				Attributes attrs = ctx.getAttributes("_minecraft._tcp." + host, new String[] {"SRV"});
+				Attribute srv = attrs.get("SRV");
+				if (srv == null || srv.size() == 0) {
+					return null;
+				}
+				// SRV record data: "<priority> <weight> <port> <target>" - only one record is ever registered for this service in practice, so just take the first.
+				String[] parts = String.valueOf(srv.get(0)).trim().split("\\s+");
+				if (parts.length < 4) {
+					return null;
+				}
+				int srvPort = Integer.parseInt(parts[2]);
+				String target = parts[3];
+				if (target.endsWith(".")) {
+					target = target.substring(0, target.length() - 1);
+				}
+				return target.isEmpty() ? null : new InetSocketAddress(target, srvPort);
+			} finally {
+				ctx.close();
+			}
+		} catch (Exception e) {
+			// No SRV record, DNS doesn't support it, or the lookup timed out - fall back to the plain host:port.
+			return null;
 		}
 	}
 
