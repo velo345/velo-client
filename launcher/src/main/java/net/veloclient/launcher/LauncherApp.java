@@ -103,8 +103,27 @@ public final class LauncherApp extends Application {
 	private Button navHome, navInstances, navCosmetics, navTheme, navSettings;
 	private VBox runningSection;
 	private VBox quickLaunchSection;
+	/**
+	 * Row nodes for the sidebar's "Running" section, keyed by {@code runId}
+	 * and reused across refreshes rather than rebuilt from scratch every
+	 * time - {@code refreshRunningSidebar()} used to always clear and
+	 * recreate every row on any change to the underlying list, but that list
+	 * mutates from a background thread the instant any tracked process exits
+	 * (see RunningInstanceManager.register), completely independent of
+	 * whatever the user happens to be doing right then. A rebuild landing
+	 * between a click's press and release replaced the very row being
+	 * clicked with a brand-new Node, silently swallowing the click - a real,
+	 * confirmed intermittent bug ("sometimes doesn't work"), not
+	 * hypothetical, and not actually platform-specific despite how it
+	 * presented - it's a timing race that can hit either OS. Keeping the
+	 * same Node alive for any run that's still present (only genuinely
+	 * added/removed rows get new Nodes) removes the window entirely for the
+	 * common case of clicking on one instance while an unrelated one exits.
+	 */
+	private final java.util.Map<String, Node> runningRowsByRunId = new java.util.LinkedHashMap<>();
 
 	public static void main(String[] args) {
+		LauncherLog.install();
 		launch(args);
 	}
 
@@ -241,8 +260,14 @@ public final class LauncherApp extends Application {
 	// ---- Sidebar: Running instances ----
 
 	private void refreshRunningSidebar() {
-		runningSection.getChildren().clear();
 		List<RunningInstanceManager.RunningInstance> running = List.copyOf(RunningInstanceManager.running());
+		java.util.Set<String> currentRunIds = running.stream()
+				.map(RunningInstanceManager.RunningInstance::runId).collect(java.util.stream.Collectors.toSet());
+		runningRowsByRunId.keySet().retainAll(currentRunIds);
+		for (RunningInstanceManager.RunningInstance ri : running) {
+			runningRowsByRunId.computeIfAbsent(ri.runId(), id -> buildRunningRow(ri));
+		}
+		runningSection.getChildren().clear();
 		if (running.isEmpty()) {
 			return;
 		}
@@ -251,7 +276,7 @@ public final class LauncherApp extends Application {
 		header.setTextFill(textColor());
 		runningSection.getChildren().add(header);
 		for (RunningInstanceManager.RunningInstance ri : running) {
-			runningSection.getChildren().add(buildRunningRow(ri));
+			runningSection.getChildren().add(runningRowsByRunId.get(ri.runId()));
 		}
 	}
 
