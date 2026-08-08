@@ -41,7 +41,7 @@ import java.util.Locale;
 public final class TntTimerModule extends AbstractModule implements Configurable {
 
 	private int textColor = 0xFFFF5555;
-	private double textScale = 1.0;
+	private double textScale = 0.5;
 
 	public TntTimerModule() {
 		super("tnt-timer", "TNT Timer",
@@ -82,10 +82,11 @@ public final class TntTimerModule extends AbstractModule implements Configurable
 			/*Vec3d entityPos = entity.position();
 			float entityHeight = entity.getBbHeight();
 			*///?}
-			// Entity position is feet/bottom-center - a small gap above the
-			// (roughly 1 block tall) TNT block itself, not several blocks up
-			// like entityLabel's own tall-entity-tuned default offset was.
-			Vec3d pos = entityPos.add(0, entityHeight + 0.35, 0);
+			// Entity position is feet/bottom-center - clear the (roughly 1
+			// block tall) TNT block itself with enough headroom that the
+			// text doesn't visually overlap it, not several blocks up like
+			// entityLabel's own tall-entity-tuned default offset was.
+			Vec3d pos = entityPos.add(0, entityHeight + 0.65, 0);
 			//? if <26.1 {
 			TextGizmo.Style style = TextGizmo.Style.centered(textColor).scaled((float) textScale);
 			//?} else {
@@ -99,7 +100,7 @@ public final class TntTimerModule extends AbstractModule implements Configurable
 	public List<ConfigField> configFields() {
 		return List.of(
 				new ConfigField.ColorField("Text Color", () -> textColor, v -> textColor = v, true),
-				new ConfigField.SliderField("Text Size", 0.5, 3.0, () -> textScale,
+				new ConfigField.SliderField("Text Size", 0.1, 3.0, () -> textScale,
 						v -> textScale = v, v -> String.format(Locale.ROOT, "%.1f", v)));
 	}
 }

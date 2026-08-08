@@ -2,6 +2,7 @@ package net.veloclient.launcher.data;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
 
 import java.io.IOException;
@@ -43,7 +44,7 @@ public final class QuickLaunchStore {
 			List<Entry> entries = GSON.fromJson(reader, new TypeToken<List<Entry>>() {
 			}.getType());
 			return entries != null ? entries : new ArrayList<>();
-		} catch (IOException e) {
+		} catch (IOException | JsonParseException e) {
 			return new ArrayList<>();
 		}
 	}

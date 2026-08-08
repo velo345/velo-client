@@ -2,6 +2,7 @@ package net.veloclient.launcher.data;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
 import net.veloclient.launcher.instance.InstancePaths;
 
@@ -56,7 +57,13 @@ public final class InstalledAssetStore {
 		try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
 			List<InstalledAsset> assets = GSON.fromJson(reader, new TypeToken<List<InstalledAsset>>() {}.getType());
 			return assets != null ? assets : new ArrayList<>();
-		} catch (IOException e) {
+		} catch (IOException | JsonParseException e) {
+			// A corrupt registry (partial write, manual edit, ...) used to throw
+			// JsonSyntaxException uncaught here - not an IOException, so this
+			// permanently broke that one profile's Mods/Resource Packs/Shader
+			// Packs tab on every subsequent open, looking exactly like "clicking
+			// the profile does nothing" from the user's side. Treat it the same
+			// as "no registry yet" instead.
 			return new ArrayList<>();
 		}
 	}

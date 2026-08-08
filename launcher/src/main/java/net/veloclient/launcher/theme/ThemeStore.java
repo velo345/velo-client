@@ -2,6 +2,7 @@ package net.veloclient.launcher.theme;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import net.veloclient.launcher.data.VeloPaths;
 
 import java.io.IOException;
@@ -34,7 +35,10 @@ public final class ThemeStore {
 			Map<String, LauncherTheme> all = new LinkedHashMap<>(LauncherThemePresets.all());
 			all.putAll(LauncherCustomThemeStore.asMap(LauncherCustomThemeStore.load()));
 			return all.getOrDefault(persisted.themeName, LauncherThemePresets.VELO_DARK);
-		} catch (IOException e) {
+		} catch (IOException | JsonParseException e) {
+			// A corrupt theme.json (JsonSyntaxException, not an IOException)
+			// used to escape this catch entirely and fail the whole launcher
+			// startup, since this loads before the main window exists.
 			return LauncherThemePresets.VELO_DARK;
 		}
 	}

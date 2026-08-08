@@ -2,6 +2,7 @@ package net.veloclient.launcher.theme;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import net.veloclient.launcher.data.VeloPaths;
 
 import java.io.IOException;
@@ -43,7 +44,7 @@ public final class LauncherCustomThemeStore {
 		try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
 			Data data = GSON.fromJson(reader, Data.class);
 			return data != null && data.themes() != null ? new ArrayList<>(data.themes()) : new ArrayList<>();
-		} catch (IOException e) {
+		} catch (IOException | JsonParseException e) {
 			return new ArrayList<>();
 		}
 	}

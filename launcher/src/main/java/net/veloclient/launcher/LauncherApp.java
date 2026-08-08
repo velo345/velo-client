@@ -1080,13 +1080,13 @@ public final class LauncherApp extends Application {
 
 		HBox actions = new HBox(6);
 		actions.setAlignment(Pos.CENTER);
-		Button editButton = iconActionButton("✎", "Edit profile", false);
+		Button editButton = iconActionButton("edit", "Edit profile", false);
 		editButton.setOnAction(e -> editInstance(instance));
-		Button duplicateButton = iconActionButton("⧉", "Duplicate profile - copies its mods/config into a new one", false);
+		Button duplicateButton = iconActionButton("duplicate", "Duplicate profile - copies its mods/config into a new one", false);
 		duplicateButton.setOnAction(e -> duplicateInstance(instance));
-		Button exportButton = iconActionButton("⬆", "Export profile - saves its mods/config as a .zip", false);
+		Button exportButton = iconActionButton("export", "Export profile - saves its mods/config as a .zip", false);
 		exportButton.setOnAction(e -> exportInstance(instance));
-		Button deleteButton = iconActionButton("🗑", "Delete profile", true);
+		Button deleteButton = iconActionButton("delete", "Delete profile", true);
 		deleteButton.setOnAction(e -> confirmDeleteInstance(instance));
 		actions.getChildren().addAll(editButton, duplicateButton, exportButton, deleteButton);
 
@@ -1094,9 +1094,20 @@ public final class LauncherApp extends Application {
 		return card;
 	}
 
-	/** A small square icon-only action button (Edit/Duplicate/Export/Delete on a profile card), with a tooltip explaining what it does. */
-	private Button iconActionButton(String glyph, String tooltip, boolean danger) {
-		Button button = new Button(glyph);
+	/**
+	 * A small square icon-only action button (Edit/Duplicate/Export/Delete
+	 * on a profile card), with a tooltip explaining what it does. A real
+	 * bundled icon image, not a Unicode glyph - text-glyph buttons here
+	 * previously rendered visibly blank for some icons (delete's trash
+	 * emoji in particular) since JavaFX's default font on some systems has
+	 * no glyph for it at all, unlike a bundled image which always renders
+	 * the same regardless of what fonts happen to be installed.
+	 */
+	private Button iconActionButton(String iconName, String tooltip, boolean danger) {
+		Image image = new Image(getClass().getResourceAsStream(
+				"/net/veloclient/launcher/images/icons/action/" + iconName + ".png"), 16, 16, true, true);
+		Button button = new Button();
+		button.setGraphic(new ImageView(image));
 		button.getStyleClass().add("icon-action-button");
 		if (danger) {
 			button.getStyleClass().add("icon-action-button-danger");
@@ -1106,7 +1117,20 @@ public final class LauncherApp extends Application {
 	}
 
 	private void showInstanceDetail(Instance instance) {
-		setContent(InstanceDetailView.build(stage, instance, theme, this::showInstances));
+		// Previously let any exception from building this view propagate
+		// straight into the FX event dispatcher, which logs it to stderr but
+		// otherwise looks exactly like "clicking the icon does nothing" -
+		// silently no-op from the user's side, with zero indication
+		// anything went wrong at all. Surfacing it explicitly at least turns
+		// that into an actionable error instead of a mystery.
+		try {
+			setContent(InstanceDetailView.build(stage, instance, theme, this::showInstances));
+		} catch (Exception e) {
+			e.printStackTrace();
+			showPlaceholderAlert("Couldn't open \"" + instance.name() + "\"",
+					(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName())
+							+ "\n\nThis profile's data may be from an older/incompatible launcher version.");
+		}
 	}
 
 	private VBox buildNewInstanceTile() {

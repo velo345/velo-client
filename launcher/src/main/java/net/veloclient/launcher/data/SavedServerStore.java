@@ -2,6 +2,7 @@ package net.veloclient.launcher.data;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
 
 import java.io.IOException;
@@ -37,7 +38,7 @@ public final class SavedServerStore {
 		try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
 			List<SavedServer> servers = GSON.fromJson(reader, new TypeToken<List<SavedServer>>() {}.getType());
 			return servers != null ? servers : new ArrayList<>();
-		} catch (IOException e) {
+		} catch (IOException | JsonParseException e) {
 			return new ArrayList<>();
 		}
 	}

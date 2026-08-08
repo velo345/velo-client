@@ -34,6 +34,6 @@ public abstract class SmallCapsActionBarMixin {
 		if (!SmallCapsModule.shouldTransformActionBar()) {
 			return message;
 		}
-		return Text.literal(SmallCapsConverter.toSmallCaps(message.getString())).setStyle(message.getStyle());
+		return SmallCapsConverter.toSmallCapsStyled(message);
 	}
 }

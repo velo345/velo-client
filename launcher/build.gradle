@@ -107,7 +107,15 @@ tasks.register("bundleJavaRuntimeFallback") {
 // reads it back as a classpath resource at runtime instead of independently
 // hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
 // below reuses the same value for the native installer's version.
-def launcherAppVersion = "0.5.0"
+def launcherAppVersion = "0.5.1"
+// A fixed identity for the Windows installer across every version - WiX
+// needs this (--win-upgrade-uuid below) to recognize a new installer as an
+// upgrade of whatever's already installed rather than an unrelated product,
+// which is what was actually happening without it: running the installer
+// for a newer version did nothing visible because Windows had no way to
+// tell it apart from "already installed". MUST NEVER CHANGE, or every
+// future version breaks upgrading again the exact same way.
+def launcherWindowsUpgradeUuid = "2AC3F105-4C66-4B28-8ABE-B8FF7CCD58EF"
 def launcherVersionResourceRoot = layout.buildDirectory.dir("generated/launcherversion")
 
 tasks.register("writeLauncherVersion") {
@@ -246,7 +254,7 @@ tasks.register("jpackageDist") {
 				"--java-options", "--enable-native-access=ALL-UNNAMED"
 		]
 		if (isWindows) {
-			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser"]
+			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser", "--win-upgrade-uuid", launcherWindowsUpgradeUuid]
 		} else if (!isMac) {
 			command += ["--linux-shortcut"]
 		}

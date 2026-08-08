@@ -2,6 +2,7 @@ package net.veloclient.launcher.instance;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -42,8 +43,13 @@ public final class InstanceStore {
 					if (instance != null) {
 						instances.add(instance);
 					}
-				} catch (IOException ignored) {
-					// Skip unreadable instance.
+				} catch (IOException | JsonParseException ignored) {
+					// Skip unreadable/corrupt instance.json rather than losing every
+					// other profile too - a malformed file (partial write from a
+					// crash, manual edit, ...) used to throw JsonSyntaxException
+					// here uncaught (not an IOException, so this catch never saw
+					// it), aborting loadAll() entirely and making every profile
+					// disappear from the grid, not just the broken one.
 				}
 			}
 		} catch (IOException ignored) {

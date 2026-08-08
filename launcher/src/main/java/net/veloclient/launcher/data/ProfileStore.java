@@ -2,6 +2,7 @@ package net.veloclient.launcher.data;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -31,6 +32,12 @@ public final class ProfileStore {
 					if (profile != null) {
 						profiles.add(profile);
 					}
+				} catch (IOException | JsonParseException ignored) {
+					// Skip one corrupt profile file rather than letting it abort the
+					// whole loop - previously had no catch of its own at all, so a
+					// single malformed file (JsonSyntaxException, not an
+					// IOException) escaped past the outer catch too and discarded
+					// every profile already loaded before it.
 				}
 			}
 		} catch (IOException ignored) {

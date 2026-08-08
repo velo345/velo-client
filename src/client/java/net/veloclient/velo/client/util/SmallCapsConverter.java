@@ -1,5 +1,17 @@
 package net.veloclient.velo.client.util;
 
+//? if <26.1 {
+import net.minecraft.text.Text;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Style;
+//?} else {
+/*import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
+*///?}
+
+import java.util.Optional;
+
 /**
  * Converts lowercase ASCII letters to their Unicode "small capital" glyphs
  * (IPA Extensions / Latin Extended-B/D, e.g. U+1D00 LATIN LETTER SMALL
@@ -33,6 +45,13 @@ package net.veloclient.velo.client.util;
  * {@code Style} data, and this used to convert the code character right
  * along with everything else, silently breaking the code (a real, confirmed
  * bug, not hypothetical).
+ *
+ * <p>Uppercase ASCII letters are folded to the same small-capital glyph as
+ * their lowercase counterpart - the whole point of "small caps" styling is
+ * a uniform cap-height look, so a literal already-uppercase letter has to
+ * shrink too rather than being left at full height (which previously made
+ * already-uppercase text, e.g. from a server's own MOTD/action bar strings,
+ * visibly stick out taller than the rest of a small-caps line).
  */
 public final class SmallCapsConverter {
 
@@ -59,13 +78,58 @@ public final class SmallCapsConverter {
 				i++;
 				continue;
 			}
-			if (c == 'q') {
+			char lower = Character.toLowerCase(c);
+			if (lower == 'q') {
 				result.append('Q');
 				continue;
 			}
-			int index = LOWER.indexOf(c);
+			if (lower == 'x') {
+				result.append('x');
+				continue;
+			}
+			int index = LOWER.indexOf(lower);
 			result.append(index >= 0 ? SMALL_CAPS[index] : c);
 		}
 		return result.toString();
 	}
+
+	/**
+	 * Style-tree-preserving variant of {@link #toSmallCaps(String)} for real
+	 * chat/action-bar {@code Text}/{@code Component} values - walks every
+	 * independently-styled run via the vanilla styled visitor (which already
+	 * resolves translatable text and merges parent/child style for each run)
+	 * and rebuilds an equivalent tree with each run's own text converted but
+	 * its own {@code Style} left untouched, rather than flattening the whole
+	 * tree down to one plain string under a single root style. Flattening
+	 * was a real, confirmed bug: any message built from multiple
+	 * differently colored/formatted siblings (common for action bar text
+	 * set by plugins, and for plenty of servers' chat) collapsed onto just
+	 * the root's own style, silently discarding every other color/format in
+	 * the message.
+	 */
+	//? if <26.1 {
+	public static Text toSmallCapsStyled(Text input) {
+		if (input == null) {
+			return null;
+		}
+		MutableText result = Text.empty();
+		input.visit((style, string) -> {
+			result.append(Text.literal(toSmallCaps(string)).setStyle(style));
+			return Optional.empty();
+		}, Style.EMPTY);
+		return result;
+	}
+	//?} else {
+	/*public static Component toSmallCapsStyled(Component input) {
+		if (input == null) {
+			return null;
+		}
+		MutableComponent result = Component.empty();
+		input.visit((style, string) -> {
+			result.append(Component.literal(toSmallCaps(string)).setStyle(style));
+			return Optional.empty();
+		}, Style.EMPTY);
+		return result;
+	}
+	*///?}
 }
