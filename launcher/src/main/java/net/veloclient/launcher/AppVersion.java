@@ -33,6 +33,6 @@ public final class AppVersion {
 		} catch (IOException ignored) {
 			// Fall through to the hardcoded default below.
 		}
-		return "0.5.2";
+		return "0.5.3";
 	}
 }

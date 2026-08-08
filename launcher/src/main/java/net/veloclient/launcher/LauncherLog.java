@@ -67,6 +67,18 @@ public final class LauncherLog {
 		}
 	}
 
+	/**
+	 * Logs a non-fatal problem worth keeping a record of - something that was
+	 * recovered from (so it shouldn't interrupt whatever the user's doing
+	 * with a dialog/crash) but that a developer would want in hand if the
+	 * user reports something looking off afterward. Routes through
+	 * {@code System.err} so it's captured by the tee installed above
+	 * regardless of whether {@link #install()} has run yet.
+	 */
+	public static void warn(String message, Throwable cause) {
+		System.err.println("[WARN] " + message + ": " + cause);
+	}
+
 	/** Writes every line to both the original stream and the log file, timestamped, without needing call sites to change. */
 	private static final class TeePrintStream extends PrintStream {
 		private final PrintStream original;
