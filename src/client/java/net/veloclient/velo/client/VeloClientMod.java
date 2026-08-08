@@ -6,6 +6,7 @@ import net.veloclient.velo.client.hud.HudManager;
 import net.veloclient.velo.client.keybind.VeloKeybinds;
 import net.veloclient.velo.client.cosmetics.render.CapeFeatureRenderer;
 import net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule;
+import net.veloclient.velo.client.modules.cosmetics.KillEffectsModule;
 import net.veloclient.velo.client.modules.debug.KeybindConflictCheckerModule;
 import net.veloclient.velo.client.modules.debug.LookingAtInspectorModule;
 import net.veloclient.velo.client.modules.debug.ResourceReloadHotkeyModule;
@@ -36,9 +37,13 @@ import net.veloclient.velo.client.modules.performance.PolyBlurModule;
 import net.veloclient.velo.client.modules.qol.CustomCrosshairModule;
 import net.veloclient.velo.client.modules.qol.FreeLookModule;
 import net.veloclient.velo.client.modules.qol.NickHiderModule;
+import net.veloclient.velo.client.modules.qol.SmallCapsModule;
 import net.veloclient.velo.client.modules.qol.ToggleSneakModule;
 import net.veloclient.velo.client.modules.qol.ToggleSprintModule;
 import net.veloclient.velo.client.modules.qol.ZoomModule;
+import net.veloclient.velo.client.modules.rendering.BlockOutlineModule;
+import net.veloclient.velo.client.modules.rendering.TimeWeatherFogModule;
+import net.veloclient.velo.client.modules.rendering.TntTimerModule;
 import net.veloclient.velo.client.modules.servertools.ChunkBorderOverlayModule;
 import net.veloclient.velo.client.modules.servertools.ClientLogViewerModule;
 import net.veloclient.velo.client.modules.servertools.EntityCountOverlayModule;
@@ -52,6 +57,7 @@ import net.veloclient.velo.client.modules.servertools.WorldBorderVisualizerModul
 import net.veloclient.velo.client.modules.utility.AutoReconnectModule;
 import net.veloclient.velo.client.modules.utility.CommandKeybindsModule;
 import net.veloclient.velo.client.modules.utility.CopyCoordinatesModule;
+import net.veloclient.velo.client.modules.utility.SessionAutoFixerModule;
 import net.veloclient.velo.module.ModuleRegistry;
 
 /** Client-only entrypoint: registers every built-in module, the keybind and the HUD renderer. */
@@ -99,9 +105,16 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new MinimapModule());
 		ModuleRegistry.register(new FreeLookModule());
 		ModuleRegistry.register(new NickHiderModule());
+		ModuleRegistry.register(new SmallCapsModule());
+
+		// Rendering
+		ModuleRegistry.register(new TntTimerModule());
+		ModuleRegistry.register(new BlockOutlineModule());
+		ModuleRegistry.register(new TimeWeatherFogModule());
 
 		// Cosmetics (section 6.5)
 		ModuleRegistry.register(new CapeCosmeticsModule());
+		ModuleRegistry.register(new KillEffectsModule());
 
 		// Performance (section 6.1)
 		ModuleRegistry.register(new FrameTimeGraphModule());
@@ -118,6 +131,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new CopyCoordinatesModule());
 		ModuleRegistry.register(new CommandKeybindsModule());
 		ModuleRegistry.register(new AutoReconnectModule());
+		ModuleRegistry.register(new SessionAutoFixerModule());
 
 		// Server Tools (section 6.3)
 		ModuleRegistry.register(new EntityCountOverlayModule());

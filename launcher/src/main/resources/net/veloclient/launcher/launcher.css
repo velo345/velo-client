@@ -641,6 +641,22 @@
 	-fx-border-radius: 14;
 }
 
+.icon-action-button {
+	-fx-min-width: 32;
+	-fx-min-height: 32;
+	-fx-max-width: 32;
+	-fx-max-height: 32;
+	-fx-padding: 0;
+	-fx-font-size: 14px;
+	-fx-background-radius: 8;
+	-fx-border-radius: 8;
+}
+
+.icon-action-button-danger:hover {
+	-fx-border-color: #e05a5a;
+	-fx-text-fill: #e05a5a;
+}
+
 .icon-picker-tile {
 	-fx-background-color: -velo-hover;
 	-fx-background-radius: 10;

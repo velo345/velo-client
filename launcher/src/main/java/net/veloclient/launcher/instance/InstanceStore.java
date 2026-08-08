@@ -9,6 +9,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -67,6 +68,49 @@ public final class InstanceStore {
 			GSON.toJson(instance, writer);
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to save profile " + instance.name(), e);
+		}
+	}
+
+	/**
+	 * Copies a profile's mods/config/resource packs/shader packs (and icon,
+	 * if custom) into a brand new profile - deliberately not its {@code
+	 * saves/}, since "make a similar setup" means the same mod/config
+	 * loadout, not a copy of the world data too.
+	 */
+	public static Instance duplicate(Instance source, String newName) {
+		String newId = UUID.randomUUID().toString();
+		InstancePaths.ensureDirectories(newId);
+		copyDirectoryIfPresent(InstancePaths.modsDir(source.id()), InstancePaths.modsDir(newId));
+		copyDirectoryIfPresent(InstancePaths.resourcePacksDir(source.id()), InstancePaths.resourcePacksDir(newId));
+		copyDirectoryIfPresent(InstancePaths.shaderPacksDir(source.id()), InstancePaths.shaderPacksDir(newId));
+		copyDirectoryIfPresent(InstancePaths.gameDir(source.id()).resolve("config"), InstancePaths.gameDir(newId).resolve("config"));
+		Path sourceIcon = InstancePaths.iconFile(source.id());
+		if (Files.exists(sourceIcon)) {
+			try {
+				Files.copy(sourceIcon, InstancePaths.iconFile(newId), StandardCopyOption.REPLACE_EXISTING);
+			} catch (IOException ignored) {
+				// Falls back to the built-in icon vanilla-style; not worth failing the whole duplicate over.
+			}
+		}
+		Instance duplicate = new Instance(newId, newName, source.mcVersion(), source.icon(), System.currentTimeMillis(),
+				source.ramMinMb(), source.ramMaxMb(), source.extraJvmArgs());
+		save(duplicate);
+		return duplicate;
+	}
+
+	private static void copyDirectoryIfPresent(Path source, Path target) {
+		if (!Files.isDirectory(source)) {
+			return;
+		}
+		try (Stream<Path> files = Files.walk(source)) {
+			for (Path file : files.filter(Files::isRegularFile).toList()) {
+				Path relative = source.relativize(file);
+				Path destination = target.resolve(relative.toString());
+				Files.createDirectories(destination.getParent());
+				Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING);
+			}
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to copy " + source + " while duplicating profile", e);
 		}
 	}
 

@@ -13,6 +13,7 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import net.veloclient.launcher.auth.AuthSession;
 import net.veloclient.launcher.auth.MicrosoftAuth;
@@ -27,6 +28,7 @@ import net.veloclient.launcher.instance.Instance;
 import net.veloclient.launcher.instance.InstanceIcon;
 import net.veloclient.launcher.instance.InstancePaths;
 import net.veloclient.launcher.instance.InstanceStore;
+import net.veloclient.launcher.instance.ProfileArchive;
 import net.veloclient.launcher.instance.RunningInstanceManager;
 import net.veloclient.launcher.launch.FabricApiInstaller;
 import net.veloclient.launcher.launch.GameJars;
@@ -130,9 +132,38 @@ public final class LauncherApp extends Application {
 		stage.setScene(scene);
 		stage.setMinWidth(920);
 		stage.setMinHeight(600);
+		fixWindowsMaximizeRestoreBug(stage);
 		stage.show();
 
 		attemptSilentSignIn();
+	}
+
+	/**
+	 * On Windows, JavaFX's own stage bounds sometimes fall out of sync with
+	 * the real OS window after clicking "restore down" from maximized - the
+	 * title bar/border shrink back but the scene content stays sized as if
+	 * still maximized, since the {@code Stage}'s width/height properties
+	 * never got the memo. Track the bounds from just before maximizing and
+	 * force them back explicitly once un-maximized, rather than trusting the
+	 * native restore to have already done it.
+	 */
+	private void fixWindowsMaximizeRestoreBug(Stage stage) {
+		double[] preMaximizeBounds = new double[4];
+		stage.maximizedProperty().addListener((obs, wasMaximized, isMaximized) -> {
+			if (isMaximized) {
+				preMaximizeBounds[0] = stage.getX();
+				preMaximizeBounds[1] = stage.getY();
+				preMaximizeBounds[2] = stage.getWidth();
+				preMaximizeBounds[3] = stage.getHeight();
+			} else if (preMaximizeBounds[2] > 0 && preMaximizeBounds[3] > 0) {
+				Platform.runLater(() -> {
+					stage.setX(preMaximizeBounds[0]);
+					stage.setY(preMaximizeBounds[1]);
+					stage.setWidth(preMaximizeBounds[2]);
+					stage.setHeight(preMaximizeBounds[3]);
+				});
+			}
+		});
 	}
 
 	private void applyTheme() {
@@ -982,6 +1013,7 @@ public final class LauncherApp extends Application {
 			grid.getChildren().add(buildInstanceCard(instance));
 		}
 		grid.getChildren().add(buildNewInstanceTile());
+		grid.getChildren().add(buildImportInstanceTile());
 
 		ScrollPane scroll = new ScrollPane(grid);
 		scroll.setFitToWidth(true);
@@ -1048,14 +1080,29 @@ public final class LauncherApp extends Application {
 
 		HBox actions = new HBox(6);
 		actions.setAlignment(Pos.CENTER);
-		Button editButton = new Button("Edit");
+		Button editButton = iconActionButton("✎", "Edit profile", false);
 		editButton.setOnAction(e -> editInstance(instance));
-		Button deleteButton = new Button("Delete");
+		Button duplicateButton = iconActionButton("⧉", "Duplicate profile - copies its mods/config into a new one", false);
+		duplicateButton.setOnAction(e -> duplicateInstance(instance));
+		Button exportButton = iconActionButton("⬆", "Export profile - saves its mods/config as a .zip", false);
+		exportButton.setOnAction(e -> exportInstance(instance));
+		Button deleteButton = iconActionButton("🗑", "Delete profile", true);
 		deleteButton.setOnAction(e -> confirmDeleteInstance(instance));
-		actions.getChildren().addAll(editButton, deleteButton);
+		actions.getChildren().addAll(editButton, duplicateButton, exportButton, deleteButton);
 
 		card.getChildren().addAll(icon, name, version, playRow, progressBar, statusLabel, actions);
 		return card;
+	}
+
+	/** A small square icon-only action button (Edit/Duplicate/Export/Delete on a profile card), with a tooltip explaining what it does. */
+	private Button iconActionButton(String glyph, String tooltip, boolean danger) {
+		Button button = new Button(glyph);
+		button.getStyleClass().add("icon-action-button");
+		if (danger) {
+			button.getStyleClass().add("icon-action-button-danger");
+		}
+		button.setTooltip(new Tooltip(tooltip));
+		return button;
 	}
 
 	private void showInstanceDetail(Instance instance) {
@@ -1134,6 +1181,117 @@ public final class LauncherApp extends Application {
 		}
 	}
 
+	/** Prompts for a new name, then copies the profile's mods/config/packs (not its saves) into a fresh one - see {@link InstanceStore#duplicate}. */
+	private void duplicateInstance(Instance instance) {
+		TextInputDialog dialog = new TextInputDialog(instance.name() + " (Copy)");
+		dialog.initOwner(stage);
+		dialog.setTitle("Duplicate Profile");
+		dialog.setHeaderText("Duplicate \"" + instance.name() + "\"");
+		dialog.setContentText("New profile name:");
+		DialogStyling.apply(dialog);
+		dialog.showAndWait().map(String::strip).filter(name -> !name.isEmpty()).ifPresent(name -> {
+			InstanceStore.duplicate(instance, name);
+			showInstances();
+		});
+	}
+
+	/** Zips the profile's mods/config/resource packs/shader packs to a file the user picks - see {@link ProfileArchive#export}. */
+	private void exportInstance(Instance instance) {
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle("Export \"" + instance.name() + "\"");
+		chooser.setInitialFileName(safeFileName(instance.name()) + ".zip");
+		chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Velo profile archive (*.zip)", "*.zip"));
+		java.io.File target = chooser.showSaveDialog(stage);
+		if (target == null) {
+			return;
+		}
+		Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
+			try {
+				ProfileArchive.export(instance, target.toPath());
+			} catch (IOException e) {
+				Platform.runLater(() -> showPlaceholderAlert("Export failed", e.getMessage()));
+			}
+		});
+	}
+
+	private static String safeFileName(String name) {
+		return name.replaceAll("[^a-zA-Z0-9._-]+", "-");
+	}
+
+	/**
+	 * Imports a profile archive as a brand new profile - accepts either
+	 * this launcher's own export (exact Minecraft version/RAM/JVM args
+	 * restored) or a generic zip of jars from anywhere else (every {@code
+	 * .jar} found becomes a mod, best-effort) - see {@link ProfileArchive#importFrom}.
+	 * Fabric API and Velo Client's own jar are (re)installed afterward
+	 * regardless, so an archive that never had them still ends up with a
+	 * working profile.
+	 */
+	private void importInstance() {
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle("Import Profile");
+		chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Profile/mods archive (*.zip)", "*.zip"));
+		java.io.File source = chooser.showOpenDialog(stage);
+		if (source == null) {
+			return;
+		}
+		String defaultName = source.getName().replaceFirst("(?i)\\.zip$", "");
+		TextInputDialog dialog = new TextInputDialog(defaultName.isBlank() ? "Imported Profile" : defaultName);
+		dialog.initOwner(stage);
+		dialog.setTitle("Import Profile");
+		dialog.setHeaderText("Name this imported profile");
+		dialog.setContentText("Profile name:");
+		DialogStyling.apply(dialog);
+		dialog.showAndWait().map(String::strip).filter(name -> !name.isEmpty()).ifPresent(name ->
+				Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
+					try {
+						GameVersion[] versions = GameVersion.values();
+						String fallbackVersion = versions[versions.length - 1].id();
+						Instance imported = ProfileArchive.importFrom(source.toPath(), name, fallbackVersion);
+						Platform.runLater(() -> {
+							try {
+								installModLoaderJars(imported);
+							} catch (IllegalArgumentException e) {
+								// The archive named a Minecraft version this launcher doesn't
+								// support - the profile itself still imported fine (mods/config
+								// already extracted), just without velo-client/Fabric API
+								// auto-installed; editing its version in "Edit" will retry that.
+								showPlaceholderAlert("Imported with a warning",
+										"\"" + imported.mcVersion() + "\" isn't a supported Minecraft version, so "
+												+ "Velo Client/Fabric API weren't installed automatically. Edit the "
+												+ "profile to set a supported version and they'll install then.");
+							}
+							showInstances();
+						});
+					} catch (IOException e) {
+						Platform.runLater(() -> showPlaceholderAlert("Import failed", e.getMessage()));
+					}
+				}));
+	}
+
+	private VBox buildImportInstanceTile() {
+		VBox tile = new VBox(10);
+		tile.getStyleClass().addAll("instance-card", "instance-card-new");
+		tile.setPrefWidth(200);
+		tile.setAlignment(Pos.CENTER);
+		tile.setPrefHeight(190);
+
+		Label icon = new Label("⬇");
+		icon.setFont(Font.font("System", FontWeight.BOLD, 32));
+		icon.setTextFill(accentColor());
+		Label label = new Label("Import Profile");
+		label.setTextFill(textColor());
+		Label hint = new Label("From a .zip - Velo's own export, or any mods folder");
+		hint.getStyleClass().add("version-tag");
+		hint.setTextFill(textColor());
+		hint.setWrapText(true);
+		hint.setStyle("-fx-text-alignment: center;");
+
+		tile.getChildren().addAll(icon, label, hint);
+		tile.setOnMouseClicked(e -> importInstance());
+		return tile;
+	}
+
 	private void confirmDeleteInstance(Instance instance) {
 		Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
 		alert.initOwner(stage);
@@ -1207,6 +1365,13 @@ public final class LauncherApp extends Application {
 
 	/** @param quickPlayTarget nullable "host:port" - when present, launches straight into that server (My Servers' Connect). */
 	private void launchWithProgress(Instance instance, String quickPlayTarget, Button triggerButton, ProgressBar progressBar, Label statusLabel) {
+		// Refreshes velo-client's own jar from whatever is bundled in THIS
+		// running launcher build before every single launch (cheap local
+		// file copy, no network - see GameJars) - otherwise a profile
+		// created under an older launcher version would keep running that
+		// older velo-client jar forever, since nothing else ever touches an
+		// existing profile's mods folder again after it's created.
+		GameJars.installInto(InstancePaths.modsDir(instance.id()), GameVersion.byId(instance.mcVersion()));
 		requireSignedIn(activeSession -> {
 			triggerButton.setDisable(true);
 			progressBar.setProgress(0);

@@ -5,17 +5,23 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"ActionBarOverlayMixin",
+		"AtmosphericFogMixin",
+		"BlockOutlineCancelMixin",
 		"CameraFreeLookMixin",
 		"ChatHudMixin",
 		"ClientConnectionMixin",
 		"FreeLookInputMixin",
 		"FullBrightMixin",
 		"GameRendererFovMixin",
+		"HudSmallCapsMixin",
 		"LocalPlayerSkinCapeMixin",
 		"MouseScrollMixin",
 		"NickHiderMixin",
 		"PlayerListHudMixin",
-		"PlayerNameTagBadgeMixin"
+		"PlayerNameTagBadgeMixin",
+		"SessionAccessorMixin",
+		"SmallCapsActionBarMixin",
+		"SmallCapsChatMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

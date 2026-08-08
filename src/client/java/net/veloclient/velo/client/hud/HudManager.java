@@ -105,15 +105,30 @@ public final class HudManager {
 		int x = hud.position().resolveX(screenWidth, scaledWidth);
 		int y = hud.position().resolveY(screenHeight, scaledHeight);
 
-		if (scale == 1.0f) {
-			hud.render(context, x, y, tickDelta);
-			return;
+		// Scoreboard is deliberately excluded from HUD small caps - vanilla's
+		// own scoreboard is exempt (there's no mixin over it, only a
+		// suppress-and-replace above), so a small-capped ScoreboardHudModule
+		// would be the only scoreboard styling that ever looks different,
+		// which reads as inconsistent rather than as the intended effect.
+		boolean smallCapsEligible = !hud.id().equals("scoreboard-hud");
+		if (smallCapsEligible) {
+			net.veloclient.velo.client.modules.qol.SmallCapsModule.setHudRenderActive(true);
 		}
-		context.getMatrices().pushMatrix();
-		context.getMatrices().translate((float) x, (float) y);
-		context.getMatrices().scale(scale, scale);
-		context.getMatrices().translate((float) -x, (float) -y);
-		hud.render(context, x, y, tickDelta);
-		context.getMatrices().popMatrix();
+		try {
+			if (scale == 1.0f) {
+				hud.render(context, x, y, tickDelta);
+				return;
+			}
+			context.getMatrices().pushMatrix();
+			context.getMatrices().translate((float) x, (float) y);
+			context.getMatrices().scale(scale, scale);
+			context.getMatrices().translate((float) -x, (float) -y);
+			hud.render(context, x, y, tickDelta);
+			context.getMatrices().popMatrix();
+		} finally {
+			if (smallCapsEligible) {
+				net.veloclient.velo.client.modules.qol.SmallCapsModule.setHudRenderActive(false);
+			}
+		}
 	}
 }

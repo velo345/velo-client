@@ -2,9 +2,17 @@ package net.veloclient.velo.client.mixin;
 
 //? if <26.1 {
 import net.minecraft.client.render.Camera;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
+import net.minecraft.world.World;
 //?} else {
 /*import net.minecraft.client.Camera;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 *///?}
 import net.veloclient.velo.client.modules.qol.FreeLookModule;
@@ -54,8 +62,20 @@ public abstract class CameraFreeLookMixin {
 		FreeLookModule.captureBaseIfNeeded(this.yaw, this.pitch);
 		float orbitYaw = FreeLookModule.effectiveYaw();
 		float orbitPitch = FreeLookModule.effectivePitch();
-		double[] offset = FreeLookModule.cameraOffset(orbitYaw, orbitPitch, FreeLookModule.orbitDistance());
+		double[] rawOffset = FreeLookModule.cameraOffset(orbitYaw, orbitPitch, FreeLookModule.orbitDistance());
 		Vec3d target = focusedEntity.getCameraPosVec(tickDelta);
+		Vec3d desired = target.add(rawOffset[0], rawOffset[1], rawOffset[2]);
+		// Same idea as vanilla third-person's own Camera#clipToSpace: cast
+		// from the orbit target toward the desired camera spot and pull the
+		// distance back to just short of whatever it hits, so the orbit
+		// camera stops at walls/terrain instead of clipping through them.
+		BlockHitResult hit = area.raycast(new RaycastContext(target, desired,
+				RaycastContext.ShapeType.VISUAL, RaycastContext.FluidHandling.NONE, focusedEntity));
+		double[] offset = rawOffset;
+		if (hit.getType() != HitResult.Type.MISS) {
+			double clamped = Math.max(0.3, target.distanceTo(hit.getPos()) - 0.1);
+			offset = FreeLookModule.cameraOffset(orbitYaw, orbitPitch, clamped);
+		}
 		this.setPos(target.x + offset[0], target.y + offset[1], target.z + offset[2]);
 		this.setRotation(orbitYaw, orbitPitch);
 	}
@@ -66,6 +86,7 @@ public abstract class CameraFreeLookMixin {
 
 	@Shadow private float xRot;
 	@Shadow private float yRot;
+	@Shadow private Level level;
 
 	@Shadow
 	protected abstract void setRotation(float yaw, float pitch);
@@ -79,15 +100,27 @@ public abstract class CameraFreeLookMixin {
 			return;
 		}
 		net.minecraft.world.entity.Entity focusedEntity = ((Camera) (Object) this).entity();
-		if (focusedEntity == null) {
+		if (focusedEntity == null || this.level == null) {
 			return;
 		}
 		float tickDelta = deltaTracker.getGameTimeDeltaPartialTick(true);
 		FreeLookModule.captureBaseIfNeeded(this.yRot, this.xRot);
 		float orbitYaw = FreeLookModule.effectiveYaw();
 		float orbitPitch = FreeLookModule.effectivePitch();
-		double[] offset = FreeLookModule.cameraOffset(orbitYaw, orbitPitch, FreeLookModule.orbitDistance());
+		double[] rawOffset = FreeLookModule.cameraOffset(orbitYaw, orbitPitch, FreeLookModule.orbitDistance());
 		Vec3 target = focusedEntity.getEyePosition(tickDelta);
+		Vec3 desired = target.add(rawOffset[0], rawOffset[1], rawOffset[2]);
+		// Same idea as vanilla third-person's own Camera#getMaxZoom: cast
+		// from the orbit target toward the desired camera spot and pull the
+		// distance back to just short of whatever it hits, so the orbit
+		// camera stops at walls/terrain instead of clipping through them.
+		BlockHitResult hit = this.level.clip(new ClipContext(target, desired,
+				ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, focusedEntity));
+		double[] offset = rawOffset;
+		if (hit.getType() != HitResult.Type.MISS) {
+			double clamped = Math.max(0.3, target.distanceTo(hit.getLocation()) - 0.1);
+			offset = FreeLookModule.cameraOffset(orbitYaw, orbitPitch, clamped);
+		}
 		this.setPosition(target.x + offset[0], target.y + offset[1], target.z + offset[2]);
 		this.setRotation(orbitYaw, orbitPitch);
 	}

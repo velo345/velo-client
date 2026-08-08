@@ -82,7 +82,9 @@ public final class WaypointsModule extends AbstractModule implements HudModule, 
 				continue;
 			}
 			BlockPos pos = BlockPos.ofFloored(waypoint.x(), waypoint.y(), waypoint.z());
-			GizmoDrawing.blockLabel(waypoint.name(), pos, 0, MARKER_COLOR, 1.2f);
+			String label = net.veloclient.velo.client.modules.qol.SmallCapsModule.isHudSmallCapsEnabled()
+					? net.veloclient.velo.client.util.SmallCapsConverter.toSmallCaps(waypoint.name()) : waypoint.name();
+			GizmoDrawing.blockLabel(label, pos, 0, MARKER_COLOR, 1.2f);
 			GizmoDrawing.point(new Vec3d(waypoint.x(), waypoint.y(), waypoint.z()), MARKER_COLOR, 6f).ignoreOcclusion();
 		}
 	}

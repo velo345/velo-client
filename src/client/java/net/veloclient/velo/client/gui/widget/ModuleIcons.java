@@ -28,7 +28,8 @@ public final class ModuleIcons {
 			"hitbox-visualizer", "world-border-visualizer", "light-level-overlay", "tps-tick-graph",
 			"packet-traffic-monitor", "particle-debug-overlay", "sound-debug-overlay", "client-log-viewer",
 			"resource-reload-hotkeys", "keybind-conflict-checker", "looking-at-inspector", "command-keybinds",
-			"scoreboard-hud", "custom-crosshair", "minimap");
+			"scoreboard-hud", "custom-crosshair", "minimap", "session-auto-fixer", "tnt-timer", "block-outline",
+			"time-weather-fog", "small-caps", "kill-effects");
 
 	private ModuleIcons() {
 	}

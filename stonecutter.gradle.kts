@@ -686,9 +686,13 @@ stonecutter parameters {
 			replace("net.minecraft.world.border.WorldBorder", "net.minecraft.world.level.border.WorldBorder")
 			// GizmoDrawing was split into a static Gizmos facade with
 			// per-shape methods (verified via javap against the real 26.1
-			// jar, not guessed) - box->cuboid, blockLabel->
-			// billboardTextOverBlock (same 5-arg shape: String, BlockPos,
-			// int, int, float), point unchanged. DrawStyle.stroked ->
+			// AND 26.2 common jars, not guessed - identical signatures on
+			// both, so safe as an unbounded ">=26.1" rule per the
+			// same-diff-both-steps rule explained in the 26.2-only block
+			// below) - box->cuboid, blockLabel->billboardTextOverBlock
+			// (same 5-arg shape: String, BlockPos, int, int, float),
+			// entityLabel->billboardTextOverMob (same 5-arg shape: Entity,
+			// int, String, int, float), line/point unchanged. DrawStyle.stroked ->
 			// GizmoStyle.stroke. ignoreOcclusion() has no direct
 			// equivalent on the new GizmoProperties - setAlwaysOnTop() is
 			// the closest (draws through terrain), though not perfectly
@@ -696,9 +700,46 @@ stonecutter parameters {
 			replace("net.minecraft.world.debug.gizmo.GizmoDrawing", "net.minecraft.gizmos.Gizmos")
 			replace("GizmoDrawing.box(", "Gizmos.cuboid(")
 			replace("GizmoDrawing.blockLabel(", "Gizmos.billboardTextOverBlock(")
+			replace("GizmoDrawing.entityLabel(", "Gizmos.billboardTextOverMob(")
 			replace("GizmoDrawing.point(", "Gizmos.point(")
+			// "line" itself is the same method name on the new Gizmos facade
+			// too (verified via javap on both the 26.1 and 26.2 common jars),
+			// but the bare class reference still needs the same swap the
+			// other GizmoDrawing.X( calls above get explicitly - there's no
+			// generic bare "GizmoDrawing"->"Gizmos" rule (deliberately, to
+			// avoid also matching inside unrelated identifiers), so each
+			// call shape needs its own line even when the method name itself
+			// doesn't change.
+			replace("GizmoDrawing.line(", "Gizmos.line(")
+			// billboardText covers the free-floating (not block/entity
+			// snapped) text call - needed for TntTimerModule, which can't
+			// use billboardTextOverMob/entityLabel since that snaps to the
+			// entity's containing BLOCK cell (getBlockX()/getBlockZ()) not
+			// its real continuous position, a real confirmed bug for a
+			// falling/moving entity (the label visibly snapped between block
+			// cells instead of tracking smoothly, and wasn't even centered
+			// over a mid-block position). TextGizmo lives in the same
+			// renamed common package as Gizmos itself.
+			replace("GizmoDrawing.text(", "Gizmos.billboardText(")
+			// Shields the bare "TextGizmo" class name from the bare
+			// "Text"->"Component" rule below (not word-boundary-aware, so it
+			// would otherwise mangle this into the nonexistent
+			// "ComponentGizmo" - a real confirmed compile failure), the same
+			// technique as the getBoundingBox() shield above.
+			replace("TextGizmo", "TextGizmo")
+			replace("net.minecraft.world.debug.gizmo.TextGizmo", "net.minecraft.gizmos.TextGizmo")
 			replace(".ignoreOcclusion()", ".setAlwaysOnTop()")
 			replace("DrawStyle.stroked(", "GizmoStyle.stroke(")
+			// Same 1-arg shape on both (verified via javap on the 26.1 AND
+			// 26.2 common jars) - used for thin filled boxes standing in for
+			// line segments (see ChunkBorderOverlayModule), since 1.21.11's
+			// own GizmoDrawing.line(...) turned out to render with a real,
+			// confirmed visual bug there (drifted with the player instead of
+			// staying fixed per-chunk) that the newer Gizmos facade doesn't
+			// have - box() was already proven correct on all three versions
+			// (WorldBorderVisualizerModule), so line-shaped segments switched
+			// to thin boxes instead of chasing the older implementation's bug.
+			replace("DrawStyle.filled(", "GizmoStyle.fill(")
 			replace("net.minecraft.client.render.DrawStyle", "net.minecraft.gizmos.GizmoStyle")
 			replace("DrawStyle", "GizmoStyle")
 			replace("net.minecraft.world.Heightmap", "net.minecraft.world.level.levelgen.Heightmap")
@@ -766,6 +807,17 @@ stonecutter parameters {
 			replace("RegistryEntry", "Holder")
 			replace("RenderTickCounter", "DeltaTracker")
 			replace("StyledNumberFormat", "StyledFormat")
+			// Shields Entity#getBoundingBox() - a real, identically-named
+			// method on both mappings (verified via javap on the 26.1 AND
+			// 26.2 common jars) - from the bare "Box"->"AABB" rule below,
+			// which would otherwise also match the "Box" inside this name
+			// (not word-boundary-aware) and mangle it into the
+			// nonexistent "getBoundingAABB()" (a real, confirmed compile
+			// failure, not hypothetical). A longer match registered at the
+			// same start position always wins per this file's own matching
+			// rules, so this "shields" it the same way "TextFieldWidget"
+			// shields the bare "Text" rule elsewhere in this file.
+			replace("getBoundingBox()", "getBoundingBox()")
 			replace("Box", "AABB")
 			replace("LightType", "LightLayer")
 			replace("CloudRenderMode", "CloudStatus")
