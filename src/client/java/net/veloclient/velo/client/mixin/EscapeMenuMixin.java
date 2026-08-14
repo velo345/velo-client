@@ -8,6 +8,7 @@ import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.screen.GameMenuScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.client.gui.widget.TextWidget;
 import net.minecraft.text.TranslatableTextContent;
 //?} else {
 /*import net.minecraft.client.Minecraft;
@@ -15,6 +16,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Renderable;
+import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.network.chat.contents.TranslatableContents;
@@ -38,10 +40,16 @@ import java.util.Map;
 /**
  * Themes the escape (pause) menu to match the rest of Velo's UI (design
  * spec section 5): every real vanilla button restacked into one centered
- * glass column directly below an opaque Velo-branded header (which also
- * covers vanilla's own "Game Menu" title text - see {@link
- * TitleScreenTheme#drawCompactBranding}'s doc for why it's covered rather
- * than cancelled), and a new "Store" button. Same real-translation-key
+ * glass column directly below a fully transparent Velo-branded header, and
+ * a new "Store" button. Vanilla's own "Game Menu"/"Paused" heading isn't
+ * covered by anything - it's a real {@link TextWidget} child added via
+ * {@code addDrawableChild} (found by dumping GameMenuScreen's own
+ * constructor bytecode: {@code super(showMenu ? GAME_TEXT : PAUSED_TEXT)},
+ * then a {@code TextWidget} built from that same title and added as a
+ * genuine child/drawable, not just narrated), so it's found the same way
+ * the real vanilla buttons are and removed from both {@code children()} and
+ * {@code drawables} outright - actually gone, not hidden underneath
+ * anything or shoved off-screen. Same real-translation-key
  * matching as {@link TitleScreenMixin} - see its class doc for why only
  * those specific buttons are touched at all, and everything else (Essential
  * or ModMenu's own buttons included) is left completely alone rather than
@@ -66,6 +74,7 @@ public abstract class EscapeMenuMixin {
 		// vanilla buttons are ever touched; everything else - Essential's
 		// included - is left completely alone at its own position/style.
 		Map<String, ButtonWidget> byKey = new HashMap<>();
+		TextWidget vanillaTitle = null;
 		for (var child : self.children()) {
 			if (child instanceof ButtonWidget widget) {
 				String key = velo$canonicalKey(widget);
@@ -76,6 +85,9 @@ public abstract class EscapeMenuMixin {
 				// Flashback/Replay Mod buttons) are matched and positioned
 				// every frame in velo$overlay instead of here - see its doc
 				// comment for why a one-shot pass at init isn't enough.
+			} else if (child instanceof TextWidget widget) {
+				// Vanilla's real "Game Menu"/"Paused" heading - see class doc.
+				vanillaTitle = widget;
 			}
 		}
 
@@ -85,6 +97,11 @@ public abstract class EscapeMenuMixin {
 		List<Element> children = (List<Element>) self.children();
 		children.add(storeButton);
 		drawables.add(storeButton);
+
+		if (vanillaTitle != null) {
+			children.remove(vanillaTitle);
+			drawables.remove(vanillaTitle);
+		}
 
 		int rowCount = 0;
 		for (String key : TitleScreenTheme.ESCAPE_KEY_ORDER) {
@@ -101,7 +118,12 @@ public abstract class EscapeMenuMixin {
 				velo$position(storeButton, layout.get(i++));
 			} else if (byKey.containsKey(key)) {
 				ButtonWidget widget = byKey.get(key);
-				drawables.remove(widget);
+				// Deliberately left in `drawables` - see TitleScreenMixin's
+				// doc comment for why (a mod anchoring its own button search
+				// against still-present real vanilla buttons, e.g. Flashback,
+				// never places its button at all once they're removed from
+				// here). Our own overlay below draws the glass version fully
+				// opaque on top of this exact rect regardless.
 				velo$position(widget, layout.get(i++));
 			}
 		}
@@ -142,6 +164,18 @@ public abstract class EscapeMenuMixin {
 		return null;
 	}
 
+	/** See {@link TitleScreenMixin}'s doc comment on its own copy of this method - same field, same reasoning, just read off {@link GameMenuScreen} instead of the title screen. */
+	@Unique
+	private static ButtonWidget velo$ukulibButton(GameMenuScreen self) {
+		try {
+			var field = self.getClass().getDeclaredField("ukulibButton");
+			field.setAccessible(true);
+			return field.get(self) instanceof ButtonWidget widget ? widget : null;
+		} catch (ReflectiveOperationException e) {
+			return null;
+		}
+	}
+
 	@Inject(method = "render", at = @At("RETURN"))
 	private void velo$overlay(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		GameMenuScreen self = (GameMenuScreen) (Object) this;
@@ -157,12 +191,13 @@ public abstract class EscapeMenuMixin {
 		ordered.sort(java.util.Comparator.comparingInt(ButtonWidget::getY));
 		TitleScreenTheme.drawCompactBranding(context, MinecraftClient.getInstance().textRenderer, self.width,
 				TitleScreenTheme.compactHeaderTop(self.width, self.height, ordered.size()));
+		TitleScreenTheme.drawVersionCorner(context, MinecraftClient.getInstance().textRenderer, self.height);
 		for (ButtonWidget widget : ordered) {
 			boolean hovered = mouseX >= widget.getX() && mouseX <= widget.getX() + widget.getWidth()
 					&& mouseY >= widget.getY() && mouseY <= widget.getY() + widget.getHeight();
 			TitleScreenTheme.drawGlassButton(context, MinecraftClient.getInstance().textRenderer,
 					new TitleScreenTheme.Layout(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
-					widget.getMessage(), hovered, widget.active);
+					widget.getMessage(), hovered, widget.active, mouseX, mouseY);
 		}
 
 		// Recomputed and repositioned every frame, not just once at init -
@@ -178,8 +213,14 @@ public abstract class EscapeMenuMixin {
 		List<String> extraKeys = new ArrayList<>();
 		List<ButtonWidget> sideOrdered = new ArrayList<>();
 		List<String> sideKeys = new ArrayList<>();
+		ButtonWidget ukulibButton = velo$ukulibButton(self);
 		for (var child : self.children()) {
 			if (!(child instanceof ButtonWidget widget) || velo$canonicalKey(widget) != null) {
+				continue;
+			}
+			if (widget == ukulibButton) {
+				extraOrdered.add(widget);
+				extraKeys.add("extensions");
 				continue;
 			}
 			String text = widget.getMessage().getString();
@@ -223,7 +264,7 @@ public abstract class EscapeMenuMixin {
 					&& mouseY >= widget.getY() && mouseY <= widget.getY() + widget.getHeight();
 			TitleScreenTheme.drawIconSquare(context,
 					new TitleScreenTheme.Layout(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
-					VeloNavIcons.of(extraKeys.get(idx)), hovered, widget.active);
+					VeloNavIcons.of(extraKeys.get(idx)), hovered, widget.active, mouseX, mouseY);
 		}
 		for (int idx = 0; idx < sideOrdered.size(); idx++) {
 			ButtonWidget widget = sideOrdered.get(idx);
@@ -231,7 +272,7 @@ public abstract class EscapeMenuMixin {
 					&& mouseY >= widget.getY() && mouseY <= widget.getY() + widget.getHeight();
 			TitleScreenTheme.drawIconSquare(context,
 					new TitleScreenTheme.Layout(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
-					VeloNavIcons.of(sideKeys.get(idx)), hovered, widget.active);
+					VeloNavIcons.of(sideKeys.get(idx)), hovered, widget.active, mouseX, mouseY);
 		}
 	}
 }
@@ -249,6 +290,7 @@ public abstract class EscapeMenuMixin {
 		// reverted (it swept Essential's own pause-menu buttons into this
 		// column instead of leaving them alone).
 		Map<String, Button> byKey = new HashMap<>();
+		StringWidget vanillaTitle = null;
 		for (var child : self.children()) {
 			if (child instanceof Button widget) {
 				String key = velo$canonicalKey(widget);
@@ -257,6 +299,9 @@ public abstract class EscapeMenuMixin {
 				}
 				// The below-stack row and side column are matched and
 				// positioned every frame in velo$overlay instead of here.
+			} else if (child instanceof StringWidget widget) {
+				// Vanilla's real "Game Menu"/"Paused" heading - see class doc.
+				vanillaTitle = widget;
 			}
 		}
 
@@ -266,6 +311,11 @@ public abstract class EscapeMenuMixin {
 		List<GuiEventListener> children = (List<GuiEventListener>) self.children();
 		children.add(storeButton);
 		renderables.add(storeButton);
+
+		if (vanillaTitle != null) {
+			children.remove(vanillaTitle);
+			renderables.remove(vanillaTitle);
+		}
 
 		int rowCount = 0;
 		for (String key : TitleScreenTheme.ESCAPE_KEY_ORDER) {
@@ -282,7 +332,8 @@ public abstract class EscapeMenuMixin {
 				velo$position(storeButton, layout.get(i++));
 			} else if (byKey.containsKey(key)) {
 				Button widget = byKey.get(key);
-				renderables.remove(widget);
+				// Deliberately left in `renderables` - see the Yarn branch's
+				// doc comment above.
 				velo$position(widget, layout.get(i++));
 			}
 		}
@@ -313,6 +364,18 @@ public abstract class EscapeMenuMixin {
 		return null;
 	}
 
+	// See TitleScreenMixin's doc comment on its own copy of this method.
+	@Unique
+	private static Button velo$ukulibButton(PauseScreen self) {
+		try {
+			var field = self.getClass().getDeclaredField("ukulibButton");
+			field.setAccessible(true);
+			return field.get(self) instanceof Button widget ? widget : null;
+		} catch (ReflectiveOperationException e) {
+			return null;
+		}
+	}
+
 	@Inject(method = "extractRenderState", at = @At("RETURN"))
 	private void velo$overlay(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		PauseScreen self = (PauseScreen) (Object) this;
@@ -328,20 +391,27 @@ public abstract class EscapeMenuMixin {
 		ordered.sort(java.util.Comparator.comparingInt(Button::getY));
 		TitleScreenTheme.drawCompactBranding(context, Minecraft.getInstance().font, self.width,
 				TitleScreenTheme.compactHeaderTop(self.width, self.height, ordered.size()));
+		TitleScreenTheme.drawVersionCorner(context, Minecraft.getInstance().font, self.height);
 		for (Button widget : ordered) {
 			boolean hovered = mouseX >= widget.getX() && mouseX <= widget.getX() + widget.getWidth()
 					&& mouseY >= widget.getY() && mouseY <= widget.getY() + widget.getHeight();
 			TitleScreenTheme.drawGlassButton(context, Minecraft.getInstance().font,
 					new TitleScreenTheme.Layout(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
-					widget.getMessage(), hovered, widget.active);
+					widget.getMessage(), hovered, widget.active, mouseX, mouseY);
 		}
 
 		List<Button> extraOrdered = new ArrayList<>();
 		List<String> extraKeys = new ArrayList<>();
 		List<Button> sideOrdered = new ArrayList<>();
 		List<String> sideKeys = new ArrayList<>();
+		Button ukulibButton = velo$ukulibButton(self);
 		for (var child : self.children()) {
 			if (!(child instanceof Button widget) || velo$canonicalKey(widget) != null) {
+				continue;
+			}
+			if (widget == ukulibButton) {
+				extraOrdered.add(widget);
+				extraKeys.add("extensions");
 				continue;
 			}
 			String text = widget.getMessage().getString();
@@ -385,7 +455,7 @@ public abstract class EscapeMenuMixin {
 					&& mouseY >= widget.getY() && mouseY <= widget.getY() + widget.getHeight();
 			TitleScreenTheme.drawIconSquare(context,
 					new TitleScreenTheme.Layout(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
-					VeloNavIcons.of(extraKeys.get(idx)), hovered, widget.active);
+					VeloNavIcons.of(extraKeys.get(idx)), hovered, widget.active, mouseX, mouseY);
 		}
 		for (int idx = 0; idx < sideOrdered.size(); idx++) {
 			Button widget = sideOrdered.get(idx);
@@ -393,7 +463,7 @@ public abstract class EscapeMenuMixin {
 					&& mouseY >= widget.getY() && mouseY <= widget.getY() + widget.getHeight();
 			TitleScreenTheme.drawIconSquare(context,
 					new TitleScreenTheme.Layout(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
-					VeloNavIcons.of(sideKeys.get(idx)), hovered, widget.active);
+					VeloNavIcons.of(sideKeys.get(idx)), hovered, widget.active, mouseX, mouseY);
 		}
 	}
 }

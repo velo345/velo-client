@@ -79,15 +79,74 @@ public final class SessionAutoFixerModule extends AbstractModule {
 		installButton(screen);
 	}
 
-	//? if <26.1 {
+	/**
+	 * The kick reason ("Invalid session (Try restarting your game and the
+	 * launcher)") is NOT what {@code getNarratedTitle()}/{@code
+	 * getNarrationMessage()} return - both just echo the screen's generic
+	 * heading ("Disconnected"), confirmed by decompiling {@code Screen}
+	 * itself (its narrated-title method is a one-line call straight through
+	 * to {@code getTitle()}, i.e. {@code this.title}, nothing else). The
+	 * real reason text lives on a separate field {@code DisconnectedScreen}
+	 * itself declares - a raw {@code Text}/{@code Component} on some builds,
+	 * or a record wrapping one behind a {@code reason()} accessor on others
+	 * (confirmed against the real Yarn 1.21.11 mappings: field {@code info},
+	 * type {@code DisconnectionInfo}, with a real generated {@code reason()}
+	 * accessor) - and that exact field name isn't available for the
+	 * Mojang-mapped 26.1/26.2 builds this project also targets. Rather than
+	 * guess it and risk a hard Mixin accessor failure on launch for those
+	 * versions, this reflectively scans every field {@code DisconnectedScreen}
+	 * itself declares (title/button-label text included - harmless, they
+	 * just never contain "invalid session") for anything - directly, or one
+	 * level behind a {@code reason()}-shaped wrapper - whose {@code
+	 * getString()} contains it. Older code here checked the wrong text
+	 * entirely, so the button never appeared for a real invalid-session kick
+	 * no matter what.
+	 */
 	private static boolean isInvalidSessionReason(DisconnectedScreen screen) {
-		return screen.getNarratedTitle().getString().toLowerCase(Locale.ROOT).contains("invalid session");
+		for (var field : screen.getClass().getDeclaredFields()) {
+			if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+				continue;
+			}
+			try {
+				field.setAccessible(true);
+				if (velo$mentionsInvalidSession(field.get(screen))) {
+					return true;
+				}
+			} catch (ReflectiveOperationException ignored) {
+				// Keep scanning - a field we can't read is just not a candidate.
+			}
+		}
+		return false;
 	}
-	//?} else {
-	/*private static boolean isInvalidSessionReason(DisconnectedScreen screen) {
-		return screen.getNarrationMessage().getString().toLowerCase(Locale.ROOT).contains("invalid session");
+
+	private static boolean velo$mentionsInvalidSession(Object value) {
+		if (value == null) {
+			return false;
+		}
+		String direct = velo$tryGetString(value);
+		if (direct != null && direct.toLowerCase(Locale.ROOT).contains("invalid session")) {
+			return true;
+		}
+		try {
+			Object reason = value.getClass().getMethod("reason").invoke(value);
+			String reasonText = velo$tryGetString(reason);
+			return reasonText != null && reasonText.toLowerCase(Locale.ROOT).contains("invalid session");
+		} catch (ReflectiveOperationException ignored) {
+			return false;
+		}
 	}
-	*///?}
+
+	private static String velo$tryGetString(Object value) {
+		if (value == null) {
+			return null;
+		}
+		try {
+			Object result = value.getClass().getMethod("getString").invoke(value);
+			return result instanceof String s ? s : null;
+		} catch (ReflectiveOperationException e) {
+			return null;
+		}
+	}
 
 	//? if <26.1 {
 	private boolean captureServer(MinecraftClient client, Screen firstScreen) {

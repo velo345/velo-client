@@ -20,6 +20,7 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.contents.TranslatableContents;
 *///?}
 import net.minecraft.text.Text;
+import net.veloclient.velo.VeloClient;
 import net.veloclient.velo.client.gui.store.StoreScreen;
 import net.veloclient.velo.client.gui.title.GlassMenuButton;
 import net.veloclient.velo.client.gui.title.TitleScreenTheme;
@@ -33,6 +34,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Fully reskins the vanilla title screen (design spec section 5): a slowly
@@ -104,7 +107,21 @@ public abstract class TitleScreenMixin {
 				velo$position(storeButton, layout.get(i++));
 			} else if (byKey.containsKey(key)) {
 				ButtonWidget widget = byKey.get(key);
-				drawables.remove(widget);
+				// Deliberately left in `drawables` (not removed) - our own
+				// velo$overlay draws the glass version fully opaque on top
+				// of this exact rect every frame anyway, so vanilla's own
+				// draw underneath is invisible either way. Actually removing
+				// it here (an earlier version did) is what made Flashback's
+				// "Open Replays" button never appear at all: confirmed by
+				// disassembling the real installed Flashback jar - it only
+				// ever anchors its own button search against real vanilla
+				// buttons still present in `drawables`/`renderables`
+				// (checked via `renderables.contains(widget)`), and with
+				// every one of them removed there was nothing left to anchor
+				// against, so `openSelectReplayScreenButton` stayed null
+				// forever. Leaving them in fixes that for free, and also
+				// lets Flashback's own overlap check correctly avoid this
+				// stack (and the Store button) when it does place its own.
 				velo$position(widget, layout.get(i++));
 			}
 		}
@@ -121,6 +138,55 @@ public abstract class TitleScreenMixin {
 	@Unique
 	private static String velo$keyOf(Text text) {
 		return text.getContent() instanceof TranslatableTextContent t ? t.getKey() : null;
+	}
+
+	/**
+	 * Diagnostic-only: logs (once per distinct widget class + label, not
+	 * every frame) any title-screen button that fell through every real key
+	 * match, hide-only needle, and extra-icon needle above - in particular
+	 * Flashback's "Open Replays" button, reported still missing from the
+	 * title screen despite {@link TitleScreenTheme#TITLE_SIDE_ICONS} that
+	 * should catch it by exact label text (see that field's doc for the
+	 * prior, reverted attempt at a class-name fallback). If it's really
+	 * present under a different label/class than assumed, this is what will
+	 * show it in the log next time the title screen is opened with it
+	 * installed - nothing here changes what's drawn or clickable.
+	 */
+	@Unique
+	private static final Set<String> velo$loggedUnmatched = ConcurrentHashMap.newKeySet();
+
+	@Unique
+	private static void velo$logUnmatched(ButtonWidget widget, String text) {
+		String id = widget.getClass().getName() + "|" + text;
+		if (velo$loggedUnmatched.add(id)) {
+			VeloClient.LOGGER.info("[title-screen] unmatched button widget class={} text=\"{}\"",
+					widget.getClass().getName(), text);
+		}
+	}
+
+	/**
+	 * ukulib's own title/pause-screen button (a per-player-head icon opening
+	 * its config-mods list) can't be matched by label text like everything
+	 * else above - it's built with an empty {@code Component} and rendered
+	 * entirely by a separate icon-draw hook, confirmed by disassembling the
+	 * real installed {@code ukulib-fabric} jar. What that same disassembly
+	 * also showed: ukulib's own mixin stashes it in a field literally named
+	 * {@code ukulibButton} on this exact screen class - not a Minecraft
+	 * field, so it isn't renamed by Yarn/Mojmap remapping either way, which
+	 * is what makes reading it back by that exact name through reflection
+	 * reliable here. Returns {@code null} (silently, every time) whenever
+	 * ukulib isn't installed, its title-screen mixin isn't applied, or its
+	 * "show button" setting is off - there's simply no such field then.
+	 */
+	@Unique
+	private static ButtonWidget velo$ukulibButton(TitleScreen self) {
+		try {
+			var field = self.getClass().getDeclaredField("ukulibButton");
+			field.setAccessible(true);
+			return field.get(self) instanceof ButtonWidget widget ? widget : null;
+		} catch (ReflectiveOperationException e) {
+			return null;
+		}
 	}
 
 	@Inject(method = "render", at = @At("RETURN"))
@@ -155,7 +221,7 @@ public abstract class TitleScreenMixin {
 					&& mouseY >= widget.getY() && mouseY <= widget.getY() + widget.getHeight();
 			TitleScreenTheme.drawGlassButton(context, MinecraftClient.getInstance().textRenderer,
 					new TitleScreenTheme.Layout(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
-					widget.getMessage(), hovered, widget.active);
+					widget.getMessage(), hovered, widget.active, mouseX, mouseY);
 		}
 		// Recomputed and repositioned every frame, not just once at init -
 		// Flashback's own title-screen button (and likely Replay Mod's) is
@@ -170,8 +236,17 @@ public abstract class TitleScreenMixin {
 		List<String> extraKeys = new java.util.ArrayList<>();
 		List<ButtonWidget> sideOrdered = new java.util.ArrayList<>();
 		List<String> sideKeys = new java.util.ArrayList<>();
+		ButtonWidget ukulibButton = velo$ukulibButton(self);
 		for (var child : self.children()) {
 			if (!(child instanceof ButtonWidget widget)) {
+				continue;
+			}
+			if (widget == ukulibButton) {
+				// Same icon-row treatment as Essential/ModMenu's own buttons
+				// below - see velo$ukulibButton's doc for why it can't go
+				// through the label-text matching every other button here does.
+				extraOrdered.add(widget);
+				extraKeys.add("extensions");
 				continue;
 			}
 			String key = velo$keyOf(widget.getMessage());
@@ -195,6 +270,8 @@ public abstract class TitleScreenMixin {
 			if (iconKey != null) {
 				extraOrdered.add(widget);
 				extraKeys.add(iconKey);
+			} else {
+				velo$logUnmatched(widget, text);
 			}
 		}
 		if (!extraOrdered.isEmpty() && !ordered.isEmpty()) {
@@ -230,7 +307,7 @@ public abstract class TitleScreenMixin {
 					&& mouseY >= widget.getY() && mouseY <= widget.getY() + widget.getHeight();
 			TitleScreenTheme.drawIconSquare(context,
 					new TitleScreenTheme.Layout(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
-					VeloNavIcons.of(extraKeys.get(idx)), hovered, widget.active);
+					VeloNavIcons.of(extraKeys.get(idx)), hovered, widget.active, mouseX, mouseY);
 		}
 		for (int idx = 0; idx < sideOrdered.size(); idx++) {
 			ButtonWidget widget = sideOrdered.get(idx);
@@ -238,7 +315,7 @@ public abstract class TitleScreenMixin {
 					&& mouseY >= widget.getY() && mouseY <= widget.getY() + widget.getHeight();
 			TitleScreenTheme.drawIconSquare(context,
 					new TitleScreenTheme.Layout(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
-					VeloNavIcons.of(sideKeys.get(idx)), hovered, widget.active);
+					VeloNavIcons.of(sideKeys.get(idx)), hovered, widget.active, mouseX, mouseY);
 		}
 	}
 }
@@ -289,7 +366,9 @@ public abstract class TitleScreenMixin {
 				velo$position(storeButton, layout.get(i++));
 			} else if (byKey.containsKey(key)) {
 				Button widget = byKey.get(key);
-				renderables.remove(widget);
+				// Deliberately left in `renderables` - see the Yarn branch's
+				// doc comment above for why (Flashback's own title button
+				// never appears at all if these are removed).
 				velo$position(widget, layout.get(i++));
 			}
 		}
@@ -306,6 +385,30 @@ public abstract class TitleScreenMixin {
 	@Unique
 	private static String velo$keyOf(Text text) {
 		return text.getContents() instanceof TranslatableContents t ? t.getKey() : null;
+	}
+
+	@Unique
+	private static final Set<String> velo$loggedUnmatched = ConcurrentHashMap.newKeySet();
+
+	@Unique
+	private static void velo$logUnmatched(Button widget, String text) {
+		String id = widget.getClass().getName() + "|" + text;
+		if (velo$loggedUnmatched.add(id)) {
+			VeloClient.LOGGER.info("[title-screen] unmatched button widget class={} text=\"{}\"",
+					widget.getClass().getName(), text);
+		}
+	}
+
+	// See the Yarn branch's doc comment above - same idea, Button instead of ButtonWidget.
+	@Unique
+	private static Button velo$ukulibButton(TitleScreen self) {
+		try {
+			var field = self.getClass().getDeclaredField("ukulibButton");
+			field.setAccessible(true);
+			return field.get(self) instanceof Button widget ? widget : null;
+		} catch (ReflectiveOperationException e) {
+			return null;
+		}
 	}
 
 	@Inject(method = "extractRenderState", at = @At("RETURN"))
@@ -340,14 +443,20 @@ public abstract class TitleScreenMixin {
 					&& mouseY >= widget.getY() && mouseY <= widget.getY() + widget.getHeight();
 			TitleScreenTheme.drawGlassButton(context, Minecraft.getInstance().font,
 					new TitleScreenTheme.Layout(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
-					widget.getMessage(), hovered, widget.active);
+					widget.getMessage(), hovered, widget.active, mouseX, mouseY);
 		}
 		List<Button> extraOrdered = new java.util.ArrayList<>();
 		List<String> extraKeys = new java.util.ArrayList<>();
 		List<Button> sideOrdered = new java.util.ArrayList<>();
 		List<String> sideKeys = new java.util.ArrayList<>();
+		Button ukulibButton = velo$ukulibButton(self);
 		for (var child : self.children()) {
 			if (!(child instanceof Button widget)) {
+				continue;
+			}
+			if (widget == ukulibButton) {
+				extraOrdered.add(widget);
+				extraKeys.add("extensions");
 				continue;
 			}
 			String key = velo$keyOf(widget.getMessage());
@@ -371,6 +480,8 @@ public abstract class TitleScreenMixin {
 			if (iconKey != null) {
 				extraOrdered.add(widget);
 				extraKeys.add(iconKey);
+			} else {
+				velo$logUnmatched(widget, text);
 			}
 		}
 		if (!extraOrdered.isEmpty() && !ordered.isEmpty()) {
@@ -401,7 +512,7 @@ public abstract class TitleScreenMixin {
 					&& mouseY >= widget.getY() && mouseY <= widget.getY() + widget.getHeight();
 			TitleScreenTheme.drawIconSquare(context,
 					new TitleScreenTheme.Layout(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
-					VeloNavIcons.of(extraKeys.get(idx)), hovered, widget.active);
+					VeloNavIcons.of(extraKeys.get(idx)), hovered, widget.active, mouseX, mouseY);
 		}
 		for (int idx = 0; idx < sideOrdered.size(); idx++) {
 			Button widget = sideOrdered.get(idx);
@@ -409,7 +520,7 @@ public abstract class TitleScreenMixin {
 					&& mouseY >= widget.getY() && mouseY <= widget.getY() + widget.getHeight();
 			TitleScreenTheme.drawIconSquare(context,
 					new TitleScreenTheme.Layout(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight()),
-					VeloNavIcons.of(sideKeys.get(idx)), hovered, widget.active);
+					VeloNavIcons.of(sideKeys.get(idx)), hovered, widget.active, mouseX, mouseY);
 		}
 	}
 }

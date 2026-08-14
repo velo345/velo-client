@@ -7,7 +7,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
-import net.veloclient.velo.client.gui.widget.VeloAnim;
 import net.veloclient.velo.client.gui.widget.VeloDraw;
 import net.veloclient.velo.client.theme.Theme;
 import net.veloclient.velo.client.theme.ThemeManager;
@@ -175,17 +174,21 @@ public final class TitleScreenTheme {
 	}
 
 	/** Same glass treatment as {@link #drawGlassButton}, just a small icon-centered square instead of a full-width text row - for the incorporated Essential/ModMenu/vanilla-corner buttons. */
-	public static void drawIconSquare(DrawContext context, Layout layout, Identifier icon, boolean hovered, boolean active) {
+	public static void drawIconSquare(DrawContext context, Layout layout, Identifier icon, boolean hovered, boolean active, int mouseX, int mouseY) {
 		Theme theme = ThemeManager.active();
 		int radius = 6;
 		int x = layout.x(), y = layout.y(), w = layout.width(), h = layout.height();
+		boolean glow = hovered && active;
 
 		VeloDraw.fillRounded(context, x, y + 1, w, h, radius, 0x33000000);
 		int base = solidify(theme.surfaceWithOpacity(), MIN_BUTTON_ALPHA);
-		int bg = hovered && active ? VeloAnim.lerpArgb(base, 0xFFFFFFFF, 0.14f) : base;
-		VeloDraw.fillRounded(context, x, y, w, h, radius, bg);
+		VeloDraw.fillRounded(context, x, y, w, h, radius, base);
 		VeloDraw.strokeRounded(context, x, y, w, h, radius,
-				hovered && active ? theme.accentStart() : ((theme.text() & 0x00FFFFFF) | 0x30000000));
+				glow ? theme.accentStart() : ((theme.text() & 0x00FFFFFF) | 0x30000000));
+
+		if (glow) {
+			drawSpotlight(context, x + 1, y + 1, w - 2, h - 2, mouseX, mouseY, Math.max(w, h), theme.accentStart());
+		}
 
 		int iconSize = Math.round(w * 0.55f);
 		int iconX = x + (w - iconSize) / 2;
@@ -194,7 +197,7 @@ public final class TitleScreenTheme {
 		context.drawTexture(RenderPipelines.GUI_TEXTURED, icon, iconX, iconY, 0f, 0f, iconSize, iconSize, 1024, 1024, 1024, 1024, tint);
 	}
 
-	/** The custom title-font identifier (Prosto One) - matches {@code assets/velo-client/font/title.json}. */
+	/** The custom title-font identifier (Audiowide) - matches {@code assets/velo-client/font/title.json}. */
 	public static final Identifier TITLE_FONT = Identifier.of("velo-client", "title");
 	/** The custom body-font identifier (Poppins) - matches {@code assets/velo-client/font/body.json}. */
 	public static final Identifier BODY_FONT = Identifier.of("velo-client", "body");
@@ -396,11 +399,16 @@ public final class TitleScreenTheme {
 	}
 
 	/**
-	 * A modern "frosted glass" pill: a soft drop shadow for depth, the
-	 * theme's translucent surface fill, a bright top hairline (the edge
-	 * real glass catches light on) inset by the corner radius so it never
-	 * overhangs the rounded corners, and an accent-colored glow border on
-	 * hover.
+	 * A modern "frosted glass" pill with a HUD-style futuristic treatment: a
+	 * soft drop shadow for depth, the theme's translucent surface fill, a
+	 * bright top hairline (the edge real glass catches light on) inset by
+	 * the corner radius so it never overhangs the rounded corners, detached
+	 * corner brackets (a targeting-reticle look, common in sci-fi UIs) that
+	 * extend and brighten on hover, and - while hovered - a pulsing
+	 * accent-colored border, and a soft themed spotlight centered on the
+	 * mouse cursor (see {@link #drawSpotlight}) - as if the cursor were a
+	 * light slightly lighting up the glass beneath it, clipped to this
+	 * button's own bounds so it never spills onto neighboring buttons.
 	 *
 	 * <p>The border is a rounded *ring*, not {@link VeloDraw#strokeRect} (a
 	 * plain 4-straight-edge rectangle outline) - a square outline drawn
@@ -415,27 +423,110 @@ public final class TitleScreenTheme {
 	 * stack - vanilla-sourced or new - renders pixel-identically instead of
 	 * the Store button using a completely different widget's own styling.
 	 */
-	public static void drawGlassButton(DrawContext context, TextRenderer textRenderer, Layout layout, Text label, boolean hovered, boolean active) {
+	public static void drawGlassButton(DrawContext context, TextRenderer textRenderer, Layout layout, Text label,
+			boolean hovered, boolean active, int mouseX, int mouseY) {
+		drawGlassButton(context, textRenderer, layout, label, hovered, active, 0f, mouseX, mouseY);
+	}
+
+	/**
+	 * Same as {@link #drawGlassButton(DrawContext, TextRenderer, Layout, Text, boolean, boolean, int, int)},
+	 * plus a bright press-flash overlay that fades from {@code pressFlash ==
+	 * 1} (the instant a real click landed) to {@code 0} - only {@link
+	 * GlassMenuButton} tracks its own click time to drive this; the
+	 * repositioned real vanilla buttons have no press-state hook reachable
+	 * from this static drawer, so they're always drawn with {@code
+	 * pressFlash == 0} via the overload above.
+	 */
+	public static void drawGlassButton(DrawContext context, TextRenderer textRenderer, Layout layout, Text label,
+			boolean hovered, boolean active, float pressFlash, int mouseX, int mouseY) {
 		Theme theme = ThemeManager.active();
 		int radius = BUTTON_CORNER_RADIUS;
 		int x = layout.x(), y = layout.y(), w = layout.width(), h = layout.height();
+		boolean glow = hovered && active;
 
 		VeloDraw.fillRounded(context, x, y + 2, w, h, radius, 0x33000000);
 
 		int base = solidify(theme.surfaceWithOpacity(), MIN_BUTTON_ALPHA);
-		int bg = hovered && active ? VeloAnim.lerpArgb(base, 0xFFFFFFFF, 0.14f) : base;
-		int borderColor = hovered && active ? theme.accentStart() : ((theme.text() & 0x00FFFFFF) | 0x30000000);
-		int borderWidth = hovered && active ? 2 : 1;
+		int borderColor = glow ? theme.accentStart() : ((theme.text() & 0x00FFFFFF) | 0x30000000);
+		int borderWidth = glow ? 2 : 1;
 
 		VeloDraw.fillRounded(context, x, y, w, h, radius, borderColor);
 		VeloDraw.fillRounded(context, x + borderWidth, y + borderWidth, w - borderWidth * 2, h - borderWidth * 2,
-				Math.max(0, radius - borderWidth), bg);
+				Math.max(0, radius - borderWidth), base);
 
-		int highlightAlpha = hovered && active ? 0x77 : 0x40;
+		if (glow) {
+			// Radius off the button's own height, not max(w, h) - the wide
+			// main buttons (200x20) made that a ~200px radius, which at a
+			// 20px height just washes the whole button evenly regardless of
+			// cursor position instead of reading as a light actually
+			// following the mouse. Scaled off height keeps it a genuinely
+			// localized, visibly moving highlight on both this (wide, short)
+			// shape and the icon squares' (roughly square) one below.
+			drawSpotlight(context, x + borderWidth, y + borderWidth, w - borderWidth * 2, h - borderWidth * 2,
+					mouseX, mouseY, h * 3, theme.accentStart());
+		}
+
+		int highlightAlpha = glow ? 0x60 : 0x40;
 		context.fill(x + radius, y + borderWidth, x + w - radius, y + borderWidth + 1, (highlightAlpha << 24) | 0xFFFFFF);
 
-		int textColor = active ? (hovered ? 0xFFFFFFFF : theme.text()) : 0xFF888888;
+		if (pressFlash > 0f) {
+			int flashAlpha = Math.round(0x90 * Math.min(1f, pressFlash));
+			VeloDraw.fillRounded(context, x, y, w, h, radius, (flashAlpha << 24) | 0xFFFFFF);
+		}
+
+		// Always the theme's own text color (never forced white on hover) -
+		// the fill only ever brightens/tints slightly, so this stays legible
+		// against it either way instead of risking a light-on-light or
+		// light-accent-on-white combination the theme never actually chose.
+		int textColor = active ? theme.text() : 0xFF888888;
 		context.drawCenteredTextWithShadow(textRenderer, bodyFont(label), x + w / 2, y + (h - 8) / 2, textColor);
+	}
+
+	/**
+	 * A soft themed light centered on {@code (mouseX, mouseY)}, as if the
+	 * cursor itself were a light slightly brightening the glass beneath it,
+	 * clipped to {@code [x, x+w) x [y, y+h)} row by row so it never spills
+	 * past this button's own bounds onto whatever's next to it. Kept
+	 * deliberately dim (low peak alpha) - a highlight, not a floodlight.
+	 *
+	 * <p>Every fillable strip's alpha is computed directly, once, from its
+	 * own true 2D distance to the cursor (a quadratic falloff that reaches
+	 * exactly zero at {@code radius}, not a hard-edged cutoff) - not layered
+	 * from several overlapping same-alpha rings the way an earlier version
+	 * of this did. That approach compounds: alpha-blending the same low
+	 * value over itself many times (to get a smooth many-ring gradient)
+	 * pushes the actually-composited alpha at the center well past the
+	 * per-ring value, *and* individual rings were still visible as faint
+	 * concentric edges since 8-bit alpha can't represent the tiny per-ring
+	 * increment a really smooth many-ring version would need. Computing the
+	 * real alpha once per strip has neither problem - what {@code peakAlpha}
+	 * says is the max is the actual max, and there are no ring edges to see
+	 * because nothing is drawn twice at the same spot.
+	 */
+	private static void drawSpotlight(DrawContext context, int x, int y, int w, int h, int centerX, int centerY, int radius, int rgb) {
+		int peakAlpha = 0x38;
+		int top = Math.max(y, centerY - radius);
+		int bottom = Math.min(y + h, centerY + radius + 1);
+		for (int py = top; py < bottom; py++) {
+			int dy = py - centerY;
+			int halfWidth = (int) Math.round(Math.sqrt(Math.max(0, (double) radius * radius - (double) dy * dy)));
+			int left = Math.max(x, centerX - halfWidth);
+			int right = Math.min(x + w, centerX + halfWidth);
+			if (right <= left) {
+				continue;
+			}
+			int step = Math.max(1, (right - left) / 32);
+			for (int px = left; px < right; px += step) {
+				int segEnd = Math.min(right, px + step);
+				double dx = (px + segEnd) / 2.0 - centerX;
+				float t = (float) Math.min(1.0, Math.sqrt(dx * dx + (double) dy * dy) / radius);
+				float falloff = 1f - t;
+				int alpha = Math.round(peakAlpha * falloff * falloff);
+				if (alpha > 0) {
+					context.fill(px, py, segEnd, py + 1, (alpha << 24) | (rgb & 0xFFFFFF));
+				}
+			}
+		}
 	}
 
 	/** Logo + "VELO CLIENT" wordmark (custom title font) + version pill, top-anchored at {@code topY} - see {@link #brandingTop} for how that's kept in sync with the button stack beneath it. */
@@ -463,58 +554,19 @@ public final class TitleScreenTheme {
 	}
 
 	/**
-	 * The escape menu header: covers wherever vanilla's own "Game Menu"/
-	 * "Paused" title text is (there's no clean injection point to cancel it
-	 * outright) with the Velo logo/wordmark, at real title size/weight
-	 * (matching {@link #drawBranding}'s treatment, not a small watermark
-	 * line) so it actually reads as this screen's title.
+	 * The escape menu header: the Velo logo/wordmark, at real title
+	 * size/weight (matching {@link #drawBranding}'s treatment, not a small
+	 * watermark line) so it actually reads as this screen's title.
 	 *
-	 * <p>The backing is solid only directly behind the logo/wordmark and
-	 * fades to fully transparent at the screen edges - a full-bleed solid
-	 * rectangle across the entire width read as a big ugly slab sitting over
-	 * the blurred gameplay behind it, and the only thing that actually needs
-	 * hiding is the (short, centered) vanilla title text right behind our
-	 * own wordmark, not the whole width of the screen.
+	 * <p>No backing of any kind is drawn behind it - fully transparent,
+	 * straight over the blurred gameplay background. An older version drew a
+	 * solid-fading-to-transparent band here to cover vanilla's own "Game
+	 * Menu"/"Paused" heading, which sat in the same spot; that heading is now
+	 * genuinely removed at the source (see {@link
+	 * net.veloclient.velo.client.mixin.EscapeMenuMixin}'s class doc), so
+	 * there is nothing left that needs covering.
 	 */
-	/**
-	 * A left-to-right fade, unlike {@link DrawContext#fillGradient} which
-	 * always interpolates top-to-bottom regardless of the x-range passed in
-	 * (confirmed against its own use a few lines up in {@link #drawPanorama}
-	 * for the bottom vignette, which really is meant to be vertical) - using
-	 * it for a horizontal fade here produced a vertical one instead. Steps
-	 * across columns since there's no true horizontal-gradient primitive.
-	 */
-	private static void fillHorizontalFade(DrawContext context, int x1, int x2, int y1, int y2, int startColor, int endColor) {
-		int width = x2 - x1;
-		if (width <= 0) {
-			return;
-		}
-		int step = Math.max(1, width / 48);
-		for (int x = x1; x < x2; x += step) {
-			float t = (x - x1) / (float) width;
-			int color = VeloAnim.lerpArgb(startColor, endColor, t);
-			context.fill(x, y1, Math.min(x2, x + step), y2, color);
-		}
-	}
-
 	public static void drawCompactBranding(DrawContext context, TextRenderer textRenderer, int screenWidth, int y) {
-		Theme theme = ThemeManager.active();
-		int bandBottom = y + compactBrandingHeight();
-		int solidColor = 0xFF000000 | (theme.background() & 0x00FFFFFF);
-		int fadeColor = theme.background() & 0x00FFFFFF;
-
-		int solidWidth = Math.min(screenWidth, 340);
-		int fadeWidth = Math.max(30, (screenWidth - solidWidth) / 3);
-		int solidX1 = (screenWidth - solidWidth) / 2;
-		int solidX2 = solidX1 + solidWidth;
-		fillHorizontalFade(context, Math.max(0, solidX1 - fadeWidth), solidX1, y, bandBottom, fadeColor, solidColor);
-		context.fill(solidX1, y, solidX2, bandBottom, solidColor);
-		fillHorizontalFade(context, solidX2, Math.min(screenWidth, solidX2 + fadeWidth), y, bandBottom, solidColor, fadeColor);
-		int accentColor = (theme.accentStart() & 0x00FFFFFF) | 0x66000000;
-		fillHorizontalFade(context, Math.max(0, solidX1 - fadeWidth), solidX1, bandBottom, bandBottom + 1, fadeColor, accentColor);
-		context.fill(solidX1, bandBottom, solidX2, bandBottom + 1, accentColor);
-		fillHorizontalFade(context, solidX2, Math.min(screenWidth, solidX2 + fadeWidth), bandBottom, bandBottom + 1, accentColor, fadeColor);
-
 		Text title = titleFont("VELO CLIENT");
 		int scale = 2;
 		int titleWidth = textRenderer.getWidth(title) * scale;
@@ -529,10 +581,13 @@ public final class TitleScreenTheme {
 		context.getMatrices().scale(scale, scale);
 		context.drawTextWithShadow(textRenderer, title, 0, 0, LOGO_RED);
 		context.getMatrices().popMatrix();
+	}
 
+	/** The version label, bottom-left of the screen - the escape menu's own corner, out of the way of the centered header/button stack, instead of crowding the header row like {@link #drawBranding}'s copy still does on the title screen. */
+	public static void drawVersionCorner(DrawContext context, TextRenderer textRenderer, int screenHeight) {
+		Theme theme = ThemeManager.active();
 		String versionLabel = "v" + VERSION;
-		int versionWidth = textRenderer.getWidth(versionLabel);
-		context.drawTextWithShadow(textRenderer, versionLabel, screenWidth - versionWidth - 8, y + 4, theme.text());
+		context.drawTextWithShadow(textRenderer, versionLabel, 8, screenHeight - 14, theme.text());
 	}
 
 	/** Total pixel height {@link #drawCompactBranding} occupies, so the escape menu can stack its button column directly beneath it. */

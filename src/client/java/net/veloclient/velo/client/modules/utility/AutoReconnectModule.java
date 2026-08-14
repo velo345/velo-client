@@ -34,10 +34,11 @@ import net.veloclient.velo.module.SafetyTag;
  * unexpected connection loss/kick, never for a manual "Disconnect" from the
  * pause menu) and only when a real multiplayer server entry is known, so
  * this can't accidentally reconnect out of singleplayer. A "Cancel Reconnect"
- * button is added directly to that screen (via Fabric API's {@link Screens}
- * helper - no need to touch vanilla's screen classes) so the attempt can be
- * called off at any time; the countdown resets back to 3s once a connection
- * actually succeeds or the attempt is cancelled.
+ * button and, beside it, a "Reconnect Now" shortcut are added directly to
+ * that screen (via Fabric API's {@link Screens} helper - no need to touch
+ * vanilla's screen classes): the countdown can be called off, or skipped
+ * entirely by whoever doesn't want to wait it out. The countdown resets back
+ * to 3s once a connection actually succeeds or the attempt is cancelled.
  */
 public final class AutoReconnectModule extends AbstractModule {
 
@@ -48,6 +49,7 @@ public final class AutoReconnectModule extends AbstractModule {
 	private int remainingTicks;
 	private Screen fallbackParent;
 	private ClickableWidget activeButton;
+	private ClickableWidget reconnectNowButton;
 
 	//? if <26.1 {
 	private ServerInfo targetServer;
@@ -76,6 +78,7 @@ public final class AutoReconnectModule extends AbstractModule {
 		targetServer = null;
 		fallbackParent = null;
 		activeButton = null;
+		reconnectNowButton = null;
 	}
 
 	/**
@@ -143,10 +146,13 @@ public final class AutoReconnectModule extends AbstractModule {
 
 	private void installButton(Screen screen) {
 		activeButton = createCancelButton(screen);
+		reconnectNowButton = createReconnectNowButton(screen);
 		//? if <26.1 {
 		Screens.getButtons(screen).add(activeButton);
+		Screens.getButtons(screen).add(reconnectNowButton);
 		//?} else {
 		/*Screens.getWidgets(screen).add(activeButton);
+		Screens.getWidgets(screen).add(reconnectNowButton);
 		*///?}
 		updateButtonLabel();
 	}
@@ -154,13 +160,25 @@ public final class AutoReconnectModule extends AbstractModule {
 	//? if <26.1 {
 	private ButtonWidget createCancelButton(Screen screen) {
 		return ButtonWidget.builder(Text.literal("Cancel Reconnect"), b -> onCancelPressed())
-				.dimensions(screen.width / 2 - 110, screen.height - 24, 220, 20)
+				.dimensions(screen.width / 2 + 4, screen.height - 24, 106, 20)
+				.build();
+	}
+
+	private ButtonWidget createReconnectNowButton(Screen screen) {
+		return ButtonWidget.builder(Text.literal("Reconnect Now"), b -> onReconnectNowPressed())
+				.dimensions(screen.width / 2 - 110, screen.height - 24, 106, 20)
 				.build();
 	}
 	//?} else {
 	/*private Button createCancelButton(Screen screen) {
 		return Button.builder(Text.literal("Cancel Reconnect"), b -> onCancelPressed())
-				.bounds(screen.width / 2 - 110, screen.height - 24, 220, 20)
+				.bounds(screen.width / 2 + 4, screen.height - 24, 106, 20)
+				.build();
+	}
+
+	private Button createReconnectNowButton(Screen screen) {
+		return Button.builder(Text.literal("Reconnect Now"), b -> onReconnectNowPressed())
+				.bounds(screen.width / 2 - 110, screen.height - 24, 106, 20)
 				.build();
 	}
 	*///?}
@@ -173,6 +191,15 @@ public final class AutoReconnectModule extends AbstractModule {
 		if (activeButton != null) {
 			activeButton.setMessage(Text.literal("Reconnect Cancelled"));
 		}
+		if (reconnectNowButton != null) {
+			reconnectNowButton.active = false;
+		}
+	}
+
+	/** The "Reconnect Now" shortcut - skips the rest of the countdown and connects immediately, without touching {@link #attempt}/the backoff schedule, so a failed manual attempt still resumes the normal progressive delays afterward instead of resetting them. */
+	private void onReconnectNowPressed() {
+		pending = false;
+		reconnectNow(MinecraftClient.getInstance());
 	}
 
 	private void onTick(MinecraftClient client) {
