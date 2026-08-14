@@ -1,0 +1,11 @@
+{
+	"providers": [
+		{
+			"type": "ttf",
+			"file": "velo-client:prosto_one.ttf",
+			"size": 11,
+			"oversample": 8,
+			"shift": [0, 0]
+		}
+	]
+}

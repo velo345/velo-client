@@ -11,12 +11,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * Draws a small Velo Client badge before the local player's own name in the
- * tab (player list) HUD - the same "which client is this player using" badge
- * Lunar/NoRisk-style clients show, purely a local cosmetic never sent to the
- * server or visible to anyone else. {@link VeloBadge} draws the identical
- * badge in chat ({@link ChatHudMixin}) and above the player's own head
- * ({@link PlayerNameTagBadgeMixin}).
+ * Draws a small Velo Client badge before a player's name in the tab (player
+ * list) HUD - the same "which client is this player using" badge
+ * Lunar/NoRisk-style clients show. Always shown for the local player; also
+ * shown for other players currently online with Velo Client on the
+ * configured server, if any (see {@link VeloBadge#isKnownVeloName}).
+ * {@link VeloBadge} draws the identical badge in chat ({@link ChatHudMixin})
+ * and above players' heads ({@link PlayerNameTagBadgeMixin}).
  *
  * <p>{@code PlayerListHud#render} calls {@code DrawContext#drawTextWithShadow
  * (TextRenderer, Text, int, int, int)} three times: the player name (what
@@ -33,7 +34,7 @@ public abstract class PlayerListHudMixin {
 			ordinal = 0))
 	private void velo$drawNameWithBadge(DrawContext context, TextRenderer textRenderer, Text text, int x, int y, int color) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client.player == null || !VeloBadge.isOwnName(text.getString(), client.player.getGameProfile().name())) {
+		if (client.player == null || !VeloBadge.isKnownVeloName(text.getString(), client.player.getGameProfile().name())) {
 			context.drawTextWithShadow(textRenderer, text, x, y, color);
 			return;
 		}

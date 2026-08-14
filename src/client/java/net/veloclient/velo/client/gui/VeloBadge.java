@@ -19,9 +19,12 @@ import net.minecraft.util.Identifier;
  * down to badge size looks meaningfully sharper than a source image that was
  * already only badge-sized to begin with.
  *
- * <p>Purely a local cosmetic, exactly like the cape/crosshair systems - never
- * sent to the server, and nobody else running Velo Client (or not) sees it on
- * this client's player, since there's no cosmetic-sync backend.
+ * <p>Own-name badging ({@link #isOwnName}) is always local-only, exactly like
+ * the cape/crosshair systems - nothing about it is ever sent anywhere. {@link
+ * #isKnownVeloName} additionally badges other players, but only if a Velo
+ * Client server is configured (see {@code network.json},
+ * {@link net.veloclient.velo.client.network.VeloServerClient}) - with none
+ * configured it behaves identically to {@link #isOwnName}.
  *
  * <p>The chat variant ({@link #prefixWithBadge}) can't just draw an icon at
  * render time like the other two - the visible chat text is pre-formatted
@@ -71,6 +74,27 @@ public final class VeloBadge {
 		int after = index + ownName.length();
 		boolean boundaryAfter = after >= text.length() || !isNameChar(text.charAt(after));
 		return boundaryBefore && boundaryAfter;
+	}
+
+	/**
+	 * Same whole-word match as {@link #isOwnName}, but also true for anyone
+	 * currently online with Velo Client on the server configured in {@code
+	 * network.json} (see {@link net.veloclient.velo.client.network.VeloServerClient},
+	 * {@link net.veloclient.velo.client.network.VeloUserRegistry}) - without
+	 * that configured, {@code onlineUsernames()} is always empty and this is
+	 * exactly {@link #isOwnName}, i.e. no behavior change for anyone who
+	 * hasn't opted into a server.
+	 */
+	public static boolean isKnownVeloName(String text, String ownName) {
+		if (isOwnName(text, ownName)) {
+			return true;
+		}
+		for (String username : net.veloclient.velo.client.network.VeloUserRegistry.onlineUsernames()) {
+			if (isOwnName(text, username)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static boolean isNameChar(char c) {

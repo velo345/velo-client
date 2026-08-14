@@ -133,9 +133,11 @@ public abstract class VeloWindow extends Screen {
 		VeloDraw.fillRounded(context, windowX, windowY, windowWidth, windowHeight, 6, surface);
 
 		int headerColor = (theme.accentStart() & 0x00FFFFFF) | (Math.min(alpha, 40) << 24);
-		context.fill(windowX, windowY, windowX + windowWidth, windowY + HEADER_HEIGHT, headerColor);
+		VeloDraw.fillRoundedTop(context, windowX, windowY, windowWidth, HEADER_HEIGHT, 6, headerColor);
 		context.fill(windowX, windowY + HEADER_HEIGHT, windowX + windowWidth, windowY + HEADER_HEIGHT + 1,
 				(theme.accentStart() & 0x00FFFFFF) | (Math.min(alpha, 180) << 24));
+		VeloDraw.strokeRounded(context, windowX, windowY, windowWidth, windowHeight, 6,
+				0xFFFFFF | (Math.min(alpha, 0x33) << 24));
 
 		context.drawTextWithShadow(this.textRenderer, this.title, windowX + PADDING, windowY + (HEADER_HEIGHT - 8) / 2,
 				(theme.text() & 0x00FFFFFF) | (alpha << 24));

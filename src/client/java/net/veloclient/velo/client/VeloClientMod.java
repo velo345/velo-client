@@ -58,6 +58,7 @@ import net.veloclient.velo.client.modules.utility.AutoReconnectModule;
 import net.veloclient.velo.client.modules.utility.CommandKeybindsModule;
 import net.veloclient.velo.client.modules.utility.CopyCoordinatesModule;
 import net.veloclient.velo.client.modules.utility.SessionAutoFixerModule;
+import net.veloclient.velo.client.modules.utility.VeloNetworkModule;
 import net.veloclient.velo.module.ModuleRegistry;
 
 /** Client-only entrypoint: registers every built-in module, the keybind and the HUD renderer. */
@@ -69,7 +70,8 @@ public final class VeloClientMod implements ClientModInitializer {
 		HudManager.register();
 		VeloKeybinds.register();
 		CapeFeatureRenderer.register();
-		net.veloclient.velo.client.gui.VeloBranding.register();
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
+				client -> net.veloclient.velo.client.cosmetics.AnimatedCapeAsset.tickAll());
 		net.veloclient.velo.client.profile.VeloProfileStore.loadActiveDeferred();
 		// Previously only loaded lazily the first time the Crosshair select
 		// screen was opened, so the persisted "equipped" crosshair never
@@ -115,6 +117,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		// Cosmetics (section 6.5)
 		ModuleRegistry.register(new CapeCosmeticsModule());
 		ModuleRegistry.register(new KillEffectsModule());
+		ModuleRegistry.register(new VeloNetworkModule());
 
 		// Performance (section 6.1)
 		ModuleRegistry.register(new FrameTimeGraphModule());

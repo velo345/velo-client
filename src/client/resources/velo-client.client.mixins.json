@@ -10,6 +10,7 @@
 		"CameraFreeLookMixin",
 		"ChatHudMixin",
 		"ClientConnectionMixin",
+		"EscapeMenuMixin",
 		"FreeLookInputMixin",
 		"FullBrightMixin",
 		"GameRendererFovMixin",
@@ -19,9 +20,14 @@
 		"NickHiderMixin",
 		"PlayerListHudMixin",
 		"PlayerNameTagBadgeMixin",
+		"ScreenAccessMixin",
 		"SessionAccessorMixin",
 		"SmallCapsActionBarMixin",
-		"SmallCapsChatMixin"
+		"SmallCapsChatMixin",
+		"TitleLogoMixin",
+		"TitlePanoramaMixin",
+		"TitleScreenMixin",
+		"TitleSplashMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

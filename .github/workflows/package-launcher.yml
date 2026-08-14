@@ -25,8 +25,9 @@ jobs:
             asset-glob: launcher/build/jpackage-dist/*.deb
           - os: windows-latest
             asset-glob: launcher/build/jpackage-dist/*.exe
-          - os: macos-latest
-            asset-glob: launcher/build/jpackage-dist/*.dmg
+          # macOS build intentionally excluded for now - re-add a
+          # macos-latest entry (asset-glob: launcher/build/jpackage-dist/*.dmg)
+          # whenever it's ready to ship again.
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

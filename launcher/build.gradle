@@ -107,7 +107,7 @@ tasks.register("bundleJavaRuntimeFallback") {
 // reads it back as a classpath resource at runtime instead of independently
 // hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
 // below reuses the same value for the native installer's version.
-def launcherAppVersion = "0.5.3"
+def launcherAppVersion = "0.6.0"
 // A fixed identity for the Windows installer across every version - WiX
 // needs this (--win-upgrade-uuid below) to recognize a new installer as an
 // upgrade of whatever's already installed rather than an unrelated product,

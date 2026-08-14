@@ -82,6 +82,16 @@ Privacy Policy required for a project with an identifiable operator.
 - **Cosmetics**: a cape library with `.velocape` bundle import/export, and a
   real verlet-integration cloth simulator driving the sway of a cape
   rendered through vanilla's own `PlayerCapeModel`/`submitModel` pipeline.
+- **Velo Network** (`server/`): a small self-hostable backend (see
+  [server/README.md](server/README.md)) that lets Velo Client users see
+  *each other* - the "which client is this player using" badge and equipped
+  Store cape, previously only ever visible on your own name/cape, now also
+  show for other online Velo Client users pointed at the same server.
+  Identity is proven the same way real Minecraft servers do (join/`hasJoined`
+  against Mojang's session server), so the backend never sees anyone's
+  access token. On by default, pointed at Velo Client's own official server
+  (`https://client.asteriasmp.net`) - overridable (or turned off entirely)
+  via `network.json`, see server/README.md.
 - **Launcher** (`launcher/`): a JavaFX shell with Home (server ping widget
   using the real Server List Ping protocol), Mods (reads the mod's exported
   manifest), Cosmetics, Profiles, Settings, and a Theme Editor — all reading
@@ -110,9 +120,12 @@ Privacy Policy required for a project with an identifiable operator.
   pretending to launch anything.
 - **Code-signed installers / auto-updater.** Needs a signing certificate and
   a release pipeline this environment doesn't have.
-- **Cosmetic-sync backend.** Without a server, capes only render for your
-  own client's view of yourself (e.g. a mirror/third-person mod) — other
-  Velo Client users' cape choices aren't synced anywhere yet.
+- **Cosmetic-sync backend now exists** (see "Velo Network" above and
+  [server/README.md](server/README.md)), but only syncs the built-in Store
+  capes - a custom `.velocape` you imported yourself still only renders on
+  your own client, since there's no texture-upload endpoint yet. Remote
+  players' capes also don't get the local player's real-time cloth physics
+  (a fixed rest lean instead) - see `CapeFeatureRenderer`'s class doc for why.
 - **True GPU backdrop blur** for the glass panel look. The current
   `GlassPanel` approximates it with layered translucency; a real
   post-processing blur shader is a documented follow-up.
@@ -135,6 +148,7 @@ mappings, Fabric API, and JavaFX).
 ```bash
 ./gradlew build          # mod + launcher
 ./gradlew :launcher:build  # launcher only
+./gradlew :server:shadowJar  # Velo Network server - see server/README.md
 ```
 
 The mod jar is written to `build/libs/velo-client-<version>.jar`. Java 21 is
@@ -158,6 +172,17 @@ window** — it's not headless.
 ./gradlew :launcher:run
 ```
 
+### Running the Velo Network server
+
+Only needed if you want to see other players' badge/cape - the mod works
+exactly as before without it. Full setup (systemd, TLS, client config) is in
+[server/README.md](server/README.md); the short version:
+
+```bash
+./gradlew :server:shadowJar
+java -jar server/build/libs/velo-server.jar
+```
+
 ### Project layout
 
 ```
@@ -166,6 +191,7 @@ src/main/resources/fabric.mod.json           mod metadata / entrypoints
 src/client/java/net/veloclient/velo/client/   client-only code (rendering, keybinds, GUI, modules, mixins)
 src/client/resources/                         client-only assets (lang files, mixin config)
 launcher/src/main/java/net/veloclient/launcher/  standalone JavaFX launcher app
+server/src/main/java/net/veloclient/server/      Velo Network backend (badge/cape sync, see server/README.md)
 ```
 
 `src/main` and `src/client` are split via Loom's

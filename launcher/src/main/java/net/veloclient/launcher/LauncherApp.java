@@ -100,7 +100,7 @@ public final class LauncherApp extends Application {
 	private MinecraftSession session;
 	private Label accountLabel;
 	private Button accountButton;
-	private Button navHome, navInstances, navCosmetics, navTheme, navSettings;
+	private Button navHome, navInstances, navCosmetics, navStore, navTheme, navSettings;
 	private VBox runningSection;
 	private VBox quickLaunchSection;
 	/**
@@ -226,10 +226,11 @@ public final class LauncherApp extends Application {
 		navHome = navButton("Home", this::showHome);
 		navInstances = navButton("Profiles", this::showInstances);
 		navCosmetics = navButton("Cosmetics", this::showCosmetics);
+		navStore = navButton("Store", this::showStore);
 		navTheme = navButton("Theme Editor", this::showThemeEditor);
 		navSettings = navButton("Settings", this::showSettings);
 
-		sidebar.getChildren().addAll(title, navHome, navInstances, navCosmetics, navTheme, navSettings);
+		sidebar.getChildren().addAll(title, navHome, navInstances, navCosmetics, navStore, navTheme, navSettings);
 
 		// "Running" (live instances) and "Quick Launch" (recent one-click
 		// shortcuts) - deliberately separated from the fixed nav above by
@@ -332,7 +333,7 @@ public final class LauncherApp extends Application {
 	}
 
 	private void clearActiveNav() {
-		for (Button b : List.of(navHome, navInstances, navCosmetics, navTheme, navSettings)) {
+		for (Button b : List.of(navHome, navInstances, navCosmetics, navStore, navTheme, navSettings)) {
 			b.getStyleClass().remove("nav-button-active");
 		}
 	}
@@ -427,7 +428,7 @@ public final class LauncherApp extends Application {
 	}
 
 	private void markActiveNav(Button active) {
-		for (Button b : List.of(navHome, navInstances, navCosmetics, navTheme, navSettings)) {
+		for (Button b : List.of(navHome, navInstances, navCosmetics, navStore, navTheme, navSettings)) {
 			b.getStyleClass().remove("nav-button-active");
 		}
 		active.getStyleClass().add("nav-button-active");
@@ -1002,6 +1003,62 @@ public final class LauncherApp extends Application {
 				showCosmetics();
 			}
 		}));
+	}
+
+	// ---- Store ----
+
+	private void showStore() {
+		setContent(net.veloclient.launcher.ui.StoreView.build(new net.veloclient.launcher.ui.StoreView.Host() {
+			@Override
+			public Stage owner() {
+				return stage;
+			}
+
+			@Override
+			public LauncherTheme theme() {
+				return theme;
+			}
+
+			@Override
+			public MinecraftSession session() {
+				return session;
+			}
+
+			@Override
+			public void openItem(net.veloclient.launcher.data.StoreItem item) {
+				showStoreItemDetail(item);
+			}
+
+			@Override
+			public void rebuild() {
+				showStore();
+			}
+		}));
+		markActiveNav(navStore);
+	}
+
+	private void showStoreItemDetail(net.veloclient.launcher.data.StoreItem item) {
+		setContent(net.veloclient.launcher.ui.StoreItemDetailView.build(new net.veloclient.launcher.ui.StoreItemDetailView.Host() {
+			@Override
+			public Stage owner() {
+				return stage;
+			}
+
+			@Override
+			public LauncherTheme theme() {
+				return theme;
+			}
+
+			@Override
+			public MinecraftSession session() {
+				return session;
+			}
+
+			@Override
+			public void goBack() {
+				showStore();
+			}
+		}, item));
 	}
 
 	// ---- Theme editor ----

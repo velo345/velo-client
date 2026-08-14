@@ -1,5 +1,7 @@
 package net.veloclient.launcher.ui;
 
+import javafx.animation.AnimationTimer;
+import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.AmbientLight;
 import javafx.scene.Group;
 import javafx.scene.Node;
@@ -15,12 +17,16 @@ import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.PhongMaterial;
+import javafx.scene.shape.Box;
 import javafx.scene.shape.CullFace;
 import javafx.scene.shape.MeshView;
 import javafx.scene.shape.TriangleMesh;
 import javafx.scene.transform.Rotate;
+import net.veloclient.launcher.data.GifFrames;
 
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.util.List;
 
 /**
  * A real, reusable rotatable 3D render of a player's skin (built for the
@@ -69,6 +75,11 @@ public final class PlayerSkin3DView {
 	 * orbit (the model always stays upright - no tilt), scroll to zoom.
 	 */
 	public static Node createViewer(byte[] skinPngBytes, boolean slim) {
+		return createViewer(skinPngBytes, slim, null);
+	}
+
+	/** Same as {@link #createViewer(byte[], boolean)}, with an optional cape rendered behind the back - the Store's "try before you buy" preview. A single-frame {@code capeFrames} renders as a static cape; more than one animates, cycling on each frame's own delay until the returned node leaves the scene. */
+	public static Node createViewer(byte[] skinPngBytes, boolean slim, List<GifFrames.Frame> capeFrames) {
 		if (skinPngBytes == null) {
 			return null;
 		}
@@ -110,6 +121,8 @@ public final class PlayerSkin3DView {
 		addPart(model, texture, uvW, uvH, 32, 48, armWidth, 12, 4, 4 + armWidth / 2, -8, 0);
 		addPart(model, texture, uvW, uvH, 0, 16, 4, 12, 4, -2, 4, 0);
 		addPart(model, texture, uvW, uvH, 16, 48, 4, 12, 4, 2, 4, 0);
+
+		AnimationTimer capeTimer = addCape(model, capeFrames);
 
 		Group rig = new Group(model);
 
@@ -154,7 +167,91 @@ public final class PlayerSkin3DView {
 			e.consume();
 		});
 
+		if (capeTimer != null) {
+			// AnimationTimer keeps running (and holding this whole viewer alive
+			// via its own pulse-listener registration) until stopped explicitly -
+			// tying that to the wrapper leaving the scene means switching away
+			// from a Store preview/profile page actually stops the timer instead
+			// of leaking one per visit.
+			wrapper.sceneProperty().addListener((obs, oldScene, newScene) -> {
+				if (newScene == null) {
+					capeTimer.stop();
+				}
+			});
+		}
+
 		return wrapper;
+	}
+
+	/**
+	 * A simple textured box behind the back (JavaFX's built-in {@link Box}
+	 * tiles the same image on all 6 faces via its default UV, so feeding it
+	 * just the cape's cropped back-panel image - the same 10x16-at-(1,1)
+	 * region the 2D cape previews elsewhere in this app already crop - reads
+	 * fine without needing a hand-rolled per-face UV atlas the way the body
+	 * parts above do). Returns the driving {@link AnimationTimer} for
+	 * more-than-one-frame input, or null for a static/no cape.
+	 */
+	private static AnimationTimer addCape(Group parent, List<GifFrames.Frame> frames) {
+		if (frames == null || frames.isEmpty()) {
+			return null;
+		}
+		double capeTexWidth = frames.get(0).image().getWidth();
+		double scale = capeTexWidth / 64.0;
+		int panelU = (int) Math.round(1 * scale);
+		int panelV = (int) Math.round(1 * scale);
+		int panelW = Math.max(1, (int) Math.round(10 * scale));
+		int panelH = Math.max(1, (int) Math.round(16 * scale));
+
+		PhongMaterial material = new PhongMaterial();
+		material.setDiffuseMap(toBackPanelImage(frames.get(0).image(), panelU, panelV, panelW, panelH));
+
+		// Model-space z is front(+)/back(-) is the WRONG way round here -
+		// confirmed by this exact file's own buildBoxMesh: the NORTH ("front")
+		// face is wound using the z0 (negative-z) vertices, so negative z is
+		// actually the side facing the camera and positive z is the back.
+		// Placing the cape at negative z (as an earlier version of this did)
+		// put it in front of the torso instead of behind it - a flat textured
+		// box pasted onto the character's chest instead of hanging off their
+		// back. The torso's own back face sits at z=+2 (half its own depth of
+		// 4), so the cape's center needs to clear that.
+		Box cape = new Box(10, 16, 1.5);
+		cape.setMaterial(material);
+		cape.setTranslateY(0);
+		cape.setTranslateZ(3);
+		parent.getChildren().add(cape);
+
+		if (frames.size() <= 1) {
+			return null;
+		}
+		AnimationTimer timer = new AnimationTimer() {
+			private int index;
+			private long frameStartNanos = -1;
+
+			@Override
+			public void handle(long now) {
+				if (frameStartNanos < 0) {
+					frameStartNanos = now;
+					return;
+				}
+				long elapsedMs = (now - frameStartNanos) / 1_000_000L;
+				if (elapsedMs < frames.get(index).delayMillis()) {
+					return;
+				}
+				frameStartNanos = now;
+				index = (index + 1) % frames.size();
+				material.setDiffuseMap(toBackPanelImage(frames.get(index).image(), panelU, panelV, panelW, panelH));
+			}
+		};
+		timer.start();
+		return timer;
+	}
+
+	private static Image toBackPanelImage(BufferedImage source, int u, int v, int w, int h) {
+		int clampedW = Math.min(w, source.getWidth() - u);
+		int clampedH = Math.min(h, source.getHeight() - v);
+		BufferedImage cropped = source.getSubimage(u, v, Math.max(1, clampedW), Math.max(1, clampedH));
+		return SwingFXUtils.toFXImage(cropped, null);
 	}
 
 	private static PointLight keyLight(double dirX, double dirY, double dirZ, double brightness) {

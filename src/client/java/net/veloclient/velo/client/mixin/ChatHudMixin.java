@@ -35,7 +35,7 @@ public abstract class ChatHudMixin {
 			at = @At("HEAD"), argsOnly = true)
 	private Text velo$prefixOwnMessage(Text message) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client.player == null || !VeloBadge.isOwnName(message.getString(), client.player.getGameProfile().name())) {
+		if (client.player == null || !VeloBadge.isKnownVeloName(message.getString(), client.player.getGameProfile().name())) {
 			return message;
 		}
 		return VeloBadge.prefixWithBadge(message);
@@ -49,7 +49,7 @@ public abstract class ChatHudMixin {
 			at = @At("HEAD"), argsOnly = true)
 	private Component velo$prefixOwnMessage(Component message) {
 		Minecraft client = Minecraft.getInstance();
-		if (client.player == null || !VeloBadge.isOwnName(message.getString(), client.player.getGameProfile().name())) {
+		if (client.player == null || !VeloBadge.isKnownVeloName(message.getString(), client.player.getGameProfile().name())) {
 			return message;
 		}
 		return VeloBadge.prefixWithBadge(message);

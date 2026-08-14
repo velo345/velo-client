@@ -49,12 +49,22 @@ import org.joml.Vector3f;
  * matches vanilla's 64x32 cape layout) with its sway angle driven by a real
  * {@link ClothSimulator} instead of vanilla's canned animation.
  *
- * <p>Purely client-rendered per design spec section 6.5: the server is never
- * told about this, and players not running Velo Client simply don't see it.
- * Without a cosmetic-sync backend (a documented future opt-in service), this
- * only renders for the local client's own view of themselves (e.g. in a
- * mirror/third-person mod) - other Velo Client users' cape choices aren't
- * synced anywhere yet.
+ * <p>Purely client-rendered per design spec section 6.5: the real Minecraft
+ * server is never told about this, and players not running Velo Client
+ * simply don't see it. The local player's own cape (this class's original,
+ * still-unconditional behavior) always renders with full {@link
+ * ClothSimulator} physics from {@link CapeManager#renderCape()}. Other
+ * players only get a cape rendered here if they're currently online with
+ * Velo Client on the same optional community server this client is
+ * configured to talk to (see {@code net.veloclient.velo.client.network} -
+ * on by default, see server/README.md) - and only if it's one of
+ * the built-in Store capes ({@link net.veloclient.velo.client.cosmetics.RemoteCapeCache}),
+ * since a custom imported cape's texture never leaves its owner's machine.
+ * That remote path deliberately skips {@link ClothSimulator} (a single
+ * instance shared by whichever player renders this frame, so it can't hold
+ * independent per-remote-player physics state) in favor of a fixed rest
+ * lean - full physics parity for other players is a natural follow-up, not
+ * a v1 requirement.
  */
 //? if <26.1 {
 public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRenderState, net.minecraft.client.render.entity.model.PlayerEntityModel> {
@@ -127,30 +137,50 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 			PlayerEntityRenderState state, float limbAngle, float limbDistance) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		PlayerEntity localPlayer = client.player;
-		if (localPlayer == null || state.id != localPlayer.getId()) {
+		if (localPlayer != null && state.id == localPlayer.getId()) {
+			CapeManager.renderCape().ifPresent(definition -> {
+				if (localPlayer.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).getItem() == net.minecraft.item.Items.ELYTRA) {
+					return;
+				}
+				advanceSimulation(definition, localPlayer);
+				float restLean = 0.14f;
+				float pitch = restLean + simulator.firstSegmentPitchRadians() * 1.35f;
+				float roll = simulator.firstSegmentRollRadians() * 0.8f;
+				renderCapeModel(matrixStack, queue, light, state, definition, pitch, roll);
+			});
 			return;
 		}
-		var equipped = CapeManager.equipped();
-		if (equipped.isEmpty()) {
-			return;
-		}
-		// Same rule vanilla's own cape and Wavey Capes both already follow -
-		// a real elytra equipped in the chestplate slot always takes over
-		// from the cape, never both at once.
-		if (localPlayer.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).getItem() == net.minecraft.item.Items.ELYTRA) {
-			return;
-		}
-		CapeDefinition definition = equipped.get();
-		advanceSimulation(definition, localPlayer);
+		renderRemote(matrixStack, queue, light, state, client);
+	}
 
+	/**
+	 * The other-player counterpart of the block above: no {@link
+	 * ClothSimulator} (that field is single-instance, shared across whatever
+	 * player renders this frame, so it can't hold per-remote-player physics
+	 * state - see class doc), just the same constant rest lean every cape
+	 * already has, driven by {@link net.veloclient.velo.client.network.VeloUserRegistry}
+	 * instead of the local {@link CapeManager}.
+	 */
+	private void renderRemote(MatrixStack matrixStack, OrderedRenderCommandQueue queue, int light,
+			PlayerEntityRenderState state, MinecraftClient client) {
+		if (client.world == null) {
+			return;
+		}
+		net.minecraft.entity.Entity entity = client.world.getEntityById(state.id);
+		if (!(entity instanceof PlayerEntity remotePlayer)) {
+			return;
+		}
+		String capeId = net.veloclient.velo.client.network.VeloUserRegistry.capeIdFor(remotePlayer.getUuid());
+		if (capeId == null || remotePlayer.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).getItem() == net.minecraft.item.Items.ELYTRA) {
+			return;
+		}
+		net.veloclient.velo.client.cosmetics.RemoteCapeCache.resolve(capeId)
+				.ifPresent(definition -> renderCapeModel(matrixStack, queue, light, state, definition, 0.14f, 0f));
+	}
+
+	private void renderCapeModel(MatrixStack matrixStack, OrderedRenderCommandQueue queue, int light,
+			PlayerEntityRenderState state, CapeDefinition definition, float pitch, float roll) {
 		Identifier texture = CapeManager.textureIdentifier(definition);
-		// A small constant outward lean even at rest, like a real cape resting
-		// against the shoulders instead of hanging perfectly flat against the
-		// back, plus the live simulated sway on top of it.
-		float restLean = 0.14f;
-		float pitch = restLean + simulator.firstSegmentPitchRadians() * 1.35f;
-		float roll = simulator.firstSegmentRollRadians() * 0.8f;
-
 		matrixStack.push();
 		// No extra translate here - vanilla's own cape model pivot already
 		// places it correctly against the back; an earlier version of this
@@ -167,27 +197,42 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 			AvatarRenderState state, float limbAngle, float limbDistance) {
 		Minecraft client = Minecraft.getInstance();
 		Player localPlayer = client.player;
-		if (localPlayer == null || state.id != localPlayer.getId()) {
+		if (localPlayer != null && state.id == localPlayer.getId()) {
+			CapeManager.renderCape().ifPresent(definition -> {
+				if (localPlayer.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem() == net.minecraft.world.item.Items.ELYTRA) {
+					return;
+				}
+				advanceSimulation(definition, localPlayer);
+				float restLean = 0.14f;
+				float pitch = restLean + simulator.firstSegmentPitchRadians() * 1.35f;
+				float roll = simulator.firstSegmentRollRadians() * 0.8f;
+				renderCapeModel(matrixStack, queue, light, state, definition, pitch, roll);
+			});
 			return;
 		}
-		var equipped = CapeManager.equipped();
-		if (equipped.isEmpty()) {
-			return;
-		}
-		if (localPlayer.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem() == net.minecraft.world.item.Items.ELYTRA) {
-			return;
-		}
-		CapeDefinition definition = equipped.get();
-		advanceSimulation(definition, localPlayer);
+		renderRemote(matrixStack, queue, light, state, client);
+	}
 
+	private void renderRemote(PoseStack matrixStack, SubmitNodeCollector queue, int light,
+			AvatarRenderState state, Minecraft client) {
+		if (client.level == null) {
+			return;
+		}
+		net.minecraft.world.entity.Entity entity = client.level.getEntity(state.id);
+		if (!(entity instanceof Player remotePlayer)) {
+			return;
+		}
+		String capeId = net.veloclient.velo.client.network.VeloUserRegistry.capeIdFor(remotePlayer.getUUID());
+		if (capeId == null || remotePlayer.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem() == net.minecraft.world.item.Items.ELYTRA) {
+			return;
+		}
+		net.veloclient.velo.client.cosmetics.RemoteCapeCache.resolve(capeId)
+				.ifPresent(definition -> renderCapeModel(matrixStack, queue, light, state, definition, 0.14f, 0f));
+	}
+
+	private void renderCapeModel(PoseStack matrixStack, SubmitNodeCollector queue, int light,
+			AvatarRenderState state, CapeDefinition definition, float pitch, float roll) {
 		Identifier texture = CapeManager.textureIdentifier(definition);
-		// A small constant outward lean even at rest, like a real cape resting
-		// against the shoulders instead of hanging perfectly flat against the
-		// back, plus the live simulated sway on top of it.
-		float restLean = 0.14f;
-		float pitch = restLean + simulator.firstSegmentPitchRadians() * 1.35f;
-		float roll = simulator.firstSegmentRollRadians() * 0.8f;
-
 		matrixStack.pushPose();
 		// No extra translate here - vanilla's own cape model pivot already
 		// places it correctly against the back; an earlier version of this

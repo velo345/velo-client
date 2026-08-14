@@ -52,7 +52,7 @@ public abstract class LocalPlayerSkinCapeMixin {
 		if ((Object) this != MinecraftClient.getInstance().player) {
 			return;
 		}
-		var equipped = CapeManager.equipped();
+		var equipped = CapeManager.renderCape();
 		if (equipped.isEmpty()) {
 			return;
 		}
@@ -95,7 +95,7 @@ public abstract class LocalPlayerSkinCapeMixin {
 		if ((Object) this != Minecraft.getInstance().player) {
 			return;
 		}
-		var equipped = CapeManager.equipped();
+		var equipped = CapeManager.renderCape();
 		if (equipped.isEmpty()) {
 			return;
 		}

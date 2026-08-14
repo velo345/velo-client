@@ -6,6 +6,7 @@ import com.google.gson.GsonBuilder;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -91,7 +92,28 @@ public final class CapeLibrary {
 			zip.write(GSON.toJson(new Meta(id, name)).getBytes(StandardCharsets.UTF_8));
 			zip.closeEntry();
 		}
-		return new CapeEntry(id, name, bundleFile, preset);
+		return new CapeEntry(id, name, bundleFile, preset, false);
+	}
+
+	/** Imports an animated GIF (a Store cape's bundled art) as a new library cape - the animated counterpart of {@link #importPng}. */
+	public static CapeEntry importAnimatedGif(String name, InputStream gifBytes, CapePhysicsPresetData preset) throws IOException {
+		VeloPaths.ensureDirectories();
+		String id = UUID.randomUUID().toString();
+		Path bundleFile = VeloPaths.capes().resolve(sanitize(name) + "-" + id.substring(0, 8) + ".velocape");
+		try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(bundleFile))) {
+			zip.putNextEntry(new ZipEntry("frames.gif"));
+			gifBytes.transferTo(zip);
+			zip.closeEntry();
+
+			zip.putNextEntry(new ZipEntry("physics.json"));
+			zip.write(GSON.toJson(preset).getBytes(StandardCharsets.UTF_8));
+			zip.closeEntry();
+
+			zip.putNextEntry(new ZipEntry("meta.json"));
+			zip.write(GSON.toJson(new Meta(id, name)).getBytes(StandardCharsets.UTF_8));
+			zip.closeEntry();
+		}
+		return new CapeEntry(id, name, bundleFile, preset, true);
 	}
 
 	public static void exportBundle(CapeEntry entry, Path destination) throws IOException {
@@ -100,15 +122,24 @@ public final class CapeLibrary {
 
 	/** Raw {@code texture.png} bytes from the bundle, for rendering a live preview (e.g. as a JavaFX {@code Image}). */
 	public static byte[] textureBytes(CapeEntry entry) throws IOException {
+		return bundleEntryBytes(entry, "texture.png");
+	}
+
+	/** Raw {@code frames.gif} bytes from an animated bundle - {@link CapeEntry#animated()} must be true. */
+	public static byte[] gifBytes(CapeEntry entry) throws IOException {
+		return bundleEntryBytes(entry, "frames.gif");
+	}
+
+	private static byte[] bundleEntryBytes(CapeEntry entry, String entryName) throws IOException {
 		try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(entry.bundleFile()))) {
 			ZipEntry zipEntry;
 			while ((zipEntry = zip.getNextEntry()) != null) {
-				if (zipEntry.getName().equals("texture.png")) {
+				if (zipEntry.getName().equals(entryName)) {
 					return zip.readAllBytes();
 				}
 			}
 		}
-		throw new IOException("Cape bundle is missing its texture.png: " + entry.bundleFile());
+		throw new IOException("Cape bundle is missing its " + entryName + ": " + entry.bundleFile());
 	}
 
 	public static void delete(CapeEntry entry) throws IOException {
@@ -152,6 +183,7 @@ public final class CapeLibrary {
 	private static Optional<CapeEntry> readMetadata(Path bundleFile) {
 		Meta meta = null;
 		CapePhysicsPresetData preset = CapePhysicsPresetData.defaults();
+		boolean animated = false;
 		try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(bundleFile))) {
 			ZipEntry entry;
 			while ((entry = zip.getNextEntry()) != null) {
@@ -159,12 +191,14 @@ public final class CapeLibrary {
 					meta = GSON.fromJson(new InputStreamReader(zip, StandardCharsets.UTF_8), Meta.class);
 				} else if (entry.getName().equals("physics.json")) {
 					preset = GSON.fromJson(new InputStreamReader(zip, StandardCharsets.UTF_8), CapePhysicsPresetData.class);
+				} else if (entry.getName().equals("frames.gif")) {
+					animated = true;
 				}
 			}
 		} catch (IOException e) {
 			return Optional.empty();
 		}
-		return meta == null ? Optional.empty() : Optional.of(new CapeEntry(meta.id, meta.name, bundleFile, preset));
+		return meta == null ? Optional.empty() : Optional.of(new CapeEntry(meta.id, meta.name, bundleFile, preset, animated));
 	}
 
 	private static String sanitize(String name) {

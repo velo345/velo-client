@@ -6,8 +6,9 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Util;
-import net.veloclient.velo.client.gui.widget.VeloButton;
 import net.veloclient.velo.client.gui.widget.VeloModuleTile;
+import net.veloclient.velo.client.gui.widget.VeloNavButton;
+import net.veloclient.velo.client.gui.widget.VeloNavIcons;
 import net.veloclient.velo.client.gui.widget.VeloScrollRegion;
 import net.veloclient.velo.client.gui.window.ModuleConfigScreen;
 import net.veloclient.velo.client.gui.window.VeloWindow;
@@ -26,8 +27,9 @@ import java.util.List;
 public final class ModMenuScreen extends VeloWindow implements ModuleConfigScreen.Reopenable {
 
 	private static final int SIDEBAR_WIDTH = 120;
-	private static final int TILE_SIZE = 72;
-	private static final int TILE_TOTAL_HEIGHT = TILE_SIZE + 20;
+	private static final int NAV_ROW_HEIGHT = 24;
+	private static final int TILE_SIZE = 88;
+	private static final int TILE_TOTAL_HEIGHT = TILE_SIZE + 22;
 	private static final int TILE_GAP = 8;
 
 	private ModuleCategory selectedCategory = ModuleCategory.HUD;
@@ -62,7 +64,8 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		sidebarRegion = new VeloScrollRegion(sidebarX, contentY(), SIDEBAR_WIDTH, contentBottom() - contentY());
 		for (ModuleCategory category : ModuleCategory.values()) {
 			ModuleCategory cat = category;
-			VeloButton button = new VeloButton(sidebarX, 0, SIDEBAR_WIDTH, 20, Text.literal(category.displayName()), b -> {
+			VeloNavButton button = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+					VeloNavIcons.of(categoryIcon(category)), Text.literal(category.displayName()), b -> {
 						this.selectedCategory = cat;
 						layoutContent();
 					})
@@ -71,37 +74,43 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			sidebarRegion.addRow(button);
 		}
 
-		VeloButton themeButton = new VeloButton(sidebarX, 0, SIDEBAR_WIDTH, 20, Text.literal("Theme Editor"),
+		VeloNavButton themeButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+				VeloNavIcons.of("theme_editor"), Text.literal("Theme Editor"),
 				b -> this.client.setScreen(new ThemeEditorScreen(this)));
 		addSelectableChild(themeButton);
 		sidebarRegion.addRow(themeButton);
 
-		VeloButton capesButton = new VeloButton(sidebarX, 0, SIDEBAR_WIDTH, 20, Text.literal("Capes"),
+		VeloNavButton capesButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+				VeloNavIcons.of("capes"), Text.literal("Capes"),
 				b -> this.client.setScreen(new CapeEquipScreen(this)));
 		addSelectableChild(capesButton);
 		sidebarRegion.addRow(capesButton);
 
-		VeloButton hudLayoutButton = new VeloButton(sidebarX, 0, SIDEBAR_WIDTH, 20, Text.literal("Edit HUD Layout"),
+		VeloNavButton hudLayoutButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+				VeloNavIcons.of("hud_layout"), Text.literal("Edit HUD Layout"),
 				b -> this.client.setScreen(new HudEditScreen(this)));
 		addSelectableChild(hudLayoutButton);
 		sidebarRegion.addRow(hudLayoutButton);
 
-		VeloButton crosshairsButton = new VeloButton(sidebarX, 0, SIDEBAR_WIDTH, 20, Text.literal("Crosshairs"),
+		VeloNavButton crosshairsButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+				VeloNavIcons.of("crosshairs"), Text.literal("Crosshairs"),
 				b -> this.client.setScreen(new CrosshairSelectScreen(this)));
 		addSelectableChild(crosshairsButton);
 		sidebarRegion.addRow(crosshairsButton);
 
-		VeloButton modsFolderButton = new VeloButton(sidebarX, 0, SIDEBAR_WIDTH, 20, Text.literal("Open Mods Folder"),
+		VeloNavButton modsFolderButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+				VeloNavIcons.of("mods_folder"), Text.literal("Open Mods Folder"),
 				b -> openInFileManager(FabricLoader.getInstance().getGameDir().resolve("mods").toFile()));
 		addSelectableChild(modsFolderButton);
 		sidebarRegion.addRow(modsFolderButton);
 
-		VeloButton profilesButton = new VeloButton(sidebarX, 0, SIDEBAR_WIDTH, 20, Text.literal("Profiles"),
+		VeloNavButton profilesButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+				VeloNavIcons.of("profiles"), Text.literal("Profiles"),
 				b -> this.client.setScreen(new ProfileScreen(this)));
 		addSelectableChild(profilesButton);
 		sidebarRegion.addRow(profilesButton);
 
-		sidebarRegion.layout(20, 2);
+		sidebarRegion.layout(NAV_ROW_HEIGHT, 2);
 
 		int listWidth = contentWidth() - SIDEBAR_WIDTH - 14;
 		int searchY = contentY();
@@ -116,6 +125,19 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		gridColumns = Math.max(1, (listWidth + TILE_GAP) / (TILE_SIZE + TILE_GAP));
 		scrollRegion = new VeloScrollRegion(listX, gridTop, listWidth, gridHeight);
 		refreshGrid();
+	}
+
+	private static String categoryIcon(ModuleCategory category) {
+		return switch (category) {
+			case PERFORMANCE -> "performance";
+			case HUD -> "hud";
+			case RENDERING -> "rendering";
+			case SERVER_TOOLS -> "server_tools";
+			case DEBUG -> "debug";
+			case COSMETICS -> "cosmetics";
+			case QOL -> "qol";
+			case UTILITY -> "utility";
+		};
 	}
 
 	private void showStatus(String text) {
@@ -217,7 +239,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			return true;
 		}
 		if (sidebarRegion != null && sidebarRegion.scroll(mouseX, mouseY, verticalAmount)) {
-			sidebarRegion.layout(20, 2);
+			sidebarRegion.layout(NAV_ROW_HEIGHT, 2);
 			return true;
 		}
 		return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
@@ -233,7 +255,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		// either fully hiding or spilling past the window border.
 		if (sidebarRegion != null) {
 			sidebarRegion.renderRows(context, mouseX, mouseY, delta);
-			sidebarRegion.renderScrollbar(context, 20, 2);
+			sidebarRegion.renderScrollbar(context, NAV_ROW_HEIGHT, 2);
 		}
 		if (scrollRegion != null) {
 			scrollRegion.renderRows(context, mouseX, mouseY, delta);

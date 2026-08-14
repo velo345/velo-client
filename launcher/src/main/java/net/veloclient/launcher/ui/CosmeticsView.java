@@ -137,7 +137,7 @@ public final class CosmeticsView {
 		holder.setPrefSize(70, 96);
 		holder.getStyleClass().add("instance-icon-custom");
 		try {
-			byte[] bytes = CapeLibrary.textureBytes(cape);
+			byte[] bytes = cape.animated() ? CapeLibrary.gifBytes(cape) : CapeLibrary.textureBytes(cape);
 			Image full = new Image(new ByteArrayInputStream(bytes));
 			double scale = full.getWidth() / CapeLibrary.TEXTURE_WIDTH;
 			ImageView view = new ImageView(full);

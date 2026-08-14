@@ -32,3 +32,4 @@ stonecutter {
 rootProject.name = "velo-client"
 
 include("launcher")
+include("server")

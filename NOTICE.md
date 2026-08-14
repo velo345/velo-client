@@ -2,7 +2,8 @@
 
 ## Lucide icons
 
-Module and mod-profile icons under `src/client/resources/assets/velo-client/textures/icon/module/`
+Module and mod-profile icons under `src/client/resources/assets/velo-client/textures/icon/module/`,
+sidebar navigation icons under `src/client/resources/assets/velo-client/textures/icon/nav/`,
 and `launcher/src/main/resources/net/veloclient/launcher/images/icons/` are rasterized from
 [Lucide](https://lucide.dev) (https://github.com/lucide-icons/lucide), used under the ISC license:
 

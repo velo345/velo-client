@@ -8,6 +8,7 @@ import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
+import net.veloclient.velo.client.gui.title.TitleScreenTheme;
 import net.veloclient.velo.client.theme.Theme;
 import net.veloclient.velo.client.theme.ThemeManager;
 
@@ -76,7 +77,7 @@ public class VeloButton extends ClickableWidget {
 		if (!this.active) {
 			textColor = 0xFF888888;
 		}
-		context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer, getMessage(),
+		context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer, TitleScreenTheme.bodyFont(getMessage()),
 				getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, textColor);
 	}
 

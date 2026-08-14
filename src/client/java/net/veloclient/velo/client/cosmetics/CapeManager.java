@@ -9,6 +9,7 @@ import net.minecraft.util.Identifier;
 import net.veloclient.velo.config.VeloPaths;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,6 +49,8 @@ public final class CapeManager {
 	private static final Map<String, Identifier> ELYTRA_TEXTURE_CACHE = new LinkedHashMap<>();
 	private static String equippedCapeId;
 	private static boolean loaded;
+	/** A Store preview cape, shown on the local player instead of the real equipped one while a preview screen is open - see {@link #renderCape()}. */
+	private static CapeDefinition previewOverride;
 
 	private CapeManager() {
 	}
@@ -76,6 +79,33 @@ public final class CapeManager {
 
 	public static Optional<CapeDefinition> equipped() {
 		return Optional.ofNullable(equippedCapeId).map(LIBRARY::get);
+	}
+
+	/** The Store catalog id of the equipped cape, if it's a purchased Store cape (see {@link CapeDefinition#sourceItemId()}) - what {@code VeloServerClient} publishes to a Velo Client server. */
+	public static Optional<String> equippedSourceItemId() {
+		return equipped().map(CapeDefinition::sourceItemId).filter(id -> id != null && !id.isBlank());
+	}
+
+	/** Sets/clears the Store's temporary preview cape - see {@link #renderCape()}. */
+	public static void setPreviewOverride(CapeDefinition definition) {
+		previewOverride = definition;
+	}
+
+	public static void clearPreviewOverride() {
+		previewOverride = null;
+	}
+
+	/**
+	 * Whichever cape should actually be drawn on the local player right now:
+	 * a Store item being previewed, if one's active, otherwise the real
+	 * equipped cape. {@link net.veloclient.velo.client.cosmetics.render.CapeFeatureRenderer}
+	 * and the Wavey Capes compat mixin both render through this instead of
+	 * {@link #equipped()} directly, so the Store's 3D preview can show a cape
+	 * the player hasn't bought yet without touching their actual equip
+	 * state.
+	 */
+	public static Optional<CapeDefinition> renderCape() {
+		return previewOverride != null ? Optional.of(previewOverride) : equipped();
 	}
 
 	public static void equip(String capeId) {
@@ -117,7 +147,7 @@ public final class CapeManager {
 			while ((entry = in.getNextEntry()) != null) {
 				out.putNextEntry(new ZipEntry(entry.getName()));
 				switch (entry.getName()) {
-					case "meta.json" -> out.write(GSON.toJson(new Meta(capeId, newName)).getBytes(StandardCharsets.UTF_8));
+					case "meta.json" -> out.write(GSON.toJson(new Meta(capeId, newName, existing.sourceItemId())).getBytes(StandardCharsets.UTF_8));
 					case "physics.json" -> out.write(GSON.toJson(newPreset).getBytes(StandardCharsets.UTF_8));
 					default -> in.transferTo(out);
 				}
@@ -125,7 +155,7 @@ public final class CapeManager {
 			}
 		}
 		Files.move(tempFile, existing.bundleFile(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-		LIBRARY.put(capeId, new CapeDefinition(capeId, newName, existing.bundleFile(), newPreset, existing.hasElytraTexture()));
+		LIBRARY.put(capeId, new CapeDefinition(capeId, newName, existing.bundleFile(), newPreset, existing.hasElytraTexture(), existing.animated(), existing.sourceItemId()));
 	}
 
 	/**
@@ -159,15 +189,82 @@ public final class CapeManager {
 				zip.closeEntry();
 
 				zip.putNextEntry(new ZipEntry("meta.json"));
-				zip.write(GSON.toJson(new Meta(id, name)).getBytes(StandardCharsets.UTF_8));
+				zip.write(GSON.toJson(new Meta(id, name, null)).getBytes(StandardCharsets.UTF_8));
 				zip.closeEntry();
 			}
 		} finally {
 			source.close();
 		}
-		CapeDefinition definition = new CapeDefinition(id, name, bundleFile, preset, combined);
+		CapeDefinition definition = new CapeDefinition(id, name, bundleFile, preset, combined, false, null);
 		LIBRARY.put(id, definition);
 		return definition;
+	}
+
+	/** Same as {@link #importAnimatedGif(String, InputStream, CapePhysicsPreset, String)} with no Store provenance - a plain shared {@code frames.gif}, not a purchase. */
+	public static CapeDefinition importAnimatedGif(String name, InputStream gifBytes, CapePhysicsPreset preset) throws IOException {
+		return importAnimatedGif(name, gifBytes, preset, null);
+	}
+
+	/**
+	 * Imports an animated GIF (a store cape's bundled art, or a shared
+	 * {@code frames.gif}) as a new library cape - the animated counterpart of
+	 * {@link #importCape}. No elytra split: animated capes are store
+	 * cosmetics, not user PNG imports, so there's no combined-texture
+	 * convention to honor here. {@code sourceItemId}, if this came from
+	 * {@code StorePurchase}, is the {@code StoreItem#id()} bought - see
+	 * {@link CapeDefinition#sourceItemId()}.
+	 */
+	public static CapeDefinition importAnimatedGif(String name, InputStream gifBytes, CapePhysicsPreset preset, String sourceItemId) throws IOException {
+		VeloPaths.ensureDirectories();
+		String id = UUID.randomUUID().toString();
+		Path bundleFile = VeloPaths.capes().resolve(sanitize(name) + "-" + id.substring(0, 8) + ".velocape");
+
+		try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(bundleFile))) {
+			zip.putNextEntry(new ZipEntry("frames.gif"));
+			gifBytes.transferTo(zip);
+			zip.closeEntry();
+
+			zip.putNextEntry(new ZipEntry("physics.json"));
+			zip.write(GSON.toJson(preset).getBytes(StandardCharsets.UTF_8));
+			zip.closeEntry();
+
+			zip.putNextEntry(new ZipEntry("meta.json"));
+			zip.write(GSON.toJson(new Meta(id, name, sourceItemId)).getBytes(StandardCharsets.UTF_8));
+			zip.closeEntry();
+		}
+		CapeDefinition definition = new CapeDefinition(id, name, bundleFile, preset, false, true, sourceItemId);
+		LIBRARY.put(id, definition);
+		return definition;
+	}
+
+	/**
+	 * Builds a throwaway, never-saved-to-the-library {@link CapeDefinition}
+	 * for the Store's "try before you buy" preview - same bundle shape {@link
+	 * #importAnimatedGif} writes, just to a temp file instead of {@link
+	 * VeloPaths#capes()}, and never added to {@link #LIBRARY}. Passing the
+	 * same {@code id} a Store item's grid tile already used to register its
+	 * preview texture (see {@code StoreAssets.preview}) means {@link
+	 * #textureIdentifier} finds that texture already cached and never
+	 * actually needs to read this temp file back - it exists purely as a
+	 * safety net for whichever code path asks first.
+	 */
+	public static CapeDefinition previewDefinitionFor(String id, String name, InputStream gifBytes, CapePhysicsPreset preset) throws IOException {
+		Path tempFile = Files.createTempFile("velo-store-preview-", ".velocape");
+		tempFile.toFile().deleteOnExit();
+		try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(tempFile))) {
+			zip.putNextEntry(new ZipEntry("frames.gif"));
+			gifBytes.transferTo(zip);
+			zip.closeEntry();
+
+			zip.putNextEntry(new ZipEntry("physics.json"));
+			zip.write(GSON.toJson(preset).getBytes(StandardCharsets.UTF_8));
+			zip.closeEntry();
+
+			zip.putNextEntry(new ZipEntry("meta.json"));
+			zip.write(GSON.toJson(new Meta(id, name, id)).getBytes(StandardCharsets.UTF_8));
+			zip.closeEntry();
+		}
+		return new CapeDefinition(id, name, tempFile, preset, false, true, id);
 	}
 
 	/** Crops {@code source} to a {@value #TEXTURE_WIDTH}x{@code height} region starting at {@code startY} and writes it as a PNG into {@code out} (via a throwaway temp file - NativeImage only writes to a real path/file, not a stream). */
@@ -207,10 +304,35 @@ public final class CapeManager {
 		return readBundleMetadata(copy).orElseThrow(() -> new IOException("Invalid .velocape bundle: " + bundleFile));
 	}
 
-	/** Lazily loads and registers the cape's texture with Minecraft's texture manager, returning its {@link Identifier}. */
+	/**
+	 * Lazily loads and registers the cape's texture with Minecraft's texture
+	 * manager, returning its {@link Identifier} - for an animated cape, this
+	 * is the one stable identifier {@link AnimatedCapeAsset} keeps updating
+	 * in place every frame, not a per-frame identifier, so every caller
+	 * (render layer, library tile, Wavey Capes compat) just keeps sampling
+	 * whatever they already had.
+	 */
 	public static Identifier textureIdentifier(CapeDefinition definition) {
+		if (definition.animated()) {
+			return AnimatedCapeAsset.getOrRegister(definition.id(), () -> openBundleEntry(definition, "frames.gif")).identifier();
+		}
 		return TEXTURE_CACHE.computeIfAbsent(definition.id(), id -> registerFromBundle(definition, "texture.png", "cape_" + id.replace('-', '_'))
 				.orElseThrow(() -> new RuntimeException("Failed to load cape texture for " + definition.id())));
+	}
+
+	/** Reads one zip entry's full bytes into memory - used for {@code frames.gif}, which {@link GifDecoder} needs as a plain {@link InputStream}, not a {@link net.minecraft.client.texture.NativeImage}. */
+	private static InputStream openBundleEntry(CapeDefinition definition, String entryName) {
+		try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(definition.bundleFile()))) {
+			ZipEntry entry;
+			while ((entry = zip.getNextEntry()) != null) {
+				if (entry.getName().equals(entryName)) {
+					return new java.io.ByteArrayInputStream(zip.readAllBytes());
+				}
+			}
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to read \"" + entryName + "\" from " + definition.bundleFile(), e);
+		}
+		throw new RuntimeException("Missing \"" + entryName + "\" in " + definition.bundleFile());
 	}
 
 	/** Lazily loads and registers the cape's bundled elytra texture, if it has one ({@link CapeDefinition#hasElytraTexture()}). */
@@ -245,6 +367,7 @@ public final class CapeManager {
 		Meta meta = null;
 		CapePhysicsPreset preset = CapePhysicsPreset.defaults();
 		boolean hasElytra = false;
+		boolean animated = false;
 		try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(bundleFile))) {
 			ZipEntry entry;
 			while ((entry = zip.getNextEntry()) != null) {
@@ -254,6 +377,8 @@ public final class CapeManager {
 					preset = GSON.fromJson(new java.io.InputStreamReader(zip, StandardCharsets.UTF_8), CapePhysicsPreset.class);
 				} else if (entry.getName().equals("elytra.png")) {
 					hasElytra = true;
+				} else if (entry.getName().equals("frames.gif")) {
+					animated = true;
 				}
 			}
 		} catch (IOException e) {
@@ -262,14 +387,18 @@ public final class CapeManager {
 		if (meta == null) {
 			return Optional.empty();
 		}
-		return Optional.of(new CapeDefinition(meta.id(), meta.name(), bundleFile, preset, hasElytra));
+		return Optional.of(new CapeDefinition(meta.id(), meta.name(), bundleFile, preset, hasElytra, animated, meta.sourceItemId()));
 	}
 
 	private static String sanitize(String name) {
 		return name.toLowerCase().replaceAll("[^a-z0-9_-]+", "-");
 	}
 
-	private record Meta(String id, String name) {
+	// sourceItemId is absent from meta.json written before this field existed
+	// - Gson leaves it null rather than failing to parse, so old bundles just
+	// come back as "not a Store cape" (accurate: they predate Store capes
+	// tracking provenance at all).
+	private record Meta(String id, String name, String sourceItemId) {
 	}
 
 	private record EquipState(String equippedCapeId) {

@@ -10,6 +10,7 @@ import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.veloclient.velo.client.gui.title.TitleScreenTheme;
 import net.veloclient.velo.client.theme.Theme;
 import net.veloclient.velo.client.theme.ThemeManager;
 import net.veloclient.velo.module.Module;
@@ -24,7 +25,7 @@ import java.util.function.Consumer;
  */
 public final class VeloModuleTile extends ClickableWidget {
 
-	private static final int TOGGLE_STRIP_HEIGHT = 20;
+	private static final int TOGGLE_STRIP_HEIGHT = 22;
 	private static final int TOGGLE_WIDTH = 26;
 	private static final int TOGGLE_HEIGHT = 12;
 
@@ -94,7 +95,7 @@ public final class VeloModuleTile extends ClickableWidget {
 		int iconBg = VeloAnim.lerpArgb(base, hoverColor, hoverProgress);
 		VeloDraw.fillRounded(context, getX(), getY(), getWidth(), iconHeight, 5, iconBg);
 		int accentEdge = enabled ? theme.accentStart() : 0x33FFFFFF;
-		VeloDraw.strokeRect(context, getX(), getY(), getWidth(), iconHeight, accentEdge);
+		VeloDraw.strokeRounded(context, getX(), getY(), getWidth(), iconHeight, 5, accentEdge);
 
 		var textRenderer = MinecraftClient.getInstance().textRenderer;
 		float iconScale = Math.min(2.2f, (iconHeight - 18) / 16f);
@@ -111,7 +112,8 @@ public final class VeloModuleTile extends ClickableWidget {
 			VeloDraw.fillRounded(context, getX() + 3, getY() + 3, getWidth() - 6, iconHeight - 15, 4, 0x77000000);
 		}
 
-		String name = trimToWidth(textRenderer, module.displayName(), getWidth() - 6);
+		String trimmedName = trimToWidth(textRenderer, module.displayName(), getWidth() - 6);
+		Text name = TitleScreenTheme.tileFont(trimmedName);
 		int nameWidth = textRenderer.getWidth(name);
 		context.drawTextWithShadow(textRenderer, name, getX() + (getWidth() - nameWidth) / 2,
 				getY() + iconHeight - 12, theme.text());
@@ -146,12 +148,13 @@ public final class VeloModuleTile extends ClickableWidget {
 		return VeloAnim.lerpArgb(a, b, 1 - t);
 	}
 
+	/** Measures against the Anta tile-title font itself (not the default font) so the trim boundary matches what's actually drawn - a mismatch here is exactly what left names clipped before. */
 	private static String trimToWidth(net.minecraft.client.font.TextRenderer renderer, String text, int maxWidth) {
-		if (renderer.getWidth(text) <= maxWidth) {
+		if (renderer.getWidth(TitleScreenTheme.tileFont(text)) <= maxWidth) {
 			return text;
 		}
 		String trimmed = text;
-		while (trimmed.length() > 1 && renderer.getWidth(trimmed + "..") > maxWidth) {
+		while (trimmed.length() > 1 && renderer.getWidth(TitleScreenTheme.tileFont(trimmed + "..")) > maxWidth) {
 			trimmed = trimmed.substring(0, trimmed.length() - 1);
 		}
 		return trimmed + "..";

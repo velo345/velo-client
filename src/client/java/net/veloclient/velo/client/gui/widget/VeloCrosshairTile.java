@@ -79,7 +79,7 @@ public final class VeloCrosshairTile extends ClickableWidget {
 		boolean iconHovered = isHovered() && mouseY < getY() + iconHeight;
 
 		VeloDraw.fillRounded(context, getX(), getY(), getWidth(), iconHeight, 5, theme.surfaceWithOpacity());
-		VeloDraw.strokeRect(context, getX(), getY(), getWidth(), iconHeight, equipped ? theme.accentStart() : 0x33FFFFFF);
+		VeloDraw.strokeRounded(context, getX(), getY(), getWidth(), iconHeight, 5, equipped ? theme.accentStart() : 0x33FFFFFF);
 
 		boolean showHit = iconHovered && definition.hitMode() != CrosshairDefinition.HitMode.NONE;
 		Identifier texture = switch (showHit ? definition.hitMode() : CrosshairDefinition.HitMode.NONE) {

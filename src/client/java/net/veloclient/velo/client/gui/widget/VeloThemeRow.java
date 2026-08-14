@@ -63,7 +63,7 @@ public final class VeloThemeRow extends ClickableWidget {
 
 		VeloDraw.fillRounded(context, getX(), getY(), nameWidth, getHeight(), 3,
 				active ? theme.accentStart() & 0x55FFFFFF | 0x33000000 : theme.surfaceWithOpacity());
-		VeloDraw.strokeRect(context, getX(), getY(), nameWidth, getHeight(), active ? theme.accentStart() : (nameHovered ? 0x33FFFFFF : 0x1AFFFFFF));
+		VeloDraw.strokeRounded(context, getX(), getY(), nameWidth, getHeight(), 3, active ? theme.accentStart() : (nameHovered ? 0x33FFFFFF : 0x1AFFFFFF));
 
 		TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
 		String label = getMessage().getString() + (active ? "  ✓" : "");
