@@ -4,7 +4,7 @@
 mod.id = "velo-client"
 mod.name = "Velo Client"
 mod.group = "net.veloclient"
-mod.version = "0.8.0"
+mod.version = "0.7.0"
 
 deps.fabric_loader = "0.19.3"
 loomx.loom_version = "1.17-SNAPSHOT"
