@@ -43,6 +43,8 @@ public final class ModuleStateStore {
 						fields.put(choice.label(), choice.get().get());
 					} else if (field instanceof ConfigField.ColorField color) {
 						fields.put(color.label(), color.get().getAsInt());
+					} else if (field instanceof ConfigField.ChordKeybindField chord) {
+						fields.put(chord.label(), chord.get().get());
 					}
 				}
 			}
@@ -73,6 +75,18 @@ public final class ModuleStateStore {
 						choice.set().accept(str);
 					} else if (field instanceof ConfigField.ColorField color && value instanceof Number number) {
 						color.set().accept(number.intValue());
+					} else if (field instanceof ConfigField.ChordKeybindField chord && value instanceof java.util.List<?> list) {
+						// Round-tripped through JSON, so each element
+						// deserializes back as a Double rather than the
+						// Integer it was captured as - normalize here rather
+						// than at every call site.
+						java.util.List<Integer> keyCodes = new java.util.ArrayList<>();
+						for (Object element : list) {
+							if (element instanceof Number number) {
+								keyCodes.add(number.intValue());
+							}
+						}
+						chord.set().accept(keyCodes);
 					}
 				}
 			}

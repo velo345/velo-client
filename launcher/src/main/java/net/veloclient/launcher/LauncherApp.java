@@ -1,20 +1,34 @@
 package net.veloclient.launcher;
 
+import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
+import javafx.animation.ParallelTransition;
+import javafx.animation.TranslateTransition;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.CycleMethod;
+import javafx.scene.paint.RadialGradient;
+import javafx.scene.paint.Stop;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Polyline;
+import javafx.scene.shape.StrokeLineCap;
+import javafx.scene.shape.StrokeLineJoin;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import net.veloclient.launcher.auth.AuthSession;
 import net.veloclient.launcher.auth.MicrosoftAuth;
 import net.veloclient.launcher.auth.MinecraftSession;
@@ -42,11 +56,13 @@ import net.veloclient.launcher.ui.AccountProfileView;
 import net.veloclient.launcher.ui.CosmeticsView;
 import net.veloclient.launcher.ui.DialogStyling;
 import net.veloclient.launcher.ui.ErrorDialog;
+import net.veloclient.launcher.ui.IconColorExtractor;
 import net.veloclient.launcher.ui.InstanceDetailView;
 import net.veloclient.launcher.ui.InstanceEditDialog;
 import net.veloclient.launcher.ui.InstanceSettingsDialog;
 import net.veloclient.launcher.ui.ParticleBackground;
 import net.veloclient.launcher.ui.PlayerHeadView;
+import net.veloclient.launcher.ui.PlayerSkin3DView;
 import net.veloclient.launcher.ui.RunningInstanceView;
 import net.veloclient.launcher.ui.ServerEditDialog;
 import net.veloclient.launcher.ui.ServerFaviconCache;
@@ -56,6 +72,7 @@ import net.veloclient.launcher.ui.ThemeEditorView;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -91,6 +108,8 @@ public final class LauncherApp extends Application {
 	 * README.md.
 	 */
 	private static final String MICROSOFT_CLIENT_ID = "6cc50134-1c8d-43dc-9265-e107d0540248";
+	/** Opacity of the home screen's big background profile icon - low enough to read as a background element (the {@link #homeLogoGlow} wash behind it is what carries its actual color, not this), not a bold, flatly opaque sticker pasted over the scene. */
+	private static final double HOME_LOGO_OPACITY = 0.5;
 
 	private LauncherTheme theme;
 	private BorderPane root;
@@ -100,9 +119,24 @@ public final class LauncherApp extends Application {
 	private MinecraftSession session;
 	private Label accountLabel;
 	private Button accountButton;
-	private Button navHome, navInstances, navCosmetics, navStore, navTheme, navSettings;
+	private Button navHome, navServers, navCosmetics, navStore, navSettings;
 	private VBox runningSection;
 	private VBox quickLaunchSection;
+	/** Which profile the home screen's carousel is showing - an index into {@link #orderedProfilesForHome()}, clamped back to range whenever the profile list changes (e.g. after a delete). */
+	private int homeProfileIndex = 0;
+	private ImageView homeBackgroundLogo;
+	/** Soft radial color wash sitting directly behind {@link #homeBackgroundLogo}, tinted with the same extracted accent color as the border glow - many profile/server icons are mostly white/line-art on a transparent background, which reads as flat gray once alpha-blended over the dark particle backdrop with nothing else behind it. */
+	private Circle homeLogoGlow;
+	private StackPane homePlayerHolder;
+	private StackPane homeBorderHost;
+	private Label homeProfileName;
+	private Label homeSubtitle;
+	private StackPane homeActionsRowHolder;
+	private Button homePlayButton;
+	/** Manage-mods shortcut, beside {@link #homePlayButton} at the same height rather than shrunk down into {@link #homeActionsRowHolder}'s small icon row - "manage mods" is a common enough action to deserve a bigger, more accessible target than rename/duplicate/export/RAM/delete. */
+	private Button homeGearButton;
+	private ProgressBar homeLaunchProgress;
+	private Label homeLaunchStatus;
 	/**
 	 * Row nodes for the sidebar's "Running" section, keyed by {@code runId}
 	 * and reused across refreshes rather than rebuilt from scratch every
@@ -132,6 +166,11 @@ public final class LauncherApp extends Application {
 		this.stage = stage;
 		VeloPaths.ensureDirectories();
 		theme = ThemeStore.load();
+		// Registers the "Audiowide" family for Font.font()/CSS -fx-font-family
+		// lookups for the rest of this process - loadFont's own return value
+		// (a Font at one specific size) isn't otherwise used, the family just
+		// needs loading once. Same font as the in-game title screen.
+		Font.loadFont(getClass().getResourceAsStream("/net/veloclient/launcher/fonts/Audiowide-Regular.ttf"), 12);
 
 		root = new BorderPane();
 		root.getStyleClass().add("root");
@@ -158,28 +197,54 @@ public final class LauncherApp extends Application {
 	}
 
 	/**
-	 * On Windows, JavaFX's own stage bounds sometimes fall out of sync with
-	 * the real OS window after clicking "restore down" from maximized - the
-	 * title bar/border shrink back but the scene content stays sized as if
-	 * still maximized, since the {@code Stage}'s width/height properties
-	 * never got the memo. Track the bounds from just before maximizing and
-	 * force them back explicitly once un-maximized, rather than trusting the
-	 * native restore to have already done it.
+	 * JavaFX's own stage bounds sometimes fall out of sync with the real OS
+	 * window after clicking "restore down" from maximized - the title bar/
+	 * border shrink back but the scene content stays sized as if still
+	 * maximized, since the {@code Stage}'s width/height properties never got
+	 * the memo. Force them back explicitly once un-maximized, rather than
+	 * trusting the native restore to have already done it.
+	 *
+	 * <p>The bounds to restore to are tracked <em>continuously</em> via
+	 * listeners on x/y/width/height themselves (guarded by {@code
+	 * !isMaximized()}), not captured once inside the {@code
+	 * maximizedProperty} listener at the moment it flips to {@code true} - an
+	 * earlier version did the latter and had a real, confirmed race: by the
+	 * time that listener callback runs, {@code stage.getWidth()}/{@code
+	 * getHeight()} can already reflect the *new* (maximized) size rather than
+	 * the windowed size from just before, since JavaFX doesn't guarantee
+	 * {@code maximizedProperty} fires strictly before the size properties
+	 * update in the same pulse. That bug had two visible symptoms other than
+	 * "restore doesn't shrink back": since the bad captured size gets reused
+	 * as the restore target on every subsequent maximize/restore cycle, and
+	 * each cycle's own bad capture could itself be based on an already-bad
+	 * prior restore, repeated cycles could ratchet the "restored" size
+	 * larger over time - reported as "the window keeps getting bigger and
+	 * bigger", not just a one-off. Continuous tracking has no such window:
+	 * whatever the size was at the instant maximizing began is always
+	 * already known, nothing needs to be caught mid-transition.
 	 */
 	private void fixWindowsMaximizeRestoreBug(Stage stage) {
-		double[] preMaximizeBounds = new double[4];
+		double[] lastWindowedBounds = {stage.getX(), stage.getY(), stage.getWidth(), stage.getHeight()};
+		javafx.beans.value.ChangeListener<Number> trackWhileWindowed = (obs, oldVal, newVal) -> {
+			if (!stage.isMaximized()) {
+				lastWindowedBounds[0] = stage.getX();
+				lastWindowedBounds[1] = stage.getY();
+				lastWindowedBounds[2] = stage.getWidth();
+				lastWindowedBounds[3] = stage.getHeight();
+			}
+		};
+		stage.xProperty().addListener(trackWhileWindowed);
+		stage.yProperty().addListener(trackWhileWindowed);
+		stage.widthProperty().addListener(trackWhileWindowed);
+		stage.heightProperty().addListener(trackWhileWindowed);
+
 		stage.maximizedProperty().addListener((obs, wasMaximized, isMaximized) -> {
-			if (isMaximized) {
-				preMaximizeBounds[0] = stage.getX();
-				preMaximizeBounds[1] = stage.getY();
-				preMaximizeBounds[2] = stage.getWidth();
-				preMaximizeBounds[3] = stage.getHeight();
-			} else if (preMaximizeBounds[2] > 0 && preMaximizeBounds[3] > 0) {
+			if (!isMaximized && lastWindowedBounds[2] > 0 && lastWindowedBounds[3] > 0) {
 				Platform.runLater(() -> {
-					stage.setX(preMaximizeBounds[0]);
-					stage.setY(preMaximizeBounds[1]);
-					stage.setWidth(preMaximizeBounds[2]);
-					stage.setHeight(preMaximizeBounds[3]);
+					stage.setX(lastWindowedBounds[0]);
+					stage.setY(lastWindowedBounds[1]);
+					stage.setWidth(lastWindowedBounds[2]);
+					stage.setHeight(lastWindowedBounds[3]);
 				});
 			}
 		});
@@ -215,7 +280,7 @@ public final class LauncherApp extends Application {
 	private VBox buildSidebar() {
 		VBox sidebar = new VBox(4);
 		sidebar.getStyleClass().add("sidebar");
-		sidebar.setPadding(new Insets(22, 12, 16, 12));
+		sidebar.setPadding(new Insets(22, 12, 12, 12));
 		sidebar.setPrefWidth(190);
 
 		Label title = new Label("VELO CLIENT");
@@ -223,14 +288,13 @@ public final class LauncherApp extends Application {
 		title.setTextFill(accentColor());
 		VBox.setMargin(title, new Insets(0, 0, 16, 6));
 
-		navHome = navButton("Home", this::showHome);
-		navInstances = navButton("Profiles", this::showInstances);
-		navCosmetics = navButton("Cosmetics", this::showCosmetics);
-		navStore = navButton("Store", this::showStore);
-		navTheme = navButton("Theme Editor", this::showThemeEditor);
-		navSettings = navButton("Settings", this::showSettings);
+		navHome = navIconButton("home", "Home", this::showHome);
+		navServers = navIconButton("server", "Servers", this::showServers);
+		navCosmetics = navIconButton("cosmetics", "Cosmetics", this::showCosmetics);
+		navStore = navIconButton("store", "Store", this::showStore);
+		navSettings = navIconButton("settings", "Settings", this::showSettings);
 
-		sidebar.getChildren().addAll(title, navHome, navInstances, navCosmetics, navStore, navTheme, navSettings);
+		sidebar.getChildren().addAll(title, navHome, navServers, navCosmetics, navStore, navSettings);
 
 		// "Running" (live instances) and "Quick Launch" (recent one-click
 		// shortcuts) - deliberately separated from the fixed nav above by
@@ -247,15 +311,61 @@ public final class LauncherApp extends Application {
 		VBox.setVgrow(extrasScroll, Priority.ALWAYS);
 		sidebar.getChildren().add(extrasScroll);
 
+		// The Microsoft account switcher, pinned to the very bottom of the
+		// sidebar (Discord/Spotify-style) - previously a floating badge in
+		// the bottom-left corner of the Home screen itself, moved here so
+		// Home has room for the new profile carousel instead.
+		accountLabel = new Label();
+		accountButton = new Button();
+		accountButton.getStyleClass().add("account-badge");
+		accountButton.setMaxWidth(Double.MAX_VALUE);
+		accountButton.setGraphic(buildAccountBadgeContent());
+		accountButton.setOnAction(e -> {
+			if (session == null) {
+				beginSignIn();
+			} else {
+				showAccountProfile();
+			}
+		});
+		sidebar.getChildren().add(accountButton);
+		refreshAccountBadge();
+
+		// The app version tag sits below the account switcher (not above -
+		// it's the least important thing at the bottom of the sidebar, not
+		// a header for it).
 		Label version = new Label("v" + AppVersion.VERSION);
 		version.getStyleClass().add("version-tag");
 		version.setTextFill(textColor());
+		version.setMaxWidth(Double.MAX_VALUE);
+		version.setAlignment(Pos.CENTER);
+		VBox.setMargin(version, new Insets(6, 0, 0, 0));
 		sidebar.getChildren().add(version);
 
 		RunningInstanceManager.running().addListener((javafx.collections.ListChangeListener<RunningInstanceManager.RunningInstance>) c -> refreshRunningSidebar());
 		refreshRunningSidebar();
 		refreshQuickLaunchSidebar();
 		return sidebar;
+	}
+
+	/** A sidebar nav row in the same "icon + label, left accent bar when active" shape as the in-game r-shift menu's own sidebar ({@code VeloNavButton}) - replaces the old plain text {@code navButton}. */
+	private Button navIconButton(String iconName, String label, Runnable action) {
+		ImageView icon = new ImageView(new Image(getClass().getResourceAsStream(
+				"/net/veloclient/launcher/images/icons/nav/" + iconName + ".png"), 18, 18, true, true));
+		Label text = new Label(label);
+		text.setTextFill(textColor());
+		HBox graphic = new HBox(10, icon, text);
+		graphic.setAlignment(Pos.CENTER_LEFT);
+
+		Button button = new Button();
+		button.setGraphic(graphic);
+		button.getStyleClass().add("nav-icon-button");
+		button.setMaxWidth(Double.MAX_VALUE);
+		button.setAlignment(Pos.CENTER_LEFT);
+		button.setOnAction(e -> {
+			action.run();
+			markActiveNav(button);
+		});
+		return button;
 	}
 
 	// ---- Sidebar: Running instances ----
@@ -329,22 +439,32 @@ public final class LauncherApp extends Application {
 
 	private void showRunningInstance(RunningInstanceManager.RunningInstance ri) {
 		clearActiveNav();
-		setContent(RunningInstanceView.build(ri, theme, this::showInstances, this::refreshRunningSidebar));
+		setContent(RunningInstanceView.build(ri, theme, this::showHome, this::refreshRunningSidebar));
 	}
 
 	private void clearActiveNav() {
-		for (Button b : List.of(navHome, navInstances, navCosmetics, navStore, navTheme, navSettings)) {
-			b.getStyleClass().remove("nav-button-active");
+		for (Button b : List.of(navHome, navServers, navCosmetics, navStore, navSettings)) {
+			b.getStyleClass().remove("nav-icon-button-active");
 		}
 	}
 
 	// ---- Sidebar: Quick Launch ----
 
+	private static final int QUICK_LAUNCH_DISPLAY_LIMIT = 3;
+
 	private void refreshQuickLaunchSidebar() {
 		quickLaunchSection.getChildren().clear();
 		List<Instance> instances = InstanceStore.loadAll();
 		List<Node> rows = new java.util.ArrayList<>();
+		// QuickLaunchStore itself already caps newly-recorded launches to 3,
+		// but a launcher upgraded from an older version can still have more
+		// than that sitting in its already-saved quick_launch.json - capped
+		// again here defensively so the sidebar never shows more than 3
+		// regardless of how many are on disk.
 		for (QuickLaunchStore.Entry entry : QuickLaunchStore.loadAll()) {
+			if (rows.size() >= QUICK_LAUNCH_DISPLAY_LIMIT) {
+				break;
+			}
 			instances.stream().filter(i -> i.id().equals(entry.instanceId())).findFirst()
 					.ifPresent(instance -> rows.add(buildQuickLaunchRow(instance, entry)));
 		}
@@ -415,30 +535,82 @@ public final class LauncherApp extends Application {
 		return container;
 	}
 
-	private Button navButton(String label, Runnable action) {
-		Button button = new Button(label);
-		button.getStyleClass().add("nav-button");
-		button.setMaxWidth(Double.MAX_VALUE);
-		button.setTextFill(textColor());
-		button.setOnAction(e -> {
-			action.run();
-			markActiveNav(button);
-		});
-		return button;
-	}
-
 	private void markActiveNav(Button active) {
-		for (Button b : List.of(navHome, navInstances, navCosmetics, navStore, navTheme, navSettings)) {
-			b.getStyleClass().remove("nav-button-active");
+		for (Button b : List.of(navHome, navServers, navCosmetics, navStore, navSettings)) {
+			b.getStyleClass().remove("nav-icon-button-active");
 		}
-		active.getStyleClass().add("nav-button-active");
+		active.getStyleClass().add("nav-icon-button-active");
 	}
 
 	private void setContent(Node node) {
 		content.getChildren().setAll(node);
 	}
 
-	// ---- Home / title screen ----
+	// ---- Home / title screen: one-click launch + the profile carousel ----
+
+	/**
+	 * One thing the Home carousel's Play button can one-click launch: either
+	 * a profile on its own, or a profile launched straight into a specific
+	 * server ({@code serverAddress} non-null) - the same distinction {@link
+	 * QuickLaunchStore.Entry} already tracks. Collapsing every quick-launch
+	 * entry down to just its {@link Instance} (the old {@code
+	 * orderedProfilesForHome()} did exactly this) silently dropped which
+	 * server it was a shortcut *into* - a real, confirmed bug where "launch
+	 * straight back into the server you last played on" (one of the original
+	 * points of this carousel) never actually showed up as its own carousel
+	 * entry, only the bare profile did.
+	 */
+	private record HomeLaunchTarget(Instance instance, String serverAddress) {
+		boolean isServer() {
+			return serverAddress != null;
+		}
+	}
+
+	/**
+	 * Every recent quick-launch (profile-only or straight-into-a-server, up
+	 * to {@link QuickLaunchStore}'s own history cap), most-recent first, then
+	 * every other profile that's never been launched at all, ordered newest-
+	 * created first - "the last thing you launched" (a plain profile launch
+	 * or a server quick-play) is always index 0, exactly what the Play
+	 * button should one-click launch again.
+	 */
+	private List<HomeLaunchTarget> orderedLaunchTargetsForHome() {
+		List<Instance> all = InstanceStore.loadAll();
+		java.util.Map<String, Instance> byId = new java.util.HashMap<>();
+		for (Instance instance : all) {
+			byId.put(instance.id(), instance);
+		}
+		List<HomeLaunchTarget> targets = new java.util.ArrayList<>();
+		java.util.Set<String> coveredInstanceIds = new java.util.HashSet<>();
+		for (QuickLaunchStore.Entry entry : QuickLaunchStore.loadAll()) {
+			Instance instance = byId.get(entry.instanceId());
+			if (instance == null) {
+				continue; // profile since deleted
+			}
+			targets.add(new HomeLaunchTarget(instance, entry.serverAddress()));
+			coveredInstanceIds.add(instance.id());
+		}
+		List<Instance> neverLaunched = new java.util.ArrayList<>();
+		for (Instance instance : all) {
+			if (!coveredInstanceIds.contains(instance.id())) {
+				neverLaunched.add(instance);
+			}
+		}
+		neverLaunched.sort(Comparator.comparingLong(Instance::createdAtEpochMillis).reversed());
+		for (Instance instance : neverLaunched) {
+			targets.add(new HomeLaunchTarget(instance, null));
+		}
+		return targets;
+	}
+
+	/** The server's saved name (falling back to its address) when {@code target} is a server quick-play shortcut, else null. */
+	private String homeTargetServerName(HomeLaunchTarget target) {
+		if (!target.isServer()) {
+			return null;
+		}
+		return SavedServerStore.loadAll().stream().filter(s -> s.address().equals(target.serverAddress())).findFirst()
+				.map(SavedServer::name).orElse(target.serverAddress());
+	}
 
 	private void showHome() {
 		if (background == null) {
@@ -449,77 +621,526 @@ public final class LauncherApp extends Application {
 		background.heightProperty().unbind();
 
 		StackPane titleScreen = new StackPane();
-		titleScreen.getStyleClass().add("title-screen");
+		titleScreen.getStyleClass().addAll("title-screen", "home-glow-border");
+		// StackPane's default computeMinWidth/Height() equals its computed
+		// preferred size, so a child that briefly *wants* to be huge (see the
+		// fitWidth comment below) would otherwise force BorderPane to grow
+		// content past the window's actual, fixed size - min size wins over
+		// available area in Region.layoutInArea's boundedSize(). Floor both
+		// to 0 so titleScreen (and its parent) can always shrink to fit.
+		titleScreen.setMinSize(0, 0);
+		content.setMinSize(0, 0);
+		homeBorderHost = titleScreen;
 		background.widthProperty().bind(titleScreen.widthProperty());
 		background.heightProperty().bind(titleScreen.heightProperty());
 		titleScreen.getChildren().add(background);
 		background.start();
 
-		VBox center = new VBox(10);
-		center.setAlignment(Pos.CENTER);
+		// Soft color wash directly behind the big profile icon (added first
+		// so it paints underneath it) - many profile/server icons are mostly
+		// white line-art on a transparent background, which alpha-blends to
+		// flat gray over the dark particle canvas with nothing behind it.
+		// A Shape's fill is a plain Java Paint, not a CSS property, so this
+		// doesn't need any of the CSS-pass handling homeIconImage() needs.
+		homeLogoGlow = new Circle();
+		homeLogoGlow.setMouseTransparent(true);
+		homeLogoGlow.radiusProperty().bind(root.heightProperty().multiply(0.55));
+		titleScreen.getChildren().add(homeLogoGlow);
+		StackPane.setAlignment(homeLogoGlow, Pos.CENTER);
+		applyLogoGlowColor(currentBorderColor);
 
+		// Big profile icon behind everything else, sized off the window
+		// itself (not a fixed pixel value) so it stays proportionally huge -
+		// clearly bigger than the player render in front of it - at any
+		// window size, and reacts to the window actually being resized
+		// instead of needing showHome() to rerun. See updateHomeProfileDisplay().
+		homeBackgroundLogo = new ImageView();
+		homeBackgroundLogo.setOpacity(HOME_LOGO_OPACITY);
+		homeBackgroundLogo.setPreserveRatio(true);
+		// Bound to root's own size (the outermost BorderPane, fixed top-down
+		// by the Scene/Stage) rather than titleScreen's - titleScreen is a
+		// StackPane, and StackPane's default preferred-size computation is
+		// the max of its children's preferred sizes, so binding a child's
+		// size to titleScreen's *own* size created a real, confirmed runaway
+		// feedback loop (bigger logo -> bigger titleScreen preferred size ->
+		// bigger logo -> ...), visible as the whole window growing on its
+		// own. root's size has no such path back down to this logo.
+		//
+		// Both fitWidth AND fitHeight are bound (not height alone): with
+		// preserveRatio and only one dimension constrained, an icon image
+		// whose aspect ratio isn't square (including a transient state
+		// before an async-loaded image reports its real dimensions) can
+		// make the *other*, unconstrained dimension balloon - and because
+		// StackPane's default computeMinWidth/Height() equals its computed
+		// preferred size, that oversized preference becomes an oversized
+		// *minimum*, which wins over the actually-available area in
+		// BorderPane's layout (Region.layoutInArea's boundedSize picks min
+		// when min > available), forcing content to overflow past the
+		// window - the same growth bug from a different trigger. Binding
+		// both dimensions keeps the image letterboxed inside a fixed box
+		// no matter its native aspect ratio, so this can't happen again.
+		homeBackgroundLogo.fitHeightProperty().bind(root.heightProperty().multiply(0.98));
+		homeBackgroundLogo.fitWidthProperty().bind(root.widthProperty().multiply(0.9));
+		homeBackgroundLogo.setMouseTransparent(true);
+		titleScreen.getChildren().add(homeBackgroundLogo);
+		StackPane.setAlignment(homeBackgroundLogo, Pos.CENTER);
+
+		// The signed-in account's 3D skin render, in front of the logo, no
+		// box/background of its own (PlayerSkin3DView's SubScene is
+		// transparent-filled) - fixed pose, not draggable, per design.
+		homePlayerHolder = new StackPane();
+		homePlayerHolder.setPrefSize(230, 340);
+		homePlayerHolder.setMaxSize(230, 340);
+		homePlayerHolder.setMouseTransparent(true);
+		titleScreen.getChildren().add(homePlayerHolder);
+		StackPane.setAlignment(homePlayerHolder, Pos.CENTER);
+		StackPane.setMargin(homePlayerHolder, new Insets(0, 0, 70, 0));
+		loadHomePlayerModel();
+
+		List<HomeLaunchTarget> targets = orderedLaunchTargetsForHome();
+		if (!targets.isEmpty()) {
+			homeProfileIndex = Math.max(0, Math.min(homeProfileIndex, targets.size() - 1));
+		}
+
+		StackPane leftHit = chevronHitArea(true, () -> shiftHomeProfile(-1));
+		StackPane rightHit = chevronHitArea(false, () -> shiftHomeProfile(1));
+		boolean multipleTargets = targets.size() > 1;
+		leftHit.setVisible(multipleTargets);
+		leftHit.setManaged(multipleTargets);
+		rightHit.setVisible(multipleTargets);
+		rightHit.setManaged(multipleTargets);
+		titleScreen.getChildren().addAll(leftHit, rightHit);
+		StackPane.setAlignment(leftHit, Pos.CENTER_LEFT);
+		StackPane.setAlignment(rightHit, Pos.CENTER_RIGHT);
+		StackPane.setMargin(leftHit, new Insets(0, 0, 50, 10));
+		StackPane.setMargin(rightHit, new Insets(0, 10, 50, 0));
+
+		// Horizontal drag-to-swap: press-drag-release anywhere on the title
+		// screen's own background (buttons/chevrons consume their own press
+		// events first, so this never steals a click from them) slides the
+		// carousel the same way clicking a chevron would - dragging left
+		// (content trailing the cursor to the left) advances to the *next*
+		// target, same direction as the right chevron.
+		if (multipleTargets) {
+			installHomeDragToSwap(titleScreen);
+		}
+
+		VBox topArea = new VBox(4);
+		topArea.setAlignment(Pos.CENTER);
+		topArea.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
 		Label title = new Label("VELO CLIENT");
 		title.getStyleClass().add("velo-title");
 		title.setTextFill(accentColor());
-		title.setEffect(new javafx.scene.effect.DropShadow(24, accentColor().deriveColor(0, 1, 1, 0.6)));
-
+		title.setEffect(new DropShadow(24, accentColor().deriveColor(0, 1, 1, 0.6)));
 		Label tagline = new Label("Made by Players for Players.");
 		tagline.getStyleClass().add("velo-tagline");
 		tagline.setTextFill(textColor());
+		topArea.getChildren().addAll(title, tagline);
+		titleScreen.getChildren().add(topArea);
+		StackPane.setAlignment(topArea, Pos.TOP_CENTER);
+		StackPane.setMargin(topArea, new Insets(18, 0, 0, 0));
 
-		VBox menu = new VBox(12);
-		menu.setAlignment(Pos.CENTER);
-		menu.setMaxWidth(280);
-		menu.setPadding(new Insets(28, 0, 0, 0));
+		HBox topRight = new HBox(8);
+		topRight.setAlignment(Pos.CENTER_RIGHT);
+		topRight.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+		Button newProfileButton = new Button("+ New Profile");
+		newProfileButton.getStyleClass().addAll("title-menu-button", "title-menu-button-primary", "button-compact");
+		newProfileButton.setOnAction(e -> createNewProfile());
+		Button importProfileButton = new Button("Import");
+		importProfileButton.getStyleClass().addAll("title-menu-button", "button-compact");
+		importProfileButton.setOnAction(e -> importInstance());
+		topRight.getChildren().addAll(newProfileButton, importProfileButton);
+		titleScreen.getChildren().add(topRight);
+		StackPane.setAlignment(topRight, Pos.TOP_RIGHT);
+		StackPane.setMargin(topRight, new Insets(18, 22, 0, 0));
 
-		Button play = new Button("Play");
-		play.getStyleClass().addAll("title-menu-button", "title-menu-button-primary");
-		play.setMaxWidth(Double.MAX_VALUE);
-		play.setOnAction(e -> { showInstances(); markActiveNav(navInstances); });
+		VBox bottomArea = new VBox(8);
+		bottomArea.setAlignment(Pos.CENTER);
+		bottomArea.setMaxSize(440, Region.USE_PREF_SIZE);
 
-		Button servers = new Button("My Servers");
-		servers.getStyleClass().add("title-menu-button");
-		servers.setMaxWidth(Double.MAX_VALUE);
-		servers.setOnAction(e -> showServers());
+		homeProfileName = new Label();
+		homeProfileName.getStyleClass().add("home-profile-name");
+		homeProfileName.setTextFill(textColor());
+		homeSubtitle = new Label();
+		homeSubtitle.getStyleClass().add("version-tag");
+		homeSubtitle.setTextFill(textColor());
 
-		Button quit = new Button("Quit");
-		quit.getStyleClass().add("title-menu-button");
-		quit.setMaxWidth(Double.MAX_VALUE);
-		quit.setOnAction(e -> Platform.exit());
+		homeActionsRowHolder = new StackPane();
 
-		menu.getChildren().addAll(play, servers, quit);
-		center.getChildren().addAll(title, tagline, menu);
+		homePlayButton = new Button("Play");
+		homePlayButton.getStyleClass().add("home-play-button");
+		homePlayButton.setMinHeight(58);
+		HBox.setHgrow(homePlayButton, Priority.ALWAYS);
+		homePlayButton.setMaxWidth(Double.MAX_VALUE);
 
-		titleScreen.getChildren().add(center);
-		StackPane.setAlignment(center, Pos.CENTER);
+		// Beside Play rather than shrunk into the small icon row below - same
+		// height as Play, a much bigger and more accessible target for what
+		// (alongside launching) is the single most-used action on a profile.
+		homeGearButton = new Button();
+		homeGearButton.setGraphic(new ImageView(new Image(getClass().getResourceAsStream(
+				"/net/veloclient/launcher/images/icons/action/manage.png"), 22, 22, true, true)));
+		homeGearButton.getStyleClass().add("home-gear-button");
+		homeGearButton.setMinSize(58, 58);
+		homeGearButton.setMaxSize(58, 58);
+		homeGearButton.setTooltip(new Tooltip("Manage mods, resource packs, shaders, schematics, datapacks..."));
 
-		// Bottom-left account badge (Minecraft-style nametag corner) - a
-		// single Button (a bare Region/Pane placed directly in a StackPane
-		// gets stretched to fill it and can end up covering/blocking
-		// whatever's behind it, which is why this is one real Button rather
-		// than a Button wrapped in an extra HBox) whose own graphic ends in
-		// a small dropdown-arrow "hot zone": that zone consumes the click
-		// before it bubbles up to the Button's own action, so clicking the
-		// arrow opens the account switcher instead of the account profile.
-		accountLabel = new Label();
-		accountButton = new Button();
-		accountButton.getStyleClass().add("account-badge");
-		accountButton.setGraphic(buildAccountBadgeContent());
-		accountButton.setOnAction(e -> {
+		HBox playRow = new HBox(10, homePlayButton, homeGearButton);
+		playRow.setAlignment(Pos.CENTER);
+		playRow.setMaxWidth(320);
+
+		homeLaunchProgress = new ProgressBar(0);
+		homeLaunchProgress.setMaxWidth(320);
+		homeLaunchProgress.setVisible(false);
+		homeLaunchProgress.setManaged(false);
+		homeLaunchStatus = new Label();
+		homeLaunchStatus.getStyleClass().add("version-tag");
+		homeLaunchStatus.setTextFill(textColor());
+		homeLaunchStatus.setVisible(false);
+		homeLaunchStatus.setManaged(false);
+		homeLaunchStatus.setWrapText(true);
+
+		bottomArea.getChildren().addAll(homeProfileName, homeSubtitle, homeActionsRowHolder, playRow, homeLaunchProgress, homeLaunchStatus);
+		titleScreen.getChildren().add(bottomArea);
+		StackPane.setAlignment(bottomArea, Pos.BOTTOM_CENTER);
+		StackPane.setMargin(bottomArea, new Insets(0, 0, 22, 0));
+
+		if (targets.isEmpty()) {
+			homeProfileName.setText("No profiles yet");
+			homeSubtitle.setText("");
+			homeGearButton.setVisible(false);
+			homeGearButton.setManaged(false);
+			homePlayButton.setText("+ Create a Profile");
+			homePlayButton.setOnAction(e -> createNewProfile());
+		} else {
+			updateHomeProfileDisplay(targets, false, 1);
+		}
+
+		setContent(titleScreen);
+		markActiveNav(navHome);
+	}
+
+	/**
+	 * Press-drag-release on {@code hitArea} (the title screen's own
+	 * StackPane, behind every button/chevron - those consume their own press
+	 * events first, so this never steals a click) slides the profile
+	 * carousel the same way a chevron click does, once the drag passes a
+	 * small threshold; a live translateX follow on the background logo while
+	 * dragging gives immediate visual feedback instead of only reacting on
+	 * release.
+	 */
+	private void installHomeDragToSwap(StackPane hitArea) {
+		double[] startX = {0};
+		boolean[] dragging = {false};
+		double threshold = 70;
+
+		hitArea.setOnMousePressed(e -> {
+			startX[0] = e.getSceneX();
+			dragging[0] = true;
+		});
+		hitArea.setOnMouseDragged(e -> {
+			if (!dragging[0] || homeBackgroundLogo == null) {
+				return;
+			}
+			homeBackgroundLogo.setTranslateX(e.getSceneX() - startX[0]);
+		});
+		hitArea.setOnMouseReleased(e -> {
+			if (!dragging[0]) {
+				return;
+			}
+			dragging[0] = false;
+			double delta = e.getSceneX() - startX[0];
+			if (Math.abs(delta) < threshold) {
+				if (homeBackgroundLogo != null) {
+					TranslateTransition snapBack = new TranslateTransition(Duration.millis(160), homeBackgroundLogo);
+					snapBack.setToX(0);
+					snapBack.play();
+				}
+				return;
+			}
+			if (homeBackgroundLogo != null) {
+				homeBackgroundLogo.setTranslateX(0);
+			}
+			// Dragging left (negative delta) reads as "swipe to the next
+			// item", same direction as the right chevron (+1).
+			shiftHomeProfile(delta < 0 ? 1 : -1);
+		});
+	}
+
+	/** A large, background-free chevron (see {@code account-switcher-chevron} for the same drawn-not-glyph reasoning) with a hover-scale animation, for switching the home carousel's selected profile. */
+	private StackPane chevronHitArea(boolean pointingLeft, Runnable onClick) {
+		Polyline chevron = pointingLeft
+				? new Polyline(10, 0, 0, 14, 10, 28)
+				: new Polyline(0, 0, 10, 14, 0, 28);
+		chevron.getStyleClass().add("home-chevron");
+		chevron.setStrokeWidth(4);
+		chevron.setStrokeLineCap(StrokeLineCap.ROUND);
+		chevron.setStrokeLineJoin(StrokeLineJoin.ROUND);
+
+		StackPane hit = new StackPane(chevron);
+		hit.setPrefSize(48, 64);
+		hit.setMaxSize(48, 64);
+		hit.setCursor(Cursor.HAND);
+		hit.setPickOnBounds(true);
+		hit.setOnMouseEntered(e -> animateScale(chevron, 1.25));
+		hit.setOnMouseExited(e -> animateScale(chevron, 1.0));
+		hit.setOnMouseClicked(e -> onClick.run());
+		return hit;
+	}
+
+	private void animateScale(Node node, double target) {
+		var scaleXTransition = new javafx.animation.Timeline(new javafx.animation.KeyFrame(Duration.millis(140),
+				new javafx.animation.KeyValue(node.scaleXProperty(), target, Interpolator.EASE_BOTH),
+				new javafx.animation.KeyValue(node.scaleYProperty(), target, Interpolator.EASE_BOTH)));
+		scaleXTransition.play();
+	}
+
+	/** @param delta +1 (right chevron/swipe-left, "next") or -1 (left chevron/swipe-right, "previous") - also doubles as the slide direction so the carousel always visibly moves the way the gesture that triggered it pointed. */
+	private void shiftHomeProfile(int delta) {
+		List<HomeLaunchTarget> targets = orderedLaunchTargetsForHome();
+		if (targets.size() < 2) {
+			return;
+		}
+		homeProfileIndex = Math.floorMod(homeProfileIndex + delta, targets.size());
+		updateHomeProfileDisplay(targets, true, delta);
+	}
+
+	/**
+	 * Refreshes the name/subtitle/actions/Play-button/background-logo/
+	 * border-glow for {@code targets.get(homeProfileIndex)}, animated
+	 * (slide+fade the logo, fade the border color) when {@code animate} is
+	 * true - i.e. every call except the screen's initial build.
+	 *
+	 * @param direction which way the slide should visibly travel - +1 slides
+	 * the new content in from the right (matches the right chevron/a
+	 * swipe-left gesture), -1 from the left; meaningless when {@code
+	 * animate} is false.
+	 */
+	private void updateHomeProfileDisplay(List<HomeLaunchTarget> targets, boolean animate, int direction) {
+		HomeLaunchTarget target = targets.get(homeProfileIndex);
+		homeCurrentTarget = target;
+		Instance instance = target.instance();
+		String serverName = homeTargetServerName(target);
+
+		homeProfileName.setText(serverName != null ? serverName : instance.name());
+		homeSubtitle.setText(serverName != null ? "via " + instance.name() : "");
+		homeActionsRowHolder.getChildren().setAll(buildHomeProfileActionsRow(instance));
+		homeGearButton.setVisible(true);
+		homeGearButton.setManaged(true);
+		homeGearButton.setOnAction(e -> showInstanceDetail(instance));
+
+		boolean signedIn = session != null;
+		String launchLabel = "Fabric " + instance.mcVersion();
+		homePlayButton.setText(signedIn ? (serverName != null ? "Connect · " + launchLabel : "Launch " + launchLabel) : "Sign In to Play");
+		homePlayButton.setTooltip(new Tooltip(signedIn
+				? (serverName != null ? "Install and connect straight into " + serverName : "Install and launch " + instance.name())
+				: "Sign in with your Microsoft account first - this won't launch anything until you do."));
+		homePlayButton.setOnAction(e -> {
 			if (session == null) {
-				beginSignIn();
+				SignInDialog.show(stage, MICROSOFT_CLIENT_ID, newSession -> { onSignedIn(newSession); showHome(); },
+						error -> showPlaceholderAlert("Sign-in failed", error));
 			} else {
-				showAccountProfile();
+				launchWithProgress(instance, target.serverAddress(), homePlayButton, homeLaunchProgress, homeLaunchStatus);
 			}
 		});
 
-		StackPane.setAlignment(accountButton, Pos.BOTTOM_LEFT);
-		StackPane.setMargin(accountButton, new Insets(0, 0, 18, 18));
-		titleScreen.getChildren().add(accountButton);
+		Image logoImage = homeIconImage(target);
+		Color glowColor = IconColorExtractor.fromImage(logoImage, accentColor());
+		if (animate) {
+			animateLogoSlide(logoImage, direction);
+			animateBorderColor(glowColor);
+		} else {
+			homeBackgroundLogo.setImage(logoImage);
+			applyBorderColor(glowColor);
+		}
+	}
 
-		refreshAccountBadge();
-		setContent(titleScreen);
-		markActiveNav(navHome);
+	/**
+	 * Slides the current background logo out one side while fading, swaps
+	 * the image, then slides the new one back in from the other side while
+	 * fading in - "smooth slide motion" between profiles.
+	 *
+	 * @param direction +1: old content exits left, new content enters from
+	 * the right (the "next" direction) - -1 is the mirror image. Previously
+	 * this read {@code homeBackgroundLogo.getTranslateX()} to guess a
+	 * direction instead of being told one explicitly - since that property
+	 * is back at (near) 0 by the time any new call starts (each slide
+	 * finishes by animating it home to exactly 0), the guess was
+	 * effectively constant, a real, confirmed bug where every swap slid the
+	 * same way regardless of which chevron was clicked.
+	 */
+	private void animateLogoSlide(Image newImage, int direction) {
+		double dir = direction < 0 ? -1 : 1;
+		TranslateTransition out = new TranslateTransition(Duration.millis(160), homeBackgroundLogo);
+		out.setToX(-60 * dir);
+		FadeTransition fadeOut = new FadeTransition(Duration.millis(160), homeBackgroundLogo);
+		fadeOut.setToValue(0.0);
+		ParallelTransition outPhase = new ParallelTransition(out, fadeOut);
+		outPhase.setOnFinished(e -> {
+			homeBackgroundLogo.setImage(newImage);
+			homeBackgroundLogo.setTranslateX(60 * dir);
+			TranslateTransition in = new TranslateTransition(Duration.millis(200), homeBackgroundLogo);
+			in.setToX(0);
+			in.setInterpolator(Interpolator.EASE_OUT);
+			FadeTransition fadeIn = new FadeTransition(Duration.millis(200), homeBackgroundLogo);
+			fadeIn.setToValue(HOME_LOGO_OPACITY);
+			new ParallelTransition(in, fadeIn).play();
+		});
+		outPhase.play();
+	}
+
+	private Color currentBorderColor = Color.TRANSPARENT;
+
+	/** Sets both the inline border-color (CSS lookup colors can't take a Java {@link Color} value directly) and a matching {@link DropShadow} glow - done in Java rather than pure CSS so {@link #animateBorderColor} can interpolate it smoothly frame-by-frame. */
+	/**
+	 * Deliberately CSS border-color only, no {@link DropShadow}/glow effect
+	 * on {@code homeBorderHost} itself - {@code Node.setEffect(...)} forces
+	 * that WHOLE node (here, the entire home screen: an animated Canvas
+	 * background, a 3D SubScene player render, and several bound StackPanes)
+	 * to render into an offscreen buffer first. Confirmed by direct
+	 * instrumentation that doing that made every other child of this same
+	 * node stop appearing at all (not mispositioned - genuinely never
+	 * painted), while every other symptom this method's own earlier
+	 * (removed) history chased - Audiowide font metrics, StackPane
+	 * TOP_CENTER/BOTTOM_CENTER alignment, translateX bindings - turned out to
+	 * be red herrings once this was found and removed. A future "add a glow
+	 * back" attempt should apply the effect to a small dedicated decorative
+	 * node (e.g. a thin Rectangle traced just outside the border), never to
+	 * the content-holding node itself.
+	 */
+	private void applyBorderColor(Color color) {
+		currentBorderColor = color;
+		homeBorderHost.setStyle("-fx-border-color: " + cssColor(argbOf(color)) + ";");
+		applyLogoGlowColor(color);
+	}
+
+	private void animateBorderColor(Color target) {
+		Color from = currentBorderColor;
+		var timeline = new javafx.animation.Timeline();
+		int steps = 20;
+		for (int i = 0; i <= steps; i++) {
+			double frac = i / (double) steps;
+			Color frame = from.interpolate(target, frac);
+			timeline.getKeyFrames().add(new javafx.animation.KeyFrame(Duration.millis(280 * frac), e -> {
+				homeBorderHost.setStyle("-fx-border-color: " + cssColor(argbOf(frame)) + ";");
+				applyLogoGlowColor(frame);
+			}));
+		}
+		currentBorderColor = target;
+		timeline.play();
+	}
+
+	/** Paints {@link #homeLogoGlow} as a soft radial wash of {@code color}, fading to fully transparent at the edge - a plain Shape fill, so (unlike {@link #homeIconImage}'s snapshot) no CSS pass is needed for it to show up. */
+	private void applyLogoGlowColor(Color color) {
+		if (homeLogoGlow == null) {
+			return;
+		}
+		homeLogoGlow.setFill(new RadialGradient(0, 0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
+				new Stop(0, color.deriveColor(0, 1, 1, 0.55)),
+				new Stop(0.6, color.deriveColor(0, 1, 1, 0.28)),
+				new Stop(1, color.deriveColor(0, 1, 1, 0))));
+	}
+
+	private static int argbOf(Color c) {
+		return ((int) Math.round(c.getOpacity() * 255) << 24)
+				| ((int) Math.round(c.getRed() * 255) << 16)
+				| ((int) Math.round(c.getGreen() * 255) << 8)
+				| (int) Math.round(c.getBlue() * 255);
+	}
+
+	/** The {@link HomeLaunchTarget} last passed to {@link #updateHomeProfileDisplay} - lets {@link #homeIconImage}'s async server-favicon fetch tell whether its result is still what's actually on screen (the user may well have already swiped to something else by the time a ping resolves) before applying it. */
+	private HomeLaunchTarget homeCurrentTarget;
+
+	/** The background logo/border-glow image for {@code target}: the target server's own favicon for a server quick-play shortcut (matching the sidebar's Quick Launch/Running rows and My Servers), the profile's own icon otherwise. */
+	private Image homeIconImage(HomeLaunchTarget target) {
+		Image profileImage = homeProfileIconImage(target.instance());
+		if (!target.isServer()) {
+			return profileImage;
+		}
+		String address = target.serverAddress();
+		Optional<SavedServer> saved = SavedServerStore.loadAll().stream().filter(s -> s.address().equals(address)).findFirst();
+		String host = saved.map(SavedServer::host).orElseGet(() -> parseHost(address));
+		int port = saved.map(SavedServer::port).orElseGet(() -> parsePort(address));
+		// ServerFaviconCache only offers an ImageView-targeting API (it's
+		// meant for live sidebar rows) - probing into a throwaway,
+		// never-shown ImageView and watching its imageProperty is a cheap
+		// way to reuse the exact same cache/fetch/decode path for the home
+		// screen's own background logo instead of duplicating it.
+		ImageView probe = new ImageView();
+		probe.imageProperty().addListener((obs, oldImg, newImg) -> {
+			if (newImg == null || newImg == profileImage || homeBackgroundLogo == null) {
+				return;
+			}
+			HomeLaunchTarget current = homeCurrentTarget;
+			if (current == null || !current.isServer() || !address.equals(current.serverAddress())) {
+				return; // the carousel moved on since this fetch started
+			}
+			homeBackgroundLogo.setImage(newImg);
+			applyBorderColor(IconColorExtractor.fromImage(newImg, accentColor()));
+		});
+		ServerFaviconCache.loadInto(probe, host, port, profileImage);
+		return probe.getImage();
+	}
+
+	/** A rasterized image of {@code instance}'s icon - a custom icon loads directly, a built-in (vector-drawn) one is snapshotted so both feed {@link IconColorExtractor} the same way. */
+	private Image homeProfileIconImage(Instance instance) {
+		if (instance.icon().kind() == InstanceIcon.Kind.CUSTOM) {
+			var iconFile = InstancePaths.iconFile(instance.id());
+			if (Files.exists(iconFile)) {
+				return new Image(iconFile.toUri().toString(), 480, 480, true, false);
+			}
+		}
+		Node rendered = renderInstanceIcon(instance, 480);
+		// rendered is a freshly-built StackPane that was never attached to a
+		// Scene, so its inline "-fx-background-color: linear-gradient(...)"
+		// (see BuiltinIcons.render) has never actually been through a CSS
+		// pass - without one, snapshot() rasterizes only the plain-drawn
+		// glyph ImageView on top, not the colored gradient tile behind it,
+		// which is why the built-in-icon background logo showed up as a
+		// huge, pale, colorless outline instead of its real accent color.
+		rendered.applyCss();
+		if (rendered instanceof javafx.scene.Parent parent) {
+			parent.layout();
+		}
+		javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+		params.setFill(Color.TRANSPARENT);
+		return rendered.snapshot(params, null);
+	}
+
+	private void loadHomePlayerModel() {
+		if (session == null) {
+			return;
+		}
+		CompletableFuture.supplyAsync(() -> SkinFetcher.fetch(session), Executors.newVirtualThreadPerTaskExecutor())
+				.thenAccept(skin -> Platform.runLater(() -> {
+					if (skin == null || homePlayerHolder == null) {
+						return;
+					}
+					Node viewer = PlayerSkin3DView.createViewer(skin.pngBytes(), skin.slim(), null, false);
+					if (viewer != null) {
+						homePlayerHolder.getChildren().setAll(viewer);
+					}
+				}));
+	}
+
+	/** brush(rename)/copy(duplicate)/download(export)/delete, plus a RAM icon (per-profile memory settings) - the home screen's replacement for the old Profiles-grid card's action row. Manage mods (the gear) lives next to Play now, not in this row - see {@link #homeGearButton}. */
+	private HBox buildHomeProfileActionsRow(Instance instance) {
+		HBox actions = new HBox(8);
+		actions.setAlignment(Pos.CENTER);
+		Button renameButton = iconActionButton("brush", "Rename / change icon", false);
+		renameButton.setOnAction(e -> editInstance(instance));
+		Button duplicateButton = iconActionButton("duplicate", "Duplicate profile - copies its mods/config into a new one", false);
+		duplicateButton.setOnAction(e -> duplicateInstance(instance));
+		Button exportButton = iconActionButton("export", "Export profile - saves its mods/config as a .zip", false);
+		exportButton.setOnAction(e -> exportInstance(instance));
+		Button ramButton = iconActionButton("ram", "RAM & JVM settings", false);
+		ramButton.setOnAction(e -> InstanceSettingsDialog.show(stage, instance).ifPresent(updated -> {
+			InstanceStore.save(updated);
+			showHome();
+		}));
+		Button deleteButton = iconActionButton("delete", "Delete profile", true);
+		deleteButton.setOnAction(e -> confirmDeleteInstance(instance));
+		actions.getChildren().addAll(renameButton, duplicateButton, exportButton, ramButton, deleteButton);
+		return actions;
 	}
 
 	/** Dropdown listing every saved account (a player head + name each, active one checked) plus an "Add Account" entry at the bottom. */
@@ -950,10 +1571,19 @@ public final class LauncherApp extends Application {
 	private void onSignedIn(MinecraftSession newSession) {
 		this.session = newSession;
 		AuthSession.save(newSession);
+		// The sidebar's account badge is built once in buildSidebar() and
+		// never touched by showHome() (which only rebuilds the title-screen
+		// content) - always refreshing it here (not just in the "else"
+		// branch that only ran when Home *wasn't* showing) fixes a real,
+		// confirmed bug where signing in while already on Home left the
+		// sidebar stuck on "Not signed in" even though session was set and
+		// everything else (the account switcher dropdown, Home's own Play
+		// button) correctly saw the new session.
+		if (accountButton != null) {
+			refreshAccountBadge();
+		}
 		if (content.getChildren().stream().anyMatch(n -> n.getStyleClass().contains("title-screen"))) {
 			showHome();
-		} else if (accountButton != null) {
-			refreshAccountBadge();
 		}
 	}
 
@@ -972,10 +1602,11 @@ public final class LauncherApp extends Application {
 	private void switchAccount(MinecraftSession target) {
 		AuthSession.switchTo(target.uuid());
 		this.session = target;
+		if (accountButton != null) {
+			refreshAccountBadge();
+		}
 		if (content.getChildren().stream().anyMatch(n -> n.getStyleClass().contains("title-screen"))) {
 			showHome();
-		} else if (accountButton != null) {
-			refreshAccountBadge();
 		}
 	}
 
@@ -1084,97 +1715,7 @@ public final class LauncherApp extends Application {
 		}));
 	}
 
-	// ---- Profiles (mod loadouts you launch with Play) ----
-
-	private void showInstances() {
-		VBox box = sectionBox("Profiles");
-		box.getChildren().add(sectionSubtitle("Each profile is its own mods folder + Minecraft version. Click its icon to manage mods/resource packs/shaders, the gear for RAM settings, or press Play to install and launch it."));
-
-		FlowPane grid = new FlowPane(16, 16);
-		for (Instance instance : InstanceStore.loadAll()) {
-			grid.getChildren().add(buildInstanceCard(instance));
-		}
-		grid.getChildren().add(buildNewInstanceTile());
-		grid.getChildren().add(buildImportInstanceTile());
-
-		ScrollPane scroll = new ScrollPane(grid);
-		scroll.setFitToWidth(true);
-		scroll.getStyleClass().add("scroll-pane");
-		VBox.setVgrow(scroll, Priority.ALWAYS);
-		box.getChildren().add(wrapGlass(scroll));
-		setContent(box);
-	}
-
-	private VBox buildInstanceCard(Instance instance) {
-		VBox card = new VBox(10);
-		card.getStyleClass().add("instance-card");
-		card.setPrefWidth(200);
-		card.setAlignment(Pos.TOP_CENTER);
-
-		Node icon = renderInstanceIcon(instance, 72);
-		icon.getStyleClass().add("instance-icon-button");
-		icon.setOnMouseClicked(e -> showInstanceDetail(instance));
-
-		Label name = new Label(instance.name());
-		name.setFont(Font.font("System", FontWeight.BOLD, 15));
-		name.setTextFill(textColor());
-		name.setWrapText(true);
-
-		Label version = new Label("Minecraft " + instance.mcVersion());
-		version.getStyleClass().add("version-tag");
-		version.setTextFill(textColor());
-
-		HBox playRow = new HBox(6);
-		boolean signedIn = session != null;
-		Button playButton = new Button(signedIn ? "Play" : "Sign In to Play");
-		playButton.getStyleClass().addAll("title-menu-button", "title-menu-button-primary");
-		playButton.setMaxWidth(Double.MAX_VALUE);
-		playButton.setTooltip(new Tooltip(signedIn ? "Install and launch " + instance.name()
-				: "Sign in with your Microsoft account first - this won't launch anything until you do."));
-		HBox.setHgrow(playButton, Priority.ALWAYS);
-		Button settingsButton = new Button("⚙");
-		settingsButton.setTooltip(new Tooltip("RAM & JVM settings"));
-		settingsButton.setOnAction(e -> InstanceSettingsDialog.show(stage, instance).ifPresent(updated -> {
-			InstanceStore.save(updated);
-			showInstances();
-		}));
-		playRow.getChildren().addAll(playButton, settingsButton);
-
-		ProgressBar progressBar = new ProgressBar(0);
-		progressBar.setMaxWidth(Double.MAX_VALUE);
-		progressBar.setVisible(false);
-		progressBar.setManaged(false);
-		Label statusLabel = new Label();
-		statusLabel.getStyleClass().add("version-tag");
-		statusLabel.setTextFill(textColor());
-		statusLabel.setVisible(false);
-		statusLabel.setManaged(false);
-		statusLabel.setWrapText(true);
-
-		playButton.setOnAction(e -> {
-			if (session == null) {
-				SignInDialog.show(stage, MICROSOFT_CLIENT_ID, newSession -> { onSignedIn(newSession); showInstances(); },
-						error -> showPlaceholderAlert("Sign-in failed", error));
-			} else {
-				launchInstance(instance, playButton, progressBar, statusLabel);
-			}
-		});
-
-		HBox actions = new HBox(6);
-		actions.setAlignment(Pos.CENTER);
-		Button editButton = iconActionButton("edit", "Edit profile", false);
-		editButton.setOnAction(e -> editInstance(instance));
-		Button duplicateButton = iconActionButton("duplicate", "Duplicate profile - copies its mods/config into a new one", false);
-		duplicateButton.setOnAction(e -> duplicateInstance(instance));
-		Button exportButton = iconActionButton("export", "Export profile - saves its mods/config as a .zip", false);
-		exportButton.setOnAction(e -> exportInstance(instance));
-		Button deleteButton = iconActionButton("delete", "Delete profile", true);
-		deleteButton.setOnAction(e -> confirmDeleteInstance(instance));
-		actions.getChildren().addAll(editButton, duplicateButton, exportButton, deleteButton);
-
-		card.getChildren().addAll(icon, name, version, playRow, progressBar, statusLabel, actions);
-		return card;
-	}
+	// ---- Profiles (mod loadouts you launch with Play) - see showHome() for the carousel that replaced the old grid page ----
 
 	/**
 	 * A small square icon-only action button (Edit/Duplicate/Export/Delete
@@ -1187,7 +1728,7 @@ public final class LauncherApp extends Application {
 	 */
 	private Button iconActionButton(String iconName, String tooltip, boolean danger) {
 		Image image = new Image(getClass().getResourceAsStream(
-				"/net/veloclient/launcher/images/icons/action/" + iconName + ".png"), 16, 16, true, true);
+				"/net/veloclient/launcher/images/icons/action/" + iconName + ".png"), 19, 19, true, true);
 		Button button = new Button();
 		button.setGraphic(new ImageView(image));
 		button.getStyleClass().add("icon-action-button");
@@ -1206,7 +1747,7 @@ public final class LauncherApp extends Application {
 		// anything went wrong at all. Surfacing it explicitly at least turns
 		// that into an actionable error instead of a mystery.
 		try {
-			setContent(InstanceDetailView.build(stage, instance, theme, this::showInstances));
+			setContent(InstanceDetailView.build(stage, instance, theme, this::showHome));
 		} catch (Exception e) {
 			e.printStackTrace();
 			showPlaceholderAlert("Couldn't open \"" + instance.name() + "\"",
@@ -1215,29 +1756,17 @@ public final class LauncherApp extends Application {
 		}
 	}
 
-	private VBox buildNewInstanceTile() {
-		VBox tile = new VBox(10);
-		tile.getStyleClass().addAll("instance-card", "instance-card-new");
-		tile.setPrefWidth(200);
-		tile.setAlignment(Pos.CENTER);
-		tile.setPrefHeight(190);
-
-		Label plus = new Label("+");
-		plus.setFont(Font.font("System", FontWeight.BOLD, 40));
-		plus.setTextFill(accentColor());
-		Label label = new Label("New Profile");
-		label.setTextFill(textColor());
-
-		tile.getChildren().addAll(plus, label);
-		tile.setOnMouseClicked(e -> InstanceEditDialog.show(stage, theme, "New Profile", "", null, InstanceIcon.builtin(BuiltinIcons.DEFAULT))
+	/** Top-right "+ New Profile" button on the home screen - was previously a grid tile on the old Profiles page. */
+	private void createNewProfile() {
+		InstanceEditDialog.show(stage, theme, "New Profile", "", null, InstanceIcon.builtin(BuiltinIcons.DEFAULT))
 				.ifPresent(result -> {
 					Instance instance = InstanceStore.createNew(
 							result.name().isBlank() ? "New Profile" : result.name(), result.mcVersion(), result.icon());
 					applyIconChoice(instance, result);
 					installModLoaderJars(instance);
-					showInstances();
-				}));
-		return tile;
+					homeProfileIndex = 0;
+					showHome();
+				});
 	}
 
 	private void editInstance(Instance instance) {
@@ -1250,7 +1779,7 @@ public final class LauncherApp extends Application {
 					InstanceStore.save(updated);
 					applyIconChoice(updated, result);
 					installModLoaderJars(updated);
-					showInstances();
+					showHome();
 				});
 	}
 
@@ -1297,7 +1826,7 @@ public final class LauncherApp extends Application {
 		DialogStyling.apply(dialog);
 		dialog.showAndWait().map(String::strip).filter(name -> !name.isEmpty()).ifPresent(name -> {
 			InstanceStore.duplicate(instance, name);
-			showInstances();
+			showHome();
 		});
 	}
 
@@ -1367,35 +1896,12 @@ public final class LauncherApp extends Application {
 												+ "Velo Client/Fabric API weren't installed automatically. Edit the "
 												+ "profile to set a supported version and they'll install then.");
 							}
-							showInstances();
+							showHome();
 						});
 					} catch (IOException e) {
 						Platform.runLater(() -> showPlaceholderAlert("Import failed", e.getMessage()));
 					}
 				}));
-	}
-
-	private VBox buildImportInstanceTile() {
-		VBox tile = new VBox(10);
-		tile.getStyleClass().addAll("instance-card", "instance-card-new");
-		tile.setPrefWidth(200);
-		tile.setAlignment(Pos.CENTER);
-		tile.setPrefHeight(190);
-
-		Label icon = new Label("⬇");
-		icon.setFont(Font.font("System", FontWeight.BOLD, 32));
-		icon.setTextFill(accentColor());
-		Label label = new Label("Import Profile");
-		label.setTextFill(textColor());
-		Label hint = new Label("From a .zip - Velo's own export, or any mods folder");
-		hint.getStyleClass().add("version-tag");
-		hint.setTextFill(textColor());
-		hint.setWrapText(true);
-		hint.setStyle("-fx-text-alignment: center;");
-
-		tile.getChildren().addAll(icon, label, hint);
-		tile.setOnMouseClicked(e -> importInstance());
-		return tile;
 	}
 
 	private void confirmDeleteInstance(Instance instance) {
@@ -1407,7 +1913,8 @@ public final class LauncherApp extends Application {
 		DialogStyling.apply(alert);
 		alert.showAndWait().filter(button -> button == ButtonType.OK).ifPresent(button -> {
 			InstanceStore.delete(instance);
-			showInstances();
+			homeProfileIndex = 0;
+			showHome();
 		});
 	}
 
@@ -1596,19 +2103,70 @@ public final class LauncherApp extends Application {
 
 	private void showSettings() {
 		VBox box = sectionBox("Settings");
-		VBox list = new VBox(6);
-		list.getChildren().add(sectionSubtitle("Config root: " + VeloPaths.root()));
-		list.getChildren().add(sectionSubtitle("Manifest: " + VeloPaths.manifestFile()));
-		list.getChildren().add(sectionSubtitle("Profiles: " + VeloPaths.profiles()));
-		list.getChildren().add(sectionSubtitle("Capes: " + VeloPaths.capes()));
+
+		VBox content = new VBox(16);
+
+		VBox appearanceCard = settingsCard("Appearance",
+				"Colors, gradients, and presets for the whole launcher.");
+		Button themeButton = new Button("Open Theme Editor");
+		themeButton.getStyleClass().addAll("title-menu-button", "button-compact");
+		themeButton.setOnAction(e -> showThemeEditor());
+		appearanceCard.getChildren().add(themeButton);
+		content.getChildren().add(appearanceCard);
+
+		VBox logsCard = settingsCard("Logs",
+				"The launcher's own log (not the game's) - useful when reporting a launcher bug.");
+		Button openLogsButton = new Button("Open Logs Folder");
+		openLogsButton.getStyleClass().addAll("title-menu-button", "button-compact");
+		openLogsButton.setOnAction(e -> {
+			try {
+				InstanceDetailView.openInFileManager(VeloPaths.logs());
+			} catch (Exception ex) {
+				showPlaceholderAlert("Couldn't open logs folder", ex.getMessage());
+			}
+		});
+		logsCard.getChildren().add(openLogsButton);
+		content.getChildren().add(logsCard);
+
+		VBox dataCard = settingsCard("Data locations", null);
+		dataCard.getChildren().addAll(
+				sectionSubtitle("Config root: " + VeloPaths.root()),
+				sectionSubtitle("Manifest: " + VeloPaths.manifestFile()),
+				sectionSubtitle("Profiles: " + VeloPaths.profiles()),
+				sectionSubtitle("Capes: " + VeloPaths.capes()));
+		content.getChildren().add(dataCard);
+
+		VBox accountCard = settingsCard("Account", null);
 		if (session != null) {
-			list.getChildren().add(sectionSubtitle("Signed in as: " + session.username() + " (" + session.uuid() + ")"));
+			accountCard.getChildren().add(sectionSubtitle("Signed in as: " + session.username() + " (" + session.uuid() + ")"));
 			Button signOutButton = new Button("Sign out");
+			signOutButton.getStyleClass().add("button-compact");
 			signOutButton.setOnAction(e -> signOut());
-			list.getChildren().add(signOutButton);
+			accountCard.getChildren().add(signOutButton);
+		} else {
+			accountCard.getChildren().add(sectionSubtitle("Not signed in."));
 		}
-		box.getChildren().add(wrapGlass(list));
+		content.getChildren().add(accountCard);
+
+		ScrollPane scroll = new ScrollPane(content);
+		scroll.setFitToWidth(true);
+		scroll.getStyleClass().add("scroll-pane");
+		VBox.setVgrow(scroll, Priority.ALWAYS);
+		box.getChildren().add(scroll);
 		setContent(box);
+	}
+
+	private VBox settingsCard(String heading, String subtitle) {
+		VBox card = new VBox(8);
+		card.getStyleClass().add("glass-panel");
+		Label headingLabel = new Label(heading);
+		headingLabel.setFont(Font.font("System", FontWeight.BOLD, 15));
+		headingLabel.setTextFill(accentColor());
+		card.getChildren().add(headingLabel);
+		if (subtitle != null) {
+			card.getChildren().add(sectionSubtitle(subtitle));
+		}
+		return card;
 	}
 
 	// ---- Shared styling helpers ----

@@ -31,6 +31,41 @@
 	-fx-background-color: -velo-background;
 }
 
+/*
+ * Generic fallback look for any plain Button that doesn't have one of the
+ * more specific role classes below (.nav-icon-button, .home-play-button,
+ * .title-menu-button, .account-badge, .icon-action-button, ...). Deliberately
+ * placed early in the file: CSS resolves same-specificity rules by source
+ * order, so every more specific button class declared *after* this one wins
+ * the cascade automatically, without needing to fight this rule's
+ * background/border on every single one of them. This used to sit at the
+ * bottom of the file (after all the role classes), which put it LAST in
+ * source order instead - a real, confirmed bug where this rule's constant
+ * -fx-background-color/-fx-border-color silently overrode .nav-icon-button's
+ * "transparent until hovered" look and gave every sidebar nav row a
+ * permanently boxed, "always-hovered" appearance instead of the intended
+ * clean/seamless one.
+ */
+.button {
+	-fx-background-radius: 8;
+	-fx-cursor: hand;
+	-fx-background-color: -velo-hover;
+	-fx-text-fill: -velo-text;
+	-fx-border-color: -velo-hairline;
+	-fx-border-radius: 8;
+	-fx-border-width: 1;
+}
+
+.button:hover {
+	-fx-border-color: -velo-accent-start;
+}
+
+.button:default, .button:default:hover {
+	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
+	-fx-text-fill: white;
+	-fx-border-width: 0;
+}
+
 .sidebar {
 	-fx-background-color: -velo-surface;
 	-fx-border-color: transparent -velo-hairline transparent transparent;
@@ -60,6 +95,29 @@
 .nav-button-active {
 	-fx-background-color: -velo-hover;
 	-fx-border-color: -velo-accent-start;
+	-fx-border-width: 0 0 0 3;
+}
+
+/* ---- Icon + label sidebar nav rows (same "icon, label, left accent bar when active" shape as the in-game r-shift menu's own sidebar) ---- */
+
+.nav-icon-button {
+	-fx-background-color: transparent;
+	-fx-text-fill: -velo-text;
+	-fx-alignment: CENTER_LEFT;
+	-fx-padding: 9 12 9 12;
+	-fx-background-radius: 8;
+	-fx-cursor: hand;
+	-fx-font-size: 13px;
+	-fx-border-width: 0;
+}
+
+.nav-icon-button:hover {
+	-fx-background-color: -velo-hover;
+}
+
+.nav-icon-button-active {
+	-fx-background-color: -velo-hover;
+	-fx-border-color: transparent transparent transparent -velo-accent-start;
 	-fx-border-width: 0 0 0 3;
 }
 
@@ -136,14 +194,64 @@
 }
 
 .velo-title {
-	-fx-font-size: 64px;
-	-fx-font-weight: bold;
-	-fx-letter-spacing: 4px;
+	-fx-font-family: "Audiowide";
+	-fx-font-size: 48px;
+	-fx-letter-spacing: 3px;
 }
 
 .velo-tagline {
-	-fx-font-size: 14px;
+	-fx-font-size: 13px;
 	-fx-opacity: 0.75;
+}
+
+/* ---- Home screen: profile carousel ---- */
+
+.home-glow-border {
+	-fx-border-width: 2;
+	-fx-border-radius: 18;
+	-fx-background-radius: 18;
+}
+
+.home-profile-name {
+	-fx-font-size: 20px;
+	-fx-font-weight: bold;
+}
+
+.home-chevron {
+	-fx-stroke: white;
+	-fx-fill: transparent;
+	-fx-opacity: 0.55;
+	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.6), 4, 0.4, 0, 1);
+}
+
+.home-chevron:hover {
+	-fx-opacity: 1;
+}
+
+.home-play-button {
+	-fx-background-color: linear-gradient(to bottom, derive(-velo-accent-start, 15%), -velo-accent-end);
+	-fx-text-fill: white;
+	-fx-font-size: 18px;
+	-fx-font-weight: bold;
+	-fx-background-radius: 14;
+	-fx-border-radius: 14;
+	-fx-border-width: 0;
+	-fx-cursor: hand;
+	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 14, 0.25, 0, 4);
+}
+
+/* Same "brighten toward white, centered on the cursor" spotlight idea as the
+   in-game title/options menu buttons (GlassMenuButton) - JavaFX has no
+   per-pixel mouse-position shader hook like that mixin does, so this
+   approximates it with a flat brightness/glow lift on hover instead of a
+   true tracked spotlight. */
+.home-play-button:hover {
+	-fx-background-color: linear-gradient(to bottom, derive(-velo-accent-start, 30%), derive(-velo-accent-end, 15%));
+	-fx-effect: dropshadow(gaussian, derive(-velo-accent-start, 20%), 22, 0.45, 0, 0);
+}
+
+.home-play-button:pressed {
+	-fx-background-color: linear-gradient(to bottom, -velo-accent-start, derive(-velo-accent-end, -10%));
 }
 
 .velo-splash {
@@ -319,26 +427,6 @@
 	-fx-border-radius: 8;
 	-fx-border-color: -velo-hairline;
 	-fx-prompt-text-fill: derive(-velo-text, -40%);
-}
-
-.button {
-	-fx-background-radius: 8;
-	-fx-cursor: hand;
-	-fx-background-color: -velo-hover;
-	-fx-text-fill: -velo-text;
-	-fx-border-color: -velo-hairline;
-	-fx-border-radius: 8;
-	-fx-border-width: 1;
-}
-
-.button:hover {
-	-fx-border-color: -velo-accent-start;
-}
-
-.button:default, .button:default:hover {
-	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
-	-fx-text-fill: white;
-	-fx-border-width: 0;
 }
 
 /* ---- In-window modal overlay (e.g. the Modrinth version/dependency picker) ---- */
@@ -642,19 +730,34 @@
 }
 
 .icon-action-button {
-	-fx-min-width: 32;
-	-fx-min-height: 32;
-	-fx-max-width: 32;
-	-fx-max-height: 32;
+	-fx-min-width: 38;
+	-fx-min-height: 38;
+	-fx-max-width: 38;
+	-fx-max-height: 38;
 	-fx-padding: 0;
 	-fx-font-size: 14px;
-	-fx-background-radius: 8;
-	-fx-border-radius: 8;
+	-fx-background-radius: 9;
+	-fx-border-radius: 9;
 }
 
 .icon-action-button-danger:hover {
 	-fx-border-color: #e05a5a;
 	-fx-text-fill: #e05a5a;
+}
+
+/* The manage-mods "gear" shortcut beside Play (see LauncherApp#homeGearButton) - same 58px height as .home-play-button so the two read as one launch-and-manage control cluster, styled as its quieter secondary rather than competing with Play's accent gradient. */
+.home-gear-button {
+	-fx-background-color: -velo-surface;
+	-fx-border-color: -velo-hairline;
+	-fx-border-width: 1;
+	-fx-background-radius: 14;
+	-fx-border-radius: 14;
+	-fx-cursor: hand;
+}
+
+.home-gear-button:hover {
+	-fx-border-color: -velo-accent-start;
+	-fx-background-color: -velo-hover;
 }
 
 .icon-picker-tile {

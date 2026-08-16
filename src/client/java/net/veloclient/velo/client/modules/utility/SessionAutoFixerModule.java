@@ -64,7 +64,7 @@ public final class SessionAutoFixerModule extends AbstractModule {
 		super("session-auto-fixer", "Session Auto-Fixer",
 				"Adds a one-click fix to the disconnect screen when kicked for an invalid/expired session, "
 						+ "refreshing your saved Velo account and reconnecting without restarting the launcher.",
-				ModuleCategory.UTILITY, SafetyTag.ALWAYS_SAFE, true);
+				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, true);
 		ScreenEvents.AFTER_INIT.register(this::onScreenInit);
 	}
 

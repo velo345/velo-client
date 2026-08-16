@@ -80,6 +80,18 @@ public final class PlayerSkin3DView {
 
 	/** Same as {@link #createViewer(byte[], boolean)}, with an optional cape rendered behind the back - the Store's "try before you buy" preview. A single-frame {@code capeFrames} renders as a static cape; more than one animates, cycling on each frame's own delay until the returned node leaves the scene. */
 	public static Node createViewer(byte[] skinPngBytes, boolean slim, List<GifFrames.Frame> capeFrames) {
+		return createViewer(skinPngBytes, slim, capeFrames, true);
+	}
+
+	/**
+	 * @param interactive when false, drag-to-orbit and scroll-to-zoom are
+	 *                    disabled entirely - the home screen's background
+	 *                    player render is a fixed, slightly-turned display
+	 *                    piece (not something meant to be spun around), while
+	 *                    every other caller (Store preview, profile page)
+	 *                    keeps the interactive behavior.
+	 */
+	public static Node createViewer(byte[] skinPngBytes, boolean slim, List<GifFrames.Frame> capeFrames, boolean interactive) {
 		if (skinPngBytes == null) {
 			return null;
 		}
@@ -150,22 +162,24 @@ public final class PlayerSkin3DView {
 		subScene.widthProperty().bind(wrapper.widthProperty());
 		subScene.heightProperty().bind(wrapper.heightProperty());
 		wrapper.getChildren().add(subScene);
-		wrapper.setPickOnBounds(true);
+		wrapper.setPickOnBounds(interactive);
 
-		double[] lastX = new double[1];
-		wrapper.setOnMousePressed(e -> lastX[0] = e.getSceneX());
-		wrapper.setOnMouseDragged(e -> {
-			double dx = e.getSceneX() - lastX[0];
-			yaw.setAngle(yaw.getAngle() + dx * 0.5);
-			lastX[0] = e.getSceneX();
-		});
-		wrapper.addEventHandler(ScrollEvent.SCROLL, e -> {
-			double z = camera.getTranslateZ() + e.getDeltaY() * 0.15;
-			camera.setTranslateZ(Math.max(-180, Math.min(-35, z)));
-			// Without this, the scroll also bubbled up to whatever ScrollPane
-			// this viewer sits inside (the profile page) and scrolled that too.
-			e.consume();
-		});
+		if (interactive) {
+			double[] lastX = new double[1];
+			wrapper.setOnMousePressed(e -> lastX[0] = e.getSceneX());
+			wrapper.setOnMouseDragged(e -> {
+				double dx = e.getSceneX() - lastX[0];
+				yaw.setAngle(yaw.getAngle() + dx * 0.5);
+				lastX[0] = e.getSceneX();
+			});
+			wrapper.addEventHandler(ScrollEvent.SCROLL, e -> {
+				double z = camera.getTranslateZ() + e.getDeltaY() * 0.15;
+				camera.setTranslateZ(Math.max(-180, Math.min(-35, z)));
+				// Without this, the scroll also bubbled up to whatever ScrollPane
+				// this viewer sits inside (the profile page) and scrolled that too.
+				e.consume();
+			});
+		}
 
 		if (capeTimer != null) {
 			// AnimationTimer keeps running (and holding this whole viewer alive

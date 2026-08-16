@@ -50,8 +50,22 @@ public final class InstancePaths {
 		return gameDir(instanceId).resolve("shaderpacks");
 	}
 
+	/** Litematica's schematic folder - its own default and not user-configurable per-install, always {@code <gamedir>/schematics/}. */
+	public static Path schematicsLitematicaDir(String instanceId) {
+		return gameDir(instanceId).resolve("schematics");
+	}
+
+	/** WorldEdit (Fabric)'s default {@code saveDir}, relative to its own config folder - {@code <gamedir>/config/worldedit/schematics/}. */
+	public static Path schematicsWorldEditDir(String instanceId) {
+		return gameDir(instanceId).resolve("config").resolve("worldedit").resolve("schematics");
+	}
+
 	public static Path logsDir(String instanceId) {
 		return gameDir(instanceId).resolve("logs");
+	}
+
+	public static Path savesDir(String instanceId) {
+		return gameDir(instanceId).resolve("saves");
 	}
 
 	public static void ensureRoot() {
@@ -64,7 +78,7 @@ public final class InstancePaths {
 
 	public static void ensureDirectories(String instanceId) {
 		for (Path dir : new Path[] {root(), dir(instanceId), modsDir(instanceId), resourcePacksDir(instanceId),
-				shaderPacksDir(instanceId), logsDir(instanceId)}) {
+				shaderPacksDir(instanceId), schematicsLitematicaDir(instanceId), schematicsWorldEditDir(instanceId), logsDir(instanceId)}) {
 			try {
 				Files.createDirectories(dir);
 			} catch (IOException e) {

@@ -12,15 +12,13 @@ import net.veloclient.velo.module.SafetyTag;
 import java.util.List;
 
 /**
- * Replaces vanilla's crosshair with the equipped one from the library
- * (managed via the "Crosshairs" sidebar button - see {@link
- * net.veloclient.velo.client.gui.CrosshairSelectScreen} and {@link
- * net.veloclient.velo.client.gui.CrosshairEditorScreen}). Actual suppression
- * of vanilla's own crosshair render + drawing this one happens in {@link
- * net.veloclient.velo.client.mixin.CustomCrosshairMixin}; this class only
- * holds the on-screen size setting, since that's the one thing that
- * naturally belongs in this module's own settings screen rather than the
- * crosshair library screen.
+ * Replaces vanilla's crosshair with the equipped one from the library -
+ * managed via a "Manage Crosshairs..." button right in this module's own
+ * settings panel (see {@link net.veloclient.velo.client.gui.CrosshairSelectScreen}
+ * and {@link net.veloclient.velo.client.gui.CrosshairEditorScreen}), folded
+ * in here instead of its own standalone sidebar entry to cut down on side-nav
+ * clutter. Actual suppression of vanilla's own crosshair render + drawing
+ * this one happens in {@link net.veloclient.velo.client.mixin.CustomCrosshairMixin}.
  */
 public final class CustomCrosshairModule extends AbstractModule implements Configurable {
 
@@ -67,6 +65,20 @@ public final class CustomCrosshairModule extends AbstractModule implements Confi
 
 	@Override
 	public List<ConfigField> configFields() {
-		return List.of(new ConfigField.SliderField("Size", 4, 64, () -> size, v -> size = (int) v, v -> (int) v + "px"));
+		return List.of(
+				new ConfigField.ActionButtonField("Manage Crosshairs...", CustomCrosshairModule::openLibrary),
+				new ConfigField.SliderField("Size", 4, 64, () -> size, v -> size = (int) v, v -> (int) v + "px"));
+	}
+
+	private static void openLibrary() {
+		var client = net.minecraft.client.MinecraftClient.getInstance();
+		//? if <26.1 {
+		var parent = client.currentScreen;
+		//?} else if <26.2 {
+		/*var parent = client.screen;
+		*///?} else {
+		/*var parent = client.gui.screen();
+		*///?}
+		client.setScreen(new net.veloclient.velo.client.gui.CrosshairSelectScreen(parent));
 	}
 }

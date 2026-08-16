@@ -24,7 +24,7 @@ public final class CopyCoordinatesModule extends AbstractModule implements Confi
 
 	public CopyCoordinatesModule() {
 		super("copy-coordinates", "Copy Coordinates", "Copies your current X/Y/Z to the clipboard with one keypress.",
-				ModuleCategory.UTILITY, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
 		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
 	}
 

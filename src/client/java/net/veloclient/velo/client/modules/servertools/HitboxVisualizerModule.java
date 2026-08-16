@@ -3,9 +3,20 @@ package net.veloclient.velo.client.modules.servertools;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.PlayerListEntry;
 import net.minecraft.client.render.DrawStyle;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
+//? if <26.1 {
+import net.minecraft.entity.boss.dragon.EnderDragonEntity;
+import net.minecraft.entity.boss.dragon.EnderDragonPart;
+import net.minecraft.world.GameMode;
+//?} else {
+/*import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragonPart;
+import net.minecraft.world.level.GameType;
+*///?}
 import net.minecraft.world.debug.gizmo.GizmoDrawing;
 import net.veloclient.velo.module.AbstractModule;
 import net.veloclient.velo.module.ConfigField;
@@ -53,12 +64,60 @@ public final class HitboxVisualizerModule extends AbstractModule implements Conf
 		if (world == null) {
 			return;
 		}
+		DrawStyle style = DrawStyle.stroked(color, (float) lineWidth);
 		for (Entity entity : world.getEntities()) {
-			if (entity == client.player) {
+			if (entity == client.player || !isVisible(client, entity)) {
 				continue;
 			}
-			GizmoDrawing.box(entity.getBoundingBox(), DrawStyle.stroked(color, (float) lineWidth));
+			//? if <26.1 {
+			if (entity instanceof EnderDragonEntity dragon) {
+			//?} else {
+			/*if (entity instanceof EnderDragon dragon) {
+			*///?}
+				// A dragon's overall getBoundingBox() doesn't match what the
+				// server actually hit-tests against - it's hit-tested per
+				// body part (head/neck/body/wings/tail), each with its own
+				// box, so draw those instead of one big approximate box.
+				//? if <26.1 {
+				for (EnderDragonPart part : dragon.getBodyParts()) {
+				//?} else {
+				/*for (EnderDragonPart part : dragon.getSubEntities()) {
+				*///?}
+					GizmoDrawing.box(part.getBoundingBox(), style);
+				}
+				continue;
+			}
+			GizmoDrawing.box(entity.getBoundingBox(), style);
 		}
+	}
+
+	/**
+	 * Only draw boxes for entities the player can actually see: invisible
+	 * entities (covers vanish-via-invisibility, not just players) and
+	 * players in spectator mode are skipped rather than exposed through this
+	 * debug tool.
+	 */
+	private static boolean isVisible(MinecraftClient client, Entity entity) {
+		if (entity.isInvisible()) {
+			return false;
+		}
+		if (entity instanceof PlayerEntity player) {
+			var networkHandler = client.getNetworkHandler();
+			PlayerListEntry entry = networkHandler == null ? null : networkHandler.getPlayerListEntry(player.getUuid());
+			// No player-list entry (e.g. NPC-ish fake players some servers
+			// spawn) means we can't tell their gamemode - keep showing
+			// rather than guess.
+			//? if <26.1 {
+			if (entry != null && entry.getGameMode() == GameMode.SPECTATOR) {
+				return false;
+			}
+			//?} else {
+			/*if (entry != null && entry.getGameMode() == GameType.SPECTATOR) {
+				return false;
+			}
+			*///?}
+		}
+		return true;
 	}
 
 	@Override

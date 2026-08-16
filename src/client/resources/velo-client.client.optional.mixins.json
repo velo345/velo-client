@@ -1,0 +1,14 @@
+{
+	"required": false,
+	"minVersion": "0.8",
+	"package": "net.veloclient.velo.client.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"QueueHandlerAccessorMixin",
+		"QueueHandlerJoinGuardMixin",
+		"QueueHandlerObserverMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

@@ -61,7 +61,7 @@ public final class AutoReconnectModule extends AbstractModule {
 		super("auto-reconnect", "Auto Reconnect",
 				"Automatically reconnects after an unexpected disconnect, waiting progressively longer between "
 						+ "attempts (3s, 5s, 10s, 30s, then every 60s). Adds a Cancel button to the disconnect screen.",
-				ModuleCategory.UTILITY, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
 		ScreenEvents.AFTER_INIT.register(this::onScreenInit);
 		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> reset());
@@ -107,6 +107,13 @@ public final class AutoReconnectModule extends AbstractModule {
 	 */
 	private void onScreenInit(MinecraftClient client, Screen screen, int scaledWidth, int scaledHeight) {
 		if (!isEnabled() || !(screen instanceof DisconnectedScreen)) {
+			return;
+		}
+		// A Velo-initiated disconnect (e.g. the Background Queue module
+		// demoting/promoting a session) isn't an unexpected kick - without
+		// this check, sending a server to the background would immediately
+		// get auto-reconnected right back, defeating the entire point.
+		if (net.veloclient.velo.client.modules.queue.BackgroundQueueManager.consumeAutoReconnectSuppression()) {
 			return;
 		}
 		if (targetServer == null && !captureServer(client, screen)) {

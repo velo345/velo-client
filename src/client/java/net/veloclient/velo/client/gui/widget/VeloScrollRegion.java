@@ -40,6 +40,15 @@ public final class VeloScrollRegion {
 		rows.clear();
 	}
 
+	/** Current scroll offset, so a caller can preserve it across a rebuild (e.g. {@code layoutContent()} after a button click) instead of it silently resetting to the top. */
+	public double scrollOffset() {
+		return scrollOffset;
+	}
+
+	public void setScrollOffset(double scrollOffset) {
+		this.scrollOffset = Math.max(0, scrollOffset);
+	}
+
 	/** Copy of the current rows, for removing them from a Screen's child list before rebuilding. */
 	public List<ClickableWidget> rowsSnapshot() {
 		return List.copyOf(rows);
@@ -66,14 +75,20 @@ public final class VeloScrollRegion {
 
 		int cursor = y - (int) scrollOffset;
 		for (ClickableWidget row : rows) {
-			// Any overlap keeps a row "active" (clickable/scrollable to) -
-			// actual pixel-perfect clipping of a row that's only partially
-			// inside the viewport is done at render time via a GPU scissor
-			// (see renderRows), not by hiding it outright.
+			// Rendered (scissor-clipped) as soon as there's any overlap at
+			// all, but only made *clickable* once at least a quarter of the
+			// row is actually visible - a row barely poking into the
+			// viewport by a pixel or two used to still count as "active"
+			// with its full hitbox, which could overlap and steal clicks
+			// meant for something below the scroll region entirely
+			// (e.g. a "Done" button) until scrolled well past it.
 			boolean overlaps = cursor + rowHeight > y && cursor < y + height;
+			int visibleTop = Math.max(cursor, y);
+			int visibleBottom = Math.min(cursor + rowHeight, y + height);
+			boolean sufficientlyVisible = (visibleBottom - visibleTop) >= rowHeight * 0.25;
 			row.setY(overlaps ? cursor : OFFSCREEN_Y);
 			row.visible = overlaps;
-			row.active = overlaps;
+			row.active = overlaps && sufficientlyVisible;
 			cursor += rowHeight + gap;
 		}
 	}
@@ -108,10 +123,13 @@ public final class VeloScrollRegion {
 			int cellX = x + col * (cellWidth + gap);
 			int cellY = y - (int) scrollOffset + row * (cellHeight + gap);
 			boolean overlaps = cellY + cellHeight > y && cellY < y + height;
+			int visibleTop = Math.max(cellY, y);
+			int visibleBottom = Math.min(cellY + cellHeight, y + height);
+			boolean sufficientlyVisible = (visibleBottom - visibleTop) >= cellHeight * 0.25;
 			cell.setX(cellX);
 			cell.setY(overlaps ? cellY : OFFSCREEN_Y);
 			cell.visible = overlaps;
-			cell.active = overlaps;
+			cell.active = overlaps && sufficientlyVisible;
 		}
 	}
 

@@ -29,7 +29,7 @@ public final class QuickLaunchStore {
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final String FILE_NAME = "quick_launch.json";
-	private static final int MAX_ENTRIES = 5;
+	private static final int MAX_ENTRIES = 3;
 
 	private QuickLaunchStore() {
 	}

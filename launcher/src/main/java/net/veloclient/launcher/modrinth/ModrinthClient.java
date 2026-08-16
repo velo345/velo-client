@@ -91,21 +91,33 @@ public final class ModrinthClient {
 		}
 	}
 
+	/** Modpacks and datapacks are just as game-version-sensitive as mods (a modpack's own mod list, or a datapack's data format, can easily not match a different Minecraft version) - only resource packs/shaders are loose enough to skip this. */
+	private static boolean versionSensitive(String projectType) {
+		return "mod".equals(projectType) || "modpack".equals(projectType) || "datapack".equals(projectType);
+	}
+
+	/** Datapacks aren't Fabric-loader-specific at all (no mod loader involved), so only mods/modpacks get the {@code categories:fabric} facet/loaders filter. */
+	private static boolean loaderSensitive(String projectType) {
+		return "mod".equals(projectType) || "modpack".equals(projectType);
+	}
+
 	/**
-	 * @param projectType one of Modrinth's project types: "mod", "resourcepack", "shader"
+	 * @param projectType one of Modrinth's project types: "mod", "modpack", "resourcepack", "shader", "datapack"
 	 * @param sortIndex   "relevance", "downloads", "follows", "newest", "updated"
 	 */
 	public static SearchResult search(String query, String projectType, String gameVersion, String sortIndex,
 			int offset, int limit) throws IOException {
 		JsonArray facets = new JsonArray();
 		facets.add(singleFacet("project_type:" + projectType));
-		if ("mod".equals(projectType)) {
+		if (versionSensitive(projectType)) {
 			// Resource packs/shaders aren't loader-specific and plenty of them
 			// never bother tagging every individual game version (especially
 			// this project's own less-common target versions), so a strict
 			// versions: facet there returned nothing installable at all - only
-			// mods actually need this to be filtered this tightly.
+			// version-sensitive project types need this filtered this tightly.
 			facets.add(singleFacet("versions:" + gameVersion));
+		}
+		if (loaderSensitive(projectType)) {
 			facets.add(singleFacet("categories:fabric"));
 		}
 
@@ -138,9 +150,15 @@ public final class ModrinthClient {
 	 */
 	public static List<ProjectVersion> versions(String projectId, String gameVersion, String projectType) throws IOException {
 		StringBuilder url = new StringBuilder(API_BASE).append("/project/").append(encode(projectId)).append("/version");
-		if ("mod".equals(projectType)) {
-			url.append("?game_versions=").append(encode("[\"" + gameVersion + "\"]"))
-					.append("&loaders=").append(encode("[\"fabric\"]"));
+		List<String> params = new ArrayList<>();
+		if (versionSensitive(projectType)) {
+			params.add("game_versions=" + encode("[\"" + gameVersion + "\"]"));
+		}
+		if (loaderSensitive(projectType)) {
+			params.add("loaders=" + encode("[\"fabric\"]"));
+		}
+		if (!params.isEmpty()) {
+			url.append('?').append(String.join("&", params));
 		}
 		JsonObject response = wrapArray(getRaw(url.toString()));
 		List<ProjectVersion> versions = new ArrayList<>();
@@ -181,6 +199,45 @@ public final class ModrinthClient {
 	public static Optional<Project> getProject(String projectId) {
 		try {
 			return Optional.of(GSON.fromJson(getJson(API_BASE + "/project/" + encode(projectId)), Project.class));
+		} catch (IOException e) {
+			return Optional.empty();
+		}
+	}
+
+	public record GalleryImage(String url, boolean featured, String title, String description) {
+	}
+
+	/**
+	 * The fuller project record backing {@link net.veloclient.launcher.ui.ProjectDetailView} - everything
+	 * {@link Project} has, plus the long-form body (Markdown), the image gallery, and the counters Modrinth's
+	 * own project page shows. Kept separate from {@link Project} (used for the lightweight dependency-name
+	 * lookups sprinkled through {@link net.veloclient.launcher.ui.InstanceDetailView}) so those callers don't
+	 * pay for fields they never use.
+	 */
+	public record ProjectDetail(
+			String id,
+			String slug,
+			String title,
+			String description,
+			String body,
+			@SerializedName("icon_url") String iconUrl,
+			long downloads,
+			long followers,
+			List<String> categories,
+			List<GalleryImage> gallery) {
+
+		public List<GalleryImage> galleryOrEmpty() {
+			return gallery == null ? List.of() : gallery;
+		}
+
+		public List<String> categoriesOrEmpty() {
+			return categories == null ? List.of() : categories;
+		}
+	}
+
+	public static Optional<ProjectDetail> getProjectDetail(String projectId) {
+		try {
+			return Optional.of(GSON.fromJson(getJson(API_BASE + "/project/" + encode(projectId)), ProjectDetail.class));
 		} catch (IOException e) {
 			return Optional.empty();
 		}

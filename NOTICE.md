@@ -1,5 +1,11 @@
 # Third-party assets
 
+## Audiowide font
+
+`assets/fonts/Audiowide-Regular.ttf` (used for the in-game title screen and the launcher's home
+screen wordmark) is the [Audiowide](https://fonts.google.com/specimen/Audiowide) typeface by
+Astigmatic, licensed under the [SIL Open Font License 1.1](https://openfontlicense.org/).
+
 ## Lucide icons
 
 Module and mod-profile icons under `src/client/resources/assets/velo-client/textures/icon/module/`,

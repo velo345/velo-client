@@ -1,11 +1,8 @@
 package net.veloclient.velo.client.gui;
 
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
-import net.minecraft.util.Util;
 import net.veloclient.velo.client.gui.widget.VeloModuleTile;
 import net.veloclient.velo.client.gui.widget.VeloNavButton;
 import net.veloclient.velo.client.gui.widget.VeloNavIcons;
@@ -32,13 +29,14 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 	private static final int TILE_TOTAL_HEIGHT = TILE_SIZE + 22;
 	private static final int TILE_GAP = 8;
 
+	private static final int CLEAR_BUTTON_WIDTH = 18;
+
 	private ModuleCategory selectedCategory = ModuleCategory.HUD;
 	private TextFieldWidget searchBox;
+	private net.veloclient.velo.client.gui.widget.VeloButton clearSearchButton;
 	private VeloScrollRegion scrollRegion;
 	private VeloScrollRegion sidebarRegion;
 	private int gridColumns = 1;
-	private Text statusText = Text.literal("");
-	private long statusUntilMs;
 
 	public ModMenuScreen() {
 		super(Text.literal("Velo Client"), 640, 480);
@@ -74,11 +72,11 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			sidebarRegion.addRow(button);
 		}
 
-		VeloNavButton themeButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
-				VeloNavIcons.of("theme_editor"), Text.literal("Theme Editor"),
-				b -> this.client.setScreen(new ThemeEditorScreen(this)));
-		addSelectableChild(themeButton);
-		sidebarRegion.addRow(themeButton);
+		VeloNavButton settingsButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+				VeloNavIcons.of("settings"), Text.literal("Settings"),
+				b -> this.client.setScreen(new SettingsTabScreen(this)));
+		addSelectableChild(settingsButton);
+		sidebarRegion.addRow(settingsButton);
 
 		VeloNavButton capesButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
 				VeloNavIcons.of("capes"), Text.literal("Capes"),
@@ -92,17 +90,11 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		addSelectableChild(hudLayoutButton);
 		sidebarRegion.addRow(hudLayoutButton);
 
-		VeloNavButton crosshairsButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
-				VeloNavIcons.of("crosshairs"), Text.literal("Crosshairs"),
-				b -> this.client.setScreen(new CrosshairSelectScreen(this)));
-		addSelectableChild(crosshairsButton);
-		sidebarRegion.addRow(crosshairsButton);
-
-		VeloNavButton modsFolderButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
-				VeloNavIcons.of("mods_folder"), Text.literal("Open Mods Folder"),
-				b -> openInFileManager(FabricLoader.getInstance().getGameDir().resolve("mods").toFile()));
-		addSelectableChild(modsFolderButton);
-		sidebarRegion.addRow(modsFolderButton);
+		VeloNavButton schematicsButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+				VeloNavIcons.of("schematics"), Text.literal("Schematics"),
+				b -> this.client.setScreen(new SchematicsScreen(this)));
+		addSelectableChild(schematicsButton);
+		sidebarRegion.addRow(schematicsButton);
 
 		VeloNavButton profilesButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
 				VeloNavIcons.of("profiles"), Text.literal("Profiles"),
@@ -114,11 +106,20 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 
 		int listWidth = contentWidth() - SIDEBAR_WIDTH - 14;
 		int searchY = contentY();
-		searchBox = new TextFieldWidget(this.textRenderer, listX, searchY, listWidth, 18, Text.literal("Search"));
+		int searchFieldWidth = listWidth - CLEAR_BUTTON_WIDTH - 4;
+		searchBox = new TextFieldWidget(this.textRenderer, listX, searchY, searchFieldWidth, 18, Text.literal("Search"));
 		searchBox.setPlaceholder(Text.literal("Search modules..."));
 		searchBox.setDrawsBackground(false);
 		searchBox.setChangedListener(s -> refreshGrid());
 		addDrawableChild(searchBox);
+
+		clearSearchButton = new net.veloclient.velo.client.gui.widget.VeloButton(
+				listX + searchFieldWidth + 4, searchY, CLEAR_BUTTON_WIDTH, 18, Text.literal("✕"),
+				b -> {
+					searchBox.setText("");
+					refreshGrid();
+				});
+		addDrawableChild(clearSearchButton);
 
 		int gridTop = searchY + 24;
 		int gridHeight = contentBottom() - gridTop;
@@ -136,70 +137,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			case DEBUG -> "debug";
 			case COSMETICS -> "cosmetics";
 			case QOL -> "qol";
-			case UTILITY -> "utility";
 		};
-	}
-
-	private void showStatus(String text) {
-		statusText = Text.literal(text);
-		statusUntilMs = System.currentTimeMillis() + 3500;
-	}
-
-	/**
-	 * Opens a folder in the system's file manager. The previous version tried
-	 * {@code Util.getOperatingSystem().open(dir)} first, which on this KDE/
-	 * Plasma setup (and likely others) shells out to {@code xdg-open} with a
-	 * bare filesystem path rather than a {@code file://} URI - confirmed by
-	 * hand that {@code xdg-open /some/path} exits 0 and opens nothing (KDE's
-	 * mime lookup fails on the missing URI scheme), while {@code xdg-open
-	 * file:///some/path} reliably opens Dolphin. Since that "succeeds" with
-	 * no exception and no visible effect, every fallback after it (AWT
-	 * Desktop, raw xdg-open) was unreachable dead code - the button looked
-	 * broken because the very first attempt silently no-oped. This now uses
-	 * the verified-working, OS-specific command first and only falls back if
-	 * the process itself fails to *start* (tool missing), not based on exit
-	 * code - several of these tools (explorer.exe in particular) return
-	 * unreliable exit codes even on success.
-	 */
-	private void openInFileManager(java.io.File dir) {
-		showStatus("Opening " + dir.getName() + "...");
-		java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
-			StringBuilder attempts = new StringBuilder();
-			String osName = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-			String[][] candidates;
-			if (osName.contains("win")) {
-				candidates = new String[][] {{"explorer.exe", dir.getAbsolutePath()}};
-			} else if (osName.contains("mac") || osName.contains("darwin")) {
-				candidates = new String[][] {{"open", dir.getAbsolutePath()}};
-			} else {
-				candidates = new String[][] {{"xdg-open", dir.toURI().toString()}};
-			}
-			for (String[] command : candidates) {
-				try {
-					new ProcessBuilder(command).start();
-					MinecraftClient.getInstance().execute(() -> showStatus("Opened " + dir.getName() + " - check your taskbar if it's not on top"));
-					return;
-				} catch (Throwable t) {
-					attempts.append(String.join(" ", command)).append(": ").append(t).append("; ");
-				}
-			}
-			try {
-				Util.getOperatingSystem().open(dir);
-				MinecraftClient.getInstance().execute(() -> showStatus("Opened " + dir.getName() + " - check your taskbar if it's not on top"));
-				return;
-			} catch (Throwable t) {
-				attempts.append("vanilla open: ").append(t).append("; ");
-			}
-			try {
-				java.awt.Desktop.getDesktop().open(dir);
-				MinecraftClient.getInstance().execute(() -> showStatus("Opened " + dir.getName() + " - check your taskbar if it's not on top"));
-				return;
-			} catch (Throwable t) {
-				attempts.append("AWT Desktop: ").append(t);
-			}
-			net.veloclient.velo.VeloClient.LOGGER.error("Could not open {} in a file manager - all methods failed: {}", dir, attempts);
-			MinecraftClient.getInstance().execute(() -> showStatus("Couldn't open a file manager - see the log"));
-		});
 	}
 
 	private void refreshGrid() {
@@ -217,7 +155,17 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		scrollRegion.clearRows();
 
 		String query = searchBox.getText().toLowerCase();
-		List<Module> modules = ModuleRegistry.byCategory(this.selectedCategory);
+		if (clearSearchButton != null) {
+			clearSearchButton.visible = !query.isEmpty();
+			clearSearchButton.active = !query.isEmpty();
+		}
+		// A non-empty search looks across every category (not just the
+		// selected one) so switching tabs isn't required to find a module by
+		// name; clearing it (or the × button) goes back to the normal
+		// per-category view.
+		List<Module> modules = query.isEmpty()
+				? ModuleRegistry.byCategory(this.selectedCategory)
+				: List.copyOf(ModuleRegistry.all());
 		for (Module module : modules) {
 			if (!query.isEmpty() && !module.displayName().toLowerCase().contains(query)) {
 				continue;
@@ -260,11 +208,6 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		if (scrollRegion != null) {
 			scrollRegion.renderRows(context, mouseX, mouseY, delta);
 			scrollRegion.renderScrollbarGrid(context, gridColumns, TILE_TOTAL_HEIGHT, TILE_GAP);
-		}
-		if (System.currentTimeMillis() < statusUntilMs) {
-			int width = this.textRenderer.getWidth(statusText);
-			context.drawTextWithShadow(this.textRenderer, statusText,
-					windowX + windowWidth - width - PADDING, windowY + windowHeight - 14, 0xFFAADDFF);
 		}
 	}
 }

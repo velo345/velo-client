@@ -9,6 +9,7 @@ import net.veloclient.velo.client.gui.widget.VeloButton;
 import net.veloclient.velo.client.gui.widget.VeloScrollRegion;
 import net.veloclient.velo.client.gui.widget.VeloSlider;
 import net.veloclient.velo.client.gui.widget.VeloToggle;
+import net.veloclient.velo.client.keybind.ChordKeybinds;
 import net.veloclient.velo.client.theme.Theme;
 import net.veloclient.velo.client.theme.ThemeManager;
 import net.veloclient.velo.module.ConfigField;
@@ -36,6 +37,9 @@ public final class ModuleConfigScreen extends VeloWindow {
 	private final Reopenable parent;
 	private List<String> descriptionLines = List.of();
 	private ConfigField.KeybindField awaitingRebind;
+	private ConfigField.ChordKeybindField awaitingChordRebind;
+	private final java.util.LinkedHashSet<Integer> chordHeldKeys = new java.util.LinkedHashSet<>();
+	private final java.util.LinkedHashSet<Integer> chordMaxKeys = new java.util.LinkedHashSet<>();
 	private VeloScrollRegion scrollRegion;
 
 	public interface Reopenable {
@@ -57,6 +61,13 @@ public final class ModuleConfigScreen extends VeloWindow {
 
 	@Override
 	protected void layoutContent() {
+		// A rebuild (e.g. from clicking a keybind field, or cycling a
+		// choice) used to always create a brand new VeloScrollRegion at
+		// offset 0, so any scrolled-down position silently reset to the top
+		// on every single interaction - preserving it here means clicking
+		// something no longer scrolls the list back up from under you.
+		double previousScrollOffset = scrollRegion != null ? scrollRegion.scrollOffset() : 0;
+
 		this.clearChildren();
 		descriptionLines = wrap(module.description(), contentWidth());
 
@@ -68,6 +79,7 @@ public final class ModuleConfigScreen extends VeloWindow {
 
 		int listBottom = contentBottom() - 26;
 		scrollRegion = new VeloScrollRegion(contentX(), y, contentWidth(), Math.max(0, listBottom - y));
+		scrollRegion.setScrollOffset(previousScrollOffset);
 
 		if (module instanceof Configurable configurable) {
 			int rowY = 0;
@@ -133,6 +145,29 @@ public final class ModuleConfigScreen extends VeloWindow {
 					b -> this.client.setScreen(new net.veloclient.velo.client.gui.VeloColorPickerScreen(
 							this, color.label(), color.get().getAsInt(), color.includeAlpha(), color.set()::accept)));
 		}
+		if (field instanceof ConfigField.ActionButtonField action) {
+			return new VeloButton(contentX(), y, contentWidth(), 20, Text.literal(action.label()),
+					b -> action.action().run());
+		}
+		if (field instanceof ConfigField.ChordKeybindField chord) {
+			boolean listening = chord == awaitingChordRebind;
+			String liveText;
+			if (listening) {
+				liveText = chordMaxKeys.isEmpty()
+						? "> hold keys, release to confirm (Esc to unbind) <"
+						: ChordKeybinds.displayText(List.copyOf(chordMaxKeys)) + "...";
+			} else {
+				liveText = ChordKeybinds.displayText(chord.get().get());
+			}
+			Text buttonText = Text.literal(chord.label() + ": " + liveText);
+			return new VeloButton(contentX(), y, contentWidth(), 20, buttonText,
+					b -> {
+						awaitingChordRebind = chord;
+						chordHeldKeys.clear();
+						chordMaxKeys.clear();
+						layoutContent();
+					});
+		}
 		throw new IllegalStateException("Unknown ConfigField type: " + field.getClass());
 	}
 
@@ -141,16 +176,52 @@ public final class ModuleConfigScreen extends VeloWindow {
 		if (awaitingRebind != null) {
 			ConfigField.KeybindField field = awaitingRebind;
 			awaitingRebind = null;
-			// Escape just cancels the rebind (matches vanilla's own Controls
-			// screen) rather than also being captured as the new key or
-			// falling through to close this whole settings window.
-			if (input.key() != org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
-				field.onKeyCodeChosen().accept(input.key());
+			// Escape unbinds the key entirely rather than just cancelling
+			// back to whatever was bound before - it's also not captured as
+			// the new key itself, and doesn't fall through to close this
+			// whole settings window.
+			field.onKeyCodeChosen().accept(input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE
+					? org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN : input.key());
+			layoutContent();
+			return true;
+		}
+		if (awaitingChordRebind != null) {
+			if (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+				ConfigField.ChordKeybindField field = awaitingChordRebind;
+				awaitingChordRebind = null;
+				chordHeldKeys.clear();
+				chordMaxKeys.clear();
+				field.set().accept(List.of());
+				layoutContent();
+				return true;
 			}
+			// Held keys accumulate into chordMaxKeys as they go down, so a
+			// chord like Ctrl+Shift+Q is captured correctly even though each
+			// key arrives as its own keyPressed event rather than all at
+			// once - keyReleased below finalizes it once every key in the
+			// combo has been let go again.
+			chordHeldKeys.add(input.key());
+			chordMaxKeys.add(input.key());
 			layoutContent();
 			return true;
 		}
 		return super.keyPressed(input);
+	}
+
+	@Override
+	public boolean keyReleased(net.minecraft.client.input.KeyInput input) {
+		if (awaitingChordRebind != null) {
+			chordHeldKeys.remove(input.key());
+			if (chordHeldKeys.isEmpty() && !chordMaxKeys.isEmpty()) {
+				ConfigField.ChordKeybindField field = awaitingChordRebind;
+				awaitingChordRebind = null;
+				field.set().accept(List.copyOf(chordMaxKeys));
+				chordMaxKeys.clear();
+				layoutContent();
+			}
+			return true;
+		}
+		return super.keyReleased(input);
 	}
 
 	@Override

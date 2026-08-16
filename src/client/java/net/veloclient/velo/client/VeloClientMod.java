@@ -29,6 +29,7 @@ import net.veloclient.velo.client.modules.performance.FovModule;
 import net.veloclient.velo.client.modules.performance.FrameTimeGraphModule;
 import net.veloclient.velo.client.modules.performance.FullBrightModule;
 import net.veloclient.velo.client.modules.performance.GpuUtilizationModule;
+import net.veloclient.velo.client.modules.performance.InputSamplerModule;
 import net.veloclient.velo.client.modules.performance.MemoryMonitorModule;
 import net.veloclient.velo.client.modules.performance.OptimizationModCompatModule;
 import net.veloclient.velo.client.modules.performance.ParticleLimiterModule;
@@ -41,6 +42,7 @@ import net.veloclient.velo.client.modules.qol.SmallCapsModule;
 import net.veloclient.velo.client.modules.qol.ToggleSneakModule;
 import net.veloclient.velo.client.modules.qol.ToggleSprintModule;
 import net.veloclient.velo.client.modules.qol.ZoomModule;
+import net.veloclient.velo.client.modules.queue.BackgroundQueueModule;
 import net.veloclient.velo.client.modules.rendering.BlockOutlineModule;
 import net.veloclient.velo.client.modules.rendering.TimeWeatherFogModule;
 import net.veloclient.velo.client.modules.rendering.TntTimerModule;
@@ -129,6 +131,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new OptimizationModCompatModule());
 		ModuleRegistry.register(new FullBrightModule());
 		ModuleRegistry.register(new FovModule());
+		ModuleRegistry.register(new InputSamplerModule());
 
 		// Utility
 		ModuleRegistry.register(new CopyCoordinatesModule());
@@ -147,6 +150,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ParticleDebugOverlayModule());
 		ModuleRegistry.register(new SoundDebugOverlayModule());
 		ModuleRegistry.register(new ClientLogViewerModule());
+		ModuleRegistry.register(new BackgroundQueueModule());
 
 		// Debug (section 6.4)
 		ModuleRegistry.register(new ResourceReloadHotkeyModule());

@@ -42,4 +42,20 @@ public sealed interface ConfigField {
 	/** A packed ARGB color (0xAARRGGBB), edited via a real HSV picker rather than raw component sliders. */
 	record ColorField(String label, IntSupplier get, IntConsumer set, boolean includeAlpha) implements ConfigField {
 	}
+
+	/** A plain action button that runs {@code action} on click - e.g. opening another screen from within a module's settings. */
+	record ActionButtonField(String label, Runnable action) implements ConfigField {
+	}
+
+	/**
+	 * A rebindable multi-key chord (e.g. Ctrl+Shift+Q) instead of a single
+	 * key - a hold-then-release-all gesture records it (see {@code
+	 * ModuleConfigScreen}), Escape while recording clears it to unbound. The
+	 * raw GLFW key codes are stored directly (not wrapped in {@code
+	 * KeyBinding}/{@code InputUtil}, matching {@link KeybindField}'s reasoning
+	 * for staying dependency-free of client-only classes) - the client side
+	 * polls whether every code in the list is currently held.
+	 */
+	record ChordKeybindField(String label, Supplier<java.util.List<Integer>> get, Consumer<java.util.List<Integer>> set) implements ConfigField {
+	}
 }

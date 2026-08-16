@@ -94,10 +94,13 @@ public final class InstanceDetailView {
 		tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 		tabs.getTabs().add(new Tab("Mods", buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.MOD,
 				InstancePaths.modsDir(instance.id()), List.of("*.jar"))));
+		tabs.getTabs().add(new Tab("Modpacks", ModpacksTabView.build(owner, overlayHost, instance, theme)));
 		tabs.getTabs().add(new Tab("Resource Packs", buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.RESOURCE_PACK,
 				InstancePaths.resourcePacksDir(instance.id()), List.of("*.zip"))));
 		tabs.getTabs().add(new Tab("Shader Packs", buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.SHADER_PACK,
 				InstancePaths.shaderPacksDir(instance.id()), List.of("*.zip"))));
+		tabs.getTabs().add(new Tab("Schematics", SchematicsTabView.build(owner, overlayHost, instance, theme)));
+		tabs.getTabs().add(new Tab("Datapacks", DatapacksTabView.build(owner, overlayHost, instance, theme)));
 		VBox.setVgrow(tabs, Priority.ALWAYS);
 		root.getChildren().add(tabs);
 
@@ -115,22 +118,87 @@ public final class InstanceDetailView {
 
 		Runnable[] showInstalled = new Runnable[1];
 		Runnable[] showSearch = new Runnable[1];
+		// Whichever of the two views above was showing right before a detail
+		// page was opened - ProjectDetailView's "< Back" returns here rather
+		// than always landing on the installed list, so opening a detail page
+		// from search results doesn't strand you back on the wrong tab.
+		Runnable[] activeBack = new Runnable[1];
+		java.util.function.Consumer<String> openDetail[] = new java.util.function.Consumer[1];
 
-		showInstalled[0] = () -> container.getChildren().setAll(
-				buildInstalledView(owner, overlayHost, instance, theme, kind, folder, fileFilters, identifyAttempted, showInstalled[0], showSearch[0]));
-		showSearch[0] = () -> container.getChildren().setAll(
-				buildSearchView(owner, overlayHost, instance, theme, kind, folder, showInstalled[0]));
+		showInstalled[0] = () -> {
+			activeBack[0] = showInstalled[0];
+			container.getChildren().setAll(
+					buildInstalledView(owner, overlayHost, instance, theme, kind, folder, fileFilters, identifyAttempted, showInstalled[0], showSearch[0], openDetail[0]));
+		};
+		showSearch[0] = () -> {
+			activeBack[0] = showSearch[0];
+			container.getChildren().setAll(
+					buildSearchView(owner, overlayHost, instance, theme, kind, folder, showInstalled[0], openDetail[0]));
+		};
+		openDetail[0] = projectId -> showProjectDetail(owner, container, instance, theme, kind, folder, projectId, () -> activeBack[0].run());
 
 		showInstalled[0].run();
 		return container;
 	}
 
+	/** Async-loads a project's full detail (description, gallery, every compatible version) and swaps it into {@code container} - see {@link ProjectDetailView}. */
+	private static void showProjectDetail(Stage owner, StackPane container, Instance instance, LauncherTheme theme,
+			InstalledAssetStore.Kind kind, Path folder, String projectId, Runnable back) {
+		container.getChildren().setAll(loadingLabel(theme));
+		CompletableFuture.supplyAsync(() -> {
+			Optional<ModrinthClient.ProjectDetail> detail = ModrinthClient.getProjectDetail(projectId);
+			if (detail.isEmpty()) {
+				return Optional.<Object[]>empty();
+			}
+			List<ModrinthClient.ProjectVersion> versions;
+			try {
+				versions = ModrinthClient.versions(projectId, instance.mcVersion(), kind.modrinthProjectType());
+			} catch (IOException e) {
+				versions = List.of();
+			}
+			return Optional.of(new Object[] {detail.get(), versions});
+		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
+			if (result.isEmpty()) {
+				container.getChildren().setAll(messageLabel("Couldn't load project details.", theme));
+				return;
+			}
+			Object[] pair = result.get();
+			ModrinthClient.ProjectDetail detail = (ModrinthClient.ProjectDetail) pair[0];
+			@SuppressWarnings("unchecked")
+			List<ModrinthClient.ProjectVersion> versions = (List<ModrinthClient.ProjectVersion>) pair[1];
+			Set<String> installedVersionIds = InstalledAssetStore.loadAll(instance.id(), kind).stream()
+					.map(InstalledAsset::versionId).collect(java.util.stream.Collectors.toSet());
+			ProjectDetailView.Host host = new ProjectDetailView.Host() {
+				@Override
+				public Stage owner() {
+					return owner;
+				}
+
+				@Override
+				public LauncherTheme theme() {
+					return theme;
+				}
+
+				@Override
+				public void goBack() {
+					back.run();
+				}
+			};
+			container.getChildren().setAll(ProjectDetailView.build(host, detail, versions, installedVersionIds, version -> {
+				ProgressBar progress = new ProgressBar(0);
+				installVersion(owner, instance, kind, folder, version, null, progress,
+						() -> showProjectDetail(owner, container, instance, theme, kind, folder, projectId, back));
+			}));
+		}));
+	}
+
 	private static Node buildInstalledView(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
-			Path folder, List<String> fileFilters, Set<String> identifyAttempted, Runnable refresh, Runnable openSearch) {
+			Path folder, List<String> fileFilters, Set<String> identifyAttempted, Runnable refresh, Runnable openSearch,
+			java.util.function.Consumer<String> openDetail) {
 		VBox root = new VBox(14);
 
 		VBox installedList = new VBox(8);
-		Runnable listRefresh = () -> refreshInstalledList(owner, overlayHost, installedList, instance, theme, kind, folder, identifyAttempted, refresh);
+		Runnable listRefresh = () -> refreshInstalledList(owner, overlayHost, installedList, instance, theme, kind, folder, identifyAttempted, refresh, openDetail);
 
 		HBox actions = new HBox(8);
 		Button addButton = new Button("Add from file...");
@@ -177,7 +245,7 @@ public final class InstanceDetailView {
 	}
 
 	private static void refreshInstalledList(Stage owner, StackPane overlayHost, VBox list, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
-			Path folder, Set<String> identifyAttempted, Runnable refresh) {
+			Path folder, Set<String> identifyAttempted, Runnable refresh, java.util.function.Consumer<String> openDetail) {
 		list.getChildren().clear();
 		try {
 			Files.createDirectories(folder);
@@ -206,7 +274,7 @@ public final class InstanceDetailView {
 			boolean disabled = isDisabled(fileName);
 			InstalledAsset asset = known.get(enabledName(fileName));
 			if (asset != null) {
-				list.getChildren().add(buildKnownRow(owner, overlayHost, instance, theme, kind, folder, file, disabled, asset, refresh));
+				list.getChildren().add(buildKnownRow(owner, overlayHost, instance, theme, kind, folder, file, disabled, asset, refresh, openDetail));
 			} else {
 				list.getChildren().add(buildUnknownRow(instance, theme, kind, folder, file, disabled, identifyAttempted, refresh));
 				autoIdentify(instance, kind, file, identifyAttempted, refresh);
@@ -250,14 +318,17 @@ public final class InstanceDetailView {
 	}
 
 	private static Node buildKnownRow(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind, Path folder,
-			Path file, boolean disabled, InstalledAsset asset, Runnable refresh) {
+			Path file, boolean disabled, InstalledAsset asset, Runnable refresh, java.util.function.Consumer<String> openDetail) {
 		HBox row = new HBox(12);
 		row.getStyleClass().add("mod-row");
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.setOpacity(disabled ? 0.5 : 1.0);
 
 		row.getChildren().add(buildEnabledToggle(file, disabled, refresh));
-		row.getChildren().add(iconView(asset.iconUrl(), 48));
+		Node icon = iconView(asset.iconUrl(), 48);
+		icon.setCursor(javafx.scene.Cursor.HAND);
+		icon.setOnMouseClicked(e -> openDetail.accept(asset.projectId()));
+		row.getChildren().add(icon);
 
 		VBox info = new VBox(2);
 		Label title = new Label(asset.title() + (disabled ? "  (disabled)" : ""));
@@ -388,7 +459,8 @@ public final class InstanceDetailView {
 
 	// ---- Full-page Modrinth search view ----
 
-	private static Node buildSearchView(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind, Path folder, Runnable onBack) {
+	private static Node buildSearchView(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind, Path folder, Runnable onBack,
+			java.util.function.Consumer<String> openDetail) {
 		VBox root = new VBox(14);
 		VBox.setVgrow(root, Priority.ALWAYS);
 
@@ -468,7 +540,7 @@ public final class InstanceDetailView {
 					}
 				}
 				for (ModrinthClient.SearchHit hit : search.hits()) {
-					results.getChildren().add(buildSearchResultCard(owner, overlayHost, instance, theme, kind, folder, hit));
+					results.getChildren().add(buildSearchResultCard(owner, overlayHost, instance, theme, kind, folder, hit, openDetail));
 				}
 				offset[0] += search.hits().size();
 				boolean hasMore = !search.hits().isEmpty() && offset[0] < search.totalHits();
@@ -495,7 +567,7 @@ public final class InstanceDetailView {
 	}
 
 	private static Node buildSearchResultCard(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
-			Path folder, ModrinthClient.SearchHit hit) {
+			Path folder, ModrinthClient.SearchHit hit, java.util.function.Consumer<String> openDetail) {
 		VBox card = new VBox(8);
 		card.getStyleClass().add("search-card");
 		card.setPrefWidth(190);
@@ -503,7 +575,10 @@ public final class InstanceDetailView {
 		card.setMaxHeight(230);
 		card.setAlignment(Pos.TOP_CENTER);
 
-		card.getChildren().add(iconView(hit.iconUrl(), 64));
+		Node icon = iconView(hit.iconUrl(), 64);
+		icon.setCursor(javafx.scene.Cursor.HAND);
+		icon.setOnMouseClicked(e -> openDetail.accept(hit.projectId()));
+		card.getChildren().add(icon);
 
 		Label title = new Label(hit.title());
 		title.setFont(Font.font("System", FontWeight.BOLD, 13));
@@ -579,7 +654,7 @@ public final class InstanceDetailView {
 		return card;
 	}
 
-	private record InstallPlan(ModrinthClient.ProjectVersion version, List<ModrinthClient.ProjectVersion> dependencies) {
+	record InstallPlan(ModrinthClient.ProjectVersion version, List<ModrinthClient.ProjectVersion> dependencies) {
 	}
 
 	/**
@@ -597,7 +672,7 @@ public final class InstanceDetailView {
 	 * grows with its content up to a cap, then the dependency list itself
 	 * scrolls.
 	 */
-	private static void showVersionPicker(StackPane overlayHost, LauncherTheme theme, Instance instance, String projectTitle,
+	static void showVersionPicker(StackPane overlayHost, LauncherTheme theme, Instance instance, String projectTitle,
 			List<ModrinthClient.ProjectVersion> versions, java.util.function.Consumer<InstallPlan> onConfirm) {
 		VBox card = new VBox(12);
 		card.getStyleClass().addAll("glass-panel", "modal-card");
@@ -668,7 +743,7 @@ public final class InstanceDetailView {
 	}
 
 	/** @param oldFilenameToRemove nullable - forwarded to the main version's install so an update replaces the old file (see {@link #installVersion}); dependency installs never have one since they're always fresh. */
-	private static void installWithDependencies(Stage owner, Instance instance, InstalledAssetStore.Kind kind, Path folder,
+	static void installWithDependencies(Stage owner, Instance instance, InstalledAssetStore.Kind kind, Path folder,
 			InstallPlan plan, String oldFilenameToRemove, ProgressBar progress, Runnable refresh) {
 		installVersion(owner, instance, kind, folder, plan.version(), oldFilenameToRemove, progress, refresh);
 		if (!plan.dependencies().isEmpty()) {
@@ -683,7 +758,7 @@ public final class InstanceDetailView {
 	}
 
 	/** @param oldFilenameToRemove nullable - when set (an update, not a fresh install), the old file is deleted once the new one is confirmed on disk, even if the filename changed between versions. */
-	private static void installVersion(Stage owner, Instance instance, InstalledAssetStore.Kind kind, Path folder, ModrinthClient.ProjectVersion version,
+	static void installVersion(Stage owner, Instance instance, InstalledAssetStore.Kind kind, Path folder, ModrinthClient.ProjectVersion version,
 			String oldFilenameToRemove, ProgressBar progress, Runnable refresh) {
 		if (version.primaryFile().isEmpty()) {
 			return;
@@ -817,7 +892,7 @@ public final class InstanceDetailView {
 
 	// ---- Shared helpers ----
 
-	private static Node iconView(String url, double size) {
+	static Node iconView(String url, double size) {
 		StackPane holder = new StackPane();
 		holder.setPrefSize(size, size);
 		holder.setMinSize(size, size);
@@ -833,7 +908,7 @@ public final class InstanceDetailView {
 		return holder;
 	}
 
-	private static String truncate(String text, int maxLen) {
+	static String truncate(String text, int maxLen) {
 		if (text == null) {
 			return "";
 		}
@@ -841,7 +916,7 @@ public final class InstanceDetailView {
 		return oneLine.length() <= maxLen ? oneLine : oneLine.substring(0, maxLen - 1).strip() + "…";
 	}
 
-	private static String formatCount(long count) {
+	static String formatCount(long count) {
 		if (count >= 1_000_000) {
 			return String.format(Locale.ROOT, "%.1fM", count / 1_000_000.0);
 		}
@@ -860,7 +935,7 @@ public final class InstanceDetailView {
 		}
 	}
 
-	private static void openInFileManager(Path folder) throws IOException {
+	public static void openInFileManager(Path folder) throws IOException {
 		String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
 		String[] command = os.contains("win") ? new String[] {"explorer.exe", folder.toString()}
 				: os.contains("mac") ? new String[] {"open", folder.toString()}
@@ -868,21 +943,21 @@ public final class InstanceDetailView {
 		new ProcessBuilder(command).start();
 	}
 
-	private static Label loadingLabel(LauncherTheme theme) {
+	static Label loadingLabel(LauncherTheme theme) {
 		return messageLabel("Searching...", theme);
 	}
 
-	private static Label messageLabel(String message, LauncherTheme theme) {
+	static Label messageLabel(String message, LauncherTheme theme) {
 		Label label = new Label(message);
 		label.setTextFill(text(theme));
 		return label;
 	}
 
-	private static Color text(LauncherTheme t) {
+	static Color text(LauncherTheme t) {
 		return Color.rgb((t.text() >> 16) & 0xFF, (t.text() >> 8) & 0xFF, t.text() & 0xFF);
 	}
 
-	private static void error(Stage owner, String title, String message) {
+	static void error(Stage owner, String title, String message) {
 		Alert alert = new Alert(Alert.AlertType.ERROR);
 		alert.initOwner(owner);
 		alert.setTitle(title);

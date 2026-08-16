@@ -29,7 +29,7 @@ public final class ModuleIcons {
 			"packet-traffic-monitor", "particle-debug-overlay", "sound-debug-overlay", "client-log-viewer",
 			"resource-reload-hotkeys", "keybind-conflict-checker", "looking-at-inspector", "command-keybinds",
 			"scoreboard-hud", "custom-crosshair", "minimap", "session-auto-fixer", "tnt-timer", "block-outline",
-			"time-weather-fog", "small-caps", "kill-effects");
+			"time-weather-fog", "small-caps", "kill-effects", "input-sampler", "background-queue");
 
 	private ModuleIcons() {
 	}

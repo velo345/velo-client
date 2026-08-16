@@ -883,6 +883,20 @@ stonecutter parameters {
 			// texture asset).
 			replace("ResourceTexture", "ResourceTexture")
 			replace("ClientAsset.Texture", "ClientAsset.Texture")
+			// Blanket shield for every remaining bare "Texture" (this
+			// codebase's own class/method names too, e.g. "RemoteTextureLoader",
+			// not just vanilla ones) - a real, confirmed repeat of this exact
+			// bug (see the top-of-file comment: "Text"->"Component" mangled
+			// "drawTexture" into "drawComponenture" once already) hit again
+			// here with "RemoteTextureLoader" -> "RemoteComponentureLoader".
+			// Registering the identity match on the whole word, rather than
+			// enumerating every individual identifier that happens to contain
+			// it, means any *future* "...Texture..." name added to this
+			// codebase is shielded automatically too - still safe against the
+			// longer specific rules above (registerTexture(/destroyTexture(/
+			// NativeImageBackedTexture/etc. are all longer matches at the
+			// same start position, so they keep winning over this).
+			replace("Texture", "Texture")
 
 			// --- The generic renames. Deliberately last and deliberately
 			// narrow: by this point every real vanilla identifier that

@@ -15,7 +15,8 @@
 	"license": "MIT",
 	"environment": "client",
 	"mixins": [
-		"velo-client.client.mixins.json"
+		"velo-client.client.mixins.json",
+		"velo-client.client.optional.mixins.json"
 	],
 	"entrypoints": {
 		"main": [
