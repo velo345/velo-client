@@ -17,7 +17,7 @@ import java.util.function.Consumer;
 /**
  * One background "ghost" session in {@link
  * net.veloclient.velo.client.gui.BackgroundQueueSessionsScreen}'s list:
- * server icon, name/address, a live status line, and three actions
+ * the Velo logo, name/address, a live status line, and three actions
  * (Peek/Switch/Terminate) laid out as a bottom strip - same click-zone
  * pattern as {@link VeloCrosshairTile}. Reads its summary fresh from {@link
  * BackgroundQueueManager} every render call instead of caching it, so
@@ -87,8 +87,9 @@ public final class VeloQueueSessionRow extends ClickableWidget {
 		TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
 		int iconX = getX() + 6;
 		int iconY = getY() + 6;
-		context.drawTexture(RenderPipelines.GUI_TEXTURED, BackgroundQueueManager.sessionIcon(key),
-				iconX, iconY, 0f, 0f, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+		int iconSource = BackgroundQueueManager.sessionIconSourceSize();
+		context.drawTexture(RenderPipelines.GUI_TEXTURED, BackgroundQueueManager.sessionIcon(),
+				iconX, iconY, 0f, 0f, ICON_SIZE, ICON_SIZE, iconSource, iconSource, iconSource, iconSource);
 
 		int textX = iconX + ICON_SIZE + 8;
 		int textWidth = getWidth() - (textX - getX()) - 8;

@@ -7,17 +7,14 @@ import net.veloclient.velo.VeloClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
-import net.minecraft.client.gui.screen.world.WorldIcon;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.network.ClientPlayerInteractionManager;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.network.ServerAddress;
 import net.minecraft.client.network.ServerInfo;
-import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.network.packet.s2c.play.GameJoinS2CPacket;
 import net.minecraft.text.Text;
-import net.veloclient.velo.client.mixin.QueueHandlerAccessorMixin;
 //?} else {
 /*import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -30,7 +27,6 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.protocol.game.ClientboundLoginPacket;
 import net.minecraft.network.chat.Component;
-import net.veloclient.velo.client.mixin.QueueHandlerAccessorMixin;
 *///?}
 
 import java.util.ArrayDeque;
@@ -51,32 +47,39 @@ import java.util.function.Consumer;
  * BackgroundQueueSessionsScreen} for the user-facing side of this; this
  * class is purely the state machine.
  *
- * <p><b>Why this doesn't need a second, from-scratch protocol client</b>:
- * {@code MinecraftClient.world}/{@code .player} are just pointers vanilla
- * itself reassigns at join/disconnect - a live {@code
- * ClientPlayNetworkHandler} keeps its own connection and keeps processing
- * real packets on the Netty IO thread regardless of what those pointers
- * currently point at. So, on 1.21.11 (verified against decompiled source):
- * <ul>
- * <li><b>Demote</b> stashes the current {@code (handler, world, player,
- * interactionManager)} tuple, then does a "soft disconnect" - vanilla's own
- * {@code disconnect(Screen, transferring=true, stopSounds)} overload, which
- * does all the local cleanup (renderer, HUD, screen transition) but never
- * itself calls {@code connection.disconnect(...)} the way the plain {@code
- * disconnect(Text)} convenience method does. The connection, and the
- * server's belief that this player is still connected (e.g. still holding a
- * queue slot), survives untouched.</li>
- * <li><b>Promote</b> first captures whatever's currently active as its own
- * new session (another server becomes a ghost the same way Demote makes one;
- * singleplayer becomes a "resume point" - see below), then leaves it (a
- * normal, full disconnect/save-and-quit) and reattaches the target session's
- * stashed tuple directly - no reconnect, no packet replay.</li>
- * <li>If the queue pops <em>while backgrounded</em> (a fresh join - common
- * for proxy-based queues swapping you to the real backend), {@link
- * net.veloclient.velo.client.mixin.QueueHandlerJoinGuardMixin} intercepts it
- * before it can hijack the foreground, and this class replays it for real
- * once the player actually promotes.</li>
- * </ul>
+ * <p><b>Demote keeps the connection alive; Promote reconnects.</b> {@code
+ * MinecraftClient.world}/{@code .player} are just pointers vanilla itself
+ * reassigns at join/disconnect - a live {@code ClientPlayNetworkHandler}
+ * keeps its own connection and keeps processing real packets on the Netty IO
+ * thread regardless of what those pointers currently point at, which is why
+ * <b>Demote</b> can afford a "soft disconnect" (verified against 1.21.11's
+ * decompiled source: vanilla's own {@code disconnect(Screen,
+ * transferring=true, stopSounds)} overload does all the local cleanup -
+ * renderer, HUD, screen transition - but never itself calls {@code
+ * connection.disconnect(...)} the way the plain {@code disconnect(Text)}
+ * convenience method does) - the connection, and the server's belief that
+ * this player is still connected (e.g. still holding a queue slot), survives
+ * untouched, purely by not being told to close.
+ *
+ * <p><b>Promote is a real reconnect, not a live handoff</b> - an earlier
+ * version of this spliced the stashed {@code (world, player,
+ * interactionManager)} tuple straight back into {@code MinecraftClient}
+ * (or replayed a buffered {@code onGameJoin} packet) to switch back
+ * instantly with the connection never dropping. That touched {@code
+ * Camera}/{@code GameRenderer}-adjacent state outside vanilla's normal
+ * packet-dispatch path, which left {@code Camera}'s own internal fields out
+ * of sync with {@code MinecraftClient.player} for a window a normal join
+ * never has - the {@code Flashback} mod's camera mixin doesn't null-check
+ * before touching that state, crashing with a NullPointerException in
+ * {@code Camera.getCameraEntityPartialTicks()} on the very next render
+ * frame. So Promote now always leaves the current context and does a
+ * normal {@code ConnectScreen} reconnect to the target session instead -
+ * slower and doesn't preserve an actual queue position across the switch,
+ * but never touches render-thread state out of band. {@link
+ * net.veloclient.velo.client.mixin.QueueHandlerJoinGuardMixin} still
+ * intercepts a background handler's {@code onGameJoin} if the queue pops
+ * while backgrounded (so it can't hijack the foreground), it's just no
+ * longer replayed - Promote reconnects fresh instead either way.
  *
  * <p><b>Singleplayer "resume points"</b>: a local integrated-server world
  * can't be held open in the background the way a remote connection can (it's
@@ -92,30 +95,34 @@ import java.util.function.Consumer;
  *
  * <p><b>Cross-version note</b>: 26.1/26.2 ship only Mojang's official
  * mappings with no equivalent full decompiled source available in this
- * environment to verify the deep {@code disconnect(...)}/world-loader
- * overload shapes against, so on those versions this deliberately does
- * *not* attempt the live in-memory handoff - demote there does a real
- * disconnect (which loses the queue slot, same as manually reconnecting)
- * and promote is a normal reconnect via the cached server entry. Every
- * other part of this module (parsing, HUD, keybinds, settings, multi-
- * session tracking) works identically everywhere.
+ * environment to verify the deep {@code disconnect(Screen, boolean,
+ * boolean)} overload shape against, so on those versions Demote doesn't
+ * attempt the soft/connection-preserving disconnect either - it's a real
+ * disconnect there (losing the queue slot immediately, same as manually
+ * reconnecting). Promote is a normal reconnect via the cached server entry
+ * on every version. Every other part of this module (parsing, HUD,
+ * keybinds, settings, multi-session tracking) works identically everywhere.
  *
- * <p><b>Auto Reconnect interaction</b>: both demote and promote trigger a
- * real vanilla disconnect/reconnect at some point (always on 26.x, only as
- * an error fallback on 1.21.11) - since {@code AutoReconnectModule} reacts
- * to any {@code DisconnectedScreen} it sees, a Velo-initiated disconnect
- * needs to not look like an unexpected kick to it. {@link
+ * <p><b>Auto Reconnect interaction</b>: demote/promote/terminate all trigger
+ * a real vanilla disconnect at some point - since {@code AutoReconnectModule}
+ * reacts to any {@code DisconnectedScreen} it sees, a Velo-initiated
+ * disconnect needs to not look like an unexpected kick to it. {@link
  * #consumeAutoReconnectSuppression()} is checked by that module and
  * suppresses exactly one reconnect attempt whenever this class was the one
  * that closed the connection.
  */
 public final class BackgroundQueueManager {
 
-	//? if <26.1 {
-	private static final Identifier FALLBACK_ICON = Identifier.ofVanilla("textures/misc/unknown_server.png");
-	//?} else {
-	/*private static final Identifier FALLBACK_ICON = Identifier.withDefaultNamespace("textures/misc/unknown_server.png");
-	*///?}
+	/**
+	 * Every background session row shows this one icon - the Velo logo - not
+	 * the server's own favicon. The row is about <em>your</em> held queue
+	 * slot, not the server's branding, and favicons render inconsistently
+	 * (often missing, pixelated, or the wrong aspect ratio). {@link
+	 * #sessionIconSourceSize()} is the asset's native size, for callers that
+	 * draw it with an explicit source rect.
+	 */
+	private static final Identifier PROFILE_ICON = Identifier.of("velo-client", "textures/icon/logo.png");
+	private static final int PROFILE_ICON_SOURCE_SIZE = 500;
 
 	public record SessionSummary(String key, String displayName, String address, boolean singleplayer,
 			boolean poppedReady, QueueStatusParser.Status status, List<String> recentMessages) {
@@ -129,7 +136,6 @@ public final class BackgroundQueueManager {
 		ClientPlayerInteractionManager interactionManager;
 		GameJoinS2CPacket pendingJoinPacket;
 		ServerInfo serverInfo;
-		Identifier icon;
 		String displayName = "";
 		String address = "";
 		String preset = "Generic";
@@ -146,7 +152,6 @@ public final class BackgroundQueueManager {
 		MultiPlayerGameMode interactionManager;
 		ClientboundLoginPacket pendingJoinPacket;
 		ServerData serverInfo;
-		Identifier icon;
 		String displayName = "";
 		String address = "";
 		String preset = "Generic";
@@ -209,9 +214,14 @@ public final class BackgroundQueueManager {
 				s.status, List.copyOf(s.recentMessages));
 	}
 
-	public static Identifier sessionIcon(String key) {
-		Session s = SESSIONS.get(key);
-		return s == null || s.icon == null ? FALLBACK_ICON : s.icon;
+	/** The icon for every background session row - always the Velo logo, never a per-server favicon (see {@link #PROFILE_ICON}). */
+	public static Identifier sessionIcon() {
+		return PROFILE_ICON;
+	}
+
+	/** Native pixel size of {@link #sessionIcon()}'s asset, for callers drawing it with an explicit source rect. */
+	public static int sessionIconSourceSize() {
+		return PROFILE_ICON_SOURCE_SIZE;
 	}
 
 	public static void setPeeked(String key) {
@@ -403,15 +413,6 @@ public final class BackgroundQueueManager {
 		String address = serverInfo != null && serverInfo.address != null ? serverInfo.address : "unknown";
 		String name = serverInfo != null && serverInfo.name != null ? serverInfo.name : address;
 		session.serverInfo = serverInfo;
-		if (serverInfo != null && serverInfo.getFavicon() != null) {
-			try {
-				WorldIcon icon = WorldIcon.forServer(client.getTextureManager(), serverInfo.address);
-				icon.load(NativeImage.read(serverInfo.getFavicon()));
-				session.icon = icon.getTextureId();
-			} catch (Exception ignored) {
-				// Bad/corrupt favicon data - keep the generic fallback icon rather than failing the whole demote.
-			}
-		}
 		//?} else {
 		/*ServerData serverInfo = client.getCurrentServer();
 		String address = serverInfo != null && serverInfo.ip != null ? serverInfo.ip : "unknown";
@@ -460,8 +461,26 @@ public final class BackgroundQueueManager {
 	/**
 	 * Leaves whatever's currently active - capturing it as its own new
 	 * session first, the same way {@link #demote()} would - and switches to
-	 * actually playing the given session (or reconnects/re-opens it, where a
-	 * live handoff isn't available).
+	 * actually playing the given session via a normal, fully-vanilla
+	 * reconnect.
+	 *
+	 * <p><b>Deliberately not a direct in-memory handoff</b> (this used to
+	 * splice the stashed {@code (world, player, interactionManager)} tuple
+	 * straight back into {@code MinecraftClient}, or replay a buffered
+	 * {@code onGameJoin} packet directly, to switch instantly with the
+	 * connection never dropping): that path called {@code
+	 * client.setCameraEntity(...)}/{@code client.joinWorld(...)}/{@code
+	 * handler.onGameJoin(...)} outside of vanilla's normal network-packet
+	 * dispatch, which left {@code Camera}'s own internal state
+	 * out of sync with {@code MinecraftClient.player} for a window a normal
+	 * join never has - {@code Flashback}'s camera mixin doesn't null-check
+	 * before touching it, crashing with a NullPointerException in {@code
+	 * Camera.getCameraEntityPartialTicks()} on the very next render frame.
+	 * Demote (leaving a server to background it) is unaffected and still
+	 * keeps the connection open without touching Camera at all - only
+	 * switching *to* a session now costs a real reconnect (so a genuine
+	 * queue position isn't preserved across a switch), which is the
+	 * necessary trade for not touching render-thread state out of band.
 	 */
 	public static void promote(String key) {
 		Session session = SESSIONS.get(key);
@@ -488,27 +507,8 @@ public final class BackgroundQueueManager {
 				resumeSingleplayer(client, key, session);
 				return;
 			}
-			//? if <26.1 {
-			if (session.pendingJoinPacket != null) {
-				GameJoinS2CPacket packet = session.pendingJoinPacket;
-				ClientPlayNetworkHandler handler = session.handler;
-				removeSession(key);
-				handler.onGameJoin(packet);
-			} else {
-				QueueHandlerAccessorMixin accessor = (QueueHandlerAccessorMixin) (Object) session.handler;
-				accessor.velo$setWorld(session.world);
-				accessor.velo$setWorldCleared(false);
-				client.joinWorld(session.world);
-				client.player = session.player;
-				client.interactionManager = session.interactionManager;
-				client.setCameraEntity(session.player);
-				client.setScreen(null);
-				removeSession(key);
-			}
-			//?} else {
-			/*removeSession(key);
+			removeSession(key);
 			reconnectSession(client, session);
-			*///?}
 		} catch (Exception e) {
 			VeloClient.LOGGER.error("Velo background queue: promote failed, falling back to reconnect", e);
 			removeSession(key);
