@@ -4,9 +4,12 @@
 	"package": "net.veloclient.velo.client.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
+		"ChunkLoadTimingMixin",
 		"QueueHandlerAccessorMixin",
 		"QueueHandlerJoinGuardMixin",
-		"QueueHandlerObserverMixin"
+		"QueueHandlerObserverMixin",
+		"RenderCullingBlockEntityMixin",
+		"RenderCullingEntityMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

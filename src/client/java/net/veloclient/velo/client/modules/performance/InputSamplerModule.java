@@ -17,6 +17,7 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -66,7 +67,8 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 		super("input-sampler", "Input Latency Sub-Tick Sampling",
 				"Timestamps mouse clicks off the main thread so latency doesn't depend on frame rate, and (optionally) polls input again at the start of every tick to notice clicks sooner during FPS stalls.",
 				ModuleCategory.PERFORMANCE, SafetyTag.ALWAYS_SAFE, false);
-		ClientTickEvents.START_CLIENT_TICK.register(this::onTickStart);
+		ClientTickEvents.START_CLIENT_TICK.register(client ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTickStart(client)));
 	}
 
 	@Override

@@ -24,6 +24,7 @@ import net.minecraft.text.Text;
 import net.veloclient.velo.module.AbstractModule;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 
 /**
  * Automatically reconnects to whatever server the client was just kicked from
@@ -63,7 +64,8 @@ public final class AutoReconnectModule extends AbstractModule {
 						+ "attempts (3s, 5s, 10s, 30s, then every 60s). Adds a Cancel button to the disconnect screen.",
 				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
 		ScreenEvents.AFTER_INIT.register(this::onScreenInit);
-		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> reset());
 	}
 

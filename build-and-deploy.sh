@@ -14,7 +14,16 @@
 # jar per Minecraft version, so shipping all three there would just make
 # Fabric Loader refuse to load whichever one doesn't match the game version
 # currently selected in the launcher.
+#
+# The optional "Velo Client Addons" jar (experimental modules, src/addon) is
+# deployed alongside it too so it can be tested; pass --no-addons to deploy
+# velo-client alone (i.e. what a player who didn't install the add-on gets).
 set -euo pipefail
+
+DEPLOY_ADDONS=1
+if [[ "${1:-}" == "--no-addons" ]]; then
+	DEPLOY_ADDONS=0
+fi
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
@@ -29,4 +38,11 @@ rm -f /home/daviseib/.minecraft/mods/velo-client-*.jar
 cp "$JAR" "$DEST"
 
 echo "Deployed $(basename "$JAR") -> $DEST"
+
+rm -f /home/daviseib/.minecraft/mods/velo-addons-*.jar
+if [[ "$DEPLOY_ADDONS" == 1 ]]; then
+	ADDONS_JAR=$(ls -t versions/26.2/build/libs/velo-addons-*.jar | grep -v sources | head -1)
+	cp "$ADDONS_JAR" "/home/daviseib/.minecraft/mods/$(basename "$ADDONS_JAR")"
+	echo "Deployed $(basename "$ADDONS_JAR") (optional add-on) -> /home/daviseib/.minecraft/mods/"
+fi
 echo "Also built (not deployed): versions/1.21.11/build/libs/, versions/26.1/build/libs/"

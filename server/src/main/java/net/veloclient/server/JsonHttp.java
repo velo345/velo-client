@@ -1,6 +1,7 @@
 package net.veloclient.server;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -16,7 +17,9 @@ final class JsonHttp {
 	// an unbounded body into memory.
 	private static final int MAX_BODY_BYTES = 16 * 1024;
 
-	private static final Gson GSON = new Gson();
+	// serializeNulls: a null capeId has to reach the client as an explicit null (heartbeat uses it
+	// to signal "your cape was not accepted"), not as a missing field.
+	private static final Gson GSON = new GsonBuilder().serializeNulls().create();
 
 	private JsonHttp() {
 	}
@@ -38,6 +41,39 @@ final class JsonHttp {
 			return parsed;
 		} catch (JsonSyntaxException e) {
 			throw new IOException("Malformed JSON body");
+		}
+	}
+
+	/** Reads a raw (non-JSON) body of at most {@code maxBytes}, e.g. an uploaded cape image. */
+	static byte[] readRawBody(HttpExchange exchange, int maxBytes) throws IOException {
+		byte[] bytes;
+		try (InputStream in = exchange.getRequestBody()) {
+			bytes = in.readNBytes(maxBytes + 1);
+		}
+		if (bytes.length > maxBytes) {
+			throw new IOException("Request body too large");
+		}
+		return bytes;
+	}
+
+	/** The {@code Authorization: Bearer <token>} value, or null. */
+	static String bearerToken(HttpExchange exchange) {
+		String header = exchange.getRequestHeaders().getFirst("Authorization");
+		if (header == null || !header.startsWith("Bearer ")) {
+			return null;
+		}
+		String token = header.substring("Bearer ".length()).trim();
+		return token.isEmpty() ? null : token;
+	}
+
+	static void writeBytes(HttpExchange exchange, int status, String contentType, byte[] bytes, String cacheControl) throws IOException {
+		exchange.getResponseHeaders().set("Content-Type", contentType);
+		if (cacheControl != null) {
+			exchange.getResponseHeaders().set("Cache-Control", cacheControl);
+		}
+		exchange.sendResponseHeaders(status, bytes.length);
+		try (var out = exchange.getResponseBody()) {
+			out.write(bytes);
 		}
 	}
 

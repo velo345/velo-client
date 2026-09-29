@@ -104,14 +104,28 @@ public final class QueueStatusParser {
 		return new Status(position, eta, text, System.currentTimeMillis());
 	}
 
+	// Chat lines get parsed continuously while a session is active, but the custom regex itself
+	// only ever changes when the player edits it in settings - recompiling it from source on
+	// every single chat line was wasted work the other presets (compiled once as constants above)
+	// don't pay.
+	private static String lastCustomRegex;
+	private static Pattern lastCustomPattern;
+
 	private static Pattern compileCustom(String regex) {
 		if (regex == null || regex.isBlank()) {
 			return null;
 		}
-		try {
-			return Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
-		} catch (java.util.regex.PatternSyntaxException e) {
-			return null;
+		if (regex.equals(lastCustomRegex)) {
+			return lastCustomPattern;
 		}
+		Pattern compiled;
+		try {
+			compiled = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
+		} catch (java.util.regex.PatternSyntaxException e) {
+			compiled = null;
+		}
+		lastCustomRegex = regex;
+		lastCustomPattern = compiled;
+		return compiled;
 	}
 }

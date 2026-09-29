@@ -63,7 +63,7 @@ public final class EntityCountOverlayModule extends AbstractModule implements Hu
 		if (stale) {
 			Map<EntityType<?>, Integer> counts = new LinkedHashMap<>();
 			int total = 0;
-			for (Entity entity : world.getEntities()) {
+			for (Entity entity : allLoadedEntities(world)) {
 				counts.merge(entity.getType(), 1, Integer::sum);
 				total++;
 			}
@@ -83,6 +83,22 @@ public final class EntityCountOverlayModule extends AbstractModule implements Hu
 			context.drawTextWithShadow(client.textRenderer, line, x, rowY, 0xFFC8C8C8);
 			rowY += lineHeight;
 		}
+	}
+
+	/**
+	 * {@code World#getEntities()} (Yarn, public) has no direct equivalent on Mojmap's {@code
+	 * ClientLevel} - the no-arg {@code getEntities()} there is {@code protected} (verified via
+	 * javap; a real, confirmed compile failure, not hypothetical - this exact call was silently
+	 * stale-compiled against an older classpath until something else forced a fresh recompile of
+	 * this file). {@code ClientLevel#entitiesForRendering()} is the public equivalent - every
+	 * entity the client currently knows about, same as this overlay needs.
+	 */
+	private static Iterable<Entity> allLoadedEntities(ClientWorld world) {
+		//? if <26.1 {
+		return world.getEntities();
+		//?} else {
+		/*return world.entitiesForRendering();
+		*///?}
 	}
 
 	@Override

@@ -11,7 +11,7 @@ import net.veloclient.velo.module.SafetyTag;
 /** Renders the client's current FPS, exactly like the vanilla F3 counter but always visible. */
 public final class FpsCounterModule extends AbstractModule implements HudModule {
 
-	private final HudPosition position = new HudPosition(0.02f, 0.02f);
+	private final HudPosition position = new HudPosition(0.01f, 0.01f);
 
 	public FpsCounterModule() {
 		super("fps-counter", "FPS Counter", "Shows current frames per second.",

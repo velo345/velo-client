@@ -17,6 +17,7 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -63,7 +64,8 @@ public final class FreeLookModule extends AbstractModule implements Configurable
 				"Hold the free look key to orbit the camera freely around your player in third person, without "
 						+ "turning your player or moving.",
 				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
-		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
 	}
 
 	private void onTick(MinecraftClient client) {

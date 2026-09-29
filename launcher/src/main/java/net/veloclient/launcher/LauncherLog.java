@@ -79,6 +79,11 @@ public final class LauncherLog {
 		System.err.println("[WARN] " + message + ": " + cause);
 	}
 
+	/** Plain informational line, same routing as {@link #warn}. */
+	public static void info(String message) {
+		System.out.println("[INFO] " + message);
+	}
+
 	/** Writes every line to both the original stream and the log file, timestamped, without needing call sites to change. */
 	private static final class TeePrintStream extends PrintStream {
 		private final PrintStream original;

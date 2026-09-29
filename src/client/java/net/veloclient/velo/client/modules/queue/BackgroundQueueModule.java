@@ -14,6 +14,7 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -82,7 +83,8 @@ public final class BackgroundQueueModule extends AbstractModule implements Confi
 						+ "for all the controls (send to background, peek, switch, terminate) - the keybinds are "
 						+ "optional multi-key-chord shortcuts, not required.",
 				ModuleCategory.SERVER_TOOLS, SafetyTag.CHECK_SERVER_RULES, false);
-		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
 		BackgroundQueueManager.setOnPopped(this::onQueuePopped);
 		BackgroundQueueManager.setOnText(this::onBackgroundText);
 		BackgroundQueueManager.setParsingConfig(statusPreset, customRegex);

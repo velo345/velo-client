@@ -13,6 +13,7 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 
 import java.util.List;
 import java.util.Locale;
@@ -47,7 +48,8 @@ public final class ChunkBorderOverlayModule extends AbstractModule implements Co
 				"Renders chunk and chunk-section borders around you, for build/world-gen testing, with "
 						+ "customizable line colors.",
 				ModuleCategory.SERVER_TOOLS, SafetyTag.CHECK_SERVER_RULES, false);
-		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(this::onRender);
+		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.WORLD_RENDER, () -> onRender(context)));
 	}
 
 	private void onRender(WorldRenderContext context) {

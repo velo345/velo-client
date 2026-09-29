@@ -30,7 +30,7 @@ import java.util.List;
 /**
  * Lets the server-set scoreboard sidebar be dragged/resized/hidden through
  * the same HUD Layout Editor as every other element, instead of being stuck
- * at vanilla's hardcoded top-right corner. Faithfully ports the real
+ * at vanilla's hardcoded right-edge spot. Faithfully ports the real
  * algorithm from {@code InGameHud#renderScoreboardSidebar(DrawContext,
  * ScoreboardObjective)} (name and score are two separately-aligned text
  * runs, not one combined string - an earlier version of this wrongly used
@@ -49,8 +49,17 @@ public final class ScoreboardHudModule extends AbstractModule implements HudModu
 	private static final String SCORE_JOINER = ": ";
 	private static final List<String> BACKGROUND_OPTIONS = List.of("Vanilla", "Solid Panel", "None");
 
-	private final HudPosition position = new HudPosition(0.995f, 0.02f);
+	// HudManager.renderScaled() calls width(), height() and render() back-to-back for the same
+	// frame, and the scoreboard itself can only change when a packet arrives (at most once per
+	// 50ms game tick) - so the full stream/sort/text-measure below is reused for one tick instead
+	// of being redone every frame (at 300 FPS that was ~6x the work for identical output).
+	private static final long CACHE_WINDOW_NANOS = 50_000_000L;
+
+	private final HudPosition position = new HudPosition(1.0f, 0.5f);
 	private String background = "Vanilla";
+
+	private Layout cachedLayout;
+	private long cachedAtNanos = Long.MIN_VALUE;
 
 	public ScoreboardHudModule() {
 		super("scoreboard-hud", "Scoreboard", "Repositions, scales, or hides the server's scoreboard sidebar - appears here automatically whenever a server actually sets one.",
@@ -64,6 +73,15 @@ public final class ScoreboardHudModule extends AbstractModule implements HudModu
 	}
 
 	private Layout computeLayout() {
+		long now = System.nanoTime();
+		if (now - cachedAtNanos < CACHE_WINDOW_NANOS) {
+			return cachedLayout;
+		}
+		cachedAtNanos = now;
+		return cachedLayout = computeLayoutUncached();
+	}
+
+	private Layout computeLayoutUncached() {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client.world == null || client.player == null) {
 			return null;

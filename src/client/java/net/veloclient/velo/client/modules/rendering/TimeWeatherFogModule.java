@@ -12,6 +12,7 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 
 import java.util.List;
 import java.util.Locale;
@@ -70,7 +71,8 @@ public final class TimeWeatherFogModule extends AbstractModule implements Config
 						+ "disable fog - purely visual, never sent to the server.",
 				ModuleCategory.RENDERING, SafetyTag.COSMETIC_ONLY, false);
 		instance = this;
-		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
 	}
 
 	private void onTick(MinecraftClient client) {

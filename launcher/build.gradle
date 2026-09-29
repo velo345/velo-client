@@ -62,7 +62,7 @@ tasks.register("bundleGameJars") {
 	notCompatibleWithConfigurationCache("Copies a sibling project's build output jar, resolved after that project builds")
 	gameVersions.each { v -> dependsOn(":${v}:build") }
 	gameVersions.each { v ->
-		inputs.files(fileTree(libsDirs[v]) { include "velo-client-*.jar"; exclude "*-sources.jar" })
+		inputs.files(fileTree(libsDirs[v]) { include "velo-client-*.jar", "velo-addons-*.jar"; exclude "*-sources.jar" })
 	}
 	outputs.dir(gameJarsOutputDir)
 	doLast {
@@ -75,6 +75,12 @@ tasks.register("bundleGameJars") {
 				throw new GradleException("Expected exactly one built velo-client jar for Minecraft ${v} in ${libsDir}, found ${matches == null ? 0 : matches.length}")
 			}
 			new File(outDir, "${v}.jar").bytes = matches[0].bytes
+			// The optional "Velo Client Addons" jar - bundled so GameJars can keep an installed
+			// copy on exactly the same build as velo-client (it's version-pinned to it).
+			def addons = libsDir.listFiles({ f -> f.name.startsWith("velo-addons-") && f.name.endsWith(".jar") && !f.name.contains("-sources") } as FileFilter)
+			if (addons != null && addons.length == 1) {
+				new File(outDir, "${v}-addons.jar").bytes = addons[0].bytes
+			}
 		}
 	}
 }
@@ -107,7 +113,7 @@ tasks.register("bundleJavaRuntimeFallback") {
 // reads it back as a classpath resource at runtime instead of independently
 // hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
 // below reuses the same value for the native installer's version.
-def launcherAppVersion = "0.7.0"
+def launcherAppVersion = "0.8.0"
 // A fixed identity for the Windows installer across every version - WiX
 // needs this (--win-upgrade-uuid below) to recognize a new installer as an
 // upgrade of whatever's already installed rather than an unrelated product,

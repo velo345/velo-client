@@ -89,9 +89,25 @@ public final class VeloBadge {
 		if (isOwnName(text, ownName)) {
 			return true;
 		}
-		for (String username : net.veloclient.velo.client.network.VeloUserRegistry.onlineUsernames()) {
-			if (isOwnName(text, username)) {
-				return true;
+		if (net.veloclient.velo.client.network.VeloUserRegistry.onlineUsernames().isEmpty()) {
+			return false;
+		}
+		// Walks each whole [a-zA-Z0-9_] run in the text once and does a hash lookup, instead of
+		// an indexOf() scan per online user - that was (tab rows x online users) string searches
+		// every frame, which got expensive with a busy Velo server.
+		int length = text.length();
+		int start = -1;
+		for (int i = 0; i <= length; i++) {
+			boolean nameChar = i < length && isNameChar(text.charAt(i));
+			if (nameChar && start < 0) {
+				start = i;
+			} else if (!nameChar && start >= 0) {
+				int runLength = i - start;
+				if (runLength >= 3 && runLength <= 16
+						&& net.veloclient.velo.client.network.VeloUserRegistry.isOnlineName(text.substring(start, i))) {
+					return true;
+				}
+				start = -1;
 			}
 		}
 		return false;

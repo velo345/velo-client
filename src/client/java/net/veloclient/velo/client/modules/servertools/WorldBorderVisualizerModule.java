@@ -11,6 +11,7 @@ import net.minecraft.world.border.WorldBorder;
 import net.veloclient.velo.module.AbstractModule;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 import net.minecraft.world.debug.gizmo.GizmoDrawing;
 
 /**
@@ -26,7 +27,8 @@ public final class WorldBorderVisualizerModule extends AbstractModule {
 		super("world-border-visualizer", "World Border Visualizer",
 				"Highlights the world border boundary in 3D, using the server-enforced bounds.",
 				ModuleCategory.SERVER_TOOLS, SafetyTag.ALWAYS_SAFE, false);
-		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(this::onRender);
+		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.WORLD_RENDER, () -> onRender(context)));
 	}
 
 	private void onRender(WorldRenderContext context) {

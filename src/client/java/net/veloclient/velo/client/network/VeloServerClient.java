@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.veloclient.velo.VeloClient;
 import net.veloclient.velo.client.auth.VeloAccountAuth;
+import net.veloclient.velo.client.cosmetics.CapeDefinition;
 import net.veloclient.velo.client.cosmetics.CapeManager;
 
 import java.net.URI;
@@ -31,6 +32,10 @@ import java.util.concurrent.atomic.AtomicReference;
  * join-a-server / hasJoined flow real Minecraft servers use for online-mode
  * auth: the client's real access token is only ever sent to Mojang, never to
  * this server (see server/MojangSessionVerifier.java for the other half).
+ * The token comes from the running game's own session ({@link
+ * GameSessionReader}) - that's what makes this work no matter which launcher
+ * started the game - with the Velo launcher's {@code account.json} only as a
+ * fallback for refreshing an expired token of that same account.
  */
 public final class VeloServerClient {
 
@@ -39,19 +44,38 @@ public final class VeloServerClient {
 	// keeps newly-joined players' badges appearing quickly for everyone else
 	// without needing to coordinate the two sides' timing.
 	private static final long TICK_INTERVAL_SECONDS = 20;
+	// Mojang rate-limits session/minecraft/join; a failing auth used to be
+	// retried every single tick (20s) forever.
+	private static final long AUTH_RETRY_MILLIS = 120_000;
 
-	private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+	static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
 	private static final AtomicReference<String> sessionToken = new AtomicReference<>();
+	private static volatile String authenticatedUuid;
+	private static volatile long nextAuthAttemptMillis;
 	private static ScheduledExecutorService scheduler;
 
+	/** Whether a custom (non-Store) equipped cape is uploaded and shown to other Velo users - see {@code VeloNetworkModule}. */
+	public static volatile boolean shareCustomCapes = true;
+
 	private VeloServerClient() {
+	}
+
+	/** Thrown for a non-2xx reply, so callers can tell "server said no" (e.g. 401) apart from "couldn't reach it". */
+	static final class HttpStatusException extends java.io.IOException {
+		final int status;
+
+		HttpStatusException(int status, String message) {
+			super(message);
+			this.status = status;
+		}
 	}
 
 	public static synchronized void start() {
 		if (scheduler != null) {
 			return;
 		}
+		nextAuthAttemptMillis = 0;
 		scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
 			Thread thread = new Thread(r, "velo-server-client");
 			thread.setDaemon(true);
@@ -67,6 +91,7 @@ public final class VeloServerClient {
 		scheduler.shutdownNow();
 		scheduler = null;
 		String token = sessionToken.getAndSet(null);
+		authenticatedUuid = null;
 		VeloUserRegistry.clear();
 		if (token != null) {
 			// Best-effort "going offline now" rather than waiting out the
@@ -77,63 +102,121 @@ public final class VeloServerClient {
 		}
 	}
 
+	/** The configured server's base URL, or null if none - shared with {@code RemoteCapeCache}'s downloads. */
+	public static String serverBaseUrl() {
+		VeloNetworkConfig config = VeloNetworkConfig.load();
+		return config.isConfigured() ? config.normalizedUrl() : null;
+	}
+
 	private static void tick() {
 		try {
-			VeloNetworkConfig config = VeloNetworkConfig.load();
-			if (!config.isConfigured()) {
+			String base = serverBaseUrl();
+			if (base == null) {
 				return;
 			}
-			String base = config.normalizedUrl();
+			// Switched accounts in-game (e.g. the session fixer) - the old
+			// session would keep badging the previous account's name.
+			Optional<ActiveAccountReader.Account> gameAccount = GameSessionReader.read();
+			if (sessionToken.get() != null && gameAccount.isPresent()
+					&& !gameAccount.get().uuid().equals(authenticatedUuid)) {
+				String old = sessionToken.getAndSet(null);
+				endSessionQuietly(old);
+			}
 			if (sessionToken.get() == null) {
-				authenticate(base);
+				authenticate(base, gameAccount);
 			}
 			String token = sessionToken.get();
 			if (token == null) {
 				return;
 			}
-			String capeId = CapeManager.equippedSourceItemId().orElse(null);
-			if (!heartbeat(base, token, capeId)) {
-				sessionToken.compareAndSet(token, null);
+			String capeId = publishedCapeId(base, token);
+			try {
+				String accepted = heartbeat(base, token, capeId);
+				if (capeId != null && capeId.startsWith(CustomCapeUploader.CUSTOM_PREFIX) && !capeId.equals(accepted)) {
+					// Server no longer has our upload (data reset, or removed) - forget the mapping
+					// so the next tick re-uploads (a removed/banned cape is then refused for good).
+					CustomCapeUploader.forget(capeId);
+				}
+			} catch (HttpStatusException e) {
+				if (e.status == 401) {
+					sessionToken.compareAndSet(token, null);
+				}
 				return;
 			}
 			poll(base);
 		} catch (Exception e) {
+			// Network blips land here - keep the session token, just try again next tick.
 			VeloClient.LOGGER.debug("Velo Network sync failed", e);
 		}
 	}
 
-	private static void authenticate(String base) {
-		Optional<ActiveAccountReader.Account> accountOpt = ActiveAccountReader.read();
-		if (accountOpt.isEmpty()) {
+	/** Store capes publish their catalog id; a custom cape publishes {@code custom:<hash>} after uploading it once. */
+	private static String publishedCapeId(String base, String token) {
+		Optional<CapeDefinition> equipped = CapeManager.equipped();
+		if (equipped.isEmpty()) {
+			return null;
+		}
+		CapeDefinition definition = equipped.get();
+		if (definition.sourceItemId() != null && !definition.sourceItemId().isBlank()) {
+			return definition.sourceItemId();
+		}
+		if (!shareCustomCapes) {
+			return null;
+		}
+		return CustomCapeUploader.publishedIdFor(base, token, definition);
+	}
+
+	private static void authenticate(String base, Optional<ActiveAccountReader.Account> gameAccount) {
+		long now = System.currentTimeMillis();
+		if (now < nextAuthAttemptMillis) {
 			return;
 		}
-		ActiveAccountReader.Account account = accountOpt.get();
-		String uuid = normalizeUuid(account.uuid());
-		if (uuid == null) {
+		nextAuthAttemptMillis = now + AUTH_RETRY_MILLIS;
+
+		if (gameAccount.isPresent() && tryAuthenticate(base, gameAccount.get())) {
+			nextAuthAttemptMillis = 0;
 			return;
 		}
-		String accessToken = account.accessToken();
-		String username = account.username();
+		// The game's own token can expire in a very long session - the Velo
+		// launcher's saved account can refresh it, but only if it's the same
+		// account actually playing (never badge someone else's name).
+		Optional<ActiveAccountReader.Account> saved = ActiveAccountReader.read();
+		if (saved.isEmpty()) {
+			return;
+		}
+		String savedUuid = normalizeUuid(saved.get().uuid());
+		if (gameAccount.isPresent() && !gameAccount.get().uuid().equals(savedUuid)) {
+			return;
+		}
+		ActiveAccountReader.Account account = saved.get();
 		if (!account.tokenLikelyValid()) {
 			try {
 				VeloAccountAuth.RefreshedSession refreshed = VeloAccountAuth.refreshActiveAccount();
-				accessToken = refreshed.accessToken();
-				uuid = normalizeUuid(refreshed.uuid());
-				username = refreshed.username();
+				account = new ActiveAccountReader.Account(refreshed.uuid(), refreshed.username(), refreshed.accessToken(), Long.MAX_VALUE);
 			} catch (VeloAccountAuth.AuthRefreshException e) {
 				return;
 			}
 		}
-		if (accessToken == null || uuid == null) {
-			return;
+		if (tryAuthenticate(base, account)) {
+			nextAuthAttemptMillis = 0;
+		}
+	}
+
+	private static boolean tryAuthenticate(String base, ActiveAccountReader.Account account) {
+		String uuid = normalizeUuid(account.uuid());
+		if (uuid == null || account.accessToken() == null || account.username() == null) {
+			return false;
 		}
 		try {
-			String serverId = requestChallenge(base, uuid, username);
-			joinMojangSession(accessToken, uuid, serverId);
+			String serverId = requestChallenge(base, uuid, account.username());
+			joinMojangSession(account.accessToken(), uuid, serverId);
 			String token = verifySession(base, uuid, serverId);
+			authenticatedUuid = uuid;
 			sessionToken.set(token);
+			return true;
 		} catch (Exception e) {
 			VeloClient.LOGGER.debug("Velo Network authentication failed", e);
+			return false;
 		}
 	}
 
@@ -170,18 +253,19 @@ public final class VeloServerClient {
 		return requireString(response, "sessionToken");
 	}
 
-	private static boolean heartbeat(String base, String token, String capeId) {
-		try {
-			JsonObject body = new JsonObject();
-			body.addProperty("sessionToken", token);
-			if (capeId != null) {
-				body.addProperty("capeId", capeId);
-			}
-			postJson(base + "/v1/heartbeat", body);
-			return true;
-		} catch (Exception e) {
-			return false;
+	/** Returns the cape id the server actually accepted (null if it rejected/cleared it). */
+	private static String heartbeat(String base, String token, String capeId) throws Exception {
+		JsonObject body = new JsonObject();
+		body.addProperty("sessionToken", token);
+		if (capeId != null) {
+			body.addProperty("capeId", capeId);
 		}
+		JsonObject response = postJson(base + "/v1/heartbeat", body);
+		// Older servers don't echo the cape back - treat that as "accepted as sent".
+		if (!response.has("capeId")) {
+			return capeId;
+		}
+		return response.get("capeId").isJsonNull() ? null : response.get("capeId").getAsString();
 	}
 
 	private static void poll(String base) {
@@ -215,16 +299,16 @@ public final class VeloServerClient {
 		try {
 			JsonObject body = new JsonObject();
 			body.addProperty("sessionToken", token);
-			VeloNetworkConfig config = VeloNetworkConfig.load();
-			if (config.isConfigured()) {
-				postJson(config.normalizedUrl() + "/v1/session/end", body);
+			String base = serverBaseUrl();
+			if (base != null) {
+				postJson(base + "/v1/session/end", body);
 			}
 		} catch (Exception ignored) {
 			// Not worth surfacing - the session will simply expire on its own.
 		}
 	}
 
-	private static JsonObject postJson(String url, JsonObject payload) throws Exception {
+	static JsonObject postJson(String url, JsonObject payload) throws Exception {
 		HttpRequest request = HttpRequest.newBuilder(URI.create(url))
 				.header("Content-Type", "application/json")
 				.header("Accept", "application/json")
@@ -233,7 +317,7 @@ public final class VeloServerClient {
 				.build();
 		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
 		if (response.statusCode() / 100 != 2) {
-			throw new java.io.IOException("Velo server returned " + response.statusCode() + ": " + response.body());
+			throw new HttpStatusException(response.statusCode(), "Velo server returned " + response.statusCode() + ": " + response.body());
 		}
 		return JsonParser.parseString(response.body()).getAsJsonObject();
 	}
@@ -245,7 +329,7 @@ public final class VeloServerClient {
 		return json.get(field).getAsString();
 	}
 
-	private static String normalizeUuid(String uuid) {
+	static String normalizeUuid(String uuid) {
 		if (uuid == null) {
 			return null;
 		}

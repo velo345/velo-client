@@ -91,6 +91,11 @@ public final class GameJars {
 		}
 	}
 
+	private static boolean isAddonsJar(Path path) {
+		String name = path.getFileName().toString();
+		return name.startsWith("velo-addons-") && (name.endsWith(".jar") || name.endsWith(".jar.disabled"));
+	}
+
 	private static boolean isVeloJar(Path path) {
 		String name = path.getFileName().toString();
 		return name.startsWith("velo-client-") && name.endsWith(".jar");

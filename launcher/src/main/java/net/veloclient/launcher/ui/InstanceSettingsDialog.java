@@ -3,6 +3,7 @@ package net.veloclient.launcher.ui;
 import com.sun.management.OperatingSystemMXBean;
 import javafx.geometry.Insets;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
@@ -10,6 +11,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
 import net.veloclient.launcher.instance.Instance;
+import net.veloclient.launcher.launch.PerformanceModsInstaller;
 
 import java.lang.management.ManagementFactory;
 import java.util.Optional;
@@ -17,7 +19,6 @@ import java.util.Optional;
 /** Per-instance RAM allocation and extra JVM arguments, opened from the profile card's gear icon. */
 public final class InstanceSettingsDialog {
 
-	private static final int DEFAULT_MIN_MB = 1024;
 	private static final int DEFAULT_MAX_MB = 4096;
 
 	private InstanceSettingsDialog() {
@@ -31,8 +32,10 @@ public final class InstanceSettingsDialog {
 		DialogStyling.apply(dialog);
 
 		int systemMemoryMb = totalSystemMemoryMb();
-		int initialMin = instance.ramMinMb() != null ? instance.ramMinMb() : DEFAULT_MIN_MB;
 		int initialMax = instance.ramMaxMb() != null ? instance.ramMaxMb() : DEFAULT_MAX_MB;
+		// Unset min defaults to max, matching GameLauncher (-Xms = -Xmx avoids heap-resize stutter);
+		// showing 1024 here used to save that low value the first time anyone pressed OK.
+		int initialMin = instance.ramMinMb() != null ? instance.ramMinMb() : initialMax;
 
 		Slider minSlider = new Slider(512, systemMemoryMb, initialMin);
 		Label minLabel = new Label(initialMin + " MB");
@@ -55,6 +58,10 @@ public final class InstanceSettingsDialog {
 		Label systemInfo = new Label("This computer has " + systemMemoryMb + " MB of RAM.");
 		systemInfo.getStyleClass().add("version-tag");
 		grid.addRow(3, systemInfo);
+		PerformanceModsInstaller.State perfState = PerformanceModsInstaller.readState(instance.id());
+		CheckBox perfMods = new CheckBox("Install performance mods (Sodium, Lithium, FerriteCore, EntityCulling, ImmediatelyFast, ModernFix)");
+		perfMods.setSelected(perfState.enabled);
+		grid.add(perfMods, 0, 4, 3, 1);
 
 		dialog.getDialogPane().setContent(grid);
 		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -62,6 +69,10 @@ public final class InstanceSettingsDialog {
 		dialog.setResultConverter(button -> {
 			if (button != ButtonType.OK) {
 				return null;
+			}
+			if (perfState.enabled != perfMods.isSelected()) {
+				perfState.enabled = perfMods.isSelected();
+				PerformanceModsInstaller.writeState(instance.id(), perfState);
 			}
 			int min = (int) Math.round(minSlider.getValue());
 			int max = (int) Math.max(min, Math.round(maxSlider.getValue()));

@@ -1,0 +1,15 @@
+{
+	"required": false,
+	"minVersion": "0.8",
+	"package": "net.veloclient.velo.addons.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"CinematicCameraMixin",
+		"CinematicChunkCacheMixin",
+		"CinematicFreezePlayerMixin",
+		"CinematicLookInputMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

@@ -25,6 +25,9 @@ public final class VeloUserRegistry {
 	// text to match against, not a UUID (see VeloBadge#isKnownVeloName).
 	private static final Map<String, Entry> BY_UUID = new ConcurrentHashMap<>();
 	private static volatile Set<String> usernames = Set.of();
+	// Lowercased username -> entry. Offline-mode/cracked servers hand every player a name-derived
+	// UUID instead of their real one, so a UUID-only lookup never matched anyone there.
+	private static volatile Map<String, Entry> byLowerName = Map.of();
 
 	private VeloUserRegistry() {
 	}
@@ -36,15 +39,36 @@ public final class VeloUserRegistry {
 		usernames = entries.values().stream()
 				.map(Entry::username)
 				.collect(java.util.stream.Collectors.toUnmodifiableSet());
+		Map<String, Entry> lower = new java.util.HashMap<>();
+		for (Entry entry : entries.values()) {
+			lower.put(entry.username().toLowerCase(java.util.Locale.ROOT), entry);
+		}
+		byLowerName = Map.copyOf(lower);
 	}
 
 	public static void clear() {
 		BY_UUID.clear();
 		usernames = Set.of();
+		byLowerName = Map.of();
 	}
 
 	public static boolean isOnline(UUID uuid) {
-		return uuid != null && BY_UUID.containsKey(dashless(uuid));
+		return uuid != null && !BY_UUID.isEmpty() && BY_UUID.containsKey(dashless(uuid));
+	}
+
+	/** UUID match first, then the username (see {@link #byLowerName}). */
+	public static boolean isOnline(UUID uuid, String username) {
+		return isOnline(uuid) || entryForName(username) != null;
+	}
+
+	/** Whether {@code name} (any case) is an online Velo user - used by the tab list/chat badge. */
+	public static boolean isOnlineName(String name) {
+		return entryForName(name) != null;
+	}
+
+	private static Entry entryForName(String username) {
+		Map<String, Entry> names = byLowerName;
+		return username == null || names.isEmpty() ? null : names.get(username.toLowerCase(java.util.Locale.ROOT));
 	}
 
 	/** Usernames of every player currently online with Velo Client on the configured server - see {@link net.veloclient.velo.client.gui.VeloBadge#isKnownVeloName}. */
@@ -54,11 +78,23 @@ public final class VeloUserRegistry {
 
 	/** The Store cape catalog id this player has equipped, if any and if they're online. */
 	public static String capeIdFor(UUID uuid) {
-		Entry entry = uuid == null ? null : BY_UUID.get(dashless(uuid));
+		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
 		return entry == null ? null : entry.capeId();
 	}
 
+	public static String capeIdFor(UUID uuid, String username) {
+		String byUuid = capeIdFor(uuid);
+		if (byUuid != null) {
+			return byUuid;
+		}
+		Entry entry = entryForName(username);
+		return entry == null ? null : entry.capeId();
+	}
+
+	// Called per rendered player per frame - formats the two longs directly instead of
+	// toString() + replace(), which allocated two strings each time.
 	private static String dashless(UUID uuid) {
-		return uuid.toString().replace("-", "");
+		return java.util.HexFormat.of().toHexDigits(uuid.getMostSignificantBits())
+				+ java.util.HexFormat.of().toHexDigits(uuid.getLeastSignificantBits());
 	}
 }

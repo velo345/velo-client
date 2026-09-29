@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -32,6 +33,9 @@ public final class VeloServerApp {
 	public static void main(String[] args) throws IOException {
 		int port = resolvePort();
 		SessionRegistry registry = new SessionRegistry();
+		Path dataDir = Path.of(envOr("VELO_DATA_DIR", "data")).toAbsolutePath();
+		CapeStore capes = new CapeStore(dataDir);
+		String adminToken = envOr("VELO_ADMIN_TOKEN", null);
 
 		HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
 		server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
@@ -40,8 +44,13 @@ public final class VeloServerApp {
 		server.createContext("/v1/session/challenge", exchange -> handle(exchange, "POST", ex -> handleChallenge(ex, registry)));
 		server.createContext("/v1/session/verify", exchange -> handle(exchange, "POST", ex -> handleVerify(ex, registry)));
 		server.createContext("/v1/session/end", exchange -> handle(exchange, "POST", ex -> handleEnd(ex, registry)));
-		server.createContext("/v1/heartbeat", exchange -> handle(exchange, "POST", ex -> handleHeartbeat(ex, registry)));
+		server.createContext("/v1/heartbeat", exchange -> handle(exchange, "POST", ex -> handleHeartbeat(ex, registry, capes)));
 		server.createContext("/v1/online", exchange -> handle(exchange, "GET", ex -> handleOnline(ex, registry)));
+		server.createContext("/v1/cape/upload", exchange -> handle(exchange, "POST", ex -> handleCapeUpload(ex, registry, capes)));
+		server.createContext("/v1/cape/remove", exchange -> handle(exchange, "POST", ex -> handleCapeRemove(ex, registry, capes)));
+		// GET /v1/cape/<sha256> - the path suffix is the hash (see handleCapeDownload).
+		server.createContext("/v1/cape/", exchange -> handle(exchange, "GET", ex -> handleCapeDownload(ex, capes)));
+		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));
 
 		// Expired sessions/challenges are already ignored by every lookup
 		// (both check their own expiry), so this is just periodic
@@ -54,7 +63,15 @@ public final class VeloServerApp {
 		}).scheduleAtFixedRate(registry::sweepExpired, 30, 30, TimeUnit.SECONDS);
 
 		server.start();
-		System.out.println("Velo Client server listening on port " + port);
+		System.out.println("Velo Client server listening on port " + port + " (data: " + dataDir + ")");
+		if (adminToken == null) {
+			System.out.println("VELO_ADMIN_TOKEN not set - the admin cape-removal endpoint is disabled");
+		}
+	}
+
+	private static String envOr(String name, String fallback) {
+		String value = System.getenv(name);
+		return value == null || value.isBlank() ? fallback : value.trim();
 	}
 
 	private static int resolvePort() {
@@ -71,7 +88,16 @@ public final class VeloServerApp {
 
 	@FunctionalInterface
 	private interface Route {
-		void handle(HttpExchange exchange) throws IOException;
+		void handle(HttpExchange exchange) throws Exception;
+	}
+
+	/** A failure after the response headers already went out can't send an error body - just let the connection close. */
+	private static void writeErrorQuietly(HttpExchange exchange, int status, String message) {
+		try {
+			JsonHttp.writeError(exchange, status, message);
+		} catch (IOException | RuntimeException ignored) {
+			// Headers were already sent; nothing more to tell the client.
+		}
 	}
 
 	/** Shared method-check + error handling wrapper so every route below only has to write its happy path. */
@@ -82,10 +108,13 @@ public final class VeloServerApp {
 				return;
 			}
 			route.handle(exchange);
+		} catch (CapeStore.RejectedUpload e) {
+			writeErrorQuietly(exchange, e.status, e.getMessage());
 		} catch (IOException e) {
-			JsonHttp.writeError(exchange, 400, e.getMessage() != null ? e.getMessage() : "Bad request");
+			writeErrorQuietly(exchange, 400, e.getMessage() != null ? e.getMessage() : "Bad request");
 		} catch (Exception e) {
-			JsonHttp.writeError(exchange, 500, "Internal server error");
+			e.printStackTrace();
+			writeErrorQuietly(exchange, 500, "Internal server error");
 		} finally {
 			exchange.close();
 		}
@@ -147,21 +176,25 @@ public final class VeloServerApp {
 	private record HeartbeatRequest(String sessionToken, String capeId) {
 	}
 
-	private record HeartbeatResponse(boolean ok, int onlineCount) {
+	private record HeartbeatResponse(boolean ok, int onlineCount, String capeId) {
 	}
 
-	private static void handleHeartbeat(HttpExchange exchange, SessionRegistry registry) throws IOException {
+	private static void handleHeartbeat(HttpExchange exchange, SessionRegistry registry, CapeStore capes) throws IOException {
 		HeartbeatRequest request = JsonHttp.readBody(exchange, HeartbeatRequest.class);
 		if (request.sessionToken() == null || request.sessionToken().isBlank()) {
 			JsonHttp.writeError(exchange, 400, "sessionToken is required");
 			return;
 		}
-		boolean ok = registry.heartbeat(request.sessionToken(), request.capeId());
-		if (!ok) {
+		SessionRegistry.Session session = registry.session(request.sessionToken());
+		String ownCustomHash = session == null ? null : capes.hashFor(session.uuid());
+		SessionRegistry.Session refreshed = registry.heartbeat(request.sessionToken(), request.capeId(), ownCustomHash);
+		if (refreshed == null) {
 			JsonHttp.writeError(exchange, 401, "Unknown or expired session - re-authenticate");
 			return;
 		}
-		JsonHttp.writeJson(exchange, 200, new HeartbeatResponse(true, registry.onlineCount()));
+		// Echoes the cape id actually accepted, so a client whose custom cape was removed (or a
+		// server whose data was reset) notices and can re-upload instead of silently showing nothing.
+		JsonHttp.writeJson(exchange, 200, new HeartbeatResponse(true, registry.onlineCount(), refreshed.capeId()));
 	}
 
 	private record EndRequest(String sessionToken) {
@@ -172,7 +205,7 @@ public final class VeloServerApp {
 		if (request.sessionToken() != null) {
 			registry.endSession(request.sessionToken());
 		}
-		JsonHttp.writeJson(exchange, 200, new HeartbeatResponse(true, registry.onlineCount()));
+		JsonHttp.writeJson(exchange, 200, new HeartbeatResponse(true, registry.onlineCount(), null));
 	}
 
 	private record OnlineResponse(List<SessionRegistry.OnlineUser> users, long serverTimeMillis) {
@@ -180,6 +213,66 @@ public final class VeloServerApp {
 
 	private static void handleOnline(HttpExchange exchange, SessionRegistry registry) throws IOException {
 		JsonHttp.writeJson(exchange, 200, new OnlineResponse(registry.onlineUsers(), System.currentTimeMillis()));
+	}
+
+	private record CapeUploadResponse(String capeId) {
+	}
+
+	/** Raw PNG/GIF body, authenticated with the session token as {@code Authorization: Bearer}. */
+	private static void handleCapeUpload(HttpExchange exchange, SessionRegistry registry, CapeStore capes) throws Exception {
+		SessionRegistry.Session session = registry.session(JsonHttp.bearerToken(exchange));
+		if (session == null) {
+			JsonHttp.writeError(exchange, 401, "Unknown or expired session - re-authenticate");
+			return;
+		}
+		byte[] bytes = JsonHttp.readRawBody(exchange, CapeStore.MAX_UPLOAD_BYTES);
+		String hash = capes.store(session.uuid(), bytes);
+		JsonHttp.writeJson(exchange, 200, new CapeUploadResponse(CapeStore.CUSTOM_PREFIX + hash));
+	}
+
+	private record OkResponse(boolean ok) {
+	}
+
+	private static void handleCapeRemove(HttpExchange exchange, SessionRegistry registry, CapeStore capes) throws IOException {
+		SessionRegistry.Session session = registry.session(JsonHttp.bearerToken(exchange));
+		if (session == null) {
+			JsonHttp.writeError(exchange, 401, "Unknown or expired session - re-authenticate");
+			return;
+		}
+		JsonHttp.writeJson(exchange, 200, new OkResponse(capes.remove(session.uuid())));
+	}
+
+	private static void handleCapeDownload(HttpExchange exchange, CapeStore capes) throws IOException {
+		String path = exchange.getRequestURI().getPath();
+		String hash = path.substring(path.lastIndexOf('/') + 1);
+		CapeStore.StoredFile file = capes.read(hash);
+		if (file == null) {
+			JsonHttp.writeError(exchange, 404, "No such cape");
+			return;
+		}
+		// Content-addressed, so a given URL's bytes can never change - clients and any proxy/CDN
+		// in front of this can cache it forever.
+		JsonHttp.writeBytes(exchange, 200, file.contentType(), file.bytes(), "public, max-age=31536000, immutable");
+	}
+
+	private record AdminRemoveRequest(String uuid) {
+	}
+
+	/** Moderation: removes (and bans the image of) a player's custom cape. Needs {@code Authorization: Bearer $VELO_ADMIN_TOKEN}. */
+	private static void handleAdminCapeRemove(HttpExchange exchange, CapeStore capes, String adminToken) throws IOException {
+		String given = JsonHttp.bearerToken(exchange);
+		if (adminToken == null || given == null
+				|| !java.security.MessageDigest.isEqual(adminToken.getBytes(), given.getBytes())) {
+			JsonHttp.writeError(exchange, 403, "Forbidden");
+			return;
+		}
+		AdminRemoveRequest request = JsonHttp.readBody(exchange, AdminRemoveRequest.class);
+		String uuid = normalizeUuid(request.uuid());
+		if (uuid == null) {
+			JsonHttp.writeError(exchange, 400, "uuid is required");
+			return;
+		}
+		JsonHttp.writeJson(exchange, 200, new OkResponse(capes.removeAndBan(uuid)));
 	}
 
 	/** Accepts dashed or dashless UUIDs from the client; everything downstream keys on this same lowercase-dashless form. */

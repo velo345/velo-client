@@ -5,10 +5,12 @@ import net.veloclient.velo.VeloClient;
 import net.veloclient.velo.client.hud.HudManager;
 import net.veloclient.velo.client.keybind.VeloKeybinds;
 import net.veloclient.velo.client.cosmetics.render.CapeFeatureRenderer;
+import net.veloclient.velo.client.devtools.AnticheatTestController;
 import net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule;
 import net.veloclient.velo.client.modules.cosmetics.KillEffectsModule;
 import net.veloclient.velo.client.modules.debug.KeybindConflictCheckerModule;
 import net.veloclient.velo.client.modules.debug.LookingAtInspectorModule;
+import net.veloclient.velo.client.modules.debug.ModuleProfilerOverlayModule;
 import net.veloclient.velo.client.modules.debug.ResourceReloadHotkeyModule;
 import net.veloclient.velo.client.modules.hud.ActionBarLogModule;
 import net.veloclient.velo.client.modules.hud.ArmorDurabilityModule;
@@ -35,6 +37,7 @@ import net.veloclient.velo.client.modules.performance.OptimizationModCompatModul
 import net.veloclient.velo.client.modules.performance.ParticleLimiterModule;
 import net.veloclient.velo.client.modules.performance.PerformanceBoostModule;
 import net.veloclient.velo.client.modules.performance.PolyBlurModule;
+import net.veloclient.velo.client.modules.performance.RenderCullingModule;
 import net.veloclient.velo.client.modules.qol.CustomCrosshairModule;
 import net.veloclient.velo.client.modules.qol.FreeLookModule;
 import net.veloclient.velo.client.modules.qol.NickHiderModule;
@@ -47,13 +50,13 @@ import net.veloclient.velo.client.modules.rendering.BlockOutlineModule;
 import net.veloclient.velo.client.modules.rendering.TimeWeatherFogModule;
 import net.veloclient.velo.client.modules.rendering.TntTimerModule;
 import net.veloclient.velo.client.modules.servertools.ChunkBorderOverlayModule;
+import net.veloclient.velo.client.modules.servertools.ChunkLoadProfilerModule;
 import net.veloclient.velo.client.modules.servertools.ClientLogViewerModule;
 import net.veloclient.velo.client.modules.servertools.EntityCountOverlayModule;
 import net.veloclient.velo.client.modules.servertools.HitboxVisualizerModule;
 import net.veloclient.velo.client.modules.servertools.LightLevelOverlayModule;
 import net.veloclient.velo.client.modules.servertools.PacketTrafficMonitorModule;
 import net.veloclient.velo.client.modules.servertools.ParticleDebugOverlayModule;
-import net.veloclient.velo.client.modules.servertools.SoundDebugOverlayModule;
 import net.veloclient.velo.client.modules.servertools.TpsTickGraphModule;
 import net.veloclient.velo.client.modules.servertools.WorldBorderVisualizerModule;
 import net.veloclient.velo.client.modules.utility.AutoReconnectModule;
@@ -69,6 +72,7 @@ public final class VeloClientMod implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		registerModules();
+		loadAddons();
 		HudManager.register();
 		VeloKeybinds.register();
 		CapeFeatureRenderer.register();
@@ -83,7 +87,26 @@ public final class VeloClientMod implements ClientModInitializer {
 		// it) at least once.
 		net.veloclient.velo.client.crosshair.CrosshairManager.loadLibrary();
 		ModuleRegistry.exportManifest();
+		AnticheatTestController.initIfEnabled();
 		VeloClient.LOGGER.info("Velo Client ready ({} modules registered)", ModuleRegistry.all().size());
+	}
+
+	/**
+	 * Runs every installed add-on (see {@link net.veloclient.velo.client.addon.VeloAddon}) - e.g.
+	 * the optional "Velo Client Addons" jar with the experimental modules. Before the profile loads,
+	 * so their saved state restores like any built-in module's. One broken add-on is logged and
+	 * skipped rather than taking the client down with it.
+	 */
+	private void loadAddons() {
+		for (var container : net.fabricmc.loader.api.FabricLoader.getInstance()
+				.getEntrypointContainers(net.veloclient.velo.client.addon.VeloAddon.ENTRYPOINT, net.veloclient.velo.client.addon.VeloAddon.class)) {
+			try {
+				container.getEntrypoint().onVeloInitialize();
+				VeloClient.LOGGER.info("Loaded Velo add-on {}", container.getProvider().getMetadata().getId());
+			} catch (Throwable t) {
+				VeloClient.LOGGER.error("Velo add-on {} failed to initialize", container.getProvider().getMetadata().getId(), t);
+			}
+		}
 	}
 
 	private void registerModules() {
@@ -127,6 +150,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new GpuUtilizationModule());
 		ModuleRegistry.register(new ParticleLimiterModule());
 		ModuleRegistry.register(new PerformanceBoostModule());
+		ModuleRegistry.register(new RenderCullingModule());
 		ModuleRegistry.register(new PolyBlurModule());
 		ModuleRegistry.register(new OptimizationModCompatModule());
 		ModuleRegistry.register(new FullBrightModule());
@@ -142,13 +166,13 @@ public final class VeloClientMod implements ClientModInitializer {
 		// Server Tools (section 6.3)
 		ModuleRegistry.register(new EntityCountOverlayModule());
 		ModuleRegistry.register(new ChunkBorderOverlayModule());
+		ModuleRegistry.register(new ChunkLoadProfilerModule());
 		ModuleRegistry.register(new HitboxVisualizerModule());
 		ModuleRegistry.register(new WorldBorderVisualizerModule());
 		ModuleRegistry.register(new LightLevelOverlayModule());
 		ModuleRegistry.register(new TpsTickGraphModule());
 		ModuleRegistry.register(new PacketTrafficMonitorModule());
 		ModuleRegistry.register(new ParticleDebugOverlayModule());
-		ModuleRegistry.register(new SoundDebugOverlayModule());
 		ModuleRegistry.register(new ClientLogViewerModule());
 		ModuleRegistry.register(new BackgroundQueueModule());
 
@@ -156,5 +180,6 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ResourceReloadHotkeyModule());
 		ModuleRegistry.register(new KeybindConflictCheckerModule());
 		ModuleRegistry.register(new LookingAtInspectorModule());
+		ModuleRegistry.register(new ModuleProfilerOverlayModule());
 	}
 }

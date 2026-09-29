@@ -32,16 +32,25 @@ import java.util.zip.ZipOutputStream;
  *
  * <p>A lot of real cape art ships with a matching elytra texture bundled
  * into the same image - vanilla's own elytra texture is also 64x32, so a
- * 64x64 imported PNG is treated as "cape on top, elytra on the bottom" and
- * split into two separate 64x32 textures at import time; a plain 64x32 PNG
- * just stays cape-only, no elytra override at all. Whichever one applies is
- * detected purely from image height, no extra UI step needed.
+ * square imported PNG (64x64, or any HD multiple of it) is treated as "cape
+ * on top, elytra on the bottom" and split into two separate textures at
+ * import time; a 2:1 PNG just stays cape-only, no elytra override at all.
+ * Whichever one applies is detected purely from the aspect ratio, no extra UI
+ * step needed.
+ *
+ * <p>HD capes: the template is resolution-independent (the model's UVs are
+ * normalized), so an image any multiple of 64x32 renders with the same
+ * layout at more detail. Imports are kept at their own resolution up to
+ * {@value #MAX_TEXTURE_WIDTH}x{@value #MAX_TEXTURE_WIDTH}/2 ("2K"), resampled
+ * onto the nearest multiple of 64 if the source isn't one - earlier versions
+ * silently cropped every import to its top-left 64px, which destroyed HD art.
  */
 public final class CapeManager {
 
 	public static final int TEXTURE_WIDTH = 64;
 	public static final int TEXTURE_HEIGHT = 32;
-	private static final int COMBINED_TEXTURE_HEIGHT = TEXTURE_HEIGHT * 2;
+	/** Largest imported cape width kept as-is ("2K"); anything wider is downscaled to this. */
+	public static final int MAX_TEXTURE_WIDTH = 2048;
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final Map<String, CapeDefinition> LIBRARY = new LinkedHashMap<>();
@@ -159,28 +168,38 @@ public final class CapeManager {
 	}
 
 	/**
-	 * Imports a PNG texture as a new library cape. A plain
-	 * {@value #TEXTURE_WIDTH}x{@value #TEXTURE_HEIGHT} image is cape-only; a
-	 * {@value #TEXTURE_WIDTH}x{@value #COMBINED_TEXTURE_HEIGHT} image is
-	 * split into a cape texture (top half) and a matching elytra texture
-	 * (bottom half) - see the class doc.
+	 * Imports a PNG texture as a new library cape. A 2:1 image is cape-only; a
+	 * square (or taller) image is split into a cape texture (top half) and a
+	 * matching elytra texture (bottom half) - see the class doc. Any width is
+	 * accepted and normalized onto a multiple of {@value #TEXTURE_WIDTH} up to
+	 * {@value #MAX_TEXTURE_WIDTH}.
 	 */
 	public static CapeDefinition importCape(String name, Path pngFile, CapePhysicsPreset preset) throws IOException {
 		VeloPaths.ensureDirectories();
 		String id = UUID.randomUUID().toString();
 		Path bundleFile = VeloPaths.capes().resolve(sanitize(name) + "-" + id.substring(0, 8) + ".velocape");
 
-		NativeImage source = NativeImage.read(Files.newInputStream(pngFile));
-		boolean combined = source.getWidth() == TEXTURE_WIDTH && source.getHeight() >= COMBINED_TEXTURE_HEIGHT;
+		NativeImage source;
+		try (InputStream in = Files.newInputStream(pngFile)) {
+			source = NativeImage.read(in);
+		}
+		int sourceWidth = source.getWidth();
+		int sourceHeight = source.getHeight();
+		// 2:1 = cape only, 1:1 = cape + elytra. Anything at least 3:4 is treated as combined so a
+		// slightly-off hand-made combined sheet still splits instead of squashing the elytra in.
+		boolean combined = sourceHeight * 4 >= sourceWidth * 3;
+		int targetWidth = Math.clamp(Math.round(sourceWidth / (float) TEXTURE_WIDTH), 1, MAX_TEXTURE_WIDTH / TEXTURE_WIDTH) * TEXTURE_WIDTH;
+		int targetHeight = targetWidth / 2;
+		int capeSourceHeight = combined ? sourceHeight / 2 : sourceHeight;
 		try {
 			try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(bundleFile))) {
 				zip.putNextEntry(new ZipEntry("texture.png"));
-				writeRegion(zip, source, 0, combined ? TEXTURE_HEIGHT : source.getHeight());
+				writeScaledRegion(zip, source, 0, capeSourceHeight, targetWidth, targetHeight);
 				zip.closeEntry();
 
 				if (combined) {
 					zip.putNextEntry(new ZipEntry("elytra.png"));
-					writeRegion(zip, source, TEXTURE_HEIGHT, TEXTURE_HEIGHT);
+					writeScaledRegion(zip, source, capeSourceHeight, sourceHeight - capeSourceHeight, targetWidth, targetHeight);
 					zip.closeEntry();
 				}
 
@@ -267,13 +286,30 @@ public final class CapeManager {
 		return new CapeDefinition(id, name, tempFile, preset, false, true, id);
 	}
 
-	/** Crops {@code source} to a {@value #TEXTURE_WIDTH}x{@code height} region starting at {@code startY} and writes it as a PNG into {@code out} (via a throwaway temp file - NativeImage only writes to a real path/file, not a stream). */
-	private static void writeRegion(java.io.OutputStream out, NativeImage source, int startY, int height) throws IOException {
-		NativeImage region = new NativeImage(TEXTURE_WIDTH, height, false);
+	/**
+	 * Resamples the {@code source} rows {@code [startY, startY + height)} onto a
+	 * {@code targetWidth}x{@code targetHeight} image and writes it as a PNG into
+	 * {@code out} (via a throwaway temp file - NativeImage only writes to a real
+	 * path/file, not a stream). Same size = plain copy; upscaling = nearest
+	 * neighbour (keeps pixel art crisp); downscaling = box average (no
+	 * shimmering from skipped pixels).
+	 */
+	private static void writeScaledRegion(java.io.OutputStream out, NativeImage source, int startY, int height,
+			int targetWidth, int targetHeight) throws IOException {
+		NativeImage region = new NativeImage(targetWidth, targetHeight, false);
 		try {
-			for (int y = 0; y < height; y++) {
-				for (int x = 0; x < TEXTURE_WIDTH; x++) {
-					region.setColorArgb(x, y, source.getColorArgb(x, startY + y));
+			int sourceWidth = source.getWidth();
+			float stepX = sourceWidth / (float) targetWidth;
+			float stepY = height / (float) targetHeight;
+			for (int y = 0; y < targetHeight; y++) {
+				int y0 = startY + (int) (y * stepY);
+				int y1 = Math.max(y0 + 1, startY + (int) ((y + 1) * stepY));
+				for (int x = 0; x < targetWidth; x++) {
+					int x0 = (int) (x * stepX);
+					int x1 = Math.max(x0 + 1, (int) ((x + 1) * stepX));
+					region.setColorArgb(x, y, stepX > 1f || stepY > 1f
+							? averageArgb(source, x0, Math.min(x1, sourceWidth), y0, Math.min(y1, startY + height))
+							: source.getColorArgb(Math.min(x0, sourceWidth - 1), Math.min(y0, startY + height - 1)));
 				}
 			}
 			Path tempFile = Files.createTempFile("velo-cape-region-", ".png");
@@ -286,6 +322,25 @@ public final class CapeManager {
 		} finally {
 			region.close();
 		}
+	}
+
+	private static int averageArgb(NativeImage source, int x0, int x1, int y0, int y1) {
+		long a = 0, r = 0, g = 0, b = 0;
+		int count = 0;
+		for (int y = y0; y < y1; y++) {
+			for (int x = x0; x < x1; x++) {
+				int argb = source.getColorArgb(x, y);
+				a += argb >>> 24;
+				r += (argb >> 16) & 0xFF;
+				g += (argb >> 8) & 0xFF;
+				b += argb & 0xFF;
+				count++;
+			}
+		}
+		if (count == 0) {
+			return 0;
+		}
+		return (int) (a / count) << 24 | (int) (r / count) << 16 | (int) (g / count) << 8 | (int) (b / count);
 	}
 
 	public static void exportCape(String capeId, Path destination) throws IOException {
@@ -318,6 +373,29 @@ public final class CapeManager {
 		}
 		return TEXTURE_CACHE.computeIfAbsent(definition.id(), id -> registerFromBundle(definition, "texture.png", "cape_" + id.replace('-', '_'))
 				.orElseThrow(() -> new RuntimeException("Failed to load cape texture for " + definition.id())));
+	}
+
+	/** Raw bytes of one bundle entry ({@code texture.png} / {@code frames.gif}) - what Velo Network uploads for a custom cape. */
+	public static byte[] readBundleEntryBytes(CapeDefinition definition, String entryName) throws IOException {
+		try (InputStream in = openBundleEntry(definition, entryName)) {
+			return in.readAllBytes();
+		} catch (RuntimeException e) {
+			throw new IOException(e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * Registers an already-decoded image as {@code definitionId}'s static cape
+	 * texture, so {@link #textureIdentifier} never needs to read a bundle for
+	 * it - used for other players' downloaded custom capes, which are decoded
+	 * off-thread (see {@link RemoteCapeCache}). Render thread only.
+	 */
+	public static Identifier registerPreloadedTexture(String definitionId, NativeImage image, String label) {
+		Identifier identifier = Identifier.of("velo-client", "cape_" + definitionId.replace('-', '_'));
+		MinecraftClient.getInstance().getTextureManager()
+				.registerTexture(identifier, new NativeImageBackedTexture(() -> label, image));
+		TEXTURE_CACHE.put(definitionId, identifier);
+		return identifier;
 	}
 
 	/** Reads one zip entry's full bytes into memory - used for {@code frames.gif}, which {@link GifDecoder} needs as a plain {@link InputStream}, not a {@link net.minecraft.client.texture.NativeImage}. */

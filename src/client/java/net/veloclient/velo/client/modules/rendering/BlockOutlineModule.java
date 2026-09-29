@@ -14,6 +14,7 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 
 import java.util.List;
 import java.util.Locale;
@@ -42,7 +43,8 @@ public final class BlockOutlineModule extends AbstractModule implements Configur
 				"Replaces the default selected-block outline with a customizable color and line width.",
 				ModuleCategory.RENDERING, SafetyTag.COSMETIC_ONLY, false);
 		instance = this;
-		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(this::onRender);
+		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.WORLD_RENDER, () -> onRender(context)));
 	}
 
 	/** Read from {@code BlockOutlineCancelMixin} to decide whether to cancel vanilla's own outline render call. */

@@ -18,7 +18,9 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -40,14 +42,26 @@ import java.util.Locale;
  */
 public final class TntTimerModule extends AbstractModule implements Configurable {
 
+	// Scanning every loaded entity every single frame just to find the (usually zero) primed TNT
+	// among them scales with total entity count for no benefit - a 4-second fuse doesn't need
+	// 60+Hz discovery. The full world.getEntities() scan only re-runs on this interval; already-
+	// found entities are still repositioned every frame below from this cached list (cheap - just
+	// the handful of TNT actually in the world, not every entity) so the countdown/position stay
+	// smooth, and isRemoved() prunes exploded ones without waiting for the next rescan.
+	private static final long RESCAN_INTERVAL_NANOS = 150_000_000L;
+
 	private int textColor = 0xFFFF5555;
 	private double textScale = 0.5;
+
+	private List<Entity> cachedTnt = List.of();
+	private long lastScanNanos;
 
 	public TntTimerModule() {
 		super("tnt-timer", "TNT Timer",
 				"Shows a live countdown above primed TNT, with a customizable color and text size.",
 				ModuleCategory.RENDERING, SafetyTag.COSMETIC_ONLY, false);
-		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(this::onRender);
+		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.WORLD_RENDER, () -> onRender(context)));
 	}
 
 	private void onRender(WorldRenderContext context) {
@@ -59,16 +73,30 @@ public final class TntTimerModule extends AbstractModule implements Configurable
 		if (world == null) {
 			return;
 		}
-		for (Entity entity : world.getEntities()) {
-			//? if <26.1 {
-			if (!(entity instanceof TntEntity tnt)) {
-				continue;
+		long now = System.nanoTime();
+		if (now - lastScanNanos >= RESCAN_INTERVAL_NANOS) {
+			lastScanNanos = now;
+			List<Entity> found = new ArrayList<>();
+			for (Entity entity : world.getEntities()) {
+				//? if <26.1 {
+				if (entity instanceof TntEntity) {
+				//?} else {
+				/*if (entity instanceof PrimedTnt) {
+				*///?}
+					found.add(entity);
+				}
 			}
+			cachedTnt = found;
+		} else {
+			cachedTnt.removeIf(Entity::isRemoved);
+		}
+
+		for (Entity entity : cachedTnt) {
+			//? if <26.1 {
+			TntEntity tnt = (TntEntity) entity;
 			int fuse = tnt.getFuse();
 			//?} else {
-			/*if (!(entity instanceof PrimedTnt tnt)) {
-				continue;
-			}
+			/*PrimedTnt tnt = (PrimedTnt) entity;
 			int fuse = tnt.getFuse();
 			*///?}
 			String label = String.format(Locale.ROOT, "%.1fs", fuse / 20.0);

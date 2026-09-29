@@ -24,6 +24,16 @@ public interface Module {
 	/** Whether this module ships enabled by default on a fresh profile. */
 	boolean defaultEnabled();
 
+	/**
+	 * Whether a saved profile's enabled state for this module should be restored on startup.
+	 * True for almost everything - false is reserved for modules (automation/bots that walk,
+	 * mine, or run commands on their own) that should always require a deliberate, explicit
+	 * re-enable each session rather than silently resuming wherever they left off.
+	 */
+	default boolean restoreEnabledStateOnLoad() {
+		return true;
+	}
+
 	boolean isEnabled();
 
 	void setEnabled(boolean enabled);

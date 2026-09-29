@@ -3,7 +3,6 @@ package net.veloclient.velo.client.modules.performance;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.PostEffectProcessor;
 import net.minecraft.client.render.DefaultFramebufferSet;
-import net.minecraft.client.util.memory.ObjectAllocator;
 import net.minecraft.util.Identifier;
 import net.veloclient.velo.VeloClient;
 import net.veloclient.velo.module.AbstractModule;
@@ -45,6 +44,15 @@ public final class PolyBlurModule extends AbstractModule implements Configurable
 			"High", Identifier.of("velo-client", "polyblur_high"));
 	private static final Map<Identifier, PostEffectProcessor> LOADED = new HashMap<>();
 	private static volatile boolean broken;
+	// The blur's intermediate render targets are reused across frames from this pool (the same
+	// kind vanilla's GameRenderer keeps) - the old TRIVIAL/UNPOOLED allocator created and freed
+	// full-screen framebuffers on every single blurred frame, which caused the very stutter a
+	// motion-blur effect is worst at hiding. Entries unused for 3 frames are released.
+	//? if <26.1 {
+	private static final net.minecraft.client.util.memory.ObjectPool POOL = new net.minecraft.client.util.memory.ObjectPool(3);
+	//?} else {
+	/*private static final com.mojang.blaze3d.resource.CrossFrameResourcePool POOL = new com.mojang.blaze3d.resource.CrossFrameResourcePool(3);
+	*///?}
 
 	private String strength = "Low";
 	private double sensitivity = 18.0;
@@ -118,11 +126,14 @@ public final class PolyBlurModule extends AbstractModule implements Configurable
 					id -> client.getShaderLoader().loadPostEffect(id, DefaultFramebufferSet.MAIN_ONLY));
 			if (processor != null) {
 				//? if <26.1 {
-				processor.render(client.getFramebuffer(), ObjectAllocator.TRIVIAL);
+				processor.render(client.getFramebuffer(), POOL);
+				POOL.decrementLifespan();
 				//?} else if <26.2 {
-				/*processor.process(client.getMainRenderTarget(), GraphicsResourceAllocator.UNPOOLED);
+				/*processor.process(client.getMainRenderTarget(), POOL);
+				POOL.endFrame();
 				*///?} else {
-				/*processor.process(client.gameRenderer.mainRenderTarget(), GraphicsResourceAllocator.UNPOOLED);
+				/*processor.process(client.gameRenderer.mainRenderTarget(), POOL);
+				POOL.endFrame();
 				*///?}
 			}
 		} catch (Throwable t) {
@@ -145,6 +156,7 @@ public final class PolyBlurModule extends AbstractModule implements Configurable
 	@Override
 	public void onDisable() {
 		havePrevious = false;
+		POOL.clear();
 	}
 
 	@Override

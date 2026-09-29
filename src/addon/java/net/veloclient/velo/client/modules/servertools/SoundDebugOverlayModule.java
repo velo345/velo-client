@@ -15,7 +15,9 @@ import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A top-down radar circle showing which direction nearby sounds are coming
@@ -30,6 +32,9 @@ import java.util.List;
 public final class SoundDebugOverlayModule extends AbstractModule implements HudModule, Configurable {
 
 	private static final int LABEL_OFFSET = 10;
+	// Items are registry singletons, so one ItemStack per Item is reused across frames instead of
+	// allocating a new one for every visible blip every frame.
+	private static final Map<Item, ItemStack> ICON_STACKS = new HashMap<>();
 
 	private final HudPosition position = new HudPosition(0.75f, 0.07f);
 	private int radius = 36;
@@ -106,7 +111,7 @@ public final class SoundDebugOverlayModule extends AbstractModule implements Hud
 			VeloDraw.fillRounded(context, px - 2, py - 2, 4, 4, 2, dotColor);
 
 			if (showIcon) {
-				ItemStack icon = new ItemStack(categoryIcon(blip));
+				ItemStack icon = ICON_STACKS.computeIfAbsent(categoryIcon(blip), ItemStack::new);
 				context.getMatrices().pushMatrix();
 				context.getMatrices().translate(px + LABEL_OFFSET, py - 4);
 				context.getMatrices().scale(0.5f, 0.5f);

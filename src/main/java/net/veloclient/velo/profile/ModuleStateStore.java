@@ -14,10 +14,6 @@ import java.util.Map;
  * it works for any module without per-module serialization code. Backs the
  * profile system (design spec section 5/8) - before this, none of it was
  * persisted at all, so every setting reset to its code default on relaunch.
- *
- * <p>{@link ConfigField.KeybindField} is intentionally not captured - it
- * only exposes a display-text supplier, not the raw key code, so there's
- * nothing safe to round-trip through JSON yet.
  */
 public final class ModuleStateStore {
 
@@ -45,6 +41,8 @@ public final class ModuleStateStore {
 						fields.put(color.label(), color.get().getAsInt());
 					} else if (field instanceof ConfigField.ChordKeybindField chord) {
 						fields.put(chord.label(), chord.get().get());
+					} else if (field instanceof ConfigField.KeybindField keybind) {
+						fields.put(keybind.label(), keybind.getKeyCode().getAsInt());
 					}
 				}
 			}
@@ -75,6 +73,8 @@ public final class ModuleStateStore {
 						choice.set().accept(str);
 					} else if (field instanceof ConfigField.ColorField color && value instanceof Number number) {
 						color.set().accept(number.intValue());
+					} else if (field instanceof ConfigField.KeybindField keybind && value instanceof Number number) {
+						keybind.onKeyCodeChosen().accept(number.intValue());
 					} else if (field instanceof ConfigField.ChordKeybindField chord && value instanceof java.util.List<?> list) {
 						// Round-tripped through JSON, so each element
 						// deserializes back as a Double rather than the
@@ -93,8 +93,13 @@ public final class ModuleStateStore {
 			// Applied after fields: modules like Performance Boost read
 			// their own field state (e.g. which preset is selected) from
 			// inside onEnable(), so the fields have to already be correct
-			// before enabling can flip that switch.
-			module.setEnabled(saved.enabled());
+			// before enabling can flip that switch. Automation modules opt
+			// out of this entirely via restoreEnabledStateOnLoad() - they
+			// always come back up disabled regardless of how the profile
+			// was saved.
+			if (module.restoreEnabledStateOnLoad()) {
+				module.setEnabled(saved.enabled());
+			}
 		}
 	}
 }

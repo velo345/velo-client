@@ -35,7 +35,6 @@ public final class GameLauncher {
 
 	private static final String LAUNCHER_NAME = "velo-client-launcher";
 	private static final int DEFAULT_MAX_MEMORY_MB = 4096;
-	private static final int DEFAULT_MIN_MEMORY_MB = 1024;
 
 	/**
 	 * @param process the running game process
@@ -68,6 +67,8 @@ public final class GameLauncher {
 		Path modsDir = InstancePaths.modsDir(instance.id());
 		GameJars.installInto(modsDir, version);
 		FabricApiInstaller.installInto(modsDir, version);
+		listener.onPhase("Checking performance mods...");
+		PerformanceModsInstaller.installInto(instance.id(), modsDir, version);
 
 		JsonArray vanillaLibraries = vanilla.getAsJsonArray("libraries");
 		JsonArray fabricLibraries = fabric.has("libraries") ? fabric.getAsJsonArray("libraries") : new JsonArray();
@@ -157,11 +158,43 @@ public final class GameLauncher {
 		}
 
 		int maxMemoryMb = instance.ramMaxMb() != null ? instance.ramMaxMb() : DEFAULT_MAX_MEMORY_MB;
-		int minMemoryMb = instance.ramMinMb() != null ? instance.ramMinMb() : DEFAULT_MIN_MEMORY_MB;
+		// Matched to max by default (only a user-set explicit min overrides this) rather than a
+		// separate, much lower default (previously 1024m against a 4096m max) - mismatched
+		// -Xms/-Xmx makes the OS/JVM repeatedly grow and shrink the heap pool during play instead
+		// of committing it once up front, which is a real, well-documented source of periodic
+		// lag spikes (the same reasoning Lunar Client's own launcher uses for always matching
+		// these two).
+		int minMemoryMb = instance.ramMinMb() != null ? instance.ramMinMb() : maxMemoryMb;
 
 		List<String> jvmArgs = new ArrayList<>();
 		jvmArgs.add("-Xmx" + maxMemoryMb + "m");
 		jvmArgs.add("-Xms" + minMemoryMb + "m");
+		// G1GC with a strict max pause target, plus a few of its own tuning knobs (new-gen
+		// reserve, region size) - Minecraft's default GC otherwise tends to run big, noticeable
+		// stop-the-world collections instead of small incremental ones, showing up as periodic
+		// full-second freezes rather than smooth frame times. This is the same standard, widely-
+		// documented G1GC tuning recipe Lunar Client and most Minecraft performance guides use;
+		// none of it is Velo-specific or risky - it only changes how the JVM manages memory, never
+		// what the game itself does.
+		jvmArgs.add("-XX:+UseG1GC");
+		jvmArgs.add("-XX:MaxGCPauseMillis=50");
+		jvmArgs.add("-XX:+UnlockExperimentalVMOptions");
+		jvmArgs.add("-XX:G1NewSizePercent=20");
+		jvmArgs.add("-XX:G1ReservePercent=20");
+		jvmArgs.add("-XX:G1HeapRegionSize=32M");
+		jvmArgs.add("-XX:G1MixedGCCountTarget=4");
+		jvmArgs.add("-XX:InitiatingHeapOccupancyPercent=15");
+		// Stops the JVM memory-mapping its hsperfdata stats file - on a busy or slow disk, the
+		// periodic writes to it are a known source of random multi-ms stalls, and nothing in a
+		// game session reads those stats.
+		jvmArgs.add("-XX:+PerfDisableSharedMem");
+		// Compact object headers (JDK 25+, JEP 519): every Java object gets 4 bytes smaller, which
+		// for Minecraft's millions of small objects means noticeably less heap churn and GC work.
+		// The game runs on this same runtime (see javaBinary()), so this only goes on where that
+		// runtime actually understands the flag - an unknown -XX flag would stop the JVM starting.
+		if (Runtime.version().feature() >= 25) {
+			jvmArgs.add("-XX:+UseCompactObjectHeaders");
+		}
 		// Windows' dual-stack connection ordering can spend the whole
 		// connect timeout on a broken/unreachable IPv6 route before ever
 		// falling back to IPv4 for a specific host, timing the connection
@@ -187,8 +220,10 @@ public final class GameLauncher {
 			gameArgs.addAll(resolveArguments(fabric.getAsJsonObject("arguments").getAsJsonArray("game"), values, activeFeatures));
 		}
 
+		String java = javaBinary();
+		WindowsGpuPreference.preferHighPerformance(Path.of(java));
 		List<String> command = new ArrayList<>();
-		command.add(javaBinary());
+		command.add(java);
 		command.addAll(jvmArgs);
 		command.add(mainClass);
 		command.addAll(gameArgs);

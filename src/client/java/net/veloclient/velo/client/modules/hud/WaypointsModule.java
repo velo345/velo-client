@@ -20,6 +20,7 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -47,8 +48,10 @@ public final class WaypointsModule extends AbstractModule implements HudModule, 
 	public WaypointsModule() {
 		super("waypoints", "Waypoints", "Manually place and track named waypoints; never auto-populated.",
 				ModuleCategory.HUD, SafetyTag.ALWAYS_SAFE, false);
-		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
-		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(this::onWorldRender);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
+		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.WORLD_RENDER, () -> onWorldRender(context)));
 	}
 
 	@Override

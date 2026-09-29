@@ -12,6 +12,7 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -25,7 +26,8 @@ public final class CopyCoordinatesModule extends AbstractModule implements Confi
 	public CopyCoordinatesModule() {
 		super("copy-coordinates", "Copy Coordinates", "Copies your current X/Y/Z to the clipboard with one keypress.",
 				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
-		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
 	}
 
 	private void onTick(MinecraftClient client) {

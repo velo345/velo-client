@@ -2,6 +2,7 @@ package net.veloclient.velo.client.modules.hud;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
+import net.veloclient.velo.client.util.ModuleProfiler;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -28,7 +29,8 @@ final class CpsTracker {
 			return;
 		}
 		registered = true;
-		ClientTickEvents.END_CLIENT_TICK.register(CpsTracker::onTick);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+				ModuleProfiler.time("cps-counter", ModuleProfiler.Phase.TICK, () -> onTick(client)));
 	}
 
 	private static void onTick(MinecraftClient client) {

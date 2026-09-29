@@ -40,6 +40,24 @@ fabricApi {
 	configureDataGeneration()
 }
 
+// "Velo Client Addons" - the optional second mod holding the experimental singleplayer/minigame
+// modules (src/addon). Compiled against the core mod's own classes + the same Minecraft/Fabric
+// classpath, but packaged into its own jar (velo-addons-<version>.jar) with its own
+// fabric.mod.json, so players only get those modules if they install that jar too. Stonecutter
+// transforms src/addon per version exactly like src/main and src/client.
+val addon: SourceSet = sourceSets.create("addon") {
+	compileClasspath += sourceSets["main"].output + sourceSets["client"].output + sourceSets["client"].compileClasspath
+	runtimeClasspath += sourceSets["main"].output + sourceSets["client"].output + sourceSets["client"].runtimeClasspath
+}
+
+loom {
+	mods {
+		create("velo-addons") {
+			sourceSet(addon)
+		}
+	}
+}
+
 tasks.named<JavaExec>("runClient") {
 	// The dev-run JVM was auto-detecting AWT as headless (no DISPLAY visible
 	// at the moment GraphicsEnvironment first got touched, likely from how
@@ -84,6 +102,44 @@ tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") 
 	filesMatching("fabric.mod.json") {
 		expand("version" to modVersion, "minecraft_dependency" to minecraftDependency, "java_version" to javaVersion)
 	}
+}
+
+tasks.named<ProcessResources>("processAddonResources") {
+	val modVersion = project.version.toString()
+	val minecraftDependency = "~${sc.current.version}"
+	val javaVersion = requiredJava.majorVersion
+	inputs.property("version", modVersion)
+	inputs.property("minecraftDependency", minecraftDependency)
+	inputs.property("javaVersion", javaVersion)
+	filesMatching("fabric.mod.json") {
+		// The add-on reaches into Velo Client's own classes, so it's pinned to the exact same build.
+		expand("version" to modVersion, "minecraft_dependency" to minecraftDependency,
+				"java_version" to javaVersion, "velo_client_version" to modVersion)
+	}
+}
+
+val addonJar = tasks.register<Jar>("addonJar") {
+	from(addon.output)
+	from(rootProject.file("LICENSE")) { rename { "${it}_velo-addons" } }
+	archiveBaseName.set("velo-addons")
+	// 1.21.11 still needs Loom's intermediary remap below; 26.1+ ships unobfuscated, so this
+	// plain jar is already the final one there.
+	if (sc.current.parsed < "26.1") {
+		archiveClassifier.set("dev")
+		destinationDirectory.set(layout.buildDirectory.dir("devlibs"))
+	}
+}
+
+if (sc.current.parsed < "26.1") {
+	val remapAddonJar = tasks.register<net.fabricmc.loom.task.RemapJarTask>("remapAddonJar") {
+		inputFile.set(addonJar.flatMap { it.archiveFile })
+		archiveBaseName.set("velo-addons")
+		addNestedDependencies.set(false)
+		classpath.from(sourceSets["main"].output, sourceSets["client"].output)
+	}
+	tasks.named("assemble") { dependsOn(remapAddonJar) }
+} else {
+	tasks.named("assemble") { dependsOn(addonJar) }
 }
 
 tasks.withType<JavaCompile>().configureEach {

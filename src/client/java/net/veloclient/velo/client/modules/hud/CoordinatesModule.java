@@ -16,11 +16,11 @@ import net.veloclient.velo.module.SafetyTag;
 public final class CoordinatesModule extends AbstractModule implements HudModule {
 
 	private static final String SAMPLE = "XYZ: -0000 / -000 / -0000";
-	private final HudPosition position = new HudPosition(0.02f, 0.07f);
+	private final HudPosition position = new HudPosition(0.01f, 0.09f);
 
 	public CoordinatesModule() {
 		super("coordinates", "Coordinates", "Displays your current X/Y/Z position.",
-				ModuleCategory.HUD, SafetyTag.ALWAYS_SAFE, true);
+				ModuleCategory.HUD, SafetyTag.ALWAYS_SAFE, false);
 	}
 
 	@Override

@@ -7,6 +7,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.Identifier;
 import net.veloclient.velo.module.Module;
 import net.veloclient.velo.module.ModuleRegistry;
+import net.veloclient.velo.client.util.ModuleProfiler;
 
 /**
  * Draws every enabled {@link HudModule} each frame via Fabric API's layered
@@ -93,7 +94,8 @@ public final class HudManager {
 			if (!(module instanceof HudModule hud) || !hud.isEnabled()) {
 				continue;
 			}
-			renderScaled(context, hud, screenWidth, screenHeight, tickDelta);
+			ModuleProfiler.time(hud.id(), ModuleProfiler.Phase.HUD_RENDER,
+					() -> renderScaled(context, hud, screenWidth, screenHeight, tickDelta));
 		}
 	}
 

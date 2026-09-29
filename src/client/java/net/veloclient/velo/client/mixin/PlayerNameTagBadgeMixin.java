@@ -51,7 +51,7 @@ public abstract class PlayerNameTagBadgeMixin {
 		if (!(entity instanceof net.minecraft.entity.player.PlayerEntity player)) {
 			return false;
 		}
-		return net.veloclient.velo.client.network.VeloUserRegistry.isOnline(player.getUuid());
+		return net.veloclient.velo.client.network.VeloUserRegistry.isOnline(player.getUuid(), player.getGameProfile().name());
 	}
 }
 //?} else {
@@ -77,7 +77,7 @@ public abstract class PlayerNameTagBadgeMixin {
 		if (!(entity instanceof net.minecraft.world.entity.player.Player player)) {
 			return false;
 		}
-		return net.veloclient.velo.client.network.VeloUserRegistry.isOnline(player.getUUID());
+		return net.veloclient.velo.client.network.VeloUserRegistry.isOnline(player.getUUID(), player.getGameProfile().name());
 	}
 }
 *///?}

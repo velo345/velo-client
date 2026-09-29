@@ -14,7 +14,9 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -29,15 +31,28 @@ public final class LightLevelOverlayModule extends AbstractModule implements Con
 
 	private static final int UNSAFE_COLOR = 0xFFFF5555;
 	private static final int SAFE_COLOR = 0xFF55FF55;
+	// The (2*radius+1)^2 column scan below (heightmap + light lookups) is the expensive part,
+	// not drawing the cached labels - at radius 16 that's over a thousand world queries. Redone
+	// every frame this scaled badly with render distance/radius; recomputing a few times a
+	// second instead of 60+ is imperceptible for a debug heatmap that isn't tracking anything
+	// moving.
+	private static final long RECOMPUTE_INTERVAL_NANOS = 200_000_000L;
 
 	private int radius = 8;
 	private int unsafeThreshold = 7;
+
+	private List<Cell> cache = List.of();
+	private long lastComputeNanos;
+
+	private record Cell(BlockPos pos, String label, int color) {
+	}
 
 	public LightLevelOverlayModule() {
 		super("light-level-overlay", "Light Level Overlay",
 				"Shows block light levels on nearby surface blocks, highlighting where hostile mobs can spawn.",
 				ModuleCategory.SERVER_TOOLS, SafetyTag.ALWAYS_SAFE, false);
-		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(this::onRender);
+		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.WORLD_RENDER, () -> onRender(context)));
 	}
 
 	private void onRender(WorldRenderContext context) {
@@ -51,8 +66,18 @@ public final class LightLevelOverlayModule extends AbstractModule implements Con
 			return;
 		}
 
-		int originX = camera.getBlockX();
-		int originZ = camera.getBlockZ();
+		long now = System.nanoTime();
+		if (now - lastComputeNanos >= RECOMPUTE_INTERVAL_NANOS) {
+			lastComputeNanos = now;
+			cache = recompute(world, camera.getBlockX(), camera.getBlockZ());
+		}
+		for (Cell cell : cache) {
+			GizmoDrawing.blockLabel(cell.label(), cell.pos(), 0, cell.color(), 1.0f);
+		}
+	}
+
+	private List<Cell> recompute(ClientWorld world, int originX, int originZ) {
+		List<Cell> result = new ArrayList<>();
 		for (int dx = -radius; dx <= radius; dx++) {
 			for (int dz = -radius; dz <= radius; dz++) {
 				int x = originX + dx;
@@ -64,9 +89,10 @@ public final class LightLevelOverlayModule extends AbstractModule implements Con
 				BlockPos spawnPos = new BlockPos(x, surfaceY, z);
 				int light = world.getLightLevel(LightType.BLOCK, spawnPos);
 				int color = light <= unsafeThreshold ? UNSAFE_COLOR : SAFE_COLOR;
-				GizmoDrawing.blockLabel(String.valueOf(light), spawnPos, 0, color, 1.0f);
+				result.add(new Cell(spawnPos, String.valueOf(light), color));
 			}
 		}
+		return result;
 	}
 
 	@Override

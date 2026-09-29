@@ -9,6 +9,7 @@ import net.veloclient.velo.client.hud.HudPosition;
 import net.veloclient.velo.module.AbstractModule;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 
 /**
  * Local-only session stats: deaths and time played this session, detected by
@@ -25,7 +26,8 @@ public final class SessionStatsModule extends AbstractModule implements HudModul
 	public SessionStatsModule() {
 		super("session-stats", "Session Stats", "Tracks deaths and time played this session, locally only.",
 				ModuleCategory.HUD, SafetyTag.ALWAYS_SAFE, false);
-		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
 	}
 
 	@Override

@@ -19,6 +19,14 @@ pointed at the same server.
 - Publishes which of the built-in Store capes (the shared, bundled-with-every-client
   ones) each online player has equipped, so other clients can render it
   without needing to download anyone's texture.
+- Stores players' own **custom capes** (imported PNG/GIF) so everyone else on
+  the server sees them too. The mod uploads your equipped custom cape once
+  (the "Share Custom Cape" toggle on the Velo Network module, on by default);
+  other clients download it once and cache it. Uploads are decoded and
+  re-encoded server-side, content-addressed by SHA-256, and kept on disk in
+  the data directory, so they survive restarts. Limits: PNG up to 2048x1024
+  (2:1 cape, or 1:1 cape+elytra, width a multiple of 64); animated GIF up to
+  512 wide and 128 frames; 6 MB per upload; one custom cape per account.
 - That's it for now - no chat, no friends list, no moderation tooling. More
   can be layered on top of the same `/v1/online` shape later.
 
@@ -38,9 +46,18 @@ By default it listens on port `8787` on all interfaces. Override with the
 VELO_SERVER_PORT=9000 java -jar server/build/libs/velo-server.jar
 ```
 
-**No other file is needed alongside the jar.** Everything server-side lives
-in memory and the only knob is that one environment variable - there's no
-`config.json`/`.properties` file to create, copy, or keep in sync. (A reverse
+**No other file is needed alongside the jar.** Configuration is three
+optional environment variables - there's no `config.json`/`.properties`
+file to create:
+
+| Variable | Default | What it does |
+|---|---|---|
+| `VELO_SERVER_PORT` | `8787` | Port to listen on |
+| `VELO_DATA_DIR` | `./data` (relative to the working directory) | Where uploaded custom capes are stored (`capes/`, `capes.json`, `banned-capes.json`) |
+| `VELO_ADMIN_TOKEN` | unset (admin endpoint disabled) | Secret for removing a player's custom cape (see "Moderation") |
+
+Online sessions still live only in memory; only custom capes are written to
+the data directory. (A reverse
 proxy like Caddy, below, keeps its own config, but that's a separate process
 running next to this one, not something this jar reads.)
 
@@ -61,8 +78,11 @@ After=network.target
 
 [Service]
 ExecStart=/usr/bin/java -jar /opt/velo-server/velo-server.jar
+WorkingDirectory=/opt/velo-server
 Restart=on-failure
 Environment=VELO_SERVER_PORT=8787
+Environment=VELO_DATA_DIR=/opt/velo-server/data
+Environment=VELO_ADMIN_TOKEN=change-me-to-a-long-random-string
 User=velo-server
 NoNewPrivileges=true
 
@@ -71,9 +91,10 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-sudo mkdir -p /opt/velo-server
+sudo mkdir -p /opt/velo-server/data
 sudo cp server/build/libs/velo-server.jar /opt/velo-server/
 sudo useradd --system --no-create-home velo-server || true
+sudo chown -R velo-server:velo-server /opt/velo-server/data
 sudo systemctl daemon-reload
 sudo systemctl enable --now velo-server
 sudo journalctl -u velo-server -f   # logs
@@ -204,6 +225,9 @@ server {
 	listen 80;
 	server_name client.asteriasmp.net;
 
+	# Custom cape uploads are up to 6 MB - nginx's default limit is 1 MB.
+	client_max_body_size 8m;
+
 	location / {
 		proxy_pass http://localhost:8787;
 		proxy_set_header Host $host;
@@ -288,13 +312,33 @@ handler code.
 | POST   | `/v1/session/verify`    | `{uuid, serverId}`                | Returns `{sessionToken, heartbeatIntervalSeconds, sessionTtlSeconds}` |
 | POST   | `/v1/heartbeat`         | `{sessionToken, capeId}`          | Keeps a session alive and publishes the currently-equipped cape (or `null`) |
 | POST   | `/v1/session/end`       | `{sessionToken}`                  | Explicit "going offline" - optional, sessions expire on their own too |
-| GET    | `/v1/online`            | -                                  | `{users: [{uuid, username, capeId}], serverTimeMillis}` |
+| GET    | `/v1/online`            | -                                  | `{users: [{uuid, username, capeId}], serverTimeMillis}` - `capeId` is a Store id or `custom:<sha256>` |
+| POST   | `/v1/cape/upload`       | raw PNG/GIF bytes, `Authorization: Bearer <sessionToken>` | Returns `{capeId: "custom:<sha256>"}` |
+| POST   | `/v1/cape/remove`       | `Authorization: Bearer <sessionToken>` | Removes your own custom cape |
+| GET    | `/v1/cape/<sha256>`     | -                                  | The cape image; immutable, cacheable forever |
+| POST   | `/v1/admin/cape/remove` | `{uuid}`, `Authorization: Bearer $VELO_ADMIN_TOKEN` | Removes a player's custom cape and bans that exact image |
+
+The heartbeat response also echoes the `capeId` the server accepted
+(`null` if it refused it, e.g. a `custom:` id that isn't that player's own
+upload).
+
+## Moderation
+
+Anyone signed in can upload a custom cape, so on a public server set
+`VELO_ADMIN_TOKEN`. To remove someone's cape (it disappears for everyone
+within ~20 s, and the same image can't be re-uploaded):
+
+```bash
+curl -X POST https://velo.yourdomain.com/v1/admin/cape/remove \
+  -H "Authorization: Bearer $VELO_ADMIN_TOKEN" \
+  -d '{"uuid":"<player uuid, dashed or not>"}'
+```
 
 ## Known limitations (v1)
 
-- Only the built-in Store capes sync across players - a custom `.velocape`
-  you imported yourself only shows on your own client, since there's no
-  texture-upload endpoint yet. That's the natural next thing to add here.
-- No persistence, no moderation/blocklist, no rate limiting beyond a body
-  size cap. Fine for a friend group or small community; harden before
-  exposing this to a large public audience.
+- Custom capes sync the cape texture only - a bundled elytra texture stays
+  local, and other players' capes render with a fixed lean (no cloth
+  physics).
+- Moderation is the admin endpoint above; there's no automatic content
+  filtering. Rate limiting is one upload per account per 10 s plus body size
+  caps - there's no per-IP limit on the auth endpoints yet.

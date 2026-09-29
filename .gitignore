@@ -16,3 +16,6 @@ run/
 # OS
 .DS_Store
 Thumbs.db
+
+# Decompiled Minecraft classes extracted during API research - never commit these
+/net/

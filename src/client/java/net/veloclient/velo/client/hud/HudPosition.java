@@ -10,10 +10,20 @@ public final class HudPosition {
 	private float xFraction;
 	private float yFraction;
 	private float scale = 1.0f;
+	private final float defaultXFraction;
+	private final float defaultYFraction;
 
 	public HudPosition(float xFraction, float yFraction) {
 		this.xFraction = xFraction;
 		this.yFraction = yFraction;
+		this.defaultXFraction = xFraction;
+		this.defaultYFraction = yFraction;
+	}
+
+	/** Back to the element's built-in default spot and size - the HUD editor's "Reset Layout". */
+	public void resetToDefault() {
+		set(defaultXFraction, defaultYFraction);
+		scale = 1.0f;
 	}
 
 	public float scale() {

@@ -18,7 +18,7 @@ public final class ClockModule extends AbstractModule implements HudModule {
 	// Bottom-right, not top-right - Scoreboard (also on by default) owns the
 	// top-right corner and can grow tall, so anything else parked there
 	// would sit right under/behind it on a fresh profile.
-	private final HudPosition position = new HudPosition(0.98f, 0.90f);
+	private final HudPosition position = new HudPosition(0.99f, 0.01f);
 
 	public ClockModule() {
 		super("clock", "Clock", "Displays the current real-world time.",

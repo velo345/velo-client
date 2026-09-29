@@ -14,6 +14,7 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -55,8 +56,10 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 	public ZoomModule() {
 		super("zoom", "Zoom", "Hold the zoom key to smoothly narrow your FOV, spyglass-style. Scroll while held to adjust.",
 				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
-		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
-		WorldRenderEvents.BEFORE_ENTITIES.register(this::onFrame);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
+		WorldRenderEvents.BEFORE_ENTITIES.register(context ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.WORLD_RENDER, () -> onFrame(context)));
 	}
 
 	@Override

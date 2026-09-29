@@ -6,6 +6,7 @@ import net.minecraft.client.option.GameOptions;
 import net.minecraft.client.option.GraphicsMode;
 import net.minecraft.client.option.InactivityFpsLimit;
 import net.minecraft.particle.ParticlesMode;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import org.lwjgl.glfw.GLFW;
 import net.veloclient.velo.module.AbstractModule;
 import net.veloclient.velo.module.ConfigField;
@@ -48,14 +49,29 @@ import java.util.List;
  *       the launcher, not here.</li>
  *   <li><b>"Poly Patcher"</b> is another client's own closed-source internal
  *       system - not something that can be integrated.</li>
+ *   <li><b>Max FPS preset</b> additionally turns off the options that cost the most frame time
+ *       for the least visual difference: smooth lighting, cutout ("fancy") leaves - opaque leaves
+ *       are the single biggest win in forests - improved transparency, chunk fade-in, texture
+ *       filtering, menu blur, and a shorter weather radius.</li>
+ *   <li><b>Adaptive Render Distance</b> watches real FPS and steps the view distance down one
+ *       chunk at a time while it stays under the target (and back up to your own setting once
+ *       there's headroom), so a heavy area costs chunks instead of frame drops.</li>
  * </ul>
  */
 public final class PerformanceBoostModule extends AbstractModule implements Configurable {
 
-	/** Read by other modules to throttle expensive per-frame work to ~20Hz instead of every frame. Default off - opt-in, not a silent behavior change. */
-	public static volatile boolean hudCachingEnabled = false;
+	/**
+	 * Read by other modules to throttle expensive per-frame work (e.g. counting every loaded
+	 * entity) to ~20Hz instead of every frame. Defaults on: this module itself defaults to
+	 * enabled, and a throttle that only engages when someone happens to also flip the "HUD
+	 * Caching" toggle otherwise silently never fires for the common case, defeating the point of
+	 * shipping it in the first place.
+	 */
+	public static volatile boolean hudCachingEnabled = true;
 
-	private static final List<String> PRESETS = List.of("Default", "Performance", "Medium Quality", "High Quality");
+	private static final List<String> PRESETS = List.of("Default", "Max FPS", "Performance", "Medium Quality", "High Quality");
+	private static final int ADAPTIVE_MIN_DISTANCE = 5;
+	private static final int ADAPTIVE_WINDOW_TICKS = 60;
 
 	private GraphicsMode previousGraphics;
 	private ParticlesMode previousParticles;
@@ -70,10 +86,84 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	private boolean dynamicFps = true;
 	private String vsyncMode = "Off";
 
+	private boolean adaptiveDistance = false;
+	private int targetFps = 90;
+	/** The view distance the player actually chose - adaptive mode never goes above it. */
+	private int adaptiveBaseline = -1;
+	private long fpsSum;
+	private int fpsSamples;
+	private int lowWindows;
+	private int highWindows;
+
 	public PerformanceBoostModule() {
 		super("performance-boost", "Performance Boost",
 				"Presets and individually-tunable settings for maximum FPS - view distance, entities, particles, VSync, HUD caching and more.",
 				ModuleCategory.PERFORMANCE, SafetyTag.ALWAYS_SAFE, true);
+		ClientTickEvents.END_CLIENT_TICK.register(this::tickAdaptiveDistance);
+	}
+
+	/**
+	 * Averages real FPS over 3-second windows; two slow windows in a row drop the view distance
+	 * by one chunk, five fast ones in a row raise it back by one (never above the player's own
+	 * choice). Paused in menus and while unfocused, where FPS says nothing about the world.
+	 */
+	private void tickAdaptiveDistance(MinecraftClient client) {
+		//? if <26.1 {
+		boolean inMenu = client.currentScreen != null || !client.isWindowFocused();
+		//?} else if <26.2 {
+		/*boolean inMenu = client.screen != null || !client.isWindowActive();
+		*///?} else {
+		/*boolean inMenu = client.gui.screen() != null || !client.isWindowActive();
+		*///?}
+		if (!isEnabled() || !adaptiveDistance || client.world == null || client.player == null || inMenu) {
+			fpsSum = 0;
+			fpsSamples = 0;
+			return;
+		}
+		GameOptions options = client.options;
+		if (adaptiveBaseline < 0) {
+			adaptiveBaseline = options.getViewDistance().getValue();
+		}
+		fpsSum += VideoOptions.currentFps();
+		if (++fpsSamples < ADAPTIVE_WINDOW_TICKS) {
+			return;
+		}
+		double average = fpsSum / (double) fpsSamples;
+		fpsSum = 0;
+		fpsSamples = 0;
+		int distance = options.getViewDistance().getValue();
+		if (average < targetFps * 0.85) {
+			highWindows = 0;
+			if (++lowWindows >= 2 && distance > ADAPTIVE_MIN_DISTANCE) {
+				options.getViewDistance().setValue(distance - 1);
+				refreshRendering();
+				lowWindows = 0;
+			}
+		} else if (average > targetFps * 1.3) {
+			lowWindows = 0;
+			if (++highWindows >= 5 && distance < adaptiveBaseline) {
+				options.getViewDistance().setValue(distance + 1);
+				refreshRendering();
+				highWindows = 0;
+			}
+		} else {
+			lowWindows = 0;
+			highWindows = 0;
+		}
+	}
+
+	/** Puts the view distance back to what the player chose, when adaptive mode stops. */
+	private void restoreAdaptiveBaseline() {
+		if (adaptiveBaseline > 0) {
+			GameOptions options = MinecraftClient.getInstance().options;
+			if (options.getViewDistance().getValue() != adaptiveBaseline) {
+				options.getViewDistance().setValue(adaptiveBaseline);
+				refreshRendering();
+			}
+		}
+		adaptiveBaseline = -1;
+		lowWindows = 0;
+		highWindows = 0;
 	}
 
 	@Override
@@ -92,6 +182,15 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		if (dynamicFps) {
 			options.getInactivityFpsLimit().setValue(InactivityFpsLimit.AFK);
 		}
+		// applyPreset() above writes straight to the GameOptions values, same as every
+		// individual slider/toggle below already does - but unlike those, this path never called
+		// refreshRendering() afterward. Vanilla's own video settings screen only actually re-queues
+		// terrain (picking up view distance/entity distance/shadows/clouds/biome blend) through a
+		// UI change-callback that a direct setValue() call bypasses entirely, so toggling this
+		// module off and back on mid-session silently changed the options with no visible FPS
+		// difference until something else happened to trigger a refresh - exactly the "doesn't
+		// seem to do anything" symptom this was reported as.
+		refreshRendering();
 	}
 
 	@Override
@@ -99,6 +198,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		if (previousGraphics == null) {
 			return;
 		}
+		restoreAdaptiveBaseline();
 		GameOptions options = MinecraftClient.getInstance().options;
 		options.getPreset().setValue(previousGraphics);
 		options.getParticles().setValue(previousParticles);
@@ -109,11 +209,28 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		options.getBiomeBlendRadius().setValue(previousBiomeBlend);
 		options.getInactivityFpsLimit().setValue(previousInactivityLimit);
 		previousGraphics = null;
+		// Same reasoning as onEnable() above - restoring the previous values directly needs the
+		// same explicit refresh to actually take visible effect again.
+		refreshRendering();
 	}
 
 	private void applyPreset(String name) {
 		GameOptions options = MinecraftClient.getInstance().options;
 		switch (name) {
+			case "Max FPS" -> {
+				options.getPreset().setValue(GraphicsMode.FAST);
+				options.getParticles().setValue(ParticlesMode.MINIMAL);
+				options.getEntityShadows().setValue(false);
+				options.getViewDistance().setValue(Math.min(options.getViewDistance().getValue(), 6));
+				options.getSimulationDistance().setValue(Math.min(options.getSimulationDistance().getValue(), 6));
+				applyVsyncMode("Off");
+				options.getCloudRenderMode().setValue(CloudRenderMode.OFF);
+				options.getBiomeBlendRadius().setValue(0);
+				options.getEntityDistanceScaling().setValue(0.5);
+				options.getMipmapLevels().setValue(0);
+				applyLowCostRendering();
+				VideoOptions.setWeatherRadius(3);
+			}
 			case "Performance" -> {
 				options.getPreset().setValue(GraphicsMode.FAST);
 				options.getParticles().setValue(ParticlesMode.MINIMAL);
@@ -124,6 +241,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				options.getBiomeBlendRadius().setValue(0);
 				options.getEntityDistanceScaling().setValue(0.75);
 				options.getMipmapLevels().setValue(0);
+				applyLowCostRendering();
 			}
 			case "Medium Quality" -> {
 				options.getPreset().setValue(GraphicsMode.FAST);
@@ -135,6 +253,9 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				options.getBiomeBlendRadius().setValue(2);
 				options.getEntityDistanceScaling().setValue(1.0);
 				options.getMipmapLevels().setValue(2);
+				VideoOptions.setSmoothLighting(true);
+				VideoOptions.setFancyLeaves(false);
+				VideoOptions.setImprovedTransparency(false);
 			}
 			case "High Quality" -> {
 				options.getPreset().setValue(GraphicsMode.FANCY);
@@ -146,6 +267,8 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				options.getBiomeBlendRadius().setValue(5);
 				options.getEntityDistanceScaling().setValue(1.5);
 				options.getMipmapLevels().setValue(4);
+				VideoOptions.setSmoothLighting(true);
+				VideoOptions.setFancyLeaves(true);
 			}
 			default -> {
 				// "Default" - since this module is enabled out of the box,
@@ -164,10 +287,25 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		}
 	}
 
+	/**
+	 * The options with the worst cost-to-looks ratio: smooth lighting, cutout ("fancy") leaves -
+	 * opaque leaves stop every leaf block's faces being drawn and blended, the biggest single win
+	 * in forests - improved transparency, chunk fade-in, texture filtering and menu blur.
+	 */
+	private static void applyLowCostRendering() {
+		VideoOptions.setSmoothLighting(false);
+		VideoOptions.setFancyLeaves(false);
+		VideoOptions.setImprovedTransparency(false);
+		VideoOptions.setChunkFade(0.0);
+		VideoOptions.setTextureFilteringOff();
+		VideoOptions.setMenuBlur(0);
+		VideoOptions.setCloudRange(2);
+	}
+
 	@Override
 	public List<ConfigField> configFields() {
 		GameOptions options = MinecraftClient.getInstance().options;
-		return List.of(
+		List<ConfigField> fields = new java.util.ArrayList<>(List.of(
 				new ConfigField.ChoiceField("Preset", PRESETS, () -> preset, v -> {
 					preset = v;
 					if (isEnabled()) {
@@ -187,7 +325,14 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 						() -> options.getMaxFps().getValue(), v -> options.getMaxFps().setValue((int) v),
 						v -> (int) v >= 260 ? "Unlimited" : String.valueOf((int) v)),
 				new ConfigField.SliderField("View Distance", 2, 32,
-						() -> options.getViewDistance().getValue(), v -> { options.getViewDistance().setValue((int) v); refreshRendering(); }, v -> String.valueOf((int) v)),
+						() -> options.getViewDistance().getValue(), v -> {
+							options.getViewDistance().setValue((int) v);
+							// A manual change is the new ceiling adaptive mode works under.
+							if (adaptiveBaseline > 0) {
+								adaptiveBaseline = (int) v;
+							}
+							refreshRendering();
+						}, v -> String.valueOf((int) v)),
 				new ConfigField.SliderField("Simulation Distance", 5, 32,
 						() -> options.getSimulationDistance().getValue(), v -> options.getSimulationDistance().setValue((int) v), v -> String.valueOf((int) v)),
 				new ConfigField.SliderField("Turbo Entities (entity distance)", 0.5, 5.0,
@@ -206,7 +351,28 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 						v -> { options.getMipmapLevels().setValue((int) v); reloadRendering(); }, v -> String.valueOf((int) v)),
 				new ConfigField.ChoiceField("Particles", List.of("Minimal", "Decreased", "All"),
 						() -> particlesLabel(options.getParticles().getValue()),
-						v -> { options.getParticles().setValue(particlesFromLabel(v)); refreshRendering(); }));
+						v -> { options.getParticles().setValue(particlesFromLabel(v)); refreshRendering(); }),
+				new ConfigField.ToggleField("Adaptive Render Distance", () -> adaptiveDistance, v -> {
+					adaptiveDistance = v;
+					if (!v) {
+						restoreAdaptiveBaseline();
+					}
+				}),
+				new ConfigField.SliderField("Adaptive Target FPS", 30, 240, () -> targetFps, v -> targetFps = (int) v,
+						v -> (int) v + " FPS"),
+				new ConfigField.ToggleField("Smooth Lighting", VideoOptions::smoothLighting,
+						v -> { VideoOptions.setSmoothLighting(v); refreshRendering(); }),
+				new ConfigField.ToggleField("Fancy Leaves", VideoOptions::fancyLeaves,
+						v -> { VideoOptions.setFancyLeaves(v); refreshRendering(); }),
+				new ConfigField.ToggleField("Improved Transparency", VideoOptions::improvedTransparency,
+						v -> { VideoOptions.setImprovedTransparency(v); reloadRendering(); }),
+				new ConfigField.ToggleField("Chunk Fade-In", () -> VideoOptions.chunkFade() > 0,
+						v -> VideoOptions.setChunkFade(v ? 0.75 : 0.0))));
+		if (VideoOptions.hasGraphicsBackendChoice()) {
+			fields.add(new ConfigField.ChoiceField("Graphics API (restart)", List.of("Default", "OpenGL", "Vulkan"),
+					VideoOptions::graphicsBackend, VideoOptions::setGraphicsBackend));
+		}
+		return fields;
 	}
 
 	/**

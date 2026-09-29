@@ -59,21 +59,49 @@ final class SessionRegistry {
 	}
 
 	String createSession(String uuid, String username) {
+		// One live session per account: a client that re-authenticates (restart, dropped token,
+		// switching between the Velo launcher and the vanilla one) used to leave its previous
+		// session behind until it expired, so /v1/online listed the same player twice - possibly
+		// with a stale cape - for up to SESSION_TTL_MILLIS.
+		sessionsByToken.values().removeIf(s -> s.uuid().equals(uuid));
 		String token = randomHex(32);
 		sessionsByToken.put(token, new Session(uuid, username, null, System.currentTimeMillis() + SESSION_TTL_MILLIS));
 		return token;
 	}
 
-	/** Refreshes the session's TTL and cape choice; returns false if the token is unknown/expired. */
-	boolean heartbeat(String token, String capeId) {
+	/** The live session behind {@code token}, or null if it's unknown/expired. */
+	Session session(String token) {
+		if (token == null) {
+			return null;
+		}
 		Session session = sessionsByToken.get(token);
 		if (session == null || session.expiresAtMillis() < System.currentTimeMillis()) {
-			sessionsByToken.remove(token);
-			return false;
+			return null;
 		}
-		sessionsByToken.put(token, new Session(session.uuid(), session.username(), normalizeCapeId(capeId),
-				System.currentTimeMillis() + SESSION_TTL_MILLIS));
-		return true;
+		return session;
+	}
+
+	/**
+	 * Refreshes the session's TTL and cape choice; returns the updated session, or null if the token is unknown/expired.
+	 * A {@code custom:<hash>} cape id is only accepted if it's the cape this same account uploaded
+	 * ({@code ownCustomCapeHash}) - otherwise anyone could point their cape at any other player's
+	 * upload, or at a hash an admin removed.
+	 */
+	Session heartbeat(String token, String capeId, String ownCustomCapeHash) {
+		Session session = session(token);
+		if (session == null) {
+			sessionsByToken.remove(token);
+			return null;
+		}
+		String normalized = normalizeCapeId(capeId);
+		if (normalized != null && normalized.startsWith(CapeStore.CUSTOM_PREFIX)
+				&& (ownCustomCapeHash == null || !normalized.equals(CapeStore.CUSTOM_PREFIX + ownCustomCapeHash))) {
+			normalized = null;
+		}
+		Session refreshed = new Session(session.uuid(), session.username(), normalized,
+				System.currentTimeMillis() + SESSION_TTL_MILLIS);
+		sessionsByToken.put(token, refreshed);
+		return refreshed;
 	}
 
 	void endSession(String token) {
@@ -104,7 +132,8 @@ final class SessionRegistry {
 			return null;
 		}
 		String trimmed = capeId.trim();
-		return trimmed.length() > 64 ? trimmed.substring(0, 64) : trimmed;
+		// custom:<64 hex chars> is 71 long, so the cap has to leave room for it.
+		return trimmed.length() > 96 ? trimmed.substring(0, 96) : trimmed;
 	}
 
 	private String randomHex(int bytes) {

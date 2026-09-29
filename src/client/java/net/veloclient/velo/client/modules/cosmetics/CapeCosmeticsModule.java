@@ -14,6 +14,7 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
@@ -32,7 +33,8 @@ public final class CapeCosmeticsModule extends AbstractModule implements Configu
 				"Equip a cloth-physics cape from your local library. Purely client-rendered.",
 				ModuleCategory.COSMETICS, SafetyTag.COSMETIC_ONLY, true);
 		CapeManager.loadLibrary();
-		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
 	}
 
 	private void onTick(MinecraftClient client) {

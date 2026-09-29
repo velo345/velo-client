@@ -27,8 +27,12 @@ public sealed interface ConfigField {
 	 * doesn't depend on client-only classes - the client-side module wires
 	 * {@code onKeyCodeChosen} to call {@code KeyBinding#setBoundKey} and
 	 * {@code KeyBinding.updateKeysByCode()} with the raw GLFW key code.
+	 * {@code getKeyCode} exposes that same raw code back out (matching
+	 * {@link ChordKeybindField}'s own get/set shape) so {@code
+	 * ModuleStateStore} can round-trip the actual binding through JSON
+	 * instead of only the display text.
 	 */
-	record KeybindField(String label, Supplier<String> displayText, IntConsumer onKeyCodeChosen) implements ConfigField {
+	record KeybindField(String label, Supplier<String> displayText, IntSupplier getKeyCode, IntConsumer onKeyCodeChosen) implements ConfigField {
 	}
 
 	/** A free-text field, e.g. a comma-separated blocklist of substrings to filter by. */

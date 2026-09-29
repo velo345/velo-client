@@ -5,6 +5,7 @@ import net.minecraft.client.MinecraftClient;
 import net.veloclient.velo.module.AbstractModule;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -30,7 +31,8 @@ public final class CommandKeybindsModule extends AbstractModule {
 	public CommandKeybindsModule() {
 		super("command-keybinds", "Command Keybinds", "Bind a key to instantly run a chat command, like /spawn.",
 				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
-		ClientTickEvents.END_CLIENT_TICK.register(CommandKeybindsModule::onTick);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+				ModuleProfiler.time("command-keybinds", ModuleProfiler.Phase.TICK, () -> onTick(client)));
 	}
 
 	/** Entries are plain user data (not "state to restore on enable"), so they're readable/editable from the settings screen at any time regardless of the module's own enabled toggle. */

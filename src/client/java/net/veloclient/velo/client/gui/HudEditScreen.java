@@ -52,7 +52,15 @@ public final class HudEditScreen extends Screen {
 
 	@Override
 	protected void init() {
-		this.addDrawableChild(new VeloButton(this.width / 2 - 50, this.height - 30, 100, 20, Text.literal("Done"), b -> this.close()));
+		this.addDrawableChild(new VeloButton(this.width / 2 - 104, this.height - 30, 100, 20, Text.literal("Reset Layout"), b -> {
+			// Every HUD element (enabled or not) back to its default spot and size.
+			for (Module module : ModuleRegistry.all()) {
+				if (module instanceof HudModule hud) {
+					hud.position().resetToDefault();
+				}
+			}
+		}));
+		this.addDrawableChild(new VeloButton(this.width / 2 + 4, this.height - 30, 100, 20, Text.literal("Done"), b -> this.close()));
 	}
 
 	private List<HudModule> enabledHudModules() {

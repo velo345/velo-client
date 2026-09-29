@@ -27,6 +27,7 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
+import net.veloclient.velo.client.util.ModuleProfiler;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -90,7 +91,8 @@ public final class KillEffectsModule extends AbstractModule implements Configura
 				"Plays a purely client-side visual effect (with optional sound) when a nearby entity dies - "
 						+ "pick when it triggers and which animation/sound plays.",
 				ModuleCategory.COSMETICS, SafetyTag.COSMETIC_ONLY, false);
-		ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
 		AttackEntityCallback.EVENT.register(this::onAttackEntity);
 	}
 

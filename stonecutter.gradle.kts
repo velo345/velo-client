@@ -45,6 +45,15 @@ stonecutter parameters {
 			// position.
 			replace("net.minecraft.block.BlockState", "net.minecraft.world.level.block.state.BlockState")
 			replace("net.minecraft.block.entity.BlockEntity", "net.minecraft.world.level.block.entity.BlockEntity")
+			// Simple names unchanged, only the package moved (verified via javap on the real
+			// 26.1 common jar) - same "package changed, simple name didn't" case as BlockState/
+			// BlockEntity above.
+			replace("net.minecraft.block.ChestBlock", "net.minecraft.world.level.block.ChestBlock")
+			replace("net.minecraft.block.BarrelBlock", "net.minecraft.world.level.block.BarrelBlock")
+			replace("net.minecraft.block.ShulkerBoxBlock", "net.minecraft.world.level.block.ShulkerBoxBlock")
+			replace("net.minecraft.block.EnderChestBlock", "net.minecraft.world.level.block.EnderChestBlock")
+			replace("net.minecraft.block.SpawnerBlock", "net.minecraft.world.level.block.SpawnerBlock")
+			replace("net.minecraft.util.math.ChunkPos", "net.minecraft.world.level.ChunkPos")
 			replace("net.minecraft.client.gl.RenderPipelines", "net.minecraft.client.renderer.RenderPipelines")
 			replace("net.minecraft.client.gui.screen.narration.NarrationMessageBuilder", "net.minecraft.client.gui.narration.NarrationElementOutput")
 			replace("net.minecraft.client.gui.screen.narration.NarrationPart", "net.minecraft.client.gui.narration.NarratedElementType")
@@ -122,6 +131,7 @@ stonecutter parameters {
 			replace("net.minecraft.util.hit.EntityHitResult", "net.minecraft.world.phys.EntityHitResult")
 			replace("net.minecraft.util.hit.HitResult", "net.minecraft.world.phys.HitResult")
 			replace("net.minecraft.util.math.BlockPos", "net.minecraft.core.BlockPos")
+			replace("net.minecraft.util.math.Direction", "net.minecraft.core.Direction")
 			replace("net.minecraft.util.math.ColorHelper", "net.minecraft.util.ARGB")
 			replace("net.minecraft.util.math.Vec3d", "net.minecraft.world.phys.Vec3")
 			replace("net.minecraft.util.math.Box", "net.minecraft.world.phys.AABB")
@@ -413,6 +423,14 @@ stonecutter parameters {
 			// site always passed true (actionbar-style transient message).
 			replace("player.sendMessage(net.minecraft.text.Text.literal(\"Copied: \" + text), true)",
 					"player.sendSystemMessage(net.minecraft.network.chat.Component.literal(\"Copied: \" + text))")
+			// Same LocalPlayer#sendMessage(Component, boolean) -> #sendSystemMessage(Component)
+			// divergence as above, for CinematicCameraModule's own singleplayer-only warning.
+			replace("player.sendMessage(net.minecraft.text.Text.literal(\"Cinematic Camera only works in singleplayer worlds.\"), true)",
+					"player.sendSystemMessage(net.minecraft.network.chat.Component.literal(\"Cinematic Camera only works in singleplayer worlds.\"))")
+			// Same LocalPlayer#sendMessage(Component, boolean) -> #sendSystemMessage(Component)
+			// divergence, for the shared singleplayer-only warning constant - matches the call
+			// shape rather than a literal message string since any module can reuse the constant.
+			replace("sendMessage(VeloKeybinds.NO_SINGLEPLAYER_MSG, true)", "sendSystemMessage(VeloKeybinds.NO_SINGLEPLAYER_MSG)")
 			// KeyBindingHelper#registerKeyBinding -> KeyMappingHelper#
 			// registerKeyMapping (verified via the real Fabric API repo),
 			// Minecraft#keyboard field -> #keyboardHandler.
@@ -711,6 +729,11 @@ stonecutter parameters {
 			// call shape needs its own line even when the method name itself
 			// doesn't change.
 			replace("GizmoDrawing.line(", "Gizmos.line(")
+			// "arrow" itself is likewise the same method name/shape on the new Gizmos facade
+			// (verified via javap on the 26.1 common jar - Vec3/Vec3/int/float, identical to the
+			// old GizmoDrawing.arrow(Vec3d,Vec3d,int,float)), same reasoning as the "line" call
+			// immediately above needing its own explicit bare-class swap.
+			replace("GizmoDrawing.arrow(", "Gizmos.arrow(")
 			// billboardText covers the free-floating (not block/entity
 			// snapped) text call - needed for TntTimerModule, which can't
 			// use billboardTextOverMob/entityLabel since that snaps to the
@@ -818,6 +841,12 @@ stonecutter parameters {
 			// rules, so this "shields" it the same way "TextFieldWidget"
 			// shields the bare "Text" rule elsewhere in this file.
 			replace("getBoundingBox()", "getBoundingBox()")
+			// Same shielding trick as getBoundingBox() above, for the other real,
+			// identically-named-in-both-mappings type this codebase now uses that happens to
+			// contain "Box" as a substring (StorageFinderModule's bare `instanceof
+			// ShulkerBoxBlock` - the import line itself is already handled by the longer FQN
+			// swap above, but a bare, unqualified reference to the class elsewhere isn't).
+			replace("ShulkerBoxBlock", "ShulkerBoxBlock")
 			replace("Box", "AABB")
 			replace("LightType", "LightLayer")
 			replace("CloudRenderMode", "CloudStatus")

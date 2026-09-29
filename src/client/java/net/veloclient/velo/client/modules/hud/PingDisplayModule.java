@@ -16,7 +16,7 @@ public final class PingDisplayModule extends AbstractModule implements HudModule
 	// Stacked just under Clock (also bottom-right by default) rather than
 	// top-right, which Scoreboard (also on by default) owns and can grow
 	// tall into.
-	private final HudPosition position = new HudPosition(0.98f, 0.95f);
+	private final HudPosition position = new HudPosition(0.01f, 0.05f);
 
 	public PingDisplayModule() {
 		super("ping-display", "Ping Display", "Shows your connection latency to the server.",

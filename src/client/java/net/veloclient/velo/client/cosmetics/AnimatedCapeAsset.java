@@ -44,6 +44,8 @@ public final class AnimatedCapeAsset {
 	private int frameIndex = -1;
 	private long msIntoCurrentFrame;
 	private long lastAdvanceNanos = -1;
+	/** Last time something asked for this texture (i.e. it's being drawn) - see {@link #tickAll}. */
+	private volatile long lastUsedNanos = System.nanoTime();
 
 	private AnimatedCapeAsset(Identifier identifier, NativeImageBackedTexture texture, List<GifDecoder.Frame> frames, int width, int height) {
 		this.identifier = identifier;
@@ -55,23 +57,42 @@ public final class AnimatedCapeAsset {
 
 	/** Decodes and registers {@code gifPath} (a resource path, e.g. from a store cape or an imported bundle's {@code frames.gif}) under a texture id derived from {@code capeId}, or returns the already-registered one. */
 	public static synchronized AnimatedCapeAsset getOrRegister(String capeId, java.util.function.Supplier<InputStream> gifSource) {
+		AnimatedCapeAsset existing = REGISTRY.get(capeId);
+		if (existing != null) {
+			existing.lastUsedNanos = System.nanoTime();
+			return existing;
+		}
 		return REGISTRY.computeIfAbsent(capeId, id -> {
 			try (InputStream in = gifSource.get()) {
-				GifDecoder.Result decoded = GifDecoder.decode(in);
-				if (decoded.frames().isEmpty()) {
-					throw new IOException("GIF has no frames");
-				}
-				Identifier textureId = Identifier.of("velo-client", "cape_anim_" + id.replace('-', '_'));
-				NativeImageBackedTexture texture = new NativeImageBackedTexture(() -> "animated cape " + id,
-						decoded.width(), decoded.height(), false);
-				MinecraftClient.getInstance().getTextureManager().registerTexture(textureId, texture);
-				AnimatedCapeAsset animated = new AnimatedCapeAsset(textureId, texture, decoded.frames(), decoded.width(), decoded.height());
-				animated.applyFrame(0);
-				return animated;
+				return create(id, GifDecoder.decode(in));
 			} catch (IOException e) {
 				throw new RuntimeException("Failed to decode animated cape texture for " + id, e);
 			}
 		});
+	}
+
+	/** Registers an already-decoded GIF (decoded off-thread, e.g. another player's downloaded cape). Render thread only. */
+	public static synchronized AnimatedCapeAsset registerDecoded(String capeId, GifDecoder.Result decoded) throws IOException {
+		AnimatedCapeAsset existing = REGISTRY.get(capeId);
+		if (existing != null) {
+			return existing;
+		}
+		AnimatedCapeAsset created = create(capeId, decoded);
+		REGISTRY.put(capeId, created);
+		return created;
+	}
+
+	private static AnimatedCapeAsset create(String id, GifDecoder.Result decoded) throws IOException {
+		if (decoded.frames().isEmpty()) {
+			throw new IOException("GIF has no frames");
+		}
+		Identifier textureId = Identifier.of("velo-client", "cape_anim_" + id.replace('-', '_'));
+		NativeImageBackedTexture texture = new NativeImageBackedTexture(() -> "animated cape " + id,
+				decoded.width(), decoded.height(), false);
+		MinecraftClient.getInstance().getTextureManager().registerTexture(textureId, texture);
+		AnimatedCapeAsset animated = new AnimatedCapeAsset(textureId, texture, decoded.frames(), decoded.width(), decoded.height());
+		animated.applyFrame(0);
+		return animated;
 	}
 
 	public Identifier identifier() {
@@ -86,10 +107,19 @@ public final class AnimatedCapeAsset {
 		return height;
 	}
 
-	/** Advances every registered animated cape's frame by real elapsed time. Cheap enough to call unconditionally every client tick - a handful of small textures at most. */
+	/**
+	 * Advances every animated cape that's actually being drawn (asked for within the last second)
+	 * by real elapsed time. Store previews, other players' capes out of view etc. stay registered
+	 * but frozen - each frame change is a full texture upload, and uploading capes nobody can see
+	 * 20 times a second was wasted GPU bandwidth.
+	 */
 	public static synchronized void tickAll() {
 		long now = System.nanoTime();
 		for (AnimatedCapeAsset texture : REGISTRY.values()) {
+			if (now - texture.lastUsedNanos > 1_000_000_000L) {
+				texture.lastAdvanceNanos = now;
+				continue;
+			}
 			texture.advance(now);
 		}
 	}
@@ -105,12 +135,19 @@ public final class AnimatedCapeAsset {
 			return;
 		}
 		msIntoCurrentFrame += elapsedMs;
-		int currentDelay = frames.get(Math.max(frameIndex, 0)).delayMillis();
+		int index = Math.max(frameIndex, 0);
+		int currentDelay = Math.max(1, frames.get(index).delayMillis());
 		int guard = 0;
 		while (msIntoCurrentFrame >= currentDelay && guard++ < frames.size()) {
 			msIntoCurrentFrame -= currentDelay;
-			applyFrame((frameIndex + 1) % frames.size());
-			currentDelay = frames.get(frameIndex).delayMillis();
+			index = (index + 1) % frames.size();
+			currentDelay = Math.max(1, frames.get(index).delayMillis());
+		}
+		// Only the frame we land on is copied + uploaded - after a hitch several frames can elapse
+		// in one tick, and uploading each skipped one (a full texture upload each, 4 MB+ for a
+		// large cape) just made the hitch worse.
+		if (index != frameIndex) {
+			applyFrame(index);
 		}
 	}
 

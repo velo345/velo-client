@@ -170,7 +170,7 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 		if (!(entity instanceof PlayerEntity remotePlayer)) {
 			return;
 		}
-		String capeId = net.veloclient.velo.client.network.VeloUserRegistry.capeIdFor(remotePlayer.getUuid());
+		String capeId = net.veloclient.velo.client.network.VeloUserRegistry.capeIdFor(remotePlayer.getUuid(), remotePlayer.getGameProfile().name());
 		if (capeId == null || remotePlayer.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).getItem() == net.minecraft.item.Items.ELYTRA) {
 			return;
 		}
@@ -222,7 +222,7 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 		if (!(entity instanceof Player remotePlayer)) {
 			return;
 		}
-		String capeId = net.veloclient.velo.client.network.VeloUserRegistry.capeIdFor(remotePlayer.getUUID());
+		String capeId = net.veloclient.velo.client.network.VeloUserRegistry.capeIdFor(remotePlayer.getUUID(), remotePlayer.getGameProfile().name());
 		if (capeId == null || remotePlayer.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem() == net.minecraft.world.item.Items.ELYTRA) {
 			return;
 		}
