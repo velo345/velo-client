@@ -128,15 +128,15 @@ public final class SchematicsScreen extends VeloWindow {
 				String displayName = dot > 0 ? fileName.substring(0, dot) : fileName;
 				SchematicMatch match = matches.get(fileName);
 				VeloSchematicTile tile = new VeloSchematicTile(0, 0, TILE_WIDTH, TILE_ICON_HEIGHT, file, displayName, sizeOf(file), match,
-						f -> {
-							try {
-								Files.deleteIfExists(f);
-								status = Text.literal("Removed \"" + displayName + "\"");
-							} catch (IOException e) {
-								status = Text.literal("Couldn't remove: " + e.getMessage());
-							}
-							layoutContent();
-						},
+						f -> this.client.setScreen(new VeloConfirmScreen(this, "Delete schematic",
+								"Delete \"" + displayName + "\"? The file is removed from your schematics folder.", "Delete", () -> {
+									try {
+										Files.deleteIfExists(f);
+										status = Text.literal("Removed \"" + displayName + "\"");
+									} catch (IOException e) {
+										status = Text.literal("Couldn't remove: " + e.getMessage());
+									}
+								})),
 						match != null && match.found() ? () -> openInBrowser(match.postUrl()) : () -> { });
 				addSelectableChild(tile);
 				scrollRegion.addRow(tile);

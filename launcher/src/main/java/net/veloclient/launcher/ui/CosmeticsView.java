@@ -1,166 +1,206 @@
 package net.veloclient.launcher.ui;
 
 import javafx.geometry.Pos;
-import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
+import net.veloclient.launcher.auth.MinecraftSession;
 import net.veloclient.launcher.data.CapeEntry;
 import net.veloclient.launcher.data.CapeLibrary;
+import net.veloclient.launcher.data.GifFrames;
 import net.veloclient.launcher.theme.LauncherTheme;
 
-import java.io.ByteArrayInputStream;
+import java.util.List;
 
-/** The redesigned Cosmetics screen: capes with live texture previews instead of a plain name list. */
+/**
+ * Cosmetics: a big live 3D showcase of your own skin wearing the selected cape (left) and your cape
+ * collection as 3D-rendered cards (right). Selecting a card previews it; Equip makes it the cape
+ * other Velo players see on you.
+ */
 public final class CosmeticsView {
 
 	public interface Host {
 		LauncherTheme activeTheme();
 
 		void rebuild();
+
+		default MinecraftSession session() {
+			return null;
+		}
 	}
+
+	/** The card currently previewed - survives rebuilds (equip/delete/import rebuild the page). */
+	private static String selectedId;
 
 	private CosmeticsView() {
 	}
 
 	public static Node build(Stage owner, Host host) {
-		VBox root = new VBox(20);
-
-		Label heading = new Label("Cosmetics");
-		heading.getStyleClass().add("section-heading");
-		heading.setTextFill(accent(host.activeTheme()));
-		root.getChildren().add(heading);
-
-		root.getChildren().add(buildCapesSection(owner, host));
-
-		ScrollPane scroll = new ScrollPane(root);
-		scroll.setFitToWidth(true);
-		scroll.getStyleClass().add("scroll-pane");
-		VBox wrapper = new VBox(scroll);
-		VBox.setVgrow(scroll, Priority.ALWAYS);
-		VBox.setVgrow(wrapper, Priority.ALWAYS);
-		return wrapper;
+		// Selecting/equipping refreshes this page in place (no full page transition per click).
+		StackPane page = new StackPane();
+		Runnable[] refresh = new Runnable[1];
+		refresh[0] = () -> page.getChildren().setAll(buildContent(owner, host, refresh[0], false));
+		page.getChildren().setAll(buildContent(owner, host, refresh[0], true));
+		return page;
 	}
 
-	private static VBox buildCapesSection(Stage owner, Host host) {
-		VBox section = new VBox(10);
-		Label title = new Label("Capes");
-		title.setFont(Font.font("System", FontWeight.BOLD, 16));
-		title.setTextFill(text(host.activeTheme()));
+	private static Node buildContent(Stage owner, Host host, Runnable refresh, boolean firstShow) {
+		List<CapeEntry> capes = CapeLibrary.listAll();
+		String equippedId = CapeLibrary.equippedCapeId().orElse(null);
+		if (selectedId == null || capes.stream().noneMatch(c -> c.id().equals(selectedId))) {
+			selectedId = equippedId != null ? equippedId : capes.isEmpty() ? null : capes.get(0).id();
+		}
+		CapeEntry selected = capes.stream().filter(c -> c.id().equals(selectedId)).findFirst().orElse(null);
 
-		Button importButton = new Button("Import Cape...");
-		importButton.getStyleClass().add("title-menu-button");
+		// Header.
+		Label heading = new Label("Cosmetics");
+		heading.getStyleClass().add("page-title");
+		Label sub = new Label("Your capes. The equipped one shows in-game for you and every other Velo player.");
+		sub.getStyleClass().add("page-subtitle");
+		VBox titles = new VBox(2, heading, sub);
+		Button importButton = new Button("+  Import cape");
+		importButton.getStyleClass().add("primary-button");
 		importButton.setOnAction(e -> CapeImportDialog.show(owner).ifPresent(result -> {
 			try {
 				CapeLibrary.importPng(result.name(), result.pngFile(), result.preset());
-				host.rebuild();
+				refresh.run();
 			} catch (Exception ex) {
 				error(owner, "Import failed", ex.getMessage());
 			}
 		}));
-
-		HBox header = new HBox(12, title, importButton);
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox header = new HBox(12, titles, spacer, importButton);
 		header.setAlignment(Pos.CENTER_LEFT);
 
+		// Left: showcase.
+		Node showcase = buildShowcase(owner, host, refresh, selected, selected != null && selected.id().equals(equippedId));
+
+		// Right: collection.
 		FlowPane grid = new FlowPane(14, 14);
-		var capes = CapeLibrary.listAll();
-		String equippedId = CapeLibrary.equippedCapeId().orElse(null);
+		grid.getStyleClass().add("cape-grid");
+		grid.getChildren().add(CosmeticUi.capeCard(null, "No cape", CosmeticUi.badge(equippedId == null ? "Equipped" : "Off",
+				equippedId == null ? "chip-owned" : null), selected == null && equippedId == null, () -> {
+					CapeLibrary.unequip();
+					selectedId = null;
+					refresh.run();
+				}));
+		for (CapeEntry cape : capes) {
+			List<GifFrames.Frame> frames = CosmeticUi.frames(cape);
+			boolean equipped = cape.id().equals(equippedId);
+			Node footer = equipped ? CosmeticUi.badge("Equipped", "chip-owned")
+					: CosmeticUi.badge(cape.animated() ? "Animated" : "Static", null);
+			grid.getChildren().add(CosmeticUi.capeCard(CosmeticUi.thumbnail("lib:" + cape.id(), frames, 150, 150),
+					cape.name(), footer, cape.id().equals(selectedId), () -> {
+						selectedId = cape.id();
+						refresh.run();
+					}));
+		}
 		if (capes.isEmpty()) {
-			Label empty = new Label("No capes imported yet. Textures must keep the 2:1 cape ratio, "
-					+ CapeLibrary.TEXTURE_WIDTH + "x" + CapeLibrary.TEXTURE_HEIGHT + " up to "
-					+ CapeLibrary.MAX_TEXTURE_WIDTH + "x" + CapeLibrary.MAX_TEXTURE_HEIGHT + ".");
-			empty.getStyleClass().add("section-subtitle");
-			empty.setTextFill(text(host.activeTheme()));
+			Label empty = new Label("No capes yet - import a cape texture (" + CapeLibrary.TEXTURE_WIDTH + "x"
+					+ CapeLibrary.TEXTURE_HEIGHT + " up to " + CapeLibrary.MAX_TEXTURE_WIDTH + "x" + CapeLibrary.MAX_TEXTURE_HEIGHT
+					+ ") or get one in the Store.");
+			empty.getStyleClass().add("empty-state");
+			empty.setWrapText(true);
 			grid.getChildren().add(empty);
 		}
-		for (CapeEntry cape : capes) {
-			grid.getChildren().add(buildCapeCard(owner, host, cape, cape.id().equals(equippedId)));
+		Label collectionTitle = new Label("Collection  ·  " + capes.size());
+		collectionTitle.getStyleClass().add("section-label");
+		VBox collection = new VBox(12, collectionTitle, grid);
+		ScrollPane scroll = new ScrollPane(collection);
+		scroll.setFitToWidth(true);
+		scroll.getStyleClass().add("scroll-pane");
+		HBox.setHgrow(scroll, Priority.ALWAYS);
+		if (firstShow) {
+			UiMotion.stagger(grid, 24);
 		}
 
-		section.getChildren().addAll(header, grid);
-		return section;
+		HBox body = new HBox(22, showcase, scroll);
+		VBox.setVgrow(body, Priority.ALWAYS);
+		VBox root = new VBox(18, header, body);
+		VBox.setVgrow(root, Priority.ALWAYS);
+		return root;
 	}
 
-	private static VBox buildCapeCard(Stage owner, Host host, CapeEntry cape, boolean equipped) {
-		VBox card = new VBox(8);
-		card.getStyleClass().add("instance-card");
-		card.setPrefWidth(140);
-		card.setAlignment(Pos.TOP_CENTER);
+	private static Node buildShowcase(Stage owner, Host host, Runnable refresh, CapeEntry selected, boolean equipped) {
+		StackPane stage = CosmeticUi.stage(300, 380);
+		stage.getStyleClass().add("showcase-stage");
+		List<GifFrames.Frame> frames = selected == null ? null : CosmeticUi.frames(selected);
+		Label loading = new Label(host.session() == null ? "Sign in to see capes on your own skin" : "Loading your skin...");
+		loading.getStyleClass().add("page-subtitle");
+		loading.setWrapText(true);
+		stage.getChildren().add(loading);
+		CosmeticUi.skin(host.session(), skin -> {
+			Node viewer = skin == null ? null : PlayerSkin3DView.createShowcase(skin.pngBytes(), skin.slim(),
+					frames == null || frames.isEmpty() ? null : frames);
+			if (viewer != null) {
+				stage.getChildren().setAll(viewer);
+			} else if (frames != null && !frames.isEmpty()) {
+				ImageView big = new ImageView(CosmeticUi.thumbnail("lib:" + selected.id(), frames, 260, 300));
+				stage.getChildren().setAll(big);
+			}
+		});
+		Label hint = new Label("Drag to rotate");
+		hint.getStyleClass().add("stage-hint");
+		StackPane.setAlignment(hint, Pos.BOTTOM_CENTER);
+		StackPane stageWithHint = new StackPane(stage, hint);
+		hint.setTranslateY(-10);
 
-		Node preview = buildCapePreview(cape);
-		Label name = new Label(cape.name() + (equipped ? "  ✓" : ""));
-		name.setTextFill(equipped ? accent(host.activeTheme()) : text(host.activeTheme()));
-		name.setWrapText(true);
-		name.setFont(Font.font("System", FontWeight.BOLD, 13));
-
-		Button equipButton = new Button(equipped ? "Unequip" : "Equip");
-		equipButton.setMaxWidth(Double.MAX_VALUE);
-		equipButton.setOnAction(e -> {
+		Label name = new Label(selected == null ? "No cape" : selected.name());
+		name.getStyleClass().add("showcase-title");
+		HBox badges = new HBox(6);
+		if (selected != null) {
+			badges.getChildren().add(CosmeticUi.badge(selected.animated() ? "Animated" : "Static", null));
 			if (equipped) {
-				CapeLibrary.unequip();
-			} else {
-				CapeLibrary.equip(cape.id());
+				badges.getChildren().add(CosmeticUi.badge("Equipped", "chip-owned"));
 			}
-			host.rebuild();
-		});
-		Button deleteButton = new Button("Delete");
-		deleteButton.setMaxWidth(Double.MAX_VALUE);
-		deleteButton.setOnAction(e -> {
-			try {
-				CapeLibrary.delete(cape);
-				host.rebuild();
-			} catch (Exception ex) {
-				error(owner, "Delete failed", ex.getMessage());
-			}
-		});
-
-		card.getChildren().addAll(preview, name, equipButton, deleteButton);
-		return card;
-	}
-
-	/** Crops the cape template's back-panel region (same 10x16 @ (1,1) UV the in-game VeloCapeTile draws), scaled to whatever resolution this particular texture actually is. */
-	private static Node buildCapePreview(CapeEntry cape) {
-		StackPane holder = new StackPane();
-		holder.setPrefSize(70, 96);
-		holder.getStyleClass().add("instance-icon-custom");
-		try {
-			byte[] bytes = cape.animated() ? CapeLibrary.gifBytes(cape) : CapeLibrary.textureBytes(cape);
-			Image full = new Image(new ByteArrayInputStream(bytes));
-			double scale = full.getWidth() / CapeLibrary.TEXTURE_WIDTH;
-			ImageView view = new ImageView(full);
-			view.setViewport(new Rectangle2D(scale, scale, 10 * scale, 16 * scale));
-			view.setFitWidth(60);
-			view.setFitHeight(96);
-			view.setSmooth(false);
-			view.setPreserveRatio(true);
-			holder.getChildren().add(view);
-		} catch (Exception e) {
-			Label fallback = new Label("?");
-			fallback.setTextFill(Color.WHITE);
-			holder.getChildren().add(fallback);
 		}
-		return holder;
-	}
 
-	private static Color accent(LauncherTheme t) {
-		return Color.rgb((t.accentStart() >> 16) & 0xFF, (t.accentStart() >> 8) & 0xFF, t.accentStart() & 0xFF);
-	}
+		HBox actions = new HBox(8);
+		if (selected != null) {
+			Button equip = new Button(equipped ? "Unequip" : "Equip");
+			if (!equipped) {
+				equip.getStyleClass().add("primary-button");
+			}
+			equip.setMaxWidth(Double.MAX_VALUE);
+			HBox.setHgrow(equip, Priority.ALWAYS);
+			equip.setOnAction(e -> {
+				if (equipped) {
+					CapeLibrary.unequip();
+				} else {
+					CapeLibrary.equip(selected.id());
+				}
+				refresh.run();
+			});
+			Button delete = new Button("Delete");
+			delete.getStyleClass().add("danger-ghost-button");
+			delete.setOnAction(e -> {
+				try {
+					CapeLibrary.delete(selected);
+					selectedId = null;
+					refresh.run();
+				} catch (Exception ex) {
+					error(owner, "Delete failed", ex.getMessage());
+				}
+			});
+			actions.getChildren().addAll(equip, delete);
+		}
 
-	private static Color text(LauncherTheme t) {
-		return Color.rgb((t.text() >> 16) & 0xFF, (t.text() >> 8) & 0xFF, t.text() & 0xFF);
+		VBox panel = new VBox(12, stageWithHint, name, badges, actions);
+		panel.getStyleClass().add("showcase-panel");
+		panel.setMinWidth(324);
+		panel.setMaxWidth(324);
+		return panel;
 	}
 
 	private static void error(Stage owner, String title, String message) {

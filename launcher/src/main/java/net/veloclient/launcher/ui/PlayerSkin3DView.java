@@ -43,7 +43,10 @@ import java.util.List;
  * by the *upscaled* texture's dimensions instead of the original skin's,
  * collapsing every part's sample into a sliver near the texture origin).
  *
- * <p>The base and second-layer (hat/jacket/sleeves/pants) textures are
+ * <p>The second layer (hat/jacket/sleeves/pants) is rendered as real 3D voxels - every opaque
+ * overlay pixel becomes a small block standing off the body, like the "3D Skin Layers" mod - built
+ * as one opaque mesh (hidden sides between neighbouring pixels skipped), so it has none of the
+ * transparency-sorting problems described next. Historically the layers were
  * pre-composited into one flattened texture per body part (alpha-blended
  * onto a copy of the base layer's own pixels) instead of rendering the
  * overlay as a separate second mesh - JavaFX's 3D pipeline has no
@@ -92,6 +95,19 @@ public final class PlayerSkin3DView {
 	 *                    keeps the interactive behavior.
 	 */
 	public static Node createViewer(byte[] skinPngBytes, boolean slim, List<GifFrames.Frame> capeFrames, boolean interactive) {
+		return createViewer(skinPngBytes, slim, capeFrames, interactive, 20, false);
+	}
+
+	/**
+	 * Showcase variant for cosmetics: starts turned so the back (and cape) faces the viewer and
+	 * slowly spins on its own; dragging takes over and the spin resumes a few seconds later.
+	 */
+	public static Node createShowcase(byte[] skinPngBytes, boolean slim, List<GifFrames.Frame> capeFrames) {
+		return createViewer(skinPngBytes, slim, capeFrames, true, 150, true);
+	}
+
+	public static Node createViewer(byte[] skinPngBytes, boolean slim, List<GifFrames.Frame> capeFrames, boolean interactive,
+			double initialYaw, boolean autoSpin) {
 		if (skinPngBytes == null) {
 			return null;
 		}
@@ -109,30 +125,37 @@ public final class PlayerSkin3DView {
 		// into a tiny sliver near the texture's top-left corner.
 		double uvW = skin.getWidth();
 		double uvH = skin.getHeight();
-		Image texture = upscale(compositeSkin(skin), UPSCALE_FACTOR);
+		Image texture = upscale(copyOf(skin), UPSCALE_FACTOR);
 		double armWidth = slim ? 3 : 4;
 
 		Group model = new Group();
-		// Model space here deliberately matches Minecraft's own ModelPart
-		// convention exactly: x = right(+)/left(-), y = DOWN(+)/up(-) (same
-		// sense as JavaFX's own screen Y), z = front(+)/back(-). An earlier
-		// version treated +y as "up" for part placement while the per-face UV
-		// correspondence was ported verbatim from Minecraft's y-down
-		// convention, then tried to reconcile the two with a blanket
-		// rig.setScaleY(-1) - that flipped vertex positions but not which
-		// texture edge each vertex's UV pointed at, so every face rendered
-		// vertically mirrored (confirmed by rendering an actual
-		// orientation-labeled test texture, not just reasoned about - see
-		// this class's own javadoc). Placing parts with y-down from the start
-		// needs no such flip: head has the smallest (most negative) y, legs
-		// the largest, vertical range still symmetric around y=0 so the
-		// camera aiming at the origin sees the model centered.
-		addPart(model, texture, uvW, uvH, 0, 0, 8, 8, 8, 0, -16, 0);
-		addPart(model, texture, uvW, uvH, 16, 16, 8, 12, 4, 0, -8, 0);
-		addPart(model, texture, uvW, uvH, 40, 16, armWidth, 12, 4, -(4 + armWidth / 2), -8, 0);
-		addPart(model, texture, uvW, uvH, 32, 48, armWidth, 12, 4, 4 + armWidth / 2, -8, 0);
-		addPart(model, texture, uvW, uvH, 0, 16, 4, 12, 4, -2, 4, 0);
-		addPart(model, texture, uvW, uvH, 16, 48, 4, 12, 4, 2, 4, 0);
+		// Model space deliberately matches Minecraft's ModelPart convention: x = right(+)/left(-),
+		// y = DOWN(+)/up(-) (same sense as JavaFX's screen Y), so the per-face UV correspondence
+		// ported from vanilla needs no flip. Head has the most negative y, legs the largest.
+		boolean modern = skin.getHeight() >= 64;
+		Part[] parts = {
+				new Part(0, 0, 8, 8, 8, 0, -16, 0, 32, 0),
+				new Part(16, 16, 8, 12, 4, 0, -8, 0, 16, 32),
+				new Part(40, 16, armWidth, 12, 4, -(4 + armWidth / 2), -8, 0, 40, 32),
+				new Part(32, 48, armWidth, 12, 4, 4 + armWidth / 2, -8, 0, 48, 48),
+				new Part(0, 16, 4, 12, 4, -2, 4, 0, 0, 32),
+				new Part(16, 48, 4, 12, 4, 2, 4, 0, 0, 48),
+		};
+		if (!modern) {
+			// Legacy 64x32 skins: no separate left limbs (mirrored from the right) and only a hat layer.
+			parts[3] = new Part(40, 16, armWidth, 12, 4, 4 + armWidth / 2, -8, 0, -1, -1);
+			parts[5] = new Part(0, 16, 4, 12, 4, 2, 4, 0, -1, -1);
+			parts[1] = new Part(16, 16, 8, 12, 4, 0, -8, 0, -1, -1);
+			parts[2] = new Part(40, 16, armWidth, 12, 4, -(4 + armWidth / 2), -8, 0, -1, -1);
+			parts[4] = new Part(0, 16, 4, 12, 4, -2, 4, 0, -1, -1);
+		}
+		for (Part part : parts) {
+			addPart(model, texture, uvW, uvH, part.u, part.v, part.w, part.h, part.d, part.cx, part.cy, part.cz);
+		}
+		MeshView layers = buildLayerVoxels(skin, texture, uvW, uvH, parts);
+		if (layers != null) {
+			model.getChildren().add(layers);
+		}
 
 		AnimationTimer capeTimer = addCape(model, capeFrames);
 
@@ -140,7 +163,7 @@ public final class PlayerSkin3DView {
 
 		// Yaw is the only interactive rotation - the model always stays
 		// upright, it never tilts/pitches.
-		Rotate yaw = new Rotate(20, Rotate.Y_AXIS);
+		Rotate yaw = new Rotate(initialYaw, Rotate.Y_AXIS);
 		rig.getTransforms().add(yaw);
 
 		PerspectiveCamera camera = new PerspectiveCamera(true);
@@ -164,13 +187,18 @@ public final class PlayerSkin3DView {
 		wrapper.getChildren().add(subScene);
 		wrapper.setPickOnBounds(interactive);
 
+		long[] lastInteraction = {0};
 		if (interactive) {
 			double[] lastX = new double[1];
-			wrapper.setOnMousePressed(e -> lastX[0] = e.getSceneX());
+			wrapper.setOnMousePressed(e -> {
+				lastX[0] = e.getSceneX();
+				lastInteraction[0] = System.nanoTime();
+			});
 			wrapper.setOnMouseDragged(e -> {
 				double dx = e.getSceneX() - lastX[0];
 				yaw.setAngle(yaw.getAngle() + dx * 0.5);
 				lastX[0] = e.getSceneX();
+				lastInteraction[0] = System.nanoTime();
 			});
 			wrapper.addEventHandler(ScrollEvent.SCROLL, e -> {
 				double z = camera.getTranslateZ() + e.getDeltaY() * 0.15;
@@ -178,6 +206,28 @@ public final class PlayerSkin3DView {
 				// Without this, the scroll also bubbled up to whatever ScrollPane
 				// this viewer sits inside (the profile page) and scrolled that too.
 				e.consume();
+			});
+		}
+
+		if (autoSpin) {
+			AnimationTimer spin = new AnimationTimer() {
+				private long last;
+
+				@Override
+				public void handle(long now) {
+					double dt = last == 0 ? 0 : Math.min(0.05, (now - last) / 1e9);
+					last = now;
+					if (now - lastInteraction[0] > 3_000_000_000L) {
+						yaw.setAngle(yaw.getAngle() + dt * 18);
+					}
+				}
+			};
+			wrapper.sceneProperty().addListener((obs, oldScene, newScene) -> {
+				if (newScene == null) {
+					spin.stop();
+				} else {
+					spin.start();
+				}
 			});
 		}
 
@@ -198,52 +248,27 @@ public final class PlayerSkin3DView {
 	}
 
 	/**
-	 * A simple textured box behind the back (JavaFX's built-in {@link Box}
-	 * tiles the same image on all 6 faces via its default UV, so feeding it
-	 * just the cape's cropped back-panel image - the same 10x16-at-(1,1)
-	 * region the 2D cape previews elsewhere in this app already crop - reads
-	 * fine without needing a hand-rolled per-face UV atlas the way the body
-	 * parts above do). Returns the driving {@link AnimationTimer} for
-	 * more-than-one-frame input, or null for a static/no cape.
+	 * The real Minecraft cape model: a 10x16x1 box with the cape template's own UV layout (outside,
+	 * inside, edges), hinged at the shoulders, hanging out from the back at a slight angle and
+	 * swaying gently. Animated capes swap the texture per frame. Returns the driving timer.
 	 */
 	private static AnimationTimer addCape(Group parent, List<GifFrames.Frame> frames) {
 		if (frames == null || frames.isEmpty()) {
 			return null;
 		}
-		double capeTexWidth = frames.get(0).image().getWidth();
-		double scale = capeTexWidth / 64.0;
-		int panelU = (int) Math.round(1 * scale);
-		int panelV = (int) Math.round(1 * scale);
-		int panelW = Math.max(1, (int) Math.round(10 * scale));
-		int panelH = Math.max(1, (int) Math.round(16 * scale));
+		CapeModel cape = capeModel(frames.get(0).image());
+		parent.getChildren().add(cape.node);
 
-		PhongMaterial material = new PhongMaterial();
-		material.setDiffuseMap(toBackPanelImage(frames.get(0).image(), panelU, panelV, panelW, panelH));
-
-		// Model-space z is front(+)/back(-) is the WRONG way round here -
-		// confirmed by this exact file's own buildBoxMesh: the NORTH ("front")
-		// face is wound using the z0 (negative-z) vertices, so negative z is
-		// actually the side facing the camera and positive z is the back.
-		// Placing the cape at negative z (as an earlier version of this did)
-		// put it in front of the torso instead of behind it - a flat textured
-		// box pasted onto the character's chest instead of hanging off their
-		// back. The torso's own back face sits at z=+2 (half its own depth of
-		// 4), so the cape's center needs to clear that.
-		Box cape = new Box(10, 16, 1.5);
-		cape.setMaterial(material);
-		cape.setTranslateY(0);
-		cape.setTranslateZ(3);
-		parent.getChildren().add(cape);
-
-		if (frames.size() <= 1) {
-			return null;
-		}
 		AnimationTimer timer = new AnimationTimer() {
 			private int index;
 			private long frameStartNanos = -1;
 
 			@Override
 			public void handle(long now) {
+				cape.swing.setAngle(CAPE_REST_ANGLE + Math.sin(now / 9e8) * 3.5 + Math.sin(now / 3.7e8) * 0.8);
+				if (frames.size() <= 1) {
+					return;
+				}
 				if (frameStartNanos < 0) {
 					frameStartNanos = now;
 					return;
@@ -254,18 +279,274 @@ public final class PlayerSkin3DView {
 				}
 				frameStartNanos = now;
 				index = (index + 1) % frames.size();
-				material.setDiffuseMap(toBackPanelImage(frames.get(index).image(), panelU, panelV, panelW, panelH));
+				cape.material.setDiffuseMap(capeTexture(frames.get(index).image()));
 			}
 		};
 		timer.start();
 		return timer;
 	}
 
-	private static Image toBackPanelImage(BufferedImage source, int u, int v, int w, int h) {
-		int clampedW = Math.min(w, source.getWidth() - u);
-		int clampedH = Math.min(h, source.getHeight() - v);
-		BufferedImage cropped = source.getSubimage(u, v, Math.max(1, clampedW), Math.max(1, clampedH));
-		return SwingFXUtils.toFXImage(cropped, null);
+	private static final double CAPE_REST_ANGLE = 9;
+
+	private record CapeModel(Group node, Rotate swing, PhongMaterial material) {
+	}
+
+	/** Builds the cape (texture in the standard 64x32 layout at any resolution) hinged at y=0. */
+	private static CapeModel capeModel(BufferedImage image) {
+		double texW = 64;
+		double texH = 64.0 * image.getHeight() / Math.max(1, image.getWidth());
+		MeshView mesh = new MeshView(buildBoxMesh(0, 0, 10, 16, 1, texW, texH));
+		PhongMaterial material = new PhongMaterial();
+		material.setDiffuseMap(capeTexture(image));
+		mesh.setMaterial(material);
+		mesh.setCullFace(CullFace.NONE);
+		// The cape template's "outside" is its north face; turning the box around makes that face
+		// point away from the body, exactly like vanilla's cape renderer does.
+		mesh.getTransforms().addAll(new javafx.scene.transform.Translate(0, 0, 0.5), new Rotate(180, Rotate.Y_AXIS));
+		Rotate swing = new Rotate(CAPE_REST_ANGLE, Rotate.X_AXIS);
+		Group hinge = new Group(mesh);
+		hinge.getTransforms().addAll(new javafx.scene.transform.Translate(0, -8, 2.05), swing);
+		return new CapeModel(hinge, swing, material);
+	}
+
+	/** Cape frame -> crisp texture (nearest-neighbour upscaled so 3D filtering can't smear it). */
+	private static Image capeTexture(BufferedImage image) {
+		Image fx = SwingFXUtils.toFXImage(image, null);
+		int factor = Math.max(1, 512 / Math.max(1, image.getWidth()));
+		return factor > 1 ? upscale(copyOf(fx), factor) : fx;
+	}
+
+	/**
+	 * A transparent 3D render of just the cape at a three-quarter angle - for cards and lists,
+	 * where a live 3D view per item would be wasteful. Rendered once per call (FX thread).
+	 */
+	public static Image capeThumbnail(BufferedImage capeTexture, double width, double height) {
+		CapeModel cape = capeModel(capeTexture);
+		cape.swing.setAngle(0);
+		Group model = new Group(cape.node);
+		// The outside of the cape faces +z (away from the body); turn it towards the camera at a three-quarter angle.
+		model.getTransforms().addAll(new Rotate(180 - 32, Rotate.Y_AXIS));
+		model.setTranslateY(0);
+		Group root = new Group(model,
+				new AmbientLight(Color.rgb(185, 185, 185)),
+				keyLight(-1, -1, -1.2, 0.7),
+				keyLight(1, -0.3, -1, 0.3));
+		PerspectiveCamera camera = new PerspectiveCamera(true);
+		camera.setFieldOfView(26);
+		camera.setNearClip(0.1);
+		camera.setFarClip(500);
+		camera.setTranslateZ(-44);
+		camera.setTranslateY(0);
+		SubScene sub = new SubScene(root, width, height, true, SceneAntialiasing.BALANCED);
+		sub.setFill(Color.TRANSPARENT);
+		sub.setCamera(camera);
+		// A SubScene renders through its own camera only inside a Scene - a throwaway offscreen one.
+		javafx.scene.Scene holder = new javafx.scene.Scene(new Group(sub), width, height, Color.TRANSPARENT);
+		javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+		params.setFill(Color.TRANSPARENT);
+		Image image = sub.snapshot(params, null);
+		holder.setRoot(new Group());
+		return image;
+	}
+
+	// ---- 3D skin layers ----
+
+	private record Part(int u, int v, double w, double h, double d, double cx, double cy, double cz, int ou, int ov) {
+	}
+
+	private static final double LAYER_THICKNESS = 0.5;
+	private static final double LAYER_GAP = 0.02;
+
+	/** One mesh with a small block for every opaque overlay pixel of every part (null if none). */
+	private static MeshView buildLayerVoxels(Image skin, Image texture, double uvW, double uvH, Part[] parts) {
+		PixelReader reader = skin.getPixelReader();
+		MeshBuilder list = new MeshBuilder();
+		for (Part part : parts) {
+			if (part.ou < 0) {
+				continue;
+			}
+			double w = part.w;
+			double h = part.h;
+			double d = part.d;
+			double x0 = -w / 2;
+			double x1 = w / 2;
+			double y0 = 0;
+			double y1 = h;
+			double z0 = -d / 2;
+			double z1 = d / 2;
+			double[] p1 = {x0, y0, z0};
+			double[] p2 = {x1, y0, z0};
+			double[] p3 = {x1, y1, z0};
+			double[] p4 = {x0, y1, z0};
+			double[] p5 = {x0, y0, z1};
+			double[] p6 = {x1, y0, z1};
+			double[] p7 = {x1, y1, z1};
+			double[] p8 = {x0, y1, z1};
+			double u = part.ou;
+			double v = part.ov;
+			double j = u;
+			double k = u + d;
+			double l = u + d + w;
+			double m = u + d + w + w;
+			double n = u + d + w + d;
+			double o = u + d + w + d + w;
+			double p = v;
+			double q = v + d;
+			double r = v + d + h;
+			double[] offset = {part.cx, part.cy, part.cz};
+			double[] center = {0, h / 2, 0};
+			// Same six faces / corner order / UV rects as buildBoxMesh.
+			Object[][] faces = {
+					{p6, p5, p1, p2, k, p, l, q},
+					{p3, p4, p8, p7, l, q, m, p},
+					{p1, p5, p8, p4, j, q, k, r},
+					{p2, p1, p4, p3, k, q, l, r},
+					{p6, p2, p3, p7, l, q, n, r},
+					{p5, p6, p7, p8, n, q, o, r},
+			};
+			for (Object[] face : faces) {
+				addLayerFace(list, reader, (double[]) face[0], (double[]) face[1], (double[]) face[2],
+						(double) face[4], (double) face[5], (double) face[6], (double) face[7], center, offset, uvW, uvH);
+			}
+		}
+		if (list.points.isEmpty()) {
+			return null;
+		}
+		TriangleMesh mesh = new TriangleMesh();
+		mesh.getPoints().addAll(toFloatArray(list.points));
+		mesh.getTexCoords().addAll(toFloatArray(list.texCoords));
+		mesh.getFaces().addAll(toIntArray(list.faces));
+		MeshView view = new MeshView(mesh);
+		PhongMaterial material = new PhongMaterial();
+		material.setDiffuseMap(texture);
+		view.setMaterial(material);
+		view.setCullFace(CullFace.NONE);
+		return view;
+	}
+
+	private static void addLayerFace(MeshBuilder list, PixelReader reader, double[] c0, double[] c1, double[] c2,
+			double u1, double v1, double u2, double v2, double[] center, double[] offset, double uvW, double uvH) {
+		int minU = (int) Math.min(u1, u2);
+		int maxU = (int) Math.max(u1, u2);
+		int minV = (int) Math.min(v1, v2);
+		int maxV = (int) Math.max(v1, v2);
+		// Outward normal of this (axis-aligned) face.
+		double[] faceCenter = new double[3];
+		for (int i = 0; i < 3; i++) {
+			faceCenter[i] = (c0[i] + c2[i]) / 2 - center[i];
+		}
+		double[] normal = new double[3];
+		int axis = Math.abs(faceCenter[0]) > Math.abs(faceCenter[1])
+				? (Math.abs(faceCenter[0]) > Math.abs(faceCenter[2]) ? 0 : 2)
+				: (Math.abs(faceCenter[1]) > Math.abs(faceCenter[2]) ? 1 : 2);
+		normal[axis] = Math.signum(faceCenter[axis]);
+		for (int tv = minV; tv < maxV; tv++) {
+			for (int tu = minU; tu < maxU; tu++) {
+				if (!opaque(reader, tu, tv, uvW, uvH)) {
+					continue;
+				}
+				double[] a = facePoint(c0, c1, c2, u1, v1, u2, v2, tu, tv);
+				double[] b = facePoint(c0, c1, c2, u1, v1, u2, v2, tu + 1, tv);
+				double[] c = facePoint(c0, c1, c2, u1, v1, u2, v2, tu + 1, tv + 1);
+				double[] e = facePoint(c0, c1, c2, u1, v1, u2, v2, tu, tv + 1);
+				double[][] inner = {a, b, c, e};
+				double[][] outer = new double[4][];
+				for (int i = 0; i < 4; i++) {
+					inner[i] = add(add(inner[i], offset), scale(normal, LAYER_GAP));
+					outer[i] = add(inner[i], scale(normal, LAYER_THICKNESS));
+				}
+				float su = (float) ((tu + 0.5) / uvW);
+				float sv = (float) ((tv + 0.5) / uvH);
+				addQuad(list, outer[0], outer[1], outer[2], outer[3], su, sv, normal);
+				// Sides only where the neighbouring pixel on this face is empty.
+				if (tv == minV || !opaque(reader, tu, tv - 1, uvW, uvH)) {
+					addQuad(list, inner[0], inner[1], outer[1], outer[0], su, sv, null);
+				}
+				if (tu == maxU - 1 || !opaque(reader, tu + 1, tv, uvW, uvH)) {
+					addQuad(list, inner[1], inner[2], outer[2], outer[1], su, sv, null);
+				}
+				if (tv == maxV - 1 || !opaque(reader, tu, tv + 1, uvW, uvH)) {
+					addQuad(list, inner[2], inner[3], outer[3], outer[2], su, sv, null);
+				}
+				if (tu == minU || !opaque(reader, tu - 1, tv, uvW, uvH)) {
+					addQuad(list, inner[3], inner[0], outer[0], outer[3], su, sv, null);
+				}
+			}
+		}
+	}
+
+	private static boolean opaque(PixelReader reader, int x, int y, double w, double h) {
+		if (x < 0 || y < 0 || x >= w || y >= h) {
+			return false;
+		}
+		return reader.getColor(x, y).getOpacity() > 0.05;
+	}
+
+	/** Point on a face for texel coordinate (U, V), using the face's own UV-to-corner mapping. */
+	private static double[] facePoint(double[] c0, double[] c1, double[] c2, double u1, double v1, double u2, double v2, double tu, double tv) {
+		double s = (tu - u1) / (u2 - u1);
+		double t = (tv - v1) / (v2 - v1);
+		return new double[] {
+				c1[0] + s * (c0[0] - c1[0]) + t * (c2[0] - c1[0]),
+				c1[1] + s * (c0[1] - c1[1]) + t * (c2[1] - c1[1]),
+				c1[2] + s * (c0[2] - c1[2]) + t * (c2[2] - c1[2]),
+		};
+	}
+
+	/** A quad sampling one texel; when {@code normal} is given, wound to face along it. */
+	private static void addQuad(MeshBuilder list, double[] a, double[] b, double[] c, double[] d, float u, float v, double[] normal) {
+		if (normal != null) {
+			double[] n = cross(sub(b, a), sub(c, a));
+			if (n[0] * normal[0] + n[1] * normal[1] + n[2] * normal[2] > 0) {
+				double[] swap = b;
+				b = d;
+				d = swap;
+			}
+		}
+		int pBase = list.points.size() / 3;
+		for (double[] point : new double[][] {a, b, c, d}) {
+			list.points.add(point[0]);
+			list.points.add(point[1]);
+			list.points.add(point[2]);
+		}
+		int tBase = list.texCoords.size() / 2;
+		list.texCoords.add((double) u);
+		list.texCoords.add((double) v);
+		list.faces.add(pBase);
+		list.faces.add(tBase);
+		list.faces.add(pBase + 1);
+		list.faces.add(tBase);
+		list.faces.add(pBase + 2);
+		list.faces.add(tBase);
+		list.faces.add(pBase);
+		list.faces.add(tBase);
+		list.faces.add(pBase + 2);
+		list.faces.add(tBase);
+		list.faces.add(pBase + 3);
+		list.faces.add(tBase);
+	}
+
+	private static double[] add(double[] a, double[] b) {
+		return new double[] {a[0] + b[0], a[1] + b[1], a[2] + b[2]};
+	}
+
+	private static double[] sub(double[] a, double[] b) {
+		return new double[] {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
+	}
+
+	private static double[] scale(double[] a, double f) {
+		return new double[] {a[0] * f, a[1] * f, a[2] * f};
+	}
+
+	private static double[] cross(double[] a, double[] b) {
+		return new double[] {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]};
+	}
+
+	private static WritableImage copyOf(Image image) {
+		int w = (int) image.getWidth();
+		int h = (int) image.getHeight();
+		WritableImage out = new WritableImage(image.getPixelReader(), w, h);
+		return out;
 	}
 
 	private static PointLight keyLight(double dirX, double dirY, double dirZ, double brightness) {

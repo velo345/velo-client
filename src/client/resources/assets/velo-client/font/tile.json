@@ -1,11 +1,8 @@
 {
 	"providers": [
 		{
-			"type": "ttf",
-			"file": "velo-client:anta.ttf",
-			"size": 11,
-			"oversample": 8,
-			"shift": [0, 0]
+			"type": "reference",
+			"id": "velo-client:ui_bold_2"
 		}
 	]
 }

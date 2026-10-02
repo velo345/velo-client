@@ -176,9 +176,29 @@ public abstract class EscapeMenuMixin {
 		}
 	}
 
+	/**
+	 * The restyled vanilla buttons stay in the drawable list (other mods anchor against them, see
+	 * init) but are hidden while vanilla draws, so only the glass version below is ever visible -
+	 * painting over them let their old labels/corners peek out around the rounded glass.
+	 */
+	@Inject(method = "render", at = @At("HEAD"))
+	private void velo$hideRestyled(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		velo$setRestyledVisible((GameMenuScreen) (Object) this, false);
+	}
+
+	@Unique
+	private static void velo$setRestyledVisible(GameMenuScreen self, boolean visible) {
+		for (var child : self.children()) {
+			if (child instanceof ButtonWidget widget && velo$canonicalKey(widget) != null) {
+				widget.visible = visible;
+			}
+		}
+	}
+
 	@Inject(method = "render", at = @At("RETURN"))
 	private void velo$overlay(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		GameMenuScreen self = (GameMenuScreen) (Object) this;
+		velo$setRestyledVisible(self, true);
 		List<Drawable> drawables = ((ScreenAccessMixin) (Object) this).velo$drawables();
 		List<ButtonWidget> ordered = new ArrayList<>();
 		for (var child : self.children()) {
@@ -376,9 +396,24 @@ public abstract class EscapeMenuMixin {
 		}
 	}
 
+	@Inject(method = "extractRenderState", at = @At("HEAD"))
+	private void velo$hideRestyled(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		velo$setRestyledVisible((PauseScreen) (Object) this, false);
+	}
+
+	@Unique
+	private static void velo$setRestyledVisible(PauseScreen self, boolean visible) {
+		for (var child : self.children()) {
+			if (child instanceof Button widget && velo$canonicalKey(widget) != null) {
+				widget.visible = visible;
+			}
+		}
+	}
+
 	@Inject(method = "extractRenderState", at = @At("RETURN"))
 	private void velo$overlay(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		PauseScreen self = (PauseScreen) (Object) this;
+		velo$setRestyledVisible(self, true);
 		List<Renderable> renderables = ((ScreenAccessMixin) (Object) this).velo$drawables();
 		List<Button> ordered = new ArrayList<>();
 		for (var child : self.children()) {

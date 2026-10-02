@@ -74,7 +74,7 @@ public final class ProjectDetailView {
 
 		VBox headerInfo = new VBox(6);
 		Label title = new Label(detail.title());
-		title.setFont(Font.font("System", FontWeight.BOLD, 22));
+		title.setFont(Font.font("Inter", FontWeight.BOLD, 22));
 		title.setTextFill(accent);
 		Label description = new Label(detail.description());
 		description.setWrapText(true);
@@ -105,7 +105,7 @@ public final class ProjectDetailView {
 
 		if (!detail.galleryOrEmpty().isEmpty()) {
 			Label galleryHeading = new Label("Gallery");
-			galleryHeading.setFont(Font.font("System", FontWeight.BOLD, 15));
+			galleryHeading.setFont(Font.font("Inter", FontWeight.BOLD, 15));
 			galleryHeading.setTextFill(text);
 			content.getChildren().add(galleryHeading);
 
@@ -119,7 +119,7 @@ public final class ProjectDetailView {
 		}
 
 		Label descHeading = new Label("Description");
-		descHeading.setFont(Font.font("System", FontWeight.BOLD, 15));
+		descHeading.setFont(Font.font("Inter", FontWeight.BOLD, 15));
 		descHeading.setTextFill(text);
 		content.getChildren().add(descHeading);
 
@@ -129,7 +129,7 @@ public final class ProjectDetailView {
 		content.getChildren().add(body);
 
 		Label versionsHeading = new Label("Versions");
-		versionsHeading.setFont(Font.font("System", FontWeight.BOLD, 15));
+		versionsHeading.setFont(Font.font("Inter", FontWeight.BOLD, 15));
 		versionsHeading.setTextFill(text);
 		content.getChildren().add(versionsHeading);
 
@@ -245,7 +245,7 @@ public final class ProjectDetailView {
 
 		VBox info = new VBox(2);
 		Label number = new Label(version.versionNumber() + (version.name() != null && !version.name().isBlank() ? "  -  " + version.name() : ""));
-		number.setFont(Font.font("System", FontWeight.BOLD, 13));
+		number.setFont(Font.font("Inter", FontWeight.BOLD, 13));
 		number.setTextFill(text(theme));
 		String meta = String.join(", ", version.gameVersions()) + "  ·  " + String.join(", ", version.loaders());
 		Label metaLabel = new Label(meta);

@@ -45,82 +45,87 @@ public final class StoreItemDetailView {
 	}
 
 	public static Node build(Host host, StoreItem item) {
-		LauncherTheme theme = host.theme();
-		Color text = text(theme);
-		Color accent = accent(theme);
-
-		VBox root = new VBox(18);
-
-		Button back = new Button("< Back");
+		Button back = new Button("‹  Store");
+		back.getStyleClass().add("ghost-button");
 		back.setOnAction(e -> host.goBack());
-		root.getChildren().add(back);
 
-		HBox body = new HBox(24);
-		body.setAlignment(Pos.TOP_LEFT);
-
-		StackPane previewHolder = new StackPane();
-		previewHolder.setPrefSize(240, 320);
-		previewHolder.setMinSize(240, 320);
-		previewHolder.setAlignment(Pos.CENTER);
-		previewHolder.getStyleClass().add("glass-panel");
-		Label loading = new Label(host.session() == null ? "Sign in to preview this on your own skin." : "Loading preview...");
-		loading.getStyleClass().add("section-subtitle");
-		loading.setTextFill(text);
+		// Left: your skin wearing the cape, turning slowly with the cape facing you first.
+		StackPane stage = CosmeticUi.stage(340, 420);
+		stage.getStyleClass().add("showcase-stage");
+		Label loading = new Label(host.session() == null ? "Sign in to preview this on your own skin" : "Loading preview...");
+		loading.getStyleClass().add("page-subtitle");
 		loading.setWrapText(true);
-		previewHolder.getChildren().add(loading);
-		if (host.session() != null) {
-			loadPreviewAsync(host.session(), item, previewHolder);
-		}
+		stage.getChildren().add(loading);
+		var frames = CosmeticUi.frames(item);
+		CosmeticUi.skin(host.session(), skin -> {
+			Node viewer = skin == null ? null
+					: PlayerSkin3DView.createShowcase(skin.pngBytes(), skin.slim(), frames.isEmpty() ? null : frames);
+			if (viewer != null) {
+				stage.getChildren().setAll(viewer);
+			} else if (!frames.isEmpty()) {
+				stage.getChildren().setAll(new javafx.scene.image.ImageView(CosmeticUi.thumbnail("store:" + item.id(), frames, 300, 340)));
+			}
+		});
+		Label hint = new Label("Drag to rotate  ·  scroll to zoom");
+		hint.getStyleClass().add("stage-hint");
+		StackPane preview = new StackPane(stage, hint);
+		StackPane.setAlignment(hint, Pos.BOTTOM_CENTER);
+		hint.setTranslateY(-10);
 
-		VBox info = new VBox(10);
-		Label name = new Label(item.name());
-		name.setFont(Font.font("System", FontWeight.BOLD, 24));
-		name.setTextFill(accent);
-		Label description = new Label(item.description());
-		description.setTextFill(text);
-		description.setWrapText(true);
-		description.setMaxWidth(320);
-
+		// Right: details and the purchase action.
 		boolean owned = StoreOwnership.owns(item.id());
-		Label priceLabel = new Label(owned ? "You own this cape." : "Price: " + item.priceCoins() + " Velo Coins");
-		priceLabel.setTextFill(Color.web("#f7d774"));
-		priceLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
+		Label tag = new Label(frames.size() > 1 ? "CAPE  ·  ANIMATED" : "CAPE");
+		tag.getStyleClass().add("featured-tag");
+		Label name = new Label(item.name());
+		name.getStyleClass().add("featured-title");
+		Label description = new Label(item.description());
+		description.getStyleClass().add("page-subtitle");
+		description.setWrapText(true);
+		description.setMaxWidth(380);
+
+		Node priceChip = CosmeticUi.priceChip(item.priceCoins(), owned);
+		Label balance = new Label("You have " + CurrencyStore.balance() + " coins");
+		balance.getStyleClass().add("page-subtitle");
+		HBox priceRow = new HBox(12, priceChip, balance);
+		priceRow.setAlignment(Pos.CENTER_LEFT);
 
 		Label status = new Label();
-		status.setTextFill(text);
+		status.getStyleClass().add("purchase-status");
 		status.setWrapText(true);
 
-		Button action = new Button(owned ? "Equip" : "Buy for " + item.priceCoins() + " Velo Coins");
-		action.getStyleClass().add("title-menu-button");
-		if (!owned) {
-			action.getStyleClass().add("title-menu-button-primary");
-		}
+		Button action = new Button(owned ? "Equip cape" : "Buy for " + item.priceCoins() + " coins");
+		action.getStyleClass().add("primary-button");
+		action.setMinHeight(46);
+		action.setPrefWidth(260);
 		action.setOnAction(e -> {
 			if (StoreOwnership.owns(item.id())) {
-				findLibraryIdFor(item).ifPresentOrElse(CapeLibrary::equip,
-						() -> status.setText("Couldn't find this cape in your library - try re-importing from the mod's Cape Library screen."));
-				status.setText("Equipped \"" + item.name() + "\"");
+				findLibraryIdFor(item).ifPresentOrElse(id -> {
+					CapeLibrary.equip(id);
+					status.setText("Equipped \"" + item.name() + "\" - it shows in-game now.");
+				}, () -> status.setText("Couldn't find this cape in your library - try re-importing it from Cosmetics."));
 				return;
 			}
 			StorePurchase.Result result = StorePurchase.buy(item);
 			switch (result) {
 				case SUCCESS -> {
-					status.setText("Purchased \"" + item.name() + "\" - added to your cape library!");
-					action.setText("Equip");
-					action.getStyleClass().remove("title-menu-button-primary");
-					priceLabel.setText("You own this cape.");
+					status.setText("Purchased! \"" + item.name() + "\" is in your Cosmetics now.");
+					action.setText("Equip cape");
+					priceRow.getChildren().set(0, CosmeticUi.priceChip(item.priceCoins(), true));
+					balance.setText("You have " + CurrencyStore.balance() + " coins");
 				}
-				case INSUFFICIENT_COINS -> status.setText("Not enough Velo Coins - you have " + CurrencyStore.balance() + ".");
-				case ALREADY_OWNED -> status.setText("Already owned.");
-				case IMPORT_FAILED -> status.setText("Purchase failed - refunded.");
+				case INSUFFICIENT_COINS -> status.setText("Not enough coins - you have " + CurrencyStore.balance() + ".");
+				case ALREADY_OWNED -> status.setText("You already own this cape.");
+				case IMPORT_FAILED -> status.setText("Purchase failed - your coins were refunded.");
 			}
 		});
 
-		info.getChildren().addAll(name, description, priceLabel, action, status);
+		VBox info = new VBox(12, tag, name, description, priceRow, action, status);
+		info.setAlignment(Pos.CENTER_LEFT);
 		HBox.setHgrow(info, Priority.ALWAYS);
-		body.getChildren().addAll(previewHolder, info);
-		root.getChildren().add(body);
 
+		HBox body = new HBox(32, preview, info);
+		body.setAlignment(Pos.CENTER_LEFT);
+		VBox root = new VBox(16, back, body);
 		return root;
 	}
 

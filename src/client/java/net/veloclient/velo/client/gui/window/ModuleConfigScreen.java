@@ -5,7 +5,12 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
+import net.veloclient.velo.client.gui.widget.ModuleIcons;
 import net.veloclient.velo.client.gui.widget.VeloButton;
+import net.veloclient.velo.client.gui.widget.VeloDraw;
+import net.veloclient.velo.client.gui.widget.VeloStyle;
+import net.veloclient.velo.client.gui.widget.VeloUi;
+import net.veloclient.velo.client.gui.widget.VeloValueRow;
 import net.veloclient.velo.client.gui.widget.VeloScrollRegion;
 import net.veloclient.velo.client.gui.widget.VeloSlider;
 import net.veloclient.velo.client.gui.widget.VeloToggle;
@@ -31,6 +36,8 @@ public final class ModuleConfigScreen extends VeloWindow {
 
 	private static final int ROW_HEIGHT = 26;
 	private static final int DESC_LINE_HEIGHT = 11;
+	private static final int CHIP = 30;
+	private static final int SWITCH_WIDTH = 28;
 	private static final int WINDOW_HEIGHT = 420;
 
 	private final Module module;
@@ -47,7 +54,7 @@ public final class ModuleConfigScreen extends VeloWindow {
 	}
 
 	public ModuleConfigScreen(Module module, Reopenable parent) {
-		super(Text.literal(module.displayName() + " Settings"), 360, WINDOW_HEIGHT);
+		super(Text.literal(module.displayName()), 380, WINDOW_HEIGHT);
 		this.module = module;
 		this.parent = parent;
 		// Every current Reopenable is also the Screen to fall back to -
@@ -69,16 +76,15 @@ public final class ModuleConfigScreen extends VeloWindow {
 		double previousScrollOffset = scrollRegion != null ? scrollRegion.scrollOffset() : 0;
 
 		this.clearChildren();
-		descriptionLines = wrap(module.description(), contentWidth());
+		// Header card: icon chip, description, safety pill, and the master switch on the right.
+		descriptionLines = wrap(module.description(), headerTextWidth());
+		int headerHeight = headerHeight();
+		addDrawableChild(new VeloToggle(contentX() + contentWidth() - SWITCH_WIDTH - 10, contentY() + 10, SWITCH_WIDTH,
+				Text.empty(), module::isEnabled, module::setEnabled));
 
-		int y = contentY() + descriptionLines.size() * DESC_LINE_HEIGHT + 6;
-
-		addDrawableChild(new VeloToggle(contentX(), y, contentWidth() - 60,
-				Text.literal("Enabled"), module::isEnabled, module::setEnabled));
-		y += ROW_HEIGHT + 4;
-
-		int listBottom = contentBottom() - 26;
-		scrollRegion = new VeloScrollRegion(contentX(), y, contentWidth(), Math.max(0, listBottom - y));
+		int y = contentY() + headerHeight + 12;
+		int listBottom = contentBottom() - 30;
+		scrollRegion = new VeloScrollRegion(contentX(), y, contentWidth(), Math.max(ROW_HEIGHT, listBottom - y));
 		scrollRegion.setScrollOffset(previousScrollOffset);
 
 		if (module instanceof Configurable configurable) {
@@ -92,81 +98,88 @@ public final class ModuleConfigScreen extends VeloWindow {
 			scrollRegion.layout(ROW_HEIGHT, 0);
 		}
 
-		addDrawableChild(new VeloButton(contentX(), contentBottom() - 20, contentWidth(), 20, Text.literal("Done"),
+		addDrawableChild(new VeloButton(contentX() + contentWidth() - 84, contentBottom() - 20, 84, 20, Text.literal("Done"),
 				b -> {
 					requestClose();
 					parent.reopen();
-				}));
+				}).primary());
+	}
+
+	private int rowWidth() {
+		return scrollRegion != null ? scrollRegion.viewportWidth() - 4 : contentWidth() - 12;
+	}
+
+	private int headerTextWidth() {
+		return contentWidth() - CHIP - 30 - SWITCH_WIDTH - 12;
+	}
+
+	private int headerHeight() {
+		return Math.max(CHIP + 20, 10 + descriptionLines.size() * DESC_LINE_HEIGHT + 22);
 	}
 
 	private ClickableWidget buildFieldWidget(ConfigField field, int y) {
+		int x = contentX() + 4;
+		int width = rowWidth();
 		if (field instanceof ConfigField.SliderField slider) {
-			return new VeloSlider(contentX(), y + 10, contentWidth(), 16, slider.label(),
+			return new VeloSlider(x, y + 6, width, 18, slider.label(),
 					slider.min(), slider.max(), slider.get(), slider.set(), null,
 					v -> slider.format().apply(v));
 		}
 		if (field instanceof ConfigField.ToggleField toggle) {
-			return new VeloToggle(contentX(), y, contentWidth(), Text.literal(toggle.label()),
+			return new VeloToggle(x, y + 2, width, Text.literal(toggle.label()),
 					toggle.get(), toggle.set());
 		}
 		if (field instanceof ConfigField.KeybindField keybind) {
-			boolean listening = keybind == awaitingRebind;
-			Text buttonText = Text.literal(keybind.label() + ": "
-					+ (listening ? "> press a key (Esc to cancel) <" : keybind.displayText().get()));
-			return new VeloButton(contentX(), y, contentWidth(), 20, buttonText,
+			return new VeloValueRow(x, y + 2, width, 22, Text.literal(keybind.label()), VeloValueRow.Kind.KEY,
+					() -> keybind.displayText().get(), null,
 					b -> {
 						awaitingRebind = keybind;
 						layoutContent();
-					});
+					}).listening(keybind == awaitingRebind);
 		}
 		if (field instanceof ConfigField.ChoiceField choice) {
-			String current = choice.get().get();
-			return new VeloButton(contentX(), y, contentWidth(), 20,
-					Text.literal(choice.label() + ": " + current + "  ▸"),
+			return new VeloValueRow(x, y + 2, width, 22, Text.literal(choice.label()), VeloValueRow.Kind.CHOICE,
+					() -> choice.get().get(), null,
 					b -> {
 						List<String> options = choice.options();
-						int index = options.indexOf(current);
-						String next = options.get((index + 1) % options.size());
-						choice.set().accept(next);
+						int index = options.indexOf(choice.get().get());
+						choice.set().accept(options.get((index + 1) % options.size()));
+						// Some modules show different fields per choice; scroll position survives the rebuild.
 						layoutContent();
 					});
 		}
 		if (field instanceof ConfigField.TextField text) {
-			TextFieldWidget widget = new TextFieldWidget(this.textRenderer, contentX(), y, contentWidth(), 18, Text.literal(text.label()));
+			TextFieldWidget widget = new TextFieldWidget(this.textRenderer, x, y + 4, width, 18, Text.literal(text.label()));
 			widget.setPlaceholder(Text.literal(text.placeholder()));
 			widget.setText(text.get().get());
 			widget.setChangedListener(text.set());
 			return widget;
 		}
 		if (field instanceof ConfigField.ColorField color) {
-			Text swatch = Text.literal("●").styled(s -> s.withColor(color.get().getAsInt() | 0xFF000000));
-			Text buttonText = Text.literal(color.label() + ": ").append(swatch).append(Text.literal("  Edit"));
-			return new VeloButton(contentX(), y, contentWidth(), 20, buttonText,
+			return new VeloValueRow(x, y + 2, width, 22, Text.literal(color.label()), VeloValueRow.Kind.COLOR,
+					() -> String.format("#%06X", color.get().getAsInt() & 0xFFFFFF), () -> color.get().getAsInt(),
 					b -> this.client.setScreen(new net.veloclient.velo.client.gui.VeloColorPickerScreen(
 							this, color.label(), color.get().getAsInt(), color.includeAlpha(), color.set()::accept)));
 		}
 		if (field instanceof ConfigField.ActionButtonField action) {
-			return new VeloButton(contentX(), y, contentWidth(), 20, Text.literal(action.label()),
+			return new VeloButton(x, y + 3, width, 20, Text.literal(action.label()),
 					b -> action.action().run());
 		}
 		if (field instanceof ConfigField.ChordKeybindField chord) {
 			boolean listening = chord == awaitingChordRebind;
-			String liveText;
-			if (listening) {
-				liveText = chordMaxKeys.isEmpty()
-						? "> hold keys, release to confirm (Esc to unbind) <"
-						: ChordKeybinds.displayText(List.copyOf(chordMaxKeys)) + "...";
-			} else {
-				liveText = ChordKeybinds.displayText(chord.get().get());
-			}
-			Text buttonText = Text.literal(chord.label() + ": " + liveText);
-			return new VeloButton(contentX(), y, contentWidth(), 20, buttonText,
+			return new VeloValueRow(x, y + 2, width, 22, Text.literal(chord.label()), VeloValueRow.Kind.KEY,
+					() -> {
+						if (!listening) {
+							return ChordKeybinds.displayText(chord.get().get());
+						}
+						return chordMaxKeys.isEmpty() ? "Hold keys..." : ChordKeybinds.displayText(List.copyOf(chordMaxKeys)) + "...";
+					}, null,
 					b -> {
 						awaitingChordRebind = chord;
 						chordHeldKeys.clear();
 						chordMaxKeys.clear();
 						layoutContent();
-					});
+					}).listening(listening && chordMaxKeys.isEmpty());
 		}
 		throw new IllegalStateException("Unknown ConfigField type: " + field.getClass());
 	}
@@ -234,21 +247,57 @@ public final class ModuleConfigScreen extends VeloWindow {
 	}
 
 	@Override
+	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
+		Theme theme = ThemeManager.active();
+		int x = contentX();
+		int y = contentY();
+		int headerHeight = headerHeight();
+		VeloDraw.fillRounded(context, x, y, contentWidth(), headerHeight, VeloStyle.RADIUS_CARD, VeloStyle.card());
+		VeloDraw.strokeRounded(context, x, y, contentWidth(), headerHeight, VeloStyle.RADIUS_CARD, VeloStyle.border());
+
+		int chipX = x + 10;
+		int chipY = y + 10;
+		boolean on = module.isEnabled();
+		VeloDraw.fillRounded(context, chipX, chipY, CHIP, CHIP, 9,
+				on ? VeloUi.withAlpha(theme.accentStart(), 0x30) : VeloUi.withAlpha(theme.text(), 0x0E));
+		context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, ModuleIcons.textureFor(module.id()),
+				chipX + 6, chipY + 6, 0f, 0f, CHIP - 12, CHIP - 12, 1024, 1024, 1024, 1024,
+				on ? (theme.accentStart() | 0xFF000000) : VeloStyle.textMuted());
+
+		int textX = chipX + CHIP + 10;
+		int lineY = y + 10;
+		for (String line : descriptionLines) {
+			context.drawTextWithShadow(this.textRenderer, line, textX, lineY, VeloStyle.textMuted());
+			lineY += DESC_LINE_HEIGHT;
+		}
+		drawSafetyPill(context, textX, lineY + 3);
+	}
+
+	private void drawSafetyPill(DrawContext context, int x, int y) {
+		var tag = module.safetyTag();
+		int color = switch (tag) {
+			case ALWAYS_SAFE -> 0xFF3FB97A;
+			case COSMETIC_ONLY -> 0xFF5B9BF0;
+			case CHECK_SERVER_RULES -> 0xFFE7A33E;
+		};
+		String label = tag.displayName();
+		int width = this.textRenderer.getWidth(label) + 16;
+		VeloDraw.fillRounded(context, x, y, width, 13, 6, VeloUi.withAlpha(color, 0x2A));
+		VeloDraw.fillCircle(context, x + 6f, y + 6.5f, 2f, color);
+		context.drawTextWithShadow(this.textRenderer, label, x + 11, y + 3, color);
+	}
+
+	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
 		if (scrollRegion != null) {
 			scrollRegion.renderRows(context, mouseX, mouseY, delta);
 			scrollRegion.renderScrollbar(context, ROW_HEIGHT, 0);
 		}
-		Theme theme = ThemeManager.active();
-		int y = contentY();
-		for (String line : descriptionLines) {
-			context.drawTextWithShadow(this.textRenderer, line, contentX(), y, theme.text() & 0x00FFFFFF | 0xCC000000);
-			y += DESC_LINE_HEIGHT;
+		if (awaitingRebind != null || awaitingChordRebind != null) {
+			String hint = awaitingRebind != null ? "Press a key - Esc unbinds" : "Hold the keys, release to save - Esc unbinds";
+			context.drawTextWithShadow(this.textRenderer, hint, contentX(), contentBottom() - 14, VeloStyle.textMuted());
 		}
-		String safety = "[" + module.safetyTag().displayName() + "]";
-		int safetyWidth = this.textRenderer.getWidth(safety);
-		context.drawTextWithShadow(this.textRenderer, safety, contentX() + contentWidth() - safetyWidth, contentY() - 12, theme.accentStart());
 	}
 
 	private static List<String> wrap(String text, int maxWidth) {

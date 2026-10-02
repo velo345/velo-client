@@ -75,7 +75,10 @@ public final class VeloClientMod implements ClientModInitializer {
 		loadAddons();
 		HudManager.register();
 		VeloKeybinds.register();
+		net.veloclient.velo.client.keybind.MenuKeySync.register();
+		net.veloclient.velo.client.util.MemoryStatsRecorder.start();
 		CapeFeatureRenderer.register();
+		registerSocialOverlay();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				client -> net.veloclient.velo.client.cosmetics.AnimatedCapeAsset.tickAll());
 		net.veloclient.velo.client.profile.VeloProfileStore.loadActiveDeferred();
@@ -88,6 +91,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.crosshair.CrosshairManager.loadLibrary();
 		ModuleRegistry.exportManifest();
 		AnticheatTestController.initIfEnabled();
+		net.veloclient.velo.client.devtools.ScreenshotTour.initIfRequested();
 		VeloClient.LOGGER.info("Velo Client ready ({} modules registered)", ModuleRegistry.all().size());
 	}
 
@@ -109,6 +113,21 @@ public final class VeloClientMod implements ClientModInitializer {
 		}
 	}
 
+	/**
+	 * Friend popups: drawn on the HUD while playing (see HudManager) and on top of every screen,
+	 * where the mouse is free so they can be clicked - a click that lands on a popup is consumed
+	 * before the screen underneath sees it.
+	 */
+	private void registerSocialOverlay() {
+		net.veloclient.velo.client.social.SocialNotifications.register();
+		net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
+			net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.afterRender(screen).register((s, context, mouseX, mouseY, tickDelta) ->
+					net.veloclient.velo.client.social.NotificationOverlay.renderOverScreen(s, context, mouseX, mouseY));
+			net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents.allowMouseClick(screen).register((s, click) ->
+					!net.veloclient.velo.client.social.NotificationOverlay.click(click.x(), click.y()));
+		});
+	}
+
 	private void registerModules() {
 		// HUD / QoL (section 6.2)
 		ModuleRegistry.register(new FpsCounterModule());
@@ -119,6 +138,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ArmorDurabilityModule());
 		ModuleRegistry.register(new PotionTimersModule());
 		ModuleRegistry.register(new HeldItemModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.TotemCounterModule());
 		ModuleRegistry.register(new KeystrokesModule());
 		ModuleRegistry.register(new MouseButtonsModule());
 		ModuleRegistry.register(new ActionBarLogModule());
@@ -129,10 +149,12 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ToggleSneakModule());
 		ModuleRegistry.register(new ZoomModule());
 		ModuleRegistry.register(new CustomCrosshairModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.AttackIndicatorModule());
 		ModuleRegistry.register(new MinimapModule());
 		ModuleRegistry.register(new FreeLookModule());
 		ModuleRegistry.register(new NickHiderModule());
 		ModuleRegistry.register(new SmallCapsModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.FriendsModule());
 
 		// Rendering
 		ModuleRegistry.register(new TntTimerModule());
@@ -151,6 +173,8 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ParticleLimiterModule());
 		ModuleRegistry.register(new PerformanceBoostModule());
 		ModuleRegistry.register(new RenderCullingModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.ShaderCacheModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.EntityDetailModule());
 		ModuleRegistry.register(new PolyBlurModule());
 		ModuleRegistry.register(new OptimizationModCompatModule());
 		ModuleRegistry.register(new FullBrightModule());

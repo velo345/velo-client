@@ -20,6 +20,11 @@ public final class FabricMetaService {
 
 	/** @return {@code mainClass} (Fabric's KnotClient) + {@code libraries} (loader/intermediary/adapters) to merge on top of the vanilla version. */
 	public static JsonObject fetchLoaderProfile(GameVersion version) throws IOException {
+		// Pinned loader version -> the profile never changes; fetched once, then served from disk.
+		return MetaCache.getOrFetch("fabric-" + version.id() + "-" + version.fabricLoaderVersion(), () -> fetchUncached(version));
+	}
+
+	private static JsonObject fetchUncached(GameVersion version) throws IOException {
 		String url = "https://meta.fabricmc.net/v2/versions/loader/" + version.id() + "/" + version.fabricLoaderVersion() + "/profile/json";
 		HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(20)).GET().build();
 		try {

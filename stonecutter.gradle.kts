@@ -750,6 +750,13 @@ stonecutter parameters {
 			// "ComponentGizmo" - a real confirmed compile failure), the same
 			// technique as the getBoundingBox() shield above.
 			replace("TextGizmo", "TextGizmo")
+			// Shields for real Mojmap packet class names that contain "Text" - without these the
+			// bare "Text" -> "Component" rule below mangles them (BackgroundQueue's GhostPackets).
+			replace("ClientboundSetActionBarTextPacket", "ClientboundSetActionBarTextPacket")
+			replace("ClientboundSetSubtitleTextPacket", "ClientboundSetSubtitleTextPacket")
+			replace("ClientboundSetTitleTextPacket", "ClientboundSetTitleTextPacket")
+			// Real Mojmap method (LivingEntityRenderer) that the bare "RenderLayers" rule would mangle.
+			replace("shouldRenderLayers", "shouldRenderLayers")
 			replace("net.minecraft.world.debug.gizmo.TextGizmo", "net.minecraft.gizmos.TextGizmo")
 			replace(".ignoreOcclusion()", ".setAlwaysOnTop()")
 			replace("DrawStyle.stroked(", "GizmoStyle.stroke(")

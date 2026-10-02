@@ -33,7 +33,12 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 	private final HudPosition position = new HudPosition(0.02f, 0.17f);
 	private boolean showIcon = true;
 	private boolean showBar = true;
-	private boolean showText = true;
+	// Off by default: the bar alone (exactly as wide as the armor icon, under it) reads at a glance;
+	// the number is opt-in.
+	private boolean showText = false;
+	// When on (default), the bar is always exactly the icon's width - the Bar Width slider only
+	// applies once this is turned off.
+	private boolean barMatchesIcon = true;
 	// Matches ICON_SIZE by default so the bar lines up directly under the
 	// armor icon above it (the default layout, barBelowIcon=true) instead of
 	// visibly overhanging both sides of a much narrower icon.
@@ -57,12 +62,17 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 		return position;
 	}
 
+	private int effectiveBarWidth() {
+		return barMatchesIcon ? ICON_SIZE : barWidth;
+	}
+
 	@Override
 	public void render(DrawContext context, int x, int y, float tickDelta) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client.player == null) {
 			return;
 		}
+		int barWidth = effectiveBarWidth();
 		int rowHeight = rowHeight();
 		int lineCenterYOffset = lineCenterYOffset();
 		int lineXOffset = lineXOffset();
@@ -180,6 +190,7 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 
 	@Override
 	public int width() {
+		int barWidth = effectiveBarWidth();
 		int barLineWidth = showBar ? barWidth : (showText ? 90 : 0);
 		if (showBar && showText) {
 			barLineWidth += 44;
@@ -201,12 +212,13 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 		return List.of(
 				new ConfigField.ToggleField("Show Icon", () -> showIcon, v -> showIcon = v),
 				new ConfigField.ToggleField("Show Bar", () -> showBar, v -> showBar = v),
-				new ConfigField.ToggleField("Show Text", () -> showText, v -> showText = v),
-				new ConfigField.SliderField("Bar Width", 8, 120, () -> barWidth, v -> barWidth = (int) v, v -> String.valueOf((int) v)),
+				new ConfigField.ToggleField("Show Durability Number", () -> showText, v -> showText = v),
+				new ConfigField.ToggleField("Bar Matches Icon Width", () -> barMatchesIcon, v -> barMatchesIcon = v),
+				new ConfigField.SliderField("Custom Bar Width", 8, 120, () -> barWidth, v -> barWidth = (int) v, v -> String.valueOf((int) v)),
 				new ConfigField.SliderField("Bar Height", 2, 10, () -> barHeight, v -> barHeight = (int) v, v -> String.valueOf((int) v)),
-				new ConfigField.SliderField("Text Size", 0.5, 2.0, () -> textScale, v -> textScale = (float) v, v -> Math.round(v * 100) + "%"),
+				new ConfigField.SliderField("Number Size", 0.5, 2.0, () -> textScale, v -> textScale = (float) v, v -> Math.round(v * 100) + "%"),
 				new ConfigField.ToggleField("Bar Below Icon", () -> barBelowIcon, v -> barBelowIcon = v),
-				new ConfigField.ChoiceField("Text Side", java.util.List.of("Right", "Left"),
+				new ConfigField.ChoiceField("Number Side", java.util.List.of("Right", "Left"),
 						() -> textOnLeft ? "Left" : "Right", v -> textOnLeft = v.equals("Left")));
 	}
 }

@@ -7,7 +7,9 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.veloclient.velo.client.gui.widget.VeloAnim;
 import net.veloclient.velo.client.gui.widget.VeloDraw;
+import net.veloclient.velo.client.gui.widget.VeloUi;
 import net.veloclient.velo.client.theme.Theme;
 import net.veloclient.velo.client.theme.ThemeManager;
 
@@ -218,7 +220,7 @@ public final class TitleScreenTheme {
 	private static final int BUTTON_HEIGHT = 20;
 	private static final int BUTTON_GAP = 6;
 	/** A modern, subtle rounding rather than the near-pill look a taller radius gives a 20px-high button. */
-	private static final int BUTTON_CORNER_RADIUS = 5;
+	private static final int BUTTON_CORNER_RADIUS = 7;
 	/** However translucent the active theme's own panel opacity is configured, these buttons never drop below this alpha - they sit over a busy game world/panorama and must fully hide whatever vanilla button is still positioned underneath, not partially show it through. */
 	private static final int MIN_BUTTON_ALPHA = 0xE8;
 
@@ -443,43 +445,46 @@ public final class TitleScreenTheme {
 		int radius = BUTTON_CORNER_RADIUS;
 		int x = layout.x(), y = layout.y(), w = layout.width(), h = layout.height();
 		boolean glow = hovered && active;
+		float hover = hoverProgress(x, y, glow);
 
-		VeloDraw.fillRounded(context, x, y + 2, w, h, radius, 0x33000000);
-
+		VeloDraw.shadow(context, x, y, w, h, radius, 8, 1, VeloUi.withAlpha(0xFF000000, 0x38 + Math.round(0x20 * hover)));
 		int base = solidify(theme.surfaceWithOpacity(), MIN_BUTTON_ALPHA);
-		int borderColor = glow ? theme.accentStart() : ((theme.text() & 0x00FFFFFF) | 0x30000000);
-		int borderWidth = glow ? 2 : 1;
-
-		VeloDraw.fillRounded(context, x, y, w, h, radius, borderColor);
-		VeloDraw.fillRounded(context, x + borderWidth, y + borderWidth, w - borderWidth * 2, h - borderWidth * 2,
-				Math.max(0, radius - borderWidth), base);
-
-		if (glow) {
-			// Radius off the button's own height, not max(w, h) - the wide
-			// main buttons (200x20) made that a ~200px radius, which at a
-			// 20px height just washes the whole button evenly regardless of
-			// cursor position instead of reading as a light actually
-			// following the mouse. Scaled off height keeps it a genuinely
-			// localized, visibly moving highlight on both this (wide, short)
-			// shape and the icon squares' (roughly square) one below.
-			drawSpotlight(context, x + borderWidth, y + borderWidth, w - borderWidth * 2, h - borderWidth * 2,
-					mouseX, mouseY, h * 3, theme.accentStart());
+		int top = VeloAnim.lerpArgb(VeloAnim.lerpArgb(base, 0xFFFFFFFF, 0.07f),
+				VeloAnim.lerpArgb(base, theme.accentStart() | 0xFF000000, 0.28f), hover);
+		int bottom = VeloAnim.lerpArgb(base, VeloAnim.lerpArgb(base, theme.accentStart() | 0xFF000000, 0.12f), hover);
+		VeloDraw.fillRoundedGradient(context, x, y, w, h, radius, top, bottom);
+		if (hover > 0.01f) {
+			drawSpotlight(context, x + 1, y + 1, w - 2, h - 2, mouseX, mouseY, h * 3,
+					theme.accentStart() & 0xFFFFFF);
 		}
-
-		int highlightAlpha = glow ? 0x60 : 0x40;
-		context.fill(x + radius, y + borderWidth, x + w - radius, y + borderWidth + 1, (highlightAlpha << 24) | 0xFFFFFF);
+		int border = VeloAnim.lerpArgb(VeloUi.withAlpha(theme.text(), 0x2A), theme.accentStart() | 0xFF000000, hover);
+		VeloDraw.strokeRounded(context, x, y, w, h, radius, border);
+		// A one-pixel top highlight sells the "glass" without looking beveled.
+		context.fill(x + radius, y + 1, x + w - radius, y + 2, VeloUi.withAlpha(0xFFFFFFFF, 0x1C + Math.round(0x18 * hover)));
 
 		if (pressFlash > 0f) {
-			int flashAlpha = Math.round(0x90 * Math.min(1f, pressFlash));
+			int flashAlpha = Math.round(0x70 * Math.min(1f, pressFlash));
 			VeloDraw.fillRounded(context, x, y, w, h, radius, (flashAlpha << 24) | 0xFFFFFF);
 		}
 
-		// Always the theme's own text color (never forced white on hover) -
-		// the fill only ever brightens/tints slightly, so this stays legible
-		// against it either way instead of risking a light-on-light or
-		// light-accent-on-white combination the theme never actually chose.
-		int textColor = active ? theme.text() : 0xFF888888;
+		int textColor = active ? VeloAnim.lerpArgb(theme.text() | 0xFF000000, 0xFFFFFFFF, hover) : 0xFF888888;
 		context.drawCenteredTextWithShadow(textRenderer, bodyFont(label), x + w / 2, y + (h - 8) / 2, textColor);
+	}
+
+	/** Per-button hover fade, keyed by position (the static drawer has no widget to keep state on). */
+	private static final java.util.Map<Long, float[]> HOVER = new java.util.HashMap<>();
+
+	private static float hoverProgress(int x, int y, boolean hovered) {
+		long key = ((long) x << 32) ^ (y & 0xFFFFFFFFL);
+		float[] state = HOVER.computeIfAbsent(key, k -> new float[] {0f, 0f});
+		long now = System.nanoTime();
+		float dt = state[1] == 0f ? 0f : Math.min(0.1f, (now / 1_000_000L - state[1]) / 1000f);
+		state[1] = now / 1_000_000L;
+		state[0] = VeloAnim.step(state[0], hovered ? 1f : 0f, dt);
+		if (HOVER.size() > 256) {
+			HOVER.clear();
+		}
+		return state[0];
 	}
 
 	/**

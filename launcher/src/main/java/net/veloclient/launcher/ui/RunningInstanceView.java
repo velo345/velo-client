@@ -52,7 +52,7 @@ public final class RunningInstanceView {
 		Button back = new Button("< Back");
 		back.setOnAction(e -> onBack.run());
 		Label title = new Label(running.instance().name());
-		title.setFont(Font.font("System", FontWeight.BOLD, 20));
+		title.setFont(Font.font("Inter", FontWeight.BOLD, 20));
 		title.setTextFill(text(theme));
 		String startedAt = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault())
 				.format(Instant.ofEpochMilli(running.startedAtEpochMillis()));
@@ -158,7 +158,7 @@ public final class RunningInstanceView {
 				HBox row = new HBox(10);
 				row.setAlignment(Pos.CENTER_LEFT);
 				Label name = new Label(mod.title());
-				name.setFont(Font.font("System", FontWeight.BOLD, 13));
+				name.setFont(Font.font("Inter", FontWeight.BOLD, 13));
 				name.setTextFill(text(theme));
 				Label version = new Label("v" + mod.versionNumber());
 				version.getStyleClass().add("version-tag");

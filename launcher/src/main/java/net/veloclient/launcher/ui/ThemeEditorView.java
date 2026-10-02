@@ -105,7 +105,7 @@ public final class ThemeEditorView {
 
 		Label name = new Label(t.name() + (active ? "  ✓" : ""));
 		name.setTextFill(active ? accent(host.activeTheme()) : text(host.activeTheme()));
-		name.setFont(Font.font("System", FontWeight.BOLD, 13));
+		name.setFont(Font.font("Inter", FontWeight.BOLD, 13));
 		name.setWrapText(true);
 
 		card.getChildren().addAll(swatch, name);
@@ -148,7 +148,7 @@ public final class ThemeEditorView {
 		VBox editor = new VBox(10);
 		editor.getStyleClass().add("glass-panel");
 		Label title = new Label("Edit \"" + t.name() + "\"");
-		title.setFont(Font.font("System", FontWeight.BOLD, 14));
+		title.setFont(Font.font("Inter", FontWeight.BOLD, 14));
 		title.setTextFill(text(t));
 		editor.getChildren().add(title);
 

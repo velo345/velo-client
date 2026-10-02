@@ -92,19 +92,8 @@ public final class ScoreboardHudModule extends AbstractModule implements HudModu
 			return null;
 		}
 		TextRenderer renderer = client.textRenderer;
-		NumberFormat numberFormat = objective.getNumberFormatOr(StyledNumberFormat.RED);
-
-		List<Row> rows = scoreboard.getScoreboardEntries(objective).stream()
-				.filter(e -> !e.hidden())
-				.sorted(Comparator.comparing(ScoreboardEntry::value).reversed()
-						.thenComparing(ScoreboardEntry::owner, String.CASE_INSENSITIVE_ORDER))
-				.limit(MAX_ENTRIES)
-				.map(entry -> {
-					Team team = scoreboard.getScoreHolderTeam(entry.owner());
-					Text name = Team.decorateName((AbstractTeam) team, entry.name());
-					MutableText score = entry.formatted(numberFormat);
-					return new Row(name, score, renderer.getWidth(name), renderer.getWidth(score));
-				})
+		List<Row> rows = sidebarRows(scoreboard, objective).stream()
+				.map(pair -> new Row(pair[0], pair[1], renderer.getWidth(pair[0]), renderer.getWidth(pair[1])))
 				.toList();
 
 		Text title = objective.getDisplayName();
@@ -117,6 +106,34 @@ public final class ScoreboardHudModule extends AbstractModule implements HudModu
 		width += PADDING_X * 2;
 		int height = rowHeight * (1 + rows.size());
 		return new Layout(title, rows, rowHeight, width, height);
+	}
+
+	/** The sidebar of any scoreboard - also used to show a background-queue session's live scoreboard. Null when it has none. */
+	public static Text sidebarTitle(Scoreboard scoreboard) {
+		ScoreboardObjective objective = scoreboard.getObjectiveForSlot(ScoreboardDisplaySlot.SIDEBAR);
+		return objective == null ? null : objective.getDisplayName();
+	}
+
+	/** {name, score} per sidebar line, sorted like vanilla's own sidebar. */
+	public static List<Text[]> sidebarRows(Scoreboard scoreboard) {
+		ScoreboardObjective objective = scoreboard.getObjectiveForSlot(ScoreboardDisplaySlot.SIDEBAR);
+		return objective == null ? List.of() : sidebarRows(scoreboard, objective);
+	}
+
+	private static List<Text[]> sidebarRows(Scoreboard scoreboard, ScoreboardObjective objective) {
+		NumberFormat numberFormat = objective.getNumberFormatOr(StyledNumberFormat.RED);
+		return scoreboard.getScoreboardEntries(objective).stream()
+				.filter(e -> !e.hidden())
+				.sorted(Comparator.comparing(ScoreboardEntry::value).reversed()
+						.thenComparing(ScoreboardEntry::owner, String.CASE_INSENSITIVE_ORDER))
+				.limit(MAX_ENTRIES)
+				.map(entry -> {
+					Team team = scoreboard.getScoreHolderTeam(entry.owner());
+					Text name = Team.decorateName((AbstractTeam) team, entry.name());
+					MutableText score = entry.formatted(numberFormat);
+					return new Text[] {name, score};
+				})
+				.toList();
 	}
 
 	@Override

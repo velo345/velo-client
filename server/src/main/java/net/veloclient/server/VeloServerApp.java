@@ -29,12 +29,14 @@ import java.util.concurrent.TimeUnit;
 public final class VeloServerApp {
 
 	private static final int DEFAULT_PORT = 8787;
+	private static SocialService social;
 
 	public static void main(String[] args) throws IOException {
 		int port = resolvePort();
 		SessionRegistry registry = new SessionRegistry();
 		Path dataDir = Path.of(envOr("VELO_DATA_DIR", "data")).toAbsolutePath();
 		CapeStore capes = new CapeStore(dataDir);
+		social = new SocialService(dataDir, registry);
 		String adminToken = envOr("VELO_ADMIN_TOKEN", null);
 
 		HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
@@ -50,6 +52,7 @@ public final class VeloServerApp {
 		server.createContext("/v1/cape/remove", exchange -> handle(exchange, "POST", ex -> handleCapeRemove(ex, registry, capes)));
 		// GET /v1/cape/<sha256> - the path suffix is the hash (see handleCapeDownload).
 		server.createContext("/v1/cape/", exchange -> handle(exchange, "GET", ex -> handleCapeDownload(ex, capes)));
+		SocialRoutes.register(server, registry, social);
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));
 
 		// Expired sessions/challenges are already ignored by every lookup
@@ -60,7 +63,12 @@ public final class VeloServerApp {
 			Thread t = new Thread(r, "velo-server-sweep");
 			t.setDaemon(true);
 			return t;
-		}).scheduleAtFixedRate(registry::sweepExpired, 30, 30, TimeUnit.SECONDS);
+		}).scheduleAtFixedRate(() -> {
+			registry.sweepExpired();
+			social.saveIfDirty();
+			social.sweepLimits();
+		}, 5, 5, TimeUnit.SECONDS);
+		Runtime.getRuntime().addShutdownHook(new Thread(social::saveIfDirty, "velo-social-save"));
 
 		server.start();
 		System.out.println("Velo Client server listening on port " + port + " (data: " + dataDir + ")");
@@ -87,7 +95,7 @@ public final class VeloServerApp {
 	}
 
 	@FunctionalInterface
-	private interface Route {
+	interface Route {
 		void handle(HttpExchange exchange) throws Exception;
 	}
 
@@ -101,7 +109,7 @@ public final class VeloServerApp {
 	}
 
 	/** Shared method-check + error handling wrapper so every route below only has to write its happy path. */
-	private static void handle(HttpExchange exchange, String requiredMethod, Route route) throws IOException {
+	static void handle(HttpExchange exchange, String requiredMethod, Route route) throws IOException {
 		try {
 			if (!requiredMethod.equals(exchange.getRequestMethod())) {
 				JsonHttp.writeError(exchange, 405, "Method not allowed");
@@ -109,6 +117,8 @@ public final class VeloServerApp {
 			}
 			route.handle(exchange);
 		} catch (CapeStore.RejectedUpload e) {
+			writeErrorQuietly(exchange, e.status, e.getMessage());
+		} catch (SocialService.SocialException e) {
 			writeErrorQuietly(exchange, e.status, e.getMessage());
 		} catch (IOException e) {
 			writeErrorQuietly(exchange, 400, e.getMessage() != null ? e.getMessage() : "Bad request");
@@ -127,7 +137,7 @@ public final class VeloServerApp {
 		JsonHttp.writeJson(exchange, 200, new HealthResponse("ok", registry.onlineCount()));
 	}
 
-	private record ChallengeRequest(String uuid, String username) {
+	private record ChallengeRequest(String uuid, String username, String kind) {
 	}
 
 	private record ChallengeResponse(String serverId) {
@@ -141,11 +151,11 @@ public final class VeloServerApp {
 			JsonHttp.writeError(exchange, 400, "uuid and username are required");
 			return;
 		}
-		String serverId = registry.createChallenge(uuid, username);
+		String serverId = registry.createChallenge(uuid, username, request.kind());
 		JsonHttp.writeJson(exchange, 200, new ChallengeResponse(serverId));
 	}
 
-	private record VerifyRequest(String uuid, String serverId) {
+	private record VerifyRequest(String uuid, String serverId, String kind) {
 	}
 
 	private record VerifyResponse(String sessionToken, long heartbeatIntervalSeconds, long sessionTtlSeconds) {
@@ -158,7 +168,7 @@ public final class VeloServerApp {
 			JsonHttp.writeError(exchange, 400, "uuid and serverId are required");
 			return;
 		}
-		SessionRegistry.Challenge challenge = registry.takeChallenge(uuid, request.serverId());
+		SessionRegistry.Challenge challenge = registry.takeChallenge(uuid, request.kind(), request.serverId());
 		if (challenge == null) {
 			JsonHttp.writeError(exchange, 400, "Unknown or expired challenge - request a new one");
 			return;
@@ -168,7 +178,8 @@ public final class VeloServerApp {
 			JsonHttp.writeError(exchange, 401, "Mojang could not verify this session - did the client actually join with this serverId?");
 			return;
 		}
-		String token = registry.createSession(uuid, challenge.username());
+		String token = registry.createSession(uuid, challenge.username(), challenge.kind());
+		social.onAuthenticated(uuid, challenge.username());
 		JsonHttp.writeJson(exchange, 200, new VerifyResponse(token,
 				SessionRegistry.HEARTBEAT_INTERVAL_SECONDS, SessionRegistry.SESSION_TTL_MILLIS / 1000));
 	}
@@ -276,7 +287,7 @@ public final class VeloServerApp {
 	}
 
 	/** Accepts dashed or dashless UUIDs from the client; everything downstream keys on this same lowercase-dashless form. */
-	private static String normalizeUuid(String uuid) {
+	static String normalizeUuid(String uuid) {
 		if (uuid == null) {
 			return null;
 		}

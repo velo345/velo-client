@@ -30,6 +30,9 @@ public final class VeloStoreItemTile extends ClickableWidget {
 	private static final int BOTTOM_STRIP_HEIGHT = 18;
 
 	private final StoreItem item;
+	private float hover;
+	private float phase = (float) (Math.random() * Math.PI * 2);
+	private long lastNanos;
 	private final Runnable onOpen;
 
 	public VeloStoreItemTile(int x, int y, int width, int iconHeight, StoreItem item, Runnable onOpen) {
@@ -49,56 +52,43 @@ public final class VeloStoreItemTile extends ClickableWidget {
 
 	@Override
 	protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
-		Theme theme = ThemeManager.active();
+		long now = System.nanoTime();
+		float dt = VeloStyle.frameDelta(lastNanos, now);
+		hover = VeloAnim.step(hover, isHovered() ? 1f : 0f, dt);
+		phase = VeloCapeRender.advancePhase(phase, hover, dt);
+		lastNanos = now;
 		int iconHeight = iconAreaHeight();
 		boolean owned = StoreOwnership.owns(item.id());
+		int x = getX();
+		int y = getY();
+		int w = getWidth();
 
-		VeloDraw.fillRounded(context, getX(), getY(), getWidth(), iconHeight, 5,
-				isHovered() ? VeloAnim.lerpArgb(theme.surfaceWithOpacity(), 0xFFFFFFFF, 0.06f) : theme.surfaceWithOpacity());
-		VeloDraw.strokeRounded(context, getX(), getY(), getWidth(), iconHeight, 5, owned ? theme.accentStart() : 0x33FFFFFF);
-
+		VeloCapeTile.drawStage(context, x, y, w, iconHeight, hover, false);
 		AnimatedCapeAsset preview = StoreAssets.preview(item);
-		// Same back-panel crop VeloCapeTile uses (10x16 starting one pixel
-		// in, in the standard 64x32 cape template), scaled proportionally -
-		// the store's bundled GIFs are a higher-resolution multiple of that
-		// template, not literally 64x32 pixels.
-		float scale = preview.width() / 64f;
-		float panelU = 1 * scale;
-		float panelV = 1 * scale;
-		float panelW = 10 * scale;
-		float panelH = 16 * scale;
-
-		int maxPreviewWidth = getWidth() - 12;
-		int maxPreviewHeight = iconHeight - 8;
-		int previewHeight = maxPreviewHeight;
-		int previewWidth = Math.round(previewHeight * (panelW / panelH));
-		if (previewWidth > maxPreviewWidth) {
-			previewWidth = maxPreviewWidth;
-			previewHeight = Math.round(previewWidth * (panelH / panelW));
-		}
-		int previewX = getX() + (getWidth() - previewWidth) / 2;
-		int previewY = getY() + 4;
-		context.drawTexture(RenderPipelines.GUI_TEXTURED, preview.identifier(), previewX, previewY,
-				panelU, panelV, previewWidth, previewHeight, Math.round(panelW), Math.round(panelH), preview.width(), preview.height());
+		VeloCapeRender.draw(context, preview.identifier(), preview.width(), preview.height(), x + w / 2f, y + iconHeight - 20,
+				iconHeight - 34, VeloCapeRender.idleYaw(phase, hover));
 
 		TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-		String name = trimToWidth(item.name(), getWidth() - 6);
+		String name = trimToWidth(item.name(), w - 10);
 		int nameWidth = textRenderer.getWidth(name);
-		context.drawTextWithShadow(textRenderer, name, getX() + (getWidth() - nameWidth) / 2, getY() + iconHeight - 12, theme.text());
+		context.drawTextWithShadow(textRenderer, name, x + (w - nameWidth) / 2, y + iconHeight - 13, VeloStyle.text());
 
+		int stripY = y + iconHeight + 2;
 		if (owned) {
-			String tag = "OWNED";
-			int tagWidth = textRenderer.getWidth(tag);
-			context.drawTextWithShadow(textRenderer, tag, getX() + getWidth() - tagWidth - 4, getY() + 4, theme.accentStart());
+			VeloUi.pill(context, x, stripY, w, BOTTOM_STRIP_HEIGHT - 2, "Owned", 2, -1, -1, () -> { });
+		} else {
+			// Gold price chip: coin + amount.
+			int h = BOTTOM_STRIP_HEIGHT - 2;
+			VeloDraw.fillRounded(context, x, stripY, w, h, h / 2, VeloAnim.lerpArgb(VeloStyle.card(), 0xFFF4B82E, 0.10f + 0.08f * hover));
+			VeloDraw.strokeRounded(context, x, stripY, w, h, h / 2, VeloUi.withAlpha(0xFFF4B82E, 0x60));
+			String price = String.valueOf(item.priceCoins());
+			int textWidth = textRenderer.getWidth(price);
+			int coinR = 4;
+			int startX = x + (w - (textWidth + coinR * 2 + 4)) / 2;
+			VeloDraw.fillCircle(context, startX + coinR + 0.5f, stripY + h / 2f, coinR, 0xFFF4B82E);
+			VeloDraw.fillCircle(context, startX + coinR + 0.5f, stripY + h / 2f, coinR - 1.5f, 0xFFFFD56A);
+			context.drawTextWithShadow(textRenderer, price, startX + coinR * 2 + 4, stripY + (h - 8) / 2, 0xFFFFD56A);
 		}
-
-		int stripY = getY() + iconHeight;
-		VeloDraw.fillRounded(context, getX(), stripY, getWidth(), BOTTOM_STRIP_HEIGHT, 3, 0x22FFFFFF);
-		String priceLabel = owned ? "Owned" : (item.priceCoins() + " VC");
-		int priceWidth = textRenderer.getWidth(priceLabel);
-		int priceY = stripY + (BOTTOM_STRIP_HEIGHT - textRenderer.fontHeight) / 2;
-		context.drawTextWithShadow(textRenderer, priceLabel, getX() + (getWidth() - priceWidth) / 2, priceY,
-				owned ? theme.accentStart() : 0xFFF7D774);
 	}
 
 	private static String trimToWidth(String text, int maxWidth) {

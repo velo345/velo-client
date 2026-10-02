@@ -132,7 +132,7 @@ public final class DatapacksTabView {
 		card.getChildren().add(iconHolder);
 
 		Label name = new Label(world.levelName());
-		name.setFont(javafx.scene.text.Font.font("System", javafx.scene.text.FontWeight.BOLD, 13));
+		name.setFont(javafx.scene.text.Font.font("Inter", javafx.scene.text.FontWeight.BOLD, 13));
 		name.setTextFill(InstanceDetailView.text(theme));
 		name.setWrapText(true);
 		name.setMaxWidth(150);
@@ -157,7 +157,7 @@ public final class DatapacksTabView {
 		Button back = new Button("< Other Worlds");
 		back.setOnAction(e -> backToWorlds.run());
 		Label heading = new Label(world.levelName());
-		heading.setFont(javafx.scene.text.Font.font("System", javafx.scene.text.FontWeight.BOLD, 15));
+		heading.setFont(javafx.scene.text.Font.font("Inter", javafx.scene.text.FontWeight.BOLD, 15));
 		heading.setTextFill(InstanceDetailView.text(theme));
 		header.getChildren().addAll(back, heading);
 		root.getChildren().add(header);
@@ -253,7 +253,7 @@ public final class DatapacksTabView {
 
 		VBox info = new VBox(2);
 		Label title = new Label(asset != null ? asset.title() : file.getFileName().toString());
-		title.setFont(javafx.scene.text.Font.font("System", javafx.scene.text.FontWeight.BOLD, 13));
+		title.setFont(javafx.scene.text.Font.font("Inter", javafx.scene.text.FontWeight.BOLD, 13));
 		title.setTextFill(InstanceDetailView.text(theme));
 		Label meta = new Label(asset != null ? "v" + asset.versionNumber() : "Not from Modrinth");
 		meta.getStyleClass().add("version-tag");
@@ -289,7 +289,7 @@ public final class DatapacksTabView {
 		Button back = new Button("< Back to installed");
 		back.setOnAction(e -> onBack.run());
 		Label heading = new Label("Browse datapacks for Minecraft " + instance.mcVersion());
-		heading.setFont(javafx.scene.text.Font.font("System", javafx.scene.text.FontWeight.BOLD, 15));
+		heading.setFont(javafx.scene.text.Font.font("Inter", javafx.scene.text.FontWeight.BOLD, 15));
 		heading.setTextFill(InstanceDetailView.text(theme));
 		topRow.getChildren().addAll(back, heading);
 		root.getChildren().add(topRow);
@@ -356,7 +356,7 @@ public final class DatapacksTabView {
 		card.getChildren().add(icon);
 
 		Label title = new Label(hit.title());
-		title.setFont(javafx.scene.text.Font.font("System", javafx.scene.text.FontWeight.BOLD, 13));
+		title.setFont(javafx.scene.text.Font.font("Inter", javafx.scene.text.FontWeight.BOLD, 13));
 		title.setTextFill(InstanceDetailView.text(theme));
 		title.setWrapText(true);
 		title.setAlignment(Pos.CENTER);

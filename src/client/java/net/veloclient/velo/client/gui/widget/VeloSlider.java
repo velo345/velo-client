@@ -24,6 +24,9 @@ public final class VeloSlider extends ClickableWidget {
 	private final DoubleUnaryOperator formatterStep;
 	private final java.util.function.DoubleFunction<String> labelFormatter;
 	private final String label;
+	private float hover;
+	private float shown = -1;
+	private long lastNanos;
 
 	public VeloSlider(int x, int y, int width, int height, String label, double min, double max,
 			DoubleSupplier getter, DoubleConsumer setter, DoubleUnaryOperator snap, java.util.function.DoubleFunction<String> labelFormatter) {
@@ -60,26 +63,43 @@ public final class VeloSlider extends ClickableWidget {
 	@Override
 	protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
 		Theme theme = ThemeManager.active();
+		long now = System.nanoTime();
+		float dt = VeloStyle.frameDelta(lastNanos, now);
+		lastNanos = now;
+		hover = VeloAnim.step(hover, isHovered() ? 1f : 0f, dt);
+
 		double value = getter.getAsDouble();
-		double fraction = max > min ? (value - min) / (max - min) : 0;
-		fraction = Math.max(0, Math.min(1, fraction));
+		double target = max > min ? (value - min) / (max - min) : 0;
+		target = Math.max(0, Math.min(1, target));
+		// The fill glides to new values (clicks, resets) instead of jumping.
+		shown = shown < 0 ? (float) target : VeloAnim.step(shown, (float) target, dt * 1.6f);
 
-		int trackY = getY() + getHeight() - 5;
-		context.fill(getX(), trackY, getX() + getWidth(), trackY + 3, 0xFF3A3230);
-		int filledEnd = getX() + (int) Math.round(getWidth() * fraction);
-		context.fill(getX(), trackY, filledEnd, trackY + 3, theme.accentStart());
-
-		int handleSize = 8;
-		// Centering the handle on filledEnd let it poke out past the
-		// track's own right edge once dragged to the max value (or the
-		// left edge at the min) - clamp its travel range so it always
-		// stays fully within the widget's own bounds.
-		int handleX = Math.max(getX(), Math.min(getX() + getWidth() - handleSize, filledEnd - handleSize / 2));
-		VeloDraw.fillRounded(context, handleX, trackY - 3, handleSize, handleSize + 6, 2, isHovered() ? lighten(theme.accentStart()) : theme.accentStart());
+		float knob = 9f + hover * 1.5f;
+		float trackX = getX() + knob / 2f;
+		float trackWidth = getWidth() - knob;
+		float trackY = getY() + getHeight() - 6.5f;
+		float trackHeight = 4f;
+		VeloDraw.fillRounded(context, getX(), trackY, getWidth(), trackHeight, 2f, VeloStyle.sunken());
+		float fillEnd = trackX + trackWidth * shown;
+		if (fillEnd - getX() > 1f) {
+			VeloDraw.fillRounded(context, getX(), trackY, fillEnd - getX(), trackHeight, 2f, theme.accentStart() | 0xFF000000);
+		}
+		float knobX = fillEnd - knob / 2f;
+		float knobY = trackY + trackHeight / 2f - knob / 2f;
+		if (hover > 0.01f) {
+			VeloDraw.fillCircle(context, fillEnd, knobY + knob / 2f, knob / 2f + 3f * hover, VeloUi.withAlpha(theme.accentStart(), Math.round(0x40 * hover)));
+		}
+		VeloDraw.fillCircle(context, fillEnd, knobY + knob / 2f + 0.6f, knob / 2f, 0x50000000);
+		VeloDraw.fillCircle(context, fillEnd, knobY + knob / 2f, knob / 2f, 0xFFFFFFFF);
+		VeloDraw.fillCircle(context, fillEnd, knobY + knob / 2f, knob / 2f - 2.5f, theme.accentStart() | 0xFF000000);
 
 		String valueText = labelFormatter != null ? labelFormatter.apply(value) : String.format("%.2f", value);
-		context.drawTextWithShadow(MinecraftClient.getInstance().textRenderer, label + ": " + valueText,
-				getX(), getY(), theme.text());
+		// Label left (muted), value right - if space is short the label is shortened, never the value.
+		var textRenderer = MinecraftClient.getInstance().textRenderer;
+		int valueWidth = textRenderer.getWidth(valueText);
+		String shownLabel = VeloUi.trim(label, Math.max(20, getWidth() - valueWidth - 8));
+		context.drawTextWithShadow(textRenderer, shownLabel, getX(), getY(), VeloStyle.textMuted());
+		context.drawTextWithShadow(textRenderer, valueText, getX() + getWidth() - valueWidth, getY(), VeloStyle.text());
 	}
 
 	private static int lighten(int argb) {

@@ -22,6 +22,11 @@ public final class MojangVersionService {
 
 	/** @return the version's own detail JSON: {@code downloads}, {@code libraries}, {@code assetIndex}, {@code arguments}, ... */
 	public static JsonObject fetchVersionDetail(String mcVersion) throws IOException {
+		// A released version's detail JSON never changes - fetched once, then served from disk.
+		return MetaCache.getOrFetch("minecraft-" + mcVersion, () -> fetchVersionDetailUncached(mcVersion));
+	}
+
+	private static JsonObject fetchVersionDetailUncached(String mcVersion) throws IOException {
 		JsonObject manifest = getJson(VERSION_MANIFEST_URL);
 		JsonArray versions = manifest.getAsJsonArray("versions");
 		for (var element : versions) {

@@ -55,6 +55,14 @@ public final class VeloServerClient {
 	private static volatile long nextAuthAttemptMillis;
 	private static ScheduledExecutorService scheduler;
 
+	/**
+	 * Human-readable connection state for the UI (Friends screen, Velo Network settings) - this
+	 * used to fail silently at debug log level, so an unreachable server (e.g. the reverse proxy
+	 * answering 502 because the backend was down) just looked like "nobody else has Velo".
+	 */
+	private static volatile String status = "Not connected";
+	private static volatile boolean warnedUnreachable;
+
 	/** Whether a custom (non-Store) equipped cape is uploaded and shown to other Velo users - see {@code VeloNetworkModule}. */
 	public static volatile boolean shareCustomCapes = true;
 
@@ -71,10 +79,60 @@ public final class VeloServerClient {
 		}
 	}
 
+	public static String status() {
+		return status;
+	}
+
+	public static boolean isRunning() {
+		return scheduler != null;
+	}
+
+	/** The live session token, or null until authenticated - shared with {@link SocialClient}. */
+	public static String sessionToken() {
+		return sessionToken.get();
+	}
+
+	/** Dashless uuid of the authenticated account, or null. */
+	public static String authenticatedUuid() {
+		return authenticatedUuid;
+	}
+
+	/** "Retry" on the Friends screen: try signing in again right away instead of waiting for the next retry slot. */
+	public static void retryNow() {
+		nextAuthAttemptMillis = 0;
+		ScheduledExecutorService current = scheduler;
+		if (current != null) {
+			current.execute(VeloServerClient::tick);
+		}
+		SocialClient.wake();
+	}
+
+	/** Called by {@link SocialClient} when the server rejects the token, so the next tick re-authenticates. */
+	static void invalidateSession(String token) {
+		sessionToken.compareAndSet(token, null);
+	}
+
+	private static void reportReachable(String message) {
+		status = message;
+		warnedUnreachable = false;
+	}
+
+	private static void reportUnreachable(String message, Exception cause) {
+		status = message;
+		if (!warnedUnreachable) {
+			warnedUnreachable = true;
+			VeloClient.LOGGER.warn("Velo Network: {} ({})", message, cause.getMessage());
+		} else {
+			VeloClient.LOGGER.debug("Velo Network sync failed", cause);
+		}
+	}
+
 	public static synchronized void start() {
 		if (scheduler != null) {
 			return;
 		}
+		status = "Connecting...";
+		SocialClient.start();
 		nextAuthAttemptMillis = 0;
 		scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
 			Thread thread = new Thread(r, "velo-server-client");
@@ -90,6 +148,8 @@ public final class VeloServerClient {
 		}
 		scheduler.shutdownNow();
 		scheduler = null;
+		SocialClient.stop();
+		status = "Disabled";
 		String token = sessionToken.getAndSet(null);
 		authenticatedUuid = null;
 		VeloUserRegistry.clear();
@@ -127,6 +187,9 @@ public final class VeloServerClient {
 			}
 			String token = sessionToken.get();
 			if (token == null) {
+				if (gameAccount.isEmpty() && ActiveAccountReader.read().isEmpty()) {
+					status = "Offline account - sign in with a Microsoft account to use Velo Network";
+				}
 				return;
 			}
 			String capeId = publishedCapeId(base, token);
@@ -144,9 +207,14 @@ public final class VeloServerClient {
 				return;
 			}
 			poll(base);
+			reportReachable("Connected");
+		} catch (HttpStatusException e) {
+			reportUnreachable(e.status >= 500
+					? "Velo server is down (HTTP " + e.status + ") - try again later"
+					: "Velo server rejected the request (HTTP " + e.status + ")", e);
 		} catch (Exception e) {
 			// Network blips land here - keep the session token, just try again next tick.
-			VeloClient.LOGGER.debug("Velo Network sync failed", e);
+			reportUnreachable("Can't reach the Velo server", e);
 		}
 	}
 
@@ -182,6 +250,9 @@ public final class VeloServerClient {
 		// account actually playing (never badge someone else's name).
 		Optional<ActiveAccountReader.Account> saved = ActiveAccountReader.read();
 		if (saved.isEmpty()) {
+			if (gameAccount.isEmpty()) {
+				reportUnreachable("No signed-in Minecraft account to sign in to Velo Network with", new IllegalStateException("no account"));
+			}
 			return;
 		}
 		String savedUuid = normalizeUuid(saved.get().uuid());
@@ -194,6 +265,7 @@ public final class VeloServerClient {
 				VeloAccountAuth.RefreshedSession refreshed = VeloAccountAuth.refreshActiveAccount();
 				account = new ActiveAccountReader.Account(refreshed.uuid(), refreshed.username(), refreshed.accessToken(), Long.MAX_VALUE);
 			} catch (VeloAccountAuth.AuthRefreshException e) {
+				reportUnreachable("Your Minecraft sign-in expired - restart the game from the launcher", e);
 				return;
 			}
 		}
@@ -214,8 +286,13 @@ public final class VeloServerClient {
 			authenticatedUuid = uuid;
 			sessionToken.set(token);
 			return true;
+		} catch (HttpStatusException e) {
+			reportUnreachable(e.status >= 500
+					? "Velo server is down (HTTP " + e.status + ") - try again later"
+					: "Sign-in to the Velo server failed (HTTP " + e.status + ")", e);
+			return false;
 		} catch (Exception e) {
-			VeloClient.LOGGER.debug("Velo Network authentication failed", e);
+			reportUnreachable("Sign-in to the Velo server failed: " + e.getMessage(), e);
 			return false;
 		}
 	}
@@ -224,6 +301,7 @@ public final class VeloServerClient {
 		JsonObject body = new JsonObject();
 		body.addProperty("uuid", uuid);
 		body.addProperty("username", username);
+		body.addProperty("kind", "game");
 		JsonObject response = postJson(base + "/v1/session/challenge", body);
 		return requireString(response, "serverId");
 	}
@@ -249,6 +327,7 @@ public final class VeloServerClient {
 		JsonObject body = new JsonObject();
 		body.addProperty("uuid", uuid);
 		body.addProperty("serverId", serverId);
+		body.addProperty("kind", "game");
 		JsonObject response = postJson(base + "/v1/session/verify", body);
 		return requireString(response, "sessionToken");
 	}

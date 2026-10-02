@@ -85,6 +85,13 @@ public final class VeloProfileStore {
 			VeloProfileManager.loadByName(name).ifPresentOrElse(
 					VeloProfileStore::applyToLive,
 					() -> VeloClient.LOGGER.info("No saved profile named '{}' yet - starting with module defaults.", name));
+			// Modules that are on by default and stayed on never went through setEnabled's off->on
+			// transition, so their startup (onEnable) still has to run - now that the client is up.
+			for (Module module : ModuleRegistry.all()) {
+				if (module instanceof net.veloclient.velo.module.AbstractModule abstractModule) {
+					abstractModule.startIfEnabled();
+				}
+			}
 		});
 	}
 }

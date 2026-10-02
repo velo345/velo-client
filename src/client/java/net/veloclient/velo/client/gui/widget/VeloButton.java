@@ -24,7 +24,8 @@ public class VeloButton extends ClickableWidget {
 	private float hoverProgress;
 	private boolean primary;
 	private boolean selected;
-	private long lastNanos = -1;
+	private long lastNanos;
+	private long pressedAt;
 
 	public VeloButton(int x, int y, int width, int height, Text message, Consumer<VeloButton> onPress) {
 		super(x, y, width, height, message);
@@ -46,6 +47,7 @@ public class VeloButton extends ClickableWidget {
 	public void onClick(net.minecraft.client.gui.Click click, boolean doubled) {
 		if (this.active && this.visible) {
 			MinecraftClient.getInstance().getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.UI_BUTTON_CLICK, 1.0f));
+			pressedAt = System.nanoTime();
 			onPress.accept(this);
 		}
 	}
@@ -55,30 +57,48 @@ public class VeloButton extends ClickableWidget {
 		Theme theme = ThemeManager.active();
 		boolean hovered = this.active && isHovered();
 		long now = System.nanoTime();
-		float dt = lastNanos < 0 ? 0f : (now - lastNanos) / 1_000_000_000f;
+		float dt = VeloStyle.frameDelta(lastNanos, now);
 		lastNanos = now;
 		hoverProgress = VeloAnim.step(hoverProgress, hovered ? 1f : 0f, dt);
 
+		int x = getX();
+		int y = getY();
+		int w = getWidth();
+		int h = getHeight();
+		int radius = Math.min(VeloStyle.RADIUS_CONTROL, h / 2);
+		VeloStyle.pushScale(context, x + w / 2f, y + h / 2f, VeloStyle.pressScale(pressedAt));
+
 		boolean tinted = primary || selected;
-		int base = tinted ? theme.accentStart() : theme.surfaceWithOpacity();
-		int hover = tinted ? lighten(theme.accentStart(), 0.15f) : VeloAnim.lerpArgb(theme.surfaceWithOpacity(), 0xFFFFFFFF, 0.08f);
-		int bg = VeloAnim.lerpArgb(base, hover, hoverProgress);
-		if (!this.active) {
-			bg = VeloAnim.lerpArgb(bg, 0xFF000000, 0.5f);
+		if (tinted) {
+			int top = VeloAnim.lerpArgb(VeloStyle.accent(), VeloStyle.accentHover(), hoverProgress);
+			int bottom = VeloAnim.lerpArgb(VeloStyle.accentEnd(), VeloStyle.accent(), hoverProgress * 0.5f);
+			if (!this.active) {
+				top = VeloAnim.lerpArgb(top, 0xFF000000, 0.5f);
+				bottom = VeloAnim.lerpArgb(bottom, 0xFF000000, 0.5f);
+			}
+			if (hoverProgress > 0.01f) {
+				VeloDraw.shadow(context, x, y, w, h, radius, 6, 1, VeloStyle.accentGlow(Math.round(0x50 * hoverProgress)));
+			}
+			VeloDraw.fillRoundedGradient(context, x, y, w, h, radius, top, bottom);
+		} else {
+			int bg = VeloAnim.lerpArgb(VeloStyle.card(), VeloStyle.cardHover(), hoverProgress);
+			if (!this.active) {
+				bg = VeloAnim.lerpArgb(bg, 0xFF000000, 0.35f);
+			}
+			VeloDraw.fillRounded(context, x, y, w, h, radius, bg);
+			VeloDraw.strokeRounded(context, x, y, w, h, radius,
+					VeloAnim.lerpArgb(VeloStyle.border(), VeloUi.withAlpha(theme.accentStart(), 0xB0), hoverProgress));
 		}
 
-		context.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), bg);
-		int borderColor = tinted ? 0x00000000 : VeloAnim.lerpArgb(0x00FFFFFF & theme.text() | 0x22000000, theme.accentStart(), hoverProgress);
-		if (!tinted) {
-			VeloDraw.strokeRect(context, getX(), getY(), getWidth(), getHeight(), borderColor);
-		}
-
-		int textColor = tinted ? 0xFFFFFFFF : theme.text();
+		int textColor = tinted ? 0xFFFFFFFF : VeloStyle.text();
 		if (!this.active) {
-			textColor = 0xFF888888;
+			textColor = VeloStyle.textFaint();
 		}
-		context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer, TitleScreenTheme.bodyFont(getMessage()),
-				getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, textColor);
+		// Long labels are cut with "..." instead of spilling past the button (and the window).
+		context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer,
+				VeloUi.trimStyled(getMessage(), w - 8, TitleScreenTheme::bodyFont),
+				x + w / 2, y + (h - 8) / 2, textColor);
+		VeloStyle.popScale(context);
 	}
 
 	private static int lighten(int argb, float amount) {

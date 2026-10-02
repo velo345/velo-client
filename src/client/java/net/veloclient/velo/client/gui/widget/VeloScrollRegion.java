@@ -20,20 +20,45 @@ import java.util.List;
 public final class VeloScrollRegion {
 
 	private static final int OFFSCREEN_Y = -10_000;
-	private static final int SCROLLBAR_WIDTH = 4;
+	private static final int SCROLLBAR_WIDTH = 3;
 
 	private final int x;
 	private final int y;
 	private final int width;
 	private final int height;
 	private final List<ClickableWidget> rows = new ArrayList<>();
+	/** Where the content should scroll to... */
 	private double scrollOffset;
+	/** ...and where it's drawn right now - eased toward {@link #scrollOffset} every frame for smooth scrolling. */
+	private double shownOffset;
+	private Runnable lastLayout;
+	private long lastNanos;
 
 	public VeloScrollRegion(int x, int y, int width, int height) {
 		this.x = x;
 		this.y = y;
 		this.width = width;
 		this.height = height;
+		LIVE.put(this, Boolean.TRUE);
+	}
+
+	/** Every region still referenced by a screen - lets VeloWindow clip clicks to them. */
+	private static final java.util.Map<VeloScrollRegion, Boolean> LIVE = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+	/**
+	 * True when {@code element} is a row of some scroll region but the point lies outside that
+	 * region's visible rectangle - e.g. the hidden lower half of a partly scrolled-in tile sitting
+	 * under the window's bottom buttons. Such clicks must not reach the row.
+	 */
+	public static boolean clipsClick(Object element, double mouseX, double mouseY) {
+		synchronized (LIVE) {
+			for (VeloScrollRegion region : LIVE.keySet()) {
+				if (region.rows.contains(element)) {
+					return !region.contains(mouseX, mouseY);
+				}
+			}
+		}
+		return false;
 	}
 
 	public void clearRows() {
@@ -47,6 +72,7 @@ public final class VeloScrollRegion {
 
 	public void setScrollOffset(double scrollOffset) {
 		this.scrollOffset = Math.max(0, scrollOffset);
+		this.shownOffset = this.scrollOffset;
 	}
 
 	/** Copy of the current rows, for removing them from a Screen's child list before rebuilding. */
@@ -69,11 +95,13 @@ public final class VeloScrollRegion {
 
 	/** Lays out rows top-to-bottom starting at the region's top, each {@code rowHeight} tall with {@code gap} between. */
 	public void layout(int rowHeight, int gap) {
+		lastLayout = () -> layout(rowHeight, gap);
 		int contentHeight = rows.isEmpty() ? 0 : rows.size() * (rowHeight + gap) - gap;
 		int maxScroll = Math.max(0, contentHeight - height);
 		scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
+		shownOffset = Math.max(0, Math.min(shownOffset, maxScroll));
 
-		int cursor = y - (int) scrollOffset;
+		int cursor = y - (int) Math.round(shownOffset);
 		for (ClickableWidget row : rows) {
 			// Rendered (scissor-clipped) as soon as there's any overlap at
 			// all, but only made *clickable* once at least a quarter of the
@@ -95,6 +123,10 @@ public final class VeloScrollRegion {
 
 	/** Renders every row clipped to this region's rectangle, so a row that's only partially inside gets cut off cleanly instead of spilling past the edge. */
 	public void renderRows(DrawContext context, int mouseX, int mouseY, float delta) {
+		if (width <= 0 || height <= 0) {
+			return; // squeezed to nothing (tiny window / huge GUI scale) - nothing can be visible
+		}
+		animate();
 		renderScissorStart(context);
 		for (ClickableWidget row : rows) {
 			if (row.visible) {
@@ -110,18 +142,21 @@ public final class VeloScrollRegion {
 	 * {@code cellWidth}x{@code cellHeight}, {@code gap} between both axes.
 	 */
 	public void layoutGrid(int columns, int cellWidth, int cellHeight, int gap) {
+		int requestedColumns = columns;
+		lastLayout = () -> layoutGrid(requestedColumns, cellWidth, cellHeight, gap);
 		columns = Math.max(1, columns);
 		int rowCount = (int) Math.ceil(rows.size() / (double) columns);
 		int contentHeight = rowCount == 0 ? 0 : rowCount * (cellHeight + gap) - gap;
 		int maxScroll = Math.max(0, contentHeight - height);
 		scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
+		shownOffset = Math.max(0, Math.min(shownOffset, maxScroll));
 
 		for (int i = 0; i < rows.size(); i++) {
 			ClickableWidget cell = rows.get(i);
 			int col = i % columns;
 			int row = i / columns;
 			int cellX = x + col * (cellWidth + gap);
-			int cellY = y - (int) scrollOffset + row * (cellHeight + gap);
+			int cellY = y - (int) Math.round(shownOffset) + row * (cellHeight + gap);
 			boolean overlaps = cellY + cellHeight > y && cellY < y + height;
 			int visibleTop = Math.max(cellY, y);
 			int visibleBottom = Math.min(cellY + cellHeight, y + height);
@@ -141,21 +176,49 @@ public final class VeloScrollRegion {
 		if (contentHeight <= height) {
 			return;
 		}
-		Theme theme = ThemeManager.active();
-		int trackX = x + width - SCROLLBAR_WIDTH;
-		context.fill(trackX, y, trackX + SCROLLBAR_WIDTH, y + height, 0x33000000);
-		int thumbHeight = Math.max(16, (int) ((double) height * height / contentHeight));
-		int maxScroll = contentHeight - height;
-		int thumbY = y + (maxScroll > 0 ? (int) (scrollOffset / maxScroll * (height - thumbHeight)) : 0);
-		context.fill(trackX, thumbY, trackX + SCROLLBAR_WIDTH, thumbY + thumbHeight, theme.accentStart());
+		drawScrollbar(context, contentHeight);
 	}
 
 	public boolean scroll(double mouseX, double mouseY, double amount) {
 		if (!contains(mouseX, mouseY)) {
 			return false;
 		}
-		scrollOffset -= amount * 16;
+		scrollOffset = Math.max(0, scrollOffset - amount * 22);
+		if (lastNanos == 0) {
+			// Owner draws rows itself (never calls renderRows), so nothing would ease the offset.
+			shownOffset = scrollOffset;
+		}
 		return true;
+	}
+
+	/** Eases the drawn offset toward the target and re-lays-out rows while it moves. */
+	private void animate() {
+		long now = System.nanoTime();
+		float dt = VeloStyle.frameDelta(lastNanos, now);
+		lastNanos = now;
+		if (Math.abs(shownOffset - scrollOffset) < 0.25) {
+			if (shownOffset != scrollOffset) {
+				shownOffset = scrollOffset;
+				if (lastLayout != null) {
+					lastLayout.run();
+				}
+			}
+			return;
+		}
+		shownOffset = VeloAnim.step((float) shownOffset, (float) scrollOffset, dt * 1.5f);
+		if (lastLayout != null) {
+			lastLayout.run();
+		}
+	}
+
+	private void drawScrollbar(DrawContext context, int contentHeight) {
+		Theme theme = ThemeManager.active();
+		float trackX = x + width - SCROLLBAR_WIDTH;
+		float thumbHeight = Math.max(18f, (float) height * height / contentHeight);
+		int maxScroll = contentHeight - height;
+		float thumbY = y + (maxScroll > 0 ? (float) (shownOffset / maxScroll * (height - thumbHeight)) : 0f);
+		VeloDraw.fillRounded(context, trackX, y, SCROLLBAR_WIDTH, height, SCROLLBAR_WIDTH / 2f, VeloUi.withAlpha(theme.text(), 0x0C));
+		VeloDraw.fillRounded(context, trackX, thumbY, SCROLLBAR_WIDTH, thumbHeight, SCROLLBAR_WIDTH / 2f, VeloUi.withAlpha(theme.text(), 0x48));
 	}
 
 	private boolean contains(double mouseX, double mouseY) {
@@ -175,12 +238,6 @@ public final class VeloScrollRegion {
 		if (contentHeight <= height) {
 			return;
 		}
-		Theme theme = ThemeManager.active();
-		int trackX = x + width - SCROLLBAR_WIDTH;
-		context.fill(trackX, y, trackX + SCROLLBAR_WIDTH, y + height, 0x33000000);
-		int thumbHeight = Math.max(16, (int) ((double) height * height / contentHeight));
-		int maxScroll = contentHeight - height;
-		int thumbY = y + (maxScroll > 0 ? (int) (scrollOffset / maxScroll * (height - thumbHeight)) : 0);
-		context.fill(trackX, thumbY, trackX + SCROLLBAR_WIDTH, thumbY + thumbHeight, theme.accentStart());
+		drawScrollbar(context, contentHeight);
 	}
 }

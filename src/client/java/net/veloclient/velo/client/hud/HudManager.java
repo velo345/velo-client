@@ -51,6 +51,9 @@ public final class HudManager {
 			boolean hit = client.targetedEntity instanceof net.minecraft.entity.LivingEntity && client.targetedEntity.isAlive();
 			net.veloclient.velo.client.modules.qol.CustomCrosshairModule.renderIfEquipped(context,
 					context.getScaledWindowWidth(), context.getScaledWindowHeight(), hit);
+			net.veloclient.velo.client.modules.qol.AttackIndicatorModule.renderUnderCrosshair(context,
+					context.getScaledWindowWidth(), context.getScaledWindowHeight(),
+					((net.veloclient.velo.client.modules.qol.CustomCrosshairModule) module).size());
 		});
 		// Same reasoning as CROSSHAIR above - vanilla's scoreboard sidebar
 		// used to be a directly mixin-cancelable InGameHud method, but it's
@@ -90,6 +93,7 @@ public final class HudManager {
 		int screenWidth = client.getWindow().getScaledWidth();
 		int screenHeight = client.getWindow().getScaledHeight();
 
+		net.veloclient.velo.client.waypoints.WaypointRenderer.renderHud(context, screenWidth, screenHeight);
 		for (Module module : ModuleRegistry.all()) {
 			if (!(module instanceof HudModule hud) || !hud.isEnabled()) {
 				continue;
@@ -97,6 +101,7 @@ public final class HudManager {
 			ModuleProfiler.time(hud.id(), ModuleProfiler.Phase.HUD_RENDER,
 					() -> renderScaled(context, hud, screenWidth, screenHeight, tickDelta));
 		}
+		net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
 	}
 
 	/** Renders one HUD element at its configured position, scaled outward from its own top-left corner. */
@@ -116,6 +121,8 @@ public final class HudManager {
 		if (smallCapsEligible) {
 			net.veloclient.velo.client.modules.qol.SmallCapsModule.setHudRenderActive(true);
 		}
+		// HUD modules keep the vanilla font even when drawn inside the HUD editor (a Velo screen).
+		net.veloclient.velo.client.gui.VeloFonts.beginHud();
 		try {
 			if (scale == 1.0f) {
 				hud.render(context, x, y, tickDelta);
@@ -128,6 +135,7 @@ public final class HudManager {
 			hud.render(context, x, y, tickDelta);
 			context.getMatrices().popMatrix();
 		} finally {
+			net.veloclient.velo.client.gui.VeloFonts.endHud();
 			if (smallCapsEligible) {
 				net.veloclient.velo.client.modules.qol.SmallCapsModule.setHudRenderActive(false);
 			}

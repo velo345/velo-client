@@ -95,9 +95,11 @@ public final class RunningInstanceManager {
 		} else {
 			Platform.runLater(() -> RUNNING.add(entry));
 		}
+		MemoryGuard.watch(instance, process);
 		Thread.ofVirtual().start(() -> {
 			try {
 				process.waitFor();
+				net.veloclient.launcher.data.PlayTimeStore.record(instance.id(), System.currentTimeMillis() - entry.startedAtEpochMillis());
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}

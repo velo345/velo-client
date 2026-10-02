@@ -29,43 +29,66 @@ final class SessionRegistry {
 	private final Map<String, Challenge> challengesByUuid = new ConcurrentHashMap<>();
 	private final Map<String, Session> sessionsByToken = new ConcurrentHashMap<>();
 
-	record Challenge(String uuid, String username, String serverId, long expiresAtMillis) {
+	/** Which app a session belongs to - the game and the launcher can each hold one session for the same account at once. */
+	static final String KIND_GAME = "game";
+	static final String KIND_LAUNCHER = "launcher";
+
+	record Challenge(String uuid, String username, String kind, String serverId, long expiresAtMillis) {
 	}
 
 	// Not actually mutated in place - heartbeat() replaces the whole record in
 	// the map (see below), so the ConcurrentHashMap itself provides the
 	// necessary visibility without needing volatile fields here (which
 	// records can't have anyway).
-	record Session(String uuid, String username, String capeId, long expiresAtMillis) {
+	record Session(String uuid, String username, String kind, String capeId, long expiresAtMillis) {
 	}
 
 	record OnlineUser(String uuid, String username, String capeId) {
 	}
 
-	String createChallenge(String uuid, String username) {
+	/** Called with a uuid whenever one of its sessions ends or expires - drives friends' presence updates. */
+	private volatile java.util.function.Consumer<String> onSessionGone = uuid -> {
+	};
+
+	void setOnSessionGone(java.util.function.Consumer<String> listener) {
+		this.onSessionGone = listener;
+	}
+
+	static String normalizeKind(String kind) {
+		return KIND_LAUNCHER.equals(kind) ? KIND_LAUNCHER : KIND_GAME;
+	}
+
+	String createChallenge(String uuid, String username, String kind) {
 		String serverId = randomHex(16);
-		challengesByUuid.put(uuid, new Challenge(uuid, username, serverId, System.currentTimeMillis() + CHALLENGE_TTL_MILLIS));
+		// Keyed per uuid+kind, so the launcher and the game authenticating at the same moment
+		// don't overwrite each other's pending challenge.
+		challengesByUuid.put(uuid + "/" + normalizeKind(kind), new Challenge(uuid, username, normalizeKind(kind), serverId,
+				System.currentTimeMillis() + CHALLENGE_TTL_MILLIS));
 		return serverId;
 	}
 
 	/** Consumes the pending challenge for {@code uuid} if {@code serverId} matches and it hasn't expired; null otherwise. */
-	Challenge takeChallenge(String uuid, String serverId) {
-		Challenge challenge = challengesByUuid.get(uuid);
+	Challenge takeChallenge(String uuid, String kind, String serverId) {
+		String key = uuid + "/" + normalizeKind(kind);
+		Challenge challenge = challengesByUuid.get(key);
 		if (challenge == null || challenge.expiresAtMillis() < System.currentTimeMillis() || !challenge.serverId().equals(serverId)) {
 			return null;
 		}
-		challengesByUuid.remove(uuid);
+		challengesByUuid.remove(key);
 		return challenge;
 	}
 
-	String createSession(String uuid, String username) {
+	String createSession(String uuid, String username, String kind) {
 		// One live session per account: a client that re-authenticates (restart, dropped token,
 		// switching between the Velo launcher and the vanilla one) used to leave its previous
 		// session behind until it expired, so /v1/online listed the same player twice - possibly
 		// with a stale cape - for up to SESSION_TTL_MILLIS.
-		sessionsByToken.values().removeIf(s -> s.uuid().equals(uuid));
+		// The launcher and the game are separate apps that can both be open - each keeps its own
+		// session, only a repeat of the same kind replaces the old one.
+		String normalizedKind = normalizeKind(kind);
+		sessionsByToken.values().removeIf(s -> s.uuid().equals(uuid) && s.kind().equals(normalizedKind));
 		String token = randomHex(32);
-		sessionsByToken.put(token, new Session(uuid, username, null, System.currentTimeMillis() + SESSION_TTL_MILLIS));
+		sessionsByToken.put(token, new Session(uuid, username, normalizedKind, null, System.currentTimeMillis() + SESSION_TTL_MILLIS));
 		return token;
 	}
 
@@ -98,20 +121,40 @@ final class SessionRegistry {
 				&& (ownCustomCapeHash == null || !normalized.equals(CapeStore.CUSTOM_PREFIX + ownCustomCapeHash))) {
 			normalized = null;
 		}
-		Session refreshed = new Session(session.uuid(), session.username(), normalized,
+		Session refreshed = new Session(session.uuid(), session.username(), session.kind(), normalized,
 				System.currentTimeMillis() + SESSION_TTL_MILLIS);
 		sessionsByToken.put(token, refreshed);
 		return refreshed;
 	}
 
-	void endSession(String token) {
-		sessionsByToken.remove(token);
+	/** Extends a live session's TTL without touching its cape - the social long-poll counts as "still here". */
+	void touch(String token) {
+		Session session = session(token);
+		if (session != null) {
+			sessionsByToken.put(token, new Session(session.uuid(), session.username(), session.kind(), session.capeId(),
+					System.currentTimeMillis() + SESSION_TTL_MILLIS));
+		}
 	}
 
+	void endSession(String token) {
+		Session removed = sessionsByToken.remove(token);
+		if (removed != null) {
+			onSessionGone.accept(removed.uuid());
+		}
+	}
+
+	/** Whether {@code uuid} has a live session of {@code kind}. */
+	boolean hasLiveSession(String uuid, String kind) {
+		long now = System.currentTimeMillis();
+		return sessionsByToken.values().stream()
+				.anyMatch(s -> s.uuid().equals(uuid) && s.kind().equals(kind) && s.expiresAtMillis() >= now);
+	}
+
+	/** In-game players only (the badge/cape list) - a launcher session isn't "in game", and isn't listed twice. */
 	List<OnlineUser> onlineUsers() {
 		long now = System.currentTimeMillis();
 		return sessionsByToken.values().stream()
-				.filter(s -> s.expiresAtMillis() >= now)
+				.filter(s -> s.expiresAtMillis() >= now && s.kind().equals(KIND_GAME))
 				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId()))
 				.toList();
 	}
@@ -123,7 +166,15 @@ final class SessionRegistry {
 	/** Drops expired sessions/challenges - called periodically so memory doesn't grow with churn. Not required for correctness (both lookups already check expiry), just housekeeping. */
 	void sweepExpired() {
 		long now = System.currentTimeMillis();
-		sessionsByToken.entrySet().removeIf(e -> e.getValue().expiresAtMillis() < now);
+		List<String> expired = new java.util.ArrayList<>();
+		sessionsByToken.entrySet().removeIf(e -> {
+			boolean gone = e.getValue().expiresAtMillis() < now;
+			if (gone) {
+				expired.add(e.getValue().uuid());
+			}
+			return gone;
+		});
+		expired.forEach(onSessionGone);
 		challengesByUuid.entrySet().removeIf(e -> e.getValue().expiresAtMillis() < now);
 	}
 

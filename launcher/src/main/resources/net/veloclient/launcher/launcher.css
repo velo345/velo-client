@@ -15,7 +15,8 @@
 	-velo-text: #ffffff;
 	-velo-hover: #2a1a1a;
 	-velo-hairline: rgba(255, 255, 255, 0.08);
-	-fx-font-family: "Segoe UI", "Inter", "Helvetica Neue", sans-serif;
+	-fx-font-family: "Inter", "Segoe UI", "Helvetica Neue", sans-serif;
+	-fx-font-smoothing-type: gray;
 	-fx-background-color: -velo-background;
 }
 
@@ -47,24 +48,63 @@
  * clean/seamless one.
  */
 .button {
-	-fx-background-radius: 8;
+	-fx-background-radius: 10;
 	-fx-cursor: hand;
-	-fx-background-color: -velo-hover;
+	-fx-background-color: rgba(255, 255, 255, 0.055);
 	-fx-text-fill: -velo-text;
-	-fx-border-color: -velo-hairline;
-	-fx-border-radius: 8;
+	-fx-border-color: rgba(255, 255, 255, 0.09);
+	-fx-border-radius: 10;
 	-fx-border-width: 1;
+	-fx-padding: 8 16 8 16;
+	-fx-font-size: 13px;
+	-fx-font-weight: 600;
 }
 
 .button:hover {
-	-fx-border-color: -velo-accent-start;
+	-fx-background-color: rgba(255, 255, 255, 0.10);
+	-fx-border-color: rgba(255, 255, 255, 0.16);
 }
 
-.button:default, .button:default:hover {
-	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
+.button:pressed {
+	-fx-background-color: rgba(255, 255, 255, 0.04);
+}
+
+.button:disabled {
+	-fx-opacity: 0.45;
+}
+
+.button:focused {
+	-fx-border-color: derive(-velo-accent-start, 10%);
+}
+
+/* Main call to action on a page: accent gradient, soft glow on hover. */
+.primary-button, .button:default {
+	-fx-background-color: linear-gradient(to bottom right, derive(-velo-accent-start, 8%), -velo-accent-end);
 	-fx-text-fill: white;
 	-fx-border-width: 0;
+	-fx-font-weight: bold;
 }
+
+.primary-button:hover, .button:default:hover {
+	-fx-background-color: linear-gradient(to bottom right, derive(-velo-accent-start, 22%), derive(-velo-accent-end, 12%));
+	-fx-effect: dropshadow(gaussian, derive(-velo-accent-start, -10%), 16, 0.2, 0, 2);
+}
+
+.primary-button:pressed, .button:default:pressed {
+	-fx-background-color: linear-gradient(to bottom right, -velo-accent-start, derive(-velo-accent-end, -12%));
+}
+
+/* Quiet secondary action (Cancel, Back): no box until hovered. */
+.ghost-button {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+}
+
+.ghost-button:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.07);
+	-fx-border-color: transparent;
+}
+
 
 .sidebar {
 	-fx-background-color: -velo-surface;
@@ -207,14 +247,15 @@
 /* ---- Home screen: profile carousel ---- */
 
 .home-glow-border {
-	-fx-border-width: 2;
+	-fx-border-width: 1.5;
 	-fx-border-radius: 18;
-	-fx-background-radius: 18;
+	-fx-background-color: transparent;
 }
 
 .home-profile-name {
 	-fx-font-size: 20px;
-	-fx-font-weight: bold;
+	-fx-font-weight: 800;
+	-fx-text-fill: white;
 }
 
 .home-chevron {
@@ -229,15 +270,15 @@
 }
 
 .home-play-button {
-	-fx-background-color: linear-gradient(to bottom, derive(-velo-accent-start, 15%), -velo-accent-end);
+	-fx-background-color: linear-gradient(to bottom right, derive(-velo-accent-start, 12%), -velo-accent-end);
 	-fx-text-fill: white;
-	-fx-font-size: 18px;
-	-fx-font-weight: bold;
+	-fx-font-size: 17px;
+	-fx-font-weight: 800;
 	-fx-background-radius: 14;
 	-fx-border-radius: 14;
 	-fx-border-width: 0;
 	-fx-cursor: hand;
-	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 14, 0.25, 0, 4);
+	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 18, 0.2, 0, 6);
 }
 
 /* Same "brighten toward white, centered on the cursor" spotlight idea as the
@@ -315,12 +356,12 @@
 }
 
 .account-badge {
-	-fx-background-color: -velo-surface;
-	-fx-background-radius: 24;
-	-fx-border-radius: 24;
-	-fx-border-color: -velo-hairline;
+	-fx-background-color: rgba(255, 255, 255, 0.05);
+	-fx-background-radius: 14;
+	-fx-border-radius: 14;
+	-fx-border-color: rgba(255, 255, 255, 0.10);
 	-fx-border-width: 1;
-	-fx-padding: 6 16 6 6;
+	-fx-padding: 8 10 8 8;
 	-fx-cursor: hand;
 }
 
@@ -420,13 +461,30 @@
 	-fx-background-color: transparent;
 }
 
-.text-field, .text-area, .text-area .content {
-	-fx-background-color: -velo-hover;
+.text-field, .text-area {
+	-fx-background-color: rgba(0, 0, 0, 0.28);
 	-fx-text-fill: -velo-text;
-	-fx-background-radius: 8;
-	-fx-border-radius: 8;
-	-fx-border-color: -velo-hairline;
-	-fx-prompt-text-fill: derive(-velo-text, -40%);
+	-fx-background-radius: 10;
+	-fx-border-radius: 10;
+	-fx-border-color: rgba(255, 255, 255, 0.10);
+	-fx-border-width: 1;
+	-fx-padding: 7 12 7 12;
+	-fx-alignment: center-left;
+	-fx-prompt-text-fill: derive(-velo-text, -50%);
+	-fx-highlight-fill: derive(-velo-accent-start, -20%);
+}
+
+.text-area .content {
+	-fx-background-color: transparent;
+}
+
+.text-field:hover, .text-area:hover {
+	-fx-border-color: rgba(255, 255, 255, 0.18);
+}
+
+.text-field:focused, .text-area:focused {
+	-fx-border-color: -velo-accent-start;
+	-fx-effect: dropshadow(gaussian, derive(-velo-accent-start, -30%), 10, 0.0, 0, 0);
 }
 
 /* ---- In-window modal overlay (e.g. the Modrinth version/dependency picker) ---- */
@@ -464,19 +522,25 @@
 
 .tab-pane .tab-header-area .headers-region .tab {
 	-fx-background-color: transparent;
-	-fx-background-radius: 8 8 0 0;
-	-fx-border-color: transparent transparent -velo-hairline transparent;
-	-fx-border-width: 0 0 2 0;
-	-fx-padding: 8 18 8 18;
+	-fx-background-radius: 10;
+	-fx-border-color: transparent;
+	-fx-border-width: 0;
+	-fx-padding: 7 16 7 16;
 	-fx-cursor: hand;
+	-fx-background-insets: 0 3 0 0;
 }
 
 .tab-pane .tab-header-area .headers-region .tab:hover {
-	-fx-background-color: -velo-hover;
+	-fx-background-color: rgba(255, 255, 255, 0.06);
 }
 
 .tab-pane .tab-header-area .headers-region .tab:selected {
-	-fx-border-color: transparent transparent -velo-accent-start transparent;
+	-fx-background-color: derive(-velo-accent-start, -55%);
+	-fx-border-color: transparent;
+}
+
+.tab-pane .tab-header-area .headers-region .tab:selected .focus-indicator {
+	-fx-border-color: transparent;
 }
 
 .tab-pane .tab-label {
@@ -500,34 +564,75 @@
 /* ---- ComboBox ---- */
 
 .combo-box, .combo-box-base {
-	-fx-background-color: -velo-hover;
-	-fx-background-radius: 8;
-	-fx-border-radius: 8;
-	-fx-border-color: -velo-hairline;
+	-fx-background-color: rgba(255, 255, 255, 0.055);
+	-fx-background-radius: 10;
+	-fx-border-radius: 10;
+	-fx-border-color: rgba(255, 255, 255, 0.10);
 	-fx-border-width: 1;
 	-fx-mark-color: -velo-text;
+	-fx-cursor: hand;
+	-fx-padding: 2 4 2 4;
+}
+
+.combo-box:hover, .combo-box-base:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.09);
+	-fx-border-color: rgba(255, 255, 255, 0.18);
+}
+
+.combo-box:showing, .combo-box-base:showing, .combo-box:focused {
+	-fx-border-color: -velo-accent-start;
 }
 
 .combo-box .list-cell {
 	-fx-background-color: transparent;
 	-fx-text-fill: -velo-text;
-	-fx-padding: 4 8 4 10;
+	-fx-padding: 5 8 5 10;
+	-fx-font-weight: 600;
 }
 
-.combo-box .arrow-button {
+.combo-box .arrow-button, .combo-box-base .arrow-button {
 	-fx-background-color: transparent;
+	-fx-padding: 0 12 0 6;
 }
 
-.combo-box .arrow {
-	-fx-background-color: -velo-text;
+.combo-box .arrow, .combo-box-base .arrow {
+	-fx-background-color: derive(-velo-text, -30%);
+	-fx-shape: "M 0 0 L 5 5 L 10 0 L 8.6 -1.4 L 5 2.2 L 1.4 -1.4 Z";
+	-fx-padding: 3.5 5 3.5 5;
+}
+
+.combo-box:showing .arrow {
+	-fx-rotate: 180;
+	-fx-background-color: -velo-accent-start;
 }
 
 .combo-box-popup .list-view {
-	-fx-background-color: -velo-surface;
-	-fx-border-color: -velo-hairline;
+	-fx-background-color: derive(-velo-surface, 8%);
+	-fx-border-color: rgba(255, 255, 255, 0.12);
 	-fx-border-width: 1;
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+	-fx-padding: 6;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.55), 22, 0.15, 0, 8);
+}
+
+.combo-box-popup .list-view .list-cell {
+	-fx-padding: 8 12 8 12;
 	-fx-background-radius: 8;
-	-fx-border-radius: 8;
+	-fx-font-weight: 500;
+}
+
+.combo-box-popup .list-view .list-cell:filled:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.07);
+}
+
+.combo-box-popup .list-view .list-cell:filled:selected {
+	-fx-background-color: derive(-velo-accent-start, -45%);
+	-fx-text-fill: white;
+}
+
+.combo-box-popup .list-view .scroll-bar:vertical {
+	-fx-pref-width: 8;
 }
 
 /* ---- ListView / cells (combo popups, choice dialogs, mod lists) ---- */
@@ -558,10 +663,15 @@
 }
 
 .check-box .box {
-	-fx-background-color: -velo-hover;
-	-fx-border-color: -velo-hairline;
-	-fx-border-radius: 4;
-	-fx-background-radius: 4;
+	-fx-background-color: rgba(0, 0, 0, 0.25);
+	-fx-border-color: rgba(255, 255, 255, 0.22);
+	-fx-border-radius: 6;
+	-fx-background-radius: 6;
+	-fx-padding: 4;
+}
+
+.check-box:hover .box {
+	-fx-border-color: -velo-accent-start;
 }
 
 .check-box:selected .box {
@@ -586,6 +696,8 @@
 
 .scroll-bar {
 	-fx-background-color: transparent;
+	-fx-pref-width: 10;
+	-fx-padding: 2;
 }
 
 .scroll-bar .track {
@@ -594,34 +706,44 @@
 }
 
 .scroll-bar .thumb {
-	-fx-background-color: -velo-hover;
+	-fx-background-color: rgba(255, 255, 255, 0.16);
 	-fx-background-radius: 6;
+	-fx-background-insets: 0 1 0 1;
 }
 
 .scroll-bar .thumb:hover, .scroll-bar .thumb:pressed {
-	-fx-background-color: derive(-velo-hover, 20%);
+	-fx-background-color: rgba(255, 255, 255, 0.30);
 }
 
 .scroll-bar .increment-button, .scroll-bar .decrement-button {
 	-fx-background-color: transparent;
 	-fx-padding: 0;
+	-fx-pref-height: 0;
+	-fx-pref-width: 0;
 }
 
 .scroll-bar .increment-arrow, .scroll-bar .decrement-arrow {
-	-fx-background-color: -velo-text;
+	-fx-shape: "";
+	-fx-padding: 0;
 }
 
 /* ---- ProgressBar / ProgressIndicator ---- */
 
 .progress-bar .track {
-	-fx-background-color: -velo-hover;
-	-fx-background-radius: 8;
+	-fx-background-color: rgba(255, 255, 255, 0.07);
+	-fx-background-radius: 999;
+	-fx-background-insets: 0;
 }
 
 .progress-bar .bar {
 	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
-	-fx-background-radius: 8;
-	-fx-padding: 4;
+	-fx-background-radius: 999;
+	-fx-background-insets: 0;
+	-fx-padding: 3;
+}
+
+.progress-indicator {
+	-fx-progress-color: -velo-accent-start;
 }
 
 .progress-indicator .percentage {
@@ -636,8 +758,10 @@
 }
 
 .slider .thumb {
-	-fx-background-color: -velo-accent-start;
+	-fx-background-color: white, -velo-accent-start;
+	-fx-background-insets: 0, 3;
 	-fx-background-radius: 100;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 4, 0.2, 0, 1);
 }
 
 .slider .axis {
@@ -647,12 +771,15 @@
 /* ---- Tooltip / Separator / TitledPane ---- */
 
 .tooltip {
-	-fx-background-color: -velo-surface;
+	-fx-background-color: derive(-velo-surface, 10%);
 	-fx-text-fill: -velo-text;
-	-fx-background-radius: 6;
-	-fx-border-color: -velo-hairline;
-	-fx-border-radius: 6;
+	-fx-background-radius: 8;
+	-fx-border-color: rgba(255, 255, 255, 0.12);
+	-fx-border-radius: 8;
 	-fx-border-width: 1;
+	-fx-padding: 6 10 6 10;
+	-fx-font-size: 12px;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 12, 0.1, 0, 4);
 }
 
 .separator .line {
@@ -775,17 +902,17 @@
 }
 
 .mod-row {
-	-fx-background-color: -velo-surface;
-	-fx-background-radius: 10;
-	-fx-border-color: -velo-hairline;
-	-fx-border-radius: 10;
+	-fx-background-color: rgba(255, 255, 255, 0.035);
+	-fx-background-radius: 12;
+	-fx-border-color: rgba(255, 255, 255, 0.06);
+	-fx-border-radius: 12;
 	-fx-border-width: 1;
-	-fx-padding: 10 14 10 14;
+	-fx-padding: 10 14 10 12;
 }
 
 .mod-row:hover {
-	-fx-background-color: -velo-hover;
-	-fx-border-color: -velo-accent-start;
+	-fx-background-color: rgba(255, 255, 255, 0.06);
+	-fx-border-color: rgba(255, 255, 255, 0.12);
 }
 
 .search-card {
@@ -800,4 +927,624 @@
 
 .search-card:hover {
 	-fx-border-color: -velo-accent-start;
+}
+
+/* ---- Friends tab ---- */
+
+.friends-pane {
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+	-fx-border-color: -velo-hairline;
+	-fx-border-width: 1;
+}
+
+.friend-row {
+	-fx-padding: 8 10 8 10;
+	-fx-background-radius: 8;
+	-fx-cursor: hand;
+}
+
+.friend-row:hover {
+	-fx-background-color: -velo-hover;
+}
+
+.friend-row-selected, .friend-row-selected:hover {
+	-fx-background-color: derive(-velo-accent-start, -55%);
+	-fx-border-color: transparent transparent transparent -velo-accent-start;
+	-fx-border-width: 0 0 0 3;
+}
+
+.friend-name {
+	-fx-font-size: 13px;
+	-fx-font-weight: bold;
+}
+
+.friend-status {
+	-fx-font-size: 11px;
+	-fx-opacity: 0.65;
+}
+
+.unread-badge {
+	-fx-background-color: -velo-accent-start;
+	-fx-background-radius: 10;
+	-fx-text-fill: white;
+	-fx-font-size: 10px;
+	-fx-font-weight: bold;
+	-fx-padding: 1 6 1 6;
+}
+
+.segmented-button {
+	-fx-background-color: transparent;
+	-fx-text-fill: -velo-text;
+	-fx-background-radius: 8;
+	-fx-border-width: 0;
+	-fx-padding: 6 14 6 14;
+	-fx-font-size: 12px;
+	-fx-cursor: hand;
+}
+
+.segmented-button:hover {
+	-fx-background-color: -velo-hover;
+}
+
+.segmented-button-active, .segmented-button-active:hover {
+	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
+	-fx-text-fill: white;
+	-fx-font-weight: bold;
+}
+
+.chat-bubble-mine {
+	-fx-background-color: derive(-velo-accent-start, -20%);
+	-fx-background-radius: 12 12 3 12;
+	-fx-padding: 7 11 7 11;
+	-fx-text-fill: white;
+	-fx-font-size: 13px;
+}
+
+.chat-bubble-theirs {
+	-fx-background-color: -velo-hover;
+	-fx-background-radius: 12 12 12 3;
+	-fx-padding: 7 11 7 11;
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 13px;
+}
+
+.chat-time {
+	-fx-font-size: 10px;
+	-fx-opacity: 0.45;
+}
+
+.status-pill {
+	-fx-background-radius: 14;
+	-fx-border-radius: 14;
+	-fx-padding: 4 12 4 10;
+	-fx-font-size: 11px;
+	-fx-cursor: hand;
+	-fx-background-color: -velo-hover;
+	-fx-border-color: -velo-hairline;
+	-fx-text-fill: -velo-text;
+}
+
+.button-positive {
+	-fx-background-color: #2e9e5b;
+	-fx-text-fill: white;
+	-fx-border-width: 0;
+}
+
+.button-danger {
+	-fx-background-color: #b83c3c;
+	-fx-text-fill: white;
+	-fx-border-width: 0;
+}
+
+.waypoint-card {
+	-fx-background-color: rgba(0,0,0,0.25);
+	-fx-background-radius: 10;
+	-fx-padding: 8 12 8 12;
+}
+
+/* ---- Sign-in flow (code first, then the login page) ---- */
+
+.signin-dialog {
+	-fx-background-color: derive(-velo-background, 6%);
+	-fx-background-radius: 18;
+	-fx-border-radius: 18;
+	-fx-border-color: -velo-hairline;
+	-fx-border-width: 1;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.55), 40, 0.15, 0, 12);
+}
+
+.signin-heading {
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 20px;
+	-fx-font-weight: bold;
+}
+
+.signin-sub, .signin-note, .signin-status {
+	-fx-text-fill: derive(-velo-text, -35%);
+	-fx-font-size: 12px;
+}
+
+.signin-note {
+	-fx-text-alignment: center;
+	-fx-alignment: center;
+}
+
+.signin-step {
+	-fx-text-fill: derive(-velo-text, -45%);
+	-fx-font-size: 11px;
+	-fx-font-weight: bold;
+	-fx-padding: 5 10 5 10;
+	-fx-background-radius: 999;
+	-fx-background-color: rgba(255, 255, 255, 0.04);
+}
+
+.signin-step-active {
+	-fx-text-fill: white;
+	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
+}
+
+.signin-step-done {
+	-fx-text-fill: -velo-accent-start;
+	-fx-background-color: rgba(255, 255, 255, 0.07);
+}
+
+.signin-code-card {
+	-fx-background-color: rgba(0, 0, 0, 0.28);
+	-fx-background-radius: 14;
+	-fx-border-color: -velo-hairline;
+	-fx-border-radius: 14;
+	-fx-padding: 16 20 14 20;
+}
+
+.signin-caption {
+	-fx-text-fill: derive(-velo-text, -45%);
+	-fx-font-size: 10px;
+	-fx-font-weight: bold;
+}
+
+.signin-code {
+	-fx-text-fill: -velo-text;
+	-fx-font-family: "JetBrains Mono", "Consolas", "DejaVu Sans Mono", monospace;
+	-fx-font-size: 32px;
+	-fx-font-weight: bold;
+}
+
+.signin-copy {
+	-fx-font-size: 12px;
+	-fx-padding: 6 12 6 12;
+}
+
+.signin-copied {
+	-fx-text-fill: #3fb97a;
+	-fx-font-size: 11px;
+	-fx-font-weight: bold;
+}
+
+/* ---- Profile workspace: pack tabs ---- */
+
+.pack-toolbar {
+	-fx-padding: 0 0 4 0;
+}
+
+.pack-count {
+	-fx-text-fill: derive(-velo-text, -35%);
+	-fx-font-size: 12px;
+	-fx-font-weight: 600;
+	-fx-padding: 0 6 0 2;
+}
+
+.update-all-button {
+	-fx-background-color: rgba(63, 185, 122, 0.16);
+	-fx-border-color: rgba(63, 185, 122, 0.55);
+	-fx-text-fill: #6fe0a4;
+}
+
+.update-all-button:hover {
+	-fx-background-color: rgba(63, 185, 122, 0.26);
+	-fx-border-color: #3fb97a;
+}
+
+.row-update-button {
+	-fx-background-color: rgba(63, 185, 122, 0.12);
+	-fx-border-color: rgba(63, 185, 122, 0.45);
+	-fx-text-fill: #6fe0a4;
+	-fx-font-size: 12px;
+	-fx-padding: 6 12 6 12;
+}
+
+.row-update-button:hover {
+	-fx-background-color: rgba(63, 185, 122, 0.22);
+}
+
+.empty-state {
+	-fx-text-fill: derive(-velo-text, -35%);
+	-fx-font-size: 13px;
+	-fx-padding: 28 8 28 8;
+}
+
+/* ---- Home ---- */
+
+.title-screen {
+	-fx-background-color: -velo-background;
+	-fx-background-radius: 18;
+}
+
+.home-bottom-fade {
+	-fx-background-color: linear-gradient(to bottom, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
+	-fx-background-radius: 18;
+}
+
+.home-brand {
+	-fx-text-fill: white;
+	-fx-font-size: 17px;
+	-fx-font-weight: 800;
+}
+
+.home-tagline {
+	-fx-text-fill: rgba(255, 255, 255, 0.6);
+	-fx-font-size: 11px;
+}
+
+.home-profile-card {
+	-fx-background-color: rgba(10, 10, 14, 0.55);
+	-fx-background-radius: 16;
+	-fx-border-color: rgba(255, 255, 255, 0.10);
+	-fx-border-radius: 16;
+	-fx-padding: 10 20 10 10;
+}
+
+.home-profile-sub {
+	-fx-text-fill: rgba(255, 255, 255, 0.65);
+	-fx-font-size: 12px;
+	-fx-font-weight: 500;
+}
+
+/* Frosted button that sits on top of the 3D scene. */
+.glass-button {
+	-fx-background-color: rgba(10, 10, 14, 0.55);
+	-fx-border-color: rgba(255, 255, 255, 0.14);
+	-fx-text-fill: white;
+	-fx-background-radius: 14;
+	-fx-border-radius: 14;
+	-fx-font-size: 14px;
+	-fx-font-weight: bold;
+	-fx-padding: 8 20 8 20;
+}
+
+.glass-button .label, .glass-button > .label {
+	-fx-text-fill: white;
+}
+
+.glass-button:hover {
+	-fx-background-color: rgba(30, 30, 38, 0.75);
+	-fx-border-color: rgba(255, 255, 255, 0.28);
+}
+
+.home-more-button {
+	-fx-font-size: 20px;
+	-fx-padding: 0 16 0 16;
+}
+
+.home-more-button > .arrow-button {
+	-fx-padding: 0;
+}
+
+.home-more-button > .arrow-button > .arrow {
+	-fx-padding: 0;
+	-fx-shape: "";
+}
+
+.home-play-button:hover {
+	-fx-background-color: linear-gradient(to bottom right, derive(-velo-accent-start, 25%), derive(-velo-accent-end, 12%));
+	-fx-effect: dropshadow(gaussian, derive(-velo-accent-start, -5%), 26, 0.3, 0, 4);
+}
+
+/* ---- Menus (dropdown menus, context menus) ---- */
+
+.context-menu {
+	-fx-background-color: derive(-velo-surface, 8%);
+	-fx-background-radius: 12;
+	-fx-border-color: rgba(255, 255, 255, 0.12);
+	-fx-border-radius: 12;
+	-fx-padding: 6;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.55), 22, 0.15, 0, 8);
+}
+
+.context-menu .menu-item {
+	-fx-background-radius: 8;
+	-fx-padding: 8 14 8 12;
+}
+
+.context-menu .menu-item .label {
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 13px;
+	-fx-font-weight: 500;
+}
+
+.context-menu .menu-item:focused, .context-menu .menu-item:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.08);
+}
+
+.context-menu .menu-item-danger .label {
+	-fx-text-fill: #ff6b6b;
+}
+
+.context-menu .separator .line {
+	-fx-border-color: rgba(255, 255, 255, 0.08);
+	-fx-padding: 0;
+}
+
+/* ---- Page headers ---- */
+
+.page-title {
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 24px;
+	-fx-font-weight: 800;
+}
+
+.page-subtitle {
+	-fx-text-fill: derive(-velo-text, -38%);
+	-fx-font-size: 13px;
+}
+
+.section-label {
+	-fx-text-fill: derive(-velo-text, -30%);
+	-fx-font-size: 13px;
+	-fx-font-weight: bold;
+}
+
+/* ---- Chips ---- */
+
+.chip {
+	-fx-background-color: rgba(255, 255, 255, 0.07);
+	-fx-background-radius: 999;
+	-fx-padding: 4 10 4 6;
+	-fx-text-fill: derive(-velo-text, -20%);
+	-fx-font-size: 12px;
+	-fx-font-weight: bold;
+}
+
+.chip-amount {
+	-fx-text-fill: #ffd56a;
+	-fx-font-size: 13px;
+	-fx-font-weight: 800;
+}
+
+.chip-owned {
+	-fx-background-color: rgba(63, 185, 122, 0.16);
+	-fx-text-fill: #6fe0a4;
+	-fx-padding: 4 10 4 10;
+}
+
+/* ---- Cape cards & stages ---- */
+
+.cape-stage {
+	-fx-background-color:
+		radial-gradient(center 50% 85%, radius 70%, derive(-velo-accent-start, -45%) 0%, transparent 100%),
+		linear-gradient(to bottom, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.25));
+	-fx-background-radius: 14;
+	-fx-border-color: rgba(255, 255, 255, 0.06);
+	-fx-border-radius: 14;
+}
+
+.cape-card {
+	-fx-background-color: rgba(255, 255, 255, 0.035);
+	-fx-background-radius: 18;
+	-fx-border-color: rgba(255, 255, 255, 0.07);
+	-fx-border-radius: 18;
+	-fx-padding: 10 10 12 10;
+	-fx-cursor: hand;
+}
+
+.cape-card:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.065);
+	-fx-border-color: rgba(255, 255, 255, 0.16);
+}
+
+.cape-card-selected, .cape-card-selected:hover {
+	-fx-border-color: -velo-accent-start;
+	-fx-border-width: 2;
+	-fx-background-color: derive(-velo-accent-start, -78%);
+}
+
+.cape-card-title {
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 13px;
+	-fx-font-weight: bold;
+}
+
+.showcase-panel {
+	-fx-background-color: rgba(255, 255, 255, 0.035);
+	-fx-background-radius: 20;
+	-fx-border-color: rgba(255, 255, 255, 0.07);
+	-fx-border-radius: 20;
+	-fx-padding: 12;
+}
+
+.showcase-stage {
+	-fx-background-color:
+		radial-gradient(center 50% 88%, radius 65%, derive(-velo-accent-start, -35%) 0%, transparent 100%),
+		linear-gradient(to bottom, derive(-velo-background, 10%), derive(-velo-background, -10%));
+	-fx-background-radius: 16;
+}
+
+.showcase-title {
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 18px;
+	-fx-font-weight: 800;
+}
+
+.stage-hint {
+	-fx-text-fill: rgba(255, 255, 255, 0.45);
+	-fx-font-size: 11px;
+}
+
+.danger-ghost-button {
+	-fx-background-color: transparent;
+	-fx-border-color: rgba(255, 107, 107, 0.35);
+	-fx-text-fill: #ff7b7b;
+}
+
+.danger-ghost-button:hover {
+	-fx-background-color: rgba(255, 107, 107, 0.12);
+	-fx-border-color: #ff6b6b;
+}
+
+/* ---- Store ---- */
+
+.balance-pill {
+	-fx-background-color: rgba(255, 255, 255, 0.05);
+	-fx-background-radius: 999;
+	-fx-border-color: rgba(255, 213, 106, 0.30);
+	-fx-border-radius: 999;
+	-fx-padding: 4 4 4 8;
+}
+
+.balance-amount {
+	-fx-text-fill: #ffd56a;
+	-fx-font-size: 15px;
+	-fx-font-weight: 800;
+}
+
+.featured-banner {
+	-fx-background-color:
+		radial-gradient(center 82% 50%, radius 55%, derive(-velo-accent-start, -40%) 0%, transparent 100%),
+		linear-gradient(to right, derive(-velo-surface, 6%), derive(-velo-background, 4%));
+	-fx-background-radius: 22;
+	-fx-border-color: rgba(255, 255, 255, 0.08);
+	-fx-border-radius: 22;
+	-fx-padding: 22 26 22 28;
+	-fx-cursor: hand;
+}
+
+.featured-tag {
+	-fx-text-fill: -velo-accent-start;
+	-fx-font-size: 11px;
+	-fx-font-weight: 800;
+}
+
+.featured-title {
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 28px;
+	-fx-font-weight: 800;
+}
+
+.purchase-status {
+	-fx-text-fill: derive(-velo-text, -20%);
+	-fx-font-size: 13px;
+}
+
+/* ---- Settings ---- */
+
+.settings-card {
+	-fx-background-color: rgba(255, 255, 255, 0.035);
+	-fx-background-radius: 16;
+	-fx-border-color: rgba(255, 255, 255, 0.07);
+	-fx-border-radius: 16;
+	-fx-padding: 16 18 10 18;
+}
+
+.settings-card-title {
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 15px;
+	-fx-font-weight: 800;
+	-fx-padding: 0 0 6 0;
+}
+
+.settings-row {
+	-fx-padding: 10 0 10 0;
+	-fx-border-color: rgba(255, 255, 255, 0.06) transparent transparent transparent;
+	-fx-border-width: 1 0 0 0;
+}
+
+.settings-row-label {
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 13px;
+	-fx-font-weight: 600;
+}
+
+.settings-row-hint {
+	-fx-text-fill: derive(-velo-text, -42%);
+	-fx-font-size: 12px;
+}
+
+.settings-subheading {
+	-fx-text-fill: derive(-velo-text, -35%);
+	-fx-font-size: 12px;
+	-fx-font-weight: bold;
+	-fx-padding: 12 0 2 0;
+}
+
+.settings-value {
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 13px;
+	-fx-font-weight: bold;
+}
+
+.settings-value-warn {
+	-fx-text-fill: #f2b84b;
+}
+
+/* ---- Account profile ---- */
+
+.profile-hero {
+	-fx-background-color:
+		radial-gradient(center 15% 50%, radius 60%, derive(-velo-accent-start, -62%) 0%, transparent 100%),
+		rgba(255, 255, 255, 0.03);
+	-fx-background-radius: 22;
+	-fx-border-color: rgba(255, 255, 255, 0.07);
+	-fx-border-radius: 22;
+	-fx-padding: 16;
+}
+
+.profile-name {
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 30px;
+	-fx-font-weight: 800;
+}
+
+.profile-uuid {
+	-fx-text-fill: derive(-velo-text, -45%);
+	-fx-font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace;
+	-fx-font-size: 11px;
+}
+
+.profile-side-card {
+	-fx-background-color: rgba(0, 0, 0, 0.22);
+	-fx-background-radius: 16;
+	-fx-padding: 14;
+}
+
+.stat-bar {
+	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
+	-fx-background-radius: 999;
+	-fx-pref-height: 5;
+	-fx-min-height: 5;
+	-fx-max-height: 5;
+}
+
+.stat-tile {
+	-fx-background-color: rgba(255, 255, 255, 0.04);
+	-fx-background-radius: 14;
+	-fx-border-color: rgba(255, 255, 255, 0.07);
+	-fx-border-radius: 14;
+	-fx-padding: 14 16 12 16;
+}
+
+.stat-tile:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.07);
+}
+
+.stat-value {
+	-fx-text-fill: -velo-text;
+	-fx-font-size: 22px;
+	-fx-font-weight: 800;
+}
+
+.stat-label {
+	-fx-text-fill: derive(-velo-text, -40%);
+	-fx-font-size: 12px;
+	-fx-font-weight: 600;
 }

@@ -34,7 +34,6 @@ import java.util.UUID;
 public final class GameLauncher {
 
 	private static final String LAUNCHER_NAME = "velo-client-launcher";
-	private static final int DEFAULT_MAX_MEMORY_MB = 4096;
 
 	/**
 	 * @param process the running game process
@@ -157,33 +156,14 @@ public final class GameLauncher {
 			activeFeatures = Set.of("is_quick_play_multiplayer");
 		}
 
-		int maxMemoryMb = instance.ramMaxMb() != null ? instance.ramMaxMb() : DEFAULT_MAX_MEMORY_MB;
-		// Matched to max by default (only a user-set explicit min overrides this) rather than a
-		// separate, much lower default (previously 1024m against a 4096m max) - mismatched
-		// -Xms/-Xmx makes the OS/JVM repeatedly grow and shrink the heap pool during play instead
-		// of committing it once up front, which is a real, well-documented source of periodic
-		// lag spikes (the same reasoning Lunar Client's own launcher uses for always matching
-		// these two).
-		int minMemoryMb = instance.ramMinMb() != null ? instance.ramMinMb() : maxMemoryMb;
+		// Memory size and garbage collector come from MemoryPlanner: automatic by default (sized
+		// from this PC, this profile's mods/settings, and what the game really used last time),
+		// or the fixed/per-profile amount when one is set. -Xms matches -Xmx for G1 (no heap
+		// resizing stutter); ZGC starts lower and grows/shrinks on its own without pauses.
+		MemoryPlanner.Plan memoryPlan = MemoryPlanner.plan(instance);
+		net.veloclient.launcher.LauncherLog.info("Launching " + instance.name() + " with " + memoryPlan.summary() + " (" + String.join("; ", memoryPlan.reasons()) + ")");
 
-		List<String> jvmArgs = new ArrayList<>();
-		jvmArgs.add("-Xmx" + maxMemoryMb + "m");
-		jvmArgs.add("-Xms" + minMemoryMb + "m");
-		// G1GC with a strict max pause target, plus a few of its own tuning knobs (new-gen
-		// reserve, region size) - Minecraft's default GC otherwise tends to run big, noticeable
-		// stop-the-world collections instead of small incremental ones, showing up as periodic
-		// full-second freezes rather than smooth frame times. This is the same standard, widely-
-		// documented G1GC tuning recipe Lunar Client and most Minecraft performance guides use;
-		// none of it is Velo-specific or risky - it only changes how the JVM manages memory, never
-		// what the game itself does.
-		jvmArgs.add("-XX:+UseG1GC");
-		jvmArgs.add("-XX:MaxGCPauseMillis=50");
-		jvmArgs.add("-XX:+UnlockExperimentalVMOptions");
-		jvmArgs.add("-XX:G1NewSizePercent=20");
-		jvmArgs.add("-XX:G1ReservePercent=20");
-		jvmArgs.add("-XX:G1HeapRegionSize=32M");
-		jvmArgs.add("-XX:G1MixedGCCountTarget=4");
-		jvmArgs.add("-XX:InitiatingHeapOccupancyPercent=15");
+		List<String> jvmArgs = new ArrayList<>(MemoryPlanner.jvmArgs(memoryPlan));
 		// Stops the JVM memory-mapping its hsperfdata stats file - on a busy or slow disk, the
 		// periodic writes to it are a known source of random multi-ms stalls, and nothing in a
 		// game session reads those stats.
@@ -220,6 +200,7 @@ public final class GameLauncher {
 			gameArgs.addAll(resolveArguments(fabric.getAsJsonObject("arguments").getAsJsonArray("game"), values, activeFeatures));
 		}
 
+		Downloader.saveVerifiedIndex();
 		String java = javaBinary();
 		WindowsGpuPreference.preferHighPerformance(Path.of(java));
 		List<String> command = new ArrayList<>();
@@ -234,6 +215,16 @@ public final class GameLauncher {
 				.directory(gameDir.toFile())
 				.redirectOutput(logFile.toFile())
 				.redirectErrorStream(true);
+		if (MemoryPlanner.isLinux() && net.veloclient.launcher.data.LauncherSettings.get().driverShaderCache) {
+			// GPU drivers keep their own compiled-shader caches (OpenGL and Vulkan alike), but
+			// NVIDIA's Linux driver purges its cache down to 128 MB and Mesa's default can be
+			// small - with a modpack plus shader packs that evicts the game's own shaders, which
+			// then recompile (stutter) next launch. Only set where the user hasn't chosen already.
+			var env = builder.environment();
+			env.putIfAbsent("__GL_SHADER_DISK_CACHE", "1");
+			env.putIfAbsent("__GL_SHADER_DISK_CACHE_SKIP_CLEANUP", "1");
+			env.putIfAbsent("MESA_SHADER_CACHE_MAX_SIZE", "2G");
+		}
 		return new LaunchResult(builder.start(), logFile, runId);
 	}
 

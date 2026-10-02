@@ -1,5 +1,11 @@
 {
 	"key.velo-client.open_mod_menu": "Open Mod Menu",
 	"key.velo-client.free_look": "Free Look",
+	"key.velo-client.open_friends": "Open Friends",
+	"key.velo-client.open_waypoints": "Open Waypoints",
+	"key.velo-client.new_waypoint": "New Waypoint Here",
+	"key.velo-client.add_waypoint": "Add Waypoint (old)",
+	"key.velo-client.queue_menu": "Open Background Queue",
+	"key.velo-client.queue_switch": "Background Queue: Switch / Send to Background",
 	"key.category.velo-client.general": "Velo Client"
 }

@@ -21,6 +21,7 @@ import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.RadialGradient;
 import javafx.scene.paint.Stop;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.Polyline;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
@@ -119,16 +120,19 @@ public final class LauncherApp extends Application {
 	private MinecraftSession session;
 	private Label accountLabel;
 	private Button accountButton;
-	private Button navHome, navServers, navCosmetics, navStore, navSettings;
+	private Button navHome, navServers, navFriends, navCosmetics, navStore, navSettings;
 	private VBox runningSection;
 	private VBox quickLaunchSection;
 	/** Which profile the home screen's carousel is showing - an index into {@link #orderedProfilesForHome()}, clamped back to range whenever the profile list changes (e.g. after a delete). */
 	private int homeProfileIndex = 0;
-	private ImageView homeBackgroundLogo;
+	/** The profile card at the bottom of Home (icon, name, details) - slides when switching profiles. */
+	private Node homeBackgroundLogo;
+	private ImageView homeProfileIcon;
+	private net.veloclient.launcher.ui.VoxelSceneryView homeScenery;
 	/** Soft radial color wash sitting directly behind {@link #homeBackgroundLogo}, tinted with the same extracted accent color as the border glow - many profile/server icons are mostly white/line-art on a transparent background, which reads as flat gray once alpha-blended over the dark particle backdrop with nothing else behind it. */
 	private Circle homeLogoGlow;
 	private StackPane homePlayerHolder;
-	private StackPane homeBorderHost;
+	private Region homeBorderHost;
 	private Label homeProfileName;
 	private Label homeSubtitle;
 	private StackPane homeActionsRowHolder;
@@ -171,6 +175,11 @@ public final class LauncherApp extends Application {
 		// (a Font at one specific size) isn't otherwise used, the family just
 		// needs loading once. Same font as the in-game title screen.
 		Font.loadFont(getClass().getResourceAsStream("/net/veloclient/launcher/fonts/Audiowide-Regular.ttf"), 12);
+		// Inter is the UI font everywhere (same as the in-game menus) - bundled so it looks the same
+		// on every OS instead of falling back to whatever sans-serif the system has.
+		for (String weight : new String[] {"Regular", "Medium", "SemiBold", "Bold", "ExtraBold"}) {
+			Font.loadFont(getClass().getResourceAsStream("/net/veloclient/launcher/fonts/Inter-" + weight + ".ttf"), 12);
+		}
 
 		root = new BorderPane();
 		root.getStyleClass().add("root");
@@ -184,6 +193,7 @@ public final class LauncherApp extends Application {
 		Scene scene = new Scene(root, 1100, 680);
 		scene.getStylesheets().add(getClass().getResource("/net/veloclient/launcher/launcher.css").toExternalForm());
 		applyTheme();
+		net.veloclient.launcher.ui.UiMotion.install(scene);
 
 		stage.getIcons().add(new Image(getClass().getResourceAsStream("/net/veloclient/launcher/images/logo.png")));
 		stage.setTitle("Velo Client Launcher");
@@ -191,9 +201,92 @@ public final class LauncherApp extends Application {
 		stage.setMinWidth(920);
 		stage.setMinHeight(600);
 		fixWindowsMaximizeRestoreBug(stage);
+		net.veloclient.launcher.ui.WindowPlacement.restore(stage, 1100, 680);
 		stage.show();
 
 		attemptSilentSignIn();
+		net.veloclient.launcher.social.LauncherSocial.addListener(event -> refreshFriendsBadge());
+		String demoShot = System.getProperty("velo.launcherDemo");
+		if (demoShot != null && !demoShot.isBlank()) {
+			runFriendsDemo(java.nio.file.Path.of(demoShot));
+		}
+		String tourDir = System.getProperty("velo.launcherTour");
+		if (tourDir != null && !tourDir.isBlank()) {
+			runScreenshotTour(java.nio.file.Path.of(tourDir));
+		}
+	}
+
+	/**
+	 * Dev-only ({@code -Dvelo.launcherTour=<folder>}): visits the main pages one after another and
+	 * saves a snapshot of each, then exits. Navigation only - nothing is changed or launched.
+	 */
+	private void runScreenshotTour(java.nio.file.Path folder) {
+		try {
+			java.nio.file.Files.createDirectories(folder);
+		} catch (java.io.IOException e) {
+			LauncherLog.warn("Tour folder not writable", e);
+			return;
+		}
+		List<Instance> instances = InstanceStore.loadAll();
+		List<Object[]> steps = new java.util.ArrayList<>();
+		steps.add(new Object[] {"01-home", (Runnable) this::showHome});
+		if (!instances.isEmpty()) {
+			steps.add(new Object[] {"02-profile", (Runnable) () -> showInstanceDetail(instances.get(0))});
+		}
+		steps.add(new Object[] {"03-settings", (Runnable) this::showSettings});
+		steps.add(new Object[] {"04-cosmetics", (Runnable) this::showCosmetics});
+		steps.add(new Object[] {"05-store", (Runnable) this::showStore});
+		if (!net.veloclient.launcher.data.StoreCatalog.all().isEmpty()) {
+			steps.add(new Object[] {"05b-store-item", (Runnable) () -> showStoreItemDetail(net.veloclient.launcher.data.StoreCatalog.all().get(0))});
+		}
+		steps.add(new Object[] {"05c-friends", (Runnable) this::showFriends});
+		steps.add(new Object[] {"06-servers", (Runnable) this::showServers});
+		steps.add(new Object[] {"07-account", (Runnable) () -> {
+			if (session != null) {
+				showAccountProfile();
+			}
+		}});
+		String extra = System.getProperty("velo.launcherTourExtra", "");
+		if (extra.contains("signin")) {
+			steps.add(new Object[] {"07-signin", (Runnable) () -> net.veloclient.launcher.ui.SignInDialog.demo(stage, theme)});
+		}
+		runTourStep(folder, steps, 0);
+	}
+
+	private void runTourStep(java.nio.file.Path folder, List<Object[]> steps, int index) {
+		if (index >= steps.size()) {
+			Platform.exit();
+			return;
+		}
+		javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(Duration.millis(index == 0 ? 2500 : 300));
+		wait.setOnFinished(e -> {
+			((Runnable) steps.get(index)[1]).run();
+			javafx.animation.PauseTransition shoot = new javafx.animation.PauseTransition(Duration.millis(2600));
+			shoot.setOnFinished(ev -> {
+				try {
+					javafx.stage.Window target = javafx.stage.Window.getWindows().stream()
+							.filter(w -> w.isShowing() && w != stage).reduce((a, b) -> b).orElse(stage);
+					var image = target.getScene().snapshot(null);
+					java.nio.file.Path out = folder.resolve(steps.get(index)[0] + ".png");
+					javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(image, null), "png", out.toFile());
+					if (target != stage) {
+						target.hide();
+					}
+				} catch (Exception ex) {
+					LauncherLog.warn("Tour screenshot failed", ex);
+				}
+				runTourStep(folder, steps, index + 1);
+			});
+			shoot.play();
+		});
+		wait.play();
+	}
+
+	@Override
+	public void stop() {
+		net.veloclient.launcher.ui.WindowPlacement.save(stage);
+		// Tell the Velo server right away that the launcher went away (friends see it immediately).
+		net.veloclient.launcher.social.LauncherSocial.shutdown();
 	}
 
 	/**
@@ -290,11 +383,12 @@ public final class LauncherApp extends Application {
 
 		navHome = navIconButton("home", "Home", this::showHome);
 		navServers = navIconButton("server", "Servers", this::showServers);
+		navFriends = navIconButton("friends", "Friends", this::showFriends);
 		navCosmetics = navIconButton("cosmetics", "Cosmetics", this::showCosmetics);
 		navStore = navIconButton("store", "Store", this::showStore);
 		navSettings = navIconButton("settings", "Settings", this::showSettings);
 
-		sidebar.getChildren().addAll(title, navHome, navServers, navCosmetics, navStore, navSettings);
+		sidebar.getChildren().addAll(title, navHome, navServers, navFriends, navCosmetics, navStore, navSettings);
 
 		// "Running" (live instances) and "Quick Launch" (recent one-click
 		// shortcuts) - deliberately separated from the fixed nav above by
@@ -443,7 +537,7 @@ public final class LauncherApp extends Application {
 	}
 
 	private void clearActiveNav() {
-		for (Button b : List.of(navHome, navServers, navCosmetics, navStore, navSettings)) {
+		for (Button b : List.of(navHome, navServers, navFriends, navCosmetics, navStore, navSettings)) {
 			b.getStyleClass().remove("nav-icon-button-active");
 		}
 	}
@@ -536,14 +630,18 @@ public final class LauncherApp extends Application {
 	}
 
 	private void markActiveNav(Button active) {
-		for (Button b : List.of(navHome, navServers, navCosmetics, navStore, navSettings)) {
+		for (Button b : List.of(navHome, navServers, navFriends, navCosmetics, navStore, navSettings)) {
 			b.getStyleClass().remove("nav-icon-button-active");
 		}
 		active.getStyleClass().add("nav-icon-button-active");
 	}
 
 	private void setContent(Node node) {
+		boolean same = content.getChildren().size() == 1 && content.getChildren().get(0) == node;
 		content.getChildren().setAll(node);
+		if (!same) {
+			net.veloclient.launcher.ui.UiMotion.enter(node);
+		}
 	}
 
 	// ---- Home / title screen: one-click launch + the profile carousel ----
@@ -613,88 +711,55 @@ public final class LauncherApp extends Application {
 	}
 
 	private void showHome() {
-		if (background == null) {
-			background = new ParticleBackground(800, 600, 60);
-		}
-		background.setDotColor(accentColor().deriveColor(0, 1, 1, 0.35));
-		background.widthProperty().unbind();
-		background.heightProperty().unbind();
-
 		StackPane titleScreen = new StackPane();
-		titleScreen.getStyleClass().addAll("title-screen", "home-glow-border");
-		// StackPane's default computeMinWidth/Height() equals its computed
-		// preferred size, so a child that briefly *wants* to be huge (see the
-		// fitWidth comment below) would otherwise force BorderPane to grow
-		// content past the window's actual, fixed size - min size wins over
-		// available area in Region.layoutInArea's boundedSize(). Floor both
-		// to 0 so titleScreen (and its parent) can always shrink to fit.
+		titleScreen.getStyleClass().add("title-screen");
+		// StackPane's default min size equals its pref size; floor both to 0 so the home card can
+		// always shrink to the window instead of forcing the BorderPane to overflow.
 		titleScreen.setMinSize(0, 0);
 		content.setMinSize(0, 0);
-		homeBorderHost = titleScreen;
-		background.widthProperty().bind(titleScreen.widthProperty());
-		background.heightProperty().bind(titleScreen.heightProperty());
-		titleScreen.getChildren().add(background);
-		background.start();
+		// The frame is its own overlay drawn last, so the 3D scene can never paint over its rounded
+		// corners (the old border sat underneath the scene and got cut off at the corners).
+		Region frame = new Region();
+		frame.getStyleClass().add("home-glow-border");
+		frame.setMouseTransparent(true);
+		homeBorderHost = frame;
 
-		// Soft color wash directly behind the big profile icon (added first
-		// so it paints underneath it) - many profile/server icons are mostly
-		// white line-art on a transparent background, which alpha-blends to
-		// flat gray over the dark particle canvas with nothing behind it.
-		// A Shape's fill is a plain Java Paint, not a CSS property, so this
-		// doesn't need any of the CSS-pass handling homeIconImage() needs.
-		homeLogoGlow = new Circle();
-		homeLogoGlow.setMouseTransparent(true);
-		homeLogoGlow.radiusProperty().bind(root.heightProperty().multiply(0.55));
-		titleScreen.getChildren().add(homeLogoGlow);
-		StackPane.setAlignment(homeLogoGlow, Pos.CENTER);
-		applyLogoGlowColor(currentBorderColor);
+		// 3D floating-island backdrop in the theme's colors (replaces the old blown-up server/profile
+		// icon, which looked blurry for most low-resolution server icons). Kept across visits.
+		if (homeScenery == null) {
+			homeScenery = new net.veloclient.launcher.ui.VoxelSceneryView();
+		}
+		homeScenery.setTheme(accentColor(), Color.web(cssColor(theme.background())));
+		Rectangle sceneryClip = new Rectangle();
+		sceneryClip.setArcWidth(34);
+		sceneryClip.setArcHeight(34);
+		sceneryClip.widthProperty().bind(titleScreen.widthProperty());
+		sceneryClip.heightProperty().bind(titleScreen.heightProperty());
+		homeScenery.setClip(sceneryClip);
+		titleScreen.getChildren().add(homeScenery);
+		// Darkens the bottom so the profile card and buttons always read clearly over the scene.
+		Region bottomFade = new Region();
+		bottomFade.setMouseTransparent(true);
+		bottomFade.getStyleClass().add("home-bottom-fade");
+		titleScreen.getChildren().add(bottomFade);
 
-		// Big profile icon behind everything else, sized off the window
-		// itself (not a fixed pixel value) so it stays proportionally huge -
-		// clearly bigger than the player render in front of it - at any
-		// window size, and reacts to the window actually being resized
-		// instead of needing showHome() to rerun. See updateHomeProfileDisplay().
-		homeBackgroundLogo = new ImageView();
-		homeBackgroundLogo.setOpacity(HOME_LOGO_OPACITY);
-		homeBackgroundLogo.setPreserveRatio(true);
-		// Bound to root's own size (the outermost BorderPane, fixed top-down
-		// by the Scene/Stage) rather than titleScreen's - titleScreen is a
-		// StackPane, and StackPane's default preferred-size computation is
-		// the max of its children's preferred sizes, so binding a child's
-		// size to titleScreen's *own* size created a real, confirmed runaway
-		// feedback loop (bigger logo -> bigger titleScreen preferred size ->
-		// bigger logo -> ...), visible as the whole window growing on its
-		// own. root's size has no such path back down to this logo.
-		//
-		// Both fitWidth AND fitHeight are bound (not height alone): with
-		// preserveRatio and only one dimension constrained, an icon image
-		// whose aspect ratio isn't square (including a transient state
-		// before an async-loaded image reports its real dimensions) can
-		// make the *other*, unconstrained dimension balloon - and because
-		// StackPane's default computeMinWidth/Height() equals its computed
-		// preferred size, that oversized preference becomes an oversized
-		// *minimum*, which wins over the actually-available area in
-		// BorderPane's layout (Region.layoutInArea's boundedSize picks min
-		// when min > available), forcing content to overflow past the
-		// window - the same growth bug from a different trigger. Binding
-		// both dimensions keeps the image letterboxed inside a fixed box
-		// no matter its native aspect ratio, so this can't happen again.
-		homeBackgroundLogo.fitHeightProperty().bind(root.heightProperty().multiply(0.98));
-		homeBackgroundLogo.fitWidthProperty().bind(root.widthProperty().multiply(0.9));
-		homeBackgroundLogo.setMouseTransparent(true);
-		titleScreen.getChildren().add(homeBackgroundLogo);
-		StackPane.setAlignment(homeBackgroundLogo, Pos.CENTER);
+		// Soft contact shadow under the player's feet so they stand on the island, not float.
+		javafx.scene.shape.Ellipse playerShadow = new javafx.scene.shape.Ellipse(58, 13);
+		playerShadow.setMouseTransparent(true);
+		playerShadow.setFill(new RadialGradient(0, 0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
+				new Stop(0, Color.rgb(0, 0, 0, 0.55)), new Stop(1, Color.rgb(0, 0, 0, 0))));
+		titleScreen.getChildren().add(playerShadow);
+		StackPane.setAlignment(playerShadow, Pos.CENTER);
+		StackPane.setMargin(playerShadow, new Insets(178, 0, 0, 0));
 
-		// The signed-in account's 3D skin render, in front of the logo, no
-		// box/background of its own (PlayerSkin3DView's SubScene is
-		// transparent-filled) - fixed pose, not draggable, per design.
+		// The signed-in account's 3D skin, standing on the island.
 		homePlayerHolder = new StackPane();
-		homePlayerHolder.setPrefSize(230, 340);
-		homePlayerHolder.setMaxSize(230, 340);
+		homePlayerHolder.setPrefSize(210, 310);
+		homePlayerHolder.setMaxSize(210, 310);
 		homePlayerHolder.setMouseTransparent(true);
 		titleScreen.getChildren().add(homePlayerHolder);
 		StackPane.setAlignment(homePlayerHolder, Pos.CENTER);
-		StackPane.setMargin(homePlayerHolder, new Insets(0, 0, 70, 0));
+		StackPane.setMargin(homePlayerHolder, new Insets(0, 0, 120, 0));
 		loadHomePlayerModel();
 
 		List<HomeLaunchTarget> targets = orderedLaunchTargetsForHome();
@@ -712,109 +777,107 @@ public final class LauncherApp extends Application {
 		titleScreen.getChildren().addAll(leftHit, rightHit);
 		StackPane.setAlignment(leftHit, Pos.CENTER_LEFT);
 		StackPane.setAlignment(rightHit, Pos.CENTER_RIGHT);
-		StackPane.setMargin(leftHit, new Insets(0, 0, 50, 10));
-		StackPane.setMargin(rightHit, new Insets(0, 10, 50, 0));
-
-		// Horizontal drag-to-swap: press-drag-release anywhere on the title
-		// screen's own background (buttons/chevrons consume their own press
-		// events first, so this never steals a click from them) slides the
-		// carousel the same way clicking a chevron would - dragging left
-		// (content trailing the cursor to the left) advances to the *next*
-		// target, same direction as the right chevron.
+		StackPane.setMargin(leftHit, new Insets(0, 0, 90, 10));
+		StackPane.setMargin(rightHit, new Insets(0, 10, 90, 0));
 		if (multipleTargets) {
 			installHomeDragToSwap(titleScreen);
 		}
 
-		VBox topArea = new VBox(4);
-		topArea.setAlignment(Pos.CENTER);
-		topArea.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
-		Label title = new Label("VELO CLIENT");
-		title.getStyleClass().add("velo-title");
-		title.setTextFill(accentColor());
-		title.setEffect(new DropShadow(24, accentColor().deriveColor(0, 1, 1, 0.6)));
-		Label tagline = new Label("Made by Players for Players.");
-		tagline.getStyleClass().add("velo-tagline");
-		tagline.setTextFill(textColor());
-		topArea.getChildren().addAll(title, tagline);
-		titleScreen.getChildren().add(topArea);
-		StackPane.setAlignment(topArea, Pos.TOP_CENTER);
-		StackPane.setMargin(topArea, new Insets(18, 0, 0, 0));
+		// Top bar: brand on the left, profile management on the right.
+		ImageView brandLogo = new ImageView(new Image(getClass().getResourceAsStream("/net/veloclient/launcher/images/logo.png"), 30, 30, true, true));
+		Label brandName = new Label("Velo Client");
+		brandName.getStyleClass().add("home-brand");
+		Label tagline = new Label("Made by players, for players");
+		tagline.getStyleClass().add("home-tagline");
+		VBox brandText = new VBox(0, brandName, tagline);
+		brandText.setAlignment(Pos.CENTER_LEFT);
+		HBox brand = new HBox(10, brandLogo, brandText);
+		brand.setAlignment(Pos.CENTER_LEFT);
 
-		HBox topRight = new HBox(8);
-		topRight.setAlignment(Pos.CENTER_RIGHT);
-		topRight.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
-		Button newProfileButton = new Button("+ New Profile");
-		newProfileButton.getStyleClass().addAll("title-menu-button", "title-menu-button-primary", "button-compact");
+		Button newProfileButton = new Button("+  New profile");
+		newProfileButton.getStyleClass().add("primary-button");
 		newProfileButton.setOnAction(e -> createNewProfile());
 		Button importProfileButton = new Button("Import");
-		importProfileButton.getStyleClass().addAll("title-menu-button", "button-compact");
+		importProfileButton.getStyleClass().add("glass-button");
+		importProfileButton.setTooltip(new Tooltip("Import a profile .zip (exported from Velo or another launcher)"));
 		importProfileButton.setOnAction(e -> importInstance());
-		topRight.getChildren().addAll(newProfileButton, importProfileButton);
-		titleScreen.getChildren().add(topRight);
-		StackPane.setAlignment(topRight, Pos.TOP_RIGHT);
-		StackPane.setMargin(topRight, new Insets(18, 22, 0, 0));
+		Region topSpacer = new Region();
+		HBox.setHgrow(topSpacer, Priority.ALWAYS);
+		HBox topBar = new HBox(8, brand, topSpacer, importProfileButton, newProfileButton);
+		topBar.setAlignment(Pos.CENTER_LEFT);
+		topBar.setPickOnBounds(false);
+		titleScreen.getChildren().add(topBar);
+		StackPane.setAlignment(topBar, Pos.TOP_CENTER);
+		StackPane.setMargin(topBar, new Insets(18, 20, 0, 22));
+		topBar.setMaxHeight(Region.USE_PREF_SIZE);
 
-		VBox bottomArea = new VBox(8);
-		bottomArea.setAlignment(Pos.CENTER);
-		bottomArea.setMaxSize(440, Region.USE_PREF_SIZE);
-
+		// Bottom: profile card (icon, name, details), then the action row.
+		homeProfileIcon = new ImageView();
+		homeProfileIcon.setFitWidth(44);
+		homeProfileIcon.setFitHeight(44);
+		homeProfileIcon.setPreserveRatio(true);
+		Rectangle iconClip = new Rectangle(44, 44);
+		iconClip.setArcWidth(14);
+		iconClip.setArcHeight(14);
+		homeProfileIcon.setClip(iconClip);
 		homeProfileName = new Label();
 		homeProfileName.getStyleClass().add("home-profile-name");
-		homeProfileName.setTextFill(textColor());
 		homeSubtitle = new Label();
-		homeSubtitle.getStyleClass().add("version-tag");
-		homeSubtitle.setTextFill(textColor());
+		homeSubtitle.getStyleClass().add("home-profile-sub");
+		VBox nameBox = new VBox(1, homeProfileName, homeSubtitle);
+		nameBox.setAlignment(Pos.CENTER_LEFT);
+		HBox profileCard = new HBox(12, homeProfileIcon, nameBox);
+		profileCard.setAlignment(Pos.CENTER_LEFT);
+		profileCard.getStyleClass().add("home-profile-card");
+		profileCard.setMaxWidth(Region.USE_PREF_SIZE);
+		homeBackgroundLogo = profileCard;
 
 		homeActionsRowHolder = new StackPane();
 
 		homePlayButton = new Button("Play");
 		homePlayButton.getStyleClass().add("home-play-button");
-		homePlayButton.setMinHeight(58);
-		HBox.setHgrow(homePlayButton, Priority.ALWAYS);
-		homePlayButton.setMaxWidth(Double.MAX_VALUE);
+		homePlayButton.setMinHeight(54);
+		homePlayButton.setPrefWidth(300);
 
-		// Beside Play rather than shrunk into the small icon row below - same
-		// height as Play, a much bigger and more accessible target for what
-		// (alongside launching) is the single most-used action on a profile.
-		homeGearButton = new Button();
-		homeGearButton.setGraphic(new ImageView(new Image(getClass().getResourceAsStream(
-				"/net/veloclient/launcher/images/icons/action/manage.png"), 22, 22, true, true)));
-		homeGearButton.getStyleClass().add("home-gear-button");
-		homeGearButton.setMinSize(58, 58);
-		homeGearButton.setMaxSize(58, 58);
-		homeGearButton.setTooltip(new Tooltip("Manage mods, resource packs, shaders, schematics, datapacks..."));
+		homeGearButton = new Button("Mods & Packs");
+		homeGearButton.getStyleClass().add("glass-button");
+		homeGearButton.setMinHeight(54);
+		homeGearButton.setTooltip(new Tooltip("Add or update mods, resource packs, shaders, schematics, datapacks"));
 
-		HBox playRow = new HBox(10, homePlayButton, homeGearButton);
+		HBox playRow = new HBox(10, homeGearButton, homePlayButton, homeActionsRowHolder);
 		playRow.setAlignment(Pos.CENTER);
-		playRow.setMaxWidth(320);
 
 		homeLaunchProgress = new ProgressBar(0);
-		homeLaunchProgress.setMaxWidth(320);
+		homeLaunchProgress.setMaxWidth(420);
 		homeLaunchProgress.setVisible(false);
 		homeLaunchProgress.setManaged(false);
 		homeLaunchStatus = new Label();
-		homeLaunchStatus.getStyleClass().add("version-tag");
-		homeLaunchStatus.setTextFill(textColor());
+		homeLaunchStatus.getStyleClass().add("home-profile-sub");
 		homeLaunchStatus.setVisible(false);
 		homeLaunchStatus.setManaged(false);
 		homeLaunchStatus.setWrapText(true);
 
-		bottomArea.getChildren().addAll(homeProfileName, homeSubtitle, homeActionsRowHolder, playRow, homeLaunchProgress, homeLaunchStatus);
+		VBox bottomArea = new VBox(12, profileCard, playRow, homeLaunchProgress, homeLaunchStatus);
+		bottomArea.setAlignment(Pos.CENTER);
+		bottomArea.setMaxSize(640, Region.USE_PREF_SIZE);
+		bottomArea.setPickOnBounds(false);
 		titleScreen.getChildren().add(bottomArea);
 		StackPane.setAlignment(bottomArea, Pos.BOTTOM_CENTER);
-		StackPane.setMargin(bottomArea, new Insets(0, 0, 22, 0));
+		StackPane.setMargin(bottomArea, new Insets(0, 0, 24, 0));
 
 		if (targets.isEmpty()) {
 			homeProfileName.setText("No profiles yet");
-			homeSubtitle.setText("");
+			homeSubtitle.setText("Create one to start playing");
+			homeProfileIcon.setImage(new Image(getClass().getResourceAsStream("/net/veloclient/launcher/images/logo.png"), 44, 44, true, true));
 			homeGearButton.setVisible(false);
 			homeGearButton.setManaged(false);
-			homePlayButton.setText("+ Create a Profile");
+			homePlayButton.setText("+  Create a profile");
 			homePlayButton.setOnAction(e -> createNewProfile());
 		} else {
 			updateHomeProfileDisplay(targets, false, 1);
 		}
 
+		titleScreen.getChildren().add(frame);
 		setContent(titleScreen);
 		markActiveNav(navHome);
 	}
@@ -922,7 +985,7 @@ public final class LauncherApp extends Application {
 		String serverName = homeTargetServerName(target);
 
 		homeProfileName.setText(serverName != null ? serverName : instance.name());
-		homeSubtitle.setText(serverName != null ? "via " + instance.name() : "");
+		homeSubtitle.setText(homeDetailsLine(instance, serverName));
 		homeActionsRowHolder.getChildren().setAll(buildHomeProfileActionsRow(instance));
 		homeGearButton.setVisible(true);
 		homeGearButton.setManaged(true);
@@ -930,7 +993,7 @@ public final class LauncherApp extends Application {
 
 		boolean signedIn = session != null;
 		String launchLabel = "Fabric " + instance.mcVersion();
-		homePlayButton.setText(signedIn ? (serverName != null ? "Connect · " + launchLabel : "Launch " + launchLabel) : "Sign In to Play");
+		homePlayButton.setText(signedIn ? (serverName != null ? "Connect" : "Play") : "Sign in to play");
 		homePlayButton.setTooltip(new Tooltip(signedIn
 				? (serverName != null ? "Install and connect straight into " + serverName : "Install and launch " + instance.name())
 				: "Sign in with your Microsoft account first - this won't launch anything until you do."));
@@ -944,14 +1007,12 @@ public final class LauncherApp extends Application {
 		});
 
 		Image logoImage = homeIconImage(target);
-		Color glowColor = IconColorExtractor.fromImage(logoImage, accentColor());
 		if (animate) {
 			animateLogoSlide(logoImage, direction);
-			animateBorderColor(glowColor);
 		} else {
-			homeBackgroundLogo.setImage(logoImage);
-			applyBorderColor(glowColor);
+			homeProfileIcon.setImage(logoImage);
 		}
+		applyBorderColor(accentColor().deriveColor(0, 1, 1, 0.55));
 	}
 
 	/**
@@ -976,13 +1037,13 @@ public final class LauncherApp extends Application {
 		fadeOut.setToValue(0.0);
 		ParallelTransition outPhase = new ParallelTransition(out, fadeOut);
 		outPhase.setOnFinished(e -> {
-			homeBackgroundLogo.setImage(newImage);
+			homeProfileIcon.setImage(newImage);
 			homeBackgroundLogo.setTranslateX(60 * dir);
 			TranslateTransition in = new TranslateTransition(Duration.millis(200), homeBackgroundLogo);
 			in.setToX(0);
 			in.setInterpolator(Interpolator.EASE_OUT);
 			FadeTransition fadeIn = new FadeTransition(Duration.millis(200), homeBackgroundLogo);
-			fadeIn.setToValue(HOME_LOGO_OPACITY);
+			fadeIn.setToValue(1.0);
 			new ParallelTransition(in, fadeIn).play();
 		});
 		outPhase.play();
@@ -1067,15 +1128,14 @@ public final class LauncherApp extends Application {
 		// screen's own background logo instead of duplicating it.
 		ImageView probe = new ImageView();
 		probe.imageProperty().addListener((obs, oldImg, newImg) -> {
-			if (newImg == null || newImg == profileImage || homeBackgroundLogo == null) {
+			if (newImg == null || newImg == profileImage || homeProfileIcon == null) {
 				return;
 			}
 			HomeLaunchTarget current = homeCurrentTarget;
 			if (current == null || !current.isServer() || !address.equals(current.serverAddress())) {
 				return; // the carousel moved on since this fetch started
 			}
-			homeBackgroundLogo.setImage(newImg);
-			applyBorderColor(IconColorExtractor.fromImage(newImg, accentColor()));
+			homeProfileIcon.setImage(newImg);
 		});
 		ServerFaviconCache.loadInto(probe, host, port, profileImage);
 		return probe.getImage();
@@ -1123,23 +1183,42 @@ public final class LauncherApp extends Application {
 	}
 
 	/** brush(rename)/copy(duplicate)/download(export)/delete, plus a RAM icon (per-profile memory settings) - the home screen's replacement for the old Profiles-grid card's action row. Manage mods (the gear) lives next to Play now, not in this row - see {@link #homeGearButton}. */
+	/** "Fabric 26.2 · 12 mods" (+ "via <profile>" for a server shortcut) under the profile name. */
+	private String homeDetailsLine(Instance instance, String serverName) {
+		long mods = 0;
+		try (var stream = java.nio.file.Files.list(net.veloclient.launcher.instance.InstancePaths.modsDir(instance.id()))) {
+			mods = stream.map(p -> p.getFileName().toString())
+					.filter(n -> n.endsWith(".jar") && !n.startsWith("velo-client-") && !n.startsWith("fabric-api-")).count();
+		} catch (java.io.IOException ignored) {
+			// No mods folder yet.
+		}
+		String line = "Fabric " + instance.mcVersion() + "  ·  " + (mods == 1 ? "1 mod" : mods + " mods");
+		return serverName != null ? line + "  ·  via " + instance.name() : line;
+	}
+
+	/** The "⋯" button next to Play: every less-frequent profile action as a labelled menu entry. */
 	private HBox buildHomeProfileActionsRow(Instance instance) {
-		HBox actions = new HBox(8);
-		actions.setAlignment(Pos.CENTER);
-		Button renameButton = iconActionButton("brush", "Rename / change icon", false);
-		renameButton.setOnAction(e -> editInstance(instance));
-		Button duplicateButton = iconActionButton("duplicate", "Duplicate profile - copies its mods/config into a new one", false);
-		duplicateButton.setOnAction(e -> duplicateInstance(instance));
-		Button exportButton = iconActionButton("export", "Export profile - saves its mods/config as a .zip", false);
-		exportButton.setOnAction(e -> exportInstance(instance));
-		Button ramButton = iconActionButton("ram", "RAM & JVM settings", false);
-		ramButton.setOnAction(e -> InstanceSettingsDialog.show(stage, instance).ifPresent(updated -> {
+		MenuButton more = new MenuButton("⋯");
+		more.getStyleClass().addAll("glass-button", "home-more-button");
+		more.setMinHeight(54);
+		more.setTooltip(new Tooltip("More profile options"));
+		MenuItem edit = new MenuItem("Rename & change icon");
+		edit.setOnAction(e -> editInstance(instance));
+		MenuItem memory = new MenuItem("Memory & Java settings");
+		memory.setOnAction(e -> InstanceSettingsDialog.show(stage, instance).ifPresent(updated -> {
 			InstanceStore.save(updated);
 			showHome();
 		}));
-		Button deleteButton = iconActionButton("delete", "Delete profile", true);
-		deleteButton.setOnAction(e -> confirmDeleteInstance(instance));
-		actions.getChildren().addAll(renameButton, duplicateButton, exportButton, ramButton, deleteButton);
+		MenuItem duplicate = new MenuItem("Duplicate profile");
+		duplicate.setOnAction(e -> duplicateInstance(instance));
+		MenuItem export = new MenuItem("Export as .zip");
+		export.setOnAction(e -> exportInstance(instance));
+		MenuItem delete = new MenuItem("Delete profile");
+		delete.getStyleClass().add("menu-item-danger");
+		delete.setOnAction(e -> confirmDeleteInstance(instance));
+		more.getItems().addAll(edit, memory, new SeparatorMenuItem(), duplicate, export, new SeparatorMenuItem(), delete);
+		HBox actions = new HBox(more);
+		actions.setAlignment(Pos.CENTER);
 		return actions;
 	}
 
@@ -1180,7 +1259,7 @@ public final class LauncherApp extends Application {
 		headHolder.getStyleClass().add("instance-icon-custom");
 		Label placeholder = new Label(account.username().substring(0, 1).toUpperCase());
 		placeholder.setTextFill(Color.WHITE);
-		placeholder.setFont(Font.font("System", FontWeight.BOLD, 10));
+		placeholder.setFont(Font.font("Inter", FontWeight.BOLD, 10));
 		headHolder.getChildren().add(placeholder);
 		CompletableFuture.supplyAsync(() -> SkinFetcher.fetch(account), Executors.newVirtualThreadPerTaskExecutor())
 				.thenAccept(skin -> Platform.runLater(() -> {
@@ -1203,6 +1282,10 @@ public final class LauncherApp extends Application {
 		avatarHolder.setPrefSize(32, 32);
 		avatarHolder.setMinSize(32, 32);
 		avatarHolder.setMaxSize(32, 32);
+		Rectangle avatarClip = new Rectangle(32, 32);
+		avatarClip.setArcWidth(12);
+		avatarClip.setArcHeight(12);
+		avatarHolder.setClip(avatarClip);
 		Label avatarFallback = new Label();
 		avatarFallback.getStyleClass().add("avatar-circle");
 		avatarFallback.setStyle("-fx-background-color: linear-gradient(to bottom right, " + cssColor(theme.accentStart()) + ", " + cssColor(theme.accentEnd()) + ");");
@@ -1341,7 +1424,7 @@ public final class LauncherApp extends Application {
 		serverIconView.setPreserveRatio(true);
 		serverIconHolder.getChildren().add(serverIconView);
 		Label name = new Label(server.name());
-		name.setFont(Font.font("System", FontWeight.BOLD, 15));
+		name.setFont(Font.font("Inter", FontWeight.BOLD, 15));
 		name.setTextFill(accentColor());
 		Label address = new Label(server.address());
 		address.getStyleClass().add("version-tag");
@@ -1519,7 +1602,7 @@ public final class LauncherApp extends Application {
 			text.setFill(Color.rgb((segment.argbColor() >> 16) & 0xFF, (segment.argbColor() >> 8) & 0xFF, segment.argbColor() & 0xFF));
 			javafx.scene.text.FontWeight weight = segment.bold() ? FontWeight.BOLD : FontWeight.NORMAL;
 			javafx.scene.text.FontPosture posture = segment.italic() ? javafx.scene.text.FontPosture.ITALIC : javafx.scene.text.FontPosture.REGULAR;
-			text.setFont(Font.font("System", weight, posture, 13));
+			text.setFont(Font.font("Inter", weight, posture, 13));
 			text.setUnderline(segment.underlined());
 			text.setStrikethrough(segment.strikethrough());
 			texts.add(text);
@@ -1553,6 +1636,7 @@ public final class LauncherApp extends Application {
 					Optional<MinecraftSession> next = AuthSession.remove(deadUuid);
 					if (next.isPresent()) {
 						this.session = next.get();
+						net.veloclient.launcher.social.LauncherSocial.setSession(this.session);
 						if (accountButton != null) {
 							refreshAccountBadge();
 						}
@@ -1571,6 +1655,7 @@ public final class LauncherApp extends Application {
 	private void onSignedIn(MinecraftSession newSession) {
 		this.session = newSession;
 		AuthSession.save(newSession);
+		net.veloclient.launcher.social.LauncherSocial.setSession(newSession);
 		// The sidebar's account badge is built once in buildSidebar() and
 		// never touched by showHome() (which only rebuilds the title-screen
 		// content) - always refreshing it here (not just in the "else"
@@ -1595,6 +1680,7 @@ public final class LauncherApp extends Application {
 		}
 		Optional<MinecraftSession> next = AuthSession.remove(session.uuid());
 		session = next.orElse(null);
+		net.veloclient.launcher.social.LauncherSocial.setSession(session);
 		showHome();
 	}
 
@@ -1602,12 +1688,153 @@ public final class LauncherApp extends Application {
 	private void switchAccount(MinecraftSession target) {
 		AuthSession.switchTo(target.uuid());
 		this.session = target;
+		net.veloclient.launcher.social.LauncherSocial.setSession(target);
 		if (accountButton != null) {
 			refreshAccountBadge();
 		}
 		if (content.getChildren().stream().anyMatch(n -> n.getStyleClass().contains("title-screen"))) {
 			showHome();
 		}
+	}
+
+	// ---- Friends ----
+
+	private void showFriends() {
+		setContent(net.veloclient.launcher.ui.FriendsView.build(new net.veloclient.launcher.ui.FriendsView.Host() {
+			@Override
+			public LauncherTheme theme() {
+				return theme;
+			}
+
+			@Override
+			public MinecraftSession session() {
+				return session;
+			}
+
+			@Override
+			public void signIn() {
+				beginSignIn();
+			}
+
+			@Override
+			public void joinServer(String address, Button trigger, ProgressBar progress, Label status) {
+				joinFriendServer(address, trigger, progress, status);
+			}
+
+			@Override
+			public void badgeChanged() {
+				refreshFriendsBadge();
+			}
+		}));
+		markActiveNav(navFriends);
+	}
+
+	/** Dev-only: fills the Friends tab with sample data, saves a screenshot of the window and quits. */
+	private void runFriendsDemo(java.nio.file.Path output) {
+		var state = new net.veloclient.launcher.social.LauncherSocial.State();
+		state.me = new net.veloclient.launcher.social.LauncherSocial.Me();
+		state.me.uuid = session != null ? session.uuid() : "00000000000000000000000000000000";
+		state.me.username = session != null ? session.username() : "You";
+		String[][] rows = {
+				{"069a79f444e94726a5befca90e38aaf5", "Notch", "server", "play.hypixel.net"},
+				{"853c80ef3c3749fdaa49938b674adae6", "jeb_", "singleplayer", "Survival Island"},
+				{"61699b2ed3274a019f1e0ea8c3f06bc6", "Dinnerbone", "launcher", null},
+				{"e6b5c088068044df9e1b9bf11792291b", "Grumm", null, null}};
+		java.util.List<net.veloclient.launcher.social.LauncherSocial.Friend> friends = new java.util.ArrayList<>();
+		for (String[] row : rows) {
+			var friend = new net.veloclient.launcher.social.LauncherSocial.Friend();
+			friend.uuid = row[0];
+			friend.username = row[1];
+			friend.online = row[2] != null;
+			if (row[2] != null) {
+				friend.activity = new net.veloclient.launcher.social.LauncherSocial.Activity();
+				friend.activity.kind = row[2];
+				friend.activity.detail = row[3];
+			}
+			friend.lastSeen = System.currentTimeMillis() - 3 * 3600_000L;
+			friend.unread = row[1].equals("jeb_") ? 2 : 0;
+			friends.add(friend);
+		}
+		state.friends = friends;
+		var request = new net.veloclient.launcher.social.LauncherSocial.Request();
+		request.uuid = "7125ba8b1c864508b92bb5c042ccfe2b";
+		request.username = "KrisJelbring";
+		request.time = System.currentTimeMillis() - 300_000;
+		state.incoming = java.util.List.of(request);
+		long now = System.currentTimeMillis();
+		java.util.List<net.veloclient.launcher.social.LauncherSocial.Message> chat = new java.util.ArrayList<>();
+		String[][] lines = {{rows[0][0], "yo, you on tonight?"}, {state.me.uuid, "yeah, just finishing my base"},
+				{rows[0][0], "nice - I'm in the bedwars queue on hypixel, join me when you're done"}};
+		for (int i = 0; i < lines.length; i++) {
+			var message = new net.veloclient.launcher.social.LauncherSocial.Message();
+			message.id = i;
+			message.from = lines[i][0];
+			message.to = lines[i][0].equals(state.me.uuid) ? rows[0][0] : state.me.uuid;
+			message.text = lines[i][1];
+			message.time = now - (lines.length - i) * 120_000L;
+			message.kind = "text";
+			chat.add(message);
+		}
+		net.veloclient.launcher.social.LauncherSocial.loadDemo(state, java.util.Map.of(rows[0][0], chat));
+		javafx.animation.PauseTransition open = new javafx.animation.PauseTransition(Duration.seconds(1));
+		open.setOnFinished(e -> {
+			if ("settings".equals(System.getProperty("velo.launcherDemoPage"))) {
+				showSettings();
+				javafx.animation.PauseTransition shoot = new javafx.animation.PauseTransition(Duration.seconds(2));
+				shoot.setOnFinished(ev -> {
+					try {
+						var image = stage.getScene().snapshot(null);
+						javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(image, null), "png", output.toFile());
+					} catch (Exception ex) {
+						LauncherLog.warn("Settings demo screenshot failed", ex);
+					}
+					Platform.exit();
+				});
+				shoot.play();
+				return;
+			}
+			showFriends();
+			// Select the first friend by clicking their row, like a user would.
+			// A ScrollPane's content only joins the scene graph after layout, so look the row up a beat later.
+			javafx.animation.PauseTransition select = new javafx.animation.PauseTransition(Duration.millis(600));
+			select.setOnFinished(ev -> root.lookupAll(".friend-row").stream().findFirst()
+					.filter(row -> row.getOnMouseClicked() != null)
+					.ifPresent(row -> row.getOnMouseClicked().handle(null)));
+			select.play();
+			javafx.animation.PauseTransition shoot = new javafx.animation.PauseTransition(Duration.seconds(4));
+			shoot.setOnFinished(ev -> {
+				try {
+					var image = stage.getScene().snapshot(null);
+					javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(image, null), "png", output.toFile());
+					LauncherLog.info("Friends demo screenshot saved to " + output);
+				} catch (Exception ex) {
+					LauncherLog.warn("Friends demo screenshot failed", ex);
+				}
+				Platform.exit();
+			});
+			shoot.play();
+		});
+		open.play();
+	}
+
+	/** "Join" on a friend: the most recently launched profile (else the newest one), straight into their server. */
+	private void joinFriendServer(String address, Button trigger, ProgressBar progress, Label status) {
+		List<HomeLaunchTarget> targets = orderedLaunchTargetsForHome();
+		if (targets.isEmpty()) {
+			showPlaceholderAlert("No profile yet", "Create a profile on the Home screen first - Join launches it straight into your friend's server.");
+			return;
+		}
+		launchWithProgress(targets.get(0).instance(), address, trigger, progress, status);
+	}
+
+	/** Unread messages + pending requests, shown on the sidebar's Friends entry. */
+	private void refreshFriendsBadge() {
+		if (navFriends == null || !(navFriends.getGraphic() instanceof HBox graphic) || graphic.getChildren().size() < 2
+				|| !(graphic.getChildren().get(1) instanceof Label label)) {
+			return;
+		}
+		int badge = net.veloclient.launcher.social.LauncherSocial.badgeCount();
+		label.setText(badge > 0 ? "Friends (" + badge + ")" : "Friends");
 	}
 
 	private void showPlaceholderAlert(String title, String message) {
@@ -1632,6 +1859,11 @@ public final class LauncherApp extends Application {
 			@Override
 			public void rebuild() {
 				showCosmetics();
+			}
+
+			@Override
+			public MinecraftSession session() {
+				return session;
 			}
 		}));
 	}
@@ -2080,6 +2312,7 @@ public final class LauncherApp extends Application {
 					Platform.runLater(() -> {
 						Optional<MinecraftSession> next = AuthSession.remove(session.uuid());
 						session = next.orElse(null);
+						net.veloclient.launcher.social.LauncherSocial.setSession(session);
 						if (session != null) {
 							// Re-enter rather than using it directly - the
 							// fallback account's own cached token may also
@@ -2102,65 +2335,67 @@ public final class LauncherApp extends Application {
 	// ---- Settings ----
 
 	private void showSettings() {
-		VBox box = sectionBox("Settings");
+		Label heading = new Label("Settings");
+		heading.getStyleClass().add("page-title");
 
 		VBox content = new VBox(16);
+		content.getChildren().addAll(net.veloclient.launcher.ui.PerformanceSettingsView.build(theme));
 
-		VBox appearanceCard = settingsCard("Appearance",
-				"Colors, gradients, and presets for the whole launcher.");
-		Button themeButton = new Button("Open Theme Editor");
-		themeButton.getStyleClass().addAll("title-menu-button", "button-compact");
+		VBox appearance = net.veloclient.launcher.ui.SettingsUi.card("Appearance");
+		Button themeButton = new Button("Customize");
 		themeButton.setOnAction(e -> showThemeEditor());
-		appearanceCard.getChildren().add(themeButton);
-		content.getChildren().add(appearanceCard);
+		net.veloclient.launcher.ui.SettingsUi.row(appearance, "Theme", theme.name(), "Colors and presets for the whole launcher.", themeButton);
+		content.getChildren().add(appearance);
 
-		VBox logsCard = settingsCard("Logs",
-				"The launcher's own log (not the game's) - useful when reporting a launcher bug.");
-		Button openLogsButton = new Button("Open Logs Folder");
-		openLogsButton.getStyleClass().addAll("title-menu-button", "button-compact");
-		openLogsButton.setOnAction(e -> {
-			try {
-				InstanceDetailView.openInFileManager(VeloPaths.logs());
-			} catch (Exception ex) {
-				showPlaceholderAlert("Couldn't open logs folder", ex.getMessage());
-			}
-		});
-		logsCard.getChildren().add(openLogsButton);
-		content.getChildren().add(logsCard);
-
-		VBox dataCard = settingsCard("Data locations", null);
-		dataCard.getChildren().addAll(
-				sectionSubtitle("Config root: " + VeloPaths.root()),
-				sectionSubtitle("Manifest: " + VeloPaths.manifestFile()),
-				sectionSubtitle("Profiles: " + VeloPaths.profiles()),
-				sectionSubtitle("Capes: " + VeloPaths.capes()));
-		content.getChildren().add(dataCard);
-
-		VBox accountCard = settingsCard("Account", null);
+		VBox account = net.veloclient.launcher.ui.SettingsUi.card("Account");
 		if (session != null) {
-			accountCard.getChildren().add(sectionSubtitle("Signed in as: " + session.username() + " (" + session.uuid() + ")"));
 			Button signOutButton = new Button("Sign out");
-			signOutButton.getStyleClass().add("button-compact");
+			signOutButton.getStyleClass().add("danger-ghost-button");
 			signOutButton.setOnAction(e -> signOut());
-			accountCard.getChildren().add(signOutButton);
+			net.veloclient.launcher.ui.SettingsUi.row(account, session.username(), "Microsoft account", "UUID " + session.uuid(), signOutButton);
 		} else {
-			accountCard.getChildren().add(sectionSubtitle("Not signed in."));
+			Button signInButton = new Button("Sign in");
+			signInButton.getStyleClass().add("primary-button");
+			signInButton.setOnAction(e -> beginSignIn());
+			net.veloclient.launcher.ui.SettingsUi.row(account, "Not signed in", "Sign in to play online", null, signInButton);
 		}
-		content.getChildren().add(accountCard);
+		content.getChildren().add(account);
+
+		VBox files = net.veloclient.launcher.ui.SettingsUi.card("Files");
+		net.veloclient.launcher.ui.SettingsUi.row(files, "Launcher data", "Profiles, capes and settings",
+				"Profiles: " + VeloPaths.profiles() + "\nCapes: " + VeloPaths.capes() + "\nManifest: " + VeloPaths.manifestFile(),
+				openFolderButton(VeloPaths.root()));
+		net.veloclient.launcher.ui.SettingsUi.row(files, "Launcher logs", "Attach these when reporting a launcher bug", null,
+				openFolderButton(VeloPaths.logs()));
+		content.getChildren().add(files);
 
 		ScrollPane scroll = new ScrollPane(content);
 		scroll.setFitToWidth(true);
 		scroll.getStyleClass().add("scroll-pane");
 		VBox.setVgrow(scroll, Priority.ALWAYS);
-		box.getChildren().add(scroll);
+		VBox box = new VBox(16, heading, scroll);
 		setContent(box);
+	}
+
+	private Button openFolderButton(java.nio.file.Path folder) {
+		Button open = new Button("Open");
+		open.setTooltip(new Tooltip(folder.toString()));
+		open.setOnAction(e -> {
+			try {
+				java.nio.file.Files.createDirectories(folder);
+				InstanceDetailView.openInFileManager(folder);
+			} catch (Exception ex) {
+				showPlaceholderAlert("Couldn't open folder", ex.getMessage());
+			}
+		});
+		return open;
 	}
 
 	private VBox settingsCard(String heading, String subtitle) {
 		VBox card = new VBox(8);
 		card.getStyleClass().add("glass-panel");
 		Label headingLabel = new Label(heading);
-		headingLabel.setFont(Font.font("System", FontWeight.BOLD, 15));
+		headingLabel.setFont(Font.font("Inter", FontWeight.BOLD, 15));
 		headingLabel.setTextFill(accentColor());
 		card.getChildren().add(headingLabel);
 		if (subtitle != null) {

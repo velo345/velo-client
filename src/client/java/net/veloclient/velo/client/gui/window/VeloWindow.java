@@ -7,6 +7,8 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.veloclient.velo.client.gui.widget.VeloAnim;
 import net.veloclient.velo.client.gui.widget.VeloDraw;
+import net.veloclient.velo.client.gui.widget.VeloStyle;
+import net.veloclient.velo.client.gui.widget.VeloUi;
 import net.veloclient.velo.client.theme.Theme;
 import net.veloclient.velo.client.theme.ThemeManager;
 
@@ -114,55 +116,95 @@ public abstract class VeloWindow extends Screen {
 			return;
 		}
 
-		context.fill(0, 0, this.width, this.height, (int) (0x55 * openProgress) << 24);
+		context.fill(0, 0, this.width, this.height, (int) (0x70 * openProgress) << 24);
 
-		float scale = 0.94f + 0.06f * openProgress;
+		// Opens with a gentle scale-up + rise, closes with the reverse.
+		float scale = 0.955f + 0.045f * openProgress;
+		float rise = (1f - openProgress) * 10f;
 		context.getMatrices().pushMatrix();
 		float centerX = windowX + windowWidth / 2f;
 		float centerY = windowY + windowHeight / 2f;
-		context.getMatrices().translate(centerX, centerY);
+		context.getMatrices().translate(centerX, centerY + rise);
 		context.getMatrices().scale(scale, scale);
 		context.getMatrices().translate(-centerX, -centerY);
 
 		Theme theme = ThemeManager.active();
 		int alpha = (int) (255 * openProgress);
-		int shadowAlpha = Math.min(90, alpha);
-		context.fill(windowX + 4, windowY + 6, windowX + windowWidth + 4, windowY + windowHeight + 6, shadowAlpha << 24);
+		int radius = VeloStyle.RADIUS_WINDOW;
+		VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 18, 6,
+				VeloUi.withAlpha(0xFF000000, Math.round(0x8C * openProgress)));
 
 		int surface = (theme.surfaceWithOpacity() & 0x00FFFFFF) | (Math.min(alpha, (theme.surfaceWithOpacity() >>> 24)) << 24);
-		VeloDraw.fillRounded(context, windowX, windowY, windowWidth, windowHeight, 6, surface);
+		VeloDraw.fillRounded(context, windowX, windowY, windowWidth, windowHeight, radius, surface);
+		// A faint accent wash at the very top gives the header depth without a hard colored band.
+		VeloDraw.fillRoundedTop(context, windowX, windowY, windowWidth, HEADER_HEIGHT, radius,
+				VeloUi.withAlpha(theme.accentStart(), Math.round(0x16 * openProgress)));
+		context.fill(windowX + 1, windowY + HEADER_HEIGHT, windowX + windowWidth - 1, windowY + HEADER_HEIGHT + 1,
+				VeloUi.withAlpha(theme.text(), Math.round(0x1A * openProgress)));
+		VeloDraw.strokeRounded(context, windowX, windowY, windowWidth, windowHeight, radius,
+				VeloUi.withAlpha(theme.text(), Math.round(0x26 * openProgress)));
 
-		int headerColor = (theme.accentStart() & 0x00FFFFFF) | (Math.min(alpha, 40) << 24);
-		VeloDraw.fillRoundedTop(context, windowX, windowY, windowWidth, HEADER_HEIGHT, 6, headerColor);
-		context.fill(windowX, windowY + HEADER_HEIGHT, windowX + windowWidth, windowY + HEADER_HEIGHT + 1,
-				(theme.accentStart() & 0x00FFFFFF) | (Math.min(alpha, 180) << 24));
-		VeloDraw.strokeRounded(context, windowX, windowY, windowWidth, windowHeight, 6,
-				0xFFFFFF | (Math.min(alpha, 0x33) << 24));
+		// Title: a small accent pill + the window name in the bold UI font.
+		int titleY = windowY + (HEADER_HEIGHT - 8) / 2;
+		VeloDraw.fillRoundedGradient(context, windowX + PADDING, titleY - 1, 3, 10, 1,
+				VeloUi.withAlpha(theme.accentStart(), alpha), VeloUi.withAlpha(theme.accentEnd(), alpha));
+		context.drawTextWithShadow(this.textRenderer,
+				VeloUi.trimStyled(this.title, windowWidth - PADDING * 2 - 40, t -> net.veloclient.velo.client.gui.title.TitleScreenTheme.tileFont(t.getString())),
+				windowX + PADDING + 9, titleY, VeloUi.withAlpha(theme.text(), alpha));
 
-		context.drawTextWithShadow(this.textRenderer, this.title, windowX + PADDING, windowY + (HEADER_HEIGHT - 8) / 2,
-				(theme.text() & 0x00FFFFFF) | (alpha << 24));
-
-		String closeLabel = "✕";
-		int closeX = windowX + windowWidth - 22;
-		int closeY = windowY + (HEADER_HEIGHT - 8) / 2;
-		boolean closeHovered = mouseX >= closeX - 4 && mouseX <= closeX + 12 && mouseY >= windowY && mouseY <= windowY + HEADER_HEIGHT;
-		context.drawTextWithShadow(this.textRenderer, closeLabel, closeX, closeY,
-				closeHovered ? theme.accentStart() : ((theme.text() & 0x00FFFFFF) | (alpha << 24)));
+		long now = System.nanoTime();
+		float dt = VeloStyle.frameDelta(lastFrameNanos, now);
+		lastFrameNanos = now;
+		boolean closeHovered = isOverClose(mouseX, mouseY);
+		closeHover = VeloAnim.step(closeHover, closeHovered ? 1f : 0f, dt);
+		int closeX = closeButtonX();
+		int closeY = closeButtonY();
+		if (closeHover > 0.01f) {
+			VeloDraw.fillRounded(context, closeX, closeY, CLOSE_SIZE, CLOSE_SIZE, 6,
+					VeloUi.withAlpha(0xFFE5484D, Math.round(0xD0 * closeHover * openProgress)));
+		}
+		int glyph = VeloAnim.lerpArgb(VeloUi.withAlpha(theme.text(), Math.round(0xB0 * openProgress)),
+				VeloUi.withAlpha(0xFFFFFFFF, alpha), closeHover);
+		VeloDraw.cross(context, closeX + CLOSE_SIZE / 2f, closeY + CLOSE_SIZE / 2f, 6.5f, 1.3f, glyph);
 
 		if (openProgress > 0.4f) {
+			renderContentLayer(context, mouseX, mouseY, delta);
 			super.render(context, mouseX, mouseY, delta);
 		}
 
 		context.getMatrices().popMatrix();
 	}
 
+	private static final int CLOSE_SIZE = 18;
+	private float closeHover;
+	private long lastFrameNanos;
+
+	private int closeButtonX() {
+		return windowX + windowWidth - 7 - CLOSE_SIZE;
+	}
+
+	private int closeButtonY() {
+		return windowY + (HEADER_HEIGHT - CLOSE_SIZE) / 2;
+	}
+
+	private boolean isOverClose(double mouseX, double mouseY) {
+		return mouseX >= closeButtonX() - 2 && mouseX <= closeButtonX() + CLOSE_SIZE + 2
+				&& mouseY >= closeButtonY() - 2 && mouseY <= closeButtonY() + CLOSE_SIZE + 2;
+	}
+
+	/**
+	 * Hook for windows that draw their own panels: runs inside the window's open/scale transform,
+	 * after the frame and before child widgets, so widgets (text fields...) end up on top of it.
+	 */
+	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
+	}
+
 	@Override
 	public boolean mouseClicked(Click click, boolean doubled) {
 		int mouseX = (int) click.x();
 		int mouseY = (int) click.y();
-		int closeX = windowX + windowWidth - 22;
 		if (mouseY >= windowY && mouseY <= windowY + HEADER_HEIGHT) {
-			if (mouseX >= closeX - 4 && mouseX <= closeX + 12) {
+			if (isOverClose(mouseX, mouseY)) {
 				requestClose();
 				return true;
 			}
@@ -172,6 +214,28 @@ public abstract class VeloWindow extends Screen {
 				dragOffsetY = mouseY - windowY;
 				return true;
 			}
+		}
+		// Rows of a scroll list may stick out past its visible area (partly scrolled-in tiles);
+		// those hidden parts must not swallow clicks meant for buttons drawn over them.
+		boolean anyClipped = false;
+		for (var child : this.children()) {
+			if (net.veloclient.velo.client.gui.widget.VeloScrollRegion.clipsClick(child, click.x(), click.y())) {
+				anyClipped = true;
+				break;
+			}
+		}
+		if (anyClipped) {
+			for (var child : this.children()) {
+				if (net.veloclient.velo.client.gui.widget.VeloScrollRegion.clipsClick(child, click.x(), click.y())) {
+					continue;
+				}
+				if (child.mouseClicked(click, doubled)) {
+					this.setFocused(child);
+					this.setDragging(true);
+					return true;
+				}
+			}
+			return false;
 		}
 		return super.mouseClicked(click, doubled);
 	}

@@ -67,6 +67,9 @@ tasks.named<JavaExec>("runClient") {
 	// only runs once and can't be un-cached later, so it has to be forced
 	// off up front instead.
 	jvmArgs("-Djava.awt.headless=false")
+	// Dev hook: extra JVM flags for the game process only (e.g. a Flight Recorder profile),
+	// without JAVA_TOOL_OPTIONS also hitting the Gradle JVMs.
+	System.getenv("VELO_RUN_JVM_ARGS")?.trim()?.takeIf { it.isNotEmpty() }?.let { jvmArgs(it.split(" ")) }
 }
 
 dependencies {

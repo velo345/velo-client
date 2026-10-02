@@ -6,11 +6,23 @@
 screen wordmark) is the [Audiowide](https://fonts.google.com/specimen/Audiowide) typeface by
 Astigmatic, licensed under the [SIL Open Font License 1.1](https://openfontlicense.org/).
 
+## Inter font
+
+`src/client/resources/assets/velo-client/font/inter_*.ttf` and
+`launcher/src/main/resources/net/veloclient/launcher/fonts/Inter-*.ttf` (the UI font of the in-game
+menus and the launcher) are [Inter](https://rsms.me/inter/) by Rasmus Andersson, licensed under the
+[SIL Open Font License 1.1](https://openfontlicense.org/).
+
+## Phosphor icons
+
+Module icons under `src/client/resources/assets/velo-client/textures/icon/module/` and sidebar
+navigation icons under `src/client/resources/assets/velo-client/textures/icon/nav/` are rasterized
+from [Phosphor Icons](https://phosphoricons.com) (https://github.com/phosphor-icons/core),
+Copyright (c) 2023 Phosphor Icons, used under the MIT License.
+
 ## Lucide icons
 
-Module and mod-profile icons under `src/client/resources/assets/velo-client/textures/icon/module/`,
-sidebar navigation icons under `src/client/resources/assets/velo-client/textures/icon/nav/`,
-and `launcher/src/main/resources/net/veloclient/launcher/images/icons/` are rasterized from
+Icons under `launcher/src/main/resources/net/veloclient/launcher/images/icons/` are rasterized from
 [Lucide](https://lucide.dev) (https://github.com/lucide-icons/lucide), used under the ISC license:
 
 ```

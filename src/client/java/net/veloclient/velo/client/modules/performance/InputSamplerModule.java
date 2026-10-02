@@ -52,7 +52,7 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 
 	private int sampleHz = 1000;
 	private boolean earlyDispatch = false;
-	private boolean showHud = true;
+	private boolean showHud = false;
 	private boolean trackGhostHits = true;
 	private int hudColor = 0xFF55FFAA;
 

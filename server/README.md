@@ -27,8 +27,23 @@ pointed at the same server.
   the data directory, so they survive restarts. Limits: PNG up to 2048x1024
   (2:1 cape, or 1:1 cape+elytra, width a multiple of 64); animated GIF up to
   512 wide and 128 frames; 6 MB per upload; one custom cape per account.
-- That's it for now - no chat, no friends list, no moderation tooling. More
-  can be layered on top of the same `/v1/online` shape later.
+- **Friends & messaging** (`/v1/social/*`, see `SocialService.java`): friend
+  requests by username or UUID, accept/deny, unfriend, block (blocked players
+  can't message you or send requests, and are never told), direct messages
+  (last 300 per conversation kept so offline friends still get them), shared
+  waypoints, and live presence - whether a friend is online and on which
+  server / singleplayer world / Realm, unless they chose "appear offline"
+  (stored server-side, so it survives launcher and server restarts).
+  Clients long-poll `/v1/social/poll` for events. Persisted to
+  `social.json` in the data directory.
+- **Rate limits** (`RateLimiter.java`): per player - friend requests 5/min and
+  30/hour, a 30-minute cooldown before re-requesting someone who declined,
+  messages 8 per 5 s / 60 per minute / 600 per hour, waypoint shares
+  10/min, and smaller caps on block/unblock/status/presence. Over the limit
+  answers HTTP 429 with a "try again in ..." message the UI shows as-is.
+- The game and the launcher each hold their own session (`kind` = `game` /
+  `launcher`) for the same account; only game sessions count for badges and
+  capes.
 
 ## Running it
 
@@ -53,11 +68,23 @@ file to create:
 | Variable | Default | What it does |
 |---|---|---|
 | `VELO_SERVER_PORT` | `8787` | Port to listen on |
-| `VELO_DATA_DIR` | `./data` (relative to the working directory) | Where uploaded custom capes are stored (`capes/`, `capes.json`, `banned-capes.json`) |
+| `VELO_DATA_DIR` | `./data` (relative to the working directory) | Where uploaded custom capes (`capes/`, `capes.json`, `banned-capes.json`) and friends/messages (`social.json`) are stored |
 | `VELO_ADMIN_TOKEN` | unset (admin endpoint disabled) | Secret for removing a player's custom cape (see "Moderation") |
 
-Online sessions still live only in memory; only custom capes are written to
-the data directory. (A reverse
+Online sessions still live only in memory; custom capes and friends/messages
+are written to the data directory (back it up).
+
+### Updating a running server
+
+```bash
+./gradlew :server:shadowJar          # on your dev machine
+# copy server/build/libs/velo-server.jar to /opt/velo-server/ (e.g. Termius SFTP), then:
+sudo systemctl restart velo-server
+curl https://your.domain/v1/health   # {"status":"ok",...}
+```
+
+A `502 Bad Gateway` from the reverse proxy means this process isn't running
+or isn't on the port the proxy forwards to - see `journalctl -u velo-server`. (A reverse
 proxy like Caddy, below, keeps its own config, but that's a separate process
 running next to this one, not something this jar reads.)
 

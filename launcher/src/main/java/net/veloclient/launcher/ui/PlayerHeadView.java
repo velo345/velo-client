@@ -41,7 +41,10 @@ public final class PlayerHeadView {
 			WritableImage composed = new WritableImage(pixels, pixels);
 			PixelReader reader = skin.getPixelReader();
 			blitLayer(reader, composed, 8, 8, pixels, false);
-			blitLayer(reader, composed, 40, 8, pixels, true);
+			// Legacy 64x32 skins' hat layer has no real alpha; vanilla ignores it when fully opaque.
+			if (skin.getHeight() > 32 || hasTransparency(reader, 40, 8)) {
+				blitLayer(reader, composed, 40, 8, pixels, true);
+			}
 
 			ImageView view = new ImageView(composed);
 			view.setSmooth(false);
@@ -53,6 +56,17 @@ public final class PlayerHeadView {
 		} catch (Exception e) {
 			return null;
 		}
+	}
+
+	private static boolean hasTransparency(PixelReader reader, int u, int v) {
+		for (int y = 0; y < 8; y++) {
+			for (int x = 0; x < 8; x++) {
+				if (reader.getColor(u + x, v + y).getOpacity() < 0.5) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/** Nearest-neighbor upscales the skin's 8x8 region at ({@code u},{@code v}) into {@code dest}, skipping fully-transparent source pixels when {@code skipTransparent} (so the hat layer doesn't paint over the base layer with blank pixels where a skin has no overlay art). */

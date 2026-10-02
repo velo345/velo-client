@@ -3,6 +3,7 @@ package net.veloclient.launcher.ui;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
@@ -10,6 +11,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -44,29 +46,35 @@ public final class StoreView {
 	}
 
 	public static Node build(Host host) {
-		VBox root = new VBox(20);
-
-		HBox headerRow = new HBox(10);
-		headerRow.setAlignment(Pos.CENTER_LEFT);
 		Label heading = new Label("Store");
-		heading.getStyleClass().add("section-heading");
-		heading.setTextFill(accent(host.theme()));
-		HBox spacer = new HBox();
+		heading.getStyleClass().add("page-title");
+		Label sub = new Label("Capes for your Velo profile - preview them on your own skin before buying.");
+		sub.getStyleClass().add("page-subtitle");
+		VBox titles = new VBox(2, heading, sub);
+		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		Node balancePill = buildBalancePill(host);
-		headerRow.getChildren().addAll(heading, spacer, balancePill);
-		root.getChildren().add(headerRow);
+		HBox headerRow = new HBox(10, titles, spacer, buildBalancePill(host));
+		headerRow.setAlignment(Pos.CENTER_LEFT);
 
-		Label sectionTitle = new Label("Capes");
-		sectionTitle.setFont(Font.font("System", FontWeight.BOLD, 16));
-		sectionTitle.setTextFill(text(host.theme()));
-		root.getChildren().add(sectionTitle);
-
-		FlowPane grid = new FlowPane(14, 14);
-		for (StoreItem item : StoreCatalog.all()) {
-			grid.getChildren().add(buildItemCard(host, item));
+		VBox root = new VBox(22, headerRow);
+		var items = StoreCatalog.all();
+		StoreItem featured = items.stream().filter(i -> !StoreOwnership.owns(i.id())).findFirst()
+				.orElse(items.isEmpty() ? null : items.get(0));
+		if (featured != null) {
+			root.getChildren().add(buildFeatured(host, featured));
 		}
-		root.getChildren().add(grid);
+
+		Label sectionTitle = new Label("Capes  ·  " + items.size());
+		sectionTitle.getStyleClass().add("section-label");
+		FlowPane grid = new FlowPane(14, 14);
+		for (StoreItem item : items) {
+			boolean owned = StoreOwnership.owns(item.id());
+			grid.getChildren().add(CosmeticUi.capeCard(
+					CosmeticUi.thumbnail("store:" + item.id(), CosmeticUi.frames(item), 150, 150),
+					item.name(), CosmeticUi.priceChip(item.priceCoins(), owned), false, () -> host.openItem(item)));
+		}
+		UiMotion.stagger(grid, 24);
+		root.getChildren().addAll(sectionTitle, grid);
 
 		ScrollPane scroll = new ScrollPane(root);
 		scroll.setFitToWidth(true);
@@ -77,62 +85,50 @@ public final class StoreView {
 		return wrapper;
 	}
 
+	/** The wide banner on top: one cape you don't own yet, big, with a direct "View" action. */
+	private static Node buildFeatured(Host host, StoreItem item) {
+		boolean owned = StoreOwnership.owns(item.id());
+		Label tag = new Label("FEATURED");
+		tag.getStyleClass().add("featured-tag");
+		Label name = new Label(item.name());
+		name.getStyleClass().add("featured-title");
+		Label description = new Label(item.description());
+		description.getStyleClass().add("page-subtitle");
+		description.setWrapText(true);
+		description.setMaxWidth(380);
+		Button view = new Button(owned ? "View" : "Preview & buy");
+		view.getStyleClass().add("primary-button");
+		view.setOnAction(e -> host.openItem(item));
+		HBox priceRow = new HBox(12, CosmeticUi.priceChip(item.priceCoins(), owned), view);
+		priceRow.setAlignment(Pos.CENTER_LEFT);
+		VBox text = new VBox(10, tag, name, description, priceRow);
+		text.setAlignment(Pos.CENTER_LEFT);
+		HBox.setHgrow(text, Priority.ALWAYS);
+
+		ImageView cape = new ImageView(CosmeticUi.thumbnail("store:" + item.id(), CosmeticUi.frames(item), 200, 200));
+		StackPane art = new StackPane(cape);
+		art.setMinWidth(220);
+
+		HBox banner = new HBox(20, text, art);
+		banner.setAlignment(Pos.CENTER_LEFT);
+		banner.getStyleClass().addAll("featured-banner", "motion-card");
+		banner.setOnMouseClicked(e -> host.openItem(item));
+		return banner;
+	}
+
 	private static Node buildBalancePill(Host host) {
-		HBox pill = new HBox(8);
-		pill.getStyleClass().add("glass-panel");
-		pill.setAlignment(Pos.CENTER_LEFT);
-		pill.setPadding(new Insets(6, 12, 6, 10));
-		ImageView logo = new ImageView(new Image(StoreView.class.getResourceAsStream("/net/veloclient/launcher/images/logo.png"), 20, 20, true, true));
-		Label balance = new Label(CurrencyStore.balance() + " Velo Coins");
-		balance.setTextFill(text(host.theme()));
-		balance.setFont(Font.font("System", FontWeight.BOLD, 13));
-		pill.getChildren().addAll(logo, balance);
-		pill.setOnMouseClicked(e -> {
+		Label balance = new Label(String.valueOf(CurrencyStore.balance()));
+		balance.getStyleClass().add("balance-amount");
+		Button getCoins = new Button("Get coins");
+		getCoins.getStyleClass().add("ghost-button");
+		getCoins.setOnAction(e -> {
 			BuyCoinsDialog.show(host.owner());
 			host.rebuild();
 		});
+		HBox pill = new HBox(8, CosmeticUi.coin(20), balance, getCoins);
+		pill.setAlignment(Pos.CENTER_LEFT);
+		pill.getStyleClass().add("balance-pill");
 		return pill;
-	}
-
-	private static Node buildItemCard(Host host, StoreItem item) {
-		VBox card = new VBox(8);
-		card.getStyleClass().add("instance-card");
-		card.setPrefWidth(150);
-		card.setAlignment(Pos.TOP_CENTER);
-
-		StackPane preview = new StackPane();
-		preview.setPrefSize(80, 110);
-		preview.getStyleClass().add("instance-icon-custom");
-		try {
-			byte[] gifBytes = StoreCatalog.openGif(item).readAllBytes();
-			Image gif = new Image(new ByteArrayInputStream(gifBytes));
-			double scale = gif.getWidth() / 64.0;
-			ImageView view = new ImageView(gif);
-			view.setViewport(new javafx.geometry.Rectangle2D(scale, scale, 10 * scale, 16 * scale));
-			view.setFitWidth(70);
-			view.setFitHeight(110);
-			view.setSmooth(false);
-			view.setPreserveRatio(true);
-			preview.getChildren().add(view);
-		} catch (Exception e) {
-			Label fallback = new Label("?");
-			fallback.setTextFill(Color.WHITE);
-			preview.getChildren().add(fallback);
-		}
-
-		boolean owned = StoreOwnership.owns(item.id());
-		Label name = new Label(item.name() + (owned ? "  ✓" : ""));
-		name.setTextFill(owned ? accent(host.theme()) : text(host.theme()));
-		name.setFont(Font.font("System", FontWeight.BOLD, 13));
-		name.setWrapText(true);
-
-		Label price = new Label(owned ? "Owned" : item.priceCoins() + " Velo Coins");
-		price.getStyleClass().add("version-tag");
-		price.setTextFill(text(host.theme()));
-
-		card.getChildren().addAll(preview, name, price);
-		card.setOnMouseClicked(e -> host.openItem(item));
-		return card;
 	}
 
 	private static Color accent(LauncherTheme t) {

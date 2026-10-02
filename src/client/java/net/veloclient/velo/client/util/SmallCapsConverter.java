@@ -63,6 +63,15 @@ public final class SmallCapsConverter {
 			"ʀ", "ꜱ", "ᴛ", "ᴜ", "ᴠ", "ᴡ", "ʏ", "ᴢ"
 	};
 
+	// HUD labels are mostly the same strings every frame, and this runs for every HUD text draw -
+	// a direct-mapped cache of recent conversions skips redoing them. Entries are immutable pairs,
+	// so a racing reader on another thread only ever sees a whole entry or none.
+	private record Converted(String input, String output) {
+	}
+
+	private static final int CACHE_SIZE = 512;
+	private static final Converted[] CACHE = new Converted[CACHE_SIZE];
+
 	private SmallCapsConverter() {
 	}
 
@@ -70,6 +79,17 @@ public final class SmallCapsConverter {
 		if (input == null || input.isEmpty()) {
 			return input;
 		}
+		int slot = (input.hashCode() ^ (input.hashCode() >>> 16)) & (CACHE_SIZE - 1);
+		Converted cached = CACHE[slot];
+		if (cached != null && cached.input().equals(input)) {
+			return cached.output();
+		}
+		String output = convert(input);
+		CACHE[slot] = new Converted(input, output);
+		return output;
+	}
+
+	private static String convert(String input) {
 		StringBuilder result = new StringBuilder(input.length());
 		for (int i = 0; i < input.length(); i++) {
 			char c = input.charAt(i);

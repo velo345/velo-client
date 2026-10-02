@@ -70,6 +70,9 @@ public final class Downloader {
 						throw new IOException("Checksum mismatch downloading " + url + " (expected " + expectedSha1 + ")");
 					}
 					Files.move(temp, dest, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+					if (expectedSha1 != null) {
+						VerifiedFileIndex.markVerified(dest, expectedSha1);
+					}
 					return;
 				} catch (IOException e) {
 					lastError = e;
@@ -104,10 +107,27 @@ public final class Downloader {
 	}
 
 	private static boolean matches(Path file, String expectedSha1, long expectedSize) throws IOException {
-		if (expectedSize >= 0 && Files.size(file) != expectedSize) {
+		long size = Files.size(file);
+		if (expectedSize >= 0 && size != expectedSize) {
 			return false;
 		}
-		return expectedSha1 == null || sha1Of(file).equalsIgnoreCase(expectedSha1);
+		if (expectedSha1 == null) {
+			return true;
+		}
+		// Unchanged since it was last verified (same size and mtime) - skip re-reading the file.
+		if (VerifiedFileIndex.isVerified(file, size, Files.getLastModifiedTime(file).toMillis(), expectedSha1)) {
+			return true;
+		}
+		boolean ok = sha1Of(file).equalsIgnoreCase(expectedSha1);
+		if (ok) {
+			VerifiedFileIndex.markVerified(file, expectedSha1);
+		}
+		return ok;
+	}
+
+	/** Persists what was verified this launch, so the next one can skip it. */
+	public static void saveVerifiedIndex() {
+		VerifiedFileIndex.save();
 	}
 
 	public static String sha1Of(Path file) throws IOException {

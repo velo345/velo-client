@@ -30,6 +30,11 @@ import java.util.function.Consumer;
  */
 public final class VeloCapeTile extends ClickableWidget {
 
+	private float hover;
+	private boolean selected;
+	private float phase = (float) (Math.random() * Math.PI * 2);
+	private long lastNanos;
+
 	private static final int BOTTOM_STRIP_HEIGHT = 20;
 	// Standard vanilla cape texture template is 64x32; the back panel (what
 	// actually shows when the cape is worn) is the 10x16 region starting one
@@ -57,6 +62,12 @@ public final class VeloCapeTile extends ClickableWidget {
 		this.onDelete = onDelete;
 	}
 
+	/** Outlines the tile as the one currently shown in the preview. */
+	public VeloCapeTile selected(boolean selected) {
+		this.selected = selected;
+		return this;
+	}
+
 	private int iconAreaHeight() {
 		return getHeight() - BOTTOM_STRIP_HEIGHT;
 	}
@@ -79,49 +90,49 @@ public final class VeloCapeTile extends ClickableWidget {
 	@Override
 	protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
 		Theme theme = ThemeManager.active();
+		long now = System.nanoTime();
+		float dt = VeloStyle.frameDelta(lastNanos, now);
+		hover = VeloAnim.step(hover, isHovered() ? 1f : 0f, dt);
+		phase = VeloCapeRender.advancePhase(phase, hover, dt);
+		lastNanos = now;
 		int iconHeight = iconAreaHeight();
+		int x = getX();
+		int y = getY();
+		int w = getWidth();
 
-		VeloDraw.fillRounded(context, getX(), getY(), getWidth(), iconHeight, 5, theme.surfaceWithOpacity());
-		VeloDraw.strokeRounded(context, getX(), getY(), getWidth(), iconHeight, 5, equipped ? theme.accentStart() : 0x33FFFFFF);
-
+		drawStage(context, x, y, w, iconHeight, hover, selected);
 		Identifier texture = CapeManager.textureIdentifier(definition);
-		// Preserve the panel's real aspect ratio inside the icon box instead
-		// of stretching it to fill a differently-shaped rectangle, which
-		// would visibly distort the cape.
-		int maxPreviewWidth = getWidth() - 12;
-		int maxPreviewHeight = iconHeight - 8;
-		int previewHeight = maxPreviewHeight;
-		int previewWidth = Math.round(previewHeight * (PANEL_WIDTH / (float) PANEL_HEIGHT));
-		if (previewWidth > maxPreviewWidth) {
-			previewWidth = maxPreviewWidth;
-			previewHeight = Math.round(previewWidth * (PANEL_HEIGHT / (float) PANEL_WIDTH));
+		VeloCapeRender.draw(context, texture, TEMPLATE_WIDTH, TEMPLATE_HEIGHT, x + w / 2f, y + iconHeight - 20,
+				iconHeight - 34, VeloCapeRender.idleYaw(phase, hover));
+		if (equipped) {
+			VeloUi.pill(context, x + 6, y + 6, 54, 13, "Equipped", 2, -1, -1, () -> { });
 		}
-		int previewX = getX() + (getWidth() - previewWidth) / 2;
-		int previewY = getY() + 4;
-		context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, previewX, previewY, PANEL_U, PANEL_V,
-				previewWidth, previewHeight, PANEL_WIDTH, PANEL_HEIGHT, TEMPLATE_WIDTH, TEMPLATE_HEIGHT);
 
 		TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-		String name = trimToWidth(definition.name(), getWidth() - 6);
+		String name = trimToWidth(definition.name(), w - 10);
 		int nameWidth = textRenderer.getWidth(name);
-		context.drawTextWithShadow(textRenderer, name,
-				getX() + (getWidth() - nameWidth) / 2, getY() + iconHeight - 12, theme.text());
+		context.drawTextWithShadow(textRenderer, name, x + (w - nameWidth) / 2, y + iconHeight - 13, VeloStyle.text());
 
-		int stripY = getY() + iconHeight;
-		int halfW = getWidth() / 2;
-		boolean editHovered = isHovered() && mouseY >= stripY && mouseX < getX() + halfW;
-		boolean deleteHovered = isHovered() && mouseY >= stripY && mouseX >= getX() + halfW;
-		int editColor = editHovered ? 0x66FFFFFF : 0x33FFFFFF;
-		int deleteColor = deleteHovered ? 0xAAFF5555 : 0x33FF5555;
-		VeloDraw.fillRounded(context, getX(), stripY, halfW - 1, BOTTOM_STRIP_HEIGHT, 3, editColor);
-		VeloDraw.fillRounded(context, getX() + halfW + 1, stripY, halfW - 1, BOTTOM_STRIP_HEIGHT, 3, deleteColor);
-		String editGlyph = "✎";
-		String deleteGlyph = "✕";
-		int labelY = stripY + (BOTTOM_STRIP_HEIGHT - textRenderer.fontHeight) / 2;
-		context.drawTextWithShadow(textRenderer, editGlyph,
-				getX() + (halfW - textRenderer.getWidth(editGlyph)) / 2, labelY, 0xFFFFFFFF);
-		context.drawTextWithShadow(textRenderer, deleteGlyph,
-				getX() + halfW + (halfW - textRenderer.getWidth(deleteGlyph)) / 2, labelY, 0xFFFFFFFF);
+		int stripY = y + iconHeight + 2;
+		int halfW = w / 2;
+		boolean editHovered = isHovered() && mouseY >= stripY && mouseX < x + halfW;
+		boolean deleteHovered = isHovered() && mouseY >= stripY && mouseX >= x + halfW;
+		VeloUi.pill(context, x, stripY, halfW - 2, BOTTOM_STRIP_HEIGHT - 2, "Edit", 0, editHovered ? mouseX : -1, editHovered ? mouseY : -1, () -> { });
+		VeloUi.pill(context, x + halfW + 2, stripY, halfW - 2, BOTTOM_STRIP_HEIGHT - 2, "Delete", deleteHovered ? 3 : 0,
+				deleteHovered ? mouseX : -1, deleteHovered ? mouseY : -1, () -> { });
+	}
+
+	/** The shared cape "stage": a card with an accent glow rising from the floor. */
+	static void drawStage(DrawContext context, int x, int y, int w, int h, float hover, boolean highlighted) {
+		Theme theme = ThemeManager.active();
+		if (hover > 0.01f) {
+			VeloDraw.shadow(context, x, y, w, h, VeloStyle.RADIUS_CARD, 8, 3, VeloUi.withAlpha(0xFF000000, Math.round(0x55 * hover)));
+		}
+		int card = VeloAnim.lerpArgb(VeloStyle.card(), VeloStyle.cardHover(), hover);
+		VeloDraw.fillRoundedGradient(context, x, y, w, h, VeloStyle.RADIUS_CARD, card,
+				VeloAnim.lerpArgb(card, theme.accentStart() | 0xFF000000, 0.18f + 0.1f * hover));
+		VeloDraw.strokeRounded(context, x, y, w, h, VeloStyle.RADIUS_CARD,
+				highlighted ? (theme.accentStart() | 0xFF000000) : VeloAnim.lerpArgb(VeloStyle.border(), VeloStyle.borderStrong(), hover));
 	}
 
 	private static String trimToWidth(String text, int maxWidth) {

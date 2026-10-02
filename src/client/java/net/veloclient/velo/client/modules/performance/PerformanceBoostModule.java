@@ -69,6 +69,14 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	 */
 	public static volatile boolean hudCachingEnabled = true;
 
+	/**
+	 * Velo's own draw-path fixes for work vanilla repeats every frame: skipping GUI layers that
+	 * can't overlap a new element, and on Vulkan re-pushing only the descriptor bindings that
+	 * changed between draws and dropping redundant vertex/index buffer binds. Same pixels, less
+	 * render-thread time. Read by the GuiLayer* and VulkanDrawState mixins.
+	 */
+	public static volatile boolean fastDrawPath = true;
+
 	private static final List<String> PRESETS = List.of("Default", "Max FPS", "Performance", "Medium Quality", "High Quality");
 	private static final int ADAPTIVE_MIN_DISTANCE = 5;
 	private static final int ADAPTIVE_WINDOW_TICKS = 60;
@@ -320,6 +328,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 					}
 				}),
 				new ConfigField.ToggleField("HUD Caching (~20Hz overlay updates)", () -> hudCachingEnabled, v -> hudCachingEnabled = v),
+				new ConfigField.ToggleField("Fast Draw Path (GUI layering + Vulkan draw state)", () -> fastDrawPath, v -> fastDrawPath = v),
 				new ConfigField.ChoiceField("VSync Mode", List.of("Off", "On", "Adaptive"), () -> vsyncMode, this::applyVsyncMode),
 				new ConfigField.SliderField("Max FPS", 10, 260,
 						() -> options.getMaxFps().getValue(), v -> options.getMaxFps().setValue((int) v),

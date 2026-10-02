@@ -73,7 +73,7 @@ public final class ModpacksTabView {
 
 			VBox info = new VBox(4);
 			Label title = new Label(modpack.title());
-			title.setFont(Font.font("System", FontWeight.BOLD, 15));
+			title.setFont(Font.font("Inter", FontWeight.BOLD, 15));
 			title.setTextFill(InstanceDetailView.text(theme));
 			Label version = new Label("Currently applied - v" + modpack.versionNumber());
 			version.getStyleClass().add("version-tag");
@@ -121,7 +121,7 @@ public final class ModpacksTabView {
 		Button back = new Button("< Back");
 		back.setOnAction(e -> onBack.run());
 		Label heading = new Label("Browse modpacks for Minecraft " + instance.mcVersion());
-		heading.setFont(Font.font("System", FontWeight.BOLD, 15));
+		heading.setFont(Font.font("Inter", FontWeight.BOLD, 15));
 		heading.setTextFill(InstanceDetailView.text(theme));
 		topRow.getChildren().addAll(back, heading);
 		root.getChildren().add(topRow);
@@ -229,7 +229,7 @@ public final class ModpacksTabView {
 		card.getChildren().add(InstanceDetailView.iconView(hit.iconUrl(), 64));
 
 		Label title = new Label(hit.title());
-		title.setFont(Font.font("System", FontWeight.BOLD, 13));
+		title.setFont(Font.font("Inter", FontWeight.BOLD, 13));
 		title.setTextFill(InstanceDetailView.text(theme));
 		title.setWrapText(true);
 		title.setAlignment(Pos.CENTER);

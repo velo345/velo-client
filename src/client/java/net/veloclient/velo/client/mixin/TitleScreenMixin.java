@@ -189,9 +189,29 @@ public abstract class TitleScreenMixin {
 		}
 	}
 
+	/**
+	 * The restyled vanilla buttons stay in the drawable list (other mods anchor against them, see
+	 * init) but are hidden while vanilla draws, so only the glass version below is ever visible -
+	 * painting over them let their old labels/corners peek out around the rounded glass.
+	 */
+	@Inject(method = "render", at = @At("HEAD"))
+	private void velo$hideRestyled(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		velo$setRestyledVisible((TitleScreen) (Object) this, false);
+	}
+
+	@Unique
+	private static void velo$setRestyledVisible(TitleScreen self, boolean visible) {
+		for (var child : self.children()) {
+			if (child instanceof ButtonWidget widget && TitleScreenTheme.TITLE_KEY_ORDER.contains(String.valueOf(velo$keyOf(widget.getMessage())))) {
+				widget.visible = visible;
+			}
+		}
+	}
+
 	@Inject(method = "render", at = @At("RETURN"))
 	private void velo$overlay(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		TitleScreen self = (TitleScreen) (Object) this;
+		velo$setRestyledVisible(self, true);
 		List<Drawable> drawables = ((ScreenAccessMixin) (Object) this).velo$drawables();
 		int rowCount = 0;
 		for (var child : self.children()) {
@@ -411,9 +431,24 @@ public abstract class TitleScreenMixin {
 		}
 	}
 
+	@Inject(method = "extractRenderState", at = @At("HEAD"))
+	private void velo$hideRestyled(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		velo$setRestyledVisible((TitleScreen) (Object) this, false);
+	}
+
+	@Unique
+	private static void velo$setRestyledVisible(TitleScreen self, boolean visible) {
+		for (var child : self.children()) {
+			if (child instanceof Button widget && TitleScreenTheme.TITLE_KEY_ORDER.contains(String.valueOf(velo$keyOf(widget.getMessage())))) {
+				widget.visible = visible;
+			}
+		}
+	}
+
 	@Inject(method = "extractRenderState", at = @At("RETURN"))
 	private void velo$overlay(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		TitleScreen self = (TitleScreen) (Object) this;
+		velo$setRestyledVisible(self, true);
 		List<Renderable> renderables = ((ScreenAccessMixin) (Object) this).velo$drawables();
 		int rowCount = 0;
 		for (var child : self.children()) {

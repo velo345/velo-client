@@ -2,6 +2,10 @@ package net.veloclient.velo.client.gui.store;
 
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
+import net.veloclient.velo.client.gui.title.TitleScreenTheme;
+import net.veloclient.velo.client.gui.widget.VeloAnim;
+import net.veloclient.velo.client.gui.widget.VeloStyle;
+import net.veloclient.velo.client.gui.widget.VeloUi;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -49,26 +53,11 @@ public final class StoreScreen extends VeloWindow {
 	@Override
 	protected void layoutContent() {
 		this.clearChildren();
-
-		int sidebarX = contentX();
-		int gridX = sidebarX + SIDEBAR_WIDTH + 14;
-		int topY = contentY() + BALANCE_BAR_HEIGHT + 8;
-
-		sidebarRegion = new VeloScrollRegion(sidebarX, topY, SIDEBAR_WIDTH, contentBottom() - topY);
-		for (StoreCategory category : StoreCategory.values()) {
-			StoreCategory cat = category;
-			VeloButton button = new VeloButton(sidebarX, 0, SIDEBAR_WIDTH, 20, Text.literal(category.displayName()), b -> {
-						this.selectedCategory = cat;
-						layoutContent();
-					})
-					.selected(category == selectedCategory);
-			addSelectableChild(button);
-			sidebarRegion.addRow(button);
-		}
-		sidebarRegion.layout(20, 2);
-
-		int gridWidth = contentX() + contentWidth() - gridX;
-		gridColumns = Math.max(1, (gridWidth + TILE_GAP) / (TILE_WIDTH + TILE_GAP));
+		// One category today, so no sidebar: header (title + coin balance) and a full-width grid.
+		int gridX = contentX();
+		int topY = contentY() + BALANCE_BAR_HEIGHT + 10;
+		int gridWidth = contentWidth();
+		gridColumns = Math.max(1, (gridWidth - 8 + TILE_GAP) / (TILE_WIDTH + TILE_GAP));
 		gridRegion = new VeloScrollRegion(gridX, topY, gridWidth, contentBottom() - topY);
 		for (var item : StoreCatalog.byCategory(selectedCategory)) {
 			VeloStoreItemTile tile = new VeloStoreItemTile(0, 0, TILE_WIDTH, TILE_ICON_HEIGHT, item,
@@ -78,8 +67,8 @@ public final class StoreScreen extends VeloWindow {
 		}
 		gridRegion.layoutGrid(gridColumns, TILE_WIDTH, TILE_TOTAL_HEIGHT, TILE_GAP);
 
-		String balanceLabel = CurrencyManager.balance() + " Velo Coins";
-		balanceWidth = this.textRenderer.getWidth(balanceLabel) + 34;
+		String balanceLabel = String.valueOf(CurrencyManager.balance());
+		balanceWidth = this.textRenderer.getWidth(balanceLabel) + this.textRenderer.getWidth("Get coins") + 44;
 		balanceX = contentX() + contentWidth() - balanceWidth;
 	}
 
@@ -87,10 +76,6 @@ public final class StoreScreen extends VeloWindow {
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
 		if (gridRegion != null && gridRegion.scroll(mouseX, mouseY, verticalAmount)) {
 			gridRegion.layoutGrid(gridColumns, TILE_WIDTH, TILE_TOTAL_HEIGHT, TILE_GAP);
-			return true;
-		}
-		if (sidebarRegion != null && sidebarRegion.scroll(mouseX, mouseY, verticalAmount)) {
-			sidebarRegion.layout(20, 2);
 			return true;
 		}
 		return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
@@ -110,25 +95,34 @@ public final class StoreScreen extends VeloWindow {
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
-		if (sidebarRegion != null) {
-			sidebarRegion.renderRows(context, mouseX, mouseY, delta);
-			sidebarRegion.renderScrollbar(context, 20, 2);
-		}
 		if (gridRegion != null) {
 			gridRegion.renderRows(context, mouseX, mouseY, delta);
 			gridRegion.renderScrollbarGrid(context, gridColumns, TILE_TOTAL_HEIGHT, TILE_GAP);
 		}
 
-		Theme theme = ThemeManager.active();
+		// Header: title + count on the left.
+		int count = StoreCatalog.byCategory(selectedCategory).size();
+		Text title = TitleScreenTheme.tileFont(selectedCategory.displayName());
+		int titleY = contentY() + (BALANCE_BAR_HEIGHT - 8) / 2;
+		context.drawTextWithShadow(this.textRenderer, title, contentX(), titleY, VeloStyle.text());
+		context.drawTextWithShadow(this.textRenderer, count + (count == 1 ? " item" : " items") + "  ·  preview on your own player",
+				contentX() + this.textRenderer.getWidth(title) + 6, titleY, VeloStyle.textFaint());
+
+		// Coin balance chip on the right (click to get coins).
 		int balanceY = contentY();
 		boolean hovered = mouseX >= balanceX && mouseX <= balanceX + balanceWidth
 				&& mouseY >= balanceY && mouseY <= balanceY + BALANCE_BAR_HEIGHT;
-		VeloDraw.fillRounded(context, balanceX, balanceY, balanceWidth, BALANCE_BAR_HEIGHT, 4,
-				hovered ? theme.accentStart() : theme.surfaceWithOpacity());
-		context.drawTexture(RenderPipelines.GUI_TEXTURED, LOGO_TEXTURE, balanceX + 4, balanceY + 2, 0f, 0f,
-				16, 16, LOGO_SOURCE_SIZE, LOGO_SOURCE_SIZE, LOGO_SOURCE_SIZE, LOGO_SOURCE_SIZE);
-		String balanceLabel = CurrencyManager.balance() + " Velo Coins";
-		context.drawTextWithShadow(this.textRenderer, balanceLabel, balanceX + 24, balanceY + (BALANCE_BAR_HEIGHT - 8) / 2,
-				hovered ? 0xFFFFFFFF : theme.text());
+		int h = BALANCE_BAR_HEIGHT;
+		VeloDraw.fillRounded(context, balanceX, balanceY, balanceWidth, h, h / 2,
+				VeloAnim.lerpArgb(VeloStyle.card(), 0xFFF4B82E, hovered ? 0.22f : 0.10f));
+		VeloDraw.strokeRounded(context, balanceX, balanceY, balanceWidth, h, h / 2, VeloUi.withAlpha(0xFFF4B82E, hovered ? 0xC0 : 0x60));
+		float coinX = balanceX + 11.5f;
+		float coinY = balanceY + h / 2f;
+		VeloDraw.fillCircle(context, coinX, coinY, 6f, 0xFFC9861A);
+		VeloDraw.fillCircle(context, coinX, coinY, 4.8f, 0xFFFFD56A);
+		String balanceLabel = String.valueOf(CurrencyManager.balance());
+		context.drawTextWithShadow(this.textRenderer, balanceLabel, balanceX + 22, balanceY + (h - 8) / 2, 0xFFFFD56A);
+		context.drawTextWithShadow(this.textRenderer, "Get coins", balanceX + 30 + this.textRenderer.getWidth(balanceLabel),
+				balanceY + (h - 8) / 2, hovered ? 0xFFFFFFFF : VeloStyle.textMuted());
 	}
 }

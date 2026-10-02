@@ -8,6 +8,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Tooltip;
+import javafx.scene.layout.Region;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
@@ -75,7 +76,7 @@ public final class InstanceDetailView {
 		Button back = new Button("< Back");
 		back.setOnAction(e -> onBack.run());
 		Label title = new Label(instance.name());
-		title.setFont(Font.font("System", FontWeight.BOLD, 20));
+		title.setFont(Font.font("Inter", FontWeight.BOLD, 20));
 		title.setTextFill(text(theme));
 		Label version = new Label("Minecraft " + instance.mcVersion() + " · Fabric");
 		version.getStyleClass().add("version-tag");
@@ -125,20 +126,49 @@ public final class InstanceDetailView {
 		Runnable[] activeBack = new Runnable[1];
 		java.util.function.Consumer<String> openDetail[] = new java.util.function.Consumer[1];
 
+		// The installed view is built once and kept: actions (toggle, remove, update) only refresh its
+		// rows, so the list keeps its scroll position instead of jumping back to the top.
+		InstalledView[] installedView = new InstalledView[1];
 		showInstalled[0] = () -> {
 			activeBack[0] = showInstalled[0];
-			container.getChildren().setAll(
-					buildInstalledView(owner, overlayHost, instance, theme, kind, folder, fileFilters, identifyAttempted, showInstalled[0], showSearch[0], openDetail[0]));
+			if (installedView[0] == null) {
+				installedView[0] = buildInstalledView(owner, overlayHost, instance, theme, kind, folder, fileFilters, identifyAttempted,
+						showSearch[0], openDetail[0]);
+			} else {
+				installedView[0].refresh().run();
+			}
+			container.getChildren().setAll(installedView[0].node());
+			UiMotion.enter(installedView[0].node());
 		};
 		showSearch[0] = () -> {
 			activeBack[0] = showSearch[0];
-			container.getChildren().setAll(
-					buildSearchView(owner, overlayHost, instance, theme, kind, folder, showInstalled[0], openDetail[0]));
+			Node search = buildSearchView(owner, overlayHost, instance, theme, kind, folder, showInstalled[0], openDetail[0]);
+			container.getChildren().setAll(search);
+			UiMotion.enter(search);
 		};
 		openDetail[0] = projectId -> showProjectDetail(owner, container, instance, theme, kind, folder, projectId, () -> activeBack[0].run());
 
-		showInstalled[0].run();
+		// Nothing installed yet (Velo's own jars don't count): open straight on Modrinth so the
+		// obvious next step - finding something to add - is already on screen.
+		if (userFileCount(folder) == 0) {
+			showSearch[0].run();
+		} else {
+			showInstalled[0].run();
+		}
 		return container;
+	}
+
+	/** Files in the folder a user added themselves (Velo Client and Fabric API are managed by the launcher). */
+	private static long userFileCount(Path folder) {
+		try (Stream<Path> stream = Files.list(folder)) {
+			return stream.filter(Files::isRegularFile).map(p -> enabledName(p.getFileName().toString()))
+					.filter(name -> !name.startsWith("velo-client-") && !name.startsWith("fabric-api-")).count();
+		} catch (IOException e) {
+			return 0;
+		}
+	}
+
+	private record InstalledView(Node node, Runnable refresh) {
 	}
 
 	/** Async-loads a project's full detail (description, gallery, every compatible version) and swaps it into {@code container} - see {@link ProjectDetailView}. */
@@ -192,17 +222,92 @@ public final class InstanceDetailView {
 		}));
 	}
 
-	private static Node buildInstalledView(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
-			Path folder, List<String> fileFilters, Set<String> identifyAttempted, Runnable refresh, Runnable openSearch,
+	private static InstalledView buildInstalledView(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
+			Path folder, List<String> fileFilters, Set<String> identifyAttempted, Runnable openSearch,
 			java.util.function.Consumer<String> openDetail) {
-		VBox root = new VBox(14);
+		VBox root = new VBox(12);
 
 		VBox installedList = new VBox(8);
-		Runnable listRefresh = () -> refreshInstalledList(owner, overlayHost, installedList, instance, theme, kind, folder, identifyAttempted, refresh, openDetail);
+		ScrollPane scroll = new ScrollPane(installedList);
+		scroll.setFitToWidth(true);
+		scroll.getStyleClass().add("scroll-pane");
+		VBox.setVgrow(scroll, Priority.ALWAYS);
 
-		HBox actions = new HBox(8);
-		Button addButton = new Button("Add from file...");
-		addButton.setOnAction(e -> {
+		String noun = switch (kind) {
+			case MOD -> "mods";
+			case RESOURCE_PACK -> "resource packs";
+			case SHADER_PACK -> "shader packs";
+			default -> "files";
+		};
+		Label count = new Label();
+		count.getStyleClass().add("pack-count");
+		TextField filter = new TextField();
+		filter.setPromptText("Filter installed " + noun + "...");
+		filter.setPrefWidth(220);
+
+		UpdateTracker updates = new UpdateTracker();
+		Button updateAll = new Button();
+		updateAll.getStyleClass().add("update-all-button");
+		updateAll.setVisible(false);
+		updateAll.setManaged(false);
+		ProgressBar bulkProgress = new ProgressBar(0);
+		bulkProgress.setPrefWidth(120);
+		bulkProgress.setVisible(false);
+		bulkProgress.setManaged(false);
+
+		Runnable[] listRefresh = new Runnable[1];
+		listRefresh[0] = () -> {
+			// Keep the exact pixel offset: rows are rebuilt, the viewport shouldn't move.
+			double contentHeight = installedList.getHeight();
+			double viewport = scroll.getViewportBounds().getHeight();
+			double offsetPx = scroll.getVvalue() * Math.max(0, contentHeight - viewport);
+			updates.clear();
+			refreshInstalledList(owner, overlayHost, installedList, instance, theme, kind, folder, identifyAttempted, listRefresh[0],
+					openDetail, filter.getText(), updates, count, noun);
+			if (offsetPx > 0) {
+				restoreScroll(scroll, installedList, offsetPx);
+			}
+		};
+		updates.onChange = () -> {
+			int n = updates.pending.size();
+			updateAll.setText(n == 1 ? "Update 1 " + noun.substring(0, noun.length() - 1) : "Update all (" + n + ")");
+			updateAll.setVisible(n > 0);
+			updateAll.setManaged(n > 0);
+		};
+		updateAll.setOnAction(e -> {
+			List<UpdateTracker.Pending> todo = List.copyOf(updates.pending.values());
+			if (todo.isEmpty()) {
+				return;
+			}
+			updateAll.setDisable(true);
+			bulkProgress.setVisible(true);
+			bulkProgress.setManaged(true);
+			CompletableFuture.runAsync(() -> {
+				for (int i = 0; i < todo.size(); i++) {
+					UpdateTracker.Pending item = todo.get(i);
+					int index = i;
+					Platform.runLater(() -> updateAll.setText("Updating " + (index + 1) + " of " + todo.size() + "..."));
+					downloadAndRecord(instance, kind, folder, item.newest(), item.asset().filename(),
+							fraction -> Platform.runLater(() -> bulkProgress.setProgress((index + fraction) / todo.size())));
+					LATEST_CACHE.put(cacheKey(instance, kind, item.asset().projectId()), new CachedLatest(item.newest(), System.currentTimeMillis()));
+				}
+				Platform.runLater(() -> {
+					bulkProgress.setVisible(false);
+					bulkProgress.setManaged(false);
+					updateAll.setDisable(false);
+					listRefresh[0].run();
+				});
+			}, Executors.newVirtualThreadPerTaskExecutor());
+		});
+
+		Button addButton = new Button(kind == InstalledAssetStore.Kind.MOD ? "+  Add mods" : "+  Add " + noun);
+		addButton.getStyleClass().add("primary-button");
+		addButton.setTooltip(new Tooltip("Browse and install from Modrinth"));
+		addButton.setOnAction(e -> openSearch.run());
+
+		Button importButton = new Button("Import file");
+		importButton.setTooltip(new Tooltip("Add a " + (kind == InstalledAssetStore.Kind.MOD ? ".jar" : ".zip") + " you downloaded yourself"));
+		importButton.setOnAction(e -> {
 			FileChooser chooser = new FileChooser();
 			chooser.setTitle("Choose files to add");
 			chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(kind == InstalledAssetStore.Kind.MOD ? "Jar files" : "Zip files", fileFilters));
@@ -218,9 +323,10 @@ public final class InstanceDetailView {
 					error(owner, "Failed to add " + file.getName(), ex.getMessage());
 				}
 			}
-			refresh.run();
+			listRefresh[0].run();
 		});
 		Button openFolderButton = new Button("Open folder");
+		openFolderButton.getStyleClass().add("ghost-button");
 		openFolderButton.setOnAction(e -> {
 			try {
 				Files.createDirectories(folder);
@@ -229,23 +335,79 @@ public final class InstanceDetailView {
 				error(owner, "Couldn't open folder", ex.getMessage());
 			}
 		});
-		Button modrinthButton = new Button("+ New Modrinth");
-		modrinthButton.getStyleClass().addAll("title-menu-button", "title-menu-button-primary", "button-compact");
-		modrinthButton.setOnAction(e -> openSearch.run());
-		actions.getChildren().addAll(addButton, openFolderButton, modrinthButton);
+		filter.textProperty().addListener((obs, was, now) -> listRefresh[0].run());
 
-		ScrollPane scroll = new ScrollPane(installedList);
-		scroll.setFitToWidth(true);
-		scroll.getStyleClass().add("scroll-pane");
-		VBox.setVgrow(scroll, Priority.ALWAYS);
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox toolbar = new HBox(8, count, filter, spacer, bulkProgress, updateAll, openFolderButton, importButton, addButton);
+		toolbar.setAlignment(Pos.CENTER_LEFT);
+		toolbar.getStyleClass().add("pack-toolbar");
 
-		root.getChildren().addAll(actions, scroll);
-		listRefresh.run();
-		return root;
+		root.getChildren().addAll(toolbar, scroll);
+		listRefresh[0].run();
+		return new InstalledView(root, listRefresh[0]);
+	}
+
+	/** Re-applies a pixel scroll offset once the rebuilt rows have been laid out. */
+	private static void restoreScroll(ScrollPane scroll, VBox content, double offsetPx) {
+		Runnable apply = () -> {
+			double range = content.getHeight() - scroll.getViewportBounds().getHeight();
+			if (range > 0) {
+				scroll.setVvalue(Math.min(1, offsetPx / range));
+			}
+		};
+		apply.run();
+		javafx.beans.value.ChangeListener<Number> once = new javafx.beans.value.ChangeListener<>() {
+			@Override
+			public void changed(javafx.beans.value.ObservableValue<? extends Number> obs, Number was, Number now) {
+				apply.run();
+				content.heightProperty().removeListener(this);
+			}
+		};
+		content.heightProperty().addListener(once);
+		Platform.runLater(apply);
+	}
+
+	// ---- Update lookups: cached per profile+project so refreshing rows doesn't re-query Modrinth ----
+
+	private record CachedLatest(ModrinthClient.ProjectVersion newest, long fetchedAt) {
+	}
+
+	private static final java.util.Map<String, CachedLatest> LATEST_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final long LATEST_TTL_MS = 10 * 60_000L;
+
+	private static String cacheKey(Instance instance, InstalledAssetStore.Kind kind, String projectId) {
+		return instance.id() + "|" + instance.mcVersion() + "|" + kind + "|" + projectId;
+	}
+
+	/** Which rows currently have a newer version, so "Update all" can act on them in one go. */
+	private static final class UpdateTracker {
+		record Pending(InstalledAsset asset, ModrinthClient.ProjectVersion newest) {
+		}
+
+		final java.util.Map<String, Pending> pending = new java.util.LinkedHashMap<>();
+		Runnable onChange = () -> { };
+
+		void clear() {
+			pending.clear();
+			onChange.run();
+		}
+
+		void add(InstalledAsset asset, ModrinthClient.ProjectVersion newest) {
+			pending.put(asset.filename(), new Pending(asset, newest));
+			onChange.run();
+		}
+
+		void remove(InstalledAsset asset) {
+			if (pending.remove(asset.filename()) != null) {
+				onChange.run();
+			}
+		}
 	}
 
 	private static void refreshInstalledList(Stage owner, StackPane overlayHost, VBox list, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
-			Path folder, Set<String> identifyAttempted, Runnable refresh, java.util.function.Consumer<String> openDetail) {
+			Path folder, Set<String> identifyAttempted, Runnable refresh, java.util.function.Consumer<String> openDetail,
+			String filterText, UpdateTracker updates, Label countLabel, String noun) {
 		list.getChildren().clear();
 		try {
 			Files.createDirectories(folder);
@@ -261,20 +423,28 @@ public final class InstanceDetailView {
 			list.getChildren().add(errorLabel);
 			return;
 		}
+		countLabel.setText(files.size() + " " + (files.size() == 1 ? noun.substring(0, noun.length() - 1) : noun));
 		if (files.isEmpty()) {
-			Label empty = new Label("Nothing here yet - add files manually or install from Modrinth above.");
-			empty.getStyleClass().add("section-subtitle");
-			empty.setTextFill(text(theme));
+			Label empty = new Label("Nothing installed yet. Click \"Add\" to browse Modrinth, or \"Import file\" for a file you downloaded.");
+			empty.getStyleClass().add("empty-state");
+			empty.setWrapText(true);
 			list.getChildren().add(empty);
 			return;
 		}
 		var known = InstalledAssetStore.asMap(InstalledAssetStore.loadAll(instance.id(), kind));
+		String needle = filterText == null ? "" : filterText.strip().toLowerCase(Locale.ROOT);
 		for (Path file : files) {
 			String fileName = file.getFileName().toString();
 			boolean disabled = isDisabled(fileName);
 			InstalledAsset asset = known.get(enabledName(fileName));
+			if (!needle.isEmpty()) {
+				String haystack = (asset != null ? asset.title() + " " : "") + fileName;
+				if (!haystack.toLowerCase(Locale.ROOT).contains(needle)) {
+					continue;
+				}
+			}
 			if (asset != null) {
-				list.getChildren().add(buildKnownRow(owner, overlayHost, instance, theme, kind, folder, file, disabled, asset, refresh, openDetail));
+				list.getChildren().add(buildKnownRow(owner, overlayHost, instance, theme, kind, folder, file, disabled, asset, refresh, openDetail, updates));
 			} else {
 				list.getChildren().add(buildUnknownRow(instance, theme, kind, folder, file, disabled, identifyAttempted, refresh));
 				autoIdentify(instance, kind, file, identifyAttempted, refresh);
@@ -318,7 +488,7 @@ public final class InstanceDetailView {
 	}
 
 	private static Node buildKnownRow(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind, Path folder,
-			Path file, boolean disabled, InstalledAsset asset, Runnable refresh, java.util.function.Consumer<String> openDetail) {
+			Path file, boolean disabled, InstalledAsset asset, Runnable refresh, java.util.function.Consumer<String> openDetail, UpdateTracker updates) {
 		HBox row = new HBox(12);
 		row.getStyleClass().add("mod-row");
 		row.setAlignment(Pos.CENTER_LEFT);
@@ -332,7 +502,7 @@ public final class InstanceDetailView {
 
 		VBox info = new VBox(2);
 		Label title = new Label(asset.title() + (disabled ? "  (disabled)" : ""));
-		title.setFont(Font.font("System", FontWeight.BOLD, 13));
+		title.setFont(Font.font("Inter", FontWeight.BOLD, 13));
 		title.setTextFill(text(theme));
 		Label meta = new Label("v" + asset.versionNumber());
 		meta.getStyleClass().add("version-tag");
@@ -346,13 +516,16 @@ public final class InstanceDetailView {
 		progress.setVisible(false);
 		progress.setManaged(false);
 
-		Label updateBadge = new Label();
-		updateBadge.getStyleClass().addAll("title-menu-button", "button-compact");
+		Button updateBadge = new Button();
+		updateBadge.getStyleClass().add("row-update-button");
 		updateBadge.setVisible(false);
 		updateBadge.setManaged(false);
-		checkForUpdate(owner, overlayHost, instance, theme, kind, folder, asset, updateBadge, progress, refresh);
+		if (!disabled) {
+			checkForUpdate(owner, overlayHost, instance, theme, kind, folder, asset, updateBadge, progress, refresh, updates);
+		}
 
 		Button remove = new Button("Remove");
+		remove.getStyleClass().add("ghost-button");
 		remove.setOnAction(e -> {
 			try {
 				Files.deleteIfExists(file);
@@ -430,7 +603,29 @@ public final class InstanceDetailView {
 	}
 
 	private static void checkForUpdate(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
-			Path folder, InstalledAsset asset, Label updateBadge, ProgressBar progress, Runnable refresh) {
+			Path folder, InstalledAsset asset, Button updateBadge, ProgressBar progress, Runnable refresh, UpdateTracker updates) {
+		String key = cacheKey(instance, kind, asset.projectId());
+		CachedLatest cached = LATEST_CACHE.get(key);
+		java.util.function.Consumer<ModrinthClient.ProjectVersion> apply = newest -> {
+			if (newest == null || newest.id().equals(asset.versionId())) {
+				return;
+			}
+			updates.add(asset, newest);
+			updateBadge.setText("Update to " + newest.versionNumber());
+			updateBadge.setVisible(true);
+			updateBadge.setManaged(true);
+			updateBadge.setOnAction(e -> {
+				updateBadge.setVisible(false);
+				updateBadge.setManaged(false);
+				updates.remove(asset);
+				showVersionPicker(overlayHost, theme, instance, asset.title(), List.of(newest), plan ->
+						installWithDependencies(owner, instance, kind, folder, plan, asset.filename(), progress, refresh));
+			});
+		};
+		if (cached != null && System.currentTimeMillis() - cached.fetchedAt() < LATEST_TTL_MS) {
+			apply.accept(cached.newest());
+			return;
+		}
 		CompletableFuture.supplyAsync(() -> {
 			try {
 				return ModrinthClient.versions(asset.projectId(), instance.mcVersion(), kind.modrinthProjectType());
@@ -438,22 +633,10 @@ public final class InstanceDetailView {
 				return List.<ModrinthClient.ProjectVersion>of();
 			}
 		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(versions -> {
-			Optional<ModrinthClient.ProjectVersion> latest = versions.stream().max(Comparator.comparing(ModrinthClient.ProjectVersion::datePublished));
-			latest.ifPresent(newest -> {
-				if (!newest.id().equals(asset.versionId())) {
-					Platform.runLater(() -> {
-						updateBadge.setText("Update to " + newest.versionNumber());
-						updateBadge.setVisible(true);
-						updateBadge.setManaged(true);
-						updateBadge.setOnMouseClicked(e -> {
-							updateBadge.setVisible(false);
-							updateBadge.setManaged(false);
-							showVersionPicker(overlayHost, theme, instance, asset.title(), List.of(newest), plan ->
-									installWithDependencies(owner, instance, kind, folder, plan, asset.filename(), progress, refresh));
-						});
-					});
-				}
-			});
+			ModrinthClient.ProjectVersion newest = versions.stream()
+					.max(Comparator.comparing(ModrinthClient.ProjectVersion::datePublished)).orElse(null);
+			LATEST_CACHE.put(key, new CachedLatest(newest, System.currentTimeMillis()));
+			Platform.runLater(() -> apply.accept(newest));
 		});
 	}
 
@@ -466,17 +649,18 @@ public final class InstanceDetailView {
 
 		HBox topRow = new HBox(10);
 		topRow.setAlignment(Pos.CENTER_LEFT);
-		Button back = new Button("< Back to installed");
+		Button back = new Button("‹  Installed (" + userFileCount(folder) + ")");
+		back.getStyleClass().add("ghost-button");
 		back.setOnAction(e -> onBack.run());
-		Label heading = new Label("Browse " + kind.modrinthProjectType() + "s for Minecraft " + instance.mcVersion());
-		heading.setFont(Font.font("System", FontWeight.BOLD, 15));
+		Label heading = new Label("Browse Modrinth " + kind.modrinthProjectType() + "s for Minecraft " + instance.mcVersion());
+		heading.setFont(Font.font("Inter", FontWeight.BOLD, 15));
 		heading.setTextFill(text(theme));
 		topRow.getChildren().addAll(back, heading);
 		root.getChildren().add(topRow);
 
 		HBox searchRow = new HBox(8);
 		TextField query = new TextField();
-		query.setPromptText("Search...");
+		query.setPromptText("Search Modrinth (e.g. Sodium, minimap, shaders)...");
 		HBox.setHgrow(query, Priority.ALWAYS);
 		ComboBox<String> sort = new ComboBox<>();
 		sort.getItems().addAll("Relevance", "Downloads", "Follows", "Newest", "Recently updated");
@@ -581,7 +765,7 @@ public final class InstanceDetailView {
 		card.getChildren().add(icon);
 
 		Label title = new Label(hit.title());
-		title.setFont(Font.font("System", FontWeight.BOLD, 13));
+		title.setFont(Font.font("Inter", FontWeight.BOLD, 13));
 		title.setTextFill(text(theme));
 		title.setWrapText(true);
 		title.setAlignment(Pos.CENTER);
@@ -681,7 +865,7 @@ public final class InstanceDetailView {
 		card.setMaxHeight(560);
 
 		Label heading = new Label("Install " + projectTitle);
-		heading.setFont(Font.font("System", FontWeight.BOLD, 16));
+		heading.setFont(Font.font("Inter", FontWeight.BOLD, 16));
 		heading.setTextFill(text(theme));
 		heading.setWrapText(true);
 		Label subheading = new Label("Choose which version to install");
@@ -798,7 +982,13 @@ public final class InstanceDetailView {
 					InstalledAssetStore.record(instance.id(), kind, new InstalledAsset(project.id(), version.id(), file.filename(),
 							project.title(), project.description(), project.iconUrl(), version.versionNumber(), kind.modrinthProjectType())));
 			if (oldFilenameToRemove != null && !oldFilenameToRemove.equals(file.filename())) {
-				Files.deleteIfExists(folder.resolve(oldFilenameToRemove));
+				// Kept (not deleted) so a bad update can be undone by moving it back.
+				Path oldFile = folder.resolve(oldFilenameToRemove);
+				if (Files.exists(oldFile)) {
+					Path backups = InstancePaths.dir(instance.id()).resolve("backups").resolve(folder.getFileName().toString());
+					Files.createDirectories(backups);
+					Files.move(oldFile, backups.resolve(oldFilenameToRemove), StandardCopyOption.REPLACE_EXISTING);
+				}
 				InstalledAssetStore.forget(instance.id(), kind, oldFilenameToRemove);
 			}
 		} catch (IOException ignored) {
@@ -838,7 +1028,7 @@ public final class InstanceDetailView {
 							return;
 						}
 						Label header = new Label("Dependencies");
-						header.setFont(Font.font("System", FontWeight.BOLD, 12));
+						header.setFont(Font.font("Inter", FontWeight.BOLD, 12));
 						node.getChildren().add(header);
 						for (Row row : rows) {
 							if (row.alreadyInstalled()) {

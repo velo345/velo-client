@@ -3,7 +3,11 @@ package net.veloclient.velo.client.gui;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
+import net.veloclient.velo.client.gui.title.TitleScreenTheme;
+import net.veloclient.velo.client.gui.widget.VeloDraw;
 import net.veloclient.velo.client.gui.widget.VeloModuleTile;
+import net.veloclient.velo.client.gui.widget.VeloSectionHeader;
+import net.veloclient.velo.client.gui.widget.VeloStyle;
 import net.veloclient.velo.client.gui.widget.VeloNavButton;
 import net.veloclient.velo.client.gui.widget.VeloNavIcons;
 import net.veloclient.velo.client.gui.widget.VeloScrollRegion;
@@ -25,11 +29,16 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 
 	private static final int SIDEBAR_WIDTH = 120;
 	private static final int NAV_ROW_HEIGHT = 24;
+	/** Minimum tile width; tiles stretch to fill the row. */
 	private static final int TILE_SIZE = 88;
-	private static final int TILE_TOTAL_HEIGHT = TILE_SIZE + 22;
+	/** Height of a tile's icon+name area (the on/off strip adds 22 below it). */
+	private static final int TILE_ICON_AREA = 76;
+	private static final int TILE_TOTAL_HEIGHT = TILE_ICON_AREA + 22;
 	private static final int TILE_GAP = 8;
 
 	private static final int CLEAR_BUTTON_WIDTH = 18;
+	private static final int SEARCH_HEIGHT = 22;
+	private static final int SEARCH_ICON_SPACE = 22;
 
 	private ModuleCategory selectedCategory = ModuleCategory.HUD;
 	private TextFieldWidget searchBox;
@@ -37,6 +46,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 	private VeloScrollRegion scrollRegion;
 	private VeloScrollRegion sidebarRegion;
 	private int gridColumns = 1;
+	private int tileWidth = TILE_SIZE;
 
 	public ModMenuScreen() {
 		super(Text.literal("Velo Client"), 640, 480);
@@ -60,6 +70,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		// than absolute-positioned - nothing ever gets pushed off the
 		// bottom of the window where it can't be seen or clicked.
 		sidebarRegion = new VeloScrollRegion(sidebarX, contentY(), SIDEBAR_WIDTH, contentBottom() - contentY());
+		sidebarRegion.addRow(new VeloSectionHeader(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT, "Modules"));
 		for (ModuleCategory category : ModuleCategory.values()) {
 			ModuleCategory cat = category;
 			VeloNavButton button = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
@@ -72,11 +83,25 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			sidebarRegion.addRow(button);
 		}
 
-		VeloNavButton settingsButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
-				VeloNavIcons.of("settings"), Text.literal("Settings"),
-				b -> this.client.setScreen(new SettingsTabScreen(this)));
-		addSelectableChild(settingsButton);
-		sidebarRegion.addRow(settingsButton);
+		sidebarRegion.addRow(new VeloSectionHeader(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT, "Social & Tools"));
+
+		VeloNavButton friendsButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+				VeloNavIcons.of("friends"), Text.literal(friendsLabel()),
+				b -> this.client.setScreen(new FriendsScreen()));
+		addSelectableChild(friendsButton);
+		sidebarRegion.addRow(friendsButton);
+
+		VeloNavButton waypointsButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+				VeloNavIcons.of("waypoints"), Text.literal("Waypoints"),
+				b -> this.client.setScreen(new WaypointsScreen(this)));
+		addSelectableChild(waypointsButton);
+		sidebarRegion.addRow(waypointsButton);
+
+		VeloNavButton queueButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+				VeloNavIcons.of("queue"), Text.literal("Background Queue"),
+				b -> this.client.setScreen(new BackgroundQueueSessionsScreen(this, null)));
+		addSelectableChild(queueButton);
+		sidebarRegion.addRow(queueButton);
 
 		VeloNavButton capesButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
 				VeloNavIcons.of("capes"), Text.literal("Capes"),
@@ -102,30 +127,48 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		addSelectableChild(profilesButton);
 		sidebarRegion.addRow(profilesButton);
 
+		sidebarRegion.addRow(new VeloSectionHeader(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT, "Client"));
+		VeloNavButton settingsButton = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
+				VeloNavIcons.of("settings"), Text.literal("Settings"),
+				b -> this.client.setScreen(new SettingsTabScreen(this)));
+		addSelectableChild(settingsButton);
+		sidebarRegion.addRow(settingsButton);
+
 		sidebarRegion.layout(NAV_ROW_HEIGHT, 2);
 
 		int listWidth = contentWidth() - SIDEBAR_WIDTH - 14;
 		int searchY = contentY();
-		int searchFieldWidth = listWidth - CLEAR_BUTTON_WIDTH - 4;
-		searchBox = new TextFieldWidget(this.textRenderer, listX, searchY, searchFieldWidth, 18, Text.literal("Search"));
+		int searchFieldWidth = listWidth - SEARCH_ICON_SPACE - CLEAR_BUTTON_WIDTH - 4;
+		searchBox = new TextFieldWidget(this.textRenderer, listX + SEARCH_ICON_SPACE, searchY + 5, searchFieldWidth, 12, Text.literal("Search"));
 		searchBox.setPlaceholder(Text.literal("Search modules..."));
 		searchBox.setDrawsBackground(false);
 		searchBox.setChangedListener(s -> refreshGrid());
 		addDrawableChild(searchBox);
 
 		clearSearchButton = new net.veloclient.velo.client.gui.widget.VeloButton(
-				listX + searchFieldWidth + 4, searchY, CLEAR_BUTTON_WIDTH, 18, Text.literal("✕"),
+				listX + listWidth - CLEAR_BUTTON_WIDTH - 2, searchY + 2, CLEAR_BUTTON_WIDTH, 18, Text.literal(""),
 				b -> {
 					searchBox.setText("");
 					refreshGrid();
 				});
 		addDrawableChild(clearSearchButton);
 
-		int gridTop = searchY + 24;
+		int gridTop = searchY + SEARCH_HEIGHT + 24;
 		int gridHeight = contentBottom() - gridTop;
-		gridColumns = Math.max(1, (listWidth + TILE_GAP) / (TILE_SIZE + TILE_GAP));
+		// Columns of at least TILE_SIZE, then stretched so the grid fills the full width (minus the scrollbar).
+		int usable = listWidth - 8;
+		gridColumns = Math.max(1, (usable + TILE_GAP) / (TILE_SIZE + TILE_GAP));
+		tileWidth = (usable - TILE_GAP * (gridColumns - 1)) / gridColumns;
 		scrollRegion = new VeloScrollRegion(listX, gridTop, listWidth, gridHeight);
 		refreshGrid();
+	}
+
+	private static String friendsLabel() {
+		int unread = net.veloclient.velo.client.network.SocialClient.totalUnread();
+		var state = net.veloclient.velo.client.network.SocialClient.snapshot();
+		int requests = state == null ? 0 : state.incoming.size();
+		int badge = unread + requests;
+		return badge > 0 ? "Friends (" + badge + ")" : "Friends";
 	}
 
 	private static String categoryIcon(ModuleCategory category) {
@@ -170,20 +213,21 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			if (!query.isEmpty() && !module.displayName().toLowerCase().contains(query)) {
 				continue;
 			}
-			VeloModuleTile tile = new VeloModuleTile(0, 0, TILE_SIZE, module,
+			VeloModuleTile tile = new VeloModuleTile(0, 0, TILE_ICON_AREA, module,
 					() -> this.client.setScreen(module.id().equals("command-keybinds")
 							? new CommandKeybindsScreen(this)
 							: new ModuleConfigScreen(module, this)));
+			tile.setWidth(tileWidth);
 			addSelectableChild(tile);
 			scrollRegion.addRow(tile);
 		}
-		scrollRegion.layoutGrid(gridColumns, TILE_SIZE, TILE_TOTAL_HEIGHT, TILE_GAP);
+		scrollRegion.layoutGrid(gridColumns, tileWidth, TILE_TOTAL_HEIGHT, TILE_GAP);
 	}
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
 		if (scrollRegion != null && scrollRegion.scroll(mouseX, mouseY, verticalAmount)) {
-			scrollRegion.layoutGrid(gridColumns, TILE_SIZE, TILE_TOTAL_HEIGHT, TILE_GAP);
+			scrollRegion.layoutGrid(gridColumns, tileWidth, TILE_TOTAL_HEIGHT, TILE_GAP);
 			return true;
 		}
 		if (sidebarRegion != null && sidebarRegion.scroll(mouseX, mouseY, verticalAmount)) {
@@ -194,8 +238,34 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 	}
 
 	@Override
+	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
+		int listX = contentX() + SIDEBAR_WIDTH + 14;
+		int listWidth = contentWidth() - SIDEBAR_WIDTH - 14;
+		int searchY = contentY();
+		// Sidebar sits on a slightly recessed column, divided from the grid by a hairline.
+		context.fill(contentX() + SIDEBAR_WIDTH + 6, contentY(), contentX() + SIDEBAR_WIDTH + 7, contentBottom(), VeloStyle.border());
+
+		boolean focused = searchBox != null && searchBox.isFocused();
+		boolean hovered = mouseX >= listX && mouseX < listX + listWidth && mouseY >= searchY && mouseY < searchY + SEARCH_HEIGHT;
+		VeloStyle.drawInputField(context, listX, searchY, listWidth, SEARCH_HEIGHT, focused, hovered);
+		VeloDraw.searchGlyph(context, listX + 11f, searchY + SEARCH_HEIGHT / 2f, 9f, focused ? VeloStyle.accent() : VeloStyle.textMuted());
+
+		String query = searchBox == null ? "" : searchBox.getText();
+		String heading = query.isEmpty() ? selectedCategory.displayName() : "Search results";
+		int count = scrollRegion == null ? 0 : scrollRegion.rowsSnapshot().size();
+		int headingY = searchY + SEARCH_HEIGHT + 8;
+		context.drawTextWithShadow(this.textRenderer, TitleScreenTheme.tileFont(heading), listX, headingY, VeloStyle.text());
+		int headingWidth = this.textRenderer.getWidth(TitleScreenTheme.tileFont(heading));
+		context.drawTextWithShadow(this.textRenderer, count + (count == 1 ? " module" : " modules"),
+				listX + headingWidth + 6, headingY, VeloStyle.textFaint());
+	}
+
+	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
+		if (clearSearchButton != null && clearSearchButton.visible) {
+			VeloDraw.cross(context, clearSearchButton.getX() + CLEAR_BUTTON_WIDTH / 2f, clearSearchButton.getY() + 9f, 5f, 1.2f, VeloStyle.textMuted());
+		}
 		// Sidebar buttons and module tiles are registered via
 		// addSelectableChild (input only, not auto-rendered) so they can be
 		// drawn here inside a GPU scissor - a row that's only partially

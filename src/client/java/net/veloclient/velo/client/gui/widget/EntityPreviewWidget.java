@@ -78,7 +78,7 @@ public final class EntityPreviewWidget extends ClickableWidget {
 	@Override
 	protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
 		Theme theme = ThemeManager.active();
-		VeloDraw.fillRounded(context, getX(), getY(), getWidth(), getHeight(), 6, theme.surfaceWithOpacity());
+		VeloCapeTile.drawStage(context, getX(), getY(), getWidth(), getHeight(), 0f, false);
 
 		PlayerEntity player = MinecraftClient.getInstance().player;
 		if (player == null) {
@@ -97,7 +97,6 @@ public final class EntityPreviewWidget extends ClickableWidget {
 
 		drawRotatableEntity(context, x1, y1, x2, y2, size, yawDegrees, player);
 
-		VeloDraw.strokeRounded(context, getX(), getY(), getWidth(), getHeight(), 6, 0x33FFFFFF);
 	}
 
 	//? if <26.1 {

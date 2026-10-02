@@ -1,6 +1,11 @@
 package net.veloclient.velo.client.gui.store;
 
 import net.minecraft.client.gui.DrawContext;
+import net.veloclient.velo.client.gui.title.TitleScreenTheme;
+import net.veloclient.velo.client.gui.widget.VeloAnim;
+import net.veloclient.velo.client.gui.widget.VeloDraw;
+import net.veloclient.velo.client.gui.widget.VeloStyle;
+import net.veloclient.velo.client.gui.widget.VeloUi;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.veloclient.velo.client.cosmetics.CapeManager;
@@ -57,6 +62,7 @@ public final class StoreItemDetailScreen extends VeloWindow {
 		// enough before that the new bordered button style read as the two
 		// touching/overlapping rather than as two separate rows.
 		int actionY = doneY - 32;
+		previewBottom = actionY - 10;
 		// The Back row spans the *full* content width (both columns), so the
 		// preview box has to stop above it - it used to run the full content
 		// height down to contentBottom(), which put its bottom edge directly
@@ -74,7 +80,7 @@ public final class StoreItemDetailScreen extends VeloWindow {
 			actionButton.primary();
 		}
 		addDrawableChild(actionButton);
-		addDrawableChild(new VeloButton(contentX(), doneY, contentWidth(), 20, Text.literal("Back"), b -> requestClose()));
+		addDrawableChild(new VeloButton(contentX(), doneY, 80, 20, Text.literal("Back"), b -> requestClose()));
 	}
 
 	private void onAction() {
@@ -108,30 +114,49 @@ public final class StoreItemDetailScreen extends VeloWindow {
 				.orElse(null);
 	}
 
+	private int previewBottom;
+
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
-		Theme theme = ThemeManager.active();
-
 		int previewWidth = contentWidth() * 2 / 5;
 		int infoX = contentX() + previewWidth + 16;
 		int infoWidth = contentX() + contentWidth() - infoX;
-		int y = contentY();
+		int y = contentY() + 4;
 
-		context.drawTextWithShadow(this.textRenderer, item.name(), infoX, y, theme.accentStart());
+		context.drawTextWithShadow(this.textRenderer, TitleScreenTheme.tileFont("CAPE  ·  ANIMATED"),
+				infoX, y, VeloStyle.accent());
 		y += 14;
-
+		context.getMatrices().pushMatrix();
+		context.getMatrices().translate(infoX, y);
+		context.getMatrices().scale(1.6f, 1.6f);
+		context.drawTextWithShadow(this.textRenderer, TitleScreenTheme.tileFont(VeloUi.trim(item.name(), (int) (infoWidth / 1.6f))), 0, 0, VeloStyle.text());
+		context.getMatrices().popMatrix();
+		y += 22;
 		for (String line : wrap(item.description(), infoWidth)) {
-			context.drawTextWithShadow(this.textRenderer, line, infoX, y, theme.text());
+			context.drawTextWithShadow(this.textRenderer, line, infoX, y, VeloStyle.textMuted());
 			y += 11;
 		}
-		y += 6;
-		String priceLine = StoreOwnership.owns(item.id()) ? "You own this cape." : "Price: " + item.priceCoins() + " Velo Coins";
-		context.drawTextWithShadow(this.textRenderer, priceLine, infoX, y, 0xFFF7D774);
+		y += 8;
+		// Price chip (or "Owned").
+		boolean owned = StoreOwnership.owns(item.id());
+		String price = owned ? "Owned" : String.valueOf(item.priceCoins());
+		int chipW = this.textRenderer.getWidth(price) + (owned ? 16 : 28);
+		VeloDraw.fillRounded(context, infoX, y, chipW, 16, 8, owned ? VeloUi.withAlpha(0xFF3FB97A, 0x40) : VeloAnim.lerpArgb(VeloStyle.card(), 0xFFF4B82E, 0.14f));
+		if (owned) {
+			context.drawTextWithShadow(this.textRenderer, price, infoX + 8, y + 4, 0xFF6FE0A4);
+		} else {
+			VeloDraw.fillCircle(context, infoX + 9f, y + 8f, 5f, 0xFFC9861A);
+			VeloDraw.fillCircle(context, infoX + 9f, y + 8f, 3.8f, 0xFFFFD56A);
+			context.drawTextWithShadow(this.textRenderer, price, infoX + 18, y + 4, 0xFFFFD56A);
+			context.drawTextWithShadow(this.textRenderer, "You have " + CurrencyManager.balance(), infoX + chipW + 8, y + 4, VeloStyle.textFaint());
+		}
 
 		if (actionButton != null && !status.getString().isEmpty()) {
-			context.drawTextWithShadow(this.textRenderer, status, infoX, actionButton.getY() - 12, theme.text());
+			context.drawTextWithShadow(this.textRenderer, status, infoX, actionButton.getY() - 12, VeloStyle.textMuted());
 		}
+		context.drawTextWithShadow(this.textRenderer, "Drag to rotate", contentX() + previewWidth / 2 - this.textRenderer.getWidth("Drag to rotate") / 2,
+				previewBottom - 14, VeloStyle.textFaint());
 	}
 
 	private List<String> wrap(String text, int maxWidth) {

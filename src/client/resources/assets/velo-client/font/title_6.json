@@ -1,0 +1,15 @@
+{
+	"providers": [
+		{
+			"type": "ttf",
+			"file": "velo-client:audiowide.ttf",
+			"size": 11,
+			"oversample": 6,
+			"shift": [0, 0]
+		},
+		{
+			"type": "reference",
+			"id": "minecraft:default"
+		}
+	]
+}

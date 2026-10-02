@@ -92,6 +92,10 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 		}
 		context.disableScissor();
 
+		if (WaypointsModule.showOnMinimap && net.veloclient.velo.client.waypoints.WaypointRenderer.Settings.enabled) {
+			drawWaypoints(context, player, viewportX, viewportY, viewportSize);
+		}
+
 		if (showArrow) {
 			drawPlayerArrow(context, player, viewportX + viewportSize / 2, viewportY + viewportSize / 2);
 		}
@@ -129,6 +133,48 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 		context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, 0, 0, 0f, 0f,
 				textureSize, textureSize, textureSize, textureSize, textureSize, textureSize);
 		context.getMatrices().popMatrix();
+	}
+
+	/**
+	 * Waypoints of this world+dimension as small icons/dots, rotated with the map; ones beyond the
+	 * map's range sit pinned to its edge in their direction so you can still see which way to go.
+	 */
+	private void drawWaypoints(DrawContext context, PlayerEntity player, int viewportX, int viewportY, int viewportSize) {
+		float scale = viewportSize / (2f * viewRadius);
+		float angle = rotateWithPlayer ? mapRotationRadians(player.getYaw()) : 0f;
+		float sin = (float) Math.sin(angle);
+		float cos = (float) Math.cos(angle);
+		float half = viewportSize / 2f;
+		float centerX = viewportX + half;
+		float centerY = viewportY + half;
+		for (var waypoint : net.veloclient.velo.client.waypoints.WaypointManager.visibleHere()) {
+			float dx = (float) (waypoint.blockX() + 0.5 - player.getX()) * scale;
+			float dz = (float) (waypoint.blockZ() + 0.5 - player.getZ()) * scale;
+			float px = dx * cos - dz * sin;
+			float py = dx * sin + dz * cos;
+			float limit = half - 5;
+			boolean pinned = Math.abs(px) > limit || Math.abs(py) > limit;
+			if (pinned) {
+				float factor = limit / Math.max(Math.abs(px), Math.abs(py));
+				px *= factor;
+				py *= factor;
+			}
+			int x = Math.round(centerX + px);
+			int y = Math.round(centerY + py);
+			int color = waypoint.color | 0xFF000000;
+			var stack = net.veloclient.velo.client.waypoints.WaypointIcons.stack(waypoint.icon);
+			if (stack != null && !pinned) {
+				net.veloclient.velo.client.gui.widget.VeloDraw.fillCircle(context, x, y, 5, 0xC0101014);
+				context.getMatrices().pushMatrix();
+				context.getMatrices().translate(x - 4f, y - 4f);
+				context.getMatrices().scale(0.5f, 0.5f);
+				context.drawItemWithoutEntity(stack, 0, 0);
+				context.getMatrices().popMatrix();
+			} else {
+				net.veloclient.velo.client.gui.widget.VeloDraw.fillCircle(context, x, y, pinned ? 3 : 4, 0xFF101014);
+				net.veloclient.velo.client.gui.widget.VeloDraw.fillCircle(context, x, y, pinned ? 2 : 3, color);
+			}
+		}
 	}
 
 	private void drawPlayerArrow(DrawContext context, PlayerEntity player, int centerX, int centerY) {

@@ -248,7 +248,7 @@ public final class SchematicsTabView {
 			row.getChildren().add(icon);
 		} else {
 			Label glyph = new Label("▦");
-			glyph.setFont(Font.font("System", FontWeight.BOLD, 20));
+			glyph.setFont(Font.font("Inter", FontWeight.BOLD, 20));
 			glyph.setTextFill(InstanceDetailView.text(theme));
 			glyph.setMinWidth(32);
 			glyph.setAlignment(Pos.CENTER);
@@ -261,7 +261,7 @@ public final class SchematicsTabView {
 
 		VBox info = new VBox(2);
 		Label title = new Label(displayName);
-		title.setFont(Font.font("System", FontWeight.BOLD, 13));
+		title.setFont(Font.font("Inter", FontWeight.BOLD, 13));
 		title.setTextFill(InstanceDetailView.text(theme));
 		if (identified) {
 			title.setCursor(Cursor.HAND);
@@ -348,7 +348,7 @@ public final class SchematicsTabView {
 		Button back = new Button("< Back to installed");
 		back.setOnAction(e -> onBack.run());
 		Label heading = new Label("Browse schematics on market.phantom-node.com");
-		heading.setFont(Font.font("System", FontWeight.BOLD, 15));
+		heading.setFont(Font.font("Inter", FontWeight.BOLD, 15));
 		heading.setTextFill(InstanceDetailView.text(theme));
 		topRow.getChildren().addAll(back, heading);
 		root.getChildren().add(topRow);
@@ -434,7 +434,7 @@ public final class SchematicsTabView {
 		card.getChildren().add(thumbHolder);
 
 		Label title = new Label(hit.title());
-		title.setFont(Font.font("System", FontWeight.BOLD, 13));
+		title.setFont(Font.font("Inter", FontWeight.BOLD, 13));
 		title.setTextFill(InstanceDetailView.text(theme));
 		title.setWrapText(true);
 		title.setAlignment(Pos.CENTER);

@@ -26,7 +26,7 @@ import java.util.function.Consumer;
 public final class VeloModuleTile extends ClickableWidget {
 
 	private static final int TOGGLE_STRIP_HEIGHT = 22;
-	private static final int TOGGLE_WIDTH = 26;
+	private static final int TOGGLE_WIDTH = 22;
 	private static final int TOGGLE_HEIGHT = 12;
 
 	private final Module module;
@@ -35,7 +35,9 @@ public final class VeloModuleTile extends ClickableWidget {
 	private final Consumer<Boolean> setter;
 	private float hoverProgress;
 	private float knobProgress = -1;
-	private long lastNanos = -1;
+	private long lastNanos;
+	private long pressedAt;
+	private float stripHover;
 	private final Identifier iconTexture;
 	private static final int ICON_SOURCE_SIZE = 1024;
 	private final long spawnNanos = System.nanoTime();
@@ -61,9 +63,11 @@ public final class VeloModuleTile extends ClickableWidget {
 			boolean newValue = !getter.getAsBoolean();
 			setter.accept(newValue);
 			net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
+			pressedAt = System.nanoTime();
 			client.getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.UI_BUTTON_CLICK, newValue ? 1.1f : 0.9f));
 		} else {
 			client.getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.UI_BUTTON_CLICK, 1.0f));
+			pressedAt = System.nanoTime();
 			onOpenSettings.run();
 		}
 	}
@@ -72,76 +76,96 @@ public final class VeloModuleTile extends ClickableWidget {
 	protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
 		Theme theme = ThemeManager.active();
 		long now = System.nanoTime();
-		float dt = lastNanos < 0 ? 0f : (now - lastNanos) / 1_000_000_000f;
+		float dt = VeloStyle.frameDelta(lastNanos, now);
 		lastNanos = now;
 
-		// New tiles (category switch, search filter) pop in via scale+slide
-		// instead of appearing instantly.
+		boolean enabled = getter.getAsBoolean();
+		if (knobProgress < 0) {
+			knobProgress = enabled ? 1f : 0f;
+		}
+		knobProgress = VeloAnim.step(knobProgress, enabled ? 1f : 0f, dt);
+		int iconHeight = iconAreaHeight();
+		boolean hovered = isHovered();
+		boolean stripHovered = hovered && mouseY >= getY() + iconHeight;
+		hoverProgress = VeloAnim.step(hoverProgress, hovered ? 1f : 0f, dt);
+		stripHover = VeloAnim.step(stripHover, stripHovered ? 1f : 0f, dt);
+
+		// New tiles (category switch, search filter) pop in via scale+slide instead of appearing
+		// instantly; hovered tiles lift slightly; clicks give a short press pulse.
 		float entrance = entranceProgress();
-		context.getMatrices().pushMatrix();
+		float scale = (0.88f + 0.12f * entrance) * VeloStyle.pressScale(pressedAt);
 		float centerX = getX() + getWidth() / 2f;
 		float centerY = getY() + getHeight() / 2f;
-		context.getMatrices().translate(centerX, centerY + (1f - entrance) * 6f);
-		context.getMatrices().scale(0.85f + 0.15f * entrance, 0.85f + 0.15f * entrance);
+		context.getMatrices().pushMatrix();
+		context.getMatrices().translate(centerX, centerY + (1f - entrance) * 8f - hoverProgress * 1.5f);
+		context.getMatrices().scale(scale, scale);
 		context.getMatrices().translate(-centerX, -centerY);
 
-		int iconHeight = iconAreaHeight();
-		boolean iconHovered = isHovered() && mouseY < getY() + iconHeight;
-		hoverProgress = VeloAnim.step(hoverProgress, iconHovered ? 1f : 0f, dt);
+		int x = getX();
+		int y = getY();
+		int w = getWidth();
+		int h = getHeight();
+		int radius = VeloStyle.RADIUS_CARD;
+		float on = knobProgress;
 
-		boolean enabled = getter.getAsBoolean();
-		int base = enabled ? blend(theme.accentStart(), theme.surfaceWithOpacity(), 0.55f) : theme.surfaceWithOpacity();
-		int hoverColor = VeloAnim.lerpArgb(base, 0xFFFFFFFF, 0.10f);
-		int iconBg = VeloAnim.lerpArgb(base, hoverColor, hoverProgress);
-		VeloDraw.fillRounded(context, getX(), getY(), getWidth(), iconHeight, 5, iconBg);
-		int accentEdge = enabled ? theme.accentStart() : 0x33FFFFFF;
-		VeloDraw.strokeRounded(context, getX(), getY(), getWidth(), iconHeight, 5, accentEdge);
+		if (hoverProgress > 0.01f) {
+			VeloDraw.shadow(context, x, y, w, h, radius, 8, 3, VeloUi.withAlpha(0xFF000000, Math.round(0x60 * hoverProgress)));
+		}
+		int card = VeloAnim.lerpArgb(VeloStyle.card(), VeloStyle.cardHover(), hoverProgress);
+		int top = VeloAnim.lerpArgb(card, VeloStyle.accentSoft(0.22f), on);
+		VeloDraw.fillRoundedGradient(context, x, y, w, h, radius, top, card);
+		int border = VeloAnim.lerpArgb(VeloAnim.lerpArgb(VeloStyle.border(), VeloStyle.borderStrong(), hoverProgress),
+				VeloUi.withAlpha(theme.accentStart(), 0xA0), on);
+		VeloDraw.strokeRounded(context, x, y, w, h, radius, border);
+
+		// Icon on a soft rounded chip.
+		int chip = 34;
+		int chipX = x + (w - chip) / 2;
+		int chipY = y + 12;
+		int chipColor = VeloAnim.lerpArgb(VeloUi.withAlpha(theme.text(), 0x0E), VeloUi.withAlpha(theme.accentStart(), 0x30), on);
+		VeloDraw.fillRounded(context, chipX, chipY, chip, chip, 10, chipColor);
+		int iconSize = 20;
+		int iconTint = VeloAnim.lerpArgb(VeloUi.withAlpha(theme.text(), 0xB4),
+				VeloAnim.lerpArgb(theme.accentStart() | 0xFF000000, 0xFFFFFFFF, 0.25f), on);
+		context.drawTexture(RenderPipelines.GUI_TEXTURED, iconTexture, chipX + (chip - iconSize) / 2, chipY + (chip - iconSize) / 2,
+				0f, 0f, iconSize, iconSize, ICON_SOURCE_SIZE, ICON_SOURCE_SIZE, ICON_SOURCE_SIZE, ICON_SOURCE_SIZE, iconTint);
 
 		var textRenderer = MinecraftClient.getInstance().textRenderer;
-		float iconScale = Math.min(2.2f, (iconHeight - 18) / 16f);
-		int iconCenterX = getX() + getWidth() / 2;
-		int iconCenterY = getY() + (iconHeight - 12) / 2;
-		context.getMatrices().pushMatrix();
-		context.getMatrices().translate(iconCenterX, iconCenterY);
-		context.getMatrices().scale(iconScale, iconScale);
-		int iconTint = enabled ? (0xFF000000 | (theme.text() & 0xFFFFFF)) : 0xAAFFFFFF;
-		context.drawTexture(RenderPipelines.GUI_TEXTURED, iconTexture, -8, -8, 0f, 0f, 16, 16,
-				ICON_SOURCE_SIZE, ICON_SOURCE_SIZE, ICON_SOURCE_SIZE, ICON_SOURCE_SIZE, iconTint);
-		context.getMatrices().popMatrix();
-		if (!enabled) {
-			VeloDraw.fillRounded(context, getX() + 3, getY() + 3, getWidth() - 6, iconHeight - 15, 4, 0x77000000);
-		}
-
-		String trimmedName = trimToWidth(textRenderer, module.displayName(), getWidth() - 6);
+		String trimmedName = trimToWidth(textRenderer, module.displayName(), w - 10);
 		Text name = TitleScreenTheme.tileFont(trimmedName);
 		int nameWidth = textRenderer.getWidth(name);
-		context.drawTextWithShadow(textRenderer, name, getX() + (getWidth() - nameWidth) / 2,
-				getY() + iconHeight - 12, theme.text());
+		int nameColor = VeloAnim.lerpArgb(VeloStyle.textMuted(), VeloStyle.text(), Math.max(on, hoverProgress));
+		context.drawTextWithShadow(textRenderer, name, x + (w - nameWidth) / 2, chipY + chip + 8, nameColor);
 
-		renderToggle(context, theme, enabled, dt);
+		renderToggleStrip(context, theme, enabled);
 		context.getMatrices().popMatrix();
 	}
 
 	private float entranceProgress() {
 		float ageSeconds = (System.nanoTime() - spawnNanos) / 1_000_000_000f;
-		float t = Math.min(1f, ageSeconds / 0.18f);
+		float t = Math.min(1f, ageSeconds / 0.22f);
 		return 1f - (1f - t) * (1f - t) * (1f - t);
 	}
 
-	private void renderToggle(DrawContext context, Theme theme, boolean enabled, float dt) {
-		if (knobProgress < 0) {
-			knobProgress = enabled ? 1f : 0f;
+	/** Bottom strip: status word on the left, switch on the right; the whole strip toggles. */
+	private void renderToggleStrip(DrawContext context, Theme theme, boolean enabled) {
+		int x = getX();
+		int w = getWidth();
+		int stripY = getY() + iconAreaHeight();
+		context.fill(x + 6, stripY, x + w - 6, stripY + 1, VeloStyle.border());
+		if (stripHover > 0.01f) {
+			VeloDraw.fillRounded(context, x + 3, stripY + 3, w - 6, TOGGLE_STRIP_HEIGHT - 6, 5,
+					VeloUi.withAlpha(theme.text(), Math.round(0x10 * stripHover)));
 		}
-		knobProgress = VeloAnim.step(knobProgress, enabled ? 1f : 0f, dt);
 
-		int trackX = getX() + (getWidth() - TOGGLE_WIDTH) / 2;
-		int trackY = getY() + iconAreaHeight() + (TOGGLE_STRIP_HEIGHT - TOGGLE_HEIGHT) / 2;
-		int off = 0xFF3A3230;
-		int trackColor = VeloAnim.lerpArgb(off, theme.accentStart(), knobProgress);
-		VeloDraw.fillRounded(context, trackX, trackY, TOGGLE_WIDTH, TOGGLE_HEIGHT, TOGGLE_HEIGHT / 2, trackColor);
-		int knobSize = TOGGLE_HEIGHT - 4;
-		int knobX = trackX + 2 + Math.round((TOGGLE_WIDTH - knobSize - 4) * knobProgress);
-		VeloDraw.fillRounded(context, knobX, trackY + 2, knobSize, knobSize, knobSize / 2, 0xFFFFFFFF);
+		var textRenderer = MinecraftClient.getInstance().textRenderer;
+		Text status = TitleScreenTheme.bodyFont(Text.literal(enabled ? "On" : "Off"));
+		int statusColor = VeloAnim.lerpArgb(VeloStyle.textFaint(), theme.accentStart() | 0xFF000000, knobProgress);
+		context.drawTextWithShadow(textRenderer, status, x + 9, stripY + (TOGGLE_STRIP_HEIGHT - 8) / 2, statusColor);
+
+		float trackX = x + w - 9 - TOGGLE_WIDTH;
+		float trackY = stripY + (TOGGLE_STRIP_HEIGHT - TOGGLE_HEIGHT) / 2f;
+		VeloToggle.drawSwitch(context, trackX, trackY, TOGGLE_WIDTH, TOGGLE_HEIGHT, knobProgress, stripHover);
 	}
 
 	private static int blend(int a, int b, float t) {
