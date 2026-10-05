@@ -1,0 +1,84 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "dev.kikugie",
+    "module": "loom-back-compat",
+    "version": "0.4.2",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.6.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "files": [
+        {
+          "name": "loom-back-compat-0.4.2.jar",
+          "url": "loom-back-compat-0.4.2.jar",
+          "size": 28052,
+          "sha512": "b2cf6cace0e1c1bb26e74ecbb50f03eb79c864c9ad374d951b79aa7a9a565db72fac02eebc09dc824359ba8932d15bcc35edabab4dffe35c9e737cb0eceba7d0",
+          "sha256": "ef76914e6626be790a69c4e827a5d6c572cf9670ae1b676428b3edea75737f94",
+          "sha1": "a8697da68fd47458543c17bb285e074453eb5e73",
+          "md5": "5ff8f9cafa3547d3e007015556c7cac0"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "files": [
+        {
+          "name": "loom-back-compat-0.4.2.jar",
+          "url": "loom-back-compat-0.4.2.jar",
+          "size": 28052,
+          "sha512": "b2cf6cace0e1c1bb26e74ecbb50f03eb79c864c9ad374d951b79aa7a9a565db72fac02eebc09dc824359ba8932d15bcc35edabab4dffe35c9e737cb0eceba7d0",
+          "sha256": "ef76914e6626be790a69c4e827a5d6c572cf9670ae1b676428b3edea75737f94",
+          "sha1": "a8697da68fd47458543c17bb285e074453eb5e73",
+          "md5": "5ff8f9cafa3547d3e007015556c7cac0"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "loom-back-compat-0.4.2-sources.jar",
+          "url": "loom-back-compat-0.4.2-sources.jar",
+          "size": 3250,
+          "sha512": "eaf41f22cfc4cb3707d431639136ea485003048fe007569470ad6fa7ddb12dd3efe1d0ca6931b277ae45873561982f4da3fe8a8809135aa994260e086c564485",
+          "sha256": "d6dc123204e2539629c13124508ea1db69ec7edd13f2a316e94b3af4d9207748",
+          "sha1": "08739c7bd9cda0a0ddc84c49e373cfda88567cd8",
+          "md5": "bdadd38b7f4b24e8f81bcc9c6b24b81d"
+        }
+      ]
+    }
+  ]
+}

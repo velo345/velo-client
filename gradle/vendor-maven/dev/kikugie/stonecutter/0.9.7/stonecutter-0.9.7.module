@@ -1,0 +1,79 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "dev.kikugie",
+    "module": "stonecutter",
+    "version": "0.9.7",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.6.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "stonecutter-0.9.7-sources.jar",
+          "url": "stonecutter-0.9.7-sources.jar",
+          "size": 86760,
+          "sha512": "074e7c28c2b777f33018ce19d81970de39564cd8e16969fda5e8442739aa09716ca2067e0ccaf023bf9f0054f508bbe8aefd649e3171dde56519678159a8a5cf",
+          "sha256": "5173c9e90c26afc16f80474cc9fcdb844933a962728a68be912bcadb62910ed4",
+          "sha1": "47d9934e69c8e8d0035451f56a0a69da89f10e14",
+          "md5": "d02dea8c9b90b0d247255d4416635b77"
+        }
+      ]
+    },
+    {
+      "name": "shadowRuntimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "shadowed",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "stonecutter-0.9.7.jar",
+          "url": "stonecutter-0.9.7.jar",
+          "size": 4910406,
+          "sha512": "6120e5665843aecb024e86a33adb603de94cd0f063f7d1950ec2f7e3387b44207887beb9bef711291f31f33ef01dd744b9c5b0b766ff43a38afb1f5944914626",
+          "sha256": "6e22d2b75207f73be60cfc3d7b3ef6eb31d14d9c25334bd848afcc88a33b23c7",
+          "sha1": "61dce152ca576848231bf2523af79fb6f51902dd",
+          "md5": "40b916de225b8e8436418a1b53c801ce"
+        }
+      ]
+    },
+    {
+      "name": "javadocElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "stonecutter-0.9.7-javadoc.jar",
+          "url": "stonecutter-0.9.7-javadoc.jar",
+          "size": 261,
+          "sha512": "1487e5a20c9e4d74f298e07c42e96a61be11b7a768c3fbc199ee138cd68e1fc2267d1cfe3f11f288acc05df755315344d052cc5f6f751f126ab4fe1caa5125ea",
+          "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3",
+          "sha1": "2ad14aed781c4a73ed4dbb421966d408a0a06686",
+          "md5": "f43436d6bec321290f6af228ad602604"
+        }
+      ]
+    }
+  ]
+}

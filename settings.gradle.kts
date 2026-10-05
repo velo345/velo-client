@@ -1,5 +1,15 @@
 pluginManagement {
 	repositories {
+		// Stonecutter + loom-back-compat checked in (gradle/vendor-maven): maven.kikugie.dev is often too slow
+		// or unreachable from GitHub's build machines, which broke the release builds.
+		maven(uri("gradle/vendor-maven")) {
+			name = "Vendored plugins"
+			// loom-back-compat is published with Gradle module metadata only (no POM).
+			metadataSources {
+				gradleMetadata()
+				mavenPom()
+			}
+		}
 		maven("https://maven.fabricmc.net/") { name = "Fabric" }
 		maven("https://maven.kikugie.dev/releases") { name = "KikuGie Releases" }
 		maven("https://maven.kikugie.dev/snapshots") { name = "KikuGie Snapshots" }
