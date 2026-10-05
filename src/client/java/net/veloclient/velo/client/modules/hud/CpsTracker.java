@@ -30,7 +30,7 @@ final class CpsTracker {
 		}
 		registered = true;
 		ClientTickEvents.END_CLIENT_TICK.register(client ->
-				ModuleProfiler.time("cps-counter", ModuleProfiler.Phase.TICK, () -> onTick(client)));
+				ModuleProfiler.time("mouse-buttons", ModuleProfiler.Phase.TICK, () -> onTick(client)));
 	}
 
 	private static void onTick(MinecraftClient client) {

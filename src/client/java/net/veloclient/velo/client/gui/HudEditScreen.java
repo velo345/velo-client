@@ -53,7 +53,12 @@ public final class HudEditScreen extends Screen {
 	@Override
 	protected void init() {
 		this.addDrawableChild(new VeloButton(this.width / 2 - 104, this.height - 30, 100, 20, Text.literal("Reset Layout"), b -> {
-			// Every HUD element (enabled or not) back to its default spot and size.
+			// Every HUD element (enabled or not) back to its default spot and size - or just the F3 panels in F3 mode.
+			var f3 = f3Editing();
+			if (f3 != null) {
+				f3.allPanels().forEach(panel -> panel.position().resetToDefault());
+				return;
+			}
 			for (Module module : ModuleRegistry.all()) {
 				if (module instanceof HudModule hud) {
 					hud.position().resetToDefault();
@@ -63,7 +68,41 @@ public final class HudEditScreen extends Screen {
 		this.addDrawableChild(new VeloButton(this.width / 2 + 4, this.height - 30, 100, 20, Text.literal("Done"), b -> this.close()));
 	}
 
+	/** Better F3 on and the F3 screen open: only the F3 panels are editable (press F3 to switch). */
+	private static net.veloclient.velo.client.modules.debug.BetterF3Module f3Editing() {
+		if (ModuleRegistry.get("better-f3").orElse(null) instanceof net.veloclient.velo.client.modules.debug.BetterF3Module f3
+				&& f3.isEnabled() && net.veloclient.velo.client.modules.debug.BetterF3Module.f3Open()) {
+			return f3;
+		}
+		return null;
+	}
+
+	private static boolean betterF3On() {
+		return ModuleRegistry.get("better-f3").map(Module::isEnabled).orElse(false);
+	}
+
+	@Override
+	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
+		if (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_F3) {
+			net.veloclient.velo.client.modules.debug.BetterF3Module.toggleF3();
+			dragging = null;
+			resizing = null;
+			return true;
+		}
+		return super.keyPressed(input);
+	}
+
 	private List<HudModule> enabledHudModules() {
+		var f3 = f3Editing();
+		if (f3 != null) {
+			List<HudModule> panels = new ArrayList<>();
+			for (HudModule panel : f3.panels()) {
+				if (panel.width() > 0 && panel.height() > 0) {
+					panels.add(panel);
+				}
+			}
+			return panels;
+		}
 		List<HudModule> modules = new ArrayList<>();
 		for (Module module : ModuleRegistry.all()) {
 			// width()/height() of 0 means "nothing to show right now" (e.g.
@@ -90,6 +129,7 @@ public final class HudEditScreen extends Screen {
 		Theme theme = ThemeManager.active();
 		int screenWidth = this.width;
 		int screenHeight = this.height;
+		net.veloclient.velo.client.hud.HudAutoLayout.update(screenWidth, screenHeight);
 
 		for (HudModule hud : enabledHudModules()) {
 			int w = scaledWidth(hud);
@@ -104,7 +144,7 @@ public final class HudEditScreen extends Screen {
 			context.drawTextWithShadow(this.textRenderer, hud.displayName() + " (" + Math.round(hud.position().scale() * 100) + "%)",
 					x, y - 12, 0xFFFFFF00);
 
-			if (hovered) {
+			if (hovered && f3Editing() == null) {
 				// Inside the box's own top-right corner, not above it -
 				// sitting outside the bounding box meant the badge vanished
 				// (hovered flipped false) the moment the mouse moved off the
@@ -133,8 +173,10 @@ public final class HudEditScreen extends Screen {
 			int alpha = (int) (0xCC * bannerOpacity);
 			context.fill(0, 0, this.width, BANNER_HEIGHT, (alpha << 24) | (theme.surfaceWithOpacity() & 0x00FFFFFF));
 			int textAlpha = (int) (0xFF * bannerOpacity);
-			context.drawCenteredTextWithShadow(this.textRenderer,
-					Text.literal("Drag to move - drag the corner handle to resize - click ✕ to disable"),
+			String hint = f3Editing() != null ? "Editing the F3 screen - drag to move, corner handle to resize - press F3 to edit the HUD"
+					: betterF3On() ? "Drag to move - corner handle to resize - click ✕ to disable - press F3 to edit the F3 screen"
+					: "Drag to move - drag the corner handle to resize - click ✕ to disable";
+			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(hint),
 					this.width / 2, 7, (textAlpha << 24) | (theme.text() & 0x00FFFFFF));
 		}
 	}
@@ -158,7 +200,7 @@ public final class HudEditScreen extends Screen {
 
 			int badgeX = x + w - BADGE_SIZE - 2;
 			int badgeY = y + 2;
-			if (isInside(mouseX, mouseY, badgeX, badgeY, BADGE_SIZE, BADGE_SIZE)) {
+			if (f3Editing() == null && isInside(mouseX, mouseY, badgeX, badgeY, BADGE_SIZE, BADGE_SIZE)) {
 				hud.setEnabled(false);
 				return true;
 			}
@@ -198,6 +240,8 @@ public final class HudEditScreen extends Screen {
 			float xFraction = this.width > w ? newX / (float) (this.width - w) : 0f;
 			float yFraction = this.height > h ? newY / (float) (this.height - h) : 0f;
 			dragging.position().set(xFraction, yFraction);
+			// Dragged by hand: from now on it stays exactly here instead of auto-stacking.
+			dragging.position().setPlaced(true);
 			return true;
 		}
 		return super.mouseDragged(click, offsetX, offsetY);

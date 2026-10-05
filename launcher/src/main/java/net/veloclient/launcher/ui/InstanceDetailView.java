@@ -95,6 +95,7 @@ public final class InstanceDetailView {
 		tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 		tabs.getTabs().add(new Tab("Mods", buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.MOD,
 				InstancePaths.modsDir(instance.id()), List.of("*.jar"))));
+		tabs.getTabs().add(new Tab("Worlds", WorldsTabView.build(owner, instance, theme)));
 		tabs.getTabs().add(new Tab("Modpacks", ModpacksTabView.build(owner, overlayHost, instance, theme)));
 		tabs.getTabs().add(new Tab("Resource Packs", buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.RESOURCE_PACK,
 				InstancePaths.resourcePacksDir(instance.id()), List.of("*.zip"))));
@@ -508,6 +509,10 @@ public final class InstanceDetailView {
 		meta.getStyleClass().add("version-tag");
 		meta.setTextFill(text(theme));
 		info.getChildren().addAll(title, meta);
+		Label builtin = builtinHint(null, asset.title());
+		if (builtin != null) {
+			info.getChildren().add(builtin);
+		}
 		HBox.setHgrow(info, Priority.ALWAYS);
 		row.getChildren().add(info);
 
@@ -750,6 +755,19 @@ public final class InstanceDetailView {
 		return root;
 	}
 
+	/** "Built into Velo: World Map" for mods whose feature Velo already has. */
+	private static Label builtinHint(String slug, String title) {
+		String feature = net.veloclient.launcher.data.VeloBuiltins.featureFor(slug, title);
+		if (feature == null) {
+			return null;
+		}
+		Label hint = new Label("★ Built into Velo: " + feature);
+		hint.getStyleClass().add("velo-builtin-hint");
+		hint.setTooltip(new javafx.scene.control.Tooltip("Velo Client already has this built in (" + feature
+				+ ") - you probably don't need this mod. Find it in game with Right Shift."));
+		return hint;
+	}
+
 	private static Node buildSearchResultCard(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
 			Path folder, ModrinthClient.SearchHit hit, java.util.function.Consumer<String> openDetail) {
 		VBox card = new VBox(8);
@@ -834,7 +852,15 @@ public final class InstanceDetailView {
 			});
 		}
 
-		card.getChildren().addAll(title, description, downloads, spacer, progress, install);
+		card.getChildren().addAll(title, description, downloads);
+		Label builtin = builtinHint(hit.slug(), hit.title());
+		if (builtin != null) {
+			card.getChildren().add(builtin);
+			description.setMinHeight(18);
+			description.setMaxHeight(18);
+			description.setText(truncate(hit.description(), 40));
+		}
+		card.getChildren().addAll(spacer, progress, install);
 		return card;
 	}
 

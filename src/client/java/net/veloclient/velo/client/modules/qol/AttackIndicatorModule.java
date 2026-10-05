@@ -26,7 +26,7 @@ public final class AttackIndicatorModule extends AbstractModule implements Confi
 	private static final Identifier VANILLA_BACKGROUND = Identifier.of("minecraft", "hud/crosshair_attack_indicator_background");
 	private static final Identifier VANILLA_PROGRESS = Identifier.of("minecraft", "hud/crosshair_attack_indicator_progress");
 
-	private String style = "Bar";
+	private String style = "Thin Line";
 	private int fillColor = 0xFFFFFFFF;
 	private int backgroundColor = 0x80000000;
 	private int readyColor = 0xFF6FE39A;

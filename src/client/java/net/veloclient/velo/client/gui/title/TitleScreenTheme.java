@@ -205,6 +205,8 @@ public final class TitleScreenTheme {
 	public static final Identifier BODY_FONT = Identifier.of("velo-client", "body");
 	/** The custom tile-title-font identifier (Anta) - matches {@code assets/velo-client/font/tile.json}; used for module tile names in {@code ModMenuScreen}. */
 	public static final Identifier TILE_FONT = Identifier.of("velo-client", "tile");
+	/** Large Inter SemiBold (15px) rasterized per GUI scale - for big numbers, crisp instead of a scaled-up small font. */
+	public static final Identifier BIG_FONT = Identifier.of("velo-client", "big");
 
 	private static final Identifier LOGO_TEXTURE = Identifier.of("velo-client", "textures/icon/logo.png");
 	private static final int LOGO_SOURCE_SIZE = 500;
@@ -250,6 +252,10 @@ public final class TitleScreenTheme {
 	public static Text tileFont(String text) {
 		return Text.literal(text).setStyle(Style.EMPTY.withFont(new net.minecraft.text.StyleSpriteSource.Font(TILE_FONT)));
 	}
+
+	public static Text bigFont(String text) {
+		return Text.literal(text).setStyle(Style.EMPTY.withFont(new net.minecraft.text.StyleSpriteSource.Font(BIG_FONT)));
+	}
 	//?} else {
 	/*public static Text titleFont(String text) {
 		return Text.literal(text).setStyle(Style.EMPTY.withFont(new net.minecraft.network.chat.FontDescription.Resource(TITLE_FONT)));
@@ -261,6 +267,10 @@ public final class TitleScreenTheme {
 
 	public static Text tileFont(String text) {
 		return Text.literal(text).setStyle(Style.EMPTY.withFont(new net.minecraft.network.chat.FontDescription.Resource(TILE_FONT)));
+	}
+
+	public static Text bigFont(String text) {
+		return Text.literal(text).setStyle(Style.EMPTY.withFont(new net.minecraft.network.chat.FontDescription.Resource(BIG_FONT)));
 	}
 	*///?}
 

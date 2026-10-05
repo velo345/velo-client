@@ -19,6 +19,9 @@ application {
 dependencies {
 	// Same JSON library used everywhere else in this repo (launcher, mod).
 	implementation 'com.google.code.gson:gson:2.11.0'
+	// Store wallets, owned items, orders and the coin ledger live in one SQLite file in the data
+	// directory - real transactions (no half-applied purchases), nothing extra to install or run.
+	implementation 'org.xerial:sqlite-jdbc:3.46.1.3'
 
 	testImplementation platform('org.junit:junit-bom:5.10.2')
 	testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -36,6 +39,10 @@ tasks.named('shadowJar') {
 	archiveBaseName.set('velo-server')
 	archiveClassifier.set('')
 	archiveVersion.set('')
+	// sqlite-jdbc loads its native library; without this newer JDKs print warnings (and will block it).
+	manifest {
+		attributes('Enable-Native-Access': 'ALL-UNNAMED')
+	}
 }
 
 tasks.named('build') {

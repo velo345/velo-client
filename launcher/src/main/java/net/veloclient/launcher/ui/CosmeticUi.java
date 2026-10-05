@@ -81,7 +81,85 @@ final class CosmeticUi {
 				k -> PlayerSkin3DView.capeThumbnail(frames.get(0).image(), width, height));
 	}
 
+	/** One frame of an animated cape as a 3D thumbnail, rendered on first use and cached. FX thread. */
+	static Image frameThumbnail(String key, List<GifFrames.Frame> frames, int index, double width, double height) {
+		if (index == 0) {
+			return thumbnail(key, frames, width, height);
+		}
+		return THUMBNAILS.computeIfAbsent(key + "@" + (int) width + "x" + (int) height + "#" + index,
+				k -> PlayerSkin3DView.capeThumbnail(frames.get(index).image(), width, height));
+	}
+
+	/**
+	 * Plays an animated cape's frames in {@code view} while the mouse is over {@code hoverTarget}
+	 * (or all the time when {@code always}), back to the first frame afterwards. Static capes are
+	 * left alone.
+	 */
+	static void animate(javafx.scene.Node hoverTarget, ImageView view, String key, List<GifFrames.Frame> frames,
+			double width, double height, boolean always) {
+		if (frames.size() < 2) {
+			return;
+		}
+		int total = 0;
+		for (GifFrames.Frame frame : frames) {
+			total += Math.max(20, frame.delayMillis());
+		}
+		int loopMillis = total;
+		long[] start = {0};
+		int[] shown = {0};
+		javafx.animation.AnimationTimer timer = new javafx.animation.AnimationTimer() {
+			@Override
+			public void handle(long now) {
+				if (start[0] == 0) {
+					start[0] = now;
+				}
+				long into = ((now - start[0]) / 1_000_000L) % loopMillis;
+				int index = 0;
+				for (int i = 0; i < frames.size(); i++) {
+					into -= Math.max(20, frames.get(i).delayMillis());
+					if (into < 0) {
+						index = i;
+						break;
+					}
+				}
+				if (index != shown[0]) {
+					shown[0] = index;
+					view.setImage(frameThumbnail(key, frames, index, width, height));
+				}
+			}
+		};
+		if (always) {
+			// Only while it's actually on screen, so leaving the page doesn't keep a timer running.
+			view.sceneProperty().addListener((obs, oldScene, scene) -> {
+				if (scene != null) {
+					timer.start();
+				} else {
+					timer.stop();
+				}
+			});
+			if (view.getScene() != null) {
+				timer.start();
+			}
+			return;
+		}
+		hoverTarget.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
+			start[0] = 0;
+			timer.start();
+		});
+		hoverTarget.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_EXITED, e -> {
+			timer.stop();
+			shown[0] = 0;
+			view.setImage(thumbnail(key, frames, width, height));
+		});
+	}
+
 	/** The account's skin, fetched once and cached; {@code onReady} runs on the FX thread (null if unavailable). */
+	/** Forgets the cached account skin (after equipping a new one). */
+	static void forgetSkin() {
+		skin = null;
+		skinOwner = null;
+	}
+
 	static void skin(MinecraftSession session, Consumer<SkinFetcher.SkinData> onReady) {
 		if (session == null) {
 			onReady.accept(null);
@@ -148,9 +226,20 @@ final class CosmeticUi {
 	 * lifts on hover (UiMotion) and shows a ring when {@code selected}.
 	 */
 	static VBox capeCard(Image thumbnail, String title, Node footer, boolean selected, Runnable onClick) {
+		return capeCard(null, null, thumbnail, title, footer, selected, onClick);
+	}
+
+	/** A cape card whose animated cape plays while hovered. */
+	static VBox capeCard(String key, List<GifFrames.Frame> frames, String title, Node footer, boolean selected, Runnable onClick) {
+		return capeCard(key, frames, thumbnail(key, frames, 150, 150), title, footer, selected, onClick);
+	}
+
+	private static VBox capeCard(String key, List<GifFrames.Frame> frames, Image thumbnail, String title, Node footer, boolean selected,
+			Runnable onClick) {
 		StackPane stage = stage(150, 150);
+		ImageView view = null;
 		if (thumbnail != null) {
-			ImageView view = new ImageView(thumbnail);
+			view = new ImageView(thumbnail);
 			view.setFitWidth(130);
 			view.setFitHeight(140);
 			view.setPreserveRatio(true);
@@ -168,6 +257,9 @@ final class CosmeticUi {
 			card.getStyleClass().add("cape-card-selected");
 		}
 		card.setOnMouseClicked(e -> onClick.run());
+		if (view != null && key != null && frames != null) {
+			animate(card, view, key, frames, 150, 150, false);
+		}
 		return card;
 	}
 

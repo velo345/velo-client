@@ -68,6 +68,18 @@ public final class VeloUi {
 		return new Hit(x, y, width, height, action);
 	}
 
+	/** Opens a web page in the player's browser (checkout, ads) - plain OS command, works on every version. */
+	public static void openUrl(String url) {
+		try {
+			String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+			String[] command = os.contains("win") ? new String[] {"rundll32", "url.dll,FileProtocolHandler", url}
+					: os.contains("mac") ? new String[] {"open", url} : new String[] {"xdg-open", url};
+			new ProcessBuilder(command).start();
+		} catch (Exception e) {
+			net.veloclient.velo.VeloClient.LOGGER.warn("Couldn't open {}", url, e);
+		}
+	}
+
 	public static int textWidth(String text) {
 		return MinecraftClient.getInstance().textRenderer.getWidth(text);
 	}

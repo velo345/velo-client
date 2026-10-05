@@ -51,7 +51,27 @@ public final class ModuleStateStore {
 		return result;
 	}
 
+	/**
+	 * Settings from older versions: the CPS Counter module was merged into Mouse Buttons (style
+	 * "Text"), so a profile that had CPS Counter on - and Mouse Buttons off - gets Mouse Buttons in
+	 * text style instead of silently losing its CPS display.
+	 */
+	static Map<String, ModuleSnapshot> migrate(Map<String, ModuleSnapshot> snapshot) {
+		ModuleSnapshot cps = snapshot.get("cps-counter");
+		ModuleSnapshot mouse = snapshot.get("mouse-buttons");
+		if (cps == null || !cps.enabled() || (mouse != null && mouse.enabled())) {
+			return snapshot;
+		}
+		Map<String, ModuleSnapshot> result = new LinkedHashMap<>(snapshot);
+		Map<String, Object> fields = new LinkedHashMap<>(mouse == null ? Map.of() : mouse.fields());
+		fields.put("Style", "Text");
+		result.put("mouse-buttons", new ModuleSnapshot(true, fields));
+		result.remove("cps-counter");
+		return result;
+	}
+
 	public static void applyAll(Map<String, ModuleSnapshot> snapshot) {
+		snapshot = migrate(snapshot);
 		for (Module module : ModuleRegistry.all()) {
 			ModuleSnapshot saved = snapshot.get(module.id());
 			if (saved == null) {

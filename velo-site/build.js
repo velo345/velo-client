@@ -42,6 +42,18 @@ function applyConditionals(content, tokens) {
 	return content;
 }
 
+/** {{> name}} pastes src/partials/name.html (shared nav/footer), before conditionals and tokens run. */
+function applyPartials(content, file) {
+	return content.replace(/\{\{>\s*([\w-]+)\s*\}\}/g, (match, name) => {
+		const partial = path.join(SRC_DIR, "partials", `${name}.html`);
+		if (!fs.existsSync(partial)) {
+			console.warn(`  ! ${file}: no partial ${name}`);
+			return match;
+		}
+		return fs.readFileSync(partial, "utf8");
+	});
+}
+
 function rmrf(dir) {
 	if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
 }
@@ -74,6 +86,7 @@ function main() {
 	const htmlFiles = fs.readdirSync(SRC_DIR).filter((f) => f.endsWith(".html"));
 	for (const file of htmlFiles) {
 		let content = fs.readFileSync(path.join(SRC_DIR, file), "utf8");
+		content = applyPartials(content, file);
 		content = applyConditionals(content, tokens);
 		content = content.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, key) => {
 			if (!(key in tokens)) {

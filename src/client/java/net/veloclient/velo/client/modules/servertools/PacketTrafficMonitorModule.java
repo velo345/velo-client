@@ -33,7 +33,8 @@ public final class PacketTrafficMonitorModule extends AbstractModule implements 
 
 	private Map<String, Long> cachedInbound = Map.of();
 	private Map<String, Long> cachedOutbound = Map.of();
-	private long cachedAtNanos = Long.MIN_VALUE;
+	private long cachedAtNanos;
+	private boolean cacheValid;
 
 	public PacketTrafficMonitorModule() {
 		super("packet-traffic-monitor", "Packet Traffic Monitor",
@@ -81,9 +82,10 @@ public final class PacketTrafficMonitorModule extends AbstractModule implements 
 
 	private void refreshCacheIfStale() {
 		long now = System.nanoTime();
-		if (now - cachedAtNanos < CACHE_WINDOW_NANOS) {
+		if (cacheValid && now - cachedAtNanos < CACHE_WINDOW_NANOS) {
 			return;
 		}
+		cacheValid = true;
 		cachedAtNanos = now;
 		cachedInbound = topEntries(PacketTrafficTracker.inboundSnapshot());
 		cachedOutbound = topEntries(PacketTrafficTracker.outboundSnapshot());

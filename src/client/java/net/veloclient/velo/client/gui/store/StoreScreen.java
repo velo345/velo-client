@@ -67,9 +67,15 @@ public final class StoreScreen extends VeloWindow {
 		}
 		gridRegion.layoutGrid(gridColumns, TILE_WIDTH, TILE_TOTAL_HEIGHT, TILE_GAP);
 
-		String balanceLabel = String.valueOf(CurrencyManager.balance());
+		net.veloclient.velo.client.network.StoreClient.refresh(false, null);
+		String balanceLabel = balanceText();
 		balanceWidth = this.textRenderer.getWidth(balanceLabel) + this.textRenderer.getWidth("Get coins") + 44;
 		balanceX = contentX() + contentWidth() - balanceWidth;
+	}
+
+	private static String balanceText() {
+		int balance = CurrencyManager.balance();
+		return balance < 0 ? "..." : String.format(java.util.Locale.ROOT, "%,d", balance);
 	}
 
 	@Override
@@ -120,7 +126,7 @@ public final class StoreScreen extends VeloWindow {
 		float coinY = balanceY + h / 2f;
 		VeloDraw.fillCircle(context, coinX, coinY, 6f, 0xFFC9861A);
 		VeloDraw.fillCircle(context, coinX, coinY, 4.8f, 0xFFFFD56A);
-		String balanceLabel = String.valueOf(CurrencyManager.balance());
+		String balanceLabel = balanceText();
 		context.drawTextWithShadow(this.textRenderer, balanceLabel, balanceX + 22, balanceY + (h - 8) / 2, 0xFFFFD56A);
 		context.drawTextWithShadow(this.textRenderer, "Get coins", balanceX + 30 + this.textRenderer.getWidth(balanceLabel),
 				balanceY + (h - 8) / 2, hovered ? 0xFFFFFFFF : VeloStyle.textMuted());

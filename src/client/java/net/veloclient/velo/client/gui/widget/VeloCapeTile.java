@@ -123,7 +123,7 @@ public final class VeloCapeTile extends ClickableWidget {
 	}
 
 	/** The shared cape "stage": a card with an accent glow rising from the floor. */
-	static void drawStage(DrawContext context, int x, int y, int w, int h, float hover, boolean highlighted) {
+	public static void drawStage(DrawContext context, int x, int y, int w, int h, float hover, boolean highlighted) {
 		Theme theme = ThemeManager.active();
 		if (hover > 0.01f) {
 			VeloDraw.shadow(context, x, y, w, h, VeloStyle.RADIUS_CARD, 8, 3, VeloUi.withAlpha(0xFF000000, Math.round(0x55 * hover)));

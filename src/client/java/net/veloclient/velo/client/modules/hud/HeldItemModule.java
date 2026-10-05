@@ -26,6 +26,8 @@ public final class HeldItemModule extends AbstractModule implements HudModule, C
 	private boolean countWholeInventory = false;
 	private boolean showBackground = true;
 	private boolean showDurability = true;
+	/** Width of the last drawn box, so the HUD editor/auto layout box matches what's on screen. */
+	private int lastWidth = 24;
 
 	public HeldItemModule() {
 		super("held-item", "Held Item", "Shows the icon and count of the item in your main hand.",
@@ -45,15 +47,20 @@ public final class HeldItemModule extends AbstractModule implements HudModule, C
 		}
 		ItemStack stack = client.player.getMainHandStack();
 		if (stack.isEmpty()) {
+			lastWidth = 24;
 			return;
 		}
 		int count = countWholeInventory ? ClientCompat.countInInventory(stack.getItem()) : stack.getCount();
 		String countLabel = count > 1 || countWholeInventory ? String.valueOf(count) : "";
 		String name = showName ? stack.getName().getString() : "";
 		var textRenderer = client.textRenderer;
-		int contentWidth = 16 + (countLabel.isEmpty() ? 0 : 4 + textRenderer.getWidth(countLabel))
-				+ (name.isEmpty() ? 0 : 6 + textRenderer.getWidth(name));
-		int boxWidth = contentWidth + 8;
+		// Text glyphs carry a pixel of spacing on their right, so text-ended boxes get a little more
+		// right padding to look as even as the 4px on the icon's left.
+		boolean hasText = !countLabel.isEmpty() || !name.isEmpty();
+		int textWidth = (countLabel.isEmpty() ? 0 : textRenderer.getWidth(countLabel))
+				+ (!countLabel.isEmpty() && !name.isEmpty() ? 6 : 0) + (name.isEmpty() ? 0 : textRenderer.getWidth(name));
+		int boxWidth = 4 + 16 + (hasText ? 4 + textWidth + 6 : 4);
+		lastWidth = boxWidth;
 		if (showBackground) {
 			VeloDraw.fillRounded(context, x, y, boxWidth, 22, 6, 0x90101014);
 		}
@@ -76,7 +83,7 @@ public final class HeldItemModule extends AbstractModule implements HudModule, C
 
 	@Override
 	public int width() {
-		return 120;
+		return lastWidth;
 	}
 
 	@Override

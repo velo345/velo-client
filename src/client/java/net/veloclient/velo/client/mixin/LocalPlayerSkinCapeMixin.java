@@ -49,10 +49,19 @@ public abstract class LocalPlayerSkinCapeMixin {
 
 	@Inject(method = "getSkin", at = @At("RETURN"), cancellable = true)
 	private void velo$overrideCapeAndElytra(CallbackInfoReturnable<SkinTextures> cir) {
-		if ((Object) this != MinecraftClient.getInstance().player) {
-			return;
+		java.util.Optional<CapeDefinition> equipped;
+		if ((Object) this == MinecraftClient.getInstance().player) {
+			equipped = CapeManager.renderCape();
+		} else {
+			// Other Velo players: with Wavey Capes installed our own render layer is off, so their
+			// Velo cape has to come through here too - otherwise nobody else's cape ever showed.
+			if (!WaveyCapesCompat.isLoaded()) {
+				return;
+			}
+			AbstractClientPlayerEntity self = (AbstractClientPlayerEntity) (Object) this;
+			equipped = net.veloclient.velo.client.cosmetics.RemoteCapeCache.resolve(
+					net.veloclient.velo.client.network.VeloUserRegistry.capeIdFor(self.getUuid(), self.getGameProfile().name()));
 		}
-		var equipped = CapeManager.renderCape();
 		if (equipped.isEmpty()) {
 			return;
 		}
@@ -92,10 +101,17 @@ public abstract class LocalPlayerSkinCapeMixin {
 
 	@Inject(method = "getSkin", at = @At("RETURN"), cancellable = true)
 	private void velo$overrideCapeAndElytra(CallbackInfoReturnable<PlayerSkin> cir) {
-		if ((Object) this != Minecraft.getInstance().player) {
-			return;
+		java.util.Optional<CapeDefinition> equipped;
+		if ((Object) this == Minecraft.getInstance().player) {
+			equipped = CapeManager.renderCape();
+		} else {
+			if (!WaveyCapesCompat.isLoaded()) {
+				return;
+			}
+			AbstractClientPlayer self = (AbstractClientPlayer) (Object) this;
+			equipped = net.veloclient.velo.client.cosmetics.RemoteCapeCache.resolve(
+					net.veloclient.velo.client.network.VeloUserRegistry.capeIdFor(self.getUUID(), self.getGameProfile().name()));
 		}
-		var equipped = CapeManager.renderCape();
 		if (equipped.isEmpty()) {
 			return;
 		}

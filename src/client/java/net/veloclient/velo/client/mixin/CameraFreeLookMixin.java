@@ -94,7 +94,11 @@ public abstract class CameraFreeLookMixin {
 	@Shadow
 	protected abstract void setPosition(double x, double y, double z);
 
-	@Inject(method = "update", at = @At("TAIL"))
+	// Right after vanilla places the camera on its entity - NOT at the end of update(): since 26.1
+	// update() also builds the chunk-culling frustum (prepareCullFrustum) from the camera's rotation,
+	// so overriding afterwards made Minecraft pick chunks for the way the player faces while showing
+	// the other way, and everything behind you vanished in free look.
+	@Inject(method = "update", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;alignWithEntity(F)V", shift = At.Shift.AFTER))
 	private void velo$applyFreeLook(net.minecraft.client.DeltaTracker deltaTracker, CallbackInfo ci) {
 		if (!FreeLookModule.isActive()) {
 			return;

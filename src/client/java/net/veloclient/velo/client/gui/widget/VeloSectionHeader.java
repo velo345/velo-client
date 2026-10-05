@@ -25,17 +25,14 @@ public final class VeloSectionHeader extends ClickableWidget {
 		var textRenderer = MinecraftClient.getInstance().textRenderer;
 		int x = getX() + 9;
 		int y = getY() + getHeight() - 11;
-		// Hand-tracked letter spacing reads as a proper "overline" caption rather than shouting caps.
-		context.getMatrices().pushMatrix();
-		context.getMatrices().translate(x, y);
-		context.getMatrices().scale(0.8f, 0.8f);
-		int cursor = 0;
+		// Drawn at native size (scaling the per-GUI-scale font down made it pixelated), in the
+		// semibold UI font, with a little letter spacing so it reads as a caption.
+		int cursor = x;
 		for (int i = 0; i < label.length(); i++) {
-			String ch = String.valueOf(label.charAt(i));
-			context.drawTextWithShadow(textRenderer, ch, cursor, 0, VeloStyle.textFaint());
+			net.minecraft.text.Text ch = net.veloclient.velo.client.gui.title.TitleScreenTheme.tileFont(String.valueOf(label.charAt(i)));
+			context.drawTextWithShadow(textRenderer, ch, cursor, y, VeloStyle.textFaint());
 			cursor += textRenderer.getWidth(ch) + 1;
 		}
-		context.getMatrices().popMatrix();
 	}
 
 	@Override

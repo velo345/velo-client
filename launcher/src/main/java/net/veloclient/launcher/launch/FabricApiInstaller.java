@@ -24,16 +24,29 @@ public final class FabricApiInstaller {
 	public static void installInto(Path modsDir, GameVersion version) {
 		try {
 			Files.createDirectories(modsDir);
-			try (Stream<Path> existing = Files.list(modsDir)) {
-				for (Path file : existing.filter(FabricApiInstaller::isFabricApiJar).toList()) {
-					Files.delete(file);
-				}
-			}
 			String apiVersion = version.fabricApiVersion();
-			String relativePath = "net/fabricmc/fabric-api/fabric-api/" + apiVersion + "/fabric-api-" + apiVersion + ".jar";
+			String targetName = "fabric-api-" + apiVersion + ".jar";
+			String relativePath = "net/fabricmc/fabric-api/fabric-api/" + apiVersion + "/" + targetName;
 			Path cached = GameDataPaths.libraries().resolve(relativePath);
 			Downloader.ensure(URI.create(MAVEN_BASE_URL + relativePath), cached, null, -1, b -> { });
-			Files.copy(cached, modsDir.resolve("fabric-api-" + apiVersion + ".jar"), StandardCopyOption.REPLACE_EXISTING);
+			Path target = modsDir.resolve(targetName);
+			// Already the right file: leave it alone. Rewriting it on every launch failed on Windows
+			// whenever the same profile was already running (the jar is locked by that game).
+			boolean upToDate = Files.exists(target) && Files.size(target) == Files.size(cached);
+			try (Stream<Path> existing = Files.list(modsDir)) {
+				for (Path file : existing.filter(FabricApiInstaller::isFabricApiJar).toList()) {
+					if (!file.getFileName().toString().equals(targetName)) {
+						try {
+							Files.delete(file);
+						} catch (IOException locked) {
+							// In use by a running game - it's cleaned up on a later launch.
+						}
+					}
+				}
+			}
+			if (!upToDate) {
+				Files.copy(cached, target, StandardCopyOption.REPLACE_EXISTING);
+			}
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to install Fabric API into " + modsDir, e);
 		}

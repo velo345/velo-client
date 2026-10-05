@@ -1,76 +1,66 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Terms of Service — {{site.name}}</title>
+{{> head}}
+<title>Terms of Service · Velo Client</title>
 <meta name="robots" content="noindex">
-<link rel="icon" type="image/png" href="assets/favicon.png">
-<link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-inner">
-    <a class="brand" href="/"><img class="brand-mark" src="assets/logo.png" alt="">{{site.name}}</a>
-    <div class="nav-links">
-      <a href="index.html#features">Features</a>
-      <a href="index.html#install">Install</a>
-    </div>
-    <a class="nav-cta" href="index.html">Home</a>
-  </div>
-</nav>
+{{> nav}}
 
 <main class="wrap legal">
-  <h1>Terms of Service</h1>
-  <p class="updated">Last updated {{legal.lastUpdated}}</p>
+<h1>Terms of Service</h1>
+<p class="updated">Last updated {{legal.lastUpdated}}</p>
 
-  <h2>1. Acceptance</h2>
-  <p>By downloading, installing, or using {{site.name}} (the "mod") or its companion launcher (together, the "Software"), you agree to these Terms of Service. If you don't agree, don't use the Software.</p>
+<h2>1. Acceptance</h2>
+<p>By downloading, installing or using Velo Client (the "mod"), its companion launcher, or the Velo Network online services (together, the "Software"), you agree to these Terms. If you don't agree, don't use the Software.</p>
 
-  <h2>2. What {{site.name}} is</h2>
-  <p>{{site.name}} is a free, independently developed Fabric mod and companion launcher for Minecraft: Java Edition. It is provided as-is, free of charge, with no purchase required and no in-app monetization. It is not an official Minecraft product and is not approved by or associated with Mojang Synergies AB or Microsoft Corporation — see the <a href="impressum.html">Imprint</a> for details.</p>
+<h2>2. What Velo Client is</h2>
+<p>Velo Client is a free, independently developed Fabric mod and launcher for Minecraft: Java Edition. All features are free. Optional <b>Velo Coins</b> can be bought to unlock cosmetic items (see section 5). It is not an official Minecraft product and is not approved by or associated with Mojang Synergies AB or Microsoft Corporation. See the <a href="impressum.html">Imprint</a>.</p>
 
-  <h2>3. License to use</h2>
-  <p>You're granted a personal, non-exclusive, non-transferable, revocable license to download and run the Software for your own use. You may not sell the Software, claim authorship of it, or redistribute modified copies as your own work without clear attribution.</p>
+<h2>3. License to use</h2>
+<p>You get a personal, non-exclusive, non-transferable, revocable license to download and run the Software for your own use. You may not sell the Software, claim authorship of it, or pass off modified copies as your own work. The source code's own license (see the repository) also applies.</p>
 
-  <h2>4. Third-party requirements and services</h2>
-  <ul>
-    <li>The mod requires Fabric Loader and Fabric API, which are separate, third-party software with their own licenses — {{site.name}} does not distribute or control them.</li>
-    <li>Playing on a Minecraft server is subject to that server's own rules. Some servers restrict or ban certain client-side mods; whether {{site.name}} is permitted on a given server is between you and that server's operators. We make no guarantee it will be allowed anywhere.</li>
-    <li>The companion launcher's Microsoft sign-in uses Microsoft's own authentication service to obtain a Minecraft session on your behalf. Your Microsoft/Xbox account is subject to Microsoft's own terms — we never see or store your password, and authentication happens directly against Microsoft's servers using the standard device-code flow.</li>
-  </ul>
+<h2>4. Third-party requirements and services</h2>
+<ul>
+<li>The mod needs Fabric Loader and Fabric API. They are separate third-party software with their own licenses.</li>
+<li>Minecraft servers have their own rules. Some restrict client-side mods. Whether Velo Client is allowed on a server is between you and that server. We don't guarantee that it is allowed anywhere.</li>
+<li>Microsoft sign-in uses Microsoft's own authentication. Your account is subject to Microsoft's terms. We never see or store your password.</li>
+</ul>
 
-  <h2>5. No warranty</h2>
-  <p>The Software is provided "as is," without warranty of any kind, express or implied, including but not limited to fitness for a particular purpose or non-infringement. Mods can occasionally break with new Minecraft versions, conflict with other mods, or contain bugs — use it at your own risk, and keep backups of worlds/saves you care about.</p>
+<h2>5. Velo Coins and cosmetics</h2>
+<ul>
+<li><b>What they are:</b> Velo Coins are a virtual currency used only to unlock cosmetic items in Velo Client, such as capes. Cosmetics don't affect gameplay.</li>
+<li><b>No cash value:</b> Velo Coins and cosmetics have no monetary value. They can't be exchanged for money, transferred, or sold to other players. They are licensed to you for use with your Minecraft account; you don't own them as property.</li>
+<li><b>Buying coins:</b> coin packs are sold by <b>Tebex Limited</b> as reseller and merchant of record, under <a href="https://checkout.tebex.io/terms" target="_blank" rel="noopener">Tebex's checkout terms</a>. Prices include any applicable VAT as shown at checkout. Coins are added to your account as soon as the payment is confirmed.</li>
+<li><b>Right of withdrawal:</b> Velo Coins are digital content delivered immediately. By completing the purchase, you agree that delivery starts straight away and you acknowledge that you therefore lose your right of withdrawal, as permitted by EU consumer law (§ 356(5) BGB). Your statutory rights for faulty delivery are not affected.</li>
+<li><b>Refunds and chargebacks:</b> if a payment is refunded or reversed, the coins from it are removed again, even if that makes your balance negative. Accounts with a negative balance can't buy anything until it is back above zero.</li>
+<li><b>Free coins:</b> daily rewards, quests and ads are a free bonus. We can change the amounts, quests and limits at any time. Collecting rewards with bots, macros, scripts, multiple accounts or manipulated statistics is not allowed. In that case we can remove those coins or exclude you from rewards.</li>
+<li><b>Changes to the store:</b> we can add, change, reprice or retire store items. Items you have already unlocked stay unlocked for as long as the Velo Network runs.</li>
+<li><b>If the service ends:</b> if we ever shut down the Velo Network, we'll announce it at least 30 days in advance. Coins that are left over at that point don't entitle you to a refund, unless the law requires one.</li>
+</ul>
 
-  <h2>6. Limitation of liability</h2>
-  <p>To the maximum extent permitted by law, {{legal.operatorName}} is not liable for any indirect, incidental, or consequential damages arising from use of the Software, including but not limited to lost saves, lost progress, or a server ban resulting from using client-side mods where they weren't permitted.</p>
+<h2>6. Acceptable use of the Velo Network</h2>
+<p>Don't harass other players, send spam, upload capes that are illegal, sexual, hateful or infringe someone else's rights, or try to break, overload or abuse the service. We can remove content and suspend accounts that break these rules.</p>
 
-  <h2>7. Changes</h2>
-  <p>The Software and these Terms may change over time as development continues. Material changes to these Terms will update the date at the top of this page.</p>
+<h2>7. No warranty</h2>
+<p>The free Software is provided "as is", without warranty of any kind, to the extent permitted by law. Mods can break with new Minecraft versions, conflict with other mods or contain bugs. Keep backups of worlds you care about. Statutory warranty rights for paid digital content remain unaffected.</p>
 
-  <h2>8. Governing law</h2>
-  <p>These Terms are governed by the laws of {{legal.country}}, without regard to conflict-of-law principles.</p>
+<h2>8. Limitation of liability</h2>
+<p>We are fully liable for intent and gross negligence, and for injury to life, body or health. For slight negligence we are only liable for breaches of essential contractual obligations, limited to the typical, foreseeable damage. Otherwise, to the extent permitted by law, {{legal.operatorName}} is not liable for indirect or consequential damages, for example lost saves or a server ban from using client-side mods where they weren't allowed.</p>
 
-  <h2>9. Contact</h2>
-  <p>Questions about these Terms: <a href="mailto:{{legal.email}}">{{legal.email}}</a>.</p>
+<h2>9. Changes</h2>
+<p>The Software and these Terms may change as development continues. We'll update the date at the top of this page when we make important changes.</p>
+
+<h2>10. Governing law</h2>
+<p>These Terms are governed by the laws of {{legal.country}}. If you are a consumer in the EU, you also keep the protection of the mandatory laws of your country of residence. We are not obliged or willing to take part in dispute resolution before a consumer arbitration board (§ 36 VSBG).</p>
+
+<h2>11. Contact</h2>
+<p>Questions about these Terms: <a href="mailto:{{legal.email}}">{{legal.email}}</a>.</p>
 </main>
 
-<footer>
-  <div class="wrap">
-    <div class="foot-links">
-      <a href="index.html#features">Features</a>
-      <a href="index.html#install">Install</a>
-      <a href="impressum.html">Imprint</a>
-      <a href="datenschutz.html">Privacy Policy</a>
-      <a href="terms.html">Terms of Service</a>
-      {{#if links.github}}<a href="{{links.github}}">GitHub</a>{{/if}}
-    </div>
-    <p><b>NOT AN OFFICIAL MINECRAFT PRODUCT.</b> NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</p>
-    <p>Minecraft is a trademark of Mojang Synergies AB. "{{site.name}}" is an independent, community-made Fabric mod.</p>
-  </div>
-</footer>
-
+{{> footer}}
+{{> scripts}}
 </body>
 </html>

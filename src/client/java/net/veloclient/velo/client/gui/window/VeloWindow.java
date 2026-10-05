@@ -62,6 +62,15 @@ public abstract class VeloWindow extends Screen {
 		this.returnScreen = screen;
 	}
 
+	/** Dev-only (screenshot tour): close like pressing Esc. */
+	public void closeForTour() {
+		requestClose();
+	}
+
+	public Screen returnScreen() {
+		return returnScreen;
+	}
+
 	@Override
 	protected void init() {
 		// Requested sizes assume plenty of scaled screen space; at a high GUI

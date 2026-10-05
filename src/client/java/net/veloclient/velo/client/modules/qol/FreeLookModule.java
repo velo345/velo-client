@@ -52,6 +52,9 @@ public final class FreeLookModule extends AbstractModule implements Configurable
 	private static volatile float pitchOffset;
 	private static volatile double orbitDistance = 4.5;
 	private static volatile boolean invertY = false;
+	/** Dev-only (screenshot tour): acts as if the key were held, looking {@link #forcedYawOffset} away. */
+	private static volatile boolean forcedForTour;
+	private static volatile float forcedYawOffset;
 
 	//? if <26.1 {
 	private static Perspective previousPerspective;
@@ -73,7 +76,7 @@ public final class FreeLookModule extends AbstractModule implements Configurable
 			deactivate(client);
 			return;
 		}
-		boolean shouldBeActive = client.player != null && FREE_LOOK_KEY.isPressed();
+		boolean shouldBeActive = client.player != null && (FREE_LOOK_KEY.isPressed() || forcedForTour);
 		if (shouldBeActive == active) {
 			return;
 		}
@@ -101,6 +104,12 @@ public final class FreeLookModule extends AbstractModule implements Configurable
 		deactivate(MinecraftClient.getInstance());
 	}
 
+	/** Dev-only: the screenshot tour turns free look on (looking {@code yawOffset} degrees away) or off. */
+	public static void forceForTour(boolean on, float yawOffset) {
+		forcedForTour = on;
+		forcedYawOffset = yawOffset;
+	}
+
 	public static boolean isActive() {
 		return active && MinecraftClient.getInstance().player != null;
 	}
@@ -126,7 +135,7 @@ public final class FreeLookModule extends AbstractModule implements Configurable
 	}
 
 	public static float effectiveYaw() {
-		return baseYaw + yawOffset;
+		return baseYaw + yawOffset + (forcedForTour ? forcedYawOffset : 0f);
 	}
 
 	public static float effectivePitch() {

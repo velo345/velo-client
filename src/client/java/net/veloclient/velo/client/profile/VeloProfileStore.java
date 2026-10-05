@@ -29,30 +29,46 @@ public final class VeloProfileStore {
 
 	public static VeloProfile captureCurrent(String name) {
 		Map<String, HudLayoutEntry> hudLayout = new LinkedHashMap<>();
-		for (Module module : ModuleRegistry.all()) {
-			if (module instanceof HudModule hud) {
-				var pos = hud.position();
-				hudLayout.put(module.id(), new HudLayoutEntry(pos.xFraction(), pos.yFraction(), pos.scale()));
-			}
+		for (HudModule hud : layoutElements()) {
+			var pos = hud.position();
+			hudLayout.put(hud.id(), new HudLayoutEntry(pos.xFraction(), pos.yFraction(), pos.scale(), pos.placed()));
 		}
 		return new VeloProfile(name, ModuleStateStore.captureAll(), hudLayout);
 	}
 
 	public static void applyToLive(VeloProfile profile) {
 		ModuleStateStore.applyAll(profile.moduleStates());
-		for (Module module : ModuleRegistry.all()) {
-			if (module instanceof HudModule hud) {
-				HudLayoutEntry entry = profile.hudLayout().get(module.id());
-				if (entry != null) {
-					hud.position().set(entry.xFraction(), entry.yFraction());
-					hud.position().setScale(entry.scale());
-				}
+		for (HudModule hud : layoutElements()) {
+			HudLayoutEntry entry = profile.hudLayout().get(hud.id());
+			if (entry != null) {
+				boolean placed = entry.placed() != null ? entry.placed()
+						: !hud.position().isDefault(entry.xFraction(), entry.yFraction());
+				hud.position().set(entry.xFraction(), entry.yFraction());
+				hud.position().setScale(entry.scale());
+				hud.position().setPlaced(placed);
 			}
 		}
 	}
 
+	/** Every HUD element with a saved position: HUD modules plus the Better F3 panels. */
+	private static java.util.List<HudModule> layoutElements() {
+		java.util.List<HudModule> list = new java.util.ArrayList<>();
+		for (Module module : ModuleRegistry.all()) {
+			if (module instanceof HudModule hud) {
+				list.add(hud);
+			}
+			if (module instanceof net.veloclient.velo.client.modules.debug.BetterF3Module f3) {
+				list.addAll(f3.allPanels());
+			}
+		}
+		return list;
+	}
+
 	/** Saves the current live state as the active profile - call after any settings/HUD-layout change made through the UI. */
 	public static void saveActive() {
+		if (System.getProperty("velo.screenshotTour") != null) {
+			return; // the dev screenshot tour shares ~/.velo-client with the real game - never persist its demo state
+		}
 		String name = VeloProfileManager.activeName();
 		VeloProfileManager.save(captureCurrent(name));
 	}

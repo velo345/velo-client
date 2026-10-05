@@ -1,40 +1,27 @@
 package net.veloclient.velo.client.store;
 
-import net.veloclient.velo.client.cosmetics.CapeManager;
-import net.veloclient.velo.client.cosmetics.CapePhysicsPreset;
-import net.veloclient.velo.client.economy.CurrencyManager;
+import net.veloclient.velo.client.network.StoreClient;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.util.function.Consumer;
 
-/** Buying a {@link StoreItem}: spend the coins, drop it into {@link CapeManager}'s library, and mark it owned - the three steps every Store "Buy" button needs, in the one order that keeps them consistent if a step fails partway through. */
+/**
+ * Buys a store item with Velo Coins - on the server (which checks the price and your balance and
+ * records ownership), then adds the cape to the local library.
+ */
 public final class StorePurchase {
-
-	public enum Result {
-		SUCCESS, ALREADY_OWNED, INSUFFICIENT_COINS, IMPORT_FAILED
-	}
 
 	private StorePurchase() {
 	}
 
-	public static Result buy(StoreItem item) {
-		if (StoreOwnership.owns(item.id())) {
-			return Result.ALREADY_OWNED;
+	/** {@code onDone} runs on the client thread with null on success, else the message to show. */
+	public static void buy(StoreItem item, Consumer<String> onDone) {
+		if (StoreClient.owns(item.id())) {
+			onDone.accept("You already own this cape.");
+			return;
 		}
-		if (!CurrencyManager.spend(item.priceCoins())) {
-			return Result.INSUFFICIENT_COINS;
-		}
-		try (InputStream in = StoreAssets.openGif(item)) {
-			CapeManager.importAnimatedGif(item.name(), in, CapePhysicsPreset.defaults(), item.id());
-			StoreOwnership.grant(item.id());
-			return Result.SUCCESS;
-		} catch (IOException e) {
-			// Refund - the coins were already spent above, and nothing was
-			// actually delivered, so a failed import must not leave the
-			// player just out the price.
-			CurrencyManager.grant(item.priceCoins());
-			net.veloclient.velo.VeloClient.LOGGER.error("Failed to deliver purchased store item {}", item.id(), e);
-			return Result.IMPORT_FAILED;
-		}
+		StoreClient.buy(item.id(), () -> {
+			StoreRestore.restoreMissing();
+			onDone.accept(null);
+		}, onDone);
 	}
 }

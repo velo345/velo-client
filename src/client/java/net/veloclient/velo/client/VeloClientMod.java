@@ -16,7 +16,6 @@ import net.veloclient.velo.client.modules.hud.ActionBarLogModule;
 import net.veloclient.velo.client.modules.hud.ArmorDurabilityModule;
 import net.veloclient.velo.client.modules.hud.ClockModule;
 import net.veloclient.velo.client.modules.hud.CoordinatesModule;
-import net.veloclient.velo.client.modules.hud.CpsCounterModule;
 import net.veloclient.velo.client.modules.hud.FpsCounterModule;
 import net.veloclient.velo.client.modules.hud.HeldItemModule;
 import net.veloclient.velo.client.modules.hud.KeystrokesModule;
@@ -33,7 +32,6 @@ import net.veloclient.velo.client.modules.performance.FullBrightModule;
 import net.veloclient.velo.client.modules.performance.GpuUtilizationModule;
 import net.veloclient.velo.client.modules.performance.InputSamplerModule;
 import net.veloclient.velo.client.modules.performance.MemoryMonitorModule;
-import net.veloclient.velo.client.modules.performance.OptimizationModCompatModule;
 import net.veloclient.velo.client.modules.performance.ParticleLimiterModule;
 import net.veloclient.velo.client.modules.performance.PerformanceBoostModule;
 import net.veloclient.velo.client.modules.performance.PolyBlurModule;
@@ -78,6 +76,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.keybind.MenuKeySync.register();
 		net.veloclient.velo.client.util.MemoryStatsRecorder.start();
 		CapeFeatureRenderer.register();
+		net.veloclient.velo.client.network.RewardsReporter.register();
 		registerSocialOverlay();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				client -> net.veloclient.velo.client.cosmetics.AnimatedCapeAsset.tickAll());
@@ -118,11 +117,72 @@ public final class VeloClientMod implements ClientModInitializer {
 	 * where the mouse is free so they can be clicked - a click that lands on a popup is consumed
 	 * before the screen underneath sees it.
 	 */
+	/** Options > Skin Customization gets a "Velo Skins" button (manage and switch skins). */
+	private static void addSkinsButton(net.minecraft.client.gui.screen.Screen screen, int width) {
+		//? if <26.1 {
+		boolean skinOptions = screen instanceof net.minecraft.client.gui.screen.option.SkinOptionsScreen;
+		//?} else {
+		/*boolean skinOptions = screen instanceof net.minecraft.client.gui.screens.options.SkinCustomizationScreen;
+		*///?}
+		if (!skinOptions) {
+			return;
+		}
+		var button = new net.veloclient.velo.client.gui.widget.VeloButton(width - 112, 6, 106, 20, net.minecraft.text.Text.literal("Velo Skins  >"),
+				b -> net.minecraft.client.MinecraftClient.getInstance().setScreen(new net.veloclient.velo.client.gui.VeloSkinsScreen(screen))).primary();
+		//? if <26.1 {
+		net.fabricmc.fabric.api.client.screen.v1.Screens.getButtons(screen).add(button);
+		//?} else {
+		/*net.fabricmc.fabric.api.client.screen.v1.Screens.getWidgets(screen).add(button);
+		*///?}
+	}
+
+	/** Pause menu: a small "Report a bug" button in the bottom-left corner. */
+	private static void addBugReportButton(net.minecraft.client.gui.screen.Screen screen, int height) {
+		if (!(screen instanceof net.minecraft.client.gui.screen.GameMenuScreen)) {
+			return;
+		}
+		var button = new net.veloclient.velo.client.gui.widget.VeloIconButton(6, height - 26, 20,
+				net.veloclient.velo.client.gui.widget.VeloNavIcons.of("bug"), net.minecraft.text.Text.literal("Report a bug"),
+				() -> net.minecraft.client.MinecraftClient.getInstance().setScreen(new net.veloclient.velo.client.gui.BugReportScreen(screen)))
+				.withPlainLabel();
+		//? if <26.1 {
+		net.fabricmc.fabric.api.client.screen.v1.Screens.getButtons(screen).add(button);
+		//?} else {
+		/*net.fabricmc.fabric.api.client.screen.v1.Screens.getWidgets(screen).add(button);
+		*///?}
+	}
+
+	/** First title screen after a crash: offer to send the crash report. */
+	private static void offerCrashReport(net.minecraft.client.MinecraftClient client, net.minecraft.client.gui.screen.Screen screen) {
+		if (!(screen instanceof net.minecraft.client.gui.screen.TitleScreen)) {
+			return;
+		}
+		java.nio.file.Path crash = net.veloclient.velo.client.report.CrashCheck.pendingCrash();
+		if (crash != null) {
+			client.execute(() -> client.setScreen(new net.veloclient.velo.client.gui.BugReportScreen(screen, crash)));
+		}
+	}
+
 	private void registerSocialOverlay() {
 		net.veloclient.velo.client.social.SocialNotifications.register();
+		// Velo's Statistics and Controls screens replace vanilla's.
 		net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
-			net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.afterRender(screen).register((s, context, mouseX, mouseY, tickDelta) ->
-					net.veloclient.velo.client.social.NotificationOverlay.renderOverScreen(s, context, mouseX, mouseY));
+			net.veloclient.velo.client.gui.VeloStatsScreen.maybeReplace(client, screen);
+			net.veloclient.velo.client.gui.VeloKeybindsScreen.maybeReplace(client, screen);
+			net.veloclient.velo.client.gui.VeloAdvancementsScreen.maybeReplace(client, screen);
+			addSkinsButton(screen, scaledWidth);
+			addBugReportButton(screen, scaledHeight);
+			offerCrashReport(client, screen);
+		});
+		net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
+			net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.afterRender(screen).register((s, context, mouseX, mouseY, tickDelta) -> {
+				net.veloclient.velo.client.modules.qol.ShulkerPreview.render(s, context, mouseX, mouseY);
+				net.veloclient.velo.client.social.NotificationOverlay.renderOverScreen(s, context, mouseX, mouseY);
+			});
+			net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents.allowMouseClick(screen).register((s, click) ->
+					!net.veloclient.velo.client.modules.qol.ShulkerPreview.click(s, click.x(), click.y(), click.button()));
+			net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents.allowKeyPress(screen).register((s, key) ->
+					!(key.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE && net.veloclient.velo.client.modules.qol.ShulkerPreview.escape(s)));
 			net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents.allowMouseClick(screen).register((s, click) ->
 					!net.veloclient.velo.client.social.NotificationOverlay.click(click.x(), click.y()));
 		});
@@ -134,17 +194,29 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new PingDisplayModule());
 		ModuleRegistry.register(new CoordinatesModule());
 		ModuleRegistry.register(new ClockModule());
-		ModuleRegistry.register(new CpsCounterModule());
 		ModuleRegistry.register(new ArmorDurabilityModule());
 		ModuleRegistry.register(new PotionTimersModule());
 		ModuleRegistry.register(new HeldItemModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.TotemCounterModule());
 		ModuleRegistry.register(new KeystrokesModule());
 		ModuleRegistry.register(new MouseButtonsModule());
+		net.veloclient.velo.client.worldmap.WorldMap.register();
+		net.veloclient.velo.client.worldmap.WorldMapKeys.register();
+		ModuleRegistry.register(new net.veloclient.velo.client.worldmap.WorldMapModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.HeartsModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.HungerModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.ArmorBarModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.XpBarModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.HotbarModule());
 		ModuleRegistry.register(new ActionBarLogModule());
 		ModuleRegistry.register(new SessionStatsModule());
 		ModuleRegistry.register(new WaypointsModule());
 		ModuleRegistry.register(new ScoreboardHudModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.BossBarModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.ShulkerPreviewModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.debug.BetterF3Module());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.servertools.SpawnRadiusModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.servertools.SimulationDistanceModule());
 		ModuleRegistry.register(new ToggleSprintModule());
 		ModuleRegistry.register(new ToggleSneakModule());
 		ModuleRegistry.register(new ZoomModule());
@@ -176,7 +248,6 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.ShaderCacheModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.EntityDetailModule());
 		ModuleRegistry.register(new PolyBlurModule());
-		ModuleRegistry.register(new OptimizationModCompatModule());
 		ModuleRegistry.register(new FullBrightModule());
 		ModuleRegistry.register(new FovModule());
 		ModuleRegistry.register(new InputSamplerModule());

@@ -83,25 +83,37 @@ public final class StoreItemDetailScreen extends VeloWindow {
 		addDrawableChild(new VeloButton(contentX(), doneY, 80, 20, Text.literal("Back"), b -> requestClose()));
 	}
 
+	private boolean busy;
+
 	private void onAction() {
 		if (StoreOwnership.owns(item.id())) {
-			CapeManager.equip(findLibraryIdFor(item.id()));
-			status = Text.literal("Equipped \"" + item.name() + "\"");
+			String id = findLibraryIdFor(item.id());
+			if (id == null) {
+				net.veloclient.velo.client.store.StoreRestore.restoreMissing();
+				id = findLibraryIdFor(item.id());
+			}
+			if (id != null) {
+				CapeManager.equip(id);
+				status = Text.literal("Equipped \"" + item.name() + "\"");
+			}
 			return;
 		}
-		StorePurchase.Result result = StorePurchase.buy(item);
-		switch (result) {
-			case SUCCESS -> {
-				status = Text.literal("Purchased \"" + item.name() + "\" - added to your cape library!");
-				layoutContent();
-			}
-			case INSUFFICIENT_COINS -> status = Text.literal("Not enough Velo Coins - you have " + CurrencyManager.balance() + ".");
-			case ALREADY_OWNED -> {
-				status = Text.literal("Already owned.");
-				layoutContent();
-			}
-			case IMPORT_FAILED -> status = Text.literal("Purchase failed - refunded. Check the log for details.");
+		if (busy) {
+			return;
 		}
+		busy = true;
+		status = Text.literal("Buying...");
+		StorePurchase.buy(item, error -> {
+			busy = false;
+			if (error == null) {
+				status = Text.literal("Purchased \"" + item.name() + "\" - it's in your cape library!");
+				layoutContent();
+			} else if (error.startsWith("Not enough")) {
+				status = Text.literal(error + " - get more under Velo Coins.");
+			} else {
+				status = Text.literal(error);
+			}
+		});
 	}
 
 	/** {@link StorePurchase#buy} imports the cape under a fresh library id (not the catalog item's own id), so equipping the just-bought item has to look that library entry back up by name. */

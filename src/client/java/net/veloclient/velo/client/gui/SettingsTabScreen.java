@@ -27,7 +27,7 @@ public final class SettingsTabScreen extends VeloWindow {
 	private final java.util.List<String> cardTitles = new java.util.ArrayList<>();
 
 	public SettingsTabScreen(Screen parent) {
-		super(Text.literal("Settings"), 340, 250);
+		super(Text.literal("Settings"), 340, 360);
 		returnTo(parent);
 	}
 
@@ -56,11 +56,26 @@ public final class SettingsTabScreen extends VeloWindow {
 				}).listening(listeningForMenuKey));
 		y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
 
+		y = section("Velo screens", y, 3);
+		addDrawableChild(screenRow(x, y, width, "Advancements", VeloScreens::advancements, VeloScreens::setAdvancements));
+		y += ROW_HEIGHT;
+		addDrawableChild(screenRow(x, y, width, "Controls (key binds)", VeloScreens::controls, VeloScreens::setControls));
+		y += ROW_HEIGHT;
+		addDrawableChild(screenRow(x, y, width, "Statistics", VeloScreens::statistics, VeloScreens::setStatistics));
+		y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
+
 		y = section("Files", y, 1);
 		addDrawableChild(new VeloValueRow(x, y, width, ROW_HEIGHT, Text.literal("Mods folder"), VeloValueRow.Kind.LINK,
 				() -> "Open", null,
 				b -> FileManagerOpener.open(FabricLoader.getInstance().getGameDir().resolve("mods").toFile(),
 						msg -> status = Text.literal(msg))));
+	}
+
+	/** "Velo" / "Vanilla" switch for one of the screens Velo replaces. */
+	private VeloValueRow screenRow(int x, int y, int width, String label, java.util.function.BooleanSupplier get,
+			java.util.function.Consumer<Boolean> set) {
+		return new VeloValueRow(x, y, width, ROW_HEIGHT, Text.literal(label), VeloValueRow.Kind.CHOICE,
+				() -> get.getAsBoolean() ? "Velo" : "Vanilla", null, b -> set.accept(!get.getAsBoolean()));
 	}
 
 	/** Reserves a titled card for {@code rows} rows starting at {@code y}; returns the first row's y. */

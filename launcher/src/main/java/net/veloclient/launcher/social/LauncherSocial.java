@@ -120,6 +120,11 @@ public final class LauncherSocial {
 
 	private static volatile boolean demo;
 
+	/** The launcher's Velo server session (null until signed in and verified). */
+	public static String sessionToken() {
+		return token;
+	}
+
 	public static boolean isDemo() {
 		return demo;
 	}
@@ -209,7 +214,7 @@ public final class LauncherSocial {
 		}
 	}
 
-	static String baseUrl() {
+	public static String baseUrl() {
 		Path config = VeloPaths.config().resolve("network.json");
 		try {
 			if (Files.exists(config)) {

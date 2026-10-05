@@ -52,6 +52,9 @@ final class CustomCapeUploader {
 
 	/** The published id for {@code definition}, uploading it first if this server hasn't got it yet; null if it can't be shared. */
 	static String publishedIdFor(String base, String sessionToken, CapeDefinition definition) {
+		if (definition.animated()) {
+			return null; // animated capes are Store items, shared by their item id - never uploaded as custom capes
+		}
 		try {
 			String entry = definition.animated() ? "frames.gif" : "texture.png";
 			String bundleKey = definition.bundleFile() + "@" + Files.getLastModifiedTime(definition.bundleFile()).toMillis();

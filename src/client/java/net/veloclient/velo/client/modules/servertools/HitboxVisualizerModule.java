@@ -46,13 +46,36 @@ import java.util.List;
  */
 public final class HitboxVisualizerModule extends AbstractModule implements Configurable {
 
-	private int color = 0xFFFFFF00;
+	/** Entity groups with their own color and on/off switch. */
+	private enum Kind {
+		PLAYERS("Players", 0xFF4FC3F7),
+		HOSTILE("Hostile Mobs", 0xFFFF5252),
+		PASSIVE("Passive Mobs", 0xFF69F0AE),
+		PROJECTILES("Projectiles", 0xFFFFD740),
+		ITEMS("Items & XP", 0xFFE0E0E0),
+		OTHER("Other", 0xFFFFFF00);
+
+		final String label;
+		final int defaultColor;
+
+		Kind(String label, int defaultColor) {
+			this.label = label;
+			this.defaultColor = defaultColor;
+		}
+	}
+
+	private final int[] colors = new int[Kind.values().length];
+	private final boolean[] shown = new boolean[Kind.values().length];
 	private double lineWidth = 1.5;
 
 	public HitboxVisualizerModule() {
 		super("hitbox-visualizer", "Hitbox Visualizer",
 				"Renders entity hitbox outlines for build/plugin testing, with a customizable color and line width.",
 				ModuleCategory.SERVER_TOOLS, SafetyTag.CHECK_SERVER_RULES, false);
+		for (Kind kind : Kind.values()) {
+			colors[kind.ordinal()] = kind.defaultColor;
+			shown[kind.ordinal()] = true;
+		}
 		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context ->
 				ModuleProfiler.time(id(), ModuleProfiler.Phase.WORLD_RENDER, () -> onRender(context)));
 	}
@@ -66,11 +89,19 @@ public final class HitboxVisualizerModule extends AbstractModule implements Conf
 		if (world == null) {
 			return;
 		}
-		DrawStyle style = DrawStyle.stroked(color, (float) lineWidth);
+		DrawStyle[] styles = new DrawStyle[Kind.values().length];
+		for (Kind kind : Kind.values()) {
+			styles[kind.ordinal()] = DrawStyle.stroked(colors[kind.ordinal()], (float) lineWidth);
+		}
 		for (Entity entity : world.getEntities()) {
 			if (entity == client.player || !isVisible(client, entity)) {
 				continue;
 			}
+			Kind kind = kindOf(entity);
+			if (!shown[kind.ordinal()]) {
+				continue;
+			}
+			DrawStyle style = styles[kind.ordinal()];
 			//? if <26.1 {
 			if (entity instanceof EnderDragonEntity dragon) {
 			//?} else {
@@ -91,6 +122,40 @@ public final class HitboxVisualizerModule extends AbstractModule implements Conf
 			}
 			GizmoDrawing.box(entity.getBoundingBox(), style);
 		}
+	}
+
+	private static Kind kindOf(Entity entity) {
+		if (entity instanceof PlayerEntity) {
+			return Kind.PLAYERS;
+		}
+		//? if <26.1 {
+		if (entity instanceof net.minecraft.entity.projectile.ProjectileEntity) {
+			return Kind.PROJECTILES;
+		}
+		if (entity instanceof net.minecraft.entity.ItemEntity || entity instanceof net.minecraft.entity.ExperienceOrbEntity) {
+			return Kind.ITEMS;
+		}
+		if (entity instanceof net.minecraft.entity.mob.Monster || entity instanceof EnderDragonEntity) {
+			return Kind.HOSTILE;
+		}
+		if (entity instanceof net.minecraft.entity.LivingEntity && !(entity instanceof net.minecraft.entity.decoration.ArmorStandEntity)) {
+			return Kind.PASSIVE;
+		}
+		//?} else {
+		/*if (entity instanceof net.minecraft.world.entity.projectile.Projectile) {
+			return Kind.PROJECTILES;
+		}
+		if (entity instanceof net.minecraft.world.entity.item.ItemEntity || entity instanceof net.minecraft.world.entity.ExperienceOrb) {
+			return Kind.ITEMS;
+		}
+		if (entity instanceof net.minecraft.world.entity.monster.Enemy || entity instanceof EnderDragon) {
+			return Kind.HOSTILE;
+		}
+		if (entity instanceof net.minecraft.world.entity.LivingEntity && !(entity instanceof net.minecraft.world.entity.decoration.ArmorStand)) {
+			return Kind.PASSIVE;
+		}
+		*///?}
+		return Kind.OTHER;
 	}
 
 	/**
@@ -124,9 +189,14 @@ public final class HitboxVisualizerModule extends AbstractModule implements Conf
 
 	@Override
 	public List<ConfigField> configFields() {
-		return List.of(
-				new ConfigField.ColorField("Hitbox Color", () -> color, v -> color = v, true),
-				new ConfigField.SliderField("Line Width", 0.5, 4.0, () -> lineWidth,
-						v -> lineWidth = v, v -> String.format(java.util.Locale.ROOT, "%.1f", v)));
+		List<ConfigField> fields = new java.util.ArrayList<>();
+		for (Kind kind : Kind.values()) {
+			int i = kind.ordinal();
+			fields.add(new ConfigField.ToggleField("Show " + kind.label, () -> shown[i], v -> shown[i] = v));
+			fields.add(new ConfigField.ColorField(kind.label + " Color", () -> colors[i], v -> colors[i] = v, true));
+		}
+		fields.add(new ConfigField.SliderField("Line Width", 0.5, 4.0, () -> lineWidth,
+				v -> lineWidth = v, v -> String.format(java.util.Locale.ROOT, "%.1f", v)));
+		return fields;
 	}
 }

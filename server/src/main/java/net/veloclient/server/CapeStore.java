@@ -99,7 +99,8 @@ final class CapeStore {
 
 	String hashFor(String uuid) {
 		StoredCape cape = byUuid.get(uuid);
-		return cape == null ? null : cape.hash();
+		// GIFs uploaded before animated capes became Store-only are no longer shown to anyone.
+		return cape == null || "gif".equals(cape.type()) ? null : cape.hash();
 	}
 
 	/** Validates, normalizes, stores and assigns {@code bytes} as {@code uuid}'s custom cape; returns its hash. */
@@ -114,14 +115,14 @@ final class CapeStore {
 		StoredCape cape;
 		byte[] normalized;
 		if (isGif(bytes)) {
-			validateGif(bytes);
-			normalized = bytes;
-			cape = new StoredCape(sha256(normalized), "gif");
+			// Animated capes are Velo Store items (shared by item id, ownership checked) - uploading
+			// your own would make buying them pointless.
+			throw new RejectedUpload(403, "Animated capes are only available from the Velo Store");
 		} else if (isPng(bytes)) {
 			normalized = reencodePng(bytes);
 			cape = new StoredCape(sha256(normalized), "png");
 		} else {
-			throw new RejectedUpload(400, "Only PNG and GIF capes are supported");
+			throw new RejectedUpload(400, "Only PNG capes are supported");
 		}
 
 		if (bannedHashes.contains(cape.hash())) {
@@ -170,7 +171,7 @@ final class CapeStore {
 			return null;
 		}
 		for (StoredCape cape : byUuid.values()) {
-			if (cape.hash().equals(hash)) {
+			if (cape.hash().equals(hash) && !"gif".equals(cape.type())) {
 				Path file = directory.resolve(cape.fileName());
 				return Files.exists(file) ? new StoredFile(Files.readAllBytes(file), cape.contentType()) : null;
 			}
@@ -220,39 +221,6 @@ final class CapeStore {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ImageIO.write(argb, "png", out);
 		return out.toByteArray();
-	}
-
-	private static void validateGif(byte[] bytes) throws RejectedUpload {
-		try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
-			Iterator<ImageReader> readers = ImageIO.getImageReaders(in);
-			if (!readers.hasNext()) {
-				throw new RejectedUpload(400, "Not a readable GIF");
-			}
-			ImageReader reader = readers.next();
-			try {
-				reader.setInput(in, false);
-				int frames = reader.getNumImages(true);
-				if (frames < 1 || frames > MAX_ANIMATED_FRAMES) {
-					throw new RejectedUpload(400, "Animated capes can have at most " + MAX_ANIMATED_FRAMES + " frames");
-				}
-				// The logical screen size is what the client's GifDecoder allocates per frame.
-				int width = reader.getWidth(0);
-				int height = reader.getHeight(0);
-				validateDimensions(width, height, MAX_ANIMATED_WIDTH);
-				if ((long) width * height * frames > MAX_ANIMATED_PIXELS) {
-					throw new RejectedUpload(400, "Animated cape is too large - use fewer frames or a smaller size");
-				}
-				for (int i = 0; i < frames; i++) {
-					reader.read(i);
-				}
-			} finally {
-				reader.dispose();
-			}
-		} catch (RejectedUpload e) {
-			throw e;
-		} catch (IOException | RuntimeException e) {
-			throw new RejectedUpload(400, "Not a readable GIF");
-		}
 	}
 
 	private static boolean isPng(byte[] b) {

@@ -8,7 +8,13 @@
 		"BufferBuilderBulkMixin",
 		"ChunkLoadTimingMixin",
 		"ChunkSlicePrepMixin",
+		"ConnectTargetMixin",
 		"CommonListenerConnectionAccessor",
+		"AdvancementsScreenAccessor",
+		"BossBarHudAccessor",
+		"HandledScreenAccessor",
+		"HandledScreenTooltipMixin",
+		"DebugHudMixin",
 		"EmptyScissorGuardMixin",
 		"EntityDetailLodMixin",
 		"GhostPacketGateMixin",
@@ -24,6 +30,8 @@
 		"RenderCullingBlockEntityMixin",
 		"RenderCullingEntityMixin",
 		"SectionMeshSlotsMixin",
+		"SpriteTintMixin",
+		"StatusBarsMixin",
 		"UberBufferSlotsMixin",
 		"VulkanDeviceCloseMixin",
 		"VulkanDrawStateMixin",
@@ -31,7 +39,8 @@
 		"VulkanPipelineCacheMixin",
 		"VulkanRenderProfileMixin",
 		"VulkanShaderCacheMixin",
-		"VulkanSurfaceProfileMixin"
+		"VulkanSurfaceProfileMixin",
+		"XpLevelColorMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

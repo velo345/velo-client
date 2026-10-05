@@ -30,6 +30,7 @@ public final class VeloServerApp {
 
 	private static final int DEFAULT_PORT = 8787;
 	private static SocialService social;
+	private static net.veloclient.server.store.StoreService store;
 
 	public static void main(String[] args) throws IOException {
 		int port = resolvePort();
@@ -38,6 +39,23 @@ public final class VeloServerApp {
 		CapeStore capes = new CapeStore(dataDir);
 		social = new SocialService(dataDir, registry);
 		String adminToken = envOr("VELO_ADMIN_TOKEN", null);
+		try {
+			var storeConfig = net.veloclient.server.store.StoreConfig.load(dataDir);
+			var storeDb = new net.veloclient.server.store.StoreDatabase(dataDir.resolve("store.db"));
+			var tebex = new net.veloclient.server.store.TebexCheckout(envOr("TEBEX_PROJECT_ID", null),
+					envOr("TEBEX_PRIVATE_KEY", null), envOr("TEBEX_WEBHOOK_SECRET", null));
+			store = new net.veloclient.server.store.StoreService(storeConfig, storeDb, tebex,
+					net.veloclient.server.store.StoreService.parseOwners(envOr("VELO_OWNERS", null), VeloServerApp::normalizeUuid),
+					envOr("VELO_PUBLIC_URL", null),
+					new net.veloclient.server.store.StoreService.AdConfig(envOr("AYET_PLACEMENT_ID", null),
+							envOr("AYET_ADSLOT", null), envOr("AYET_API_KEY", null)),
+					query -> {
+						SocialService.PlayerRef ref = social.resolvePlayer(query);
+						return new String[] {ref.uuid(), ref.username()};
+					});
+		} catch (java.sql.SQLException e) {
+			throw new IOException("Couldn't open the store database", e);
+		}
 
 		HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
 		server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
@@ -53,6 +71,8 @@ public final class VeloServerApp {
 		// GET /v1/cape/<sha256> - the path suffix is the hash (see handleCapeDownload).
 		server.createContext("/v1/cape/", exchange -> handle(exchange, "GET", ex -> handleCapeDownload(ex, capes)));
 		SocialRoutes.register(server, registry, social);
+		StoreRoutes.register(server, registry, store, dataDir);
+		NewsRoutes.register(server, registry, new NewsService(dataDir), new ReportService(dataDir), store, adminToken);
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));
 
 		// Expired sessions/challenges are already ignored by every lookup
@@ -75,6 +95,9 @@ public final class VeloServerApp {
 		if (adminToken == null) {
 			System.out.println("VELO_ADMIN_TOKEN not set - the admin cape-removal endpoint is disabled");
 		}
+		System.out.println("Store: coin checkout " + (store.checkoutEnabled() ? "ON" : "OFF (set TEBEX_PROJECT_ID, TEBEX_PRIVATE_KEY, VELO_PUBLIC_URL)")
+				+ ", Tebex webhooks " + (envOr("TEBEX_WEBHOOK_SECRET", null) != null ? "ON" : "OFF (set TEBEX_WEBHOOK_SECRET)")
+				+ ", rewarded ads " + (store.adsEnabled() ? "ON" : "OFF (set AYET_PLACEMENT_ID, AYET_ADSLOT, AYET_API_KEY, VELO_PUBLIC_URL)"));
 	}
 
 	private static String envOr(String name, String fallback) {
@@ -119,6 +142,10 @@ public final class VeloServerApp {
 		} catch (CapeStore.RejectedUpload e) {
 			writeErrorQuietly(exchange, e.status, e.getMessage());
 		} catch (SocialService.SocialException e) {
+			writeErrorQuietly(exchange, e.status, e.getMessage());
+		} catch (net.veloclient.server.store.StoreService.StoreException e) {
+			writeErrorQuietly(exchange, e.status, e.getMessage());
+		} catch (NewsService.NewsException e) {
 			writeErrorQuietly(exchange, e.status, e.getMessage());
 		} catch (IOException e) {
 			writeErrorQuietly(exchange, 400, e.getMessage() != null ? e.getMessage() : "Bad request");
@@ -198,7 +225,12 @@ public final class VeloServerApp {
 		}
 		SessionRegistry.Session session = registry.session(request.sessionToken());
 		String ownCustomHash = session == null ? null : capes.hashFor(session.uuid());
-		SessionRegistry.Session refreshed = registry.heartbeat(request.sessionToken(), request.capeId(), ownCustomHash);
+		// Store capes are only shown for players who actually own them (server-side ownership).
+		String capeId = session != null && !store.mayDisplayCape(session.uuid(), request.capeId()) ? null : request.capeId();
+		SessionRegistry.Session refreshed = registry.heartbeat(request.sessionToken(), capeId, ownCustomHash);
+		if (refreshed != null && "game".equals(refreshed.kind())) {
+			store.onGameHeartbeat(refreshed.uuid());
+		}
 		if (refreshed == null) {
 			JsonHttp.writeError(exchange, 401, "Unknown or expired session - re-authenticate");
 			return;

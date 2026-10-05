@@ -64,10 +64,15 @@ public final class GameLauncher {
 		listener.onProgress(1.0);
 
 		Path modsDir = InstancePaths.modsDir(instance.id());
-		GameJars.installInto(modsDir, version);
-		FabricApiInstaller.installInto(modsDir, version);
-		listener.onPhase("Checking performance mods...");
-		PerformanceModsInstaller.installInto(instance.id(), modsDir, version);
+		// The same profile may already be running (e.g. a second account on it). Its mods and
+		// natives are in use then - and on Windows locked - so leave them exactly as they are.
+		boolean alreadyRunning = net.veloclient.launcher.instance.RunningInstanceManager.countRunning(instance.id()) > 0;
+		if (!alreadyRunning) {
+			GameJars.installInto(modsDir, version);
+			FabricApiInstaller.installInto(modsDir, version);
+			listener.onPhase("Checking performance mods...");
+			PerformanceModsInstaller.installInto(instance.id(), modsDir, version);
+		}
 
 		JsonArray vanillaLibraries = vanilla.getAsJsonArray("libraries");
 		JsonArray fabricLibraries = fabric.has("libraries") ? fabric.getAsJsonArray("libraries") : new JsonArray();
@@ -94,7 +99,9 @@ public final class GameLauncher {
 
 		listener.onPhase("Preparing natives...");
 		Path nativesDir = InstancePaths.dir(instance.id()).resolve("natives");
-		NativesExtractor.prepare(nativesDir, vanillaLibraries);
+		if (!alreadyRunning || !Files.isDirectory(nativesDir)) {
+			NativesExtractor.prepare(nativesDir, vanillaLibraries);
+		}
 		listener.onProgress(1.0);
 
 		listener.onPhase("Starting Minecraft...");

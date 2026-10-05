@@ -20,16 +20,18 @@ public final class ModuleIcons {
 	public static final Identifier DEFAULT = texture("default");
 
 	private static final Set<String> KNOWN_IDS = Set.of(
-			"fps-counter", "ping-display", "coordinates", "clock", "cps-counter", "armor-durability",
+			"fps-counter", "ping-display", "coordinates", "clock", "armor-durability",
 			"potion-timers", "held-item", "keystrokes", "actionbar-log", "session-stats", "waypoints",
 			"toggle-sprint", "toggle-sneak", "zoom", "cape-cosmetics", "frame-time-graph", "memory-monitor",
-			"gpu-utilization", "particle-limiter", "performance-boost", "polyblur", "optimization-mod-compat",
+			"gpu-utilization", "particle-limiter", "performance-boost", "polyblur",
 			"full-bright", "fov", "mouse-buttons", "copy-coordinates", "entity-count-overlay", "chunk-border-overlay",
 			"hitbox-visualizer", "world-border-visualizer", "light-level-overlay", "tps-tick-graph",
 			"packet-traffic-monitor", "particle-debug-overlay", "sound-debug-overlay", "client-log-viewer",
 			"resource-reload-hotkeys", "keybind-conflict-checker", "looking-at-inspector", "command-keybinds",
 			"scoreboard-hud", "custom-crosshair", "minimap", "session-auto-fixer", "tnt-timer", "block-outline",
-			"time-weather-fog", "small-caps", "kill-effects", "input-sampler", "background-queue", "friends", "totem-counter", "shader-cache");
+			"time-weather-fog", "small-caps", "kill-effects", "input-sampler", "background-queue", "friends", "totem-counter", "shader-cache",
+			"hearts", "hunger", "armor-bar", "xp-bar", "hotbar", "world-map",
+			"boss-bar", "shulker-preview", "better-f3", "spawn-radius", "simulation-distance");
 
 	private ModuleIcons() {
 	}

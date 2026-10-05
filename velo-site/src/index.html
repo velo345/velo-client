@@ -1,292 +1,321 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{site.name}} — {{site.taglineMain}} {{site.taglineAccent}}</title>
+{{> head}}
+<title>Velo Client: a faster, cleaner Minecraft client</title>
 <meta name="description" content="{{site.description}}">
-<meta name="theme-color" content="{{site.themeColor}}">
-<link rel="icon" type="image/png" href="assets/favicon.png">
-<link rel="stylesheet" href="assets/style.css">
+<meta property="og:title" content="Velo Client">
+<meta property="og:description" content="{{site.description}}">
+<meta property="og:image" content="{{site.url}}/assets/shots/launcher-home.webp">
+<meta property="og:type" content="website">
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-inner">
-    <a class="brand" href="/"><img class="brand-mark" src="assets/logo.png" alt="">{{site.name}}</a>
-    <div class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#profiles">Profiles</a>
-      <a href="#launcher">Launcher</a>
-      <a href="#install">Install</a>
-      {{#if links.github}}
-      <a href="{{links.github}}">GitHub</a>
-      {{/if}}
-    </div>
-    {{#if status.downloadsEnabled}}
-    <a class="nav-cta" href="#install">Download</a>
-    {{/if}}
-    {{#ifnot status.downloadsEnabled}}
-    <span class="nav-cta nav-cta-disabled">In Development</span>
-    {{/ifnot}}
-  </div>
-</nav>
+{{> nav}}
 
 <header class="hero">
+  <div class="hero-glow" aria-hidden="true"></div>
   <div class="wrap hero-inner">
-    <span class="eyebrow">FABRIC · MC {{minecraft.version}}</span>
-    <h1>{{site.taglineMain}} <span>{{site.taglineAccent}}</span></h1>
-    <p>{{site.name}} is a free Fabric mod and companion launcher: real FPS gains, a full HUD suite, tools built for server admins, and every setting saved per-profile.</p>
+    <a class="chip" href="{{links.releases}}/tag/v{{release.version}}"><span class="chip-dot"></span>v{{release.version}} is out: full redesign, Friends &amp; Waypoints <span aria-hidden="true">→</span></a>
+    <h1>Minecraft, <span class="grad">faster</span> and <span class="grad">cleaner</span>.</h1>
+    <p class="lead">Velo Client is a free Fabric client and launcher. You get more FPS, a HUD that stays out of your way, friends and waypoints across every server, and 3D capes, without giving up your other mods.</p>
     <div class="cta-row">
-      {{#if status.downloadsEnabled}}
-      <a class="btn btn-primary" href="downloads/{{minecraft.modJarFile}}" download>⬇ Download {{minecraft.modJarFile}}</a>
-      {{/if}}
-      {{#ifnot status.downloadsEnabled}}
-      <span class="btn btn-disabled" aria-disabled="true">🚧 In Development — Download Coming Soon</span>
-      {{/ifnot}}
-      <a class="btn btn-ghost" href="#features">See what's inside</a>
+      <a class="btn btn-primary btn-lg" href="#download">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg>
+        Download for free
+      </a>
+      <a class="btn btn-ghost btn-lg" href="#features">See what's inside</a>
     </div>
-    <p class="hero-note">Requires Fabric Loader + Fabric API · supports Minecraft {{minecraft.version}}</p>
+    <ul class="hero-facts">
+      <li><b>{{minecraft.version}}</b><span>Minecraft versions</span></li>
+      <li><b>60+</b><span>modules</span></li>
+      <li><b>Fabric</b><span>works with your mods</span></li>
+      <li><b>€0</b><span>free to play, always</span></li>
+    </ul>
+  </div>
+  <div class="wrap hero-shot reveal">
+    <div class="frame frame-launcher">
+      <div class="frame-bar"><i></i><i></i><i></i><span>Velo Client Launcher</span></div>
+      <img src="assets/shots/launcher-home.webp" width="1800" height="1045" alt="The Velo Client launcher home screen: your skin standing on a floating 3D island, with your profile and a big Connect button">
+    </div>
   </div>
 </header>
 
-<section class="shot-section">
-  <div class="wrap">
-    <div class="shot-frame">
-      <img src="assets/screenshot-modules.jpg" alt="{{site.name}}'s in-game module panel, showing the Performance category with Performance Boost and PolyBlur enabled">
-    </div>
-    <p class="shot-caption">The actual in-game panel — not a mockup.</p>
-  </div>
-</section>
-
 <section class="section" id="features">
   <div class="wrap">
-    <div class="section-head">
-      <h2>Where the FPS actually comes from</h2>
-      <p>Three features worth trying first.</p>
+    <div class="section-head reveal">
+      <span class="eyebrow">Features</span>
+      <h2>Everything you'd install five mods for</h2>
+      <p>Built in, designed to work together, and every setting is saved per profile.</p>
     </div>
 
-    <div class="highlights">
-      <div class="highlight">
-        <span class="num">01</span>
-        <h4>Performance Boost</h4>
-        <p>Presets plus granular control over view distance, entities, particles, VSync mode (Off / On / Adaptive), mipmaps and HUD update rate — all applied live, no reload needed.</p>
-      </div>
-      <div class="highlight">
-        <span class="num">02</span>
-        <h4>PolyBlur</h4>
-        <p>Motion blur that only kicks in when you're actually turning or moving fast, built on Minecraft's own tested blur shader instead of untested custom GLSL.</p>
-      </div>
-      <div class="highlight">
-        <span class="num">03</span>
-        <h4>Command Keybinds</h4>
-        <p>Bind any key to instantly run a command — <code>/spawn</code>, <code>/home</code>, whatever you type ten times an hour. Add, edit, and delete as many as you want.</p>
-      </div>
+    <div class="bento">
+      <article class="card card-wide reveal">
+        <div class="card-text">
+          <span class="tag tag-red">Performance</span>
+          <h3>More frames, fewer stutters</h3>
+          <p><b>Performance Boost</b> presets with live sliders and adaptive render distance. <b>Render Culling</b> skips far-away holograms, item frames and chests, which is where lobby lag comes from. <b>Shader Cache</b> makes startup and resource reloads faster. The launcher also adds Sodium, Lithium, FerriteCore, EntityCulling and ImmediatelyFast where they're available.</p>
+        </div>
+        <img class="card-shot" src="assets/shots/game-performance.webp" loading="lazy" width="1600" height="900" alt="Performance Boost settings in game: presets, Dynamic FPS, HUD caching">
+      </article>
+
+      <article class="card card-span2 reveal">
+        <span class="tag">HUD</span>
+        <h3>A HUD that arranges itself</h3>
+        <p>FPS, ping, coordinates, armor, potions, keystrokes, minimap, scoreboard and more. Modules stack into the corners automatically, and you can drag anything wherever you like.</p>
+        <img class="card-shot" src="assets/shots/game-hud.webp" loading="lazy" width="1600" height="900" alt="In-game HUD with FPS, ping, coordinates, minimap and armor display">
+      </article>
+
+      <article class="card reveal">
+        <span class="tag">Social</span>
+        <h3>Friends on every server</h3>
+        <p>See where your friends are playing, chat with them, and join them with one click. It works in game (press O) and in the launcher, with popups you can tune or mute.</p>
+        <img class="card-shot" src="assets/shots/game-friends.webp" loading="lazy" width="1600" height="900" alt="Friends window with a friends list and an open chat">
+      </article>
+
+      <article class="card reveal">
+        <span class="tag">Waypoints</span>
+        <h3>Never lose your base</h3>
+        <p>Waypoints with icons and colours, separate lists per world and dimension, automatic death points, and sharing with friends.</p>
+        <img class="card-shot" src="assets/shots/game-waypoints.webp" loading="lazy" width="1600" height="900" alt="Waypoints manager listing waypoints with distances">
+      </article>
+
+      <article class="card card-span2 reveal">
+        <span class="tag">Queues</span>
+        <h3>Background Queue</h3>
+        <p>Wait in a long server queue while you play somewhere else. Velo shows your position and switches you over when it's your turn.</p>
+        <img class="card-shot" src="assets/shots/game-queue.webp" loading="lazy" width="1600" height="900" alt="Background Queue window showing a queue position">
+      </article>
+
+      <article class="card card-wide card-flip reveal">
+        <div class="card-text">
+          <span class="tag">Quality of life</span>
+          <h3>The small things, done right</h3>
+          <ul class="ticks">
+            <li><b>Auto Reconnect</b> with a countdown that stops once you leave the screen</li>
+            <li><b>Session Fixer</b> refreshes an expired login and reconnects you</li>
+            <li><b>Zoom</b>, <b>Free Look</b>, toggle sprint and sneak</li>
+            <li><b>Custom crosshair</b> editor with an attack-charge indicator</li>
+            <li><b>Command keybinds</b>: one key for <code>/home</code></li>
+            <li><b>Schematics</b> browser for Litematica and WorldEdit</li>
+          </ul>
+        </div>
+        <img class="card-shot" src="assets/shots/game-menu.webp" loading="lazy" width="1600" height="900" alt="The Velo menu opened with Right Shift, showing HUD modules as cards with switches">
+      </article>
     </div>
   </div>
 </section>
 
-<hr class="divider">
-
-<section class="section">
+<section class="section section-tint" id="launcher">
   <div class="wrap">
-    <div class="section-head">
-      <h2>Organized the way you'd actually look for it</h2>
-      <p>Eight categories, scrollable, searchable — nothing overflows off screen.</p>
-    </div>
-
-    <div class="cat-grid">
-      <div class="cat">
-        <h3>Performance</h3>
-        <ul>
-          <li><b>Performance Boost</b><small>presets + granular FPS tuning</small></li>
-          <li><b>PolyBlur</b><small>motion-triggered blur</small></li>
-          <li><b>Particle Limiter</b></li>
-          <li><b>Frame Time Graph</b></li>
-          <li><b>GPU Utilization</b></li>
-          <li><b>Memory &amp; GC Monitor</b></li>
-          <li><b>Optimization Mod Detector</b><small>flags Sodium / Lithium / Iris / Starlight</small></li>
+    <div class="split">
+      <div class="split-text reveal">
+        <span class="eyebrow">Launcher</span>
+        <h2>A launcher you'll actually enjoy opening</h2>
+        <p>Sign in with Microsoft, pick a profile and connect. Velo handles Fabric, mods and memory for you.</p>
+        <ul class="ticks">
+          <li><b>Profiles</b> for every server or modpack, each with its own mods, resource packs and shaders</li>
+          <li><b>Modrinth built in</b>: add mods, <b>Update all</b> in one click, old files are kept as backups</li>
+          <li><b>Automatic RAM</b> that leaves room for your PC, so heavy modpacks don't push it into swap</li>
+          <li><b>Servers</b> with live ping and player counts, and a launch profile for each server</li>
+          <li><b>Your profile</b>: play time, sessions and stats from your worlds</li>
+          <li>Open the same profile <b>twice</b>, for example for an alt account</li>
         </ul>
       </div>
-      <div class="cat">
-        <h3>Rendering</h3>
-        <ul>
-          <li><b>FOV</b><small>separate sliders: movement, nausea, damage tilt</small></li>
-          <li><b>Full Bright</b></li>
-        </ul>
-      </div>
-      <div class="cat">
-        <h3>HUD</h3>
-        <ul>
-          <li><b>Armor &amp; Durability</b><small>customizable bar &amp; text size</small></li>
-          <li><b>Coordinates, Clock, FPS, Ping, CPS</b></li>
-          <li><b>Mouse Buttons, Keystrokes, Held Item</b></li>
-          <li><b>Potion Effect Timers</b></li>
-          <li><b>Session Stats</b><small>deaths / playtime, local only</small></li>
-          <li><b>Action Bar Log</b></li>
-          <li><b>Waypoints</b><small>manual, never auto-populated</small></li>
-        </ul>
-      </div>
-      <div class="cat">
-        <h3>Server Tools</h3>
-        <ul>
-          <li><b>Client Log Viewer</b><small>filter, wrap, copy, export</small></li>
-          <li><b>TPS &amp; Tick Graph</b></li>
-          <li><b>Entity Count Overlay</b></li>
-          <li><b>Packet Traffic Monitor</b></li>
-          <li><b>Particle Debug Overlay</b></li>
-          <li><b>Chunk Boundary Overlay</b></li>
-          <li><b>World Border Visualizer</b></li>
-          <li><b>Hitbox Visualizer</b></li>
-          <li><b>Light Level Overlay</b><small>mob-spawn-relevant lighting</small></li>
-        </ul>
-      </div>
-      <div class="cat">
-        <h3>QoL</h3>
-        <ul>
-          <li><b>Zoom</b><small>deep range, never corrupts your real FOV</small></li>
-          <li><b>Toggle Sneak</b></li>
-          <li><b>Toggle Sprint</b></li>
-        </ul>
-      </div>
-      <div class="cat">
-        <h3>Utility</h3>
-        <ul>
-          <li><b>Command Keybinds</b><small>bind a key, run a command</small></li>
-          <li><b>Copy Coordinates</b></li>
-        </ul>
-      </div>
-      <div class="cat">
-        <h3>Debug</h3>
-        <ul>
-          <li><b>Block/Entity Inspector</b><small>registry id, NBT, UUID</small></li>
-          <li><b>Keybind Conflict Checker</b></li>
-          <li><b>Resource/Shader Reload Hotkeys</b></li>
-        </ul>
-      </div>
-      <div class="cat">
-        <h3>Cosmetics</h3>
-        <ul>
-          <li><b>Cosmetic Capes</b><small>cloth-physics, client-rendered only</small></li>
-        </ul>
+      <div class="split-media reveal" data-tabs>
+        <div class="tabs" role="tablist" aria-label="Launcher screenshots">
+          <button role="tab" aria-selected="true">Mods</button>
+          <button role="tab" aria-selected="false">Servers</button>
+          <button role="tab" aria-selected="false">Cosmetics</button>
+        </div>
+        <div class="frame" role="tabpanel"><img src="assets/shots/launcher-mods.webp" loading="lazy" width="1800" height="1045" alt="Launcher profile page with the Mods tab, Update all and Add mods buttons"></div>
+        <div class="frame" role="tabpanel" hidden><img src="assets/shots/launcher-servers.webp" loading="lazy" width="1800" height="1045" alt="Launcher servers page with live ping and a launch profile per server"></div>
+        <div class="frame" role="tabpanel" hidden><img src="assets/shots/launcher-cosmetics.webp" loading="lazy" width="1800" height="1045" alt="Launcher cosmetics page with a 3D player wearing a cape"></div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="band" id="profiles">
-  <div class="wrap band-inner">
-    <div>
-      <h2>Every setting, saved per-profile</h2>
-      <p>Module states and your whole HUD layout live inside named profiles — not one global config. Switch instantly, and nothing bleeds between them.</p>
-      <ul class="checklist">
-        <li>Create, rename, and delete profiles from an in-game tab</li>
-        <li>HUD element positions and scale saved per-profile</li>
-        <li>Switching profiles applies everything at once, live</li>
-        <li>A new profile starts from your current setup, not from scratch</li>
-      </ul>
-    </div>
-    <div class="mock-panel">
-      <div class="mock-row"><span class="active">Survival Grind</span><span class="pill">ACTIVE</span></div>
-      <div class="mock-row"><span>Recording / Clean HUD</span><span></span></div>
-      <div class="mock-row"><span>PvP</span><span></span></div>
-      <div class="mock-row"><span>Building</span><span></span></div>
-    </div>
-  </div>
-</section>
-
-<section class="shot-section" style="padding-top:80px">
+<section class="section" id="cosmetics">
   <div class="wrap">
-    <div class="shot-frame">
-      <img src="assets/screenshot-settings.jpg" alt="Performance Boost's settings screen, showing presets, VSync mode, and live sliders for view distance, entities, and particles">
+    <div class="split split-rev">
+      <div class="split-text reveal">
+        <span class="eyebrow">Cosmetics</span>
+        <h2>Capes everyone can see</h2>
+        <p>Import your own cape as a PNG up to 2048×1024, or as an animated GIF. Other Velo players see it as a real 3D cape with cloth physics. Badges and capes sync through the Velo Network, whichever launcher you start the game from.</p>
+        <ul class="ticks">
+          <li>Live 3D preview on your own skin, in game and in the launcher</li>
+          <li>Works together with Wavey Capes</li>
+          <li>Kill effects and a growing store of designed capes</li>
+        </ul>
+      </div>
+      <div class="split-media reveal">
+        <div class="frame"><img src="assets/shots/game-capes.webp" loading="lazy" width="1600" height="900" alt="In-game cape library with a live 3D preview of the player wearing the selected cape"></div>
+      </div>
     </div>
-    <p class="shot-caption">Every slider applies immediately — no re-toggling a module to see a change take effect.</p>
+
+    <div class="coins reveal">
+      <div class="coins-text">
+        <span class="eyebrow eyebrow-gold">Velo Coins {{#ifnot status.storeLive}}<span class="soon">Coming soon</span>{{/ifnot}}</span>
+        <h3>Cosmetics only. Never pay-to-win.</h3>
+        <p>Store capes cost Velo Coins. You can earn them for free every day, or buy a pack to support the project. Nothing you can buy changes gameplay.</p>
+        <div class="coin-ways">
+          <div><b>Daily reward</b><span>Log in and play, and build a streak. Every 7th day in a row pays a weekly bonus.</span></div>
+          <div><b>Daily quests</b><span>Three quests a day, like defeating mobs, mining or exploring.</span></div>
+          {{#if status.adsLive}}<div><b>Short ads</b><span>Optional: watch up to three a day for a few extra coins.</span></div>{{/if}}
+        </div>
+      </div>
+      <div class="coins-media">
+        <div class="frame"><img src="assets/shots/game-coins.webp" loading="lazy" width="1600" height="900" alt="Velo Coins window with coin packs, the daily reward streak, quests and ads"></div>
+      </div>
+    </div>
   </div>
 </section>
 
-<section class="section" id="launcher">
+<section class="section section-tint" id="modules">
   <div class="wrap">
-    <div class="section-head">
-      <h2>{{site.name}} Launcher</h2>
-      <p>A companion app for the parts that shouldn't need to be in-game.</p>
+    <div class="section-head reveal">
+      <span class="eyebrow">Modules</span>
+      <h2>The full list</h2>
+      <p>Open the menu with <kbd>Right Shift</kbd>. Everything is searchable, and each module can be switched off.</p>
     </div>
-    <div class="highlights">
-      <div class="highlight">
-        <span class="num">→</span>
-        <h4>Microsoft sign-in</h4>
-        <p>Standard device-code login. No credentials stored, no third-party auth server.</p>
+    <div class="mod-grid">
+      <div class="mod-cat reveal">
+        <h4>Performance</h4>
+        <ul>
+          <li>Performance Boost</li><li>Render Culling</li><li>Shader Cache</li><li>Entity Detail Distance</li>
+          <li>Particle Limiter</li><li>PolyBlur</li><li>Input Sampler</li><li>Frame Time Graph</li>
+          <li>Memory &amp; GC Monitor</li><li>GPU Utilization</li>
+        </ul>
       </div>
-      <div class="highlight">
-        <span class="num">→</span>
-        <h4>Saved servers</h4>
-        <p>Your server list with live ping and MOTD, outside of Minecraft's own multiplayer screen.</p>
+      <div class="mod-cat reveal">
+        <h4>HUD</h4>
+        <ul>
+          <li>FPS</li><li>Ping</li><li>Coordinates</li><li>Clock</li><li>Keystrokes</li>
+          <li>Mouse Buttons &amp; CPS</li><li>Armor &amp; Durability</li><li>Potion Timers</li><li>Held Item</li>
+          <li>Totem Counter</li><li>Scoreboard</li><li>Minimap</li><li>Waypoints</li><li>Session Stats</li><li>Action Bar Log</li><li>Hearts</li><li>Hunger &amp; Saturation</li><li>Armor Bar</li><li>XP &amp; Locator Bar</li><li>Hotbar Colors</li>
+        </ul>
       </div>
-      <div class="highlight">
-        <span class="num">→</span>
-        <h4>Cape library</h4>
-        <p>Import and manage capes from one place, shared with the in-game cosmetics module.</p>
+      <div class="mod-cat reveal">
+        <h4>Rendering</h4>
+        <ul>
+          <li>FOV Control</li><li>Full Bright</li><li>Block Outline</li><li>Time, Weather &amp; Fog</li><li>TNT Timer</li>
+        </ul>
+      </div>
+      <div class="mod-cat reveal">
+        <h4>Quality of Life</h4>
+        <ul>
+          <li>Zoom</li><li>Free Look</li><li>Toggle Sprint</li><li>Toggle Sneak</li><li>Custom Crosshair</li>
+          <li>Attack Indicator</li><li>Nick Hider</li><li>Small Caps</li><li>Friends</li>
+        </ul>
+      </div>
+      <div class="mod-cat reveal">
+        <h4>Utility</h4>
+        <ul>
+          <li>Auto Reconnect</li><li>Session Fixer</li><li>Background Queue</li><li>Command Keybinds</li>
+          <li>Copy Coordinates</li><li>Velo Network</li>
+        </ul>
+      </div>
+      <div class="mod-cat reveal">
+        <h4>Server Tools</h4>
+        <ul>
+          <li>TPS &amp; Tick Graph</li><li>Packet Monitor</li><li>Entity Count</li><li>Chunk Borders</li>
+          <li>Chunk Load Profiler</li><li>Hitboxes</li><li>Light Levels</li><li>World Border</li>
+          <li>Particle Debug</li><li>Log Viewer</li>
+        </ul>
+      </div>
+      <div class="mod-cat reveal">
+        <h4>Debug</h4>
+        <ul>
+          <li>Block &amp; Entity Inspector</li><li>Keybind Conflicts</li><li>Reload Hotkeys</li><li>Module Profiler</li>
+        </ul>
+      </div>
+      <div class="mod-cat reveal">
+        <h4>Cosmetics</h4>
+        <ul>
+          <li>3D Capes</li><li>Animated &amp; HD Capes</li><li>Kill Effects</li>
+        </ul>
       </div>
     </div>
   </div>
 </section>
 
-<section class="section" id="install">
+<section class="section" id="download">
   <div class="wrap">
-    <div class="section-head">
-      <h2>Requirements</h2>
+    <div class="section-head reveal">
+      <span class="eyebrow">Download</span>
+      <h2>Get Velo Client</h2>
+      <p>Version {{release.version}} · {{release.channel}} · Minecraft {{minecraft.version}}</p>
     </div>
-    <div class="req-grid" style="margin-bottom:16px">
-      <div class="req"><div class="label">Minecraft</div><div class="value">{{minecraft.version}}</div></div>
-      <div class="req"><div class="label">Mod Loader</div><div class="value">Fabric Loader</div></div>
-      <div class="req"><div class="label">Dependency</div><div class="value">Fabric API</div></div>
-      <div class="req"><div class="label">Runtime</div><div class="value">Java {{minecraft.javaVersion}}</div></div>
+    <div class="dl-grid">
+      <a class="dl dl-main reveal" href="{{links.releases}}/download/v{{release.version}}/{{release.launcherExe}}">
+        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="currentColor" d="M3 5.5 10 4.5v7H3zm8-1.15L21 3v8.5H11zM3 12.5h7v7l-7-1zm8 0h10V21l-10-1.4z"/></svg>
+        <div><b>Windows</b><span>Launcher installer (.exe)</span></div>
+        <em>Recommended</em>
+      </a>
+      <a class="dl reveal" href="{{links.releases}}/download/v{{release.version}}/{{release.launcherDeb}}">
+        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 3c-2.2 0-3.4 1.9-3.4 4.4 0 1.6-.6 2.7-1.6 4.1-1.4 2-2.3 4.1-2 6 .4 2 2.4 3.2 4.4 3h5.2c2 .2 4-1 4.4-3 .3-1.9-.6-4-2-6-1-1.4-1.6-2.5-1.6-4.1C15.4 4.9 14.2 3 12 3Z"/><circle cx="10.4" cy="8" r=".9" fill="currentColor"/><circle cx="13.6" cy="8" r=".9" fill="currentColor"/></svg>
+        <div><b>Linux</b><span>Launcher package (.deb)</span></div>
+      </a>
+      <a class="dl reveal" href="{{links.releases}}/tag/v{{release.version}}">
+        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M12 2.8 20 7.4v9.2l-8 4.6-8-4.6V7.4zM4 7.4l8 4.6 8-4.6M12 12v9.2"/></svg>
+        <div><b>Mod only</b><span>Jar for any Fabric launcher</span></div>
+      </a>
     </div>
-    <p class="hero-note" style="margin-bottom:56px">Java 21+ for 1.21.11 · Java 25+ for 26.1 and 26.2 — each Minecraft version needs its own matching jar.</p>
-
-    {{#if status.downloadsEnabled}}
-    <div class="section-head">
-      <h2>Install</h2>
+    <div class="req-row reveal">
+      <div><span>Minecraft</span><b>{{minecraft.version}}</b></div>
+      <div><span>Loader</span><b>Fabric + Fabric API</b></div>
+      <div><span>Java</span><b>{{minecraft.javaVersion}}</b></div>
+      <div><span>Launcher</span><b>sets all of this up</b></div>
     </div>
-    <div class="install-steps">
-      <div class="install-step"><p>Install <a href="{{links.fabricInstaller}}">Fabric Loader</a> for the Minecraft version you're playing (1.21.11, 26.1, or 26.2) if you haven't already.</p></div>
-      <div class="install-step"><p>Get <a href="{{links.fabricApi}}">Fabric API</a> — {{site.name}} depends on it and won't load without it.</p></div>
-      <div class="install-step"><p>Download the jar matching your Minecraft version below and drop both files into your <code>.minecraft/mods</code> folder.</p></div>
-      <div class="install-step"><p>Launch with the Fabric profile. Press <code>Right Shift</code> in-game to open the panel.</p></div>
-    </div>
-    <div class="cta-row" style="margin-top:40px">
-      <a class="btn btn-primary" href="downloads/{{minecraft.modJarFile}}" download>⬇ Download {{minecraft.modJarFile}}</a>
-      <a class="btn btn-ghost" href="{{links.fabricApi}}">Get Fabric API</a>
-    </div>
-    <p class="hero-note" style="margin-top:18px">{{site.name}} Launcher (the companion desktop app) isn't packaged for standalone download yet — the mod above is fully independent and doesn't need it.</p>
-    {{/if}}
-    {{#ifnot status.downloadsEnabled}}
-    <div class="section-head">
-      <h2>Not ready yet</h2>
-      <p>{{site.name}} is still in active development, so there's no polished download flow here yet — this page will get a real download link the moment one's ready.</p>
-      {{#if links.github}}
-      <p style="margin-top:8px">Early, pre-release builds for Minecraft 1.21.11, 26.1, and 26.2 (for people comfortable testing in-development software) are published as <a href="{{links.github}}/releases">GitHub Releases</a> — each release has a separate jar per version.</p>
-      {{/if}}
-    </div>
-    {{/ifnot}}
+    <p class="fine reveal">Using the mod jar on its own? Install <a href="{{links.fabricInstaller}}">Fabric Loader</a> and <a href="{{links.fabricApi}}">Fabric API</a>, then put the jar for your Minecraft version into <code>.minecraft/mods</code>. Java 21+ for 1.21.11, Java 25+ for 26.1 and 26.2.</p>
   </div>
 </section>
 
-<footer>
-  <div class="wrap">
-    <div class="foot-links">
-      <a href="#features">Features</a>
-      <a href="#profiles">Profiles</a>
-      <a href="#launcher">Launcher</a>
-      <a href="#install">Install</a>
-      <a href="impressum.html">Imprint</a>
-      <a href="datenschutz.html">Privacy Policy</a>
-      <a href="terms.html">Terms of Service</a>
-      {{#if links.github}}<a href="{{links.github}}">GitHub</a>{{/if}}
+<section class="section section-tint" id="faq">
+  <div class="wrap wrap-narrow">
+    <div class="section-head reveal">
+      <span class="eyebrow">FAQ</span>
+      <h2>Questions</h2>
     </div>
-    <p><b>NOT AN OFFICIAL MINECRAFT PRODUCT.</b> NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</p>
-    <p>Minecraft is a trademark of Mojang Synergies AB. "{{site.name}}" is an independent, community-made Fabric mod.</p>
+    <div class="faq">
+      <details class="reveal">
+        <summary>Is Velo Client free?</summary>
+        <p>Yes. The client, the launcher and every module are free. Velo Coins only buy cosmetic capes, and you can earn them by playing.</p>
+      </details>
+      <details class="reveal">
+        <summary>Can I use it on servers like Hypixel?</summary>
+        <p>The modules are mostly visual and quality-of-life features. Every server has its own rules, so check them before you join. Server-specific tools can be turned off per profile, and each module shows how safe it is to use.</p>
+      </details>
+      <details class="reveal">
+        <summary>Does it work with Sodium, Iris and my other mods?</summary>
+        <p>Yes. Velo is a normal Fabric mod. The launcher can install Sodium, Lithium and other performance mods for you, and you can add anything from Modrinth to each profile.</p>
+      </details>
+      <details class="reveal">
+        <summary>Do I need the launcher?</summary>
+        <p>No. The launcher is the easiest way to play, but the mod jar also works with the vanilla launcher, Prism, MultiMC or any other Fabric setup. Friends and capes sync either way.</p>
+      </details>
+      <details class="reveal">
+        <summary>Is my Microsoft account safe?</summary>
+        <p>Sign-in uses Microsoft's own device-code login. Your password never touches Velo. The Velo Network checks who you are the same way Minecraft servers do, so it never receives your access token.</p>
+      </details>
+      <details class="reveal">
+        <summary>Which Minecraft versions are supported?</summary>
+        <p>{{minecraft.version}}. Each version has its own jar, and the launcher picks the right one automatically.</p>
+      </details>
+    </div>
   </div>
-</footer>
+</section>
 
+<section class="section cta-final">
+  <div class="wrap reveal">
+    <h2>Ready to play?</h2>
+    <p>It's free and takes a minute to set up.</p>
+    <a class="btn btn-primary btn-lg" href="#download">Download Velo Client</a>
+  </div>
+</section>
+
+{{> footer}}
+{{> scripts}}
 </body>
 </html>

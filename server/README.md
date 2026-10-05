@@ -19,14 +19,15 @@ pointed at the same server.
 - Publishes which of the built-in Store capes (the shared, bundled-with-every-client
   ones) each online player has equipped, so other clients can render it
   without needing to download anyone's texture.
-- Stores players' own **custom capes** (imported PNG/GIF) so everyone else on
+- Stores players' own **custom capes** (imported PNG) so everyone else on
   the server sees them too. The mod uploads your equipped custom cape once
   (the "Share Custom Cape" toggle on the Velo Network module, on by default);
   other clients download it once and cache it. Uploads are decoded and
   re-encoded server-side, content-addressed by SHA-256, and kept on disk in
   the data directory, so they survive restarts. Limits: PNG up to 2048x1024
-  (2:1 cape, or 1:1 cape+elytra, width a multiple of 64); animated GIF up to
-  512 wide and 128 frames; 6 MB per upload; one custom cape per account.
+  (2:1 cape, or 1:1 cape+elytra, width a multiple of 64); 6 MB per upload; one
+  custom cape per account. Animated (GIF) capes are refused - they're Velo Store
+  items, shared by item id and only shown for players who own them.
 - **Friends & messaging** (`/v1/social/*`, see `SocialService.java`): friend
   requests by username or UUID, accept/deny, unfriend, block (blocked players
   can't message you or send requests, and are never told), direct messages
@@ -44,6 +45,16 @@ pointed at the same server.
 - The game and the launcher each hold their own session (`kind` = `game` /
   `launcher`) for the same account; only game sessions count for badges and
   capes.
+
+- **News, polls & bug reports** (`NewsRoutes.java`): launcher news posts (block-based, with
+  uploaded images in `news/images/`) and community polls, both stored in `news.json`; anyone can
+  read them, signed-in players can vote (one vote per account, changeable until the poll ends).
+  Bug and crash reports from the game and the launcher go to `reports/` (one gzip'd JSON each,
+  with the player's message, versions, system, mods, log tail and crash report) - signing in is
+  optional, limited to 4 per 10 minutes / 20 per day per player or IP. Owners (`VELO_OWNERS`)
+  write posts/polls and read reports in the launcher's News tab; scripts can use the
+  `X-Velo-Admin-Token: $VELO_ADMIN_TOKEN` header on the `/v1/admin/news/*` and
+  `/v1/admin/reports*` endpoints instead.
 
 ## Running it
 
@@ -252,8 +263,8 @@ server {
 	listen 80;
 	server_name client.asteriasmp.net;
 
-	# Custom cape uploads are up to 6 MB - nginx's default limit is 1 MB.
-	client_max_body_size 8m;
+	# News images are up to 12 MB (capes 6 MB) - nginx's default limit is 1 MB.
+	client_max_body_size 16m;
 
 	location / {
 		proxy_pass http://localhost:8787;
@@ -299,6 +310,104 @@ needed, clean it up so it stops trying (and failing) to restart:
 sudo systemctl disable --now caddy
 ```
 
+## Velo Coins store (real payments, daily rewards, ads)
+
+The server is the only place coins and owned cosmetics exist: balances, purchases, orders and an
+append-only coin ledger live in `store.db` (SQLite) in the data directory. Prices, coin packs and
+reward amounts are in `store.json` (created with defaults on first start - edit and restart).
+Clients only display what the server answers, so editing local files can't create coins.
+
+**Back up `store.db`** (it's real money). While the server runs, copy it with
+`sqlite3 data/store.db ".backup data/store-backup.db"` (or stop the server and copy the file).
+
+### 1. Payments: Tebex (merchant of record)
+
+Tebex takes the payment (cards, PayPal, paysafecard, ...), handles VAT/sales tax, refunds and
+chargebacks, and pays out to you - you don't need your own VAT registration in every EU country.
+Velo uses the **Tebex Checkout API**, where the server defines each coin pack and price itself
+(Lunar Client's store runs on the same API).
+
+1. Create an account and a project at <https://creator.tebex.io>. Pick the currency you want
+   prices in (it must match `"currency"` in `store.json`, default `EUR`).
+2. Ask Tebex support to enable **Checkout API** access for the project (it's not on by default).
+3. *Developers -> API Keys*: copy the **Project ID** and **Private Key**.
+4. *Developers -> Webhooks*: add the endpoint `https://YOUR-SERVER/v1/store/webhook/tebex`,
+   subscribe to `payment.completed`, `payment.refunded`, `payment.dispute.opened`,
+   `payment.dispute.lost`, and copy the **webhook secret**. Tebex sends a validation webhook first;
+   the server answers it automatically.
+5. For testing: *Settings -> Checkout -> Test Mode* adds a "Test Payments" method that always
+   succeeds (real records, real webhooks). **Turn it off before going public.**
+
+### 2. Rewarded ads: ayeT-Studios
+
+Players can watch up to `adsPerDay` (default 3) short videos per day for `adCoins` (default 6)
+coins each. [ayeT-Studios](https://www.ayetstudios.com) (rewarded video for the web, no minimum
+traffic) confirms every completed view **server-to-server** with an HMAC-signed callback; the
+server de-duplicates by transaction id, so views can't be faked from the client. The coin amount
+always comes from `store.json`, never from the callback.
+
+1. Sign up as a publisher at <https://www.ayetstudios.com> (*Publishers -> Sign up*).
+2. *Placements -> Add placement*: type **Website**, URL = your `VELO_PUBLIC_URL`
+   (the ad page is `https://YOUR-SERVER/rewards/ad`). Note the numeric **placement id**.
+3. In that placement, add an **AdSlot** of type **Rewarded Video**. Note its **name** (that's `AYET_ADSLOT`).
+4. *Callback URL* of the placement/adslot:
+   `https://YOUR-SERVER/v1/rewards/ayet?uid={external_identifier}&tid={transaction_id}`
+5. *Account settings*: copy your **publisher API key** (it verifies the
+   `X-Ayetstudios-Security-Hash` header on callbacks).
+6. **ads.txt**: copy the lines ayeT shows for the placement into `data/ads.txt` on the server
+   (next to `store.db`). The server serves it at `https://YOUR-SERVER/ads.txt`; no restart needed.
+
+EU visitors without a consent banner (CMP) only get non-personalised ads, so fill and payout are
+lower; that's fine to start with.
+
+### 3. Owners
+
+`VELO_OWNERS` lists who gets the owner tools (launcher: *Velo Coins -> Owner tools*; in game:
+*Velo Coins* screen): give/take coins, give/remove cosmetics, look up a player's balance and
+ledger. Comma-separated Minecraft UUIDs (recommended - names can change) or usernames.
+
+### 4. Environment
+
+| Variable | What it does |
+|---|---|
+| `VELO_PUBLIC_URL` | Public https address of this server, e.g. `https://client.example.net` (needed for checkout return pages and the ad page) |
+| `VELO_OWNERS` | Owner accounts, e.g. `069a79f444e94726a5befca90e38aaf5,Velo2k` |
+| `TEBEX_PROJECT_ID` / `TEBEX_PRIVATE_KEY` | Tebex Checkout API credentials (enables buying coins) |
+| `TEBEX_WEBHOOK_SECRET` | Verifies Tebex webhooks (required for coins to be credited) |
+| `AYET_PLACEMENT_ID` / `AYET_ADSLOT` / `AYET_API_KEY` | Rewarded ads (ayeT-Studios placement id, rewarded-video adslot name, publisher API key) |
+
+With systemd, put them in the unit (or an `EnvironmentFile=` only root can read):
+
+```ini
+[Service]
+Environment=VELO_PUBLIC_URL=https://client.example.net
+Environment=VELO_OWNERS=YOUR-UUID
+Environment=TEBEX_PROJECT_ID=...
+Environment=TEBEX_PRIVATE_KEY=...
+Environment=TEBEX_WEBHOOK_SECRET=...
+Environment=AYET_PLACEMENT_ID=...
+Environment=AYET_ADSLOT=...
+Environment=AYET_API_KEY=...
+```
+
+On start the server prints which parts are on, e.g.
+`Store: coin checkout ON, Tebex webhooks ON, rewarded ads OFF (set AYET_PLACEMENT_ID, ...)`.
+
+### How it stays safe
+
+- A paid order is credited exactly once: the order goes pending -> paid in the same database
+  transaction that adds the coins, and webhook ids are remembered (Tebex retries deliveries).
+- The coins credited come from the server's own order (created when checkout started), never from
+  the webhook; the paid amount is checked against the order price - mismatches are parked as
+  `review` and logged instead of credited.
+- Refunds and lost chargebacks take the coins back (the balance may go negative; a negative
+  balance can't buy anything).
+- Store capes are only shown to other players when the server says you own them.
+- Free coins are slow on purpose: everything maxed every day (login streak, all quests, all ads)
+  is roughly 60-70 coins - about two weeks for a ~1000-coin cape. Quests count Minecraft's own
+  server-tracked statistics, are rate-capped per minute, and only pay after the server has seen
+  enough real in-game time that day (from game-session heartbeats).
+
 ## Configuring the mod to use your server
 
 The mod ships already pointed at Velo Client's own official server
@@ -340,7 +449,7 @@ handler code.
 | POST   | `/v1/heartbeat`         | `{sessionToken, capeId}`          | Keeps a session alive and publishes the currently-equipped cape (or `null`) |
 | POST   | `/v1/session/end`       | `{sessionToken}`                  | Explicit "going offline" - optional, sessions expire on their own too |
 | GET    | `/v1/online`            | -                                  | `{users: [{uuid, username, capeId}], serverTimeMillis}` - `capeId` is a Store id or `custom:<sha256>` |
-| POST   | `/v1/cape/upload`       | raw PNG/GIF bytes, `Authorization: Bearer <sessionToken>` | Returns `{capeId: "custom:<sha256>"}` |
+| POST   | `/v1/cape/upload`       | raw PNG bytes, `Authorization: Bearer <sessionToken>` (GIFs are refused: animated capes are Store-only) | Returns `{capeId: "custom:<sha256>"}` |
 | POST   | `/v1/cape/remove`       | `Authorization: Bearer <sessionToken>` | Removes your own custom cape |
 | GET    | `/v1/cape/<sha256>`     | -                                  | The cape image; immutable, cacheable forever |
 | POST   | `/v1/admin/cape/remove` | `{uuid}`, `Authorization: Bearer $VELO_ADMIN_TOKEN` | Removes a player's custom cape and bans that exact image |

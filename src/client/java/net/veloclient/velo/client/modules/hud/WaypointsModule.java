@@ -32,7 +32,7 @@ import java.util.List;
  * Waypoints" is on. Everything is managed in the Waypoints menu (P); N drops a new one where you
  * stand. Turning this module off hides them but keeps them all.
  */
-public final class WaypointsModule extends AbstractModule implements Configurable {
+public final class WaypointsModule extends AbstractModule implements Configurable, net.veloclient.velo.client.gui.window.ModuleShortcut {
 
 	public static final KeyBinding OPEN_MENU = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.velo-client.open_waypoints", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_P, VeloKeybinds.CATEGORY));
@@ -105,10 +105,18 @@ public final class WaypointsModule extends AbstractModule implements Configurabl
 	}
 
 	@Override
+	public String shortcutLabel() {
+		return "Open Waypoints";
+	}
+
+	@Override
+	public void openShortcut(net.minecraft.client.gui.screen.Screen parent) {
+		MinecraftClient.getInstance().setScreen(new WaypointsScreen(parent));
+	}
+
+	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
-				new ConfigField.ActionButtonField("Open Waypoints Menu...", () -> MinecraftClient.getInstance().setScreen(
-						new WaypointsScreen(ClientCompat.currentScreen()))),
 				KeybindConfig.field("Waypoints Menu Key", OPEN_MENU),
 				KeybindConfig.field("New Waypoint Key", NEW_WAYPOINT),
 				new ConfigField.ToggleField("Death Waypoints", () -> deathWaypoints, v -> deathWaypoints = v),

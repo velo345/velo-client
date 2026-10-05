@@ -40,6 +40,10 @@ public final class StoreView {
 		void openItem(StoreItem item);
 
 		void rebuild();
+
+		/** Opens the Velo Coins page (buy coins / free coins). */
+		default void openCoins() {
+		}
 	}
 
 	private StoreView() {
@@ -69,8 +73,7 @@ public final class StoreView {
 		FlowPane grid = new FlowPane(14, 14);
 		for (StoreItem item : items) {
 			boolean owned = StoreOwnership.owns(item.id());
-			grid.getChildren().add(CosmeticUi.capeCard(
-					CosmeticUi.thumbnail("store:" + item.id(), CosmeticUi.frames(item), 150, 150),
+			grid.getChildren().add(CosmeticUi.capeCard("store:" + item.id(), CosmeticUi.frames(item),
 					item.name(), CosmeticUi.priceChip(item.priceCoins(), owned), false, () -> host.openItem(item)));
 		}
 		UiMotion.stagger(grid, 24);
@@ -113,18 +116,31 @@ public final class StoreView {
 		banner.setAlignment(Pos.CENTER_LEFT);
 		banner.getStyleClass().addAll("featured-banner", "motion-card");
 		banner.setOnMouseClicked(e -> host.openItem(item));
+		CosmeticUi.animate(banner, cape, "store:" + item.id(), CosmeticUi.frames(item), 200, 200, false);
 		return banner;
 	}
 
+	private static String balanceText() {
+		int balance = CurrencyStore.balance();
+		return balance < 0 ? "..." : String.format(java.util.Locale.ROOT, "%,d", balance);
+	}
+
 	private static Node buildBalancePill(Host host) {
-		Label balance = new Label(String.valueOf(CurrencyStore.balance()));
+		Label balance = new Label(balanceText());
 		balance.getStyleClass().add("balance-amount");
+		// The balance lives on the server: show the cached value, then refresh it.
+		java.util.concurrent.CompletableFuture.runAsync(() -> {
+			try {
+				net.veloclient.launcher.social.StoreApi.wallet();
+				net.veloclient.launcher.data.StorePurchase.restoreMissing();
+			} catch (net.veloclient.launcher.social.StoreApi.StoreError ignored) {
+				// Shown as "..." until it works.
+			}
+			javafx.application.Platform.runLater(() -> balance.setText(balanceText()));
+		}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor());
 		Button getCoins = new Button("Get coins");
 		getCoins.getStyleClass().add("ghost-button");
-		getCoins.setOnAction(e -> {
-			BuyCoinsDialog.show(host.owner());
-			host.rebuild();
-		});
+		getCoins.setOnAction(e -> host.openCoins());
 		HBox pill = new HBox(8, CosmeticUi.coin(20), balance, getCoins);
 		pill.setAlignment(Pos.CENTER_LEFT);
 		pill.getStyleClass().add("balance-pill");

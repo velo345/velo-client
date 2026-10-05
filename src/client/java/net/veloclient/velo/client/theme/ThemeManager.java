@@ -75,6 +75,30 @@ public final class ThemeManager {
 		return true;
 	}
 
+	/** Renames a custom theme (false if the new name is empty or taken). */
+	public static synchronized boolean renameCustomTheme(String oldName, String newName) {
+		String name = newName.trim();
+		if (name.isEmpty() || name.equals(oldName) || isBuiltIn(name) || CustomThemeStore.asMap(customThemes()).containsKey(name)) {
+			return false;
+		}
+		List<Theme> customs = customThemes();
+		for (int i = 0; i < customs.size(); i++) {
+			Theme t = customs.get(i);
+			if (t.name().equals(oldName)) {
+				Theme renamed = new Theme(name, t.background(), t.surface(), t.accentStart(), t.accentEnd(), t.text(),
+						t.cornerRadius(), t.blurIntensity(), t.animationSpeed(), t.panelOpacity());
+				customs.set(i, renamed);
+				CustomThemeStore.save(customs);
+				if (active != null && active.name().equals(oldName)) {
+					active = renamed;
+					save();
+				}
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** No-op if {@code name} isn't a custom theme (built-ins can't be deleted). Falls back to the default preset if the deleted theme was active. */
 	public static synchronized void deleteCustomTheme(String name) {
 		List<Theme> customs = customThemes();

@@ -1,88 +1,84 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Privacy Policy — {{site.name}}</title>
+{{> head}}
+<title>Privacy Policy · Velo Client</title>
 <meta name="robots" content="noindex">
-<link rel="icon" type="image/png" href="assets/favicon.png">
-<link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-inner">
-    <a class="brand" href="/"><img class="brand-mark" src="assets/logo.png" alt="">{{site.name}}</a>
-    <div class="nav-links">
-      <a href="index.html#features">Features</a>
-      <a href="index.html#install">Install</a>
-    </div>
-    <a class="nav-cta" href="index.html">Home</a>
-  </div>
-</nav>
+{{> nav}}
 
 <main class="wrap legal">
-  <h1>Privacy Policy</h1>
-  <p class="updated">Information pursuant to Art. 13 GDPR (Datenschutz-Grundverordnung) · Last updated {{legal.lastUpdated}}</p>
+<h1>Privacy Policy</h1>
+<p class="updated">Information pursuant to Art. 13 GDPR (Datenschutz-Grundverordnung) · Last updated {{legal.lastUpdated}}</p>
 
-  <h2>1. Controller</h2>
-  <p>The controller responsible for data processing on this website, within the meaning of the GDPR, is:</p>
-  <address>
-    {{legal.operatorName}}<br>
-    {{legal.addressLine1}}<br>
-    {{legal.addressLine2}}<br>
-    {{legal.country}}<br>
-    Email: <a href="mailto:{{legal.email}}">{{legal.email}}</a>
-  </address>
+<h2>1. Controller</h2>
+<p>The controller responsible for data processing on this website and for the Velo Client online services, within the meaning of the GDPR, is:</p>
+<address>
+{{legal.operatorName}}<br>
+{{legal.addressLine1}}<br>
+{{legal.addressLine2}}<br>
+{{legal.country}}<br>
+Email: <a href="mailto:{{legal.email}}">{{legal.email}}</a>
+</address>
 
-  <h2>2. Overview of data processing</h2>
-  <p>This is a static informational website. It does not use cookies, does not run analytics or tracking scripts, does not embed third-party advertising, and does not include any forms that collect personal data. All fonts, styles, and scripts are served directly from this site's own hosting — nothing is loaded from third-party font or script CDNs, so no data about your visit is shared with those providers just by loading the page.</p>
+<h2>2. Overview</h2>
+<p>This policy covers two things: <b>this website</b>, and the <b>online features of the Velo Client mod and launcher</b> (the "Velo Network": friends, messages, capes, Velo Coins and daily rewards). Velo Client's offline features (modules, HUD, settings, profiles) run entirely on your computer and send nothing to us.</p>
 
-  <h2>3. Hosting and server log files</h2>
-  <p>This website is hosted by Vercel Inc., 340 S Lemon Ave #4133, Walnut, CA 91789, USA ("Vercel"). Vercel processes data on our behalf (data processor) to deliver this website's content to your browser. Like virtually any web host, Vercel's infrastructure automatically records technical information for every request in server log files, typically including:</p>
-  <ul>
-    <li>IP address (used for request routing and abuse prevention)</li>
-    <li>Date and time of the request</li>
-    <li>Requested file / URL and HTTP status code</li>
-    <li>Browser type and version, operating system</li>
-    <li>Referring URL</li>
-  </ul>
-  <p>This data is processed to ensure a functioning, secure delivery of the website (legitimate interest, Art. 6(1)(f) GDPR) and is not merged with any other data source. Vercel's own privacy policy is available at <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">vercel.com/legal/privacy-policy</a>.</p>
+<h2>3. This website</h2>
+<h3>3.1 No cookies, no tracking</h3>
+<p>This website does not use cookies, analytics, tracking scripts or advertising. Fonts, styles and scripts are served from this site's own hosting. Nothing is loaded from third-party CDNs.</p>
+<h3>3.2 Hosting and server log files</h3>
+<p>This website is hosted by Vercel Inc., 340 S Lemon Ave #4133, Walnut, CA 91789, USA ("Vercel"), as our data processor. For every request, Vercel automatically records technical information in server log files, typically: IP address, date and time, requested URL and HTTP status, browser and operating system, and referring URL. This is necessary to deliver the website securely (legitimate interest, Art. 6(1)(f) GDPR). Transfers to the USA are based on the EU-US Data Privacy Framework and/or standard contractual clauses. See <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">vercel.com/legal/privacy-policy</a>.</p>
+<h3>3.3 Downloads</h3>
+<p>Download buttons link to release files hosted on GitHub (GitHub Inc., USA). When you download a file, GitHub processes your IP address and request data under its own privacy statement: <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub Privacy Statement</a>.</p>
 
-  <h2>4. Downloading the mod</h2>
-  <p>Downloading the mod jar file from this site is handled as a direct file transfer through our hosting provider. No account, registration, or personal information is required or requested to download it.</p>
+<h2>4. Velo Network (in the mod and launcher)</h2>
+<p>The Velo Network is turned on by default and can be switched off in game (Velo Network module) or in the launcher settings. When it is on, we process the following data to provide the features you use (performance of a contract, Art. 6(1)(b) GDPR):</p>
+<ul>
+<li><b>Identity:</b> your Minecraft UUID and username. We check them the same way Minecraft servers do (Mojang's session server). We never receive your Microsoft password or Minecraft access token.</li>
+<li><b>Presence:</b> that you are online with Velo Client and, if you share it with friends, which server, world or Realm you are playing on. "Appear offline" hides this. Online status is kept in memory only.</li>
+<li><b>Friends and messages:</b> your friend list, requests, blocks, direct messages (the last 300 per conversation) and waypoints you share.</li>
+<li><b>Cosmetics:</b> the cape you have equipped and, if "Share Custom Cape" is on, the cape image you uploaded.</li>
+<li><b>Velo Coins and rewards:</b> your coin balance, a history of every change (purchases, rewards, refunds, grants), the cosmetics you own, and for daily rewards: how long you played that day plus totals of Minecraft's own statistics (mobs defeated, blocks mined and placed, distance travelled).</li>
+<li><b>Technical data:</b> IP address and request times, used for security and rate limiting (legitimate interest, Art. 6(1)(f) GDPR).</li>
+</ul>
+<p>We keep this data while you use the Velo Network. You can ask us to delete your account data at any time (see section 7). Records of purchases are kept for as long as tax and commercial law requires (usually up to 10 years under German law, Art. 6(1)(c) GDPR).</p>
 
-  <h2>5. Your rights</h2>
-  <p>Under the GDPR, you have the right to:</p>
-  <ul>
-    <li>Request access to any personal data we hold about you (Art. 15)</li>
-    <li>Request correction of inaccurate data (Art. 16)</li>
-    <li>Request erasure of your data (Art. 17)</li>
-    <li>Request restriction of processing (Art. 18)</li>
-    <li>Data portability (Art. 20)</li>
-    <li>Object to processing (Art. 21)</li>
-    <li>Lodge a complaint with a supervisory authority</li>
-  </ul>
-  <p>To exercise any of these rights, contact us at <a href="mailto:{{legal.email}}">{{legal.email}}</a>.</p>
+<h2>5. Velo Coins purchases (Tebex)</h2>
+<p>Velo Coins packs are sold through <b>Tebex Limited</b> (United Kingdom), which acts as reseller and merchant of record. When you buy coins, the checkout opens on Tebex's website, and Tebex processes your payment and billing data under its own privacy policy: <a href="https://tebex.io/legal/privacy" target="_blank" rel="noopener">tebex.io/legal/privacy</a>. We never see your card or bank details. Tebex sends us the order number, transaction ID, amount, currency and status (paid, refunded, disputed) so we can add coins to your account or take them back after a refund (Art. 6(1)(b) and (c) GDPR).</p>
 
-  <h2>6. Changes to this policy</h2>
-  <p>This policy may be updated if the site's functionality changes (for example, if analytics or a contact form are added in the future — in which case this section will be updated to reflect exactly what's collected and why, before such a feature goes live).</p>
+<h2>6. Optional rewarded ads (ayeT-Studios)</h2>
+<p>If you choose "Watch an ad" for free coins, an ad page opens in your browser. The video ads are provided by <b>ayeT-Studios GmbH</b> (Germany) and the advertising partners it works with. They may process your IP address, device and browser data and your Minecraft UUID (used as an anonymous ID so the reward reaches your account), and may use cookies or similar technologies to deliver ads, measure them and prevent fraud. See <a href="https://www.ayetstudios.com/privacy-policy" target="_blank" rel="noopener">ayeT-Studios' privacy policy</a>. This only happens when you start an ad yourself (consent, Art. 6(1)(a) GDPR), and you can simply not use this feature. We only receive a confirmation that an ad was completed, with a transaction ID, so that we can credit the coins.</p>
+
+<h2>7. Other services the launcher talks to</h2>
+<ul>
+<li><b>Microsoft / Xbox Live and Mojang:</b> sign-in and Minecraft sessions, under <a href="https://privacy.microsoft.com/privacystatement" target="_blank" rel="noopener">Microsoft's privacy statement</a>.</li>
+<li><b>Modrinth:</b> searching for and downloading mods, under <a href="https://modrinth.com/legal/privacy" target="_blank" rel="noopener">Modrinth's privacy policy</a>.</li>
+<li><b>Minecraft servers you add:</b> the launcher pings them directly to show player counts.</li>
+<li><b>GitHub:</b> checking for and downloading updates.</li>
+</ul>
+
+<h2>8. Your rights</h2>
+<p>Under the GDPR, you have the right to:</p>
+<ul>
+<li>access the personal data we hold about you (Art. 15)</li>
+<li>have inaccurate data corrected (Art. 16)</li>
+<li>have your data erased (Art. 17)</li>
+<li>restrict processing (Art. 18)</li>
+<li>data portability (Art. 20)</li>
+<li>object to processing based on legitimate interest (Art. 21)</li>
+<li>withdraw consent at any time, with effect for the future (Art. 7(3))</li>
+<li>lodge a complaint with a supervisory authority, for example the Landesbeauftragte für den Datenschutz und die Informationsfreiheit Rheinland-Pfalz</li>
+</ul>
+<p>To use any of these rights, write to <a href="mailto:{{legal.email}}">{{legal.email}}</a> and include your Minecraft username so we can find your data.</p>
+
+<h2>9. Changes to this policy</h2>
+<p>We update this policy when Velo Client's online features change. The date at the top shows the latest version.</p>
 </main>
 
-<footer>
-  <div class="wrap">
-    <div class="foot-links">
-      <a href="index.html#features">Features</a>
-      <a href="index.html#install">Install</a>
-      <a href="impressum.html">Imprint</a>
-      <a href="datenschutz.html">Privacy Policy</a>
-      <a href="terms.html">Terms of Service</a>
-      {{#if links.github}}<a href="{{links.github}}">GitHub</a>{{/if}}
-    </div>
-    <p><b>NOT AN OFFICIAL MINECRAFT PRODUCT.</b> NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</p>
-    <p>Minecraft is a trademark of Mojang Synergies AB. "{{site.name}}" is an independent, community-made Fabric mod.</p>
-  </div>
-</footer>
-
+{{> footer}}
+{{> scripts}}
 </body>
 </html>

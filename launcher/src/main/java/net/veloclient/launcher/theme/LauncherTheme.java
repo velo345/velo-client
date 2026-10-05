@@ -23,7 +23,7 @@ public record LauncherTheme(
 		int r = (argb >> 16) & 0xFF;
 		int g = (argb >> 8) & 0xFF;
 		int b = argb & 0xFF;
-		return String.format("rgba(%d,%d,%d,%.3f)", r, g, b, a / 255.0);
+		return String.format(java.util.Locale.ROOT, "rgba(%d,%d,%d,%.3f)", r, g, b, a / 255.0);
 	}
 
 	public static String toCssHex(int argb) {

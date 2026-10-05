@@ -338,6 +338,11 @@ final class SocialService {
 	 * signed in here first, then Mojang's public profile API (so you can add a friend who hasn't
 	 * installed Velo yet - they'll see the request the first time they sign in).
 	 */
+	/** Username or uuid -> player, for other services (e.g. the store's owner tools). */
+	PlayerRef resolvePlayer(String query) throws SocialException {
+		return resolve(query);
+	}
+
 	private PlayerRef resolve(String query) throws SocialException {
 		if (query == null || query.isBlank()) {
 			throw new SocialException(400, "Enter a username or UUID");

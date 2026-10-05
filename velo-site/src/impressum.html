@@ -1,29 +1,17 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Imprint — {{site.name}}</title>
+{{> head}}
+<title>Imprint · Velo Client</title>
 <meta name="robots" content="noindex">
-<link rel="icon" type="image/png" href="assets/favicon.png">
-<link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-inner">
-    <a class="brand" href="/"><img class="brand-mark" src="assets/logo.png" alt="">{{site.name}}</a>
-    <div class="nav-links">
-      <a href="index.html#features">Features</a>
-      <a href="index.html#install">Install</a>
-    </div>
-    <a class="nav-cta" href="index.html">Home</a>
-  </div>
-</nav>
+{{> nav}}
 
 <main class="wrap legal">
   <h1>Imprint</h1>
-  <p class="updated">Information pursuant to § 5 TMG (German Telemedia Act) · Last updated {{legal.lastUpdated}}</p>
+  <p class="updated">Information pursuant to § 5 DDG (German Digital Services Act) · Last updated {{legal.lastUpdated}}</p>
 
   <h2>Service provider</h2>
   <address>
@@ -48,32 +36,17 @@
   </address>
 
   <h2>About this project</h2>
-  <p>{{site.name}} is an independently developed, non-commercial Fabric mod and companion launcher for Minecraft. It is not an official Minecraft product and is not approved by or associated with Mojang Synergies AB or Microsoft Corporation. "Minecraft" is a trademark of Mojang Synergies AB.</p>
+  <p>{{site.name}} is an independently developed Fabric mod and companion launcher for Minecraft. It is free to use; optional cosmetic Velo Coins are sold through Tebex Limited as reseller (see the <a href="terms.html">Terms of Service</a>). It is not an official Minecraft product and is not approved by or associated with Mojang Synergies AB or Microsoft Corporation. "Minecraft" is a trademark of Mojang Synergies AB.</p>
 
   <h2>Dispute resolution</h2>
-  <p>The European Commission provides a platform for online dispute resolution (ODR): <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener">https://ec.europa.eu/consumers/odr/</a>. We are not obligated and generally not willing to participate in dispute resolution proceedings before a consumer arbitration board.</p>
-
   <h2>Liability for content</h2>
-  <p>As a service provider, we are responsible for our own content on these pages under general law (§ 7 Abs. 1 TMG). We are not obligated to monitor transmitted or stored third-party information, or to investigate circumstances pointing to illegal activity (§§ 8–10 TMG). Obligations to remove or block the use of information under general law remain unaffected. Liability in this regard is only possible from the point in time at which a concrete infringement of the law becomes known. Upon becoming aware of any such legal infringements, we will remove the relevant content immediately.</p>
+  <p>As a service provider, we are responsible for our own content on these pages under general law (§ 7 Abs. 1 DDG). We are not obligated to monitor transmitted or stored third-party information, or to investigate circumstances pointing to illegal activity (§§ 8–10 DDG). Obligations to remove or block the use of information under general law remain unaffected. Liability in this regard is only possible from the point in time at which a concrete infringement of the law becomes known. Upon becoming aware of any such legal infringements, we will remove the relevant content immediately.</p>
 
   <h2>Liability for links</h2>
   <p>Our website may contain links to external third-party websites over whose content we have no control. We therefore cannot assume any liability for this external content. The respective provider or operator of the linked pages is always responsible for their content. At the time of linking, no legal violations were apparent. A permanent review of linked pages is unreasonable without concrete evidence of a violation of the law. Upon becoming aware of legal infringements, we will remove such links immediately.</p>
 </main>
 
-<footer>
-  <div class="wrap">
-    <div class="foot-links">
-      <a href="index.html#features">Features</a>
-      <a href="index.html#install">Install</a>
-      <a href="impressum.html">Imprint</a>
-      <a href="datenschutz.html">Privacy Policy</a>
-      <a href="terms.html">Terms of Service</a>
-      {{#if links.github}}<a href="{{links.github}}">GitHub</a>{{/if}}
-    </div>
-    <p><b>NOT AN OFFICIAL MINECRAFT PRODUCT.</b> NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</p>
-    <p>Minecraft is a trademark of Mojang Synergies AB. "{{site.name}}" is an independent, community-made Fabric mod.</p>
-  </div>
-</footer>
-
+{{> footer}}
+{{> scripts}}
 </body>
 </html>

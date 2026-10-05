@@ -51,6 +51,10 @@ public final class AutoReconnectModule extends AbstractModule {
 	private Screen fallbackParent;
 	private ClickableWidget activeButton;
 	private ClickableWidget reconnectNowButton;
+	/** The disconnect screen the running countdown belongs to - leaving it cancels the countdown. */
+	private Screen countdownScreen;
+	/** True between firing a reconnect and its outcome (ConnectScreen showing). */
+	private boolean connecting;
 
 	//? if <26.1 {
 	private ServerInfo targetServer;
@@ -71,16 +75,18 @@ public final class AutoReconnectModule extends AbstractModule {
 
 	@Override
 	public void onDisable() {
-		pending = false;
+		reset();
 	}
 
 	private void reset() {
 		pending = false;
+		connecting = false;
 		attempt = 0;
 		targetServer = null;
 		fallbackParent = null;
 		activeButton = null;
 		reconnectNowButton = null;
+		countdownScreen = null;
 	}
 
 	/**
@@ -111,42 +117,86 @@ public final class AutoReconnectModule extends AbstractModule {
 		if (!isEnabled() || !(screen instanceof DisconnectedScreen)) {
 			return;
 		}
-		// A Velo-initiated disconnect (e.g. the Background Queue module
-		// demoting/promoting a session) isn't an unexpected kick - without
-		// this check, sending a server to the background would immediately
-		// get auto-reconnected right back, defeating the entire point.
+		// The same screen re-initializing (window resize, coming back to it) is NOT a new disconnect:
+		// just put the buttons back. Treating it as one stacked a new countdown + buttons every time.
+		if (screen == countdownScreen) {
+			if (pending) {
+				installButton(screen);
+			}
+			return;
+		}
+		// A Velo-initiated disconnect (e.g. the Background Queue module demoting/promoting a
+		// session) isn't an unexpected kick - don't reconnect right back.
 		if (net.veloclient.velo.client.modules.queue.BackgroundQueueManager.consumeAutoReconnectSuppression()) {
 			return;
 		}
+		// Kicked for an invalid session: reconnecting with the same session only fails again. The
+		// Session Auto-Fixer refreshes it and reconnects instead.
+		if (SessionAutoFixerModule.isInvalidSessionScreen(screen)) {
+			return;
+		}
+		// Only continue a chain from the reconnect attempt we started ourselves; any other
+		// disconnect screen starts a fresh chain.
+		if (!connecting) {
+			reset();
+		}
+		connecting = false;
 		if (targetServer == null && !captureServer(client, screen)) {
 			return;
 		}
 		startCountdown(screen);
 	}
 
+	/** What the disconnect screen's own "Back" leads to (server list / title) - reflectively, it's a private field. */
+	private static Screen parentOf(Screen disconnectedScreen) {
+		for (var field : disconnectedScreen.getClass().getDeclaredFields()) {
+			if (Screen.class.isAssignableFrom(field.getType()) && !java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+				try {
+					field.setAccessible(true);
+					Object value = field.get(disconnectedScreen);
+					if (value instanceof Screen parent) {
+						return parent;
+					}
+				} catch (ReflectiveOperationException ignored) {
+					// Fall through.
+				}
+			}
+		}
+		return null;
+	}
+
 	//? if <26.1 {
 	private boolean captureServer(MinecraftClient client, Screen firstScreen) {
 		ServerInfo server = client.getCurrentServerEntry();
+		if (server == null) {
+			server = net.veloclient.velo.client.util.LastConnectTarget.server();
+		}
 		if (server == null || server.address == null || server.address.isEmpty()) {
 			return false;
 		}
 		this.targetServer = server;
-		this.fallbackParent = firstScreen;
+		Screen parent = parentOf(firstScreen);
+		this.fallbackParent = parent != null ? parent : new net.minecraft.client.gui.screen.TitleScreen();
 		return true;
 	}
 	//?} else {
 	/*private boolean captureServer(MinecraftClient client, Screen firstScreen) {
 		ServerData server = client.getCurrentServer();
+		if (server == null) {
+			server = net.veloclient.velo.client.util.LastConnectTarget.server();
+		}
 		if (server == null || server.ip == null || server.ip.isEmpty()) {
 			return false;
 		}
 		this.targetServer = server;
-		this.fallbackParent = firstScreen;
+		Screen parent = parentOf(firstScreen);
+		this.fallbackParent = parent != null ? parent : new net.minecraft.client.gui.screens.TitleScreen();
 		return true;
 	}
 	*///?}
 
 	private void startCountdown(Screen currentScreen) {
+		this.countdownScreen = currentScreen;
 		this.attempt++;
 		this.remainingTicks = delayTicksForAttempt(attempt);
 		this.pending = true;
@@ -193,10 +243,11 @@ public final class AutoReconnectModule extends AbstractModule {
 	*///?}
 
 	private void onCancelPressed() {
-		pending = false;
-		attempt = 0;
-		targetServer = null;
-		fallbackParent = null;
+		ClickableWidget cancel = activeButton;
+		ClickableWidget now = reconnectNowButton;
+		reset();
+		activeButton = cancel;
+		reconnectNowButton = now;
 		if (activeButton != null) {
 			activeButton.setMessage(Text.literal("Reconnect Cancelled"));
 		}
@@ -212,7 +263,23 @@ public final class AutoReconnectModule extends AbstractModule {
 	}
 
 	private void onTick(MinecraftClient client) {
-		if (!isEnabled() || !pending) {
+		if (!isEnabled()) {
+			return;
+		}
+		if (connecting && !pending) {
+			// Our reconnect attempt was cancelled from its "Connecting..." screen: end the chain.
+			Screen screen = net.veloclient.velo.client.util.ClientCompat.currentScreen();
+			if (!(screen instanceof ConnectScreen) && !(screen instanceof DisconnectedScreen) && client.world == null) {
+				reset();
+			}
+			return;
+		}
+		if (!pending) {
+			return;
+		}
+		// Left the disconnect screen (Back to server list, title, anything else): stop for good.
+		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() != countdownScreen) {
+			reset();
 			return;
 		}
 		updateButtonLabel();
@@ -236,6 +303,7 @@ public final class AutoReconnectModule extends AbstractModule {
 		if (targetServer == null) {
 			return;
 		}
+		connecting = true;
 		ServerAddress address = ServerAddress.parse(targetServer.address);
 		ConnectScreen.connect(fallbackParent, client, address, targetServer, false, null);
 	}
@@ -244,6 +312,7 @@ public final class AutoReconnectModule extends AbstractModule {
 		if (targetServer == null) {
 			return;
 		}
+		connecting = true;
 		ServerAddress address = ServerAddress.parseString(targetServer.ip);
 		ConnectScreen.startConnecting(fallbackParent, client, address, targetServer, false, null);
 	}

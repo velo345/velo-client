@@ -105,18 +105,20 @@ public final class StoreItemDetailView {
 				}, () -> status.setText("Couldn't find this cape in your library - try re-importing it from Cosmetics."));
 				return;
 			}
-			StorePurchase.Result result = StorePurchase.buy(item);
-			switch (result) {
-				case SUCCESS -> {
-					status.setText("Purchased! \"" + item.name() + "\" is in your Cosmetics now.");
-					action.setText("Equip cape");
-					priceRow.getChildren().set(0, CosmeticUi.priceChip(item.priceCoins(), true));
-					balance.setText("You have " + CurrencyStore.balance() + " coins");
-				}
-				case INSUFFICIENT_COINS -> status.setText("Not enough coins - you have " + CurrencyStore.balance() + ".");
-				case ALREADY_OWNED -> status.setText("You already own this cape.");
-				case IMPORT_FAILED -> status.setText("Purchase failed - your coins were refunded.");
-			}
+			action.setDisable(true);
+			status.setText("Buying...");
+			java.util.concurrent.CompletableFuture.supplyAsync(() -> StorePurchase.buy(item),
+					java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()).thenAccept(error -> javafx.application.Platform.runLater(() -> {
+						action.setDisable(false);
+						if (error == null) {
+							status.setText("Purchased! \"" + item.name() + "\" is in your Cosmetics now.");
+							action.setText("Equip cape");
+							priceRow.getChildren().set(0, CosmeticUi.priceChip(item.priceCoins(), true));
+							balance.setText("You have " + CurrencyStore.balance() + " coins");
+						} else {
+							status.setText(error);
+						}
+					}));
 		});
 
 		VBox info = new VBox(12, tag, name, description, priceRow, action, status);

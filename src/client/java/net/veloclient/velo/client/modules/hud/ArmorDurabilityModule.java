@@ -30,7 +30,15 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 	private static final int ROW_GAP = 3;
 	private static final int ICON_BAR_GAP = 2;
 
+	private static final List<String> STYLES = List.of("Classic", "Inventory Slots");
+	private static final int SLOT = 18;
+
 	private final HudPosition position = new HudPosition(0.02f, 0.17f);
+	// "Inventory Slots": the armor in vanilla-looking inventory slots, like many PvP YouTubers use -
+	// only the item's own durability bar, no numbers.
+	private String style = "Classic";
+	private boolean slotsHorizontal = false;
+	private boolean showEmptySlots = true;
 	private boolean showIcon = true;
 	private boolean showBar = true;
 	// Off by default: the bar alone (exactly as wide as the armor icon, under it) reads at a glance;
@@ -72,6 +80,10 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 		if (client.player == null) {
 			return;
 		}
+		if (slotStyle()) {
+			renderSlots(context, client, x, y);
+			return;
+		}
 		int barWidth = effectiveBarWidth();
 		int rowHeight = rowHeight();
 		int lineCenterYOffset = lineCenterYOffset();
@@ -96,10 +108,10 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 				float fraction = maxDamage > 0 ? (float) remaining / maxDamage : 1f;
 				int color = durabilityColor(fraction);
 				if (showBar) {
-					String barText = remaining + "/" + maxDamage;
+					String barText = String.valueOf(remaining);
 					int barX = lineX;
 					if (showText && textOnLeft) {
-						drawScaledText(context, client, barText, lineX, centerY, 0xFFFFFFFF);
+						drawScaledText(context, client, barText, lineX, centerY, textColor(remaining, maxDamage));
 						barX = lineX + scaledTextWidth(client, barText) + 4;
 					}
 					int barY = centerY - barHeight / 2;
@@ -109,17 +121,79 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 						VeloDraw.fillRounded(context, barX, barY, filled, barHeight, Math.min(1, barHeight / 2), color);
 					}
 					if (showText && !textOnLeft) {
-						drawScaledText(context, client, barText, barX + barWidth + 4, centerY, 0xFFFFFFFF);
+						drawScaledText(context, client, barText, barX + barWidth + 4, centerY, textColor(remaining, maxDamage));
 					}
 				} else if (showText) {
-					String text = stack.getName().getString() + ": " + remaining + "/" + maxDamage;
-					drawScaledText(context, client, text, lineX, centerY, color);
+					drawScaledText(context, client, String.valueOf(remaining), lineX, centerY, textColor(remaining, maxDamage));
 				}
 			} else if (showText) {
 				drawScaledText(context, client, stack.getName().getString(), lineX, centerY, 0xFFFFFFFF);
 			}
 			rowY += rowHeight + ROW_GAP;
 		}
+	}
+
+	private boolean slotStyle() {
+		return style.equals("Inventory Slots");
+	}
+
+	private void renderSlots(DrawContext context, MinecraftClient client, int x, int y) {
+		int i = 0;
+		for (EquipmentSlot slot : SLOTS) {
+			ItemStack stack = client.player.getEquippedStack(slot);
+			if (stack.isEmpty() && !showEmptySlots) {
+				continue;
+			}
+			int sx = slotsHorizontal ? x + i * SLOT : x;
+			int sy = slotsHorizontal ? y : y + i * SLOT;
+			// Vanilla's inventory slot: grey well, dark top/left edge, white bottom/right edge.
+			context.fill(sx, sy, sx + SLOT, sy + SLOT, 0xFF8B8B8B);
+			context.fill(sx, sy, sx + SLOT - 1, sy + 1, 0xFF373737);
+			context.fill(sx, sy, sx + 1, sy + SLOT - 1, 0xFF373737);
+			context.fill(sx + 1, sy + SLOT - 1, sx + SLOT, sy + SLOT, 0xFFFFFFFF);
+			context.fill(sx + SLOT - 1, sy + 1, sx + SLOT, sy + SLOT, 0xFFFFFFFF);
+			if (!stack.isEmpty()) {
+				context.drawItemWithoutEntity(stack, sx + 1, sy + 1);
+				//? if <26.1 {
+				context.drawStackOverlay(client.textRenderer, stack, sx + 1, sy + 1);
+				//?} else {
+				/*context.itemDecorations(client.font, stack, sx + 1, sy + 1);
+				*///?}
+			}
+			i++;
+		}
+	}
+
+	private int visibleSlots() {
+		if (showEmptySlots) {
+			return SLOTS.length;
+		}
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (client.player == null) {
+			return SLOTS.length;
+		}
+		int count = 0;
+		for (EquipmentSlot slot : SLOTS) {
+			if (!client.player.getEquippedStack(slot).isEmpty()) {
+				count++;
+			}
+		}
+		return count;
+	}
+
+	/** Durability number color: white while undamaged, then green, orange and red as it wears down. */
+	private static int textColor(int remaining, int max) {
+		if (remaining >= max) {
+			return 0xFFFFFFFF;
+		}
+		float fraction = max > 0 ? (float) remaining / max : 1f;
+		if (fraction < 0.2f) {
+			return 0xFFFF5555;
+		}
+		if (fraction < 0.5f) {
+			return 0xFFFFA53D;
+		}
+		return 0xFF55FF55;
 	}
 
 	private static int durabilityColor(float fraction) {
@@ -190,10 +264,14 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 
 	@Override
 	public int width() {
+		if (slotStyle()) {
+			return slotsHorizontal ? visibleSlots() * SLOT : SLOT;
+		}
 		int barWidth = effectiveBarWidth();
-		int barLineWidth = showBar ? barWidth : (showText ? 90 : 0);
+		int numberWidth = Math.round(MinecraftClient.getInstance().textRenderer.getWidth("0000") * textScale);
+		int barLineWidth = showBar ? barWidth : (showText ? numberWidth : 0);
 		if (showBar && showText) {
-			barLineWidth += 44;
+			barLineWidth += 4 + numberWidth;
 		}
 		if (barBelowIcon) {
 			return Math.max(showIcon ? ICON_SIZE : 0, barLineWidth);
@@ -203,6 +281,9 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 
 	@Override
 	public int height() {
+		if (slotStyle()) {
+			return slotsHorizontal ? SLOT : visibleSlots() * SLOT;
+		}
 		int rowHeight = rowHeight();
 		return SLOTS.length * rowHeight + (SLOTS.length - 1) * ROW_GAP;
 	}
@@ -210,6 +291,10 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
+				new ConfigField.ChoiceField("Style", STYLES, () -> style, v -> style = v),
+				new ConfigField.ChoiceField("Slot Direction", List.of("Vertical", "Horizontal"),
+						() -> slotsHorizontal ? "Horizontal" : "Vertical", v -> slotsHorizontal = v.equals("Horizontal")),
+				new ConfigField.ToggleField("Show Empty Slots", () -> showEmptySlots, v -> showEmptySlots = v),
 				new ConfigField.ToggleField("Show Icon", () -> showIcon, v -> showIcon = v),
 				new ConfigField.ToggleField("Show Bar", () -> showBar, v -> showBar = v),
 				new ConfigField.ToggleField("Show Durability Number", () -> showText, v -> showText = v),

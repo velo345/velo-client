@@ -64,7 +64,7 @@ public final class CrosshairSelectScreen extends VeloWindow {
 		for (CrosshairDefinition definition : CrosshairManager.library().values()) {
 			VeloCrosshairTile tile = new VeloCrosshairTile(0, 0, TILE_SIZE, definition,
 					definition.id().equals(equippedId),
-					() -> this.client.setScreen(new CrosshairEditorScreen(this, definition)),
+					() -> this.client.setScreen(CrosshairEditorScreen.create(this, definition)),
 					() -> {
 						CrosshairManager.equip(definition.id());
 						status = Text.literal("Equipped \"" + definition.name() + "\"");
@@ -97,7 +97,7 @@ public final class CrosshairSelectScreen extends VeloWindow {
 			addDrawableChild(new VeloButton(x, y, w, 24, Text.literal(size + "x" + size), b -> {
 				CrosshairDefinition created = CrosshairManager.createBlank("New Crosshair", finalSize);
 				choosingSize = false;
-				this.client.setScreen(new CrosshairEditorScreen(this, created));
+				this.client.setScreen(CrosshairEditorScreen.create(this, created));
 			}));
 			x += w + 8;
 		}

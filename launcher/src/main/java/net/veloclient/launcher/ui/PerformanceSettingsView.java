@@ -82,7 +82,7 @@ public final class PerformanceSettingsView {
 			}
 			int fixedMb = (int) (Math.round(fixed.getValue() / 256.0) * 256);
 			fixedLabel.setText(gb(fixedMb));
-			LauncherSettings.Data updated = new LauncherSettings.Data();
+			LauncherSettings.Data updated = copy(LauncherSettings.get());
 			updated.memoryMode = auto ? LauncherSettings.MemoryMode.AUTO : LauncherSettings.MemoryMode.FIXED;
 			updated.fixedMemoryMb = fixedMb;
 			updated.gc = LauncherSettings.GcMode.values()[Math.max(0, gc.getSelectionModel().getSelectedIndex())];
@@ -123,11 +123,78 @@ public final class PerformanceSettingsView {
 			SettingsUi.row(card, "Bigger GPU shader cache", "Fewer stutters after driver/game updates",
 					"Linux, NVIDIA/Mesa: keeps a larger driver shader cache so shaders don't recompile as often.", driverCache);
 		}
+		if (MemoryPlanner.isLinux()) {
+			guardRows(card);
+		}
 		Label perProfile = new Label("Next launch per profile  ·  hover a row for details");
 		perProfile.getStyleClass().add("settings-subheading");
 		card.getChildren().addAll(perProfile, preview);
 		refresh[0].run();
 		return card;
+	}
+
+	// ---- Memory guard ----
+
+	private static LauncherSettings.Data copy(LauncherSettings.Data from) {
+		LauncherSettings.Data to = new LauncherSettings.Data();
+		to.memoryMode = from.memoryMode;
+		to.fixedMemoryMb = from.fixedMemoryMb;
+		to.gc = from.gc;
+		to.driverShaderCache = from.driverShaderCache;
+		to.memoryGuard = from.memoryGuard;
+		to.guardAvailableMb = from.guardAvailableMb;
+		to.guardSwapMb = from.guardSwapMb;
+		to.guardSeconds = from.guardSeconds;
+		return to;
+	}
+
+	/** On/off plus the three thresholds; changes apply to running games right away. */
+	private static void guardRows(VBox card) {
+		LauncherSettings.Data settings = LauncherSettings.get();
+		CheckBox enabled = new CheckBox();
+		enabled.setSelected(settings.memoryGuard);
+		javafx.scene.control.Spinner<Integer> ram = new javafx.scene.control.Spinner<>(64, 4096, settings.guardAvailableMb, 20);
+		javafx.scene.control.Spinner<Integer> swap = new javafx.scene.control.Spinner<>(0, 8192, settings.guardSwapMb, 20);
+		javafx.scene.control.Spinner<Double> seconds = new javafx.scene.control.Spinner<>(0.5, 30.0, settings.guardSeconds, 0.5);
+		for (javafx.scene.control.Spinner<?> spinner : List.of(ram, swap, seconds)) {
+			spinner.setEditable(true);
+			spinner.setPrefWidth(110);
+		}
+		Runnable save = () -> {
+			LauncherSettings.Data updated = copy(LauncherSettings.get());
+			updated.memoryGuard = enabled.isSelected();
+			updated.guardAvailableMb = ram.getValue();
+			updated.guardSwapMb = swap.getValue();
+			updated.guardSeconds = seconds.getValue();
+			LauncherSettings.save(updated);
+			for (javafx.scene.control.Spinner<?> spinner : List.of(ram, swap, seconds)) {
+				spinner.setDisable(!updated.memoryGuard);
+			}
+		};
+		enabled.setOnAction(e -> save.run());
+		ram.valueProperty().addListener((o, a, b) -> save.run());
+		swap.valueProperty().addListener((o, a, b) -> save.run());
+		seconds.valueProperty().addListener((o, a, b) -> save.run());
+		javafx.scene.control.Button reset = new javafx.scene.control.Button("Defaults");
+		reset.getStyleClass().add("ghost-button");
+		reset.setOnAction(e -> {
+			LauncherSettings.Data defaults = new LauncherSettings.Data();
+			enabled.setSelected(defaults.memoryGuard);
+			ram.getValueFactory().setValue(defaults.guardAvailableMb);
+			swap.getValueFactory().setValue(defaults.guardSwapMb);
+			seconds.getValueFactory().setValue(defaults.guardSeconds);
+			save.run();
+		});
+		Label heading = new Label("Memory guard");
+		heading.getStyleClass().add("settings-subheading");
+		card.getChildren().add(heading);
+		SettingsUi.row(card, "Stop a game before the PC freezes", "Recommended - only the most recently started game is stopped",
+				"When RAM and swap stay critically low, the launcher stops the newest running game so your desktop doesn't lock up. "
+						+ "With two games open, the one you were already playing keeps running.", enabled, reset);
+		SettingsUi.row(card, "Free RAM below (MB)", "Default 220", null, ram);
+		SettingsUi.row(card, "...and free swap below (MB)", "Default 160 (no swap counts as below)", null, swap);
+		SettingsUi.row(card, "...for (seconds)", "Default 2 - short dips are ignored", null, seconds);
+		save.run();
 	}
 
 	// ---- Menu key ----

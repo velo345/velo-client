@@ -1,0 +1,8 @@
+{
+	"providers": [
+		{
+			"type": "reference",
+			"id": "velo-client:big_2"
+		}
+	]
+}

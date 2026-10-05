@@ -23,7 +23,7 @@ import java.util.List;
  * Master toggle + menu-opener for the cape cosmetic system (design spec
  * section 6.5). Purely client-rendered; see {@link net.veloclient.velo.client.cosmetics.render.CapeFeatureRenderer}.
  */
-public final class CapeCosmeticsModule extends AbstractModule implements Configurable {
+public final class CapeCosmeticsModule extends AbstractModule implements Configurable, net.veloclient.velo.client.gui.window.ModuleShortcut {
 
 	public static final KeyBinding OPEN_CAPE_MENU = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.velo-client.open_cape_menu", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
@@ -57,6 +57,16 @@ public final class CapeCosmeticsModule extends AbstractModule implements Configu
 	@Override
 	public void onDisable() {
 		CapeManager.unequip();
+	}
+
+	@Override
+	public String shortcutLabel() {
+		return "Open Cosmetics & Store";
+	}
+
+	@Override
+	public void openShortcut(net.minecraft.client.gui.screen.Screen parent) {
+		net.minecraft.client.MinecraftClient.getInstance().setScreen(new net.veloclient.velo.client.gui.CapeEquipScreen(parent));
 	}
 
 	@Override

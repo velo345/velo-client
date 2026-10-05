@@ -25,11 +25,16 @@ final class JsonHttp {
 	}
 
 	static <T> T readBody(HttpExchange exchange, Class<T> type) throws IOException {
+		return readBody(exchange, type, MAX_BODY_BYTES);
+	}
+
+	/** {@link #readBody(HttpExchange, Class)} for the few endpoints that take bigger documents (news posts, bug reports). */
+	static <T> T readBody(HttpExchange exchange, Class<T> type, int maxBytes) throws IOException {
 		byte[] bytes;
 		try (InputStream in = exchange.getRequestBody()) {
-			bytes = in.readNBytes(MAX_BODY_BYTES + 1);
+			bytes = in.readNBytes(maxBytes + 1);
 		}
-		if (bytes.length > MAX_BODY_BYTES) {
+		if (bytes.length > maxBytes) {
 			throw new IOException("Request body too large");
 		}
 		String json = new String(bytes, StandardCharsets.UTF_8);

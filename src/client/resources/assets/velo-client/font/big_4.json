@@ -1,0 +1,15 @@
+{
+	"providers": [
+		{
+			"type": "ttf",
+			"file": "velo-client:inter_semibold.ttf",
+			"size": 15,
+			"oversample": 4,
+			"shift": [0, -3]
+		},
+		{
+			"type": "reference",
+			"id": "minecraft:default"
+		}
+	]
+}

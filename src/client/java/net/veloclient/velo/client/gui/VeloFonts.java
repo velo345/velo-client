@@ -35,10 +35,12 @@ public final class VeloFonts {
 	private static final StyleSpriteSource[] UI = fonts("ui");
 	private static final StyleSpriteSource[] UI_BOLD = fonts("ui_bold");
 	private static final StyleSpriteSource[] TITLE = fonts("title");
+	private static final StyleSpriteSource[] BIG = fonts("big");
 	//?} else {
 	/*private static final FontDescription[] UI = fonts("ui");
 	private static final FontDescription[] UI_BOLD = fonts("ui_bold");
 	private static final FontDescription[] TITLE = fonts("title");
+	private static final FontDescription[] BIG = fonts("big");
 	*///?}
 
 	private static int hudDepth;
@@ -118,6 +120,7 @@ public final class VeloFonts {
 			case "body", "ui" -> UI[scaleIndex()];
 			case "tile", "ui_bold" -> UI_BOLD[scaleIndex()];
 			case "title" -> TITLE[scaleIndex()];
+			case "big" -> BIG[scaleIndex()];
 			default -> fallback;
 		};
 	}

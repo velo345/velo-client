@@ -26,6 +26,18 @@ public final class LauncherSettings {
 		public GcMode gc = GcMode.AUTO;
 		/** Let the driver keep a bigger shader cache between launches (Linux, NVIDIA/Mesa). */
 		public boolean driverShaderCache = true;
+		/** Linux: stop a game before the PC runs out of RAM and freezes (see MemoryGuard). */
+		public boolean memoryGuard = true;
+		/** Stop when available RAM stays below this... */
+		public int guardAvailableMb = 220;
+		/** ...while free swap is also below this (no swap counts as below). */
+		public int guardSwapMb = 160;
+		/** ...for this long, in seconds. */
+		public double guardSeconds = 2.0;
+		/** Newest news post the player has seen (publish time) - for the sidebar's unread badge. */
+		public long newsSeenAt;
+		/** Crash reports already offered/sent (file names), so a crash is only brought up once. */
+		public java.util.List<String> handledCrashes = new java.util.ArrayList<>();
 	}
 
 	private static Data cached;

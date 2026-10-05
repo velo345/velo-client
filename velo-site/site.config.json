@@ -1,26 +1,32 @@
 {
   "site": {
     "name": "Velo Client",
-    "url": "https://velo-client.example.com",
-    "taglineMain": "Performance, HUD, and server tools —",
-    "taglineAccent": "in one Fabric mod.",
-    "description": "Velo Client: a free Fabric mod + companion launcher for Minecraft 1.21.11, 26.1, and 26.2. Real FPS gains, a full HUD suite, server-admin tools, and per-profile settings.",
-    "themeColor": "#ff4747"
+    "url": "https://velo-client-mc.vercel.app",
+    "description": "Velo Client: a free Fabric client and launcher for Minecraft 1.21.11, 26.1 and 26.2. More FPS, a clean HUD, Friends, Waypoints, 3D capes and tools for server players.",
+    "themeColor": "#0b0707"
   },
   "status": {
-    "_comment": "downloadsEnabled controls both the CTA buttons AND whether the jar is even copied into dist/ - flip to true once there's a real build ready to hand out.",
-    "downloadsEnabled": false
+    "_comment": "downloadsEnabled only controls whether the old local jar in downloads/ is copied into dist/ - real downloads come from GitHub Releases (release.* below). storeLive switches the Velo Coins section from 'coming soon' to live once Tebex is set up on the server; adsLive shows the 'watch ads for coins' card once rewarded ads are switched on.",
+    "downloadsEnabled": false,
+    "storeLive": false,
+    "adsLive": false
+  },
+  "release": {
+    "_comment": "Bump version on every release - the download buttons link straight to these GitHub release assets.",
+    "version": "0.8.2",
+    "channel": "Pre-release",
+    "launcherExe": "Velo.Client.Launcher-0.8.2.exe",
+    "launcherDeb": "velo-client-launcher_0.8.2_amd64.deb"
   },
   "minecraft": {
     "version": "1.21.11 · 26.1 · 26.2",
-    "javaVersion": "21+ / 25+",
-    "modVersion": "0.1.0",
-    "modJarFile": "velo-client-0.1.0.jar"
+    "javaVersion": "21+ / 25+"
   },
   "links": {
     "fabricInstaller": "https://fabricmc.net/use/installer/",
     "fabricApi": "https://modrinth.com/mod/fabric-api",
     "github": "https://github.com/velo345/velo-client",
+    "releases": "https://github.com/velo345/velo-client/releases",
     "discord": ""
   },
   "legal": {
@@ -31,6 +37,6 @@
     "country": "Germany",
     "email": "davidseibert20@gmail.com",
     "responsiblePersonName": "David Seibert",
-    "lastUpdated": "2026-08-02"
+    "lastUpdated": "2026-10-04"
   }
 }

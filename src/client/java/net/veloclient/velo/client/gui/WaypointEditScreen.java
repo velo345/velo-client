@@ -78,6 +78,14 @@ public final class WaypointEditScreen extends VeloWindow {
 		return new WaypointEditScreen(parent, draft, true);
 	}
 
+	/** A new waypoint at a chosen spot (e.g. right-clicked on the world map), not saved until "Create". */
+	public static WaypointEditScreen createAt(Screen parent, String world, String dimension, double x, double y, double z) {
+		Waypoint draft = new Waypoint(WaypointManager.defaultName(), world == null ? WaypointManager.LEGACY_WORLD : world,
+				dimension == null ? "minecraft:overworld" : dimension, Math.floor(x) + 0.5, Math.floor(y), Math.floor(z) + 0.5,
+				WaypointManager.nextColor(), WaypointIcons.NONE);
+		return new WaypointEditScreen(parent, draft, true);
+	}
+
 	public static WaypointEditScreen edit(Screen parent, Waypoint waypoint) {
 		return new WaypointEditScreen(parent, waypoint, false);
 	}

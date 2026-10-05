@@ -64,6 +64,12 @@ public final class FriendsScreen extends VeloWindow {
 		super(Text.literal("Friends"), 620, 400);
 	}
 
+	/** Opened from another Velo screen (the R-Shift menu): closing goes back to it. */
+	public FriendsScreen(net.minecraft.client.gui.screen.Screen parent) {
+		this();
+		returnTo(parent);
+	}
+
 	// ---- Entry points (popups, keybind, menus) ----
 
 	public static void open() {

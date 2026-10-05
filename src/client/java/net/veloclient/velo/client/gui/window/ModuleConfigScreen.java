@@ -98,6 +98,11 @@ public final class ModuleConfigScreen extends VeloWindow {
 			scrollRegion.layout(ROW_HEIGHT, 0);
 		}
 
+		if (module instanceof ModuleShortcut shortcut) {
+			int w = Math.min(contentWidth() - 96, this.textRenderer.getWidth(shortcut.shortcutLabel()) + 40);
+			addDrawableChild(new VeloButton(contentX(), contentBottom() - 20, w, 20, Text.literal(shortcut.shortcutLabel() + "  >"),
+					b -> shortcut.openShortcut(this)).primary());
+		}
 		addDrawableChild(new VeloButton(contentX() + contentWidth() - 84, contentBottom() - 20, 84, 20, Text.literal("Done"),
 				b -> {
 					requestClose();

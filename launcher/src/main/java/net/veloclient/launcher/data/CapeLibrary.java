@@ -89,14 +89,15 @@ public final class CapeLibrary {
 			zip.closeEntry();
 
 			zip.putNextEntry(new ZipEntry("meta.json"));
-			zip.write(GSON.toJson(new Meta(id, name)).getBytes(StandardCharsets.UTF_8));
+			zip.write(GSON.toJson(new Meta(id, name, null)).getBytes(StandardCharsets.UTF_8));
 			zip.closeEntry();
 		}
 		return new CapeEntry(id, name, bundleFile, preset, false);
 	}
 
 	/** Imports an animated GIF (a Store cape's bundled art) as a new library cape - the animated counterpart of {@link #importPng}. */
-	public static CapeEntry importAnimatedGif(String name, InputStream gifBytes, CapePhysicsPresetData preset) throws IOException {
+	public static CapeEntry importAnimatedGif(String name, InputStream gifBytes, CapePhysicsPresetData preset, String storeItemId)
+			throws IOException {
 		VeloPaths.ensureDirectories();
 		String id = UUID.randomUUID().toString();
 		Path bundleFile = VeloPaths.capes().resolve(sanitize(name) + "-" + id.substring(0, 8) + ".velocape");
@@ -110,13 +111,17 @@ public final class CapeLibrary {
 			zip.closeEntry();
 
 			zip.putNextEntry(new ZipEntry("meta.json"));
-			zip.write(GSON.toJson(new Meta(id, name)).getBytes(StandardCharsets.UTF_8));
+			// sourceItemId marks it as a real Store cape - the game hides animated bundles without one.
+			zip.write(GSON.toJson(new Meta(id, name, storeItemId)).getBytes(StandardCharsets.UTF_8));
 			zip.closeEntry();
 		}
 		return new CapeEntry(id, name, bundleFile, preset, true);
 	}
 
 	public static void exportBundle(CapeEntry entry, Path destination) throws IOException {
+		if (entry.animated()) {
+			throw new IOException("Animated capes are Velo Store items and can't be exported");
+		}
 		Files.copy(entry.bundleFile(), destination, StandardCopyOption.REPLACE_EXISTING);
 	}
 
@@ -198,7 +203,11 @@ public final class CapeLibrary {
 		} catch (IOException e) {
 			return Optional.empty();
 		}
-		return meta == null ? Optional.empty() : Optional.of(new CapeEntry(meta.id, meta.name, bundleFile, preset, animated));
+		if (meta == null || (animated && meta.sourceItemId == null)) {
+			// Animated capes only come from the Velo Store, which records the item id.
+			return Optional.empty();
+		}
+		return Optional.of(new CapeEntry(meta.id, meta.name, bundleFile, preset, animated));
 	}
 
 	private static String sanitize(String name) {
@@ -208,10 +217,12 @@ public final class CapeLibrary {
 	private static final class Meta {
 		String id;
 		String name;
+		String sourceItemId;
 
-		Meta(String id, String name) {
+		Meta(String id, String name, String sourceItemId) {
 			this.id = id;
 			this.name = name;
+			this.sourceItemId = sourceItemId;
 		}
 	}
 

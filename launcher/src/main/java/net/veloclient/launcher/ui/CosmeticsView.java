@@ -100,7 +100,7 @@ public final class CosmeticsView {
 			boolean equipped = cape.id().equals(equippedId);
 			Node footer = equipped ? CosmeticUi.badge("Equipped", "chip-owned")
 					: CosmeticUi.badge(cape.animated() ? "Animated" : "Static", null);
-			grid.getChildren().add(CosmeticUi.capeCard(CosmeticUi.thumbnail("lib:" + cape.id(), frames, 150, 150),
+			grid.getChildren().add(CosmeticUi.capeCard("lib:" + cape.id(), frames,
 					cape.name(), footer, cape.id().equals(selectedId), () -> {
 						selectedId = cape.id();
 						refresh.run();

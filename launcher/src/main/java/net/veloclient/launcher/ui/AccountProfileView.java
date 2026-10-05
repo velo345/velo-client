@@ -61,6 +61,15 @@ public final class AccountProfileView {
 		void signOut();
 
 		void goBack();
+
+		/** Rebuilds the page (after equipping a skin). */
+		default void reload() {
+		}
+
+		/** Runs {@code action} with a session whose Minecraft token is still valid (refreshing it first if needed). */
+		default void withFreshSession(java.util.function.Consumer<MinecraftSession> action) {
+			action.accept(session());
+		}
 	}
 
 	private AccountProfileView() {
@@ -178,7 +187,9 @@ public final class AccountProfileView {
 				}));
 		UiMotion.stagger(velo, 10);
 
-		VBox root = new VBox(18, back, hero, veloTitle, velo, worldTitle, world);
+		Label skinsTitle = new Label("Skins");
+		skinsTitle.getStyleClass().add("section-label");
+		VBox root = new VBox(18, back, hero, skinsTitle, SkinsSection.build(host), veloTitle, velo, worldTitle, world);
 		ScrollPane scroll = new ScrollPane(root);
 		scroll.setFitToWidth(true);
 		scroll.getStyleClass().add("scroll-pane");

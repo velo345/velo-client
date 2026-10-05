@@ -60,6 +60,13 @@ public final class HudManager {
 		// drawn through this same registry now. Suppressed (not replaced)
 		// while our own ScoreboardHudModule is enabled, so it doesn't draw
 		// twice in two different positions/styles at once.
+		// Boss bars: drawn (or hidden) by the Boss Bar module while it's on.
+		HudElementRegistry.replaceElement(VanillaHudElements.BOSS_BAR, vanilla -> (context, tickCounter) -> {
+			boolean handled = ModuleRegistry.get("boss-bar").map(Module::isEnabled).orElse(false);
+			if (!handled) {
+				vanilla.render(context, tickCounter);
+			}
+		});
 		HudElementRegistry.replaceElement(VanillaHudElements.SCOREBOARD, vanilla -> (context, tickCounter) -> {
 			boolean handled = ModuleRegistry.get("scoreboard-hud").map(Module::isEnabled).orElse(false);
 			if (!handled) {
@@ -93,6 +100,7 @@ public final class HudManager {
 		int screenWidth = client.getWindow().getScaledWidth();
 		int screenHeight = client.getWindow().getScaledHeight();
 
+		HudAutoLayout.update(screenWidth, screenHeight);
 		net.veloclient.velo.client.waypoints.WaypointRenderer.renderHud(context, screenWidth, screenHeight);
 		for (Module module : ModuleRegistry.all()) {
 			if (!(module instanceof HudModule hud) || !hud.isEnabled()) {

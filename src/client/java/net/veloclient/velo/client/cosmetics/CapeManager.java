@@ -348,15 +348,34 @@ public final class CapeManager {
 		if (definition == null) {
 			throw new IOException("Unknown cape id: " + capeId);
 		}
+		if (definition.animated()) {
+			// Animated capes are Velo Store items - sharing the bundle would hand them out for free.
+			throw new IOException("Animated capes are Velo Store items and can't be exported");
+		}
 		Files.copy(definition.bundleFile(), destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 	}
 
 	/** Imports a {@code .velocape} bundle someone shared with you. */
 	public static CapeDefinition importBundle(Path bundleFile) throws IOException {
 		VeloPaths.ensureDirectories();
+		if (bundleIsAnimated(bundleFile)) {
+			throw new IOException("Animated capes are only available from the Velo Store");
+		}
 		Path copy = VeloPaths.capes().resolve(bundleFile.getFileName());
 		Files.copy(bundleFile, copy, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 		return readBundleMetadata(copy).orElseThrow(() -> new IOException("Invalid .velocape bundle: " + bundleFile));
+	}
+
+	private static boolean bundleIsAnimated(Path bundleFile) throws IOException {
+		try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(bundleFile))) {
+			ZipEntry entry;
+			while ((entry = zip.getNextEntry()) != null) {
+				if (entry.getName().equals("frames.gif")) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -463,6 +482,11 @@ public final class CapeManager {
 			return Optional.empty();
 		}
 		if (meta == null) {
+			return Optional.empty();
+		}
+		if (animated && meta.sourceItemId() == null) {
+			// Animated capes only ever come from the Velo Store (which records the item); anything
+			// else is a hand-made bundle trying to sneak one in.
 			return Optional.empty();
 		}
 		return Optional.of(new CapeDefinition(meta.id(), meta.name(), bundleFile, preset, hasElytra, animated, meta.sourceItemId()));

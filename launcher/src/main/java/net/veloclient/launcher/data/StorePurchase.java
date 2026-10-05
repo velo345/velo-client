@@ -1,34 +1,46 @@
 package net.veloclient.launcher.data;
 
-import java.io.IOException;
+import net.veloclient.launcher.social.StoreApi;
+
 import java.io.InputStream;
 
-/** Buying a {@link StoreItem} - mirrors the mod's own {@code StorePurchase}: spend the coins, drop it into {@link CapeLibrary}, mark it owned. */
+/**
+ * Buying a {@link StoreItem} with Velo Coins: the server checks the price and balance and records
+ * ownership; the cape then lands in the local {@link CapeLibrary}. Blocking - call off the FX thread.
+ */
 public final class StorePurchase {
-
-	public enum Result {
-		SUCCESS, ALREADY_OWNED, INSUFFICIENT_COINS, IMPORT_FAILED
-	}
 
 	private StorePurchase() {
 	}
 
-	public static Result buy(StoreItem item) {
+	/** Returns null on success, else the message to show. */
+	public static String buy(StoreItem item) {
 		if (StoreOwnership.owns(item.id())) {
-			return Result.ALREADY_OWNED;
+			return "You already own this cape.";
 		}
-		if (!CurrencyStore.spend(item.priceCoins())) {
-			return Result.INSUFFICIENT_COINS;
+		try {
+			StoreApi.buy(item.id());
+		} catch (StoreApi.StoreError e) {
+			return e.getMessage();
 		}
-		try (InputStream in = StoreCatalog.openGif(item)) {
-			CapeLibrary.importAnimatedGif(item.name(), in, CapePhysicsPresetData.defaults());
-			StoreOwnership.grant(item.id());
-			return Result.SUCCESS;
-		} catch (IOException e) {
-			// Refund - the coins were already spent above, and nothing was
-			// actually delivered.
-			CurrencyStore.grant(item.priceCoins());
-			return Result.IMPORT_FAILED;
+		restoreMissing();
+		return null;
+	}
+
+	/** Imports every owned store cape the local library doesn't have yet (bought elsewhere / granted). */
+	public static void restoreMissing() {
+		for (String itemId : StoreApi.owned()) {
+			StoreCatalog.byId(itemId).ifPresent(item -> {
+				boolean present = CapeLibrary.listAll().stream().anyMatch(c -> c.animated() && c.name().equals(item.name()));
+				if (present) {
+					return;
+				}
+				try (InputStream in = StoreCatalog.openGif(item)) {
+					CapeLibrary.importAnimatedGif(item.name(), in, CapePhysicsPresetData.defaults(), item.id());
+				} catch (Exception ignored) {
+					// Retried on the next refresh.
+				}
+			});
 		}
 	}
 }

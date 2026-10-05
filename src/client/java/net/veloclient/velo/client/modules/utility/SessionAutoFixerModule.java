@@ -62,21 +62,55 @@ public final class SessionAutoFixerModule extends AbstractModule {
 
 	public SessionAutoFixerModule() {
 		super("session-auto-fixer", "Session Auto-Fixer",
-				"Adds a one-click fix to the disconnect screen when kicked for an invalid/expired session, "
-						+ "refreshing your saved Velo account and reconnecting without restarting the launcher.",
+				"When a server kicks you for an invalid/expired session, refreshes your saved Velo account "
+						+ "and reconnects automatically - no game or launcher restart.",
 				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, true);
 		ScreenEvents.AFTER_INIT.register(this::onScreenInit);
 	}
 
+	/** Last automatic fix per server address, so a refresh that keeps failing can't loop. */
+	private final java.util.Map<String, Long> lastAutoFix = new java.util.HashMap<>();
+	private static final long AUTO_RETRY_COOLDOWN_MS = 120_000;
+
 	private void onScreenInit(MinecraftClient client, Screen screen, int scaledWidth, int scaledHeight) {
-		if (!isEnabled() || !(screen instanceof DisconnectedScreen disconnectedScreen)) {
+		if (!isEnabled() || !(screen instanceof DisconnectedScreen)) {
 			return;
 		}
-		if (!isInvalidSessionReason(disconnectedScreen) || !captureServer(client, screen)) {
+		if (!isInvalidSessionScreen(screen)) {
 			return;
 		}
-		fixing = false;
+		if (fixing) {
+			// Re-init (resize) while a fix runs: just keep the status button on screen.
+			installButton(screen);
+			setButtonMessage("Fixing session...");
+			return;
+		}
+		if (!captureServer(client, screen)) {
+			return;
+		}
 		installButton(screen);
+		String key = serverKey();
+		long now = System.currentTimeMillis();
+		Long last = lastAutoFix.get(key);
+		if (last == null || now - last > AUTO_RETRY_COOLDOWN_MS) {
+			lastAutoFix.put(key, now);
+			onFixPressed(); // automatic - the button stays as a manual retry if this fails
+		}
+	}
+
+	//? if <26.1 {
+	private String serverKey() {
+		return targetServer == null ? "" : targetServer.address;
+	}
+	//?} else {
+	/*private String serverKey() {
+		return targetServer == null ? "" : targetServer.ip;
+	}
+	*///?}
+
+	/** True for a disconnect screen whose reason is an invalid/expired session - in any game language. */
+	public static boolean isInvalidSessionScreen(Screen screen) {
+		return screen instanceof DisconnectedScreen disconnected && isInvalidSessionReason(disconnected);
 	}
 
 	/**
@@ -119,22 +153,94 @@ public final class SessionAutoFixerModule extends AbstractModule {
 		return false;
 	}
 
+	private static final String[] LOCALIZED_HINTS = {"invalid session", "ungültige sitzung", "sesión no válida",
+			"session invalide", "sessione non valida", "sessão inválida"};
+
 	private static boolean velo$mentionsInvalidSession(Object value) {
 		if (value == null) {
 			return false;
 		}
+		if (value instanceof Text text && velo$hasInvalidSessionKey(text, 0)) {
+			return true;
+		}
 		String direct = velo$tryGetString(value);
-		if (direct != null && direct.toLowerCase(Locale.ROOT).contains("invalid session")) {
+		if (direct != null && velo$matchesHint(direct)) {
 			return true;
 		}
 		try {
 			Object reason = value.getClass().getMethod("reason").invoke(value);
+			if (reason instanceof Text reasonComponent && velo$hasInvalidSessionKey(reasonComponent, 0)) {
+				return true;
+			}
 			String reasonText = velo$tryGetString(reason);
-			return reasonText != null && reasonText.toLowerCase(Locale.ROOT).contains("invalid session");
+			return reasonText != null && velo$matchesHint(reasonText);
 		} catch (ReflectiveOperationException ignored) {
 			return false;
 		}
 	}
+
+	private static boolean velo$matchesHint(String text) {
+		String lower = text.toLowerCase(Locale.ROOT);
+		for (String hint : LOCALIZED_HINTS) {
+			if (lower.contains(hint)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Walks the reason's component tree for vanilla's invalid-session translation keys
+	 * ({@code disconnect.loginFailedInfo.invalidSession}, and the session-service variants) - this
+	 * works in every language, unlike matching the English text.
+	 */
+	//? if <26.1 {
+	private static boolean velo$hasInvalidSessionKey(Text text, int depth) {
+		if (text == null || depth > 8) {
+			return false;
+		}
+		if (text.getContent() instanceof net.minecraft.text.TranslatableTextContent translatable) {
+			String key = translatable.getKey();
+			if (key.contains("invalidSession") || key.contains("invalid_session") || key.equals("disconnect.loginFailedInfo.serversUnavailable")) {
+				return true;
+			}
+			for (Object arg : translatable.getArgs()) {
+				if (arg instanceof Text nested && velo$hasInvalidSessionKey(nested, depth + 1)) {
+					return true;
+				}
+			}
+		}
+		for (Text sibling : text.getSiblings()) {
+			if (velo$hasInvalidSessionKey(sibling, depth + 1)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	//?} else {
+	/*private static boolean velo$hasInvalidSessionKey(Text text, int depth) {
+		if (text == null || depth > 8) {
+			return false;
+		}
+		if (text.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents translatable) {
+			String key = translatable.getKey();
+			if (key.contains("invalidSession") || key.contains("invalid_session") || key.equals("disconnect.loginFailedInfo.serversUnavailable")) {
+				return true;
+			}
+			for (Object arg : translatable.getArgs()) {
+				if (arg instanceof Text nested && velo$hasInvalidSessionKey(nested, depth + 1)) {
+					return true;
+				}
+			}
+		}
+		for (Text sibling : text.getSiblings()) {
+			if (velo$hasInvalidSessionKey(sibling, depth + 1)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	*///?}
 
 	private static String velo$tryGetString(Object value) {
 		if (value == null) {
@@ -151,21 +257,29 @@ public final class SessionAutoFixerModule extends AbstractModule {
 	//? if <26.1 {
 	private boolean captureServer(MinecraftClient client, Screen firstScreen) {
 		ServerInfo server = client.getCurrentServerEntry();
+		if (server == null) {
+			server = net.veloclient.velo.client.util.LastConnectTarget.server();
+		}
 		if (server == null || server.address == null || server.address.isEmpty()) {
 			return false;
 		}
 		this.targetServer = server;
-		this.fallbackParent = firstScreen;
+		Screen returnTo = net.veloclient.velo.client.util.LastConnectTarget.parent();
+		this.fallbackParent = returnTo != null ? returnTo : firstScreen;
 		return true;
 	}
 	//?} else {
 	/*private boolean captureServer(MinecraftClient client, Screen firstScreen) {
 		ServerData server = client.getCurrentServer();
+		if (server == null) {
+			server = net.veloclient.velo.client.util.LastConnectTarget.server();
+		}
 		if (server == null || server.ip == null || server.ip.isEmpty()) {
 			return false;
 		}
 		this.targetServer = server;
-		this.fallbackParent = firstScreen;
+		Screen returnTo = net.veloclient.velo.client.util.LastConnectTarget.parent();
+		this.fallbackParent = returnTo != null ? returnTo : firstScreen;
 		return true;
 	}
 	*///?}
@@ -181,13 +295,13 @@ public final class SessionAutoFixerModule extends AbstractModule {
 
 	//? if <26.1 {
 	private ButtonWidget createButton(Screen screen) {
-		return ButtonWidget.builder(Text.literal("Fix Session & Reconnect"), b -> onFixPressed())
+		return ButtonWidget.builder(Text.literal(fixing ? "Fixing session..." : "Fix Session & Reconnect"), b -> onFixPressed())
 				.dimensions(screen.width / 2 - 110, screen.height - 48, 220, 20)
 				.build();
 	}
 	//?} else {
 	/*private Button createButton(Screen screen) {
-		return Button.builder(Text.literal("Fix Session & Reconnect"), b -> onFixPressed())
+		return Button.builder(Text.literal(fixing ? "Fixing session..." : "Fix Session & Reconnect"), b -> onFixPressed())
 				.bounds(screen.width / 2 - 110, screen.height - 48, 220, 20)
 				.build();
 	}

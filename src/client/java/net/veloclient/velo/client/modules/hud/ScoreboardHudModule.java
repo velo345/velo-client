@@ -59,7 +59,8 @@ public final class ScoreboardHudModule extends AbstractModule implements HudModu
 	private String background = "Vanilla";
 
 	private Layout cachedLayout;
-	private long cachedAtNanos = Long.MIN_VALUE;
+	private long cachedAtNanos;
+	private boolean cacheValid;
 
 	public ScoreboardHudModule() {
 		super("scoreboard-hud", "Scoreboard", "Repositions, scales, or hides the server's scoreboard sidebar - appears here automatically whenever a server actually sets one.",
@@ -74,9 +75,12 @@ public final class ScoreboardHudModule extends AbstractModule implements HudModu
 
 	private Layout computeLayout() {
 		long now = System.nanoTime();
-		if (now - cachedAtNanos < CACHE_WINDOW_NANOS) {
+		// (A Long.MIN_VALUE "never cached" start made now - cachedAt overflow negative, so the cache
+		// always looked fresh, returned its initial null forever, and the scoreboard never showed.)
+		if (cacheValid && now - cachedAtNanos < CACHE_WINDOW_NANOS) {
 			return cachedLayout;
 		}
+		cacheValid = true;
 		cachedAtNanos = now;
 		return cachedLayout = computeLayoutUncached();
 	}

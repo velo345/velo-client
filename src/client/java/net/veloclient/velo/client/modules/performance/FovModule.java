@@ -21,12 +21,14 @@ public final class FovModule extends AbstractModule implements Configurable {
 	private double savedDistortionScale = -1;
 	private double savedDamageTilt = -1;
 
+	/** Minecraft's own Field of View (30-110), applied while the module is on; 0 = leave it alone. */
+	private int baseFov = 0;
 	private double fovPercent = 0;
 	private double nauseaPercent = 0;
 	private double damageTiltPercent = 0;
 
 	public FovModule() {
-		super("fov", "FOV", "Independent sliders for movement FOV kick, nausea distortion and damage tilt.",
+		super("fov", "FOV", "Your field of view plus separate sliders for movement FOV kick, nausea distortion and damage tilt.",
 				ModuleCategory.RENDERING, SafetyTag.ALWAYS_SAFE, false);
 	}
 
@@ -37,6 +39,9 @@ public final class FovModule extends AbstractModule implements Configurable {
 		savedDistortionScale = options.getDistortionEffectScale().getValue();
 		savedDamageTilt = options.getDamageTiltStrength().getValue();
 
+		if (baseFov >= 30) {
+			options.getFov().setValue(baseFov);
+		}
 		options.getFovEffectScale().setValue(fovPercent / 100.0);
 		options.getDistortionEffectScale().setValue(nauseaPercent / 100.0);
 		options.getDamageTiltStrength().setValue(damageTiltPercent / 100.0);
@@ -56,6 +61,16 @@ public final class FovModule extends AbstractModule implements Configurable {
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
+				// Same setting as Options -> FOV, so changing it in either place shows up in both.
+				new ConfigField.SliderField("Field of View", 30, 110,
+						() -> MinecraftClient.getInstance().options.getFov().getValue(),
+						v -> {
+							baseFov = (int) Math.round(v);
+							if (isEnabled()) {
+								MinecraftClient.getInstance().options.getFov().setValue(baseFov);
+							}
+						},
+						v -> Math.round(v) == 70 ? "Normal (70)" : Math.round(v) == 110 ? "Quake Pro (110)" : String.valueOf(Math.round(v))),
 				new ConfigField.SliderField("Movement FOV (sprint/speed/spyglass)", 0, 100,
 						() -> fovPercent,
 						v -> {
