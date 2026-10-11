@@ -39,7 +39,7 @@ public final class AttackIndicatorModule extends AbstractModule implements Confi
 	public AttackIndicatorModule() {
 		super("attack-indicator", "Attack Indicator",
 				"Shows the attack charge bar under your custom crosshair, styled and colored the way you like.",
-				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, true);
+				ModuleCategory.PVP, SafetyTag.ALWAYS_SAFE, true);
 	}
 
 	/** Called right after the custom crosshair is drawn (see HudManager). */

@@ -11,7 +11,9 @@ Astigmatic, licensed under the [SIL Open Font License 1.1](https://openfontlicen
 `src/client/resources/assets/velo-client/font/inter_*.ttf` and
 `launcher/src/main/resources/net/veloclient/launcher/fonts/Inter-*.ttf` (the UI font of the in-game
 menus and the launcher) are [Inter](https://rsms.me/inter/) by Rasmus Andersson, licensed under the
-[SIL Open Font License 1.1](https://openfontlicense.org/).
+[SIL Open Font License 1.1](https://openfontlicense.org/). The in-game copies are modified: their
+TrueType hinting instructions were removed (outlines and metrics unchanged), because FreeType's
+hinting interpreter crashed the game while preloading glyphs.
 
 ## Phosphor icons
 

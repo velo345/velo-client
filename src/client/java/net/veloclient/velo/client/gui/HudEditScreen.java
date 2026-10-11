@@ -81,15 +81,35 @@ public final class HudEditScreen extends Screen {
 		return ModuleRegistry.get("better-f3").map(Module::isEnabled).orElse(false);
 	}
 
+	/** F3 state when F3 went down here, or null - see {@link #keyReleased}. */
+	private Boolean f3StateAtPress;
+
 	@Override
 	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
-		if (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_F3) {
-			net.veloclient.velo.client.modules.debug.BetterF3Module.toggleF3();
+		if (input.key() == net.veloclient.velo.client.util.Keys.F3) {
+			f3StateAtPress = net.veloclient.velo.client.modules.debug.BetterF3Module.f3Open();
+			return true;
+		}
+		return super.keyPressed(input);
+	}
+
+	/**
+	 * F3 toggles on release, and only if nothing else already toggled it: depending on the version
+	 * vanilla also flips the debug screen for F3 while some screens are open, and doing it here on
+	 * press as well made it flip twice (back to where it was).
+	 */
+	@Override
+	public boolean keyReleased(net.minecraft.client.input.KeyInput input) {
+		if (input.key() == net.veloclient.velo.client.util.Keys.F3 && f3StateAtPress != null) {
+			if (net.veloclient.velo.client.modules.debug.BetterF3Module.f3Open() == f3StateAtPress) {
+				net.veloclient.velo.client.modules.debug.BetterF3Module.toggleF3();
+			}
+			f3StateAtPress = null;
 			dragging = null;
 			resizing = null;
 			return true;
 		}
-		return super.keyPressed(input);
+		return super.keyReleased(input);
 	}
 
 	private List<HudModule> enabledHudModules() {

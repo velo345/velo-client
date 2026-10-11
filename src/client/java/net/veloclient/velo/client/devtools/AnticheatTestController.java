@@ -7,7 +7,6 @@ import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.veloclient.velo.VeloClient;
 import net.veloclient.velo.client.keybind.VeloKeybinds;
-import org.lwjgl.glfw.GLFW;
 
 //? if <26.1 {
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
@@ -62,19 +61,19 @@ public final class AnticheatTestController {
         }
         KeyBinding slowAscentKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "key.velo-client.anticheat-test-slow-ascent", InputUtil.Type.KEYSYM,
-            GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+            net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
         KeyBinding burstKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "key.velo-client.anticheat-test-packet-burst", InputUtil.Type.KEYSYM,
-            GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+            net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
         KeyBinding weaselKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "key.velo-client.anticheat-test-rubberband-weasel", InputUtil.Type.KEYSYM,
-            GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+            net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
         KeyBinding vehicleKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "key.velo-client.anticheat-test-vehicle-ascent", InputUtil.Type.KEYSYM,
-            GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+            net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
         KeyBinding stopKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "key.velo-client.anticheat-test-stop", InputUtil.Type.KEYSYM,
-            GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+            net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
         VeloClient.LOGGER.warn("[AnticheatTest] Bind the 5 'AntiCheat Test' actions from vanilla's "
             + "Controls menu (search \"AntiCheat\") to run scenarios: Slow Ascent, Packet Burst, "

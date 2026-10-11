@@ -12,7 +12,6 @@ import net.veloclient.velo.client.gui.widget.VeloStyle;
 import net.veloclient.velo.client.gui.widget.VeloUi;
 import net.veloclient.velo.client.gui.window.VeloWindow;
 import net.veloclient.velo.client.hud.StatusBarIcons;
-import org.lwjgl.glfw.GLFW;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -625,7 +624,7 @@ public final class PixelEditorScreen extends VeloWindow {
 		int px = (int) Math.floor((click.x() - canvasX) / Math.max(1, cell));
 		int py = (int) Math.floor((click.y() - canvasY) / Math.max(1, cell));
 		if (click.x() >= canvasX && click.y() >= canvasY && px < size && py < size && images.get(current) != null) {
-			if (tool == Tool.PICK && click.button() == 0) {
+			if (tool == Tool.PICK && click.button() == net.veloclient.velo.client.util.Keys.MOUSE_LEFT) {
 				int picked = images.get(current).getColorArgb(px, py);
 				if ((picked >>> 24) != 0) {
 					setColor(picked);
@@ -633,12 +632,12 @@ public final class PixelEditorScreen extends VeloWindow {
 				return true;
 			}
 			snapshot();
-			if (tool == Tool.FILL && click.button() == 0) {
+			if (tool == Tool.FILL && click.button() == net.veloclient.velo.client.util.Keys.MOUSE_LEFT) {
 				fill(px, py);
 				return true;
 			}
 			painting = true;
-			erasingStroke = tool == Tool.ERASE || click.button() == 1;
+			erasingStroke = tool == Tool.ERASE || click.button() == net.veloclient.velo.client.util.Keys.MOUSE_RIGHT;
 			apply(px, py, erasingStroke);
 			return true;
 		}
@@ -667,10 +666,10 @@ public final class PixelEditorScreen extends VeloWindow {
 		if (nameBox != null && nameBox.isFocused()) {
 			return super.keyPressed(input);
 		}
-		boolean ctrl = (input.modifiers() & GLFW.GLFW_MOD_CONTROL) != 0;
-		boolean shift = (input.modifiers() & GLFW.GLFW_MOD_SHIFT) != 0;
+		boolean ctrl = (input.modifiers() & net.veloclient.velo.client.util.Keys.MOD_CONTROL) != 0;
+		boolean shift = (input.modifiers() & net.veloclient.velo.client.util.Keys.MOD_SHIFT) != 0;
 		switch (input.key()) {
-			case GLFW.GLFW_KEY_Z -> {
+			case net.veloclient.velo.client.util.Keys.Z -> {
 				if (ctrl) {
 					if (shift) {
 						redo();
@@ -680,29 +679,29 @@ public final class PixelEditorScreen extends VeloWindow {
 					return true;
 				}
 			}
-			case GLFW.GLFW_KEY_Y -> {
+			case net.veloclient.velo.client.util.Keys.Y -> {
 				if (ctrl) {
 					redo();
 					return true;
 				}
 			}
-			case GLFW.GLFW_KEY_B -> {
+			case net.veloclient.velo.client.util.Keys.B -> {
 				tool = Tool.DRAW;
 				return true;
 			}
-			case GLFW.GLFW_KEY_E -> {
+			case net.veloclient.velo.client.util.Keys.E -> {
 				tool = Tool.ERASE;
 				return true;
 			}
-			case GLFW.GLFW_KEY_G -> {
+			case net.veloclient.velo.client.util.Keys.G -> {
 				tool = Tool.FILL;
 				return true;
 			}
-			case GLFW.GLFW_KEY_I -> {
+			case net.veloclient.velo.client.util.Keys.I -> {
 				tool = Tool.PICK;
 				return true;
 			}
-			case GLFW.GLFW_KEY_M -> {
+			case net.veloclient.velo.client.util.Keys.M -> {
 				mirror = !mirror;
 				return true;
 			}

@@ -1,5 +1,6 @@
 package net.veloclient.launcher.ui;
 
+import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -21,9 +22,16 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import net.veloclient.launcher.social.NewsApi;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -39,6 +47,7 @@ import java.util.TreeMap;
  */
 final class BugReportsView {
 
+	private static final Gson PRETTY = new GsonBuilder().setPrettyPrinting().create();
 	private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", Locale.ENGLISH);
 
 	private BugReportsView() {
@@ -57,7 +66,9 @@ final class BugReportsView {
 		filter.setValue("Open");
 		Button refresh = new Button("Refresh");
 		refresh.getStyleClass().add("glass-button");
-		HBox top = new HBox(10, back, title, spacer, filter, refresh);
+		Button exportOpen = new Button("Export open");
+		exportOpen.getStyleClass().add("glass-button");
+		HBox top = new HBox(10, back, title, spacer, filter, exportOpen, refresh);
 		top.setAlignment(Pos.CENTER_LEFT);
 
 		VBox list = new VBox(8);
@@ -107,8 +118,61 @@ final class BugReportsView {
 		}, error -> list.getChildren().setAll(hint(error)));
 		filter.valueProperty().addListener((o, a, v) -> render[0].run());
 		refresh.setOnAction(e -> load[0].run());
+		exportOpen.setOnAction(e -> exportOpen(host, all, exportOpen));
 		load[0].run();
 		return new VBox(14, top, body);
+	}
+
+	/**
+	 * Saves every report that isn't marked fixed / won't fix (new and seen alike) as one JSON file
+	 * with the full details (crash report, log, mods) - easy to hand to whoever fixes them.
+	 */
+	private static void exportOpen(NewsView.Host host, List<JsonObject> all, Button button) {
+		List<String> ids = new ArrayList<>();
+		for (JsonObject r : all) {
+			String status = NewsUi.str(r, "status");
+			if (status == null || "new".equals(status) || "seen".equals(status)) {
+				ids.add(NewsUi.str(r, "id"));
+			}
+		}
+		if (ids.isEmpty()) {
+			button.setText("Nothing open");
+			return;
+		}
+		Path target = chooseFile(host, "velo-open-reports-" + LocalDate.now() + ".json");
+		if (target == null) {
+			return;
+		}
+		button.setDisable(true);
+		button.setText("Exporting...");
+		NewsView.run(() -> {
+			JsonArray full = new JsonArray();
+			for (String id : ids) {
+				full.add(NewsApi.report(id));
+			}
+			Files.writeString(target, PRETTY.toJson(full), StandardCharsets.UTF_8);
+			return full.size();
+		}, count -> {
+			button.setDisable(false);
+			button.setText("Exported " + count);
+		}, error -> {
+			button.setDisable(false);
+			button.setText("Export failed");
+			button.setTooltip(new javafx.scene.control.Tooltip(error));
+		});
+	}
+
+	private static Path chooseFile(NewsView.Host host, String suggestedName) {
+		FileChooser chooser = new FileChooser();
+		chooser.setTitle("Export reports");
+		chooser.setInitialFileName(suggestedName);
+		chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON", "*.json"));
+		Path downloads = Path.of(System.getProperty("user.home"), "Downloads");
+		if (Files.isDirectory(downloads)) {
+			chooser.setInitialDirectory(downloads.toFile());
+		}
+		File file = chooser.showSaveDialog(host.owner());
+		return file == null ? null : file.toPath();
 	}
 
 	private static Label hint(String text) {
@@ -199,9 +263,23 @@ final class BugReportsView {
 		copy.getStyleClass().add("glass-button");
 		copy.setOnAction(e -> {
 			ClipboardContent content = new ClipboardContent();
-			content.putString(new GsonBuilder().setPrettyPrinting().create().toJson(r));
+			content.putString(PRETTY.toJson(r));
 			Clipboard.getSystemClipboard().setContent(content);
 			copy.setText("Copied");
+		});
+		Button export = new Button("Export");
+		export.getStyleClass().add("glass-button");
+		export.setOnAction(e -> {
+			Path target = chooseFile(host, "velo-report-" + id + ".json");
+			if (target == null) {
+				return;
+			}
+			try {
+				Files.writeString(target, PRETTY.toJson(r), StandardCharsets.UTF_8);
+				export.setText("Exported");
+			} catch (IOException ex) {
+				export.setText("Export failed");
+			}
 		});
 		Button delete = new Button("Delete");
 		delete.getStyleClass().add("danger-ghost-button");
@@ -215,7 +293,7 @@ final class BugReportsView {
 		});
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox actions = new HBox(8, kind, spacer, new Label("Status"), status, copy, delete);
+		HBox actions = new HBox(8, kind, spacer, new Label("Status"), status, copy, export, delete);
 		actions.setAlignment(Pos.CENTER_LEFT);
 
 		VBox content = new VBox(14, actions, title, meta);

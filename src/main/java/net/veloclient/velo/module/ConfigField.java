@@ -47,6 +47,10 @@ public sealed interface ConfigField {
 	record ColorField(String label, IntSupplier get, IntConsumer set, boolean includeAlpha) implements ConfigField {
 	}
 
+	/** A section title that groups the fields below it in the settings window. Holds no value. */
+	record HeaderField(String label) implements ConfigField {
+	}
+
 	/** A plain action button that runs {@code action} on click - e.g. opening another screen from within a module's settings. */
 	record ActionButtonField(String label, Runnable action) implements ConfigField {
 	}

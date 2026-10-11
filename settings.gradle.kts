@@ -31,6 +31,7 @@ stonecutter {
 		versions("1.21.11")
 		version("26.1", "26.1")
 		version("26.2", "26.2")
+		version("26.3", "26.3")
 		// 1.21.11 is what's actually deployed to ~/.minecraft/mods/ right
 		// now (see build-and-deploy.sh) - keep it the checked-in default so
 		// a plain IDE open / non-stonecutter-aware tooling still lands on

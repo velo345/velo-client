@@ -20,6 +20,18 @@ public final class ModuleStateStore {
 	public record ModuleSnapshot(boolean enabled, Map<String, Object> fields) {
 	}
 
+	/** Snapshot entry (not a module) recording which key codes the keybind fields hold. */
+	public static final String META_ID = "_velo";
+	private static final String KEY_FORMAT = "Key format";
+
+	/**
+	 * Key codes changed meaning in 26.3 (GLFW key codes -> SDL scancodes). The client sets the
+	 * running version's format and a converter {@code (storedFormat, code) -> code for this version},
+	 * so a profile saved on one version keeps the same physical keys on another.
+	 */
+	public static String currentKeyFormat = "glfw";
+	public static java.util.function.BiFunction<String, Integer, Integer> keyConverter = (format, code) -> code;
+
 	private ModuleStateStore() {
 	}
 
@@ -48,6 +60,7 @@ public final class ModuleStateStore {
 			}
 			result.put(module.id(), new ModuleSnapshot(module.isEnabled(), fields));
 		}
+		result.put(META_ID, new ModuleSnapshot(false, Map.of(KEY_FORMAT, currentKeyFormat)));
 		return result;
 	}
 
@@ -72,6 +85,9 @@ public final class ModuleStateStore {
 
 	public static void applyAll(Map<String, ModuleSnapshot> snapshot) {
 		snapshot = migrate(snapshot);
+		ModuleSnapshot meta = snapshot.get(META_ID);
+		// Saved before the format was recorded = GLFW codes (every version before 26.3).
+		String storedFormat = meta != null && meta.fields().get(KEY_FORMAT) instanceof String f ? f : "glfw";
 		for (Module module : ModuleRegistry.all()) {
 			ModuleSnapshot saved = snapshot.get(module.id());
 			if (saved == null) {
@@ -94,7 +110,7 @@ public final class ModuleStateStore {
 					} else if (field instanceof ConfigField.ColorField color && value instanceof Number number) {
 						color.set().accept(number.intValue());
 					} else if (field instanceof ConfigField.KeybindField keybind && value instanceof Number number) {
-						keybind.onKeyCodeChosen().accept(number.intValue());
+						keybind.onKeyCodeChosen().accept(keyConverter.apply(storedFormat, number.intValue()));
 					} else if (field instanceof ConfigField.ChordKeybindField chord && value instanceof java.util.List<?> list) {
 						// Round-tripped through JSON, so each element
 						// deserializes back as a Double rather than the
@@ -103,7 +119,7 @@ public final class ModuleStateStore {
 						java.util.List<Integer> keyCodes = new java.util.ArrayList<>();
 						for (Object element : list) {
 							if (element instanceof Number number) {
-								keyCodes.add(number.intValue());
+								keyCodes.add(keyConverter.apply(storedFormat, number.intValue()));
 							}
 						}
 						chord.set().accept(keyCodes);

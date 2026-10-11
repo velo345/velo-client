@@ -35,6 +35,12 @@ public final class BetterF3Module extends AbstractModule implements Configurable
 	private final Map<String, Boolean> shown = new LinkedHashMap<>();
 	private double opacity = 0.55;
 	private boolean coloredAxes = true;
+	private String style = "Panels";
+	private boolean lineBackground = false;
+	private boolean linkShortcuts = true;
+	private static final List<String> STYLES = List.of("Panels", "Vanilla Style");
+	/** A blank line goes before these rows in Vanilla Style, grouping the screen like vanilla's. */
+	private static final java.util.Set<String> SECTION_STARTS = java.util.Set.of("XYZ", "Facing", "Biome", "Time", "Looking at", "World", "Server");
 
 	private int fpsMin = Integer.MAX_VALUE;
 	private int fpsShownMin;
@@ -65,11 +71,82 @@ public final class BetterF3Module extends AbstractModule implements Configurable
 		int screenH = context.getScaledWindowHeight();
 		mainPanel.refresh();
 		systemPanel.refresh();
+		if (style.equals("Vanilla Style")) {
+			renderVanillaStyle(context, client, screenW);
+			return;
+		}
 		layoutDefaults(screenW, screenH);
 		net.veloclient.velo.client.hud.HudManager.renderScaled(context, mainPanel, screenW, screenH, 0f);
 		if (systemPanel.isEnabled()) {
 			net.veloclient.velo.client.hud.HudManager.renderScaled(context, systemPanel, screenW, screenH, 0f);
 		}
+	}
+
+	/**
+	 * Vanilla Style: plain shadowed text in two columns like vanilla F3 (game info left, system
+	 * right), no panels - but with the colored coordinates, the row choices and grouping.
+	 */
+	private void renderVanillaStyle(DrawContext context, MinecraftClient client, int screenW) {
+		var renderer = client.textRenderer;
+		int y = 2;
+		for (String[] row : mainPanel.rows) {
+			if (SECTION_STARTS.contains(row[0]) && y > 2) {
+				y += 6;
+			}
+			String line = "§7" + row[0] + ": §f" + row[1];
+			int w = renderer.getWidth(line);
+			if (lineBackground) {
+				context.fill(1, y - 1, 3 + w, y + 9, 0x90505050);
+			}
+			context.drawTextWithShadow(renderer, line, 2, y, 0xFFFFFFFF);
+			y += 10;
+		}
+		if (!systemPanel.isEnabled()) {
+			return;
+		}
+		y = 2;
+		for (String[] row : systemPanel.rows) {
+			String line = "§7" + row[0] + ": §f" + row[1];
+			int w = renderer.getWidth(line);
+			if (lineBackground) {
+				context.fill(screenW - w - 3, y - 1, screenW - 1, y + 9, 0x90505050);
+			}
+			context.drawTextWithShadow(renderer, line, screenW - w - 2, y, 0xFFFFFFFF);
+			y += 10;
+		}
+	}
+
+	private static boolean bWasDown;
+	private static boolean gWasDown;
+
+	/**
+	 * F3+B / F3+G also toggle Velo's own Hitbox Visualizer / Chunk Borders modules (vanilla still
+	 * handles its own toggles), so the familiar shortcuts work for the nicer overlays. Every tick.
+	 */
+	public static void tickShortcuts() {
+		var module = net.veloclient.velo.module.ModuleRegistry.get("better-f3").orElse(null);
+		boolean active = module instanceof BetterF3Module f3 && f3.linkShortcuts()
+				&& net.veloclient.velo.client.util.ClientCompat.currentScreen() == null;
+		boolean f3Down = active && net.veloclient.velo.client.util.Keys.isKeyDown(net.veloclient.velo.client.util.Keys.F3);
+		boolean bDown = f3Down && net.veloclient.velo.client.util.Keys.isKeyDown(net.veloclient.velo.client.util.Keys.B);
+		boolean gDown = f3Down && net.veloclient.velo.client.util.Keys.isKeyDown(net.veloclient.velo.client.util.Keys.G);
+		if (bDown && !bWasDown) {
+			toggleModule("hitbox-visualizer");
+		}
+		if (gDown && !gWasDown) {
+			toggleModule("chunk-border-overlay");
+		}
+		bWasDown = bDown;
+		gWasDown = gDown;
+	}
+
+	private static void toggleModule(String id) {
+		net.veloclient.velo.module.ModuleRegistry.get(id).ifPresent(m -> m.setEnabled(!m.isEnabled()));
+	}
+
+	/** Whether F3+B / F3+G should also toggle Velo's Hitbox Visualizer / Chunk Borders modules. */
+	public boolean linkShortcuts() {
+		return isEnabled() && linkShortcuts;
 	}
 
 	/** Not moved by hand yet: System sits top right, or under the main panel when they'd overlap. */
@@ -351,13 +428,19 @@ public final class BetterF3Module extends AbstractModule implements Configurable
 	@Override
 	public List<ConfigField> configFields() {
 		List<ConfigField> fields = new ArrayList<>();
+		fields.add(new ConfigField.HeaderField("Look"));
+		fields.add(new ConfigField.ChoiceField("Style", STYLES, () -> style, v -> style = v));
+		fields.add(new ConfigField.ToggleField("Colored X / Y / Z", () -> coloredAxes, v -> coloredAxes = v));
+		fields.add(new ConfigField.SliderField("Panel Background Opacity", 0, 1, () -> opacity, v -> opacity = v,
+				v -> Math.round(v * 100) + "%"));
+		fields.add(new ConfigField.ToggleField("Vanilla Style: Line Backgrounds", () -> lineBackground, v -> lineBackground = v));
+		fields.add(new ConfigField.HeaderField("Shortcuts"));
+		fields.add(new ConfigField.ToggleField("F3+B / F3+G Also Toggle Velo Hitboxes & Chunk Borders", () -> linkShortcuts, v -> linkShortcuts = v));
+		fields.add(new ConfigField.HeaderField("Rows"));
 		for (String[] row : ROWS) {
 			String id = row[0];
 			fields.add(new ConfigField.ToggleField("Show " + row[1], () -> on(id), v -> shown.put(id, v)));
 		}
-		fields.add(new ConfigField.ToggleField("Colored X / Y / Z", () -> coloredAxes, v -> coloredAxes = v));
-		fields.add(new ConfigField.SliderField("Background Opacity", 0, 1, () -> opacity, v -> opacity = v,
-				v -> Math.round(v * 100) + "%"));
 		return fields;
 	}
 }

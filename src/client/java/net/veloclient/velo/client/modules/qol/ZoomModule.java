@@ -15,7 +15,6 @@ import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
 import net.veloclient.velo.client.util.ModuleProfiler;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -40,7 +39,7 @@ import java.util.List;
 public final class ZoomModule extends AbstractModule implements Configurable {
 
 	public static final KeyBinding ZOOM_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.zoom", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_C, VeloKeybinds.CATEGORY));
+			"key.velo-client.zoom", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.C, VeloKeybinds.CATEGORY));
 
 	private static final float MIN_ZOOM_FOV = 3f;
 	private static final float MAX_ZOOM_FOV = 90f;

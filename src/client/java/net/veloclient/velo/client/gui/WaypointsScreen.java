@@ -287,6 +287,13 @@ public final class WaypointsScreen extends VeloWindow {
 		bx -= 46;
 		hits.add(VeloUi.pill(context, bx, buttonY, 42, 16, "Edit", 0, mouseX, mouseY,
 				() -> this.client.setScreen(WaypointEditScreen.edit(this, waypoint))));
+		if (net.veloclient.velo.client.waypoints.WaypointTeleport.available()) {
+			bx -= 40;
+			hits.add(VeloUi.pill(context, bx, buttonY, 36, 16, "TP", 1, mouseX, mouseY, () -> {
+				net.veloclient.velo.client.waypoints.WaypointTeleport.teleport(waypoint.x, waypoint.y, waypoint.z, waypoint.dimension);
+				this.close();
+			}));
+		}
 		hits.add(new VeloUi.Hit(textX, y, bx - textX - 4, ROW_HEIGHT, () -> this.client.setScreen(WaypointEditScreen.edit(this, waypoint))));
 	}
 

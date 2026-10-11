@@ -2,7 +2,7 @@
   "site": {
     "name": "Velo Client",
     "url": "https://velo-client-mc.vercel.app",
-    "description": "Velo Client: a free Fabric client and launcher for Minecraft 1.21.11, 26.1 and 26.2. More FPS, a clean HUD, Friends, Waypoints, 3D capes and tools for server players.",
+    "description": "Velo Client: a free Fabric client and launcher for Minecraft 1.21.11, 26.1, 26.2 and 26.3. More FPS, a clean HUD, Friends, Waypoints, 3D capes and tools for server players.",
     "themeColor": "#0b0707"
   },
   "status": {
@@ -13,13 +13,13 @@
   },
   "release": {
     "_comment": "Bump version on every release - the download buttons link straight to these GitHub release assets.",
-    "version": "0.8.2",
+    "version": "0.8.5",
     "channel": "Pre-release",
-    "launcherExe": "Velo.Client.Launcher-0.8.2.exe",
-    "launcherDeb": "velo-client-launcher_0.8.2_amd64.deb"
+    "launcherExe": "Velo.Client.Launcher-0.8.5.exe",
+    "launcherDeb": "velo-client-launcher_0.8.5_amd64.deb"
   },
   "minecraft": {
-    "version": "1.21.11 · 26.1 · 26.2",
+    "version": "1.21.11 · 26.1 · 26.2 · 26.3",
     "javaVersion": "21+ / 25+"
   },
   "links": {

@@ -17,7 +17,6 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -29,7 +28,7 @@ import java.util.List;
 public final class FriendsModule extends AbstractModule implements Configurable {
 
 	public static final KeyBinding OPEN_FRIENDS = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.open_friends", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_O, VeloKeybinds.CATEGORY));
+			"key.velo-client.open_friends", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.O, VeloKeybinds.CATEGORY));
 
 	private int tickCounter;
 

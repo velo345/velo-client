@@ -220,7 +220,12 @@ final class GhostPackets {
 			return new Result(Kind.CHAT, decorate(() -> message.chatType().decorate(message.message()), message.message()), null);
 		}
 		if (packet instanceof ClientboundPlayerChatPacket chat) {
-			Component content = chat.unsignedContent() != null ? chat.unsignedContent() : Component.literal(chat.body().content());
+			// Nullable Component up to 26.2, Optional<Component> from 26.3.
+			Object unsigned = chat.unsignedContent();
+			if (unsigned instanceof java.util.Optional<?> optional) {
+				unsigned = optional.orElse(null);
+			}
+			Component content = unsigned instanceof Component c ? c : Component.literal(chat.body().content());
 			return new Result(Kind.BUFFER, decorate(() -> chat.chatType().decorate(content), content), "chat");
 		}
 		if (packet instanceof ClientboundSetActionBarTextPacket overlay) {

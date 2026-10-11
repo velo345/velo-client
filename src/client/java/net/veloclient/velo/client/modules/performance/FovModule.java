@@ -29,7 +29,7 @@ public final class FovModule extends AbstractModule implements Configurable {
 
 	public FovModule() {
 		super("fov", "FOV", "Your field of view plus separate sliders for movement FOV kick, nausea distortion and damage tilt.",
-				ModuleCategory.RENDERING, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.PVP, SafetyTag.ALWAYS_SAFE, false);
 	}
 
 	@Override

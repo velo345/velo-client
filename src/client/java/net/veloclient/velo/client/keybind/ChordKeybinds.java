@@ -2,7 +2,6 @@ package net.veloclient.velo.client.keybind;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.util.InputUtil;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -23,9 +22,8 @@ public final class ChordKeybinds {
 		if (keyCodes == null || keyCodes.isEmpty()) {
 			return false;
 		}
-		long window = MinecraftClient.getInstance().getWindow().getHandle();
 		for (int code : keyCodes) {
-			if (GLFW.glfwGetKey(window, code) != GLFW.GLFW_PRESS) {
+			if (!net.veloclient.velo.client.util.Keys.isKeyDown(code)) {
 				return false;
 			}
 		}

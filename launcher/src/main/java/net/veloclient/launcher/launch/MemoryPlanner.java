@@ -23,31 +23,32 @@ import java.util.stream.Stream;
  * <p>How "Automatic" decides:
  * <ol>
  * <li><b>Learned</b> - after you've played a profile, the game records how much heap it really
- * needed (live data after garbage collection, see {@code MemoryStatsRecorder}). The heap is set
- * to that peak plus headroom, and grows if the game spent noticeable time collecting garbage.</li>
+ * needed (live data after garbage collection, see {@code MemoryStatsRecorder}) - the highest of
+ * recent sessions, slowly forgetting old ones, so one short lobby session can't shrink the next
+ * heavy one into an out-of-memory crash. Sessions that came close to running out get extra.</li>
  * <li><b>Estimated</b> - before that: a baseline plus extra for each mod beyond the bundled ones,
  * render distance above 12, resource pack size and installed shader packs.</li>
- * <li><b>Clamped to the PC</b> - never more than a safe share of total RAM, always leaving room
- * for the OS, and never more than what's actually free right now (so the game doesn't push
- * itself into swap - the classic cause of "more RAM made it worse").</li>
+ * <li><b>Clamped to the PC</b> - a fixed tier per amount of installed RAM (never a big share of
+ * it, the game needs 1.5-4 GB outside its heap too). Free memory right now can lower it, but
+ * never below what the profile needs - a too-small heap crashes the game just as surely.</li>
  * </ol>
  *
- * <p>Free memory is checked for EVERY mode (manual and fixed amounts too), against the whole game
- * process, not just its heap: mods, the GPU driver and native buffers add roughly 1-2.5 GB on top
- * (a real 87-mod session sat at ~3 GB resident with ~1 GB of heap). And the heap is committed
- * up front ({@code AlwaysPreTouch}), so world loads and resource reloads never have to grab more
- * memory mid-game - on a PC with little swap, that grab is what froze/crashed the whole system.
- * More is not better past a point: a bigger heap only makes each garbage collection longer.
+ * <p>The heap is <b>not</b> claimed up front any more: {@code -Xms} starts small and G1 grows it
+ * only as the game really needs, and hands unused memory back to the OS when it's idle. Claiming
+ * the whole maximum at launch ({@code -Xms=-Xmx} + {@code AlwaysPreTouch}) made every session cost
+ * its worst case from the first second, which is exactly what pushed PCs into swap and froze them;
+ * on Windows it also reserved the whole heap against the page file (commit limit), so the GPU
+ * driver's own allocations failed instead.
  */
 public final class MemoryPlanner {
 
-	private static final int BASELINE_MB = 1600;
-	private static final int FLOOR_MB = 2048;
-	private static final int CEILING_MB = 12288;
+	private static final int BASELINE_MB = 1700;
+	private static final int CEILING_MB = 10240;
 	private static final int BUNDLED_MODS = 20;
 	/** Kept free for the OS, the launcher and short spikes, on top of the whole game process. */
-	private static final int SAFETY_MB = 900;
-	private static final int MIN_HEAP_MB = 1536;
+	private static final int SAFETY_MB = 1024;
+	/** Below this the game can't even load a world with Velo's modules - lowering further only trades a swap for a crash. */
+	private static final int ABSOLUTE_MIN_MB = 2048;
 
 	public enum Gc { G1, ZGC }
 
@@ -69,45 +70,54 @@ public final class MemoryPlanner {
 
 		boolean profileOverride = instance != null && instance.ramMaxMb() != null && !isLegacyDefault(instance);
 		int maxMb;
+		int needMb;
 		boolean automatic;
 		if (profileOverride) {
 			maxMb = instance.ramMaxMb();
+			needMb = maxMb;
 			automatic = false;
 			reasons.add("Set manually for this profile");
 		} else if (settings.memoryMode == LauncherSettings.MemoryMode.FIXED) {
 			maxMb = settings.fixedMemoryMb;
+			needMb = maxMb;
 			automatic = false;
 			reasons.add("Fixed amount from launcher settings");
 		} else {
 			automatic = true;
-			maxMb = automaticMb(instance, totalMb, availableMb, reasons);
+			int[] auto = automaticMb(instance, totalMb, reasons);
+			maxMb = auto[0];
+			needMb = auto[1];
 		}
 
-		// Whatever the mode: heap + the game's native memory must fit into what's free right now.
+		// Heap + the game's native memory should fit into what's free right now. Automatic may give
+		// up its headroom for that, but never what the profile needs; manual amounts are respected.
+		int overhead = nativeOverheadMb(instance);
 		if (availableMb > 0) {
-			int overhead = nativeOverheadMb(instance);
 			long budget = availableMb - overhead - SAFETY_MB;
-			if (maxMb > budget) {
-				int fitted = (int) Math.max(MIN_HEAP_MB, Math.round(budget / 256.0) * 256);
+			if (automatic && maxMb > budget) {
+				int fitted = (int) Math.max(needMb, Math.round(budget / 256.0) * 256);
 				if (fitted < maxMb) {
-					reasons.add(String.format(Locale.ROOT, "Lowered from %.1f GB to fit free memory (%.1f GB free, ~%.1f GB needed outside the heap)",
-							maxMb / 1024.0, availableMb / 1024.0, overhead / 1024.0));
+					reasons.add(String.format(Locale.ROOT, "Lowered from %.1f GB to fit free memory (%.1f GB free)", maxMb / 1024.0, availableMb / 1024.0));
 					maxMb = fitted;
 				}
 			}
-			if (budget < 2048) {
-				warning = String.format(Locale.ROOT, "Only %.1f GB is free right now - close other programs (browser, Discord...) before playing.",
-						availableMb / 1024.0);
+			if (maxMb > budget) {
+				warning = String.format(Locale.ROOT, "Only %.1f GB is free right now but this profile needs about %.1f GB in total - close other programs (browser, Discord...) before playing.",
+						availableMb / 1024.0, (maxMb + overhead) / 1024.0);
 			}
+		}
+		if (maxMb + overhead > totalMb - 1536) {
+			warning = String.format(Locale.ROOT, "%.1f GB for the game is too much for this %.0f GB PC - it may freeze when memory runs out. Switch to Automatic.",
+					maxMb / 1024.0, totalMb / 1024.0);
 		}
 
 		Gc gc = switch (settings.gc) {
-			case G1 -> Gc.G1;
 			case ZGC -> Gc.ZGC;
-			default -> Runtime.version().feature() >= 21 && maxMb >= 8192 && Runtime.getRuntime().availableProcessors() >= 8 ? Gc.ZGC : Gc.G1;
+			// G1 is the safe default: it's the most memory-efficient collector and returns unused heap.
+			// ZGC needs noticeably more headroom for the same game and is only used when picked.
+			default -> Gc.G1;
 		};
-		// Always the full heap from the start (see class doc: memory is claimed at launch, never mid-game).
-		int minMb = maxMb;
+		int minMb = Math.min(maxMb, Math.max(1024, Math.min(2048, maxMb / 3)));
 		return new Plan(maxMb, minMb, gc, automatic, reasons, warning);
 	}
 
@@ -120,24 +130,50 @@ public final class MemoryPlanner {
 		return instance.ramMaxMb() != null && instance.ramMaxMb() == 4096 && (instance.ramMinMb() == null || instance.ramMinMb() == 4096);
 	}
 
-	private static int automaticMb(Instance instance, long totalMb, long availableMb, List<String> reasons) {
+	/** The most heap Automatic ever hands out on a PC with {@code totalMb} of RAM. */
+	static int tierCapMb(long totalMb) {
+		if (totalMb <= 4608) {
+			return 1792;
+		}
+		if (totalMb <= 6656) {
+			return 2560;
+		}
+		if (totalMb <= 8704) {
+			return 3584;
+		}
+		if (totalMb <= 12800) {
+			return 4608;
+		}
+		if (totalMb <= 16896) {
+			return 6144;
+		}
+		if (totalMb <= 25088) {
+			return 7168;
+		}
+		if (totalMb <= 33280) {
+			return 8192;
+		}
+		return CEILING_MB;
+	}
+
+	/** @return {target heap, least heap this profile should run with} */
+	private static int[] automaticMb(Instance instance, long totalMb, List<String> reasons) {
 		int target;
-		// The least this profile should run with. plan() still caps the final value to free memory:
-		// on PCs with little swap, swapping freezes the whole system, which is worse than a small heap.
 		int minimumNeed;
 		Learned learned = instance == null ? null : readLearned(instance);
 		if (learned != null) {
-			double headroom = learned.gcPercent > 3 ? 2.2 : 1.8;
-			target = (int) (learned.peakLiveMb * headroom) + 256;
-			minimumNeed = (int) (learned.peakLiveMb * 1.3) + 256;
-			reasons.add(String.format(Locale.ROOT, "Last sessions needed up to %.1f GB%s", learned.peakLiveMb / 1024.0,
-					learned.gcPercent > 3 ? String.format(Locale.ROOT, " and spent %.0f%% of the time collecting garbage", learned.gcPercent) : ""));
+			double headroom = learned.gcPercent > 3 || learned.nearOom ? 2.0 : 1.7;
+			target = (int) (learned.peakLiveMb * headroom) + 384;
+			minimumNeed = (int) (learned.peakLiveMb * (learned.nearOom ? 1.6 : 1.35)) + 384;
+			reasons.add(String.format(Locale.ROOT, "Recent sessions needed up to %.1f GB%s", learned.peakLiveMb / 1024.0,
+					learned.nearOom ? " and nearly ran out" : learned.gcPercent > 3
+							? String.format(Locale.ROOT, " and spent %.0f%% of the time collecting garbage", learned.gcPercent) : ""));
 		} else {
 			int need = BASELINE_MB;
 			if (instance != null) {
 				int mods = countJars(InstancePaths.modsDir(instance.id()));
 				if (mods > BUNDLED_MODS) {
-					need += (mods - BUNDLED_MODS) * 30;
+					need += (mods - BUNDLED_MODS) * 35;
 					reasons.add(mods + " mods installed");
 				}
 				int renderDistance = readRenderDistance(InstancePaths.gameDir(instance.id()));
@@ -156,65 +192,55 @@ public final class MemoryPlanner {
 				}
 			}
 			target = (int) (need * 1.5);
-			minimumNeed = (int) (need * 1.15);
+			minimumNeed = (int) (need * 1.2);
 			if (reasons.isEmpty()) {
 				reasons.add("Standard setup");
 			}
 		}
 
-		long shareCap = (long) (totalMb * (totalMb <= 8192 ? 0.40 : totalMb <= 16384 ? 0.45 : 0.40));
-		long osCap = totalMb - 2560;
-		long cap = Math.max(1024, Math.min(CEILING_MB, Math.min(shareCap, osCap)));
-		long floor = Math.min(FLOOR_MB, cap);
-		long result = Math.max(floor, Math.min(cap, target));
-		if (availableMb > 0 && result > availableMb - 768) {
-			long fits = Math.max(Math.max(floor, Math.min(cap, minimumNeed)), availableMb - 768);
-			if (fits < result) {
-				result = fits;
-				reasons.add("Limited by free memory right now");
-			}
-		}
+		int cap = tierCapMb(totalMb);
+		minimumNeed = Math.max(Math.min(ABSOLUTE_MIN_MB, cap), Math.min(minimumNeed, cap));
+		int result = Math.max(minimumNeed, Math.min(cap, target));
 		if (result == cap && target > cap) {
 			reasons.add(String.format(Locale.ROOT, "Capped to keep your %.0f GB PC responsive", totalMb / 1024.0));
 		}
-		return (int) (Math.round(result / 256.0) * 256);
+		return new int[] {roundUp256(result), roundUp256(minimumNeed)};
+	}
+
+	private static int roundUp256(int mb) {
+		return (mb + 255) / 256 * 256;
 	}
 
 	/**
 	 * Memory the game uses outside its heap: class metadata and JIT code for every mod, native
-	 * buffers (Sodium, LWJGL), the GPU driver's own allocations, thread stacks.
+	 * buffers (Sodium, LWJGL), the GPU driver's own allocations (Vulkan on 26.2 maps a lot of it
+	 * into the process), thread stacks. Measured: 1.5-4 GB resident beyond the heap with big packs.
 	 */
 	public static int nativeOverheadMb(Instance instance) {
-		int overhead = 950;
+		int overhead = 1300;
 		if (instance != null) {
-			overhead += countJars(InstancePaths.modsDir(instance.id())) * 12;
+			overhead += countJars(InstancePaths.modsDir(instance.id())) * 15;
 			if (countFiles(InstancePaths.shaderPacksDir(instance.id())) > 0) {
-				overhead += 350;
+				overhead += 450;
 			}
 		}
 		return overhead;
 	}
 
-	/** The JVM memory/GC flags for {@code plan} on this launcher's own runtime (the game runs on it too). */
-	public static List<String> jvmArgs(Plan plan) {
+	/** The JVM memory/GC flags for {@code plan} on a game runtime of Java {@code javaFeature}. */
+	public static List<String> jvmArgs(Plan plan, int javaFeature) {
 		List<String> args = new ArrayList<>();
 		args.add("-Xmx" + plan.maxMb() + "m");
 		args.add("-Xms" + plan.minMb() + "m");
-		// Claim the whole heap at startup instead of page by page during world loads / resource
-		// reloads - those spikes are exactly when a nearly-full PC used to start swapping and freeze.
-		args.add("-XX:+AlwaysPreTouch");
-		int feature = Runtime.version().feature();
 		if (plan.gc() == Gc.ZGC) {
-			// Generational ZGC: pauses well under a millisecond regardless of heap size. The heap
-			// starts at half and may grow to the max, but ZGC hands unused memory back, and
-			// SoftMaxHeapSize keeps it aiming lower unless the game genuinely needs more.
+			// Generational ZGC: pauses well under a millisecond regardless of heap size, and it
+			// returns unused memory (ZUncommit, on by default). SoftMaxHeapSize keeps it aiming lower
+			// unless the game genuinely needs more.
 			args.add("-XX:+UseZGC");
-			if (feature >= 21 && feature <= 22) {
+			if (javaFeature >= 21 && javaFeature <= 22) {
 				args.add("-XX:+ZGenerational");
 			}
-			args.add("-XX:SoftMaxHeapSize=" + (int) (plan.maxMb() * 0.85) + "m");
-			// Keep the claimed memory instead of handing it back and re-grabbing it under load.
-			args.add("-XX:-ZUncommit");
+			args.add("-XX:SoftMaxHeapSize=" + (int) (plan.maxMb() * 0.8) + "m");
 		} else {
 			// G1 with a strict pause target and young-gen sizing tuned for Minecraft's huge
 			// allocation rate of short-lived objects (the widely used Aikar-style recipe);
@@ -230,18 +256,18 @@ public final class MemoryPlanner {
 			args.add("-XX:InitiatingHeapOccupancyPercent=15");
 			args.add("-XX:G1RSetUpdatingPauseTimePercent=5");
 			args.add("-XX:+ParallelRefProcEnabled");
-		}
-		if (isLinux() && plan.gc() == Gc.G1) {
-			// Transparent huge pages (only where the kernel allows them, "madvise" mode): fewer TLB
-			// misses walking a multi-GB heap. Linux-only flag - other OSes would refuse to start.
-			args.add("-XX:+UseTransparentHugePages");
+			// Give memory back: a periodic concurrent cycle when no GC ran for a while (menus, AFK)
+			// lets G1 shrink the heap, and the free-ratio bounds stop it keeping lots of empty heap.
+			args.add("-XX:G1PeriodicGCInterval=30000");
+			args.add("-XX:MinHeapFreeRatio=10");
+			args.add("-XX:MaxHeapFreeRatio=30");
 		}
 		return args;
 	}
 
 	// ---- Inputs ----
 
-	private record Learned(long peakLiveMb, double gcPercent) {
+	private record Learned(long peakLiveMb, double gcPercent, boolean nearOom) {
 	}
 
 	private static Learned readLearned(Instance instance) {
@@ -252,8 +278,13 @@ public final class MemoryPlanner {
 			}
 			JsonObject json = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
 			long peak = json.get("peakLiveAfterGcMb").getAsLong();
+			// Highest of recent sessions (decays slowly), so one light session can't undersize the next.
+			if (json.has("recentPeakMb")) {
+				peak = Math.max(peak, json.get("recentPeakMb").getAsLong());
+			}
 			double gc = json.has("gcTimePercent") ? json.get("gcTimePercent").getAsDouble() : 0;
-			return peak > 256 ? new Learned(peak, gc) : null;
+			boolean nearOom = json.has("nearOom") && json.get("nearOom").getAsBoolean();
+			return peak > 256 ? new Learned(peak, gc, nearOom) : null;
 		} catch (Exception e) {
 			return null;
 		}

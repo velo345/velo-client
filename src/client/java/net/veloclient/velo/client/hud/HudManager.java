@@ -131,18 +131,30 @@ public final class HudManager {
 		}
 		// HUD modules keep the vanilla font even when drawn inside the HUD editor (a Velo screen).
 		net.veloclient.velo.client.gui.VeloFonts.beginHud();
+		boolean pushed = false;
 		try {
 			if (scale == 1.0f) {
 				hud.render(context, x, y, tickDelta);
 				return;
 			}
 			context.getMatrices().pushMatrix();
+			pushed = true;
 			context.getMatrices().translate((float) x, (float) y);
 			context.getMatrices().scale(scale, scale);
 			context.getMatrices().translate((float) -x, (float) -y);
 			hud.render(context, x, y, tickDelta);
-			context.getMatrices().popMatrix();
+		} catch (RuntimeException e) {
+			// A broken HUD element used to crash the whole game (an exception on the render thread).
+			// Turn just that module off and say so instead.
+			org.slf4j.LoggerFactory.getLogger("velo-client").error("HUD module {} crashed while drawing - turned it off", hud.id(), e);
+			hud.setEnabled(false);
+			net.veloclient.velo.client.social.NotificationOverlay.show(new net.veloclient.velo.client.social.NotificationOverlay.Toast(null, null,
+					hud.displayName() + " turned off", "It ran into an error while drawing. Please send a bug report from the pause menu.",
+					8000, null, null, null));
 		} finally {
+			if (pushed) {
+				context.getMatrices().popMatrix();
+			}
 			net.veloclient.velo.client.gui.VeloFonts.endHud();
 			if (smallCapsEligible) {
 				net.veloclient.velo.client.modules.qol.SmallCapsModule.setHudRenderActive(false);

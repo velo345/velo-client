@@ -413,8 +413,8 @@ public final class VeloSkinsScreen extends VeloWindow {
 
 	@Override
 	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
-		if (playerBox != null && playerBox.isFocused() && (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
-				|| input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER)) {
+		if (playerBox != null && playerBox.isFocused() && (input.key() == net.veloclient.velo.client.util.Keys.ENTER
+				|| input.key() == net.veloclient.velo.client.util.Keys.KP_ENTER)) {
 			addPlayer();
 			return true;
 		}

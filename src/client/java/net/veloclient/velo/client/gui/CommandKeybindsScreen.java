@@ -12,7 +12,6 @@ import net.veloclient.velo.client.modules.utility.CommandKeybindEntry;
 import net.veloclient.velo.client.modules.utility.CommandKeybindsModule;
 import net.veloclient.velo.client.theme.Theme;
 import net.veloclient.velo.client.theme.ThemeManager;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +31,7 @@ public final class CommandKeybindsScreen extends VeloWindow {
 	private TextFieldWidget commandBox;
 	private Text status = Text.literal("");
 	private int selectedIndex = -1;
-	private int pendingKeyCode = GLFW.GLFW_KEY_UNKNOWN;
+	private int pendingKeyCode = net.veloclient.velo.client.util.Keys.UNKNOWN;
 	private boolean listeningForKey;
 	private int commandLabelY;
 
@@ -64,7 +63,7 @@ public final class CommandKeybindsScreen extends VeloWindow {
 		for (int i = 0; i < entries.size(); i++) {
 			CommandKeybindEntry entry = entries.get(i);
 			int index = i;
-			String keyLabel = entry.keyCode() == GLFW.GLFW_KEY_UNKNOWN ? "Unbound" : keyName(entry.keyCode());
+			String keyLabel = entry.keyCode() == net.veloclient.velo.client.util.Keys.UNKNOWN ? "Unbound" : keyName(entry.keyCode());
 			VeloButton row = new VeloButton(scrollRegion.x(), 0, scrollRegion.viewportWidth(), ROW_HEIGHT - 4,
 					Text.literal(entry.command() + "  —  " + keyLabel),
 					b -> select(index));
@@ -90,7 +89,7 @@ public final class CommandKeybindsScreen extends VeloWindow {
 
 		Text keyButtonText = Text.literal(listeningForKey
 				? "> press a key (Esc to cancel) <"
-				: "Keybind: " + (pendingKeyCode == GLFW.GLFW_KEY_UNKNOWN ? "Unbound" : keyName(pendingKeyCode)));
+				: "Keybind: " + (pendingKeyCode == net.veloclient.velo.client.util.Keys.UNKNOWN ? "Unbound" : keyName(pendingKeyCode)));
 		addDrawableChild(new VeloButton(contentX(), keyY, contentWidth(), 20, keyButtonText, b -> {
 			listeningForKey = true;
 			layoutContent();
@@ -108,7 +107,7 @@ public final class CommandKeybindsScreen extends VeloWindow {
 	private void select(int index) {
 		selectedIndex = index;
 		List<CommandKeybindEntry> entries = CommandKeybindsModule.entries();
-		pendingKeyCode = index < entries.size() ? entries.get(index).keyCode() : GLFW.GLFW_KEY_UNKNOWN;
+		pendingKeyCode = index < entries.size() ? entries.get(index).keyCode() : net.veloclient.velo.client.util.Keys.UNKNOWN;
 		layoutContent();
 	}
 
@@ -142,7 +141,7 @@ public final class CommandKeybindsScreen extends VeloWindow {
 		CommandKeybindsModule.setEntries(entries);
 		status = Text.literal("Deleted \"" + removed.command() + "\"");
 		selectedIndex = -1;
-		pendingKeyCode = GLFW.GLFW_KEY_UNKNOWN;
+		pendingKeyCode = net.veloclient.velo.client.util.Keys.UNKNOWN;
 		commandBox.setText("");
 		layoutContent();
 	}
@@ -155,7 +154,7 @@ public final class CommandKeybindsScreen extends VeloWindow {
 	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
 		if (listeningForKey) {
 			listeningForKey = false;
-			if (input.key() != GLFW.GLFW_KEY_ESCAPE) {
+			if (input.key() != net.veloclient.velo.client.util.Keys.ESCAPE) {
 				pendingKeyCode = input.key();
 			}
 			layoutContent();

@@ -62,16 +62,16 @@ public final class AutoExcavatorModule extends AbstractModule implements Configu
 
 	public static final KeyBinding CORNER_A_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.velo-client.auto-excavator-corner-a", InputUtil.Type.KEYSYM,
-			org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 	public static final KeyBinding CORNER_B_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.velo-client.auto-excavator-corner-b", InputUtil.Type.KEYSYM,
-			org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 	public static final KeyBinding CLEAR_SELECTION_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.velo-client.auto-excavator-clear-selection", InputUtil.Type.KEYSYM,
-			org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 	public static final KeyBinding START_PAUSE_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.velo-client.auto-excavator-start-pause", InputUtil.Type.KEYSYM,
-			org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	private static final Random RANDOM = new Random();
 	private static final int MINING_STUCK_TICKS = 100;

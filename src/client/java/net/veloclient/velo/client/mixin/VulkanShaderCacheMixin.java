@@ -1,6 +1,6 @@
 package net.veloclient.velo.client.mixin;
 
-//? if >=26.2 {
+//? if >=26.2 && <26.3 {
 /*import com.mojang.blaze3d.shaders.ShaderType;
 import com.mojang.blaze3d.vulkan.glsl.GlslCompiler;
 import com.mojang.blaze3d.vulkan.glsl.IntermediaryShaderModule;
@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.Mixin;
  * built from the bytes exactly as vanilla would, so nothing downstream can tell the difference.
  * Applied only where the class exists (see {@code VeloMixinPlugin}).
  */
-//? if >=26.2 {
+//? if >=26.2 && <26.3 {
 /*@Mixin(GlslCompiler.class)
 public abstract class VulkanShaderCacheMixin {
 

@@ -27,7 +27,7 @@ fi
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-./gradlew :1.21.11:build :26.1:build :26.2:build -q
+./gradlew :1.21.11:build :26.1:build :26.2:build :26.3:build -q
 
 JAR=$(ls -t versions/26.2/build/libs/velo-client-*.jar | grep -v sources | head -1)
 DEST="/home/daviseib/.minecraft/mods/$(basename "$JAR")"
@@ -45,4 +45,4 @@ if [[ "$DEPLOY_ADDONS" == 1 ]]; then
 	cp "$ADDONS_JAR" "/home/daviseib/.minecraft/mods/$(basename "$ADDONS_JAR")"
 	echo "Deployed $(basename "$ADDONS_JAR") (optional add-on) -> /home/daviseib/.minecraft/mods/"
 fi
-echo "Also built (not deployed): versions/1.21.11/build/libs/, versions/26.1/build/libs/"
+echo "Also built (not deployed): versions/1.21.11/build/libs/, versions/26.1/build/libs/, versions/26.3/build/libs/"

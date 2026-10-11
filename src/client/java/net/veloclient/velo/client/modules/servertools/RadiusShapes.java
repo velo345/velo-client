@@ -4,7 +4,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.debug.gizmo.GizmoDrawing;
 
 /** Wireframe shapes drawn with debug gizmos (depth-tested, so terrain hides what's behind it). */
-final class RadiusShapes {
+public final class RadiusShapes {
 
 	private RadiusShapes() {
 	}
@@ -13,7 +13,7 @@ final class RadiusShapes {
 	 * A wire sphere: {@code rings} horizontal circles plus as many meridians. The equator (at the
 	 * center's height) is drawn thicker so the radius on your own level reads clearly.
 	 */
-	static void sphere(double cx, double cy, double cz, double radius, int color, float width, int rings) {
+	public static void sphere(double cx, double cy, double cz, double radius, int color, float width, int rings) {
 		int segments = Math.max(24, rings * 3);
 		for (int r = 1; r < rings; r++) {
 			double phi = Math.PI * r / rings;
@@ -41,7 +41,7 @@ final class RadiusShapes {
 		}
 	}
 
-	static void circle(double cx, double y, double cz, double radius, int color, float width, int segments) {
+	public static void circle(double cx, double y, double cz, double radius, int color, float width, int segments) {
 		Vec3d previous = null;
 		for (int i = 0; i <= segments; i++) {
 			double a = Math.PI * 2 * i / segments;
@@ -53,7 +53,7 @@ final class RadiusShapes {
 		}
 	}
 
-	static void line(double x1, double y1, double z1, double x2, double y2, double z2, int color, float width) {
+	public static void line(double x1, double y1, double z1, double x2, double y2, double z2, int color, float width) {
 		GizmoDrawing.line(new Vec3d(x1, y1, z1), new Vec3d(x2, y2, z2), color, width);
 	}
 }

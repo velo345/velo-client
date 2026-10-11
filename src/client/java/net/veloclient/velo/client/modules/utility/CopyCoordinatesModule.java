@@ -13,7 +13,6 @@ import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
 import net.veloclient.velo.client.util.ModuleProfiler;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -21,7 +20,7 @@ import java.util.List;
 public final class CopyCoordinatesModule extends AbstractModule implements Configurable {
 
 	public static final KeyBinding COPY_COORDS_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.copy_coordinates", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			"key.velo-client.copy_coordinates", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	public CopyCoordinatesModule() {
 		super("copy-coordinates", "Copy Coordinates", "Copies your current X/Y/Z to the clipboard with one keypress.",

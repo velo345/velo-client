@@ -6,7 +6,6 @@ import net.veloclient.velo.module.AbstractModule;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
 import net.veloclient.velo.client.util.ModuleProfiler;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -72,14 +71,13 @@ public final class CommandKeybindsModule extends AbstractModule {
 			return;
 		}
 		*///?}
-		long handle = client.getWindow().getHandle();
 		List<CommandKeybindEntry> current = entries();
 		for (int i = 0; i < current.size(); i++) {
 			CommandKeybindEntry entry = current.get(i);
-			if (entry.keyCode() == GLFW.GLFW_KEY_UNKNOWN) {
+			if (entry.keyCode() == net.veloclient.velo.client.util.Keys.UNKNOWN) {
 				continue;
 			}
-			boolean down = GLFW.glfwGetKey(handle, entry.keyCode()) == GLFW.GLFW_PRESS;
+			boolean down = net.veloclient.velo.client.util.Keys.isKeyDown(entry.keyCode());
 			boolean wasDown = WAS_DOWN.getOrDefault(i, false);
 			if (down && !wasDown && !entry.command().isBlank()) {
 				String command = entry.command().startsWith("/") ? entry.command().substring(1) : entry.command();

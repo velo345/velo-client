@@ -296,6 +296,74 @@ public final class VeloDraw {
 		submit(context);
 	}
 
+	/**
+	 * An anti-aliased ring arc: {@code sweep} degrees starting at {@code startDegrees} (0 = 12
+	 * o'clock, clockwise), drawn {@code thickness} units wide centered on {@code radius}. Used for
+	 * circular progress (cooldowns). A full 360 sweep draws a closed ring.
+	 */
+	public static void strokeArc(DrawContext context, float cx, float cy, float radius, float thickness,
+			float startDegrees, float sweep, int color) {
+		if (sweep <= 0f || radius <= 0f) {
+			return;
+		}
+		sweep = Math.min(360f, sweep);
+		float half = pixel() / 2f;
+		float inner = Math.max(0f, radius - thickness / 2f);
+		float outer = radius + thickness / 2f;
+		int segments = Math.max(6, (int) Math.ceil(sweep / 360f * Math.max(24, radius * 4)));
+		int clear = transparent(color);
+		begin();
+		double a0 = Math.toRadians(startDegrees - 90);
+		double step = Math.toRadians(sweep) / segments;
+		for (int i = 0; i < segments; i++) {
+			double a = a0 + step * i;
+			double b = a + step;
+			float ca = (float) Math.cos(a);
+			float sa = (float) Math.sin(a);
+			float cb = (float) Math.cos(b);
+			float sb = (float) Math.sin(b);
+			float ic = inner + half;
+			float oc = Math.max(ic, outer - half);
+			quad(cx + ca * ic, cy + sa * ic, color, cx + cb * ic, cy + sb * ic, color,
+					cx + cb * oc, cy + sb * oc, color, cx + ca * oc, cy + sa * oc, color);
+			quad(cx + ca * oc, cy + sa * oc, color, cx + cb * oc, cy + sb * oc, color,
+					cx + cb * (outer + half), cy + sb * (outer + half), clear, cx + ca * (outer + half), cy + sa * (outer + half), clear);
+			if (inner > 0f) {
+				float ii = Math.max(0f, inner - half);
+				quad(cx + ca * ii, cy + sa * ii, clear, cx + cb * ii, cy + sb * ii, clear,
+						cx + cb * ic, cy + sb * ic, color, cx + ca * ic, cy + sa * ic, color);
+			}
+		}
+		submit(context);
+	}
+
+	/** A filled pie slice (clock-sweep): {@code sweep} degrees from {@code startDegrees}, 0 = 12 o'clock, clockwise. */
+	public static void fillPie(DrawContext context, float cx, float cy, float radius, float startDegrees, float sweep, int color) {
+		if (sweep <= 0f || radius <= 0f) {
+			return;
+		}
+		sweep = Math.min(360f, sweep);
+		float half = pixel() / 2f;
+		int segments = Math.max(6, (int) Math.ceil(sweep / 360f * Math.max(24, radius * 4)));
+		int clear = transparent(color);
+		begin();
+		double a0 = Math.toRadians(startDegrees - 90);
+		double step = Math.toRadians(sweep) / segments;
+		float core = Math.max(0f, radius - half);
+		for (int i = 0; i < segments; i++) {
+			double a = a0 + step * i;
+			double b = a + step;
+			float ca = (float) Math.cos(a);
+			float sa = (float) Math.sin(a);
+			float cb = (float) Math.cos(b);
+			float sb = (float) Math.sin(b);
+			quad(cx, cy, color, cx + ca * core, cy + sa * core, color, cx + cb * core, cy + sb * core, color, cx, cy, color);
+			quad(cx + ca * core, cy + sa * core, color, cx + cb * core, cy + sb * core, color,
+					cx + cb * (radius + half), cy + sb * (radius + half), clear, cx + ca * (radius + half), cy + sa * (radius + half), clear);
+		}
+		submit(context);
+	}
+
 	/** An anti-aliased line segment with round-ish ends - used for the close X, checkmarks and chevrons. */
 	public static void line(DrawContext context, float x1, float y1, float x2, float y2, float thickness, int color) {
 		float dx = x2 - x1;

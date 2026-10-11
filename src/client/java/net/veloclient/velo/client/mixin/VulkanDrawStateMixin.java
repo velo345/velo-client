@@ -1,7 +1,7 @@
 package net.veloclient.velo.client.mixin;
 
 import org.spongepowered.asm.mixin.Mixin;
-//? if >=26.2 {
+//? if >=26.2 && <26.3 {
 /*import com.mojang.blaze3d.IndexType;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
@@ -43,7 +43,7 @@ import java.util.List;
  * longer dirties anything, and vertex/index buffer binds identical to the current binding are
  * skipped (bindings survive pipeline switches in Vulkan).
  */
-//? if >=26.2 {
+//? if >=26.2 && <26.3 {
 /*@Mixin(VulkanRenderPass.class)
 public abstract class VulkanDrawStateMixin {
 

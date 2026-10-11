@@ -17,7 +17,6 @@ import net.veloclient.velo.client.modules.queue.BackgroundQueueModule;
 import net.veloclient.velo.client.theme.Theme;
 import net.veloclient.velo.client.theme.ThemeManager;
 import net.veloclient.velo.client.util.ClientCompat;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -381,7 +380,7 @@ public final class BackgroundQueueSessionsScreen extends VeloWindow {
 
 	@Override
 	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
-		if ((input.key() == GLFW.GLFW_KEY_ENTER || input.key() == GLFW.GLFW_KEY_KP_ENTER) && chatField != null && chatField.isFocused()) {
+		if ((input.key() == net.veloclient.velo.client.util.Keys.ENTER || input.key() == net.veloclient.velo.client.util.Keys.KP_ENTER) && chatField != null && chatField.isFocused()) {
 			sendChat();
 			return true;
 		}

@@ -753,10 +753,19 @@ stonecutter parameters {
 			// Shields for real Mojmap packet class names that contain "Text" - without these the
 			// bare "Text" -> "Component" rule below mangles them (BackgroundQueue's GhostPackets).
 			replace("ClientboundSetActionBarTextPacket", "ClientboundSetActionBarTextPacket")
+			// GuiRenderState$Node#addText (GuiLayerListMixin's method list) - the
+			// bare Text rule turned it into "addComponent", so the require = 0
+			// redirect silently never applied to text.
+			replace("\"addText\"", "\"addText\"")
+			// EntityRenderState#scoreText (NameTagLinesMixin's 26.x branches).
+			replace("state.scoreText", "state.scoreText")
 			replace("ClientboundSetSubtitleTextPacket", "ClientboundSetSubtitleTextPacket")
 			replace("ClientboundSetTitleTextPacket", "ClientboundSetTitleTextPacket")
 			// Real Mojmap method (LivingEntityRenderer) that the bare "RenderLayers" rule would mangle.
 			replace("shouldRenderLayers", "shouldRenderLayers")
+			// Mojmap consume effect class used by PvpCompat - the bare StatusEffect rule would
+			// turn it into the nonexistent "ApplyMobEffectsConsumeEffect".
+			replace("ApplyStatusEffectsConsumeEffect", "ApplyStatusEffectsConsumeEffect")
 			replace("net.minecraft.world.debug.gizmo.TextGizmo", "net.minecraft.gizmos.TextGizmo")
 			replace(".ignoreOcclusion()", ".setAlwaysOnTop()")
 			replace("DrawStyle.stroked(", "GizmoStyle.stroke(")
@@ -1031,6 +1040,53 @@ stonecutter parameters {
 			// matching what a plain Items.LIGHTNING_ROD reference meant
 			// before.
 			replace("Items.LIGHTNING_ROD", "Items.LIGHTNING_ROD.weathering().unaffected()")
+		}
+		// --- 26.3: Mojang moved the render API out of com.mojang.blaze3d into a
+		// new com.mojang.renderpearl package (api / backend / frontend split).
+		// Every pair below is an exact fully-qualified class name taken from a
+		// diff of the real 26.2 vs 26.3 client jars (same simple name, new
+		// package) - no rule shares a start position with an older rule.
+		// VulkanBindGroupLayout and glsl.IntermediaryShaderModule have no 26.3
+		// counterpart; the two mixins using them are //? if <26.3 only.
+		string(current.parsed >= "26.3") {
+			// 26.3 swapped GLFW for SDL3; the keyboard input type is KEYBOARD
+			// now. Suffix-only so it never starts where "InputUtil" rules do.
+			replace(".Type.KEYSYM", ".Type.KEYBOARD")
+			// One-call API changes in 26.3, each an exact source text that occurs
+			// once in this repo (checked with grep):
+			// PoseStack#mulPose(Quaternionf) -> #rotate(Quaternionfc)
+			replace(".mulPose(new Quaternionf()", ".rotate(new Quaternionf()")
+			// submitModel lost the trailing CrumblingOverlay argument
+			replace("state.outlineColor, null);", "state.outlineColor);")
+			// BundleContents#itemCopyStream -> #itemCopies
+			replace(".itemCopyStream()", ".itemCopies()")
+			// ClientboundLevelChunkWithLightPacket became a record (x()/z())
+			replace("packet.getX(), packet.getZ()", "packet.x(), packet.z()")
+			// ServerboundMoveVehiclePacket now takes a PositionAndRotation
+			replace("new ServerboundMoveVehiclePacket(new Vec3(x, y, z), yaw, pitch, onGround)",
+					"new ServerboundMoveVehiclePacket(net.minecraft.core.PositionAndRotation.of(new Vec3(x, y, z), yaw, pitch), onGround)")
+			replace("p.position().x, p.position().y, p.position().z",
+					"p.movingTo().position().x, p.movingTo().position().y, p.movingTo().position().z")
+			replace("new ServerboundMoveVehiclePacket(new Vec3(decoy.x(), decoy.y(), decoy.z()), p.yRot(), p.xRot(), grounded)",
+					"new ServerboundMoveVehiclePacket(net.minecraft.core.PositionAndRotation.of(new Vec3(decoy.x(), decoy.y(), decoy.z()), p.movingTo().yRot(), p.movingTo().xRot()), grounded)")
+			// LivingEntity#swing takes the item's SwingAnimation now (vanilla passes false too)
+			replace(".swing(net.minecraft.world.InteractionHand.MAIN_HAND);",
+					".swing(net.minecraft.world.InteractionHand.MAIN_HAND, net.minecraft.world.item.component.SwingAnimation.DEFAULT, false);")
+			replace("com.mojang.blaze3d.buffers.GpuBufferSlice", "com.mojang.renderpearl.api.buffers.GpuBufferSlice")
+			replace("com.mojang.blaze3d.buffers.GpuBuffer;", "com.mojang.renderpearl.api.buffers.GpuBuffer;")
+			replace("com.mojang.blaze3d.IndexType", "com.mojang.renderpearl.api.pipeline.IndexType")
+			replace("com.mojang.blaze3d.pipeline.RenderPipeline", "com.mojang.renderpearl.api.pipeline.RenderPipeline")
+			replace("com.mojang.blaze3d.PrimitiveTopology", "com.mojang.renderpearl.api.pipeline.PrimitiveTopology")
+			replace("com.mojang.blaze3d.shaders.ShaderType", "com.mojang.renderpearl.api.pipeline.ShaderType")
+			replace("com.mojang.blaze3d.systems.RenderPass", "com.mojang.renderpearl.api.commands.RenderPass")
+			replace("com.mojang.blaze3d.textures.GpuSampler", "com.mojang.renderpearl.api.textures.GpuSampler")
+			replace("com.mojang.blaze3d.textures.GpuTextureView", "com.mojang.renderpearl.api.textures.GpuTextureView")
+			replace("com.mojang.blaze3d.vulkan.glsl.GlslCompiler", "com.mojang.renderpearl.frontend.shaders.GlslCompiler")
+			replace("com.mojang.blaze3d.vulkan.glsl.ShaderCompileException", "com.mojang.renderpearl.util.ShaderCompileException")
+			replace("com.mojang.blaze3d.vulkan.VulkanDevice", "com.mojang.renderpearl.backend.vulkan.VulkanDevice")
+			replace("com.mojang.blaze3d.vulkan.VulkanGpuBuffer", "com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer")
+			replace("com.mojang.blaze3d.vulkan.VulkanRenderPass", "com.mojang.renderpearl.backend.vulkan.VulkanRenderPass")
+			replace("com.mojang.blaze3d.vulkan.VulkanRenderPipeline", "com.mojang.renderpearl.backend.vulkan.VulkanRenderPipeline")
 		}
 	}
 }

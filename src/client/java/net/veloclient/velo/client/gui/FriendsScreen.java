@@ -21,7 +21,6 @@ import net.veloclient.velo.client.util.ClientCompat;
 import net.veloclient.velo.client.waypoints.WaypointIcons;
 import net.veloclient.velo.client.waypoints.WaypointManager;
 import net.veloclient.velo.module.ModuleRegistry;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -800,7 +799,7 @@ public final class FriendsScreen extends VeloWindow {
 	@Override
 	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
 		int key = input.key();
-		if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+		if (key == net.veloclient.velo.client.util.Keys.ENTER || key == net.veloclient.velo.client.util.Keys.KP_ENTER) {
 			if (chatField != null && chatField.isFocused()) {
 				submitMessage();
 				return true;

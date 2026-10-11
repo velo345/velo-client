@@ -13,7 +13,6 @@ import net.veloclient.velo.client.gui.widget.VeloStyle;
 import net.veloclient.velo.client.gui.widget.VeloUi;
 import net.veloclient.velo.client.gui.window.VeloWindow;
 import net.veloclient.velo.client.keybind.BindingAccess;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -285,9 +284,9 @@ public final class VeloKeybindsScreen extends VeloWindow {
 		if (listening != null) {
 			KeyBinding binding = listening;
 			listening = null;
-			if (input.key() == GLFW.GLFW_KEY_ESCAPE) {
+			if (input.key() == net.veloclient.velo.client.util.Keys.ESCAPE) {
 				status = "Cancelled";
-			} else if (input.key() == GLFW.GLFW_KEY_BACKSPACE || input.key() == GLFW.GLFW_KEY_DELETE) {
+			} else if (input.key() == net.veloclient.velo.client.util.Keys.BACKSPACE || input.key() == net.veloclient.velo.client.util.Keys.DELETE) {
 				BindingAccess.unbind(binding);
 				status = "\"" + BindingAccess.name(binding) + "\" is now unbound";
 			} else {

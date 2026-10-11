@@ -36,7 +36,7 @@ public final class MouseButtonsModule extends AbstractModule implements HudModul
 
 	private final HudPosition position = new HudPosition(0.02f, 0.66f);
 
-	private String style = STYLE_BOXES;
+	private String style = STYLE_MOUSE;
 	private boolean showCps = true;
 	// Off by default - the plain body box below the two buttons is mostly dead space.
 	private boolean showBodyBox = false;
@@ -109,8 +109,7 @@ public final class MouseButtonsModule extends AbstractModule implements HudModul
 
 	/** Middle mouse button straight from the mouse (works whatever pick-block is bound to). */
 	private static boolean middlePressed(MinecraftClient client) {
-		long handle = client.getWindow().getHandle();
-		return org.lwjgl.glfw.GLFW.glfwGetMouseButton(handle, org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_MIDDLE) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
+		return net.veloclient.velo.client.util.Keys.isMouseDown(net.veloclient.velo.client.util.Keys.MOUSE_MIDDLE);
 	}
 
 	private void renderMouse(DrawContext context, MinecraftClient client, int x, int y, boolean leftPressed, boolean rightPressed) {

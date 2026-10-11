@@ -63,7 +63,7 @@ public final class AutoTunnelMinerModule extends AbstractModule implements Confi
 
 	public static final KeyBinding TOGGLE_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.velo-client.auto-tunnel-miner-toggle", InputUtil.Type.KEYSYM,
-			org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	private static final Random RANDOM = new Random();
 	// A digging cycle is at minimum several ticks (even a diamond pickaxe on stone takes ~5), so

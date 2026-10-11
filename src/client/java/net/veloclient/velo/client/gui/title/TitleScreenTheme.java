@@ -41,8 +41,15 @@ public final class TitleScreenTheme {
 			"menu.singleplayer", "menu.multiplayer", "menu.online", "$store", "menu.options", "menu.quit");
 
 	/** Same idea for the escape menu - real vanilla keys only, Essential's own pause-menu buttons (it already has its own dedicated right-side panel for those) are left completely alone. */
+	/**
+	 * Pause menu rows, top to bottom. Includes the buttons servers can add (Custom Options... from
+	 * server dialogs, Server Links..., Quick Actions...) - before, those kept vanilla's style and
+	 * position and ended up drawn behind this column. Report Bugs / Feedback / Player Reporting stay
+	 * small icon buttons below the column ({@link #ESCAPE_EXTRA_ICONS}).
+	 */
 	public static final List<String> ESCAPE_KEY_ORDER = List.of(
 			"menu.returnToGame", "gui.advancements", "gui.stats", "$store", "menu.options",
+			"menu.custom_options", "menu.server_links", "menu.quick_actions",
 			"menu.shareToLan", "menu.returnToMenu", "menu.disconnect");
 
 	/**
@@ -58,6 +65,7 @@ public final class TitleScreenTheme {
 
 	/** Essential/ModMenu pause-menu buttons repositioned into their own small icon row instead of left overlapping the restyled stack. */
 	public static final List<ExtraIcon> ESCAPE_EXTRA_ICONS = List.of(
+			new ExtraIcon("report_player", List.of("player reporting")),
 			new ExtraIcon("bugs", List.of("bug", "report")),
 			new ExtraIcon("feedback", List.of("feedback")),
 			new ExtraIcon("friends", List.of("friend")),

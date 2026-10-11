@@ -26,7 +26,7 @@ public final class CustomCrosshairModule extends AbstractModule implements Confi
 
 	public CustomCrosshairModule() {
 		super("custom-crosshair", "Custom Crosshair", "Replaces the vanilla crosshair with one from your library - draw your own or import a PNG.",
-				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.PVP, SafetyTag.ALWAYS_SAFE, false);
 	}
 
 	public int size() {

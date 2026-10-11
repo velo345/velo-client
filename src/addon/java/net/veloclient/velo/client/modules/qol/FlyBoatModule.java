@@ -6,7 +6,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.entity.Entity;
-import org.lwjgl.glfw.GLFW;
 import java.util.List;
 import java.util.Locale;
 
@@ -22,9 +21,9 @@ import net.veloclient.velo.module.SafetyTag;
 public final class FlyBoatModule extends AbstractModule implements Configurable {
 
 	public static final KeyBinding TOGGLE_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.fly-boat-toggle", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			"key.velo-client.fly-boat-toggle", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 	public static final KeyBinding DESCEND_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.fly-boat-descend", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			"key.velo-client.fly-boat-descend", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	private static final double MIN_SPEED = 4.0;
 	private static final double MAX_SPEED = 120.0;

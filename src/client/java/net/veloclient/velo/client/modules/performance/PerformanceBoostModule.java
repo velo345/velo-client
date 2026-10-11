@@ -7,7 +7,6 @@ import net.minecraft.client.option.GraphicsMode;
 import net.minecraft.client.option.InactivityFpsLimit;
 import net.minecraft.particle.ParticlesMode;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import org.lwjgl.glfw.GLFW;
 import net.veloclient.velo.module.AbstractModule;
 import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
@@ -77,7 +76,9 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	 */
 	public static volatile boolean fastDrawPath = true;
 
-	private static final List<String> PRESETS = List.of("Default", "Max FPS", "Performance", "Medium Quality", "High Quality");
+	private static final List<String> PRESETS = List.of("Auto", "Default", "Max FPS", "Performance", "Medium Quality", "High Quality");
+	/** Quality steps Auto moves through, best first. */
+	private static final List<String> AUTO_LEVELS = List.of("High Quality", "Medium Quality", "Performance", "Max FPS");
 	private static final int ADAPTIVE_MIN_DISTANCE = 5;
 	private static final int ADAPTIVE_WINDOW_TICKS = 60;
 
@@ -90,7 +91,18 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	private Integer previousBiomeBlend;
 	private InactivityFpsLimit previousInactivityLimit;
 
-	private String preset = "Default";
+	private String preset = "High Quality";
+	private int autoTargetFps = 60;
+	private int autoLevel;
+	private boolean autoNotify = false;
+	private long autoFpsSum;
+	private int autoSamples;
+	private int autoLow;
+	private int autoHigh;
+	private long autoCooldownUntil;
+	private long autoTicks;
+	/** While Auto applies a step, view distance is left alone (changing it reloads every chunk). */
+	private boolean keepDistance;
 	private boolean dynamicFps = true;
 	private String vsyncMode = "Off";
 
@@ -108,6 +120,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				"Presets and individually-tunable settings for maximum FPS - view distance, entities, particles, VSync, HUD caching and more.",
 				ModuleCategory.PERFORMANCE, SafetyTag.ALWAYS_SAFE, true);
 		ClientTickEvents.END_CLIENT_TICK.register(this::tickAdaptiveDistance);
+		ClientTickEvents.END_CLIENT_TICK.register(this::tickAuto);
 	}
 
 	/**
@@ -157,6 +170,65 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		} else {
 			lowWindows = 0;
 			highWindows = 0;
+		}
+	}
+
+	/**
+	 * Auto preset: averages FPS over 3-second windows while you're in a world. Three slow windows in
+	 * a row (below 90% of the target) step quality down one level; eight fast ones (above 160%)
+	 * step it back up. At least 20 seconds between steps so it never flickers between looks.
+	 */
+	private void tickAuto(MinecraftClient client) {
+		autoTicks++;
+		//? if <26.1 {
+		boolean inMenu = client.currentScreen != null || !client.isWindowFocused();
+		//?} else if <26.2 {
+		/*boolean inMenu = client.screen != null || !client.isWindowActive();
+		*///?} else {
+		/*boolean inMenu = client.gui.screen() != null || !client.isWindowActive();
+		*///?}
+		if (!isEnabled() || !preset.equals("Auto") || client.world == null || client.player == null || inMenu) {
+			autoFpsSum = 0;
+			autoSamples = 0;
+			return;
+		}
+		autoFpsSum += VideoOptions.currentFps();
+		if (++autoSamples < ADAPTIVE_WINDOW_TICKS) {
+			return;
+		}
+		double average = autoFpsSum / (double) autoSamples;
+		autoFpsSum = 0;
+		autoSamples = 0;
+		if (autoTicks < autoCooldownUntil) {
+			return;
+		}
+		int next = autoLevel;
+		if (average < autoTargetFps * 0.9) {
+			autoHigh = 0;
+			if (++autoLow >= 3 && autoLevel < AUTO_LEVELS.size() - 1) {
+				next = autoLevel + 1;
+			}
+		} else if (average > autoTargetFps * 1.6) {
+			autoLow = 0;
+			if (++autoHigh >= 8 && autoLevel > 0) {
+				next = autoLevel - 1;
+			}
+		} else {
+			autoLow = 0;
+			autoHigh = 0;
+		}
+		if (next != autoLevel) {
+			autoLevel = next;
+			autoLow = 0;
+			autoHigh = 0;
+			autoCooldownUntil = autoTicks + 400;
+			applyPreset("Auto");
+			refreshRendering();
+			if (autoNotify) {
+				net.veloclient.velo.client.social.NotificationOverlay.show(new net.veloclient.velo.client.social.NotificationOverlay.Toast(
+						null, null, "Auto graphics: " + AUTO_LEVELS.get(autoLevel), String.format(java.util.Locale.ROOT,
+								"Averaging %.0f FPS (target %d).", average, autoTargetFps), 3500, null, null, null));
+			}
 		}
 	}
 
@@ -224,13 +296,26 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 
 	private void applyPreset(String name) {
 		GameOptions options = MinecraftClient.getInstance().options;
+		if (name.equals("Auto")) {
+			keepDistance = true;
+			try {
+				applyPreset(AUTO_LEVELS.get(Math.max(0, Math.min(AUTO_LEVELS.size() - 1, autoLevel))));
+			} finally {
+				keepDistance = false;
+			}
+			return;
+		}
 		switch (name) {
 			case "Max FPS" -> {
 				options.getPreset().setValue(GraphicsMode.FAST);
 				options.getParticles().setValue(ParticlesMode.MINIMAL);
 				options.getEntityShadows().setValue(false);
-				options.getViewDistance().setValue(Math.min(options.getViewDistance().getValue(), 6));
-				options.getSimulationDistance().setValue(Math.min(options.getSimulationDistance().getValue(), 6));
+				if (!keepDistance) {
+					options.getViewDistance().setValue(Math.min(options.getViewDistance().getValue(), 6));
+				}
+				if (!keepDistance) {
+					options.getSimulationDistance().setValue(Math.min(options.getSimulationDistance().getValue(), 6));
+				}
 				applyVsyncMode("Off");
 				options.getCloudRenderMode().setValue(CloudRenderMode.OFF);
 				options.getBiomeBlendRadius().setValue(0);
@@ -243,7 +328,9 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				options.getPreset().setValue(GraphicsMode.FAST);
 				options.getParticles().setValue(ParticlesMode.MINIMAL);
 				options.getEntityShadows().setValue(false);
-				options.getViewDistance().setValue(Math.min(options.getViewDistance().getValue(), 8));
+				if (!keepDistance) {
+					options.getViewDistance().setValue(Math.min(options.getViewDistance().getValue(), 8));
+				}
 				applyVsyncMode("Off");
 				options.getCloudRenderMode().setValue(CloudRenderMode.OFF);
 				options.getBiomeBlendRadius().setValue(0);
@@ -255,7 +342,9 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				options.getPreset().setValue(GraphicsMode.FAST);
 				options.getParticles().setValue(ParticlesMode.DECREASED);
 				options.getEntityShadows().setValue(false);
-				options.getViewDistance().setValue(Math.max(options.getViewDistance().getValue(), 12));
+				if (!keepDistance) {
+					options.getViewDistance().setValue(Math.max(options.getViewDistance().getValue(), heapSafeDistance(12)));
+				}
 				applyVsyncMode("Off");
 				options.getCloudRenderMode().setValue(CloudRenderMode.FAST);
 				options.getBiomeBlendRadius().setValue(2);
@@ -269,7 +358,9 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				options.getPreset().setValue(GraphicsMode.FANCY);
 				options.getParticles().setValue(ParticlesMode.ALL);
 				options.getEntityShadows().setValue(true);
-				options.getViewDistance().setValue(Math.max(options.getViewDistance().getValue(), 16));
+				if (!keepDistance) {
+					options.getViewDistance().setValue(Math.max(options.getViewDistance().getValue(), heapSafeDistance(16)));
+				}
 				applyVsyncMode("Off");
 				options.getCloudRenderMode().setValue(CloudRenderMode.FANCY);
 				options.getBiomeBlendRadius().setValue(5);
@@ -316,11 +407,17 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		List<ConfigField> fields = new java.util.ArrayList<>(List.of(
 				new ConfigField.ChoiceField("Preset", PRESETS, () -> preset, v -> {
 					preset = v;
+					if (v.equals("Auto")) {
+						autoLevel = 0;
+					}
 					if (isEnabled()) {
 						applyPreset(v);
 						refreshRendering();
 					}
 				}),
+				new ConfigField.SliderField("Auto: Target FPS", 30, 240, () -> autoTargetFps, v -> autoTargetFps = (int) Math.round(v / 5) * 5,
+						v -> (int) Math.round(v / 5) * 5 + " FPS"),
+				new ConfigField.ToggleField("Auto: Notify On Quality Change", () -> autoNotify, v -> autoNotify = v),
 				new ConfigField.ToggleField("Dynamic FPS (throttle when unfocused/AFK)", () -> dynamicFps, v -> {
 					dynamicFps = v;
 					if (isEnabled()) {
@@ -443,18 +540,29 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		GameOptions options = MinecraftClient.getInstance().options;
 		switch (mode) {
 			case "On" -> {
-				GLFW.glfwSwapInterval(1);
+				net.veloclient.velo.client.util.Keys.setSwapInterval(1);
 				options.getEnableVsync().setValue(true);
 			}
 			case "Adaptive" -> {
-				GLFW.glfwSwapInterval(-1);
+				net.veloclient.velo.client.util.Keys.setSwapInterval(-1);
 				options.getEnableVsync().setValue(true);
 			}
 			default -> {
-				GLFW.glfwSwapInterval(0);
+				net.veloclient.velo.client.util.Keys.setSwapInterval(0);
 				options.getEnableVsync().setValue(false);
 			}
 		}
+	}
+
+	/**
+	 * The quality presets raise view distance, but chunk data grows with its square: forcing 16 on
+	 * a 2-3 GB heap was enough to run the game out of memory. Limit what a preset raises it to by
+	 * the heap the launcher gave this session (the player can still pick more by hand).
+	 */
+	private static int heapSafeDistance(int wanted) {
+		long heapMb = Runtime.getRuntime().maxMemory() / (1024 * 1024);
+		int cap = heapMb < 3000 ? 10 : heapMb < 4500 ? 12 : heapMb < 6000 ? 16 : 32;
+		return Math.min(wanted, cap);
 	}
 
 	private static String particlesLabel(ParticlesMode mode) {

@@ -31,7 +31,11 @@ public final class ModuleIcons {
 			"scoreboard-hud", "custom-crosshair", "minimap", "session-auto-fixer", "tnt-timer", "block-outline",
 			"time-weather-fog", "small-caps", "kill-effects", "input-sampler", "background-queue", "friends", "totem-counter", "shader-cache",
 			"hearts", "hunger", "armor-bar", "xp-bar", "hotbar", "world-map",
-			"boss-bar", "shulker-preview", "better-f3", "spawn-radius", "simulation-distance");
+			"boss-bar", "shulker-preview", "better-f3", "spawn-radius", "simulation-distance",
+			"old-animations", "hit-color", "hit-particles", "cooldowns", "health-indicator", "enemy-effects", "enemy-hunger",
+			"target-hud", "combo-counter", "reach-display", "pot-counter", "anti-farm-lag", "item-position",
+			"damage-numbers", "hit-sounds", "auto-gg", "height-limit", "speed-hud", "direction-hud", "arrow-counter",
+			"low-health-warning");
 
 	private ModuleIcons() {
 	}

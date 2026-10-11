@@ -6,13 +6,12 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.veloclient.velo.client.keybind.VeloKeybinds;
-import org.lwjgl.glfw.GLFW;
 
 /** The world map's own key (M by default, rebindable in Controls). */
 public final class WorldMapKeys {
 
 	public static final KeyBinding OPEN_MAP = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.world_map", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_M, VeloKeybinds.CATEGORY));
+			"key.velo-client.world_map", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.M, VeloKeybinds.CATEGORY));
 
 	private WorldMapKeys() {
 	}

@@ -13,7 +13,6 @@ import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
 import net.veloclient.velo.client.util.ModuleProfiler;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 import java.util.Locale;
@@ -46,7 +45,7 @@ import java.util.Locale;
 public final class CinematicCameraModule extends AbstractModule implements Configurable {
 
 	public static final KeyBinding TOGGLE_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.cinematic_camera_toggle", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			"key.velo-client.cinematic_camera_toggle", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	private static final double MIN_SPEED = 0.5;
 	private static final double MAX_SPEED = 200.0;

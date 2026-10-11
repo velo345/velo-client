@@ -41,6 +41,8 @@ public final class AnimatedCapeAsset {
 	private final List<GifDecoder.Frame> frames;
 	private final int width;
 	private final int height;
+	/** Decoded from a source that can be read again (store / bundled cape) - safe to free when idle. */
+	private boolean reloadable;
 	private int frameIndex = -1;
 	private long msIntoCurrentFrame;
 	private long lastAdvanceNanos = -1;
@@ -64,7 +66,9 @@ public final class AnimatedCapeAsset {
 		}
 		return REGISTRY.computeIfAbsent(capeId, id -> {
 			try (InputStream in = gifSource.get()) {
-				return create(id, GifDecoder.decode(in));
+				AnimatedCapeAsset created = create(id, GifDecoder.decode(in));
+				created.reloadable = true;
+				return created;
 			} catch (IOException e) {
 				throw new RuntimeException("Failed to decode animated cape texture for " + id, e);
 			}
@@ -115,12 +119,36 @@ public final class AnimatedCapeAsset {
 	 */
 	public static synchronized void tickAll() {
 		long now = System.nanoTime();
+		// Every frame of a GIF is kept decoded in native memory (a large animated cape is tens of
+		// MB). Browsing the store used to keep every cape ever previewed for the rest of the
+		// session; ones that can be decoded again are freed after a minute of not being drawn.
+		releaseIdle(60_000);
 		for (AnimatedCapeAsset texture : REGISTRY.values()) {
 			if (now - texture.lastUsedNanos > 1_000_000_000L) {
 				texture.lastAdvanceNanos = now;
 				continue;
 			}
 			texture.advance(now);
+		}
+	}
+
+	/** Frees re-decodable capes not drawn for {@code idleMillis}. Render thread. */
+	public static synchronized void releaseIdle(long idleMillis) {
+		long now = System.nanoTime();
+		var it = REGISTRY.values().iterator();
+		while (it.hasNext()) {
+			AnimatedCapeAsset asset = it.next();
+			if (asset.reloadable && now - asset.lastUsedNanos > idleMillis * 1_000_000L) {
+				it.remove();
+				asset.release();
+			}
+		}
+	}
+
+	private void release() {
+		MinecraftClient.getInstance().getTextureManager().destroyTexture(identifier);
+		for (GifDecoder.Frame frame : frames) {
+			frame.image().close();
 		}
 	}
 

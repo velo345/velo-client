@@ -64,6 +64,12 @@ public abstract class AbstractModule implements Module {
 	 * such a module (e.g. Velo Network) never started at all until toggled off and on by hand.
 	 */
 	private boolean started;
+	/**
+	 * A default-on module's static state starts out "on" (renderer flags, caches...). When a saved
+	 * profile turns it off at startup, onDisable() never ran because it never started - e.g.
+	 * waypoints kept drawing until toggled on and off. It now runs once in that case.
+	 */
+	private boolean defaultStateReverted;
 
 	@Override
 	public void setEnabled(boolean enabled) {
@@ -73,6 +79,9 @@ public abstract class AbstractModule implements Module {
 			onEnable();
 		} else if (!enabled && started) {
 			started = false;
+			onDisable();
+		} else if (!enabled && defaultEnabled && !defaultStateReverted) {
+			defaultStateReverted = true;
 			onDisable();
 		}
 	}

@@ -18,7 +18,6 @@ import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
 import net.veloclient.velo.client.util.ModuleProfiler;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -43,7 +42,7 @@ import java.util.List;
 public final class InputSamplerModule extends AbstractModule implements Configurable, HudModule {
 
 	public static final KeyBinding RESET_STATS_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.input-sampler-reset", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			"key.velo-client.input-sampler-reset", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	private static final int ROLLING_WINDOW = 64;
 
@@ -128,7 +127,7 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 			// it again here just means input gets noticed at the next tick
 			// boundary instead of waiting for the next (possibly stalled)
 			// render frame.
-			GLFW.glfwPollEvents();
+			net.veloclient.velo.client.util.Keys.pollEvents();
 		}
 	}
 

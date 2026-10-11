@@ -10,7 +10,6 @@ import net.minecraft.util.Identifier;
 import net.veloclient.velo.client.gui.HudEditScreen;
 import net.veloclient.velo.client.gui.ModMenuScreen;
 import net.veloclient.velo.client.gui.window.VeloWindow;
-import org.lwjgl.glfw.GLFW;
 
 /** Registers Velo Client's global keybinds. Default panel key is Right Shift, matching section 5. */
 public final class VeloKeybinds {
@@ -30,7 +29,7 @@ public final class VeloKeybinds {
 	public static final KeyBinding OPEN_MOD_MENU = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.velo-client.open_mod_menu",
 			InputUtil.Type.KEYSYM,
-			GLFW.GLFW_KEY_RIGHT_SHIFT,
+			net.veloclient.velo.client.util.Keys.RIGHT_SHIFT,
 			CATEGORY));
 
 	private VeloKeybinds() {

@@ -4,9 +4,9 @@
 mod.id = "velo-client"
 mod.name = "Velo Client"
 mod.group = "net.veloclient"
-mod.version = "0.8.4"
+mod.version = "0.8.5"
 
-deps.fabric_loader = "0.19.3"
+deps.fabric_loader = "0.19.5"
 loomx.loom_version = "1.17-SNAPSHOT"
 
 ["1.21.11"]
@@ -27,3 +27,7 @@ deps.fabric_api = "0.145.1+26.1"
 ["26.2"]
 # Verified against maven.fabricmc.net's real metadata - latest available.
 deps.fabric_api = "0.156.0+26.2"
+
+["26.3"]
+# Verified against maven.fabricmc.net's real metadata - latest available.
+deps.fabric_api = "0.162.0+26.3"

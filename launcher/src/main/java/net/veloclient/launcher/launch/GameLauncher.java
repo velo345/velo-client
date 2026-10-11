@@ -104,8 +104,10 @@ public final class GameLauncher {
 		}
 		listener.onProgress(1.0);
 
+		JavaRuntimeProvider.JavaRuntime runtime = JavaRuntimeProvider.forVersion(vanilla, listener);
+
 		listener.onPhase("Starting Minecraft...");
-		return startProcess(instance, version, vanilla, fabric, libraries, clientJar, nativesDir, session, quickPlayServerAddress, runId);
+		return startProcess(instance, version, vanilla, fabric, libraries, clientJar, nativesDir, session, quickPlayServerAddress, runId, runtime);
 	}
 
 	private static void downloadLibraries(List<LibraryResolver.ResolvedLibrary> libraries, LaunchProgressListener listener) throws IOException {
@@ -136,7 +138,7 @@ public final class GameLauncher {
 
 	private static LaunchResult startProcess(Instance instance, GameVersion version, JsonObject vanilla, JsonObject fabric,
 			List<LibraryResolver.ResolvedLibrary> libraries, Path clientJar, Path nativesDir, MinecraftSession session,
-			String quickPlayServerAddress, String runId) throws IOException {
+			String quickPlayServerAddress, String runId, JavaRuntimeProvider.JavaRuntime runtime) throws IOException {
 		String classpath = buildClasspath(libraries, clientJar);
 		String mainClass = fabric.get("mainClass").getAsString();
 		Path gameDir = InstancePaths.gameDir(instance.id());
@@ -165,21 +167,21 @@ public final class GameLauncher {
 
 		// Memory size and garbage collector come from MemoryPlanner: automatic by default (sized
 		// from this PC, this profile's mods/settings, and what the game really used last time),
-		// or the fixed/per-profile amount when one is set. -Xms matches -Xmx for G1 (no heap
-		// resizing stutter); ZGC starts lower and grows/shrinks on its own without pauses.
+		// or the fixed/per-profile amount when one is set. The heap starts small and grows only
+		// as needed (see MemoryPlanner's class doc for why it's no longer claimed up front).
 		MemoryPlanner.Plan memoryPlan = MemoryPlanner.plan(instance);
 		net.veloclient.launcher.LauncherLog.info("Launching " + instance.name() + " with " + memoryPlan.summary() + " (" + String.join("; ", memoryPlan.reasons()) + ")");
 
-		List<String> jvmArgs = new ArrayList<>(MemoryPlanner.jvmArgs(memoryPlan));
+		List<String> jvmArgs = new ArrayList<>(MemoryPlanner.jvmArgs(memoryPlan, runtime.feature()));
 		// Stops the JVM memory-mapping its hsperfdata stats file - on a busy or slow disk, the
 		// periodic writes to it are a known source of random multi-ms stalls, and nothing in a
 		// game session reads those stats.
 		jvmArgs.add("-XX:+PerfDisableSharedMem");
 		// Compact object headers (JDK 25+, JEP 519): every Java object gets 4 bytes smaller, which
 		// for Minecraft's millions of small objects means noticeably less heap churn and GC work.
-		// The game runs on this same runtime (see javaBinary()), so this only goes on where that
-		// runtime actually understands the flag - an unknown -XX flag would stop the JVM starting.
-		if (Runtime.version().feature() >= 25) {
+		// Only where the game's runtime actually understands the flag - an unknown -XX flag would
+		// stop the JVM starting.
+		if (runtime.feature() >= 25) {
 			jvmArgs.add("-XX:+UseCompactObjectHeaders");
 		}
 		// Windows' dual-stack connection ordering can spend the whole
@@ -208,7 +210,7 @@ public final class GameLauncher {
 		}
 
 		Downloader.saveVerifiedIndex();
-		String java = javaBinary();
+		String java = runtime.binary().toString();
 		WindowsGpuPreference.preferHighPerformance(Path.of(java));
 		List<String> command = new ArrayList<>();
 		command.add(java);
@@ -242,19 +244,6 @@ public final class GameLauncher {
 		}
 		classpath.append(clientJar.toAbsolutePath());
 		return classpath.toString();
-	}
-
-	private static String javaBinary() throws IOException {
-		String javaHome = System.getProperty("java.home");
-		String exe = OsRules.currentOsName().equals("windows") ? "java.exe" : "java";
-		Path path = Path.of(javaHome, "bin", exe);
-		if (!Files.exists(path)) {
-			// A jpackage-installed build's bundled runtime doesn't reliably
-			// keep this binary (see JavaRuntimeFallback's own doc comment for
-			// why) - self-heal into a cache directory instead of failing.
-			return JavaRuntimeFallback.ensureAvailable().toString();
-		}
-		return path.toString();
 	}
 
 	private static List<String> resolveArguments(JsonArray argsArray, Map<String, String> values, Set<String> activeFeatures) {

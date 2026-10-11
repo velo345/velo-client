@@ -38,7 +38,7 @@ public final class MojangVersionService {
 		throw new IOException("Minecraft version \"" + mcVersion + "\" not found in Mojang's version manifest.");
 	}
 
-	private static JsonObject getJson(String url) throws IOException {
+	static JsonObject getJson(String url) throws IOException {
 		HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(20)).GET().build();
 		try {
 			HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());

@@ -33,8 +33,37 @@ public final class RemoteTextureLoader {
 	private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 	private static final Map<String, Identifier> CACHE = new ConcurrentHashMap<>();
 	private static final Map<String, Boolean> FAILED = new ConcurrentHashMap<>();
+	private static final java.util.concurrent.ExecutorService DOWNLOADS = Executors.newVirtualThreadPerTaskExecutor();
+	private static long noScreenSince = -1;
 
 	private RemoteTextureLoader() {
+	}
+
+	/**
+	 * Thumbnails are only shown on menu screens; each is a full-size decoded image (several MB of
+	 * native memory plus its GPU copy). Once no screen has been open for 30 s they're all released
+	 * - screens ask for them again when reopened. Called every client tick.
+	 */
+	public static void tick(MinecraftClient client) {
+		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() != null || CACHE.isEmpty()) {
+			noScreenSince = -1;
+			return;
+		}
+		long now = System.nanoTime();
+		if (noScreenSince < 0) {
+			noScreenSince = now;
+		} else if (now - noScreenSince > 30_000_000_000L) {
+			releaseAll(client);
+		}
+	}
+
+	/** Frees every downloaded thumbnail now (they're fetched again when a screen asks). Render thread. */
+	public static void releaseAll(MinecraftClient client) {
+		for (Identifier id : CACHE.values()) {
+			client.getTextureManager().destroyTexture(id);
+		}
+		CACHE.clear();
+		noScreenSince = -1;
 	}
 
 	/** @param onLoaded called on the render thread once the texture is registered; never called if the URL is blank, already known to fail, or the fetch/decode fails. */
@@ -47,7 +76,7 @@ public final class RemoteTextureLoader {
 			onLoaded.accept(cached);
 			return;
 		}
-		Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
+		DOWNLOADS.submit(() -> {
 			try {
 				HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(15)).GET().build();
 				HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());

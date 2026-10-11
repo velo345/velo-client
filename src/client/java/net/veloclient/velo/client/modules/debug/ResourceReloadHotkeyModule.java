@@ -14,7 +14,6 @@ import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
 import net.veloclient.velo.client.util.ModuleProfiler;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -27,9 +26,9 @@ import java.util.List;
 public final class ResourceReloadHotkeyModule extends AbstractModule implements Configurable {
 
 	public static final KeyBinding RELOAD_RESOURCES = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.reload_resources", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			"key.velo-client.reload_resources", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 	public static final KeyBinding RELOAD_SHADERS = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.reload_shaders", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			"key.velo-client.reload_shaders", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	public ResourceReloadHotkeyModule() {
 		super("resource-reload-hotkeys", "Resource/Shader Reload Hotkeys",

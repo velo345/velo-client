@@ -8,7 +8,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.veloclient.velo.client.mixin.HandledScreenAccessor;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -60,16 +59,15 @@ public final class ShulkerPreview {
 	}
 
 	private static boolean down(int key) {
-		long handle = MinecraftClient.getInstance().getWindow().getHandle();
-		return GLFW.glfwGetKey(handle, key) == GLFW.GLFW_PRESS;
+		return net.veloclient.velo.client.util.Keys.isKeyDown(key);
 	}
 
 	private static boolean shift() {
-		return tourSlot != null || down(GLFW.GLFW_KEY_LEFT_SHIFT) || down(GLFW.GLFW_KEY_RIGHT_SHIFT);
+		return tourSlot != null || down(net.veloclient.velo.client.util.Keys.LEFT_SHIFT) || down(net.veloclient.velo.client.util.Keys.RIGHT_SHIFT);
 	}
 
 	private static boolean ctrl() {
-		return down(GLFW.GLFW_KEY_LEFT_CONTROL) || down(GLFW.GLFW_KEY_RIGHT_CONTROL);
+		return down(net.veloclient.velo.client.util.Keys.LEFT_CONTROL) || down(net.veloclient.velo.client.util.Keys.RIGHT_CONTROL);
 	}
 
 	// ---- Hooks ----
@@ -159,7 +157,7 @@ public final class ShulkerPreview {
 			if (!canEdit(screen)) {
 				status = "Servers don't allow editing in survival - preview only.";
 			} else {
-				edit(screen, index, button == 1);
+				edit(screen, index, button == net.veloclient.velo.client.util.Keys.MOUSE_RIGHT);
 			}
 		}
 		return true;

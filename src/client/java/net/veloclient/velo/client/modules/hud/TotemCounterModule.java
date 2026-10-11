@@ -33,7 +33,7 @@ public final class TotemCounterModule extends AbstractModule implements HudModul
 
 	public TotemCounterModule() {
 		super("totem-counter", "Totem Counter", "Shows how many Totems of Undying you carry, with the totem icon.",
-				ModuleCategory.HUD, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.PVP, SafetyTag.ALWAYS_SAFE, false);
 	}
 
 	@Override

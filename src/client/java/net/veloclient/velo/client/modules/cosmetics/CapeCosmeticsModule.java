@@ -15,7 +15,6 @@ import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
 import net.veloclient.velo.client.util.ModuleProfiler;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -26,7 +25,7 @@ import java.util.List;
 public final class CapeCosmeticsModule extends AbstractModule implements Configurable, net.veloclient.velo.client.gui.window.ModuleShortcut {
 
 	public static final KeyBinding OPEN_CAPE_MENU = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.open_cape_menu", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			"key.velo-client.open_cape_menu", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	public CapeCosmeticsModule() {
 		super("cape-cosmetics", "Cosmetic Capes",

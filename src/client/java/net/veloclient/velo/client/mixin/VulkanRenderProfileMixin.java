@@ -1,7 +1,7 @@
 package net.veloclient.velo.client.mixin;
 
 import org.spongepowered.asm.mixin.Mixin;
-//? if >=26.2 {
+//? if >=26.2 && <26.3 {
 /*import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup;
 import net.veloclient.velo.client.devtools.RenderProfiler;
@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 *///?}
 
 /** Dev-only terrain draw timing for {@code RenderProfiler} (26.2; applied with the Vulkan mixins). */
-//? if >=26.2 {
+//? if >=26.2 && <26.3 {
 /*@Mixin(ChunkSectionsToRender.class)
 public abstract class VulkanRenderProfileMixin {
 

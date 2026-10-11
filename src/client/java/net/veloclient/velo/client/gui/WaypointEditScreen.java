@@ -15,7 +15,6 @@ import net.veloclient.velo.client.util.ClientCompat;
 import net.veloclient.velo.client.waypoints.Waypoint;
 import net.veloclient.velo.client.waypoints.WaypointIcons;
 import net.veloclient.velo.client.waypoints.WaypointManager;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -359,7 +358,7 @@ public final class WaypointEditScreen extends VeloWindow {
 
 	@Override
 	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
-		if (input.key() == GLFW.GLFW_KEY_ENTER || input.key() == GLFW.GLFW_KEY_KP_ENTER) {
+		if (input.key() == net.veloclient.velo.client.util.Keys.ENTER || input.key() == net.veloclient.velo.client.util.Keys.KP_ENTER) {
 			save();
 			return true;
 		}

@@ -15,7 +15,6 @@ import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
 import net.veloclient.velo.client.util.ModuleProfiler;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -27,7 +26,7 @@ import java.util.List;
 public final class ClientLogViewerModule extends AbstractModule implements Configurable {
 
 	public static final KeyBinding OPEN_LOG_VIEWER = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.open_log_viewer", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F10, VeloKeybinds.CATEGORY));
+			"key.velo-client.open_log_viewer", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.F10, VeloKeybinds.CATEGORY));
 
 	public ClientLogViewerModule() {
 		super("client-log-viewer", "Client Log Viewer",

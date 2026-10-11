@@ -14,7 +14,6 @@ import net.veloclient.velo.client.gui.widget.VeloUi;
 import net.veloclient.velo.client.gui.window.VeloWindow;
 import net.veloclient.velo.client.waypoints.Waypoint;
 import net.veloclient.velo.client.waypoints.WaypointManager;
-import org.lwjgl.glfw.GLFW;
 
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -428,8 +427,10 @@ public final class WorldMapScreen extends VeloWindow {
 		int bz = (int) Math.floor(menuAt[3]);
 		int w = 150;
 		boolean coords = WorldMapModule.showCoordinates();
-		VeloDraw.fillRounded(context, mx, my, w, coords ? 58 : 40, 7, 0xF0141418);
-		VeloDraw.strokeRounded(context, mx, my, w, coords ? 58 : 40, 7, VeloStyle.border());
+		boolean teleport = net.veloclient.velo.client.waypoints.WaypointTeleport.available();
+		int menuHeight = (coords ? 58 : 40) + (teleport ? 20 : 0);
+		VeloDraw.fillRounded(context, mx, my, w, menuHeight, 7, 0xF0141418);
+		VeloDraw.strokeRounded(context, mx, my, w, menuHeight, 7, VeloStyle.border());
 		context.drawTextWithShadow(this.textRenderer, coords ? "X " + bx + ", Z " + bz : "Here", mx + 8, my + 6, VeloStyle.textMuted());
 		hits.add(0, VeloUi.pill(context, mx + 4, my + 18, w - 8, 16, "Add waypoint here", 1, mouseX, mouseY, () -> {
 			menuAt = null;
@@ -440,6 +441,13 @@ public final class WorldMapScreen extends VeloWindow {
 			hits.add(0, VeloUi.pill(context, mx + 4, my + 38, w - 8, 16, "Copy coordinates", 0, mouseX, mouseY, () -> {
 				menuAt = null;
 				MinecraftClient.getInstance().keyboard.setClipboard(bx + " " + surfaceY(bx, bz) + " " + bz);
+			}));
+		}
+		if (teleport) {
+			hits.add(0, VeloUi.pill(context, mx + 4, my + menuHeight - 20, w - 8, 16, "Teleport here", 0, mouseX, mouseY, () -> {
+				menuAt = null;
+				net.veloclient.velo.client.waypoints.WaypointTeleport.teleport(bx, surfaceY(bx, bz), bz, viewedDimension);
+				this.close();
 			}));
 		}
 	}
@@ -474,8 +482,8 @@ public final class WorldMapScreen extends VeloWindow {
 			return true;
 		}
 		if (click.y() >= mapTop() && click.y() < mapBottom() && click.x() >= contentX() && click.x() < contentX() + contentWidth()) {
-			if (click.button() == 1) {
-				menuAt = new double[] {Math.min(click.x(), contentX() + contentWidth() - 152), Math.min(click.y(), mapBottom() - 60),
+			if (click.button() == net.veloclient.velo.client.util.Keys.MOUSE_RIGHT) {
+				menuAt = new double[] {Math.min(click.x(), contentX() + contentWidth() - 152), Math.min(click.y(), mapBottom() - 80),
 						blockX(click.x()), blockZ(click.y())};
 				return true;
 			}
@@ -518,7 +526,7 @@ public final class WorldMapScreen extends VeloWindow {
 			requestClose();
 			return true;
 		}
-		if (input.key() == GLFW.GLFW_KEY_SPACE) {
+		if (input.key() == net.veloclient.velo.client.util.Keys.SPACE) {
 			follow = true;
 			return true;
 		}

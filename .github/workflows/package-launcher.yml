@@ -45,7 +45,7 @@ jobs:
 
       - name: Build mod jars (all 3 supported Minecraft versions)
         shell: bash
-        run: ./gradlew :1.21.11:build :26.1:build :26.2:build -q
+        run: ./gradlew :1.21.11:build :26.1:build :26.2:build :26.3:build -q
 
       - name: Build launcher installer
         shell: bash

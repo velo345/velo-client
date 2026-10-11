@@ -21,7 +21,6 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -35,9 +34,9 @@ import java.util.List;
 public final class WaypointsModule extends AbstractModule implements Configurable, net.veloclient.velo.client.gui.window.ModuleShortcut {
 
 	public static final KeyBinding OPEN_MENU = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.open_waypoints", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_P, VeloKeybinds.CATEGORY));
+			"key.velo-client.open_waypoints", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.P, VeloKeybinds.CATEGORY));
 	public static final KeyBinding NEW_WAYPOINT = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.new_waypoint", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_N, VeloKeybinds.CATEGORY));
+			"key.velo-client.new_waypoint", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.N, VeloKeybinds.CATEGORY));
 
 	private static boolean deathWaypoints = true;
 	private boolean wasDead;
@@ -71,6 +70,10 @@ public final class WaypointsModule extends AbstractModule implements Configurabl
 	}
 
 	private void onTick(MinecraftClient client) {
+		// The renderer's flag must follow the real module state: a default-on module that a saved
+		// profile turns off at startup never runs onDisable (it was never started), which left
+		// waypoints drawing until the module was toggled on and off by hand.
+		WaypointRenderer.Settings.enabled = isEnabled();
 		// The menu and the "new here" key work even with rendering switched off.
 		while (OPEN_MENU.wasPressed()) {
 			if (ClientCompat.currentScreen() == null) {

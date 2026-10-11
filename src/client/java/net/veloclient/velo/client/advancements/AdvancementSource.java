@@ -148,7 +148,7 @@ public final class AdvancementSource {
 			handler.getAdvancementHandler().selectTab(advancement, true);
 		}
 	}
-	//?} else {
+	//?} else if <26.3 {
 	/*private final net.minecraft.client.multiplayer.ClientAdvancements.Listener listener = new net.minecraft.client.multiplayer.ClientAdvancements.Listener() {
 		@Override
 		public void onAddAdvancementRoot(net.minecraft.advancements.AdvancementNode root) {
@@ -227,6 +227,97 @@ public final class AdvancementSource {
 		var connection = net.minecraft.client.Minecraft.getInstance().getConnection();
 		if (connection != null) {
 			connection.getAdvancements().setListener(listener);
+		}
+	}
+
+	public void detach() {
+		var connection = net.minecraft.client.Minecraft.getInstance().getConnection();
+		if (connection != null) {
+			connection.getAdvancements().setListener(null);
+			connection.send(net.minecraft.network.protocol.game.ServerboundSeenAdvancementsPacket.closedScreen());
+		}
+	}
+
+	public void selectTab(String rootId) {
+		var connection = net.minecraft.client.Minecraft.getInstance().getConnection();
+		Object holder = handles.get(rootId);
+		if (connection != null && holder instanceof net.minecraft.advancements.AdvancementHolder advancement) {
+			connection.getAdvancements().setSelectedTab(advancement, true);
+		}
+	}
+	*///?} else {
+	/*private final net.minecraft.client.multiplayer.ClientAdvancements.Listener listener = new net.minecraft.client.multiplayer.ClientAdvancements.Listener() {
+		@Override
+		public void onAdvancementsUpdated() {
+			rebuild();
+		}
+
+		@Override
+		public void onAdvancementsCleared() {
+			nodes.clear();
+			progress.clear();
+			roots.clear();
+			handles.clear();
+			changed();
+		}
+
+		@Override
+		public void onSelectedTabChanged(net.minecraft.advancements.AdvancementHolder holder) {
+		}
+	};
+
+	// 26.3 only reports "something changed": rebuild from the client's own tree and progress map.
+	private void rebuild() {
+		var connection = net.minecraft.client.Minecraft.getInstance().getConnection();
+		if (connection == null) {
+			return;
+		}
+		var advancements = connection.getAdvancements();
+		nodes.clear();
+		progress.clear();
+		roots.clear();
+		handles.clear();
+		for (var root : advancements.tree().roots()) {
+			add(root);
+		}
+		for (var node : advancements.tree().nodes()) {
+			add(node);
+		}
+		for (var entry : advancements.progress().entrySet()) {
+			var p = entry.getValue();
+			progress.put(entry.getKey().id().toString(), progressOf(p.isDone(), p.getPercent(),
+					list(p.getCompletedCriteria()), list(p.getRemainingCriteria())));
+		}
+		changed();
+	}
+
+	private void add(net.minecraft.advancements.AdvancementNode node) {
+		var display = node.advancement().display();
+		if (display.isEmpty()) {
+			return;
+		}
+		var d = display.get();
+		String id = node.holder().id().toString();
+		String parent = node.parent() == null ? null : node.parent().holder().id().toString();
+		String root = node.root().holder().id().toString();
+		Frame frame = switch (d.type()) {
+			case GOAL -> Frame.GOAL;
+			case CHALLENGE -> Frame.CHALLENGE;
+			default -> Frame.TASK;
+		};
+		nodes.put(id, new Node(id, parent, root, d.title().getString(), d.description().getString(), d.icon().create(), frame,
+				node.x(), node.y()));
+		handles.put(id, node.holder());
+		if (parent == null && !roots.contains(id)) {
+			roots.add(id);
+		}
+	}
+
+	public void attach() {
+		var connection = net.minecraft.client.Minecraft.getInstance().getConnection();
+		if (connection != null) {
+			connection.getAdvancements().setListener(listener);
+			rebuild();
 		}
 	}
 

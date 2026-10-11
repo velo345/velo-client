@@ -18,7 +18,6 @@ import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
 import net.veloclient.velo.client.util.ModuleProfiler;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
@@ -42,7 +41,7 @@ import java.util.List;
 public final class FreeLookModule extends AbstractModule implements Configurable {
 
 	public static final KeyBinding FREE_LOOK_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.free_look", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			"key.velo-client.free_look", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	private static volatile boolean active;
 	private static volatile boolean needsBaseCapture;

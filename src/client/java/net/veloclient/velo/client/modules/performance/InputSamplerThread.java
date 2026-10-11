@@ -1,6 +1,5 @@
 package net.veloclient.velo.client.modules.performance;
 
-import org.lwjgl.glfw.GLFW;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.LockSupport;
@@ -66,10 +65,9 @@ final class InputSamplerThread extends Thread {
 	@Override
 	public void run() {
 		while (running) {
-			long windowHandle = net.minecraft.client.MinecraftClient.getInstance().getWindow().getHandle();
 			try {
-				boolean attackDown = GLFW.glfwGetMouseButton(windowHandle, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS;
-				boolean useDown = GLFW.glfwGetMouseButton(windowHandle, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS;
+				boolean attackDown = net.veloclient.velo.client.util.Keys.isMouseDown(net.veloclient.velo.client.util.Keys.MOUSE_LEFT);
+				boolean useDown = net.veloclient.velo.client.util.Keys.isMouseDown(net.veloclient.velo.client.util.Keys.MOUSE_RIGHT);
 				long now = System.nanoTime();
 				if (attackDown && !attackWasDown) {
 					attackEdges.add(now);

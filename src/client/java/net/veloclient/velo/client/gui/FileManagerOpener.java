@@ -64,6 +64,8 @@ public final class FileManagerOpener {
 					attempts.append(String.join(" ", command)).append(": ").append(t).append("; ");
 				}
 			}
+			// Vanilla's own opener (gone in 26.3).
+			//? if <26.3 {
 			try {
 				Util.getOperatingSystem().open(dir);
 				MinecraftClient.getInstance().execute(() -> onStatus.accept("Opened " + dir.getName() + " - check your taskbar if it's not on top"));
@@ -71,6 +73,7 @@ public final class FileManagerOpener {
 			} catch (Throwable t) {
 				attempts.append("vanilla open: ").append(t).append("; ");
 			}
+			//?}
 			try {
 				java.awt.Desktop.getDesktop().open(dir);
 				MinecraftClient.getInstance().execute(() -> onStatus.accept("Opened " + dir.getName() + " - check your taskbar if it's not on top"));

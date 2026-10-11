@@ -166,6 +166,9 @@ public final class ModuleConfigScreen extends VeloWindow {
 					b -> this.client.setScreen(new net.veloclient.velo.client.gui.VeloColorPickerScreen(
 							this, color.label(), color.get().getAsInt(), color.includeAlpha(), color.set()::accept)));
 		}
+		if (field instanceof ConfigField.HeaderField header) {
+			return new net.veloclient.velo.client.gui.widget.VeloSectionHeader(x, y + 10, width, 14, header.label().toUpperCase(java.util.Locale.ROOT));
+		}
 		if (field instanceof ConfigField.ActionButtonField action) {
 			return new VeloButton(x, y + 3, width, 20, Text.literal(action.label()),
 					b -> action.action().run());
@@ -198,13 +201,13 @@ public final class ModuleConfigScreen extends VeloWindow {
 			// back to whatever was bound before - it's also not captured as
 			// the new key itself, and doesn't fall through to close this
 			// whole settings window.
-			field.onKeyCodeChosen().accept(input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE
-					? org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN : input.key());
+			field.onKeyCodeChosen().accept(input.key() == net.veloclient.velo.client.util.Keys.ESCAPE
+					? net.veloclient.velo.client.util.Keys.UNKNOWN : input.key());
 			layoutContent();
 			return true;
 		}
 		if (awaitingChordRebind != null) {
-			if (input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+			if (input.key() == net.veloclient.velo.client.util.Keys.ESCAPE) {
 				ConfigField.ChordKeybindField field = awaitingChordRebind;
 				awaitingChordRebind = null;
 				chordHeldKeys.clear();

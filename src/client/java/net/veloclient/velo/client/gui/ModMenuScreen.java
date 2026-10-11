@@ -60,7 +60,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 
 	/** Module categories in the order people look for them. */
 	private static final ModuleCategory[] CATEGORY_ORDER = {
-			ModuleCategory.HUD, ModuleCategory.QOL, ModuleCategory.PERFORMANCE, ModuleCategory.RENDERING,
+			ModuleCategory.HUD, ModuleCategory.PVP, ModuleCategory.QOL, ModuleCategory.PERFORMANCE, ModuleCategory.RENDERING,
 			ModuleCategory.COSMETICS, ModuleCategory.SERVER_TOOLS, ModuleCategory.DEBUG};
 	private static final int TOP_BAR = 22;
 
@@ -407,7 +407,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 
 	@Override
 	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
-		if (menuOpen && input.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+		if (menuOpen && input.key() == net.veloclient.velo.client.util.Keys.ESCAPE) {
 			menuOpen = false;
 			return true;
 		}
@@ -429,6 +429,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			case DEBUG -> "debug";
 			case COSMETICS -> "cosmetics";
 			case QOL -> "qol";
+			case PVP -> "pvp";
 		};
 	}
 

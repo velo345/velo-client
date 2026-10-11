@@ -11,7 +11,8 @@ public enum ModuleCategory {
 	SERVER_TOOLS("Server Tools"),
 	DEBUG("Debug"),
 	COSMETICS("Cosmetics"),
-	QOL("Quality of Life");
+	QOL("Quality of Life"),
+	PVP("PvP");
 
 	private final String displayName;
 

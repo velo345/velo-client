@@ -103,7 +103,7 @@ public final class SettingsTabScreen extends VeloWindow {
 	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
 		if (listeningForMenuKey) {
 			listeningForMenuKey = false;
-			if (input.key() != org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+			if (input.key() != net.veloclient.velo.client.util.Keys.ESCAPE) {
 				var key = net.minecraft.client.util.InputUtil.Type.KEYSYM.createFromCode(input.key());
 				//? if <26.1 {
 				net.veloclient.velo.client.keybind.MenuKeySync.set(key.getTranslationKey());

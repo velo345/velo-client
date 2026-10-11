@@ -54,7 +54,7 @@ public final class EnderChestFarmerModule extends AbstractModule implements Conf
 
 	public static final KeyBinding TOGGLE_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.velo-client.ender-chest-farmer-toggle", InputUtil.Type.KEYSYM,
-			org.lwjgl.glfw.GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	private enum Phase { WAITING_AFTER_RTP, SCANNING, NAVIGATING, MINING_OBSTRUCTION, MINING_TARGET, COLLECTING, SELLING, WAITING_FOR_SHOP }
 

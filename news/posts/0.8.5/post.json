@@ -1,0 +1,130 @@
+{
+  "title": "Velo Client 0.8.5: The PvP Update",
+  "summary": "A new PvP tab with 1.8 animations, Hit Color, Cooldowns, enemy health/effects/hunger above heads and more - plus Anti Farm Lag, 26.3 support and big crash & memory fixes.",
+  "tag": "Update",
+  "version": "0.8.5",
+  "accent": "#ff4444",
+  "pinned": true,
+  "cover": "file:images/cover.jpg",
+  "blocks": [
+    {
+      "type": "text",
+      "text": "0.8.5 is all about **PvP** - a whole new PvP tab with 1.8 animations, hit colors, cooldown timers, enemy info above heads and more - plus a lot of fixes for crashes and memory problems you reported. Thanks for every bug report!"
+    },
+    {
+      "type": "heading",
+      "text": "A new PvP tab"
+    },
+    {
+      "type": "text",
+      "text": "Everything fight-related now lives in its own **PvP** tab: the new modules below, plus FOV, Totem Counter, Attack Indicator and Custom Crosshair."
+    },
+    {
+      "type": "heading",
+      "text": "1.7 / 1.8 animations"
+    },
+    {
+      "type": "text",
+      "text": "**Old Animations** brings back the feel of old PvP: no more hand dropping after every hit, the classic **sword-blocking** pose (with a shield in your off hand, or just holding right click), **block-hitting** - your arm keeps swinging while you eat or block - the old fishing rod and bow positions, adjustable swing speed and the classic hurt camera shake. Every part can be switched on its own."
+    },
+    {
+      "type": "callout",
+      "style": "info",
+      "text": "Want your items somewhere else? **Item Position** moves, rotates and resizes each hand, can lower your shield and can swap which side each hand is drawn on."
+    },
+    {
+      "type": "heading",
+      "text": "Hit Color, Hit Particles & Hit Sounds"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Hit Color** - pick the hurt flash color and strength separately for players, hostile mobs, passive mobs and yourself. It now tints **armor and armor trims** too, like 1.8 did.",
+        "**Hit Particles** - a different look for normal hits and crits: crit sparks, sharpness stars, blood, hearts, flames and more.",
+        "**Hit Sounds** - a sound only you hear when your hits land, with a separate crit sound and rising pitch for combos."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "See what your enemy has"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Health Indicator** - hearts above other players. On servers that already show health under names (like PvP servers) it steps aside and uses theirs.",
+        "**Enemy Effects** - their potion effects with roughly how long they have left. Exact when you saw them drink, eat a golden apple, get splashed or pop a totem.",
+        "**Enemy Hunger** - an estimate of their hunger and saturation, from how much they sprint, jump, fight and eat.",
+        "**Damage Numbers** - how much damage each hit did, right above their name.",
+        "**Target HUD** - a card for the player you're fighting: health, armor, distance and whether you're winning."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Cooldowns & reach"
+    },
+    {
+      "type": "text",
+      "text": "**Cooldowns** shows every item cooldown - ender pearls, wind charges, a disabled shield - as its icon with a circular timer (Ring, Icon Fill, Pie or Bar style, seconds optional). **Reach Display** draws a red circle on the ground at exactly your reach: it turns green when someone is in range."
+    },
+    {
+      "type": "heading",
+      "text": "More PvP modules"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Combo Counter**, **Pot Counter** and **Arrow Counter**",
+        "**Low Health Warning** - a pulsing red glow and heartbeat when you're low",
+        "**Height Limit** - blocks left to the build limit and the void, for Bed Wars and SkyWars",
+        "**Direction** - a compass strip at the top of the screen",
+        "**Low Fire** - lowers the fire overlay (or hides it with Fire Resistance)",
+        "**Auto GG** - says gg when a minigame ends"
+      ]
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "text": "Anti Farm Lag"
+    },
+    {
+      "type": "text",
+      "text": "Big redstone farms no longer tank your FPS. **Anti Farm Lag** (on by default) notices when redstone is actually running around you and draws it lighter - busy sections update a few times a second instead of every tick, far pistons skip their slide, item stacks draw one model and particle/sound spam is capped. Farms keep working exactly as before. It also has a **redstone sound volume** slider. Works with Sodium too."
+    },
+    {
+      "type": "heading",
+      "text": "Fewer crashes, better memory"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Automatic RAM is rebuilt**: the game no longer grabs all of its memory at startup, uses safe amounts for your PC, learns from your recent sessions and never goes so low that it runs out.",
+        "If memory still gets tight, Velo now **lowers render distance** for you instead of crashing.",
+        "Fixed a crash on launch with mods like **YACL** (newer Fabric Loader).",
+        "The launcher now **downloads the right Java** if yours is too old.",
+        "Fixed a font crash and several memory leaks (animated capes, store images)."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Also new"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Minecraft 26.3** support",
+        "**Auto graphics** preset in Performance Boost that adjusts quality to your FPS - new installs start on High Quality",
+        "**Better F3**: a new Vanilla Style, and F3+B / F3+G also toggle Velo's hitboxes and chunk borders",
+        "**Teleport to waypoints** from the waypoint list or the world map when you're allowed to use /tp",
+        "Server buttons in the pause menu (Server Links, Custom Options) now fit the Velo menu",
+        "Fixed waypoints showing when the module was off, and F3 flipping twice in the HUD editor"
+      ]
+    },
+    {
+      "type": "callout",
+      "style": "info",
+      "text": "Found a bug? Use **Report a bug** in the pause menu - it sends us everything we need in one click."
+    }
+  ]
+}

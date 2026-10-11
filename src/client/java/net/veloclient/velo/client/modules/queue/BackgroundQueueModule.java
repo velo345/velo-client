@@ -23,7 +23,6 @@ import net.veloclient.velo.module.ConfigField;
 import net.veloclient.velo.module.Configurable;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,9 +39,9 @@ import java.util.List;
 public final class BackgroundQueueModule extends AbstractModule implements Configurable, HudModule {
 
 	public static final KeyBinding OPEN_MENU = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.queue_menu", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_J, VeloKeybinds.CATEGORY));
+			"key.velo-client.queue_menu", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.J, VeloKeybinds.CATEGORY));
 	public static final KeyBinding QUICK_SWITCH = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.queue_switch", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, VeloKeybinds.CATEGORY));
+			"key.velo-client.queue_switch", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	private static final List<String> CHAT_MIRROR_OPTIONS = List.of("All sessions", "Peeked session only", "Off");
 
