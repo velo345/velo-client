@@ -41,6 +41,9 @@ public final class Keys {
 	public static final int RIGHT = InputConstants.KEY_RIGHT;
 	public static final int F3 = InputConstants.KEY_F3;
 	public static final int F10 = InputConstants.KEY_F10;
+	public static final int F8 = InputConstants.KEY_F8;
+	public static final int K = InputConstants.KEY_K;
+	public static final int V = InputConstants.KEY_V;
 	public static final int B = InputConstants.KEY_B;
 	public static final int C = InputConstants.KEY_C;
 	public static final int E = InputConstants.KEY_E;
@@ -79,6 +82,9 @@ public final class Keys {
 	public static final int RIGHT = GLFW.GLFW_KEY_RIGHT;
 	public static final int F3 = GLFW.GLFW_KEY_F3;
 	public static final int F10 = GLFW.GLFW_KEY_F10;
+	public static final int F8 = GLFW.GLFW_KEY_F8;
+	public static final int K = GLFW.GLFW_KEY_K;
+	public static final int V = GLFW.GLFW_KEY_V;
 	public static final int B = GLFW.GLFW_KEY_B;
 	public static final int C = GLFW.GLFW_KEY_C;
 	public static final int E = GLFW.GLFW_KEY_E;

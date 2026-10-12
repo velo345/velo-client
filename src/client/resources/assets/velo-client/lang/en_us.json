@@ -8,5 +8,7 @@
 	"key.velo-client.add_waypoint": "Add Waypoint (old)",
 	"key.velo-client.queue_menu": "Open Background Queue",
 	"key.velo-client.queue_switch": "Background Queue: Switch / Send to Background",
-	"key.category.velo-client.general": "Velo Client"
+	"key.category.velo-client.general": "Velo Client",
+	"key.velo-client.save_clip": "Save Clip",
+	"key.velo-client.fight_recap": "Open Fight Recap"
 }

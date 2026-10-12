@@ -60,6 +60,7 @@
 		"VulkanDeviceCloseMixin",
 		"VulkanDrawStateMixin",
 		"VulkanFrameProfileMixin",
+		"ClipCaptureMixin",
 		"VulkanPipelineCacheMixin",
 		"VulkanRenderProfileMixin",
 		"VulkanShaderCacheMixin",

@@ -200,7 +200,11 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 				new MenuSection("Explore", List.of(
 						new MenuItem("map", "World Map", "Everywhere you've explored  (M)",
 								() -> this.client.setScreen(new net.veloclient.velo.client.worldmap.WorldMapScreen(this))),
-						new MenuItem("waypoints", "Waypoints", "Saved places and death points", () -> this.client.setScreen(new WaypointsScreen(this))))),
+						new MenuItem("waypoints", "Waypoints", "Saved places and death points", () -> this.client.setScreen(new WaypointsScreen(this))),
+						new MenuItem("clips", "Clips & Screenshots", "Watch your clips and screenshots",
+								() -> this.client.setScreen(new net.veloclient.velo.client.gui.media.MediaScreen(this))),
+						new MenuItem("fight_recap", "Fight Recap", "Your last fights, hit by hit  (K)",
+								() -> this.client.setScreen(new net.veloclient.velo.client.gui.media.FightRecapScreen(this))))),
 				new MenuSection("Your look", List.of(
 						new MenuItem("capes", "Capes & Store", "Your capes and the Velo Store", () -> this.client.setScreen(new CapeEquipScreen(this))),
 						new MenuItem("skins", "Skins", "Switch your Minecraft skin", () -> this.client.setScreen(new VeloSkinsScreen(this))))),

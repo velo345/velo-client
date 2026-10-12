@@ -89,10 +89,12 @@ public final class VeloClientMod implements ClientModInitializer {
 				net.veloclient.velo.client.util.HeapPressureGuard::tick);
 		// PvP trackers and Anti Farm Lag (each does nothing while its modules are off).
 		net.veloclient.velo.client.pvp.CombatTracker.register();
+		net.veloclient.velo.client.pvp.FightTracker.register();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.START_CLIENT_TICK.register(
 				client -> net.veloclient.velo.client.modules.pvp.OldAnimationsModule.tick());
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			net.veloclient.velo.client.pvp.CombatTracker.tick();
+			net.veloclient.velo.client.pvp.FightTracker.tick();
 			net.veloclient.velo.client.pvp.EnemyTracker.tick();
 			net.veloclient.velo.client.modules.performance.AntiFarmLagModule.tickAll();
 			net.veloclient.velo.client.modules.pvp.HitColorModule.tickAll();
@@ -231,6 +233,8 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.ArrowCounterModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.LowHealthWarningModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.LowFireModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.FightRecapModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.ClipsModule());
 		// HUD / QoL (section 6.2)
 		ModuleRegistry.register(new FpsCounterModule());
 		ModuleRegistry.register(new PingDisplayModule());
