@@ -102,6 +102,13 @@ public final class CrashReportDialog {
 		message.setPrefRowCount(3);
 		CheckBox includeLog = new CheckBox("Include the crash report and game log (recommended)");
 		includeLog.setSelected(true);
+		CheckBox autoSend = new CheckBox("Send crash reports automatically from now on");
+		autoSend.setSelected(net.veloclient.launcher.data.LauncherSettings.get().crashTelemetry);
+		autoSend.setOnAction(e -> {
+			var settings = net.veloclient.launcher.data.LauncherSettings.get();
+			settings.crashTelemetry = autoSend.isSelected();
+			net.veloclient.launcher.data.LauncherSettings.save(settings);
+		});
 
 		Map<String, String> system = system(instance, exitCode);
 		List<String> mods = mods(instance);
@@ -143,7 +150,8 @@ public final class CrashReportDialog {
 
 		String crashText = crash;
 		String logText = log;
-		send.setOnAction(e -> {
+		boolean[] sentOnce = {false};
+		java.util.function.Supplier<JsonObject> buildReport = () -> {
 			JsonObject report = new JsonObject();
 			report.addProperty("kind", "crash");
 			report.addProperty("source", "launcher");
@@ -159,6 +167,11 @@ public final class CrashReportDialog {
 				report.addProperty("crash", crashText);
 				report.addProperty("log", logText);
 			}
+			return report;
+		};
+		send.setOnAction(e -> {
+			JsonObject report = buildReport.get();
+			sentOnce[0] = true;
 			send.setDisable(true);
 			status.setText("Sending...");
 			NewsView.run(() -> NewsApi.sendReport(report), id -> {
@@ -166,17 +179,35 @@ public final class CrashReportDialog {
 				send.setText("Sent");
 				markHandled(instance, crashFile);
 			}, error -> {
+				sentOnce[0] = false;
 				send.setDisable(false);
 				status.setText("Couldn't send it: " + error);
 			});
 		});
 
-		VBox root = new VBox(14, header, askLabel, message, includeLog, what, actions, status);
+		VBox root = new VBox(14, header, askLabel, message, new VBox(6, includeLog, autoSend), what, actions, status);
 		root.setPadding(new Insets(6));
 		root.setPrefWidth(560);
 		root.getStyleClass().add("crash-dialog");
 		dialog.getDialogPane().setContent(root);
-		dialog.setOnHidden(e -> markHandled(instance, crashFile));
+		dialog.setOnHidden(e -> {
+			markHandled(instance, crashFile);
+			// Opt-in telemetry: closing without pressing Send still reports it, grouped by cause on
+			// the server with every other report of the same crash.
+			if (!sentOnce[0] && net.veloclient.launcher.data.LauncherSettings.get().crashTelemetry) {
+				JsonObject report = buildReport.get();
+				report.addProperty("auto", true);
+				Thread thread = new Thread(() -> {
+					try {
+						NewsApi.sendReport(report);
+					} catch (Exception ex) {
+						net.veloclient.launcher.LauncherLog.info("Automatic crash report not sent: " + ex);
+					}
+				}, "velo-crash-telemetry");
+				thread.setDaemon(true);
+				thread.start();
+			}
+		});
 		dialog.show();
 	}
 

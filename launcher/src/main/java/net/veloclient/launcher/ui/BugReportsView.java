@@ -62,7 +62,7 @@ final class BugReportsView {
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		ComboBox<String> filter = new ComboBox<>();
-		filter.getItems().addAll("Open", "All", "Crashes", "Bugs", "Fixed");
+		filter.getItems().addAll("Open", "Grouped by cause", "All", "Crashes", "Bugs", "Fixed");
 		filter.setValue("Open");
 		Button refresh = new Button("Refresh");
 		refresh.getStyleClass().add("glass-button");
@@ -86,9 +86,14 @@ final class BugReportsView {
 		List<JsonObject> all = new ArrayList<>();
 		Runnable[] render = new Runnable[1];
 		Runnable[] load = new Runnable[1];
+		String[] openGroup = {null};
 		render[0] = () -> {
 			list.getChildren().clear();
 			String f = filter.getValue();
+			if ("Grouped by cause".equals(f)) {
+				renderGroups(host, list, detail, all, openGroup, render[0], load[0]);
+				return;
+			}
 			int shown = 0;
 			for (JsonObject r : all) {
 				String status = NewsUi.str(r, "status");
@@ -121,6 +126,101 @@ final class BugReportsView {
 		exportOpen.setOnAction(e -> exportOpen(host, all, exportOpen));
 		load[0].run();
 		return new VBox(14, top, body);
+	}
+
+	/**
+	 * Reports clustered by cause (the server's {@code group}: same root exception and top stack
+	 * frames, or the same title), biggest open group first. Opening a group lists its reports and
+	 * offers to mark the whole group fixed at once.
+	 */
+	private static void renderGroups(NewsView.Host host, VBox list, StackPane detail, List<JsonObject> all, String[] openGroup,
+			Runnable rerender, Runnable reload) {
+		java.util.Map<String, List<JsonObject>> groups = new java.util.LinkedHashMap<>();
+		for (JsonObject r : all) {
+			String group = NewsUi.str(r, "group");
+			groups.computeIfAbsent(group == null ? NewsUi.str(r, "id") : group, k -> new ArrayList<>()).add(r);
+		}
+		if (openGroup[0] != null && groups.containsKey(openGroup[0])) {
+			List<JsonObject> members = groups.get(openGroup[0]);
+			Button back = new Button("←  All groups");
+			back.getStyleClass().add("ghost-button");
+			back.setOnAction(e -> {
+				openGroup[0] = null;
+				rerender.run();
+			});
+			Button fixAll = new Button("Mark group fixed");
+			fixAll.getStyleClass().add("glass-button");
+			fixAll.setOnAction(e -> {
+				fixAll.setDisable(true);
+				NewsView.run(() -> {
+					for (JsonObject r : members) {
+						String status = NewsUi.str(r, "status");
+						if (!"fixed".equals(status) && !"wontfix".equals(status)) {
+							NewsApi.reportStatus(NewsUi.str(r, "id"), "fixed");
+						}
+					}
+					return null;
+				}, done -> reload.run(), error -> fixAll.setDisable(false));
+			});
+			Region spacer = new Region();
+			HBox.setHgrow(spacer, Priority.ALWAYS);
+			HBox bar = new HBox(8, back, spacer, fixAll);
+			bar.setAlignment(Pos.CENTER_LEFT);
+			list.getChildren().add(bar);
+			for (JsonObject r : members) {
+				list.getChildren().add(row(r, () -> openReport(host, detail, r, reload)));
+			}
+			return;
+		}
+		openGroup[0] = null;
+		List<java.util.Map.Entry<String, List<JsonObject>>> sorted = new ArrayList<>(groups.entrySet());
+		sorted.sort(java.util.Comparator.comparingLong((java.util.Map.Entry<String, List<JsonObject>> e) -> -openCount(e.getValue()))
+				.thenComparingLong(e -> -e.getValue().size()));
+		for (var entry : sorted) {
+			List<JsonObject> members = entry.getValue();
+			JsonObject first = members.get(0);
+			long open = openCount(members);
+			long players = members.stream().map(r -> NewsUi.str(r, "username")).filter(java.util.Objects::nonNull).distinct().count();
+			java.util.Set<String> versions = new java.util.TreeSet<>();
+			for (JsonObject r : members) {
+				String v = NewsUi.str(r, "version");
+				if (v != null) {
+					versions.add(v);
+				}
+			}
+			boolean crash = "crash".equals(NewsUi.str(first, "kind"));
+			Label kind = new Label(crash ? "CRASH" : "BUG");
+			kind.getStyleClass().addAll("news-tag", crash ? "report-kind-crash" : "report-kind-bug");
+			Label count = new Label(members.size() + (members.size() == 1 ? " report" : " reports"));
+			count.getStyleClass().addAll("news-tag", open > 0 ? "report-status-new" : "report-status-fixed");
+			Region spacer = new Region();
+			HBox.setHgrow(spacer, Priority.ALWAYS);
+			Label when = new Label(NewsUi.date(NewsUi.num(first, "createdAt")));
+			when.getStyleClass().add("news-card-date");
+			HBox top = new HBox(6, kind, count, spacer, when);
+			top.setAlignment(Pos.CENTER_LEFT);
+			String label = NewsUi.str(first, "groupLabel");
+			Label title = new Label(label == null || label.isBlank() ? NewsUi.str(first, "title") : label);
+			title.getStyleClass().add("news-card-title");
+			title.setWrapText(true);
+			Label meta = new Label(open + " open  ·  " + players + (players == 1 ? " player" : " players")
+					+ (versions.isEmpty() ? "" : "  ·  Velo " + String.join(", ", versions)));
+			meta.getStyleClass().add("news-card-date");
+			VBox card = new VBox(6, top, title, meta);
+			card.getStyleClass().add("report-row");
+			card.setOnMouseClicked(e -> {
+				openGroup[0] = entry.getKey();
+				rerender.run();
+			});
+			list.getChildren().add(card);
+		}
+		if (groups.isEmpty()) {
+			list.getChildren().add(hint("No reports yet."));
+		}
+	}
+
+	private static long openCount(List<JsonObject> reports) {
+		return reports.stream().map(r -> NewsUi.str(r, "status")).filter(s -> s == null || "new".equals(s) || "seen".equals(s)).count();
 	}
 
 	/**
@@ -205,7 +305,8 @@ final class BugReportsView {
 		String version = NewsUi.str(r, "version");
 		String mc = NewsUi.str(r, "minecraft");
 		Label meta = new Label((who == null ? "Anonymous" : who) + "  ·  " + NewsUi.str(r, "source")
-				+ (version != null ? "  ·  Velo " + version : "") + (mc != null ? "  ·  MC " + mc : ""));
+				+ (version != null ? "  ·  Velo " + version : "") + (mc != null ? "  ·  MC " + mc : "")
+				+ (r.has("auto") && r.get("auto").getAsBoolean() ? "  ·  auto" : ""));
 		meta.getStyleClass().add("news-card-date");
 		VBox card = new VBox(6, top, title, meta);
 		card.getStyleClass().add("report-row");

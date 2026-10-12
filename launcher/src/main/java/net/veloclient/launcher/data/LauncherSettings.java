@@ -38,6 +38,8 @@ public final class LauncherSettings {
 		public long newsSeenAt;
 		/** Crash reports already offered/sent (file names), so a crash is only brought up once. */
 		public java.util.List<String> handledCrashes = new java.util.ArrayList<>();
+		/** Opt-in: send crash reports (crash report, log, mods, system) automatically, no dialog click needed. */
+		public boolean crashTelemetry;
 		/** System check kinds (finding titles) that no longer interrupt a launch. */
 		public java.util.List<String> silencedChecks = new java.util.ArrayList<>();
 	}

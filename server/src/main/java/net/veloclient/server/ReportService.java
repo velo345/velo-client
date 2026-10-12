@@ -47,10 +47,17 @@ final class ReportService {
 		/** new, seen, fixed, wontfix. */
 		String status = "new";
 		String note;
+		/** Sent automatically (opt-in crash telemetry) rather than by the player pressing Send. */
+		boolean auto;
 	}
 
+	/**
+	 * {@code group} clusters reports with the same cause (same root exception and top frames of
+	 * the stack, or the same normalized title when there's no stack trace); {@code groupLabel} is a
+	 * short readable name for it.
+	 */
 	record Summary(String id, long createdAt, String kind, String source, String username, String title, String message, String status,
-			String version, String minecraft) {
+			String version, String minecraft, String group, String groupLabel, boolean auto) {
 	}
 
 	private final Path dir;
@@ -86,6 +93,7 @@ final class ReportService {
 		report.modules = incoming.modules;
 		report.log = tail(incoming.log);
 		report.crash = clip(incoming.crash, MAX_LOG_CHARS);
+		report.auto = incoming.auto;
 		write(report);
 		index.put(report.id, summary(report));
 		return report.id;
@@ -146,7 +154,76 @@ final class ReportService {
 		String version = r.system == null ? null : r.system.get("Velo Client");
 		String minecraft = r.system == null ? null : r.system.get("Minecraft");
 		String message = r.message == null ? "" : r.message.length() > 160 ? r.message.substring(0, 160) + "..." : r.message;
-		return new Summary(r.id, r.createdAt, r.kind, r.source, r.username, r.title, message, r.status, version, minecraft);
+		String[] signature = signature(r);
+		return new Summary(r.id, r.createdAt, r.kind, r.source, r.username, r.title, message, r.status, version, minecraft,
+				signature[0], signature[1], r.auto);
+	}
+
+	private static final java.util.regex.Pattern EXCEPTION = java.util.regex.Pattern.compile(
+			"^(?:Caused by: )?((?:[a-zA-Z_$][\\w$]*\\.)+[A-Z][\\w$]*(?:Exception|Error|Throwable))(?::.*)?$");
+	private static final java.util.regex.Pattern FRAME = java.util.regex.Pattern.compile("^\\s*at\\s+([\\w$.<>/]+)\\(");
+
+	/**
+	 * {@code [groupId, label]}. The root cause (the last "Caused by") plus its first three frames
+	 * outside the JDK, with line numbers, lambda/mixin-handler counters and the "Caused by" chain
+	 * above it ignored - so the same bug lands in one group across versions and players.
+	 */
+	static String[] signature(Report r) {
+		String text = r.crash != null ? r.crash : "crash".equals(r.kind) ? r.log : null;
+		if (text != null) {
+			String exception = null;
+			List<String> frames = new java.util.ArrayList<>();
+			List<String> current = new java.util.ArrayList<>();
+			for (String raw : text.split("\\R")) {
+				String line = raw.strip();
+				if (line.startsWith("A detailed walkthrough of the error")) {
+					break; // Minecraft crash reports repeat the stack below; the first one is the real one.
+				}
+				var ex = EXCEPTION.matcher(line);
+				if (ex.matches()) {
+					exception = ex.group(1);
+					current = new java.util.ArrayList<>();
+					frames = current;
+					continue;
+				}
+				var frame = FRAME.matcher(raw);
+				if (exception != null && frame.find() && current.size() < 3) {
+					String method = frame.group(1);
+					if (method.startsWith("java.") || method.startsWith("jdk.") || method.startsWith("sun.")) {
+						continue;
+					}
+					current.add(method.replaceAll("\\$lambda\\$\\w*\\$\\d+", "\\$lambda")
+							.replaceAll("\\$[a-z]{3}\\d{3}\\$", "\\$")
+							.replaceAll("\\$\\d+", "\\$"));
+				}
+			}
+			if (exception != null) {
+				String key = exception + "|" + String.join("|", frames);
+				String shortEx = exception.substring(exception.lastIndexOf('.') + 1);
+				String top = frames.isEmpty() ? "" : " at " + shortName(frames.get(0));
+				return new String[] {hash(key), shortEx + top};
+			}
+		}
+		String title = r.title != null && !r.title.isBlank() ? r.title : r.message != null ? r.message : "";
+		String normalized = title.toLowerCase(java.util.Locale.ROOT).replaceAll("0x[0-9a-f]+|\\d+", "#").replaceAll("\\s+", " ").strip();
+		String label = title.length() > 80 ? title.substring(0, 80) + "..." : title;
+		return new String[] {hash(r.kind + "|" + normalized), label.isBlank() ? "(no title)" : label};
+	}
+
+	/** "net.veloclient.velo.client.Foo.bar" -> "Foo.bar". */
+	private static String shortName(String method) {
+		int dot = method.lastIndexOf('.');
+		int classDot = dot > 0 ? method.lastIndexOf('.', dot - 1) : -1;
+		return classDot >= 0 ? method.substring(classDot + 1) : method;
+	}
+
+	private static String hash(String key) {
+		try {
+			byte[] digest = java.security.MessageDigest.getInstance("SHA-1").digest(key.getBytes(StandardCharsets.UTF_8));
+			return java.util.HexFormat.of().formatHex(digest).substring(0, 10);
+		} catch (java.security.NoSuchAlgorithmException e) {
+			return Integer.toHexString(key.hashCode());
+		}
 	}
 
 	private static String clip(String text, int max) {

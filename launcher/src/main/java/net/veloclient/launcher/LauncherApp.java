@@ -2687,6 +2687,17 @@ public final class LauncherApp extends Application {
 				net.veloclient.launcher.launch.SystemHealth.check(null)));
 		net.veloclient.launcher.ui.SettingsUi.row(updates, "System check", "Memory, swap, disk space and other games - also runs before every launch",
 				"Checks the usual causes of freezes and crashes on start. Before a launch only real problems interrupt you.", systemCheck);
+		javafx.scene.control.CheckBox telemetry = new javafx.scene.control.CheckBox();
+		telemetry.setSelected(net.veloclient.launcher.data.LauncherSettings.get().crashTelemetry);
+		telemetry.setOnAction(e -> {
+			net.veloclient.launcher.data.LauncherSettings.Data data = net.veloclient.launcher.data.LauncherSettings.get();
+			data.crashTelemetry = telemetry.isSelected();
+			net.veloclient.launcher.data.LauncherSettings.save(data);
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(updates, "Automatic crash reports", "Off by default - helps us find the crashes hitting the most players",
+				"When the game crashes, the crash report, game log, mod list and system info (OS, RAM, GPU, versions) are sent"
+						+ " to the Velo team without you pressing Send. Reports of the same crash are grouped so we fix the biggest ones first."
+						+ " No worlds, screenshots or chat beyond what's in the log.", telemetry);
 		content.getChildren().add(updates);
 		content.getChildren().addAll(net.veloclient.launcher.ui.PerformanceSettingsView.build(theme));
 
