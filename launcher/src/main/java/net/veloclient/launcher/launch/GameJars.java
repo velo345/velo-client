@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Stream;
 
 /**
@@ -17,7 +18,8 @@ import java.util.stream.Stream;
  * {@code bundleGameJars} task, which copies each version's built jar from
  * {@code versions/<version>/build/libs/} into
  * {@code net/veloclient/launcher/gamejars/<version>.jar}), so the launcher
- * stays self-contained and never needs to download or locate it elsewhere.
+ * works fully offline. Newer jars fetched by the in-launcher updater
+ * ({@link UpdateService}) take precedence over the bundled ones.
  */
 public final class GameJars {
 
@@ -54,8 +56,12 @@ public final class GameJars {
 	public static void installInto(Path modsDir, GameVersion version) {
 		try {
 			Files.createDirectories(modsDir);
-			String resourcePath = "/net/veloclient/launcher/gamejars/" + version.id() + ".jar";
-			byte[] bundled = readResource(resourcePath);
+			byte[] bundled = currentBytes(version.id());
+			if (bundled == null) {
+				throw new IllegalStateException("No bundled velo-client jar for Minecraft " + version.id()
+						+ " (was the launcher built with ./gradlew :launcher:build?)");
+			}
+			installAddons(modsDir, version);
 			Path dest = modsDir.resolve("velo-client-" + version.id() + ".jar");
 			if (Files.exists(dest) && Arrays.equals(bundled, Files.readAllBytes(dest))) {
 				return;
@@ -81,13 +87,64 @@ public final class GameJars {
 		}
 	}
 
-	private static byte[] readResource(String resourcePath) throws IOException {
-		try (InputStream in = GameJars.class.getResourceAsStream(resourcePath)) {
-			if (in == null) {
-				throw new IllegalStateException("No bundled velo-client jar for this Minecraft version"
-						+ " (missing " + resourcePath + " - was the launcher built with ./gradlew :launcher:build?)");
+	/**
+	 * The jar that would be installed for {@code key} ({@code "26.2"} or {@code "26.2-addons"}): a
+	 * newer one the in-launcher updater downloaded (see {@link UpdateService}) if there is one for
+	 * this launcher's version or later, else the copy bundled into the launcher. Null if neither.
+	 */
+	static byte[] currentBytes(String key) throws IOException {
+		Path cached = UpdateService.gameJarsDir().resolve(key + ".jar");
+		if (Files.exists(cached) && cacheIsCurrent()) {
+			return Files.readAllBytes(cached);
+		}
+		try (InputStream in = GameJars.class.getResourceAsStream("/net/veloclient/launcher/gamejars/" + key + ".jar")) {
+			return in == null ? null : in.readAllBytes();
+		}
+	}
+
+	/** Downloaded jars from an older release than this launcher (it was updated since) are ignored. */
+	private static boolean cacheIsCurrent() {
+		Path props = UpdateService.gameJarsDir().resolve("cache.properties");
+		try (var reader = Files.newBufferedReader(props)) {
+			java.util.Properties p = new java.util.Properties();
+			p.load(reader);
+			String version = p.getProperty("version", "0");
+			return UpdateService.compare(version, net.veloclient.launcher.AppVersion.VERSION) >= 0;
+		} catch (IOException e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Keeps an installed "Velo Client Addons" jar on the current build: if the profile has one
+	 * (enabled or {@code .jar.disabled}), it's replaced with the current addons jar, keeping its
+	 * enabled/disabled state. Profiles without addons are left alone - addons stay opt-in.
+	 */
+	private static void installAddons(Path modsDir, GameVersion version) {
+		try (Stream<Path> existing = Files.list(modsDir)) {
+			List<Path> installed = existing.filter(GameJars::isAddonsJar).toList();
+			if (installed.isEmpty()) {
+				return;
 			}
-			return in.readAllBytes();
+			byte[] current = currentBytes(version.id() + "-addons");
+			if (current == null) {
+				return;
+			}
+			boolean disabled = installed.stream().allMatch(p -> p.getFileName().toString().endsWith(".disabled"));
+			Path dest = modsDir.resolve("velo-addons-" + version.id() + ".jar" + (disabled ? ".disabled" : ""));
+			if (installed.size() == 1 && installed.get(0).equals(dest) && Arrays.equals(current, Files.readAllBytes(dest))) {
+				return;
+			}
+			for (Path file : installed) {
+				try {
+					Files.delete(file);
+				} catch (IOException e) {
+					LauncherLog.warn("Couldn't remove old addons jar " + file.getFileName(), e);
+				}
+			}
+			Files.write(dest, current, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+		} catch (IOException e) {
+			LauncherLog.warn("Couldn't update the Velo Client Addons jar in " + modsDir, e);
 		}
 	}
 

@@ -429,6 +429,21 @@ public final class LauncherApp extends Application {
 		VBox.setVgrow(extrasScroll, Priority.ALWAYS);
 		sidebar.getChildren().add(extrasScroll);
 
+		// Shown once a background check finds a newer build (see checkForUpdates).
+		updateButton = new Button("Update available");
+		updateButton.getStyleClass().add("primary-button");
+		updateButton.setMaxWidth(Double.MAX_VALUE);
+		updateButton.setVisible(false);
+		updateButton.setManaged(false);
+		updateButton.setOnAction(e -> {
+			if (availableUpdate != null) {
+				net.veloclient.launcher.ui.UpdateDialog.show(stage, availableUpdate);
+			}
+		});
+		VBox.setMargin(updateButton, new Insets(0, 0, 6, 0));
+		sidebar.getChildren().add(updateButton);
+		checkForUpdates(null);
+
 		// The Microsoft account switcher, pinned to the very bottom of the
 		// sidebar (Discord/Spotify-style) - previously a floating badge in
 		// the bottom-left corner of the Home screen itself, moved here so
@@ -2468,6 +2483,17 @@ public final class LauncherApp extends Application {
 
 	/** @param quickPlayTarget nullable "host:port" - when present, launches straight into that server (My Servers' Connect). */
 	private void launchWithProgress(Instance instance, String quickPlayTarget, Button triggerButton, ProgressBar progressBar, Label statusLabel) {
+		// Quick system check (memory, swap, disk, other games running) - only real problems interrupt.
+		if (System.getProperty("velo.launcherTour") == null) {
+			try {
+				var warnings = net.veloclient.launcher.launch.SystemHealth.warnings(net.veloclient.launcher.launch.SystemHealth.check(instance));
+				if (!warnings.isEmpty() && !net.veloclient.launcher.ui.SystemCheckDialog.confirmLaunch(stage, warnings)) {
+					return;
+				}
+			} catch (RuntimeException e) {
+				LauncherLog.warn("System check failed - launching anyway", e);
+			}
+		}
 		// Refreshes velo-client's own jar from whatever is bundled in THIS
 		// running launcher build before every single launch (cheap local
 		// file copy, no network - see GameJars) - otherwise a profile
@@ -2591,12 +2617,77 @@ public final class LauncherApp extends Application {
 
 	// ---- Settings ----
 
+	private Button updateButton;
+	private net.veloclient.launcher.launch.UpdateService.Release availableUpdate;
+
+	/**
+	 * Asks GitHub for the latest release in the background. Reveals the sidebar's "Update available"
+	 * button when there's something new; {@code status} (nullable) is the Settings row to report into.
+	 */
+	private void checkForUpdates(Label status) {
+		if (System.getProperty("velo.launcherTour") != null) {
+			return;
+		}
+		if (status != null) {
+			status.setText("Checking...");
+		}
+		Thread thread = new Thread(() -> {
+			try {
+				var release = net.veloclient.launcher.launch.UpdateService.check();
+				javafx.application.Platform.runLater(() -> {
+					availableUpdate = release.anything() ? release : null;
+					if (updateButton != null) {
+						updateButton.setText(release.launcherNewer() ? "Update to v" + release.version() : "Mod update available");
+						updateButton.setVisible(availableUpdate != null);
+						updateButton.setManaged(availableUpdate != null);
+					}
+					if (status != null) {
+						status.setText(availableUpdate == null ? "You're up to date (v" + AppVersion.VERSION + ")"
+								: release.launcherNewer() ? "Version " + release.version() + " is available" : "A newer mod build is available");
+						if (availableUpdate != null) {
+							net.veloclient.launcher.ui.UpdateDialog.show(stage, availableUpdate);
+						}
+					}
+				});
+			} catch (Exception e) {
+				LauncherLog.info("Update check failed: " + e);
+				if (status != null) {
+					javafx.application.Platform.runLater(() -> status.setText("Couldn't reach GitHub - try again later"));
+				}
+			}
+		}, "velo-update-check");
+		thread.setDaemon(true);
+		thread.start();
+	}
+
 	private void showSettings() {
 		currentPage = this::showSettings;
 		Label heading = new Label("Settings");
 		heading.getStyleClass().add("page-title");
 
 		VBox content = new VBox(16);
+		VBox updates = net.veloclient.launcher.ui.SettingsUi.card("Updates & system");
+		Label updateStatus = new Label(availableUpdate != null ? "Version " + availableUpdate.version() + " is available"
+				: "Installed: v" + AppVersion.VERSION);
+		updateStatus.getStyleClass().add("settings-row-hint");
+		Button checkButton = new Button(availableUpdate != null ? "Update" : "Check for updates");
+		checkButton.getStyleClass().add("primary-button");
+		checkButton.setOnAction(e -> {
+			if (availableUpdate != null) {
+				net.veloclient.launcher.ui.UpdateDialog.show(stage, availableUpdate);
+			} else {
+				checkForUpdates(updateStatus);
+			}
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(updates, "Velo Client", "Launcher, mod and addons - updated right here, no website needed",
+				"Downloads the latest GitHub release. New mod and addons builds apply to every profile on its next launch;"
+						+ " a new launcher version installs itself and restarts the launcher.", updateStatus, checkButton);
+		Button systemCheck = new Button("Run check");
+		systemCheck.setOnAction(e -> net.veloclient.launcher.ui.SystemCheckDialog.showAll(stage,
+				net.veloclient.launcher.launch.SystemHealth.check(null)));
+		net.veloclient.launcher.ui.SettingsUi.row(updates, "System check", "Memory, swap, disk space and other games - also runs before every launch",
+				"Checks the usual causes of freezes and crashes on start. Before a launch only real problems interrupt you.", systemCheck);
+		content.getChildren().add(updates);
 		content.getChildren().addAll(net.veloclient.launcher.ui.PerformanceSettingsView.build(theme));
 
 		VBox appearance = net.veloclient.launcher.ui.SettingsUi.card("Appearance");

@@ -10,6 +10,8 @@ import net.veloclient.velo.VeloClient;
 public final class RenderProfiler {
 
 	public static final boolean ENABLED = Boolean.getBoolean("velo.renderProfile");
+	/** Draw calls seen since {@link #begin()} - counted at the Vulkan draw calls on 26.3, where the old per-layer draw lists are gone. */
+	public static int drawCalls;
 	/** With {@code -Dvelo.renderProfileAB=true}, flips the Fast Draw Path toggle every block for a same-scene A/B. */
 	private static final boolean AB = Boolean.getBoolean("velo.renderProfileAB");
 
@@ -42,6 +44,7 @@ public final class RenderProfiler {
 	}
 
 	public static void begin() {
+		drawCalls = 0;
 		sectionStart = System.nanoTime();
 	}
 

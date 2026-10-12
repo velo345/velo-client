@@ -38,6 +38,8 @@ public final class LauncherSettings {
 		public long newsSeenAt;
 		/** Crash reports already offered/sent (file names), so a crash is only brought up once. */
 		public java.util.List<String> handledCrashes = new java.util.ArrayList<>();
+		/** System check kinds (finding titles) that no longer interrupt a launch. */
+		public java.util.List<String> silencedChecks = new java.util.ArrayList<>();
 	}
 
 	private static Data cached;

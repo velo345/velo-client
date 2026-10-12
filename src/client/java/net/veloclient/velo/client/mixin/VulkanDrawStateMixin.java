@@ -28,6 +28,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.HashMap;
 import java.util.List;
 *///?}
+//? if >=26.3 {
+/*import net.veloclient.velo.client.modules.performance.PerformanceBoostModule;
+import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+*///?}
 
 /**
  * Removes redundant per-draw work from 26.2's Vulkan render pass (Sodium doesn't run on Vulkan, so
@@ -250,6 +259,182 @@ public abstract class VulkanDrawStateMixin {
 	@Inject(method = "setIndexBuffer", at = @At("HEAD"), cancellable = true)
 	private void velo$skipSameIndexBuffer(GpuBuffer indexBuffer, IndexType indexType, CallbackInfo ci) {
 		long handle = ((VulkanGpuBuffer) indexBuffer).vkBuffer();
+		if (PerformanceBoostModule.fastDrawPath && velo$indexHandle == handle && velo$indexType == indexType) {
+			ci.cancel();
+			return;
+		}
+		velo$indexHandle = handle;
+		velo$indexType = indexType;
+	}
+}
+*///?} else if >=26.3 {
+/*@Mixin(com.mojang.renderpearl.backend.vulkan.VulkanRenderPass.class)
+public abstract class VulkanDrawStateMixin {
+
+	// 26.3 port: uniforms are an index-based list now (no more name lookups), but a change to any
+	// single uniform still re-pushes the whole descriptor set before the next draw. Same idea as the
+	// 26.2 version: track which uniform slots changed and push only those uniform buffers.
+
+	@Unique
+	private static final int VELO_MAX_TRACKED = 8;
+	@Unique
+	private static final int VELO_VERTEX_SLOTS = 4;
+
+	@Shadow
+	@Final
+	private org.lwjgl.vulkan.VkCommandBuffer commandBuffer;
+	@Shadow
+	protected com.mojang.renderpearl.backend.vulkan.VulkanRenderPipeline pipeline;
+	@Shadow
+	private boolean anyDescriptorDirty;
+	@Shadow
+	@Final
+	protected it.unimi.dsi.fastutil.objects.ReferenceList<Object> uniforms;
+
+	@Unique
+	private boolean velo$needsFullPush = true;
+	@Unique
+	private com.mojang.renderpearl.backend.vulkan.VulkanRenderPipeline velo$pushedPipeline;
+	@Unique
+	private final int[] velo$changed = new int[VELO_MAX_TRACKED];
+	@Unique
+	private int velo$changedCount;
+	@Unique
+	private final long[] velo$vertexHandle = {-1L, -1L, -1L, -1L};
+	@Unique
+	private final long[] velo$vertexOffset = new long[VELO_VERTEX_SLOTS];
+	@Unique
+	private long velo$indexHandle = -1L;
+	@Unique
+	private Object velo$indexType;
+
+	@Inject(method = "setPipeline", at = @At("HEAD"))
+	private void velo$pipelineChanged(com.mojang.renderpearl.backend.api.BackendRenderPipeline renderPipeline, CallbackInfo ci) {
+		velo$needsFullPush = true;
+	}
+
+	@Inject(method = "setUniform(ILjava/lang/Object;)V", at = @At("HEAD"), cancellable = true)
+	private void velo$uniformChanged(int index, Object value, CallbackInfo ci) {
+		Object current = index >= 0 && index < uniforms.size() ? uniforms.get(index) : null;
+		if (PerformanceBoostModule.fastDrawPath && current != null && velo$same(current, value)) {
+			ci.cancel();
+			return;
+		}
+		if (!(value instanceof com.mojang.renderpearl.api.buffers.GpuBufferSlice)) {
+			velo$needsFullPush = true; // textures/samplers/texel buffers: let vanilla push everything
+			return;
+		}
+		velo$noteChanged(index);
+	}
+
+	@Unique
+	private static boolean velo$same(Object current, Object value) {
+		if (current == value) {
+			return true;
+		}
+		return current instanceof com.mojang.renderpearl.api.buffers.GpuBufferSlice a
+				&& value instanceof com.mojang.renderpearl.api.buffers.GpuBufferSlice b
+				&& a.buffer() == b.buffer() && a.offset() == b.offset() && a.length() == b.length();
+	}
+
+	@Unique
+	private void velo$noteChanged(int index) {
+		if (velo$needsFullPush) {
+			return;
+		}
+		for (int i = 0; i < velo$changedCount; i++) {
+			if (velo$changed[i] == index) {
+				return;
+			}
+		}
+		if (velo$changedCount == VELO_MAX_TRACKED) {
+			velo$needsFullPush = true;
+			return;
+		}
+		velo$changed[velo$changedCount++] = index;
+	}
+
+	@Inject(method = "pushDescriptors", at = @At("HEAD"), cancellable = true)
+	private void velo$pushChangedOnly(CallbackInfo ci) {
+		if (!anyDescriptorDirty || pipeline == null) {
+			return;
+		}
+		if (!PerformanceBoostModule.fastDrawPath || velo$needsFullPush || pipeline != velo$pushedPipeline
+				|| velo$changedCount == 0 || !velo$pushPartial()) {
+			// Vanilla's full push runs next; it re-establishes every binding for this pipeline.
+			velo$pushedPipeline = pipeline;
+			velo$needsFullPush = !PerformanceBoostModule.fastDrawPath;
+			velo$changedCount = 0;
+			return;
+		}
+		anyDescriptorDirty = false;
+		velo$changedCount = 0;
+		ci.cancel();
+	}
+
+	// Pushes just the changed uniform buffers. False (nothing pushed) when any of them isn't a plain uniform buffer.
+	@Unique
+	private boolean velo$pushPartial() {
+		var descriptions = pipeline.uniforms();
+		try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+			org.lwjgl.vulkan.VkWriteDescriptorSet.Buffer writes = org.lwjgl.vulkan.VkWriteDescriptorSet.calloc(velo$changedCount, stack);
+			int count = 0;
+			for (int c = 0; c < velo$changedCount; c++) {
+				int binding = velo$changed[c];
+				if (binding < 0 || binding >= descriptions.size()) {
+					continue;
+				}
+				if (descriptions.get(binding).type() != com.mojang.renderpearl.api.pipeline.UniformType.UNIFORM_BUFFER) {
+					return false;
+				}
+				if (!(uniforms.get(binding) instanceof com.mojang.renderpearl.api.buffers.GpuBufferSlice slice)) {
+					return false; // let vanilla report the missing uniform
+				}
+				org.lwjgl.vulkan.VkDescriptorBufferInfo.Buffer bufferInfo = org.lwjgl.vulkan.VkDescriptorBufferInfo.calloc(1, stack);
+				bufferInfo.buffer(((com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer) slice.buffer()).vkBuffer());
+				bufferInfo.offset(slice.offset());
+				bufferInfo.range(slice.length());
+				org.lwjgl.vulkan.VkWriteDescriptorSet write = writes.get(count++).sType$Default();
+				write.dstBinding(binding);
+				write.dstArrayElement(0);
+				write.descriptorCount(1);
+				write.descriptorType(6); // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, as vanilla
+				write.pBufferInfo(bufferInfo);
+			}
+			if (count > 0) {
+				writes.limit(count);
+				org.lwjgl.vulkan.KHRPushDescriptor.vkCmdPushDescriptorSetKHR(commandBuffer, 0, pipeline.pipelineLayout(), 0, writes);
+			}
+			return true;
+		}
+	}
+
+	@Inject(method = {"drawIndexed", "multiDrawIndexed", "draw", "multiDraw"}, at = @At("HEAD"))
+	private void velo$countDraw(CallbackInfo ci) {
+		if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+			net.veloclient.velo.client.devtools.RenderProfiler.drawCalls++;
+		}
+	}
+
+	@Inject(method = "setVertexBuffer", at = @At("HEAD"), cancellable = true)
+	private void velo$skipSameVertexBuffer(int slot, com.mojang.renderpearl.api.buffers.GpuBufferSlice vertexBuffer, CallbackInfo ci) {
+		if (slot < 0 || slot >= VELO_VERTEX_SLOTS) {
+			return;
+		}
+		long handle = vertexBuffer != null ? ((com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer) vertexBuffer.buffer()).vkBuffer() : 0L;
+		long offset = vertexBuffer != null ? vertexBuffer.offset() : 0L;
+		if (PerformanceBoostModule.fastDrawPath && velo$vertexHandle[slot] == handle && velo$vertexOffset[slot] == offset) {
+			ci.cancel();
+			return;
+		}
+		velo$vertexHandle[slot] = handle;
+		velo$vertexOffset[slot] = offset;
+	}
+
+	@Inject(method = "setIndexBuffer", at = @At("HEAD"), cancellable = true)
+	private void velo$skipSameIndexBuffer(com.mojang.renderpearl.api.buffers.GpuBuffer indexBuffer,
+			com.mojang.renderpearl.api.pipeline.IndexType indexType, CallbackInfo ci) {
+		long handle = ((com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer) indexBuffer).vkBuffer();
 		if (PerformanceBoostModule.fastDrawPath && velo$indexHandle == handle && velo$indexType == indexType) {
 			ci.cancel();
 			return;

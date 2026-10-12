@@ -75,6 +75,69 @@ public abstract class VulkanShaderCacheMixin {
 		return IntermediaryShaderModule.createFromSpirv(filename, spirv);
 	}
 }
+*///?} else if >=26.3 {
+/*@Mixin(com.mojang.renderpearl.frontend.shaders.GlslCompiler.class)
+public abstract class VulkanShaderCacheMixin {
+
+	// 26.3 port: shaderc now resolves #includes itself during compileToSpv, so the cache key also
+	// covers the shader defines and the active resource packs (an include can come from a pack).
+
+	@org.spongepowered.asm.mixin.Unique
+	private static final ThreadLocal<String> VELO_PENDING_KEY = new ThreadLocal<>();
+	@org.spongepowered.asm.mixin.Unique
+	private static final ThreadLocal<Long> VELO_STARTED = new ThreadLocal<>();
+	@org.spongepowered.asm.mixin.Unique
+	private static final String VELO_MC_VERSION = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("minecraft")
+			.map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("unknown");
+
+	@org.spongepowered.asm.mixin.Unique
+	private static String velo$packs() {
+		try {
+			return String.join(",", net.minecraft.client.Minecraft.getInstance().getResourcePackRepository().getSelectedIds());
+		} catch (RuntimeException e) {
+			return "?";
+		}
+	}
+
+	@org.spongepowered.asm.mixin.injection.Inject(method = "compileToSpv", at = @org.spongepowered.asm.mixin.injection.At("HEAD"), cancellable = true)
+	private void velo$serveCachedSpirv(String name, String source, com.mojang.renderpearl.api.pipeline.ShaderType type,
+			net.minecraft.client.renderer.ShaderDefines defines, com.mojang.renderpearl.api.pipeline.ShaderSource includes,
+			org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<com.mojang.renderpearl.backend.api.SpvModule> cir) {
+		VELO_PENDING_KEY.remove();
+		if (!net.veloclient.velo.client.modules.performance.ShaderCache.enabled) {
+			return;
+		}
+		String key = net.veloclient.velo.client.modules.performance.ShaderCache.key(VELO_MC_VERSION,
+				name + "|" + defines + "|" + velo$packs(), type.name(), source);
+		byte[] cached = net.veloclient.velo.client.modules.performance.ShaderCache.readSpirv(key);
+		if (cached != null) {
+			java.nio.ByteBuffer spirv = org.lwjgl.system.MemoryUtil.memCalloc(cached.length);
+			spirv.put(cached).flip();
+			cir.setReturnValue(new com.mojang.renderpearl.frontend.shaders.SPIRVModule(spirv, type));
+			net.veloclient.velo.client.modules.performance.ShaderCache.recordHit();
+			return;
+		}
+		VELO_PENDING_KEY.set(key);
+		VELO_STARTED.set(System.nanoTime());
+	}
+
+	@org.spongepowered.asm.mixin.injection.Inject(method = "compileToSpv", at = @org.spongepowered.asm.mixin.injection.At("RETURN"))
+	private void velo$storeCompiledSpirv(String name, String source, com.mojang.renderpearl.api.pipeline.ShaderType type,
+			net.minecraft.client.renderer.ShaderDefines defines, com.mojang.renderpearl.api.pipeline.ShaderSource includes,
+			org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<com.mojang.renderpearl.backend.api.SpvModule> cir) {
+		String key = VELO_PENDING_KEY.get();
+		if (key == null || cir.getReturnValue() == null) {
+			return;
+		}
+		VELO_PENDING_KEY.remove();
+		Long started = VELO_STARTED.get();
+		net.veloclient.velo.client.modules.performance.ShaderCache.recordCompile(started == null ? 0 : System.nanoTime() - started);
+		java.nio.ByteBuffer spirv = cir.getReturnValue().spv().duplicate();
+		byte[] bytes = new byte[spirv.remaining()];
+		spirv.get(bytes);
+		net.veloclient.velo.client.modules.performance.ShaderCache.writeSpirv(key, bytes);
+	}
+}
 *///?} else {
 @Mixin(targets = "com.mojang.blaze3d.vulkan.glsl.GlslCompiler")
 public abstract class VulkanShaderCacheMixin {

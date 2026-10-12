@@ -102,8 +102,8 @@ public final class MemoryPlanner {
 				}
 			}
 			if (maxMb > budget) {
-				warning = String.format(Locale.ROOT, "Only %.1f GB is free right now but this profile needs about %.1f GB in total - close other programs (browser, Discord...) before playing.",
-						availableMb / 1024.0, (maxMb + overhead) / 1024.0);
+				warning = String.format(Locale.ROOT, "Only %.1f GB is free right now but this profile needs about %.1f GB (game + safety margin) - close other programs (browser, Discord...) before playing.",
+						availableMb / 1024.0, (maxMb + overhead + SAFETY_MB) / 1024.0);
 			}
 		}
 		if (maxMb + overhead > totalMb - 1536) {
