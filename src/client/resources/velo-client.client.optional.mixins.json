@@ -61,6 +61,7 @@
 		"VulkanDrawStateMixin",
 		"VulkanFrameProfileMixin",
 		"ClipCaptureMixin",
+		"ChatTweaksMixin",
 		"VulkanPipelineCacheMixin",
 		"VulkanRenderProfileMixin",
 		"VulkanShaderCacheMixin",

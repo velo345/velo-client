@@ -35,7 +35,7 @@ public abstract class ChatHudMixin {
 			at = @At("HEAD"), argsOnly = true)
 	private Text velo$prefixOwnMessage(Text message) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		if (client.player == null || !VeloBadge.isKnownVeloName(message.getString(), client.player.getGameProfile().name())) {
+		if (net.veloclient.velo.client.modules.qol.ChatTweaksModule.reentry || client.player == null || !VeloBadge.isKnownVeloName(message.getString(), client.player.getGameProfile().name())) {
 			return message;
 		}
 		return VeloBadge.prefixWithBadge(message);
