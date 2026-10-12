@@ -100,6 +100,21 @@ public final class WaypointShareScreen extends VeloWindow {
 		if (!chosen.isEmpty() && !sending) {
 			hits.add(share);
 		}
+		if (SocialClient.inParty()) {
+			VeloUi.Hit party = VeloUi.pill(context, x + width - 250, bottom - 20, 124, 20, "Share with party", 1, mouseX, mouseY, this::shareWithParty);
+			if (!sending) {
+				hits.add(party);
+			}
+		}
+	}
+
+	private void shareWithParty() {
+		sending = true;
+		SocialClient.partyWaypoint(WaypointManager.toShared(waypoint)).thenAccept(error ->
+				MinecraftClient.getInstance().execute(() -> {
+					sending = false;
+					status = error == null ? "Shared with your party" : error;
+				}));
 	}
 
 	private void share() {

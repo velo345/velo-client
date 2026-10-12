@@ -428,7 +428,8 @@ public final class WorldMapScreen extends VeloWindow {
 		int w = 150;
 		boolean coords = WorldMapModule.showCoordinates();
 		boolean teleport = net.veloclient.velo.client.waypoints.WaypointTeleport.available();
-		int menuHeight = (coords ? 58 : 40) + (teleport ? 20 : 0);
+		boolean party = net.veloclient.velo.client.network.SocialClient.inParty();
+		int menuHeight = (coords ? 58 : 40) + (teleport ? 20 : 0) + (party ? 20 : 0);
 		VeloDraw.fillRounded(context, mx, my, w, menuHeight, 7, 0xF0141418);
 		VeloDraw.strokeRounded(context, mx, my, w, menuHeight, 7, VeloStyle.border());
 		context.drawTextWithShadow(this.textRenderer, coords ? "X " + bx + ", Z " + bz : "Here", mx + 8, my + 6, VeloStyle.textMuted());
@@ -441,6 +442,21 @@ public final class WorldMapScreen extends VeloWindow {
 			hits.add(0, VeloUi.pill(context, mx + 4, my + 38, w - 8, 16, "Copy coordinates", 0, mouseX, mouseY, () -> {
 				menuAt = null;
 				MinecraftClient.getInstance().keyboard.setClipboard(bx + " " + surfaceY(bx, bz) + " " + bz);
+			}));
+		}
+		if (party) {
+			int py = my + (coords ? 58 : 38);
+			hits.add(0, VeloUi.pill(context, mx + 4, py, w - 8, 16, "Share spot with party", 0, mouseX, mouseY, () -> {
+				menuAt = null;
+				java.util.Map<String, Object> spot = new java.util.LinkedHashMap<>();
+				spot.put("name", net.veloclient.velo.client.serverpacks.ServerData.localName() + "'s spot");
+				spot.put("x", bx);
+				spot.put("y", surfaceY(bx, bz));
+				spot.put("z", bz);
+				spot.put("dimension", viewedDimension);
+				spot.put("world", WorldMap.currentWorld());
+				spot.put("color", net.veloclient.velo.client.waypoints.WaypointManager.nextColor());
+				net.veloclient.velo.client.network.SocialClient.partyWaypoint(spot);
 			}));
 		}
 		if (teleport) {

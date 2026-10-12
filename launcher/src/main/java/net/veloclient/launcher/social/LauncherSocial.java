@@ -1,6 +1,7 @@
 package net.veloclient.launcher.social;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -367,13 +368,169 @@ public final class LauncherSocial {
 				publish(new Event(type, GSON.fromJson(data, Friend.class), null, null, null));
 				return true;
 			}
+			case "party", "party_invite", "party_chat", "party_launch", "party_ping", "party_waypoint" -> {
+				onPartyEvent(type, data == null || !data.isJsonObject() ? new JsonObject() : data.getAsJsonObject());
+				return false;
+			}
 			default -> {
 				return true;
 			}
 		}
 	}
 
+	// ---- Party ----
+
+	/** A party change: {@code type} is the server event ("party", "party_invite", "party_chat", "party_launch"...). */
+	public record PartyEvent(String type, JsonObject data) {
+	}
+
+	private static final List<java.util.function.Consumer<PartyEvent>> PARTY_LISTENERS = new CopyOnWriteArrayList<>();
+	private static volatile JsonObject party;
+	private static volatile List<JsonObject> partyInvites = List.of();
+
+	public static void addPartyListener(java.util.function.Consumer<PartyEvent> listener) {
+		PARTY_LISTENERS.add(listener);
+	}
+
+	public static void removePartyListener(java.util.function.Consumer<PartyEvent> listener) {
+		PARTY_LISTENERS.remove(listener);
+	}
+
+	/** The party you're in (id, leader, members, invited, chat, sync, launch), or null. */
+	public static JsonObject party() {
+		return party;
+	}
+
+	public static List<JsonObject> partyInvites() {
+		return partyInvites;
+	}
+
+	public static String myUuid() {
+		State current = state;
+		return current != null && current.me != null ? current.me.uuid : null;
+	}
+
+	public static boolean isPartyLeader() {
+		JsonObject p = party;
+		String me = myUuid();
+		return p != null && me != null && me.equals(p.get("leader").getAsString());
+	}
+
+	private static void reloadParty() {
+		try {
+			applyPartyState(getJson("/v1/party/state", Duration.ofSeconds(15)));
+		} catch (Exception e) {
+			// Older server without parties - the feature just stays empty.
+		}
+	}
+
+	private static void applyPartyState(JsonObject stateJson) {
+		party = stateJson.has("party") && stateJson.get("party").isJsonObject() ? stateJson.getAsJsonObject("party") : null;
+		if (stateJson.has("invites") && stateJson.get("invites").isJsonArray()) {
+			List<JsonObject> invites = new ArrayList<>();
+			for (JsonElement e : stateJson.getAsJsonArray("invites")) {
+				invites.add(e.getAsJsonObject());
+			}
+			partyInvites = List.copyOf(invites);
+		}
+	}
+
+	private static void onPartyEvent(String type, JsonObject data) {
+		switch (type) {
+			case "party" -> {
+				party = data.has("party") && data.get("party").isJsonObject() ? data.getAsJsonObject("party") : null;
+				if (party != null) {
+					String id = party.get("id").getAsString();
+					partyInvites = partyInvites.stream().filter(i -> !id.equals(i.get("party").getAsString())).toList();
+				}
+			}
+			case "party_invite" -> {
+				List<JsonObject> invites = new ArrayList<>(partyInvites);
+				invites.removeIf(i -> i.get("party").getAsString().equals(data.get("party").getAsString()));
+				invites.add(data);
+				partyInvites = List.copyOf(invites);
+			}
+			case "party_chat" -> {
+				JsonObject current = party;
+				if (current != null && current.has("chat")) {
+					JsonArray chat = current.getAsJsonArray("chat");
+					chat.add(data);
+				}
+			}
+			default -> {
+			}
+		}
+		Platform.runLater(() -> {
+			for (var listener : PARTY_LISTENERS) {
+				try {
+					listener.accept(new PartyEvent(type, data));
+				} catch (RuntimeException e) {
+					LauncherLog.info("Party listener failed: " + e);
+				}
+			}
+		});
+	}
+
+	private static CompletableFuture<String> partyAction(String path, JsonObject body) {
+		return action(path, body).thenApply(error -> {
+			reloadParty();
+			onPartyEvent("party_refresh", new JsonObject());
+			return error;
+		});
+	}
+
+	public static CompletableFuture<String> partyCreate() {
+		return partyAction("/v1/party/create", new JsonObject());
+	}
+
+	public static CompletableFuture<String> partyInvite(String target) {
+		JsonObject body = new JsonObject();
+		body.addProperty("target", target);
+		return partyAction("/v1/party/invite", body);
+	}
+
+	public static CompletableFuture<String> partyRespond(String partyId, boolean accept) {
+		JsonObject body = new JsonObject();
+		body.addProperty("party", partyId);
+		body.addProperty("accept", accept);
+		return partyAction("/v1/party/respond", body);
+	}
+
+	public static CompletableFuture<String> partyLeave() {
+		return partyAction("/v1/party/leave", new JsonObject());
+	}
+
+	public static CompletableFuture<String> partyKick(String uuid) {
+		return partyAction("/v1/party/kick", uuidBody(uuid));
+	}
+
+	public static CompletableFuture<String> partyTransfer(String uuid) {
+		return partyAction("/v1/party/transfer", uuidBody(uuid));
+	}
+
+	public static CompletableFuture<String> partyChat(String text) {
+		JsonObject body = new JsonObject();
+		body.addProperty("text", text);
+		return action("/v1/party/chat", body);
+	}
+
+	/** Leader: share (or with null, stop sharing) your mod profile. */
+	public static CompletableFuture<String> partySync(JsonObject sync) {
+		JsonObject body = new JsonObject();
+		body.add("sync", sync);
+		return partyAction("/v1/party/sync", body);
+	}
+
+	/** Leader: tell everyone you're launching (and where to). */
+	public static CompletableFuture<String> partyLaunch(String server, String mcVersion) {
+		JsonObject body = new JsonObject();
+		body.addProperty("server", server == null ? "" : server);
+		body.addProperty("mcVersion", mcVersion);
+		return action("/v1/party/launch", body);
+	}
+
 	private static void reloadState() throws Exception {
+		reloadParty();
 		State loaded = GSON.fromJson(getJson("/v1/social/state", Duration.ofSeconds(15)), State.class);
 		if (loaded.friends == null) {
 			loaded.friends = List.of();

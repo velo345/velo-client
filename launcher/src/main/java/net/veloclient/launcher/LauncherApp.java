@@ -121,7 +121,7 @@ public final class LauncherApp extends Application {
 	private MinecraftSession session;
 	private Label accountLabel;
 	private Button accountButton;
-	private Button navHome, navNews, navServers, navFriends, navCosmetics, navStore, navSettings, navMedia;
+	private Button navHome, navNews, navServers, navFriends, navCosmetics, navStore, navSettings, navMedia, navParty;
 	private VBox runningSection;
 	private VBox quickLaunchSection;
 	/** Which profile the home screen's carousel is showing - an index into {@link #orderedProfilesForHome()}, clamped back to range whenever the profile list changes (e.g. after a delete). */
@@ -206,6 +206,12 @@ public final class LauncherApp extends Application {
 		stage.show();
 
 		attemptSilentSignIn();
+		partyController = new net.veloclient.launcher.party.PartyController(stage, this::currentProfile,
+				(instance, server) -> Platform.runLater(() -> {
+					showHome();
+					launchWithProgress(instance, server, homePlayButton, homeLaunchProgress, homeLaunchStatus);
+				}));
+		partyController.setOnChange(this::refreshPartyStrip);
 		net.veloclient.launcher.social.LauncherSocial.addListener(event -> refreshFriendsBadge());
 		String demoShot = System.getProperty("velo.launcherDemo");
 		if (demoShot != null && !demoShot.isBlank()) {
@@ -411,8 +417,9 @@ public final class LauncherApp extends Application {
 		navStore = navIconButton("store", "Store", this::showStore);
 		navSettings = navIconButton("settings", "Settings", this::showSettings);
 		navMedia = navIconButton("media", "Clips", this::showMedia);
+		navParty = navIconButton("party", "Party", this::showParty);
 
-		sidebar.getChildren().addAll(title, navHome, navNews, navServers, navFriends, navMedia, navCosmetics, navStore, navSettings);
+		sidebar.getChildren().addAll(title, navHome, navNews, navServers, navFriends, navParty, navMedia, navCosmetics, navStore, navSettings);
 		refreshNews(false);
 
 		// "Running" (live instances) and "Quick Launch" (recent one-click
@@ -577,7 +584,7 @@ public final class LauncherApp extends Application {
 	}
 
 	private void clearActiveNav() {
-		for (Button b : List.of(navHome, navNews, navServers, navFriends, navMedia, navCosmetics, navStore, navSettings)) {
+		for (Button b : List.of(navHome, navNews, navServers, navFriends, navParty, navMedia, navCosmetics, navStore, navSettings)) {
 			b.getStyleClass().remove("nav-icon-button-active");
 		}
 	}
@@ -670,7 +677,7 @@ public final class LauncherApp extends Application {
 	}
 
 	private void markActiveNav(Button active) {
-		for (Button b : List.of(navHome, navNews, navServers, navFriends, navMedia, navCosmetics, navStore, navSettings)) {
+		for (Button b : List.of(navHome, navNews, navServers, navFriends, navParty, navMedia, navCosmetics, navStore, navSettings)) {
 			b.getStyleClass().remove("nav-icon-button-active");
 		}
 		active.getStyleClass().add("nav-icon-button-active");
@@ -921,7 +928,10 @@ public final class LauncherApp extends Application {
 		homeLaunchStatus.setManaged(false);
 		homeLaunchStatus.setWrapText(true);
 
-		VBox bottomArea = new VBox(12, profileCard, playRow, homeLaunchProgress, homeLaunchStatus);
+		homePartyStrip = new HBox(6);
+		homePartyStrip.setAlignment(Pos.CENTER);
+		refreshPartyStrip();
+		VBox bottomArea = new VBox(12, profileCard, homePartyStrip, playRow, homeLaunchProgress, homeLaunchStatus);
 		bottomArea.setAlignment(Pos.CENTER);
 		bottomArea.setMaxSize(640, Region.USE_PREF_SIZE);
 		bottomArea.setPickOnBounds(false);
@@ -2484,6 +2494,12 @@ public final class LauncherApp extends Application {
 
 	/** @param quickPlayTarget nullable "host:port" - when present, launches straight into that server (My Servers' Connect). */
 	private void launchWithProgress(Instance instance, String quickPlayTarget, Button triggerButton, ProgressBar progressBar, Label statusLabel) {
+		// Party leader with "launch together": everyone else's launcher follows.
+		var partyNow = net.veloclient.launcher.social.LauncherSocial.party();
+		if (partyNow != null && net.veloclient.launcher.social.LauncherSocial.isPartyLeader()
+				&& net.veloclient.launcher.data.LauncherSettings.get().partyLaunchTogether && partyNow.getAsJsonArray("members").size() > 1) {
+			net.veloclient.launcher.social.LauncherSocial.partyLaunch(quickPlayTarget, instance.mcVersion());
+		}
 		// Quick system check (memory, swap, disk, other games running) - only real problems interrupt.
 		if (System.getProperty("velo.launcherTour") == null) {
 			try {
@@ -2617,6 +2633,65 @@ public final class LauncherApp extends Application {
 	}
 
 	// ---- Settings ----
+
+	private net.veloclient.launcher.party.PartyController partyController;
+	private HBox homePartyStrip;
+
+	/** The profile selected on Home (or the first one), for party sharing / syncing / launching. */
+	private Instance currentProfile() {
+		if (homeCurrentTarget != null) {
+			return InstanceStore.loadAll().stream().filter(i -> i.id().equals(homeCurrentTarget.instance().id())).findFirst()
+					.orElse(homeCurrentTarget.instance());
+		}
+		List<Instance> all = InstanceStore.loadAll();
+		return all.isEmpty() ? null : all.get(0);
+	}
+
+	private void showParty() {
+		currentPage = this::showParty;
+		setContent(net.veloclient.launcher.ui.PartyView.build(this::currentProfile));
+	}
+
+	/** The small party bar above Play on Home: members' heads, and what the party is doing. */
+	private void refreshPartyStrip() {
+		if (homePartyStrip == null) {
+			return;
+		}
+		com.google.gson.JsonObject party = net.veloclient.launcher.social.LauncherSocial.party();
+		homePartyStrip.getChildren().clear();
+		boolean show = party != null;
+		homePartyStrip.setVisible(show);
+		homePartyStrip.setManaged(show);
+		if (!show) {
+			return;
+		}
+		String leader = party.get("leader").getAsString();
+		int count = 0;
+		for (var element : party.getAsJsonArray("members")) {
+			var member = element.getAsJsonObject();
+			Node head = net.veloclient.launcher.ui.Heads.head(member.get("uuid").getAsString(), member.get("name").getAsString(), 24);
+			Tooltip.install(head, new Tooltip(member.get("name").getAsString() + (leader.equals(member.get("uuid").getAsString()) ? " (leader)" : "")));
+			homePartyStrip.getChildren().add(head);
+			count++;
+		}
+		boolean iLead = net.veloclient.launcher.social.LauncherSocial.isPartyLeader();
+		String state;
+		if (iLead) {
+			state = net.veloclient.launcher.data.LauncherSettings.get().partyLaunchTogether ? "You lead - Play launches everyone" : "You lead the party";
+		} else {
+			Instance profile = currentProfile();
+			state = profile != null && net.veloclient.launcher.party.PartyModSync.isSynced(profile) ? "Using the leader's mods" : "In a party";
+		}
+		Label label = new Label("Party (" + count + ")  ·  " + state);
+		label.getStyleClass().add("home-profile-sub");
+		Button open = new Button("Open");
+		open.getStyleClass().add("glass-button");
+		open.setOnAction(e -> {
+			showParty();
+			markActiveNav(navParty);
+		});
+		homePartyStrip.getChildren().addAll(label, open);
+	}
 
 	private void showMedia() {
 		currentPage = this::showMedia;

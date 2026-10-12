@@ -21,7 +21,7 @@ final class SocialRoutes {
 	}
 
 	@FunctionalInterface
-	private interface Authed {
+	interface Authed {
 		void handle(HttpExchange exchange, String me) throws Exception;
 	}
 
@@ -127,7 +127,7 @@ final class SocialRoutes {
 		});
 	}
 
-	private static void route(HttpServer server, SessionRegistry registry, String path, String method, Authed handler) {
+	static void route(HttpServer server, SessionRegistry registry, String path, String method, Authed handler) {
 		server.createContext(path, exchange -> VeloServerApp.handle(exchange, method, ex -> {
 			String token = JsonHttp.bearerToken(ex);
 			SessionRegistry.Session session = registry.session(token);
@@ -140,7 +140,7 @@ final class SocialRoutes {
 		}));
 	}
 
-	private static String requireUuid(String uuid) throws SocialService.SocialException {
+	static String requireUuid(String uuid) throws SocialService.SocialException {
 		String normalized = VeloServerApp.normalizeUuid(uuid);
 		if (normalized == null) {
 			throw new SocialService.SocialException(400, "A valid player uuid is required");

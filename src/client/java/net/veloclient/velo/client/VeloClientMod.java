@@ -237,6 +237,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.LowFireModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.FightRecapModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.ClipsModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.PartyPingModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.ServerOverlaysModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.PlayerLevelsModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.servertools.GameModePresetsModule());

@@ -338,6 +338,50 @@ final class SocialService {
 	 * signed in here first, then Mojang's public profile API (so you can add a friend who hasn't
 	 * installed Velo yet - they'll see the request the first time they sign in).
 	 */
+	// ---- For PartyService (same event queue, same rate limiter) ----
+
+	/** Queues an event for {@code uuid} and wakes their long-poll. */
+	void pushEvent(String uuid, String type, Object payload) {
+		lock.lock();
+		try {
+			push(uuid, type, payload);
+		} finally {
+			lock.unlock();
+		}
+	}
+
+	String usernameOf(String uuid) {
+		lock.lock();
+		try {
+			return nameOf(uuid);
+		} finally {
+			lock.unlock();
+		}
+	}
+
+	boolean friendsWith(String a, String b) {
+		lock.lock();
+		try {
+			return areFriends(a, b);
+		} finally {
+			lock.unlock();
+		}
+	}
+
+	/** What {@code uuid} is doing right now as their friends see it, or null when offline/invisible. */
+	Activity activityOf(String uuid) {
+		lock.lock();
+		try {
+			return visibleActivity(uuid);
+		} finally {
+			lock.unlock();
+		}
+	}
+
+	void rateLimit(String uuid, String action, RateLimiter.Window... windows) throws SocialException {
+		limit(uuid, action, windows);
+	}
+
 	/** Username or uuid -> player, for other services (e.g. the store's owner tools). */
 	PlayerRef resolvePlayer(String query) throws SocialException {
 		return resolve(query);

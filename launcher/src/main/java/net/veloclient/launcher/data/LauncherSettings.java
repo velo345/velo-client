@@ -40,6 +40,10 @@ public final class LauncherSettings {
 		public java.util.List<String> handledCrashes = new java.util.ArrayList<>();
 		/** Opt-in: send crash reports (crash report, log, mods, system) automatically, no dialog click needed. */
 		public boolean crashTelemetry;
+		/** Party leader: pressing Play also launches every member. */
+		public boolean partyLaunchTogether = true;
+		/** Party member: launch when the leader does (asks with a short countdown). */
+		public boolean partyFollowLaunches = true;
 		/** System check kinds (finding titles) that no longer interrupt a launch. */
 		public java.util.List<String> silencedChecks = new java.util.ArrayList<>();
 	}

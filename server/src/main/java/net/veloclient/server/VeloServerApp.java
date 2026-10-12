@@ -71,6 +71,8 @@ public final class VeloServerApp {
 		// GET /v1/cape/<sha256> - the path suffix is the hash (see handleCapeDownload).
 		server.createContext("/v1/cape/", exchange -> handle(exchange, "GET", ex -> handleCapeDownload(ex, capes)));
 		SocialRoutes.register(server, registry, social);
+		PartyService parties = new PartyService(social);
+		PartyRoutes.register(server, registry, social, parties);
 		StoreRoutes.register(server, registry, store, dataDir);
 		NewsRoutes.register(server, registry, new NewsService(dataDir), new ReportService(dataDir), store, adminToken);
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));
@@ -88,6 +90,11 @@ public final class VeloServerApp {
 			social.saveIfDirty();
 			social.sweepLimits();
 		}, 5, 5, TimeUnit.SECONDS);
+		Executors.newSingleThreadScheduledExecutor(r -> {
+			Thread t = new Thread(r, "velo-party-sweep");
+			t.setDaemon(true);
+			return t;
+		}).scheduleAtFixedRate(parties::sweep, 10, 10, TimeUnit.MINUTES);
 		Runtime.getRuntime().addShutdownHook(new Thread(social::saveIfDirty, "velo-social-save"));
 
 		server.start();

@@ -304,6 +304,16 @@ public final class SocialClient {
 				CONVERSATIONS.remove(ref.uuid);
 				return true;
 			}
+			case "party" -> {
+				JsonObject payload = data.getAsJsonObject();
+				party = payload.has("party") && payload.get("party").isJsonObject() ? payload.getAsJsonObject("party") : null;
+				publishParty(type, payload);
+				return false;
+			}
+			case "party_ping", "party_waypoint", "party_chat", "party_invite", "party_launch" -> {
+				publishParty(type, data != null && data.isJsonObject() ? data.getAsJsonObject() : new JsonObject());
+				return false;
+			}
 			default -> {
 				// state_changed / read / anything newer than this client: just resync.
 				return true;
@@ -359,6 +369,12 @@ public final class SocialClient {
 	}
 
 	private static void reloadState() throws Exception {
+		try {
+			JsonObject partyState = get("/v1/party/state", Duration.ofSeconds(15));
+			party = partyState.has("party") && partyState.get("party").isJsonObject() ? partyState.getAsJsonObject("party") : null;
+		} catch (Exception ignored) {
+			// Server without parties.
+		}
 		State loaded = GSON.fromJson(get("/v1/social/state", Duration.ofSeconds(15)), State.class);
 		if (loaded.friends == null) {
 			loaded.friends = List.of();
@@ -451,6 +467,54 @@ public final class SocialClient {
 			replaceFriend(copy);
 		}
 		return action("/v1/social/read", uuidBody(uuid));
+	}
+
+	// ---- Party ----
+
+	private static volatile JsonObject party;
+	private static final List<java.util.function.BiConsumer<String, JsonObject>> PARTY_LISTENERS = new CopyOnWriteArrayList<>();
+
+	/** The party you're in (members, leader, ...), or null. Managed from the launcher; the game pings and shares into it. */
+	public static JsonObject party() {
+		return party;
+	}
+
+	public static boolean inParty() {
+		JsonObject p = party;
+		return p != null && p.has("members") && p.getAsJsonArray("members").size() > 1;
+	}
+
+	/** {@code (type, data)} for party events: party, party_ping, party_waypoint, party_chat, party_invite, party_launch. */
+	public static void addPartyListener(java.util.function.BiConsumer<String, JsonObject> listener) {
+		PARTY_LISTENERS.add(listener);
+	}
+
+	private static void publishParty(String type, JsonObject data) {
+		for (var listener : PARTY_LISTENERS) {
+			try {
+				listener.accept(type, data);
+			} catch (RuntimeException e) {
+				VeloClient.LOGGER.warn("Party listener failed", e);
+			}
+		}
+	}
+
+	public static CompletableFuture<String> partyPing(Map<String, Object> payload) {
+		JsonObject body = new JsonObject();
+		body.add("payload", GSON.toJsonTree(payload));
+		return action("/v1/party/ping", body);
+	}
+
+	public static CompletableFuture<String> partyWaypoint(Map<String, Object> waypoint) {
+		JsonObject body = new JsonObject();
+		body.add("payload", GSON.toJsonTree(waypoint));
+		return action("/v1/party/waypoint", body);
+	}
+
+	public static CompletableFuture<String> partyChat(String text) {
+		JsonObject body = new JsonObject();
+		body.addProperty("text", text);
+		return action("/v1/party/chat", body);
 	}
 
 	public static CompletableFuture<String> shareWaypoint(List<String> to, Map<String, Object> waypoint) {
