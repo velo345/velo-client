@@ -27,6 +27,7 @@
 		"OldAnimationsHandMixin",
 		"OldAnimationsHandTickMixin",
 		"OverlayTextureAccessor",
+		"HologramAccessor",
 
 		"BufferBuilderBulkMixin",
 		"ChunkLoadTimingMixin",

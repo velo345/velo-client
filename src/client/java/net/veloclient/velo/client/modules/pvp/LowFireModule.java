@@ -14,8 +14,8 @@ public final class LowFireModule extends AbstractModule implements Configurable 
 
 	private static LowFireModule instance;
 
-	private double lower = 0.3;
-	private boolean hideWithFireRes = true;
+	private double lower = 0.25;
+	private boolean hideWithFireRes = false;
 
 	public LowFireModule() {
 		super("low-fire", "Low Fire", "Lowers the fire overlay while you burn so you can still see - or hides it with Fire Resistance.",
@@ -39,7 +39,8 @@ public final class LowFireModule extends AbstractModule implements Configurable 
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
-				new ConfigField.SliderField("Lower By", 0, 0.5, () -> lower, v -> lower = Math.round(v * 100) / 100.0, v -> Math.round(v / 0.5 * 100) + "%"),
-				new ConfigField.ToggleField("Hide With Fire Resistance", () -> hideWithFireRes, v -> hideWithFireRes = v));
+				new ConfigField.SliderField("Lower By", 0, 0.6, () -> lower, v -> lower = Math.round(v * 100) / 100.0,
+						v -> Math.round(v / 0.6 * 100) + "%"),
+				new ConfigField.ToggleField("Hide Fire Completely With Fire Resistance", () -> hideWithFireRes, v -> hideWithFireRes = v));
 	}
 }

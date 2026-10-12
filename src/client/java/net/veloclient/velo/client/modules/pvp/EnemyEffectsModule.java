@@ -101,6 +101,7 @@ public final class EnemyEffectsModule extends AbstractModule implements Configur
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
+				net.veloclient.velo.client.pvp.NameTagLines.heightField(),
 				new ConfigField.ToggleField("Show Time Left", () -> showTime, v -> showTime = v),
 				new ConfigField.ToggleField("Show Level (II, III...)", () -> showLevel, v -> showLevel = v),
 				new ConfigField.ToggleField("Only Beneficial Effects", () -> onlyBeneficial, v -> onlyBeneficial = v),

@@ -36,6 +36,30 @@ public final class ServerHealth {
 		}
 	}
 
+	private static int ticks;
+
+	/** Every 5 ticks: read health from floating text (holograms) above each player, for servers that hide name tags. */
+	public static void tick() {
+		if (++ticks % 5 != 0 || !(enabled("health-indicator") || enabled("damage-numbers"))) {
+			return;
+		}
+		for (var player : PvpCompat.otherPlayers()) {
+			for (String text : PvpCompat.floatingTextAbove(player)) {
+				Float value = parse(text);
+				if (value != null) {
+					synchronized (ServerHealth.class) {
+						READINGS.put(player.getId(), new Reading(value, System.currentTimeMillis()));
+					}
+					break;
+				}
+			}
+		}
+	}
+
+	private static boolean enabled(String id) {
+		return net.veloclient.velo.module.ModuleRegistry.get(id).map(net.veloclient.velo.module.Module::isEnabled).orElse(false);
+	}
+
 	/** The server-shown health for this player, or null if the server doesn't show one (seen in the last 3 s). */
 	public static synchronized Float get(int entityId) {
 		Reading reading = READINGS.get(entityId);

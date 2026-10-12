@@ -90,6 +90,7 @@ public final class HealthIndicatorModule extends AbstractModule implements Confi
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
+				net.veloclient.velo.client.pvp.NameTagLines.heightField(),
 				new ConfigField.ChoiceField("Style", STYLES, () -> style, v -> style = v),
 				new ConfigField.ToggleField("Only When Damaged", () -> onlyWhenDamaged, v -> onlyWhenDamaged = v),
 				new ConfigField.ToggleField("Hide When The Server Shows Health", () -> hideWhenServerShows, v -> hideWhenServerShows = v),

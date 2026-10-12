@@ -16,6 +16,18 @@ public final class NameTagLines {
 	}
 
 	private static final List<Provider> PROVIDERS = new ArrayList<>();
+	/** Lines left free above a player whose vanilla name tag is hidden (server-drawn names/ranks/health). */
+	private static int extraLines = 2;
+
+	public static int extraLines() {
+		return extraLines;
+	}
+
+	/** Shared "Height Above Head" setting, shown in each module that draws lines here. */
+	public static net.veloclient.velo.module.ConfigField heightField() {
+		return new net.veloclient.velo.module.ConfigField.SliderField("Height When Server Hides Names", 0, 5, () -> extraLines,
+				v -> extraLines = (int) Math.round(v), v -> Math.round(v) + (Math.round(v) == 1 ? " line" : " lines"));
+	}
 
 	private NameTagLines() {
 	}

@@ -32,6 +32,7 @@ public final class DamageNumbersModule extends AbstractModule implements Configu
 	private boolean showHeals = true;
 	private boolean asHearts = false;
 	private double seconds = 1.5;
+	private boolean showSource = false;
 
 	public DamageNumbersModule() {
 		super("damage-numbers", "Damage Numbers", "Shows the damage players take (and heal) above their heads for a moment after each hit.",
@@ -77,6 +78,14 @@ public final class DamageNumbersModule extends AbstractModule implements Configu
 			return null;
 		}
 		Change change = m.shown.get(entityId);
+		if (m.showSource) {
+			// Diagnostic: which health number Velo sees for this player and where it came from.
+			Float server = net.veloclient.velo.client.pvp.ServerHealth.get(entityId);
+			Float last = m.lastHealth.get(entityId);
+			String source = server != null ? "server " + server : "entity " + (last == null ? "?" : String.format(Locale.ROOT, "%.1f", last));
+			String damage = change == null ? "" : String.format(Locale.ROOT, "  %+.1f", change.amount());
+			return PvpCompat.literal("[" + source + "]" + damage, 0xB8B8B8);
+		}
 		if (change == null) {
 			return null;
 		}
@@ -88,9 +97,11 @@ public final class DamageNumbersModule extends AbstractModule implements Configu
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
+				net.veloclient.velo.client.pvp.NameTagLines.heightField(),
 				new ConfigField.ToggleField("Show Healing Too", () -> showHeals, v -> showHeals = v),
 				new ConfigField.ToggleField("In Hearts (÷2)", () -> asHearts, v -> asHearts = v),
 				new ConfigField.SliderField("Show For", 0.5, 5, () -> seconds, v -> seconds = Math.round(v * 2) / 2.0,
-						v -> String.format(Locale.ROOT, "%.1fs", v)));
+						v -> String.format(Locale.ROOT, "%.1fs", v)),
+				new ConfigField.ToggleField("Show Health Source (Diagnostic)", () -> showSource, v -> showSource = v));
 	}
 }

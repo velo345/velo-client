@@ -223,7 +223,7 @@ public abstract class TitleScreenMixin {
 			}
 		}
 		TitleScreenTheme.drawBranding(context, MinecraftClient.getInstance().textRenderer, self.width,
-				TitleScreenTheme.brandingTop(self.width, self.height, rowCount));
+				TitleScreenTheme.brandingTop(self.width, self.height, rowCount + 1));
 		List<ButtonWidget> ordered = new java.util.ArrayList<>();
 		for (var child : self.children()) {
 			if (!(child instanceof ButtonWidget widget)) {
@@ -234,6 +234,32 @@ public abstract class TitleScreenMixin {
 				continue;
 			}
 			ordered.add(widget);
+		}
+		ordered.sort(java.util.Comparator.comparingInt(ButtonWidget::getY));
+		// Re-apply Velo's stack every frame: other mods (Mod Menu's "Mods" button on 1.21.11...) can
+		// move vanilla's buttons after our init pass, which left the glass buttons unevenly spaced.
+		net.veloclient.velo.client.gui.title.GlassMenuButton velo$store = null;
+		for (var child : self.children()) {
+			if (child instanceof net.veloclient.velo.client.gui.title.GlassMenuButton glass) {
+				velo$store = glass;
+				break;
+			}
+		}
+		java.util.Map<String, ButtonWidget> velo$byKey = new java.util.HashMap<>();
+		for (ButtonWidget widget : ordered) {
+			velo$byKey.put(velo$keyOf(widget.getMessage()), widget);
+		}
+		List<TitleScreenTheme.Layout> velo$stack = TitleScreenTheme.stackLayout(self.width, self.height,
+				velo$byKey.size() + (velo$store != null ? 1 : 0));
+		int velo$slot = 0;
+		for (String key : TitleScreenTheme.TITLE_KEY_ORDER) {
+			if (key.equals("$store")) {
+				if (velo$store != null) {
+					velo$position(velo$store, velo$stack.get(velo$slot++));
+				}
+			} else if (velo$byKey.containsKey(key)) {
+				velo$position(velo$byKey.get(key), velo$stack.get(velo$slot++));
+			}
 		}
 		ordered.sort(java.util.Comparator.comparingInt(ButtonWidget::getY));
 		for (ButtonWidget widget : ordered) {
@@ -460,7 +486,7 @@ public abstract class TitleScreenMixin {
 			}
 		}
 		TitleScreenTheme.drawBranding(context, Minecraft.getInstance().font, self.width,
-				TitleScreenTheme.brandingTop(self.width, self.height, rowCount));
+				TitleScreenTheme.brandingTop(self.width, self.height, rowCount + 1));
 		List<Button> ordered = new java.util.ArrayList<>();
 		for (var child : self.children()) {
 			if (!(child instanceof Button widget)) {
@@ -471,6 +497,32 @@ public abstract class TitleScreenMixin {
 				continue;
 			}
 			ordered.add(widget);
+		}
+		ordered.sort(java.util.Comparator.comparingInt(Button::getY));
+		// Re-apply Velo's stack every frame: other mods (Mod Menu's "Mods" button on 1.21.11...) can
+		// move vanilla's buttons after our init pass, which left the glass buttons unevenly spaced.
+		net.veloclient.velo.client.gui.title.GlassMenuButton velo$store = null;
+		for (var child : self.children()) {
+			if (child instanceof net.veloclient.velo.client.gui.title.GlassMenuButton glass) {
+				velo$store = glass;
+				break;
+			}
+		}
+		java.util.Map<String, Button> velo$byKey = new java.util.HashMap<>();
+		for (Button widget : ordered) {
+			velo$byKey.put(velo$keyOf(widget.getMessage()), widget);
+		}
+		List<TitleScreenTheme.Layout> velo$stack = TitleScreenTheme.stackLayout(self.width, self.height,
+				velo$byKey.size() + (velo$store != null ? 1 : 0));
+		int velo$slot = 0;
+		for (String key : TitleScreenTheme.TITLE_KEY_ORDER) {
+			if (key.equals("$store")) {
+				if (velo$store != null) {
+					velo$position(velo$store, velo$stack.get(velo$slot++));
+				}
+			} else if (velo$byKey.containsKey(key)) {
+				velo$position(velo$byKey.get(key), velo$stack.get(velo$slot++));
+			}
 		}
 		ordered.sort(java.util.Comparator.comparingInt(Button::getY));
 		for (Button widget : ordered) {

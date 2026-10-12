@@ -35,7 +35,7 @@ public final class ModuleIcons {
 			"old-animations", "hit-color", "hit-particles", "cooldowns", "health-indicator", "enemy-effects", "enemy-hunger",
 			"target-hud", "combo-counter", "reach-display", "pot-counter", "anti-farm-lag", "item-position",
 			"damage-numbers", "hit-sounds", "auto-gg", "height-limit", "speed-hud", "direction-hud", "arrow-counter",
-			"low-health-warning");
+			"low-health-warning", "low-fire");
 
 	private ModuleIcons() {
 	}

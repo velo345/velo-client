@@ -210,6 +210,49 @@ public final class PvpCompat {
 		return e.getZ();
 	}
 
+	/**
+	 * Text floating just above {@code player}'s head - text displays and named armor stands, which
+	 * servers use to draw names, ranks and health when they hide the vanilla name tag.
+	 */
+	public static List<String> floatingTextAbove(LivingEntity player) {
+		List<String> texts = new ArrayList<>();
+		double x = player.getX();
+		double top = player.getBoundingBox().maxY;
+		double z = player.getZ();
+		try {
+			//? if <26.1 {
+			var world = MinecraftClient.getInstance().world;
+			if (world == null) {
+				return texts;
+			}
+			var area = new net.minecraft.util.math.Box(x - 0.8, top - 0.4, z - 0.8, x + 0.8, top + 2.6, z + 0.8);
+			for (Entity e : world.getOtherEntities(player, area, e -> !(e instanceof LivingEntity) || e.hasCustomName())) {
+				if (e instanceof net.minecraft.entity.decoration.DisplayEntity.TextDisplayEntity) {
+					texts.add(((net.veloclient.velo.client.mixin.HologramAccessor) e).velo$text().getString());
+				} else if (e.hasCustomName() && e.getCustomName() != null) {
+					texts.add(e.getCustomName().getString());
+				}
+			}
+			//?} else {
+			/*var level = Minecraft.getInstance().level;
+			if (level == null) {
+				return texts;
+			}
+			var area = new net.minecraft.world.phys.AABB(x - 0.8, top - 0.4, z - 0.8, x + 0.8, top + 2.6, z + 0.8);
+			for (Entity e : level.getEntities(player, area, e -> !(e instanceof LivingEntity) || e.hasCustomName())) {
+				if (e instanceof net.minecraft.world.entity.Display.TextDisplay) {
+					texts.add(((net.veloclient.velo.client.mixin.HologramAccessor) e).velo$text().getString());
+				} else if (e.hasCustomName() && e.getCustomName() != null) {
+					texts.add(e.getCustomName().getString());
+				}
+			}
+			*///?}
+		} catch (RuntimeException | LinkageError ignored) {
+			// Accessor not applied on this setup - nothing to read.
+		}
+		return texts;
+	}
+
 	/** Your attack reach in blocks (the entity interaction range attribute - 3 in vanilla survival). */
 	public static double attackRange() {
 		//? if <26.1 {

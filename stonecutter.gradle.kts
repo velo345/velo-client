@@ -759,6 +759,14 @@ stonecutter parameters {
 			replace("\"addText\"", "\"addText\"")
 			// EntityRenderState#scoreText (NameTagLinesMixin's 26.x branches).
 			replace("state.scoreText", "state.scoreText")
+			// EntityRenderState#boundingBoxHeight (NameTagLinesMixin) - the bare Box rule would
+			// turn it into "boundingAABBHeight".
+			replace("boundingBoxHeight", "boundingBoxHeight")
+			// Display.TextDisplay (HologramAccessor / PvpCompat) - the bare Text rule would make it
+			// "ComponentDisplay".
+			replace("Display.TextDisplay", "Display.TextDisplay")
+			// HologramAccessor's @Invoker("getText") - real Mojmap method name.
+			replace("\"getText\"", "\"getText\"")
 			replace("ClientboundSetSubtitleTextPacket", "ClientboundSetSubtitleTextPacket")
 			replace("ClientboundSetTitleTextPacket", "ClientboundSetTitleTextPacket")
 			// Real Mojmap method (LivingEntityRenderer) that the bare "RenderLayers" rule would mangle.

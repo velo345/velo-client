@@ -98,6 +98,7 @@ public final class VeloClientMod implements ClientModInitializer {
 			net.veloclient.velo.client.modules.pvp.HitColorModule.tickAll();
 			net.veloclient.velo.client.modules.debug.BetterF3Module.tickShortcuts();
 			net.veloclient.velo.client.modules.pvp.DamageNumbersModule.tickAll();
+			net.veloclient.velo.client.pvp.ServerHealth.tick();
 		});
 		net.veloclient.velo.client.profile.VeloProfileStore.loadActiveDeferred();
 		// Previously only loaded lazily the first time the Crosshair select
@@ -229,6 +230,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.DirectionHudModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.ArrowCounterModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.LowHealthWarningModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.LowFireModule());
 		// HUD / QoL (section 6.2)
 		ModuleRegistry.register(new FpsCounterModule());
 		ModuleRegistry.register(new PingDisplayModule());
