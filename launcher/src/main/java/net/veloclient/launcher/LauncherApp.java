@@ -121,7 +121,7 @@ public final class LauncherApp extends Application {
 	private MinecraftSession session;
 	private Label accountLabel;
 	private Button accountButton;
-	private Button navHome, navNews, navServers, navFriends, navCosmetics, navStore, navSettings;
+	private Button navHome, navNews, navServers, navFriends, navCosmetics, navStore, navSettings, navMedia;
 	private VBox runningSection;
 	private VBox quickLaunchSection;
 	/** Which profile the home screen's carousel is showing - an index into {@link #orderedProfilesForHome()}, clamped back to range whenever the profile list changes (e.g. after a delete). */
@@ -410,8 +410,9 @@ public final class LauncherApp extends Application {
 		navCosmetics = navIconButton("cosmetics", "Cosmetics", this::showCosmetics);
 		navStore = navIconButton("store", "Store", this::showStore);
 		navSettings = navIconButton("settings", "Settings", this::showSettings);
+		navMedia = navIconButton("media", "Clips", this::showMedia);
 
-		sidebar.getChildren().addAll(title, navHome, navNews, navServers, navFriends, navCosmetics, navStore, navSettings);
+		sidebar.getChildren().addAll(title, navHome, navNews, navServers, navFriends, navMedia, navCosmetics, navStore, navSettings);
 		refreshNews(false);
 
 		// "Running" (live instances) and "Quick Launch" (recent one-click
@@ -576,7 +577,7 @@ public final class LauncherApp extends Application {
 	}
 
 	private void clearActiveNav() {
-		for (Button b : List.of(navHome, navNews, navServers, navFriends, navCosmetics, navStore, navSettings)) {
+		for (Button b : List.of(navHome, navNews, navServers, navFriends, navMedia, navCosmetics, navStore, navSettings)) {
 			b.getStyleClass().remove("nav-icon-button-active");
 		}
 	}
@@ -669,7 +670,7 @@ public final class LauncherApp extends Application {
 	}
 
 	private void markActiveNav(Button active) {
-		for (Button b : List.of(navHome, navNews, navServers, navFriends, navCosmetics, navStore, navSettings)) {
+		for (Button b : List.of(navHome, navNews, navServers, navFriends, navMedia, navCosmetics, navStore, navSettings)) {
 			b.getStyleClass().remove("nav-icon-button-active");
 		}
 		active.getStyleClass().add("nav-icon-button-active");
@@ -2616,6 +2617,11 @@ public final class LauncherApp extends Application {
 	}
 
 	// ---- Settings ----
+
+	private void showMedia() {
+		currentPage = this::showMedia;
+		setContent(net.veloclient.launcher.ui.MediaView.build(stage));
+	}
 
 	private Button updateButton;
 	private net.veloclient.launcher.launch.UpdateService.Release availableUpdate;
