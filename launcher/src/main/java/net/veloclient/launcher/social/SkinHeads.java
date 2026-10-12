@@ -26,7 +26,7 @@ public final class SkinHeads {
 
 	private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build();
 	private static final long TTL_MILLIS = 6 * 60 * 60 * 1000L;
-	private static final Map<String, CompletableFuture<byte[]>> CACHE = new ConcurrentHashMap<>();
+	private static final Map<String, CompletableFuture<byte[]>> CACHE = net.veloclient.launcher.ui.LauncherCaches.lru(300);
 
 	private SkinHeads() {
 	}

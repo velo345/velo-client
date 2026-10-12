@@ -102,6 +102,20 @@ public final class GameJars {
 		}
 	}
 
+	/** When the bundled jars were built into this launcher (0 if unknown). */
+	static long bundledAt() {
+		try (InputStream in = GameJars.class.getResourceAsStream("/net/veloclient/launcher/gamejars/build.properties")) {
+			if (in == null) {
+				return 0;
+			}
+			java.util.Properties p = new java.util.Properties();
+			p.load(in);
+			return Long.parseLong(p.getProperty("builtAt", "0").strip());
+		} catch (IOException | NumberFormatException e) {
+			return 0;
+		}
+	}
+
 	/** Downloaded jars from an older release than this launcher (it was updated since) are ignored. */
 	private static boolean cacheIsCurrent() {
 		Path props = UpdateService.gameJarsDir().resolve("cache.properties");

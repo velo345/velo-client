@@ -113,13 +113,23 @@ public final class PartyController {
 		Dialog<ButtonType> dialog = new Dialog<>();
 		dialog.initOwner(stage);
 		dialog.setTitle("Party invite");
-		dialog.setHeaderText(invite.get("fromName").getAsString() + " invited you to a party");
-		dialog.setContentText("Join " + invite.get("leaderName").getAsString() + "'s party to chat, share mods and launch together.");
-		ButtonType join = new ButtonType("Join", ButtonBar.ButtonData.OK_DONE);
-		ButtonType later = new ButtonType("Not now", ButtonBar.ButtonData.CANCEL_CLOSE);
+		String from = invite.get("fromName").getAsString();
+		javafx.scene.control.Label title = new javafx.scene.control.Label(from + " invited you to a party");
+		title.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+		javafx.scene.control.Label sub = new javafx.scene.control.Label(invite.get("leaderName").getAsString() + "'s party \u00B7 "
+				+ invite.get("members").getAsInt() + " in it\nChat together, play with the leader's mods and launch at the same time.");
+		sub.setWrapText(true);
+		sub.setStyle("-fx-opacity: 0.75;");
+		javafx.scene.layout.HBox content = new javafx.scene.layout.HBox(16,
+				net.veloclient.launcher.ui.Heads.head(invite.get("from").getAsString(), from, 56), new VBox(6, title, sub));
+		content.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+		content.setPrefWidth(440);
+		dialog.getDialogPane().setContent(content);
+		ButtonType join = new ButtonType("Join party", ButtonBar.ButtonData.OK_DONE);
+		ButtonType later = new ButtonType("Decline", ButtonBar.ButtonData.CANCEL_CLOSE);
 		dialog.getDialogPane().getButtonTypes().addAll(join, later);
 		net.veloclient.launcher.ui.DialogStyling.apply(dialog);
-		dialog.showAndWait().filter(b -> b == join).ifPresent(b -> LauncherSocial.partyRespond(invite.get("party").getAsString(), true));
+		dialog.showAndWait().ifPresent(choice -> LauncherSocial.partyRespond(invite.get("party").getAsString(), choice == join));
 	}
 
 	private void askToSync(Instance profile, JsonObject sync, String leaderName) {

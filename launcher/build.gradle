@@ -25,7 +25,8 @@ application {
 	// webp-imageio (RemoteIconLoader) loads a native decoder via System.load()
 	// - silences the JDK's restricted-native-access warning now, and avoids
 	// it becoming a hard failure on a future JDK that blocks this by default.
-	applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
+	applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED', '-Xms48m', '-Xmx768m', '-XX:+UseSerialGC', '-XX:MinHeapFreeRatio=10',
+			'-XX:MaxHeapFreeRatio=30', '-XX:TieredStopAtLevel=1', '-XX:ReservedCodeCacheSize=64m', '-Xss512k', '-Dprism.maxvram=256m']
 }
 
 dependencies {
@@ -85,6 +86,9 @@ tasks.register("bundleGameJars") {
 				new File(outDir, "${v}-addons.jar").bytes = newest(addons).bytes
 			}
 		}
+		// When these jars were bundled - the updater only treats a same-version release as a
+		// hotfix if its jars were uploaded after this (jar bytes aren't reproducible across builds).
+		new File(outDir, "build.properties").text = "builtAt=${System.currentTimeMillis()}\n"
 	}
 }
 
@@ -260,7 +264,20 @@ tasks.register("jpackageDist") {
 				// files already are), not a literal env var.
 				"--java-options", "--module-path=\$APPDIR",
 				"--java-options", "--add-modules=javafx.controls,javafx.graphics,javafx.swing",
-				"--java-options", "--enable-native-access=ALL-UNNAMED"
+				"--java-options", "--enable-native-access=ALL-UNNAMED",
+				// Memory: without a cap the JVM may take a quarter of the PC's RAM and G1 rarely hands
+				// it back - the launcher idles at ~60 MB of live data. SerialGC has no background GC
+				// threads and, with MaxHeapFreeRatio, shrinks the heap after a collection (idle mode
+				// forces one). C1-only JIT keeps compiler memory/threads down; a UI doesn't need C2.
+				"--java-options", "-Xms48m",
+				"--java-options", "-Xmx768m",
+				"--java-options", "-XX:+UseSerialGC",
+				"--java-options", "-XX:MinHeapFreeRatio=10",
+				"--java-options", "-XX:MaxHeapFreeRatio=30",
+				"--java-options", "-XX:TieredStopAtLevel=1",
+				"--java-options", "-XX:ReservedCodeCacheSize=64m",
+				"--java-options", "-Xss512k",
+				"--java-options", "-Dprism.maxvram=256m"
 		]
 		if (isWindows) {
 			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser", "--win-upgrade-uuid", launcherWindowsUpgradeUuid]

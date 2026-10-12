@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
  */
 public final class NewsUi {
 
-	private static final Map<String, Image> IMAGES = new ConcurrentHashMap<>();
+	private static final Map<String, Image> IMAGES = LauncherCaches.lru(30);
 	private static final Pattern INLINE = Pattern.compile("\\*\\*(.+?)\\*\\*|\\*(.+?)\\*|`(.+?)`|\\[(.+?)]\\((https?://[^)\\s]+)\\)");
 
 	private NewsUi() {

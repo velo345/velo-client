@@ -988,6 +988,12 @@
 	-fx-background-color: -velo-hover;
 }
 
+.segment-bar {
+	-fx-background-color: rgba(255, 255, 255, 0.05);
+	-fx-background-radius: 10;
+	-fx-padding: 4;
+}
+
 .segmented-button-active, .segmented-button-active:hover {
 	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
 	-fx-text-fill: white;

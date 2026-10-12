@@ -37,7 +37,7 @@ public final class RemoteIconLoader {
 	private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 	// Small process-wide cache - the same project icon is drawn repeatedly
 	// across search results/installed rows/update checks within one session.
-	private static final java.util.Map<String, Image> CACHE = new ConcurrentHashMap<>();
+	private static final java.util.Map<String, Image> CACHE = LauncherCaches.lru(250);
 
 	private RemoteIconLoader() {
 	}

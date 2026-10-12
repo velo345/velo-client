@@ -52,7 +52,7 @@ public final class UpdateService {
 			.followRedirects(HttpClient.Redirect.NORMAL).build();
 
 	/** One downloadable file of a release. */
-	public record Asset(String name, String url, long size, String sha256) {
+	public record Asset(String name, String url, long size, String sha256, long updatedAt, long id) {
 	}
 
 	/**
@@ -112,7 +112,14 @@ public final class UpdateService {
 			JsonObject a = element.getAsJsonObject();
 			String digest = a.has("digest") && !a.get("digest").isJsonNull() ? a.get("digest").getAsString() : null;
 			String sha = digest != null && digest.startsWith("sha256:") ? digest.substring(7) : null;
-			assets.add(new Asset(a.get("name").getAsString(), a.get("browser_download_url").getAsString(), a.get("size").getAsLong(), sha));
+			long updated = 0;
+			try {
+				updated = java.time.Instant.parse(a.get("updated_at").getAsString()).toEpochMilli();
+			} catch (RuntimeException ignored) {
+				// Unknown - treated as old.
+			}
+			assets.add(new Asset(a.get("name").getAsString(), a.get("browser_download_url").getAsString(), a.get("size").getAsLong(), sha,
+					updated, a.has("id") ? a.get("id").getAsLong() : 0));
 		}
 
 		boolean launcherNewer = compare(version, AppVersion.VERSION) > 0;
@@ -125,15 +132,23 @@ public final class UpdateService {
 			}
 		}
 
-		// Mod jars only from a release that isn't older than this launcher.
+		// Mod jars: a newer release always counts; the same version only when its jars were uploaded
+		// after this launcher bundled its own (a hotfix re-release) - and never twice for one upload.
 		Map<String, Asset> mods = new LinkedHashMap<>();
-		if (compare(version, AppVersion.VERSION) >= 0) {
+		int versionOrder = compare(version, AppVersion.VERSION);
+		if (versionOrder >= 0) {
+			long bundledAt = GameJars.bundledAt();
+			java.util.Set<String> downloaded = downloadedAssetIds();
 			for (GameVersion game : GameVersion.values()) {
 				for (boolean addons : new boolean[] {false, true}) {
 					String name = (addons ? "velo-addons-" : "velo-client-") + version + "+" + game.id() + ".jar";
 					String key = game.id() + (addons ? "-addons" : "");
 					for (Asset asset : assets) {
-						if (asset.name().equals(name) && !alreadyHave(key, asset)) {
+						if (!asset.name().equals(name) || downloaded.contains(asset.id() + ":" + asset.updatedAt())) {
+							continue;
+						}
+						boolean hotfix = asset.updatedAt() > bundledAt + 15 * 60_000L;
+						if ((versionOrder > 0 || hotfix) && !alreadyHave(key, asset)) {
 							mods.put(key, asset);
 						}
 					}
@@ -141,6 +156,26 @@ public final class UpdateService {
 			}
 		}
 		return new Release(version, notes, page, launcherNewer, installer, mods);
+	}
+
+	/** Release assets already downloaded ("id:updatedAt"), so the same upload is never offered again. */
+	private static java.util.Set<String> downloadedAssetIds() {
+		java.util.Set<String> ids = new java.util.LinkedHashSet<>();
+		Path file = gameJarsDir().resolve("cache.properties");
+		if (Files.exists(file)) {
+			try (var reader = Files.newBufferedReader(file)) {
+				Properties props = new Properties();
+				props.load(reader);
+				for (String id : props.getProperty("assets", "").split(",")) {
+					if (!id.isBlank()) {
+						ids.add(id.strip());
+					}
+				}
+			} catch (IOException ignored) {
+				// Treat as none.
+			}
+		}
+		return ids;
 	}
 
 	private static String tag(JsonObject release) {
@@ -176,6 +211,11 @@ public final class UpdateService {
 		}
 		Properties props = new Properties();
 		props.setProperty("version", release.version());
+		StringBuilder ids = new StringBuilder(String.join(",", downloadedAssetIds()));
+		for (Asset asset : release.modAssets().values()) {
+			ids.append(ids.isEmpty() ? "" : ",").append(asset.id()).append(':').append(asset.updatedAt());
+		}
+		props.setProperty("assets", ids.toString());
 		try (var out = Files.newBufferedWriter(dir.resolve("cache.properties"))) {
 			props.store(out, "Velo Client mod jars downloaded by the launcher updater");
 		}

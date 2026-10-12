@@ -121,7 +121,7 @@ public final class LauncherApp extends Application {
 	private MinecraftSession session;
 	private Label accountLabel;
 	private Button accountButton;
-	private Button navHome, navNews, navServers, navFriends, navCosmetics, navStore, navSettings, navMedia, navParty;
+	private Button navHome, navNews, navServers, navFriends, navCosmetics, navStore, navSettings, navMedia;
 	private VBox runningSection;
 	private VBox quickLaunchSection;
 	/** Which profile the home screen's carousel is showing - an index into {@link #orderedProfilesForHome()}, clamped back to range whenever the profile list changes (e.g. after a delete). */
@@ -163,6 +163,10 @@ public final class LauncherApp extends Application {
 
 	public static void main(String[] args) {
 		LauncherLog.install();
+		if (!SingleInstance.acquire()) {
+			LauncherLog.info("Launcher already running - brought it to the front instead of starting a second one");
+			System.exit(0);
+		}
 		launch(args);
 	}
 
@@ -204,6 +208,12 @@ public final class LauncherApp extends Application {
 		fixWindowsMaximizeRestoreBug(stage);
 		net.veloclient.launcher.ui.WindowPlacement.restore(stage, 1100, 680);
 		stage.show();
+		installIdleMode();
+		net.veloclient.launcher.SingleInstance.onActivate(() -> Platform.runLater(() -> {
+			stage.setIconified(false);
+			stage.show();
+			stage.toFront();
+		}));
 
 		attemptSilentSignIn();
 		partyController = new net.veloclient.launcher.party.PartyController(stage, this::currentProfile,
@@ -417,9 +427,8 @@ public final class LauncherApp extends Application {
 		navStore = navIconButton("store", "Store", this::showStore);
 		navSettings = navIconButton("settings", "Settings", this::showSettings);
 		navMedia = navIconButton("media", "Clips", this::showMedia);
-		navParty = navIconButton("party", "Party", this::showParty);
 
-		sidebar.getChildren().addAll(title, navHome, navNews, navServers, navFriends, navParty, navMedia, navCosmetics, navStore, navSettings);
+		sidebar.getChildren().addAll(title, navHome, navNews, navServers, navFriends, navMedia, navCosmetics, navStore, navSettings);
 		refreshNews(false);
 
 		// "Running" (live instances) and "Quick Launch" (recent one-click
@@ -584,7 +593,7 @@ public final class LauncherApp extends Application {
 	}
 
 	private void clearActiveNav() {
-		for (Button b : List.of(navHome, navNews, navServers, navFriends, navParty, navMedia, navCosmetics, navStore, navSettings)) {
+		for (Button b : List.of(navHome, navNews, navServers, navFriends, navMedia, navCosmetics, navStore, navSettings)) {
 			b.getStyleClass().remove("nav-icon-button-active");
 		}
 	}
@@ -677,10 +686,62 @@ public final class LauncherApp extends Application {
 	}
 
 	private void markActiveNav(Button active) {
-		for (Button b : List.of(navHome, navNews, navServers, navFriends, navParty, navMedia, navCosmetics, navStore, navSettings)) {
+		for (Button b : List.of(navHome, navNews, navServers, navFriends, navMedia, navCosmetics, navStore, navSettings)) {
 			b.getStyleClass().remove("nav-icon-button-active");
 		}
 		active.getStyleClass().add("nav-icon-button-active");
+	}
+
+	// ---- Idle mode: the launcher mostly sits in the background while you play ----
+
+	private boolean idle;
+	private javafx.animation.PauseTransition idleDelay;
+
+	/**
+	 * While the window is minimized - or unfocused with a game running - the launcher drops the
+	 * current page (stopping every animation and 3D view on it), empties its image caches and
+	 * hands the freed heap back to the OS. Coming back rebuilds the page you were on.
+	 */
+	private void installIdleMode() {
+		idleDelay = new javafx.animation.PauseTransition(Duration.seconds(4));
+		idleDelay.setOnFinished(e -> enterIdle());
+		Runnable evaluate = () -> {
+			boolean background = stage.isIconified() || !stage.isShowing()
+					|| (!stage.isFocused() && !RunningInstanceManager.running().isEmpty());
+			if (background && !idle) {
+				idleDelay.playFromStart();
+			} else if (!background) {
+				idleDelay.stop();
+				if (idle) {
+					leaveIdle();
+				}
+			}
+		};
+		stage.iconifiedProperty().addListener((o, a, b) -> evaluate.run());
+		stage.focusedProperty().addListener((o, a, b) -> {
+			// Unfocused-with-a-game waits longer: alt-tabbing out for a second shouldn't rebuild pages.
+			idleDelay.setDuration(Duration.seconds(stage.isIconified() ? 4 : 45));
+			evaluate.run();
+		});
+		stage.showingProperty().addListener((o, a, b) -> evaluate.run());
+	}
+
+	private void enterIdle() {
+		if (idle) {
+			return;
+		}
+		idle = true;
+		content.getChildren().clear();
+		net.veloclient.launcher.ui.LauncherCaches.trimAll();
+		// With SerialGC + MaxHeapFreeRatio (see launcher/build.gradle) a full collection also shrinks the heap.
+		System.gc();
+		LauncherLog.info("Launcher idle - page released, caches cleared");
+	}
+
+	private void leaveIdle() {
+		idle = false;
+		Runnable page = currentPage;
+		(page != null ? page : (Runnable) this::showHome).run();
 	}
 
 	private void setContent(Node node) {
@@ -1871,7 +1932,7 @@ public final class LauncherApp extends Application {
 
 	private void showFriends() {
 		currentPage = this::showFriends;
-		setContent(net.veloclient.launcher.ui.FriendsView.build(new net.veloclient.launcher.ui.FriendsView.Host() {
+		Node friendsNode = (net.veloclient.launcher.ui.FriendsView.build(new net.veloclient.launcher.ui.FriendsView.Host() {
 			@Override
 			public LauncherTheme theme() {
 				return theme;
@@ -1897,6 +1958,34 @@ public final class LauncherApp extends Application {
 				refreshFriendsBadge();
 			}
 		}));
+		boolean inParty = net.veloclient.launcher.social.LauncherSocial.party() != null;
+		boolean partyTab = friendsTabParty != null ? friendsTabParty : inParty;
+		ToggleButton friendsButton = new ToggleButton("Friends");
+		var partyNow = net.veloclient.launcher.social.LauncherSocial.party();
+		int invites = net.veloclient.launcher.social.LauncherSocial.partyInvites().size();
+		ToggleButton partyButton = new ToggleButton(partyNow != null ? "Party (" + partyNow.getAsJsonArray("members").size() + ")"
+				: invites > 0 ? "Party • " + invites + " invite" + (invites == 1 ? "" : "s") : "Party");
+		ToggleGroup tabs = new ToggleGroup();
+		friendsButton.setToggleGroup(tabs);
+		partyButton.setToggleGroup(tabs);
+		friendsButton.getStyleClass().add("segmented-button");
+		partyButton.getStyleClass().add("segmented-button");
+		(partyTab ? partyButton : friendsButton).setSelected(true);
+		(partyTab ? partyButton : friendsButton).getStyleClass().add("segmented-button-active");
+		friendsButton.setOnAction(e -> {
+			friendsTabParty = false;
+			showFriends();
+		});
+		partyButton.setOnAction(e -> {
+			friendsTabParty = true;
+			showFriends();
+		});
+		HBox switcher = new HBox(4, friendsButton, partyButton);
+		switcher.getStyleClass().add("segment-bar");
+		switcher.setMaxWidth(Region.USE_PREF_SIZE);
+		Node page = partyTab ? net.veloclient.launcher.ui.PartyView.build(this::currentProfile) : friendsNode;
+		VBox.setVgrow(page, Priority.ALWAYS);
+		setContent(new VBox(12, switcher, page));
 		markActiveNav(navFriends);
 	}
 
@@ -2563,6 +2652,9 @@ public final class LauncherApp extends Application {
 						statusLabel.setManaged(false);
 						refreshRunningSidebar();
 						refreshQuickLaunchSidebar();
+						if (net.veloclient.launcher.data.LauncherSettings.get().minimizeOnLaunch) {
+							stage.setIconified(true);
+						}
 					});
 					int exitCode = result.process().waitFor();
 					// A non-zero exit after a deliberate Stop is expected
@@ -2647,9 +2739,13 @@ public final class LauncherApp extends Application {
 		return all.isEmpty() ? null : all.get(0);
 	}
 
+	/** Friends page tab: null = pick automatically (Party while you're in one). */
+	private Boolean friendsTabParty;
+
 	private void showParty() {
-		currentPage = this::showParty;
-		setContent(net.veloclient.launcher.ui.PartyView.build(this::currentProfile));
+		friendsTabParty = true;
+		showFriends();
+		markActiveNav(navFriends);
 	}
 
 	/** The small party bar above Play on Home: members' heads, and what the party is doing. */
@@ -2688,7 +2784,6 @@ public final class LauncherApp extends Application {
 		open.getStyleClass().add("glass-button");
 		open.setOnAction(e -> {
 			showParty();
-			markActiveNav(navParty);
 		});
 		homePartyStrip.getChildren().addAll(label, open);
 	}
@@ -2763,6 +2858,16 @@ public final class LauncherApp extends Application {
 		net.veloclient.launcher.ui.SettingsUi.row(updates, "Velo Client", "Launcher, mod and addons - updated right here, no website needed",
 				"Downloads the latest GitHub release. New mod and addons builds apply to every profile on its next launch;"
 						+ " a new launcher version installs itself and restarts the launcher.", updateStatus, checkButton);
+		javafx.scene.control.CheckBox minimize = new javafx.scene.control.CheckBox();
+		minimize.setSelected(net.veloclient.launcher.data.LauncherSettings.get().minimizeOnLaunch);
+		minimize.setOnAction(e -> {
+			net.veloclient.launcher.data.LauncherSettings.Data data = net.veloclient.launcher.data.LauncherSettings.get();
+			data.minimizeOnLaunch = minimize.isSelected();
+			net.veloclient.launcher.data.LauncherSettings.save(data);
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(updates, "Minimize when the game starts", "The launcher frees its memory while it's in the background",
+				"While minimized (or in the background with a game running) the launcher drops the page you were on, stops all animations"
+						+ " and empties its image caches, so it uses as little RAM and CPU as possible while you play.", minimize);
 		Button systemCheck = new Button("Run check");
 		systemCheck.setOnAction(e -> net.veloclient.launcher.ui.SystemCheckDialog.showAll(stage,
 				net.veloclient.launcher.launch.SystemHealth.check(null)));

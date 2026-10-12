@@ -38,8 +38,8 @@ import java.util.function.Consumer;
  */
 final class CosmeticUi {
 
-	private static final Map<String, List<GifFrames.Frame>> FRAMES = new ConcurrentHashMap<>();
-	private static final Map<String, Image> THUMBNAILS = new ConcurrentHashMap<>();
+	private static final Map<String, List<GifFrames.Frame>> FRAMES = LauncherCaches.lru(6);
+	private static final Map<String, Image> THUMBNAILS = LauncherCaches.lru(120);
 	private static volatile String skinOwner;
 	private static volatile SkinFetcher.SkinData skin;
 

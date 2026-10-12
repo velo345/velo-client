@@ -40,6 +40,8 @@ public final class LauncherSettings {
 		public java.util.List<String> handledCrashes = new java.util.ArrayList<>();
 		/** Opt-in: send crash reports (crash report, log, mods, system) automatically, no dialog click needed. */
 		public boolean crashTelemetry;
+		/** Minimize the launcher once a game has started (it then frees its memory - see idle mode). */
+		public boolean minimizeOnLaunch = true;
 		/** Party leader: pressing Play also launches every member. */
 		public boolean partyLaunchTogether = true;
 		/** Party member: launch when the leader does (asks with a short countdown). */

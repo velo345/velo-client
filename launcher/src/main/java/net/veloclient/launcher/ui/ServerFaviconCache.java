@@ -23,7 +23,7 @@ import java.util.concurrent.Executors;
  */
 public final class ServerFaviconCache {
 
-	private static final Map<String, Image> CACHE = new ConcurrentHashMap<>();
+	private static final Map<String, Image> CACHE = LauncherCaches.lru(150);
 	private static final Set<String> INFLIGHT = ConcurrentHashMap.newKeySet();
 
 	private ServerFaviconCache() {

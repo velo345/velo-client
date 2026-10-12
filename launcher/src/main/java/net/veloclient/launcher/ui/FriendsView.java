@@ -238,6 +238,18 @@ public final class FriendsView {
 		VBox textBox = new VBox(1, name, status);
 		HBox.setHgrow(textBox, Priority.ALWAYS);
 		row.getChildren().addAll(headWithDot, textBox);
+		if (!inMyParty(friend.uuid)) {
+			Button invite = new Button("+ Party");
+			invite.getStyleClass().add("status-pill");
+			invite.setTooltip(new javafx.scene.control.Tooltip("Invite " + friend.username + " to your party"));
+			invite.setVisible(false);
+			row.hoverProperty().addListener((o, a, hover) -> invite.setVisible(hover));
+			invite.setOnAction(e -> {
+				e.consume();
+				act(LauncherSocial.partyInvite(friend.uuid), "Invited " + friend.username + " to your party");
+			});
+			row.getChildren().add(invite);
+		}
 		if (friend.unread > 0) {
 			Label badge = new Label(friend.unread > 99 ? "99+" : String.valueOf(friend.unread));
 			badge.getStyleClass().add("unread-badge");
@@ -248,6 +260,19 @@ public final class FriendsView {
 			select(friend.uuid);
 		});
 		return row;
+	}
+
+	private static boolean inMyParty(String uuid) {
+		var party = LauncherSocial.party();
+		if (party == null) {
+			return false;
+		}
+		for (var member : party.getAsJsonArray("members")) {
+			if (uuid.equals(member.getAsJsonObject().get("uuid").getAsString())) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private void select(String uuid) {

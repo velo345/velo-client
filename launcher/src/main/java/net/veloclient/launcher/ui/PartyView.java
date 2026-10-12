@@ -73,11 +73,9 @@ public final class PartyView {
 
 	private void rebuild() {
 		JsonObject party = LauncherSocial.party();
-		Label title = new Label("Party");
-		title.getStyleClass().add("page-title");
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox top = new HBox(10, title, spacer);
+		HBox top = new HBox(10, spacer);
 		top.setAlignment(Pos.CENTER_LEFT);
 		if (party != null) {
 			Button leave = new Button("Leave party");
@@ -124,9 +122,12 @@ public final class PartyView {
 
 	private Node inviteCard(JsonObject invite) {
 		String from = str(invite, "fromName");
-		Label text = new Label(from + " invited you to " + str(invite, "leaderName") + "'s party (" + num(invite, "members") + " in it)");
-		text.setWrapText(true);
-		Button join = new Button("Join");
+		Label title = new Label(from + " invited you to a party");
+		title.setStyle("-fx-font-size: 15px; -fx-font-weight: bold;");
+		Label sub = new Label(str(invite, "leaderName") + "'s party \u00B7 " + num(invite, "members") + (num(invite, "members") == 1 ? " player" : " players"));
+		sub.getStyleClass().add("settings-row-hint");
+		VBox text = new VBox(3, title, sub);
+		Button join = new Button("Join party");
 		join.getStyleClass().add("primary-button");
 		join.setOnAction(e -> act(LauncherSocial.partyRespond(str(invite, "party"), true), "You joined the party"));
 		Button decline = new Button("Decline");
@@ -134,34 +135,66 @@ public final class PartyView {
 		decline.setOnAction(e -> act(LauncherSocial.partyRespond(str(invite, "party"), false), "Invite declined"));
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox row = new HBox(10, Heads.head(str(invite, "from"), from, 32), text, spacer, join, decline);
+		HBox row = new HBox(14, Heads.head(str(invite, "from"), from, 44), text, spacer, decline, join);
 		row.setAlignment(Pos.CENTER_LEFT);
-		row.getStyleClass().add("settings-card");
+		row.setPadding(new Insets(14));
+		row.setStyle("-fx-background-color: linear-gradient(to right, rgba(120,140,255,0.22), rgba(120,140,255,0.06));"
+				+ " -fx-background-radius: 14; -fx-border-color: rgba(140,160,255,0.45); -fx-border-radius: 14;");
 		return row;
 	}
 
+	/** Online friends first, as clickable heads - one click invites. */
 	private Node inviteRow() {
-		ComboBox<String> friends = new ComboBox<>();
-		friends.setEditable(true);
-		friends.setPromptText("Friend's name");
+		VBox box = new VBox(6);
+		Label label = new Label("Invite friends");
+		label.getStyleClass().add("settings-row-hint");
+		javafx.scene.layout.FlowPane heads = new javafx.scene.layout.FlowPane(8, 8);
 		LauncherSocial.State state = LauncherSocial.snapshot();
-		if (state != null && state.friends != null) {
-			for (LauncherSocial.Friend friend : state.friends) {
-				friends.getItems().add(friend.username);
+		JsonObject party = LauncherSocial.party();
+		java.util.Set<String> taken = new java.util.HashSet<>();
+		if (party != null) {
+			for (String key : new String[] {"members", "invited"}) {
+				if (party.has(key)) {
+					for (JsonElement e : party.getAsJsonArray(key)) {
+						taken.add(e.getAsJsonObject().get("uuid").getAsString());
+					}
+				}
 			}
 		}
-		friends.setPrefWidth(220);
-		Button invite = new Button("Invite");
-		invite.getStyleClass().add("glass-button");
-		invite.setOnAction(e -> {
-			String name = friends.getEditor().getText().strip();
-			if (!name.isEmpty()) {
-				act(LauncherSocial.partyInvite(name), "Invited " + name);
-			}
-		});
-		HBox row = new HBox(8, friends, invite);
-		row.setAlignment(Pos.CENTER_LEFT);
-		return row;
+		if (state != null && state.friends != null) {
+			state.friends.stream().filter(f -> !taken.contains(f.uuid))
+					.sorted(java.util.Comparator.comparing((LauncherSocial.Friend f) -> !f.online).thenComparing(f -> f.username.toLowerCase(Locale.ROOT)))
+					.limit(24)
+					.forEach(friend -> heads.getChildren().add(inviteChip(friend)));
+		}
+		if (heads.getChildren().isEmpty()) {
+			label.setText(state == null || state.friends == null || state.friends.isEmpty()
+					? "Add friends on the Friends tab to invite them" : "Everyone's already invited");
+		}
+		box.getChildren().addAll(label, heads);
+		return box;
+	}
+
+	private Node inviteChip(LauncherSocial.Friend friend) {
+		StackPane head = new StackPane(Heads.head(friend.uuid, friend.username, 34));
+		Circle dot = new Circle(5, friend.online ? Color.web("#3ecf6e") : Color.web("#7a7a80"));
+		dot.setStroke(Color.web("#14141a"));
+		dot.setStrokeWidth(2);
+		StackPane.setAlignment(dot, Pos.BOTTOM_RIGHT);
+		head.getChildren().add(dot);
+		Label name = new Label(friend.username);
+		name.setStyle("-fx-font-size: 10px;");
+		name.setMaxWidth(64);
+		VBox chip = new VBox(3, head, name);
+		chip.setAlignment(Pos.CENTER);
+		chip.setPadding(new Insets(6));
+		chip.setStyle("-fx-background-radius: 10; -fx-cursor: hand;");
+		chip.setOnMouseEntered(e -> chip.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-background-radius: 10; -fx-cursor: hand;"));
+		chip.setOnMouseExited(e -> chip.setStyle("-fx-background-radius: 10; -fx-cursor: hand;"));
+		javafx.scene.control.Tooltip.install(chip, new javafx.scene.control.Tooltip("Invite " + friend.username));
+		chip.setOnMouseClicked(e -> act(LauncherSocial.partyInvite(friend.uuid), "Invited " + friend.username));
+		chip.setOpacity(friend.online ? 1 : 0.6);
+		return chip;
 	}
 
 	private Node membersColumn(JsonObject party) {
