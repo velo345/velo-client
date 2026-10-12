@@ -11,5 +11,10 @@
 	"key.category.velo-client.general": "Velo Client",
 	"key.velo-client.save_clip": "Save Clip",
 	"key.velo-client.fight_recap": "Open Fight Recap",
-	"key.velo-client.party_ping": "Party Ping"
+	"key.velo-client.party_ping": "Party Ping",
+	"key.velo-client.fast_grow": "Toggle Fast Grow",
+	"key.velo-client.tick_step": "Tick Mode: Step Forward",
+	"key.velo-client.tick_back": "Tick Mode: Step Back",
+	"key.velo-client.tick_play": "Tick Mode: Play While Held",
+	"key.velo-client.tick_rewind": "Tick Mode: Rewind 1 Second"
 }

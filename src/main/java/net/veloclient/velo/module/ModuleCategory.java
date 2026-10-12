@@ -12,7 +12,8 @@ public enum ModuleCategory {
 	DEBUG("Debug"),
 	COSMETICS("Cosmetics"),
 	QOL("Quality of Life"),
-	PVP("PvP");
+	PVP("PvP"),
+	REDSTONE("Redstone");
 
 	private final String displayName;
 

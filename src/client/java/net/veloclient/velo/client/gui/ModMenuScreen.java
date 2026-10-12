@@ -61,7 +61,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 	/** Module categories in the order people look for them. */
 	private static final ModuleCategory[] CATEGORY_ORDER = {
 			ModuleCategory.HUD, ModuleCategory.PVP, ModuleCategory.QOL, ModuleCategory.PERFORMANCE, ModuleCategory.RENDERING,
-			ModuleCategory.COSMETICS, ModuleCategory.SERVER_TOOLS, ModuleCategory.DEBUG};
+			ModuleCategory.COSMETICS, ModuleCategory.REDSTONE, ModuleCategory.SERVER_TOOLS, ModuleCategory.DEBUG};
 	private static final int TOP_BAR = 22;
 
 	private final java.util.List<net.veloclient.velo.client.gui.widget.VeloIconButton> toolButtons = new java.util.ArrayList<>();
@@ -434,6 +434,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			case COSMETICS -> "cosmetics";
 			case QOL -> "qol";
 			case PVP -> "pvp";
+			case REDSTONE -> "redstone";
 		};
 	}
 
