@@ -372,6 +372,13 @@ public final class SocialClient {
 		try {
 			JsonObject partyState = get("/v1/party/state", Duration.ofSeconds(15));
 			party = partyState.has("party") && partyState.get("party").isJsonObject() ? partyState.getAsJsonObject("party") : null;
+			if (partyState.has("invites")) {
+				List<JsonObject> invites = new ArrayList<>();
+				for (JsonElement e : partyState.getAsJsonArray("invites")) {
+					invites.add(e.getAsJsonObject());
+				}
+				partyInvites = List.copyOf(invites);
+			}
 		} catch (Exception ignored) {
 			// Server without parties.
 		}
@@ -479,6 +486,11 @@ public final class SocialClient {
 		return party;
 	}
 
+	/** In a Velo party (even alone in it). */
+	public static boolean inPartyOrSolo() {
+		return party != null;
+	}
+
 	public static boolean inParty() {
 		JsonObject p = party;
 		return p != null && p.has("members") && p.getAsJsonArray("members").size() > 1;
@@ -489,7 +501,100 @@ public final class SocialClient {
 		PARTY_LISTENERS.add(listener);
 	}
 
+	private static volatile List<JsonObject> partyInvites = List.of();
+
+	/** Party invites waiting for an answer (newest last). */
+	public static List<JsonObject> partyInvites() {
+		return partyInvites;
+	}
+
+	public static String myUuidPublic() {
+		return myUuid();
+	}
+
+	public static boolean isPartyLeader() {
+		JsonObject p = party;
+		String me = myUuid();
+		return p != null && me != null && me.equals(p.get("leader").getAsString());
+	}
+
+	private static void trackParty(String type, JsonObject data) {
+		switch (type) {
+			case "party_invite" -> {
+				List<JsonObject> list = new ArrayList<>(partyInvites);
+				list.removeIf(i -> i.get("party").getAsString().equals(data.get("party").getAsString()));
+				list.add(data);
+				partyInvites = List.copyOf(list);
+			}
+			case "party_chat" -> {
+				JsonObject current = party;
+				if (current != null && current.has("chat")) {
+					current.getAsJsonArray("chat").add(data);
+				}
+			}
+			case "party" -> {
+				JsonObject current = party;
+				if (current != null) {
+					String id = current.get("id").getAsString();
+					partyInvites = partyInvites.stream().filter(i -> !id.equals(i.get("party").getAsString())).toList();
+				}
+			}
+			default -> {
+			}
+		}
+	}
+
+	private static CompletableFuture<String> partyAction(String path, JsonObject body) {
+		return action(path, body).thenApply(error -> {
+			try {
+				JsonObject partyState = get("/v1/party/state", Duration.ofSeconds(15));
+				party = partyState.has("party") && partyState.get("party").isJsonObject() ? partyState.getAsJsonObject("party") : null;
+				List<JsonObject> invites = new ArrayList<>();
+				if (partyState.has("invites")) {
+					for (JsonElement e : partyState.getAsJsonArray("invites")) {
+						invites.add(e.getAsJsonObject());
+					}
+				}
+				partyInvites = List.copyOf(invites);
+				publishParty("party_refresh", new JsonObject());
+			} catch (Exception ignored) {
+				// Next poll catches up.
+			}
+			return error;
+		});
+	}
+
+	public static CompletableFuture<String> partyCreate() {
+		return partyAction("/v1/party/create", new JsonObject());
+	}
+
+	public static CompletableFuture<String> partyInvite(String target) {
+		JsonObject body = new JsonObject();
+		body.addProperty("target", target);
+		return partyAction("/v1/party/invite", body);
+	}
+
+	public static CompletableFuture<String> partyRespond(String partyId, boolean accept) {
+		JsonObject body = new JsonObject();
+		body.addProperty("party", partyId);
+		body.addProperty("accept", accept);
+		return partyAction("/v1/party/respond", body);
+	}
+
+	public static CompletableFuture<String> partyLeave() {
+		return partyAction("/v1/party/leave", new JsonObject());
+	}
+
+	public static CompletableFuture<String> partyKick(String uuid) {
+		return partyAction("/v1/party/kick", uuidBody(uuid));
+	}
+
+	public static CompletableFuture<String> partyTransfer(String uuid) {
+		return partyAction("/v1/party/transfer", uuidBody(uuid));
+	}
+
 	private static void publishParty(String type, JsonObject data) {
+		trackParty(type, data);
 		for (var listener : PARTY_LISTENERS) {
 			try {
 				listener.accept(type, data);

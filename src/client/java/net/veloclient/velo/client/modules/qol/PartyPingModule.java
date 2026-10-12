@@ -46,9 +46,10 @@ public final class PartyPingModule extends AbstractModule implements Configurabl
 	private boolean sound = true;
 	private int color = 0xFFFFC53D;
 	private long lastPing;
+	private String command = "party";
 
 	public PartyPingModule() {
-		super("party-ping", "Party Ping", "Ping a spot for your party (V) - they see a marker with distance. Shared waypoints pop up to save.",
+		super("party-ping", "Party", "Party chat (/party), pings (V), invites and shared waypoints - parties live in the Friends menu.",
 				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, true);
 		instance = this;
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -143,12 +144,16 @@ public final class PartyPingModule extends AbstractModule implements Configurabl
 						WaypointManager.importShared(shared, from);
 						NotificationOverlay.show(new NotificationOverlay.Toast(null, null, "Waypoint saved", str(data, "name"), 2500, null, null, null));
 					}, () -> { }).labels("Save", "Ignore"));
-		} else if (type.equals("party_chat") && data.has("text") && !"system".equals(str(data, "kind"))) {
-			String me = net.veloclient.velo.client.serverpacks.ServerData.localName();
-			if (!me.equals(str(data, "name"))) {
-				NotificationOverlay.show(new NotificationOverlay.Toast(str(data, "from"), str(data, "name"), "[Party] " + str(data, "name"),
-						str(data, "text"), 5000, null, null, null));
-			}
+		} else if (type.equals("party_chat")) {
+			net.veloclient.velo.client.social.PartyChat.show(data);
+		} else if (type.equals("party_invite") && data.has("party")) {
+			String from = str(data, "fromName");
+			String partyId = str(data, "party");
+			NotificationOverlay.replaceKeyed("party:" + partyId, new NotificationOverlay.Toast(str(data, "from"), from,
+					from + " invited you to a party", str(data, "leaderName") + "'s party - chat, pings & shared waypoints", 30000,
+					net.veloclient.velo.client.gui.FriendsScreen::openParty,
+					() -> SocialClient.partyRespond(partyId, true),
+					() -> SocialClient.partyRespond(partyId, false)).labels("Join", "Decline"));
 		}
 	}
 
@@ -209,6 +214,10 @@ public final class PartyPingModule extends AbstractModule implements Configurabl
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
+				new ConfigField.TextField("Party Chat Command", "party", () -> command, v -> {
+					command = v == null || v.isBlank() ? "party" : v.strip();
+					net.veloclient.velo.client.social.PartyChat.setCommandName(command);
+				}),
 				KeybindConfig.field("Ping Key", PING_KEY),
 				new ConfigField.SliderField("Ping Lasts (s)", 3, 30, () -> seconds, v -> seconds = Math.round(v),
 						v -> String.format(Locale.ROOT, "%ds", Math.round(v))),

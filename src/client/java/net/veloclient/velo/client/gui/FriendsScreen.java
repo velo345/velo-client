@@ -34,7 +34,7 @@ import java.util.Map;
  */
 public final class FriendsScreen extends VeloWindow {
 
-	private enum View { CHAT, REQUESTS, BLOCKED, NOTIFICATIONS }
+	private enum View { PARTY, CHAT, REQUESTS, BLOCKED, NOTIFICATIONS }
 
 	private static final int MAX_LEFT_WIDTH = 188;
 	private static final int ROW_HEIGHT = 30;
@@ -42,7 +42,9 @@ public final class FriendsScreen extends VeloWindow {
 
 	private static FriendsScreen openInstance;
 
-	private View view = View.CHAT;
+	/** Party first while you're in one (or have an invite), otherwise your friends' chats. */
+	private View view = SocialClient.party() != null || !SocialClient.partyInvites().isEmpty() ? View.PARTY : View.CHAT;
+	private String partyMember;
 	private String selected;
 	private TextFieldWidget addField;
 	private TextFieldWidget chatField;
@@ -79,6 +81,12 @@ public final class FriendsScreen extends VeloWindow {
 		FriendsScreen screen = openInstance != null && ClientCompat.currentScreen() == openInstance ? openInstance : new FriendsScreen();
 		screen.view = View.CHAT;
 		screen.select(uuid);
+		show(screen);
+	}
+
+	public static void openParty() {
+		FriendsScreen screen = openInstance != null && ClientCompat.currentScreen() == openInstance ? openInstance : new FriendsScreen();
+		screen.view = View.PARTY;
 		show(screen);
 	}
 
@@ -144,10 +152,10 @@ public final class FriendsScreen extends VeloWindow {
 		int rightWidth = rightWidth();
 		chatField = new TextFieldWidget(this.textRenderer, rightX + 8, contentBottom() - 15, rightWidth - 64, 14, Text.literal("Message"));
 		chatField.setDrawsBackground(false);
-		chatField.setPlaceholder(Text.literal(VeloUi.trim("Write a message...", chatField.getWidth() - 8)));
+		chatField.setPlaceholder(Text.literal(VeloUi.trim(view == View.PARTY ? "Message your party..." : "Write a message...", chatField.getWidth() - 8)));
 		chatField.setMaxLength(500);
 		chatField.setText(chatFieldValue);
-		chatField.visible = view == View.CHAT && SocialClient.friend(selected) != null;
+		chatField.visible = view == View.CHAT && SocialClient.friend(selected) != null || view == View.PARTY && SocialClient.party() != null;
 		addDrawableChild(chatField);
 	}
 
@@ -170,7 +178,8 @@ public final class FriendsScreen extends VeloWindow {
 	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
 		hits.clear();
 		if (chatField != null) {
-			chatField.visible = view == View.CHAT && SocialClient.friend(selected) != null && SocialClient.isReady();
+			chatField.visible = (view == View.CHAT && SocialClient.friend(selected) != null || view == View.PARTY && SocialClient.party() != null)
+					&& SocialClient.isReady();
 		}
 		if (addField != null) {
 			addField.visible = SocialClient.isReady();
@@ -315,6 +324,13 @@ public final class FriendsScreen extends VeloWindow {
 			VeloDraw.fillRounded(context, badgeX, y + 4, badgeWidth, 11, 5, theme.accentStart());
 			context.drawTextWithShadow(this.textRenderer, count, badgeX + (badgeWidth - this.textRenderer.getWidth(count)) / 2, y + 6, 0xFFFFFFFF);
 		}
+		if (hovered && !inParty(friend.uuid) && y + 8 >= clipTop && y + 22 <= clipBottom) {
+			hits.add(VeloUi.pill(context, x + leftWidth() - 24, y + 7, 18, 16, "+", 1, mouseX, mouseY, () -> {
+				report(SocialClient.partyInvite(friend.uuid), "Invited " + friend.username + " to your party");
+				view = View.PARTY;
+				layoutContent();
+			}));
+		}
 		if (hovered) {
 			hits.add(new VeloUi.Hit(x, Math.max(y, clipTop), leftWidth(), Math.min(ROW_HEIGHT, clipBottom - Math.max(y, clipTop)), () -> {
 				view = View.CHAT;
@@ -334,8 +350,11 @@ public final class FriendsScreen extends VeloWindow {
 		SocialClient.State state = SocialClient.snapshot();
 		View[] views = View.values();
 		boolean narrow = width < 300;
-		String[] labels = {"Chat", (narrow ? "Req." : "Requests") + (state.incoming.isEmpty() ? "" : " (" + state.incoming.size() + ")"),
-				"Blocked", narrow ? "Popups" : "Notifications"};
+		var party = SocialClient.party();
+		int partyInvites = SocialClient.partyInvites().size();
+		String partyLabel = party != null ? "Party (" + party.getAsJsonArray("members").size() + ")" : partyInvites > 0 ? "Party \u2022" + partyInvites : "Party";
+		String[] labels = {partyLabel, "Chat", (narrow ? "Req." : "Requests") + (state.incoming.isEmpty() ? "" : " (" + state.incoming.size() + ")"),
+				"Blocked", narrow ? "Popups" : "Alerts"};
 		int segWidth = (width - 12) / views.length;
 		for (int i = 0; i < views.length; i++) {
 			View target = views[i];
@@ -356,6 +375,10 @@ public final class FriendsScreen extends VeloWindow {
 		}
 
 		int bodyTop = y + 6 + NAV_HEIGHT + 8;
+		if (view == View.PARTY) {
+			renderParty(context, x, bodyTop, width, mouseX, mouseY);
+			return;
+		}
 		if (view == View.CHAT) {
 			renderChat(context, x, bodyTop, width, mouseX, mouseY);
 			return;
@@ -390,6 +413,141 @@ public final class FriendsScreen extends VeloWindow {
 				hits.set(i, new VeloUi.Hit(hit.x(), y1, hit.width(), y2 - y1, hit.action()));
 			}
 		}
+	}
+
+	private static boolean inParty(String uuid) {
+		var party = SocialClient.party();
+		if (party == null) {
+			return false;
+		}
+		for (String key : new String[] {"members", "invited"}) {
+			if (party.has(key)) {
+				for (var member : party.getAsJsonArray(key)) {
+					if (uuid.equals(member.getAsJsonObject().get("uuid").getAsString())) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	private static String str(com.google.gson.JsonObject o, String key) {
+		return o.has(key) && !o.get(key).isJsonNull() ? o.get(key).getAsString() : "";
+	}
+
+	/** Party tab: invites, members (click one for leader actions), party chat. */
+	private void renderParty(DrawContext context, int x, int top, int width, int mouseX, int mouseY) {
+		Theme theme = ThemeManager.active();
+		int y = top;
+		for (var invite : SocialClient.partyInvites()) {
+			int h = 38;
+			VeloDraw.fillRoundedGradient(context, x + 6, y, width - 12, h, 7, VeloUi.withAlpha(theme.accentStart(), 0x70),
+					VeloUi.withAlpha(theme.accentStart(), 0x28));
+			PlayerHeads.draw(context, str(invite, "from"), str(invite, "fromName"), x + 12, y + 7, 24);
+			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(str(invite, "fromName") + " invited you", width - 150), x + 42, y + 8, 0xFFFFFFFF);
+			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(str(invite, "leaderName") + "'s party", width - 150), x + 42, y + 21,
+					VeloUi.withAlpha(0xFFFFFFFF, 0xB0));
+			String partyId = str(invite, "party");
+			hits.add(VeloUi.pill(context, x + width - 112, y + 11, 50, 16, "Join", 2, mouseX, mouseY,
+					() -> report(SocialClient.partyRespond(partyId, true), "You joined the party")));
+			hits.add(VeloUi.pill(context, x + width - 58, y + 11, 46, 16, "Decline", 0, mouseX, mouseY,
+					() -> report(SocialClient.partyRespond(partyId, false), "Invite declined")));
+			y += h + 6;
+		}
+		var party = SocialClient.party();
+		if (party == null) {
+			int lineY = y + 10;
+			for (String line : VeloUi.wrap("Play together: party chat (/" + net.veloclient.velo.client.social.PartyChat.commandName()
+					+ "), pings for your party (V), shared waypoints and launching together from the launcher.", width - 24)) {
+				context.drawTextWithShadow(this.textRenderer, line, x + 12, lineY, VeloUi.muted());
+				lineY += 11;
+			}
+			hits.add(VeloUi.pill(context, x + 12, lineY + 6, 110, 18, "Start a party", 1, mouseX, mouseY,
+					() -> report(SocialClient.partyCreate(), "Party started - hover a friend and click + to invite")));
+			context.drawTextWithShadow(this.textRenderer, VeloUi.trim("or hover a friend on the left and click +", width - 140), x + 130, lineY + 11,
+					VeloUi.muted());
+			return;
+		}
+		String me = SocialClient.myUuidPublic();
+		boolean leader = SocialClient.isPartyLeader();
+		String leaderUuid = str(party, "leader");
+		var members = party.getAsJsonArray("members");
+		context.drawTextWithShadow(this.textRenderer, "PARTY  " + members.size() + "/8", x + 10, y + 2, VeloUi.muted());
+		hits.add(VeloUi.pill(context, x + width - 58, y - 2, 50, 14, "Leave", 3, mouseX, mouseY,
+				() -> report(SocialClient.partyLeave(), "You left the party")));
+		y += 16;
+		int slot = 44;
+		int hx = x + 10;
+		for (var element : members) {
+			var member = element.getAsJsonObject();
+			String uuid = str(member, "uuid");
+			String name = str(member, "name");
+			boolean online = member.has("online") && member.get("online").getAsBoolean();
+			boolean hovered = VeloUi.inside(mouseX, mouseY, hx, y, slot - 4, 40);
+			if (uuid.equals(partyMember) || hovered) {
+				VeloDraw.fillRounded(context, hx - 2, y - 2, slot - 2, 42, 5, VeloUi.withAlpha(0xFFFFFFFF, uuid.equals(partyMember) ? 0x22 : 0x12));
+			}
+			PlayerHeads.draw(context, uuid, name, hx + (slot - 4 - 22) / 2, y + 2, 22);
+			VeloDraw.fillCircle(context, hx + (slot - 4) / 2 + 10, y + 23, 3, 0xFF101010);
+			VeloDraw.fillCircle(context, hx + (slot - 4) / 2 + 10, y + 23, 2, online ? 0xFF43D17A : 0xFF7A7A80);
+			if (uuid.equals(leaderUuid)) {
+				context.drawTextWithShadow(this.textRenderer, "\u265B", hx + (slot - 4) / 2 - 3, y - 7, 0xFFFFC53D);
+			}
+			String shown = VeloUi.trim(uuid.equals(me) ? "You" : name, slot - 2);
+			context.drawTextWithShadow(this.textRenderer, shown, hx + (slot - 4 - this.textRenderer.getWidth(shown)) / 2, y + 28,
+					online ? theme.text() : VeloUi.muted());
+			if (leader && !uuid.equals(me)) {
+				hits.add(new VeloUi.Hit(hx, y, slot - 4, 40, () -> partyMember = uuid.equals(partyMember) ? null : uuid));
+			}
+			hx += slot;
+			if (hx + slot > x + width) {
+				break;
+			}
+		}
+		y += 44;
+		if (leader && partyMember != null) {
+			String target = partyMember;
+			hits.add(VeloUi.pill(context, x + 10, y, 90, 16, "Make leader", 1, mouseX, mouseY, () -> {
+				partyMember = null;
+				report(SocialClient.partyTransfer(target), "Leadership handed over");
+			}));
+			hits.add(VeloUi.pill(context, x + 106, y, 70, 16, "Remove", 3, mouseX, mouseY, () -> {
+				partyMember = null;
+				report(SocialClient.partyKick(target), "Removed from the party");
+			}));
+			y += 22;
+		}
+		// Party chat, newest at the bottom above the input.
+		int chatTop = y;
+		int chatBottom = contentBottom() - 20;
+		VeloDraw.fillRounded(context, x + 6, chatTop, width - 12, chatBottom - chatTop, 5, VeloUi.withAlpha(0xFF000000, 0x30));
+		context.enableScissor(x + 6, chatTop, x + width - 6, chatBottom);
+		var chat = party.has("chat") ? party.getAsJsonArray("chat") : new com.google.gson.JsonArray();
+		int lineY = chatBottom - 4 + (int) chatScroll;
+		for (int i = chat.size() - 1; i >= 0 && lineY > chatTop - 200; i--) {
+			var line = chat.get(i).getAsJsonObject();
+			boolean system = "system".equals(str(line, "kind"));
+			String text = system ? str(line, "text") : str(line, "name") + ": " + str(line, "text");
+			List<String> wrapped = VeloUi.wrap(text, width - 24);
+			for (int w = wrapped.size() - 1; w >= 0; w--) {
+				lineY -= 10;
+				int color = system ? VeloUi.muted() : w == 0 ? 0xFF7FD8FF : theme.text();
+				if (!system && w == 0) {
+					String name = str(line, "name") + ":";
+					context.drawTextWithShadow(this.textRenderer, name, x + 12, lineY, 0xFF7FD8FF);
+					context.drawTextWithShadow(this.textRenderer, wrapped.get(0).substring(Math.min(wrapped.get(0).length(), name.length())),
+							x + 12 + this.textRenderer.getWidth(name), lineY, theme.text());
+				} else {
+					context.drawTextWithShadow(this.textRenderer, wrapped.get(w), x + 12, lineY, color);
+				}
+			}
+			lineY -= 3;
+		}
+		context.disableScissor();
+		chatScroll = Math.max(0, chatScroll);
+		VeloDraw.fillRounded(context, x + 6, contentBottom() - 17, width - 66, 16, 4, VeloUi.withAlpha(0xFF000000, 0x40));
+		hits.add(VeloUi.pill(context, x + width - 52, contentBottom() - 18, 46, 18, "Send", 1, mouseX, mouseY, this::submitMessage));
 	}
 
 	private void renderChat(DrawContext context, int x, int top, int width, int mouseX, int mouseY) {
@@ -745,6 +903,22 @@ public final class FriendsScreen extends VeloWindow {
 	}
 
 	private void submitMessage() {
+		if (view == View.PARTY) {
+			String text = chatField.getText().strip();
+			if (text.isEmpty() || SocialClient.party() == null) {
+				return;
+			}
+			chatField.setText("");
+			chatFieldValue = "";
+			chatScroll = 0;
+			SocialClient.partyChat(text).thenAccept(error -> MinecraftClient.getInstance().execute(() -> {
+				if (error != null) {
+					chatField.setText(text);
+					flash(error, true);
+				}
+			}));
+			return;
+		}
 		SocialClient.Friend friend = SocialClient.friend(selected);
 		String text = chatField.getText().strip();
 		if (friend == null || text.isEmpty()) {
@@ -788,7 +962,7 @@ public final class FriendsScreen extends VeloWindow {
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
 		if (mouseX < rightX()) {
 			friendsScroll -= verticalAmount * 16;
-		} else if (view == View.CHAT) {
+		} else if (view == View.CHAT || view == View.PARTY) {
 			chatScroll += verticalAmount * 16;
 		} else {
 			rightScroll -= verticalAmount * 16;
