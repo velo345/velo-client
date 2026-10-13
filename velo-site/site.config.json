@@ -13,10 +13,10 @@
   },
   "release": {
     "_comment": "Bump version on every release - the download buttons link straight to these GitHub release assets.",
-    "version": "0.8.5",
+    "version": "0.8.6",
     "channel": "Pre-release",
-    "launcherExe": "Velo.Client.Launcher-0.8.5.exe",
-    "launcherDeb": "velo-client-launcher_0.8.5_amd64.deb"
+    "launcherExe": "Velo.Client.Launcher-0.8.6.exe",
+    "launcherDeb": "velo-client-launcher_0.8.6_amd64.deb"
   },
   "minecraft": {
     "version": "1.21.11 · 26.1 · 26.2 · 26.3",
