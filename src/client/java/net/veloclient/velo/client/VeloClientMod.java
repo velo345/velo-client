@@ -240,8 +240,14 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.PartyPingModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.ChatTweaksModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.redstone.HopperSpeedModule());
-		ModuleRegistry.register(new net.veloclient.velo.client.modules.redstone.TickControlModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.redstone.FastGrowModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.redstone.RedstoneModeModule());
+		// Redstone Mode's undo history and timeline recordings live for one world session only.
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+			net.veloclient.velo.client.redstone.Timeline.discard();
+			net.veloclient.velo.client.redstone.RmOps.reset();
+			net.veloclient.velo.client.redstone.TickControls.exit();
+		});
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.ServerOverlaysModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.PlayerLevelsModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.servertools.GameModePresetsModule());

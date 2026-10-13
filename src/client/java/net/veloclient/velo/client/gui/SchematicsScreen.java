@@ -77,11 +77,13 @@ public final class SchematicsScreen extends VeloWindow {
 		this.clearChildren();
 
 		int toggleY = contentY();
-		int toggleWidth = (contentWidth() - 8) / 2;
+		int toggleWidth = (contentWidth() - 16) / 3;
 		addDrawableChild(new VeloButton(contentX(), toggleY, toggleWidth, TOGGLE_ROW_HEIGHT,
 				Text.literal("Litematica"), b -> selectFormat(SchematicFormat.LITEMATICA)).selected(format == SchematicFormat.LITEMATICA));
 		addDrawableChild(new VeloButton(contentX() + toggleWidth + 8, toggleY, toggleWidth, TOGGLE_ROW_HEIGHT,
 				Text.literal("WorldEdit"), b -> selectFormat(SchematicFormat.WORLDEDIT)).selected(format == SchematicFormat.WORLDEDIT));
+		addDrawableChild(new VeloButton(contentX() + (toggleWidth + 8) * 2, toggleY, toggleWidth, TOGGLE_ROW_HEIGHT,
+				Text.literal("Velo"), b -> selectFormat(SchematicFormat.VELO)).selected(format == SchematicFormat.VELO));
 
 		int areaTop = toggleY + TOGGLE_ROW_HEIGHT + 6;
 
@@ -137,10 +139,16 @@ public final class SchematicsScreen extends VeloWindow {
 										status = Text.literal("Couldn't remove: " + e.getMessage());
 									}
 								})),
-						match != null && match.found() ? () -> openInBrowser(match.postUrl()) : () -> { });
+						format == SchematicFormat.VELO || (format == SchematicFormat.LITEMATICA && (match == null || !match.found()))
+								? () -> {
+									// Load straight into Redstone Mode's clipboard (paste preview when the mode is on).
+									net.veloclient.velo.client.redstone.SchematicIO.loadToClipboard(file);
+									status = Text.literal("Loaded \"" + displayName + "\" - in Redstone Mode (R) aim and left click to paste");
+								}
+								: match != null && match.found() ? () -> openInBrowser(match.postUrl()) : () -> { });
 				addSelectableChild(tile);
 				scrollRegion.addRow(tile);
-				if (match == null && identifyAttempted.add(fileName)) {
+				if (match == null && format != SchematicFormat.VELO && identifyAttempted.add(fileName)) {
 					identifyAsync(folder, fileName);
 				}
 			}

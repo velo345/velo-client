@@ -41,7 +41,7 @@ public final class HopperSpeedModule extends AbstractModule implements Configura
 
 	public HopperSpeedModule() {
 		super("hopper-speed", "Hopper Speed", "Singleplayer: items per hopper transfer (1-64), transfer cooldown, or no hopper transfers at all.",
-				ModuleCategory.REDSTONE, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
 		ClientTickEvents.END_CLIENT_TICK.register(client -> sync());
 	}
 

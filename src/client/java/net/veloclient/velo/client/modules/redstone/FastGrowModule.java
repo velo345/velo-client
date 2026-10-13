@@ -33,7 +33,7 @@ public final class FastGrowModule extends AbstractModule implements Configurable
 
 	public FastGrowModule() {
 		super("fast-grow", "Fast Grow", "Singleplayer: crops, amethyst, saplings and other growing blocks grow up to 100x faster.",
-				ModuleCategory.REDSTONE, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			while (TOGGLE_KEY.wasPressed()) {
 				setEnabled(!isEnabled());

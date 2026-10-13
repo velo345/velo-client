@@ -18,6 +18,10 @@ public abstract class RedstoneServerLevelMixin {
 		if (TickJournal.enabled) {
 			TickJournal.onLevelTick((net.minecraft.server.world.ServerWorld) (Object) this);
 		}
+		if (net.veloclient.velo.client.redstone.Timeline.phase() == net.veloclient.velo.client.redstone.Timeline.Phase.RECORDING
+				&& net.veloclient.velo.client.redstone.RmWorld.runsNormally(this)) {
+			net.veloclient.velo.client.redstone.Timeline.onServerTick(this);
+		}
 	}
 
 	@ModifyVariable(method = "tickChunk", at = @At("HEAD"), argsOnly = true, ordinal = 0)
@@ -33,6 +37,10 @@ public abstract class RedstoneServerLevelMixin {
 	private void velo$tickStart(java.util.function.BooleanSupplier haveTime, CallbackInfo ci) {
 		if (TickJournal.enabled) {
 			TickJournal.onLevelTick((net.minecraft.server.level.ServerLevel) (Object) this);
+		}
+		if (net.veloclient.velo.client.redstone.Timeline.phase() == net.veloclient.velo.client.redstone.Timeline.Phase.RECORDING
+				&& net.veloclient.velo.client.redstone.RmWorld.runsNormally(this)) {
+			net.veloclient.velo.client.redstone.Timeline.onServerTick(this);
 		}
 	}
 

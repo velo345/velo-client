@@ -24,6 +24,13 @@ public enum SchematicFormat {
 		public Path folder() {
 			return FabricLoader.getInstance().getGameDir().resolve("config").resolve("worldedit").resolve("schematics");
 		}
+	},
+	/** Redstone Mode's own format (Ctrl+S in Redstone Mode) - always available, it's built in. */
+	VELO("Velo", "velo-client", ".veloschem") {
+		@Override
+		public Path folder() {
+			return FabricLoader.getInstance().getGameDir().resolve("schematics").resolve("velo");
+		}
 	};
 
 	private final String displayName;

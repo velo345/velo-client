@@ -103,6 +103,7 @@ public final class HudManager {
 		HudAutoLayout.update(screenWidth, screenHeight);
 		net.veloclient.velo.client.waypoints.WaypointRenderer.renderHud(context, screenWidth, screenHeight);
 		net.veloclient.velo.client.modules.qol.PartyPingModule.renderHud(context, screenWidth, screenHeight);
+		net.veloclient.velo.client.redstone.RmRender.hud(context, screenWidth, screenHeight);
 		for (Module module : ModuleRegistry.all()) {
 			if (!(module instanceof HudModule hud) || !hud.isEnabled()) {
 				continue;

@@ -17,6 +17,9 @@ public abstract class TickJournalSetBlockMixin {
 		if (TickJournal.enabled) {
 			TickJournal.onSetBlock((net.minecraft.world.World) (Object) this, pos);
 		}
+		if (net.veloclient.velo.client.redstone.ClockTracker.enabled && ((net.minecraft.world.World) (Object) this).isClient()) {
+			net.veloclient.velo.client.redstone.ClockTracker.observe(this, pos.getX(), pos.getY(), pos.getZ(), state);
+		}
 	}
 }
 //?} else {
@@ -28,6 +31,9 @@ public abstract class TickJournalSetBlockMixin {
 			CallbackInfoReturnable<Boolean> cir) {
 		if (TickJournal.enabled) {
 			TickJournal.onSetBlock((net.minecraft.world.level.Level) (Object) this, pos);
+		}
+		if (net.veloclient.velo.client.redstone.ClockTracker.enabled && ((net.minecraft.world.level.Level) (Object) this).isClientSide()) {
+			net.veloclient.velo.client.redstone.ClockTracker.observe(this, pos.getX(), pos.getY(), pos.getZ(), state);
 		}
 	}
 }

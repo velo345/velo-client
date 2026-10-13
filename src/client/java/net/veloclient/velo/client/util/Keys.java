@@ -42,6 +42,7 @@ public final class Keys {
 	public static final int F3 = InputConstants.KEY_F3;
 	public static final int F10 = InputConstants.KEY_F10;
 	public static final int F8 = InputConstants.KEY_F8;
+	public static final int LEFT_ALT = InputConstants.KEY_LALT;
 	public static final int K = InputConstants.KEY_K;
 	public static final int V = InputConstants.KEY_V;
 	public static final int B = InputConstants.KEY_B;
@@ -83,6 +84,7 @@ public final class Keys {
 	public static final int F3 = GLFW.GLFW_KEY_F3;
 	public static final int F10 = GLFW.GLFW_KEY_F10;
 	public static final int F8 = GLFW.GLFW_KEY_F8;
+	public static final int LEFT_ALT = GLFW.GLFW_KEY_LEFT_ALT;
 	public static final int K = GLFW.GLFW_KEY_K;
 	public static final int V = GLFW.GLFW_KEY_V;
 	public static final int B = GLFW.GLFW_KEY_B;
@@ -111,6 +113,12 @@ public final class Keys {
 	private static final int[] LEGACY_SDL = {44, 52, 54, 45, 55, 56, 39, 30, 31, 32, 33, 34, 35, 36, 37, 38, 51, 46, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 47, 49, 48, 53, 41, 40, 43, 42, 73, 76, 79, 80, 81, 82, 75, 78, 74, 77, 57, 71, 83, 70, 72, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 98, 89, 90, 91, 92, 93, 94, 95, 96, 97, 220, 85, 87, 88, 103, 225, 224, 226, 227, 229, 228, 230, 231};
 
 	private Keys() {
+	}
+
+	/** Key code of the letter key {@code c} (A-Z) on this version: ASCII before 26.3, SDL scancodes 4-29 after. */
+	public static int letter(char c) {
+		int index = Character.toUpperCase(c) - 'A';
+		return SDL ? 4 + index : 'A' + index;
 	}
 
 	/** A key code Velo saved before 26.3 (GLFW) in this version's codes; unchanged before 26.3 and for -1. */
