@@ -7,25 +7,28 @@ import net.minecraft.util.Identifier;
 import net.veloclient.velo.client.util.Keys;
 
 /**
- * Redstone Mode's keys, in their own controls category. While Redstone Mode is on these are the
- * only Velo keybinds that work - every module keybind is paused (see {@code RedstoneKeyPauseMixin}).
- * Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+Z / Ctrl+Y / Ctrl+D are fixed shortcuts on top of these.
+ * Redstone Mode's keys (Controls &gt; Velo Redstone Mode). Kept to a handful with defaults that
+ * don't clash with movement, sprint or voice chat: R toggles the mode, a Left Alt tap frees the
+ * mouse for the overlay, F7 freezes the world, F9 hides the overlay, K records / replays, End
+ * stops a running paste. Every tool also has its own key, unbound by default. While the mode is on
+ * these are the only Velo keys that work. Editing shortcuts (Ctrl+C/X/V/Z/Y, Delete, Enter,
+ * Backspace) only act while the Redstone tool slot is selected in the hotbar.
  */
 public final class RmKeys {
 
 	public static final KeyBinding.Category CATEGORY = KeyBinding.Category.create(Identifier.of("velo-client", "redstone"));
 
 	public static final KeyBinding TOGGLE = key("rm_toggle", Keys.R);
-	public static final KeyBinding NEXT_TOOL = key("rm_next_tool", Keys.letter('Z'));
-	public static final KeyBinding MOVE = key("rm_move", Keys.letter('G'));
-	public static final KeyBinding STACK = key("rm_stack", Keys.letter('U'));
-	public static final KeyBinding FLIP = key("rm_flip", Keys.letter('H'));
-	public static final KeyBinding REPLACE = key("rm_replace", Keys.letter('J'));
-	public static final KeyBinding TIMELINE = key("rm_timeline", Keys.letter('K'));
-	public static final KeyBinding SETTINGS = key("rm_settings", Keys.O);
-	public static final KeyBinding ERASE = key("rm_erase", Keys.DELETE);
-	public static final KeyBinding CONFIRM = key("rm_confirm", Keys.ENTER);
-	public static final KeyBinding CANCEL = key("rm_cancel", Keys.BACKSPACE);
+	public static final KeyBinding CURSOR = key("rm_cursor", Keys.LEFT_ALT);
+	public static final KeyBinding FREEZE = key("rm_freeze", Keys.F7);
+	public static final KeyBinding HIDE = key("rm_hide", Keys.F9);
+	public static final KeyBinding RECORD = key("rm_record", Keys.letter('K'));
+	public static final KeyBinding CANCEL_JOB = key("rm_cancel_job", Keys.END);
+	public static final KeyBinding TOOL_SELECT = key("rm_tool_select", Keys.UNKNOWN);
+	public static final KeyBinding TOOL_MOVE = key("rm_tool_move", Keys.UNKNOWN);
+	public static final KeyBinding TOOL_STACK = key("rm_tool_stack", Keys.UNKNOWN);
+	public static final KeyBinding TOOL_WIRE = key("rm_tool_wire", Keys.UNKNOWN);
+	public static final KeyBinding TOOL_WATER = key("rm_tool_water", Keys.UNKNOWN);
 	public static final KeyBinding STEP = key("rm_tick_step", Keys.RIGHT);
 	public static final KeyBinding BACK = key("rm_tick_back", Keys.LEFT);
 	public static final KeyBinding PLAY = key("rm_tick_play", Keys.UP);
@@ -52,5 +55,14 @@ public final class RmKeys {
 
 	public static boolean alt() {
 		return Keys.isKeyDown(Keys.LEFT_ALT);
+	}
+
+	/** Empties a key's click queue (keys pressed while they mean nothing). */
+	static void drain(KeyBinding... keys) {
+		for (KeyBinding key : keys) {
+			while (key.wasPressed()) {
+				// discard
+			}
+		}
 	}
 }

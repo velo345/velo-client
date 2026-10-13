@@ -1,43 +1,48 @@
 package net.veloclient.velo.client.redstone;
 
 /**
- * Redstone Mode's live state on the client: the active tool, the box selection, what's being
- * previewed (paste / move / stack / a wiring route), and short status messages for the overlay.
+ * Redstone Mode's live client state: the chosen tool (used while the Redstone slot is selected in
+ * the hotbar), the box selection, the move / stack offset built up with the scroll wheel, a
+ * clipboard paste following the crosshair, wiring endpoints and short status messages.
  */
 public final class RmState {
 
 	public enum Tool {
-		SELECT("Select", "Left click: corner 1  ·  Right click: corner 2"),
-		WIRE("Redstone Wire", "Left click: start  ·  Right click: end  ·  Enter: build"),
-		WATER("Water Wire", "Left click: start  ·  Right click: end  ·  Enter: build"),
-		BUILD("Build", "Normal building - Redstone keys still work");
+		SELECT("select", "Select", "Left click corner 1  ·  right click corner 2  ·  Shift+scroll grows the side you look at"),
+		MOVE("move", "Move", "Look along an axis and scroll to move  ·  Shift+scroll rotates  ·  left click applies"),
+		STACK("stack", "Stack", "Look along an axis and scroll to add copies  ·  left click applies"),
+		WIRE("wire", "Redstone Wire", "Left click start  ·  right click end  ·  left click again to build"),
+		WATER("water", "Water Wire", "Left click start  ·  right click end  ·  left click again to build");
 
+		public final String icon;
 		public final String label;
 		public final String hint;
 
-		Tool(String label, String hint) {
+		Tool(String icon, String label, String hint) {
+			this.icon = icon;
 			this.label = label;
 			this.hint = hint;
 		}
 	}
 
-	/** What a confirm (Enter / left click) would apply right now. */
-	public enum Pending { NONE, PASTE, MOVE, STACK, WIRE, WATER }
-
 	public static Tool tool = Tool.SELECT;
-	/** Selection corners {x,y,z} or null. */
 	public static int[] cornerA;
 	public static int[] cornerB;
 
-	public static Pending pending = Pending.NONE;
-	/** Preview transform for paste/move: quarter turns clockwise and east-west mirror. */
-	public static int rotation;
-	public static boolean mirrored;
-	/** Stack: how many extra copies and in which direction (face index). */
-	public static int stackCount = 1;
+	/** Move tool: offset built with the scroll wheel, plus rotation / mirror. */
+	public static int[] moveOffset = {0, 0, 0};
+	public static int moveRotation;
+	public static boolean moveMirror;
+
+	/** Stack tool: extra copies along one axis (negative = the other way). */
+	public static int stackCount;
 	public static int stackFace = 2;
 
-	/** Wiring endpoints {x,y,z,face}. */
+	/** Clipboard paste following the crosshair (Ctrl+V), with rotation / mirror. */
+	public static boolean pasting;
+	public static int pasteRotation;
+	public static boolean pasteMirror;
+
 	public static int[] wireStart;
 	public static int[] wireEnd;
 
@@ -52,7 +57,7 @@ public final class RmState {
 		return cornerA != null && cornerB != null;
 	}
 
-	/** {minX, minY, minZ, maxX, maxY, maxZ} of the selection, or null. */
+	/** {minX, minY, minZ, maxX, maxY, maxZ} or null. */
 	public static int[] box() {
 		if (!hasSelection()) {
 			return null;
@@ -66,16 +71,30 @@ public final class RmState {
 		return b == null ? 0 : (long) (b[3] - b[0] + 1) * (b[4] - b[1] + 1) * (b[5] - b[2] + 1);
 	}
 
+	public static int[] size() {
+		int[] b = box();
+		return b == null ? null : new int[] {b[3] - b[0] + 1, b[4] - b[1] + 1, b[5] - b[2] + 1};
+	}
+
 	public static void clearSelection() {
 		cornerA = null;
 		cornerB = null;
+		resetTransforms();
 	}
 
-	public static void cancelPending() {
-		pending = Pending.NONE;
-		rotation = 0;
-		mirrored = false;
-		stackCount = 1;
+	/** Forget any move / stack offsets and an open paste. */
+	public static void resetTransforms() {
+		moveOffset = new int[] {0, 0, 0};
+		moveRotation = 0;
+		moveMirror = false;
+		stackCount = 0;
+		pasting = false;
+		pasteRotation = 0;
+		pasteMirror = false;
+	}
+
+	public static boolean moveActive() {
+		return moveOffset[0] != 0 || moveOffset[1] != 0 || moveOffset[2] != 0 || moveRotation != 0 || moveMirror;
 	}
 
 	public static void info(String text) {
@@ -90,7 +109,6 @@ public final class RmState {
 		messageUntil = System.currentTimeMillis() + 5000;
 	}
 
-	/** The current status line, or null when it has expired. */
 	public static String message() {
 		return System.currentTimeMillis() < messageUntil ? message : null;
 	}

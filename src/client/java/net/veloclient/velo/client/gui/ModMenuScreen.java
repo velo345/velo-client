@@ -113,7 +113,15 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		// Sidebar: module categories only.
 		int sidebarX = contentX();
 		int listX = sidebarX + SIDEBAR_WIDTH + 14;
-		sidebarRegion = new VeloScrollRegion(sidebarX, bodyY(), SIDEBAR_WIDTH, contentBottom() - bodyY());
+		// Redstone Mode lives at the bottom left - it's its own mode, not a module.
+		int redstoneHeight = 30;
+		var redstone = new net.veloclient.velo.client.gui.widget.RedstoneModeButton(sidebarX, contentBottom() - redstoneHeight, SIDEBAR_WIDTH,
+				redstoneHeight, () -> {
+					this.client.setScreen(null);
+					net.veloclient.velo.client.redstone.RedstoneMode.enter();
+				});
+		addDrawableChild(redstone);
+		sidebarRegion = new VeloScrollRegion(sidebarX, bodyY(), SIDEBAR_WIDTH, contentBottom() - redstoneHeight - 8 - bodyY());
 		sidebarRegion.addRow(new VeloSectionHeader(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT - 6, "Categories"));
 		for (ModuleCategory category : CATEGORY_ORDER) {
 			ModuleCategory cat = category;

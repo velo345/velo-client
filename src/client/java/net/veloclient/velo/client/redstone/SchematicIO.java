@@ -120,7 +120,7 @@ public final class SchematicIO {
 			int sx = in.readInt();
 			int sy = in.readInt();
 			int sz = in.readInt();
-			if ((long) sx * sy * sz > RmOps.MAX_VOLUME * 4L || sx <= 0 || sy <= 0 || sz <= 0) {
+			if ((long) sx * sy * sz > 400_000_000L || sx <= 0 || sy <= 0 || sz <= 0) {
 				throw new IOException("Schematic too big");
 			}
 			Clip clip = new Clip(sx, sy, sz);
@@ -198,7 +198,7 @@ public final class SchematicIO {
 		int sx = max[0] - min[0] + 1;
 		int sy = max[1] - min[1] + 1;
 		int sz = max[2] - min[2] + 1;
-		if ((long) sx * sy * sz > RmOps.MAX_VOLUME * 4L) {
+		if ((long) sx * sy * sz > 400_000_000L) {
 			throw new IOException("Schematic too big (" + sx + "x" + sy + "x" + sz + ")");
 		}
 		Clip clip = new Clip(sx, sy, sz);
@@ -302,15 +302,12 @@ public final class SchematicIO {
 				String name = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
 				Clip clip = name.endsWith(".litematic") ? loadLitematic(file) : loadVelo(file);
 				net.minecraft.client.MinecraftClient.getInstance().execute(() -> {
-					RmOps.setClipboard(clip);
-					if (RedstoneModeModule.active()) {
-						RmState.cancelPending();
-						RmState.pending = RmState.Pending.PASTE;
-						RmState.info("Loaded " + file.getFileName() + " (" + clip.sx + "x" + clip.sy + "x" + clip.sz
-								+ ") - aim and left click to paste, scroll to rotate");
-					} else {
-						RmState.info("Loaded into the clipboard - turn on Redstone Mode (R) and Ctrl+V to paste");
+					Placements.add(file.getFileName().toString(), clip);
+					if (!RedstoneMode.active()) {
+						RedstoneMode.enter();
 					}
+					RmState.info("Loaded " + file.getFileName() + " (" + clip.sx + "x" + clip.sy + "x" + clip.sz
+							+ ") - aim and left click to place it, Shift+scroll to rotate");
 				});
 			} catch (Exception e) {
 				net.minecraft.client.MinecraftClient.getInstance().execute(() -> RmState.error("Couldn't load " + file.getFileName() + ": "
@@ -326,10 +323,6 @@ public final class SchematicIO {
 		int[] b = RmState.box();
 		if (b == null) {
 			RmState.error("Select an area first");
-			return;
-		}
-		if (RmState.volume() > RmOps.MAX_VOLUME) {
-			RmState.error("Selection too big to save");
 			return;
 		}
 		String clean = name.replaceAll("[^A-Za-z0-9 _.-]", "_").strip();

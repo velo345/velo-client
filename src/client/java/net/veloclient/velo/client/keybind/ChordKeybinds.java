@@ -19,7 +19,7 @@ public final class ChordKeybinds {
 
 	/** True only when every key in the chord is currently held down; an empty/unbound chord is never "held". */
 	public static boolean isHeld(List<Integer> keyCodes) {
-		if (keyCodes == null || keyCodes.isEmpty()) {
+		if (keyCodes == null || keyCodes.isEmpty() || net.veloclient.velo.client.redstone.RedstoneMode.active()) {
 			return false;
 		}
 		for (int code : keyCodes) {

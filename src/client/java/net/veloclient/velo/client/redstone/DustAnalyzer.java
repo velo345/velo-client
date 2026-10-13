@@ -44,8 +44,8 @@ public final class DustAnalyzer {
 	}
 
 	public static boolean visible() {
-		String mode = RedstoneModeModule.dustWarnings();
-		return "Always".equals(mode) || "Redstone Mode".equals(mode) && RedstoneModeModule.active();
+		String mode = RmSettings.get().dustWarnings;
+		return "Always".equals(mode) || "Redstone Mode".equals(mode) && RedstoneMode.active();
 	}
 
 	public static void tick() {

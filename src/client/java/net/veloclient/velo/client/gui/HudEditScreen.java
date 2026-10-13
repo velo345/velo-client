@@ -54,6 +54,10 @@ public final class HudEditScreen extends Screen {
 	protected void init() {
 		this.addDrawableChild(new VeloButton(this.width / 2 - 104, this.height - 30, 100, 20, Text.literal("Reset Layout"), b -> {
 			// Every HUD element (enabled or not) back to its default spot and size - or just the F3 panels in F3 mode.
+			if (redstone()) {
+				net.veloclient.velo.client.redstone.RmHud.allPanels().forEach(panel -> panel.position().resetToDefault());
+				return;
+			}
 			var f3 = f3Editing();
 			if (f3 != null) {
 				f3.allPanels().forEach(panel -> panel.position().resetToDefault());
@@ -75,6 +79,11 @@ public final class HudEditScreen extends Screen {
 			return f3;
 		}
 		return null;
+	}
+
+	/** Redstone Mode on: only its overlay panels are shown and editable. */
+	private static boolean redstone() {
+		return net.veloclient.velo.client.redstone.RedstoneMode.active();
 	}
 
 	private static boolean betterF3On() {
@@ -113,6 +122,15 @@ public final class HudEditScreen extends Screen {
 	}
 
 	private List<HudModule> enabledHudModules() {
+		if (redstone()) {
+			List<HudModule> panels = new ArrayList<>();
+			for (HudModule panel : net.veloclient.velo.client.redstone.RmHud.allPanels()) {
+				if (panel.width() > 0 && panel.height() > 0) {
+					panels.add(panel);
+				}
+			}
+			return panels;
+		}
 		var f3 = f3Editing();
 		if (f3 != null) {
 			List<HudModule> panels = new ArrayList<>();
@@ -164,7 +182,7 @@ public final class HudEditScreen extends Screen {
 			context.drawTextWithShadow(this.textRenderer, hud.displayName() + " (" + Math.round(hud.position().scale() * 100) + "%)",
 					x, y - 12, 0xFFFFFF00);
 
-			if (hovered && f3Editing() == null) {
+			if (hovered && f3Editing() == null && !redstone()) {
 				// Inside the box's own top-right corner, not above it -
 				// sitting outside the bounding box meant the badge vanished
 				// (hovered flipped false) the moment the mouse moved off the
@@ -193,7 +211,8 @@ public final class HudEditScreen extends Screen {
 			int alpha = (int) (0xCC * bannerOpacity);
 			context.fill(0, 0, this.width, BANNER_HEIGHT, (alpha << 24) | (theme.surfaceWithOpacity() & 0x00FFFFFF));
 			int textAlpha = (int) (0xFF * bannerOpacity);
-			String hint = f3Editing() != null ? "Editing the F3 screen - drag to move, corner handle to resize - press F3 to edit the HUD"
+			String hint = redstone() ? "Editing the Redstone Mode overlay - drag to move, corner handle to resize"
+					: f3Editing() != null ? "Editing the F3 screen - drag to move, corner handle to resize - press F3 to edit the HUD"
 					: betterF3On() ? "Drag to move - corner handle to resize - click ✕ to disable - press F3 to edit the F3 screen"
 					: "Drag to move - drag the corner handle to resize - click ✕ to disable";
 			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(hint),
@@ -220,7 +239,7 @@ public final class HudEditScreen extends Screen {
 
 			int badgeX = x + w - BADGE_SIZE - 2;
 			int badgeY = y + 2;
-			if (f3Editing() == null && isInside(mouseX, mouseY, badgeX, badgeY, BADGE_SIZE, BADGE_SIZE)) {
+			if (f3Editing() == null && !redstone() && isInside(mouseX, mouseY, badgeX, badgeY, BADGE_SIZE, BADGE_SIZE)) {
 				hud.setEnabled(false);
 				return true;
 			}
@@ -283,12 +302,18 @@ public final class HudEditScreen extends Screen {
 
 	@Override
 	public void close() {
+		if (redstone()) {
+			net.veloclient.velo.client.redstone.RmHud.storePositions();
+		}
 		net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
 		this.client.setScreen(this.parent);
 	}
 
 	/** Unlike {@link #close()} (Escape - returns to whatever screen opened this), the panel-toggle keybind should back all the way out to gameplay in one press. */
 	public void closeToGame() {
+		if (redstone()) {
+			net.veloclient.velo.client.redstone.RmHud.storePositions();
+		}
 		net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
 		this.client.setScreen(null);
 	}

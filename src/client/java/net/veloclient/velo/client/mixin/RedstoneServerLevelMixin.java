@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Singleplayer redstone tools on the integrated server: Tick Mode's journal and Fast Grow's random-tick scale. */
+/** Singleplayer redstone tools on the integrated server: Tick Mode's journal, timeline recording, gradual paste jobs and Fast Grow's random-tick scale. */
 //? if <26.1 {
 @Mixin(net.minecraft.server.world.ServerWorld.class)
 public abstract class RedstoneServerLevelMixin {
@@ -22,6 +22,7 @@ public abstract class RedstoneServerLevelMixin {
 				&& net.veloclient.velo.client.redstone.RmWorld.runsNormally(this)) {
 			net.veloclient.velo.client.redstone.Timeline.onServerTick(this);
 		}
+		net.veloclient.velo.client.redstone.RmJobs.serverTick(this);
 	}
 
 	@ModifyVariable(method = "tickChunk", at = @At("HEAD"), argsOnly = true, ordinal = 0)
@@ -42,6 +43,7 @@ public abstract class RedstoneServerLevelMixin {
 				&& net.veloclient.velo.client.redstone.RmWorld.runsNormally(this)) {
 			net.veloclient.velo.client.redstone.Timeline.onServerTick(this);
 		}
+		net.veloclient.velo.client.redstone.RmJobs.serverTick(this);
 	}
 
 	@ModifyVariable(method = "tickChunk", at = @At("HEAD"), argsOnly = true, ordinal = 0)

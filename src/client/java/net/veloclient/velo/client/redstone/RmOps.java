@@ -8,30 +8,25 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Redstone Mode's area operations - copy, cut, paste, move, stack, erase, replace, undo, redo -
- * run on the singleplayer server thread. Blocks are placed without neighbour/shape updates (so
- * observers don't fire and nothing pops off), then, with "Keep Redstone Running" on, redstone
- * components get their pending ticks back and a neighbour update, so pasted clocks keep ticking
- * and pistons don't get stuck. Every edit is undoable.
- *
- * <p>To protect the PC an operation is limited to {@link #MAX_VOLUME} blocks, and the undo
- * history keeps at most {@link #MAX_UNDO_VOLUME} blocks in total.
+ * Redstone Mode's edits - copy, cut, paste, move, stack, erase, replace, undo, redo - on the
+ * singleplayer server. Copying reads the area in one go; everything that writes blocks runs as a
+ * {@link RmJobs} job (a slice per tick, cancellable with End). There's no size limit beyond what
+ * the PC can hold; the undo history drops its oldest steps past {@link #MAX_UNDO_BLOCKS} changed
+ * blocks.
  */
 public final class RmOps {
 
-	public static final int MAX_VOLUME = 262_144;
-	private static final long MAX_UNDO_VOLUME = 2_000_000;
-	private static final int MAX_UNDO = 30;
+	private static final long MAX_UNDO_BLOCKS = 20_000_000;
+	private static final int MAX_UNDO = 40;
 
-	/** Blocks that matter for keeping redstone alive after a paste. */
 	private static final Set<String> REDSTONE = Set.of("minecraft:observer", "minecraft:repeater", "minecraft:comparator",
 			"minecraft:piston", "minecraft:sticky_piston", "minecraft:redstone_torch", "minecraft:redstone_wall_torch",
 			"minecraft:redstone_wire", "minecraft:redstone_lamp", "minecraft:dropper", "minecraft:dispenser", "minecraft:hopper",
 			"minecraft:powered_rail", "minecraft:activator_rail", "minecraft:detector_rail", "minecraft:note_block", "minecraft:target",
 			"minecraft:daylight_detector", "minecraft:sculk_sensor", "minecraft:calibrated_sculk_sensor", "minecraft:crafter",
-			"minecraft:lever", "minecraft:stone_button", "minecraft:tnt", "minecraft:redstone_block");
+			"minecraft:lever", "minecraft:tnt", "minecraft:redstone_block", "minecraft:trapped_chest", "minecraft:lectern");
 
-	private record Undo(int x, int y, int z, Clip before, Clip after) {
+	private record Undo(int x, int y, int z, RmJobs.Source before, RmJobs.Source after, boolean skipAir, long blocks) {
 	}
 
 	private static final Deque<Undo> UNDO = new ArrayDeque<>();
@@ -39,6 +34,10 @@ public final class RmOps {
 	private static volatile Clip clipboard;
 
 	private RmOps() {
+	}
+
+	static boolean isRedstone(String id) {
+		return REDSTONE.contains(id) || id.endsWith("_button") || id.endsWith("pressure_plate");
 	}
 
 	public static Clip clipboard() {
@@ -53,30 +52,22 @@ public final class RmOps {
 		MinecraftClient.getInstance().execute(task);
 	}
 
-	private static boolean checkVolume(long volume) {
+	private static boolean canEdit() {
 		if (!RmWorld.singleplayer()) {
-			RmState.error("World editing only works in singleplayer");
-			return false;
-		}
-		if (volume > MAX_VOLUME) {
-			RmState.error("Selection too big (" + volume + " blocks, max " + MAX_VOLUME + ")");
+			RmState.error("Editing the world needs singleplayer");
 			return false;
 		}
 		return true;
 	}
 
-	// ---- capture / place (server thread) ----
+	// ---- capture (server thread) ----
 
 	static Clip capture(Object level, int x0, int y0, int z0, int sx, int sy, int sz) {
 		return capture(level, x0, y0, z0, sx, sy, sz, false);
 	}
 
-	/** {@code withEntities}: also take the entities in the box (copies / schematics - not undo snapshots). */
 	static Clip capture(Object level, int x0, int y0, int z0, int sx, int sy, int sz, boolean withEntities) {
 		Clip clip = new Clip(sx, sy, sz);
-		if (withEntities) {
-			clip.entities.addAll(RmWorld.captureEntities(level, x0, y0, z0, x0 + sx - 1, y0 + sy - 1, z0 + sz - 1));
-		}
 		for (int x = 0; x < sx; x++) {
 			for (int y = 0; y < sy; y++) {
 				for (int z = 0; z < sz; z++) {
@@ -85,127 +76,82 @@ public final class RmOps {
 					clip.states[i] = state;
 					if (!RmWorld.isAir(state)) {
 						clip.blockEntities[i] = RmWorld.saveBe(level, x0 + x, y0 + y, z0 + z);
-						if (REDSTONE.contains(RmWorld.id(state))) {
+						if (isRedstone(RmWorld.id(state))) {
 							clip.pendingTicks[i] = RmWorld.hasPendingTick(level, x0 + x, y0 + y, z0 + z);
 						}
 					}
 				}
 			}
 		}
+		if (withEntities) {
+			clip.entities.addAll(RmWorld.captureEntities(level, x0, y0, z0, x0 + sx - 1, y0 + sy - 1, z0 + sz - 1));
+		}
 		return clip;
 	}
 
-	/** Writes {@code clip} at x0/y0/z0. {@code skipAir}: air in the clip leaves the world untouched. */
-	static void place(Object level, Clip clip, int x0, int y0, int z0, boolean skipAir, boolean keepRunning) {
-		for (int x = 0; x < clip.sx; x++) {
-			for (int y = 0; y < clip.sy; y++) {
-				for (int z = 0; z < clip.sz; z++) {
-					Object state = clip.states[clip.index(x, y, z)];
-					if (state == null || skipAir && RmWorld.isAir(state)) {
-						continue;
-					}
-					RmWorld.set(level, x0 + x, y0 + y, z0 + z, state, RmWorld.SILENT);
-				}
-			}
-		}
-		for (int x = 0; x < clip.sx; x++) {
-			for (int y = 0; y < clip.sy; y++) {
-				for (int z = 0; z < clip.sz; z++) {
-					Object tag = clip.blockEntities[clip.index(x, y, z)];
-					if (tag != null) {
-						RmWorld.loadBe(level, x0 + x, y0 + y, z0 + z, tag);
-					}
-				}
-			}
-		}
-		if (keepRunning) {
-			wake(level, clip, x0, y0, z0);
-		}
-		// Entities only once every block is in place (minecarts need their rails, item frames their wall).
-		for (Object[] e : clip.entities) {
-			RmWorld.spawnEntity(level, e[4], x0 + (double) e[0], y0 + (double) e[1], z0 + (double) e[2], (float) e[3]);
+	private static void runJob(Object level, RmJobs.Source source, int x, int y, int z, boolean skipAir, String label, Runnable onDone) {
+		RmJobs.submit(new RmJobs.Job(level, source, x, y, z, skipAir, RmSettings.get().keepRunning, true, label, onDone));
+	}
+
+	static void rememberJob(RmJobs.Job job, int sx, int sy, int sz) {
+		RmJobs.Source before = job.changes.asSource(sx, sy, sz);
+		synchronized (RmOps.class) {
+			UNDO.addLast(new Undo(job.x0, job.y0, job.z0, before, job.source, job.skipAir, before.count()));
+			REDO.clear();
+			trim();
 		}
 	}
 
-	private static void wake(Object level, Clip clip, int x0, int y0, int z0) {
-		for (int x = 0; x < clip.sx; x++) {
-			for (int y = 0; y < clip.sy; y++) {
-				for (int z = 0; z < clip.sz; z++) {
-					int i = clip.index(x, y, z);
-					Object state = clip.states[i];
-					if (state == null || RmWorld.isAir(state) || !REDSTONE.contains(RmWorld.id(state))) {
-						continue;
-					}
-					if (clip.pendingTicks[i]) {
-						RmWorld.scheduleTick(level, x0 + x, y0 + y, z0 + z, 1);
-					}
-					// Observers react to shape updates, not neighbour updates - so this wakes pistons,
-					// repeaters, comparators and dust without making any observer fire.
-					RmWorld.neighborUpdate(level, x0 + x, y0 + y, z0 + z);
-				}
-			}
+	/** Records an edit made outside a job (wiring) so it can be undone too. Server thread. */
+	static void rememberEdit(int x, int y, int z, Clip before, Clip after) {
+		synchronized (RmOps.class) {
+			UNDO.addLast(new Undo(x, y, z, RmJobs.Source.of(before), RmJobs.Source.of(after), false, before.volume()));
+			REDO.clear();
+			trim();
 		}
 	}
 
-	private static void remember(int x, int y, int z, Clip before, Clip after) {
-		UNDO.addLast(new Undo(x, y, z, before, after));
-		REDO.clear();
+	/** Undo entry for a build that touched only some blocks of a large box (wiring). Server thread. */
+	static void rememberSparse(int x0, int y0, int z0, int sx, int sy, int sz, RmJobs.Changes changes, java.util.List<Wiring.Placement> placed) {
+		int[] indices = new int[placed.size()];
+		Object[] states = new Object[placed.size()];
+		for (int i = 0; i < placed.size(); i++) {
+			Wiring.Placement p = placed.get(i);
+			indices[i] = ((p.x() - x0) * sy + (p.y() - y0)) * sz + (p.z() - z0);
+			states[i] = p.state();
+		}
+		RmJobs.Source after = new RmJobs.Source(sx, sy, sz, indices, states, null, null, java.util.List.of());
+		RmJobs.Source before = changes.asSource(sx, sy, sz);
+		synchronized (RmOps.class) {
+			UNDO.addLast(new Undo(x0, y0, z0, before, after, false, before.count()));
+			REDO.clear();
+			trim();
+		}
+	}
+
+	private static void trim() {
 		long total = 0;
 		for (Undo u : UNDO) {
-			total += u.before().volume() + u.after().volume();
+			total += u.blocks();
 		}
-		while (UNDO.size() > MAX_UNDO || total > MAX_UNDO_VOLUME && UNDO.size() > 1) {
-			Undo dropped = UNDO.removeFirst();
-			total -= dropped.before().volume() + dropped.after().volume();
+		while (UNDO.size() > MAX_UNDO || total > MAX_UNDO_BLOCKS && UNDO.size() > 1) {
+			total -= UNDO.removeFirst().blocks();
 		}
-	}
-
-	/** Places {@code clip} at the given corner as one undoable step. Server thread. */
-	static void applyUndoable(Object level, Clip clip, int x, int y, int z, boolean skipAir) {
-		Clip before = capture(level, x, y, z, clip.sx, clip.sy, clip.sz);
-		place(level, clip, x, y, z, skipAir, RedstoneModeModule.preserveStates());
-		Clip after = capture(level, x, y, z, clip.sx, clip.sy, clip.sz);
-		synchronized (RmOps.class) {
-			remember(x, y, z, before, after);
-		}
-	}
-
-	// ---- operations (client thread entry points) ----
-
-	public static void copy(boolean cut) {
-		int[] b = RmState.box();
-		if (b == null) {
-			RmState.error("Select an area first (left + right click)");
-			return;
-		}
-		int sx = b[3] - b[0] + 1;
-		int sy = b[4] - b[1] + 1;
-		int sz = b[5] - b[2] + 1;
-		if (!checkVolume((long) sx * sy * sz)) {
-			return;
-		}
-		RmWorld.onServer(level -> {
-			Clip clip = capture(level, b[0], b[1], b[2], sx, sy, sz, true);
-			clipboard = clip;
-			if (cut) {
-				RmWorld.removeEntities(level, b[0], b[1], b[2], b[3], b[4], b[5]);
-				applyUndoable(level, air(sx, sy, sz), b[0], b[1], b[2], false);
-				updateBorder(level, b);
-			}
-			client(() -> RmState.info((cut ? "Cut " : "Copied ") + clip.solidCount() + " blocks"
-					+ (clip.entities.isEmpty() ? "" : " + " + clip.entities.size() + " entities") + " (" + sx + "x" + sy + "x" + sz + ") - Ctrl+V to paste"));
-		});
 	}
 
 	private static Clip air(int sx, int sy, int sz) {
 		Clip clip = new Clip(sx, sy, sz);
-		Object air = RmWorld.parse("minecraft:air", Map.of());
-		java.util.Arrays.fill(clip.states, air);
+		java.util.Arrays.fill(clip.states, RmWorld.parse("minecraft:air", Map.of()));
 		return clip;
 	}
 
-	/** After removing blocks: let the blocks just outside the box notice (dust reconnects, rails settle). */
+	/** After removing blocks: let the blocks around the box notice (dust reconnects, rails settle). */
 	private static void updateBorder(Object level, int[] b) {
+		long faces = 2L * ((long) (b[3] - b[0] + 3) * (b[4] - b[1] + 3) + (long) (b[3] - b[0] + 3) * (b[5] - b[2] + 3)
+				+ (long) (b[4] - b[1] + 3) * (b[5] - b[2] + 3));
+		if (faces > 2_000_000) {
+			return;
+		}
 		for (int x = b[0] - 1; x <= b[3] + 1; x++) {
 			for (int y = b[1] - 1; y <= b[4] + 1; y++) {
 				for (int z = b[2] - 1; z <= b[5] + 1; z++) {
@@ -218,87 +164,112 @@ public final class RmOps {
 		}
 	}
 
+	// ---- operations (client thread) ----
+
+	public static void copy(boolean cut) {
+		int[] b = RmState.box();
+		if (b == null) {
+			RmState.error("Select an area first");
+			return;
+		}
+		if (!canEdit()) {
+			return;
+		}
+		int[] s = RmState.size();
+		RmState.info(cut ? "Cutting..." : "Copying...");
+		RmWorld.onServer(level -> {
+			Clip clip = capture(level, b[0], b[1], b[2], s[0], s[1], s[2], true);
+			clipboard = clip;
+			if (cut) {
+				RmWorld.removeEntities(level, b[0], b[1], b[2], b[3], b[4], b[5]);
+				runJob(level, RmJobs.Source.of(air(s[0], s[1], s[2])), b[0], b[1], b[2], false, "Cutting", () -> RmState.info("Cut done"));
+			}
+			client(() -> RmState.info((cut ? "Cut " : "Copied ") + clip.solidCount() + " blocks"
+					+ (clip.entities.isEmpty() ? "" : " + " + clip.entities.size() + " entities") + " - Ctrl+V to paste"));
+		});
+	}
+
 	public static void erase() {
 		int[] b = RmState.box();
 		if (b == null) {
 			RmState.error("Select an area first");
 			return;
 		}
-		if (!checkVolume(RmState.volume())) {
+		if (!canEdit()) {
 			return;
 		}
-		RmWorld.onServer(level -> {
-			applyUndoable(level, air(b[3] - b[0] + 1, b[4] - b[1] + 1, b[5] - b[2] + 1), b[0], b[1], b[2], false);
-			updateBorder(level, b);
-			client(() -> RmState.info("Erased " + RmState.volume() + " blocks - Ctrl+Z to undo"));
-		});
+		int[] s = RmState.size();
+		RmWorld.onServer(level -> runJob(level, RmJobs.Source.of(air(s[0], s[1], s[2])), b[0], b[1], b[2], false, "Erasing", () -> {
+			RmWorld.onServer(l -> updateBorder(l, b));
+			RmState.info("Erased - Ctrl+Z to undo");
+		}));
 	}
 
-	/** Pastes the (transformed) clipboard with its minimum corner at x/y/z. */
 	public static void paste(Clip clip, int x, int y, int z) {
-		if (clip == null || !checkVolume(clip.volume())) {
+		if (clip == null || !canEdit()) {
 			return;
 		}
-		RmWorld.onServer(level -> {
-			applyUndoable(level, clip, x, y, z, true);
-			client(() -> RmState.info("Pasted " + clip.solidCount() + " blocks"));
-		});
+		RmWorld.onServer(level -> runJob(level, RmJobs.Source.of(clip), x, y, z, true, "Pasting",
+				() -> RmState.info("Pasted " + clip.solidCount() + " blocks - Ctrl+Z to undo")));
 	}
 
-	/** Moves the selection: erases the source and pastes the (transformed) copy at x/y/z, as one step each way. */
-	public static void move(int x, int y, int z, int rotation, boolean mirror) {
+	/** Applies the Move tool's offset / rotation to the selection. */
+	public static void applyMove() {
 		int[] b = RmState.box();
-		if (b == null || !checkVolume(RmState.volume())) {
+		if (b == null || !RmState.moveActive() || !canEdit()) {
 			return;
 		}
-		int sx = b[3] - b[0] + 1;
-		int sy = b[4] - b[1] + 1;
-		int sz = b[5] - b[2] + 1;
+		int[] s = RmState.size();
+		int[] off = RmState.moveOffset.clone();
+		int rotation = RmState.moveRotation;
+		boolean mirror = RmState.moveMirror;
 		RmWorld.onServer(level -> {
-			Clip source = capture(level, b[0], b[1], b[2], sx, sy, sz, true);
-			RmWorld.removeEntities(level, b[0], b[1], b[2], b[3], b[4], b[5]);
-			applyUndoable(level, air(sx, sy, sz), b[0], b[1], b[2], false);
+			Clip source = capture(level, b[0], b[1], b[2], s[0], s[1], s[2], true);
 			Clip moved = source.transformed(rotation, mirror);
-			applyUndoable(level, moved, x, y, z, true);
-			updateBorder(level, b);
-			client(() -> {
-				RmState.cornerA = new int[] {x, y, z};
-				RmState.cornerB = new int[] {x + moved.sx - 1, y + moved.sy - 1, z + moved.sz - 1};
+			// Rotation keeps the box's centre column in place.
+			int nx = b[0] + off[0] + (s[0] - moved.sx) / 2;
+			int nz = b[2] + off[2] + (s[2] - moved.sz) / 2;
+			int ny = b[1] + off[1];
+			RmWorld.removeEntities(level, b[0], b[1], b[2], b[3], b[4], b[5]);
+			runJob(level, RmJobs.Source.of(air(s[0], s[1], s[2])), b[0], b[1], b[2], false, "Moving", null);
+			runJob(level, RmJobs.Source.of(moved), nx, ny, nz, true, "Moving", () -> {
+				RmState.cornerA = new int[] {nx, ny, nz};
+				RmState.cornerB = new int[] {nx + moved.sx - 1, ny + moved.sy - 1, nz + moved.sz - 1};
+				RmState.resetTransforms();
 				RmState.info("Moved - Ctrl+Z twice to undo");
 			});
 		});
 	}
 
-	/** Repeats the selection {@code count} more times towards {@code face}. */
-	public static void stack(int count, int face) {
+	/** Applies the Stack tool's copies. */
+	public static void applyStack() {
 		int[] b = RmState.box();
-		if (b == null) {
+		int count = RmState.stackCount;
+		if (b == null || count == 0 || !canEdit()) {
 			return;
 		}
-		int sx = b[3] - b[0] + 1;
-		int sy = b[4] - b[1] + 1;
-		int sz = b[5] - b[2] + 1;
-		if (!checkVolume((long) sx * sy * sz * (count + 1))) {
-			return;
-		}
-		int[] d = RmWorld.faceOffset(face);
+		int[] s = RmState.size();
+		int[] d = RmWorld.faceOffset(RmState.stackFace);
 		RmWorld.onServer(level -> {
-			Clip source = capture(level, b[0], b[1], b[2], sx, sy, sz, true);
-			for (int i = 1; i <= count; i++) {
-				applyUndoable(level, source, b[0] + d[0] * sx * i, b[1] + d[1] * sy * i, b[2] + d[2] * sz * i, false);
+			Clip source = capture(level, b[0], b[1], b[2], s[0], s[1], s[2], true);
+			for (int i = 1; i <= Math.abs(count); i++) {
+				boolean last = i == Math.abs(count);
+				runJob(level, RmJobs.Source.of(source), b[0] + d[0] * s[0] * i, b[1] + d[1] * s[1] * i, b[2] + d[2] * s[2] * i, false,
+						"Stacking " + i + "/" + Math.abs(count), last ? () -> {
+							RmState.resetTransforms();
+							RmState.info("Stacked " + Math.abs(count) + "x - Ctrl+Z per copy to undo");
+						} : null);
 			}
-			client(() -> RmState.info("Stacked " + count + "x - Ctrl+Z per copy to undo"));
 		});
 	}
 
 	/**
-	 * Replaces every block in the selection whose id is {@code fromId} (or every non-air block for
-	 * "*") with {@code toText} ("id" or "id[prop=value]"), copying over properties both share
-	 * (facing, powered...) unless the new text sets them.
+	 * Replaces every block in the selection whose id is {@code fromId} ("*" = every non-air block)
+	 * with {@code toText} ("id" or "id[prop=value]"), carrying over shared properties unless set.
 	 */
 	public static void replace(String fromId, String toText, boolean keepProperties) {
 		int[] b = RmState.box();
-		if (b == null || !checkVolume(RmState.volume())) {
+		if (b == null || !canEdit()) {
 			return;
 		}
 		Object target = RmWorld.fromText(toText);
@@ -307,18 +278,15 @@ public final class RmOps {
 			return;
 		}
 		String explicit = toText.contains("[") ? toText.substring(toText.indexOf('[')) : "";
+		int[] s = RmState.size();
 		RmWorld.onServer(level -> {
-			int sx = b[3] - b[0] + 1;
-			int sy = b[4] - b[1] + 1;
-			int sz = b[5] - b[2] + 1;
-			Clip before = capture(level, b[0], b[1], b[2], sx, sy, sz);
-			Clip after = new Clip(sx, sy, sz);
+			Clip current = capture(level, b[0], b[1], b[2], s[0], s[1], s[2]);
+			Clip after = new Clip(s[0], s[1], s[2]);
 			int changed = 0;
-			for (int i = 0; i < before.states.length; i++) {
-				Object state = before.states[i];
+			for (int i = 0; i < current.states.length; i++) {
+				Object state = current.states[i];
 				boolean match = "*".equals(fromId) ? !RmWorld.isAir(state) : RmWorld.id(state).equals(fromId);
 				if (!match) {
-					after.states[i] = null;
 					continue;
 				}
 				Object next = target;
@@ -337,13 +305,8 @@ public final class RmOps {
 				after.states[i] = next;
 				changed++;
 			}
-			place(level, after, b[0], b[1], b[2], true, RedstoneModeModule.preserveStates());
-			Clip result = capture(level, b[0], b[1], b[2], sx, sy, sz);
-			synchronized (RmOps.class) {
-				remember(b[0], b[1], b[2], before, result);
-			}
 			int count = changed;
-			client(() -> RmState.info("Replaced " + count + " blocks - Ctrl+Z to undo"));
+			runJob(level, RmJobs.Source.of(after), b[0], b[1], b[2], false, "Replacing", () -> RmState.info("Replaced " + count + " blocks"));
 		});
 	}
 
@@ -359,8 +322,8 @@ public final class RmOps {
 			RmState.error("Nothing to undo");
 			return;
 		}
-		RmWorld.onServer(level -> place(level, u.before(), u.x(), u.y(), u.z(), false, RedstoneModeModule.preserveStates()));
-		RmState.info("Undone");
+		RmWorld.onServer(level -> RmJobs.submit(new RmJobs.Job(level, u.before(), u.x(), u.y(), u.z(), false, RmSettings.get().keepRunning,
+				false, "Undoing", () -> RmState.info("Undone"))));
 	}
 
 	public static void redo() {
@@ -375,18 +338,10 @@ public final class RmOps {
 			RmState.error("Nothing to redo");
 			return;
 		}
-		RmWorld.onServer(level -> place(level, u.after(), u.x(), u.y(), u.z(), false, RedstoneModeModule.preserveStates()));
-		RmState.info("Redone");
+		RmWorld.onServer(level -> RmJobs.submit(new RmJobs.Job(level, u.after(), u.x(), u.y(), u.z(), u.skipAir(), RmSettings.get().keepRunning,
+				false, "Redoing", () -> RmState.info("Redone"))));
 	}
 
-	/** Records an edit made elsewhere (wiring) so it can be undone too. Server thread. */
-	static void rememberEdit(int x, int y, int z, Clip before, Clip after) {
-		synchronized (RmOps.class) {
-			remember(x, y, z, before, after);
-		}
-	}
-
-	/** Forget everything when leaving the world. */
 	public static void reset() {
 		synchronized (RmOps.class) {
 			UNDO.clear();

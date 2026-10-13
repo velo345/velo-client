@@ -86,7 +86,7 @@ public final class ClockTracker {
 
 	/** Client tick: refresh the clock list a few times a second. */
 	public static void tick() {
-		enabled = RedstoneModeModule.active() && RedstoneModeModule.clockTracking();
+		enabled = RedstoneMode.active() && RmSettings.get().clockLabels;
 		if (!enabled) {
 			if (!clocks.isEmpty()) {
 				clocks = List.of();

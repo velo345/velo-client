@@ -5,26 +5,30 @@ import net.veloclient.velo.client.modules.redstone.TickJournal;
 import net.veloclient.velo.client.util.ClientCompat;
 
 /**
- * Tick Mode inside Redstone Mode (singleplayer): entering freezes the world - you still move and
- * build - and the arrow keys drive time: right steps one game tick (hold to keep stepping, Shift
- * for 10), left steps back (hold / Shift for 10), up plays while held (Shift+up sprints ahead),
- * down rewinds a second. Built on vanilla's tick freeze/step/sprint; rewinding uses
- * {@link TickJournal} (blocks and block-entity contents near you, not entities or pending
- * scheduled ticks).
+ * Freezing in Redstone Mode (singleplayer). Nothing is frozen by default: F7 (or the snowflake in
+ * the overlay) freezes the world while you build - you still move and place blocks - and while
+ * frozen the arrow keys drive time: right steps one tick (hold to keep stepping, Shift for 10),
+ * left steps back (hold / Shift for 10), up plays while held (Shift+up sprints ahead), down
+ * rewinds a second. A timeline replay also freezes the world until you leave it. Built on
+ * vanilla's tick freeze / step / sprint; stepping back uses {@link TickJournal}, which only
+ * records while frozen.
  */
 public final class TickControls {
 
-	private static boolean on;
+	private static boolean frozen;
+	private static boolean replay;
 	private static int stepHeld;
 	private static int backHeld;
 	private static boolean playing;
 	private static long stepped;
+	private static boolean applied;
 
 	private TickControls() {
 	}
 
-	public static boolean on() {
-		return on;
+	/** Frozen by the player (F7). */
+	public static boolean frozen() {
+		return frozen;
 	}
 
 	public static boolean playing() {
@@ -35,48 +39,77 @@ public final class TickControls {
 		return stepped;
 	}
 
-	public static void enter(int historyTicks, int radius) {
-		if (on || !ClientCompat.isSingleplayer()) {
-			return;
-		}
-		on = true;
-		TickJournal.radius = radius;
-		TickJournal.maxTicks = historyTicks;
-		TickJournal.clear();
-		TickJournal.enabled = true;
-		stepped = 0;
-		playing = false;
-		server(manager -> setFrozen(manager, true));
+	public static void toggleFreeze() {
+		setFrozen(!frozen);
 	}
 
-	public static void exit() {
-		if (!on) {
+	public static void setFrozen(boolean on) {
+		if (on && !ClientCompat.isSingleplayer()) {
+			RmState.error("Freezing only works in singleplayer");
 			return;
 		}
-		on = false;
+		frozen = on;
+		stepped = 0;
+		playing = false;
+		apply();
+		RmState.info(on ? "World frozen - \u2192 step, \u2190 back, \u2191 play (Shift: sprint), \u2193 rewind 1s" : "World running");
+	}
+
+	/** Timeline replays freeze the world while they're open. */
+	static void setReplay(boolean on) {
+		replay = on;
+		apply();
+	}
+
+	private static void apply() {
+		boolean want = frozen || replay;
+		boolean journal = frozen && !replay;
+		if (journal != TickJournal.enabled) {
+			TickJournal.clear();
+			TickJournal.enabled = journal;
+		}
+		if (want != applied) {
+			applied = want;
+			server(manager -> {
+				if (!want) {
+					stopSprint(manager);
+				}
+				setFrozen(manager, want);
+			});
+		}
+	}
+
+	/** Leaving Redstone Mode / the world. */
+	public static void exit() {
+		frozen = false;
+		replay = false;
+		playing = false;
 		TickJournal.enabled = false;
 		TickJournal.clear();
-		playing = false;
-		server(manager -> {
-			stopSprint(manager);
-			setFrozen(manager, false);
-		});
+		if (applied) {
+			applied = false;
+			server(manager -> {
+				stopSprint(manager);
+				setFrozen(manager, false);
+			});
+		}
 	}
 
 	private static boolean shift() {
-		MinecraftClient client = MinecraftClient.getInstance();
-		//? if <26.1 {
-		return client.player != null && client.player.isSneaking();
-		//?} else {
-		/*return client.player != null && client.player.isShiftKeyDown();
-		*///?}
+		return RmKeys.shift();
 	}
 
-	/** Called every client tick while Tick Mode is on and no screen is open. */
+	/** Client tick while Redstone Mode is on and no screen is open. */
 	public static void tick(int sprintTicks) {
-		if (!on) {
+		if (!frozen || replay) {
+			RmKeys.drain(RmKeys.STEP, RmKeys.BACK, RmKeys.REWIND);
+			if (!replay) {
+				RmKeys.drain(RmKeys.PLAY);
+			}
 			return;
 		}
+		TickJournal.radius = 32;
+		TickJournal.maxTicks = 1200;
 		while (RmKeys.STEP.wasPressed()) {
 			step(shift() ? 10 : 1);
 			stepHeld = 0;
@@ -129,12 +162,6 @@ public final class TickControls {
 		});
 		stepped = Math.max(0, stepped - ticks);
 	}
-
-	/** Freezes or unfreezes the world (used by timeline playback too). */
-	public static void freeze(boolean frozen) {
-		server(manager -> setFrozen(manager, frozen));
-	}
-
 
 	//? if <26.1 {
 	static void server(java.util.function.Consumer<net.minecraft.server.ServerTickManager> action) {

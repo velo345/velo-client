@@ -100,10 +100,17 @@ public final class HudManager {
 		int screenWidth = client.getWindow().getScaledWidth();
 		int screenHeight = client.getWindow().getScaledHeight();
 
+		if (net.veloclient.velo.client.redstone.RedstoneMode.active()) {
+			// Redstone Mode replaces the whole Velo HUD with its own overlay (Edit HUD Layout draws it itself).
+			if (!(net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen)) {
+				net.veloclient.velo.client.redstone.RmHud.render(context, screenWidth, screenHeight, tickDelta);
+			}
+			return;
+		}
 		HudAutoLayout.update(screenWidth, screenHeight);
 		net.veloclient.velo.client.waypoints.WaypointRenderer.renderHud(context, screenWidth, screenHeight);
 		net.veloclient.velo.client.modules.qol.PartyPingModule.renderHud(context, screenWidth, screenHeight);
-		net.veloclient.velo.client.redstone.RmRender.hud(context, screenWidth, screenHeight);
+		net.veloclient.velo.client.redstone.RmAnalysis.renderOutside(context, screenWidth, screenHeight);
 		for (Module module : ModuleRegistry.all()) {
 			if (!(module instanceof HudModule hud) || !hud.isEnabled()) {
 				continue;

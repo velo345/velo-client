@@ -331,6 +331,116 @@ public final class RmWorld {
 		}
 	}
 
+	/** {eyeX, eyeY, eyeZ, lookX, lookY, lookZ} of the player, or null. */
+	public static double[] eyeAndLook() {
+		var player = net.minecraft.client.MinecraftClient.getInstance().player;
+		if (player == null) {
+			return null;
+		}
+		var eye = player.getEyePos();
+		var look = player.getRotationVec(1f);
+		return new double[] {eye.x, eye.y, eye.z, look.x, look.y, look.z};
+	}
+
+	public static int selectedSlot() {
+		var player = net.minecraft.client.MinecraftClient.getInstance().player;
+		return player == null ? -1 : player.getInventory().getSelectedSlot();
+	}
+
+	public static void setSelectedSlot(int slot) {
+		var player = net.minecraft.client.MinecraftClient.getInstance().player;
+		if (player != null && slot >= 0 && slot < 9) {
+			player.getInventory().setSelectedSlot(slot);
+		}
+	}
+
+	/** Map colour (RGB) of a state, for block previews. */
+	public static int mapColor(Object level, Object state, int x, int y, int z) {
+		try {
+			return s(state).getMapColor(w(level), pos(x, y, z)).color;
+		} catch (RuntimeException e) {
+			return 0x808080;
+		}
+	}
+
+	/** The block's item (an ItemStack), or an empty stack for blocks without one. */
+	public static Object blockItem(Object state) {
+		return s(state).getBlock().asItem().getDefaultStack();
+	}
+
+	public static List<String> allBlockIds() {
+		List<String> ids = new ArrayList<>();
+		for (var id : net.minecraft.registry.Registries.BLOCK.getIds()) {
+			ids.add(id.toString());
+		}
+		java.util.Collections.sort(ids);
+		return ids;
+	}
+
+	public static boolean hasNeighborSignal(Object level, int x, int y, int z) {
+		return w(level).isReceivingRedstonePower(pos(x, y, z));
+	}
+
+	/** A comparator's output strength (server level), or -1. */
+	public static int comparatorOutput(Object level, int x, int y, int z) {
+		return w(level).getBlockEntity(pos(x, y, z)) instanceof net.minecraft.block.entity.ComparatorBlockEntity c ? c.getOutputSignal() : -1;
+	}
+
+	/** Recomputes a block's connections from its neighbours (dust, fences, walls...) after silent placement. */
+	public static void refreshShape(Object level, int x, int y, int z) {
+		var p = pos(x, y, z);
+		var state = w(level).getBlockState(p);
+		var updated = net.minecraft.block.Block.postProcessState(state, (net.minecraft.world.WorldAccess) w(level), p);
+		if (updated != state) {
+			w(level).setBlockState(p, updated, 2);
+		}
+	}
+
+	/** Item entities in the box: {entity id, item count}. */
+	public static List<int[]> itemEntities(Object level, double x0, double y0, double z0, double x1, double y1, double z1) {
+		List<int[]> out = new ArrayList<>();
+		var box = new net.minecraft.util.math.Box(x0, y0, z0, x1, y1, z1);
+		for (var e : w(level).getEntitiesByClass(net.minecraft.entity.ItemEntity.class, box, e -> true)) {
+			out.add(new int[] {e.getId(), e.getStack().getCount()});
+		}
+		return out;
+	}
+
+	/** Middle click on a schematic block: select / fetch its item from your inventory (creative: create it). */
+	public static boolean pickItem(Object state) {
+		var client = net.minecraft.client.MinecraftClient.getInstance();
+		var player = client.player;
+		if (player == null || client.interactionManager == null) {
+			return false;
+		}
+		var item = s(state).getBlock().asItem();
+		if (item == net.minecraft.item.Items.AIR) {
+			return false;
+		}
+		var inventory = player.getInventory();
+		for (int i = 0; i < 9; i++) {
+			if (inventory.getStack(i).isOf(item)) {
+				inventory.setSelectedSlot(i);
+				return true;
+			}
+		}
+		int selected = inventory.getSelectedSlot();
+		for (int i = 9; i < 36; i++) {
+			if (inventory.getStack(i).isOf(item)) {
+				client.interactionManager.clickSlot(player.playerScreenHandler.syncId, i, selected,
+						net.minecraft.screen.slot.SlotActionType.SWAP, player);
+				return true;
+			}
+		}
+		if (player.isCreative()) {
+			var stack = item.getDefaultStack();
+			inventory.setStack(selected, stack);
+			client.interactionManager.clickCreativeStack(stack, 36 + selected);
+			return true;
+		}
+		return false;
+	}
+
 	/** Whether the level actually advances this tick (not frozen by Tick Mode). */
 	public static boolean runsNormally(Object level) {
 		return w(level).getTickManager().shouldTick();
@@ -581,6 +691,110 @@ public final class RmWorld {
 			entity.snapTo(x, y, z, yaw, entity.getXRot());
 			server.addFreshEntity(entity);
 		}
+	}
+
+	public static double[] eyeAndLook() {
+		var player = net.minecraft.client.Minecraft.getInstance().player;
+		if (player == null) {
+			return null;
+		}
+		var eye = player.getEyePosition();
+		var look = player.getViewVector(1f);
+		return new double[] {eye.x, eye.y, eye.z, look.x, look.y, look.z};
+	}
+
+	public static int selectedSlot() {
+		var player = net.minecraft.client.Minecraft.getInstance().player;
+		return player == null ? -1 : player.getInventory().getSelectedSlot();
+	}
+
+	public static void setSelectedSlot(int slot) {
+		var player = net.minecraft.client.Minecraft.getInstance().player;
+		if (player != null && slot >= 0 && slot < 9) {
+			player.getInventory().setSelectedSlot(slot);
+		}
+	}
+
+	public static int mapColor(Object level, Object state, int x, int y, int z) {
+		try {
+			return s(state).getMapColor(w(level), pos(x, y, z)).col;
+		} catch (RuntimeException e) {
+			return 0x808080;
+		}
+	}
+
+	public static Object blockItem(Object state) {
+		return s(state).getBlock().asItem().getDefaultInstance();
+	}
+
+	public static List<String> allBlockIds() {
+		List<String> ids = new ArrayList<>();
+		for (var id : net.minecraft.core.registries.BuiltInRegistries.BLOCK.keySet()) {
+			ids.add(id.toString());
+		}
+		java.util.Collections.sort(ids);
+		return ids;
+	}
+
+	public static boolean hasNeighborSignal(Object level, int x, int y, int z) {
+		return w(level).hasNeighborSignal(pos(x, y, z));
+	}
+
+	public static int comparatorOutput(Object level, int x, int y, int z) {
+		return w(level).getBlockEntity(pos(x, y, z)) instanceof net.minecraft.world.level.block.entity.ComparatorBlockEntity c
+				? c.getOutputSignal() : -1;
+	}
+
+	public static void refreshShape(Object level, int x, int y, int z) {
+		var p = pos(x, y, z);
+		var state = w(level).getBlockState(p);
+		var updated = net.minecraft.world.level.block.Block.updateFromNeighbourShapes(state, (net.minecraft.world.level.LevelAccessor) w(level), p);
+		if (updated != state) {
+			w(level).setBlock(p, updated, 2);
+		}
+	}
+
+	public static List<int[]> itemEntities(Object level, double x0, double y0, double z0, double x1, double y1, double z1) {
+		List<int[]> out = new ArrayList<>();
+		var box = new net.minecraft.world.phys.AABB(x0, y0, z0, x1, y1, z1);
+		for (var e : w(level).getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, box, e -> true)) {
+			out.add(new int[] {e.getId(), e.getItem().getCount()});
+		}
+		return out;
+	}
+
+	public static boolean pickItem(Object state) {
+		var client = net.minecraft.client.Minecraft.getInstance();
+		var player = client.player;
+		if (player == null || client.gameMode == null) {
+			return false;
+		}
+		var item = s(state).getBlock().asItem();
+		if (item == net.minecraft.world.item.Items.AIR) {
+			return false;
+		}
+		var inventory = player.getInventory();
+		for (int i = 0; i < 9; i++) {
+			if (inventory.getItem(i).is(item)) {
+				inventory.setSelectedSlot(i);
+				return true;
+			}
+		}
+		int selected = inventory.getSelectedSlot();
+		for (int i = 9; i < 36; i++) {
+			if (inventory.getItem(i).is(item)) {
+				client.gameMode.handleContainerInput(player.inventoryMenu.containerId, i, selected,
+						net.minecraft.world.inventory.ContainerInput.SWAP, player);
+				return true;
+			}
+		}
+		if (player.isCreative()) {
+			var stack = item.getDefaultInstance();
+			inventory.setItem(selected, stack);
+			client.gameMode.handleCreativeModeItemAdd(stack, 36 + selected);
+			return true;
+		}
+		return false;
 	}
 
 	public static boolean runsNormally(Object level) {

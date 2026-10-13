@@ -77,7 +77,9 @@ public final class CommandKeybindsModule extends AbstractModule {
 			if (entry.keyCode() == net.veloclient.velo.client.util.Keys.UNKNOWN) {
 				continue;
 			}
-			boolean down = net.veloclient.velo.client.util.Keys.isKeyDown(entry.keyCode());
+			// Redstone Mode switches every Velo keybind off.
+			boolean down = !net.veloclient.velo.client.redstone.RedstoneMode.active()
+					&& net.veloclient.velo.client.util.Keys.isKeyDown(entry.keyCode());
 			boolean wasDown = WAS_DOWN.getOrDefault(i, false);
 			if (down && !wasDown && !entry.command().isBlank()) {
 				String command = entry.command().startsWith("/") ? entry.command().substring(1) : entry.command();

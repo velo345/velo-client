@@ -4,50 +4,75 @@ import net.minecraft.client.MinecraftClient;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * Timeline: a frame-by-frame recording of the selected area, played back right in the world.
- * Press K with an area selected to start recording (the world runs as usual - or step it with
- * Tick Mode), K again to stop: the world freezes and the area becomes a 3D replay you can scrub
- * (arrow keys / scroll), play at the configured speed (up arrow) or jump to the start (down
- * arrow). K once more leaves the replay and puts the area back exactly as it was at the end of the
- * recording. Shift+K re-opens the last recording.
+ * Recordings of a selected area, replayed in the world. K starts recording (the world keeps running
+ * normally), K stops it and opens the replay: the world freezes and the area shows the recorded
+ * ticks - walk around it, scrub with the slider / arrow keys / scroll, play it at any speed. K once
+ * more leaves the replay and puts the area back exactly as it was. The last few recordings stay
+ * available from the Recordings menu until you leave the world.
  *
- * <p>Only block states are recorded (that's what redstone shows), as per-tick differences. It's
- * kept for this session only - leaving the world drops it - and it stops by itself at the
- * configured length or when it would take more than {@link #MAX_MEMORY_INTS} values, and areas
- * above {@link #MAX_VOLUME} blocks can't be recorded, so the PC can't run out of memory.
+ * <p>Only block states are recorded (that's what redstone shows), as per-tick changes. Areas up to
+ * {@link #MAX_VOLUME} blocks; a recording stops by itself at the configured length or memory limit.
  */
 public final class Timeline {
 
-	public enum Phase { IDLE, RECORDING, PLAYBACK }
+	public enum Phase { IDLE, RECORDING }
 
-	public static final int MAX_VOLUME = 32_768;
-	private static final long MAX_MEMORY_INTS = 24_000_000;
+	public static final int MAX_VOLUME = 1_000_000;
+	private static final long MAX_MEMORY_INTS = 40_000_000;
+
+	/** One recording (server-side data, read-only once finished). */
+	public static final class Recording {
+		final int number;
+		final int[] box;
+		final int sx;
+		final int sy;
+		final int sz;
+		final Object level;
+		final int[] first;
+		int[] last;
+		final List<int[]> diffs = new ArrayList<>();
+		long stored;
+
+		Recording(int number, int[] box, Object level) {
+			this.number = number;
+			this.box = box;
+			this.sx = box[3] - box[0] + 1;
+			this.sy = box[4] - box[1] + 1;
+			this.sz = box[5] - box[2] + 1;
+			this.level = level;
+			this.first = new int[sx * sy * sz];
+		}
+
+		public int number() {
+			return number;
+		}
+
+		public synchronized int frames() {
+			return diffs.size();
+		}
+
+		public String size() {
+			return sx + "x" + sy + "x" + sz;
+		}
+	}
 
 	private static volatile Phase phase = Phase.IDLE;
+	private static final List<Recording> RECORDINGS = new ArrayList<>();
+	private static Recording recording;
+	private static int counter;
 
-	// Recording data. Written on the server thread while recording, then read-only.
-	private static int[] box;
-	private static int sx;
-	private static int sy;
-	private static int sz;
-	private static int[] firstFrame;
-	private static int[] serverCurrent;
-	/** Per recorded tick: {index, oldId, newId, index, oldId, newId, ...}. */
-	private static final List<int[]> DIFFS = new ArrayList<>();
-	private static long storedInts;
-	private static Object recordingLevel;
-	private static int maxFrames;
-
-	// Playback (client thread).
-	private static volatile int frameCount;
-	private static int shownFrame;
+	// Replay (server-side arrays guarded by Timeline.class)
+	private static volatile Recording replay;
+	private static int[] saved;
+	private static int[] showing;
+	private static volatile int shownFrame;
 	private static int targetFrame;
 	private static boolean playing;
-	private static double playAccumulator;
+	private static double accumulator;
 	private static int heldTicks;
-	private static boolean hasRecording;
 
 	private Timeline() {
 	}
@@ -56,12 +81,18 @@ public final class Timeline {
 		return phase;
 	}
 
-	public static boolean playbackActive() {
-		return phase == Phase.PLAYBACK;
+	public static boolean replayOpen() {
+		return replay != null;
+	}
+
+	public static int recordingFrames() {
+		Recording r = recording;
+		return r == null ? 0 : r.frames();
 	}
 
 	public static int frameCount() {
-		return frameCount;
+		Recording r = replay;
+		return r == null ? 0 : r.frames();
 	}
 
 	public static int shownFrame() {
@@ -72,189 +103,270 @@ public final class Timeline {
 		return playing;
 	}
 
+	/** The box being recorded or replayed (for the outline), or null. */
 	public static int[] box() {
-		return box;
+		Recording r = replay != null ? replay : recording;
+		return r == null ? null : r.box;
 	}
 
-	/** Change counts per frame, for the timeline bar's activity marks. */
+	public static synchronized List<Recording> recordings() {
+		return List.copyOf(RECORDINGS);
+	}
+
 	public static synchronized int changesAt(int frame) {
-		return frame >= 1 && frame <= DIFFS.size() ? DIFFS.get(frame - 1).length / 3 : 0;
+		Recording r = replay;
+		if (r == null || frame < 1 || frame > r.diffs.size()) {
+			return 0;
+		}
+		return r.diffs.get(frame - 1).length / 3;
 	}
 
+	/** K: start recording, stop and replay, or leave the replay. */
 	public static void toggle() {
-		switch (phase) {
-			case IDLE -> {
-				if (RmKeys.shift() && hasRecording) {
-					enterPlayback();
-				} else {
-					startRecording();
-				}
-			}
-			case RECORDING -> stopRecording();
-			case PLAYBACK -> exitPlayback();
+		if (replay != null) {
+			closeReplay();
+		} else if (phase == Phase.RECORDING) {
+			stopRecording();
+		} else {
+			startRecording();
 		}
 	}
 
 	private static void startRecording() {
 		int[] b = RmState.box();
 		if (b == null) {
-			RmState.error("Select the area to record first (left + right click), then press K");
+			RmState.error("Select the area to record first, then press K");
 			return;
 		}
 		if (!RmWorld.singleplayer()) {
-			RmState.error("Timelines need singleplayer");
+			RmState.error("Recording needs singleplayer");
 			return;
 		}
-		long volume = RmState.volume();
-		if (volume > MAX_VOLUME) {
-			RmState.error("Area too big to record (" + volume + " blocks, max " + MAX_VOLUME + ")");
+		if (RmState.volume() > MAX_VOLUME) {
+			RmState.error("Area too big to record (max " + MAX_VOLUME + " blocks)");
 			return;
 		}
 		int[] area = b.clone();
-		maxFrames = (int) Math.round(RedstoneModeModule.timelineFrames);
 		RmWorld.onServer(level -> {
 			synchronized (Timeline.class) {
-				box = area;
-				sx = area[3] - area[0] + 1;
-				sy = area[4] - area[1] + 1;
-				sz = area[5] - area[2] + 1;
-				firstFrame = new int[sx * sy * sz];
-				for (int x = 0; x < sx; x++) {
-					for (int y = 0; y < sy; y++) {
-						for (int z = 0; z < sz; z++) {
-							firstFrame[(x * sy + y) * sz + z] = RmWorld.rawId(RmWorld.state(level, area[0] + x, area[1] + y, area[2] + z));
+				Recording r = new Recording(++counter, area, level);
+				for (int x = 0; x < r.sx; x++) {
+					for (int y = 0; y < r.sy; y++) {
+						for (int z = 0; z < r.sz; z++) {
+							r.first[(x * r.sy + y) * r.sz + z] = RmWorld.rawId(RmWorld.state(level, area[0] + x, area[1] + y, area[2] + z));
 						}
 					}
 				}
-				serverCurrent = firstFrame.clone();
-				DIFFS.clear();
-				storedInts = firstFrame.length;
-				recordingLevel = level;
+				r.last = r.first.clone();
+				r.stored = r.first.length;
+				recording = r;
 				phase = Phase.RECORDING;
-				frameCount = 0;
 			}
-			MinecraftClient.getInstance().execute(() -> RmState.info("Recording " + sx + "x" + sy + "x" + sz
-					+ " - run or step your contraption, K to stop"));
+			MinecraftClient.getInstance().execute(() -> RmState.info("Recording - run your contraption, K stops"));
 		});
 	}
 
-	/** Server thread, at the start of every level tick that actually runs. */
+	/** Server thread, every level tick that actually runs. */
 	public static void onServerTick(Object level) {
-		if (phase != Phase.RECORDING || level != recordingLevel) {
+		Recording r = recording;
+		if (phase != Phase.RECORDING || r == null || level != r.level) {
 			return;
 		}
 		synchronized (Timeline.class) {
 			int[] scratch = new int[96];
 			int used = 0;
-			for (int x = 0; x < sx; x++) {
-				for (int y = 0; y < sy; y++) {
-					for (int z = 0; z < sz; z++) {
-						int i = (x * sy + y) * sz + z;
-						int id = RmWorld.rawId(RmWorld.state(level, box[0] + x, box[1] + y, box[2] + z));
-						if (id != serverCurrent[i]) {
+			for (int x = 0; x < r.sx; x++) {
+				for (int y = 0; y < r.sy; y++) {
+					for (int z = 0; z < r.sz; z++) {
+						int i = (x * r.sy + y) * r.sz + z;
+						int id = RmWorld.rawId(RmWorld.state(level, r.box[0] + x, r.box[1] + y, r.box[2] + z));
+						if (id != r.last[i]) {
 							if (used + 3 > scratch.length) {
 								scratch = java.util.Arrays.copyOf(scratch, scratch.length * 2);
 							}
 							scratch[used++] = i;
-							scratch[used++] = serverCurrent[i];
+							scratch[used++] = r.last[i];
 							scratch[used++] = id;
-							serverCurrent[i] = id;
+							r.last[i] = id;
 						}
 					}
 				}
 			}
-			DIFFS.add(java.util.Arrays.copyOf(scratch, used));
-			storedInts += used + 4;
-			frameCount = DIFFS.size();
-			if (DIFFS.size() >= maxFrames || storedInts > MAX_MEMORY_INTS) {
+			synchronized (r) {
+				r.diffs.add(java.util.Arrays.copyOf(scratch, used));
+			}
+			r.stored += used + 4;
+			if (r.diffs.size() >= RmSettings.get().timelineFrames || r.stored > MAX_MEMORY_INTS) {
 				MinecraftClient.getInstance().execute(Timeline::stopRecording);
 			}
 		}
 	}
 
 	private static void stopRecording() {
-		if (phase != Phase.RECORDING) {
+		Recording r = recording;
+		if (phase != Phase.RECORDING || r == null) {
 			return;
 		}
 		synchronized (Timeline.class) {
 			phase = Phase.IDLE;
-			hasRecording = frameCount > 0;
+			recording = null;
+			if (r.frames() == 0) {
+				MinecraftClient.getInstance().execute(() -> RmState.error("Nothing recorded - the world didn't run"));
+				return;
+			}
+			RECORDINGS.add(r);
+			while (RECORDINGS.size() > Math.max(1, RmSettings.get().keepRecordings)) {
+				RECORDINGS.removeFirst();
+			}
 		}
-		if (!hasRecording) {
-			RmState.error("Nothing recorded - the world didn't run (unfreeze with the up arrow or step with right arrow)");
+		openReplay(r);
+	}
+
+	/** Opens a recording: freezes the world and shows its last tick, keeping the area's current blocks to restore later. */
+	public static void openReplay(Recording r) {
+		if (replay != null) {
+			closeReplay();
+		}
+		if (phase == Phase.RECORDING) {
+			RmState.error("Stop the recording first (K)");
 			return;
 		}
-		enterPlayback();
-	}
-
-	private static void enterPlayback() {
-		TickControls.freeze(true);
-		phase = Phase.PLAYBACK;
-		shownFrame = frameCount;
-		targetFrame = frameCount;
+		TickControls.setReplay(true);
+		replay = r;
 		playing = false;
-		RmState.info("Replay: ←/→ frame, scroll to scrub, ↑ play/pause, ↓ to start, K to leave (" + frameCount + " ticks)");
+		int last = r.frames();
+		targetFrame = last;
+		shownFrame = last;
+		RmWorld.onServer(level -> {
+			synchronized (Timeline.class) {
+				int[] current = new int[r.first.length];
+				for (int x = 0; x < r.sx; x++) {
+					for (int y = 0; y < r.sy; y++) {
+						for (int z = 0; z < r.sz; z++) {
+							current[(x * r.sy + y) * r.sz + z] = RmWorld.rawId(RmWorld.state(level, r.box[0] + x, r.box[1] + y, r.box[2] + z));
+						}
+					}
+				}
+				saved = current;
+				showing = current.clone();
+				applyAbsolute(level, r, r.last);
+				shownFrame = last;
+			}
+		});
+		RmState.info("Replay #" + r.number + " - scrub with the slider or ← →, ↑ plays, K leaves");
 	}
 
-	private static void exitPlayback() {
-		seek(frameCount);
-		phase = Phase.IDLE;
+	/** Leaves the replay: the area goes back to how it was when the replay was opened. */
+	public static void closeReplay() {
+		Recording r = replay;
+		if (r == null) {
+			return;
+		}
+		replay = null;
 		playing = false;
-		RmState.info("Left the replay - area restored. Shift+K reopens it.");
+		RmWorld.onServer(level -> {
+			synchronized (Timeline.class) {
+				if (saved != null) {
+					applyAbsolute(level, r, saved);
+				}
+				saved = null;
+				showing = null;
+			}
+			MinecraftClient.getInstance().execute(() -> TickControls.setReplay(false));
+		});
+		RmState.info("Left the replay - area restored");
 	}
 
-	/** Moves the shown frame by {@code delta}. */
+	/** Server thread: sets every block of the area that differs from {@code target}. */
+	private static void applyAbsolute(Object level, Recording r, int[] target) {
+		for (int i = 0; i < target.length; i++) {
+			if (showing[i] != target[i]) {
+				setIndex(level, r, i, target[i]);
+				showing[i] = target[i];
+			}
+		}
+	}
+
+	private static void setIndex(Object level, Recording r, int i, int id) {
+		int x = i / (r.sy * r.sz);
+		int y = (i / r.sz) % r.sy;
+		int z = i % r.sz;
+		RmWorld.set(level, r.box[0] + x, r.box[1] + y, r.box[2] + z, RmWorld.byRawId(id), RmWorld.SILENT);
+	}
+
 	public static void scrub(int delta) {
 		playing = false;
 		seek(targetFrame + delta);
 	}
 
+	public static void seekFraction(double fraction) {
+		playing = false;
+		seek((int) Math.round(Math.max(0, Math.min(1, fraction)) * frameCount()));
+	}
+
+	public static void togglePlay() {
+		playing = !playing;
+		if (playing && targetFrame >= frameCount()) {
+			seek(0);
+		}
+		accumulator = 0;
+	}
+
+	private static final double[] SPEEDS = {0.05, 0.1, 0.25, 0.5, 1, 2, 4};
+
+	public static void changeSpeed(int direction) {
+		RmSettings.Data s = RmSettings.get();
+		int i = 0;
+		while (i < SPEEDS.length - 1 && SPEEDS[i] < s.playbackSpeed - 1e-6) {
+			i++;
+		}
+		s.playbackSpeed = SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, i + direction))];
+		RmSettings.save();
+	}
+
 	private static void seek(int frame) {
-		int to = Math.max(0, Math.min(frameCount, frame));
-		if (to == targetFrame && to == shownFrame) {
+		Recording r = replay;
+		if (r == null) {
 			return;
 		}
+		int to = Math.max(0, Math.min(r.frames(), frame));
 		targetFrame = to;
-		RmWorld.onServer(level -> applyFrame(level, to));
-	}
-
-	/** Server thread: walks the area from the frame it shows to {@code to}, setting changed blocks silently. */
-	private static void applyFrame(Object level, int to) {
-		synchronized (Timeline.class) {
-			int from = shownFrame;
-			if (box == null || from == to) {
-				return;
-			}
-			java.util.Map<Integer, Integer> changed = new java.util.HashMap<>();
-			if (to > from) {
-				for (int f = from; f < to; f++) {
-					int[] d = DIFFS.get(f);
-					for (int i = 0; i < d.length; i += 3) {
-						changed.put(d[i], d[i + 2]);
+		RmWorld.onServer(level -> {
+			synchronized (Timeline.class) {
+				if (replay != r || showing == null) {
+					return;
+				}
+				int from = shownFrame;
+				java.util.Map<Integer, Integer> changed = new java.util.HashMap<>();
+				if (to > from) {
+					for (int f = from; f < to; f++) {
+						int[] d = r.diffs.get(f);
+						for (int i = 0; i < d.length; i += 3) {
+							changed.put(d[i], d[i + 2]);
+						}
+					}
+				} else {
+					for (int f = from - 1; f >= to; f--) {
+						int[] d = r.diffs.get(f);
+						for (int i = d.length - 3; i >= 0; i -= 3) {
+							changed.put(d[i], d[i + 1]);
+						}
 					}
 				}
-			} else {
-				for (int f = from - 1; f >= to; f--) {
-					int[] d = DIFFS.get(f);
-					for (int i = d.length - 3; i >= 0; i -= 3) {
-						changed.put(d[i], d[i + 1]);
+				for (var e : changed.entrySet()) {
+					if (showing[e.getKey()] != e.getValue()) {
+						setIndex(level, r, e.getKey(), e.getValue());
+						showing[e.getKey()] = e.getValue();
 					}
 				}
+				shownFrame = to;
 			}
-			for (var e : changed.entrySet()) {
-				int i = e.getKey();
-				int x = i / (sy * sz);
-				int y = (i / sz) % sy;
-				int z = i % sz;
-				RmWorld.set(level, box[0] + x, box[1] + y, box[2] + z, RmWorld.byRawId(e.getValue()), RmWorld.SILENT);
-			}
-			shownFrame = to;
-		}
+		});
 	}
 
-	/** Client tick: playback controls and auto-play. */
+	/** Client tick: replay keys and auto-play. */
 	public static void tick() {
-		if (phase != Phase.PLAYBACK || !RedstoneModeModule.active()) {
+		if (replay == null || !RedstoneMode.active()) {
 			return;
 		}
 		while (RmKeys.STEP.wasPressed()) {
@@ -273,24 +385,20 @@ public final class Timeline {
 			heldTicks = 0;
 		}
 		while (RmKeys.PLAY.wasPressed()) {
-			playing = !playing;
-			if (playing && targetFrame >= frameCount) {
-				seek(0);
-			}
-			playAccumulator = 0;
+			togglePlay();
 		}
 		while (RmKeys.REWIND.wasPressed()) {
 			playing = false;
 			seek(0);
 		}
 		if (playing) {
-			playAccumulator += RedstoneModeModule.playbackSpeed;
-			int steps = (int) playAccumulator;
+			accumulator += RmSettings.get().playbackSpeed;
+			int steps = (int) accumulator;
 			if (steps > 0) {
-				playAccumulator -= steps;
+				accumulator -= steps;
 				int next = targetFrame + steps;
-				if (next >= frameCount) {
-					next = frameCount;
+				if (next >= frameCount()) {
+					next = frameCount();
 					playing = false;
 				}
 				seek(next);
@@ -298,25 +406,17 @@ public final class Timeline {
 		}
 	}
 
-	/** Leaving Redstone Mode / the world: restore the area and forget the recording. */
-	public static void stopAll() {
-		if (phase == Phase.PLAYBACK) {
-			seek(frameCount);
-		}
-		phase = Phase.IDLE;
-		playing = false;
+	public static String speedText() {
+		return String.format(Locale.ROOT, "%.2fx", RmSettings.get().playbackSpeed);
 	}
 
-	public static synchronized void discard() {
+	/** Leaving the world: drop everything. */
+	public static synchronized void discardAll() {
+		if (replay != null) {
+			closeReplay();
+		}
+		RECORDINGS.clear();
+		recording = null;
 		phase = Phase.IDLE;
-		playing = false;
-		hasRecording = false;
-		DIFFS.clear();
-		firstFrame = null;
-		serverCurrent = null;
-		box = null;
-		frameCount = 0;
-		storedInts = 0;
-		recordingLevel = null;
 	}
 }
