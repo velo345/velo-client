@@ -71,6 +71,8 @@ public final class SessionAutoFixerModule extends AbstractModule {
 	/** Last automatic fix per server address, so a refresh that keeps failing can't loop. */
 	private final java.util.Map<String, Long> lastAutoFix = new java.util.HashMap<>();
 	private static final long AUTO_RETRY_COOLDOWN_MS = 120_000;
+	private static final long FIX_TIMEOUT_MS = 45_000;
+	private long fixAttempt;
 
 	private void onScreenInit(MinecraftClient client, Screen screen, int scaledWidth, int scaledHeight) {
 		if (!isEnabled() || !(screen instanceof DisconnectedScreen)) {
@@ -312,7 +314,24 @@ public final class SessionAutoFixerModule extends AbstractModule {
 			return;
 		}
 		fixing = true;
+		long attempt = ++fixAttempt;
 		setButtonMessage("Fixing session...");
+		// Watchdog: whatever happens to the refresh thread, the button never stays stuck.
+		Thread watchdog = new Thread(() -> {
+			try {
+				Thread.sleep(FIX_TIMEOUT_MS);
+			} catch (InterruptedException ignored) {
+				return;
+			}
+			MinecraftClient.getInstance().execute(() -> {
+				if (fixing && fixAttempt == attempt) {
+					fixing = false;
+					setButtonMessage("Session fix timed out - click to retry");
+				}
+			});
+		}, "velo-session-fix-watchdog");
+		watchdog.setDaemon(true);
+		watchdog.start();
 		Thread thread = new Thread(this::refreshAndReconnect, "velo-session-fix");
 		thread.setDaemon(true);
 		thread.start();
@@ -342,6 +361,8 @@ public final class SessionAutoFixerModule extends AbstractModule {
 		Session newSession = new Session(refreshed.username(), UUID.fromString(refreshed.uuid()), refreshed.accessToken(),
 				current.getXuid(), current.getClientId());
 		((SessionAccessorMixin) client).velo$setSession(newSession);
+		// The fix is done once the new session is in - a later kick must be able to start a new one.
+		fixing = false;
 		reconnect(client);
 	}
 
@@ -358,6 +379,8 @@ public final class SessionAutoFixerModule extends AbstractModule {
 		User newUser = new User(refreshed.username(), UUID.fromString(refreshed.uuid()), refreshed.accessToken(),
 				current.getXuid(), current.getClientId());
 		((SessionAccessorMixin) client).velo$setSession(newUser);
+		// The fix is done once the new session is in - a later kick must be able to start a new one.
+		fixing = false;
 		reconnect(client);
 	}
 

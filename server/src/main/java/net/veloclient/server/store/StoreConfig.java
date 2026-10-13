@@ -33,11 +33,25 @@ public final class StoreConfig {
 			new CoinPack("coins_1200", 1200, 140, 9.99),
 			new CoinPack("coins_2600", 2600, 400, 19.99),
 			new CoinPack("coins_6500", 6500, 1500, 39.99));
-	public List<Item> items = List.of(
+	public List<Item> items = DEFAULT_ITEMS;
+
+	/**
+	 * Everything the clients ship with. New ones are added to an existing store.json on start (see
+	 * {@link #load}), so a server that was set up before an item existed still sells it; prices
+	 * already in the file are never changed. The wings ids are {@code wings_<id>} of the client's
+	 * {@code cosmetics/wings/wings.json} - keep the prices there in sync (they're only the fallback
+	 * shown before the catalog loads).
+	 */
+	public static final List<Item> DEFAULT_ITEMS = List.of(
 			new Item("cape_black_pattern", "Digitized", 900),
 			new Item("cape_red_code", "Codebreaker", 1000),
 			new Item("cape_red_lightning", "Storm Strike", 1200),
-			new Item("cape_symbols", "Rune Weave", 950));
+			new Item("cape_symbols", "Rune Weave", 950),
+			new Item("wings_angelic", "Angelic Wings", 3000),
+			new Item("wings_frost", "Frost Wings", 2800),
+			new Item("wings_phoenix", "Phoenix Wings", 3200),
+			new Item("wings_raven", "Raven Wings", 2400),
+			new Item("wings_shadowfang", "Shadowfang Wings", 2800));
 
 	/**
 	 * A daily quest. {@code stat}: {@code online_minutes} (measured by the server from game
@@ -93,6 +107,18 @@ public final class StoreConfig {
 		}
 		if (config.rewards == null) {
 			config.rewards = new Rewards();
+		}
+		List<Item> merged = new java.util.ArrayList<>(config.items);
+		boolean added = false;
+		for (Item item : DEFAULT_ITEMS) {
+			if (config.item(item.id()) == null) {
+				merged.add(item);
+				added = true;
+			}
+		}
+		if (added) {
+			config.items = List.copyOf(merged);
+			Files.writeString(file, GSON.toJson(config), StandardCharsets.UTF_8);
 		}
 		return config;
 	}

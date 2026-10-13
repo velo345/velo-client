@@ -47,6 +47,7 @@ public final class RmInput {
 		}
 		DustAnalyzer.tick();
 		ClockTracker.tick();
+		RedstoneMode.tickSlot();
 		if (!RedstoneMode.active()) {
 			RmKeys.drain(RmKeys.CURSOR, RmKeys.FREEZE, RmKeys.HIDE, RmKeys.RECORD, RmKeys.CANCEL_JOB, RmKeys.TOOL_SELECT, RmKeys.TOOL_MOVE,
 					RmKeys.TOOL_STACK, RmKeys.TOOL_WIRE, RmKeys.TOOL_WATER, RmKeys.STEP, RmKeys.BACK, RmKeys.PLAY, RmKeys.REWIND);
@@ -201,7 +202,7 @@ public final class RmInput {
 			RmState.pasting = false;
 		} else if (!Wiring.preview().isEmpty() || RmState.wireStart != null) {
 			Wiring.reset();
-		} else if (RmState.moveActive() || RmState.stackCount != 0) {
+		} else if (RmState.moveActive() || RmState.stackCopies() != 0) {
 			RmState.resetTransforms();
 		} else {
 			RmState.clearSelection();
@@ -319,6 +320,11 @@ public final class RmInput {
 		if (Placements.following() != null && RmKeys.shift()) {
 			return true;
 		}
+		return toolWantsScroll() || !RmWorld.spectator() && RedstoneMode.scrollReachesToolSlot();
+	}
+
+	/** Whether the selected tool uses this scroll itself (otherwise it moves through the hotbar). */
+	private static boolean toolWantsScroll() {
 		if (!RedstoneMode.toolHeld()) {
 			return false;
 		}
@@ -341,8 +347,15 @@ public final class RmInput {
 			return;
 		}
 		Placements.Placement following = Placements.following();
-		if (following != null) {
+		if (following != null && RmKeys.shift()) {
 			following.rotation = Math.floorMod(following.rotation + step, 4);
+			return;
+		}
+		if (!toolWantsScroll()) {
+			// Plain hotbar scrolling, with the tool slot between slot 9 and slot 1.
+			if (!RedstoneMode.scrollHotbar(amount)) {
+				RmWorld.setSelectedSlot(Math.floorMod(RmWorld.selectedSlot() - step, 9));
+			}
 			return;
 		}
 		if (RmState.pasting) {
@@ -362,21 +375,22 @@ public final class RmInput {
 				}
 			}
 			case STACK -> {
-				// Count along the axis you look at; switching axis starts over.
-				int axisFace = face % 2 == 0 ? face : face - 1;
-				int currentAxis = RmState.stackFace % 2 == 0 ? RmState.stackFace : RmState.stackFace - 1;
-				int signed = RmState.stackFace == face ? RmState.stackCount : axisFace == currentAxis ? -RmState.stackCount : 0;
-				signed += step;
-				RmState.stackFace = signed >= 0 ? face : opposite(face);
-				RmState.stackCount = Math.min(256, Math.abs(signed));
+				// Scrolling adds copies along the axis you look at (backward = the other way); the
+				// other axes keep their counts, so X, Y and Z can all be stacked in one go.
+				int axis = d[0] != 0 ? 0 : d[1] != 0 ? 1 : 2;
+				int next = Math.max(-256, Math.min(256, RmState.stack[axis] + d[axis] * step));
+				int[] trial = RmState.stack.clone();
+				trial[axis] = next;
+				long copies = (long) (Math.abs(trial[0]) + 1) * (Math.abs(trial[1]) + 1) * (Math.abs(trial[2]) + 1) - 1;
+				if (copies > 4096) {
+					RmState.error("That's over 4096 copies - apply this stack first");
+				} else {
+					RmState.stack = trial;
+				}
 			}
 			default -> {
 			}
 		}
-	}
-
-	private static int opposite(int face) {
-		return face % 2 == 0 ? face + 1 : face - 1;
 	}
 
 	/** Shift+scroll with Select: moves the selection's side you look at outwards (scroll forward) or inwards. */

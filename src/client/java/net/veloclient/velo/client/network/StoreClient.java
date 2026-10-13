@@ -230,7 +230,26 @@ public final class StoreClient {
 		owned = Set.copyOf(items);
 	}
 
+	/** Item prices from the server's catalog (the server is what actually charges). */
+	private static volatile java.util.Map<String, Integer> prices = java.util.Map.of();
+
+	/** The server's price for an item, or {@code fallback} before the catalog has loaded. */
+	public static int price(String itemId, int fallback) {
+		Integer price = prices.get(itemId);
+		return price != null ? price : fallback;
+	}
+
 	private static void applyCatalog(JsonObject catalog) {
+		if (catalog.has("items") && catalog.get("items").isJsonArray()) {
+			java.util.Map<String, Integer> map = new java.util.HashMap<>();
+			for (var element : catalog.getAsJsonArray("items")) {
+				JsonObject item = element.getAsJsonObject();
+				if (item.has("id") && item.has("price")) {
+					map.put(item.get("id").getAsString(), item.get("price").getAsInt());
+				}
+			}
+			prices = java.util.Map.copyOf(map);
+		}
 		currency = catalog.get("currency").getAsString();
 		checkoutEnabled = catalog.get("checkoutEnabled").getAsBoolean();
 		List<CoinPack> list = new ArrayList<>();

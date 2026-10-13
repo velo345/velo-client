@@ -23,22 +23,23 @@ public final class RmJobs {
 		final int[] indices;
 		final Object[] states;
 		final Object[] blockEntities;
-		final boolean[] pendingTicks;
+		/** Scheduled ticks to restore: {box index, delay, priority, fluid} (see {@link Clip#ticks}). */
+		final List<int[]> ticks;
 		final List<Object[]> entities;
 
-		Source(int sx, int sy, int sz, int[] indices, Object[] states, Object[] blockEntities, boolean[] pendingTicks, List<Object[]> entities) {
+		Source(int sx, int sy, int sz, int[] indices, Object[] states, Object[] blockEntities, List<int[]> ticks, List<Object[]> entities) {
 			this.sx = sx;
 			this.sy = sy;
 			this.sz = sz;
 			this.indices = indices;
 			this.states = states;
 			this.blockEntities = blockEntities;
-			this.pendingTicks = pendingTicks;
+			this.ticks = ticks == null ? List.of() : ticks;
 			this.entities = entities;
 		}
 
 		static Source of(Clip clip) {
-			return new Source(clip.sx, clip.sy, clip.sz, null, clip.states, clip.blockEntities, clip.pendingTicks, clip.entities);
+			return new Source(clip.sx, clip.sy, clip.sz, null, clip.states, clip.blockEntities, clip.ticks, clip.entities);
 		}
 
 		int count() {
@@ -87,6 +88,8 @@ public final class RmJobs {
 		final boolean recordUndo;
 		final String label;
 		final Runnable onDone;
+		/** Jobs sharing a non-zero group (one stack, one move) become a single undo step. */
+		int group;
 		final Changes changes = new Changes();
 		int phase;
 		int cursor;
@@ -104,6 +107,48 @@ public final class RmJobs {
 			this.recordUndo = recordUndo;
 			this.label = label;
 			this.onDone = onDone;
+		}
+	}
+
+	/**
+	 * Neighbour updates from every redstone-relevant block just outside the pasted box, plus from the
+	 * box's own outer shell: pasted dust next to a power source picks it up, dust that was powered by
+	 * something outside the copy turns off, pistons outside react. Skipped for enormous boxes.
+	 */
+	private static void wakeBorder(Object level, int x0, int y0, int z0, int sx, int sy, int sz) {
+		long shell = 2L * ((long) (sx + 2) * (sy + 2) + (long) (sx + 2) * (sz + 2) + (long) (sy + 2) * (sz + 2));
+		if (shell > 2_000_000) {
+			return;
+		}
+		for (int x = x0 - 1; x <= x0 + sx; x++) {
+			for (int y = y0 - 1; y <= y0 + sy; y++) {
+				for (int z = z0 - 1; z <= z0 + sz; z++) {
+					boolean outside = x < x0 || y < y0 || z < z0 || x >= x0 + sx || y >= y0 + sy || z >= z0 + sz;
+					if (!outside) {
+						continue;
+					}
+					Object state = RmWorld.state(level, x, y, z);
+					if (!RmWorld.isAir(state)) {
+						RmWorld.neighborUpdate(level, x, y, z);
+					}
+				}
+			}
+		}
+		// The shell's own redstone parts: they update their neighbours, which includes the outside.
+		for (int x = x0; x < x0 + sx; x++) {
+			for (int y = y0; y < y0 + sy; y++) {
+				for (int z = z0; z < z0 + sz; z++) {
+					boolean edge = x == x0 || y == y0 || z == z0 || x == x0 + sx - 1 || y == y0 + sy - 1 || z == z0 + sz - 1;
+					if (!edge) {
+						z = z0 + sz - 2;
+						continue;
+					}
+					Object state = RmWorld.state(level, x, y, z);
+					if (!RmWorld.isAir(state) && RmOps.isRedstone(RmWorld.id(state))) {
+						RmWorld.neighborUpdate(level, x, y, z);
+					}
+				}
+			}
 		}
 	}
 
@@ -208,28 +253,25 @@ public final class RmJobs {
 					}
 				}
 				case 2 -> {
-					while (budget > 0 && job.cursor < n) {
-						int i = job.cursor++;
-						Object state = src.states[i];
-						if (state == null || RmWorld.isAir(state) || !RmOps.isRedstone(RmWorld.id(state))) {
-							continue;
-						}
-						int b = src.boxIndex(i);
-						int x = job.x0 + b / layer;
-						int y = job.y0 + (b / src.sz) % src.sy;
-						int z = job.z0 + b % src.sz;
-						if (src.pendingTicks != null && src.pendingTicks[i]) {
-							RmWorld.scheduleTick(level, x, y, z, 1);
-						}
-						// Observers react to shape updates, not neighbour updates - pistons, repeaters,
-						// comparators and dust wake up, no observer fires.
-						RmWorld.neighborUpdate(level, x, y, z);
-						budget -= 3;
+					// Wake-up: the pasted build is a consistent snapshot, so its inside is left exactly
+					// as captured - only the ticks it had scheduled come back (same delay, priority
+					// and order), then the blocks around its outside get a neighbour update so the
+					// build connects to (or disconnects from) whatever it was pasted next to.
+					for (int[] t : src.ticks) {
+						int b = t[0];
+						RmWorld.scheduleExact(level, job.x0 + b / layer, job.y0 + (b / src.sz) % src.sy, job.z0 + b % src.sz, t[1], t[2], t[3] == 1);
 					}
-					if (job.cursor >= n) {
-						job.phase = 3;
-						job.cursor = 0;
+					budget -= src.ticks.size();
+					if (src.indices == null) {
+						wakeBorder(level, job.x0, job.y0, job.z0, src.sx, src.sy, src.sz);
+					} else {
+						for (int i = 0; i < n; i++) {
+							int b = src.boxIndex(i);
+							RmWorld.neighborUpdate(level, job.x0 + b / layer, job.y0 + (b / src.sz) % src.sy, job.z0 + b % src.sz);
+						}
 					}
+					job.phase = 3;
+					job.cursor = 0;
 				}
 				case 3 -> {
 					for (Object[] e : src.entities) {

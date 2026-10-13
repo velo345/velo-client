@@ -26,7 +26,19 @@ public final class RmOps {
 			"minecraft:daylight_detector", "minecraft:sculk_sensor", "minecraft:calibrated_sculk_sensor", "minecraft:crafter",
 			"minecraft:lever", "minecraft:tnt", "minecraft:redstone_block", "minecraft:trapped_chest", "minecraft:lectern");
 
-	private record Undo(int x, int y, int z, RmJobs.Source before, RmJobs.Source after, boolean skipAir, long blocks) {
+	/** One placed box of an undo step. */
+	private record Part(int x, int y, int z, RmJobs.Source before, RmJobs.Source after, boolean skipAir) {
+	}
+
+	/** One undo step: every box an action placed (a stack places one per copy), undone together. */
+	private static final class Undo {
+		final java.util.List<Part> parts = new java.util.ArrayList<>();
+		final int group;
+		long blocks;
+
+		Undo(int group) {
+			this.group = group;
+		}
 	}
 
 	private static final Deque<Undo> UNDO = new ArrayDeque<>();
@@ -76,12 +88,12 @@ public final class RmOps {
 					clip.states[i] = state;
 					if (!RmWorld.isAir(state)) {
 						clip.blockEntities[i] = RmWorld.saveBe(level, x0 + x, y0 + y, z0 + z);
-						if (isRedstone(RmWorld.id(state))) {
-							clip.pendingTicks[i] = RmWorld.hasPendingTick(level, x0 + x, y0 + y, z0 + z);
-						}
 					}
 				}
 			}
+		}
+		for (int[] t : RmWorld.scheduledTicks(level, x0, y0, z0, sx, sy, sz)) {
+			clip.ticks.add(new int[] {clip.index(t[0], t[1], t[2]), t[3], t[4], t[5]});
 		}
 		if (withEntities) {
 			clip.entities.addAll(RmWorld.captureEntities(level, x0, y0, z0, x0 + sx - 1, y0 + sy - 1, z0 + sz - 1));
@@ -89,26 +101,47 @@ public final class RmOps {
 		return clip;
 	}
 
+	private static final java.util.concurrent.atomic.AtomicInteger GROUPS = new java.util.concurrent.atomic.AtomicInteger();
+
+	/** A fresh id for jobs that should undo as one step. */
+	static int newGroup() {
+		return GROUPS.incrementAndGet();
+	}
+
 	private static void runJob(Object level, RmJobs.Source source, int x, int y, int z, boolean skipAir, String label, Runnable onDone) {
-		RmJobs.submit(new RmJobs.Job(level, source, x, y, z, skipAir, RmSettings.get().keepRunning, true, label, onDone));
+		runJob(level, source, x, y, z, skipAir, label, onDone, 0);
+	}
+
+	private static void runJob(Object level, RmJobs.Source source, int x, int y, int z, boolean skipAir, String label, Runnable onDone, int group) {
+		RmJobs.Job job = new RmJobs.Job(level, source, x, y, z, skipAir, RmSettings.get().keepRunning, true, label, onDone);
+		job.group = group;
+		RmJobs.submit(job);
+	}
+
+	/** Adds a placed box to the undo history - to the last step if it belongs to the same group. Server thread. */
+	private static void remember(int group, Part part, long blocks) {
+		synchronized (RmOps.class) {
+			Undo last = UNDO.peekLast();
+			Undo target = group != 0 && last != null && last.group == group ? last : null;
+			if (target == null) {
+				target = new Undo(group);
+				UNDO.addLast(target);
+			}
+			target.parts.add(part);
+			target.blocks += blocks;
+			REDO.clear();
+			trim();
+		}
 	}
 
 	static void rememberJob(RmJobs.Job job, int sx, int sy, int sz) {
 		RmJobs.Source before = job.changes.asSource(sx, sy, sz);
-		synchronized (RmOps.class) {
-			UNDO.addLast(new Undo(job.x0, job.y0, job.z0, before, job.source, job.skipAir, before.count()));
-			REDO.clear();
-			trim();
-		}
+		remember(job.group, new Part(job.x0, job.y0, job.z0, before, job.source, job.skipAir), before.count());
 	}
 
 	/** Records an edit made outside a job (wiring) so it can be undone too. Server thread. */
 	static void rememberEdit(int x, int y, int z, Clip before, Clip after) {
-		synchronized (RmOps.class) {
-			UNDO.addLast(new Undo(x, y, z, RmJobs.Source.of(before), RmJobs.Source.of(after), false, before.volume()));
-			REDO.clear();
-			trim();
-		}
+		remember(0, new Part(x, y, z, RmJobs.Source.of(before), RmJobs.Source.of(after), false), before.volume());
 	}
 
 	/** Undo entry for a build that touched only some blocks of a large box (wiring). Server thread. */
@@ -122,20 +155,16 @@ public final class RmOps {
 		}
 		RmJobs.Source after = new RmJobs.Source(sx, sy, sz, indices, states, null, null, java.util.List.of());
 		RmJobs.Source before = changes.asSource(sx, sy, sz);
-		synchronized (RmOps.class) {
-			UNDO.addLast(new Undo(x0, y0, z0, before, after, false, before.count()));
-			REDO.clear();
-			trim();
-		}
+		remember(0, new Part(x0, y0, z0, before, after, false), before.count());
 	}
 
 	private static void trim() {
 		long total = 0;
 		for (Undo u : UNDO) {
-			total += u.blocks();
+			total += u.blocks;
 		}
 		while (UNDO.size() > MAX_UNDO || total > MAX_UNDO_BLOCKS && UNDO.size() > 1) {
-			total -= UNDO.removeFirst().blocks();
+			total -= UNDO.removeFirst().blocks;
 		}
 	}
 
@@ -231,34 +260,47 @@ public final class RmOps {
 			int nz = b[2] + off[2] + (s[2] - moved.sz) / 2;
 			int ny = b[1] + off[1];
 			RmWorld.removeEntities(level, b[0], b[1], b[2], b[3], b[4], b[5]);
-			runJob(level, RmJobs.Source.of(air(s[0], s[1], s[2])), b[0], b[1], b[2], false, "Moving", null);
+			int group = newGroup();
+			runJob(level, RmJobs.Source.of(air(s[0], s[1], s[2])), b[0], b[1], b[2], false, "Moving", null, group);
 			runJob(level, RmJobs.Source.of(moved), nx, ny, nz, true, "Moving", () -> {
 				RmState.cornerA = new int[] {nx, ny, nz};
 				RmState.cornerB = new int[] {nx + moved.sx - 1, ny + moved.sy - 1, nz + moved.sz - 1};
 				RmState.resetTransforms();
-				RmState.info("Moved - Ctrl+Z twice to undo");
-			});
+				RmState.info("Moved - Ctrl+Z to undo");
+			}, group);
 		});
 	}
 
-	/** Applies the Stack tool's copies. */
+	/** Applies the Stack tool's copies - along up to all three axes at once (a grid) - as one undo step. */
 	public static void applyStack() {
 		int[] b = RmState.box();
-		int count = RmState.stackCount;
-		if (b == null || count == 0 || !canEdit()) {
+		int[] counts = RmState.stack.clone();
+		long copies = RmState.stackCopies();
+		if (b == null || copies == 0 || !canEdit()) {
 			return;
 		}
 		int[] s = RmState.size();
-		int[] d = RmWorld.faceOffset(RmState.stackFace);
 		RmWorld.onServer(level -> {
 			Clip source = capture(level, b[0], b[1], b[2], s[0], s[1], s[2], true);
-			for (int i = 1; i <= Math.abs(count); i++) {
-				boolean last = i == Math.abs(count);
-				runJob(level, RmJobs.Source.of(source), b[0] + d[0] * s[0] * i, b[1] + d[1] * s[1] * i, b[2] + d[2] * s[2] * i, false,
-						"Stacking " + i + "/" + Math.abs(count), last ? () -> {
+			int group = newGroup();
+			long placed = 0;
+			for (int i = 0; i <= Math.abs(counts[0]); i++) {
+				for (int j = 0; j <= Math.abs(counts[1]); j++) {
+					for (int k = 0; k <= Math.abs(counts[2]); k++) {
+						if (i == 0 && j == 0 && k == 0) {
+							continue;
+						}
+						placed++;
+						boolean last = placed == copies;
+						int x = b[0] + Integer.signum(counts[0]) * s[0] * i;
+						int y = b[1] + Integer.signum(counts[1]) * s[1] * j;
+						int z = b[2] + Integer.signum(counts[2]) * s[2] * k;
+						runJob(level, RmJobs.Source.of(source), x, y, z, false, "Stacking " + placed + "/" + copies, last ? () -> {
 							RmState.resetTransforms();
-							RmState.info("Stacked " + Math.abs(count) + "x - Ctrl+Z per copy to undo");
-						} : null);
+							RmState.info("Stacked " + copies + " copies - Ctrl+Z undoes the whole stack");
+						} : null, group);
+					}
+				}
 			}
 		});
 	}
@@ -322,8 +364,14 @@ public final class RmOps {
 			RmState.error("Nothing to undo");
 			return;
 		}
-		RmWorld.onServer(level -> RmJobs.submit(new RmJobs.Job(level, u.before(), u.x(), u.y(), u.z(), false, RmSettings.get().keepRunning,
-				false, "Undoing", () -> RmState.info("Undone"))));
+		RmWorld.onServer(level -> {
+			// Last placed first, so overlapping boxes come back in the right order.
+			for (int i = u.parts.size() - 1; i >= 0; i--) {
+				Part p = u.parts.get(i);
+				RmJobs.submit(new RmJobs.Job(level, p.before(), p.x(), p.y(), p.z(), false, RmSettings.get().keepRunning, false, "Undoing",
+						i == 0 ? () -> RmState.info("Undone") : null));
+			}
+		});
 	}
 
 	public static void redo() {
@@ -338,8 +386,13 @@ public final class RmOps {
 			RmState.error("Nothing to redo");
 			return;
 		}
-		RmWorld.onServer(level -> RmJobs.submit(new RmJobs.Job(level, u.after(), u.x(), u.y(), u.z(), u.skipAir(), RmSettings.get().keepRunning,
-				false, "Redoing", () -> RmState.info("Redone"))));
+		RmWorld.onServer(level -> {
+			for (int i = 0; i < u.parts.size(); i++) {
+				Part p = u.parts.get(i);
+				RmJobs.submit(new RmJobs.Job(level, p.after(), p.x(), p.y(), p.z(), p.skipAir(), RmSettings.get().keepRunning, false, "Redoing",
+						i == u.parts.size() - 1 ? () -> RmState.info("Redone") : null));
+			}
+		});
 	}
 
 	public static void reset() {

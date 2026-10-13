@@ -48,7 +48,7 @@ public final class VeloServerClient {
 	// retried every single tick (20s) forever.
 	private static final long AUTH_RETRY_MILLIS = 120_000;
 
-	static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+	public static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
 	private static final AtomicReference<String> sessionToken = new AtomicReference<>();
 	private static volatile String authenticatedUuid;
@@ -70,10 +70,10 @@ public final class VeloServerClient {
 	}
 
 	/** Thrown for a non-2xx reply, so callers can tell "server said no" (e.g. 401) apart from "couldn't reach it". */
-	static final class HttpStatusException extends java.io.IOException {
-		final int status;
+	public static final class HttpStatusException extends java.io.IOException {
+		public final int status;
 
-		HttpStatusException(int status, String message) {
+		public HttpStatusException(int status, String message) {
 			super(message);
 			this.status = status;
 		}
@@ -339,6 +339,10 @@ public final class VeloServerClient {
 		if (capeId != null) {
 			body.addProperty("capeId", capeId);
 		}
+		String wingsId = net.veloclient.velo.client.cosmetics.wings.WingsManager.networkValue();
+		if (wingsId != null) {
+			body.addProperty("wingsId", wingsId);
+		}
 		JsonObject response = postJson(base + "/v1/heartbeat", body);
 		// Older servers don't echo the cape back - treat that as "accepted as sent".
 		if (!response.has("capeId")) {
@@ -364,8 +368,9 @@ public final class VeloServerClient {
 				String uuid = normalizeUuid(user.has("uuid") ? user.get("uuid").getAsString() : null);
 				String username = user.has("username") ? user.get("username").getAsString() : null;
 				String capeId = user.has("capeId") && !user.get("capeId").isJsonNull() ? user.get("capeId").getAsString() : null;
+				String wingsId = user.has("wingsId") && !user.get("wingsId").isJsonNull() ? user.get("wingsId").getAsString() : null;
 				if (uuid != null && username != null) {
-					entries.put(uuid, new VeloUserRegistry.Entry(username, capeId));
+					entries.put(uuid, new VeloUserRegistry.Entry(username, capeId, wingsId));
 				}
 			}
 			VeloUserRegistry.replaceAll(entries);

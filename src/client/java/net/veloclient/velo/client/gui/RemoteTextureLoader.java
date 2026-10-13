@@ -96,4 +96,24 @@ public final class RemoteTextureLoader {
 			}
 		});
 	}
+
+	/**
+	 * Registers PNG bytes made on this machine (e.g. a schematic preview just rendered for upload)
+	 * under {@code key}, replacing any earlier texture with that key. Released like the downloads.
+	 */
+	public static void fromBytes(String key, byte[] png, Consumer<Identifier> onLoaded) {
+		DOWNLOADS.submit(() -> {
+			try {
+				NativeImage image = NativeImage.read(new ByteArrayInputStream(png));
+				Identifier identifier = Identifier.of("velo-client", "local/" + Integer.toHexString(key.hashCode()));
+				MinecraftClient.getInstance().execute(() -> {
+					MinecraftClient.getInstance().getTextureManager().registerTexture(identifier, new NativeImageBackedTexture(() -> key, image));
+					CACHE.put("local:" + key, identifier);
+					onLoaded.accept(identifier);
+				});
+			} catch (Exception ignored) {
+				// No preview then.
+			}
+		});
+	}
 }

@@ -1,0 +1,102 @@
+package net.veloclient.velo.client.gui.widget;
+
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
+import net.minecraft.client.gui.screen.narration.NarrationPart;
+import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import net.veloclient.velo.client.cosmetics.wings.WingsManager;
+
+/**
+ * A pair of wings in the Store: the pair's picture (rendered from the model) gently floating on a
+ * glow in its own colour, lifting on hover, with the name and the price - or "Owned" / "Equipped".
+ * Click opens the pair's page with the live 3D preview. Cards deliberately don't each render a 3D
+ * player: every GUI entity preview is its own offscreen render target, and a page of them ran a
+ * small GPU out of memory - one live preview per screen.
+ */
+public final class VeloWingCard extends ClickableWidget {
+
+	private final WingsManager.WingType type;
+	private final Runnable onOpen;
+	private final Identifier picture;
+	private final int accent;
+	private final float phase;
+	private float hover;
+
+	public VeloWingCard(int width, int height, WingsManager.WingType type, Runnable onOpen) {
+		super(0, 0, width, height, Text.literal(type.name()));
+		this.type = type;
+		this.onOpen = onOpen;
+		this.accent = accentFor(type.id());
+		this.picture = previewImage(type.id());
+		this.phase = (type.id().hashCode() & 0xFF) / 40f;
+	}
+
+	/** The pair's still picture (rendered from the model by tools/cosmetics/render_wing_previews.py). */
+	public static Identifier previewImage(String id) {
+		return Identifier.of("velo-client", "textures/cosmetics/wings/" + id + "_preview.png");
+	}
+
+	/** A colour that matches each pair, for glows and accents. */
+	public static int accentFor(String id) {
+		return switch (id) {
+			case "angelic" -> 0xFFF2D27A;
+			case "frost" -> 0xFF5CC8FF;
+			case "phoenix" -> 0xFFFF7A2E;
+			case "raven" -> 0xFF8C9BD6;
+			case "shadowfang" -> 0xFFA25CFF;
+			default -> 0xFFFF4D4D;
+		};
+	}
+
+	@Override
+	public void onClick(net.minecraft.client.gui.Click click, boolean doubled) {
+		onOpen.run();
+	}
+
+	@Override
+	protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+		TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
+		hover = VeloAnim.step(hover, isHovered() ? 1f : 0f, 0.016f * 6);
+		int x = getX();
+		int y = getY();
+		int w = getWidth();
+		int h = getHeight();
+		if (hover > 0.01f) {
+			VeloDraw.shadow(context, x, y, w, h, VeloStyle.RADIUS_CARD, 10, 4, VeloUi.withAlpha(accent, Math.round(0x50 * hover)));
+		}
+		VeloDraw.fillRounded(context, x, y, w, h, VeloStyle.RADIUS_CARD, 0xFF15151C);
+		// A soft glow in the pair's colour behind the player.
+		VeloDraw.fillRoundedGradient(context, x, y, w, h - 30, VeloStyle.RADIUS_CARD, VeloUi.withAlpha(accent, 0x30), 0x0015151C);
+		VeloDraw.strokeRounded(context, x, y, w, h, VeloStyle.RADIUS_CARD, VeloUi.withAlpha(accent, 0x40 + Math.round(0x80 * hover)));
+		// The picture, 4:3, floating slowly (each card a little out of step) and growing on hover.
+		int area = h - 34;
+		float bob = (float) Math.sin(System.currentTimeMillis() / 900.0 + phase) * 2.5f;
+		float grow = 1f + 0.06f * hover;
+		int pw = Math.round(Math.min(w - 8, area * 4 / 3f) * grow);
+		int ph = pw * 3 / 4;
+		int px = x + (w - pw) / 2;
+		int py = y + 4 + (area - ph) / 2 + Math.round(bob - 3 * hover);
+		context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, picture, px, py, 0f, 0f, pw, ph, pw, ph, pw, ph);
+
+		String state = WingsManager.equippedId() != null && WingsManager.equippedId().equals(type.id()) ? "Equipped"
+				: WingsManager.owns(type.id()) ? "Owned" : null;
+		context.drawTextWithShadow(textRenderer, VeloUi.trim(type.name(), w - 12), x + 6, y + h - 25, 0xFFFFFFFF);
+		if (state != null) {
+			context.drawTextWithShadow(textRenderer, state, x + 6, y + h - 13, 0xFF8FE3A8);
+		} else {
+			int price = net.veloclient.velo.client.network.StoreClient.price(type.itemId(), type.price());
+			VeloDraw.fillCircle(context, x + 10f, y + h - 9.5f, 3.6f, 0xFFC9861A);
+			VeloDraw.fillCircle(context, x + 10f, y + h - 9.5f, 2.7f, 0xFFFFD56A);
+			context.drawTextWithShadow(textRenderer, String.format(java.util.Locale.ROOT, "%,d", price), x + 17, y + h - 13, 0xFFFFD56A);
+		}
+	}
+
+	@Override
+	protected void appendClickableNarrations(NarrationMessageBuilder builder) {
+		builder.put(NarrationPart.TITLE, getMessage());
+	}
+}

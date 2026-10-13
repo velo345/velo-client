@@ -21,14 +21,14 @@ import java.util.zip.GZIPOutputStream;
 
 /**
  * Redstone Mode schematics. {@code .veloschem} (Velo's own, in {@code .minecraft/schematics/velo})
- * stores block states, block-entity data and which redstone parts had a tick pending, so a
- * pasted contraption starts up running. {@code .litematic} files (Litematica's format, all
+ * stores block states, block-entity data and every scheduled block / fluid tick with its delay and
+ * priority, so a pasted contraption keeps running exactly where it was. {@code .litematic} files (Litematica's format, all
  * regions) can be loaded too.
  */
 public final class SchematicIO {
 
 	private static final String MAGIC = "VELOSCHEM";
-	private static final int VERSION = 2;
+	private static final int VERSION = 3;
 
 	private SchematicIO() {
 	}
@@ -84,15 +84,13 @@ public final class SchematicIO {
 				out.writeInt(i);
 				writeString(out, RmWorld.tagToText(clip.blockEntities[i]));
 			}
-			int pending = 0;
-			for (boolean b : clip.pendingTicks) {
-				pending += b ? 1 : 0;
-			}
-			out.writeInt(pending);
-			for (int i = 0; i < clip.pendingTicks.length; i++) {
-				if (clip.pendingTicks[i]) {
-					out.writeInt(i);
-				}
+			// v3: every scheduled tick with its delay, priority and kind (v1/v2 had a flag per block).
+			out.writeInt(clip.ticks.size());
+			for (int[] t : clip.ticks) {
+				out.writeInt(t[0]);
+				out.writeInt(t[1]);
+				out.writeByte(t[2]);
+				out.writeByte(t[3]);
 			}
 			// v2: entities, placed after all blocks when pasting.
 			out.writeInt(clip.entities.size());
@@ -140,8 +138,25 @@ public final class SchematicIO {
 				clip.blockEntities[i] = RmWorld.tagFromText(readString(in));
 			}
 			int pending = in.readInt();
+			if (pending < 0 || pending > clip.states.length * 2L) {
+				throw new IOException("Damaged file");
+			}
 			for (int n = 0; n < pending; n++) {
-				clip.pendingTicks[in.readInt()] = true;
+				if (version >= 3) {
+					int index = in.readInt();
+					int delay = in.readInt();
+					int priority = in.readByte();
+					int fluid = in.readByte();
+					if (index >= 0 && index < clip.states.length) {
+						clip.ticks.add(new int[] {index, Math.max(1, delay), priority, fluid});
+					}
+				} else {
+					// Old files only knew "something was pending": a 1-tick wake-up at normal priority.
+					int index = in.readInt();
+					if (index >= 0 && index < clip.states.length) {
+						clip.ticks.add(new int[] {index, 1, 3, 0});
+					}
+				}
 			}
 			if (version >= 2) {
 				int entities = in.readInt();
@@ -204,6 +219,7 @@ public final class SchematicIO {
 		Clip clip = new Clip(sx, sy, sz);
 		Object air = RmWorld.parse("minecraft:air", Map.of());
 		java.util.Arrays.fill(clip.states, air);
+		List<long[]> litematicTicks = new ArrayList<>();
 		for (var entry : regions.entrySet()) {
 			JsonObject region = entry.getValue().getAsJsonObject();
 			int[][] r = regionBox(region);
@@ -276,6 +292,28 @@ public final class SchematicIO {
 					clip.blockEntities[clip.index(x, y, z)] = te;
 				}
 			}
+			// Litematica keeps scheduled ticks too: {Time (delay), Priority (-3..3), SubTick, x, y, z}.
+			for (String key : new String[] {"PendingBlockTicks", "PendingFluidTicks"}) {
+				for (Object tick : RmWorld.list(RmWorld.child(regionTag, key))) {
+					JsonObject t = RmWorld.json(tick).getAsJsonObject();
+					if (!t.has("x") || !t.has("Time")) {
+						continue;
+					}
+					int x = t.get("x").getAsInt() + ox;
+					int y = t.get("y").getAsInt() + oy;
+					int z = t.get("z").getAsInt() + oz;
+					if (x >= 0 && y >= 0 && z >= 0 && x < sx && y < sy && z < sz) {
+						int priority = t.has("Priority") ? t.get("Priority").getAsInt() + 3 : 3;
+						long sub = t.has("SubTick") ? t.get("SubTick").getAsLong() : 0;
+						litematicTicks.add(new long[] {clip.index(x, y, z), Math.max(1, t.get("Time").getAsInt()), priority,
+								key.contains("Fluid") ? 1 : 0, sub});
+					}
+				}
+			}
+		}
+		litematicTicks.sort((a, b) -> a[1] != b[1] ? Long.compare(a[1], b[1]) : a[2] != b[2] ? Long.compare(a[2], b[2]) : Long.compare(a[4], b[4]));
+		for (long[] t : litematicTicks) {
+			clip.ticks.add(new int[] {(int) t[0], (int) t[1], (int) t[2], (int) t[3]});
 		}
 		return clip;
 	}

@@ -70,17 +70,71 @@ public final class EntityPreviewWidget extends ClickableWidget {
 	private float zoom = 1f;
 	private double lastDragX;
 	private boolean dragging;
+	/** Wings to show on this preview (Store cards), or null for what you really wear. */
+	private java.util.function.Supplier<net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag> wings;
+	/** Degrees per second the preview turns by itself (0 = only by dragging). */
+	private float spin;
+	/** Shown instead of "join a world" when there's no player to render (title screen). */
+	private java.util.function.Supplier<net.minecraft.util.Identifier> fallbackImage;
+	private long lastFrameNanos;
+	private boolean stage = true;
 
 	public EntityPreviewWidget(int x, int y, int width, int height) {
 		super(x, y, width, height, Text.literal("Preview"));
 	}
 
+	/** Shows these wings on this preview only (each preview animates on its own). */
+	public EntityPreviewWidget wings(java.util.function.Supplier<net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag> wings) {
+		this.wings = wings;
+		return this;
+	}
+
+	/** Turns slowly by itself; dragging still works. */
+	public EntityPreviewWidget spin(float degreesPerSecond, float startYaw) {
+		this.spin = degreesPerSecond;
+		this.yawDegrees = startYaw;
+		return this;
+	}
+
+	public EntityPreviewWidget fallbackImage(net.minecraft.util.Identifier image) {
+		this.fallbackImage = image == null ? null : () -> image;
+		return this;
+	}
+
+	public EntityPreviewWidget fallbackImage(java.util.function.Supplier<net.minecraft.util.Identifier> image) {
+		this.fallbackImage = image;
+		return this;
+	}
+
+	/** Draw without the default stage background (when the caller draws its own). */
+	public EntityPreviewWidget noStage() {
+		this.stage = false;
+		return this;
+	}
+
 	@Override
 	protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
 		Theme theme = ThemeManager.active();
-		VeloCapeTile.drawStage(context, getX(), getY(), getWidth(), getHeight(), 0f, false);
+		if (stage) {
+			VeloCapeTile.drawStage(context, getX(), getY(), getWidth(), getHeight(), 0f, false);
+		}
+		long now = System.nanoTime();
+		float dt = lastFrameNanos == 0 ? 0 : Math.min(0.1f, (now - lastFrameNanos) / 1e9f);
+		lastFrameNanos = now;
+		if (spin != 0 && !dragging) {
+			yawDegrees += spin * dt;
+		}
 
 		PlayerEntity player = MinecraftClient.getInstance().player;
+		net.minecraft.util.Identifier fallback = player == null && fallbackImage != null ? fallbackImage.get() : null;
+		if (fallback != null) {
+			int side = Math.min(getWidth(), getHeight()) - 8;
+			int w = side * 4 / 3 > getWidth() - 8 ? getWidth() - 8 : side * 4 / 3;
+			int h = w * 3 / 4;
+			context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, fallback, getX() + (getWidth() - w) / 2,
+					getY() + (getHeight() - h) / 2, 0f, 0f, w, h, w, h, w, h);
+			return;
+		}
 		if (player == null) {
 			TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
 			String line1 = "Join a world";
@@ -95,17 +149,21 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		int y2 = getY() + getHeight() - 4;
 		int size = Math.round(Math.min(getWidth(), getHeight()) * 2 / 5f * zoom);
 
-		drawRotatableEntity(context, x1, y1, x2, y2, size, yawDegrees, player);
+		drawRotatableEntity(context, x1, y1, x2, y2, size, yawDegrees, player, wings == null ? null : wings.get(), wings != null);
 
 	}
 
 	//? if <26.1 {
-	private static void drawRotatableEntity(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees, net.minecraft.entity.LivingEntity entity) {
+	private static void drawRotatableEntity(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees, net.minecraft.entity.LivingEntity entity,
+			net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag wingsTag, boolean tagged) {
 		Quaternionf worldRotation = new Quaternionf().rotateZ((float) Math.PI);
 		Quaternionf tilt = new Quaternionf();
 		worldRotation.mul(tilt);
 
 		EntityRenderState state = extractRenderState(entity);
+		if (tagged) {
+			net.veloclient.velo.client.cosmetics.wings.WingsPreview.tag(state, wingsTag);
+		}
 		if (state instanceof LivingEntityRenderState living) {
 			living.bodyYaw = 180f + yawDegrees;
 			living.relativeHeadYaw = 0f;
@@ -123,19 +181,26 @@ public final class EntityPreviewWidget extends ClickableWidget {
 	private static EntityRenderState extractRenderState(net.minecraft.entity.LivingEntity entity) {
 		EntityRenderManager dispatcher = MinecraftClient.getInstance().getEntityRenderDispatcher();
 		EntityRenderer renderer = dispatcher.getRenderer(entity);
-		EntityRenderState state = renderer.getAndUpdateRenderState(entity, 1.0f);
+		// A fresh state per preview: the renderer's shared one would be overwritten by the next
+		// preview drawn in the same frame (several Store cards at once).
+		EntityRenderState state = renderer.createRenderState();
+		renderer.updateRenderState(entity, state, 1.0f);
 		state.light = 0xF000F0;
 		state.shadowPieces.clear();
 		state.outlineColor = 0;
 		return state;
 	}
 	//?} else {
-	/*private static void drawRotatableEntity(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees, net.minecraft.world.entity.LivingEntity entity) {
+	/*private static void drawRotatableEntity(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees, net.minecraft.world.entity.LivingEntity entity,
+			net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag wingsTag, boolean tagged) {
 		Quaternionf worldRotation = new Quaternionf().rotateZ((float) Math.PI);
 		Quaternionf tilt = new Quaternionf();
 		worldRotation.mul(tilt);
 
 		EntityRenderState state = extractRenderState(entity);
+		if (tagged) {
+			net.veloclient.velo.client.cosmetics.wings.WingsPreview.tag(state, wingsTag);
+		}
 		if (state instanceof LivingEntityRenderState living) {
 			living.bodyRot = 180f + yawDegrees;
 			living.yRot = 0f;

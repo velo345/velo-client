@@ -10,16 +10,25 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Redstone Mode in the world: the selection box, paste / move / stack previews and schematic
- * placements drawn as blocks in their own colours (only blocks with an open side, so even big
- * builds stay cheap), wiring routes, dust range warnings and the recorded area.
+ * Redstone Mode in the world: the selection box, paste / move / stack previews (blocks in their own
+ * colours, only those with an open side so even big builds stay cheap), locked schematic placements
+ * as hologram blocks (see {@link RmBlockRender}) with wrong blocks red, the right block in the wrong
+ * state yellow and blocks that shouldn't be there pink (like Litematica), wiring routes, dust range
+ * warnings and the recorded area.
  */
 public final class RmRender {
 
 	private static final int MAX_VOXELS = 12_000;
 	/** Per clip: its visible blocks as {x, y, z, rgb} (surface only). */
 	private static final Map<Clip, int[]> SURFACES = new IdentityHashMap<>();
+	private static final int MAX_GHOST_BLOCKS = 8_000;
+	/** Litematica's colours: a different block, the right block in the wrong state, a block that shouldn't be there. */
+	private static final int WRONG_BLOCK = 0x66FF2A2A;
+	private static final int WRONG_STATE = 0x66FFD21E;
+	private static final int EXTRA = 0x66FF5AD2;
 	private static List<float[]> placementVoxels = List.of();
+	/** Missing schematic blocks to draw as real blocks: {x, y, z, state}. */
+	private static volatile List<Object[]> ghostBlocks = List.of();
 	private static int placementTicks;
 
 	private RmRender() {
@@ -31,6 +40,11 @@ public final class RmRender {
 
 	private static void fill(double x0, double y0, double z0, double x1, double y1, double z1, int color) {
 		GizmoDrawing.box(new Box(x0, y0, z0, x1, y1, z1), DrawStyle.filled(color)).ignoreOcclusion();
+	}
+
+	/** Locked placements' missing blocks, drawn as real blocks by {@link RmBlockRender}. */
+	static List<Object[]> ghostBlocks() {
+		return ghostBlocks;
 	}
 
 	/** World pass (gizmos). */
@@ -180,7 +194,7 @@ public final class RmRender {
 	}
 
 	private static void previewStack(int[] b) {
-		if (RmState.stackCount == 0) {
+		if (RmState.stackCopies() == 0) {
 			return;
 		}
 		if (moveSource == null || moveSourceBox == null || !java.util.Arrays.equals(moveSourceBox, b)) {
@@ -188,15 +202,24 @@ public final class RmRender {
 			moveSource = captureClient(b);
 		}
 		int[] s = RmState.size();
-		int[] d = RmWorld.faceOffset(RmState.stackFace);
-		for (int i = 1; i <= RmState.stackCount; i++) {
-			int x = b[0] + d[0] * s[0] * i;
-			int y = b[1] + d[1] * s[1] * i;
-			int z = b[2] + d[2] * s[2] * i;
-			if (moveSource != null && i <= 8) {
-				ghost(moveSource, x, y, z, 0x70);
+		int[] c = RmState.stack;
+		int ghosts = 0;
+		int outlines = 0;
+		for (int i = 0; i <= Math.abs(c[0]); i++) {
+			for (int j = 0; j <= Math.abs(c[1]); j++) {
+				for (int k = 0; k <= Math.abs(c[2]); k++) {
+					if (i == 0 && j == 0 && k == 0 || outlines++ > 512) {
+						continue;
+					}
+					int x = b[0] + Integer.signum(c[0]) * s[0] * i;
+					int y = b[1] + Integer.signum(c[1]) * s[1] * j;
+					int z = b[2] + Integer.signum(c[2]) * s[2] * k;
+					if (moveSource != null && ghosts++ < 8) {
+						ghost(moveSource, x, y, z, 0x70);
+					}
+					outline(x, y, z, x + s[0], y + s[1], z + s[2], 0xFFFFD84A, 2f);
+				}
 			}
-			outline(x, y, z, x + s[0], y + s[1], z + s[2], 0xFFFFD84A, 2f);
 		}
 	}
 
@@ -225,6 +248,7 @@ public final class RmRender {
 		List<Placements.Placement> list = Placements.all();
 		if (list.isEmpty()) {
 			placementVoxels = List.of();
+			ghostBlocks = List.of();
 			return;
 		}
 		Placements.Placement following = Placements.following();
@@ -236,8 +260,15 @@ public final class RmRender {
 		if (++placementTicks % 8 == 0) {
 			placementVoxels = collectPlacements(list);
 		}
+		// Wrong (red), wrong state (yellow) and extra blocks where the schematic is empty (pink): a
+		// tinted box plus a solid outline, so they're easy to spot even in a busy build.
+		int outlined = 0;
 		for (float[] v : placementVoxels) {
-			fill(v[0] + 0.05, v[1] + 0.05, v[2] + 0.05, v[0] + 0.95, v[1] + 0.95, v[2] + 0.95, (int) v[3]);
+			int color = (int) v[3];
+			fill(v[0] - 0.01, v[1] - 0.01, v[2] - 0.01, v[0] + 1.01, v[1] + 1.01, v[2] + 1.01, color);
+			if (outlined++ < 3000) {
+				outline(v[0] - 0.01, v[1] - 0.01, v[2] - 0.01, v[0] + 1.01, v[1] + 1.01, v[2] + 1.01, color | 0xFF000000, 2f);
+			}
 		}
 		for (Placements.Placement p : list) {
 			if (p.visible && p.locked) {
@@ -247,13 +278,19 @@ public final class RmRender {
 		}
 	}
 
+	/**
+	 * Refreshes {@link #ghostBlocks} (missing blocks, nearest first, hidden ones skipped) and returns
+	 * the red overlay boxes for blocks that are wrong or in the way.
+	 */
 	private static List<float[]> collectPlacements(List<Placements.Placement> list) {
 		Object level = RmWorld.clientLevel();
 		int[] player = RmWorld.playerBlock();
 		if (level == null || player == null) {
+			ghostBlocks = List.of();
 			return List.of();
 		}
 		List<float[]> out = new ArrayList<>();
+		List<Object[]> ghosts = new ArrayList<>();
 		int radius = 40;
 		for (Placements.Placement p : list) {
 			if (!p.visible || !p.locked) {
@@ -281,19 +318,50 @@ public final class RmRender {
 						if (wantAir && RmWorld.isAir(have)) {
 							continue;
 						}
-						int color;
-						if (wantAir || !RmWorld.isAir(have)) {
-							color = 0x70FF3030;
-						} else {
-							int rgb = RmWorld.mapColor(level, want, p.x + x, p.y + y, p.z + z);
-							color = 0x80000000 | (rgb == 0 ? 0x808080 : rgb);
+						if (wantAir) {
+							// Something built where the schematic has nothing: pink.
+							out.add(new float[] {p.x + x, p.y + y, p.z + z, EXTRA});
+						} else if (!RmWorld.isAir(have) && !RmWorld.replaceable(have)) {
+							// Right block in the wrong state (facing, waterlogged...) yellow, a different block red.
+							out.add(new float[] {p.x + x, p.y + y, p.z + z, RmWorld.id(have).equals(RmWorld.id(want)) ? WRONG_STATE : WRONG_BLOCK});
+						} else if (!hidden(p, v, level, x, y, z)) {
+							ghosts.add(new Object[] {p.x + x, p.y + y, p.z + z, want});
 						}
-						out.add(new float[] {p.x + x, p.y + y, p.z + z, color});
 					}
 				}
 			}
 		}
+		if (ghosts.size() > MAX_GHOST_BLOCKS) {
+			ghosts.sort(java.util.Comparator.comparingLong(g -> distance(g, player)));
+			ghosts = new ArrayList<>(ghosts.subList(0, MAX_GHOST_BLOCKS));
+		}
+		ghostBlocks = ghosts;
 		return out;
+	}
+
+	private static long distance(Object[] g, int[] player) {
+		long dx = (int) g[0] - player[0];
+		long dy = (int) g[1] - player[1];
+		long dz = (int) g[2] - player[2];
+		return dx * dx + dy * dy + dz * dz;
+	}
+
+	/** A missing block with something solid (built or still to build) on all six sides can't be seen. */
+	private static boolean hidden(Placements.Placement p, Clip v, Object level, int x, int y, int z) {
+		int[][] sides = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+		for (int[] d : sides) {
+			int nx = x + d[0];
+			int ny = y + d[1];
+			int nz = z + d[2];
+			boolean inside = nx >= 0 && ny >= 0 && nz >= 0 && nx < v.sx && ny < v.sy && nz < v.sz && p.shows(nx, ny, nz);
+			Object schematic = inside ? v.states[v.index(nx, ny, nz)] : null;
+			boolean covered = !RmWorld.isAir(RmWorld.state(level, p.x + nx, p.y + ny, p.z + nz))
+					|| schematic != null && !RmWorld.isAir(schematic) && RmWorld.opaque(schematic);
+			if (!covered) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	// ---- wiring ----
@@ -315,10 +383,40 @@ public final class RmRender {
 		int[] e = RmState.wireEnd;
 		if (s != null) {
 			outline(s[0], s[1], s[2], s[0] + 1, s[1] + 1, s[2] + 1, 0xFF6FE39A, 3f);
+			connectionCell(s, 0xFF6FE39A);
 		}
 		if (e != null) {
 			outline(e[0], e[1], e[2], e[0] + 1, e[1] + 1, e[2] + 1, 0xFFFF6060, 3f);
+			connectionCell(e, 0xFFFF6060);
 		}
+		// Before building: show exactly which cell the next click would use - the one in front of
+		// the face you aim at (green = start, red = end).
+		if (RedstoneMode.toolHeld() && Wiring.preview().isEmpty()) {
+			int[] look = RmWorld.lookedBlock(256);
+			if (look != null) {
+				connectionCell(look, s == null ? 0xFF6FE39A : 0xFFFF6060);
+			}
+		}
+	}
+
+	/** The cell in front of a clicked face: filled lightly, outlined, with the clicked face marked. */
+	private static void connectionCell(int[] clicked, int color) {
+		int[] o = RmWorld.faceOffset(clicked[3]);
+		int x = clicked[0] + o[0];
+		int y = clicked[1] + o[1];
+		int z = clicked[2] + o[2];
+		boolean water = RmState.tool == RmState.Tool.WATER;
+		fill(x + 0.02, y + 0.02, z + 0.02, x + 0.98, y + 0.98, z + 0.98, water ? 0x403070FF : 0x30FF3030);
+		outline(x, y, z, x + 1, y + 1, z + 1, color, 2f);
+		// A thin plate on the clicked face, so it's clear which side counts.
+		double t = 0.04;
+		double x0 = clicked[0] + (o[0] > 0 ? 1 - t : 0);
+		double x1 = clicked[0] + (o[0] < 0 ? t : 1);
+		double y0 = clicked[1] + (o[1] > 0 ? 1 - t : 0);
+		double y1 = clicked[1] + (o[1] < 0 ? t : 1);
+		double z0 = clicked[2] + (o[2] > 0 ? 1 - t : 0);
+		double z1 = clicked[2] + (o[2] < 0 ? t : 1);
+		fill(x0, y0, z0, x1, y1, z1, (color & 0x00FFFFFF) | 0x90000000);
 	}
 
 	static int colorFor(String id, int alpha) {

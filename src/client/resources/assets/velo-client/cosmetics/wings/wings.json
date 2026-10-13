@@ -1,0 +1,43 @@
+[
+	{
+		"id": "angelic",
+		"name": "Angelic Wings",
+		"description": "Radiant white feathers with a golden crest and a halo on top.",
+		"style": "feathered",
+		"scale": 0.85,
+		"price": 3000
+	},
+	{
+		"id": "frost",
+		"name": "Frost Wings",
+		"description": "Wings of living ice - crystal shards over a frozen frame.",
+		"style": "crystal",
+		"scale": 1.0,
+		"price": 2800
+	},
+	{
+		"id": "phoenix",
+		"name": "Phoenix Wings",
+		"description": "Blazing feathers in every shade of fire, reborn with every stroke.",
+		"style": "feathered",
+		"scale": 0.85,
+		"price": 3200
+	},
+	{
+		"id": "raven",
+		"name": "Raven Wings",
+		"description": "Midnight-black feathers with a quiet blue sheen.",
+		"style": "feathered",
+		"scale": 0.85,
+		"price": 2400
+	},
+	{
+		"id": "shadowfang",
+		"name": "Shadowfang Wings",
+		"description": "Leathery dragon wings with glowing violet claws.",
+		"style": "bat",
+		"scale": 1.95,
+		"offsetY": 0.0625,
+		"price": 2800
+	}
+]

@@ -60,7 +60,26 @@ public final class StoreApi {
 	}
 
 	public static JsonObject catalog() throws StoreError {
-		return get("/v1/store/catalog");
+		JsonObject catalog = get("/v1/store/catalog");
+		if (catalog.has("items") && catalog.get("items").isJsonArray()) {
+			java.util.Map<String, Integer> map = new java.util.HashMap<>();
+			catalog.getAsJsonArray("items").forEach(e -> {
+				JsonObject item = e.getAsJsonObject();
+				if (item.has("id") && item.has("price")) {
+					map.put(item.get("id").getAsString(), item.get("price").getAsInt());
+				}
+			});
+			prices = java.util.Map.copyOf(map);
+		}
+		return catalog;
+	}
+
+	private static volatile java.util.Map<String, Integer> prices = java.util.Map.of();
+
+	/** The server's price for an item (after {@link #catalog()} ran), else {@code fallback}. */
+	public static int price(String itemId, int fallback) {
+		Integer price = prices.get(itemId);
+		return price != null ? price : fallback;
 	}
 
 	public static JsonObject wallet() throws StoreError {

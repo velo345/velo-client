@@ -24,6 +24,10 @@ public final class SpriteTints {
 			return 0;
 		}
 		if (path.startsWith("hud/hotbar")) {
+			// Redstone Mode's tool slot is selected: hide vanilla's frame on the normal slot.
+			if (path.equals("hud/hotbar_selection") && net.veloclient.velo.client.redstone.RedstoneMode.toolHeld()) {
+				return 0x00FFFFFF;
+			}
 			return ask("hotbar", path);
 		}
 		if (path.startsWith("hud/experience_bar") || path.startsWith("hud/locator_bar")) {

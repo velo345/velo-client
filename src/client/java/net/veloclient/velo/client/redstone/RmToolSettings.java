@@ -95,8 +95,8 @@ final class RmToolSettings {
 				cy += 18;
 			}
 			case STACK -> {
-				String stack = size == null ? "Select an area first" : RmState.stackCount == 0 ? "Scroll while looking along an axis"
-						: Math.abs(RmState.stackCount) + " copies towards " + RmWorld.faceName(RmState.stackFace);
+				String stack = size == null ? "Select an area first" : RmState.stackCopies() == 0 ? "Scroll while looking along an axis"
+						: RmState.stackCopies() + " copies  ·  " + stackAxes();
 				int ly = cy;
 				draw.add(() -> context.drawTextWithShadow(textRenderer, VeloUi.trim(stack, w), x, ly, RmHud.TEXT));
 				cy += 14;
@@ -201,5 +201,17 @@ final class RmToolSettings {
 			}
 			changed();
 		}));
+	}
+
+	/** "X +3  Y -1" for the Stack tool's per-axis counts. */
+	private static String stackAxes() {
+		StringBuilder out = new StringBuilder();
+		String[] names = {"X", "Y", "Z"};
+		for (int a = 0; a < 3; a++) {
+			if (RmState.stack[a] != 0) {
+				out.append(out.isEmpty() ? "" : "  ").append(names[a]).append(RmState.stack[a] > 0 ? " +" : " ").append(RmState.stack[a]);
+			}
+		}
+		return out.toString();
 	}
 }

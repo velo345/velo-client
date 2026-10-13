@@ -10,9 +10,10 @@ public final class RmState {
 	public enum Tool {
 		SELECT("select", "Select", "Left click corner 1  ·  right click corner 2  ·  Shift+scroll grows the side you look at"),
 		MOVE("move", "Move", "Look along an axis and scroll to move  ·  Shift+scroll rotates  ·  left click applies"),
-		STACK("stack", "Stack", "Look along an axis and scroll to add copies  ·  left click applies"),
-		WIRE("wire", "Redstone Wire", "Left click start  ·  right click end  ·  left click again to build"),
-		WATER("water", "Water Wire", "Left click start  ·  right click end  ·  left click again to build");
+		STACK("stack", "Stack", "Look along an axis and scroll to add copies - works on X, Y and Z at once  ·  left click applies"),
+		WIRE("wire", "Redstone Wire", "Aim at the face the wire starts from and left click  ·  right click the target's face  ·  left click again builds"),
+		WATER("water", "Water Wire", "The highlighted cell in front of the face you aim at is where the stream starts (left click) / ends (right click)"
+				+ "  ·  click a stream to join it  ·  left click again builds");
 
 		public final String icon;
 		public final String label;
@@ -34,9 +35,8 @@ public final class RmState {
 	public static int moveRotation;
 	public static boolean moveMirror;
 
-	/** Stack tool: extra copies along one axis (negative = the other way). */
-	public static int stackCount;
-	public static int stackFace = 2;
+	/** Stack tool: extra copies per axis {x, y, z} (negative = the other way); several axes make a grid. */
+	public static int[] stack = {0, 0, 0};
 
 	/** Clipboard paste following the crosshair (Ctrl+V), with rotation / mirror. */
 	public static boolean pasting;
@@ -87,10 +87,15 @@ public final class RmState {
 		moveOffset = new int[] {0, 0, 0};
 		moveRotation = 0;
 		moveMirror = false;
-		stackCount = 0;
+		stack = new int[] {0, 0, 0};
 		pasting = false;
 		pasteRotation = 0;
 		pasteMirror = false;
+	}
+
+	/** How many copies the Stack tool would place (the grid minus the original). */
+	public static long stackCopies() {
+		return (long) (Math.abs(stack[0]) + 1) * (Math.abs(stack[1]) + 1) * (Math.abs(stack[2]) + 1) - 1;
 	}
 
 	public static boolean moveActive() {

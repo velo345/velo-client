@@ -106,8 +106,22 @@ public final class PlayerSkin3DView {
 		return createViewer(skinPngBytes, slim, capeFrames, true, 150, true);
 	}
 
+	/**
+	 * The Store's wings showcase: your skin, turned so the back faces you, slowly spinning, with a
+	 * {@link Wings3D} on its back - {@code onWings} gets it to pick the pair and the motion.
+	 */
+	public static Node createWingsShowcase(byte[] skinPngBytes, boolean slim, java.util.function.Consumer<Wings3D> onWings) {
+		return createViewer(skinPngBytes, slim, null, true, 155, true, model -> onWings.accept(new Wings3D(model)));
+	}
+
 	public static Node createViewer(byte[] skinPngBytes, boolean slim, List<GifFrames.Frame> capeFrames, boolean interactive,
 			double initialYaw, boolean autoSpin) {
+		return createViewer(skinPngBytes, slim, capeFrames, interactive, initialYaw, autoSpin, null);
+	}
+
+	/** {@code decorate}: adds more to the player model (wings), in its own space. */
+	public static Node createViewer(byte[] skinPngBytes, boolean slim, List<GifFrames.Frame> capeFrames, boolean interactive,
+			double initialYaw, boolean autoSpin, java.util.function.Consumer<Group> decorate) {
 		if (skinPngBytes == null) {
 			return null;
 		}
@@ -158,6 +172,9 @@ public final class PlayerSkin3DView {
 		}
 
 		AnimationTimer capeTimer = addCape(model, capeFrames);
+		if (decorate != null) {
+			decorate.accept(model);
+		}
 
 		Group rig = new Group(model);
 

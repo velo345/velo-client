@@ -1,0 +1,72 @@
+{
+  "title": "New collection: Shadows & Angels",
+  "summary": "Five pairs of real 3D wings that move with you - Shadowfang, Raven, Phoenix, Frost and Angelic. In the Velo Store now.",
+  "tag": "News",
+  "accent": "#a25cff",
+  "pinned": false,
+  "cover": "file:images/cover.jpg",
+  "blocks": [
+    {
+      "type": "text",
+      "text": "Meet **Shadows & Angels** - our first collection of **3D wings**. Five pairs, from leathery dragon wings to a radiant halo, and every one of them **moves with you**."
+    },
+    {
+      "type": "heading",
+      "text": "Wings that move with you"
+    },
+    {
+      "type": "text",
+      "text": "No canned animation: the wings react to what you're doing. A slow, calm wingbeat while you stand, wider strokes the faster you run, strong strokes in the air, spread wide and nearly still while you glide, folded in when you sneak and tucked in with small strokes while swimming. They sit right outside your cape, so you can wear both."
+    },
+    {
+      "type": "image",
+      "image": "file:images/store-wing.jpg",
+      "caption": "Try every pair on your own player - and every animation - before you buy."
+    },
+    {
+      "type": "heading",
+      "text": "The collection"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Shadowfang** - leathery dragon wings with glowing violet claws.",
+        "**Raven** - midnight-black feathers with a quiet blue sheen.",
+        "**Phoenix** - blazing feathers in every shade of fire.",
+        "**Frost** - wings of living ice, crystal shards over a frozen frame.",
+        "**Angelic** - radiant white feathers with a golden crest and a halo."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Make them yours"
+    },
+    {
+      "type": "text",
+      "text": "Every pair has its own settings: **size**, **height**, **distance from your back**, **spread**, **flap speed** and **flap strength**. Other Velo Client players see your wings exactly the way you set them up."
+    },
+    {
+      "type": "heading",
+      "text": "A new Store"
+    },
+    {
+      "type": "text",
+      "text": "The Store got a redesign in the game and in the launcher: a **Featured** page with the new collection front and centre - your own skin wearing each pair in turn - **Wings** and **Capes** tabs, and **My cosmetics** right next to your coins."
+    },
+    {
+      "type": "image",
+      "image": "file:images/store-featured.jpg",
+      "caption": "The new in-game Store."
+    },
+    {
+      "type": "image",
+      "image": "file:images/launcher-store.jpg",
+      "caption": "And in the launcher."
+    },
+    {
+      "type": "callout",
+      "style": "success",
+      "text": "Wings are **Velo Coins** items - from **2,400 coins**. Open the **Store** in the launcher or from the pause menu to try them on."
+    }
+  ]
+}

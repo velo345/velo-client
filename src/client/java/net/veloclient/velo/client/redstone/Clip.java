@@ -1,9 +1,10 @@
 package net.veloclient.velo.client.redstone;
 
 /**
- * A captured box of blocks: states (air included), block-entity data, and which redstone
- * components had a tick pending when it was copied (so a paste can restart running clocks
- * instead of freezing them). Index order is x, then y, then z.
+ * A captured box of blocks: states (air included), block-entity data, and every block / fluid tick
+ * that was scheduled when it was copied - with its remaining delay and priority, in run order - so a
+ * paste continues running clocks, observer chains and flowing water exactly where they were.
+ * Index order is x, then y, then z.
  */
 public final class Clip {
 
@@ -12,7 +13,8 @@ public final class Clip {
 	public final int sz;
 	public final Object[] states;
 	public final Object[] blockEntities;
-	public final boolean[] pendingTicks;
+	/** Scheduled ticks in run order: {index, delay, priority ordinal, fluid ? 1 : 0}. */
+	public final java.util.List<int[]> ticks = new java.util.ArrayList<>();
 	/** Entities (minecarts, mobs, item frames, armor stands, items...): {dx, dy, dz, yaw, tag}, relative to the clip's corner. */
 	public final java.util.List<Object[]> entities = new java.util.ArrayList<>();
 
@@ -23,7 +25,6 @@ public final class Clip {
 		int n = sx * sy * sz;
 		states = new Object[n];
 		blockEntities = new Object[n];
-		pendingTicks = new boolean[n];
 	}
 
 	public int index(int x, int y, int z) {
@@ -42,6 +43,7 @@ public final class Clip {
 		}
 		boolean swap = turns % 2 == 1;
 		Clip out = new Clip(swap ? sz : sx, sy, swap ? sx : sz);
+		int[] moved = ticks.isEmpty() ? null : new int[states.length];
 		for (int x = 0; x < sx; x++) {
 			for (int y = 0; y < sy; y++) {
 				for (int z = 0; z < sz; z++) {
@@ -77,8 +79,15 @@ public final class Clip {
 					}
 					out.states[to] = state;
 					out.blockEntities[to] = blockEntities[from];
-					out.pendingTicks[to] = pendingTicks[from];
+					if (moved != null) {
+						moved[from] = to;
+					}
 				}
+			}
+		}
+		if (moved != null) {
+			for (int[] t : ticks) {
+				out.ticks.add(new int[] {moved[t[0]], t[1], t[2], t[3]});
 			}
 		}
 		for (Object[] e : entities) {

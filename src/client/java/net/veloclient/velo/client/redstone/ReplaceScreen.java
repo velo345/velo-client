@@ -1,5 +1,6 @@
 package net.veloclient.velo.client.redstone;
 
+import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
@@ -11,19 +12,23 @@ import java.util.Map;
 
 /**
  * Replace in the selection: one block type for another ("*" = every non-air block), with an
- * optional explicit state ("minecraft:repeater[delay=3]"). Properties both blocks share (facing,
- * powered, half...) carry over unless "Keep properties" is off or the new text sets them.
+ * optional explicit state ("minecraft:repeater[delay=3]"). Both fields suggest blocks by name or id
+ * as you type (with their icons), and the grid button next to each opens the block picker.
+ * Properties both blocks share (facing, powered, half...) carry over unless "Keep properties" is off
+ * or the new text sets them.
  */
 public final class ReplaceScreen extends VeloWindow {
 
 	private TextFieldWidget from;
 	private TextFieldWidget to;
+	private BlockSuggest fromSuggest;
+	private BlockSuggest toSuggest;
 	private boolean keepProperties = true;
 	private String fromValue;
 	private String toValue;
 
 	public ReplaceScreen() {
-		super(Text.literal("Replace Blocks"), 380, 210);
+		super(Text.literal("Replace Blocks"), 400, 220);
 		int[] look = RmWorld.lookedBlock(64);
 		Object level = RmWorld.clientLevel();
 		fromValue = look != null && level != null ? RmWorld.id(RmWorld.state(level, look[0], look[1], look[2])) : "*";
@@ -41,30 +46,85 @@ public final class ReplaceScreen extends VeloWindow {
 		this.clearChildren();
 		int x = contentX();
 		int w = contentWidth();
-		from = new TextFieldWidget(this.textRenderer, x, contentY() + 14, w, 16, Text.literal("From"));
+		int fieldW = w - 46;
+		from = new TextFieldWidget(this.textRenderer, x, contentY() + 14, fieldW, 16, Text.literal("From"));
 		from.setMaxLength(200);
 		from.setText(fromValue);
+		from.setPlaceholder(Text.literal("Type a block name, e.g. stone or *"));
 		addDrawableChild(from);
-		to = new TextFieldWidget(this.textRenderer, x, contentY() + 48, w, 16, Text.literal("To"));
+		fromSuggest = new BlockSuggest(from, true);
+		addDrawableChild(new VeloButton(x + w - 20, contentY() + 13, 20, 18, Text.literal("..."),
+				b -> pick("Replace which block", id -> from.setText(id))));
+		to = new TextFieldWidget(this.textRenderer, x, contentY() + 50, fieldW, 16, Text.literal("To"));
 		to.setMaxLength(300);
 		to.setText(toValue);
+		to.setPlaceholder(Text.literal("Type a block name, e.g. glass"));
 		addDrawableChild(to);
-		addDrawableChild(new VeloButton(x, contentY() + 74, w, 18, Text.literal("Keep properties (facing, powered...): " + (keepProperties ? "On" : "Off")),
+		toSuggest = new BlockSuggest(to, false);
+		addDrawableChild(new VeloButton(x + w - 20, contentY() + 49, 20, 18, Text.literal("..."),
+				b -> pick("Replace with", id -> to.setText(id))));
+		addDrawableChild(new VeloButton(x, contentY() + 78, w, 18, Text.literal("Keep properties (facing, powered...): " + (keepProperties ? "On" : "Off")),
 				b -> {
 					keepProperties = !keepProperties;
 					layoutContent();
 				}));
 		int half = (w - 8) / 2;
-		addDrawableChild(new VeloButton(x, contentBottom() - 20, half, 20, Text.literal("Replace"), b -> {
-			RmOps.replace(from.getText().strip(), to.getText().strip(), keepProperties);
-			requestClose();
-		}));
+		addDrawableChild(new VeloButton(x, contentBottom() - 20, half, 20, Text.literal("Replace"), b -> apply()));
 		addDrawableChild(new VeloButton(x + half + 8, contentBottom() - 20, half, 20, Text.literal("Cancel"), b -> requestClose()));
+		setInitialFocus(to);
+	}
+
+	/** Opens the icon grid; the chosen block goes into the field when this window comes back. */
+	private void pick(String title, java.util.function.Consumer<String> set) {
+		this.client.setScreen(new BlockPickerScreen(title, false, set).backTo(this));
+	}
+
+	private void apply() {
+		String fromText = from.getText().strip();
+		String toText = to.getText().strip();
+		if (!fromText.equals("*") && RmWorld.fromText(fromText) == null) {
+			RmState.error("Unknown block: " + fromText);
+			return;
+		}
+		RmOps.replace(fromText.contains(":") || fromText.equals("*") ? stripState(fromText) : "minecraft:" + stripState(fromText), toText,
+				keepProperties);
+		requestClose();
+	}
+
+	private static String stripState(String text) {
+		int bracket = text.indexOf('[');
+		return bracket >= 0 ? text.substring(0, bracket) : text;
 	}
 
 	@Override
 	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
-		context.drawTextWithShadow(this.textRenderer, "Replace (block id, or * for everything)", contentX(), contentY() + 3, VeloUi.muted());
-		context.drawTextWithShadow(this.textRenderer, "With (block id, optionally [property=value,...])", contentX(), contentY() + 37, VeloUi.muted());
+		context.drawTextWithShadow(this.textRenderer, "Replace (block name or id, * = everything)", contentX(), contentY() + 3, VeloUi.muted());
+		context.drawTextWithShadow(this.textRenderer, "With (block, optionally [property=value,...])", contentX(), contentY() + 39, VeloUi.muted());
+		fromSuggest.renderIcon(context, contentX() + contentWidth() - 42, contentY() + 13);
+		toSuggest.renderIcon(context, contentX() + contentWidth() - 42, contentY() + 49);
+	}
+
+	@Override
+	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+		super.render(context, mouseX, mouseY, delta);
+		// Suggestions go over everything else in the window.
+		fromSuggest.renderList(context, mouseX, mouseY);
+		toSuggest.renderList(context, mouseX, mouseY);
+	}
+
+	@Override
+	public boolean mouseClicked(Click click, boolean doubled) {
+		if (fromSuggest.click(click.x(), click.y()) || toSuggest.click(click.x(), click.y())) {
+			return true;
+		}
+		return super.mouseClicked(click, doubled);
+	}
+
+	@Override
+	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
+		if (fromSuggest.key(input.key()) || toSuggest.key(input.key())) {
+			return true;
+		}
+		return super.keyPressed(input);
 	}
 }

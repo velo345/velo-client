@@ -15,7 +15,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * otherwise scrolling in any of those would also silently change whatever's in the hotbar
  * underneath.
  */
-@Mixin(Mouse.class)
+// Runs before other mods' scroll hooks (Axiom) so Redstone Mode's tool slot gets the wheel first.
+@Mixin(value = Mouse.class, priority = 500)
 public abstract class MouseScrollMixin {
 
 	@Inject(method = "onMouseScroll", at = @At("HEAD"), cancellable = true)

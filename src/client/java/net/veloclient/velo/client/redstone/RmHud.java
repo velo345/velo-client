@@ -139,14 +139,23 @@ public final class RmHud {
 		}
 	}
 
-	/** The current tool's icon over the Redstone hotbar slot. */
+	/**
+	 * The Redstone tool slot ("slot 0") right of the hotbar, built from vanilla's own hotbar sprites
+	 * so it matches (and picks up Hotbar Colors). Selected, it carries the selection frame - vanilla's
+	 * frame on the normal slot is hidden meanwhile (see {@code SpriteTints}).
+	 */
 	private static void hotbarIcon(DrawContext context, int w, int h) {
-		int slot = RmSettings.get().toolSlot;
-		int x = w / 2 - 91 + 3 + slot * 20;
-		int y = h - 19;
+		int x = w / 2 + 91 + 6;
+		int y = h - 22;
+		Identifier bar = Identifier.of("minecraft", "hud/hotbar");
+		context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, bar, 182, 22, 0, 0, x, y, 21, 22);
+		context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, bar, 182, 22, 181, 0, x + 21, y, 1, 22);
 		boolean held = RedstoneMode.toolHeld();
-		VeloDraw.fillRounded(context, x - 1, y - 1, 18, 18, 3, held ? 0xA0FF4D4D : 0x80000000);
-		drawIcon(context, RmState.tool.icon, x, y, 16, held ? 0xFFFFFFFF : 0xC0FFFFFF);
+		drawIcon(context, RmState.tool.icon, x + 3, y + 3, 16, held ? 0xFFFFFFFF : 0xB0FFFFFF);
+		if (held) {
+			// Not quite -1, so the hidden-selection tint doesn't apply to this one.
+			context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, Identifier.of("minecraft", "hud/hotbar_selection"), x - 1, y - 1, 24, 23, 0xFEFFFFFF);
+		}
 	}
 
 	private static void message(DrawContext context, int w, int h) {
@@ -489,7 +498,7 @@ public final class RmHud {
 			cy += hint.size() * 10 + 6;
 			if (!RedstoneMode.toolHeld()) {
 				int ly = cy;
-				draw.add(() -> context.drawTextWithShadow(textRenderer, VeloUi.trim("Select hotbar slot " + (RmSettings.get().toolSlot + 1)
+				draw.add(() -> context.drawTextWithShadow(textRenderer, VeloUi.trim("Press 0 or scroll past the hotbar for the tool slot"
 						+ " to use it", inner), x + 8, ly, 0xFFFFD84A));
 				cy += 14;
 			}
@@ -579,6 +588,7 @@ public final class RmHud {
 					int layerY = cy;
 					draw.add(() -> {
 						context.drawTextWithShadow(textRenderer, selected.layerMode == Placements.LayerMode.RANGE ? "From" : "Layer", x + 8, layerY + 3, MUTED);
+						feetButton(context, x + width - 112, layerY, () -> selected.layer = selected.layerAtFeet());
 						stepper(context, x + width - 74, layerY, selected.layer, v2 -> selected.layer = Math.max(0, Math.min(selected.layerCount() - 1, v2)));
 					});
 					cy += 18;
@@ -586,6 +596,7 @@ public final class RmHud {
 						int toY = cy;
 						draw.add(() -> {
 							context.drawTextWithShadow(textRenderer, "To", x + 8, toY + 3, MUTED);
+							feetButton(context, x + width - 112, toY, () -> selected.layerTo = selected.layerAtFeet());
 							stepper(context, x + width - 74, toY, selected.layerTo,
 									v2 -> selected.layerTo = Math.max(0, Math.min(selected.layerCount() - 1, v2)));
 						});
@@ -616,6 +627,12 @@ public final class RmHud {
 			for (Runnable r : draw) {
 				r.run();
 			}
+		}
+
+		/** Sets a layer to the one you're standing in (along the placement's layer axis). */
+		private void feetButton(DrawContext context, int x, int y, Runnable set) {
+			hit(x, y, 34, 14, set, "Set to the layer at your feet");
+			textButton(context, x, y, 34, "Feet", false, set);
 		}
 
 		private void stepper(DrawContext context, int x, int y, int value, java.util.function.IntConsumer set) {

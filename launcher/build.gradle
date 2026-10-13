@@ -144,9 +144,24 @@ tasks.register("writeLauncherVersion") {
 	}
 }
 
+// The 3D wings (meshes, textures, previews and wings.json) from the mod's own assets, so the
+// launcher's Store can show the same animated wings - one source of truth for both.
+def wingAssetsResourceRoot = layout.buildDirectory.dir("generated/wings")
+
+tasks.register("bundleWingAssets", Copy) {
+	group = "build"
+	description = "Copies the mod's 3D wing assets into launcher resources."
+	from(rootProject.file("src/client/resources/assets/velo-client/cosmetics/wings"))
+	from(rootProject.file("src/client/resources/assets/velo-client/textures/cosmetics/wings")) {
+		into("textures")
+	}
+	into(wingAssetsResourceRoot.map { it.dir("net/veloclient/launcher/wings") })
+}
+
 sourceSets {
 	main {
 		resources {
+			srcDir(wingAssetsResourceRoot)
 			srcDir(gameJarsResourceRoot)
 			srcDir(javaRuntimeResourceRoot)
 			srcDir(launcherVersionResourceRoot)
@@ -155,7 +170,7 @@ sourceSets {
 }
 
 tasks.named("processResources") {
-	dependsOn("bundleGameJars", "bundleJavaRuntimeFallback", "writeLauncherVersion")
+	dependsOn("bundleGameJars", "bundleJavaRuntimeFallback", "writeLauncherVersion", "bundleWingAssets")
 }
 
 // The javafx plugin's "run" task reaches into Project internals

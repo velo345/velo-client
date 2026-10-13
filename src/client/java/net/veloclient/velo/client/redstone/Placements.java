@@ -69,9 +69,24 @@ public final class Placements {
 				case 'z' -> lz;
 				default -> ly;
 			};
-			int from = layer;
+			// A range works whichever way round From and To were set.
+			int from = layerMode == LayerMode.SINGLE ? layer : Math.min(layer, layerTo);
 			int to = layerMode == LayerMode.SINGLE ? layer : Math.max(layer, layerTo);
 			return value >= from && value <= to;
+		}
+
+		/** The layer (along the current axis) of the block you're standing in, clamped to this placement. */
+		public int layerAtFeet() {
+			int[] feet = RmWorld.playerBlock();
+			if (feet == null) {
+				return layer;
+			}
+			int value = switch (axis) {
+				case 'x' -> feet[0] - x;
+				case 'z' -> feet[2] - z;
+				default -> feet[1] - y;
+			};
+			return Math.max(0, Math.min(layerCount() - 1, value));
 		}
 	}
 

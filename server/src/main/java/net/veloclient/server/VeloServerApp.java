@@ -75,6 +75,8 @@ public final class VeloServerApp {
 		PartyRoutes.register(server, registry, social, parties);
 		StoreRoutes.register(server, registry, store, dataDir);
 		NewsRoutes.register(server, registry, new NewsService(dataDir), new ReportService(dataDir), store, adminToken);
+		SchematicShareService schematics = new SchematicShareService(dataDir);
+		SchematicRoutes.register(server, registry, schematics, store);
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));
 
 		// Expired sessions/challenges are already ignored by every lookup
@@ -89,6 +91,7 @@ public final class VeloServerApp {
 			registry.sweepExpired();
 			social.saveIfDirty();
 			social.sweepLimits();
+			schematics.sweepLimits();
 		}, 5, 5, TimeUnit.SECONDS);
 		Executors.newSingleThreadScheduledExecutor(r -> {
 			Thread t = new Thread(r, "velo-party-sweep");
@@ -154,6 +157,8 @@ public final class VeloServerApp {
 			writeErrorQuietly(exchange, e.status, e.getMessage());
 		} catch (NewsService.NewsException e) {
 			writeErrorQuietly(exchange, e.status, e.getMessage());
+		} catch (SchematicShareService.SchematicException e) {
+			writeErrorQuietly(exchange, e.status, e.getMessage());
 		} catch (IOException e) {
 			writeErrorQuietly(exchange, 400, e.getMessage() != null ? e.getMessage() : "Bad request");
 		} catch (Exception e) {
@@ -218,7 +223,7 @@ public final class VeloServerApp {
 				SessionRegistry.HEARTBEAT_INTERVAL_SECONDS, SessionRegistry.SESSION_TTL_MILLIS / 1000));
 	}
 
-	private record HeartbeatRequest(String sessionToken, String capeId) {
+	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId) {
 	}
 
 	private record HeartbeatResponse(boolean ok, int onlineCount, String capeId) {
@@ -234,7 +239,15 @@ public final class VeloServerApp {
 		String ownCustomHash = session == null ? null : capes.hashFor(session.uuid());
 		// Store capes are only shown for players who actually own them (server-side ownership).
 		String capeId = session != null && !store.mayDisplayCape(session.uuid(), request.capeId()) ? null : request.capeId();
-		SessionRegistry.Session refreshed = registry.heartbeat(request.sessionToken(), capeId, ownCustomHash);
+		// Wings are store items too ("wings_<id>"): only shown for players who bought them.
+		String wingsId = request.wingsId();
+		if (session != null && wingsId != null) {
+			String wingsItem = "wings_" + wingsId.split(";", 2)[0];
+			if (!store.mayDisplayCape(session.uuid(), wingsItem) || store.config().item(wingsItem) == null) {
+				wingsId = null;
+			}
+		}
+		SessionRegistry.Session refreshed = registry.heartbeat(request.sessionToken(), capeId, ownCustomHash, wingsId);
 		if (refreshed != null && "game".equals(refreshed.kind())) {
 			store.onGameHeartbeat(refreshed.uuid());
 		}

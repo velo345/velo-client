@@ -32,6 +32,11 @@ final class RmMenus {
 			net.veloclient.velo.client.gui.FileManagerOpener.open(SchematicIO.veloFolder().toFile(), RmState::info);
 		}));
 		items.add(SEPARATOR);
+		items.add(RmHud.MenuItem.of("Community schematics...", () -> MinecraftClient.getInstance()
+				.setScreen(new net.veloclient.velo.client.gui.CommunitySchematicsScreen(null))));
+		items.add(RmHud.MenuItem.of("Share a schematic...", () -> MinecraftClient.getInstance()
+				.setScreen(new net.veloclient.velo.client.gui.ShareSchematicScreen(null))));
+		items.add(SEPARATOR);
 		items.add(RmHud.MenuItem.of("Remove all schematic previews", Placements::clear));
 		return items;
 	}
@@ -99,10 +104,6 @@ final class RmMenus {
 				i++;
 			}
 			s.pasteSpeed = SPEEDS[(i + 1) % SPEEDS.length];
-			RmSettings.save();
-		}, null));
-		items.add(new RmHud.MenuItem("Redstone tool slot", "Slot " + (s.toolSlot + 1), () -> {
-			s.toolSlot = (s.toolSlot + 1) % 9;
 			RmSettings.save();
 		}, null));
 		items.add(new RmHud.MenuItem("Keep redstone running when pasting", null, () -> {

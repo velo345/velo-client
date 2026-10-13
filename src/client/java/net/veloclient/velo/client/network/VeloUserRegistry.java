@@ -15,7 +15,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class VeloUserRegistry {
 
-	public record Entry(String username, String capeId) {
+	public record Entry(String username, String capeId, String wingsId) {
+		public Entry(String username, String capeId) {
+			this(username, capeId, null);
+		}
 	}
 
 	// Keyed by dashless-lowercase UUID (matches the server's own canonical
@@ -89,6 +92,15 @@ public final class VeloUserRegistry {
 		}
 		Entry entry = entryForName(username);
 		return entry == null ? null : entry.capeId();
+	}
+
+	/** The 3D wings this player has equipped (a bundled cosmetic id), if any and if they're online. */
+	public static String wingsIdFor(UUID uuid, String username) {
+		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
+		if (entry == null) {
+			entry = entryForName(username);
+		}
+		return entry == null ? null : entry.wingsId();
 	}
 
 	// Called per rendered player per frame - formats the two longs directly instead of

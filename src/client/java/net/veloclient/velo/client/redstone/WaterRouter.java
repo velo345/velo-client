@@ -319,6 +319,8 @@ final class WaterRouter {
 				// Bubble elevator: soul sand, water sources, a cap so items can't jump out; the top source carries them on.
 				Node p = n.parent();
 				Wiring.put(out, n.x(), p.y() - 1, n.z(), soulSand, 0);
+				// The elevator needs its soul sand - it may replace any ordinary block.
+				grid.overrides.add(Wiring.key(n.x(), p.y() - 1, n.z()));
 				for (int y = p.y(); y <= n.y(); y++) {
 					Wiring.put(out, n.x(), y, n.z(), source, 3);
 				}
@@ -334,7 +336,7 @@ final class WaterRouter {
 					Wiring.put(out, n.x(), y, n.z(), air, 0);
 				}
 				separator(out, grid, style, n.x(), p.y(), n.z(), n.dir(), stream);
-				Wiring.put(out, n.x(), n.y() - 1, n.z(), floor, 0);
+				floor(out, grid, n.x(), n.y() - 1, n.z(), floor);
 				Wiring.put(out, n.x(), n.y(), n.z(), source, 3);
 				drops++;
 				separators++;
@@ -343,7 +345,7 @@ final class WaterRouter {
 			}
 			boolean onTarget = last && !joining && n.x() == end[0] && n.y() - 1 == end[1] && n.z() == end[2];
 			if (!onTarget && !keep.contains(Wiring.key(n.x(), n.y() - 1, n.z())) && !grid.water(n.x(), n.y() - 1, n.z())) {
-				Wiring.put(out, n.x(), n.y() - 1, n.z(), floor, 0);
+				floor(out, grid, n.x(), n.y() - 1, n.z(), floor);
 			}
 			boolean beforeVertical = next != null && next.vertical() > 0;
 			boolean beforeDrop = next != null && next.vertical() < 0;
@@ -385,6 +387,16 @@ final class WaterRouter {
 		String summary = "Water: " + path.size() + " blocks, " + separators + " separators" + (elevators > 0 ? ", " + elevators + " elevator"
 				+ (elevators > 1 ? "s" : "") : "") + (drops > 0 ? ", " + drops + " drop" + (drops > 1 ? "s" : "") : "") + " - " + ending;
 		return new Wiring.Result(new ArrayList<>(out.values()), summary, null);
+	}
+
+	/**
+	 * Floor under a stream block: placed on air (or anything when going through); an existing solid
+	 * floor - glass, stone, whatever is already built there - is kept, items slide over it too.
+	 */
+	private static void floor(Map<Long, Wiring.Placement> out, Wiring.Grid grid, int x, int y, int z, Object floor) {
+		if (grid.air(x, y, z) || grid.through || grid.overrides.contains(Wiring.key(x, y, z))) {
+			Wiring.put(out, x, y, z, floor, 0);
+		}
 	}
 
 	/** A separator in a stream block: a wall sign on a side wall (or the chosen block as-is). */

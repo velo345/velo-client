@@ -127,6 +127,14 @@ public final class Keys {
 		return SDL ? 4 + index : 'A' + index;
 	}
 
+	/** Key code of the number key {@code d} (0-9) on the main keyboard: ASCII before 26.3, SDL scancodes after (1-9 = 30-38, 0 = 39). */
+	public static int digit(int d) {
+		if (SDL) {
+			return d == 0 ? 39 : 29 + d;
+		}
+		return '0' + d;
+	}
+
 	/** A key code Velo saved before 26.3 (GLFW) in this version's codes; unchanged before 26.3 and for -1. */
 	public static int fromStored(int glfwCode) {
 		if (!SDL || glfwCode < 0) {

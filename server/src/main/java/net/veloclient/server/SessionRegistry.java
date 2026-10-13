@@ -40,10 +40,10 @@ final class SessionRegistry {
 	// the map (see below), so the ConcurrentHashMap itself provides the
 	// necessary visibility without needing volatile fields here (which
 	// records can't have anyway).
-	record Session(String uuid, String username, String kind, String capeId, long expiresAtMillis) {
+	record Session(String uuid, String username, String kind, String capeId, String wingsId, long expiresAtMillis) {
 	}
 
-	record OnlineUser(String uuid, String username, String capeId) {
+	record OnlineUser(String uuid, String username, String capeId, String wingsId) {
 	}
 
 	/** Called with a uuid whenever one of its sessions ends or expires - drives friends' presence updates. */
@@ -88,7 +88,7 @@ final class SessionRegistry {
 		String normalizedKind = normalizeKind(kind);
 		sessionsByToken.values().removeIf(s -> s.uuid().equals(uuid) && s.kind().equals(normalizedKind));
 		String token = randomHex(32);
-		sessionsByToken.put(token, new Session(uuid, username, normalizedKind, null, System.currentTimeMillis() + SESSION_TTL_MILLIS));
+		sessionsByToken.put(token, new Session(uuid, username, normalizedKind, null, null, System.currentTimeMillis() + SESSION_TTL_MILLIS));
 		return token;
 	}
 
@@ -111,6 +111,11 @@ final class SessionRegistry {
 	 * upload, or at a hash an admin removed.
 	 */
 	Session heartbeat(String token, String capeId, String ownCustomCapeHash) {
+		return heartbeat(token, capeId, ownCustomCapeHash, null);
+	}
+
+	/** Same, also recording the equipped 3D wings ({@code wingsId}, a bundled cosmetic id - or null for none). */
+	Session heartbeat(String token, String capeId, String ownCustomCapeHash, String wingsId) {
 		Session session = session(token);
 		if (session == null) {
 			sessionsByToken.remove(token);
@@ -121,7 +126,7 @@ final class SessionRegistry {
 				&& (ownCustomCapeHash == null || !normalized.equals(CapeStore.CUSTOM_PREFIX + ownCustomCapeHash))) {
 			normalized = null;
 		}
-		Session refreshed = new Session(session.uuid(), session.username(), session.kind(), normalized,
+		Session refreshed = new Session(session.uuid(), session.username(), session.kind(), normalized, normalizeWingsId(wingsId),
 				System.currentTimeMillis() + SESSION_TTL_MILLIS);
 		sessionsByToken.put(token, refreshed);
 		return refreshed;
@@ -131,7 +136,7 @@ final class SessionRegistry {
 	void touch(String token) {
 		Session session = session(token);
 		if (session != null) {
-			sessionsByToken.put(token, new Session(session.uuid(), session.username(), session.kind(), session.capeId(),
+			sessionsByToken.put(token, new Session(session.uuid(), session.username(), session.kind(), session.capeId(), session.wingsId(),
 					System.currentTimeMillis() + SESSION_TTL_MILLIS));
 		}
 	}
@@ -155,7 +160,7 @@ final class SessionRegistry {
 		long now = System.currentTimeMillis();
 		return sessionsByToken.values().stream()
 				.filter(s -> s.expiresAtMillis() >= now && s.kind().equals(KIND_GAME))
-				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId()))
+				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId()))
 				.toList();
 	}
 
@@ -185,6 +190,17 @@ final class SessionRegistry {
 		String trimmed = capeId.trim();
 		// custom:<64 hex chars> is 71 long, so the cap has to leave room for it.
 		return trimmed.length() > 96 ? trimmed.substring(0, 96) : trimmed;
+	}
+
+	/**
+	 * Wings are bundled with every client and picked by id, followed by the wearer's settings as
+	 * numbers ("phoenix;100;0;0;10;120;90") - only that short plain form is passed on.
+	 */
+	static String normalizeWingsId(String wingsId) {
+		if (wingsId == null || !wingsId.matches("[a-z0-9_-]{1,32}(;-?[0-9]{1,4}){0,8}")) {
+			return null;
+		}
+		return wingsId;
 	}
 
 	private String randomHex(int bytes) {

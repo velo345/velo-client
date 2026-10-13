@@ -79,6 +79,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.keybind.MenuKeySync.register();
 		net.veloclient.velo.client.util.MemoryStatsRecorder.start();
 		CapeFeatureRenderer.register();
+		net.veloclient.velo.client.cosmetics.render.WingsFeatureRenderer.register();
 		net.veloclient.velo.client.network.RewardsReporter.register();
 		registerSocialOverlay();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
@@ -241,6 +242,8 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.ChatTweaksModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.redstone.HopperSpeedModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.redstone.FastGrowModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.FlySpeedModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.PhantomModule());
 		net.veloclient.velo.client.redstone.RedstoneMode.init();
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.ServerOverlaysModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.PlayerLevelsModule());

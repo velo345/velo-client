@@ -161,11 +161,15 @@ public final class SchematicsScreen extends VeloWindow {
 		scrollRegion.layoutGrid(gridColumns, currentTileWidth, currentTileHeight, TILE_GAP);
 
 		int bottomY = contentBottom() - 20;
-		int bottomWidth = (contentWidth() - 16) / 3;
+		int bottomWidth = (contentWidth() - 24) / 4;
 		addDrawableChild(new VeloButton(contentX(), bottomY, bottomWidth, 20, Text.literal("Open Folder"), b -> openFolder()));
 		addDrawableChild(new VeloButton(contentX() + bottomWidth + 8, bottomY, bottomWidth, 20,
 				Text.literal(browseMode ? "My Schematics" : "Browse Online"), b -> toggleBrowseMode()));
-		addDrawableChild(new VeloButton(contentX() + (bottomWidth + 8) * 2, bottomY, bottomWidth, 20, Text.literal("Done"), b -> requestClose()));
+		VeloButton community = new VeloButton(contentX() + (bottomWidth + 8) * 2, bottomY, bottomWidth, 20, Text.literal("Community"),
+				b -> this.client.setScreen(new CommunitySchematicsScreen(this)));
+		community.primary();
+		addDrawableChild(community);
+		addDrawableChild(new VeloButton(contentX() + (bottomWidth + 8) * 3, bottomY, bottomWidth, 20, Text.literal("Done"), b -> requestClose()));
 	}
 
 	/** Best-effort, once per filename per screen instance - silently stays a plain filename tile if PhantomMarket doesn't know it or the lookup fails. */

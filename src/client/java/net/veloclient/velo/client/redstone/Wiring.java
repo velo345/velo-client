@@ -55,6 +55,9 @@ public final class Wiring {
 	private static volatile String summary;
 	private static volatile String progress;
 	private static volatile Result pending;
+	private static volatile Set<Long> pendingOverrides = Set.of();
+	/** Cells the current preview may build over although Go Around is on (around its connection points). */
+	private static volatile Set<Long> previewOverrides = Set.of();
 
 	private Wiring() {
 	}
@@ -104,6 +107,7 @@ public final class Wiring {
 			RmState.error(r.error());
 		} else {
 			preview = r.placements();
+			previewOverrides = pendingOverrides;
 			summary = r.summary();
 			RmState.info(r.summary() + " - left click / Enter builds");
 		}
@@ -116,6 +120,8 @@ public final class Wiring {
 		final boolean through;
 		final int generation;
 		private final Map<Long, Object> cache = new HashMap<>();
+		/** Cells around the two connection points that may be built over even when going around (glass, stone...). */
+		final Set<Long> overrides = new HashSet<>();
 		int expansions;
 
 		Grid(Object level, boolean through, int generation) {
@@ -150,7 +156,25 @@ public final class Wiring {
 				return true;
 			}
 			String id = id(x, y, z);
-			return through && !protectedBlock(id) && !id.contains("water") && !id.contains("lava");
+			return (through || overrides.contains(key(x, y, z))) && !protectedBlock(id) && !id.contains("water") && !id.contains("lava");
+		}
+
+		/**
+		 * The connection points may replace ordinary blocks: the cell in front of each clicked face and
+		 * its neighbours (never the clicked blocks themselves, nor redstone / containers).
+		 */
+		void allowEndpoint(int[] clicked) {
+			int[] o = RmWorld.faceOffset(clicked[3]);
+			int cx = clicked[0] + o[0];
+			int cy = clicked[1] + o[1];
+			int cz = clicked[2] + o[2];
+			for (int dx = -1; dx <= 1; dx++) {
+				for (int dy = -1; dy <= 1; dy++) {
+					for (int dz = -1; dz <= 1; dz++) {
+						overrides.add(key(cx + dx, cy + dy, cz + dz));
+					}
+				}
+			}
 		}
 
 		boolean cancelled() {
@@ -195,6 +219,10 @@ public final class Wiring {
 		String style = RmSettings.get().wireStyle;
 		PLANNER.execute(() -> {
 			Grid grid = new Grid(level, through, generation);
+			grid.allowEndpoint(start);
+			grid.allowEndpoint(end);
+			grid.overrides.remove(key(start[0], start[1], start[2]));
+			grid.overrides.remove(key(end[0], end[1], end[2]));
 			Result result;
 			long t0 = System.nanoTime();
 			try {
@@ -206,6 +234,7 @@ public final class Wiring {
 			if (grid.cancelled()) {
 				return;
 			}
+			pendingOverrides = Set.copyOf(grid.overrides);
 			if (result.error() == null) {
 				result = new Result(result.placements(), result.summary() + " (" + (System.nanoTime() - t0) / 1_000_000 + " ms)", null);
 			}
@@ -224,6 +253,7 @@ public final class Wiring {
 			return;
 		}
 		boolean through = "Go Through".equals(RmSettings.get().pathMode);
+		Set<Long> overrides = previewOverrides;
 		List<Placement> sorted = new ArrayList<>(placements);
 		sorted.sort(java.util.Comparator.comparingInt(Placement::order));
 		int[] b = {Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
@@ -244,7 +274,7 @@ public final class Wiring {
 			for (Placement p : sorted) {
 				Object current = RmWorld.state(level, p.x(), p.y(), p.z());
 				if (current != p.state() && !RmWorld.replaceable(current) && !(p.order() == 0 && RmWorld.conductor(level, p.x(), p.y(), p.z()))
-						&& !(through && !protectedBlock(RmWorld.id(current)))) {
+						&& !((through || overrides.contains(key(p.x(), p.y(), p.z()))) && !protectedBlock(RmWorld.id(current)))) {
 					MinecraftClient.getInstance().execute(() -> RmState.error("Blocked at " + p.x() + " " + p.y() + " " + p.z() + " by "
 							+ RmWorld.id(current).replace("minecraft:", "") + " - plan again"));
 					return;

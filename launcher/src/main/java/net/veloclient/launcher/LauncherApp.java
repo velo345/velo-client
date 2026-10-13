@@ -261,6 +261,12 @@ public final class LauncherApp extends Application {
 		if (!net.veloclient.launcher.data.StoreCatalog.all().isEmpty()) {
 			steps.add(new Object[] {"05b-store-item", (Runnable) () -> showStoreItemDetail(net.veloclient.launcher.data.StoreCatalog.all().get(0))});
 		}
+		if (!net.veloclient.launcher.data.WingsCatalog.all().isEmpty()) {
+			steps.add(new Object[] {"05e-wings", (Runnable) () -> showWingDetail(net.veloclient.launcher.data.WingsCatalog.all().stream()
+					.filter(w -> w.id().equals("shadowfang")).findFirst().orElse(net.veloclient.launcher.data.WingsCatalog.all().get(0)))});
+		}
+		steps.add(new Object[] {"05f-clips", (Runnable) this::showMedia});
+		steps.add(new Object[] {"05g-party", (Runnable) this::showParty});
 		steps.add(new Object[] {"05d-coins", (Runnable) this::showCoins});
 		steps.add(new Object[] {"05c-friends", (Runnable) this::showFriends});
 		steps.add(new Object[] {"06-servers", (Runnable) this::showServers});
@@ -2266,11 +2272,43 @@ public final class LauncherApp extends Application {
 			}
 
 			@Override
+			public void openWings(net.veloclient.launcher.data.WingsCatalog.WingType type) {
+				showWingDetail(type);
+			}
+
+			@Override
+			public void openCosmetics() {
+				showCosmetics();
+			}
+
+			@Override
 			public void rebuild() {
 				showStore();
 			}
 		}));
 		markActiveNav(navStore);
+		// Server prices for the cards (shown on the next visit if they weren't loaded yet).
+		java.util.concurrent.CompletableFuture.runAsync(() -> {
+			try {
+				net.veloclient.launcher.social.StoreApi.catalog();
+			} catch (net.veloclient.launcher.social.StoreApi.StoreError ignored) {
+				// The bundled prices stay.
+			}
+		}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor());
+	}
+
+	private void showWingDetail(net.veloclient.launcher.data.WingsCatalog.WingType type) {
+		setContent(net.veloclient.launcher.ui.WingDetailView.build(new net.veloclient.launcher.ui.WingDetailView.Host() {
+			@Override
+			public MinecraftSession session() {
+				return session;
+			}
+
+			@Override
+			public void goBack() {
+				showStore();
+			}
+		}, type));
 	}
 
 	private void showStoreItemDetail(net.veloclient.launcher.data.StoreItem item) {

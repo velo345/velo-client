@@ -20,8 +20,13 @@ import java.util.Map;
  */
 public final class RmWorld {
 
-	/** Update clients only: no neighbour / shape updates (observers don't fire, nothing pops off). */
-	public static final int SILENT = 2 | 16;
+	/**
+	 * Update clients only: no neighbour / shape updates, no on-place reactions (512), no block-entity
+	 * side effects (256) and no drops (32). Without 512 every placed block ran its own on-place logic
+	 * while the rest of the build wasn't there yet - dust recalculated its power, powered observers
+	 * switched off, pistons checked for power - which is what made pasted clocks stop at random.
+	 */
+	public static final int SILENT = 2 | 16 | 32 | 256 | 512;
 	/** Normal placement: neighbours updated, clients told. */
 	public static final int NORMAL = 3;
 
@@ -286,6 +291,68 @@ public final class RmWorld {
 		return server.getBlockTickScheduler().isQueued(p, server.getBlockState(p).getBlock());
 	}
 
+	/**
+	 * Every scheduled block and fluid tick inside the box, in the order the game would run them:
+	 * {dx, dy, dz, delay, priority ordinal, fluid ? 1 : 0}. Server level. Only ticks meant for the
+	 * block / fluid that's actually there count (a stale tick for a replaced block is dropped).
+	 */
+	public static List<int[]> scheduledTicks(Object level, int x0, int y0, int z0, int sx, int sy, int sz) {
+		List<int[]> out = new ArrayList<>();
+		if (!(level instanceof net.minecraft.server.world.ServerWorld server)) {
+			return out;
+		}
+		long now = server.getTime();
+		List<Object[]> all = new ArrayList<>();
+		for (int cx = x0 >> 4; cx <= (x0 + sx - 1) >> 4; cx++) {
+			for (int cz = z0 >> 4; cz <= (z0 + sz - 1) >> 4; cz++) {
+				if (!server.isChunkLoaded(cx, cz)) {
+					continue;
+				}
+				var chunk = server.getChunk(cx, cz);
+				for (int kind = 0; kind < 2; kind++) {
+					if (!((kind == 0 ? chunk.getBlockTickScheduler() : chunk.getFluidTickScheduler())
+							instanceof net.minecraft.world.tick.ChunkTickScheduler<?> ticks)) {
+						continue;
+					}
+					int fluid = kind;
+					ticks.getQueueAsStream().forEach(t -> {
+						var p = t.pos();
+						if (p.getX() < x0 || p.getY() < y0 || p.getZ() < z0 || p.getX() >= x0 + sx || p.getY() >= y0 + sy || p.getZ() >= z0 + sz) {
+							return;
+						}
+						var here = server.getBlockState(p);
+						if (fluid == 0 ? t.type() != here.getBlock() : t.type() != here.getFluidState().getFluid()) {
+							return;
+						}
+						all.add(new Object[] {t, fluid});
+					});
+				}
+			}
+		}
+		all.sort((a, b) -> net.minecraft.world.tick.OrderedTick.TRIGGER_TICK_COMPARATOR.compare(
+				(net.minecraft.world.tick.OrderedTick<?>) a[0], (net.minecraft.world.tick.OrderedTick<?>) b[0]));
+		for (Object[] e : all) {
+			var t = (net.minecraft.world.tick.OrderedTick<?>) e[0];
+			out.add(new int[] {t.pos().getX() - x0, t.pos().getY() - y0, t.pos().getZ() - z0,
+					(int) Math.max(1, Math.min(Integer.MAX_VALUE, t.triggerTick() - now)), t.priority().ordinal(), (int) e[1]});
+		}
+		return out;
+	}
+
+	/** Schedules a tick for whatever block (or fluid) is at x/y/z, with its original delay and priority. Server level. */
+	public static void scheduleExact(Object level, int x, int y, int z, int delay, int priority, boolean fluid) {
+		var p = pos(x, y, z);
+		var here = w(level).getBlockState(p);
+		if (fluid) {
+			if (!here.getFluidState().isEmpty()) {
+				w(level).scheduleFluidTick(p, here.getFluidState().getFluid(), delay);
+			}
+		} else if (!here.isAir()) {
+			var priorities = net.minecraft.world.tick.TickPriority.values();
+			w(level).scheduleBlockTick(p, here.getBlock(), delay, priorities[Math.max(0, Math.min(priorities.length - 1, priority))]);
+		}
+	}
+
 	/** A full block redstone treats as a conductor (dust on top works, signal passes into it). */
 	public static boolean conductor(Object level, int x, int y, int z) {
 		var p = pos(x, y, z);
@@ -347,6 +414,24 @@ public final class RmWorld {
 		return player == null ? -1 : player.getInventory().getSelectedSlot();
 	}
 
+	/** Spectators scroll to change fly speed - Redstone Mode leaves that alone. */
+	public static boolean spectator() {
+		var player = net.minecraft.client.MinecraftClient.getInstance().player;
+		return player != null && player.isSpectator();
+	}
+
+	/** Bit i set while hotbar key i+1 is held. */
+	public static int hotbarKeysDown() {
+		var keys = net.minecraft.client.MinecraftClient.getInstance().options.hotbarKeys;
+		int mask = 0;
+		for (int i = 0; i < keys.length && i < 9; i++) {
+			if (keys[i].isPressed()) {
+				mask |= 1 << i;
+			}
+		}
+		return mask;
+	}
+
 	public static void setSelectedSlot(int slot) {
 		var player = net.minecraft.client.MinecraftClient.getInstance().player;
 		if (player != null && slot >= 0 && slot < 9) {
@@ -366,6 +451,16 @@ public final class RmWorld {
 	/** The block's item (an ItemStack), or an empty stack for blocks without one. */
 	public static Object blockItem(Object state) {
 		return s(state).getBlock().asItem().getDefaultStack();
+	}
+
+	/** A full, non-see-through cube (stone, planks) - hides whatever is behind it. */
+	public static boolean opaque(Object state) {
+		return s(state).isOpaqueFullCube();
+	}
+
+	/** The block's name in the game's language ("Redstone Repeater"). */
+	public static String blockName(Object state) {
+		return s(state).getBlock().getName().getString();
 	}
 
 	public static List<String> allBlockIds() {
@@ -646,6 +741,62 @@ public final class RmWorld {
 		return server.getBlockTicks().hasScheduledTick(p, server.getBlockState(p).getBlock());
 	}
 
+	public static List<int[]> scheduledTicks(Object level, int x0, int y0, int z0, int sx, int sy, int sz) {
+		List<int[]> out = new ArrayList<>();
+		if (!(level instanceof net.minecraft.server.level.ServerLevel server)) {
+			return out;
+		}
+		long now = server.getGameTime();
+		List<Object[]> all = new ArrayList<>();
+		for (int cx = x0 >> 4; cx <= (x0 + sx - 1) >> 4; cx++) {
+			for (int cz = z0 >> 4; cz <= (z0 + sz - 1) >> 4; cz++) {
+				if (!server.hasChunk(cx, cz)) {
+					continue;
+				}
+				var chunk = server.getChunk(cx, cz);
+				for (int kind = 0; kind < 2; kind++) {
+					if (!((kind == 0 ? chunk.getBlockTicks() : chunk.getFluidTicks())
+							instanceof net.minecraft.world.ticks.LevelChunkTicks<?> ticks)) {
+						continue;
+					}
+					int fluid = kind;
+					ticks.getAll().forEach(t -> {
+						var p = t.pos();
+						if (p.getX() < x0 || p.getY() < y0 || p.getZ() < z0 || p.getX() >= x0 + sx || p.getY() >= y0 + sy || p.getZ() >= z0 + sz) {
+							return;
+						}
+						var here = server.getBlockState(p);
+						if (fluid == 0 ? t.type() != here.getBlock() : t.type() != here.getFluidState().getType()) {
+							return;
+						}
+						all.add(new Object[] {t, fluid});
+					});
+				}
+			}
+		}
+		all.sort((a, b) -> net.minecraft.world.ticks.ScheduledTick.DRAIN_ORDER.compare(
+				(net.minecraft.world.ticks.ScheduledTick<?>) a[0], (net.minecraft.world.ticks.ScheduledTick<?>) b[0]));
+		for (Object[] e : all) {
+			var t = (net.minecraft.world.ticks.ScheduledTick<?>) e[0];
+			out.add(new int[] {t.pos().getX() - x0, t.pos().getY() - y0, t.pos().getZ() - z0,
+					(int) Math.max(1, Math.min(Integer.MAX_VALUE, t.triggerTick() - now)), t.priority().ordinal(), (int) e[1]});
+		}
+		return out;
+	}
+
+	public static void scheduleExact(Object level, int x, int y, int z, int delay, int priority, boolean fluid) {
+		var p = pos(x, y, z);
+		var here = w(level).getBlockState(p);
+		if (fluid) {
+			if (!here.getFluidState().isEmpty()) {
+				w(level).scheduleTick(p, here.getFluidState().getType(), delay);
+			}
+		} else if (!here.isAir()) {
+			var priorities = net.minecraft.world.ticks.TickPriority.values();
+			w(level).scheduleTick(p, here.getBlock(), delay, priorities[Math.max(0, Math.min(priorities.length - 1, priority))]);
+		}
+	}
+
 	public static boolean conductor(Object level, int x, int y, int z) {
 		var p = pos(x, y, z);
 		return w(level).getBlockState(p).isRedstoneConductor(w(level), p);
@@ -708,6 +859,22 @@ public final class RmWorld {
 		return player == null ? -1 : player.getInventory().getSelectedSlot();
 	}
 
+	public static boolean spectator() {
+		var player = net.minecraft.client.Minecraft.getInstance().player;
+		return player != null && player.isSpectator();
+	}
+
+	public static int hotbarKeysDown() {
+		var keys = net.minecraft.client.Minecraft.getInstance().options.keyHotbarSlots;
+		int mask = 0;
+		for (int i = 0; i < keys.length && i < 9; i++) {
+			if (keys[i].isDown()) {
+				mask |= 1 << i;
+			}
+		}
+		return mask;
+	}
+
 	public static void setSelectedSlot(int slot) {
 		var player = net.minecraft.client.Minecraft.getInstance().player;
 		if (player != null && slot >= 0 && slot < 9) {
@@ -725,6 +892,14 @@ public final class RmWorld {
 
 	public static Object blockItem(Object state) {
 		return s(state).getBlock().asItem().getDefaultInstance();
+	}
+
+	public static boolean opaque(Object state) {
+		return s(state).isSolidRender();
+	}
+
+	public static String blockName(Object state) {
+		return s(state).getBlock().getName().getString();
 	}
 
 	public static List<String> allBlockIds() {

@@ -265,6 +265,50 @@ public final class ScreenshotTour {
 			case "skins" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.VeloSkinsScreen(null))},
 					new Object[] {30, (Runnable) () -> shot(client, "skins")});
+			// Redstone Mode with a schematic locked in place (hologram blocks), then Replace's suggestions.
+			// -Dvelo.tourSchematic=<file> picks the schematic (.litematic / .veloschem).
+			case "redstone" -> List.of(
+					new Object[] {40, (Runnable) () -> {
+						aim(client, 35f);
+						net.veloclient.velo.client.redstone.RedstoneMode.enter();
+						String file = System.getProperty("velo.tourSchematic");
+						if (file != null) {
+							net.veloclient.velo.client.redstone.SchematicIO.loadToClipboard(java.nio.file.Path.of(file));
+						}
+					}},
+					new Object[] {60, (Runnable) () -> {
+						var p = net.veloclient.velo.client.redstone.Placements.following();
+						if (p != null) {
+							// Put it ahead of the player, its front facing the camera, and look at it.
+							double[] eye = net.veloclient.velo.client.redstone.RmWorld.eyeAndLook();
+							int[] feet = net.veloclient.velo.client.redstone.RmWorld.playerBlock();
+							var v = p.view();
+							double len = Math.max(1e-3, Math.hypot(eye[3], eye[5]));
+							double cx = eye[0] + eye[3] / len * (v.sz / 2.0 + 18);
+							double cz = eye[2] + eye[5] / len * (v.sz / 2.0 + 18);
+							p.x = (int) Math.floor(cx - v.sx / 2.0);
+							p.z = (int) Math.floor(cz - v.sz / 2.0);
+							p.y = feet[1];
+							p.locked = true;
+						}
+						aim(client, 8f);
+					}},
+					new Object[] {40, (Runnable) () -> shot(client, "redstone-hologram")},
+					new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.redstone.ReplaceScreen())},
+					new Object[] {25, (Runnable) () -> typeForTour(client, "redst")},
+					new Object[] {20, (Runnable) () -> shot(client, "redstone-replace")},
+					new Object[] {2, (Runnable) () -> ModuleRegistry.get("phantom")
+							.ifPresent(m -> client.setScreen(new net.veloclient.velo.client.gui.window.ModuleConfigScreen(m, null)))},
+					new Object[] {25, (Runnable) () -> shot(client, "module-phantom")},
+					new Object[] {2, (Runnable) () -> ModuleRegistry.get("fly-speed")
+							.ifPresent(m -> client.setScreen(new net.veloclient.velo.client.gui.window.ModuleConfigScreen(m, null)))},
+					new Object[] {25, (Runnable) () -> shot(client, "module-flyspeed")});
+			case "store" -> List.of(
+					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null))},
+					new Object[] {60, (Runnable) () -> shot(client, "store-featured")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.cosmetics.wings.WingsManager.type("phoenix").ifPresent(type ->
+							client.setScreen(new net.veloclient.velo.client.gui.store.WingDetailScreen(null, type)))},
+					new Object[] {60, (Runnable) () -> shot(client, "store-wing")});
 			case "pause" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))},
 					new Object[] {30, (Runnable) () -> shot(client, "pause")});
@@ -465,6 +509,22 @@ public final class ScreenshotTour {
 	private static String screenName(MinecraftClient client) {
 		var screen = net.veloclient.velo.client.util.ClientCompat.currentScreen();
 		return screen == null ? "none (game)" : screen.getClass().getSimpleName();
+	}
+
+	/** Looks down by {@code pitch} degrees (so the crosshair hits the ground for placements). */
+	private static void aim(MinecraftClient client, float pitch) {
+		//? if >=26.2 {
+		/*client.player.setXRot(pitch);
+		*///?}
+	}
+
+	/** Types into the focused text field of the open screen. */
+	private static void typeForTour(MinecraftClient client, String text) {
+		//? if >=26.2 {
+		/*if (client.gui.screen() != null && client.gui.screen().getFocused() instanceof net.minecraft.client.gui.components.EditBox box) {
+			box.setValue(text);
+		}
+		*///?}
 	}
 
 	private static void toggleF3(MinecraftClient client, boolean on) {

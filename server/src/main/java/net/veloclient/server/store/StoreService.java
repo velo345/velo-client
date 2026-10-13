@@ -83,6 +83,10 @@ public final class StoreService {
 		return LocalDate.now(ZoneOffset.UTC).toString();
 	}
 
+	public StoreConfig config() {
+		return config;
+	}
+
 	public boolean isOwner(String uuid, String username) {
 		return owners.contains(uuid) || (username != null && owners.contains(username.toLowerCase(Locale.ROOT)));
 	}

@@ -8,11 +8,11 @@ import net.veloclient.velo.client.util.Keys;
 
 /**
  * Redstone Mode's keys (Controls &gt; Velo Redstone Mode). Kept to a handful with defaults that
- * don't clash with movement, sprint or voice chat: R toggles the mode, a Left Alt tap frees the
- * mouse for the overlay, F7 freezes the world, F9 hides the overlay, K records / replays, End
- * stops a running paste. Every tool also has its own key, unbound by default. While the mode is on
+ * don't clash with movement, sprint or voice chat: R toggles the mode, 0 selects the tool slot, a
+ * Left Alt tap frees the mouse for the overlay, F7 freezes the world, F9 hides the overlay, K
+ * records / replays, End stops a running paste. Every tool also has its own key, unbound by default. While the mode is on
  * these are the only Velo keys that work. Editing shortcuts (Ctrl+C/X/V/Z/Y, Delete, Enter,
- * Backspace) only act while the Redstone tool slot is selected in the hotbar.
+ * Backspace) only act while the Redstone tool slot is selected.
  */
 public final class RmKeys {
 
@@ -24,6 +24,8 @@ public final class RmKeys {
 	public static final KeyBinding HIDE = key("rm_hide", Keys.F9);
 	public static final KeyBinding RECORD = key("rm_record", Keys.letter('K'));
 	public static final KeyBinding CANCEL_JOB = key("rm_cancel_job", Keys.END);
+	/** Selects the Redstone tool slot (slot 0, right of the hotbar) - like Axiom's tool slot. */
+	public static final KeyBinding TOOL_SLOT = key("rm_tool_slot", Keys.digit(0));
 	public static final KeyBinding TOOL_SELECT = key("rm_tool_select", Keys.UNKNOWN);
 	public static final KeyBinding TOOL_MOVE = key("rm_tool_move", Keys.UNKNOWN);
 	public static final KeyBinding TOOL_STACK = key("rm_tool_stack", Keys.UNKNOWN);

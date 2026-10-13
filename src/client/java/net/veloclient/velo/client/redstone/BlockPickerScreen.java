@@ -26,11 +26,20 @@ public final class BlockPickerScreen extends VeloWindow {
 	private TextFieldWidget search;
 	private String query = "";
 	private double scroll;
+	/** Go back to the window that opened the picker after a pick, instead of straight to the game. */
+	private boolean backOnPick;
 
 	public BlockPickerScreen(String title, boolean allowAuto, Consumer<String> onPick) {
 		super(Text.literal(title), 360, 300);
 		this.onPick = onPick;
 		this.allowAuto = allowAuto;
+	}
+
+	/** After a pick, return to {@code parent} (e.g. the Replace window) rather than to the game. */
+	public BlockPickerScreen backTo(net.minecraft.client.gui.screen.Screen parent) {
+		returnTo(parent);
+		backOnPick = true;
+		return this;
 	}
 
 	private static List<String> ids() {
@@ -105,7 +114,11 @@ public final class BlockPickerScreen extends VeloWindow {
 			if (clipBottom > clipTop) {
 				hits.add(new VeloUi.Hit(cx, clipTop, cell - 2, clipBottom - clipTop, () -> {
 					onPick.accept(id);
-					closeToGame();
+					if (backOnPick) {
+						requestClose();
+					} else {
+						closeToGame();
+					}
 				}));
 			}
 		}
