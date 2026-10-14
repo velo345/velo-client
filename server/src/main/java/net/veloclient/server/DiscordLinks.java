@@ -58,6 +58,10 @@ final class DiscordLinks {
 		}
 	}
 
+	synchronized List<Link> all() {
+		return new ArrayList<>(links.values());
+	}
+
 	synchronized Link byUuid(String uuid) {
 		return links.values().stream().filter(l -> l.uuid().equals(uuid)).findFirst().orElse(null);
 	}

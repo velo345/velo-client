@@ -41,6 +41,31 @@ final class ServerApi {
 		return new Linked(answer.get("uuid").getAsString(), answer.get("username").getAsString());
 	}
 
+	/** A linked Discord account: whether its Minecraft account has an active Velo+ right now. */
+	record LinkInfo(String discordId, String uuid, String username, boolean plus) {
+	}
+
+	java.util.List<LinkInfo> links() throws ApiException {
+		try {
+			HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + "/v1/admin/discord/links")).timeout(Duration.ofSeconds(15))
+					.header("X-Velo-Admin-Token", adminToken).GET().build();
+			HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+			if (response.statusCode() / 100 != 2) {
+				throw new ApiException("The Velo server answered HTTP " + response.statusCode());
+			}
+			java.util.List<LinkInfo> out = new java.util.ArrayList<>();
+			for (var element : JsonParser.parseString(response.body()).getAsJsonObject().getAsJsonArray("links")) {
+				JsonObject o = element.getAsJsonObject();
+				out.add(new LinkInfo(o.get("discordId").getAsString(), o.get("uuid").getAsString(), o.get("username").getAsString(), o.get("plus").getAsBoolean()));
+			}
+			return out;
+		} catch (ApiException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new ApiException("Couldn't reach the Velo server");
+		}
+	}
+
 	boolean unlink(String discordId) throws ApiException {
 		JsonObject body = new JsonObject();
 		body.addProperty("discordId", discordId);

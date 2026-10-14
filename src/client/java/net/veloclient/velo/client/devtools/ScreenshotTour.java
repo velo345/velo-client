@@ -343,6 +343,12 @@ public final class ScreenshotTour {
 				}
 				yield steps;
 			}
+			case "plus" -> List.of(
+					new Object[] {0, (Runnable) () -> {
+						net.veloclient.velo.client.gui.store.StoreScreen.showPlus();
+						client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null));
+					}},
+					new Object[] {40, (Runnable) () -> shot(client, "store-plus")});
 			case "pause" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))},
 					new Object[] {30, (Runnable) () -> shot(client, "pause")});

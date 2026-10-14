@@ -129,37 +129,9 @@ public final class GameJars {
 		}
 	}
 
-	/**
-	 * Keeps an installed "Velo Client Addons" jar on the current build: if the profile has one
-	 * (enabled or {@code .jar.disabled}), it's replaced with the current addons jar, keeping its
-	 * enabled/disabled state. Profiles without addons are left alone - addons stay opt-in.
-	 */
+	/** The Velo Client Addons are Velo+ only and come from the server - see {@link PlusAddons}. */
 	private static void installAddons(Path modsDir, GameVersion version) {
-		try (Stream<Path> existing = Files.list(modsDir)) {
-			List<Path> installed = existing.filter(GameJars::isAddonsJar).toList();
-			if (installed.isEmpty()) {
-				return;
-			}
-			byte[] current = currentBytes(version.id() + "-addons");
-			if (current == null) {
-				return;
-			}
-			boolean disabled = installed.stream().allMatch(p -> p.getFileName().toString().endsWith(".disabled"));
-			Path dest = modsDir.resolve("velo-addons-" + version.id() + ".jar" + (disabled ? ".disabled" : ""));
-			if (installed.size() == 1 && installed.get(0).equals(dest) && Arrays.equals(current, Files.readAllBytes(dest))) {
-				return;
-			}
-			for (Path file : installed) {
-				try {
-					Files.delete(file);
-				} catch (IOException e) {
-					LauncherLog.warn("Couldn't remove old addons jar " + file.getFileName(), e);
-				}
-			}
-			Files.write(dest, current, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-		} catch (IOException e) {
-			LauncherLog.warn("Couldn't update the Velo Client Addons jar in " + modsDir, e);
-		}
+		PlusAddons.sync(modsDir, version);
 	}
 
 	private static boolean isAddonsJar(Path path) {

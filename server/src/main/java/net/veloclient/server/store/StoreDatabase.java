@@ -50,6 +50,22 @@ public final class StoreDatabase implements AutoCloseable {
 						username TEXT,
 						balance INTEGER NOT NULL DEFAULT 0,
 						updated_at INTEGER NOT NULL)""");
+			// Velo+ subscriptions: when each member's membership ends, and the payments that extended it
+			// (so a refund can take exactly those days back and a renewal can be matched to its member).
+			st.execute("""
+					CREATE TABLE IF NOT EXISTS plus (
+						uuid TEXT PRIMARY KEY,
+						until INTEGER NOT NULL,
+						source TEXT,
+						last_coins INTEGER NOT NULL DEFAULT 0,
+						started INTEGER NOT NULL)""");
+			st.execute("""
+					CREATE TABLE IF NOT EXISTS plus_payments (
+						txn TEXT PRIMARY KEY,
+						uuid TEXT NOT NULL,
+						days INTEGER NOT NULL,
+						reference TEXT,
+						created_at INTEGER NOT NULL)""");
 			st.execute("""
 					CREATE TABLE IF NOT EXISTS ledger (
 						id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -129,6 +145,140 @@ public final class StoreDatabase implements AutoCloseable {
 			ps.setString(1, uuid);
 			ps.setString(2, username);
 			ps.setLong(3, System.currentTimeMillis());
+			ps.executeUpdate();
+		}
+	}
+
+	// ---- Velo+ ----
+
+	public record PlusRow(String uuid, long until, String source, long lastCoins, long started) {
+	}
+
+	public synchronized long plusUntil(String uuid) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("SELECT until FROM plus WHERE uuid = ?")) {
+			ps.setString(1, uuid);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getLong(1) : 0;
+			}
+		}
+	}
+
+	/**
+	 * Adds {@code days} to the membership (from today, or from its current end if that's later) and returns the new end.
+	 * {@code txn} (the payment) is remembered: a payment counts once, and its days can be taken back on a refund.
+	 */
+	public synchronized long extendPlus(String uuid, int days, String source, String txn, String reference) throws SQLException {
+		return inTransaction(() -> {
+			long now = System.currentTimeMillis();
+			if (txn != null) {
+				try (PreparedStatement ps = connection.prepareStatement("SELECT 1 FROM plus_payments WHERE txn = ?")) {
+					ps.setString(1, txn);
+					try (ResultSet rs = ps.executeQuery()) {
+						if (rs.next()) {
+							return plusUntil(uuid);
+						}
+					}
+				}
+				try (PreparedStatement ps = connection.prepareStatement(
+						"INSERT INTO plus_payments(txn, uuid, days, reference, created_at) VALUES(?, ?, ?, ?, ?)")) {
+					ps.setString(1, txn);
+					ps.setString(2, uuid);
+					ps.setInt(3, days);
+					ps.setString(4, reference);
+					ps.setLong(5, now);
+					ps.executeUpdate();
+				}
+			}
+			long current = plusUntil(uuid);
+			long until = Math.max(now, current) + days * 86_400_000L;
+			try (PreparedStatement ps = connection.prepareStatement(
+					"INSERT INTO plus(uuid, until, source, last_coins, started) VALUES(?, ?, ?, 0, ?) "
+							+ "ON CONFLICT(uuid) DO UPDATE SET until = excluded.until, source = excluded.source")) {
+				ps.setString(1, uuid);
+				ps.setLong(2, until);
+				ps.setString(3, source);
+				ps.setLong(4, now);
+				ps.executeUpdate();
+			}
+			return until;
+		});
+	}
+
+	/** Ends the membership now (owner revoke). */
+	public synchronized void endPlus(String uuid) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("UPDATE plus SET until = ? WHERE uuid = ?")) {
+			ps.setLong(1, System.currentTimeMillis());
+			ps.setString(2, uuid);
+			ps.executeUpdate();
+		}
+	}
+
+	/** A refunded / charged-back payment: takes its days back. Returns the member's uuid, or null if it wasn't a Velo+ payment. */
+	public synchronized String reversePlusPayment(String txn) throws SQLException {
+		return inTransaction(() -> {
+			String uuid;
+			int days;
+			try (PreparedStatement ps = connection.prepareStatement("SELECT uuid, days FROM plus_payments WHERE txn = ?")) {
+				ps.setString(1, txn);
+				try (ResultSet rs = ps.executeQuery()) {
+					if (!rs.next()) {
+						return null;
+					}
+					uuid = rs.getString(1);
+					days = rs.getInt(2);
+				}
+			}
+			try (PreparedStatement ps = connection.prepareStatement("DELETE FROM plus_payments WHERE txn = ?")) {
+				ps.setString(1, txn);
+				ps.executeUpdate();
+			}
+			long until = Math.max(System.currentTimeMillis(), plusUntil(uuid) - days * 86_400_000L);
+			try (PreparedStatement ps = connection.prepareStatement("UPDATE plus SET until = ? WHERE uuid = ?")) {
+				ps.setLong(1, until);
+				ps.setString(2, uuid);
+				ps.executeUpdate();
+			}
+			return uuid;
+		});
+	}
+
+	/** The member a payment (or its recurring reference) belongs to, or null. */
+	public synchronized String plusMemberOfPayment(String txnOrReference) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("SELECT uuid FROM plus_payments WHERE txn = ? OR reference = ? LIMIT 1")) {
+			ps.setString(1, txnOrReference);
+			ps.setString(2, txnOrReference);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getString(1) : null;
+			}
+		}
+	}
+
+	public synchronized PlusRow plusRow(String uuid) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("SELECT uuid, until, source, last_coins, started FROM plus WHERE uuid = ?")) {
+			ps.setString(1, uuid);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? new PlusRow(rs.getString(1), rs.getLong(2), rs.getString(3), rs.getLong(4), rs.getLong(5)) : null;
+			}
+		}
+	}
+
+	public synchronized List<PlusRow> activePlus(long now) throws SQLException {
+		List<PlusRow> out = new ArrayList<>();
+		try (PreparedStatement ps = connection.prepareStatement("SELECT uuid, until, source, last_coins, started FROM plus WHERE until > ?")) {
+			ps.setLong(1, now);
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new PlusRow(rs.getString(1), rs.getLong(2), rs.getString(3), rs.getLong(4), rs.getLong(5)));
+				}
+			}
+		}
+		return out;
+	}
+
+	public synchronized void markPlusCoins(String uuid, long at) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("UPDATE plus SET last_coins = ? WHERE uuid = ?")) {
+			ps.setLong(1, at);
+			ps.setString(2, uuid);
 			ps.executeUpdate();
 		}
 	}

@@ -94,6 +94,10 @@ final class BotConfig {
 	String supportRoleId;
 	/** Given to members who linked their Minecraft account (optional). */
 	String linkedRoleId;
+	/** The VIP role of Velo+ members - kept in step automatically (given, and taken away when Velo+ ends). */
+	String vipRoleId;
+	/** Also take the VIP role from anyone holding it without an active Velo+ (false: only from linked members whose Velo+ ended). */
+	boolean vipStrict = true;
 	int ticketCounter;
 	int maxOpenTicketsPerUser = 2;
 	String ticketPanelTitle = "Need help?";
@@ -139,6 +143,8 @@ final class BotConfig {
 		this.ticketLogChannelId = fresh.ticketLogChannelId;
 		this.supportRoleId = fresh.supportRoleId;
 		this.linkedRoleId = fresh.linkedRoleId;
+		this.vipRoleId = fresh.vipRoleId;
+		this.vipStrict = fresh.vipStrict;
 		this.maxOpenTicketsPerUser = fresh.maxOpenTicketsPerUser;
 		this.ticketPanelTitle = fresh.ticketPanelTitle;
 		this.ticketPanelText = fresh.ticketPanelText;

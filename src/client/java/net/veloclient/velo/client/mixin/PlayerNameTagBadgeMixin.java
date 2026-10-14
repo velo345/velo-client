@@ -41,7 +41,15 @@ public abstract class PlayerNameTagBadgeMixin {
 		if (original == null) {
 			return;
 		}
-		cir.setReturnValue(VeloBadge.prefixWithBadge(original));
+		cir.setReturnValue(VeloBadge.prefixWithBadge(original, velo$isPlus(entity)));
+	}
+
+	private static boolean velo$isPlus(Entity entity) {
+		if (entity == MinecraftClient.getInstance().player) {
+			return net.veloclient.velo.client.network.StoreClient.plus();
+		}
+		return entity instanceof net.minecraft.entity.player.PlayerEntity player
+				&& net.veloclient.velo.client.network.VeloUserRegistry.isPlus(player.getUuid(), player.getGameProfile().name());
 	}
 
 	private static boolean velo$shouldBadge(Entity entity) {
@@ -67,7 +75,15 @@ public abstract class PlayerNameTagBadgeMixin {
 		if (original == null) {
 			return;
 		}
-		cir.setReturnValue(VeloBadge.prefixWithBadge(original));
+		cir.setReturnValue(VeloBadge.prefixWithBadge(original, velo$isPlus(entity)));
+	}
+
+	private static boolean velo$isPlus(Entity entity) {
+		if (entity == Minecraft.getInstance().player) {
+			return net.veloclient.velo.client.network.StoreClient.plus();
+		}
+		return entity instanceof net.minecraft.world.entity.player.Player player
+				&& net.veloclient.velo.client.network.VeloUserRegistry.isPlus(player.getUUID(), player.getGameProfile().name());
 	}
 
 	private static boolean velo$shouldBadge(Entity entity) {

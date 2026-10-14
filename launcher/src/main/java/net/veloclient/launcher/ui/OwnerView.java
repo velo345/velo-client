@@ -329,8 +329,36 @@ public final class OwnerView {
 		take.getStyleClass().add("danger-ghost-button");
 		take.setOnAction(e -> each(targets, target -> StoreApi.adminItem(target, item.getValue(), false), output));
 
+		// Velo+ for a number of days (a trial, a giveaway, a thank-you) - or end it. Everything follows from the membership:
+		// the badge, the monthly coins, the Addons, and the Discord role once they've linked.
+		ComboBox<String> days = new ComboBox<>();
+		days.getItems().addAll("1 day", "3 days", "7 days", "14 days", "30 days", "90 days", "365 days");
+		days.setValue("30 days");
+		days.setEditable(true);
+		days.setPrefWidth(120);
+		Button givePlus = new Button("Give Velo+");
+		givePlus.getStyleClass().add("primary-button");
+		givePlus.setOnAction(e -> {
+			int count;
+			try {
+				count = Integer.parseInt(days.getEditor().getText().replaceAll("[^0-9]", ""));
+			} catch (NumberFormatException ex) {
+				output.setText("Enter the number of days, e.g. 7");
+				return;
+			}
+			if (count <= 0) {
+				output.setText("Days must be more than 0 (use End Velo+ to remove it)");
+				return;
+			}
+			each(targets, target -> StoreApi.adminPlus(target, count), output);
+		});
+		Button endPlus = new Button("End Velo+");
+		endPlus.getStyleClass().add("danger-ghost-button");
+		endPlus.setOnAction(e -> each(targets, target -> StoreApi.adminPlus(target, 0), output));
+		Label plusHint = hint("Velo+ days add to what they have. Coins, badge and Addons switch on within a minute; the Discord role follows once they've linked (the bot checks every minute).");
+
 		VBox card = new VBox(10, title("Players"), new HBox(8, targets, lookup), new HBox(8, amount, note, coins),
-				new HBox(8, item, give, take), output);
+				new HBox(8, item, give, take), new HBox(8, hint("Velo+"), days, givePlus, endPlus), plusHint, output);
 		card.getStyleClass().add("settings-card");
 		return card;
 	}
@@ -377,6 +405,9 @@ public final class OwnerView {
 	private static String describe(JsonObject view) {
 		StringBuilder text = new StringBuilder(view.get("username").getAsString() + ": " + String.format(Locale.ROOT, "%,d", view.get("balance").getAsInt())
 				+ " coins");
+		long plusUntil = view.has("plusUntil") ? view.get("plusUntil").getAsLong() : 0;
+		text.append("\n  Velo+: ").append(plusUntil > System.currentTimeMillis()
+				? "until " + java.time.LocalDate.ofInstant(Instant.ofEpochMilli(plusUntil), java.time.ZoneId.systemDefault()) : "no");
 		JsonArray owned = view.getAsJsonArray("owned");
 		text.append("\n  owns: ").append(owned.isEmpty() ? "nothing" : owned.toString().replaceAll("[\\[\\]\"]", "").replace(",", ", "));
 		JsonArray ledger = view.getAsJsonArray("ledger");

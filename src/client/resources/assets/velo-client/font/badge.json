@@ -5,7 +5,14 @@
 			"file": "velo-client:font/badge_glyph.png",
 			"ascent": 7,
 			"height": 8,
-			"chars": [""]
+			"chars": ["\ue050"]
+		},
+		{
+			"type": "bitmap",
+			"file": "velo-client:font/badge_plus_glyph.png",
+			"ascent": 7,
+			"height": 8,
+			"chars": ["\ue051"]
 		}
 	]
 }

@@ -122,6 +122,26 @@ final class DiscordAnnouncer {
 		post(donationsWebhook, embed);
 	}
 
+	/** Someone started (or renewed) Velo+. */
+	void plus(String uuid, String username) {
+		if (!donationsEnabled()) {
+			return;
+		}
+		String player = username != null ? username : "A Velo player";
+		JsonObject embed = new JsonObject();
+		embed.addProperty("title", "⭐  " + player + " is now Velo+!");
+		embed.addProperty("description", "**" + player + "** subscribed to **Velo+** - VIP role, monthly Velo Coins and the Velo Client Addons. Thank you! ❤");
+		embed.addProperty("color", RED);
+		embed.addProperty("timestamp", Instant.now().toString());
+		JsonObject thumb = new JsonObject();
+		thumb.addProperty("url", "https://mc-heads.net/body/" + uuid + "/200");
+		embed.add("thumbnail", thumb);
+		JsonObject footer = new JsonObject();
+		footer.addProperty("text", "Velo Client");
+		embed.add("footer", footer);
+		post(donationsWebhook, embed);
+	}
+
 	/** A bug or crash report arrived. */
 	void report(ReportService.Summary summary, ReportService.Report report) {
 		if (!reportsEnabled()) {

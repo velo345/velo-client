@@ -79,12 +79,6 @@ tasks.register("bundleGameJars") {
 			// the one just built (newest) is the right one.
 			def newest = { File[] files -> files.max { it.lastModified() } }
 			new File(outDir, "${v}.jar").bytes = newest(matches).bytes
-			// The optional "Velo Client Addons" jar - bundled so GameJars can keep an installed
-			// copy on exactly the same build as velo-client (it's version-pinned to it).
-			def addons = libsDir.listFiles({ f -> f.name.startsWith("velo-addons-") && f.name.endsWith(".jar") && !f.name.contains("-sources") } as FileFilter)
-			if (addons != null && addons.length > 0) {
-				new File(outDir, "${v}-addons.jar").bytes = newest(addons).bytes
-			}
 		}
 		// When these jars were bundled - the updater only treats a same-version release as a
 		// hotfix if its jars were uploaded after this (jar bytes aren't reproducible across builds).

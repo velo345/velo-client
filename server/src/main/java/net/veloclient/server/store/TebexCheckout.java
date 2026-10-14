@@ -103,6 +103,62 @@ public final class TebexCheckout {
 	}
 
 	/**
+	 * Creates a basket for the Velo+ subscription (a monthly recurring package) and returns where to send the
+	 * player. The player's uuid rides along in {@code custom} ({@code velo_plus}) and comes back in the webhook.
+	 */
+	public Basket createSubscriptionCheckout(String uuid, String username, String name, double price, String returnUrl, String completeUrl)
+			throws Exception {
+		JsonObject custom = new JsonObject();
+		custom.addProperty("velo_plus", true);
+		custom.addProperty("velo_uuid", uuid);
+		custom.addProperty("velo_username", username);
+		JsonObject pack = new JsonObject();
+		pack.addProperty("name", name);
+		pack.addProperty("price", price);
+		pack.addProperty("type", "subscription");
+		pack.addProperty("expiry_length", 1);
+		pack.addProperty("expiry_period", "month");
+		pack.add("custom", custom);
+		JsonObject item = new JsonObject();
+		item.add("package", pack);
+		item.addProperty("qty", 1);
+		JsonArray items = new JsonArray();
+		items.add(item);
+		JsonObject basket = new JsonObject();
+		basket.addProperty("return_url", returnUrl);
+		basket.addProperty("complete_url", completeUrl);
+		basket.add("custom", custom.deepCopy());
+		JsonObject body = new JsonObject();
+		body.add("basket", basket);
+		body.add("items", items);
+		return post(body);
+	}
+
+	private Basket post(JsonObject body) throws Exception {
+		String auth = Base64.getEncoder().encodeToString((projectId + ":" + privateKey).getBytes(StandardCharsets.UTF_8));
+		HttpRequest request = HttpRequest.newBuilder(URI.create(API + "/checkout"))
+				.header("Authorization", "Basic " + auth)
+				.header("Content-Type", "application/json")
+				.header("Accept", "application/json")
+				.timeout(Duration.ofSeconds(20))
+				.POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+				.build();
+		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+		if (response.statusCode() / 100 != 2) {
+			throw new IllegalStateException("Tebex checkout failed (HTTP " + response.statusCode() + "): " + response.body());
+		}
+		JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
+		if (json.has("data") && json.get("data").isJsonObject()) {
+			json = json.getAsJsonObject("data");
+		}
+		String ident = json.get("ident").getAsString();
+		String checkout = json.has("links") && json.getAsJsonObject("links").has("checkout")
+				? json.getAsJsonObject("links").get("checkout").getAsString()
+				: "https://pay.tebex.io/" + ident;
+		return new Basket(ident, checkout);
+	}
+
+	/**
 	 * Tebex signs each webhook as {@code HMAC-SHA256(key = secret, data = hex(SHA256(raw body)))},
 	 * hex-encoded, in the {@code X-Signature} header. Compared in constant time.
 	 */

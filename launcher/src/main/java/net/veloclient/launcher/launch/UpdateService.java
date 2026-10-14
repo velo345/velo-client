@@ -140,7 +140,8 @@ public final class UpdateService {
 			long bundledAt = GameJars.bundledAt();
 			java.util.Set<String> downloaded = downloadedAssetIds();
 			for (GameVersion game : GameVersion.values()) {
-				for (boolean addons : new boolean[] {false, true}) {
+				// The Addons aren't released on GitHub any more: they're for Velo+ members, from the server.
+				for (boolean addons : new boolean[] {false}) {
 					String name = (addons ? "velo-addons-" : "velo-client-") + version + "+" + game.id() + ".jar";
 					String key = game.id() + (addons ? "-addons" : "");
 					for (Asset asset : assets) {

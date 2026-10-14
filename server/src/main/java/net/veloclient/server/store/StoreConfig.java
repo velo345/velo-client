@@ -94,6 +94,15 @@ public final class StoreConfig {
 
 	public Rewards rewards = new Rewards();
 
+	/** The Velo+ subscription: what it costs (shown), how long a payment lasts, and the monthly coins it includes. */
+	public static final class Plus {
+		public double price = 4.99;
+		public int periodDays = 30;
+		public int monthlyCoins = 1200;
+	}
+
+	public Plus plus = new Plus();
+
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	public static StoreConfig load(Path dataDir) throws IOException {
@@ -110,6 +119,9 @@ public final class StoreConfig {
 		}
 		if (config.rewards == null) {
 			config.rewards = new Rewards();
+		}
+		if (config.plus == null) {
+			config.plus = new Plus();
 		}
 		List<Item> merged = new java.util.ArrayList<>(config.items);
 		boolean added = false;

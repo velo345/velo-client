@@ -38,7 +38,7 @@ public abstract class ChatHudMixin {
 		if (net.veloclient.velo.client.modules.qol.ChatTweaksModule.reentry || client.player == null || !VeloBadge.isKnownVeloName(message.getString(), client.player.getGameProfile().name())) {
 			return message;
 		}
-		return VeloBadge.prefixWithBadge(message);
+		return VeloBadge.prefixWithBadge(message, VeloBadge.isPlus(message.getString(), client.player.getGameProfile().name()));
 	}
 }
 //?} else {
@@ -52,7 +52,7 @@ public abstract class ChatHudMixin {
 		if (client.player == null || !VeloBadge.isKnownVeloName(message.getString(), client.player.getGameProfile().name())) {
 			return message;
 		}
-		return VeloBadge.prefixWithBadge(message);
+		return VeloBadge.prefixWithBadge(message, VeloBadge.isPlus(message.getString(), client.player.getGameProfile().name()));
 	}
 }
 *///?}

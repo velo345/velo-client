@@ -15,9 +15,10 @@
 # Fabric Loader refuse to load whichever one doesn't match the game version
 # currently selected in the launcher.
 #
-# The optional "Velo Client Addons" jar (experimental modules, src/addon) is
+# The "Velo Client Addons" jar (Velo+ modules; source in the private submodule src/addon) is
 # deployed alongside it too so it can be tested; pass --no-addons to deploy
-# velo-client alone (i.e. what a player who didn't install the add-on gets).
+# velo-client alone (i.e. what a player without Velo+ gets). The addons are never attached to
+# the public GitHub releases - see tools/release/publish_addons.py.
 set -euo pipefail
 
 DEPLOY_ADDONS=1
@@ -41,8 +42,13 @@ echo "Deployed $(basename "$JAR") -> $DEST"
 
 rm -f /home/daviseib/.minecraft/mods/velo-addons-*.jar
 if [[ "$DEPLOY_ADDONS" == 1 ]]; then
-	ADDONS_JAR=$(ls -t versions/26.2/build/libs/velo-addons-*.jar | grep -v sources | head -1)
-	cp "$ADDONS_JAR" "/home/daviseib/.minecraft/mods/$(basename "$ADDONS_JAR")"
-	echo "Deployed $(basename "$ADDONS_JAR") (optional add-on) -> /home/daviseib/.minecraft/mods/"
+	# The Addons (Velo+) are built from the private submodule src/addon - skipped when it isn't checked out.
+	ADDONS_JAR=$(ls -t versions/26.2/build/libs/velo-addons-*.jar 2>/dev/null | grep -v sources | head -1 || true)
+	if [[ -n "$ADDONS_JAR" ]]; then
+		cp "$ADDONS_JAR" "/home/daviseib/.minecraft/mods/$(basename "$ADDONS_JAR")"
+		echo "Deployed $(basename "$ADDONS_JAR") (Velo+ add-on) -> /home/daviseib/.minecraft/mods/"
+	else
+		echo "No Velo Client Addons built (src/addon submodule not checked out) - skipped"
+	fi
 fi
 echo "Also built (not deployed): versions/1.21.11/build/libs/, versions/26.1/build/libs/, versions/26.3/build/libs/"

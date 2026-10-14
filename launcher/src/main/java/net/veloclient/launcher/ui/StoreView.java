@@ -69,7 +69,7 @@ public final class StoreView {
 	private StoreView() {
 	}
 
-	private enum Page { FEATURED, WINGS, CAPES, AURAS }
+	private enum Page { FEATURED, WINGS, CAPES, AURAS, PLUS }
 
 	/** Which tab was open last (kept while the launcher runs). */
 	private static Page page = Page.FEATURED;
@@ -110,7 +110,7 @@ public final class StoreView {
 		headerRow.setAlignment(Pos.CENTER_LEFT);
 
 		HBox tabs = new HBox(6);
-		String[] labels = {"Featured", "Wings", "Capes", "Auras"};
+		String[] labels = {"Featured", "Wings", "Capes", "Auras", "Velo+"};
 		for (Page p : Page.values()) {
 			Button tab = new Button(labels[p.ordinal()]);
 			tab.getStyleClass().add("segmented-button");
@@ -165,6 +165,7 @@ public final class StoreView {
 					root.getChildren().addAll(title, wingGrid(host, loose));
 				}
 			}
+			case PLUS -> root.getChildren().addAll(plusPage(), discordBanner());
 			case AURAS -> {
 				// For sale, plus any you own that aren't (given to you while testing, or a drop that ended).
 				var auras = net.veloclient.launcher.data.AuraCatalog.all().stream()
@@ -215,6 +216,122 @@ public final class StoreView {
 		}
 		UiMotion.stagger(grid, 24);
 		return grid;
+	}
+
+	/** Opens on the Velo+ tab next time (the launcher tour). */
+	public static void showPlusTab() {
+		page = Page.PLUS;
+	}
+
+	/**
+	 * Velo+: what it includes and what it costs, your membership, and the subscribe button (opens the payment
+	 * page). The price, the monthly coins and your status come from the server, off the UI thread.
+	 */
+	private static Node plusPage() {
+		Label tag = new Label("SUBSCRIPTION");
+		tag.getStyleClass().add("featured-tag");
+		Label title = new Label("Velo+");
+		title.getStyleClass().add("featured-title");
+		title.setStyle("-fx-font-size: 44px;");
+		ImageView badge = new ImageView(new Image(StoreView.class.getResourceAsStream("/net/veloclient/launcher/images/velo-plus-badge.png"), 96, 64, true, true));
+		HBox heading = new HBox(14, title, badge);
+		heading.setAlignment(Pos.CENTER_LEFT);
+		Label price = new Label("...");
+		price.getStyleClass().add("page-subtitle");
+		Label status = new Label();
+		status.setStyle("-fx-font-weight: 700; -fx-text-fill: #8fe3a8;");
+
+		VBox perks = new VBox(10);
+		String[][] list = {
+				{"+", "The Velo+ badge", "Your Velo logo with a red plus behind it - next to your name for every Velo player: in chat, the tab list and above your head."},
+				{"★", "VIP role in the Discord", "The VIP role and its channels - given automatically once you've linked your Discord, and taken away again when Velo+ ends."},
+				{"V", "Velo Coins every month", "...  spend them on wings, capes and auras in the Store."},
+				{"◆", "The Velo Client Addons", "Cinematic Camera, Fly Boat, Auto Eat, Storage Finder, Entity Finder, Auto Tunnel Miner, Ender Chest Farmer, Auto Excavator and Sound Radar - "
+						+ "for Velo+ only. The launcher installs and updates them for you."},
+				{"♥", "Supporting Velo Client", "Velo Client is built by a small team - Velo+ keeps it going."}};
+		Label[] descriptions = new Label[list.length];
+		for (int i = 0; i < list.length; i++) {
+			// A red disc with a glyph (the launcher's font has no colour emoji).
+			Label glyph = new Label(list[i][0]);
+			glyph.setStyle("-fx-text-fill: white; -fx-font-weight: 800; -fx-font-size: 15px;");
+			StackPane icon = new StackPane(glyph);
+			icon.setMinSize(32, 32);
+			icon.setMaxSize(32, 32);
+			icon.setStyle("-fx-background-color: #ff2d3c40; -fx-background-radius: 16; -fx-border-color: #ff2d3c; -fx-border-radius: 16;");
+			Label name = new Label(list[i][1]);
+			name.getStyleClass().add("settings-card-title");
+			Label text = new Label(list[i][2]);
+			text.getStyleClass().add("page-subtitle");
+			text.setWrapText(true);
+			descriptions[i] = text;
+			VBox words = new VBox(2, name, text);
+			HBox row = new HBox(12, icon, words);
+			row.setAlignment(Pos.TOP_LEFT);
+			HBox.setHgrow(words, Priority.ALWAYS);
+			perks.getChildren().add(row);
+		}
+
+		Button subscribe = new Button("Subscribe");
+		subscribe.getStyleClass().add("primary-button");
+		subscribe.setMinHeight(46);
+		subscribe.setPrefWidth(300);
+		subscribe.setDisable(true);
+		Label message = new Label();
+		message.getStyleClass().add("purchase-status");
+		message.setWrapText(true);
+		VBox info = new VBox(12, tag, heading, price, status, perks, subscribe, message);
+		info.getStyleClass().add("featured-banner");
+		info.setPadding(new javafx.geometry.Insets(26, 30, 26, 30));
+		info.setStyle("-fx-background-color: radial-gradient(center 85% 20%, radius 70%, #ff2d3c55 0%, #00000000 100%), linear-gradient(to right, #1b1416, #121014);"
+				+ " -fx-border-color: #ff2d3c88; -fx-border-radius: 18; -fx-background-radius: 18;");
+		java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+			try {
+				return net.veloclient.launcher.social.StoreApi.plusStatus();
+			} catch (net.veloclient.launcher.social.StoreApi.StoreError e) {
+				return null;
+			}
+		}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> javafx.application.Platform.runLater(() -> {
+			if (result == null) {
+				price.setText("Sign in to see Velo+.");
+				return;
+			}
+			double amount = result.get("price").getAsDouble();
+			String currency = result.get("currency").getAsString();
+			int coins = result.get("monthlyCoins").getAsInt();
+			price.setText(String.format(java.util.Locale.ROOT, "%.2f %s per month  ·  cancel any time", amount, currency));
+			descriptions[2].setText(String.format(java.util.Locale.ROOT, "%,d Velo Coins land in your wallet every month - spend them on wings, capes and auras in the Store.", coins));
+			if (result.get("plus").getAsBoolean()) {
+				status.setText("✓ You're Velo+  ·  active until " + java.time.LocalDate.ofInstant(java.time.Instant.ofEpochMilli(result.get("until").getAsLong()),
+						java.time.ZoneId.systemDefault()));
+				subscribe.setText("Extend / manage");
+			} else {
+				subscribe.setText(String.format(java.util.Locale.ROOT, "Subscribe  ·  %.2f %s / month", amount, currency));
+			}
+			subscribe.setDisable(!result.get("checkoutEnabled").getAsBoolean());
+			if (!result.get("checkoutEnabled").getAsBoolean()) {
+				message.setText("Subscriptions aren't open on this server yet.");
+			}
+		}));
+		subscribe.setOnAction(e -> {
+			subscribe.setDisable(true);
+			message.setText("Opening the payment page...");
+			java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+				try {
+					return (Object) net.veloclient.launcher.social.StoreApi.plusCheckout();
+				} catch (net.veloclient.launcher.social.StoreApi.StoreError error) {
+					return error.getMessage();
+				}
+			}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> javafx.application.Platform.runLater(() -> {
+				subscribe.setDisable(false);
+				if (result instanceof com.google.gson.JsonObject json) {
+					CoinsView.openUrl(json.get("checkoutUrl").getAsString());
+					message.setText("Finish the payment in your browser - Velo+ switches on within a minute.");
+				} else {
+					message.setText(String.valueOf(result));
+				}
+			}));
+		});
+		return info;
 	}
 
 	/**

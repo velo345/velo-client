@@ -88,6 +88,11 @@ public final class VeloServerClient {
 	}
 
 	/** The live session token, or null until authenticated - shared with {@link SocialClient}. */
+	/** The (dashless) UUID the game is signed in as, or null for offline / dev sessions. */
+	public static String sessionUuid() {
+		return GameSessionReader.read().map(ActiveAccountReader.Account::uuid).orElse(null);
+	}
+
 	public static String sessionToken() {
 		return sessionToken.get();
 	}
@@ -379,7 +384,8 @@ public final class VeloServerClient {
 				String wingsId = user.has("wingsId") && !user.get("wingsId").isJsonNull() ? user.get("wingsId").getAsString() : null;
 				String auraId = user.has("auraId") && !user.get("auraId").isJsonNull() ? user.get("auraId").getAsString() : null;
 				if (uuid != null && username != null) {
-					entries.put(uuid, new VeloUserRegistry.Entry(username, capeId, wingsId, auraId));
+					boolean plus = user.has("plus") && !user.get("plus").isJsonNull() && user.get("plus").getAsBoolean();
+					entries.put(uuid, new VeloUserRegistry.Entry(username, capeId, wingsId, auraId, plus));
 				}
 			}
 			VeloUserRegistry.replaceAll(entries);

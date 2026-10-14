@@ -7,6 +7,7 @@ import net.minecraft.text.Text;
 import net.veloclient.velo.client.cosmetics.wings.WingsManager;
 import net.veloclient.velo.client.cosmetics.wings.WingsPreview;
 import net.veloclient.velo.client.economy.CurrencyManager;
+import net.veloclient.velo.client.gui.VeloBadge;
 import net.veloclient.velo.client.gui.title.TitleScreenTheme;
 import net.veloclient.velo.client.gui.widget.EntityPreviewWidget;
 import net.veloclient.velo.client.gui.widget.VeloAnim;
@@ -33,7 +34,7 @@ import java.util.List;
  */
 public final class StoreScreen extends VeloWindow {
 
-	private enum Page { FEATURED, WINGS, CAPES, AURAS }
+	private enum Page { FEATURED, WINGS, CAPES, AURAS, PLUS }
 
 	private static final int SIDEBAR_WIDTH = 108;
 	private static final int HEADER_HEIGHT = 20;
@@ -43,6 +44,11 @@ public final class StoreScreen extends VeloWindow {
 	private static final long HERO_SECONDS = 4;
 
 	private static Page page = Page.FEATURED;
+
+	/** Opens on the Velo+ page next time (the screenshot tour). */
+	public static void showPlus() {
+		page = Page.PLUS;
+	}
 
 	/** Opens on the Auras page next time (the screenshot tour). */
 	public static void showAuras() {
@@ -92,7 +98,7 @@ public final class StoreScreen extends VeloWindow {
 		int x = contentX();
 		int y = contentY() + HEADER_HEIGHT + 10;
 		Page[] pages = Page.values();
-		String[] labels = {"Featured", "Wings", "Capes", "Auras"};
+		String[] labels = {"Featured", "Wings", "Capes", "Auras", "Velo+"};
 		for (int i = 0; i < pages.length; i++) {
 			Page p = pages[i];
 			VeloButton nav = new VeloButton(x, y + i * 24, SIDEBAR_WIDTH - 10, 20, Text.literal(labels[i]), b -> {
@@ -126,6 +132,7 @@ public final class StoreScreen extends VeloWindow {
 			case WINGS -> layoutWings(cx, y, cw, WingsManager.forSale());
 			case CAPES -> layoutCapes(cx, y, cw);
 			case AURAS -> layoutAuras(cx, y, cw);
+			case PLUS -> layoutPlus(cx, y, cw);
 		}
 		// Generous padding: the UI font can draw a little wider than the vanilla width measure.
 		balanceWidth = Math.round((this.textRenderer.getWidth(balanceText()) + this.textRenderer.getWidth("Get coins")) * 1.15f) + 46;
@@ -193,6 +200,70 @@ public final class StoreScreen extends VeloWindow {
 			region.addRow(card);
 		}
 		region.layoutGrid(columns, tileWidth, tileHeight, GAP);
+	}
+
+	/** What Velo+ includes - shown on its page (and in the launcher's Store). */
+	private static final String[] PLUS_PERKS = {
+			"The Velo+ badge: your logo with a red plus next to your name, for every Velo player",
+			"VIP role in the Velo Discord - automatic once you've linked it",
+			"Velo Coins every month - spend them on wings, capes and auras",
+			"The Velo Client Addons (Velo+ only, updated by the launcher): Cinematic Camera, Fly Boat, Auto Eat, Storage and Entity Finder, "
+					+ "Auto Tunnel Miner, Ender Chest Farmer, Auto Excavator, Sound Radar",
+			"Supporting the development of Velo Client"};
+
+	private VeloButton plusButton;
+
+	private void layoutPlus(int cx, int y, int cw) {
+		boolean member = StoreClient.plus();
+		int buttonW = Math.min(220, cw - 24);
+		plusButton = new VeloButton(cx + 12, contentBottom() - 30, buttonW, 22,
+				Text.literal(member ? "You're Velo+  ✔" : String.format(java.util.Locale.ROOT, "Subscribe  ·  %.2f %s / month", StoreClient.plusPrice(), StoreClient.currency())),
+				b -> {
+					if (member) {
+						return;
+					}
+					StoreClient.plusCheckout(url -> VeloUi.openUrl(url), error -> {
+						discordError = error;
+						layoutContent();
+					});
+				});
+		if (!member) {
+			plusButton.primary();
+		}
+		addDrawableChild(plusButton);
+	}
+
+	/** The panel behind the Velo+ page's widgets. */
+	private void renderPlusBackground(DrawContext context, int cx, int y, int cw) {
+		VeloDraw.fillRounded(context, cx, y, cw, contentBottom() - y, 10, 0xFF14100F);
+		VeloDraw.fillRoundedGradient(context, cx, y, cw, 90, 10, VeloUi.withAlpha(0xFFFF2D3C, 0x40), 0x0014100F);
+		VeloDraw.strokeRounded(context, cx, y, cw, contentBottom() - y, 10, VeloUi.withAlpha(0xFFFF2D3C, 0x90));
+	}
+
+	private void renderPlus(DrawContext context, int cx, int y, int cw) {
+		int top = y + 4;
+		VeloBadge.draw(context, cx + 14, top + 10, true);
+		context.drawTextWithShadow(this.textRenderer, TitleScreenTheme.tileFont("Velo+"), cx + 14 + VeloBadge.width(true) + 8, top + 9, 0xFFFFFFFF);
+		String status = StoreClient.plus() ? "Active until " + java.time.LocalDate.ofInstant(java.time.Instant.ofEpochMilli(StoreClient.plusUntil()),
+				java.time.ZoneId.systemDefault()) : "Everything below - for " + String.format(java.util.Locale.ROOT, "%.2f %s", StoreClient.plusPrice(), StoreClient.currency()) + " a month";
+		context.drawTextWithShadow(this.textRenderer, status, cx + 14, top + 28, StoreClient.plus() ? 0xFF8FE3A8 : VeloStyle.textMuted());
+		int line = top + 48;
+		for (int i = 0; i < PLUS_PERKS.length; i++) {
+			String perk = i == 2 ? "+" + String.format(java.util.Locale.ROOT, "%,d", StoreClient.plusMonthlyCoins()) + " " + PLUS_PERKS[i] : PLUS_PERKS[i];
+			if (i == 2) {
+				perk = String.format(java.util.Locale.ROOT, "%,d Velo Coins every month - spend them on wings, capes and auras", StoreClient.plusMonthlyCoins());
+			}
+			List<String> wrapped = VeloUi.wrap(perk, cw - 52);
+			VeloDraw.fillCircle(context, cx + 20f, line + 4f, 3f, 0xFFFF2D3C);
+			for (String w : wrapped) {
+				context.drawTextWithShadow(this.textRenderer, w, cx + 32, line, VeloStyle.text());
+				line += 11;
+			}
+			line += 3;
+		}
+		if (!discordError.isEmpty()) {
+			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(discordError, cw - 24), cx + 14, contentBottom() - 40, 0xFFFF7A7A);
+		}
 	}
 
 	private void layoutAuras(int cx, int y, int cw) {
@@ -264,10 +335,13 @@ public final class StoreScreen extends VeloWindow {
 		super.render(context, mouseX, mouseY, delta);
 		if (!discordCode.isEmpty() || !discordError.isEmpty()) {
 			String line = discordError.isEmpty() ? "/link " + discordCode : VeloUi.trim(discordError, SIDEBAR_WIDTH - 10);
-			context.drawTextWithShadow(this.textRenderer, line, x, contentBottom() - 56, discordError.isEmpty() ? 0xFF8FE3A8 : 0xFFFF7A7A);
+			context.drawTextWithShadow(this.textRenderer, line, x, contentBottom() - 80, discordError.isEmpty() ? 0xFF8FE3A8 : 0xFFFF7A7A);
 		}
 		if (page == Page.FEATURED) {
 			renderHero(context, cx, y, cw);
+		}
+		if (page == Page.PLUS) {
+			renderPlus(context, cx, y, cw);
 		}
 		if (region != null) {
 			region.renderRows(context, mouseX, mouseY, delta);
@@ -282,6 +356,7 @@ public final class StoreScreen extends VeloWindow {
 			case WINGS -> "Wings";
 			case CAPES -> "Capes";
 			case AURAS -> "Auras";
+			case PLUS -> "Velo+";
 		};
 		Text heading = TitleScreenTheme.tileFont(title);
 		context.drawTextWithShadow(this.textRenderer, heading, x, contentY() + 6, VeloStyle.text());
@@ -290,6 +365,7 @@ public final class StoreScreen extends VeloWindow {
 			case WINGS -> WingsManager.forSale().size() + " pairs of animated 3D wings  ·  " + WingsManager.collections().size() + " collections";
 			case CAPES -> "animated capes  ·  preview on your own player";
 			case AURAS -> "animated effects around you";
+			case PLUS -> "the subscription";
 		};
 		context.drawTextWithShadow(this.textRenderer, sub, x + this.textRenderer.getWidth(heading) + 8, contentY() + 6, VeloStyle.textFaint());
 		renderBalance(context, mouseX, mouseY);
@@ -297,6 +373,10 @@ public final class StoreScreen extends VeloWindow {
 
 	@Override
 	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
+		if (page == Page.PLUS) {
+			renderPlusBackground(context, contentX() + SIDEBAR_WIDTH, contentY() + HEADER_HEIGHT + 10, contentX() + contentWidth() - (contentX() + SIDEBAR_WIDTH));
+			return;
+		}
 		if (page != Page.FEATURED) {
 			return;
 		}

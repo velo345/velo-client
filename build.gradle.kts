@@ -45,6 +45,11 @@ fabricApi {
 // classpath, but packaged into its own jar (velo-addons-<version>.jar) with its own
 // fabric.mod.json, so players only get those modules if they install that jar too. Stonecutter
 // transforms src/addon per version exactly like src/main and src/client.
+// The Addons are Velo+ only: their source lives in the private repo velo345/velo-client-plus, checked
+// out as the git submodule src/addon. Without access to it (a public clone, CI) src/addon is empty and
+// the Addons simply aren't built - everything else is unaffected.
+val hasAddons = rootProject.file("src/addon/resources/fabric.mod.json").exists()
+
 val addon: SourceSet = sourceSets.create("addon") {
 	compileClasspath += sourceSets["main"].output + sourceSets["client"].output + sourceSets["client"].compileClasspath
 	runtimeClasspath += sourceSets["main"].output + sourceSets["client"].output + sourceSets["client"].runtimeClasspath
@@ -122,6 +127,7 @@ tasks.named<ProcessResources>("processAddonResources") {
 }
 
 val addonJar = tasks.register<Jar>("addonJar") {
+	enabled = hasAddons
 	from(addon.output)
 	from(rootProject.file("LICENSE")) { rename { "${it}_velo-addons" } }
 	archiveBaseName.set("velo-addons")
@@ -135,6 +141,7 @@ val addonJar = tasks.register<Jar>("addonJar") {
 
 if (sc.current.parsed < "26.1") {
 	val remapAddonJar = tasks.register<net.fabricmc.loom.task.RemapJarTask>("remapAddonJar") {
+		enabled = hasAddons
 		inputFile.set(addonJar.flatMap { it.archiveFile })
 		archiveBaseName.set("velo-addons")
 		addNestedDependencies.set(false)

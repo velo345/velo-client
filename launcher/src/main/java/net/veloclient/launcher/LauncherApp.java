@@ -274,6 +274,10 @@ public final class LauncherApp extends Application {
 			net.veloclient.launcher.ui.StoreView.showAurasTab();
 			showStore();
 		}});
+		steps.add(new Object[] {"05k-plus", (Runnable) () -> {
+			net.veloclient.launcher.ui.StoreView.showPlusTab();
+			showStore();
+		}});
 		steps.add(new Object[] {"05j-aura", (Runnable) () -> showAuraDetail(net.veloclient.launcher.data.AuraCatalog.byId("storm").orElseThrow())});
 		steps.add(new Object[] {"04c-cosmetics-auras", (Runnable) () -> {
 			net.veloclient.launcher.ui.CosmeticsView.showAurasTab();

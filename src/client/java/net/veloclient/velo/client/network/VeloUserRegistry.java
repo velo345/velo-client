@@ -15,9 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class VeloUserRegistry {
 
-	public record Entry(String username, String capeId, String wingsId, String auraId) {
+	public record Entry(String username, String capeId, String wingsId, String auraId, boolean plus) {
 		public Entry(String username, String capeId) {
-			this(username, capeId, null, null);
+			this(username, capeId, null, null, false);
 		}
 	}
 
@@ -101,6 +101,21 @@ public final class VeloUserRegistry {
 			entry = entryForName(username);
 		}
 		return entry == null ? null : entry.wingsId();
+	}
+
+	/** Whether this player (UUID first, then name) is a Velo+ member - they get the badge with the plus. */
+	public static boolean isPlus(UUID uuid, String username) {
+		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
+		if (entry == null) {
+			entry = entryForName(username);
+		}
+		return entry != null && entry.plus();
+	}
+
+	/** Whether the player called {@code name} is a Velo+ member. */
+	public static boolean isPlusName(String name) {
+		Entry entry = entryForName(name);
+		return entry != null && entry.plus();
 	}
 
 	/** The aura this player has equipped ("id;settings"), if any and if they're online. */

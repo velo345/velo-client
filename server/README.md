@@ -456,6 +456,31 @@ Discord; the bot (`bot/`, with `VELO_ADMIN_TOKEN`) redeems it at `POST /v1/admin
 records the link in `discord-links.json` and gives **Velo Neon** (`cape_velo_neon`, `unlock: "discord"` - such
 an item is never sold, whatever its status). See `bot/README.md`.
 
+## Velo+ (subscription)
+
+Velo+ = the Velo badge with a red plus, the VIP Discord role, **monthly Velo Coins** (`plus.monthlyCoins` in
+`store.json`, default 1200) and the **Velo Client Addons**. A membership is just an end date per player
+(`store.db`, table `plus`): the Tebex subscription extends it by a month per payment (`POST /v1/plus/checkout`
+creates the basket; `payment.completed` and `recurring-payment.renewed` webhooks extend it, a refund takes the days
+back), and the owner can give or end it by days in the launcher (Store > Owner panel > Players). The coins are paid
+hourly-checked, once per 30 days of membership. Members' badge flag rides on `/v1/online`.
+
+| Variable | What |
+|---|---|
+| `VELO_PLUS_SIGNING_KEY` | Ed25519 private key (PKCS#8, base64): signs the proof the game checks before it loads the Addons. The matching public key is built into the mod (`assets/velo-client/plus/public.key`) |
+| `VELO_PLUS_GITHUB_REPO` | the **private** repo holding the Addons releases (default `velo345/velo-client-plus`) |
+| `VELO_PLUS_GITHUB_TOKEN` | a fine-grained GitHub token with read access (Contents) to that repo only |
+
+**The Addons are never public.** Their source is the private repo `velo345/velo-client-plus` (a git submodule at
+`src/addon` of the main repo); `tools/release/publish_addons.py` puts the built jars into a release *there*, the server
+fetches them (hourly, or at once via `POST /v1/admin/addons/sync`) and serves them to members only
+(`GET /v1/plus/addons/file?mc=`). The launcher installs / updates them in a member's profiles at launch and disables
+them when Velo+ ends; the game itself only loads them with a valid signed proof (`GET /v1/plus/token`, valid up to a week).
+Members need no GitHub account and no access to the private repo.
+
+The Tebex recurring-payment webhook shape was written from the docs and is **not yet tested against real Tebex events**:
+try a subscription in Tebex's test mode first (a manual grant from the Owner panel works regardless).
+
 ## Configuring the mod to use your server
 
 The mod ships already pointed at Velo Client's own official server

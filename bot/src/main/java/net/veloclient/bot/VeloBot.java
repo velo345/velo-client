@@ -38,6 +38,7 @@ public final class VeloBot extends ListenerAdapter {
 	private final BotConfig config;
 	private final ServerApi server;
 	private final Tickets tickets;
+	private VipSync vip;
 
 	private VeloBot(BotConfig config, ServerApi server) {
 		this.config = config;
@@ -60,6 +61,8 @@ public final class VeloBot extends ListenerAdapter {
 				.setMemberCachePolicy(MemberCachePolicy.NONE).setActivity(Activity.playing("Velo Client")).addEventListeners(bot).build();
 		jda.awaitReady();
 		bot.registerCommands(jda, env("DISCORD_GUILD_ID", null));
+		bot.vip = new VipSync(jda, config, bot.server);
+		bot.vip.start();
 		System.out.println("Velo bot online as " + jda.getSelfUser().getName());
 	}
 
@@ -102,6 +105,7 @@ public final class VeloBot extends ListenerAdapter {
 				new SubcommandData("ticket-log", "Where ticket logs and transcripts go").addOptions(new OptionData(OptionType.CHANNEL, "channel", "The channel", true)),
 				new SubcommandData("support-role", "The role that handles every ticket").addOptions(new OptionData(OptionType.ROLE, "role", "The role", true)),
 				new SubcommandData("linked-role", "A role for members who linked their Minecraft account").addOptions(new OptionData(OptionType.ROLE, "role", "The role", true)),
+				new SubcommandData("vip-role", "The VIP role of Velo+ members (given and taken away automatically)").addOptions(new OptionData(OptionType.ROLE, "role", "The role", true)),
 				new SubcommandData("webhooks", "Create the donation and bug-report webhooks (the URLs go in the server's settings)").addOptions(
 						new OptionData(OptionType.CHANNEL, "donations", "Channel for purchase announcements", false),
 						new OptionData(OptionType.CHANNEL, "reports", "Channel for bug / crash reports", false)),
@@ -160,7 +164,11 @@ public final class VeloBot extends ListenerAdapter {
 					guild.addRoleToMember(event.getMember(), role).queue(null, e -> { });
 				}
 			}
-			event.getHook().sendMessage("✅ Linked to **" + linked.username() + "**! You unlocked the **Velo Neon** cape - it's in your cosmetics next time you open Velo Client.").queue();
+			event.getHook().sendMessage("✅ Linked to **" + linked.username() + "**! You unlocked the **Velo Neon** cape - it's in your cosmetics next time you open Velo Client."
+					+ (config.vipRoleId != null ? " If you have Velo+, your VIP role follows in a moment." : "")).queue();
+			if (vip != null) {
+				vip.runNow();
+			}
 		} catch (ServerApi.ApiException e) {
 			event.getHook().sendMessage("❌ " + e.getMessage()).queue();
 		}
@@ -177,6 +185,9 @@ public final class VeloBot extends ListenerAdapter {
 				}
 			}
 			event.getHook().sendMessage(removed ? "Unlinked. The Velo Neon cape is removed - link again any time." : "You weren't linked.").queue();
+			if (vip != null) {
+				vip.runNow();
+			}
 		} catch (ServerApi.ApiException e) {
 			event.getHook().sendMessage("❌ " + e.getMessage()).queue();
 		}
@@ -376,6 +387,15 @@ public final class VeloBot extends ListenerAdapter {
 					event.getHook().sendMessage("Pick a donations and/or reports channel.").queue();
 				}
 			}
+			case "vip-role" -> {
+				config.vipRoleId = event.getOption("role").getAsRole().getId();
+				config.save();
+				event.reply("<@&" + config.vipRoleId + "> is the VIP role now: Velo+ members (who linked their Discord) get it, and it's taken away when Velo+ ends. "
+						+ "Checked every minute. Move my role above it in the server settings.").setEphemeral(true).queue();
+				if (vip != null) {
+					vip.runNow();
+				}
+			}
 			case "reload" -> {
 				try {
 					config.reload();
@@ -390,6 +410,7 @@ public final class VeloBot extends ListenerAdapter {
 					.addField("Ticket log", config.ticketLogChannelId == null ? "not set" : "<#" + config.ticketLogChannelId + ">", true)
 					.addField("Support role", config.supportRoleId == null ? "not set" : "<@&" + config.supportRoleId + ">", true)
 					.addField("Linked role", config.linkedRoleId == null ? "not set" : "<@&" + config.linkedRoleId + ">", true)
+					.addField("VIP role (Velo+)", config.vipRoleId == null ? "not set" : "<@&" + config.vipRoleId + ">", true)
 					.addField("Ticket types", String.valueOf(config.ticketTypes.size()), true).addField("Ping roles", String.valueOf(config.roles.size()), true)
 					.addField("Open tickets", String.valueOf(config.tickets.size()), true).build()).setEphemeral(true).queue();
 			default -> event.reply("Unknown subcommand").setEphemeral(true).queue();

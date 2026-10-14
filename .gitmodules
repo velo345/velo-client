@@ -1,0 +1,3 @@
+[submodule "src/addon"]
+	path = src/addon
+	url = https://github.com/velo345/velo-client-plus.git

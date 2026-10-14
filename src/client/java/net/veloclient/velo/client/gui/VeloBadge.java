@@ -52,6 +52,9 @@ public final class VeloBadge {
 	// "chars" entry in assets/velo-client/font/badge.json's bitmap
 	// provider.
 	private static final String GLYPH = "";
+	/** The Velo+ badge (U+E051): the logo with a red plus behind it - 192 x 128, so 1.5 times as wide as it is tall. */
+	private static final String PLUS_GLYPH = "\uE051";
+	private static final Identifier PLUS_TEXTURE = Identifier.of("velo-client", "textures/font/badge_plus_glyph.png");
 
 	private VeloBadge() {
 	}
@@ -113,12 +116,51 @@ public final class VeloBadge {
 		return false;
 	}
 
+	/**
+	 * Whether the name in {@code text} (yours, or an online player's) belongs to a Velo+ member - they get the
+	 * badge with the plus behind it. Only asked once {@link #isKnownVeloName} said the name has a badge.
+	 */
+	public static boolean isPlus(String text, String ownName) {
+		if (isOwnName(text, ownName) && net.veloclient.velo.client.network.StoreClient.plus()) {
+			return true;
+		}
+		int length = text.length();
+		int start = -1;
+		for (int i = 0; i <= length; i++) {
+			boolean nameChar = i < length && isNameChar(text.charAt(i));
+			if (nameChar && start < 0) {
+				start = i;
+			} else if (!nameChar && start >= 0) {
+				int runLength = i - start;
+				if (runLength >= 3 && runLength <= 16 && net.veloclient.velo.client.network.VeloUserRegistry.isPlusName(text.substring(start, i))) {
+					return true;
+				}
+				start = -1;
+			}
+		}
+		return false;
+	}
+
 	private static boolean isNameChar(char c) {
 		return Character.isLetterOrDigit(c) || c == '_';
 	}
 
 	/** Draws the badge at {@code (x, y)} on-screen, {@link #SIZE} pixels square. */
 	public static void draw(DrawContext context, int x, int y) {
+		draw(context, x, y, false);
+	}
+
+	/** The badge's width: {@link #SIZE}, or 1.5 times that for the Velo+ one (logo and plus). */
+	public static int width(boolean plus) {
+		return plus ? SIZE * 3 / 2 : SIZE;
+	}
+
+	/** Draws the badge, or the Velo+ one (the logo with a red plus behind it). */
+	public static void draw(DrawContext context, int x, int y, boolean plus) {
+		if (plus) {
+			context.drawTexture(RenderPipelines.GUI_TEXTURED, PLUS_TEXTURE, x, y, 0f, 0f, width(true), SIZE, 192, 128, 192, 128);
+			return;
+		}
 		context.drawTexture(RenderPipelines.GUI_TEXTURED, LOGO_TEXTURE, x, y, 0f, 0f,
 				SIZE, SIZE, LOGO_SOURCE_SIZE, LOGO_SOURCE_SIZE, LOGO_SOURCE_SIZE, LOGO_SOURCE_SIZE);
 	}
@@ -141,6 +183,11 @@ public final class VeloBadge {
 	 * through to the normal default one, untouched.
 	 */
 	public static Text prefixWithBadge(Text original) {
+		return prefixWithBadge(original, false);
+	}
+
+	/** Same, with the Velo+ badge (logo and a red plus) when {@code plus}. */
+	public static Text prefixWithBadge(Text original, boolean plus) {
 		Identifier fontId = Identifier.of("velo-client", "badge");
 		//? if <26.1 {
 		Style badgeStyle = Style.EMPTY.withFont(new net.minecraft.text.StyleSpriteSource.Font(fontId));
@@ -148,7 +195,7 @@ public final class VeloBadge {
 		/*Style badgeStyle = Style.EMPTY.withFont(new net.minecraft.network.chat.FontDescription.Resource(fontId));
 		*///?}
 		MutableText result = Text.empty();
-		result.append(Text.literal(GLYPH).setStyle(badgeStyle));
+		result.append(Text.literal(plus ? PLUS_GLYPH : GLYPH).setStyle(badgeStyle));
 		result.append(original);
 		return result;
 	}

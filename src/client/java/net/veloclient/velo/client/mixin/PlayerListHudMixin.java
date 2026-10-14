@@ -43,9 +43,10 @@ public abstract class PlayerListHudMixin {
 		// nothing overlaps, matching how those clients reserve the space.
 		// Vertically centered against the actual row/font height rather
 		// than a fixed offset, so it stays centered regardless of VeloBadge.SIZE.
-		int shift = VeloBadge.SIZE + 3;
+		boolean plus = VeloBadge.isPlus(text.getString(), client.player.getGameProfile().name());
+		int shift = VeloBadge.width(plus) + 3;
 		int badgeY = y + (textRenderer.fontHeight - VeloBadge.SIZE) / 2;
-		VeloBadge.draw(context, x, badgeY);
+		VeloBadge.draw(context, x, badgeY, plus);
 		context.drawTextWithShadow(textRenderer, text, x + shift, y, color);
 	}
 }

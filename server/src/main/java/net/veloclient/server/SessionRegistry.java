@@ -43,7 +43,7 @@ final class SessionRegistry {
 	record Session(String uuid, String username, String kind, String capeId, String wingsId, String auraId, long expiresAtMillis) {
 	}
 
-	record OnlineUser(String uuid, String username, String capeId, String wingsId, String auraId) {
+	record OnlineUser(String uuid, String username, String capeId, String wingsId, String auraId, boolean plus) {
 	}
 
 	/** Called with a uuid whenever one of its sessions ends or expires - drives friends' presence updates. */
@@ -161,11 +161,18 @@ final class SessionRegistry {
 	}
 
 	/** In-game players only (the badge/cape list) - a launcher session isn't "in game", and isn't listed twice. */
+	/** Whether a member has Velo+ (the badge with the plus); set by the server app. */
+	private volatile java.util.function.Predicate<String> plusLookup = uuid -> false;
+
+	void setPlusLookup(java.util.function.Predicate<String> lookup) {
+		this.plusLookup = lookup;
+	}
+
 	List<OnlineUser> onlineUsers() {
 		long now = System.currentTimeMillis();
 		return sessionsByToken.values().stream()
 				.filter(s -> s.expiresAtMillis() >= now && s.kind().equals(KIND_GAME))
-				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId(), s.auraId()))
+				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId(), s.auraId(), plusLookup.test(s.uuid())))
 				.toList();
 	}
 

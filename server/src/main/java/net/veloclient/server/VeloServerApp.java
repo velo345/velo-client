@@ -87,7 +87,45 @@ public final class VeloServerApp {
 		DiscordRoutes.register(server, registry, store, discordLinks, envOr("VELO_DISCORD_INVITE", null), adminToken);
 		DiscordAnnouncer announcer = new DiscordAnnouncer(envOr("VELO_DISCORD_DONATIONS_WEBHOOK", null), envOr("VELO_DISCORD_REPORTS_WEBHOOK", null),
 				envOr("VELO_PUBLIC_URL", null), cosmetics, registry, store.database());
-		store.setPurchaseListener(announcer::donation);
+		store.setPurchaseListener(new net.veloclient.server.store.StoreService.PurchaseListener() {
+			@Override
+			public void coinsPurchased(net.veloclient.server.store.StoreDatabase.Order order, String username, int balance) {
+				announcer.donation(order, username, balance);
+			}
+
+			@Override
+			public void plusStarted(String uuid, String username) {
+				announcer.plus(uuid, username);
+			}
+		});
+		// Velo+: memberships in memory, monthly coins hourly, signed tokens + addon jars for members.
+		store.loadPlus();
+		registry.setPlusLookup(store::isPlus);
+		PlusTokens plusTokens = new PlusTokens(envOr("VELO_PLUS_SIGNING_KEY", null));
+		AddonStore addonStore = new AddonStore(dataDir);
+		AddonSync addonSync = new AddonSync(addonStore, envOr("VELO_PLUS_GITHUB_REPO", "velo345/velo-client-plus"), envOr("VELO_PLUS_GITHUB_TOKEN", null));
+		PlusRoutes.register(server, registry, store, plusTokens, addonStore, addonSync, discordLinks, adminToken);
+		Executors.newSingleThreadScheduledExecutor(r -> {
+			Thread t = new Thread(r, "velo-plus-sweep");
+			t.setDaemon(true);
+			return t;
+		}).scheduleAtFixedRate(() -> {
+			store.loadPlus();
+			store.plusSweep();
+			if (addonSync.enabled()) {
+				try {
+					addonSync.sync();
+				} catch (Exception e) {
+					System.out.println("[addons] Sync failed: " + e.getMessage());
+				}
+			}
+		}, 1, 60, TimeUnit.MINUTES);
+		if (!addonSync.enabled()) {
+			System.out.println("VELO_PLUS_GITHUB_TOKEN not set - the Addons must be uploaded by hand (POST /v1/admin/addons)");
+		}
+		if (!plusTokens.enabled()) {
+			System.out.println("VELO_PLUS_SIGNING_KEY not set - Velo+ members can't unlock the addons");
+		}
 		reportService.setListener(announcer::report);
 		NewsRoutes.register(server, registry, new NewsService(dataDir), reportService, store, adminToken);
 		SchematicShareService schematics = new SchematicShareService(dataDir);

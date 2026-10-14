@@ -5,6 +5,11 @@ What it does:
 - **`/link <code>`** - members link their Minecraft account (code from Velo Client: Store > Capes > *Get my link
   code*, or the *Link Discord* button in the in-game Store) and unlock the **Velo Neon** cape. `/unlink` undoes it.
   Optional "linked" role.
+- **VIP role for Velo+** - `/setup vip-role`: members who linked their Discord get the role while they have Velo+
+  (bought, or given in the launcher's Owner panel) and **lose it again when Velo+ ends**. The bot checks every minute
+  and right after `/link`, so linking after getting Velo+ gives the role at once. With `vipStrict` (default, in
+  `bot-config.json`) anyone holding the role without an active Velo+ loses it too - set it to `false` if you hand the
+  role out by hand.
 - **Ping roles** - a panel with one button per role (News, Updates, Giveaways, Polls...). Press to get or drop
   the role. `/roles add|remove|list|panel`, `/announce` pings a role with an embed.
 - **Tickets** - a panel with a button per *ticket type*; each type has its own form, staff roles, ping roles,
@@ -44,6 +49,7 @@ DISCORD_TOKEN=... VELO_ADMIN_TOKEN=... VELO_SERVER_URL=https://client.asteriasmp
 /setup ticket-log channel:<a channel>             logs + transcripts
 /setup support-role role:@Team                    handles every ticket
 /setup linked-role role:@Linked                   (optional) for linked members
+/setup vip-role role:@VIP                         Velo+ members (automatic, see above)
 /setup webhooks donations:#donations reports:#bug-reports   -> prints two URLs for the Velo server
 /roles add role:@News label:News emoji:📰 description:Release news
 /roles panel channel:#roles

@@ -92,6 +92,10 @@ public final class StoreService {
 	/** Told when a real-money coin pack was credited (the donation announcements in Discord). */
 	public interface PurchaseListener {
 		void coinsPurchased(StoreDatabase.Order order, String username, int balance);
+
+		/** Someone started (or renewed) Velo+. */
+		default void plusStarted(String uuid, String username) {
+		}
 	}
 
 	private volatile PurchaseListener purchaseListener;
@@ -158,12 +162,98 @@ public final class StoreService {
 				checkoutEnabled(), adsEnabled());
 	}
 
-	public record WalletView(int balance, List<String> owned, boolean owner) {
+	public record WalletView(int balance, List<String> owned, boolean owner, boolean plus, long plusUntil) {
 	}
 
 	public WalletView wallet(String uuid, String username) throws Exception {
 		db.touchWallet(uuid, username);
-		return new WalletView(db.balance(uuid), db.ownedItems(uuid), isOwner(uuid, username));
+		return new WalletView(db.balance(uuid), db.ownedItems(uuid), isOwner(uuid, username), isPlus(uuid), plusUntil(uuid));
+	}
+
+	// ---- Velo+ ----
+
+	private final Map<String, Long> plusCache = new ConcurrentHashMap<>();
+
+	/** Loads the active memberships into memory (start-up, and after every change): {@link #isPlus} is asked for every online player. */
+	public void loadPlus() {
+		try {
+			Map<String, Long> fresh = new java.util.HashMap<>();
+			for (StoreDatabase.PlusRow row : db.activePlus(System.currentTimeMillis())) {
+				fresh.put(row.uuid(), row.until());
+			}
+			plusCache.keySet().retainAll(fresh.keySet());
+			plusCache.putAll(fresh);
+		} catch (Exception e) {
+			System.out.println("[store] Couldn't load Velo+ memberships: " + e.getMessage());
+		}
+	}
+
+	public boolean isPlus(String uuid) {
+		Long until = plusCache.get(uuid);
+		return until != null && until > System.currentTimeMillis();
+	}
+
+	/** When the membership ends (0 if none or over). */
+	public long plusUntil(String uuid) {
+		Long until = plusCache.get(uuid);
+		return until != null && until > System.currentTimeMillis() ? until : 0;
+	}
+
+	/**
+	 * Adds a month (or {@code days}) of Velo+ and pays out the monthly coins if they're due. A Tebex payment
+	 * that arrives while an earlier Tebex month still has most of its time left (a renewal reported twice by
+	 * two different events) is recorded without adding days again.
+	 */
+	public long grantPlus(String uuid, String username, int days, String source, String txn, String reference) throws Exception {
+		db.touchWallet(uuid, username);
+		int add = days;
+		StoreDatabase.PlusRow current = db.plusRow(uuid);
+		long now = System.currentTimeMillis();
+		if ("tebex".equals(source) && txn != null && current != null && "tebex".equals(current.source())
+				&& current.until() - now > (config.plus.periodDays - 3) * 86_400_000L) {
+			add = 0;
+		}
+		long until = db.extendPlus(uuid, add, source, txn, reference);
+		loadPlus();
+		plusSweep();
+		return until;
+	}
+
+	/** Owner: ends someone's Velo+ now. */
+	public void endPlus(String uuid) throws Exception {
+		db.endPlus(uuid);
+		loadPlus();
+	}
+
+	/** Pays the monthly Velo Coins to every active member whose last payout is a month ago (or never) - run hourly and after a grant. */
+	public synchronized void plusSweep() {
+		try {
+			long now = System.currentTimeMillis();
+			long month = config.plus.periodDays * 86_400_000L;
+			for (StoreDatabase.PlusRow row : db.activePlus(now)) {
+				if (row.lastCoins() == 0 || now - row.lastCoins() >= month) {
+					if (config.plus.monthlyCoins > 0) {
+						db.touchWallet(row.uuid(), null);
+						db.adjust(row.uuid(), config.plus.monthlyCoins, "plus_monthly", null, "plus");
+					}
+					db.markPlusCoins(row.uuid(), now);
+				}
+			}
+		} catch (Exception e) {
+			System.out.println("[store] Velo+ coin payout failed: " + e.getMessage());
+		}
+	}
+
+	public record PlusCheckoutView(String checkoutUrl) {
+	}
+
+	public PlusCheckoutView plusCheckout(String uuid, String username) throws Exception {
+		if (!checkoutEnabled()) {
+			throw new StoreException(503, "Subscriptions aren't set up on this server yet");
+		}
+		TebexCheckout.Basket basket = tebex.createSubscriptionCheckout(uuid, username, "Velo+ (monthly)" + (username != null ? " for " + username : ""),
+				config.plus.price, publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?plus=1");
+		return new PlusCheckoutView(basket.checkoutUrl());
 	}
 
 	/** Store capes are published by item id; only owners may show them (anything else is a custom/other id). */
@@ -245,6 +335,7 @@ public final class StoreService {
 			String txn = subject.has("transaction_id") ? subject.get("transaction_id").getAsString() : null;
 			switch (type) {
 				case "payment.completed" -> handlePaid(subject, txn);
+				case "recurring-payment.renewed" -> handleRenewal(subject, id);
 				case "payment.refunded" -> reverse(txn, "refunded");
 				case "payment.dispute.lost" -> reverse(txn, "chargeback");
 				case "payment.dispute.opened" -> System.out.println("[store] Dispute opened on " + txn + " - coins stay until it's lost");
@@ -270,6 +361,19 @@ public final class StoreService {
 				continue;
 			}
 			com.google.gson.JsonObject custom = product.getAsJsonObject("custom");
+			if (custom.has("velo_plus") && custom.has("velo_uuid")) {
+				// The Velo+ subscription: a month, then the coins and perks follow from the membership.
+				String plusUuid = custom.get("velo_uuid").getAsString();
+				String plusName = custom.has("velo_username") ? custom.get("velo_username").getAsString() : null;
+				String reference = subject.has("recurring_payment_reference") ? subject.get("recurring_payment_reference").getAsString() : null;
+				grantPlus(plusUuid, plusName, config.plus.periodDays, "tebex", txn == null ? "plus:" + System.nanoTime() : txn, reference);
+				System.out.println("[store] Velo+ month for " + plusUuid + " (" + txn + ")");
+				PurchaseListener listener = purchaseListener;
+				if (listener != null) {
+					listener.plusStarted(plusUuid, plusName == null ? db.username(plusUuid) : plusName);
+				}
+				continue;
+			}
 			if (!custom.has("velo_order")) {
 				continue;
 			}
@@ -301,9 +405,44 @@ public final class StoreService {
 		}
 	}
 
+	/**
+	 * A Velo+ renewal reported as a recurring-payment event: matched to the member by the first payment's
+	 * transaction / the recurring reference, and counted once per webhook delivery.
+	 */
+	private void handleRenewal(com.google.gson.JsonObject subject, String eventId) throws Exception {
+		List<String> keys = new ArrayList<>();
+		for (String field : new String[] {"reference", "id", "transaction_id"}) {
+			if (subject.has(field) && subject.get(field).isJsonPrimitive()) {
+				keys.add(subject.get(field).getAsString());
+			}
+		}
+		if (subject.has("initial_payment") && subject.get("initial_payment").isJsonObject()) {
+			com.google.gson.JsonObject initial = subject.getAsJsonObject("initial_payment");
+			for (String field : new String[] {"transaction_id", "id", "reference"}) {
+				if (initial.has(field) && initial.get(field).isJsonPrimitive()) {
+					keys.add(initial.get(field).getAsString());
+				}
+			}
+		}
+		for (String key : keys) {
+			String uuid = db.plusMemberOfPayment(key);
+			if (uuid != null) {
+				grantPlus(uuid, db.username(uuid), config.plus.periodDays, "tebex", "renew:" + eventId, keys.get(0));
+				System.out.println("[store] Velo+ renewed for " + uuid);
+				return;
+			}
+		}
+		System.out.println("[store] Velo+ renewal event " + eventId + " didn't match a member (" + keys + ")");
+	}
+
 	private void reverse(String txn, String status) throws Exception {
 		if (txn == null) {
 			return;
+		}
+		String plusMember = db.reversePlusPayment(txn);
+		if (plusMember != null) {
+			loadPlus();
+			System.out.println("[store] " + status + " on " + txn + " - Velo+ days taken back from " + plusMember);
 		}
 		int reversed = db.reverseByTransaction(txn, status);
 		if (reversed > 0) {
@@ -317,7 +456,7 @@ public final class StoreService {
 
 	// ---- Owner tools ----
 
-	public record PlayerView(String uuid, String username, int balance, List<String> owned, List<StoreDatabase.LedgerEntry> ledger) {
+	public record PlayerView(String uuid, String username, int balance, List<String> owned, List<StoreDatabase.LedgerEntry> ledger, long plusUntil) {
 	}
 
 	private String[] requireOwnerAndResolve(String meUuid, String meName, String target) throws Exception {
@@ -333,7 +472,21 @@ public final class StoreService {
 
 	public PlayerView adminLookup(String meUuid, String meName, String target) throws Exception {
 		String[] ref = requireOwnerAndResolve(meUuid, meName, target);
-		return new PlayerView(ref[0], ref[1], db.balance(ref[0]), db.ownedItems(ref[0]), db.ledger(ref[0], 30));
+		return new PlayerView(ref[0], ref[1], db.balance(ref[0]), db.ownedItems(ref[0]), db.ledger(ref[0], 30), plusUntil(ref[0]));
+	}
+
+	/** Owner: gives {@code days} of Velo+ (more than 0), or ends it ({@code days} 0 or less). */
+	public PlayerView adminPlus(String meUuid, String meName, String target, int days) throws Exception {
+		String[] ref = requireOwnerAndResolve(meUuid, meName, target);
+		if (days > 3650) {
+			throw new StoreException(400, "At most 3650 days");
+		}
+		if (days > 0) {
+			grantPlus(ref[0], ref[1], days, "owner:" + meName, null, null);
+		} else {
+			endPlus(ref[0]);
+		}
+		return adminLookup(meUuid, meName, ref[0]);
 	}
 
 	public PlayerView adminCoins(String meUuid, String meName, String target, int amount, String note) throws Exception {

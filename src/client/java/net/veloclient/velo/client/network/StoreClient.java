@@ -43,6 +43,10 @@ public final class StoreClient {
 	/** Whether the server has told us what we own yet (this session). */
 	private static volatile boolean walletLoaded;
 	private static volatile boolean owner;
+	private static volatile boolean plus;
+	private static volatile long plusUntil;
+	private static volatile double plusPrice = 4.99;
+	private static volatile int plusMonthlyCoins = 1200;
 	private static volatile String currency = "EUR";
 	private static volatile List<CoinPack> packs = List.of();
 	private static volatile boolean checkoutEnabled;
@@ -73,6 +77,25 @@ public final class StoreClient {
 
 	public static boolean isOwner() {
 		return owner;
+	}
+
+	/** Whether you're a Velo+ member (VIP role, monthly coins, the Addons, the badge with the plus). */
+	public static boolean plus() {
+		return plus;
+	}
+
+	/** What Velo+ costs per month (in the store's currency) and the Velo Coins it includes every month. */
+	public static double plusPrice() {
+		return plusPrice;
+	}
+
+	public static int plusMonthlyCoins() {
+		return plusMonthlyCoins;
+	}
+
+	/** When your Velo+ ends (epoch millis), 0 if you're not a member. */
+	public static long plusUntil() {
+		return plusUntil;
 	}
 
 	public static List<CoinPack> packs() {
@@ -143,6 +166,13 @@ public final class StoreClient {
 				throw new java.io.IOException("Not connected");
 			}
 			applyWallet(get("/v1/store/wallet"));
+			try {
+				JsonObject status = get("/v1/plus/status");
+				plusPrice = status.get("price").getAsDouble();
+				plusMonthlyCoins = status.get("monthlyCoins").getAsInt();
+			} catch (Exception ignored) {
+				// An older server: the defaults stay.
+			}
 			applyRewards(get("/v1/rewards"));
 			return null;
 		}, ok -> {
@@ -228,6 +258,11 @@ public final class StoreClient {
 		async(() -> post("/v1/admin/store/coins", body), onOk, onError);
 	}
 
+	/** Starts the Velo+ subscription checkout; {@code onUrl} gets the payment page. */
+	public static void plusCheckout(Consumer<String> onUrl, Consumer<String> onError) {
+		async(() -> post("/v1/plus/checkout", new JsonObject()), r -> onUrl.accept(r.get("checkoutUrl").getAsString()), onError);
+	}
+
 	/** A code to type as {@code /link <code>} in the Velo Discord (unlocks the Velo Neon cape). */
 	public static void discordCode(Consumer<JsonObject> onOk, Consumer<String> onError) {
 		async(() -> post("/v1/discord/code", new JsonObject()), onOk, onError);
@@ -263,6 +298,13 @@ public final class StoreClient {
 	private static void applyWallet(JsonObject wallet) {
 		balance = wallet.get("balance").getAsInt();
 		owner = wallet.has("owner") && wallet.get("owner").getAsBoolean();
+		boolean wasPlus = plus;
+		plus = wallet.has("plus") && wallet.get("plus").getAsBoolean();
+		plusUntil = wallet.has("plusUntil") ? wallet.get("plusUntil").getAsLong() : 0;
+		if (plus && !wasPlus) {
+			// Just became (or just proved to be) a member: get the signed proof the Addons check at start-up.
+			net.veloclient.velo.client.plus.PlusAccess.refresh();
+		}
 		java.util.Set<String> items = new java.util.HashSet<>();
 		for (var element : wallet.getAsJsonArray("owned")) {
 			items.add(element.getAsString());

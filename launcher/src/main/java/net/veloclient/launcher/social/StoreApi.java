@@ -150,6 +150,53 @@ public final class StoreApi {
 		return post("/v1/admin/store/item", body);
 	}
 
+	/** Velo+: {@code plus}, {@code until}, {@code price}, {@code currency}, {@code monthlyCoins}, {@code periodDays}, {@code checkoutEnabled}. */
+	public static JsonObject plusStatus() throws StoreError {
+		return get("/v1/plus/status");
+	}
+
+	/** Starts the Velo+ subscription: {@code checkoutUrl}. */
+	public static JsonObject plusCheckout() throws StoreError {
+		return post("/v1/plus/checkout", new JsonObject());
+	}
+
+	/** A signed proof of membership ({@code token}) for the game's Addons check (members only). */
+	public static JsonObject plusToken() throws StoreError {
+		return get("/v1/plus/token");
+	}
+
+	/** The Addons jars on the server: {@code addons: [{mc, version, sha256, size}]} (members only). */
+	public static JsonObject plusAddons() throws StoreError {
+		return get("/v1/plus/addons");
+	}
+
+	/** The Addons jar for a Minecraft version (members only). */
+	public static byte[] plusAddonJar(String mc) throws StoreError {
+		try {
+			HttpResponse<byte[]> response = HTTP.send(request("/v1/plus/addons/file?mc=" + java.net.URLEncoder.encode(mc, java.nio.charset.StandardCharsets.UTF_8))
+					.timeout(Duration.ofSeconds(120)).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+			if (response.statusCode() != 200) {
+				throw new StoreError(response.statusCode(), "Couldn't download the Addons (HTTP " + response.statusCode() + ")");
+			}
+			return response.body();
+		} catch (StoreError e) {
+			throw e;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new StoreError(0, "Interrupted");
+		} catch (Exception e) {
+			throw new StoreError(0, "Couldn't reach the Velo server");
+		}
+	}
+
+	/** Owner: gives {@code days} of Velo+ (more than 0) or ends it (0). */
+	public static JsonObject adminPlus(String target, int days) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.addProperty("target", target);
+		body.addProperty("days", days);
+		return post("/v1/admin/store/plus", body);
+	}
+
 	/** Whether your Discord is linked ({@code linked}, {@code discordName}) and the invite link ({@code inviteUrl}). */
 	public static JsonObject discordStatus() throws StoreError {
 		return get("/v1/discord/status");
@@ -212,6 +259,7 @@ public final class StoreApi {
 					{"id":"coins_500","coins":500,"bonus":0,"price":4.99},{"id":"coins_1200","coins":1200,"bonus":140,"price":9.99},
 					{"id":"coins_2600","coins":2600,"bonus":400,"price":19.99},{"id":"coins_6500","coins":6500,"bonus":1500,"price":39.99}],
 					"items":[]}""";
+			case "/v1/plus/status" -> "{\"plus\":false,\"until\":0,\"price\":4.99,\"currency\":\"EUR\",\"monthlyCoins\":1200,\"periodDays\":30,\"checkoutEnabled\":true,\"addonsEnabled\":true}";
 			case "/v1/store/wallet" -> "{\"balance\":1340,\"owner\":true,\"owned\":[\"wings_bonedragon\",\"wings_cobweb\",\"wings_wraith\",\"wings_phoenix\",\"aura_orbit\",\"aura_ember\",\"aura_void\"]}";
 			default -> """
 					{"onlineMinutes":42,"loginClaimed":false,"loginClaimable":true,"loginCoins":12,"streak":3,"quests":[
