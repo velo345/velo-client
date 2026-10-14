@@ -28,8 +28,8 @@ import net.veloclient.launcher.theme.LauncherTheme;
 import java.io.ByteArrayInputStream;
 
 /**
- * The cosmetics store, like the in-game one: Featured (the new "Shadows &amp; Angels" wings - your
- * skin wearing each pair in turn, in 3D, flapping, tinted in the pair's colour - and the collection),
+ * The cosmetics store, like the in-game one: Featured (the newest wings collection - your skin
+ * wearing each of its pairs in turn, in 3D, flapping, tinted in the pair's colour - and its pairs),
  * Wings and Capes tabs, "My cosmetics" and the Velo Coins balance top right.
  */
 public final class StoreView {
@@ -56,6 +56,10 @@ public final class StoreView {
 		/** Opens Cosmetics (equip what you own). */
 		default void openCosmetics() {
 		}
+
+		/** Opens the owner panel (owners only). */
+		default void openOwner() {
+		}
 	}
 
 	private StoreView() {
@@ -66,16 +70,9 @@ public final class StoreView {
 	/** Which tab was open last (kept while the launcher runs). */
 	private static Page page = Page.FEATURED;
 
-	/** Each pair's own colour - the same accents the in-game Store uses. */
+	/** Each pair's own colour ({@code accent} in wings.json) - the same accents the in-game Store uses. */
 	static String accent(String wingId) {
-		return switch (wingId) {
-			case "angelic" -> "#f2d27a";
-			case "frost" -> "#5cc8ff";
-			case "phoenix" -> "#ff7a2e";
-			case "raven" -> "#8c9bd6";
-			case "shadowfang" -> "#a25cff";
-			default -> "#ff4d4d";
-		};
+		return net.veloclient.launcher.data.WingsCatalog.byId(wingId).map(net.veloclient.launcher.data.WingsCatalog.WingType::accent).orElse("#ff4d4d");
 	}
 
 	public static Node build(Host host) {
@@ -92,6 +89,15 @@ public final class StoreView {
 		mine.setStyle("-fx-border-color: #ff4d4d; -fx-border-radius: 18; -fx-background-radius: 18; -fx-padding: 8 16;");
 		mine.setOnAction(e -> host.openCosmetics());
 		HBox headerRow = new HBox(10, titles, spacer, mine, buildBalancePill(host));
+		titles.setMinWidth(0);
+		mine.setMinWidth(Region.USE_PREF_SIZE);
+		if (net.veloclient.launcher.social.StoreApi.isOwner()) {
+			Button ownerPanel = new Button("Owner panel");
+			ownerPanel.setMinWidth(Region.USE_PREF_SIZE);
+			ownerPanel.getStyleClass().add("ghost-button");
+			ownerPanel.setOnAction(e -> host.openOwner());
+			headerRow.getChildren().add(2, ownerPanel);
+		}
 		headerRow.setAlignment(Pos.CENTER_LEFT);
 
 		HBox tabs = new HBox(6);
@@ -118,20 +124,37 @@ public final class StoreView {
 		}
 
 		VBox root = new VBox(20, headerRow, tabs);
-		var wings = net.veloclient.launcher.data.WingsCatalog.all();
+		var wings = net.veloclient.launcher.data.WingsCatalog.forSale();
+		var featured = net.veloclient.launcher.data.WingsCatalog.featured().orElse(null);
+		var featuredWings = featured == null ? wings : net.veloclient.launcher.data.WingsCatalog.inCollection(featured.id());
+		if (featuredWings.isEmpty()) {
+			featuredWings = wings;
+		}
 		switch (page) {
 			case FEATURED -> {
-				if (!wings.isEmpty()) {
-					root.getChildren().add(buildWingsHero(host, wings));
+				if (!featuredWings.isEmpty()) {
+					root.getChildren().add(buildWingsHero(host, featured, featuredWings));
 					Label title = new Label("The collection");
 					title.getStyleClass().add("section-label");
-					root.getChildren().addAll(title, wingGrid(host, wings));
+					root.getChildren().addAll(title, wingGrid(host, featuredWings));
 				}
 			}
 			case WINGS -> {
-				Label title = new Label("Shadows & Angels  ·  " + wings.size() + " pairs of animated 3D wings");
-				title.getStyleClass().add("section-label");
-				root.getChildren().addAll(title, wingGrid(host, wings));
+				// One section per collection, newest first; pairs without one at the end.
+				for (var collection : net.veloclient.launcher.data.WingsCatalog.collections()) {
+					var pairs = net.veloclient.launcher.data.WingsCatalog.inCollection(collection.id());
+					if (!pairs.isEmpty()) {
+						Label title = new Label(collection.name() + "  ·  " + pairs.size() + " pairs of animated 3D wings");
+						title.getStyleClass().add("section-label");
+						root.getChildren().addAll(title, wingGrid(host, pairs));
+					}
+				}
+				var loose = wings.stream().filter(w -> net.veloclient.launcher.data.WingsCatalog.collection(w.collection()).isEmpty()).toList();
+				if (!loose.isEmpty()) {
+					Label title = new Label("More wings  ·  " + loose.size());
+					title.getStyleClass().add("section-label");
+					root.getChildren().addAll(title, wingGrid(host, loose));
+				}
 			}
 			case CAPES -> {
 				var items = StoreCatalog.all();
@@ -169,7 +192,7 @@ public final class StoreView {
 	/** A pair of wings: its picture floating on a glow in its own colour, name, and price / Owned. */
 	private static Node wingCard(Host host, net.veloclient.launcher.data.WingsCatalog.WingType type) {
 		String accent = accent(type.id());
-		ImageView picture = new ImageView(new Image(net.veloclient.launcher.data.WingsCatalog.open("textures/" + type.id() + "_preview.png")));
+		ImageView picture = new ImageView(new Image(net.veloclient.launcher.data.WingsCatalog.openPreview(type.id())));
 		picture.setFitWidth(176);
 		picture.setPreserveRatio(true);
 		StackPane art = new StackPane(picture);
@@ -208,18 +231,23 @@ public final class StoreView {
 	}
 
 	/**
-	 * The banner on top: "New collection - Shadows & Angels", your skin in 3D wearing each pair in
+	 * The banner on top: "New - <collection>", your skin in 3D wearing each of its pairs in
 	 * turn (a few seconds each), flapping and slowly turning, the banner tinted in that pair's colour.
 	 * Not signed in: the pairs' pictures take turns.
 	 */
-	private static Node buildWingsHero(Host host, java.util.List<net.veloclient.launcher.data.WingsCatalog.WingType> wings) {
-		Label tag = new Label("NEW COLLECTION");
+	private static Node buildWingsHero(Host host, net.veloclient.launcher.data.WingsCatalog.Collection collection,
+			java.util.List<net.veloclient.launcher.data.WingsCatalog.WingType> wings) {
+		Long until = wings.stream().map(net.veloclient.launcher.data.WingsCatalog.WingType::availableUntil)
+				.filter(java.util.Objects::nonNull).min(Long::compare).orElse(null);
+		long daysLeft = until == null ? -1 : Math.max(0, (until - System.currentTimeMillis()) / 86_400_000L);
+		// Limited drops (e.g. Halloween) say how long they're left in the store.
+		Label tag = new Label((collection == null ? "NEW COLLECTION" : until != null ? collection.tag() : "NEW  ·  " + collection.tag())
+				+ (until == null ? "" : daysLeft >= 1 ? "  ·  " + daysLeft + (daysLeft == 1 ? " DAY LEFT" : " DAYS LEFT") : "  ·  LAST DAY"));
 		tag.getStyleClass().add("featured-tag");
-		Label name = new Label("Shadows & Angels");
+		Label name = new Label(collection == null ? "Wings" : collection.name());
 		name.getStyleClass().add("featured-title");
 		name.setStyle("-fx-font-size: 40px;");
-		Label description = new Label("Five pairs of real 3D wings that move with you - a slow, calm wingbeat while you stand, wider strokes "
-				+ "as you run, spread wide when you glide. Every Velo Client player sees them.");
+		Label description = new Label((collection == null ? "" : collection.description() + " ") + "Every Velo Client player sees them.");
 		description.getStyleClass().add("page-subtitle");
 		description.setWrapText(true);
 		description.setMaxWidth(420);
@@ -246,7 +274,7 @@ public final class StoreView {
 
 		StackPane art = CosmeticUi.stage(300, 320);
 		art.getStyleClass().add("showcase-stage");
-		ImageView still = new ImageView(new Image(net.veloclient.launcher.data.WingsCatalog.open("textures/" + wings.get(0).id() + "_preview.png")));
+		ImageView still = new ImageView(new Image(net.veloclient.launcher.data.WingsCatalog.openPreview(wings.get(0).id())));
 		still.setFitWidth(280);
 		still.setPreserveRatio(true);
 		art.getChildren().add(still);
@@ -275,7 +303,7 @@ public final class StoreView {
 			if (model[0] != null) {
 				model[0].show(type.id());
 			} else {
-				still.setImage(new Image(net.veloclient.launcher.data.WingsCatalog.open("textures/" + type.id() + "_preview.png")));
+				still.setImage(new Image(net.veloclient.launcher.data.WingsCatalog.openPreview(type.id())));
 			}
 		}));
 		cycle.setCycleCount(javafx.animation.Animation.INDEFINITE);
@@ -301,6 +329,7 @@ public final class StoreView {
 		Label balance = new Label(balanceText());
 		balance.getStyleClass().add("balance-amount");
 		// The balance lives on the server: show the cached value, then refresh it.
+		boolean wasOwner = net.veloclient.launcher.social.StoreApi.isOwner();
 		java.util.concurrent.CompletableFuture.runAsync(() -> {
 			try {
 				net.veloclient.launcher.social.StoreApi.wallet();
@@ -308,7 +337,13 @@ public final class StoreView {
 			} catch (net.veloclient.launcher.social.StoreApi.StoreError ignored) {
 				// Shown as "..." until it works.
 			}
-			javafx.application.Platform.runLater(() -> balance.setText(balanceText()));
+			javafx.application.Platform.runLater(() -> {
+				balance.setText(balanceText());
+				// Turned out to be the owner: show the page again with the Owner panel button.
+				if (!wasOwner && net.veloclient.launcher.social.StoreApi.isOwner() && balance.getScene() != null) {
+					host.rebuild();
+				}
+			});
 		}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor());
 		Button getCoins = new Button("Get coins");
 		getCoins.getStyleClass().add("ghost-button");
@@ -316,6 +351,7 @@ public final class StoreView {
 		HBox pill = new HBox(8, CosmeticUi.coin(20), balance, getCoins);
 		pill.setAlignment(Pos.CENTER_LEFT);
 		pill.getStyleClass().add("balance-pill");
+		pill.setMinWidth(Region.USE_PREF_SIZE);
 		return pill;
 	}
 

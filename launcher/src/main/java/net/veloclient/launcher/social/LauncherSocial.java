@@ -216,6 +216,11 @@ public final class LauncherSocial {
 	}
 
 	public static String baseUrl() {
+		// Dev-only: -Dvelo.serverUrl=http://localhost:8787 points the launcher at a test server.
+		String override = System.getProperty("velo.serverUrl");
+		if (override != null && !override.isBlank()) {
+			return override.replaceAll("/+$", "");
+		}
 		Path config = VeloPaths.config().resolve("network.json");
 		try {
 			if (Files.exists(config)) {

@@ -40,6 +40,8 @@ public final class StoreClient {
 
 	private static volatile int balance = -1;
 	private static volatile Set<String> owned = Set.of();
+	/** Whether the server has told us what we own yet (this session). */
+	private static volatile boolean walletLoaded;
 	private static volatile boolean owner;
 	private static volatile String currency = "EUR";
 	private static volatile List<CoinPack> packs = List.of();
@@ -62,6 +64,11 @@ public final class StoreClient {
 
 	public static Set<String> owned() {
 		return owned;
+	}
+
+	/** True once the wallet (owned items) has been loaded from the server. */
+	public static boolean walletLoaded() {
+		return walletLoaded;
 	}
 
 	public static boolean isOwner() {
@@ -128,6 +135,7 @@ public final class StoreClient {
 			return;
 		}
 		lastWalletRefresh = now;
+		Set<String> ownedBefore = owned;
 		async(() -> {
 			// The catalog is public; wallet and rewards need the Velo session.
 			applyCatalog(get("/v1/store/catalog"));
@@ -139,6 +147,8 @@ public final class StoreClient {
 			return null;
 		}, ok -> {
 			lastError = null;
+			// The catalog lists what you own too, so it follows the wallet.
+			net.veloclient.velo.client.cosmetics.CosmeticsCatalog.refresh(!owned.equals(ownedBefore));
 			net.veloclient.velo.client.store.StoreRestore.restoreMissing();
 			if (onDone != null) {
 				onDone.run();
@@ -218,6 +228,31 @@ public final class StoreClient {
 		async(() -> post("/v1/admin/store/coins", body), onOk, onError);
 	}
 
+	/** Gives ({@code grant}) or takes away a cosmetic (any status - testing items too). */
+	public static void adminItem(String target, String itemId, boolean grant, Consumer<JsonObject> onOk, Consumer<String> onError) {
+		JsonObject body = new JsonObject();
+		body.addProperty("target", target);
+		body.addProperty("itemId", itemId);
+		body.addProperty("grant", grant);
+		async(() -> post("/v1/admin/store/item", body), onOk, onError);
+	}
+
+	/** Every cosmetic with its status, collections and the featured one (owner only). */
+	public static void adminCosmetics(Consumer<JsonObject> onOk, Consumer<String> onError) {
+		async(() -> get("/v1/admin/cosmetics"), onOk, onError);
+	}
+
+	/** Changes a cosmetic: only the fields in {@code item} (plus its id) change. */
+	public static void adminUpdateCosmetic(JsonObject item, boolean clearWindow, Consumer<JsonObject> onOk, Consumer<String> onError) {
+		JsonObject body = new JsonObject();
+		body.add("item", item);
+		body.addProperty("clearWindow", clearWindow);
+		async(() -> post("/v1/admin/cosmetics/item", body), r -> {
+			net.veloclient.velo.client.cosmetics.CosmeticsCatalog.refresh(true);
+			onOk.accept(r);
+		}, onError);
+	}
+
 	// ---- Parsing ----
 
 	private static void applyWallet(JsonObject wallet) {
@@ -228,6 +263,7 @@ public final class StoreClient {
 			items.add(element.getAsString());
 		}
 		owned = Set.copyOf(items);
+		walletLoaded = true;
 	}
 
 	/** Item prices from the server's catalog (the server is what actually charges). */

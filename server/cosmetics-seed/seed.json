@@ -1,0 +1,339 @@
+{
+	"featured": "afterlife",
+	"collections": [
+		{
+			"id": "afterlife",
+			"name": "Afterlife",
+			"tag": "HALLOWEEN COLLECTION",
+			"description": "Three pairs back from the other side - cobwebbed bat wings, the bare bones of a dragon and a wraith's drifting shroud. Each one moves with you like the rest of your wings."
+		},
+		{
+			"id": "shadows_angels",
+			"name": "Shadows & Angels",
+			"tag": "WINGS COLLECTION",
+			"description": "Five pairs of real 3D wings that move with you - a slow, calm wingbeat while you stand, wider strokes as you run, spread wide when you glide."
+		},
+		{
+			"id": "yuletide",
+			"name": "Yuletide",
+			"tag": "CHRISTMAS COLLECTION",
+			"description": "Candy canes, fresh snow and frosted feathers for the coldest nights of the year."
+		},
+		{
+			"id": "neon",
+			"name": "Neon",
+			"tag": "NEON COLLECTION",
+			"description": "Glowing neon wings in five colours - pick the one that matches your setup."
+		}
+	],
+	"items": [
+		{
+			"id": "wings_angelic",
+			"type": "wings",
+			"name": "Angelic Wings",
+			"description": "Radiant white feathers with a golden crest and a halo on top.",
+			"price": 3000,
+			"status": "released",
+			"collection": "shadows_angels",
+			"accent": "#f2d27a",
+			"style": "feathered",
+			"scale": 0.85,
+			"files": {
+				"mesh": "client/wings/angelic.vmesh",
+				"texture": "client/wings/textures/angelic.png",
+				"preview": "client/wings/textures/angelic_preview.png"
+			}
+		},
+		{
+			"id": "wings_bonedragon",
+			"type": "wings",
+			"name": "Bone Dragon Wings",
+			"description": "The bare bones of a dragon's wings, claws tipped with a sickly green glow.",
+			"price": 3000,
+			"status": "released",
+			"collection": "afterlife",
+			"accent": "#9be36b",
+			"style": "bat",
+			"scale": 0.85,
+			"files": {
+				"mesh": "client/wings/bonedragon.vmesh",
+				"texture": "client/wings/textures/bonedragon.png",
+				"preview": "client/wings/textures/bonedragon_preview.png"
+			},
+			"availableUntil": 1794096000000
+		},
+		{
+			"id": "wings_cobweb",
+			"type": "wings",
+			"name": "Cobweb Wings",
+			"description": "Tattered bat wings strung with cobwebs, their edges smouldering orange.",
+			"price": 2600,
+			"status": "released",
+			"collection": "afterlife",
+			"accent": "#ff8a1f",
+			"style": "bat",
+			"scale": 0.85,
+			"files": {
+				"mesh": "client/wings/cobweb.vmesh",
+				"texture": "client/wings/textures/cobweb.png",
+				"preview": "client/wings/textures/cobweb_preview.png"
+			},
+			"availableUntil": 1794096000000
+		},
+		{
+			"id": "wings_frost",
+			"type": "wings",
+			"name": "Frost Wings",
+			"description": "Wings of living ice - crystal shards over a frozen frame.",
+			"price": 2800,
+			"status": "released",
+			"collection": "shadows_angels",
+			"accent": "#5cc8ff",
+			"style": "crystal",
+			"scale": 1.0,
+			"files": {
+				"mesh": "client/wings/frost.vmesh",
+				"texture": "client/wings/textures/frost.png",
+				"preview": "client/wings/textures/frost_preview.png"
+			}
+		},
+		{
+			"id": "wings_phoenix",
+			"type": "wings",
+			"name": "Phoenix Wings",
+			"description": "Blazing feathers in every shade of fire, reborn with every stroke.",
+			"price": 3200,
+			"status": "released",
+			"collection": "shadows_angels",
+			"accent": "#ff7a2e",
+			"style": "feathered",
+			"scale": 0.85,
+			"files": {
+				"mesh": "client/wings/phoenix.vmesh",
+				"texture": "client/wings/textures/phoenix.png",
+				"preview": "client/wings/textures/phoenix_preview.png"
+			}
+		},
+		{
+			"id": "wings_raven",
+			"type": "wings",
+			"name": "Raven Wings",
+			"description": "Midnight-black feathers with a quiet blue sheen.",
+			"price": 2400,
+			"status": "released",
+			"collection": "shadows_angels",
+			"accent": "#8c9bd6",
+			"style": "feathered",
+			"scale": 0.85,
+			"files": {
+				"mesh": "client/wings/raven.vmesh",
+				"texture": "client/wings/textures/raven.png",
+				"preview": "client/wings/textures/raven_preview.png"
+			}
+		},
+		{
+			"id": "wings_shadowfang",
+			"type": "wings",
+			"name": "Shadowfang Wings",
+			"description": "Leathery dragon wings with glowing violet claws.",
+			"price": 2800,
+			"status": "released",
+			"collection": "shadows_angels",
+			"accent": "#a25cff",
+			"style": "bat",
+			"scale": 1.95,
+			"files": {
+				"mesh": "client/wings/shadowfang.vmesh",
+				"texture": "client/wings/textures/shadowfang.png",
+				"preview": "client/wings/textures/shadowfang_preview.png"
+			},
+			"offsetY": 0.0625
+		},
+		{
+			"id": "wings_wraith",
+			"type": "wings",
+			"name": "Wraith Wings",
+			"description": "A wraith's shroud torn into wings - violet wisps that trail behind you.",
+			"price": 2800,
+			"status": "released",
+			"collection": "afterlife",
+			"accent": "#b45cff",
+			"style": "feathered",
+			"scale": 0.85,
+			"files": {
+				"mesh": "client/wings/wraith.vmesh",
+				"texture": "client/wings/textures/wraith.png",
+				"preview": "client/wings/textures/wraith_preview.png"
+			},
+			"availableUntil": 1794096000000
+		},
+		{
+			"id": "cape_black_pattern",
+			"type": "cape",
+			"name": "Digitized",
+			"description": "Shifting black geometric weave.",
+			"price": 900,
+			"status": "released",
+			"files": {
+				"gif": "client/capes/cape_black_pattern.gif"
+			}
+		},
+		{
+			"id": "cape_red_code",
+			"type": "cape",
+			"name": "Codebreaker",
+			"description": "Scrolling red code cascades down the fabric.",
+			"price": 1000,
+			"status": "released",
+			"files": {
+				"gif": "client/capes/cape_red_code.gif"
+			}
+		},
+		{
+			"id": "cape_red_lightning",
+			"type": "cape",
+			"name": "Storm Strike",
+			"description": "Crackling red lightning arcs across the cloth.",
+			"price": 1200,
+			"status": "released",
+			"files": {
+				"gif": "client/capes/cape_red_lightning.gif"
+			}
+		},
+		{
+			"id": "cape_symbols",
+			"type": "cape",
+			"name": "Rune Weave",
+			"description": "Animated arcane symbols drift and glow.",
+			"price": 950,
+			"status": "released",
+			"files": {
+				"gif": "client/capes/cape_symbols.gif"
+			}
+		},
+		{
+			"id": "wings_candycane",
+			"type": "wings",
+			"name": "Candy Cane Wings",
+			"description": "Striped candy-cane frames wrapped in evergreen, ready for the holidays.",
+			"price": 2800,
+			"status": "testing",
+			"collection": "yuletide",
+			"accent": "#ff4d5e",
+			"style": "feathered",
+			"scale": 0.85,
+			"files": {
+				"mesh": "wings/candycane.vmesh",
+				"texture": "wings/candycane.png",
+				"preview": "wings/candycane_preview.png"
+			}
+		},
+		{
+			"id": "wings_snowdrift",
+			"type": "wings",
+			"name": "Snowdrift Wings",
+			"description": "Soft feathers dusted with fresh snow and glittering frost.",
+			"price": 2800,
+			"status": "testing",
+			"collection": "yuletide",
+			"accent": "#cfe9ff",
+			"style": "feathered",
+			"scale": 0.85,
+			"files": {
+				"mesh": "wings/snowdrift.vmesh",
+				"texture": "wings/snowdrift.png",
+				"preview": "wings/snowdrift_preview.png"
+			}
+		},
+		{
+			"id": "wings_neon_white",
+			"type": "wings",
+			"name": "Neon White Wings",
+			"description": "Glowing white neon light traced along sharp wing frames.",
+			"price": 2200,
+			"status": "testing",
+			"collection": "neon",
+			"accent": "#f4f6ff",
+			"style": "bat",
+			"scale": 0.85,
+			"files": {
+				"mesh": "wings/neon_white.vmesh",
+				"texture": "wings/neon_white.png",
+				"preview": "wings/neon_white_preview.png"
+			},
+			"glow": true
+		},
+		{
+			"id": "wings_neon_cyan",
+			"type": "wings",
+			"name": "Neon Cyan Wings",
+			"description": "Glowing cyan neon light traced along sharp wing frames.",
+			"price": 2200,
+			"status": "testing",
+			"collection": "neon",
+			"accent": "#3ff0ff",
+			"style": "bat",
+			"scale": 0.85,
+			"files": {
+				"mesh": "wings/neon_cyan.vmesh",
+				"texture": "wings/neon_cyan.png",
+				"preview": "wings/neon_cyan_preview.png"
+			},
+			"glow": true
+		},
+		{
+			"id": "wings_neon_pink",
+			"type": "wings",
+			"name": "Neon Pink Wings",
+			"description": "Glowing pink neon light traced along sharp wing frames.",
+			"price": 2200,
+			"status": "testing",
+			"collection": "neon",
+			"accent": "#ff4fd8",
+			"style": "bat",
+			"scale": 0.85,
+			"files": {
+				"mesh": "wings/neon_pink.vmesh",
+				"texture": "wings/neon_pink.png",
+				"preview": "wings/neon_pink_preview.png"
+			},
+			"glow": true
+		},
+		{
+			"id": "wings_neon_purple",
+			"type": "wings",
+			"name": "Neon Purple Wings",
+			"description": "Glowing purple neon light traced along sharp wing frames.",
+			"price": 2200,
+			"status": "testing",
+			"collection": "neon",
+			"accent": "#a65cff",
+			"style": "bat",
+			"scale": 0.85,
+			"files": {
+				"mesh": "wings/neon_purple.vmesh",
+				"texture": "wings/neon_purple.png",
+				"preview": "wings/neon_purple_preview.png"
+			},
+			"glow": true
+		},
+		{
+			"id": "wings_neon_red",
+			"type": "wings",
+			"name": "Neon Red Wings",
+			"description": "Glowing red neon light traced along sharp wing frames.",
+			"price": 2200,
+			"status": "testing",
+			"collection": "neon",
+			"accent": "#ff3b3b",
+			"style": "bat",
+			"scale": 0.85,
+			"files": {
+				"mesh": "wings/neon_red.vmesh",
+				"texture": "wings/neon_red.png",
+				"preview": "wings/neon_red_preview.png"
+			},
+			"glow": true
+		}
+	]
+}

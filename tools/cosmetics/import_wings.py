@@ -2,12 +2,18 @@
 """Turns a Meshy (or any single-mesh glTF) pair-of-wings .glb into Velo Client's wing assets.
 
     python3 tools/cosmetics/import_wings.py <wings.glb> <id> "<Display Name>" [--style feathered|bat|crystal] [--scale 0.9]
+        [--dest server|client] [--collection <id>] [--accent #rrggbb] [--price 2500] [--description "..."]
 
-Writes, under src/client/resources/assets/velo-client/:
-    cosmetics/wings/<id>.vmesh         both wing halves, each with its own shoulder hinge
-    textures/cosmetics/wings/<id>.png  the base colour texture, 512x512
-and adds / updates the entry in cosmetics/wings/wings.json (a hand-written description, price -
-in Velo Coins, keep it in sync with the server's store.json - and offsetY stay as they are).
+--dest server (the default): the pair lives on the Velo server only - clients download it, no client
+update needed. Writes server/cosmetics-seed/wings/<id>.vmesh, <id>.png (512x512) and <id>_preview.png
+and adds the item to server/cosmetics-seed/seed.json with status "testing" (only the owner can give it
+out; release it in the launcher's Owner panel). The next server build ships it; to add it to a running
+server right away use tools/cosmetics/publish_wings.py <id>.
+
+--dest client: also bundled inside the mod (cosmetics/wings/<id>.vmesh + textures/cosmetics/wings/ and an
+entry in cosmetics/wings/wings.json) so it shows without downloading. Only worth it for long-lived pairs.
+
+Hand-edited fields of an existing entry (description, price, offsetY, status...) stay as they are.
 
 What the model needs: both wings in one mesh, spread flat and facing forward (+Y up, the wings to
 the left and right along X, thin along Z, +Z towards the wearer's back), the two halves meeting at
@@ -117,6 +123,26 @@ def write_vmesh(path, halves):
     path.write_bytes(out.getvalue())
 
 
+SEED = ROOT / "server/cosmetics-seed"
+
+
+def upsert_seed(item):
+    """Adds / updates an item in server/cosmetics-seed/seed.json, keeping hand-set fields."""
+    path = SEED / "seed.json"
+    seed = json.loads(path.read_text()) if path.exists() else {"featured": None, "collections": [], "items": []}
+    previous = next((e for e in seed["items"] if e["id"] == item["id"]), None)
+    if previous:
+        merged = dict(item)
+        for key in ("description", "price", "status", "collection", "accent", "offsetY", "availableFrom", "availableUntil"):
+            if previous.get(key) not in (None, ""):
+                merged[key] = previous[key]
+        seed["items"][seed["items"].index(previous)] = merged
+    else:
+        seed["items"].append(item)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(seed, indent="\t") + "\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("glb")
@@ -125,34 +151,64 @@ def main():
     parser.add_argument("--style", default="feathered", choices=["feathered", "bat", "crystal"],
                         help="animation feel: feathered = soft flaps, bat = snappier, crystal = stiff, slower")
     parser.add_argument("--scale", type=float, default=0.9, help="size on the player (1 = model units as blocks)")
+    parser.add_argument("--dest", default="server", choices=["server", "client"])
+    parser.add_argument("--collection", default=None)
+    parser.add_argument("--accent", default="#ff4d4d")
+    parser.add_argument("--price", type=int, default=2500)
+    parser.add_argument("--description", default="")
     args = parser.parse_args()
     if not args.id.replace("_", "").replace("-", "").isalnum() or args.id.lower() != args.id or len(args.id) > 32:
         raise SystemExit("id must be lowercase letters, digits, _ or - (max 32)")
 
     pos, nrm, uv, idx, texture = read_glb(args.glb)
     halves = [split_half(pos, nrm, uv, idx, left=True), split_half(pos, nrm, uv, idx, left=False)]
-    write_vmesh(ASSETS / "cosmetics/wings" / f"{args.id}.vmesh", halves)
+    texture = texture.resize((TEXTURE_SIZE, TEXTURE_SIZE), Image.LANCZOS)
 
-    tex_path = ASSETS / "textures/cosmetics/wings" / f"{args.id}.png"
+    if args.dest == "client":
+        mesh_path = ASSETS / "cosmetics/wings" / f"{args.id}.vmesh"
+        tex_path = ASSETS / "textures/cosmetics/wings" / f"{args.id}.png"
+        preview_path = ASSETS / "textures/cosmetics/wings" / f"{args.id}_preview.png"
+        files = {"mesh": f"client/wings/{args.id}.vmesh", "texture": f"client/wings/textures/{args.id}.png",
+                 "preview": f"client/wings/textures/{args.id}_preview.png"}
+    else:
+        mesh_path = SEED / "wings" / f"{args.id}.vmesh"
+        tex_path = SEED / "wings" / f"{args.id}.png"
+        preview_path = SEED / "wings" / f"{args.id}_preview.png"
+        files = {"mesh": f"wings/{args.id}.vmesh", "texture": f"wings/{args.id}.png", "preview": f"wings/{args.id}_preview.png"}
+    write_vmesh(mesh_path, halves)
     tex_path.parent.mkdir(parents=True, exist_ok=True)
-    texture.resize((TEXTURE_SIZE, TEXTURE_SIZE), Image.LANCZOS).save(tex_path, optimize=True)
+    texture.save(tex_path, optimize=True)
 
-    index_path = ASSETS / "cosmetics/wings/wings.json"
-    entries = json.loads(index_path.read_text()) if index_path.exists() else []
-    # Keep anything set by hand on an existing entry (description, price, offsetY...).
-    previous = next((e for e in entries if e["id"] == args.id), {})
-    entries = [e for e in entries if e["id"] != args.id]
-    entry = dict(previous)
-    entry.update({"id": args.id, "name": args.name, "style": args.style, "scale": args.scale})
-    entry.setdefault("description", "")
-    entry.setdefault("price", 2500)
-    entries.append(entry)
-    entries.sort(key=lambda e: e["name"])
-    index_path.write_text(json.dumps(entries, indent="\t") + "\n")
+    if args.dest == "client":
+        index_path = ASSETS / "cosmetics/wings/wings.json"
+        entries = json.loads(index_path.read_text()) if index_path.exists() else []
+        # Keep anything set by hand on an existing entry (description, price, offsetY...).
+        previous = next((e for e in entries if e["id"] == args.id), {})
+        entries = [e for e in entries if e["id"] != args.id]
+        entry = dict(previous)
+        entry.update({"id": args.id, "name": args.name, "style": args.style, "scale": args.scale})
+        entry.setdefault("description", args.description)
+        entry.setdefault("price", args.price)
+        entry.setdefault("accent", args.accent)
+        if args.collection:
+            entry.setdefault("collection", args.collection)
+        entries.append(entry)
+        entries.sort(key=lambda e: e["name"])
+        index_path.write_text(json.dumps(entries, indent="\t") + "\n")
+
+    upsert_seed({"id": "wings_" + args.id, "type": "wings", "name": args.name, "description": args.description,
+                 "price": args.price, "status": "testing", "collection": args.collection, "accent": args.accent,
+                 "style": args.style, "scale": args.scale, "files": files})
+
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("previews", Path(__file__).with_name("render_wing_previews.py"))
+    previews = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(previews)
+    previews.render(mesh_path, tex_path, args.scale, preview_path)
 
     tris = sum(len(h[5]) for h in halves)
     print(f"{args.id}: {tris} triangles, hinges at y={halves[0][0][1]:.2f}/{halves[1][0][1]:.2f}, "
-          f"span {halves[0][1]:.2f}/{halves[1][1]:.2f} -> {tex_path.relative_to(ROOT)}")
+          f"span {halves[0][1]:.2f}/{halves[1][1]:.2f} -> {mesh_path.relative_to(ROOT)} ({args.dest})")
 
 
 if __name__ == "__main__":

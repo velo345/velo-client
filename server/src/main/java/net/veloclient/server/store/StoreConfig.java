@@ -51,7 +51,10 @@ public final class StoreConfig {
 			new Item("wings_frost", "Frost Wings", 2800),
 			new Item("wings_phoenix", "Phoenix Wings", 3200),
 			new Item("wings_raven", "Raven Wings", 2400),
-			new Item("wings_shadowfang", "Shadowfang Wings", 2800));
+			new Item("wings_shadowfang", "Shadowfang Wings", 2800),
+			new Item("wings_cobweb", "Cobweb Wings", 2600),
+			new Item("wings_bonedragon", "Bone Dragon Wings", 3000),
+			new Item("wings_wraith", "Wraith Wings", 2800));
 
 	/**
 	 * A daily quest. {@code stat}: {@code online_minutes} (measured by the server from game

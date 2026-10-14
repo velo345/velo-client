@@ -1,0 +1,55 @@
+{
+  "title": "Halloween collection: Afterlife",
+  "summary": "Three pairs of animated 3D wings back from the other side - Cobweb, Bone Dragon and Wraith. In the Velo Store until November 7.",
+  "tag": "News",
+  "accent": "#ff8a1f",
+  "pinned": true,
+  "cover": "file:images/cover.jpg",
+  "blocks": [
+    {
+      "type": "text",
+      "text": "Halloween is here, and so is **Afterlife** - three new pairs of **3D wings** for the spookiest weeks of the year. Like every pair, they **move with you**: calm wingbeats while you stand, big strokes when you run or fly, spread wide while you glide."
+    },
+    {
+      "type": "callout",
+      "style": "warning",
+      "text": "**Limited time:** Afterlife is only in the Store until **November 7**. Whatever you get stays yours after that."
+    },
+    {
+      "type": "heading",
+      "text": "The collection"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Cobweb Wings** - tattered bat wings strung with cobwebs, their edges smouldering orange.",
+        "**Bone Dragon Wings** - the bare bones of a dragon's wings, claws tipped with a sickly green glow.",
+        "**Wraith Wings** - a wraith's shroud torn into wings, violet wisps that trail behind you."
+      ]
+    },
+    {
+      "type": "image",
+      "image": "file:images/store-featured.jpg",
+      "caption": "Afterlife in the in-game Store - the banner counts down the days it has left."
+    },
+    {
+      "type": "image",
+      "image": "file:images/store-wing.jpg",
+      "caption": "Try every pair on your own player, in every animation, before you buy."
+    },
+    {
+      "type": "text",
+      "text": "Every pair has its own settings - **size**, **height**, **distance**, **spread**, **flap speed** and **flap strength** - and other Velo Client players see your wings exactly the way you set them up."
+    },
+    {
+      "type": "image",
+      "image": "file:images/launcher-store.jpg",
+      "caption": "Also in the launcher's Store."
+    },
+    {
+      "type": "callout",
+      "style": "success",
+      "text": "Afterlife wings are **Velo Coins** items, from **2,600 coins**. Open the **Store** in the launcher or from the pause menu."
+    }
+  ]
+}

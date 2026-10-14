@@ -306,7 +306,7 @@ public final class ScreenshotTour {
 			case "store" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null))},
 					new Object[] {60, (Runnable) () -> shot(client, "store-featured")},
-					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.cosmetics.wings.WingsManager.type("phoenix").ifPresent(type ->
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.cosmetics.wings.WingsManager.type(System.getProperty("velo.tourWings", "phoenix")).ifPresent(type ->
 							client.setScreen(new net.veloclient.velo.client.gui.store.WingDetailScreen(null, type)))},
 					new Object[] {60, (Runnable) () -> shot(client, "store-wing")});
 			case "pause" -> List.of(

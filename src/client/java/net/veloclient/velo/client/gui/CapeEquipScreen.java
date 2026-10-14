@@ -119,8 +119,17 @@ public final class CapeEquipScreen extends VeloWindow {
 		int tileW = (listWidth - (columns - 1) * 6) / columns;
 		java.util.List<String[]> tiles = new java.util.ArrayList<>();
 		tiles.add(new String[] {"", "None"});
-		for (var type : net.veloclient.velo.client.cosmetics.wings.WingsManager.catalog()) {
-			tiles.add(new String[] {type.id(), type.name()});
+		// What you own first, then what the Store sells (to try on).
+		var wingTypes = net.veloclient.velo.client.cosmetics.wings.WingsManager.catalog();
+		for (var type : wingTypes) {
+			if (net.veloclient.velo.client.cosmetics.wings.WingsManager.owns(type.id())) {
+				tiles.add(new String[] {type.id(), type.name()});
+			}
+		}
+		for (var type : wingTypes) {
+			if (type.inStore() && !net.veloclient.velo.client.cosmetics.wings.WingsManager.owns(type.id())) {
+				tiles.add(new String[] {type.id(), type.name()});
+			}
 		}
 		for (int i = 0; i < tiles.size(); i++) {
 			String id = tiles.get(i)[0];

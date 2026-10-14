@@ -408,6 +408,39 @@ On start the server prints which parts are on, e.g.
   server-tracked statistics, are rate-capped per minute, and only pay after the server has seen
   enough real in-game time that day (from game-session heartbeats).
 
+## Cosmetics catalog (wings and capes without client updates)
+
+Every wing pair and store cape lives in the server's catalog (`CosmeticsService.java`,
+`data/cosmetics/catalog.json`, art content-addressed in `data/cosmetics/files/<sha256>`). The game
+and the launcher download the catalog and any art they don't ship with, so **adding a cosmetic
+never needs a client update**.
+
+Each item has a status:
+
+| Status | In the store | Who has it |
+|---|---|---|
+| `released` | yes, inside its optional window (`availableFrom` / `availableUntil`) | buyers + whoever you give it to |
+| `testing` | no | only whoever the owner gives it to - and everyone sees it on them |
+| `hidden` | no (e.g. a limited drop that's over) | whoever already owns it keeps it |
+
+Owners manage it in the launcher (**Store > Owner panel**: status, price, "last day in store",
+collection, featured collection, give/take coins and items, several players at once) or in-game
+(**Get coins > Owner**: give/take items, switch status).
+
+Adding a new pair of wings:
+
+```bash
+python3 tools/cosmetics/import_wings.py <meshy.glb> <id> "<Name>" --collection <id> --accent "#rrggbb" --price 2500
+# -> server/cosmetics-seed/ (status "testing"); then put it on the running server:
+python3 tools/cosmetics/publish_wings.py <id>   # needs VELO_SERVER_URL + VELO_ADMIN_TOKEN (env or .env)
+```
+
+`server/cosmetics-seed/seed.json` is also bundled into the jar: anything in it that the catalog
+doesn't have yet is added on start (existing items are never overwritten, so your edits stay).
+Endpoints: `GET /v1/cosmetics/catalog` (store + what you own; everything for owners),
+`GET /v1/cosmetics/item?id=`, `GET /v1/cosmetics/file/<sha256>`, and the owner-only
+`/v1/admin/cosmetics{,/item,/file,/collection,/featured}` (owner session or `X-Velo-Admin-Token`).
+
 ## Configuring the mod to use your server
 
 The mod ships already pointed at Velo Client's own official server

@@ -257,6 +257,10 @@ public final class LauncherApp extends Application {
 		}
 		steps.add(new Object[] {"03-settings", (Runnable) this::showSettings});
 		steps.add(new Object[] {"04-cosmetics", (Runnable) this::showCosmetics});
+		steps.add(new Object[] {"04b-cosmetics-wings", (Runnable) () -> {
+			net.veloclient.launcher.ui.CosmeticsView.showWingsTab();
+			showCosmetics();
+		}});
 		steps.add(new Object[] {"05-store", (Runnable) this::showStore});
 		if (!net.veloclient.launcher.data.StoreCatalog.all().isEmpty()) {
 			steps.add(new Object[] {"05b-store-item", (Runnable) () -> showStoreItemDetail(net.veloclient.launcher.data.StoreCatalog.all().get(0))});
@@ -265,6 +269,7 @@ public final class LauncherApp extends Application {
 			steps.add(new Object[] {"05e-wings", (Runnable) () -> showWingDetail(net.veloclient.launcher.data.WingsCatalog.all().stream()
 					.filter(w -> w.id().equals("shadowfang")).findFirst().orElse(net.veloclient.launcher.data.WingsCatalog.all().get(0)))});
 		}
+		steps.add(new Object[] {"05h-owner", (Runnable) this::showOwner});
 		steps.add(new Object[] {"05f-clips", (Runnable) this::showMedia});
 		steps.add(new Object[] {"05g-party", (Runnable) this::showParty});
 		steps.add(new Object[] {"05d-coins", (Runnable) this::showCoins});
@@ -2233,9 +2238,34 @@ public final class LauncherApp extends Application {
 				return session;
 			}
 		}));
+		markActiveNav(navCosmetics);
+		refreshWingsCatalog();
+	}
+
+	/**
+	 * Fetches the server's wings catalog (new pairs, prices, what's for sale) in the background and
+	 * shows the page again if it changed and you're still on it.
+	 */
+	private void refreshWingsCatalog() {
+		Runnable page = currentPage;
+		java.util.concurrent.CompletableFuture.runAsync(() -> {
+			if (net.veloclient.launcher.data.WingsCatalog.refresh()) {
+				javafx.application.Platform.runLater(() -> {
+					if (currentPage == page) {
+						page.run();
+					}
+				});
+			}
+		}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor());
 	}
 
 	// ---- Store ----
+
+	private void showOwner() {
+		currentPage = this::showOwner;
+		setContent(net.veloclient.launcher.ui.OwnerView.build(this::showOwner));
+		markActiveNav(navStore);
+	}
 
 	private void showCoins() {
 		currentPage = this::showCoins;
@@ -2282,11 +2312,17 @@ public final class LauncherApp extends Application {
 			}
 
 			@Override
+			public void openOwner() {
+				showOwner();
+			}
+
+			@Override
 			public void rebuild() {
 				showStore();
 			}
 		}));
 		markActiveNav(navStore);
+		refreshWingsCatalog();
 		// Server prices for the cards (shown on the next visit if they weren't loaded yet).
 		java.util.concurrent.CompletableFuture.runAsync(() -> {
 			try {

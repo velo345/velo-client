@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import net.minecraft.util.Identifier;
 import net.veloclient.velo.VeloClient;
 
 import java.io.InputStream;
@@ -41,12 +42,23 @@ public final class WingsManager {
 		}
 	}
 
-	/** A pair in the catalog; {@code offsetY} nudges it down on the back (blocks), {@code price} is a fallback for the shop. */
-	public record WingType(String id, String name, Style style, float scale, float offsetY, String description, int price) {
+	/**
+	 * A pair in the catalog; {@code offsetY} nudges it down on the back (blocks), {@code price} is a fallback for the shop,
+	 * {@code collection} is the id of the {@link Collection} it belongs to and {@code accent} its colour (ARGB) for glows.
+	 * {@code bundled}: its art ships inside the mod; otherwise {@code mesh}/{@code texture}/{@code preview} are the server
+	 * files (sha256) it's drawn from. {@code inStore}: can be bought right now ({@code availableUntil}: until when, or null).
+	 */
+	public record WingType(String id, String name, Style style, float scale, float offsetY, String description, int price,
+			String collection, int accent, boolean glow, boolean bundled, boolean inStore, Long availableUntil,
+			String mesh, String texture, String preview) {
 		/** Its Velo Store item id. */
 		public String itemId() {
 			return ITEM_PREFIX + id;
 		}
+	}
+
+	/** A themed drop of wings, e.g. "Afterlife". */
+	public record Collection(String id, String name, String tag, String description) {
 	}
 
 	/** Wings are Velo Store items: {@code wings_<id>}. */
@@ -103,8 +115,14 @@ public final class WingsManager {
 	private record EquipState(String wingsId, Map<String, Settings> perWing, Settings settings) {
 	}
 
-	private static final Map<String, WingType> CATALOG = new LinkedHashMap<>();
+	private static final Map<String, WingType> BUNDLED = new LinkedHashMap<>();
+	private static final List<Collection> BUNDLED_COLLECTIONS = new ArrayList<>();
+	private static Map<String, WingType> CATALOG = new LinkedHashMap<>();
+	private static List<Collection> COLLECTIONS = new ArrayList<>();
+	private static String featuredId;
+	private static int catalogVersion = -1;
 	private static final Map<String, WingModel> MODELS = new HashMap<>();
+	private static final Map<String, Identifier> TEXTURES = new HashMap<>();
 	private static final java.util.Set<String> FAILED = new java.util.HashSet<>();
 	private static boolean loaded;
 	private static String equippedId;
@@ -117,34 +135,51 @@ public final class WingsManager {
 
 	public static synchronized void load() {
 		if (loaded) {
+			sync();
 			return;
 		}
 		loaded = true;
+		try (InputStream in = WingsManager.class.getResourceAsStream("/assets/velo-client/cosmetics/wings/collections.json")) {
+			if (in != null) {
+				for (JsonElement element : new Gson().fromJson(new InputStreamReader(in, StandardCharsets.UTF_8), JsonArray.class)) {
+					JsonObject c = element.getAsJsonObject();
+					BUNDLED_COLLECTIONS.add(new Collection(c.get("id").getAsString(), c.get("name").getAsString(),
+							c.has("tag") ? c.get("tag").getAsString() : "COLLECTION", c.has("description") ? c.get("description").getAsString() : ""));
+				}
+			}
+		} catch (Exception e) {
+			VeloClient.LOGGER.warn("Couldn't read the wings collections", e);
+		}
 		try (InputStream in = WingsManager.class.getResourceAsStream("/assets/velo-client/cosmetics/wings/wings.json")) {
 			if (in != null) {
 				JsonArray entries = new Gson().fromJson(new InputStreamReader(in, StandardCharsets.UTF_8), JsonArray.class);
 				for (JsonElement element : entries) {
 					JsonObject e = element.getAsJsonObject();
-					Style style = Style.FEATHERED;
-					try {
-						style = Style.valueOf(e.get("style").getAsString().toUpperCase(java.util.Locale.ROOT));
-					} catch (RuntimeException ignored) {
-						// Unknown style - feathered.
-					}
 					String id = e.get("id").getAsString();
-					CATALOG.put(id, new WingType(id, e.get("name").getAsString(), style, e.has("scale") ? e.get("scale").getAsFloat() : 0.9f,
-							e.has("offsetY") ? e.get("offsetY").getAsFloat() : 0f, e.has("description") ? e.get("description").getAsString() : "",
-							e.has("price") ? e.get("price").getAsInt() : 2500));
+					int accent = 0xFFFF4D4D;
+					try {
+						accent = 0xFF000000 | Integer.parseInt(e.get("accent").getAsString().substring(1), 16);
+					} catch (RuntimeException ignored) {
+						// No / bad accent - Velo red.
+					}
+					BUNDLED.put(id, new WingType(id, e.get("name").getAsString(), style(e.has("style") ? e.get("style").getAsString() : null),
+							e.has("scale") ? e.get("scale").getAsFloat() : 0.9f, e.has("offsetY") ? e.get("offsetY").getAsFloat() : 0f,
+							e.has("description") ? e.get("description").getAsString() : "", e.has("price") ? e.get("price").getAsInt() : 2500,
+							e.has("collection") ? e.get("collection").getAsString() : "", accent, false, true, true, null, null, null, null));
 				}
 			}
 		} catch (Exception e) {
 			VeloClient.LOGGER.warn("Couldn't read the wings catalog", e);
 		}
+		net.veloclient.velo.client.cosmetics.CosmeticsCatalog.refresh(false);
+		sync();
+		// The saved choice is kept even for a pair this client doesn't know yet (a server-only one): the
+		// server catalog arrives a moment later.
 		EquipState state = net.veloclient.velo.config.ConfigManager.load("cosmetics-wings", EquipState.class, new EquipState(null, null, null));
-		equippedId = state != null && state.wingsId() != null && CATALOG.containsKey(state.wingsId()) ? state.wingsId() : null;
+		equippedId = state != null ? state.wingsId() : null;
 		if (state != null && state.perWing() != null) {
 			state.perWing().forEach((id, s) -> {
-				if (s != null && CATALOG.containsKey(id)) {
+				if (s != null) {
 					// Through the constructor again, so values from the file are clamped.
 					SETTINGS.put(id, new Settings(s.scale(), s.offsetY(), s.offsetZ(), s.spread(), s.flapSpeed(), s.flapStrength()));
 				}
@@ -155,14 +190,139 @@ public final class WingsManager {
 		}
 	}
 
-	public static List<WingType> catalog() {
+	private static Style style(String name) {
+		try {
+			return name == null ? Style.FEATHERED : Style.valueOf(name.toUpperCase(java.util.Locale.ROOT));
+		} catch (RuntimeException e) {
+			return Style.FEATHERED;
+		}
+	}
+
+	/**
+	 * Rebuilds the catalog when the server's changed: the bundled pairs, updated / extended by the
+	 * server's (prices, status, new pairs). Once the server answered, a bundled pair it didn't list
+	 * isn't in the store (hidden or its time is over) - still drawn on whoever wears it.
+	 */
+	private static void sync() {
+		int version = net.veloclient.velo.client.cosmetics.CosmeticsCatalog.version();
+		if (version == catalogVersion) {
+			return;
+		}
+		catalogVersion = version;
+		boolean server = net.veloclient.velo.client.cosmetics.CosmeticsCatalog.loaded();
+		Map<String, WingType> merged = new LinkedHashMap<>();
+		for (WingType t : BUNDLED.values()) {
+			merged.put(t.id(), server ? withStore(t, false, null) : t);
+		}
+		List<net.veloclient.velo.client.cosmetics.CosmeticsCatalog.Item> remote = new ArrayList<>(net.veloclient.velo.client.cosmetics.CosmeticsCatalog.items());
+		// Plus pairs looked up because someone wears them.
+		for (var looked : net.veloclient.velo.client.cosmetics.CosmeticsCatalog.lookedUp()) {
+			if (remote.stream().noneMatch(i -> i.id().equals(looked.id()))) {
+				remote.add(looked);
+			}
+		}
+		for (var item : remote) {
+			if (!"wings".equals(item.type()) || !item.id().startsWith(ITEM_PREFIX)) {
+				continue;
+			}
+			String id = item.id().substring(ITEM_PREFIX.length());
+			WingType base = BUNDLED.get(id);
+			merged.put(id, new WingType(id, item.name(), item.style() != null ? style(item.style()) : base != null ? base.style() : Style.FEATHERED,
+					item.scale() != null ? item.scale() : base != null ? base.scale() : 0.9f,
+					item.offsetY() != null ? item.offsetY() : base != null ? base.offsetY() : 0f,
+					item.description(), item.price() > 0 ? item.price() : base != null ? base.price() : 0,
+					item.collection() != null ? item.collection() : "", item.accent() != null ? item.accent() : base != null ? base.accent() : 0xFFFF4D4D,
+					item.glow(), base != null, item.inStore(), item.availableUntil(),
+					item.files().get("mesh"), item.files().get("texture"), item.files().get("preview")));
+		}
+		List<Collection> collections = new ArrayList<>(BUNDLED_COLLECTIONS);
+		if (server && !net.veloclient.velo.client.cosmetics.CosmeticsCatalog.collections().isEmpty()) {
+			collections = new ArrayList<>();
+			for (var c : net.veloclient.velo.client.cosmetics.CosmeticsCatalog.collections()) {
+				collections.add(new Collection(c.id(), c.name(), c.tag(), c.description()));
+			}
+		}
+		featuredId = server ? net.veloclient.velo.client.cosmetics.CosmeticsCatalog.featured() : null;
+		List<Collection> order = collections;
+		List<WingType> types = new ArrayList<>(merged.values());
+		// Newest collection first, by name inside each one.
+		types.sort(java.util.Comparator.comparingInt((WingType t) -> index(order, t.collection())).thenComparing(WingType::name));
+		Map<String, WingType> sorted = new LinkedHashMap<>();
+		types.forEach(t -> sorted.put(t.id(), t));
+		CATALOG = sorted;
+		COLLECTIONS = collections;
+	}
+
+	private static WingType withStore(WingType t, boolean inStore, Long until) {
+		return new WingType(t.id(), t.name(), t.style(), t.scale(), t.offsetY(), t.description(), t.price(), t.collection(), t.accent(),
+				t.glow(), t.bundled(), inStore, until, t.mesh(), t.texture(), t.preview());
+	}
+
+	private static int index(List<Collection> collections, String id) {
+		for (int i = 0; i < collections.size(); i++) {
+			if (collections.get(i).id().equals(id)) {
+				return i;
+			}
+		}
+		return collections.size();
+	}
+
+	/** Every pair this client knows (bundled, in the store, owned, or seen on someone). */
+	public static synchronized List<WingType> catalog() {
 		load();
 		return new ArrayList<>(CATALOG.values());
 	}
 
-	public static Optional<WingType> type(String id) {
+	/** What the Store sells right now. */
+	public static List<WingType> forSale() {
+		return catalog().stream().filter(WingType::inStore).toList();
+	}
+
+	/** Pairs you can equip: the ones you own (the saved one too, until the server answered). */
+	public static List<WingType> owned() {
+		return catalog().stream().filter(t -> owns(t.id())).toList();
+	}
+
+	/** Collections with something for sale, newest first. */
+	public static synchronized List<Collection> collections() {
 		load();
-		return Optional.ofNullable(id == null ? null : CATALOG.get(id));
+		List<WingType> sale = forSale();
+		return COLLECTIONS.stream().filter(c -> sale.stream().anyMatch(t -> t.collection().equals(c.id()))).toList();
+	}
+
+	/** What the Store features: the server's pick, else the newest collection with something for sale. */
+	public static Optional<Collection> featured() {
+		List<Collection> withItems = collections();
+		return withItems.stream().filter(c -> c.id().equals(featuredId)).findFirst().or(() -> withItems.stream().findFirst());
+	}
+
+	public static synchronized Optional<Collection> collection(String id) {
+		load();
+		return COLLECTIONS.stream().filter(c -> c.id().equals(id)).findFirst();
+	}
+
+	/** The pairs for sale in one collection. */
+	public static List<WingType> inCollection(String collectionId) {
+		return forSale().stream().filter(t -> t.collection().equals(collectionId)).toList();
+	}
+
+	/** A pair by id; one this client doesn't know yet (someone else wears it) is looked up on the server. */
+	public static synchronized Optional<WingType> type(String id) {
+		load();
+		if (id == null) {
+			return Optional.empty();
+		}
+		WingType type = CATALOG.get(id);
+		if (type == null) {
+			net.veloclient.velo.client.cosmetics.CosmeticsCatalog.requestItem(ITEM_PREFIX + id);
+			var item = net.veloclient.velo.client.cosmetics.CosmeticsCatalog.item(ITEM_PREFIX + id);
+			if (item.isPresent()) {
+				catalogVersion = -1;
+				sync();
+				type = CATALOG.get(id);
+			}
+		}
+		return Optional.ofNullable(type);
 	}
 
 	/** The equipped pair's id, or null. */
@@ -171,19 +331,22 @@ public final class WingsManager {
 		return equippedId;
 	}
 
-	/** Whether you own this pair (bought with Velo Coins). Before the store has answered, a saved choice is trusted. */
+	/**
+	 * Whether you own this pair (bought with Velo Coins or given by the owner). Until the server has said
+	 * what you own, the saved choice is trusted - otherwise your wings vanish after every launch.
+	 */
 	public static boolean owns(String id) {
 		if (id == null) {
 			return false;
 		}
 		return net.veloclient.velo.client.network.StoreClient.owns(ITEM_PREFIX + id)
-				|| !net.veloclient.velo.client.network.StoreClient.connected() && id.equals(equippedId);
+				|| !net.veloclient.velo.client.network.StoreClient.walletLoaded() && id.equals(equippedId);
 	}
 
 	/** Equips a pair you own (or takes wings off with null); returns false if you don't own it. */
 	public static boolean equip(String id) {
 		load();
-		if (id != null && (!CATALOG.containsKey(id) || !owns(id))) {
+		if (id != null && (type(id).isEmpty() || !owns(id))) {
 			return false;
 		}
 		equippedId = id;
@@ -227,7 +390,7 @@ public final class WingsManager {
 			return null;
 		}
 		String[] parts = value.split(";");
-		if (!CATALOG.containsKey(parts[0])) {
+		if (type(parts[0]).isEmpty()) {
 			return null;
 		}
 		return new Worn(parts[0], parts.length >= 7 ? Settings.decode(parts, 1) : Settings.DEFAULT);
@@ -258,23 +421,84 @@ public final class WingsManager {
 		return previewActive ? previewId : equippedId();
 	}
 
-	/** The model for a catalog id, loaded on first use (null if it can't be). */
+	/**
+	 * The model for a catalog id, loaded on first use. Null if it can't be - or, for a server-only pair,
+	 * until its mesh has downloaded (asked again next frame).
+	 */
 	public static synchronized WingModel model(String id) {
 		WingModel model = MODELS.get(id);
 		if (model != null || FAILED.contains(id)) {
 			return model;
 		}
-		WingType type = CATALOG.get(id);
+		WingType type = type(id).orElse(null);
 		if (type == null) {
 			return null;
 		}
 		try {
-			model = WingModel.load(id, type.scale());
+			if (type.bundled()) {
+				model = WingModel.load(id, type.scale());
+			} else {
+				java.nio.file.Path file = net.veloclient.velo.client.cosmetics.CosmeticsCatalog.file(type.mesh());
+				if (file == null) {
+					return null;
+				}
+				try (InputStream in = java.nio.file.Files.newInputStream(file)) {
+					model = WingModel.read(in, id, type.scale());
+				}
+			}
 			MODELS.put(id, model);
 		} catch (Exception e) {
 			FAILED.add(id);
 			VeloClient.LOGGER.warn("Couldn't load wings {}", id, e);
 		}
 		return model;
+	}
+
+	/** The pair's texture: bundled, or registered from the downloaded file (null until it's there). Render thread only. */
+	public static synchronized Identifier texture(String id) {
+		WingType type = type(id).orElse(null);
+		if (type == null) {
+			return null;
+		}
+		if (type.bundled()) {
+			return Identifier.of("velo-client", "textures/cosmetics/wings/" + id + ".png");
+		}
+		return downloaded(type.texture(), "wings " + id);
+	}
+
+	/** The pair's still picture for cards (null until downloaded). Render thread only. */
+	public static synchronized Identifier previewTexture(String id) {
+		WingType type = type(id).orElse(null);
+		if (type == null) {
+			return null;
+		}
+		if (type.bundled()) {
+			return Identifier.of("velo-client", "textures/cosmetics/wings/" + id + "_preview.png");
+		}
+		return downloaded(type.preview(), "wings preview " + id);
+	}
+
+	private static Identifier downloaded(String sha, String label) {
+		if (sha == null) {
+			return null;
+		}
+		Identifier known = TEXTURES.get(sha);
+		if (known != null || FAILED.contains(sha)) {
+			return known;
+		}
+		java.nio.file.Path file = net.veloclient.velo.client.cosmetics.CosmeticsCatalog.file(sha);
+		if (file == null) {
+			return null;
+		}
+		try (InputStream in = java.nio.file.Files.newInputStream(file)) {
+			net.minecraft.client.texture.NativeImage image = net.minecraft.client.texture.NativeImage.read(in);
+			Identifier id = net.veloclient.velo.client.cosmetics.CapeManager.registerPreloadedTexture("wingtex_" + sha.substring(0, 24), image, label);
+			TEXTURES.put(sha, id);
+			return id;
+		} catch (Exception e) {
+			FAILED.add(sha);
+			VeloClient.LOGGER.warn("Couldn't load {}", label, e);
+			return null;
+		}
 	}
 }

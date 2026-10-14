@@ -1,0 +1,48 @@
+{
+  "title": "Velo Client 0.8.7",
+  "summary": "The Afterlife Halloween wings, new cosmetics that arrive without updating, wings in the launcher's Cosmetics, and fixes for disappearing wings and the Session Auto-Fixer.",
+  "tag": "Update",
+  "version": "0.8.7",
+  "accent": "#ff8a1f",
+  "pinned": false,
+  "cover": "file:images/cover.jpg",
+  "blocks": [
+    {
+      "type": "text",
+      "text": "0.8.7 brings the **Afterlife** Halloween wings (they get their own post), makes new cosmetics show up **without an update**, and fixes two things that have been bugging you."
+    },
+    {
+      "type": "heading",
+      "text": "New cosmetics, no update needed"
+    },
+    {
+      "type": "text",
+      "text": "Wings and capes now come from the Velo server. When a new pair or cape drops, it appears in the Store right away - in the game and in the launcher - and its model and textures download in the background. Limited drops show how many days they have left."
+    },
+    {
+      "type": "heading",
+      "text": "Wings in the launcher's Cosmetics"
+    },
+    {
+      "type": "text",
+      "text": "The **Cosmetics** page has a new **Wings** tab: see every pair you own on your own skin, equip one, and tune **size**, **height**, **distance**, **spread**, **flap speed** and **flap strength** with a live 3D preview. The game picks your choice up the next time it starts."
+    },
+    {
+      "type": "image",
+      "image": "file:images/launcher-cosmetics-wings.jpg",
+      "caption": "Your wings and their settings, right in the launcher."
+    },
+    {
+      "type": "heading",
+      "text": "Fixes"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Wings showed as equipped but weren't on your player** after starting the game until you re-equipped them - they're there right away now.",
+        "**Session Auto-Fixer** could stay on \"Fixing session...\" forever for some accounts. The session was actually refreshed, but switching to it failed - that's fixed, and if anything ever goes wrong the button tells you instead of getting stuck.",
+        "The launcher's sidebar now highlights **Cosmetics** while you're on it."
+      ]
+    }
+  ]
+}

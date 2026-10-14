@@ -56,6 +56,12 @@ public final class VeloServerApp {
 		} catch (java.sql.SQLException e) {
 			throw new IOException("Couldn't open the store database", e);
 		}
+		// Wings and capes with their art: bundled ones are added when missing, the rest is managed by the owner.
+		var cosmetics = new net.veloclient.server.store.CosmeticsService(dataDir);
+		java.util.Map<String, Integer> oldPrices = new java.util.HashMap<>();
+		store.config().items.forEach(i -> oldPrices.put(i.id(), i.price()));
+		cosmetics.seedFromClasspath("/cosmetics-seed/", oldPrices);
+		store.setCosmetics(cosmetics);
 
 		HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
 		server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
@@ -74,6 +80,7 @@ public final class VeloServerApp {
 		PartyService parties = new PartyService(social);
 		PartyRoutes.register(server, registry, social, parties);
 		StoreRoutes.register(server, registry, store, dataDir);
+		CosmeticsRoutes.register(server, registry, store, cosmetics, adminToken);
 		NewsRoutes.register(server, registry, new NewsService(dataDir), new ReportService(dataDir), store, adminToken);
 		SchematicShareService schematics = new SchematicShareService(dataDir);
 		SchematicRoutes.register(server, registry, schematics, store);
@@ -243,7 +250,7 @@ public final class VeloServerApp {
 		String wingsId = request.wingsId();
 		if (session != null && wingsId != null) {
 			String wingsItem = "wings_" + wingsId.split(";", 2)[0];
-			if (!store.mayDisplayCape(session.uuid(), wingsItem) || store.config().item(wingsItem) == null) {
+			if (!store.mayDisplayCape(session.uuid(), wingsItem) || !store.knownItem(wingsItem)) {
 				wingsId = null;
 			}
 		}

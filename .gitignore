@@ -19,3 +19,6 @@ Thumbs.db
 
 # Decompiled Minecraft classes extracted during API research - never commit these
 /net/
+
+# Local secrets (Meshy API key etc.)
+.env

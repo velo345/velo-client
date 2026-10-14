@@ -14,10 +14,30 @@ public final class StoreAssets {
 
 	/** The item's animated texture, previewable before it's ever been bought - registered under the catalog id, separate from whatever id it gets once actually imported into the cape library on purchase. */
 	public static AnimatedCapeAsset preview(StoreItem item) {
+		if (!ready(item)) {
+			return null;
+		}
 		return AnimatedCapeAsset.getOrRegister(item.id(), () -> openGif(item));
 	}
 
+	/** Whether the art is there: bundled, or a server-only cape's GIF downloaded (starts the download if not). */
+	public static boolean ready(StoreItem item) {
+		return item.gifResource() != null || net.veloclient.velo.client.cosmetics.CosmeticsCatalog.file(item.gifSha()) != null;
+	}
+
+	/** The item's GIF: bundled, or the downloaded file of a server-only cape. Check {@link #ready} first. */
 	public static InputStream openGif(StoreItem item) {
+		if (item.gifResource() == null) {
+			java.nio.file.Path file = net.veloclient.velo.client.cosmetics.CosmeticsCatalog.file(item.gifSha());
+			try {
+				if (file == null) {
+					throw new IOException("Still downloading " + item.id());
+				}
+				return java.nio.file.Files.newInputStream(file);
+			} catch (IOException e) {
+				throw new RuntimeException("Failed to open store item " + item.id(), e);
+			}
+		}
 		try {
 			var resource = MinecraftClient.getInstance().getResourceManager().getResource(item.gifResource())
 					.orElseThrow(() -> new IOException("Missing bundled resource " + item.gifResource()));

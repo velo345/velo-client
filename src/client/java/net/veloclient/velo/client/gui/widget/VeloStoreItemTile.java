@@ -65,8 +65,10 @@ public final class VeloStoreItemTile extends ClickableWidget {
 
 		VeloCapeTile.drawStage(context, x, y, w, iconHeight, hover, false);
 		AnimatedCapeAsset preview = StoreAssets.preview(item);
-		VeloCapeRender.draw(context, preview.identifier(), preview.width(), preview.height(), x + w / 2f, y + iconHeight - 20,
-				iconHeight - 34, VeloCapeRender.idleYaw(phase, hover));
+		if (preview != null) {
+			VeloCapeRender.draw(context, preview.identifier(), preview.width(), preview.height(), x + w / 2f, y + iconHeight - 20,
+					iconHeight - 34, VeloCapeRender.idleYaw(phase, hover));
+		}
 
 		TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
 		String name = trimToWidth(item.name(), w - 10);

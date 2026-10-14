@@ -5,7 +5,29 @@
 		"description": "Radiant white feathers with a golden crest and a halo on top.",
 		"style": "feathered",
 		"scale": 0.85,
-		"price": 3000
+		"price": 3000,
+		"collection": "shadows_angels",
+		"accent": "#f2d27a"
+	},
+	{
+		"id": "bonedragon",
+		"name": "Bone Dragon Wings",
+		"style": "bat",
+		"scale": 0.85,
+		"description": "The bare bones of a dragon's wings, claws tipped with a sickly green glow.",
+		"price": 3000,
+		"collection": "afterlife",
+		"accent": "#9be36b"
+	},
+	{
+		"id": "cobweb",
+		"name": "Cobweb Wings",
+		"style": "bat",
+		"scale": 0.85,
+		"description": "Tattered bat wings strung with cobwebs, their edges smouldering orange.",
+		"price": 2600,
+		"collection": "afterlife",
+		"accent": "#ff8a1f"
 	},
 	{
 		"id": "frost",
@@ -13,7 +35,9 @@
 		"description": "Wings of living ice - crystal shards over a frozen frame.",
 		"style": "crystal",
 		"scale": 1.0,
-		"price": 2800
+		"price": 2800,
+		"collection": "shadows_angels",
+		"accent": "#5cc8ff"
 	},
 	{
 		"id": "phoenix",
@@ -21,7 +45,9 @@
 		"description": "Blazing feathers in every shade of fire, reborn with every stroke.",
 		"style": "feathered",
 		"scale": 0.85,
-		"price": 3200
+		"price": 3200,
+		"collection": "shadows_angels",
+		"accent": "#ff7a2e"
 	},
 	{
 		"id": "raven",
@@ -29,7 +55,9 @@
 		"description": "Midnight-black feathers with a quiet blue sheen.",
 		"style": "feathered",
 		"scale": 0.85,
-		"price": 2400
+		"price": 2400,
+		"collection": "shadows_angels",
+		"accent": "#8c9bd6"
 	},
 	{
 		"id": "shadowfang",
@@ -38,6 +66,18 @@
 		"style": "bat",
 		"scale": 1.95,
 		"offsetY": 0.0625,
-		"price": 2800
+		"price": 2800,
+		"collection": "shadows_angels",
+		"accent": "#a25cff"
+	},
+	{
+		"id": "wraith",
+		"name": "Wraith Wings",
+		"style": "feathered",
+		"scale": 0.85,
+		"description": "A wraith's shroud torn into wings - violet wisps that trail behind you.",
+		"price": 2800,
+		"collection": "afterlife",
+		"accent": "#b45cff"
 	}
 ]

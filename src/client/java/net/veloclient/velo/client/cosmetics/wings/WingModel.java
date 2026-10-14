@@ -48,6 +48,13 @@ public final class WingModel {
 			if (raw == null) {
 				throw new IOException("Missing " + path);
 			}
+			return read(raw, path, scale);
+		}
+	}
+
+	/** Reads a {@code .vmesh} from a stream (a downloaded one for server-only pairs), scaled to blocks. */
+	public static WingModel read(InputStream raw, String path, float scale) throws IOException {
+		{
 			DataInputStream in = new DataInputStream(new java.io.BufferedInputStream(raw));
 			byte[] magic = new byte[4];
 			in.readFully(magic);

@@ -32,6 +32,22 @@ test {
 	useJUnitPlatform()
 }
 
+// The cosmetics the server knows from the start (server/cosmetics-seed/seed.json): server-only art
+// lives next to it, the art the mod bundles anyway is copied from the mod's resources.
+def cosmeticSeedRoot = layout.buildDirectory.dir("generated/cosmetic-seed")
+tasks.register("bundleCosmeticSeed", Copy) {
+	from(file("cosmetics-seed")) { into("cosmetics-seed") }
+	from(rootProject.file("src/client/resources/assets/velo-client/cosmetics/wings")) {
+		include("*.vmesh")
+		into("cosmetics-seed/client/wings")
+	}
+	from(rootProject.file("src/client/resources/assets/velo-client/textures/cosmetics/wings")) { into("cosmetics-seed/client/wings/textures") }
+	from(rootProject.file("src/client/resources/assets/velo-client/textures/store/cape")) { into("cosmetics-seed/client/capes") }
+	into(cosmeticSeedRoot)
+}
+sourceSets.main.resources.srcDir(cosmeticSeedRoot)
+tasks.named("processResources") { dependsOn("bundleCosmeticSeed") }
+
 // A single runnable jar with Gson bundled in, so deploying this is just
 // "copy one file, run `java -jar velo-server.jar`" - no classpath wrangling
 // needed on whatever box ends up hosting it (see server/README.md).

@@ -364,7 +364,12 @@ public final class CoinsView {
 		});
 
 		ComboBox<String> item = new ComboBox<>();
+		// Every cosmetic the server has - testing and hidden ones too (the full panel: Store > Owner panel).
 		StoreCatalog.all().forEach(i -> item.getItems().add(i.id()));
+		run(StoreApi::adminCosmetics, all -> {
+			item.getItems().clear();
+			all.getAsJsonArray("items").forEach(i -> item.getItems().add(i.getAsJsonObject().get("id").getAsString()));
+		}, error -> { });
 		item.setPromptText("Cosmetic");
 		Button grant = new Button("Give item");
 		grant.setOnAction(e -> run(() -> StoreApi.adminItem(player.getText().trim(), item.getValue(), true),

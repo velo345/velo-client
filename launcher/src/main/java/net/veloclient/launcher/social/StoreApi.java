@@ -34,6 +34,12 @@ public final class StoreApi {
 
 	private static volatile int balance = -1;
 	private static volatile Set<String> owned = Set.of();
+	private static volatile boolean walletLoaded;
+
+	/** True once the wallet (what you own) came from the server this run. */
+	public static boolean walletLoaded() {
+		return walletLoaded;
+	}
 	private static volatile boolean owner;
 
 	private StoreApi() {
@@ -144,12 +150,38 @@ public final class StoreApi {
 		return post("/v1/admin/store/item", body);
 	}
 
+	/** Every cosmetic with status, price, window and files; collections; the featured one (owner only). */
+	public static JsonObject adminCosmetics() throws StoreError {
+		return get("/v1/admin/cosmetics");
+	}
+
+	/** Changes a cosmetic - only the fields in {@code item} (plus its id). {@code clearWindow} drops its time window. */
+	public static JsonObject adminUpdateCosmetic(JsonObject item, boolean clearWindow) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.add("item", item);
+		body.addProperty("clearWindow", clearWindow);
+		return post("/v1/admin/cosmetics/item", body);
+	}
+
+	/** Creates or changes a collection (id, name, tag, description). */
+	public static JsonObject adminCollection(JsonObject collection) throws StoreError {
+		return post("/v1/admin/cosmetics/collection", collection);
+	}
+
+	/** Which collection the store features (null / blank = the newest one). */
+	public static void adminFeatured(String collectionId) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.addProperty("collection", collectionId);
+		post("/v1/admin/cosmetics/featured", body);
+	}
+
 	private static JsonObject applyWallet(JsonObject wallet) {
 		balance = wallet.get("balance").getAsInt();
 		owner = wallet.has("owner") && wallet.get("owner").getAsBoolean();
 		Set<String> items = new HashSet<>();
 		wallet.getAsJsonArray("owned").forEach(e -> items.add(e.getAsString()));
 		owned = Set.copyOf(items);
+		walletLoaded = true;
 		return wallet;
 	}
 
@@ -170,7 +202,7 @@ public final class StoreApi {
 					{"id":"coins_500","coins":500,"bonus":0,"price":4.99},{"id":"coins_1200","coins":1200,"bonus":140,"price":9.99},
 					{"id":"coins_2600","coins":2600,"bonus":400,"price":19.99},{"id":"coins_6500","coins":6500,"bonus":1500,"price":39.99}],
 					"items":[]}""";
-			case "/v1/store/wallet" -> "{\"balance\":1340,\"owner\":true,\"owned\":[]}";
+			case "/v1/store/wallet" -> "{\"balance\":1340,\"owner\":true,\"owned\":[\"wings_bonedragon\",\"wings_cobweb\",\"wings_wraith\",\"wings_phoenix\"]}";
 			default -> """
 					{"onlineMinutes":42,"loginClaimed":false,"loginClaimable":true,"loginCoins":12,"streak":3,"quests":[
 					{"id":"kill_100","title":"Defeat 100 mobs","progress":64,"target":100,"coins":10,"claimed":false,"claimable":false},
@@ -182,6 +214,10 @@ public final class StoreApi {
 	}
 
 	private static JsonObject get(String path) throws StoreError {
+		if (DEMO && path.startsWith("/v1/admin/") && System.getProperty("velo.adminToken") != null) {
+			// Dev-only tour against a test server (-Dvelo.serverUrl + -Dvelo.adminToken): real owner data.
+			return send(request(path).header("X-Velo-Admin-Token", System.getProperty("velo.adminToken")).GET().build());
+		}
 		if (DEMO) {
 			return demo(path);
 		}

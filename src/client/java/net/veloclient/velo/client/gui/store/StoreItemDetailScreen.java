@@ -44,7 +44,7 @@ public final class StoreItemDetailScreen extends VeloWindow {
 		try {
 			CapeManager.setPreviewOverride(
 					CapeManager.previewDefinitionFor(item.id(), item.name(), StoreAssets.openGif(item), CapePhysicsPreset.defaults()));
-		} catch (java.io.IOException e) {
+		} catch (java.io.IOException | RuntimeException e) {
 			net.veloclient.velo.VeloClient.LOGGER.error("Failed to build Store preview for {}", item.id(), e);
 		}
 		onClosed(CapeManager::clearPreviewOverride);

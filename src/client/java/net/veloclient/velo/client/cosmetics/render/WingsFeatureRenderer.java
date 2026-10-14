@@ -78,14 +78,19 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		WingAnimator.Pose pose = WingAnimator.pose(tag != null ? tag.key() : state.id, motion, type.style(), worn.settings());
 		scratch = WingAnimator.deform(model, pose, worn.settings(), type.offsetY(), scratch);
 		float[][] geometry = copy(scratch);
-		var texture = net.minecraft.util.Identifier.of("velo-client", "textures/cosmetics/wings/" + id + ".png");
+		var texture = WingsManager.texture(id);
+		if (texture == null) {
+			return; // a server-only pair whose texture is still downloading
+		}
+		// Neon pairs glow: full brightness whatever the light around.
+		int drawLight = type.glow() ? 0xF000F0 : light;
 		matrices.push();
 		this.getContextModel().body.applyTransform(matrices);
 		queue.submitCustom(matrices, net.minecraft.client.render.RenderLayers.entityCutoutNoCull(texture), (entry, consumer) -> {
 			Matrix4f position = entry.getPositionMatrix();
 			Matrix3f normal = entry.getNormalMatrix();
 			emit(model, geometry, position, normal, (x, y, z, u, v, nx, ny, nz) -> consumer.vertex(x, y, z, 0xFFFFFFFF, u, v,
-					net.minecraft.client.render.OverlayTexture.DEFAULT_UV, light, nx, ny, nz));
+					net.minecraft.client.render.OverlayTexture.DEFAULT_UV, drawLight, nx, ny, nz));
 		});
 		matrices.pop();
 	}
@@ -138,14 +143,19 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		WingAnimator.Pose pose = WingAnimator.pose(tag != null ? tag.key() : state.id, motion, type.style(), worn.settings());
 		scratch = WingAnimator.deform(model, pose, worn.settings(), type.offsetY(), scratch);
 		float[][] geometry = copy(scratch);
-		var texture = net.minecraft.resources.Identifier.fromNamespaceAndPath("velo-client", "textures/cosmetics/wings/" + id + ".png");
+		var texture = WingsManager.texture(id);
+		if (texture == null) {
+			return; // a server-only pair whose texture is still downloading
+		}
+		// Neon pairs glow: full brightness whatever the light around.
+		int drawLight = type.glow() ? 0xF000F0 : light;
 		matrices.pushPose();
 		this.getParentModel().body.translateAndRotate(matrices);
 		queue.submitCustomGeometry(matrices, net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture), (pose2, consumer) -> {
 			Matrix4f position = new Matrix4f(pose2.pose());
 			Matrix3f normal = new Matrix3f(pose2.normal());
 			emit(model, geometry, position, normal, (x, y, z, u, v, nx, ny, nz) -> consumer.addVertex(x, y, z, 0xFFFFFFFF, u, v,
-					net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, light, nx, ny, nz));
+					net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, drawLight, nx, ny, nz));
 		});
 		matrices.popPose();
 	}

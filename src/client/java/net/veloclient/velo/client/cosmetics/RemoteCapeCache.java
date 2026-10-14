@@ -103,10 +103,13 @@ public final class RemoteCapeCache {
 	private static void loadStore(String capeCatalogId) throws IOException {
 		Optional<StoreItem> item = StoreCatalog.byId(capeCatalogId);
 		if (item.isEmpty()) {
-			RESOLVED.put(capeCatalogId, Optional.empty());
-			return;
+			// Maybe a cape added on the server that this client hasn't heard of yet - byId asked for it, retry later.
+			throw new IOException("Unknown store cape (yet): " + capeCatalogId);
 		}
 		byte[] gif;
+		if (!StoreAssets.ready(item.get())) {
+			throw new IOException("Store cape art still downloading: " + capeCatalogId);
+		}
 		try (InputStream in = StoreAssets.openGif(item.get())) {
 			gif = in.readAllBytes();
 		}

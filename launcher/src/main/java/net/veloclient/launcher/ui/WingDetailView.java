@@ -43,7 +43,7 @@ public final class WingDetailView {
 
 		StackPane stage = CosmeticUi.stage(360, 440);
 		stage.getStyleClass().add("showcase-stage");
-		ImageView still = new ImageView(new Image(WingsCatalog.open("textures/" + type.id() + "_preview.png")));
+		ImageView still = new ImageView(new Image(WingsCatalog.openPreview(type.id())));
 		still.setFitWidth(320);
 		still.setPreserveRatio(true);
 		stage.getChildren().add(still);
@@ -84,7 +84,8 @@ public final class WingDetailView {
 
 		boolean owned = StoreOwnership.owns(type.itemId());
 		int price = StoreApi.price(type.itemId(), type.price());
-		Label tag = new Label("SHADOWS & ANGELS  ·  WINGS");
+		Label tag = new Label(net.veloclient.launcher.data.WingsCatalog.collection(type.collection())
+				.map(c -> c.name().toUpperCase(java.util.Locale.ROOT) + "  ·  WINGS").orElse("WINGS"));
 		tag.getStyleClass().add("featured-tag");
 		Label name = new Label(type.name());
 		name.getStyleClass().add("featured-title");

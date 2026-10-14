@@ -24,9 +24,9 @@ import net.veloclient.velo.client.store.StoreCategory;
 import java.util.List;
 
 /**
- * The Velo Store. Opens on <b>Featured</b>: the new wings collection, "Shadows &amp; Angels", front and
- * centre - you wearing each pair in turn on a slowly turning 3D model, flapping - with the whole
- * collection below it. <b>Wings</b> and <b>Capes</b> list everything for sale; "My cosmetics" (top
+ * The Velo Store. Opens on <b>Featured</b>: the newest wings collection (the first in
+ * {@code collections.json}), front and centre - you wearing each of its pairs in turn on a slowly
+ * turning 3D model, flapping - with the collection's pairs below it. <b>Wings</b> and <b>Capes</b> list everything for sale; "My cosmetics" (top
  * right) is where you equip what you own. Your Velo Coins sit top right (click for more). Everything
  * is bought with Velo Coins; the server checks the price and records what you own.
  */
@@ -61,9 +61,14 @@ public final class StoreScreen extends VeloWindow {
 		WingsManager.load();
 	}
 
+	/** The featured collection's pairs (every pair if there are no collections). */
+	private static List<WingsManager.WingType> featuredWings() {
+		return WingsManager.featured().map(c -> WingsManager.inCollection(c.id())).filter(l -> !l.isEmpty()).orElseGet(WingsManager::forSale);
+	}
+
 	/** The pair the Featured hero shows right now (changes every few seconds). */
 	private static WingsManager.WingType heroWings() {
-		List<WingsManager.WingType> all = WingsManager.catalog();
+		List<WingsManager.WingType> all = featuredWings();
 		if (all.isEmpty()) {
 			return null;
 		}
@@ -97,7 +102,7 @@ public final class StoreScreen extends VeloWindow {
 		int cw = contentX() + contentWidth() - cx;
 		switch (page) {
 			case FEATURED -> layoutFeatured(cx, y, cw);
-			case WINGS -> layoutWings(cx, y, cw, WingsManager.catalog());
+			case WINGS -> layoutWings(cx, y, cw, WingsManager.forSale());
 			case CAPES -> layoutCapes(cx, y, cw);
 		}
 		// Generous padding: the UI font can draw a little wider than the vanilla width measure.
@@ -141,7 +146,7 @@ public final class StoreScreen extends VeloWindow {
 		if (!collectionRow) {
 			return;
 		}
-		List<WingsManager.WingType> all = WingsManager.catalog();
+		List<WingsManager.WingType> all = featuredWings();
 		int n = Math.max(1, all.size());
 		int cardW = (cw - (n - 1) * 8) / n;
 		int cardY = y + heroH + 22;
@@ -237,7 +242,7 @@ public final class StoreScreen extends VeloWindow {
 		context.drawTextWithShadow(this.textRenderer, heading, x, contentY() + 6, VeloStyle.text());
 		String sub = switch (page) {
 			case FEATURED -> "the newest drops";
-			case WINGS -> "Shadows & Angels  ·  " + WingsManager.catalog().size() + " pairs of animated 3D wings";
+			case WINGS -> WingsManager.forSale().size() + " pairs of animated 3D wings  ·  " + WingsManager.collections().size() + " collections";
 			case CAPES -> "animated capes  ·  preview on your own player";
 		};
 		context.drawTextWithShadow(this.textRenderer, sub, x + this.textRenderer.getWidth(heading) + 8, contentY() + 6, VeloStyle.textFaint());
@@ -266,19 +271,37 @@ public final class StoreScreen extends VeloWindow {
 		int tx = cx + previewW + 24;
 		int tw = cx + cw - tx - 12;
 		int ty = y + 14;
-		VeloDraw.fillRounded(context, tx, ty, 92, 13, 4, VeloUi.withAlpha(accent, 0xE0));
-		context.drawTextWithShadow(this.textRenderer, "NEW COLLECTION", tx + 6, ty + 3, 0xFF101014);
-		// As big as fits: "Shadows & Angels" is long.
-		float big = Math.min(heroH >= 190 ? 2.2f : 1.7f, tw / (float) Math.max(1, this.textRenderer.getWidth("Shadows & Angels") * 1.1f));
+		WingsManager.Collection collection = WingsManager.featured().orElse(null);
+		Long until = type == null ? null : type.availableUntil();
+		// Limited drops (e.g. Halloween) say how long they're left in the store instead of "NEW".
+		String tag = collection == null ? "NEW COLLECTION" : until != null ? collection.tag() : "NEW  ·  " + collection.tag();
+		String title = collection == null ? "Wings" : collection.name();
+		VeloDraw.fillRounded(context, tx, ty, this.textRenderer.getWidth(tag) + 12, 13, 4, VeloUi.withAlpha(accent, 0xE0));
+		context.drawTextWithShadow(this.textRenderer, tag, tx + 6, ty + 3, 0xFF101014);
+		if (until != null) {
+			long days = Math.max(0, (until - System.currentTimeMillis()) / 86_400_000L);
+			String left = days >= 1 ? days + (days == 1 ? " DAY LEFT" : " DAYS LEFT") : "LAST DAY";
+			int bw = this.textRenderer.getWidth(left) + 12;
+			int lx = tx + this.textRenderer.getWidth(tag) + 18;
+			int ly = ty;
+			if (lx + bw > tx + tw) {
+				// No room next to the tag: above "Now showing".
+				lx = tx;
+				ly = y + heroH - 60;
+			}
+			VeloDraw.strokeRounded(context, lx, ly, bw, 13, 4, VeloUi.withAlpha(accent, 0xE0));
+			context.drawTextWithShadow(this.textRenderer, left, lx + 6, ly + 3, VeloUi.withAlpha(accent, 0xFF));
+		}
+		// As big as fits: some names are long.
+		float big = Math.min(heroH >= 190 ? 2.2f : 1.7f, tw / (float) Math.max(1, this.textRenderer.getWidth(title) * 1.1f));
 		context.getMatrices().pushMatrix();
 		context.getMatrices().translate(tx, ty + 19);
 		context.getMatrices().scale(big, big);
-		context.drawTextWithShadow(this.textRenderer, TitleScreenTheme.tileFont("Shadows & Angels"), 0, 0, 0xFFFFFFFF);
+		context.drawTextWithShadow(this.textRenderer, TitleScreenTheme.tileFont(title), 0, 0, 0xFFFFFFFF);
 		context.getMatrices().popMatrix();
 		int textTop = ty + 19 + Math.round(10 * big) + 6;
-		int textBottom = y + heroH - 46;
-		List<String> lines = VeloUi.wrap("Five pairs of real 3D wings that move with you - a slow, calm wingbeat while you stand, wider strokes as you run, "
-				+ "spread wide when you glide. Tune each pair's size and flap to your style.", tw);
+		int textBottom = y + heroH - (until != null ? 62 : 46);
+		List<String> lines = VeloUi.wrap((collection == null ? "" : collection.description() + " ") + "Tune each pair's size and flap to your style.", tw);
 		for (int i = 0; i < lines.size() && textTop + (i + 1) * 10 <= textBottom; i++) {
 			context.drawTextWithShadow(this.textRenderer, lines.get(i), tx, textTop + i * 10, VeloStyle.textMuted());
 		}
@@ -287,7 +310,7 @@ public final class StoreScreen extends VeloWindow {
 					VeloUi.withAlpha(accent, 0xFF));
 		}
 		// Which pair the hero is on.
-		List<WingsManager.WingType> all = WingsManager.catalog();
+		List<WingsManager.WingType> all = featuredWings();
 		for (int i = 0; i < all.size(); i++) {
 			boolean on = type != null && all.get(i).id().equals(type.id());
 			VeloDraw.fillCircle(context, cx + 8 + previewW / 2f - all.size() * 6 + i * 12, y + heroH - 6, on ? 3f : 2f, on ? accent : 0x80FFFFFF);

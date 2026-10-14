@@ -52,6 +52,8 @@ public final class StoreService {
 	private final PlayerResolver resolver;
 	private final SecureRandom random = new SecureRandom();
 	private final Map<String, Long> lastStatReport = new ConcurrentHashMap<>();
+	/** The cosmetics catalog; without one (tests) the items in store.json are sold. */
+	private volatile CosmeticsService cosmetics;
 	/** Short-lived token for the ad page link -> uuid (keeps the page tied to a signed-in player). */
 	private final Map<String, AdToken> adTokens = new ConcurrentHashMap<>();
 
@@ -87,6 +89,28 @@ public final class StoreService {
 		return config;
 	}
 
+	public void setCosmetics(CosmeticsService cosmetics) {
+		this.cosmetics = cosmetics;
+	}
+
+	public CosmeticsService cosmetics() {
+		return cosmetics;
+	}
+
+	/** Any cosmetic the server knows (in the store or not). */
+	public boolean knownItem(String itemId) {
+		return cosmetics != null ? cosmetics.exists(itemId) : config.item(itemId) != null;
+	}
+
+	/** An item as sold right now (name + price), or null when it isn't for sale. */
+	private StoreConfig.Item sellable(String itemId) {
+		if (cosmetics == null) {
+			return config.item(itemId);
+		}
+		CosmeticsService.Item item = cosmetics.buyable(itemId) ? cosmetics.item(itemId) : null;
+		return item == null ? null : new StoreConfig.Item(item.id, item.name, item.price);
+	}
+
 	public boolean isOwner(String uuid, String username) {
 		return owners.contains(uuid) || (username != null && owners.contains(username.toLowerCase(Locale.ROOT)));
 	}
@@ -106,7 +130,8 @@ public final class StoreService {
 	}
 
 	public CatalogView catalog() {
-		return new CatalogView(config.currency, config.coinPacks, config.items, checkoutEnabled(), adsEnabled());
+		return new CatalogView(config.currency, config.coinPacks, cosmetics != null ? cosmetics.storeItems() : config.items,
+				checkoutEnabled(), adsEnabled());
 	}
 
 	public record WalletView(int balance, List<String> owned, boolean owner) {
@@ -119,7 +144,7 @@ public final class StoreService {
 
 	/** Store capes are published by item id; only owners may show them (anything else is a custom/other id). */
 	public boolean mayDisplayCape(String uuid, String capeId) {
-		if (capeId == null || config.item(capeId) == null) {
+		if (capeId == null || !knownItem(capeId)) {
 			return true;
 		}
 		try {
@@ -130,9 +155,9 @@ public final class StoreService {
 	}
 
 	public WalletView buy(String uuid, String username, String itemId) throws Exception {
-		StoreConfig.Item item = config.item(itemId);
+		StoreConfig.Item item = sellable(itemId);
 		if (item == null) {
-			throw new StoreException(404, "That item isn't sold here");
+			throw new StoreException(404, "That item isn't for sale right now");
 		}
 		switch (db.buyItem(uuid, itemId, item.price())) {
 			case ALREADY_OWNED -> throw new StoreException(409, "You already own " + item.name());
@@ -291,7 +316,7 @@ public final class StoreService {
 
 	public PlayerView adminItem(String meUuid, String meName, String target, String itemId, boolean grant) throws Exception {
 		String[] ref = requireOwnerAndResolve(meUuid, meName, target);
-		if (config.item(itemId) == null) {
+		if (!knownItem(itemId)) {
 			throw new StoreException(404, "Unknown item");
 		}
 		db.touchWallet(ref[0], ref[1]);

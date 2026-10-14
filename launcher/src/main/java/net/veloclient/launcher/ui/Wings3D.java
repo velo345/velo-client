@@ -51,6 +51,8 @@ public final class Wings3D {
 	private float frequency = 0.28f;
 	private float lift = 0.05f;
 	private long last;
+	/** How they're worn (size, position, spread, flap) - the game's per-pair settings. */
+	private WingsCatalog.Settings settings = WingsCatalog.Settings.DEFAULT;
 
 	public Wings3D(Group parent) {
 		parent.getChildren().add(node);
@@ -71,6 +73,12 @@ public final class Wings3D {
 
 	public Wings3D motion(Motion motion) {
 		this.motion = motion;
+		return this;
+	}
+
+	/** Shows them the way they're set to be worn (live while the sliders move). */
+	public Wings3D settings(WingsCatalog.Settings settings) {
+		this.settings = settings == null ? WingsCatalog.Settings.DEFAULT : settings;
 		return this;
 	}
 
@@ -250,10 +258,9 @@ public final class Wings3D {
 			case "crystal" -> 0.5f;
 			default -> 1f;
 		};
-		targetAmp *= ampScale;
-		// The game's default Spread setting (6 degrees).
-		targetSweep += (float) Math.toRadians(6);
-		targetFreq *= speedScale;
+		targetAmp *= ampScale * settings.flapStrength();
+		targetSweep += (float) Math.toRadians(settings.spread());
+		targetFreq *= speedScale * settings.flapSpeed();
 		float k = 1f - (float) Math.exp(-dt / 0.35f);
 		sweep += (targetSweep - sweep) * k;
 		amplitude += (targetAmp - amplitude) * k;
@@ -266,7 +273,9 @@ public final class Wings3D {
 		float bend = -amplitude * 0.25f * flex * (float) Math.sin(phase);
 
 		int base = 0;
-		float attachY = ATTACH_Y + type.offsetY();
+		float attachY = ATTACH_Y + type.offsetY() + settings.offsetY();
+		float attachZ = ATTACH_Z + settings.offsetZ();
+		float size = settings.scale();
 		for (Half half : model.halves) {
 			int s = half.side;
 			float l = -s * poseLift;
@@ -278,14 +287,14 @@ public final class Wings3D {
 				float yaw = -s * (poseSweep + bend * w * w);
 				float cy = (float) Math.cos(yaw);
 				float sy = (float) Math.sin(yaw);
-				float gx = half.geometry[v * 3];
-				float gy = half.geometry[v * 3 + 1];
-				float gz = half.geometry[v * 3 + 2];
+				float gx = half.geometry[v * 3] * size;
+				float gy = half.geometry[v * 3 + 1] * size;
+				float gz = half.geometry[v * 3 + 2] * size;
 				float x = gx * cosL - gy * sinL;
 				float y = gx * sinL + gy * cosL;
 				float bx = x * cy + gz * sy + s * SHOULDER_X;
 				float by = y + attachY;
-				float bz = -x * sy + gz * cy + ATTACH_Z;
+				float bz = -x * sy + gz * cy + attachZ;
 				// Body space (blocks, from the neck) -> the viewer's pixels (shoulders at y = -8).
 				int o = (base + v) * 3;
 				points[o] = bx * 16;

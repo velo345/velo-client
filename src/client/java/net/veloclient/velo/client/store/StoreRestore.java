@@ -24,7 +24,7 @@ public final class StoreRestore {
 			if (present) {
 				continue;
 			}
-			StoreCatalog.byId(itemId).ifPresent(item -> {
+			StoreCatalog.byId(itemId).filter(StoreAssets::ready).ifPresent(item -> {
 				try (InputStream in = StoreAssets.openGif(item)) {
 					CapeManager.importAnimatedGif(item.name(), in, CapePhysicsPreset.defaults(), item.id());
 				} catch (Exception e) {

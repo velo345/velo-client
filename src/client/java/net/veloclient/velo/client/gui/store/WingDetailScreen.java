@@ -47,7 +47,7 @@ public final class WingDetailScreen extends VeloWindow {
 		int x = contentX();
 		addDrawableChild(new EntityPreviewWidget(x, contentY(), PREVIEW_WIDTH, contentBottom() - contentY() - 24)
 				.wings(() -> new WingsPreview.Tag(new WingsManager.Worn(type.id(), WingsManager.settings(type.id())), showcase, key))
-				.spin(16f, 160f).fallbackImage(VeloWingCard.previewImage(type.id())));
+				.spin(16f, 160f).fallbackImage(() -> VeloWingCard.previewImage(type.id())));
 		// How they move.
 		int chipW = (PREVIEW_WIDTH - 10) / 6;
 		WingsPreview.Showcase[] all = WingsPreview.Showcase.values();
@@ -158,8 +158,9 @@ public final class WingDetailScreen extends VeloWindow {
 		int ix = contentX() + PREVIEW_WIDTH + 16;
 		int iw = contentX() + contentWidth() - ix;
 		int y = contentY();
-		VeloDraw.fillRounded(context, ix, y, this.textRenderer.getWidth("SHADOWS & ANGELS") + 12, 12, 4, VeloUi.withAlpha(accent, 0xD0));
-		context.drawTextWithShadow(this.textRenderer, "SHADOWS & ANGELS", ix + 5, y + 2, 0xFF101014);
+		String collection = WingsManager.collection(type.collection()).map(c -> c.name().toUpperCase(java.util.Locale.ROOT)).orElse("WINGS");
+		VeloDraw.fillRounded(context, ix, y, this.textRenderer.getWidth(collection) + 12, 12, 4, VeloUi.withAlpha(accent, 0xD0));
+		context.drawTextWithShadow(this.textRenderer, collection, ix + 5, y + 2, 0xFF101014);
 		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(type.name(), iw), ix, y + 18, VeloStyle.text());
 		String style = switch (type.style()) {
 			case BAT -> "Leathery, snappy wingbeats";

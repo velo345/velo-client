@@ -285,6 +285,10 @@ public final class VeloServerClient {
 			String token = verifySession(base, uuid, serverId);
 			authenticatedUuid = uuid;
 			sessionToken.set(token);
+			// Fetch what you own right away - until then your equipped wings/cape couldn't be shown on you.
+			StoreClient.refresh(true, null);
+			// Signed in: the catalog now includes what you own (testing pairs the owner gave you too).
+			net.veloclient.velo.client.cosmetics.CosmeticsCatalog.refresh(true);
 			return true;
 		} catch (HttpStatusException e) {
 			reportUnreachable(e.status >= 500

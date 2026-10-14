@@ -21,7 +21,6 @@ public final class VeloWingCard extends ClickableWidget {
 
 	private final WingsManager.WingType type;
 	private final Runnable onOpen;
-	private final Identifier picture;
 	private final int accent;
 	private final float phase;
 	private float hover;
@@ -31,25 +30,17 @@ public final class VeloWingCard extends ClickableWidget {
 		this.type = type;
 		this.onOpen = onOpen;
 		this.accent = accentFor(type.id());
-		this.picture = previewImage(type.id());
 		this.phase = (type.id().hashCode() & 0xFF) / 40f;
 	}
 
-	/** The pair's still picture (rendered from the model by tools/cosmetics/render_wing_previews.py). */
+	/** The pair's still picture (rendered by tools/cosmetics/render_wing_previews.py); null while a server-only one downloads. */
 	public static Identifier previewImage(String id) {
-		return Identifier.of("velo-client", "textures/cosmetics/wings/" + id + "_preview.png");
+		return WingsManager.previewTexture(id);
 	}
 
-	/** A colour that matches each pair, for glows and accents. */
+	/** A colour that matches each pair, for glows and accents ({@code accent} in wings.json). */
 	public static int accentFor(String id) {
-		return switch (id) {
-			case "angelic" -> 0xFFF2D27A;
-			case "frost" -> 0xFF5CC8FF;
-			case "phoenix" -> 0xFFFF7A2E;
-			case "raven" -> 0xFF8C9BD6;
-			case "shadowfang" -> 0xFFA25CFF;
-			default -> 0xFFFF4D4D;
-		};
+		return WingsManager.type(id).map(WingsManager.WingType::accent).orElse(0xFFFF4D4D);
 	}
 
 	@Override
@@ -80,7 +71,10 @@ public final class VeloWingCard extends ClickableWidget {
 		int ph = pw * 3 / 4;
 		int px = x + (w - pw) / 2;
 		int py = y + 4 + (area - ph) / 2 + Math.round(bob - 3 * hover);
-		context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, picture, px, py, 0f, 0f, pw, ph, pw, ph, pw, ph);
+		Identifier picture = previewImage(type.id());
+		if (picture != null) {
+			context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, picture, px, py, 0f, 0f, pw, ph, pw, ph, pw, ph);
+		}
 
 		String state = WingsManager.equippedId() != null && WingsManager.equippedId().equals(type.id()) ? "Equipped"
 				: WingsManager.owns(type.id()) ? "Owned" : null;

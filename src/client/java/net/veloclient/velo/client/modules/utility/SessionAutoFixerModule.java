@@ -30,6 +30,8 @@ import net.veloclient.velo.module.SafetyTag;
 import java.util.Locale;
 import java.util.UUID;
 
+import net.veloclient.velo.VeloClient;
+
 /**
  * Adds a "Fix Session & Reconnect" button directly to the vanilla disconnect
  * screen whenever the kick reason is specifically an expired/invalid session
@@ -341,7 +343,16 @@ public final class SessionAutoFixerModule extends AbstractModule {
 		MinecraftClient client = MinecraftClient.getInstance();
 		try {
 			VeloAccountAuth.RefreshedSession refreshed = VeloAccountAuth.refreshActiveAccount();
-			client.execute(() -> applyAndReconnect(client, refreshed));
+			client.execute(() -> {
+				try {
+					applyAndReconnect(client, refreshed);
+				} catch (RuntimeException e) {
+					// Never leave the button on "Fixing session..." because swapping the session threw.
+					VeloClient.LOGGER.warn("Session fix: couldn't apply the refreshed session", e);
+					fixing = false;
+					setButtonMessage("Session fix failed - click to retry");
+				}
+			});
 		} catch (VeloAccountAuth.AuthRefreshException e) {
 			client.execute(() -> {
 				fixing = false;
@@ -358,7 +369,7 @@ public final class SessionAutoFixerModule extends AbstractModule {
 	//? if <26.1 {
 	private void applyAndReconnect(MinecraftClient client, VeloAccountAuth.RefreshedSession refreshed) {
 		Session current = client.getSession();
-		Session newSession = new Session(refreshed.username(), UUID.fromString(refreshed.uuid()), refreshed.accessToken(),
+		Session newSession = new Session(refreshed.username(), parseUuid(refreshed.uuid()), refreshed.accessToken(),
 				current.getXuid(), current.getClientId());
 		((SessionAccessorMixin) client).velo$setSession(newSession);
 		// The fix is done once the new session is in - a later kick must be able to start a new one.
@@ -376,7 +387,7 @@ public final class SessionAutoFixerModule extends AbstractModule {
 	//?} else {
 	/*private void applyAndReconnect(MinecraftClient client, VeloAccountAuth.RefreshedSession refreshed) {
 		User current = client.getUser();
-		User newUser = new User(refreshed.username(), UUID.fromString(refreshed.uuid()), refreshed.accessToken(),
+		User newUser = new User(refreshed.username(), parseUuid(refreshed.uuid()), refreshed.accessToken(),
 				current.getXuid(), current.getClientId());
 		((SessionAccessorMixin) client).velo$setSession(newUser);
 		// The fix is done once the new session is in - a later kick must be able to start a new one.
@@ -392,6 +403,15 @@ public final class SessionAutoFixerModule extends AbstractModule {
 		ConnectScreen.startConnecting(fallbackParent, client, address, targetServer, false, null);
 	}
 	*///?}
+
+	/** Minecraft's services hand out UUIDs without dashes ("aba7a2762ef4..."), which UUID.fromString rejects. */
+	static UUID parseUuid(String raw) {
+		String hex = raw.replace("-", "");
+		if (hex.length() != 32) {
+			return UUID.fromString(raw);
+		}
+		return new UUID(Long.parseUnsignedLong(hex.substring(0, 16), 16), Long.parseUnsignedLong(hex.substring(16), 16));
+	}
 
 	private void setButtonMessage(String message) {
 		if (activeButton != null) {

@@ -23,7 +23,7 @@ import java.util.function.Consumer;
 
 /**
  * Rotating news banner: each slide is a post's cover with its tag, title and summary over a dark
- * fade. Slides change every few seconds with a crossfade + small slide (paused while hovered),
+ * fade (on Home just the cover image, when there is one). Slides change every few seconds with a crossfade + small slide (paused while hovered),
  * with dots and arrows to jump around. Used big on the News page and compact on Home.
  */
 final class NewsCarousel extends StackPane {
@@ -141,6 +141,15 @@ final class NewsCarousel extends StackPane {
 	private Node slide(JsonObject post) {
 		String accent = NewsUi.str(post, "accent");
 		StackPane cover = NewsUi.cover(NewsUi.str(post, "cover"), accent, compact ? null : NewsUi.str(post, "tag"), compact ? 16 : 22);
+		String coverImage = NewsUi.str(post, "cover");
+		if (compact && coverImage != null && !coverImage.isBlank()) {
+			// Home: just the banner image - covers carry their own title, text over it only gets in the way.
+			StackPane slide = new StackPane(cover);
+			slide.setMinSize(0, 0);
+			slide.setCursor(javafx.scene.Cursor.HAND);
+			slide.setOnMouseClicked(e -> onOpen.accept(post));
+			return slide;
+		}
 		Region shade = new Region();
 		shade.getStyleClass().add("news-slide-shade");
 		shade.setMouseTransparent(true);

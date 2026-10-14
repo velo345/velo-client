@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Renders a still picture of every pair in wings.json (3/4 view from behind, lit, transparent
-background) to textures/cosmetics/wings/<id>_preview.png - shown by the Store where there's no
-player to put the wings on (the title screen) and by the launcher's thumbnails.
+"""Renders a still picture of every pair (3/4 view from behind, lit, transparent background) to
+<id>_preview.png - shown by the Store where there's no player to put the wings on (the title
+screen) and by the launcher's thumbnails. Covers the pairs bundled with the client (wings.json)
+and the server-only ones in server/cosmetics-seed/seed.json.
 
     python3 tools/cosmetics/render_wing_previews.py
 """
@@ -18,8 +19,11 @@ ASSETS = ROOT / "src/client/resources/assets/velo-client"
 W, H, SS = 384, 288, 3
 
 
-def load(wid, scale):
-    b = (ASSETS / f"cosmetics/wings/{wid}.vmesh").read_bytes()
+SEED = ROOT / "server/cosmetics-seed"
+
+
+def load(mesh_path, scale):
+    b = Path(mesh_path).read_bytes()
     o = 12
     halves = []
     for _ in range(struct.unpack_from(">i", b, 8)[0]):
@@ -41,9 +45,9 @@ def load(wid, scale):
     return halves
 
 
-def render(wid, scale):
-    tex = np.array(Image.open(ASSETS / f"textures/cosmetics/wings/{wid}.png").convert("RGB")).astype(float)
-    halves = load(wid, scale)
+def render(mesh_path, texture_path, scale, out_path):
+    tex = np.array(Image.open(texture_path).convert("RGB")).astype(float)
+    halves = load(mesh_path, scale)
     # Camera behind the wearer, turned 28 degrees, looking slightly down.
     yaw, pitch = math.radians(28), math.radians(12)
     light = np.array([0.35, -0.6, 0.7]); light /= np.linalg.norm(light)
@@ -77,10 +81,28 @@ def render(wid, scale):
     out = Image.new("RGBA", img.size, (0, 0, 0, 0))
     out.alpha_composite(shadow, (3, 6))
     out.alpha_composite(img)
-    path = ASSETS / f"textures/cosmetics/wings/{wid}_preview.png"
-    out.save(path, optimize=True)
-    print("wrote", path.relative_to(ROOT))
+    out.save(out_path, optimize=True)
+    print("wrote", out_path)
 
 
-for entry in json.loads((ASSETS / "cosmetics/wings/wings.json").read_text()):
-    render(entry["id"], entry.get("scale", 0.9))
+def render_client(wid, scale):
+    render(ASSETS / f"cosmetics/wings/{wid}.vmesh", ASSETS / f"textures/cosmetics/wings/{wid}.png", scale,
+           ASSETS / f"textures/cosmetics/wings/{wid}_preview.png")
+
+
+def render_seed(item):
+    """A server-only pair: files live next to seed.json (paths in item["files"])."""
+    files = item["files"]
+    if files["mesh"].startswith("client/"):
+        return  # bundled with the client - rendered above
+    render(SEED / files["mesh"], SEED / files["texture"], item.get("scale", 0.9), SEED / files["preview"])
+
+
+if __name__ == "__main__":
+    for entry in json.loads((ASSETS / "cosmetics/wings/wings.json").read_text()):
+        render_client(entry["id"], entry.get("scale", 0.9))
+    seed = SEED / "seed.json"
+    if seed.exists():
+        for item in json.loads(seed.read_text())["items"]:
+            if item["type"] == "wings":
+                render_seed(item)
