@@ -600,6 +600,45 @@
 			"files": {
 				"gif": "capes/pearl.gif"
 			}
+		},
+		{
+			"id": "cape_haunted",
+			"type": "cape",
+			"name": "Haunted",
+			"description": "Ghosts drift up out of a misty graveyard under the full moon.",
+			"price": 1700,
+			"status": "testing",
+			"collection": "afterlife",
+			"availableUntil": 1794096000000,
+			"files": {
+				"gif": "capes/haunted.gif"
+			}
+		},
+		{
+			"id": "cape_jack_o_lantern",
+			"type": "cape",
+			"name": "Jack o'Lantern",
+			"description": "A carved pumpkin grins out of the dark, its face flickering with candlelight as smoke curls up.",
+			"price": 1600,
+			"status": "testing",
+			"collection": "afterlife",
+			"availableUntil": 1794096000000,
+			"files": {
+				"gif": "capes/jack_o_lantern.gif"
+			}
+		},
+		{
+			"id": "cape_witching_hour",
+			"type": "cape",
+			"name": "Witching Hour",
+			"description": "Bats flap across a huge orange moon behind a crooked dead tree.",
+			"price": 1700,
+			"status": "testing",
+			"collection": "afterlife",
+			"availableUntil": 1794096000000,
+			"files": {
+				"gif": "capes/witching_hour.gif"
+			}
 		}
 	]
 }

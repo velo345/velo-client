@@ -537,6 +537,187 @@ def pearl(phase):
     return img
 
 
+# ---- Halloween (Afterlife) ----
+
+def _poly_mask(h, w, draw):
+    """A smooth mask from a PIL drawing done at 4x and scaled down."""
+    from PIL import ImageDraw
+    big = Image.new("L", (w * 4, h * 4), 0)
+    draw(ImageDraw.Draw(big), 4)
+    return np.asarray(big.resize((w, h), Image.LANCZOS), dtype=float) / 255
+
+
+def ghost_shape(size, wobble):
+    """A ghost sprite (alpha), {size} px tall: round head, wavy hem, two eyes and a mouth (cut out)."""
+    s = size
+    w = int(s * 0.7)
+
+    def draw(d, k):
+        S, W2 = s * k, w * k
+        d.ellipse([0, 0, W2, W2], fill=255)
+        hem = [(0, W2 / 2), (W2, W2 / 2)]
+        pts = [(W2, W2 / 2), (W2, S * 0.82)]
+        for i in range(7):
+            fx = 1 - i / 6
+            pts.append((W2 * fx, S * (0.82 + 0.1 * math.sin(i * 2.1 + wobble * 2 * math.pi) + (0.08 if i % 2 else 0))))
+        pts.append((0, W2 / 2))
+        d.polygon(pts, fill=255)
+        for ex in (0.32, 0.68):
+            d.ellipse([W2 * ex - W2 * 0.08, W2 * 0.38, W2 * ex + W2 * 0.08, W2 * 0.6], fill=0)
+        d.ellipse([W2 * 0.44, W2 * 0.68, W2 * 0.56, W2 * 0.84], fill=0)
+    return _poly_mask(s, w, draw)
+
+
+HAUNTED = None
+
+
+def haunted(phase):
+    global HAUNTED
+    h, w = H * SS, W * SS
+    if HAUNTED is None:
+        r = np.random.default_rng(121)
+        ghosts = [(r.uniform(0.1, 0.9), r.uniform(0, 1), r.uniform(0.18, 0.3), r.uniform(0, 1), 1 + r.integers(0, 2)) for _ in range(5)]
+        HAUNTED = (ghosts, tile_noise(h, w, 3, 122, 4))
+    ghosts, mist = HAUNTED
+    x, y = coords()
+    img = gradient(y, [(0, (10, 14, 34)), (0.6, (26, 32, 60)), (1, (44, 50, 78))])
+    # The moon, top right, with a soft halo.
+    d = np.hypot((x - 0.72) * w, (y - 0.13) * h) / w
+    img += (np.exp(-np.clip(d - 0.13, 0, None) * 22) * 0.35)[..., None] * np.array([0.8, 0.85, 1.0])
+    img = np.where((d < 0.13)[..., None], np.array([0.92, 0.94, 0.86]) - blur(mist, 2)[..., None] * 0.15, img)
+    # Gravestones along the bottom.
+    def stones(dr, k):
+        for gx, gw, gh in ((0.12, 0.2, 0.12), (0.5, 0.16, 0.09), (0.82, 0.22, 0.14)):
+            cx, base = gx * w * k, h * k
+            dr.rounded_rectangle([cx - gw * w * k / 2, base - gh * h * k, cx + gw * w * k / 2, base + 10], radius=gw * w * k / 2, fill=255)
+            dr.rectangle([cx - gw * w * k / 2, base - gh * h * k * 0.5, cx + gw * w * k / 2, base + 10], fill=255)
+    graves = _poly_mask(h, w, stones)
+    img = img * (1 - graves[..., None]) + graves[..., None] * np.array([0.08, 0.08, 0.12])
+    # Ghosts drifting up, swaying, fading in and out.
+    for gx, gy, gs, gp, speed in ghosts:
+        t = (gy + phase * speed) % 1
+        size = int(gs * h)
+        sprite = ghost_shape(size, phase * speed + gp)
+        cx = int((gx + 0.06 * math.sin((phase * speed + gp) * 2 * math.pi)) * w)
+        cy = int((1.1 - t * 1.3) * h)
+        alpha = math.sin(t * math.pi) * 0.85
+        sh, sw = sprite.shape
+        x0, y0 = cx - sw // 2, cy - sh // 2
+        ys, xs = slice(max(0, y0), min(h, y0 + sh)), slice(max(0, x0), min(w, x0 + sw))
+        sub = sprite[ys.start - y0:ys.stop - y0, xs.start - x0:xs.stop - x0] * alpha
+        if sub.size == 0:
+            continue
+        glow = np.zeros((h, w))
+        glow[ys, xs] = sub
+        img += blur(glow, 6)[..., None] * np.array([0.5, 0.8, 0.75]) * 0.45
+        img = img * (1 - glow[..., None]) + glow[..., None] * np.array([0.88, 0.97, 0.95])
+    # Ground mist rolling sideways.
+    fog = np.roll(mist, int(phase * w), axis=1) * np.clip((y - 0.55) * 2.5, 0, 1)
+    img += fog[..., None] * np.array([0.35, 0.4, 0.5]) * 0.6
+    return img
+
+
+PUMPKIN = None
+
+
+def jack_o_lantern(phase):
+    global PUMPKIN
+    h, w = H * SS, W * SS
+    if PUMPKIN is None:
+        cx, cy, pw, ph = 0.5, 0.52, 0.86, 0.46
+
+        def body(d, k):
+            W2, H2 = w * k, h * k
+            for off in (-0.28, 0.28, -0.14, 0.14, 0):
+                d.ellipse([W2 * (cx + off * pw - pw * 0.34), H2 * (cy - ph / 2), W2 * (cx + off * pw + pw * 0.34), H2 * (cy + ph / 2)], fill=255)
+
+        def face(d, k):
+            W2, H2 = w * k, h * k
+            def P(px, py):
+                return (W2 * (cx + px * pw), H2 * (cy + py * ph))
+            d.polygon([P(-0.3, -0.12), P(-0.14, -0.12), P(-0.22, -0.3)], fill=255)   # eyes
+            d.polygon([P(0.14, -0.12), P(0.3, -0.12), P(0.22, -0.3)], fill=255)
+            d.polygon([P(-0.05, 0.0), P(0.05, 0.0), P(0, -0.1)], fill=255)          # nose
+            mouth = [P(-0.36, 0.08), P(-0.24, 0.16), P(-0.18, 0.1), P(-0.1, 0.18), P(-0.02, 0.1), P(0.06, 0.18),
+                     P(0.14, 0.1), P(0.22, 0.18), P(0.36, 0.08), P(0.24, 0.3), P(-0.24, 0.3)]
+            d.polygon(mouth, fill=255)
+
+        def stem(d, k):
+            W2, H2 = w * k, h * k
+            d.polygon([(W2 * 0.46, H2 * (cy - ph / 2 + 0.02)), (W2 * 0.54, H2 * (cy - ph / 2 + 0.02)),
+                       (W2 * 0.58, H2 * (cy - ph / 2 - 0.08)), (W2 * 0.5, H2 * (cy - ph / 2 - 0.1))], fill=255)
+        ribs = np.abs(np.sin((coords()[0] - cx) / pw * math.pi * 3.2)) ** 0.6
+        PUMPKIN = (_poly_mask(h, w, body), _poly_mask(h, w, face), _poly_mask(h, w, stem), ribs, tile_noise(h, w, 4, 131, 3))
+    body, face, stem, ribs, smoke = PUMPKIN
+    x, y = coords()
+    img = gradient(y, [(0, (14, 6, 20)), (1, (34, 12, 30))])
+    # Candle flicker: a few beats per loop, never quite steady.
+    flicker = 0.78 + 0.12 * math.sin(phase * 2 * math.pi * 5) + 0.1 * math.sin(phase * 2 * math.pi * 13 + 1)
+    # Orange glow on the background around the pumpkin.
+    img += blur(body, 14)[..., None] * np.array([1.0, 0.45, 0.08]) * 0.35 * flicker
+    skin = np.array([0.95, 0.42, 0.06]) * (0.55 + 0.45 * (1 - ribs[..., None])) * (0.7 + 0.3 * (1 - y[..., None]))
+    img = img * (1 - body[..., None]) + body[..., None] * skin
+    img = img * (1 - stem[..., None]) + stem[..., None] * np.array([0.25, 0.32, 0.1])
+    # The carved face, lit from inside: yellow-white core, orange edges.
+    inner = blur(face, 2)
+    lit = np.array([1.0, 0.85, 0.35]) * flicker
+    img = img * (1 - face[..., None]) + face[..., None] * lit * (0.75 + 0.35 * inner[..., None])
+    img += blur(face, 8)[..., None] * np.array([1.0, 0.6, 0.15]) * 0.6 * flicker
+    # Wisps of smoke rising from the top.
+    wisp = np.roll(smoke, -int(phase * h), axis=0) * np.clip((0.3 - y) * 3, 0, 1)
+    img += (np.clip(wisp - 0.45, 0, 1) * 1.5)[..., None] * np.array([0.35, 0.3, 0.35])
+    return img
+
+
+WITCH = None
+
+
+def witching_hour(phase):
+    global WITCH
+    h, w = H * SS, W * SS
+    if WITCH is None:
+        r = np.random.default_rng(141)
+
+        def tree(d, k):
+            W2, H2 = w * k, h * k
+            def branch(x0, y0, angle, length, width, depth):
+                if depth == 0:
+                    return
+                x1, y1 = x0 + math.cos(angle) * length, y0 + math.sin(angle) * length
+                d.line([(x0, y0), (x1, y1)], fill=255, width=max(1, int(width)))
+                for _ in range(2):
+                    branch(x1, y1, angle + r.uniform(-0.7, 0.7), length * r.uniform(0.55, 0.75), width * 0.6, depth - 1)
+            branch(W2 * 0.12, H2, -math.pi / 2 + 0.15, H2 * 0.3, 7 * k, 6)
+            d.rectangle([0, H2 * 0.95, W2, H2], fill=255)
+        bats = [(r.uniform(0, 1), r.uniform(0.12, 0.62), r.uniform(0.1, 0.16), r.uniform(0, 1), 1 + r.integers(0, 2)) for _ in range(6)]
+        WITCH = (_poly_mask(h, w, tree), bats)
+    tree, bats = WITCH
+    x, y = coords()
+    img = gradient(y, [(0, (40, 10, 50)), (0.55, (110, 30, 40)), (1, (60, 14, 30))])
+    # A huge orange moon.
+    d = np.hypot((x - 0.55) * w, (y - 0.4) * h) / w
+    moon = np.clip((0.33 - d) * 60, 0, 1)
+    img += (np.exp(-np.clip(d - 0.33, 0, None) * 9) * 0.45)[..., None] * np.array([1.0, 0.55, 0.15])
+    img = img * (1 - moon[..., None]) + moon[..., None] * (np.array([1.0, 0.62, 0.18]) - (np.abs(np.sin(x * 23 + y * 17)) * 0.05)[..., None])
+    # Bats flapping across.
+    from PIL import ImageDraw
+    layer = Image.new("L", (w * 4, h * 4), 0)
+    dr = ImageDraw.Draw(layer)
+    for bx, by, bs, bp, speed in bats:
+        t = (bx + phase * speed) % 1.2 - 0.1
+        cx, cy = t * w * 4, (by + 0.03 * math.sin((phase * speed * 3 + bp) * 2 * math.pi)) * h * 4
+        flap = math.sin((phase * 8 * speed + bp) * 2 * math.pi)
+        S = bs * w * 4
+        wing_y = cy - flap * S * 0.35
+        dr.polygon([(cx, cy), (cx - S, wing_y), (cx - S * 0.7, cy + S * 0.15), (cx - S * 0.35, cy + S * 0.05), (cx, cy + S * 0.2),
+                    (cx + S * 0.35, cy + S * 0.05), (cx + S * 0.7, cy + S * 0.15), (cx + S, wing_y)], fill=255)
+        dr.ellipse([cx - S * 0.14, cy - S * 0.12, cx + S * 0.14, cy + S * 0.22], fill=255)
+    batmask = np.asarray(layer.resize((w, h), Image.LANCZOS), dtype=float) / 255
+    sil = np.clip(tree + batmask, 0, 1)
+    img = img * (1 - sil[..., None]) + sil[..., None] * np.array([0.04, 0.02, 0.05])
+    return img
+
+
 CAPES = {
     "velo_neon": velo_neon,
     "wildfire": wildfire,
@@ -550,6 +731,9 @@ CAPES = {
     "kintsugi": kintsugi,
     "heaven": heaven,
     "pearl": pearl,
+    "haunted": haunted,
+    "jack_o_lantern": jack_o_lantern,
+    "witching_hour": witching_hour,
 }
 
 
