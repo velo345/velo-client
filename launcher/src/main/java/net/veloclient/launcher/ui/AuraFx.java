@@ -40,11 +40,18 @@ public final class AuraFx {
 	private static final double UNIT = 16;
 	private static final double FEET_Y = 10;
 
-	/** A glow, or (shape {@link #LINE}) a beam from (x, y) to (x2, y2) {@code radius} wide. */
+	/**
+	 * A glow, (shape {@link #LINE}) a beam from (x, y) to (x2, y2) {@code radius} wide, or (shape {@link #PANEL}) an
+	 * upright card {@code radius} wide and {@code x2} tall showing atlas cell {@code (int) y2}.
+	 */
 	private record Sprite(double x, double y, double depth, double radius, int rgb, double alpha, int shape, double x2, double y2) {
 	}
 
 	private static final int LINE = 99;
+	private static final int PANEL = 98;
+	/** Code-rain characters the default font surely has (the game's atlas has katakana; fonts here might not). */
+	private static final String GLYPHS = "0123457ABCDEFHXZ";
+	private static final javafx.scene.text.Font GLYPH_FONT = javafx.scene.text.Font.font("Monospaced", javafx.scene.text.FontWeight.BOLD, 12);
 
 	private AuraFx() {
 	}
@@ -180,6 +187,20 @@ public final class AuraFx {
 				out.add(new Sprite(a[0], a[1], (a[2] + b[2]) / 2, width * UNIT * k, rgb, alpha, LINE, b[0], b[1]));
 			}
 
+			@Override
+			public void panel(float x, float y, float z, float w, float h, float nx, float nz, int cell, int rgb, float alpha) {
+				if (alpha <= 0.02f) {
+					return;
+				}
+				double[] c = point(x, y, z);
+				if (c == null) {
+					return;
+				}
+				double k = focal / c[3];
+				// Turned away from the camera it gets narrow (its normal, turned like the model).
+				out.add(new Sprite(c[0], c[1], c[2], w * UNIT * k * Math.max(0.15, facingFor(nx, nz, cos, sin)), rgb, alpha, PANEL, h * UNIT * k, cell));
+			}
+
 			private double[] point(float x, float y, float z) {
 				double mx = x * UNIT;
 				double my = FEET_Y - y * UNIT;
@@ -197,6 +218,13 @@ public final class AuraFx {
 		return out;
 	}
 
+	/** How squarely a card with normal (nx, nz) faces the camera after the model's turn (0 edge-on, 1 head-on). */
+	private static double facingFor(float nx, float nz, double cos, double sin) {
+		// The model turns by its yaw; the camera looks along +z.
+		double rz = -nx * sin + nz * cos;
+		return Math.abs(rz);
+	}
+
 	/** Draws the sprites behind ({@code front} false) or in front of the player. */
 	private static void draw(GraphicsContext g, List<Sprite> sprites, double distance, boolean front) {
 		g.setGlobalBlendMode(BlendMode.ADD);
@@ -205,14 +233,58 @@ public final class AuraFx {
 				continue;
 			}
 			Color c = Color.rgb((s.rgb >> 16) & 255, (s.rgb >> 8) & 255, s.rgb & 255, Math.min(1, s.alpha));
+			if (s.shape == PANEL) {
+				int cell = (int) s.y2;
+				double w = Math.max(1, s.radius);
+				double h = Math.max(1, s.x2);
+				if (cell >= AuraEffects.CELL_GLYPH) {
+					// A code glyph: the character itself, mirrored like in the game.
+					g.save();
+					g.translate(s.x, s.y);
+					g.scale(-w / 9.0, h / 12.0);
+					g.setFill(c);
+					g.setFont(GLYPH_FONT);
+					g.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+					g.setTextBaseline(javafx.geometry.VPos.CENTER);
+					g.fillText(String.valueOf(GLYPHS.charAt((cell - AuraEffects.CELL_GLYPH) % GLYPHS.length())), 0, 0);
+					g.restore();
+				} else {
+					// A light curtain: bright at the foot, fading upwards.
+					g.setFill(new javafx.scene.paint.LinearGradient(0, s.y + h / 2, 0, s.y - h / 2, false, CycleMethod.NO_CYCLE,
+							new Stop(0, c), new Stop(0.12, c.deriveColor(0, 1, 1, 0.55)), new Stop(1, Color.TRANSPARENT)));
+					g.fillRect(s.x - w / 2, s.y - h / 2, w, h);
+				}
+				continue;
+			}
+			if (s.shape == AuraEffects.HEART) {
+				double r = Math.max(1.5, s.radius);
+				g.setFill(c);
+				g.beginPath();
+				g.moveTo(s.x, s.y + r * 0.9);
+				g.bezierCurveTo(s.x - r * 1.4, s.y - r * 0.1, s.x - r * 0.6, s.y - r * 1.1, s.x, s.y - r * 0.35);
+				g.bezierCurveTo(s.x + r * 0.6, s.y - r * 1.1, s.x + r * 1.4, s.y - r * 0.1, s.x, s.y + r * 0.9);
+				g.closePath();
+				g.fill();
+				continue;
+			}
+			if (s.shape == AuraEffects.LEAF) {
+				double r = Math.max(1.5, s.radius);
+				g.save();
+				g.translate(s.x, s.y);
+				g.rotate((s.rgb * 37 + s.depth * 40) % 360);
+				g.setFill(c);
+				g.fillOval(-r * 0.4, -r, r * 0.8, r * 2);
+				g.restore();
+				continue;
+			}
 			if (s.shape == LINE) {
 				// A soft glow around a sharper line.
 				g.setLineCap(StrokeLineCap.ROUND);
 				g.setStroke(c.deriveColor(0, 1, 1, 0.35));
-				g.setLineWidth(Math.max(1.5, s.radius * 2.2));
+				g.setLineWidth(Math.max(1.2, s.radius * 1.1));
 				g.strokeLine(s.x, s.y, s.x2, s.y2);
 				g.setStroke(c);
-				g.setLineWidth(Math.max(0.8, s.radius * 0.8));
+				g.setLineWidth(Math.max(0.6, s.radius * 0.4));
 				g.strokeLine(s.x, s.y, s.x2, s.y2);
 				continue;
 			}

@@ -332,6 +332,14 @@ public final class OwnerView {
 					text.append(target).append(": ").append(e.getMessage()).append("\n\n");
 				}
 			}
+			// If you gave yourself something, the rest of the launcher sees it right away.
+			try {
+				StoreApi.wallet();
+				net.veloclient.launcher.data.StorePurchase.restoreMissing();
+				WingsCatalog.refresh();
+			} catch (StoreApi.StoreError ignored) {
+				// Shown on the next visit.
+			}
 			Platform.runLater(() -> output.setText(text.toString().strip()));
 		}, Executors.newVirtualThreadPerTaskExecutor());
 	}

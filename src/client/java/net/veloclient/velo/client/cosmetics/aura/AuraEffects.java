@@ -26,13 +26,31 @@ public final class AuraEffects {
 		/** A pulsing rune circle at your feet pulling wisps in. */
 		VOID,
 		/** Lightning arcs crackling around your body, throwing sparks. */
-		STORM
+		STORM,
+		/** Green code raining down a cylinder of light around you. */
+		MATRIX,
+		/** A roaring column of fire. */
+		INFERNO,
+		/** Vines growing up around you, leafing out and flowering, with fireflies. */
+		BLOOM,
+		/** A ring of hearts pulsing to a heartbeat, more floating up. */
+		HEART,
+		/** Northern-lights curtains waving around you. */
+		AURORA
 	}
 
-	/** Sprite shapes: a soft glowing ball, a four-pointed star, a flat glow on the ground plane. */
+	/** Sprite shapes: a soft glowing ball, a four-pointed star, a flat glow on the ground plane, a heart, a leaf. */
 	public static final int GLOW = 0;
 	public static final int STAR = 1;
 	public static final int DISC = 2;
+	public static final int HEART = 3;
+	public static final int LEAF = 4;
+
+	/** Atlas cells (8 x 4 grid, see tools/cosmetics/make_aura_atlas.py) for {@link Out#panel}. */
+	public static final int CELL_CURTAIN = 5;
+	public static final int CELL_GLYPH = 8;
+	/** The code-rain glyphs, in atlas order from {@link #CELL_GLYPH} (drawn mirrored there). */
+	public static final String GLYPHS = "0123457ｱｶｻﾀﾅﾊﾏﾗﾜ";
 
 	/** Colour choices: 0 = the aura's own colours, then these, then rainbow. */
 	public static final int[] PALETTE = {0xFF4D4D, 0xFF8A1F, 0xFFD84D, 0x5CFF7A, 0x3FF0FF, 0x4D7CFF, 0xA65CFF, 0xFF4FD8, 0xF4F6FF};
@@ -77,6 +95,12 @@ public final class AuraEffects {
 		void sprite(float x, float y, float z, float size, int rgb, float alpha, int shape);
 
 		void beam(float x1, float y1, float z1, float x2, float y2, float z2, float width, int rgb, float alpha);
+
+		/**
+		 * A flat upright card {@code w} x {@code h} centred on (x, y, z), facing outwards along (nx, nz),
+		 * showing atlas {@code cell} (a code glyph, a light curtain).
+		 */
+		void panel(float x, float y, float z, float w, float h, float nx, float nz, int cell, int rgb, float alpha);
 	}
 
 	private AuraEffects() {
@@ -89,6 +113,11 @@ public final class AuraEffects {
 			case "frost" -> Kind.FROST;
 			case "void" -> Kind.VOID;
 			case "storm" -> Kind.STORM;
+			case "matrix" -> Kind.MATRIX;
+			case "inferno" -> Kind.INFERNO;
+			case "bloom" -> Kind.BLOOM;
+			case "heartbeat" -> Kind.HEART;
+			case "aurora" -> Kind.AURORA;
 			default -> null;
 		};
 	}
@@ -103,6 +132,11 @@ public final class AuraEffects {
 			case FROST -> new int[] {0xDFF4FF, 0x7CC8FF};
 			case VOID -> new int[] {0x7A2BFF, 0xFF5CF0};
 			case STORM -> new int[] {0xFFE14D, 0x6FE6FF};
+			case MATRIX -> new int[] {0xD8FFE0, 0x1FD65A};
+			case INFERNO -> new int[] {0xFFF3B0, 0xE8320C};
+			case BLOOM -> new int[] {0x9BE36B, 0xFF9ECF};
+			case HEART -> new int[] {0xFF9ECF, 0xFF2D55};
+			case AURORA -> new int[] {0x5CFF9D, 0xB47CFF};
 		};
 	}
 
@@ -225,6 +259,11 @@ public final class AuraEffects {
 				case FROST -> emitFrost(t, s, px, py, pz);
 				case VOID -> emitVoid(t, s, px, py, pz);
 				case STORM -> emitStorm(t, s, px, py, pz);
+				case INFERNO -> emitInferno(t, s, px, py, pz);
+				case BLOOM -> emitBloom(t, s, px, py, pz);
+				case HEART -> emitHearts(t, s, px, py, pz);
+				case MATRIX -> updateRain(t, s);
+				case AURORA -> emitAurora(t, s, px, py, pz);
 			}
 			for (int i = particles.size() - 1; i >= 0; i--) {
 				P p = particles.get(i);
@@ -368,6 +407,135 @@ public final class AuraEffects {
 			}
 		}
 
+		private void emitInferno(float t, Settings s, double px, double py, double pz) {
+			int n = count(t, 95 * s.density());
+			for (int k = 0; k < n; k++) {
+				// Around the body (not inside it, where the player would hide the flames).
+				float a = rnd(0, (float) (Math.PI * 2));
+				float r = rnd(0.4f, 0.62f) * s.size();
+				P p = new P();
+				p.x = px + Math.cos(a) * r;
+				p.y = py + rnd(0, 0.2f);
+				p.z = pz + Math.sin(a) * r;
+				p.vy = rnd(1.6f, 2.7f);
+				p.life = rnd(0.7f, 1.1f);
+				p.size = rnd(0.2f, 0.32f) * s.size();
+				p.shape = GLOW;
+				add(p);
+			}
+			// Now and then a spark shoots up out of the fire.
+			if (random.nextFloat() < t * 6 * s.density()) {
+				P p = new P();
+				p.x = px + rnd(-0.3f, 0.3f) * s.size();
+				p.y = py + 0.6;
+				p.z = pz + rnd(-0.3f, 0.3f) * s.size();
+				p.vx = rnd(-0.5f, 0.5f);
+				p.vy = rnd(2.5f, 3.6f);
+				p.vz = rnd(-0.5f, 0.5f);
+				p.life = rnd(0.8f, 1.2f);
+				p.size = rnd(0.04f, 0.06f) * s.size();
+				p.shape = STAR;
+				add(p);
+			}
+		}
+
+		private void emitBloom(float t, Settings s, double px, double py, double pz) {
+			int n = count(t, 8 * s.density());
+			for (int k = 0; k < n; k++) {
+				float a = rnd(0, (float) (Math.PI * 2));
+				float r = rnd(0.55f, 1.05f) * s.size();
+				P p = new P();
+				p.x = px + Math.cos(a) * r;
+				p.y = py + rnd(0.2f, 2.1f);
+				p.z = pz + Math.sin(a) * r;
+				float kind = random.nextFloat();
+				if (kind < 0.7f) {
+					// A firefly.
+					p.shape = GLOW;
+					p.size = rnd(0.035f, 0.055f) * s.size();
+					p.life = rnd(2.0f, 3.2f);
+				} else {
+					// A petal falling from the flowers, turning slowly around you.
+					p.shape = LEAF;
+					p.size = rnd(0.07f, 0.11f) * s.size();
+					p.life = rnd(2.6f, 3.6f);
+					p.vy = -rnd(0.15f, 0.3f);
+				}
+				add(p);
+			}
+		}
+
+		private void emitHearts(float t, Settings s, double px, double py, double pz) {
+			int n = count(t, 7 * s.density());
+			for (int k = 0; k < n; k++) {
+				float a = rnd(0, (float) (Math.PI * 2));
+				float r = rnd(0.35f, 0.8f) * s.size();
+				P p = new P();
+				p.x = px + Math.cos(a) * r;
+				p.y = py + rnd(0.8f, 1.7f);
+				p.z = pz + Math.sin(a) * r;
+				p.vy = rnd(0.45f, 0.7f);
+				p.life = rnd(1.6f, 2.2f);
+				p.size = rnd(0.07f, 0.12f) * s.size();
+				p.shape = HEART;
+				add(p);
+			}
+		}
+
+		private void emitAurora(float t, Settings s, double px, double py, double pz) {
+			int n = count(t, 6 * s.density());
+			for (int k = 0; k < n; k++) {
+				float a = rnd(0, (float) (Math.PI * 2));
+				float r = 1.15f * s.size();
+				P p = new P();
+				p.x = px + Math.cos(a) * r;
+				p.y = py + rnd(1.4f, 2.4f);
+				p.z = pz + Math.sin(a) * r;
+				p.vy = rnd(0.1f, 0.25f);
+				p.life = rnd(1.5f, 2.5f);
+				p.size = rnd(0.03f, 0.05f) * s.size();
+				p.shape = STAR;
+				add(p);
+			}
+		}
+
+		// -- Code rain (kept per column, around the player) --
+
+		private float[] rainAngle = new float[0];
+		private float[] rainHead;
+		private float[] rainSpeed;
+		private int[] rainLength;
+		private long[] rainSeed;
+
+		private void updateRain(float t, Settings s) {
+			int columns = Math.max(6, Math.round(20 * s.density()));
+			if (rainAngle.length != columns) {
+				rainAngle = new float[columns];
+				rainHead = new float[columns];
+				rainSpeed = new float[columns];
+				rainLength = new int[columns];
+				rainSeed = new long[columns];
+				for (int i = 0; i < columns; i++) {
+					rainAngle[i] = (float) (i * Math.PI * 2 / columns) + rnd(-0.08f, 0.08f);
+					resetColumn(i);
+					rainHead[i] = rnd(-0.2f, 2.6f);
+				}
+			}
+			for (int i = 0; i < columns; i++) {
+				rainHead[i] -= rainSpeed[i] * t;
+				if (rainHead[i] + rainLength[i] * 0.13f < -0.1f) {
+					resetColumn(i);
+				}
+			}
+		}
+
+		private void resetColumn(int i) {
+			rainHead[i] = rnd(2.4f, 3.0f);
+			rainSpeed[i] = rnd(1.1f, 2.2f);
+			rainLength[i] = 7 + random.nextInt(9);
+			rainSeed[i] = random.nextLong();
+		}
+
 		// -- Motion --
 
 		private void move(P p, float t, Settings s, double px, double py, double pz) {
@@ -401,6 +569,40 @@ public final class AuraEffects {
 					p.vy = (float) ((py + 1.0 - p.y) * 0.6);
 				}
 				case STORM -> p.vy -= 6f * t;
+				case INFERNO -> {
+					// Licking flames: a wobble, pulled back towards the middle, slowing near the top.
+					p.vx += (float) Math.sin(p.age * 14 + p.seed * 30) * 2.2f * t;
+					p.vz += (float) Math.cos(p.age * 12 + p.seed * 17) * 2.2f * t;
+					// Held on a cylinder around the body, narrowing a little towards the top.
+					double dx = p.x - px;
+					double dz = p.z - pz;
+					double d = Math.max(0.05, Math.sqrt(dx * dx + dz * dz));
+					double want = (0.5 - 0.12 * Math.min(1, (p.y - py) / 2)) * s.size();
+					p.vx += (float) (dx / d * (want - d) * 6 * t);
+					p.vz += (float) (dz / d * (want - d) * 6 * t);
+					if (p.shape == GLOW) {
+						p.vy *= 1 - 0.5f * t;
+					}
+				}
+				case BLOOM -> {
+					// Turn slowly around the player's axis; fireflies wander.
+					double dx = p.x - px;
+					double dz = p.z - pz;
+					double w = 0.35 * t;
+					p.x = px + dx * Math.cos(w) - dz * Math.sin(w);
+					p.z = pz + dx * Math.sin(w) + dz * Math.cos(w);
+					if (p.shape == GLOW) {
+						p.vx = (float) Math.sin(p.age * 2.3f + p.seed * 9) * 0.25f;
+						p.vy = (float) Math.cos(p.age * 1.7f + p.seed * 5) * 0.15f;
+						p.vz = (float) Math.cos(p.age * 2.1f + p.seed * 7) * 0.25f;
+					} else {
+						p.vx = (float) Math.sin(p.age * 1.6f + p.seed * 11) * 0.12f;
+						p.vz = (float) Math.cos(p.age * 1.3f + p.seed * 3) * 0.12f;
+					}
+				}
+				case HEART -> p.vx = (float) Math.sin(p.age * 3 + p.seed * 10) * 0.18f;
+				case AURORA, MATRIX -> {
+				}
 				case ORBIT -> {
 					p.vx *= 1 - 1.5f * t;
 					p.vz *= 1 - 1.5f * t;
@@ -425,6 +627,25 @@ public final class AuraEffects {
 				case FROST -> drawFrost(s, out);
 				case VOID -> drawVoid(s, out);
 				case STORM -> drawStorm(s, out);
+				case MATRIX -> drawRain(s, out);
+				case INFERNO -> {
+					float pulse = 0.4f + 0.12f * (float) Math.sin(time * 9) + 0.06f * (float) Math.sin(time * 23);
+					out.sprite(0, 0.03f, 0, 1.0f * sz, color(kind, s, 0.6f, 0, time), pulse, DISC);
+					out.sprite(0, 0.9f, 0, 0.75f * sz, color(kind, s, 0.7f, 0, time), 0.08f, GLOW);
+				}
+				case BLOOM -> {
+					out.sprite(0, 0.03f, 0, 1.25f * sz, color(kind, s, 0f, 0, time), 0.22f, DISC);
+					drawVines(s, out);
+					// Grass sparkles at your feet.
+					for (int i = 0; i < 8; i++) {
+						float a = i * 0.785f + time * 0.2f;
+						float twinkle = (float) Math.max(0, Math.sin(time * 2.5f + i * 2.1f));
+						out.sprite(0.75f * sz * (float) Math.cos(a), 0.06f, 0.75f * sz * (float) Math.sin(a), 0.05f * sz,
+								color(kind, s, 0f, i / 8f, time), twinkle * 0.8f, STAR);
+					}
+				}
+				case HEART -> drawHeartRing(s, out);
+				case AURORA -> drawAurora(s, out);
 			}
 			for (P p : particles) {
 				float f = p.age / p.life;
@@ -456,6 +677,34 @@ public final class AuraEffects {
 					}
 					case STORM -> out.sprite(x, y, z, p.size, color(kind, s, p.seed, p.seed, time), 1 - f, STAR);
 					case ORBIT -> out.sprite(x, y, z, p.size * (1 - f * 0.5f), color(kind, s, p.seed, p.seed, time), (1 - f) * 0.9f, STAR);
+					case INFERNO -> {
+						if (p.shape == STAR) {
+							out.sprite(x, y, z, p.size, 0xFFE9A0, 1 - f, STAR);
+							break;
+						}
+						// White-hot at the root, through orange to deep red, then gone.
+						float flicker = 0.85f + 0.15f * (float) Math.sin(p.age * 30 + p.seed * 50);
+						int c = s.color() == 0 ? (f < 0.25f ? mix(0xFFF3B0, 0xFFB02E, f / 0.25f) : mix(0xFFB02E, 0xC7280C, (f - 0.25f) / 0.75f))
+								: color(kind, s, f, p.seed, time);
+						out.sprite(x, y, z, p.size * (1 - 0.65f * f), c, (float) Math.pow(1 - f, 1.4) * flicker, GLOW);
+					}
+					case BLOOM -> {
+						float alpha = Math.min(1, Math.min(p.age * 2, (p.life - p.age) * 1.5f));
+						if (p.shape == GLOW) {
+							float blink = (float) Math.max(0, Math.sin(p.age * 3.4f + p.seed * 20));
+							out.sprite(x, y, z, p.size, s.color() == 0 ? 0xE8FF8A : color(kind, s, 0.5f, p.seed, time), alpha * blink, GLOW);
+						} else {
+							out.sprite(x, y, z, p.size * 0.8f, color(kind, s, 1f, p.seed, time), alpha * 0.9f, LEAF);
+						}
+					}
+					case HEART -> {
+						float grow = Math.min(1, p.age * 3);
+						float alpha = Math.min(1, (p.life - p.age) * 1.6f);
+						out.sprite(x, y, z, p.size * grow, color(kind, s, p.seed, p.seed, time), alpha, HEART);
+					}
+					case AURORA -> out.sprite(x, y, z, p.size, color(kind, s, p.seed, p.seed, time), (1 - f) * 0.9f, STAR);
+					case MATRIX -> {
+					}
 				}
 			}
 		}
@@ -545,6 +794,127 @@ public final class AuraEffects {
 				float pulse = (float) Math.pow(0.5 + 0.5 * Math.sin(time * 2.4f + i * 0.7f), 2);
 				out.beam(r * (float) Math.cos(a1), y, r * (float) Math.sin(a1), r * (float) Math.cos(a2), y, r * (float) Math.sin(a2), width,
 						color(kind, s, pulse, i / (float) segments, time), 0.35f + 0.65f * pulse);
+			}
+		}
+
+		private void drawRain(Settings s, Out out) {
+			float sz = s.size();
+			float r = 0.8f * sz;
+			float glyph = 0.15f * sz;
+			out.sprite(0, 0.03f, 0, 1.2f * sz, color(kind, s, 1f, 0, time), 0.18f, DISC);
+			for (int i = 0; i < rainAngle.length; i++) {
+				float a = rainAngle[i];
+				float nx = (float) Math.cos(a);
+				float nz = (float) Math.sin(a);
+				// The glyphs change now and then (per column, from its seed and the time).
+				long tick = (long) (time * 9);
+				for (int k = 0; k < rainLength[i]; k++) {
+					float y = rainHead[i] + k * 0.13f;
+					if (y < 0 || y > 2.7f) {
+						continue;
+					}
+					float fade = 1 - k / (float) rainLength[i];
+					long h = rainSeed[i] * 31 + k * 977 + (k == 0 ? tick : tick / (3 + k % 4));
+					int g = (int) Math.floorMod(h ^ (h >>> 17), (long) GLYPHS.length());
+					int c = k == 0 ? (s.color() == 0 ? 0xE8FFEE : 0xFFFFFF) : color(kind, s, 0.4f + 0.6f * (1 - fade), i / (float) rainAngle.length, time);
+					// Fade in at the top and out at the feet.
+					float edge = Math.min(1, Math.min(y * 3, (2.7f - y) * 2.5f));
+					float alpha = (k == 0 ? 1f : 0.95f * fade) * edge;
+					// Twice at right angles, so no column is ever seen edge-on.
+					out.panel(r * nx, y, r * nz, glyph, glyph, nx, nz, CELL_GLYPH + g, c, alpha);
+					out.panel(r * nx, y, r * nz, glyph, glyph, -nz, nx, CELL_GLYPH + g, c, alpha * 0.8f);
+				}
+				// The column's faint light.
+				float top = Math.min(2.7f, rainHead[i] + rainLength[i] * 0.13f);
+				float bottom = Math.max(0, rainHead[i]);
+				if (top > bottom) {
+					out.beam(r * nx, bottom, r * nz, r * nx, top, r * nz, 0.05f * sz, color(kind, s, 1f, 0, time), 0.22f);
+				}
+			}
+		}
+
+		/** Three vines spiralling up around you: they grow, leaf out, flower at the tip, fade and grow again. */
+		private void drawVines(Settings s, Out out) {
+			float sz = s.size();
+			float period = 7f;
+			int segments = 30;
+			for (int v = 0; v < 3; v++) {
+				float phase = (time + v * period / 3) % period;
+				float grown = Math.min(1, phase / 4f);
+				float fade = phase > period - 1.2f ? (period - phase) / 1.2f : 1;
+				if (fade <= 0) {
+					continue;
+				}
+				float a0 = v * (float) (Math.PI * 2 / 3) + 0.4f;
+				int shown = Math.max(1, Math.round(segments * grown));
+				float[] prev = null;
+				for (int i = 0; i <= shown; i++) {
+					float f = i / (float) segments;
+					float a = a0 + f * (float) (Math.PI * 2.3) + 0.08f * (float) Math.sin(time * 0.8f + v + f * 6);
+					float r = (0.42f + 0.07f * (float) Math.sin(f * 11 + v * 2)) * sz;
+					float[] q = {r * (float) Math.cos(a), 0.04f + f * 2.0f * sz, r * (float) Math.sin(a)};
+					if (prev != null) {
+						// Darker and thicker at the root, fresh green at the tip.
+						int c = mix(0x2E7D32, color(kind, s, 0f, v / 3f, time), f);
+						out.beam(prev[0], prev[1], prev[2], q[0], q[1], q[2], (0.09f - 0.045f * f) * sz, c, fade);
+					}
+					// A leaf every few segments, alternating sides, unfolding as the vine grows past it.
+					if (i > 0 && i % 3 == 0 && i < shown) {
+						float out1 = (i / 3) % 2 == 0 ? 1.18f : 0.82f;
+						float unfold = Math.min(1, (shown - i) / 4f);
+						int leaf = s.color() == 0 ? mix(0x3FAE4A, 0x9BE36B, (i % 5) / 4f) : color(kind, s, 0.2f, v / 3f + i, time);
+						out.sprite(q[0] * out1, q[1] + 0.03f, q[2] * out1, 0.11f * sz * unfold, leaf, fade, LEAF);
+					}
+					prev = q;
+				}
+				// The flower at the tip once it's grown.
+				if (grown >= 1 && prev != null) {
+					float open = Math.min(1, (phase - 4f) / 0.8f);
+					int petal = color(kind, s, 1f, v / 3f, time);
+					for (int k = 0; k < 5; k++) {
+						float pa = k * 1.2566f + time * 0.3f;
+						float pr = 0.07f * sz * open;
+						out.sprite(prev[0] + pr * (float) Math.cos(pa), prev[1] + 0.02f, prev[2] + pr * (float) Math.sin(pa), 0.06f * sz * open, petal,
+								0.95f * fade, GLOW);
+					}
+					out.sprite(prev[0], prev[1] + 0.02f, prev[2], 0.05f * sz * open, 0xFFF4A0, fade, STAR);
+				}
+			}
+		}
+
+		private void drawHeartRing(Settings s, Out out) {
+			float sz = s.size();
+			// Lub-dub: two quick beats, then a pause.
+			float beat = time % 1.1f;
+			float pulse = (float) (Math.exp(-Math.pow((beat - 0.05) / 0.07, 2)) + 0.7 * Math.exp(-Math.pow((beat - 0.3) / 0.07, 2)));
+			out.sprite(0, 1.15f, 0, (0.55f + 0.12f * pulse) * sz, color(kind, s, 0.9f, 0, time), 0.06f + 0.08f * pulse, GLOW);
+			int hearts = 8;
+			for (int i = 0; i < hearts; i++) {
+				float a = i * (float) (Math.PI * 2 / hearts) + time * 0.7f;
+				float r = 0.78f * sz;
+				float y = 1.1f + 0.08f * (float) Math.sin(time * 1.5f + i);
+				out.sprite(r * (float) Math.cos(a), y, r * (float) Math.sin(a), (0.11f + 0.05f * pulse) * sz,
+						color(kind, s, 0.5f + 0.5f * pulse, i / (float) hearts, time), 0.75f + 0.25f * pulse, HEART);
+			}
+		}
+
+		private void drawAurora(Settings s, Out out) {
+			float sz = s.size();
+			int segments = 30;
+			float r = 1.15f * sz;
+			float width = (float) (Math.PI * 2 * r / segments) * 1.25f;
+			for (int i = 0; i < segments; i++) {
+				float a = i * (float) (Math.PI * 2 / segments) + time * 0.12f;
+				// The curtain waves: its radius, height and brightness move along the ring.
+				float wave = (float) Math.sin(time * 0.9f + i * 0.45f);
+				float rr = r * (1 + 0.06f * (float) Math.sin(time * 1.3f + i * 0.8f));
+				float h = (1.0f + 0.35f * wave) * sz;
+				float bottom = 1.25f + 0.12f * (float) Math.sin(time * 0.7f + i * 0.3f);
+				float nx = (float) Math.cos(a);
+				float nz = (float) Math.sin(a);
+				float f = (float) (0.5 + 0.5 * Math.sin(time * 0.35f + i * 0.21f));
+				float shimmer = 0.45f + 0.25f * (float) Math.sin(time * 2.2f + i * 1.3f);
+				out.panel(rr * nx, bottom + h / 2, rr * nz, width, h, nx, nz, CELL_CURTAIN, color(kind, s, f, i / (float) segments, time), shimmer);
 			}
 		}
 

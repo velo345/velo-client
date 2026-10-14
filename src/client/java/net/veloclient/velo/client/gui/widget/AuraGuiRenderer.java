@@ -45,8 +45,28 @@ public final class AuraGuiRenderer {
 				float yr = (float) (y * Math.cos(pitch) - zr * Math.sin(pitch));
 				int a = Math.round(Math.min(1, alpha) * 255);
 				float px = shape == AuraEffects.DISC ? size * 0.6f : size;
-				sprites.add(new Sprite(cx + xr * scale, feetY - yr * scale, zr, px * scale * 2, (a << 24) | (rgb & 0xFFFFFF),
-						shape == AuraEffects.STAR ? 1 : 0));
+				int cell = switch (shape) {
+					case AuraEffects.STAR -> 1;
+					case AuraEffects.HEART -> 3;
+					case AuraEffects.LEAF -> 4;
+					default -> 0;
+				};
+				sprites.add(new Sprite(cx + xr * scale, feetY - yr * scale, zr, px * scale * 2, (a << 24) | (rgb & 0xFFFFFF), cell));
+			}
+
+			@Override
+			public void panel(float x, float y, float z, float w, float h, float nx, float nz, int cell, int rgb, float alpha) {
+				if (alpha <= 0.02f) {
+					return;
+				}
+				float xr = x * cos - z * sin;
+				float zr = x * sin + z * cos;
+				float yr = (float) (y * Math.cos(pitch) - zr * Math.sin(pitch));
+				int a = Math.round(Math.min(1, alpha) * 255);
+				// Seen edge-on it gets narrow: scale by how much it faces the camera.
+				float facing = Math.abs(nx * sin + nz * cos);
+				float size = Math.max(w, h) * Math.max(0.35f, facing);
+				sprites.add(new Sprite(cx + xr * scale, feetY - yr * scale, zr, size * scale, (a << 24) | (rgb & 0xFFFFFF), cell));
 			}
 
 			@Override
@@ -75,7 +95,7 @@ public final class AuraGuiRenderer {
 	private static void sprite(DrawContext context, Sprite s) {
 		int size = Math.max(2, Math.round(s.size));
 		context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, ATLAS, Math.round(s.x - size / 2f), Math.round(s.y - size / 2f),
-				s.cell * 128f, 0f, size, size, 128, 128, 384, 128, s.argb);
+				(s.cell % 8) * 128f, (s.cell / 8) * 128f, size, size, 128, 128, 1024, 512, s.argb);
 	}
 
 	/** A dim, simple player shape for scale. */

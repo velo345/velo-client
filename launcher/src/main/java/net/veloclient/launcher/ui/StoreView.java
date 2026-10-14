@@ -383,6 +383,7 @@ public final class StoreView {
 		balance.getStyleClass().add("balance-amount");
 		// The balance lives on the server: show the cached value, then refresh it.
 		boolean wasOwner = net.veloclient.launcher.social.StoreApi.isOwner();
+		java.util.Set<String> ownedBefore = net.veloclient.launcher.social.StoreApi.owned();
 		java.util.concurrent.CompletableFuture.runAsync(() -> {
 			try {
 				net.veloclient.launcher.social.StoreApi.wallet();
@@ -392,8 +393,10 @@ public final class StoreView {
 			}
 			javafx.application.Platform.runLater(() -> {
 				balance.setText(balanceText());
-				// Turned out to be the owner: show the page again with the Owner panel button.
-				if (!wasOwner && net.veloclient.launcher.social.StoreApi.isOwner() && balance.getScene() != null) {
+				// Turned out to be the owner (Owner panel button) or owns something new: show the page again.
+				boolean changed = !wasOwner && net.veloclient.launcher.social.StoreApi.isOwner()
+						|| !net.veloclient.launcher.social.StoreApi.owned().equals(ownedBefore);
+				if (changed && balance.getScene() != null) {
 					host.rebuild();
 				}
 			});

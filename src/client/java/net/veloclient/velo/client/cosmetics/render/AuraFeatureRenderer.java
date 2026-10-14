@@ -26,12 +26,10 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 
 	/** Full brightness (block and sky light 15). */
 	private static final int LIGHT = 0xF000F0;
-	/** Atlas cells: glow, star, beam - each a third of the texture. */
-	private static final float CELL = 1f / 3f;
 
-	/** Geometry for one player: x y z u v color per vertex, 4 vertices per quad. */
+	/** Geometry for one player: x y z u v color per vertex, 4 vertices per quad - every quad both ways round (the render type culls). */
 	private static final class Mesh implements AuraEffects.Out {
-		float[] data = new float[6 * 4 * 512];
+		float[] data = new float[6 * 4 * 1024];
 		int size;
 
 		void vertex(float x, float y, float z, float u, float v, int color) {
@@ -52,12 +50,20 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			return (a << 24) | (rgb & 0xFFFFFF);
 		}
 
-		private void quad(float[] c, float u0, int color) {
-			// c: 4 corners (x y z), mapped to the cell's corners.
-			vertex(c[0], c[1], c[2], u0, 0, color);
-			vertex(c[3], c[4], c[5], u0, 1, color);
-			vertex(c[6], c[7], c[8], u0 + CELL, 1, color);
-			vertex(c[9], c[10], c[11], u0 + CELL, 0, color);
+		/** A quad from 4 corners (x y z each) showing atlas {@code cell} (8 x 4 grid), seen from both sides. */
+		private void quad(float[] c, int cell, int color) {
+			float u0 = (cell % 8) / 8f;
+			float v0 = (cell / 8) / 4f;
+			float u1 = u0 + 1 / 8f;
+			float v1 = v0 + 1 / 4f;
+			vertex(c[0], c[1], c[2], u0, v0, color);
+			vertex(c[3], c[4], c[5], u0, v1, color);
+			vertex(c[6], c[7], c[8], u1, v1, color);
+			vertex(c[9], c[10], c[11], u1, v0, color);
+			vertex(c[9], c[10], c[11], u1, v0, color);
+			vertex(c[6], c[7], c[8], u1, v1, color);
+			vertex(c[3], c[4], c[5], u0, v1, color);
+			vertex(c[0], c[1], c[2], u0, v0, color);
 		}
 
 		@Override
@@ -67,14 +73,33 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			}
 			int color = color(rgb, alpha);
 			float h = size;
-			float u0 = shape == AuraEffects.STAR ? CELL : 0;
-			// Ground plane.
-			quad(new float[] {x - h, y, z - h, x - h, y, z + h, x + h, y, z + h, x + h, y, z - h}, u0, color);
-			if (shape == AuraEffects.DISC) {
+			int cell = switch (shape) {
+				case AuraEffects.STAR -> 1;
+				case AuraEffects.HEART -> 3;
+				case AuraEffects.LEAF -> 4;
+				default -> 0;
+			};
+			// Upright quads: v = 0 at the top of the cell.
+			if (shape != AuraEffects.DISC) {
+				quad(new float[] {x - h, y + h, z, x - h, y - h, z, x + h, y - h, z, x + h, y + h, z}, cell, color);
+				quad(new float[] {x, y + h, z - h, x, y - h, z - h, x, y - h, z + h, x, y + h, z + h}, cell, color);
+			}
+			// Ground plane (not for hearts: they only read upright).
+			if (shape != AuraEffects.HEART) {
+				quad(new float[] {x - h, y, z - h, x - h, y, z + h, x + h, y, z + h, x + h, y, z - h}, cell, color);
+			}
+		}
+
+		@Override
+		public void panel(float x, float y, float z, float w, float h, float nx, float nz, int cell, int rgb, float alpha) {
+			if (alpha <= 0.01f) {
 				return;
 			}
-			quad(new float[] {x - h, y - h, z, x - h, y + h, z, x + h, y + h, z, x + h, y - h, z}, u0, color);
-			quad(new float[] {x, y - h, z - h, x, y + h, z - h, x, y + h, z + h, x, y - h, z + h}, u0, color);
+			// Tangent to the ring (left to right seen from outside).
+			float tx = -nz * w / 2;
+			float tz = nx * w / 2;
+			quad(new float[] {x + tx, y + h / 2, z + tz, x + tx, y - h / 2, z + tz, x - tx, y - h / 2, z - tz, x - tx, y + h / 2, z - tz}, cell,
+					color(rgb, alpha));
 		}
 
 		@Override
@@ -94,11 +119,9 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			Vector3f n2 = new Vector3f(d).cross(n1).normalize(width / 2);
 			int color = color(rgb, alpha);
 			for (Vector3f n : new Vector3f[] {n1, n2}) {
-				// u runs across the beam (the soft profile), v along it.
-				vertex(x1 - n.x, y1 - n.y, z1 - n.z, 2 * CELL, 0, color);
-				vertex(x2 - n.x, y2 - n.y, z2 - n.z, 2 * CELL, 1, color);
-				vertex(x2 + n.x, y2 + n.y, z2 + n.z, 1f, 1, color);
-				vertex(x1 + n.x, y1 + n.y, z1 + n.z, 1f, 0, color);
+				// The beam cell's soft profile runs across u.
+				quad(new float[] {x1 - n.x, y1 - n.y, z1 - n.z, x2 - n.x, y2 - n.y, z2 - n.z, x2 + n.x, y2 + n.y, z2 + n.z, x1 + n.x, y1 + n.y, z1 + n.z},
+						2, color);
 			}
 		}
 	}

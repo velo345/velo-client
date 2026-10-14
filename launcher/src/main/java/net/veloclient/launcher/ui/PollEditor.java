@@ -93,11 +93,15 @@ final class PollEditor {
 		VBox optionsBox = new VBox(6);
 		List<TextField> optionFields = new ArrayList<>();
 		Runnable[] rebuild = new Runnable[1];
+		Runnable[] addAnswer = new Runnable[1];
 		rebuild[0] = () -> {
 			optionsBox.getChildren().clear();
 			for (int i = 0; i < optionFields.size(); i++) {
 				TextField field = optionFields.get(i);
 				field.setPromptText("Answer " + (i + 1));
+				// Enter in the last answer adds the next one.
+				boolean last = i == optionFields.size() - 1;
+				field.setOnAction(last ? e -> addAnswer[0].run() : null);
 				HBox.setHgrow(field, Priority.ALWAYS);
 				Button remove = new Button("✕");
 				remove.getStyleClass().add("mini-button");
@@ -122,12 +126,16 @@ final class PollEditor {
 		rebuild[0].run();
 		Button addOption = new Button("+ Answer");
 		addOption.getStyleClass().add("mini-button");
-		addOption.setOnAction(e -> {
+		addAnswer[0] = () -> {
 			if (optionFields.size() < 10) {
-				optionFields.add(new TextField());
+				TextField next = new TextField();
+				optionFields.add(next);
 				rebuild[0].run();
+				next.requestFocus();
 			}
-		});
+			addOption.setDisable(optionFields.size() >= 10);
+		};
+		addOption.setOnAction(e -> addAnswer[0].run());
 
 		CheckBox multi = new CheckBox("Allow picking more than one answer");
 		multi.setSelected(existing != null && NewsUi.bool(existing, "multi"));
@@ -150,7 +158,17 @@ final class PollEditor {
 		VBox content = new VBox(10, question, description, new HBox(8, pickImage, removeImage), imageBox,
 				new Label("Answers"), optionsBox, addOption, multi, resultsFirst, new HBox(8, new Label("Ends"), ends), closed, status);
 		content.setPrefWidth(460);
-		dialog.getDialogPane().setContent(content);
+		content.setPadding(new javafx.geometry.Insets(0, 10, 0, 0));
+		// Scrolls inside a fixed-height area, so Create stays on screen however many answers there are.
+		javafx.scene.control.ScrollPane scroll = new javafx.scene.control.ScrollPane(content);
+		scroll.setFitToWidth(true);
+		scroll.setHbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);
+		scroll.getStyleClass().add("scroll-pane");
+		double screen = javafx.stage.Screen.getPrimary().getVisualBounds().getHeight();
+		scroll.setPrefViewportHeight(Math.min(560, screen * 0.62));
+		scroll.setPrefViewportWidth(480);
+		dialog.getDialogPane().setContent(scroll);
+		dialog.setResizable(true);
 		ButtonType save = new ButtonType(existing == null ? "Create poll" : "Save", ButtonBar.ButtonData.OK_DONE);
 		dialog.getDialogPane().getButtonTypes().addAll(save, ButtonType.CANCEL);
 		ButtonType delete = new ButtonType("Delete poll", ButtonBar.ButtonData.LEFT);

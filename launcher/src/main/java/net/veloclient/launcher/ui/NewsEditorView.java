@@ -174,7 +174,7 @@ final class NewsEditorView {
 			color.setDisable(v);
 			set("accent", v ? null : hex(color.getValue()));
 		});
-		CheckBox pinned = new CheckBox("Pin to the top of the banner");
+		CheckBox pinned = new CheckBox("Pin to the top of the banner (unpins the post pinned before)");
 		pinned.setSelected(NewsUi.bool(post, "pinned"));
 		pinned.selectedProperty().addListener((o, a, v) -> {
 			post.addProperty("pinned", v);

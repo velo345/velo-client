@@ -22,7 +22,7 @@ import java.util.Optional;
 public final class AuraCatalog {
 
 	public static final String ITEM_PREFIX = "aura_";
-	public static final List<String> IDS = List.of("orbit", "ember", "frost", "void", "storm");
+	public static final List<String> IDS = List.of("orbit", "ember", "frost", "void", "storm", "matrix", "inferno", "bloom", "heartbeat", "aurora");
 
 	public record AuraType(String id, String name, String description, int price, boolean inStore, String accent) {
 		public String itemId() {
@@ -39,7 +39,12 @@ public final class AuraCatalog {
 			"ember", new String[] {"Ember Spiral", "Embers spiral up from your feet in a double helix and drift away as you move."},
 			"frost", new String[] {"Frost Halo", "A crown of glittering ice above your head and soft snow falling all around you."},
 			"void", new String[] {"Void Rift", "A pulsing rune circle at your feet pulls dark wisps in from all around."},
-			"storm", new String[] {"Storm Sparks", "Lightning arcs crackle around your body and throw off bright sparks."});
+			"storm", new String[] {"Storm Sparks", "Lightning arcs crackle around your body and throw off bright sparks."},
+			"matrix", new String[] {"Code Rain", "Glowing green code rains down a cylinder of light around you - digits and glyphs flicker as they fall."},
+			"inferno", new String[] {"Inferno", "A roaring column of fire licks up around you, white-hot at your feet, throwing sparks into the air."},
+			"bloom", new String[] {"Bloom", "Vines spiral up around you, leaf out and burst into glowing flowers while fireflies blink and petals drift down."},
+			"heartbeat", new String[] {"Heartbeat", "A ring of hearts pulses to a heartbeat around you as more hearts float up and fade."},
+			"aurora", new String[] {"Aurora", "Northern-lights curtains wave around you in green, cyan and violet, with stars rising through them."});
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 

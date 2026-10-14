@@ -67,7 +67,11 @@
       "items": [
         "**Wings showed as equipped but weren't on your player** after starting the game until you re-equipped them - they're there right away now.",
         "**Session Auto-Fixer** could stay on \"Fixing session...\" forever for some accounts. The session was actually refreshed, but switching to it failed - that's fixed, and if anything ever goes wrong the button tells you instead of getting stuck.",
-        "The launcher's sidebar now highlights **Cosmetics** while you're on it."
+        "The launcher's sidebar now highlights **Cosmetics** while you're on it.",
+        "A profile you'd used to join a server **disappeared from the Home list** as a plain \"just play\" entry - it's always there now.",
+        "The **News** page could end up wider than the window (scrolling sideways) until you resized it a few times - images in posts now fit the window right away.",
+        "Things the Velo team gives you show up in **Cosmetics** and the **Store** right away, without restarting the launcher.",
+        "Wings and auras are no longer cut off on the **Home** screen."
       ]
     }
   ]

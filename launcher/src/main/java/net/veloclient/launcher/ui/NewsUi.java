@@ -310,7 +310,13 @@ public final class NewsUi {
 				StackPane frame = new StackPane(view);
 				frame.getStyleClass().add("news-image");
 				frame.setMinHeight(60);
+				// The image follows the frame's width but doesn't size it (unmanaged): an image sized from its
+				// own container made the page only ever grow - wider than the window after a resize.
+				frame.setMinWidth(0);
+				frame.setPrefWidth(0);
 				frame.setMaxWidth(Double.MAX_VALUE);
+				view.setManaged(false);
+				view.setLayoutX(1);
 				view.fitWidthProperty().bind(frame.widthProperty().subtract(2));
 				Rectangle clip = new Rectangle();
 				clip.setArcWidth(20);
@@ -318,7 +324,10 @@ public final class NewsUi {
 				clip.widthProperty().bind(view.fitWidthProperty());
 				view.imageProperty().addListener((o, a, img) -> {
 					if (img != null) {
-						clip.heightProperty().bind(view.fitWidthProperty().multiply(img.getHeight() / img.getWidth()));
+						var height = view.fitWidthProperty().multiply(img.getHeight() / img.getWidth());
+						clip.heightProperty().bind(height);
+						frame.minHeightProperty().bind(height);
+						frame.prefHeightProperty().bind(height);
 					}
 				});
 				view.setClip(clip);

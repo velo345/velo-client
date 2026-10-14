@@ -814,7 +814,11 @@ public final class LauncherApp extends Application {
 				continue; // profile since deleted
 			}
 			targets.add(new HomeLaunchTarget(instance, entry.serverAddress()));
-			coveredInstanceIds.add(instance.id());
+			// Only a plain launch covers the profile itself - one used to join a server still gets its own
+			// plain entry (it used to vanish from the list after the first server launch).
+			if (entry.serverAddress() == null || entry.serverAddress().isBlank()) {
+				coveredInstanceIds.add(instance.id());
+			}
 		}
 		List<Instance> neverLaunched = new java.util.ArrayList<>();
 		for (Instance instance : all) {
@@ -883,8 +887,9 @@ public final class LauncherApp extends Application {
 
 		// The signed-in account's 3D skin, standing on the island.
 		homePlayerHolder = new StackPane();
-		homePlayerHolder.setPrefSize(210, 310);
-		homePlayerHolder.setMaxSize(210, 310);
+		// Wide enough for spread wings and auras (the 3D view scales with the height, so the player stays the same size).
+		homePlayerHolder.setPrefSize(480, 310);
+		homePlayerHolder.setMaxSize(480, 310);
 		homePlayerHolder.setMouseTransparent(true);
 		titleScreen.getChildren().add(homePlayerHolder);
 		StackPane.setAlignment(homePlayerHolder, Pos.CENTER);
@@ -2265,6 +2270,33 @@ public final class LauncherApp extends Application {
 		}));
 		markActiveNav(navCosmetics);
 		refreshWingsCatalog();
+		refreshOwned();
+	}
+
+	/**
+	 * Fetches what you own again (the owner may just have given you something) and shows the page
+	 * again if it changed and you're still on it.
+	 */
+	private void refreshOwned() {
+		Runnable page = currentPage;
+		java.util.Set<String> before = net.veloclient.launcher.social.StoreApi.owned();
+		java.util.concurrent.CompletableFuture.runAsync(() -> {
+			try {
+				net.veloclient.launcher.social.StoreApi.wallet();
+				net.veloclient.launcher.data.StorePurchase.restoreMissing();
+			} catch (net.veloclient.launcher.social.StoreApi.StoreError ignored) {
+				return;
+			}
+			if (!net.veloclient.launcher.social.StoreApi.owned().equals(before)) {
+				// The catalog lists owned testing items too.
+				net.veloclient.launcher.data.WingsCatalog.refresh();
+				javafx.application.Platform.runLater(() -> {
+					if (currentPage == page) {
+						page.run();
+					}
+				});
+			}
+		}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor());
 	}
 
 	/**

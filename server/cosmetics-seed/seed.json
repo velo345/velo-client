@@ -29,7 +29,7 @@
 			"id": "auras",
 			"name": "Auras",
 			"tag": "AURA COLLECTION",
-			"description": "Animated auras that live around you - orbiting stars, rising embers, falling snow, a void rift and crackling lightning. Pick a colour, size and speed."
+			"description": "Animated auras that live around you - stars, embers, snow, a void rift, lightning, code rain, fire, nature, hearts and northern lights. Pick a colour, size and speed."
 		}
 	],
 	"items": [
@@ -394,6 +394,61 @@
 			"status": "testing",
 			"collection": "auras",
 			"accent": "#ffe14d",
+			"files": {}
+		},
+		{
+			"id": "aura_matrix",
+			"type": "aura",
+			"name": "Code Rain",
+			"description": "Glowing green code rains down a cylinder of light around you - digits and glyphs flicker as they fall.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#1fd65a",
+			"files": {}
+		},
+		{
+			"id": "aura_inferno",
+			"type": "aura",
+			"name": "Inferno",
+			"description": "A roaring column of fire licks up around you, white-hot at your feet, throwing sparks into the air.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#ff7a1f",
+			"files": {}
+		},
+		{
+			"id": "aura_bloom",
+			"type": "aura",
+			"name": "Bloom",
+			"description": "Vines spiral up around you, leaf out and burst into glowing flowers while fireflies blink and petals drift down.",
+			"price": 2200,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#9be36b",
+			"files": {}
+		},
+		{
+			"id": "aura_heartbeat",
+			"type": "aura",
+			"name": "Heartbeat",
+			"description": "A ring of hearts pulses to a heartbeat around you as more hearts float up and fade.",
+			"price": 2200,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#ff4d6d",
+			"files": {}
+		},
+		{
+			"id": "aura_aurora",
+			"type": "aura",
+			"name": "Aurora",
+			"description": "Northern-lights curtains wave around you in green, cyan and violet, with stars rising through them.",
+			"price": 2600,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#5cff9d",
 			"files": {}
 		}
 	]

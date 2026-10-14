@@ -224,6 +224,14 @@ final class NewsService {
 			block.image = checkImage(block.image);
 		}
 		post.pinned = incoming.pinned;
+		if (post.pinned) {
+			// Only one pinned post: pinning this one unpins the one before.
+			for (Post other : data.posts) {
+				if (other != post) {
+					other.pinned = false;
+				}
+			}
+		}
 		post.published = incoming.published;
 		post.updatedAt = now;
 		if (post.published && !wasPublished) {
