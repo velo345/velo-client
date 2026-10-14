@@ -716,7 +716,8 @@ def jack_o_lantern(phase):
         def face(d, k):
             Wk, Hk = HW * k, HH * k
             def P(px, py):
-                return (Wk * (cx + px * rx), Hk * (cy + py * ry * 2))
+                # 70% of the first design, a touch lower on the pumpkin.
+                return (Wk * (cx + px * rx * 0.7), Hk * (cy + 0.02 + py * ry * 2 * 0.7))
             d.polygon([P(-0.62, -0.08), P(-0.18, -0.06), P(-0.42, -0.42)], fill=255)
             d.polygon([P(0.18, -0.06), P(0.62, -0.08), P(0.42, -0.42)], fill=255)
             d.polygon([P(-0.1, 0.06), P(0.1, 0.06), P(0, -0.1)], fill=255)
@@ -734,15 +735,29 @@ def jack_o_lantern(phase):
                        (Wk * 0.6, top - Hk * 0.1), (Wk * 0.52, top - Hk * 0.06), (Wk * 0.48, top - Hk * 0.06)], fill=255)
         PUMPKIN = (_hmask(face), _hmask(stem), hnoise(14, 161, 3), hnoise(4, 162, 4), hnoise(3, 163, 4),
                    np.random.default_rng(164).random((14, 4)))
-    face, stem, grain, smoke, fog, flies = PUMPKIN
-    flick = 0.82 + 0.22 * periodic_flicker(phase, 165)
-    # Night: dark violet sky, a low mist, the ground.
+    face0, stem0, grain0, smoke, fog, flies = PUMPKIN
+    # The pumpkin rocks on its base: sample its masks through a small rotation about the bottom.
+    rock = 0.07 * math.sin(phase * 2 * math.pi * 2)
+    px0, py0 = cx, cy + ry
+    dx, dy = (x - px0) * HW, (y - py0) * HH
+    xr = px0 + (dx * math.cos(rock) + dy * math.sin(rock)) / HW
+    yr = py0 + (-dx * math.sin(rock) + dy * math.cos(rock)) / HH
+    ix = np.clip((xr * HW).astype(int), 0, HW - 1)
+    iy = np.clip((yr * HH).astype(int), 0, HH - 1)
+    face, stem, grain = face0[iy, ix], stem0[iy, ix], grain0[iy, ix]
+    # Candle flicker, and once a loop the flame flares up.
+    flare = math.exp(-(((phase - 0.55) % 1) * 9))
+    flick = 0.8 + 0.2 * periodic_flicker(phase, 165) + 0.9 * flare
+    # Night: dark violet sky (a distant lightning flash once a loop), a low mist, the ground.
     img = gradient(y, [(0, (8, 4, 14)), (0.6, (20, 10, 26)), (0.78, (30, 16, 26)), (1, (16, 8, 10))])
+    t_flash = (phase - 0.2) % 1
+    flash = (math.exp(-t_flash * 25) + 0.6 * math.exp(-abs(t_flash - 0.06) * 60)) if t_flash < 0.3 else 0
+    img += (smoothstep(0.75, 0.0, y) * flash)[..., None] * np.array([0.45, 0.4, 0.7]) * 0.5
     img += (smoothstep(0.55, 0.85, y) * np.roll(fog, int(phase * HW), axis=1))[..., None] * np.array([0.25, 0.18, 0.3]) * 0.4
     # Pumpkin body: an ellipsoid of lobes, shaded.
     # Body: wider than tall (half-width rx of the width, half-height ry of the height), lobed.
-    u = (x - cx) / rx
-    v = (y - cy) / ry
+    u = (xr - cx) / rx
+    v = (yr - cy) / ry
     lobes = 7
     lobe = np.cos(np.arcsin(np.clip(u, -0.999, 0.999)) * lobes) * 0.5 + 0.5        # 1 on lobe centres, 0 in grooves
     outline = 1 - 0.045 * (1 - lobe) * (np.abs(v) < 0.9)
@@ -768,17 +783,46 @@ def jack_o_lantern(phase):
     img = img * (1 - wall[..., None]) + wall[..., None] * np.array([1.0, 0.72, 0.3]) * flick
     # Stem.
     st = stem * (1 - inside * 0.0)
-    stem_col = np.array([0.32, 0.36, 0.12]) * (0.6 + 0.6 * smoothstep(0.62, 0.45, x))[..., None] * (0.8 + 0.25 * grain[..., None])
+    stem_col = np.array([0.32, 0.36, 0.12]) * (0.6 + 0.6 * smoothstep(0.62, 0.45, xr))[..., None] * (0.8 + 0.25 * grain[..., None])
     img = img * (1 - st[..., None]) + st[..., None] * stem_col
     # Glow from the face out into the night, and a warm pool of light on the ground.
     img += blur(face, 14 * HS / 2)[..., None] * np.array([1.0, 0.55, 0.12]) * 1.1 * flick
     pool = np.exp(-(((x - 0.5) / 0.5) ** 2 + ((y - 0.84) / 0.05) ** 2)) * (y > cy)
     img += pool[..., None] * np.array([1.0, 0.45, 0.1]) * 0.35 * flick
-    # Smoke curling up from the lid.
-    sm = np.roll(smoke, -int(phase * HH), axis=0)
-    sm = np.roll(sm, int(6 * HS * math.sin(phase * 2 * math.pi)), axis=1)
-    column = np.exp(-((x - 0.5 - 0.08 * (cy - y)) / 0.14) ** 2) * smoothstep(cy - 0.12, 0.05, y)
-    img += (column * smoothstep(0.5, 0.75, sm))[..., None] * np.array([0.35, 0.3, 0.35]) * 0.6
+    # Green ghost fire licking up from behind the lid, taller when the flame flares.
+    sm = np.roll(smoke, -int(phase * 2 * HH), axis=0)
+    sm = np.roll(sm, int(5 * HS * math.sin(phase * 4 * math.pi)), axis=1)
+    top = cy - ry * 0.9
+    height = 0.18 + 0.12 * flare
+    column = np.exp(-((x - 0.5) / (0.16 * smoothstep(top - height, top, y) + 0.02)) ** 2) * smoothstep(top - height, top, y) * (y < top + 0.02)
+    tongues = smoothstep(0.42, 0.7, sm) * column
+    img += tongues[..., None] * np.array([0.35, 1.0, 0.55]) * 0.9
+    img += blur(tongues, 4 * HS)[..., None] * np.array([0.2, 0.8, 0.4]) * 0.6
+    # Sparks bursting out of the eyes and mouth during the flare.
+    burst = np.random.default_rng(166)
+    for k in range(18):
+        sx_, sy_ = burst.uniform(0.33, 0.67), burst.uniform(cy - 0.06, cy + 0.08)
+        ang, spd = burst.uniform(-2.7, -0.45), burst.uniform(0.6, 1.1)
+        t = (phase - 0.55) % 1
+        if t > 0.35:
+            continue
+        ex_ = sx_ + math.cos(ang) * spd * t
+        ey_ = sy_ + math.sin(ang) * spd * t + 0.6 * t * t
+        img += np.exp(-(((x - ex_) * HW) ** 2 + ((y - ey_) * HH) ** 2) / 10)[..., None] * np.array([1.0, 0.7, 0.25]) * (1 - t / 0.35) * 1.4
+    # Autumn leaves tumbling down.
+    leaves = np.random.default_rng(167).random((7, 4))
+    for lx, lp, lsz, lc in leaves:
+        t = (phase + lp) % 1
+        lx_ = (lx + 0.12 * math.sin((t + lp) * 2 * math.pi * 2)) % 1
+        ly_ = t * 1.1 - 0.05
+        spin = (t * 3 + lp) * 2 * math.pi
+        du, dv = (x - lx_) * HW, (y - ly_) * HH
+        a_ = du * math.cos(spin) + dv * math.sin(spin)
+        b_ = -du * math.sin(spin) + dv * math.cos(spin)
+        size_ = (4 + lsz * 4) * HS
+        leaf = smoothstep(1.0, 0.8, np.hypot(a_ / size_, b_ / (size_ * 0.45 * (0.4 + 0.6 * abs(math.cos(spin * 0.5))))))
+        colour = np.array([0.85, 0.35, 0.05]) if lc < 0.5 else np.array([0.6, 0.18, 0.04])
+        img = img * (1 - leaf[..., None]) + leaf[..., None] * colour * 0.8
     # Fireflies / sparks drifting.
     for fx, fy, fp, fs in flies:
         px_ = (fx + 0.05 * math.sin((phase + fp) * 2 * math.pi * 2)) % 1
