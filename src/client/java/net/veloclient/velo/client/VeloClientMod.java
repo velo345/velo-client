@@ -80,6 +80,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.util.MemoryStatsRecorder.start();
 		CapeFeatureRenderer.register();
 		net.veloclient.velo.client.cosmetics.render.WingsFeatureRenderer.register();
+		net.veloclient.velo.client.cosmetics.render.AuraFeatureRenderer.register();
 		net.veloclient.velo.client.network.RewardsReporter.register();
 		registerSocialOverlay();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(

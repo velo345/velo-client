@@ -230,7 +230,7 @@ public final class VeloServerApp {
 				SessionRegistry.HEARTBEAT_INTERVAL_SECONDS, SessionRegistry.SESSION_TTL_MILLIS / 1000));
 	}
 
-	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId) {
+	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId, String auraId) {
 	}
 
 	private record HeartbeatResponse(boolean ok, int onlineCount, String capeId) {
@@ -254,7 +254,15 @@ public final class VeloServerApp {
 				wingsId = null;
 			}
 		}
-		SessionRegistry.Session refreshed = registry.heartbeat(request.sessionToken(), capeId, ownCustomHash, wingsId);
+		// Auras too ("aura_<id>"), same rules.
+		String auraId = request.auraId();
+		if (session != null && auraId != null) {
+			String auraItem = "aura_" + auraId.split(";", 2)[0];
+			if (!store.mayDisplayCape(session.uuid(), auraItem) || !store.knownItem(auraItem)) {
+				auraId = null;
+			}
+		}
+		SessionRegistry.Session refreshed = registry.heartbeat(request.sessionToken(), capeId, ownCustomHash, wingsId, auraId);
 		if (refreshed != null && "game".equals(refreshed.kind())) {
 			store.onGameHeartbeat(refreshed.uuid());
 		}

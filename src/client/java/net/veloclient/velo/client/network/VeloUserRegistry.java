@@ -15,9 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class VeloUserRegistry {
 
-	public record Entry(String username, String capeId, String wingsId) {
+	public record Entry(String username, String capeId, String wingsId, String auraId) {
 		public Entry(String username, String capeId) {
-			this(username, capeId, null);
+			this(username, capeId, null, null);
 		}
 	}
 
@@ -101,6 +101,15 @@ public final class VeloUserRegistry {
 			entry = entryForName(username);
 		}
 		return entry == null ? null : entry.wingsId();
+	}
+
+	/** The aura this player has equipped ("id;settings"), if any and if they're online. */
+	public static String auraIdFor(UUID uuid, String username) {
+		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
+		if (entry == null) {
+			entry = entryForName(username);
+		}
+		return entry == null ? null : entry.auraId();
 	}
 
 	// Called per rendered player per frame - formats the two longs directly instead of

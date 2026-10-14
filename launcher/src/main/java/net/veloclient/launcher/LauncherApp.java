@@ -270,6 +270,15 @@ public final class LauncherApp extends Application {
 					.filter(w -> w.id().equals("shadowfang")).findFirst().orElse(net.veloclient.launcher.data.WingsCatalog.all().get(0)))});
 		}
 		steps.add(new Object[] {"05h-owner", (Runnable) this::showOwner});
+		steps.add(new Object[] {"05i-auras", (Runnable) () -> {
+			net.veloclient.launcher.ui.StoreView.showAurasTab();
+			showStore();
+		}});
+		steps.add(new Object[] {"05j-aura", (Runnable) () -> showAuraDetail(net.veloclient.launcher.data.AuraCatalog.byId("storm").orElseThrow())});
+		steps.add(new Object[] {"04c-cosmetics-auras", (Runnable) () -> {
+			net.veloclient.launcher.ui.CosmeticsView.showAurasTab();
+			showCosmetics();
+		}});
 		steps.add(new Object[] {"05f-clips", (Runnable) this::showMedia});
 		steps.add(new Object[] {"05g-party", (Runnable) this::showParty});
 		steps.add(new Object[] {"05d-coins", (Runnable) this::showCoins});
@@ -1321,8 +1330,24 @@ public final class LauncherApp extends Application {
 					if (skin == null || homePlayerHolder == null) {
 						return;
 					}
-					Node viewer = PlayerSkin3DView.createViewer(skin.pngBytes(), skin.slim(), null, false);
+					// Wearing your equipped cosmetics: cape, wings and aura (turning slowly so the back shows too).
+					var cape = net.veloclient.launcher.data.CapeLibrary.equippedCapeId().flatMap(id -> net.veloclient.launcher.data.CapeLibrary.listAll()
+							.stream().filter(c -> c.id().equals(id)).findFirst()).orElse(null);
+					String wingsId = net.veloclient.launcher.data.WingsCatalog.equipped();
+					boolean wings = wingsId != null && net.veloclient.launcher.data.WingsCatalog.byId(wingsId).isPresent();
+					String auraId = net.veloclient.launcher.data.AuraCatalog.equipped();
+					boolean dressed = cape != null || wings || auraId != null;
+					Node viewer = PlayerSkin3DView.createViewer(skin.pngBytes(), skin.slim(),
+							cape == null ? null : net.veloclient.launcher.ui.CosmeticUi.frames(cape), false, 20, dressed, !wings ? null : model -> {
+								net.veloclient.launcher.ui.Wings3D w = new net.veloclient.launcher.ui.Wings3D(model);
+								w.settings(net.veloclient.launcher.data.WingsCatalog.settings(wingsId));
+								w.show(wingsId);
+							});
 					if (viewer != null) {
+						if (auraId != null) {
+							var auraSettings = net.veloclient.launcher.data.AuraCatalog.settings(auraId);
+							net.veloclient.launcher.ui.AuraFx.attach(viewer, () -> new net.veloclient.launcher.ui.AuraFx.Shown(auraId, auraSettings));
+						}
 						homePlayerHolder.getChildren().setAll(viewer);
 					}
 				}));
@@ -2261,6 +2286,22 @@ public final class LauncherApp extends Application {
 
 	// ---- Store ----
 
+	private void showAuraDetail(net.veloclient.launcher.data.AuraCatalog.AuraType type) {
+		currentPage = () -> showAuraDetail(type);
+		setContent(net.veloclient.launcher.ui.AuraDetailView.build(new net.veloclient.launcher.ui.AuraDetailView.Host() {
+			@Override
+			public MinecraftSession session() {
+				return session;
+			}
+
+			@Override
+			public void goBack() {
+				showStore();
+			}
+		}, type));
+		markActiveNav(navStore);
+	}
+
 	private void showOwner() {
 		currentPage = this::showOwner;
 		setContent(net.veloclient.launcher.ui.OwnerView.build(this::showOwner));
@@ -2314,6 +2355,11 @@ public final class LauncherApp extends Application {
 			@Override
 			public void openOwner() {
 				showOwner();
+			}
+
+			@Override
+			public void openAura(net.veloclient.launcher.data.AuraCatalog.AuraType type) {
+				showAuraDetail(type);
 			}
 
 			@Override

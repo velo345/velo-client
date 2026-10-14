@@ -46,6 +46,9 @@ public final class CosmeticsView {
 	/** Wings tab open (instead of capes). */
 	private static boolean wingsTab;
 	private static String selectedWings;
+	/** Auras tab open. */
+	private static boolean aurasTab;
+	private static String selectedAura;
 
 	private CosmeticsView() {
 	}
@@ -53,6 +56,13 @@ public final class CosmeticsView {
 	/** Opens on the Wings tab next time (the launcher tour). */
 	public static void showWingsTab() {
 		wingsTab = true;
+		aurasTab = false;
+	}
+
+	/** Opens on the Auras tab next time (the launcher tour). */
+	public static void showAurasTab() {
+		aurasTab = true;
+		wingsTab = false;
 	}
 
 	public static Node build(Stage owner, Host host) {
@@ -64,17 +74,21 @@ public final class CosmeticsView {
 		return page;
 	}
 
-	/** Capes / Wings switch. */
+	/** Capes / Wings / Auras switch. */
 	private static HBox tabs(Runnable refresh) {
 		HBox tabs = new HBox(6);
-		for (boolean wings : new boolean[] {false, true}) {
-			Button tab = new Button(wings ? "Wings" : "Capes");
+		String[] names = {"Capes", "Wings", "Auras"};
+		int active = aurasTab ? 2 : wingsTab ? 1 : 0;
+		for (int i = 0; i < names.length; i++) {
+			int index = i;
+			Button tab = new Button(names[i]);
 			tab.getStyleClass().add("segmented-button");
-			if (wings == wingsTab) {
+			if (i == active) {
 				tab.getStyleClass().add("segmented-button-active");
 			}
 			tab.setOnAction(e -> {
-				wingsTab = wings;
+				wingsTab = index == 1;
+				aurasTab = index == 2;
 				refresh.run();
 			});
 			tabs.getChildren().add(tab);
@@ -82,7 +96,114 @@ public final class CosmeticsView {
 		return tabs;
 	}
 
+	// ---- Auras ----
+
+	private static Node buildAuras(Host host, Runnable refresh, boolean firstShow) {
+		if (!net.veloclient.launcher.social.StoreApi.walletLoaded()) {
+			java.util.concurrent.CompletableFuture.runAsync(() -> {
+				try {
+					net.veloclient.launcher.social.StoreApi.wallet();
+					javafx.application.Platform.runLater(refresh);
+				} catch (net.veloclient.launcher.social.StoreApi.StoreError ignored) {
+					// Signed out / offline: nothing owned to show.
+				}
+			}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor());
+		}
+		List<net.veloclient.launcher.data.AuraCatalog.AuraType> owned = net.veloclient.launcher.data.AuraCatalog.all().stream()
+				.filter(a -> net.veloclient.launcher.data.AuraCatalog.owns(a.id())).toList();
+		String equipped = net.veloclient.launcher.data.AuraCatalog.equipped();
+		if (selectedAura == null || owned.stream().noneMatch(a -> a.id().equals(selectedAura))) {
+			selectedAura = equipped != null && owned.stream().anyMatch(a -> a.id().equals(equipped)) ? equipped
+					: owned.isEmpty() ? null : owned.get(0).id();
+		}
+		var selected = owned.stream().filter(a -> a.id().equals(selectedAura)).findFirst().orElse(null);
+
+		Label heading = new Label("Cosmetics");
+		heading.getStyleClass().add("page-title");
+		Label sub = new Label("Your auras. The equipped one shows in-game for you and every other Velo player.");
+		sub.getStyleClass().add("page-subtitle");
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox header = new HBox(12, new VBox(2, heading, sub), spacer, tabs(refresh));
+		header.setAlignment(Pos.CENTER_LEFT);
+
+		FlowPane grid = new FlowPane(14, 14);
+		grid.getStyleClass().add("cape-grid");
+		for (var aura : owned) {
+			boolean isEquipped = aura.id().equals(equipped);
+			Node art = AuraFx.card(aura.kind(), () -> net.veloclient.launcher.data.AuraCatalog.settings(aura.id()), 164, 124);
+			StackPane artBox = new StackPane(art);
+			artBox.setStyle("-fx-background-radius: 12; -fx-background-color: radial-gradient(center 50% 60%, radius 70%, " + aura.accent()
+					+ "44 0%, #0f0f1400 100%), #101015;");
+			Label name = new Label(aura.name());
+			name.getStyleClass().add("cape-card-title");
+			VBox card = new VBox(8, artBox, name, isEquipped ? CosmeticUi.badge("Equipped", "chip-owned") : CosmeticUi.badge("Owned", null));
+			card.getStyleClass().addAll("cape-card", "motion-card");
+			boolean isSelected = aura.id().equals(selectedAura);
+			card.setStyle("-fx-border-color: " + aura.accent() + (isSelected ? "" : "55") + "; -fx-border-radius: 14; -fx-border-width: "
+					+ (isSelected ? "1.8" : "1.2") + ";");
+			card.setOnMouseClicked(e -> {
+				selectedAura = aura.id();
+				refresh.run();
+			});
+			grid.getChildren().add(card);
+		}
+		if (owned.isEmpty()) {
+			Label empty = new Label("No auras yet - get one in the Store.");
+			empty.getStyleClass().add("empty-state");
+			grid.getChildren().add(empty);
+		}
+		Label title = new Label("Your auras  ·  " + owned.size());
+		title.getStyleClass().add("section-label");
+		ScrollPane scroll = new ScrollPane(new VBox(12, title, grid));
+		scroll.setFitToWidth(true);
+		scroll.getStyleClass().add("scroll-pane");
+		HBox.setHgrow(scroll, Priority.ALWAYS);
+		if (firstShow) {
+			UiMotion.stagger(grid, 24);
+		}
+
+		VBox panel = new VBox(10);
+		if (selected != null) {
+			net.veloclient.velo.client.cosmetics.aura.AuraEffects.Settings[] current = {net.veloclient.launcher.data.AuraCatalog.settings(selected.id())};
+			panel.getChildren().add(AuraDetailView.stage(host.session(), selected.kind(), () -> new AuraFx.Shown(selected.id(), current[0]), 300, 330));
+			Label name = new Label(selected.name());
+			name.getStyleClass().add("showcase-title");
+			boolean isEquipped = selected.id().equals(equipped);
+			Button equip = new Button(isEquipped ? "Take it off" : "Equip");
+			if (!isEquipped) {
+				equip.getStyleClass().add("primary-button");
+			}
+			equip.setMaxWidth(Double.MAX_VALUE);
+			equip.setOnAction(e -> {
+				net.veloclient.launcher.data.AuraCatalog.equip(isEquipped ? null : selected.id());
+				refresh.run();
+			});
+			panel.getChildren().addAll(name, equip, AuraDetailView.settingsPanel(selected.id(), selected.kind(), s -> current[0] = s));
+		} else {
+			Label none = new Label("No aura");
+			none.getStyleClass().add("showcase-title");
+			panel.getChildren().add(none);
+		}
+		panel.getStyleClass().add("showcase-panel");
+		panel.setMinWidth(324);
+		panel.setMaxWidth(324);
+		ScrollPane left = new ScrollPane(panel);
+		left.setFitToWidth(true);
+		left.getStyleClass().add("scroll-pane");
+		left.setMinWidth(340);
+		left.setMaxWidth(340);
+		HBox body = new HBox(22, left, scroll);
+		VBox.setVgrow(body, Priority.ALWAYS);
+		VBox root = new VBox(18, header, body);
+		VBox.setVgrow(root, Priority.ALWAYS);
+		return root;
+	}
+
 	private static Node buildContent(Stage owner, Host host, Runnable refresh, boolean firstShow) {
+		if (aurasTab) {
+			return buildAuras(host, refresh, firstShow);
+		}
 		if (wingsTab) {
 			return buildWings(host, refresh, firstShow);
 		}

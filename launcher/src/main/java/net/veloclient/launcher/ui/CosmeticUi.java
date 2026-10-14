@@ -36,7 +36,7 @@ import java.util.function.Consumer;
  * thumbnails, the cape card, the coin icon/price chip, and the signed-in player's skin (fetched once
  * per account and reused, so switching between pages doesn't refetch it).
  */
-final class CosmeticUi {
+public final class CosmeticUi {
 
 	private static final Map<String, List<GifFrames.Frame>> FRAMES = LauncherCaches.lru(6);
 	private static final Map<String, Image> THUMBNAILS = LauncherCaches.lru(120);
@@ -48,7 +48,7 @@ final class CosmeticUi {
 
 	// ---- Data ----
 
-	static List<GifFrames.Frame> frames(CapeEntry cape) {
+	public static List<GifFrames.Frame> frames(CapeEntry cape) {
 		return FRAMES.computeIfAbsent("lib:" + cape.id(), key -> {
 			try {
 				if (cape.animated()) {

@@ -60,15 +60,24 @@ public final class StoreView {
 		/** Opens the owner panel (owners only). */
 		default void openOwner() {
 		}
+
+		/** Opens an aura's page. */
+		default void openAura(net.veloclient.launcher.data.AuraCatalog.AuraType type) {
+		}
 	}
 
 	private StoreView() {
 	}
 
-	private enum Page { FEATURED, WINGS, CAPES }
+	private enum Page { FEATURED, WINGS, CAPES, AURAS }
 
 	/** Which tab was open last (kept while the launcher runs). */
 	private static Page page = Page.FEATURED;
+
+	/** Opens on the Auras tab next time (the launcher tour). */
+	public static void showAurasTab() {
+		page = Page.AURAS;
+	}
 
 	/** Each pair's own colour ({@code accent} in wings.json) - the same accents the in-game Store uses. */
 	static String accent(String wingId) {
@@ -101,7 +110,7 @@ public final class StoreView {
 		headerRow.setAlignment(Pos.CENTER_LEFT);
 
 		HBox tabs = new HBox(6);
-		String[] labels = {"Featured", "Wings", "Capes"};
+		String[] labels = {"Featured", "Wings", "Capes", "Auras"};
 		for (Page p : Page.values()) {
 			Button tab = new Button(labels[p.ordinal()]);
 			tab.getStyleClass().add("segmented-button");
@@ -112,7 +121,7 @@ public final class StoreView {
 				page = p;
 				host.rebuild();
 			});
-			if (p == Page.WINGS) {
+			if (p == Page.AURAS) {
 				Label badge = new Label("NEW");
 				badge.setStyle("-fx-background-color: #ff4d4d; -fx-text-fill: white; -fx-font-size: 10px; -fx-font-weight: 800;"
 						+ " -fx-padding: 1 6; -fx-background-radius: 6;");
@@ -156,6 +165,24 @@ public final class StoreView {
 					root.getChildren().addAll(title, wingGrid(host, loose));
 				}
 			}
+			case AURAS -> {
+				// For sale, plus any you own that aren't (given to you while testing, or a drop that ended).
+				var auras = net.veloclient.launcher.data.AuraCatalog.all().stream()
+						.filter(a -> a.inStore() || net.veloclient.launcher.data.AuraCatalog.owns(a.id())).toList();
+				Label title = new Label("Auras  ·  animated effects around you - your colour, size and speed");
+				title.getStyleClass().add("section-label");
+				FlowPane grid = new FlowPane(14, 14);
+				for (var aura : auras) {
+					grid.getChildren().add(auraCard(host, aura));
+				}
+				if (auras.isEmpty()) {
+					Label empty = new Label("No auras in the Store right now - check back soon.");
+					empty.getStyleClass().add("empty-state");
+					grid.getChildren().add(empty);
+				}
+				UiMotion.stagger(grid, 24);
+				root.getChildren().addAll(title, grid);
+			}
 			case CAPES -> {
 				var items = StoreCatalog.all();
 				Label title = new Label("Animated capes  ·  " + items.size());
@@ -187,6 +214,32 @@ public final class StoreView {
 		}
 		UiMotion.stagger(grid, 24);
 		return grid;
+	}
+
+	/** An aura: itself, live, around a dim player shape; name; price / Owned / Equipped. */
+	private static Node auraCard(Host host, net.veloclient.launcher.data.AuraCatalog.AuraType type) {
+		String accent = type.accent();
+		boolean owned = net.veloclient.launcher.data.AuraCatalog.owns(type.id());
+		Node canvas = AuraFx.card(type.kind(), () -> owned ? net.veloclient.launcher.data.AuraCatalog.settings(type.id())
+				: net.veloclient.velo.client.cosmetics.aura.AuraEffects.Settings.DEFAULT, 190, 150);
+		StackPane art = new StackPane(canvas);
+		art.setPrefSize(190, 150);
+		art.setMinSize(190, 150);
+		art.setStyle("-fx-background-radius: 12; -fx-background-color: radial-gradient(center 50% 60%, radius 70%, " + accent
+				+ "44 0%, #0f0f1400 100%), linear-gradient(to bottom, #15151c, #0e0e12);");
+		Label name = new Label(type.name());
+		name.getStyleClass().add("cape-card-title");
+		boolean equipped = type.id().equals(net.veloclient.launcher.data.AuraCatalog.equipped());
+		Node footer = equipped ? CosmeticUi.badge("Equipped", "chip-owned")
+				: CosmeticUi.priceChip(net.veloclient.launcher.social.StoreApi.price(type.itemId(), type.price()), owned);
+		VBox card = new VBox(8, art, name, footer);
+		card.getStyleClass().addAll("cape-card", "motion-card");
+		card.setStyle("-fx-border-color: " + accent + "66; -fx-border-radius: 14; -fx-border-width: 1.2;");
+		card.setOnMouseEntered(e -> card.setStyle("-fx-border-color: " + accent + "; -fx-border-radius: 14; -fx-border-width: 1.6;"
+				+ " -fx-effect: dropshadow(gaussian, " + accent + "88, 22, 0.2, 0, 4);"));
+		card.setOnMouseExited(e -> card.setStyle("-fx-border-color: " + accent + "66; -fx-border-radius: 14; -fx-border-width: 1.2;"));
+		card.setOnMouseClicked(e -> host.openAura(type));
+		return card;
 	}
 
 	/** A pair of wings: its picture floating on a glow in its own colour, name, and price / Owned. */

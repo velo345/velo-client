@@ -158,8 +158,22 @@ tasks.register("bundleWingAssets", Copy) {
 	into(wingAssetsResourceRoot.map { it.dir("net/veloclient/launcher/wings") })
 }
 
+// The auras' animation code is plain Java shared with the mod: compiled into the launcher too, so its
+// previews move exactly like the game's.
+def auraSourceRoot = layout.buildDirectory.dir("generated/aura-src")
+tasks.register("bundleAuraEffects", Copy) {
+	group = "build"
+	description = "Copies the mod's AuraEffects (plain Java) into launcher sources."
+	from(rootProject.file("src/client/java/net/veloclient/velo/client/cosmetics/aura")) { include("AuraEffects.java") }
+	into(auraSourceRoot.map { it.dir("net/veloclient/velo/client/cosmetics/aura") })
+}
+tasks.named("compileJava") { dependsOn("bundleAuraEffects") }
+
 sourceSets {
 	main {
+		java {
+			srcDir(auraSourceRoot)
+		}
 		resources {
 			srcDir(wingAssetsResourceRoot)
 			srcDir(gameJarsResourceRoot)

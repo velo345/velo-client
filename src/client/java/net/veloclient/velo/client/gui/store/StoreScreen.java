@@ -32,7 +32,7 @@ import java.util.List;
  */
 public final class StoreScreen extends VeloWindow {
 
-	private enum Page { FEATURED, WINGS, CAPES }
+	private enum Page { FEATURED, WINGS, CAPES, AURAS }
 
 	private static final int SIDEBAR_WIDTH = 108;
 	private static final int HEADER_HEIGHT = 20;
@@ -42,6 +42,11 @@ public final class StoreScreen extends VeloWindow {
 	private static final long HERO_SECONDS = 4;
 
 	private static Page page = Page.FEATURED;
+
+	/** Opens on the Auras page next time (the screenshot tour). */
+	public static void showAuras() {
+		page = Page.AURAS;
+	}
 	private VeloScrollRegion region;
 	private int columns = 1;
 	private int tileWidth;
@@ -83,7 +88,7 @@ public final class StoreScreen extends VeloWindow {
 		int x = contentX();
 		int y = contentY() + HEADER_HEIGHT + 10;
 		Page[] pages = Page.values();
-		String[] labels = {"Featured", "Wings", "Capes"};
+		String[] labels = {"Featured", "Wings", "Capes", "Auras"};
 		for (int i = 0; i < pages.length; i++) {
 			Page p = pages[i];
 			VeloButton nav = new VeloButton(x, y + i * 24, SIDEBAR_WIDTH - 10, 20, Text.literal(labels[i]), b -> {
@@ -104,6 +109,7 @@ public final class StoreScreen extends VeloWindow {
 			case FEATURED -> layoutFeatured(cx, y, cw);
 			case WINGS -> layoutWings(cx, y, cw, WingsManager.forSale());
 			case CAPES -> layoutCapes(cx, y, cw);
+			case AURAS -> layoutAuras(cx, y, cw);
 		}
 		// Generous padding: the UI font can draw a little wider than the vanilla width measure.
 		balanceWidth = Math.round((this.textRenderer.getWidth(balanceText()) + this.textRenderer.getWidth("Get coins")) * 1.15f) + 46;
@@ -173,6 +179,24 @@ public final class StoreScreen extends VeloWindow {
 		region.layoutGrid(columns, tileWidth, tileHeight, GAP);
 	}
 
+	private void layoutAuras(int cx, int y, int cw) {
+		columns = 3;
+		tileWidth = (cw - (columns - 1) * GAP - 8) / columns;
+		tileHeight = tileWidth * 6 / 5;
+		region = new VeloScrollRegion(cx, y, cw, contentBottom() - y);
+		// What's for sale, plus any you own that aren't (testing / limited ones you were given).
+		for (var type : net.veloclient.velo.client.cosmetics.aura.AuraManager.catalog()) {
+			if (!type.inStore() && !net.veloclient.velo.client.cosmetics.aura.AuraManager.owns(type.id())) {
+				continue;
+			}
+			net.veloclient.velo.client.gui.widget.VeloAuraCard card = new net.veloclient.velo.client.gui.widget.VeloAuraCard(tileWidth, tileHeight, type,
+					() -> this.client.setScreen(new AuraDetailScreen(this, type)));
+			addSelectableChild(card);
+			region.addRow(card);
+		}
+		region.layoutGrid(columns, tileWidth, tileHeight, GAP);
+	}
+
 	private void layoutCapes(int cx, int y, int cw) {
 		columns = Math.max(1, (cw - 8 + GAP) / (CAPE_TILE_WIDTH + GAP));
 		tileWidth = CAPE_TILE_WIDTH;
@@ -229,14 +253,15 @@ public final class StoreScreen extends VeloWindow {
 			region.renderRows(context, mouseX, mouseY, delta);
 			region.renderScrollbarGrid(context, columns, tileHeight, GAP);
 		}
-		// "NEW" on the Wings button.
-		VeloDraw.fillRounded(context, x + SIDEBAR_WIDTH - 40, y + 24 + 4, 26, 12, 4, 0xFFFF4D4D);
-		context.drawTextWithShadow(this.textRenderer, "NEW", x + SIDEBAR_WIDTH - 36, y + 24 + 6, 0xFFFFFFFF);
+		// "NEW" on the Auras button.
+		VeloDraw.fillRounded(context, x + SIDEBAR_WIDTH - 40, y + 72 + 4, 26, 12, 4, 0xFFFF4D4D);
+		context.drawTextWithShadow(this.textRenderer, "NEW", x + SIDEBAR_WIDTH - 36, y + 72 + 6, 0xFFFFFFFF);
 
 		String title = switch (page) {
 			case FEATURED -> "Featured";
 			case WINGS -> "Wings";
 			case CAPES -> "Capes";
+			case AURAS -> "Auras";
 		};
 		Text heading = TitleScreenTheme.tileFont(title);
 		context.drawTextWithShadow(this.textRenderer, heading, x, contentY() + 6, VeloStyle.text());
@@ -244,6 +269,7 @@ public final class StoreScreen extends VeloWindow {
 			case FEATURED -> "the newest drops";
 			case WINGS -> WingsManager.forSale().size() + " pairs of animated 3D wings  ·  " + WingsManager.collections().size() + " collections";
 			case CAPES -> "animated capes  ·  preview on your own player";
+			case AURAS -> "animated effects around you";
 		};
 		context.drawTextWithShadow(this.textRenderer, sub, x + this.textRenderer.getWidth(heading) + 8, contentY() + 6, VeloStyle.textFaint());
 		renderBalance(context, mouseX, mouseY);

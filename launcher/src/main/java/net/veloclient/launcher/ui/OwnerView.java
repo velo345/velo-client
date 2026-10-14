@@ -181,7 +181,7 @@ public final class OwnerView {
 		art.setStyle("-fx-background-radius: 10; -fx-background-color: radial-gradient(center 50% 60%, radius 70%, " + accent
 				+ "66 0%, #16161d00 100%), #17171d;");
 		if (!wings) {
-			Label cape = new Label("Cape");
+			Label cape = new Label(id.startsWith("aura_") ? "Aura" : "Cape");
 			cape.getStyleClass().add("page-subtitle");
 			art.getChildren().setAll(cape);
 		}

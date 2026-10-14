@@ -205,6 +205,21 @@ public final class WingsCatalog {
 		collections = List.copyOf(cols);
 	}
 
+	/** The server catalog's raw items of one type ("aura", "cape"...), empty before it loaded. */
+	public static List<JsonObject> serverItems(String type) {
+		loadBundled();
+		JsonObject s = server;
+		List<JsonObject> out = new ArrayList<>();
+		if (s != null) {
+			for (JsonElement e : s.getAsJsonArray("items")) {
+				if (type.equals(str(e.getAsJsonObject(), "type", ""))) {
+					out.add(e.getAsJsonObject());
+				}
+			}
+		}
+		return out;
+	}
+
 	/** Every pair the launcher knows (bundled, for sale, or owned). */
 	public static synchronized List<WingType> all() {
 		build();

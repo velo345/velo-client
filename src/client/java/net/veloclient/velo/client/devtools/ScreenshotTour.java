@@ -309,6 +309,23 @@ public final class ScreenshotTour {
 					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.cosmetics.wings.WingsManager.type(System.getProperty("velo.tourWings", "phoenix")).ifPresent(type ->
 							client.setScreen(new net.veloclient.velo.client.gui.store.WingDetailScreen(null, type)))},
 					new Object[] {60, (Runnable) () -> shot(client, "store-wing")});
+			case "auras" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				steps.add(new Object[] {0, (Runnable) () -> {
+					net.veloclient.velo.client.gui.store.StoreScreen.showAuras();
+					client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null));
+				}});
+				steps.add(new Object[] {60, (Runnable) () -> shot(client, "store-auras")});
+				for (String id : net.veloclient.velo.client.cosmetics.aura.AuraManager.IDS) {
+					steps.add(new Object[] {2, (Runnable) () -> net.veloclient.velo.client.cosmetics.aura.AuraManager.type(id).ifPresent(type ->
+							client.setScreen(new net.veloclient.velo.client.gui.store.AuraDetailScreen(null, type)))});
+					steps.add(new Object[] {50, (Runnable) () -> shot(client, "aura-" + id)});
+				}
+				yield steps;
+			}
+			case "replace" -> List.of(
+					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.redstone.ReplaceScreen())},
+					new Object[] {30, (Runnable) () -> shot(client, "replace")});
 			case "pause" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))},
 					new Object[] {30, (Runnable) () -> shot(client, "pause")});

@@ -40,10 +40,10 @@ final class SessionRegistry {
 	// the map (see below), so the ConcurrentHashMap itself provides the
 	// necessary visibility without needing volatile fields here (which
 	// records can't have anyway).
-	record Session(String uuid, String username, String kind, String capeId, String wingsId, long expiresAtMillis) {
+	record Session(String uuid, String username, String kind, String capeId, String wingsId, String auraId, long expiresAtMillis) {
 	}
 
-	record OnlineUser(String uuid, String username, String capeId, String wingsId) {
+	record OnlineUser(String uuid, String username, String capeId, String wingsId, String auraId) {
 	}
 
 	/** Called with a uuid whenever one of its sessions ends or expires - drives friends' presence updates. */
@@ -88,7 +88,7 @@ final class SessionRegistry {
 		String normalizedKind = normalizeKind(kind);
 		sessionsByToken.values().removeIf(s -> s.uuid().equals(uuid) && s.kind().equals(normalizedKind));
 		String token = randomHex(32);
-		sessionsByToken.put(token, new Session(uuid, username, normalizedKind, null, null, System.currentTimeMillis() + SESSION_TTL_MILLIS));
+		sessionsByToken.put(token, new Session(uuid, username, normalizedKind, null, null, null, System.currentTimeMillis() + SESSION_TTL_MILLIS));
 		return token;
 	}
 
@@ -116,6 +116,11 @@ final class SessionRegistry {
 
 	/** Same, also recording the equipped 3D wings ({@code wingsId}, a bundled cosmetic id - or null for none). */
 	Session heartbeat(String token, String capeId, String ownCustomCapeHash, String wingsId) {
+		return heartbeat(token, capeId, ownCustomCapeHash, wingsId, null);
+	}
+
+	/** Same, also recording the equipped aura ({@code auraId}: "id;settings...", like wings). */
+	Session heartbeat(String token, String capeId, String ownCustomCapeHash, String wingsId, String auraId) {
 		Session session = session(token);
 		if (session == null) {
 			sessionsByToken.remove(token);
@@ -127,7 +132,7 @@ final class SessionRegistry {
 			normalized = null;
 		}
 		Session refreshed = new Session(session.uuid(), session.username(), session.kind(), normalized, normalizeWingsId(wingsId),
-				System.currentTimeMillis() + SESSION_TTL_MILLIS);
+				normalizeWingsId(auraId), System.currentTimeMillis() + SESSION_TTL_MILLIS);
 		sessionsByToken.put(token, refreshed);
 		return refreshed;
 	}
@@ -137,7 +142,7 @@ final class SessionRegistry {
 		Session session = session(token);
 		if (session != null) {
 			sessionsByToken.put(token, new Session(session.uuid(), session.username(), session.kind(), session.capeId(), session.wingsId(),
-					System.currentTimeMillis() + SESSION_TTL_MILLIS));
+					session.auraId(), System.currentTimeMillis() + SESSION_TTL_MILLIS));
 		}
 	}
 
@@ -160,7 +165,7 @@ final class SessionRegistry {
 		long now = System.currentTimeMillis();
 		return sessionsByToken.values().stream()
 				.filter(s -> s.expiresAtMillis() >= now && s.kind().equals(KIND_GAME))
-				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId()))
+				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId(), s.auraId()))
 				.toList();
 	}
 

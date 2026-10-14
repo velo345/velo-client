@@ -1,6 +1,6 @@
 {
   "title": "Velo Client 0.8.7",
-  "summary": "The Afterlife Halloween wings, new cosmetics that arrive without updating, wings in the launcher's Cosmetics, and fixes for disappearing wings and the Session Auto-Fixer.",
+  "summary": "The Afterlife Halloween wings, new cosmetics without updating, your cosmetics on the Home screen, a better Redstone Replace, and fixes for disappearing wings and the Session Auto-Fixer.",
   "tag": "Update",
   "version": "0.8.7",
   "accent": "#ff8a1f",
@@ -31,6 +31,32 @@
       "type": "image",
       "image": "file:images/launcher-cosmetics-wings.jpg",
       "caption": "Your wings and their settings, right in the launcher."
+    },
+    {
+      "type": "heading",
+      "text": "Your cosmetics on the Home screen"
+    },
+    {
+      "type": "text",
+      "text": "The player on the launcher's Home screen now wears what you have equipped - cape, wings and aura - and turns slowly so you can see the back too."
+    },
+    {
+      "type": "heading",
+      "text": "Redstone Mode: better Replace"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Keep direction** - blocks keep pointing the same way even when the two blocks store it differently: a **crafter** becomes a **dispenser** facing the same way, logs and chains keep their axis, signs and heads their rotation.",
+        "**Turn** - replace and rotate in one go: 90° right, 180°, 90° left or the opposite way.",
+        "**Chance** - replace only a share of the blocks, picked at random (great for mixing textures).",
+        "**Several blocks at once** - e.g. `stone, andesite, cobblestone`."
+      ]
+    },
+    {
+      "type": "image",
+      "image": "file:images/redstone-replace.jpg",
+      "caption": "The new Replace options."
     },
     {
       "type": "heading",

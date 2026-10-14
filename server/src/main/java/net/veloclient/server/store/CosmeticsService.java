@@ -41,8 +41,8 @@ public final class CosmeticsService {
 	public static final String STATUS_TESTING = "testing";
 	public static final String STATUS_HIDDEN = "hidden";
 	private static final Set<String> STATUSES = Set.of(STATUS_RELEASED, STATUS_TESTING, STATUS_HIDDEN);
-	private static final Set<String> TYPES = Set.of("wings", "cape");
-	private static final Pattern ITEM_ID = Pattern.compile("(wings|cape)_[a-z0-9_-]{1,40}");
+	private static final Set<String> TYPES = Set.of("wings", "cape", "aura");
+	private static final Pattern ITEM_ID = Pattern.compile("(wings|cape|aura)_[a-z0-9_-]{1,40}");
 	private static final Pattern COLLECTION_ID = Pattern.compile("[a-z0-9_-]{1,40}");
 	private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
 	public static final int MAX_FILE_BYTES = 12 * 1024 * 1024;
@@ -349,14 +349,14 @@ public final class CosmeticsService {
 	 */
 	public synchronized Item upsert(Item change, boolean clearWindow) throws IOException, StoreService.StoreException {
 		if (change == null || change.id == null || !ITEM_ID.matcher(change.id).matches()) {
-			throw new StoreService.StoreException(400, "Item ids look like wings_<name> or cape_<name> (lowercase, digits, _ or -)");
+			throw new StoreService.StoreException(400, "Item ids look like wings_<name>, cape_<name> or aura_<name> (lowercase, digits, _ or -)");
 		}
 		Item item = find(change.id);
 		boolean created = item == null;
 		if (created) {
 			item = new Item();
 			item.id = change.id;
-			item.type = change.id.startsWith("wings_") ? "wings" : "cape";
+			item.type = change.id.startsWith("wings_") ? "wings" : change.id.startsWith("aura_") ? "aura" : "cape";
 			item.name = change.id;
 			item.description = "";
 			item.status = STATUS_TESTING;
@@ -364,7 +364,7 @@ public final class CosmeticsService {
 			item.addedAt = System.currentTimeMillis();
 		}
 		if (change.type != null && !TYPES.contains(change.type)) {
-			throw new StoreService.StoreException(400, "type is wings or cape");
+			throw new StoreService.StoreException(400, "type is wings, cape or aura");
 		}
 		if (change.status != null) {
 			if (!STATUSES.contains(change.status)) {
@@ -433,7 +433,8 @@ public final class CosmeticsService {
 			item.files = new LinkedHashMap<>(item.files);
 			item.files.putAll(change.files);
 		}
-		List<String> required = "wings".equals(item.type) ? List.of("mesh", "texture") : List.of("gif");
+		// Auras are drawn by code in the clients - no files.
+		List<String> required = "wings".equals(item.type) ? List.of("mesh", "texture") : "cape".equals(item.type) ? List.of("gif") : List.of();
 		for (String role : required) {
 			if (!item.files.containsKey(role)) {
 				throw new StoreService.StoreException(400, "A " + item.type + " item needs its " + role + " file");

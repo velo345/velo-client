@@ -410,7 +410,7 @@ On start the server prints which parts are on, e.g.
 
 ## Cosmetics catalog (wings and capes without client updates)
 
-Every wing pair and store cape lives in the server's catalog (`CosmeticsService.java`,
+Every wing pair, store cape and aura lives in the server's catalog (`CosmeticsService.java`,
 `data/cosmetics/catalog.json`, art content-addressed in `data/cosmetics/files/<sha256>`). The game
 and the launcher download the catalog and any art they don't ship with, so **adding a cosmetic
 never needs a client update**.

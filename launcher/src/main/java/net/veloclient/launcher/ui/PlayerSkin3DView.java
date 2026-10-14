@@ -203,6 +203,10 @@ public final class PlayerSkin3DView {
 		subScene.heightProperty().bind(wrapper.heightProperty());
 		wrapper.getChildren().add(subScene);
 		wrapper.setPickOnBounds(interactive);
+		// For overlays drawn in the model's space (auras, see AuraFx).
+		wrapper.getProperties().put("velo.yaw", yaw);
+		wrapper.getProperties().put("velo.camera", camera);
+		wrapper.getProperties().put("velo.subScene", subScene);
 
 		long[] lastInteraction = {0};
 		if (interactive) {

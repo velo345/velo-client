@@ -309,7 +309,13 @@ public final class RmOps {
 	 * Replaces every block in the selection whose id is {@code fromId} ("*" = every non-air block)
 	 * with {@code toText} ("id" or "id[prop=value]"), carrying over shared properties unless set.
 	 */
-	public static void replace(String fromId, String toText, boolean keepProperties) {
+	/**
+	 * Replaces blocks in the selection: any of {@code fromIds} ("*" = every non-air block) becomes
+	 * {@code toText} (a block, optionally with [properties]); what carries over is up to
+	 * {@code options} (see {@link ReplaceProps}); {@code chance} (1-100) replaces only that share,
+	 * picked at random.
+	 */
+	public static void replace(java.util.List<String> fromIds, String toText, ReplaceProps.Options options, int chance) {
 		int[] b = RmState.box();
 		if (b == null || !canEdit()) {
 			return;
@@ -319,7 +325,10 @@ public final class RmOps {
 			RmState.error("Unknown block: " + toText);
 			return;
 		}
-		String explicit = toText.contains("[") ? toText.substring(toText.indexOf('[')) : "";
+		java.util.Set<String> explicit = ReplaceProps.parse(toText).keySet();
+		java.util.Set<String> targetProps = ReplaceProps.parse(RmWorld.toText(target)).keySet();
+		boolean any = fromIds.contains("*");
+		java.util.Random random = new java.util.Random();
 		int[] s = RmState.size();
 		RmWorld.onServer(level -> {
 			Clip current = capture(level, b[0], b[1], b[2], s[0], s[1], s[2]);
@@ -327,22 +336,13 @@ public final class RmOps {
 			int changed = 0;
 			for (int i = 0; i < current.states.length; i++) {
 				Object state = current.states[i];
-				boolean match = "*".equals(fromId) ? !RmWorld.isAir(state) : RmWorld.id(state).equals(fromId);
-				if (!match) {
+				boolean match = any ? !RmWorld.isAir(state) : fromIds.contains(RmWorld.id(state));
+				if (!match || chance < 100 && random.nextInt(100) >= chance) {
 					continue;
 				}
 				Object next = target;
-				if (keepProperties) {
-					String text = RmWorld.toText(state);
-					int bracket = text.indexOf('[');
-					if (bracket > 0) {
-						for (String pair : text.substring(bracket + 1, text.length() - 1).split(",")) {
-							int eq = pair.indexOf('=');
-							if (eq > 0 && !explicit.contains(pair.substring(0, eq) + "=")) {
-								next = RmWorld.with(next, pair.substring(0, eq), pair.substring(eq + 1));
-							}
-						}
-					}
+				for (var e : ReplaceProps.carry(ReplaceProps.parse(RmWorld.toText(state)), targetProps, explicit, options).entrySet()) {
+					next = RmWorld.with(next, e.getKey(), e.getValue());
 				}
 				after.states[i] = next;
 				changed++;

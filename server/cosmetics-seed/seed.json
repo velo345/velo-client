@@ -24,6 +24,12 @@
 			"name": "Neon",
 			"tag": "NEON COLLECTION",
 			"description": "Glowing neon wings in five colours - pick the one that matches your setup."
+		},
+		{
+			"id": "auras",
+			"name": "Auras",
+			"tag": "AURA COLLECTION",
+			"description": "Animated auras that live around you - orbiting stars, rising embers, falling snow, a void rift and crackling lightning. Pick a colour, size and speed."
 		}
 	],
 	"items": [
@@ -334,6 +340,61 @@
 				"preview": "wings/neon_red_preview.png"
 			},
 			"glow": true
+		},
+		{
+			"id": "aura_orbit",
+			"type": "aura",
+			"name": "Celestial Orbit",
+			"description": "Three tilted rings of stars circle you, each trailing a comet tail.",
+			"price": 2200,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#7cc8ff",
+			"files": {}
+		},
+		{
+			"id": "aura_ember",
+			"type": "aura",
+			"name": "Ember Spiral",
+			"description": "Embers spiral up from your feet in a double helix and drift away as you move.",
+			"price": 2000,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#ff7a2e",
+			"files": {}
+		},
+		{
+			"id": "aura_frost",
+			"type": "aura",
+			"name": "Frost Halo",
+			"description": "A crown of glittering ice above your head and soft snow falling all around you.",
+			"price": 2000,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#bfe6ff",
+			"files": {}
+		},
+		{
+			"id": "aura_void",
+			"type": "aura",
+			"name": "Void Rift",
+			"description": "A pulsing rune circle at your feet pulls dark wisps in from all around.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#a24dff",
+			"files": {}
+		},
+		{
+			"id": "aura_storm",
+			"type": "aura",
+			"name": "Storm Sparks",
+			"description": "Lightning arcs crackle around your body and throw off bright sparks.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#ffe14d",
+			"files": {}
 		}
 	]
 }

@@ -202,7 +202,7 @@ public final class StoreApi {
 					{"id":"coins_500","coins":500,"bonus":0,"price":4.99},{"id":"coins_1200","coins":1200,"bonus":140,"price":9.99},
 					{"id":"coins_2600","coins":2600,"bonus":400,"price":19.99},{"id":"coins_6500","coins":6500,"bonus":1500,"price":39.99}],
 					"items":[]}""";
-			case "/v1/store/wallet" -> "{\"balance\":1340,\"owner\":true,\"owned\":[\"wings_bonedragon\",\"wings_cobweb\",\"wings_wraith\",\"wings_phoenix\"]}";
+			case "/v1/store/wallet" -> "{\"balance\":1340,\"owner\":true,\"owned\":[\"wings_bonedragon\",\"wings_cobweb\",\"wings_wraith\",\"wings_phoenix\",\"aura_orbit\",\"aura_ember\",\"aura_void\"]}";
 			default -> """
 					{"onlineMinutes":42,"loginClaimed":false,"loginClaimable":true,"loginCoins":12,"streak":3,"quests":[
 					{"id":"kill_100","title":"Defeat 100 mobs","progress":64,"target":100,"coins":10,"claimed":false,"claimable":false},

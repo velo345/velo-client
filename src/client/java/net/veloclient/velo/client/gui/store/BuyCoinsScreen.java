@@ -172,7 +172,7 @@ public final class BuyCoinsScreen extends VeloWindow {
 				case "hidden" -> 0xFF8A8398;
 				default -> 0xFFF4B82E;
 			};
-			String name = (id.startsWith("cape_") ? "Cape: " : "") + item.get("name").getAsString();
+			String name = (id.startsWith("cape_") ? "Cape: " : id.startsWith("aura_") ? "Aura: " : "") + item.get("name").getAsString();
 			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(name, width - 158), x, ry + 4, VeloStyle.text());
 			hits.add(VeloUi.pill(context, x + width - 152, ry, 66, 14, status, 0, mouseX, mouseY, () -> cycleStatus(id, status)));
 			context.fill(x + width - 150, ry + 6, x + width - 147, ry + 9, statusColor);
