@@ -70,6 +70,8 @@ public final class CosmeticsService {
 		public Float offsetY;
 		/** Drawn full-bright (neon). */
 		public Boolean glow;
+		/** How it's earned instead of bought ("discord" = linking your Discord account); such an item is never sold, whatever its status. */
+		public String unlock;
 		public Map<String, String> files;
 		public long addedAt;
 
@@ -214,7 +216,7 @@ public final class CosmeticsService {
 
 	/** Released and inside its time window: shown in the store and can be bought. */
 	public static boolean inStore(Item item, long now) {
-		return STATUS_RELEASED.equals(item.status) && (item.availableFrom == null || item.availableFrom <= now)
+		return item.unlock == null && STATUS_RELEASED.equals(item.status) && (item.availableFrom == null || item.availableFrom <= now)
 				&& (item.availableUntil == null || item.availableUntil > now);
 	}
 
@@ -225,7 +227,8 @@ public final class CosmeticsService {
 
 	/** What a client may see of an item: everything except the owner-only status details. */
 	public record ItemView(String id, String type, String name, String description, int price, String collection, String accent,
-			String style, Float scale, Float offsetY, Boolean glow, Map<String, String> files, boolean inStore, Long availableUntil, String status) {
+			String style, Float scale, Float offsetY, Boolean glow, Map<String, String> files, boolean inStore, Long availableUntil, String status,
+			String unlock) {
 	}
 
 	public record CollectionView(String id, String name, String tag, String description) {
@@ -237,7 +240,7 @@ public final class CosmeticsService {
 	private static ItemView view(Item i, long now, boolean withStatus) {
 		boolean inStore = inStore(i, now);
 		return new ItemView(i.id, i.type, i.name, i.description, i.price, i.collection, i.accent, i.style, i.scale, i.offsetY, i.glow,
-				Map.copyOf(i.files), inStore, inStore ? i.availableUntil : null, withStatus ? i.status : null);
+				Map.copyOf(i.files), inStore, inStore ? i.availableUntil : null, withStatus ? i.status : null, i.unlock);
 	}
 
 	/**
@@ -273,7 +276,7 @@ public final class CosmeticsService {
 		}
 		ItemView v = view(item, System.currentTimeMillis(), false);
 		return new ItemView(v.id(), v.type(), v.name(), v.description(), 0, v.collection(), v.accent(), v.style(), v.scale(), v.offsetY(), v.glow(),
-				v.files(), v.inStore(), null, null);
+				v.files(), v.inStore(), null, null, v.unlock());
 	}
 
 	/** Released items in their window, for the old {@code /v1/store/catalog} price list. */
@@ -420,6 +423,9 @@ public final class CosmeticsService {
 		}
 		if (change.glow != null) {
 			item.glow = change.glow;
+		}
+		if (change.unlock != null) {
+			item.unlock = change.unlock.isBlank() ? null : change.unlock;
 		}
 		if (change.offsetY != null) {
 			item.offsetY = Math.max(-1f, Math.min(1f, change.offsetY));

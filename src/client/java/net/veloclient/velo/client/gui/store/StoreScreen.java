@@ -1,5 +1,6 @@
 package net.veloclient.velo.client.gui.store;
 
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -59,6 +60,9 @@ public final class StoreScreen extends VeloWindow {
 	/** Hero height for the current window size (smaller GUI space = smaller hero, cards only if they fit). */
 	private int heroH = 220;
 	private boolean collectionRow = true;
+	/** The Discord link code just requested (copied as "/link CODE"), and why a request failed. */
+	private String discordCode = "";
+	private String discordError = "";
 
 	public StoreScreen(Screen parent) {
 		super(Text.literal("Velo Store"), 720, 470);
@@ -102,6 +106,18 @@ public final class StoreScreen extends VeloWindow {
 		}
 		addDrawableChild(new VeloButton(x, contentBottom() - 20, SIDEBAR_WIDTH - 10, 20, Text.literal("Get coins"),
 				b -> this.client.setScreen(new BuyCoinsScreen(this))));
+		// The Velo Neon cape isn't sold: it comes from linking your Discord.
+		addDrawableChild(new VeloButton(x, contentBottom() - 44, SIDEBAR_WIDTH - 10, 20, Text.literal(discordCode.isEmpty() ? "Link Discord" : "Copied!"),
+				b -> StoreClient.discordCode(code -> {
+					String value = code.get("code").getAsString();
+					MinecraftClient.getInstance().keyboard.setClipboard("/link " + value);
+					discordCode = value;
+					discordError = "";
+					layoutContent();
+				}, error -> {
+					discordError = error;
+					layoutContent();
+				})));
 
 		int cx = x + SIDEBAR_WIDTH;
 		int cw = contentX() + contentWidth() - cx;
@@ -246,6 +262,10 @@ public final class StoreScreen extends VeloWindow {
 		int cx = x + SIDEBAR_WIDTH;
 		int cw = contentX() + contentWidth() - cx;
 		super.render(context, mouseX, mouseY, delta);
+		if (!discordCode.isEmpty() || !discordError.isEmpty()) {
+			String line = discordError.isEmpty() ? "/link " + discordCode : VeloUi.trim(discordError, SIDEBAR_WIDTH - 10);
+			context.drawTextWithShadow(this.textRenderer, line, x, contentBottom() - 56, discordError.isEmpty() ? 0xFF8FE3A8 : 0xFFFF7A7A);
+		}
 		if (page == Page.FEATURED) {
 			renderHero(context, cx, y, cw);
 		}

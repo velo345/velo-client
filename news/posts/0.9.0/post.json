@@ -1,15 +1,15 @@
 {
-  "title": "Velo Client 0.8.7",
+  "title": "Velo Client 0.9.0",
   "summary": "The Afterlife Halloween wings, new cosmetics without updating, your cosmetics on the Home screen, a better Redstone Replace, and fixes for disappearing wings and the Session Auto-Fixer.",
   "tag": "Update",
-  "version": "0.8.7",
+  "version": "0.9.0",
   "accent": "#ff8a1f",
   "pinned": false,
   "cover": "file:images/cover.jpg",
   "blocks": [
     {
       "type": "text",
-      "text": "0.8.7 brings the **Afterlife** Halloween wings (they get their own post), makes new cosmetics show up **without an update**, and fixes two things that have been bugging you."
+      "text": "0.9.0 brings the **Afterlife** Halloween wings (they get their own post), makes new cosmetics show up **without an update**, and fixes two things that have been bugging you."
     },
     {
       "type": "heading",
@@ -57,6 +57,22 @@
       "type": "image",
       "image": "file:images/redstone-replace.jpg",
       "caption": "The new Replace options."
+    },
+    {
+      "type": "heading",
+      "text": "Velo Neon: free with Discord"
+    },
+    {
+      "type": "text",
+      "text": "The **Velo Neon** cape isn't sold in the Store - you get it by joining our **Discord** and linking your account. In the Store's **Capes** tab (launcher) or with the **Link Discord** button (in-game Store) you get a short code; type `/link` and the code in our Discord and the cape is yours."
+    },
+    {
+      "type": "heading",
+      "text": "A much snappier launcher"
+    },
+    {
+      "type": "text",
+      "text": "Cosmetics, Store, News and Home used to freeze while capes decoded on the main thread (and sometimes ran out of memory). Pages now open instantly with a small spinner and the previews fill in after; news shows straight away from the last visit and updates in the background; cards animate lighter. Cape previews use a fraction of the memory."
     },
     {
       "type": "heading",

@@ -79,9 +79,17 @@ public final class VeloServerApp {
 		SocialRoutes.register(server, registry, social);
 		PartyService parties = new PartyService(social);
 		PartyRoutes.register(server, registry, social, parties);
+		ReportService reportService = new ReportService(dataDir);
 		StoreRoutes.register(server, registry, store, dataDir);
 		CosmeticsRoutes.register(server, registry, store, cosmetics, adminToken);
-		NewsRoutes.register(server, registry, new NewsService(dataDir), new ReportService(dataDir), store, adminToken);
+		// Discord: linking (unlocks the Velo Neon cape) and announcements through channel webhooks.
+		DiscordLinks discordLinks = new DiscordLinks(dataDir, store);
+		DiscordRoutes.register(server, registry, store, discordLinks, envOr("VELO_DISCORD_INVITE", null), adminToken);
+		DiscordAnnouncer announcer = new DiscordAnnouncer(envOr("VELO_DISCORD_DONATIONS_WEBHOOK", null), envOr("VELO_DISCORD_REPORTS_WEBHOOK", null),
+				envOr("VELO_PUBLIC_URL", null), cosmetics, registry, store.database());
+		store.setPurchaseListener(announcer::donation);
+		reportService.setListener(announcer::report);
+		NewsRoutes.register(server, registry, new NewsService(dataDir), reportService, store, adminToken);
 		SchematicShareService schematics = new SchematicShareService(dataDir);
 		SchematicRoutes.register(server, registry, schematics, store);
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));

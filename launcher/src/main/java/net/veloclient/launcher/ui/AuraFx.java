@@ -111,13 +111,47 @@ public final class AuraFx {
 		}
 	}
 
+	private static final java.util.Map<String, javafx.scene.image.Image> SNAPSHOTS = new java.util.HashMap<>();
+
+	/**
+	 * One still picture of an aura (a couple of seconds into its animation, around a dim player shape):
+	 * for lists with many entries, where a live animation per row would cost more than it's worth.
+	 * FX thread; cached.
+	 */
+	public static javafx.scene.image.Image snapshot(AuraEffects.Kind kind, double width, double height) {
+		return SNAPSHOTS.computeIfAbsent(kind + "@" + (int) width + "x" + (int) height, k -> {
+			AuraEffects.Emitter emitter = new AuraEffects.Emitter(kind);
+			for (int i = 0; i < 90; i++) {
+				emitter.update(1 / 30f, AuraEffects.Settings.DEFAULT, 0, 0, 0);
+			}
+			double focal = (height / 2) / Math.tan(Math.toRadians(15));
+			double distance = 95;
+			Canvas canvas = new Canvas(width, height);
+			List<Sprite> sprites = project(emitter, AuraEffects.Settings.DEFAULT, width / 2, height / 2 - 6, focal, distance, 0.5);
+			GraphicsContext g = canvas.getGraphicsContext2D();
+			draw(g, sprites, distance, false);
+			silhouette(g, width / 2, height / 2 - 6, focal / distance);
+			draw(g, sprites, distance, true);
+			javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+			params.setFill(Color.TRANSPARENT);
+			return canvas.snapshot(params, null);
+		});
+	}
+
 	/** A Store card's picture: the aura around a dim player shape, turning slowly. */
 	public static Node card(AuraEffects.Kind kind, Supplier<AuraEffects.Settings> settings, double width, double height) {
 		Canvas canvas = new Canvas(width, height);
 		AuraEffects.Emitter emitter = new AuraEffects.Emitter(kind);
 		AnimationTimer timer = new AnimationTimer() {
+			private long lastDraw;
+
 			@Override
 			public void handle(long now) {
+				// Cards animate at ~30 fps: a page of ten of them at the full refresh rate was most of the Store's cost.
+				if (now - lastDraw < 30_000_000L) {
+					return;
+				}
+				lastDraw = now;
 				AuraEffects.Settings s = settings.get();
 				emitter.update(emitter.tick(now), s, 0, 0, 0);
 				// A camera like the viewer's, zoomed so the whole aura fits.
@@ -225,6 +259,37 @@ public final class AuraFx {
 		return Math.abs(rz);
 	}
 
+	private static final java.util.Map<Integer, javafx.scene.image.Image> GLOWS = new java.util.HashMap<>();
+
+	/** A soft round glow (bright core, long falloff) in {@code rgb}, 48 px, made once per colour (colours snapped to 16 levels). */
+	private static javafx.scene.image.Image glowImage(int rgb) {
+		int key = ((rgb >> 20) & 15) << 8 | ((rgb >> 12) & 15) << 4 | ((rgb >> 4) & 15);
+		javafx.scene.image.Image cached = GLOWS.get(key);
+		if (cached != null) {
+			return cached;
+		}
+		if (GLOWS.size() > 600) {
+			GLOWS.clear();
+		}
+		int size = 48;
+		javafx.scene.image.WritableImage image = new javafx.scene.image.WritableImage(size, size);
+		javafx.scene.image.PixelWriter writer = image.getPixelWriter();
+		int r = ((key >> 8) & 15) * 17;
+		int gr = ((key >> 4) & 15) * 17;
+		int b = (key & 15) * 17;
+		for (int y = 0; y < size; y++) {
+			for (int x = 0; x < size; x++) {
+				double dx = (x + 0.5) / size * 2 - 1;
+				double dy = (y + 0.5) / size * 2 - 1;
+				double d = Math.hypot(dx, dy);
+				double a = d >= 1 ? 0 : (Math.exp(-d * d * 9) * 0.85 + Math.exp(-d * d * 2.5) * 0.35) * Math.sqrt(1 - d);
+				writer.setArgb(x, y, ((int) Math.round(Math.min(1, a) * 255) << 24) | (r << 16) | (gr << 8) | b);
+			}
+		}
+		GLOWS.put(key, image);
+		return image;
+	}
+
 	/** Draws the sprites behind ({@code front} false) or in front of the player. */
 	private static void draw(GraphicsContext g, List<Sprite> sprites, double distance, boolean front) {
 		g.setGlobalBlendMode(BlendMode.ADD);
@@ -289,20 +354,17 @@ public final class AuraFx {
 				continue;
 			}
 			double r = Math.max(1, s.radius);
-			double ry = s.shape == AuraEffects.DISC ? r * 0.22 : r;
-			g.setFill(new RadialGradient(0, 0, s.x, s.y, r, false, CycleMethod.NO_CYCLE,
-					new Stop(0, c), new Stop(0.35, c.deriveColor(0, 1, 1, 0.45)), new Stop(1, Color.TRANSPARENT)));
+			// Glows are a cached soft sprite per colour, stamped with the sprite's alpha: building a gradient
+			// object per particle per frame (the old way) made a page of aura cards crawl.
+			javafx.scene.image.Image glow = glowImage(s.rgb);
+			g.setGlobalAlpha(Math.min(1, s.alpha));
 			if (s.shape == AuraEffects.DISC) {
-				g.save();
-				g.translate(s.x, s.y);
-				g.scale(1, ry / r);
-				g.setFill(new RadialGradient(0, 0, 0, 0, r, false, CycleMethod.NO_CYCLE,
-						new Stop(0, c), new Stop(0.5, c.deriveColor(0, 1, 1, 0.35)), new Stop(1, Color.TRANSPARENT)));
-				g.fillOval(-r, -r, r * 2, r * 2);
-				g.restore();
+				g.drawImage(glow, s.x - r, s.y - r * 0.22, r * 2, r * 0.44);
+				g.setGlobalAlpha(1);
 				continue;
 			}
-			g.fillOval(s.x - r, s.y - r, r * 2, r * 2);
+			g.drawImage(glow, s.x - r, s.y - r, r * 2, r * 2);
+			g.setGlobalAlpha(1);
 			if (s.shape == AuraEffects.STAR) {
 				g.setStroke(c);
 				g.setLineCap(StrokeLineCap.ROUND);

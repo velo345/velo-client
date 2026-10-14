@@ -180,10 +180,25 @@ public final class OwnerView {
 		String accent = str(item, "accent", "#ff4d4d");
 		art.setStyle("-fx-background-radius: 10; -fx-background-color: radial-gradient(center 50% 60%, radius 70%, " + accent
 				+ "66 0%, #16161d00 100%), #17171d;");
-		if (!wings) {
-			Label cape = new Label(id.startsWith("aura_") ? "Aura" : "Cape");
-			cape.getStyleClass().add("page-subtitle");
-			art.getChildren().setAll(cape);
+		if (id.startsWith("cape_")) {
+			// The cape's first frame (just the outside of the cape), read off the UI thread.
+			String gifSha = item.has("files") && item.getAsJsonObject("files").has("gif") ? item.getAsJsonObject("files").get("gif").getAsString() : null;
+			thumb.setFitWidth(52);
+			thumb.setFitHeight(84);
+			if (gifSha != null) {
+				CompletableFuture.supplyAsync(() -> firstCapeFrame(gifSha), Executors.newVirtualThreadPerTaskExecutor())
+						.thenAccept(image -> Platform.runLater(() -> {
+							if (image != null) {
+								thumb.setImage(image);
+							}
+						}));
+			}
+		} else if (id.startsWith("aura_")) {
+			// The aura itself, drawn once into a picture (not a live animation per row).
+			net.veloclient.velo.client.cosmetics.aura.AuraEffects.Kind kind = net.veloclient.velo.client.cosmetics.aura.AuraEffects.kind(id.substring(5));
+			if (kind != null) {
+				Platform.runLater(() -> thumb.setImage(AuraFx.snapshot(kind, 104, 76)));
+			}
 		}
 
 		VBox details = new VBox(8);
@@ -251,6 +266,21 @@ public final class OwnerView {
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.getStyleClass().add("settings-card");
 		return row;
+	}
+
+	/** Frame 0 of a cape GIF, cropped to the outside of the cape (10 x 16 cape pixels of the 64 x 32 layout). */
+	private static Image firstCapeFrame(String sha) {
+		try (java.io.InputStream in = WingsCatalog.openFile(sha); javax.imageio.stream.ImageInputStream iis = javax.imageio.ImageIO.createImageInputStream(in)) {
+			var reader = javax.imageio.ImageIO.getImageReadersByFormatName("gif").next();
+			reader.setInput(iis, true);
+			java.awt.image.BufferedImage frame = reader.read(0);
+			reader.dispose();
+			int scale = Math.max(1, frame.getWidth() / 64);
+			java.awt.image.BufferedImage face = frame.getSubimage(scale, scale, 10 * scale, 16 * scale);
+			return javafx.embed.swing.SwingFXUtils.toFXImage(face, null);
+		} catch (Exception e) {
+			return null;
+		}
 	}
 
 	// ---- Players ----

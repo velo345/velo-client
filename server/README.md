@@ -441,6 +441,21 @@ Endpoints: `GET /v1/cosmetics/catalog` (store + what you own; everything for own
 `GET /v1/cosmetics/item?id=`, `GET /v1/cosmetics/file/<sha256>`, and the owner-only
 `/v1/admin/cosmetics{,/item,/file,/collection,/featured}` (owner session or `X-Velo-Admin-Token`).
 
+## Discord (linking, donations, bug reports)
+
+Environment variables (all optional):
+
+| Variable | What |
+|---|---|
+| `VELO_DISCORD_INVITE` | your Discord invite link, shown next to the link code in Velo Client |
+| `VELO_DISCORD_DONATIONS_WEBHOOK` | channel webhook: every paid Tebex coin pack is announced with the buyer's skin (mc-heads.net), what they wear (needs them in game), their collection, and their wings' picture (needs `VELO_PUBLIC_URL`) |
+| `VELO_DISCORD_REPORTS_WEBHOOK` | channel webhook: every bug / crash report |
+
+Linking: a signed-in player asks `POST /v1/discord/code` (Velo Client does) and types `/link <code>` in the
+Discord; the bot (`bot/`, with `VELO_ADMIN_TOKEN`) redeems it at `POST /v1/admin/discord/link`, which
+records the link in `discord-links.json` and gives **Velo Neon** (`cape_velo_neon`, `unlock: "discord"` - such
+an item is never sold, whatever its status). See `bot/README.md`.
+
 ## Configuring the mod to use your server
 
 The mod ships already pointed at Velo Client's own official server

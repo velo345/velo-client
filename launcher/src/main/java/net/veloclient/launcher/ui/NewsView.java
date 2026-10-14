@@ -122,9 +122,16 @@ public final class NewsView {
 
 	public static Node build(Host host) {
 		StackPane page = new StackPane();
-		Label loading = new Label("Loading news...");
-		loading.getStyleClass().add("page-subtitle");
-		page.getChildren().add(loading);
+		page.getChildren().add(CosmeticUi.spinner(30));
+		// The last feed (from disk) shows straight away; the fresh one follows and replaces it only if it changed -
+		// the page used to sit on "Loading news..." until the server answered.
+		JsonObject[] shown = new JsonObject[1];
+		CompletableFuture.supplyAsync(NewsApi::cachedFeed, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(cached -> Platform.runLater(() -> {
+			if (cached != null && shown[0] == null) {
+				shown[0] = cached;
+				page.getChildren().setAll(list(host, cached));
+			}
+		}));
 		CompletableFuture.supplyAsync(() -> {
 			try {
 				return (Object) NewsApi.feed();
@@ -134,8 +141,11 @@ public final class NewsView {
 		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
 			if (result instanceof JsonObject feed) {
 				markSeen(feed);
-				page.getChildren().setAll(list(host, feed));
-			} else {
+				if (!feed.equals(shown[0])) {
+					shown[0] = feed;
+					page.getChildren().setAll(list(host, feed));
+				}
+			} else if (shown[0] == null) {
 				Label error = new Label(result + "");
 				error.getStyleClass().add("empty-state");
 				page.getChildren().setAll(error);

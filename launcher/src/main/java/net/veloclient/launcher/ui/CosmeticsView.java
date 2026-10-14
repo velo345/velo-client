@@ -15,6 +15,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import net.veloclient.launcher.auth.MinecraftSession;
+import net.veloclient.launcher.auth.SkinFetcher;
 import net.veloclient.launcher.data.CapeEntry;
 import net.veloclient.launcher.data.CapeLibrary;
 import net.veloclient.launcher.data.GifFrames;
@@ -82,6 +83,7 @@ public final class CosmeticsView {
 		for (int i = 0; i < names.length; i++) {
 			int index = i;
 			Button tab = new Button(names[i]);
+			tab.setMinWidth(Region.USE_PREF_SIZE);
 			tab.getStyleClass().add("segmented-button");
 			if (i == active) {
 				tab.getStyleClass().add("segmented-button-active");
@@ -93,7 +95,27 @@ public final class CosmeticsView {
 			});
 			tabs.getChildren().add(tab);
 		}
+		tabs.setMinWidth(Region.USE_PREF_SIZE);
 		return tabs;
+	}
+
+	/**
+	 * The page header, the same on every tab: title and subtitle (with {@code extra} - e.g. Import - on
+	 * the right), then the tab row under them. The tabs used to sit beside the title, so the Import button
+	 * on the Capes tab squeezed them (cut off to "A...") and moved everything between tabs.
+	 */
+	private static Node header(String subtitle, Runnable refresh, Node extra) {
+		Label heading = new Label("Cosmetics");
+		heading.getStyleClass().add("page-title");
+		Label sub = new Label(subtitle);
+		sub.getStyleClass().add("page-subtitle");
+		VBox titles = new VBox(2, heading, sub);
+		titles.setMinWidth(0);
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox top = extra == null ? new HBox(12, titles) : new HBox(12, titles, spacer, extra);
+		top.setAlignment(Pos.CENTER_LEFT);
+		return new VBox(12, top, tabs(refresh));
 	}
 
 	// ---- Auras ----
@@ -118,14 +140,7 @@ public final class CosmeticsView {
 		}
 		var selected = owned.stream().filter(a -> a.id().equals(selectedAura)).findFirst().orElse(null);
 
-		Label heading = new Label("Cosmetics");
-		heading.getStyleClass().add("page-title");
-		Label sub = new Label("Your auras. The equipped one shows in-game for you and every other Velo player.");
-		sub.getStyleClass().add("page-subtitle");
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox header = new HBox(12, new VBox(2, heading, sub), spacer, tabs(refresh));
-		header.setAlignment(Pos.CENTER_LEFT);
+		Node header = header("Your auras. The equipped one shows in-game for you and every other Velo player.", refresh, null);
 
 		FlowPane grid = new FlowPane(14, 14);
 		grid.getStyleClass().add("cape-grid");
@@ -215,11 +230,6 @@ public final class CosmeticsView {
 		CapeEntry selected = capes.stream().filter(c -> c.id().equals(selectedId)).findFirst().orElse(null);
 
 		// Header.
-		Label heading = new Label("Cosmetics");
-		heading.getStyleClass().add("page-title");
-		Label sub = new Label("Your capes. The equipped one shows in-game for you and every other Velo player.");
-		sub.getStyleClass().add("page-subtitle");
-		VBox titles = new VBox(2, heading, sub);
 		Button importButton = new Button("+  Import cape");
 		importButton.getStyleClass().add("primary-button");
 		importButton.setOnAction(e -> CapeImportDialog.show(owner).ifPresent(result -> {
@@ -230,10 +240,7 @@ public final class CosmeticsView {
 				error(owner, "Import failed", ex.getMessage());
 			}
 		}));
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox header = new HBox(12, titles, spacer, tabs(refresh), importButton);
-		header.setAlignment(Pos.CENTER_LEFT);
+		Node header = header("Your capes. The equipped one shows in-game for you and every other Velo player.", refresh, importButton);
 
 		// Left: showcase.
 		Node showcase = buildShowcase(owner, host, refresh, selected, selected != null && selected.id().equals(equippedId));
@@ -248,11 +255,11 @@ public final class CosmeticsView {
 					refresh.run();
 				}));
 		for (CapeEntry cape : capes) {
-			List<GifFrames.Frame> frames = CosmeticUi.frames(cape);
 			boolean equipped = cape.id().equals(equippedId);
 			Node footer = equipped ? CosmeticUi.badge("Equipped", "chip-owned")
 					: CosmeticUi.badge(cape.animated() ? "Animated" : "Static", null);
-			grid.getChildren().add(CosmeticUi.capeCard("lib:" + cape.id(), frames,
+			// The card shows at once with a spinner; its 3D preview arrives when the frames are decoded (off the UI thread).
+			grid.getChildren().add(CosmeticUi.capeCardLazy("lib:" + cape.id(), done -> CosmeticUi.framesAsync(cape, done),
 					cape.name(), footer, cape.id().equals(selectedId), () -> {
 						selectedId = cape.id();
 						refresh.run();
@@ -287,20 +294,49 @@ public final class CosmeticsView {
 	private static Node buildShowcase(Stage owner, Host host, Runnable refresh, CapeEntry selected, boolean equipped) {
 		StackPane stage = CosmeticUi.stage(300, 380);
 		stage.getStyleClass().add("showcase-stage");
-		List<GifFrames.Frame> frames = selected == null ? null : CosmeticUi.frames(selected);
-		Label loading = new Label(host.session() == null ? "Sign in to see capes on your own skin" : "Loading your skin...");
-		loading.getStyleClass().add("page-subtitle");
-		loading.setWrapText(true);
-		stage.getChildren().add(loading);
-		CosmeticUi.skin(host.session(), skin -> {
-			Node viewer = skin == null ? null : PlayerSkin3DView.createShowcase(skin.pngBytes(), skin.slim(),
-					frames == null || frames.isEmpty() ? null : frames);
-			if (viewer != null) {
-				stage.getChildren().setAll(viewer);
-			} else if (frames != null && !frames.isEmpty()) {
-				ImageView big = new ImageView(CosmeticUi.thumbnail("lib:" + selected.id(), frames, 260, 300));
-				stage.getChildren().setAll(big);
+		if (host.session() == null) {
+			Label signIn = new Label("Sign in to see capes on your own skin");
+			signIn.getStyleClass().add("page-subtitle");
+			signIn.setWrapText(true);
+			stage.getChildren().add(signIn);
+		} else {
+			stage.getChildren().add(CosmeticUi.spinner(34));
+		}
+		// The skin and the cape's frames both load off the UI thread; the 3D viewer is built once both are in.
+		List<GifFrames.Frame>[] frames = new List[1];
+		SkinFetcher.SkinData[] skinData = new SkinFetcher.SkinData[1];
+		boolean[] arrived = new boolean[2];
+		Runnable build = () -> {
+			if (!arrived[0] || !arrived[1]) {
+				return;
 			}
+			List<GifFrames.Frame> f = frames[0] == null || frames[0].isEmpty() ? null : frames[0];
+			Node viewer = skinData[0] == null ? null : PlayerSkin3DView.createShowcase(skinData[0].pngBytes(), skinData[0].slim(), f);
+			if (viewer != null) {
+				viewer.setOpacity(0);
+				stage.getChildren().setAll(viewer);
+				javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(javafx.util.Duration.millis(200), viewer);
+				fade.setToValue(1);
+				fade.play();
+			} else if (f != null) {
+				stage.getChildren().setAll(new ImageView(CosmeticUi.thumbnail("lib:" + selected.id(), f, 260, 300)));
+			} else if (host.session() != null) {
+				stage.getChildren().clear();
+			}
+		};
+		if (selected == null) {
+			arrived[1] = true;
+		} else {
+			CosmeticUi.framesAsync(selected, f -> {
+				frames[0] = f;
+				arrived[1] = true;
+				build.run();
+			});
+		}
+		CosmeticUi.skin(host.session(), data -> {
+			skinData[0] = data;
+			arrived[0] = true;
+			build.run();
 		});
 		Label hint = new Label("Drag to rotate");
 		hint.getStyleClass().add("stage-hint");
@@ -378,15 +414,7 @@ public final class CosmeticsView {
 		}
 		WingsCatalog.WingType selected = owned.stream().filter(w -> w.id().equals(selectedWings)).findFirst().orElse(null);
 
-		Label heading = new Label("Cosmetics");
-		heading.getStyleClass().add("page-title");
-		Label sub = new Label("Your wings. The equipped pair shows in-game for you and every other Velo player.");
-		sub.getStyleClass().add("page-subtitle");
-		VBox titles = new VBox(2, heading, sub);
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox header = new HBox(12, titles, spacer, tabs(refresh));
-		header.setAlignment(Pos.CENTER_LEFT);
+		Node header = header("Your wings. The equipped pair shows in-game for you and every other Velo player.", refresh, null);
 
 		FlowPane grid = new FlowPane(14, 14);
 		grid.getStyleClass().add("cape-grid");

@@ -38,7 +38,16 @@ import java.util.function.Consumer;
  */
 public final class CosmeticUi {
 
-	private static final Map<String, List<GifFrames.Frame>> FRAMES = LauncherCaches.lru(6);
+	/** Decoded cape frames at {@link GifFrames#PREVIEW_WIDTH} (about 5 MB for a 40-frame cape), so a few dozen fit. */
+	private static final Map<String, List<GifFrames.Frame>> FRAMES = LauncherCaches.lru(30);
+	/** Decoding happens off the UI thread, two at a time (a page of capes shouldn't saturate every core). */
+	private static final java.util.concurrent.ExecutorService DECODER = Executors.newFixedThreadPool(2, r -> {
+		Thread t = new Thread(r, "velo-cape-decoder");
+		t.setDaemon(true);
+		t.setPriority(Thread.MIN_PRIORITY + 1);
+		return t;
+	});
+	private static final Map<String, List<Consumer<List<GifFrames.Frame>>>> WAITING = new java.util.HashMap<>();
 	private static final Map<String, Image> THUMBNAILS = LauncherCaches.lru(120);
 	private static volatile String skinOwner;
 	private static volatile SkinFetcher.SkinData skin;
@@ -48,28 +57,114 @@ public final class CosmeticUi {
 
 	// ---- Data ----
 
-	public static List<GifFrames.Frame> frames(CapeEntry cape) {
-		return FRAMES.computeIfAbsent("lib:" + cape.id(), key -> {
-			try {
-				if (cape.animated()) {
-					return GifFrames.decode(new ByteArrayInputStream(CapeLibrary.gifBytes(cape))).frames();
-				}
-				var image = ImageIO.read(new ByteArrayInputStream(CapeLibrary.textureBytes(cape)));
-				return image == null ? List.of() : List.of(new GifFrames.Frame(image, 100));
-			} catch (Exception e) {
-				return List.of();
+	private static List<GifFrames.Frame> decode(CapeEntry cape) {
+		try {
+			if (cape.animated()) {
+				return GifFrames.decode(new ByteArrayInputStream(CapeLibrary.gifBytes(cape)), GifFrames.PREVIEW_WIDTH).frames();
 			}
+			var image = ImageIO.read(new ByteArrayInputStream(CapeLibrary.textureBytes(cape)));
+			return image == null ? List.of() : List.of(new GifFrames.Frame(image, 100));
+		} catch (Throwable e) {
+			return List.of();
+		}
+	}
+
+	private static List<GifFrames.Frame> decode(StoreItem item) {
+		try (var in = StoreCatalog.openGif(item)) {
+			return in == null ? List.of() : GifFrames.decode(in, GifFrames.PREVIEW_WIDTH).frames();
+		} catch (Throwable e) {
+			return List.of();
+		}
+	}
+
+	/** The frames if they're already decoded (instant), else null. */
+	static List<GifFrames.Frame> cachedFrames(String key) {
+		return FRAMES.get(key);
+	}
+
+	/** Blocking decode - only for code already running off the UI thread. */
+	public static List<GifFrames.Frame> frames(CapeEntry cape) {
+		return FRAMES.computeIfAbsent("lib:" + cape.id(), key -> decode(cape));
+	}
+
+	/** Blocking decode - only for code already running off the UI thread. */
+	static List<GifFrames.Frame> frames(StoreItem item) {
+		return FRAMES.computeIfAbsent("store:" + item.id(), key -> decode(item));
+	}
+
+	/**
+	 * Decodes a library cape's frames off the UI thread; {@code done} runs on the FX thread (at once if
+	 * they're cached already). Several waiting for the same cape share one decode.
+	 */
+	public static void framesAsync(CapeEntry cape, Consumer<List<GifFrames.Frame>> done) {
+		load("lib:" + cape.id(), () -> decode(cape), done);
+	}
+
+	static void framesAsync(StoreItem item, Consumer<List<GifFrames.Frame>> done) {
+		load("store:" + item.id(), () -> decode(item), done);
+	}
+
+	private static void load(String key, java.util.function.Supplier<List<GifFrames.Frame>> decode, Consumer<List<GifFrames.Frame>> done) {
+		List<GifFrames.Frame> cached = FRAMES.get(key);
+		if (cached != null) {
+			done.accept(cached);
+			return;
+		}
+		boolean first;
+		synchronized (WAITING) {
+			List<Consumer<List<GifFrames.Frame>>> waiting = WAITING.get(key);
+			first = waiting == null;
+			if (first) {
+				waiting = new java.util.ArrayList<>();
+				WAITING.put(key, waiting);
+			}
+			waiting.add(done);
+		}
+		if (!first) {
+			return;
+		}
+		DECODER.execute(() -> {
+			List<GifFrames.Frame> frames = decode.get();
+			// A failed decode isn't cached: it may work next time (the file might still be downloading).
+			if (!frames.isEmpty()) {
+				FRAMES.put(key, frames);
+			}
+			List<Consumer<List<GifFrames.Frame>>> waiting;
+			synchronized (WAITING) {
+				waiting = WAITING.remove(key);
+			}
+			Platform.runLater(() -> {
+				if (waiting != null) {
+					waiting.forEach(c -> c.accept(frames));
+				}
+			});
 		});
 	}
 
-	static List<GifFrames.Frame> frames(StoreItem item) {
-		return FRAMES.computeIfAbsent("store:" + item.id(), key -> {
-			try (var in = StoreCatalog.openGif(item)) {
-				return GifFrames.decode(in).frames();
-			} catch (Exception e) {
-				return List.of();
+	/** A small spinning arc for "loading" - runs only while it's on screen. */
+	public static Node spinner(double size) {
+		javafx.scene.shape.Arc arc = new javafx.scene.shape.Arc(0, 0, size / 2, size / 2, 0, 270);
+		arc.setType(javafx.scene.shape.ArcType.OPEN);
+		arc.setFill(Color.TRANSPARENT);
+		arc.setStroke(Color.web("#ffffff99"));
+		arc.setStrokeWidth(Math.max(2, size / 9));
+		arc.setStrokeLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
+		javafx.animation.RotateTransition spin = new javafx.animation.RotateTransition(javafx.util.Duration.millis(900), arc);
+		spin.setByAngle(360);
+		spin.setInterpolator(javafx.animation.Interpolator.LINEAR);
+		spin.setCycleCount(javafx.animation.Animation.INDEFINITE);
+		StackPane box = new StackPane(arc);
+		box.setMinSize(size + 4, size + 4);
+		box.setMaxSize(size + 4, size + 4);
+		box.sceneProperty().addListener((obs, oldScene, scene) -> {
+			if (scene != null) {
+				spin.play();
+			} else {
+				spin.stop();
 			}
 		});
+		box.setMouseTransparent(true);
+		return box;
 	}
 
 	/** A 3D-rendered cape image (cached per cape and size). FX thread. */
@@ -227,6 +322,45 @@ public final class CosmeticUi {
 	 */
 	static VBox capeCard(Image thumbnail, String title, Node footer, boolean selected, Runnable onClick) {
 		return capeCard(null, null, thumbnail, title, footer, selected, onClick);
+	}
+
+	/**
+	 * A cape card that shows at once with a spinner and fills in when {@code loader} delivers the frames
+	 * (decoded off the UI thread). The animated cape plays while hovered.
+	 */
+	static VBox capeCardLazy(String key, java.util.function.Consumer<Consumer<List<GifFrames.Frame>>> loader, String title, Node footer,
+			boolean selected, Runnable onClick) {
+		StackPane stage = stage(150, 150);
+		stage.getChildren().add(spinner(26));
+		Label name = new Label(title);
+		name.getStyleClass().add("cape-card-title");
+		name.setMaxWidth(150);
+		VBox card = new VBox(8, stage, name);
+		if (footer != null) {
+			card.getChildren().add(footer);
+		}
+		card.getStyleClass().addAll("cape-card", "motion-card");
+		if (selected) {
+			card.getStyleClass().add("cape-card-selected");
+		}
+		card.setOnMouseClicked(e -> onClick.run());
+		loader.accept(frames -> {
+			if (frames.isEmpty()) {
+				stage.getChildren().clear();
+				return;
+			}
+			ImageView view = new ImageView(thumbnail(key, frames, 150, 150));
+			view.setFitWidth(130);
+			view.setFitHeight(140);
+			view.setPreserveRatio(true);
+			view.setOpacity(0);
+			stage.getChildren().setAll(view);
+			javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(javafx.util.Duration.millis(220), view);
+			fade.setToValue(1);
+			fade.play();
+			animate(card, view, key, frames, 150, 150, false);
+		});
+		return card;
 	}
 
 	/** A cape card whose animated cape plays while hovered. */

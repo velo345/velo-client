@@ -1,5 +1,6 @@
 package net.veloclient.launcher.ui;
 
+import java.util.function.Consumer;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import javafx.application.Platform;
@@ -90,14 +91,22 @@ public final class AccountProfileView {
 		stage.getChildren().add(loading);
 		CapeEntry equipped = CapeLibrary.equippedCapeId()
 				.flatMap(id -> CapeLibrary.listAll().stream().filter(c -> c.id().equals(id)).findFirst()).orElse(null);
+		stage.getChildren().setAll(CosmeticUi.spinner(34));
 		CosmeticUi.skin(session, skin -> {
-			var frames = equipped == null ? null : CosmeticUi.frames(equipped);
-			Node viewer = skin == null ? null : PlayerSkin3DView.createViewer(skin.pngBytes(), skin.slim(),
-					frames == null || frames.isEmpty() ? null : frames, true, 25, true);
-			if (viewer != null) {
-				stage.getChildren().setAll(viewer);
+			Consumer<java.util.List<net.veloclient.launcher.data.GifFrames.Frame>> show = frames -> {
+				Node viewer = skin == null ? null : PlayerSkin3DView.createViewer(skin.pngBytes(), skin.slim(),
+						frames == null || frames.isEmpty() ? null : frames, true, 25, true);
+				if (viewer != null) {
+					stage.getChildren().setAll(viewer);
+				} else {
+					loading.setText("Couldn't load your skin.");
+					stage.getChildren().setAll(loading);
+				}
+			};
+			if (equipped == null) {
+				show.accept(null);
 			} else {
-				loading.setText("Couldn't load your skin.");
+				CosmeticUi.framesAsync(equipped, show);
 			}
 		});
 

@@ -32,7 +32,20 @@ public final class GifFrames {
 	public record Result(List<Frame> frames, int width, int height) {
 	}
 
+	/** Largest width the launcher keeps cape frames at: plenty for cards and the 3D preview, a fraction of the memory of 512 px frames. */
+	public static final int PREVIEW_WIDTH = 256;
+
 	public static Result decode(InputStream in) throws IOException {
+		return decode(in, Integer.MAX_VALUE);
+	}
+
+	/**
+	 * Same, but every returned frame is scaled down to at most {@code maxWidth} wide (the GIF itself is
+	 * composited at full size first, so disposal methods still work). A 512 x 256 cape with 40 frames
+	 * is 21 MB decoded and about 5 MB at 256 px - the difference between a launcher that opens
+	 * Cosmetics instantly and one that runs out of memory.
+	 */
+	public static Result decode(InputStream in, int maxWidth) throws IOException {
 		ImageReader reader = ImageIO.getImageReadersByFormatName("gif").next();
 		try (ImageInputStream iis = ImageIO.createImageInputStream(in)) {
 			reader.setInput(iis, false);
@@ -84,7 +97,7 @@ public final class GifFrames {
 				g.drawImage(frameImage, left, top, null);
 				g.dispose();
 
-				frames.add(new Frame(deepCopy(canvas), normalizeDelay(delayCentiseconds)));
+				frames.add(new Frame(scaled(canvas, maxWidth), normalizeDelay(delayCentiseconds)));
 
 				if ("restoreToBackgroundColor".equals(disposal)) {
 					pendingClearRect = new int[] {left, top, frameImage.getWidth(), frameImage.getHeight()};
@@ -92,10 +105,41 @@ public final class GifFrames {
 					pendingRestorePrevious = true;
 				}
 			}
-			return new Result(frames, canvas != null ? canvas.getWidth() : 0, canvas != null ? canvas.getHeight() : 0);
+			BufferedImage first = frames.isEmpty() ? null : frames.get(0).image();
+			return new Result(frames, first != null ? first.getWidth() : 0, first != null ? first.getHeight() : 0);
 		} finally {
 			reader.dispose();
 		}
+	}
+
+	/** A copy of {@code source}, scaled down (smoothly) to {@code maxWidth} wide if it's wider. */
+	private static BufferedImage scaled(BufferedImage source, int maxWidth) {
+		if (source.getWidth() <= maxWidth) {
+			return deepCopy(source);
+		}
+		int w = maxWidth;
+		int h = Math.max(1, Math.round(source.getHeight() * (maxWidth / (float) source.getWidth())));
+		BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D g = out.createGraphics();
+		g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+		g.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING, java.awt.RenderingHints.VALUE_RENDER_QUALITY);
+		// Step down in halves so large reductions stay smooth (a single bilinear step would alias).
+		BufferedImage step = source;
+		int sw = source.getWidth();
+		int sh = source.getHeight();
+		while (sw / 2 >= w) {
+			sw /= 2;
+			sh = Math.max(1, sh / 2);
+			BufferedImage half = new BufferedImage(sw, sh, BufferedImage.TYPE_INT_ARGB);
+			Graphics2D hg = half.createGraphics();
+			hg.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+			hg.drawImage(step, 0, 0, sw, sh, null);
+			hg.dispose();
+			step = half;
+		}
+		g.drawImage(step, 0, 0, w, h, null);
+		g.dispose();
+		return out;
 	}
 
 	private static int normalizeDelay(int delayCentiseconds) {

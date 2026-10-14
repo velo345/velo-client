@@ -187,10 +187,11 @@ public final class StoreView {
 				var items = StoreCatalog.all().stream().filter(i -> i.inStore() || StoreOwnership.owns(i.id())).toList();
 				Label title = new Label("Animated capes  ·  " + items.size());
 				title.getStyleClass().add("section-label");
+				root.getChildren().add(discordBanner());
 				FlowPane grid = new FlowPane(14, 14);
 				for (StoreItem item : items) {
 					boolean owned = StoreOwnership.owns(item.id());
-					grid.getChildren().add(CosmeticUi.capeCard("store:" + item.id(), CosmeticUi.frames(item),
+					grid.getChildren().add(CosmeticUi.capeCardLazy("store:" + item.id(), done -> CosmeticUi.framesAsync(item, done),
 							item.name(), CosmeticUi.priceChip(item.priceCoins(), owned), false, () -> host.openItem(item)));
 				}
 				UiMotion.stagger(grid, 24);
@@ -214,6 +215,81 @@ public final class StoreView {
 		}
 		UiMotion.stagger(grid, 24);
 		return grid;
+	}
+
+	/**
+	 * "Velo Neon - free: join our Discord and link your account". Shows your link status (loaded off the UI
+	 * thread); the button gets a code to type as /link in the Discord.
+	 */
+	private static Node discordBanner() {
+		Label title = new Label("Velo Neon cape  ·  free with Discord");
+		title.getStyleClass().add("settings-card-title");
+		Label text = new Label("Join the Velo Discord and link your Minecraft account to unlock it - it isn't sold in the Store.");
+		text.getStyleClass().add("page-subtitle");
+		text.setWrapText(true);
+		Label status = new Label("Checking...");
+		status.getStyleClass().add("page-subtitle");
+		Button getCode = new Button("Get my link code");
+		getCode.getStyleClass().add("primary-button");
+		getCode.setDisable(true);
+		Button join = new Button("Join the Discord");
+		join.getStyleClass().add("ghost-button");
+		join.setDisable(true);
+		String[] invite = {""};
+		HBox actions = new HBox(8, getCode, join, status);
+		actions.setAlignment(Pos.CENTER_LEFT);
+		VBox box = new VBox(8, title, text, actions);
+		box.getStyleClass().add("settings-card");
+		join.setOnAction(e -> CoinsView.openUrl(invite[0]));
+		java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+			try {
+				return net.veloclient.launcher.social.StoreApi.discordStatus();
+			} catch (net.veloclient.launcher.social.StoreApi.StoreError e) {
+				return null;
+			}
+		}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> javafx.application.Platform.runLater(() -> {
+			if (result == null) {
+				status.setText("Sign in to link your Discord.");
+				return;
+			}
+			invite[0] = result.get("inviteUrl").getAsString();
+			join.setDisable(invite[0].isBlank());
+			if (result.get("linked").getAsBoolean()) {
+				status.setText("✓ Linked as " + result.get("discordName").getAsString() + " - the cape is in your Cosmetics.");
+				getCode.setDisable(true);
+				getCode.setText("Linked");
+			} else {
+				status.setText("");
+				getCode.setDisable(false);
+			}
+		}));
+		getCode.setOnAction(e -> {
+			getCode.setDisable(true);
+			status.setText("Getting a code...");
+			java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+				try {
+					return (Object) net.veloclient.launcher.social.StoreApi.discordCode();
+				} catch (net.veloclient.launcher.social.StoreApi.StoreError error) {
+					return error.getMessage();
+				}
+			}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> javafx.application.Platform.runLater(() -> {
+				getCode.setDisable(false);
+				if (result instanceof com.google.gson.JsonObject json) {
+					String code = json.get("code").getAsString();
+					javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+					content.putString("/link " + code);
+					javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+					status.setText("Copied!  Type  /link " + code + "  in the Discord (valid " + json.get("expiresInSeconds").getAsLong() / 60 + " min).");
+					if (invite[0].isBlank() && json.has("inviteUrl")) {
+						invite[0] = json.get("inviteUrl").getAsString();
+						join.setDisable(invite[0].isBlank());
+					}
+				} else {
+					status.setText(String.valueOf(result));
+				}
+			}));
+		});
+		return box;
 	}
 
 	/** An aura: itself, live, around a dim player shape; name; price / Owned / Equipped. */

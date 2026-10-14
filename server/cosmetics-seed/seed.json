@@ -461,13 +461,14 @@
 			"id": "cape_velo_neon",
 			"type": "cape",
 			"name": "Velo Neon",
-			"description": "The Velo logo traced in red neon - sparks race around it over a scrolling synthwave grid.",
-			"price": 1800,
-			"status": "testing",
+			"description": "The Velo logo traced in red neon - sparks race around it over a scrolling synthwave grid. Free: join the Velo Discord and link your account.",
+			"status": "released",
 			"collection": "velo_originals",
 			"files": {
 				"gif": "capes/velo_neon.gif"
-			}
+			},
+			"unlock": "discord",
+			"price": 0
 		},
 		{
 			"id": "cape_wildfire",

@@ -89,6 +89,30 @@ public final class StoreService {
 		return config;
 	}
 
+	/** Told when a real-money coin pack was credited (the donation announcements in Discord). */
+	public interface PurchaseListener {
+		void coinsPurchased(StoreDatabase.Order order, String username, int balance);
+	}
+
+	private volatile PurchaseListener purchaseListener;
+
+	public void setPurchaseListener(PurchaseListener listener) {
+		this.purchaseListener = listener;
+	}
+
+	public StoreDatabase database() {
+		return db;
+	}
+
+	/** Gives a cosmetic without charging (system grants such as the Discord link reward); true if it's new to the player. */
+	public boolean grantSystem(String uuid, String username, String itemId, String actor) throws Exception {
+		if (!knownItem(itemId)) {
+			throw new StoreException(404, "Unknown item " + itemId);
+		}
+		db.touchWallet(uuid, username);
+		return db.grantItem(uuid, itemId, actor);
+	}
+
 	public void setCosmetics(CosmeticsService cosmetics) {
 		this.cosmetics = cosmetics;
 	}
@@ -265,6 +289,14 @@ public final class StoreService {
 			}
 			if (db.completeOrder(orderId, txn)) {
 				System.out.println("[store] Credited " + order.coins() + " coins to " + order.uuid() + " for " + txn);
+				PurchaseListener listener = purchaseListener;
+				if (listener != null) {
+					try {
+						listener.coinsPurchased(order, db.username(order.uuid()), db.balance(order.uuid()));
+					} catch (Exception e) {
+						System.out.println("[store] Purchase announcement failed: " + e.getMessage());
+					}
+				}
 			}
 		}
 	}

@@ -228,6 +228,11 @@ public final class StoreClient {
 		async(() -> post("/v1/admin/store/coins", body), onOk, onError);
 	}
 
+	/** A code to type as {@code /link <code>} in the Velo Discord (unlocks the Velo Neon cape). */
+	public static void discordCode(Consumer<JsonObject> onOk, Consumer<String> onError) {
+		async(() -> post("/v1/discord/code", new JsonObject()), onOk, onError);
+	}
+
 	/** Gives ({@code grant}) or takes away a cosmetic (any status - testing items too). */
 	public static void adminItem(String target, String itemId, boolean grant, Consumer<JsonObject> onOk, Consumer<String> onError) {
 		JsonObject body = new JsonObject();

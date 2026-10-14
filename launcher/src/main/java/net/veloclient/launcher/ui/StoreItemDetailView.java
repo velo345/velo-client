@@ -52,19 +52,44 @@ public final class StoreItemDetailView {
 		// Left: your skin wearing the cape, turning slowly with the cape facing you first.
 		StackPane stage = CosmeticUi.stage(340, 420);
 		stage.getStyleClass().add("showcase-stage");
-		Label loading = new Label(host.session() == null ? "Sign in to preview this on your own skin" : "Loading preview...");
-		loading.getStyleClass().add("page-subtitle");
-		loading.setWrapText(true);
-		stage.getChildren().add(loading);
-		var frames = CosmeticUi.frames(item);
-		CosmeticUi.skin(host.session(), skin -> {
-			Node viewer = skin == null ? null
-					: PlayerSkin3DView.createShowcase(skin.pngBytes(), skin.slim(), frames.isEmpty() ? null : frames);
+		if (host.session() == null) {
+			Label signIn = new Label("Sign in to preview this on your own skin");
+			signIn.getStyleClass().add("page-subtitle");
+			signIn.setWrapText(true);
+			stage.getChildren().add(signIn);
+		} else {
+			stage.getChildren().add(CosmeticUi.spinner(34));
+		}
+		Label tag = new Label("CAPE");
+		// The skin and the cape's frames load off the UI thread; the page is already up.
+		java.util.List<net.veloclient.launcher.data.GifFrames.Frame>[] loaded = new java.util.List[1];
+		net.veloclient.launcher.auth.SkinFetcher.SkinData[] skinData = new net.veloclient.launcher.auth.SkinFetcher.SkinData[1];
+		boolean[] arrived = new boolean[2];
+		Runnable build = () -> {
+			if (!arrived[0] || !arrived[1]) {
+				return;
+			}
+			var frames = loaded[0] == null ? java.util.List.<net.veloclient.launcher.data.GifFrames.Frame>of() : loaded[0];
+			tag.setText(frames.size() > 1 ? "CAPE  ·  ANIMATED" : "CAPE");
+			Node viewer = skinData[0] == null ? null
+					: PlayerSkin3DView.createShowcase(skinData[0].pngBytes(), skinData[0].slim(), frames.isEmpty() ? null : frames);
 			if (viewer != null) {
 				stage.getChildren().setAll(viewer);
 			} else if (!frames.isEmpty()) {
 				stage.getChildren().setAll(new javafx.scene.image.ImageView(CosmeticUi.thumbnail("store:" + item.id(), frames, 300, 340)));
+			} else {
+				stage.getChildren().clear();
 			}
+		};
+		CosmeticUi.framesAsync(item, f -> {
+			loaded[0] = f;
+			arrived[1] = true;
+			build.run();
+		});
+		CosmeticUi.skin(host.session(), data -> {
+			skinData[0] = data;
+			arrived[0] = true;
+			build.run();
 		});
 		Label hint = new Label("Drag to rotate  ·  scroll to zoom");
 		hint.getStyleClass().add("stage-hint");
@@ -74,7 +99,6 @@ public final class StoreItemDetailView {
 
 		// Right: details and the purchase action.
 		boolean owned = StoreOwnership.owns(item.id());
-		Label tag = new Label(frames.size() > 1 ? "CAPE  ·  ANIMATED" : "CAPE");
 		tag.getStyleClass().add("featured-tag");
 		Label name = new Label(item.name());
 		name.getStyleClass().add("featured-title");

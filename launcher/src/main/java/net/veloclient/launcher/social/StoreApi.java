@@ -150,6 +150,16 @@ public final class StoreApi {
 		return post("/v1/admin/store/item", body);
 	}
 
+	/** Whether your Discord is linked ({@code linked}, {@code discordName}) and the invite link ({@code inviteUrl}). */
+	public static JsonObject discordStatus() throws StoreError {
+		return get("/v1/discord/status");
+	}
+
+	/** A code to type as {@code /link <code>} in the Velo Discord ({@code code}, {@code expiresInSeconds}, {@code inviteUrl}). */
+	public static JsonObject discordCode() throws StoreError {
+		return post("/v1/discord/code", new JsonObject());
+	}
+
 	/** Every cosmetic with status, price, window and files; collections; the featured one (owner only). */
 	public static JsonObject adminCosmetics() throws StoreError {
 		return get("/v1/admin/cosmetics");

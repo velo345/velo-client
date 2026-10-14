@@ -304,7 +304,44 @@ public final class LauncherApp extends Application {
 		if (extra.contains("signin")) {
 			steps.add(new Object[] {"07-signin", (Runnable) () -> net.veloclient.launcher.ui.SignInDialog.demo(stage, theme)});
 		}
+		if (System.getProperty("velo.launcherFps") != null) {
+			startFpsLog();
+		}
 		runTourStep(folder, steps, 0);
+	}
+
+	/** The tour page being shown (for the dev FPS log). */
+	private static volatile String tourPage = "";
+
+	/**
+	 * Dev-only ({@code -Dvelo.launcherFps}): logs frames per second and the slowest frame every two
+	 * seconds, with the tour page - to compare pages before and after performance work.
+	 */
+	private static void startFpsLog() {
+		new javafx.animation.AnimationTimer() {
+			private long windowStart;
+			private long last;
+			private int frames;
+			private long worst;
+
+			@Override
+			public void handle(long now) {
+				if (last != 0) {
+					worst = Math.max(worst, now - last);
+				}
+				last = now;
+				frames++;
+				if (windowStart == 0) {
+					windowStart = now;
+				} else if (now - windowStart >= 2_000_000_000L) {
+					LauncherLog.info(String.format(java.util.Locale.ROOT, "FPS %-20s %5.1f fps, worst frame %4.0f ms", tourPage,
+							frames / ((now - windowStart) / 1e9), worst / 1e6));
+					windowStart = now;
+					frames = 0;
+					worst = 0;
+				}
+			}
+		}.start();
 	}
 
 	private void runTourStep(java.nio.file.Path folder, List<Object[]> steps, int index) {
@@ -315,7 +352,10 @@ public final class LauncherApp extends Application {
 		javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(Duration.millis(index == 0 ? 2500 : 300));
 		wait.setOnFinished(e -> {
 			((Runnable) steps.get(index)[1]).run();
-			javafx.animation.PauseTransition shoot = new javafx.animation.PauseTransition(Duration.millis(2600));
+			tourPage = (String) steps.get(index)[0];
+			// -Dvelo.launcherTourDwell=8000: stay longer on each page (performance profiling).
+			javafx.animation.PauseTransition shoot = new javafx.animation.PauseTransition(Duration.millis(
+					Long.getLong("velo.launcherTourDwell", 2600)));
 			shoot.setOnFinished(ev -> {
 				try {
 					javafx.stage.Window target = javafx.stage.Window.getWindows().stream()
@@ -1330,32 +1370,55 @@ public final class LauncherApp extends Application {
 		if (session == null) {
 			return;
 		}
-		CompletableFuture.supplyAsync(() -> SkinFetcher.fetch(session), Executors.newVirtualThreadPerTaskExecutor())
-				.thenAccept(skin -> Platform.runLater(() -> {
-					if (skin == null || homePlayerHolder == null) {
-						return;
-					}
-					// Wearing your equipped cosmetics: cape, wings and aura (turning slowly so the back shows too).
-					var cape = net.veloclient.launcher.data.CapeLibrary.equippedCapeId().flatMap(id -> net.veloclient.launcher.data.CapeLibrary.listAll()
-							.stream().filter(c -> c.id().equals(id)).findFirst()).orElse(null);
-					String wingsId = net.veloclient.launcher.data.WingsCatalog.equipped();
-					boolean wings = wingsId != null && net.veloclient.launcher.data.WingsCatalog.byId(wingsId).isPresent();
-					String auraId = net.veloclient.launcher.data.AuraCatalog.equipped();
-					boolean dressed = cape != null || wings || auraId != null;
-					Node viewer = PlayerSkin3DView.createViewer(skin.pngBytes(), skin.slim(),
-							cape == null ? null : net.veloclient.launcher.ui.CosmeticUi.frames(cape), false, 20, dressed, !wings ? null : model -> {
-								net.veloclient.launcher.ui.Wings3D w = new net.veloclient.launcher.ui.Wings3D(model);
-								w.settings(net.veloclient.launcher.data.WingsCatalog.settings(wingsId));
-								w.show(wingsId);
-							});
-					if (viewer != null) {
-						if (auraId != null) {
-							var auraSettings = net.veloclient.launcher.data.AuraCatalog.settings(auraId);
-							net.veloclient.launcher.ui.AuraFx.attach(viewer, () -> new net.veloclient.launcher.ui.AuraFx.Shown(auraId, auraSettings));
-						}
-						homePlayerHolder.getChildren().setAll(viewer);
-					}
-				}));
+		// A spinner while the skin (and your cape's frames) load - off the UI thread, so Home opens at once.
+		if (homePlayerHolder != null && homePlayerHolder.getChildren().isEmpty()) {
+			homePlayerHolder.getChildren().setAll(net.veloclient.launcher.ui.CosmeticUi.spinner(30));
+		}
+		CompletableFuture.supplyAsync(() -> {
+			SkinFetcher.SkinData skin = SkinFetcher.fetch(session);
+			// Reading the cape library touches the disk: off the UI thread too.
+			var cape = net.veloclient.launcher.data.CapeLibrary.equippedCapeId().flatMap(id -> net.veloclient.launcher.data.CapeLibrary.listAll()
+					.stream().filter(c -> c.id().equals(id)).findFirst()).orElse(null);
+			// The cape's frames decode here too (cached for the Cosmetics page).
+			java.util.List<net.veloclient.launcher.data.GifFrames.Frame> frames = cape == null ? null : net.veloclient.launcher.ui.CosmeticUi.frames(cape);
+			return new Object[] {skin, frames, cape != null};
+		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
+			SkinFetcher.SkinData skin = (SkinFetcher.SkinData) result[0];
+			@SuppressWarnings("unchecked")
+			java.util.List<net.veloclient.launcher.data.GifFrames.Frame> frames = (java.util.List<net.veloclient.launcher.data.GifFrames.Frame>) result[1];
+			boolean hasCape = (boolean) result[2];
+			if (homePlayerHolder == null) {
+				return;
+			}
+			if (skin == null) {
+				homePlayerHolder.getChildren().clear();
+				return;
+			}
+			// Wearing your equipped cosmetics: cape, wings and aura (turning slowly so the back shows too).
+			String wingsId = net.veloclient.launcher.data.WingsCatalog.equipped();
+			boolean wings = wingsId != null && net.veloclient.launcher.data.WingsCatalog.byId(wingsId).isPresent();
+			String auraId = net.veloclient.launcher.data.AuraCatalog.equipped();
+			boolean dressed = hasCape || wings || auraId != null;
+			Node viewer = PlayerSkin3DView.createViewer(skin.pngBytes(), skin.slim(), frames == null || frames.isEmpty() ? null : frames,
+					false, 20, dressed, !wings ? null : model -> {
+						net.veloclient.launcher.ui.Wings3D w = new net.veloclient.launcher.ui.Wings3D(model);
+						w.settings(net.veloclient.launcher.data.WingsCatalog.settings(wingsId));
+						w.show(wingsId);
+					});
+			if (viewer != null) {
+				if (auraId != null) {
+					var auraSettings = net.veloclient.launcher.data.AuraCatalog.settings(auraId);
+					net.veloclient.launcher.ui.AuraFx.attach(viewer, () -> new net.veloclient.launcher.ui.AuraFx.Shown(auraId, auraSettings));
+				}
+				viewer.setOpacity(0);
+				homePlayerHolder.getChildren().setAll(viewer);
+				javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(Duration.millis(260), viewer);
+				fade.setToValue(1);
+				fade.play();
+			} else {
+				homePlayerHolder.getChildren().clear();
+			}
+		}));
 	}
 
 	/** brush(rename)/copy(duplicate)/download(export)/delete, plus a RAM icon (per-profile memory settings) - the home screen's replacement for the old Profiles-grid card's action row. Manage mods (the gear) lives next to Play now, not in this row - see {@link #homeGearButton}. */

@@ -78,6 +78,13 @@ final class ReportService {
 		}
 	}
 
+	/** Told about every new report (the bug-report log in Discord). */
+	private volatile java.util.function.BiConsumer<Summary, Report> listener;
+
+	void setListener(java.util.function.BiConsumer<Summary, Report> listener) {
+		this.listener = listener;
+	}
+
 	String submit(Report incoming, String uuid, String username) throws IOException {
 		Report report = new Report();
 		report.id = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
@@ -95,7 +102,16 @@ final class ReportService {
 		report.crash = clip(incoming.crash, MAX_LOG_CHARS);
 		report.auto = incoming.auto;
 		write(report);
-		index.put(report.id, summary(report));
+		Summary summary = summary(report);
+		index.put(report.id, summary);
+		var notify = listener;
+		if (notify != null) {
+			try {
+				notify.accept(summary, report);
+			} catch (RuntimeException e) {
+				System.out.println("[reports] Discord notification failed: " + e.getMessage());
+			}
+		}
 		return report.id;
 	}
 

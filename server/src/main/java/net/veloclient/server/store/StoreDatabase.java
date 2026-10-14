@@ -133,6 +133,16 @@ public final class StoreDatabase implements AutoCloseable {
 		}
 	}
 
+	/** The last username seen for a wallet (null if none). */
+	public synchronized String username(String uuid) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("SELECT username FROM wallets WHERE uuid = ?")) {
+			ps.setString(1, uuid);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getString(1) : null;
+			}
+		}
+	}
+
 	public synchronized int balance(String uuid) throws SQLException {
 		try (PreparedStatement ps = connection.prepareStatement("SELECT balance FROM wallets WHERE uuid = ?")) {
 			ps.setString(1, uuid);

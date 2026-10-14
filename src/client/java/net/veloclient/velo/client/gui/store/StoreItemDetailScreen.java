@@ -41,13 +41,25 @@ public final class StoreItemDetailScreen extends VeloWindow {
 		super(Text.literal(item.name()), 480, 360);
 		this.item = item;
 		returnTo(parent);
+		trySetPreview();
+		onClosed(CapeManager::clearPreviewOverride);
+	}
+
+	private boolean previewSet;
+
+	/** Shows the cape on you; a server-only cape's art may still be downloading - this is tried again every frame until it's there. */
+	private void trySetPreview() {
+		if (previewSet || !StoreAssets.ready(item)) {
+			return;
+		}
 		try {
 			CapeManager.setPreviewOverride(
 					CapeManager.previewDefinitionFor(item.id(), item.name(), StoreAssets.openGif(item), CapePhysicsPreset.defaults()));
+			previewSet = true;
 		} catch (java.io.IOException | RuntimeException e) {
+			previewSet = true; // don't retry a broken file every frame
 			net.veloclient.velo.VeloClient.LOGGER.error("Failed to build Store preview for {}", item.id(), e);
 		}
-		onClosed(CapeManager::clearPreviewOverride);
 	}
 
 	@Override
@@ -130,6 +142,7 @@ public final class StoreItemDetailScreen extends VeloWindow {
 
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+		trySetPreview();
 		super.render(context, mouseX, mouseY, delta);
 		int previewWidth = contentWidth() * 2 / 5;
 		int infoX = contentX() + previewWidth + 16;

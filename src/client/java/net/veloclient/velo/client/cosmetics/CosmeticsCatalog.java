@@ -191,6 +191,8 @@ public final class CosmeticsCatalog {
 				Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 				pending.remove(sha256);
 				version++;
+				// An owned server-only cape can be put in the library now.
+				net.veloclient.velo.client.store.StoreRestore.scheduleRestore();
 			} catch (Exception e) {
 				pending.put(sha256, System.currentTimeMillis());
 				VeloClient.LOGGER.debug("Couldn't download cosmetic file {}: {}", sha256, e.toString());
