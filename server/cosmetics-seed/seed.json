@@ -30,6 +30,12 @@
 			"name": "Auras",
 			"tag": "AURA COLLECTION",
 			"description": "Animated auras that live around you - stars, embers, snow, a void rift, lightning, code rain, fire, nature, hearts and northern lights. Pick a colour, size and speed."
+		},
+		{
+			"id": "velo_originals",
+			"name": "Velo Originals",
+			"tag": "CAPE COLLECTION",
+			"description": "High-res animated capes: the Velo logo in neon, wildfire, glacier, two thunderstorms, gold glyphs - and black and white designs."
 		}
 	],
 	"items": [
@@ -179,7 +185,7 @@
 			"name": "Digitized",
 			"description": "Shifting black geometric weave.",
 			"price": 900,
-			"status": "released",
+			"status": "hidden",
 			"files": {
 				"gif": "client/capes/cape_black_pattern.gif"
 			}
@@ -190,7 +196,7 @@
 			"name": "Codebreaker",
 			"description": "Scrolling red code cascades down the fabric.",
 			"price": 1000,
-			"status": "released",
+			"status": "hidden",
 			"files": {
 				"gif": "client/capes/cape_red_code.gif"
 			}
@@ -201,7 +207,7 @@
 			"name": "Storm Strike",
 			"description": "Crackling red lightning arcs across the cloth.",
 			"price": 1200,
-			"status": "released",
+			"status": "hidden",
 			"files": {
 				"gif": "client/capes/cape_red_lightning.gif"
 			}
@@ -212,7 +218,7 @@
 			"name": "Rune Weave",
 			"description": "Animated arcane symbols drift and glow.",
 			"price": 950,
-			"status": "released",
+			"status": "hidden",
 			"files": {
 				"gif": "client/capes/cape_symbols.gif"
 			}
@@ -450,6 +456,150 @@
 			"collection": "auras",
 			"accent": "#5cff9d",
 			"files": {}
+		},
+		{
+			"id": "cape_velo_neon",
+			"type": "cape",
+			"name": "Velo Neon",
+			"description": "The Velo logo traced in red neon - sparks race around it over a scrolling synthwave grid.",
+			"price": 1800,
+			"status": "testing",
+			"collection": "velo_originals",
+			"files": {
+				"gif": "capes/velo_neon.gif"
+			}
+		},
+		{
+			"id": "cape_wildfire",
+			"type": "cape",
+			"name": "Wildfire",
+			"description": "Flames roll up the cape and embers drift into the air.",
+			"price": 1600,
+			"status": "testing",
+			"collection": "velo_originals",
+			"files": {
+				"gif": "capes/wildfire.gif"
+			}
+		},
+		{
+			"id": "cape_glacier",
+			"type": "cape",
+			"name": "Glacier",
+			"description": "Ice crystals spread across a frozen cape, a shimmer sweeps over them and frost twinkles.",
+			"price": 1600,
+			"status": "testing",
+			"collection": "velo_originals",
+			"files": {
+				"gif": "capes/glacier.gif"
+			}
+		},
+		{
+			"id": "cape_thunderstrike",
+			"type": "cape",
+			"name": "Thunderstrike",
+			"description": "Violet storm clouds and rain - then forked purple lightning tears down the cape and lights up the sky.",
+			"price": 1700,
+			"status": "testing",
+			"collection": "velo_originals",
+			"files": {
+				"gif": "capes/thunderstrike.gif"
+			}
+		},
+		{
+			"id": "cape_hieroglyph",
+			"type": "cape",
+			"name": "Hieroglyph",
+			"description": "Gold glyphs on obsidian light up in waves while a highlight runs round the border.",
+			"price": 1700,
+			"status": "testing",
+			"collection": "velo_originals",
+			"files": {
+				"gif": "capes/hieroglyph.gif"
+			}
+		},
+		{
+			"id": "cape_crimson_storm",
+			"type": "cape",
+			"name": "Crimson Storm",
+			"description": "Blood-red storm clouds and rain, split by red lightning that lights up the whole sky.",
+			"price": 1700,
+			"status": "testing",
+			"collection": "velo_originals",
+			"files": {
+				"gif": "capes/crimson_storm.gif"
+			}
+		},
+		{
+			"id": "cape_obsidian",
+			"type": "cape",
+			"name": "Obsidian",
+			"description": "Glossy black stone with faint silver veins - an oil-slick sheen glides across it.",
+			"price": 1600,
+			"status": "testing",
+			"collection": "velo_originals",
+			"files": {
+				"gif": "capes/obsidian.gif"
+			}
+		},
+		{
+			"id": "cape_eclipse",
+			"type": "cape",
+			"name": "Eclipse",
+			"description": "A black sun among faint stars - its corona pulses and a flare licks round the rim.",
+			"price": 1800,
+			"status": "testing",
+			"collection": "velo_originals",
+			"files": {
+				"gif": "capes/eclipse.gif"
+			}
+		},
+		{
+			"id": "cape_phantom",
+			"type": "cape",
+			"name": "Phantom",
+			"description": "Wisps of dark smoke rise up the cape, glowing faintly violet at their edges.",
+			"price": 1700,
+			"status": "testing",
+			"collection": "velo_originals",
+			"files": {
+				"gif": "capes/phantom.gif"
+			}
+		},
+		{
+			"id": "cape_kintsugi",
+			"type": "cape",
+			"name": "Kintsugi",
+			"description": "White porcelain mended with gold - a glint of light runs down the golden cracks.",
+			"price": 1700,
+			"status": "testing",
+			"collection": "velo_originals",
+			"files": {
+				"gif": "capes/kintsugi.gif"
+			}
+		},
+		{
+			"id": "cape_heaven",
+			"type": "cape",
+			"name": "Heaven",
+			"description": "Soft white clouds drift by while golden rays of light fan down from above.",
+			"price": 1600,
+			"status": "testing",
+			"collection": "velo_originals",
+			"files": {
+				"gif": "capes/heaven.gif"
+			}
+		},
+		{
+			"id": "cape_pearl",
+			"type": "cape",
+			"name": "Pearl",
+			"description": "Iridescent pearl white - pastel colours shift with the light and sparkles come and go.",
+			"price": 1600,
+			"status": "testing",
+			"collection": "velo_originals",
+			"files": {
+				"gif": "capes/pearl.gif"
+			}
 		}
 	]
 }

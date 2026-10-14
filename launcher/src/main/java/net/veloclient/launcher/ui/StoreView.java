@@ -184,7 +184,7 @@ public final class StoreView {
 				root.getChildren().addAll(title, grid);
 			}
 			case CAPES -> {
-				var items = StoreCatalog.all();
+				var items = StoreCatalog.all().stream().filter(i -> i.inStore() || StoreOwnership.owns(i.id())).toList();
 				Label title = new Label("Animated capes  ·  " + items.size());
 				title.getStyleClass().add("section-label");
 				FlowPane grid = new FlowPane(14, 14);

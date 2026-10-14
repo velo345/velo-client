@@ -149,6 +149,12 @@ public final class WingsCatalog {
 					}
 				}
 			}
+			// Server-only capes' GIFs too.
+			for (JsonObject cape : serverItems("cape")) {
+				if (cape.has("files") && cape.getAsJsonObject("files").has("gif")) {
+					file(cape.getAsJsonObject("files").get("gif").getAsString());
+				}
+			}
 			return changed;
 		} catch (Exception e) {
 			return false;
@@ -203,6 +209,12 @@ public final class WingsCatalog {
 				.thenComparing(WingType::name));
 		catalog = List.copyOf(out);
 		collections = List.copyOf(cols);
+	}
+
+	/** Whether a server catalog (fresh or cached) is known. */
+	public static boolean serverLoaded() {
+		loadBundled();
+		return server != null;
 	}
 
 	/** The server catalog's raw items of one type ("aura", "cape"...), empty before it loaded. */

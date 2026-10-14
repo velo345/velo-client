@@ -28,7 +28,8 @@ public final class StoreCatalog {
 
 	private static StoreItem cape(String id, String name, String description, int priceCoins) {
 		Identifier gif = Identifier.of("velo-client", "textures/store/cape/" + id + ".gif");
-		return new StoreItem(id, StoreCategory.CAPES, name, description, priceCoins, gif, null, true);
+		// Not for sale any more (the Velo Originals replaced them) - still shown on whoever owns one.
+		return new StoreItem(id, StoreCategory.CAPES, name, description, priceCoins, gif, null, false);
 	}
 
 	private static synchronized List<StoreItem> items() {

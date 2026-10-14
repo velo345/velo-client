@@ -326,6 +326,23 @@ public final class ScreenshotTour {
 			case "replace" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.redstone.ReplaceScreen())},
 					new Object[] {30, (Runnable) () -> shot(client, "replace")});
+			case "capes" -> {
+				// -Dvelo.tourCapes=cape_a,cape_b: each cape's Store page (its art downloaded first).
+				List<Object[]> steps = new java.util.ArrayList<>();
+				String[] ids = System.getProperty("velo.tourCapes", "").split(",");
+				steps.add(new Object[] {0, (Runnable) () -> net.veloclient.velo.client.cosmetics.CosmeticsCatalog.refresh(true)});
+				steps.add(new Object[] {60, (Runnable) () -> {
+					for (String id : ids) {
+						net.veloclient.velo.client.store.StoreCatalog.byId(id).ifPresent(net.veloclient.velo.client.store.StoreAssets::ready);
+					}
+				}});
+				for (String id : ids) {
+					steps.add(new Object[] {60, (Runnable) () -> net.veloclient.velo.client.store.StoreCatalog.byId(id).ifPresent(item ->
+							client.setScreen(new net.veloclient.velo.client.gui.store.StoreItemDetailScreen(null, item)))});
+					steps.add(new Object[] {40, (Runnable) () -> shot(client, "cape-" + id)});
+				}
+				yield steps;
+			}
 			case "pause" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))},
 					new Object[] {30, (Runnable) () -> shot(client, "pause")});
