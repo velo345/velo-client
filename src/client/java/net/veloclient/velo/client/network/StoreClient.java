@@ -45,8 +45,8 @@ public final class StoreClient {
 	private static volatile boolean owner;
 	private static volatile boolean plus;
 	private static volatile long plusUntil;
-	private static volatile double plusPrice = 4.99;
-	private static volatile int plusMonthlyCoins = 1200;
+	private static volatile double plusPrice = 8.99;
+	private static volatile int plusMonthlyCoins = 2500;
 	private static volatile String currency = "EUR";
 	private static volatile List<CoinPack> packs = List.of();
 	private static volatile boolean checkoutEnabled;

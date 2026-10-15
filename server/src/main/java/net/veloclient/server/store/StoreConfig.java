@@ -96,9 +96,9 @@ public final class StoreConfig {
 
 	/** The Velo+ subscription: what it costs (shown), how long a payment lasts, and the monthly coins it includes. */
 	public static final class Plus {
-		public double price = 4.99;
+		public double price = 8.99;
 		public int periodDays = 30;
-		public int monthlyCoins = 1200;
+		public int monthlyCoins = 2500;
 	}
 
 	public Plus plus = new Plus();

@@ -459,7 +459,7 @@ an item is never sold, whatever its status). See `bot/README.md`.
 ## Velo+ (subscription)
 
 Velo+ = the Velo badge with a red plus, the VIP Discord role, **monthly Velo Coins** (`plus.monthlyCoins` in
-`store.json`, default 1200) and the **Velo Client Addons**. A membership is just an end date per player
+`store.json`, default 2500, price 8.99 EUR) and the **Velo Client Addons**. A membership is just an end date per player
 (`store.db`, table `plus`): the Tebex subscription extends it by a month per payment (`POST /v1/plus/checkout`
 creates the basket; `payment.completed` and `recurring-payment.renewed` webhooks extend it, a refund takes the days
 back), and the owner can give or end it by days in the launcher (Store > Owner panel > Players). The coins are paid
