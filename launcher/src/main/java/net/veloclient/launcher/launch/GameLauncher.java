@@ -211,6 +211,11 @@ public final class GameLauncher {
 
 		Downloader.saveVerifiedIndex();
 		String java = runtime.binary().toString();
+		if (java.regionMatches(true, java.length() - 8, "java.exe", 0, 8) && Files.isRegularFile(Path.of(java.substring(0, java.length() - 8) + "javaw.exe"))) {
+			// Discord only recognises Minecraft as a game when it runs as javaw.exe (with Fabric's -DFabricMcEmu argument, which the
+			// Fabric profile adds) - started as java.exe it never gets the game overlay or "Playing Minecraft". Same as Mojang's launcher.
+			java = java.substring(0, java.length() - 8) + "javaw.exe";
+		}
 		WindowsGpuPreference.preferHighPerformance(Path.of(java));
 		List<String> command = new ArrayList<>();
 		command.add(java);

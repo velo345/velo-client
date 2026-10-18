@@ -141,6 +141,7 @@ public final class StoreView {
 		}
 		switch (page) {
 			case FEATURED -> {
+				root.getChildren().add(discordBanner());
 				if (!featuredWings.isEmpty()) {
 					root.getChildren().add(buildWingsHero(host, featured, featuredWings));
 					Label title = new Label("The collection");
@@ -336,7 +337,7 @@ public final class StoreView {
 
 	/**
 	 * "Velo Neon - free: join our Discord and link your account". Shows your link status (loaded off the UI
-	 * thread); the button gets a code to type as /link in the Discord.
+	 * thread); the button copies a code to paste in the Discord's configured link channel.
 	 */
 	private static Node discordBanner() {
 		Label title = new Label("Velo Neon cape  ·  free with Discord");
@@ -346,7 +347,7 @@ public final class StoreView {
 		text.setWrapText(true);
 		Label status = new Label("Checking...");
 		status.getStyleClass().add("page-subtitle");
-		Button getCode = new Button("Get my link code");
+		Button getCode = new Button("Copy link code");
 		getCode.getStyleClass().add("primary-button");
 		getCode.setDisable(true);
 		Button join = new Button("Join the Discord");
@@ -369,9 +370,9 @@ public final class StoreView {
 				status.setText("Sign in to link your Discord.");
 				return;
 			}
-			invite[0] = result.get("inviteUrl").getAsString();
+			invite[0] = result.has("inviteUrl") && !result.get("inviteUrl").isJsonNull() ? result.get("inviteUrl").getAsString() : "";
 			join.setDisable(invite[0].isBlank());
-			if (result.get("linked").getAsBoolean()) {
+			if (result.has("linked") && result.get("linked").getAsBoolean()) {
 				status.setText("✓ Linked as " + result.get("discordName").getAsString() + " - the cape is in your Cosmetics.");
 				getCode.setDisable(true);
 				getCode.setText("Linked");
@@ -394,9 +395,10 @@ public final class StoreView {
 				if (result instanceof com.google.gson.JsonObject json) {
 					String code = json.get("code").getAsString();
 					javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
-					content.putString("/link " + code);
+					content.putString(code);
 					javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
-					status.setText("Copied!  Type  /link " + code + "  in the Discord (valid " + json.get("expiresInSeconds").getAsLong() / 60 + " min).");
+					status.setText("Copied! Paste the code in the Discord link channel (valid "
+							+ json.get("expiresInSeconds").getAsLong() / 60 + " min).");
 					if (invite[0].isBlank() && json.has("inviteUrl")) {
 						invite[0] = json.get("inviteUrl").getAsString();
 						join.setDisable(invite[0].isBlank());
@@ -413,8 +415,12 @@ public final class StoreView {
 	private static Node auraCard(Host host, net.veloclient.launcher.data.AuraCatalog.AuraType type) {
 		String accent = type.accent();
 		boolean owned = net.veloclient.launcher.data.AuraCatalog.owns(type.id());
-		Node canvas = AuraFx.card(type.kind(), () -> owned ? net.veloclient.launcher.data.AuraCatalog.settings(type.id())
-				: net.veloclient.velo.client.cosmetics.aura.AuraEffects.Settings.DEFAULT, 190, 150);
+		var settings = owned ? net.veloclient.launcher.data.AuraCatalog.settings(type.id())
+				: net.veloclient.velo.client.cosmetics.aura.AuraEffects.Settings.DEFAULT;
+		ImageView canvas = new ImageView(AuraFx.snapshot(type.kind(), settings, 190, 150));
+		canvas.setFitWidth(190);
+		canvas.setFitHeight(150);
+		canvas.setPreserveRatio(false);
 		StackPane art = new StackPane(canvas);
 		art.setPrefSize(190, 150);
 		art.setMinSize(190, 150);

@@ -45,8 +45,7 @@ public final class StoreItemDetailView {
 	}
 
 	public static Node build(Host host, StoreItem item) {
-		Button back = new Button("‹  Store");
-		back.getStyleClass().add("ghost-button");
+		Button back = BackButton.create("Store", null);
 		back.setOnAction(e -> host.goBack());
 
 		// Left: your skin wearing the cape, turning slowly with the cape facing you first.

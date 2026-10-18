@@ -276,8 +276,7 @@ public final class MediaView {
 	private void openViewer(Item item) {
 		stopPlayback();
 		List<Item> siblings = shown();
-		Button back = new Button("←  Back");
-		back.getStyleClass().add("ghost-button");
+		Button back = BackButton.create(null, null);
 		back.setOnAction(e -> closeViewer());
 		Label title = new Label(label(item));
 		title.getStyleClass().add("page-title");

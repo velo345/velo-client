@@ -459,7 +459,7 @@ public final class FriendsScreen extends VeloWindow {
 		if (party == null) {
 			int lineY = y + 10;
 			for (String line : VeloUi.wrap("Play together: party chat (/" + net.veloclient.velo.client.social.PartyChat.commandName()
-					+ "), pings for your party (V), shared waypoints and launching together from the launcher.", width - 24)) {
+					+ "), pings for your party, live positions on the world map, shared waypoints and launching together from the launcher.", width - 24)) {
 				context.drawTextWithShadow(this.textRenderer, line, x + 12, lineY, VeloUi.muted());
 				lineY += 11;
 			}
@@ -476,6 +476,26 @@ public final class FriendsScreen extends VeloWindow {
 		context.drawTextWithShadow(this.textRenderer, "PARTY  " + members.size() + "/8", x + 10, y + 2, VeloUi.muted());
 		hits.add(VeloUi.pill(context, x + width - 58, y - 2, 50, 14, "Leave", 3, mouseX, mouseY,
 				() -> report(SocialClient.partyLeave(), "You left the party")));
+		// Opt-in extras, off for every new party: your live position on the party's maps, and (leader) asking everyone to follow you.
+		int toggleX = x + width - 58 - 4;
+		if (leader) {
+			boolean follow = net.veloclient.velo.client.social.PartyFollow.requesting();
+			toggleX -= 62;
+			hits.add(VeloUi.pill(context, toggleX, y - 2, 58, 14, "Follow me", follow ? 1 : 0, mouseX, mouseY,
+					() -> net.veloclient.velo.client.social.PartyFollow.setRequesting(!net.veloclient.velo.client.social.PartyFollow.requesting())));
+			toggleX -= 4;
+		}
+		if (net.veloclient.velo.client.social.PartyVoice.available()) {
+			boolean voiceOn = SocialSettings.voiceGroup();
+			toggleX -= 76;
+			hits.add(VeloUi.pill(context, toggleX, y - 2, 72, 14, "Voice group", voiceOn ? 1 : 0, mouseX, mouseY,
+					() -> SocialSettings.setVoiceGroup(!SocialSettings.voiceGroup())));
+			toggleX -= 4;
+		}
+		boolean sharing = net.veloclient.velo.client.worldmap.PartyLocator.sharing();
+		toggleX -= 86;
+		hits.add(VeloUi.pill(context, toggleX, y - 2, 82, 14, "Share location", sharing ? 1 : 0, mouseX, mouseY,
+				() -> net.veloclient.velo.client.worldmap.PartyLocator.setSharing(!net.veloclient.velo.client.worldmap.PartyLocator.sharing())));
 		y += 16;
 		int slot = 44;
 		int hx = x + 10;
@@ -506,6 +526,14 @@ public final class FriendsScreen extends VeloWindow {
 			}
 		}
 		y += 44;
+		String[] voice = net.veloclient.velo.client.social.PartyVoice.current();
+		if (voice != null) {
+			String line = "Voice chat group: " + voice[0] + "   password: " + voice[1];
+			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(line, width - 90), x + 10, y + 2, VeloUi.muted());
+			String password = voice[1];
+			hits.add(VeloUi.pill(context, x + width - 72, y - 2, 62, 14, "Copy", 0, mouseX, mouseY, () -> MinecraftClient.getInstance().keyboard.setClipboard(password)));
+			y += 16;
+		}
 		if (leader && partyMember != null) {
 			String target = partyMember;
 			hits.add(VeloUi.pill(context, x + 10, y, 90, 16, "Make leader", 1, mouseX, mouseY, () -> {
@@ -548,6 +576,18 @@ public final class FriendsScreen extends VeloWindow {
 		chatScroll = Math.max(0, chatScroll);
 		VeloDraw.fillRounded(context, x + 6, contentBottom() - 17, width - 66, 16, 4, VeloUi.withAlpha(0xFF000000, 0x40));
 		hits.add(VeloUi.pill(context, x + width - 52, contentBottom() - 18, 46, 18, "Send", 1, mouseX, mouseY, this::submitMessage));
+		// Report someone in the party chat.
+		java.util.List<String[]> others = new java.util.ArrayList<>();
+		for (var element : members) {
+			var member = element.getAsJsonObject();
+			if (!str(member, "uuid").equals(me)) {
+				others.add(new String[] {str(member, "uuid"), str(member, "name")});
+			}
+		}
+		if (!others.isEmpty()) {
+			hits.add(VeloUi.pill(context, x + width - 58, chatTop + 2, 50, 14, "Report", 3, mouseX, mouseY,
+					() -> this.client.setScreen(ReportScreen.party(this, others))));
+		}
 	}
 
 	private void renderChat(DrawContext context, int x, int top, int width, int mouseX, int mouseY) {
@@ -568,7 +608,7 @@ public final class FriendsScreen extends VeloWindow {
 
 		// Header: who, where, actions (actions drop to their own row when the panel is narrow).
 		String joinableHere = joinableAddress(friend);
-		int buttonsWidth = 46 + 58 + 52 + (joinableHere != null ? 52 : 0) + 8;
+		int buttonsWidth = 46 + 58 + 52 + 52 + (joinableHere != null ? 52 : 0) + 8;
 		boolean stacked = width - buttonsWidth < 150;
 		int textWidth = stacked ? width - 50 : width - buttonsWidth - 52;
 		PlayerHeads.draw(context, friend.uuid, friend.username, x + 8, top, 24);
@@ -579,13 +619,17 @@ public final class FriendsScreen extends VeloWindow {
 		int buttonX = x + width - 8;
 		boolean muted = SocialSettings.isMuted(friend.uuid);
 		// Shrink the buttons evenly when even a row of their own is too narrow for them.
-		int buttonCount = joinableHere != null ? 4 : 3;
+		int buttonCount = joinableHere != null ? 5 : 4;
 		float fit = Math.min(1f, (width - 16 - 4f * buttonCount) / (buttonsWidth - 8f));
 		int blockWidth = Math.round(46 * fit);
 		int unfriendWidth = Math.round(54 * fit);
 		int muteWidth = Math.round(48 * fit);
 		int joinWidth = Math.round(48 * fit);
-		buttonX -= blockWidth;
+		int reportWidth = Math.round(48 * fit);
+		buttonX -= reportWidth;
+		hits.add(VeloUi.pill(context, buttonX, buttonRow, reportWidth, 16, "Report", 3, mouseX, mouseY,
+				() -> this.client.setScreen(new ReportScreen(this, friend.uuid, friend.username))));
+		buttonX -= blockWidth + 4;
 		hits.add(confirmPill(context, buttonX, buttonRow, blockWidth, "Block", "block:" + friend.uuid, mouseX, mouseY,
 				() -> report(SocialClient.block(friend.uuid), "Blocked " + friend.username)));
 		buttonX -= unfriendWidth + 4;

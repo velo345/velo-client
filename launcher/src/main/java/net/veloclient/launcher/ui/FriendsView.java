@@ -370,7 +370,10 @@ public final class FriendsView {
 		}
 		Button unfriend = confirmButton("Unfriend", () -> act(LauncherSocial.unfriend(friend.uuid), "Removed " + friend.username));
 		Button block = confirmButton("Block", () -> act(LauncherSocial.block(friend.uuid), "Blocked " + friend.username));
-		header.getChildren().addAll(unfriend, block);
+		Button reportButton = new Button("Report");
+		reportButton.getStyleClass().addAll("danger-ghost-button", "button-compact");
+		reportButton.setOnAction(e -> ReportDialog.show(reportButton.getScene().getWindow(), friend.uuid, friend.username, "dm"));
+		header.getChildren().addAll(unfriend, block, reportButton);
 		chat.getChildren().addAll(header, progress, launchStatus);
 
 		// Messages.

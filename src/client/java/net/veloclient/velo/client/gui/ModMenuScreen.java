@@ -123,8 +123,19 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		addDrawableChild(redstone);
 		sidebarRegion = new VeloScrollRegion(sidebarX, bodyY(), SIDEBAR_WIDTH, contentBottom() - redstoneHeight - 8 - bodyY());
 		sidebarRegion.addRow(new VeloSectionHeader(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT - 6, "Categories"));
-		for (ModuleCategory category : CATEGORY_ORDER) {
+		java.util.List<ModuleCategory> categories = new java.util.ArrayList<>(java.util.List.of(CATEGORY_ORDER));
+		// Velo+ Addons only show up when the addons jar is installed and actually registered modules.
+		boolean hasAddons = !net.veloclient.velo.module.ModuleRegistry.byCategory(ModuleCategory.ADDONS).isEmpty();
+		if (hasAddons) {
+			categories.add(ModuleCategory.ADDONS);
+		} else if (selectedCategory == ModuleCategory.ADDONS) {
+			selectedCategory = ModuleCategory.HUD;
+		}
+		for (ModuleCategory category : categories) {
 			ModuleCategory cat = category;
+			if (category == ModuleCategory.ADDONS) {
+				sidebarRegion.addRow(new VeloSectionHeader(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT - 6, "Velo+"));
+			}
 			VeloNavButton button = new VeloNavButton(sidebarX, 0, SIDEBAR_WIDTH, NAV_ROW_HEIGHT,
 					VeloNavIcons.of(categoryIcon(category)), Text.literal(category.displayName()), b -> {
 						this.selectedCategory = cat;
@@ -442,6 +453,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			case COSMETICS -> "cosmetics";
 			case QOL -> "qol";
 			case PVP -> "pvp";
+			case ADDONS -> "extensions";
 		};
 	}
 

@@ -143,7 +143,7 @@ public final class SchematicsScreen extends VeloWindow {
 								? () -> {
 									// Load straight into Redstone Mode's clipboard (paste preview when the mode is on).
 									net.veloclient.velo.client.redstone.SchematicIO.loadToClipboard(file);
-									status = Text.literal("Loaded \"" + displayName + "\" - in Redstone Mode (R) aim and left click to paste");
+									status = Text.literal("Loaded \"" + displayName + "\" - in Redstone Mode" + net.veloclient.velo.client.redstone.RmKeys.toggleHint() + " aim and left click to paste");
 								}
 								: match != null && match.found() ? () -> openInBrowser(match.postUrl()) : () -> { });
 				addSelectableChild(tile);

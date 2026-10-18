@@ -8,7 +8,8 @@ import net.veloclient.velo.client.util.Keys;
 
 /**
  * Redstone Mode's keys (Controls &gt; Velo Redstone Mode). Kept to a handful with defaults that
- * don't clash with movement, sprint or voice chat: R toggles the mode, 0 selects the tool slot, a
+ * don't clash with movement, sprint or voice chat: the mode toggle is unbound by default (R was too
+ * valuable to take - bind it in Controls, or enter from the Velo menu), 0 selects the tool slot, a
  * Left Alt tap frees the mouse for the overlay, F7 freezes the world, F9 hides the overlay, K
  * records / replays, End stops a running paste. Every tool also has its own key, unbound by default. While the mode is on
  * these are the only Velo keys that work. Editing shortcuts (Ctrl+C/X/V/Z/Y, Delete, Enter,
@@ -18,7 +19,7 @@ public final class RmKeys {
 
 	public static final KeyBinding.Category CATEGORY = KeyBinding.Category.create(Identifier.of("velo-client", "redstone"));
 
-	public static final KeyBinding TOGGLE = key("rm_toggle", Keys.R);
+	public static final KeyBinding TOGGLE = key("rm_toggle", Keys.UNKNOWN);
 	public static final KeyBinding CURSOR = key("rm_cursor", Keys.LEFT_ALT);
 	public static final KeyBinding FREEZE = key("rm_freeze", Keys.F7);
 	public static final KeyBinding HIDE = key("rm_hide", Keys.F9);
@@ -41,6 +42,12 @@ public final class RmKeys {
 
 	private static KeyBinding key(String id, int code) {
 		return KeyBindingHelper.registerKeyBinding(new KeyBinding("key.velo-client." + id, InputUtil.Type.KEYSYM, code, CATEGORY));
+	}
+
+	/** " (R)" for tooltips and hints - the toggle key's real name, or nothing while it is unbound. */
+	public static String toggleHint() {
+		return net.veloclient.velo.client.keybind.BindingAccess.isUnbound(TOGGLE) ? ""
+				: " (" + net.veloclient.velo.client.keybind.BindingAccess.keyText(TOGGLE) + ")";
 	}
 
 	/** Forces class loading (registration) during mod init. */

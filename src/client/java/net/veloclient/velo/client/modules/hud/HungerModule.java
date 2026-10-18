@@ -28,9 +28,11 @@ public final class HungerModule extends AbstractModule implements Configurable {
 	private static final Identifier FILL = Identifier.of("velo-client", "textures/gui/hud/food_fill.png");
 	private static final Identifier OUTLINE = Identifier.of("velo-client", "textures/gui/hud/food_outline.png");
 	private static final Identifier DETAIL = Identifier.of("velo-client", "textures/gui/hud/food_detail.png");
-	private static final List<String> STYLES = List.of("Vanilla", "Recolored", "Custom Drawing");
+	private static final String VANILLA_RECOLORED = "Vanilla Recolored";
+	private static final String VELO = "Velo Style";
+	private static final List<String> STYLES = List.of("Vanilla", VANILLA_RECOLORED, VELO, "Custom Drawing");
 
-	private String style = "Vanilla";
+	private String style = VANILLA_RECOLORED;
 	private boolean showSaturation = true;
 	private int saturationColor = 0xFFFFC83A;
 	private int foodColor = 0xFFC27A3E;
@@ -66,7 +68,8 @@ public final class HungerModule extends AbstractModule implements Configurable {
 		boolean hungerEffect = player.hasEffect(net.minecraft.world.effect.MobEffects.HUNGER);
 		*///?}
 		boolean custom = module.style.equals("Custom Drawing") && StatusBarIcons.hasDrawing(KIND);
-		boolean recolored = !custom && !module.style.equals("Vanilla");
+		boolean vanillaRecolored = !custom && module.style.equals(VANILLA_RECOLORED);
+		boolean recolored = !custom && module.style.equals(VELO);
 		Random random = new Random(ticks * 312871L + 1);
 		for (int i = 0; i < 10; i++) {
 			int y = top;
@@ -81,6 +84,19 @@ public final class HungerModule extends AbstractModule implements Configurable {
 				if (full || half) {
 					int tint = module.tintCustomIcon ? (hungerEffect ? module.hungerEffectColor : module.foodColor) : 0xFFFFFFFF;
 					StatusBarIcons.draw(context, KIND, half ? StatusBarIcons.State.HALF : StatusBarIcons.State.FULL, x, y, tint);
+				}
+			} else if (vanillaRecolored) {
+				String suffix = hungerEffect ? "_hunger" : "";
+				context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, Identifier.of("minecraft", "hud/food_empty" + suffix), x, y, 9, 9);
+				if (full || half) {
+					String sprite = "hud/food_" + (half ? "half" : "full") + suffix;
+					int color = hungerEffect ? module.hungerEffectColor : module.foodColor;
+					Identifier texture = StatusBarIcons.recoloredSprite(sprite, color);
+					if (texture == null) {
+						context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, Identifier.of("minecraft", sprite), x, y, 9, 9);
+					} else {
+						StatusBarIcons.drawSquare(context, texture, StatusBarIcons.recoloredSize(sprite, color), x, y, false, 0xFFFFFFFF);
+					}
 				}
 			} else if (recolored) {
 				layer(context, FILL, x, y, false, module.emptyColor);
@@ -106,7 +122,84 @@ public final class HungerModule extends AbstractModule implements Configurable {
 				}
 			}
 		}
+		if (custom || recolored || !net.veloclient.velo.client.util.AppleSkinCompat.present()) {
+			// AppleSkin's overlays are drawn for vanilla's icon shape and are switched off for ours (see ownsFoodOverlay):
+			// the held-food preview is drawn here instead, in the same style as the row. Also when AppleSkin isn't installed.
+			module.drawHeldFoodPreview(context, player, food, saturation, top, right, custom, vanillaRecolored, recolored, hungerEffect);
+		} else {
+			// AppleSkin's held-food preview (hunger + saturation it would give), which would have drawn after vanilla's food row.
+			net.veloclient.velo.client.util.AppleSkinCompat.afterFood(context, player, top, right);
+		}
 		return true;
+	}
+
+	/**
+	 * True while our food row has a shape AppleSkin's overlays don't fit (Velo Style or a custom drawing): AppleSkin's own
+	 * hunger/saturation/exhaustion overlays are cancelled then, and {@link #drawHeldFoodPreview} draws ours.
+	 */
+	public static boolean ownsFoodOverlay() {
+		HungerModule module = active();
+		return module != null && (module.style.equals(VELO) || module.style.equals("Custom Drawing") && StatusBarIcons.hasDrawing(KIND));
+	}
+
+	/**
+	 * AppleSkin's held-food preview, our way: with food in your hand (and room to eat), the shanks and saturation it would
+	 * give fade in and out on top of the row.
+	 */
+	private void drawHeldFoodPreview(DrawContext context, PlayerEntity player, int food, float saturation, int top, int right,
+			boolean custom, boolean vanillaRecolored, boolean recolored, boolean hungerEffect) {
+		if (food >= 20) {
+			return;
+		}
+		float[] gain = net.veloclient.velo.client.pvp.PvpCompat.food(net.veloclient.velo.client.pvp.PvpCompat.mainHand(player));
+		if (gain == null) {
+			gain = net.veloclient.velo.client.pvp.PvpCompat.food(net.veloclient.velo.client.pvp.PvpCompat.offHand(player));
+		}
+		if (gain == null || gain[0] <= 0 && gain[1] <= 0) {
+			return;
+		}
+		int newFood = Math.min(20, food + Math.round(gain[0]));
+		float newSaturation = Math.min(newFood, saturation + gain[1]);
+		// Smooth fade between ~15% and ~85%, like AppleSkin's flash.
+		double phase = (System.currentTimeMillis() % 1600L) / 1600.0 * Math.PI * 2;
+		float alpha = (float) (0.5 - 0.35 * Math.cos(phase));
+		int a = Math.round(alpha * 255) << 24;
+		for (int i = 0; i < 10; i++) {
+			int x = right - i * 8 - 9;
+			boolean fullNow = i * 2 + 1 < food;
+			boolean halfNow = i * 2 + 1 == food;
+			boolean fullNew = i * 2 + 1 < newFood;
+			boolean halfNew = i * 2 + 1 == newFood;
+			if (fullNew && !fullNow || halfNew && !halfNow && !fullNow) {
+				int tint = (hungerEffect ? hungerEffectColor : foodColor) & 0xFFFFFF | a;
+				if (custom) {
+					StatusBarIcons.draw(context, KIND, halfNew ? StatusBarIcons.State.HALF : StatusBarIcons.State.FULL, x, top,
+							tintCustomIcon ? tint : 0xFFFFFF | a);
+				} else if (recolored) {
+					layer(context, FILL, x, top, halfNew, tint);
+					layer(context, DETAIL, x, top, halfNew, 0xFFFFFF | a);
+				} else {
+					String sprite = "hud/food_" + (halfNew ? "half" : "full") + (hungerEffect ? "_hunger" : "");
+					int color = hungerEffect ? hungerEffectColor : foodColor;
+					Identifier texture = vanillaRecolored ? StatusBarIcons.recoloredSprite(sprite, color) : null;
+					if (texture == null) {
+						context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, Identifier.of("minecraft", sprite), x, top, 9, 9, 0xFFFFFF | a);
+					} else {
+						StatusBarIcons.drawSquare(context, texture, StatusBarIcons.recoloredSize(sprite, color), x, top, false, 0xFFFFFF | a);
+					}
+				}
+			}
+			if (showSaturation) {
+				float before = Math.max(0f, Math.min(2f, saturation - i * 2));
+				float after = Math.max(0f, Math.min(2f, newSaturation - i * 2));
+				if (after > before && after > 0) {
+					int previous = saturationColor;
+					saturationColor = saturationColor & 0xFFFFFF | a;
+					drawSaturation(context, custom, recolored, x, top, after < 2f);
+					saturationColor = previous;
+				}
+			}
+		}
 	}
 
 	private void drawSaturation(DrawContext context, boolean custom, boolean recolored, int x, int y, boolean half) {
@@ -139,11 +232,11 @@ public final class HungerModule extends AbstractModule implements Configurable {
 		return List.of(
 				new ConfigField.ToggleField("Show Saturation Outline", () -> showSaturation, v -> showSaturation = v),
 				new ConfigField.ColorField("Saturation Color", () -> saturationColor, v -> saturationColor = v, true),
-				new ConfigField.ChoiceField("Food Icon Style", STYLES, () -> style, v -> style = v),
+				new ConfigField.ChoiceField("Food Icon Style", STYLES, () -> style, v -> style = "Recolored".equals(v) ? VANILLA_RECOLORED : v),
 				new ConfigField.ColorField("Food Color (Recolored)", () -> foodColor, v -> foodColor = v, false),
 				new ConfigField.ColorField("Food Color With Hunger Effect", () -> hungerEffectColor, v -> hungerEffectColor = v, false),
-				new ConfigField.ColorField("Empty Food Color", () -> emptyColor, v -> emptyColor = v, true),
-				new ConfigField.ColorField("Outline Color", () -> outlineColor, v -> outlineColor = v, true),
+				new ConfigField.ColorField("Empty Food Color (Velo Style)", () -> emptyColor, v -> emptyColor = v, true),
+				new ConfigField.ColorField("Outline Color (Velo Style)", () -> outlineColor, v -> outlineColor = v, true),
 				new ConfigField.ActionButtonField("Draw Custom Food Icon (or import a PNG)...", () -> {
 					style = "Custom Drawing";
 					net.veloclient.velo.client.gui.StatusIconEditor.openFromSettings(KIND, "Food Icon", foodColor);
@@ -155,7 +248,7 @@ public final class HungerModule extends AbstractModule implements Configurable {
 					} catch (Exception ignored) {
 						// nothing to delete
 					}
-					style = "Vanilla";
+					style = VANILLA_RECOLORED;
 				}));
 	}
 }

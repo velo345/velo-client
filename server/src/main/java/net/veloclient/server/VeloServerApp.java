@@ -30,6 +30,8 @@ public final class VeloServerApp {
 
 	private static final int DEFAULT_PORT = 8787;
 	private static SocialService social;
+	/** Staff, online-service bans and player reports. */
+	static StaffService staff;
 	private static net.veloclient.server.store.StoreService store;
 
 	public static void main(String[] args) throws IOException {
@@ -70,12 +72,15 @@ public final class VeloServerApp {
 		server.createContext("/v1/session/challenge", exchange -> handle(exchange, "POST", ex -> handleChallenge(ex, registry)));
 		server.createContext("/v1/session/verify", exchange -> handle(exchange, "POST", ex -> handleVerify(ex, registry)));
 		server.createContext("/v1/session/end", exchange -> handle(exchange, "POST", ex -> handleEnd(ex, registry)));
+		server.createContext("/v1/session/end-game", exchange -> handle(exchange, "POST", ex -> handleEndGame(ex, registry)));
 		server.createContext("/v1/heartbeat", exchange -> handle(exchange, "POST", ex -> handleHeartbeat(ex, registry, capes)));
 		server.createContext("/v1/online", exchange -> handle(exchange, "GET", ex -> handleOnline(ex, registry)));
 		server.createContext("/v1/cape/upload", exchange -> handle(exchange, "POST", ex -> handleCapeUpload(ex, registry, capes)));
 		server.createContext("/v1/cape/remove", exchange -> handle(exchange, "POST", ex -> handleCapeRemove(ex, registry, capes)));
 		// GET /v1/cape/<sha256> - the path suffix is the hash (see handleCapeDownload).
 		server.createContext("/v1/cape/", exchange -> handle(exchange, "GET", ex -> handleCapeDownload(ex, capes)));
+		staff = new StaffService(dataDir);
+		SocialRoutes.setBans(staff);
 		SocialRoutes.register(server, registry, social);
 		PartyService parties = new PartyService(social);
 		PartyRoutes.register(server, registry, social, parties);
@@ -100,7 +105,9 @@ public final class VeloServerApp {
 		});
 		// Velo+: memberships in memory, monthly coins hourly, signed tokens + addon jars for members.
 		store.loadPlus();
+		store.setStaffLookup(staff::isStaff);
 		registry.setPlusLookup(store::isPlus);
+		StaffRoutes.register(server, registry, staff, social, parties, capes, store, cosmetics, discordLinks, announcer, adminToken);
 		PlusTokens plusTokens = new PlusTokens(envOr("VELO_PLUS_SIGNING_KEY", null));
 		AddonStore addonStore = new AddonStore(dataDir);
 		AddonSync addonSync = new AddonSync(addonStore, envOr("VELO_PLUS_GITHUB_REPO", "velo345/velo-client-plus"), envOr("VELO_PLUS_GITHUB_TOKEN", null));
@@ -276,7 +283,7 @@ public final class VeloServerApp {
 				SessionRegistry.HEARTBEAT_INTERVAL_SECONDS, SessionRegistry.SESSION_TTL_MILLIS / 1000));
 	}
 
-	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId, String auraId) {
+	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId, String auraId, Boolean idle, Boolean hidePlus) {
 	}
 
 	private record HeartbeatResponse(boolean ok, int onlineCount, String capeId) {
@@ -289,7 +296,8 @@ public final class VeloServerApp {
 			return;
 		}
 		SessionRegistry.Session session = registry.session(request.sessionToken());
-		String ownCustomHash = session == null ? null : capes.hashFor(session.uuid());
+		// A player banned from custom capes shows none (their upload is ignored).
+		String ownCustomHash = session == null || staff != null && staff.banFor(session.uuid(), "capes") != null ? null : capes.hashFor(session.uuid());
 		// Store capes are only shown for players who actually own them (server-side ownership).
 		String capeId = session != null && !store.mayDisplayCape(session.uuid(), request.capeId()) ? null : request.capeId();
 		// Wings are store items too ("wings_<id>"): only shown for players who bought them.
@@ -311,6 +319,14 @@ public final class VeloServerApp {
 		SessionRegistry.Session refreshed = registry.heartbeat(request.sessionToken(), capeId, ownCustomHash, wingsId, auraId);
 		if (refreshed != null && "game".equals(refreshed.kind())) {
 			store.onGameHeartbeat(refreshed.uuid());
+			if (request.hidePlus() != null) {
+				registry.setPlusHidden(refreshed.uuid(), request.hidePlus());
+			}
+		}
+		if (refreshed != null && "launcher".equals(refreshed.kind())
+				&& registry.setIdle(request.sessionToken(), Boolean.TRUE.equals(request.idle()))) {
+			// Idle <-> active changes what friends see.
+			social.refreshPresence(refreshed.uuid());
 		}
 		if (refreshed == null) {
 			JsonHttp.writeError(exchange, 401, "Unknown or expired session - re-authenticate");
@@ -322,6 +338,15 @@ public final class VeloServerApp {
 	}
 
 	private record EndRequest(String sessionToken) {
+	}
+
+	/** Launcher token: the game it started has ended, so any game session of the account is stale. */
+	private static void handleEndGame(HttpExchange exchange, SessionRegistry registry) throws IOException {
+		EndRequest request = JsonHttp.readBody(exchange, EndRequest.class);
+		if (request.sessionToken() != null) {
+			registry.endGameSessions(request.sessionToken());
+		}
+		JsonHttp.writeJson(exchange, 200, new HeartbeatResponse(true, registry.onlineCount(), null));
 	}
 
 	private static void handleEnd(HttpExchange exchange, SessionRegistry registry) throws IOException {
@@ -347,6 +372,10 @@ public final class VeloServerApp {
 		SessionRegistry.Session session = registry.session(JsonHttp.bearerToken(exchange));
 		if (session == null) {
 			JsonHttp.writeError(exchange, 401, "Unknown or expired session - re-authenticate");
+			return;
+		}
+		if (staff != null && staff.banFor(session.uuid(), "capes") != null) {
+			JsonHttp.writeError(exchange, 403, "You're banned from custom capes: " + staff.banFor(session.uuid(), "capes").reason);
 			return;
 		}
 		byte[] bytes = JsonHttp.readRawBody(exchange, CapeStore.MAX_UPLOAD_BYTES);

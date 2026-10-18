@@ -20,7 +20,7 @@ public abstract class PartyChatMixin {
 
 	@Inject(method = "sendChatCommand", at = @At("HEAD"), cancellable = true)
 	private void velo$partyCommand(String command, CallbackInfo ci) {
-		if (PartyChat.onOutgoingCommand(command)) {
+		if (PartyChat.onOutgoingCommand(command) || net.veloclient.velo.client.social.VeloCommands.onOutgoingCommand(command)) {
 			ci.cancel();
 		}
 	}
@@ -38,7 +38,7 @@ public abstract class PartyChatMixin {
 
 	@Inject(method = "sendCommand", at = @At("HEAD"), cancellable = true)
 	private void velo$partyCommand(String command, CallbackInfo ci) {
-		if (PartyChat.onOutgoingCommand(command)) {
+		if (PartyChat.onOutgoingCommand(command) || net.veloclient.velo.client.social.VeloCommands.onOutgoingCommand(command)) {
 			ci.cancel();
 		}
 	}

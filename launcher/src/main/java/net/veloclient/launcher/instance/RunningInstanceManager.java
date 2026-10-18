@@ -103,6 +103,7 @@ public final class RunningInstanceManager {
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 			}
+			net.veloclient.launcher.social.LauncherSocial.gameEnded();
 			Platform.runLater(() -> RUNNING.remove(entry));
 		});
 		return entry;

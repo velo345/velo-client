@@ -1,0 +1,154 @@
+{
+  "title": "Velo Client 0.9.1",
+  "summary": "Import from Lunar, Feather & co, party live locations and voice groups, /velo commands, vanilla-style recoloured hearts, a smarter world map, new Future capes, wings and a Hologram aura - and a long list of fixes.",
+  "tag": "Update",
+  "version": "0.9.1",
+  "accent": "#3ff0ff",
+  "pinned": false,
+  "cover": "file:images/cover.jpg",
+  "blocks": [
+    {
+      "type": "text",
+      "text": "0.9.1 is a big one: bring everything over from your old client in one click, play together better in parties, and a pile of fixes you asked for."
+    },
+    {
+      "type": "heading",
+      "text": "Switch from your old client"
+    },
+    {
+      "type": "text",
+      "text": "Press **Switch from another client** at the top of Home: pick where you're coming from - Lunar, Feather, NoRisk, the Modrinth App, Prism / MultiMC, CurseForge or the vanilla launcher (the ones on your PC light up), tick what to bring - **keybinds and settings**, **servers**, **Fabric mods** (fetched from Modrinth in the right version), **configs**, **resource packs**, **shaders** and **worlds** - and press **Bring it over**. New to Velo? The launcher offers it on your very first start."
+    },
+    {
+      "type": "image",
+      "image": "file:images/switch.jpg",
+      "caption": "Three steps, real logos, done."
+    },
+    {
+      "type": "image",
+      "image": "file:images/firstrun.jpg",
+      "caption": "On your first start, if another launcher is on your PC."
+    },
+    {
+      "type": "heading",
+      "text": "Parties"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Live location** - turn on *Share my position* on the world map and your party sees you as an arrow on theirs. Off every time you join a party.",
+        "**Follow me** - the leader can ask the party to follow: when they join another server, everyone gets a small popup to join too. No full-screen menus mid-fight, and it can't be spammed.",
+        "**Voice group** - with Simple Voice Chat, your party gets its own voice group automatically (the password is shown in the Party tab). Opt-in.",
+        "**/party** no longer shows up red in chat, and Tab completes your party members."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "/velo commands"
+    },
+    {
+      "type": "text",
+      "text": "`/velo plus` shows how much Velo+ you have left, `/velo coins` your coins, `/velo store`, `/velo map`, `/velo friends`, `/velo waypoint <name>` posts a waypoint in chat, plus `/phantom` and `/flyspeed <amount>` (only when the server doesn't have those commands itself). Everything tab-completes."
+    },
+    {
+      "type": "heading",
+      "text": "World map & waypoints"
+    },
+    {
+      "type": "list",
+      "items": [
+        "Your arrow on the map now points the right way.",
+        "Right-click a waypoint on the map to **edit**, **delete**, **teleport** or **share** it.",
+        "In creative: click anywhere on the map to **teleport** there.",
+        "New **Chat** button: posts a waypoint (position, dimension, world) in chat.",
+        "Waypoints and maps of the same server no longer split in two when you join from the launcher vs. the server list."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Hearts, hunger & armor"
+    },
+    {
+      "type": "text",
+      "text": "The custom bars now default to **Vanilla Recolored** - the real vanilla icons in your colour (the old look is still there as *Velo Style*). Hearts update instantly again, and **AppleSkin**'s food preview shows with custom bars. Enemy hunger estimates reset when a server heals and feeds everyone between rounds."
+    },
+    {
+      "type": "heading",
+      "text": "New cosmetics"
+    },
+    {
+      "type": "text",
+      "text": "The Neon collection is now the **Future** collection, with new **Sci-Fi Circuit Wings**, two new capes - **Circuit** and **Holo Grid** - and the **Hologram** aura. **Pearl**, **Kintsugi** and **Heaven** were redrawn so they're no longer washed-out white, and every Velo cape now shows crisply on your **elytra**."
+    },
+    {
+      "type": "image",
+      "image": "file:images/capes.jpg",
+      "caption": "Pearl, Heaven, Circuit and Holo Grid."
+    },
+    {
+      "type": "image",
+      "image": "file:images/scifi-wings.jpg",
+      "caption": "Sci-Fi Circuit Wings."
+    },
+    {
+      "type": "heading",
+      "text": "Christmas is coming"
+    },
+    {
+      "type": "text",
+      "text": "The **Yuletide** collection: three animated capes - **Silent Night**, **Festive Lights** and **Gift Wrap** - the **Ice Star Wings** and the **Festive** aura, a garland of chasing lights with baubles, a star and snow."
+    },
+    {
+      "type": "heading",
+      "text": "Safer friends & parties"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Report** someone from a friend chat or party chat - pick what happened (spam, scam, insults...), add a note and, only if you tick the box, the recent messages. Chats aren't watched by anyone, so chat at your own risk - but the team reads every report.",
+        "The Velo team (with the new **Velo Staff** cape) can hide inappropriate custom capes and ban players from friends, custom capes or parties."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Cosmetics load for everyone"
+    },
+    {
+      "type": "text",
+      "text": "Other players' capes, wings and auras now keep retrying until they load instead of giving up - no more seeing someone without the cape they're wearing."
+    },
+    {
+      "type": "heading",
+      "text": "Launcher"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Search** profiles and servers right on the Home screen.",
+        "Your profile page shows your player wearing your cosmetics; 3D skin layers now load for every skin (legacy and HD skins too).",
+        "**Velo+ Addons** card in the Mods tab: add them to a profile with one click; choose whether the + shows on your badge.",
+        "New installs get a ready-to-play **26.2 profile**, and new profiles get **Wavey Capes** for nicer cape physics.",
+        "Servers on another port: typing `host:port` in the address now just works, and SRV records are followed.",
+        "You no longer show as online when the launcher sits in the background while you play another client.",
+        "Discord now recognises the game on Windows (overlay and *Playing Minecraft*)."
+      ]
+    },
+    {
+      "type": "image",
+      "image": "file:images/launcher-addons-card.jpg",
+      "caption": "The Velo+ Addons card in a profile's Mods tab."
+    },
+    {
+      "type": "heading",
+      "text": "Also"
+    },
+    {
+      "type": "list",
+      "items": [
+        "Redstone Mode and party pings are unbound by default - R and V belong to your other mods (voice chat!). Set them in Controls.",
+        "Phantom no-clip flying no longer crouches you or slows you down inside blocks.",
+        "In-game Owner panel redesigned like the launcher's."
+      ]
+    }
+  ]
+}

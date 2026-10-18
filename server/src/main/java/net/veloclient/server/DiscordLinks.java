@@ -18,8 +18,8 @@ import java.util.Map;
 
 /**
  * Links a Minecraft account (proved by a Velo session) to a Discord account (proved by the bot):
- * the game or launcher asks for a short code, the player types {@code /link <code>} in the Velo
- * Discord, the bot redeems it here. One Discord account per Minecraft account and the other way
+ * the game or launcher asks for a short code, the player pastes it into the Velo Discord's configured
+ * link channel, and the bot redeems it here. One Discord account per Minecraft account and the other way
  * round. Linking unlocks {@link #REWARDS} (the Velo Neon cape). Persisted in {@code discord-links.json}.
  */
 final class DiscordLinks {
@@ -60,6 +60,10 @@ final class DiscordLinks {
 
 	synchronized List<Link> all() {
 		return new ArrayList<>(links.values());
+	}
+
+	synchronized Link byDiscordId(String discordId) {
+		return discordId == null ? null : links.get(discordId);
 	}
 
 	synchronized Link byUuid(String uuid) {

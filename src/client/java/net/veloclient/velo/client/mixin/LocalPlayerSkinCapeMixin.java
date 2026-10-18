@@ -55,9 +55,7 @@ public abstract class LocalPlayerSkinCapeMixin {
 		} else {
 			// Other Velo players: with Wavey Capes installed our own render layer is off, so their
 			// Velo cape has to come through here too - otherwise nobody else's cape ever showed.
-			if (!WaveyCapesCompat.isLoaded()) {
-				return;
-			}
+			// Without it only their elytra is touched (their cape art on the wings).
 			AbstractClientPlayerEntity self = (AbstractClientPlayerEntity) (Object) this;
 			equipped = net.veloclient.velo.client.cosmetics.RemoteCapeCache.resolve(
 					net.veloclient.velo.client.network.VeloUserRegistry.capeIdFor(self.getUuid(), self.getGameProfile().name()));
@@ -67,7 +65,9 @@ public abstract class LocalPlayerSkinCapeMixin {
 		}
 		CapeDefinition definition = equipped.get();
 		boolean overrideCape = WaveyCapesCompat.isLoaded();
-		var elytraTexture = CapeManager.elytraTextureIdentifier(definition);
+		// Only painted while an elytra is actually worn (it is re-made from the cape art every animation frame).
+		var elytraTexture = ((AbstractClientPlayerEntity) (Object) this).getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).getItem()
+				== net.minecraft.item.Items.ELYTRA ? CapeManager.elytraTextureIdentifier(definition) : java.util.Optional.<Identifier>empty();
 		if (!overrideCape && elytraTexture.isEmpty()) {
 			return;
 		}
@@ -105,9 +105,6 @@ public abstract class LocalPlayerSkinCapeMixin {
 		if ((Object) this == Minecraft.getInstance().player) {
 			equipped = CapeManager.renderCape();
 		} else {
-			if (!WaveyCapesCompat.isLoaded()) {
-				return;
-			}
 			AbstractClientPlayer self = (AbstractClientPlayer) (Object) this;
 			equipped = net.veloclient.velo.client.cosmetics.RemoteCapeCache.resolve(
 					net.veloclient.velo.client.network.VeloUserRegistry.capeIdFor(self.getUUID(), self.getGameProfile().name()));
@@ -117,7 +114,8 @@ public abstract class LocalPlayerSkinCapeMixin {
 		}
 		CapeDefinition definition = equipped.get();
 		boolean overrideCape = WaveyCapesCompat.isLoaded();
-		var elytraTexture = CapeManager.elytraTextureIdentifier(definition);
+		var elytraTexture = ((AbstractClientPlayer) (Object) this).getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem()
+				== net.minecraft.world.item.Items.ELYTRA ? CapeManager.elytraTextureIdentifier(definition) : java.util.Optional.<Identifier>empty();
 		if (!overrideCape && elytraTexture.isEmpty()) {
 			return;
 		}

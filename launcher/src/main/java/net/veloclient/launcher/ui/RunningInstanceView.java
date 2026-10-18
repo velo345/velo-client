@@ -49,7 +49,7 @@ public final class RunningInstanceView {
 
 		HBox header = new HBox(12);
 		header.setAlignment(Pos.CENTER_LEFT);
-		Button back = new Button("< Back");
+		Button back = BackButton.create(null, null);
 		back.setOnAction(e -> onBack.run());
 		Label title = new Label(running.instance().name());
 		title.setFont(Font.font("Inter", FontWeight.BOLD, 20));

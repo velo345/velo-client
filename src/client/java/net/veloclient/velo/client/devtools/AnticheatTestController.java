@@ -29,7 +29,7 @@ import net.minecraft.world.phys.Vec3;
  * <p>Only ever initialised when {@link AnticheatTestGate#isEnabled()} is true — see that class for
  * why. Every packet this sends is fabricated on top of whatever vanilla is already sending; nothing
  * here cancels or rewrites a real packet (no {@code ClientConnection} mixin, unlike
- * {@code FlyBoatVehicleMoveMixin}), so this can't accidentally desync ordinary movement when idle.
+ * the former Fly Boat packet mixin), so this can't accidentally desync ordinary movement when idle.
  */
 public final class AnticheatTestController {
 

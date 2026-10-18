@@ -119,15 +119,20 @@ public final class AuraFx {
 	 * FX thread; cached.
 	 */
 	public static javafx.scene.image.Image snapshot(AuraEffects.Kind kind, double width, double height) {
-		return SNAPSHOTS.computeIfAbsent(kind + "@" + (int) width + "x" + (int) height, k -> {
+		return snapshot(kind, AuraEffects.Settings.DEFAULT, width, height);
+	}
+
+	/** One cached still picture using the supplied per-aura settings. */
+	public static javafx.scene.image.Image snapshot(AuraEffects.Kind kind, AuraEffects.Settings settings, double width, double height) {
+		return SNAPSHOTS.computeIfAbsent(kind + "@" + settings.encode() + "@" + (int) width + "x" + (int) height, k -> {
 			AuraEffects.Emitter emitter = new AuraEffects.Emitter(kind);
 			for (int i = 0; i < 90; i++) {
-				emitter.update(1 / 30f, AuraEffects.Settings.DEFAULT, 0, 0, 0);
+				emitter.update(1 / 30f, settings, 0, 0, 0);
 			}
 			double focal = (height / 2) / Math.tan(Math.toRadians(15));
 			double distance = 95;
 			Canvas canvas = new Canvas(width, height);
-			List<Sprite> sprites = project(emitter, AuraEffects.Settings.DEFAULT, width / 2, height / 2 - 6, focal, distance, 0.5);
+			List<Sprite> sprites = project(emitter, settings, width / 2, height / 2 - 6, focal, distance, 0.5);
 			GraphicsContext g = canvas.getGraphicsContext2D();
 			draw(g, sprites, distance, false);
 			silhouette(g, width / 2, height / 2 - 6, focal / distance);

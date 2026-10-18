@@ -269,8 +269,7 @@ public final class NewsView {
 
 	/** A post on its own page: cover, tag/date, title, summary and the body blocks. */
 	static Node post(Host host, JsonObject post, boolean owner) {
-		Button back = new Button("←  News");
-		back.getStyleClass().add("ghost-button");
+		Button back = BackButton.create("News", null);
 		back.setOnAction(e -> host.openNews());
 		HBox top = new HBox(8, back);
 		top.setAlignment(Pos.CENTER_LEFT);

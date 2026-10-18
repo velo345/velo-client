@@ -174,8 +174,14 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 		if (capeId == null || remotePlayer.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).getItem() == net.minecraft.item.Items.ELYTRA) {
 			return;
 		}
-		net.veloclient.velo.client.cosmetics.RemoteCapeCache.resolve(capeId)
-				.ifPresent(definition -> renderCapeModel(matrixStack, queue, light, state, definition, 0.14f, 0f));
+		net.veloclient.velo.client.cosmetics.RemoteCapeCache.resolve(capeId).ifPresent(definition -> {
+			try {
+				renderCapeModel(matrixStack, queue, light, state, definition, 0.14f, 0f);
+			} catch (RuntimeException e) {
+				// Its art couldn't be (re)loaded this frame: load it again from scratch instead of failing every frame.
+				net.veloclient.velo.client.cosmetics.RemoteCapeCache.forget(capeId);
+			}
+		});
 	}
 
 	private void renderCapeModel(MatrixStack matrixStack, OrderedRenderCommandQueue queue, int light,
@@ -226,8 +232,14 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 		if (capeId == null || remotePlayer.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem() == net.minecraft.world.item.Items.ELYTRA) {
 			return;
 		}
-		net.veloclient.velo.client.cosmetics.RemoteCapeCache.resolve(capeId)
-				.ifPresent(definition -> renderCapeModel(matrixStack, queue, light, state, definition, 0.14f, 0f));
+		net.veloclient.velo.client.cosmetics.RemoteCapeCache.resolve(capeId).ifPresent(definition -> {
+			try {
+				renderCapeModel(matrixStack, queue, light, state, definition, 0.14f, 0f);
+			} catch (RuntimeException e) {
+				// Its art couldn't be (re)loaded this frame: load it again from scratch instead of failing every frame.
+				net.veloclient.velo.client.cosmetics.RemoteCapeCache.forget(capeId);
+			}
+		});
 	}
 
 	private void renderCapeModel(PoseStack matrixStack, SubmitNodeCollector queue, int light,

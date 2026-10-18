@@ -22,7 +22,7 @@ import java.util.Optional;
 public final class AuraCatalog {
 
 	public static final String ITEM_PREFIX = "aura_";
-	public static final List<String> IDS = List.of("orbit", "ember", "frost", "void", "storm", "matrix", "inferno", "bloom", "heartbeat", "aurora");
+	public static final List<String> IDS = List.of("orbit", "ember", "frost", "void", "storm", "matrix", "inferno", "bloom", "heartbeat", "aurora", "hologram", "festive");
 
 	public record AuraType(String id, String name, String description, int price, boolean inStore, String accent) {
 		public String itemId() {
@@ -34,17 +34,19 @@ public final class AuraCatalog {
 		}
 	}
 
-	private static final Map<String, String[]> FALLBACK = Map.of(
-			"orbit", new String[] {"Celestial Orbit", "Three tilted rings of stars circle you, each trailing a comet tail."},
-			"ember", new String[] {"Ember Spiral", "Embers spiral up from your feet in a double helix and drift away as you move."},
-			"frost", new String[] {"Frost Halo", "A crown of glittering ice above your head and soft snow falling all around you."},
-			"void", new String[] {"Void Rift", "A pulsing rune circle at your feet pulls dark wisps in from all around."},
-			"storm", new String[] {"Storm Sparks", "Lightning arcs crackle around your body and throw off bright sparks."},
-			"matrix", new String[] {"Code Rain", "Glowing green code rains down a cylinder of light around you - digits and glyphs flicker as they fall."},
-			"inferno", new String[] {"Inferno", "A roaring column of fire licks up around you, white-hot at your feet, throwing sparks into the air."},
-			"bloom", new String[] {"Bloom", "Vines spiral up around you, leaf out and burst into glowing flowers while fireflies blink and petals drift down."},
-			"heartbeat", new String[] {"Heartbeat", "A ring of hearts pulses to a heartbeat around you as more hearts float up and fade."},
-			"aurora", new String[] {"Aurora", "Northern-lights curtains wave around you in green, cyan and violet, with stars rising through them."});
+	private static final Map<String, String[]> FALLBACK = Map.ofEntries(
+			Map.entry("orbit", new String[] {"Celestial Orbit", "Three tilted rings of stars circle you, each trailing a comet tail."}),
+			Map.entry("ember", new String[] {"Ember Spiral", "Embers spiral up from your feet in a double helix and drift away as you move."}),
+			Map.entry("frost", new String[] {"Frost Halo", "A crown of glittering ice above your head and soft snow falling all around you."}),
+			Map.entry("void", new String[] {"Void Rift", "A pulsing rune circle at your feet pulls dark wisps in from all around."}),
+			Map.entry("storm", new String[] {"Storm Sparks", "Lightning arcs crackle around your body and throw off bright sparks."}),
+			Map.entry("matrix", new String[] {"Code Rain", "Glowing green code rains down a cylinder of light around you - digits and glyphs flicker as they fall."}),
+			Map.entry("inferno", new String[] {"Inferno", "A roaring column of fire licks up around you, white-hot at your feet, throwing sparks into the air."}),
+			Map.entry("bloom", new String[] {"Bloom", "Vines spiral up around you, leaf out and burst into glowing flowers while fireflies blink and petals drift down."}),
+			Map.entry("heartbeat", new String[] {"Heartbeat", "A ring of hearts pulses to a heartbeat around you as more hearts float up and fade."}),
+			Map.entry("aurora", new String[] {"Aurora", "Northern-lights curtains wave around you in green, cyan and violet, with stars rising through them."}),
+			Map.entry("hologram", new String[] {"Hologram", "A hexagon plate glows under you while scan rings sweep up your body, data glyphs orbit and bits of light rise."}),
+			Map.entry("festive", new String[] {"Festive", "A garland of Christmas lights spirals up around you, baubles circle, a star shines above and snow drifts down."}));
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 

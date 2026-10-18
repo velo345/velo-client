@@ -23,7 +23,8 @@ import java.util.Set;
  * rules from what we can see: sprinting/swimming distance, jumps, natural regeneration, damage
  * taken all add exhaustion; finishing a food adds its nutrition and saturation. Seeing someone
  * sprint proves they have more than 6 food, so the estimate is corrected up then. Starts at full
- * (20 / 5) the first time a player is seen and after they respawn.
+ * (20 / 5) the first time a player is seen, after they respawn, and when the server evidently healed and
+ * fed them (a sudden jump back to full health with no potion or apple seen - rounds resetting on PvP servers).
  */
 public final class EnemyTracker {
 
@@ -315,6 +316,16 @@ public final class EnemyTracker {
 			t.hunger = 20f;
 			t.saturation = 5f;
 			t.exhaustion = 0;
+		}
+		// Many servers heal and feed everyone between rounds (/heal + /feed, kit reset). A big instant health gain with
+		// no potion or golden apple seen is that: the player is fed again too, so the estimate starts over at full.
+		float gained = health - t.lastHealth;
+		boolean potionSeen = tick <= t.pendingUntil + 10;
+		if (t.lastHealth > 0 && (gained >= 12f || gained >= 8f && !potionSeen) && health >= player.getMaxHealth() - 1f) {
+			t.hunger = 20f;
+			t.saturation = 5f;
+			t.exhaustion = 0;
+			t.lastHealth = health;
 		}
 		boolean sprinting = player.isSprinting();
 		if (PvpCompat.isSwimming(player)) {

@@ -332,6 +332,12 @@ public final class TitleScreenTheme {
 		return rows;
 	}
 
+	/** Gap between the button stack and the small icon row under it - the same gap as between the buttons, so it all reads as one column. */
+	public static int iconRowGap(int screenHeight, int count) {
+		int rowHeight = Math.min(BUTTON_HEIGHT, Math.max(12, (screenHeight - 40) / Math.max(1, count + 3)));
+		return Math.min(BUTTON_GAP, Math.max(2, rowHeight / 4)) + 2;
+	}
+
 	/** Same row-width/height/gap scaling as {@link #stackLayout}, but anchored to a fixed {@code topY} (right below a header band) instead of centering the whole branding+stack block - what the escape menu uses, since its header is a fixed top band rather than something to center alongside the buttons. */
 	public static List<Layout> stackLayoutFrom(int screenWidth, int screenHeight, int topY, int count) {
 		int width = Math.min(BUTTON_WIDTH, Math.max(80, screenWidth - 24));

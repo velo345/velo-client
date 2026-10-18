@@ -450,11 +450,29 @@ Environment variables (all optional):
 | `VELO_DISCORD_INVITE` | your Discord invite link, shown next to the link code in Velo Client |
 | `VELO_DISCORD_DONATIONS_WEBHOOK` | channel webhook: every paid Tebex coin pack is announced with the buyer's skin (mc-heads.net), what they wear (needs them in game), their collection, and their wings' picture (needs `VELO_PUBLIC_URL`) |
 | `VELO_DISCORD_REPORTS_WEBHOOK` | channel webhook: every bug / crash report |
+| `VELO_DISCORD_PLAYER_REPORTS_WEBHOOK` | channel webhook (staff only): every player report from friends / party chat, with the attached messages if the reporter agreed |
 
-Linking: a signed-in player asks `POST /v1/discord/code` (Velo Client does) and types `/link <code>` in the
-Discord; the bot (`bot/`, with `VELO_ADMIN_TOKEN`) redeems it at `POST /v1/admin/discord/link`, which
-records the link in `discord-links.json` and gives **Velo Neon** (`cape_velo_neon`, `unlock: "discord"` - such
-an item is never sold, whatever its status). See `bot/README.md`.
+Linking: a signed-in player asks `POST /v1/discord/code` (Velo Client does) and pastes the copied code in the
+Discord channel configured with `/setup link-channel`. The bot deletes the code message before redeeming it
+at `POST /v1/admin/discord/link`, which records the link in `discord-links.json` and gives **Velo Neon**
+(`cape_velo_neon`, `unlock: "discord"` - such an item is never sold, whatever its status). The bot and server
+must use the same `VELO_ADMIN_TOKEN`; a 403 from the link endpoint means those values do not match. See `bot/README.md`.
+
+## Staff, service bans and player reports
+
+Staff come from Discord roles: the bot posts the list to `POST /v1/admin/staff/sync` (admin token) every 5 minutes;
+it's kept in `staff.json`. Staff get `cape_velo_staff` and count as Velo+ while they're staff. Levels:
+
+- **mod** - `/velostaff <player>` in game: `POST /v1/staff/lookup`, `POST /v1/staff/censor-cape` (removes and bans a custom cape).
+- **admin** (and owners) - also `POST /v1/staff/ban` / `unban` (online-service bans: friends, custom capes, parties; with
+  a duration and reason) and the reports queue: `GET /v1/staff/reports?status=`, `POST /v1/staff/reports/resolve`.
+
+Players report friend / party chat with `POST /v1/social/report` (6 per hour); the last 25 messages are attached only
+when they tick the box. Each report goes to `VELO_DISCORD_PLAYER_REPORTS_WEBHOOK`. Chats aren't monitored.
+
+The bot also uses `POST /v1/admin/discord/booster` (14 days Velo+ and `cape_booster`, once per boost),
+`POST /v1/admin/discord/grant` (giveaway prizes: coins, Velo+ days or an item) and the public
+`GET /v1/cosmetics/card?id=` (a picture of a cosmetic for embeds).
 
 ## Velo+ (subscription)
 
@@ -469,7 +487,7 @@ hourly-checked, once per 30 days of membership. Members' badge flag rides on `/v
 |---|---|
 | `VELO_PLUS_SIGNING_KEY` | Ed25519 private key (PKCS#8, base64): signs the proof the game checks before it loads the Addons. The matching public key is built into the mod (`assets/velo-client/plus/public.key`) |
 | `VELO_PLUS_GITHUB_REPO` | the **private** repo holding the Addons releases (default `velo345/velo-client-plus`) |
-| `VELO_PLUS_GITHUB_TOKEN` | a fine-grained GitHub token with read access (Contents) to that repo only |
+| `VELO_PLUS_GITHUB_TOKEN` | a fine-grained GitHub personal access token with **Contents: read-only** access to that repo only; not an App ID, Client ID, or Discord token |
 
 **The Addons are never public.** Their source is the private repo `velo345/velo-client-plus` (a git submodule at
 `src/addon` of the main repo); `tools/release/publish_addons.py` puts the built jars into a release *there*, the server
@@ -477,6 +495,12 @@ fetches them (hourly, or at once via `POST /v1/admin/addons/sync`) and serves th
 (`GET /v1/plus/addons/file?mc=`). The launcher installs / updates them in a member's profiles at launch and disables
 them when Velo+ ends; the game itself only loads them with a valid signed proof (`GET /v1/plus/token`, valid up to a week).
 Members need no GitHub account and no access to the private repo.
+
+To create the token, use GitHub **Settings → Developer settings → Personal access tokens → Fine-grained tokens**.
+Select only `velo345/velo-client-plus`, grant **Contents: Read-only**, create the token, and set its value as
+`VELO_PLUS_GITHUB_TOKEN` in the server's environment (for example, the server's systemd service environment),
+then restart the server. Do not put it in the bot's environment or commit it to the repository. No token is
+needed if the server's repo is public or Velo+ Addons are not being served.
 
 The Tebex recurring-payment webhook shape was written from the docs and is **not yet tested against real Tebex events**:
 try a subscription in Tebex's test mode first (a manual grant from the Owner panel works regardless).
@@ -551,3 +575,25 @@ curl -X POST https://velo.yourdomain.com/v1/admin/cape/remove \
 - Moderation is the admin endpoint above; there's no automatic content
   filtering. Rate limiting is one upload per account per 10 s plus body size
   caps - there's no per-IP limit on the auth endpoints yet.
+
+
+## Moving to another server
+
+`tools/server/migrate.sh` moves everything in one go - the data directory (coins, Velo+, ownership, friends, capes,
+cosmetics, news, reports, Discord links; `store.db` is snapshotted consistently when `sqlite3` is installed), the server's
+and the Discord bot's settings and secrets, both jars, their systemd units and the Caddy config:
+
+```bash
+# on the NEW machine (Ubuntu/Debian, a JDK 21+ installed, ssh access to the old one):
+git clone <this repo> && cd <repo>
+tools/server/migrate.sh pull root@old-server      # packs there, copies here, restores and starts the services
+tools/server/migrate.sh check https://your.domain # after pointing DNS at the new machine
+# then stop the old services so nothing runs twice (the bot especially):
+#   sudo systemctl disable --now velo-server velo-bot
+```
+
+`pack` / `restore` / `push` do the single steps (see the header of the script). Paths default to this README's layout
+(`/opt/velo-server`, service `velo-server`; the bot in `/opt/velo-bot`, service `velo-bot`) - override with `SERVER_DIR`,
+`BOT_DIR`, `SERVER_UNIT`, `BOT_UNIT`. The archive holds your secrets (admin token, Tebex keys, Discord token), so it is
+mode 600 and deleted after use. Nothing is removed on the old server. If the domain stays the same, launchers and games need no
+update; otherwise change `serverUrl` in `~/.velo-client/config/network.json` (and the launcher's default) to the new address.

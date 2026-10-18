@@ -53,8 +53,8 @@ public final class ModpacksTabView {
 
 		Runnable[] showStatus = new Runnable[1];
 		Runnable[] showBrowse = new Runnable[1];
-		showStatus[0] = () -> container.getChildren().setAll(buildStatusView(owner, overlayHost, instance, theme, showStatus[0], showBrowse[0]));
-		showBrowse[0] = () -> container.getChildren().setAll(buildBrowseView(owner, overlayHost, instance, theme, showStatus[0]));
+		showStatus[0] = () -> ScrollKeeper.setAll(container, buildStatusView(owner, overlayHost, instance, theme, showStatus[0], showBrowse[0]));
+		showBrowse[0] = () -> ScrollKeeper.setAll(container, buildBrowseView(owner, overlayHost, instance, theme, showStatus[0]));
 
 		showStatus[0].run();
 		return container;
@@ -118,7 +118,7 @@ public final class ModpacksTabView {
 
 		HBox topRow = new HBox(10);
 		topRow.setAlignment(Pos.CENTER_LEFT);
-		Button back = new Button("< Back");
+		Button back = BackButton.create(null, null);
 		back.setOnAction(e -> onBack.run());
 		Label heading = new Label("Browse modpacks for Minecraft " + instance.mcVersion());
 		heading.setFont(Font.font("Inter", FontWeight.BOLD, 15));

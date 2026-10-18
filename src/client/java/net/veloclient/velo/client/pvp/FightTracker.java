@@ -11,7 +11,8 @@ import java.util.function.Consumer;
  * {@link Recap}: hits dealt and taken, crits, best combo, reach, damage both ways, a hit timeline
  * and who won. A fight starts with your first confirmed hit on a player (or the first hit you take
  * with a player close by), and ends when one of you dies, the opponent vanishes, or nobody lands a
- * hit for a few seconds. Fights with fewer than three exchanges aren't worth a recap and are dropped.
+ * hit for a few seconds. Only real players who aren't on your team count (no NPCs, no teammates), and a fight needs hits
+ * both ways and some damage - anything less isn't worth a recap (or a clip) and is dropped.
  */
 public final class FightTracker {
 
@@ -66,7 +67,7 @@ public final class FightTracker {
 			synchronized (FightTracker.class) {
 				if (id == opponentId) {
 					attacks++;
-				} else if (PvpCompat.entityById(id) instanceof LivingEntity living && PvpCompat.isPlayer(living)) {
+				} else if (PvpCompat.entityById(id) instanceof LivingEntity living && PvpCompat.isOpponent(living)) {
 					// First swing of a fight that hasn't started yet still counts towards accuracy.
 					pendingAttacks++;
 				}
@@ -96,7 +97,8 @@ public final class FightTracker {
 	}
 
 	private static synchronized void onHit(LivingEntity target, boolean ownHit, boolean crit) {
-		if (!ownHit || !PvpCompat.isPlayer(target)) {
+		// Teammates (an accidental hit), NPCs and bots don't start or feed a fight.
+		if (!ownHit || !PvpCompat.isOpponent(target)) {
 			return;
 		}
 		if (opponentId != target.getId()) {
@@ -152,10 +154,14 @@ public final class FightTracker {
 		lastSelfHurt = selfHurt;
 
 		if (freshlyHurt && opponentId == Integer.MIN_VALUE) {
-			// Hit first by someone: the closest player within melee/bow-ish range is the opponent.
+			// Hit first by someone: the closest real, non-team player in melee range who is swinging is the opponent
+			// (fall damage, mobs or a teammate standing nearby used to start a "fight" too).
 			LivingEntity closest = null;
-			double best = 8;
+			double best = 4.5;
 			for (LivingEntity other : PvpCompat.otherPlayers()) {
+				if (!PvpCompat.isOpponent(other) || PvpCompat.swingProgress(other) <= 0f) {
+					continue;
+				}
 				double d = PvpCompat.distanceTo(other);
 				if (d < best) {
 					best = d;
@@ -216,7 +222,8 @@ public final class FightTracker {
 				damageDealt, damageTaken, self == null ? 0 : self.getHealth(), Math.max(0, lastOpponentSeenHealth), List.copyOf(EVENTS));
 		opponentId = Integer.MIN_VALUE;
 		EVENTS.clear();
-		if (exchanges < 3) {
+		// A real fight goes both ways and does damage: a few one-sided taps (a teammate, a lobby with PvP off) aren't one.
+		if (exchanges < 4 || hitsDealt == 0 || hitsTaken == 0 || damageDealt + damageTaken <= 0.01f) {
 			return;
 		}
 		RECAPS.add(recap);

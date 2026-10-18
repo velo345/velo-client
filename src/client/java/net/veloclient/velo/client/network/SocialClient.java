@@ -310,7 +310,7 @@ public final class SocialClient {
 				publishParty(type, payload);
 				return false;
 			}
-			case "party_ping", "party_waypoint", "party_chat", "party_invite", "party_launch" -> {
+			case "party_ping", "party_waypoint", "party_chat", "party_invite", "party_launch", "party_follow" -> {
 				publishParty(type, data != null && data.isJsonObject() ? data.getAsJsonObject() : new JsonObject());
 				return false;
 			}
@@ -614,6 +614,100 @@ public final class SocialClient {
 		JsonObject body = new JsonObject();
 		body.add("payload", GSON.toJsonTree(waypoint));
 		return action("/v1/party/waypoint", body);
+	}
+
+	/** An answer from the Velo server: the JSON, or the error text to show. */
+	public record Reply(JsonObject json, String error) {
+		public boolean ok() {
+			return error == null;
+		}
+	}
+
+	/** POST (body non-null) or GET to the Velo server as you; the reply arrives off the render thread. */
+	public static CompletableFuture<Reply> request(String path, JsonObject body) {
+		return CompletableFuture.supplyAsync(() -> {
+			try {
+				return new Reply(body == null ? get(path, Duration.ofSeconds(15)) : post(path, body), null);
+			} catch (Exception e) {
+				return new Reply(null, errorText(e));
+			}
+		});
+	}
+
+	/** Reports a player's chat to the Velo Client team ({@code context}: "dm" or "party"). */
+	public static CompletableFuture<Reply> reportPlayer(String target, String category, String reason, String context, boolean includeHistory) {
+		JsonObject body = new JsonObject();
+		body.addProperty("target", target);
+		body.addProperty("category", category);
+		body.addProperty("reason", reason);
+		body.addProperty("context", context);
+		body.addProperty("includeHistory", includeHistory);
+		return request("/v1/social/report", body);
+	}
+
+	private static volatile String staffLevel;
+	private static volatile long staffCheckedAt;
+
+	/** Your Velo Client staff level ("mod", "admin") or null; refreshed in the background at most once a minute. */
+	public static String staffLevel() {
+		long now = System.currentTimeMillis();
+		if (now - staffCheckedAt > 60_000 && VeloServerClient.sessionToken() != null) {
+			staffCheckedAt = now;
+			request("/v1/staff/me", null).thenAccept(r -> {
+				if (r.ok()) {
+					staffLevel = r.json().has("level") && !r.json().get("level").isJsonNull() ? r.json().get("level").getAsString() : null;
+				}
+			});
+		}
+		return staffLevel;
+	}
+
+	/** The leader made a voice chat group for the party ({@code null} name = remove it). */
+	public static CompletableFuture<String> partyVoice(String name, String password) {
+		JsonObject body = new JsonObject();
+		if (name != null) {
+			body.addProperty("name", name);
+			body.addProperty("password", password == null ? "" : password);
+		}
+		return action("/v1/party/voice", body);
+	}
+
+	/** The leader joined a server and asked the party to follow: members get a popup. */
+	public static CompletableFuture<String> partyFollow(String server, String serverName) {
+		JsonObject body = new JsonObject();
+		body.addProperty("server", server);
+		body.addProperty("serverName", serverName == null ? "" : serverName);
+		return action("/v1/party/follow", body);
+	}
+
+	/** Live position for the party's map arrows; {@code null} stops sharing. */
+	public static CompletableFuture<String> partyPosition(Map<String, Object> position) {
+		JsonObject body = new JsonObject();
+		if (position != null) {
+			body.add("payload", GSON.toJsonTree(position));
+		}
+		return action("/v1/party/position", body);
+	}
+
+	/** The other members' live positions (those who share), as the server has them. */
+	public static CompletableFuture<List<JsonObject>> partyPositions() {
+		if (demo) {
+			return CompletableFuture.completedFuture(List.of());
+		}
+		return CompletableFuture.supplyAsync(() -> {
+			try {
+				JsonObject result = get("/v1/party/positions", Duration.ofSeconds(8));
+				List<JsonObject> out = new ArrayList<>();
+				if (result.has("positions")) {
+					for (JsonElement e : result.getAsJsonArray("positions")) {
+						out.add(e.getAsJsonObject());
+					}
+				}
+				return out;
+			} catch (Exception e) {
+				return List.<JsonObject>of();
+			}
+		});
 	}
 
 	public static CompletableFuture<String> partyChat(String text) {

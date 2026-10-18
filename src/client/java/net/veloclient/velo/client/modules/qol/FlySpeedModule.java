@@ -43,6 +43,20 @@ public final class FlySpeedModule extends AbstractModule implements Configurable
 		});
 	}
 
+	/** {@code /flyspeed <amount>}: sets the speed (1 = vanilla) and turns the module on; null/off turns it off. */
+	public void setSpeedFromCommand(Double multiplier) {
+		if (multiplier == null) {
+			setEnabled(false);
+			return;
+		}
+		speed = Math.max(0.1, Math.min(10, Math.round(multiplier * 10) / 10.0));
+		setEnabled(true);
+	}
+
+	public double speed() {
+		return speed;
+	}
+
 	private void tick() {
 		//? if <26.1 {
 		var player = net.minecraft.client.MinecraftClient.getInstance().player;

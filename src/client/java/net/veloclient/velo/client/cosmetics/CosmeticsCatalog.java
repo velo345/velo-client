@@ -47,7 +47,8 @@ public final class CosmeticsCatalog {
 	public record Collection(String id, String name, String tag, String description) {
 	}
 
-	private static final long RETRY_MILLIS = 60_000;
+	/** A failed lookup or download is tried again after this (short: someone's cosmetics shouldn't stay hidden for minutes). */
+	private static final long RETRY_MILLIS = 15_000;
 	private static final int MAX_FILE_BYTES = 12 * 1024 * 1024;
 
 	private static volatile Map<String, Item> items = Map.of();

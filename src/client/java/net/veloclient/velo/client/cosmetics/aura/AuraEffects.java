@@ -36,7 +36,11 @@ public final class AuraEffects {
 		/** A ring of hearts pulsing to a heartbeat, more floating up. */
 		HEART,
 		/** Northern-lights curtains waving around you. */
-		AURORA
+		AURORA,
+		/** A hologram: a hexagon plate under you, scan rings sweeping up your body, data glyphs orbiting, bits of light rising. */
+		HOLOGRAM,
+		/** Christmas: a garland of lights spiralling up around you, baubles circling, a star above and snow drifting down. */
+		FESTIVE
 	}
 
 	/** Sprite shapes: a soft glowing ball, a four-pointed star, a flat glow on the ground plane, a heart, a leaf. */
@@ -118,6 +122,8 @@ public final class AuraEffects {
 			case "bloom" -> Kind.BLOOM;
 			case "heartbeat" -> Kind.HEART;
 			case "aurora" -> Kind.AURORA;
+			case "hologram" -> Kind.HOLOGRAM;
+			case "festive" -> Kind.FESTIVE;
 			default -> null;
 		};
 	}
@@ -137,6 +143,8 @@ public final class AuraEffects {
 			case BLOOM -> new int[] {0x9BE36B, 0xFF9ECF};
 			case HEART -> new int[] {0xFF9ECF, 0xFF2D55};
 			case AURORA -> new int[] {0x5CFF9D, 0xB47CFF};
+			case HOLOGRAM -> new int[] {0x3FF0FF, 0x8A5CFF};
+			case FESTIVE -> new int[] {0xFF3B3B, 0x3BD16F};
 		};
 	}
 
@@ -264,6 +272,8 @@ public final class AuraEffects {
 				case HEART -> emitHearts(t, s, px, py, pz);
 				case MATRIX -> updateRain(t, s);
 				case AURORA -> emitAurora(t, s, px, py, pz);
+				case HOLOGRAM -> emitHologram(t, s, px, py, pz);
+				case FESTIVE -> emitFestive(t, s, px, py, pz);
 			}
 			for (int i = particles.size() - 1; i >= 0; i--) {
 				P p = particles.get(i);
@@ -499,6 +509,40 @@ public final class AuraEffects {
 			}
 		}
 
+		private void emitFestive(float t, Settings s, double px, double py, double pz) {
+			int n = count(t, 10 * s.density());
+			for (int k = 0; k < n; k++) {
+				float a = rnd(0, (float) (Math.PI * 2));
+				float r = rnd(0.3f, 1.2f) * s.size();
+				P p = new P();
+				p.x = px + Math.cos(a) * r;
+				p.y = py + rnd(2.2f, 2.8f);
+				p.z = pz + Math.sin(a) * r;
+				p.vy = -rnd(0.3f, 0.55f);
+				p.life = rnd(4f, 6f);
+				p.size = rnd(0.03f, 0.055f) * s.size();
+				p.shape = STAR;
+				add(p);
+			}
+		}
+
+		private void emitHologram(float t, Settings s, double px, double py, double pz) {
+			int n = count(t, 16 * s.density());
+			for (int k = 0; k < n; k++) {
+				float a = rnd(0, (float) (Math.PI * 2));
+				float r = rnd(0.35f, 0.95f) * s.size();
+				P p = new P();
+				p.x = px + Math.cos(a) * r;
+				p.y = py + rnd(0f, 0.3f);
+				p.z = pz + Math.sin(a) * r;
+				p.vy = rnd(0.5f, 1.1f);
+				p.life = rnd(1.2f, 2.0f);
+				p.size = rnd(0.025f, 0.045f) * s.size();
+				p.shape = random.nextInt(3) == 0 ? STAR : GLOW;
+				add(p);
+			}
+		}
+
 		// -- Code rain (kept per column, around the player) --
 
 		private float[] rainAngle = new float[0];
@@ -601,8 +645,9 @@ public final class AuraEffects {
 					}
 				}
 				case HEART -> p.vx = (float) Math.sin(p.age * 3 + p.seed * 10) * 0.18f;
-				case AURORA, MATRIX -> {
+				case AURORA, MATRIX, HOLOGRAM -> {
 				}
+				case FESTIVE -> p.vx = (float) Math.sin(p.age * 1.7f + p.seed * 9) * 0.12f;
 				case ORBIT -> {
 					p.vx *= 1 - 1.5f * t;
 					p.vz *= 1 - 1.5f * t;
@@ -646,6 +691,8 @@ public final class AuraEffects {
 				}
 				case HEART -> drawHeartRing(s, out);
 				case AURORA -> drawAurora(s, out);
+				case HOLOGRAM -> drawHologram(s, out);
+				case FESTIVE -> drawFestive(s, out);
 			}
 			for (P p : particles) {
 				float f = p.age / p.life;
@@ -703,6 +750,14 @@ public final class AuraEffects {
 						out.sprite(x, y, z, p.size * grow, color(kind, s, p.seed, p.seed, time), alpha, HEART);
 					}
 					case AURORA -> out.sprite(x, y, z, p.size, color(kind, s, p.seed, p.seed, time), (1 - f) * 0.9f, STAR);
+					case HOLOGRAM -> {
+						float alpha = Math.min(1, Math.min(p.age * 4, (p.life - p.age) * 1.8f)) * (0.55f + 0.45f * (float) Math.abs(Math.sin(p.age * 14 + p.seed * 30)));
+						out.sprite(x, y, z, p.size, color(kind, s, p.seed, p.seed, time), alpha, p.shape);
+					}
+					case FESTIVE -> {
+						float alpha = Math.min(1, Math.min(p.age * 2, (p.life - p.age) * 1.5f));
+						out.sprite(x, y, z, p.size, s.color() == 0 ? 0xEAF6FF : color(kind, s, 0.5f, p.seed, time), alpha * 0.9f, STAR);
+					}
 					case MATRIX -> {
 					}
 				}
@@ -915,6 +970,100 @@ public final class AuraEffects {
 				float f = (float) (0.5 + 0.5 * Math.sin(time * 0.35f + i * 0.21f));
 				float shimmer = 0.45f + 0.25f * (float) Math.sin(time * 2.2f + i * 1.3f);
 				out.panel(rr * nx, bottom + h / 2, rr * nz, width, h, nx, nz, CELL_CURTAIN, color(kind, s, f, i / (float) segments, time), shimmer);
+			}
+		}
+
+		/** Garland of lights spiralling up, baubles circling at three heights, a star above your head. */
+		private void drawFestive(Settings s, Out out) {
+			float sz = s.size();
+			out.sprite(0, 0.03f, 0, 1.3f * sz, color(kind, s, 1f, 0, time), 0.14f, DISC);
+			// The garland: a helix of green beams with lights along it, chasing round.
+			int segments = 48;
+			float turns = 2.5f;
+			float r = 0.7f * sz;
+			float px = 0;
+			float py = 0;
+			float pz = 0;
+			int[] bulbColors = {0xFF3B3B, 0xFFD24D, 0x3BD16F, 0x4D8CFF};
+			for (int i = 0; i <= segments; i++) {
+				float f = i / (float) segments;
+				float a = f * turns * (float) (Math.PI * 2) + time * 0.5f;
+				float rr = r * (1.05f - f * 0.45f);
+				float x = rr * (float) Math.cos(a);
+				float y = 0.15f + f * 1.9f;
+				float z = rr * (float) Math.sin(a);
+				if (i > 0) {
+					out.beam(px, py, pz, x, y, z, 0.03f * sz, s.color() == 0 ? 0x1E7A3C : color(kind, s, 1f, f, time), 0.7f);
+				}
+				if (i % 3 == 0) {
+					float chase = 0.5f + 0.5f * (float) Math.cos((f * 6 - time * 1.6f) * Math.PI * 2);
+					int c = s.color() == 0 ? bulbColors[(i / 3) % bulbColors.length] : color(kind, s, (i / 3) % 2, f, time);
+					out.sprite(x, y, z, 0.07f * sz, c, 0.45f + 0.55f * chase, GLOW);
+				}
+				px = x;
+				py = y;
+				pz = z;
+			}
+			// Baubles orbiting.
+			for (int i = 0; i < 6; i++) {
+				float a = -time * 0.7f + i * (float) (Math.PI / 3);
+				float y = 0.5f + (i % 3) * 0.55f + 0.05f * (float) Math.sin(time * 2 + i);
+				float br = 0.95f * sz;
+				int c = s.color() == 0 ? (i % 2 == 0 ? 0xFF3B3B : 0xFFD24D) : color(kind, s, i % 2, i / 6f, time);
+				out.sprite(br * (float) Math.cos(a), y, br * (float) Math.sin(a), 0.11f * sz, c, 0.9f, GLOW);
+				out.sprite(br * (float) Math.cos(a), y + 0.03f, br * (float) Math.sin(a), 0.04f * sz, 0xFFFFFF, 0.8f, GLOW);
+			}
+			// The star on top, twinkling.
+			float twinkle = 0.75f + 0.25f * (float) Math.sin(time * 4);
+			out.sprite(0, 2.25f * Math.max(0.85f, sz * 0.9f), 0, 0.28f * sz * twinkle, s.color() == 0 ? 0xFFE27A : color(kind, s, 0f, 0, time), 1f, STAR);
+			out.sprite(0, 2.25f * Math.max(0.85f, sz * 0.9f), 0, 0.5f * sz, s.color() == 0 ? 0xFFD24D : color(kind, s, 0f, 0, time), 0.25f, GLOW);
+		}
+
+		/** A hexagon outline of radius {@code r} at height {@code y}, turned by {@code rot}. */
+		private void drawHex(Out out, float r, float y, float rot, int rgb, float alpha, float width) {
+			for (int i = 0; i < 6; i++) {
+				float a1 = rot + i * (float) (Math.PI / 3);
+				float a2 = a1 + (float) (Math.PI / 3);
+				out.beam(r * (float) Math.cos(a1), y, r * (float) Math.sin(a1), r * (float) Math.cos(a2), y, r * (float) Math.sin(a2), width, rgb, alpha);
+			}
+		}
+
+		private void drawHologram(Settings s, Out out) {
+			float sz = s.size();
+			// The plate: a faint glow, two hexagons turning against each other, light pillars at the corners.
+			out.sprite(0, 0.03f, 0, 1.4f * sz, color(kind, s, 0.2f, 0, time), 0.16f, DISC);
+			drawHex(out, 0.9f * sz, 0.04f, time * 0.35f, color(kind, s, 0.1f, 0, time), 0.85f, 0.035f * sz);
+			drawHex(out, 0.55f * sz, 0.04f, -time * 0.6f, color(kind, s, 0.85f, 0, time), 0.7f, 0.03f * sz);
+			for (int i = 0; i < 6; i++) {
+				float a = time * 0.35f + i * (float) (Math.PI / 3);
+				float flick = 0.45f + 0.35f * (float) Math.sin(time * 4 + i * 1.7f);
+				out.beam(0.9f * sz * (float) Math.cos(a), 0.04f, 0.9f * sz * (float) Math.sin(a), 0.9f * sz * (float) Math.cos(a), 0.55f + 0.2f * flick, 0.9f * sz * (float) Math.sin(a),
+						0.02f * sz, color(kind, s, 0.3f, i / 6f, time), 0.35f * flick);
+			}
+			// Two scan rings sweeping up through the body.
+			for (int k = 0; k < 2; k++) {
+				float f = (time * 0.32f + k * 0.5f) % 1f;
+				float y = 0.05f + f * 2.1f;
+				float r = (0.6f + 0.08f * (float) Math.sin(time * 2 + k * 3)) * sz;
+				float alpha = (float) Math.sin(Math.PI * f) * 0.9f;
+				int segments = 28;
+				for (int i = 0; i < segments; i++) {
+					float a1 = i * (float) (Math.PI * 2 / segments);
+					float a2 = (i + 1) * (float) (Math.PI * 2 / segments);
+					out.beam(r * (float) Math.cos(a1), y, r * (float) Math.sin(a1), r * (float) Math.cos(a2), y, r * (float) Math.sin(a2), 0.028f * sz,
+							color(kind, s, f, i / (float) segments, time), alpha);
+				}
+			}
+			// Data glyphs orbiting at different heights, always facing outwards.
+			for (int i = 0; i < 6; i++) {
+				float a = time * 0.5f + i * (float) (Math.PI / 3);
+				float r = 0.78f * sz;
+				float y = 0.35f + (i * 0.37f) % 1.7f + 0.08f * (float) Math.sin(time * 1.5f + i);
+				int g = (int) Math.floorMod((long) (time * 3) + i * 5L, (long) GLYPHS.length());
+				float nx = (float) Math.cos(a);
+				float nz = (float) Math.sin(a);
+				out.panel(r * nx, y, r * nz, 0.17f * sz, 0.17f * sz, nx, nz, CELL_GLYPH + g, color(kind, s, 0.2f + 0.6f * ((i % 3) / 2f), i / 6f, time), 0.9f);
+				out.panel(r * nx, y, r * nz, 0.17f * sz, 0.17f * sz, -nz, nx, CELL_GLYPH + g, color(kind, s, 0.2f, i / 6f, time), 0.7f);
 			}
 		}
 

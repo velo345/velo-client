@@ -27,7 +27,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * Installs a small, curated set of widely-used Fabric optimization mods into a profile, from
+ * Installs a small, curated set of widely-used Fabric optimization mods (and Wavey Capes, for nicer capes) into a profile, from
  * their official Modrinth releases - the single biggest FPS lever there is. Most of the frame
  * rate gap between vanilla and "PvP clients" comes from exactly this kind of engine-level work
  * (Sodium's rewritten chunk renderer alone is typically 2-3x or more), which no in-game
@@ -58,6 +58,8 @@ public final class PerformanceModsInstaller {
 		MODS.put("entityculling", "entityculling");
 		MODS.put("immediatelyfast", "immediatelyfast");
 		MODS.put("modernfix", "modernfix");
+		// Not performance: physics for capes (Velo Client detects it and hands it Velo's capes). Fetched from Modrinth like the rest, never bundled.
+		MODS.put("wavey-capes", "waveycapes");
 	}
 
 	/** Modrinth's project id for Fabric API - the one dependency always satisfied here. */

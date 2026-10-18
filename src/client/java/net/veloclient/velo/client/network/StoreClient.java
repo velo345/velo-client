@@ -258,6 +258,21 @@ public final class StoreClient {
 		async(() -> post("/v1/admin/store/coins", body), onOk, onError);
 	}
 
+	/** Owner: everything about a player - {@code username}, {@code uuid}, {@code balance}, {@code owned}, {@code plusUntil}, {@code ledger}. */
+	public static void adminLookup(String target, Consumer<JsonObject> onOk, Consumer<String> onError) {
+		JsonObject body = new JsonObject();
+		body.addProperty("target", target);
+		async(() -> post("/v1/admin/store/lookup", body), onOk, onError);
+	}
+
+	/** Owner: gives {@code days} of Velo+ (more than 0) or ends it (0). */
+	public static void adminPlus(String target, int days, Consumer<JsonObject> onOk, Consumer<String> onError) {
+		JsonObject body = new JsonObject();
+		body.addProperty("target", target);
+		body.addProperty("days", days);
+		async(() -> post("/v1/admin/store/plus", body), onOk, onError);
+	}
+
 	/** Starts the Velo+ subscription checkout; {@code onUrl} gets the payment page. */
 	public static void plusCheckout(Consumer<String> onUrl, Consumer<String> onError) {
 		async(() -> post("/v1/plus/checkout", new JsonObject()), r -> onUrl.accept(r.get("checkoutUrl").getAsString()), onError);

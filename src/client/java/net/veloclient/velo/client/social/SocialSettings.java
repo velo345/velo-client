@@ -21,6 +21,8 @@ public final class SocialSettings {
 		boolean online = true;
 		boolean waypoints = true;
 		boolean sound = true;
+		/** Join the party's Simple Voice Chat group automatically (off by default). */
+		boolean voiceGroup = false;
 		Set<String> mutedFriends = new LinkedHashSet<>();
 	}
 
@@ -41,6 +43,15 @@ public final class SocialSettings {
 
 	private static void save() {
 		ConfigManager.save(CONFIG_ID, data());
+	}
+
+	public static boolean voiceGroup() {
+		return data().voiceGroup;
+	}
+
+	public static void setVoiceGroup(boolean value) {
+		data().voiceGroup = value;
+		save();
 	}
 
 	public static boolean doNotDisturb() {

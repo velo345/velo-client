@@ -388,10 +388,34 @@ public final class CapeManager {
 	 */
 	public static Identifier textureIdentifier(CapeDefinition definition) {
 		if (definition.animated()) {
-			return AnimatedCapeAsset.getOrRegister(definition.id(), () -> openBundleEntry(definition, "frames.gif")).identifier();
+			return AnimatedCapeAsset.getOrRegister(definition.id(), () -> openAnimatedSource(definition)).identifier();
 		}
 		return TEXTURE_CACHE.computeIfAbsent(definition.id(), id -> registerFromBundle(definition, "texture.png", "cape_" + id.replace('-', '_'))
 				.orElseThrow(() -> new RuntimeException("Failed to load cape texture for " + definition.id())));
+	}
+
+	/**
+	 * Where an animated cape's GIF comes from when it has to be decoded (again): a library bundle, another player's downloaded
+	 * GIF (a plain file, not a bundle), or - for another player's Store cape, which has no file of its own - the Store's art.
+	 * Store capes of other players were freed after a minute out of view and then couldn't be read back (no bundle), so they
+	 * stopped showing for the rest of the session.
+	 */
+	private static InputStream openAnimatedSource(CapeDefinition definition) {
+		Path file = definition.bundleFile();
+		if (file != null && Files.isRegularFile(file)) {
+			if (file.toString().endsWith(".velocape") || file.toString().endsWith(".zip")) {
+				return openBundleEntry(definition, "frames.gif");
+			}
+			try {
+				return new java.io.ByteArrayInputStream(Files.readAllBytes(file));
+			} catch (IOException e) {
+				throw new RuntimeException("Failed to read " + file, e);
+			}
+		}
+		String itemId = definition.sourceItemId() != null ? definition.sourceItemId() : definition.id();
+		var item = net.veloclient.velo.client.store.StoreCatalog.byId(itemId)
+				.orElseThrow(() -> new RuntimeException("No art for cape " + itemId + " yet"));
+		return net.veloclient.velo.client.store.StoreAssets.openGif(item);
 	}
 
 	/** Raw bytes of one bundle entry ({@code texture.png} / {@code frames.gif}) - what Velo Network uploads for a custom cape. */
@@ -435,11 +459,64 @@ public final class CapeManager {
 	/** Lazily loads and registers the cape's bundled elytra texture, if it has one ({@link CapeDefinition#hasElytraTexture()}). */
 	public static Optional<Identifier> elytraTextureIdentifier(CapeDefinition definition) {
 		if (!definition.hasElytraTexture()) {
-			return Optional.empty();
+			return composedElytra(definition);
 		}
 		return Optional.of(ELYTRA_TEXTURE_CACHE.computeIfAbsent(definition.id(),
 				id -> registerFromBundle(definition, "elytra.png", "cape_elytra_" + id.replace('-', '_'))
 						.orElseThrow(() -> new RuntimeException("Failed to load elytra texture for " + definition.id()))));
+	}
+
+	/** Elytra textures painted from a cape's own art, for capes that bring no elytra texture of their own (see {@link ElytraArt}). */
+	private static final Map<String, Identifier> COMPOSED_ELYTRA = new LinkedHashMap<>();
+
+	private static Optional<Identifier> composedElytra(CapeDefinition definition) {
+		var animated = AnimatedCapeAsset.existing(definition.id());
+		if (animated != null) {
+			return Optional.of(animated.elytraIdentifier());
+		}
+		if (COMPOSED_ELYTRA.containsKey(definition.id())) {
+			return Optional.ofNullable(COMPOSED_ELYTRA.get(definition.id()));
+		}
+		if (definition.animated()) {
+			try {
+				return Optional.of(AnimatedCapeAsset.getOrRegister(definition.id(), () -> openAnimatedSource(definition)).elytraIdentifier());
+			} catch (RuntimeException e) {
+				return Optional.empty();
+			}
+		}
+		if (definition.bundleFile() == null || !Files.isRegularFile(definition.bundleFile())) {
+			return Optional.empty();
+		}
+		try (InputStream in = openBundleEntry(definition, "texture.png")) {
+			NativeImage cape = NativeImage.read(in);
+			try {
+				return Optional.of(registerComposedElytra(definition.id(), cape));
+			} finally {
+				cape.close();
+			}
+		} catch (IOException | RuntimeException e) {
+			COMPOSED_ELYTRA.put(definition.id(), null);
+			return Optional.empty();
+		}
+	}
+
+	/** Another player's static cape: its elytra texture too (best effort). Render thread. */
+	public static void composeElytraFor(String definitionId, NativeImage cape) {
+		try {
+			registerComposedElytra(definitionId, cape);
+		} catch (RuntimeException e) {
+			// The elytra just stays vanilla.
+		}
+	}
+
+	/** Paints and registers the elytra texture for a (static) cape image. Render thread. */
+	static Identifier registerComposedElytra(String definitionId, NativeImage cape) {
+		NativeImage out = new NativeImage(ElytraArt.WIDTH, ElytraArt.HEIGHT, true);
+		ElytraArt.compose(cape, out);
+		Identifier identifier = Identifier.of("velo-client", "elytra_" + definitionId.replace('-', '_'));
+		MinecraftClient.getInstance().getTextureManager().registerTexture(identifier, new NativeImageBackedTexture(() -> "elytra " + definitionId, out));
+		COMPOSED_ELYTRA.put(definitionId, identifier);
+		return identifier;
 	}
 
 	private static Optional<Identifier> registerFromBundle(CapeDefinition definition, String entryName, String texturePath) {

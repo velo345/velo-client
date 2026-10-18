@@ -1,6 +1,5 @@
 package net.veloclient.launcher.ui;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import javafx.application.Platform;
@@ -14,14 +13,11 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import net.veloclient.launcher.data.WingsCatalog;
 import net.veloclient.launcher.social.StoreApi;
 
 import java.time.Instant;
@@ -49,7 +45,7 @@ import java.util.concurrent.Executors;
  */
 public final class OwnerView {
 
-	private enum Tab { COSMETICS, PLAYERS, COLLECTIONS }
+	private enum Tab { COSMETICS, PLAYERS, REPORTS, COLLECTIONS }
 
 	private static Tab tab = Tab.COSMETICS;
 	private static String filter = "all";
@@ -72,6 +68,7 @@ public final class OwnerView {
 			Button b = new Button(switch (t) {
 				case COSMETICS -> "Cosmetics";
 				case PLAYERS -> "Players";
+				case REPORTS -> "Reports";
 				case COLLECTIONS -> "Collections";
 			});
 			b.getStyleClass().add("segmented-button");
@@ -85,16 +82,20 @@ public final class OwnerView {
 			tabs.getChildren().add(b);
 		}
 		VBox body = new VBox(14);
-		Label loading = new Label("Loading...");
+		Label loading = new Label();
 		loading.getStyleClass().add("page-subtitle");
-		body.getChildren().add(loading);
+		body.getChildren().add(Skeleton.list(5));
 		run(StoreApi::adminCosmetics, data -> {
 			body.getChildren().setAll(switch (tab) {
 				case COSMETICS -> cosmetics(data, rebuild);
-				case PLAYERS -> players(data);
+				case PLAYERS -> OwnerPlayers.build(data);
+				case REPORTS -> OwnerReports.build();
 				case COLLECTIONS -> collections(data, rebuild);
 			});
-		}, error -> loading.setText(error));
+		}, error -> {
+			loading.setText(error);
+			body.getChildren().setAll(loading);
+		});
 
 		VBox root = new VBox(16, new VBox(2, heading, sub), tabs, body);
 		ScrollPane scroll = new ScrollPane(root);
@@ -163,43 +164,7 @@ public final class OwnerView {
 
 	private static Node itemRow(JsonObject item, List<String> collectionIds) {
 		String id = item.get("id").getAsString();
-		boolean wings = id.startsWith("wings_");
-		ImageView thumb = new ImageView();
-		thumb.setFitWidth(96);
-		thumb.setFitHeight(72);
-		thumb.setPreserveRatio(true);
-		String previewSha = item.has("files") && item.getAsJsonObject("files").has("preview")
-				? item.getAsJsonObject("files").get("preview").getAsString() : null;
-		if (wings && previewSha != null) {
-			// Straight from the server's files (testing pairs aren't in your own catalog), loaded off the UI thread.
-			CompletableFuture.supplyAsync(() -> new Image(WingsCatalog.openFile(previewSha)), Executors.newVirtualThreadPerTaskExecutor())
-					.thenAccept(image -> Platform.runLater(() -> thumb.setImage(image)));
-		}
-		StackPane art = new StackPane(thumb);
-		art.setMinSize(104, 76);
-		String accent = str(item, "accent", "#ff4d4d");
-		art.setStyle("-fx-background-radius: 10; -fx-background-color: radial-gradient(center 50% 60%, radius 70%, " + accent
-				+ "66 0%, #16161d00 100%), #17171d;");
-		if (id.startsWith("cape_")) {
-			// The cape's first frame (just the outside of the cape), read off the UI thread.
-			String gifSha = item.has("files") && item.getAsJsonObject("files").has("gif") ? item.getAsJsonObject("files").get("gif").getAsString() : null;
-			thumb.setFitWidth(52);
-			thumb.setFitHeight(84);
-			if (gifSha != null) {
-				CompletableFuture.supplyAsync(() -> firstCapeFrame(gifSha), Executors.newVirtualThreadPerTaskExecutor())
-						.thenAccept(image -> Platform.runLater(() -> {
-							if (image != null) {
-								thumb.setImage(image);
-							}
-						}));
-			}
-		} else if (id.startsWith("aura_")) {
-			// The aura itself, drawn once into a picture (not a live animation per row).
-			net.veloclient.velo.client.cosmetics.aura.AuraEffects.Kind kind = net.veloclient.velo.client.cosmetics.aura.AuraEffects.kind(id.substring(5));
-			if (kind != null) {
-				Platform.runLater(() -> thumb.setImage(AuraFx.snapshot(kind, 104, 76)));
-			}
-		}
+		StackPane art = OwnerPreviews.thumb(item, 104, 76);
 
 		VBox details = new VBox(8);
 		Label name = new Label(str(item, "name", id));
@@ -266,160 +231,6 @@ public final class OwnerView {
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.getStyleClass().add("settings-card");
 		return row;
-	}
-
-	/** Frame 0 of a cape GIF, cropped to the outside of the cape (10 x 16 cape pixels of the 64 x 32 layout). */
-	private static Image firstCapeFrame(String sha) {
-		try (java.io.InputStream in = WingsCatalog.openFile(sha); javax.imageio.stream.ImageInputStream iis = javax.imageio.ImageIO.createImageInputStream(in)) {
-			var reader = javax.imageio.ImageIO.getImageReadersByFormatName("gif").next();
-			reader.setInput(iis, true);
-			java.awt.image.BufferedImage frame = reader.read(0);
-			reader.dispose();
-			int scale = Math.max(1, frame.getWidth() / 64);
-			java.awt.image.BufferedImage face = frame.getSubimage(scale, scale, 10 * scale, 16 * scale);
-			return javafx.embed.swing.SwingFXUtils.toFXImage(face, null);
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
-	// ---- Players ----
-
-	private static Node players(JsonObject data) {
-		TextField targets = new TextField();
-		targets.setPromptText("Player names or UUIDs - several, comma separated, for giveaways");
-		HBox.setHgrow(targets, Priority.ALWAYS);
-		TextArea output = new TextArea();
-		output.setEditable(false);
-		output.setWrapText(true);
-		output.setPrefRowCount(12);
-		Button lookup = new Button("Look up");
-		lookup.getStyleClass().add("ghost-button");
-		lookup.setOnAction(e -> each(targets, StoreApi::adminLookup, output));
-
-		TextField amount = new TextField();
-		amount.setPromptText("Coins, e.g. 500 or -200");
-		amount.setPrefWidth(170);
-		TextField note = new TextField();
-		note.setPromptText("Note (e.g. giveaway)");
-		HBox.setHgrow(note, Priority.ALWAYS);
-		Button coins = new Button("Apply coins");
-		coins.getStyleClass().add("primary-button");
-		coins.setOnAction(e -> {
-			int value;
-			try {
-				value = Integer.parseInt(amount.getText().trim().replace("+", ""));
-			} catch (NumberFormatException ex) {
-				output.setText("Enter a whole number, e.g. 500 or -200");
-				return;
-			}
-			each(targets, target -> StoreApi.adminCoins(target, value, note.getText().trim()), output);
-		});
-
-		ComboBox<String> item = new ComboBox<>();
-		for (JsonObject i : items(data)) {
-			item.getItems().add(i.get("id").getAsString());
-		}
-		item.setPromptText("Cosmetic");
-		item.setPrefWidth(240);
-		Button give = new Button("Give");
-		give.getStyleClass().add("primary-button");
-		give.setOnAction(e -> each(targets, target -> StoreApi.adminItem(target, item.getValue(), true), output));
-		Button take = new Button("Take away");
-		take.getStyleClass().add("danger-ghost-button");
-		take.setOnAction(e -> each(targets, target -> StoreApi.adminItem(target, item.getValue(), false), output));
-
-		// Velo+ for a number of days (a trial, a giveaway, a thank-you) - or end it. Everything follows from the membership:
-		// the badge, the monthly coins, the Addons, and the Discord role once they've linked.
-		ComboBox<String> days = new ComboBox<>();
-		days.getItems().addAll("1 day", "3 days", "7 days", "14 days", "30 days", "90 days", "365 days");
-		days.setValue("30 days");
-		days.setEditable(true);
-		days.setPrefWidth(120);
-		Button givePlus = new Button("Give Velo+");
-		givePlus.getStyleClass().add("primary-button");
-		givePlus.setOnAction(e -> {
-			int count;
-			try {
-				count = Integer.parseInt(days.getEditor().getText().replaceAll("[^0-9]", ""));
-			} catch (NumberFormatException ex) {
-				output.setText("Enter the number of days, e.g. 7");
-				return;
-			}
-			if (count <= 0) {
-				output.setText("Days must be more than 0 (use End Velo+ to remove it)");
-				return;
-			}
-			each(targets, target -> StoreApi.adminPlus(target, count), output);
-		});
-		Button endPlus = new Button("End Velo+");
-		endPlus.getStyleClass().add("danger-ghost-button");
-		endPlus.setOnAction(e -> each(targets, target -> StoreApi.adminPlus(target, 0), output));
-		Label plusHint = hint("Velo+ days add to what they have. Coins, badge and Addons switch on within a minute; the Discord role follows once they've linked (the bot checks every minute).");
-
-		VBox card = new VBox(10, title("Players"), new HBox(8, targets, lookup), new HBox(8, amount, note, coins),
-				new HBox(8, item, give, take), new HBox(8, hint("Velo+"), days, givePlus, endPlus), plusHint, output);
-		card.getStyleClass().add("settings-card");
-		return card;
-	}
-
-	@FunctionalInterface
-	private interface PerTarget {
-		JsonObject run(String target) throws StoreApi.StoreError;
-	}
-
-	/** Runs an action for every name in the field, one after another, and lists what happened. */
-	private static void each(TextField field, PerTarget action, TextArea output) {
-		List<String> targets = new ArrayList<>();
-		for (String part : field.getText().split("[,\\s]+")) {
-			if (!part.isBlank()) {
-				targets.add(part.trim());
-			}
-		}
-		if (targets.isEmpty()) {
-			output.setText("Enter at least one player");
-			return;
-		}
-		output.setText("Working...");
-		CompletableFuture.runAsync(() -> {
-			StringBuilder text = new StringBuilder();
-			for (String target : targets) {
-				try {
-					text.append(describe(action.run(target))).append("\n\n");
-				} catch (StoreApi.StoreError e) {
-					text.append(target).append(": ").append(e.getMessage()).append("\n\n");
-				}
-			}
-			// If you gave yourself something, the rest of the launcher sees it right away.
-			try {
-				StoreApi.wallet();
-				net.veloclient.launcher.data.StorePurchase.restoreMissing();
-				WingsCatalog.refresh();
-			} catch (StoreApi.StoreError ignored) {
-				// Shown on the next visit.
-			}
-			Platform.runLater(() -> output.setText(text.toString().strip()));
-		}, Executors.newVirtualThreadPerTaskExecutor());
-	}
-
-	private static String describe(JsonObject view) {
-		StringBuilder text = new StringBuilder(view.get("username").getAsString() + ": " + String.format(Locale.ROOT, "%,d", view.get("balance").getAsInt())
-				+ " coins");
-		long plusUntil = view.has("plusUntil") ? view.get("plusUntil").getAsLong() : 0;
-		text.append("\n  Velo+: ").append(plusUntil > System.currentTimeMillis()
-				? "until " + java.time.LocalDate.ofInstant(Instant.ofEpochMilli(plusUntil), java.time.ZoneId.systemDefault()) : "no");
-		JsonArray owned = view.getAsJsonArray("owned");
-		text.append("\n  owns: ").append(owned.isEmpty() ? "nothing" : owned.toString().replaceAll("[\\[\\]\"]", "").replace(",", ", "));
-		JsonArray ledger = view.getAsJsonArray("ledger");
-		for (int i = 0; i < Math.min(5, ledger.size()); i++) {
-			JsonObject entry = ledger.get(i).getAsJsonObject();
-			text.append("\n  ").append(entry.get("delta").getAsInt() >= 0 ? "+" : "").append(entry.get("delta").getAsInt())
-					.append("  ").append(entry.get("reason").getAsString());
-			if (entry.has("ref") && !entry.get("ref").isJsonNull()) {
-				text.append("  (").append(entry.get("ref").getAsString()).append(")");
-			}
-		}
-		return text.toString();
 	}
 
 	// ---- Collections ----

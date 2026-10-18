@@ -172,6 +172,9 @@ public final class VoxelSceneryView extends Region {
 
 	/** Re-grades the island and backdrop to the theme (rebuilds only the texture atlas). */
 	public void setTheme(Color accent, Color background) {
+		if (accent.equals(this.accent) && background.equals(this.backdrop) && material.getDiffuseMap() != null) {
+			return; // Home shown again with the same theme: the atlas (~100ms to bake) is still right
+		}
 		this.accent = accent;
 		this.backdrop = background;
 		material.setDiffuseMap(buildAtlas());

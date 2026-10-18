@@ -127,7 +127,29 @@ final class SocialRoutes {
 		});
 	}
 
+	private static volatile StaffService bans;
+
+	/** Online-service bans: the friends system and parties refuse a banned player's actions. */
+	static void setBans(StaffService staff) {
+		bans = staff;
+	}
+
+	/** Which banned service an action belongs to (null: always allowed - reading, leaving, reporting). */
+	private static String serviceOf(String path, String method) {
+		if (!"POST".equals(method)) {
+			return null;
+		}
+		if (path.startsWith("/v1/social/") && !path.equals("/v1/social/report") && !path.equals("/v1/social/read")) {
+			return "friends";
+		}
+		if (path.startsWith("/v1/party/") && !path.equals("/v1/party/leave") && !path.equals("/v1/party/respond")) {
+			return "parties";
+		}
+		return null;
+	}
+
 	static void route(HttpServer server, SessionRegistry registry, String path, String method, Authed handler) {
+		String service = serviceOf(path, method);
 		server.createContext(path, exchange -> VeloServerApp.handle(exchange, method, ex -> {
 			String token = JsonHttp.bearerToken(ex);
 			SessionRegistry.Session session = registry.session(token);
@@ -136,6 +158,9 @@ final class SocialRoutes {
 				return;
 			}
 			registry.touch(token);
+			if (service != null && bans != null) {
+				bans.check(session.uuid(), service);
+			}
 			handler.handle(ex, session.uuid());
 		}));
 	}

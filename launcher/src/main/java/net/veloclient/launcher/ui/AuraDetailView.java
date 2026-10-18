@@ -55,8 +55,7 @@ public final class AuraDetailView {
 	}
 
 	public static Node build(Host host, AuraCatalog.AuraType type) {
-		Button back = new Button("‹  Store");
-		back.getStyleClass().add("ghost-button");
+		Button back = BackButton.create("Store", null);
 		back.setOnAction(e -> host.goBack());
 
 		AuraEffects.Settings[] current = {AuraCatalog.settings(type.id())};

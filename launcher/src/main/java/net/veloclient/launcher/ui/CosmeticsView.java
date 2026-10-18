@@ -70,7 +70,7 @@ public final class CosmeticsView {
 		// Selecting/equipping refreshes this page in place (no full page transition per click).
 		StackPane page = new StackPane();
 		Runnable[] refresh = new Runnable[1];
-		refresh[0] = () -> page.getChildren().setAll(buildContent(owner, host, refresh[0], false));
+		refresh[0] = () -> ScrollKeeper.setAll(page, buildContent(owner, host, refresh[0], false));
 		page.getChildren().setAll(buildContent(owner, host, refresh[0], true));
 		return page;
 	}
@@ -146,7 +146,11 @@ public final class CosmeticsView {
 		grid.getStyleClass().add("cape-grid");
 		for (var aura : owned) {
 			boolean isEquipped = aura.id().equals(equipped);
-			Node art = AuraFx.card(aura.kind(), () -> net.veloclient.launcher.data.AuraCatalog.settings(aura.id()), 164, 124);
+			var settings = net.veloclient.launcher.data.AuraCatalog.settings(aura.id());
+			ImageView art = new ImageView(AuraFx.snapshot(aura.kind(), settings, 164, 124));
+			art.setFitWidth(164);
+			art.setFitHeight(124);
+			art.setPreserveRatio(false);
 			StackPane artBox = new StackPane(art);
 			artBox.setStyle("-fx-background-radius: 12; -fx-background-color: radial-gradient(center 50% 60%, radius 70%, " + aura.accent()
 					+ "44 0%, #0f0f1400 100%), #101015;");

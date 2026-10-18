@@ -34,6 +34,11 @@ public final class UpdateDialog {
 		dialog.setHeaderText(launcher ? "Velo Client " + release.version() + " is available"
 				: "New Velo Client mod build (" + release.version() + ")");
 
+		if (!launcher && release.launcherNewer() == false && !UpdateService.packaged()
+				&& UpdateService.compare(release.version(), AppVersion.VERSION) > 0) {
+			// Started from the source tree: there is no installed launcher to replace.
+			dialog.setHeaderText("Velo Client " + release.version() + " is out");
+		}
 		Label summary = new Label(launcher
 				? "You have " + AppVersion.VERSION + ". Updating downloads the new launcher, mod and addons, then restarts the launcher."
 				: "Updated mod and addons jars for " + String.join(", ", release.modAssets().keySet().stream()
@@ -73,16 +78,20 @@ public final class UpdateDialog {
 			Thread worker = new Thread(() -> {
 				try {
 					if (!release.modAssets().isEmpty()) {
-						UpdateService.installModUpdates(release, text -> Platform.runLater(() -> status.setText(text)));
+						UpdateService.installModUpdates(release, text -> Platform.runLater(() -> status.setText(text)),
+								f -> Platform.runLater(() -> progress.setProgress(f < 0 ? ProgressBar.INDETERMINATE_PROGRESS : f)));
 					}
 					if (launcher) {
-						boolean started = UpdateService.runInstaller(release, text -> Platform.runLater(() -> status.setText(text)));
+						boolean started = UpdateService.runInstaller(release, text -> Platform.runLater(() -> status.setText(text)),
+								f -> Platform.runLater(() -> progress.setProgress(f < 0 ? ProgressBar.INDETERMINATE_PROGRESS : f)));
 						if (started) {
 							boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
+							Platform.runLater(() -> status.setText(windows ? "The installer takes over now - Velo Client closes." : "Installed - restarting Velo Client..."));
 							if (!windows) {
-								// The package manager finished replacing the files: start the new launcher.
+								// The package manager finished replacing the files: start the new launcher once this one is gone.
 								UpdateService.relaunch();
 							}
+							Thread.sleep(800);
 							Platform.runLater(() -> {
 								Platform.exit();
 								System.exit(0);
@@ -94,6 +103,7 @@ public final class UpdateDialog {
 						progress.setVisible(false);
 						progress.setManaged(false);
 						status.setText(launcher ? "Mod updated. This system has no launcher installer - get it from " + release.pageUrl()
+								: !UpdateService.packaged() ? "Mods updated. This launcher runs from the source folder - update it with git pull."
 								: "Done - your next game launch uses the new build.");
 						later.setText("Close");
 						later.setDisable(false);

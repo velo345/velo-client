@@ -73,7 +73,7 @@ public final class DatapacksTabView {
 		}));
 		showManage[0] = () -> {
 			activeBack[0] = showManage[0];
-			container.getChildren().setAll(buildManageView(owner, overlayHost, instance, theme, selectedWorld[0], showWorldPicker[0], showManage[0], showBrowse[0], openDetail[0]));
+			ScrollKeeper.setAll(container, buildManageView(owner, overlayHost, instance, theme, selectedWorld[0], showWorldPicker[0], showManage[0], showBrowse[0], openDetail[0]));
 		};
 		showBrowse[0] = () -> {
 			activeBack[0] = showBrowse[0];
@@ -154,7 +154,7 @@ public final class DatapacksTabView {
 
 		HBox header = new HBox(10);
 		header.setAlignment(Pos.CENTER_LEFT);
-		Button back = new Button("< Other Worlds");
+		Button back = BackButton.create("other worlds", null);
 		back.setOnAction(e -> backToWorlds.run());
 		Label heading = new Label(world.levelName());
 		heading.setFont(javafx.scene.text.Font.font("Inter", javafx.scene.text.FontWeight.BOLD, 15));
@@ -286,7 +286,7 @@ public final class DatapacksTabView {
 
 		HBox topRow = new HBox(10);
 		topRow.setAlignment(Pos.CENTER_LEFT);
-		Button back = new Button("< Back to installed");
+		Button back = BackButton.create("installed", null);
 		back.setOnAction(e -> onBack.run());
 		Label heading = new Label("Browse datapacks for Minecraft " + instance.mcVersion());
 		heading.setFont(javafx.scene.text.Font.font("Inter", javafx.scene.text.FontWeight.BOLD, 15));
@@ -414,7 +414,7 @@ public final class DatapacksTabView {
 
 	private static void showDatapackDetail(Stage owner, StackPane overlayHost, StackPane container, Instance instance, LauncherTheme theme,
 			WorldInfo world, String projectId, Runnable back) {
-		container.getChildren().setAll(InstanceDetailView.loadingLabel(theme));
+		container.getChildren().setAll(Skeleton.detail());
 		Path datapacksDir = WorldScanner.datapacksDir(InstancePaths.savesDir(instance.id()).resolve(world.folderName()));
 		CompletableFuture.supplyAsync(() -> {
 			Optional<ModrinthClient.ProjectDetail> detail = ModrinthClient.getProjectDetail(projectId);

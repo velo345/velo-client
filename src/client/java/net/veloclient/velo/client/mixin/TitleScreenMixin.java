@@ -322,7 +322,7 @@ public abstract class TitleScreenMixin {
 		}
 		if (!extraOrdered.isEmpty() && !ordered.isEmpty()) {
 			ButtonWidget lastMain = ordered.get(ordered.size() - 1);
-			int iconRowY = Math.min(lastMain.getY() + lastMain.getHeight() + 10, self.height - 30);
+			int iconRowY = Math.min(lastMain.getY() + lastMain.getHeight() + TitleScreenTheme.iconRowGap(self.height, ordered.size()), self.height - 30);
 			List<TitleScreenTheme.Layout> iconRow = TitleScreenTheme.iconRowLayout(self.width, iconRowY, extraOrdered.size());
 			for (int idx = 0; idx < extraOrdered.size(); idx++) {
 				ButtonWidget widget = extraOrdered.get(idx);
@@ -573,7 +573,7 @@ public abstract class TitleScreenMixin {
 		}
 		if (!extraOrdered.isEmpty() && !ordered.isEmpty()) {
 			Button lastMain = ordered.get(ordered.size() - 1);
-			int iconRowY = Math.min(lastMain.getY() + lastMain.getHeight() + 10, self.height - 30);
+			int iconRowY = Math.min(lastMain.getY() + lastMain.getHeight() + TitleScreenTheme.iconRowGap(self.height, ordered.size()), self.height - 30);
 			List<TitleScreenTheme.Layout> iconRow = TitleScreenTheme.iconRowLayout(self.width, iconRowY, extraOrdered.size());
 			for (int idx = 0; idx < extraOrdered.size(); idx++) {
 				Button widget = extraOrdered.get(idx);

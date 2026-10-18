@@ -55,6 +55,15 @@ public final class GameJars {
 	 */
 	public static void installInto(Path modsDir, GameVersion version) {
 		try {
+			installClientJar(modsDir, version);
+		} finally {
+			// After the client jar is in place: Addons built for another Velo Client version are switched off, not crashed on.
+			PlusAddons.disableMismatched(modsDir);
+		}
+	}
+
+	private static void installClientJar(Path modsDir, GameVersion version) {
+		try {
 			Files.createDirectories(modsDir);
 			byte[] bundled = currentBytes(version.id());
 			if (bundled == null) {
@@ -136,7 +145,7 @@ public final class GameJars {
 
 	private static boolean isAddonsJar(Path path) {
 		String name = path.getFileName().toString();
-		return name.startsWith("velo-addons-") && (name.endsWith(".jar") || name.endsWith(".jar.disabled"));
+		return name.startsWith("velo-addons-") && (name.endsWith(".jar") || name.endsWith(".jar.disabled") || name.endsWith(".jar.mismatch"));
 	}
 
 	private static boolean isVeloJar(Path path) {

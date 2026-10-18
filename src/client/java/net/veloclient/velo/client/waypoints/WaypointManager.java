@@ -65,7 +65,26 @@ public final class WaypointManager {
 					waypoint.name = "Waypoint";
 				}
 			}
+			// Saved under different spellings of the same server (see normalizeAddress): bring them together.
+			boolean merged = false;
+			for (Waypoint waypoint : data.waypoints) {
+				String key = normalizeKey(waypoint.world);
+				if (!key.equals(waypoint.world)) {
+					waypoint.world = key;
+					merged = true;
+				}
+			}
+			Map<String, String> names = new LinkedHashMap<>();
+			for (Map.Entry<String, String> entry : data.worldNames.entrySet()) {
+				String key = normalizeKey(entry.getKey());
+				merged |= !key.equals(entry.getKey());
+				names.putIfAbsent(key, entry.getValue());
+			}
+			data.worldNames = names;
 			importLegacy();
+			if (merged) {
+				save();
+			}
 		}
 		return data;
 	}
@@ -116,7 +135,7 @@ public final class WaypointManager {
 			label = (name == null ? "Realm" : name) + " (Realm)";
 		} else {
 			String address = ClientCompat.currentServerAddress();
-			key = "mp:" + (address == null ? "unknown" : address.toLowerCase(Locale.ROOT));
+			key = "mp:" + (address == null ? "unknown" : normalizeAddress(address));
 			String name = ClientCompat.currentServerName();
 			label = name != null && address != null && !name.equalsIgnoreCase(address) ? name + " (" + address + ")"
 					: address != null ? address : "Server";
@@ -126,6 +145,34 @@ public final class WaypointManager {
 			save();
 		}
 		return key;
+	}
+
+	/**
+	 * One spelling per server: joining from the launcher (quick play) and from the multiplayer screen used to give
+	 * {@code Play.Example.net}, {@code play.example.net:25565} or {@code play.example.net.} - three different "worlds"
+	 * with separate waypoints and maps for the same server. Lower case, no trailing dot, no default port.
+	 */
+	public static String normalizeAddress(String address) {
+		String a = address.strip().toLowerCase(Locale.ROOT);
+		while (a.endsWith(".")) {
+			a = a.substring(0, a.length() - 1);
+		}
+		if (a.endsWith(":25565")) {
+			a = a.substring(0, a.length() - 6);
+		}
+		while (a.endsWith(".")) {
+			a = a.substring(0, a.length() - 1);
+		}
+		return a;
+	}
+
+	/** The key spelled the old way(s) - for moving saved map data over. */
+	public static List<String> legacyKeys(String key) {
+		return key.startsWith("mp:") ? List.of(key + ":25565") : List.of();
+	}
+
+	private static String normalizeKey(String key) {
+		return key != null && key.startsWith("mp:") ? "mp:" + normalizeAddress(key.substring(3)) : key;
 	}
 
 	public static String worldName(String key) {
@@ -290,6 +337,22 @@ public final class WaypointManager {
 		map.put("color", waypoint.color);
 		map.put("icon", waypoint.icon);
 		return map;
+	}
+
+	/** One short line for chat: name, position, dimension and world (kept well under the 256-character chat limit). */
+	public static String chatText(Waypoint waypoint) {
+		String name = waypoint.name.length() > 40 ? waypoint.name.substring(0, 39) + "..." : waypoint.name;
+		String world = worldName(waypoint.world);
+		if (world.length() > 50) {
+			world = world.substring(0, 49) + "...";
+		}
+		return String.format(Locale.ROOT, "[Waypoint] %s: X %d, Y %d, Z %d | %s | %s", name, waypoint.blockX(), waypoint.blockY(),
+				waypoint.blockZ(), dimensionLabel(waypoint.dimension), world);
+	}
+
+	/** Posts the waypoint in public chat. */
+	public static void shareInChat(Waypoint waypoint) {
+		net.veloclient.velo.client.social.PartyChat.sendPublic(chatText(waypoint));
 	}
 
 	/** Adds a waypoint a friend shared; it keeps the friend's world so it shows up on the same server. */

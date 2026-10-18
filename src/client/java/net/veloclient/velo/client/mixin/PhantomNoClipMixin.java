@@ -23,6 +23,19 @@ public abstract class PhantomNoClipMixin {
 			self.noClip = true;
 		}
 	}
+
+	/**
+	 * Flying through blocks used to crouch or crawl the player (vanilla's pose logic sees a body that doesn't fit and shrinks it
+	 * unless you're a spectator), which lowered the camera and slowed you down. While Phantom flies you through, you stay standing.
+	 */
+	@Inject(method = "updatePose", at = @At("HEAD"), cancellable = true, require = 0)
+	private void velo$standing(CallbackInfo ci) {
+		var self = (net.minecraft.entity.player.PlayerEntity) (Object) this;
+		if (PhantomModule.noClip(self.getUuid(), self.getAbilities().flying, self.isCreative())) {
+			self.setPose(net.minecraft.entity.EntityPose.STANDING);
+			ci.cancel();
+		}
+	}
 }
 //?} else {
 /*@Mixin(net.minecraft.world.entity.player.Player.class)
@@ -34,6 +47,16 @@ public abstract class PhantomNoClipMixin {
 		var self = (net.minecraft.world.entity.player.Player) (Object) this;
 		if (PhantomModule.noClip(self.getUUID(), self.getAbilities().flying, self.isCreative())) {
 			self.noPhysics = true;
+		}
+	}
+
+	// See the Yarn branch: no crouching/crawling while Phantom flies you through blocks.
+	@Inject(method = "updatePlayerPose", at = @At("HEAD"), cancellable = true, require = 0)
+	private void velo$standing(CallbackInfo ci) {
+		var self = (net.minecraft.world.entity.player.Player) (Object) this;
+		if (PhantomModule.noClip(self.getUUID(), self.getAbilities().flying, self.isCreative())) {
+			self.setPose(net.minecraft.world.entity.Pose.STANDING);
+			ci.cancel();
 		}
 	}
 }

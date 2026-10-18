@@ -46,9 +46,7 @@ public final class CoinsView {
 
 	public static Node build() {
 		StackPane page = new StackPane();
-		Label loading = new Label("Loading your coins...");
-		loading.getStyleClass().add("page-subtitle");
-		page.getChildren().add(loading);
+		page.getChildren().add(Skeleton.grid(6, 220, 200));
 		Runnable[] reload = new Runnable[1];
 		reload[0] = () -> CompletableFuture.supplyAsync(() -> {
 			try {
@@ -67,7 +65,7 @@ public final class CoinsView {
 				page.getChildren().setAll(error);
 				return;
 			}
-			page.getChildren().setAll(content((JsonObject) result[0], (JsonObject) result[1], reload[0]));
+			ScrollKeeper.setAll(page, content((JsonObject) result[0], (JsonObject) result[1], reload[0]));
 		}));
 		reload[0].run();
 		return page;

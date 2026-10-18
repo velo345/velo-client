@@ -105,6 +105,12 @@ public final class LauncherSocial {
 	private static volatile String status = "Not signed in";
 	private static volatile Thread worker;
 	private static volatile boolean running;
+	/** The launcher window is in front (focused, not minimised); see {@link #setWindowActive}. */
+	private static volatile boolean windowActive = true;
+	private static volatile long windowInactiveSince;
+	private static volatile boolean lastIdleSent;
+	/** A launcher left in the background this long counts as "away": the player is probably in another client. */
+	private static final long IDLE_AFTER_MILLIS = 3 * 60_000L;
 	private static final Map<String, List<Message>> CONVERSATIONS = new ConcurrentHashMap<>();
 	private static final List<java.util.function.Consumer<Event>> LISTENERS = new CopyOnWriteArrayList<>();
 
@@ -215,6 +221,38 @@ public final class LauncherSocial {
 		}
 	}
 
+	/** The launcher window came to the front / went to the background (focus lost or minimised). */
+	public static void setWindowActive(boolean active) {
+		if (!active && windowActive) {
+			windowInactiveSince = System.currentTimeMillis();
+		}
+		windowActive = active;
+	}
+
+	private static boolean isWindowIdle() {
+		return !windowActive && System.currentTimeMillis() - windowInactiveSince > IDLE_AFTER_MILLIS;
+	}
+
+	/**
+	 * The game this launcher started has ended: the server drops any leftover in-game session of the account
+	 * at once (a crash or a failed join would otherwise show you as playing for a couple more minutes).
+	 */
+	public static void gameEnded() {
+		String current = token;
+		if (current == null || baseUrl() == null) {
+			return;
+		}
+		Thread.ofVirtual().start(() -> {
+			try {
+				JsonObject body = new JsonObject();
+				body.addProperty("sessionToken", current);
+				postJson("/v1/session/end-game", body, null);
+			} catch (Exception ignored) {
+				// An older server doesn't know this; the session expires on its own.
+			}
+		});
+	}
+
 	public static String baseUrl() {
 		// Dev-only: -Dvelo.serverUrl=http://localhost:8787 points the launcher at a test server.
 		String override = System.getProperty("velo.serverUrl");
@@ -255,10 +293,13 @@ public final class LauncherSocial {
 					since = 0;
 					status = "Connected";
 				}
-				if (System.currentTimeMillis() - lastHeartbeat > 30_000) {
+				boolean idleNow = isWindowIdle();
+				if (System.currentTimeMillis() - lastHeartbeat > 30_000 || idleNow != lastIdleSent) {
 					JsonObject body = new JsonObject();
 					body.addProperty("sessionToken", token);
+					body.addProperty("idle", idleNow);
 					postJson("/v1/heartbeat", body, null);
+					lastIdleSent = idleNow;
 					lastHeartbeat = System.currentTimeMillis();
 				}
 				if (state == null || since == 0) {
@@ -372,6 +413,10 @@ public final class LauncherSocial {
 			case "friend_online", "presence", "friend_added" -> {
 				publish(new Event(type, GSON.fromJson(data, Friend.class), null, null, null));
 				return true;
+			}
+			case "party_follow" -> {
+				// A popup for the game (the leader joined a server); nothing to refresh in the launcher.
+				return false;
 			}
 			case "party", "party_invite", "party_chat", "party_launch", "party_ping", "party_waypoint" -> {
 				onPartyEvent(type, data == null || !data.isJsonObject() ? new JsonObject() : data.getAsJsonObject());
