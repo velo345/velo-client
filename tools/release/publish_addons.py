@@ -73,7 +73,16 @@ def main():
         with urllib.request.urlopen(request, timeout=300) as response:
             print("Server:", response.read().decode())
     except urllib.error.HTTPError as e:
-        print("The server couldn't sync yet:", e.code, e.read().decode(errors="replace"))
+        print("The server couldn't sync from GitHub (" + str(e.code) + ") - uploading the jars to it directly instead.")
+        for jar in jars:
+            mc = re.search(r"\+(.+)\.jar$", jar.name).group(1)
+            up = urllib.request.Request(base.rstrip("/") + f"/v1/admin/addons?mc={mc}&version={version}", data=jar.read_bytes(),
+                                        method="POST", headers={"X-Velo-Admin-Token": token, "Content-Type": "application/java-archive"})
+            try:
+                with urllib.request.urlopen(up, timeout=120) as r:
+                    print("  uploaded", jar.name, r.status)
+            except urllib.error.HTTPError as e2:
+                print("  couldn't upload", jar.name, e2.code, e2.read().decode(errors="replace"))
 
 
 if __name__ == "__main__":

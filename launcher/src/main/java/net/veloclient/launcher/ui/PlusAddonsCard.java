@@ -73,6 +73,7 @@ final class PlusAddonsCard {
 		showPlus.setManaged(false);
 
 		boolean[] member = {false};
+		String[] lastProblem = {null};
 		Runnable[] update = new Runnable[1];
 		update[0] = () -> {
 			PlusAddons.State state = PlusAddons.state(modsDir);
@@ -95,7 +96,7 @@ final class PlusAddonsCard {
 				case ENABLED -> "In this profile and switched on.";
 				case DISABLED -> "In this profile, switched off.";
 				case MISMATCH -> "Waiting for Addons that fit this profile's Velo Client - they switch on by themselves once they're out.";
-			});
+			} + (lastProblem[0] == null ? "" : "\n" + lastProblem[0]));
 			if (state == PlusAddons.State.MISMATCH) {
 				CompletableFuture.supplyAsync(() -> PlusAddons.mismatch(modsDir), Executors.newVirtualThreadPerTaskExecutor())
 						.thenAccept(m -> Platform.runLater(() -> {
@@ -117,8 +118,9 @@ final class PlusAddonsCard {
 		primary.setOnAction(e -> {
 			primary.setDisable(true);
 			primary.setText("Adding...");
-			CompletableFuture.runAsync(() -> PlusAddons.installNow(modsDir, GameVersion.byId(instance.mcVersion())),
-					Executors.newVirtualThreadPerTaskExecutor()).whenComplete((v, error) -> Platform.runLater(() -> {
+			CompletableFuture.supplyAsync(() -> PlusAddons.installNow(modsDir, GameVersion.byId(instance.mcVersion())),
+					Executors.newVirtualThreadPerTaskExecutor()).whenComplete((problem, error) -> Platform.runLater(() -> {
+				lastProblem[0] = error != null ? "Couldn't add the Addons: " + error.getMessage() : problem;
 				primary.setDisable(false);
 				update[0].run();
 				onChange.run();
@@ -135,8 +137,9 @@ final class PlusAddonsCard {
 			// Switching on also asks the server for the newest build: a parked (mismatched) jar may have a fitting update by now.
 			toggle.setDisable(true);
 			toggle.setText("Switching on...");
-			CompletableFuture.runAsync(() -> PlusAddons.installNow(modsDir, GameVersion.byId(instance.mcVersion())),
-					Executors.newVirtualThreadPerTaskExecutor()).whenComplete((v, error) -> Platform.runLater(() -> {
+			CompletableFuture.supplyAsync(() -> PlusAddons.installNow(modsDir, GameVersion.byId(instance.mcVersion())),
+					Executors.newVirtualThreadPerTaskExecutor()).whenComplete((problem, error) -> Platform.runLater(() -> {
+				lastProblem[0] = error != null ? "Couldn't add the Addons: " + error.getMessage() : problem;
 				toggle.setDisable(false);
 				update[0].run();
 				onChange.run();
