@@ -1,0 +1,24 @@
+{
+  "title": "Velo Client 0.9.3",
+  "summary": "A quick fix update: Velo+ Addons install reliably again, the launcher tells you exactly why if they can't, Fabric API is always the newest build, and a startup crash with the Addons is gone.",
+  "tag": "Update",
+  "version": "0.9.3",
+  "accent": "#ff5a5a",
+  "pinned": false,
+  "cover": "file:images/cover.jpg",
+  "blocks": [
+    {
+      "type": "text",
+      "text": "0.9.3 fixes the problems some of you had right after 0.9.2."
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Velo+ Addons install again** - *Add to this profile* in the Mods tab works for every member.",
+        "**No more silent failures** - if the Addons can't be added, the card now says why (offline, not signed in, no build for that Minecraft version yet).",
+        "**Always the newest Fabric API** - the launcher now installs the latest Fabric API for your Minecraft version, so mods that need a recent one just work.",
+        "**Startup crash fixed** - the game no longer crashes while loading with the Addons installed."
+      ]
+    }
+  ]
+}

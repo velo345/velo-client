@@ -53,10 +53,17 @@ public final class PlusAddons {
 	}
 
 	/** "Add to this profile": installs (or updates) the Addons jar and makes sure it is switched on. Members only; run off the UI thread. */
-	public static void installNow(Path modsDir, GameVersion version) {
+	public static String installNow(Path modsDir, GameVersion version) {
 		setEnabled(modsDir, true);
-		sync(modsDir, version, true);
+		String problem = sync(modsDir, version, true);
 		disableMismatched(modsDir);
+		if (problem == null && state(modsDir) == State.NOT_INSTALLED) {
+			problem = "The Addons didn't arrive - try again in a minute.";
+		}
+		if (problem != null) {
+			LauncherLog.info("Velo+ Addons not added to " + modsDir + ": " + problem);
+		}
+		return problem;
 	}
 
 	/**
@@ -114,13 +121,16 @@ public final class PlusAddons {
 		sync(modsDir, version, false);
 	}
 
+	/** Why the last sync stopped, or null when it went through. */
+
 	/** {@code install}: add them even if the profile doesn't have them yet (the player pressed "Add to this profile"). */
-	private static void sync(Path modsDir, GameVersion version, boolean install) {
+	private static String sync(Path modsDir, GameVersion version, boolean install) {
 		boolean plus;
 		try {
 			plus = StoreApi.plusStatus().get("plus").getAsBoolean();
 		} catch (Exception e) {
-			return; // offline / signed out: no change
+			// offline / signed out: no change
+			return "Couldn't reach the Velo server (" + e.getMessage() + ") - check that you're online and signed in.";
 		}
 		try (Stream<Path> files = Files.list(modsDir)) {
 			List<Path> installed = files.filter(PlusAddons::isAddonsJar).toList();
@@ -132,10 +142,10 @@ public final class PlusAddons {
 						LauncherLog.info("Velo+ ended - disabled " + name);
 					}
 				}
-				return;
+				return "Velo+ isn't active on this account.";
 			}
 			if (installed.isEmpty() && !install) {
-				return; // opt-in: only profiles the player added them to
+				return null; // opt-in: only profiles the player added them to
 			}
 			// The proof the game checks before it loads the Addons' modules.
 			try {
@@ -153,20 +163,20 @@ public final class PlusAddons {
 				}
 			}
 			if (entry == null) {
-				return; // no Addons published for this Minecraft version yet
+				return "No Addons are published for Minecraft " + version.id() + " yet."; // no Addons published for this Minecraft version yet
 			}
 			boolean disabled = !installed.isEmpty() && installed.stream().allMatch(p -> p.getFileName().toString().endsWith(".disabled"));
 			Path dest = modsDir.resolve("velo-addons-" + version.id() + ".jar" + (disabled ? ".disabled" : ""));
 			String sha = entry.get("sha256").getAsString();
 			if (installed.size() == 1 && installed.get(0).equals(dest) && sha.equals(sha256(Files.readAllBytes(dest)))) {
-				return;
+				return null;
 			}
 			if (installed.size() == 1 && installed.get(0).getFileName().toString().endsWith(".mismatch")
 					&& sha.equals(sha256(Files.readAllBytes(installed.get(0))))) {
-				return; // the server still has the build that didn't fit: leave it parked
+				return null; // the server still has the build that didn't fit: leave it parked
 			}
 			if (keepLocalBuild(installed, entry)) {
-				return;
+				return null;
 			}
 			byte[] jar = cachedOrDownload(version.id(), sha);
 			for (Path old : installed) {
@@ -178,8 +188,10 @@ public final class PlusAddons {
 			}
 			Files.write(dest, jar, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 			LauncherLog.info("Installed Velo Client Addons for " + version.id());
+			return null;
 		} catch (Exception e) {
 			LauncherLog.warn("Couldn't sync the Velo Client Addons in " + modsDir, e);
+			return "Couldn't install the Addons: " + e.getMessage();
 		}
 	}
 
