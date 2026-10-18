@@ -23,6 +23,8 @@ public final class PartyChat {
 			"open", "close", "kickoffline", "hijack", "challenge", "info", "toggle", "c");
 
 	private static volatile boolean partyMode;
+	/** Set while we send a public line ourselves (a shared waypoint), so party chat mode doesn't swallow it. */
+	private static volatile boolean sendingPublic;
 	private static volatile String commandName = "party";
 
 	private PartyChat() {
@@ -43,7 +45,7 @@ public final class PartyChat {
 
 	/** Outgoing chat line: true when it went to the party instead (cancel the public send). */
 	public static boolean onOutgoingChat(String message) {
-		if (!partyMode) {
+		if (!partyMode || sendingPublic) {
 			return false;
 		}
 		if (SocialClient.party() == null) {
@@ -66,18 +68,53 @@ public final class PartyChat {
 			return false;
 		}
 		String rest = trimmed.length() > commandName.length() ? trimmed.substring(commandName.length()).strip() : "";
-		if (rest.isEmpty()) {
+		if (!rest.isEmpty() && isServerSubcommand(rest.split("\\s+", 2)[0])) {
+			return false;
+		}
+		runLocal(rest);
+		return true;
+	}
+
+	/** Whether {@code word} is a party subcommand the server's own party plugin owns (it must reach the server). */
+	public static boolean isServerSubcommand(String word) {
+		return SERVER_SUBCOMMANDS.contains(word.toLowerCase(Locale.ROOT));
+	}
+
+	/**
+	 * What {@code /party <rest>} does while you're in a Velo party: nothing after it switches party chat on/off, "follow"
+	 * toggles asking the party to follow you, anything else is a single message to the party.
+	 */
+	public static void runLocal(String rest) {
+		String text = rest == null ? "" : rest.strip();
+		if (text.isEmpty()) {
 			partyMode = !partyMode;
 			info(partyMode ? "Party chat ON - your messages go to your Velo party. /" + commandName + " to switch back."
 					: "Party chat OFF - back to public chat.");
-			return true;
+			return;
 		}
-		String first = rest.split("\\s+", 2)[0].toLowerCase(Locale.ROOT);
-		if (SERVER_SUBCOMMANDS.contains(first)) {
-			return false;
+		String[] words = text.split("\\s+");
+		if (words[0].equalsIgnoreCase("follow")) {
+			if (!SocialClient.isPartyLeader()) {
+				info("Only the party leader can ask everyone to follow.");
+				return;
+			}
+			boolean on = words.length > 1 ? words[1].equalsIgnoreCase("on") : !PartyFollow.requesting();
+			PartyFollow.setRequesting(on);
+			info(on ? "Follow requests ON - when you join a server, your party gets a small popup to join you."
+					: "Follow requests OFF.");
+			return;
 		}
-		send(rest);
-		return true;
+		send(text);
+	}
+
+	/** Sends a line to the server's public chat even while party chat is switched on. */
+	public static void sendPublic(String message) {
+		sendingPublic = true;
+		try {
+			net.veloclient.velo.client.pvp.PvpCompat.sendChat(message);
+		} finally {
+			sendingPublic = false;
+		}
 	}
 
 	private static void send(String message) {

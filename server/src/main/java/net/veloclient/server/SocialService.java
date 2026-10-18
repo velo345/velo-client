@@ -271,7 +271,8 @@ final class SocialService {
 			Activity presence = gamePresence.get(uuid);
 			return presence != null ? presence : new Activity("menu", null);
 		}
-		if (sessions.hasLiveSession(uuid, SessionRegistry.KIND_LAUNCHER)) {
+		// A launcher left in the background is not "online": the player is probably in another client.
+		if (sessions.hasActiveLauncherSession(uuid)) {
 			return new Activity("launcher", null);
 		}
 		return null;
@@ -471,6 +472,21 @@ final class SocialService {
 				blocked.add(new PlayerRef(uuid, nameOf(uuid)));
 			}
 			return new State(new Me(me, nameOf(me), self.invisible), friends, incoming, outgoing, blocked, seq.get());
+		} finally {
+			lock.unlock();
+		}
+	}
+
+	/** The last {@code count} messages between two players, oldest first (for a report the reporter agreed to attach). */
+	List<MessageView> recentConversation(String a, String b, int count) {
+		lock.lock();
+		try {
+			List<Message> conversation = data.conversations.getOrDefault(pair(a, b), List.of());
+			List<MessageView> out = new ArrayList<>();
+			for (int i = Math.max(0, conversation.size() - count); i < conversation.size(); i++) {
+				out.add(view(conversation.get(i)));
+			}
+			return out;
 		} finally {
 			lock.unlock();
 		}

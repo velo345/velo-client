@@ -188,15 +188,23 @@ public final class StoreService {
 		}
 	}
 
-	public boolean isPlus(String uuid) {
-		Long until = plusCache.get(uuid);
-		return until != null && until > System.currentTimeMillis();
+	/** Staff of Velo Client have Velo+ for as long as they're staff (set by the server app). */
+	private volatile java.util.function.Predicate<String> staffLookup = uuid -> false;
+
+	public void setStaffLookup(java.util.function.Predicate<String> lookup) {
+		this.staffLookup = lookup;
 	}
 
-	/** When the membership ends (0 if none or over). */
+	public boolean isPlus(String uuid) {
+		Long until = plusCache.get(uuid);
+		return until != null && until > System.currentTimeMillis() || staffLookup.test(uuid);
+	}
+
+	/** When the membership ends (0 if none or over); staff always show at least 30 days ahead. */
 	public long plusUntil(String uuid) {
 		Long until = plusCache.get(uuid);
-		return until != null && until > System.currentTimeMillis() ? until : 0;
+		long real = until != null && until > System.currentTimeMillis() ? until : 0;
+		return staffLookup.test(uuid) ? Math.max(real, System.currentTimeMillis() + 30L * 86_400_000L) : real;
 	}
 
 	/**

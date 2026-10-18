@@ -3,6 +3,8 @@
 
     python3 tools/release/publish_addons.py            # the jars of the current mod.version
     python3 tools/release/publish_addons.py --no-sync  # don't tell the server to fetch them right away
+    python3 tools/release/publish_addons.py --prerelease  # upload for testing: the server ignores pre-releases until you
+                                                          # promote it (gh release edit v<version> -R <repo> --prerelease=false)
 
 Needs the Addons built (`./gradlew :1.21.11:build :26.1:build :26.2:build :26.3:build`, with the private
 submodule src/addon checked out) and `gh` logged in with access to velo345/velo-client-plus. It creates (or
@@ -39,6 +41,7 @@ def env(name):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--no-sync", action="store_true")
+    parser.add_argument("--prerelease", action="store_true", help="mark it a pre-release (not served until promoted); implies --no-sync")
     args = parser.parse_args()
     version = re.search(r'^mod\.version\s*=\s*"([^"]+)"', (ROOT / "stonecutter.properties.toml").read_text(), re.M).group(1)
     jars = sorted(p for p in (ROOT / "versions").glob(f"*/build/libs/velo-addons-{version}+*.jar") if "sources" not in p.name)
@@ -50,9 +53,16 @@ def main():
     exists = subprocess.run(["gh", "release", "view", tag, "-R", REPO], capture_output=True).returncode == 0
     if exists:
         subprocess.check_call(["gh", "release", "upload", tag, "-R", REPO, "--clobber", *map(str, jars)])
+        if args.prerelease:
+            subprocess.check_call(["gh", "release", "edit", tag, "-R", REPO, "--prerelease"])
     else:
         subprocess.check_call(["gh", "release", "create", tag, "-R", REPO, "--title", f"Velo Client Addons {version}",
-                               "--notes", f"Velo Client Addons {version} - for Velo+ (served by the Velo server, never public).", *map(str, jars)])
+                               "--notes", f"Velo Client Addons {version} - for Velo+ (served by the Velo server, never public).",
+                               *(["--prerelease"] if args.prerelease else []), *map(str, jars)])
+    if args.prerelease:
+        print(f"Uploaded as a pre-release - the server keeps serving the previous release. Promote with:\n"
+              f"  gh release edit {tag} -R {REPO} --prerelease=false && python3 tools/release/publish_addons.py")
+        return
     base, token = env("VELO_SERVER_URL"), env("VELO_ADMIN_TOKEN")
     if args.no_sync or not base or not token:
         print("Done (the server fetches it within the hour).")

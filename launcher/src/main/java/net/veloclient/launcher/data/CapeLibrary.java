@@ -48,7 +48,7 @@ public final class CapeLibrary {
 		List<CapeEntry> capes = new ArrayList<>();
 		try (var files = Files.list(VeloPaths.capes())) {
 			for (Path file : files.filter(p -> p.toString().endsWith(".velocape")).toList()) {
-				readMetadata(file).ifPresent(capes::add);
+				cachedMetadata(file).ifPresent(capes::add);
 			}
 		} catch (IOException ignored) {
 			// Empty/missing directory - no capes yet.
@@ -182,6 +182,28 @@ public final class CapeLibrary {
 			GSON.toJson(new EquipState(capeId), writer);
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to save cape equip state", e);
+		}
+	}
+
+	/** A bundle's metadata as of its size + modified time - every page rebuild (equip, select...) used to unzip every cape again. */
+	private record CachedMeta(long modified, long size, Optional<CapeEntry> entry) {
+	}
+
+	private static final java.util.Map<Path, CachedMeta> META_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+	private static Optional<CapeEntry> cachedMetadata(Path bundleFile) {
+		try {
+			long modified = Files.getLastModifiedTime(bundleFile).toMillis();
+			long size = Files.size(bundleFile);
+			CachedMeta cached = META_CACHE.get(bundleFile);
+			if (cached != null && cached.modified() == modified && cached.size() == size) {
+				return cached.entry();
+			}
+			Optional<CapeEntry> entry = readMetadata(bundleFile);
+			META_CACHE.put(bundleFile, new CachedMeta(modified, size, entry));
+			return entry;
+		} catch (IOException e) {
+			return readMetadata(bundleFile);
 		}
 	}
 

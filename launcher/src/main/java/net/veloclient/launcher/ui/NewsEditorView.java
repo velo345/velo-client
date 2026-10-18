@@ -85,8 +85,7 @@ final class NewsEditorView {
 	}
 
 	private Node root(boolean isNew) {
-		Button back = new Button("←  News");
-		back.getStyleClass().add("ghost-button");
+		Button back = BackButton.create("News", null);
 		back.setOnAction(e -> {
 			if (Confirm.ask(host.owner(), "Leave the editor?", "Unsaved changes to this post are lost.")) {
 				host.openNews();

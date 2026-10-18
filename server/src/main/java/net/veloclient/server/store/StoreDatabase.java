@@ -302,6 +302,21 @@ public final class StoreDatabase implements AutoCloseable {
 		}
 	}
 
+	/** Everyone who owns {@code itemId} through {@code source} (e.g. the staff cape handed out by the staff sync). */
+	public synchronized List<String> ownersOf(String itemId, String source) throws SQLException {
+		List<String> out = new ArrayList<>();
+		try (PreparedStatement ps = connection.prepareStatement("SELECT uuid FROM owned_items WHERE item_id = ? AND source = ?")) {
+			ps.setString(1, itemId);
+			ps.setString(2, source);
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(rs.getString(1));
+				}
+			}
+		}
+		return out;
+	}
+
 	public synchronized List<String> ownedItems(String uuid) throws SQLException {
 		List<String> out = new ArrayList<>();
 		try (PreparedStatement ps = connection.prepareStatement("SELECT item_id FROM owned_items WHERE uuid = ? ORDER BY created_at")) {

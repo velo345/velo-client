@@ -9,9 +9,15 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.concrete.Category;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleAddEvent;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberRoleRemoveEvent;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
@@ -26,24 +32,36 @@ import net.dv8tion.jda.api.utils.MemberCachePolicy;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
- * The Velo Client Discord bot: {@code /link} (unlocks the Velo Neon cape), a ping-role panel, a ticket
- * system with per-type forms and roles, and ticket logs. Settings come from commands and from
+ * The Velo Client Discord bot: channel-based account linking (unlocks the Velo Neon cape), a ping-role
+ * panel, a ticket system with per-type forms and roles, ticket logs, ready-made info posts, booster
+ * rewards, giveaways, a bot-trap channel and the staff-role sync. Settings come from commands and from
  * {@code bot-config.json} (see bot/README.md). Run: {@code DISCORD_TOKEN=... VELO_SERVER_URL=...
  * VELO_ADMIN_TOKEN=... java -jar velo-bot.jar}.
  */
 public final class VeloBot extends ListenerAdapter {
 
+	private static final Pattern LINK_CODE = Pattern.compile("(?i)(?:VELO-)?[A-HJ-NP-Z2-9]{6}");
+
 	private final BotConfig config;
 	private final ServerApi server;
 	private final Tickets tickets;
+	private final Boosters boosters;
+	private final Honeypot honeypot;
 	private VipSync vip;
+	private StaffSync staff;
+	private Welcomer welcomer;
+	private Giveaways giveaways;
 
 	private VeloBot(BotConfig config, ServerApi server) {
 		this.config = config;
 		this.server = server;
 		this.tickets = new Tickets(config);
+		this.boosters = new Boosters(config, server);
+		this.honeypot = new Honeypot(config);
+		this.welcomer = new Welcomer(config);
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -63,6 +81,10 @@ public final class VeloBot extends ListenerAdapter {
 		bot.registerCommands(jda, env("DISCORD_GUILD_ID", null));
 		bot.vip = new VipSync(jda, config, bot.server);
 		bot.vip.start();
+		bot.staff = new StaffSync(jda, config, bot.server);
+		bot.staff.start();
+		bot.giveaways = new Giveaways(jda, config, bot.server);
+		bot.giveaways.start();
 		System.out.println("Velo bot online as " + jda.getSelfUser().getName());
 	}
 
@@ -76,8 +98,6 @@ public final class VeloBot extends ListenerAdapter {
 	private void registerCommands(JDA jda, String guildId) {
 		DefaultMemberPermissions admin = DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER);
 		List<SlashCommandData> commands = new ArrayList<>();
-		commands.add(Commands.slash("link", "Link your Minecraft account to unlock the Velo Neon cape")
-				.addOption(OptionType.STRING, "code", "The code from Velo Client (Store > Capes > Link Discord)", true));
 		commands.add(Commands.slash("unlink", "Unlink your Minecraft account (the Velo Neon cape is removed)"));
 		commands.add(Commands.slash("roles", "Ping roles members can pick").setDefaultPermissions(admin).addSubcommands(
 				new SubcommandData("add", "Put a role on the panel").addOptions(new OptionData(OptionType.ROLE, "role", "The role to give", true),
@@ -101,24 +121,76 @@ public final class VeloBot extends ListenerAdapter {
 				new SubcommandData("remove", "Remove someone from this ticket").addOptions(new OptionData(OptionType.USER, "user", "Who", true)),
 				new SubcommandData("close", "Close this ticket").addOptions(new OptionData(OptionType.STRING, "reason", "Why", false))));
 		commands.add(Commands.slash("setup", "Set the bot up").setDefaultPermissions(admin).addSubcommands(
+				new SubcommandData("link-channel", "Where members paste their one-time Velo Client link codes")
+						.addOptions(new OptionData(OptionType.CHANNEL, "channel", "The link-code channel", true)),
 				new SubcommandData("ticket-category", "The category tickets are created in").addOptions(new OptionData(OptionType.CHANNEL, "category", "The category", true)),
 				new SubcommandData("ticket-log", "Where ticket logs and transcripts go").addOptions(new OptionData(OptionType.CHANNEL, "channel", "The channel", true)),
 				new SubcommandData("support-role", "The role that handles every ticket").addOptions(new OptionData(OptionType.ROLE, "role", "The role", true)),
 				new SubcommandData("linked-role", "A role for members who linked their Minecraft account").addOptions(new OptionData(OptionType.ROLE, "role", "The role", true)),
 				new SubcommandData("vip-role", "The VIP role of Velo+ members (given and taken away automatically)").addOptions(new OptionData(OptionType.ROLE, "role", "The role", true)),
-				new SubcommandData("webhooks", "Create the donation and bug-report webhooks (the URLs go in the server's settings)").addOptions(
+				new SubcommandData("webhooks", "Create the server's webhooks (the URLs go in the Velo server's settings)").addOptions(
 						new OptionData(OptionType.CHANNEL, "donations", "Channel for purchase announcements", false),
-						new OptionData(OptionType.CHANNEL, "reports", "Channel for bug / crash reports", false)),
+						new OptionData(OptionType.CHANNEL, "reports", "Channel for bug / crash reports", false),
+						new OptionData(OptionType.CHANNEL, "player-reports", "Channel for reported friend / party chat messages (staff only!)", false)),
+				new SubcommandData("staff-role", "Members with this role are on the Velo team (staff cape, Velo+, maybe in-game staff tools)").addOptions(
+						new OptionData(OptionType.ROLE, "role", "The role", true),
+						new OptionData(OptionType.STRING, "level", "What they may do", true)
+								.addChoice("Helper - staff cape and Velo+, no moderation tools", "helper")
+								.addChoice("Moderator - look up players, censor capes", "mod")
+								.addChoice("Admin - also bans and player reports", "admin")),
+				new SubcommandData("staff-role-remove", "This role no longer makes someone Velo staff").addOptions(new OptionData(OptionType.ROLE, "role", "The role", true)),
+				new SubcommandData("welcome", "Post a welcome card for every new member in a channel").addOptions(
+						new OptionData(OptionType.CHANNEL, "channel", "Where welcomes go", true),
+						new OptionData(OptionType.CHANNEL, "rules", "A channel to point new members to (e.g. the rules)", false)),
+				new SubcommandData("welcome-off", "Stop posting welcome messages"),
+				new SubcommandData("welcome-test", "Post your own welcome card here, to see how it looks"),
+				new SubcommandData("boost-channel", "Where boost thank-yous with the Claim button go (default: Discord's boost message)")
+						.addOptions(new OptionData(OptionType.CHANNEL, "channel", "The channel", true)),
+				new SubcommandData("honeypot", "Make a bot-trap channel: anyone (not staff) writing there is removed").addOptions(
+						new OptionData(OptionType.CHANNEL, "channel", "A new, empty channel - put it near the top", true),
+						new OptionData(OptionType.STRING, "action", "What happens to them (default: softban)", false)
+								.addChoice("Softban - kick and delete their last day of messages", "softban").addChoice("Ban", "ban")),
+				new SubcommandData("mod-log", "Where honeypot catches and giveaway problems are logged (default: ticket log)")
+						.addOptions(new OptionData(OptionType.CHANNEL, "channel", "The channel", true)),
 				new SubcommandData("reload", "Re-read bot-config.json after editing it"),
 				new SubcommandData("show", "Show the current settings")));
 		commands.add(Commands.slash("announce", "Post an announcement that pings a role").setDefaultPermissions(admin)
 				.addOptions(new OptionData(OptionType.CHANNEL, "channel", "Where", true), new OptionData(OptionType.ROLE, "role", "Who to ping", true),
 						new OptionData(OptionType.STRING, "message", "The announcement", true), new OptionData(OptionType.STRING, "title", "Title", false)));
-		if (guildId != null && jda.getGuildById(guildId) != null) {
-			jda.getGuildById(guildId).updateCommands().addCommands(commands).queue();
-		} else {
-			jda.updateCommands().addCommands(commands).queue();
+		OptionData postKind = new OptionData(OptionType.STRING, "post", "Which post", true).addChoice("📜 Rules", "rules")
+				.addChoice("⬇️ How to download", "download").addChoice("🧥 Free Velo Neon cape", "free-cape").addChoice("💖 Booster perks (with Claim button)", "boosters");
+		commands.add(Commands.slash("post", "Post a ready-made info message (rules, download, free cape, boosters)").setDefaultPermissions(admin)
+				.addOptions(postKind, new OptionData(OptionType.CHANNEL, "channel", "Where", true)));
+		commands.add(Commands.slash("giveaway", "Giveaways - prizes go straight onto the winners' Velo accounts").setDefaultPermissions(admin).addSubcommands(
+				new SubcommandData("start", "Start a giveaway").addOptions(
+						new OptionData(OptionType.STRING, "prize-type", "What they win", true).addChoice("✨ Cosmetic", "cosmetic")
+								.addChoice("🪙 Velo Coins", "coins").addChoice("⭐ Velo+ days", "plus"),
+						new OptionData(OptionType.STRING, "prize", "Cosmetic (type to search), number of coins, or number of days", true, true),
+						new OptionData(OptionType.STRING, "duration", "How long, e.g. 30m, 12h, 3d, 1w", true),
+						new OptionData(OptionType.INTEGER, "winners", "How many winners (default 1)", false).setRequiredRange(1, 20),
+						new OptionData(OptionType.CHANNEL, "channel", "Where (default: here)", false),
+						new OptionData(OptionType.STRING, "title", "Title (default: the prize)", false),
+						new OptionData(OptionType.STRING, "description", "A few words under the title", false),
+						new OptionData(OptionType.ATTACHMENT, "image", "A picture (cosmetics show theirs automatically)", false),
+						new OptionData(OptionType.ROLE, "role", "Only members with this role can enter", false)),
+				new SubcommandData("end", "End a giveaway now and draw the winners").addOptions(new OptionData(OptionType.STRING, "id", "Giveaway id", true)),
+				new SubcommandData("reroll", "Draw new winner(s) for an ended giveaway").addOptions(new OptionData(OptionType.STRING, "id", "Giveaway id", true),
+						new OptionData(OptionType.INTEGER, "winners", "How many (default 1)", false).setRequiredRange(1, 20)),
+				new SubcommandData("cancel", "Delete a giveaway without giving prizes").addOptions(new OptionData(OptionType.STRING, "id", "Giveaway id", true)),
+				new SubcommandData("list", "Running and recent giveaways")));
+		if (guildId != null) {
+			Guild guild = jda.getGuildById(guildId);
+			if (guild != null) {
+				guild.updateCommands().addCommands(commands).queue(
+						registered -> System.out.println("Registered " + registered.size() + " slash commands in guild " + guildId),
+						error -> System.err.println("Couldn't register slash commands in guild " + guildId + ": " + error.getMessage()));
+				return;
+			}
+			System.err.println("DISCORD_GUILD_ID " + guildId + " isn't a guild the bot has joined; registering commands globally instead.");
 		}
+		jda.updateCommands().addCommands(commands).queue(
+				registered -> System.out.println("Registered " + registered.size() + " global slash commands (Discord may take up to an hour to show them)"),
+				error -> System.err.println("Couldn't register global slash commands: " + error.getMessage()));
 	}
 
 	private OptionData typeOption() {
@@ -134,12 +206,13 @@ public final class VeloBot extends ListenerAdapter {
 		try {
 			String sub = event.getSubcommandName();
 			switch (event.getName()) {
-				case "link" -> link(event);
 				case "unlink" -> unlink(event);
 				case "roles" -> roles(event, sub);
 				case "ticket" -> ticket(event, sub);
 				case "setup" -> setup(event, sub);
 				case "announce" -> announce(event);
+				case "post" -> post(event);
+				case "giveaway" -> giveaways.command(event, sub);
 				default -> event.reply("Unknown command").setEphemeral(true).queue();
 			}
 		} catch (RuntimeException e) {
@@ -150,27 +223,49 @@ public final class VeloBot extends ListenerAdapter {
 		}
 	}
 
-	// ---- /link, /unlink ----
+	// ---- Link channel, /unlink ----
 
-	private void link(SlashCommandInteractionEvent event) {
-		String code = event.getOption("code").getAsString();
-		event.deferReply(true).queue();
+	@Override
+	public void onMessageReceived(MessageReceivedEvent event) {
+		if (honeypot.onMessage(event) || boosters.onMessage(event)) {
+			return;
+		}
+		if (event.getGuild() == null || event.getAuthor().isBot() || config.linkChannelId == null
+				|| !event.getChannel().getId().equals(config.linkChannelId)) {
+			return;
+		}
+		String code = event.getMessage().getContentRaw().strip();
+		if (!LINK_CODE.matcher(code).matches()) {
+			return;
+		}
+		event.getMessage().delete().queue(
+				ignored -> link(event, code),
+				error -> {
+					System.err.println("Couldn't delete a Discord link-code message: " + error.getMessage());
+					event.getChannel().sendMessage("I couldn't safely process that code. Please check that I have Manage Messages in this channel.")
+							.queue(null, sendError -> System.err.println("Couldn't report link-code deletion failure: " + sendError.getMessage()));
+				});
+	}
+
+	private void link(MessageReceivedEvent event, String code) {
 		try {
-			ServerApi.Linked linked = server.link(code, event.getUser().getId(), event.getUser().getName());
+			ServerApi.Linked linked = server.link(code, event.getAuthor().getId(), event.getAuthor().getName());
 			Guild guild = event.getGuild();
-			if (guild != null && config.linkedRoleId != null && event.getMember() != null) {
+			if (config.linkedRoleId != null && event.getMember() != null) {
 				Role role = guild.getRoleById(config.linkedRoleId);
 				if (role != null && guild.getSelfMember().canInteract(role)) {
 					guild.addRoleToMember(event.getMember(), role).queue(null, e -> { });
 				}
 			}
-			event.getHook().sendMessage("✅ Linked to **" + linked.username() + "**! You unlocked the **Velo Neon** cape - it's in your cosmetics next time you open Velo Client."
-					+ (config.vipRoleId != null ? " If you have Velo+, your VIP role follows in a moment." : "")).queue();
+			event.getChannel().sendMessage("✅ Linked to **" + linked.username()
+					+ "**! The **Velo Neon** cape is now in your cosmetics.").queue(null,
+					e -> System.err.println("Couldn't confirm Discord link: " + e.getMessage()));
 			if (vip != null) {
 				vip.runNow();
 			}
 		} catch (ServerApi.ApiException e) {
-			event.getHook().sendMessage("❌ " + e.getMessage()).queue();
+			event.getChannel().sendMessage("❌ " + e.getMessage()).queue(null,
+					error -> System.err.println("Couldn't report Discord link failure: " + error.getMessage()));
 		}
 	}
 
@@ -339,6 +434,16 @@ public final class VeloBot extends ListenerAdapter {
 	private void setup(SlashCommandInteractionEvent event, String sub) {
 		Guild guild = event.getGuild();
 		switch (sub) {
+			case "link-channel" -> {
+				if (!(event.getOption("channel").getAsChannel() instanceof TextChannel channel)) {
+					event.reply("Pick a text channel.").setEphemeral(true).queue();
+					return;
+				}
+				config.linkChannelId = channel.getId();
+				config.save();
+				event.reply("Link codes will be accepted in " + channel.getAsMention()
+						+ " and deleted before they're redeemed.").setEphemeral(true).queue();
+			}
 			case "ticket-category" -> {
 				if (!(event.getOption("category").getAsChannel() instanceof Category category)) {
 					event.reply("Pick a category (a channel group).").setEphemeral(true).queue();
@@ -368,7 +473,8 @@ public final class VeloBot extends ListenerAdapter {
 				StringBuilder out = new StringBuilder("Put these in the Velo server's settings (environment):\n");
 				List<Runnable> pending = new ArrayList<>();
 				int[] left = {0};
-				for (String[] pair : new String[][] {{"donations", "VELO_DISCORD_DONATIONS_WEBHOOK"}, {"reports", "VELO_DISCORD_REPORTS_WEBHOOK"}}) {
+				for (String[] pair : new String[][] {{"donations", "VELO_DISCORD_DONATIONS_WEBHOOK"}, {"reports", "VELO_DISCORD_REPORTS_WEBHOOK"},
+						{"player-reports", "VELO_DISCORD_PLAYER_REPORTS_WEBHOOK"}}) {
 					var option = event.getOption(pair[0]);
 					if (option == null || !(option.getAsChannel() instanceof TextChannel channel)) {
 						continue;
@@ -384,7 +490,7 @@ public final class VeloBot extends ListenerAdapter {
 					}, e -> event.getHook().sendMessage("Couldn't create the " + pair[0] + " webhook: " + e.getMessage()).queue());
 				}
 				if (left[0] == 0) {
-					event.getHook().sendMessage("Pick a donations and/or reports channel.").queue();
+					event.getHook().sendMessage("Pick at least one channel.").queue();
 				}
 			}
 			case "vip-role" -> {
@@ -395,6 +501,81 @@ public final class VeloBot extends ListenerAdapter {
 				if (vip != null) {
 					vip.runNow();
 				}
+			}
+			case "staff-role" -> {
+				Role role = event.getOption("role").getAsRole();
+				String level = event.getOption("level").getAsString();
+				config.staffRoles.put(role.getId(), level);
+				config.save();
+				String perks = level.equals("helper") ? "the Velo Staff cape and Velo+ (no moderation tools)"
+						: "the Velo Staff cape, Velo+ and `/velostaff` in game";
+				event.reply(role.getAsMention() + " now makes members Velo **" + switch (level) {
+					case "admin" -> "admins";
+					case "helper" -> "helpers";
+					default -> "moderators";
+				} + "** - they get " + perks + " within a minute (only once they've linked their account), for as long as they have the role.")
+						.setEphemeral(true).queue();
+				staff.runNow();
+			}
+			case "staff-role-remove" -> {
+				Role role = event.getOption("role").getAsRole();
+				boolean removed = config.staffRoles.remove(role.getId()) != null;
+				config.save();
+				event.reply(removed ? role.getAsMention() + " is no longer a staff role - its members lose staff perks within a minute." : "That role wasn't a staff role.")
+						.setEphemeral(true).queue();
+				staff.runNow();
+			}
+			case "welcome" -> {
+				if (!(event.getOption("channel").getAsChannel() instanceof TextChannel channel)) {
+					event.reply("Pick a text channel.").setEphemeral(true).queue();
+					return;
+				}
+				config.welcomeChannelId = channel.getId();
+				var rules = event.getOption("rules");
+				config.welcomeRulesChannelId = rules == null ? null : rules.getAsChannel().getId();
+				config.save();
+				event.reply("New members get a welcome card in " + channel.getAsMention() + ". Try `/setup welcome-test` to see one.").setEphemeral(true).queue();
+			}
+			case "welcome-off" -> {
+				config.welcomeChannelId = null;
+				config.save();
+				event.reply("Welcome messages are off.").setEphemeral(true).queue();
+			}
+			case "welcome-test" -> {
+				if (!(event.getChannel() instanceof TextChannel channel)) {
+					event.reply("Run this in a text channel.").setEphemeral(true).queue();
+					return;
+				}
+				welcomer.test(channel, event.getGuild(), event.getUser());
+				event.reply("Posting a test welcome...").setEphemeral(true).queue();
+			}
+			case "boost-channel" -> {
+				config.boostChannelId = event.getOption("channel").getAsChannel().getId();
+				config.save();
+				event.reply("Boost thank-yous go to <#" + config.boostChannelId + "> now. Tip: `/post boosters` puts a permanent Claim button somewhere.")
+						.setEphemeral(true).queue();
+			}
+			case "honeypot" -> {
+				if (!(event.getOption("channel").getAsChannel() instanceof TextChannel channel)) {
+					event.reply("Pick a text channel.").setEphemeral(true).queue();
+					return;
+				}
+				config.honeypotChannelId = channel.getId();
+				if (event.getOption("action") != null) {
+					config.honeypotAction = event.getOption("action").getAsString();
+				}
+				config.save();
+				event.deferReply(true).queue();
+				Honeypot.postWarning(channel, () -> event.getHook().sendMessage("🪤 " + channel.getAsMention() + " is a bot trap now (" + config.honeypotAction
+						+ "). Keep it visible and near the top of the channel list - bots post in the first channels they see. "
+						+ "Staff and anyone with Manage Messages are never caught. Catches are logged in "
+						+ (config.modLogChannelId != null ? "<#" + config.modLogChannelId + ">" : config.ticketLogChannelId != null ? "<#" + config.ticketLogChannelId + ">" : "the console - set `/setup mod-log`") + ".").queue(),
+						e -> event.getHook().sendMessage("Saved, but couldn't post the warning: " + e.getMessage()).queue());
+			}
+			case "mod-log" -> {
+				config.modLogChannelId = event.getOption("channel").getAsChannel().getId();
+				config.save();
+				event.reply("Honeypot catches and giveaway problems are logged in <#" + config.modLogChannelId + "> now.").setEphemeral(true).queue();
 			}
 			case "reload" -> {
 				try {
@@ -408,11 +589,18 @@ public final class VeloBot extends ListenerAdapter {
 			case "show" -> event.replyEmbeds(new EmbedBuilder().setTitle("Velo bot settings").setColor(0xFF4D4D)
 					.addField("Ticket category", config.ticketCategoryId == null ? "not set" : "<#" + config.ticketCategoryId + ">", true)
 					.addField("Ticket log", config.ticketLogChannelId == null ? "not set" : "<#" + config.ticketLogChannelId + ">", true)
+					.addField("Link-code channel", config.linkChannelId == null ? "not set" : "<#" + config.linkChannelId + ">", true)
 					.addField("Support role", config.supportRoleId == null ? "not set" : "<@&" + config.supportRoleId + ">", true)
 					.addField("Linked role", config.linkedRoleId == null ? "not set" : "<@&" + config.linkedRoleId + ">", true)
 					.addField("VIP role (Velo+)", config.vipRoleId == null ? "not set" : "<@&" + config.vipRoleId + ">", true)
 					.addField("Ticket types", String.valueOf(config.ticketTypes.size()), true).addField("Ping roles", String.valueOf(config.roles.size()), true)
-					.addField("Open tickets", String.valueOf(config.tickets.size()), true).build()).setEphemeral(true).queue();
+					.addField("Open tickets", String.valueOf(config.tickets.size()), true)
+					.addField("Staff roles", config.staffRoles.isEmpty() ? "not set" : String.join("\n", config.staffRoles.entrySet().stream()
+							.map(e -> "<@&" + e.getKey() + "> - " + e.getValue()).toList()), true)
+					.addField("Boost channel", config.boostChannelId == null ? "Discord's boost message" : "<#" + config.boostChannelId + ">", true)
+					.addField("Honeypot", config.honeypotChannelId == null ? "not set" : "<#" + config.honeypotChannelId + "> (" + config.honeypotAction + ")", true)
+					.addField("Mod log", config.modLogChannelId == null ? "ticket log" : "<#" + config.modLogChannelId + ">", true)
+					.addField("Giveaways", config.giveaways.values().stream().filter(g -> !g.ended).count() + " running", true).build()).setEphemeral(true).queue();
 			default -> event.reply("Unknown subcommand").setEphemeral(true).queue();
 		}
 	}
@@ -432,6 +620,23 @@ public final class VeloBot extends ListenerAdapter {
 						e -> event.reply("Couldn't post: " + e.getMessage()).setEphemeral(true).queue());
 	}
 
+	private void post(SlashCommandInteractionEvent event) {
+		if (!(event.getOption("channel").getAsChannel() instanceof TextChannel channel)) {
+			event.reply("Pick a text channel.").setEphemeral(true).queue();
+			return;
+		}
+		event.deferReply(true).queue();
+		InfoPosts.post(event.getOption("post").getAsString(), channel, config, () -> event.getHook().sendMessage("Posted in " + channel.getAsMention()).queue(),
+				e -> event.getHook().sendMessage("Couldn't post: " + e.getMessage()).queue());
+	}
+
+	@Override
+	public void onCommandAutoCompleteInteraction(CommandAutoCompleteInteractionEvent event) {
+		if (event.getName().equals("giveaway") && event.getFocusedOption().getName().equals("prize") && giveaways != null) {
+			giveaways.autocomplete(event);
+		}
+	}
+
 	// ---- Buttons and forms ----
 
 	@Override
@@ -445,6 +650,10 @@ public final class VeloBot extends ListenerAdapter {
 			tickets.claim(event);
 		} else if (id.equals(Tickets.CLOSE)) {
 			tickets.askClose(event);
+		} else if (id.equals(Boosters.CLAIM)) {
+			boosters.claim(event);
+		} else if (id.startsWith(Giveaways.ENTER) && giveaways != null) {
+			giveaways.enter(event);
 		}
 	}
 
@@ -454,6 +663,33 @@ public final class VeloBot extends ListenerAdapter {
 			tickets.open(event);
 		} else if (event.getModalId().equals(Tickets.CLOSE_MODAL)) {
 			tickets.close(event);
+		}
+	}
+
+	@Override
+	public void onGuildMemberJoin(GuildMemberJoinEvent event) {
+		welcomer.onJoin(event.getGuild(), event.getMember());
+	}
+
+	/** Leaving the server or losing a staff role ends staff perks right away instead of at the next 5-minute sync. */
+	@Override
+	public void onGuildMemberRemove(GuildMemberRemoveEvent event) {
+		if (staff != null && !config.staffRoles.isEmpty()) {
+			staff.soon();
+		}
+	}
+
+	@Override
+	public void onGuildMemberRoleRemove(GuildMemberRoleRemoveEvent event) {
+		if (staff != null && event.getRoles().stream().anyMatch(r -> config.staffRoles.containsKey(r.getId()))) {
+			staff.soon();
+		}
+	}
+
+	@Override
+	public void onGuildMemberRoleAdd(GuildMemberRoleAddEvent event) {
+		if (staff != null && event.getRoles().stream().anyMatch(r -> config.staffRoles.containsKey(r.getId()))) {
+			staff.soon();
 		}
 	}
 

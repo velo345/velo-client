@@ -83,6 +83,10 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.cosmetics.render.AuraFeatureRenderer.register();
 		net.veloclient.velo.client.network.RewardsReporter.register();
 		registerSocialOverlay();
+		net.veloclient.velo.client.social.PartyFollow.register();
+		net.veloclient.velo.client.social.PartyVoice.register();
+		net.veloclient.velo.client.social.PartyCommand.register();
+		net.veloclient.velo.client.social.VeloCommands.register();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				client -> net.veloclient.velo.client.cosmetics.AnimatedCapeAsset.tickAll());
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
@@ -105,6 +109,9 @@ public final class VeloClientMod implements ClientModInitializer {
 			net.veloclient.velo.client.modules.debug.BetterF3Module.tickShortcuts();
 			net.veloclient.velo.client.modules.pvp.DamageNumbersModule.tickAll();
 			net.veloclient.velo.client.pvp.ServerHealth.tick();
+			net.veloclient.velo.client.worldmap.PartyLocator.tick();
+			net.veloclient.velo.client.social.PartyFollow.tick();
+			net.veloclient.velo.client.social.PartyVoice.tick();
 		});
 		net.veloclient.velo.client.profile.VeloProfileStore.loadActiveDeferred();
 		// Previously only loaded lazily the first time the Crosshair select
@@ -265,6 +272,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new net.veloclient.velo.client.worldmap.WorldMapModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.HeartsModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.HungerModule());
+		net.veloclient.velo.client.util.AppleSkinCompat.vetoFoodOverlays(net.veloclient.velo.client.modules.hud.HungerModule::ownsFoodOverlay);
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.ArmorBarModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.XpBarModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.HotbarModule());

@@ -14,6 +14,7 @@ import net.veloclient.velo.client.gui.widget.VeloUi;
 import net.veloclient.velo.client.gui.window.VeloWindow;
 import net.veloclient.velo.client.waypoints.Waypoint;
 import net.veloclient.velo.client.waypoints.WaypointManager;
+import net.veloclient.velo.client.waypoints.WaypointTeleport;
 
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -52,6 +53,10 @@ public final class WorldMapScreen extends VeloWindow {
 	private boolean dragging;
 	private double dragged;
 	private double[] menuAt;
+	/** The waypoint under the cursor when the menu was opened (right-click on a waypoint), else null. */
+	private Waypoint menuWaypoint;
+	private boolean armedDelete;
+	private static boolean clickTeleport = true;
 	private long lastNanos;
 
 	public WorldMapScreen(Screen parent) {
@@ -231,6 +236,8 @@ public final class WorldMapScreen extends VeloWindow {
 		if (showWaypoints) {
 			drawWaypoints(context, mouseX, mouseY);
 		}
+		PartyLocator.pollIfDue();
+		drawPartyMembers(context, mouseX, mouseY);
 		if (player != null && WorldMap.currentDimension() != null && WorldMap.currentDimension().equals(viewedDimension)) {
 			drawPlayer(context, screenX(player[0]), screenY(player[2]), (float) player[3]);
 		}
@@ -246,7 +253,11 @@ public final class WorldMapScreen extends VeloWindow {
 		drawToolbar(context, mouseX, mouseY);
 		drawStatus(context, mouseX, mouseY, store);
 		if (menuAt != null) {
-			drawMenu(context, mouseX, mouseY);
+			if (menuWaypoint != null) {
+				drawWaypointMenu(context, mouseX, mouseY);
+			} else {
+				drawMenu(context, mouseX, mouseY);
+			}
 		}
 	}
 
@@ -267,6 +278,33 @@ public final class WorldMapScreen extends VeloWindow {
 			boolean region = Math.floorMod((long) bz, MapRegion.SIZE) == 0;
 			context.fill(left, sy, right, sy + 1, region ? 0x50FFFFFF : 0x22FFFFFF);
 		}
+	}
+
+	/** The enabled waypoint under the cursor (same radius the map uses for hover), or null. */
+	private Waypoint waypointAt(double mouseX, double mouseY) {
+		String world = WorldMap.currentWorld();
+		if (world == null || !showWaypoints) {
+			return null;
+		}
+		Waypoint best = null;
+		double bestDistance = Double.MAX_VALUE;
+		for (Waypoint waypoint : WaypointManager.inWorldAndDimension(world, viewedDimension)) {
+			if (!waypoint.enabled) {
+				continue;
+			}
+			double distance = Math.hypot(mouseX - screenX(waypoint.x), mouseY - screenY(waypoint.z));
+			if (distance < (waypoint.death ? 4 : 5) + 4 && distance < bestDistance) {
+				best = waypoint;
+				bestDistance = distance;
+			}
+		}
+		return best;
+	}
+
+	/** Creative with a usable /tp: a plain click on the map teleports there. */
+	private boolean clickTeleportAvailable() {
+		var player = this.client == null ? null : this.client.player;
+		return player != null && player.isCreative() && WaypointTeleport.available();
 	}
 
 	private void drawWaypoints(DrawContext context, int mouseX, int mouseY) {
@@ -299,7 +337,30 @@ public final class WorldMapScreen extends VeloWindow {
 
 	/** The player as an arrow pointing where they look (north = up). */
 	private void drawPlayer(DrawContext context, float x, float y, float yaw) {
-		double angle = Math.toRadians(yaw + 180);
+		drawArrow(context, x, y, yaw, 0xFFFFFFFF, VeloStyle.accent());
+	}
+
+	/** Party members who share their live position, each as an arrow in their own colour with their name. */
+	private void drawPartyMembers(DrawContext context, int mouseX, int mouseY) {
+		String world = WorldMap.currentWorld();
+		for (PartyLocator.Member member : PartyLocator.members()) {
+			if (!member.dimension().equals(viewedDimension) || world == null || !member.world().equals(world)) {
+				continue;
+			}
+			int color = WaypointManager.PALETTE[Math.floorMod(member.name().hashCode(), WaypointManager.PALETTE.length)] | 0xFF000000;
+			float sx = screenX(member.x());
+			float sy = screenY(member.z());
+			drawArrow(context, sx, sy, (float) member.yaw(), color, 0xFF000000);
+			int tw = this.textRenderer.getWidth(member.name()) + 8;
+			VeloDraw.fillRounded(context, Math.round(sx - tw / 2f), Math.round(sy + 11), tw, 12, 4, 0xC0101014);
+			context.drawTextWithShadow(this.textRenderer, member.name(), Math.round(sx - tw / 2f) + 4, Math.round(sy + 13), color);
+		}
+	}
+
+	/** A direction arrow: {@code fill} inside, {@code outline} around it. */
+	private void drawArrow(DrawContext context, float x, float y, float yaw, int fill, int outline) {
+		// Yaw 0 looks south (+Z = down the screen), 90 west: the facing vector on the map is (-sin yaw, +cos yaw).
+		double angle = Math.toRadians(yaw);
 		float size = 7;
 		float tipX = (float) (x - Math.sin(angle) * size);
 		float tipY = (float) (y + Math.cos(angle) * size);
@@ -312,12 +373,12 @@ public final class WorldMapScreen extends VeloWindow {
 			// Filled by sweeping lines from the tip to the back edge.
 			float bx = leftX + (rightX - leftX) * t;
 			float by = leftY + (rightY - leftY) * t;
-			VeloDraw.line(context, tipX, tipY, bx, by, 1.6f, 0xFFFFFFFF);
+			VeloDraw.line(context, tipX, tipY, bx, by, 1.6f, fill);
 		}
-		VeloDraw.line(context, tipX, tipY, leftX, leftY, 1.4f, VeloStyle.accent());
-		VeloDraw.line(context, tipX, tipY, rightX, rightY, 1.4f, VeloStyle.accent());
-		VeloDraw.line(context, leftX, leftY, x, y, 1.4f, VeloStyle.accent());
-		VeloDraw.line(context, rightX, rightY, x, y, 1.4f, VeloStyle.accent());
+		VeloDraw.line(context, tipX, tipY, leftX, leftY, 1.4f, outline);
+		VeloDraw.line(context, tipX, tipY, rightX, rightY, 1.4f, outline);
+		VeloDraw.line(context, leftX, leftY, x, y, 1.4f, outline);
+		VeloDraw.line(context, rightX, rightY, x, y, 1.4f, outline);
 	}
 
 	private void drawToolbar(DrawContext context, int mouseX, int mouseY) {
@@ -367,10 +428,17 @@ public final class WorldMapScreen extends VeloWindow {
 		hits.add(VeloUi.pill(context, rx, cy, 20, 16, "+", 0, mouseX, mouseY, () -> targetZoom = Math.min(16f, targetZoom * 1.5f)));
 		rx -= 24;
 		hits.add(VeloUi.pill(context, rx, cy, 20, 16, "-", 0, mouseX, mouseY, () -> targetZoom = Math.max(0.05f, targetZoom / 1.5f)));
-		for (Object[] toggle : new Object[][] {
-				{"Follow me", follow, (Runnable) () -> follow = !follow},
-				{"Waypoints", showWaypoints, (Runnable) () -> showWaypoints = !showWaypoints},
-				{"Grid", grid, (Runnable) () -> grid = !grid}}) {
+		java.util.List<Object[]> toggles = new ArrayList<>(List.of(
+				new Object[] {"Follow me", follow, (Runnable) () -> follow = !follow},
+				new Object[] {"Waypoints", showWaypoints, (Runnable) () -> showWaypoints = !showWaypoints},
+				new Object[] {"Grid", grid, (Runnable) () -> grid = !grid}));
+		if (PartyLocator.available()) {
+			toggles.add(new Object[] {"Share my position", PartyLocator.sharing(), (Runnable) () -> PartyLocator.setSharing(!PartyLocator.sharing())});
+		}
+		if (clickTeleportAvailable()) {
+			toggles.add(new Object[] {"Click to teleport", clickTeleport, (Runnable) () -> clickTeleport = !clickTeleport});
+		}
+		for (Object[] toggle : toggles) {
 			String label = (String) toggle[0];
 			int w = this.textRenderer.getWidth(label) + 14;
 			rx -= w + 4;
@@ -416,7 +484,8 @@ public final class WorldMapScreen extends VeloWindow {
 			text = "";
 		}
 		context.drawTextWithShadow(this.textRenderer, text, contentX(), y, VeloStyle.text());
-		String help = "Drag to move  ·  scroll to zoom  ·  right-click for waypoints  ·  " + Math.round(zoom * 100) + "%";
+		String help = "Drag to move  ·  scroll to zoom  ·  right-click for waypoints"
+				+ (clickTeleport && clickTeleportAvailable() ? "  ·  click to teleport" : "") + "  ·  " + Math.round(zoom * 100) + "%";
 		context.drawTextWithShadow(this.textRenderer, help, contentX() + contentWidth() - this.textRenderer.getWidth(help), y, VeloStyle.textFaint());
 	}
 
@@ -468,6 +537,57 @@ public final class WorldMapScreen extends VeloWindow {
 		}
 	}
 
+	/** Right-click on an existing waypoint: edit, share, teleport, delete. */
+	private void drawWaypointMenu(DrawContext context, int mouseX, int mouseY) {
+		Waypoint waypoint = menuWaypoint;
+		int mx = (int) menuAt[0];
+		int my = (int) menuAt[1];
+		int w = 156;
+		List<Object[]> entries = new ArrayList<>();
+		entries.add(new Object[] {"Edit waypoint", 1, (Runnable) () -> {
+			menuAt = null;
+			menuWaypoint = null;
+			this.client.setScreen(WaypointEditScreen.edit(this, waypoint));
+		}});
+		entries.add(new Object[] {"Share in chat", 0, (Runnable) () -> {
+			menuAt = null;
+			menuWaypoint = null;
+			WaypointManager.shareInChat(waypoint);
+		}});
+		entries.add(new Object[] {"Share with friends / party...", 0, (Runnable) () -> {
+			menuAt = null;
+			menuWaypoint = null;
+			this.client.setScreen(new net.veloclient.velo.client.gui.WaypointShareScreen(this, waypoint));
+		}});
+		if (WaypointTeleport.available()) {
+			entries.add(new Object[] {"Teleport here", 0, (Runnable) () -> {
+				menuAt = null;
+				menuWaypoint = null;
+				WaypointTeleport.teleport(waypoint.x, waypoint.y, waypoint.z, waypoint.dimension);
+				this.close();
+			}});
+		}
+		entries.add(new Object[] {armedDelete ? "Click again to delete" : "Delete waypoint", armedDelete ? 3 : 0, (Runnable) () -> {
+			if (!armedDelete) {
+				armedDelete = true;
+				return;
+			}
+			armedDelete = false;
+			menuAt = null;
+			menuWaypoint = null;
+			WaypointManager.delete(waypoint);
+		}});
+		int menuHeight = 24 + entries.size() * 20;
+		VeloDraw.fillRounded(context, mx, my, w, menuHeight, 7, 0xF0141418);
+		VeloDraw.strokeRounded(context, mx, my, w, menuHeight, 7, VeloStyle.border());
+		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(waypoint.name, w - 16), mx + 8, my + 6, waypoint.color | 0xFF000000);
+		int y = my + 20;
+		for (Object[] entry : entries) {
+			hits.add(0, VeloUi.pill(context, mx + 4, y, w - 8, 16, (String) entry[0], (Integer) entry[1], mouseX, mouseY, (Runnable) entry[2]));
+			y += 20;
+		}
+	}
+
 	private int surfaceY(int bx, int bz) {
 		MapStore store = store();
 		if (store != null) {
@@ -495,11 +615,17 @@ public final class WorldMapScreen extends VeloWindow {
 		}
 		if (menuAt != null) {
 			menuAt = null;
+			menuWaypoint = null;
+			armedDelete = false;
 			return true;
 		}
 		if (click.y() >= mapTop() && click.y() < mapBottom() && click.x() >= contentX() && click.x() < contentX() + contentWidth()) {
 			if (click.button() == net.veloclient.velo.client.util.Keys.MOUSE_RIGHT) {
-				menuAt = new double[] {Math.min(click.x(), contentX() + contentWidth() - 152), Math.min(click.y(), mapBottom() - 80),
+				menuWaypoint = waypointAt(click.x(), click.y());
+				armedDelete = false;
+				int menuWidth = menuWaypoint != null ? 160 : 152;
+				int menuHeight = menuWaypoint != null ? 24 + 5 * 20 : 96;
+				menuAt = new double[] {Math.min(click.x(), contentX() + contentWidth() - menuWidth), Math.min(click.y(), mapBottom() - menuHeight),
 						blockX(click.x()), blockZ(click.y())};
 				return true;
 			}
@@ -526,7 +652,21 @@ public final class WorldMapScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseReleased(Click click) {
+		boolean wasClick = dragging && dragged <= 2 && click.button() == net.veloclient.velo.client.util.Keys.MOUSE_LEFT;
 		dragging = false;
+		if (wasClick && menuAt == null && clickTeleport && clickTeleportAvailable()
+				&& click.y() >= mapTop() && click.y() < mapBottom() && click.x() >= contentX() && click.x() < contentX() + contentWidth()) {
+			Waypoint target = waypointAt(click.x(), click.y());
+			if (target != null) {
+				WaypointTeleport.teleport(target.x, target.y, target.z, target.dimension);
+			} else {
+				int bx = (int) Math.floor(blockX(click.x()));
+				int bz = (int) Math.floor(blockZ(click.y()));
+				WaypointTeleport.teleport(bx, surfaceY(bx, bz), bz, viewedDimension);
+			}
+			this.close();
+			return true;
+		}
 		return super.mouseReleased(click);
 	}
 

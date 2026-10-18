@@ -71,6 +71,25 @@ public final class WorldMap {
 		return STORES.computeIfAbsent(key, k -> new MapStore(root().resolve(safe(world)).resolve(safe(dim)), layer));
 	}
 
+	/** Map data saved under an older spelling of this server's address (see WaypointManager#normalizeAddress) moves to the new folder. */
+	private static void adoptLegacyFolder(String world) {
+		try {
+			java.nio.file.Path fresh = root().resolve(safe(world));
+			if (java.nio.file.Files.exists(fresh)) {
+				return;
+			}
+			for (String legacy : WaypointManager.legacyKeys(world)) {
+				java.nio.file.Path old = root().resolve(safe(legacy));
+				if (java.nio.file.Files.isDirectory(old)) {
+					java.nio.file.Files.move(old, fresh);
+					return;
+				}
+			}
+		} catch (java.io.IOException | RuntimeException e) {
+			// The map for this server just starts fresh.
+		}
+	}
+
 	private static void tick() {
 		MinecraftClient client = MinecraftClient.getInstance();
 		String world = WaypointManager.currentWorldKey();
@@ -89,6 +108,9 @@ public final class WorldMap {
 		}
 		if (!world.equals(worldKey) || !dim.equals(dimension)) {
 			flush();
+			if (!world.equals(worldKey)) {
+				adoptLegacyFolder(world);
+			}
 			worldKey = world;
 			dimension = dim;
 		}

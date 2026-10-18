@@ -352,6 +352,8 @@ public final class VeloServerClient {
 		if (wingsId != null) {
 			body.addProperty("wingsId", wingsId);
 		}
+		// Whether to show the + of Velo+ on your badge to others (shared with the launcher's setting).
+		body.addProperty("hidePlus", !PlusBadgeSetting.show());
 		String auraId = net.veloclient.velo.client.cosmetics.aura.AuraManager.networkValue();
 		if (auraId != null) {
 			body.addProperty("auraId", auraId);

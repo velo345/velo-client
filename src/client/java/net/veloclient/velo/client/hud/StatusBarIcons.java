@@ -44,6 +44,7 @@ public final class StatusBarIcons {
 
 	private static final Map<String, Identifier> CACHE = new HashMap<>();
 	private static final Map<String, Integer> SIZES = new HashMap<>();
+	private static final Map<String, Boolean> DRAWINGS = new HashMap<>();
 
 	private StatusBarIcons() {
 	}
@@ -57,8 +58,10 @@ public final class StatusBarIcons {
 	}
 
 	public static boolean hasDrawing(String kind) {
-		migrateOldImport(kind);
-		return Files.isRegularFile(file(kind, State.FULL));
+		return DRAWINGS.computeIfAbsent(kind, key -> {
+			migrateOldImport(key);
+			return Files.isRegularFile(file(key, State.FULL));
+		});
 	}
 
 	/** Older versions stored one imported PNG as icons/&lt;kind&gt;.png - it becomes the "full" drawing. */
@@ -170,6 +173,158 @@ public final class StatusBarIcons {
 		return SIZES.getOrDefault("vanilla/" + sprite.replace('/', '_') + "_outline", 9);
 	}
 
+	// ---- Vanilla sprites in your colour ----
+
+	/** sprite -> cache key of the colour currently registered for it (only the latest per sprite is kept, so a colour picker doesn't leak textures). */
+	private static final Map<String, String> RECOLORED = new HashMap<>();
+
+	/**
+	 * A vanilla GUI sprite (e.g. {@code hud/heart/full}, resource packs included) with its hue moved to
+	 * {@code color}: shading, highlights and outline stay, so it still looks like the vanilla icon - just in
+	 * another colour. A grey/white/black target gives a grey version. Null if the sprite doesn't exist.
+	 */
+	public static Identifier recoloredSprite(String sprite, int color) {
+		String key = "vrc/" + sprite.replace('/', '_') + "/" + String.format("%08x", color);
+		String previous = RECOLORED.put(sprite, key);
+		if (previous != null && !previous.equals(key)) {
+			destroy(previous);
+		}
+		return cached(key, () -> {
+			Identifier path = Identifier.of("minecraft", "textures/gui/sprites/" + sprite + ".png");
+			var resource = MinecraftClient.getInstance().getResourceManager().getResource(path);
+			if (resource.isEmpty()) {
+				return null;
+			}
+			//? if <26.1 {
+			try (InputStream in = resource.get().getInputStream()) {
+			//?} else {
+			/*try (InputStream in = resource.get().open()) {
+			*///?}
+				NativeImage image = NativeImage.read(in);
+				recolor(image, color);
+				return image;
+			}
+		});
+	}
+
+	/** Pixel size of a recoloured sprite (the sprite's own resolution). */
+	public static int recoloredSize(String sprite, int color) {
+		return SIZES.getOrDefault("vrc/" + sprite.replace('/', '_') + "/" + String.format("%08x", color), 9);
+	}
+
+	/** In place: shifts every pixel's hue by (target - the sprite's own average colour), scaling saturation/lightness the same way. */
+	private static void recolor(NativeImage image, int color) {
+		int w = image.getWidth();
+		int h = image.getHeight();
+		// The sprite's own average colour (weighted by saturation, so the dark outline and white shine don't count).
+		double sumX = 0, sumY = 0, sumS = 0, sumL = 0, weight = 0;
+		float[] hsl = new float[3];
+		for (int y = 0; y < h; y++) {
+			for (int x = 0; x < w; x++) {
+				int argb = image.getColorArgb(x, y);
+				if ((argb >>> 24) < 128) {
+					continue;
+				}
+				rgbToHsl(argb, hsl);
+				double wt = hsl[1] * (1 - Math.abs(2 * hsl[2] - 1));
+				sumX += Math.cos(hsl[0] * 2 * Math.PI) * wt;
+				sumY += Math.sin(hsl[0] * 2 * Math.PI) * wt;
+				sumS += hsl[1] * wt;
+				sumL += hsl[2] * wt;
+				weight += wt;
+			}
+		}
+		if (weight <= 0.0001) {
+			return;
+		}
+		double refHue = (Math.atan2(sumY, sumX) / (2 * Math.PI) + 1) % 1;
+		double refSat = Math.max(0.05, sumS / weight);
+		double refLight = Math.max(0.05, sumL / weight);
+		float[] target = new float[3];
+		rgbToHsl(color | 0xFF000000, target);
+		double satScale = target[1] / refSat;
+		double lightScale = target[2] / refLight;
+		boolean grey = target[1] < 0.08f;
+		for (int y = 0; y < h; y++) {
+			for (int x = 0; x < w; x++) {
+				int argb = image.getColorArgb(x, y);
+				int alpha = argb >>> 24;
+				if (alpha == 0) {
+					continue;
+				}
+				rgbToHsl(argb, hsl);
+				// Only the colourful part follows the target; near-grey pixels (outline, shine) keep their lightness.
+				double colorful = Math.min(1, hsl[1] * 2);
+				double hue = (hsl[0] + (target[0] - refHue) + 1) % 1;
+				double sat = grey ? 0 : Math.min(1, hsl[1] * satScale);
+				double light = hsl[2] * (1 + (lightScale - 1) * colorful);
+				int rgb = hslToRgb((float) hue, (float) sat, (float) Math.max(0, Math.min(1, light)));
+				image.setColorArgb(x, y, (alpha << 24) | (rgb & 0xFFFFFF));
+			}
+		}
+	}
+
+	private static void rgbToHsl(int argb, float[] out) {
+		float r = ((argb >> 16) & 0xFF) / 255f;
+		float g = ((argb >> 8) & 0xFF) / 255f;
+		float b = (argb & 0xFF) / 255f;
+		float max = Math.max(r, Math.max(g, b));
+		float min = Math.min(r, Math.min(g, b));
+		float l = (max + min) / 2;
+		float s = 0;
+		float hue = 0;
+		if (max != min) {
+			float d = max - min;
+			s = l > 0.5f ? d / (2 - max - min) : d / (max + min);
+			if (max == r) {
+				hue = (g - b) / d + (g < b ? 6 : 0);
+			} else if (max == g) {
+				hue = (b - r) / d + 2;
+			} else {
+				hue = (r - g) / d + 4;
+			}
+			hue /= 6;
+		}
+		out[0] = hue;
+		out[1] = s;
+		out[2] = l;
+	}
+
+	private static int hslToRgb(float h, float s, float l) {
+		float r;
+		float g;
+		float b;
+		if (s == 0) {
+			r = g = b = l;
+		} else {
+			float q = l < 0.5f ? l * (1 + s) : l + s - l * s;
+			float p = 2 * l - q;
+			r = hue(p, q, h + 1f / 3);
+			g = hue(p, q, h);
+			b = hue(p, q, h - 1f / 3);
+		}
+		return (Math.round(r * 255) << 16) | (Math.round(g * 255) << 8) | Math.round(b * 255);
+	}
+
+	private static float hue(float p, float q, float t) {
+		if (t < 0) {
+			t += 1;
+		}
+		if (t > 1) {
+			t -= 1;
+		}
+		if (t < 1f / 6) {
+			return p + (q - p) * 6 * t;
+		}
+		if (t < 0.5f) {
+			return q;
+		}
+		if (t < 2f / 3) {
+			return p + (q - p) * (2f / 3 - t) * 6;
+		}
+		return p;
+	}
+
 	// ---- Editing ----
 
 	/** Copies of the saved drawings (missing states absent), for the pixel editor. */
@@ -214,12 +369,14 @@ public final class StatusBarIcons {
 
 	/** Forgets everything (resource reloads change the vanilla sprites). */
 	public static void invalidateAll() {
+		RECOLORED.clear();
 		for (String key : new java.util.ArrayList<>(CACHE.keySet())) {
 			destroy(key);
 		}
 	}
 
 	private static void invalidate(String kind) {
+		DRAWINGS.remove(kind);
 		for (String key : new java.util.ArrayList<>(CACHE.keySet())) {
 			if (key.startsWith(kind + "/")) {
 				destroy(key);

@@ -40,6 +40,8 @@ public final class VeloNetworkModule extends AbstractModule implements Configura
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(new ConfigField.ToggleField("Share Custom Cape",
-				() -> VeloServerClient.shareCustomCapes, v -> VeloServerClient.shareCustomCapes = v));
+				() -> VeloServerClient.shareCustomCapes, v -> VeloServerClient.shareCustomCapes = v),
+				new ConfigField.ToggleField("Show the + of Velo+ on my badge",
+						net.veloclient.velo.client.network.PlusBadgeSetting::show, net.veloclient.velo.client.network.PlusBadgeSetting::set));
 	}
 }

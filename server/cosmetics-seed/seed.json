@@ -21,9 +21,9 @@
 		},
 		{
 			"id": "neon",
-			"name": "Neon",
-			"tag": "NEON COLLECTION",
-			"description": "Glowing neon wings in five colours - pick the one that matches your setup."
+			"name": "Future",
+			"tag": "FUTURE COLLECTION",
+			"description": "Wings from tomorrow: glowing neon frames in five colours and sci-fi circuitry - pick the one that matches your setup."
 		},
 		{
 			"id": "auras",
@@ -458,6 +458,28 @@
 			"files": {}
 		},
 		{
+			"id": "aura_hologram",
+			"type": "aura",
+			"name": "Hologram",
+			"description": "A hexagon plate glows under you while scan rings sweep up your body, data glyphs orbit and bits of light rise.",
+			"price": 2800,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#3ff0ff",
+			"files": {}
+		},
+		{
+			"id": "aura_festive",
+			"type": "aura",
+			"name": "Festive",
+			"description": "A garland of Christmas lights spirals up around you, baubles circle, a star shines above and snow drifts down.",
+			"price": 2600,
+			"status": "testing",
+			"collection": "yuletide",
+			"accent": "#ff3b3b",
+			"files": {}
+		},
+		{
 			"id": "cape_velo_neon",
 			"type": "cape",
 			"name": "Velo Neon",
@@ -568,9 +590,10 @@
 		},
 		{
 			"id": "cape_kintsugi",
+			"rev": 2,
 			"type": "cape",
 			"name": "Kintsugi",
-			"description": "White porcelain mended with gold - a glint of light runs down the golden cracks.",
+			"description": "Black porcelain mended with gold - a glint of light runs down the golden cracks.",
 			"price": 1700,
 			"status": "testing",
 			"collection": "velo_originals",
@@ -580,6 +603,7 @@
 		},
 		{
 			"id": "cape_heaven",
+			"rev": 2,
 			"type": "cape",
 			"name": "Heaven",
 			"description": "Soft white clouds drift by while golden rays of light fan down from above.",
@@ -592,6 +616,7 @@
 		},
 		{
 			"id": "cape_pearl",
+			"rev": 2,
 			"type": "cape",
 			"name": "Pearl",
 			"description": "Iridescent pearl white - pastel colours shift with the light and sparkles come and go.",
@@ -639,6 +664,129 @@
 			"availableUntil": 1794096000000,
 			"files": {
 				"gif": "capes/witching_hour.gif"
+			}
+		},
+		{
+			"id": "cape_silent_night",
+			"type": "cape",
+			"name": "Silent Night",
+			"description": "Snow falls on a sleeping forest - a cabin's windows glow, the Christmas star shines and an aurora drifts overhead.",
+			"price": 1900,
+			"status": "testing",
+			"collection": "yuletide",
+			"files": {
+				"gif": "capes/silent_night.gif"
+			}
+		},
+		{
+			"id": "cape_festive_lights",
+			"type": "cape",
+			"name": "Festive Lights",
+			"description": "Strings of Christmas lights twinkle and chase across deep green velvet while snow drifts past.",
+			"price": 1800,
+			"status": "testing",
+			"collection": "yuletide",
+			"files": {
+				"gif": "capes/festive_lights.gif"
+			}
+		},
+		{
+			"id": "cape_gift_wrap",
+			"type": "cape",
+			"name": "Gift Wrap",
+			"description": "Red paper with silver snowflakes, tied with a gold satin bow that catches the light.",
+			"price": 1700,
+			"status": "testing",
+			"collection": "yuletide",
+			"files": {
+				"gif": "capes/gift_wrap.gif"
+			}
+		},
+		{
+			"id": "cape_velo_staff",
+			"rev": 2,
+			"type": "cape",
+			"name": "Velo Staff",
+			"description": "Worn only by the Velo Client team - the Velo logo and STAFF in crisp white over matte black, a red line breathing beneath.",
+			"price": 0,
+			"status": "released",
+			"collection": "velo_originals",
+			"unlock": "staff",
+			"files": {
+				"gif": "capes/velo_staff.gif"
+			}
+		},
+		{
+			"id": "cape_booster",
+			"rev": 2,
+			"type": "cape",
+			"name": "Booster",
+			"description": "For everyone who boosts the Velo Discord - a cut pink gem catching a sweep of light among rising bokeh.",
+			"price": 0,
+			"status": "released",
+			"collection": "velo_originals",
+			"unlock": "booster",
+			"files": {
+				"gif": "capes/booster.gif"
+			}
+		},
+		{
+			"id": "cape_circuit",
+			"type": "cape",
+			"name": "Circuit",
+			"description": "A dark board etched with glowing cyan traces - data pulses race along the circuits and through the chips.",
+			"price": 1900,
+			"status": "testing",
+			"collection": "neon",
+			"files": {
+				"gif": "capes/circuit.gif"
+			}
+		},
+		{
+			"id": "cape_holo_grid",
+			"type": "cape",
+			"name": "Holo Grid",
+			"description": "A hologram of hexagon cells lighting up in a slow wave from cyan to violet, with a scan line sweeping through.",
+			"price": 1900,
+			"status": "testing",
+			"collection": "neon",
+			"files": {
+				"gif": "capes/holo_grid.gif"
+			}
+		},
+		{
+			"id": "wings_scifi_circuit",
+			"type": "wings",
+			"name": "Sci-Fi Circuit Wings",
+			"description": "Glowing circuit lines pulse along a sharp sci-fi wing frame.",
+			"price": 2600,
+			"status": "testing",
+			"collection": "neon",
+			"accent": "#35e0ff",
+			"style": "crystal",
+			"scale": 0.9,
+			"glow": true,
+			"files": {
+				"mesh": "wings/scifi_circuit.vmesh",
+				"texture": "wings/scifi_circuit.png",
+				"preview": "wings/scifi_circuit_preview.png"
+			}
+		},
+		{
+			"id": "wings_ice_star",
+			"type": "wings",
+			"name": "Ice Star Wings",
+			"description": "Frozen crystal feathers tipped with glittering ice stars.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "yuletide",
+			"accent": "#9fe3ff",
+			"style": "crystal",
+			"scale": 0.9,
+			"files": {
+				"mesh": "wings/ice_star.vmesh",
+				"texture": "wings/ice_star.png",
+				"preview": "wings/ice_star_preview.png"
 			}
 		}
 	]

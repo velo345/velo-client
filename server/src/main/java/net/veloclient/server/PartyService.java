@@ -28,6 +28,8 @@ final class PartyService {
 	private static final int CHAT_KEEP = 100;
 	private static final RateLimiter.Window[] CHAT_LIMIT = {new RateLimiter.Window(8, 5_000), new RateLimiter.Window(60, 60_000)};
 	private static final RateLimiter.Window[] PING_LIMIT = {new RateLimiter.Window(6, 5_000), new RateLimiter.Window(60, 60_000)};
+	private static final RateLimiter.Window[] FOLLOW_LIMIT = {new RateLimiter.Window(3, 60_000), new RateLimiter.Window(12, 600_000)};
+	private static final long FOLLOW_SAME_SERVER_MILLIS = 120_000;
 	private static final RateLimiter.Window[] MANAGE_LIMIT = {new RateLimiter.Window(30, 60_000)};
 
 	record ChatLine(long id, String from, String name, String text, long time, String kind) {
@@ -46,8 +48,12 @@ final class PartyService {
 	record InviteView(String party, String from, String fromName, String leaderName, int members, long expires) {
 	}
 
+	/** The party's voice chat group (Simple Voice Chat): its name and password, set by the leader so members can join. */
+	record Voice(String name, String password, long setAt) {
+	}
+
 	record PartyView(String id, String leader, List<MemberView> members, List<MemberView> invited, List<ChatLine> chat,
-			ModSync sync, LaunchCall launch) {
+			ModSync sync, LaunchCall launch, Voice voice) {
 	}
 
 	record State(PartyView party, List<InviteView> invites) {
@@ -62,7 +68,19 @@ final class PartyService {
 		final Deque<ChatLine> chat = new ArrayDeque<>();
 		ModSync sync;
 		LaunchCall launch;
+		Voice voice;
+		/** The last server the leader asked everyone to follow them to (and when) - the same destination isn't announced again. */
+		String lastFollowServer;
+		long lastFollowAt;
 	}
+
+	/** A member's live position on the world map (opt-in, in memory only, dropped after a few seconds without update). */
+	record LivePosition(String uuid, String name, double x, double y, double z, double yaw, String dimension, String world, long at) {
+	}
+
+	private static final long POSITION_FRESH_MILLIS = 8_000;
+	private static final RateLimiter.Window[] POSITION_LIMIT = {new RateLimiter.Window(8, 4_000)};
+	private final Map<String, LivePosition> positions = new HashMap<>();
 
 	private final SocialService social;
 	private final Map<String, Party> parties = new HashMap<>();
@@ -102,7 +120,7 @@ final class PartyService {
 		if (chat.size() > 50) {
 			chat = chat.subList(chat.size() - 50, chat.size());
 		}
-		return new PartyView(p.id, p.leader, members, invited, chat, p.sync, p.launch);
+		return new PartyView(p.id, p.leader, members, invited, chat, p.sync, p.launch, p.voice);
 	}
 
 	private MemberView member(String uuid, boolean leader) {
@@ -227,6 +245,7 @@ final class PartyService {
 	private void removeMember(Party party, String uuid, String message) {
 		party.members.remove(uuid);
 		partyOf.remove(uuid);
+		positions.remove(uuid);
 		if (party.members.isEmpty()) {
 			parties.remove(party.id);
 			return;
@@ -235,6 +254,7 @@ final class PartyService {
 			party.leader = party.members.get(0);
 			party.sync = null;
 			party.launch = null;
+			party.voice = null;
 			system(party, message + " - " + social.usernameOf(party.leader) + " leads now");
 		} else {
 			system(party, message);
@@ -250,6 +270,7 @@ final class PartyService {
 		party.leader = target;
 		party.sync = null;
 		party.launch = null;
+		party.voice = null;
 		system(party, social.usernameOf(target) + " is the party leader now");
 		broadcast(party);
 	}
@@ -301,7 +322,93 @@ final class PartyService {
 		broadcast(party);
 	}
 
+	// ---- voice chat group ----
+
+	/** The leader made a voice chat group for the party (null = none anymore); members' games join it if they chose to. */
+	synchronized void setVoice(String me, String name, String password) throws SocialService.SocialException {
+		social.rateLimit(me, "party-manage", MANAGE_LIMIT);
+		Party party = requireLeader(me);
+		if (name == null || name.isBlank()) {
+			party.voice = null;
+		} else {
+			party.voice = new Voice(clip(name.strip(), 24), password == null ? "" : clip(password, 40), System.currentTimeMillis());
+		}
+		broadcast(party);
+	}
+
+	// ---- follow the leader ----
+
+	/**
+	 * The leader (who asked the party to follow) joined {@code server}: every other member gets a small popup offering to
+	 * join. Rate limited, and the same server isn't announced twice within two minutes, so it can't be used to nag.
+	 */
+	synchronized void follow(String me, String server, String serverName) throws SocialService.SocialException {
+		social.rateLimit(me, "party-follow", FOLLOW_LIMIT);
+		Party party = requireLeader(me);
+		String address = server == null ? "" : clip(server.strip(), 120);
+		if (address.isEmpty()) {
+			throw new SocialService.SocialException(400, "No server");
+		}
+		long now = System.currentTimeMillis();
+		if (address.equalsIgnoreCase(party.lastFollowServer) && now - party.lastFollowAt < FOLLOW_SAME_SERVER_MILLIS) {
+			return;
+		}
+		party.lastFollowServer = address;
+		party.lastFollowAt = now;
+		String label = serverName == null || serverName.isBlank() ? address : clip(serverName.strip(), 60);
+		for (String member : party.members) {
+			if (!member.equals(me)) {
+				social.pushEvent(member, "party_follow", Map.of("party", party.id, "leader", me, "leaderName", social.usernameOf(me),
+						"server", address, "serverName", label));
+			}
+		}
+	}
+
+	// ---- live positions ----
+
+	/** Stores where {@code me} is (they turned live position sharing on); only the party sees it. */
+	synchronized void setPosition(String me, Map<String, Object> payload) throws SocialService.SocialException {
+		social.rateLimit(me, "party-position", POSITION_LIMIT);
+		requireParty(me);
+		if (payload == null) {
+			positions.remove(me);
+			return;
+		}
+		positions.put(me, new LivePosition(me, social.usernameOf(me), num(payload.get("x")), num(payload.get("y")), num(payload.get("z")),
+				num(payload.get("yaw")), payload.get("dimension") instanceof String d ? clip(d, 60) : "minecraft:overworld",
+				payload.get("world") instanceof String w ? clip(w, 120) : "", System.currentTimeMillis()));
+	}
+
+	/** Fresh positions of the other members of {@code me}'s party. */
+	synchronized List<LivePosition> positions(String me) throws SocialService.SocialException {
+		Party party = requireParty(me);
+		long now = System.currentTimeMillis();
+		List<LivePosition> out = new ArrayList<>();
+		for (String member : party.members) {
+			LivePosition position = positions.get(member);
+			if (position != null && !member.equals(me) && now - position.at() <= POSITION_FRESH_MILLIS) {
+				out.add(position);
+			}
+		}
+		return out;
+	}
+
+	private static double num(Object value) {
+		double v = value instanceof Number n ? n.doubleValue() : 0;
+		return Double.isFinite(v) ? Math.max(-3.0e7, Math.min(3.0e7, v)) : 0;
+	}
+
 	// ---- talking ----
+
+	/** The last {@code count} lines of {@code me}'s party chat (for a report the reporter agreed to attach); empty without a party. */
+	synchronized List<ChatLine> recentChat(String me, int count) {
+		Party party = party(me);
+		if (party == null) {
+			return List.of();
+		}
+		List<ChatLine> all = new ArrayList<>(party.chat);
+		return new ArrayList<>(all.subList(Math.max(0, all.size() - count), all.size()));
+	}
 
 	synchronized ChatLine chat(String me, String text) throws SocialService.SocialException {
 		social.rateLimit(me, "party-chat", CHAT_LIMIT);

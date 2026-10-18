@@ -28,9 +28,14 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 	private static final Identifier FILL = Identifier.of("velo-client", "textures/gui/hud/heart_fill.png");
 	private static final Identifier OUTLINE = Identifier.of("velo-client", "textures/gui/hud/heart_outline.png");
 	private static final Identifier DETAIL = Identifier.of("velo-client", "textures/gui/hud/heart_detail.png");
-	private static final List<String> STYLES = List.of("Recolored", "Custom Drawing");
+	private static final String VANILLA = "Vanilla Recolored";
+	private static final String VELO = "Velo Style";
+	private static final List<String> STYLES = List.of(VANILLA, VELO, "Custom Drawing");
 
-	private String style = "Recolored";
+	private String style = VANILLA;
+	/** Per frame, set by {@link #render}: the vanilla sprites are being recoloured (and whether the world is hardcore). */
+	private boolean vanillaLook;
+	private boolean hardcore;
 	private int heartColor = 0xFFE3262B;
 	private int absorptionColor = 0xFFF5C33B;
 	private int emptyColor = 0xFF2B2323;
@@ -53,7 +58,7 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 	 * hearts were drawn here (vanilla's are then skipped).
 	 */
 	public static boolean render(DrawContext context, PlayerEntity player, int xLeft, int yLineBase, int rowHeight,
-			int regenIndex, float maxHealth, int lastHealth, int health, int absorption, boolean blinking, int ticks) {
+			int regenIndex, float maxHealth, int currentHealth, int delayedHealth, int absorption, boolean blinking, int ticks) {
 		HeartsModule module = active();
 		if (module == null) {
 			return false;
@@ -62,6 +67,13 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 			return false;
 		}
 		boolean custom = module.style.equals("Custom Drawing") && StatusBarIcons.hasDrawing(KIND);
+		module.vanillaLook = !custom && !module.style.equals(VELO);
+		module.hardcore = module.vanillaLook && isHardcore();
+		// Vanilla's parameter names are misleading: "lastHealth" is the player's CURRENT health (what the hearts fill to) and
+		// "health" is the delayed value that only catches up after a second without damage (the white damage flash goes up to it).
+		// Filling to the delayed value made hearts lag behind - or not move at all during a fight.
+		int health = currentHealth;
+		int lastHealth = delayedHealth;
 		// Same seed vanilla uses for the frame, so the low-health shake matches.
 		Random random = new Random(ticks * 312871L);
 		int containers = (int) Math.ceil(maxHealth / 2.0);
@@ -91,10 +103,17 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 				module.drawHeart(context, custom, x, y, halves + 1 == health, module.heartColor, false);
 			}
 		}
+		// AppleSkin's "health restored by the held food" preview, which would have drawn after vanilla's hearts.
+		net.veloclient.velo.client.util.AppleSkinCompat.afterHealth(context, player, xLeft, yLineBase, rowHeight, regenIndex, maxHealth,
+				currentHealth, delayedHealth, absorption, blinking);
 		return true;
 	}
 
 	private void drawContainer(DrawContext context, boolean custom, int x, int y, boolean blinking) {
+		if (vanillaLook) {
+			vanillaSprite(context, "container" + (hardcore ? "_hardcore" : "") + (blinking ? "_blinking" : ""), x, y);
+			return;
+		}
 		if (custom) {
 			StatusBarIcons.draw(context, KIND, StatusBarIcons.State.EMPTY, x, y, 0xFFFFFFFF);
 			return;
@@ -104,6 +123,18 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 	}
 
 	private void drawHeart(DrawContext context, boolean custom, int x, int y, boolean half, int color, boolean absorbing) {
+		if (vanillaLook) {
+			String shape = (half ? "half" : "full");
+			if (color == 0xFFFFFFFF && !absorbing) {
+				// The white flash after taking damage: vanilla's own blinking sprite.
+				vanillaSprite(context, (hardcore ? "hardcore_" : "") + shape + "_blinking", x, y);
+			} else if (absorbing) {
+				recoloredSprite(context, "hud/heart/absorbing_" + (hardcore ? "hardcore_" : "") + shape, color, x, y);
+			} else {
+				recoloredSprite(context, "hud/heart/" + (hardcore ? "hardcore_" : "") + shape, color, x, y);
+			}
+			return;
+		}
 		if (custom) {
 			StatusBarIcons.draw(context, KIND, half ? StatusBarIcons.State.HALF : StatusBarIcons.State.FULL, x, y,
 					tintCustomIcon || absorbing ? color : 0xFFFFFFFF);
@@ -111,6 +142,29 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 		}
 		layer(context, FILL, x, y, half, color);
 		layer(context, DETAIL, x, y, half, 0xFFFFFFFF);
+	}
+
+	private static void vanillaSprite(DrawContext context, String name, int x, int y) {
+		context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, Identifier.of("minecraft", "hud/heart/" + name), x, y, 9, 9);
+	}
+
+	private static void recoloredSprite(DrawContext context, String sprite, int color, int x, int y) {
+		Identifier texture = StatusBarIcons.recoloredSprite(sprite, color);
+		if (texture == null) {
+			context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, Identifier.of("minecraft", sprite), x, y, 9, 9);
+			return;
+		}
+		StatusBarIcons.drawSquare(context, texture, StatusBarIcons.recoloredSize(sprite, color), x, y, false, 0xFFFFFFFF);
+	}
+
+	private static boolean isHardcore() {
+		//? if <26.1 {
+		var world = net.minecraft.client.MinecraftClient.getInstance().world;
+		return world != null && world.getLevelProperties().isHardcore();
+		//?} else {
+		/*var level = net.minecraft.client.Minecraft.getInstance().level;
+		return level != null && level.getLevelData().isHardcore();
+		*///?}
 	}
 
 	/** One 9x9 layer; a half heart is the left 5 columns, like vanilla's. */
@@ -132,11 +186,11 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
-				new ConfigField.ChoiceField("Style", STYLES, () -> style, v -> style = v),
+				new ConfigField.ChoiceField("Style", STYLES, () -> style, v -> style = "Recolored".equals(v) ? VANILLA : v),
 				new ConfigField.ColorField("Heart Color", () -> heartColor, v -> heartColor = v, false),
 				new ConfigField.ColorField("Absorption Color", () -> absorptionColor, v -> absorptionColor = v, false),
-				new ConfigField.ColorField("Empty Heart Color", () -> emptyColor, v -> emptyColor = v, true),
-				new ConfigField.ColorField("Outline Color", () -> outlineColor, v -> outlineColor = v, true),
+				new ConfigField.ColorField("Empty Heart Color (Velo Style)", () -> emptyColor, v -> emptyColor = v, true),
+				new ConfigField.ColorField("Outline Color (Velo Style)", () -> outlineColor, v -> outlineColor = v, true),
 				new ConfigField.ToggleField("Keep Vanilla Look When Poisoned/Withered/Frozen", () -> vanillaForEffects, v -> vanillaForEffects = v),
 				new ConfigField.ActionButtonField("Draw Custom Heart (or import a PNG)...", () -> {
 					style = "Custom Drawing";
@@ -149,7 +203,7 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 					} catch (Exception ignored) {
 						// nothing to delete
 					}
-					style = "Recolored";
+					style = VANILLA;
 				}));
 	}
 }

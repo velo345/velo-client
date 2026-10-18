@@ -28,6 +28,10 @@ final class SessionRegistry {
 	private final SecureRandom random = new SecureRandom();
 	private final Map<String, Challenge> challengesByUuid = new ConcurrentHashMap<>();
 	private final Map<String, Session> sessionsByToken = new ConcurrentHashMap<>();
+	/** Members who chose not to show their Velo+ badge (the game says so with every heartbeat). */
+	private final java.util.Set<String> plusHidden = ConcurrentHashMap.newKeySet();
+	/** Launcher sessions whose window has been in the background for a while: still connected, but not shown as online. */
+	private final java.util.Set<String> idleTokens = ConcurrentHashMap.newKeySet();
 
 	/** Which app a session belongs to - the game and the launcher can each hold one session for the same account at once. */
 	static final String KIND_GAME = "game";
@@ -146,7 +150,37 @@ final class SessionRegistry {
 		}
 	}
 
+	/** The game's heartbeat carries whether this player wants their Velo+ badge shown. */
+	void setPlusHidden(String uuid, boolean hidden) {
+		if (hidden) {
+			plusHidden.add(uuid);
+		} else {
+			plusHidden.remove(uuid);
+		}
+	}
+
+	/** Marks a launcher session idle (window long in the background - the player may be in another client) or active again; true if that changed. */
+	boolean setIdle(String token, boolean idle) {
+		return idle ? idleTokens.add(token) : idleTokens.remove(token);
+	}
+
+	/**
+	 * The launcher saw its game process end (a crash, a failed join that left a stale session behind):
+	 * drops every game session of the account behind this launcher token right away instead of waiting out the TTL.
+	 */
+	void endGameSessions(String launcherToken) {
+		Session launcher = session(launcherToken);
+		if (launcher == null || !KIND_LAUNCHER.equals(launcher.kind())) {
+			return;
+		}
+		boolean removed = sessionsByToken.values().removeIf(s -> s.uuid().equals(launcher.uuid()) && s.kind().equals(KIND_GAME));
+		if (removed) {
+			onSessionGone.accept(launcher.uuid());
+		}
+	}
+
 	void endSession(String token) {
+		idleTokens.remove(token);
 		Session removed = sessionsByToken.remove(token);
 		if (removed != null) {
 			onSessionGone.accept(removed.uuid());
@@ -158,6 +192,13 @@ final class SessionRegistry {
 		long now = System.currentTimeMillis();
 		return sessionsByToken.values().stream()
 				.anyMatch(s -> s.uuid().equals(uuid) && s.kind().equals(kind) && s.expiresAtMillis() >= now);
+	}
+
+	/** Whether {@code uuid} has a launcher session that is live and not idle. */
+	boolean hasActiveLauncherSession(String uuid) {
+		long now = System.currentTimeMillis();
+		return sessionsByToken.entrySet().stream().anyMatch(e -> e.getValue().uuid().equals(uuid) && e.getValue().kind().equals(KIND_LAUNCHER)
+				&& e.getValue().expiresAtMillis() >= now && !idleTokens.contains(e.getKey()));
 	}
 
 	/** In-game players only (the badge/cape list) - a launcher session isn't "in game", and isn't listed twice. */
@@ -172,7 +213,7 @@ final class SessionRegistry {
 		long now = System.currentTimeMillis();
 		return sessionsByToken.values().stream()
 				.filter(s -> s.expiresAtMillis() >= now && s.kind().equals(KIND_GAME))
-				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId(), s.auraId(), plusLookup.test(s.uuid())))
+				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId(), s.auraId(), plusLookup.test(s.uuid()) && !plusHidden.contains(s.uuid())))
 				.toList();
 	}
 
@@ -187,6 +228,7 @@ final class SessionRegistry {
 		sessionsByToken.entrySet().removeIf(e -> {
 			boolean gone = e.getValue().expiresAtMillis() < now;
 			if (gone) {
+				idleTokens.remove(e.getKey());
 				expired.add(e.getValue().uuid());
 			}
 			return gone;

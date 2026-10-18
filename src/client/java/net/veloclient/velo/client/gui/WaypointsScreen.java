@@ -243,8 +243,8 @@ public final class WaypointsScreen extends VeloWindow {
 
 		// Name + details.
 		int textX = iconX + 30;
-		boolean compact = width < 360;
-		int actionsWidth = compact ? 0 : 176;
+		boolean compact = width < 400;
+		int actionsWidth = compact ? 0 : 220;
 		int nameColor = waypoint.enabled ? VeloAnim.lerpArgb(waypoint.color | 0xFF000000, 0xFFFFFFFF, 0.25f) : VeloUi.muted();
 		int textSpace = Math.max(30, width - (textX - x) - (compact ? 58 : actionsWidth));
 		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(waypoint.name, textSpace), textX, y + 5, nameColor);
@@ -284,6 +284,11 @@ public final class WaypointsScreen extends VeloWindow {
 		bx -= 54;
 		hits.add(VeloUi.pill(context, bx, buttonY, 50, 16, "Share", 0, mouseX, mouseY,
 				() -> this.client.setScreen(new WaypointShareScreen(this, waypoint))));
+		bx -= 46;
+		hits.add(VeloUi.pill(context, bx, buttonY, 42, 16, "Chat", 0, mouseX, mouseY, () -> {
+			WaypointManager.shareInChat(waypoint);
+			flash("Posted \"" + waypoint.name + "\" in chat");
+		}));
 		bx -= 46;
 		hits.add(VeloUi.pill(context, bx, buttonY, 42, 16, "Edit", 0, mouseX, mouseY,
 				() -> this.client.setScreen(WaypointEditScreen.edit(this, waypoint))));

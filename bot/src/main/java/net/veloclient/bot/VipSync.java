@@ -73,13 +73,12 @@ final class VipSync {
 				guild.retrieveMemberById(link.discordId()).queue(member -> adjust(guild, member, role, link.plus()), error -> { });
 			}
 			if (config.vipStrict) {
-				guild.findMembersWithRoles(role).onSuccess(holders -> {
-					for (Member holder : holders) {
-						if (!plusIds.contains(holder.getId())) {
-							adjust(guild, holder, role, false);
-						}
+				for (String holder : RoleHolders.of(jda, guild.getId(), Set.of(role.getId())).keySet()) {
+					if (!plusIds.contains(holder)) {
+						guild.removeRoleFromMember(net.dv8tion.jda.api.entities.UserSnowflake.fromId(holder), role).reason("Velo+ is not active")
+								.queue(null, e -> System.err.println("Couldn't remove the VIP role: " + e.getMessage()));
 					}
-				});
+				}
 			}
 		}
 	}

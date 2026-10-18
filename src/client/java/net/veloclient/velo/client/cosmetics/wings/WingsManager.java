@@ -123,7 +123,13 @@ public final class WingsManager {
 	private static int catalogVersion = -1;
 	private static final Map<String, WingModel> MODELS = new HashMap<>();
 	private static final Map<String, Identifier> TEXTURES = new HashMap<>();
-	private static final java.util.Set<String> FAILED = new java.util.HashSet<>();
+	/** id or file hash -> when loading it last failed; tried again after a while instead of never (a bad moment shouldn't hide wings for the session). */
+	private static final java.util.Map<String, Long> FAILED = new java.util.HashMap<>();
+
+	private static boolean failedRecently(String key) {
+		Long at = FAILED.get(key);
+		return at != null && System.currentTimeMillis() - at < 30_000;
+	}
 	private static boolean loaded;
 	private static String equippedId;
 	private static final Map<String, Settings> SETTINGS = new HashMap<>();
@@ -427,7 +433,7 @@ public final class WingsManager {
 	 */
 	public static synchronized WingModel model(String id) {
 		WingModel model = MODELS.get(id);
-		if (model != null || FAILED.contains(id)) {
+		if (model != null || failedRecently(id)) {
 			return model;
 		}
 		WingType type = type(id).orElse(null);
@@ -448,7 +454,7 @@ public final class WingsManager {
 			}
 			MODELS.put(id, model);
 		} catch (Exception e) {
-			FAILED.add(id);
+			FAILED.put(id, System.currentTimeMillis());
 			VeloClient.LOGGER.warn("Couldn't load wings {}", id, e);
 		}
 		return model;
@@ -483,7 +489,7 @@ public final class WingsManager {
 			return null;
 		}
 		Identifier known = TEXTURES.get(sha);
-		if (known != null || FAILED.contains(sha)) {
+		if (known != null || failedRecently(sha)) {
 			return known;
 		}
 		java.nio.file.Path file = net.veloclient.velo.client.cosmetics.CosmeticsCatalog.file(sha);
@@ -496,7 +502,7 @@ public final class WingsManager {
 			TEXTURES.put(sha, id);
 			return id;
 		} catch (Exception e) {
-			FAILED.add(sha);
+			FAILED.put(sha, System.currentTimeMillis());
 			VeloClient.LOGGER.warn("Couldn't load {}", label, e);
 			return null;
 		}

@@ -51,11 +51,22 @@ import java.util.concurrent.Executors;
 public final class RemoteCapeCache {
 
 	private static final String CUSTOM_PREFIX = "custom:";
-	private static final long RETRY_AFTER_FAILURE_MILLIS = 60_000;
+	private static final long RETRY_AFTER_FAILURE_MILLIS = 20_000;
+	/** Waiting for something that is on its way (the catalog entry, the art download): look again soon, not in a minute. */
+	private static final long RETRY_WHILE_WAITING_MILLIS = 1_500;
 	private static final int MAX_DOWNLOAD_BYTES = 8 * 1024 * 1024;
 
 	private static final Map<String, Optional<CapeDefinition>> RESOLVED = new ConcurrentHashMap<>();
 	private static final Map<String, Long> IN_FLIGHT_OR_FAILED_AT = new ConcurrentHashMap<>();
+	/** Capes whose last attempt only had to wait (catalog or art still arriving) - retried quickly. */
+	private static final java.util.Set<String> WAITING = ConcurrentHashMap.newKeySet();
+
+	/** "Not yet" rather than "failed": the cape's catalog entry or art is still being fetched. */
+	private static final class NotYet extends IOException {
+		NotYet(String message) {
+			super(message);
+		}
+	}
 	private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
 			.followRedirects(HttpClient.Redirect.NORMAL).build();
 	private static final ExecutorService LOADER = Executors.newFixedThreadPool(2, r -> {
@@ -78,11 +89,20 @@ public final class RemoteCapeCache {
 		}
 		long now = System.currentTimeMillis();
 		Long started = IN_FLIGHT_OR_FAILED_AT.get(capeId);
-		if (started == null || (started < 0 && now + started > RETRY_AFTER_FAILURE_MILLIS)) {
+		if (started == null || started < 0 && now + started > RETRY_AFTER_FAILURE_MILLIS
+				|| started > 0 && WAITING.contains(capeId) && now - started > RETRY_WHILE_WAITING_MILLIS) {
+			WAITING.remove(capeId);
 			IN_FLIGHT_OR_FAILED_AT.put(capeId, now);
 			LOADER.execute(() -> load(capeId));
 		}
 		return Optional.empty();
+	}
+
+	/** Drops what's known about {@code capeId} so the next {@link #resolve} loads it again. */
+	public static void forget(String capeId) {
+		RESOLVED.remove(capeId);
+		IN_FLIGHT_OR_FAILED_AT.remove(capeId);
+		WAITING.remove(capeId);
 	}
 
 	private static void load(String capeId) {
@@ -92,6 +112,9 @@ public final class RemoteCapeCache {
 			} else {
 				loadStore(capeId);
 			}
+		} catch (NotYet e) {
+			WAITING.add(capeId);
+			IN_FLIGHT_OR_FAILED_AT.put(capeId, System.currentTimeMillis());
 		} catch (Exception e) {
 			VeloClient.LOGGER.debug("Could not load remote cape {}", capeId, e);
 			// Negative = "failed at"; resolve() retries after RETRY_AFTER_FAILURE_MILLIS (a server
@@ -104,11 +127,11 @@ public final class RemoteCapeCache {
 		Optional<StoreItem> item = StoreCatalog.byId(capeCatalogId);
 		if (item.isEmpty()) {
 			// Maybe a cape added on the server that this client hasn't heard of yet - byId asked for it, retry later.
-			throw new IOException("Unknown store cape (yet): " + capeCatalogId);
+			throw new NotYet("Unknown store cape (yet): " + capeCatalogId);
 		}
 		byte[] gif;
 		if (!StoreAssets.ready(item.get())) {
-			throw new IOException("Store cape art still downloading: " + capeCatalogId);
+			throw new NotYet("Store cape art still downloading: " + capeCatalogId);
 		}
 		try (InputStream in = StoreAssets.openGif(item.get())) {
 			gif = in.readAllBytes();
@@ -123,7 +146,7 @@ public final class RemoteCapeCache {
 				AnimatedCapeAsset.registerDecoded(capeCatalogId, decoded);
 				RESOLVED.put(capeCatalogId, Optional.of(definition));
 			} catch (IOException | RuntimeException e) {
-				RESOLVED.put(capeCatalogId, Optional.empty());
+				IN_FLIGHT_OR_FAILED_AT.put(capeCatalogId, -System.currentTimeMillis());
 			}
 		});
 	}
@@ -152,7 +175,7 @@ public final class RemoteCapeCache {
 					AnimatedCapeAsset.registerDecoded(definitionId, decoded);
 					RESOLVED.put(capeId, Optional.of(definition));
 				} catch (IOException | RuntimeException e) {
-					RESOLVED.put(capeId, Optional.empty());
+					IN_FLIGHT_OR_FAILED_AT.put(capeId, -System.currentTimeMillis());
 				}
 			});
 			return;
@@ -161,10 +184,11 @@ public final class RemoteCapeCache {
 		MinecraftClient.getInstance().execute(() -> {
 			try {
 				CapeManager.registerPreloadedTexture(definitionId, image, "remote cape " + hash);
+				CapeManager.composeElytraFor(definitionId, image);
 				RESOLVED.put(capeId, Optional.of(definition));
 			} catch (RuntimeException e) {
 				image.close();
-				RESOLVED.put(capeId, Optional.empty());
+				IN_FLIGHT_OR_FAILED_AT.put(capeId, -System.currentTimeMillis());
 			}
 		});
 	}

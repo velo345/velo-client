@@ -25,9 +25,11 @@ public final class ArmorBarModule extends AbstractModule implements Configurable
 	private static final Identifier FILL = Identifier.of("velo-client", "textures/gui/hud/armor_fill.png");
 	private static final Identifier OUTLINE = Identifier.of("velo-client", "textures/gui/hud/armor_outline.png");
 	private static final Identifier DETAIL = Identifier.of("velo-client", "textures/gui/hud/armor_detail.png");
-	private static final List<String> STYLES = List.of("Recolored", "Custom Drawing");
+	private static final String VANILLA_RECOLORED = "Vanilla Recolored";
+	private static final String VELO = "Velo Style";
+	private static final List<String> STYLES = List.of(VANILLA_RECOLORED, VELO, "Custom Drawing");
 
-	private String style = "Recolored";
+	private String style = VANILLA_RECOLORED;
 	private int armorColor = 0xFFB9C7D6;
 	private int emptyColor = 0xFF2B2B30;
 	private int outlineColor = 0xFF000000;
@@ -69,6 +71,19 @@ public final class ArmorBarModule extends AbstractModule implements Configurable
 				}
 				continue;
 			}
+			if (!armor.style.equals(VELO)) {
+				context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, Identifier.of("minecraft", "hud/armor_empty"), x, y, 9, 9);
+				if (full || half) {
+					String sprite = "hud/armor_" + (half ? "half" : "full");
+					Identifier texture = StatusBarIcons.recoloredSprite(sprite, armor.armorColor);
+					if (texture == null) {
+						context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, Identifier.of("minecraft", sprite), x, y, 9, 9);
+					} else {
+						StatusBarIcons.drawSquare(context, texture, StatusBarIcons.recoloredSize(sprite, armor.armorColor), x, y, false, 0xFFFFFFFF);
+					}
+				}
+				continue;
+			}
 			layer(context, FILL, x, y, false, armor.emptyColor);
 			if (full || half) {
 				layer(context, FILL, x, y, half, armor.armorColor);
@@ -87,10 +102,10 @@ public final class ArmorBarModule extends AbstractModule implements Configurable
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
-				new ConfigField.ChoiceField("Style", STYLES, () -> style, v -> style = v),
+				new ConfigField.ChoiceField("Style", STYLES, () -> style, v -> style = "Recolored".equals(v) ? VANILLA_RECOLORED : v),
 				new ConfigField.ColorField("Armor Color", () -> armorColor, v -> armorColor = v, false),
-				new ConfigField.ColorField("Empty Color", () -> emptyColor, v -> emptyColor = v, true),
-				new ConfigField.ColorField("Outline Color", () -> outlineColor, v -> outlineColor = v, true),
+				new ConfigField.ColorField("Empty Color (Velo Style)", () -> emptyColor, v -> emptyColor = v, true),
+				new ConfigField.ColorField("Outline Color (Velo Style)", () -> outlineColor, v -> outlineColor = v, true),
 				new ConfigField.ActionButtonField("Draw Custom Armor Icon (or import a PNG)...", () -> {
 					style = "Custom Drawing";
 					net.veloclient.velo.client.gui.StatusIconEditor.openFromSettings(KIND, "Armor Icon", armorColor);
@@ -102,7 +117,7 @@ public final class ArmorBarModule extends AbstractModule implements Configurable
 					} catch (Exception ignored) {
 						// nothing to delete
 					}
-					style = "Recolored";
+					style = VANILLA_RECOLORED;
 				}));
 	}
 }

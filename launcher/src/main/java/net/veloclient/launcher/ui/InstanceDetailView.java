@@ -73,7 +73,7 @@ public final class InstanceDetailView {
 
 		HBox header = new HBox(12);
 		header.setAlignment(Pos.CENTER_LEFT);
-		Button back = new Button("< Back");
+		Button back = BackButton.create("Home", null);
 		back.setOnAction(e -> onBack.run());
 		Label title = new Label(instance.name());
 		title.setFont(Font.font("Inter", FontWeight.BOLD, 20));
@@ -93,21 +93,41 @@ public final class InstanceDetailView {
 
 		TabPane tabs = new TabPane();
 		tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+		// Only the Mods tab is built right away; every other tab when it's first opened (they used to all be built - worlds,
+		// schematics, datapacks with their file scans - before the page could even show).
 		tabs.getTabs().add(new Tab("Mods", buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.MOD,
 				InstancePaths.modsDir(instance.id()), List.of("*.jar"))));
-		tabs.getTabs().add(new Tab("Worlds", WorldsTabView.build(owner, instance, theme)));
-		tabs.getTabs().add(new Tab("Modpacks", ModpacksTabView.build(owner, overlayHost, instance, theme)));
-		tabs.getTabs().add(new Tab("Resource Packs", buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.RESOURCE_PACK,
+		tabs.getTabs().add(lazyTab("Worlds", () -> WorldsTabView.build(owner, instance, theme)));
+		tabs.getTabs().add(lazyTab("Modpacks", () -> ModpacksTabView.build(owner, overlayHost, instance, theme)));
+		tabs.getTabs().add(lazyTab("Resource Packs", () -> buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.RESOURCE_PACK,
 				InstancePaths.resourcePacksDir(instance.id()), List.of("*.zip"))));
-		tabs.getTabs().add(new Tab("Shader Packs", buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.SHADER_PACK,
+		tabs.getTabs().add(lazyTab("Shader Packs", () -> buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.SHADER_PACK,
 				InstancePaths.shaderPacksDir(instance.id()), List.of("*.zip"))));
-		tabs.getTabs().add(new Tab("Schematics", SchematicsTabView.build(owner, overlayHost, instance, theme)));
-		tabs.getTabs().add(new Tab("Datapacks", DatapacksTabView.build(owner, overlayHost, instance, theme)));
+		tabs.getTabs().add(lazyTab("Schematics", () -> SchematicsTabView.build(owner, overlayHost, instance, theme)));
+		tabs.getTabs().add(lazyTab("Datapacks", () -> DatapacksTabView.build(owner, overlayHost, instance, theme)));
 		VBox.setVgrow(tabs, Priority.ALWAYS);
 		root.getChildren().add(tabs);
 
 		StackPane container = new StackPane(root, overlayHost);
 		return container;
+	}
+
+	/** A tab whose content is built the first time it's selected: a loading skeleton shows for that one frame. */
+	private static Tab lazyTab(String name, java.util.function.Supplier<Node> content) {
+		Tab tab = new Tab(name, Skeleton.list(4));
+		boolean[] built = {false};
+		tab.selectedProperty().addListener((o, was, selected) -> {
+			if (selected && !built[0]) {
+				built[0] = true;
+				// Next pulse: the tab switch (and skeleton) paints first, then the real content replaces it.
+				javafx.application.Platform.runLater(() -> {
+					Node node = content.get();
+					tab.setContent(node);
+					UiMotion.enter(node);
+				});
+			}
+		});
+		return tab;
 	}
 
 	// ---- One pack tab (Mods / Resource Packs / Shader Packs) ----
@@ -163,7 +183,7 @@ public final class InstanceDetailView {
 	private static long userFileCount(Path folder) {
 		try (Stream<Path> stream = Files.list(folder)) {
 			return stream.filter(Files::isRegularFile).map(p -> enabledName(p.getFileName().toString()))
-					.filter(name -> !name.startsWith("velo-client-") && !name.startsWith("fabric-api-")).count();
+					.filter(name -> !name.startsWith("velo-client-") && !name.startsWith("fabric-api-") && !name.startsWith("velo-addons-")).count();
 		} catch (IOException e) {
 			return 0;
 		}
@@ -175,7 +195,7 @@ public final class InstanceDetailView {
 	/** Async-loads a project's full detail (description, gallery, every compatible version) and swaps it into {@code container} - see {@link ProjectDetailView}. */
 	private static void showProjectDetail(Stage owner, StackPane container, Instance instance, LauncherTheme theme,
 			InstalledAssetStore.Kind kind, Path folder, String projectId, Runnable back) {
-		container.getChildren().setAll(loadingLabel(theme));
+		container.getChildren().setAll(Skeleton.detail());
 		CompletableFuture.supplyAsync(() -> {
 			Optional<ModrinthClient.ProjectDetail> detail = ModrinthClient.getProjectDetail(projectId);
 			if (detail.isEmpty()) {
@@ -344,7 +364,11 @@ public final class InstanceDetailView {
 		toolbar.setAlignment(Pos.CENTER_LEFT);
 		toolbar.getStyleClass().add("pack-toolbar");
 
-		root.getChildren().addAll(toolbar, scroll);
+		root.getChildren().add(toolbar);
+		if (kind == InstalledAssetStore.Kind.MOD) {
+			root.getChildren().add(PlusAddonsCard.build(instance, () -> listRefresh[0].run()));
+		}
+		root.getChildren().add(scroll);
 		listRefresh[0].run();
 		return new InstalledView(root, listRefresh[0]);
 	}
@@ -358,14 +382,20 @@ public final class InstanceDetailView {
 			}
 		};
 		apply.run();
-		javafx.beans.value.ChangeListener<Number> once = new javafx.beans.value.ChangeListener<>() {
+		// Rows arrive over a few frames (addRowsInBatches): follow the growing list until the offset is reachable.
+		javafx.beans.value.ChangeListener<Number> follow = new javafx.beans.value.ChangeListener<>() {
 			@Override
 			public void changed(javafx.beans.value.ObservableValue<? extends Number> obs, Number was, Number now) {
 				apply.run();
-				content.heightProperty().removeListener(this);
+				if (now.doubleValue() - scroll.getViewportBounds().getHeight() >= offsetPx) {
+					content.heightProperty().removeListener(this);
+				}
 			}
 		};
-		content.heightProperty().addListener(once);
+		content.heightProperty().addListener(follow);
+		javafx.animation.PauseTransition giveUp = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(2));
+		giveUp.setOnFinished(e -> content.heightProperty().removeListener(follow));
+		giveUp.play();
 		Platform.runLater(apply);
 	}
 
@@ -434,6 +464,7 @@ public final class InstanceDetailView {
 		}
 		var known = InstalledAssetStore.asMap(InstalledAssetStore.loadAll(instance.id(), kind));
 		String needle = filterText == null ? "" : filterText.strip().toLowerCase(Locale.ROOT);
+		List<Runnable> rows = new java.util.ArrayList<>();
 		for (Path file : files) {
 			String fileName = file.getFileName().toString();
 			boolean disabled = isDisabled(fileName);
@@ -445,12 +476,49 @@ public final class InstanceDetailView {
 				}
 			}
 			if (asset != null) {
-				list.getChildren().add(buildKnownRow(owner, overlayHost, instance, theme, kind, folder, file, disabled, asset, refresh, openDetail, updates));
+				rows.add(() -> list.getChildren().add(buildKnownRow(owner, overlayHost, instance, theme, kind, folder, file, disabled, asset, refresh,
+						openDetail, updates)));
 			} else {
-				list.getChildren().add(buildUnknownRow(instance, theme, kind, folder, file, disabled, identifyAttempted, refresh));
-				autoIdentify(instance, kind, file, identifyAttempted, refresh);
+				rows.add(() -> {
+					list.getChildren().add(buildUnknownRow(instance, theme, kind, folder, file, disabled, identifyAttempted, refresh));
+					autoIdentify(instance, kind, file, identifyAttempted, refresh);
+				});
 			}
 		}
+		addRowsInBatches(list, rows);
+	}
+
+	/**
+	 * Adds the first screenful of rows now and the rest over the next frames: a profile with 100+ mods used to build (and style)
+	 * every row in one go after each toggle/remove/update, freezing the launcher for a moment. A newer refresh cancels an older one.
+	 */
+	private static void addRowsInBatches(VBox list, List<Runnable> rows) {
+		int generation = (int) list.getProperties().merge("velo.rowsGeneration", 1, (a, b) -> (Integer) a + 1);
+		int first = Math.min(rows.size(), 24);
+		for (int i = 0; i < first; i++) {
+			rows.get(i).run();
+		}
+		if (first == rows.size()) {
+			return;
+		}
+		int[] next = {first};
+		new javafx.animation.AnimationTimer() {
+			@Override
+			public void handle(long now) {
+				if (!Integer.valueOf(generation).equals(list.getProperties().get("velo.rowsGeneration"))) {
+					stop();
+					return;
+				}
+				long start = System.nanoTime();
+				// ~8ms of row building per frame keeps scrolling and animations smooth.
+				while (next[0] < rows.size() && System.nanoTime() - start < 8_000_000L) {
+					rows.get(next[0]++).run();
+				}
+				if (next[0] >= rows.size()) {
+					stop();
+				}
+			}
+		}.start();
 	}
 
 	// ---- Enable/disable (renames the extension so Fabric Loader/resource pack scanning never sees it, without deleting it) ----
@@ -549,7 +617,8 @@ public final class InstanceDetailView {
 		String fileName = enabledName(file.getFileName().toString());
 		boolean isVeloClient = fileName.startsWith("velo-client-");
 		boolean isFabricApi = fileName.startsWith("fabric-api-");
-		boolean protectedFile = kind == InstalledAssetStore.Kind.MOD && (isVeloClient || isFabricApi);
+		boolean isAddons = fileName.startsWith("velo-addons-");
+		boolean protectedFile = kind == InstalledAssetStore.Kind.MOD && (isVeloClient || isFabricApi || isAddons);
 
 		HBox row = new HBox(12);
 		row.getStyleClass().add("mod-row");
@@ -562,7 +631,7 @@ public final class InstanceDetailView {
 		row.getChildren().add(iconView(null, 48));
 
 		VBox info = new VBox(2);
-		Label name = new Label(fileName + (isVeloClient ? "  (Velo Client)" : isFabricApi ? "  (Fabric API - required)" : "")
+		Label name = new Label(fileName + (isVeloClient ? "  (Velo Client)" : isFabricApi ? "  (Fabric API - required)" : isAddons ? "  (Velo+ Addons - managed in the card above)" : "")
 				+ (disabled ? "  (disabled)" : ""));
 		name.setTextFill(text(theme));
 		Label size = new Label(protectedFile ? sizeOf(file) : sizeOf(file) + "  ·  not on Modrinth");
@@ -591,7 +660,8 @@ public final class InstanceDetailView {
 	private static void autoIdentify(Instance instance, InstalledAssetStore.Kind kind, Path file, Set<String> identifyAttempted, Runnable refresh) {
 		String fileName = file.getFileName().toString();
 		String enabledFileName = enabledName(fileName);
-		if (enabledFileName.startsWith("velo-client-") || enabledFileName.startsWith("fabric-api-") || !identifyAttempted.add(fileName)) {
+		if (enabledFileName.startsWith("velo-client-") || enabledFileName.startsWith("fabric-api-") || enabledFileName.startsWith("velo-addons-")
+				|| !identifyAttempted.add(fileName)) {
 			return;
 		}
 		CompletableFuture.runAsync(() -> {
@@ -654,8 +724,7 @@ public final class InstanceDetailView {
 
 		HBox topRow = new HBox(10);
 		topRow.setAlignment(Pos.CENTER_LEFT);
-		Button back = new Button("‹  Installed (" + userFileCount(folder) + ")");
-		back.getStyleClass().add("ghost-button");
+		Button back = BackButton.create("installed (" + userFileCount(folder) + ")", null);
 		back.setOnAction(e -> onBack.run());
 		Label heading = new Label("Browse Modrinth " + kind.modrinthProjectType() + "s for Minecraft " + instance.mcVersion());
 		heading.setFont(Font.font("Inter", FontWeight.BOLD, 15));
@@ -1108,6 +1177,8 @@ public final class InstanceDetailView {
 
 	// ---- Shared helpers ----
 
+	private static final java.util.Map<Double, Image> FALLBACKS = new java.util.concurrent.ConcurrentHashMap<>();
+
 	static Node iconView(String url, double size) {
 		StackPane holder = new StackPane();
 		holder.setPrefSize(size, size);
@@ -1117,7 +1188,8 @@ public final class InstanceDetailView {
 		view.setFitWidth(size);
 		view.setFitHeight(size);
 		view.setPreserveRatio(true);
-		Image fallback = new Image(InstanceDetailView.class.getResourceAsStream(FALLBACK_ICON), size, size, true, true);
+		// Decoded once per size: every row used to decode and downscale the same PNG again on the UI thread.
+		Image fallback = FALLBACKS.computeIfAbsent(size, s -> new Image(InstanceDetailView.class.getResourceAsStream(FALLBACK_ICON), s, s, true, true));
 		view.setImage(fallback);
 		RemoteIconLoader.load(view, url, () -> view.setImage(fallback));
 		holder.getChildren().add(view);
@@ -1159,8 +1231,9 @@ public final class InstanceDetailView {
 		new ProcessBuilder(command).start();
 	}
 
-	static Label loadingLabel(LauncherTheme theme) {
-		return messageLabel("Searching...", theme);
+	/** What search results show while they load: skeleton cards in the shape of the result cards. */
+	static Node loadingLabel(LauncherTheme theme) {
+		return Skeleton.grid(8, 190, 230);
 	}
 
 	static Label messageLabel(String message, LauncherTheme theme) {

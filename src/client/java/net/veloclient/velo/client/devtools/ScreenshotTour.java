@@ -157,7 +157,7 @@ public final class ScreenshotTour {
 			}
 			case 1075 -> shot(client, "25-status-bars");
 			case 1080 -> {
-				setChoice("hunger", "Food Icon Style", "Recolored");
+				setChoice("hunger", "Food Icon Style", "Velo Style");
 				setColor("hunger", "Food Color (Recolored)", 0xFFE0A030);
 				setColor("hearts", "Heart Color", 0xFFE3262B);
 			}

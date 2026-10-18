@@ -79,8 +79,7 @@ public final class AccountProfileView {
 	public static Node build(Host host) {
 		MinecraftSession session = host.session();
 
-		Button back = new Button("‹  Back");
-		back.getStyleClass().add("ghost-button");
+		Button back = BackButton.create(null, null);
 		back.setOnAction(e -> host.goBack());
 
 		// ---- Hero: 3D model + identity ----
@@ -93,21 +92,22 @@ public final class AccountProfileView {
 				.flatMap(id -> CapeLibrary.listAll().stream().filter(c -> c.id().equals(id)).findFirst()).orElse(null);
 		stage.getChildren().setAll(CosmeticUi.spinner(34));
 		CosmeticUi.skin(session, skin -> {
-			Consumer<java.util.List<net.veloclient.launcher.data.GifFrames.Frame>> show = frames -> {
-				Node viewer = skin == null ? null : PlayerSkin3DView.createViewer(skin.pngBytes(), skin.slim(),
-						frames == null || frames.isEmpty() ? null : frames, true, 25, true);
+			Runnable failed = () -> {
+				loading.setText("Couldn't load your skin.");
+				stage.getChildren().setAll(loading);
+			};
+			if (skin == null) {
+				failed.run();
+				return;
+			}
+			// Wears everything equipped: cape, wings and aura, like on the home screen.
+			DressedPlayer.build(skin, true, 25, viewer -> {
 				if (viewer != null) {
 					stage.getChildren().setAll(viewer);
 				} else {
-					loading.setText("Couldn't load your skin.");
-					stage.getChildren().setAll(loading);
+					failed.run();
 				}
-			};
-			if (equipped == null) {
-				show.accept(null);
-			} else {
-				CosmeticUi.framesAsync(equipped, show);
-			}
+			});
 		});
 
 		Label name = new Label(session.username());

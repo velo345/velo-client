@@ -143,6 +143,60 @@ public final class PvpCompat {
 		*///?}
 	}
 
+	/**
+	 * A real player rather than an NPC: servers' NPCs (Citizens, lobby shopkeepers, practice bots...) are player entities too, but
+	 * they're not in the tab list's player data, or carry a version-2 UUID. Fight tracking and the Target HUD only count real players.
+	 */
+	public static boolean isRealPlayer(Entity entity) {
+		if (!isPlayer(entity)) {
+			return false;
+		}
+		java.util.UUID id = uuid(entity);
+		if (id == null || id.version() == 2) {
+			return false;
+		}
+		//? if <26.1 {
+		var handler = MinecraftClient.getInstance().getNetworkHandler();
+		return handler == null || handler.getPlayerListEntry(id) != null;
+		//?} else {
+		/*var connection = Minecraft.getInstance().getConnection();
+		return connection == null || connection.getPlayerInfo(id) != null;
+		*///?}
+	}
+
+	/** On your side: the same scoreboard team as you (minigame teams), or in your Velo party. */
+	public static boolean isTeammate(Entity entity) {
+		LivingEntity self = localPlayer();
+		if (self == null || entity == null) {
+			return false;
+		}
+		//? if <26.1 {
+		if (self.isTeammate(entity)) {
+			return true;
+		}
+		//?} else {
+		/*if (self.isAlliedTo(entity)) {
+			return true;
+		}
+		*///?}
+		var party = net.veloclient.velo.client.network.SocialClient.party();
+		if (party != null && party.has("members")) {
+			String id = String.valueOf(uuid(entity)).replace("-", "");
+			for (var member : party.getAsJsonArray("members")) {
+				var o = member.getAsJsonObject();
+				if (o.has("uuid") && id.equalsIgnoreCase(o.get("uuid").getAsString().replace("-", ""))) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/** Someone you'd actually fight: a real player who isn't on your team. */
+	public static boolean isOpponent(Entity entity) {
+		return isRealPlayer(entity) && !isTeammate(entity);
+	}
+
 	public static String name(Entity entity) {
 		return entity.getName().getString();
 	}

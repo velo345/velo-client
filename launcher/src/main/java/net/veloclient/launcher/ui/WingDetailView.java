@@ -37,8 +37,7 @@ public final class WingDetailView {
 	}
 
 	public static Node build(Host host, WingsCatalog.WingType type) {
-		Button back = new Button("‹  Store");
-		back.getStyleClass().add("ghost-button");
+		Button back = BackButton.create("Store", null);
 		back.setOnAction(e -> host.goBack());
 
 		StackPane stage = CosmeticUi.stage(360, 440);

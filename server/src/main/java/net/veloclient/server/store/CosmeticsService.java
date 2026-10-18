@@ -74,6 +74,8 @@ public final class CosmeticsService {
 		public String unlock;
 		public Map<String, String> files;
 		public long addedAt;
+		/** Seed revision: when the bundled seed's revision is higher, the item's art (and text) is refreshed from it - owner-set price/status/window stay. */
+		public int rev;
 
 		Item copy() {
 			Item c = GSON.fromJson(GSON.toJson(this), Item.class);
@@ -149,26 +151,38 @@ public final class CosmeticsService {
 				changed = true;
 			}
 		}
+		// The "Neon" collection became the "Future" collection: rename it unless the owner already edited it.
+		Collection neon = collection("neon");
+		if (neon != null && "Neon".equals(neon.name) && "NEON COLLECTION".equals(neon.tag)) {
+			for (Collection c : seed.collections) {
+				if (c.id.equals("neon")) {
+					neon.name = c.name;
+					neon.tag = c.tag;
+					neon.description = c.description;
+					changed = true;
+				}
+			}
+		}
 		for (Item s : seed.items) {
-			if (find(s.id) != null) {
+			Item existing = find(s.id);
+			if (existing != null) {
+				if (s.rev > existing.rev) {
+					// Redrawn art / reworded text shipped with a newer server: refresh it, keep everything the owner set.
+					Map<String, String> hashes = seedFiles(root, s);
+					if (hashes != null) {
+						existing.files = hashes;
+						if (s.description != null) {
+							existing.description = s.description;
+						}
+						existing.rev = s.rev;
+						changed = true;
+					}
+				}
 				continue;
 			}
 			Item item = s.copy();
-			Map<String, String> hashes = new LinkedHashMap<>();
-			boolean complete = true;
-			for (Map.Entry<String, String> file : s.files.entrySet()) {
-				try (InputStream in = CosmeticsService.class.getResourceAsStream(root + file.getValue())) {
-					if (in == null) {
-						System.out.println("[cosmetics] Seed file missing: " + file.getValue());
-						complete = false;
-						break;
-					}
-					hashes.put(file.getKey(), storeFile(in.readAllBytes()));
-				} catch (StoreService.StoreException e) {
-					throw new IOException("Bad seed file " + file.getValue() + ": " + e.getMessage());
-				}
-			}
-			if (!complete) {
+			Map<String, String> hashes = seedFiles(root, s);
+			if (hashes == null) {
 				continue;
 			}
 			item.files = hashes;
@@ -182,6 +196,23 @@ public final class CosmeticsService {
 		if (changed) {
 			save();
 		}
+	}
+
+	/** Stores a seed item's bundled files and returns role -> sha256, or null when one is missing from the jar. */
+	private Map<String, String> seedFiles(String root, Item s) throws IOException {
+		Map<String, String> hashes = new LinkedHashMap<>();
+		for (Map.Entry<String, String> file : s.files.entrySet()) {
+			try (InputStream in = CosmeticsService.class.getResourceAsStream(root + file.getValue())) {
+				if (in == null) {
+					System.out.println("[cosmetics] Seed file missing: " + file.getValue());
+					return null;
+				}
+				hashes.put(file.getKey(), storeFile(in.readAllBytes()));
+			} catch (StoreService.StoreException e) {
+				throw new IOException("Bad seed file " + file.getValue() + ": " + e.getMessage());
+			}
+		}
+		return hashes;
 	}
 
 	// ---- Reading ----

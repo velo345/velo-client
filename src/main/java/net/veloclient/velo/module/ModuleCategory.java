@@ -12,7 +12,9 @@ public enum ModuleCategory {
 	DEBUG("Debug"),
 	COSMETICS("Cosmetics"),
 	QOL("Quality of Life"),
-	PVP("PvP");
+	PVP("PvP"),
+	/** Velo+ Addons (the optional velo-addons jar) - listed on their own, below the core categories. */
+	ADDONS("Velo+ Addons");
 
 	private final String displayName;
 

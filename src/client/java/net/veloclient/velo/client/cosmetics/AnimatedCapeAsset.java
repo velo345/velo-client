@@ -43,6 +43,11 @@ public final class AnimatedCapeAsset {
 	private final int height;
 	/** Decoded from a source that can be read again (store / bundled cape) - safe to free when idle. */
 	private boolean reloadable;
+	/** The matching elytra texture (see {@link ElytraArt}); created on first request, then repainted with every frame. */
+	private Identifier elytraId;
+	private NativeImageBackedTexture elytraTexture;
+	/** Last time the elytra texture was asked for - it is only repainted while an elytra is actually being drawn. */
+	private long elytraUsedNanos;
 	private int frameIndex = -1;
 	private long msIntoCurrentFrame;
 	private long lastAdvanceNanos = -1;
@@ -103,6 +108,42 @@ public final class AnimatedCapeAsset {
 		return identifier;
 	}
 
+	/** A texture of this cape's art laid out for elytra wings, kept in step with the animation. */
+	public synchronized Identifier elytraIdentifier() {
+		long now = System.nanoTime();
+		lastUsedNanos = now;
+		boolean stale = now - elytraUsedNanos > 1_000_000_000L;
+		elytraUsedNanos = now;
+		if (elytraId != null && stale) {
+			paintElytra(Math.max(frameIndex, 0));
+		}
+		if (elytraId == null) {
+			elytraId = Identifier.of(identifier.getNamespace(), identifier.getPath().replace("cape_anim_", "elytra_anim_"));
+			elytraTexture = new NativeImageBackedTexture(() -> "animated elytra " + elytraId, ElytraArt.WIDTH, ElytraArt.HEIGHT, false);
+			MinecraftClient.getInstance().getTextureManager().registerTexture(elytraId, elytraTexture);
+			paintElytra(Math.max(frameIndex, 0));
+		}
+		return elytraId;
+	}
+
+	/** The already-registered animated cape for {@code capeId}, or null. */
+	public static synchronized AnimatedCapeAsset existing(String capeId) {
+		AnimatedCapeAsset asset = REGISTRY.get(capeId);
+		if (asset != null) {
+			asset.lastUsedNanos = System.nanoTime();
+		}
+		return asset;
+	}
+
+	private void paintElytra(int index) {
+		// (Named "texture" on purpose: the 26.x port rewrites "texture.getImage(" - see stonecutter.gradle.kts.)
+		NativeImageBackedTexture texture = elytraTexture;
+		if (texture != null) {
+			ElytraArt.compose(frames.get(index).image(), texture.getImage());
+			texture.upload();
+		}
+	}
+
 	public int width() {
 		return width;
 	}
@@ -147,6 +188,9 @@ public final class AnimatedCapeAsset {
 
 	private void release() {
 		MinecraftClient.getInstance().getTextureManager().destroyTexture(identifier);
+		if (elytraId != null) {
+			MinecraftClient.getInstance().getTextureManager().destroyTexture(elytraId);
+		}
 		for (GifDecoder.Frame frame : frames) {
 			frame.image().close();
 		}
@@ -183,5 +227,8 @@ public final class AnimatedCapeAsset {
 		frameIndex = index;
 		texture.getImage().copyFrom(frames.get(index).image());
 		texture.upload();
+		if (System.nanoTime() - elytraUsedNanos < 1_000_000_000L) {
+			paintElytra(index);
+		}
 	}
 }

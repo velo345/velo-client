@@ -10,7 +10,7 @@ import java.util.Map;
  * Discord linking:
  * <ul>
  * <li>{@code GET /v1/discord/status} (signed in) - whether you're linked, the invite link</li>
- * <li>{@code POST /v1/discord/code} (signed in) - a code to type as {@code /link <code>} in the Discord</li>
+ * <li>{@code POST /v1/discord/code} (signed in) - a code to paste in the Discord's configured link channel</li>
  * <li>{@code POST /v1/admin/discord/link} - the bot redeems a code ({@code X-Velo-Admin-Token})</li>
  * <li>{@code POST /v1/admin/discord/unlink} - the bot removes a link</li>
  * </ul>

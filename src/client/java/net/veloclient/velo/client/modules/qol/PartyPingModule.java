@@ -27,7 +27,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Party pings: press the key (V) while looking at something and a marker pops up for everyone in
+ * Party pings: press the ping key (unbound by default - V is taken by voice chat and others; set it in Controls) while looking at something and a marker pops up for everyone in
  * your party who's on the same server and dimension - "go here", "enemy", "loot" - with distance,
  * fading after a few seconds. Waypoints your party shares arrive as a popup you can save with one
  * click. Parties are made in the launcher (Party page).
@@ -35,7 +35,7 @@ import java.util.Map;
 public final class PartyPingModule extends AbstractModule implements Configurable {
 
 	public static final KeyBinding PING_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.party_ping", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.V, VeloKeybinds.CATEGORY));
+			"key.velo-client.party_ping", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	private record Ping(String from, double x, double y, double z, String dimension, String server, long at, boolean mine) {
 	}

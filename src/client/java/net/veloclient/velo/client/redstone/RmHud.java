@@ -454,7 +454,7 @@ public final class RmHud {
 			bx += size + 2;
 			iconButton(context, bx, by, size, "hidden", false, "Hide overlay (F9)", RedstoneMode::toggleOverlay);
 			bx += size + 2;
-			iconButton(context, bx, by, size, "exit", false, "Leave Redstone Mode (R)", RedstoneMode::exit);
+			iconButton(context, bx, by, size, "exit", false, "Leave Redstone Mode" + RmKeys.toggleHint(), RedstoneMode::exit);
 		}
 	}
 

@@ -70,6 +70,14 @@ public final class UpdateService {
 	private UpdateService() {
 	}
 
+	/**
+	 * The installed launcher (jpackage sets {@code jpackage.app-path} to its executable). Started from the source tree
+	 * ({@code ./gradlew :launcher:run}, launch-launcher.sh) there's no installation to replace - only mod jars update then.
+	 */
+	public static boolean packaged() {
+		return System.getProperty("jpackage.app-path") != null;
+	}
+
 	public static Path updatesDir() {
 		return VeloPaths.root().resolve("updates");
 	}
@@ -124,6 +132,10 @@ public final class UpdateService {
 
 		boolean launcherNewer = compare(version, AppVersion.VERSION) > 0;
 		Asset installer = null;
+		if (!packaged()) {
+			// From the source tree: nothing to install over (git pull instead) - only the mod jars below.
+			return new Release(version, notes, page, false, null, modJars(assets, version));
+		}
 		String os = System.getProperty("os.name", "").toLowerCase();
 		for (Asset asset : assets) {
 			if (os.contains("win") && asset.name().endsWith(".exe")
@@ -132,6 +144,12 @@ public final class UpdateService {
 			}
 		}
 
+		Map<String, Asset> mods = modJars(assets, version);
+		return new Release(version, notes, page, launcherNewer, installer, mods);
+	}
+
+	/** The mod jars of {@code version} that differ from what this launcher would install today. */
+	private static Map<String, Asset> modJars(List<Asset> assets, String version) {
 		// Mod jars: a newer release always counts; the same version only when its jars were uploaded
 		// after this launcher bundled its own (a hotfix re-release) - and never twice for one upload.
 		Map<String, Asset> mods = new LinkedHashMap<>();
@@ -156,7 +174,7 @@ public final class UpdateService {
 				}
 			}
 		}
-		return new Release(version, notes, page, launcherNewer, installer, mods);
+		return mods;
 	}
 
 	/** Release assets already downloaded ("id:updatedAt"), so the same upload is never offered again. */
@@ -201,13 +219,19 @@ public final class UpdateService {
 
 	/** Downloads the changed mod jars into the updates cache; GameJars uses them from the next launch on. */
 	public static void installModUpdates(Release release, Consumer<String> status) throws IOException, InterruptedException {
+		installModUpdates(release, status, f -> { });
+	}
+
+	/** {@code progress}: 0..1 of the current download (or -1 when its size is unknown). */
+	public static void installModUpdates(Release release, Consumer<String> status, java.util.function.DoubleConsumer progress)
+			throws IOException, InterruptedException {
 		Path dir = gameJarsDir();
 		Files.createDirectories(dir);
 		int done = 0;
 		for (Map.Entry<String, Asset> entry : release.modAssets().entrySet()) {
 			status.accept("Downloading " + entry.getValue().name() + " (" + (++done) + "/" + release.modAssets().size() + ")");
 			Path tmp = dir.resolve(entry.getKey() + ".jar.part");
-			download(entry.getValue(), tmp);
+			download(entry.getValue(), tmp, progress);
 			Files.move(tmp, dir.resolve(entry.getKey() + ".jar"), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 		}
 		Properties props = new Properties();
@@ -227,6 +251,11 @@ public final class UpdateService {
 	 * launcher should now close; false if this OS has no installer (open the release page instead).
 	 */
 	public static boolean runInstaller(Release release, Consumer<String> status) throws IOException, InterruptedException {
+		return runInstaller(release, status, f -> { });
+	}
+
+	public static boolean runInstaller(Release release, Consumer<String> status, java.util.function.DoubleConsumer progress)
+			throws IOException, InterruptedException {
 		Asset installer = release.installer();
 		if (installer == null) {
 			return false;
@@ -236,10 +265,11 @@ public final class UpdateService {
 		if (!Files.exists(file) || Files.size(file) != installer.size()) {
 			status.accept("Downloading " + installer.name());
 			Path tmp = updatesDir().resolve(installer.name() + ".part");
-			download(installer, tmp);
+			download(installer, tmp, progress);
 			Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
 		}
-		status.accept("Starting the installer");
+		progress.accept(-1);
+		status.accept("Installing - confirm the password prompt");
 		String os = System.getProperty("os.name", "").toLowerCase();
 		if (os.contains("win")) {
 			new ProcessBuilder(file.toString()).start();
@@ -261,40 +291,50 @@ public final class UpdateService {
 		return true;
 	}
 
-	/** Linux only: after the .deb replaced the files, start the launcher again. */
+	/**
+	 * Linux: after the .deb replaced the files, start the launcher again. It must start <em>after</em> this one has exited:
+	 * started right away it found this launcher still holding the single-instance lock, asked it to come to the front and quit -
+	 * and then this one closed too, so nothing was left running. A detached shell waits a moment, then starts it.
+	 */
 	public static void relaunch() {
 		try {
-			String command = ProcessHandle.current().info().command().orElse(null);
-			if (command == null) {
+			String app = System.getProperty("jpackage.app-path");
+			if (app == null || !Files.isExecutable(Path.of(app))) {
+				LauncherLog.warn("No installed launcher to restart (jpackage.app-path " + app + ")", null);
 				return;
 			}
-			Path self = Path.of(command);
-			// jpackage apps run from <app>/lib/runtime/bin/java; the launcher binary is <app>/bin/<name>.
-			Path appBin = self.getParent() != null && self.getParent().getParent() != null && self.getParent().getParent().getParent() != null
-					&& self.getParent().getParent().getParent().getParent() != null
-					? self.getParent().getParent().getParent().getParent().resolve("bin") : null;
-			if (appBin != null && Files.isDirectory(appBin)) {
-				try (var files = Files.list(appBin)) {
-					Path launcher = files.filter(Files::isExecutable).findFirst().orElse(null);
-					if (launcher != null) {
-						new ProcessBuilder(launcher.toString()).start();
-					}
-				}
+			List<String> command = new ArrayList<>();
+			if (onPath("setsid")) {
+				command.add("setsid");
 			}
+			command.addAll(List.of("sh", "-c", "sleep 2; exec \"$0\" >/dev/null 2>&1", app));
+			new ProcessBuilder(command).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
 		} catch (Exception e) {
 			LauncherLog.warn("Couldn't restart the launcher after updating", e);
 		}
 	}
 
-	private static void download(Asset asset, Path target) throws IOException, InterruptedException {
+	private static void download(Asset asset, Path target, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException {
 		HttpRequest request = HttpRequest.newBuilder(URI.create(asset.url())).timeout(Duration.ofMinutes(10))
 				.header("User-Agent", "VeloClientLauncher/" + AppVersion.VERSION).GET().build();
 		HttpResponse<InputStream> response = HTTP.send(request, HttpResponse.BodyHandlers.ofInputStream());
 		if (response.statusCode() != 200) {
 			throw new IOException("Download of " + asset.name() + " failed (" + response.statusCode() + ")");
 		}
-		try (InputStream in = response.body()) {
-			Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+		long total = response.headers().firstValueAsLong("Content-Length").orElse(asset.size());
+		try (InputStream in = response.body(); var out = Files.newOutputStream(target)) {
+			byte[] buffer = new byte[64 * 1024];
+			long done = 0;
+			long lastReport = 0;
+			int read;
+			while ((read = in.read(buffer)) > 0) {
+				out.write(buffer, 0, read);
+				done += read;
+				if (done - lastReport > 256 * 1024 || done == total) {
+					lastReport = done;
+					progress.accept(total > 0 ? Math.min(1.0, done / (double) total) : -1);
+				}
+			}
 		}
 		if (asset.sha256() != null && !asset.sha256().equalsIgnoreCase(sha256(Files.readAllBytes(target)))) {
 			Files.deleteIfExists(target);

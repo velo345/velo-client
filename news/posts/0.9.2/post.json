@@ -1,0 +1,87 @@
+{
+  "title": "Velo Client 0.9.2",
+  "summary": "The biggest Velo+ Addons update yet: a new Velo+ Addons category, 40+ modules for movement, combat, building and automation on your own worlds, a smoother Fly Boat and Cinematic Camera, and an Auto Eat that finally works.",
+  "tag": "Update",
+  "version": "0.9.2",
+  "accent": "#ff5a5a",
+  "pinned": false,
+  "cover": "file:images/cover.jpg",
+  "blocks": [
+    {
+      "type": "text",
+      "text": "0.9.2 is all about the **Velo+ Addons** - built for your own singleplayer worlds and private servers: challenge videos, cinematic shots, minigames and practice."
+    },
+    {
+      "type": "heading",
+      "text": "Velo+ Addons get their own category"
+    },
+    {
+      "type": "text",
+      "text": "Open the mod menu (Right Shift) and every addon module now sits under **Velo+ Addons** at the bottom of the sidebar. Every module that moves, fights or builds for you only works in **singleplayer** or on servers you add to the **Private Servers** list in its settings - one list shared by all of them."
+    },
+    {
+      "type": "callout",
+      "text": "Add your private server's address under Private Servers once and every addon works there. Anywhere else they simply stay switched off."
+    },
+    {
+      "type": "heading",
+      "text": "Movement"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Fly**, **Speed**, **Jump Boost**, **Air Jump** and **Wall Jump** for flight and parkour scenes.",
+        "**Auto Jump** hops while you run (perfect with Speed) or only takes 1-block steps for you.",
+        "**Jesus** walks on water and lava, **Spider** climbs walls, **Safe Walk** keeps you on the edge of your bridge.",
+        "**No Slow** - no slowdown from eating, cobwebs or soul sand. **No Fall** and **Anti Knockback** keep you where you want to be.",
+        "**Arrow Dodge** sees incoming arrows and dashes out of the way.",
+        "**Inventory Move** - keep walking with a chest or your inventory open."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Combat"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Kill Aura** with hit interval, look speed and spread-hits for crowd scenes - it follows your reach.",
+        "**Auto Trigger** hits the moment your crosshair is on an enemy and your swing is charged.",
+        "**Bow Aimbot** for bows and crossbows, leading moving targets.",
+        "**Auto Crystal**, **Auto Anchor** and **Auto Totem** for fast-paced crystal fights.",
+        "**Auto Mace** lands every smash, and **Stun Slam** breaks a raised shield with your axe and goes straight back to the mace.",
+        "**Auto Pot** heals when you're low and re-pots Speed, Strength and more - from the hotbar or inventory.",
+        "**Auto Armor** puts on the best armor you carry, enchantments included. **Reach** and **Auto Clicker** round it off."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Building & utility"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Scaffold** bridges under you like a pro, **Fast Place** and **Fast Break** speed things up.",
+        "**Auto Craft** - lay out your recipes in a real 3x3 grid with item search, open a crafting table and it crafts them over and over.",
+        "**Auto Trade** buys the villager trades on your list until they run out.",
+        "**Auto Write** fills signs and books from your clipboard, wrapped to use every line and page.",
+        "**Block Finder** and **X-Ray** show the blocks you pick (all ores by default), each in its own colour.",
+        "**Entity Finder** now outlines the entity's exact shape through walls, with a colour per category and labels off by default."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Better & fixed"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Fly Boat** flies smoothly now - the old burst / lag-back is gone.",
+        "**Cinematic Camera** no longer flickers chunks away when it grazes a wall, and has movement and look smoothing.",
+        "**Auto Eat** really eats now: it presses the hotbar key and holds use, just like you would.",
+        "Ender Chest Farmer, Auto Tunnel Miner and Auto Excavator now mine and place through the normal mouse input.",
+        "The launcher no longer reports a version mismatch for your Addons when a matching build is already installed."
+      ]
+    }
+  ]
+}

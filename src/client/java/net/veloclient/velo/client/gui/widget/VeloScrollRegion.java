@@ -39,7 +39,44 @@ public final class VeloScrollRegion {
 		this.y = y;
 		this.width = width;
 		this.height = height;
+		//? if <26.1 {
+		this.screen = net.minecraft.client.MinecraftClient.getInstance().currentScreen;
+		//?} else if <26.2 {
+		/*this.screen = net.minecraft.client.Minecraft.getInstance().screen;
+		*///?} else {
+		/*this.screen = net.minecraft.client.Minecraft.getInstance().gui.screen();
+		*///?}
 		LIVE.put(this, Boolean.TRUE);
+	}
+
+	/**
+	 * Scroll offsets of earlier regions, per screen: screens rebuild their widgets (and a new region) after every click -
+	 * equip, select, a store refresh - which used to throw the list back to the top. A new region on the same screen with
+	 * the same rectangle and the same number of rows (so not a different tab) carries on where the old one was.
+	 */
+	private static final java.util.Map<Object, java.util.Map<String, Double>> REMEMBERED = java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+	private final Object screen;
+	private boolean restored;
+
+	private String memoryKey() {
+		return x + "," + y + "," + width + "," + height + "#" + rows.size();
+	}
+
+	/** First layout: picks up the remembered offset; later: remembers the current one. */
+	private void remember() {
+		if (screen == null) {
+			return;
+		}
+		java.util.Map<String, Double> map = REMEMBERED.computeIfAbsent(screen, k -> new java.util.HashMap<>());
+		if (!restored) {
+			restored = true;
+			Double previous = map.get(memoryKey());
+			if (previous != null && scrollOffset == 0 && shownOffset == 0) {
+				scrollOffset = previous;
+				shownOffset = previous;
+			}
+		}
+		map.put(memoryKey(), scrollOffset);
 	}
 
 	/** Every region still referenced by a screen - lets VeloWindow clip clicks to them. */
@@ -73,6 +110,7 @@ public final class VeloScrollRegion {
 	public void setScrollOffset(double scrollOffset) {
 		this.scrollOffset = Math.max(0, scrollOffset);
 		this.shownOffset = this.scrollOffset;
+		this.restored = true; // the caller decides
 	}
 
 	/** Copy of the current rows, for removing them from a Screen's child list before rebuilding. */
@@ -96,6 +134,7 @@ public final class VeloScrollRegion {
 	/** Lays out rows top-to-bottom starting at the region's top, each {@code rowHeight} tall with {@code gap} between. */
 	public void layout(int rowHeight, int gap) {
 		lastLayout = () -> layout(rowHeight, gap);
+		remember();
 		int contentHeight = rows.isEmpty() ? 0 : rows.size() * (rowHeight + gap) - gap;
 		int maxScroll = Math.max(0, contentHeight - height);
 		scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
@@ -144,6 +183,7 @@ public final class VeloScrollRegion {
 	public void layoutGrid(int columns, int cellWidth, int cellHeight, int gap) {
 		int requestedColumns = columns;
 		lastLayout = () -> layoutGrid(requestedColumns, cellWidth, cellHeight, gap);
+		remember();
 		columns = Math.max(1, columns);
 		int rowCount = (int) Math.ceil(rows.size() / (double) columns);
 		int contentHeight = rowCount == 0 ? 0 : rowCount * (cellHeight + gap) - gap;
@@ -184,6 +224,7 @@ public final class VeloScrollRegion {
 			return false;
 		}
 		scrollOffset = Math.max(0, scrollOffset - amount * 22);
+		remember();
 		if (lastNanos == 0) {
 			// Owner draws rows itself (never calls renderRows), so nothing would ease the offset.
 			shownOffset = scrollOffset;

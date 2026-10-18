@@ -470,14 +470,18 @@ def kintsugi(phase):
         KINTSUGI = (mask, blur(tile_noise(h, w, 3, 92, 3), 4))
     mask, glaze = KINTSUGI
     x, y = coords()
-    img = np.zeros((h, w, 3)) + np.array([0.93, 0.92, 0.9]) - glaze[..., None] * 0.08 - (y * 0.06)[..., None]
-    gold = np.array([0.82, 0.6, 0.24])
-    # A glint of light travels down the cracks.
+    # Black glazed porcelain (a pale sheet disappeared against the skin and the gold had nothing to stand out from).
+    img = np.zeros((h, w, 3)) + np.array([0.075, 0.075, 0.10]) + glaze[..., None] * np.array([0.05, 0.05, 0.07]) + (y * 0.03)[..., None]
+    # Soft glaze reflections: a broad cool sheen sliding down, and a fine ceramic mottling.
+    sheen = np.exp(-((x * 0.7 + y - (phase * 2.0 - 0.5)) ** 2) * 14)
+    img += sheen[..., None] * np.array([0.10, 0.11, 0.16])
+    gold = np.array([1.0, 0.72, 0.26])
+    glow = blur(mask, 3.5)
+    # A glint of light travels down the cracks; the cracks also glow softly on their own.
     flow = np.exp(-(((y + x * 0.3) - (phase * 1.6 - 0.3)) ** 2) * 40)
-    img = img * (1 - mask[..., None]) + mask[..., None] * gold * (0.8 + 0.7 * flow[..., None])
-    img += blur(mask * flow, 3)[..., None] * np.array([1.0, 0.8, 0.4]) * 0.5
-    # A soft glaze highlight drifting down.
-    img += np.exp(-((y - (phase * 1.4 - 0.2)) ** 2) * 30)[..., None] * 0.06
+    img += glow[..., None] * gold * 0.28
+    img = img * (1 - mask[..., None]) + mask[..., None] * gold * (0.85 + 0.9 * flow[..., None])
+    img += blur(mask * flow, 3)[..., None] * np.array([1.0, 0.85, 0.5]) * 0.7
     return img
 
 
@@ -494,17 +498,17 @@ def heaven(phase):
     c1, c2 = HEAVEN
     x, y = coords()
     clouds = np.roll(c1, int(phase * w), axis=1) * 0.65 + np.roll(c2, -int(phase * 2 * w), axis=1) * 0.35
-    sky = np.array([0.62, 0.74, 0.92]) * (1 - y[..., None] * 0.1) + np.array([0.2, 0.14, 0.04]) * (1 - y[..., None]) ** 3
-    puff = np.clip((clouds - 0.45) * 3.2, 0, 1)
+    sky = np.array([0.16, 0.34, 0.74]) * (1 - y[..., None] * 0.35) + np.array([0.55, 0.32, 0.12]) * (1 - y[..., None]) ** 3
+    puff = np.clip((clouds - 0.52) * 2.6, 0, 1) * 0.85
     # Clouds lit from above: bright tops, soft grey-blue undersides.
     shade = np.clip(np.roll(puff, -3 * SS, axis=0) - puff, 0, 1)
-    cloud_colour = np.array([1.0, 0.99, 0.97]) - shade[..., None] * np.array([0.25, 0.22, 0.12])
+    cloud_colour = np.array([0.93, 0.92, 0.95]) - shade[..., None] * np.array([0.42, 0.34, 0.2]) - (y[..., None] * 0.12)
     img = sky * (1 - puff[..., None]) + puff[..., None] * cloud_colour
     # God rays fanning from the top, turning gently.
     angle = np.arctan2(y + 0.25, x - 0.5)
     rays = (0.5 + 0.5 * np.cos(angle * 22 + math.sin(phase * 2 * math.pi) * 1.5)) ** 4 * np.clip(1 - y * 1.1, 0, 1)
-    img += rays[..., None] * np.array([1.0, 0.85, 0.45]) * 0.35
-    img += np.exp(-(((x - 0.5) * 2) ** 2 + ((y + 0.05) * 3) ** 2))[..., None] * np.array([1.0, 0.9, 0.6]) * 0.35
+    img += rays[..., None] * np.array([1.0, 0.78, 0.32]) * 0.28
+    img += np.exp(-(((x - 0.5) * 2) ** 2 + ((y + 0.05) * 3) ** 2))[..., None] * np.array([1.0, 0.82, 0.45]) * 0.16
     return img
 
 
@@ -517,16 +521,20 @@ def pearl(phase):
     global PEARL
     h, w = H * SS, W * SS
     if PEARL is None:
-        PEARL = (blur(tile_noise(h, w, 2, 111, 3), 5), np.random.default_rng(112).random((30, 3)))
-    field, sparks = PEARL
+        PEARL = (blur(tile_noise(h, w, 2, 111, 3), 5), np.random.default_rng(112).random((30, 3)),
+                 blur(tile_noise(h, w, 6, 113, 4), 1.5))
+    field, sparks, ridges = PEARL
     x, y = coords()
-    img = np.zeros((h, w, 3)) + np.array([0.94, 0.94, 0.95])
-    # Pastel interference colours drifting with the surface and the light.
-    hue = (field * 1.6 + x * 0.4 + y * 0.6 + phase) % 1
-    pastel = np.stack([0.5 + 0.5 * np.cos(2 * np.pi * (hue + k / 3)) for k in range(3)], axis=-1)
-    img = img * 0.9 + pastel * 0.1
+    # A black pearl: deep blue-grey body, strong thin-film colours (teal, violet, rose) rolling over it - dark enough to read on any skin.
+    img = np.zeros((h, w, 3)) + np.array([0.36, 0.37, 0.46]) + (field[..., None] - 0.5) * 0.10
+    hue = (field * 1.8 + x * 0.5 + y * 0.8 + ridges * 0.25 + phase) % 1
+    film = np.stack([0.5 + 0.5 * np.cos(2 * np.pi * (hue + k / 3)) for k in range(3)], axis=-1)
+    film = 0.45 + film * np.array([0.35, 0.40, 0.5])  # soft pastel, leans teal-rose
+    strength = 0.18 + 0.30 * smoothstep_arr(ridges)
+    img = img * (1 - strength[..., None]) + film * strength[..., None] * 1.0
+    # A broad nacre highlight sweeping across.
     shine = np.exp(-(((x * 0.6 - y * 0.8) - (phase * 2.2 - 1.2)) ** 2) * 16)
-    img += shine[..., None] * 0.25
+    img += shine[..., None] * np.array([0.22, 0.22, 0.28])
     for sx, sy, sp in sparks:
         tw = max(0, math.sin((phase + sp) * 2 * math.pi)) ** 8
         if tw < 0.02:
@@ -534,6 +542,157 @@ def pearl(phase):
         dx, dy = (x - sx) * w, (y - sy) * h
         cross = np.exp(-dx ** 2 / 1.2) * np.exp(-dy ** 2 / 40) + np.exp(-dy ** 2 / 1.2) * np.exp(-dx ** 2 / 40)
         img += (cross + np.exp(-(dx ** 2 + dy ** 2) / 4))[..., None] * tw * np.array([1.0, 0.95, 1.0])
+    return img
+
+
+def smoothstep_arr(v):
+    t = np.clip((v - 0.3) / 0.4, 0, 1)
+    return t * t * (3 - 2 * t)
+
+
+# ---- 12. Circuit: a dark board with glowing traces and data pulses running along them ----
+
+CIRCUIT = None
+
+
+def build_circuit():
+    from PIL import ImageDraw
+    r = np.random.default_rng(401)
+    h, w = H * SS, W * SS
+    step = 8 * SS // 2 * 2          # routing grid
+    cols, rows = w // step, h // step
+    traces = []                     # polylines (list of (x, y) pixel points)
+    used = set()
+    for _ in range(26):
+        gx, gy = int(r.integers(0, cols)), int(r.integers(0, rows))
+        pts = [(gx, gy)]
+        dx, dy = (0, 1) if r.random() < 0.6 else (1, 0)
+        for _ in range(int(r.integers(5, 14))):
+            run = int(r.integers(2, 6))
+            for _ in range(run):
+                nx, ny = pts[-1][0] + dx, pts[-1][1] + dy
+                if not (0 <= nx < cols and 0 <= ny < rows) or (nx, ny) in used:
+                    break
+                pts.append((nx, ny))
+            # turn 45 / 90 degrees
+            if dx == 0:
+                dx, dy = (int(r.choice([-1, 1])), 1 if r.random() < 0.5 else 0)
+            else:
+                dx, dy = (1 if r.random() < 0.5 else 0, int(r.choice([-1, 1])))
+            if dx == 0 and dy == 0:
+                dx, dy = 0, 1
+        if len(pts) >= 4:
+            used.update(pts)
+            traces.append([(px * step + step // 2, py * step + step // 2) for px, py in pts])
+    # chips
+    chips = []
+    for _ in range(4):
+        cx, cy = int(r.integers(2, cols - 2)), int(r.integers(2, rows - 2))
+        chips.append((cx * step, cy * step, int(r.integers(2, 4)) * step, int(r.integers(2, 3)) * step))
+    static = Image.new("RGB", (w, h), (0, 0, 0))
+    d = ImageDraw.Draw(static)
+    for t in traces:
+        d.line(t, fill=(40, 150, 190), width=2, joint="curve")
+        for (px, py) in (t[0], t[-1]):
+            d.ellipse((px - 3, py - 3, px + 3, py + 3), outline=(70, 210, 240), width=2)
+    for (cx, cy, cw, ch) in chips:
+        d.rectangle((cx, cy, cx + cw, cy + ch), fill=(14, 22, 34), outline=(60, 190, 230), width=2)
+        for k in range(0, cw, step // 2):
+            d.line((cx + k, cy - 3, cx + k, cy), fill=(60, 190, 230), width=1)
+            d.line((cx + k, cy + ch, cx + k, cy + ch + 3), fill=(60, 190, 230), width=1)
+    lengths = []
+    for t in traces:
+        seg = [math.dist(t[i], t[i + 1]) for i in range(len(t) - 1)]
+        lengths.append(seg)
+    return np.asarray(static, dtype=float) / 255, traces, lengths, chips
+
+
+def point_at(trace, seg, s):
+    for i, l in enumerate(seg):
+        if s <= l:
+            f = s / max(l, 1e-6)
+            return (trace[i][0] + (trace[i + 1][0] - trace[i][0]) * f, trace[i][1] + (trace[i + 1][1] - trace[i][1]) * f), i
+        s -= l
+    return trace[-1], len(seg) - 1
+
+
+def circuit(phase):
+    global CIRCUIT
+    from PIL import ImageDraw
+    h, w = H * SS, W * SS
+    if CIRCUIT is None:
+        CIRCUIT = build_circuit()
+    static, traces, lengths, chips = CIRCUIT
+    x, y = coords()
+    img = np.zeros((h, w, 3)) + np.array([0.025, 0.04, 0.06]) + (y * 0.02)[..., None]
+    img += static * 0.85
+    pulses = Image.new("RGB", (w, h), (0, 0, 0))
+    d = ImageDraw.Draw(pulses)
+    for k, (t, seg) in enumerate(zip(traces, lengths)):
+        total = sum(seg)
+        speed = 1 + (k % 2)
+        head = ((phase * speed + (k * 0.37)) % 1.0) * (total + 24)
+        tail = max(0.0, head - 22)
+        head = min(head, total)
+        if head <= tail:
+            continue
+        # sample the pulse as short bright segments, brightest at the head
+        n = 14
+        prev, _ = point_at(t, seg, tail)
+        for j in range(1, n + 1):
+            s = tail + (head - tail) * j / n
+            pt, _ = point_at(t, seg, s)
+            fade = j / n
+            col = (int(120 + 135 * fade), int(230 * fade + 25), 255)
+            d.line((prev, pt), fill=tuple(int(c * (0.35 + 0.65 * fade)) for c in col), width=3)
+            prev = pt
+    pa = np.asarray(pulses, dtype=float) / 255
+    img += pa * 1.1 + blur_rgb(pa, 3) * 1.4
+    # chips glow softly
+    img += blur_rgb(static * np.array([0.5, 1.0, 1.0]), 4) * 0.35
+    # a slow scan line
+    img += np.exp(-((y - (phase % 1.0)) ** 2) * 220)[..., None] * np.array([0.0, 0.18, 0.22])
+    return img
+
+
+def blur_rgb(arr, radius):
+    return np.stack([blur(arr[..., c], radius) for c in range(3)], axis=-1)
+
+
+# ---- 13. Holo Grid: hexagon cells lighting in a travelling wave, cyan to violet, with a scanline ----
+
+def holo_grid(phase):
+    h, w = H * SS, W * SS
+    x, y = coords()
+    size = 9.0 * SS / 2 * 2          # hex radius in pixels
+    px, py = x * w, y * h
+    # pointy-top hex grid: axial coordinates of the nearest cell centre
+    q = (math.sqrt(3) / 3 * px - 1.0 / 3 * py) / size
+    rr = (2.0 / 3 * py) / size
+    cx, cy, cz = q, -q - rr, rr
+    rx, ry, rz = np.round(cx), np.round(cy), np.round(cz)
+    dx, dy, dz = np.abs(rx - cx), np.abs(ry - cy), np.abs(rz - cz)
+    fix_x = (dx > dy) & (dx > dz)
+    fix_y = (~fix_x) & (dy > dz)
+    rx = np.where(fix_x, -ry - rz, rx)
+    rz = np.where(~fix_x & ~fix_y, -rx - ry, rz)
+    q_c, r_c = rx, rz
+    # centre of each cell in pixels, distance from the pixel to its centre
+    cxp = size * math.sqrt(3) * (q_c + r_c / 2)
+    cyp = size * 1.5 * r_c
+    dist = np.hypot(px - cxp, py - cyp) / size           # 0 centre .. ~1 corner
+    edge = np.clip((dist - 0.80) / 0.2, 0, 1)             # outline weight
+    # wave across the cape (and a slow second one) - whole-number cycles so it loops
+    wave = 0.5 + 0.5 * np.sin(2 * math.pi * (cyp / h * 1.0 + cxp / w * 0.45 - phase))
+    wave2 = 0.5 + 0.5 * np.sin(2 * math.pi * (cyp / h * 2.0 - cxp / w * 0.9 + phase * 2))
+    active = np.clip(wave * 0.8 + wave2 * 0.35 - 0.25, 0, 1)
+    hue = np.clip(cyp / h * 0.9 + cxp / w * 0.2, 0, 1)
+    colour = np.array([0.1, 0.85, 1.0]) * (1 - hue[..., None]) + np.array([0.62, 0.3, 1.0]) * hue[..., None]
+    img = np.zeros((h, w, 3)) + np.array([0.02, 0.03, 0.07])
+    img += colour * (active ** 1.5 * 0.7 * (1 - dist * 0.6))[..., None]                # cell fill, brighter in the middle
+    img += colour * (edge * (0.55 + 0.9 * active))[..., None]                 # outlines flare as the wave passes
+    img += np.exp(-((y - (phase % 1.0)) ** 2) * 260)[..., None] * np.array([0.10, 0.22, 0.30])
+    img += (np.sin(py * 1.6) * 0.5 + 0.5)[..., None] * 0.015                    # faint scanlines
     return img
 
 
@@ -933,6 +1092,371 @@ def witching_hour(phase):
     return vignette(tonemap(img * 1.15), 0.45)
 
 
+# ---- Christmas (Yuletide) - drawn at 4x like the Halloween ones ----
+
+def snow_layer(phase, seed, count, size, speed, drift, x, y):
+    """Falling snowflakes that loop: each falls a whole number of cape heights per loop."""
+    r = np.random.default_rng(seed)
+    layer = np.zeros_like(x)
+    for _ in range(count):
+        sx, sy, sp = r.random(), r.random(), r.random()
+        fy = (sy + phase * speed) % 1.0
+        fx = (sx + drift * math.sin((phase * speed + sp) * 2 * math.pi)) % 1.0
+        d2 = ((x - fx) * HW) ** 2 + ((y - fy) * HH) ** 2
+        layer = np.maximum(layer, np.exp(-d2 / (size * size)))
+    return layer
+
+
+SILENT = None
+
+
+def silent_night(phase):
+    global SILENT
+    x, y = hcoords()
+    if SILENT is None:
+        r = np.random.default_rng(301)
+
+        def pines(k, base, height, count, seed):
+            rr = np.random.default_rng(seed)
+
+            def draw(d, s):
+                Wk, Hk = HW * s, HH * s
+                d.rectangle([0, Hk * base, Wk, Hk], fill=255)
+                for _ in range(count):
+                    cx = rr.uniform(-0.05, 1.05) * Wk
+                    h = rr.uniform(0.7, 1.0) * height * Hk
+                    w = h * 0.42
+                    top = Hk * base - h
+                    for tier in range(4):
+                        t0 = top + h * tier * 0.22
+                        tw = w * (0.45 + tier * 0.2)
+                        d.polygon([(cx, t0), (cx - tw / 2, t0 + h * 0.34), (cx + tw / 2, t0 + h * 0.34)], fill=255)
+            return draw
+
+        def cabin(d, s):
+            Wk, Hk = HW * s, HH * s
+            bx, by, bw, bh = Wk * 0.52, Hk * 0.78, Wk * 0.3, Hk * 0.1
+            d.rectangle([bx, by, bx + bw, by + bh], fill=255)
+            d.polygon([(bx - bw * 0.1, by), (bx + bw / 2, by - bh * 0.75), (bx + bw * 1.1, by)], fill=255)
+            d.rectangle([bx + bw * 0.72, by - bh * 0.85, bx + bw * 0.84, by - bh * 0.3], fill=255)
+
+        def windows(d, s):
+            Wk, Hk = HW * s, HH * s
+            bx, by, bw, bh = Wk * 0.52, Hk * 0.78, Wk * 0.3, Hk * 0.1
+            for wx in (0.15, 0.62):
+                d.rectangle([bx + bw * wx, by + bh * 0.3, bx + bw * (wx + 0.2), by + bh * 0.7], fill=255)
+
+        SILENT = (_hmask(pines(2, 0.86, 0.32, 9, 302)), _hmask(pines(1, 0.95, 0.24, 7, 303)), _hmask(cabin), _hmask(windows),
+                  r.random((70, 3)), hnoise(3, 304, 4))
+    far, near, cabin_m, win_m, stars, aurora = SILENT
+    img = gradient(y, [(0, (6, 10, 32)), (0.45, (16, 34, 74)), (0.75, (34, 62, 108)), (1, (60, 86, 130))])
+    for sx, sy, sp in stars:
+        if sy > 0.55:
+            continue
+        tw = 0.25 + 0.75 * max(0, math.sin((phase * 2 + sp) * 2 * math.pi)) ** 3
+        img += np.exp(-(((x - sx) * HW) ** 2 + ((y - sy) * HH) ** 2) / 2.5)[..., None] * tw * 0.8
+    # A soft green veil of aurora drifting across the top.
+    au = np.roll(aurora, int(phase * HW), axis=1)
+    band = np.exp(-((y - 0.22 - 0.06 * np.sin(x * 6 + phase * 2 * math.pi)) ** 2) * 60) * smoothstep(0.4, 0.8, au)
+    img += band[..., None] * np.array([0.15, 0.55, 0.4]) * 0.6
+    # The Christmas star, top left, pulsing.
+    pulse = 0.75 + 0.25 * math.sin(phase * 2 * math.pi)
+    sx, sy = 0.25, 0.12
+    dx, dy = (x - sx) * HW, (y - sy) * HH
+    star = np.exp(-(dx ** 2 + dy ** 2) / 20) + 0.5 * np.exp(-dx ** 2 / 2) * np.exp(-dy ** 2 / 900) + 0.5 * np.exp(-dy ** 2 / 2) * np.exp(-dx ** 2 / 900)
+    img += star[..., None] * np.array([1.0, 0.92, 0.7]) * pulse
+    # Far trees (blue, snowy tips), then the cabin with warm windows, near trees.
+    img = img * (1 - far[..., None]) + far[..., None] * np.array([0.12, 0.2, 0.3])
+    snowcap = np.clip(far - np.roll(far, 3 * HS, axis=0), 0, 1)
+    img += snowcap[..., None] * np.array([0.5, 0.6, 0.7]) * 0.6
+    img = img * (1 - cabin_m[..., None]) + cabin_m[..., None] * np.array([0.08, 0.06, 0.07])
+    flicker = 0.85 + 0.15 * math.sin(phase * 14 * math.pi)
+    glow = blur(win_m, 6)
+    img += glow[..., None] * np.array([1.0, 0.6, 0.2]) * 0.8 * flicker
+    img = img * (1 - win_m[..., None]) + win_m[..., None] * np.array([1.0, 0.75, 0.35]) * flicker
+    img = img * (1 - near[..., None]) + near[..., None] * np.array([0.04, 0.08, 0.12])
+    nearcap = np.clip(near - np.roll(near, 3 * HS, axis=0), 0, 1)
+    img += nearcap[..., None] * np.array([0.8, 0.85, 0.95]) * 0.7
+    # Snow in three depths.
+    for seed, count, size, speed, drift, b in ((311, 60, 1.2, 1, 0.01, 0.5), (312, 35, 2.0, 2, 0.02, 0.8), (313, 14, 3.4, 3, 0.03, 1.0)):
+        img += snow_layer(phase, seed, count, size * HS / 2, speed, drift, x, y)[..., None] * b
+    return vignette(tonemap(img * 1.05), 0.35)
+
+
+def catenary(x0, y0, x1, y1, sag, n=40):
+    pts = []
+    for i in range(n + 1):
+        t = i / n
+        pts.append((x0 + (x1 - x0) * t, y0 + (y1 - y0) * t + sag * 4 * t * (1 - t)))
+    return pts
+
+
+LIGHTS = None
+
+
+def festive_lights(phase):
+    global LIGHTS
+    x, y = hcoords()
+    if LIGHTS is None:
+        strands = []
+        bulbs = []
+        r = np.random.default_rng(321)
+        for k, base in enumerate((0.1, 0.33, 0.56, 0.79)):
+            y0 = base + r.uniform(-0.02, 0.02)
+            y1 = base + r.uniform(-0.03, 0.03)
+            pts = catenary(-0.05, y0, 1.05, y1, 0.08 + 0.02 * k)
+            strands.append(pts)
+            for i in range(2, len(pts) - 2, 4):
+                bulbs.append((pts[i][0], pts[i][1] + 0.015, (i // 4 + k) % 4, r.random()))
+
+        def wires(d, s):
+            for pts in strands:
+                d.line([(px * HW * s, py * HH * s) for px, py in pts], fill=255, width=int(2 * s), joint="curve")
+        LIGHTS = (_hmask(wires), bulbs, hnoise(6, 322, 4))
+    wire, bulbs, velvet = LIGHTS
+    # Deep pine-green velvet with a soft sheen.
+    img = np.zeros((HH, HW, 3)) + np.array([0.02, 0.07, 0.04]) + (velvet[..., None] - 0.5) * 0.04
+    img += np.exp(-((x * 0.8 + y - (phase * 2.2 - 0.6)) ** 2) * 10)[..., None] * np.array([0.03, 0.08, 0.05])
+    img = img * (1 - wire[..., None]) + wire[..., None] * np.array([0.05, 0.12, 0.06])
+    palette = [np.array([1.0, 0.18, 0.15]), np.array([1.0, 0.75, 0.2]), np.array([0.2, 0.9, 0.35]), np.array([0.3, 0.55, 1.0])]
+    glow = np.zeros((HH, HW, 3))
+    core = np.zeros((HH, HW, 3))
+    for bx, by, c, seed in bulbs:
+        # A chase that runs along the strands twice per loop, plus each bulb's own twinkle.
+        chase = 0.5 + 0.5 * math.cos(2 * math.pi * (phase * 2 - bx - c * 0.25))
+        twinkle = 0.65 + 0.35 * math.sin(2 * math.pi * (phase * 3 + seed))
+        on = 0.35 + 0.65 * chase * twinkle
+        d2 = ((x - bx) * HW) ** 2 + (((y - by) * HH) * 0.75) ** 2
+        b = np.exp(-d2 / (5.0 * HS))
+        core += b[..., None] * palette[c] * on
+        glow += np.exp(-d2 / (90.0 * HS))[..., None] * palette[c] * on
+    img += glow * 0.9 + core * 1.6
+    img += snow_layer(phase, 323, 30, 1.5 * HS / 2, 1, 0.015, x, y)[..., None] * 0.35
+    return vignette(tonemap(img), 0.3)
+
+
+# ---- Velo Staff: only staff members get it ----
+
+# ---- Nitro Booster: for server boosters ----
+
+
+
+# ---- shared helpers for the high-detail capes ----
+
+def emboss(mask, radius, light_angle, strength=1.0):
+    """Lighting for a raised shape: (diffuse, specular) from a blurred height field lit from {light_angle}."""
+    height = blur(mask, radius)
+    gy, gx = np.gradient(height)
+    lx, ly = math.cos(light_angle), math.sin(light_angle)
+    shade = np.clip(0.5 + (gx * lx + gy * ly) * 18 * strength, 0, 1)
+    spec = np.clip((gx * lx + gy * ly) * 30 * strength, 0, 1) ** 3
+    return shade, spec
+
+
+def logo_mask_h(scale=0.86, top=0.12):
+    size = int(HW * scale)
+    img = Image.open(ROOT / "Logo.png").convert("RGBA").resize((size, size), Image.LANCZOS)
+    mask = np.zeros((HH, HW))
+    oy, ox = int(HH * top), (HW - size) // 2
+    mask[oy:oy + size, ox:ox + size] = np.asarray(img)[:, :, 3] / 255
+    return mask, (ox + size / 2) / HW, (oy + size / 2) / HH
+
+
+GIFT2 = None
+
+
+def gift_wrap(phase):
+    from PIL import ImageDraw
+    global GIFT2
+    x, y = hcoords()
+    if GIFT2 is None:
+        W2, H2 = HW * 2, HH * 2
+
+        def pattern(d, s):
+            step = W2 / 3.2
+            for j in range(-1, 8):
+                for i in range(-1, 5):
+                    cx = i * step + (step / 2 if j % 2 else 0)
+                    cy = j * step * 0.9
+                    if (i + j) % 2 == 0:
+                        for a in range(6):
+                            ang = a * math.pi / 3
+                            ex, ey = cx + math.cos(ang) * step * 0.2, cy + math.sin(ang) * step * 0.2
+                            d.line([(cx, cy), (ex, ey)], fill=255, width=5)
+                            mx, my = cx + math.cos(ang) * step * 0.12, cy + math.sin(ang) * step * 0.12
+                            for side in (-0.7, 0.7):
+                                d.line([(mx, my), (mx + math.cos(ang + side) * step * 0.07, my + math.sin(ang + side) * step * 0.07)], fill=255, width=4)
+                    else:
+                        pts = []
+                        for k in range(10):
+                            rr = step * (0.13 if k % 2 == 0 else 0.055)
+                            ang = -math.pi / 2 + k * math.pi / 5
+                            pts.append((cx + math.cos(ang) * rr, cy + math.sin(ang) * rr))
+                        d.polygon(pts, fill=255)
+        pat = Image.new("L", (W2, H2), 0)
+        pattern(ImageDraw.Draw(pat), 2)
+        pat_m = np.asarray(pat.resize((HW, HH), Image.LANCZOS), dtype=float) / 255
+
+        def ribbon(d):
+            d.rectangle([W2 * 0.41, 0, W2 * 0.59, H2], fill=255)
+            d.rectangle([0, H2 * 0.34, W2, H2 * 0.45], fill=255)
+        rib = Image.new("L", (W2, H2), 0)
+        ribbon(ImageDraw.Draw(rib))
+        rib_m = np.asarray(rib.resize((HW, HH), Image.LANCZOS), dtype=float) / 255
+        bow = Image.new("L", (W2, H2), 0)
+        bd = ImageDraw.Draw(bow)
+        cx, cy = W2 * 0.5, H2 * 0.39
+        for side in (-1, 1):
+            loop = [(cx, cy)]
+            for k in range(25):
+                t = k / 24 * math.pi
+                loop.append((cx + side * (W2 * 0.27) * math.sin(t) * (0.6 + 0.4 * math.sin(t)), cy - H2 * 0.11 * math.sin(t * 1.0) * math.cos(t - 0.6) - H2 * 0.03 * math.sin(t)))
+            bd.polygon(loop, fill=255)
+            bd.polygon([(cx, cy), (cx + side * W2 * 0.22, cy + H2 * 0.19), (cx + side * W2 * 0.13, cy + H2 * 0.2), (cx + side * W2 * 0.04, cy + H2 * 0.04)], fill=255)
+        bd.ellipse([cx - W2 * 0.065, cy - H2 * 0.045, cx + W2 * 0.065, cy + H2 * 0.035], fill=255)
+        bow_m = np.asarray(bow.resize((HW, HH), Image.LANCZOS), dtype=float) / 255
+        GIFT2 = (pat_m, rib_m, bow_m, hnoise(10, 451, 3))
+    pat_m, rib_m, bow_m, paper = GIFT2
+    # Deep red paper with a fine grain and a soft fold shading.
+    img = np.zeros((HH, HW, 3)) + np.array([0.6, 0.04, 0.07]) * (0.85 + 0.25 * paper[..., None])
+    img *= (0.9 + 0.1 * np.sin(x * 9 + 1))[..., None]
+    # Silver foil pattern that glints as the light passes.
+    shine = np.exp(-((x * 0.7 + y - (phase * 2.4 - 0.7)) ** 2) * 14)
+    foil_shade, foil_spec = emboss(pat_m, 1.5, -2.2, 0.8)
+    img = img * (1 - pat_m[..., None] * 0.85) + pat_m[..., None] * (np.array([0.62, 0.6, 0.66]) * (0.5 + foil_shade[..., None] * 0.7) + shine[..., None] * 0.8)
+    # Gold satin ribbon with stripes, lit; the bow embossed and glinting.
+    gold_dark = np.array([0.55, 0.36, 0.08])
+    gold = np.array([1.0, 0.76, 0.28])
+    stripe = 0.85 + 0.15 * np.sin((x + y) * 140)
+    rib_shade, rib_spec = emboss(rib_m, 3, -2.0, 0.7)
+    img = img * (1 - rib_m[..., None]) + rib_m[..., None] * (gold_dark + (gold - gold_dark) * (rib_shade * stripe)[..., None] + shine[..., None] * 0.6)
+    img -= blur(np.clip(np.roll(bow_m, 5 * HS, axis=0) - bow_m, 0, 1), 4)[..., None] * 0.35
+    bow_shade, bow_spec = emboss(bow_m, 6, -2.2 + 0.3 * math.sin(phase * 2 * math.pi), 1.2)
+    img = img * (1 - bow_m[..., None]) + bow_m[..., None] * (gold_dark + (gold - gold_dark) * bow_shade[..., None] + bow_spec[..., None] * 1.2 + shine[..., None] * 0.5)
+    # Glints popping on the foil and snow drifting down.
+    r = np.random.default_rng(452)
+    for _ in range(22):
+        sx, sy, sp = r.random(3)
+        tw = max(0, math.sin((phase * 3 + sp) * 2 * math.pi)) ** 12
+        if tw < 0.02:
+            continue
+        dx, dy = (x - sx) * HW, (y - sy) * HH
+        img += (np.exp(-dx ** 2 / 2) * np.exp(-dy ** 2 / 90) + np.exp(-dy ** 2 / 2) * np.exp(-dx ** 2 / 90))[..., None] * tw * 1.2
+    img += snow_layer(phase, 453, 40, 1.4 * HS / 2, 1, 0.012, x, y)[..., None] * 0.55
+    img += snow_layer(phase, 454, 14, 2.6 * HS / 2, 2, 0.02, x, y)[..., None] * 0.8
+    return vignette(tonemap(img * 1.1), 0.28)
+
+
+STAFF3 = None
+
+
+def velo_staff(phase):
+    """Minimal and calm: matte black, the Velo logo in flat white, a thin red line and STAFF in spaced letters."""
+    from PIL import ImageDraw, ImageFont
+    global STAFF3
+    x, y = hcoords()
+    if STAFF3 is None:
+        logo, lcx, lcy = logo_mask_h(0.58, 0.16)
+        W2, H2 = HW * 2, HH * 2
+        text = Image.new("L", (W2, H2), 0)
+        # Large, tracked-out letters across ~74% of the width: readable on a player's back, not a smudge.
+        font = ImageFont.truetype(str(ROOT / "launcher/src/main/resources/net/veloclient/launcher/fonts/Inter-Bold.ttf"), int(H2 * 0.088))
+        d = ImageDraw.Draw(text)
+        letters = "STAFF"
+        widths = [d.textbbox((0, 0), ch, font=font)[2] - d.textbbox((0, 0), ch, font=font)[0] for ch in letters]
+        target = W2 * 0.74
+        gap = (target - sum(widths)) / (len(letters) - 1)
+        bb = d.textbbox((0, 0), "S", font=font)
+        cx = (W2 - target) / 2
+        for ch, w in zip(letters, widths):
+            cb = d.textbbox((0, 0), ch, font=font)
+            d.text((cx - cb[0], H2 * 0.655 - bb[1]), ch, font=font, fill=255)
+            cx += w + gap
+        text_m = np.asarray(text.resize((HW, HH), Image.LANCZOS), dtype=float) / 255
+        STAFF3 = (logo, text_m, hnoise(40, 461, 2))
+    logo, text_m, grain = STAFF3
+    red = np.array([0.95, 0.16, 0.22])
+    # Matte black with a soft top light and a fine grain.
+    img = np.zeros((HH, HW, 3)) + np.array([0.045, 0.045, 0.05]) + (grain[..., None] - 0.5) * 0.025
+    img += np.exp(-(((x - 0.5) * 1.6) ** 2 + ((y - 0.28) * 2.2) ** 2) * 3)[..., None] * np.array([0.05, 0.05, 0.06])
+    # A thin red line under the logo, its light breathing; a short highlight travelling along it.
+    line = np.exp(-((y - 0.6) * HH) ** 2 / 2.0) * smoothstep(0.08, 0.2, x) * smoothstep(0.92, 0.8, x)
+    # The letters get a faint red underglow so they read as lit, not printed.
+    img += blur(text_m, 5)[..., None] * red * 0.22
+    breathe = 0.7 + 0.3 * math.sin(phase * 2 * math.pi)
+    glint_x = (phase * 1.4 - 0.2)
+    glint = np.exp(-((x - glint_x) * 9) ** 2)
+    img += line[..., None] * red * (0.9 * breathe + glint[..., None] * 1.5) + blur(line, 3)[..., None] * red * 0.4 * breathe
+    # The logo in flat white, with one slow light sweep across it.
+    sweep = np.exp(-((x + y * 0.5 - (phase * 2.0 - 0.4)) * 7) ** 2)
+    # (Values above 1: the tonemap below rolls them off to a clean white instead of grey.)
+    img = img * (1 - logo[..., None]) + logo[..., None] * (np.array([1.75, 1.75, 1.82]) + sweep[..., None] * 0.8)
+    img = img * (1 - text_m[..., None]) + text_m[..., None] * (np.array([1.9, 1.9, 1.98]) + sweep[..., None] * 0.4)
+    # A red seam along the bottom edge.
+    img += np.exp(-((y - 0.985) * HH) ** 2 / 6)[..., None] * red * 0.8
+    return vignette(tonemap(img), 0.25)
+
+
+def booster(phase):
+    """Soft and bright: a pink-to-violet glow, out-of-focus orbs drifting up, a thin glowing gem outline."""
+    from PIL import ImageDraw
+    x, y = hcoords()
+    pink = np.array([1.0, 0.45, 0.85])
+    violet = np.array([0.55, 0.35, 1.0])
+    img = gradient(y, [(0, (64, 20, 92)), (0.5, (150, 46, 140)), (1, (230, 92, 170))]) * 0.85
+    # Bokeh orbs rising at different speeds and sizes (whole cape heights per loop, so it loops).
+    r = np.random.default_rng(471)
+    for _ in range(18):
+        sx, sy, sp = r.random(3)
+        size = 4 + sp * 14
+        py = (sy - phase * (1 + int(sp * 2))) % 1.15 - 0.075
+        d = np.hypot((x - sx) * HW, (y - py) * HH)
+        orb = np.clip(1 - d / (size * HS / 2), 0, 1) ** 0.6
+        rim = np.exp(-((d - size * HS / 2 * 0.92) ** 2) / 6)
+        img += (orb * 0.12 + rim * 0.1)[..., None] * (pink if sp > 0.5 else np.array([1.0, 0.85, 0.95]))
+    # The gem: cut facets in pink and violet, lit by a light that sweeps across them, a crisp glowing outline.
+    W2, H2 = HW * 2, HH * 2
+    cx, cy, gw, gh = W2 * 0.5, H2 * 0.42, W2 * 0.56, H2 * 0.31
+    T0, T1 = (cx - gw * 0.28, cy - gh * 0.42), (cx + gw * 0.28, cy - gh * 0.42)
+    G0, G1 = (cx - gw * 0.5, cy - gh * 0.1), (cx + gw * 0.5, cy - gh * 0.1)
+    K0, K1 = (cx - gw * 0.14, cy - gh * 0.1), (cx + gw * 0.14, cy - gh * 0.1)
+    C = (cx, cy + gh * 0.58)
+    pts = [T0, T1, G1, C, G0]
+    facets = [  # polygon, base brightness, hue mix (0 pink .. 1 violet)
+        ([T0, T1, K1, K0], 1.0, 0.15), ([G0, T0, K0], 0.7, 0.55), ([T1, G1, K1], 0.85, 0.35),
+        ([G0, K0, C], 0.55, 0.85), ([K0, K1, C], 0.9, 0.4), ([K1, G1, C], 0.65, 0.7),
+    ]
+    sweep = (phase * 1.6 - 0.3)
+    body = np.zeros((HH, HW))
+    for k, (poly, bright, mix) in enumerate(facets):
+        m = Image.new("L", (W2, H2), 0)
+        ImageDraw.Draw(m).polygon(poly, fill=255)
+        fm = np.asarray(m.resize((HW, HH), Image.LANCZOS), dtype=float) / 255
+        body = np.maximum(body, fm)
+        fx = sum(p[0] for p in poly) / len(poly) / W2
+        light = np.exp(-((fx - sweep) * 3.2) ** 2)
+        colour = pink * (1 - mix) + violet * mix
+        inner = (0.45 + 0.35 * y + 0.2 * (1 - x)) * bright
+        img = img * (1 - fm[..., None] * 0.92) + fm[..., None] * (colour * (0.55 + 0.6 * inner[..., None]) + light * 0.75)
+    pulse = 0.75 + 0.25 * math.sin(phase * 2 * math.pi)
+    img += blur(body, 14)[..., None] * pink * 0.55 * pulse
+    edges = Image.new("L", (W2, H2), 0)
+    ed = ImageDraw.Draw(edges)
+    ed.line(pts + [pts[0]], fill=255, width=6, joint="curve")
+    ed.line([G0, G1], fill=200, width=4)
+    for a, b in ((T0, K0), (K0, C), (T1, K1), (K1, C)):
+        ed.line([a, b], fill=170, width=3)
+    gm = np.asarray(edges.resize((HW, HH), Image.LANCZOS), dtype=float) / 255
+    img += blur(gm, 5)[..., None] * pink * 0.8 * pulse + gm[..., None] * np.array([1.2, 1.05, 1.25]) * (0.8 + 0.2 * pulse)
+    # One sparkle that hops between the gem's corners.
+    corner = pts[int(phase * 5) % 5]
+    local = (phase * 5) % 1
+    tw = math.sin(local * math.pi) ** 2
+    dx, dy = (x - corner[0] / W2) * HW, (y - corner[1] / H2) * HH
+    img += (np.exp(-dx ** 2 / 3) * np.exp(-dy ** 2 / 220) + np.exp(-dy ** 2 / 3) * np.exp(-dx ** 2 / 220))[..., None] * tw * 1.6
+    return vignette(tonemap(img * 1.05), 0.2)
+
+
 CAPES = {
     "velo_neon": velo_neon,
     "wildfire": wildfire,
@@ -946,6 +1470,13 @@ CAPES = {
     "kintsugi": kintsugi,
     "heaven": heaven,
     "pearl": pearl,
+    "circuit": circuit,
+    "holo_grid": holo_grid,
+    "silent_night": silent_night,
+    "festive_lights": festive_lights,
+    "gift_wrap": gift_wrap,
+    "velo_staff": velo_staff,
+    "booster": booster,
     "haunted": haunted,
     "jack_o_lantern": jack_o_lantern,
     "witching_hour": witching_hour,
@@ -954,13 +1485,21 @@ CAPES = {
 
 # ---- cape layout ----
 
-def to_texture(art):
-    """Outside art (H*SS x W*SS x 3, 0..1+) -> 512 x 256 RGB cape texture."""
+# Capes whose detail (text, fine lines) needs more than 8 texture pixels per cape pixel: {id: (scale, frames, dither)}.
+# Every frame stays decoded in the game's memory (scale^2 * 8 KB each), so only where it matters.
+HIGH_RES = {
+    "velo_staff": (16, 24, False),   # 1024 x 512: the STAFF lettering stays crisp; flat colours, no dither speckle
+    "booster": (12, 40, True),       # 768 x 384
+}
+
+
+def to_texture(art, scale=SCALE):
+    """Outside art (0..1+) -> (64 x 32) * scale RGB cape texture."""
     art = np.clip(art, 0, 1)
-    face = Image.fromarray((art * 255).astype(np.uint8)).resize((W, H), Image.LANCZOS)
-    tex = Image.new("RGB", (64 * SCALE, 32 * SCALE), (0, 0, 0))
+    face = Image.fromarray((art * 255).astype(np.uint8)).resize((10 * scale, 16 * scale), Image.LANCZOS)
+    tex = Image.new("RGB", (64 * scale, 32 * scale), (0, 0, 0))
     edge_colour = tuple(int(c) for c in np.asarray(face).reshape(-1, 3).mean(0) * 0.6)
-    s = SCALE
+    s = scale
     tex.paste(face, (1 * s, 1 * s))                                     # outside
     inside = Image.fromarray((np.asarray(face.transpose(Image.FLIP_LEFT_RIGHT), dtype=float) * 0.45).astype(np.uint8))
     tex.paste(inside, (12 * s, 1 * s))                                   # inside (towards your back)
@@ -971,16 +1510,22 @@ def to_texture(art):
 
 def render(cape_id):
     fn = CAPES[cape_id]
-    frames = [to_texture(fn(i / FRAMES)) for i in range(FRAMES)]
+    scale, count, dither = HIGH_RES.get(cape_id, (SCALE, FRAMES, True))
+    delay = round(DELAY_MS * FRAMES / count)  # same loop length with fewer frames
+    frames = [to_texture(fn(i / count), scale) for i in range(count)]
     # libimagequant: far better palettes than median cut (smooth gradients, no speckled dither).
-    paletted = [f.quantize(colors=256, method=Image.Quantize.LIBIMAGEQUANT, dither=Image.Dither.FLOYDSTEINBERG) for f in frames]
+    paletted = [f.quantize(colors=256, method=Image.Quantize.LIBIMAGEQUANT,
+                           dither=Image.Dither.FLOYDSTEINBERG if dither else Image.Dither.NONE) for f in frames]
     OUT.mkdir(parents=True, exist_ok=True)
     path = OUT / f"{cape_id}.gif"
-    paletted[0].save(path, save_all=True, append_images=paletted[1:], duration=DELAY_MS, loop=0, disposal=1, optimize=False)
+    paletted[0].save(path, save_all=True, append_images=paletted[1:], duration=delay, loop=0, disposal=1, optimize=False)
     PREVIEW.mkdir(parents=True, exist_ok=True)
-    sheet = Image.new("RGB", (W * 8 + 70, H + 20), (20, 20, 26))
-    for k, i in enumerate(range(0, FRAMES, FRAMES // 8)):
-        sheet.paste(frames[i].crop((SCALE, SCALE, 11 * SCALE, 17 * SCALE)), (10 + k * (W + 7), 10))
+    fw, fh = 10 * scale, 16 * scale
+    sheet = Image.new("RGB", (fw * 8 + 70, fh + 20), (20, 20, 26))
+    for k, i in enumerate(range(0, count, max(1, count // 8))):
+        if k >= 8:
+            break
+        sheet.paste(frames[i].crop((scale, scale, 11 * scale, 17 * scale)), (10 + k * (fw + 7), 10))
     sheet.save(PREVIEW / f"{cape_id}.png")
     print(f"{cape_id}: {path.relative_to(ROOT)} ({path.stat().st_size // 1024} KB)")
 

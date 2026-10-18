@@ -92,6 +92,8 @@ final class BotConfig {
 	String ticketCategoryId;
 	String ticketLogChannelId;
 	String supportRoleId;
+	/** The channel where players paste one-time Velo Client link codes. */
+	String linkChannelId;
 	/** Given to members who linked their Minecraft account (optional). */
 	String linkedRoleId;
 	/** The VIP role of Velo+ members - kept in step automatically (given, and taken away when Velo+ ends). */
@@ -109,6 +111,48 @@ final class BotConfig {
 	String rolesPanelTitle = "Pick your pings";
 	String rolesPanelText = "Press a button to get - or drop - a ping role. You only get pinged for what you pick.";
 	Map<String, Ticket> tickets = new LinkedHashMap<>();
+	/** Default ticket types already offered once - a type you delete from the file isn't put back. */
+	List<String> seededTypes = new ArrayList<>();
+	/** Discord roles that make someone Velo staff: role id to "helper", "mod" or "admin" (synced to the Velo server). */
+	Map<String, String> staffRoles = new LinkedHashMap<>();
+	/** Where the welcome card for new members is posted (null: no welcome messages). */
+	String welcomeChannelId;
+	/** A channel the welcome points new members to (e.g. the rules), optional. */
+	String welcomeRulesChannelId;
+	/** Where boost thank-yous go (falls back to the server's system channel). */
+	String boostChannelId;
+	/** The bot trap: anyone who isn't staff writing here is removed. */
+	String honeypotChannelId;
+	/** "softban" (kick and wipe their last day of messages - they can rejoin) or "ban". */
+	String honeypotAction = "softban";
+	/** Where honeypot catches are logged (falls back to the ticket log). */
+	String modLogChannelId;
+	/** Giveaways by id, running and ended (ended ones are kept for /giveaway reroll). */
+	Map<String, Giveaway> giveaways = new LinkedHashMap<>();
+
+	/** A giveaway: a post with an Enter button; the prize goes straight to the winners' Velo accounts. */
+	static final class Giveaway {
+		String id;
+		String guildId;
+		String channelId;
+		String messageId;
+		String hostId;
+		String title;
+		String description;
+		/** "cosmetic" (value: item id), "coins" (value: amount) or "plus" (value: days). */
+		String prizeType;
+		String prizeValue;
+		String prizeName;
+		int winners = 1;
+		long endsAt;
+		boolean ended;
+		/** Only members with this role may enter (optional). */
+		String requiredRoleId;
+		/** The post carries a picture (giveaway.png). */
+		boolean hasImage;
+		List<String> entrants = new ArrayList<>();
+		List<String> winnerIds = new ArrayList<>();
+	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private transient Path file;
@@ -126,9 +170,32 @@ final class BotConfig {
 		if (config.tickets == null) {
 			config.tickets = new LinkedHashMap<>();
 		}
+		if (config.staffRoles == null) {
+			config.staffRoles = new LinkedHashMap<>();
+		}
+		if (config.giveaways == null) {
+			config.giveaways = new LinkedHashMap<>();
+		}
+		if (config.seededTypes == null) {
+			config.seededTypes = new ArrayList<>();
+		}
 		config.file = file;
+		boolean changed = false;
 		if (config.ticketTypes == null || config.ticketTypes.isEmpty()) {
 			config.ticketTypes = defaultTypes();
+			changed = true;
+		}
+		// New default types (like staff applications) reach existing configs once.
+		for (TicketType type : defaultTypes()) {
+			if (!config.seededTypes.contains(type.id)) {
+				config.seededTypes.add(type.id);
+				if (config.ticketTypes.stream().noneMatch(t -> t.id.equals(type.id))) {
+					config.ticketTypes.add(type);
+				}
+				changed = true;
+			}
+		}
+		if (changed) {
 			config.save();
 		}
 		return config;
@@ -142,6 +209,7 @@ final class BotConfig {
 		this.ticketCategoryId = fresh.ticketCategoryId;
 		this.ticketLogChannelId = fresh.ticketLogChannelId;
 		this.supportRoleId = fresh.supportRoleId;
+		this.linkChannelId = fresh.linkChannelId;
 		this.linkedRoleId = fresh.linkedRoleId;
 		this.vipRoleId = fresh.vipRoleId;
 		this.vipStrict = fresh.vipStrict;
@@ -150,13 +218,20 @@ final class BotConfig {
 		this.ticketPanelText = fresh.ticketPanelText;
 		this.rolesPanelTitle = fresh.rolesPanelTitle;
 		this.rolesPanelText = fresh.rolesPanelText;
+		this.staffRoles = fresh.staffRoles;
+		this.boostChannelId = fresh.boostChannelId;
+		this.welcomeChannelId = fresh.welcomeChannelId;
+		this.welcomeRulesChannelId = fresh.welcomeRulesChannelId;
+		this.honeypotChannelId = fresh.honeypotChannelId;
+		this.honeypotAction = fresh.honeypotAction;
+		this.modLogChannelId = fresh.modLogChannelId;
 	}
 
 	TicketType type(String id) {
 		return ticketTypes.stream().filter(t -> t.id.equals(id)).findFirst().orElse(ticketTypes.get(0));
 	}
 
-	/** The four kinds a fresh bot starts with - change, add and remove them in bot-config.json. */
+	/** The kinds a fresh bot starts with - change, add and remove them in bot-config.json. */
 	static List<TicketType> defaultTypes() {
 		TicketType support = type("support", "Support", "🛠", "Something isn't working or you need help.", "primary", "#5865f2",
 				new Question("issue", "What's wrong?", "paragraph", "What happened, and what did you expect?", true, 1500),
@@ -170,9 +245,22 @@ final class BotConfig {
 				new Question("name", "Minecraft username", "short", "The account you bought it on", true, 16),
 				new Question("what", "What went wrong?", "paragraph", "What did you buy, when, and what happened?", true, 1200),
 				new Question("order", "Order / transaction id", "short", "From your Tebex receipt (optional)", false, 80));
-		TicketType other = type("other", "Other", "💬", "Anything else - questions, ideas, partnerships.", "secondary", "#99aab5",
+		TicketType other = type("other", "Other", "💬", "Anything else - questions, ideas, feedback.", "secondary", "#99aab5",
 				new Question("message", "How can we help?", "paragraph", "Tell us more", true, 1500));
-		return new ArrayList<>(List.of(support, bug, purchase, other));
+		TicketType staff = type("staff", "Staff application", "🛡", "Want to help run the community? Apply for the team.", "primary", "#ff4d4d",
+				new Question("about", "Name, age & timezone", "short", "e.g. Alex, 17, CET", true, 100),
+				new Question("why", "Why do you want to join the team?", "paragraph", "What would you bring?", true, 1200),
+				new Question("experience", "Moderation / community experience", "paragraph", "Servers you helped run, what you did there", true, 1200),
+				new Question("time", "How much time can you give?", "short", "e.g. 1-2 hours a day, weekends", true, 100),
+				new Question("mc", "Minecraft username", "short", "Your Velo Client account", true, 16));
+		staff.welcome = "Thanks for applying! The team reads every application - please be patient, and don't ping staff about it.";
+		staff.maxOpen = 1;
+		TicketType partner = type("partner", "Partner inquiry", "🤝", "Servers, creators and projects that want to work with us.", "success", "#f5a623",
+				new Question("who", "Who are you / what's your project?", "short", "Server, channel or project name", true, 120),
+				new Question("link", "Link & size", "short", "Invite / channel link, members or subscribers", true, 200),
+				new Question("idea", "What do you have in mind?", "paragraph", "What kind of partnership, and what's in it for both sides?", true, 1500));
+		partner.welcome = "Thanks for reaching out! Someone from the team will get back to you here.";
+		return new ArrayList<>(List.of(support, bug, purchase, staff, partner, other));
 	}
 
 	private static TicketType type(String id, String label, String emoji, String description, String style, String color, Question... questions) {

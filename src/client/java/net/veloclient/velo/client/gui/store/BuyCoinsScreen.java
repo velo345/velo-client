@@ -28,16 +28,6 @@ public final class BuyCoinsScreen extends VeloWindow {
 	private int statusColor = 0;
 	private String pendingOrder;
 	private long nextOrderPoll;
-	private TextFieldWidget adminTarget;
-	private TextFieldWidget adminAmount;
-	private boolean showOwner;
-	/** Owner tools: every cosmetic (admin view) and how far its list is scrolled. */
-	private List<com.google.gson.JsonObject> adminItems;
-	private int ownerScroll;
-	private int ownerListX;
-	private int ownerListY;
-	private int ownerListW;
-	private int ownerListH;
 
 	public BuyCoinsScreen(Screen parent) {
 		super(Text.literal("Velo Coins"), 620, 420);
@@ -48,23 +38,6 @@ public final class BuyCoinsScreen extends VeloWindow {
 	protected void layoutContent() {
 		this.clearChildren();
 		StoreClient.refresh(true, null);
-		if (StoreClient.isOwner() && showOwner) {
-			int width = contentWidth();
-			int rightX = contentX() + (width - 14) * 52 / 100 + 14;
-			int rightWidth = contentX() + width - rightX;
-			adminTarget = new TextFieldWidget(this.textRenderer, rightX, contentY() + 34, rightWidth, 18, Text.literal("Player"));
-			adminTarget.setPlaceholder(Text.literal("Player name or UUID"));
-			adminAmount = new TextFieldWidget(this.textRenderer, rightX, contentY() + 58, rightWidth, 18, Text.literal("Amount"));
-			adminAmount.setPlaceholder(Text.literal("Amount, e.g. 500 or -200"));
-			addDrawableChild(adminTarget);
-			addDrawableChild(adminAmount);
-			if (adminItems == null) {
-				loadAdminItems();
-			}
-		} else {
-			adminTarget = null;
-			adminAmount = null;
-		}
 	}
 
 	private void setStatus(String text, boolean error) {
@@ -118,130 +91,16 @@ public final class BuyCoinsScreen extends VeloWindow {
 
 		drawPacks(context, x, y + 26, leftWidth, mouseX, mouseY);
 		if (StoreClient.isOwner()) {
-			hits.add(VeloUi.pill(context, rightX + rightWidth - 54, y + 2, 54, 14, showOwner ? "Rewards" : "Owner", 0, mouseX, mouseY, () -> {
-				showOwner = !showOwner;
-				layoutContent();
-			}));
+			hits.add(VeloUi.pill(context, rightX + rightWidth - 54, y + 2, 54, 14, "Owner", 0, mouseX, mouseY,
+					() -> this.client.setScreen(new OwnerScreen(this))));
 		}
-		if (showOwner && StoreClient.isOwner()) {
-			drawOwner(context, rightX, y, rightWidth, mouseX, mouseY);
-		} else {
-			drawRewards(context, rightX, y, rightWidth, mouseX, mouseY);
-		}
+		drawRewards(context, rightX, y, rightWidth, mouseX, mouseY);
 		if (!status.getString().isEmpty()) {
 			for (String line : VeloUi.wrap(status.getString(), leftWidth)) {
 				context.drawTextWithShadow(this.textRenderer, line, x, contentBottom() - 9, statusColor == 0 ? VeloStyle.textMuted() : statusColor);
 				break;
 			}
 		}
-	}
-
-	private void drawOwner(DrawContext context, int x, int y, int width, int mouseX, int mouseY) {
-		context.drawTextWithShadow(this.textRenderer, TitleScreenTheme.tileFont("Owner tools"), x, y + 6, VeloStyle.accent());
-		context.drawTextWithShadow(this.textRenderer, "Player empty = you. Coins: - takes them away.", x, y + 20, VeloStyle.textFaint());
-		hits.add(VeloUi.pill(context, x, y + 82, width, 18, "Apply coins", 1, mouseX, mouseY, this::giveCoins));
-		drawOwnerCosmetics(context, x, y + 108, width, mouseX, mouseY);
-	}
-
-	/**
-	 * Every cosmetic: give / take it (testing ones too - that's how they're tried out) and switch its
-	 * status (released = in the store, testing = only given out, hidden = out of the store again).
-	 * Prices, time windows and collections: launcher > Owner.
-	 */
-	private void drawOwnerCosmetics(DrawContext context, int x, int y, int width, int mouseX, int mouseY) {
-		context.drawTextWithShadow(this.textRenderer, "Cosmetics", x, y, VeloStyle.text());
-		if (adminItems == null) {
-			context.drawTextWithShadow(this.textRenderer, "Loading...", x, y + 14, VeloStyle.textMuted());
-			return;
-		}
-		int rowH = 16;
-		ownerListX = x;
-		ownerListY = y + 12;
-		ownerListW = width;
-		ownerListH = Math.max(rowH, contentBottom() - 14 - ownerListY);
-		int visible = ownerListH / rowH;
-		ownerScroll = Math.max(0, Math.min(ownerScroll, adminItems.size() - visible));
-		context.enableScissor(x, ownerListY, x + width, ownerListY + ownerListH);
-		for (int i = ownerScroll; i < adminItems.size() && i < ownerScroll + visible; i++) {
-			com.google.gson.JsonObject item = adminItems.get(i);
-			int ry = ownerListY + (i - ownerScroll) * rowH;
-			String id = item.get("id").getAsString();
-			String status = item.has("status") && !item.get("status").isJsonNull() ? item.get("status").getAsString() : "testing";
-			int statusColor = switch (status) {
-				case "released" -> 0xFF6FE0A4;
-				case "hidden" -> 0xFF8A8398;
-				default -> 0xFFF4B82E;
-			};
-			String name = (id.startsWith("cape_") ? "Cape: " : id.startsWith("aura_") ? "Aura: " : "") + item.get("name").getAsString();
-			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(name, width - 158), x, ry + 4, VeloStyle.text());
-			hits.add(VeloUi.pill(context, x + width - 152, ry, 66, 14, status, 0, mouseX, mouseY, () -> cycleStatus(id, status)));
-			context.fill(x + width - 150, ry + 6, x + width - 147, ry + 9, statusColor);
-			hits.add(VeloUi.pill(context, x + width - 82, ry, 40, 14, "Give", 1, mouseX, mouseY, () -> grantItem(id, true)));
-			hits.add(VeloUi.pill(context, x + width - 40, ry, 40, 14, "Take", 0, mouseX, mouseY, () -> grantItem(id, false)));
-		}
-		context.disableScissor();
-		if (adminItems.size() > visible) {
-			context.drawTextWithShadow(this.textRenderer, "scroll for more (" + adminItems.size() + ")", x, ownerListY + ownerListH + 2, VeloStyle.textFaint());
-		}
-	}
-
-	private void loadAdminItems() {
-		StoreClient.adminCosmetics(result -> {
-			List<com.google.gson.JsonObject> list = new ArrayList<>();
-			result.getAsJsonArray("items").forEach(e -> list.add(e.getAsJsonObject()));
-			// Testing first (what you're working on), then released, then hidden.
-			list.sort(java.util.Comparator.comparingInt((com.google.gson.JsonObject o) -> switch (o.get("status").getAsString()) {
-				case "testing" -> 0;
-				case "released" -> 1;
-				default -> 2;
-			}).thenComparing(o -> o.get("name").getAsString()));
-			adminItems = list;
-		}, e -> {
-			adminItems = List.of();
-			setStatus(e, true);
-		});
-	}
-
-	private String adminTargetOrMe() {
-		String target = adminTarget == null ? "" : adminTarget.getText().trim();
-		return target.isEmpty() ? net.veloclient.velo.client.network.VeloServerClient.authenticatedUuid() : target;
-	}
-
-	private void grantItem(String itemId, boolean grant) {
-		String target = adminTargetOrMe();
-		if (target == null) {
-			setStatus("Not connected to the Velo server yet", true);
-			return;
-		}
-		StoreClient.adminItem(target, itemId, grant, view -> {
-			setStatus((grant ? "Gave " : "Took ") + itemId + (grant ? " to " : " from ") + view.get("username").getAsString(), false);
-			StoreClient.refresh(true, null);
-		}, e -> setStatus(e, true));
-	}
-
-	private void cycleStatus(String itemId, String current) {
-		String next = switch (current) {
-			case "testing" -> "released";
-			case "released" -> "hidden";
-			default -> "testing";
-		};
-		com.google.gson.JsonObject change = new com.google.gson.JsonObject();
-		change.addProperty("id", itemId);
-		change.addProperty("status", next);
-		StoreClient.adminUpdateCosmetic(change, false, r -> {
-			setStatus(itemId + " is now " + next + (next.equals("released") ? " (in the store)" : next.equals("testing") ? " (only given out)" : " (out of the store)"), false);
-			loadAdminItems();
-		}, e -> setStatus(e, true));
-	}
-
-	@Override
-	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-		if (showOwner && adminItems != null && mouseX >= ownerListX && mouseX <= ownerListX + ownerListW && mouseY >= ownerListY
-				&& mouseY <= ownerListY + ownerListH) {
-			ownerScroll = Math.max(0, ownerScroll - (int) Math.signum(verticalAmount) * 2);
-			return true;
-		}
-		return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
 	}
 
 	// ---- Coin packs ----
@@ -418,23 +277,6 @@ public final class BuyCoinsScreen extends VeloWindow {
 						}, e -> setStatus(e, true));
 					}
 				}));
-	}
-
-	private void giveCoins() {
-		if (adminTarget == null) {
-			return;
-		}
-		int amount;
-		try {
-			amount = Integer.parseInt(adminAmount.getText().trim().replace("+", ""));
-		} catch (NumberFormatException e) {
-			setStatus("Enter an amount like 500 or -200", true);
-			return;
-		}
-		StoreClient.adminCoins(adminTargetOrMe(), amount, "in-game", view -> {
-			setStatus("Done - " + view.get("username").getAsString() + " now has " + view.get("balance").getAsInt() + " coins", false);
-			StoreClient.refresh(true, null);
-		}, e -> setStatus(e, true));
 	}
 
 	// ---- Drawing helpers ----

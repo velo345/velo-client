@@ -189,6 +189,40 @@ public final class StoreApi {
 		}
 	}
 
+	/** Reports a player's chat ({@code context} "dm" or "party") to the Velo Client team. */
+	public static JsonObject reportPlayer(String target, String category, String reason, String context, boolean includeHistory) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.addProperty("target", target);
+		body.addProperty("category", category);
+		body.addProperty("reason", reason);
+		body.addProperty("context", context);
+		body.addProperty("includeHistory", includeHistory);
+		return post("/v1/social/report", body);
+	}
+
+	/** Admins: open (or all) player reports. */
+	public static JsonObject staffReports(String status) throws StoreError {
+		return get("/v1/staff/reports?status=" + status);
+	}
+
+	/** Admins: closes a report, optionally banning the reported player from services for {@code days} (0 = for good). */
+	public static JsonObject staffResolve(String id, boolean ban, int days) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.addProperty("id", id);
+		body.addProperty("status", ban ? "actioned" : "dismissed");
+		if (ban) {
+			JsonObject b = new JsonObject();
+			com.google.gson.JsonArray services = new com.google.gson.JsonArray();
+			services.add("friends");
+			services.add("parties");
+			b.add("services", services);
+			b.addProperty("days", days);
+			b.addProperty("reason", "Reported chat");
+			body.add("ban", b);
+		}
+		return post("/v1/staff/reports/resolve", body);
+	}
+
 	/** Owner: gives {@code days} of Velo+ (more than 0) or ends it (0). */
 	public static JsonObject adminPlus(String target, int days) throws StoreError {
 		JsonObject body = new JsonObject();
@@ -202,7 +236,7 @@ public final class StoreApi {
 		return get("/v1/discord/status");
 	}
 
-	/** A code to type as {@code /link <code>} in the Velo Discord ({@code code}, {@code expiresInSeconds}, {@code inviteUrl}). */
+	/** A code to paste in the Velo Discord's configured link channel ({@code code}, {@code expiresInSeconds}, {@code inviteUrl}). */
 	public static JsonObject discordCode() throws StoreError {
 		return post("/v1/discord/code", new JsonObject());
 	}

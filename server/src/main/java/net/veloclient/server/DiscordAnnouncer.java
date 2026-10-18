@@ -143,6 +143,42 @@ final class DiscordAnnouncer {
 	}
 
 	/** A bug or crash report arrived. */
+	/** Player reports from the friends system / party chat (VELO_DISCORD_PLAYER_REPORTS_WEBHOOK). */
+	private String playerReportsWebhook = System.getenv("VELO_DISCORD_PLAYER_REPORTS_WEBHOOK");
+
+	void playerReport(StaffService.Report report) {
+		if (!DiscordWebhook.valid(playerReportsWebhook)) {
+			return;
+		}
+		JsonObject embed = new JsonObject();
+		embed.addProperty("title", "🚩  Player report - " + report.category);
+		embed.addProperty("description", "**" + report.reporterName + "** reported **" + report.targetName + "** ("
+				+ ("party".equals(report.context) ? "party chat" : "direct messages") + ")"
+				+ (report.reason == null || report.reason.isBlank() ? "" : "\n> " + clip(report.reason, 500)));
+		embed.addProperty("color", 0xE23B3B);
+		embed.addProperty("timestamp", Instant.ofEpochMilli(report.at).toString());
+		JsonArray fields = new JsonArray();
+		if (!report.messages.isEmpty()) {
+			StringBuilder chat = new StringBuilder();
+			for (StaffService.Line line : report.messages) {
+				String entry = line.fromName() + ": " + line.text().replace("`", "'") + "\n";
+				if (chat.length() + entry.length() > 950) {
+					break;
+				}
+				chat.append(entry);
+			}
+			fields.add(field("Chat (attached with the reporter's consent)", "```" + chat + "```", false));
+		} else {
+			fields.add(field("Chat", "Not attached", true));
+		}
+		fields.add(field("Report id", "`" + report.id + "`", true));
+		embed.add("fields", fields);
+		JsonObject footer = new JsonObject();
+		footer.addProperty("text", "Admins review it in the launcher: Owner > Reports, or in game with /velostaff");
+		embed.add("footer", footer);
+		post(playerReportsWebhook, embed);
+	}
+
 	void report(ReportService.Summary summary, ReportService.Report report) {
 		if (!reportsEnabled()) {
 			return;

@@ -64,7 +64,7 @@ public final class ProjectDetailView {
 		VBox content = new VBox(16);
 		content.setPadding(new Insets(4, 10, 14, 4));
 
-		Button back = new Button("< Back");
+		Button back = BackButton.create(null, null);
 		back.setOnAction(e -> host.goBack());
 		content.getChildren().add(back);
 

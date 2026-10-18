@@ -115,6 +115,8 @@ public final class LauncherApp extends Application {
 
 	private LauncherTheme theme;
 	private BorderPane root;
+	/** The scene's root: the window ({@link #root}) with room for cards over it, like the first-start import prompt. */
+	private StackPane layers;
 	private StackPane content;
 	private Stage stage;
 	private ParticleBackground background;
@@ -195,7 +197,8 @@ public final class LauncherApp extends Application {
 		root.setCenter(content);
 		showHome();
 
-		Scene scene = new Scene(root, 1100, 680);
+		layers = new StackPane(root);
+		Scene scene = new Scene(layers, 1100, 680);
 		scene.getStylesheets().add(getClass().getResource("/net/veloclient/launcher/launcher.css").toExternalForm());
 		applyTheme();
 		net.veloclient.launcher.ui.UiMotion.install(scene);
@@ -207,7 +210,11 @@ public final class LauncherApp extends Application {
 		stage.setMinHeight(600);
 		fixWindowsMaximizeRestoreBug(stage);
 		net.veloclient.launcher.ui.WindowPlacement.restore(stage, 1100, 680);
+		boolean firstStart = ensureDefaultProfile();
 		stage.show();
+		if (firstStart) {
+			offerClientImport();
+		}
 		installIdleMode();
 		net.veloclient.launcher.SingleInstance.onActivate(() -> Platform.runLater(() -> {
 			stage.setIconified(false);
@@ -294,6 +301,16 @@ public final class LauncherApp extends Application {
 			}
 		}});
 		steps.add(new Object[] {"08-themes", (Runnable) this::showThemeEditor});
+		steps.add(new Object[] {"09-switch", (Runnable) this::showClientImport});
+		steps.add(new Object[] {"09b-firstrun", (Runnable) () -> {
+			showHome();
+			java.util.List<net.veloclient.launcher.data.ClientImport.Source> found = net.veloclient.launcher.data.ClientImport.detect();
+			if (found.isEmpty()) {
+				found = java.util.List.of(new net.veloclient.launcher.data.ClientImport.Source("Lunar Client", "Lunar", null, null, "1.21.11", "fabric", null, null),
+						new net.veloclient.launcher.data.ClientImport.Source("Minecraft Launcher", "Minecraft", null, null, "1.21.11", "fabric", null, null));
+			}
+			net.veloclient.launcher.ui.FirstRunImportPrompt.show(layers, found, this::showClientImport);
+		}});
 		// -Dvelo.launcherTourOnly=servers,themes -> only steps whose name contains one of these.
 		String only = System.getProperty("velo.launcherTourOnly", "");
 		if (!only.isBlank()) {
@@ -310,6 +327,9 @@ public final class LauncherApp extends Application {
 		}
 		if (System.getProperty("velo.launcherFps") != null) {
 			startFpsLog();
+		}
+		if (System.getProperty("velo.fxWatchdog") != null) {
+			net.veloclient.launcher.ui.FxStallWatchdog.start();
 		}
 		runTourStep(folder, steps, 0);
 	}
@@ -355,8 +375,12 @@ public final class LauncherApp extends Application {
 		}
 		javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(Duration.millis(index == 0 ? 2500 : 300));
 		wait.setOnFinished(e -> {
-			((Runnable) steps.get(index)[1]).run();
 			tourPage = (String) steps.get(index)[0];
+			long built = System.nanoTime();
+			((Runnable) steps.get(index)[1]).run();
+			if (System.getProperty("velo.fxWatchdog") != null) {
+				LauncherLog.info(String.format(java.util.Locale.ROOT, "PAGE %-20s built in %4.0f ms", tourPage, (System.nanoTime() - built) / 1e6));
+			}
 			// -Dvelo.launcherTourDwell=8000: stay longer on each page (performance profiling).
 			javafx.animation.PauseTransition shoot = new javafx.animation.PauseTransition(Duration.millis(
 					Long.getLong("velo.launcherTourDwell", 2600)));
@@ -446,7 +470,14 @@ public final class LauncherApp extends Application {
 	}
 
 	private void applyTheme() {
-		root.setStyle(String.format(java.util.Locale.ROOT,
+		root.setStyle(themeStyle());
+		if (layers != null) {
+			layers.setStyle(themeStyle());
+		}
+	}
+
+	private String themeStyle() {
+		return (String.format(java.util.Locale.ROOT,
 				"-velo-background: %s; -velo-surface: %s; -velo-accent-start: %s; -velo-accent-end: %s; "
 						+ "-velo-text: %s; -velo-hover: %s; -velo-hairline: %s; -fx-background-color: -velo-background;",
 				cssColor(theme.background()), cssColor(theme.surface()), cssColor(theme.accentStart()),
@@ -781,6 +812,10 @@ public final class LauncherApp extends Application {
 				}
 			}
 		};
+		// Friends see the launcher as online only while it is in front (or was a moment ago).
+		Runnable reportActive = () -> net.veloclient.launcher.social.LauncherSocial.setWindowActive(stage.isFocused() && !stage.isIconified());
+		stage.iconifiedProperty().addListener((o, a, b) -> reportActive.run());
+		stage.focusedProperty().addListener((o, a, b) -> reportActive.run());
 		stage.iconifiedProperty().addListener((o, a, b) -> evaluate.run());
 		stage.focusedProperty().addListener((o, a, b) -> {
 			// Unfocused-with-a-game waits longer: alt-tabbing out for a second shouldn't rebuild pages.
@@ -809,9 +844,17 @@ public final class LauncherApp extends Application {
 	}
 
 	private void setContent(Node node) {
-		boolean same = content.getChildren().size() == 1 && content.getChildren().get(0) == node;
+		Node previous = content.getChildren().size() == 1 ? content.getChildren().get(0) : null;
+		if (previous == node) {
+			return;
+		}
+		// The same page built again (equip, select, edit, a reload finishing): keep where it was scrolled to, no page animation.
+		boolean rebuilt = net.veloclient.launcher.ui.ScrollKeeper.samePage(previous, node);
+		List<?> scroll = rebuilt ? net.veloclient.launcher.ui.ScrollKeeper.captureAll(previous) : List.of();
 		content.getChildren().setAll(node);
-		if (!same) {
+		if (rebuilt) {
+			net.veloclient.launcher.ui.ScrollKeeper.restoreAll(node, scroll);
+		} else {
 			net.veloclient.launcher.ui.UiMotion.enter(node);
 		}
 	}
@@ -830,6 +873,49 @@ public final class LauncherApp extends Application {
 	 * points of this carousel) never actually showed up as its own carousel
 	 * entry, only the bare profile did.
 	 */
+	/** What the home search offers: every profile (and server shortcut in the carousel), and every saved server. */
+	private List<net.veloclient.launcher.ui.HomeSearch.Entry> homeSearchEntries() {
+		List<net.veloclient.launcher.ui.HomeSearch.Entry> entries = new java.util.ArrayList<>();
+		List<HomeLaunchTarget> targets = orderedLaunchTargetsForHome();
+		java.util.Set<String> profilesListed = new java.util.HashSet<>();
+		for (int i = 0; i < targets.size(); i++) {
+			HomeLaunchTarget target = targets.get(i);
+			int index = i;
+			Instance instance = target.instance();
+			if (target.isServer()) {
+				entries.add(new net.veloclient.launcher.ui.HomeSearch.Entry(target.serverAddress(), "via " + instance.name() + "  ·  " + instance.mcVersion(),
+						true, instance.name() + " " + instance.mcVersion() + " " + target.serverAddress(), () -> jumpToHomeTarget(index),
+						() -> buildSidebarIcon(instance, target.serverAddress(), 32)));
+			} else if (profilesListed.add(instance.id())) {
+				entries.add(new net.veloclient.launcher.ui.HomeSearch.Entry(instance.name(), "Fabric " + instance.mcVersion(), false,
+						instance.mcVersion() + " fabric", () -> jumpToHomeTarget(index), () -> renderInstanceIcon(instance, 32)));
+			}
+		}
+		java.util.Map<String, Instance> byId = new java.util.HashMap<>();
+		InstanceStore.loadAll().forEach(i -> byId.put(i.id(), i));
+		for (SavedServer server : SavedServerStore.loadAll()) {
+			Instance profile = server.instanceId() == null ? null : byId.get(server.instanceId());
+			String subtitle = server.address() + (profile != null ? "  ·  " + profile.name() + " " + profile.mcVersion() : "");
+			entries.add(new net.veloclient.launcher.ui.HomeSearch.Entry(server.name(), subtitle, true,
+					server.host() + " " + (profile != null ? profile.name() + " " + profile.mcVersion() : ""), () -> {
+						// The carousel entry for this server if there is one, otherwise the Servers page.
+						for (int i = 0; i < targets.size(); i++) {
+							if (targets.get(i).isServer() && targets.get(i).serverAddress().equalsIgnoreCase(server.address())) {
+								jumpToHomeTarget(i);
+								return;
+							}
+						}
+						showServers();
+					}, () -> buildSidebarIcon(profile, server.address(), 32)));
+		}
+		return entries;
+	}
+
+	private void jumpToHomeTarget(int index) {
+		homeProfileIndex = index;
+		showHome();
+	}
+
 	private record HomeLaunchTarget(Instance instance, String serverAddress) {
 		boolean isServer() {
 			return serverAddress != null;
@@ -975,14 +1061,40 @@ public final class LauncherApp extends Application {
 		Button newProfileButton = new Button("+  New profile");
 		newProfileButton.getStyleClass().add("primary-button");
 		newProfileButton.setOnAction(e -> createNewProfile());
+		Button switchButton = new Button("Switch from another client");
+		javafx.scene.shape.SVGPath switchIcon = new javafx.scene.shape.SVGPath();
+		switchIcon.setContent("M9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3z");
+		switchIcon.setFill(Color.WHITE);
+		switchButton.setGraphic(switchIcon);
+		switchButton.getStyleClass().add("glass-button");
+		switchButton.setTooltip(new Tooltip("Bring your settings, servers and mods from Lunar, Feather, NoRisk, Modrinth..."));
+		switchButton.setOnAction(e -> showClientImport());
 		Button importProfileButton = new Button("Import");
 		importProfileButton.getStyleClass().add("glass-button");
-		importProfileButton.setTooltip(new Tooltip("Import a profile .zip (exported from Velo or another launcher)"));
+		importProfileButton.setTooltip(new Tooltip("Import a profile .zip"));
 		importProfileButton.setOnAction(e -> importInstance());
 		Region topSpacer = new Region();
 		HBox.setHgrow(topSpacer, Priority.ALWAYS);
-		HBox topBar = new HBox(8, brand, topSpacer, importProfileButton, newProfileButton);
+		TextField homeSearch = net.veloclient.launcher.ui.HomeSearch.create(this::homeSearchEntries);
+		homeSearch.getStyleClass().add("home-search");
+		HBox topBar = new HBox(8, brand, topSpacer, homeSearch, switchButton, importProfileButton, newProfileButton);
 		topBar.setAlignment(Pos.CENTER_LEFT);
+		// Buttons never get cut off: the search box gives way first, then the switch button drops to its icon and the
+		// brand text hides on narrow windows.
+		for (Button button : List.of(switchButton, importProfileButton, newProfileButton)) {
+			button.setMinWidth(Region.USE_PREF_SIZE);
+		}
+		homeSearch.setMinWidth(150);
+		brand.setMinWidth(Region.USE_PREF_SIZE);
+		topBar.widthProperty().addListener((obs, old, width) -> {
+			double w = width.doubleValue();
+			boolean compact = w < 1120;
+			switchButton.setText(compact ? null : "Switch from another client");
+			switchButton.setContentDisplay(compact ? ContentDisplay.GRAPHIC_ONLY : ContentDisplay.LEFT);
+			boolean tiny = w < 860;
+			brandText.setVisible(!tiny);
+			brandText.setManaged(!tiny);
+		});
 		topBar.setPickOnBounds(false);
 		titleScreen.getChildren().add(topBar);
 		StackPane.setAlignment(topBar, Pos.TOP_CENTER);
@@ -1378,51 +1490,30 @@ public final class LauncherApp extends Application {
 		if (homePlayerHolder != null && homePlayerHolder.getChildren().isEmpty()) {
 			homePlayerHolder.getChildren().setAll(net.veloclient.launcher.ui.CosmeticUi.spinner(30));
 		}
-		CompletableFuture.supplyAsync(() -> {
-			SkinFetcher.SkinData skin = SkinFetcher.fetch(session);
-			// Reading the cape library touches the disk: off the UI thread too.
-			var cape = net.veloclient.launcher.data.CapeLibrary.equippedCapeId().flatMap(id -> net.veloclient.launcher.data.CapeLibrary.listAll()
-					.stream().filter(c -> c.id().equals(id)).findFirst()).orElse(null);
-			// The cape's frames decode here too (cached for the Cosmetics page).
-			java.util.List<net.veloclient.launcher.data.GifFrames.Frame> frames = cape == null ? null : net.veloclient.launcher.ui.CosmeticUi.frames(cape);
-			return new Object[] {skin, frames, cape != null};
-		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
-			SkinFetcher.SkinData skin = (SkinFetcher.SkinData) result[0];
-			@SuppressWarnings("unchecked")
-			java.util.List<net.veloclient.launcher.data.GifFrames.Frame> frames = (java.util.List<net.veloclient.launcher.data.GifFrames.Frame>) result[1];
-			boolean hasCape = (boolean) result[2];
-			if (homePlayerHolder == null) {
-				return;
-			}
-			if (skin == null) {
-				homePlayerHolder.getChildren().clear();
-				return;
-			}
-			// Wearing your equipped cosmetics: cape, wings and aura (turning slowly so the back shows too).
-			String wingsId = net.veloclient.launcher.data.WingsCatalog.equipped();
-			boolean wings = wingsId != null && net.veloclient.launcher.data.WingsCatalog.byId(wingsId).isPresent();
-			String auraId = net.veloclient.launcher.data.AuraCatalog.equipped();
-			boolean dressed = hasCape || wings || auraId != null;
-			Node viewer = PlayerSkin3DView.createViewer(skin.pngBytes(), skin.slim(), frames == null || frames.isEmpty() ? null : frames,
-					false, 20, dressed, !wings ? null : model -> {
-						net.veloclient.launcher.ui.Wings3D w = new net.veloclient.launcher.ui.Wings3D(model);
-						w.settings(net.veloclient.launcher.data.WingsCatalog.settings(wingsId));
-						w.show(wingsId);
+		CompletableFuture.supplyAsync(() -> SkinFetcher.fetch(session), Executors.newVirtualThreadPerTaskExecutor())
+				.exceptionally(e -> null)
+				.thenAccept(skin -> Platform.runLater(() -> {
+					if (skin == null) {
+						if (homePlayerHolder != null) {
+							homePlayerHolder.getChildren().clear();
+						}
+						return;
+					}
+					net.veloclient.launcher.ui.DressedPlayer.build(skin, false, 20, viewer -> {
+						if (homePlayerHolder == null) {
+							return;
+						}
+						if (viewer == null) {
+							homePlayerHolder.getChildren().clear();
+							return;
+						}
+						viewer.setOpacity(0);
+						homePlayerHolder.getChildren().setAll(viewer);
+						javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(Duration.millis(260), viewer);
+						fade.setToValue(1);
+						fade.play();
 					});
-			if (viewer != null) {
-				if (auraId != null) {
-					var auraSettings = net.veloclient.launcher.data.AuraCatalog.settings(auraId);
-					net.veloclient.launcher.ui.AuraFx.attach(viewer, () -> new net.veloclient.launcher.ui.AuraFx.Shown(auraId, auraSettings));
-				}
-				viewer.setOpacity(0);
-				homePlayerHolder.getChildren().setAll(viewer);
-				javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(Duration.millis(260), viewer);
-				fade.setToValue(1);
-				fade.play();
-			} else {
-				homePlayerHolder.getChildren().clear();
-			}
-		}));
+				}));
 	}
 
 	/** brush(rename)/copy(duplicate)/download(export)/delete, plus a RAM icon (per-profile memory settings) - the home screen's replacement for the old Profiles-grid card's action row. Manage mods (the gear) lives next to Play now, not in this row - see {@link #homeGearButton}. */
@@ -2578,6 +2669,52 @@ public final class LauncherApp extends Application {
 					(e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName())
 							+ "\n\nThis profile's data may be from an older/incompatible launcher version.");
 		}
+	}
+
+	/**
+	 * First start with no profiles at all: creates a ready-to-play "Velo Client" profile on Minecraft 26.2 (with Velo Client and Fabric
+	 * API installed), so a new player can press Play straight away. Only ever once - deleting every profile later doesn't bring it back.
+	 */
+	private boolean ensureDefaultProfile() {
+		if (System.getProperty("velo.launcherTour") != null || System.getProperty("velo.launcherDemo") != null) {
+			return false;
+		}
+		java.nio.file.Path marker = VeloPaths.config().resolve("default-profile-created");
+		try {
+			if (Files.exists(marker)) {
+				return false;
+			}
+			if (InstanceStore.loadAll().isEmpty()) {
+				Instance instance = InstanceStore.createNew("Velo Client", GameVersion.MC_26_2.id(), InstanceIcon.builtin(BuiltinIcons.DEFAULT));
+				installModLoaderJars(instance);
+				LauncherLog.info("Created the default profile on " + instance.mcVersion());
+			}
+			Files.createDirectories(marker.getParent());
+			Files.writeString(marker, java.time.Instant.now().toString());
+			return true;
+		} catch (Exception e) {
+			LauncherLog.warn("Couldn't create the default profile", e);
+			return false;
+		}
+	}
+
+	/** Very first start: looks for other launchers off the UI thread and, if there are any, offers to bring everything over. */
+	private void offerClientImport() {
+		java.util.concurrent.CompletableFuture.supplyAsync(net.veloclient.launcher.data.ClientImport::detect,
+				java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()).thenAccept(sources -> Platform.runLater(() -> {
+					if (!sources.isEmpty()) {
+						net.veloclient.launcher.ui.FirstRunImportPrompt.show(layers, sources, this::showClientImport);
+					}
+				})).exceptionally(e -> {
+					LauncherLog.warn("Couldn't look for other launchers", e);
+					return null;
+				});
+	}
+
+	/** "Switch from another client": the step-by-step import page. */
+	private void showClientImport() {
+		currentPage = this::showClientImport;
+		setContent(net.veloclient.launcher.ui.ClientImportView.build(this::showHome, this::installModLoaderJars, this::showInstanceDetail));
 	}
 
 	/** Top-right "+ New Profile" button on the home screen - was previously a grid tile on the old Profiles page. */

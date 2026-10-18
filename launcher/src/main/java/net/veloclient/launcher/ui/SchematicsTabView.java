@@ -96,8 +96,8 @@ public final class SchematicsTabView {
 		Runnable[] showLocal = new Runnable[1];
 		Runnable[] showBrowse = new Runnable[1];
 
-		showLocal[0] = () -> container.getChildren().setAll(buildLocalView(owner, overlayHost, instance, theme, selected, identifyAttempted, showLocal[0], showBrowse[0]));
-		showBrowse[0] = () -> container.getChildren().setAll(buildBrowseView(owner, instance, theme, selected, showLocal[0]));
+		showLocal[0] = () -> ScrollKeeper.setAll(container, buildLocalView(owner, overlayHost, instance, theme, selected, identifyAttempted, showLocal[0], showBrowse[0]));
+		showBrowse[0] = () -> ScrollKeeper.setAll(container, buildBrowseView(owner, instance, theme, selected, showLocal[0]));
 
 		showLocal[0].run();
 		return container;
@@ -345,7 +345,7 @@ public final class SchematicsTabView {
 
 		HBox topRow = new HBox(10);
 		topRow.setAlignment(Pos.CENTER_LEFT);
-		Button back = new Button("< Back to installed");
+		Button back = BackButton.create("installed", null);
 		back.setOnAction(e -> onBack.run());
 		Label heading = new Label("Browse schematics on market.phantom-node.com");
 		heading.setFont(Font.font("Inter", FontWeight.BOLD, 15));

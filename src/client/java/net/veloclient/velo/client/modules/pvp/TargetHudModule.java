@@ -22,7 +22,7 @@ import java.util.Locale;
 /**
  * A card for the player you're fighting: head, name, a smooth health bar with the exact number,
  * absorption, their armor and held item, distance, and whether you're ahead on health. Shows the
- * player you last hit (for a few seconds) or the one under your crosshair.
+ * player you last hit (for a few seconds) - optionally also the one under your crosshair. NPCs and teammates never show.
  */
 public final class TargetHudModule extends AbstractModule implements HudModule, Configurable {
 
@@ -34,6 +34,7 @@ public final class TargetHudModule extends AbstractModule implements HudModule, 
 	private boolean showDistance = true;
 	private boolean showWinning = true;
 	private double holdSeconds = 4;
+	private boolean showLookedAt = false;
 	private float shownHealth = -1;
 	private int shownId = Integer.MIN_VALUE;
 
@@ -50,10 +51,15 @@ public final class TargetHudModule extends AbstractModule implements HudModule, 
 	private LivingEntity target() {
 		int recent = CombatTracker.recentTarget((int) Math.round(holdSeconds * 20));
 		if (recent != Integer.MIN_VALUE && PvpCompat.entityById(recent) instanceof LivingEntity living
-				&& PvpCompat.isPlayer(living) && living.isAlive()) {
+				&& PvpCompat.isOpponent(living) && living.isAlive()) {
 			return living;
 		}
-		return PvpCompat.crosshairPlayer();
+		// Only while you're fighting by default - looking at an NPC or a teammate in the lobby isn't a fight.
+		if (!showLookedAt) {
+			return null;
+		}
+		LivingEntity looked = PvpCompat.crosshairPlayer();
+		return looked != null && PvpCompat.isOpponent(looked) ? looked : null;
 	}
 
 	@Override
@@ -151,6 +157,7 @@ public final class TargetHudModule extends AbstractModule implements HudModule, 
 				new ConfigField.ToggleField("Show Armor & Held Item", () -> showArmor, v -> showArmor = v),
 				new ConfigField.ToggleField("Show Distance", () -> showDistance, v -> showDistance = v),
 				new ConfigField.ToggleField("Show Winning / Losing", () -> showWinning, v -> showWinning = v),
+				new ConfigField.ToggleField("Also Show The Player You Look At", () -> showLookedAt, v -> showLookedAt = v),
 				new ConfigField.SliderField("Keep Showing After Hit (s)", 1, 15, () -> holdSeconds, v -> holdSeconds = Math.round(v),
 						v -> (int) Math.round(v) + "s"));
 	}

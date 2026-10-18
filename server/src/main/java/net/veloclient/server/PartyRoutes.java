@@ -34,7 +34,16 @@ final class PartyRoutes {
 	private record ChatRequest(String text) {
 	}
 
+	private record FollowRequest(String server, String serverName) {
+	}
+
+	private record VoiceRequest(String name, String password) {
+	}
+
 	private record ShareRequest(Map<String, Object> payload) {
+	}
+
+	private record PositionsResponse(java.util.List<PartyService.LivePosition> positions) {
 	}
 
 	static void register(HttpServer server, SessionRegistry registry, SocialService social, PartyService parties) {
@@ -70,12 +79,29 @@ final class PartyRoutes {
 			parties.launch(me, request.server(), request.mcVersion());
 			JsonHttp.writeJson(ex, 200, new Ok(true));
 		});
+		SocialRoutes.route(server, registry, "/v1/party/voice", "POST", (ex, me) -> {
+			VoiceRequest request = JsonHttp.readBody(ex, VoiceRequest.class);
+			parties.setVoice(me, request.name(), request.password());
+			JsonHttp.writeJson(ex, 200, new Ok(true));
+		});
+		SocialRoutes.route(server, registry, "/v1/party/follow", "POST", (ex, me) -> {
+			FollowRequest request = JsonHttp.readBody(ex, FollowRequest.class);
+			parties.follow(me, request.server(), request.serverName());
+			JsonHttp.writeJson(ex, 200, new Ok(true));
+		});
 		SocialRoutes.route(server, registry, "/v1/party/chat", "POST", (ex, me) ->
 				JsonHttp.writeJson(ex, 200, parties.chat(me, JsonHttp.readBody(ex, ChatRequest.class).text())));
 		SocialRoutes.route(server, registry, "/v1/party/ping", "POST", (ex, me) -> {
 			parties.share(me, "ping", JsonHttp.readBody(ex, ShareRequest.class).payload());
 			JsonHttp.writeJson(ex, 200, new Ok(true));
 		});
+		// Live positions: members who turned sharing on post theirs (null payload = stop); the map polls the others'.
+		SocialRoutes.route(server, registry, "/v1/party/position", "POST", (ex, me) -> {
+			parties.setPosition(me, JsonHttp.readBody(ex, ShareRequest.class).payload());
+			JsonHttp.writeJson(ex, 200, new Ok(true));
+		});
+		SocialRoutes.route(server, registry, "/v1/party/positions", "GET", (ex, me) ->
+				JsonHttp.writeJson(ex, 200, new PositionsResponse(parties.positions(me))));
 		SocialRoutes.route(server, registry, "/v1/party/waypoint", "POST", (ex, me) -> {
 			parties.share(me, "waypoint", JsonHttp.readBody(ex, ShareRequest.class).payload());
 			JsonHttp.writeJson(ex, 200, new Ok(true));

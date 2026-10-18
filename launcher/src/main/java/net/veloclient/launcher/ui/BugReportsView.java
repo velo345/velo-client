@@ -54,8 +54,7 @@ final class BugReportsView {
 	}
 
 	static Node build(NewsView.Host host) {
-		Button back = new Button("←  News");
-		back.getStyleClass().add("ghost-button");
+		Button back = BackButton.create("News", null);
 		back.setOnAction(e -> host.openNews());
 		Label title = new Label("Bug reports");
 		title.getStyleClass().add("page-title");
@@ -142,8 +141,7 @@ final class BugReportsView {
 		}
 		if (openGroup[0] != null && groups.containsKey(openGroup[0])) {
 			List<JsonObject> members = groups.get(openGroup[0]);
-			Button back = new Button("←  All groups");
-			back.getStyleClass().add("ghost-button");
+			Button back = BackButton.create("all groups", null);
 			back.setOnAction(e -> {
 				openGroup[0] = null;
 				rerender.run();
@@ -326,7 +324,7 @@ final class BugReportsView {
 	}
 
 	private static void openReport(NewsView.Host host, StackPane detail, JsonObject summary, Runnable reload) {
-		detail.getChildren().setAll(hint("Loading report..."));
+		detail.getChildren().setAll(Skeleton.detail());
 		String id = NewsUi.str(summary, "id");
 		NewsView.run(() -> NewsApi.report(id), report -> {
 			detail.getChildren().setAll(details(host, report, reload));
