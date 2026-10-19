@@ -217,13 +217,13 @@ public final class ThemeEditorScreen extends VeloWindow {
 			int tx = cx + cardW - 30;
 			boolean on = i == 0;
 			VeloDraw.fillRounded(context, tx, cy + 9, 22, 12, 6, on ? theme.accentStart() | 0xFF000000 : 0xFF3A3A40);
-			VeloDraw.fillCircle(context, on ? tx + 16 : tx + 6, cy + 15, 4, 0xFFFFFFFF);
+			VeloDraw.fillCircle(context, on ? tx + 16 : tx + 6, cy + 15, 4, on && theme.onAccent() != 0xFFFFFFFF ? 0xFF22252B : 0xFFFFFFFF);
 		}
 		int by = y + height - 24;
 		VeloDraw.fillRoundedGradient(context, x + 10, by, 110, 18, Math.min(theme.cornerRadius(), 9),
 				theme.accentStart() | 0xFF000000, theme.accentEnd() | 0xFF000000);
 		String label = "Button";
-		context.drawTextWithShadow(this.textRenderer, label, x + 10 + (110 - this.textRenderer.getWidth(label)) / 2, by + 5, 0xFFFFFFFF);
+		context.drawTextWithShadow(this.textRenderer, label, x + 10 + (110 - this.textRenderer.getWidth(label)) / 2, by + 5, theme.onAccent());
 		VeloDraw.fillRounded(context, x + 130, by, width - 140, 18, Math.min(theme.cornerRadius(), 9), 0x30000000);
 		context.drawTextWithShadow(this.textRenderer, "Search modules...", x + 138, by + 5, VeloAnim.lerpArgb(theme.text(), theme.background(), 0.5f));
 	}

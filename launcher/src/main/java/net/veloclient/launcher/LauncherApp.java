@@ -479,9 +479,9 @@ public final class LauncherApp extends Application {
 	private String themeStyle() {
 		return (String.format(java.util.Locale.ROOT,
 				"-velo-background: %s; -velo-surface: %s; -velo-accent-start: %s; -velo-accent-end: %s; "
-						+ "-velo-text: %s; -velo-hover: %s; -velo-hairline: %s; -fx-background-color: -velo-background;",
+						+ "-velo-text: %s; -velo-hover: %s; -velo-hairline: %s; -velo-on-accent: %s; -fx-background-color: -velo-background;",
 				cssColor(theme.background()), cssColor(theme.surface()), cssColor(theme.accentStart()),
-				cssColor(theme.accentEnd()), cssColor(theme.text()), hoverColor(), hairlineColor()));
+				cssColor(theme.accentEnd()), cssColor(theme.text()), hoverColor(), hairlineColor(), cssColor(theme.onAccent())));
 	}
 
 	private static String cssColor(int argb) {

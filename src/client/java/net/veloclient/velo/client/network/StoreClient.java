@@ -45,8 +45,8 @@ public final class StoreClient {
 	private static volatile boolean owner;
 	private static volatile boolean plus;
 	private static volatile long plusUntil;
-	private static volatile double plusPrice = 8.99;
-	private static volatile int plusMonthlyCoins = 2500;
+	private static volatile double plusPrice = 9.99;
+	private static volatile int plusMonthlyCoins = 2000;
 	private static volatile String currency = "EUR";
 	private static volatile List<CoinPack> packs = List.of();
 	private static volatile boolean checkoutEnabled;
@@ -131,8 +131,8 @@ public final class StoreClient {
 		balance = 1340;
 		currency = "EUR";
 		checkoutEnabled = true;
-		packs = List.of(new CoinPack("coins_500", 500, 0, 4.99), new CoinPack("coins_1200", 1200, 140, 9.99),
-				new CoinPack("coins_2600", 2600, 400, 19.99), new CoinPack("coins_6500", 6500, 1500, 39.99));
+		packs = List.of(new CoinPack("coins_1200", 1200, 0, 4.99), new CoinPack("coins_2500", 2300, 200, 9.99),
+				new CoinPack("coins_5500", 4700, 800, 19.99), new CoinPack("coins_15000", 12000, 3000, 49.99));
 		rewards = new Rewards(42, false, true, 12, 3, List.of(
 				new Quest("kill_100", "Defeat 100 mobs", 64, 100, 10, false, false, null),
 				new Quest("play_60", "Play for 1 hour", 60, 60, 8, false, true, null),

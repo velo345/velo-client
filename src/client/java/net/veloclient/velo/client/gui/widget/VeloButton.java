@@ -90,7 +90,7 @@ public class VeloButton extends ClickableWidget {
 					VeloAnim.lerpArgb(VeloStyle.border(), VeloUi.withAlpha(theme.accentStart(), 0xB0), hoverProgress));
 		}
 
-		int textColor = tinted ? 0xFFFFFFFF : VeloStyle.text();
+		int textColor = tinted ? VeloStyle.onAccent() : VeloStyle.text();
 		if (!this.active) {
 			textColor = VeloStyle.textFaint();
 		}

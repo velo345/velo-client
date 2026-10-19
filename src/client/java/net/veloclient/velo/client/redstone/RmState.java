@@ -9,8 +9,8 @@ public final class RmState {
 
 	public enum Tool {
 		SELECT("select", "Select", "Left click corner 1  ·  right click corner 2  ·  Shift+scroll grows the side you look at"),
-		MOVE("move", "Move", "Look along an axis and scroll to move  ·  Shift+scroll rotates  ·  left click applies"),
-		STACK("stack", "Stack", "Look along an axis and scroll to add copies - works on X, Y and Z at once  ·  left click applies"),
+		MOVE("move", "Move", "Left / right click the corners  ·  then scroll along an axis to preview the move (Shift+scroll rotates)  ·  left click applies, right click cancels"),
+		STACK("stack", "Stack", "Left / right click the corners  ·  then scroll along an axis to preview copies (X, Y and Z at once)  ·  left click applies, right click cancels"),
 		WIRE("wire", "Redstone Wire", "Aim at the face the wire starts from and left click  ·  right click the target's face  ·  left click again builds"),
 		WATER("water", "Water Wire", "The highlighted cell in front of the face you aim at is where the stream starts (left click) / ends (right click)"
 				+ "  ·  click a stream to join it  ·  left click again builds");

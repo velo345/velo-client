@@ -29,4 +29,23 @@ public record LauncherTheme(
 	public static String toCssHex(int argb) {
 		return String.format("#%06X", argb & 0xFFFFFF);
 	}
+
+	/**
+	 * Text color for anything drawn on a solid {@code accentStart} fill: white while that still
+	 * reads (contrast of at least 3:1 - Velo red, Midnight blue), otherwise near-black. Light
+	 * accents like Nord's cyan or Monochrome's white made white labels on them unreadable.
+	 */
+	public int onAccent() {
+		return 1.05 / (luminance(accentStart) + 0.05) >= 3.0 ? 0xFFFFFFFF : 0xFF15171C;
+	}
+
+	/** WCAG relative luminance of an RGB color (alpha ignored). */
+	public static double luminance(int rgb) {
+		return 0.2126 * channel(rgb >> 16) + 0.7152 * channel(rgb >> 8) + 0.0722 * channel(rgb);
+	}
+
+	private static double channel(int value) {
+		double c = (value & 0xFF) / 255.0;
+		return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+	}
 }

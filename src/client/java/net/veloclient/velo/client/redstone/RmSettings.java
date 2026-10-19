@@ -30,6 +30,8 @@ public final class RmSettings {
 		// Editing
 		public boolean keepRunning = true;
 		public int pasteSpeed = 20_000;
+		/** Pastes, moves and stacks leave the world's blocks where the copy has air (faster); off = air clears them. */
+		public boolean skipAir = true;
 		/** Unused since the tool slot became its own slot 0; kept so older settings files still load. */
 		public int toolSlot = 8;
 		// Redstone wiring

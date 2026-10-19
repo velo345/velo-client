@@ -273,7 +273,8 @@ public final class RmRender {
 		for (Placements.Placement p : list) {
 			if (p.visible && p.locked) {
 				Clip v = p.view();
-				outline(p.x, p.y, p.z, p.x + v.sx, p.y + v.sy, p.z + v.sz, p == Placements.selected() ? 0xFFFF8040 : 0x80FF8040, 2f);
+				int color = p.outlineOnly ? 0xFF4FD8FF : p == Placements.selected() ? 0xFFFF8040 : 0x80FF8040;
+				outline(p.x, p.y, p.z, p.x + v.sx, p.y + v.sy, p.z + v.sz, color, p.outlineOnly ? 3f : 2f);
 			}
 		}
 	}
@@ -293,8 +294,8 @@ public final class RmRender {
 		List<Object[]> ghosts = new ArrayList<>();
 		int radius = 40;
 		for (Placements.Placement p : list) {
-			if (!p.visible || !p.locked) {
-				continue;
+			if (!p.visible || !p.locked || p.outlineOnly) {
+				continue; // outline-only placements show just their box
 			}
 			Clip v = p.view();
 			int x0 = Math.max(0, player[0] - radius - p.x);

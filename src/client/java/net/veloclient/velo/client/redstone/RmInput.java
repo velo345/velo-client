@@ -237,7 +237,21 @@ public final class RmInput {
 					RmState.resetTransforms();
 				}
 			}
-			case MOVE, STACK -> confirm();
+			case MOVE, STACK -> {
+				// Select first (left/right click the corners, as often as you like); once you've scrolled a
+				// preview out, left click applies it.
+				if (RmState.moveActive() || RmState.stackCopies() != 0) {
+					confirm();
+				} else {
+					int[] look = RmWorld.lookedBlock(256);
+					if (look != null) {
+						RmState.cornerA = new int[] {look[0], look[1], look[2]};
+						if (RmState.cornerB == null) {
+							RmState.cornerB = RmState.cornerA;
+						}
+					}
+				}
+			}
 			case WIRE, WATER -> {
 				if (!Wiring.preview().isEmpty()) {
 					Wiring.build();
@@ -286,7 +300,21 @@ public final class RmInput {
 					RmState.resetTransforms();
 				}
 			}
-			case MOVE, STACK -> RmState.resetTransforms();
+			case MOVE, STACK -> {
+				// Right click: cancel the preview - or, with none, set the second corner.
+				if (RmState.moveActive() || RmState.stackCopies() != 0) {
+					RmState.resetTransforms();
+					RmState.info("Cancelled");
+				} else {
+					int[] look = RmWorld.lookedBlock(256);
+					if (look != null) {
+						RmState.cornerB = new int[] {look[0], look[1], look[2]};
+						if (RmState.cornerA == null) {
+							RmState.cornerA = RmState.cornerB;
+						}
+					}
+				}
+			}
 			case WIRE, WATER -> {
 				int[] look = RmWorld.lookedBlock(256);
 				if (look == null) {

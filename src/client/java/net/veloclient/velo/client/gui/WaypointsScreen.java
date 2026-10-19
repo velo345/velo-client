@@ -147,7 +147,7 @@ public final class WaypointsScreen extends VeloWindow {
 			int bg = active ? theme.accentStart() : hovered ? VeloUi.withAlpha(0xFFFFFFFF, 0x18) : VeloUi.withAlpha(0xFF000000, 0x40);
 			VeloDraw.fillRounded(context, tabX, tabY, tabWidth, 20, 6, bg);
 			VeloDraw.fillCircle(context, tabX + 8, tabY + 10, 2, dimensionColor(dim));
-			context.drawTextWithShadow(this.textRenderer, label, tabX + 14, tabY + 6, active ? 0xFFFFFFFF : theme.text());
+			context.drawTextWithShadow(this.textRenderer, label, tabX + 14, tabY + 6, active ? theme.onAccent() : theme.text());
 			hits.add(new VeloUi.Hit(tabX, tabY, tabWidth, 20, () -> {
 				dimension = dim;
 				scroll = 0;

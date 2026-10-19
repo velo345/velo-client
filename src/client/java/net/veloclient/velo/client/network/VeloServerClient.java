@@ -44,6 +44,9 @@ public final class VeloServerClient {
 	// keeps newly-joined players' badges appearing quickly for everyone else
 	// without needing to coordinate the two sides' timing.
 	private static final long TICK_INTERVAL_SECONDS = 20;
+	/** Other players' cosmetics are fetched this often (the public /v1/online list, cheap) - 20 s felt laggy. */
+	private static final long POLL_INTERVAL_SECONDS = 5;
+	private static final java.util.concurrent.atomic.AtomicBoolean SYNC_QUEUED = new java.util.concurrent.atomic.AtomicBoolean();
 	// Mojang rate-limits session/minecraft/join; a failing auth used to be
 	// retried every single tick (20s) forever.
 	private static final long AUTH_RETRY_MILLIS = 120_000;
@@ -145,6 +148,26 @@ public final class VeloServerClient {
 			return thread;
 		});
 		scheduler.scheduleWithFixedDelay(VeloServerClient::tick, 0, TICK_INTERVAL_SECONDS, TimeUnit.SECONDS);
+		scheduler.scheduleWithFixedDelay(() -> {
+			String base = serverBaseUrl();
+			if (base != null && sessionToken.get() != null) {
+				poll(base);
+			}
+		}, POLL_INTERVAL_SECONDS, POLL_INTERVAL_SECONDS, TimeUnit.SECONDS);
+	}
+
+	/**
+	 * You changed what you wear (cape, wings, aura or their settings): publish it right away instead of at the next
+	 * 20-second heartbeat. Changes within a quarter second are sent together.
+	 */
+	public static synchronized void syncSoon() {
+		if (scheduler == null || !SYNC_QUEUED.compareAndSet(false, true)) {
+			return;
+		}
+		scheduler.schedule(() -> {
+			SYNC_QUEUED.set(false);
+			tick();
+		}, 250, TimeUnit.MILLISECONDS);
 	}
 
 	public static synchronized void stop() {

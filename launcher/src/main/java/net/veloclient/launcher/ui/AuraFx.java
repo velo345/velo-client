@@ -28,7 +28,10 @@ import java.util.function.Supplier;
  * camera and turn, so the aura wraps around the player as it spins;</li>
  * <li>{@link #card} is a light 2D version around a dim player shape, for Store cards.</li>
  * </ul>
- * Glows are radial gradients drawn with additive blending, like the game's.
+ * Glows, glyphs and curtains are cached pictures. Live views draw with normal blending (a little brighter to make
+ * up for it): a Canvas in ADD mode composites every single particle separately, which made dense, fast auras crawl -
+ * and a blend mode on the canvas node would push the 3D viewer into offscreen rendering (see the JavaFX effect
+ * trap). Only the one-off stills use ADD. Frames are capped at ~40 fps and particles at {@link #MAX_SPRITES}.
  */
 public final class AuraFx {
 
@@ -53,6 +56,9 @@ public final class AuraFx {
 	private static final String GLYPHS = "0123457ABCDEFHXZ";
 	private static final javafx.scene.text.Font GLYPH_FONT = javafx.scene.text.Font.font("Monospaced", javafx.scene.text.FontWeight.BOLD, 12);
 
+	private static final int MAX_SPRITES = 700;
+	private static final long FRAME_NANOS = 25_000_000L;
+
 	private AuraFx() {
 	}
 
@@ -75,8 +81,14 @@ public final class AuraFx {
 		wrapper.getChildren().add(front);
 		AuraEffects.Emitter[] emitter = new AuraEffects.Emitter[1];
 		AnimationTimer timer = new AnimationTimer() {
+			private long lastDraw;
+
 			@Override
 			public void handle(long now) {
+				if (now - lastDraw < FRAME_NANOS || !wrapper.isVisible()) {
+					return;
+				}
+				lastDraw = now;
 				Shown s = shown.get();
 				AuraEffects.Kind kind = s == null || s.id() == null ? null : AuraEffects.kind(s.id());
 				clear(back);
@@ -95,8 +107,8 @@ public final class AuraFx {
 				double distance = -camera.getTranslateZ();
 				double angle = Math.toRadians(yaw.getAngle());
 				List<Sprite> sprites = project(emitter[0], s.settings(), w / 2, h / 2, focal, distance, angle);
-				draw(back.getGraphicsContext2D(), sprites, distance, false);
-				draw(front.getGraphicsContext2D(), sprites, distance, true);
+				draw(back.getGraphicsContext2D(), sprites, distance, false, false);
+				draw(front.getGraphicsContext2D(), sprites, distance, true, false);
 			}
 		};
 		wrapper.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -134,9 +146,9 @@ public final class AuraFx {
 			Canvas canvas = new Canvas(width, height);
 			List<Sprite> sprites = project(emitter, settings, width / 2, height / 2 - 6, focal, distance, 0.5);
 			GraphicsContext g = canvas.getGraphicsContext2D();
-			draw(g, sprites, distance, false);
+			draw(g, sprites, distance, false, true);
 			silhouette(g, width / 2, height / 2 - 6, focal / distance);
-			draw(g, sprites, distance, true);
+			draw(g, sprites, distance, true, true);
 			javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
 			params.setFill(Color.TRANSPARENT);
 			return canvas.snapshot(params, null);
@@ -145,7 +157,14 @@ public final class AuraFx {
 
 	/** A Store card's picture: the aura around a dim player shape, turning slowly. */
 	public static Node card(AuraEffects.Kind kind, Supplier<AuraEffects.Settings> settings, double width, double height) {
-		Canvas canvas = new Canvas(width, height);
+		// Behind / player shape (drawn once) / in front.
+		Canvas back = new Canvas(width, height);
+		Canvas shape = new Canvas(width, height);
+		Canvas front = new Canvas(width, height);
+		double focal0 = (height / 2) / Math.tan(Math.toRadians(15));
+		silhouette(shape.getGraphicsContext2D(), width / 2, height / 2 - 6, focal0 / 95);
+		StackPane canvas = new StackPane(back, shape, front);
+		canvas.setMouseTransparent(true);
 		AuraEffects.Emitter emitter = new AuraEffects.Emitter(kind);
 		AnimationTimer timer = new AnimationTimer() {
 			private long lastDraw;
@@ -153,7 +172,7 @@ public final class AuraFx {
 			@Override
 			public void handle(long now) {
 				// Cards animate at ~30 fps: a page of ten of them at the full refresh rate was most of the Store's cost.
-				if (now - lastDraw < 30_000_000L) {
+				if (now - lastDraw < 33_000_000L || !canvas.isVisible()) {
 					return;
 				}
 				lastDraw = now;
@@ -164,11 +183,10 @@ public final class AuraFx {
 				double distance = 95;
 				double angle = now / 4e9;
 				List<Sprite> sprites = project(emitter, s, width / 2, height / 2 - 6, focal, distance, angle);
-				GraphicsContext g = canvas.getGraphicsContext2D();
-				clear(canvas);
-				draw(g, sprites, distance, false);
-				silhouette(g, width / 2, height / 2 - 6, focal / distance);
-				draw(g, sprites, distance, true);
+				clear(back);
+				clear(front);
+				draw(back.getGraphicsContext2D(), sprites, distance, false, false);
+				draw(front.getGraphicsContext2D(), sprites, distance, true, false);
 			}
 		};
 		canvas.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -253,6 +271,13 @@ public final class AuraFx {
 				return new double[] {cx + rx * focal / d, cy + my * focal / d, rz, d};
 			}
 		});
+		if (out.size() > MAX_SPRITES) {
+			// Very dense / fast settings: keep the brightest ones, drop the faint.
+			out.sort((a, b) -> Double.compare(b.alpha * b.radius, a.alpha * a.radius));
+			List<Sprite> kept = new ArrayList<>(out.subList(0, MAX_SPRITES));
+			kept.sort((a, b) -> Double.compare(b.depth, a.depth));
+			return kept;
+		}
 		out.sort((a, b) -> Double.compare(b.depth, a.depth));
 		return out;
 	}
@@ -295,35 +320,74 @@ public final class AuraFx {
 		return image;
 	}
 
-	/** Draws the sprites behind ({@code front} false) or in front of the player. */
-	private static void draw(GraphicsContext g, List<Sprite> sprites, double distance, boolean front) {
-		g.setGlobalBlendMode(BlendMode.ADD);
+	private static final java.util.Map<Integer, javafx.scene.image.Image> CURTAINS = new java.util.HashMap<>();
+	private static final java.util.Map<Integer, javafx.scene.image.Image> GLYPH_IMAGES = new java.util.HashMap<>();
+
+	/** A light curtain (bright foot, fading up) in {@code rgb}, made once per colour. */
+	private static javafx.scene.image.Image curtainImage(int rgb) {
+		int key = rgb & 0xF0F0F0;
+		return CURTAINS.computeIfAbsent(key, k -> {
+			int w = 4;
+			int h = 64;
+			javafx.scene.image.WritableImage image = new javafx.scene.image.WritableImage(w, h);
+			javafx.scene.image.PixelWriter writer = image.getPixelWriter();
+			for (int y = 0; y < h; y++) {
+				double t = 1 - (y + 0.5) / h; // 1 at the foot (bottom)
+				double a = t > 0.88 ? 1 : t * 0.62;
+				for (int x = 0; x < w; x++) {
+					writer.setArgb(x, y, ((int) Math.round(a * 255) << 24) | (k & 0xFFFFFF));
+				}
+			}
+			return image;
+		});
+	}
+
+	/** One code glyph in {@code rgb}, drawn once per character and colour (mirrored like in the game). */
+	private static javafx.scene.image.Image glyphImage(int index, int rgb) {
+		int key = index << 24 | (rgb & 0xF0F0F0);
+		return GLYPH_IMAGES.computeIfAbsent(key, k -> {
+			Canvas canvas = new Canvas(10, 14);
+			GraphicsContext g = canvas.getGraphicsContext2D();
+			g.translate(5, 7);
+			g.scale(-1, 1);
+			g.setFill(Color.rgb((rgb >> 16) & 0xF0, (rgb >> 8) & 0xF0, rgb & 0xF0));
+			g.setFont(GLYPH_FONT);
+			g.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+			g.setTextBaseline(javafx.geometry.VPos.CENTER);
+			g.fillText(String.valueOf(GLYPHS.charAt(index % GLYPHS.length())), 0, 0);
+			javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+			params.setFill(Color.TRANSPARENT);
+			return canvas.snapshot(params, null);
+		});
+	}
+
+	/**
+	 * Draws the sprites behind ({@code front} false) or in front of the player. {@code additive}: blend each sprite
+	 * additively here (one-off stills); live canvases leave that to the canvas node's own blend mode.
+	 */
+	private static void draw(GraphicsContext g, List<Sprite> sprites, double distance, boolean front, boolean additive) {
+		g.setGlobalBlendMode(additive ? BlendMode.ADD : BlendMode.SRC_OVER);
+		double boost = additive ? 1.0 : 1.3;
 		for (Sprite s : sprites) {
 			if (s.depth < 0 != front) {
 				continue;
 			}
-			Color c = Color.rgb((s.rgb >> 16) & 255, (s.rgb >> 8) & 255, s.rgb & 255, Math.min(1, s.alpha));
+			Color c = Color.rgb((s.rgb >> 16) & 255, (s.rgb >> 8) & 255, s.rgb & 255, Math.min(1, s.alpha * boost));
 			if (s.shape == PANEL) {
 				int cell = (int) s.y2;
 				double w = Math.max(1, s.radius);
 				double h = Math.max(1, s.x2);
+				g.setGlobalAlpha(Math.min(1, s.alpha * boost));
 				if (cell >= AuraEffects.CELL_GLYPH) {
-					// A code glyph: the character itself, mirrored like in the game.
-					g.save();
-					g.translate(s.x, s.y);
-					g.scale(-w / 9.0, h / 12.0);
-					g.setFill(c);
-					g.setFont(GLYPH_FONT);
-					g.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
-					g.setTextBaseline(javafx.geometry.VPos.CENTER);
-					g.fillText(String.valueOf(GLYPHS.charAt((cell - AuraEffects.CELL_GLYPH) % GLYPHS.length())), 0, 0);
-					g.restore();
+					// A code glyph: the character itself (cached picture), mirrored like in the game.
+					double gw = w / 9.0 * 10;
+					double gh = h / 12.0 * 14;
+					g.drawImage(glyphImage(cell - AuraEffects.CELL_GLYPH, s.rgb), s.x - gw / 2, s.y - gh / 2, gw, gh);
 				} else {
-					// A light curtain: bright at the foot, fading upwards.
-					g.setFill(new javafx.scene.paint.LinearGradient(0, s.y + h / 2, 0, s.y - h / 2, false, CycleMethod.NO_CYCLE,
-							new Stop(0, c), new Stop(0.12, c.deriveColor(0, 1, 1, 0.55)), new Stop(1, Color.TRANSPARENT)));
-					g.fillRect(s.x - w / 2, s.y - h / 2, w, h);
+					// A light curtain: bright at the foot, fading upwards (cached gradient picture).
+					g.drawImage(curtainImage(s.rgb), s.x - w / 2, s.y - h / 2, w, h);
 				}
+				g.setGlobalAlpha(1);
 				continue;
 			}
 			if (s.shape == AuraEffects.HEART) {
@@ -362,7 +426,7 @@ public final class AuraFx {
 			// Glows are a cached soft sprite per colour, stamped with the sprite's alpha: building a gradient
 			// object per particle per frame (the old way) made a page of aura cards crawl.
 			javafx.scene.image.Image glow = glowImage(s.rgb);
-			g.setGlobalAlpha(Math.min(1, s.alpha));
+			g.setGlobalAlpha(Math.min(1, s.alpha * boost));
 			if (s.shape == AuraEffects.DISC) {
 				g.drawImage(glow, s.x - r, s.y - r * 0.22, r * 2, r * 0.44);
 				g.setGlobalAlpha(1);

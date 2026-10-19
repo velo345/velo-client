@@ -261,20 +261,99 @@ public final class ModrinthClient {
 	}
 
 	private static String getRaw(String url) throws IOException {
-		HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-				.header("User-Agent", USER_AGENT)
-				.timeout(Duration.ofSeconds(20))
-				.GET().build();
+		return send(HttpRequest.newBuilder(URI.create(url)).GET(), url);
+	}
+
+	private static String postRaw(String url, String json) throws IOException {
+		return send(HttpRequest.newBuilder(URI.create(url)).header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(json)), url);
+	}
+
+	/**
+	 * Sends with the User-Agent; on "429 Too Many Requests" waits until Modrinth's rate limit resets (its
+	 * X-Ratelimit-Reset / Retry-After header, at most 20 s) and tries again - a big import used to hit the limit and
+	 * every mod after that silently counted as "not on Modrinth".
+	 */
+	private static String send(HttpRequest.Builder builder, String url) throws IOException {
+		HttpRequest request = builder.header("User-Agent", USER_AGENT).timeout(Duration.ofSeconds(20)).build();
 		try {
-			HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-			if (response.statusCode() >= 400) {
-				throw new IOException("HTTP " + response.statusCode() + " from Modrinth: " + url);
+			for (int attempt = 0; ; attempt++) {
+				HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+				if (response.statusCode() == 429 && attempt < 3) {
+					long wait = response.headers().firstValue("X-Ratelimit-Reset")
+							.or(() -> response.headers().firstValue("Retry-After"))
+							.map(v -> {
+								try {
+									return Long.parseLong(v.trim());
+								} catch (NumberFormatException e) {
+									return 5L;
+								}
+							}).orElse(5L);
+					Thread.sleep(Math.min(20, Math.max(1, wait)) * 1000L);
+					continue;
+				}
+				if (response.statusCode() >= 400) {
+					throw new IOException("HTTP " + response.statusCode() + " from Modrinth: " + url);
+				}
+				return response.body();
 			}
-			return response.body();
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new IOException("Interrupted contacting Modrinth", e);
 		}
+	}
+
+	/** sha1 -> the version that file belongs to, for many files in one request ({@code POST /version_files}). */
+	public static java.util.Map<String, ProjectVersion> versionsByFileSha1(java.util.Collection<String> sha1s) throws IOException {
+		java.util.Map<String, ProjectVersion> out = new java.util.HashMap<>();
+		if (sha1s.isEmpty()) {
+			return out;
+		}
+		JsonObject body = new JsonObject();
+		body.add("hashes", GSON.toJsonTree(List.copyOf(sha1s)));
+		body.addProperty("algorithm", "sha1");
+		JsonObject response = com.google.gson.JsonParser.parseString(postRaw(API_BASE + "/version_files", body.toString())).getAsJsonObject();
+		for (var entry : response.entrySet()) {
+			out.put(entry.getKey(), GSON.fromJson(entry.getValue(), ProjectVersion.class));
+		}
+		return out;
+	}
+
+	/**
+	 * sha1 -> the newest version of that file's project for these loaders / game versions, for many files in one
+	 * request ({@code POST /version_files/update}) - a Forge or 1.20 jar's hash comes back as its Fabric build for
+	 * the target version.
+	 */
+	public static java.util.Map<String, ProjectVersion> latestForFiles(java.util.Collection<String> sha1s, String loader, String gameVersion)
+			throws IOException {
+		java.util.Map<String, ProjectVersion> out = new java.util.HashMap<>();
+		if (sha1s.isEmpty()) {
+			return out;
+		}
+		JsonObject body = new JsonObject();
+		body.add("hashes", GSON.toJsonTree(List.copyOf(sha1s)));
+		body.addProperty("algorithm", "sha1");
+		body.add("loaders", GSON.toJsonTree(List.of(loader)));
+		body.add("game_versions", GSON.toJsonTree(List.of(gameVersion)));
+		JsonObject response = com.google.gson.JsonParser.parseString(postRaw(API_BASE + "/version_files/update", body.toString())).getAsJsonObject();
+		for (var entry : response.entrySet()) {
+			out.put(entry.getKey(), GSON.fromJson(entry.getValue(), ProjectVersion.class));
+		}
+		return out;
+	}
+
+	/** Projects by id or slug, many in one request ({@code GET /projects?ids=[...]}); unknown ones are just missing. */
+	public static List<Project> projects(java.util.Collection<String> idsOrSlugs) throws IOException {
+		List<Project> out = new ArrayList<>();
+		List<String> all = List.copyOf(idsOrSlugs);
+		for (int from = 0; from < all.size(); from += 100) {
+			List<String> part = all.subList(from, Math.min(all.size(), from + 100));
+			String url = API_BASE + "/projects?ids=" + encode(GSON.toJson(part));
+			for (var element : com.google.gson.JsonParser.parseString(getRaw(url)).getAsJsonArray()) {
+				out.add(GSON.fromJson(element, Project.class));
+			}
+		}
+		return out;
 	}
 
 	private static String encode(String value) {

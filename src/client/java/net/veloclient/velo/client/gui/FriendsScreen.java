@@ -257,7 +257,7 @@ public final class FriendsScreen extends VeloWindow {
 			VeloDraw.fillRounded(context, x, listTop, leftWidth(), 16, 5,
 					hovered ? VeloAnim.lerpArgb(theme.accentStart(), 0xFFFFFFFF, 0.12f) : theme.accentStart());
 			String banner = state.incoming.size() == 1 ? "1 friend request" : state.incoming.size() + " friend requests";
-			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(banner, leftWidth() - 12), x + 8, listTop + 4, 0xFFFFFFFF);
+			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(banner, leftWidth() - 12), x + 8, listTop + 4, theme.onAccent());
 			hits.add(new VeloUi.Hit(x, listTop, leftWidth(), 16, () -> view = View.REQUESTS));
 			listTop += 20;
 		}
@@ -322,7 +322,7 @@ public final class FriendsScreen extends VeloWindow {
 			int badgeWidth = Math.max(14, this.textRenderer.getWidth(count) + 6);
 			int badgeX = x + leftWidth() - 8 - badgeWidth;
 			VeloDraw.fillRounded(context, badgeX, y + 4, badgeWidth, 11, 5, theme.accentStart());
-			context.drawTextWithShadow(this.textRenderer, count, badgeX + (badgeWidth - this.textRenderer.getWidth(count)) / 2, y + 6, 0xFFFFFFFF);
+			context.drawTextWithShadow(this.textRenderer, count, badgeX + (badgeWidth - this.textRenderer.getWidth(count)) / 2, y + 6, theme.onAccent());
 		}
 		if (hovered && !inParty(friend.uuid) && y + 8 >= clipTop && y + 22 <= clipBottom) {
 			hits.add(VeloUi.pill(context, x + leftWidth() - 24, y + 7, 18, 16, "+", 1, mouseX, mouseY, () -> {
@@ -366,7 +366,7 @@ public final class FriendsScreen extends VeloWindow {
 			VeloDraw.fillRounded(context, segX, y + 6, segWidth - 4, NAV_HEIGHT, 5, bg);
 			String label = VeloUi.trim(labels[i], segWidth - 10);
 			context.drawTextWithShadow(this.textRenderer, label, segX + (segWidth - 4 - this.textRenderer.getWidth(label)) / 2, y + 11,
-					active ? 0xFFFFFFFF : theme.text());
+					active ? theme.onAccent() : theme.text());
 			hits.add(new VeloUi.Hit(segX, y + 6, segWidth - 4, NAV_HEIGHT, () -> {
 				view = target;
 				rightScroll = 0;
@@ -877,7 +877,7 @@ public final class FriendsScreen extends VeloWindow {
 		int trackY = y + 6;
 		VeloDraw.fillRounded(context, trackX, trackY, 28, 14, 7, on ? theme.accentStart() : 0xFF3A3A40);
 		int knobX = on ? trackX + 16 : trackX + 2;
-		VeloDraw.fillRounded(context, knobX, trackY + 2, 10, 10, 5, 0xFFFFFFFF);
+		VeloDraw.fillRounded(context, knobX, trackY + 2, 10, 10, 5, on && theme.onAccent() != 0xFFFFFFFF ? 0xFF22252B : 0xFFFFFFFF);
 		hits.add(new VeloUi.Hit(x, y, width, 26, toggle));
 		return y + 30;
 	}

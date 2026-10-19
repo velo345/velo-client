@@ -73,14 +73,23 @@ public final class SessionAutoFixerModule extends AbstractModule {
 	/** Last automatic fix per server address, so a refresh that keeps failing can't loop. */
 	private final java.util.Map<String, Long> lastAutoFix = new java.util.HashMap<>();
 	private static final long AUTO_RETRY_COOLDOWN_MS = 120_000;
-	private static final long FIX_TIMEOUT_MS = 45_000;
+	private static final long FIX_TIMEOUT_MS = 20_000;
+	/** Velocity (and many proxies) refuse a login within 3 s of the last one ("logging in too fast"). */
+	private static final long MIN_RECONNECT_GAP_MS = 3_500;
+	private static final long[] RETRY_DELAYS_MS = {4_000, 8_000, 15_000};
 	private long fixAttempt;
+	private long lastConnectMs;
+	private int retries;
+	private long retryWindowStart;
+	private long retryAt;
+	private Screen retryScreen;
 
 	private void onScreenInit(MinecraftClient client, Screen screen, int scaledWidth, int scaledHeight) {
 		if (!isEnabled() || !(screen instanceof DisconnectedScreen)) {
 			return;
 		}
 		if (!isInvalidSessionScreen(screen)) {
+			retryIfTemporary(client, screen);
 			return;
 		}
 		if (fixing) {
@@ -311,9 +320,129 @@ public final class SessionAutoFixerModule extends AbstractModule {
 	}
 	*///?}
 
-	private void onFixPressed() {
-		if (fixing) {
+	/**
+	 * Kicks that clear up by themselves a few seconds later - "logging in too fast" (proxy rate limit), "already
+	 * connected" / "logged in from another location" (the old connection is still timing out), Mojang's session
+	 * servers being busy - just get retried with a growing pause, no token refresh needed.
+	 */
+	private void retryIfTemporary(MinecraftClient client, Screen screen) {
+		if (!(screen instanceof DisconnectedScreen disconnected)) {
 			return;
+		}
+		String reason = reasonText(disconnected).toLowerCase(Locale.ROOT);
+		boolean temporary = reason.contains("too fast") || reason.contains("already connected") || reason.contains("logged in from another")
+				|| reason.contains("throttl") || reason.contains("try again later") || reason.contains("serversunavailable")
+				|| reason.contains("servers are unavailable") || reason.contains("authentication servers");
+		if (!temporary || !captureServer(client, screen)) {
+			return;
+		}
+		long now = System.currentTimeMillis();
+		if (now - retryWindowStart > 120_000) {
+			retryWindowStart = now;
+			retries = 0;
+		}
+		installButton(screen);
+		if (retries >= RETRY_DELAYS_MS.length) {
+			setButtonMessage("Still refused - click to try again");
+			return;
+		}
+		long delay = Math.max(RETRY_DELAYS_MS[retries], MIN_RECONNECT_GAP_MS - (now - lastConnectMs));
+		retries++;
+		retryAt = now + delay;
+		retryScreen = screen;
+		setButtonMessage("Retrying in " + (delay / 1000) + "s... (click to retry now)");
+		Thread waiter = new Thread(() -> {
+			try {
+				Thread.sleep(delay);
+			} catch (InterruptedException ignored) {
+				return;
+			}
+			client.execute(() -> {
+				// Only if you're still looking at that screen (didn't go back to the menu meanwhile).
+				if (retryScreen == screen && net.veloclient.velo.client.util.ClientCompat.currentScreen() == screen) {
+					reconnect(client);
+				}
+			});
+		}, "velo-session-retry");
+		waiter.setDaemon(true);
+		waiter.start();
+	}
+
+	/** Everything the disconnect screen says (its reason fields), for matching kick messages. */
+	private static String reasonText(DisconnectedScreen screen) {
+		StringBuilder out = new StringBuilder();
+		for (var field : screen.getClass().getDeclaredFields()) {
+			if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+				continue;
+			}
+			try {
+				field.setAccessible(true);
+				Object value = field.get(screen);
+				String text = velo$tryGetString(value);
+				if (text != null) {
+					out.append(text).append(' ');
+				}
+				if (value != null) {
+					try {
+						String inner = velo$tryGetString(value.getClass().getMethod("reason").invoke(value));
+						if (inner != null) {
+							out.append(inner).append(' ');
+						}
+					} catch (ReflectiveOperationException ignored) {
+						// not a reason wrapper
+					}
+				}
+				if (value instanceof Text component) {
+					out.append(translationKeys(component, 0)).append(' ');
+				}
+			} catch (ReflectiveOperationException ignored) {
+				// keep scanning
+			}
+		}
+		return out.toString();
+	}
+
+	//? if <26.1 {
+	private static String translationKeys(Text text, int depth) {
+		if (text == null || depth > 8) {
+			return "";
+		}
+		StringBuilder out = new StringBuilder();
+		if (text.getContent() instanceof net.minecraft.text.TranslatableTextContent translatable) {
+			out.append(translatable.getKey()).append(' ');
+		}
+		for (Text sibling : text.getSiblings()) {
+			out.append(translationKeys(sibling, depth + 1));
+		}
+		return out.toString();
+	}
+	//?} else {
+	/*private static String translationKeys(Text text, int depth) {
+		if (text == null || depth > 8) {
+			return "";
+		}
+		StringBuilder out = new StringBuilder();
+		if (text.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents translatable) {
+			out.append(translatable.getKey()).append(' ');
+		}
+		for (Text sibling : text.getSiblings()) {
+			out.append(translationKeys(sibling, depth + 1));
+		}
+		return out.toString();
+	}
+	*///?}
+
+	private void onFixPressed() {
+		if (retryScreen != null && System.currentTimeMillis() < retryAt) {
+			// A timed retry is waiting: go now.
+			retryScreen = null;
+			reconnect(MinecraftClient.getInstance());
+			return;
+		}
+		if (fixing) {
+			// Clicking while it's (apparently) stuck starts over instead of doing nothing.
+			fixAttempt++;
+			fixing = false;
 		}
 		fixing = true;
 		long attempt = ++fixAttempt;
@@ -381,6 +510,13 @@ public final class SessionAutoFixerModule extends AbstractModule {
 		if (targetServer == null) {
 			return;
 		}
+		long wait = MIN_RECONNECT_GAP_MS - (System.currentTimeMillis() - lastConnectMs);
+		if (wait > 0) {
+			delayed(client, wait);
+			return;
+		}
+		lastConnectMs = System.currentTimeMillis();
+		retryScreen = null;
 		ServerAddress address = ServerAddress.parse(targetServer.address);
 		ConnectScreen.connect(fallbackParent, client, address, targetServer, false, null);
 	}
@@ -399,10 +535,32 @@ public final class SessionAutoFixerModule extends AbstractModule {
 		if (targetServer == null) {
 			return;
 		}
+		long wait = MIN_RECONNECT_GAP_MS - (System.currentTimeMillis() - lastConnectMs);
+		if (wait > 0) {
+			delayed(client, wait);
+			return;
+		}
+		lastConnectMs = System.currentTimeMillis();
+		retryScreen = null;
 		ServerAddress address = ServerAddress.parseString(targetServer.ip);
 		ConnectScreen.startConnecting(fallbackParent, client, address, targetServer, false, null);
 	}
 	*///?}
+
+	/** Reconnects once the proxy's login rate limit has passed (it would refuse a quicker one). */
+	private void delayed(MinecraftClient client, long wait) {
+		setButtonMessage("Reconnecting in " + Math.max(1, wait / 1000) + "s...");
+		Thread waiter = new Thread(() -> {
+			try {
+				Thread.sleep(wait + 50);
+			} catch (InterruptedException ignored) {
+				return;
+			}
+			client.execute(() -> reconnect(client));
+		}, "velo-session-gap");
+		waiter.setDaemon(true);
+		waiter.start();
+	}
 
 	/** Minecraft's services hand out UUIDs without dashes ("aba7a2762ef4..."), which UUID.fromString rejects. */
 	static UUID parseUuid(String raw) {

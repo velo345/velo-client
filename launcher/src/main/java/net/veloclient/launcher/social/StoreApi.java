@@ -290,10 +290,10 @@ public final class StoreApi {
 		String json = switch (path) {
 			case "/v1/store/catalog" -> """
 					{"currency":"EUR","checkoutEnabled":true,"coinPacks":[
-					{"id":"coins_500","coins":500,"bonus":0,"price":4.99},{"id":"coins_1200","coins":1200,"bonus":140,"price":9.99},
-					{"id":"coins_2600","coins":2600,"bonus":400,"price":19.99},{"id":"coins_6500","coins":6500,"bonus":1500,"price":39.99}],
+					{"id":"coins_1200","coins":1200,"bonus":0,"price":4.99},{"id":"coins_2500","coins":2300,"bonus":200,"price":9.99},
+					{"id":"coins_5500","coins":4700,"bonus":800,"price":19.99},{"id":"coins_15000","coins":12000,"bonus":3000,"price":49.99}],
 					"items":[]}""";
-			case "/v1/plus/status" -> "{\"plus\":false,\"until\":0,\"price\":8.99,\"currency\":\"EUR\",\"monthlyCoins\":2500,\"periodDays\":30,\"checkoutEnabled\":true,\"addonsEnabled\":true}";
+			case "/v1/plus/status" -> "{\"plus\":false,\"until\":0,\"price\":9.99,\"currency\":\"EUR\",\"monthlyCoins\":2000,\"periodDays\":30,\"checkoutEnabled\":true,\"addonsEnabled\":true}";
 			case "/v1/store/wallet" -> "{\"balance\":1340,\"owner\":true,\"owned\":[\"wings_bonedragon\",\"wings_cobweb\",\"wings_wraith\",\"wings_phoenix\",\"aura_orbit\",\"aura_ember\",\"aura_void\"]}";
 			default -> """
 					{"onlineMinutes":42,"loginClaimed":false,"loginClaimable":true,"loginCoins":12,"streak":3,"quests":[

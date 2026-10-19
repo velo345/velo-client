@@ -64,7 +64,7 @@ public final class VeloUi {
 		var textRenderer = MinecraftClient.getInstance().textRenderer;
 		String shown = trim(label, width - 6);
 		context.drawTextWithShadow(textRenderer, shown, x + (width - textRenderer.getWidth(shown)) / 2,
-				y + (height - 8) / 2, tone == 0 ? theme.text() : 0xFFFFFFFF);
+				y + (height - 8) / 2, tone == 0 ? theme.text() : tone == 1 ? theme.onAccent() : 0xFFFFFFFF);
 		return new Hit(x, y, width, height, action);
 	}
 

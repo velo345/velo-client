@@ -381,6 +381,7 @@ public final class WingsManager {
 	}
 
 	private static void save() {
+		net.veloclient.velo.client.network.VeloServerClient.syncSoon();
 		net.veloclient.velo.config.ConfigManager.save("cosmetics-wings", new EquipState(equippedId, new HashMap<>(SETTINGS), null));
 	}
 
