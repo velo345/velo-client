@@ -106,6 +106,10 @@ final class RmMenus {
 			s.pasteSpeed = SPEEDS[(i + 1) % SPEEDS.length];
 			RmSettings.save();
 		}, null));
+		items.add(new RmHud.MenuItem("Skip air when pasting / moving / stacking", null, () -> {
+			s.skipAir = !s.skipAir;
+			RmSettings.save();
+		}, () -> s.skipAir));
 		items.add(new RmHud.MenuItem("Keep redstone running when pasting", null, () -> {
 			s.keepRunning = !s.keepRunning;
 			RmSettings.save();

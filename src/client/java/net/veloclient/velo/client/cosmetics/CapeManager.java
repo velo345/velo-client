@@ -118,6 +118,7 @@ public final class CapeManager {
 	}
 
 	public static void equip(String capeId) {
+		net.veloclient.velo.client.network.VeloServerClient.syncSoon();
 		equippedCapeId = capeId;
 		net.veloclient.velo.config.ConfigManager.save("cosmetics-cape", new EquipState(capeId));
 	}

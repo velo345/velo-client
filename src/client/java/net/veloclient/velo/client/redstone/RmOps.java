@@ -238,7 +238,7 @@ public final class RmOps {
 		if (clip == null || !canEdit()) {
 			return;
 		}
-		RmWorld.onServer(level -> runJob(level, RmJobs.Source.of(clip), x, y, z, true, "Pasting",
+		RmWorld.onServer(level -> runJob(level, RmJobs.Source.of(clip), x, y, z, RmSettings.get().skipAir, "Pasting",
 				() -> RmState.info("Pasted " + clip.solidCount() + " blocks - Ctrl+Z to undo")));
 	}
 
@@ -262,10 +262,8 @@ public final class RmOps {
 			RmWorld.removeEntities(level, b[0], b[1], b[2], b[3], b[4], b[5]);
 			int group = newGroup();
 			runJob(level, RmJobs.Source.of(air(s[0], s[1], s[2])), b[0], b[1], b[2], false, "Moving", null, group);
-			runJob(level, RmJobs.Source.of(moved), nx, ny, nz, true, "Moving", () -> {
-				RmState.cornerA = new int[] {nx, ny, nz};
-				RmState.cornerB = new int[] {nx + moved.sx - 1, ny + moved.sy - 1, nz + moved.sz - 1};
-				RmState.resetTransforms();
+			runJob(level, RmJobs.Source.of(moved), nx, ny, nz, RmSettings.get().skipAir, "Moving", () -> {
+				RmState.clearSelection(); // done: select the next area
 				RmState.info("Moved - Ctrl+Z to undo");
 			}, group);
 		});
@@ -282,6 +280,7 @@ public final class RmOps {
 		int[] s = RmState.size();
 		RmWorld.onServer(level -> {
 			Clip source = capture(level, b[0], b[1], b[2], s[0], s[1], s[2], true);
+			RmJobs.Source stackSource = RmJobs.Source.of(source);
 			int group = newGroup();
 			long placed = 0;
 			for (int i = 0; i <= Math.abs(counts[0]); i++) {
@@ -295,8 +294,9 @@ public final class RmOps {
 						int x = b[0] + Integer.signum(counts[0]) * s[0] * i;
 						int y = b[1] + Integer.signum(counts[1]) * s[1] * j;
 						int z = b[2] + Integer.signum(counts[2]) * s[2] * k;
-						runJob(level, RmJobs.Source.of(source), x, y, z, false, "Stacking " + placed + "/" + copies, last ? () -> {
-							RmState.resetTransforms();
+						// Like pasting a schematic: air in the copy is skipped when "Skip air" is on (much faster).
+						runJob(level, stackSource, x, y, z, RmSettings.get().skipAir, "Stacking " + placed + "/" + copies, last ? () -> {
+							RmState.clearSelection();
 							RmState.info("Stacked " + copies + " copies - Ctrl+Z undoes the whole stack");
 						} : null, group);
 					}

@@ -323,6 +323,22 @@ public final class ScreenshotTour {
 				}
 				yield steps;
 			}
+			case "title" -> {
+				// The title panorama + theme editor (accent buttons) for every preset. setActive saves
+				// theme.json, so run this with -Duser.home=<temp>.
+				List<Object[]> steps = new java.util.ArrayList<>();
+				for (String theme : net.veloclient.velo.client.theme.ThemePresets.all().keySet()) {
+					String slug = theme.toLowerCase(java.util.Locale.ROOT).replace(' ', '-');
+					steps.add(new Object[] {2, (Runnable) () -> {
+						net.veloclient.velo.client.theme.ThemeManager.setActive(net.veloclient.velo.client.theme.ThemePresets.all().get(theme));
+						client.setScreen(new net.minecraft.client.gui.screen.TitleScreen());
+					}});
+					steps.add(new Object[] {45, (Runnable) () -> shot(client, "title-" + slug)});
+					steps.add(new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.ThemeEditorScreen(null))});
+					steps.add(new Object[] {25, (Runnable) () -> shot(client, "themes-" + slug)});
+				}
+				yield steps;
+			}
 			case "replace" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.redstone.ReplaceScreen())},
 					new Object[] {30, (Runnable) () -> shot(client, "replace")});

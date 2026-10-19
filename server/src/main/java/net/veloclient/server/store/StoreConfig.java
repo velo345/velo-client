@@ -28,7 +28,17 @@ public final class StoreConfig {
 	}
 
 	public String currency = "EUR";
-	public List<CoinPack> coinPacks = List.of(
+	/** ~250 coins per euro at 9.99, more per euro for the bigger packs (240 -> 300). */
+	public List<CoinPack> coinPacks = DEFAULT_PACKS;
+
+	public static final List<CoinPack> DEFAULT_PACKS = List.of(
+			new CoinPack("coins_1200", 1200, 0, 4.99),
+			new CoinPack("coins_2500", 2300, 200, 9.99),
+			new CoinPack("coins_5500", 4700, 800, 19.99),
+			new CoinPack("coins_15000", 12000, 3000, 49.99));
+
+	/** The packs every store.json was created with before the 2026-10 price change - replaced on start if untouched. */
+	private static final List<CoinPack> OLD_DEFAULT_PACKS = List.of(
 			new CoinPack("coins_500", 500, 0, 4.99),
 			new CoinPack("coins_1200", 1200, 140, 9.99),
 			new CoinPack("coins_2600", 2600, 400, 19.99),
@@ -96,9 +106,9 @@ public final class StoreConfig {
 
 	/** The Velo+ subscription: what it costs (shown), how long a payment lasts, and the monthly coins it includes. */
 	public static final class Plus {
-		public double price = 8.99;
+		public double price = 9.99;
 		public int periodDays = 30;
-		public int monthlyCoins = 2500;
+		public int monthlyCoins = 2000;
 	}
 
 	public Plus plus = new Plus();
@@ -123,8 +133,18 @@ public final class StoreConfig {
 		if (config.plus == null) {
 			config.plus = new Plus();
 		}
-		List<Item> merged = new java.util.ArrayList<>(config.items);
 		boolean added = false;
+		// The 2026-10 price change reaches servers whose store.json still has the old defaults (custom prices stay).
+		if (config.coinPacks.equals(OLD_DEFAULT_PACKS)) {
+			config.coinPacks = DEFAULT_PACKS;
+			added = true;
+		}
+		if (config.plus.price == 8.99 && config.plus.monthlyCoins == 2500) {
+			config.plus.price = 9.99;
+			config.plus.monthlyCoins = 2000;
+			added = true;
+		}
+		List<Item> merged = new java.util.ArrayList<>(config.items);
 		for (Item item : DEFAULT_ITEMS) {
 			if (config.item(item.id()) == null) {
 				merged.add(item);

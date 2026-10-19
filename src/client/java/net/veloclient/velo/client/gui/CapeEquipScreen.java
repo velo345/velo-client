@@ -44,6 +44,8 @@ public final class CapeEquipScreen extends VeloWindow {
 	/** The cape shown on the player preview (not necessarily the equipped one). */
 	private String selectedId;
 	/** Showing the 3D wings instead of the capes. */
+	/** Wings / aura picture tiles in the collection grid. */
+	private static final int TILE_H = 58;
 	private boolean wingsTab;
 	/** The wings shown on the player preview ("" = none), null = the equipped pair. */
 	private String selectedWings;
@@ -141,20 +143,18 @@ public final class CapeEquipScreen extends VeloWindow {
 		}
 		for (int i = 0; i < tiles.size(); i++) {
 			String id = tiles.get(i)[0];
-			String label = tiles.get(i)[1] + (id.equals(equipped == null ? "" : equipped) ? "  ✔"
-					: !id.isEmpty() && !net.veloclient.velo.client.cosmetics.aura.AuraManager.owns(id) ? "  (Store)" : "");
-			VeloButton tile = new VeloButton(gridX + (i % columns) * (tileW + 6), y + (i / columns) * 24, tileW, 20, Text.literal(label), b -> {
-				selectedAura = id;
-				layoutContent();
-			});
-			if (id.equals(selectedAura)) {
-				tile.primary();
-			}
-			addDrawableChild(tile);
+			boolean tileOwned = id.isEmpty() || net.veloclient.velo.client.cosmetics.aura.AuraManager.owns(id);
+			addDrawableChild(new net.veloclient.velo.client.gui.widget.VeloCosmeticTile(gridX + (i % columns) * (tileW + 6),
+					y + (i / columns) * (TILE_H + 6), tileW, TILE_H, net.veloclient.velo.client.gui.widget.VeloCosmeticTile.Kind.AURA, id,
+					tiles.get(i)[1], id.equals(selectedAura), id.equals(equipped == null ? "" : equipped), tileOwned, () -> {
+						selectedAura = id;
+						layoutContent();
+					}));
 		}
-		y += ((tiles.size() + columns - 1) / columns) * 24 + 10;
+		y += ((tiles.size() + columns - 1) / columns) * (TILE_H + 6) + 4;
+		int customizeY = y;
 		if (!selectedAura.isEmpty()) {
-			net.veloclient.velo.client.cosmetics.aura.AuraManager.type(selectedAura).ifPresent(type -> addDrawableChild(new VeloButton(gridX, contentY() + 18 + ((tiles.size() + 2) / 3) * 24 + 10,
+			net.veloclient.velo.client.cosmetics.aura.AuraManager.type(selectedAura).ifPresent(type -> addDrawableChild(new VeloButton(gridX, customizeY,
 					Math.min(200, listWidth), 20, Text.literal("Customize: size, speed, colour..."),
 					b -> this.client.setScreen(new net.veloclient.velo.client.gui.store.AuraDetailScreen(this, type)))));
 		}
@@ -217,18 +217,15 @@ public final class CapeEquipScreen extends VeloWindow {
 		}
 		for (int i = 0; i < tiles.size(); i++) {
 			String id = tiles.get(i)[0];
-			String label = tiles.get(i)[1] + (id.equals(equipped == null ? "" : equipped) ? "  ✔"
-					: !id.isEmpty() && !net.veloclient.velo.client.cosmetics.wings.WingsManager.owns(id) ? "  (Store)" : "");
-			VeloButton tile = new VeloButton(gridX + (i % columns) * (tileW + 6), y + (i / columns) * 24, tileW, 20, Text.literal(label), b -> {
-				selectedWings = id;
-				layoutContent();
-			});
-			if (id.equals(selectedWings)) {
-				tile.primary();
-			}
-			addDrawableChild(tile);
+			boolean tileOwned = id.isEmpty() || net.veloclient.velo.client.cosmetics.wings.WingsManager.owns(id);
+			addDrawableChild(new net.veloclient.velo.client.gui.widget.VeloCosmeticTile(gridX + (i % columns) * (tileW + 6),
+					y + (i / columns) * (TILE_H + 6), tileW, TILE_H, net.veloclient.velo.client.gui.widget.VeloCosmeticTile.Kind.WINGS, id,
+					tiles.get(i)[1], id.equals(selectedWings), id.equals(equipped == null ? "" : equipped), tileOwned, () -> {
+						selectedWings = id;
+						layoutContent();
+					}));
 		}
-		y += ((tiles.size() + columns - 1) / columns) * 24 + 10;
+		y += ((tiles.size() + columns - 1) / columns) * (TILE_H + 6) + 4;
 		int half = (listWidth - 8) / 2;
 		java.util.List<Object[]> sliders = java.util.List.of(
 				new Object[] {"Size", 0.4, 2.0, 0, (java.util.function.DoubleFunction<String>) v -> Math.round(v * 100) + "%"},

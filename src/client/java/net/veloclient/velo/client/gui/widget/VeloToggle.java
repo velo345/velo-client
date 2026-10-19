@@ -84,7 +84,9 @@ public final class VeloToggle extends ClickableWidget {
 		float knob = height - inset * 2;
 		float knobX = x + inset + (width - knob - inset * 2) * progress;
 		VeloDraw.fillRounded(context, knobX, y + inset + 0.6f, knob, knob, knob / 2f, 0x40000000);
-		int knobColor = VeloAnim.lerpArgb(0xFFD8D8DE, 0xFFFFFFFF, Math.max(progress, hover));
+		// on a light accent track (Monochrome, Nord) a white knob vanishes - go dark there instead
+		int onKnob = theme.onAccent() == 0xFFFFFFFF ? 0xFFFFFFFF : 0xFF22252B;
+		int knobColor = VeloAnim.lerpArgb(VeloAnim.lerpArgb(0xFFD8D8DE, 0xFFFFFFFF, hover), onKnob, progress);
 		VeloDraw.fillRounded(context, knobX, y + inset, knob, knob, knob / 2f, knobColor);
 	}
 

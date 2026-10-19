@@ -12,6 +12,8 @@
 	-velo-surface: #1e1212;
 	-velo-accent-start: #ff4444;
 	-velo-accent-end: #b71c1c;
+	/* text drawn on a solid accent fill - dark for light accents (Nord, Monochrome); set from the theme */
+	-velo-on-accent: white;
 	-velo-text: #ffffff;
 	-velo-hover: #2a1a1a;
 	-velo-hairline: rgba(255, 255, 255, 0.08);
@@ -80,7 +82,7 @@
 /* Main call to action on a page: accent gradient, soft glow on hover. */
 .primary-button, .button:default {
 	-fx-background-color: linear-gradient(to bottom right, derive(-velo-accent-start, 8%), -velo-accent-end);
-	-fx-text-fill: white;
+	-fx-text-fill: -velo-on-accent;
 	-fx-border-width: 0;
 	-fx-font-weight: bold;
 }
@@ -271,7 +273,7 @@
 
 .home-play-button {
 	-fx-background-color: linear-gradient(to bottom right, derive(-velo-accent-start, 12%), -velo-accent-end);
-	-fx-text-fill: white;
+	-fx-text-fill: -velo-on-accent;
 	-fx-font-size: 17px;
 	-fx-font-weight: 800;
 	-fx-background-radius: 14;
@@ -322,7 +324,7 @@
 
 .title-menu-button-primary {
 	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
-	-fx-text-fill: white;
+	-fx-text-fill: -velo-on-accent;
 	-fx-font-weight: bold;
 	-fx-border-width: 0;
 }
@@ -653,7 +655,7 @@
 
 .list-cell:filled:selected {
 	-fx-background-color: -velo-accent-start;
-	-fx-text-fill: white;
+	-fx-text-fill: -velo-on-accent;
 }
 
 /* ---- CheckBox / RadioButton ---- */
@@ -680,7 +682,7 @@
 }
 
 .check-box:selected .mark {
-	-fx-background-color: white;
+	-fx-background-color: -velo-on-accent;
 }
 
 .radio-button .radio {
@@ -968,7 +970,7 @@
 .unread-badge {
 	-fx-background-color: -velo-accent-start;
 	-fx-background-radius: 10;
-	-fx-text-fill: white;
+	-fx-text-fill: -velo-on-accent;
 	-fx-font-size: 10px;
 	-fx-font-weight: bold;
 	-fx-padding: 1 6 1 6;
@@ -996,7 +998,7 @@
 
 .segmented-button-active, .segmented-button-active:hover {
 	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
-	-fx-text-fill: white;
+	-fx-text-fill: -velo-on-accent;
 	-fx-font-weight: bold;
 }
 

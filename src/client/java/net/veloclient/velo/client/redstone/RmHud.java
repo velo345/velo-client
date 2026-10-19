@@ -603,6 +603,17 @@ public final class RmHud {
 						cy += 18;
 					}
 				}
+				int placeY = cy;
+				draw.add(() -> {
+					int bx = x + 8;
+					bx += textButton(context, bx, placeY, 0, "Move Here", false, () -> {
+						selected.moveToFeet();
+						RmState.info("Lower corner moved to where you stand");
+					}) + 4;
+					textButton(context, bx, placeY, 0, selected.outlineOnly ? "Show Blocks" : "Outline Only", selected.outlineOnly,
+							() -> selected.outlineOnly = !selected.outlineOnly);
+				});
+				cy += 18;
 				int buttonsY = cy;
 				draw.add(() -> {
 					int bx = x + 8;

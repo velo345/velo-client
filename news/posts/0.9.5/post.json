@@ -1,0 +1,110 @@
+{
+  "title": "Velo Client 0.9.5",
+  "summary": "A brand new animated title screen - a real 3D world with a live sword duel that glows in your theme color - two new themes, readable Monochrome and Nord, faster cosmetics, and a huge Velo+ Addons update with the Terminator.",
+  "tag": "Update",
+  "version": "0.9.5",
+  "accent": "#ff5a5a",
+  "pinned": false,
+  "cover": "file:images/cover.jpg",
+  "blocks": [
+    {
+      "type": "text",
+      "text": "0.9.5 starts with the first thing you see: the title screen."
+    },
+    {
+      "type": "heading",
+      "text": "A new title screen"
+    },
+    {
+      "type": "text",
+      "text": "The old blurry background is gone. The new one is a **real 3D Minecraft world**, fully ray traced with soft sunset light, shadows and reflections - a ruined arena by a lake, a forest, mountains and a glowing portal. In the middle of it **two players fight a live sword duel**: slashes, shield blocks and sparks on every hit. The view slowly turns all the way around and loops without a seam."
+    },
+    {
+      "type": "image",
+      "image": "file:images/title-velo-dark.jpg",
+      "caption": "Velo Dark"
+    },
+    {
+      "type": "text",
+      "text": "The portal, the crystal pillars, the lanterns, the house windows and the drifting embers all **glow in your theme color** - switch themes and the whole world changes with it. Custom themes work too."
+    },
+    {
+      "type": "image",
+      "image": "file:images/title-emerald.jpg",
+      "caption": "Emerald"
+    },
+    {
+      "type": "image",
+      "image": "file:images/title-sunset.jpg",
+      "caption": "Sunset"
+    },
+    {
+      "type": "image",
+      "image": "file:images/title-midnight.jpg",
+      "caption": "Midnight"
+    },
+    {
+      "type": "heading",
+      "text": "Two new themes, readable everywhere"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Emerald** and **Sunset** are new built-in themes, in the game and in the launcher.",
+        "**Monochrome and Nord are readable again** - buttons, tabs, badges and toggles on their light accent colors now use dark text instead of white-on-white.",
+        "The same fix is in the launcher, so its buttons and selected rows stay readable with every theme."
+      ]
+    },
+    {
+      "type": "image",
+      "image": "file:images/themes-monochrome.jpg",
+      "caption": "Monochrome: dark text on the light accent"
+    },
+    {
+      "type": "image",
+      "image": "file:images/themes-nord.jpg",
+      "caption": "Nord"
+    },
+    {
+      "type": "heading",
+      "text": "Everything else"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Cosmetics update faster** - when you change your cape, wings or aura, other players see it right away, and their changes reach you within seconds.",
+        "**Session Auto Fixer** now also reconnects by itself after \"logging in too fast\", \"already connected\" and busy-session kicks, waiting just as long as the server needs.",
+        "**Importing from other clients** is much faster and no longer marks mods as \"not on Modrinth\" when a big import hits Modrinth's rate limit.",
+        "**Smoother aura previews** in the launcher, and picture tiles for wings and auras in the collection.",
+        "**Redstone Mode**: bounding-box-only view, move a placement to where you stand, and stacked copies paste much faster (air in the copy can be skipped)."
+      ]
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "heading",
+      "text": "Velo+ Addons"
+    },
+    {
+      "type": "text",
+      "text": "The biggest Addons update so far. As always, every module that acts for you only works in **singleplayer** or on servers in your **Private Servers** list."
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Terminator** - a bot that hunts one player on its own: it walks, parkours, swims, bridges, pillars and digs its way there, uses boats, and fights with crystals, anchors, bows and mace runs.",
+        "**Elytra Mace** and **Firework Mace** - full mace runs, and **Auto Cart** for TNT minecart hits.",
+        "New: **Auto Shield**, **Auto Dodge** (dodges arrows, tridents, fireballs and more), **Auto MLG**, **Auto Mend**, **Auto Extinguish**, **Criticals**, **W-Tap**, **Auto Walk**, **Auto Fish**, **Enemy Armor** and **Remove All Addons**.",
+        "**Auto Crystal** places a guard block so its blasts don't hit you, and can launch the target with a sword knock-up first. **Auto Anchor** shields itself too.",
+        "**X-Ray** outlines the blocks you can actually see, so you still know where to walk.",
+        "**Auto Eat** goes for golden apples when you need healing and also takes food from your inventory."
+      ]
+    },
+    {
+      "type": "callout",
+      "style": "info",
+      "text": "Velo+ members get the new Addons automatically on their next launch in profiles that already have them."
+    }
+  ]
+}

@@ -18,12 +18,18 @@ public final class ThemePresets {
 	public static final Theme MONOCHROME = new Theme(
 			"Monochrome", 0xF0111111, 0xE01E1E1E, 0xFFBBBBBB, 0xFFFFFFFF, 0xFFFFFFFF, 4, 0.3f, 0.8f, 0.85f);
 
+	public static final Theme EMERALD = new Theme(
+			"Emerald", 0xF0071311, 0xE00F2420, 0xFF2ECC71, 0xFF13A08A, 0xFFE6FFF2, 8, 0.5f, 1.0f, 0.85f);
+
+	public static final Theme SUNSET = new Theme(
+			"Sunset", 0xF0150A10, 0xE0281520, 0xFFFF8040, 0xFFE0457B, 0xFFFFF0E8, 8, 0.5f, 1.0f, 0.85f);
+
 	private ThemePresets() {
 	}
 
 	public static Map<String, Theme> all() {
 		Map<String, Theme> presets = new LinkedHashMap<>();
-		for (Theme theme : new Theme[] {VELO_DARK, MIDNIGHT, NORD, MONOCHROME}) {
+		for (Theme theme : new Theme[] {VELO_DARK, MIDNIGHT, NORD, MONOCHROME, EMERALD, SUNSET}) {
 			presets.put(theme.name(), theme);
 		}
 		return presets;

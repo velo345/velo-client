@@ -220,11 +220,34 @@ public final class TitleScreenTheme {
 	private static final int LOGO_SOURCE_SIZE = 500;
 	/** The Velo brand red, sampled straight from logo.png - the "VELO CLIENT" wordmark always uses this, never the active theme's accent color, so it stays recognizable as the Velo brand regardless of what theme is selected. */
 	private static final int LOGO_RED = 0xFFF24759;
-	private static final Identifier PANORAMA_TEXTURE = Identifier.of("velo-client", "textures/gui/title/panorama.png");
-	private static final int PANORAMA_WIDTH = 2048;
-	private static final int PANORAMA_HEIGHT = 1024;
-	/** Pixels of the (wrapped) panorama texture scrolled per second. */
-	private static final float PAN_PIXELS_PER_SECOND = 28f;
+	/*
+	 * The panorama is a path-traced 360-degree central-cylindrical render (tools/panorama), so
+	 * panning it sideways is distortion-free and its two ends meet seamlessly. Four textures:
+	 * the scene itself, the theme-glow layer (white light from the crystals/portal/lanterns,
+	 * added on top in the theme accent color), and the looping duel as frame atlases of the
+	 * same two layers. Glow layers are soft light, so they are stored at half resolution and
+	 * scaled back up by the linear filter. Glow textures have alpha 1/255 - vanilla's GUI shader discards alpha 0 -
+	 * so the premultiplied pipeline adds them almost exactly additively.
+	 */
+	private static final Identifier PANO_BASE = Identifier.of("velo-client", "textures/gui/title/pano_base.png");
+	private static final Identifier PANO_GLOW = Identifier.of("velo-client", "textures/gui/title/pano_glow.png");
+	private static final Identifier DUEL_BASE = Identifier.of("velo-client", "textures/gui/title/pano_duel.png");
+	private static final Identifier DUEL_GLOW = Identifier.of("velo-client", "textures/gui/title/pano_duel_glow.png");
+	private static final int PANO_W = 6144;
+	private static final int PANO_H = 1152;
+	/** Where the duel's animated crop sits in the panorama, and its frame atlas layout. */
+	private static final int DUEL_X = 2776;
+	private static final int DUEL_Y = 372;
+	private static final int DUEL_FRAME_W = 640;
+	private static final int DUEL_FRAME_H = 432;
+	private static final int DUEL_COLUMNS = 6;
+	private static final int DUEL_FRAMES = 24;
+	private static final float DUEL_FPS = 12f;
+	/** Panorama pixels scrolled per second - one full turn takes about four minutes. */
+	private static final double PAN_PIXELS_PER_SECOND = 25.0;
+	private static final int EMBERS = 34;
+	/** First panorama draw - the pan starts on the duel instead of wherever the clock happens to be. */
+	private static long panoramaStart;
 	/** Vanilla's own main-menu button width (its {@code ButtonWidget.DEFAULT_WIDTH}) - matched instead of stretching toward the screen edges, which is what made buttons look oversized at high/Auto GUI Scale (a small scaled screen has little margin, so "screenWidth - 40" was nearly the full width). */
 	private static final int BUTTON_WIDTH = 200;
 	private static final int BUTTON_HEIGHT = 20;
@@ -373,55 +396,118 @@ public final class TitleScreenTheme {
 	}
 
 	/**
-	 * Draws a fixed-size "window" onto the panorama image, sliding sideways
-	 * through it over time (wrapping around) - the "rotate slowly like
-	 * vanilla's panorama" look from one flat equirectangular-style image
-	 * instead of a 6-face cubemap.
+	 * The slowly turning title panorama: the scene, the looping sword duel composited into it,
+	 * the theme-colored glow, drifting embers, and a soft scrim behind the menu column.
 	 *
-	 * <p>The elapsed-time math is deliberately {@code double}, not {@code
-	 * float}: {@link System#currentTimeMillis()} is a huge epoch-based
-	 * number (currently on the order of 1.7 trillion), and a 32-bit float
-	 * only has about 7 significant decimal digits of precision - dividing
-	 * that straight into a {@code float} silently collapsed every call
-	 * within the same session to the *same* rounded value (confirmed with
-	 * real debug output: {@code scrollPx} was frozen at a single constant
-	 * number the entire time), which is why the panorama never visibly
-	 * panned at all, not just "slowly". {@code double} has ~15-17 digits of
-	 * precision, comfortably enough to keep millisecond resolution at this
-	 * magnitude.
+	 * <p>Everything is drawn in panorama-pixel space under one scale + sub-pixel translate, so
+	 * the pan is smooth instead of stepping a whole GUI pixel at a time. The strip is drawn
+	 * twice (at 0 and one width further) which covers every wrap position. Time is measured
+	 * with {@code nanoTime} deltas as doubles - a float of epoch millis loses all precision.
 	 */
 	public static void drawPanorama(DrawContext context, int screenWidth, int screenHeight) {
 		Theme theme = ThemeManager.active();
-
-		float screenAspect = screenWidth / (float) screenHeight;
-		int viewportWidth = Math.min(PANORAMA_WIDTH, Math.max(500, PANORAMA_WIDTH / 3));
-		int viewportHeight = Math.min(PANORAMA_HEIGHT, Math.round(viewportWidth / screenAspect));
-		int vOffset = (PANORAMA_HEIGHT - viewportHeight) / 2;
-
-		double seconds = System.currentTimeMillis() / 1000.0;
-		long rounded = Math.round(seconds * PAN_PIXELS_PER_SECOND);
-		int scrollPx = (int) Math.floorMod(rounded, (long) PANORAMA_WIDTH);
-
-		// Two draws only when the sliding window itself wraps past the
-		// texture's right edge (not "whenever screenWidth is smaller than
-		// what's left of the texture", the earlier bug's condition).
-		int firstSourceWidth = Math.min(viewportWidth, PANORAMA_WIDTH - scrollPx);
-		int firstDrawWidth = Math.round(screenWidth * (firstSourceWidth / (float) viewportWidth));
-		context.drawTexture(RenderPipelines.GUI_TEXTURED, PANORAMA_TEXTURE, 0, 0, scrollPx, vOffset,
-				firstDrawWidth, screenHeight, firstSourceWidth, viewportHeight, PANORAMA_WIDTH, PANORAMA_HEIGHT);
-		if (firstSourceWidth < viewportWidth) {
-			int secondSourceWidth = viewportWidth - firstSourceWidth;
-			int secondDrawWidth = screenWidth - firstDrawWidth;
-			context.drawTexture(RenderPipelines.GUI_TEXTURED, PANORAMA_TEXTURE, firstDrawWidth, 0, 0, vOffset,
-					secondDrawWidth, screenHeight, secondSourceWidth, viewportHeight, PANORAMA_WIDTH, PANORAMA_HEIGHT);
+		long now = System.nanoTime();
+		if (panoramaStart == 0) {
+			panoramaStart = now;
 		}
-		// A soft themed tint + vignette so vanilla's own white button/logo
-		// text and this theme's accent colors both stay readable over
-		// whatever's in the source photo, matching the glass panels used
-		// everywhere else in the mod rather than looking like a bare photo
-		// pasted behind vanilla's UI.
-		context.fill(0, 0, screenWidth, screenHeight, (theme.background() & 0x00FFFFFF) | 0x4D000000);
-		context.fillGradient(0, screenHeight - 100, screenWidth, screenHeight, 0x00000000, 0x99000000);
+		double seconds = (now - panoramaStart) / 1_000_000_000.0;
+
+		float scale = Math.max(screenHeight / (float) PANO_H, screenWidth / (float) PANO_W);
+		float viewWidth = screenWidth / scale;
+		float viewTop = (PANO_H - screenHeight / scale) / 2f;
+		// Opens with the duel on the right, clear of the button column, then lets it drift across.
+		double offset = (DUEL_X + DUEL_FRAME_W / 2.0 - viewWidth * 0.8 + seconds * PAN_PIXELS_PER_SECOND) % PANO_W;
+		if (offset < 0) {
+			offset += PANO_W;
+		}
+
+		float framePos = (float) ((seconds * DUEL_FPS) % DUEL_FRAMES);
+		int frame = (int) framePos;
+		int nextFrame = (frame + 1) % DUEL_FRAMES;
+		float blend = framePos - frame;
+		int accent = theme.accentStart() | 0xFF000000;
+
+		context.getMatrices().pushMatrix();
+		context.getMatrices().scale(scale, scale);
+		context.getMatrices().translate((float) -offset, -viewTop);
+		for (int copy = 0; copy < 2; copy++) {
+			int x = copy * PANO_W;
+			context.drawTexture(RenderPipelines.GUI_TEXTURED, PANO_BASE, x, 0, 0f, 0f, PANO_W, PANO_H,
+					PANO_W, PANO_H, PANO_W, PANO_H, 0xFFFFFFFF);
+			// Duel frames carry a feathered alpha edge, so they melt into the static render.
+			drawDuelFrame(context, RenderPipelines.GUI_TEXTURED, DUEL_BASE, x, frame, 0xFFFFFFFF);
+			drawDuelFrame(context, RenderPipelines.GUI_TEXTURED, DUEL_BASE, x, nextFrame,
+					(Math.round(blend * 255) << 24) | 0xFFFFFF);
+			context.drawTexture(RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA, PANO_GLOW, x, 0, 0f, 0f, PANO_W, PANO_H,
+					PANO_W / 2, PANO_H / 2, PANO_W / 2, PANO_H / 2, accent);
+			drawDuelFrame(context, RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA, DUEL_GLOW, x, frame, scaleRgb(accent, 1f - blend));
+			drawDuelFrame(context, RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA, DUEL_GLOW, x, nextFrame, scaleRgb(accent, blend));
+		}
+		context.getMatrices().popMatrix();
+
+		drawEmbers(context, screenWidth, screenHeight, seconds, scale, accent);
+
+		// A light grade toward the theme background, edge fades, and a soft scrim behind the
+		// logo + button column so the wordmark never sits on bright sky unprotected.
+		context.fill(0, 0, screenWidth, screenHeight, (theme.background() & 0x00FFFFFF) | 0x1E000000);
+		context.fillGradient(0, 0, screenWidth, 48, 0x55000000, 0x00000000);
+		context.fillGradient(0, screenHeight - 120, screenWidth, screenHeight, 0x00000000, 0xAA000000);
+		List<Layout> column = stackLayout(screenWidth, screenHeight, 6);
+		Layout first = column.get(0);
+		Layout last = column.get(column.size() - 1);
+		int scrimX = first.x() - 28;
+		int scrimY = brandingTop(screenWidth, screenHeight, 6) - 16;
+		int scrimW = first.width() + 56;
+		int scrimH = last.y() + last.height() + 40 - scrimY;
+		VeloDraw.shadow(context, scrimX, scrimY, scrimW, scrimH, 22, 60, 0, 0x30000000);
+		VeloDraw.fillRounded(context, scrimX, scrimY, scrimW, scrimH, 22, 0x30000000);
+	}
+
+	private static void drawDuelFrame(DrawContext context, com.mojang.blaze3d.pipeline.RenderPipeline pipeline, Identifier texture,
+			int copyX, int frame, int color) {
+		// nothing to add: a fully transparent base frame, or a black (zero-brightness) glow frame
+		boolean additive = pipeline != RenderPipelines.GUI_TEXTURED;
+		if (additive ? (color & 0xFFFFFF) == 0 : (color >>> 24) == 0) {
+			return;
+		}
+		int div = additive ? 2 : 1; // the glow atlas is half resolution
+		int frameW = DUEL_FRAME_W / div;
+		int frameH = DUEL_FRAME_H / div;
+		float u = (frame % DUEL_COLUMNS) * frameW;
+		float v = (frame / DUEL_COLUMNS) * frameH;
+		context.drawTexture(pipeline, texture, copyX + DUEL_X, DUEL_Y, u, v, DUEL_FRAME_W, DUEL_FRAME_H,
+				frameW, frameH, frameW * DUEL_COLUMNS, frameH * (DUEL_FRAMES / DUEL_COLUMNS), color);
+	}
+
+	/** Multiplies an opaque color's RGB by {@code factor} - for additive layers, that's their brightness. */
+	private static int scaleRgb(int argb, float factor) {
+		int r = Math.round(((argb >> 16) & 0xFF) * factor);
+		int g = Math.round(((argb >> 8) & 0xFF) * factor);
+		int b = Math.round((argb & 0xFF) * factor);
+		return 0xFF000000 | (r << 16) | (g << 8) | b;
+	}
+
+	/** Theme-colored embers drifting up through the scene, a little faster than the pan (parallax). */
+	private static void drawEmbers(DrawContext context, int screenWidth, int screenHeight, double seconds, float scale, int accent) {
+		int span = screenWidth + 60;
+		int core = VeloAnim.lerpArgb(accent, 0xFFFFFFFF, 0.45f);
+		for (int i = 0; i < EMBERS; i++) {
+			double r1 = hash(i * 3 + 1), r2 = hash(i * 3 + 2), r3 = hash(i * 3 + 3);
+			double life = (seconds * (0.035 + 0.035 * r2) + r1) % 1.0;
+			double drift = seconds * PAN_PIXELS_PER_SECOND * scale * (1.25 + 0.5 * r3);
+			float x = (float) (((r3 * span - drift) % span + span) % span) - 30
+					+ (float) Math.sin(seconds * 0.7 + i) * 6f;
+			float y = (float) (screenHeight * (1.02 - life * 0.85));
+			float fade = (float) Math.sin(life * Math.PI);
+			float size = 0.6f + (float) r2 * 0.9f;
+			VeloDraw.fillCircle(context, x, y, size * 3.2f, VeloUi.withAlpha(accent, Math.round(0x2A * fade)));
+			VeloDraw.fillCircle(context, x, y, size, VeloUi.withAlpha(core, Math.round(0xC8 * fade)));
+		}
+	}
+
+	private static double hash(int n) {
+		double s = Math.sin(n * 12.9898) * 43758.5453;
+		return s - Math.floor(s);
 	}
 
 	/**

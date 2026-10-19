@@ -58,14 +58,14 @@ class StoreServiceTest {
 
 	@Test
 	void paidOrderIsCreditedExactlyOnceAndRefundTakesItBack() throws Exception {
-		StoreConfig.CoinPack pack = new StoreConfig().pack("coins_1200");
+		StoreConfig.CoinPack pack = new StoreConfig().pack("coins_2500");
 		db.createOrder("vo_1", ME, pack, "EUR");
 		JsonObject paid = paymentEvent("evt1", "payment.completed", "tbx-1", "vo_1", ME, 9.99, "EUR");
 		store.tebexWebhook(paid);
-		assertEquals(1340, db.balance(ME));
+		assertEquals(2500, db.balance(ME));
 		store.tebexWebhook(paid); // Tebex retry, same event id
 		store.tebexWebhook(paymentEvent("evt2", "payment.completed", "tbx-1", "vo_1", ME, 9.99, "EUR")); // new id, same order
-		assertEquals(1340, db.balance(ME));
+		assertEquals(2500, db.balance(ME));
 		assertEquals("paid", db.order("vo_1").status());
 
 		store.tebexWebhook(paymentEvent("evt3", "payment.refunded", "tbx-1", "vo_1", ME, 9.99, "EUR"));
@@ -75,14 +75,14 @@ class StoreServiceTest {
 
 	@Test
 	void underpaidOrWrongPlayerGoesToReview() throws Exception {
-		StoreConfig.CoinPack pack = new StoreConfig().pack("coins_6500");
+		StoreConfig.CoinPack pack = new StoreConfig().pack("coins_15000");
 		db.createOrder("vo_2", ME, pack, "EUR");
 		store.tebexWebhook(paymentEvent("e1", "payment.completed", "tbx-2", "vo_2", ME, 1.00, "EUR"));
 		assertEquals(0, db.balance(ME));
 		assertEquals("review", db.order("vo_2").status());
 
 		db.createOrder("vo_3", ME, pack, "EUR");
-		store.tebexWebhook(paymentEvent("e2", "payment.completed", "tbx-3", "vo_3", OTHER, 39.99, "EUR"));
+		store.tebexWebhook(paymentEvent("e2", "payment.completed", "tbx-3", "vo_3", OTHER, 49.99, "EUR"));
 		assertEquals(0, db.balance(ME));
 		assertEquals(0, db.balance(OTHER));
 	}

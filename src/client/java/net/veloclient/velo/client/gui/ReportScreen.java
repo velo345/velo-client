@@ -124,7 +124,7 @@ public final class ReportScreen extends VeloWindow {
 		int boxY = reason.getY() + 26;
 		VeloDraw.fillRounded(context, x, boxY, 12, 12, 3, attach ? ThemeManager.active().accentStart() : 0xFF3A3A40);
 		if (attach) {
-			context.drawTextWithShadow(this.textRenderer, "v", x + 3, boxY + 2, 0xFFFFFFFF);
+			context.drawTextWithShadow(this.textRenderer, "v", x + 3, boxY + 2, ThemeManager.active().onAccent());
 		}
 		hits.add(new VeloUi.Hit(x, boxY - 2, width, 16, () -> attach = !attach));
 		context.drawTextWithShadow(this.textRenderer, VeloUi.trim("Attach the recent messages of this chat for staff", width - 18), x + 18, boxY + 2,

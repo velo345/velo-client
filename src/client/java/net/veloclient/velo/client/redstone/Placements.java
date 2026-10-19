@@ -27,6 +27,8 @@ public final class Placements {
 		public int z;
 		public boolean visible = true;
 		public boolean locked;
+		/** Only the bounding box lines, no blocks - for digging out the area on a server. */
+		public boolean outlineOnly;
 		public LayerMode layerMode = LayerMode.ALL;
 		public char axis = 'y';
 		public int layer;
@@ -73,6 +75,17 @@ public final class Placements {
 			int from = layerMode == LayerMode.SINGLE ? layer : Math.min(layer, layerTo);
 			int to = layerMode == LayerMode.SINGLE ? layer : Math.max(layer, layerTo);
 			return value >= from && value <= to;
+		}
+
+		/** Moves the placement so its lower corner (min x/y/z) is the block you're standing in. */
+		public void moveToFeet() {
+			int[] feet = RmWorld.playerBlock();
+			if (feet != null) {
+				x = feet[0];
+				y = feet[1];
+				z = feet[2];
+				locked = true;
+			}
 		}
 
 		/** The layer (along the current axis) of the block you're standing in, clamped to this placement. */
@@ -159,7 +172,7 @@ public final class Placements {
 	public static synchronized Object stateAt(int x, int y, int z) {
 		for (int i = PLACEMENTS.size() - 1; i >= 0; i--) {
 			Placement p = PLACEMENTS.get(i);
-			if (!p.visible) {
+			if (!p.visible || p.outlineOnly) {
 				continue;
 			}
 			Clip v = p.view();

@@ -14,13 +14,17 @@ public final class LauncherThemePresets {
 			"Nord", 0xF02E3440, 0xE03B4252, 0xFF88C0D0, 0xFF81A1C1, 0xFFECEFF4, 6, 0.4f, 1.0f, 0.85f);
 	public static final LauncherTheme MONOCHROME = new LauncherTheme(
 			"Monochrome", 0xF0111111, 0xE01E1E1E, 0xFFBBBBBB, 0xFFFFFFFF, 0xFFFFFFFF, 4, 0.3f, 0.8f, 0.85f);
+	public static final LauncherTheme EMERALD = new LauncherTheme(
+			"Emerald", 0xF0071311, 0xE00F2420, 0xFF2ECC71, 0xFF13A08A, 0xFFE6FFF2, 8, 0.5f, 1.0f, 0.85f);
+	public static final LauncherTheme SUNSET = new LauncherTheme(
+			"Sunset", 0xF0150A10, 0xE0281520, 0xFFFF8040, 0xFFE0457B, 0xFFFFF0E8, 8, 0.5f, 1.0f, 0.85f);
 
 	private LauncherThemePresets() {
 	}
 
 	public static Map<String, LauncherTheme> all() {
 		Map<String, LauncherTheme> presets = new LinkedHashMap<>();
-		for (LauncherTheme theme : new LauncherTheme[] {VELO_DARK, MIDNIGHT, NORD, MONOCHROME}) {
+		for (LauncherTheme theme : new LauncherTheme[] {VELO_DARK, MIDNIGHT, NORD, MONOCHROME, EMERALD, SUNSET}) {
 			presets.put(theme.name(), theme);
 		}
 		return presets;

@@ -687,6 +687,8 @@ public final class ClientImport {
 		int imported = 0;
 		int skipped = 0;
 		int i = 0;
+		progress.accept("Looking up " + jars.size() + " mods on Modrinth...");
+		Lookup lookup = bulkLookup(jars, mcVersion);
 		for (Path jar : jars) {
 			i++;
 			String name = jar.getFileName().toString().toLowerCase(Locale.ROOT);
@@ -700,7 +702,7 @@ public final class ClientImport {
 				continue;
 			}
 			try {
-				Path fetched = fetchForVersion(jar, modId, mcVersion, projects);
+				Path fetched = fetchForVersion(jar, modId, mcVersion, projects, lookup);
 				if (fetched == FOUND_ALREADY) {
 					continue;
 				}
@@ -730,18 +732,68 @@ public final class ClientImport {
 	/** Marker: the jar's Modrinth project was already brought in by another jar in this import. */
 	private static final Path FOUND_ALREADY = Path.of("");
 
+	/** What a few bulk Modrinth requests already found for the whole import (instead of several requests per mod). */
+	private record Lookup(java.util.Map<Path, String> sha1, java.util.Map<String, ModrinthClient.ProjectVersion> latest,
+			java.util.Map<String, ModrinthClient.ProjectVersion> owner, java.util.Map<String, String> slugToId) {
+	}
+
+	private static Lookup bulkLookup(List<Path> jars, String mcVersion) {
+		java.util.Map<Path, String> sha1 = new java.util.HashMap<>();
+		for (Path jar : jars) {
+			try {
+				sha1.put(jar, Downloader.sha1Of(jar));
+			} catch (IOException | RuntimeException ignored) {
+				// unreadable jar: per-mod fallback
+			}
+		}
+		java.util.Map<String, ModrinthClient.ProjectVersion> latest = java.util.Map.of();
+		java.util.Map<String, ModrinthClient.ProjectVersion> owner = java.util.Map.of();
+		java.util.Map<String, String> slugToId = new java.util.HashMap<>();
+		try {
+			latest = ModrinthClient.latestForFiles(sha1.values(), "fabric", mcVersion);
+			owner = ModrinthClient.versionsByFileSha1(sha1.values());
+			// Jars Modrinth doesn't know by checksum: their mod ids are usually the project slug - ask for all at once.
+			java.util.Set<String> slugs = new java.util.LinkedHashSet<>();
+			for (Path jar : jars) {
+				String hash = sha1.get(jar);
+				if (hash == null || !owner.containsKey(hash)) {
+					slugs.addAll(slugCandidates(jar, fabricModId(jar)));
+				}
+			}
+			for (ModrinthClient.Project project : ModrinthClient.projects(slugs)) {
+				if (project.slug() != null) {
+					slugToId.put(project.slug(), project.id());
+				}
+				slugToId.put(project.id(), project.id());
+			}
+		} catch (IOException | RuntimeException e) {
+			LauncherLog.info("Modrinth bulk lookup failed, looking mods up one by one: " + e.getMessage());
+		}
+		return new Lookup(sha1, latest, owner, slugToId);
+	}
+
 	/** The cached Fabric build for {@code mcVersion} of the jar's Modrinth project, or null when there's none. */
-	private static Path fetchForVersion(Path jar, String fabricId, String mcVersion, java.util.Set<String> projects) throws IOException {
-		String projectId = ModrinthClient.versionByFileSha1(Downloader.sha1Of(jar)).map(ModrinthClient.ProjectVersion::projectId).orElse(null);
+	private static Path fetchForVersion(Path jar, String fabricId, String mcVersion, java.util.Set<String> projects, Lookup lookup)
+			throws IOException {
+		String hash = lookup.sha1().get(jar);
+		ModrinthClient.ProjectVersion direct = hash == null ? null : lookup.latest().get(hash);
+		String projectId = direct != null ? direct.projectId()
+				: hash != null && lookup.owner().containsKey(hash) ? lookup.owner().get(hash).projectId() : null;
 		if (projectId == null) {
 			// Not on Modrinth by checksum (a CurseForge download, a re-packed jar): most mods' Modrinth slug is their mod id.
 			for (String slug : slugCandidates(jar, fabricId)) {
-				var project = ModrinthClient.getProject(slug);
-				if (project.isPresent()) {
-					projectId = project.get().id();
+				String id = lookup.slugToId().get(slug);
+				if (id == null && lookup.slugToId().isEmpty()) {
+					id = ModrinthClient.getProject(slug).map(ModrinthClient.Project::id).orElse(null);
+				}
+				if (id != null) {
+					projectId = id;
 					break;
 				}
 			}
+		}
+		if (projectId == null && hash != null && lookup.owner().isEmpty()) {
+			projectId = ModrinthClient.versionByFileSha1(hash).map(ModrinthClient.ProjectVersion::projectId).orElse(null);
 		}
 		if (projectId == null) {
 			return null;
@@ -749,10 +801,12 @@ public final class ClientImport {
 		if (!projects.add(projectId)) {
 			return FOUND_ALREADY;
 		}
-		Optional<ModrinthClient.ProjectVersion> build = ModrinthClient.versions(projectId, mcVersion).stream()
-				.filter(v -> v.gameVersions() != null && v.gameVersions().contains(mcVersion))
-				.filter(v -> v.loaders() != null && v.loaders().contains("fabric"))
-				.findFirst();
+		Optional<ModrinthClient.ProjectVersion> build = direct != null && direct.gameVersions() != null && direct.gameVersions().contains(mcVersion)
+				? Optional.of(direct)
+				: ModrinthClient.versions(projectId, mcVersion).stream()
+						.filter(v -> v.gameVersions() != null && v.gameVersions().contains(mcVersion))
+						.filter(v -> v.loaders() != null && v.loaders().contains("fabric"))
+						.findFirst();
 		if (build.isEmpty()) {
 			return null;
 		}

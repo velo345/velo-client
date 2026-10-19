@@ -76,6 +76,11 @@ public final class VeloStyle {
 		return theme().accentEnd() | 0xFF000000;
 	}
 
+	/** Readable text on a solid accent fill - see {@link Theme#onAccent()}. */
+	public static int onAccent() {
+		return theme().onAccent();
+	}
+
 	public static int accentHover() {
 		return VeloAnim.lerpArgb(accent(), 0xFFFFFFFF, 0.14f);
 	}

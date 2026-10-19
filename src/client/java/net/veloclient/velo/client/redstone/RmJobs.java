@@ -191,17 +191,31 @@ public final class RmJobs {
 		status = null;
 	}
 
-	/** Server thread, every level tick. */
+	/**
+	 * Server thread, every level tick. The tick's "Paste Speed" budget carries on into the next queued jobs once one
+	 * finishes, so a stack of many small copies goes as fast as one big paste instead of one copy per tick.
+	 */
 	public static void serverTick(Object level) {
-		Job job;
-		synchronized (RmJobs.class) {
-			job = QUEUE.peekFirst();
-		}
-		if (job == null || job.level != level) {
-			return;
-		}
 		int speed = RmSettings.get().pasteSpeed;
 		long budget = speed <= 0 ? Long.MAX_VALUE : speed;
+		for (int jobs = 0; jobs < 512 && budget > 0; jobs++) {
+			Job job;
+			synchronized (RmJobs.class) {
+				job = QUEUE.peekFirst();
+			}
+			if (job == null || job.level != level) {
+				return;
+			}
+			budget = step(level, job, budget);
+			if (job.phase < 4) {
+				return; // budget used up mid-job
+			}
+			budget = Math.max(0, budget - 1);
+		}
+	}
+
+	/** Works on one job until it's done or the budget is gone; returns what's left of the budget. */
+	private static long step(Object level, Job job, long budget) {
 		Source src = job.source;
 		int n = src.count();
 		int layer = src.sy * src.sz;
@@ -303,5 +317,6 @@ public final class RmJobs {
 				}
 			});
 		}
+		return budget;
 	}
 }
