@@ -135,17 +135,12 @@ public final class PerformanceSettingsView {
 
 	// ---- Memory guard ----
 
+	/**
+	 * Copy of the current settings to change and save. It used to copy only the memory fields, so every visit to
+	 * Settings reset everything else (news read state, crash reports, minimize on launch, party options).
+	 */
 	private static LauncherSettings.Data copy(LauncherSettings.Data from) {
-		LauncherSettings.Data to = new LauncherSettings.Data();
-		to.memoryMode = from.memoryMode;
-		to.fixedMemoryMb = from.fixedMemoryMb;
-		to.gc = from.gc;
-		to.driverShaderCache = from.driverShaderCache;
-		to.memoryGuard = from.memoryGuard;
-		to.guardAvailableMb = from.guardAvailableMb;
-		to.guardSwapMb = from.guardSwapMb;
-		to.guardSeconds = from.guardSeconds;
-		return to;
+		return LauncherSettings.copy(from);
 	}
 
 	/** On/off plus the three thresholds; changes apply to running games right away. */

@@ -167,7 +167,7 @@ public final class WorldsTabView {
 
 		ImageView icon = new ImageView(world.iconFile() != null
 				? new Image(world.iconFile().toUri().toString(), 64, 64, true, true)
-				: new Image(WorldsTabView.class.getResourceAsStream("/net/veloclient/launcher/images/logo.png"), 64, 64, true, true));
+				: UiImages.resource("/net/veloclient/launcher/images/logo.png", 64, 64));
 		icon.setFitWidth(64);
 		icon.setFitHeight(64);
 		StackPane iconHolder = new StackPane(icon);

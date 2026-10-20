@@ -137,6 +137,9 @@ public final class AuraCatalog {
 		return AuraEffects.Settings.DEFAULT;
 	}
 
+	/** Runs after any per-item settings change (the Locker keeps the worn loadout in step with it). */
+	public static final java.util.List<Runnable> SETTINGS_LISTENERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
 	public static void setSettings(String id, AuraEffects.Settings settings) {
 		JsonObject o = read();
 		JsonObject per = o.has("perAura") && o.get("perAura").isJsonObject() ? o.getAsJsonObject("perAura") : new JsonObject();
@@ -152,6 +155,7 @@ public final class AuraCatalog {
 		}
 		o.add("perAura", per);
 		write(o);
+		SETTINGS_LISTENERS.forEach(Runnable::run);
 	}
 
 	private static float f(JsonObject o, String key, float fallback) {

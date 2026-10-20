@@ -297,7 +297,7 @@ public final class ProjectDetailView {
 		view.setFitWidth(size);
 		view.setFitHeight(size);
 		view.setPreserveRatio(true);
-		Image fallback = new Image(InstanceDetailView.class.getResourceAsStream("/net/veloclient/launcher/images/logo.png"), size, size, true, true);
+		Image fallback = UiImages.resource("/net/veloclient/launcher/images/logo.png", size, size);
 		view.setImage(fallback);
 		RemoteIconLoader.load(view, url, () -> view.setImage(fallback));
 		holder.getChildren().add(view);

@@ -5,9 +5,10 @@ import net.minecraft.client.texture.NativeImage;
 /**
  * Elytra texture made from a cape's art. Vanilla maps whatever cape texture a player has onto the elytra wings
  * through the elytra's own UV layout, which turns a hand-drawn (or high-resolution animated) cape into a smeared mess.
- * This paints the cape's outside face onto both big faces of each wing - the 10 x 20 faces of the wing box at
- * (24, 2) and (36, 2) in the 64 x 32 elytra layout - in a texture of its own, with the thin edges in the art's
- * darker average colour, so the wings carry the cape's design sharply.
+ * This paints the cape's outside face into the wing in a texture of its own - but only inside vanilla's own elytra
+ * silhouette: vanilla's elytra.png leaves the front face of the 2-deep wing box see-through and tapers the back face
+ * like feathers, which is why a real elytra reads as one thin sheet. Filling the whole box (both faces and every edge)
+ * made the wings look like thick planks.
  */
 public final class ElytraArt {
 
@@ -19,41 +20,64 @@ public final class ElytraArt {
 	private ElytraArt() {
 	}
 
+	/**
+	 * Vanilla elytra.png's opaque pixels (columns 20-47, rows 0-21 of the 64 x 32 layout; '#' = drawn). The wing box's
+	 * back face is (36, 2) 10 x 20, its edge strips are at (34, 2), (22, 2) and the top rows.
+	 */
+	private static final String[] MASK = {
+			"...........#########........",
+			"............##..............",
+			"..............########......",
+			"..............#########.....",
+			"...............#########....",
+			"...............#########....",
+			"...............#########....",
+			"...............##########...",
+			"...............##########...",
+			"...............##########...",
+			"...............##########...",
+			"..#.............##########..",
+			"..#.............##########..",
+			"..#.............##########..",
+			"..#.............##########..",
+			"..#.............##########..",
+			"..#..............#########..",
+			"..#..............#########..",
+			"..#..............#########..",
+			"..#...............########..",
+			"..#...............########..",
+			"..#................#######.."};
+
+	private static boolean drawn(int x, int y) {
+		if (y < 0 || y >= MASK.length || x < 20 || x >= 48) {
+			return false;
+		}
+		return MASK[y].charAt(x - 20) == '#';
+	}
+
 	/** Paints {@code cape} (any resolution of the 64 x 32 cape layout) into {@code out} ({@link #WIDTH} x {@link #HEIGHT}). */
 	public static void compose(NativeImage cape, NativeImage out) {
-		for (int y = 0; y < HEIGHT; y++) {
-			for (int x = 0; x < WIDTH; x++) {
-				out.setColorArgb(x, y, 0);
-			}
-		}
 		int sc = Math.max(1, cape.getWidth() / 64);
 		int edge = darker(average(cape, sc));
-		// Edges first (top, bottom, left and right sides of the wing box), then the two faces over them.
-		fill(out, 24, 0, 10, 2, edge);
-		fill(out, 34, 0, 10, 2, edge);
-		fill(out, 22, 2, 2, 20, edge);
-		fill(out, 34, 2, 2, 20, edge);
-		face(cape, out, sc, 24, 2, false);
-		face(cape, out, sc, 36, 2, true);
-	}
-
-	/** One 10 x 20 face at ({@code fx}, {@code fy}) filled from the cape's outside face (10 x 16 at (1, 1)), stretched to fit. */
-	private static void face(NativeImage cape, NativeImage out, int sc, int fx, int fy, boolean mirror) {
-		for (int dy = 0; dy < 20 * SCALE; dy++) {
-			for (int dx = 0; dx < 10 * SCALE; dx++) {
-				double u = (dx + 0.5) / (10.0 * SCALE);
-				double v = (dy + 0.5) / (20.0 * SCALE);
-				double sx = (1 + (mirror ? 1 - u : u) * 10) * sc;
-				double sy = (1 + v * 16) * sc;
-				out.setColorArgb(fx * SCALE + dx, fy * SCALE + dy, sample(cape, sx, sy));
-			}
-		}
-	}
-
-	private static void fill(NativeImage out, int x, int y, int w, int h, int argb) {
-		for (int dy = y * SCALE; dy < (y + h) * SCALE; dy++) {
-			for (int dx = x * SCALE; dx < (x + w) * SCALE; dx++) {
-				out.setColorArgb(dx, dy, argb);
+		for (int y = 0; y < HEIGHT; y++) {
+			for (int x = 0; x < WIDTH; x++) {
+				int lx = x / SCALE;
+				int ly = y / SCALE;
+				int argb = 0;
+				if (drawn(lx, ly)) {
+					if (lx >= 36 && lx < 46 && ly >= 2 && ly < 22) {
+						// The back face carries the cape's outside face (mirrored, like it hangs on the back).
+						double u = (x - 36 * SCALE + 0.5) / (10.0 * SCALE);
+						double v = (y - 2 * SCALE + 0.5) / (20.0 * SCALE);
+						argb = sample(cape, (1 + (1 - u) * 10) * sc, (1 + v * 16) * sc);
+						if ((argb >>> 24) < 128) {
+							argb = edge;
+						}
+					} else {
+						argb = edge;
+					}
+				}
+				out.setColorArgb(x, y, argb);
 			}
 		}
 	}

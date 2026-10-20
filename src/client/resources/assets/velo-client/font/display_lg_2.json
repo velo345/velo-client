@@ -1,0 +1,18 @@
+{
+	"providers": [
+		{
+			"type": "ttf",
+			"file": "velo-client:sora_bold.ttf",
+			"size": 17,
+			"oversample": 2,
+			"shift": [
+				0,
+				9
+			]
+		},
+		{
+			"type": "reference",
+			"id": "minecraft:default"
+		}
+	]
+}

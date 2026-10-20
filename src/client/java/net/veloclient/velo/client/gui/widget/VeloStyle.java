@@ -25,7 +25,8 @@ public final class VeloStyle {
 
 	/** Opaque version of the theme surface - the base everything else is mixed from. */
 	public static int base() {
-		return theme().surface() | 0xFF000000;
+		// 0.9.7: graphite with a touch of the theme's surface (same as the window frame), not the full tint.
+		return VeloAnim.lerpArgb(0xFF0E0E12, theme().surface() | 0xFF000000, 0.14f);
 	}
 
 	/** Window body: the themed surface at its configured opacity. */

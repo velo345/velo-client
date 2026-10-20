@@ -1,34 +1,23 @@
 package net.veloclient.launcher.ui;
 
-import javafx.application.Platform;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 import net.veloclient.launcher.auth.MinecraftSession;
-import net.veloclient.launcher.auth.SkinFetcher;
+import net.veloclient.launcher.data.CapeEntry;
 import net.veloclient.launcher.data.CapeLibrary;
-import net.veloclient.launcher.data.CurrencyStore;
 import net.veloclient.launcher.data.GifFrames;
-import net.veloclient.launcher.data.StoreCatalog;
 import net.veloclient.launcher.data.StoreItem;
 import net.veloclient.launcher.data.StoreOwnership;
 import net.veloclient.launcher.data.StorePurchase;
+import net.veloclient.launcher.social.StoreApi;
 import net.veloclient.launcher.theme.LauncherTheme;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
+import java.util.List;
+import java.util.Optional;
 
-/** "Try before you buy" for one {@link StoreItem}: a live 3D preview of the signed-in account's skin wearing it, title/description/price, and a Buy/Equip button - the launcher's counterpart to the mod's in-game Store detail screen. */
+/** "Try before you buy" for one cape: your skin wearing it in 3D, its price and Buy / Equip / Gift / Wishlist. */
 public final class StoreItemDetailView {
 
 	public interface Host {
@@ -39,37 +28,33 @@ public final class StoreItemDetailView {
 		MinecraftSession session();
 
 		void goBack();
+
+		default void openCoins() {
+		}
 	}
 
 	private StoreItemDetailView() {
 	}
 
 	public static Node build(Host host, StoreItem item) {
-		Button back = BackButton.create("Store", null);
-		back.setOnAction(e -> host.goBack());
-
-		// Left: your skin wearing the cape, turning slowly with the cape facing you first.
-		StackPane stage = CosmeticUi.stage(340, 420);
-		stage.getStyleClass().add("showcase-stage");
+		StackPane stage = new StackPane();
+		stage.setMinSize(320, 400);
 		if (host.session() == null) {
 			Label signIn = new Label("Sign in to preview this on your own skin");
-			signIn.getStyleClass().add("page-subtitle");
-			signIn.setWrapText(true);
+			signIn.getStyleClass().add("t-muted");
 			stage.getChildren().add(signIn);
 		} else {
 			stage.getChildren().add(CosmeticUi.spinner(34));
 		}
-		Label tag = new Label("CAPE");
 		// The skin and the cape's frames load off the UI thread; the page is already up.
-		java.util.List<net.veloclient.launcher.data.GifFrames.Frame>[] loaded = new java.util.List[1];
+		List<GifFrames.Frame>[] loaded = new List[1];
 		net.veloclient.launcher.auth.SkinFetcher.SkinData[] skinData = new net.veloclient.launcher.auth.SkinFetcher.SkinData[1];
 		boolean[] arrived = new boolean[2];
 		Runnable build = () -> {
 			if (!arrived[0] || !arrived[1]) {
 				return;
 			}
-			var frames = loaded[0] == null ? java.util.List.<net.veloclient.launcher.data.GifFrames.Frame>of() : loaded[0];
-			tag.setText(frames.size() > 1 ? "CAPE  ·  ANIMATED" : "CAPE");
+			var frames = loaded[0] == null ? List.<GifFrames.Frame>of() : loaded[0];
 			Node viewer = skinData[0] == null ? null
 					: PlayerSkin3DView.createShowcase(skinData[0].pngBytes(), skinData[0].slim(), frames.isEmpty() ? null : frames);
 			if (viewer != null) {
@@ -90,107 +75,25 @@ public final class StoreItemDetailView {
 			arrived[0] = true;
 			build.run();
 		});
-		Label hint = new Label("Drag to rotate  ·  scroll to zoom");
-		hint.getStyleClass().add("stage-hint");
-		StackPane preview = new StackPane(stage, hint);
-		StackPane.setAlignment(hint, Pos.BOTTOM_CENTER);
-		hint.setTranslateY(-10);
 
-		// Right: details and the purchase action.
-		boolean owned = StoreOwnership.owns(item.id());
-		tag.getStyleClass().add("featured-tag");
-		Label name = new Label(item.name());
-		name.getStyleClass().add("featured-title");
-		Label description = new Label(item.description());
-		description.getStyleClass().add("page-subtitle");
-		description.setWrapText(true);
-		description.setMaxWidth(380);
-
-		Node priceChip = CosmeticUi.priceChip(item.priceCoins(), owned);
-		Label balance = new Label("You have " + CurrencyStore.balance() + " coins");
-		balance.getStyleClass().add("page-subtitle");
-		HBox priceRow = new HBox(12, priceChip, balance);
-		priceRow.setAlignment(Pos.CENTER_LEFT);
-
-		Label status = new Label();
-		status.getStyleClass().add("purchase-status");
-		status.setWrapText(true);
-
-		Button action = new Button(owned ? "Equip cape" : "Buy for " + item.priceCoins() + " coins");
-		action.getStyleClass().add("primary-button");
-		action.setMinHeight(46);
-		action.setPrefWidth(260);
-		action.setOnAction(e -> {
-			if (StoreOwnership.owns(item.id())) {
-				findLibraryIdFor(item).ifPresentOrElse(id -> {
-					CapeLibrary.equip(id);
-					status.setText("Equipped \"" + item.name() + "\" - it shows in-game now.");
-				}, () -> status.setText("Couldn't find this cape in your library - try re-importing it from Cosmetics."));
-				return;
-			}
-			action.setDisable(true);
-			status.setText("Buying...");
-			java.util.concurrent.CompletableFuture.supplyAsync(() -> StorePurchase.buy(item),
-					java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()).thenAccept(error -> javafx.application.Platform.runLater(() -> {
-						action.setDisable(false);
-						if (error == null) {
-							status.setText("Purchased! \"" + item.name() + "\" is in your Cosmetics now.");
-							action.setText("Equip cape");
-							priceRow.getChildren().set(0, CosmeticUi.priceChip(item.priceCoins(), true));
-							balance.setText("You have " + CurrencyStore.balance() + " coins");
-						} else {
-							status.setText(error);
-						}
-					}));
-		});
-
-		VBox info = new VBox(12, tag, name, description, priceRow, action, status);
-		info.setAlignment(Pos.CENTER_LEFT);
-		HBox.setHgrow(info, Priority.ALWAYS);
-
-		HBox body = new HBox(32, preview, info);
-		body.setAlignment(Pos.CENTER_LEFT);
-		VBox root = new VBox(16, back, body);
-		return root;
+		int price = StoreApi.price(item.id(), item.priceCoins());
+		ItemPage.Purchase purchase = new ItemPage.Purchase(item.id(), price,
+				() -> StoreOwnership.owns(item.id()),
+				() -> findLibraryIdFor(item).map(id -> id.equals(CapeLibrary.equippedCapeId().orElse(null))).orElse(false),
+				() -> findLibraryIdFor(item).ifPresent(CapeLibrary::equip),
+				CapeLibrary::unequip,
+				() -> StorePurchase.buy(item), "cape", item.inStore());
+		return ItemPage.build(host::goBack, host::openCoins, stage, null,
+				host.session() == null ? null : "Drag to rotate  ·  scroll to zoom",
+				"#5aa9ff", "Capes", StoreTiles.Rarity.of(item.id(), price), item.name(), item.description(),
+				List.of("Animated, with real cloth physics in-game", "Seen by every Velo Client player", "Works with elytra and wings"), null, purchase);
 	}
 
 	/** {@link StorePurchase#buy} imports the cape under a fresh library id (not the catalog item's own id), so equipping the just-bought item has to look that library entry back up by name. */
-	private static java.util.Optional<String> findLibraryIdFor(StoreItem item) {
+	private static Optional<String> findLibraryIdFor(StoreItem item) {
 		return CapeLibrary.listAll().stream()
 				.filter(entry -> entry.animated() && entry.name().equals(item.name()))
 				.reduce((first, second) -> second)
-				.map(net.veloclient.launcher.data.CapeEntry::id);
-	}
-
-	private static void loadPreviewAsync(MinecraftSession session, StoreItem item, StackPane holder) {
-		CompletableFuture<SkinFetcher.SkinData> skinFuture =
-				CompletableFuture.supplyAsync(() -> SkinFetcher.fetch(session), Executors.newVirtualThreadPerTaskExecutor());
-		CompletableFuture<GifFrames.Result> capeFuture = CompletableFuture.supplyAsync(() -> {
-			try (var in = StoreCatalog.openGif(item)) {
-				return GifFrames.decode(in);
-			} catch (Exception e) {
-				return null;
-			}
-		}, Executors.newVirtualThreadPerTaskExecutor());
-
-		skinFuture.thenAcceptBoth(capeFuture, (skin, cape) -> Platform.runLater(() -> {
-			Node viewer = skin == null ? null
-					: PlayerSkin3DView.createViewer(skin.pngBytes(), skin.slim(), cape == null ? null : cape.frames());
-			if (viewer != null) {
-				holder.getChildren().setAll(viewer);
-			} else {
-				Label failed = new Label("Couldn't load a preview.");
-				failed.getStyleClass().add("section-subtitle");
-				holder.getChildren().setAll(failed);
-			}
-		}));
-	}
-
-	private static Color accent(LauncherTheme t) {
-		return Color.rgb((t.accentStart() >> 16) & 0xFF, (t.accentStart() >> 8) & 0xFF, t.accentStart() & 0xFF);
-	}
-
-	private static Color text(LauncherTheme t) {
-		return Color.rgb((t.text() >> 16) & 0xFF, (t.text() >> 8) & 0xFF, t.text() & 0xFF);
+				.map(CapeEntry::id);
 	}
 }

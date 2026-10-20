@@ -123,15 +123,24 @@ public final class VeloStatsScreen extends VeloWindow {
 		stepScroll();
 		int x = contentX();
 		int y = contentY();
+		// Underline tabs (0.9.7): the active one white with an accent line.
 		int tabX = x;
 		for (Tab t : Tab.values()) {
-			int w = this.textRenderer.getWidth(t.label) + 22;
-			hits.add(VeloUi.pill(context, tabX, y, w, 16, t.label, tab == t ? 1 : 0, mouseX, mouseY, () -> {
+			net.minecraft.text.Text label = net.veloclient.velo.client.gui.title.MenuKit.uiBold(t.label);
+			int w = this.textRenderer.getWidth(label);
+			boolean on = tab == t;
+			boolean hover = VeloUi.inside(mouseX, mouseY, tabX - 4, y, w + 8, 16);
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, label, tabX, y + 4,
+					on ? 0xFFF4F4F6 : hover ? 0xFFD4D4DA : 0xFF9D9DA8);
+			if (on) {
+				VeloDraw.fillRounded(context, tabX, y + 15, w, 2, 1, net.veloclient.velo.client.gui.title.MenuKit.accent());
+			}
+			hits.add(new VeloUi.Hit(tabX - 4, y, w + 8, 18, () -> {
 				tab = t;
 				scroll = 0;
 				scrollTarget = 0;
 			}));
-			tabX += w + 4;
+			tabX += w + 16;
 		}
 		hits.add(VeloUi.pill(context, x + contentWidth() - 72, y, 72, 16, "Vanilla view", 0, mouseX, mouseY, () -> {
 			openVanillaOnce = true;
@@ -170,50 +179,136 @@ public final class VeloStatsScreen extends VeloWindow {
 
 	private int drawOverview(DrawContext context, int x, int y, int width) {
 		Map<String, StatsData.General> byId = data.general().stream().collect(Collectors.toMap(StatsData.General::id, g -> g, (a, b) -> a));
-		long cm = 0;
+		long walkedCm = 0;
 		for (StatsData.General g : data.general()) {
 			if (g.id().endsWith("_one_cm")) {
-				cm += g.value();
+				walkedCm += g.value();
 			}
 		}
 		long mined = data.items().stream().mapToLong(StatsData.ItemRow::mined).sum();
-		long crafted = data.items().stream().mapToLong(StatsData.ItemRow::crafted).sum();
-		String[][] cards = {
-				{"Time played", formatted(byId, "play_time")},
-				{"Distance traveled", distance(cm)},
-				{"Mob kills", formatted(byId, "mob_kills")},
-				{"Deaths", formatted(byId, "deaths")},
-				{"Blocks mined", String.format(Locale.ROOT, "%,d", mined)},
-				{"Items crafted", String.format(Locale.ROOT, "%,d", crafted)},
-				{"Jumps", formatted(byId, "jump")},
-				{"Damage dealt", formatted(byId, "damage_dealt")},
-				{"Player kills", formatted(byId, "player_kills")},
+		Object[][] cards = {
+				{"Play time", formatted(byId, "play_time"), "clock", 0xFF5AA9FF},
+				{"Distance", distance(walkedCm), "walk", 0xFF3DDC97},
+				{"Blocks mined", compact(mined), "pickaxe", 0xFFF7C04A},
+				{"Mobs killed", formatted(byId, "mob_kills"), "sword", 0xFFFF7A7E},
+				{"Deaths", formatted(byId, "deaths"), "skull", 0xFFA9A9B3},
+				{"Jumps", formatted(byId, "jump"), "jump", 0xFFBCA6FF},
 		};
 		String q = query();
-		int cardW = (width - 2 * 10) / 3;
+		int perRow = width >= 520 ? 6 : 3;
+		int gap = 8;
+		int cardW = (width - (perRow - 1) * gap) / perRow;
 		int shown = 0;
-		for (String[] card : cards) {
-			if (!q.isEmpty() && !card[0].toLowerCase(Locale.ROOT).contains(q)) {
+		for (Object[] card : cards) {
+			if (!q.isEmpty() && !((String) card[0]).toLowerCase(Locale.ROOT).contains(q)) {
 				continue;
 			}
-			int cx = x + (shown % 3) * (cardW + 10);
-			int cy = y + (shown / 3) * 58;
-			VeloDraw.fillRounded(context, cx, cy, cardW, 50, 8, VeloStyle.card());
-			context.drawTextWithShadow(this.textRenderer, card[0], cx + 10, cy + 9, VeloStyle.textMuted());
-			context.drawTextWithShadow(this.textRenderer, net.veloclient.velo.client.gui.title.TitleScreenTheme.bigFont(card[1]), cx + 10, cy + 30,
-					VeloStyle.text());
+			int cx = x + (shown % perRow) * (cardW + gap);
+			int cy = y + (shown / perRow) * 50;
+			VeloDraw.fillRounded(context, cx, cy, cardW, 44, 8, 0x0AFFFFFF);
+			VeloDraw.strokeRounded(context, cx, cy, cardW, 44, 8, 0x0FFFFFFF);
+			net.veloclient.velo.client.gui.title.MenuKit.icon(context, (String) card[2], cx + 8, cy + 8, 9, (int) card[3]);
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer,
+					net.veloclient.velo.client.gui.title.MenuKit.fit(this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.ui((String) card[0]), cardW - 26),
+					cx + 21, cy + 9, 0xFFA9A9B3);
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer,
+					net.veloclient.velo.client.gui.title.MenuKit.fit(this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.display((String) card[1]), cardW - 14),
+					cx + 8, cy + 24, 0xFFF4F4F6);
 			shown++;
 		}
-		int listY = y + ((shown + 2) / 3) * 58 + 8;
+		int rowY = y + ((shown + perRow - 1) / perRow) * 50 + 6;
 		int colW = (width - 10) / 2;
+		int h1 = playTimeChart(context, x, rowY, colW);
 		List<StatsData.ItemRow> topMined = data.items().stream().filter(r -> r.mined() > 0 && matches(r.name(), q))
 				.sorted(Comparator.comparingInt(StatsData.ItemRow::mined).reversed()).limit(6).toList();
+		int h2 = minedTable(context, x + colW + 10, rowY, colW, topMined);
+		int listY = rowY + Math.max(h1, h2) + 10;
 		List<StatsData.MobRow> topMobs = data.mobs().stream().filter(r -> r.killed() > 0 && matches(r.name(), q))
 				.sorted(Comparator.comparingInt(StatsData.MobRow::killed).reversed()).limit(6).toList();
-		int h1 = topList(context, x, listY, colW, "Most mined", topMined.stream().map(r -> new Object[] {r.icon(), r.name(), r.mined()}).toList());
-		int h2 = topList(context, x + colW + 10, listY, colW, "Most defeated mobs",
-				topMobs.stream().map(r -> new Object[] {r.icon(), r.name(), r.killed()}).toList());
-		return listY - y + Math.max(h1, h2);
+		int h3 = topList(context, x, listY, width, "Most defeated mobs", topMobs.stream().map(r -> new Object[] {r.icon(), r.name(), r.killed()}).toList());
+		return listY - y + h3;
+	}
+
+	private static String compact(long n) {
+		return n >= 10_000 ? String.format(Locale.ROOT, "%.1fk", n / 1000.0) : String.format(Locale.ROOT, "%,d", n);
+	}
+
+	/** "Play time · last 7 days": a bar per day, today in the accent colour (counted by Velo, see PlayTimeDays). */
+	private int playTimeChart(DrawContext context, int x, int y, int width) {
+		int h = 130;
+		VeloDraw.fillRounded(context, x, y, width, h, 8, 0x0AFFFFFF);
+		VeloDraw.strokeRounded(context, x, y, width, h, 8, 0x0FFFFFFF);
+		List<Integer> days = net.veloclient.velo.client.stats.PlayTimeDays.lastDays(7);
+		int total = days.stream().mapToInt(Integer::intValue).sum();
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.uiBold("Play time · last 7 days"),
+				x + 10, y + 9, 0xFFF4F4F6);
+		net.minecraft.text.Text sum = net.veloclient.velo.client.gui.title.MenuKit.mono(hours(total));
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, sum, x + width - 10 - this.textRenderer.getWidth(sum), y + 10, 0xFFA9A9B3);
+		int max = Math.max(60, days.stream().mapToInt(Integer::intValue).max().orElse(60));
+		int chartTop = y + 30;
+		int chartBottom = y + h - 18;
+		int slot = (width - 20) / 7;
+		java.time.LocalDate today = java.time.LocalDate.now();
+		for (int i = 0; i < 7; i++) {
+			int value = days.get(i);
+			int barH = Math.max(value > 0 ? 3 : 1, Math.round((chartBottom - chartTop - 10) * value / (float) max));
+			int bx = x + 10 + i * slot + slot / 6;
+			int bw = slot - slot / 3;
+			int color = i == 6 ? net.veloclient.velo.client.gui.title.MenuKit.accent()
+					: (net.veloclient.velo.client.gui.title.MenuKit.accent() & 0xFFFFFF) | 0x73000000;
+			VeloDraw.fillRoundedTop(context, bx, chartBottom - barH, bw, barH, Math.min(3, bw / 3), color);
+			String day = i == 6 ? "Today" : WEEKDAYS[today.minusDays(6 - i).getDayOfWeek().getValue() - 1];
+			net.minecraft.text.Text dayText = net.veloclient.velo.client.gui.title.MenuKit.ui(day);
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, dayText, bx + (bw - this.textRenderer.getWidth(dayText)) / 2, chartBottom + 5, 0xFF8A8A95);
+		}
+		context.fill(x + 10, chartBottom, x + width - 10, chartBottom + 1, 0x1AFFFFFF);
+		if (!net.veloclient.velo.client.stats.PlayTimeDays.hasData()) {
+			net.minecraft.text.Text note = net.veloclient.velo.client.gui.title.MenuKit.ui("Velo counts this from today on");
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, note, x + (width - this.textRenderer.getWidth(note)) / 2,
+					(chartTop + chartBottom) / 2 - 4, 0xFF8A8A95);
+		}
+		return h;
+	}
+
+	private static final String[] WEEKDAYS = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+
+	private static String hours(int seconds) {
+		int minutes = seconds / 60;
+		return minutes >= 60 ? (minutes / 60) + " h " + (minutes % 60) + " m" : minutes + " m";
+	}
+
+	/** Most mined blocks with what else you did with them. */
+	private int minedTable(DrawContext context, int x, int y, int width, List<StatsData.ItemRow> rows) {
+		int h = Math.max(130, 26 + Math.max(1, rows.size()) * 17 + 6);
+		VeloDraw.fillRounded(context, x, y, width, h, 8, 0x0AFFFFFF);
+		VeloDraw.strokeRounded(context, x, y, width, h, 8, 0x0FFFFFFF);
+		int colW = Math.min(44, (width - 120) / 3);
+		String[] heads = {"MINED", "USED", "CRAFTED"};
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.mono("MOST MINED"), x + 10, y + 10, 0xFF8A8A95);
+		for (int c = 0; c < 3; c++) {
+			net.minecraft.text.Text head = net.veloclient.velo.client.gui.title.MenuKit.mono(heads[c]);
+			int right = x + width - 10 - (2 - c) * colW;
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, head, right - this.textRenderer.getWidth(head), y + 10, 0xFF8A8A95);
+		}
+		if (rows.isEmpty()) {
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.ui("Nothing mined yet"), x + 10, y + 30, 0xFF6E6E78);
+		}
+		int ry = y + 24;
+		for (StatsData.ItemRow row : rows) {
+			drawIcon(context, row.icon(), x + 8, ry - 2);
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer,
+					net.veloclient.velo.client.gui.title.MenuKit.fit(this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.ui(row.name()), width - 30 - colW * 3 - 10),
+					x + 28, ry + 3, 0xFFF4F4F6);
+			int[] values = {row.mined(), row.used(), row.crafted()};
+			for (int c = 0; c < 3; c++) {
+				net.minecraft.text.Text value = net.veloclient.velo.client.gui.title.MenuKit.mono(values[c] == 0 ? "-" : String.format(Locale.ROOT, "%,d", values[c]));
+				int right = x + width - 10 - (2 - c) * colW;
+				net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, value, right - this.textRenderer.getWidth(value), ry + 3,
+						c == 0 ? 0xFFF4F4F6 : 0xFFA9A9B3);
+			}
+			ry += 17;
+		}
+		return h;
 	}
 
 	private int topList(DrawContext context, int x, int y, int width, String title, List<Object[]> rows) {

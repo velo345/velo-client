@@ -136,7 +136,11 @@ public final class StoreService {
 			return config.item(itemId);
 		}
 		CosmeticsService.Item item = cosmetics.buyable(itemId) ? cosmetics.item(itemId) : null;
-		return item == null ? null : new StoreConfig.Item(item.id, item.name, item.price);
+		if (item == null) {
+			return null;
+		}
+		Integer deal = dailyDeals().prices().get(itemId);
+		return new StoreConfig.Item(item.id, item.name, deal != null ? deal : item.price);
 	}
 
 	public boolean isOwner(String uuid, String username) {
@@ -153,13 +157,334 @@ public final class StoreService {
 
 	// ---- Catalog & wallet ----
 
-	public record CatalogView(String currency, List<StoreConfig.CoinPack> coinPacks, List<StoreConfig.Item> items,
-			boolean checkoutEnabled, boolean adsEnabled) {
+	/** An item for sale; {@code fullPrice} is its regular price while it's one of today's deals. */
+	public record CatalogItem(String id, String name, int price, Integer fullPrice) {
+	}
+
+	/** Today's four picks and when they change (next UTC midnight). */
+	public record DailyView(List<String> items, long endsAt) {
+	}
+
+	/** One price for every item of a collection that's in the store. */
+	public record BundleView(String id, String name, String description, List<String> items, int price) {
+	}
+
+	public record CatalogView(String currency, List<StoreConfig.CoinPack> coinPacks, List<CatalogItem> items,
+			boolean checkoutEnabled, boolean adsEnabled, DailyView daily, List<BundleView> bundles) {
 	}
 
 	public CatalogView catalog() {
-		return new CatalogView(config.currency, config.coinPacks, cosmetics != null ? cosmetics.storeItems() : config.items,
-				checkoutEnabled(), adsEnabled());
+		List<CatalogItem> items = new ArrayList<>();
+		DailyDeals deals = dailyDeals();
+		for (StoreConfig.Item item : cosmetics != null ? cosmetics.storeItems() : config.items) {
+			Integer deal = deals.prices().get(item.id());
+			items.add(new CatalogItem(item.id(), item.name(), deal != null ? deal : item.price(), deal != null ? item.price() : null));
+		}
+		return new CatalogView(config.currency, config.coinPacks, items, checkoutEnabled(), adsEnabled(),
+				new DailyView(deals.items(), LocalDate.now(ZoneOffset.UTC).plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()),
+				bundles());
+	}
+
+	// ---- Daily picks & bundles ----
+
+	/** Off the first and second daily pick. */
+	private static final int[] DAILY_DISCOUNTS = {30, 20};
+	private static final int DAILY_PICKS = 4;
+	private static final int BUNDLE_DISCOUNT = 20;
+
+	private record DailyDeals(String day, List<String> items, Map<String, Integer> prices) {
+	}
+
+	private volatile DailyDeals dailyDeals;
+
+	/** Four store items a day, the same for everyone (seeded by the date); the first two are discounted. */
+	private DailyDeals dailyDeals() {
+		String day = today();
+		DailyDeals current = dailyDeals;
+		if (current != null && current.day().equals(day)) {
+			return current;
+		}
+		List<StoreConfig.Item> pool = new ArrayList<>(cosmetics != null ? cosmetics.storeItems() : config.items);
+		pool.removeIf(item -> item.price() <= 0);
+		pool.sort(java.util.Comparator.comparing(StoreConfig.Item::id));
+		java.util.Collections.shuffle(pool, new Random(day.hashCode() * 31L + 7));
+		List<String> picks = new ArrayList<>();
+		Map<String, Integer> prices = new java.util.HashMap<>();
+		for (int i = 0; i < Math.min(DAILY_PICKS, pool.size()); i++) {
+			StoreConfig.Item item = pool.get(i);
+			picks.add(item.id());
+			if (i < DAILY_DISCOUNTS.length) {
+				prices.put(item.id(), discounted(item.price(), DAILY_DISCOUNTS[i]));
+			}
+		}
+		DailyDeals fresh = new DailyDeals(day, List.copyOf(picks), Map.copyOf(prices));
+		dailyDeals = fresh;
+		return fresh;
+	}
+
+	/** {@code percent} off, rounded to tens, never free. */
+	static int discounted(int price, int percent) {
+		int cut = (int) Math.round(price * (100 - percent) / 1000.0) * 10;
+		return Math.max(10, Math.min(price, cut));
+	}
+
+	/**
+	 * The owner's bundles; while the owner hasn't made any, every collection with at least two items in the
+	 * store, {@value #BUNDLE_DISCOUNT}% off together.
+	 */
+	public List<BundleView> bundles() {
+		List<BundleView> out = new ArrayList<>();
+		if (cosmetics == null) {
+			return out;
+		}
+		List<CosmeticsService.StoreBundle> own = cosmetics.storeBundles();
+		if (own != null) {
+			for (CosmeticsService.StoreBundle b : own) {
+				out.add(new BundleView(b.id(), b.name(), b.description(), b.items().stream().map(StoreConfig.Item::id).toList(), b.price()));
+			}
+			return out;
+		}
+		for (CosmeticsService.StoreCollection collection : cosmetics.storeCollections()) {
+			if (collection.items().size() < 2) {
+				continue;
+			}
+			int sum = collection.items().stream().mapToInt(StoreConfig.Item::price).sum();
+			out.add(new BundleView(collection.id(), collection.name(), collection.description(),
+					collection.items().stream().map(StoreConfig.Item::id).toList(), discounted(sum, BUNDLE_DISCOUNT)));
+		}
+		return out;
+	}
+
+	/** Buys the items of a bundle you don't own yet; owning some lowers the price by their share. */
+	private WalletView buyBundle(String uuid, String username, String bundleId) throws Exception {
+		BundleView bundle = bundles().stream().filter(b -> b.id().equals(bundleId)).findFirst()
+				.orElseThrow(() -> new StoreException(404, "That bundle isn't available right now"));
+		int full = 0;
+		int missing = 0;
+		for (String id : bundle.items()) {
+			int price = cosmetics.item(id).price;
+			full += price;
+			if (!db.owns(uuid, id)) {
+				missing += price;
+			}
+		}
+		// Owning part of it: pay the bundle's rate for the rest.
+		int price = missing == full ? bundle.price() : Math.max(10, (int) Math.round((double) bundle.price() * missing / full / 10.0) * 10);
+		switch (db.buyItems(uuid, bundle.items(), price, "bundle:" + bundleId)) {
+			case ALREADY_OWNED -> throw new StoreException(409, "You already own everything in " + bundle.name());
+			case INSUFFICIENT_COINS -> throw new StoreException(402, "Not enough Velo Coins - " + bundle.name() + " costs " + price);
+			default -> {
+			}
+		}
+		return wallet(uuid, username);
+	}
+
+	// ---- Gifts & wishlist ----
+
+	public WalletView gift(String uuid, String username, String itemId, String to) throws Exception {
+		if (to == null || to.isBlank()) {
+			throw new StoreException(400, "Who is it for?");
+		}
+		StoreConfig.Item item = sellable(itemId);
+		if (item == null) {
+			throw new StoreException(404, "That item isn't for sale right now");
+		}
+		String recipient = db.uuidByUsername(to.trim());
+		if (recipient == null && resolver != null) {
+			try {
+				String[] resolved = resolver.resolve(to.trim());
+				recipient = resolved == null ? null : resolved[0];
+			} catch (Exception ignored) {
+				// Unknown name: answered below.
+			}
+		}
+		if (recipient == null) {
+			throw new StoreException(404, to.trim() + " hasn't used Velo Client yet");
+		}
+		if (recipient.equals(uuid)) {
+			throw new StoreException(400, "That's you - buy it instead");
+		}
+		switch (db.giftItem(uuid, recipient, itemId, item.price())) {
+			case ALREADY_OWNED -> throw new StoreException(409, to.trim() + " already owns " + item.name());
+			case INSUFFICIENT_COINS -> throw new StoreException(402, "Not enough Velo Coins - " + item.name() + " costs " + item.price());
+			default -> {
+			}
+		}
+		return wallet(uuid, username);
+	}
+
+	public List<String> wishlist(String uuid) throws Exception {
+		return db.wishlist(uuid);
+	}
+
+	public List<String> setWishlisted(String uuid, String itemId, boolean on) throws Exception {
+		if (itemId == null || !knownItem(itemId)) {
+			throw new StoreException(404, "Unknown item");
+		}
+		db.setWishlisted(uuid, itemId, on);
+		return db.wishlist(uuid);
+	}
+
+	// ---- Referrals ----
+
+	public static final int REFERRAL_FRIEND_COINS = 300;
+	public static final long REFERRAL_PLAY_SECONDS = 2 * 3600;
+	public static final int REFERRAL_WINDOW_DAYS = 7;
+	private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+	/** One rung of the ladder: invites {@code from}..{@code to} (to = 0: and up) pay {@code coins} each. */
+	public record LadderStep(int from, int to, int coins) {
+	}
+
+	public static final List<LadderStep> REFERRAL_LADDER = List.of(new LadderStep(1, 2, 300), new LadderStep(3, 5, 400),
+			new LadderStep(6, 10, 500));
+
+	/** Paid invites per player, so farming invites with alt accounts stays worth little (4,300 coins at most). */
+	public static final int MAX_PAID_INVITES = 10;
+
+	/** What the referrer gets for an invite when {@code paidBefore} invites were already paid (0 past the cap). */
+	public static int referrerReward(int paidBefore) {
+		int n = paidBefore + 1;
+		for (LadderStep step : REFERRAL_LADDER) {
+			if (n <= step.to()) {
+				return step.coins();
+			}
+		}
+		return 0;
+	}
+
+	public record InviteView(String username, long joinedAt, long playedSeconds, boolean rewarded, int coins) {
+	}
+
+	public record InvitedByView(String username, boolean rewarded, long playedSeconds) {
+	}
+
+	public record ReferralView(String code, int friendCoins, long targetSeconds, List<LadderStep> ladder, int maxInvites, int paidInvites,
+			int earned, int nextReward, List<InviteView> invites, InvitedByView invitedBy, boolean canRedeem, Long redeemUntil) {
+	}
+
+	private final Set<String> pendingReferrals = ConcurrentHashMap.newKeySet();
+	private volatile boolean pendingLoaded;
+
+	private void loadPendingReferrals() {
+		if (pendingLoaded) {
+			return;
+		}
+		try {
+			pendingReferrals.addAll(db.pendingReferrals());
+			pendingLoaded = true;
+		} catch (Exception e) {
+			System.out.println("[store] Couldn't load pending referrals: " + e.getMessage());
+		}
+	}
+
+	private String ensureReferralCode(String uuid) throws Exception {
+		String code = db.referralCode(uuid);
+		while (code == null) {
+			StringBuilder fresh = new StringBuilder();
+			for (int i = 0; i < 6; i++) {
+				fresh.append(CODE_ALPHABET.charAt(random.nextInt(CODE_ALPHABET.length())));
+			}
+			if (db.setReferralCode(uuid, fresh.toString())) {
+				code = fresh.toString();
+			} else {
+				code = db.referralCode(uuid); // raced with ourselves, or the code was taken - try again
+			}
+		}
+		return code;
+	}
+
+	/** Epoch millis until which the player may still enter a code, or null while they haven't played yet. */
+	private Long redeemUntil(String uuid) throws Exception {
+		String first = db.firstDay(uuid);
+		return first == null ? null
+				: LocalDate.parse(first).plusDays(REFERRAL_WINDOW_DAYS).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
+	}
+
+	public ReferralView referral(String uuid, String username) throws Exception {
+		db.touchWallet(uuid, username);
+		String code = ensureReferralCode(uuid);
+		List<InviteView> invites = new ArrayList<>();
+		int paid = 0;
+		int earned = 0;
+		for (StoreDatabase.Referral r : db.referralsBy(uuid)) {
+			boolean rewarded = r.rewardedAt() > 0;
+			if (rewarded) {
+				paid++;
+				earned += r.referrerCoins();
+			}
+			String name = db.username(r.referred());
+			invites.add(new InviteView(name == null ? "Player" : name, r.createdAt(),
+					rewarded ? REFERRAL_PLAY_SECONDS : Math.min(REFERRAL_PLAY_SECONDS, db.totalOnlineSeconds(r.referred())), rewarded,
+					rewarded ? r.referrerCoins() : 0));
+		}
+		StoreDatabase.Referral mine = db.referredBy(uuid);
+		InvitedByView invitedBy = null;
+		if (mine != null) {
+			String name = db.username(mine.referrer());
+			boolean rewarded = mine.rewardedAt() > 0;
+			invitedBy = new InvitedByView(name == null ? "Player" : name, rewarded,
+					rewarded ? REFERRAL_PLAY_SECONDS : Math.min(REFERRAL_PLAY_SECONDS, db.totalOnlineSeconds(uuid)));
+			if (rewarded) {
+				earned += REFERRAL_FRIEND_COINS;
+			}
+		}
+		Long until = redeemUntil(uuid);
+		boolean canRedeem = mine == null && (until == null || System.currentTimeMillis() < until);
+		return new ReferralView(code, REFERRAL_FRIEND_COINS, REFERRAL_PLAY_SECONDS, REFERRAL_LADDER, MAX_PAID_INVITES, paid, earned, referrerReward(paid), invites,
+				invitedBy, canRedeem, canRedeem ? until : null);
+	}
+
+	/** Enters a friend's code (or their name): one referrer per account, within the first days of playing. */
+	public ReferralView redeemReferral(String uuid, String username, String input) throws Exception {
+		String cleaned = input == null ? "" : input.trim();
+		if (cleaned.isEmpty()) {
+			throw new StoreException(400, "Enter a friend's code");
+		}
+		db.touchWallet(uuid, username);
+		String referrer = db.uuidForReferralCode(cleaned.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", ""));
+		if (referrer == null) {
+			referrer = db.uuidByUsername(cleaned);
+		}
+		if (referrer == null) {
+			throw new StoreException(404, "No player has that code");
+		}
+		if (referrer.equals(uuid)) {
+			throw new StoreException(400, "That's your own code");
+		}
+		if (db.referredBy(uuid) != null) {
+			throw new StoreException(409, "You already entered a friend's code");
+		}
+		Long until = redeemUntil(uuid);
+		if (until != null && System.currentTimeMillis() >= until) {
+			throw new StoreException(403, "Codes can only be entered in your first " + REFERRAL_WINDOW_DAYS + " days");
+		}
+		StoreDatabase.Referral theirs = db.referredBy(referrer);
+		if (theirs != null && theirs.referrer().equals(uuid)) {
+			throw new StoreException(400, "You invited them - you can't both invite each other");
+		}
+		if (db.referralsBy(referrer).stream().filter(r -> r.rewardedAt() > 0).count() >= MAX_PAID_INVITES) {
+			throw new StoreException(403, "That code has already been used " + MAX_PAID_INVITES + " times");
+		}
+		if (!db.addReferral(uuid, referrer)) {
+			throw new StoreException(409, "You already entered a friend's code");
+		}
+		loadPendingReferrals();
+		pendingReferrals.add(uuid);
+		checkReferral(uuid);
+		return referral(uuid, username);
+	}
+
+	/** Pays an invite once the invited player has played long enough. */
+	private void checkReferral(String uuid) {
+		try {
+			if (db.totalOnlineSeconds(uuid) >= REFERRAL_PLAY_SECONDS) {
+				db.rewardReferral(uuid, REFERRAL_FRIEND_COINS, StoreService::referrerReward);
+				pendingReferrals.remove(uuid);
+			}
+		} catch (Exception e) {
+			System.out.println("[store] referral payout failed: " + e.getMessage());
+		}
 	}
 
 	public record WalletView(int balance, List<String> owned, boolean owner, boolean plus, long plusUntil) {
@@ -277,6 +602,9 @@ public final class StoreService {
 	}
 
 	public WalletView buy(String uuid, String username, String itemId) throws Exception {
+		if (itemId != null && itemId.startsWith("bundle:")) {
+			return buyBundle(uuid, username, itemId.substring("bundle:".length()));
+		}
 		StoreConfig.Item item = sellable(itemId);
 		if (item == null) {
 			throw new StoreException(404, "That item isn't for sale right now");
@@ -527,6 +855,10 @@ public final class StoreService {
 	public void onGameHeartbeat(String uuid) {
 		try {
 			db.recordHeartbeat(uuid, today(), System.currentTimeMillis(), HEARTBEAT_MAX_GAP_MS);
+			loadPendingReferrals();
+			if (pendingReferrals.contains(uuid)) {
+				checkReferral(uuid);
+			}
 		} catch (Exception e) {
 			System.out.println("[store] heartbeat accounting failed: " + e.getMessage());
 		}

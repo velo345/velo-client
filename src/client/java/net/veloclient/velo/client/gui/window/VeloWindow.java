@@ -78,6 +78,11 @@ public abstract class VeloWindow extends Screen {
 		// screen can be much smaller than that, so clamp to what's actually
 		// available or the window (and its header/drag area) ends up
 		// partially or fully off-screen.
+		if (DenseGui.appliesTo(this)) {
+			float factor = DenseGui.factor();
+			this.width = (int) Math.floor(MinecraftClient.getInstance().getWindow().getScaledWidth() * factor);
+			this.height = (int) Math.floor(MinecraftClient.getInstance().getWindow().getScaledHeight() * factor);
+		}
 		int margin = 12;
 		windowWidth = Math.min(requestedWidth, Math.max(160, this.width - margin * 2));
 		windowHeight = Math.min(requestedHeight, Math.max(120, this.height - margin * 2));
@@ -143,23 +148,19 @@ public abstract class VeloWindow extends Screen {
 		VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 18, 6,
 				VeloUi.withAlpha(0xFF000000, Math.round(0x8C * openProgress)));
 
-		int surface = (theme.surfaceWithOpacity() & 0x00FFFFFF) | (Math.min(alpha, (theme.surfaceWithOpacity() >>> 24)) << 24);
+		// 0.9.7: graphite glass (a touch of the theme's own surface), hairline edge, Sora title - no coloured header band.
+		int glass = VeloAnim.lerpArgb(0xFF0E0E12, theme.surface() | 0xFF000000, 0.14f);
+		int surface = (glass & 0x00FFFFFF) | (Math.round(0xEB * openProgress) << 24);
 		VeloDraw.fillRounded(context, windowX, windowY, windowWidth, windowHeight, radius, surface);
-		// A faint accent wash at the very top gives the header depth without a hard colored band.
-		VeloDraw.fillRoundedTop(context, windowX, windowY, windowWidth, HEADER_HEIGHT, radius,
-				VeloUi.withAlpha(theme.accentStart(), Math.round(0x16 * openProgress)));
 		context.fill(windowX + 1, windowY + HEADER_HEIGHT, windowX + windowWidth - 1, windowY + HEADER_HEIGHT + 1,
-				VeloUi.withAlpha(theme.text(), Math.round(0x1A * openProgress)));
+				VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x10 * openProgress)));
 		VeloDraw.strokeRounded(context, windowX, windowY, windowWidth, windowHeight, radius,
-				VeloUi.withAlpha(theme.text(), Math.round(0x26 * openProgress)));
+				VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x18 * openProgress)));
 
-		// Title: a small accent pill + the window name in the bold UI font.
-		int titleY = windowY + (HEADER_HEIGHT - 8) / 2;
-		VeloDraw.fillRoundedGradient(context, windowX + PADDING, titleY - 1, 3, 10, 1,
-				VeloUi.withAlpha(theme.accentStart(), alpha), VeloUi.withAlpha(theme.accentEnd(), alpha));
-		context.drawTextWithShadow(this.textRenderer,
-				VeloUi.trimStyled(this.title, windowWidth - PADDING * 2 - 40, t -> net.veloclient.velo.client.gui.title.TitleScreenTheme.tileFont(t.getString())),
-				windowX + PADDING + 9, titleY, VeloUi.withAlpha(theme.text(), alpha));
+		renderHeader(context, mouseX, mouseY, alpha);
+		if (openProgress > 0.4f) {
+			renderHeaderExtras(context, mouseX, mouseY);
+		}
 
 		long now = System.nanoTime();
 		float dt = VeloStyle.frameDelta(lastFrameNanos, now);
@@ -168,20 +169,143 @@ public abstract class VeloWindow extends Screen {
 		closeHover = VeloAnim.step(closeHover, closeHovered ? 1f : 0f, dt);
 		int closeX = closeButtonX();
 		int closeY = closeButtonY();
-		if (closeHover > 0.01f) {
-			VeloDraw.fillRounded(context, closeX, closeY, CLOSE_SIZE, CLOSE_SIZE, 6,
-					VeloUi.withAlpha(0xFFE5484D, Math.round(0xD0 * closeHover * openProgress)));
-		}
+		VeloDraw.fillRounded(context, closeX, closeY, CLOSE_SIZE, CLOSE_SIZE, 5,
+				VeloAnim.lerpArgb(VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x0D * openProgress)),
+						VeloUi.withAlpha(0xFFE5484D, Math.round(0xD0 * openProgress)), closeHover));
 		int glyph = VeloAnim.lerpArgb(VeloUi.withAlpha(theme.text(), Math.round(0xB0 * openProgress)),
 				VeloUi.withAlpha(0xFFFFFFFF, alpha), closeHover);
 		VeloDraw.cross(context, closeX + CLOSE_SIZE / 2f, closeY + CLOSE_SIZE / 2f, 6.5f, 1.3f, glyph);
 
 		if (openProgress > 0.4f) {
+			// A page rises into place after a tab switch.
+			float page = pageIn();
+			context.getMatrices().pushMatrix();
+			context.getMatrices().translate(0f, (1f - page) * 8f);
 			renderContentLayer(context, mouseX, mouseY, delta);
 			super.render(context, mouseX, mouseY, delta);
+			renderOverlayLayer(context, mouseX, mouseY, delta);
+			context.getMatrices().popMatrix();
 		}
 
 		context.getMatrices().popMatrix();
+	}
+
+	/** Draws a subclass's header extras (coins, actions) right-aligned before {@link #headerRight()}. */
+	protected void renderHeaderExtras(DrawContext context, int mouseX, int mouseY) {
+	}
+
+	/** Clicks on header extras a subclass draws (coins, actions); true when handled. */
+	protected boolean headerClick(int mouseX, int mouseY) {
+		return false;
+	}
+
+	// ---- Header: big title + launcher-style underline tabs ----
+
+	/** Tabs shown next to the title in the header (launcher look), or null for none. */
+	protected String[] headerTabs() {
+		return null;
+	}
+
+	/** The selected header tab. */
+	protected int headerTab() {
+		return -1;
+	}
+
+	protected void selectHeaderTab(int index) {
+	}
+
+	/** A small accent badge after a tab's label ("NEW"), or null. */
+	protected String headerTabBadge(int index) {
+		return null;
+	}
+
+	/** Where header extras (coins, actions) may start from the right: subclasses draw them left of this x. */
+	protected int headerRight() {
+		return closeButtonX() - 8;
+	}
+
+	private int[] tabX = new int[0];
+	private int[] tabW = new int[0];
+	private float underlineX = -1;
+	private float underlineW;
+	private final java.util.Map<Integer, Float> tabHover = new java.util.HashMap<>();
+
+	private void renderHeader(DrawContext context, int mouseX, int mouseY, int alpha) {
+		String[] tabs = headerTabs();
+		Text title = net.veloclient.velo.client.gui.title.MenuKit.display(this.title.getString());
+		// Sora's capitals sit low in its line box: this centres them on the header (measured on screen).
+		int titleY = windowY + (HEADER_HEIGHT - net.veloclient.velo.client.gui.title.MenuKit.H_DISPLAY) / 2 + 5;
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer,
+				net.veloclient.velo.client.gui.title.MenuKit.fit(this.textRenderer, title, windowWidth - PADDING * 2 - 40),
+				windowX + PADDING, titleY, VeloUi.withAlpha(0xFFF4F4F6, alpha));
+		if (tabs == null || tabs.length == 0) {
+			tabX = new int[0];
+			return;
+		}
+		int x = windowX + PADDING + this.textRenderer.getWidth(title) + 18;
+		int textY = windowY + (HEADER_HEIGHT - 8) / 2 + 1;
+		tabX = new int[tabs.length];
+		tabW = new int[tabs.length];
+		int active = headerTab();
+		for (int i = 0; i < tabs.length; i++) {
+			Text label = net.veloclient.velo.client.gui.title.MenuKit.ui(tabs[i]);
+			int w = this.textRenderer.getWidth(label);
+			String badge = headerTabBadge(i);
+			int badgeW = badge == null ? 0 : this.textRenderer.getWidth(net.veloclient.velo.client.gui.title.MenuKit.small(badge)) + 8;
+			tabX[i] = x;
+			tabW[i] = w + (badge == null ? 0 : badgeW + 4);
+			boolean hovered = mouseX >= x - 4 && mouseX < x + tabW[i] + 4 && mouseY >= windowY && mouseY < windowY + HEADER_HEIGHT;
+			float h = tabHover.getOrDefault(i, 0f);
+			h = VeloAnim.step(h, hovered ? 1f : 0f, 0.016f * 6);
+			tabHover.put(i, h);
+			int color = i == active ? 0xFFF4F4F6 : VeloAnim.lerpArgb(0xFF9A9AA6, 0xFFF4F4F6, h);
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, label, x, textY, VeloUi.withAlpha(color, alpha));
+			if (badge != null) {
+				int bx = x + w + 4;
+				VeloDraw.fillRounded(context, bx, textY - 1, badgeW, 10, 3, VeloUi.withAlpha(net.veloclient.velo.client.gui.title.MenuKit.accent(), alpha));
+				net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.small(badge),
+						bx + 4, textY + 1, VeloUi.withAlpha(0xFFFFFFFF, alpha));
+			}
+			x += tabW[i] + 16;
+		}
+		if (active >= 0 && active < tabs.length) {
+			// The underline slides to the selected tab.
+			if (underlineX < 0) {
+				underlineX = tabX[active];
+				underlineW = tabW[active];
+			}
+			underlineX += (tabX[active] - underlineX) * 0.25f;
+			underlineW += (tabW[active] - underlineW) * 0.25f;
+			VeloDraw.fillRounded(context, Math.round(underlineX), windowY + HEADER_HEIGHT - 2, Math.round(underlineW), 2, 1,
+					VeloUi.withAlpha(net.veloclient.velo.client.gui.title.MenuKit.accent(), alpha));
+		}
+	}
+
+	private boolean clickHeaderTab(double mouseX, double mouseY) {
+		for (int i = 0; i < tabX.length; i++) {
+			if (mouseX >= tabX[i] - 6 && mouseX < tabX[i] + tabW[i] + 6 && mouseY >= windowY && mouseY < windowY + HEADER_HEIGHT) {
+				if (i != headerTab()) {
+					selectHeaderTab(i);
+					contentShownAt = System.nanoTime();
+				}
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** When the current page appeared - pages fade/slide in from this (see {@link #pageIn()}). */
+	private long contentShownAt = System.nanoTime();
+
+	/** 0..1 eased progress of the current page's entrance (after a tab switch). */
+	protected float pageIn() {
+		float t = Math.min(1f, (System.nanoTime() - contentShownAt) / 260_000_000f);
+		return 1f - (float) Math.pow(1f - t, 3);
+	}
+
+	/** Restarts the page entrance (call when a subclass switches pages its own way). */
+	protected void restartPageIn() {
+		contentShownAt = System.nanoTime();
 	}
 
 	private static final int CLOSE_SIZE = 18;
@@ -208,6 +332,10 @@ public abstract class VeloWindow extends Screen {
 	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
 	}
 
+	/** Hook drawn after the child widgets (inside the window transform): text or badges over previews. */
+	protected void renderOverlayLayer(DrawContext context, int mouseX, int mouseY, float delta) {
+	}
+
 	@Override
 	public boolean mouseClicked(Click click, boolean doubled) {
 		int mouseX = (int) click.x();
@@ -215,6 +343,12 @@ public abstract class VeloWindow extends Screen {
 		if (mouseY >= windowY && mouseY <= windowY + HEADER_HEIGHT) {
 			if (isOverClose(mouseX, mouseY)) {
 				requestClose();
+				return true;
+			}
+			if (clickHeaderTab(mouseX, mouseY)) {
+				return true;
+			}
+			if (headerClick(mouseX, mouseY)) {
 				return true;
 			}
 			if (mouseX >= windowX && mouseX <= windowX + windowWidth) {

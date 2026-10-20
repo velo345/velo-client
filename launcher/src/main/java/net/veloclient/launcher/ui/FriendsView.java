@@ -108,12 +108,17 @@ public final class FriendsView {
 			return;
 		}
 		Label heading = new Label("Friends");
-		heading.getStyleClass().add("section-heading");
-		heading.setTextFill(accent(theme));
+		heading.getStyleClass().add("t-title");
+		long onlineCount = state.friends.stream().filter(f -> f.online).count();
+		Label sub = new Label(onlineCount + " online  ·  " + state.friends.size() + (state.friends.size() == 1 ? " friend" : " friends")
+				+ (state.incoming.isEmpty() ? "" : "  ·  " + state.incoming.size() + (state.incoming.size() == 1 ? " request" : " requests")));
+		sub.getStyleClass().add("t-muted");
+		HBox titleRow = new HBox(14, heading, sub);
+		titleRow.setAlignment(Pos.BASELINE_LEFT);
 
-		HBox body = new HBox(14, buildLeft(state), buildRight(state));
+		HBox body = new HBox(16, buildLeft(state), buildRight(state));
 		VBox.setVgrow(body, Priority.ALWAYS);
-		VBox wrapper = new VBox(14, heading, body);
+		VBox wrapper = new VBox(16, titleRow, body);
 		root.getChildren().setAll(wrapper);
 	}
 
@@ -121,11 +126,11 @@ public final class FriendsView {
 
 	private Node buildLeft(LauncherSocial.State state) {
 		LauncherTheme theme = host.theme();
-		VBox left = new VBox(10);
-		left.setPrefWidth(280);
-		left.setMinWidth(260);
-		left.getStyleClass().add("friends-pane");
-		left.setPadding(new Insets(14));
+		VBox left = new VBox(12);
+		left.setPrefWidth(310);
+		left.setMinWidth(290);
+		left.getStyleClass().add("card");
+		left.setPadding(new Insets(16));
 
 		// Me.
 		boolean invisible = state.me != null && state.me.invisible;
@@ -133,16 +138,15 @@ public final class FriendsView {
 		me.setAlignment(Pos.CENTER_LEFT);
 		Node myHead = head(state.me != null ? state.me.uuid : null, state.me != null ? state.me.username : "?", 34);
 		Label myName = new Label(state.me != null ? state.me.username : "You");
-		myName.getStyleClass().add("friend-name");
-		myName.setTextFill(text(theme));
+		myName.getStyleClass().add("t-strong");
 		Label myStatus = new Label(invisible ? "Appearing offline" : "Online");
-		myStatus.getStyleClass().add("friend-status");
-		myStatus.setTextFill(text(theme));
+		myStatus.getStyleClass().add("t-muted");
 		myStatus.setGraphic(dot(invisible ? Color.web("#7a7a80") : Color.web("#43d17a")));
 		VBox meText = new VBox(2, myName, myStatus);
 		HBox.setHgrow(meText, Priority.ALWAYS);
-		Button visibility = new Button(invisible ? "Go online" : "Hide me");
-		visibility.getStyleClass().add("status-pill");
+		Button visibility = new Button(invisible ? "Go online" : "Hide me", Icons.icon(invisible ? "eye" : "lock", 13, Color.web("#E4E4E8")));
+		visibility.getStyleClass().addAll("ghost-button", "button-sm");
+		visibility.setMinWidth(Region.USE_PREF_SIZE);
 		visibility.setTooltip(new Tooltip(invisible ? "Let friends see you're online and where you play"
 				: "Appear offline to all friends - stays that way until you switch back, also in game"));
 		visibility.setOnAction(e -> act(LauncherSocial.setInvisible(!invisible),
@@ -152,7 +156,7 @@ public final class FriendsView {
 		// Add friend.
 		TextField add = new TextField(addDraft);
 		add.setId("add-friend");
-		add.setPromptText("Add friend: username or UUID");
+		add.setPromptText("Add by username");
 		add.textProperty().addListener((obs, o, n) -> addDraft = n);
 		if (addFocused) {
 			Platform.runLater(() -> {
@@ -161,8 +165,9 @@ public final class FriendsView {
 			});
 		}
 		HBox.setHgrow(add, Priority.ALWAYS);
-		Button addButton = new Button("Add");
-		addButton.getStyleClass().addAll("title-menu-button-primary", "button-compact");
+		Button addButton = new Button("Add", Icons.icon("user-plus", 14, Color.WHITE));
+		addButton.getStyleClass().add("primary-button");
+		addButton.setMinWidth(Region.USE_PREF_SIZE);
 		Runnable submit = () -> {
 			String target = add.getText().strip();
 			if (target.isEmpty()) {
@@ -179,8 +184,10 @@ public final class FriendsView {
 		};
 		addButton.setOnAction(e -> submit.run());
 		add.setOnAction(e -> submit.run());
-		HBox addRow = new HBox(6, add, addButton);
-		left.getChildren().addAll(me, addRow);
+		HBox addRow = new HBox(8, add, addButton);
+		Region meLine = new Region();
+		meLine.getStyleClass().add("hairline-h");
+		left.getChildren().addAll(me, meLine, addRow);
 
 		if (!feedback.isEmpty()) {
 			Label info = new Label(feedback);
@@ -190,27 +197,36 @@ public final class FriendsView {
 			left.getChildren().add(info);
 		}
 
-		long online = state.friends.stream().filter(f -> f.online).count();
-		Label header = new Label("FRIENDS  " + online + "/" + state.friends.size() + " ONLINE");
-		header.getStyleClass().add("sidebar-section-title");
-		header.setTextFill(text(theme));
-
 		VBox list = new VBox(2);
 		if (state.friends.isEmpty()) {
-			Label empty = new Label("No friends yet - add one above. They'll get a request in the launcher or in game.");
+			Label empty = new Label("No friends yet. Add one above - they get the request in the launcher or in game.");
 			empty.setWrapText(true);
-			empty.getStyleClass().add("section-subtitle");
-			empty.setTextFill(text(theme));
+			empty.getStyleClass().add("t-muted");
 			list.getChildren().add(empty);
 		}
-		for (LauncherSocial.Friend friend : state.friends) {
-			list.getChildren().add(friendRow(friend));
+		// Online first, then offline - each under its own small header.
+		List<LauncherSocial.Friend> onlineFriends = state.friends.stream().filter(f -> f.online).toList();
+		List<LauncherSocial.Friend> offlineFriends = state.friends.stream().filter(f -> !f.online).toList();
+		for (Object[] group : new Object[][] {{"ONLINE", onlineFriends}, {"OFFLINE", offlineFriends}}) {
+			@SuppressWarnings("unchecked")
+			List<LauncherSocial.Friend> friends = (List<LauncherSocial.Friend>) group[1];
+			if (friends.isEmpty()) {
+				continue;
+			}
+			Label groupHeader = new Label(group[0] + "  " + friends.size());
+			groupHeader.getStyleClass().add("field-label");
+			groupHeader.setPadding(new Insets(list.getChildren().isEmpty() ? 4 : 14, 0, 6, 4));
+			list.getChildren().add(groupHeader);
+			for (LauncherSocial.Friend friend : friends) {
+				list.getChildren().add(friendRow(friend));
+			}
 		}
 		ScrollPane scroll = new ScrollPane(list);
 		scroll.setFitToWidth(true);
 		scroll.getStyleClass().add("scroll-pane");
+		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 		VBox.setVgrow(scroll, Priority.ALWAYS);
-		left.getChildren().addAll(header, scroll);
+		left.getChildren().add(scroll);
 		return left;
 	}
 
@@ -222,27 +238,32 @@ public final class FriendsView {
 			row.getStyleClass().add("friend-row-selected");
 		}
 		row.setAlignment(Pos.CENTER_LEFT);
-		StackPane headWithDot = new StackPane(head(friend.uuid, friend.username, 30));
+		StackPane headWithDot = new StackPane(head(friend.uuid, friend.username, 34));
 		Circle dot = new Circle(4.5, statusColor(friend));
-		dot.setStroke(Color.web("#141414"));
+		dot.setStyle("-fx-stroke: -velo-surface;");
 		dot.setStrokeWidth(2);
 		StackPane.setAlignment(dot, Pos.BOTTOM_RIGHT);
 		headWithDot.getChildren().add(dot);
 		Label name = new Label(friend.username);
-		name.getStyleClass().add("friend-name");
-		name.setTextFill(text(theme));
+		name.getStyleClass().add("t-strong");
 		name.setOpacity(friend.online ? 1 : 0.7);
 		Label status = new Label(describe(friend));
-		status.getStyleClass().add("friend-status");
-		status.setTextFill(text(theme));
+		status.getStyleClass().add(friend.online && friend.activity != null ? "t-green" : "t-muted");
+		status.setStyle("-fx-font-size: 12px;");
+		status.setWrapText(true);
+		name.setWrapText(true);
 		VBox textBox = new VBox(1, name, status);
 		HBox.setHgrow(textBox, Priority.ALWAYS);
 		row.getChildren().addAll(headWithDot, textBox);
 		if (!inMyParty(friend.uuid)) {
-			Button invite = new Button("+ Party");
-			invite.getStyleClass().add("status-pill");
+			// Icon + short word, never squeezed: a cut-off "+..." told nobody anything.
+			Button invite = new Button("Party", Icons.icon("user-plus", 13, Color.web("#E4E4E8")));
+			invite.getStyleClass().addAll("ghost-button", "button-sm");
+			invite.setMinWidth(Region.USE_PREF_SIZE);
+			invite.setGraphicTextGap(6);
 			invite.setTooltip(new javafx.scene.control.Tooltip("Invite " + friend.username + " to your party"));
 			invite.setVisible(false);
+			invite.managedProperty().bind(invite.visibleProperty());
 			row.hoverProperty().addListener((o, a, hover) -> invite.setVisible(hover));
 			invite.setOnAction(e -> {
 				e.consume();
@@ -288,19 +309,21 @@ public final class FriendsView {
 	// ---- Right: chat / requests / blocked ----
 
 	private Node buildRight(LauncherSocial.State state) {
-		VBox right = new VBox(10);
-		right.getStyleClass().add("friends-pane");
-		right.setPadding(new Insets(14));
+		VBox right = new VBox(14);
+		right.getStyleClass().add("card");
+		right.setPadding(new Insets(10, 20, 18, 20));
 		HBox.setHgrow(right, Priority.ALWAYS);
 		// Take exactly the remaining width - otherwise a long wrapped hint (e.g. on the Blocked tab)
 		// reports its full one-line width as preferred size and squeezes the friends list.
 		right.setMinWidth(0);
 		right.setPrefWidth(0);
 
-		HBox segments = new HBox(4,
+		HBox segments = new HBox(22,
 				segment("Chat", Mode.CHAT),
 				segment(state.incoming.isEmpty() ? "Requests" : "Requests (" + state.incoming.size() + ")", Mode.REQUESTS),
 				segment("Blocked", Mode.BLOCKED));
+		segments.getStyleClass().add("utab-row");
+		segments.setAlignment(Pos.BOTTOM_LEFT);
 		right.getChildren().add(segments);
 
 		Node content = switch (mode) {
@@ -315,9 +338,10 @@ public final class FriendsView {
 
 	private Button segment(String label, Mode target) {
 		Button button = new Button(label);
-		button.getStyleClass().add("segmented-button");
+		button.getStyleClass().setAll("button", "utab", "no-motion");
+		button.setMinWidth(Region.USE_PREF_SIZE);
 		if (mode == target) {
-			button.getStyleClass().add("segmented-button-active");
+			button.getStyleClass().add("utab-active");
 		}
 		button.setOnAction(e -> {
 			mode = target;
@@ -527,15 +551,17 @@ public final class FriendsView {
 	private Node personRow(String uuid, String name, String subtitle, Button... actions) {
 		LauncherTheme theme = host.theme();
 		HBox row = new HBox(10);
-		row.getStyleClass().add("glass-panel");
-		row.setPadding(new Insets(8, 12, 8, 12));
+		row.getStyleClass().add("card-2");
+		row.setPadding(new Insets(10, 14, 10, 12));
 		row.setAlignment(Pos.CENTER_LEFT);
 		Label nameLabel = new Label(name);
-		nameLabel.getStyleClass().add("friend-name");
-		nameLabel.setTextFill(text(theme));
+		nameLabel.getStyleClass().add("t-strong");
 		Label sub = new Label(subtitle);
-		sub.getStyleClass().add("friend-status");
-		sub.setTextFill(text(theme));
+		sub.getStyleClass().add("t-muted");
+		sub.setWrapText(true);
+		for (Button action : actions) {
+			action.setMinWidth(Region.USE_PREF_SIZE);
+		}
 		VBox textBox = new VBox(2, nameLabel, sub);
 		HBox.setHgrow(textBox, Priority.ALWAYS);
 		row.getChildren().addAll(head(uuid, name, 30), textBox);
@@ -653,24 +679,27 @@ public final class FriendsView {
 	private Label muted(String textValue) {
 		Label label = new Label(textValue);
 		label.setWrapText(true);
-		label.getStyleClass().add("section-subtitle");
-		label.setTextFill(text(host.theme()));
+		label.getStyleClass().add("t-muted");
 		return label;
 	}
 
 	private Node centered(String title, String subtitle, String buttonLabel, Runnable action) {
 		VBox box = new VBox(10);
 		box.setAlignment(Pos.CENTER);
+		StackPane badge = new StackPane(Icons.icon("message", 22, Color.web("#C9C9D1")));
+		badge.setMinSize(52, 52);
+		badge.setMaxSize(52, 52);
+		badge.setStyle("-fx-background-color: rgba(255,255,255,0.05); -fx-background-radius: 16;");
 		Label titleLabel = new Label(title);
-		titleLabel.setFont(Font.font("Inter", FontWeight.BOLD, 16));
-		titleLabel.setTextFill(text(host.theme()));
+		titleLabel.getStyleClass().add("t-heading");
 		Label sub = muted(subtitle == null ? "" : subtitle);
 		sub.setMaxWidth(420);
 		sub.setAlignment(Pos.CENTER);
-		box.getChildren().addAll(titleLabel, sub);
+		sub.setStyle("-fx-text-alignment: center;");
+		box.getChildren().addAll(badge, titleLabel, sub);
 		if (buttonLabel != null) {
 			Button button = new Button(buttonLabel);
-			button.getStyleClass().addAll("title-menu-button", "title-menu-button-primary");
+			button.getStyleClass().add("primary-button");
 			button.setOnAction(e -> action.run());
 			box.getChildren().add(button);
 		}

@@ -91,10 +91,23 @@ public final class CosmeticsService {
 		public String description = "";
 	}
 
+	/** An owner-made offer: several items for one price, optionally only until a day. */
+	public static final class Bundle {
+		public String id;
+		public String name;
+		public String description = "";
+		public List<String> items = new ArrayList<>();
+		public int price;
+		public boolean active;
+		/** Epoch millis; null = no end. */
+		public Long availableUntil;
+	}
+
 	private static final class Data {
 		String featured;
 		List<Collection> collections = new ArrayList<>();
 		List<Item> items = new ArrayList<>();
+		List<Bundle> bundles = new ArrayList<>();
 	}
 
 	/** The seed bundled in the jar: the same shape plus where each file is ({@code files} are paths inside the seed). */
@@ -322,7 +335,96 @@ public final class CosmeticsService {
 		return out;
 	}
 
-	public record AdminView(String featured, List<Collection> collections, List<Item> items) {
+	/** A collection with the items of it that are in the store right now. */
+	public record StoreCollection(String id, String name, String description, List<StoreConfig.Item> items) {
+	}
+
+	public synchronized List<StoreCollection> storeCollections() {
+		long now = System.currentTimeMillis();
+		List<StoreCollection> out = new ArrayList<>();
+		for (Collection c : data.collections) {
+			List<StoreConfig.Item> items = new ArrayList<>();
+			for (Item i : data.items) {
+				if (c.id.equals(i.collection) && inStore(i, now)) {
+					items.add(new StoreConfig.Item(i.id, i.name, i.price));
+				}
+			}
+			out.add(new StoreCollection(c.id, c.name, c.description, items));
+		}
+		return out;
+	}
+
+	/** An owner bundle as sold now: only the items of it that are in the store. */
+	public record StoreBundle(String id, String name, String description, List<StoreConfig.Item> items, int price) {
+	}
+
+	/** Active owner bundles in their window with at least two items in the store; null when the owner made none. */
+	public synchronized List<StoreBundle> storeBundles() {
+		if (data.bundles == null || data.bundles.isEmpty()) {
+			return null;
+		}
+		long now = System.currentTimeMillis();
+		List<StoreBundle> out = new ArrayList<>();
+		for (Bundle b : data.bundles) {
+			if (!b.active || b.availableUntil != null && now >= b.availableUntil) {
+				continue;
+			}
+			List<StoreConfig.Item> items = new ArrayList<>();
+			for (String id : b.items) {
+				Item i = find(id);
+				if (i != null && inStore(i, now)) {
+					items.add(new StoreConfig.Item(i.id, i.name, i.price));
+				}
+			}
+			if (items.size() >= 2) {
+				out.add(new StoreBundle(b.id, b.name, b.description, items, b.price));
+			}
+		}
+		return out;
+	}
+
+	public synchronized Bundle upsertBundle(Bundle change) throws IOException, StoreService.StoreException {
+		if (change == null || change.id == null || !COLLECTION_ID.matcher(change.id).matches()) {
+			throw new StoreService.StoreException(400, "Bundle ids are lowercase letters, digits, _ or -");
+		}
+		if (change.items == null || change.items.size() < 2) {
+			throw new StoreService.StoreException(400, "A bundle needs at least two items");
+		}
+		for (String id : change.items) {
+			if (find(id) == null) {
+				throw new StoreService.StoreException(404, "Unknown item " + id);
+			}
+		}
+		if (change.price <= 0 || change.price > 1_000_000) {
+			throw new StoreService.StoreException(400, "Price: 1 to 1,000,000 coins");
+		}
+		if (data.bundles == null) {
+			data.bundles = new ArrayList<>();
+		}
+		Bundle b = data.bundles.stream().filter(x -> x.id.equals(change.id)).findFirst().orElse(null);
+		if (b == null) {
+			b = new Bundle();
+			b.id = change.id;
+			data.bundles.add(0, b);
+		}
+		b.name = change.name == null || change.name.isBlank() ? change.id : change.name.strip();
+		b.description = change.description == null ? "" : change.description.strip();
+		b.items = new ArrayList<>(new java.util.LinkedHashSet<>(change.items));
+		b.price = change.price;
+		b.active = change.active;
+		b.availableUntil = change.availableUntil;
+		save();
+		return b;
+	}
+
+	public synchronized void deleteBundle(String id) throws IOException, StoreService.StoreException {
+		if (data.bundles == null || !data.bundles.removeIf(b -> b.id.equals(id))) {
+			throw new StoreService.StoreException(404, "No such bundle");
+		}
+		save();
+	}
+
+	public record AdminView(String featured, List<Collection> collections, List<Item> items, List<Bundle> bundles) {
 	}
 
 	public synchronized AdminView admin() {
@@ -330,7 +432,7 @@ public final class CosmeticsService {
 		for (Item i : data.items) {
 			items.add(i.copy());
 		}
-		return new AdminView(data.featured, List.copyOf(data.collections), items);
+		return new AdminView(data.featured, List.copyOf(data.collections), items, data.bundles == null ? List.of() : List.copyOf(data.bundles));
 	}
 
 	// ---- Files ----

@@ -126,7 +126,7 @@ public final class DatapacksTabView {
 		iconView.setPreserveRatio(true);
 		Image image = world.iconFile() != null
 				? new Image(world.iconFile().toUri().toString(), 64, 64, true, true)
-				: new Image(InstanceDetailView.class.getResourceAsStream("/net/veloclient/launcher/images/logo.png"), 64, 64, true, true);
+				: UiImages.resource("/net/veloclient/launcher/images/logo.png", 64, 64);
 		iconView.setImage(image);
 		iconHolder.getChildren().add(iconView);
 		card.getChildren().add(iconHolder);

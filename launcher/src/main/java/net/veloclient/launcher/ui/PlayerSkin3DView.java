@@ -327,10 +327,26 @@ public final class PlayerSkin3DView {
 
 	/** Cape frame -> crisp texture (nearest-neighbour upscaled so 3D filtering can't smear it). */
 	private static Image capeTexture(BufferedImage image) {
-		Image fx = SwingFXUtils.toFXImage(image, null);
-		int factor = Math.max(1, 512 / Math.max(1, image.getWidth()));
-		return factor > 1 ? upscale(copyOf(fx), factor) : fx;
+		// Animated capes ask for the same frames over and over: each frame's texture is made once.
+		synchronized (CAPE_TEXTURES) {
+			Image cached = CAPE_TEXTURES.get(image);
+			if (cached != null) {
+				return cached;
+			}
+		}
+		int w = image.getWidth();
+		int h = image.getHeight();
+		int[] argb = image.getRGB(0, 0, w, h, null, 0, w);
+		int factor = Math.max(1, 512 / Math.max(1, w));
+		Image texture = upscale(argb, w, h, factor);
+		synchronized (CAPE_TEXTURES) {
+			CAPE_TEXTURES.put(image, texture);
+		}
+		return texture;
 	}
+
+	/** Cape frame -> its texture, dropped together with the frame. */
+	private static final java.util.Map<BufferedImage, Image> CAPE_TEXTURES = new java.util.WeakHashMap<>();
 
 	/**
 	 * A transparent 3D render of just the cape at a three-quarter angle - for cards and lists,
@@ -593,11 +609,7 @@ public final class PlayerSkin3DView {
 		WritableImage out = new WritableImage(w, w);
 		PixelReader reader = source.getPixelReader();
 		PixelWriter writer = out.getPixelWriter();
-		for (int y = 0; y < h; y++) {
-			for (int x = 0; x < w; x++) {
-				writer.setColor(x, y, reader.getColor(x, y));
-			}
-		}
+		writer.setPixels(0, 0, w, h, reader, 0, 0);
 		if (legacy) {
 			// Transparent below the old image, then the mirrored limbs.
 			for (int y = h; y < w; y++) {
@@ -691,19 +703,32 @@ public final class PlayerSkin3DView {
 	private static Image upscale(WritableImage source, int factor) {
 		int sw = (int) source.getWidth();
 		int sh = (int) source.getHeight();
-		WritableImage out = new WritableImage(sw * factor, sh * factor);
-		PixelReader reader = source.getPixelReader();
-		PixelWriter writer = out.getPixelWriter();
+		int[] argb = new int[sw * sh];
+		source.getPixelReader().getPixels(0, 0, sw, sh, javafx.scene.image.PixelFormat.getIntArgbInstance(), argb, 0, sw);
+		return upscale(argb, sw, sh, factor);
+	}
+
+	/** Nearest-neighbour upscale done on plain arrays and written in one go (per-pixel writes cost ~100 ms per texture). */
+	private static Image upscale(int[] argb, int sw, int sh, int factor) {
+		if (factor <= 1) {
+			WritableImage out = new WritableImage(sw, sh);
+			out.getPixelWriter().setPixels(0, 0, sw, sh, javafx.scene.image.PixelFormat.getIntArgbInstance(), argb, 0, sw);
+			return out;
+		}
+		int ow = sw * factor;
+		int oh = sh * factor;
+		int[] big = new int[ow * oh];
 		for (int y = 0; y < sh; y++) {
+			int row = y * factor * ow;
 			for (int x = 0; x < sw; x++) {
-				Color c = reader.getColor(x, y);
-				for (int dy = 0; dy < factor; dy++) {
-					for (int dx = 0; dx < factor; dx++) {
-						writer.setColor(x * factor + dx, y * factor + dy, c);
-					}
-				}
+				java.util.Arrays.fill(big, row + x * factor, row + x * factor + factor, argb[y * sw + x]);
+			}
+			for (int dy = 1; dy < factor; dy++) {
+				System.arraycopy(big, row, big, row + dy * ow, ow);
 			}
 		}
+		WritableImage out = new WritableImage(ow, oh);
+		out.getPixelWriter().setPixels(0, 0, ow, oh, javafx.scene.image.PixelFormat.getIntArgbInstance(), big, 0, ow);
 		return out;
 	}
 

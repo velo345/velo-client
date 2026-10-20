@@ -77,6 +77,11 @@ public final class MediaView {
 	private List<Item> items = List.of();
 	private Node gallery;
 	private AnimationTimer playback;
+	/** The open clip and its playhead (frame index), for trimming. */
+	private MjpegAvi.Clip openClip;
+	private double[] playhead;
+	/** Trim range in frames while trimming ({@code [in, out]}), else null. */
+	private int[] trim;
 
 	private MediaView(Stage owner) {
 		this.owner = owner;
@@ -273,8 +278,14 @@ public final class MediaView {
 
 	// ---- Viewer ----
 
+	/** The trim bar and its buttons for the open clip: {bar, set start, set end, trim}. */
+	private Object[] trimControls;
+
 	private void openViewer(Item item) {
 		stopPlayback();
+		trim = null;
+		openClip = null;
+		trimControls = null;
 		List<Item> siblings = shown();
 		Button back = BackButton.create(null, null);
 		back.setOnAction(e -> closeViewer());
@@ -321,16 +332,118 @@ public final class MediaView {
 			Button play = new Button("Pause");
 			play.getStyleClass().add("primary-button");
 			Slider seek = new Slider(0, 1, 0);
-			HBox.setHgrow(seek, Priority.ALWAYS);
+			// The kept part while trimming, drawn behind the seek bar.
+			Region kept = new Region();
+			kept.setStyle("-fx-background-color: -velo-accent-soft; -fx-border-color: -velo-accent; -fx-border-width: 0 2 0 2;"
+					+ " -fx-background-radius: 4; -fx-border-radius: 4;");
+			kept.setManaged(false);
+			kept.setVisible(false);
+			javafx.scene.layout.Pane seekBox = new javafx.scene.layout.Pane(kept, seek);
+			seek.prefWidthProperty().bind(seekBox.widthProperty());
+			seekBox.setMinHeight(24);
+			seekBox.setPrefHeight(24);
+			HBox.setHgrow(seekBox, Priority.ALWAYS);
 			Label time = new Label("0.0s");
 			time.getStyleClass().add("settings-row-hint");
-			controls.getChildren().addAll(play, seek, time, delete);
+			Button trimButton = new Button("Trim", Icons.icon("scissors", 14, javafx.scene.paint.Color.WHITE));
+			trimButton.getStyleClass().add("glass-button");
+			trimButton.setDisable(true);
+			controls.getChildren().addAll(play, seekBox, time, trimButton, delete);
+
+			Label range = new Label();
+			range.getStyleClass().add("t-mono");
+			Button setIn = new Button("Set start");
+			setIn.getStyleClass().add("ghost-button");
+			Button setOut = new Button("Set end");
+			setOut.getStyleClass().add("ghost-button");
+			Button saveCopy = new Button("Save as new clip");
+			saveCopy.getStyleClass().add("primary-button");
+			Button cancelTrim = new Button("Cancel");
+			cancelTrim.getStyleClass().add("ghost-button");
+			Label trimHint = new Label("Play or drag to a spot, then set start and end. Keys: I / O.");
+			trimHint.getStyleClass().add("t-muted");
+			Region trimGap = new Region();
+			HBox.setHgrow(trimGap, Priority.ALWAYS);
+			HBox trimBar = new HBox(10, Icons.icon("scissors", 16, javafx.scene.paint.Color.web("#E4E4E8")), setIn, setOut, range, trimHint, trimGap,
+					cancelTrim, saveCopy);
+			trimBar.setAlignment(Pos.CENTER_LEFT);
+			trimBar.getStyleClass().add("card");
+			trimBar.setPadding(new Insets(10, 14, 10, 14));
+			trimBar.setVisible(false);
+			trimBar.setManaged(false);
+			Runnable paintTrim = () -> {
+				if (trim == null || openClip == null) {
+					kept.setVisible(false);
+					return;
+				}
+				int last = Math.max(1, openClip.frames().size() - 1);
+				double w = seekBox.getWidth();
+				kept.setVisible(true);
+				kept.resizeRelocate(w * trim[0] / last, 2, Math.max(4, w * (trim[1] - trim[0]) / last), 20);
+				range.setText(String.format(Locale.ROOT, "%.1fs - %.1fs  (%.1fs)", trim[0] / openClip.fps(), trim[1] / openClip.fps(),
+						(trim[1] - trim[0] + 1) / openClip.fps()));
+			};
+			seekBox.widthProperty().addListener((o, a, b) -> paintTrim.run());
+			Runnable endTrim = () -> {
+				trim = null;
+				trimBar.setVisible(false);
+				trimBar.setManaged(false);
+				trimButton.setDisable(openClip == null);
+				paintTrim.run();
+			};
+			trimButton.setOnAction(e -> {
+				if (openClip == null) {
+					return;
+				}
+				trim = new int[] {0, openClip.frames().size() - 1};
+				trimBar.setVisible(true);
+				trimBar.setManaged(true);
+				trimButton.setDisable(true);
+				paintTrim.run();
+			});
+			setIn.setOnAction(e -> {
+				if (trim != null) {
+					trim[0] = Math.min((int) Math.round(playhead[0]), trim[1] - 1);
+					paintTrim.run();
+				}
+			});
+			setOut.setOnAction(e -> {
+				if (trim != null) {
+					trim[1] = Math.max((int) Math.round(playhead[0]), trim[0] + 1);
+					paintTrim.run();
+				}
+			});
+			cancelTrim.setOnAction(e -> endTrim.run());
+			saveCopy.setOnAction(e -> {
+				int[] keep = trim.clone();
+				MjpegAvi.Clip clip = openClip;
+				saveCopy.setDisable(true);
+				LOADER.execute(() -> {
+					try {
+						Path saved = saveTrimmed(item, clip, keep[0], keep[1]);
+						Platform.runLater(() -> {
+							saveCopy.setDisable(false);
+							endTrim.run();
+							Toasts.show(saveCopy, "Saved " + saved.getFileName());
+							load();
+						});
+					} catch (Exception ex) {
+						LauncherLog.warn("Couldn't save the trimmed clip", ex);
+						Platform.runLater(() -> {
+							saveCopy.setDisable(false);
+							Toasts.show(saveCopy, "Couldn't save: " + ex.getMessage());
+						});
+					}
+				});
+			});
+			trimControls = new Object[] {trimBar, setIn, setOut, trimButton};
 			LOADER.execute(() -> {
 				try {
 					MjpegAvi.Clip clip = MjpegAvi.read(item.file());
 					Platform.runLater(() -> {
 						stage.getChildren().remove(loading);
 						startPlayback(clip, view, play, seek, time, stage);
+						((Button) trimControls[3]).setDisable(false);
 					});
 				} catch (Exception ex) {
 					Platform.runLater(() -> loading.setText("Couldn't open this clip: " + ex.getMessage()));
@@ -364,9 +477,14 @@ public final class MediaView {
 			controls.getChildren().addAll(previous, next, counter, gap, copy, delete);
 		}
 		VBox viewer = new VBox(12, top, body, controls);
+		if (item.clip() && trimControls != null) {
+			viewer.getChildren().add((Node) trimControls[0]);
+		}
 		viewer.setFocusTraversable(true);
 		viewer.setOnKeyPressed(e -> {
-			if (e.getCode() == KeyCode.ESCAPE) {
+			if (item.clip() && trim != null && (e.getCode() == KeyCode.I || e.getCode() == KeyCode.O)) {
+				((Button) trimControls[e.getCode() == KeyCode.I ? 1 : 2]).fire();
+			} else if (e.getCode() == KeyCode.ESCAPE) {
 				closeViewer();
 			} else if (!item.clip() && (e.getCode() == KeyCode.LEFT || e.getCode() == KeyCode.RIGHT)) {
 				int index = siblings.indexOf(item);
@@ -428,6 +546,8 @@ public final class MediaView {
 		}
 		int last = clip.frames().size() - 1;
 		double[] position = {0};
+		openClip = clip;
+		playhead = position;
 		boolean[] playing = {true};
 		boolean[] dragging = {false};
 		int[] shown = {-1};
@@ -452,7 +572,10 @@ public final class MediaView {
 			public void handle(long now) {
 				if (lastNanos != 0 && playing[0] && !dragging[0]) {
 					position[0] += (now - lastNanos) / 1e9 * clip.fps();
-					if (position[0] >= last) {
+					if (trim != null && (position[0] > trim[1] || position[0] < trim[0])) {
+						// Trimming: loop the kept part.
+						position[0] = trim[0];
+					} else if (position[0] >= last) {
 						position[0] = last;
 						playing[0] = false;
 						play.setText("Play");
@@ -471,6 +594,26 @@ public final class MediaView {
 			}
 		};
 		playback.start();
+	}
+
+	/**
+	 * Writes frames {@code from}..{@code to} as a new clip next to the original ("name-trim.avi", numbered if taken),
+	 * with the first kept frame as its thumbnail and the original's fight recap.
+	 */
+	private static Path saveTrimmed(Item item, MjpegAvi.Clip clip, int from, int to) throws java.io.IOException {
+		String base = item.file().getFileName().toString().replaceFirst("\\.avi$", "");
+		Path target = item.file().resolveSibling(base + "-trim.avi");
+		for (int n = 2; Files.exists(target); n++) {
+			target = item.file().resolveSibling(base + "-trim" + n + ".avi");
+		}
+		MjpegAvi.write(target, new ArrayList<>(clip.frames().subList(from, to + 1)), clip.fps(), clip.width(), clip.height());
+		String newBase = target.getFileName().toString().replaceFirst("\\.avi$", "");
+		Files.write(target.resolveSibling(newBase + ".jpg"), clip.frames().get(from));
+		Path meta = item.file().resolveSibling(base + ".json");
+		if (Files.exists(meta)) {
+			Files.copy(meta, target.resolveSibling(newBase + ".json"), StandardCopyOption.REPLACE_EXISTING);
+		}
+		return target;
 	}
 
 	private void stopPlayback() {

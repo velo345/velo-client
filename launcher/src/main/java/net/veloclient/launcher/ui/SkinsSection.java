@@ -251,7 +251,7 @@ final class SkinsSection {
 	}
 
 	@FunctionalInterface
-	private interface Task<T> {
+	interface Task<T> {
 		T run() throws Exception;
 	}
 
@@ -259,7 +259,7 @@ final class SkinsSection {
 		run(task, onDone, status::setText);
 	}
 
-	private static <T> void run(Task<T> task, java.util.function.Consumer<T> onDone, java.util.function.Consumer<String> onError) {
+	static <T> void run(Task<T> task, java.util.function.Consumer<T> onDone, java.util.function.Consumer<String> onError) {
 		CompletableFuture.supplyAsync(() -> {
 			try {
 				return (Object) task.run();
@@ -278,14 +278,20 @@ final class SkinsSection {
 	}
 
 	/** Interactive 3D model; old 64x32 skins are converted to the 64x64 layout first. */
-	private static Node viewer(SkinLibrary.Skin skin) {
+	static Node viewer(SkinLibrary.Skin skin) {
+		byte[] png = pngBytes(skin);
+		return png == null ? null : PlayerSkin3DView.createViewer(png, skin.slim(), null, true, 25, false);
+	}
+
+	/** A library skin's texture in the 64x64 layout (legacy 64x32 skins converted), or null. */
+	static byte[] pngBytes(SkinLibrary.Skin skin) {
 		try {
 			byte[] png = Files.readAllBytes(SkinLibrary.png(skin));
 			BufferedImage src = ImageIO.read(new java.io.ByteArrayInputStream(png));
 			if (src != null && src.getHeight() == 32) {
 				png = modernize(src);
 			}
-			return PlayerSkin3DView.createViewer(png, skin.slim(), null, true, 25, false);
+			return png;
 		} catch (Exception e) {
 			return null;
 		}

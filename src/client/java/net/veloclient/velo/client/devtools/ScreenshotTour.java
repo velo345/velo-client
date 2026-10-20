@@ -48,12 +48,53 @@ public final class ScreenshotTour {
 		ClientTickEvents.END_CLIENT_TICK.register(ScreenshotTour::tick);
 	}
 
+	// ---- Real-game runs (launched by the launcher's dev auto-launch, other mods installed) ----
+	// -Dvelo.screenshotTour.boot: shoots the title screen as the game opens it (with every other mod's
+	// buttons), then -Dvelo.screenshotTour.world=<save> opens that world for the in-world scenes.
+	// -Dvelo.screenshotTour.noDemo: no demo friends/waypoints (never writes demo data into a real world).
+	private static final boolean BOOT = System.getProperty("velo.screenshotTour.boot") != null;
+	private static int bootTicks;
+	private static boolean bootDone;
+
+	private static void bootTick(MinecraftClient client) {
+		if (!(net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.minecraft.client.gui.screen.TitleScreen)) {
+			return;
+		}
+		bootTicks++;
+		switch (bootTicks) {
+			case 4 -> shot(client, "boot-title-opening");
+			case 200 -> shot(client, "boot-title");
+			case 210 -> {
+				bootDone = true;
+				String world = System.getProperty("velo.screenshotTour.world");
+				if (world == null) {
+					stop(client);
+					return;
+				}
+				//? if <26.1 {
+				client.createIntegratedServerLoader().start(world, () -> { });
+				//?} else {
+				/*client.createWorldOpenFlows().openWorld(world, () -> { });
+				*///?}
+			}
+			default -> {
+			}
+		}
+	}
+
 	private static void tick(MinecraftClient client) {
+		if (BOOT && !bootDone && client.player == null) {
+			bootTick(client);
+			return;
+		}
 		if (client.player == null || client.world == null) {
 			return;
 		}
 		ticksInWorld++;
 		int t = ticksInWorld;
+		if (t == 100 && !prepared && System.getProperty("velo.screenshotTour.noDemo") != null) {
+			prepared = true;
+		}
 		if (t == 100 && !prepared) {
 			prepared = true;
 			prepare(client);
@@ -215,6 +256,7 @@ public final class ScreenshotTour {
 	private static net.veloclient.velo.client.gui.VeloAdvancementsScreen advForTour;
 	private static net.veloclient.velo.client.gui.ModMenuScreen menuForTour;
 	private static java.util.ArrayDeque<Object[]> queue;
+	private static net.veloclient.velo.client.gui.CapeEquipScreen lockerForTour;
 	private static int nextAt;
 
 	/** Each scene = steps of {delayTicks, Runnable}. Add a scene here instead of running the whole tour. */
@@ -365,8 +407,29 @@ public final class ScreenshotTour {
 						client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null));
 					}},
 					new Object[] {40, (Runnable) () -> shot(client, "store-plus")});
+			case "friends" -> List.of(
+					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.FriendsScreen())},
+					new Object[] {30, (Runnable) () -> shot(client, "friends")});
+			case "locker" -> List.of(
+					new Object[] {0, (Runnable) () -> {
+						lockerForTour = new net.veloclient.velo.client.gui.CapeEquipScreen(null);
+						client.setScreen(lockerForTour);
+					}},
+					new Object[] {40, (Runnable) () -> shot(client, "locker")},
+					new Object[] {2, (Runnable) () -> lockerForTour.showTabForTour(1)},
+					new Object[] {40, (Runnable) () -> shot(client, "locker-wings")});
+			case "storecapes" -> List.of(
+					new Object[] {0, (Runnable) () -> {
+						net.veloclient.velo.client.gui.store.StoreScreen.showCapes();
+						client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null));
+					}},
+					new Object[] {60, (Runnable) () -> shot(client, "store-capes")});
+			case "title1" -> List.of(
+					new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.TitleScreen())},
+					new Object[] {45, (Runnable) () -> shot(client, "title")});
 			case "pause" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))},
+					new Object[] {3, (Runnable) () -> shot(client, "pause-opening")},
 					new Object[] {30, (Runnable) () -> shot(client, "pause")});
 			case "bugreport" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.BugReportScreen(null))},

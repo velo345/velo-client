@@ -98,6 +98,8 @@ public final class VeloBot extends ListenerAdapter {
 	private void registerCommands(JDA jda, String guildId) {
 		DefaultMemberPermissions admin = DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER);
 		List<SlashCommandData> commands = new ArrayList<>();
+		commands.add(Commands.slash("link", "Link your Minecraft account with the code from Velo Client (only you see the answer)")
+				.addOption(OptionType.STRING, "code", "The code Velo Client shows you", true));
 		commands.add(Commands.slash("unlink", "Unlink your Minecraft account (the Velo Neon cape is removed)"));
 		commands.add(Commands.slash("roles", "Ping roles members can pick").setDefaultPermissions(admin).addSubcommands(
 				new SubcommandData("add", "Put a role on the panel").addOptions(new OptionData(OptionType.ROLE, "role", "The role to give", true),
@@ -206,6 +208,7 @@ public final class VeloBot extends ListenerAdapter {
 		try {
 			String sub = event.getSubcommandName();
 			switch (event.getName()) {
+				case "link" -> linkCommand(event);
 				case "unlink" -> unlink(event);
 				case "roles" -> roles(event, sub);
 				case "ticket" -> ticket(event, sub);
@@ -247,25 +250,55 @@ public final class VeloBot extends ListenerAdapter {
 				});
 	}
 
+	/** A code typed in the link channel: the answer goes to the member privately (DM), not to the whole channel. */
 	private void link(MessageReceivedEvent event, String code) {
+		String reply;
 		try {
 			ServerApi.Linked linked = server.link(code, event.getAuthor().getId(), event.getAuthor().getName());
-			Guild guild = event.getGuild();
-			if (config.linkedRoleId != null && event.getMember() != null) {
-				Role role = guild.getRoleById(config.linkedRoleId);
-				if (role != null && guild.getSelfMember().canInteract(role)) {
-					guild.addRoleToMember(event.getMember(), role).queue(null, e -> { });
-				}
-			}
-			event.getChannel().sendMessage("✅ Linked to **" + linked.username()
-					+ "**! The **Velo Neon** cape is now in your cosmetics.").queue(null,
-					e -> System.err.println("Couldn't confirm Discord link: " + e.getMessage()));
+			grantLinkedRole(event.getGuild(), event.getMember());
+			reply = linkedMessage(linked);
 			if (vip != null) {
 				vip.runNow();
 			}
 		} catch (ServerApi.ApiException e) {
-			event.getChannel().sendMessage("❌ " + e.getMessage()).queue(null,
-					error -> System.err.println("Couldn't report Discord link failure: " + error.getMessage()));
+			reply = "❌ " + e.getMessage();
+		}
+		String text = reply;
+		event.getAuthor().openPrivateChannel().flatMap(channel -> channel.sendMessage(text)).queue(null, dmClosed ->
+				// DMs closed: a short note in the channel for them only to see, gone again after 15 seconds.
+				event.getChannel().sendMessage(event.getAuthor().getAsMention() + " " + text + " *(this message disappears)*")
+						.queue(message -> message.delete().queueAfter(15, java.util.concurrent.TimeUnit.SECONDS, null, e -> { }),
+								error -> System.err.println("Couldn't answer a Discord link: " + error.getMessage())));
+	}
+
+	/** /link code - answered ephemerally, so only the member sees it. */
+	private void linkCommand(SlashCommandInteractionEvent event) {
+		event.deferReply(true).queue();
+		var option = event.getOption("code");
+		String code = option == null ? "" : option.getAsString().strip();
+		try {
+			ServerApi.Linked linked = server.link(code, event.getUser().getId(), event.getUser().getName());
+			grantLinkedRole(event.getGuild(), event.getMember());
+			event.getHook().sendMessage(linkedMessage(linked)).queue();
+			if (vip != null) {
+				vip.runNow();
+			}
+		} catch (ServerApi.ApiException e) {
+			event.getHook().sendMessage("❌ " + e.getMessage()).queue();
+		}
+	}
+
+	private static String linkedMessage(ServerApi.Linked linked) {
+		return "✅ Linked to **" + linked.username() + "**! The **Velo Neon** cape is now in your cosmetics.";
+	}
+
+	private void grantLinkedRole(Guild guild, net.dv8tion.jda.api.entities.Member member) {
+		if (guild == null || member == null || config.linkedRoleId == null) {
+			return;
+		}
+		Role role = guild.getRoleById(config.linkedRoleId);
+		if (role != null && guild.getSelfMember().canInteract(role)) {
+			guild.addRoleToMember(member, role).queue(null, e -> { });
 		}
 	}
 

@@ -44,6 +44,10 @@ public final class NewsView {
 		void openNews();
 
 		boolean signedIn();
+
+		/** The player has now seen every post in the feed (clears the unread badges). */
+		default void seen(JsonObject feed) {
+		}
 	}
 
 	private NewsView() {
@@ -55,6 +59,16 @@ public final class NewsView {
 		var settings = net.veloclient.launcher.data.LauncherSettings.get();
 		if (newest > settings.newsSeenAt) {
 			settings.newsSeenAt = newest;
+			net.veloclient.launcher.data.LauncherSettings.save(settings);
+		}
+	}
+
+	/** Reading one post counts as having seen it (and everything older). */
+	public static void markSeen(JsonObject feed, JsonObject post) {
+		long at = NewsUi.num(post, "publishedAt");
+		var settings = net.veloclient.launcher.data.LauncherSettings.get();
+		if (at > settings.newsSeenAt) {
+			settings.newsSeenAt = at;
 			net.veloclient.launcher.data.LauncherSettings.save(settings);
 		}
 	}
@@ -110,6 +124,57 @@ public final class NewsView {
 		return box;
 	}
 
+	/** Home's big "What's new" card: the post's cover with its tag, date and title over the bottom. */
+	public static Node homeLeadCard(JsonObject post, java.util.function.Consumer<JsonObject> onOpen) {
+		String accent = NewsUi.str(post, "accent");
+		StackPane cover = NewsUi.cover(NewsUi.str(post, "cover"), accent, null, 14);
+		cover.setMinHeight(150);
+		javafx.scene.layout.Region shade = new javafx.scene.layout.Region();
+		shade.setMouseTransparent(true);
+		shade.setStyle("-fx-background-color: linear-gradient(to top, rgba(11,11,14,0.96) 12%, rgba(11,11,14,0) 70%); -fx-background-radius: 14;");
+		Label tag = NewsUi.tag(NewsUi.str(post, "tag"), accent);
+		String version = NewsUi.str(post, "version");
+		Label when = new Label((version == null || version.isBlank() ? "" : "v" + version + "  ·  ") + NewsUi.date(NewsUi.num(post, "publishedAt")));
+		when.getStyleClass().add("t-mono");
+		javafx.scene.layout.HBox meta = new javafx.scene.layout.HBox(8, tag, when);
+		meta.setAlignment(Pos.CENTER_LEFT);
+		Label title = new Label(NewsUi.str(post, "title"));
+		title.getStyleClass().add("t-heading");
+		title.setWrapText(true);
+		javafx.scene.layout.VBox text = new javafx.scene.layout.VBox(6, meta, title);
+		text.setPadding(new Insets(14, 16, 14, 16));
+		text.setMouseTransparent(true);
+		StackPane.setAlignment(text, Pos.BOTTOM_LEFT);
+		text.setMaxHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+		StackPane card = new StackPane(cover, shade, text);
+		card.getStyleClass().addAll("tile", "motion-card");
+		card.setMinHeight(150);
+		card.setOnMouseClicked(e -> onOpen.accept(post));
+		return card;
+	}
+
+	/** A compact news row (small cover, title, tag and date) for Home's "What's new" list. */
+	public static Node homeRow(JsonObject post, java.util.function.Consumer<JsonObject> onOpen) {
+		StackPane thumb = NewsUi.cover(NewsUi.str(post, "cover"), NewsUi.str(post, "accent"), null, 8);
+		thumb.setMinSize(42, 42);
+		thumb.setPrefSize(42, 42);
+		thumb.setMaxSize(42, 42);
+		Label title = new Label(NewsUi.str(post, "title"));
+		title.getStyleClass().add("t-strong");
+		title.setMaxWidth(260);
+		String tag = NewsUi.str(post, "tag");
+		Label meta = new Label((tag.isBlank() ? "" : tag + "  ·  ") + NewsUi.date(NewsUi.num(post, "publishedAt")));
+		meta.getStyleClass().add("t-muted");
+		javafx.scene.layout.VBox text = new javafx.scene.layout.VBox(2, title, meta);
+		javafx.scene.layout.HBox row = new javafx.scene.layout.HBox(12, thumb, text);
+		row.setAlignment(Pos.CENTER_LEFT);
+		row.setPadding(new Insets(10, 14, 10, 12));
+		row.getStyleClass().add("row-hover");
+		row.setStyle("-fx-cursor: hand;");
+		row.setOnMouseClicked(e -> onOpen.accept(post));
+		return row;
+	}
+
 	/** A post page opened from outside the News list (e.g. the Home banner). */
 	public static Node postPage(Host host, JsonObject post, JsonObject feed) {
 		return post(host, post, feed != null && NewsUi.bool(feed, "owner"));
@@ -141,6 +206,7 @@ public final class NewsView {
 		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
 			if (result instanceof JsonObject feed) {
 				markSeen(feed);
+				host.seen(feed);
 				if (!feed.equals(shown[0])) {
 					shown[0] = feed;
 					page.getChildren().setAll(list(host, feed));

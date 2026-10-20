@@ -76,8 +76,7 @@ public final class TitleScreenTheme {
 	public static final List<ExtraIcon> TITLE_EXTRA_ICONS = List.of(
 			new ExtraIcon("friends", List.of("friend")),
 			new ExtraIcon("language", List.of("language")),
-			new ExtraIcon("accessibility", List.of("accessibility")),
-			new ExtraIcon("mods", List.of("mods")));
+			new ExtraIcon("accessibility", List.of("accessibility")));
 
 	/** Buttons that get hidden outright rather than incorporated - a "News" popup button isn't something worth a permanent icon slot. */
 	public static final List<String> TITLE_HIDE_ONLY_NEEDLES = List.of("news");
@@ -452,15 +451,11 @@ public final class TitleScreenTheme {
 		context.fill(0, 0, screenWidth, screenHeight, (theme.background() & 0x00FFFFFF) | 0x1E000000);
 		context.fillGradient(0, 0, screenWidth, 48, 0x55000000, 0x00000000);
 		context.fillGradient(0, screenHeight - 120, screenWidth, screenHeight, 0x00000000, 0xAA000000);
-		List<Layout> column = stackLayout(screenWidth, screenHeight, 6);
-		Layout first = column.get(0);
-		Layout last = column.get(column.size() - 1);
-		int scrimX = first.x() - 28;
-		int scrimY = brandingTop(screenWidth, screenHeight, 6) - 16;
-		int scrimW = first.width() + 56;
-		int scrimH = last.y() + last.height() + 40 - scrimY;
-		VeloDraw.shadow(context, scrimX, scrimY, scrimW, scrimH, 22, 60, 0, 0x30000000);
-		VeloDraw.fillRounded(context, scrimX, scrimY, scrimW, scrimH, 22, 0x30000000);
+		// The menu column lives on the left (TitleMenu): the scene fades to the theme's dark there.
+		int dark = theme.background() & 0x00FFFFFF;
+		int solid = Math.round(screenWidth * 0.22f);
+		context.fill(0, 0, solid, screenHeight, dark | 0xD8000000);
+		MenuKit.hGradient(context, solid, 0, Math.round(screenWidth * 0.36f), screenHeight, dark | 0xD8000000, dark);
 	}
 
 	private static void drawDuelFrame(DrawContext context, com.mojang.blaze3d.pipeline.RenderPipeline pipeline, Identifier texture,

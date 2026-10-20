@@ -84,8 +84,8 @@ public final class VoxelSceneryView extends Region {
 	// JavaFX mipmaps material textures, so tiles sit in power-of-two-aligned cells with a wide gutter
 	// of repeated edge pixels: mip levels then never average two different tiles together (that's
 	// what showed up as dark/grey outlines along block edges).
-	private static final int UPSCALE = 2;
-	private static final int GUTTER = 16;
+	private static final int UPSCALE = 4;
+	private static final int GUTTER = 32;
 	private static final int CELL = TEX * UPSCALE + GUTTER * 2;
 
 	private final SubScene subScene;
@@ -157,6 +157,12 @@ public final class VoxelSceneryView extends Region {
 				last[0] = now;
 				spin.setAngle((spin.getAngle() + dt * 5) % 360);
 				waterView.setTranslateY(Math.sin(now / 7e8) * 0.03);
+				// Rippling surface: a short loop of pixel-art frames, swapped ~9 times a second.
+				int frame = (int) ((now / 110_000_000L) % WATER_FRAMES);
+				if (frame != waterFrame && waterFrames != null) {
+					waterFrame = frame;
+					waterMaterial.setDiffuseMap(waterFrames[frame]);
+				}
 			}
 		};
 		sceneProperty().addListener((obs, was, scene) -> {
@@ -178,8 +184,10 @@ public final class VoxelSceneryView extends Region {
 		this.accent = accent;
 		this.backdrop = background;
 		material.setDiffuseMap(buildAtlas());
-		Color water = Color.hsb(205 + (((accent.getHue() - 205) % 360 + 540) % 360 - 180) * 0.25, 0.62, 0.8);
-		waterMaterial.setDiffuseColor(Color.color(water.getRed(), water.getGreen(), water.getBlue(), 0.7));
+		Color water = Color.hsb(200 + (((accent.getHue() - 200) % 360 + 540) % 360 - 180) * 0.08, 0.66, 0.82);
+		waterFrames = waterFrames(water);
+		waterMaterial.setDiffuseColor(Color.color(1, 1, 1, 0.82));
+		waterMaterial.setDiffuseMap(waterFrames[0]);
 		waterMaterial.setSpecularColor(Color.gray(0.9));
 		waterMaterial.setSpecularPower(48);
 		setBackground(new Background(
@@ -492,8 +500,12 @@ public final class VoxelSceneryView extends Region {
 
 	private WritableImage buildAtlas() {
 		int rows = Math.max(1, (tiles.size() + atlasColumns - 1) / atlasColumns);
-		WritableImage atlas = new WritableImage(atlasColumns * CELL, rows * CELL);
-		PixelWriter writer = atlas.getPixelWriter();
+		int atlasW = atlasColumns * CELL;
+		int atlasH = rows * CELL;
+		WritableImage atlas = new WritableImage(atlasW, atlasH);
+		// Built in an array and written once - pixel-by-pixel writes made this the slowest part of Home.
+		int[] pixels = new int[atlasW * atlasH];
+		Color bounce = accent.interpolate(Color.WHITE, 0.15);
 		Color[][][] textures = new Color[TEXTURES][][];
 		for (int t = 0; t < TEXTURES; t++) {
 			textures[t] = texture(t);
@@ -522,11 +534,60 @@ public final class VoxelSceneryView extends Region {
 					double u = (cx + 0.5) / inner;
 					double v = (cy + 0.5) / inner;
 					double ao = (corner[0] * (1 - u) + corner[1] * u) * (1 - v) + (corner[3] * (1 - u) + corner[2] * u) * v;
-					writer.setArgb(ox + px, oy + py, argb(base, shade * ao));
+					double light = shade * ao;
+					Color c = base;
+					if (texture != T_CLOUD && dir == 1) {
+						// Undersides pick up a faint bounce of the theme colour.
+						c = base.interpolate(bounce, 0.12);
+					}
+					pixels[(oy + py) * atlasW + ox + px] = argb(c, light);
 				}
 			}
 		}
+		atlas.getPixelWriter().setPixels(0, 0, atlasW, atlasH, javafx.scene.image.PixelFormat.getIntArgbInstance(), pixels, 0, atlasW);
 		return atlas;
+	}
+
+	private static final int WATER_FRAMES = 16;
+	private WritableImage[] waterFrames;
+	private int waterFrame = -1;
+
+	/**
+	 * Minecraft-style water: a 16x16 pixel-art loop of crossing ripples in four tones, seamless across blocks
+	 * (every wave repeats exactly every 16 texels), with alpha so the sand below shows through.
+	 */
+	private static WritableImage[] waterFrames(Color water) {
+		// Like vanilla water: one flat blue, a few slightly darker pixels and thin light streaks drifting across.
+		Color[] tones = {water.deriveColor(0, 1, 0.9, 1), water, water, water.interpolate(Color.WHITE, 0.22)};
+		double[] alpha = {0.76, 0.74, 0.74, 0.8};
+		int px = 2;
+		int size = TEX * px;
+		WritableImage[] frames = new WritableImage[WATER_FRAMES];
+		for (int f = 0; f < WATER_FRAMES; f++) {
+			double t = (double) f / WATER_FRAMES * Math.PI * 2;
+			int[] pixels = new int[size * size];
+			for (int y = 0; y < TEX; y++) {
+				for (int x = 0; x < TEX; x++) {
+					double k = Math.PI * 2 / TEX;
+					double w = 0.5 * Math.sin(k * (x + y) + t) + 0.32 * Math.sin(k * (2 * x - y) - 2 * t)
+							+ 0.22 * Math.sin(k * (x - 3 * y) + t) + 0.12 * Math.sin(k * 3 * y + 3 * t);
+					double v = (w + 1.16) / 2.32;
+					int tone = v > 0.86 ? 3 : v > 0.2 ? 1 : 0;
+					Color c = tones[tone];
+					int argb = ((int) Math.round(alpha[tone] * 255) << 24) | ((int) Math.round(c.getRed() * 255) << 16)
+							| ((int) Math.round(c.getGreen() * 255) << 8) | (int) Math.round(c.getBlue() * 255);
+					for (int dy = 0; dy < px; dy++) {
+						for (int dx = 0; dx < px; dx++) {
+							pixels[(y * px + dy) * size + x * px + dx] = argb;
+						}
+					}
+				}
+			}
+			WritableImage frame = new WritableImage(size, size);
+			frame.getPixelWriter().setPixels(0, 0, size, size, javafx.scene.image.PixelFormat.getIntArgbInstance(), pixels, 0, size);
+			frames[f] = frame;
+		}
+		return frames;
 	}
 
 	/** Picks a palette entry from a 0..1 value - quantizing is what gives the crisp pixel-art look. */
@@ -547,7 +608,7 @@ public final class VoxelSceneryView extends Region {
 	/** One 16x16 pixel-art texture, graded towards the theme accent. */
 	private Color[][] texture(int texture) {
 		Random random = new Random(1000L + texture * 7919L);
-		// Foliage takes the accent's hue at a natural saturation/brightness - a stylized "theme biome".
+		// Grass and leaves take the accent's hue at a natural saturation/brightness - a stylized "theme biome".
 		Color foliage = Color.hsb(accent.getHue(), Math.min(0.6, Math.max(0.4, accent.getSaturation() * 0.66)), 0.68);
 		Color[] grass = ramp(foliage, 0.76, 0.87, 0.96, 1.05);
 		Color[] dirt = ramp(Color.web("#86603f"), 0.7, 0.82, 0.92, 1.02);
@@ -561,7 +622,8 @@ public final class VoxelSceneryView extends Region {
 				double n = random.nextDouble();
 				// Mixing in a low-frequency blotch term makes tones form clusters instead of static.
 				double blotch = 0.5 + 0.5 * noise(x * 0.9, y * 0.9, texture * 13L + 1);
-				double v = n * 0.55 + blotch * 0.45;
+				// Mostly per-pixel speckle like vanilla's textures, with only a hint of clustering.
+				double v = n * 0.85 + blotch * 0.15;
 				Color c;
 				switch (texture) {
 					case T_GRASS_TOP -> c = pick(grass, v);

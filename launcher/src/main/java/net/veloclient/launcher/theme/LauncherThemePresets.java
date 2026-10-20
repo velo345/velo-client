@@ -3,21 +3,21 @@ package net.veloclient.launcher.theme;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Same preset values as the mod's {@code ThemePresets} (design spec section 7). */
+/** The launcher's built-in themes (0.9.7 redesign: neutral grounds, one solid accent). Names match the mod's {@code ThemePresets}. */
 public final class LauncherThemePresets {
 
 	public static final LauncherTheme VELO_DARK = new LauncherTheme(
-			"Velo Dark", 0xF00F0A0A, 0xE01E1212, 0xFFFF4444, 0xFFB71C1C, 0xFFFFFFFF, 8, 0.6f, 1.0f, 0.85f);
+			"Velo Dark", 0xFF0B0B0E, 0xFF131317, 0xFFE0262E, 0xFFC81F27, 0xFFF4F4F6, 10, 0.6f, 1.0f, 0.92f);
 	public static final LauncherTheme MIDNIGHT = new LauncherTheme(
-			"Midnight", 0xF0000010, 0xE0101025, 0xFF3B5BFF, 0xFF7A5CFF, 0xFFE8E8FF, 6, 0.5f, 1.0f, 0.85f);
+			"Midnight", 0xFF090D18, 0xFF111726, 0xFF4F7DFF, 0xFF3B5BDB, 0xFFEEF1FF, 10, 0.5f, 1.0f, 0.92f);
 	public static final LauncherTheme NORD = new LauncherTheme(
-			"Nord", 0xF02E3440, 0xE03B4252, 0xFF88C0D0, 0xFF81A1C1, 0xFFECEFF4, 6, 0.4f, 1.0f, 0.85f);
+			"Nord", 0xFF2A303B, 0xFF333A47, 0xFF88C0D0, 0xFF81A1C1, 0xFFECEFF4, 10, 0.4f, 1.0f, 0.92f);
 	public static final LauncherTheme MONOCHROME = new LauncherTheme(
-			"Monochrome", 0xF0111111, 0xE01E1E1E, 0xFFBBBBBB, 0xFFFFFFFF, 0xFFFFFFFF, 4, 0.3f, 0.8f, 0.85f);
+			"Monochrome", 0xFF0D0D0D, 0xFF171717, 0xFFE6E6E6, 0xFFBDBDBD, 0xFFF5F5F5, 10, 0.3f, 0.8f, 0.92f);
 	public static final LauncherTheme EMERALD = new LauncherTheme(
-			"Emerald", 0xF0071311, 0xE00F2420, 0xFF2ECC71, 0xFF13A08A, 0xFFE6FFF2, 8, 0.5f, 1.0f, 0.85f);
+			"Emerald", 0xFF07110D, 0xFF0F1B16, 0xFF22C17A, 0xFF16A066, 0xFFE8FFF4, 10, 0.5f, 1.0f, 0.92f);
 	public static final LauncherTheme SUNSET = new LauncherTheme(
-			"Sunset", 0xF0150A10, 0xE0281520, 0xFFFF8040, 0xFFE0457B, 0xFFFFF0E8, 8, 0.5f, 1.0f, 0.85f);
+			"Sunset", 0xFF130C0A, 0xFF1D1411, 0xFFFF7A3D, 0xFFE85D2A, 0xFFFFF3EC, 10, 0.5f, 1.0f, 0.92f);
 
 	private LauncherThemePresets() {
 	}

@@ -60,10 +60,11 @@ public final class CapeImportDialog {
 		grid.addRow(row++, new Label("Segments (perf vs fidelity)"), segments);
 
 		dialog.getDialogPane().setContent(grid);
-		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+		ButtonType confirm = new ButtonType("Import cape", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, confirm);
 
 		dialog.setResultConverter(button -> {
-			if (button != ButtonType.OK) {
+			if (button != confirm) {
 				return null;
 			}
 			CapePhysicsPresetData preset = new CapePhysicsPresetData(

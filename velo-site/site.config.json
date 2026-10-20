@@ -1,7 +1,7 @@
 {
   "site": {
     "name": "Velo Client",
-    "url": "https://velo-client-mc.vercel.app",
+    "url": "https://velo-client-flame.vercel.app",
     "description": "Velo Client: a free Fabric client and launcher for Minecraft 1.21.11, 26.1, 26.2 and 26.3. More FPS, a clean HUD, Friends, Waypoints, 3D capes and tools for server players.",
     "themeColor": "#0b0707"
   },

@@ -163,7 +163,9 @@ public final class VeloAdvancementsScreen extends VeloWindow {
 				() -> listView = !listView));
 		hits.add(VeloUi.pill(context, contentX() + half + 4, bottom - 16, half, 16, "Vanilla", 0, mouseX, mouseY, this::openVanilla));
 
-		VeloDraw.fillRounded(context, mainX, top, mainW, bottom - top, 8, VeloStyle.sunken());
+		int detailW = mainW >= 300 ? Math.max(120, Math.min(190, Math.round(mainW * 0.36f))) : 0;
+		mainW -= detailW > 0 ? detailW + 10 : 0;
+		VeloDraw.fillRounded(context, mainX, top, mainW, bottom - top, 8, 0x66000000);
 		if (tab == null) {
 			context.drawTextWithShadow(this.textRenderer, "No advancements yet.", mainX + 10, top + 10, VeloStyle.textMuted());
 		} else if (listView) {
@@ -171,7 +173,9 @@ public final class VeloAdvancementsScreen extends VeloWindow {
 		} else {
 			drawTree(context, mainX, top, mainW, bottom - top, mouseX, mouseY);
 		}
-		if (selected != null && source.nodes.containsKey(selected)) {
+		if (detailW > 0) {
+			drawDetails(context, mainX + mainW + 10, top, detailW, bottom - top);
+		} else if (selected != null && source.nodes.containsKey(selected)) {
 			int dw = Math.min(180, mainW / 2);
 			int dx = mainX + mainW - dw - 6;
 			drawDetails(context, dx, top + 6, dw, bottom - top - 12);
@@ -184,11 +188,20 @@ public final class VeloAdvancementsScreen extends VeloWindow {
 		int y = contentY();
 		int total = source.nodes.size();
 		long completed = source.nodes.keySet().stream().filter(this::done).count();
-		context.drawTextWithShadow(this.textRenderer, "Total", x, y + 2, VeloStyle.textMuted());
-		String totalText = completed + " / " + total;
-		context.drawTextWithShadow(this.textRenderer, totalText, x + sidebar() - this.textRenderer.getWidth(totalText), y + 2, VeloStyle.text());
-		bar(context, x, y + 13, sidebar(), total == 0 ? 0 : completed / (float) total);
-		int listTop = y + 24;
+		// Progress ring (0.9.7): percent inside, "x of y done" beside it.
+		float fraction = total == 0 ? 0 : completed / (float) total;
+		float rcx = x + 15;
+		float rcy = y + 15;
+		VeloDraw.strokeArc(context, rcx, rcy, 13, 3, 0, 360, 0x14FFFFFF);
+		if (fraction > 0) {
+			VeloDraw.strokeArc(context, rcx, rcy, 13, 3, 0, 360 * fraction, 0xFF3DDC97);
+		}
+		net.minecraft.text.Text pct = net.veloclient.velo.client.gui.title.MenuKit.uiBold(Math.round(fraction * 100) + "%");
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, pct, Math.round(rcx - this.textRenderer.getWidth(pct) / 2f), Math.round(rcy - 4), 0xFFF4F4F6);
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.uiBold(completed + " of " + total + " done"),
+				x + 36, y + 6, 0xFFF4F4F6);
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.ui("This world"), x + 36, y + 17, 0xFF8A8A95);
+		int listTop = y + 38;
 		context.enableScissor(x, listTop, x + sidebar(), contentBottom() - 20);
 		int ry = listTop - Math.round(sideScroll);
 		for (String rootId : source.roots) {
@@ -206,9 +219,8 @@ public final class VeloAdvancementsScreen extends VeloWindow {
 			}
 			boolean active = rootId.equals(tab);
 			boolean hovered = VeloUi.inside(mouseX, mouseY, x, ry, sidebar(), 34) && mouseY >= listTop;
-			VeloDraw.fillRounded(context, x, ry, sidebar(), 34, 7, active ? VeloStyle.accentSoft(0.22f) : hovered ? VeloStyle.cardHover() : VeloStyle.card());
-			if (active) {
-				VeloDraw.fillRounded(context, x + 1, ry + 8, 3, 18, 1, VeloStyle.accent());
+			if (active || hovered) {
+				VeloDraw.fillRounded(context, x, ry, sidebar(), 34, 7, active ? 0x14FFFFFF : 0x0AFFFFFF);
 			}
 			context.drawItemWithoutEntity(root.icon(), x + 7, ry + 9);
 			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(root.title(), sidebar() - 32), x + 28, ry + 6, VeloStyle.text());
@@ -231,9 +243,9 @@ public final class VeloAdvancementsScreen extends VeloWindow {
 	}
 
 	private void bar(DrawContext context, int x, int y, int w, float fraction) {
-		VeloDraw.fillRounded(context, x, y, w, 4, 2, 0x40FFFFFF);
+		VeloDraw.fillRounded(context, x, y, w, 4, 2, 0x14FFFFFF);
 		if (fraction > 0) {
-			VeloDraw.fillRounded(context, (float) x, y, Math.max(4, w * fraction), 4, 2, fraction >= 1 ? 0xFF6FE0A4 : VeloStyle.accent());
+			VeloDraw.fillRounded(context, (float) x, y, Math.max(4, w * fraction), 4, 2, 0xFF3DDC97);
 		}
 	}
 
@@ -252,6 +264,15 @@ public final class VeloAdvancementsScreen extends VeloWindow {
 		float step = SPACING * zoom;
 		int size = Math.round(22 * zoom);
 		context.enableScissor(x, y, x + w, y + h);
+		// A faint dot grid that moves with the tree.
+		int grid = Math.max(8, Math.round(11 * zoom));
+		int gx0 = x + Math.floorMod(Math.round(panX), grid);
+		int gy0 = y + Math.floorMod(Math.round(panY), grid);
+		for (int gy = gy0; gy < y + h; gy += grid) {
+			for (int gx = gx0; gx < x + w; gx += grid) {
+				context.fill(gx, gy, gx + 1, gy + 1, 0x12FFFFFF);
+			}
+		}
 		// Connections (elbow lines, like vanilla).
 		for (AdvancementSource.Node n : tabNodes) {
 			AdvancementSource.Node parent = n.parentId() == null ? null : source.nodes.get(n.parentId());
@@ -263,7 +284,7 @@ public final class VeloAdvancementsScreen extends VeloWindow {
 			float px = ox + parent.x() * step;
 			float py = oy + parent.y() * step;
 			float midX = (cx + px) / 2f;
-			int color = done(n.id()) ? VeloAnim.lerpArgb(VeloStyle.accent(), 0xFFFFFFFF, 0.2f) : 0x50FFFFFF;
+			int color = done(n.id()) ? 0xFF3DDC97 : 0x24FFFFFF;
 			float t = Math.max(1f, 1.5f * zoom);
 			VeloDraw.line(context, px, py, midX, py, t, color);
 			VeloDraw.line(context, midX, py, midX, cy, t, color);
@@ -277,16 +298,19 @@ public final class VeloAdvancementsScreen extends VeloWindow {
 			int ny = Math.round(cy - size / 2f);
 			boolean show = visible(n);
 			boolean isDone = done(n.id());
-			boolean isSelected = n.id().equals(selected);
+				boolean isSelected = n.id().equals(selected);
 			boolean isHovered = VeloUi.inside(mouseX, mouseY, nx, ny, size, size) && VeloUi.inside(mouseX, mouseY, x, y, w, h);
 			if (isHovered) {
 				hovered = n;
 			}
-			int fill = isDone ? VeloAnim.lerpArgb(VeloStyle.accent(), 0xFF000000, 0.35f) : 0xFF26262C;
+			AdvancementSource.Progress progress = source.progress.get(n.id());
+			boolean inProgress = !isDone && progress != null && progress.percent() > 0;
+			// Done green, in progress blue, the rest grey; goals and challenges keep their gold / purple edge.
+			int fill = isDone ? 0xFF16251F : inProgress ? 0xFF151E2A : 0xFF1B1B20;
 			int border = switch (n.frame()) {
 				case CHALLENGE -> 0xFFB06BFF;
 				case GOAL -> 0xFFF4B82E;
-				default -> isDone ? VeloStyle.accent() : 0x60FFFFFF;
+				default -> isDone ? 0xFF3DDC97 : inProgress ? 0xFF5AA9FF : 0x1FFFFFFF;
 			};
 			int radius = n.frame() == AdvancementSource.Frame.TASK ? Math.max(3, size / 5) : size / 2;
 			if (!show) {
@@ -361,19 +385,27 @@ public final class VeloAdvancementsScreen extends VeloWindow {
 	// ---- Details ----
 
 	private void drawDetails(DrawContext context, int x, int y, int w, int h) {
-		VeloDraw.fillRounded(context, x, y, w, h, 8, 0xF0141418);
-		VeloDraw.strokeRounded(context, x, y, w, h, 8, VeloStyle.border());
+		VeloDraw.fillRounded(context, x, y, w, h, 8, 0x29000000);
+		VeloDraw.strokeRounded(context, x, y, w, h, 8, 0x0FFFFFFF);
 		AdvancementSource.Node n = selected == null ? null : source.nodes.get(selected);
 		if (n == null) {
 			context.drawTextWithShadow(this.textRenderer, "Select an advancement", x + 10, y + 10, VeloStyle.textMuted());
 			context.drawTextWithShadow(this.textRenderer, "to see what it needs.", x + 10, y + 22, VeloStyle.textFaint());
 			return;
 		}
+		boolean detailDone = done(n.id());
+		AdvancementSource.Progress detailProgress = source.progress.get(n.id());
+		boolean detailInProgress = !detailDone && detailProgress != null && detailProgress.percent() > 0;
+		int stateColor = detailDone ? 0xFF3DDC97 : detailInProgress ? 0xFF5AA9FF : 0xFF6E6E78;
+		VeloDraw.fillRounded(context, x + 8, y + 8, 40, 40, 10, (stateColor & 0xFFFFFF) | 0x1F000000);
+		VeloDraw.strokeRounded(context, x + 8, y + 8, 40, 40, 10, stateColor);
 		context.getMatrices().pushMatrix();
-		context.getMatrices().translate(x + 10, y + 10);
+		context.getMatrices().translate(x + 12, y + 12);
 		context.getMatrices().scale(2f, 2f);
 		context.drawItemWithoutEntity(n.icon(), 0, 0);
 		context.getMatrices().popMatrix();
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.mono(
+				detailDone ? "DONE" : detailInProgress ? "IN PROGRESS" : "NOT STARTED"), x + 56, y + 36, stateColor);
 		String type = switch (n.frame()) {
 			case CHALLENGE -> "Challenge";
 			case GOAL -> "Goal";
@@ -384,14 +416,12 @@ public final class VeloAdvancementsScreen extends VeloWindow {
 			case GOAL -> 0xFFF4B82E;
 			default -> VeloStyle.textMuted();
 		};
-		context.drawTextWithShadow(this.textRenderer, type, x + 48, y + 14, typeColor);
-		boolean isDone = done(n.id());
-		context.drawTextWithShadow(this.textRenderer, isDone ? "Completed" : "Not done yet", x + 48, y + 26, isDone ? 0xFF6FE0A4 : VeloStyle.textFaint());
-		int ty = y + 50;
-		for (String line : VeloUi.wrap(n.title(), w - 20)) {
-			context.drawTextWithShadow(this.textRenderer, net.veloclient.velo.client.gui.title.TitleScreenTheme.tileFont(line), x + 10, ty,
-					VeloStyle.text());
-			ty += 11;
+		context.drawTextWithShadow(this.textRenderer, type, x + 56, y + 14, typeColor);
+		int ty = y + 58;
+		for (net.minecraft.text.Text line : net.veloclient.velo.client.gui.title.MenuKit.wrap(this.textRenderer, n.title(),
+				net.veloclient.velo.client.gui.title.MenuKit::display, w - 20)) {
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, line, x + 10, ty, 0xFFF4F4F6);
+			ty += 13;
 		}
 		ty += 4;
 		for (String line : VeloUi.wrap(n.description(), w - 20)) {

@@ -203,10 +203,20 @@ public final class GameLauncher {
 			jvmArgs.addAll(resolveArguments(fabric.getAsJsonObject("arguments").getAsJsonArray("jvm"), values, activeFeatures));
 		}
 
+		String devJvmArgs = System.getProperty("velo.gameJvmArgs");
+		if (devJvmArgs != null && !devJvmArgs.isBlank()) {
+			jvmArgs.addAll(List.of(devJvmArgs.split("\\|")));
+		}
+
 		List<String> gameArgs = new ArrayList<>();
 		gameArgs.addAll(resolveArguments(vanilla.getAsJsonObject("arguments").getAsJsonArray("game"), values, activeFeatures));
 		if (fabric.has("arguments") && fabric.getAsJsonObject("arguments").has("game")) {
 			gameArgs.addAll(resolveArguments(fabric.getAsJsonObject("arguments").getAsJsonArray("game"), values, activeFeatures));
+		}
+
+		String devGameArgs = System.getProperty("velo.gameArgs");
+		if (devGameArgs != null && !devGameArgs.isBlank()) {
+			gameArgs.addAll(List.of(devGameArgs.split("\\|")));
 		}
 
 		Downloader.saveVerifiedIndex();

@@ -9,24 +9,28 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.GridPane;
+import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import net.veloclient.launcher.theme.LauncherCustomThemeStore;
 import net.veloclient.launcher.theme.LauncherTheme;
 import net.veloclient.launcher.theme.LauncherThemePresets;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Locale;
 import java.util.function.UnaryOperator;
 
 /**
- * Launcher themes on one page, laid out like the in-game editor: the theme list on the left
- * (click to use it), and on the right a live preview plus every setting of the active theme -
- * colors as swatches with their hex code, and sliders. Changes apply to the whole launcher right
- * away. Changing a built-in theme makes an editable copy first, so presets are never lost.
+ * Themes: built-in and your own on the left, the controls in the middle (accent and background swatches, panel and
+ * text colours, corners) and a live miniature launcher on the right. Changing anything on a built-in theme makes an
+ * editable copy. Themes can be shared as a short code.
  */
 public final class ThemeEditorView {
 
@@ -39,86 +43,93 @@ public final class ThemeEditorView {
 		void rebuild();
 	}
 
+	private static final int[] ACCENTS = {0xE0262E, 0xFF7A3D, 0xF7C04A, 0x22C17A, 0x2EC4B6, 0x4F7DFF, 0x8B6CFF, 0xF05AA8, 0xE6E6E6};
+	private static final int[] GROUNDS = {0x0B0B0E, 0x090D18, 0x07110D, 0x130C0A, 0x2A303B, 0x0D0D0D, 0x15101C};
+
 	private ThemeEditorView() {
 	}
 
 	public static Node build(Host host) {
-		Label title = new Label("Themes");
-		title.getStyleClass().add("page-title");
-		Label subtitle = new Label("Pick a theme, or tweak colors and see the whole launcher change live.");
-		subtitle.getStyleClass().add("page-subtitle");
-		VBox header = new VBox(4, title, subtitle);
-
-		HBox body = new HBox(22, themeList(host), editor(host));
-		HBox.setHgrow(body.getChildren().get(1), Priority.ALWAYS);
-
-		VBox root = new VBox(20, header, body);
-		root.setPadding(new Insets(0, 4, 20, 0));
-		ScrollPane scroll = new ScrollPane(root);
-		scroll.setFitToWidth(true);
-		scroll.getStyleClass().add("scroll-pane");
-		VBox wrapper = new VBox(scroll);
-		VBox.setVgrow(scroll, Priority.ALWAYS);
-		return wrapper;
+		HBox body = new HBox(28, themeList(host), controls(host), preview(host.activeTheme()));
+		HBox.setHgrow(body.getChildren().get(2), Priority.ALWAYS);
+		body.getStyleClass().add("page");
+		return body;
 	}
 
 	// ---- Left: the list ----
 
 	private static Node themeList(Host host) {
-		VBox list = new VBox(6);
-		list.getStyleClass().add("theme-list");
-		list.setMinWidth(230);
+		Label title = new Label("Themes");
+		title.getStyleClass().add("page-title");
+		VBox list = new VBox(2, title);
+		VBox.setMargin(title, new Insets(0, 0, 12, 0));
+		list.setMinWidth(220);
 		list.setPrefWidth(230);
 		list.getChildren().add(caption("BUILT-IN"));
 		for (LauncherTheme t : LauncherThemePresets.all().values()) {
 			list.getChildren().add(themeRow(host, t, false));
 		}
-		list.getChildren().add(caption("YOUR THEMES"));
+		list.getChildren().add(caption("YOURS"));
 		var customs = LauncherCustomThemeStore.load();
 		if (customs.isEmpty()) {
-			Label none = new Label("None yet - change any color to make one.");
-			none.getStyleClass().add("settings-row-hint");
+			Label none = new Label("None yet - change anything to make one.");
+			none.getStyleClass().add("t-muted");
 			none.setWrapText(true);
+			none.setPadding(new Insets(2, 10, 6, 10));
 			list.getChildren().add(none);
 		}
 		for (LauncherTheme t : customs) {
 			list.getChildren().add(themeRow(host, t, true));
 		}
-		Button create = new Button("+  New theme");
-		create.getStyleClass().add("primary-button");
+		Button create = new Button("New theme");
+		create.setGraphic(Icons.icon("plus", 14, Color.web("#A9A9B3"), 2.2));
+		create.getStyleClass().add("dashed-tile");
 		create.setMaxWidth(Double.MAX_VALUE);
 		create.setOnAction(e -> {
-			LauncherCustomThemeStore.create(freeName("My Theme"), host.activeTheme()).ifPresent(host::setActiveTheme);
+			LauncherCustomThemeStore.create(freeName("My theme"), host.activeTheme()).ifPresent(host::setActiveTheme);
 			host.rebuild();
 		});
 		VBox.setMargin(create, new Insets(8, 0, 0, 0));
-		list.getChildren().add(create);
+		Region grow = new Region();
+		VBox.setVgrow(grow, Priority.ALWAYS);
+		Button importCode = new Button("Import theme code");
+		importCode.setGraphic(Icons.icon("download", 14, Color.web("#E4E4E8")));
+		importCode.setMaxWidth(Double.MAX_VALUE);
+		importCode.setOnAction(e -> importCode(host, importCode));
+		list.getChildren().addAll(create, grow, importCode);
 		return list;
 	}
 
 	private static Label caption(String text) {
 		Label label = new Label(text);
-		label.getStyleClass().add("theme-caption");
+		label.getStyleClass().add("popover-section");
 		return label;
 	}
 
 	private static Node themeRow(Host host, LauncherTheme t, boolean custom) {
 		boolean active = t.name().equals(host.activeTheme().name());
-		HBox palette = new HBox(0, chip(t.background(), "6 0 0 6"), chip(t.surface(), "0"), gradientChip(t));
-		palette.setMinWidth(54);
+		StackPane bg = dot(t.background(), 18);
+		StackPane accent = dot(t.accentStart(), 18);
+		accent.setTranslateX(-6);
+		HBox palette = new HBox(bg, accent);
 		Label name = new Label(t.name());
-		name.getStyleClass().add("theme-row-name");
+		name.getStyleClass().add("t-strong");
+		name.setStyle("-fx-font-family: '" + (active ? "Inter SemiBold" : "Inter Medium") + "';");
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox row = new HBox(10, palette, name, spacer);
+		HBox row = new HBox(8, palette, name, spacer);
 		row.setAlignment(Pos.CENTER_LEFT);
-		row.getStyleClass().add("theme-row");
+		row.getStyleClass().add("popover-row");
 		if (active) {
-			row.getStyleClass().add("theme-row-active");
+			row.getStyleClass().add("popover-row-active");
 		}
 		if (custom) {
-			Button delete = new Button("✕");
-			delete.getStyleClass().add("theme-row-delete");
+			Button delete = new Button();
+			delete.setGraphic(Icons.icon("trash", 14, Color.web("#A9A9B3")));
+			delete.getStyleClass().addAll("icon-button", "icon-button-flat");
+			delete.setMinSize(28, 28);
+			delete.setPrefSize(28, 28);
+			delete.setTooltip(new Tooltip("Delete theme"));
 			delete.setOnAction(e -> {
 				LauncherCustomThemeStore.delete(t.name());
 				if (active) {
@@ -136,38 +147,34 @@ public final class ThemeEditorView {
 		return row;
 	}
 
-	private static Region chip(int argb, String radius) {
-		Region r = new Region();
-		r.setPrefSize(18, 18);
-		r.setStyle("-fx-background-color: " + LauncherTheme.toCssRgba(argb | 0xFF000000) + "; -fx-background-radius: " + radius + ";");
-		return r;
+	private static StackPane dot(int argb, double size) {
+		StackPane dot = new StackPane();
+		dot.setMinSize(size, size);
+		dot.setMaxSize(size, size);
+		dot.setStyle("-fx-background-color: " + LauncherTheme.toCssRgba(argb | 0xFF000000) + "; -fx-background-radius: 99;"
+				+ " -fx-border-color: rgba(255,255,255,0.18); -fx-border-radius: 99;");
+		return dot;
 	}
 
-	private static Region gradientChip(LauncherTheme t) {
-		Region r = new Region();
-		r.setPrefSize(18, 18);
-		r.setStyle("-fx-background-color: linear-gradient(to bottom right, " + LauncherTheme.toCssRgba(t.accentStart() | 0xFF000000) + ", "
-				+ LauncherTheme.toCssRgba(t.accentEnd() | 0xFF000000) + "); -fx-background-radius: 0 6 6 0;");
-		return r;
-	}
+	// ---- Middle: the controls ----
 
-	// ---- Right: preview + settings ----
-
-	private static Node editor(Host host) {
+	private static Node controls(Host host) {
 		LauncherTheme t = host.activeTheme();
 		boolean builtIn = LauncherCustomThemeStore.isBuiltIn(t.name());
+		VBox box = new VBox(22);
+		box.setPrefWidth(380);
+		box.setMinWidth(340);
+		box.setMaxWidth(400);
 
 		Node nameRow;
 		if (builtIn) {
 			Label name = new Label(t.name());
-			name.getStyleClass().add("section-label");
-			Label hint = new Label("Built-in - change anything below to get your own editable copy.");
-			hint.getStyleClass().add("settings-row-hint");
-			nameRow = new VBox(2, name, hint);
+			name.getStyleClass().add("t-title-sm");
+			Label hint = new Label("Built-in. Change anything to get your own copy.");
+			hint.getStyleClass().add("t-muted");
+			nameRow = new VBox(4, name, hint);
 		} else {
 			TextField name = new TextField(t.name());
-			name.getStyleClass().add("theme-name-field");
-			name.setPrefWidth(260);
 			Runnable rename = () -> {
 				String wanted = name.getText().trim();
 				LauncherTheme current = host.activeTheme();
@@ -186,139 +193,260 @@ public final class ThemeEditorView {
 					rename.run();
 				}
 			});
-			nameRow = name;
+			nameRow = labeled("NAME", name);
 		}
+		box.getChildren().add(nameRow);
 
-		GridPane colors = new GridPane();
-		colors.setHgap(12);
-		colors.setVgap(10);
-		colors.add(colorRow(host, "Background", t.background(), c -> x -> copy(x, c, null, null, null, null, null, null, null, null)), 0, 0);
-		colors.add(colorRow(host, "Panels", t.surface(), c -> x -> copy(x, null, c, null, null, null, null, null, null, null)), 1, 0);
-		colors.add(colorRow(host, "Accent", t.accentStart(), c -> x -> copy(x, null, null, c, null, null, null, null, null, null)), 0, 1);
-		colors.add(colorRow(host, "Accent fade", t.accentEnd(), c -> x -> copy(x, null, null, null, c, null, null, null, null, null)), 1, 1);
-		colors.add(colorRow(host, "Font color", t.text(), c -> x -> copy(x, null, null, null, null, c, null, null, null, null)), 0, 2);
+		FlowPane accents = new FlowPane(10, 10);
+		for (int accent : ACCENTS) {
+			accents.getChildren().add(swatch(accent, (t.accentStart() & 0xFFFFFF) == accent, () -> {
+				apply(host, x -> copy(x, null, null, 0xFF000000 | accent, 0xFF000000 | darker(accent), null, null, null, null, null));
+				host.rebuild();
+			}));
+		}
+		accents.getChildren().add(picker(t.accentStart(), c -> x -> copy(x, null, null, c, 0xFF000000 | darker(c & 0xFFFFFF), null, null, null, null, null), host));
+		box.getChildren().add(labeled("ACCENT", accents, LauncherTheme.toCssHex(t.accentStart())));
 
-		GridPane sliders = new GridPane();
-		sliders.setHgap(18);
-		sliders.setVgap(10);
-		sliders.add(sliderRow(host, "Corner radius", 0, 16, t.cornerRadius(), v -> Math.round(v) + " px",
-				v -> x -> copy(x, null, null, null, null, null, (int) Math.round(v), null, null, null)), 0, 0);
-		sliders.add(sliderRow(host, "Panel opacity", 0.3, 1, t.panelOpacity(), v -> Math.round(v * 100) + "%",
-				v -> x -> copy(x, null, null, null, null, null, null, null, null, (float) v)), 1, 0);
-		sliders.add(sliderRow(host, "Background blur", 0, 1, t.blurIntensity(), v -> Math.round(v * 100) + "%",
-				v -> x -> copy(x, null, null, null, null, null, null, (float) v, null, null)), 0, 1);
-		sliders.add(sliderRow(host, "Animation speed", 0, 2, t.animationSpeed(), v -> String.format(Locale.ROOT, "%.1fx", v),
-				v -> x -> copy(x, null, null, null, null, null, null, null, (float) v, null)), 1, 1);
-		for (GridPane grid : new GridPane[] {colors, sliders}) {
-			for (int i = 0; i < 2; i++) {
-				var column = new javafx.scene.layout.ColumnConstraints();
-				column.setPercentWidth(50);
-				grid.getColumnConstraints().add(column);
+		FlowPane grounds = new FlowPane(10, 10);
+		for (int ground : GROUNDS) {
+			grounds.getChildren().add(swatch(ground, (t.background() & 0xFFFFFF) == ground, () -> {
+				apply(host, x -> copy(x, 0xFF000000 | ground, 0xFF000000 | lift(ground, 9), null, null, null, null, null, null, null));
+				host.rebuild();
+			}));
+		}
+		grounds.getChildren().add(picker(t.background(), c -> x -> copy(x, c, 0xFF000000 | lift(c & 0xFFFFFF, 9), null, null, null, null, null, null, null), host));
+		box.getChildren().add(labeled("BACKGROUND", grounds, LauncherTheme.toCssHex(t.background())));
+
+		HBox colors = new HBox(18,
+				colorField("Panels", t.surface(), c -> x -> copy(x, null, c, null, null, null, null, null, null, null), host),
+				colorField("Text", t.text(), c -> x -> copy(x, null, null, null, null, c, null, null, null, null), host));
+		box.getChildren().add(labeled("FINE TUNING", colors));
+
+		HBox corners = new HBox(2);
+		corners.getStyleClass().add("segment-bar");
+		corners.setMaxWidth(Region.USE_PREF_SIZE);
+		Object[][] options = {{"Sharp", 4}, {"Soft", 10}, {"Round", 16}};
+		for (Object[] option : options) {
+			int radius = (int) option[1];
+			Button b = new Button((String) option[0]);
+			b.getStyleClass().setAll("button", "segmented-button");
+			if (Math.abs(t.cornerRadius() - radius) <= 2) {
+				b.getStyleClass().add("segmented-button-active");
 			}
+			b.setOnAction(e -> {
+				apply(host, x -> copy(x, null, null, null, null, null, radius, null, null, null));
+				host.rebuild();
+			});
+			corners.getChildren().add(b);
 		}
+		box.getChildren().add(labeled("CORNERS", corners, t.cornerRadius() + " px"));
 
-		VBox editor = new VBox(16, nameRow, preview(t), section("Colors"), colors, section("Look & feel"), sliders);
-		editor.getStyleClass().add("glass-panel");
-		editor.setPadding(new Insets(18));
-		return editor;
+		Slider speed = new Slider(0, 2, t.animationSpeed());
+		Label speedValue = new Label(String.format(Locale.ROOT, "%.1fx", t.animationSpeed()));
+		speedValue.getStyleClass().add("t-mono");
+		speed.valueProperty().addListener((o, a, v) -> speedValue.setText(String.format(Locale.ROOT, "%.1fx", v.doubleValue())));
+		speed.valueChangingProperty().addListener((obs, was, is) -> {
+			if (!is) {
+				apply(host, x -> copy(x, null, null, null, null, null, null, null, (float) speed.getValue(), null));
+				host.rebuild();
+			}
+		});
+		HBox.setHgrow(speed, Priority.ALWAYS);
+		HBox speedRow = new HBox(12, speed, speedValue);
+		speedRow.setAlignment(Pos.CENTER_LEFT);
+		box.getChildren().add(labeled("ANIMATION SPEED", speedRow));
+
+		Button share = new Button("Copy theme code");
+		share.setGraphic(Icons.icon("share", 15, Color.web("#E4E4E8")));
+		share.setOnAction(e -> {
+			javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+			content.putString(code(host.activeTheme()));
+			javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+			Toasts.show(share, "share", "#5AA9FF", "Theme code copied - send it to a friend");
+		});
+		box.getChildren().add(share);
+		ScrollPane scroll = new ScrollPane(box);
+		scroll.setFitToWidth(true);
+		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		scroll.setMinWidth(360);
+		scroll.setPrefWidth(400);
+		scroll.setMaxWidth(420);
+		return scroll;
 	}
 
-	private static Label section(String text) {
-		Label label = new Label(text);
-		label.getStyleClass().add("section-label");
-		return label;
+	private static Node labeled(String label, Node control) {
+		return labeled(label, control, null);
 	}
 
-	/** A miniature launcher drawn in the theme's own colors. */
-	private static Node preview(LauncherTheme t) {
-		String radius = String.valueOf(Math.max(4, t.cornerRadius() + 2));
-		String text = LauncherTheme.toCssRgba(t.text() | 0xFF000000);
-		String muted = LauncherTheme.toCssRgba((t.text() & 0xFFFFFF) | 0x99000000);
-		VBox sidebar = new VBox(6);
-		sidebar.setPadding(new Insets(12));
-		sidebar.setPrefWidth(120);
-		sidebar.setStyle("-fx-background-color: " + LauncherTheme.toCssRgba(t.surface() | 0xFF000000) + "; -fx-background-radius: " + radius + " 0 0 " + radius + ";");
-		String[] items = {"Home", "Servers", "Cosmetics", "Settings"};
-		for (int i = 0; i < items.length; i++) {
-			Label item = new Label(items[i]);
-			item.setMaxWidth(Double.MAX_VALUE);
-			item.setPadding(new Insets(5, 8, 5, 8));
-			item.setStyle("-fx-text-fill: " + (i == 0 ? text : muted) + "; -fx-font-size: 12px;"
-					+ (i == 0 ? "-fx-background-color: " + LauncherTheme.toCssRgba((t.accentStart() & 0xFFFFFF) | 0x33000000)
-							+ "; -fx-background-radius: 6;" : ""));
-			sidebar.getChildren().add(item);
+	private static Node labeled(String label, Node control, String value) {
+		Label name = new Label(label);
+		name.getStyleClass().add("popover-section");
+		name.setPadding(Insets.EMPTY);
+		HBox head = new HBox(name);
+		if (value != null) {
+			Region spacer = new Region();
+			HBox.setHgrow(spacer, Priority.ALWAYS);
+			Label shown = new Label(value);
+			shown.getStyleClass().add("t-mono");
+			head.getChildren().addAll(spacer, shown);
 		}
-		Label heading = new Label("Welcome back");
-		heading.setStyle("-fx-text-fill: " + text + "; -fx-font-size: 16px; -fx-font-weight: bold;");
-		Label sub = new Label("This is how your launcher looks.");
-		sub.setStyle("-fx-text-fill: " + muted + "; -fx-font-size: 12px;");
-		Label card = new Label("Profile card");
-		card.setMaxWidth(Double.MAX_VALUE);
-		card.setPadding(new Insets(14));
-		card.setStyle("-fx-text-fill: " + text + "; -fx-background-color: " + LauncherTheme.toCssRgba(t.surface() | 0xFF000000)
-				+ "; -fx-background-radius: " + radius + ";");
-		Label button = new Label("Play");
-		button.setPadding(new Insets(8, 26, 8, 26));
-		button.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: " + radius + "; -fx-background-color: linear-gradient(to right, "
-				+ LauncherTheme.toCssRgba(t.accentStart() | 0xFF000000) + ", " + LauncherTheme.toCssRgba(t.accentEnd() | 0xFF000000) + ");");
-		VBox main = new VBox(8, heading, sub, card, button);
-		main.setPadding(new Insets(14));
-		HBox.setHgrow(main, Priority.ALWAYS);
-		HBox mock = new HBox(sidebar, main);
-		mock.setMinHeight(170);
-		mock.setStyle("-fx-background-color: " + LauncherTheme.toCssRgba(t.background() | 0xFF000000) + "; -fx-background-radius: " + radius + ";");
-		return mock;
+		return new VBox(10, head, control);
 	}
 
-	private static Node colorRow(Host host, String label, int argb, java.util.function.IntFunction<UnaryOperator<LauncherTheme>> change) {
+	private static Node swatch(int rgb, boolean selected, Runnable onClick) {
+		StackPane swatch = new StackPane();
+		swatch.setMinSize(32, 32);
+		swatch.setMaxSize(32, 32);
+		String color = String.format("#%06X", rgb);
+		swatch.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 99; -fx-cursor: hand; -fx-border-radius: 99;"
+				+ (selected ? " -fx-border-color: -velo-text; -fx-border-width: 2; -fx-border-insets: -4;" : " -fx-border-color: rgba(255,255,255,0.18);"));
+		swatch.getStyleClass().add("motion-card");
+		swatch.setOnMouseClicked(e -> onClick.run());
+		return swatch;
+	}
+
+	private static Node picker(int argb, java.util.function.IntFunction<UnaryOperator<LauncherTheme>> change, Host host) {
 		ColorPicker picker = new ColorPicker(Color.web(LauncherTheme.toCssHex(argb)));
 		picker.getStyleClass().addAll("button", "swatch-picker");
 		picker.setStyle("-fx-color-label-visible: false;");
-		Label name = new Label(label);
-		name.getStyleClass().add("theme-color-name");
-		Label hex = new Label(String.format(Locale.ROOT, "#%06X", argb & 0xFFFFFF));
-		hex.getStyleClass().add("theme-color-hex");
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox row = new HBox(10, picker, name, spacer, hex);
-		row.setAlignment(Pos.CENTER_LEFT);
-		row.getStyleClass().add("theme-color-row");
+		picker.setTooltip(new Tooltip("Any colour"));
 		picker.setOnAction(e -> {
-			Color c = picker.getValue();
-			int picked = 0xFF000000 | ((int) Math.round(c.getRed() * 255) << 16) | ((int) Math.round(c.getGreen() * 255) << 8)
-					| (int) Math.round(c.getBlue() * 255);
-			apply(host, change.apply(picked));
+			apply(host, change.apply(toArgb(picker.getValue())));
 			host.rebuild();
 		});
-		row.setOnMouseClicked(e -> picker.show());
+		return picker;
+	}
+
+	private static Node colorField(String label, int argb, java.util.function.IntFunction<UnaryOperator<LauncherTheme>> change, Host host) {
+		Label name = new Label(label);
+		name.getStyleClass().add("t-body");
+		Label hex = new Label(LauncherTheme.toCssHex(argb));
+		hex.getStyleClass().add("t-mono");
+		HBox row = new HBox(10, picker(argb, change, host), new VBox(1, name, hex));
+		row.setAlignment(Pos.CENTER_LEFT);
 		return row;
 	}
 
-	private static Node sliderRow(Host host, String label, double min, double max, double value,
-			java.util.function.DoubleFunction<String> format, java.util.function.DoubleFunction<UnaryOperator<LauncherTheme>> change) {
-		Label name = new Label(label);
-		name.getStyleClass().add("theme-color-name");
-		Label shown = new Label(format.apply(value));
-		shown.getStyleClass().add("theme-color-hex");
+	// ---- Right: a miniature launcher in the theme ----
+
+	private static Node preview(LauncherTheme t) {
+		int radius = Math.max(4, t.cornerRadius());
+		String bg = css(t.background());
+		String surface = css(lift(t.surface() & 0xFFFFFF, 0) | 0xFF000000);
+		String accent = css(t.accentStart());
+		String text = css(t.text());
+		String muted = LauncherTheme.toCssRgba((t.text() & 0xFFFFFF) | 0x88000000);
+		String onAccent = t.onAccent() == 0xFFFFFFFF ? "white" : "#111111";
+
+		HBox top = new HBox(16);
+		top.setAlignment(Pos.CENTER_LEFT);
+		top.setPadding(new Insets(0, 14, 0, 14));
+		top.setMinHeight(40);
+		top.setStyle("-fx-border-color: transparent transparent rgba(255,255,255,0.07) transparent;");
+		String[] tabs = {"Home", "Library", "Store", "Locker"};
+		for (int i = 0; i < tabs.length; i++) {
+			Label tab = new Label(tabs[i]);
+			tab.setStyle("-fx-font-size: 11px; -fx-padding: 11 0 9 0; -fx-text-fill: " + (i == 0 ? text : muted) + ";"
+					+ (i == 0 ? " -fx-border-color: transparent transparent " + accent + " transparent; -fx-border-width: 0 0 2 0;" : ""));
+			top.getChildren().add(tab);
+		}
+		StackPane hero = new StackPane();
+		hero.setMinHeight(150);
+		hero.setStyle("-fx-background-color: " + surface + "; -fx-background-radius: " + radius + ";");
+		Label over = new Label("CONTINUE PLAYING");
+		over.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 9px; -fx-font-weight: bold;");
+		Label name = new Label("AsteriaSMP");
+		name.setStyle("-fx-text-fill: " + text + "; -fx-font-family: 'Sora'; -fx-font-weight: bold; -fx-font-size: 22px;");
+		VBox heroText = new VBox(4, over, name);
+		heroText.setAlignment(Pos.BOTTOM_LEFT);
+		heroText.setPadding(new Insets(14));
+		hero.getChildren().add(heroText);
+		HBox tiles = new HBox(10);
+		for (int i = 0; i < 3; i++) {
+			Region tile = new Region();
+			tile.setMinHeight(66);
+			HBox.setHgrow(tile, Priority.ALWAYS);
+			tile.setStyle("-fx-background-color: " + surface + "; -fx-background-radius: " + radius + ";"
+					+ (i == 2 ? " -fx-border-color: " + accent + "; -fx-border-radius: " + radius + ";" : ""));
+			tiles.getChildren().add(tile);
+		}
+		Label chip = new Label("Velo+");
+		chip.setStyle("-fx-background-color: " + LauncherTheme.toCssRgba((t.accentStart() & 0xFFFFFF) | 0x26000000) + "; -fx-text-fill: " + accent
+				+ "; -fx-background-radius: 99; -fx-padding: 4 10 4 10; -fx-font-size: 11px; -fx-font-weight: bold;");
+		Label chip2 = new Label("Fabric 26.2");
+		chip2.setStyle("-fx-background-color: " + surface + "; -fx-text-fill: " + muted + "; -fx-background-radius: 99; -fx-padding: 4 10 4 10; -fx-font-size: 11px;");
+		VBox main = new VBox(12, hero, tiles, new HBox(8, chip, chip2));
+		main.setPadding(new Insets(14));
+		VBox.setVgrow(main, Priority.ALWAYS);
+		Label play = new Label("PLAY");
+		play.setStyle("-fx-background-color: " + accent + "; -fx-text-fill: " + onAccent + "; -fx-background-radius: " + radius
+				+ "; -fx-padding: 9 28 9 28; -fx-font-family: 'Sora'; -fx-font-weight: bold; -fx-font-size: 12px;");
+		Label profile = new Label("AsteriaSMP");
+		profile.setStyle("-fx-text-fill: " + text + "; -fx-font-size: 12px; -fx-font-weight: bold;");
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		Slider slider = new Slider(min, max, value);
-		slider.setMaxWidth(Double.MAX_VALUE);
-		slider.valueProperty().addListener((obs, was, now) -> shown.setText(format.apply(now.doubleValue())));
-		slider.valueChangingProperty().addListener((obs, was, is) -> {
-			if (!is) {
-				apply(host, change.apply(slider.getValue()));
-				host.rebuild();
-			}
-		});
-		slider.setOnMouseReleased(e -> {
-			if (!slider.isValueChanging()) {
-				apply(host, change.apply(slider.getValue()));
-				host.rebuild();
-			}
-		});
-		return new VBox(4, new HBox(name, spacer, shown), slider);
+		HBox bar = new HBox(10, profile, spacer, play);
+		bar.setAlignment(Pos.CENTER_LEFT);
+		bar.setPadding(new Insets(10, 12, 10, 14));
+		bar.setStyle("-fx-background-color: " + surface + "; -fx-background-radius: 0 0 14 14;");
+		VBox mock = new VBox(top, main, bar);
+		mock.setStyle("-fx-background-color: " + bg + "; -fx-background-radius: 14; -fx-border-color: rgba(255,255,255,0.08); -fx-border-radius: 14;");
+		mock.setMinHeight(380);
+		mock.setMaxHeight(460);
+		Label title = new Label("LIVE PREVIEW");
+		title.getStyleClass().add("popover-section");
+		title.setPadding(Insets.EMPTY);
+		VBox column = new VBox(12, title, mock);
+		column.setMinWidth(320);
+		return column;
 	}
+
+	private static String css(int argb) {
+		return LauncherTheme.toCssRgba(argb | 0xFF000000);
+	}
+
+	// ---- Theme codes ----
+
+	/** A compact, pasteable code: "VELO1:" + base64 of the theme's fields. */
+	static String code(LauncherTheme t) {
+		String raw = String.join(";", t.name().replace(";", ","), Integer.toHexString(t.background()), Integer.toHexString(t.surface()),
+				Integer.toHexString(t.accentStart()), Integer.toHexString(t.accentEnd()), Integer.toHexString(t.text()),
+				String.valueOf(t.cornerRadius()), String.valueOf(t.blurIntensity()), String.valueOf(t.animationSpeed()), String.valueOf(t.panelOpacity()));
+		return "VELO1:" + Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+	}
+
+	static LauncherTheme decode(String code) {
+		String text = code.strip();
+		if (!text.startsWith("VELO1:")) {
+			return null;
+		}
+		try {
+			String[] p = new String(Base64.getUrlDecoder().decode(text.substring(6)), StandardCharsets.UTF_8).split(";");
+			return new LauncherTheme(p[0], (int) Long.parseLong(p[1], 16), (int) Long.parseLong(p[2], 16), (int) Long.parseLong(p[3], 16),
+					(int) Long.parseLong(p[4], 16), (int) Long.parseLong(p[5], 16), Integer.parseInt(p[6]), Float.parseFloat(p[7]),
+					Float.parseFloat(p[8]), Float.parseFloat(p[9]));
+		} catch (RuntimeException e) {
+			return null;
+		}
+	}
+
+	private static void importCode(Host host, Node anchor) {
+		TextInputDialog dialog = new TextInputDialog();
+		dialog.setTitle("Import theme");
+		dialog.setHeaderText("Paste a theme code (starts with VELO1:)");
+		DialogStyling.apply(dialog);
+		dialog.showAndWait().ifPresent(code -> {
+			LauncherTheme decoded = decode(code);
+			if (decoded == null) {
+				Toasts.show(anchor, "warning", "#FF7A7E", "That isn't a theme code");
+				return;
+			}
+			LauncherCustomThemeStore.create(freeName(decoded.name()), decoded).ifPresent(host::setActiveTheme);
+			host.rebuild();
+		});
+	}
+
+	// ---- Editing ----
 
 	/** Applies an edit to the active theme - copying a built-in theme into an editable one first. */
 	private static void apply(Host host, UnaryOperator<LauncherTheme> edit) {
@@ -338,6 +466,24 @@ public final class ThemeEditorView {
 			name = base + " " + n;
 		}
 		return name;
+	}
+
+	private static int toArgb(Color c) {
+		return 0xFF000000 | ((int) Math.round(c.getRed() * 255) << 16) | ((int) Math.round(c.getGreen() * 255) << 8) | (int) Math.round(c.getBlue() * 255);
+	}
+
+	private static int darker(int rgb) {
+		int r = (int) (((rgb >> 16) & 0xFF) * 0.86);
+		int g = (int) (((rgb >> 8) & 0xFF) * 0.86);
+		int b = (int) ((rgb & 0xFF) * 0.86);
+		return (r << 16) | (g << 8) | b;
+	}
+
+	private static int lift(int rgb, int amount) {
+		int r = Math.min(255, ((rgb >> 16) & 0xFF) + amount);
+		int g = Math.min(255, ((rgb >> 8) & 0xFF) + amount);
+		int b = Math.min(255, (rgb & 0xFF) + amount);
+		return (r << 16) | (g << 8) | b;
 	}
 
 	private static LauncherTheme copy(LauncherTheme t, Integer background, Integer surface, Integer accentStart, Integer accentEnd,

@@ -87,6 +87,8 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.social.PartyVoice.register();
 		net.veloclient.velo.client.social.PartyCommand.register();
 		net.veloclient.velo.client.social.VeloCommands.register();
+		net.veloclient.velo.client.gui.title.LastServer.register();
+		net.veloclient.velo.client.stats.PlayTimeDays.register();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				client -> net.veloclient.velo.client.cosmetics.AnimatedCapeAsset.tickAll());
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
@@ -169,22 +171,6 @@ public final class VeloClientMod implements ClientModInitializer {
 		*///?}
 	}
 
-	/** Pause menu: a small "Report a bug" button in the bottom-left corner, just above the version label. */
-	private static void addBugReportButton(net.minecraft.client.gui.screen.Screen screen, int height) {
-		if (!(screen instanceof net.minecraft.client.gui.screen.GameMenuScreen)) {
-			return;
-		}
-		var button = new net.veloclient.velo.client.gui.widget.VeloIconButton(6, height - 40, 20,
-				net.veloclient.velo.client.gui.widget.VeloNavIcons.of("bug"), net.minecraft.text.Text.literal("Report a bug"),
-				() -> net.minecraft.client.MinecraftClient.getInstance().setScreen(new net.veloclient.velo.client.gui.BugReportScreen(screen)))
-				.withPlainLabel();
-		//? if <26.1 {
-		net.fabricmc.fabric.api.client.screen.v1.Screens.getButtons(screen).add(button);
-		//?} else {
-		/*net.fabricmc.fabric.api.client.screen.v1.Screens.getWidgets(screen).add(button);
-		*///?}
-	}
-
 	/** First title screen after a crash: offer to send the crash report. */
 	private static void offerCrashReport(net.minecraft.client.MinecraftClient client, net.minecraft.client.gui.screen.Screen screen) {
 		if (!(screen instanceof net.minecraft.client.gui.screen.TitleScreen)) {
@@ -204,7 +190,6 @@ public final class VeloClientMod implements ClientModInitializer {
 			net.veloclient.velo.client.gui.VeloKeybindsScreen.maybeReplace(client, screen);
 			net.veloclient.velo.client.gui.VeloAdvancementsScreen.maybeReplace(client, screen);
 			addSkinsButton(screen, scaledWidth);
-			addBugReportButton(screen, scaledHeight);
 			offerCrashReport(client, screen);
 		});
 		net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {

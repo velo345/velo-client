@@ -88,21 +88,24 @@ public final class InstanceEditDialog {
 			iconGroup.selectToggle(iconPicker.getChildren().isEmpty() ? null : (ToggleButton) iconPicker.getChildren().get(0));
 		}
 
-		VBox content = new VBox(14);
-		content.setPadding(new Insets(16));
+		VBox content = new VBox(18);
+		content.setPadding(new Insets(4, 0, 4, 0));
+		content.setPrefWidth(460);
 		content.getChildren().addAll(
 				labeled("Name", nameField),
 				labeled("Minecraft version", versionBox),
 				labeled("Icon", iconPicker));
 
 		dialog.getDialogPane().setContent(content);
-		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+		boolean creating = initialName == null || initialName.isBlank();
+		ButtonType confirm = new ButtonType(creating ? "Create profile" : "Save", ButtonBar.ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, confirm);
 
-		Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
+		Node okButton = dialog.getDialogPane().lookupButton(confirm);
 		okButton.disableProperty().bind(nameField.textProperty().isEmpty());
 
 		dialog.setResultConverter(button -> {
-			if (button != ButtonType.OK) {
+			if (button != confirm) {
 				return null;
 			}
 			Toggle selected = iconGroup.getSelectedToggle();

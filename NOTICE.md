@@ -45,3 +45,14 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
+
+## Sora and JetBrains Mono fonts
+
+`launcher/src/main/resources/net/veloclient/launcher/fonts/Sora-*.ttf` (launcher display headings, and the
+in-game copies `src/client/resources/assets/velo-client/font/sora_*.ttf`) are
+[Sora](https://fonts.google.com/specimen/Sora) by Jonathan Barnbrook and Julián Moncada, and
+`launcher/src/main/resources/net/veloclient/launcher/fonts/JetBrainsMono-*.ttf` and the in-game
+`src/client/resources/assets/velo-client/font/jetbrains_mono_medium.ttf` (versions, numbers, keys)
+are [JetBrains Mono](https://www.jetbrains.com/lp/mono/) by JetBrains. Both are licensed under the
+[SIL Open Font License 1.1](https://openfontlicense.org/); the license texts sit next to the fonts
+(`OFL-Sora.txt`, `OFL-JetBrainsMono.txt`). The bundled files are the Latin static subsets.
