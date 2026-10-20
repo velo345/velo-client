@@ -49,6 +49,17 @@ public final class StoreApi {
 		return balance;
 	}
 
+	private static final java.util.List<Runnable> WALLET_LISTENERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+	/** Runs {@code listener} (on whatever thread fetched it) whenever the balance or owned items change. */
+	public static void onWalletChanged(Runnable listener) {
+		WALLET_LISTENERS.add(listener);
+	}
+
+	private static void fireWallet() {
+		WALLET_LISTENERS.forEach(Runnable::run);
+	}
+
 	public static boolean owns(String itemId) {
 		return owned.contains(itemId);
 	}
@@ -69,20 +80,51 @@ public final class StoreApi {
 		JsonObject catalog = get("/v1/store/catalog");
 		if (catalog.has("items") && catalog.get("items").isJsonArray()) {
 			java.util.Map<String, Integer> map = new java.util.HashMap<>();
+			java.util.Map<String, Integer> full = new java.util.HashMap<>();
+			java.util.Map<String, String> tiers = new java.util.HashMap<>();
 			catalog.getAsJsonArray("items").forEach(e -> {
 				JsonObject item = e.getAsJsonObject();
 				if (item.has("id") && item.has("price")) {
-					map.put(item.get("id").getAsString(), item.get("price").getAsInt());
+					String id = item.get("id").getAsString();
+					map.put(id, item.get("price").getAsInt());
+					if (item.has("fullPrice") && !item.get("fullPrice").isJsonNull()) {
+						full.put(id, item.get("fullPrice").getAsInt());
+					}
+					if (item.has("rarity") && !item.get("rarity").isJsonNull()) {
+						tiers.put(id, item.get("rarity").getAsString());
+					}
 				}
 			});
 			prices = java.util.Map.copyOf(map);
+			fullPrices = java.util.Map.copyOf(full);
+			rarities = java.util.Map.copyOf(tiers);
 		}
+		lastCatalog = catalog;
 		return catalog;
 	}
 
 	private static volatile java.util.Map<String, Integer> prices = java.util.Map.of();
 
 	/** The server's price for an item (after {@link #catalog()} ran), else {@code fallback}. */
+	private static volatile java.util.Map<String, Integer> fullPrices = java.util.Map.of();
+	private static volatile java.util.Map<String, String> rarities = java.util.Map.of();
+	private static volatile JsonObject lastCatalog;
+
+	/** The regular price while an item is discounted (daily deal), else null. */
+	public static Integer fullPrice(String itemId) {
+		return fullPrices.get(itemId);
+	}
+
+	/** The rarity the server set for an item ("rare", "epic", ...), or null. */
+	public static String rarity(String itemId) {
+		return rarities.get(itemId);
+	}
+
+	/** The last catalog fetched this run (daily picks, bundles, coin packs), or null. */
+	public static JsonObject cachedCatalog() {
+		return lastCatalog;
+	}
+
 	public static int price(String itemId, int fallback) {
 		Integer price = prices.get(itemId);
 		return price != null ? price : fallback;
@@ -107,6 +149,7 @@ public final class StoreApi {
 	public static JsonObject order(String orderId) throws StoreError {
 		JsonObject order = get("/v1/store/order?id=" + URLEncoder.encode(orderId, StandardCharsets.UTF_8));
 		balance = order.get("balance").getAsInt();
+		fireWallet();
 		return order;
 	}
 
@@ -152,7 +195,16 @@ public final class StoreApi {
 
 	/** Velo+: {@code plus}, {@code until}, {@code price}, {@code currency}, {@code monthlyCoins}, {@code periodDays}, {@code checkoutEnabled}. */
 	public static JsonObject plusStatus() throws StoreError {
-		return get("/v1/plus/status");
+		JsonObject status = get("/v1/plus/status");
+		plusMember = status.has("plus") && status.get("plus").getAsBoolean();
+		return status;
+	}
+
+	private static volatile boolean plusMember;
+
+	/** Whether the last {@link #plusStatus()} answer said Velo+ is active (false until asked). */
+	public static boolean isPlusCached() {
+		return plusMember;
 	}
 
 	/** Starts the Velo+ subscription: {@code checkoutUrl}. */
@@ -259,6 +311,149 @@ public final class StoreApi {
 		return post("/v1/admin/cosmetics/collection", collection);
 	}
 
+	/** Creates or changes an owner bundle (id, name, description, items, price, active, availableUntil). */
+	public static JsonObject adminBundle(JsonObject bundle) throws StoreError {
+		return post("/v1/admin/cosmetics/bundle", bundle);
+	}
+
+	public static JsonObject adminDeleteBundle(String id) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.addProperty("id", id);
+		return post("/v1/admin/cosmetics/bundle/delete", body);
+	}
+
+	/** Your invite code, invites and what they earned, who invited you and whether you can still enter a code. */
+	public static JsonObject referral() throws StoreError {
+		return get("/v1/referral");
+	}
+
+	/** Enters a friend's code (or their name). Answers with the fresh {@link #referral()} state. */
+	public static JsonObject redeemReferral(String code) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.addProperty("code", code);
+		if (DEMO) {
+			throw new StoreError(404, "No player has that code");
+		}
+		return post("/v1/referral/redeem", body);
+	}
+
+	private static java.nio.file.Path pendingReferralFile() {
+		return net.veloclient.launcher.data.VeloPaths.config().resolve("pending-referral.txt");
+	}
+
+	/** Keeps a friend's code entered before signing in (first start), to redeem once the server knows who you are. */
+	public static void savePendingReferral(String code) {
+		try {
+			java.nio.file.Files.createDirectories(pendingReferralFile().getParent());
+			java.nio.file.Files.writeString(pendingReferralFile(), code.trim());
+		} catch (java.io.IOException ignored) {
+			// Best effort: the Invite page still takes the code later.
+		}
+	}
+
+	/**
+	 * Redeems a code kept by {@link #savePendingReferral}. Blocks - call off the FX thread. Returns null when there's
+	 * nothing to do or it worked, else the server's reason (the code is dropped unless it was a connection problem).
+	 */
+	public static String redeemPendingReferral() {
+		java.nio.file.Path file = pendingReferralFile();
+		if (!java.nio.file.Files.exists(file) || !connected()) {
+			return null;
+		}
+		try {
+			String code = java.nio.file.Files.readString(file).trim();
+			if (!code.isEmpty()) {
+				redeemReferral(code);
+			}
+			java.nio.file.Files.deleteIfExists(file);
+			return null;
+		} catch (StoreError e) {
+			if (e.status != 0 && e.status != 401 && e.status / 100 != 5) {
+				try {
+					java.nio.file.Files.deleteIfExists(file);
+				} catch (java.io.IOException ignored) {
+					// Tried again next start.
+				}
+			}
+			return e.getMessage();
+		} catch (java.io.IOException e) {
+			return null;
+		}
+	}
+
+	/** Buys {@code itemId} for the player called {@code toUsername} (they must have used Velo Client). */
+	public static JsonObject gift(String itemId, String toUsername, String note) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.addProperty("itemId", itemId);
+		body.addProperty("to", toUsername);
+		body.addProperty("note", note == null ? "" : note);
+		return trackBalance(post("/v1/store/gift", body));
+	}
+
+	private static final java.util.Set<String> WISHLIST = java.util.concurrent.ConcurrentHashMap.newKeySet();
+	private static volatile boolean wishlistLoaded;
+
+	/** Items on your wishlist (kept locally, synced with the server when it supports it). */
+	public static java.util.Set<String> wishlist() {
+		loadWishlist();
+		return java.util.Collections.unmodifiableSet(WISHLIST);
+	}
+
+	public static boolean wishlisted(String itemId) {
+		loadWishlist();
+		return WISHLIST.contains(itemId);
+	}
+
+	/** Adds or removes {@code itemId}; returns whether it's on the list now. Saves locally at once, tells the server in the background. */
+	public static boolean toggleWishlist(String itemId) {
+		loadWishlist();
+		boolean on = !WISHLIST.remove(itemId);
+		if (on) {
+			WISHLIST.add(itemId);
+		}
+		saveWishlist();
+		java.util.concurrent.CompletableFuture.runAsync(() -> {
+			try {
+				JsonObject body = new JsonObject();
+				body.addProperty("itemId", itemId);
+				body.addProperty("on", on);
+				post("/v1/store/wishlist", body);
+			} catch (StoreError ignored) {
+				// Older server: the local list is enough.
+			}
+		}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor());
+		return on;
+	}
+
+	private static java.nio.file.Path wishlistFile() {
+		return net.veloclient.launcher.data.VeloPaths.config().resolve("wishlist.json");
+	}
+
+	private static synchronized void loadWishlist() {
+		if (wishlistLoaded) {
+			return;
+		}
+		wishlistLoaded = true;
+		try {
+			if (java.nio.file.Files.exists(wishlistFile())) {
+				com.google.gson.JsonArray list = com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(wishlistFile())).getAsJsonArray();
+				list.forEach(e -> WISHLIST.add(e.getAsString()));
+			}
+		} catch (Exception ignored) {
+			// Unreadable: start empty.
+		}
+	}
+
+	private static synchronized void saveWishlist() {
+		try {
+			com.google.gson.JsonArray list = new com.google.gson.JsonArray();
+			WISHLIST.forEach(list::add);
+			java.nio.file.Files.writeString(wishlistFile(), list.toString());
+		} catch (java.io.IOException ignored) {
+			// Not fatal.
+		}
+	}
+
 	/** Which collection the store features (null / blank = the newest one). */
 	public static void adminFeatured(String collectionId) throws StoreError {
 		JsonObject body = new JsonObject();
@@ -273,12 +468,14 @@ public final class StoreApi {
 		wallet.getAsJsonArray("owned").forEach(e -> items.add(e.getAsString()));
 		owned = Set.copyOf(items);
 		walletLoaded = true;
+		fireWallet();
 		return wallet;
 	}
 
 	private static JsonObject trackBalance(JsonObject json) {
 		if (json.has("balance")) {
 			balance = json.get("balance").getAsInt();
+			fireWallet();
 		}
 		return json;
 	}
@@ -293,6 +490,15 @@ public final class StoreApi {
 					{"id":"coins_1200","coins":1200,"bonus":0,"price":4.99},{"id":"coins_2500","coins":2300,"bonus":200,"price":9.99},
 					{"id":"coins_5500","coins":4700,"bonus":800,"price":19.99},{"id":"coins_15000","coins":12000,"bonus":3000,"price":49.99}],
 					"items":[]}""";
+			case "/v1/referral" -> """
+					{"code":"K7Q2MX","friendCoins":300,"targetSeconds":7200,"maxInvites":10,"paidInvites":3,"earned":1000,"nextReward":400,
+					"ladder":[{"from":1,"to":2,"coins":300},{"from":3,"to":5,"coins":400},{"from":6,"to":10,"coins":500}],
+					"invites":[{"username":"Nyxie","joinedAt":1760900000000,"playedSeconds":3120,"rewarded":false,"coins":0},
+					{"username":"Kaito_","joinedAt":1760300000000,"playedSeconds":7200,"rewarded":true,"coins":400},
+					{"username":"BlockBaron","joinedAt":1759900000000,"playedSeconds":7200,"rewarded":true,"coins":300},
+					{"username":"mossy","joinedAt":1759000000000,"playedSeconds":7200,"rewarded":true,"coins":300}],
+					"invitedBy":null,"canRedeem":true,"redeemUntil":null}""";
+			case "/v1/admin/cosmetics" -> adminDemo();
 			case "/v1/plus/status" -> "{\"plus\":false,\"until\":0,\"price\":9.99,\"currency\":\"EUR\",\"monthlyCoins\":2000,\"periodDays\":30,\"checkoutEnabled\":true,\"addonsEnabled\":true}";
 			case "/v1/store/wallet" -> "{\"balance\":1340,\"owner\":true,\"owned\":[\"wings_bonedragon\",\"wings_cobweb\",\"wings_wraith\",\"wings_phoenix\",\"aura_orbit\",\"aura_ember\",\"aura_void\"]}";
 			default -> """
@@ -303,6 +509,51 @@ public final class StoreApi {
 					"adsWatched":1,"adsPerDay":3,"adCoins":6,"adsEnabled":false,"resetsInSeconds":18720,"weeklyBonus":40,"weeklyBonusToday":false,"balance":1340}""";
 		};
 		return com.google.gson.JsonParser.parseString(json).getAsJsonObject();
+	}
+
+	/** Tour-only owner data: the bundled wings with mixed statuses and one bundle. */
+	private static String adminDemo() {
+		JsonObject data = new JsonObject();
+		data.addProperty("featured", "");
+		com.google.gson.JsonArray collections = new com.google.gson.JsonArray();
+		for (var c : net.veloclient.launcher.data.WingsCatalog.collections()) {
+			JsonObject o = new JsonObject();
+			o.addProperty("id", c.id());
+			o.addProperty("name", c.name());
+			o.addProperty("tag", c.tag());
+			o.addProperty("description", c.description());
+			collections.add(o);
+		}
+		data.add("collections", collections);
+		com.google.gson.JsonArray items = new com.google.gson.JsonArray();
+		com.google.gson.JsonArray bundleItems = new com.google.gson.JsonArray();
+		String[] statuses = {"released", "released", "testing", "released", "hidden"};
+		int i = 0;
+		for (var w : net.veloclient.launcher.data.WingsCatalog.all()) {
+			JsonObject o = new JsonObject();
+			o.addProperty("id", w.itemId());
+			o.addProperty("name", w.name());
+			o.addProperty("price", w.price());
+			o.addProperty("status", statuses[i % statuses.length]);
+			o.addProperty("accent", w.accent());
+			if (bundleItems.size() < 3 && i % statuses.length < 2) {
+				bundleItems.add(w.itemId());
+			}
+			items.add(o);
+			i++;
+		}
+		data.add("items", items);
+		com.google.gson.JsonArray bundles = new com.google.gson.JsonArray();
+		JsonObject bundle = new JsonObject();
+		bundle.addProperty("id", "starter");
+		bundle.addProperty("name", "Starter Pack");
+		bundle.addProperty("description", "Three favourites for new players");
+		bundle.add("items", bundleItems);
+		bundle.addProperty("price", 4800);
+		bundle.addProperty("active", true);
+		bundles.add(bundle);
+		data.add("bundles", bundles);
+		return data.toString();
 	}
 
 	private static JsonObject get(String path) throws StoreError {

@@ -34,6 +34,9 @@ public final class AuraDetailView {
 		MinecraftSession session();
 
 		void goBack();
+
+		default void openCoins() {
+		}
 	}
 
 	private AuraDetailView() {
@@ -55,84 +58,31 @@ public final class AuraDetailView {
 	}
 
 	public static Node build(Host host, AuraCatalog.AuraType type) {
-		Button back = BackButton.create("Store", null);
-		back.setOnAction(e -> host.goBack());
-
 		AuraEffects.Settings[] current = {AuraCatalog.settings(type.id())};
-		Node stage = stage(host.session(), type.kind(), () -> new AuraFx.Shown(type.id(), current[0]), 360, 440);
-		Label hint = new Label(host.session() == null ? "Sign in to see it on your own skin" : "Drag to rotate  ·  scroll to zoom");
-		hint.getStyleClass().add("stage-hint");
-		VBox preview = new VBox(10, stage, hint);
-		preview.setAlignment(Pos.TOP_CENTER);
-
-		boolean owned = AuraCatalog.owns(type.id());
+		Node stage = stage(host.session(), type.kind(), () -> new AuraFx.Shown(type.id(), current[0]), 420, 480);
+		if (stage instanceof javafx.scene.layout.Region region) {
+			region.getStyleClass().removeAll("cape-stage", "showcase-stage");
+			region.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+		}
 		int price = StoreApi.price(type.itemId(), type.price());
-		Label tag = new Label("AURA");
-		tag.getStyleClass().add("featured-tag");
-		Label name = new Label(type.name());
-		name.getStyleClass().add("featured-title");
-		Label description = new Label(type.description() + "  Every Velo Client player sees it.");
-		description.getStyleClass().add("page-subtitle");
-		description.setWrapText(true);
-		description.setMaxWidth(420);
-		Label balance = new Label("You have " + CurrencyStore.balance() + " coins");
-		balance.getStyleClass().add("page-subtitle");
-		HBox priceRow = new HBox(12, CosmeticUi.priceChip(price, owned), balance);
-		priceRow.setAlignment(Pos.CENTER_LEFT);
-		Label status = new Label();
-		status.getStyleClass().add("purchase-status");
-		status.setWrapText(true);
-
-		Button action = new Button();
-		action.getStyleClass().add("primary-button");
-		action.setMinHeight(46);
-		action.setPrefWidth(280);
-		Runnable label = () -> action.setText(type.id().equals(AuraCatalog.equipped()) ? "Take it off"
-				: AuraCatalog.owns(type.id()) ? "Equip aura" : String.format(Locale.ROOT, "Buy for %,d coins", price));
-		label.run();
-		action.setOnAction(e -> {
-			if (type.id().equals(AuraCatalog.equipped())) {
-				AuraCatalog.equip(null);
-				status.setText("Aura off.");
-				label.run();
-				return;
-			}
-			if (AuraCatalog.owns(type.id())) {
-				AuraCatalog.equip(type.id());
-				status.setText("Equipped - it shows the next time you start the game.");
-				label.run();
-				return;
-			}
-			action.setDisable(true);
-			status.setText("Buying...");
-			CompletableFuture.supplyAsync(() -> {
-				try {
-					StoreApi.buy(type.itemId());
-					return null;
-				} catch (StoreApi.StoreError error) {
-					return error.getMessage();
-				}
-			}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(error -> Platform.runLater(() -> {
-				action.setDisable(false);
-				if (error == null) {
-					AuraCatalog.equip(type.id());
-					status.setText("It's yours - equipped for your next game.");
-					priceRow.getChildren().set(0, CosmeticUi.priceChip(price, true));
-					balance.setText("You have " + CurrencyStore.balance() + " coins");
-				} else {
-					status.setText(error);
-				}
-				label.run();
-			}));
-		});
-
-		VBox info = new VBox(12, tag, name, description, priceRow, action, status,
-				settingsPanel(type.id(), type.kind(), s -> current[0] = s));
-		info.setAlignment(Pos.CENTER_LEFT);
-		HBox.setHgrow(info, Priority.ALWAYS);
-		HBox body = new HBox(32, preview, info);
-		body.setAlignment(Pos.CENTER_LEFT);
-		return new VBox(16, back, body);
+		ItemPage.Purchase purchase = new ItemPage.Purchase(type.itemId(), price,
+				() -> AuraCatalog.owns(type.id()),
+				() -> type.id().equals(AuraCatalog.equipped()),
+				() -> AuraCatalog.equip(type.id()),
+				() -> AuraCatalog.equip(null),
+				() -> {
+					try {
+						StoreApi.buy(type.itemId());
+						return null;
+					} catch (StoreApi.StoreError error) {
+						return error.getMessage();
+					}
+				}, "aura", type.inStore());
+		Node settings = settingsPanel(type.id(), type.kind(), s -> current[0] = s);
+		return ItemPage.build(host::goBack, host::openCoins, stage, null,
+				host.session() == null ? "Sign in to see it on your own skin" : "Drag to rotate  ·  scroll to zoom",
+				type.accent(), "Auras", StoreTiles.Rarity.of(type.itemId(), price), type.name(), type.description(),
+				java.util.List.of("Seen by every Velo Client player", "Your colour, size, speed and density"), settings, purchase);
 	}
 
 	/**
@@ -142,15 +92,15 @@ public final class AuraDetailView {
 	static Node settingsPanel(String id, AuraEffects.Kind kind, Consumer<AuraEffects.Settings> live) {
 		AuraEffects.Settings[] current = {AuraCatalog.settings(id)};
 		VBox box = new VBox(6);
-		Label title = new Label("How you wear it (this aura only)");
-		title.getStyleClass().add("section-label");
+		Label title = new Label("How you wear it");
+		title.getStyleClass().add("t-heading");
 		box.getChildren().add(title);
 		Object[][] rows = {{"Size", 0.5, 1.6}, {"Speed", 0.25, 2.5}, {"Density", 0.25, 2.0}};
 		for (int i = 0; i < rows.length; i++) {
 			int field = i;
 			double value = field == 0 ? current[0].size() : field == 1 ? current[0].speed() : current[0].density();
 			Slider slider = new Slider((double) rows[i][1], (double) rows[i][2], value);
-			slider.setMaxWidth(360);
+			slider.setMaxWidth(Double.MAX_VALUE);
 			Label label = new Label();
 			label.getStyleClass().add("page-subtitle");
 			Runnable text = () -> label.setText(rows[field][0] + "  " + Math.round(slider.getValue() * 100) + "%");

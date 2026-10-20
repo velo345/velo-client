@@ -99,6 +99,22 @@ public final class UiMotion {
 	}
 
 	/** Fades a freshly shown page in while it rises a few pixels - used for every page switch. */
+	/** Enters from the side: {@code direction} 1 = from the right (a tab to the right was picked), -1 = from the left. */
+	public static void enterFrom(Node node, int direction) {
+		if (direction == 0) {
+			enter(node);
+			return;
+		}
+		node.setOpacity(0);
+		node.setTranslateX(36 * direction);
+		FadeTransition fade = new FadeTransition(Duration.millis(220), node);
+		fade.setToValue(1);
+		TranslateTransition slide = new TranslateTransition(Duration.millis(320), node);
+		slide.setToX(0);
+		slide.setInterpolator(EASE_OUT);
+		new ParallelTransition(fade, slide).play();
+	}
+
 	public static void enter(Node node) {
 		node.setOpacity(0);
 		node.setTranslateY(10);

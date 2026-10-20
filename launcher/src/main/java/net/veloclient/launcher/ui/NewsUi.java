@@ -91,7 +91,7 @@ public final class NewsUi {
 		fallback.setStyle(fallbackStyle(accent));
 		Label watermark = new Label(tag == null ? "" : tag.toUpperCase(Locale.ROOT));
 		watermark.getStyleClass().add("news-cover-watermark");
-		ImageView logo = new ImageView(new Image(NewsUi.class.getResourceAsStream("/net/veloclient/launcher/images/logo.png"), 26, 26, true, true));
+		ImageView logo = new ImageView(UiImages.resource("/net/veloclient/launcher/images/logo.png", 26, 26));
 		logo.setOpacity(0.22);
 		HBox mark = new HBox(8, logo, watermark);
 		mark.setAlignment(Pos.CENTER_RIGHT);

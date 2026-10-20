@@ -68,29 +68,30 @@ public class VeloButton extends ClickableWidget {
 		int radius = Math.min(VeloStyle.RADIUS_CONTROL, h / 2);
 		VeloStyle.pushScale(context, x + w / 2f, y + h / 2f, VeloStyle.pressScale(pressedAt));
 
-		boolean tinted = primary || selected;
-		if (tinted) {
-			int top = VeloAnim.lerpArgb(VeloStyle.accent(), VeloStyle.accentHover(), hoverProgress);
-			int bottom = VeloAnim.lerpArgb(VeloStyle.accentEnd(), VeloStyle.accent(), hoverProgress * 0.5f);
+		// 0.9.7 (launcher look): primary = flat accent; selected (a sidebar entry) = soft accent tint with white text;
+		// everything else = graphite with a hairline that brightens on hover.
+		boolean tinted = primary;
+		if (primary) {
+			int fill = VeloAnim.lerpArgb(VeloStyle.accent(), VeloStyle.accentHover(), hoverProgress);
 			if (!this.active) {
-				top = VeloAnim.lerpArgb(top, 0xFF000000, 0.5f);
-				bottom = VeloAnim.lerpArgb(bottom, 0xFF000000, 0.5f);
+				fill = VeloAnim.lerpArgb(fill, 0xFF000000, 0.5f);
 			}
 			if (hoverProgress > 0.01f) {
-				VeloDraw.shadow(context, x, y, w, h, radius, 6, 1, VeloStyle.accentGlow(Math.round(0x50 * hoverProgress)));
+				VeloDraw.shadow(context, x, y, w, h, radius, 6, 1, VeloStyle.accentGlow(Math.round(0x40 * hoverProgress)));
 			}
-			VeloDraw.fillRoundedGradient(context, x, y, w, h, radius, top, bottom);
+			VeloDraw.fillRounded(context, x, y, w, h, radius, fill);
+		} else if (selected) {
+			VeloDraw.fillRounded(context, x, y, w, h, radius, VeloUi.withAlpha(theme.accentStart(), 0x33 + Math.round(0x14 * hoverProgress)));
 		} else {
-			int bg = VeloAnim.lerpArgb(VeloStyle.card(), VeloStyle.cardHover(), hoverProgress);
+			int bg = VeloAnim.lerpArgb(0x0DFFFFFF, 0x1AFFFFFF, hoverProgress);
 			if (!this.active) {
-				bg = VeloAnim.lerpArgb(bg, 0xFF000000, 0.35f);
+				bg = 0x08FFFFFF;
 			}
 			VeloDraw.fillRounded(context, x, y, w, h, radius, bg);
-			VeloDraw.strokeRounded(context, x, y, w, h, radius,
-					VeloAnim.lerpArgb(VeloStyle.border(), VeloUi.withAlpha(theme.accentStart(), 0xB0), hoverProgress));
+			VeloDraw.strokeRounded(context, x, y, w, h, radius, VeloAnim.lerpArgb(0x17FFFFFF, 0x38FFFFFF, hoverProgress));
 		}
 
-		int textColor = tinted ? VeloStyle.onAccent() : VeloStyle.text();
+		int textColor = tinted ? VeloStyle.onAccent() : selected ? 0xFFFFFFFF : VeloStyle.text();
 		if (!this.active) {
 			textColor = VeloStyle.textFaint();
 		}

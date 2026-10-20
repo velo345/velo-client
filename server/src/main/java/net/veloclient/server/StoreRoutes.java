@@ -19,6 +19,8 @@ import java.util.Map;
  * {@code GET /v1/store/order} - signed-in player</li>
  * <li>{@code POST /v1/store/webhook/tebex} - Tebex payment events (signature-checked)</li>
  * <li>{@code POST /v1/admin/store/{lookup,coins,item}} - owner only</li>
+ * <li>{@code POST /v1/store/gift}, {@code POST /v1/store/wishlist}, {@code GET /v1/store/wishlist/list} - signed-in player</li>
+ * <li>{@code GET /v1/referral}, {@code POST /v1/referral/redeem} - invite friends, enter a friend's code</li>
  * <li>{@code GET /v1/rewards}, {@code POST /v1/rewards/{login,quest,progress,ad}} - free coins</li>
  * <li>{@code GET /v1/rewards/ayet} - ayeT-Studios' rewarded-video callback (HMAC-checked)</li>
  * <li>{@code GET /ads.txt} - the ads.txt the ad network requires (from {@code data/ads.txt})</li>
@@ -39,6 +41,15 @@ final class StoreRoutes {
 	}
 
 	private record CheckoutRequest(String packId) {
+	}
+
+	private record GiftRequest(String itemId, String to, String note) {
+	}
+
+	private record WishlistRequest(String itemId, boolean on) {
+	}
+
+	private record RedeemRequest(String code) {
 	}
 
 	private record QuestRequest(String questId) {
@@ -63,6 +74,18 @@ final class StoreRoutes {
 				JsonHttp.writeJson(ex, 200, store.buy(s.uuid(), s.username(), JsonHttp.readBody(ex, BuyRequest.class).itemId())));
 		route(server, registry, "/v1/store/checkout", "POST", (ex, s) ->
 				JsonHttp.writeJson(ex, 200, store.checkout(s.uuid(), s.username(), JsonHttp.readBody(ex, CheckoutRequest.class).packId())));
+		route(server, registry, "/v1/store/gift", "POST", (ex, s) -> {
+			GiftRequest r = JsonHttp.readBody(ex, GiftRequest.class);
+			JsonHttp.writeJson(ex, 200, store.gift(s.uuid(), s.username(), r.itemId(), r.to()));
+		});
+		route(server, registry, "/v1/store/wishlist/list", "GET", (ex, s) -> JsonHttp.writeJson(ex, 200, Map.of("items", store.wishlist(s.uuid()))));
+		route(server, registry, "/v1/store/wishlist", "POST", (ex, s) -> {
+			WishlistRequest r = JsonHttp.readBody(ex, WishlistRequest.class);
+			JsonHttp.writeJson(ex, 200, Map.of("items", store.setWishlisted(s.uuid(), r.itemId(), r.on())));
+		});
+		route(server, registry, "/v1/referral", "GET", (ex, s) -> JsonHttp.writeJson(ex, 200, store.referral(s.uuid(), s.username())));
+		route(server, registry, "/v1/referral/redeem", "POST", (ex, s) ->
+				JsonHttp.writeJson(ex, 200, store.redeemReferral(s.uuid(), s.username(), JsonHttp.readBody(ex, RedeemRequest.class).code())));
 		route(server, registry, "/v1/store/order", "GET", (ex, s) -> JsonHttp.writeJson(ex, 200, store.order(s.uuid(), query(ex).get("id"))));
 
 		server.createContext("/v1/store/webhook/tebex", ex -> VeloServerApp.handle(ex, "POST", e -> {

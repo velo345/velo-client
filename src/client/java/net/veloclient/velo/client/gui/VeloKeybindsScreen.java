@@ -42,9 +42,12 @@ public final class VeloKeybindsScreen extends VeloWindow {
 	private float maxScroll;
 	private long lastFrameNanos;
 	private String status = "";
+	/** Keyboard map (default) or the searchable list. */
+	private static boolean mapView = true;
+	private final KeyboardMapView map = new KeyboardMapView();
 
 	public VeloKeybindsScreen(Screen parent) {
-		super(Text.literal("Controls"), 720, 460);
+		super(Text.literal("Controls"), 900, 520);
 		returnTo(parent);
 	}
 
@@ -87,8 +90,9 @@ public final class VeloKeybindsScreen extends VeloWindow {
 	protected void layoutContent() {
 		this.clearChildren();
 		String previous = search != null ? search.getText() : "";
-		search = new TextFieldWidget(this.textRenderer, contentX(), contentY(), 200, 16, Text.literal("Search"));
-		search.setPlaceholder(Text.literal("Search actions or keys..."));
+		int searchWidth = Math.max(90, Math.min(200, contentWidth() - 120 - 258));
+		search = new TextFieldWidget(this.textRenderer, contentX(), contentY(), searchWidth, 16, Text.literal("Search"));
+		search.setPlaceholder(Text.literal("Search actions or keys"));
 		search.setText(previous);
 		search.setChangedListener(v -> {
 			scroll = 0;
@@ -127,12 +131,22 @@ public final class VeloKeybindsScreen extends VeloWindow {
 		List<KeyBinding> all = BindingAccess.all();
 		int conflictCount = (int) all.stream().filter(b -> !BindingAccess.conflicts(b).isEmpty()).count();
 
-		// Top bar: search, conflicts filter, reset all, vanilla view.
-		hits.add(VeloUi.pill(context, x + 208, y, 110, 16, "Conflicts (" + conflictCount + ")", conflictsOnly ? 3 : 0, mouseX, mouseY,
+		// Top bar: search, keyboard/list, conflicts, reset all, vanilla view.
+		// Right to left: Vanilla view, Reset all, Conflicts; Keyboard / List right after the search box.
+		int searchW = search == null ? 200 : search.getWidth();
+		hits.add(VeloUi.pill(context, x + searchW + 8, y, 62, 16, "Keyboard", mapView ? 1 : 0, mouseX, mouseY, () -> mapView = true));
+		hits.add(VeloUi.pill(context, x + searchW + 72, y, 40, 16, "List", mapView ? 0 : 1, mouseX, mouseY, () -> mapView = false));
+		hits.add(VeloUi.pill(context, x + width - 150 - 102, y, 96, 16, "Conflicts (" + conflictCount + ")", conflictsOnly ? 3 : 0, mouseX, mouseY,
 				() -> {
+					if (mapView) {
+						// Jump to the next key two actions fight over.
+						all.stream().filter(b -> !BindingAccess.conflicts(b).isEmpty()).findFirst()
+								.ifPresent(b -> map.select(BindingAccess.keyId(b)));
+						return;
+					}
 					conflictsOnly = !conflictsOnly;
 					scroll = 0;
-				scrollTarget = 0;
+					scrollTarget = 0;
 				}));
 		hits.add(VeloUi.pill(context, x + width - 72, y, 72, 16, "Vanilla view", 0, mouseX, mouseY, this::openVanilla));
 		hits.add(VeloUi.pill(context, x + width - 150, y, 72, 16, "Reset all", 0, mouseX, mouseY, () ->
@@ -143,6 +157,32 @@ public final class VeloKeybindsScreen extends VeloWindow {
 							}
 							status = "All key binds reset";
 						}))));
+
+		if (mapView) {
+			map.render(context, this.textRenderer, x, y + 24, width, contentBottom() - 14 - (y + 24), mouseX, mouseY, hits, new KeyboardMapView.Host() {
+				@Override
+				public void listen(KeyBinding binding) {
+					listening = binding;
+					status = "";
+				}
+
+				@Override
+				public void status(String text) {
+					status = text;
+				}
+
+				@Override
+				public String query() {
+					return search == null ? "" : search.getText();
+				}
+			});
+			String footer = listening != null
+					? "Press a key or mouse button for \"" + BindingAccess.name(listening) + "\" - Esc cancels, Backspace unbinds"
+					: status;
+			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(footer, width), x, contentBottom() - 9,
+					listening != null ? VeloStyle.accent() : VeloStyle.textMuted());
+			return;
+		}
 
 		// Category chips.
 		Map<String, String> categories = new LinkedHashMap<>();

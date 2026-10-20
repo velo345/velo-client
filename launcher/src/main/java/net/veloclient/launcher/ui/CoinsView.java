@@ -44,7 +44,23 @@ public final class CoinsView {
 		JsonObject run() throws StoreApi.StoreError;
 	}
 
+	/** Where the page's shortcuts go (Store, invite friends, Velo+). */
+	public interface Links {
+		void openStore();
+
+		void openReferrals();
+
+		void openPlus();
+	}
+
+	private static Links links;
+
 	public static Node build() {
+		return build(null);
+	}
+
+	public static Node build(Links shortcuts) {
+		links = shortcuts;
 		StackPane page = new StackPane();
 		page.getChildren().add(Skeleton.grid(6, 220, 200));
 		Runnable[] reload = new Runnable[1];
@@ -73,45 +89,115 @@ public final class CoinsView {
 
 	private static Node content(JsonObject catalog, JsonObject rewards, Runnable reload) {
 		Label status = new Label();
-		status.getStyleClass().add("purchase-status");
+		status.getStyleClass().add("t-strong");
 		status.setWrapText(true);
+		status.managedProperty().bind(status.textProperty().isNotEmpty());
+		status.visibleProperty().bind(status.managedProperty());
 
-		// Header: big balance.
-		Label title = new Label("Velo Coins");
-		title.getStyleClass().add("page-title");
-		Label sub = new Label("Buy coins for cosmetics - or earn some every day for free.");
-		sub.getStyleClass().add("page-subtitle");
-		VBox titles = new VBox(2, title, sub);
-		Label balance = new Label(String.format(Locale.ROOT, "%,d", StoreApi.balance()));
-		balance.getStyleClass().add("coins-balance");
-		HBox balanceBox = new HBox(10, CosmeticUi.coin(30), balance);
-		balanceBox.setAlignment(Pos.CENTER_RIGHT);
-		Region spacer = new Region();
-		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox header = new HBox(12, titles, spacer, balanceBox);
-		header.setAlignment(Pos.CENTER_LEFT);
-
-		VBox left = new VBox(12, sectionLabel("Get coins"), packs(catalog, status, reload));
+		VBox left = new VBox(28, hero(), section("Buy coins", "One-time packs, no subscription", packs(catalog, status, reload)), waysToEarn());
 		HBox.setHgrow(left, Priority.ALWAYS);
-		VBox right = new VBox(12, sectionLabel("Free coins"), rewards == null ? note("Sign in to earn free coins.") : freeCoins(rewards, status, reload));
+		VBox right = new VBox(12, section("Free every day", null, rewards == null ? note("Sign in to earn free coins.") : freeCoins(rewards, status, reload)));
 		right.setMinWidth(340);
 		right.setMaxWidth(380);
-		HBox columns = new HBox(22, left, right);
+		HBox columns = new HBox(28, left, right);
 
-		VBox root = new VBox(18, header, status, columns);
+		VBox root = new VBox(18, status, columns);
 		if (StoreApi.isOwner()) {
 			root.getChildren().add(ownerTools(catalog, reload));
 		}
+		root.setPadding(new javafx.geometry.Insets(4, 24, 28, 4));
 		ScrollPane scroll = new ScrollPane(root);
 		scroll.setFitToWidth(true);
+		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 		scroll.getStyleClass().add("scroll-pane");
-		return scroll;
+		VBox page = new VBox(scroll);
+		page.getStyleClass().add("page");
+		VBox.setVgrow(scroll, Priority.ALWAYS);
+		return page;
+	}
+
+	/** Your balance, big, with where to spend it. */
+	private static Node hero() {
+		Label overline = new Label("VELO COINS");
+		overline.getStyleClass().add("t-overline");
+		Label balance = new Label(String.format(Locale.ROOT, "%,d", Math.max(0, StoreApi.balance())));
+		balance.getStyleClass().add("t-display");
+		balance.setStyle("-fx-text-fill: -velo-gold;");
+		HBox amount = new HBox(14, CosmeticUi.coin(44), balance);
+		amount.setAlignment(Pos.CENTER_LEFT);
+		Label sub = new Label("Spend them on wings, capes, auras and bundles. Earn more for free every day.");
+		sub.getStyleClass().add("t-body");
+		sub.setWrapText(true);
+		HBox actions = new HBox(10);
+		if (links != null) {
+			Button store = new Button("Browse the Store", Icons.icon("store", 15, javafx.scene.paint.Color.WHITE));
+			store.getStyleClass().add("primary-button");
+			store.setOnAction(e -> links.openStore());
+			Button invite = new Button("Invite friends", Icons.icon("gift", 15, javafx.scene.paint.Color.web("#F7C04A")));
+			invite.getStyleClass().add("ghost-button");
+			invite.setOnAction(e -> links.openReferrals());
+			actions.getChildren().addAll(store, invite);
+		}
+		VBox hero = new VBox(10, overline, amount, sub, actions);
+		VBox.setMargin(actions, new javafx.geometry.Insets(8, 0, 0, 0));
+		hero.getStyleClass().add("card");
+		hero.setPadding(new javafx.geometry.Insets(26, 30, 26, 30));
+		hero.setStyle("-fx-background-color: radial-gradient(center 85% 20%, radius 65%, rgba(247,192,74,0.16) 0%, transparent 100%), -velo-surface;"
+				+ " -fx-border-color: rgba(247,192,74,0.22);");
+		return hero;
+	}
+
+	/** Other ways to get coins: inviting friends and Velo+. */
+	private static Node waysToEarn() {
+		if (links == null) {
+			return new Region();
+		}
+		HBox row = new HBox(14,
+				earnCard("gift", "#F7C04A", "Invite friends", "Up to 500 coins for each friend who plays 2 hours. They get 300 too.", "Get your code",
+						links::openReferrals),
+				earnCard("crown", "#FF7A7E", "Velo+", "A coin drop every month, plus all the Addons and the + badge.", "See Velo+", links::openPlus));
+		row.getChildren().forEach(n -> HBox.setHgrow(n, Priority.ALWAYS));
+		return section("More ways to earn", null, row);
+	}
+
+	private static Node earnCard(String icon, String color, String title, String text, String action, Runnable onAction) {
+		StackPane badge = new StackPane(Icons.icon(icon, 20, javafx.scene.paint.Color.web(color)));
+		badge.setMinSize(42, 42);
+		badge.setMaxSize(42, 42);
+		badge.setStyle("-fx-background-color: " + color + "22; -fx-background-radius: 12;");
+		Label name = new Label(title);
+		name.getStyleClass().add("t-heading");
+		Label body = new Label(text);
+		body.getStyleClass().add("t-muted");
+		body.setWrapText(true);
+		Button go = new Button(action);
+		go.getStyleClass().addAll("ghost-button", "button-sm");
+		go.setOnAction(e -> onAction.run());
+		VBox card = new VBox(10, badge, name, body, go);
+		card.getStyleClass().addAll("card", "card-hover");
+		card.setPadding(new javafx.geometry.Insets(18));
+		card.setMaxWidth(Double.MAX_VALUE);
+		card.setOnMouseClicked(e -> onAction.run());
+		return card;
+	}
+
+	private static Node section(String title, String subtitle, Node body) {
+		Label heading = new Label(title);
+		heading.getStyleClass().add("t-title-sm");
+		HBox head = new HBox(12, heading);
+		head.setAlignment(Pos.BASELINE_LEFT);
+		if (subtitle != null) {
+			Label sub = new Label(subtitle);
+			sub.getStyleClass().add("t-muted");
+			head.getChildren().add(sub);
+		}
+		return new VBox(14, head, body);
 	}
 
 	// ---- Coin packs ----
 
 	private static Node packs(JsonObject catalog, Label status, Runnable reload) {
-		FlowPane grid = new FlowPane(14, 14);
+		FlowPane grid = StoreTiles.grid(190, 14);
 		JsonArray packs = catalog.getAsJsonArray("coinPacks");
 		String currency = catalog.get("currency").getAsString();
 		boolean enabled = catalog.get("checkoutEnabled").getAsBoolean();
@@ -123,40 +209,44 @@ public final class CoinsView {
 			double price = pack.get("price").getAsDouble();
 
 			StackPane art = new StackPane(coinPile(2 + i * 2));
-			art.getStyleClass().add("coin-art");
-			art.setPrefSize(200, 92);
+			art.setPrefHeight(104);
+			art.setMinHeight(104);
+			art.setStyle("-fx-background-color: radial-gradient(center 50% 60%, radius 60%, rgba(247,192,74," + (0.12 + i * 0.05)
+					+ ") 0%, transparent 100%), -velo-surface-2; -fx-background-radius: 12;");
 			Label amount = new Label(String.format(Locale.ROOT, "%,d", coins + bonus));
-			amount.getStyleClass().add("pack-amount");
+			amount.getStyleClass().add("t-title-sm");
+			amount.setStyle("-fx-text-fill: -velo-gold;");
 			Label coinsWord = new Label("coins");
-			coinsWord.getStyleClass().add("page-subtitle");
+			coinsWord.getStyleClass().add("t-muted");
 			HBox amountRow = new HBox(6, amount, coinsWord);
 			amountRow.setAlignment(Pos.BASELINE_LEFT);
-			VBox body = new VBox(4, art, amountRow);
-			if (bonus > 0) {
-				body.getChildren().add(CosmeticUi.badge("+" + String.format(Locale.ROOT, "%,d", bonus) + " bonus", "chip-owned"));
-			}
-			Button buy = new Button(enabled ? "Buy for " + formatPrice(price, currency) : "Coming soon");
-			buy.getStyleClass().add("primary-button");
+			Label extra = new Label(bonus > 0 ? "+" + String.format(Locale.ROOT, "%,d", bonus) + " bonus" : "Starter pack");
+			extra.getStyleClass().addAll("badge", bonus > 0 ? "badge-green" : "badge-grey");
+			Button buy = new Button(enabled ? formatPrice(price, currency) : "Coming soon");
+			buy.getStyleClass().add(i == best ? "buy-button" : "primary-button");
 			buy.setMaxWidth(Double.MAX_VALUE);
 			buy.setDisable(!enabled);
 			String packId = pack.get("id").getAsString();
 			buy.setOnAction(e -> startCheckout(packId, buy, status, reload));
-			body.getChildren().add(buy);
-			body.getStyleClass().addAll("pack-card", "motion-card");
+			VBox body = new VBox(10, art, amountRow, extra, buy);
+			body.getStyleClass().add("card");
+			body.setPadding(new javafx.geometry.Insets(12, 12, 14, 12));
 			if (i == best) {
-				body.getStyleClass().add("pack-card-best");
+				body.setStyle("-fx-border-color: rgba(247,192,74,0.55); -fx-border-width: 1.5;");
 				Label ribbon = new Label("BEST VALUE");
-				ribbon.getStyleClass().add("best-ribbon");
+				ribbon.getStyleClass().addAll("badge", "badge-gold");
 				StackPane.setAlignment(ribbon, Pos.TOP_RIGHT);
+				StackPane.setMargin(ribbon, new javafx.geometry.Insets(8));
 				art.getChildren().add(ribbon);
 			}
-			body.setPrefWidth(220);
 			grid.getChildren().add(body);
 		}
 		UiMotion.stagger(grid, 8);
-		Label secure = note(enabled ? "Secure checkout by Tebex - cards, PayPal, paysafecard and more. Opens in your browser."
-				: "Buying coins isn't open yet.");
-		return new VBox(10, grid, secure);
+		HBox secure = new HBox(8, Icons.icon("lock", 13, javafx.scene.paint.Color.web("#A9A9B3")),
+				note(enabled ? "Secure checkout by Tebex: cards, PayPal, paysafecard and more. Opens in your browser."
+						: "Buying coins isn't open yet."));
+		secure.setAlignment(Pos.CENTER_LEFT);
+		return new VBox(12, grid, secure);
 	}
 
 	private static void startCheckout(String packId, Button button, Label status, Runnable reload) {
@@ -211,42 +301,50 @@ public final class CoinsView {
 	// ---- Free coins ----
 
 	private static Node freeCoins(JsonObject r, Label status, Runnable reload) {
-		VBox box = new VBox(10);
+		VBox box = new VBox(0);
+		box.getStyleClass().add("card");
 
 		// Daily reward + streak.
 		int streak = r.get("streak").getAsInt();
 		boolean claimed = r.get("loginClaimed").getAsBoolean();
 		boolean claimable = r.get("loginClaimable").getAsBoolean();
 		Label dailyTitle = new Label("Daily reward");
-		dailyTitle.getStyleClass().add("reward-title");
+		dailyTitle.getStyleClass().add("t-strong");
 		HBox dots = new HBox(5);
 		int days = streak + (claimed ? 1 : 0);
 		int litInWeek = days == 0 ? 0 : (days - 1) % 7 + 1;
 		for (int d = 0; d < 7; d++) {
-			Region dot = new Region();
-			dot.getStyleClass().add(d < litInWeek ? "streak-dot-on" : "streak-dot");
-			if (d == 6) {
-				dot.getStyleClass().add("streak-dot-week");
-			}
-			dots.getChildren().add(dot);
+			boolean lit = d < litInWeek;
+			Label day = new Label(d == 6 ? "★" : String.valueOf(d + 1));
+			day.setStyle("-fx-font-family: 'JetBrains Mono Medium'; -fx-font-size: 10px; -fx-text-fill: "
+					+ (lit ? "#1a1406" : d == 6 ? "-velo-gold" : "-velo-text-3") + ";");
+			StackPane cell = new StackPane(day);
+			cell.setMinSize(24, 24);
+			cell.setMaxSize(24, 24);
+			cell.setStyle("-fx-background-radius: 7; -fx-background-color: " + (lit ? "-velo-gold" : "rgba(255,255,255,0.06)") + ";"
+					+ (d == 6 && !lit ? " -fx-border-color: rgba(247,192,74,0.5); -fx-border-radius: 7;" : ""));
+			dots.getChildren().add(cell);
 		}
 		// Every 7th day in a row pays a weekly bonus on top.
 		int weekly = r.has("weeklyBonus") ? r.get("weeklyBonus").getAsInt() : 0;
 		boolean weeklyToday = r.has("weeklyBonusToday") && r.get("weeklyBonusToday").getAsBoolean();
-		Label streakLabel = new Label(weekly <= 0 ? "" : weeklyToday ? "Week bonus!" : "Day 7 +" + weekly);
-		streakLabel.getStyleClass().add("streak-week-label");
-		HBox streakRow = new HBox(8, dots, streakLabel);
-		streakRow.setAlignment(Pos.CENTER_LEFT);
-		Button claim = new Button(claimed ? "Claimed" : claimable ? "Claim +" + r.get("loginCoins").getAsInt() : "Play 5 min in game");
+		Label streakLabel = new Label(weekly <= 0 ? "" : weeklyToday ? "Week bonus!" : "Day 7 pays +" + weekly + " extra");
+		streakLabel.getStyleClass().add("t-muted");
+		streakLabel.setMinWidth(Region.USE_PREF_SIZE);
+		streakLabel.setManaged(!streakLabel.getText().isEmpty());
+		VBox streakRow = new VBox(6, dots, streakLabel);
+		Button claim = new Button(claimed ? "Claimed" : claimable ? "Claim +" + r.get("loginCoins").getAsInt() : "Play 5 min");
 		claim.setDisable(!claimable);
-		if (claimable) {
-			claim.getStyleClass().add("primary-button");
-		}
+		claim.getStyleClass().add(claimable ? "buy-button" : "ghost-button");
 		claim.setOnAction(e -> run(StoreApi::claimLogin, ok -> {
 			status.setText("Daily reward claimed!");
 			reload.run();
 		}, status::setText));
-		box.getChildren().add(rewardCard(new VBox(6, dailyTitle, streakRow), claim));
+		box.getChildren().add(rewardCard(new VBox(8, dailyTitle, streakRow), claim));
+		Label questsHead = new Label("TODAY'S QUESTS");
+		questsHead.getStyleClass().add("field-label");
+		questsHead.setPadding(new javafx.geometry.Insets(14, 16, 4, 16));
+		box.getChildren().addAll(hairline(), questsHead);
 
 		// Today's quests.
 		for (var element : r.getAsJsonArray("quests")) {
@@ -256,22 +354,16 @@ public final class CoinsView {
 			boolean done = q.get("claimed").getAsBoolean();
 			boolean canClaim = q.get("claimable").getAsBoolean();
 			Label name = new Label(q.get("title").getAsString());
-			name.getStyleClass().add("reward-title");
-			ProgressBar bar = new ProgressBar(target == 0 ? 1 : Math.min(1, progress / (double) target));
-			bar.setMaxWidth(Double.MAX_VALUE);
-			bar.getStyleClass().add("quest-bar");
-			if (done) {
-				bar.getStyleClass().add("quest-bar-done");
-			}
+			name.getStyleClass().add("t-strong");
+			name.setWrapText(true);
+			Region bar = progressLine(target == 0 ? 1 : Math.min(1, progress / (double) target), done);
 			String hint = q.has("hint") && !q.get("hint").isJsonNull() ? q.get("hint").getAsString()
 					: compact(progress) + " / " + compact(target);
 			Label hintLabel = new Label(hint);
-			hintLabel.getStyleClass().add("settings-row-hint");
-			Button button = new Button(done ? "Done" : "+" + q.get("coins").getAsInt());
+			hintLabel.getStyleClass().add("t-mono");
+			Button button = new Button(done ? "Done" : canClaim ? "Claim +" + q.get("coins").getAsInt() : "+" + q.get("coins").getAsInt());
 			button.setDisable(!canClaim);
-			if (canClaim) {
-				button.getStyleClass().add("update-all-button");
-			}
+			button.getStyleClass().add(canClaim ? "buy-button" : "ghost-button");
 			String id = q.get("id").getAsString();
 			button.setOnAction(e -> run(() -> StoreApi.claimQuest(id), ok -> {
 				status.setText("Quest reward claimed!");
@@ -287,7 +379,9 @@ public final class CoinsView {
 		}
 
 		long resets = r.get("resetsInSeconds").getAsLong();
-		box.getChildren().add(note("New rewards in " + resets / 3600 + "h " + (resets % 3600) / 60 + "m"));
+		Label resetsLabel = note("New quests in " + resets / 3600 + "h " + (resets % 3600) / 60 + "m");
+		resetsLabel.setPadding(new javafx.geometry.Insets(10, 16, 14, 16));
+		box.getChildren().addAll(hairline(), resetsLabel);
 		return box;
 	}
 
@@ -295,9 +389,9 @@ public final class CoinsView {
 		int watched = r.get("adsWatched").getAsInt();
 		int perDay = r.get("adsPerDay").getAsInt();
 		Label adTitle = new Label("Watch an ad  +" + r.get("adCoins").getAsInt());
-		adTitle.getStyleClass().add("reward-title");
+		adTitle.getStyleClass().add("t-strong");
 		Label adCount = new Label(watched + " / " + perDay + " today");
-		adCount.getStyleClass().add("settings-row-hint");
+		adCount.getStyleClass().add("t-mono");
 		boolean adsLeft = watched < perDay;
 		Button watch = new Button(adsLeft ? "Watch" : "Done");
 		watch.setDisable(!adsLeft);
@@ -319,18 +413,40 @@ public final class CoinsView {
 
 	private static Node rewardCard(Node left, Button action) {
 		HBox.setHgrow(left, Priority.ALWAYS);
-		action.setMinWidth(92);
+		action.setMinWidth(Region.USE_PREF_SIZE);
+		action.getStyleClass().add("button-sm");
 		HBox card = new HBox(12, left, action);
 		card.setAlignment(Pos.CENTER_LEFT);
-		card.getStyleClass().add("reward-card");
+		card.setPadding(new javafx.geometry.Insets(12, 16, 12, 16));
 		return card;
+	}
+
+	private static Region hairline() {
+		Region line = new Region();
+		line.getStyleClass().add("hairline-h");
+		return line;
+	}
+
+	/** A thin progress line (real progress: how far a quest is). */
+	private static Region progressLine(double fraction, boolean done) {
+		Region fill = new Region();
+		fill.setStyle("-fx-background-color: " + (done ? "-velo-green" : "-velo-gold") + "; -fx-background-radius: 2;");
+		fill.setMinHeight(4);
+		fill.setMaxHeight(4);
+		StackPane track = new StackPane(fill);
+		StackPane.setAlignment(fill, Pos.CENTER_LEFT);
+		track.setMinHeight(4);
+		track.setMaxHeight(4);
+		track.setStyle("-fx-background-color: rgba(255,255,255,0.07); -fx-background-radius: 2;");
+		fill.maxWidthProperty().bind(track.widthProperty().multiply(fraction));
+		return track;
 	}
 
 	// ---- Owner tools ----
 
 	private static Node ownerTools(JsonObject catalog, Runnable reload) {
 		Label title = new Label("Owner tools");
-		title.getStyleClass().add("settings-card-title");
+		title.getStyleClass().add("t-heading");
 		TextField player = new TextField();
 		player.setPromptText("Player name or UUID");
 		player.setPrefWidth(200);
@@ -365,6 +481,9 @@ public final class CoinsView {
 		// Every cosmetic the server has - testing and hidden ones too (the full panel: Store > Owner panel).
 		StoreCatalog.all().forEach(i -> item.getItems().add(i.id()));
 		run(StoreApi::adminCosmetics, all -> {
+			if (!all.has("items") || !all.get("items").isJsonArray()) {
+				return;
+			}
 			item.getItems().clear();
 			all.getAsJsonArray("items").forEach(i -> item.getItems().add(i.getAsJsonObject().get("id").getAsString()));
 		}, error -> { });
@@ -381,12 +500,16 @@ public final class CoinsView {
 		lookup.setOnAction(e -> run(() -> StoreApi.adminLookup(player.getText().trim()),
 				view -> result.setText(describe(view)), result::setText));
 
+		grant.getStyleClass().add("ghost-button");
 		HBox row1 = new HBox(8, player, amount, note, give);
 		row1.setAlignment(Pos.CENTER_LEFT);
 		HBox row2 = new HBox(8, item, grant, revoke, lookup);
 		row2.setAlignment(Pos.CENTER_LEFT);
-		VBox card = new VBox(10, title, row1, row2, result);
-		card.getStyleClass().add("settings-card");
+		Label hint = note("Full catalog, bundles and players live in Store > Owner panel.");
+		result.getStyleClass().setAll("label", "t-mono");
+		VBox card = new VBox(12, new VBox(2, title, hint), row1, row2, result);
+		card.getStyleClass().add("card");
+		card.setPadding(new javafx.geometry.Insets(18, 20, 18, 20));
 		return card;
 	}
 
@@ -415,7 +538,7 @@ public final class CoinsView {
 
 	private static Label note(String text) {
 		Label label = new Label(text);
-		label.getStyleClass().add("settings-row-hint");
+		label.getStyleClass().add("t-muted");
 		label.setWrapText(true);
 		return label;
 	}

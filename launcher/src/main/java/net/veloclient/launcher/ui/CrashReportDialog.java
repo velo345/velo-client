@@ -190,7 +190,11 @@ public final class CrashReportDialog {
 		root.setPrefWidth(560);
 		root.getStyleClass().add("crash-dialog");
 		dialog.getDialogPane().setContent(root);
+		var styledHidden = dialog.getOnHidden();
 		dialog.setOnHidden(e -> {
+			if (styledHidden != null) {
+				styledHidden.handle(e);
+			}
 			markHandled(instance, crashFile);
 			// Opt-in telemetry: closing without pressing Send still reports it, grouped by cause on
 			// the server with every other report of the same crash.

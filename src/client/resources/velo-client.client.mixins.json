@@ -17,6 +17,8 @@
 		"HudSmallCapsMixin",
 		"LocalPlayerSkinCapeMixin",
 		"MouseScrollMixin",
+		"DenseGuiMouseMixin",
+		"DenseGuiScreenMixin",
 		"NickHiderMixin",
 		"PlayerListHudMixin",
 		"PlayerNameTagBadgeMixin",

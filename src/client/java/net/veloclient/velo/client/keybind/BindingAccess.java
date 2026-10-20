@@ -88,6 +88,28 @@ public final class BindingAccess {
 		return out;
 	}
 
+	/** What the player's keyboard shows for a key id ("key.keyboard.y" reads "Z" on a German layout). */
+	public static String keyLabel(String keyId) {
+		try {
+			//? if <26.1 {
+			return net.minecraft.client.util.InputUtil.fromTranslationKey(keyId).getLocalizedText().getString();
+			//?} else {
+			/*return com.mojang.blaze3d.platform.InputConstants.getKey(keyId).getDisplayName().getString();
+			*///?}
+		} catch (RuntimeException e) {
+			return keyId;
+		}
+	}
+
+	/** Binds to a key id ("key.keyboard.g", "key.mouse.4"). */
+	public static void bindKeyId(KeyBinding binding, String keyId) {
+		//? if <26.1 {
+		set(binding, net.minecraft.client.util.InputUtil.fromTranslationKey(keyId));
+		//?} else {
+		/*set(binding, com.mojang.blaze3d.platform.InputConstants.getKey(keyId));
+		*///?}
+	}
+
 	public static void bindKeyboard(KeyBinding binding, int keyCode) {
 		set(binding, net.minecraft.client.util.InputUtil.Type.KEYSYM.createFromCode(keyCode));
 	}

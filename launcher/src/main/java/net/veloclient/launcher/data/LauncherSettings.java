@@ -81,6 +81,11 @@ public final class LauncherSettings {
 		return cached;
 	}
 
+	/** A full independent copy - every field, so saving it never resets settings it didn't mean to touch. */
+	public static Data copy(Data from) {
+		return GSON.fromJson(GSON.toJson(from), Data.class);
+	}
+
 	public static synchronized void save(Data data) {
 		cached = data;
 		try {

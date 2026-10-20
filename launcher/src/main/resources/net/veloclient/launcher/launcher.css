@@ -8,15 +8,35 @@
 	 * scene graph and never see that inline override, so they fall back to
 	 * these defaults instead of failing CSS color lookups.
 	 */
-	-velo-background: #0f0a0a;
-	-velo-surface: #1e1212;
-	-velo-accent-start: #ff4444;
-	-velo-accent-end: #b71c1c;
+	-velo-background: #0b0b0e;
+	-velo-surface: #131317;
+	-velo-surface-2: #1b1b21;
+	-velo-surface-3: #23232a;
+	-velo-glass: rgba(11, 11, 14, 0.86);
+	-velo-accent-start: #e0262e;
+	-velo-accent-end: #c81f27;
+	-velo-accent: #e0262e;
+	-velo-accent-hover: #e43c43;
+	-velo-accent-pressed: #c12128;
+	-velo-accent-soft: rgba(224, 38, 46, 0.12);
+	-velo-accent-line: rgba(224, 38, 46, 0.38);
+	-velo-accent-glow: rgba(224, 38, 46, 0.35);
+	-velo-accent-text: #ff5a5f;
 	/* text drawn on a solid accent fill - dark for light accents (Nord, Monochrome); set from the theme */
 	-velo-on-accent: white;
-	-velo-text: #ffffff;
-	-velo-hover: #2a1a1a;
-	-velo-hairline: rgba(255, 255, 255, 0.08);
+	-velo-text: #f4f4f6;
+	-velo-text-2: rgba(244, 244, 246, 0.68);
+	-velo-text-3: rgba(244, 244, 246, 0.5);
+	-velo-hover: #1f1f25;
+	-velo-hairline: rgba(255, 255, 255, 0.07);
+	-velo-hairline-2: rgba(255, 255, 255, 0.12);
+	/* fixed meaning colors - the same in every theme */
+	-velo-gold: #f7c04a;
+	-velo-gold-ink: #2a1e02;
+	-velo-green: #3ddc97;
+	-velo-blue: #5aa9ff;
+	-velo-violet: #bca6ff;
+	-velo-danger: #ff7a7e;
 	-fx-font-family: "Inter", "Segoe UI", "Helvetica Neue", sans-serif;
 	-fx-font-smoothing-type: gray;
 	-fx-background-color: -velo-background;
@@ -2397,3 +2417,884 @@
 	-fx-border-radius: 12;
 	-fx-background-radius: 12;
 }
+
+/* ======================================================================
+ * 0.9.7 "Velo Pro" redesign. Kept last so it wins the cascade over the
+ * older rules above. Neutral surfaces, one solid accent, no gradients on
+ * controls. Typography: Sora (display), Inter (UI), JetBrains Mono (numbers).
+ * ====================================================================== */
+
+.root {
+	-fx-font-family: "Inter", "Segoe UI", sans-serif;
+	-fx-font-size: 13px;
+}
+
+/* ---- Typography ---- */
+
+.t-display { -fx-font-family: "Sora"; -fx-font-weight: bold; -fx-font-size: 44px; -fx-text-fill: -velo-text; }
+.t-title { -fx-font-family: "Sora"; -fx-font-weight: bold; -fx-font-size: 28px; -fx-text-fill: -velo-text; }
+.t-title-sm { -fx-font-family: "Sora"; -fx-font-weight: bold; -fx-font-size: 20px; -fx-text-fill: -velo-text; }
+.t-heading { -fx-font-family: "Sora SemiBold"; -fx-font-size: 17px; -fx-text-fill: -velo-text; }
+.t-strong { -fx-font-weight: 600; -fx-font-family: "Inter SemiBold"; -fx-text-fill: -velo-text; }
+.t-body { -fx-font-size: 14px; -fx-text-fill: -velo-text-2; }
+.t-muted { -fx-font-size: 12px; -fx-text-fill: -velo-text-3; }
+.t-overline { -fx-font-family: "Inter"; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: -velo-accent-text; }
+.t-mono { -fx-font-family: "JetBrains Mono Medium"; -fx-font-size: 12px; -fx-text-fill: -velo-text-2; }
+.t-link { -fx-font-family: "Inter SemiBold"; -fx-text-fill: -velo-accent-text; -fx-cursor: hand; }
+.t-link:hover { -fx-underline: true; }
+.t-gold { -fx-text-fill: -velo-gold; }
+.t-green { -fx-text-fill: -velo-green; }
+
+.page-title { -fx-font-family: "Sora"; -fx-font-weight: bold; -fx-font-size: 28px; -fx-text-fill: -velo-text; }
+.page-subtitle { -fx-text-fill: -velo-text-3; -fx-font-size: 13px; }
+
+/* ---- Buttons ---- */
+
+.button, .menu-button, .toggle-button {
+	-fx-background-color: -velo-surface-2;
+	-fx-background-radius: 10;
+	-fx-border-color: -velo-hairline-2;
+	-fx-border-radius: 10;
+	-fx-border-width: 1;
+	-fx-text-fill: -velo-text;
+	-fx-font-family: "Inter SemiBold";
+	-fx-font-size: 13px;
+	-fx-padding: 9 16 9 16;
+	-fx-cursor: hand;
+	-fx-effect: null;
+}
+
+.button:hover, .menu-button:hover, .toggle-button:hover {
+	-fx-background-color: -velo-surface-3;
+	-fx-border-color: rgba(255, 255, 255, 0.18);
+}
+
+.button:pressed, .menu-button:pressed { -fx-background-color: -velo-surface; }
+
+.button:focused { -fx-border-color: -velo-accent-line; }
+
+.primary-button, .button:default, .play-button, .home-play-button {
+	-fx-background-color: -velo-accent;
+	-fx-border-color: transparent;
+	-fx-text-fill: -velo-on-accent;
+	-fx-font-family: "Inter SemiBold";
+	-fx-effect: null;
+}
+
+.primary-button:hover, .button:default:hover, .home-play-button:hover {
+	-fx-background-color: -velo-accent-hover;
+	-fx-border-color: transparent;
+	-fx-effect: dropshadow(gaussian, -velo-accent-glow, 18, 0.1, 0, 4);
+}
+
+.primary-button:pressed, .button:default:pressed, .home-play-button:pressed { -fx-background-color: -velo-accent-pressed; }
+
+.primary-button .vicon .svg-path, .play-button .vicon .svg-path { -fx-stroke: -velo-on-accent; }
+
+.glass-button, .secondary-button {
+	-fx-background-color: -velo-surface-2;
+	-fx-border-color: -velo-hairline-2;
+	-fx-text-fill: -velo-text;
+	-fx-effect: null;
+}
+
+.glass-button:hover, .secondary-button:hover {
+	-fx-background-color: -velo-surface-3;
+	-fx-border-color: rgba(255, 255, 255, 0.18);
+}
+
+.ghost-button {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-text-fill: -velo-text-2;
+}
+
+.ghost-button:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.06);
+	-fx-border-color: transparent;
+	-fx-text-fill: -velo-text;
+}
+
+.danger-button, .danger-ghost-button, .button-danger {
+	-fx-background-color: transparent;
+	-fx-border-color: rgba(255, 90, 95, 0.35);
+	-fx-text-fill: -velo-danger;
+}
+
+.danger-button:hover, .danger-ghost-button:hover, .button-danger:hover {
+	-fx-background-color: rgba(255, 90, 95, 0.12);
+	-fx-border-color: rgba(255, 90, 95, 0.5);
+}
+
+.buy-button {
+	-fx-background-color: -velo-gold;
+	-fx-border-color: transparent;
+	-fx-text-fill: -velo-gold-ink;
+	-fx-font-family: "Inter";
+	-fx-font-weight: bold;
+}
+
+.buy-button:hover {
+	-fx-background-color: #ffd06a;
+	-fx-border-color: transparent;
+	-fx-effect: dropshadow(gaussian, rgba(247, 192, 74, 0.3), 16, 0.1, 0, 4);
+}
+
+.icon-button {
+	-fx-padding: 0;
+	-fx-min-width: 38;
+	-fx-min-height: 38;
+	-fx-pref-width: 38;
+	-fx-pref-height: 38;
+	-fx-background-radius: 10;
+	-fx-border-radius: 10;
+}
+
+.icon-button-flat {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+}
+
+.icon-button-flat:hover {
+	-fx-background-color: rgba(255, 255, 255, 0.07);
+	-fx-border-color: transparent;
+}
+
+.button-lg { -fx-padding: 12 22 12 22; -fx-font-size: 15px; -fx-background-radius: 12; -fx-border-radius: 12; }
+.button-sm { -fx-padding: 6 12 6 12; -fx-font-size: 12px; -fx-background-radius: 8; -fx-border-radius: 8; }
+
+.button:disabled, .primary-button:disabled { -fx-opacity: 0.4; }
+
+/* ---- Switches: every CheckBox reads as a toggle ---- */
+
+.check-box { -fx-text-fill: -velo-text; -fx-label-padding: 0 0 0 10; }
+
+.check-box .box {
+	-fx-background-color: -velo-surface-3;
+	-fx-background-radius: 999;
+	-fx-border-width: 0;
+	-fx-border-color: transparent;
+	-fx-padding: 3 19 3 3;
+}
+
+.check-box:hover .box { -fx-background-color: derive(-velo-surface-3, 12%); -fx-border-color: transparent; }
+
+.check-box .mark {
+	-fx-shape: "M 0 0 a 7 7 0 1 0 0.01 0 Z";
+	-fx-background-color: -velo-text-3;
+	-fx-padding: 7;
+}
+
+.check-box:selected .box {
+	-fx-background-color: -velo-accent;
+	-fx-border-color: transparent;
+	-fx-padding: 3 3 3 19;
+}
+
+.check-box:selected .mark { -fx-background-color: white; }
+.check-box:indeterminate .mark { -fx-background-color: -velo-text-2; }
+
+/* ---- Inputs ---- */
+
+.text-field, .text-area, .password-field {
+	-fx-background-color: -velo-surface;
+	-fx-border-color: -velo-hairline-2;
+	-fx-background-radius: 10;
+	-fx-border-radius: 10;
+	-fx-text-fill: -velo-text;
+	-fx-prompt-text-fill: -velo-text-3;
+	-fx-effect: null;
+	-fx-padding: 9 12 9 12;
+}
+
+.text-field:focused, .text-area:focused { -fx-border-color: -velo-accent-line; -fx-effect: null; }
+
+.combo-box, .combo-box-base { -fx-background-color: -velo-surface; -fx-border-color: -velo-hairline-2; }
+.combo-box:hover, .combo-box-base:hover { -fx-background-color: -velo-surface-2; }
+.combo-box-popup .list-view { -fx-background-color: -velo-surface-2; }
+.combo-box-popup .list-view .list-cell:filled:selected { -fx-background-color: -velo-accent-soft; -fx-text-fill: -velo-text; }
+.combo-box:showing .arrow { -fx-background-color: -velo-text; }
+
+.progress-bar .bar { -fx-background-color: -velo-accent; }
+.slider .track { -fx-background-color: -velo-surface-3; }
+.slider .thumb { -fx-background-color: white; -fx-effect: dropshadow(gaussian, -velo-accent-glow, 6, 0.4, 0, 0); }
+
+.scroll-bar .thumb { -fx-background-color: rgba(255, 255, 255, 0.12); }
+
+.tooltip {
+	-fx-background-color: -velo-surface-3;
+	-fx-font-family: "Inter Medium";
+	-fx-background-radius: 8;
+	-fx-border-radius: 8;
+}
+
+.context-menu {
+	-fx-background-color: -velo-surface-2;
+	-fx-border-color: -velo-hairline-2;
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+	-fx-padding: 6;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.55), 24, 0.1, 0, 10);
+}
+
+.context-menu .menu-item { -fx-background-radius: 8; -fx-padding: 8 12 8 12; }
+.context-menu .menu-item:focused { -fx-background-color: rgba(255, 255, 255, 0.07); }
+.context-menu .menu-item .label { -fx-text-fill: -velo-text; -fx-font-family: "Inter Medium"; }
+
+/* Tabs: text with an accent underline, never filled pills */
+.tab-pane .tab-header-area .headers-region .tab {
+	-fx-background-color: transparent;
+	-fx-background-radius: 0;
+	-fx-padding: 9 2 9 2;
+	-fx-background-insets: 0 20 0 0;
+	-fx-border-width: 0 0 2 0;
+	-fx-border-color: transparent;
+	-fx-border-insets: 0 20 0 0;
+}
+
+.tab-pane .tab-header-area .headers-region .tab:hover { -fx-background-color: transparent; }
+.tab-pane .tab-header-area .headers-region .tab:selected { -fx-background-color: transparent; -fx-border-color: transparent transparent -velo-accent-text transparent; }
+.tab-pane .tab-label { -fx-text-fill: -velo-text-3; -fx-font-family: "Inter Medium"; -fx-font-size: 14px; }
+.tab-pane .tab:selected .tab-label { -fx-text-fill: -velo-text; -fx-font-family: "Inter SemiBold"; -fx-font-weight: normal; }
+.tab-pane .tab-header-area { -fx-border-color: transparent transparent -velo-hairline transparent; -fx-border-width: 0 0 1 0; -fx-padding: 0 0 0 0; }
+
+/* Segmented control */
+.segmented-button {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-text-fill: -velo-text-3;
+	-fx-background-radius: 8;
+	-fx-padding: 7 14 7 14;
+	-fx-font-family: "Inter Medium";
+}
+
+.segmented-button:hover { -fx-background-color: rgba(255, 255, 255, 0.05); -fx-text-fill: -velo-text; }
+
+.segmented-button-active, .segmented-button-active:hover {
+	-fx-background-color: -velo-surface-3;
+	-fx-text-fill: -velo-text;
+	-fx-font-family: "Inter SemiBold";
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 4, 0, 0, 1);
+}
+
+.segment-bar {
+	-fx-background-color: -velo-surface;
+	-fx-border-color: -velo-hairline;
+	-fx-background-radius: 10;
+	-fx-border-radius: 10;
+	-fx-padding: 3;
+	-fx-spacing: 2;
+}
+
+/* Underlined text tabs (pages build these from plain buttons) */
+.utab {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-border-width: 0 0 2 0;
+	-fx-border-radius: 0;
+	-fx-background-radius: 0;
+	-fx-padding: 10 0 10 0;
+	-fx-text-fill: -velo-text-3;
+	-fx-font-family: "Inter Medium";
+	-fx-font-size: 14px;
+}
+
+.utab:hover { -fx-background-color: transparent; -fx-border-color: transparent; -fx-text-fill: -velo-text; }
+.utab-active, .utab-active:hover { -fx-border-color: transparent transparent -velo-accent-text transparent; -fx-text-fill: -velo-text; -fx-font-family: "Inter SemiBold"; }
+.utab-row { -fx-border-color: transparent transparent -velo-hairline transparent; -fx-border-width: 0 0 1 0; -fx-spacing: 24; }
+
+/* Filter chips */
+.fchip {
+	-fx-background-color: transparent;
+	-fx-border-color: -velo-hairline-2;
+	-fx-background-radius: 999;
+	-fx-border-radius: 999;
+	-fx-padding: 6 14 6 14;
+	-fx-text-fill: -velo-text-2;
+	-fx-font-family: "Inter Medium";
+}
+
+.fchip:hover { -fx-background-color: rgba(255, 255, 255, 0.05); -fx-border-color: rgba(255, 255, 255, 0.2); -fx-text-fill: -velo-text; }
+.fchip-active, .fchip-active:hover { -fx-background-color: -velo-text; -fx-border-color: -velo-text; -fx-text-fill: -velo-background; -fx-font-family: "Inter SemiBold"; }
+
+/* ---- Cards & surfaces ---- */
+
+.card {
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 14;
+	-fx-border-color: -velo-hairline;
+	-fx-border-radius: 14;
+}
+
+.card-2 { -fx-background-color: -velo-surface-2; -fx-background-radius: 12; -fx-border-color: -velo-hairline; -fx-border-radius: 12; }
+.card-hover { -fx-cursor: hand; }
+.card-hover:hover { -fx-border-color: rgba(255, 255, 255, 0.18); }
+.card-selected { -fx-border-color: -velo-accent-line; -fx-background-color: -velo-accent-soft; }
+
+.hairline-h { -fx-background-color: -velo-hairline; -fx-min-height: 1; -fx-pref-height: 1; -fx-max-height: 1; }
+.hairline-v { -fx-background-color: -velo-hairline; -fx-min-width: 1; -fx-pref-width: 1; -fx-max-width: 1; }
+
+/* ---- Badges, pills, tags ---- */
+
+.badge {
+	-fx-background-radius: 5;
+	-fx-padding: 2 7 2 7;
+	-fx-font-family: "Inter";
+	-fx-font-weight: bold;
+	-fx-font-size: 10px;
+}
+
+.badge-new { -fx-background-color: -velo-accent; -fx-text-fill: -velo-on-accent; }
+.badge-plus { -fx-background-color: -velo-accent-soft; -fx-text-fill: -velo-accent-text; }
+.badge-gold { -fx-background-color: rgba(247, 192, 74, 0.16); -fx-text-fill: -velo-gold; }
+.badge-violet { -fx-background-color: rgba(188, 166, 255, 0.16); -fx-text-fill: -velo-violet; }
+.badge-blue { -fx-background-color: rgba(90, 169, 255, 0.16); -fx-text-fill: #7dbbff; }
+.badge-green { -fx-background-color: rgba(61, 220, 151, 0.14); -fx-text-fill: -velo-green; }
+.badge-grey { -fx-background-color: rgba(255, 255, 255, 0.08); -fx-text-fill: -velo-text-2; }
+.badge-mono { -fx-font-family: "JetBrains Mono Medium"; -fx-font-weight: normal; -fx-font-size: 11px; }
+
+.pill {
+	-fx-background-radius: 999;
+	-fx-padding: 5 11 5 11;
+	-fx-font-family: "Inter SemiBold";
+	-fx-font-size: 12px;
+}
+
+.pill-green { -fx-background-color: rgba(61, 220, 151, 0.12); -fx-text-fill: -velo-green; }
+.pill-blue { -fx-background-color: rgba(90, 169, 255, 0.12); -fx-text-fill: #7dbbff; }
+.pill-grey { -fx-background-color: rgba(255, 255, 255, 0.08); -fx-text-fill: -velo-text; }
+.pill-gold { -fx-background-color: rgba(247, 192, 74, 0.12); -fx-text-fill: -velo-gold; }
+
+.count-badge {
+	-fx-background-color: -velo-accent;
+	-fx-background-radius: 999;
+	-fx-text-fill: white;
+	-fx-font-family: "Inter";
+	-fx-font-weight: bold;
+	-fx-font-size: 10px;
+	-fx-padding: 1 5 1 5;
+	-fx-min-width: 16;
+	-fx-alignment: center;
+}
+
+.count-badge-green { -fx-background-color: -velo-green; -fx-text-fill: #04130c; }
+
+/* ---- Top bar ---- */
+
+.topbar {
+	-fx-background-color: -velo-background;
+	-fx-border-color: transparent transparent -velo-hairline transparent;
+	-fx-border-width: 0 0 1 0;
+	-fx-padding: 0 16 0 22;
+	-fx-min-height: 60;
+	-fx-pref-height: 60;
+	-fx-max-height: 60;
+}
+
+.topbar-brand { -fx-font-family: "Sora"; -fx-font-weight: bold; -fx-font-size: 15px; -fx-text-fill: -velo-text; }
+
+.topnav-tab {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-border-width: 0 0 2 0;
+	-fx-background-radius: 0;
+	-fx-border-radius: 0;
+	-fx-padding: 0 12 0 12;
+	-fx-text-fill: -velo-text-3;
+	-fx-font-family: "Inter Medium";
+	-fx-font-size: 14px;
+	-fx-min-height: 59;
+	-fx-pref-height: 59;
+}
+
+.topnav-tab:hover { -fx-background-color: transparent; -fx-border-color: transparent; -fx-text-fill: -velo-text; }
+
+.topnav-tab-active, .topnav-tab-active:hover {
+	-fx-text-fill: -velo-text;
+	-fx-font-family: "Inter SemiBold";
+	-fx-border-color: transparent transparent -velo-accent-text transparent;
+}
+
+.topbar-search {
+	-fx-background-color: -velo-surface;
+	-fx-border-color: -velo-hairline;
+	-fx-background-radius: 9;
+	-fx-border-radius: 9;
+	-fx-padding: 0 10 0 12;
+	-fx-min-height: 36;
+	-fx-pref-height: 36;
+	-fx-cursor: text;
+}
+
+.topbar-search:hover { -fx-border-color: -velo-hairline-2; }
+.kbd { -fx-font-family: "JetBrains Mono Medium"; -fx-font-size: 10px; -fx-text-fill: -velo-text-3; -fx-border-color: -velo-hairline-2; -fx-border-radius: 4; -fx-padding: 1 5 1 5; }
+
+.coin-pill {
+	-fx-background-color: rgba(247, 192, 74, 0.08);
+	-fx-border-color: rgba(247, 192, 74, 0.24);
+	-fx-background-radius: 999;
+	-fx-border-radius: 999;
+	-fx-padding: 0 12 0 6;
+	-fx-min-height: 34;
+	-fx-pref-height: 34;
+	-fx-text-fill: -velo-gold;
+	-fx-font-family: "Inter";
+	-fx-font-weight: bold;
+	-fx-font-size: 13px;
+}
+
+.coin-pill:hover { -fx-background-color: rgba(247, 192, 74, 0.14); -fx-border-color: rgba(247, 192, 74, 0.4); }
+
+.coin {
+	-fx-background-color: -velo-gold;
+	-fx-background-radius: 999;
+	-fx-text-fill: -velo-gold-ink;
+	-fx-font-family: "Sora";
+	-fx-font-weight: bold;
+	-fx-alignment: center;
+}
+
+.account-pill {
+	-fx-background-color: transparent;
+	-fx-border-color: -velo-hairline-2;
+	-fx-background-radius: 999;
+	-fx-border-radius: 999;
+	-fx-padding: 3 10 3 3;
+	-fx-text-fill: -velo-text;
+	-fx-font-family: "Inter SemiBold";
+}
+
+.account-pill:hover { -fx-background-color: rgba(255, 255, 255, 0.05); -fx-border-color: rgba(255, 255, 255, 0.2); }
+
+/* ---- Launch bar ---- */
+
+.launchbar {
+	-fx-background-color: derive(-velo-background, 6%);
+	-fx-border-color: -velo-hairline transparent transparent transparent;
+	-fx-border-width: 1 0 0 0;
+	-fx-padding: 0 18 0 12;
+	-fx-min-height: 76;
+	-fx-pref-height: 76;
+	-fx-max-height: 76;
+}
+
+.profile-switcher {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+	-fx-padding: 6 12 6 6;
+	-fx-cursor: hand;
+}
+
+.profile-switcher:hover { -fx-background-color: rgba(255, 255, 255, 0.05); -fx-border-color: -velo-hairline; }
+.profile-switcher-name { -fx-font-family: "Inter SemiBold"; -fx-font-size: 15px; -fx-text-fill: -velo-text; }
+.profile-switcher-meta { -fx-font-size: 12px; -fx-text-fill: -velo-text-3; }
+
+.play-button {
+	-fx-background-radius: 12 0 0 12;
+	-fx-border-radius: 12 0 0 12;
+	-fx-font-family: "Sora";
+	-fx-font-weight: bold;
+	-fx-font-size: 16px;
+	-fx-padding: 0 30 0 26;
+	-fx-min-height: 50;
+	-fx-pref-height: 50;
+}
+
+.play-button:hover { -fx-background-color: -velo-accent-hover; -fx-effect: dropshadow(gaussian, -velo-accent-glow, 20, 0.15, 0, 4); }
+.play-button:pressed { -fx-background-color: -velo-accent-pressed; }
+.play-button-solo { -fx-background-radius: 12; -fx-border-radius: 12; }
+
+.play-chevron {
+	-fx-background-color: -velo-accent-pressed;
+	-fx-border-color: transparent;
+	-fx-background-radius: 0 12 12 0;
+	-fx-border-radius: 0 12 12 0;
+	-fx-padding: 0;
+	-fx-min-width: 42;
+	-fx-pref-width: 42;
+	-fx-min-height: 50;
+	-fx-pref-height: 50;
+}
+
+.play-chevron:hover { -fx-background-color: derive(-velo-accent-pressed, 10%); -fx-border-color: transparent; }
+
+.play-progress-track { -fx-background-color: derive(-velo-accent, -70%); -fx-background-radius: 12; -fx-border-color: -velo-accent-line; -fx-border-radius: 12; }
+.play-progress-fill { -fx-background-color: -velo-accent; -fx-background-radius: 12; }
+.play-progress-label { -fx-font-family: "Sora"; -fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: white; }
+.play-progress-sub { -fx-font-family: "JetBrains Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(255, 255, 255, 0.8); }
+
+.running-box {
+	-fx-background-color: -velo-surface-2;
+	-fx-border-color: rgba(61, 220, 151, 0.35);
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+	-fx-padding: 0 6 0 14;
+	-fx-min-height: 50;
+	-fx-pref-height: 50;
+}
+
+.status-dot { -fx-background-color: -velo-green; -fx-background-radius: 99; -fx-min-width: 7; -fx-min-height: 7; -fx-max-width: 7; -fx-max-height: 7; }
+
+/* ---- Popovers (profile switcher, notifications, account menu) ---- */
+
+.popover {
+	-fx-background-color: -velo-surface-2;
+	-fx-border-color: -velo-hairline-2;
+	-fx-background-radius: 14;
+	-fx-border-radius: 14;
+	-fx-padding: 8;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 30, 0.1, 0, 12);
+}
+
+.popover-row {
+	-fx-background-color: transparent;
+	-fx-background-radius: 10;
+	-fx-padding: 8 10 8 10;
+	-fx-cursor: hand;
+}
+
+.popover-row:hover { -fx-background-color: rgba(255, 255, 255, 0.06); }
+.popover-row-active { -fx-background-color: -velo-accent-soft; }
+.popover-section { -fx-font-family: "Inter"; -fx-font-weight: bold; -fx-font-size: 10px; -fx-text-fill: -velo-text-3; -fx-padding: 8 10 4 10; }
+
+/* ---- Page scaffolding ---- */
+
+.page { -fx-background-color: transparent; }
+.page-pad { -fx-padding: 26 32 28 32; }
+
+.tile {
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 14;
+	-fx-border-color: -velo-hairline;
+	-fx-border-radius: 14;
+	-fx-cursor: hand;
+}
+
+.tile:hover { -fx-border-color: rgba(255, 255, 255, 0.18); }
+
+.tile-play {
+	-fx-background-color: -velo-accent;
+	-fx-background-radius: 999;
+	-fx-min-width: 42;
+	-fx-min-height: 42;
+	-fx-max-width: 42;
+	-fx-max-height: 42;
+	-fx-effect: dropshadow(gaussian, -velo-accent-glow, 14, 0.2, 0, 4);
+}
+
+.hero {
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 18;
+	-fx-border-color: -velo-hairline;
+	-fx-border-radius: 18;
+}
+
+.dashed-tile {
+	-fx-background-color: transparent;
+	-fx-border-color: rgba(255, 255, 255, 0.16);
+	-fx-border-style: segments(6, 5);
+	-fx-border-width: 1.5;
+	-fx-border-radius: 14;
+	-fx-background-radius: 14;
+	-fx-cursor: hand;
+}
+
+.dashed-tile:hover { -fx-border-color: rgba(255, 255, 255, 0.3); -fx-background-color: rgba(255, 255, 255, 0.03); }
+
+.row-hover { -fx-background-radius: 10; }
+.row-hover:hover { -fx-background-color: rgba(255, 255, 255, 0.04); }
+
+.toast {
+	-fx-background-color: -velo-surface-3;
+	-fx-border-color: -velo-hairline-2;
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+	-fx-padding: 10 14 10 12;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 24, 0.1, 0, 8);
+}
+
+.topbar-search-field {
+	-fx-padding: 0 52 0 34;
+	-fx-min-height: 36;
+	-fx-pref-height: 36;
+	-fx-background-color: -velo-surface;
+	-fx-border-color: -velo-hairline;
+	-fx-background-radius: 9;
+	-fx-border-radius: 9;
+	-fx-font-size: 13px;
+}
+
+.topbar-search-field:focused { -fx-border-color: -velo-accent-line; }
+.menu-button > .label, .menu-button .label { -fx-text-fill: -velo-text; }
+.menu-button > .arrow-button > .arrow { -fx-background-color: -velo-text-3; }
+
+/* ---- Profile page: section nav + table rows ---- */
+
+.snav {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-alignment: center-left;
+	-fx-padding: 9 12 9 12;
+	-fx-background-radius: 9;
+	-fx-text-fill: -velo-text-2;
+	-fx-font-family: "Inter Medium";
+	-fx-font-size: 14px;
+	-fx-graphic-text-gap: 10;
+}
+
+.snav:hover { -fx-background-color: rgba(255, 255, 255, 0.05); -fx-border-color: transparent; -fx-text-fill: -velo-text; }
+.snav-active, .snav-active:hover { -fx-background-color: -velo-accent-soft; -fx-text-fill: -velo-text; -fx-font-family: "Inter SemiBold"; }
+.snav-count { -fx-text-fill: -velo-text-3; -fx-font-family: "JetBrains Mono Medium"; -fx-font-size: 11px; }
+.snav-active .snav-count { -fx-text-fill: -velo-accent-text; }
+
+.mod-table {
+	-fx-background-color: derive(-velo-background, 3%);
+	-fx-border-color: -velo-hairline;
+	-fx-border-radius: 12;
+	-fx-background-radius: 12;
+}
+
+.mod-row, .mod-row:hover {
+	-fx-background-color: transparent;
+	-fx-background-radius: 0;
+	-fx-border-color: transparent transparent -velo-hairline transparent;
+	-fx-border-width: 0 0 1 0;
+	-fx-border-radius: 0;
+	-fx-padding: 10 16 10 14;
+	-fx-effect: null;
+}
+
+.mod-row:hover { -fx-background-color: rgba(255, 255, 255, 0.035); }
+.mod-row .row-remove { -fx-opacity: 0; }
+.mod-row:hover .row-remove { -fx-opacity: 1; }
+
+.pack-toolbar { -fx-padding: 0 0 4 0; }
+.pack-count { -fx-text-fill: -velo-text-3; -fx-font-size: 13px; }
+
+.update-all-button, .row-update-button {
+	-fx-background-color: rgba(90, 169, 255, 0.12);
+	-fx-border-color: rgba(90, 169, 255, 0.25);
+	-fx-text-fill: #7dbbff;
+	-fx-background-radius: 999;
+	-fx-border-radius: 999;
+	-fx-padding: 5 12 5 12;
+	-fx-font-size: 12px;
+}
+
+.update-all-button:hover, .row-update-button:hover { -fx-background-color: rgba(90, 169, 255, 0.2); -fx-border-color: rgba(90, 169, 255, 0.45); }
+
+/* ---- Servers ---- */
+
+.server-card {
+	-fx-background-color: -velo-surface;
+	-fx-border-color: -velo-hairline;
+	-fx-background-radius: 14;
+	-fx-border-radius: 14;
+	-fx-padding: 14 16 14 14;
+	-fx-effect: null;
+}
+
+.server-card:hover { -fx-border-color: rgba(255, 255, 255, 0.16); -fx-background-color: -velo-surface-2; }
+.server-name { -fx-font-family: "Inter SemiBold"; -fx-font-size: 16px; -fx-text-fill: -velo-text; }
+.server-address { -fx-font-family: "JetBrains Mono Medium"; -fx-font-size: 12px; -fx-text-fill: -velo-text-3; }
+.server-icon { -fx-background-color: -velo-surface-2; -fx-background-radius: 12; -fx-border-width: 0; }
+.server-chip {
+	-fx-background-color: rgba(255, 255, 255, 0.06);
+	-fx-background-radius: 6;
+	-fx-text-fill: -velo-text-2;
+	-fx-font-size: 11px;
+	-fx-padding: 3 8 3 8;
+	-fx-border-width: 0;
+}
+
+.server-online { -fx-background-color: rgba(61, 220, 151, 0.12); -fx-text-fill: -velo-green; }
+.server-offline { -fx-background-color: rgba(255, 90, 95, 0.12); -fx-text-fill: -velo-danger; }
+.server-ping-good { -fx-text-fill: -velo-green; }
+.server-ping-ok { -fx-text-fill: -velo-gold; }
+.server-ping-bad { -fx-text-fill: -velo-danger; }
+
+.server-join {
+	-fx-background-color: -velo-surface-2;
+	-fx-border-color: -velo-hairline-2;
+	-fx-text-fill: -velo-text;
+	-fx-min-height: 40;
+}
+
+.server-card:hover .server-join, .server-join:hover {
+	-fx-background-color: -velo-accent;
+	-fx-border-color: transparent;
+	-fx-text-fill: -velo-on-accent;
+	-fx-effect: dropshadow(gaussian, -velo-accent-glow, 14, 0.1, 0, 3);
+}
+
+/* Focus rings: keyboard focus never paints the underline of tabs that aren't active. */
+.topnav-tab:focused, .utab:focused, .snav:focused, .segmented-button:focused, .fchip:focused, .profile-switcher:focused,
+.account-pill:focused, .icon-button-flat:focused, .coin-pill:focused {
+	-fx-border-color: transparent;
+}
+
+.topnav-tab-active:focused, .utab-active:focused { -fx-border-color: transparent transparent -velo-accent-text transparent; }
+.fchip-active:focused { -fx-border-color: -velo-text; }
+.account-pill:focused { -fx-border-color: -velo-hairline-2; }
+.coin-pill:focused { -fx-border-color: rgba(247, 192, 74, 0.24); }
+
+/* ---- Settings: flat sections with hairline rows ---- */
+
+.settings-card {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-border-width: 0;
+	-fx-effect: null;
+	-fx-padding: 0 0 26 0;
+}
+
+.settings-card-title { -fx-font-family: "Sora SemiBold"; -fx-font-size: 19px; -fx-text-fill: -velo-text; -fx-padding: 0 0 6 0; }
+.settings-subheading { -fx-font-family: "Inter"; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: -velo-text-3; -fx-padding: 14 0 2 0; }
+
+.settings-row {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent transparent -velo-hairline transparent;
+	-fx-border-width: 0 0 1 0;
+	-fx-background-radius: 0;
+	-fx-padding: 14 2 14 0;
+}
+
+.settings-row:hover { -fx-background-color: transparent; }
+.settings-row-label { -fx-font-family: "Inter SemiBold"; -fx-font-size: 14px; -fx-text-fill: -velo-text; }
+.settings-row-hint { -fx-font-size: 13px; -fx-text-fill: -velo-text-3; }
+.settings-value { -fx-font-family: "JetBrains Mono Medium"; -fx-text-fill: -velo-text-2; }
+
+.theme-tile {
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 13;
+	-fx-border-radius: 13;
+	-fx-border-width: 2;
+	-fx-border-color: rgba(255, 255, 255, 0.06);
+	-fx-padding: 6;
+	-fx-cursor: hand;
+}
+
+.theme-tile:hover { -fx-border-color: rgba(255, 255, 255, 0.2); }
+.theme-tile-active, .theme-tile-active:hover { -fx-border-color: -velo-accent-text; }
+
+/* The top tabs share one sliding underline (TopBar.indicator); the tabs themselves only change color. */
+.topnav-tab-active, .topnav-tab-active:hover, .topnav-tab-active:focused { -fx-border-color: transparent; }
+
+.topnav-indicator { -fx-background-color: -velo-accent-text; -fx-background-radius: 2; }
+
+
+/* ---- Popups: frameless rounded cards (DialogStyling) ---- */
+
+.dialog-pane.velo-dialog {
+	-fx-background-color: -velo-surface-2;
+	-fx-background-radius: 18;
+	-fx-border-color: -velo-hairline-2;
+	-fx-border-radius: 18;
+	-fx-border-width: 1;
+	-fx-padding: 6 6 4 6;
+	-fx-font-family: "Inter";
+}
+
+.dialog-pane.velo-dialog > .header-panel {
+	-fx-background-color: transparent;
+	-fx-padding: 20 22 6 22;
+	-fx-border-width: 0;
+}
+
+.dialog-pane.velo-dialog > .header-panel .label {
+	-fx-font-family: "Sora";
+	-fx-font-weight: bold;
+	-fx-font-size: 19px;
+	-fx-text-fill: -velo-text;
+}
+
+.dialog-pane.velo-dialog > .header-panel > .graphic-container { -fx-padding: 0 0 0 12; }
+.dialog-pane.velo-dialog > .content { -fx-padding: 12 22 16 22; }
+.dialog-pane.velo-dialog > .content.label { -fx-text-fill: -velo-text-2; -fx-font-size: 14px; -fx-wrap-text: true; }
+.dialog-pane.velo-dialog .label { -fx-text-fill: -velo-text; }
+
+.dialog-pane.velo-dialog > .button-bar > .container {
+	-fx-padding: 14 22 18 22;
+	-fx-border-color: -velo-hairline transparent transparent transparent;
+	-fx-border-width: 1 0 0 0;
+}
+
+.dialog-pane.velo-dialog .button-bar .button {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-text-fill: -velo-text-2;
+	-fx-min-height: 40;
+	-fx-padding: 9 18 9 18;
+}
+
+.dialog-pane.velo-dialog .button-bar .button:hover { -fx-background-color: rgba(255, 255, 255, 0.06); -fx-text-fill: -velo-text; }
+
+.dialog-pane.velo-dialog .button-bar .button:default {
+	-fx-background-color: -velo-accent;
+	-fx-text-fill: -velo-on-accent;
+	-fx-font-family: "Inter SemiBold";
+}
+
+.dialog-pane.velo-dialog .button-bar .button:default:hover { -fx-background-color: -velo-accent-hover; }
+
+.dialog-pane.velo-dialog .text-field, .dialog-pane.velo-dialog .combo-box, .dialog-pane.velo-dialog .text-area {
+	-fx-background-color: -velo-surface;
+}
+
+.modal-scrim { -fx-background-color: rgba(0, 0, 0, 0.55); }
+
+.field-label {
+	-fx-font-family: "Inter";
+	-fx-font-weight: bold;
+	-fx-font-size: 11px;
+	-fx-text-fill: -velo-text-3;
+	-fx-opacity: 1;
+}
+
+.icon-picker-tile {
+	-fx-background-color: -velo-surface;
+	-fx-border-color: -velo-hairline;
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+	-fx-border-width: 2;
+	-fx-padding: 6;
+	-fx-min-width: 60;
+	-fx-min-height: 60;
+}
+
+.icon-picker-tile:hover { -fx-border-color: rgba(255, 255, 255, 0.2); -fx-background-color: -velo-surface-3; }
+.icon-picker-tile:selected, .icon-picker-tile:selected:hover { -fx-border-color: -velo-accent-text; -fx-background-color: -velo-accent-soft; }
+
+.dialog-pane.velo-dialog > .content, .dialog-pane.velo-dialog .content { -fx-background-color: transparent; }
+.dialog-pane.velo-dialog .field-label { -fx-text-fill: -velo-text-3; }
+.dialog-pane.velo-dialog > .content.label { -fx-text-fill: -velo-text-2; }
+
+/* ---- Own window frame (0.9.7): minimize / maximize / close in the top bar ---- */
+
+.window-frame { -fx-border-color: -velo-hairline-2; -fx-border-width: 1; }
+.window-frame:maximized { -fx-border-width: 0; }
+
+.window-button {
+	-fx-background-color: transparent;
+	-fx-background-radius: 8;
+	-fx-border-color: transparent;
+	-fx-min-width: 36;
+	-fx-min-height: 32;
+	-fx-pref-width: 36;
+	-fx-pref-height: 32;
+	-fx-padding: 0;
+	-fx-cursor: default;
+}
+
+.window-button:hover { -fx-background-color: rgba(255, 255, 255, 0.07); }
+.window-button:pressed { -fx-background-color: rgba(255, 255, 255, 0.12); }
+.window-button-close:hover { -fx-background-color: #E0262E; }
+.window-button-close:pressed { -fx-background-color: #b51d24; }
+
+.window-glyph { -fx-stroke: -velo-text-2; -fx-stroke-width: 1.4; -fx-fill: transparent; }
+.window-glyph-front { -fx-fill: -velo-background; }
+.window-button:hover .window-glyph { -fx-stroke: -velo-text; }
+.window-button-close:hover .window-glyph { -fx-stroke: white; }
+.window-button:focused { -fx-border-color: transparent; }

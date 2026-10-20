@@ -68,48 +68,182 @@ public final class InstanceDetailView {
 	private InstanceDetailView() {
 	}
 
+	/** What the launcher adds to the page header: the profile's icon, a meta line, its menu actions. */
+	public record Header(Node icon, String meta, Runnable edit, List<javafx.scene.control.MenuItem> menu, Runnable javaSettings) {
+	}
+
 	public static Node build(Stage owner, Instance instance, LauncherTheme theme, Runnable onBack) {
-		VBox root = new VBox(14);
+		return build(owner, instance, theme, onBack, null);
+	}
 
-		HBox header = new HBox(12);
-		header.setAlignment(Pos.CENTER_LEFT);
-		Button back = BackButton.create("Home", null);
-		back.setOnAction(e -> onBack.run());
-		Label title = new Label(instance.name());
-		title.setFont(Font.font("Inter", FontWeight.BOLD, 20));
-		title.setTextFill(text(theme));
-		Label version = new Label("Minecraft " + instance.mcVersion() + " · Fabric");
-		version.getStyleClass().add("version-tag");
-		version.setTextFill(text(theme));
-		header.getChildren().addAll(back, title, version);
-		root.getChildren().add(header);
+	/** Which section was open last, per profile (kept while the launcher runs). */
+	private static final java.util.Map<String, String> LAST_SECTION = new java.util.HashMap<>();
 
-		// A second layer on top of the tabs for the version/dependency picker
-		// - it needs to grow and scroll with however many dependencies a mod
-		// has, which a native Dialog's own auto-sizing handled poorly, and it
-		// reads as part of this workspace rather than a separate OS window.
+	/**
+	 * The profile page: a banner with the profile's icon, name and versions, then a section list on the left
+	 * (Mods, Resource packs, Shaders, Worlds, Datapacks, Schematics, Modpacks, then Java & memory and logs) and the
+	 * open section on the right. Sections are built the first time they're opened.
+	 */
+	public static Node build(Stage owner, Instance instance, LauncherTheme theme, Runnable onBack, Header header) {
 		StackPane overlayHost = new StackPane();
 		overlayHost.setPickOnBounds(false);
 
-		TabPane tabs = new TabPane();
-		tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-		// Only the Mods tab is built right away; every other tab when it's first opened (they used to all be built - worlds,
-		// schematics, datapacks with their file scans - before the page could even show).
-		tabs.getTabs().add(new Tab("Mods", buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.MOD,
-				InstancePaths.modsDir(instance.id()), List.of("*.jar"))));
-		tabs.getTabs().add(lazyTab("Worlds", () -> WorldsTabView.build(owner, instance, theme)));
-		tabs.getTabs().add(lazyTab("Modpacks", () -> ModpacksTabView.build(owner, overlayHost, instance, theme)));
-		tabs.getTabs().add(lazyTab("Resource Packs", () -> buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.RESOURCE_PACK,
-				InstancePaths.resourcePacksDir(instance.id()), List.of("*.zip"))));
-		tabs.getTabs().add(lazyTab("Shader Packs", () -> buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.SHADER_PACK,
-				InstancePaths.shaderPacksDir(instance.id()), List.of("*.zip"))));
-		tabs.getTabs().add(lazyTab("Schematics", () -> SchematicsTabView.build(owner, overlayHost, instance, theme)));
-		tabs.getTabs().add(lazyTab("Datapacks", () -> DatapacksTabView.build(owner, overlayHost, instance, theme)));
-		VBox.setVgrow(tabs, Priority.ALWAYS);
-		root.getChildren().add(tabs);
+		// ---- Banner ----
+		Button back = new Button();
+		back.setGraphic(Icons.icon("arrow-left", 16, javafx.scene.paint.Color.web("#E4E4E8"), 2.2));
+		back.getStyleClass().add("icon-button");
+		back.setStyle("-fx-background-radius: 999; -fx-border-radius: 999;");
+		back.setTooltip(new Tooltip("Back"));
+		back.setOnAction(e -> onBack.run());
+		Node icon = header != null && header.icon() != null ? header.icon() : iconView(null, 64);
+		StackPane iconBox = new StackPane(icon);
+		iconBox.setStyle("-fx-border-color: rgba(255,255,255,0.1); -fx-border-radius: 16; -fx-background-radius: 16;");
+		Label title = new Label(instance.name());
+		title.getStyleClass().add("t-title");
+		Label mc = new Label("Minecraft " + instance.mcVersion());
+		mc.getStyleClass().addAll("badge", "badge-grey", "badge-mono");
+		Label loader = new Label("Fabric");
+		loader.getStyleClass().addAll("badge", "badge-grey", "badge-mono");
+		HBox chips = new HBox(8, mc, loader);
+		chips.setAlignment(Pos.CENTER_LEFT);
+		if (header != null && header.meta() != null && !header.meta().isBlank()) {
+			Label meta = new Label(header.meta());
+			meta.getStyleClass().add("t-muted");
+			meta.setStyle("-fx-font-size: 13px;");
+			chips.getChildren().add(meta);
+		}
+		VBox titles = new VBox(8, title, chips);
+		Region headerSpacer = new Region();
+		HBox.setHgrow(headerSpacer, Priority.ALWAYS);
+		HBox banner = new HBox(16, back, iconBox, titles, headerSpacer);
+		banner.setAlignment(Pos.CENTER_LEFT);
+		if (header != null && header.edit() != null) {
+			Button edit = new Button("Edit profile");
+			edit.setGraphic(Icons.icon("edit", 15, javafx.scene.paint.Color.web("#E4E4E8")));
+			edit.setOnAction(e -> header.edit().run());
+			banner.getChildren().add(edit);
+		}
+		if (header != null && header.menu() != null && !header.menu().isEmpty()) {
+			Button more = new Button();
+			more.setGraphic(Icons.icon("more", 18, javafx.scene.paint.Color.web("#E4E4E8"), 3));
+			more.getStyleClass().add("icon-button");
+			javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
+			menu.getItems().addAll(header.menu());
+			more.setOnAction(e -> menu.show(more, javafx.geometry.Side.BOTTOM, 0, 6));
+			banner.getChildren().add(more);
+		}
+		banner.setPadding(new Insets(0, 0, 18, 0));
 
-		StackPane container = new StackPane(root, overlayHost);
-		return container;
+		// ---- Sections ----
+		StackPane sectionHost = new StackPane();
+		HBox.setHgrow(sectionHost, Priority.ALWAYS);
+		java.util.Map<String, Node> built = new java.util.HashMap<>();
+		java.util.LinkedHashMap<String, java.util.function.Supplier<Node>> sections = new java.util.LinkedHashMap<>();
+		sections.put("Mods", () -> buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.MOD,
+				InstancePaths.modsDir(instance.id()), List.of("*.jar")));
+		sections.put("Resource packs", () -> buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.RESOURCE_PACK,
+				InstancePaths.resourcePacksDir(instance.id()), List.of("*.zip")));
+		sections.put("Shaders", () -> buildPackTab(owner, overlayHost, instance, theme, InstalledAssetStore.Kind.SHADER_PACK,
+				InstancePaths.shaderPacksDir(instance.id()), List.of("*.zip")));
+		sections.put("Worlds", () -> WorldsTabView.build(owner, instance, theme));
+		sections.put("Datapacks", () -> DatapacksTabView.build(owner, overlayHost, instance, theme));
+		sections.put("Schematics", () -> SchematicsTabView.build(owner, overlayHost, instance, theme));
+		sections.put("Modpacks", () -> ModpacksTabView.build(owner, overlayHost, instance, theme));
+		java.util.Map<String, Long> counts = new java.util.HashMap<>();
+		counts.put("Mods", userFileCount(InstancePaths.modsDir(instance.id())));
+		counts.put("Resource packs", userFileCount(InstancePaths.resourcePacksDir(instance.id())));
+		counts.put("Shaders", userFileCount(InstancePaths.shaderPacksDir(instance.id())));
+		counts.put("Worlds", folderCount(InstancePaths.savesDir(instance.id())));
+
+		VBox nav = new VBox(2);
+		nav.setMinWidth(210);
+		nav.setPrefWidth(220);
+		java.util.Map<String, Button> navButtons = new java.util.LinkedHashMap<>();
+		java.util.function.Consumer<String> open = new java.util.function.Consumer<>() {
+			@Override
+			public void accept(String name) {
+				LAST_SECTION.put(instance.id(), name);
+				navButtons.forEach((n, b) -> b.getStyleClass().remove("snav-active"));
+				navButtons.get(name).getStyleClass().add("snav-active");
+				Node node = built.get(name);
+				if (node == null) {
+					sectionHost.getChildren().setAll(Skeleton.list(4));
+					Platform.runLater(() -> {
+						Node made = sections.get(name).get();
+						built.put(name, made);
+						if (name.equals(LAST_SECTION.get(instance.id()))) {
+							sectionHost.getChildren().setAll(made);
+							UiMotion.enter(made);
+						}
+					});
+				} else {
+					sectionHost.getChildren().setAll(node);
+					UiMotion.enter(node);
+				}
+			}
+		};
+		for (String name : sections.keySet()) {
+			Button button = navButton(name, counts.get(name));
+			button.setOnAction(e -> open.accept(name));
+			navButtons.put(name, button);
+			nav.getChildren().add(button);
+		}
+		Region divider = new Region();
+		divider.getStyleClass().add("hairline-h");
+		VBox.setMargin(divider, new Insets(10, 4, 10, 4));
+		nav.getChildren().add(divider);
+		if (header != null && header.javaSettings() != null) {
+			Button java = navButton("Java & memory", null);
+			java.setGraphic(null);
+			java.setOnAction(e -> header.javaSettings().run());
+			nav.getChildren().add(java);
+		}
+		Button logs = navButton("Logs & crashes", null);
+		logs.setOnAction(e -> {
+			try {
+				Files.createDirectories(InstancePaths.logsDir(instance.id()));
+				openInFileManager(InstancePaths.logsDir(instance.id()));
+			} catch (Exception ex) {
+				error(owner, "Couldn't open logs", ex.getMessage());
+			}
+		});
+		Button folder = navButton("Open profile folder", null);
+		folder.setOnAction(e -> {
+			try {
+				Files.createDirectories(InstancePaths.gameDir(instance.id()));
+				openInFileManager(InstancePaths.gameDir(instance.id()));
+			} catch (Exception ex) {
+				error(owner, "Couldn't open folder", ex.getMessage());
+			}
+		});
+		nav.getChildren().addAll(logs, folder);
+
+		HBox body = new HBox(28, nav, sectionHost);
+		VBox.setVgrow(body, Priority.ALWAYS);
+		VBox root = new VBox(banner, body);
+		open.accept(LAST_SECTION.getOrDefault(instance.id(), "Mods"));
+		return new StackPane(root, overlayHost);
+	}
+
+	private static Button navButton(String name, Long count) {
+		Button button = new Button(name);
+		button.getStyleClass().setAll("button", "snav", "no-motion");
+		button.setMaxWidth(Double.MAX_VALUE);
+		if (count != null) {
+			Label badge = new Label(String.valueOf(count));
+			badge.getStyleClass().add("snav-count");
+			button.setGraphic(badge);
+			button.setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
+		}
+		return button;
+	}
+
+	private static long folderCount(Path folder) {
+		try (Stream<Path> stream = Files.list(folder)) {
+			return stream.filter(Files::isDirectory).count();
+		} catch (IOException e) {
+			return 0;
+		}
 	}
 
 	/** A tab whose content is built the first time it's selected: a loading skeleton shows for that one frame. */
@@ -248,7 +382,8 @@ public final class InstanceDetailView {
 			java.util.function.Consumer<String> openDetail) {
 		VBox root = new VBox(12);
 
-		VBox installedList = new VBox(8);
+		VBox installedList = new VBox(0);
+		installedList.getStyleClass().add("mod-table");
 		ScrollPane scroll = new ScrollPane(installedList);
 		scroll.setFitToWidth(true);
 		scroll.getStyleClass().add("scroll-pane");
@@ -534,6 +669,16 @@ public final class InstanceDetailView {
 		return isDisabled(fileName) ? fileName.substring(0, fileName.length() - DISABLED_SUFFIX.length()) : fileName;
 	}
 
+	/** A quiet trash button that shows on row hover. */
+	private static Button removeButton(Runnable action) {
+		Button remove = new Button();
+		remove.setGraphic(Icons.icon("trash", 16, javafx.scene.paint.Color.web("#A9A9B3")));
+		remove.getStyleClass().addAll("icon-button", "icon-button-flat", "row-remove");
+		remove.setTooltip(new Tooltip("Remove"));
+		remove.setOnAction(e -> action.run());
+		return remove;
+	}
+
 	private static CheckBox buildEnabledToggle(Path file, boolean disabled, Runnable refresh) {
 		CheckBox toggle = new CheckBox();
 		toggle.setSelected(!disabled);
@@ -563,8 +708,7 @@ public final class InstanceDetailView {
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.setOpacity(disabled ? 0.5 : 1.0);
 
-		row.getChildren().add(buildEnabledToggle(file, disabled, refresh));
-		Node icon = iconView(asset.iconUrl(), 48);
+		Node icon = iconView(asset.iconUrl(), 40);
 		icon.setCursor(javafx.scene.Cursor.HAND);
 		icon.setOnMouseClicked(e -> openDetail.accept(asset.projectId()));
 		row.getChildren().add(icon);
@@ -597,9 +741,7 @@ public final class InstanceDetailView {
 			checkForUpdate(owner, overlayHost, instance, theme, kind, folder, asset, updateBadge, progress, refresh, updates);
 		}
 
-		Button remove = new Button("Remove");
-		remove.getStyleClass().add("ghost-button");
-		remove.setOnAction(e -> {
+		Button remove = removeButton(() -> {
 			try {
 				Files.deleteIfExists(file);
 				InstalledAssetStore.forget(instance.id(), kind, enabledName(file.getFileName().toString()));
@@ -608,7 +750,7 @@ public final class InstanceDetailView {
 			}
 			refresh.run();
 		});
-		row.getChildren().addAll(progress, updateBadge, remove);
+		row.getChildren().addAll(progress, updateBadge, remove, buildEnabledToggle(file, disabled, refresh));
 		return row;
 	}
 
@@ -625,10 +767,7 @@ public final class InstanceDetailView {
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.setOpacity(disabled ? 0.5 : 1.0);
 
-		if (!protectedFile) {
-			row.getChildren().add(buildEnabledToggle(file, disabled, refresh));
-		}
-		row.getChildren().add(iconView(null, 48));
+		row.getChildren().add(iconView(null, 40));
 
 		VBox info = new VBox(2);
 		Label name = new Label(fileName + (isVeloClient ? "  (Velo Client)" : isFabricApi ? "  (Fabric API - required)" : isAddons ? "  (Velo+ Addons - managed in the card above)" : "")
@@ -642,16 +781,18 @@ public final class InstanceDetailView {
 		row.getChildren().add(info);
 
 		if (!protectedFile) {
-			Button remove = new Button("Remove");
-			remove.setOnAction(e -> {
+			row.getChildren().addAll(removeButton(() -> {
 				try {
 					Files.deleteIfExists(file);
 				} catch (IOException ignored) {
 					// Best-effort.
 				}
 				refresh.run();
-			});
-			row.getChildren().add(remove);
+			}), buildEnabledToggle(file, disabled, refresh));
+		} else {
+			Label managed = new Label("Managed");
+			managed.getStyleClass().addAll("badge", "badge-grey");
+			row.getChildren().add(managed);
 		}
 		return row;
 	}

@@ -85,6 +85,22 @@ final class OwnerPreviews {
 			sha = f.has(key) && !f.get(key).isJsonNull() ? f.get(key).getAsString() : null;
 		}
 		if (sha == null) {
+			// Wings bundled with the launcher: their own preview picture.
+			var local = net.veloclient.launcher.data.WingsCatalog.all().stream().filter(w -> w.itemId().equals(id)).findFirst();
+			local.ifPresent(wings -> CompletableFuture.supplyAsync(() -> {
+				try (var in = net.veloclient.launcher.data.WingsCatalog.openPreview(wings.id())) {
+					return in == null ? null : new Image(in, (width - 8) * 2, (height - 8) * 2, true, true);
+				} catch (Exception e) {
+					return null;
+				}
+			}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(image -> {
+				if (image != null) {
+					Platform.runLater(() -> {
+						remember(id, image);
+						done.accept(image);
+					});
+				}
+			}));
 			return;
 		}
 		String file = sha;

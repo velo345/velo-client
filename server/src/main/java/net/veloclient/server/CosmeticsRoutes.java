@@ -15,7 +15,7 @@ import java.util.Set;
  * <li>{@code GET /v1/cosmetics/catalog} - what's in the store, plus what you own (signed in); owners get everything</li>
  * <li>{@code GET /v1/cosmetics/item?id=} - what's needed to draw any item on another player</li>
  * <li>{@code GET /v1/cosmetics/file/<sha256>} - art (meshes, textures, GIFs), cacheable forever</li>
- * <li>{@code GET /v1/admin/cosmetics}, {@code POST /v1/admin/cosmetics/{item,file,collection,featured}} - owner only (an
+ * <li>{@code GET /v1/admin/cosmetics}, {@code POST /v1/admin/cosmetics/{item,file,collection,featured,bundle,bundle/delete}} - owner only (an
  * owner session, or the {@code X-Velo-Admin-Token} header for scripts like tools/cosmetics/publish_wings.py)</li>
  * </ul>
  */
@@ -34,6 +34,9 @@ final class CosmeticsRoutes {
 	}
 
 	private record FeaturedRequest(String collection) {
+	}
+
+	private record BundleDelete(String id) {
 	}
 
 	static void register(HttpServer server, SessionRegistry registry, StoreService store, CosmeticsService cosmetics, String adminToken) {
@@ -74,6 +77,12 @@ final class CosmeticsRoutes {
 				JsonHttp.writeJson(e, 200, Map.of("sha256", cosmetics.storeFile(JsonHttp.readRawBody(e, CosmeticsService.MAX_FILE_BYTES)))));
 		admin(server, registry, store, adminToken, "/v1/admin/cosmetics/collection", "POST", e ->
 				JsonHttp.writeJson(e, 200, cosmetics.upsertCollection(JsonHttp.readBody(e, CosmeticsService.Collection.class))));
+		admin(server, registry, store, adminToken, "/v1/admin/cosmetics/bundle", "POST", e ->
+				JsonHttp.writeJson(e, 200, cosmetics.upsertBundle(JsonHttp.readBody(e, CosmeticsService.Bundle.class))));
+		admin(server, registry, store, adminToken, "/v1/admin/cosmetics/bundle/delete", "POST", e -> {
+			cosmetics.deleteBundle(JsonHttp.readBody(e, BundleDelete.class).id());
+			JsonHttp.writeJson(e, 200, Map.of("ok", true));
+		});
 		admin(server, registry, store, adminToken, "/v1/admin/cosmetics/featured", "POST", e -> {
 			cosmetics.setFeatured(JsonHttp.readBody(e, FeaturedRequest.class).collection());
 			JsonHttp.writeJson(e, 200, Map.of("ok", true));

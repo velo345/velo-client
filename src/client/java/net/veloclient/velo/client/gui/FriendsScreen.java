@@ -36,9 +36,10 @@ public final class FriendsScreen extends VeloWindow {
 
 	private enum View { PARTY, CHAT, REQUESTS, BLOCKED, NOTIFICATIONS }
 
-	private static final int MAX_LEFT_WIDTH = 188;
+	private static final int MAX_LEFT_WIDTH = 230;
 	private static final int ROW_HEIGHT = 30;
-	private static final int NAV_HEIGHT = 18;
+	/** Inner padding of the friends card (launcher look: the list sits in a card). */
+	private static final int CARD_PAD = 8;
 
 	private static FriendsScreen openInstance;
 
@@ -62,7 +63,7 @@ public final class FriendsScreen extends VeloWindow {
 	private final java.util.Set<String> loadedConversations = new java.util.HashSet<>();
 
 	public FriendsScreen() {
-		super(Text.literal("Friends"), 620, 400);
+		super(Text.literal("Friends"), 860, 540);
 	}
 
 	/** Opened from another Velo screen (the R-Shift menu): closing goes back to it. */
@@ -127,6 +128,49 @@ public final class FriendsScreen extends VeloWindow {
 		}
 	}
 
+	// ---- Header tabs (launcher look) ----
+
+	private static final View[] TAB_VIEWS = {View.CHAT, View.PARTY, View.REQUESTS, View.BLOCKED, View.NOTIFICATIONS};
+
+	@Override
+	protected String[] headerTabs() {
+		int incoming = SocialClient.isReady() ? SocialClient.snapshot().incoming.size() : 0;
+		var party = SocialClient.party();
+		int partyInvites = SocialClient.partyInvites().size();
+		return new String[] {"Chat", party != null ? "Party (" + party.getAsJsonArray("members").size() + ")" : partyInvites > 0 ? "Party (" + partyInvites + " invite)" : "Party",
+				incoming > 0 ? "Requests (" + incoming + ")" : "Requests", "Blocked", "Popups"};
+	}
+
+	@Override
+	protected int headerTab() {
+		for (int i = 0; i < TAB_VIEWS.length; i++) {
+			if (TAB_VIEWS[i] == view) {
+				return i;
+			}
+		}
+		return 0;
+	}
+
+	@Override
+	protected void selectHeaderTab(int index) {
+		view = TAB_VIEWS[index];
+		rightScroll = 0;
+		layoutContent();
+	}
+
+	@Override
+	protected void renderHeaderExtras(DrawContext context, int mouseX, int mouseY) {
+		if (!SocialClient.isReady()) {
+			return;
+		}
+		SocialClient.State state = SocialClient.snapshot();
+		long online = state.friends.stream().filter(f -> f.online).count();
+		Text line = net.veloclient.velo.client.gui.title.MenuKit.ui(online + " online  ·  " + state.friends.size() + (state.friends.size() == 1 ? " friend" : " friends"));
+		int w = this.textRenderer.getWidth(line);
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, line, headerRight() - w, windowY + (HEADER_HEIGHT - 8) / 2 + 1,
+				net.veloclient.velo.client.gui.title.MenuKit.TEXT_3);
+	}
+
 	// ---- Layout ----
 
 	@Override
@@ -141,7 +185,7 @@ public final class FriendsScreen extends VeloWindow {
 		this.clearChildren();
 
 		int leftX = contentX();
-		addField = new TextFieldWidget(this.textRenderer, leftX + 6, contentY() + 40, leftWidth() - 58, 14, Text.literal("Add friend"));
+		addField = new TextFieldWidget(this.textRenderer, leftX + CARD_PAD + 6, contentY() + CARD_PAD + 40, leftWidth() - CARD_PAD * 2 - 58, 14, Text.literal("Add friend"));
 		addField.setDrawsBackground(false);
 		addField.setPlaceholder(Text.literal(VeloUi.trim("Username or UUID", addField.getWidth() - 8)));
 		addField.setMaxLength(36);
@@ -150,7 +194,7 @@ public final class FriendsScreen extends VeloWindow {
 
 		int rightX = rightX();
 		int rightWidth = rightWidth();
-		chatField = new TextFieldWidget(this.textRenderer, rightX + 8, contentBottom() - 15, rightWidth - 64, 14, Text.literal("Message"));
+		chatField = new TextFieldWidget(this.textRenderer, rightX + 12, contentBottom() - 19, rightWidth - 64, 14, Text.literal("Message"));
 		chatField.setDrawsBackground(false);
 		chatField.setPlaceholder(Text.literal(VeloUi.trim(view == View.PARTY ? "Message your party..." : "Write a message...", chatField.getWidth() - 8)));
 		chatField.setMaxLength(500);
@@ -161,7 +205,7 @@ public final class FriendsScreen extends VeloWindow {
 
 	/** The friends column shrinks on small GUI sizes (Auto GUI scale on 1080p is only 480x270). */
 	private int leftWidth() {
-		return Math.max(130, Math.min(MAX_LEFT_WIDTH, (int) (contentWidth() * 0.42f)));
+		return Math.max(150, Math.min(MAX_LEFT_WIDTH + 2 * CARD_PAD, (int) (contentWidth() * 0.36f)));
 	}
 
 	private int rightX() {
@@ -220,87 +264,101 @@ public final class FriendsScreen extends VeloWindow {
 	private void renderLeft(DrawContext context, int mouseX, int mouseY) {
 		Theme theme = ThemeManager.active();
 		SocialClient.State state = SocialClient.snapshot();
-		int x = contentX();
-		int y = contentY();
+		cardPanel(context, contentX(), contentY(), leftWidth(), contentBottom() - contentY());
+		int x = contentX() + CARD_PAD;
+		int y = contentY() + CARD_PAD;
+		int lw = leftWidth() - CARD_PAD * 2;
 
-		// Your own card + status switch.
-		VeloDraw.fillRounded(context, x, y, leftWidth(), 32, 6, panelColor());
+		// Your own row + status switch.
 		String myUuid = state.me != null ? state.me.uuid : null;
 		String myName = state.me != null ? state.me.username : "You";
 		PlayerHeads.draw(context, myUuid, myName, x + 6, y + 6, 20);
-		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(myName, leftWidth() - 106), x + 32, y + 6, theme.text());
+		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(myName, lw - 106), x + 32, y + 6, theme.text());
 		boolean invisible = state.me != null ? state.me.invisible : SocialStatusCache.invisible();
 		int dot = invisible ? FriendStatus.OFFLINE_COLOR : FriendStatus.ONLINE_COLOR;
 		VeloDraw.fillCircle(context, x + 35, y + 21, 2, dot);
-		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(invisible ? "Appearing offline" : "Online", leftWidth() - 116), x + 41, y + 17, VeloUi.muted());
+		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(invisible ? "Appearing offline" : "Online", lw - 116), x + 41, y + 17, VeloUi.muted());
 		int pillWidth = 62;
-		hits.add(VeloUi.pill(context, x + leftWidth() - pillWidth - 6, y + 8, pillWidth, 16, invisible ? "Go online" : "Hide me", 0,
+		hits.add(VeloUi.pill(context, x + lw - pillWidth - 6, y + 8, pillWidth, 16, invisible ? "Go online" : "Hide me", 0,
 				mouseX, mouseY, () -> report(SocialClient.setInvisible(!invisible),
 						!invisible ? "You now appear offline to friends" : "Friends can see you again")));
 
 		// Add friend.
 		int addY = y + 38;
-		VeloDraw.fillRounded(context, x, addY - 2, leftWidth() - 50, 18, 5, fieldColor(addField != null && addField.isFocused()));
-		hits.add(VeloUi.pill(context, x + leftWidth() - 46, addY - 2, 46, 18, "Add", 1, mouseX, mouseY, this::submitAdd));
+		VeloDraw.fillRounded(context, x, addY - 2, lw - 50, 18, 5, fieldColor(addField != null && addField.isFocused()));
+		hits.add(VeloUi.pill(context, x + lw - 46, addY - 2, 46, 18, "Add", 1, mouseX, mouseY, this::submitAdd));
 
 		// Feedback line.
 		int listTop = addY + 22;
 		if (!feedback.isEmpty() && System.currentTimeMillis() < feedbackUntil) {
-			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(feedback, leftWidth()), x, listTop,
+			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(feedback, lw), x, listTop,
 					feedbackError ? 0xFFFF7070 : 0xFF6FE39A);
 			listTop += 12;
 		}
 
 		// Requests banner.
 		if (!state.incoming.isEmpty()) {
-			boolean hovered = VeloUi.inside(mouseX, mouseY, x, listTop, leftWidth(), 16);
-			VeloDraw.fillRounded(context, x, listTop, leftWidth(), 16, 5,
-					hovered ? VeloAnim.lerpArgb(theme.accentStart(), 0xFFFFFFFF, 0.12f) : theme.accentStart());
+			boolean hovered = VeloUi.inside(mouseX, mouseY, x, listTop, lw, 16);
+			// A calm card with an accent dot (launcher look), not a solid red bar.
+			VeloDraw.fillRounded(context, x, listTop, lw, 16, 5, VeloUi.withAlpha(theme.accentStart(), hovered ? 0x33 : 0x1F));
+			VeloDraw.strokeRounded(context, x, listTop, lw, 16, 5, VeloUi.withAlpha(theme.accentStart(), hovered ? 0xB0 : 0x59));
+			VeloDraw.fillCircle(context, x + 9, listTop + 8, 2.5f, theme.accentStart() | 0xFF000000);
 			String banner = state.incoming.size() == 1 ? "1 friend request" : state.incoming.size() + " friend requests";
-			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(banner, leftWidth() - 12), x + 8, listTop + 4, theme.onAccent());
-			hits.add(new VeloUi.Hit(x, listTop, leftWidth(), 16, () -> view = View.REQUESTS));
+			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(banner, lw - 24), x + 17, listTop + 4, 0xFFF4F4F6);
+			hits.add(new VeloUi.Hit(x, listTop, lw, 16, () -> view = View.REQUESTS));
 			listTop += 20;
 		}
 
-		// Friends list.
-		long onlineCount = state.friends.stream().filter(f -> f.online).count();
-		context.drawTextWithShadow(this.textRenderer, VeloUi.trim("FRIENDS  " + onlineCount + "/" + state.friends.size() + " online", leftWidth() - 4),
-				x + 2, listTop, VeloUi.muted());
-		listTop += 12;
-		int listBottom = contentBottom();
+		// Friends list: online first, then offline, each under its own small heading.
+		listTop += 2;
+		int listBottom = contentBottom() - CARD_PAD;
 		if (listBottom - listTop < 12) {
 			return;
 		}
 		int listHeight = listBottom - listTop;
-		List<SocialClient.Friend> friends = state.friends;
-		int contentHeight = friends.size() * (ROW_HEIGHT + 2);
+		List<SocialClient.Friend> online = state.friends.stream().filter(f -> f.online).toList();
+		List<SocialClient.Friend> offline = state.friends.stream().filter(f -> !f.online).toList();
+		int sectionH = 14;
+		int contentHeight = (online.isEmpty() ? 0 : sectionH) + (offline.isEmpty() ? 0 : sectionH) + state.friends.size() * (ROW_HEIGHT + 2);
 		friendsScroll = Math.max(0, Math.min(friendsScroll, Math.max(0, contentHeight - listHeight)));
-		if (friends.isEmpty()) {
+		if (state.friends.isEmpty()) {
 			int lineY = listTop + 8;
-			for (String line : VeloUi.wrap("No friends yet. Type a username above and press Add.", leftWidth() - 8)) {
-				context.drawTextWithShadow(this.textRenderer, line, x + 4, lineY, VeloUi.muted());
+			for (Text line : net.veloclient.velo.client.gui.title.MenuKit.wrap(this.textRenderer, "No friends yet. Type a username above and press Add.",
+					net.veloclient.velo.client.gui.title.MenuKit::ui, lw - 8)) {
+				net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, line, x + 4, lineY, net.veloclient.velo.client.gui.title.MenuKit.TEXT_3);
 				lineY += 11;
 			}
 		}
-		context.enableScissor(x, listTop, x + leftWidth(), listBottom);
+		context.enableScissor(x, listTop, x + lw, listBottom);
 		int rowY = listTop - (int) friendsScroll;
-		for (SocialClient.Friend friend : friends) {
-			if (rowY + ROW_HEIGHT >= listTop && rowY <= listBottom) {
-				drawFriendRow(context, friend, x, rowY, mouseX, mouseY, listTop, listBottom);
+		for (int section = 0; section < 2; section++) {
+			List<SocialClient.Friend> group = section == 0 ? online : offline;
+			if (group.isEmpty()) {
+				continue;
 			}
-			rowY += ROW_HEIGHT + 2;
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer,
+					net.veloclient.velo.client.gui.title.MenuKit.small((section == 0 ? "ONLINE  " : "OFFLINE  ") + group.size()), x + 4, rowY + 4,
+					net.veloclient.velo.client.gui.title.MenuKit.TEXT_3);
+			rowY += sectionH;
+			for (SocialClient.Friend friend : group) {
+				if (rowY + ROW_HEIGHT >= listTop && rowY <= listBottom) {
+					drawFriendRow(context, friend, x, rowY, mouseX, mouseY, listTop, listBottom);
+				}
+				rowY += ROW_HEIGHT + 2;
+			}
 		}
 		context.disableScissor();
-		drawScrollbar(context, x + leftWidth() - 2, listTop, listHeight, contentHeight, friendsScroll);
+		drawScrollbar(context, x + lw - 2, listTop, listHeight, contentHeight, friendsScroll);
 	}
 
 	private void drawFriendRow(DrawContext context, SocialClient.Friend friend, int x, int y, int mouseX, int mouseY, int clipTop, int clipBottom) {
 		Theme theme = ThemeManager.active();
+		int rowW = leftWidth() - CARD_PAD * 2;
 		boolean isSelected = view == View.CHAT && friend.uuid.equals(selected);
-		boolean hovered = mouseY >= clipTop && mouseY < clipBottom && VeloUi.inside(mouseX, mouseY, x, y, leftWidth(), ROW_HEIGHT);
+		boolean hovered = mouseY >= clipTop && mouseY < clipBottom && VeloUi.inside(mouseX, mouseY, x, y, rowW, ROW_HEIGHT);
 		if (isSelected || hovered) {
 			int bg = isSelected ? VeloAnim.lerpArgb(theme.accentStart(), 0xFF000000, 0.55f) : VeloUi.withAlpha(0xFFFFFFFF, 0x12);
-			VeloDraw.fillRounded(context, x, y, leftWidth() - 4, ROW_HEIGHT, 5, bg);
+			VeloDraw.fillRounded(context, x, y, rowW - 4, ROW_HEIGHT, 5, bg);
 		}
 		if (isSelected) {
 			VeloDraw.fillRounded(context, x, y + 5, 2, ROW_HEIGHT - 10, 1, theme.accentStart());
@@ -310,29 +368,29 @@ public final class FriendsScreen extends VeloWindow {
 		VeloDraw.fillCircle(context, x + 25, y + 24, 2, FriendStatus.dotColor(friend));
 		int textX = x + 32;
 		int badgeSpace = friend.unread > 0 ? 22 : 0;
-		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(friend.username, leftWidth() - 40 - badgeSpace), textX, y + 5,
+		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(friend.username, rowW - 40 - badgeSpace), textX, y + 5,
 				friend.online ? theme.text() : VeloUi.withAlpha(theme.text(), 0xAA));
 		String status = FriendStatus.describe(friend);
 		if (SocialSettings.isMuted(friend.uuid)) {
 			status = "(muted) " + status;
 		}
-		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(status, leftWidth() - 40), textX, y + 17, VeloUi.muted());
+		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(status, rowW - 40), textX, y + 17, VeloUi.muted());
 		if (friend.unread > 0) {
 			String count = friend.unread > 99 ? "99+" : String.valueOf(friend.unread);
 			int badgeWidth = Math.max(14, this.textRenderer.getWidth(count) + 6);
-			int badgeX = x + leftWidth() - 8 - badgeWidth;
+			int badgeX = x + rowW - 8 - badgeWidth;
 			VeloDraw.fillRounded(context, badgeX, y + 4, badgeWidth, 11, 5, theme.accentStart());
 			context.drawTextWithShadow(this.textRenderer, count, badgeX + (badgeWidth - this.textRenderer.getWidth(count)) / 2, y + 6, theme.onAccent());
 		}
 		if (hovered && !inParty(friend.uuid) && y + 8 >= clipTop && y + 22 <= clipBottom) {
-			hits.add(VeloUi.pill(context, x + leftWidth() - 24, y + 7, 18, 16, "+", 1, mouseX, mouseY, () -> {
+			hits.add(VeloUi.pill(context, x + rowW - 24, y + 7, 18, 16, "+", 1, mouseX, mouseY, () -> {
 				report(SocialClient.partyInvite(friend.uuid), "Invited " + friend.username + " to your party");
 				view = View.PARTY;
 				layoutContent();
 			}));
 		}
 		if (hovered) {
-			hits.add(new VeloUi.Hit(x, Math.max(y, clipTop), leftWidth(), Math.min(ROW_HEIGHT, clipBottom - Math.max(y, clipTop)), () -> {
+			hits.add(new VeloUi.Hit(x, Math.max(y, clipTop), rowW, Math.min(ROW_HEIGHT, clipBottom - Math.max(y, clipTop)), () -> {
 				view = View.CHAT;
 				select(friend.uuid);
 				layoutContent();
@@ -344,37 +402,9 @@ public final class FriendsScreen extends VeloWindow {
 		int x = rightX();
 		int width = rightWidth();
 		int y = contentY();
-		VeloDraw.fillRounded(context, x, y, width, contentBottom() - y, 7, panelColor());
+		cardPanel(context, x, y, width, contentBottom() - y);
 
-		// Segmented nav.
-		SocialClient.State state = SocialClient.snapshot();
-		View[] views = View.values();
-		boolean narrow = width < 300;
-		var party = SocialClient.party();
-		int partyInvites = SocialClient.partyInvites().size();
-		String partyLabel = party != null ? "Party (" + party.getAsJsonArray("members").size() + ")" : partyInvites > 0 ? "Party \u2022" + partyInvites : "Party";
-		String[] labels = {partyLabel, "Chat", (narrow ? "Req." : "Requests") + (state.incoming.isEmpty() ? "" : " (" + state.incoming.size() + ")"),
-				"Blocked", narrow ? "Popups" : "Alerts"};
-		int segWidth = (width - 12) / views.length;
-		for (int i = 0; i < views.length; i++) {
-			View target = views[i];
-			int segX = x + 6 + i * segWidth;
-			boolean active = view == target;
-			boolean hovered = VeloUi.inside(mouseX, mouseY, segX, y + 6, segWidth - 4, NAV_HEIGHT);
-			Theme theme = ThemeManager.active();
-			int bg = active ? theme.accentStart() : hovered ? VeloUi.withAlpha(0xFFFFFFFF, 0x18) : VeloUi.withAlpha(0xFF000000, 0x30);
-			VeloDraw.fillRounded(context, segX, y + 6, segWidth - 4, NAV_HEIGHT, 5, bg);
-			String label = VeloUi.trim(labels[i], segWidth - 10);
-			context.drawTextWithShadow(this.textRenderer, label, segX + (segWidth - 4 - this.textRenderer.getWidth(label)) / 2, y + 11,
-					active ? theme.onAccent() : theme.text());
-			hits.add(new VeloUi.Hit(segX, y + 6, segWidth - 4, NAV_HEIGHT, () -> {
-				view = target;
-				rightScroll = 0;
-				layoutContent();
-			}));
-		}
-
-		int bodyTop = y + 6 + NAV_HEIGHT + 8;
+		int bodyTop = y + 12;
 		if (view == View.PARTY) {
 			renderParty(context, x, bodyTop, width, mouseX, mouseY);
 			return;
@@ -548,7 +578,7 @@ public final class FriendsScreen extends VeloWindow {
 		}
 		// Party chat, newest at the bottom above the input.
 		int chatTop = y;
-		int chatBottom = contentBottom() - 20;
+		int chatBottom = contentBottom() - 30;
 		VeloDraw.fillRounded(context, x + 6, chatTop, width - 12, chatBottom - chatTop, 5, VeloUi.withAlpha(0xFF000000, 0x30));
 		context.enableScissor(x + 6, chatTop, x + width - 6, chatBottom);
 		var chat = party.has("chat") ? party.getAsJsonArray("chat") : new com.google.gson.JsonArray();
@@ -574,8 +604,9 @@ public final class FriendsScreen extends VeloWindow {
 		}
 		context.disableScissor();
 		chatScroll = Math.max(0, chatScroll);
-		VeloDraw.fillRounded(context, x + 6, contentBottom() - 17, width - 66, 16, 4, VeloUi.withAlpha(0xFF000000, 0x40));
-		hits.add(VeloUi.pill(context, x + width - 52, contentBottom() - 18, 46, 18, "Send", 1, mouseX, mouseY, this::submitMessage));
+		VeloDraw.fillRounded(context, x + 8, contentBottom() - 24, width - 68, 18, 5, fieldColor(chatField != null && chatField.isFocused()));
+		VeloDraw.strokeRounded(context, x + 8, contentBottom() - 24, width - 68, 18, 5, 0x17FFFFFF);
+		hits.add(VeloUi.pill(context, x + width - 56, contentBottom() - 24, 48, 18, "Send", 1, mouseX, mouseY, this::submitMessage));
 		// Report someone in the party chat.
 		java.util.List<String[]> others = new java.util.ArrayList<>();
 		for (var element : members) {
@@ -598,9 +629,20 @@ public final class FriendsScreen extends VeloWindow {
 			String hint = state.friends.isEmpty()
 					? "Add a friend on the left - they'll get a request they can accept in the launcher or in game."
 					: "Pick a friend on the left to chat.";
-			int lineY = top + 60;
-			for (String line : VeloUi.wrap(hint, width - 40)) {
-				context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(line), x + width / 2, lineY, VeloUi.muted());
+			// Launcher empty state: an icon chip, a heading and one quiet line.
+			int midY = top + Math.max(30, (contentBottom() - top) / 2 - 40);
+			int chip = 24;
+			VeloDraw.fillRounded(context, x + (width - chip) / 2, midY, chip, chip, 7, 0x14FFFFFF);
+			net.veloclient.velo.client.gui.title.MenuKit.icon(context, "feedback", x + (width - 12) / 2, midY + 6, 12,
+					net.veloclient.velo.client.gui.title.MenuKit.TEXT_2);
+			Text heading = net.veloclient.velo.client.gui.title.MenuKit.displaySm(state.friends.isEmpty() ? "Add your first friend" : "Pick a friend to chat");
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, heading, x + (width - this.textRenderer.getWidth(heading)) / 2,
+					midY + chip + 10, net.veloclient.velo.client.gui.title.MenuKit.TEXT);
+			int lineY = midY + chip + 26;
+			String sub = state.friends.isEmpty() ? hint : "Messages also pop up while you play.";
+			for (Text line : net.veloclient.velo.client.gui.title.MenuKit.wrap(this.textRenderer, sub, net.veloclient.velo.client.gui.title.MenuKit::ui, width - 40)) {
+				net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, line, x + (width - this.textRenderer.getWidth(line)) / 2, lineY,
+						net.veloclient.velo.client.gui.title.MenuKit.TEXT_3);
 				lineY += 11;
 			}
 			return;
@@ -654,16 +696,17 @@ public final class FriendsScreen extends VeloWindow {
 
 		int chatTop = top + (stacked ? 50 : 30);
 		context.fill(x + 6, chatTop - 3, x + width - 6, chatTop - 2, VeloUi.withAlpha(theme.text(), 0x20));
-		int chatBottom = contentBottom() - 22;
+		int chatBottom = contentBottom() - 28;
 		if (chatBottom - chatTop < 12) {
 			return;
 		}
 		drawMessages(context, friend, x + 6, chatTop, width - 12, chatBottom - chatTop, mouseX, mouseY);
 
 		// Input bar.
-		int inputY = contentBottom() - 18;
-		VeloDraw.fillRounded(context, x + 4, inputY, width - 60, 18, 5, fieldColor(chatField != null && chatField.isFocused()));
-		hits.add(VeloUi.pill(context, x + width - 52, inputY, 46, 18, "Send", 1, mouseX, mouseY, this::submitMessage));
+		int inputY = contentBottom() - 24;
+		VeloDraw.fillRounded(context, x + 8, inputY, width - 68, 18, 5, fieldColor(chatField != null && chatField.isFocused()));
+		VeloDraw.strokeRounded(context, x + 8, inputY, width - 68, 18, 5, chatField != null && chatField.isFocused() ? 0x40FFFFFF : 0x17FFFFFF);
+		hits.add(VeloUi.pill(context, x + width - 56, inputY, 48, 18, "Send", 1, mouseX, mouseY, this::submitMessage));
 	}
 
 	private void drawMessages(DrawContext context, SocialClient.Friend friend, int x, int top, int width, int height, int mouseX, int mouseY) {
@@ -916,6 +959,12 @@ public final class FriendsScreen extends VeloWindow {
 		int maxOffset = contentHeight - height;
 		int thumbY = top + (int) ((height - thumbHeight) * Math.max(0, Math.min(1, offset / maxOffset)));
 		context.fill(x - 2, thumbY, x, thumbY + thumbHeight, VeloUi.withAlpha(ThemeManager.active().accentStart(), 0xAA));
+	}
+
+	/** The launcher's card: a slightly lifted graphite fill with a hairline edge. */
+	private static void cardPanel(DrawContext context, int x, int y, int w, int h) {
+		VeloDraw.fillRounded(context, x, y, w, h, 8, 0xFF131318);
+		VeloDraw.strokeRounded(context, x, y, w, h, 8, 0x17FFFFFF);
 	}
 
 	private int panelColor() {

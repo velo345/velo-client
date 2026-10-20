@@ -27,7 +27,7 @@ import net.veloclient.velo.client.theme.ThemeManager;
  */
 public final class VeloStoreItemTile extends ClickableWidget {
 
-	private static final int BOTTOM_STRIP_HEIGHT = 18;
+	private static final int BOTTOM_STRIP_HEIGHT = StoreCard.INFO_H;
 
 	private final StoreItem item;
 	private float hover;
@@ -63,34 +63,16 @@ public final class VeloStoreItemTile extends ClickableWidget {
 		int y = getY();
 		int w = getWidth();
 
-		VeloCapeTile.drawStage(context, x, y, w, iconHeight, hover, false);
+		int accent = 0xFF8B7CF6;
+		int h = getHeight();
+		int lift = StoreCard.frame(context, x, y, w, h, hover, accent);
 		AnimatedCapeAsset preview = StoreAssets.preview(item);
 		if (preview != null) {
-			VeloCapeRender.draw(context, preview.identifier(), preview.width(), preview.height(), x + w / 2f, y + iconHeight - 20,
-					iconHeight - 34, VeloCapeRender.idleYaw(phase, hover));
+			VeloCapeRender.draw(context, preview.identifier(), preview.width(), preview.height(), x + w / 2f, y - lift + iconHeight - 6,
+					iconHeight - 16, VeloCapeRender.idleYaw(phase, hover));
 		}
-
 		TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-		String name = trimToWidth(item.name(), w - 10);
-		int nameWidth = textRenderer.getWidth(name);
-		context.drawTextWithShadow(textRenderer, name, x + (w - nameWidth) / 2, y + iconHeight - 13, VeloStyle.text());
-
-		int stripY = y + iconHeight + 2;
-		if (owned) {
-			VeloUi.pill(context, x, stripY, w, BOTTOM_STRIP_HEIGHT - 2, "Owned", 2, -1, -1, () -> { });
-		} else {
-			// Gold price chip: coin + amount.
-			int h = BOTTOM_STRIP_HEIGHT - 2;
-			VeloDraw.fillRounded(context, x, stripY, w, h, h / 2, VeloAnim.lerpArgb(VeloStyle.card(), 0xFFF4B82E, 0.10f + 0.08f * hover));
-			VeloDraw.strokeRounded(context, x, stripY, w, h, h / 2, VeloUi.withAlpha(0xFFF4B82E, 0x60));
-			String price = String.valueOf(item.priceCoins());
-			int textWidth = textRenderer.getWidth(price);
-			int coinR = 4;
-			int startX = x + (w - (textWidth + coinR * 2 + 4)) / 2;
-			VeloDraw.fillCircle(context, startX + coinR + 0.5f, stripY + h / 2f, coinR, 0xFFF4B82E);
-			VeloDraw.fillCircle(context, startX + coinR + 0.5f, stripY + h / 2f, coinR - 1.5f, 0xFFFFD56A);
-			context.drawTextWithShadow(textRenderer, price, startX + coinR * 2 + 4, stripY + (h - 8) / 2, 0xFFFFD56A);
-		}
+		StoreCard.info(context, textRenderer, x, y, w, h, lift, "Cape", accent, item.name(), owned ? "Owned" : null, item.priceCoins());
 	}
 
 	private static String trimToWidth(String text, int maxWidth) {

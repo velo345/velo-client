@@ -100,4 +100,46 @@ class CosmeticsServiceTest {
 		item.files = null;
 		return item;
 	}
+
+	@Test
+	void ownerBundlesReplaceCollectionBundlesAndSell() throws Exception {
+		var released = cosmetics.storeItems();
+		assertTrue(released.size() >= 3);
+		assertFalse(store.bundles().isEmpty() && cosmetics.storeCollections().stream().anyMatch(c -> c.items().size() >= 2));
+
+		CosmeticsService.Bundle bundle = new CosmeticsService.Bundle();
+		bundle.id = "starter";
+		bundle.name = "Starter pack";
+		bundle.items = java.util.List.of(released.get(0).id(), released.get(1).id(), released.get(2).id());
+		bundle.price = 3000;
+		bundle.active = true;
+		cosmetics.upsertBundle(bundle);
+		assertEquals(java.util.List.of("starter"), store.bundles().stream().map(StoreService.BundleView::id).toList());
+
+		db.adjust(ME, 5000, "test", null, null);
+		db.grantItem(ME, released.get(0).id(), "test");
+		int full = released.get(0).price() + released.get(1).price() + released.get(2).price();
+		int missing = full - released.get(0).price();
+		store.buy(ME, "Me", "bundle:starter");
+		assertTrue(db.owns(ME, released.get(1).id()) && db.owns(ME, released.get(2).id()));
+		assertEquals(5000 - Math.max(10, (int) Math.round(3000.0 * missing / full / 10.0) * 10), db.balance(ME));
+		assertEquals(409, assertThrows(StoreService.StoreException.class, () -> store.buy(ME, "Me", "bundle:starter")).status);
+
+		bundle.active = false;
+		cosmetics.upsertBundle(bundle);
+		assertTrue(store.bundles().isEmpty());
+		cosmetics.deleteBundle("starter");
+		assertNull(cosmetics.storeBundles());
+	}
+
+	@Test
+	void dailyDealIsChargedAtSalePrice() throws Exception {
+		var catalog = store.catalog();
+		assertEquals(Math.min(4, catalog.items().size()), catalog.daily().items().size());
+		var deal = catalog.items().stream().filter(i -> i.fullPrice() != null).findFirst().orElseThrow();
+		assertTrue(deal.price() < deal.fullPrice());
+		db.adjust(ME, deal.price(), "test", null, null);
+		store.buy(ME, "Me", deal.id());
+		assertEquals(0, db.balance(ME));
+	}
 }

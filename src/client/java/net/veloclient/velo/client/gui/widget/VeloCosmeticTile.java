@@ -60,30 +60,51 @@ public final class VeloCosmeticTile extends ClickableWidget {
 		int y = getY();
 		int w = getWidth();
 		int h = getHeight();
-		VeloDraw.fillRounded(context, x, y, w, h, 5, selected ? 0xFF1E1E28 : 0xFF15151C);
-		VeloDraw.fillRoundedGradient(context, x, y, w, h - 14, 5, VeloUi.withAlpha(accent, 0x28 + Math.round(0x20 * hover)), 0x0015151C);
-		VeloDraw.strokeRounded(context, x, y, w, h, 5, selected ? accent : VeloUi.withAlpha(accent, 0x30 + Math.round(0x70 * hover)));
-		int area = h - 16;
+		// The launcher's Locker tile: graphite card, picture on a slightly lighter well, name bottom-left; equipped =
+		// green edge + tick, the one on the preview = white edge.
+		int nameH = 16;
+		VeloDraw.fillRounded(context, x, y, w, h, 7, VeloAnim.lerpArgb(0xFF16161C, 0xFF1C1C23, hover));
+		VeloDraw.fillRounded(context, x + 3, y + 3, w - 6, h - nameH - 4, 5, VeloAnim.lerpArgb(0xFF1C1C23, 0xFF22222A, hover));
+		int edge = equipped ? 0xFF3DDC97 : selected ? 0xD0FFFFFF : VeloAnim.lerpArgb(0x14FFFFFF, 0x40FFFFFF, hover);
+		VeloDraw.strokeRounded(context, x, y, w, h, 7, edge);
+		int area = h - nameH - 4;
 		if (id.isEmpty()) {
-			VeloDraw.cross(context, x + w / 2f, y + area / 2f + 2, 7, 1.5f, 0xFF6A6A7A);
+			VeloDraw.cross(context, x + w / 2f, y + 3 + area / 2f, 6, 1.3f, 0xFF6A6A7A);
 		} else if (kind == Kind.WINGS) {
 			Identifier picture = VeloWingCard.previewImage(id);
 			if (picture != null) {
-				int pw = Math.min(w - 6, Math.round(area * 4 / 3f));
+				int pw = Math.min(w - 12, Math.round((area - 4) * 4 / 3f));
 				int ph = pw * 3 / 4;
-				context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, picture, x + (w - pw) / 2, y + 2 + (area - ph) / 2,
+				context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, picture, x + (w - pw) / 2, y + 3 + (area - ph) / 2,
 						0f, 0f, pw, ph, pw, ph, pw, ph);
 			}
 		} else if (emitter != null) {
 			float scale = Math.min(area / 2.6f, w / 2.6f);
-			context.enableScissor(x + 1, y + 1, x + w - 1, y + area + 2);
-			AuraGuiRenderer.draw(context, emitter, owned ? AuraManager.settings(id) : AuraEffects.Settings.DEFAULT, x + w / 2f, y + area - 1, scale);
+			context.enableScissor(x + 3, y + 3, x + w - 3, y + 3 + area);
+			AuraGuiRenderer.draw(context, emitter, owned ? AuraManager.settings(id) : AuraEffects.Settings.DEFAULT, x + w / 2f, y + area - 2, scale);
 			context.disableScissor();
 		}
-		String suffix = equipped ? " ✔" : !owned && !id.isEmpty() ? " ·Store" : "";
-		String text = VeloUi.trim(label, w - 8 - textRenderer.getWidth(suffix)) + suffix;
-		int tw = textRenderer.getWidth(text);
-		context.drawTextWithShadow(textRenderer, text, x + (w - tw) / 2, y + h - 12, equipped ? 0xFF8FE3A8 : owned || id.isEmpty() ? 0xFFFFFFFF : 0xFFFFD56A);
+		int textY = y + h - nameH + 4;
+		int right = x + w - 7;
+		if (equipped) {
+			// A small tick, drawn (no font glyph needed).
+			int cx = right - 6;
+			int cy = textY + 4;
+			for (int i = 0; i < 3; i++) {
+				context.fill(cx + i, cy + i - 1, cx + i + 1, cy + i + 1, 0xFF3DDC97);
+			}
+			for (int i = 0; i < 5; i++) {
+				context.fill(cx + 2 + i, cy + 1 - i, cx + 3 + i, cy + 3 - i, 0xFF3DDC97);
+			}
+			right -= 12;
+		} else if (!owned && !id.isEmpty()) {
+			Text store = net.veloclient.velo.client.gui.title.MenuKit.small("STORE");
+			int sw = textRenderer.getWidth(store);
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, textRenderer, store, right - sw, textY + 1, 0xFFFFD56A);
+			right -= sw + 6;
+		}
+		Text name = net.veloclient.velo.client.gui.title.MenuKit.fit(textRenderer, net.veloclient.velo.client.gui.title.MenuKit.uiBold(label), right - (x + 7));
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, textRenderer, name, x + 7, textY, owned || id.isEmpty() ? 0xFFF4F4F6 : 0xFFA9A9B3);
 	}
 
 	@Override

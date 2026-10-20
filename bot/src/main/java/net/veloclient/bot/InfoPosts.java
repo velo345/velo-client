@@ -76,7 +76,7 @@ final class InfoPosts {
 						.setDescription("Link your Minecraft account to this Discord and the animated **Velo Neon** cape is yours - it's not sold anywhere else.")
 						.addField("1 · Open the Store", "In the **Velo Launcher** go to **Store** (in game: **Store → Link Discord**).", false)
 						.addField("2 · Copy your code", "Press **Copy link code**. You get a one-time code like `VELO-AB12CD`.", false)
-						.addField("3 · Paste it here", "Paste the code in " + link + ". The message is deleted right away, so nobody else sees it.", false)
+						.addField("3 · Paste it here", "Paste the code in " + link + " (or use **/link**). The message is deleted right away and the bot answers you privately.", false)
 						.addField("4 · Wear it", "Done! Open **Cosmetics** and equip **Velo Neon**. Everyone with Velo Client sees it.", false)
 						.setImage("attachment://link-steps.png")
 						.setFooter("Unlinking (/unlink) removes the cape again.").build());

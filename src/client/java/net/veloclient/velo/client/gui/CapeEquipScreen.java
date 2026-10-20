@@ -7,7 +7,9 @@ import net.veloclient.velo.client.cosmetics.CapeDefinition;
 import net.veloclient.velo.client.cosmetics.CapeManager;
 import net.veloclient.velo.client.cosmetics.CapePhysicsPreset;
 import net.veloclient.velo.client.gui.title.TitleScreenTheme;
+import net.veloclient.velo.client.gui.title.MenuKit;
 import net.veloclient.velo.client.gui.widget.EntityPreviewWidget;
+import net.veloclient.velo.client.gui.widget.VeloDraw;
 import net.veloclient.velo.client.gui.widget.VeloButton;
 import net.veloclient.velo.client.gui.widget.VeloStyle;
 import net.veloclient.velo.client.gui.widget.VeloUi;
@@ -36,7 +38,10 @@ public final class CapeEquipScreen extends VeloWindow {
 	private static final int TILE_ICON_HEIGHT = 112;
 	private static final int TILE_TOTAL_HEIGHT = TILE_ICON_HEIGHT + 20;
 	private static final int TILE_GAP = 8;
-	private static final int SHOWCASE_WIDTH = 160;
+	private static final int SHOWCASE_WIDTH = 220;
+	/** The slot list on the left (Cape / Wings / Aura, like the launcher's Locker). */
+	private static final int SLOTS_W = 150;
+	private static final int SLOT_H = 38;
 
 	private VeloScrollRegion scrollRegion;
 	private int gridColumns = 1;
@@ -45,7 +50,7 @@ public final class CapeEquipScreen extends VeloWindow {
 	private String selectedId;
 	/** Showing the 3D wings instead of the capes. */
 	/** Wings / aura picture tiles in the collection grid. */
-	private static final int TILE_H = 58;
+	private static final int TILE_H = 72;
 	private boolean wingsTab;
 	/** The wings shown on the player preview ("" = none), null = the equipped pair. */
 	private String selectedWings;
@@ -55,7 +60,7 @@ public final class CapeEquipScreen extends VeloWindow {
 	private String selectedAura;
 
 	public CapeEquipScreen(net.minecraft.client.gui.screen.Screen parent) {
-		super(Text.literal("Cosmetics"), 620, 420);
+		super(Text.literal("Locker"), 940, 580);
 		returnTo(parent);
 		onClosed(() -> {
 			CapeManager.clearPreviewOverride();
@@ -64,34 +69,158 @@ public final class CapeEquipScreen extends VeloWindow {
 		});
 	}
 
-	/** The Capes / Wings switch above the collection. */
+	// ---- Header (launcher look): Capes / Wings / Auras tabs, "Get more" to the Store ----
+
+	@Override
+	protected String[] headerTabs() {
+		return new String[] {"Capes", "Wings", "Auras"};
+	}
+
+	@Override
+	protected int headerTab() {
+		return aurasTab ? 2 : wingsTab ? 1 : 0;
+	}
+
+	@Override
+	protected void selectHeaderTab(int index) {
+		wingsTab = index == 1;
+		aurasTab = index == 2;
+		if (!wingsTab) {
+			net.veloclient.velo.client.cosmetics.wings.WingsManager.clearPreview();
+		}
+		if (!aurasTab) {
+			net.veloclient.velo.client.cosmetics.aura.AuraManager.clearPreview();
+		}
+		layoutContent();
+	}
+
+	/** Dev-only (screenshot tour): switch tab. */
+	public void showTabForTour(int index) {
+		selectHeaderTab(index);
+	}
+
+	private int getMoreX;
+	private int getMoreW;
+
+	@Override
+	protected void renderHeaderExtras(DrawContext context, int mouseX, int mouseY) {
+		Text label = MenuKit.ui("Get more");
+		getMoreW = 8 + 10 + 4 + this.textRenderer.getWidth(label) + 8;
+		getMoreX = headerRight() - getMoreW;
+		int y = windowY + (HEADER_HEIGHT - 18) / 2;
+		boolean hovered = MenuKit.inside(mouseX, mouseY, getMoreX, y, getMoreW, 18);
+		VeloDraw.fillRounded(context, getMoreX, y, getMoreW, 18, 6, hovered ? 0x1AFFFFFF : 0x0DFFFFFF);
+		VeloDraw.strokeRounded(context, getMoreX, y, getMoreW, 18, 6, hovered ? 0x38FFFFFF : 0x17FFFFFF);
+		MenuKit.icon(context, "store", getMoreX + 8, y + 4, 10, hovered ? MenuKit.TEXT : MenuKit.TEXT_2);
+		MenuKit.text(context, this.textRenderer, label, getMoreX + 22, y + 5, hovered ? MenuKit.TEXT : MenuKit.TEXT_2);
+	}
+
+	@Override
+	protected boolean headerClick(int mouseX, int mouseY) {
+		int y = windowY + (HEADER_HEIGHT - 18) / 2;
+		if (MenuKit.inside(mouseX, mouseY, getMoreX, y, getMoreW, 18)) {
+			this.client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(this));
+			return true;
+		}
+		return false;
+	}
+
 	private void addTabs(int x) {
-		VeloButton capes = new VeloButton(x, contentY() - 2, 54, 14, Text.literal("Capes"), b -> {
-			wingsTab = false;
-			aurasTab = false;
-			net.veloclient.velo.client.cosmetics.wings.WingsManager.clearPreview();
-			net.veloclient.velo.client.cosmetics.aura.AuraManager.clearPreview();
-			layoutContent();
-		});
-		VeloButton wings = new VeloButton(x + 58, contentY() - 2, 54, 14, Text.literal("Wings"), b -> {
-			wingsTab = true;
-			aurasTab = false;
-			net.veloclient.velo.client.cosmetics.aura.AuraManager.clearPreview();
-			layoutContent();
-		});
-		VeloButton auras = new VeloButton(x + 116, contentY() - 2, 54, 14, Text.literal("Auras"), b -> {
-			aurasTab = true;
-			wingsTab = false;
-			net.veloclient.velo.client.cosmetics.wings.WingsManager.clearPreview();
-			layoutContent();
-		});
-		(aurasTab ? auras : wingsTab ? wings : capes).primary();
-		addDrawableChild(capes);
-		addDrawableChild(wings);
-		addDrawableChild(auras);
-		// Straight to the Store (wings and capes for sale).
-		addDrawableChild(new VeloButton(contentX() + contentWidth() - 70, contentY() - 2, 70, 14, Text.literal("✦ Store"),
-				b -> this.client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(this))));
+		// The tabs live in the window header now.
+	}
+
+	/** Height of the pinned wing settings block (heading + three slider rows). */
+	private static final int SETTINGS_H = 16 + 3 * 24;
+	private int regionTileW = TILE_WIDTH;
+	private int regionTileH = TILE_TOTAL_HEIGHT;
+
+	private void startTileRegion(int x, int y, int w, int h, int columns, int tileW) {
+		scrollRegion = new VeloScrollRegion(x, y, w, Math.max(TILE_H, h));
+		gridColumns = columns;
+		regionTileW = tileW;
+		regionTileH = TILE_H;
+	}
+
+	private void addTile(net.minecraft.client.gui.widget.ClickableWidget tile) {
+		addSelectableChild(tile);
+		scrollRegion.addRow(tile);
+	}
+
+	private void finishTileRegion() {
+		scrollRegion.layoutGrid(gridColumns, regionTileW, regionTileH, TILE_GAP);
+	}
+
+	private int showcaseX() {
+		return contentX() + SLOTS_W + 12;
+	}
+
+	private int gridX() {
+		return showcaseX() + SHOWCASE_WIDTH + 14;
+	}
+
+	/** The slot list: what you're wearing per slot; click one to open its tab. */
+	private void renderSlots(DrawContext context, int mouseX, int mouseY) {
+		int x = contentX();
+		int y = contentY();
+		String cape = CapeManager.equipped().map(CapeDefinition::name).orElse("None");
+		String wingsId = net.veloclient.velo.client.cosmetics.wings.WingsManager.equippedId();
+		String wings = wingsId == null ? "None" : net.veloclient.velo.client.cosmetics.wings.WingsManager.type(wingsId)
+				.map(net.veloclient.velo.client.cosmetics.wings.WingsManager.WingType::name).orElse(wingsId);
+		String auraId = net.veloclient.velo.client.cosmetics.aura.AuraManager.equippedId();
+		String aura = auraId == null ? "None" : net.veloclient.velo.client.cosmetics.aura.AuraManager.type(auraId)
+				.map(net.veloclient.velo.client.cosmetics.aura.AuraManager.AuraType::name).orElse(auraId);
+		String[][] rows = {{"CAPE", cape, "capes"}, {"WINGS", wings, "cosmetics"}, {"AURA", aura, "bolt"}};
+		for (int i = 0; i < rows.length; i++) {
+			int ry = y + i * (SLOT_H + 6);
+			boolean active = headerTab() == i;
+			boolean hovered = MenuKit.inside(mouseX, mouseY, x, ry, SLOTS_W, SLOT_H);
+			VeloDraw.fillRounded(context, x, ry, SLOTS_W, SLOT_H, 8, active ? VeloUi.withAlpha(MenuKit.accent(), 0x1F) : hovered ? 0xFF1A1A21 : 0xFF131318);
+			VeloDraw.strokeRounded(context, x, ry, SLOTS_W, SLOT_H, 8, active ? VeloUi.withAlpha(MenuKit.accent(), 0x80) : 0x17FFFFFF);
+			if (active) {
+				VeloDraw.fillRounded(context, x + 1, ry + 8, 2, SLOT_H - 16, 1, MenuKit.accent());
+			}
+			VeloDraw.fillRounded(context, x + 8, ry + 7, 24, 24, 6, 0x14FFFFFF);
+			MenuKit.icon(context, rows[i][2], x + 14, ry + 13, 12, rows[i][1].equals("None") ? MenuKit.TEXT_3 : MenuKit.TEXT);
+			MenuKit.text(context, this.textRenderer, MenuKit.small(rows[i][0]), x + 40, ry + 9, MenuKit.TEXT_3);
+			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.uiBold(rows[i][1]), SLOTS_W - 48), x + 40, ry + 19,
+					rows[i][1].equals("None") ? MenuKit.TEXT_2 : MenuKit.TEXT);
+		}
+		// Sync note under the slots.
+		int ny = y + rows.length * (SLOT_H + 6) + 6;
+		for (Text line : MenuKit.wrap(this.textRenderer, "Synced: other Velo players see what you wear.", MenuKit::ui, SLOTS_W - 4)) {
+			MenuKit.text(context, this.textRenderer, line, x + 2, ny, MenuKit.TEXT_3);
+			ny += 11;
+		}
+	}
+
+	/** The stage behind the live preview. */
+	private void renderStage(DrawContext context) {
+		int x = showcaseX();
+		int y = contentY();
+		int h = contentBottom() - y;
+		VeloDraw.fillRounded(context, x, y, SHOWCASE_WIDTH, h, 10, 0xFF111116);
+		VeloDraw.fillRoundedGradient(context, x, y, SHOWCASE_WIDTH, h, 10, VeloUi.withAlpha(MenuKit.accent(), 0x14), 0x00111116);
+		VeloDraw.strokeRounded(context, x, y, SHOWCASE_WIDTH, h, 10, 0x17FFFFFF);
+	}
+
+	@Override
+	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
+		renderSlots(context, mouseX, mouseY);
+		renderStage(context);
+	}
+
+	@Override
+	public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+		for (int i = 0; i < 3; i++) {
+			if (MenuKit.inside((int) click.x(), (int) click.y(), contentX(), contentY() + i * (SLOT_H + 6), SLOTS_W, SLOT_H)) {
+				if (i != headerTab()) {
+					selectHeaderTab(i);
+					restartPageIn();
+				}
+				return true;
+			}
+		}
+		return super.mouseClicked(click, doubled);
 	}
 
 	/** The Auras tab: pick one (shown on you right away), equip it; Customize opens its settings. */
@@ -101,11 +230,11 @@ public final class CapeEquipScreen extends VeloWindow {
 			selectedAura = equipped == null ? "" : equipped;
 		}
 		net.veloclient.velo.client.cosmetics.aura.AuraManager.setPreview(selectedAura.isEmpty() ? null : selectedAura);
-		int showcaseX = contentX();
-		addDrawableChild(new EntityPreviewWidget(showcaseX, contentY(), SHOWCASE_WIDTH, contentBottom() - contentY() - 30));
+		int showcaseX = showcaseX();
+		addDrawableChild(new EntityPreviewWidget(showcaseX + 6, contentY() + 6, SHOWCASE_WIDTH - 12, contentBottom() - contentY() - 42).noStage().zoom(1.35f));
 		boolean isEquipped = selectedAura.isEmpty() ? equipped == null : selectedAura.equals(equipped);
 		boolean owned = selectedAura.isEmpty() || net.veloclient.velo.client.cosmetics.aura.AuraManager.owns(selectedAura);
-		VeloButton equip = new VeloButton(showcaseX, contentBottom() - 20, SHOWCASE_WIDTH, 20,
+		VeloButton equip = new VeloButton(showcaseX + 8, contentBottom() - 28, SHOWCASE_WIDTH - 16, 20,
 				Text.literal(selectedAura.isEmpty() ? (equipped == null ? "No aura" : "Take aura off") : isEquipped ? "Unequip"
 						: owned ? "Equip" : "Get in the Store"), b -> {
 					var type = net.veloclient.velo.client.cosmetics.aura.AuraManager.type(selectedAura);
@@ -131,9 +260,9 @@ public final class CapeEquipScreen extends VeloWindow {
 		int gridX = showcaseX + SHOWCASE_WIDTH + 14;
 		int listWidth = contentX() + contentWidth() - gridX;
 		addTabs(gridX);
-		int y = contentY() + 18;
-		int columns = 3;
-		int tileW = (listWidth - (columns - 1) * 6) / columns;
+		int y = contentY() + 20;
+		int columns = Math.max(3, (listWidth + 8) / 128);
+		int tileW = (listWidth - 6 - (columns - 1) * 8) / columns;
 		java.util.List<String[]> tiles = new java.util.ArrayList<>();
 		tiles.add(new String[] {"", "None"});
 		for (var type : net.veloclient.velo.client.cosmetics.aura.AuraManager.catalog()) {
@@ -141,18 +270,18 @@ public final class CapeEquipScreen extends VeloWindow {
 				tiles.add(new String[] {type.id(), type.name()});
 			}
 		}
+		int customizeY = contentBottom() - 20;
+		startTileRegion(gridX, y, listWidth, customizeY - 8 - y, columns, tileW);
 		for (int i = 0; i < tiles.size(); i++) {
 			String id = tiles.get(i)[0];
 			boolean tileOwned = id.isEmpty() || net.veloclient.velo.client.cosmetics.aura.AuraManager.owns(id);
-			addDrawableChild(new net.veloclient.velo.client.gui.widget.VeloCosmeticTile(gridX + (i % columns) * (tileW + 6),
-					y + (i / columns) * (TILE_H + 6), tileW, TILE_H, net.veloclient.velo.client.gui.widget.VeloCosmeticTile.Kind.AURA, id,
+			addTile(new net.veloclient.velo.client.gui.widget.VeloCosmeticTile(0, 0, tileW, TILE_H, net.veloclient.velo.client.gui.widget.VeloCosmeticTile.Kind.AURA, id,
 					tiles.get(i)[1], id.equals(selectedAura), id.equals(equipped == null ? "" : equipped), tileOwned, () -> {
 						selectedAura = id;
 						layoutContent();
 					}));
 		}
-		y += ((tiles.size() + columns - 1) / columns) * (TILE_H + 6) + 4;
-		int customizeY = y;
+		finishTileRegion();
 		if (!selectedAura.isEmpty()) {
 			net.veloclient.velo.client.cosmetics.aura.AuraManager.type(selectedAura).ifPresent(type -> addDrawableChild(new VeloButton(gridX, customizeY,
 					Math.min(200, listWidth), 20, Text.literal("Customize: size, speed, colour..."),
@@ -167,11 +296,11 @@ public final class CapeEquipScreen extends VeloWindow {
 			selectedWings = equipped == null ? "" : equipped;
 		}
 		net.veloclient.velo.client.cosmetics.wings.WingsManager.setPreview(selectedWings.isEmpty() ? null : selectedWings);
-		int showcaseX = contentX();
-		addDrawableChild(new EntityPreviewWidget(showcaseX, contentY(), SHOWCASE_WIDTH, contentBottom() - contentY() - 30));
+		int showcaseX = showcaseX();
+		addDrawableChild(new EntityPreviewWidget(showcaseX + 6, contentY() + 6, SHOWCASE_WIDTH - 12, contentBottom() - contentY() - 42).noStage().zoom(1.35f));
 		boolean isEquipped = selectedWings.isEmpty() ? equipped == null : selectedWings.equals(equipped);
 		boolean owned = selectedWings.isEmpty() || net.veloclient.velo.client.cosmetics.wings.WingsManager.owns(selectedWings);
-		VeloButton equip = new VeloButton(showcaseX, contentBottom() - 20, SHOWCASE_WIDTH, 20,
+		VeloButton equip = new VeloButton(showcaseX + 8, contentBottom() - 28, SHOWCASE_WIDTH - 16, 20,
 				Text.literal(selectedWings.isEmpty() ? (equipped == null ? "No wings" : "Take wings off") : isEquipped ? "Unequip"
 						: owned ? "Equip" : "Get in the Store"), b -> {
 					if (!owned) {
@@ -198,9 +327,9 @@ public final class CapeEquipScreen extends VeloWindow {
 		int gridX = showcaseX + SHOWCASE_WIDTH + 14;
 		int listWidth = contentX() + contentWidth() - gridX;
 		addTabs(gridX);
-		int y = contentY() + 18;
-		int columns = 3;
-		int tileW = (listWidth - (columns - 1) * 6) / columns;
+		int y = contentY() + 20;
+		int columns = Math.max(3, (listWidth + 8) / 128);
+		int tileW = (listWidth - 6 - (columns - 1) * 8) / columns;
 		java.util.List<String[]> tiles = new java.util.ArrayList<>();
 		tiles.add(new String[] {"", "None"});
 		// What you own first, then what the Store sells (to try on).
@@ -215,18 +344,21 @@ public final class CapeEquipScreen extends VeloWindow {
 				tiles.add(new String[] {type.id(), type.name()});
 			}
 		}
+		// The pair's settings stay pinned under the grid (the grid scrolls), so nothing runs out of the window.
+		int settingsTop = contentBottom() - SETTINGS_H;
+		startTileRegion(gridX, y, listWidth, settingsTop - 10 - y, columns, tileW);
 		for (int i = 0; i < tiles.size(); i++) {
 			String id = tiles.get(i)[0];
 			boolean tileOwned = id.isEmpty() || net.veloclient.velo.client.cosmetics.wings.WingsManager.owns(id);
-			addDrawableChild(new net.veloclient.velo.client.gui.widget.VeloCosmeticTile(gridX + (i % columns) * (tileW + 6),
-					y + (i / columns) * (TILE_H + 6), tileW, TILE_H, net.veloclient.velo.client.gui.widget.VeloCosmeticTile.Kind.WINGS, id,
+			addTile(new net.veloclient.velo.client.gui.widget.VeloCosmeticTile(0, 0, tileW, TILE_H, net.veloclient.velo.client.gui.widget.VeloCosmeticTile.Kind.WINGS, id,
 					tiles.get(i)[1], id.equals(selectedWings), id.equals(equipped == null ? "" : equipped), tileOwned, () -> {
 						selectedWings = id;
 						layoutContent();
 					}));
 		}
-		y += ((tiles.size() + columns - 1) / columns) * (TILE_H + 6) + 4;
-		int half = (listWidth - 8) / 2;
+		finishTileRegion();
+		y = settingsTop + 16;
+		int half = (listWidth - 12) / 2;
 		java.util.List<Object[]> sliders = java.util.List.of(
 				new Object[] {"Size", 0.4, 2.0, 0, (java.util.function.DoubleFunction<String>) v -> Math.round(v * 100) + "%"},
 				new Object[] {"Height", -0.5, 0.5, 1, (java.util.function.DoubleFunction<String>) v -> String.format(java.util.Locale.ROOT, "%+d px", Math.round(v * 16))},
@@ -239,12 +371,13 @@ public final class CapeEquipScreen extends VeloWindow {
 			int field = (int) row[3];
 			@SuppressWarnings("unchecked")
 			java.util.function.DoubleFunction<String> format = (java.util.function.DoubleFunction<String>) row[4];
-			addDrawableChild(new net.veloclient.velo.client.gui.widget.VeloSlider(gridX + (i % 2) * (half + 8), y + (i / 2) * 26, half, 20,
+			addDrawableChild(new net.veloclient.velo.client.gui.widget.VeloSlider(gridX + (i % 2) * (half + 12), y + (i / 2) * 24, half, 20,
 					(String) row[0], (double) row[1], (double) row[2], () -> wingSetting(field),
 					v -> setWingSetting(field, (float) v), v -> Math.round(v * 100) / 100.0, format));
 		}
-		y += ((sliders.size() + 1) / 2) * 26 + 2;
-		addDrawableChild(new VeloButton(gridX, y, half, 18, Text.literal("Reset settings"), b -> {
+		Text reset = Text.literal("Reset");
+		int resetW = this.textRenderer.getWidth(reset) + 20;
+		addDrawableChild(new VeloButton(gridX + listWidth - resetW, settingsTop - 2, resetW, 14, reset, b -> {
 			net.veloclient.velo.client.cosmetics.wings.WingsManager.setSettings(selectedWings, net.veloclient.velo.client.cosmetics.wings.WingsManager.Settings.DEFAULT);
 			layoutContent();
 		}));
@@ -301,14 +434,14 @@ public final class CapeEquipScreen extends VeloWindow {
 		}
 
 		// Left: live preview + actions.
-		int showcaseX = contentX();
+		int showcaseX = showcaseX();
 		int actionsHeight = selected == null ? 0 : 20 + 6 + 20;
-		int previewHeight = contentBottom() - contentY() - actionsHeight - (selected == null ? 0 : 22);
-		addDrawableChild(new EntityPreviewWidget(showcaseX, contentY(), SHOWCASE_WIDTH, previewHeight));
+		int previewHeight = contentBottom() - contentY() - actionsHeight - (selected == null ? 0 : 34);
+		addDrawableChild(new EntityPreviewWidget(showcaseX + 6, contentY() + 6, SHOWCASE_WIDTH - 12, previewHeight - 6).noStage().zoom(1.35f));
 		if (selected != null) {
 			boolean isEquipped = selected.id().equals(equippedId);
-			int buttonsY = contentBottom() - 46;
-			VeloButton equip = new VeloButton(showcaseX, buttonsY, SHOWCASE_WIDTH, 20,
+			int buttonsY = contentBottom() - 54;
+			VeloButton equip = new VeloButton(showcaseX + 8, buttonsY, SHOWCASE_WIDTH - 16, 20,
 					Text.literal(isEquipped ? "Unequip" : "Equip"), b -> {
 						if (isEquipped) {
 							CapeManager.unequip();
@@ -323,25 +456,29 @@ public final class CapeEquipScreen extends VeloWindow {
 				equip.primary();
 			}
 			addDrawableChild(equip);
-			int half = (SHOWCASE_WIDTH - 6) / 2;
-			addDrawableChild(new VeloButton(showcaseX, buttonsY + 26, half, 20, Text.literal("Edit"),
+			int half = (SHOWCASE_WIDTH - 16 - 6) / 2;
+			addDrawableChild(new VeloButton(showcaseX + 8, buttonsY + 26, half, 20, Text.literal("Edit"),
 					b -> this.client.setScreen(new CapeEditScreen(this, selected))));
-			addDrawableChild(new VeloButton(showcaseX + half + 6, buttonsY + 26, half, 20, Text.literal("Delete"),
+			addDrawableChild(new VeloButton(showcaseX + 8 + half + 6, buttonsY + 26, half, 20, Text.literal("Delete"),
 					b -> confirmDelete(selected)));
 		}
 
 		// Right: the collection.
 		int gridX = showcaseX + SHOWCASE_WIDTH + 14;
 		int listWidth = contentX() + contentWidth() - gridX;
-		int gridTop = contentY() + 16;
+		int gridTop = contentY() + 20;
 		int gridHeight = contentBottom() - gridTop - 14;
-		gridColumns = Math.max(1, (listWidth - 8 + TILE_GAP) / (TILE_WIDTH + TILE_GAP));
+		gridColumns = Math.max(3, (listWidth + TILE_GAP) / (104 + TILE_GAP));
+		int capeTileW = (listWidth - 6 - (gridColumns - 1) * TILE_GAP) / gridColumns;
+		int capeIconH = capeTileW * 5 / 4;
 		scrollRegion = new VeloScrollRegion(gridX, gridTop, listWidth, gridHeight);
+		regionTileW = capeTileW;
+		regionTileH = capeIconH + VeloCapeTile.NAME_H;
 		addTabs(gridX);
 
 		for (CapeDefinition definition : CapeManager.library().values()) {
 			boolean equipped = definition.id().equals(equippedId);
-			VeloCapeTile tile = new VeloCapeTile(0, 0, TILE_WIDTH, TILE_ICON_HEIGHT, definition, equipped,
+			VeloCapeTile tile = new VeloCapeTile(0, 0, capeTileW, capeIconH, definition, equipped,
 					() -> this.client.setScreen(new CapeEditScreen(this, definition)),
 					() -> {
 						selectedId = definition.id();
@@ -352,11 +489,11 @@ public final class CapeEquipScreen extends VeloWindow {
 			scrollRegion.addRow(tile);
 		}
 
-		VeloButton importTile = new VeloButton(0, 0, TILE_WIDTH, TILE_TOTAL_HEIGHT - 4, Text.literal("+ Import"), b -> pickFile());
+		VeloButton importTile = new VeloButton(0, 0, capeTileW, regionTileH, Text.literal("+ Import"), b -> pickFile());
 		addSelectableChild(importTile);
 		scrollRegion.addRow(importTile);
 
-		scrollRegion.layoutGrid(gridColumns, TILE_WIDTH, TILE_TOTAL_HEIGHT, TILE_GAP);
+		scrollRegion.layoutGrid(gridColumns, regionTileW, regionTileH, TILE_GAP);
 	}
 
 	private void confirmDelete(CapeDefinition definition) {
@@ -399,40 +536,52 @@ public final class CapeEquipScreen extends VeloWindow {
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
 		if (scrollRegion != null && scrollRegion.scroll(mouseX, mouseY, verticalAmount)) {
-			scrollRegion.layoutGrid(gridColumns, TILE_WIDTH, TILE_TOTAL_HEIGHT, TILE_GAP);
+			scrollRegion.layoutGrid(gridColumns, regionTileW, regionTileH, TILE_GAP);
 			return true;
 		}
 		return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
 	}
 
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-		super.render(context, mouseX, mouseY, delta);
+	protected void renderOverlayLayer(DrawContext context, int mouseX, int mouseY, float delta) {
 		if (scrollRegion != null) {
 			scrollRegion.renderRows(context, mouseX, mouseY, delta);
-			scrollRegion.renderScrollbarGrid(context, gridColumns, TILE_TOTAL_HEIGHT, TILE_GAP);
+			scrollRegion.renderScrollbarGrid(context, gridColumns, regionTileH, TILE_GAP);
 		}
-		int gridX = contentX() + SHOWCASE_WIDTH + 14;
-		if (aurasTab) {
-			context.drawTextWithShadow(this.textRenderer, VeloUi.trim("Click one to try it on", contentX() + contentWidth() - 80 - gridX - 180),
-					gridX + 180, contentY() + 1, VeloStyle.textFaint());
-			context.drawTextWithShadow(this.textRenderer, status, gridX, contentBottom() - 9, VeloStyle.textMuted());
-			return;
+		int gridX = gridX();
+		// Heading over the collection: "Capes 12" + a quiet hint.
+		String name = aurasTab ? "Auras" : wingsTab ? "Wings" : "Capes";
+		int count = aurasTab ? (int) net.veloclient.velo.client.cosmetics.aura.AuraManager.catalog().stream()
+				.filter(t -> net.veloclient.velo.client.cosmetics.aura.AuraManager.owns(t.id())).count()
+				: wingsTab ? net.veloclient.velo.client.cosmetics.wings.WingsManager.owned().size() : CapeManager.library().size();
+		Text heading = MenuKit.display(name);
+		MenuKit.text(context, this.textRenderer, heading, gridX, contentY() + 1, MenuKit.TEXT);
+		Text countText = MenuKit.small(count + " OWNED");
+		int hx = gridX + this.textRenderer.getWidth(heading) + 8;
+		MenuKit.text(context, this.textRenderer, countText, hx, contentY() + 4, MenuKit.TEXT_3);
+		if (wingsTab && selectedWings != null && !selectedWings.isEmpty()) {
+			MenuKit.text(context, this.textRenderer, MenuKit.small("HOW YOU WEAR THIS PAIR"), gridX, contentBottom() - SETTINGS_H + 1, MenuKit.TEXT_3);
 		}
-		if (wingsTab) {
-			context.drawTextWithShadow(this.textRenderer, VeloUi.trim("Click a pair to try it on", contentX() + contentWidth() - 80 - gridX - 130),
-					gridX + 180, contentY() + 1, VeloStyle.textFaint());
-			context.drawTextWithShadow(this.textRenderer, status, gridX, contentBottom() - 9, VeloStyle.textMuted());
-			return;
+		String hint = aurasTab ? "click one to try it on" : wingsTab ? "click a pair to try it on" : "click one to preview it on you";
+		Text hintText = MenuKit.ui(hint);
+		int right = contentX() + contentWidth();
+		if (hx + this.textRenderer.getWidth(countText) + 16 + this.textRenderer.getWidth(hintText) <= right) {
+			MenuKit.text(context, this.textRenderer, hintText, right - this.textRenderer.getWidth(hintText), contentY() + 2, MenuKit.TEXT_3);
 		}
-		int count = CapeManager.library().size();
-		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(count + (count == 1 ? " cape" : " capes") + "  ·  click one to preview it on you",
-				contentX() + contentWidth() - 80 - gridX - 180), gridX + 180, contentY() + 1, VeloStyle.textFaint());
-		CapeDefinition selected = selectedId == null ? null : CapeManager.library().get(selectedId);
-		if (selected != null) {
-			String name = VeloUi.trim(selected.name(), SHOWCASE_WIDTH);
-			context.drawTextWithShadow(this.textRenderer, TitleScreenTheme.tileFont(name), contentX(), contentBottom() - 62, VeloStyle.text());
+		if (!aurasTab && !wingsTab) {
+			CapeDefinition selected = selectedId == null ? null : CapeManager.library().get(selectedId);
+			if (selected != null) {
+				MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.displaySm(selected.name()), SHOWCASE_WIDTH - 16),
+						showcaseX() + 8, contentBottom() - 70, MenuKit.TEXT);
+			}
 		}
-		context.drawTextWithShadow(this.textRenderer, status, gridX, contentBottom() - 9, VeloStyle.textMuted());
+		if (!status.getString().isEmpty()) {
+			// Feedback ("Equipped ...") at the top of the stage.
+			Text line = MenuKit.fit(this.textRenderer, MenuKit.ui(status.getString()), SHOWCASE_WIDTH - 20);
+			int lw = this.textRenderer.getWidth(line) + 14;
+			int lx = showcaseX() + (SHOWCASE_WIDTH - lw) / 2;
+			VeloDraw.fillRounded(context, lx, contentY() + 8, lw, 14, 7, 0x263DDC97);
+			MenuKit.text(context, this.textRenderer, line, lx + 7, contentY() + 11, MenuKit.GREEN);
+		}
 	}
 }

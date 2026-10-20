@@ -78,10 +78,11 @@ public final class InstanceSettingsDialog {
 		grid.add(perfMods, 0, 6, 3, 1);
 
 		dialog.getDialogPane().setContent(grid);
-		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+		ButtonType confirm = new ButtonType("Save", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, confirm);
 
 		dialog.setResultConverter(button -> {
-			if (button != ButtonType.OK) {
+			if (button != confirm) {
 				return null;
 			}
 			if (perfState.enabled != perfMods.isSelected()) {

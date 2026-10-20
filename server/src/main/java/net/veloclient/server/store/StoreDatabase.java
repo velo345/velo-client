@@ -133,6 +133,26 @@ public final class StoreDatabase implements AutoCloseable {
 						event_id TEXT PRIMARY KEY,
 						type TEXT NOT NULL,
 						received_at INTEGER NOT NULL)""");
+			// Referrals: everyone's own code, and who invited whom (rewarded once the invited player has played 2 h).
+			st.execute("""
+					CREATE TABLE IF NOT EXISTS referral_codes (
+						uuid TEXT PRIMARY KEY,
+						code TEXT NOT NULL UNIQUE,
+						created_at INTEGER NOT NULL)""");
+			st.execute("""
+					CREATE TABLE IF NOT EXISTS referrals (
+						referred_uuid TEXT PRIMARY KEY,
+						referrer_uuid TEXT NOT NULL,
+						created_at INTEGER NOT NULL,
+						rewarded_at INTEGER NOT NULL DEFAULT 0,
+						referrer_coins INTEGER NOT NULL DEFAULT 0)""");
+			st.execute("CREATE INDEX IF NOT EXISTS referrals_referrer ON referrals(referrer_uuid)");
+			st.execute("""
+					CREATE TABLE IF NOT EXISTS wishlist (
+						uuid TEXT NOT NULL,
+						item_id TEXT NOT NULL,
+						created_at INTEGER NOT NULL,
+						PRIMARY KEY (uuid, item_id))""");
 		}
 	}
 
@@ -739,6 +759,231 @@ public final class StoreDatabase implements AutoCloseable {
 			adjustInTx(uuid, coins, "ad_reward", tid, "rewarded_ad");
 			return AdResult.CREDITED;
 		});
+	}
+
+	// ---- Bundles & gifts ----
+
+	/** Buys every item of {@code itemIds} the player doesn't own yet for one price, atomically. */
+	public synchronized BuyResult buyItems(String uuid, List<String> itemIds, int price, String ref) throws SQLException {
+		return inTransaction(() -> {
+			List<String> missing = new ArrayList<>();
+			for (String id : itemIds) {
+				if (!owns(uuid, id)) {
+					missing.add(id);
+				}
+			}
+			if (missing.isEmpty()) {
+				return BuyResult.ALREADY_OWNED;
+			}
+			ensureWalletInTx(uuid);
+			if (balance(uuid) < price) {
+				return BuyResult.INSUFFICIENT_COINS;
+			}
+			adjustInTx(uuid, -price, "buy_bundle", ref, null);
+			for (String id : missing) {
+				insertOwned(uuid, id, "purchase:" + ref);
+			}
+			return BuyResult.OK;
+		});
+	}
+
+	/** {@code giver} pays for an item that goes straight to {@code recipient}'s Locker. */
+	public synchronized BuyResult giftItem(String giver, String recipient, String itemId, int price) throws SQLException {
+		return inTransaction(() -> {
+			if (owns(recipient, itemId)) {
+				return BuyResult.ALREADY_OWNED;
+			}
+			ensureWalletInTx(giver);
+			if (balance(giver) < price) {
+				return BuyResult.INSUFFICIENT_COINS;
+			}
+			adjustInTx(giver, -price, "gift_item", itemId + ":" + recipient, null);
+			ensureWalletInTx(recipient);
+			insertOwned(recipient, itemId, "gift:" + giver);
+			adjustInTx(recipient, 0, "gift_received", itemId, giver);
+			return BuyResult.OK;
+		});
+	}
+
+	/** The uuid of the player who last used this name with Velo Client, or null. */
+	public synchronized String uuidByUsername(String username) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement(
+				"SELECT uuid FROM wallets WHERE username = ? COLLATE NOCASE ORDER BY updated_at DESC LIMIT 1")) {
+			ps.setString(1, username);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getString(1) : null;
+			}
+		}
+	}
+
+	// ---- Wishlist ----
+
+	public synchronized void setWishlisted(String uuid, String itemId, boolean on) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement(on
+				? "INSERT OR IGNORE INTO wishlist(uuid, item_id, created_at) VALUES(?, ?, ?)"
+				: "DELETE FROM wishlist WHERE uuid = ? AND item_id = ?")) {
+			ps.setString(1, uuid);
+			ps.setString(2, itemId);
+			if (on) {
+				ps.setLong(3, System.currentTimeMillis());
+			}
+			ps.executeUpdate();
+		}
+	}
+
+	public synchronized List<String> wishlist(String uuid) throws SQLException {
+		List<String> out = new ArrayList<>();
+		try (PreparedStatement ps = connection.prepareStatement("SELECT item_id FROM wishlist WHERE uuid = ? ORDER BY created_at")) {
+			ps.setString(1, uuid);
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(rs.getString(1));
+				}
+			}
+		}
+		return out;
+	}
+
+	// ---- Referrals ----
+
+	public record Referral(String referred, String referrer, long createdAt, long rewardedAt, int referrerCoins) {
+	}
+
+	public synchronized String referralCode(String uuid) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("SELECT code FROM referral_codes WHERE uuid = ?")) {
+			ps.setString(1, uuid);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getString(1) : null;
+			}
+		}
+	}
+
+	/** Stores {@code code} as the player's code; false when another player already has it. */
+	public synchronized boolean setReferralCode(String uuid, String code) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("INSERT OR IGNORE INTO referral_codes(uuid, code, created_at) VALUES(?, ?, ?)")) {
+			ps.setString(1, uuid);
+			ps.setString(2, code);
+			ps.setLong(3, System.currentTimeMillis());
+			return ps.executeUpdate() == 1;
+		}
+	}
+
+	public synchronized String uuidForReferralCode(String code) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("SELECT uuid FROM referral_codes WHERE code = ?")) {
+			ps.setString(1, code);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getString(1) : null;
+			}
+		}
+	}
+
+	private static Referral referral(ResultSet rs) throws SQLException {
+		return new Referral(rs.getString(1), rs.getString(2), rs.getLong(3), rs.getLong(4), rs.getInt(5));
+	}
+
+	/** Who invited {@code uuid}, or null. */
+	public synchronized Referral referredBy(String uuid) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement(
+				"SELECT referred_uuid, referrer_uuid, created_at, rewarded_at, referrer_coins FROM referrals WHERE referred_uuid = ?")) {
+			ps.setString(1, uuid);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? referral(rs) : null;
+			}
+		}
+	}
+
+	/** Everyone {@code referrer} invited, newest first. */
+	public synchronized List<Referral> referralsBy(String referrer) throws SQLException {
+		List<Referral> out = new ArrayList<>();
+		try (PreparedStatement ps = connection.prepareStatement(
+				"SELECT referred_uuid, referrer_uuid, created_at, rewarded_at, referrer_coins FROM referrals WHERE referrer_uuid = ? ORDER BY created_at DESC")) {
+			ps.setString(1, referrer);
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(referral(rs));
+				}
+			}
+		}
+		return out;
+	}
+
+	/** Invited players still waiting for their reward. */
+	public synchronized List<String> pendingReferrals() throws SQLException {
+		List<String> out = new ArrayList<>();
+		try (Statement st = connection.createStatement();
+				ResultSet rs = st.executeQuery("SELECT referred_uuid FROM referrals WHERE rewarded_at = 0")) {
+			while (rs.next()) {
+				out.add(rs.getString(1));
+			}
+		}
+		return out;
+	}
+
+	/** Records the invite; false when the player already has a referrer. */
+	public synchronized boolean addReferral(String referred, String referrer) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement(
+				"INSERT OR IGNORE INTO referrals(referred_uuid, referrer_uuid, created_at) VALUES(?, ?, ?)")) {
+			ps.setString(1, referred);
+			ps.setString(2, referrer);
+			ps.setLong(3, System.currentTimeMillis());
+			return ps.executeUpdate() == 1;
+		}
+	}
+
+	/**
+	 * Pays both sides of an invite once: {@code referredCoins} to the invited player and the referrer's ladder
+	 * amount ({@code ladder} gets how many invites the referrer was already paid for). False if already paid.
+	 */
+	public synchronized boolean rewardReferral(String referred, int referredCoins, java.util.function.IntUnaryOperator ladder) throws SQLException {
+		return inTransaction(() -> {
+			Referral row = referredBy(referred);
+			if (row == null || row.rewardedAt() != 0) {
+				return false;
+			}
+			int paidBefore;
+			try (PreparedStatement ps = connection.prepareStatement("SELECT COUNT(*) FROM referrals WHERE referrer_uuid = ? AND rewarded_at > 0")) {
+				ps.setString(1, row.referrer());
+				try (ResultSet rs = ps.executeQuery()) {
+					rs.next();
+					paidBefore = rs.getInt(1);
+				}
+			}
+			int referrerCoins = ladder.applyAsInt(paidBefore);
+			try (PreparedStatement ps = connection.prepareStatement(
+					"UPDATE referrals SET rewarded_at = ?, referrer_coins = ? WHERE referred_uuid = ? AND rewarded_at = 0")) {
+				ps.setLong(1, System.currentTimeMillis());
+				ps.setInt(2, referrerCoins);
+				ps.setString(3, referred);
+				if (ps.executeUpdate() != 1) {
+					return false;
+				}
+			}
+			adjustInTx(referred, referredCoins, "referral_joined", row.referrer(), null);
+			if (referrerCoins > 0) {
+				adjustInTx(row.referrer(), referrerCoins, "referral_invite", referred, null);
+			}
+			return true;
+		});
+	}
+
+	/** In-game seconds over all days. */
+	public synchronized long totalOnlineSeconds(String uuid) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("SELECT COALESCE(SUM(online_seconds), 0) FROM daily WHERE uuid = ?")) {
+			ps.setString(1, uuid);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getLong(1) : 0;
+			}
+		}
+	}
+
+	/** The first UTC day the player was seen in-game or claimed anything ("yyyy-mm-dd"), or null. */
+	public synchronized String firstDay(String uuid) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("SELECT MIN(day) FROM daily WHERE uuid = ?")) {
+			ps.setString(1, uuid);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getString(1) : null;
+			}
+		}
 	}
 
 	// ---- Transactions ----

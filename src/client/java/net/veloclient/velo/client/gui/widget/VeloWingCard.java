@@ -56,21 +56,15 @@ public final class VeloWingCard extends ClickableWidget {
 		int y = getY();
 		int w = getWidth();
 		int h = getHeight();
-		if (hover > 0.01f) {
-			VeloDraw.shadow(context, x, y, w, h, VeloStyle.RADIUS_CARD, 10, 4, VeloUi.withAlpha(accent, Math.round(0x50 * hover)));
-		}
-		VeloDraw.fillRounded(context, x, y, w, h, VeloStyle.RADIUS_CARD, 0xFF15151C);
-		// A soft glow in the pair's colour behind the player.
-		VeloDraw.fillRoundedGradient(context, x, y, w, h - 30, VeloStyle.RADIUS_CARD, VeloUi.withAlpha(accent, 0x30), 0x0015151C);
-		VeloDraw.strokeRounded(context, x, y, w, h, VeloStyle.RADIUS_CARD, VeloUi.withAlpha(accent, 0x40 + Math.round(0x80 * hover)));
+		int lift = StoreCard.frame(context, x, y, w, h, hover, accent);
 		// The picture, 4:3, floating slowly (each card a little out of step) and growing on hover.
-		int area = h - 34;
-		float bob = (float) Math.sin(System.currentTimeMillis() / 900.0 + phase) * 2.5f;
+		int area = h - StoreCard.INFO_H - 4;
+		float bob = (float) Math.sin(System.currentTimeMillis() / 900.0 + phase) * 2f;
 		float grow = 1f + 0.06f * hover;
-		int pw = Math.round(Math.min(w - 8, area * 4 / 3f) * grow);
+		int pw = Math.round(Math.min(w - 10, area * 4 / 3f) * grow);
 		int ph = pw * 3 / 4;
 		int px = x + (w - pw) / 2;
-		int py = y + 4 + (area - ph) / 2 + Math.round(bob - 3 * hover);
+		int py = y - lift + 3 + (area - ph) / 2 + Math.round(bob);
 		Identifier picture = previewImage(type.id());
 		if (picture != null) {
 			context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, picture, px, py, 0f, 0f, pw, ph, pw, ph, pw, ph);
@@ -78,15 +72,10 @@ public final class VeloWingCard extends ClickableWidget {
 
 		String state = WingsManager.equippedId() != null && WingsManager.equippedId().equals(type.id()) ? "Equipped"
 				: WingsManager.owns(type.id()) ? "Owned" : null;
-		context.drawTextWithShadow(textRenderer, VeloUi.trim(type.name(), w - 12), x + 6, y + h - 25, 0xFFFFFFFF);
-		if (state != null) {
-			context.drawTextWithShadow(textRenderer, state, x + 6, y + h - 13, 0xFF8FE3A8);
-		} else {
-			int price = net.veloclient.velo.client.network.StoreClient.price(type.itemId(), type.price());
-			VeloDraw.fillCircle(context, x + 10f, y + h - 9.5f, 3.6f, 0xFFC9861A);
-			VeloDraw.fillCircle(context, x + 10f, y + h - 9.5f, 2.7f, 0xFFFFD56A);
-			context.drawTextWithShadow(textRenderer, String.format(java.util.Locale.ROOT, "%,d", price), x + 17, y + h - 13, 0xFFFFD56A);
-		}
+		String kicker = type.collection() != null && !type.collection().isBlank()
+				? "Wings · " + WingsManager.collection(type.collection()).map(WingsManager.Collection::name).orElse(type.collection()) : "Wings";
+		StoreCard.info(context, textRenderer, x, y, w, h, lift, kicker, accent, type.name(), state,
+				net.veloclient.velo.client.network.StoreClient.price(type.itemId(), type.price()));
 	}
 
 	@Override

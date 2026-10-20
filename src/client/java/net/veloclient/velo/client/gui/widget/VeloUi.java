@@ -49,22 +49,22 @@ public final class VeloUi {
 		boolean hovered = inside(mouseX, mouseY, x, y, width, height);
 		int radius = Math.min(height / 2, 6);
 		int base = switch (tone) {
-			case 1 -> theme.accentStart() | 0xFF000000;
+			// The active choice of a group (tab, filter): the launcher's white chip.
+			case 1 -> 0xFFF4F4F6;
 			case 2 -> 0xFF2E9E5B;
 			case 3 -> 0xFFC24242;
 			default -> VeloStyle.card();
 		};
-		int top = hovered ? VeloAnim.lerpArgb(base, 0xFFFFFFFF, tone == 0 ? 0.06f : 0.14f) : base;
-		int bottom = tone == 0 ? top : VeloAnim.lerpArgb(top, 0xFF000000, 0.12f);
-		VeloDraw.fillRoundedGradient(context, x, y, width, height, radius, top, bottom);
+		// 0.9.7: flat fills, hairline on neutral pills, a light lift on hover.
+		int fill = hovered ? VeloAnim.lerpArgb(base, 0xFFFFFFFF, tone == 0 ? 0.07f : 0.12f) : base;
+		VeloDraw.fillRounded(context, x, y, width, height, radius, fill);
 		if (tone == 0) {
-			VeloDraw.strokeRounded(context, x, y, width, height, radius,
-					hovered ? withAlpha(theme.accentStart(), 0xC0) : VeloStyle.border());
+			VeloDraw.strokeRounded(context, x, y, width, height, radius, hovered ? withAlpha(0xFFFFFFFF, 0x38) : VeloStyle.border());
 		}
 		var textRenderer = MinecraftClient.getInstance().textRenderer;
 		String shown = trim(label, width - 6);
 		context.drawTextWithShadow(textRenderer, shown, x + (width - textRenderer.getWidth(shown)) / 2,
-				y + (height - 8) / 2, tone == 0 ? theme.text() : tone == 1 ? theme.onAccent() : 0xFFFFFFFF);
+				y + (height - 8) / 2, tone == 0 ? theme.text() : tone == 1 ? 0xFF0B0B0E : 0xFFFFFFFF);
 		return new Hit(x, y, width, height, action);
 	}
 

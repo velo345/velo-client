@@ -35,7 +35,9 @@ public final class VeloCapeTile extends ClickableWidget {
 	private float phase = (float) (Math.random() * Math.PI * 2);
 	private long lastNanos;
 
-	private static final int BOTTOM_STRIP_HEIGHT = 20;
+	/** The name strip under the picture. */
+	public static final int NAME_H = 16;
+	private static final int BOTTOM_STRIP_HEIGHT = NAME_H;
 	// Standard vanilla cape texture template is 64x32; the back panel (what
 	// actually shows when the cape is worn) is the 10x16 region starting one
 	// pixel in from the top-left corner.
@@ -74,52 +76,48 @@ public final class VeloCapeTile extends ClickableWidget {
 
 	@Override
 	public void onClick(net.minecraft.client.gui.Click click, boolean doubled) {
-		int localY = (int) click.y() - getY();
-		if (localY < iconAreaHeight()) {
-			onToggleEquip.run();
-			return;
-		}
-		boolean leftHalf = click.x() < getX() + getWidth() / 2.0;
-		if (leftHalf) {
-			onEdit.run();
-		} else {
-			onDelete.accept(definition);
-		}
+		// Shows it on you; Equip / Edit / Delete live under the preview (launcher Locker).
+		onToggleEquip.run();
 	}
 
 	@Override
 	protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
-		Theme theme = ThemeManager.active();
 		long now = System.nanoTime();
 		float dt = VeloStyle.frameDelta(lastNanos, now);
 		hover = VeloAnim.step(hover, isHovered() ? 1f : 0f, dt);
 		phase = VeloCapeRender.advancePhase(phase, hover, dt);
 		lastNanos = now;
-		int iconHeight = iconAreaHeight();
 		int x = getX();
 		int y = getY();
 		int w = getWidth();
-
-		drawStage(context, x, y, w, iconHeight, hover, selected);
+		int h = getHeight();
+		// Same tile as the Wings / Auras tabs: graphite card, picture on a lighter well, name bottom-left,
+		// green edge + tick when worn, white edge when it's the one on the preview.
+		VeloDraw.fillRounded(context, x, y, w, h, 7, VeloAnim.lerpArgb(0xFF16161C, 0xFF1C1C23, hover));
+		VeloDraw.fillRounded(context, x + 3, y + 3, w - 6, h - NAME_H - 4, 5, VeloAnim.lerpArgb(0xFF1C1C23, 0xFF22222A, hover));
+		int edge = equipped ? 0xFF3DDC97 : selected ? 0xD0FFFFFF : VeloAnim.lerpArgb(0x14FFFFFF, 0x40FFFFFF, hover);
+		VeloDraw.strokeRounded(context, x, y, w, h, 7, edge);
+		int area = h - NAME_H - 4;
 		Identifier texture = CapeManager.textureIdentifier(definition);
-		VeloCapeRender.draw(context, texture, TEMPLATE_WIDTH, TEMPLATE_HEIGHT, x + w / 2f, y + iconHeight - 20,
-				iconHeight - 34, VeloCapeRender.idleYaw(phase, hover));
-		if (equipped) {
-			VeloUi.pill(context, x + 6, y + 6, 54, 13, "Equipped", 2, -1, -1, () -> { });
-		}
+		VeloCapeRender.draw(context, texture, TEMPLATE_WIDTH, TEMPLATE_HEIGHT, x + w / 2f, y + 3 + area - 8,
+				area - 18, VeloCapeRender.idleYaw(phase, hover));
 
 		TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-		String name = trimToWidth(definition.name(), w - 10);
-		int nameWidth = textRenderer.getWidth(name);
-		context.drawTextWithShadow(textRenderer, name, x + (w - nameWidth) / 2, y + iconHeight - 13, VeloStyle.text());
-
-		int stripY = y + iconHeight + 2;
-		int halfW = w / 2;
-		boolean editHovered = isHovered() && mouseY >= stripY && mouseX < x + halfW;
-		boolean deleteHovered = isHovered() && mouseY >= stripY && mouseX >= x + halfW;
-		VeloUi.pill(context, x, stripY, halfW - 2, BOTTOM_STRIP_HEIGHT - 2, "Edit", 0, editHovered ? mouseX : -1, editHovered ? mouseY : -1, () -> { });
-		VeloUi.pill(context, x + halfW + 2, stripY, halfW - 2, BOTTOM_STRIP_HEIGHT - 2, "Delete", deleteHovered ? 3 : 0,
-				deleteHovered ? mouseX : -1, deleteHovered ? mouseY : -1, () -> { });
+		int textY = y + h - NAME_H + 4;
+		int right = x + w - 7;
+		if (equipped) {
+			int cx = right - 6;
+			int cy = textY + 4;
+			for (int i = 0; i < 3; i++) {
+				context.fill(cx + i, cy + i - 1, cx + i + 1, cy + i + 1, 0xFF3DDC97);
+			}
+			for (int i = 0; i < 5; i++) {
+				context.fill(cx + 2 + i, cy + 1 - i, cx + 3 + i, cy + 3 - i, 0xFF3DDC97);
+			}
+			right -= 12;
+		}
+		Text name = net.veloclient.velo.client.gui.title.MenuKit.fit(textRenderer, net.veloclient.velo.client.gui.title.MenuKit.uiBold(definition.name()), right - (x + 7));
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, textRenderer, name, x + 7, textY, 0xFFF4F4F6);
 	}
 
 	/** The shared cape "stage": a card with an accent glow rising from the floor. */

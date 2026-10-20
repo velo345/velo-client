@@ -416,6 +416,9 @@ public final class WingsCatalog {
 	}
 
 	/** Saves how this pair is worn - the game reads it on its next start. */
+	/** Runs after any per-item settings change (the Locker keeps the worn loadout in step with it). */
+	public static final java.util.List<Runnable> SETTINGS_LISTENERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
 	public static void setSettings(String id, Settings settings) {
 		JsonObject o = read();
 		JsonObject perWing = o.has("perWing") && o.get("perWing").isJsonObject() ? o.getAsJsonObject("perWing") : new JsonObject();
@@ -426,6 +429,7 @@ public final class WingsCatalog {
 		}
 		o.add("perWing", perWing);
 		write(o);
+		SETTINGS_LISTENERS.forEach(Runnable::run);
 	}
 
 	private static float f(JsonObject o, String key, float fallback) {

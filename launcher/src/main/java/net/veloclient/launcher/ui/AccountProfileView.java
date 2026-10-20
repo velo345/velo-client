@@ -4,7 +4,10 @@ import java.util.function.Consumer;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import javafx.application.Platform;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -71,6 +74,12 @@ public final class AccountProfileView {
 		default void withFreshSession(java.util.function.Consumer<MinecraftSession> action) {
 			action.accept(session());
 		}
+
+		default void openLocker() {
+		}
+
+		default void openReferrals() {
+		}
 	}
 
 	private AccountProfileView() {
@@ -79,107 +88,116 @@ public final class AccountProfileView {
 	public static Node build(Host host) {
 		MinecraftSession session = host.session();
 
-		Button back = BackButton.create(null, null);
-		back.setOnAction(e -> host.goBack());
-
-		// ---- Hero: 3D model + identity ----
-		StackPane stage = CosmeticUi.stage(240, 320);
-		stage.getStyleClass().add("showcase-stage");
-		Label loading = new Label("Loading skin...");
-		loading.getStyleClass().add("page-subtitle");
-		stage.getChildren().add(loading);
-		CapeEntry equipped = CapeLibrary.equippedCapeId()
-				.flatMap(id -> CapeLibrary.listAll().stream().filter(c -> c.id().equals(id)).findFirst()).orElse(null);
-		stage.getChildren().setAll(CosmeticUi.spinner(34));
+		// ---- Banner: who you are, with you in 3D on the right ----
+		StackPane banner = new StackPane();
+		banner.setMinHeight(230);
+		banner.setStyle("-fx-background-color: radial-gradient(center 78% 40%, radius 60%, -velo-accent-glow 0%, transparent 100%),"
+				+ " linear-gradient(to bottom, -velo-surface-2, -velo-background); -fx-background-radius: 20; -fx-border-color: -velo-hairline; -fx-border-radius: 20;");
+		StackPane stage = new StackPane(CosmeticUi.spinner(30));
+		stage.setPrefSize(260, 300);
+		stage.setMaxSize(260, 300);
+		StackPane.setAlignment(stage, Pos.CENTER_RIGHT);
+		StackPane.setMargin(stage, new Insets(0, 36, 0, 0));
 		CosmeticUi.skin(session, skin -> {
-			Runnable failed = () -> {
-				loading.setText("Couldn't load your skin.");
-				stage.getChildren().setAll(loading);
-			};
 			if (skin == null) {
-				failed.run();
+				stage.getChildren().clear();
 				return;
 			}
-			// Wears everything equipped: cape, wings and aura, like on the home screen.
-			DressedPlayer.build(skin, true, 25, viewer -> {
+			DressedPlayer.build(skin, true, 22, viewer -> {
 				if (viewer != null) {
 					stage.getChildren().setAll(viewer);
 				} else {
-					failed.run();
+					stage.getChildren().clear();
 				}
 			});
 		});
+		banner.getChildren().add(stage);
 
+		Node head = Heads.head(session.uuid(), session.username(), 112);
+		StackPane headBox = new StackPane(head);
+		headBox.setStyle("-fx-border-color: -velo-accent-text; -fx-border-width: 2; -fx-border-radius: 26; -fx-background-radius: 26; -fx-padding: 4;");
+		headBox.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
 		Label name = new Label(session.username());
-		name.getStyleClass().add("profile-name");
-		Label accountChip = CosmeticUi.badge("Microsoft account", null);
-		Label javaChip = CosmeticUi.badge("Java Edition", null);
-		HBox chips = new HBox(6, accountChip, javaChip);
-
-		Label uuid = new Label(session.uuid());
-		uuid.getStyleClass().add("profile-uuid");
-		Button copyUuid = new Button("Copy");
+		name.getStyleClass().add("t-display");
+		name.setStyle("-fx-font-size: 38px;");
+		HBox badges = new HBox(8);
+		badges.setAlignment(Pos.CENTER_LEFT);
+		if (net.veloclient.launcher.social.StoreApi.isPlusCached()) {
+			javafx.scene.image.ImageView plus = new javafx.scene.image.ImageView(new javafx.scene.image.Image(
+					AccountProfileView.class.getResourceAsStream("/net/veloclient/launcher/images/velo-plus-badge.png"), 54, 26, true, true));
+			badges.getChildren().add(plus);
+		}
+		Label java = new Label("Java Edition");
+		java.getStyleClass().addAll("badge", "badge-grey");
+		Label microsoft = new Label("Microsoft account");
+		microsoft.getStyleClass().addAll("badge", "badge-grey");
+		badges.getChildren().addAll(java, microsoft);
+		long since = PlayTimeStore.get().firstRecordedEpochMillis;
+		Label line = new Label("Online" + (since > 0 ? "  ·  Velo player since "
+				+ DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH).withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(since)) : ""));
+		line.getStyleClass().add("t-body");
+		Region dot = new Region();
+		dot.getStyleClass().add("status-dot");
+		line.setGraphic(dot);
+		Button locker = new Button("Open Locker");
+		locker.setGraphic(Icons.icon("locker", 15, Color.web("#E4E4E8")));
+		locker.setOnAction(e -> host.openLocker());
+		Button invite = new Button("Invite friends");
+		invite.setGraphic(Icons.icon("gift", 15, Color.web("#2A1E02")));
+		invite.getStyleClass().add("buy-button");
+		invite.setOnAction(e -> host.openReferrals());
+		Button copyUuid = new Button("Copy UUID");
 		copyUuid.getStyleClass().add("ghost-button");
 		copyUuid.setOnAction(e -> {
 			ClipboardContent content = new ClipboardContent();
 			content.putString(session.uuid());
 			Clipboard.getSystemClipboard().setContent(content);
-			copyUuid.setText("Copied");
+			Toasts.show(copyUuid, "UUID copied");
 		});
-		HBox uuidRow = new HBox(6, uuid, copyUuid);
-		uuidRow.setAlignment(Pos.CENTER_LEFT);
-
-		String expiry = DateTimeFormatter.ofPattern("MMM d, HH:mm").withZone(ZoneId.systemDefault())
-				.format(Instant.ofEpochMilli(session.accessTokenExpiresAtEpochMillis()));
-		Label sessionLine = new Label(session.isAccessTokenExpired()
-				? "Session refreshes automatically on next launch"
-				: "Signed in  ·  session valid until " + expiry);
-		sessionLine.getStyleClass().add("page-subtitle");
-
-		Label capeLine = new Label("Cape: " + (equipped == null ? "none" : equipped.name()));
-		capeLine.getStyleClass().add("page-subtitle");
-
-		Button signOut = new Button("Sign out");
-		signOut.getStyleClass().add("danger-ghost-button");
-		signOut.setOnAction(e -> {
-			Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
-			confirm.initOwner(host.owner());
-			confirm.setTitle("Sign out");
-			confirm.setHeaderText("Sign out of " + session.username() + "?");
-			DialogStyling.apply(confirm);
-			confirm.showAndWait().filter(b -> b == ButtonType.OK).ifPresent(b -> host.signOut());
-		});
-
-		VBox identity = new VBox(10, name, chips, uuidRow, sessionLine, capeLine, signOut);
+		HBox actions = new HBox(10, locker, invite, copyUuid);
+		VBox identity = new VBox(10, name, badges, line, actions);
 		identity.setAlignment(Pos.CENTER_LEFT);
-		HBox.setHgrow(identity, Priority.ALWAYS);
+		HBox idRow = new HBox(24, headBox, identity);
+		idRow.setAlignment(Pos.CENTER_LEFT);
+		idRow.setPadding(new Insets(28, 32, 28, 32));
+		idRow.setPickOnBounds(false);
+		StackPane.setAlignment(idRow, Pos.CENTER_LEFT);
+		banner.getChildren().add(idRow);
+		Rectangle clip = new Rectangle();
+		clip.setArcWidth(40);
+		clip.setArcHeight(40);
+		clip.widthProperty().bind(banner.widthProperty());
+		clip.heightProperty().bind(banner.heightProperty());
+		banner.setClip(clip);
 
-		// Most played (launcher-tracked) next to the identity.
-		VBox mostPlayed = buildMostPlayed();
-		HBox hero = new HBox(24, stage, identity, mostPlayed);
-		hero.setAlignment(Pos.CENTER_LEFT);
-		hero.getStyleClass().add("profile-hero");
-
-		// ---- Stats ----
+		// ---- Numbers ----
 		PlayTimeStore.Data play = PlayTimeStore.get();
 		List<Instance> instances = InstanceStore.loadAll();
-		long mods = instances.stream().mapToLong(i -> countFiles(InstancePaths.modsDir(i.id()), ".jar")).sum();
-		FlowPane velo = new FlowPane(12, 12,
-				statTile("Time played", duration(PlayTimeStore.totalMillis()), "Time in game launched through Velo"),
-				statTile("Sessions", String.valueOf(PlayTimeStore.totalSessions()), null),
-				statTile("Longest session", duration(play.longestSessionMillis), null),
-				statTile("Profiles", String.valueOf(instances.size()), null),
-				statTile("Mods installed", String.valueOf(mods), "Across all profiles, including Velo's own"),
-				statTile("Capes", String.valueOf(CapeLibrary.listAll().size()), null),
-				statTile("Velo Coins", String.valueOf(CurrencyStore.balance()), null));
-		Label veloTitle = new Label("Velo");
-		veloTitle.getStyleClass().add("section-label");
+		int coins = net.veloclient.launcher.social.StoreApi.balance();
+		HBox kpis = new HBox(14,
+				kpi("Time played", duration(PlayTimeStore.totalMillis()), false),
+				kpi("Sessions", String.valueOf(PlayTimeStore.totalSessions()), false),
+				kpi("Longest session", duration(play.longestSessionMillis), false),
+				kpi("Velo Coins", coins >= 0 ? StoreTiles.format(coins) : "-", true));
+		kpis.getChildren().forEach(n -> HBox.setHgrow(n, Priority.ALWAYS));
 
-		Label worldTitle = new Label("Singleplayer  ·  from your worlds' Minecraft statistics");
-		worldTitle.getStyleClass().add("section-label");
-		FlowPane world = new FlowPane(12, 12);
+		// ---- Most played, what you wear, connections ----
+		VBox mostPlayed = buildMostPlayed();
+		HBox.setHgrow(mostPlayed, Priority.ALWAYS);
+		VBox showcase = showcase(host);
+		VBox connections = connections(host, session);
+		HBox cards = new HBox(14, mostPlayed, showcase, connections);
+
+		// ---- Singleplayer ----
+		Label worldTitle = new Label("Singleplayer");
+		worldTitle.getStyleClass().add("t-title-sm");
+		Label worldSub = new Label("From your worlds' Minecraft statistics");
+		worldSub.getStyleClass().add("t-muted");
+		HBox worldHead = new HBox(12, worldTitle, worldSub);
+		worldHead.setAlignment(Pos.BASELINE_LEFT);
+		FlowPane world = StoreTiles.grid(150, 12);
 		Label scanning = new Label("Reading world statistics...");
-		scanning.getStyleClass().add("page-subtitle");
+		scanning.getStyleClass().add("t-muted");
 		world.getChildren().add(scanning);
 		CompletableFuture.supplyAsync(() -> WorldTotals.scan(instances), Executors.newVirtualThreadPerTaskExecutor())
 				.thenAccept(totals -> Platform.runLater(() -> {
@@ -194,24 +212,154 @@ public final class AccountProfileView {
 							statTile("Jumps", compact(totals.jumps), null));
 					UiMotion.stagger(world, 10);
 				}));
-		UiMotion.stagger(velo, 10);
 
-		Label skinsTitle = new Label("Skins");
-		skinsTitle.getStyleClass().add("section-label");
-		VBox root = new VBox(18, back, hero, skinsTitle, SkinsSection.build(host), veloTitle, velo, worldTitle, world);
+		VBox root = new VBox(20, banner, kpis, cards, worldHead, world);
+		root.setPadding(new Insets(0, 4, 24, 0));
 		ScrollPane scroll = new ScrollPane(root);
 		scroll.setFitToWidth(true);
-		scroll.getStyleClass().add("scroll-pane");
+		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 		return scroll;
+	}
+
+	private static Node kpi(String label, String value, boolean gold) {
+		Label l = new Label(label);
+		l.getStyleClass().add("t-muted");
+		l.setStyle("-fx-font-size: 13px;" + (gold ? " -fx-text-fill: #c9a657;" : ""));
+		Label v = new Label(value);
+		v.getStyleClass().add("t-title");
+		if (gold) {
+			v.setStyle("-fx-text-fill: -velo-gold;");
+		}
+		VBox box = new VBox(10, l, v);
+		box.setPadding(new Insets(18));
+		box.getStyleClass().add("card");
+		if (gold) {
+			box.setStyle("-fx-background-color: rgba(247,192,74,0.06); -fx-border-color: rgba(247,192,74,0.22);");
+		}
+		box.setMaxWidth(Double.MAX_VALUE);
+		return box;
+	}
+
+	/** What you wear right now: cape, wings and aura. */
+	private static VBox showcase(Host host) {
+		Label title = new Label("Wearing");
+		title.getStyleClass().add("t-heading");
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		Label edit = new Label("Locker");
+		edit.getStyleClass().add("t-link");
+		edit.setOnMouseClicked(e -> host.openLocker());
+		HBox head = new HBox(title, spacer, edit);
+		HBox items = new HBox(10);
+		CapeEntry cape = CapeLibrary.equippedCapeId().flatMap(id -> CapeLibrary.listAll().stream().filter(c -> c.id().equals(id)).findFirst()).orElse(null);
+		var wings = net.veloclient.launcher.data.WingsCatalog.equipped() == null ? null
+				: net.veloclient.launcher.data.WingsCatalog.byId(net.veloclient.launcher.data.WingsCatalog.equipped()).orElse(null);
+		var aura = net.veloclient.launcher.data.AuraCatalog.equipped() == null ? null
+				: net.veloclient.launcher.data.AuraCatalog.byId(net.veloclient.launcher.data.AuraCatalog.equipped()).orElse(null);
+		StackPane capeArt = new StackPane();
+		if (cape != null) {
+			CosmeticUi.framesAsync(cape, frames -> {
+				if (!frames.isEmpty()) {
+					javafx.scene.image.ImageView view = new javafx.scene.image.ImageView(CosmeticUi.thumbnail("lib:" + cape.id(), frames, 120, 120));
+					view.setFitHeight(80);
+					view.setPreserveRatio(true);
+					capeArt.getChildren().setAll(view);
+				}
+			});
+		}
+		items.getChildren().add(worn(capeArt, cape == null ? "No cape" : cape.name()));
+		javafx.scene.Node wingsArt = wings == null ? new Region() : new javafx.scene.image.ImageView(new javafx.scene.image.Image(
+				net.veloclient.launcher.data.WingsCatalog.openPreview(wings.id()), 0, 74, true, true));
+		items.getChildren().add(worn(wingsArt, wings == null ? "No wings" : wings.name()));
+		javafx.scene.Node auraArt = aura == null ? new Region() : new javafx.scene.image.ImageView(
+				AuraFx.snapshot(aura.kind(), net.veloclient.launcher.data.AuraCatalog.settings(aura.id()), 104, 80));
+		items.getChildren().add(worn(auraArt, aura == null ? "No aura" : aura.name()));
+		VBox box = new VBox(12, head, items);
+		box.getStyleClass().add("card");
+		box.setPadding(new Insets(18));
+		box.setMinWidth(360);
+		return box;
+	}
+
+	private static Node worn(javafx.scene.Node art, String name) {
+		StackPane artBox = new StackPane(art);
+		artBox.setMinSize(104, 90);
+		artBox.setMaxSize(104, 90);
+		artBox.setStyle("-fx-background-color: -velo-surface-2; -fx-background-radius: 10;");
+		Label label = new Label(name);
+		label.getStyleClass().add("t-strong");
+		label.setStyle("-fx-font-size: 12px;");
+		label.setMaxWidth(104);
+		return new VBox(6, artBox, label);
+	}
+
+	/** Microsoft session, Discord link and sign out. */
+	private static VBox connections(Host host, MinecraftSession session) {
+		Label title = new Label("Connections");
+		title.getStyleClass().add("t-heading");
+		String expiry = DateTimeFormatter.ofPattern("MMM d, HH:mm", Locale.ENGLISH).withZone(ZoneId.systemDefault())
+				.format(Instant.ofEpochMilli(session.accessTokenExpiresAtEpochMillis()));
+		Node microsoft = connection("MS", "#2F6FD6", "Microsoft", session.isAccessTokenExpired() ? "Refreshes on next launch" : "Session valid until " + expiry, true);
+		Label discordStatus = new Label("Checking...");
+		discordStatus.getStyleClass().add("t-muted");
+		HBox discord = (HBox) connection("D", "#5865F2", "Discord", "", false);
+		((VBox) discord.getChildren().get(1)).getChildren().set(1, discordStatus);
+		CompletableFuture.supplyAsync(() -> {
+			try {
+				return net.veloclient.launcher.social.StoreApi.discordStatus();
+			} catch (net.veloclient.launcher.social.StoreApi.StoreError e) {
+				return null;
+			}
+		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
+			if (result != null && result.has("linked") && result.get("linked").getAsBoolean()) {
+				discordStatus.setText("Linked as " + result.get("discordName").getAsString());
+				discordStatus.setStyle("-fx-text-fill: -velo-green;");
+			} else {
+				discordStatus.setText(result == null ? "Not available" : "Not linked - link it in the Store");
+			}
+		}));
+		Region grow = new Region();
+		VBox.setVgrow(grow, Priority.ALWAYS);
+		Button signOut = new Button("Sign out");
+		signOut.getStyleClass().addAll("danger-button", "button-sm");
+		signOut.setMaxWidth(Double.MAX_VALUE);
+		signOut.setOnAction(e -> {
+			Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+			confirm.initOwner(host.owner());
+			confirm.setTitle("Sign out");
+			confirm.setHeaderText("Sign out of " + session.username() + "?");
+			DialogStyling.apply(confirm);
+			confirm.showAndWait().filter(b -> b == ButtonType.OK).ifPresent(b -> host.signOut());
+		});
+		VBox box = new VBox(14, title, microsoft, discord, grow, signOut);
+		box.getStyleClass().add("card");
+		box.setPadding(new Insets(18));
+		box.setMinWidth(260);
+		box.setPrefWidth(280);
+		return box;
+	}
+
+	private static Node connection(String letters, String color, String name, String status, boolean ok) {
+		Label badge = new Label(letters);
+		badge.setMinSize(32, 32);
+		badge.setAlignment(Pos.CENTER);
+		badge.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 8; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 12px;");
+		Label title = new Label(name);
+		title.getStyleClass().add("t-strong");
+		Label sub = new Label(status);
+		sub.setStyle(ok ? "-fx-text-fill: -velo-green; -fx-font-size: 12px;" : "-fx-text-fill: -velo-text-3; -fx-font-size: 12px;");
+		HBox row = new HBox(10, badge, new VBox(2, title, sub));
+		row.setAlignment(Pos.CENTER_LEFT);
+		return row;
 	}
 
 	private static VBox buildMostPlayed() {
 		Label title = new Label("Most played");
-		title.getStyleClass().add("section-label");
-		VBox box = new VBox(10, title);
-		box.getStyleClass().add("profile-side-card");
-		box.setMinWidth(230);
-		box.setMaxWidth(260);
+		title.getStyleClass().add("t-heading");
+		VBox box = new VBox(12, title);
+		box.getStyleClass().add("card");
+		box.setPadding(new Insets(18));
+		box.setMinWidth(240);
 		Map<String, Long> byProfile = PlayTimeStore.get().millisByProfile;
 		List<Instance> instances = InstanceStore.loadAll();
 		List<Instance> ranked = instances.stream()
@@ -236,10 +384,17 @@ public final class AccountProfileView {
 			HBox.setHgrow(spacer, Priority.ALWAYS);
 			HBox line = new HBox(name, spacer, time);
 			Region bar = new Region();
-			bar.getStyleClass().add("stat-bar");
-			bar.setPrefWidth(Math.max(8, 220.0 * millis / top));
+			bar.setStyle("-fx-background-color: -velo-accent; -fx-background-radius: 3;");
+			bar.setMinHeight(5);
+			bar.setPrefHeight(5);
+			bar.setPrefWidth(Math.max(8, 260.0 * millis / top));
 			bar.setMaxWidth(Region.USE_PREF_SIZE);
-			box.getChildren().add(new VBox(4, line, bar));
+			Region track = new Region();
+			StackPane barTrack = new StackPane(bar);
+			barTrack.setAlignment(Pos.CENTER_LEFT);
+			barTrack.setStyle("-fx-background-color: -velo-surface-3; -fx-background-radius: 3;");
+			barTrack.setMaxHeight(5);
+			box.getChildren().add(new VBox(6, line, barTrack));
 		}
 		return box;
 	}

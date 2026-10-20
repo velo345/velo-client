@@ -33,14 +33,18 @@ public final class WindowPlacement {
 	}
 
 	/** Call before {@code stage.show()}. */
-	public static void restore(Stage stage, double defaultWidth, double defaultHeight) {
+	public static void restore(Stage stage, double defaultWidth, double defaultHeight, WindowChrome chrome) {
 		Saved saved = read();
 		if (saved != null && mostlyVisible(saved)) {
-			stage.setX(saved.x());
-			stage.setY(saved.y());
-			stage.setWidth(saved.width());
-			stage.setHeight(saved.height());
-			stage.setMaximized(saved.maximized());
+			if (saved.maximized() && chrome != null) {
+				chrome.startMaximized(new Rectangle2D(saved.x(), saved.y(), saved.width(), saved.height()));
+			} else {
+				stage.setX(saved.x());
+				stage.setY(saved.y());
+				stage.setWidth(saved.width());
+				stage.setHeight(saved.height());
+				stage.setMaximized(saved.maximized());
+			}
 		} else {
 			Rectangle2D bounds = screenUnderMouse().getVisualBounds();
 			double width = Math.min(defaultWidth, bounds.getWidth() - 40);
@@ -54,7 +58,7 @@ public final class WindowPlacement {
 		double x = stage.getX();
 		double y = stage.getY();
 		stage.setOnShown(e -> Platform.runLater(() -> {
-			if (!stage.isMaximized() && (Math.abs(stage.getX() - x) > 2 || Math.abs(stage.getY() - y) > 2)) {
+			if (!stage.isMaximized() && (chrome == null || !chrome.isMaximized()) && (Math.abs(stage.getX() - x) > 2 || Math.abs(stage.getY() - y) > 2)) {
 				stage.setX(x);
 				stage.setY(y);
 			}
@@ -62,9 +66,10 @@ public final class WindowPlacement {
 	}
 
 	/** Call when the launcher closes. */
-	public static void save(Stage stage) {
+	public static void save(Stage stage, WindowChrome chrome) {
 		try {
-			Saved saved = new Saved(stage.getX(), stage.getY(), stage.getWidth(), stage.getHeight(), stage.isMaximized());
+			Rectangle2D b = chrome != null ? chrome.windowedBounds() : new Rectangle2D(stage.getX(), stage.getY(), stage.getWidth(), stage.getHeight());
+			Saved saved = new Saved(b.getMinX(), b.getMinY(), b.getWidth(), b.getHeight(), stage.isMaximized() || chrome != null && chrome.isMaximized());
 			Files.writeString(file(), GSON.toJson(saved), StandardCharsets.UTF_8);
 		} catch (Exception ignored) {
 			// Next start just centers again.

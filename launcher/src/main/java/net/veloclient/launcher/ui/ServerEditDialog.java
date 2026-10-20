@@ -2,6 +2,9 @@ package net.veloclient.launcher.ui;
 
 import javafx.geometry.Insets;
 import javafx.scene.control.ButtonType;
+import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
@@ -20,6 +23,12 @@ public final class ServerEditDialog {
 	}
 
 	private ServerEditDialog() {
+	}
+
+	private static VBox labeled(String label, javafx.scene.Node control) {
+		Label l = new Label(label);
+		l.getStyleClass().add("field-label");
+		return new VBox(6, l, control);
 	}
 
 	public static Optional<Result> show(Stage owner, String title, String initialName, String initialHost, int initialPort,
@@ -54,20 +63,20 @@ public final class ServerEditDialog {
 		instances.stream().filter(i -> i.id().equals(initialInstanceId)).findFirst()
 				.ifPresentOrElse(instanceBox::setValue, () -> instanceBox.setValue(null));
 
-		GridPane grid = new GridPane();
-		grid.setHgap(10);
-		grid.setVgap(10);
-		grid.setPadding(new Insets(16));
-		grid.addRow(0, new Label("Name"), nameField);
-		grid.addRow(1, new Label("Address"), hostField);
-		grid.addRow(2, new Label("Port"), portField);
-		grid.addRow(3, new Label("Launch with"), instanceBox);
-
-		dialog.getDialogPane().setContent(grid);
-		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+		HBox.setHgrow(hostField, javafx.scene.layout.Priority.ALWAYS);
+		portField.setPrefWidth(96);
+		HBox address = new HBox(10, labeled("Address", hostField), labeled("Port", portField));
+		HBox.setHgrow(address.getChildren().get(0), javafx.scene.layout.Priority.ALWAYS);
+		instanceBox.setMaxWidth(Double.MAX_VALUE);
+		VBox content = new VBox(18, labeled("Name", nameField), address, labeled("Launch with", instanceBox));
+		content.setPadding(new Insets(4, 0, 4, 0));
+		content.setPrefWidth(440);
+		dialog.getDialogPane().setContent(content);
+		ButtonType confirm = new ButtonType(initialHost == null || initialHost.isBlank() ? "Add server" : "Save", ButtonBar.ButtonData.OK_DONE);
+		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, confirm);
 
 		dialog.setResultConverter(button -> {
-			if (button != ButtonType.OK) {
+			if (button != confirm) {
 				return null;
 			}
 			String name = nameField.getText().isBlank() ? hostField.getText() : nameField.getText().trim();

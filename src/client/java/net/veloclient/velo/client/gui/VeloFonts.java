@@ -36,11 +36,23 @@ public final class VeloFonts {
 	private static final StyleSpriteSource[] UI_BOLD = fonts("ui_bold");
 	private static final StyleSpriteSource[] TITLE = fonts("title");
 	private static final StyleSpriteSource[] BIG = fonts("big");
+	private static final StyleSpriteSource[] DISPLAY = fonts("display");
+	private static final StyleSpriteSource[] DISPLAY_SM = fonts("display_sm");
+	private static final StyleSpriteSource[] DISPLAY_LG = fonts("display_lg");
+	private static final StyleSpriteSource[] HERO = fonts("hero");
+	private static final StyleSpriteSource[] UI_SM = fonts("ui_sm");
+	private static final StyleSpriteSource[] MONO = fonts("mono");
 	//?} else {
 	/*private static final FontDescription[] UI = fonts("ui");
+	private static final FontDescription[] HERO = fonts("hero");
+	private static final FontDescription[] UI_SM = fonts("ui_sm");
 	private static final FontDescription[] UI_BOLD = fonts("ui_bold");
 	private static final FontDescription[] TITLE = fonts("title");
 	private static final FontDescription[] BIG = fonts("big");
+	private static final FontDescription[] DISPLAY = fonts("display");
+	private static final FontDescription[] DISPLAY_SM = fonts("display_sm");
+	private static final FontDescription[] DISPLAY_LG = fonts("display_lg");
+	private static final FontDescription[] MONO = fonts("mono");
 	*///?}
 
 	private static int hudDepth;
@@ -68,7 +80,9 @@ public final class VeloFonts {
 	}
 
 	private static int scaleIndex() {
-		int scale = ClientCompat.guiScale();
+		// A dense Velo window draws at a finer scale - its text uses that scale's atlas (the HUD under it keeps the real one).
+		int scale = hudDepth == 0 && net.veloclient.velo.client.gui.window.DenseGui.active()
+				? net.veloclient.velo.client.gui.window.DenseGui.effectiveScale() : ClientCompat.guiScale();
 		return Math.max(1, Math.min(MAX_SCALE, scale)) - 1;
 	}
 
@@ -121,6 +135,12 @@ public final class VeloFonts {
 			case "tile", "ui_bold" -> UI_BOLD[scaleIndex()];
 			case "title" -> TITLE[scaleIndex()];
 			case "big" -> BIG[scaleIndex()];
+			case "display" -> DISPLAY[scaleIndex()];
+			case "display_sm" -> DISPLAY_SM[scaleIndex()];
+			case "display_lg" -> DISPLAY_LG[scaleIndex()];
+			case "hero" -> HERO[scaleIndex()];
+			case "ui_sm" -> UI_SM[scaleIndex()];
+			case "mono" -> MONO[scaleIndex()];
 			default -> fallback;
 		};
 	}

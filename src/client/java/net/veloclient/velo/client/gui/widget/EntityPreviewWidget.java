@@ -107,6 +107,12 @@ public final class EntityPreviewWidget extends ClickableWidget {
 	}
 
 	/** Draw without the default stage background (when the caller draws its own). */
+	/** Starting zoom (scroll still changes it). */
+	public EntityPreviewWidget zoom(float value) {
+		this.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, value));
+		return this;
+	}
+
 	public EntityPreviewWidget noStage() {
 		this.stage = false;
 		return this;
@@ -148,6 +154,16 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		int x2 = getX() + getWidth() - 4;
 		int y2 = getY() + getHeight() - 4;
 		int size = Math.round(Math.min(getWidth(), getHeight()) * 2 / 5f * zoom);
+		// The entity is drawn as its own picture-in-picture element, which ignores the GUI pose: map the box (dense Velo
+		// windows, the window open animation) by hand.
+		var pose = context.getMatrices();
+		org.joml.Vector2f a = pose.transformPosition(x1, y1, new org.joml.Vector2f());
+		org.joml.Vector2f b = pose.transformPosition(x2, y2, new org.joml.Vector2f());
+		size = Math.max(1, Math.round(size * pose.m00()));
+		x1 = Math.round(a.x);
+		y1 = Math.round(a.y);
+		x2 = Math.round(b.x);
+		y2 = Math.round(b.y);
 
 		drawRotatableEntity(context, x1, y1, x2, y2, size, yawDegrees, player, wings == null ? null : wings.get(), wings != null);
 

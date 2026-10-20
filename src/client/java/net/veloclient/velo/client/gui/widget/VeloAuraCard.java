@@ -42,29 +42,17 @@ public final class VeloAuraCard extends ClickableWidget {
 		int w = getWidth();
 		int h = getHeight();
 		int accent = type.accent();
-		if (hover > 0.01f) {
-			VeloDraw.shadow(context, x, y, w, h, VeloStyle.RADIUS_CARD, 10, 4, VeloUi.withAlpha(accent, Math.round(0x50 * hover)));
-		}
-		VeloDraw.fillRounded(context, x, y, w, h, VeloStyle.RADIUS_CARD, 0xFF101016);
-		VeloDraw.fillRoundedGradient(context, x, y, w, h - 30, VeloStyle.RADIUS_CARD, VeloUi.withAlpha(accent, 0x22), 0x00101016);
-		VeloDraw.strokeRounded(context, x, y, w, h, VeloStyle.RADIUS_CARD, VeloUi.withAlpha(accent, 0x40 + Math.round(0x80 * hover)));
-		int area = h - 34;
+		int lift = StoreCard.frame(context, x, y, w, h, hover, accent);
+		int area = h - StoreCard.INFO_H;
 		float scale = Math.min(area / 2.6f, w / 2.6f);
-		context.enableScissor(x + 1, y + 1, x + w - 1, y + area + 4);
+		context.enableScissor(x + 1, y - lift + 1, x + w - 1, y - lift + area - 1);
 		AuraGuiRenderer.draw(context, emitter, AuraManager.owns(type.id()) ? AuraManager.settings(type.id()) : AuraEffects.Settings.DEFAULT,
-				x + w / 2f, y + area - 2, scale);
+				x + w / 2f, y - lift + area - 6, scale);
 		context.disableScissor();
 
 		String state = type.id().equals(AuraManager.equippedId()) ? "Equipped" : AuraManager.owns(type.id()) ? "Owned" : null;
-		context.drawTextWithShadow(textRenderer, VeloUi.trim(type.name(), w - 12), x + 6, y + h - 25, 0xFFFFFFFF);
-		if (state != null) {
-			context.drawTextWithShadow(textRenderer, state, x + 6, y + h - 13, 0xFF8FE3A8);
-		} else {
-			int price = net.veloclient.velo.client.network.StoreClient.price(type.itemId(), type.price());
-			VeloDraw.fillCircle(context, x + 10f, y + h - 9.5f, 3.6f, 0xFFC9861A);
-			VeloDraw.fillCircle(context, x + 10f, y + h - 9.5f, 2.7f, 0xFFFFD56A);
-			context.drawTextWithShadow(textRenderer, String.format(java.util.Locale.ROOT, "%,d", price), x + 17, y + h - 13, 0xFFFFD56A);
-		}
+		StoreCard.info(context, textRenderer, x, y, w, h, lift, "Aura", accent, type.name(), state,
+				net.veloclient.velo.client.network.StoreClient.price(type.itemId(), type.price()));
 	}
 
 	@Override
