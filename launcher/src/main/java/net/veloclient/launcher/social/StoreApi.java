@@ -212,7 +212,7 @@ public final class StoreApi {
 		return post("/v1/plus/checkout", new JsonObject());
 	}
 
-	/** A signed proof of membership ({@code token}) for the game's Addons check (members only). */
+	/** A signed proof ({@code token}) the game checks offline - Velo+ members and players with Addons access. */
 	public static JsonObject plusToken() throws StoreError {
 		return get("/v1/plus/token");
 	}
@@ -281,6 +281,58 @@ public final class StoreApi {
 		body.addProperty("target", target);
 		body.addProperty("days", days);
 		return post("/v1/admin/store/plus", body);
+	}
+
+	// ---- Discover (World Hosting + partner servers) ----
+
+	/** Public hosted worlds: {@code worlds: [{id, name, description, hostName, version, guests, maxPlayers, ask}]}. */
+	public static JsonObject publicWorlds() throws StoreError {
+		return get("/v1/worlds/public");
+	}
+
+	/** Friends' worlds you may join (signed in). */
+	public static JsonObject joinableWorlds() throws StoreError {
+		return get("/v1/worlds/joinable");
+	}
+
+	/** Asks the host of a public world to let you in. */
+	public static JsonObject askWorld(String world) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.addProperty("world", world);
+		return post("/v1/worlds/ask", body);
+	}
+
+	/** Partner servers: {@code partners: [{id, name, address, description, versions, accent}]}. */
+	/** Reports a public world (Discover) to the Velo staff. */
+	public static void reportWorld(String worldId, String category) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.addProperty("world", worldId);
+		body.addProperty("category", category);
+		body.addProperty("reason", "");
+		post("/v1/worlds/report", body);
+	}
+
+	public static JsonObject partners() throws StoreError {
+		return get("/v1/partners");
+	}
+
+	/** Owner: the partner list, and saving it (whole list, in order). */
+	public static JsonObject adminPartners() throws StoreError {
+		return get("/v1/admin/partners");
+	}
+
+	public static JsonObject saveAdminPartners(com.google.gson.JsonArray partners) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.add("partners", partners);
+		return post("/v1/admin/partners", body);
+	}
+
+	/** Owner: gives ({@code granted}) or takes away a player's Addons access. */
+	public static JsonObject adminAddons(String target, boolean granted) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.addProperty("target", target);
+		body.addProperty("granted", granted);
+		return post("/v1/admin/store/addons", body);
 	}
 
 	/** Whether your Discord is linked ({@code linked}, {@code discordName}) and the invite link ({@code inviteUrl}). */
@@ -504,7 +556,7 @@ public final class StoreApi {
 					{"username":"mossy","joinedAt":1759000000000,"playedSeconds":7200,"rewarded":true,"coins":300}],
 					"invitedBy":null,"canRedeem":true,"redeemUntil":null}""";
 			case "/v1/admin/cosmetics" -> adminDemo();
-			case "/v1/plus/status" -> "{\"plus\":false,\"until\":0,\"price\":9.99,\"currency\":\"EUR\",\"monthlyCoins\":2000,\"periodDays\":30,\"checkoutEnabled\":true,\"addonsEnabled\":true}";
+			case "/v1/plus/status" -> "{\"plus\":false,\"until\":0,\"price\":9.99,\"currency\":\"EUR\",\"monthlyCoins\":2000,\"periodDays\":30,\"checkoutEnabled\":true}";
 			case "/v1/store/wallet" -> "{\"balance\":1340,\"owner\":true,\"owned\":[\"wings_bonedragon\",\"wings_cobweb\",\"wings_wraith\",\"wings_phoenix\",\"aura_orbit\",\"aura_ember\",\"aura_void\"]}";
 			default -> """
 					{"onlineMinutes":42,"loginClaimed":false,"loginClaimable":true,"loginCoins":12,"streak":3,"quests":[

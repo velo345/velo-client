@@ -402,6 +402,7 @@ public final class WingsCatalog {
 			o.addProperty("wingsId", id);
 		}
 		write(o);
+		SETTINGS_LISTENERS.forEach(Runnable::run);
 	}
 
 	/** How you wear this pair (as the game saved it). */

@@ -160,6 +160,14 @@ public final class AuraFx {
 	 * - exported as animated previews for the website and the owner panel by {@code AuraPreviewExport}. FX thread.
 	 */
 	public static List<javafx.scene.image.WritableImage> previewFrames(AuraEffects.Kind kind, int width, int height, int frames, int fps) {
+		return previewFrames(kind, width, height, frames, fps, 0);
+	}
+
+	/**
+	 * {@code layer}: 0 = the whole card (particles + the grey stand-in body), 1 = only the particles behind the body, 2 =
+	 * only those in front - the website lays 1 under its real 3D player and 2 over it, so no stand-in body shows.
+	 */
+	public static List<javafx.scene.image.WritableImage> previewFrames(AuraEffects.Kind kind, int width, int height, int frames, int fps, int layer) {
 		AuraEffects.Settings settings = AuraEffects.Settings.DEFAULT;
 		AuraEffects.Emitter emitter = new AuraEffects.Emitter(kind);
 		for (int i = 0; i < 120; i++) {
@@ -177,9 +185,15 @@ public final class AuraFx {
 			double angle = 0.5 + 0.35 * Math.sin(2 * Math.PI * i / frames);
 			List<Sprite> sprites = project(emitter, settings, width / 2.0, height / 2.0 - 6, focal, distance, angle);
 			clear(canvas);
-			draw(g, sprites, distance, false, true);
-			silhouette(g, width / 2.0, height / 2.0 - 6, focal / distance);
-			draw(g, sprites, distance, true, true);
+			if (layer != 2) {
+				draw(g, sprites, distance, false, true);
+			}
+			if (layer == 0) {
+				silhouette(g, width / 2.0, height / 2.0 - 6, focal / distance);
+			}
+			if (layer != 1) {
+				draw(g, sprites, distance, true, true);
+			}
 			out.add(canvas.snapshot(params, null));
 		}
 		return out;

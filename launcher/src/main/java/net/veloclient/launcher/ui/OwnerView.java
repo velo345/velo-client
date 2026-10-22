@@ -54,7 +54,7 @@ import java.util.concurrent.Executors;
  */
 public final class OwnerView {
 
-	private enum Tab { COSMETICS, BUNDLES, COLLECTIONS, PLAYERS, REPORTS }
+	private enum Tab { COSMETICS, BUNDLES, COLLECTIONS, PLAYERS, PARTNERS, REPORTS }
 
 	private static Tab tab = Tab.COSMETICS;
 	private static String filter = "all";
@@ -112,6 +112,7 @@ public final class OwnerView {
 				case BUNDLES -> bundlesTab(data, rebuild);
 				case COLLECTIONS -> collections(data, rebuild);
 				case PLAYERS -> OwnerPlayers.build(data);
+				case PARTNERS -> OwnerPartners.build();
 				case REPORTS -> OwnerReports.build();
 			});
 		}, error -> {
@@ -143,6 +144,7 @@ public final class OwnerView {
 				case BUNDLES -> new String[] {"Bundles", "box"};
 				case COLLECTIONS -> new String[] {"Collections", "grid"};
 				case PLAYERS -> new String[] {"Players", "user"};
+				case PARTNERS -> new String[] {"Partner servers", "globe"};
 				case REPORTS -> new String[] {"Reports", "shield"};
 			};
 			Label count = new Label(data == null ? "" : switch (t) {

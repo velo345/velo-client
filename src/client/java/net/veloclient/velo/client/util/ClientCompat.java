@@ -111,6 +111,12 @@ public final class ClientCompat {
 	 * Leaves whatever world/server you're in (saving singleplayer as usual) and connects to
 	 * {@code address} - used by "Join" on a friend who's playing on a server.
 	 */
+	/** The Minecraft version the game runs ("26.2"). */
+	public static String minecraftVersion() {
+		return net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("minecraft")
+				.map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("");
+	}
+
 	public static void joinServer(String address, String label) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client.world != null) {

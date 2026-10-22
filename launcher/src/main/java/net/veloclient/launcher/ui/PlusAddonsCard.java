@@ -5,14 +5,12 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import net.veloclient.launcher.data.PlusBadgeSetting;
 import net.veloclient.launcher.instance.Instance;
 import net.veloclient.launcher.instance.InstancePaths;
 import net.veloclient.launcher.launch.GameVersion;
@@ -24,9 +22,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 
 /**
- * The "Velo Client Addons" card at the top of a profile's Mods tab: Velo+ members add the Addons to this profile with one
- * button (and switch them off, on or remove them again); everyone else sees what Velo+ adds. Also the switch for showing the
- * + of Velo+ on your badge. The Addons are otherwise kept up to date by the launcher at every launch (see PlusAddons).
+ * The "Addons" card at the top of a profile's Mods tab - only for the players the owner gave the Addons to (the server
+ * says so in {@code /v1/plus/status}); for everyone else it never appears, not even as a teaser. They add the Addons
+ * to this profile with one button (and switch them off, on or remove them again); the launcher keeps them up to date at
+ * every launch (see PlusAddons).
  */
 final class PlusAddonsCard {
 
@@ -42,13 +41,11 @@ final class PlusAddonsCard {
 		badge.setAlignment(Pos.CENTER);
 		badge.setStyle("-fx-background-color: linear-gradient(to bottom right, #ff4d4d, #c2182b); -fx-background-radius: 12; -fx-text-fill: white;"
 				+ " -fx-font-size: 28px; -fx-font-weight: 900;");
-		Label title = new Label("Velo Client Addons");
+		Label title = new Label("Addons");
 		title.setStyle("-fx-font-weight: 800; -fx-font-size: 14px; -fx-text-fill: white;");
-		Label tag = new Label("VELO+");
-		tag.setStyle("-fx-background-color: #ff4d4d; -fx-background-radius: 6; -fx-padding: 1 6 1 6; -fx-font-size: 9px; -fx-font-weight: 900; -fx-text-fill: white;");
-		HBox titleRow = new HBox(8, title, tag);
+		HBox titleRow = new HBox(8, title);
 		titleRow.setAlignment(Pos.CENTER_LEFT);
-		Label detail = new Label("Checking your Velo+ ...");
+		Label detail = new Label("");
 		detail.getStyleClass().add("settings-row-hint");
 		detail.setWrapText(true);
 		VBox text = new VBox(2, titleRow, detail);
@@ -66,11 +63,6 @@ final class PlusAddonsCard {
 		remove.getStyleClass().add("ghost-button");
 		remove.setVisible(false);
 		remove.setManaged(false);
-		CheckBox showPlus = new CheckBox("Show the + of Velo+ on my badge");
-		showPlus.setSelected(PlusBadgeSetting.show());
-		showPlus.setOnAction(e -> PlusBadgeSetting.set(showPlus.isSelected()));
-		showPlus.setVisible(false);
-		showPlus.setManaged(false);
 
 		boolean[] member = {false};
 		String[] lastProblem = {null};
@@ -78,18 +70,8 @@ final class PlusAddonsCard {
 		update[0] = () -> {
 			PlusAddons.State state = PlusAddons.state(modsDir);
 			if (!member[0]) {
-				detail.setText("Extra modules for members: " + (state == PlusAddons.State.NOT_INSTALLED ? "not installed. " : "switched off - you're not a member. ")
-						+ "Get Velo+ in the Store to add them here.");
-				primary.setVisible(false);
-				primary.setManaged(false);
-				toggle.setVisible(false);
-				toggle.setManaged(false);
-				remove.setVisible(false);
-				remove.setManaged(false);
 				return;
 			}
-			showPlus.setVisible(true);
-			showPlus.setManaged(true);
 			boolean installed = state != PlusAddons.State.NOT_INSTALLED;
 			detail.setText(switch (state) {
 				case NOT_INSTALLED -> "Not in this profile - Addons are opt-in: add them with one click (then kept up to date automatically).";
@@ -155,25 +137,30 @@ final class PlusAddonsCard {
 		actions.setAlignment(Pos.CENTER_RIGHT);
 		HBox top = new HBox(12, badge, text, actions);
 		top.setAlignment(Pos.CENTER_LEFT);
-		VBox card = new VBox(8, top, showPlus);
+		VBox card = new VBox(8, top);
 		card.getStyleClass().add("mod-row");
 		card.setPadding(new Insets(10, 12, 10, 12));
 		card.setStyle("-fx-border-color: rgba(255,77,77,0.45); -fx-border-radius: 12; -fx-background-radius: 12;");
+		StackPane holder = new StackPane();
+		holder.setVisible(false);
+		holder.setManaged(false);
 
 		CompletableFuture.supplyAsync(() -> {
 			try {
-				return StoreApi.plusStatus().get("plus").getAsBoolean();
+				var status = StoreApi.plusStatus();
+				return status.has("addons") && status.get("addons").getAsBoolean();
 			} catch (Exception e) {
-				return null;
+				return false;
 			}
 		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
-			if (result == null) {
-				detail.setText("Couldn't check your Velo+ right now (offline or signed out).");
-				return;
-			}
 			member[0] = result;
-			update[0].run();
+			if (result) {
+				holder.getChildren().setAll(card);
+				holder.setVisible(true);
+				holder.setManaged(true);
+				update[0].run();
+			}
 		}));
-		return new StackPane(card);
+		return holder;
 	}
 }

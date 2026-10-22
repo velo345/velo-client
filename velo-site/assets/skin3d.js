@@ -147,11 +147,16 @@ async function player3d(container, options) {
 	canvas.className = "skin3d";
 	canvas.setAttribute("role", "img");
 	canvas.setAttribute("aria-label", "Your skin in 3D");
+	// Aura: the particles behind the player go under the canvas (the real body covers them), the rest over it.
+	const auraBack = document.createElement("img");
+	auraBack.className = "skin3d-aura back";
+	auraBack.alt = "";
+	auraBack.hidden = true;
 	const aura = document.createElement("img");
 	aura.className = "skin3d-aura";
 	aura.alt = "";
 	aura.hidden = true;
-	container.append(canvas, aura);
+	container.append(auraBack, canvas, aura);
 
 	const scene = new THREE.Scene();
 	const camera = new THREE.PerspectiveCamera(30, 1, 1, 400);
@@ -235,6 +240,14 @@ async function player3d(container, options) {
 		const frames = await gifFrames(options.fileUrl(item.files.gif));
 		const first = frames[0].canvas;
 		const tex = pixelTexture(first);
+		if (first.width >= 512) {
+			// HD art (16 texels per cape pixel) is painted, not pixel art: filter it smoothly and mipmap it, so it
+			// neither turns blocky up close nor shimmers small.
+			tex.magFilter = THREE.LinearFilter;
+			tex.minFilter = THREE.LinearMipmapLinearFilter;
+			tex.generateMipmaps = true;
+			tex.anisotropy = 8;
+		}
 		const tw = 64, th = 64 * first.height / first.width;
 		const geo = new THREE.BoxGeometry(10, 16, 1);
 		// Outside of the cape (template 1,1-11,17) faces away from the body (-z).
@@ -289,7 +302,9 @@ async function player3d(container, options) {
 		});
 		const tick = (t) => {
 			const flap = 0.28 + Math.sin(t / 420) * 0.32;
-			pivots.forEach((p) => { p.rotation.y = -p.userData.side * flap; });
+			// Each wing turns about its shoulder hinge with its tip going backwards (-z, away from the body) - the other
+			// way round swung the tips forward through the player.
+			pivots.forEach((p) => { p.rotation.y = p.userData.side * flap; });
 		};
 		return { object: back, tick };
 	}
@@ -297,6 +312,7 @@ async function player3d(container, options) {
 	async function setItem(item) {
 		if (worn) { player.remove(worn); worn = null; wornTick = null; }
 		aura.hidden = true;
+		auraBack.hidden = true;
 		if (!item) return;
 		try {
 			if (item.type === "cape" && item.files && item.files.gif) {
@@ -306,8 +322,10 @@ async function player3d(container, options) {
 				const w = await buildWings(item);
 				worn = w.object; wornTick = w.tick; player.add(worn);
 			} else if (item.type === "aura") {
-				aura.src = options.auraUrl(item.id);
+				aura.src = options.auraUrl(item.id, "front");
+				auraBack.src = options.auraUrl(item.id, "back");
 				aura.hidden = false;
+				auraBack.hidden = false;
 			}
 		} catch (e) {
 			console.warn("try-on", e);

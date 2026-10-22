@@ -55,9 +55,10 @@ public final class ElytraArt {
 		return MASK[y].charAt(x - 20) == '#';
 	}
 
-	/** Paints {@code cape} (any resolution of the 64 x 32 cape layout) into {@code out} ({@link #WIDTH} x {@link #HEIGHT}). */
+	/** Paints {@code cape} (any resolution of the 64 x 32 cape layout, or its {@link GifDecoder} cape region) into {@code out} ({@link #WIDTH} x {@link #HEIGHT}). */
 	public static void compose(NativeImage cape, NativeImage out) {
-		int sc = Math.max(1, cape.getWidth() / 64);
+		boolean region = cape.getWidth() * GifDecoder.CAPE_REGION_HEIGHT == cape.getHeight() * GifDecoder.CAPE_REGION_WIDTH;
+		int sc = Math.max(1, cape.getWidth() / (region ? GifDecoder.CAPE_REGION_WIDTH : 64));
 		int edge = darker(average(cape, sc));
 		for (int y = 0; y < HEIGHT; y++) {
 			for (int x = 0; x < WIDTH; x++) {

@@ -147,6 +147,12 @@ public final class StoreDatabase implements AutoCloseable {
 						rewarded_at INTEGER NOT NULL DEFAULT 0,
 						referrer_coins INTEGER NOT NULL DEFAULT 0)""");
 			st.execute("CREATE INDEX IF NOT EXISTS referrals_referrer ON referrals(referrer_uuid)");
+			// The Addons: only the players the owner picked (not a Velo+ perk, never advertised).
+			st.execute("""
+					CREATE TABLE IF NOT EXISTS addon_access (
+						uuid TEXT PRIMARY KEY,
+						granted_by TEXT,
+						granted_at INTEGER NOT NULL)""");
 			st.execute("""
 					CREATE TABLE IF NOT EXISTS wishlist (
 						uuid TEXT NOT NULL,
@@ -293,6 +299,35 @@ public final class StoreDatabase implements AutoCloseable {
 			}
 		}
 		return out;
+	}
+
+	// ---- Addon access ----
+
+	public synchronized java.util.Set<String> addonAccess() throws SQLException {
+		java.util.Set<String> out = new java.util.HashSet<>();
+		try (Statement st = connection.createStatement(); ResultSet rs = st.executeQuery("SELECT uuid FROM addon_access")) {
+			while (rs.next()) {
+				out.add(rs.getString(1));
+			}
+		}
+		return out;
+	}
+
+	public synchronized void setAddonAccess(String uuid, boolean granted, String grantedBy) throws SQLException {
+		if (!granted) {
+			try (PreparedStatement ps = connection.prepareStatement("DELETE FROM addon_access WHERE uuid = ?")) {
+				ps.setString(1, uuid);
+				ps.executeUpdate();
+			}
+			return;
+		}
+		try (PreparedStatement ps = connection.prepareStatement(
+				"INSERT INTO addon_access(uuid, granted_by, granted_at) VALUES(?, ?, ?) ON CONFLICT(uuid) DO NOTHING")) {
+			ps.setString(1, uuid);
+			ps.setString(2, grantedBy);
+			ps.setLong(3, System.currentTimeMillis());
+			ps.executeUpdate();
+		}
 	}
 
 	public synchronized void markPlusCoins(String uuid, long at) throws SQLException {

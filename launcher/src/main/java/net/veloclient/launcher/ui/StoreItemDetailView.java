@@ -65,7 +65,7 @@ public final class StoreItemDetailView {
 				stage.getChildren().clear();
 			}
 		};
-		CosmeticUi.framesAsync(item, f -> {
+		CosmeticUi.viewerFramesAsync(item, f -> {
 			loaded[0] = f;
 			arrived[1] = true;
 			build.run();

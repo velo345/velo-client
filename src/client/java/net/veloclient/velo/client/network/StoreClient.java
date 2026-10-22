@@ -83,7 +83,7 @@ public final class StoreClient {
 		return owner;
 	}
 
-	/** Whether you're a Velo+ member (VIP role, monthly coins, the Addons, the badge with the plus). */
+	/** Whether you're a Velo+ member (Cloud Sync, Clips Pro, Name Styles, animated custom capes, monthly coins, the badge with the plus). */
 	public static boolean plus() {
 		return plus;
 	}
@@ -428,14 +428,17 @@ public final class StoreClient {
 
 	// ---- Parsing ----
 
+	private static boolean proofFetched;
+
 	private static void applyWallet(JsonObject wallet) {
 		balance = wallet.get("balance").getAsInt();
 		owner = wallet.has("owner") && wallet.get("owner").getAsBoolean();
 		boolean wasPlus = plus;
 		plus = wallet.has("plus") && wallet.get("plus").getAsBoolean();
 		plusUntil = wallet.has("plusUntil") ? wallet.get("plusUntil").getAsLong() : 0;
-		if (plus && !wasPlus) {
-			// Just became (or just proved to be) a member: get the signed proof the Addons check at start-up.
+		if (plus && !wasPlus || !proofFetched) {
+			// Once per start, and again when you just became a member: the signed proof the offline checks use.
+			proofFetched = true;
 			net.veloclient.velo.client.plus.PlusAccess.refresh();
 		}
 		java.util.Set<String> items = new java.util.HashSet<>();

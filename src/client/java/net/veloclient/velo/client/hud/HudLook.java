@@ -34,7 +34,7 @@ public final class HudLook {
 		return style() != null;
 	}
 
-	private static String font() {
+	public static String font() {
 		HudStyleModule style = style();
 		return style == null ? "Minecraft" : style.font();
 	}
@@ -112,6 +112,15 @@ public final class HudLook {
 
 	public static int width(Text text) {
 		return MinecraftClient.getInstance().textRenderer.getWidth(text);
+	}
+
+	/** {@link #width} without rounding up - TTF glyphs have fractional widths, and centring on the rounded one leans left. */
+	public static float exactWidth(Text text) {
+		//? if <26.1 {
+		return MinecraftClient.getInstance().textRenderer.getTextHandler().getWidth(text);
+		//?} else {
+		/*return net.minecraft.client.Minecraft.getInstance().font.getSplitter().stringWidth(text);
+		*///?}
 	}
 
 	public static boolean hasBackground() {

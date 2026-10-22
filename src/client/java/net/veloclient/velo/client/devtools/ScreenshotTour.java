@@ -276,6 +276,40 @@ public final class ScreenshotTour {
 	/** Each scene = steps of {delayTicks, Runnable}. Add a scene here instead of running the whole tour. */
 	private static List<Object[]> scene(MinecraftClient client, String name) {
 		return switch (name) {
+			case "veloplus" -> {
+				var nameScreen = new net.veloclient.velo.client.gui.NameStyleScreen(null);
+				yield List.of(
+						new Object[] {0, (Runnable) () -> {
+							net.veloclient.velo.client.namestyle.NameStyles.save(net.veloclient.velo.client.namestyle.NameStyle.PRESETS.get(0).style(), true);
+						}},
+						new Object[] {5, (Runnable) () -> {
+							String me = client.player == null ? "Player" : client.player.getGameProfile().name();
+							String[] lines = {"<" + me + "> gg, that was close", "\u00a77[\u00a7cVIP\u00a77] \u00a7a" + me + "\u00a77: \u00a7fserver-coloured name",
+									"<Steve> clean", "<Alex> nice name " + me};
+							for (String line : lines) {
+								//? if <26.1 {
+								client.inGameHud.getChatHud().addMessage(net.minecraft.text.Text.literal(line));
+								//?} else {
+								/*if (client.player != null) client.player.sendSystemMessage(net.minecraft.network.chat.Component.literal(line));
+								*///?}
+							}
+						}},
+						new Object[] {20, (Runnable) () -> shot(client, "veloplus-chat")},
+						new Object[] {2, (Runnable) () -> client.setScreen(nameScreen)},
+						new Object[] {40, (Runnable) () -> shot(client, "veloplus-namestyle")},
+						new Object[] {2, (Runnable) () -> nameScreen.scrollForTour(560)},
+						new Object[] {15, (Runnable) () -> shot(client, "veloplus-namestyle-colours")},
+						new Object[] {2, (Runnable) () -> nameScreen.scrollForTour(1100)},
+						new Object[] {15, (Runnable) () -> shot(client, "veloplus-namestyle-fonts")},
+						new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.CloudSyncScreen(null))},
+						new Object[] {40, (Runnable) () -> shot(client, "veloplus-cloud")},
+						new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.WorldHostScreen(null))},
+						new Object[] {30, (Runnable) () -> shot(client, "veloplus-host")},
+						new Object[] {2, (Runnable) () -> client.setScreen(net.veloclient.velo.client.gui.WorldHostScreen.discover(null))},
+						new Object[] {40, (Runnable) () -> shot(client, "veloplus-discover")},
+						new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.media.MediaScreen(null))},
+						new Object[] {30, (Runnable) () -> shot(client, "veloplus-clips")});
+			}
 			case "rshift" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.ModMenuScreen())},
 					new Object[] {30, (Runnable) () -> shot(client, "rshift")});

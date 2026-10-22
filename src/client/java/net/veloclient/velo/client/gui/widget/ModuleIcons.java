@@ -36,16 +36,7 @@ public final class ModuleIcons {
 			"target-hud", "combo-counter", "reach-display", "pot-counter", "anti-farm-lag", "item-position",
 			"damage-numbers", "hit-sounds", "auto-gg", "height-limit", "speed-hud", "direction-hud", "arrow-counter",
 			"low-health-warning", "low-fire", "clips", "fight-recap", "party-ping", "server-overlays", "player-levels", "mode-presets", "chat-tweaks", "hopper-speed", "fast-grow", "hud-style", "wings-cosmetics", "aura-cosmetics",
-			// Velo+ Addons (tools/icons/addon_icons.json -> render_icons.py)
-			"addons-kill-switch", "air-jump", "anti-knockback", "auto-anchor", "auto-armor", "auto-cart", "auto-clicker",
-			"auto-craft", "auto-crystal", "auto-dodge", "auto-eat", "auto-excavator", "auto-extinguish", "auto-fish",
-			"auto-jump", "auto-mace", "auto-mend", "auto-mlg", "auto-pot", "auto-shield", "auto-totem", "auto-trade",
-			"auto-trigger", "auto-tunnel-miner", "auto-walk", "auto-write", "block-finder", "bow-aimbot", "cinematic-camera",
-			"criticals", "ender-chest-farmer", "enemy-armor", "entity-finder", "fast-break", "fast-place", "fly", "fly-boat",
-			"inventory-move", "jesus", "jump-boost", "kill-aura", "no-fall", "no-slow", "reach", "safe-walk", "scaffold",
-			"shield-breaker", "speed", "spider", "storage-finder", "stun-slam", "terminator", "w-tap",
-			"wall-jump", "x-ray", "elytra-mace", "firework-mace",
-			// Core modules that showed the fallback grid before (also from addon_icons.json, group Core)
+			// Core modules that showed the fallback grid before (tools/icons/module_icons.json)
 			"attack-indicator", "auto-reconnect", "chunk-load-profiler", "entity-detail", "fly-speed", "free-look",
 			"module-profiler", "nick-hider", "phantom", "render-culling", "velo-network", "screen-stretch",
 			"hide-foliage", "container-animations", "emoji-chat");
@@ -53,7 +44,18 @@ public final class ModuleIcons {
 	private ModuleIcons() {
 	}
 
+	/** Icons other jars (an add-on) bring for their own modules. */
+	private static final java.util.Map<String, Identifier> EXTRA = new java.util.concurrent.ConcurrentHashMap<>();
+
+	public static void register(String moduleId, Identifier texture) {
+		EXTRA.put(moduleId, texture);
+	}
+
 	public static Identifier textureFor(String moduleId) {
+		Identifier extra = EXTRA.get(moduleId);
+		if (extra != null) {
+			return extra;
+		}
 		return KNOWN_IDS.contains(moduleId) ? texture(moduleId) : DEFAULT;
 	}
 

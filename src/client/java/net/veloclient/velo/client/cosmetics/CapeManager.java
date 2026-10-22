@@ -121,6 +121,7 @@ public final class CapeManager {
 		net.veloclient.velo.client.network.VeloServerClient.syncSoon();
 		equippedCapeId = capeId;
 		net.veloclient.velo.config.ConfigManager.save("cosmetics-cape", new EquipState(capeId));
+		Loadouts.changed();
 	}
 
 	public static void unequip() {
@@ -157,7 +158,7 @@ public final class CapeManager {
 			while ((entry = in.getNextEntry()) != null) {
 				out.putNextEntry(new ZipEntry(entry.getName()));
 				switch (entry.getName()) {
-					case "meta.json" -> out.write(GSON.toJson(new Meta(capeId, newName, existing.sourceItemId())).getBytes(StandardCharsets.UTF_8));
+					case "meta.json" -> out.write(GSON.toJson(new Meta(capeId, newName, existing.sourceItemId(), existing.animated() && existing.sourceItemId() == null)).getBytes(StandardCharsets.UTF_8));
 					case "physics.json" -> out.write(GSON.toJson(newPreset).getBytes(StandardCharsets.UTF_8));
 					default -> in.transferTo(out);
 				}
@@ -249,7 +250,8 @@ public final class CapeManager {
 			zip.closeEntry();
 
 			zip.putNextEntry(new ZipEntry("meta.json"));
-			zip.write(GSON.toJson(new Meta(id, name, sourceItemId)).getBytes(StandardCharsets.UTF_8));
+			// No Store item: a Velo+ member's own animated cape (shared as custom:<hash>, only while they're Velo+).
+			zip.write(GSON.toJson(new Meta(id, name, sourceItemId, sourceItemId == null)).getBytes(StandardCharsets.UTF_8));
 			zip.closeEntry();
 		}
 		CapeDefinition definition = new CapeDefinition(id, name, bundleFile, preset, false, true, sourceItemId);
@@ -638,9 +640,9 @@ public final class CapeManager {
 		if (meta == null) {
 			return Optional.empty();
 		}
-		if (animated && meta.sourceItemId() == null) {
-			// Animated capes only ever come from the Velo Store (which records the item); anything
-			// else is a hand-made bundle trying to sneak one in.
+		if (animated && meta.sourceItemId() == null && !meta.custom()) {
+			// Animated capes come from the Velo Store (which records the item) or a Velo+ member's own GIF import;
+			// anything else is a hand-made bundle. (Other players only ever see a custom one while its owner is Velo+.)
 			return Optional.empty();
 		}
 		return Optional.of(new CapeDefinition(meta.id(), meta.name(), bundleFile, preset, hasElytra, animated, meta.sourceItemId()));
@@ -654,7 +656,10 @@ public final class CapeManager {
 	// - Gson leaves it null rather than failing to parse, so old bundles just
 	// come back as "not a Store cape" (accurate: they predate Store capes
 	// tracking provenance at all).
-	private record Meta(String id, String name, String sourceItemId) {
+	private record Meta(String id, String name, String sourceItemId, boolean custom) {
+		Meta(String id, String name, String sourceItemId) {
+			this(id, name, sourceItemId, false);
+		}
 	}
 
 	private record EquipState(String equippedCapeId) {

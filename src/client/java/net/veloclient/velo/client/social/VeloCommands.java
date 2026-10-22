@@ -61,12 +61,21 @@ public final class VeloCommands {
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> ClientCmd.forgetServerCommands());
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
 			dispatcher.register(root());
-			// The team's tools: /velostaff [player].
-			dispatcher.register(ClientCmd.literal("velostaff").requires(source -> SocialClient.staffLevel() != null)
+			// The team's tools: /velostaff [player] (mods and up), /velostaff clips | worlds (every staff member, helpers too).
+			dispatcher.register(ClientCmd.literal("velostaff").requires(source -> SocialClient.staffTeam() != null)
 					.executes(context -> {
-						openLater(() -> new net.veloclient.velo.client.gui.StaffScreen(null, null));
+						openLater(() -> SocialClient.staffLevel() != null ? new net.veloclient.velo.client.gui.StaffScreen(null, null)
+								: new net.veloclient.velo.client.gui.StaffModerationScreen(null, "clip"));
 						return 1;
 					})
+					.then(ClientCmd.literal("clips").executes(context -> {
+						openLater(() -> new net.veloclient.velo.client.gui.StaffModerationScreen(null, "clip"));
+						return 1;
+					}))
+					.then(ClientCmd.literal("worlds").executes(context -> {
+						openLater(() -> new net.veloclient.velo.client.gui.StaffModerationScreen(null, "world"));
+						return 1;
+					}))
 					.then(ClientCmd.argument("player", StringArgumentType.word()).suggests(PLAYERS).executes(context -> {
 						String target = context.getArgument("player", String.class);
 						openLater(() -> new net.veloclient.velo.client.gui.StaffScreen(null, target));

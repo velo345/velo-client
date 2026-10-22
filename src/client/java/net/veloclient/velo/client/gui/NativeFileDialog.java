@@ -31,21 +31,37 @@ public final class NativeFileDialog {
 		return pickFile(promptTitle, "PNG images", "png");
 	}
 
+	/** A PNG or (for animated capes) GIF image. */
+	public static Path pickImageFile(String promptTitle) throws IOException, InterruptedException {
+		return pickFile(promptTitle, "Images", "png", "gif");
+	}
+
 	/**
 	 * @param promptTitle    shown on macOS/Linux dialogs that support a custom prompt (Windows' OpenFileDialog has none)
 	 * @param filterLabel    e.g. {@code "Litematica schematics"} - shown next to the extension in the dialog's type dropdown
 	 * @param extensionNoDot the file extension to filter to, without a leading dot (e.g. {@code "litematic"})
 	 * @return the chosen file, or {@code null} if the user cancelled.
 	 */
-	public static Path pickFile(String promptTitle, String filterLabel, String extensionNoDot) throws IOException, InterruptedException {
+	public static Path pickFile(String promptTitle, String filterLabel, String... extensionsNoDot) throws IOException, InterruptedException {
 		String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
 		if (osName.contains("win")) {
-			return pickFileWindows(filterLabel, extensionNoDot);
+			return pickFileWindows(filterLabel, extensionsNoDot);
 		}
 		if (osName.contains("mac") || osName.contains("darwin")) {
-			return pickFileMac(promptTitle, extensionNoDot);
+			return pickFileMac(promptTitle, extensionsNoDot);
 		}
-		return pickFileLinux(filterLabel, extensionNoDot);
+		return pickFileLinux(filterLabel, extensionsNoDot);
+	}
+
+	private static String globs(String[] extensions, String separator) {
+		StringBuilder sb = new StringBuilder();
+		for (String extension : extensions) {
+			if (sb.length() > 0) {
+				sb.append(separator);
+			}
+			sb.append("*.").append(extension);
+		}
+		return sb.toString();
 	}
 
 	/**
@@ -54,12 +70,12 @@ public final class NativeFileDialog {
 	 * WinForms' own {@code OpenFileDialog} - a real native dialog, still
 	 * without touching AWT/Swing.
 	 */
-	private static Path pickFileWindows(String filterLabel, String extensionNoDot) throws IOException, InterruptedException {
+	private static Path pickFileWindows(String filterLabel, String[] extensions) throws IOException, InterruptedException {
 		String home = System.getProperty("user.home", ".").replace("'", "''");
 		String script = "Add-Type -AssemblyName System.Windows.Forms; " +
 				"$f = New-Object System.Windows.Forms.OpenFileDialog; " +
 				"$f.InitialDirectory = '" + home + "'; " +
-				"$f.Filter = '" + filterLabel.replace("'", "''") + " (*." + extensionNoDot + ")|*." + extensionNoDot + "'; " +
+				"$f.Filter = '" + filterLabel.replace("'", "''") + " (" + globs(extensions, ", ") + ")|" + globs(extensions, ";") + "'; " +
 				"if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.FileName }";
 		Process process = new ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-Command", script)
 				.redirectErrorStream(false).start();
@@ -68,19 +84,20 @@ public final class NativeFileDialog {
 		return output.isBlank() ? null : Path.of(output);
 	}
 
-	private static Path pickFileMac(String promptTitle, String extensionNoDot) throws IOException, InterruptedException {
-		String script = "try\nPOSIX path of (choose file with prompt \"" + promptTitle.replace("\"", "'") + "\" of type {\"" + extensionNoDot + "\"})\non error\nreturn \"\"\nend try";
+	private static Path pickFileMac(String promptTitle, String[] extensions) throws IOException, InterruptedException {
+		String types = "\"" + String.join("\", \"", extensions) + "\"";
+		String script = "try\nPOSIX path of (choose file with prompt \"" + promptTitle.replace("\"", "'") + "\" of type {" + types + "})\non error\nreturn \"\"\nend try";
 		Process process = new ProcessBuilder("osascript", "-e", script).redirectErrorStream(false).start();
 		String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
 		process.waitFor();
 		return output.isBlank() ? null : Path.of(output);
 	}
 
-	private static Path pickFileLinux(String filterLabel, String extensionNoDot) throws IOException, InterruptedException {
+	private static Path pickFileLinux(String filterLabel, String[] extensions) throws IOException, InterruptedException {
 		String home = System.getProperty("user.home", ".");
 		String[][] candidates = {
-				{"kdialog", "--getopenfilename", home, "*." + extensionNoDot + "|" + filterLabel},
-				{"zenity", "--file-selection", "--file-filter=" + filterLabel + " | *." + extensionNoDot},
+				{"kdialog", "--getopenfilename", home, globs(extensions, " ") + "|" + filterLabel},
+				{"zenity", "--file-selection", "--file-filter=" + filterLabel + " | " + globs(extensions, " ")},
 		};
 		IOException lastMissing = null;
 		for (String[] command : candidates) {

@@ -69,6 +69,12 @@ public final class VeloClientMod implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		// A Cloud Sync restore waiting for this start goes in before anything reads its settings.
+		net.veloclient.velo.client.cloud.CloudSync.applyPendingAtStartup();
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
+				client -> net.veloclient.velo.client.cloud.CloudSync.tick());
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(
+				client -> net.veloclient.velo.client.cloud.CloudSync.onStop());
 		// Before any profile loads: saved keybinds convert between GLFW (<26.3) and SDL (26.3+) codes.
 		net.veloclient.velo.profile.ModuleStateStore.currentKeyFormat = net.veloclient.velo.client.util.Keys.format();
 		net.veloclient.velo.profile.ModuleStateStore.keyConverter = net.veloclient.velo.client.util.Keys::convert;
@@ -98,6 +104,11 @@ public final class VeloClientMod implements ClientModInitializer {
 		// PvP trackers and Anti Farm Lag (each does nothing while its modules are off).
 		net.veloclient.velo.client.pvp.CombatTracker.register();
 		net.veloclient.velo.client.pvp.FightTracker.register();
+		net.veloclient.velo.client.clips.AutoClips.register();
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
+				client -> net.veloclient.velo.client.hosting.WorldHosting.tickPending());
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
+				(handler, client) -> net.veloclient.velo.client.hosting.WorldHosting.onWorldLeft());
 		net.veloclient.velo.client.serverpacks.GameSession.register();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.START_CLIENT_TICK.register(
 				client -> net.veloclient.velo.client.modules.pvp.OldAnimationsModule.tick());

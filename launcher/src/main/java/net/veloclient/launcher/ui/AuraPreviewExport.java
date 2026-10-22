@@ -37,10 +37,14 @@ public final class AuraPreviewExport {
 			Exception[] failure = new Exception[1];
 			Platform.runLater(() -> {
 				try {
-					List<WritableImage> images = AuraFx.previewFrames(AuraEffects.kind(id), size, size, frames, fps);
-					Path dir = Files.createDirectories(out.resolve(id));
-					for (int i = 0; i < images.size(); i++) {
-						ImageIO.write(SwingFXUtils.fromFXImage(images.get(i), null), "png", dir.resolve(String.format("%04d.png", i)).toFile());
+					// The card (with the stand-in body) and the website try-on's two layers (behind / in front of the player).
+					String[] names = {id, id + "-back", id + "-front"};
+					for (int layer = 0; layer < 3; layer++) {
+						List<WritableImage> images = AuraFx.previewFrames(AuraEffects.kind(id), size, size, frames, fps, layer);
+						Path dir = Files.createDirectories(out.resolve(names[layer]));
+						for (int i = 0; i < images.size(); i++) {
+							ImageIO.write(SwingFXUtils.fromFXImage(images.get(i), null), "png", dir.resolve(String.format("%04d.png", i)).toFile());
+						}
 					}
 				} catch (Exception e) {
 					failure[0] = e;

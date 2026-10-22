@@ -1,8 +1,8 @@
-"""Renders tools/icons/addon_icons.json to the module icon PNGs (112x112, white strokes on transparent - the same
+"""Renders an icon JSON (default tools/icons/module_icons.json) to the module icon PNGs (112x112, white strokes on transparent - the same
 format as the Lucide-derived module icons; the game tints them).
 
     pip install --target /tmp/pylib svgpathtools   # once (pure Python)
-    PYTHONPATH=/tmp/pylib python3 tools/icons/render_icons.py [--preview sheet.png]
+    PYTHONPATH=/tmp/pylib python3 tools/icons/render_icons.py [icons.json [out_dir]] [--preview sheet.png]
 
 Each icon is a 24x24 stroke path (stroke 2, round caps and joins). Edit the path in the JSON and run this again.
 """
@@ -49,7 +49,11 @@ def render(d):
 
 
 def main():
-    data = json.loads((ROOT / "tools/icons/addon_icons.json").read_text())["icons"]
+    args = [a for a in sys.argv[1:] if not a.startswith("--") and not a.endswith(".png")]
+    global OUT
+    if len(args) > 1:
+        OUT = ROOT / args[1]
+    data = json.loads((ROOT / (args[0] if args else "tools/icons/module_icons.json")).read_text())["icons"]
     preview = sys.argv[sys.argv.index("--preview") + 1] if "--preview" in sys.argv else None
     sheet = Image.new("RGBA", (8 * 132, ((len(data) + 7) // 8) * 132), (24, 24, 30, 255)) if preview else None
     for i, (module_id, icon) in enumerate(sorted(data.items(), key=lambda e: (e[1]["group"], e[0]))):

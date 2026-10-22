@@ -129,6 +129,17 @@ final class PartyService {
 				activity == null ? null : activity.kind(), activity == null ? null : activity.detail());
 	}
 
+	/** The other members of {@code uuid}'s party (empty when not in one) - World Hosting invites the whole party. */
+	synchronized List<String> partyMates(String uuid) {
+		Party party = party(uuid);
+		if (party == null) {
+			return List.of();
+		}
+		List<String> out = new ArrayList<>(party.members);
+		out.remove(uuid);
+		return out;
+	}
+
 	private Party party(String uuid) {
 		String id = partyOf.get(uuid);
 		return id == null ? null : parties.get(id);

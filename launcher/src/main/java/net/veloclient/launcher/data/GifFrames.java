@@ -32,8 +32,6 @@ public final class GifFrames {
 	public record Result(List<Frame> frames, int width, int height) {
 	}
 
-	/** Largest width the launcher keeps cape frames at: plenty for cards and the 3D preview, a fraction of the memory of 512 px frames. */
-	public static final int PREVIEW_WIDTH = 256;
 
 	public static Result decode(InputStream in) throws IOException {
 		return decode(in, Integer.MAX_VALUE);
@@ -46,6 +44,33 @@ public final class GifFrames {
 	 * Cosmetics instantly and one that runs out of memory.
 	 */
 	public static Result decode(InputStream in, int maxWidth) throws IOException {
+		return decode(in, canvas -> scaled(canvas, maxWidth));
+	}
+
+	/** The part of the 64 x 32 cape layout a cape uses: outside, inside and edges ({@code 22 x 17} cape pixels from the top left). */
+	public static final int CAPE_REGION_WIDTH = 22;
+	public static final int CAPE_REGION_HEIGHT = 17;
+
+	/**
+	 * A cape GIF's frames cropped to {@link #CAPE_REGION_WIDTH} x {@link #CAPE_REGION_HEIGHT} cape pixels (the rest of the
+	 * layout is never drawn - 82% of every frame), at most {@code maxScale} texture pixels per cape pixel. At its own
+	 * resolution nothing is resampled at all, so the art stays exactly as sharp as the file. See {@link #isCapeRegion}.
+	 */
+	public static Result decodeCape(InputStream in, int maxScale) throws IOException {
+		return decode(in, canvas -> {
+			int scale = Math.max(1, canvas.getWidth() / 64);
+			BufferedImage region = canvas.getSubimage(0, 0, Math.min(canvas.getWidth(), CAPE_REGION_WIDTH * scale),
+					Math.min(canvas.getHeight(), CAPE_REGION_HEIGHT * scale));
+			return scale <= maxScale ? deepCopy(region) : scaled(region, CAPE_REGION_WIDTH * maxScale);
+		});
+	}
+
+	/** Whether {@code image} is a {@link #decodeCape} crop rather than a whole 64 x 32 layout. */
+	public static boolean isCapeRegion(BufferedImage image) {
+		return image.getWidth() * CAPE_REGION_HEIGHT == image.getHeight() * CAPE_REGION_WIDTH;
+	}
+
+	private static Result decode(InputStream in, java.util.function.UnaryOperator<BufferedImage> output) throws IOException {
 		ImageReader reader = ImageIO.getImageReadersByFormatName("gif").next();
 		try (ImageInputStream iis = ImageIO.createImageInputStream(in)) {
 			reader.setInput(iis, false);
@@ -97,7 +122,7 @@ public final class GifFrames {
 				g.drawImage(frameImage, left, top, null);
 				g.dispose();
 
-				frames.add(new Frame(scaled(canvas, maxWidth), normalizeDelay(delayCentiseconds)));
+				frames.add(new Frame(output.apply(canvas), normalizeDelay(delayCentiseconds)));
 
 				if ("restoreToBackgroundColor".equals(disposal)) {
 					pendingClearRect = new int[] {left, top, frameImage.getWidth(), frameImage.getHeight()};

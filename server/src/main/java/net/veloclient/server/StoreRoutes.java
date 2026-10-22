@@ -190,7 +190,7 @@ final class StoreRoutes {
 				ADMIN_TOKEN.getBytes(StandardCharsets.UTF_8), header.getBytes(StandardCharsets.UTF_8))) {
 			return null;
 		}
-		return new SessionRegistry.Session(panelOwner, "Owner panel", SessionRegistry.KIND_WEB, null, null, null, Long.MAX_VALUE);
+		return new SessionRegistry.Session(panelOwner, "Owner panel", SessionRegistry.KIND_WEB, null, null, null, null, Long.MAX_VALUE);
 	}
 
 	static Map<String, String> query(HttpExchange exchange) {

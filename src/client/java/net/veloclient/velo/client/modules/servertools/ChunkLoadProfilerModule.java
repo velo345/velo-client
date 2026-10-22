@@ -209,7 +209,7 @@ public final class ChunkLoadProfilerModule extends AbstractModule implements Con
 		return 0xFF000000 | (r << 16) | (g << 8) | b;
 	}
 
-	/** Same mapping divergence/verification as {@code StorageFinderModule#playDiscoverySound}. */
+	/** Same mapping divergence/verification as the other discovery sounds. */
 	private static void playSlowChunkSound(MinecraftClient client) {
 		if (client.player == null) {
 			return;

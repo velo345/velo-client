@@ -424,10 +424,6 @@ stonecutter parameters {
 			replace("player.sendMessage(net.minecraft.text.Text.literal(\"Copied: \" + text), true)",
 					"player.sendSystemMessage(net.minecraft.network.chat.Component.literal(\"Copied: \" + text))")
 			// Same LocalPlayer#sendMessage(Component, boolean) -> #sendSystemMessage(Component)
-			// divergence as above, for CinematicCameraModule's own singleplayer-only warning.
-			replace("player.sendMessage(net.minecraft.text.Text.literal(\"Cinematic Camera only works in singleplayer worlds.\"), true)",
-					"player.sendSystemMessage(net.minecraft.network.chat.Component.literal(\"Cinematic Camera only works in singleplayer worlds.\"))")
-			// Same LocalPlayer#sendMessage(Component, boolean) -> #sendSystemMessage(Component)
 			// divergence, for the shared singleplayer-only warning constant - matches the call
 			// shape rather than a literal message string since any module can reuse the constant.
 			replace("sendMessage(VeloKeybinds.NO_SINGLEPLAYER_MSG, true)", "sendSystemMessage(VeloKeybinds.NO_SINGLEPLAYER_MSG)")
@@ -769,6 +765,10 @@ stonecutter parameters {
 			replace("\"getText\"", "\"getText\"")
 			replace("ClientboundSetSubtitleTextPacket", "ClientboundSetSubtitleTextPacket")
 			replace("ClientboundSetTitleTextPacket", "ClientboundSetTitleTextPacket")
+			// Name Styles' glyph hook (Font$PreparedTextBuilder) and Clips Pro's win-title hooks - real Mojmap names.
+			replace("PreparedTextBuilder", "PreparedTextBuilder")
+			replace("\"setTitleText\"", "\"setTitleText\"")
+			replace("\"setSubtitleText\"", "\"setSubtitleText\"")
 			// Real Mojmap method (LivingEntityRenderer) that the bare "RenderLayers" rule would mangle.
 			replace("shouldRenderLayers", "shouldRenderLayers")
 			// Mojmap consume effect class used by PvpCompat - the bare StatusEffect rule would
@@ -867,7 +867,7 @@ stonecutter parameters {
 			replace("getBoundingBox()", "getBoundingBox()")
 			// Same shielding trick as getBoundingBox() above, for the other real,
 			// identically-named-in-both-mappings type this codebase now uses that happens to
-			// contain "Box" as a substring (StorageFinderModule's bare `instanceof
+			// contain "Box" as a substring (a bare `instanceof
 			// ShulkerBoxBlock` - the import line itself is already handled by the longer FQN
 			// swap above, but a bare, unqualified reference to the class elsewhere isn't).
 			replace("ShulkerBoxBlock", "ShulkerBoxBlock")
@@ -1089,6 +1089,7 @@ stonecutter parameters {
 			replace("com.mojang.blaze3d.systems.RenderPass", "com.mojang.renderpearl.api.commands.RenderPass")
 			replace("com.mojang.blaze3d.textures.GpuSampler", "com.mojang.renderpearl.api.textures.GpuSampler")
 			replace("com.mojang.blaze3d.textures.GpuTextureView", "com.mojang.renderpearl.api.textures.GpuTextureView")
+			replace("com.mojang.blaze3d.textures.FilterMode", "com.mojang.renderpearl.api.textures.FilterMode")
 			replace("com.mojang.blaze3d.vulkan.glsl.GlslCompiler", "com.mojang.renderpearl.frontend.shaders.GlslCompiler")
 			replace("com.mojang.blaze3d.vulkan.glsl.ShaderCompileException", "com.mojang.renderpearl.util.ShaderCompileException")
 			replace("com.mojang.blaze3d.vulkan.VulkanDevice", "com.mojang.renderpearl.backend.vulkan.VulkanDevice")

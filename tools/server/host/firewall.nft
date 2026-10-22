@@ -23,6 +23,8 @@ table inet velo_host {
 
 		# Published by Docker (FlipSMP): web, Minecraft, Bedrock, and the other server.
 		tcp dport { 80, 443, 25565, 8192 } accept
+		# Velo World Hosting relay (raw TCP, not behind Caddy/nginx).
+		tcp dport 25600 accept
 		udp dport { 443, 19132, 25565 } accept
 	}
 }

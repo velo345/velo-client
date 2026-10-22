@@ -1,5 +1,6 @@
 package net.veloclient.velo.client.modules.utility;
 
+import net.veloclient.velo.client.namestyle.NameStyles;
 import net.veloclient.velo.client.network.VeloServerClient;
 import net.veloclient.velo.module.AbstractModule;
 import net.veloclient.velo.module.ConfigField;
@@ -42,6 +43,27 @@ public final class VeloNetworkModule extends AbstractModule implements Configura
 		return List.of(new ConfigField.ToggleField("Share Custom Cape",
 				() -> VeloServerClient.shareCustomCapes, v -> VeloServerClient.shareCustomCapes = v),
 				new ConfigField.ToggleField("Show the + of Velo+ on my badge",
-						net.veloclient.velo.client.network.PlusBadgeSetting::show, net.veloclient.velo.client.network.PlusBadgeSetting::set));
+						net.veloclient.velo.client.network.PlusBadgeSetting::show, net.veloclient.velo.client.network.PlusBadgeSetting::set),
+				// What you see of other Velo+ players' name styles (your own is set up in the Locker).
+				new ConfigField.ToggleField("Others' Name Styles", () -> NameStyles.viewer().others(), v -> {
+					var c = NameStyles.viewer();
+					NameStyles.setViewer(new NameStyles.Viewer(v, c.chat(), c.tab(), c.nameTags(), c.animate()));
+				}),
+				new ConfigField.ToggleField("Name Styles in Chat", () -> NameStyles.viewer().chat(), v -> {
+					var c = NameStyles.viewer();
+					NameStyles.setViewer(new NameStyles.Viewer(c.others(), v, c.tab(), c.nameTags(), c.animate()));
+				}),
+				new ConfigField.ToggleField("Name Styles in Tab List", () -> NameStyles.viewer().tab(), v -> {
+					var c = NameStyles.viewer();
+					NameStyles.setViewer(new NameStyles.Viewer(c.others(), c.chat(), v, c.nameTags(), c.animate()));
+				}),
+				new ConfigField.ToggleField("Name Styles Above Heads", () -> NameStyles.viewer().nameTags(), v -> {
+					var c = NameStyles.viewer();
+					NameStyles.setViewer(new NameStyles.Viewer(c.others(), c.chat(), c.tab(), v, c.animate()));
+				}),
+				new ConfigField.ToggleField("Animate Others' Names", () -> NameStyles.viewer().animate(), v -> {
+					var c = NameStyles.viewer();
+					NameStyles.setViewer(new NameStyles.Viewer(c.others(), c.chat(), c.tab(), c.nameTags(), v));
+				}));
 	}
 }

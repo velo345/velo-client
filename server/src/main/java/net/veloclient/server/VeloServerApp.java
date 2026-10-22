@@ -117,6 +117,7 @@ public final class VeloServerApp {
 		});
 		// Velo+: memberships in memory, monthly coins hourly, signed tokens + addon jars for members.
 		store.loadPlus();
+		store.loadAddonAccess();
 		store.setStaffLookup(staff::isStaff);
 		registry.setPlusLookup(store::isPlus);
 		StaffRoutes.register(server, registry, staff, social, parties, capes, store, cosmetics, discordLinks, announcer, adminToken);
@@ -124,6 +125,44 @@ public final class VeloServerApp {
 		AddonStore addonStore = new AddonStore(dataDir);
 		AddonSync addonSync = new AddonSync(addonStore, envOr("VELO_PLUS_GITHUB_REPO", "velo345/velo-client-plus"), envOr("VELO_PLUS_GITHUB_TOKEN", null));
 		PlusRoutes.register(server, registry, store, plusTokens, addonStore, addonSync, discordLinks, adminToken);
+		// Velo+ features: Cloud Sync restore points and Clips Pro share links (velo-client.com/c/<id>).
+		CloudBackupService cloud = new CloudBackupService(dataDir);
+		ClipShareService clipShares = new ClipShareService(dataDir, Long.parseLong(envOr("VELO_CLIPS_MAX_GB", "40")) * 1024 * 1024 * 1024,
+				ClipShareService.MIN_FREE_DISK, Integer.parseInt(envOr("VELO_CLIPS_RETENTION_DAYS", String.valueOf(ClipShareService.DEFAULT_RETENTION_DAYS))));
+		ModerationService moderation = new ModerationService(dataDir);
+		PlusFeatureRoutes.setModeration(moderation);
+		PlusFeatureRoutes.register(server, registry, store, cloud, clipShares, envOr("VELO_SITE_URL", "https://velo-client.com"));
+		// World Hosting: a raw TCP relay next to the HTTP API (its own port, not behind the web proxy).
+		WorldHostService worlds = new WorldHostService(social, Integer.parseInt(envOr("VELO_RELAY_PORT", "25600")),
+				envOr("VELO_RELAY_HOST", "api.velo-client.com"));
+		try {
+			worlds.start();
+		} catch (IOException e) {
+			System.out.println("[relay] Couldn't start the world hosting relay: " + e.getMessage());
+		}
+		worlds.setPartyLookup(parties::partyMates);
+		PlusFeatureRoutes.registerWorlds(server, registry, store, worlds);
+		PartnerServers partners = new PartnerServers(dataDir);
+		PlusFeatureRoutes.registerPartners(server, registry, store, partners);
+		// Partner icons + player counts for the title screen bar and Discover (clients never ping partners themselves).
+		Executors.newSingleThreadScheduledExecutor(r -> {
+			Thread t = new Thread(r, "velo-partner-ping");
+			t.setDaemon(true);
+			return t;
+		}).scheduleAtFixedRate(partners::refreshStatus, 3, 180, TimeUnit.SECONDS);
+		Executors.newSingleThreadScheduledExecutor(r -> {
+			Thread t = new Thread(r, "velo-plus-storage-sweep");
+			t.setDaemon(true);
+			return t;
+		}).scheduleAtFixedRate(() -> {
+			try {
+				long now = System.currentTimeMillis();
+				cloud.sweep(uuid -> store.wasPlusSince(uuid, now - CloudBackupService.KEEP_AFTER_PLUS_MILLIS));
+				clipShares.sweep(uuid -> store.wasPlusSince(uuid, now - ClipShareService.KEEP_AFTER_PLUS_MILLIS));
+			} catch (Exception e) {
+				System.out.println("[plus] Storage sweep failed: " + e.getMessage());
+			}
+		}, 2, 10, TimeUnit.MINUTES);
 		Executors.newSingleThreadScheduledExecutor(r -> {
 			Thread t = new Thread(r, "velo-plus-sweep");
 			t.setDaemon(true);
@@ -143,9 +182,11 @@ public final class VeloServerApp {
 			System.out.println("VELO_PLUS_GITHUB_TOKEN not set - the Addons must be uploaded by hand (POST /v1/admin/addons)");
 		}
 		if (!plusTokens.enabled()) {
-			System.out.println("VELO_PLUS_SIGNING_KEY not set - Velo+ members can't unlock the addons");
+			System.out.println("VELO_PLUS_SIGNING_KEY not set - no Velo+ proofs for the game");
 		}
 		reportService.setListener(announcer::report);
+		ModerationRoutes.register(server, registry, moderation, staff, social, store, clipShares, worlds, capes, reportService,
+				envOr("VELO_SITE_URL", "https://velo-client.com"));
 		NewsRoutes.register(server, registry, new NewsService(dataDir), reportService, store, adminToken);
 		SchematicShareService schematics = new SchematicShareService(dataDir);
 		SchematicRoutes.register(server, registry, schematics, store);
@@ -272,6 +313,8 @@ public final class VeloServerApp {
 			route.handle(exchange);
 		} catch (CapeStore.RejectedUpload e) {
 			writeErrorQuietly(exchange, e.status, e.getMessage());
+		} catch (ApiError e) {
+			writeErrorQuietly(exchange, e.status, e.getMessage());
 		} catch (SocialService.SocialException e) {
 			writeErrorQuietly(exchange, e.status, e.getMessage());
 		} catch (net.veloclient.server.store.StoreService.StoreException e) {
@@ -351,7 +394,7 @@ public final class VeloServerApp {
 				SessionRegistry.HEARTBEAT_INTERVAL_SECONDS, SessionRegistry.SESSION_TTL_MILLIS / 1000));
 	}
 
-	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId, String auraId, Boolean idle, Boolean hidePlus) {
+	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId, String auraId, Boolean idle, Boolean hidePlus, String nameStyle) {
 	}
 
 	private record HeartbeatResponse(boolean ok, int onlineCount, String capeId) {
@@ -365,7 +408,8 @@ public final class VeloServerApp {
 		}
 		SessionRegistry.Session session = registry.session(request.sessionToken());
 		// A player banned from custom capes shows none (their upload is ignored).
-		String ownCustomHash = session == null || staff != null && staff.banFor(session.uuid(), "capes") != null ? null : capes.hashFor(session.uuid());
+		String ownCustomHash = session == null || staff != null && staff.banFor(session.uuid(), "capes") != null ? null
+				: capes.hashFor(session.uuid(), store.isPlus(session.uuid()));
 		// Store capes are only shown for players who actually own them (server-side ownership).
 		String capeId = session != null && !store.mayDisplayCape(session.uuid(), request.capeId()) ? null : request.capeId();
 		// Wings are store items too ("wings_<id>"): only shown for players who bought them.
@@ -384,7 +428,9 @@ public final class VeloServerApp {
 				auraId = null;
 			}
 		}
-		SessionRegistry.Session refreshed = registry.heartbeat(request.sessionToken(), capeId, ownCustomHash, wingsId, auraId);
+		// Name styles are a Velo+ perk.
+		String nameStyle = session != null && store.isPlus(session.uuid()) ? request.nameStyle() : null;
+		SessionRegistry.Session refreshed = registry.heartbeat(request.sessionToken(), capeId, ownCustomHash, wingsId, auraId, nameStyle);
 		if (refreshed != null) {
 			stats.active(refreshed.uuid(), refreshed.kind());
 		}
@@ -450,7 +496,7 @@ public final class VeloServerApp {
 			return;
 		}
 		byte[] bytes = JsonHttp.readRawBody(exchange, CapeStore.MAX_UPLOAD_BYTES);
-		String hash = capes.store(session.uuid(), bytes);
+		String hash = capes.store(session.uuid(), bytes, store.isPlus(session.uuid()));
 		JsonHttp.writeJson(exchange, 200, new CapeUploadResponse(CapeStore.CUSTOM_PREFIX + hash));
 	}
 
@@ -469,7 +515,7 @@ public final class VeloServerApp {
 	private static void handleCapeDownload(HttpExchange exchange, CapeStore capes) throws IOException {
 		String path = exchange.getRequestURI().getPath();
 		String hash = path.substring(path.lastIndexOf('/') + 1);
-		CapeStore.StoredFile file = capes.read(hash);
+		CapeStore.StoredFile file = capes.read(hash, store::isPlus);
 		if (file == null) {
 			JsonHttp.writeError(exchange, 404, "No such cape");
 			return;

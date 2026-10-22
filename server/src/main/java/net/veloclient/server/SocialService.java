@@ -360,6 +360,16 @@ final class SocialService {
 		}
 	}
 
+	/** Everyone {@code uuid} is friends with. */
+	List<String> friendList(String uuid) {
+		lock.lock();
+		try {
+			return List.copyOf(friendsOf(uuid));
+		} finally {
+			lock.unlock();
+		}
+	}
+
 	boolean friendsWith(String a, String b) {
 		lock.lock();
 		try {

@@ -209,6 +209,9 @@ public final class LauncherApp extends Application {
 			offerClientImport();
 		}
 		installIdleMode();
+		// World Hosting: "Relaunch with matching mods" from the game.
+		net.veloclient.launcher.party.WorldRelaunch.start(instance -> launchWithProgress(instance, null, new Button(), new ProgressBar(), new Label()),
+				(title, text) -> showPlaceholderAlert(title, text));
 		net.veloclient.launcher.SingleInstance.onActivate(() -> Platform.runLater(() -> {
 			stage.setIconified(false);
 			stage.show();
@@ -663,7 +666,7 @@ public final class LauncherApp extends Application {
 				{"Library", "Page · all profiles", "profiles instances", (Runnable) this::showLibrary, "library"},
 				{"Servers", "Page", "multiplayer", (Runnable) this::showServers, "server"},
 				{"Store", "Page · wings, capes, auras", "shop buy cosmetics", (Runnable) this::showStore, "store"},
-				{"Velo+", "Store · subscription", "plus addons membership", (Runnable) this::showPlus, "crown"},
+				{"Velo+", "Store · subscription", "plus membership cloud clips name style", (Runnable) this::showPlus, "crown"},
 				{"Get coins", "Store · Velo Coins", "coins buy balance", (Runnable) this::showCoins, "store"},
 				{"Locker", "Page · your cosmetics", "cosmetics capes wings auras equip", (Runnable) this::showCosmetics, "locker"},
 				{"Skins", "Locker · change your skin", "skin change upload", (Runnable) this::showSkins, "skin"},
@@ -1396,9 +1399,69 @@ public final class LauncherApp extends Application {
 		});
 
 		VBox recent = buildHomeRecent(targets);
-		page.getChildren().addAll(top, recent);
+		// Under the launch options: partner servers and worlds to join (only shown when there are some).
+		Node discover = net.veloclient.launcher.ui.DiscoverView.build(discoverJoiner(), true);
+		page.getChildren().addAll(top, recent, discover);
 		setContent(page);
 		refreshLaunchBar();
+	}
+
+	/** Settings > Appearance: the Velo+ Home background (a picture or GIF instead of the island). */
+	private Node homeBackgroundRow() {
+		boolean plus = net.veloclient.launcher.social.StoreApi.isPlusCached();
+		java.nio.file.Path current = net.veloclient.launcher.data.HomeBackground.file();
+		VBox holder = new VBox();
+		javafx.scene.layout.StackPane preview = new javafx.scene.layout.StackPane();
+		preview.setPrefSize(112, 56);
+		preview.setMinSize(112, 56);
+		preview.setMaxSize(112, 56);
+		Rectangle round = new Rectangle(112, 56);
+		round.setArcWidth(14);
+		round.setArcHeight(14);
+		preview.setClip(round);
+		preview.setStyle("-fx-background-color: -velo-surface-2;");
+		if (current != null) {
+			preview.getChildren().add(new net.veloclient.launcher.ui.CoverImageView(new javafx.scene.image.Image(current.toUri().toString(), 224, 112, true, true, true)));
+		} else {
+			preview.getChildren().add(net.veloclient.launcher.ui.Icons.icon("image", 20, Color.web("#6E6E78")));
+		}
+		Button pick = new Button(current == null ? "Choose image or GIF" : "Change");
+		pick.setGraphic(net.veloclient.launcher.ui.Icons.icon(plus ? "image" : "lock", 15, Color.web("#E4E4E8")));
+		pick.setDisable(!plus);
+		pick.setOnAction(e -> {
+			javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+			chooser.setTitle("Home background");
+			chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("Images and GIFs", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.bmp"));
+			java.io.File file = chooser.showOpenDialog(stage);
+			if (file == null) {
+				return;
+			}
+			try {
+				net.veloclient.launcher.data.HomeBackground.set(file.toPath());
+				net.veloclient.launcher.ui.Toasts.show(pick, "Home background set");
+				showSettings();
+			} catch (Exception ex) {
+				net.veloclient.launcher.ui.Toasts.show(pick, ex.getMessage());
+			}
+		});
+		Button reset = new Button("Use the island");
+		reset.getStyleClass().add("ghost-button");
+		reset.setVisible(current != null);
+		reset.setManaged(current != null);
+		reset.setOnAction(e -> {
+			try {
+				net.veloclient.launcher.data.HomeBackground.clear();
+			} catch (Exception ignored) {
+				// Nothing to remove.
+			}
+			showSettings();
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(holder, "Home background" + (plus ? "" : " · Velo+"),
+				plus ? "Your own picture or animated GIF behind the Home card" : "Velo+ members can put their own picture or GIF on Home",
+				"It's scaled to always cover the whole card (cropped evenly, never stretched). PNG, JPG or GIF up to "
+						+ net.veloclient.launcher.data.HomeBackground.MAX_BYTES / 1024 / 1024 + " MB. Without Velo+ the island is shown.",
+				preview, reset, pick);
+		return holder.getChildren().isEmpty() ? new Region() : holder.getChildren().getFirst();
 	}
 
 	/** The big "continue playing" card: the selected profile over the 3D island, with your player standing on it. */
@@ -1413,6 +1476,17 @@ public final class LauncherApp extends Application {
 		clip.heightProperty().bind(hero.heightProperty());
 		hero.setClip(clip);
 
+		// Velo+: your own picture or GIF fills the whole card instead of the island (and the player standing on it).
+		java.nio.file.Path customBackground = net.veloclient.launcher.social.StoreApi.isPlusCached()
+				? net.veloclient.launcher.data.HomeBackground.file() : null;
+		if (customBackground != null) {
+			net.veloclient.launcher.ui.CoverImageView cover = new net.veloclient.launcher.ui.CoverImageView(
+					new javafx.scene.image.Image(customBackground.toUri().toString(), true));
+			cover.setMouseTransparent(true);
+			cover.prefWidthProperty().bind(hero.widthProperty());
+			cover.prefHeightProperty().bind(hero.heightProperty());
+			hero.getChildren().add(cover);
+		} else {
 		if (homeScenery == null) {
 			homeScenery = new net.veloclient.launcher.ui.VoxelSceneryView();
 		}
@@ -1440,6 +1514,7 @@ public final class LauncherApp extends Application {
 		StackPane.setMargin(homePlayerHolder, new Insets(0, 0, 120, 0));
 		hero.getChildren().add(homePlayerHolder);
 		loadHomePlayerModel();
+		}
 
 		Region fade = new Region();
 		fade.setMouseTransparent(true);
@@ -1959,6 +2034,8 @@ public final class LauncherApp extends Application {
 			empty.setOnMouseClicked(e -> addButton.fire());
 			list.getChildren().add(empty);
 		}
+		// Discover first: partner servers and worlds hosted with Velo.
+		list.getChildren().add(0, net.veloclient.launcher.ui.DiscoverView.build(discoverJoiner()));
 		for (SavedServer server : servers) {
 			Node row = buildServerRow(server, refreshers);
 			rows.add(new Node[] {row});
@@ -2503,6 +2580,49 @@ public final class LauncherApp extends Application {
 	}
 
 	/** "Join" on a friend: the most recently launched profile (else the newest one), straight into their server. */
+	/**
+	 * A world hosted with Velo: leave a note for the game ({@code config/pending-world-join.json}, it joins once signed
+	 * in) and launch a profile of that Minecraft version.
+	 */
+	private net.veloclient.launcher.ui.DiscoverView.Joiner discoverJoiner() {
+		return new net.veloclient.launcher.ui.DiscoverView.Joiner() {
+			@Override
+			public void server(String address, Button trigger) {
+				joinFriendServer(address, trigger, new ProgressBar(), new Label());
+			}
+
+			@Override
+			public void world(String worldId, String version, Button trigger) {
+				joinHostedWorld(worldId, version, trigger);
+			}
+		};
+	}
+
+	private void joinHostedWorld(String worldId, String version, Button trigger) {
+		List<HomeLaunchTarget> targets = orderedLaunchTargetsForHome();
+		if (targets.isEmpty()) {
+			showPlaceholderAlert("No profile yet", "Create a profile on the Home screen first.");
+			return;
+		}
+		Instance instance = targets.stream().map(HomeLaunchTarget::instance).filter(i -> version.equals(i.mcVersion())).findFirst()
+				.orElse(null);
+		if (instance == null) {
+			showPlaceholderAlert("Needs Minecraft " + version, "That world runs Minecraft " + version + " - make a " + version + " profile to join it.");
+			return;
+		}
+		try {
+			com.google.gson.JsonObject note = new com.google.gson.JsonObject();
+			note.addProperty("world", worldId);
+			note.addProperty("at", System.currentTimeMillis());
+			java.nio.file.Files.createDirectories(net.veloclient.launcher.data.VeloPaths.config());
+			java.nio.file.Files.writeString(net.veloclient.launcher.data.VeloPaths.config().resolve("pending-world-join.json"), note.toString());
+		} catch (java.io.IOException e) {
+			showPlaceholderAlert("Couldn't join", e.getMessage());
+			return;
+		}
+		launchWithProgress(instance, null, trigger, new ProgressBar(), new Label());
+	}
+
 	private void joinFriendServer(String address, Button trigger, ProgressBar progress, Label status) {
 		List<HomeLaunchTarget> targets = orderedLaunchTargetsForHome();
 		if (targets.isEmpty()) {
@@ -3742,8 +3862,8 @@ public final class LauncherApp extends Application {
 				checkForUpdates(updateStatus);
 			}
 		});
-		net.veloclient.launcher.ui.SettingsUi.row(updates, "Velo Client", "Launcher, mod and addons - updated right here, no website needed",
-				"Downloads the latest GitHub release. New mod and addons builds apply to every profile on its next launch;"
+		net.veloclient.launcher.ui.SettingsUi.row(updates, "Velo Client", "Launcher and mod - updated right here, no website needed",
+				"Downloads the latest GitHub release. New mod builds apply to every profile on its next launch;"
 						+ " a new launcher version installs itself and restarts the launcher.", updateStatus, checkButton);
 		javafx.scene.control.CheckBox minimize = new javafx.scene.control.CheckBox();
 		minimize.setSelected(net.veloclient.launcher.data.LauncherSettings.get().minimizeOnLaunch);
@@ -3781,6 +3901,7 @@ public final class LauncherApp extends Application {
 		themeButton.setOnAction(e -> showThemeEditor());
 		net.veloclient.launcher.ui.SettingsUi.row(appearance, "Your own theme", "Accent, background, corners - with a live preview",
 				"Make your own colors and share them as a code.", themeButton);
+		appearance.getChildren().add(homeBackgroundRow());
 		content.getChildren().add(1, appearance);
 
 		VBox account = net.veloclient.launcher.ui.SettingsUi.card("Account");

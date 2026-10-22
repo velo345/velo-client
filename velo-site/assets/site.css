@@ -262,7 +262,7 @@ code { font-family: var(--mono); font-size: .9em; background: rgba(255, 255, 255
 /* 3D cape (CSS): the template's six faces cut out of the animated GIF, so it plays like in game. */
 .cape3d { --k: 12px; width: calc(var(--k) * 10); height: calc(var(--k) * 16); perspective: 900px; filter: drop-shadow(0 22px 26px rgba(0, 0, 0, .65)); }
 .cape3d .rig { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; animation: cape-sway 7s ease-in-out infinite; }
-.cape3d .face { position: absolute; left: 0; top: 0; image-rendering: pixelated; background-repeat: no-repeat; background-size: calc(var(--k) * 64) calc(var(--k) * 32); backface-visibility: hidden; }
+.cape3d .face { position: absolute; left: 0; top: 0; image-rendering: auto; background-repeat: no-repeat; background-size: calc(var(--k) * 64) calc(var(--k) * 32); backface-visibility: hidden; }
 .cape3d .out { width: calc(var(--k) * 10); height: calc(var(--k) * 16); background-position: calc(var(--k) * -1) calc(var(--k) * -1); transform: translateZ(calc(var(--k) * .5)); }
 .cape3d .in { width: calc(var(--k) * 10); height: calc(var(--k) * 16); background-position: calc(var(--k) * -12) calc(var(--k) * -1); transform: rotateY(180deg) translateZ(calc(var(--k) * .5)); filter: brightness(.7); }
 .cape3d .l, .cape3d .r { width: var(--k); height: calc(var(--k) * 16); left: calc(var(--k) * 4.5); filter: brightness(.75); }
@@ -312,9 +312,6 @@ code { font-family: var(--mono); font-size: .9em; background: rgba(255, 255, 255
 .cat h3 { font-size: 19px; }
 .cat p { margin: 0; color: var(--text-2); font-size: 14.5px; }
 .ico { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; color: var(--red-soft); background: rgba(224, 38, 46, .12); box-shadow: inset 0 0 0 1px rgba(224, 38, 46, .28); }
-.addon-groups { display: flex; flex-wrap: wrap; gap: 10px; }
-.addon-groups span { display: inline-flex; align-items: center; gap: 9px; height: 40px; padding: 0 15px; border-radius: 999px; font: 600 14px Inter; background: rgba(0, 0, 0, .3); border: 1px solid var(--line-2); }
-.addon-groups i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
 
 /* ---- Themes strip ---- */
 .themes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
@@ -545,7 +542,10 @@ dialog::backdrop { background: rgba(4, 4, 6, .72); backdrop-filter: blur(8px); }
 /* ---- Try-on (WebGL viewer from skin3d.js) ---- */
 .skin3d { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: pan-y; }
 .skin3d:active { cursor: grabbing; }
+/* The aura in two layers: the particles behind the player under the 3D canvas (the body hides them), the rest over it. */
+.skin3d { z-index: 1; }
 .skin3d-aura { position: absolute; inset: 4% 12% 10%; width: 76%; height: 86%; object-fit: contain; mix-blend-mode: screen; pointer-events: none; z-index: 2; }
+.skin3d-aura.back { z-index: 0; mix-blend-mode: normal; }
 .tryon-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 3; }
 .tryon-bar input { height: 36px; width: 170px; border-radius: 10px; border: 1px solid var(--line-2); background: rgba(10, 10, 13, .85); color: var(--text); padding: 0 12px; font: 500 14px Inter; }
 .seg-mini { display: inline-flex; padding: 3px; border-radius: 11px; background: rgba(10, 10, 13, .85); border: 1px solid var(--line-2); }
@@ -553,7 +553,8 @@ dialog::backdrop { background: rgba(4, 4, 6, .72); backdrop-filter: blur(8px); }
 .seg-mini button[aria-pressed="true"] { background: rgba(224, 38, 46, .25); color: #fff; }
 .head-img { width: 32px; height: 32px; border-radius: 8px; image-rendering: pixelated; background: #1e1e26; display: block; }
 .tryon-stage { position: absolute; inset: 0; display: grid; place-items: center; }
-.tryon-hint { position: absolute; top: 14px; right: 16px; bottom: auto; left: auto; color: var(--text-3); font-size: 12.5px; }
+.detail-art .tryon-hint { position: absolute; top: 14px; right: 16px; bottom: auto; left: auto; text-align: right; color: var(--text-3); font-size: 12.5px; pointer-events: none; }
+.detail-art .hint { pointer-events: none; }
 .detail-art { overflow: hidden; }
 .signin-step { display: grid; gap: 10px; padding: 16px; border-radius: 16px; background: rgba(255, 255, 255, .025); border: 1px solid var(--line); }
 .signin-step p { margin: 0; color: var(--text-2); }

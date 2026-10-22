@@ -10,9 +10,10 @@ import java.util.function.Consumer;
  * Follows one fight at a time against another player and, when it ends, produces a
  * {@link Recap}: hits dealt and taken, crits, best combo, reach, damage both ways, a hit timeline
  * and who won. A fight starts with your first confirmed hit on a player (or the first hit you take
- * with a player close by), and ends when one of you dies, the opponent vanishes, or nobody lands a
- * hit for a few seconds. Only real players who aren't on your team count (no NPCs, no teammates), and a fight needs hits
- * both ways and some damage - anything less isn't worth a recap (or a clip) and is dropped.
+ * with a player close by). It only counts (a recap, a clip) when it really ends: one of you dies, or the server says so
+ * in chat (a kill message, "won the duel"...). Hitting a friend a few times, someone running off or logging out, or a
+ * long pause just quietly drops it - no recap, no replay. Only real players who aren't on your team count (no NPCs, no
+ * teammates), and a fight needs hits both ways and some damage.
  */
 public final class FightTracker {
 
@@ -31,7 +32,12 @@ public final class FightTracker {
 		}
 	}
 
-	private static final int END_IDLE_TICKS = 160;
+	/** No hits for this long and it's dropped (a fight that never ended isn't a match). */
+	private static final int END_IDLE_TICKS = 400;
+	/** Chat lines that end a fight when they name your opponent (or you). */
+	private static final String[] DEATH_WORDS = {"slain", "killed", "died", "was shot", "eliminated", "fell", "knocked", "blew up", "burned", "drowned",
+			"was finished", "defeated", "doomed", "pummeled", "was struck"};
+	private static final String[] WIN_WORDS = {"won the duel", "won the match", "wins the duel", "wins the match", "won the fight", "has won", "victory"};
 	private static final int MAX_RECAPS = 20;
 	private static final List<Recap> RECAPS = new ArrayList<>();
 	private static final List<Consumer<Recap>> LISTENERS = new ArrayList<>();
@@ -63,6 +69,13 @@ public final class FightTracker {
 
 	public static void register() {
 		CombatTracker.addListener(FightTracker::onHit);
+		net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.GAME.register((message, overlay) -> {
+			if (!overlay) {
+				onChat(message.getString());
+			}
+		});
+		net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.CHAT.register((message, signed, sender, params, receivedAt) ->
+				onChat(message.getString()));
 		PvpCompat.onLocalAttack(id -> {
 			synchronized (FightTracker.class) {
 				if (id == opponentId) {
@@ -122,6 +135,42 @@ public final class FightTracker {
 		}
 		EVENTS.add(new Event(System.currentTimeMillis() - startedAt, true, crit));
 		lastExchangeTick = tick;
+	}
+
+	/** A kill / death / "won the duel" line about this fight ends it for real. */
+	private static synchronized void onChat(String line) {
+		if (opponentId == Integer.MIN_VALUE || opponentName == null || line == null) {
+			return;
+		}
+		String plain = line.replaceAll("§.", "").toLowerCase(java.util.Locale.ROOT);
+		String opponent = opponentName.toLowerCase(java.util.Locale.ROOT);
+		LivingEntity self = PvpCompat.localPlayer();
+		String me = self == null ? "" : PvpCompat.name(self).toLowerCase(java.util.Locale.ROOT);
+		boolean mentionsOpponent = plain.contains(opponent);
+		boolean mentionsMe = !me.isEmpty() && plain.contains(me);
+		if (!mentionsOpponent && !mentionsMe) {
+			return;
+		}
+		for (String word : WIN_WORDS) {
+			int at = plain.indexOf(word);
+			if (at >= 0) {
+				// "<name> won the duel": whoever is named right before it won.
+				String before = plain.substring(0, at);
+				boolean iWon = mentionsMe && (!mentionsOpponent || before.lastIndexOf(me) > before.lastIndexOf(opponent));
+				finish(iWon ? Outcome.WON : Outcome.LOST);
+				return;
+			}
+		}
+		for (String word : DEATH_WORDS) {
+			int at = plain.indexOf(word);
+			if (at >= 0) {
+				// "<victim> was slain by <killer>": the name before the word died.
+				String before = plain.substring(0, at);
+				boolean opponentDied = mentionsOpponent && (!mentionsMe || before.lastIndexOf(opponent) > before.lastIndexOf(me));
+				finish(opponentDied ? Outcome.WON : Outcome.LOST);
+				return;
+			}
+		}
 	}
 
 	private static void begin(LivingEntity opponent) {
@@ -222,8 +271,9 @@ public final class FightTracker {
 				damageDealt, damageTaken, self == null ? 0 : self.getHealth(), Math.max(0, lastOpponentSeenHealth), List.copyOf(EVENTS));
 		opponentId = Integer.MIN_VALUE;
 		EVENTS.clear();
-		// A real fight goes both ways and does damage: a few one-sided taps (a teammate, a lobby with PvP off) aren't one.
-		if (exchanges < 4 || hitsDealt == 0 || hitsTaken == 0 || damageDealt + damageTaken <= 0.01f) {
+		// Only a fight that really ended (a death, or the server saying so) is a match; a real one also goes both ways and
+		// does damage - a few taps on a friend, a lobby with PvP off, or someone walking off aren't one.
+		if (outcome == Outcome.ENDED || exchanges < 4 || hitsDealt == 0 || hitsTaken == 0 || damageDealt + damageTaken <= 0.01f) {
 			return;
 		}
 		RECAPS.add(recap);

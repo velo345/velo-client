@@ -88,11 +88,14 @@ public final class ClipRecorder {
 	}
 
 	public static boolean active() {
-		return active;
+		return active || ProClipRecorder.active();
 	}
 
 	/** Seconds of footage currently buffered. */
 	public static double bufferedSeconds() {
+		if (ProClipRecorder.active()) {
+			return ProClipRecorder.bufferedSeconds();
+		}
 		synchronized (RING) {
 			return RING.size() < 2 ? 0 : (RING.getLast().nanos - RING.getFirst().nanos) / 1e9;
 		}
@@ -104,6 +107,10 @@ public final class ClipRecorder {
 
 	/** Called at the end of every rendered frame (GameRenderer#render). */
 	public static void onFrameRendered() {
+		if (ProClipRecorder.active()) {
+			ProClipRecorder.onFrameRendered();
+			return;
+		}
 		if (!active) {
 			return;
 		}
@@ -202,6 +209,10 @@ public final class ClipRecorder {
 	 * {@code done} gets the saved file, or null if there was nothing to save / it failed.
 	 */
 	public static void save(String trigger, FightTracker.Recap recap, double lastSeconds, Consumer<Path> done) {
+		if (ProClipRecorder.active()) {
+			ProClipRecorder.save(trigger, recap, lastSeconds, done);
+			return;
+		}
 		List<Frame> frames;
 		synchronized (RING) {
 			frames = new ArrayList<>(RING);

@@ -95,7 +95,7 @@ public final class CapeLibrary {
 		return new CapeEntry(id, name, bundleFile, preset, false);
 	}
 
-	/** Imports an animated GIF (a Store cape's bundled art) as a new library cape - the animated counterpart of {@link #importPng}. */
+	/** Imports an animated GIF (a Store cape's bundled art, or a Velo+ member's own GIF when {@code storeItemId} is null) as a new library cape - the animated counterpart of {@link #importPng}. */
 	public static CapeEntry importAnimatedGif(String name, InputStream gifBytes, CapePhysicsPresetData preset, String storeItemId)
 			throws IOException {
 		VeloPaths.ensureDirectories();
@@ -111,8 +111,10 @@ public final class CapeLibrary {
 			zip.closeEntry();
 
 			zip.putNextEntry(new ZipEntry("meta.json"));
-			// sourceItemId marks it as a real Store cape - the game hides animated bundles without one.
-			zip.write(GSON.toJson(new Meta(id, name, storeItemId)).getBytes(StandardCharsets.UTF_8));
+			// sourceItemId marks a Store cape; without one it's a Velo+ member's own GIF ("custom").
+			Meta meta = new Meta(id, name, storeItemId);
+			meta.custom = storeItemId == null;
+			zip.write(GSON.toJson(meta).getBytes(StandardCharsets.UTF_8));
 			zip.closeEntry();
 		}
 		return new CapeEntry(id, name, bundleFile, preset, true);
@@ -167,6 +169,9 @@ public final class CapeLibrary {
 		}
 	}
 
+	/** Runs after the equipped cape changed (the Locker keeps the worn loadout in step with it). */
+	public static final java.util.List<Runnable> EQUIP_LISTENERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
 	public static void equip(String capeId) {
 		saveEquipState(capeId);
 	}
@@ -183,6 +188,7 @@ public final class CapeLibrary {
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to save cape equip state", e);
 		}
+		EQUIP_LISTENERS.forEach(Runnable::run);
 	}
 
 	/** A bundle's metadata as of its size + modified time - every page rebuild (equip, select...) used to unzip every cape again. */
@@ -225,8 +231,8 @@ public final class CapeLibrary {
 		} catch (IOException e) {
 			return Optional.empty();
 		}
-		if (meta == null || (animated && meta.sourceItemId == null)) {
-			// Animated capes only come from the Velo Store, which records the item id.
+		if (meta == null || (animated && meta.sourceItemId == null && !meta.custom)) {
+			// Animated capes come from the Velo Store (it records the item id) or a Velo+ member's own GIF import.
 			return Optional.empty();
 		}
 		return Optional.of(new CapeEntry(meta.id, meta.name, bundleFile, preset, animated));
@@ -240,6 +246,7 @@ public final class CapeLibrary {
 		String id;
 		String name;
 		String sourceItemId;
+		boolean custom;
 
 		Meta(String id, String name, String sourceItemId) {
 			this.id = id;

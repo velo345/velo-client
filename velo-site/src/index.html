@@ -13,9 +13,9 @@
 			{"@type": "Question", "name": "Is Velo Client free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. The launcher, the client and all 108 modules are free. Velo+ and Store cosmetics are optional and never needed to play."}},
 			{"@type": "Question", "name": "Which Minecraft versions does Velo Client support?", "acceptedAnswer": {"@type": "Answer", "text": "Minecraft Java Edition 1.21.11, 26.1, 26.2 and 26.3 on Fabric. The launcher installs the right build for every profile."}},
 			{"@type": "Question", "name": "Can I keep my own mods?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Every profile is a normal Fabric instance: add mods from Modrinth inside the launcher or drop in your own jars. The Velo mod also works in any other Fabric launcher."}},
-			{"@type": "Question", "name": "Is Velo Client allowed on servers?", "acceptedAnswer": {"@type": "Answer", "text": "The core client is made for normal play on any server. Velo+ Addons that act for you only run in singleplayer and on your private servers. Always follow the rules of the server you join."}},
+			{"@type": "Question", "name": "Is Velo Client allowed on servers?", "acceptedAnswer": {"@type": "Answer", "text": "The client is made for normal play on any server. Always follow the rules of the server you join."}},
 			{"@type": "Question", "name": "Can I move over from Lunar Client, Modrinth or CurseForge?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. The launcher finds your existing Lunar, Modrinth and CurseForge setups and imports their mods, settings and servers in a few clicks."}},
-			{"@type": "Question", "name": "What is Velo+?", "acceptedAnswer": {"@type": "Answer", "text": "An optional monthly subscription: 2,000 Velo Coins every month, all 56 Velo+ Addons, the + badge next to your name and the VIP role on Discord. Cancel any time."}},
+			{"@type": "Question", "name": "What is Velo+?", "acceptedAnswer": {"@type": "Answer", "text": "An optional monthly subscription: World Hosting for your friends, Cloud Sync with restore points, Clips Pro (1080p60 replay buffer and share links), animated Name Styles, animated custom capes, 2,000 Velo Coins every month, the + badge and the VIP role on Discord. Cancel any time."}},
 			{"@type": "Question", "name": "How do I get Velo Coins?", "acceptedAnswer": {"@type": "Answer", "text": "Earn them free from daily rewards, quests and inviting friends, get them every month with Velo+, or buy a coin pack."}},
 			{"@type": "Question", "name": "Does Velo Client run on Mac?", "acceptedAnswer": {"@type": "Answer", "text": "The launcher is available for Windows and Linux. On macOS you can use the Velo mod jars in any Fabric launcher."}}
 		]}
@@ -61,7 +61,7 @@
     <div class="stats">
       <div class="card stat spot reveal" style="--i:0"><b><span data-count="{{counts.modules}}">{{counts.modules}}</span></b><span>modules, every one of them free</span></div>
       <div class="card stat spot reveal" style="--i:1"><b><span data-count="4">4</span></b><span>Minecraft versions, 1.21.11 to 26.3</span></div>
-      <div class="card stat spot reveal" style="--i:2"><b><span data-count="{{counts.addons}}">{{counts.addons}}</span><em>+</em></b><span>Velo+ Addons for singleplayer</span></div>
+      <div class="card stat spot reveal" style="--i:2"><b><span data-count="60">60</span></b><span>fps clips in 1080p with Clips Pro</span></div>
       <div class="card stat spot reveal" style="--i:3"><b><em>€</em>0</b><span>to download and play. Always.</span></div>
     </div>
   </div>
@@ -278,8 +278,8 @@
       <div class="plus-top">
         <div>
           <span class="plus-badge">VELO+</span>
-          <h2 id="plus-h">Monthly coins, {{counts.addons}} Addons and the + badge.</h2>
-          <p>Velo Coins every month, every Velo+ Addon (Cinematic Camera, Auto Tunnel Miner, Storage Finder and more), the VIP role on Discord and a red plus next to your name. Cancel any time.</p>
+          <h2 id="plus-h">Host your world, keep your setup in the cloud, clip everything.</h2>
+          <p>Cloud Sync with restore points, Clips Pro at 1080p60 with share links, World Hosting for your friends, animated Name Styles, animated custom capes, your own Home background in the launcher, Velo Coins every month and the + badge. Cancel any time.</p>
         </div>
         <div style="display:grid;gap:12px;justify-items:start">
           <span class="price">{{plus.price}}<small> / month</small></span>
@@ -309,9 +309,9 @@
       <details class="reveal"><summary>Is Velo Client free?</summary><div class="answer"><p>Yes. The launcher, the client and all {{counts.modules}} modules are free. Velo+ and Store cosmetics are optional and never needed to play.</p></div></details>
       <details class="reveal"><summary>Which Minecraft versions does Velo Client support?</summary><div class="answer"><p>Minecraft Java Edition {{minecraft.version}} on Fabric. The launcher installs the right build for every profile.</p></div></details>
       <details class="reveal"><summary>Can I keep my own mods?</summary><div class="answer"><p>Yes. Every profile is a normal Fabric instance: add mods from Modrinth inside the launcher or drop in your own jars. The Velo mod also works in any other Fabric launcher.</p></div></details>
-      <details class="reveal"><summary>Is Velo Client allowed on servers?</summary><div class="answer"><p>The core client is made for normal play on any server. Velo+ Addons that act for you only run in singleplayer and on your private servers. Always follow the rules of the server you join.</p></div></details>
+      <details class="reveal"><summary>Is Velo Client allowed on servers?</summary><div class="answer"><p>The client is made for normal play on any server. Always follow the rules of the server you join.</p></div></details>
       <details class="reveal"><summary>Can I move over from Lunar Client, Modrinth or CurseForge?</summary><div class="answer"><p>Yes. The launcher finds your existing Lunar, Modrinth and CurseForge setups and imports their mods, settings and servers in a few clicks.</p></div></details>
-      <details class="reveal"><summary>What is Velo+?</summary><div class="answer"><p>An optional monthly subscription: 2,000 Velo Coins every month, all {{counts.addons}} Velo+ Addons, the + badge next to your name and the VIP role on Discord. Cancel any time.</p></div></details>
+      <details class="reveal"><summary>What is Velo+?</summary><div class="answer"><p>An optional monthly subscription: World Hosting for your friends, Cloud Sync with restore points, Clips Pro (1080p60 replay buffer and share links), animated Name Styles, animated custom capes, {{plus.monthlyCoins}} Velo Coins every month, the + badge and the VIP role on Discord. Cancel any time.</p></div></details>
       <details class="reveal"><summary>How do I get Velo Coins?</summary><div class="answer"><p>Earn them free from daily rewards, quests and inviting friends, get them every month with Velo+, or buy a coin pack.</p></div></details>
       <details class="reveal"><summary>Does Velo Client run on Mac?</summary><div class="answer"><p>The launcher is available for Windows and Linux. On macOS you can use the Velo mod jars in any Fabric launcher.</p></div></details>
     </div>

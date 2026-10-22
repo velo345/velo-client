@@ -3,6 +3,7 @@ package net.veloclient.velo.client.gui.media;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -30,8 +31,10 @@ import java.util.stream.Stream;
 
 /**
  * Your clips and screenshots, without leaving the game: a thumbnail grid per tab and a full viewer -
- * clips play with pause, scrubbing and frame stepping (with the fight recap alongside when the clip
- * came from a fight), screenshots page with the arrow keys. Open folder and delete on both.
+ * Clips Pro clips play right here with their sound ({@link ClipPlayerPanel}: drag the timeline's end handles to trim,
+ * then save the trimmed part as a new clip or share just that part), older clips with pause, scrubbing and frame
+ * stepping; the fight recap sits alongside when the clip came from a fight. Share (Velo+) gives a link to copy or send
+ * to a Velo friend. Screenshots page with the arrow keys. Open folder and delete on both.
  */
 public final class MediaScreen extends VeloWindow {
 
@@ -55,6 +58,8 @@ public final class MediaScreen extends VeloWindow {
 	private double scroll;
 	private Item viewing;
 	private ClipPlayer clipPlayer;
+	private ClipPlayerPanel proPlayer;
+	private boolean savingTrim;
 	private boolean confirmDelete;
 	private String status;
 	private int scrubX;
@@ -87,7 +92,7 @@ public final class MediaScreen extends VeloWindow {
 		try (Stream<Path> files = Files.list(dir)) {
 			return files.filter(p -> {
 				String n = p.getFileName().toString().toLowerCase(Locale.ROOT);
-				return clip ? n.endsWith(".avi") : n.endsWith(".png") || n.endsWith(".jpg");
+				return clip ? n.endsWith(".avi") || n.endsWith(".mp4") && !n.endsWith(".tmp.mp4") : n.endsWith(".png") || n.endsWith(".jpg");
 			}).map(p -> {
 				long modified = 0;
 				try {
@@ -98,7 +103,7 @@ public final class MediaScreen extends VeloWindow {
 				Path thumb = p;
 				JsonObject meta = null;
 				if (clip) {
-					String base = p.getFileName().toString().replaceFirst("\\.avi$", "");
+					String base = p.getFileName().toString().replaceFirst("\\.(avi|mp4)$", "");
 					thumb = p.resolveSibling(base + ".jpg");
 					try {
 						Path json = p.resolveSibling(base + ".json");
@@ -125,9 +130,93 @@ public final class MediaScreen extends VeloWindow {
 		closePlayer();
 		viewing = item;
 		confirmDelete = false;
-		if (item.clip()) {
+		lastUrl = null;
+		// Clips Pro clips are real videos with sound (FFmpeg plays them here); older clips are Velo's own MJPEG files.
+		if (item.clip() && pro(item)) {
+			proPlayer = new ClipPlayerPanel(item.file().toString(), true);
+		} else if (item.clip()) {
 			clipPlayer = new ClipPlayer(item.file());
 		}
+	}
+
+	private static boolean pro(Item item) {
+		return item.file().getFileName().toString().endsWith(".mp4");
+	}
+
+	private boolean sharing;
+	/** The link just made (a trimmed part isn't kept in the clip's sidecar). */
+	private String lastUrl;
+	/** The share choices (copy the link, or send it to a friend) are open. */
+	private boolean sharePanel;
+
+	/** Copy link, or one click per friend (online first) to send it in Velo friends chat. */
+	private void renderSharePanel(DrawContext context, int mouseX, int mouseY, int right, int top) {
+		String url = lastUrl != null ? lastUrl : net.veloclient.velo.client.clips.ClipShare.sharedUrl(viewing.meta());
+		if (url == null) {
+			sharePanel = false;
+			return;
+		}
+		var state = net.veloclient.velo.client.network.SocialClient.snapshot();
+		List<net.veloclient.velo.client.network.SocialClient.Friend> friends = state == null ? List.of()
+				: state.friends.stream().sorted(java.util.Comparator.comparing((net.veloclient.velo.client.network.SocialClient.Friend f) -> !f.online)
+						.thenComparing(f -> f.username.toLowerCase(Locale.ROOT))).limit(8).toList();
+		int w = 230;
+		int h = 66 + Math.max(1, friends.size()) * 22;
+		int x = right - w;
+		VeloDraw.shadow(context, x, top, w, h, 8, 14, 4, 0x66000000);
+		VeloDraw.fillRounded(context, x, top, w, h, 8, 0xF7131318);
+		VeloDraw.strokeRounded(context, x, top, w, h, 8, 0x30FFFFFF);
+		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(url, w - 16), x + 8, top + 8, VeloUi.muted());
+		hits.add(iconPill(context, x + 8, top + 22, w - 16, "copy", "Copy link", 1, mouseX, mouseY, () -> {
+			MinecraftClient.getInstance().keyboard.setClipboard(url);
+			status = "Link copied: " + url;
+			sharePanel = false;
+		}));
+		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(retentionNote(viewing.meta()), w - 16), x + 8, top + 48, 0xFF8A8A95);
+		int fy = top + 62;
+		if (friends.isEmpty()) {
+			context.drawTextWithShadow(this.textRenderer, "Add friends to send it to them.", x + 8, fy + 4, VeloUi.muted());
+		}
+		for (var friend : friends) {
+			String label = (friend.online ? "● " : "") + "Send to " + friend.username;
+			hits.add(iconPill(context, x + 8, fy, w - 16, "send", VeloUi.trim(label, w - 50), 0, mouseX, mouseY, () -> {
+				sharePanel = false;
+				status = "Sending to " + friend.username + "...";
+				String text = "Check out my clip: " + url;
+				net.veloclient.velo.client.network.SocialClient.sendMessage(friend.uuid, text).thenAccept(error ->
+						this.client.execute(() -> status = error == null ? "Sent to " + friend.username : "Couldn't send: " + error));
+			}));
+			fy += 22;
+		}
+	}
+
+	private void share() {
+		if (sharing || viewing == null) {
+			return;
+		}
+		String known = lastUrl != null ? lastUrl : net.veloclient.velo.client.clips.ClipShare.sharedUrl(viewing.meta());
+		if (known != null && (proPlayer == null || !proPlayer.trimmed() || lastUrl != null)) {
+			sharePanel = !sharePanel;
+			return;
+		}
+		sharing = true;
+		Item item = viewing;
+		double from = proPlayer != null && proPlayer.trimmed() ? proPlayer.trimFrom() : -1;
+		double to = proPlayer != null && proPlayer.trimmed() ? proPlayer.trimTo() : -1;
+		net.veloclient.velo.client.clips.ClipShare.share(item.file(), item.meta(), from, to, line -> status = line, url -> {
+			sharing = false;
+			if (url != null) {
+				lastUrl = url;
+				status = "Link copied: " + url;
+				sharePanel = true;
+				reload();
+				for (Item fresh : clips) {
+					if (fresh.file().equals(item.file()) && viewing != null && viewing.file().equals(item.file())) {
+						viewing = fresh;
+					}
+				}
+			}
+		});
 	}
 
 	private void closePlayer() {
@@ -135,6 +224,48 @@ public final class MediaScreen extends VeloWindow {
 			clipPlayer.release();
 			clipPlayer = null;
 		}
+		if (proPlayer != null) {
+			proPlayer.release();
+			proPlayer = null;
+		}
+	}
+
+	/** Saves the part between the trim handles as a new clip next to the original (thumbnail and details too). */
+	private void saveTrimmed() {
+		if (savingTrim || proPlayer == null || !proPlayer.trimmed()) {
+			return;
+		}
+		savingTrim = true;
+		Item item = viewing;
+		double from = proPlayer.trimFrom();
+		double to = proPlayer.trimTo();
+		status = "Saving the trimmed part...";
+		Thread.ofVirtual().name("velo-clip-trim").start(() -> {
+			String result;
+			try {
+				String base = item.file().getFileName().toString().replaceFirst("\\.mp4$", "");
+				String name = base + "-trim-" + System.currentTimeMillis() / 1000;
+				Path out = item.file().resolveSibling(name + ".mp4");
+				net.veloclient.velo.client.clips.core.ClipTools.trim(net.veloclient.velo.client.clips.FfmpegTool.binary(), item.file(), out, from, to);
+				net.veloclient.velo.client.clips.core.ClipTools.thumbnail(net.veloclient.velo.client.clips.FfmpegTool.binary(), out, (to - from) * 2 / 3,
+						out.resolveSibling(name + ".jpg"));
+				JsonObject meta = item.meta() == null ? new JsonObject() : item.meta().deepCopy();
+				meta.remove("shareUrl");
+				meta.remove("shareExpires");
+				meta.addProperty("seconds", to - from);
+				meta.addProperty("trimmedFrom", item.file().getFileName().toString());
+				Files.writeString(out.resolveSibling(name + ".json"), meta.toString(), StandardCharsets.UTF_8);
+				result = "Saved the trimmed clip (" + Math.round(to - from) + "s)";
+			} catch (Exception e) {
+				result = "Couldn't trim: " + e.getMessage();
+			}
+			String message = result;
+			MinecraftClient.getInstance().execute(() -> {
+				savingTrim = false;
+				status = message;
+				reload();
+			});
+		});
 	}
 
 	@Override
@@ -168,7 +299,9 @@ public final class MediaScreen extends VeloWindow {
 		Path folder = clipsTab ? ClipRecorder.clipsDir() : FabricLoader.getInstance().getGameDir().resolve("screenshots");
 		hits.add(VeloUi.pill(context, x + width - 100, y, 100, 20, "Open folder", 0, mouseX, mouseY, () -> openFolder(folder)));
 		String hint = clipsTab
-				? (ClipRecorder.active() ? String.format(Locale.ROOT, "Recording - %.0fs buffered. Save with the Clips key.", ClipRecorder.bufferedSeconds())
+				? (!net.veloclient.velo.client.clips.ProClipRecorder.status().isEmpty() ? net.veloclient.velo.client.clips.ProClipRecorder.status()
+						: ClipRecorder.active() ? String.format(Locale.ROOT, "%s - %.0fs buffered. Save with the Clips key.",
+								net.veloclient.velo.client.clips.ProClipRecorder.active() ? "Clips Pro recording" : "Recording", ClipRecorder.bufferedSeconds())
 						: "Turn on the Clips module to keep the last 30 seconds ready to save.")
 				: "F2 takes a screenshot.";
 		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(hint, width - 360), x + 256, y + 6, VeloUi.muted());
@@ -244,10 +377,26 @@ public final class MediaScreen extends VeloWindow {
 		int y = contentY();
 		int width = contentWidth();
 		hits.add(VeloUi.pill(context, x, y, 70, 20, "< Back", 0, mouseX, mouseY, this::backToGallery));
-		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(label(viewing), width - 330), x + 80, y + 6, theme.text());
-		hits.add(VeloUi.pill(context, x + width - 210, y, 100, 20, "Open folder", 0, mouseX, mouseY,
+		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(label(viewing), width - (proPlayer != null && proPlayer.trimmed() ? 540 : 420)), x + 80, y + 6, theme.text());
+		hits.add(iconPill(context, x + width - 214, y, 100, "mods_folder", "Folder", 0, mouseX, mouseY,
 				() -> openFolder(viewing.file().getParent())));
-		hits.add(VeloUi.pill(context, x + width - 104, y, 104, 20, confirmDelete ? "Really delete?" : "Delete", 3, mouseX, mouseY, this::delete));
+		if (viewing.clip()) {
+			boolean member = net.veloclient.velo.client.namestyle.NameStyles.plus();
+			boolean trimmed = proPlayer != null && proPlayer.trimmed();
+			String shareLabel = !member ? "Share · Velo+" : sharing ? "Sharing..." : trimmed ? "Share part" : "Share";
+			hits.add(iconPill(context, x + width - 324, y, 104, "share", shareLabel, 1, mouseX, mouseY, () -> {
+				if (member) {
+					share();
+				} else {
+					status = "Share links are part of Velo+ (shared clips stay online for "
+							+ net.veloclient.velo.client.clips.core.ClipTools.DEFAULT_RETENTION_DAYS + " days)";
+				}
+			}));
+			if (trimmed) {
+				hits.add(iconPill(context, x + width - 444, y, 114, "scissors", savingTrim ? "Saving..." : "Save trimmed", 1, mouseX, mouseY, this::saveTrimmed));
+			}
+		}
+		hits.add(iconPill(context, x + width - 108, y, 108, "trash", confirmDelete ? "Really delete?" : "Delete", 3, mouseX, mouseY, this::delete));
 
 		boolean recap = viewing.clip() && viewing.meta() != null && viewing.meta().has("recap");
 		int sideW = recap ? 170 : 0;
@@ -256,7 +405,16 @@ public final class MediaScreen extends VeloWindow {
 		int areaW = width - (recap ? sideW + 10 : 0);
 		int areaH = contentBottom() - areaY - (viewing.clip() ? 30 : 26);
 		VeloDraw.fillRounded(context, areaX, areaY, areaW, areaH, 6, 0xFF0B0B0F);
-		if (viewing.clip()) {
+		if (viewing.clip() && pro(viewing) && proPlayer != null) {
+			proPlayer.render(context, this.textRenderer, areaX, areaY, areaW, contentBottom() - areaY - 14, mouseX, mouseY);
+			if (status == null) {
+				String hint = "Space play/pause · ←/→ 5s · M mute · drag the timeline's ends to trim";
+				context.drawTextWithShadow(this.textRenderer, VeloUi.trim(hint, areaW), x, contentBottom() + 4, 0xFF6E6E78);
+			}
+			if (recap) {
+				renderRecap(context, viewing.meta().getAsJsonObject("recap"), x + width - sideW, areaY, sideW);
+			}
+		} else if (viewing.clip()) {
 			MediaTextures.Tex tex = clipPlayer == null ? null : clipPlayer.frame();
 			if (tex != null) {
 				MediaTextures.drawFit(context, tex, areaX + 2, areaY + 2, areaW - 4, areaH - 4);
@@ -291,6 +449,14 @@ public final class MediaScreen extends VeloWindow {
 		}
 		if (status != null) {
 			context.drawTextWithShadow(this.textRenderer, status, x, contentBottom() + 4, VeloUi.muted());
+		}
+		if (sharePanel && viewing != null) {
+			// Drawn last and its buttons checked first (hits are tried in order, so move them to the front).
+			int before = hits.size();
+			renderSharePanel(context, mouseX, mouseY, x + width - 216, y + 24);
+			List<VeloUi.Hit> panel = new ArrayList<>(hits.subList(before, hits.size()));
+			hits.subList(before, hits.size()).clear();
+			hits.addAll(0, panel);
 		}
 	}
 
@@ -354,7 +520,30 @@ public final class MediaScreen extends VeloWindow {
 		view(screenshots.get(next));
 	}
 
+	/** "Online until 21 Dec - shared clips are deleted after 60 days" (Velo+ shares are kept two months). */
+	private static String retentionNote(JsonObject meta) {
+		long expires = meta != null && meta.has("shareExpires") ? meta.get("shareExpires").getAsLong() : 0;
+		int days = net.veloclient.velo.client.clips.core.ClipTools.DEFAULT_RETENTION_DAYS;
+		if (expires > 0) {
+			return "Online until " + DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH).withZone(ZoneId.systemDefault())
+					.format(Instant.ofEpochMilli(expires)) + " · then deleted";
+		}
+		return "Shared clips stay online for " + days + " days";
+	}
+
+	/** A pill button with an icon in front of its label. */
+	private VeloUi.Hit iconPill(DrawContext context, int x, int y, int w, String icon, String label, int tone, int mouseX, int mouseY, Runnable action) {
+		VeloUi.Hit hit = VeloUi.pill(context, x, y, w, 20, "", tone, mouseX, mouseY, action);
+		int labelW = this.textRenderer.getWidth(label);
+		int total = 12 + 5 + labelW;
+		int ix = x + (w - total) / 2;
+		net.veloclient.velo.client.gui.title.MenuKit.icon(context, icon, ix, y + 4, 12, 0xFFFFFFFF);
+		context.drawTextWithShadow(this.textRenderer, label, ix + 17, y + 6, 0xFFFFFFFF);
+		return hit;
+	}
+
 	private void backToGallery() {
+		sharePanel = false;
 		closePlayer();
 		viewing = null;
 		confirmDelete = false;
@@ -373,7 +562,7 @@ public final class MediaScreen extends VeloWindow {
 			MediaTextures.forget(item.thumbnail());
 			Files.deleteIfExists(item.file());
 			if (item.clip()) {
-				String base = item.file().getFileName().toString().replaceFirst("\\.avi$", "");
+				String base = item.file().getFileName().toString().replaceFirst("\\.(avi|mp4)$", "");
 				Files.deleteIfExists(item.file().resolveSibling(base + ".jpg"));
 				Files.deleteIfExists(item.file().resolveSibling(base + ".json"));
 			}
@@ -394,6 +583,9 @@ public final class MediaScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseClicked(Click click, boolean doubled) {
+		if (proPlayer != null && !sharePanel && proPlayer.mouseClicked(click.x(), click.y())) {
+			return true;
+		}
 		if (viewing != null && viewing.clip() && clipPlayer != null
 				&& VeloUi.inside(click.x(), click.y(), scrubX - 4, scrubY - 6, scrubW + 8, 18)) {
 			scrubbing = true;
@@ -411,6 +603,9 @@ public final class MediaScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+		if (proPlayer != null && proPlayer.mouseDragged(click.x(), click.y())) {
+			return true;
+		}
 		if (scrubbing && clipPlayer != null) {
 			clipPlayer.seek((click.x() - scrubX) / Math.max(1, scrubW));
 			return true;
@@ -420,6 +615,9 @@ public final class MediaScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseReleased(Click click) {
+		if (proPlayer != null) {
+			proPlayer.mouseReleased();
+		}
 		scrubbing = false;
 		return super.mouseReleased(click);
 	}
@@ -438,6 +636,9 @@ public final class MediaScreen extends VeloWindow {
 		if (viewing != null) {
 			if (key == net.veloclient.velo.client.util.Keys.ESCAPE) {
 				backToGallery();
+				return true;
+			}
+			if (proPlayer != null && proPlayer.keyPressed(key)) {
 				return true;
 			}
 			if (key == net.veloclient.velo.client.util.Keys.SPACE && clipPlayer != null) {

@@ -315,10 +315,11 @@ public final class PlayerSkin3DView {
 	private record CapeModel(Group node, Rotate swing, PhongMaterial material) {
 	}
 
-	/** Builds the cape (texture in the standard 64x32 layout at any resolution, upscaled to about {@code textureWidth}) hinged at y=0. */
+	/** Builds the cape (texture in the standard 64x32 layout - or its {@link GifFrames#decodeCape} crop - at any resolution, upscaled to about {@code textureWidth}) hinged at y=0. */
 	private static CapeModel capeModel(BufferedImage image, int textureWidth) {
-		double texW = 64;
-		double texH = 64.0 * image.getHeight() / Math.max(1, image.getWidth());
+		boolean region = GifFrames.isCapeRegion(image);
+		double texW = region ? GifFrames.CAPE_REGION_WIDTH : 64;
+		double texH = region ? GifFrames.CAPE_REGION_HEIGHT : 64.0 * image.getHeight() / Math.max(1, image.getWidth());
 		MeshView mesh = new MeshView(buildBoxMesh(0, 0, 10, 16, 1, texW, texH));
 		PhongMaterial material = new PhongMaterial();
 		material.setDiffuseMap(capeTexture(image, textureWidth));
@@ -335,8 +336,9 @@ public final class PlayerSkin3DView {
 
 	/**
 	 * Texture widths. A still cape is one texture, so it gets 2048 px (at 512 an HD cape looked softer than in game).
-	 * Animated capes keep a texture per frame: their frames are already 256 px, so 512 keeps them crisp - they were
-	 * 1024 (2 MB each, 80 MB per 40-frame cape). Thumbnails only need about twice their on-screen size; they used the
+	 * Animated capes keep a texture per frame: their frames are cape-region crops at the file's own resolution (352 px
+	 * for a 1024 px cape), taken as they are - no resampling, so nothing blurs. Whole 1024 px layouts were 2 MB each,
+	 * 80 MB per 40-frame cape. Thumbnails only need about twice their on-screen size; they used the
 	 * 2048 path, so hovering one animated tile built 40 x 8 MB textures on the UI thread.
 	 */
 	private static final int STILL_TEXTURE_WIDTH = 2048;

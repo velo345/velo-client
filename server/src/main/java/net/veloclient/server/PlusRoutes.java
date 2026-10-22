@@ -11,10 +11,11 @@ import java.util.Map;
  * Velo+ (the subscription):
  * <ul>
  * <li>{@code GET /v1/plus/status}, {@code POST /v1/plus/checkout} - signed in</li>
- * <li>{@code GET /v1/plus/token} - a signed proof of membership for the game (members only)</li>
- * <li>{@code GET /v1/plus/addons}, {@code GET /v1/plus/addons/file?mc=} - the Velo Client Addons jars (members only)</li>
+ * <li>{@code GET /v1/plus/token} - a signed proof of membership for the game (members and Addons players)</li>
+ * <li>{@code GET /v1/plus/addons}, {@code GET /v1/plus/addons/file?mc=} - the Addons jars, only for players the owner
+ * gave them to (everyone else gets a plain 404, as if the route didn't exist)</li>
  * <li>{@code POST /v1/admin/addons?mc=&version=} - upload a jar ({@code X-Velo-Admin-Token})</li>
- * <li>{@code POST /v1/admin/store/plus}, {@code GET /v1/admin/discord/links} - owner / bot</li>
+ * <li>{@code POST /v1/admin/store/plus}, {@code POST /v1/admin/store/addons}, {@code GET /v1/admin/discord/links} - owner / bot</li>
  * </ul>
  */
 final class PlusRoutes {
@@ -25,6 +26,9 @@ final class PlusRoutes {
 	private record GrantRequest(String target, int days) {
 	}
 
+	private record AddonGrantRequest(String target, boolean granted) {
+	}
+
 	private interface Authed {
 		void handle(HttpExchange exchange, SessionRegistry.Session session) throws Exception;
 	}
@@ -33,13 +37,21 @@ final class PlusRoutes {
 			DiscordLinks links, String adminToken) {
 		route(server, registry, "/v1/plus/status", "GET", (ex, s) -> {
 			var plus = store.config().plus;
-			JsonHttp.writeJson(ex, 200, Map.of("plus", store.isPlus(s.uuid()), "until", store.plusUntil(s.uuid()), "price", plus.price,
-					"currency", store.config().currency, "monthlyCoins", plus.monthlyCoins, "periodDays", plus.periodDays,
-					"checkoutEnabled", store.checkoutEnabled(), "addonsEnabled", tokens.enabled()));
+			Map<String, Object> out = new java.util.LinkedHashMap<>(Map.of("plus", store.isPlus(s.uuid()), "until", store.plusUntil(s.uuid()),
+					"price", plus.price, "currency", store.config().currency, "monthlyCoins", plus.monthlyCoins, "periodDays", plus.periodDays,
+					"checkoutEnabled", store.checkoutEnabled()));
+			// Only the players who have them hear about the Addons at all.
+			if (store.hasAddons(s.uuid())) {
+				out.put("addons", true);
+				out.put("addonsEnabled", tokens.enabled());
+			}
+			JsonHttp.writeJson(ex, 200, out);
 		});
 		route(server, registry, "/v1/plus/checkout", "POST", (ex, s) -> JsonHttp.writeJson(ex, 200, store.plusCheckout(s.uuid(), s.username())));
 		route(server, registry, "/v1/plus/token", "GET", (ex, s) -> {
-			if (!store.isPlus(s.uuid())) {
+			boolean plusMember = store.isPlus(s.uuid());
+			boolean addonAccess = store.hasAddons(s.uuid());
+			if (!plusMember && !addonAccess) {
 				JsonHttp.writeError(ex, 403, "Velo+ is required");
 				return;
 			}
@@ -47,18 +59,20 @@ final class PlusRoutes {
 				JsonHttp.writeError(ex, 503, "Velo+ tokens aren't set up on this server (VELO_PLUS_SIGNING_KEY)");
 				return;
 			}
-			JsonHttp.writeJson(ex, 200, Map.of("token", tokens.issue(s.uuid(), store.plusUntil(s.uuid())), "until", tokens.validUntil(store.plusUntil(s.uuid()))));
+			long until = store.plusUntil(s.uuid());
+			JsonHttp.writeJson(ex, 200, Map.of("token", tokens.issue(s.uuid(), until, plusMember, addonAccess),
+					"until", tokens.validUntil(plusMember ? until : 0, addonAccess)));
 		});
 		route(server, registry, "/v1/plus/addons", "GET", (ex, s) -> {
-			if (!store.isPlus(s.uuid())) {
-				JsonHttp.writeError(ex, 403, "Velo+ is required");
+			if (!store.hasAddons(s.uuid())) {
+				JsonHttp.writeError(ex, 404, "Not found");
 				return;
 			}
 			JsonHttp.writeJson(ex, 200, Map.of("addons", addons.list()));
 		});
 		route(server, registry, "/v1/plus/addons/file", "GET", (ex, s) -> {
-			if (!store.isPlus(s.uuid())) {
-				JsonHttp.writeError(ex, 403, "Velo+ is required");
+			if (!store.hasAddons(s.uuid())) {
+				JsonHttp.writeError(ex, 404, "Not found");
 				return;
 			}
 			String mc = StoreRoutes.query(ex).get("mc");
@@ -90,6 +104,11 @@ final class PlusRoutes {
 		route(server, registry, "/v1/admin/store/plus", "POST", (ex, s) -> {
 			GrantRequest r = JsonHttp.readBody(ex, GrantRequest.class);
 			JsonHttp.writeJson(ex, 200, store.adminPlus(s.uuid(), s.username(), r.target(), r.days()));
+		});
+		// Owner gives or takes away the Addons (independent of Velo+).
+		route(server, registry, "/v1/admin/store/addons", "POST", (ex, s) -> {
+			AddonGrantRequest r = JsonHttp.readBody(ex, AddonGrantRequest.class);
+			JsonHttp.writeJson(ex, 200, store.adminAddons(s.uuid(), s.username(), r.target(), r.granted()));
 		});
 		admin(server, adminToken, "/v1/admin/discord/links", ex -> {
 			List<Map<String, Object>> out = new java.util.ArrayList<>();

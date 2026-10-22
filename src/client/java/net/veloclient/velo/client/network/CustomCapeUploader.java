@@ -19,7 +19,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Uploads the player's own imported (non-Store) cape to the Velo server so everyone else on it
+ * Uploads the player's own imported (non-Store) cape - a PNG, or for Velo+ members an animated GIF - to the Velo server so everyone else on it
  * can see it - the server stores it content-addressed and hands back a {@code custom:<hash>} id,
  * which is what the heartbeat then publishes (see {@code server/CapeStore.java}).
  *
@@ -52,8 +52,8 @@ final class CustomCapeUploader {
 
 	/** The published id for {@code definition}, uploading it first if this server hasn't got it yet; null if it can't be shared. */
 	static String publishedIdFor(String base, String sessionToken, CapeDefinition definition) {
-		if (definition.animated()) {
-			return null; // animated capes are Store items, shared by their item id - never uploaded as custom capes
+		if (definition.animated() && !net.veloclient.velo.client.namestyle.NameStyles.plus()) {
+			return null; // animated custom capes are a Velo+ perk (the server checks too)
 		}
 		try {
 			String entry = definition.animated() ? "frames.gif" : "texture.png";

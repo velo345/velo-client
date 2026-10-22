@@ -72,12 +72,15 @@ public final class CapeEquipScreen extends VeloWindow {
 	// ---- Header (launcher look): Capes / Wings / Auras tabs, "Get more" to the Store ----
 
 	/** The Locker's tabs: Skin is {@link VeloSkinsScreen} (same header, so it reads as one Locker). */
-	public static final String[] LOCKER_TABS = {"Skin", "Capes", "Wings", "Auras"};
+	public static final String[] LOCKER_TABS = {"Skin", "Capes", "Wings", "Auras", "Name"};
 
-	/** Opens the Locker on a tab: 0 Skin, 1 Capes, 2 Wings, 3 Auras. */
+	/** Opens the Locker on a tab: 0 Skin, 1 Capes, 2 Wings, 3 Auras, 4 Name (Velo+ Name Styles). */
 	public static net.minecraft.client.gui.screen.Screen open(net.minecraft.client.gui.screen.Screen parent, int tab) {
 		if (tab == 0) {
 			return new VeloSkinsScreen(parent);
+		}
+		if (tab == 4) {
+			return new NameStyleScreen(parent);
 		}
 		CapeEquipScreen locker = new CapeEquipScreen(parent);
 		locker.wingsTab = tab == 2;
@@ -97,8 +100,8 @@ public final class CapeEquipScreen extends VeloWindow {
 
 	@Override
 	protected void selectHeaderTab(int index) {
-		if (index == 0) {
-			this.client.setScreen(new VeloSkinsScreen(returnScreen()));
+		if (index == 0 || index == 4) {
+			this.client.setScreen(open(returnScreen(), index));
 			return;
 		}
 		wingsTab = index == 2;
@@ -195,8 +198,10 @@ public final class CapeEquipScreen extends VeloWindow {
 		if (skin == null || skin.isEmpty()) {
 			skin = net.veloclient.velo.client.gui.title.MenuInfo.username();
 		}
+		var nameStyle = net.veloclient.velo.client.namestyle.NameStyles.own();
+		String name = net.veloclient.velo.client.namestyle.NameStyles.ownEnabled() ? nameStyle.effect().label : "None";
 		String[][] rows = {{"SKIN", skin == null || skin.isEmpty() ? "Your skin" : skin, "skins"}, {"CAPE", cape, "capes"},
-				{"WINGS", wings, "wings"}, {"AURA", aura, "bolt"}};
+				{"WINGS", wings, "wings"}, {"AURA", aura, "bolt"}, {"NAME STYLE", name, "theme_editor"}};
 		for (int i = 0; i < rows.length; i++) {
 			int ry = y + i * (SLOT_H + 6);
 			boolean active = activeTab == i;
@@ -636,7 +641,9 @@ public final class CapeEquipScreen extends VeloWindow {
 		status = Text.literal("Opening file picker...");
 		Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
 			try {
-				Path file = NativeFileDialog.pickPngFile("Choose a cape PNG");
+				// Velo+ members can import animated (GIF) capes too.
+				boolean plus = net.veloclient.velo.client.namestyle.NameStyles.plus();
+				Path file = plus ? NativeFileDialog.pickImageFile("Choose a cape PNG or animated GIF") : NativeFileDialog.pickPngFile("Choose a cape PNG");
 				if (file == null) {
 					MinecraftClient.getInstance().execute(() -> status = Text.literal(""));
 					return;
@@ -646,7 +653,17 @@ public final class CapeEquipScreen extends VeloWindow {
 				String name = dot > 0 ? fileName.substring(0, dot) : fileName;
 				MinecraftClient.getInstance().execute(() -> {
 					try {
-						CapeManager.importCape(name, file, CapePhysicsPreset.defaults());
+						if (fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".gif")) {
+							if (!plus) {
+								status = Text.literal("Animated custom capes are part of Velo+");
+								return;
+							}
+							try (java.io.InputStream in = java.nio.file.Files.newInputStream(file)) {
+								CapeManager.importAnimatedGif(name, in, CapePhysicsPreset.defaults());
+							}
+						} else {
+							CapeManager.importCape(name, file, CapePhysicsPreset.defaults());
+						}
 						status = Text.literal("Imported \"" + name + "\"");
 						layoutContent();
 					} catch (IOException e) {

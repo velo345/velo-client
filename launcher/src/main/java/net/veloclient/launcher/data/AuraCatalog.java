@@ -126,6 +126,7 @@ public final class AuraCatalog {
 			o.addProperty("auraId", id);
 		}
 		write(o);
+		SETTINGS_LISTENERS.forEach(Runnable::run);
 	}
 
 	public static AuraEffects.Settings settings(String id) {

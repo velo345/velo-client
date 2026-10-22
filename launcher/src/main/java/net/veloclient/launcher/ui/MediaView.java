@@ -77,6 +77,8 @@ public final class MediaView {
 	private List<Item> items = List.of();
 	private Node gallery;
 	private AnimationTimer playback;
+	/** The open Clips Pro clip's player (null for other items). */
+	private ClipPlayerView proView;
 	/** The open clip and its playhead (frame index), for trimming. */
 	private MjpegAvi.Clip openClip;
 	private double[] playhead;
@@ -165,7 +167,7 @@ public final class MediaView {
 		try (Stream<Path> files = Files.list(dir)) {
 			return files.filter(p -> {
 				String n = p.getFileName().toString().toLowerCase(Locale.ROOT);
-				return clip ? n.endsWith(".avi") : n.endsWith(".png") || n.endsWith(".jpg");
+				return clip ? n.endsWith(".avi") || n.endsWith(".mp4") && !n.endsWith(".tmp.mp4") : n.endsWith(".png") || n.endsWith(".jpg");
 			}).map(p -> {
 				long modified = 0;
 				try {
@@ -176,7 +178,7 @@ public final class MediaView {
 				Path thumb = p;
 				JsonObject meta = null;
 				if (clip) {
-					String base = p.getFileName().toString().replaceFirst("\\.avi$", "");
+					String base = p.getFileName().toString().replaceFirst("\\.(avi|mp4)$", "");
 					thumb = p.resolveSibling(base + ".jpg");
 					try {
 						Path json = p.resolveSibling(base + ".json");
@@ -283,6 +285,10 @@ public final class MediaView {
 
 	private void openViewer(Item item) {
 		stopPlayback();
+		if (item.clip() && item.file().getFileName().toString().endsWith(".mp4")) {
+			openProViewer(item);
+			return;
+		}
 		trim = null;
 		openClip = null;
 		trimControls = null;
@@ -621,6 +627,204 @@ public final class MediaView {
 			playback.stop();
 			playback = null;
 		}
+		if (proView != null) {
+			proView.release();
+			proView = null;
+		}
+	}
+
+	/**
+	 * A Clips Pro clip: plays here with its sound. Drag the timeline's ends to trim, then Save trimmed (a new clip next
+	 * to it) or Share just that part. Share (Velo+) makes a link to copy or send to a Velo friend, online for 60 days.
+	 */
+	private void openProViewer(Item item) {
+		Button back = BackButton.create(null, null);
+		back.setOnAction(e -> closeViewer());
+		Label title = new Label(label(item));
+		title.getStyleClass().add("page-title");
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		ClipPlayerView player = new ClipPlayerView(item.file());
+		proView = player;
+		Label status = new Label("Space play/pause · ←/→ 5 s · M mute · drag the timeline's ends to trim");
+		status.getStyleClass().add("t-muted");
+		Button saveTrim = new Button("Save trimmed", Icons.icon("scissors", 14, javafx.scene.paint.Color.WHITE));
+		saveTrim.getStyleClass().add("primary-button");
+		saveTrim.setVisible(false);
+		saveTrim.setManaged(false);
+		Button resetTrim = new Button("Reset");
+		resetTrim.getStyleClass().add("ghost-button");
+		resetTrim.setVisible(false);
+		resetTrim.setManaged(false);
+		resetTrim.setOnAction(e -> player.resetTrim());
+		boolean plus = net.veloclient.launcher.social.StoreApi.isPlusCached();
+		Button share = new Button(plus ? "Share" : "Share · Velo+", Icons.icon("share", 14, javafx.scene.paint.Color.WHITE));
+		share.getStyleClass().add(plus ? "primary-button" : "glass-button");
+		Button export = new Button("Export", Icons.icon("download", 14, javafx.scene.paint.Color.web("#E4E4E8")));
+		export.getStyleClass().add("glass-button");
+		export.setOnAction(e -> export(item));
+		Button folder = new Button("Folder", Icons.icon("folder", 14, javafx.scene.paint.Color.web("#E4E4E8")));
+		folder.getStyleClass().add("glass-button");
+		folder.setOnAction(e -> openFolder(item.file().getParent()));
+		Button delete = new Button("Delete", Icons.icon("trash", 14, javafx.scene.paint.Color.web("#FF8A8A")));
+		delete.getStyleClass().add("danger-ghost-button");
+		delete.setOnAction(e -> {
+			if (Confirm.ask(owner, "Delete clip?", "This can't be undone.")) {
+				delete(item);
+				closeViewer();
+				load();
+			}
+		});
+		HBox top = new HBox(10, back, title, spacer, resetTrim, saveTrim, share, export, folder, delete);
+		top.setAlignment(Pos.CENTER_LEFT);
+
+		// The link, once there is one: copy it or send it to a friend.
+		VBox sharePanel = new VBox(8);
+		sharePanel.getStyleClass().add("card");
+		sharePanel.setPadding(new Insets(12, 14, 12, 14));
+		sharePanel.setVisible(false);
+		sharePanel.setManaged(false);
+		String[] lastUrl = {null};
+		java.util.function.BiConsumer<String, Long> showLink = (url, expires) -> {
+			lastUrl[0] = url;
+			javafx.scene.control.TextField link = new javafx.scene.control.TextField(url);
+			link.setEditable(false);
+			HBox.setHgrow(link, Priority.ALWAYS);
+			Button copy = new Button("Copy link", Icons.icon("copy", 14, javafx.scene.paint.Color.WHITE));
+			copy.getStyleClass().add("primary-button");
+			copy.setOnAction(e -> {
+				ClipboardContent content = new ClipboardContent();
+				content.putString(url);
+				Clipboard.getSystemClipboard().setContent(content);
+				Toasts.show(copy, "Link copied");
+			});
+			ComboBox<net.veloclient.launcher.social.LauncherSocial.Friend> friend = new ComboBox<>();
+			var social = net.veloclient.launcher.social.LauncherSocial.snapshot();
+			if (social != null && social.friends != null) {
+				friend.getItems().setAll(social.friends.stream()
+						.sorted(Comparator.comparing((net.veloclient.launcher.social.LauncherSocial.Friend f) -> !f.online)
+								.thenComparing(f -> f.username.toLowerCase(Locale.ROOT))).toList());
+			}
+			friend.setPromptText(friend.getItems().isEmpty() ? "Add friends to send it to them" : "Send to a friend...");
+			friend.setConverter(new javafx.util.StringConverter<>() {
+				@Override
+				public String toString(net.veloclient.launcher.social.LauncherSocial.Friend f) {
+					return f == null ? "" : (f.online ? "● " : "") + f.username;
+				}
+
+				@Override
+				public net.veloclient.launcher.social.LauncherSocial.Friend fromString(String s) {
+					return null;
+				}
+			});
+			Button send = new Button("Send", Icons.icon("send", 14, javafx.scene.paint.Color.web("#E4E4E8")));
+			send.getStyleClass().add("glass-button");
+			send.disableProperty().bind(friend.valueProperty().isNull());
+			send.setOnAction(e -> {
+				var to = friend.getValue();
+				net.veloclient.launcher.social.LauncherSocial.sendMessage(to.uuid, "Check out my clip: " + url).thenAccept(error ->
+						Platform.runLater(() -> Toasts.show(send, error == null ? "Sent to " + to.username : "Couldn't send: " + error)));
+			});
+			Label note = new Label(expires != null && expires > 0
+					? "Online until " + DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH).withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(expires))
+							+ " - shared clips are deleted after " + net.veloclient.velo.client.clips.core.ClipTools.DEFAULT_RETENTION_DAYS + " days"
+					: "Shared clips stay online for " + net.veloclient.velo.client.clips.core.ClipTools.DEFAULT_RETENTION_DAYS + " days, then they're deleted");
+			note.getStyleClass().add("t-muted");
+			HBox row = new HBox(10, Icons.icon("link", 16, javafx.scene.paint.Color.web("#A9A9B3")), link, copy, friend, send);
+			row.setAlignment(Pos.CENTER_LEFT);
+			sharePanel.getChildren().setAll(row, note);
+			sharePanel.setVisible(true);
+			sharePanel.setManaged(true);
+		};
+		String known = net.veloclient.launcher.media.ClipSharing.sharedUrl(item.meta());
+		if (known != null) {
+			showLink.accept(known, item.meta().has("shareExpires") ? item.meta().get("shareExpires").getAsLong() : null);
+		}
+		share.setOnAction(e -> {
+			if (!plus) {
+				status.setText("Share links are part of Velo+ - get it in the Store. Shared clips stay online for "
+						+ net.veloclient.velo.client.clips.core.ClipTools.DEFAULT_RETENTION_DAYS + " days.");
+				return;
+			}
+			boolean trimmed = player.trimmed();
+			if (!trimmed && known != null) {
+				showLink.accept(known, item.meta().has("shareExpires") ? item.meta().get("shareExpires").getAsLong() : null);
+				return;
+			}
+			share.setDisable(true);
+			net.veloclient.launcher.media.ClipSharing.share(item.file(), item.meta(), trimmed ? player.trimFrom() : -1, trimmed ? player.trimTo() : -1,
+					status::setText, shared -> {
+						share.setDisable(false);
+						if (shared != null) {
+							ClipboardContent content = new ClipboardContent();
+							content.putString(shared.url());
+							Clipboard.getSystemClipboard().setContent(content);
+							status.setText("Link copied: " + shared.url());
+							showLink.accept(shared.url(), shared.expiresAt());
+						}
+					});
+		});
+		player.onTrimChanged(() -> {
+			boolean trimmed = player.trimmed();
+			for (Button b : new Button[] {saveTrim, resetTrim}) {
+				b.setVisible(trimmed);
+				b.setManaged(trimmed);
+			}
+			share.setText(!plus ? "Share · Velo+" : trimmed ? "Share part" : "Share");
+		});
+		saveTrim.setOnAction(e -> {
+			Path ffmpeg = ClipPlayerView.ffmpeg();
+			if (ffmpeg == null) {
+				return;
+			}
+			double from = player.trimFrom();
+			double to = player.trimTo();
+			saveTrim.setDisable(true);
+			status.setText("Saving the trimmed part...");
+			LOADER.execute(() -> {
+				String result;
+				try {
+					String base = item.file().getFileName().toString().replaceFirst("\\.mp4$", "");
+					String name = base + "-trim-" + System.currentTimeMillis() / 1000;
+					Path out = item.file().resolveSibling(name + ".mp4");
+					net.veloclient.velo.client.clips.core.ClipTools.trim(ffmpeg, item.file(), out, from, to);
+					net.veloclient.velo.client.clips.core.ClipTools.thumbnail(ffmpeg, out, (to - from) * 2 / 3, out.resolveSibling(name + ".jpg"));
+					JsonObject meta = item.meta() == null ? new JsonObject() : item.meta().deepCopy();
+					meta.remove("shareUrl");
+					meta.remove("shareExpires");
+					meta.addProperty("seconds", to - from);
+					meta.addProperty("trimmedFrom", item.file().getFileName().toString());
+					Files.writeString(out.resolveSibling(name + ".json"), meta.toString(), StandardCharsets.UTF_8);
+					result = "Saved the trimmed clip (" + Math.round(to - from) + " s)";
+				} catch (Exception ex) {
+					LauncherLog.warn("Couldn't trim the clip", ex);
+					result = "Couldn't trim: " + ex.getMessage();
+				}
+				String message = result;
+				Platform.runLater(() -> {
+					saveTrim.setDisable(false);
+					status.setText(message);
+					Toasts.show(saveTrim, message);
+					load();
+				});
+			});
+		});
+
+		Node body = player;
+		VBox.setVgrow(player, Priority.ALWAYS);
+		if (item.meta() != null && item.meta().has("recap")) {
+			HBox.setHgrow(player, Priority.ALWAYS);
+			body = new HBox(14, player, recapPanel(item.meta().getAsJsonObject("recap")));
+			VBox.setVgrow(body, Priority.ALWAYS);
+		}
+		VBox viewer = new VBox(12, top, sharePanel, body, status);
+		viewer.setOnKeyPressed(e -> {
+			if (e.getCode() == KeyCode.ESCAPE) {
+				closeViewer();
+			}
+		});
+		root.getChildren().setAll(viewer);
+		player.requestFocus();
 	}
 
 	private void closeViewer() {
@@ -648,7 +852,7 @@ public final class MediaView {
 		try {
 			Files.deleteIfExists(item.file());
 			if (item.clip()) {
-				String base = item.file().getFileName().toString().replaceFirst("\\.avi$", "");
+				String base = item.file().getFileName().toString().replaceFirst("\\.(avi|mp4)$", "");
 				Files.deleteIfExists(item.file().resolveSibling(base + ".jpg"));
 				Files.deleteIfExists(item.file().resolveSibling(base + ".json"));
 			}

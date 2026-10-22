@@ -34,6 +34,9 @@ import java.util.function.Function;
  * Replay Mod's / Flashback's viewer a "Replays" row (as icons nobody found them); other buttons a mod puts into
  * vanilla's centre column become extra rows under the menu, icon-only ones join the icon row. Essential's character
  * and side menu go right of the menu (see {@link EssentialAnchors}); the Store card hides when Essential is installed.
+ *
+ * <p>Partner servers sit in a bar along the top, right of the brand: each with its own server icon, name and live
+ * player count (the Velo server pings them; the game never does), one click joins.
  */
 public final class TitleMenu {
 
@@ -64,6 +67,12 @@ public final class TitleMenu {
 	private static HotspotButton jumpCard;
 	private static HotspotButton storeCard;
 	private static HotspotButton friends;
+	/** "Discover": friends' and public hosted worlds and partner servers (World Hosting, Join tab). */
+	private static HotspotButton discoverRow;
+	/** One per partner card in the top bar (placed - or hidden - every frame). */
+	private static final List<HotspotButton> PARTNER_CARDS = new ArrayList<>();
+	private static final int MAX_PARTNER_CARDS = 6;
+	private static final Map<String, Identifier> PARTNER_ICONS = new java.util.concurrent.ConcurrentHashMap<>();
 	/**
 	 * With Essential: stand-ins for the vanilla menu buttons (and ukulib's), because those real buttons stay put as
 	 * invisible anchors - Essential lays out its character, wardrobe and side menu around vanilla's buttons, so they
@@ -92,7 +101,22 @@ public final class TitleMenu {
 		jumpCard = new HotspotButton(Text.literal("Jump back in"), LastServer::join);
 		storeCard = new HotspotButton(Text.literal("Store"), () -> client.setScreen(new StoreScreen(screen)));
 		friends = new HotspotButton(Text.literal("Friends"), () -> client.setScreen(new FriendsScreen(screen)));
-		List<ClickableWidget> out = new ArrayList<>(List.of(storeRow, jumpCard, storeCard, friends));
+		discoverRow = new HotspotButton(Text.literal("Discover"),
+				() -> client.setScreen(net.veloclient.velo.client.gui.WorldHostScreen.discover(screen)));
+		List<ClickableWidget> out = new ArrayList<>(List.of(storeRow, jumpCard, storeCard, friends, discoverRow));
+		PARTNER_CARDS.clear();
+		for (int i = 0; i < MAX_PARTNER_CARDS; i++) {
+			int index = i;
+			HotspotButton card = new HotspotButton(Text.literal("Partner server"), () -> {
+				List<net.veloclient.velo.client.hosting.WorldHosting.Partner> list = net.veloclient.velo.client.hosting.WorldHosting.partnersCached();
+				if (index < list.size()) {
+					net.veloclient.velo.client.util.ClientCompat.joinServer(list.get(index).address(), list.get(index).name());
+				}
+			});
+			card.place(0, 0, 0, 0, false);
+			PARTNER_CARDS.add(card);
+			out.add(card);
+		}
 		PROXIES.clear();
 		for (String key : MAIN_KEYS) {
 			if (!key.startsWith("$")) {
@@ -219,6 +243,9 @@ public final class TitleMenu {
 					clickable = proxy.forwardTo(widget);
 				}
 				rows.add(new Row(clickable, widget.getMessage(), null, true, key.equals("menu.singleplayer"), key.equals("menu.quit")));
+				if (key.equals("menu.multiplayer")) {
+					rows.add(new Row(discoverRow, Text.literal("Discover"), "NEW", true, false, false));
+				}
 			}
 		}
 		int quitIndex = rows.size();
@@ -235,6 +262,9 @@ public final class TitleMenu {
 		slideIn(context, open, step++);
 		int brandH = drawBrand(context, renderer, margin, y, large);
 		context.getMatrices().popMatrix();
+		int brandRight = margin + MenuKit.width(renderer, large ? MenuKit.display("VELO CLIENT") : MenuKit.displaySm("VELO CLIENT")) + (large ? 37 : 31);
+		drawPartnerBar(context, renderer, brandRight + 28, top, width - margin - (FabricLoader.getInstance().isModLoaded("essential") ? 70 : 0),
+				large, open, mouseX, mouseY);
 		y += brandH + (compact ? 10 : large ? 22 : 16);
 
 		LastServer.Entry last = LastServer.get();
@@ -281,7 +311,7 @@ public final class TitleMenu {
 			int w = Math.min(width - margin * 2, MenuKit.width(renderer, label) + 30 + (row.badge() != null ? 34 : 0));
 			if (widget instanceof HotspotButton hotspot) {
 				hotspot.place(margin, y, w, h, true);
-				if (hotspot != storeRow) {
+				if (hotspot != storeRow && hotspot != discoverRow) {
 					ClickableWidget target = byKey.values().stream().filter(v -> PROXIES.get(env.keyOf(v)) == hotspot).findFirst().orElse(null);
 					if (target != null) {
 						hotspot.active = target.active;
@@ -387,6 +417,102 @@ public final class TitleMenu {
 			}
 			widget.visible = false;
 		}
+	}
+
+	// ---- Partner servers (top bar) ----
+
+	/**
+	 * The partner cards from {@code left} to {@code right}, right-aligned at the top; as many as fit (none on narrow
+	 * screens). They drop in from above after the menu has slid in.
+	 */
+	private static void drawPartnerBar(DrawContext context, TextRenderer renderer, int left, int top, int right, boolean large, float open,
+			int mouseX, int mouseY) {
+		List<net.veloclient.velo.client.hosting.WorldHosting.Partner> partners = net.veloclient.velo.client.hosting.WorldHosting.partnersCached();
+		int cardH = large ? 34 : 28;
+		int icon = cardH - 10;
+		int gap = 6;
+		List<Integer> widths = new ArrayList<>();
+		int total = 0;
+		int shown = 0;
+		Text label = MenuKit.mono("PARTNER SERVERS");
+		int labelW = MenuKit.width(renderer, label) + 12;
+		for (int i = 0; i < Math.min(partners.size(), MAX_PARTNER_CARDS); i++) {
+			var p = partners.get(i);
+			int nameW = MenuKit.width(renderer, MenuKit.uiBold(p.name()));
+			int lineW = MenuKit.width(renderer, MenuKit.ui(playersLine(p)));
+			int w = Math.min(170, icon + 18 + Math.max(nameW, lineW) + 10);
+			if (left + labelW + total + w + (shown > 0 ? gap : 0) > right) {
+				break;
+			}
+			total += w + (shown > 0 ? gap : 0);
+			widths.add(w);
+			shown++;
+		}
+		for (int i = 0; i < PARTNER_CARDS.size(); i++) {
+			if (i >= shown) {
+				PARTNER_CARDS.get(i).place(0, 0, 0, 0, false);
+			}
+		}
+		if (shown == 0) {
+			return;
+		}
+		float local = Math.max(0f, Math.min(1f, (open * 900f - 260f) / 420f));
+		float eased = 1f - (float) Math.pow(1f - local, 3);
+		context.getMatrices().pushMatrix();
+		context.getMatrices().translate(0f, -14f * (1f - eased));
+		int x = right - total;
+		int alpha = Math.round(eased * 255);
+		MenuKit.text(context, renderer, label, x - labelW, top + (cardH - MenuKit.H_MONO) / 2, (Math.round(alpha * 0.55f) << 24) | 0xFFFFFF);
+		for (int i = 0; i < shown; i++) {
+			var p = partners.get(i);
+			int w = widths.get(i);
+			HotspotButton hotspot = PARTNER_CARDS.get(i);
+			hotspot.place(x, top, w, cardH, true);
+			float hover = MenuKit.hover(hotspot, hovered(mouseX, mouseY, hotspot));
+			int lift = Math.round(hover * 2);
+			int cy = top - lift;
+			int accent = p.accent() != 0 ? p.accent() : MenuKit.accent();
+			VeloDraw.shadow(context, x, cy, w, cardH, 8, 10 + Math.round(hover * 6), 3, VeloAnim.lerpArgb(0x40000000, (accent & 0xFFFFFF) | 0x55000000, hover));
+			VeloDraw.fillRounded(context, x, cy, w, cardH, 8, VeloAnim.lerpArgb(0xB8101015, 0xD81A1A22, hover));
+			VeloDraw.strokeRounded(context, x, cy, w, cardH, 8, VeloAnim.lerpArgb(0x1FFFFFFF, accent, hover));
+			Identifier texture = p.iconUrl() == null ? null : PARTNER_ICONS.get(p.iconUrl());
+			if (texture == null && p.iconUrl() != null) {
+				String url = p.iconUrl();
+				net.veloclient.velo.client.gui.RemoteTextureLoader.load(url, id -> PARTNER_ICONS.put(url, id));
+			}
+			int ix = x + 5;
+			int iy = cy + 5;
+			if (texture != null) {
+				MenuKit.texture(context, texture, ix, iy, icon, 64);
+			} else {
+				VeloDraw.fillRounded(context, ix, iy, icon, icon, 5, (accent & 0xFFFFFF) | 0x33000000);
+				MenuKit.icon(context, "globe", ix + icon / 4, iy + icon / 4, icon / 2, accent);
+			}
+			int tx = ix + icon + 7;
+			int textW = w - (tx - x) - 8;
+			int ty = cy + (cardH - (MenuKit.H_UI * 2 + 3)) / 2;
+			MenuKit.text(context, renderer, MenuKit.fit(renderer, MenuKit.uiBold(p.name()), textW), tx, ty, MenuKit.TEXT);
+			// Hover turns the player count into the call to action.
+			Text line = hover > 0.5f ? MenuKit.ui("Click to join") : MenuKit.ui(playersLine(p));
+			int lineColor = hover > 0.5f ? MenuKit.accentText() : p.online() ? MenuKit.GREEN : MenuKit.TEXT_3;
+			if (p.online() && hover <= 0.5f) {
+				// A live dot that breathes.
+				float pulse = 0.5f + 0.5f * (float) Math.sin(System.nanoTime() / 4e8);
+				VeloDraw.fillCircle(context, tx + 2.5f, ty + MenuKit.H_UI + 3 + 3.5f, 2.2f + pulse * 0.6f, MenuKit.GREEN);
+				MenuKit.text(context, renderer, MenuKit.fit(renderer, line, textW - 8), tx + 8, ty + MenuKit.H_UI + 3, lineColor);
+			} else {
+				MenuKit.text(context, renderer, MenuKit.fit(renderer, line, textW), tx, ty + MenuKit.H_UI + 3, lineColor);
+			}
+			x += w + gap;
+		}
+		context.getMatrices().popMatrix();
+	}
+
+	private static String playersLine(net.veloclient.velo.client.hosting.WorldHosting.Partner p) {
+		if (!p.online()) {
+			return p.versions().isEmpty() ? "Offline right now" : p.versions();
+		}
+		return String.format(java.util.Locale.ROOT, "%,d online", p.players());
 	}
 
 	// ---- Entrance ----

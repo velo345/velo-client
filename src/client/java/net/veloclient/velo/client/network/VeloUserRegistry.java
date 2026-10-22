@@ -15,9 +15,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class VeloUserRegistry {
 
-	public record Entry(String username, String capeId, String wingsId, String auraId, boolean plus) {
+	/** {@code nameStyle}: a Velo+ member's name style in its wire form (see {@code NameStyle}), or null. */
+	public record Entry(String username, String capeId, String wingsId, String auraId, boolean plus, String nameStyle) {
 		public Entry(String username, String capeId) {
-			this(username, capeId, null, null, false);
+			this(username, capeId, null, null, false, null);
 		}
 	}
 
@@ -47,12 +48,27 @@ public final class VeloUserRegistry {
 			lower.put(entry.username().toLowerCase(java.util.Locale.ROOT), entry);
 		}
 		byLowerName = Map.copyOf(lower);
+		styledNames = entries.values().stream().filter(e -> e.nameStyle() != null).map(Entry::username).toList();
 	}
 
 	public static void clear() {
 		BY_UUID.clear();
 		usernames = Set.of();
 		byLowerName = Map.of();
+		styledNames = java.util.List.of();
+	}
+
+	/** Online players who have a name style (their names as the server has them). */
+	private static volatile java.util.List<String> styledNames = java.util.List.of();
+
+	public static java.util.List<String> styledNames() {
+		return styledNames;
+	}
+
+	/** The name style (wire form) of the player called {@code name}, or null. */
+	public static String nameStyleForName(String name) {
+		Entry entry = entryForName(name);
+		return entry == null ? null : entry.nameStyle();
 	}
 
 	public static boolean isOnline(UUID uuid) {

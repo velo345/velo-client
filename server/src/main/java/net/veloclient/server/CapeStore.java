@@ -34,6 +34,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * dimension limits match what the mod can render: vanilla's 64x32 cape layout scaled up to
  * 2048x1024 (2x height for the combined cape+elytra layout), and much smaller for animated capes
  * because every frame is held decoded in each viewer's memory.
+ *
+ * <p>Animated (GIF) custom capes are a Velo+ perk: only members can upload one, and it's only shown
+ * (and served) while its owner is a member - otherwise they fall back to no custom cape.
  */
 final class CapeStore {
 
@@ -49,7 +52,8 @@ final class CapeStore {
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-	record StoredCape(String hash, String type) {
+	/** {@code at}: when it was uploaded (0 for capes from before that was kept). */
+	record StoredCape(String hash, String type, long at) {
 		String fileName() {
 			return hash + "." + type;
 		}
@@ -97,14 +101,14 @@ final class CapeStore {
 		}
 	}
 
-	String hashFor(String uuid) {
+	/** The custom cape {@code uuid} shows, or null; an animated one only while they're a Velo+ member. */
+	String hashFor(String uuid, boolean plus) {
 		StoredCape cape = byUuid.get(uuid);
-		// GIFs uploaded before animated capes became Store-only are no longer shown to anyone.
-		return cape == null || "gif".equals(cape.type()) ? null : cape.hash();
+		return cape == null || "gif".equals(cape.type()) && !plus ? null : cape.hash();
 	}
 
 	/** Validates, normalizes, stores and assigns {@code bytes} as {@code uuid}'s custom cape; returns its hash. */
-	synchronized String store(String uuid, byte[] bytes) throws RejectedUpload, IOException {
+	synchronized String store(String uuid, byte[] bytes, boolean plus) throws RejectedUpload, IOException {
 		long now = System.currentTimeMillis();
 		Long last = lastUploadMillis.get(uuid);
 		if (last != null && now - last < MIN_UPLOAD_INTERVAL_MILLIS) {
@@ -115,12 +119,15 @@ final class CapeStore {
 		StoredCape cape;
 		byte[] normalized;
 		if (isGif(bytes)) {
-			// Animated capes are Velo Store items (shared by item id, ownership checked) - uploading
-			// your own would make buying them pointless.
-			throw new RejectedUpload(403, "Animated capes are only available from the Velo Store");
+			if (!plus) {
+				throw new RejectedUpload(403, "Animated custom capes are part of Velo+");
+			}
+			validateGif(bytes);
+			normalized = bytes;
+			cape = new StoredCape(sha256(normalized), "gif", now);
 		} else if (isPng(bytes)) {
 			normalized = reencodePng(bytes);
-			cape = new StoredCape(sha256(normalized), "png");
+			cape = new StoredCape(sha256(normalized), "png", now);
 		} else {
 			throw new RejectedUpload(400, "Only PNG capes are supported");
 		}
@@ -155,6 +162,19 @@ final class CapeStore {
 		return remove(uuid);
 	}
 
+	/** Every custom cape by player, for the staff review list. */
+	Map<String, StoredCape> all() {
+		return Map.copyOf(byUuid);
+	}
+
+	long fileSize(StoredCape cape) {
+		try {
+			return Files.size(directory.resolve(cape.fileName()));
+		} catch (IOException e) {
+			return -1;
+		}
+	}
+
 	synchronized boolean remove(String uuid) throws IOException {
 		StoredCape removed = byUuid.remove(uuid);
 		if (removed == null) {
@@ -165,13 +185,14 @@ final class CapeStore {
 		return true;
 	}
 
-	/** Raw bytes + content type for a stored hash, or null if nobody currently has that cape. */
-	StoredFile read(String hash) throws IOException {
+	/** Raw bytes + content type for a stored hash, or null if nobody currently shows that cape. */
+	StoredFile read(String hash, java.util.function.Predicate<String> plusLookup) throws IOException {
 		if (hash == null || !hash.matches("[0-9a-f]{64}")) {
 			return null;
 		}
-		for (StoredCape cape : byUuid.values()) {
-			if (cape.hash().equals(hash) && !"gif".equals(cape.type())) {
+		for (Map.Entry<String, StoredCape> entry : byUuid.entrySet()) {
+			StoredCape cape = entry.getValue();
+			if (cape.hash().equals(hash) && (!"gif".equals(cape.type()) || plusLookup.test(entry.getKey()))) {
 				Path file = directory.resolve(cape.fileName());
 				return Files.exists(file) ? new StoredFile(Files.readAllBytes(file), cape.contentType()) : null;
 			}
@@ -202,6 +223,37 @@ final class CapeStore {
 		}
 		if (height != width / 2 && height != width) {
 			throw new RejectedUpload(400, "Cape must be 2:1 (cape) or 1:1 (cape + elytra) - got " + width + "x" + height);
+		}
+	}
+
+	/** Every frame decodes, same size, within the frame and pixel budget. */
+	private static void validateGif(byte[] bytes) throws RejectedUpload {
+		try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
+			Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("gif");
+			if (!readers.hasNext() || in == null) {
+				throw new RejectedUpload(400, "Not a readable GIF");
+			}
+			ImageReader reader = readers.next();
+			try {
+				reader.setInput(in, false, false);
+				int frames = reader.getNumImages(true);
+				if (frames < 1 || frames > MAX_ANIMATED_FRAMES) {
+					throw new RejectedUpload(400, "An animated cape can have 1 to " + MAX_ANIMATED_FRAMES + " frames (got " + frames + ")");
+				}
+				int width = reader.getWidth(0);
+				int height = reader.getHeight(0);
+				validateDimensions(width, height, MAX_ANIMATED_WIDTH);
+				if ((long) width * height * frames > MAX_ANIMATED_PIXELS) {
+					throw new RejectedUpload(400, "Animated cape too big - use fewer frames or a smaller size");
+				}
+				for (int i = 0; i < frames; i++) {
+					reader.read(i);
+				}
+			} finally {
+				reader.dispose();
+			}
+		} catch (IOException | RuntimeException e) {
+			throw new RejectedUpload(400, "Not a readable GIF");
 		}
 	}
 

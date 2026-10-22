@@ -1,6 +1,6 @@
 {
   "title": "Velo Client 0.9.5",
-  "summary": "A brand new animated title screen - a real 3D world with a live sword duel that glows in your theme color - two new themes, readable Monochrome and Nord, faster cosmetics, and a huge Velo+ Addons update with the Terminator.",
+  "summary": "A brand new animated title screen - a real 3D world with a live sword duel that glows in your theme color - two new themes, readable Monochrome and Nord, and faster cosmetics.",
   "tag": "Update",
   "version": "0.9.5",
   "accent": "#ff5a5a",
@@ -78,33 +78,6 @@
         "**Smoother aura previews** in the launcher, and picture tiles for wings and auras in the collection.",
         "**Redstone Mode**: bounding-box-only view, move a placement to where you stand, and stacked copies paste much faster (air in the copy can be skipped)."
       ]
-    },
-    {
-      "type": "divider"
-    },
-    {
-      "type": "heading",
-      "text": "Velo+ Addons"
-    },
-    {
-      "type": "text",
-      "text": "The biggest Addons update so far. As always, every module that acts for you only works in **singleplayer** or on servers in your **Private Servers** list."
-    },
-    {
-      "type": "list",
-      "items": [
-        "**Terminator** - a bot that hunts one player on its own: it walks, parkours, swims, bridges, pillars and digs its way there, uses boats, and fights with crystals, anchors, bows and mace runs.",
-        "**Elytra Mace** and **Firework Mace** - full mace runs, and **Auto Cart** for TNT minecart hits.",
-        "New: **Auto Shield**, **Auto Dodge** (dodges arrows, tridents, fireballs and more), **Auto MLG**, **Auto Mend**, **Auto Extinguish**, **Criticals**, **W-Tap**, **Auto Walk**, **Auto Fish**, **Enemy Armor** and **Remove All Addons**.",
-        "**Auto Crystal** places a guard block so its blasts don't hit you, and can launch the target with a sword knock-up first. **Auto Anchor** shields itself too.",
-        "**X-Ray** outlines the blocks you can actually see, so you still know where to walk.",
-        "**Auto Eat** goes for golden apples when you need healing and also takes food from your inventory."
-      ]
-    },
-    {
-      "type": "callout",
-      "style": "info",
-      "text": "Velo+ members get the new Addons automatically on their next launch in profiles that already have them."
     }
   ]
 }

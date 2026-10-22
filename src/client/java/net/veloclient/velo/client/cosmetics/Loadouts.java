@@ -16,20 +16,25 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Saved looks for the Locker: cape, wings and aura plus how they're worn (wing size/position/flap, aura colour, size,
- * speed and density), switched in one click. Same file and format as the launcher's Locker loadouts
+ * Saved looks for the Locker: cape, wings, aura and name style plus how they're worn (wing size/position/flap, aura
+ * colour, size, speed and density), switched in one click. Same file and format as the launcher's Locker loadouts
  * ({@code config/loadouts.json}), so a look saved in either shows up in both.
  */
 public final class Loadouts {
 
+	/**
+	 * {@code nameStyle}: the Velo+ name style in its wire form and {@code nameStyleOn} whether it's switched on; both null
+	 * in looks saved before name styles existed, which then leave your name style as it is.
+	 */
 	public record Loadout(String name, String cape, String wings, String aura, WingsManager.Settings wingsSettings,
-			AuraEffects.Settings auraSettings) {
+			AuraEffects.Settings auraSettings, String nameStyle, Boolean nameStyleOn) {
 
 		static Loadout current(String name) {
 			String wings = WingsManager.equippedId();
 			String aura = AuraManager.equippedId();
 			return new Loadout(name, CapeManager.equipped().map(CapeDefinition::id).orElse(null), wings, aura,
-					wings == null ? null : WingsManager.settings(wings), aura == null ? null : AuraManager.settings(aura));
+					wings == null ? null : WingsManager.settings(wings), aura == null ? null : AuraManager.settings(aura),
+					net.veloclient.velo.client.namestyle.NameStyles.own().encode(), net.veloclient.velo.client.namestyle.NameStyles.ownEnabled());
 		}
 
 		/** Whether this is exactly what you wear right now. */
@@ -39,11 +44,15 @@ public final class Loadouts {
 			return Objects.equals(cape, CapeManager.equipped().map(CapeDefinition::id).orElse(null)) && Objects.equals(wings, wornWings)
 					&& Objects.equals(aura, wornAura)
 					&& (wingsSettings == null || wings == null || wingsSettings.equals(WingsManager.settings(wings)))
-					&& (auraSettings == null || aura == null || auraSettings.equals(AuraManager.settings(aura)));
+					&& (auraSettings == null || aura == null || auraSettings.equals(AuraManager.settings(aura)))
+					&& (nameStyleOn == null || nameStyleOn == net.veloclient.velo.client.namestyle.NameStyles.ownEnabled()
+							&& (!nameStyleOn || Objects.equals(nameStyle, net.veloclient.velo.client.namestyle.NameStyles.own().encode())));
 		}
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+	private static final java.util.concurrent.atomic.AtomicBoolean SYNC_PENDING = new java.util.concurrent.atomic.AtomicBoolean();
+	private static volatile boolean wearing;
 	private static List<Loadout> cached;
 	private static long cachedStamp = -1;
 
@@ -113,8 +122,62 @@ public final class Loadouts {
 		return name;
 	}
 
+	/**
+	 * Something you wear changed (an item, a colour, a size, the name style): the look you have on (picked or saved
+	 * last) takes it, so every look keeps its own items and settings - same as the launcher's Locker. Sliders call this
+	 * every frame while dragged, so it's written once things settle.
+	 */
+	public static void changed() {
+		if (wearing || !SYNC_PENDING.compareAndSet(false, true)) {
+			return;
+		}
+		java.util.concurrent.CompletableFuture.delayedExecutor(400, java.util.concurrent.TimeUnit.MILLISECONDS)
+				.execute(() -> net.minecraft.client.MinecraftClient.getInstance().execute(() -> {
+					SYNC_PENDING.set(false);
+					if (!wearing) {
+						syncActive();
+					}
+				}));
+	}
+
+	private static void syncActive() {
+		String name = active();
+		if (name.isEmpty()) {
+			return;
+		}
+		List<Loadout> list = new ArrayList<>(all());
+		for (int i = 0; i < list.size(); i++) {
+			if (list.get(i).name().equals(name)) {
+				Loadout now = Loadout.current(name);
+				if (!now.equals(list.get(i))) {
+					list.set(i, now);
+					write(list);
+				}
+				return;
+			}
+		}
+	}
+
+	/** The look you have on, "" for none. */
+	public static String active() {
+		try {
+			return Files.exists(activeFile()) ? Files.readString(activeFile(), StandardCharsets.UTF_8).strip() : "";
+		} catch (Exception e) {
+			return "";
+		}
+	}
+
 	/** Puts the look on; returns what couldn't be (not owned / no longer in your library), empty when all of it is on. */
 	public static List<String> wear(Loadout loadout) {
+		wearing = true;
+		try {
+			return wearNow(loadout);
+		} finally {
+			wearing = false;
+		}
+	}
+
+	private static List<String> wearNow(Loadout loadout) {
 		List<String> missing = new ArrayList<>();
 		setActive("");
 		// The Locker's try-on previews would hide what's really worn now.
@@ -142,6 +205,11 @@ public final class Loadouts {
 		}
 		if (!AuraManager.equip(loadout.aura())) {
 			missing.add("aura \"" + loadout.aura() + "\"");
+		}
+		if (loadout.nameStyleOn() != null) {
+			var style = net.veloclient.velo.client.namestyle.NameStyle.decode(loadout.nameStyle());
+			net.veloclient.velo.client.namestyle.NameStyles.save(style == null ? net.veloclient.velo.client.namestyle.NameStyles.own() : style,
+					loadout.nameStyleOn() && net.veloclient.velo.client.namestyle.NameStyles.plus());
 		}
 		net.veloclient.velo.client.network.VeloServerClient.syncSoon();
 		setActive(loadout.name());

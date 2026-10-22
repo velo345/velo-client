@@ -12,9 +12,10 @@ import java.util.Base64;
 /**
  * Signed proof of Velo+ ("this uuid is a member until then"), made with the server's Ed25519 key
  * ({@code VELO_PLUS_SIGNING_KEY}, PKCS#8 base64); the game checks it against the public key built into
- * the mod before it lets the Velo Client Addons modules load. Format: {@code v1.<payload>.<signature>}
- * (both base64url, payload = JSON {uuid, until, iat}). A token is valid for a week at most, so a lapsed
- * membership stops working even for someone offline.
+ * the mod before it unlocks Velo+ features. Format: {@code v1.<payload>.<signature>} (both base64url,
+ * payload = JSON {uuid, until, iat, plus, addons}). {@code addons} is only there for players the owner gave
+ * the Addons to; the Addons jar checks it. A token is valid for a week at most, so a lapsed membership (or
+ * taken-away access) stops working even for someone offline.
  */
 final class PlusTokens {
 
@@ -38,14 +39,21 @@ final class PlusTokens {
 		return key != null;
 	}
 
-	/** A token for {@code uuid}, valid until the membership ends or a week from now, whichever comes first. */
-	String issue(String uuid, long membershipUntil) throws Exception {
+	/**
+	 * A token for {@code uuid}, valid until the membership ends or a week from now, whichever comes first
+	 * (a week for someone who only has the Addons).
+	 */
+	String issue(String uuid, long membershipUntil, boolean plus, boolean addons) throws Exception {
 		long now = System.currentTimeMillis();
-		long until = Math.min(membershipUntil, now + MAX_VALID_MILLIS);
+		long until = validUntil(plus ? membershipUntil : 0, addons);
 		JsonObject payload = new JsonObject();
 		payload.addProperty("uuid", uuid);
 		payload.addProperty("until", until);
 		payload.addProperty("iat", now);
+		payload.addProperty("plus", plus);
+		if (addons) {
+			payload.addProperty("addons", true);
+		}
 		String body = Base64.getUrlEncoder().withoutPadding().encodeToString(payload.toString().getBytes(StandardCharsets.UTF_8));
 		Signature signature = Signature.getInstance("Ed25519");
 		signature.initSign(key);
@@ -53,7 +61,8 @@ final class PlusTokens {
 		return "v1." + body + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(signature.sign());
 	}
 
-	long validUntil(long membershipUntil) {
-		return Math.min(membershipUntil, System.currentTimeMillis() + MAX_VALID_MILLIS);
+	long validUntil(long membershipUntil, boolean addons) {
+		long week = System.currentTimeMillis() + MAX_VALID_MILLIS;
+		return addons ? week : Math.min(membershipUntil, week);
 	}
 }
