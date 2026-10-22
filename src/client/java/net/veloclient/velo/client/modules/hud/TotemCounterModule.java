@@ -28,7 +28,7 @@ public final class TotemCounterModule extends AbstractModule implements HudModul
 
 	private final HudPosition position = new HudPosition(0.66f, 0.86f);
 	private boolean hideWhenNone = false;
-	private boolean showBackground = true;
+	private boolean showBackground = false;
 	private boolean colorByCount = true;
 
 	public TotemCounterModule() {
@@ -52,7 +52,7 @@ public final class TotemCounterModule extends AbstractModule implements HudModul
 			return;
 		}
 		String label = String.valueOf(count);
-		int textWidth = client.textRenderer.getWidth(label);
+		int textWidth = net.veloclient.velo.client.hud.HudLook.measure(label);
 		if (showBackground) {
 			VeloDraw.fillRounded(context, x, y, width(), 22, 6, 0x90101014);
 		}
@@ -61,7 +61,7 @@ public final class TotemCounterModule extends AbstractModule implements HudModul
 		}
 		context.drawItemWithoutEntity(totem, x + 4, y + 3);
 		int color = !colorByCount ? 0xFFFFFFFF : count == 0 ? 0xFFFF5555 : count == 1 ? 0xFFFFC53D : 0xFF6FE39A;
-		context.drawTextWithShadow(client.textRenderer, label, x + 24 + (width() - 28 - textWidth) / 2, y + 7, color);
+		net.veloclient.velo.client.hud.HudLook.draw(context, label, x + 24 + (width() - 28 - textWidth) / 2, y + 7, color);
 	}
 
 	@Override

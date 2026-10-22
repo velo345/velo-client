@@ -79,7 +79,6 @@ public final class PauseMenu {
 	 */
 	private static final Map<String, HotspotButton> PROXIES = new java.util.HashMap<>();
 	private static final String UKULIB = "$ukulib";
-	private static int ghostCenter;
 	private static List<Module> shownToggles = List.of();
 	private static boolean showRecent;
 	private static long clipSavedAt;
@@ -204,6 +203,7 @@ public final class PauseMenu {
 		// ---- Sort the buttons ----
 		java.util.Map<String, ClickableWidget> byKey = new java.util.HashMap<>();
 		List<Row> modRows = new ArrayList<>();
+		Row modsRow = null;
 		List<ClickableWidget> iconWidgets = new ArrayList<>();
 		List<String> iconKeys = new ArrayList<>();
 		ClickableWidget ukulib = env.ukulib();
@@ -235,10 +235,12 @@ public final class PauseMenu {
 			if (className.startsWith("gg.essential.") || label.startsWith("<") && label.endsWith(">")) {
 				continue;
 			}
-			String iconKey = TitleScreenTheme.matchExtraIcon(TitleScreenTheme.ESCAPE_EXTRA_ICONS, label);
-			if (iconKey == null && className.startsWith("com.terraformersmc.modmenu") && (label.isEmpty() || first[2] <= 24)) {
-				iconKey = "mods";
+			// Mod Menu gets a labelled row in the panel - as a small icon nobody recognised it.
+			if (className.startsWith("com.terraformersmc.modmenu")) {
+				modsRow = new Row(widget, "Mods", "mods", null);
+				continue;
 			}
+			String iconKey = TitleScreenTheme.matchExtraIcon(TitleScreenTheme.ESCAPE_EXTRA_ICONS, label);
 			String recording = TitleScreenTheme.matchExtraIcon(TitleScreenTheme.RECORDING_SIDE_ICONS, label);
 			// Vanilla's own extras (Report Bugs, Feedback...) always belong to the menu, wherever vanilla put them.
 			boolean vanilla = widget.getClass().getName().startsWith("net.minecraft.");
@@ -265,13 +267,13 @@ public final class PauseMenu {
 		}
 
 		boolean essentialMode = FabricLoader.getInstance().isModLoaded("essential");
+		Map<String, ClickableWidget> anchors = new java.util.HashMap<>();
 		if (essentialMode) {
-			int cardsRight = margin + colW + 16 + clamp(Math.round(width * 0.26f), 160, 210);
-			ghostCenter = Math.max(cardsRight + 120, cardsRight + 16 + Math.round((width - margin - cardsRight - 16) * 0.45f));
 			for (Map.Entry<String, ClickableWidget> entry : new ArrayList<>(byKey.entrySet())) {
 				HotspotButton proxy = PROXIES.get(entry.getKey());
 				if (proxy != null) {
-					anchorForEssential(entry.getValue());
+					RESTYLED.remove(entry.getValue());
+					anchors.put(entry.getKey(), entry.getValue());
 					byKey.put(entry.getKey(), proxy.forwardTo(entry.getValue()));
 				}
 			}
@@ -308,6 +310,9 @@ public final class PauseMenu {
 			}
 			if (key.equals("gui.stats")) {
 				rows.add(new Row(store, "Store", "store", null));
+			}
+			if (key.equals("menu.options") && modsRow != null) {
+				rows.add(modsRow);
 			}
 		}
 		rows.add(new Row(friends, "Friends", "friends", null));
@@ -387,9 +392,20 @@ public final class PauseMenu {
 
 		// ---- Right column: cards ----
 		int cardW = clamp(Math.round(width * 0.26f), 160, 210);
-		boolean essential = FabricLoader.getInstance().isModLoaded("essential");
-		int cardX = essential ? margin + colW + 16 : width - margin - cardW;
-		boolean room = essential ? cardX + cardW < width * 0.62f : cardX > margin + colW + 16;
+		int cardX = essentialMode ? margin + colW + 16 : width - margin - cardW;
+		boolean room = cardX > margin + colW + 16 || essentialMode;
+		if (essentialMode) {
+			// Essential's character goes right next to the menu - it has to stay in the left half of the screen (see
+			// EssentialAnchors) - and the cards after it, when they fit before Essential's side menu; else they give way.
+			EssentialAnchors.Plan plan = EssentialAnchors.plan(width, margin + colW, false);
+			if (plan != null) {
+				cardX = EssentialAnchors.playerRight(margin + colW) + 14;
+				room = cardX + cardW + 8 <= EssentialAnchors.menuLeft(width, plan.topX() + EssentialAnchors.ANCHOR_W);
+			} else {
+				room = true;
+			}
+			anchorForEssential(anchors, plan);
+		}
 		if (!room) {
 			hideCards();
 			return;
@@ -433,17 +449,22 @@ public final class PauseMenu {
 		return real.getMessage().getString();
 	}
 
-	/** Essential: the real button stays as an invisible anchor in the ghost column, at vanilla's height. */
-	private static void anchorForEssential(ClickableWidget widget) {
-		RESTYLED.remove(widget);
-		int[] first = FIRST_SEEN.get(widget);
-		widget.setX(ghostCenter - 10);
-		widget.setWidth(20);
-		if (first != null) {
-			widget.setY(first[1]);
-			widget.setHeight(first[3]);
+	/**
+	 * Essential: the real buttons stay as invisible, unclickable anchors (our proxies take the clicks), parked so
+	 * Essential draws its character right of our menu and cards and its side menu at the right edge - see
+	 * {@link EssentialAnchors}.
+	 */
+	private static void anchorForEssential(Map<String, ClickableWidget> anchors, EssentialAnchors.Plan plan) {
+		for (ClickableWidget widget : anchors.values()) {
+			int[] first = FIRST_SEEN.get(widget);
+			widget.setX(plan == null ? -10000 : plan.topX());
+			widget.setWidth(EssentialAnchors.ANCHOR_W);
+			if (first != null) {
+				widget.setY(first[1]);
+				widget.setHeight(first[3]);
+			}
+			widget.visible = false;
 		}
-		widget.visible = false;
 	}
 
 	private static void hideCards() {

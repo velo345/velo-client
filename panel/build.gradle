@@ -1,0 +1,36 @@
+plugins {
+	id 'application'
+	id 'com.gradleup.shadow' version '8.3.5'
+}
+
+repositories {
+	mavenCentral()
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}
+
+application {
+	mainClass = 'net.veloclient.panel.PanelApp'
+}
+
+dependencies {
+	// Same JSON library as the server; the panel has no other dependencies (JDK HTTP server, /proc, systemctl).
+	implementation 'com.google.code.gson:gson:2.11.0'
+
+	testImplementation platform('org.junit:junit-bom:5.10.2')
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+	useJUnitPlatform()
+}
+
+tasks.named('shadowJar') {
+	archiveBaseName.set('velo-panel')
+	archiveClassifier.set('')
+	archiveVersion.set('')
+}

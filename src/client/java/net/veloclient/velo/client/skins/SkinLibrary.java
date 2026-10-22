@@ -51,7 +51,20 @@ public final class SkinLibrary {
 		return dir().resolve(skin.id() + ".png");
 	}
 
+	/** Screens read the library every frame; keep the parsed file for a moment instead of hitting the disk each time. */
+	private static Data cached;
+	private static long cachedAt;
+
 	private static synchronized Data load() {
+		if (cached != null && System.currentTimeMillis() - cachedAt < 2000) {
+			return cached;
+		}
+		cached = read();
+		cachedAt = System.currentTimeMillis();
+		return cached;
+	}
+
+	private static Data read() {
 		try {
 			Path file = dir().resolve("library.json");
 			if (Files.exists(file)) {
@@ -68,6 +81,8 @@ public final class SkinLibrary {
 	}
 
 	private static synchronized void save(Data data) throws IOException {
+		cached = data;
+		cachedAt = System.currentTimeMillis();
 		Files.createDirectories(dir());
 		Files.writeString(dir().resolve("library.json"), GSON.toJson(data), StandardCharsets.UTF_8);
 	}
@@ -78,6 +93,20 @@ public final class SkinLibrary {
 
 	public static String equippedId() {
 		return load().equippedId;
+	}
+
+	/** Name of the library skin you last equipped, or null. */
+	public static String equippedName() {
+		String id = equippedId();
+		if (id == null) {
+			return null;
+		}
+		for (Skin skin : all()) {
+			if (skin.id().equals(id)) {
+				return skin.name();
+			}
+		}
+		return null;
 	}
 
 	public static void markEquipped(Skin skin) throws IOException {

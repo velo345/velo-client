@@ -33,7 +33,8 @@ public final class OldAnimationsModule extends AbstractModule implements Configu
 
 	private boolean noCooldownDrop = true;
 	private double swingTicks = 6;
-	private String blockMode = "Shield In Offhand";
+	// Off by default: most players want their shield to look like a shield (opt in to the 1.7 sword block).
+	private String blockMode = "Off";
 	private boolean hideShield = true;
 	private boolean swingWhileUsing = true;
 	private boolean oldRod = true;

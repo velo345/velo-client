@@ -55,7 +55,7 @@ public final class ModuleProfilerOverlayModule extends AbstractModule implements
 		int lineHeight = client.textRenderer.fontHeight + 1;
 
 		List<ModuleProfiler.Entry> entries = ModuleProfiler.snapshot();
-		context.drawTextWithShadow(client.textRenderer, "Module Profiler (avg / peak ms)", x, y, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, "Module Profiler (avg / peak ms)", x, y, 0xFFFFFFFF);
 		int rowY = y + lineHeight + 1;
 		int shown = Math.min(maxRows, entries.size());
 		for (int i = 0; i < shown; i++) {
@@ -63,11 +63,11 @@ public final class ModuleProfilerOverlayModule extends AbstractModule implements
 			String line = String.format(Locale.ROOT, "[%s] %s: %.2f / %.2f",
 					entry.phase().label(), entry.moduleId(), entry.avgMs(), entry.maxMs());
 			int color = entry.avgMs() > 2.0 ? 0xFFFF5555 : (entry.avgMs() > 0.5 ? 0xFFFFFF55 : 0xFFC8C8C8);
-			context.drawTextWithShadow(client.textRenderer, line, x, rowY, color);
+			net.veloclient.velo.client.hud.HudLook.draw(context, line, x, rowY, color);
 			rowY += lineHeight;
 		}
 		if (entries.isEmpty()) {
-			context.drawTextWithShadow(client.textRenderer, "No samples yet - enable some modules.", x, rowY, 0xFFC8C8C8);
+			net.veloclient.velo.client.hud.HudLook.draw(context, "No samples yet - enable some modules.", x, rowY, 0xFFC8C8C8);
 		}
 	}
 

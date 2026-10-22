@@ -34,6 +34,59 @@ public final class LastServer {
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> client.execute(LastServer::capture));
 	}
 
+	private static final long RECHECK_MS = 60_000;
+	private static volatile String reachableAddress;
+	private static volatile String checkedAddress;
+	private static volatile long checkedAt;
+	private static volatile boolean checking;
+
+	/**
+	 * Whether the server answers right now - the "Jump back in" card only offers servers you can actually get to. Checked
+	 * in the background (resolve + connect, a few seconds at most), again every minute while the title screen asks.
+	 */
+	public static boolean reachable(Entry entry) {
+		String address = entry.address();
+		long now = System.currentTimeMillis();
+		if (!checking && (!address.equals(checkedAddress) || now - checkedAt > RECHECK_MS)) {
+			checking = true;
+			checkedAddress = address;
+			checkedAt = now;
+			Thread thread = new Thread(() -> {
+				boolean up = probe(address);
+				reachableAddress = up ? address : null;
+				checking = false;
+			}, "Velo last-server check");
+			thread.setDaemon(true);
+			thread.start();
+		}
+		return address.equals(reachableAddress);
+	}
+
+	private static boolean probe(String address) {
+		try {
+			//? if <26.1 {
+			var resolved = net.minecraft.client.network.AllowedAddressResolver.DEFAULT.resolve(net.minecraft.client.network.ServerAddress.parse(address));
+			if (resolved.isEmpty()) {
+				return false;
+			}
+			java.net.InetSocketAddress target = resolved.get().getInetSocketAddress();
+			//?} else {
+			/*var resolved = net.minecraft.client.multiplayer.resolver.ServerNameResolver.DEFAULT.resolveAddress(
+					net.minecraft.client.multiplayer.resolver.ServerAddress.parseString(address));
+			if (resolved.isEmpty()) {
+				return false;
+			}
+			java.net.InetSocketAddress target = resolved.get().asInetSocketAddress();
+			*///?}
+			try (java.net.Socket socket = new java.net.Socket()) {
+				socket.connect(target, 3000);
+				return true;
+			}
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
 	private static Path file() {
 		return VeloPaths.config().resolve("last-server.json");
 	}

@@ -66,7 +66,7 @@ public final class VeloBot extends ListenerAdapter {
 
 	public static void main(String[] args) throws Exception {
 		String token = env("DISCORD_TOKEN", null);
-		String serverUrl = env("VELO_SERVER_URL", "https://client.asteriasmp.net");
+		String serverUrl = env("VELO_SERVER_URL", "https://api.velo-client.com");
 		String adminToken = env("VELO_ADMIN_TOKEN", null);
 		if (token == null || adminToken == null) {
 			System.err.println("Set DISCORD_TOKEN and VELO_ADMIN_TOKEN (and VELO_SERVER_URL) - see bot/README.md");

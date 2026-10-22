@@ -88,18 +88,18 @@ public final class TargetHudModule extends AbstractModule implements HudModule, 
 		shownHealth += (health - shownHealth) * Math.min(1f, 0.25f + tickDelta * 0.1f);
 
 		VeloDraw.shadow(context, x, y, WIDTH, HEIGHT, 8, 6, 2, 0x60000000);
-		VeloDraw.fillRounded(context, x, y, WIDTH, HEIGHT, 8, 0xD0121218);
+		net.veloclient.velo.client.hud.HudLook.panel(context, x, y, WIDTH, HEIGHT);
 		if (target != null) {
 			PlayerHeads.draw(context, PvpCompat.uuid(target).toString(), name, x + 6, y + 6, 34);
 		} else {
-			VeloDraw.fillRounded(context, x + 6, y + 6, 34, 34, 6, 0xFF2A2A33);
+			VeloDraw.fillRounded(context, x + 6, y + 6, 34, 34, 6, 0x40000000);
 		}
 		int textX = x + 46;
-		context.drawTextWithShadow(client.textRenderer, name, textX, y + 6, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, name, textX, y + 6, 0xFFFFFFFF);
 		if (showDistance) {
 			String distance = String.format(Locale.ROOT, "%.1fm", target == null ? 3.1 : PvpCompat.distanceTo(target));
-			int w = client.textRenderer.getWidth(distance);
-			context.drawTextWithShadow(client.textRenderer, distance, x + WIDTH - 6 - w, y + 6, 0xFFB8B8C8);
+			int w = net.veloclient.velo.client.hud.HudLook.measure(distance);
+			net.veloclient.velo.client.hud.HudLook.draw(context, distance, x + WIDTH - 6 - w, y + 6, 0xFFB8B8C8);
 		}
 		// Health bar
 		int barX = textX;
@@ -107,7 +107,7 @@ public final class TargetHudModule extends AbstractModule implements HudModule, 
 		int barW = WIDTH - 52;
 		float ratio = Math.max(0f, Math.min(1f, shownHealth / max));
 		int barColor = ratio > 0.6f ? 0xFF6FE39A : ratio > 0.3f ? 0xFFFFC53D : 0xFFFF5555;
-		VeloDraw.fillRounded(context, barX, barY, barW, 6, 3, 0xFF2A2A33);
+		VeloDraw.fillRounded(context, barX, barY, barW, 6, 3, 0x55000000);
 		if (ratio > 0f) {
 			VeloDraw.fillRounded(context, barX, barY, Math.max(6, Math.round(barW * ratio)), 6, 3, barColor);
 		}
@@ -116,14 +116,14 @@ public final class TargetHudModule extends AbstractModule implements HudModule, 
 			VeloDraw.fillRounded(context, barX, barY + 7, Math.max(4, Math.round(barW * absorbRatio)), 2, 1, 0xFFFFD84A);
 		}
 		String hp = String.format(Locale.ROOT, "%.1f", health) + (absorption > 0f ? String.format(Locale.ROOT, " +%.0f", absorption) : "");
-		context.drawTextWithShadow(client.textRenderer, hp, textX, y + 30, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, hp, textX, y + 30, 0xFFFFFFFF);
 		if (showWinning) {
 			float mine = self.getHealth() + self.getAbsorptionAmount();
 			float theirs = health + absorption;
 			String verdict = mine > theirs + 0.5f ? "Winning" : mine + 0.5f < theirs ? "Losing" : "Even";
 			int color = verdict.equals("Winning") ? 0xFF6FE39A : verdict.equals("Losing") ? 0xFFFF5555 : 0xFFFFC53D;
-			int w = client.textRenderer.getWidth(verdict);
-			context.drawTextWithShadow(client.textRenderer, verdict, x + WIDTH - 6 - w, y + 30, color);
+			int w = net.veloclient.velo.client.hud.HudLook.measure(verdict);
+			net.veloclient.velo.client.hud.HudLook.draw(context, verdict, x + WIDTH - 6 - w, y + 30, color);
 		}
 		if (showArmor && target != null) {
 			int ix = x + WIDTH + 2;

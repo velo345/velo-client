@@ -67,6 +67,11 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	 * shipping it in the first place.
 	 */
 	public static volatile boolean hudCachingEnabled = true;
+	/**
+	 * Turbo Block Entities: share of each block entity renderer's normal view distance (chests, signs, banners, heads,
+	 * shulkers...) that is still drawn; 1 = vanilla. Read by TurboBlockEntitiesMixin.
+	 */
+	public static volatile double turboBlockEntities = 1.0;
 
 	/**
 	 * Velo's own draw-path fixes for work vanilla repeats every frame: skipping GUI layers that
@@ -445,6 +450,9 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 						() -> options.getEntityDistanceScaling().getValue(),
 						v -> { options.getEntityDistanceScaling().setValue(v); refreshRendering(); },
 						v -> Math.round(v * 100) + "%"),
+				new ConfigField.SliderField("Turbo Block Entities (chest, sign & banner distance)", 0.25, 1.0,
+						() -> turboBlockEntities, v -> turboBlockEntities = Math.round(v * 20) / 20.0,
+						v -> v >= 0.999 ? "Vanilla" : Math.round(v * 100) + "%"),
 				new ConfigField.ToggleField("Entity Shadows", () -> options.getEntityShadows().getValue(),
 						v -> { options.getEntityShadows().setValue(v); refreshRendering(); }),
 				new ConfigField.ToggleField("Clouds", () -> options.getCloudRenderMode().getValue() != CloudRenderMode.OFF,
@@ -506,7 +514,8 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	}
 
 	/** Mipmap levels change the texture atlas itself, not just how it's rendered - that needs the heavier full reload, not just a terrain re-queue. */
-	private static void reloadRendering() {
+	/** Rebuilds every loaded chunk (render settings that change block meshes). */
+	public static void reloadRendering() {
 		MinecraftClient client = MinecraftClient.getInstance();
 		//? if <26.1 {
 		if (client.worldRenderer != null) {

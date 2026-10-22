@@ -208,6 +208,44 @@ public final class VeloScrollRegion {
 		}
 	}
 
+	/**
+	 * Lays rows out at fixed spots on a taller page - for pages of mixed sections (headings and banners drawn by the
+	 * screen, tiles as rows). {@code spots[i]} is row i's {x, y from the page top}; the page is {@code pageHeight} tall.
+	 * Draw the non-widget parts relative to {@link #pageTop()}.
+	 */
+	public void layoutPositioned(int[][] spots, int pageHeight) {
+		lastLayout = () -> layoutPositioned(spots, pageHeight);
+		this.pageHeight = pageHeight;
+		remember();
+		int maxScroll = Math.max(0, pageHeight - height);
+		scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
+		shownOffset = Math.max(0, Math.min(shownOffset, maxScroll));
+		for (int i = 0; i < rows.size() && i < spots.length; i++) {
+			ClickableWidget row = rows.get(i);
+			int rowY = pageTop() + spots[i][1];
+			int rowH = row.getHeight();
+			boolean overlaps = rowY + rowH > y && rowY < y + height;
+			int visible = Math.min(rowY + rowH, y + height) - Math.max(rowY, y);
+			row.setX(spots[i][0]);
+			row.setY(overlaps ? rowY : OFFSCREEN_Y);
+			row.visible = overlaps;
+			row.active = overlaps && visible >= rowH * 0.25;
+		}
+	}
+
+	private int pageHeight;
+
+	/** Where the top of a {@link #layoutPositioned} page is drawn right now. */
+	public int pageTop() {
+		return y - (int) Math.round(shownOffset);
+	}
+
+	/** The scrollbar for a {@link #layoutPositioned} page. */
+	public void renderScrollbarPage(DrawContext context) {
+		if (pageHeight > height) {
+			drawScrollbar(context, pageHeight);
+		}
+	}
 
 	public void renderScrollbarGrid(DrawContext context, int columns, int cellHeight, int gap) {
 		columns = Math.max(1, columns);

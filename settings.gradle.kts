@@ -45,3 +45,4 @@ rootProject.name = "velo-client"
 include("launcher")
 include("server")
 include("bot")
+include("panel")

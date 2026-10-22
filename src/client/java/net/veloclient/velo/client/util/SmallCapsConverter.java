@@ -28,9 +28,10 @@ import java.util.Optional;
  *
  * <p>Two letters are deliberately NOT mapped to their small-capital
  * codepoint: 'q' has no widely-supported one (the Unicode 14 addition,
- * U+A7AF, is too new to trust being in Minecraft's bundled font, so it's
- * left as a regular capital 'Q' instead - readable, guaranteed to render,
- * just very slightly taller than its neighbors) and 'x' is left as a plain
+ * U+A7AF, is in neither Inter nor Sora, so it fell back to a pixel glyph),
+ * so it becomes U+01EB 'ǫ' - the look-alike fancy-text generators use, at
+ * small-cap height in Inter and Minecraft's font alike (a capital 'Q' stood
+ * out taller than its neighbours) - and 'x' is left as a plain
  * lowercase 'x' (its shape is already close enough to cap-height at a
  * glance that dedicated small-caps fonts commonly reuse it directly rather
  * than defining a separate glyph). Digits and everything else that isn't a
@@ -100,7 +101,7 @@ public final class SmallCapsConverter {
 			}
 			char lower = Character.toLowerCase(c);
 			if (lower == 'q') {
-				result.append('Q');
+				result.append('\u01EB');
 				continue;
 			}
 			if (lower == 'x') {

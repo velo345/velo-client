@@ -153,6 +153,14 @@ final class SocialRoutes {
 		server.createContext(path, exchange -> VeloServerApp.handle(exchange, method, ex -> {
 			String token = JsonHttp.bearerToken(ex);
 			SessionRegistry.Session session = registry.session(token);
+			if (session == null && path.startsWith("/v1/staff/")) {
+				// The owner panel: staff tools with the admin token, acting as the owner.
+				SessionRegistry.Session panel = StoreRoutes.panelSession(ex);
+				if (panel != null) {
+					handler.handle(ex, panel.uuid());
+					return;
+				}
+			}
 			if (session == null) {
 				JsonHttp.writeError(ex, 401, "Unknown or expired session - re-authenticate");
 				return;

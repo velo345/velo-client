@@ -104,16 +104,16 @@ public final class PlayerLevelsModule extends AbstractModule implements HudModul
 		int height = (shown.size() + 1) * ROW_H + 6;
 		lastRows = shown.size() + 1;
 		VeloDraw.fillRounded(context, x, y, WIDTH, height, 5, 0x90101016);
-		context.drawTextWithShadow(client.textRenderer, "Players by " + label, x + 5, y + 4, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, "Players by " + label, x + 5, y + 4, 0xFFFFFFFF);
 		int ry = y + 4 + ROW_H;
 		for (int index : shown) {
 			Entry e = entries.get(index);
 			int color = e.you() ? 0xFF8FB8FF : e.level() >= highlightAbove ? 0xFFFF5555 : 0xFFDDDDDD;
 			String name = (index + 1) + ". " + net.veloclient.velo.client.gui.widget.VeloUi.trim(e.name(), WIDTH - 60);
-			context.drawTextWithShadow(client.textRenderer, name, x + 5, ry, color);
+			net.veloclient.velo.client.hud.HudLook.draw(context, name, x + 5, ry, color);
 			String value = e.level() + (showPing ? "  " + e.ping() + "ms" : "");
-			int w = client.textRenderer.getWidth(value);
-			context.drawTextWithShadow(client.textRenderer, value, x + WIDTH - 5 - w, ry, color);
+			int w = net.veloclient.velo.client.hud.HudLook.measure(value);
+			net.veloclient.velo.client.hud.HudLook.draw(context, value, x + WIDTH - 5 - w, ry, color);
 			ry += ROW_H;
 		}
 	}

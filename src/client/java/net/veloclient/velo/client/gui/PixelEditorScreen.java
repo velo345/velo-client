@@ -176,7 +176,7 @@ public final class PixelEditorScreen extends VeloWindow {
 		if (name != null) {
 			nameBox = new TextFieldWidget(this.textRenderer, contentX(), contentY(), 150, 16, Text.literal("Name"));
 			nameBox.setText(name);
-			nameBox.setPlaceholder(Text.literal("Name..."));
+			nameBox.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Name..."));
 			nameBox.setChangedListener(v -> name = v);
 			addDrawableChild(nameBox);
 		}

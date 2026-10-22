@@ -30,10 +30,10 @@ import java.util.function.Function;
  * Store card bottom-right.
  *
  * <p>Other mods: every real button stays a real widget in the screen (mods anchor to vanilla's, see
- * TitleScreenMixin) - Velo only moves and paints them. Buttons another mod puts into vanilla's centre column
- * (Mod Menu's "Mods", Flashback's "Open Replays"...) become extra rows under the menu, icon-only ones join the
- * icon row; anything a mod places elsewhere (Essential's character and panels on the right) is left exactly where
- * and how it is - which is why the right side stays clear, and the Store card hides when Essential is installed.
+ * TitleScreenMixin) - Velo only moves and paints them. Mod Menu's button always becomes a main "Mods" entry and
+ * Replay Mod's / Flashback's viewer a "Replays" row (as icons nobody found them); other buttons a mod puts into
+ * vanilla's centre column become extra rows under the menu, icon-only ones join the icon row. Essential's character
+ * and side menu go right of the menu (see {@link EssentialAnchors}); the Store card hides when Essential is installed.
  */
 public final class TitleMenu {
 
@@ -140,6 +140,7 @@ public final class TitleMenu {
 		// ---- Sort the buttons ----
 		java.util.Map<String, ClickableWidget> byKey = new java.util.HashMap<>();
 		List<Row> modRows = new ArrayList<>();
+		Row modsRow = null;
 		List<Icon> icons = new ArrayList<>();
 		ClickableWidget ukulib = env.ukulib();
 		int columnRight = margin + 260;
@@ -177,13 +178,17 @@ public final class TitleMenu {
 				widget.setY(-10000);
 				continue;
 			}
+			// Mod Menu and the replay viewers get real, labelled rows - as small icons nobody recognised them.
+			if (className.startsWith("com.terraformersmc.modmenu")) {
+				modsRow = new Row(widget, Text.literal("Mods"), null, true, false, false);
+				continue;
+			}
+			if (TitleScreenTheme.matchExtraIcon(TitleScreenTheme.TITLE_SIDE_ICONS, label) != null
+					|| label.isEmpty() && TitleScreenTheme.matchExtraIcon(TitleScreenTheme.TITLE_SIDE_ICON_CLASSES, className) != null) {
+				modRows.add(new Row(widget, Text.literal("Replays"), null, false, false, false));
+				continue;
+			}
 			String iconKey = TitleScreenTheme.matchExtraIcon(TitleScreenTheme.TITLE_EXTRA_ICONS, label);
-			if (iconKey == null && className.startsWith("com.terraformersmc.modmenu") && (label.isEmpty() || first[2] <= 24)) {
-				iconKey = "mods";
-			}
-			if (iconKey == null && label.isEmpty()) {
-				iconKey = TitleScreenTheme.matchExtraIcon(TitleScreenTheme.TITLE_SIDE_ICON_CLASSES, className);
-			}
 			boolean iconOnly = label.isEmpty() || first[2] <= 24 && first[3] <= 24;
 			boolean meantForMenu = Math.abs(first[0] + first[2] / 2 - width / 2) <= 110 || first[0] < columnRight;
 			if (iconKey != null) {
@@ -202,12 +207,15 @@ public final class TitleMenu {
 		for (String key : MAIN_KEYS) {
 			if (key.equals("$store")) {
 				rows.add(new Row(storeRow, Text.literal("Store"), "NEW", true, false, false));
+				if (modsRow != null) {
+					rows.add(modsRow);
+				}
 			} else if (byKey.containsKey(key)) {
 				ClickableWidget widget = byKey.get(key);
 				ClickableWidget clickable = widget;
 				HotspotButton proxy = PROXIES.get(key);
 				if (essential && proxy != null) {
-					anchorForEssential(widget, width, margin);
+					RESTYLED.remove(widget);
 					clickable = proxy.forwardTo(widget);
 				}
 				rows.add(new Row(clickable, widget.getMessage(), null, true, key.equals("menu.singleplayer"), key.equals("menu.quit")));
@@ -230,20 +238,41 @@ public final class TitleMenu {
 		y += brandH + (compact ? 10 : large ? 22 : 16);
 
 		LastServer.Entry last = LastServer.get();
-		int cardW = Math.min(large ? 250 : 220, width - margin * 2);
+		// With Essential the free space right of the menu is where its character goes: keep the card narrow.
+		int cardW = Math.min(essential ? 190 : large ? 250 : 220, width - margin * 2);
+		int contentRight = margin + MenuKit.width(renderer, large ? MenuKit.display("VELO CLIENT") : MenuKit.displaySm("VELO CLIENT")) + (large ? 37 : 31);
 		int cardH = large ? 36 : 30;
-		if (last != null && height >= 230) {
+		int cardBlock = cardH + (compact ? 8 : large ? 16 : 12);
+
+		// Everything has to fit above the footer (you, friends, language...): rows get tighter first, the
+		// "Jump back in" card goes only when even tight rows don't fit - most players are at 1080p (GUI 480x270).
+		int iconSize = large ? 22 : 18;
+		int footerY = height - clamp(Math.round(height * 0.07f), 10, 56) - iconSize;
+		int rowH = compact ? 15 : large ? 25 : 19;
+		int secondaryH = compact ? 12 : large ? 16 : 14;
+		// Only servers that answer: no card pointing at one that's down or gone.
+		boolean showCard = last != null && height >= 230 && LastServer.reachable(last);
+		int mains = (int) rows.stream().filter(Row::main).count();
+		int seconds = rows.size() - mains;
+		int room = footerY - 8 - y - (showCard ? cardBlock : 0);
+		while (mains * (rowH + 2) + seconds * secondaryH > room && rowH > (large ? 20 : 15)) {
+			rowH--;
+			secondaryH = Math.max(12, secondaryH - 1);
+		}
+		if (showCard && mains * (rowH + 2) + seconds * secondaryH > room) {
+			showCard = false;
+		}
+		if (showCard) {
 			jumpCard.place(margin, y, cardW, cardH, true);
 			slideIn(context, open, step++);
 			drawJumpCard(context, renderer, margin, y, cardW, cardH, last, MenuKit.hover(jumpCard, hovered(mouseX, mouseY, jumpCard)));
 			context.getMatrices().popMatrix();
+			contentRight = Math.max(contentRight, margin + cardW);
 			y += cardH + (compact ? 8 : large ? 16 : 12);
 		} else {
 			jumpCard.place(0, 0, 0, 0, false);
 		}
 
-		int rowH = compact ? 15 : large ? 25 : 19;
-		int secondaryH = compact ? 12 : large ? 16 : 14;
 		for (Row row : rows) {
 			ClickableWidget widget = row.widget();
 			int h = row.main() ? rowH : secondaryH;
@@ -268,12 +297,11 @@ public final class TitleMenu {
 			slideIn(context, open, step++);
 			drawRow(context, renderer, row, label, margin, y, w, h, large, MenuKit.hover(widget, widget.active && hovered(mouseX, mouseY, widget)));
 			context.getMatrices().popMatrix();
+			contentRight = Math.max(contentRight, margin + w);
 			y += h + (row.main() ? 2 : 0);
 		}
 
 		// ---- Footer: you, friends online, small icon buttons - one row, centred on the icons ----
-		int iconSize = large ? 22 : 18;
-		int footerY = height - clamp(Math.round(height * 0.07f), 10, 56) - iconSize;
 		boolean showFooter = footerY > y + 8;
 		int x = margin;
 		String name = MenuInfo.username();
@@ -315,15 +343,21 @@ public final class TitleMenu {
 			}
 		}
 		context.getMatrices().popMatrix();
+		if (showFooter) {
+			contentRight = Math.max(contentRight, x);
+		}
+		if (essential) {
+			anchorForEssential(byKey, width, contentRight);
+		}
 
 		// ---- Store card, bottom right (unless a mod owns the right side) ----
 		int scW = large ? 180 : 150;
 		int scH = large ? 40 : 34;
-		boolean showCard = !essential && width >= 420 && width - margin - scW > margin + cardW + 20;
+		boolean showStoreCard = !essential && width >= 420 && width - margin - scW > margin + cardW + 20;
 		int scX = width - margin - scW;
 		int scY = footerY + iconSize - scH;
-		storeCard.place(scX, scY, scW, scH, showCard);
-		if (showCard) {
+		storeCard.place(scX, scY, scW, scH, showStoreCard);
+		if (showStoreCard) {
 			slideIn(context, open, step + 2);
 			drawStoreCard(context, renderer, scX, scY, scW, scH, MenuKit.hover(storeCard, hovered(mouseX, mouseY, storeCard)));
 			context.getMatrices().popMatrix();
@@ -331,22 +365,28 @@ public final class TitleMenu {
 	}
 
 	/**
-	 * Essential: a vanilla menu button stays (invisible, unclickable) in a narrow column in the middle of the free space
-	 * right of our menu, at vanilla's height - Essential hangs its character left of that column and its menu right of
-	 * it, so both land in that space instead of off the left edge or under our words.
+	 * Essential: the vanilla menu buttons stay as invisible, unclickable anchors (our proxies take the clicks), parked
+	 * where Essential then draws its character in the free space right of our menu and its side menu at the right
+	 * edge - see {@link EssentialAnchors}. On screens too narrow for the character it goes off-screen (its Wardrobe is
+	 * also in the side menu) instead of over our words.
 	 */
-	private static void anchorForEssential(ClickableWidget widget, int width, int margin) {
-		RESTYLED.remove(widget);
-		int[] first = FIRST_SEEN.get(widget);
-		int freeLeft = margin + 260;
-		int center = Math.max(freeLeft + 130, (freeLeft + width - margin) / 2);
-		widget.setX(center - 10);
-		widget.setWidth(20);
-		if (first != null) {
-			widget.setY(first[1]);
-			widget.setHeight(first[3]);
+	private static void anchorForEssential(Map<String, ClickableWidget> byKey, int width, int contentRight) {
+		ClickableWidget top = byKey.get("menu.singleplayer");
+		ClickableWidget second = byKey.get("menu.multiplayer");
+		EssentialAnchors.Plan plan = EssentialAnchors.plan(width, contentRight, top != null && second != null);
+		for (Map.Entry<String, ClickableWidget> entry : byKey.entrySet()) {
+			ClickableWidget widget = entry.getValue();
+			RESTYLED.remove(widget);
+			int[] first = FIRST_SEEN.get(widget);
+			int x = plan == null ? -10000 : widget == top ? plan.topX() : plan.menuX();
+			widget.setX(x);
+			widget.setWidth(EssentialAnchors.ANCHOR_W);
+			if (first != null) {
+				widget.setY(first[1]);
+				widget.setHeight(first[3]);
+			}
+			widget.visible = false;
 		}
-		widget.visible = false;
 	}
 
 	// ---- Entrance ----

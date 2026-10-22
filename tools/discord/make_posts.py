@@ -136,7 +136,7 @@ def rules():
 
 def download():
     img = header("download", "GET VELO CLIENT", "Free · Windows · macOS · Linux", (40, 8, 10), (14, 10, 12), (255, 80, 60), 2)
-    pill(img, (256, 296), "velo-client-flame.vercel.app", font("Inter-Bold.ttf", 24), (255, 77, 77, 210))
+    pill(img, (256, 296), "velo-client.com", font("Inter-Bold.ttf", 24), (255, 77, 77, 210))
     finish(img, "download.png")
 
 

@@ -17,7 +17,7 @@ Cosmetics, plus a companion JavaFX launcher shell. It has been smoke-tested
 in a real launched client (`./gradlew runClient`), not just compiled.
 
 The marketing site (source and copy under [`velo-site/`](velo-site/)) is
-live at **https://velo-client-flame.vercel.app** — including the Imprint and
+live at **https://velo-client.com** — including the Imprint and
 Privacy Policy required for a project with an identifiable operator.
 
 ### Implemented
@@ -90,7 +90,7 @@ Privacy Policy required for a project with an identifiable operator.
   Identity is proven the same way real Minecraft servers do (join/`hasJoined`
   against Mojang's session server), so the backend never sees anyone's
   access token. On by default, pointed at Velo Client's own official server
-  (`https://client.asteriasmp.net`) - overridable (or turned off entirely)
+  (`https://api.velo-client.com`) - overridable (or turned off entirely)
   via `network.json`, see server/README.md.
 - **Launcher** (`launcher/`): a JavaFX shell with Home (server ping widget
   using the real Server List Ping protocol), Mods (reads the mod's exported

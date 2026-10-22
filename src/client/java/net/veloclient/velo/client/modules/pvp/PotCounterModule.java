@@ -24,7 +24,7 @@ public final class PotCounterModule extends AbstractModule implements HudModule,
 	private final HudPosition position = new HudPosition(0.60f, 0.86f);
 	private String counting = "Healing Splash";
 	private boolean hideWhenNone = false;
-	private boolean showBackground = true;
+	private boolean showBackground = false;
 	private double warnBelow = 3;
 
 	public PotCounterModule() {
@@ -70,8 +70,8 @@ public final class PotCounterModule extends AbstractModule implements HudModule,
 		context.drawItemWithoutEntity(icon, x + 4, y + 3);
 		String label = String.valueOf(count);
 		int color = count == 0 ? 0xFFFF5555 : count < warnBelow ? 0xFFFFC53D : 0xFF6FE39A;
-		int textWidth = client.textRenderer.getWidth(label);
-		context.drawTextWithShadow(client.textRenderer, label, x + 24 + (width() - 28 - textWidth) / 2, y + 7, color);
+		int textWidth = net.veloclient.velo.client.hud.HudLook.measure(label);
+		net.veloclient.velo.client.hud.HudLook.draw(context, label, x + 24 + (width() - 28 - textWidth) / 2, y + 7, color);
 	}
 
 	@Override

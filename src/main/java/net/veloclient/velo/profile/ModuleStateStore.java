@@ -23,6 +23,8 @@ public final class ModuleStateStore {
 	/** Snapshot entry (not a module) recording which key codes the keybind fields hold. */
 	public static final String META_ID = "_velo";
 	private static final String KEY_FORMAT = "Key format";
+	/** Set once a profile has the 0.9.8 HUD look (elements without their own dark boxes). */
+	private static final String HUD_LOOK = "HUD look";
 
 	/**
 	 * Key codes changed meaning in 26.3 (GLFW key codes -> SDL scancodes). The client sets the
@@ -60,7 +62,7 @@ public final class ModuleStateStore {
 			}
 			result.put(module.id(), new ModuleSnapshot(module.isEnabled(), fields));
 		}
-		result.put(META_ID, new ModuleSnapshot(false, Map.of(KEY_FORMAT, currentKeyFormat)));
+		result.put(META_ID, new ModuleSnapshot(false, Map.of(KEY_FORMAT, currentKeyFormat, HUD_LOOK, "0.9.8")));
 		return result;
 	}
 
@@ -70,6 +72,7 @@ public final class ModuleStateStore {
 	 * text style instead of silently losing its CPS display.
 	 */
 	static Map<String, ModuleSnapshot> migrate(Map<String, ModuleSnapshot> snapshot) {
+		snapshot = migrateHudLook(snapshot);
 		ModuleSnapshot cps = snapshot.get("cps-counter");
 		ModuleSnapshot mouse = snapshot.get("mouse-buttons");
 		if (cps == null || !cps.enabled() || (mouse != null && mouse.enabled())) {
@@ -80,6 +83,30 @@ public final class ModuleStateStore {
 		fields.put("Style", "Text");
 		result.put("mouse-buttons", new ModuleSnapshot(true, fields));
 		result.remove("cps-counter");
+		return result;
+	}
+
+	/**
+	 * 0.9.8: HUD elements dropped their dark boxes by default (they hid the world). A profile saved before that still
+	 * says "Show Background: on" for most of them - once, those switches are dropped so the new default applies.
+	 */
+	static Map<String, ModuleSnapshot> migrateHudLook(Map<String, ModuleSnapshot> snapshot) {
+		ModuleSnapshot meta = snapshot.get(META_ID);
+		if (meta != null && meta.fields().get(HUD_LOOK) != null) {
+			return snapshot;
+		}
+		Map<String, ModuleSnapshot> result = new LinkedHashMap<>(snapshot);
+		for (Map.Entry<String, ModuleSnapshot> entry : snapshot.entrySet()) {
+			Map<String, Object> fields = entry.getValue().fields();
+			if (fields.containsKey("Show Background") || fields.containsKey("Background") && fields.get("Background") instanceof Boolean) {
+				Map<String, Object> copy = new LinkedHashMap<>(fields);
+				copy.remove("Show Background");
+				if (copy.get("Background") instanceof Boolean) {
+					copy.remove("Background");
+				}
+				result.put(entry.getKey(), new ModuleSnapshot(entry.getValue().enabled(), copy));
+			}
+		}
 		return result;
 	}
 

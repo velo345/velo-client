@@ -174,6 +174,11 @@ public final class FriendsScreen extends VeloWindow {
 	// ---- Layout ----
 
 	@Override
+	protected boolean contentReady() {
+		return net.veloclient.velo.client.network.SocialClient.snapshot() != null;
+	}
+
+	@Override
 	protected void layoutContent() {
 		openInstance = this;
 		if (addField != null) {
@@ -187,7 +192,7 @@ public final class FriendsScreen extends VeloWindow {
 		int leftX = contentX();
 		addField = new TextFieldWidget(this.textRenderer, leftX + CARD_PAD + 6, contentY() + CARD_PAD + 40, leftWidth() - CARD_PAD * 2 - 58, 14, Text.literal("Add friend"));
 		addField.setDrawsBackground(false);
-		addField.setPlaceholder(Text.literal(VeloUi.trim("Username or UUID", addField.getWidth() - 8)));
+		addField.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder(VeloUi.trim("Username or UUID", addField.getWidth() - 8)));
 		addField.setMaxLength(36);
 		addField.setText(addFieldValue);
 		addDrawableChild(addField);
@@ -196,7 +201,7 @@ public final class FriendsScreen extends VeloWindow {
 		int rightWidth = rightWidth();
 		chatField = new TextFieldWidget(this.textRenderer, rightX + 12, contentBottom() - 19, rightWidth - 64, 14, Text.literal("Message"));
 		chatField.setDrawsBackground(false);
-		chatField.setPlaceholder(Text.literal(VeloUi.trim(view == View.PARTY ? "Message your party..." : "Write a message...", chatField.getWidth() - 8)));
+		chatField.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder(VeloUi.trim(view == View.PARTY ? "Message your party..." : "Write a message...", chatField.getWidth() - 8)));
 		chatField.setMaxLength(500);
 		chatField.setText(chatFieldValue);
 		chatField.visible = view == View.CHAT && SocialClient.friend(selected) != null || view == View.PARTY && SocialClient.party() != null;

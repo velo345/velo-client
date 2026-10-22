@@ -1,0 +1,24 @@
+<article class="wrap">
+  <div class="article">
+    <header class="article-hero">
+      <nav aria-label="Breadcrumb" class="mono fade-up" style="--d:.05s"><a href="/news">News</a> / {{post.tag}}</nav>
+      <div class="news-meta fade-up" style="--d:.1s"><span class="tag tag-{{post.tagClass}}">{{post.tag}}</span><time datetime="{{post.date}}">{{post.prettyDate}}</time></div>
+      <h1 data-split>{{post.title}}</h1>
+      <p class="fade-up" style="--d:.45s">{{post.summary}}</p>
+    </header>
+    <img class="article-cover fade-up" style="--d:.55s" src="{{post.cover}}" alt="{{post.title}}" width="1600" height="976">
+    <div class="prose" style="margin-top:36px">
+{{post.body}}
+    </div>
+    <div class="callout reveal" style="margin-top:48px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">
+      <p><strong>Get the update:</strong> the launcher updates itself. New here? It's free.</p>
+      <a class="btn btn-primary btn-sm" href="/download">Download Velo Client</a>
+    </div>
+  </div>
+  <section class="section" style="padding-top:50px" aria-label="More news">
+    <div class="store-section-head"><h2 style="font-size:1.6rem">More news</h2><a href="/news">All news →</a></div>
+    <div class="news-grid">
+{{post.more}}
+    </div>
+  </section>
+</article>

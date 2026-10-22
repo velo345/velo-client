@@ -36,6 +36,11 @@ public final class MouseButtonsModule extends AbstractModule implements HudModul
 
 	private final HudPosition position = new HudPosition(0.02f, 0.66f);
 
+	/** The last wheel turn: when, and which way (+1 up, -1 down) - the Mouse style shows it on the wheel. */
+	private static volatile long lastScrollNanos;
+	private static volatile int lastScrollDirection;
+	private static final long SCROLL_SHOW_NANOS = 280_000_000L;
+
 	private String style = STYLE_MOUSE;
 	private boolean showCps = true;
 	// Off by default - the plain body box below the two buttons is mostly dead space.
@@ -87,10 +92,10 @@ public final class MouseButtonsModule extends AbstractModule implements HudModul
 		if (showCps) {
 			String leftCps = String.valueOf(CpsTracker.leftCps());
 			String rightCps = String.valueOf(CpsTracker.rightCps());
-			context.drawTextWithShadow(client.textRenderer, leftCps,
-					x + INSET + (halfW - client.textRenderer.getWidth(leftCps)) / 2, y + INSET + TOP_HEIGHT / 2 - 3, textColor);
-			context.drawTextWithShadow(client.textRenderer, rightCps,
-					x + INSET + halfW + 2 + (halfW - client.textRenderer.getWidth(rightCps)) / 2, y + INSET + TOP_HEIGHT / 2 - 3, textColor);
+			net.veloclient.velo.client.hud.HudLook.draw(context, leftCps,
+					x + INSET + (halfW - net.veloclient.velo.client.hud.HudLook.measure(leftCps)) / 2, y + INSET + TOP_HEIGHT / 2 - 3, textColor);
+			net.veloclient.velo.client.hud.HudLook.draw(context, rightCps,
+					x + INSET + halfW + 2 + (halfW - net.veloclient.velo.client.hud.HudLook.measure(rightCps)) / 2, y + INSET + TOP_HEIGHT / 2 - 3, textColor);
 		}
 	}
 
@@ -98,13 +103,27 @@ public final class MouseButtonsModule extends AbstractModule implements HudModul
 		String left = String.valueOf(CpsTracker.leftCps());
 		String right = String.valueOf(CpsTracker.rightCps());
 		int cx = x;
-		context.drawTextWithShadow(client.textRenderer, left, cx, y, leftPressed ? pressedColor | 0xFF000000 : textColor);
-		cx += client.textRenderer.getWidth(left);
-		context.drawTextWithShadow(client.textRenderer, " | ", cx, y, (textColor & 0x00FFFFFF) | 0x99000000);
-		cx += client.textRenderer.getWidth(" | ");
-		context.drawTextWithShadow(client.textRenderer, right, cx, y, rightPressed ? pressedColor | 0xFF000000 : textColor);
-		cx += client.textRenderer.getWidth(right);
-		context.drawTextWithShadow(client.textRenderer, " CPS", cx, y, textColor);
+		net.veloclient.velo.client.hud.HudLook.draw(context, left, cx, y, leftPressed ? pressedColor | 0xFF000000 : textColor);
+		cx += net.veloclient.velo.client.hud.HudLook.measure(left);
+		net.veloclient.velo.client.hud.HudLook.draw(context, " | ", cx, y, (textColor & 0x00FFFFFF) | 0x99000000);
+		cx += net.veloclient.velo.client.hud.HudLook.measure(" | ");
+		net.veloclient.velo.client.hud.HudLook.draw(context, right, cx, y, rightPressed ? pressedColor | 0xFF000000 : textColor);
+		cx += net.veloclient.velo.client.hud.HudLook.measure(right);
+		net.veloclient.velo.client.hud.HudLook.draw(context, " CPS", cx, y, textColor);
+	}
+
+	/** Called for every scroll of the mouse wheel. */
+	public static void noteScroll(double vertical) {
+		if (vertical != 0) {
+			lastScrollDirection = vertical > 0 ? 1 : -1;
+			lastScrollNanos = System.nanoTime();
+		}
+	}
+
+	/** 1 right after a wheel turn, fading to 0. */
+	private static float scrollGlow() {
+		long age = System.nanoTime() - lastScrollNanos;
+		return lastScrollNanos == 0 || age > SCROLL_SHOW_NANOS ? 0f : 1f - (float) age / SCROLL_SHOW_NANOS;
 	}
 
 	/** Middle mouse button straight from the mouse (works whatever pick-block is bound to). */
@@ -138,6 +157,14 @@ public final class MouseButtonsModule extends AbstractModule implements HudModul
 		int wheelY = y + 4;
 		VeloDraw.fillRounded(context, wheelX - 1, wheelY - 1, wheelW + 2, wheelH + 2, 3, (idleColor & 0x00FFFFFF) | 0xFF000000);
 		VeloDraw.fillRounded(context, wheelX, wheelY, wheelW, wheelH, 2, middle ? pressedColor | 0xFF000000 : 0xCCFFFFFF);
+		float glow = scrollGlow();
+		if (glow > 0f) {
+			// Scrolling: a small red chevron just above / below the wheel, pointing the way it turned.
+			int color = (pressedColor & 0x00FFFFFF) | Math.round(255 * glow) << 24;
+			boolean up = lastScrollDirection > 0;
+			float cy = up ? wheelY - 2.5f : wheelY + wheelH + 2.5f;
+			VeloDraw.chevron(context, wheelX + wheelW / 2f, cy, 6f, 1.4f, up ? 3 : 1, color);
+		}
 		VeloDraw.strokeRounded(context, x, y, MOUSE_W, MOUSE_H, radius, 0x40FFFFFF);
 		if (showCps) {
 			// CPS inside each button, beside the wheel.
@@ -146,11 +173,11 @@ public final class MouseButtonsModule extends AbstractModule implements HudModul
 			int textY = y + MOUSE_SPLIT - client.textRenderer.fontHeight - 4;
 			int leftCenter = x + (half - 3) / 2 + 2;
 			int rightCenter = x + half + 3 + (half - 3) / 2 - 1;
-			context.drawTextWithShadow(client.textRenderer, left, leftCenter - client.textRenderer.getWidth(left) / 2, textY, textColor);
-			context.drawTextWithShadow(client.textRenderer, right, rightCenter - client.textRenderer.getWidth(right) / 2, textY, textColor);
+			net.veloclient.velo.client.hud.HudLook.draw(context, left, leftCenter - net.veloclient.velo.client.hud.HudLook.measure(left) / 2, textY, textColor);
+			net.veloclient.velo.client.hud.HudLook.draw(context, right, rightCenter - net.veloclient.velo.client.hud.HudLook.measure(right) / 2, textY, textColor);
 			// "CPS" under the split, small and faint.
 			String label = "CPS";
-			context.drawTextWithShadow(client.textRenderer, label, x + half - client.textRenderer.getWidth(label) / 2 + 1, y + MOUSE_SPLIT + (MOUSE_H - MOUSE_SPLIT - client.textRenderer.fontHeight) / 2,
+			net.veloclient.velo.client.hud.HudLook.draw(context, label, x + half - net.veloclient.velo.client.hud.HudLook.measure(label) / 2 + 1, y + MOUSE_SPLIT + (MOUSE_H - MOUSE_SPLIT - client.textRenderer.fontHeight) / 2,
 					(textColor & 0x00FFFFFF) | 0x80000000);
 		}
 	}
@@ -158,7 +185,7 @@ public final class MouseButtonsModule extends AbstractModule implements HudModul
 	@Override
 	public int width() {
 		return switch (style) {
-			case STYLE_TEXT -> MinecraftClient.getInstance().textRenderer.getWidth("00 | 00 CPS");
+			case STYLE_TEXT -> net.veloclient.velo.client.hud.HudLook.measure("00 | 00 CPS");
 			case STYLE_MOUSE -> MOUSE_W;
 			default -> BOX_WIDTH;
 		};

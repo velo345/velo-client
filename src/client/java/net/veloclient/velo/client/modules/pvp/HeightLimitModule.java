@@ -55,16 +55,16 @@ public final class HeightLimitModule extends AbstractModule implements HudModule
 		if (onlyWhenClose && up > closeBlocks && !editing) {
 			return;
 		}
-		VeloDraw.fillRounded(context, x, y, width(), height(), 6, 0x90101014);
+		net.veloclient.velo.client.hud.HudLook.panel(context, x, y, width(), height());
 		int upColor = up <= 3 ? 0xFFFF5555 : up <= 8 ? 0xFFFFC53D : 0xFFFFFFFF;
-		context.drawTextWithShadow(client.textRenderer, "Limit", x + 6, y + 6, 0xFF9A9AA6);
+		net.veloclient.velo.client.hud.HudLook.draw(context, "Limit", x + 6, y + 6, 0xFF9A9AA6);
 		String upText = up <= 0 ? "MAX" : "↑ " + up;
-		context.drawTextWithShadow(client.textRenderer, upText, x + width() - 6 - client.textRenderer.getWidth(upText), y + 6, upColor);
+		net.veloclient.velo.client.hud.HudLook.draw(context, upText, x + width() - 6 - net.veloclient.velo.client.hud.HudLook.measure(upText), y + 6, upColor);
 		if (showVoid) {
 			int downColor = down <= 5 ? 0xFFFF5555 : 0xFFB8B8C8;
-			context.drawTextWithShadow(client.textRenderer, "Void", x + 6, y + 18, 0xFF9A9AA6);
+			net.veloclient.velo.client.hud.HudLook.draw(context, "Void", x + 6, y + 18, 0xFF9A9AA6);
 			String downText = "↓ " + down;
-			context.drawTextWithShadow(client.textRenderer, downText, x + width() - 6 - client.textRenderer.getWidth(downText), y + 18, downColor);
+			net.veloclient.velo.client.hud.HudLook.draw(context, downText, x + width() - 6 - net.veloclient.velo.client.hud.HudLook.measure(downText), y + 18, downColor);
 		}
 	}
 

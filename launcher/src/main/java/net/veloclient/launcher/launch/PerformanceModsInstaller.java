@@ -27,7 +27,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * Installs a small, curated set of widely-used Fabric optimization mods (and Wavey Capes, for nicer capes) into a profile, from
+ * Installs a small, curated set of widely-used Fabric optimization mods (plus Wavey Capes, for nicer capes, and Mod Menu) into a profile, from
  * their official Modrinth releases - the single biggest FPS lever there is. Most of the frame
  * rate gap between vanilla and "PvP clients" comes from exactly this kind of engine-level work
  * (Sodium's rewritten chunk renderer alone is typically 2-3x or more), which no in-game
@@ -60,10 +60,15 @@ public final class PerformanceModsInstaller {
 		MODS.put("modernfix", "modernfix");
 		// Not performance: physics for capes (Velo Client detects it and hands it Velo's capes). Fetched from Modrinth like the rest, never bundled.
 		MODS.put("wavey-capes", "waveycapes");
+		// Not performance either: Mod Menu is how players find their mods. Its library first (Modrinth lists it as required).
+		MODS.put("placeholder-api", "placeholder-api");
+		MODS.put("modmenu", "modmenu");
 	}
 
-	/** Modrinth's project id for Fabric API - the one dependency always satisfied here. */
+	/** Modrinth's project id for Fabric API - always satisfied here. */
 	private static final String FABRIC_API_PROJECT_ID = "P7dR8mSH";
+	/** Text Placeholder API - installed by this list itself, ahead of Mod Menu. */
+	private static final String PLACEHOLDER_API_PROJECT_ID = "eXts2L7r";
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final String STATE_FILE = "velo-performance-mods.json";
@@ -157,7 +162,7 @@ public final class PerformanceModsInstaller {
 		}
 		ModrinthClient.ProjectVersion projectVersion = chosen.get();
 		boolean unmetDependency = projectVersion.requiredDependencies().stream()
-				.anyMatch(d -> !FABRIC_API_PROJECT_ID.equals(d.projectId()));
+				.anyMatch(d -> !FABRIC_API_PROJECT_ID.equals(d.projectId()) && !PLACEHOLDER_API_PROJECT_ID.equals(d.projectId()));
 		if (unmetDependency) {
 			// Fabric API is always installed alongside velo-client (FabricApiInstaller); anything
 			// else would need resolving, which this installer doesn't guess at - skip that mod.

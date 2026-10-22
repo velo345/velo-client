@@ -20,7 +20,7 @@ import java.util.function.Consumer;
  */
 final class InfoPosts {
 
-	static final String SITE = "https://velo-client-flame.vercel.app/";
+	static final String SITE = "https://velo-client.com/";
 	static final String[] KINDS = {"rules", "download", "free-cape", "boosters"};
 
 	private static final int RED = 0xFF4D4D;

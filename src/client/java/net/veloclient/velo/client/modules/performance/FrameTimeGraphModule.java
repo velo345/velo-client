@@ -49,7 +49,7 @@ public final class FrameTimeGraphModule extends AbstractModule implements HudMod
 
 		double lastMs = frameTimesNanos[(cursor + SAMPLES - 1) % SAMPLES] / 1_000_000.0;
 		MinecraftClient client = MinecraftClient.getInstance();
-		context.drawTextWithShadow(client.textRenderer, String.format("%.1f ms", lastMs), x, y + GRAPH_HEIGHT + 2, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, String.format("%.1f ms", lastMs), x, y + GRAPH_HEIGHT + 2, 0xFFFFFFFF);
 	}
 
 	@Override

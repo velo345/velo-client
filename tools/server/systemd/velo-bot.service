@@ -1,0 +1,32 @@
+[Unit]
+Description=Velo Client Discord bot
+After=network-online.target velo-server.service
+Wants=network-online.target
+
+[Service]
+User=velo-bot
+Group=velo
+WorkingDirectory=/opt/velo/bot
+EnvironmentFile=/etc/velo/bot.env
+ExecStart=/usr/bin/java -Xms64m -Xmx384m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -jar /opt/velo/bot/velo-bot.jar
+Restart=always
+RestartSec=10
+UMask=0007
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/velo/bot
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictNamespaces=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=600M
+
+[Install]
+WantedBy=multi-user.target

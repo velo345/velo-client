@@ -88,7 +88,7 @@ public final class VeloStatsScreen extends VeloWindow {
 		this.clearChildren();
 		String previous = search != null ? search.getText() : "";
 		search = new TextFieldWidget(this.textRenderer, contentX() + contentWidth() - 250, contentY(), 170, 16, Text.literal("Search"));
-		search.setPlaceholder(Text.literal("Search stats, items, mobs..."));
+		search.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Search stats, items, mobs..."));
 		search.setText(previous);
 		search.setChangedListener(v -> {
 			scroll = 0;

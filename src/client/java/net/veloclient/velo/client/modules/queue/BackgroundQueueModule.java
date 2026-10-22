@@ -219,22 +219,22 @@ public final class BackgroundQueueModule extends AbstractModule implements Confi
 		VeloDraw.fillRounded(context, x, y, width, height, 6, 0xB0101014);
 		VeloDraw.fillRounded(context, x, y + 4, 2, height - 8, 1, hudColor);
 		int lineY = y + 5;
-		context.drawTextWithShadow(textRenderer, peeked != null ? "BACKGROUND - PEEKING" : "BACKGROUND SESSIONS", x + 8, lineY, VeloUi.withAlpha(hudColor, 0xCC));
+		net.veloclient.velo.client.hud.HudLook.draw(context, peeked != null ? "BACKGROUND - PEEKING" : "BACKGROUND SESSIONS", x + 8, lineY, VeloUi.withAlpha(hudColor, 0xCC));
 		lineY += 12;
 		for (var summary : shown) {
 			VeloDraw.fillCircle(context, x + 11, lineY + 4, 2, statusColor(summary));
-			context.drawTextWithShadow(textRenderer, VeloUi.trim(summary.displayName(), width - 22), x + 17, lineY, 0xFFFFFFFF);
+			net.veloclient.velo.client.hud.HudLook.draw(context, VeloUi.trim(summary.displayName(), width - 22), x + 17, lineY, 0xFFFFFFFF);
 			lineY += 10;
-			context.drawTextWithShadow(textRenderer, VeloUi.trim(statusLine(summary), width - 22), x + 17, lineY, VeloUi.withAlpha(0xFFFFFFFF, 0xA0));
+			net.veloclient.velo.client.hud.HudLook.draw(context, VeloUi.trim(statusLine(summary), width - 22), x + 17, lineY, VeloUi.withAlpha(0xFFFFFFFF, 0xA0));
 			lineY += 11;
 		}
 		if (peeked != null) {
 			if (peeked.actionBar() != null && System.currentTimeMillis() - peeked.actionBarTime() < 15000) {
-				context.drawTextWithShadow(textRenderer, VeloUi.trim(peeked.actionBar(), width - 16), x + 8, lineY, hudColor);
+				net.veloclient.velo.client.hud.HudLook.draw(context, VeloUi.trim(peeked.actionBar(), width - 16), x + 8, lineY, hudColor);
 				lineY += 11;
 			}
 			for (String message : peeked.recentMessages().subList(Math.max(0, peeked.recentMessages().size() - 4), peeked.recentMessages().size())) {
-				context.drawTextWithShadow(textRenderer, VeloUi.trim(message, width - 16), x + 8, lineY, 0xFFD0D4DC);
+				net.veloclient.velo.client.hud.HudLook.draw(context, VeloUi.trim(message, width - 16), x + 8, lineY, 0xFFD0D4DC);
 				lineY += 10;
 			}
 		}

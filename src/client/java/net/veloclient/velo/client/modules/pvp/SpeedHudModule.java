@@ -25,7 +25,7 @@ public final class SpeedHudModule extends AbstractModule implements HudModule, C
 	private double lastY;
 	private double lastZ;
 	private boolean includeVertical = false;
-	private boolean showBackground = true;
+	private boolean showBackground = false;
 
 	public SpeedHudModule() {
 		super("speed-hud", "Speed", "Shows how fast you're moving in blocks per second.", ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
@@ -65,7 +65,7 @@ public final class SpeedHudModule extends AbstractModule implements HudModule, C
 		if (showBackground) {
 			VeloDraw.fillRounded(context, x, y, width(), height(), 6, 0x90101014);
 		}
-		context.drawTextWithShadow(client.textRenderer, label, x + (width() - client.textRenderer.getWidth(label)) / 2, y + 6, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, label, x + (width() - net.veloclient.velo.client.hud.HudLook.measure(label)) / 2, y + 6, 0xFFFFFFFF);
 	}
 
 	@Override

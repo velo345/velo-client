@@ -49,6 +49,8 @@ public final class CosmeticUi {
 	});
 	private static final Map<String, List<Consumer<List<GifFrames.Frame>>>> WAITING = new java.util.HashMap<>();
 	private static final Map<String, Image> THUMBNAILS = LauncherCaches.lru(120);
+	/** Hover animation frames, one array per cape and size - in THUMBNAILS, three 40-frame capes evicted each other's frames and every hover re-rendered them all. */
+	private static final Map<String, Image[]> FRAME_THUMBNAILS = LauncherCaches.lru(10);
 	private static volatile String skinOwner;
 	private static volatile SkinFetcher.SkinData skin;
 
@@ -181,8 +183,14 @@ public final class CosmeticUi {
 		if (index == 0) {
 			return thumbnail(key, frames, width, height);
 		}
-		return THUMBNAILS.computeIfAbsent(key + "@" + (int) width + "x" + (int) height + "#" + index,
-				k -> PlayerSkin3DView.capeThumbnail(frames.get(index).image(), width, height));
+		Image[] rendered = FRAME_THUMBNAILS.computeIfAbsent(key + "@" + (int) width + "x" + (int) height, k -> new Image[frames.size()]);
+		if (index >= rendered.length) {
+			return thumbnail(key, frames, width, height);
+		}
+		if (rendered[index] == null) {
+			rendered[index] = PlayerSkin3DView.capeThumbnail(frames.get(index).image(), width, height);
+		}
+		return rendered[index];
 	}
 
 	/**

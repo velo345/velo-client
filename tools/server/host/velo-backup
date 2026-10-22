@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Nightly backup of everything Velo keeps: server data (SQLite copied safely while running), bot data, the website.
+# Keeps 14 days in /opt/velo/backups (the owner panel can download them). Secrets (/etc/velo) are NOT included.
+set -euo pipefail
+umask 027
+DEST=/opt/velo/backups
+STAMP=$(date +%Y-%m-%d_%H%M)
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+mkdir -p "$WORK/server-data"
+# Live SQLite databases through the backup API (consistent even while velo-server writes).
+for db in /opt/velo/server/data/*.db; do
+	[ -e "$db" ] || continue
+	python3 -I -c 'import sqlite3,sys; s=sqlite3.connect("file:"+sys.argv[1]+"?mode=ro", uri=True); d=sqlite3.connect(sys.argv[2]); s.backup(d); d.close(); s.close()' "$db" "$WORK/server-data/$(basename "$db")"
+done
+tar -C /opt/velo/server/data --exclude='*.db' --exclude='*.db-wal' --exclude='*.db-shm' -cf - . | tar -C "$WORK/server-data" -xf -
+tar -C "$WORK" -czf "$DEST/velo-$STAMP.tar.gz" server-data -C /opt/velo/bot bot-data -C /var/www velo-client.com
+chgrp velo "$DEST/velo-$STAMP.tar.gz"
+chmod 640 "$DEST/velo-$STAMP.tar.gz"
+find "$DEST" -name 'velo-*.tar.gz' -mtime +14 -delete
+echo "backup $DEST/velo-$STAMP.tar.gz $(du -h "$DEST/velo-$STAMP.tar.gz" | cut -f1)"

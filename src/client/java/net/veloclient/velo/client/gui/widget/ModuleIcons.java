@@ -35,7 +35,20 @@ public final class ModuleIcons {
 			"old-animations", "hit-color", "hit-particles", "cooldowns", "health-indicator", "enemy-effects", "enemy-hunger",
 			"target-hud", "combo-counter", "reach-display", "pot-counter", "anti-farm-lag", "item-position",
 			"damage-numbers", "hit-sounds", "auto-gg", "height-limit", "speed-hud", "direction-hud", "arrow-counter",
-			"low-health-warning", "low-fire", "clips", "fight-recap", "party-ping", "server-overlays", "player-levels", "mode-presets", "chat-tweaks", "hopper-speed", "fast-grow");
+			"low-health-warning", "low-fire", "clips", "fight-recap", "party-ping", "server-overlays", "player-levels", "mode-presets", "chat-tweaks", "hopper-speed", "fast-grow", "hud-style", "wings-cosmetics", "aura-cosmetics",
+			// Velo+ Addons (tools/icons/addon_icons.json -> render_icons.py)
+			"addons-kill-switch", "air-jump", "anti-knockback", "auto-anchor", "auto-armor", "auto-cart", "auto-clicker",
+			"auto-craft", "auto-crystal", "auto-dodge", "auto-eat", "auto-excavator", "auto-extinguish", "auto-fish",
+			"auto-jump", "auto-mace", "auto-mend", "auto-mlg", "auto-pot", "auto-shield", "auto-totem", "auto-trade",
+			"auto-trigger", "auto-tunnel-miner", "auto-walk", "auto-write", "block-finder", "bow-aimbot", "cinematic-camera",
+			"criticals", "ender-chest-farmer", "enemy-armor", "entity-finder", "fast-break", "fast-place", "fly", "fly-boat",
+			"inventory-move", "jesus", "jump-boost", "kill-aura", "no-fall", "no-slow", "reach", "safe-walk", "scaffold",
+			"shield-breaker", "speed", "spider", "storage-finder", "stun-slam", "terminator", "w-tap",
+			"wall-jump", "x-ray", "elytra-mace", "firework-mace",
+			// Core modules that showed the fallback grid before (also from addon_icons.json, group Core)
+			"attack-indicator", "auto-reconnect", "chunk-load-profiler", "entity-detail", "fly-speed", "free-look",
+			"module-profiler", "nick-hider", "phantom", "render-culling", "velo-network", "screen-stretch",
+			"hide-foliage", "container-animations", "emoji-chat");
 
 	private ModuleIcons() {
 	}

@@ -98,9 +98,18 @@ public final class VeloCapeTile extends ClickableWidget {
 		int edge = equipped ? 0xFF3DDC97 : selected ? 0xD0FFFFFF : VeloAnim.lerpArgb(0x14FFFFFF, 0x40FFFFFF, hover);
 		VeloDraw.strokeRounded(context, x, y, w, h, 7, edge);
 		int area = h - NAME_H - 4;
-		Identifier texture = CapeManager.textureIdentifier(definition);
-		VeloCapeRender.draw(context, texture, TEMPLATE_WIDTH, TEMPLATE_HEIGHT, x + w / 2f, y + 3 + area - 8,
-				area - 18, VeloCapeRender.idleYaw(phase, hover));
+		// Loaded off-thread: a soft pulse until the cape is ready, so the Locker opens instantly.
+		Identifier texture = CapeManager.textureIfReady(definition);
+		if (texture == null) {
+			float pulse = 0.5f + 0.5f * (float) Math.sin(System.nanoTime() / 2.5e8);
+			int pw = Math.max(8, (w - 6) / 3);
+			int ph = Math.max(10, area - 30);
+			VeloDraw.fillRounded(context, x + (w - pw) / 2, y + 3 + (area - ph) / 2, pw, ph, 4,
+					VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x0A + 0x10 * pulse)));
+		} else {
+			VeloCapeRender.draw(context, texture, TEMPLATE_WIDTH, TEMPLATE_HEIGHT, x + w / 2f, y + 3 + area - 8,
+					area - 18, VeloCapeRender.idleYaw(phase, hover));
+		}
 
 		TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
 		int textY = y + h - NAME_H + 4;

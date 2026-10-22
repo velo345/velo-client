@@ -73,7 +73,7 @@ public final class InstanceSettingsDialog {
 		systemInfo.getStyleClass().add("version-tag");
 		grid.addRow(5, systemInfo);
 		PerformanceModsInstaller.State perfState = PerformanceModsInstaller.readState(instance.id());
-		CheckBox perfMods = new CheckBox("Install performance mods (Sodium, Lithium, FerriteCore, EntityCulling, ImmediatelyFast, ModernFix) and Wavey Capes");
+		CheckBox perfMods = new CheckBox("Install recommended mods (Sodium, Lithium, FerriteCore, EntityCulling, ImmediatelyFast, ModernFix, Wavey Capes, Mod Menu)");
 		perfMods.setSelected(perfState.enabled);
 		grid.add(perfMods, 0, 6, 3, 1);
 

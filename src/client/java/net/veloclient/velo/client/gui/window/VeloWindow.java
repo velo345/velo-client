@@ -37,8 +37,17 @@ public abstract class VeloWindow extends Screen {
 	private double dragOffsetY;
 	private float openProgress;
 	private boolean closing;
+	/** Spring animation ({@link #springAnimation()}): when the window started opening / closing. */
+	private long openedAtNanos = -1;
+	private long closingAtNanos;
+	private float springScale = 1f;
+	private float springRise;
 	private Runnable onClosed;
 	private Screen returnScreen;
+	/** The last frame any Velo window drew - a window opening right after one is a hand-off, not a fresh open. */
+	private static long lastWindowFrameNanos;
+	private boolean openDecided;
+	private boolean handedOff;
 
 	protected VeloWindow(Text title, int windowWidth, int windowHeight) {
 		super(title);
@@ -113,7 +122,30 @@ public abstract class VeloWindow extends Screen {
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		float deltaSeconds = MinecraftClient.getInstance().getRenderTickCounter().getDynamicDeltaTicks() / 20f;
-		openProgress = VeloAnim.step(openProgress, closing ? 0f : 1f, Math.max(deltaSeconds, 1 / 60f) * 3f);
+		long frameNanos = System.nanoTime();
+		if (!openDecided) {
+			// Opened straight from another Velo window (a rail tab, a sub-page): no second open animation - the
+			// window just stays put and the new page fades in, instead of the whole menu bouncing on every switch.
+			openDecided = true;
+			if (frameNanos - lastWindowFrameNanos < 250_000_000L) {
+				handedOff = true;
+				openProgress = 1f;
+				restartPageIn();
+			}
+		}
+		lastWindowFrameNanos = frameNanos;
+		if (closing && returnScreen instanceof VeloWindow) {
+			// Back to the window underneath: switch right away too.
+			openProgress = 0f;
+		} else if (handedOff && !closing) {
+			openProgress = 1f;
+			springScale = 1f;
+			springRise = 0f;
+		} else if (springAnimation()) {
+			springStep();
+		} else {
+			openProgress = VeloAnim.step(openProgress, closing ? 0f : 1f, Math.max(deltaSeconds, 1 / 60f) * 4.5f);
+		}
 		if (closing && openProgress < 0.02f) {
 			if (onClosed != null) {
 				onClosed.run();
@@ -133,8 +165,8 @@ public abstract class VeloWindow extends Screen {
 		context.fill(0, 0, this.width, this.height, (int) (0x70 * openProgress) << 24);
 
 		// Opens with a gentle scale-up + rise, closes with the reverse.
-		float scale = 0.955f + 0.045f * openProgress;
-		float rise = (1f - openProgress) * 10f;
+		float scale = springAnimation() ? springScale : 0.955f + 0.045f * openProgress;
+		float rise = springAnimation() ? springRise : (1f - openProgress) * 10f;
 		context.getMatrices().pushMatrix();
 		float centerX = windowX + windowWidth / 2f;
 		float centerY = windowY + windowHeight / 2f;
@@ -177,17 +209,71 @@ public abstract class VeloWindow extends Screen {
 		VeloDraw.cross(context, closeX + CLOSE_SIZE / 2f, closeY + CLOSE_SIZE / 2f, 6.5f, 1.3f, glyph);
 
 		if (openProgress > 0.4f) {
-			// A page rises into place after a tab switch.
+			if (showingSkeleton()) {
+				drawSkeleton(context);
+			} else {
+				renderContentLayer(context, mouseX, mouseY, delta);
+				super.render(context, mouseX, mouseY, delta);
+				renderOverlayLayer(context, mouseX, mouseY, delta);
+			}
+			// A new page fades in after a tab switch - in place: moving the content made the whole window jump, and
+			// hovering missed while it was still sliding.
 			float page = pageIn();
-			context.getMatrices().pushMatrix();
-			context.getMatrices().translate(0f, (1f - page) * 8f);
-			renderContentLayer(context, mouseX, mouseY, delta);
-			super.render(context, mouseX, mouseY, delta);
-			renderOverlayLayer(context, mouseX, mouseY, delta);
-			context.getMatrices().popMatrix();
+			if (page < 1f) {
+				int[] area = pageArea();
+				VeloDraw.fillRounded(context, area[0], area[1], area[2], area[3], 6,
+						(glass & 0x00FFFFFF) | (Math.round(0xD8 * (1f - page) * openProgress) << 24));
+			}
 		}
 
 		context.getMatrices().popMatrix();
+	}
+
+	/**
+	 * False while the window still waits for its data (the Store's catalog, the friends list...): it then shows a
+	 * loading skeleton instead of half-empty panels - for at most {@link #SKELETON_MAX_NANOS}, so it never hangs.
+	 */
+	protected boolean contentReady() {
+		return true;
+	}
+
+	private static final long SKELETON_MAX_NANOS = 1_500_000_000L;
+	private final long createdNanos = System.nanoTime();
+
+	private boolean showingSkeleton() {
+		return !contentReady() && System.nanoTime() - createdNanos < SKELETON_MAX_NANOS;
+	}
+
+	/** The loading skeleton: a title bar and a grid of cards in faint grey with a light sweeping across. */
+	private void drawSkeleton(DrawContext context) {
+		int x = contentX();
+		int y = contentY();
+		int w = contentWidth();
+		int h = contentBottom() - y;
+		int shape = 0x10FFFFFF;
+		VeloDraw.fillRounded(context, x, y, Math.min(220, w / 3), 14, 4, shape);
+		VeloDraw.fillRounded(context, x, y + 26, w, Math.min(120, h / 3), 10, 0x0AFFFFFF);
+		int top = y + 26 + Math.min(120, h / 3) + 16;
+		int columns = Math.max(2, w / 150);
+		int gap = 10;
+		int cw = (w - (columns - 1) * gap) / columns;
+		int ch = Math.max(40, Math.min(110, (contentBottom() - top - gap) / 2));
+		for (int row = 0; row < 2; row++) {
+			for (int c = 0; c < columns; c++) {
+				int cy = top + row * (ch + gap);
+				if (cy + ch > contentBottom()) {
+					continue;
+				}
+				VeloDraw.fillRounded(context, x + c * (cw + gap), cy, cw, ch, 9, 0x0AFFFFFF);
+				VeloDraw.fillRounded(context, x + c * (cw + gap) + 10, cy + ch - 24, Math.min(cw - 20, 80), 8, 3, shape);
+			}
+		}
+		float sweep = (System.nanoTime() / 1_000_000L % 1200) / 1200f;
+		int band = Math.max(60, w / 4);
+		int bx = x - band + Math.round((w + band) * sweep);
+		context.enableScissor(x, y, x + w, contentBottom());
+		VeloDraw.fillRounded(context, bx, y, band, h, 0, 0x08FFFFFF);
+		context.disableScissor();
 	}
 
 	/** Draws a subclass's header extras (coins, actions) right-aligned before {@link #headerRight()}. */
@@ -299,8 +385,13 @@ public abstract class VeloWindow extends Screen {
 
 	/** 0..1 eased progress of the current page's entrance (after a tab switch). */
 	protected float pageIn() {
-		float t = Math.min(1f, (System.nanoTime() - contentShownAt) / 260_000_000f);
+		float t = Math.min(1f, (System.nanoTime() - contentShownAt) / 200_000_000f);
 		return 1f - (float) Math.pow(1f - t, 3);
+	}
+
+	/** The part of the window that fades in on a page switch: {x, y, w, h} (default: all of the content). */
+	protected int[] pageArea() {
+		return new int[] {contentX(), contentY(), contentWidth(), contentBottom() - contentY()};
 	}
 
 	/** Restarts the page entrance (call when a subclass switches pages its own way). */
@@ -408,7 +499,44 @@ public abstract class VeloWindow extends Screen {
 	}
 
 	protected void requestClose() {
+		if (!closing) {
+			closingAtNanos = System.nanoTime();
+		}
 		closing = true;
+	}
+
+	/**
+	 * True for windows that open with a spring (the Velo menu): a quick fade with a slight overshoot in scale on the
+	 * way in, a short ease-in shrink on the way out. Time-based, so it looks the same at any frame rate.
+	 */
+	protected boolean springAnimation() {
+		return false;
+	}
+
+	private void springStep() {
+		long now = System.nanoTime();
+		if (openedAtNanos < 0) {
+			openedAtNanos = now;
+		}
+		if (!closing) {
+			float t = Math.min(1f, (now - openedAtNanos) / 420_000_000f);
+			openProgress = 1f - (float) Math.pow(1f - Math.min(1f, t * 1.6f), 3);
+			// Back-out: 0.9 -> a hair over 1 -> 1.
+			float c1 = 1.4f;
+			float c3 = c1 + 1f;
+			float back = 1f + c3 * (float) Math.pow(t - 1f, 3) + c1 * (float) Math.pow(t - 1f, 2);
+			springScale = 0.9f + 0.1f * back;
+			springRise = (1f - openProgress) * 16f;
+		} else {
+			float t = Math.min(1f, (now - closingAtNanos) / 170_000_000f);
+			float in = t * t * t;
+			openProgress = Math.min(openProgress, 1f - in);
+			springScale = 1f - 0.05f * in;
+			springRise = -4f * in;
+			if (t >= 1f) {
+				openProgress = 0f;
+			}
+		}
 	}
 
 	/**

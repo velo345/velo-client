@@ -63,7 +63,7 @@ public final class WaypointsScreen extends VeloWindow {
 		this.clearChildren();
 		searchField = new TextFieldWidget(this.textRenderer, contentX() + 20, contentY() + 31, 180, 14, Text.literal("Search"));
 		searchField.setDrawsBackground(false);
-		searchField.setPlaceholder(Text.literal(VeloUi.trim("Search waypoints...", 120)));
+		searchField.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder(VeloUi.trim("Search waypoints...", 120)));
 		searchField.setText(search);
 		searchField.setChangedListener(value -> scroll = 0);
 		addDrawableChild(searchField);
@@ -244,10 +244,13 @@ public final class WaypointsScreen extends VeloWindow {
 		// Name + details.
 		int textX = iconX + 30;
 		boolean compact = width < 400;
-		int actionsWidth = compact ? 0 : 220;
+		// The actions only show on the row you're on (or while a Delete waits for "Sure?").
+		boolean showActions = hovered || ("del:" + waypoint.id).equals(confirmKey) && System.currentTimeMillis() < confirmUntil;
+		int actionsWidth = compact || !showActions ? 0 : 230;
 		int nameColor = waypoint.enabled ? VeloAnim.lerpArgb(waypoint.color | 0xFF000000, 0xFFFFFFFF, 0.25f) : VeloUi.muted();
 		int textSpace = Math.max(30, width - (textX - x) - (compact ? 58 : actionsWidth));
-		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(waypoint.name, textSpace), textX, y + 5, nameColor);
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.fit(this.textRenderer,
+				net.veloclient.velo.client.gui.title.MenuKit.uiBold(waypoint.name), textSpace), textX, y + 5, nameColor);
 		StringBuilder detail = new StringBuilder(String.format(Locale.ROOT, "%d, %d, %d", waypoint.blockX(), waypoint.blockY(), waypoint.blockZ()));
 		var player = MinecraftClient.getInstance().player;
 		if (player != null && world != null && world.equals(WaypointManager.currentWorldKey()) && waypoint.dimension.equals(ClientCompat.dimensionId())) {
@@ -262,7 +265,8 @@ public final class WaypointsScreen extends VeloWindow {
 		if (!waypoint.enabled) {
 			detail.append("  -  hidden");
 		}
-		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(detail.toString(), textSpace), textX, y + 17, VeloUi.muted());
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.fit(this.textRenderer,
+				net.veloclient.velo.client.gui.title.MenuKit.ui(detail.toString()), textSpace), textX, y + 17, VeloUi.muted());
 
 		if (!rowVisible) {
 			return;
@@ -272,6 +276,10 @@ public final class WaypointsScreen extends VeloWindow {
 			hits.add(VeloUi.pill(context, x + width - 52, y + 7, 46, 16, "Share", 0, mouseX, mouseY,
 					() -> this.client.setScreen(new WaypointShareScreen(this, waypoint))));
 			hits.add(new VeloUi.Hit(textX, Math.max(y, clipTop), x + width - 58 - textX, ROW_HEIGHT, () -> this.client.setScreen(WaypointEditScreen.edit(this, waypoint))));
+			return;
+		}
+		if (!showActions) {
+			hits.add(new VeloUi.Hit(textX, Math.max(y, clipTop), x + width - textX, ROW_HEIGHT, () -> this.client.setScreen(WaypointEditScreen.edit(this, waypoint))));
 			return;
 		}
 		int buttonY = y + 7;

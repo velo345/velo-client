@@ -38,10 +38,10 @@ public final class CapeEquipScreen extends VeloWindow {
 	private static final int TILE_ICON_HEIGHT = 112;
 	private static final int TILE_TOTAL_HEIGHT = TILE_ICON_HEIGHT + 20;
 	private static final int TILE_GAP = 8;
-	private static final int SHOWCASE_WIDTH = 220;
+	static final int SHOWCASE_WIDTH = 220;
 	/** The slot list on the left (Cape / Wings / Aura, like the launcher's Locker). */
-	private static final int SLOTS_W = 150;
-	private static final int SLOT_H = 38;
+	static final int SLOTS_W = 150;
+	static final int SLOT_H = 38;
 
 	private VeloScrollRegion scrollRegion;
 	private int gridColumns = 1;
@@ -71,20 +71,38 @@ public final class CapeEquipScreen extends VeloWindow {
 
 	// ---- Header (launcher look): Capes / Wings / Auras tabs, "Get more" to the Store ----
 
+	/** The Locker's tabs: Skin is {@link VeloSkinsScreen} (same header, so it reads as one Locker). */
+	public static final String[] LOCKER_TABS = {"Skin", "Capes", "Wings", "Auras"};
+
+	/** Opens the Locker on a tab: 0 Skin, 1 Capes, 2 Wings, 3 Auras. */
+	public static net.minecraft.client.gui.screen.Screen open(net.minecraft.client.gui.screen.Screen parent, int tab) {
+		if (tab == 0) {
+			return new VeloSkinsScreen(parent);
+		}
+		CapeEquipScreen locker = new CapeEquipScreen(parent);
+		locker.wingsTab = tab == 2;
+		locker.aurasTab = tab == 3;
+		return locker;
+	}
+
 	@Override
 	protected String[] headerTabs() {
-		return new String[] {"Capes", "Wings", "Auras"};
+		return LOCKER_TABS;
 	}
 
 	@Override
 	protected int headerTab() {
-		return aurasTab ? 2 : wingsTab ? 1 : 0;
+		return aurasTab ? 3 : wingsTab ? 2 : 1;
 	}
 
 	@Override
 	protected void selectHeaderTab(int index) {
-		wingsTab = index == 1;
-		aurasTab = index == 2;
+		if (index == 0) {
+			this.client.setScreen(new VeloSkinsScreen(returnScreen()));
+			return;
+		}
+		wingsTab = index == 2;
+		aurasTab = index == 3;
 		if (!wingsTab) {
 			net.veloclient.velo.client.cosmetics.wings.WingsManager.clearPreview();
 		}
@@ -96,7 +114,7 @@ public final class CapeEquipScreen extends VeloWindow {
 
 	/** Dev-only (screenshot tour): switch tab. */
 	public void showTabForTour(int index) {
-		selectHeaderTab(index);
+		selectHeaderTab(index + 1);
 	}
 
 	private int getMoreX;
@@ -160,8 +178,12 @@ public final class CapeEquipScreen extends VeloWindow {
 
 	/** The slot list: what you're wearing per slot; click one to open its tab. */
 	private void renderSlots(DrawContext context, int mouseX, int mouseY) {
-		int x = contentX();
-		int y = contentY();
+		drawSlots(context, this.textRenderer, contentX(), contentY(), headerTab(), mouseX, mouseY);
+		drawLoadouts(context, this.textRenderer, contentX(), contentY(), contentBottom(), mouseX, mouseY);
+	}
+
+	/** The Locker's slot column (shared with the Skin tab, {@link VeloSkinsScreen}). */
+	static void drawSlots(DrawContext context, net.minecraft.client.font.TextRenderer font, int x, int y, int activeTab, int mouseX, int mouseY) {
 		String cape = CapeManager.equipped().map(CapeDefinition::name).orElse("None");
 		String wingsId = net.veloclient.velo.client.cosmetics.wings.WingsManager.equippedId();
 		String wings = wingsId == null ? "None" : net.veloclient.velo.client.cosmetics.wings.WingsManager.type(wingsId)
@@ -169,28 +191,126 @@ public final class CapeEquipScreen extends VeloWindow {
 		String auraId = net.veloclient.velo.client.cosmetics.aura.AuraManager.equippedId();
 		String aura = auraId == null ? "None" : net.veloclient.velo.client.cosmetics.aura.AuraManager.type(auraId)
 				.map(net.veloclient.velo.client.cosmetics.aura.AuraManager.AuraType::name).orElse(auraId);
-		String[][] rows = {{"CAPE", cape, "capes"}, {"WINGS", wings, "cosmetics"}, {"AURA", aura, "bolt"}};
+		String skin = net.veloclient.velo.client.skins.SkinLibrary.equippedName();
+		if (skin == null || skin.isEmpty()) {
+			skin = net.veloclient.velo.client.gui.title.MenuInfo.username();
+		}
+		String[][] rows = {{"SKIN", skin == null || skin.isEmpty() ? "Your skin" : skin, "skins"}, {"CAPE", cape, "capes"},
+				{"WINGS", wings, "wings"}, {"AURA", aura, "bolt"}};
 		for (int i = 0; i < rows.length; i++) {
 			int ry = y + i * (SLOT_H + 6);
-			boolean active = headerTab() == i;
+			boolean active = activeTab == i;
 			boolean hovered = MenuKit.inside(mouseX, mouseY, x, ry, SLOTS_W, SLOT_H);
 			VeloDraw.fillRounded(context, x, ry, SLOTS_W, SLOT_H, 8, active ? VeloUi.withAlpha(MenuKit.accent(), 0x1F) : hovered ? 0xFF1A1A21 : 0xFF131318);
 			VeloDraw.strokeRounded(context, x, ry, SLOTS_W, SLOT_H, 8, active ? VeloUi.withAlpha(MenuKit.accent(), 0x80) : 0x17FFFFFF);
 			if (active) {
 				VeloDraw.fillRounded(context, x + 1, ry + 8, 2, SLOT_H - 16, 1, MenuKit.accent());
 			}
-			VeloDraw.fillRounded(context, x + 8, ry + 7, 24, 24, 6, 0x14FFFFFF);
-			MenuKit.icon(context, rows[i][2], x + 14, ry + 13, 12, rows[i][1].equals("None") ? MenuKit.TEXT_3 : MenuKit.TEXT);
-			MenuKit.text(context, this.textRenderer, MenuKit.small(rows[i][0]), x + 40, ry + 9, MenuKit.TEXT_3);
-			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.uiBold(rows[i][1]), SLOTS_W - 48), x + 40, ry + 19,
+			VeloDraw.fillRounded(context, x + 8, ry + 7, 24, 24, 6, active ? VeloUi.withAlpha(MenuKit.accent(), 0x30) : 0x14FFFFFF);
+			MenuKit.icon(context, rows[i][2], x + 14, ry + 13, 12, rows[i][1].equals("None") ? MenuKit.TEXT_3 : active ? MenuKit.accent() : MenuKit.TEXT);
+			MenuKit.text(context, font, MenuKit.small(rows[i][0]), x + 40, ry + 9, MenuKit.TEXT_3);
+			MenuKit.text(context, font, MenuKit.fit(font, MenuKit.uiBold(rows[i][1]), SLOTS_W - 48), x + 40, ry + 19,
 					rows[i][1].equals("None") ? MenuKit.TEXT_2 : MenuKit.TEXT);
 		}
 		// Sync note under the slots.
 		int ny = y + rows.length * (SLOT_H + 6) + 6;
-		for (Text line : MenuKit.wrap(this.textRenderer, "Synced: other Velo players see what you wear.", MenuKit::ui, SLOTS_W - 4)) {
-			MenuKit.text(context, this.textRenderer, line, x + 2, ny, MenuKit.TEXT_3);
+		for (Text line : MenuKit.wrap(font, "Synced: other Velo players see what you wear.", MenuKit::ui, SLOTS_W - 4)) {
+			MenuKit.text(context, font, line, x + 2, ny, MenuKit.TEXT_3);
 			ny += 11;
 		}
+	}
+
+	// ---- Loadouts (whole looks, shared with the launcher's Locker) under the slots ----
+
+	static final int LOADOUT_H = 18;
+
+	private static int loadoutsTop(int y) {
+		return y + LOCKER_TABS.length * (SLOT_H + 6) + 36;
+	}
+
+	/** The look rows that fit above {@code bottom} (the last row is always "Save current look"). */
+	private static int loadoutRows(int y, int bottom, int count) {
+		int room = (bottom - (loadoutsTop(y) + 13)) / (LOADOUT_H + 4);
+		return Math.max(0, Math.min(count, room - 1));
+	}
+
+	static void drawLoadouts(DrawContext context, net.minecraft.client.font.TextRenderer font, int x, int y, int bottom, int mouseX, int mouseY) {
+		var looks = net.veloclient.velo.client.cosmetics.Loadouts.all();
+		int top = loadoutsTop(y);
+		if (top + 13 + LOADOUT_H > bottom) {
+			return;
+		}
+		MenuKit.text(context, font, MenuKit.small("LOADOUTS"), x + 2, top, MenuKit.TEXT_3);
+		int ry = top + 13;
+		int shown = loadoutRows(y, bottom, looks.size());
+		for (int i = 0; i < shown; i++) {
+			var look = looks.get(i);
+			boolean worn = look.isWorn();
+			boolean hovered = MenuKit.inside(mouseX, mouseY, x, ry, SLOTS_W, LOADOUT_H);
+			VeloDraw.fillRounded(context, x, ry, SLOTS_W, LOADOUT_H, 6, worn ? VeloUi.withAlpha(MenuKit.accent(), 0x1F) : hovered ? 0xFF1A1A21 : 0xFF131318);
+			VeloDraw.strokeRounded(context, x, ry, SLOTS_W, LOADOUT_H, 6, worn ? VeloUi.withAlpha(MenuKit.accent(), 0x80) : 0x17FFFFFF);
+			VeloDraw.fillCircle(context, x + 9f, ry + LOADOUT_H / 2f, 2.5f, worn ? MenuKit.GREEN : 0x40FFFFFF);
+			MenuKit.text(context, font, MenuKit.fit(font, MenuKit.uiBold(look.name()), SLOTS_W - 40), x + 17, ry + 5, worn ? MenuKit.TEXT : MenuKit.TEXT_2);
+			if (hovered) {
+				boolean onDelete = mouseX >= x + SLOTS_W - 16;
+				VeloDraw.cross(context, x + SLOTS_W - 9f, ry + LOADOUT_H / 2f, 3f, 1.2f, onDelete ? 0xFFE5484D : MenuKit.TEXT_3);
+			}
+			ry += LOADOUT_H + 4;
+		}
+		boolean hovered = MenuKit.inside(mouseX, mouseY, x, ry, SLOTS_W, LOADOUT_H);
+		VeloDraw.fillRounded(context, x, ry, SLOTS_W, LOADOUT_H, 6, hovered ? 0x1AFFFFFF : 0x0AFFFFFF);
+		VeloDraw.strokeRounded(context, x, ry, SLOTS_W, LOADOUT_H, 6, hovered ? 0x38FFFFFF : 0x17FFFFFF);
+		MenuKit.text(context, font, MenuKit.uiBold("+  Save current look"), x + 10, ry + 5, hovered ? MenuKit.TEXT : MenuKit.TEXT_2);
+		if (hovered && !looks.isEmpty()) {
+			net.minecraft.text.Text tip = MenuKit.ui("Right-click a look to update it");
+			MenuKit.text(context, font, MenuKit.fit(font, tip, SLOTS_W), x + 2, ry + LOADOUT_H + 4, MenuKit.TEXT_3);
+		}
+	}
+
+	/** What the last loadout click did ("Wearing Purple", "Couldn't put on: ..."), for the screen's status line. */
+	static String loadoutMessage = "";
+
+	/** A click on the loadouts: wear (left), update (right), delete (the cross) or save. True if it was one. */
+	static boolean loadoutClick(double mouseX, double mouseY, int button, int x, int y, int bottom) {
+		var looks = net.veloclient.velo.client.cosmetics.Loadouts.all();
+		int top = loadoutsTop(y);
+		if (top + 13 + LOADOUT_H > bottom) {
+			return false;
+		}
+		int ry = top + 13;
+		int shown = loadoutRows(y, bottom, looks.size());
+		for (int i = 0; i < shown; i++) {
+			var look = looks.get(i);
+			if (MenuKit.inside((int) mouseX, (int) mouseY, x, ry, SLOTS_W, LOADOUT_H)) {
+				if (button == 1) {
+					net.veloclient.velo.client.cosmetics.Loadouts.update(look.name());
+					loadoutMessage = "Updated \"" + look.name() + "\"";
+				} else if (mouseX >= x + SLOTS_W - 16) {
+					net.veloclient.velo.client.cosmetics.Loadouts.delete(look.name());
+					loadoutMessage = "Deleted \"" + look.name() + "\"";
+				} else {
+					var missing = net.veloclient.velo.client.cosmetics.Loadouts.wear(look);
+					loadoutMessage = missing.isEmpty() ? "Wearing \"" + look.name() + "\"" : "Couldn't put on: " + String.join(", ", missing);
+				}
+				return true;
+			}
+			ry += LOADOUT_H + 4;
+		}
+		if (MenuKit.inside((int) mouseX, (int) mouseY, x, ry, SLOTS_W, LOADOUT_H)) {
+			loadoutMessage = "Saved \"" + net.veloclient.velo.client.cosmetics.Loadouts.saveCurrent() + "\"";
+			return true;
+		}
+		return false;
+	}
+
+	/** Which slot row is under the mouse (-1 = none). */
+	static int slotAt(int mouseX, int mouseY, int x, int y) {
+		for (int i = 0; i < LOCKER_TABS.length; i++) {
+			if (MenuKit.inside(mouseX, mouseY, x, y + i * (SLOT_H + 6), SLOTS_W, SLOT_H)) {
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	/** The stage behind the live preview. */
@@ -211,14 +331,22 @@ public final class CapeEquipScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
-		for (int i = 0; i < 3; i++) {
-			if (MenuKit.inside((int) click.x(), (int) click.y(), contentX(), contentY() + i * (SLOT_H + 6), SLOTS_W, SLOT_H)) {
-				if (i != headerTab()) {
-					selectHeaderTab(i);
-					restartPageIn();
-				}
-				return true;
+		if (loadoutClick(click.x(), click.y(), click.button(), contentX(), contentY(), contentBottom())) {
+			// Show the look just put on, not what was being browsed.
+			selectedId = null;
+			selectedWings = null;
+			selectedAura = null;
+			status = Text.literal(loadoutMessage);
+			layoutContent();
+			return true;
+		}
+		int slot = slotAt((int) click.x(), (int) click.y(), contentX(), contentY());
+		if (slot >= 0) {
+			if (slot != headerTab()) {
+				selectHeaderTab(slot);
+				restartPageIn();
 			}
+			return true;
 		}
 		return super.mouseClicked(click, doubled);
 	}

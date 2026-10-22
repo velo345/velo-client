@@ -1,0 +1,9 @@
+
+# ---- Velo Client (velo-client.com) ----------------------------------------------------------------------
+# Added for Velo: TLS here, everything else in the host's nginx (/etc/nginx/conf.d/velo.conf on 172.18.0.1:8080).
+# The FlipSMP sites above are unchanged.
+velo-client.com, www.velo-client.com, api.velo-client.com, panel.velo-client.com {
+	reverse_proxy 172.18.0.1:8080 {
+		header_up X-Forwarded-Proto https
+	}
+}

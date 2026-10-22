@@ -30,7 +30,7 @@ import java.util.concurrent.Executors;
  */
 public final class ReferralView {
 
-	public static final String SITE = "https://velo-client-flame.vercel.app";
+	public static final String SITE = "https://velo-client.com";
 
 	private ReferralView() {
 	}

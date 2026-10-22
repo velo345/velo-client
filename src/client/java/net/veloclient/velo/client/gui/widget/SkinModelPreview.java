@@ -32,6 +32,11 @@ public final class SkinModelPreview {
 	//? if <26.1 {
 	private static java.util.function.Supplier<SkinTextures> current;
 
+	/** The skin textures your account has right now (no world needed). */
+	public static SkinTextures current() {
+		return currentSkin();
+	}
+
 	private static SkinTextures currentSkin() {
 		if (current == null) {
 			MinecraftClient client = MinecraftClient.getInstance();
@@ -50,6 +55,10 @@ public final class SkinModelPreview {
 	}
 	//?} else {
 	/*private static java.util.function.Supplier<PlayerSkin> current;
+
+	public static PlayerSkin current() {
+		return currentSkin();
+	}
 
 	private static PlayerSkin currentSkin() {
 		if (current == null) {

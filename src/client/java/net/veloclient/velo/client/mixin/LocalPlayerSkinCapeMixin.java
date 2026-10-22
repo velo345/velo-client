@@ -47,6 +47,19 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(AbstractClientPlayerEntity.class)
 public abstract class LocalPlayerSkinCapeMixin {
 
+	/** The Locker's Skin tab trying a skin on you (runs before the cape override below, which keeps the body). */
+	@Inject(method = "getSkin", at = @At("RETURN"), cancellable = true)
+	private void velo$tryOnSkin(CallbackInfoReturnable<SkinTextures> cir) {
+		Identifier skin = net.veloclient.velo.client.skins.SkinTryOn.texture();
+		if (skin == null || (Object) this != MinecraftClient.getInstance().player) {
+			return;
+		}
+		SkinTextures original = cir.getReturnValue();
+		cir.setReturnValue(new SkinTextures(new AssetInfo.TextureAssetInfo(skin, skin), original.cape(), original.elytra(),
+				net.veloclient.velo.client.skins.SkinTryOn.slim() ? net.minecraft.entity.player.PlayerSkinType.SLIM
+						: net.minecraft.entity.player.PlayerSkinType.WIDE, original.secure()));
+	}
+
 	@Inject(method = "getSkin", at = @At("RETURN"), cancellable = true)
 	private void velo$overrideCapeAndElytra(CallbackInfoReturnable<SkinTextures> cir) {
 		java.util.Optional<CapeDefinition> equipped;
@@ -98,6 +111,18 @@ public abstract class LocalPlayerSkinCapeMixin {
 //?} else {
 /*@Mixin(AbstractClientPlayer.class)
 public abstract class LocalPlayerSkinCapeMixin {
+
+	@Inject(method = "getSkin", at = @At("RETURN"), cancellable = true)
+	private void velo$tryOnSkin(CallbackInfoReturnable<PlayerSkin> cir) {
+		Identifier skin = net.veloclient.velo.client.skins.SkinTryOn.texture();
+		if (skin == null || (Object) this != Minecraft.getInstance().player) {
+			return;
+		}
+		PlayerSkin original = cir.getReturnValue();
+		cir.setReturnValue(new PlayerSkin(new ClientAsset.ResourceTexture(skin, skin), original.cape(), original.elytra(),
+				net.veloclient.velo.client.skins.SkinTryOn.slim() ? net.minecraft.world.entity.player.PlayerModelType.SLIM
+						: net.minecraft.world.entity.player.PlayerModelType.WIDE, original.secure()));
+	}
 
 	@Inject(method = "getSkin", at = @At("RETURN"), cancellable = true)
 	private void velo$overrideCapeAndElytra(CallbackInfoReturnable<PlayerSkin> cir) {

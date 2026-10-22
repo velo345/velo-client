@@ -1,7 +1,6 @@
 package net.veloclient.velo.client.gui.widget;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.client.gui.widget.ClickableWidget;
@@ -53,11 +52,9 @@ import org.joml.Vector3f;
  * bounded arctangent - a full turn is just a longer drag, same feel as the
  * launcher's own free-spinning viewer.
  *
- * <p>Requires a real {@link PlayerEntity} to render at all, which only
- * exists once actually in a world - opened from the title screen (before
- * any world is joined), {@code client.player} is null and there is nothing
- * to preview yet, so this shows an explanatory message instead of a blank
- * panel.
+ * <p>Opened from the title screen (before any world is joined) there is no
+ * {@link PlayerEntity}; then it draws {@link MenuAvatar} - your skin and
+ * cosmetics on a bare render state - unless a fallback picture was given.
  */
 public final class EntityPreviewWidget extends ClickableWidget {
 
@@ -141,14 +138,6 @@ public final class EntityPreviewWidget extends ClickableWidget {
 					getY() + (getHeight() - h) / 2, 0f, 0f, w, h, w, h, w, h);
 			return;
 		}
-		if (player == null) {
-			TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-			String line1 = "Join a world";
-			String line2 = "to preview this";
-			context.drawCenteredTextWithShadow(textRenderer, line1, getX() + getWidth() / 2, getY() + getHeight() / 2 - 10, theme.text());
-			context.drawCenteredTextWithShadow(textRenderer, line2, getX() + getWidth() / 2, getY() + getHeight() / 2 + 2, theme.text());
-			return;
-		}
 		int x1 = getX() + 4;
 		int y1 = getY() + 4;
 		int x2 = getX() + getWidth() - 4;
@@ -165,7 +154,12 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		x2 = Math.round(b.x);
 		y2 = Math.round(b.y);
 
-		drawRotatableEntity(context, x1, y1, x2, y2, size, yawDegrees, player, wings == null ? null : wings.get(), wings != null);
+		if (player == null) {
+			// No world yet (title screen): your skin and cosmetics on a bare render state.
+			drawMenuAvatar(context, x1, y1, x2, y2, size, yawDegrees, wings == null ? null : wings.get(), wings != null);
+		} else {
+			drawRotatableEntity(context, x1, y1, x2, y2, size, yawDegrees, player, wings == null ? null : wings.get(), wings != null);
+		}
 
 	}
 
@@ -191,6 +185,17 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		// (which has to handle *any* entity, baby mobs included) does.
 		Vector3f position = new Vector3f(0, entity.getHeight() / 2f, 0);
 		context.addEntity(state, (float) size, position, worldRotation, tilt, x1, y1, x2, y2);
+	}
+
+	private static void drawMenuAvatar(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees,
+			net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag wingsTag, boolean tagged) {
+		Quaternionf worldRotation = new Quaternionf().rotateZ((float) Math.PI);
+		var state = MenuAvatar.build();
+		if (tagged) {
+			net.veloclient.velo.client.cosmetics.wings.WingsPreview.tag(state, wingsTag);
+		}
+		state.bodyYaw = 180f + yawDegrees;
+		context.addEntity(state, (float) size, new Vector3f(0, MenuAvatar.HEIGHT / 2f, 0), worldRotation, new Quaternionf(), x1, y1, x2, y2);
 	}
 
 	@SuppressWarnings({"unchecked", "rawtypes"})
@@ -224,6 +229,17 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		}
 		Vector3f position = new Vector3f(0, entity.getBbHeight() / 2f, 0);
 		context.entity(state, (float) size, position, worldRotation, tilt, x1, y1, x2, y2);
+	}
+
+	private static void drawMenuAvatar(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees,
+			net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag wingsTag, boolean tagged) {
+		Quaternionf worldRotation = new Quaternionf().rotateZ((float) Math.PI);
+		var state = MenuAvatar.build();
+		if (tagged) {
+			net.veloclient.velo.client.cosmetics.wings.WingsPreview.tag(state, wingsTag);
+		}
+		state.bodyRot = 180f + yawDegrees;
+		context.entity(state, (float) size, new Vector3f(0, MenuAvatar.HEIGHT / 2f, 0), worldRotation, new Quaternionf(), x1, y1, x2, y2);
 	}
 
 	@SuppressWarnings({"unchecked", "rawtypes"})

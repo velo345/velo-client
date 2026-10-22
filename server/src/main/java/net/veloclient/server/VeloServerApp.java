@@ -33,6 +33,8 @@ public final class VeloServerApp {
 	/** Staff, online-service bans and player reports. */
 	static StaffService staff;
 	private static net.veloclient.server.store.StoreService store;
+	/** Installs, daily actives and online samples for the owner panel. */
+	private static StatsService stats;
 
 	public static void main(String[] args) throws IOException {
 		int port = resolvePort();
@@ -65,7 +67,15 @@ public final class VeloServerApp {
 		cosmetics.seedFromClasspath("/cosmetics-seed/", oldPrices);
 		store.setCosmetics(cosmetics);
 
-		HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
+		try {
+			stats = new StatsService(dataDir);
+		} catch (java.sql.SQLException e) {
+			throw new IOException("Couldn't open the stats database", e);
+		}
+
+		// VELO_SERVER_BIND=127.0.0.1 behind nginx, so the plain-HTTP port isn't reachable from outside.
+		String bind = envOr("VELO_SERVER_BIND", null);
+		HttpServer server = HttpServer.create(bind == null ? new InetSocketAddress(port) : new InetSocketAddress(bind, port), 0);
 		server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
 		server.createContext("/v1/health", exchange -> handle(exchange, "GET", ex -> handleHealth(ex, registry)));
@@ -86,6 +96,8 @@ public final class VeloServerApp {
 		PartyRoutes.register(server, registry, social, parties);
 		ReportService reportService = new ReportService(dataDir);
 		StoreRoutes.register(server, registry, store, dataDir);
+		StoreRoutes.setPanelOwner(store.firstOwnerUuid());
+		WebRoutes.register(server, registry, social, new SkinService(dataDir));
 		CosmeticsRoutes.register(server, registry, store, cosmetics, adminToken);
 		// Discord: linking (unlocks the Velo Neon cape) and announcements through channel webhooks.
 		DiscordLinks discordLinks = new DiscordLinks(dataDir, store);
@@ -138,6 +150,15 @@ public final class VeloServerApp {
 		SchematicShareService schematics = new SchematicShareService(dataDir);
 		SchematicRoutes.register(server, registry, schematics, store);
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));
+		PanelRoutes.register(server, registry, stats, store, adminToken);
+		Executors.newSingleThreadScheduledExecutor(r -> {
+			Thread t = new Thread(r, "velo-stats-sample");
+			t.setDaemon(true);
+			return t;
+		}).scheduleAtFixedRate(() -> {
+			int[] live = registry.countsByKind();
+			stats.sample(live[0], live[1], live[2]);
+		}, 1, 5, TimeUnit.MINUTES);
 
 		// Expired sessions/challenges are already ignored by every lookup
 		// (both check their own expiry), so this is just periodic
@@ -202,8 +223,48 @@ public final class VeloServerApp {
 	}
 
 	/** Shared method-check + error handling wrapper so every route below only has to write its happy path. */
+	/**
+	 * Sites allowed to call the API from a browser (the web Store): velo-client.com, plus any in VELO_WEB_ORIGINS
+	 * (comma separated, e.g. http://localhost:3000 for a local preview).
+	 */
+	private static final java.util.Set<String> WEB_ORIGINS = webOrigins();
+
+	private static java.util.Set<String> webOrigins() {
+		java.util.Set<String> origins = new java.util.HashSet<>(java.util.List.of("https://velo-client.com", "https://www.velo-client.com"));
+		String extra = System.getenv("VELO_WEB_ORIGINS");
+		if (extra != null) {
+			for (String origin : extra.split(",")) {
+				if (!origin.isBlank()) {
+					origins.add(origin.trim());
+				}
+			}
+		}
+		return java.util.Set.copyOf(origins);
+	}
+
+	/** CORS for the website; true when this was a preflight that's now answered. */
+	private static boolean cors(HttpExchange exchange) throws IOException {
+		String origin = exchange.getRequestHeaders().getFirst("Origin");
+		if (origin != null && WEB_ORIGINS.contains(origin)) {
+			var headers = exchange.getResponseHeaders();
+			headers.set("Access-Control-Allow-Origin", origin);
+			headers.set("Vary", "Origin");
+			headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+			headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+			headers.set("Access-Control-Max-Age", "600");
+		}
+		if ("OPTIONS".equals(exchange.getRequestMethod())) {
+			exchange.sendResponseHeaders(204, -1);
+			return true;
+		}
+		return false;
+	}
+
 	static void handle(HttpExchange exchange, String requiredMethod, Route route) throws IOException {
 		try {
+			if (cors(exchange)) {
+				return;
+			}
 			if (!requiredMethod.equals(exchange.getRequestMethod())) {
 				JsonHttp.writeError(exchange, 405, "Method not allowed");
 				return;
@@ -277,8 +338,15 @@ public final class VeloServerApp {
 			JsonHttp.writeError(exchange, 401, "Mojang could not verify this session - did the client actually join with this serverId?");
 			return;
 		}
+		StaffService.Ban networkBan = staff == null ? null : staff.banFor(uuid, "network");
+		if (networkBan != null) {
+			JsonHttp.writeError(exchange, 403, "This account is banned from the Velo Network" + (networkBan.reason == null || networkBan.reason.isBlank() ? "" : ": " + networkBan.reason)
+					+ (networkBan.until > 0 ? " (until " + java.time.Instant.ofEpochMilli(networkBan.until).toString().substring(0, 10) + ")" : ""));
+			return;
+		}
 		String token = registry.createSession(uuid, challenge.username(), challenge.kind());
 		social.onAuthenticated(uuid, challenge.username());
+		stats.signedIn(uuid, challenge.username(), challenge.kind());
 		JsonHttp.writeJson(exchange, 200, new VerifyResponse(token,
 				SessionRegistry.HEARTBEAT_INTERVAL_SECONDS, SessionRegistry.SESSION_TTL_MILLIS / 1000));
 	}
@@ -317,6 +385,9 @@ public final class VeloServerApp {
 			}
 		}
 		SessionRegistry.Session refreshed = registry.heartbeat(request.sessionToken(), capeId, ownCustomHash, wingsId, auraId);
+		if (refreshed != null) {
+			stats.active(refreshed.uuid(), refreshed.kind());
+		}
 		if (refreshed != null && "game".equals(refreshed.kind())) {
 			store.onGameHeartbeat(refreshed.uuid());
 			if (request.hidePlus() != null) {

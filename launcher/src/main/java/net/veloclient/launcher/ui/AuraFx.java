@@ -155,6 +155,36 @@ public final class AuraFx {
 		});
 	}
 
+	/**
+	 * The frames of a looping card picture (the aura around the dim player shape, swaying gently so the turn loops)
+	 * - exported as animated previews for the website and the owner panel by {@code AuraPreviewExport}. FX thread.
+	 */
+	public static List<javafx.scene.image.WritableImage> previewFrames(AuraEffects.Kind kind, int width, int height, int frames, int fps) {
+		AuraEffects.Settings settings = AuraEffects.Settings.DEFAULT;
+		AuraEffects.Emitter emitter = new AuraEffects.Emitter(kind);
+		for (int i = 0; i < 120; i++) {
+			emitter.update(1 / 30f, settings, 0, 0, 0);
+		}
+		double focal = (height / 2.0) / Math.tan(Math.toRadians(15));
+		double distance = 95;
+		Canvas canvas = new Canvas(width, height);
+		GraphicsContext g = canvas.getGraphicsContext2D();
+		javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+		params.setFill(Color.TRANSPARENT);
+		List<javafx.scene.image.WritableImage> out = new ArrayList<>();
+		for (int i = 0; i < frames; i++) {
+			emitter.update(1f / fps, settings, 0, 0, 0);
+			double angle = 0.5 + 0.35 * Math.sin(2 * Math.PI * i / frames);
+			List<Sprite> sprites = project(emitter, settings, width / 2.0, height / 2.0 - 6, focal, distance, angle);
+			clear(canvas);
+			draw(g, sprites, distance, false, true);
+			silhouette(g, width / 2.0, height / 2.0 - 6, focal / distance);
+			draw(g, sprites, distance, true, true);
+			out.add(canvas.snapshot(params, null));
+		}
+		return out;
+	}
+
 	/** A Store card's picture: the aura around a dim player shape, turning slowly. */
 	public static Node card(AuraEffects.Kind kind, Supplier<AuraEffects.Settings> settings, double width, double height) {
 		// Behind / player shape (drawn once) / in front.

@@ -247,6 +247,19 @@ curl -I https://velo.yourdomain.com/v1/health
 Then point the mod at `https://velo.yourdomain.com` instead of the bare
 `http://host:8787` address (see the client-side setup below).
 
+### velo-client.com (the official setup): one script
+
+The official server runs nginx + certbot for both the website and the API. With the DNS records for
+`velo-client.com`, `www.velo-client.com` and `api.velo-client.com` pointing at the box, run from the repo:
+
+```bash
+sudo CERTBOT_EMAIL=you@example.com tools/server/setup-domains.sh            # add --with-legacy while client.asteriasmp.net still exists
+```
+
+It installs `tools/server/nginx/*.conf`, gets the certificates, creates `/var/www/velo-client.com` and sets
+`VELO_PUBLIC_URL=https://api.velo-client.com` on `velo-server.service`. The website is then uploaded from your PC
+with `velo-site/deploy.sh user@server`. The manual steps below are the same thing by hand.
+
 ### Already running nginx? Use that instead
 
 If port 80/443 are already nginx's (confirm with `sudo ss -ltnp | grep -E
@@ -258,10 +271,10 @@ box:
 **1. Add a server block** for the domain (swap in your real one):
 
 ```nginx
-# /etc/nginx/sites-available/client.asteriasmp.net
+# /etc/nginx/sites-available/api.velo-client.com
 server {
 	listen 80;
-	server_name client.asteriasmp.net;
+	server_name api.velo-client.com;
 
 	# News images are up to 12 MB (capes 6 MB) - nginx's default limit is 1 MB.
 	client_max_body_size 16m;
@@ -279,7 +292,7 @@ server {
 **2. Enable it and reload nginx:**
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/client.asteriasmp.net /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/api.velo-client.com /etc/nginx/sites-enabled/
 sudo nginx -t   # sanity-checks the config before touching anything live
 sudo systemctl reload nginx
 ```
@@ -289,7 +302,7 @@ you've already certbot'd on this box - if you've used `sudo certbot --nginx`
 before, this is nothing new, just a new `-d`):
 
 ```bash
-sudo certbot --nginx -d client.asteriasmp.net
+sudo certbot --nginx -d api.velo-client.com
 ```
 
 Certbot edits that server block in place to add the `listen 443 ssl`
@@ -299,7 +312,7 @@ already set up from your previous certificates - nothing new to schedule.
 Check it worked:
 
 ```bash
-curl -I https://client.asteriasmp.net/v1/health
+curl -I https://api.velo-client.com/v1/health
 # HTTP/1.1 200 (or 2 200) with a valid certificate
 ```
 
@@ -508,7 +521,7 @@ try a subscription in Tebex's test mode first (a manual grant from the Owner pan
 ## Configuring the mod to use your server
 
 The mod ships already pointed at Velo Client's own official server
-(`https://client.asteriasmp.net`) with the "Velo Network" module on by
+(`https://api.velo-client.com`) with the "Velo Network" module on by
 default - **no setup needed** for that case, nothing to create by hand.
 
 Only touch this if you're running your own server instead (e.g. testing

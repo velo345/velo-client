@@ -97,6 +97,9 @@ final class StaffRoutes {
 				throw new SocialService.SocialException(403, "Staff can't be banned here - remove their staff role first");
 			}
 			staff.setBan(ref.uuid(), r.services() == null ? List.of() : r.services(), r.days(), r.reason(), social.usernameOf(me));
+			if (r.services() != null && r.services().contains("network")) {
+				registry.endSessionsOf(ref.uuid());
+			}
 			JsonHttp.writeJson(ex, 200, lookup(ref, staff, social, capes, levelOf));
 		});
 		SocialRoutes.route(server, registry, "/v1/staff/unban", "POST", (ex, me) -> {

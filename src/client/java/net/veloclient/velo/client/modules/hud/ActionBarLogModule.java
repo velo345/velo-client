@@ -69,7 +69,7 @@ public final class ActionBarLogModule extends AbstractModule implements HudModul
 		// this used to center each line on x instead, which routinely drew
 		// half the text outside the box the HUD editor shows/drags.
 		for (Text line : history) {
-			context.drawTextWithShadow(client.textRenderer, line, x, rowY, 0xFFFFFFFF);
+			net.veloclient.velo.client.hud.HudLook.draw(context, line, x, rowY, 0xFFFFFFFF);
 			rowY += lineHeight;
 		}
 	}

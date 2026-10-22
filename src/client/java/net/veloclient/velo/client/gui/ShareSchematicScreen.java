@@ -136,13 +136,13 @@ public final class ShareSchematicScreen extends VeloWindow {
 		y += 34;
 		description = new TextFieldWidget(this.textRenderer, fx, y, fw, 16, Text.literal("Description"));
 		description.setMaxLength(600);
-		description.setPlaceholder(Text.literal("What it does, rates, how to use it..."));
+		description.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("What it does, rates, how to use it..."));
 		description.setText(descriptionValue);
 		addDrawableChild(description);
 		y += 34;
 		tags = new TextFieldWidget(this.textRenderer, fx, y, fw, 16, Text.literal("Tags"));
 		tags.setMaxLength(130);
-		tags.setPlaceholder(Text.literal("kelp, farm, 1.21"));
+		tags.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("kelp, farm, 1.21"));
 		tags.setText(tagsValue);
 		addDrawableChild(tags);
 		VeloButton upload = new VeloButton(fx, contentBottom() - 20, fw, 20, Text.literal(uploading ? "Uploading..." : "Share with the community"),

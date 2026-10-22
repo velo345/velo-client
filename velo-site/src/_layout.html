@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+{{> head}}
+</head>
+<body class="{{page.bodyClass}}">
+<div class="scroll-progress" aria-hidden="true"></div>
+<div class="bg-glow" aria-hidden="true"><span></span><span></span><span></span></div>
+{{> nav}}
+<main id="main">
+{{page.body}}
+</main>
+{{> footer}}
+{{> scripts}}
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!--page {
+	"title": "Download Velo Client – Free Minecraft Launcher for Windows & Linux",
+	"description": "Download Velo Client 0.9.7 for free: the launcher for Windows (.exe) and Linux (.deb), or the Fabric mod for Minecraft 1.21.11, 26.1, 26.2 and 26.3.",
+	"path": "/download",
+	"active": "download",
+	"priority": "0.9",
+	"changefreq": "weekly",
+	"lastmod": "latest-post",
+	"schema": [
+		{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Velo Client Launcher", "applicationCategory": "GameApplication", "operatingSystem": "Windows 10, Windows 11, Linux", "softwareVersion": "0.9.7", "downloadUrl": "https://velo-client.com/download", "fileSize": "153MB", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "publisher": {"@id": "https://velo-client.com/#org"}},
+		{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://velo-client.com/"}, {"@type": "ListItem", "position": 2, "name": "Download", "item": "https://velo-client.com/download"}]}
+	]
+}-->
+<section class="section" aria-labelledby="dl-h">
+  <div class="wrap">
+    <div class="section-head center">
+      <span class="eyebrow fade-up" style="--d:.05s">Download</span>
+      <h1 id="dl-h" data-split style="font-size:clamp(2.6rem,6vw,4.4rem);font-weight:800;letter-spacing:-0.04em">Get Velo Client</h1>
+      <p class="fade-up" style="--d:.5s">Version {{release.version}} · released Oct 20, 2026 · <a href="/news/0-9-7">What's new</a> · free</p>
+    </div>
+    <div class="dl-grid">
+      <article class="card dl best spot reveal" style="--i:0" id="windows">
+        <span class="os"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5l7-1v7H3zM11 4.4 21 3v8.5H11zM3 12.5h7v7l-7-1zM11 12.5h10V21l-10-1.4z"/></svg></span>
+        <h2>Windows</h2>
+        <p>The launcher with everything included: Java, Fabric and performance mods install themselves. Windows 10 and 11.</p>
+        <a class="btn btn-primary btn-lg magnetic" href="{{download.exe}}">Download .exe</a>
+        <span class="mono">{{release.launcherExe}} · 153 MB</span>
+      </article>
+      <article class="card dl spot reveal" style="--i:1" id="linux">
+        <span class="os"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-2 0-3 2-3 4.5 0 1.5-.5 3-1.5 4.5S5 15 5 17c0 2.5 3 4 7 4s7-1.5 7-4c0-2-1.5-3.5-2.5-5S15 9 15 7.5C15 5 14 3 12 3zM10 8h.01M14 8h.01M10.5 10.5h3"/></svg></span>
+        <h2>Linux</h2>
+        <p>For Ubuntu, Debian, Mint and other Debian-based systems. Install with your software centre or <code>sudo apt install ./velo-client-launcher_{{release.version}}_amd64.deb</code>.</p>
+        <a class="btn btn-lg" href="{{download.deb}}">Download .deb</a>
+        <span class="mono">{{release.launcherDeb}} · 134 MB</span>
+      </article>
+      <article class="card dl spot reveal" style="--i:2" id="mod">
+        <span class="os"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4.5L20 8v8l-8 4.5L4 16zM4 8l8 4.5L20 8M12 12.5V21"/></svg></span>
+        <h2>Mod only</h2>
+        <p>Just the Velo mod for your own Fabric setup, in any launcher (including on macOS). Needs <a href="{{links.fabricInstaller}}" rel="noopener">Fabric Loader</a> and <a href="{{links.fabricApi}}" rel="noopener">Fabric API</a>.</p>
+        <div class="versions">
+          <a class="btn btn-sm" href="{{download.mod.1_21_11}}">1.21.11</a>
+          <a class="btn btn-sm" href="{{download.mod.26_1}}">26.1</a>
+          <a class="btn btn-sm" href="{{download.mod.26_2}}">26.2</a>
+          <a class="btn btn-sm" href="{{download.mod.26_3}}">26.3</a>
+        </div>
+        <span class="mono">velo-client-{{release.version}}+&lt;version&gt;.jar</span>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top:0" aria-label="How to start">
+  <div class="wrap" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr));gap:16px">
+    <div class="card reveal-left" style="padding:28px;display:grid;gap:18px">
+      <h2 style="font-size:22px">Playing in three steps</h2>
+      <ol class="steps-list">
+        <li>Install the launcher and sign in with your Microsoft account. Velo never sees your password.</li>
+        <li>Pick a Minecraft version, or bring your setup over from Lunar Client, Modrinth or CurseForge.</li>
+        <li>Press Play. Fabric, Java, Sodium and the rest install themselves.</li>
+      </ol>
+    </div>
+    <div class="card reveal-right" style="padding:28px;display:grid;gap:10px">
+      <h2 style="font-size:22px">What you need</h2>
+      <dl class="kv">
+        <div><dt>Minecraft</dt><dd>Java Edition (owned)</dd></div>
+        <div><dt>Versions</dt><dd>{{minecraft.version}}</dd></div>
+        <div><dt>Java</dt><dd>Included with the launcher</dd></div>
+        <div><dt>Memory</dt><dd>Set automatically for your PC</dd></div>
+        <div><dt>Systems</dt><dd>Windows 10/11, Debian-based Linux</dd></div>
+      </dl>
+    </div>
+  </div>
+  <div class="wrap reveal" style="margin-top:16px">
+    <div class="notice">Windows SmartScreen may warn about a new app the first time: choose <b>More info → Run anyway</b>. Every release is also published on <a href="{{links.releases}}" rel="noopener">GitHub</a>. Only download Velo from this site or GitHub.</div>
+  </div>
+</section>

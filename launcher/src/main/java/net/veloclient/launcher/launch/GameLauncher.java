@@ -70,7 +70,7 @@ public final class GameLauncher {
 		if (!alreadyRunning) {
 			GameJars.installInto(modsDir, version);
 			FabricApiInstaller.installInto(modsDir, version);
-			listener.onPhase("Checking performance mods...");
+			listener.onPhase("Checking recommended mods...");
 			PerformanceModsInstaller.installInto(instance.id(), modsDir, version);
 		}
 

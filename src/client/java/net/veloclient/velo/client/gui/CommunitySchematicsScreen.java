@@ -125,7 +125,7 @@ public final class CommunitySchematicsScreen extends VeloWindow {
 		addDrawableChild(share);
 		y += 24;
 		search = new TextFieldWidget(this.textRenderer, x, y, contentWidth() - 76, 16, Text.literal("Search"));
-		search.setPlaceholder(Text.literal("Search titles, tags, authors..."));
+		search.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Search titles, tags, authors..."));
 		search.setText(query);
 		addDrawableChild(search);
 		addDrawableChild(new VeloButton(x + contentWidth() - 70, y - 1, 70, 18, Text.literal(loading ? "..." : "Search"), b -> {

@@ -24,7 +24,7 @@ public final class HeldItemModule extends AbstractModule implements HudModule, C
 	private final HudPosition position = new HudPosition(0.5f, 0.85f);
 	private boolean showName = false;
 	private boolean countWholeInventory = false;
-	private boolean showBackground = true;
+	private boolean showBackground = false;
 	private boolean showDurability = true;
 	/** Width of the last drawn box, so the HUD editor/auto layout box matches what's on screen. */
 	private int lastWidth = 24;
@@ -57,8 +57,8 @@ public final class HeldItemModule extends AbstractModule implements HudModule, C
 		// Text glyphs carry a pixel of spacing on their right, so text-ended boxes get a little more
 		// right padding to look as even as the 4px on the icon's left.
 		boolean hasText = !countLabel.isEmpty() || !name.isEmpty();
-		int textWidth = (countLabel.isEmpty() ? 0 : textRenderer.getWidth(countLabel))
-				+ (!countLabel.isEmpty() && !name.isEmpty() ? 6 : 0) + (name.isEmpty() ? 0 : textRenderer.getWidth(name));
+		int textWidth = (countLabel.isEmpty() ? 0 : net.veloclient.velo.client.hud.HudLook.measure(countLabel))
+				+ (!countLabel.isEmpty() && !name.isEmpty() ? 6 : 0) + (name.isEmpty() ? 0 : net.veloclient.velo.client.hud.HudLook.measure(name));
 		int boxWidth = 4 + 16 + (hasText ? 4 + textWidth + 6 : 4);
 		lastWidth = boxWidth;
 		if (showBackground) {
@@ -67,11 +67,11 @@ public final class HeldItemModule extends AbstractModule implements HudModule, C
 		context.drawItemWithoutEntity(stack, x + 4, y + 3);
 		int textX = x + 24;
 		if (!countLabel.isEmpty()) {
-			context.drawTextWithShadow(textRenderer, countLabel, textX, y + 7, 0xFFFFFFFF);
-			textX += textRenderer.getWidth(countLabel) + 6;
+			net.veloclient.velo.client.hud.HudLook.draw(context, countLabel, textX, y + 7, 0xFFFFFFFF);
+			textX += net.veloclient.velo.client.hud.HudLook.measure(countLabel) + 6;
 		}
 		if (!name.isEmpty()) {
-			context.drawTextWithShadow(textRenderer, name, textX, y + 7, 0xFFBFC3CC);
+			net.veloclient.velo.client.hud.HudLook.draw(context, name, textX, y + 7, 0xFFBFC3CC);
 		}
 		if (showDurability && stack.isDamageable() && stack.getDamage() > 0) {
 			float fraction = 1f - stack.getDamage() / (float) Math.max(1, stack.getMaxDamage());

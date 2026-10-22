@@ -26,7 +26,7 @@ public final class ParticleDebugOverlayModule extends AbstractModule implements 
 	@Override
 	public void render(DrawContext context, int x, int y, float tickDelta) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		context.drawTextWithShadow(client.textRenderer, "P: " + client.particleManager.getDebugString(), x, y, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, "P: " + client.particleManager.getDebugString(), x, y, 0xFFFFFFFF);
 	}
 
 	@Override

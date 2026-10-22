@@ -22,7 +22,7 @@ public final class DirectionHudModule extends AbstractModule implements HudModul
 
 	private final HudPosition position = new HudPosition(0.5f, 0.01f);
 	private boolean showDegrees = true;
-	private boolean showBackground = true;
+	private boolean showBackground = false;
 	private int accent = 0xFFFF5C5C;
 
 	public DirectionHudModule() {
@@ -57,7 +57,7 @@ public final class DirectionHudModule extends AbstractModule implements HudModul
 			int mx = Math.round(center + diff * pixelsPerDegree);
 			String mark = MARKS[i];
 			int color = mark.equals("N") ? accent : mark.length() == 1 ? 0xFFFFFFFF : 0xFFB8B8C8;
-			context.drawTextWithShadow(client.textRenderer, mark, mx - client.textRenderer.getWidth(mark) / 2, y + 4, color);
+			net.veloclient.velo.client.hud.HudLook.draw(context, mark, mx - net.veloclient.velo.client.hud.HudLook.measure(mark) / 2, y + 4, color);
 		}
 		for (int tick = 0; tick < 360; tick += 15) {
 			float diff = wrap(tick - yaw);
@@ -71,7 +71,7 @@ public final class DirectionHudModule extends AbstractModule implements HudModul
 		if (showDegrees) {
 			int heading = Math.round((yaw + 180f) % 360f);
 			String text = heading + "°";
-			context.drawTextWithShadow(client.textRenderer, text, center - client.textRenderer.getWidth(text) / 2, y + 17, 0xFFFFFFFF);
+			net.veloclient.velo.client.hud.HudLook.draw(context, text, center - net.veloclient.velo.client.hud.HudLook.measure(text) / 2, y + 17, 0xFFFFFFFF);
 		}
 	}
 

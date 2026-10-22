@@ -222,7 +222,14 @@ public final class LauncherApp extends Application {
 					launchWithProgress(instance, server, launchBar.playButton(), launchBar.progress(), launchBar.statusLabel());
 				}));
 		partyController.setOnChange(this::refreshPartyStrip);
-		net.veloclient.launcher.social.LauncherSocial.addListener(event -> refreshFriendsBadge());
+		net.veloclient.launcher.social.LauncherSocial.addListener(event -> {
+			if ("web_code".equals(event.type())) {
+				// velo-client.com asked for a sign-in code (fromName carries it).
+				Platform.runLater(() -> net.veloclient.launcher.ui.WebCodeDialog.show(stage, event.fromName()));
+				return;
+			}
+			refreshFriendsBadge();
+		});
 		String demoShot = System.getProperty("velo.launcherDemo");
 		if (demoShot != null && !demoShot.isBlank()) {
 			runFriendsDemo(java.nio.file.Path.of(demoShot));
@@ -752,6 +759,25 @@ public final class LauncherApp extends Application {
 		homeProfileIndex = Math.max(0, Math.min(homeProfileIndex, targets.size() - 1));
 		homeCurrentTarget = targets.get(homeProfileIndex);
 		return homeCurrentTarget;
+	}
+
+	/**
+	 * Points the launch bar at {@code instance} (its plain entry) unless it already targets that profile,
+	 * so PLAY/CONNECT on a profile's own page never launches some other profile.
+	 */
+	private void focusLaunchTarget(Instance instance) {
+		HomeLaunchTarget current = currentTarget();
+		if (current != null && current.instance().id().equals(instance.id())) {
+			return;
+		}
+		List<HomeLaunchTarget> targets = orderedLaunchTargetsForHome();
+		for (int i = 0; i < targets.size(); i++) {
+			if (!targets.get(i).isServer() && targets.get(i).instance().id().equals(instance.id())) {
+				homeProfileIndex = i;
+				refreshLaunchBar();
+				return;
+			}
+		}
 	}
 
 	private void selectTarget(int index) {
@@ -2900,6 +2926,7 @@ public final class LauncherApp extends Application {
 						refreshLaunchBar();
 					}));
 			currentPage = () -> showInstanceDetail(instance);
+			focusLaunchTarget(instance);
 			setContent(InstanceDetailView.build(stage, instance, theme, back, header));
 			if (!"library".equals(activePage)) {
 				setActivePage("library");
@@ -3762,6 +3789,39 @@ public final class LauncherApp extends Application {
 			signOutButton.getStyleClass().add("danger-ghost-button");
 			signOutButton.setOnAction(e -> signOut());
 			net.veloclient.launcher.ui.SettingsUi.row(account, session.username(), "Microsoft account", "UUID " + session.uuid(), signOutButton);
+			// velo-client.com: a short code to type on the website signs you in to the web Store.
+			Label webCode = new Label("");
+			webCode.setStyle("-fx-font-family: 'JetBrains Mono'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -velo-text;");
+			Button codeButton = new Button("Get a code");
+			codeButton.setOnAction(e -> {
+				codeButton.setDisable(true);
+				java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+					try {
+						return net.veloclient.launcher.social.StoreApi.webCode();
+					} catch (net.veloclient.launcher.social.StoreApi.StoreError error) {
+						com.google.gson.JsonObject failed = new com.google.gson.JsonObject();
+						failed.addProperty("error", error.getMessage());
+						return failed;
+					}
+				}).thenAccept(result -> Platform.runLater(() -> {
+					codeButton.setDisable(false);
+					if (result.has("error")) {
+						webCode.setText("");
+						net.veloclient.launcher.ui.Toasts.show(codeButton, result.get("error").getAsString());
+						return;
+					}
+					String code = result.get("code").getAsString();
+					webCode.setText(code.substring(0, 3) + " " + code.substring(3));
+					codeButton.setText("New code");
+					javafx.scene.input.ClipboardContent clip = new javafx.scene.input.ClipboardContent();
+					clip.putString(code);
+					javafx.scene.input.Clipboard.getSystemClipboard().setContent(clip);
+					net.veloclient.launcher.ui.Toasts.show(codeButton, "Copied - works for 5 minutes");
+				}));
+			});
+			net.veloclient.launcher.ui.SettingsUi.row(account, "Website sign-in", "Buy in the Store on velo-client.com with this account",
+					"Get a code, then type it on velo-client.com. It works once, for 5 minutes. The website never sees your Microsoft login.",
+					webCode, codeButton);
 		} else {
 			Button signInButton = new Button("Sign in");
 			signInButton.getStyleClass().add("primary-button");

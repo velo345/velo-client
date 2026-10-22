@@ -41,7 +41,7 @@ public final class ServerOverlaysModule extends AbstractModule implements HudMod
 	private boolean showTimers = true;
 	private boolean showSession = true;
 	private boolean showInLobby = false;
-	private boolean background = true;
+	private boolean background = false;
 	private int lastRows = 6;
 
 	public ServerOverlaysModule() {
@@ -213,9 +213,9 @@ public final class ServerOverlaysModule extends AbstractModule implements HudMod
 			Row row = rows.get(i);
 			boolean header = i == 0 && showHeader;
 			String label = net.veloclient.velo.client.gui.widget.VeloUi.trim(row.label(), WIDTH / 2 + 10);
-			context.drawTextWithShadow(client.textRenderer, label, x + 5, ry, header ? 0xFFFFFFFF : 0xFFB8B8C8);
-			int w = client.textRenderer.getWidth(row.value());
-			context.drawTextWithShadow(client.textRenderer, row.value(), x + WIDTH - 5 - w, ry, header ? 0xFF8FB8FF : row.color());
+			net.veloclient.velo.client.hud.HudLook.draw(context, label, x + 5, ry, header ? 0xFFFFFFFF : 0xFFB8B8C8);
+			int w = net.veloclient.velo.client.hud.HudLook.measure(row.value());
+			net.veloclient.velo.client.hud.HudLook.draw(context, row.value(), x + WIDTH - 5 - w, ry, header ? 0xFF8FB8FF : row.color());
 			if (header && rows.size() > 1) {
 				context.fill(x + 4, ry + 10, x + WIDTH - 4, ry + 11, 0x30FFFFFF);
 			}

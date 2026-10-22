@@ -986,6 +986,116 @@ public final class StoreDatabase implements AutoCloseable {
 		}
 	}
 
+	// ---- Owner panel ----
+
+	/**
+	 * Money and Store numbers for the owner panel: paid coin orders (revenue), coins spent on items, item sales,
+	 * Velo+ members, plus the latest orders and item purchases. {@code since} limits the per-day series.
+	 */
+	public synchronized Map<String, Object> panelSummary(long since, long now, java.util.Set<String> excludeFromWallets) throws SQLException {
+		Map<String, Object> out = new java.util.LinkedHashMap<>();
+		try (Statement st = connection.createStatement()) {
+			try (ResultSet rs = st.executeQuery("SELECT COUNT(*), COALESCE(SUM(price), 0), COALESCE(SUM(coins), 0) FROM orders WHERE status = 'paid'")) {
+				rs.next();
+				out.put("paidOrders", rs.getLong(1));
+				out.put("revenue", rs.getDouble(2));
+				out.put("coinsSold", rs.getLong(3));
+			}
+			try (ResultSet rs = st.executeQuery("SELECT COUNT(*), COALESCE(SUM(price), 0) FROM orders WHERE status = 'paid' AND created_at >= " + since)) {
+				rs.next();
+				out.put("paidOrdersInRange", rs.getLong(1));
+				out.put("revenueInRange", rs.getDouble(2));
+			}
+			try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM orders WHERE status IN ('refunded', 'chargeback')")) {
+				rs.next();
+				out.put("reversedOrders", rs.getLong(1));
+			}
+			try (ResultSet rs = st.executeQuery("SELECT COUNT(*), COALESCE(-SUM(delta), 0) FROM ledger WHERE reason IN ('buy_item', 'buy_bundle', 'gift_item')")) {
+				rs.next();
+				out.put("itemPurchases", rs.getLong(1));
+				out.put("coinsSpent", rs.getLong(2));
+			}
+			// Players' coins only: the owners' own test wallets would dwarf everyone else's.
+			long coins = 0;
+			long wallets = 0;
+			try (ResultSet rs = st.executeQuery("SELECT uuid, balance FROM wallets")) {
+				while (rs.next()) {
+					if (!excludeFromWallets.contains(rs.getString(1))) {
+						coins += rs.getLong(2);
+						wallets++;
+					}
+				}
+			}
+			out.put("coinsInCirculation", coins);
+			out.put("wallets", wallets);
+			try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM plus WHERE until > " + now)) {
+				rs.next();
+				out.put("plusMembers", rs.getLong(1));
+			}
+			List<Map<String, Object>> top = new ArrayList<>();
+			try (ResultSet rs = st.executeQuery("SELECT item_id, COUNT(*) FROM owned_items WHERE source LIKE 'purchase%' OR source LIKE 'gift%' "
+					+ "GROUP BY item_id ORDER BY 2 DESC LIMIT 10")) {
+				while (rs.next()) {
+					top.add(Map.of("itemId", rs.getString(1), "sales", rs.getLong(2)));
+				}
+			}
+			out.put("topItems", top);
+			// Per day: revenue (paid orders) and coins spent in the Store.
+			Map<String, double[]> days = new java.util.TreeMap<>();
+			try (ResultSet rs = st.executeQuery("SELECT date(created_at / 1000, 'unixepoch'), SUM(price) FROM orders WHERE status = 'paid' AND created_at >= "
+					+ since + " GROUP BY 1")) {
+				while (rs.next()) {
+					days.computeIfAbsent(rs.getString(1), k -> new double[2])[0] = rs.getDouble(2);
+				}
+			}
+			try (ResultSet rs = st.executeQuery("SELECT date(created_at / 1000, 'unixepoch'), -SUM(delta) FROM ledger WHERE reason IN ('buy_item', 'buy_bundle', 'gift_item') "
+					+ "AND created_at >= " + since + " GROUP BY 1")) {
+				while (rs.next()) {
+					days.computeIfAbsent(rs.getString(1), k -> new double[2])[1] = rs.getDouble(2);
+				}
+			}
+			List<Map<String, Object>> series = new ArrayList<>();
+			days.forEach((day, v) -> series.add(Map.of("day", day, "revenue", v[0], "coinsSpent", (long) v[1])));
+			out.put("daily", series);
+		}
+		List<Map<String, Object>> orders = new ArrayList<>();
+		try (PreparedStatement ps = connection.prepareStatement("SELECT o.order_id, o.uuid, w.username, o.pack_id, o.coins, o.price, o.currency, o.status, o.created_at "
+				+ "FROM orders o LEFT JOIN wallets w ON w.uuid = o.uuid ORDER BY o.created_at DESC LIMIT 50");
+				ResultSet rs = ps.executeQuery()) {
+			while (rs.next()) {
+				Map<String, Object> row = new java.util.LinkedHashMap<>();
+				row.put("orderId", rs.getString(1));
+				row.put("uuid", rs.getString(2));
+				row.put("username", rs.getString(3));
+				row.put("packId", rs.getString(4));
+				row.put("coins", rs.getInt(5));
+				row.put("price", rs.getDouble(6));
+				row.put("currency", rs.getString(7));
+				row.put("status", rs.getString(8));
+				row.put("createdAt", rs.getLong(9));
+				orders.add(row);
+			}
+		}
+		out.put("recentOrders", orders);
+		List<Map<String, Object>> purchases = new ArrayList<>();
+		try (PreparedStatement ps = connection.prepareStatement("SELECT l.uuid, w.username, l.reason, l.ref, l.delta, l.created_at FROM ledger l "
+				+ "LEFT JOIN wallets w ON w.uuid = l.uuid WHERE l.reason IN ('buy_item', 'buy_bundle', 'gift_item', 'purchase_coins') ORDER BY l.id DESC LIMIT 50");
+				ResultSet rs = ps.executeQuery()) {
+			while (rs.next()) {
+				Map<String, Object> row = new java.util.LinkedHashMap<>();
+				row.put("uuid", rs.getString(1));
+				row.put("username", rs.getString(2));
+				row.put("reason", rs.getString(3));
+				row.put("ref", rs.getString(4));
+				row.put("coins", rs.getInt(5));
+				row.put("createdAt", rs.getLong(6));
+				purchases.add(row);
+			}
+		}
+		out.put("recentPurchases", purchases);
+		return out;
+	}
+
 	// ---- Transactions ----
 
 	@FunctionalInterface

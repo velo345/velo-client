@@ -4,6 +4,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.veloclient.velo.client.hud.HudModule;
 import net.veloclient.velo.client.hud.HudPosition;
+import net.veloclient.velo.client.hud.HudLook;
 import net.veloclient.velo.module.AbstractModule;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
@@ -34,16 +35,20 @@ public final class ClockModule extends AbstractModule implements HudModule {
 	public void render(DrawContext context, int x, int y, float tickDelta) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		String text = LocalTime.now().format(FORMAT);
-		context.drawTextWithShadow(client.textRenderer, text, x, y, 0xFFFFFFFF);
+		if (HudLook.on()) {
+			HudLook.line(context, x, y, text, 0xFFFFFFFF);
+			return;
+		}
+		net.veloclient.velo.client.hud.HudLook.draw(context, text, x, y, 0xFFFFFFFF);
 	}
 
 	@Override
 	public int width() {
-		return MinecraftClient.getInstance().textRenderer.getWidth("00:00:00");
+		return HudLook.on() ? HudLook.lineWidth("00:00:00") : net.veloclient.velo.client.hud.HudLook.measure("00:00:00");
 	}
 
 	@Override
 	public int height() {
-		return MinecraftClient.getInstance().textRenderer.fontHeight;
+		return HudLook.on() ? HudLook.statHeight() : MinecraftClient.getInstance().textRenderer.fontHeight;
 	}
 }

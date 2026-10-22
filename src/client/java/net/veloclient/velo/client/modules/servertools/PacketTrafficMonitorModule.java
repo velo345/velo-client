@@ -64,18 +64,18 @@ public final class PacketTrafficMonitorModule extends AbstractModule implements 
 		int lineHeight = client.textRenderer.fontHeight + 1;
 
 		refreshCacheIfStale();
-		context.drawTextWithShadow(client.textRenderer, "Inbound:", x, y, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, "Inbound:", x, y, 0xFFFFFFFF);
 		int rowY = y + lineHeight;
 		for (Map.Entry<String, Long> entry : cachedInbound.entrySet()) {
-			context.drawTextWithShadow(client.textRenderer, "  " + entry.getKey() + ": " + entry.getValue(), x, rowY, 0xFFC8C8C8);
+			net.veloclient.velo.client.hud.HudLook.draw(context, "  " + entry.getKey() + ": " + entry.getValue(), x, rowY, 0xFFC8C8C8);
 			rowY += lineHeight;
 		}
 
 		rowY += 2;
-		context.drawTextWithShadow(client.textRenderer, "Outbound:", x, rowY, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, "Outbound:", x, rowY, 0xFFFFFFFF);
 		rowY += lineHeight;
 		for (Map.Entry<String, Long> entry : cachedOutbound.entrySet()) {
-			context.drawTextWithShadow(client.textRenderer, "  " + entry.getKey() + ": " + entry.getValue(), x, rowY, 0xFFC8C8C8);
+			net.veloclient.velo.client.hud.HudLook.draw(context, "  " + entry.getKey() + ": " + entry.getValue(), x, rowY, 0xFFC8C8C8);
 			rowY += lineHeight;
 		}
 	}

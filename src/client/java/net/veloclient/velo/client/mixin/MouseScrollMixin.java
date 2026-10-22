@@ -21,6 +21,7 @@ public abstract class MouseScrollMixin {
 
 	@Inject(method = "onMouseScroll", at = @At("HEAD"), cancellable = true)
 	private void velo$onMouseScroll(long window, double horizontal, double vertical, CallbackInfo ci) {
+		net.veloclient.velo.client.modules.hud.MouseButtonsModule.noteScroll(vertical);
 		if (ZoomModule.isZoomKeyHeld()) {
 			ZoomModule.adjustZoomOnScroll(vertical);
 			ci.cancel();

@@ -17,7 +17,7 @@ final class MapTextures {
 
 	enum Style { SURFACE, TOPOGRAPHY, BIOMES }
 
-	private static final int MAX_TEXTURES = 72;
+	private static final int MAX_TEXTURES = 128;
 
 	private record Entry(Identifier id, NativeImageBackedTexture texture, int version) {
 	}
@@ -65,6 +65,12 @@ final class MapTextures {
 		return id;
 	}
 
+	/** A region's texture if it's already built (any version), without building it. */
+	static Identifier cachedOnly(MapStore store, int rx, int rz, Style style) {
+		Entry entry = CACHE.get(store.dir + "|" + rx + "|" + rz + "|" + style);
+		return entry == null ? null : entry.id;
+	}
+
 	static void clear() {
 		for (Entry entry : CACHE.values()) {
 			MinecraftClient.getInstance().getTextureManager().destroyTexture(entry.id);
@@ -76,34 +82,39 @@ final class MapTextures {
 		int n = MapRegion.SIZE;
 		for (int z = 0; z < n; z++) {
 			for (int x = 0; x < n; x++) {
-				int i = z * n + x;
-				int rgb = region.rgb[i];
-				if (rgb == 0) {
-					image.setColorArgb(x, z, 0);
-					continue;
-				}
-				int h = region.height[i];
-				int north = z > 0 && region.rgb[i - n] != 0 ? region.height[i - n] : h;
-				int west = x > 0 && region.rgb[i - 1] != 0 ? region.height[i - 1] : h;
-				int color = switch (style) {
-					case SURFACE -> {
-						// Vanilla map shading: brighter facing a rise to the north, darker below it.
-						float factor = h > north ? 1.0f : h < north ? 0.71f : 0.86f;
-						yield WorldMap.shade(rgb & 0xFFFFFF, factor);
-					}
-					case TOPOGRAPHY -> {
-						int c = heightColor(h);
-						boolean contour = Math.floorDiv(h, 8) != Math.floorDiv(north, 8) || Math.floorDiv(h, 8) != Math.floorDiv(west, 8);
-						yield contour ? WorldMap.shade(c, 0.62f) : c;
-					}
-					case BIOMES -> {
-						float factor = h > north ? 1.0f : h < north ? 0.8f : 0.9f;
-						yield WorldMap.shade(biomeColor(store.biomeName(region.biome[i])), factor);
-					}
-				};
-				image.setColorArgb(x, z, 0xFF000000 | color);
+				image.setColorArgb(x, z, color(store, region, style, x, z));
 			}
 		}
+	}
+
+	/** One column's map colour in a style (ARGB, 0 = not explored). Any thread. */
+	static int color(MapStore store, MapRegion region, Style style, int x, int z) {
+		int n = MapRegion.SIZE;
+		int i = z * n + x;
+		int rgb = region.rgb[i];
+		if (rgb == 0) {
+			return 0;
+		}
+		int h = region.height[i];
+		int north = z > 0 && region.rgb[i - n] != 0 ? region.height[i - n] : h;
+		int west = x > 0 && region.rgb[i - 1] != 0 ? region.height[i - 1] : h;
+		int color = switch (style) {
+			case SURFACE -> {
+				// Vanilla map shading: brighter facing a rise to the north, darker below it.
+				float factor = h > north ? 1.0f : h < north ? 0.71f : 0.86f;
+				yield WorldMap.shade(rgb & 0xFFFFFF, factor);
+			}
+			case TOPOGRAPHY -> {
+				int c = heightColor(h);
+				boolean contour = Math.floorDiv(h, 8) != Math.floorDiv(north, 8) || Math.floorDiv(h, 8) != Math.floorDiv(west, 8);
+				yield contour ? WorldMap.shade(c, 0.62f) : c;
+			}
+			case BIOMES -> {
+				float factor = h > north ? 1.0f : h < north ? 0.8f : 0.9f;
+				yield WorldMap.shade(biomeColor(store.biomeName(region.biome[i])), factor);
+			}
+		};
+		return 0xFF000000 | color;
 	}
 
 	/** Height ramp: deep blue sea, green lowlands, yellow hills, brown mountains, white peaks. */

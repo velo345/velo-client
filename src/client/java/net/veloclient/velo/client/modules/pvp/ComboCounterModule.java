@@ -19,7 +19,7 @@ public final class ComboCounterModule extends AbstractModule implements HudModul
 
 	private final HudPosition position = new HudPosition(0.02f, 0.40f);
 	private boolean hideWhenZero = true;
-	private boolean showBackground = true;
+	private boolean showBackground = false;
 	private boolean colorByCombo = true;
 
 	public ComboCounterModule() {
@@ -41,21 +41,31 @@ public final class ComboCounterModule extends AbstractModule implements HudModul
 			return;
 		}
 		String label = (editing && combo == 0 ? 3 : combo) + " Combo";
+		int color = !colorByCombo ? 0xFFFFFFFF : combo >= 5 ? 0xFFFF5CCB : combo >= 3 ? 0xFFFFC53D : 0xFFFFFFFF;
+		if (net.veloclient.velo.client.hud.HudLook.on()) {
+			net.veloclient.velo.client.hud.HudLook.stat(context, x, y, String.valueOf(editing && combo == 0 ? 3 : combo), "combo", color);
+			return;
+		}
 		if (showBackground) {
 			VeloDraw.fillRounded(context, x, y, width(), height(), 6, 0x90101014);
 		}
-		int color = !colorByCombo ? 0xFFFFFFFF : combo >= 5 ? 0xFFFF5CCB : combo >= 3 ? 0xFFFFC53D : 0xFFFFFFFF;
-		int textWidth = client.textRenderer.getWidth(label);
-		context.drawTextWithShadow(client.textRenderer, label, x + (width() - textWidth) / 2, y + 6, color);
+		int textWidth = net.veloclient.velo.client.hud.HudLook.measure(label);
+		net.veloclient.velo.client.hud.HudLook.draw(context, label, x + (width() - textWidth) / 2, y + 6, color);
 	}
 
 	@Override
 	public int width() {
+		if (net.veloclient.velo.client.hud.HudLook.on()) {
+			return net.veloclient.velo.client.hud.HudLook.statWidth("00", "combo");
+		}
 		return 64;
 	}
 
 	@Override
 	public int height() {
+		if (net.veloclient.velo.client.hud.HudLook.on()) {
+			return net.veloclient.velo.client.hud.HudLook.statHeight();
+		}
 		return 20;
 	}
 

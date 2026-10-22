@@ -55,8 +55,8 @@ public final class TpsTickGraphModule extends AbstractModule implements HudModul
 			line = String.format(Locale.ROOT, "%.0f tx %.0f rx pkt/s",
 					connection.getAveragePacketsSent(), connection.getAveragePacketsReceived());
 		}
-		int width = client.textRenderer.getWidth(line);
-		context.drawTextWithShadow(client.textRenderer, line, x - width / 2, y, 0xFFFFFFFF);
+		int width = net.veloclient.velo.client.hud.HudLook.measure(line);
+		net.veloclient.velo.client.hud.HudLook.draw(context, line, x - width / 2, y, 0xFFFFFFFF);
 	}
 
 	@Override

@@ -48,6 +48,10 @@ public final class ModuleConfigScreen extends VeloWindow {
 	private final java.util.LinkedHashSet<Integer> chordHeldKeys = new java.util.LinkedHashSet<>();
 	private final java.util.LinkedHashSet<Integer> chordMaxKeys = new java.util.LinkedHashSet<>();
 	private VeloScrollRegion scrollRegion;
+	/** The choice whose option list is open (under its row), or null. */
+	private ConfigField.ChoiceField dropdown;
+	private VeloValueRow dropdownRow;
+	private static final int OPTION_H = 16;
 
 	public interface Reopenable {
 		void reopen();
@@ -147,6 +151,12 @@ public final class ModuleConfigScreen extends VeloWindow {
 					() -> choice.get().get(), null,
 					b -> {
 						List<String> options = choice.options();
+						if (options.size() > 2) {
+							// A real list to pick from (the chip already shows a dropdown chevron).
+							dropdown = choice;
+							dropdownRow = b;
+							return;
+						}
 						int index = options.indexOf(choice.get().get());
 						choice.set().accept(options.get((index + 1) % options.size()));
 						// Some modules show different fields per choice; scroll position survives the rebuild.
@@ -155,7 +165,7 @@ public final class ModuleConfigScreen extends VeloWindow {
 		}
 		if (field instanceof ConfigField.TextField text) {
 			TextFieldWidget widget = new TextFieldWidget(this.textRenderer, x, y + 4, width, 18, Text.literal(text.label()));
-			widget.setPlaceholder(Text.literal(text.placeholder()));
+			widget.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder(text.placeholder()));
 			widget.setText(text.get().get());
 			widget.setChangedListener(text.set());
 			return widget;
@@ -194,6 +204,11 @@ public final class ModuleConfigScreen extends VeloWindow {
 
 	@Override
 	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
+		if (dropdown != null && input.key() == net.veloclient.velo.client.util.Keys.ESCAPE) {
+			dropdown = null;
+			dropdownRow = null;
+			return true;
+		}
 		if (awaitingRebind != null) {
 			ConfigField.KeybindField field = awaitingRebind;
 			awaitingRebind = null;
@@ -245,8 +260,75 @@ public final class ModuleConfigScreen extends VeloWindow {
 		return super.keyReleased(input);
 	}
 
+	/** The open option list's box {x, y, w, h}: under its row, or above it when there's no room below. */
+	private int[] dropdownBox() {
+		int w = Math.max(120, Math.min(200, dropdownRow.getWidth() / 2 + 20));
+		int h = dropdown.options().size() * OPTION_H + 6;
+		int x = dropdownRow.getX() + dropdownRow.getWidth() - w;
+		int y = dropdownRow.getY() + dropdownRow.getHeight();
+		if (y + h > contentBottom() && dropdownRow.getY() - h >= contentY()) {
+			y = dropdownRow.getY() - h;
+		}
+		return new int[] {x, y, w, h};
+	}
+
+	/** An option as the list shows it: HUD Style's fonts each in their own font. */
+	private Text optionLabel(String option) {
+		if (module.id().equals("hud-style") && dropdown.label().equals("Font")) {
+			return net.veloclient.velo.client.hud.HudLook.preview(option, option);
+		}
+		return Text.literal(option);
+	}
+
+	private void renderDropdown(DrawContext context, int mouseX, int mouseY) {
+		int[] box = dropdownBox();
+		Theme theme = ThemeManager.active();
+		VeloDraw.shadow(context, box[0], box[1], box[2], box[3], 7, 10, 3, 0x66000000);
+		VeloDraw.fillRounded(context, box[0], box[1], box[2], box[3], 7, 0xF4141418);
+		VeloDraw.strokeRounded(context, box[0], box[1], box[2], box[3], 7, VeloStyle.border());
+		String current = dropdown.get().get();
+		int y = box[1] + 3;
+		for (String option : dropdown.options()) {
+			boolean hovered = mouseX >= box[0] && mouseX < box[0] + box[2] && mouseY >= y && mouseY < y + OPTION_H;
+			boolean selected = option.equals(current);
+			if (hovered || selected) {
+				VeloDraw.fillRounded(context, box[0] + 3, y, box[2] - 6, OPTION_H, 5,
+						selected ? VeloUi.withAlpha(theme.accentStart(), 0x30) : 0x14FFFFFF);
+			}
+			if (selected) {
+				VeloDraw.fillCircle(context, box[0] + 10f, y + OPTION_H / 2f, 2.2f, theme.accentStart() | 0xFF000000);
+			}
+			context.drawTextWithShadow(this.textRenderer, optionLabel(option), box[0] + 18, y + (OPTION_H - 8) / 2,
+					selected || hovered ? VeloStyle.text() : VeloStyle.textMuted());
+			y += OPTION_H;
+		}
+	}
+
+	@Override
+	public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+		if (dropdown != null) {
+			int[] box = dropdownBox();
+			double mx = click.x();
+			double my = click.y();
+			if (mx >= box[0] && mx < box[0] + box[2] && my >= box[1] + 3 && my < box[1] + box[3] - 3) {
+				int index = (int) ((my - box[1] - 3) / OPTION_H);
+				if (index >= 0 && index < dropdown.options().size()) {
+					dropdown.set().accept(dropdown.options().get(index));
+				}
+			}
+			// Any click closes the list (and isn't passed on to what's under it).
+			dropdown = null;
+			dropdownRow = null;
+			layoutContent();
+			return true;
+		}
+		return super.mouseClicked(click, doubled);
+	}
+
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+		dropdown = null;
+		dropdownRow = null;
 		if (scrollRegion != null && scrollRegion.scroll(mouseX, mouseY, verticalAmount)) {
 			scrollRegion.layout(ROW_HEIGHT, 0);
 			return true;
@@ -298,9 +380,18 @@ public final class ModuleConfigScreen extends VeloWindow {
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
+		boolean overDropdown = false;
+		if (dropdown != null) {
+			int[] box = dropdownBox();
+			overDropdown = mouseX >= box[0] && mouseX < box[0] + box[2] && mouseY >= box[1] && mouseY < box[1] + box[3];
+		}
 		if (scrollRegion != null) {
-			scrollRegion.renderRows(context, mouseX, mouseY, delta);
+			// Rows under the open list don't light up.
+			scrollRegion.renderRows(context, overDropdown ? -10000 : mouseX, overDropdown ? -10000 : mouseY, delta);
 			scrollRegion.renderScrollbar(context, ROW_HEIGHT, 0);
+		}
+		if (dropdown != null) {
+			renderDropdown(context, mouseX, mouseY);
 		}
 		if (awaitingRebind != null || awaitingChordRebind != null) {
 			String hint = awaitingRebind != null ? "Press a key - Esc unbinds" : "Hold the keys, release to save - Esc unbinds";

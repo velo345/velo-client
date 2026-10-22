@@ -1,33 +1,40 @@
 <footer class="footer">
-  <div class="wrap footer-inner">
-    <div class="footer-brand">
-      <a class="brand" href="index.html"><img src="assets/logo.png" alt="" width="28" height="28"><span>Velo Client</span></a>
-      <p>A free Fabric client and launcher for Minecraft {{minecraft.version}}. Made by players, for players.</p>
+  <div class="wrap footer-cta reveal">
+    <div>
+      <h2>Ready when you are.</h2>
+      <p>Free, no account needed beyond your Minecraft one. Takes a minute to set up.</p>
     </div>
-    <div class="footer-cols">
-      <div>
-        <h5>Product</h5>
-        <a href="index.html#features">Features</a>
-        <a href="index.html#launcher">Launcher</a>
-        <a href="index.html#modules">All modules</a>
-        <a href="index.html#download">Download</a>
-      </div>
-      <div>
-        <h5>Project</h5>
-        {{#if links.github}}<a href="{{links.github}}">GitHub</a>{{/if}}
-        <a href="{{links.releases}}">Releases</a>
-        <a href="index.html#faq">FAQ</a>
-      </div>
-      <div>
-        <h5>Legal</h5>
-        <a href="impressum.html">Imprint</a>
-        <a href="datenschutz.html">Privacy Policy</a>
-        <a href="terms.html">Terms of Service</a>
-      </div>
-    </div>
+    <a class="btn btn-primary btn-lg magnetic" href="/download">Download Velo Client</a>
   </div>
-  <div class="wrap footer-legal">
-    <p>NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</p>
-    <p>Minecraft is a trademark of Mojang Synergies AB. "Velo Client" is an independent, community-made project.</p>
+  <div class="wrap footer-grid">
+    <div class="footer-brand">
+      <a class="brand" href="/"><img src="/assets/logo.png" alt="" width="32" height="32" loading="lazy"><span>VELO CLIENT</span></a>
+      <p>A free Minecraft launcher and Fabric client. Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.</p>
+    </div>
+    <nav aria-label="Product">
+      <h2>Product</h2>
+      <a href="/features">Features</a>
+      <a href="/features#plus">Velo+</a>
+      <a href="/store">Store</a>
+      <a href="/download">Download</a>
+    </nav>
+    <nav aria-label="Community">
+      <h2>Community</h2>
+      <a href="/news">News</a>
+      <a href="{{links.discord}}" rel="noopener" target="_blank">Discord</a>
+      <a href="{{links.github}}" rel="noopener" target="_blank">GitHub</a>
+      <a href="/#faq">FAQ</a>
+    </nav>
+    <nav aria-label="Legal">
+      <h2>Legal</h2>
+      <a href="/terms">Terms of Service</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/refunds">Refunds &amp; Velo+</a>
+      <a href="/imprint">Imprint</a>
+    </nav>
+  </div>
+  <div class="wrap footer-base">
+    <span>© {{build.year}} Velo Client · Minecraft is a trademark of Mojang Synergies AB.</span>
+    <span>Payments by Tebex · v{{release.version}}</span>
   </div>
 </footer>

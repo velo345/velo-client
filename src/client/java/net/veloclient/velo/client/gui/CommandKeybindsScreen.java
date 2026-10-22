@@ -76,7 +76,7 @@ public final class CommandKeybindsScreen extends VeloWindow {
 		scrollRegion.layout(ROW_HEIGHT, 2);
 
 		commandBox = new TextFieldWidget(this.textRenderer, contentX(), commandY, contentWidth(), 18, Text.literal("Command"));
-		commandBox.setPlaceholder(Text.literal("/spawn"));
+		commandBox.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("/spawn"));
 		// Unlike the borderless name fields elsewhere in this mod's menus,
 		// this one keeps its background/border so it visibly reads as a real
 		// text input rather than blending into the panel - it's easy to

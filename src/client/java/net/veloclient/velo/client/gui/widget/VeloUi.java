@@ -2,6 +2,8 @@ package net.veloclient.velo.client.gui.widget;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
+import net.veloclient.velo.client.gui.title.MenuKit;
 import net.veloclient.velo.client.theme.Theme;
 import net.veloclient.velo.client.theme.ThemeManager;
 
@@ -15,6 +17,12 @@ import java.util.List;
  * trees each update would just churn) and only use real widgets for text input.
  */
 public final class VeloUi {
+
+	/** A text box's hint text in a readable grey (vanilla's dark grey all but vanished on the graphite fields). */
+	public static Text placeholder(String hint) {
+		return Text.literal(hint).setStyle(net.minecraft.text.Style.EMPTY.withColor(0x9A9AA6));
+	}
+
 
 	private VeloUi() {
 	}
@@ -49,22 +57,23 @@ public final class VeloUi {
 		boolean hovered = inside(mouseX, mouseY, x, y, width, height);
 		int radius = Math.min(height / 2, 6);
 		int base = switch (tone) {
-			// The active choice of a group (tab, filter): the launcher's white chip.
-			case 1 -> 0xFFF4F4F6;
+			// The active choice of a group (tab, filter) or the main action: the theme accent.
+			case 1 -> VeloStyle.accent();
 			case 2 -> 0xFF2E9E5B;
 			case 3 -> 0xFFC24242;
-			default -> VeloStyle.card();
+			default -> withAlpha(0xFFFFFFFF, 0x0D);
 		};
-		// 0.9.7: flat fills, hairline on neutral pills, a light lift on hover.
-		int fill = hovered ? VeloAnim.lerpArgb(base, 0xFFFFFFFF, tone == 0 ? 0.07f : 0.12f) : base;
+		// Flat fills, hairline on neutral pills, a light lift on hover.
+		int fill = hovered ? (tone == 0 ? withAlpha(0xFFFFFFFF, 0x1A) : VeloAnim.lerpArgb(base, 0xFFFFFFFF, 0.12f)) : base;
 		VeloDraw.fillRounded(context, x, y, width, height, radius, fill);
 		if (tone == 0) {
-			VeloDraw.strokeRounded(context, x, y, width, height, radius, hovered ? withAlpha(0xFFFFFFFF, 0x38) : VeloStyle.border());
+			VeloDraw.strokeRounded(context, x, y, width, height, radius, hovered ? withAlpha(0xFFFFFFFF, 0x38) : withAlpha(0xFFFFFFFF, 0x17));
 		}
 		var textRenderer = MinecraftClient.getInstance().textRenderer;
-		String shown = trim(label, width - 6);
-		context.drawTextWithShadow(textRenderer, shown, x + (width - textRenderer.getWidth(shown)) / 2,
-				y + (height - 8) / 2, tone == 0 ? theme.text() : tone == 1 ? 0xFF0B0B0E : 0xFFFFFFFF);
+		Text shown = MenuKit.fit(textRenderer,
+				tone == 0 ? MenuKit.ui(label) : MenuKit.uiBold(label), width - 8);
+		MenuKit.text(context, textRenderer, shown, x + (width - textRenderer.getWidth(shown)) / 2,
+				y + (height - 8) / 2, tone == 0 ? theme.text() : tone == 1 ? VeloStyle.onAccent() : 0xFFFFFFFF);
 		return new Hit(x, y, width, height, action);
 	}
 

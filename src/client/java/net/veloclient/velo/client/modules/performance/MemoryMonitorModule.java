@@ -52,10 +52,10 @@ public final class MemoryMonitorModule extends AbstractModule implements HudModu
 		sampleAllocationRate(used);
 
 		int lineHeight = client.textRenderer.fontHeight + 1;
-		context.drawTextWithShadow(client.textRenderer,
+		net.veloclient.velo.client.hud.HudLook.draw(context,
 				String.format(Locale.ROOT, "Mem: %d%% %dMB/%dMB", used * 100 / max, toMb(used), toMb(max)),
 				x, y, 0xFFFFFFFF);
-		context.drawTextWithShadow(client.textRenderer,
+		net.veloclient.velo.client.hud.HudLook.draw(context,
 				String.format(Locale.ROOT, "Alloc: %dMB/s", toMb(allocationRateBytesPerSec)),
 				x, y + lineHeight, 0xFFC8C8C8);
 	}

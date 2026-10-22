@@ -37,7 +37,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public final class LauncherSocial {
 
-	public static final String DEFAULT_SERVER_URL = "https://client.asteriasmp.net";
+	public static final String DEFAULT_SERVER_URL = "https://api.velo-client.com";
+	/** The official server's old address - a saved {@code network.json} still naming it follows the move. */
+	private static final java.util.Set<String> LEGACY_SERVER_URLS = java.util.Set.of("https://client.asteriasmp.net", "http://client.asteriasmp.net");
 
 	private static final Gson GSON = new Gson();
 	private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
@@ -268,7 +270,8 @@ public final class LauncherSocial {
 					if (url.isEmpty()) {
 						return null;
 					}
-					return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+					url = url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+					return LEGACY_SERVER_URLS.contains(url) ? DEFAULT_SERVER_URL : url;
 				}
 			}
 		} catch (Exception ignored) {
@@ -292,6 +295,8 @@ public final class LauncherSocial {
 					authenticate();
 					since = 0;
 					status = "Connected";
+					// The website may have asked for a sign-in code while the launcher was closed.
+					fetchWebCode();
 				}
 				boolean idleNow = isWindowIdle();
 				if (System.currentTimeMillis() - lastHeartbeat > 30_000 || idleNow != lastIdleSent) {
@@ -386,10 +391,33 @@ public final class LauncherSocial {
 		token = postJson("/v1/session/verify", verify, null).get("sessionToken").getAsString();
 	}
 
+	/**
+	 * velo-client.com asked for a sign-in code ("Send code to my launcher"): fetches it and publishes a
+	 * {@code web_code} event whose {@code fromName} is the 6-digit code - LauncherApp shows it in a dialog.
+	 */
+	private static void fetchWebCode() {
+		Thread thread = new Thread(() -> {
+			try {
+				JsonObject result = getJson("/v1/web/pending", Duration.ofSeconds(10));
+				if (result.has("code") && !result.get("code").isJsonNull()) {
+					publish(new Event("web_code", null, null, null, result.get("code").getAsString()));
+				}
+			} catch (Exception e) {
+				LauncherLog.info("Velo website code: " + e);
+			}
+		}, "velo-web-code");
+		thread.setDaemon(true);
+		thread.start();
+	}
+
 	private static boolean handleEvent(JsonObject event) {
 		String type = event.get("type").getAsString();
 		JsonElement data = event.get("data");
 		switch (type) {
+			case "web_code" -> {
+				fetchWebCode();
+				return false;
+			}
 			case "message" -> {
 				JsonObject payload = data.getAsJsonObject();
 				Message message = GSON.fromJson(payload.get("message"), Message.class);

@@ -24,7 +24,10 @@ import java.util.zip.GZIPOutputStream;
  */
 final class MapStore {
 
-	private static final int MAX_LOADED = 40;
+	private static final int MAX_LOADED = 96;
+	/** Region files read from disk on the render thread per frame for drawing (the rest wait a frame). */
+	private static final int READS_PER_FRAME = 3;
+	private static int readsThisFrame;
 	private static final int MAGIC = 0x56454C4F;
 	private static final ExecutorService SAVER = Executors.newSingleThreadExecutor(r -> {
 		Thread thread = new Thread(r, "velo-worldmap-save");
@@ -74,6 +77,55 @@ final class MapStore {
 
 	synchronized String biomeName(int index) {
 		return index >= 0 && index < palette.size() ? palette.get(index) : "";
+	}
+
+	static void beginFrame() {
+		readsThisFrame = 0;
+	}
+
+	/** For drawing: the region if it's in memory or one of this frame's few disk reads allows it, else null. */
+	MapRegion regionForDraw(int rx, int rz) {
+		long key = MapRegion.key(rx, rz);
+		if (!loaded.containsKey(key) && !missing.contains(key)) {
+			if (readsThisFrame >= READS_PER_FRAME) {
+				return null;
+			}
+			readsThisFrame++;
+		}
+		return region(rx, rz, false);
+	}
+
+	/** The regions in memory right now (render thread) - the newest data, not yet on disk. */
+	List<MapRegion> loadedRegions() {
+		return new ArrayList<>(loaded.values());
+	}
+
+	/** Region keys with a file on disk. Any thread. */
+	java.util.Set<Long> regionsOnDisk() {
+		java.util.Set<Long> keys = new java.util.HashSet<>();
+		try (var files = Files.list(dir)) {
+			files.forEach(file -> {
+				String name = file.getFileName().toString();
+				if (name.startsWith("r.") && name.endsWith(".bin")) {
+					String[] parts = name.split("\\.");
+					if (parts.length == 4) {
+						try {
+							keys.add(MapRegion.key(Integer.parseInt(parts[1]), Integer.parseInt(parts[2])));
+						} catch (NumberFormatException ignored) {
+							// not a region file
+						}
+					}
+				}
+			});
+		} catch (IOException ignored) {
+			// nothing saved yet
+		}
+		return keys;
+	}
+
+	/** Reads a region file straight from disk without caching it (the map's zoomed-out tiles, off-thread). */
+	MapRegion readUncached(int rx, int rz) {
+		return read(rx, rz);
 	}
 
 	/** The region, loading it from disk; {@code create} makes an empty one if there's none. */

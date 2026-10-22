@@ -242,6 +242,9 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.PlayerLevelsModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.servertools.GameModePresetsModule());
 		// HUD / QoL (section 6.2)
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.HudStyleModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.cosmetics.WingsCosmeticsModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.cosmetics.AuraCosmeticsModule());
 		ModuleRegistry.register(new FpsCounterModule());
 		ModuleRegistry.register(new PingDisplayModule());
 		ModuleRegistry.register(new CoordinatesModule());
@@ -280,6 +283,9 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new NickHiderModule());
 		ModuleRegistry.register(new SmallCapsModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.FriendsModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.EmojiChatModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.HideFoliageModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.ContainerAnimationsModule());
 
 		// Rendering
 		ModuleRegistry.register(new TntTimerModule());
@@ -304,6 +310,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new PolyBlurModule());
 		ModuleRegistry.register(new FullBrightModule());
 		ModuleRegistry.register(new FovModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.ScreenStretchModule());
 		ModuleRegistry.register(new InputSamplerModule());
 
 		// Utility
