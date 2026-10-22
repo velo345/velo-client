@@ -383,6 +383,7 @@ public final class WingsManager {
 	private static void save() {
 		net.veloclient.velo.client.network.VeloServerClient.syncSoon();
 		net.veloclient.velo.config.ConfigManager.save("cosmetics-wings", new EquipState(equippedId, new HashMap<>(SETTINGS), null));
+		net.veloclient.velo.client.cosmetics.Loadouts.changed();
 	}
 
 	/** What goes out with the Velo Network heartbeat: "id;scale;y;z;spread;speed;strength", or null. */

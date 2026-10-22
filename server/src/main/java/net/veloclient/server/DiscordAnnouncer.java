@@ -130,7 +130,7 @@ final class DiscordAnnouncer {
 		String player = username != null ? username : "A Velo player";
 		JsonObject embed = new JsonObject();
 		embed.addProperty("title", "⭐  " + player + " is now Velo+!");
-		embed.addProperty("description", "**" + player + "** subscribed to **Velo+** - VIP role, monthly Velo Coins and the Velo Client Addons. Thank you! ❤");
+		embed.addProperty("description", "**" + player + "** subscribed to **Velo+** - World Hosting, Cloud Sync, Clips Pro, Name Styles, a custom Home background, monthly Velo Coins and the VIP role. Thank you! ❤");
 		embed.addProperty("color", RED);
 		embed.addProperty("timestamp", Instant.now().toString());
 		JsonObject thumb = new JsonObject();

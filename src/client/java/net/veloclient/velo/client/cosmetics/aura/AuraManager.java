@@ -82,6 +82,7 @@ public final class AuraManager {
 	private static void save() {
 		net.veloclient.velo.client.network.VeloServerClient.syncSoon();
 		net.veloclient.velo.config.ConfigManager.save("cosmetics-aura", new EquipState(equippedId, new HashMap<>(SETTINGS)));
+		net.veloclient.velo.client.cosmetics.Loadouts.changed();
 	}
 
 	// ---- Catalog ----

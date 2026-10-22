@@ -770,7 +770,7 @@ public final class InstanceDetailView {
 		row.getChildren().add(iconView(null, 40));
 
 		VBox info = new VBox(2);
-		Label name = new Label(fileName + (isVeloClient ? "  (Velo Client)" : isFabricApi ? "  (Fabric API - required)" : isAddons ? "  (Velo+ Addons - managed in the card above)" : "")
+		Label name = new Label(fileName + (isVeloClient ? "  (Velo Client)" : isFabricApi ? "  (Fabric API - required)" : isAddons ? "  (Addons - managed in the card above)" : "")
 				+ (disabled ? "  (disabled)" : ""));
 		name.setTextFill(text(theme));
 		Label size = new Label(protectedFile ? sizeOf(file) : sizeOf(file) + "  ·  not on Modrinth");

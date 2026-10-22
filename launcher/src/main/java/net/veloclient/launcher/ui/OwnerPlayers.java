@@ -132,6 +132,7 @@ final class OwnerPlayers {
 		long plusUntil = view.has("plusUntil") ? view.get("plusUntil").getAsLong() : 0;
 		boolean plus = plusUntil > System.currentTimeMillis();
 		JsonArray owned = view.getAsJsonArray("owned");
+		boolean addons = view.has("addons") && view.get("addons").getAsBoolean();
 
 		Label nameLabel = new Label(name);
 		nameLabel.getStyleClass().add("profile-name");
@@ -145,9 +146,10 @@ final class OwnerPlayers {
 		FlowPane tiles = new FlowPane(12, 12,
 				stat("Coins", String.format(Locale.ROOT, "%,d", balance), "balance"),
 				stat("Velo+", plus ? remaining(plusUntil) : "Not subscribed", plus ? "until " + date(plusUntil) : "no membership"),
-				stat("Cosmetics", String.valueOf(owned.size()), owned.isEmpty() ? "owns nothing" : "owned"));
+				stat("Cosmetics", String.valueOf(owned.size()), owned.isEmpty() ? "owns nothing" : "owned"),
+				stat("Addons", addons ? "Access" : "No access", addons ? "given by the owner" : "invite only"));
 
-		VBox card = new VBox(14, header, tiles, coinsCard(uuid), plusCard(uuid, plus), cosmeticsCard(uuid, owned), activityCard(view.getAsJsonArray("ledger")));
+		VBox card = new VBox(14, header, tiles, coinsCard(uuid), plusCard(uuid, plus), addonsCard(uuid, addons), cosmeticsCard(uuid, owned), activityCard(view.getAsJsonArray("ledger")));
 		card.getStyleClass().add("settings-card");
 		return card;
 	}
@@ -232,7 +234,21 @@ final class OwnerPlayers {
 		HBox row = new HBox(8, custom, give, end);
 		row.setAlignment(Pos.CENTER_LEFT);
 		return section("Velo+", new VBox(8, quick, row,
-				hint("Days add to what they have. Coins, badge and Addons switch on within a minute; the Discord role follows once linked.")));
+				hint("Days add to what they have. Coins, badge and the Velo+ features switch on within a minute; the Discord role follows once linked.")));
+	}
+
+	/** The Addons are invite only: give or take away access (separate from Velo+). Nobody without it sees they exist. */
+	private Node addonsCard(String uuid, boolean addons) {
+		Button grant = new Button(addons ? "Take away access" : "Give access");
+		grant.getStyleClass().add(addons ? "danger-ghost-button" : "primary-button");
+		grant.setOnAction(e -> {
+			if (!addons || confirm("Take away the Addons?", "They're switched off in this player's profiles at their next launch.")) {
+				perform(() -> StoreApi.adminAddons(uuid, !addons), uuid, true);
+			}
+		});
+		return section("Addons", new VBox(8, grant,
+				hint("Only players you give access see the Addons anywhere (launcher, game, website). Access ends here at once; their proof"
+						+ " runs out within a week even offline.")));
 	}
 
 	private Node cosmeticsCard(String uuid, JsonArray owned) {

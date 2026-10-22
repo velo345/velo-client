@@ -155,7 +155,7 @@ public final class CoinsView {
 		HBox row = new HBox(14,
 				earnCard("gift", "#F7C04A", "Invite friends", "Up to 500 coins for each friend who plays 2 hours. They get 300 too.", "Get your code",
 						links::openReferrals),
-				earnCard("crown", "#FF7A7E", "Velo+", "A coin drop every month, plus all the Addons and the + badge.", "See Velo+", links::openPlus));
+				earnCard("crown", "#FF7A7E", "Velo+", "World Hosting, Cloud Sync, Clips Pro, Name Styles, your own Home background, a monthly coin drop and the + badge.", "See Velo+", links::openPlus));
 		row.getChildren().forEach(n -> HBox.setHgrow(n, Priority.ALWAYS));
 		return section("More ways to earn", null, row);
 	}

@@ -17,7 +17,7 @@ import net.veloclient.launcher.instance.RunningInstanceManager;
 import net.veloclient.launcher.launch.UpdateService;
 
 /**
- * "Update available" dialog: release notes, then one button that pulls the new mod and addons jars
+ * "Update available" dialog: release notes, then one button that pulls the new mod jars
  * and, if the launcher itself is newer, downloads and starts its installer and closes the launcher
  * so it can be replaced. Mod-only updates need no restart - they apply on the next game launch.
  */
@@ -40,8 +40,8 @@ public final class UpdateDialog {
 			dialog.setHeaderText("Velo Client " + release.version() + " is out");
 		}
 		Label summary = new Label(launcher
-				? "You have " + AppVersion.VERSION + ". Updating downloads the new launcher, mod and addons, then restarts the launcher."
-				: "Updated mod and addons jars for " + String.join(", ", release.modAssets().keySet().stream()
+				? "You have " + AppVersion.VERSION + ". Updating downloads the new launcher and mod, then restarts the launcher."
+				: "Updated mod jars for " + String.join(", ", release.modAssets().keySet().stream()
 						.filter(k -> !k.endsWith("-addons")).toList()) + ". They're used from your next game launch - no restart needed.");
 		summary.setWrapText(true);
 		TextArea notes = new TextArea(release.notes().isBlank() ? "No release notes." : release.notes());

@@ -29,8 +29,8 @@ import java.util.Map;
  * closes whatever image was previously assigned to it - the decoded frames
  * are a persistent, reusable master list (read from repeatedly, forever), not
  * something that can be handed away and closed. Instead each tick copies the
- * next frame's pixels into the texture's own backing image via {@link
- * NativeImage#copyFrom}, leaving the master frames untouched.
+ * next frame's pixels (just the used cape region - see {@link GifDecoder})
+ * into the texture's own backing image, leaving the master frames untouched.
  */
 public final class AnimatedCapeAsset {
 
@@ -102,12 +102,29 @@ public final class AnimatedCapeAsset {
 			throw new IOException("GIF has no frames");
 		}
 		Identifier textureId = Identifier.of("velo-client", "cape_anim_" + id.replace('-', '_'));
-		NativeImageBackedTexture texture = new NativeImageBackedTexture(() -> "animated cape " + id,
-				decoded.width(), decoded.height(), false);
+		NativeImageBackedTexture texture = decoded.width() >= 512 ? new SmoothTexture(() -> "animated cape " + id, decoded.width(), decoded.height())
+				: new NativeImageBackedTexture(() -> "animated cape " + id, decoded.width(), decoded.height(), false);
 		MinecraftClient.getInstance().getTextureManager().registerTexture(textureId, texture);
+		// Frames only cover the used part of the layout (see GifDecoder#capeRegion): the rest stays transparent.
+		texture.getImage().fillRect(0, 0, decoded.width(), decoded.height(), 0);
 		AnimatedCapeAsset animated = new AnimatedCapeAsset(textureId, texture, decoded.frames(), decoded.width(), decoded.height());
 		animated.applyFrame(0);
 		return animated;
+	}
+
+	/**
+	 * HD capes (16 texels per cape pixel) are painted art, not pixel art: sampled bilinearly they stay smooth at every
+	 * size, where nearest sampling turned them jagged and shimmering when drawn smaller than the texture.
+	 */
+	private static final class SmoothTexture extends NativeImageBackedTexture {
+		SmoothTexture(java.util.function.Supplier<String> name, int width, int height) {
+			super(name, width, height, false);
+			//? if <26.1 {
+			this.sampler = com.mojang.blaze3d.systems.RenderSystem.getSamplerCache().get(com.mojang.blaze3d.textures.FilterMode.LINEAR);
+			//?} else {
+			/*this.sampler = com.mojang.blaze3d.systems.RenderSystem.getSamplerCache().getClampToEdge(com.mojang.blaze3d.textures.FilterMode.LINEAR);
+			*///?}
+		}
 	}
 
 	public Identifier identifier() {
@@ -231,7 +248,8 @@ public final class AnimatedCapeAsset {
 
 	private void applyFrame(int index) {
 		frameIndex = index;
-		texture.getImage().copyFrom(frames.get(index).image());
+		NativeImage frame = frames.get(index).image();
+		frame.copyRect(texture.getImage(), 0, 0, 0, 0, Math.min(frame.getWidth(), width), Math.min(frame.getHeight(), height), false, false);
 		texture.upload();
 		if (System.nanoTime() - elytraUsedNanos < 1_000_000_000L) {
 			paintElytra(index);

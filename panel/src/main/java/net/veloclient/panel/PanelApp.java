@@ -153,7 +153,7 @@ public final class PanelApp {
 
 	private static void securityHeaders(HttpExchange ex) {
 		var h = ex.getResponseHeaders();
-		h.set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; connect-src 'self'; "
+		h.set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob: https://velo-client.com; media-src 'self' https://velo-client.com; style-src 'self'; script-src 'self'; connect-src 'self'; "
 				+ "font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'");
 		h.set("X-Frame-Options", "DENY");
 		h.set("X-Content-Type-Options", "nosniff");
@@ -326,6 +326,7 @@ public final class PanelApp {
 		}
 		boolean allowed = rest.startsWith("admin/") || rest.startsWith("staff/") || PUBLIC_VELO.contains(rest) && method.equals("GET")
 				|| rest.matches("cape/[0-9a-f]{64}") && method.equals("GET")
+				|| rest.matches("partners/icon/[a-z0-9-]{1,40}") && method.equals("GET") || rest.equals("partners") && method.equals("GET")
 				|| rest.matches("skins/[0-9a-f]{32}/(head\\.png|skin\\.png|meta)") && method.equals("GET")
 				|| rest.startsWith("cosmetics/file/") && method.equals("GET") || rest.startsWith("news/image/") && method.equals("GET");
 		if (!allowed || !(method.equals("GET") || method.equals("POST"))) {

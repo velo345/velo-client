@@ -126,17 +126,12 @@
       "items": [
         "**Search** profiles and servers right on the Home screen.",
         "Your profile page shows your player wearing your cosmetics; 3D skin layers now load for every skin (legacy and HD skins too).",
-        "**Velo+ Addons** card in the Mods tab: add them to a profile with one click; choose whether the + shows on your badge.",
+        "Velo+ members can choose whether the **+** shows on their badge.",
         "New installs get a ready-to-play **26.2 profile**, and new profiles get **Wavey Capes** for nicer cape physics.",
         "Servers on another port: typing `host:port` in the address now just works, and SRV records are followed.",
         "You no longer show as online when the launcher sits in the background while you play another client.",
         "Discord now recognises the game on Windows (overlay and *Playing Minecraft*)."
       ]
-    },
-    {
-      "type": "image",
-      "image": "file:images/launcher-addons-card.jpg",
-      "caption": "The Velo+ Addons card in a profile's Mods tab."
     },
     {
       "type": "heading",

@@ -66,6 +66,19 @@ class PlusTest {
 	}
 
 	@Test
+	void addonsAreOnlyForPlayersTheOwnerPicked() throws Exception {
+		store.grantPlus(ME, "Me", 30, "owner", null, null);
+		assertFalse(store.hasAddons(ME), "Velo+ alone doesn't give the Addons");
+		assertThrows(StoreService.StoreException.class, () -> store.adminAddons(ME, "Me", ME, true), "only owners");
+		assertTrue(store.adminAddons(OWNER, "Owner", ME, true).addons());
+		assertTrue(store.hasAddons(ME));
+		store.loadAddonAccess();
+		assertTrue(store.hasAddons(ME), "kept across reloads");
+		assertFalse(store.adminAddons(OWNER, "Owner", ME, false).addons());
+		assertFalse(store.hasAddons(ME));
+	}
+
+	@Test
 	void aPaymentCountsOnceAndARefundTakesItsDaysBack() throws Exception {
 		store.grantPlus(ME, "Me", 30, "tebex", "txn-1", "rec-1");
 		long afterFirst = store.plusUntil(ME);
@@ -85,7 +98,7 @@ class PlusTest {
 		KeyPair pair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
 		PlusTokens tokens = new PlusTokens(Base64.getEncoder().encodeToString(pair.getPrivate().getEncoded()));
 		assertTrue(tokens.enabled());
-		String token = tokens.issue(ME, System.currentTimeMillis() + 30L * 86_400_000L);
+		String token = tokens.issue(ME, System.currentTimeMillis() + 30L * 86_400_000L, true, false);
 		String[] parts = token.split("\\.");
 		assertEquals("v1", parts[0]);
 		Signature verify = Signature.getInstance("Ed25519");
@@ -95,6 +108,13 @@ class PlusTest {
 		var payload = JsonParser.parseString(new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8)).getAsJsonObject();
 		assertEquals(ME, payload.get("uuid").getAsString());
 		assertTrue(payload.get("until").getAsLong() <= System.currentTimeMillis() + PlusTokens.MAX_VALID_MILLIS + 1000, "a token lasts a week at most");
+		assertTrue(payload.get("plus").getAsBoolean());
+		assertFalse(payload.has("addons"), "members don't get the Addons claim");
+		var addonOnly = tokens.issue(ME, 0, false, true).split("\\.");
+		var addonPayload = JsonParser.parseString(new String(Base64.getUrlDecoder().decode(addonOnly[1]), StandardCharsets.UTF_8)).getAsJsonObject();
+		assertTrue(addonPayload.get("addons").getAsBoolean());
+		assertFalse(addonPayload.get("plus").getAsBoolean());
+		assertTrue(addonPayload.get("until").getAsLong() > System.currentTimeMillis() + PlusTokens.MAX_VALID_MILLIS - 60_000, "Addons-only proofs last a week");
 		assertFalse(new PlusTokens(null).enabled());
 	}
 

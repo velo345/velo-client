@@ -37,7 +37,26 @@ public final class VeloDraw {
 
 	// ---------------------------------------------------------------- builder
 
+	private static boolean batching;
+
+	/**
+	 * Starts collecting every shape drawn until {@link #endBatch} into one gui element - for widgets that draw many
+	 * small shapes each frame (Keystrokes' keys). The pose must not change in between.
+	 */
+	public static void beginBatch() {
+		begin();
+		batching = true;
+	}
+
+	public static void endBatch(DrawContext context) {
+		batching = false;
+		submit(context);
+	}
+
 	private static void begin() {
+		if (batching) {
+			return;
+		}
 		quadCount = 0;
 		minX = minY = Float.MAX_VALUE;
 		maxX = maxY = -Float.MAX_VALUE;
@@ -91,7 +110,7 @@ public final class VeloDraw {
 	}
 
 	private static void submit(DrawContext context) {
-		if (quadCount == 0) {
+		if (batching || quadCount == 0) {
 			return;
 		}
 		VeloShapeElement.submit(context, xy, colors, quadCount,

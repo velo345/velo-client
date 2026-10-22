@@ -214,6 +214,14 @@ public final class LaunchBar extends HBox {
 		if (heads.length > 0) {
 			HBox stack = new HBox(-6);
 			stack.getChildren().addAll(heads);
+			// The bar stretches its children to its full height: keep the faces in the middle of it, not at the top.
+			stack.setAlignment(Pos.CENTER_LEFT);
+			stack.setMaxHeight(Region.USE_PREF_SIZE);
+			for (Node head : heads) {
+				if (head instanceof Region region) {
+					region.setMaxHeight(Region.USE_PREF_SIZE);
+				}
+			}
 			socialBox.getChildren().add(stack);
 		}
 		social.setText(text == null ? "" : text);

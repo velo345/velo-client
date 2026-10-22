@@ -310,6 +310,12 @@ public final class SocialClient {
 				publishParty(type, payload);
 				return false;
 			}
+			case "world_invite", "world_knock" -> {
+				if (data != null && data.isJsonObject()) {
+					net.veloclient.velo.client.hosting.WorldHosting.onEvent(type, data.getAsJsonObject());
+				}
+				return false;
+			}
 			case "party_ping", "party_waypoint", "party_chat", "party_invite", "party_launch", "party_follow" -> {
 				publishParty(type, data != null && data.isJsonObject() ? data.getAsJsonObject() : new JsonObject());
 				return false;
@@ -646,7 +652,32 @@ public final class SocialClient {
 	}
 
 	private static volatile String staffLevel;
+	private static volatile String staffTeam;
 	private static volatile long staffCheckedAt;
+
+	/** Your place on the Velo team ("helper", "mod", "admin") or null - helpers get the clip & world reports too. */
+	public static String staffTeam() {
+		staffLevel();
+		return staffTeam;
+	}
+
+	/** Reports a world from Discover to the Velo staff. */
+	public static CompletableFuture<Reply> reportWorld(String worldId, String category, String reason) {
+		JsonObject body = new JsonObject();
+		body.addProperty("world", worldId);
+		body.addProperty("category", category);
+		body.addProperty("reason", reason);
+		return request("/v1/worlds/report", body);
+	}
+
+	/** Reports someone's shared clip to the Velo staff. */
+	public static CompletableFuture<Reply> reportClip(String clipId, String category, String reason) {
+		JsonObject body = new JsonObject();
+		body.addProperty("id", clipId);
+		body.addProperty("category", category);
+		body.addProperty("reason", reason);
+		return request("/v1/clips/report", body);
+	}
 
 	/** Your Velo Client staff level ("mod", "admin") or null; refreshed in the background at most once a minute. */
 	public static String staffLevel() {
@@ -656,6 +687,7 @@ public final class SocialClient {
 			request("/v1/staff/me", null).thenAccept(r -> {
 				if (r.ok()) {
 					staffLevel = r.json().has("level") && !r.json().get("level").isJsonNull() ? r.json().get("level").getAsString() : null;
+					staffTeam = r.json().has("team") && !r.json().get("team").isJsonNull() ? r.json().get("team").getAsString() : null;
 				}
 			});
 		}

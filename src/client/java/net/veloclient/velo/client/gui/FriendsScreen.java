@@ -745,6 +745,11 @@ public final class FriendsScreen extends VeloWindow {
 				}
 				bubbleWidth = widest + 12;
 				bubbleHeight = lines.size() * 10 + 8;
+				// A shared clip link gets a Watch button: it plays right here in the game.
+				if (net.veloclient.velo.client.clips.core.ClipTools.shareId(message.text) != null) {
+					bubbleWidth = Math.max(bubbleWidth, 120);
+					bubbleHeight += 24;
+				}
 			}
 			int h = bubbleHeight + (showTime ? 11 : 3);
 			laid.add(new Laid(message, mine, lines, bubbleWidth, h, showTime));
@@ -775,6 +780,12 @@ public final class FriendsScreen extends VeloWindow {
 				for (String line : item.lines()) {
 					context.drawTextWithShadow(this.textRenderer, line, bubbleX + 6, lineY, 0xFFFFFFFF);
 					lineY += 10;
+				}
+				String clipId = net.veloclient.velo.client.clips.core.ClipTools.shareId(item.message().text);
+				if (clipId != null && lineY + 20 > top && lineY < top + height) {
+					String sender = item.mine() ? null : friend.username;
+					hits.add(VeloUi.pill(context, bubbleX + 6, lineY + 2, item.bubbleWidth() - 12, 18, "▶  Watch clip", 1, mouseX, mouseY,
+							() -> this.client.setScreen(new net.veloclient.velo.client.gui.media.ClipWatchScreen(this, clipId, sender))));
 				}
 			}
 			if (item.showTime()) {

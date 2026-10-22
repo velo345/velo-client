@@ -7,43 +7,28 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The short "good for" tag on each module card in the Velo menu ("PvP", "Survival", "Bed Wars"...) and the
- * groups the Velo+ Addons are shown in (Find & See, Combat, Survive, Automate, Move, Safety - each with its own
- * colour, matching the icons in tools/icons/addon_icons.json).
+ * The short "good for" tag on each module card in the Velo menu ("PvP", "Survival", "Bed Wars"...) and the groups an
+ * add-on's modules are shown in - the add-on registers those itself ({@link #registerAddonGroups}).
  */
 public final class ModuleTags {
 
 	public record AddonGroup(String name, String blurb, int color) {
 	}
 
-	public static final List<AddonGroup> ADDON_GROUPS = List.of(
-			new AddonGroup("Find & See", "Spot what matters", 0xFF2DD4BF),
-			new AddonGroup("Combat", "Hit harder, hit smarter", 0xFFFF4D5A),
-			new AddonGroup("Survive", "Stay alive without thinking", 0xFF3DDC97),
-			new AddonGroup("Automate", "Let the boring parts run", 0xFFF7C04A),
-			new AddonGroup("Move", "Go where you want", 0xFF5AA9FF),
-			new AddonGroup("Safety", "Always one key away", 0xFFA9A9B3));
+	private static final AddonGroup OTHER = new AddonGroup("Other", "", 0xFFA9A9B3);
+	private static volatile List<AddonGroup> addonGroups = List.of(OTHER);
+	private static volatile Map<String, String> addonGroupOf = Map.of();
 
-	private static final Map<String, String> ADDON_GROUP_OF = Map.ofEntries(
-			Map.entry("block-finder", "Find & See"), Map.entry("storage-finder", "Find & See"), Map.entry("entity-finder", "Find & See"),
-			Map.entry("x-ray", "Find & See"), Map.entry("sound-debug-overlay", "Find & See"), Map.entry("enemy-armor", "Find & See"),
-			Map.entry("cinematic-camera", "Find & See"),
-			Map.entry("kill-aura", "Combat"), Map.entry("auto-trigger", "Combat"), Map.entry("criticals", "Combat"), Map.entry("reach", "Combat"),
-			Map.entry("bow-aimbot", "Combat"), Map.entry("auto-crystal", "Combat"), Map.entry("auto-anchor", "Combat"), Map.entry("auto-mace", "Combat"),
-			Map.entry("stun-slam", "Combat"), Map.entry("elytra-mace", "Combat"), Map.entry("firework-mace", "Combat"),
-			Map.entry("shield-breaker", "Combat"), Map.entry("w-tap", "Combat"), Map.entry("anti-knockback", "Combat"),
-			Map.entry("auto-cart", "Combat"), Map.entry("terminator", "Combat"), Map.entry("auto-clicker", "Combat"),
-			Map.entry("auto-totem", "Survive"), Map.entry("auto-pot", "Survive"), Map.entry("auto-eat", "Survive"), Map.entry("auto-armor", "Survive"),
-			Map.entry("auto-shield", "Survive"), Map.entry("auto-mend", "Survive"), Map.entry("auto-mlg", "Survive"),
-			Map.entry("auto-extinguish", "Survive"), Map.entry("auto-dodge", "Survive"), Map.entry("no-fall", "Survive"),
-			Map.entry("auto-tunnel-miner", "Automate"), Map.entry("auto-excavator", "Automate"), Map.entry("ender-chest-farmer", "Automate"),
-			Map.entry("auto-craft", "Automate"), Map.entry("auto-trade", "Automate"), Map.entry("auto-fish", "Automate"),
-			Map.entry("auto-write", "Automate"), Map.entry("fast-break", "Automate"), Map.entry("fast-place", "Automate"), Map.entry("scaffold", "Automate"),
-			Map.entry("fly", "Move"), Map.entry("fly-boat", "Move"), Map.entry("speed", "Move"), Map.entry("jump-boost", "Move"),
-			Map.entry("air-jump", "Move"), Map.entry("wall-jump", "Move"), Map.entry("spider", "Move"), Map.entry("jesus", "Move"),
-			Map.entry("safe-walk", "Move"), Map.entry("no-slow", "Move"), Map.entry("inventory-move", "Move"), Map.entry("auto-walk", "Move"),
-			Map.entry("auto-jump", "Move"),
-			Map.entry("addons-kill-switch", "Safety"));
+	/** An add-on's groups (in order) and which group each of its modules is in. */
+	public static void registerAddonGroups(List<AddonGroup> groups, Map<String, String> groupOfModule) {
+		addonGroups = List.copyOf(groups);
+		addonGroupOf = Map.copyOf(groupOfModule);
+	}
+
+	public static List<AddonGroup> addonGroups() {
+		return addonGroups;
+	}
+
 
 	private static final Map<String, String> TAGS = Map.ofEntries(
 			Map.entry("keystrokes", "PvP"), Map.entry("mouse-buttons", "PvP"), Map.entry("armor-durability", "PvP"),
@@ -78,15 +63,16 @@ public final class ModuleTags {
 	private ModuleTags() {
 	}
 
-	/** The addon group a Velo+ Addon belongs to (Safety for one we don't know yet). */
+	/** The group an add-on module belongs to (the last group for one it didn't name). */
 	public static AddonGroup addonGroup(String moduleId) {
-		String name = ADDON_GROUP_OF.getOrDefault(moduleId, "Safety");
-		for (AddonGroup group : ADDON_GROUPS) {
+		List<AddonGroup> groups = addonGroups;
+		String name = addonGroupOf.get(moduleId);
+		for (AddonGroup group : groups) {
 			if (group.name().equals(name)) {
 				return group;
 			}
 		}
-		return ADDON_GROUPS.getLast();
+		return groups.getLast();
 	}
 
 	/** What a module is good for, in a word or two. */
@@ -106,7 +92,7 @@ public final class ModuleTags {
 			case SERVER_TOOLS -> "Servers";
 			case DEBUG -> "Dev tools";
 			case COSMETICS -> "Look";
-			case ADDONS -> "Velo+";
+			case ADDONS -> "Addon";
 		};
 	}
 }

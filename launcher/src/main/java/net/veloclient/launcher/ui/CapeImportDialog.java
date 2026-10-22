@@ -12,7 +12,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.Optional;
 
-/** Import-a-cape dialog: PNG picker (native file chooser), name field, and the five physics parameters. */
+/** Import-a-cape dialog: PNG picker (and animated GIF for Velo+ members), name field, and the five physics parameters. */
 public final class CapeImportDialog {
 
 	public record Result(String name, Path pngFile, CapePhysicsPresetData preset) {
@@ -25,6 +25,10 @@ public final class CapeImportDialog {
 		FileChooser chooser = new FileChooser();
 		chooser.setTitle("Choose a cape texture (PNG, 2:1 ratio, " + CapeLibrary.TEXTURE_WIDTH + "x" + CapeLibrary.TEXTURE_HEIGHT
 				+ " up to " + CapeLibrary.MAX_TEXTURE_WIDTH + "x" + CapeLibrary.MAX_TEXTURE_HEIGHT + ")");
+		if (net.veloclient.launcher.social.StoreApi.isPlusCached()) {
+			// Velo+: animated custom capes - every Velo player sees them move.
+			chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG or animated GIF", "*.png", "*.gif"));
+		}
 		chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG image", "*.png"));
 		File file = chooser.showOpenDialog(owner);
 		if (file == null) {

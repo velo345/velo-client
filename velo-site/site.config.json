@@ -60,9 +60,8 @@
     "monthlyCoins": "2,000"
   },
   "counts": {
-    "_comment": "Shown across the site - update when modules or Addons are added.",
+    "_comment": "Shown across the site - update when modules are added.",
     "modules": "108",
-    "addons": "56",
     "categories": "8"
   },
   "seo": {

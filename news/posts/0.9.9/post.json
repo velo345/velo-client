@@ -1,0 +1,139 @@
+{
+  "title": "Velo Client 0.9.9: The Velo+ Update",
+  "summary": "Play your world with friends from anywhere, animated Name Styles, Cloud Sync with restore points, Clips Pro at 1080p60 with sound - watched and trimmed right in the game and launcher - your own Home background, partner servers on the title screen and smoother container animations.",
+  "tag": "Update",
+  "version": "0.9.9",
+  "accent": "#ff3b44",
+  "pinned": true,
+  "blocks": [
+    {
+      "type": "text",
+      "text": "0.9.9 is the biggest Velo+ update yet - and the best parts are free for your friends: they join your world without Velo+."
+    },
+    {
+      "type": "heading",
+      "text": "World Hosting"
+    },
+    {
+      "type": "text",
+      "text": "Open your singleplayer world and press **Open to friends** in R-Shift > **World Hosting**. No port forwarding, no IP to share - your friends join through Velo, from anywhere. Before anyone gets in, your world is **backed up**."
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Invite** friends or your whole **party** with one click - they get a Join button wherever they are.",
+        "**Join codes** like VELO-ABC123: share it anywhere, people knock, you let them in.",
+        "**Public worlds**: list yours in **Discover** - anyone joins, or they ask first.",
+        "Manage who's in: **op**, **game mode**, **teleport**, **kick**, **remove** or **ban** - and the world's rules: keep inventory, PvP, one player sleeps for all, mob griefing, day cycle, difficulty.",
+        "Different mods? Velo shows exactly which world mods you're missing and **relaunches with matching mods** - in a temporary profile, your own setup stays as it is."
+      ]
+    },
+    {
+      "type": "callout",
+      "text": "Hosting is part of Velo+. Joining is free for everyone."
+    },
+    {
+      "type": "heading",
+      "text": "Discover"
+    },
+    {
+      "type": "text",
+      "text": "Partner servers now sit in a bar along the top of the **title screen** - each with its own icon and live player count, one click to join. The **Discover** button (and the top of the launcher's Servers page) lists them with your friends' worlds and public worlds. Something wrong with a public world? Press the **flag** to report it to the Velo staff."
+    },
+    {
+      "type": "heading",
+      "text": "Name Styles"
+    },
+    {
+      "type": "text",
+      "text": "Make your name move - in chat, the tab list and above your head, for every Velo player. In the Locker's new **Name** tab (game and launcher, changes show live):"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**21 effects**: wave, rainbow, shimmer, neon, glitch, fire, aurora, scanner, heartbeat, matrix and more.",
+        "Up to **6 colours** with a full colour picker, **speed** and **spread**.",
+        "**9 fonts**, an **icon** in front, bold, italic, underline and **glow**.",
+        "**27 presets** to start from - and every Loadout remembers its name style.",
+        "Don't like flashy names? Turn others' styles off - or just in chat, tab or above heads - in Velo Network settings."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Cloud Sync & restore points"
+    },
+    {
+      "type": "text",
+      "text": "Your settings, HUD layouts, profiles, waypoints and keybinds follow you to every PC. Velo backs up after sign-in, every 10 minutes and when you close the game, and keeps **30 restore points** - pin the ones you never want to lose, roll back with one click. R-Shift > **Cloud Sync**."
+    },
+    {
+      "type": "heading",
+      "text": "Clips Pro"
+    },
+    {
+      "type": "list",
+      "items": [
+        "A **2-5 minute replay buffer at 1080p60** with **sound**, recorded on your graphics card's own encoder.",
+        "**Auto clips** when you get a kill or win a game.",
+        "**Watch clips right where you are** - a real player in the game's Clips screen and the launcher's Media page, with sound, volume and seeking. No more external video player.",
+        "**Trim by dragging**: pull the handles at either end of the timeline in, then **Save trimmed** - or share just that part.",
+        "**Share**: copy a link to velo-client.com or send it to a Velo friend - they watch it in the game too. Shared clips stay online for **60 days**, then they're deleted.",
+        "Clips are compressed hard, so they take a fraction of the space."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Animated custom capes"
+    },
+    {
+      "type": "text",
+      "text": "Import your own **GIF** as a cape - in the game or the launcher - and every Velo player sees it move."
+    },
+    {
+      "type": "heading",
+      "text": "Your own Home background"
+    },
+    {
+      "type": "text",
+      "text": "Velo+ members can put their **own picture or animated GIF** behind the launcher's Home card instead of the island. It's always scaled to cover the whole card - never stretched. Settings > Appearance > **Home background**."
+    },
+    {
+      "type": "heading",
+      "text": "Container animations"
+    },
+    {
+      "type": "list",
+      "items": [
+        "The whole window now pops, slides, drops or zooms in - its texture too, not just the items and text.",
+        "Items **fly to where they land** for every kind of move: shift-click, **hotbar keys**, **Mouse Tweaks** drags and scrolls - in chests and your own inventory, creative included.",
+        "New settings: opening style, open/close speed, item flight speed, flight arc and whether an item only appears once it lands."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Smaller things"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Name Styles** now replace the server's colours on your name everywhere - also when a server colours names letter by letter.",
+        "Changes to your cape, wings, aura or name style **save straight into the loadout you're wearing**, in the game and the launcher.",
+        "**Keystrokes** costs less every frame (labels are kept, keys are drawn as one shape) and the W is properly centred."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Fixes"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Fight Recap** only counts real fights now: one that ends in a death or with the server saying who won. Hitting a friend a few times no longer makes a recap or a replay."
+      ]
+    },
+    {
+      "type": "callout",
+      "text": "Velo+ is on the Store page - Cloud Sync, Clips Pro, World Hosting, Name Styles, your own Home background, animated capes, monthly coins and the + badge."
+    }
+  ]
+}

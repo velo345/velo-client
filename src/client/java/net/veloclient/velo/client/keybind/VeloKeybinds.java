@@ -22,7 +22,7 @@ public final class VeloKeybinds {
 	public static final KeyBinding.Category CATEGORY =
 			KeyBinding.Category.create(Identifier.of("velo-client", "general"));
 
-	/** Shared action-bar message for any singleplayer-only feature (Cinematic Camera, Entity Finder, ...) that refuses to activate on a real server. */
+	/** Shared action-bar message for any singleplayer-only feature  that refuses to activate on a real server. */
 	public static final net.minecraft.text.Text NO_SINGLEPLAYER_MSG =
 			net.minecraft.text.Text.literal("This feature only works in singleplayer worlds.");
 

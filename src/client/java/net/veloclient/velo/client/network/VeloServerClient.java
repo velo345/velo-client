@@ -381,6 +381,10 @@ public final class VeloServerClient {
 		if (auraId != null) {
 			body.addProperty("auraId", auraId);
 		}
+		String nameStyle = net.veloclient.velo.client.namestyle.NameStyles.networkValue();
+		if (nameStyle != null) {
+			body.addProperty("nameStyle", nameStyle);
+		}
 		JsonObject response = postJson(base + "/v1/heartbeat", body);
 		// Older servers don't echo the cape back - treat that as "accepted as sent".
 		if (!response.has("capeId")) {
@@ -408,9 +412,10 @@ public final class VeloServerClient {
 				String capeId = user.has("capeId") && !user.get("capeId").isJsonNull() ? user.get("capeId").getAsString() : null;
 				String wingsId = user.has("wingsId") && !user.get("wingsId").isJsonNull() ? user.get("wingsId").getAsString() : null;
 				String auraId = user.has("auraId") && !user.get("auraId").isJsonNull() ? user.get("auraId").getAsString() : null;
+				String nameStyle = user.has("nameStyle") && !user.get("nameStyle").isJsonNull() ? user.get("nameStyle").getAsString() : null;
 				if (uuid != null && username != null) {
 					boolean plus = user.has("plus") && !user.get("plus").isJsonNull() && user.get("plus").getAsBoolean();
-					entries.put(uuid, new VeloUserRegistry.Entry(username, capeId, wingsId, auraId, plus));
+					entries.put(uuid, new VeloUserRegistry.Entry(username, capeId, wingsId, auraId, plus, nameStyle));
 				}
 			}
 			VeloUserRegistry.replaceAll(entries);

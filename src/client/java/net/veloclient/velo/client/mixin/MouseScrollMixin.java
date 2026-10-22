@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Reroutes scroll-wheel input away from vanilla's own hotbar-slot-change handling while
  * {@link ZoomModule}'s zoom key is held (adjusting zoom level) or a module registered with
- * {@link ScrollHandlers} is active (e.g. the add-on's Cinematic Camera / Fly Boat speed) -
+ * {@link ScrollHandlers} is active (e.g. an add-on's speed setting) -
  * otherwise scrolling in any of those would also silently change whatever's in the hotbar
  * underneath.
  */

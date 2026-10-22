@@ -79,6 +79,11 @@ public final class Icons {
 			Map.entry("warning", "M12 3 2 20h20zM12 10v4M12 17h.01"),
 			Map.entry("play", "M7 4.5v15l12.5-7.5z"),
 			Map.entry("stop", "M6 6h12v12H6z"),
+			Map.entry("pause", "M6.5 4.5h3.5v15H6.5zM14 4.5h3.5v15H14z"),
+			Map.entry("volume", "M4 9.5h4L13 5v14l-5-4.5H4zM16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"),
+			Map.entry("volume-off", "M4 9.5h4L13 5v14l-5-4.5H4zM16.5 9.5l5 5M21.5 9.5l-5 5"),
+			Map.entry("flag", "M5 21V4M5 4h11l-2 4 2 4H5"),
+			Map.entry("expand", "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"),
 			Map.entry("wings", "M12 9C9 6 5 4.5 2 5C2.5 8 4 10 6 11.5C5 11.7 4 11.6 3 11.2C4.2 13.2 6 14.4 8 14.7C7.2 15.1 6.4 15.3 5.5 15.2C7.6 17 10 17 12 14"
 					+ "M12 9C15 6 19 4.5 22 5C21.5 8 20 10 18 11.5C19 11.7 20 11.6 21 11.2C19.8 13.2 18 14.4 16 14.7C16.8 15.1 17.6 15.3 18.5 15.2C16.4 17 14 17 12 14"),
 			Map.entry("aura", "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4.9 4.9l2.1 2.1M17 17l2.1 2.1M3 12h2M19 12h2M4.9 19.1 7 17M17 7l2.1-2.1M12 2v2M12 20v2"),
@@ -107,7 +112,7 @@ public final class Icons {
 	public static Node icon(String name, double size, Paint color, double strokeWidth) {
 		SVGPath path = new SVGPath();
 		path.setContent(PATHS.getOrDefault(name, PATHS.get("info")));
-		boolean filled = name.equals("play") || name.equals("stop");
+		boolean filled = name.equals("play") || name.equals("stop") || name.equals("pause");
 		path.setFill(filled ? color : Color.TRANSPARENT);
 		path.setStroke(color);
 		path.setStrokeWidth(strokeWidth);

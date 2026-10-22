@@ -490,7 +490,7 @@ The bot also uses `POST /v1/admin/discord/booster` (14 days Velo+ and `cape_boos
 ## Velo+ (subscription)
 
 Velo+ = the Velo badge with a red plus, the VIP Discord role, **monthly Velo Coins** (`plus.monthlyCoins` in
-`store.json`, default 2000, price 9.99 EUR) and the **Velo Client Addons**. A membership is just an end date per player
+`store.json`, default 2000, price 9.99 EUR) and the Velo+ features below. A membership is just an end date per player
 (`store.db`, table `plus`): the Tebex subscription extends it by a month per payment (`POST /v1/plus/checkout`
 creates the basket; `payment.completed` and `recurring-payment.renewed` webhooks extend it, a refund takes the days
 back), and the owner can give or end it by days in the launcher (Store > Owner panel > Players). The coins are paid
@@ -498,22 +498,29 @@ hourly-checked, once per 30 days of membership. Members' badge flag rides on `/v
 
 | Variable | What |
 |---|---|
-| `VELO_PLUS_SIGNING_KEY` | Ed25519 private key (PKCS#8, base64): signs the proof the game checks before it loads the Addons. The matching public key is built into the mod (`assets/velo-client/plus/public.key`) |
-| `VELO_PLUS_GITHUB_REPO` | the **private** repo holding the Addons releases (default `velo345/velo-client-plus`) |
-| `VELO_PLUS_GITHUB_TOKEN` | a fine-grained GitHub personal access token with **Contents: read-only** access to that repo only; not an App ID, Client ID, or Discord token |
+| `VELO_PLUS_SIGNING_KEY` | Ed25519 private key (PKCS#8, base64): signs the proof (`GET /v1/plus/token`, valid up to a week) the game checks offline. The matching public key is built into the mod (`assets/velo-client/plus/public.key`) |
+| `VELO_SITE_URL` | where share links point (default `https://velo-client.com`) |
+| `VELO_RELAY_PORT` / `VELO_RELAY_HOST` | World Hosting relay: TCP port (default `25600`, must be open in the firewall - it is **not** HTTP and doesn't go through Caddy/nginx) and the host name clients connect to (default `api.velo-client.com`) |
 
-**The Addons are never public.** Their source is the private repo `velo345/velo-client-plus` (a git submodule at
-`src/addon` of the main repo); `tools/release/publish_addons.py` puts the built jars into a release *there*, the server
-fetches them (hourly, or at once via `POST /v1/admin/addons/sync`) and serves them to members only
-(`GET /v1/plus/addons/file?mc=`). The launcher installs / updates them in a member's profiles at launch and disables
-them when Velo+ ends; the game itself only loads them with a valid signed proof (`GET /v1/plus/token`, valid up to a week).
-Members need no GitHub account and no access to the private repo.
+**Velo+ features on the server** (all `PlusFeatureRoutes`):
 
-To create the token, use GitHub **Settings → Developer settings → Personal access tokens → Fine-grained tokens**.
-Select only `velo345/velo-client-plus`, grant **Contents: Read-only**, create the token, and set its value as
-`VELO_PLUS_GITHUB_TOKEN` in the server's environment (for example, the server's systemd service environment),
-then restart the server. Do not put it in the bot's environment or commit it to the repository. No token is
-needed if the server's repo is public or Velo+ Addons are not being served.
+- **Name Styles** - the game sends `nameStyle` (`1|effect|speed|flags|colors|icon|where`) with its heartbeat; it's strictly
+  validated (`SessionRegistry.normalizeNameStyle`) and only passed on in `/v1/online` for members.
+- **Cloud Sync** - `CloudBackupService`, `<data>/cloud/<uuid>/`: 30 restore points / 20 MB per member, zips checked (no
+  path tricks, no zip bombs), kept 90 days after a membership ends.
+- **Clips Pro share links** - `ClipShareService`, `<data>/clips/`: MP4 uploads streamed to disk (120 MB per clip, 1 GB and
+  100 clips per member; the game re-encodes them small first), served at `velo-client.com/c/<id>` (page with Discord/OG
+  embed tags, `/c/<id>.mp4` with HTTP ranges). nginx needs `location ^~ /c/` on the site and a 128 MB body limit on
+  `/v1/clips/upload` (see `tools/server/nginx/velo.conf`). Deleted 30 days after a membership ends.
+- **Animated custom capes** - GIF custom capes are accepted from members and only shown while they're members.
+- **World Hosting** - `WorldHostService`: a member's world registry plus the TCP relay. Guests need no Velo+. Access is
+  checked before a ticket is handed out (invited / friend / party / let in after a knock / public). Public worlds are
+  listed at `GET /v1/worlds/public` (Discover). Nothing is persisted - an open world lives as long as its host's link.
+- **Partner servers** - `PartnerServers`, `<data>/partners.json`, edited in Owner panel > Partner servers, listed at
+  `GET /v1/partners`.
+
+Owner-granted extras: `POST /v1/admin/store/addons {target, granted}` (Owner panel > Players) - nothing about them is
+shown to anyone without the grant.
 
 The Tebex recurring-payment webhook shape was written from the docs and is **not yet tested against real Tebex events**:
 try a subscription in Tebex's test mode first (a manual grant from the Owner panel works regardless).

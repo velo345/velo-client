@@ -13,8 +13,8 @@ public enum ModuleCategory {
 	COSMETICS("Cosmetics"),
 	QOL("Quality of Life"),
 	PVP("PvP"),
-	/** Velo+ Addons (the optional velo-addons jar) - listed on their own, below the core categories. */
-	ADDONS("Velo+ Addons");
+	/** Addons (the optional velo-addons jar, invite only) - listed on their own, below the core categories. */
+	ADDONS("Addons");
 
 	private final String displayName;
 

@@ -272,7 +272,7 @@
 				if (viewer) viewer.dispose();
 				stage.replaceChildren();
 				viewer = await window.velo.player3d(stage, { skin: window.velo.skinUrl(meta.uuid), slim: meta.slim, item,
-					fileUrl: window.velo.fileUrl, auraUrl: (id) => `/assets/auras/${id.replace(/^aura_/, "")}.webp` });
+					fileUrl: window.velo.fileUrl, auraUrl: (id, layer) => `/assets/auras/${id.replace(/^aura_/, "")}${layer ? "-" + layer : ""}.webp` });
 			} catch (e) {
 				stage.replaceChildren(el("span", { class: "hint", style: "position:static" }, "Couldn't load that skin - try another name."));
 			}

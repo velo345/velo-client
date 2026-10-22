@@ -353,7 +353,7 @@ final class StaffRoutes {
 		SocialService.Activity activity = social.activityOf(ref.uuid());
 		out.put("online", activity != null);
 		out.put("activity", activity);
-		String hash = capes.hashFor(ref.uuid());
+		String hash = capes.hashFor(ref.uuid(), true);
 		out.put("customCape", hash);
 		out.put("ban", staff.ban(ref.uuid()));
 		out.put("reports", staff.reportsAgainst(ref.uuid()));

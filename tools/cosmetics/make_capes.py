@@ -19,9 +19,10 @@ from PIL import Image, ImageFilter
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "server/cosmetics-seed/capes"
 PREVIEW = ROOT / "build/cape-previews"
-SCALE = 8                      # texture pixels per cape pixel
+SCALE = 8                      # art pixels per cape pixel (the art itself is drawn at SS x this)
 W, H = 10 * SCALE, 16 * SCALE  # the outside face
 SS = 2                         # supersampling
+OUT_SCALE = SCALE * SS         # texture pixels per cape pixel: the art at full detail, never downscaled
 FRAMES = 40
 DELAY_MS = 60
 
@@ -1487,13 +1488,13 @@ CAPES = {
 
 # Capes whose detail (text, fine lines) needs more than 8 texture pixels per cape pixel: {id: (scale, frames, dither)}.
 # Every frame stays decoded in the game's memory (scale^2 * 8 KB each), so only where it matters.
+# Every cape is 1024 x 512 (OUT_SCALE 16); these differ in frame count / dithering.
 HIGH_RES = {
-    "velo_staff": (16, 24, False),   # 1024 x 512: the STAFF lettering stays crisp; flat colours, no dither speckle
-    "booster": (12, 40, True),       # 768 x 384
+    "velo_staff": (OUT_SCALE, 24, False),   # flat colours: no dither speckle on the STAFF lettering
 }
 
 
-def to_texture(art, scale=SCALE):
+def to_texture(art, scale=OUT_SCALE):
     """Outside art (0..1+) -> (64 x 32) * scale RGB cape texture."""
     art = np.clip(art, 0, 1)
     face = Image.fromarray((art * 255).astype(np.uint8)).resize((10 * scale, 16 * scale), Image.LANCZOS)
@@ -1510,7 +1511,7 @@ def to_texture(art, scale=SCALE):
 
 def render(cape_id):
     fn = CAPES[cape_id]
-    scale, count, dither = HIGH_RES.get(cape_id, (SCALE, FRAMES, True))
+    scale, count, dither = HIGH_RES.get(cape_id, (OUT_SCALE, FRAMES, True))
     delay = round(DELAY_MS * FRAMES / count)  # same loop length with fewer frames
     frames = [to_texture(fn(i / count), scale) for i in range(count)]
     # libimagequant: far better palettes than median cut (smooth gradients, no speckled dither).

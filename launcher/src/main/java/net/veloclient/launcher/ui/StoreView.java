@@ -982,46 +982,27 @@ public final class StoreView {
 
 	// ---- Velo+ ----
 
-	/** Every Velo+ Addon module, by group: {group, name, icon}. Keep in step with VeloAddonsMod's registrations. */
-	private static final String[][][] ADDON_GROUPS = {
-			{{"Combat", "shield"},
-					{"Kill Aura", "zap"}, {"Auto Trigger", "zap"}, {"Reach", "external"}, {"Criticals", "star"}, {"W-Tap", "keyboard"},
-					{"Auto Clicker", "refresh"}, {"Bow Aimbot", "eye"}, {"Auto Crystal", "sparkles"}, {"Auto Anchor", "link"},
-					{"Auto Totem", "heart"}, {"Auto Shield", "shield"}, {"Shield Breaker", "close"}, {"Auto Pot", "heart"},
-					{"Anti Knockback", "lock"}, {"Auto Dodge", "swap"}, {"Auto Mace", "trophy"}, {"Elytra Mace", "wings"},
-					{"Firework Mace", "sparkles"}, {"Stun Slam", "download"}, {"Terminator", "cpu"}, {"Enemy Armor", "user"},
-					{"Auto Armor", "shield"}},
-			{{"Movement", "wings"},
-					{"Fly", "wings"}, {"Speed", "zap"}, {"Spider", "upload"}, {"Jesus", "globe"}, {"Air Jump", "chevron-up"},
-					{"Wall Jump", "chevron-up"}, {"Jump Boost", "upload"}, {"Auto Jump", "chevron-up"}, {"No Fall", "download"},
-					{"No Slow", "clock"}, {"Safe Walk", "lock"}, {"Scaffold", "grid"}, {"Inventory Move", "box"}, {"Auto Walk", "play"},
-					{"Fly Boat", "wings"}, {"Auto MLG", "download"}, {"Auto Cart", "map"}},
-			{{"Find & See", "eye"},
-					{"X-Ray", "eye"}, {"Block Finder", "search"}, {"Storage Finder", "box"}, {"Entity Finder", "user"},
-					{"Sound Radar", "bell"}, {"Cinematic Camera", "clips"}},
-			{{"Automate", "cpu"},
-					{"Auto Eat", "heart"}, {"Auto Fish", "refresh"}, {"Auto Craft", "grid"}, {"Auto Trade", "swap"}, {"Auto Write", "edit"},
-					{"Auto Mend", "sparkles"}, {"Auto Extinguish", "warning"}, {"Auto Excavator", "download"}, {"Auto Tunnel Miner", "map"},
-					{"Ender Chest Farmer", "box"}, {"Fast Break", "zap"}, {"Fast Place", "plus"}}};
+	/** What Velo+ adds, for the perk cards under the price: {icon, title, text}. */
+	private static final String[][] PLUS_FEATURES = {
+			{"globe", "World Hosting", "Play your singleplayer world with friends from anywhere - no port forwarding. Invite friends, share a code or go public in Discover. Friends join free."},
+			{"download", "Cloud Sync & restore points", "Settings, HUD layouts, profiles, waypoints and keybinds on every PC. Roll back to any of 30 restore points."},
+			{"clips", "Clips Pro", "A 2-5 minute replay buffer at 1080p60 with sound, automatic clips on kills and wins, share links (kept 60 days) and sending clips to friends."},
+			{"sparkles", "Name Styles", "21 animated effects, your colours, 9 fonts and icons - on your name in chat, the tab list and above your head."},
+			{"cape", "Animated custom capes", "Import your own GIF cape and every Velo player sees it move."},
+			{"image", "Your Home background", "Put your own picture or animated GIF on the launcher's Home screen instead of the island - always scaled to fill the card."},
+			{"gift", "Velo Coins every month", "Spend them on wings, capes and auras in the Store."},
+			{"crown", "The + badge & VIP role", "A red plus next to your name for every Velo player, and the VIP role on Discord."}};
 
 	/**
 	 * Velo+: the pitch, price and subscribe button on the left, a Free vs Velo+ comparison on the right, the
-	 * Addons underneath. Price, monthly coins and your membership come from the server, off the UI thread.
+	 * perks underneath. Price, monthly coins and your membership come from the server, off the UI thread.
 	 */
-	private static int addonCount() {
-		int n = 0;
-		for (String[][] group : ADDON_GROUPS) {
-			n += group.length - 1;
-		}
-		return n;
-	}
-
 	private static Node plusPage() {
 		ImageView badge = new ImageView(UiImages.resource("/net/veloclient/launcher/images/velo-plus-badge.png", 120, 72));
 		Label headline = new Label("Play more.\nUnlock everything.");
 		headline.getStyleClass().add("t-display");
 		headline.setStyle("-fx-font-size: 46px;");
-		Label pitch = new Label("Velo+ adds the Addons, a monthly coin drop and the + badge, and keeps Velo Client independent.");
+		Label pitch = new Label("Host your world for friends, your setup in the cloud, pro clips, a name that moves and a monthly coin drop.");
 		pitch.getStyleClass().add("t-body");
 		pitch.setStyle("-fx-font-size: 15px;");
 		pitch.setWrapText(true);
@@ -1067,8 +1048,11 @@ public final class StoreView {
 		table.addRow(0, padded(whatHead), freeHead, plusHead);
 		String[][] rows = {
 				{"Velo Client, launcher, free cosmetics", "Everything you have today", "y"},
-				{"Velo Addons", addonCount() + " extra modules, installed for you", "n"},
 				{"Velo Coins every month", "Spend on wings, capes and auras", "n"},
+				{"World Hosting", "Your world for friends from anywhere, no port forwarding", "n"},
+				{"Cloud Sync & Clips Pro", "Backups on every PC, 1080p60 clips with share links", "n"},
+				{"Name Styles & animated capes", "Animated names, your own GIF cape", "n"},
+				{"Your Home background", "Your own picture or GIF in the launcher", "n"},
 				{"The Velo+ badge", "In chat, tab list and above your head", "n"},
 				{"VIP role in the Discord", "Given automatically once linked", "n"},
 				{"Keeps Velo independent", "Built by a small team", "n"}};
@@ -1078,7 +1062,7 @@ public final class StoreView {
 			t.getStyleClass().add("t-strong");
 			Label d = new Label(rows[i][1]);
 			d.getStyleClass().add("t-muted");
-			if (i == 2) {
+			if (i == 1) {
 				coinsRow = t;
 			}
 			VBox cell = new VBox(2, t, d);
@@ -1089,35 +1073,30 @@ public final class StoreView {
 		HBox top = new HBox(48, left, table);
 		top.setAlignment(Pos.TOP_LEFT);
 
-		VBox addons = new VBox(22);
-		int total = 0;
-		for (String[][] group : ADDON_GROUPS) {
-			Label groupName = new Label(group[0][0]);
-			groupName.getStyleClass().add("t-heading");
-			Label groupCount = new Label(String.valueOf(group.length - 1));
-			groupCount.getStyleClass().addAll("badge", "badge-grey");
-			HBox groupHead = new HBox(10, Icons.icon(group[0][1], 16, Color.web("#C9C9D1")), groupName, groupCount);
-			groupHead.setAlignment(Pos.CENTER_LEFT);
-			FlowPane cells = new FlowPane(10, 10);
-			for (int i = 1; i < group.length; i++) {
-				StackPane icon = new StackPane(Icons.icon(group[i][1], 16, Color.web("#FF7A7E")));
-				icon.setMinSize(32, 32);
-				icon.setMaxSize(32, 32);
-				icon.setStyle("-fx-background-color: -velo-accent-soft; -fx-background-radius: 9;");
-				Label n = new Label(group[i][0]);
-				n.getStyleClass().add("t-strong");
-				n.setMinWidth(Region.USE_PREF_SIZE);
-				HBox cell = new HBox(10, icon, n);
-				cell.setAlignment(Pos.CENTER_LEFT);
-				cell.setPadding(new Insets(8, 14, 8, 8));
-				cell.getStyleClass().add("card");
-				cell.setMinWidth(Region.USE_PREF_SIZE);
-				cells.getChildren().add(cell);
-			}
-			total += group.length - 1;
-			addons.getChildren().add(new VBox(12, groupHead, cells));
+		FlowPane perks = new FlowPane(14, 14);
+		for (String[] feature : PLUS_FEATURES) {
+			StackPane icon = new StackPane(Icons.icon(feature[0], 18, Color.web("#FF7A7E")));
+			icon.setMinSize(38, 38);
+			icon.setMaxSize(38, 38);
+			icon.setStyle("-fx-background-color: -velo-accent-soft; -fx-background-radius: 10;");
+			Label title = new Label(feature[1]);
+			title.getStyleClass().add("t-strong");
+			Label text = new Label(feature[2]);
+			text.getStyleClass().add("t-muted");
+			text.setWrapText(true);
+			VBox card = new VBox(10, icon, title, text);
+			card.getStyleClass().add("card");
+			card.setPadding(new Insets(16));
+			card.setPrefWidth(300);
+			card.setMinHeight(150);
+			perks.getChildren().add(card);
 		}
-		Node addonSection = section("The Addons", total + " modules, installed and updated by the launcher, toggled per profile", null, null, addons);
+		javafx.scene.control.CheckBox showPlus = new javafx.scene.control.CheckBox("Show the + of Velo+ on my badge");
+		showPlus.setSelected(net.veloclient.launcher.data.PlusBadgeSetting.show());
+		showPlus.setOnAction(e -> net.veloclient.launcher.data.PlusBadgeSetting.set(showPlus.isSelected()));
+		showPlus.setVisible(false);
+		showPlus.setManaged(false);
+		Node addonSection = section("What's in Velo+", "Everything below switches on the moment you subscribe", null, null, new VBox(14, perks, showPlus));
 
 		Label coinsLabel = coinsRow;
 		CompletableFuture.supplyAsync(() -> {
@@ -1144,6 +1123,8 @@ public final class StoreView {
 				status.setText("You're Velo+  ·  active until " + LocalDate.ofInstant(java.time.Instant.ofEpochMilli(result.get("until").getAsLong()),
 						java.time.ZoneId.systemDefault()));
 				subscribe.setText("Extend / manage");
+				showPlus.setVisible(true);
+				showPlus.setManaged(true);
 			}
 			subscribe.setDisable(!result.get("checkoutEnabled").getAsBoolean());
 			if (!result.get("checkoutEnabled").getAsBoolean()) {

@@ -10,8 +10,11 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Container Animations: scales/slides the container screen in (and out before it closes), and remembers shift-clicks
- * so the moved stack can fly from its old slot to wherever it landed.
+ * Container Animations: scales/slides the container screen in (and out before it closes), and lets items that moved
+ * between slots fly there (found by comparing the slots every frame - see {@link ContainerAnimationsModule#track}).
+ * The window texture is moved by ContainerBackgroundMixin. Hooks the contents pass (renderMain / extractContents), not
+ * the whole render: the player inventory (a recipe book screen) calls that directly and skips the base render, which
+ * left its close animation never finishing (Escape had to be pressed twice) and its items never flying.
  */
 //? if <26.1 {
 @Mixin(net.minecraft.client.gui.screen.ingame.HandledScreen.class)
@@ -34,15 +37,9 @@ public abstract class ContainerAnimationsMixin {
 	@Unique
 	private boolean velo$reallyClose;
 	@Unique
-	private net.minecraft.screen.slot.Slot velo$from;
-	@Unique
-	private net.minecraft.item.ItemStack velo$moved;
-	@Unique
-	private int[] velo$before;
-	@Unique
-	private long velo$movedAt;
+	private final net.veloclient.velo.client.modules.rendering.ContainerSlotView velo$slots = new net.veloclient.velo.client.modules.rendering.ContainerSlotView();
 
-	@Inject(method = "render", at = @At("HEAD"), require = 0)
+	@Inject(method = "renderMain", at = @At("HEAD"), require = 0)
 	private void velo$begin(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		velo$pushed = false;
 		if (!ContainerAnimationsModule.active()) {
@@ -54,17 +51,38 @@ public abstract class ContainerAnimationsMixin {
 			velo$reallyClose = false;
 			return;
 		}
+		velo$pushed = velo$push(context);
+	}
+
+	@Unique
+	private boolean velo$push(net.minecraft.client.gui.DrawContext context) {
 		float[] f = ContainerAnimationsModule.frame(this);
+		if (!ContainerAnimationsModule.animating(f)) {
+			return false;
+		}
 		float cx = x + backgroundWidth / 2f;
 		float cy = y + backgroundHeight / 2f;
 		context.getMatrices().pushMatrix();
-		context.getMatrices().translate(cx, cy + f[1]);
+		context.getMatrices().translate(cx + f[1], cy + f[2]);
 		context.getMatrices().scale(f[0], f[0]);
 		context.getMatrices().translate(-cx, -cy);
-		velo$pushed = true;
+		return true;
 	}
 
-	@Inject(method = "render", at = @At("RETURN"), require = 0)
+	@Inject(method = "renderBackground", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/ingame/HandledScreen;drawBackground(Lnet/minecraft/client/gui/DrawContext;FII)V"), require = 0)
+	private void velo$beginWindow(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		velo$pushed = ContainerAnimationsModule.active() && velo$push(context);
+	}
+
+	@Inject(method = "renderBackground", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/ingame/HandledScreen;drawBackground(Lnet/minecraft/client/gui/DrawContext;FII)V", shift = At.Shift.AFTER), require = 0)
+	private void velo$endWindow(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		if (velo$pushed) {
+			context.getMatrices().popMatrix();
+			velo$pushed = false;
+		}
+	}
+
+	@Inject(method = "renderMain", at = @At("RETURN"), require = 0)
 	private void velo$end(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		if (velo$pushed) {
 			context.getMatrices().popMatrix();
@@ -74,45 +92,27 @@ public abstract class ContainerAnimationsMixin {
 			return;
 		}
 		long now = System.nanoTime();
-		if (velo$moved != null) {
-			boolean found = false;
-			for (int i = 0; i < handler.slots.size() && i < velo$before.length; i++) {
-				net.minecraft.screen.slot.Slot s = handler.slots.get(i);
-				if (s != velo$from && net.minecraft.item.ItemStack.areItemsAndComponentsEqual(s.getStack(), velo$moved)
-						&& s.getStack().getCount() > velo$before[i]) {
-					ContainerAnimationsModule.FLIGHTS.add(new ContainerAnimationsModule.Flight(velo$moved.copy(), x + velo$from.x, y + velo$from.y,
-							x + s.x, y + s.y, now));
-					found = true;
-				}
+		ContainerAnimationsModule.track(velo$slots.set(handler, x, y,
+				(Object) this instanceof net.minecraft.client.gui.screen.ingame.CreativeInventoryScreen), now);
+		java.util.Iterator<ContainerAnimationsModule.Flight> it = ContainerAnimationsModule.FLIGHTS.iterator();
+		while (it.hasNext()) {
+			ContainerAnimationsModule.Flight fl = it.next();
+			int[] at = ContainerAnimationsModule.flightPosition(fl, now);
+			if (at == null) {
+				it.remove();
+				continue;
 			}
-			if (found || now - velo$movedAt > 400_000_000L) {
-				velo$moved = null;
-			}
-		}
-		long length = ContainerAnimationsModule.flightMillis() * 1_000_000L;
-		ContainerAnimationsModule.FLIGHTS.removeIf(fl -> now - fl.start() > length);
-		for (ContainerAnimationsModule.Flight fl : ContainerAnimationsModule.FLIGHTS) {
-			float t = (now - fl.start()) / (float) length;
-			float e = t < 0.5f ? 2 * t * t : 1 - (float) Math.pow(-2 * t + 2, 2) / 2;
-			int px = Math.round(fl.fromX() + (fl.toX() - fl.fromX()) * e);
-			int py = Math.round(fl.fromY() + (fl.toY() - fl.fromY()) * e - (float) Math.sin(Math.PI * e) * 10);
-			context.drawItemWithoutEntity((net.minecraft.item.ItemStack) fl.stack(), px, py);
+			net.minecraft.item.ItemStack stack = (net.minecraft.item.ItemStack) fl.stack();
+			context.drawItemWithoutEntity(stack, at[0], at[1]);
+			context.drawStackOverlay(((net.minecraft.client.gui.screen.Screen) (Object) this).getTextRenderer(), stack, at[0], at[1]);
 		}
 	}
 
-	@Inject(method = "onMouseClick(Lnet/minecraft/screen/slot/Slot;IILnet/minecraft/screen/slot/SlotActionType;)V", at = @At("HEAD"), require = 0)
-	private void velo$click(net.minecraft.screen.slot.Slot slot, int slotId, int button, net.minecraft.screen.slot.SlotActionType action, CallbackInfo ci) {
-		if (!ContainerAnimationsModule.itemMovement() || slot == null || action != net.minecraft.screen.slot.SlotActionType.QUICK_MOVE || !slot.hasStack()) {
-			return;
+	@Inject(method = "drawSlot", at = @At("HEAD"), cancellable = true, require = 0)
+	private void velo$hideIncoming(net.minecraft.client.gui.DrawContext context, net.minecraft.screen.slot.Slot slot, int mouseX, int mouseY, CallbackInfo ci) {
+		if (ContainerAnimationsModule.itemMovement() && ContainerAnimationsModule.hiddenUntilLanded(slot.id)) {
+			ci.cancel();
 		}
-		velo$from = slot;
-		velo$moved = slot.getStack().copy();
-		velo$before = new int[handler.slots.size()];
-		for (int i = 0; i < velo$before.length; i++) {
-			net.minecraft.item.ItemStack s = handler.slots.get(i).getStack();
-			velo$before[i] = net.minecraft.item.ItemStack.areItemsAndComponentsEqual(s, velo$moved) ? s.getCount() : 0;
-		}
-		velo$movedAt = System.nanoTime();
 	}
 
 	@Inject(method = "close", at = @At("HEAD"), cancellable = true, require = 0)
@@ -124,7 +124,7 @@ public abstract class ContainerAnimationsMixin {
 }
 //?} else {
 /*@Mixin(net.minecraft.client.gui.screens.inventory.AbstractContainerScreen.class)
-public abstract class ContainerAnimationsMixin {
+public abstract class ContainerAnimationsMixin implements ContainerAnimationsModule.Window {
 
 	@Shadow
 	protected int leftPos;
@@ -145,15 +145,9 @@ public abstract class ContainerAnimationsMixin {
 	@Unique
 	private boolean velo$reallyClose;
 	@Unique
-	private net.minecraft.world.inventory.Slot velo$from;
-	@Unique
-	private net.minecraft.world.item.ItemStack velo$moved;
-	@Unique
-	private int[] velo$before;
-	@Unique
-	private long velo$movedAt;
+	private final net.veloclient.velo.client.modules.rendering.ContainerSlotView velo$slots = new net.veloclient.velo.client.modules.rendering.ContainerSlotView();
 
-	@Inject(method = "extractRenderState", at = @At("HEAD"), require = 0)
+	@Inject(method = "extractContents", at = @At("HEAD"), require = 0)
 	private void velo$begin(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		velo$pushed = false;
 		if (!ContainerAnimationsModule.active()) {
@@ -165,17 +159,26 @@ public abstract class ContainerAnimationsMixin {
 			velo$reallyClose = false;
 			return;
 		}
+		velo$pushed = velo$push(context);
+	}
+
+	@Override
+	public boolean velo$push(Object graphics) {
+		net.minecraft.client.gui.GuiGraphicsExtractor context = (net.minecraft.client.gui.GuiGraphicsExtractor) graphics;
 		float[] f = ContainerAnimationsModule.frame(this);
+		if (!ContainerAnimationsModule.animating(f)) {
+			return false;
+		}
 		float cx = leftPos + imageWidth / 2f;
 		float cy = topPos + imageHeight / 2f;
 		context.pose().pushMatrix();
-		context.pose().translate(cx, cy + f[1]);
+		context.pose().translate(cx + f[1], cy + f[2]);
 		context.pose().scale(f[0], f[0]);
 		context.pose().translate(-cx, -cy);
-		velo$pushed = true;
+		return true;
 	}
 
-	@Inject(method = "extractRenderState", at = @At("RETURN"), require = 0)
+	@Inject(method = "extractContents", at = @At("RETURN"), require = 0)
 	private void velo$end(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		if (velo$pushed) {
 			context.pose().popMatrix();
@@ -185,45 +188,27 @@ public abstract class ContainerAnimationsMixin {
 			return;
 		}
 		long now = System.nanoTime();
-		if (velo$moved != null) {
-			boolean found = false;
-			for (int i = 0; i < menu.slots.size() && i < velo$before.length; i++) {
-				net.minecraft.world.inventory.Slot s = menu.slots.get(i);
-				if (s != velo$from && net.minecraft.world.item.ItemStack.isSameItemSameComponents(s.getItem(), velo$moved)
-						&& s.getItem().getCount() > velo$before[i]) {
-					ContainerAnimationsModule.FLIGHTS.add(new ContainerAnimationsModule.Flight(velo$moved.copy(), leftPos + velo$from.x, topPos + velo$from.y,
-							leftPos + s.x, topPos + s.y, now));
-					found = true;
-				}
+		ContainerAnimationsModule.track(velo$slots.set(menu, leftPos, topPos,
+				(Object) this instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen), now);
+		java.util.Iterator<ContainerAnimationsModule.Flight> it = ContainerAnimationsModule.FLIGHTS.iterator();
+		while (it.hasNext()) {
+			ContainerAnimationsModule.Flight fl = it.next();
+			int[] at = ContainerAnimationsModule.flightPosition(fl, now);
+			if (at == null) {
+				it.remove();
+				continue;
 			}
-			if (found || now - velo$movedAt > 400_000_000L) {
-				velo$moved = null;
-			}
-		}
-		long length = ContainerAnimationsModule.flightMillis() * 1_000_000L;
-		ContainerAnimationsModule.FLIGHTS.removeIf(fl -> now - fl.start() > length);
-		for (ContainerAnimationsModule.Flight fl : ContainerAnimationsModule.FLIGHTS) {
-			float t = (now - fl.start()) / (float) length;
-			float e = t < 0.5f ? 2 * t * t : 1 - (float) Math.pow(-2 * t + 2, 2) / 2;
-			int px = Math.round(fl.fromX() + (fl.toX() - fl.fromX()) * e);
-			int py = Math.round(fl.fromY() + (fl.toY() - fl.fromY()) * e - (float) Math.sin(Math.PI * e) * 10);
-			context.item((net.minecraft.world.item.ItemStack) fl.stack(), px, py);
+			net.minecraft.world.item.ItemStack stack = (net.minecraft.world.item.ItemStack) fl.stack();
+			context.item(stack, at[0], at[1]);
+			context.itemDecorations(net.minecraft.client.Minecraft.getInstance().font, stack, at[0], at[1]);
 		}
 	}
 
-	@Inject(method = "slotClicked(Lnet/minecraft/world/inventory/Slot;IILnet/minecraft/world/inventory/ContainerInput;)V", at = @At("HEAD"), require = 0)
-	private void velo$click(net.minecraft.world.inventory.Slot slot, int slotId, int button, net.minecraft.world.inventory.ContainerInput action, CallbackInfo ci) {
-		if (!ContainerAnimationsModule.itemMovement() || slot == null || action != net.minecraft.world.inventory.ContainerInput.QUICK_MOVE || !slot.hasItem()) {
-			return;
+	@Inject(method = "extractSlot", at = @At("HEAD"), cancellable = true, require = 0)
+	private void velo$hideIncoming(net.minecraft.client.gui.GuiGraphicsExtractor context, net.minecraft.world.inventory.Slot slot, int mouseX, int mouseY, CallbackInfo ci) {
+		if (ContainerAnimationsModule.itemMovement() && ContainerAnimationsModule.hiddenUntilLanded(slot.index)) {
+			ci.cancel();
 		}
-		velo$from = slot;
-		velo$moved = slot.getItem().copy();
-		velo$before = new int[menu.slots.size()];
-		for (int i = 0; i < velo$before.length; i++) {
-			net.minecraft.world.item.ItemStack s = menu.slots.get(i).getItem();
-			velo$before[i] = net.minecraft.world.item.ItemStack.isSameItemSameComponents(s, velo$moved) ? s.getCount() : 0;
-		}
-		velo$movedAt = System.nanoTime();
 	}
 
 	@Inject(method = "onClose", at = @At("HEAD"), cancellable = true, require = 0)

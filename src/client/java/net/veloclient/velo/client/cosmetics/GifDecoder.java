@@ -96,7 +96,7 @@ public final class GifDecoder {
 				g.drawImage(frameImage, left, top, null);
 				g.dispose();
 
-				frames.add(new Frame(toNativeImage(canvas), normalizeDelay(delayCentiseconds)));
+				frames.add(new Frame(toNativeImage(capeRegion(canvas)), normalizeDelay(delayCentiseconds)));
 
 				if ("restoreToBackgroundColor".equals(disposal)) {
 					pendingClearRect = new int[] {left, top, frameImage.getWidth(), frameImage.getHeight()};
@@ -162,6 +162,24 @@ public final class GifDecoder {
 		g.drawImage(source, 0, 0, null);
 		g.dispose();
 		return copy;
+	}
+
+	/** The part of the 64 x 32 cape layout a cape actually uses (outside, inside, edges), in cape pixels from the top left. */
+	public static final int CAPE_REGION_WIDTH = 22;
+	public static final int CAPE_REGION_HEIGHT = 17;
+
+	/**
+	 * A cape layout (2:1) cropped to {@link #CAPE_REGION_WIDTH} x {@link #CAPE_REGION_HEIGHT} cape pixels - the other 82%
+	 * is never drawn (elytras get their own {@link ElytraArt} texture), and a 1024 x 512 cape of 40 frames is 84 MB
+	 * whole but 15 MB cropped. Anything else is kept as it is. {@link Result#width()} / {@link Result#height()} stay
+	 * the whole layout's size.
+	 */
+	private static BufferedImage capeRegion(BufferedImage canvas) {
+		if (canvas.getWidth() != canvas.getHeight() * 2 || canvas.getWidth() < 64) {
+			return canvas;
+		}
+		int scale = canvas.getWidth() / 64;
+		return canvas.getSubimage(0, 0, CAPE_REGION_WIDTH * scale, CAPE_REGION_HEIGHT * scale);
 	}
 
 	private static NativeImage toNativeImage(BufferedImage source) {

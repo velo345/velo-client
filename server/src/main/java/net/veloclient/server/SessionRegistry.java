@@ -54,10 +54,11 @@ final class SessionRegistry {
 	// the map (see below), so the ConcurrentHashMap itself provides the
 	// necessary visibility without needing volatile fields here (which
 	// records can't have anyway).
-	record Session(String uuid, String username, String kind, String capeId, String wingsId, String auraId, long expiresAtMillis) {
+	record Session(String uuid, String username, String kind, String capeId, String wingsId, String auraId, String nameStyle, long expiresAtMillis) {
 	}
 
-	record OnlineUser(String uuid, String username, String capeId, String wingsId, String auraId, boolean plus) {
+	/** {@code nameStyle}: a Velo+ member's animated name (see {@link #normalizeNameStyle}), null for none. */
+	record OnlineUser(String uuid, String username, String capeId, String wingsId, String auraId, boolean plus, String nameStyle) {
 	}
 
 	/** Called with a uuid whenever one of its sessions ends or expires - drives friends' presence updates. */
@@ -108,7 +109,7 @@ final class SessionRegistry {
 			sessionsByToken.values().removeIf(s -> s.uuid().equals(uuid) && s.kind().equals(normalizedKind));
 		}
 		String token = randomHex(32);
-		sessionsByToken.put(token, new Session(uuid, username, normalizedKind, null, null, null, System.currentTimeMillis() + ttl(normalizedKind)));
+		sessionsByToken.put(token, new Session(uuid, username, normalizedKind, null, null, null, null, System.currentTimeMillis() + ttl(normalizedKind)));
 		return token;
 	}
 
@@ -187,6 +188,11 @@ final class SessionRegistry {
 
 	/** Same, also recording the equipped aura ({@code auraId}: "id;settings...", like wings). */
 	Session heartbeat(String token, String capeId, String ownCustomCapeHash, String wingsId, String auraId) {
+		return heartbeat(token, capeId, ownCustomCapeHash, wingsId, auraId, null);
+	}
+
+	/** Same, also recording the name style (already checked: only Velo+ members may have one). */
+	Session heartbeat(String token, String capeId, String ownCustomCapeHash, String wingsId, String auraId, String nameStyle) {
 		Session session = session(token);
 		if (session == null) {
 			sessionsByToken.remove(token);
@@ -198,7 +204,7 @@ final class SessionRegistry {
 			normalized = null;
 		}
 		Session refreshed = new Session(session.uuid(), session.username(), session.kind(), normalized, normalizeWingsId(wingsId),
-				normalizeWingsId(auraId), System.currentTimeMillis() + SESSION_TTL_MILLIS);
+				normalizeWingsId(auraId), normalizeNameStyle(nameStyle), System.currentTimeMillis() + SESSION_TTL_MILLIS);
 		sessionsByToken.put(token, refreshed);
 		return refreshed;
 	}
@@ -208,7 +214,7 @@ final class SessionRegistry {
 		Session session = session(token);
 		if (session != null) {
 			sessionsByToken.put(token, new Session(session.uuid(), session.username(), session.kind(), session.capeId(), session.wingsId(),
-					session.auraId(), System.currentTimeMillis() + ttl(session.kind())));
+					session.auraId(), session.nameStyle(), System.currentTimeMillis() + ttl(session.kind())));
 		}
 	}
 
@@ -275,7 +281,8 @@ final class SessionRegistry {
 		long now = System.currentTimeMillis();
 		return sessionsByToken.values().stream()
 				.filter(s -> s.expiresAtMillis() >= now && s.kind().equals(KIND_GAME))
-				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId(), s.auraId(), plusLookup.test(s.uuid()) && !plusHidden.contains(s.uuid())))
+				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId(), s.auraId(), plusLookup.test(s.uuid()) && !plusHidden.contains(s.uuid()),
+						plusLookup.test(s.uuid()) ? s.nameStyle() : null))
 				.toList();
 	}
 
@@ -299,6 +306,7 @@ final class SessionRegistry {
 			row.put("capeId", s.capeId());
 			row.put("wingsId", s.wingsId());
 			row.put("auraId", s.auraId());
+			row.put("nameStyle", s.nameStyle());
 			row.put("plus", plusLookup.test(s.uuid()));
 			out.add(row);
 		});
@@ -367,6 +375,20 @@ final class SessionRegistry {
 			return null;
 		}
 		return wingsId;
+	}
+
+	/**
+	 * A name style as the game sends it: {@code 1|effect|speed|flags|colors|icon|where}, e.g.
+	 * {@code 1|wave|12|bg|ff4d4d,ffb84d,ffe14d|3|ctn} - effect name, speed in tenths, flags (b bold, i italic,
+	 * u underline, g glow, r reverse, a digit for the spread, a capital letter for the font), 1 to 6 colours, an icon number (0 none) and where it shows (chat, tab, name tag).
+	 * Anything else is dropped, so a client can't send other players arbitrary text.
+	 */
+	static String normalizeNameStyle(String style) {
+		if (style == null || style.length() > 96
+				|| !style.matches("1\\|[a-z]{1,12}\\|[0-9]{1,2}\\|[biugr1-9A-I]{0,7}\\|[0-9a-f]{6}(,[0-9a-f]{6}){0,5}\\|[0-9]{1,2}\\|[ctn]{0,3}")) {
+			return null;
+		}
+		return style;
 	}
 
 	private String randomHex(int bytes) {

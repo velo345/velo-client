@@ -473,9 +473,9 @@ public final class StoreScreen extends VeloWindow {
 			int bw = this.textRenderer.getWidth(button) + 22;
 			int bx = x + w - 12 - bw;
 			int tw = bx - 10 - tx;
-			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.display("Monthly coins, the Addons and the + badge"), tw),
+			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.display("World Hosting, Cloud Sync, Clips Pro"), tw),
 					tx, y + h / 2 - 11, MenuKit.TEXT);
-			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui("Plus the VIP Discord role. Cancel any time."), tw),
+			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui("Monthly coins, the + badge and more. Cancel any time."), tw),
 					tx, y + h / 2 + 4, MenuKit.TEXT_2);
 			VeloDraw.fillRounded(context, bx, y + (h - 20) / 2, bw, 20, 6, StoreClient.plus() ? 0x263DDC97 : VeloAnim.lerpArgb(MenuKit.accent(), 0xFFFFFFFF, 0.1f * hover));
 			MenuKit.text(context, this.textRenderer, button, bx + 11, y + (h - 8) / 2, StoreClient.plus() ? MenuKit.GREEN : MenuKit.onAccent());
@@ -625,12 +625,14 @@ public final class StoreScreen extends VeloWindow {
 
 	/** What Velo+ includes - shown on its page (and in the launcher's Store). */
 	private static final String[] PLUS_PERKS = {
-			"The Velo+ badge: your logo with a red plus next to your name, for every Velo player",
-			"VIP role in the Velo Discord - automatic once you've linked it",
+			"World Hosting: play your world with friends from anywhere, no port forwarding - invite, share a code or go public",
+			"Cloud Sync: settings, HUD layouts, profiles, waypoints and keybinds on every PC, with restore points",
+			"Clips Pro: a 2-5 minute replay buffer at 1080p60 with sound, auto clips on kills and wins, share links (60 days) and sending to friends",
+			"Name Styles: animated gradients, rainbow, glitch and more on your name - in chat, tab list and above your head",
+			"Animated custom capes: import your own GIF cape and every Velo player sees it move",
+			"Home background: your own picture or animated GIF on the launcher's Home screen instead of the island",
 			"%,d Velo Coins every month - spend them on wings, capes and auras",
-			"All 57 Velo Client Addons modules (updated by the launcher): Cinematic Camera, Fly Boat, Auto Eat, Storage and Entity Finder, "
-					+ "Auto Tunnel Miner, Sound Radar and more",
-			"Supporting the development of Velo Client"};
+			"The Velo+ badge and the VIP role in the Velo Discord"};
 
 	private void layoutPlus(int cx, int y, int cw) {
 		boolean member = StoreClient.plus();

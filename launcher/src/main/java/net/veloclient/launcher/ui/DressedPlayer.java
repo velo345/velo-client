@@ -28,7 +28,7 @@ public final class DressedPlayer {
 	private static List<GifFrames.Frame> equippedCapeFrames() {
 		try {
 			return CapeLibrary.equippedCapeId().flatMap(id -> CapeLibrary.listAll().stream().filter(c -> c.id().equals(id)).findFirst())
-					.map(CosmeticUi::frames).orElse(null);
+					.map(CosmeticUi::viewerFrames).orElse(null);
 		} catch (RuntimeException e) {
 			LauncherLog.warn("Could not read the equipped cape", e);
 			return null;

@@ -76,7 +76,7 @@ public final class CosmeticsView {
 		}
 	}
 
-	public enum Slot { SKIN, CAPE, WINGS, AURA }
+	public enum Slot { SKIN, CAPE, WINGS, AURA, NAME }
 
 	private static Slot slot = Slot.CAPE;
 	private static String selectedCape;
@@ -100,6 +100,10 @@ public final class CosmeticsView {
 
 	public static void showSkinsTab() {
 		slot = Slot.SKIN;
+	}
+
+	public static void showNameStyleTab() {
+		slot = Slot.NAME;
 	}
 
 	public static Node build(Stage owner, Host host) {
@@ -129,13 +133,15 @@ public final class CosmeticsView {
 
 	private static Node content(Stage owner, Host host, Runnable refresh) {
 		VBox slots = slotsColumn(host, refresh);
-		StackPane stage = stage(host, refresh);
+		String playerName = host.session() == null ? null : host.session().username();
+		StackPane stage = slot == Slot.NAME ? NameStyleEditor.stage(playerName) : stage(host, refresh);
 		HBox.setHgrow(stage, Priority.ALWAYS);
 		Node panel = switch (slot) {
 			case SKIN -> skinsPanel(owner, host, refresh);
 			case CAPE -> capesPanel(owner, host, refresh);
 			case WINGS -> wingsPanel(host, refresh);
 			case AURA -> aurasPanel(host, refresh);
+			case NAME -> NameStyleEditor.panel(playerName, refresh);
 		};
 		HBox body = new HBox(0, slots, stage, panel);
 		body.getStyleClass().add("page");
@@ -164,6 +170,10 @@ public final class CosmeticsView {
 		column.getChildren().add(slotButton(Slot.CAPE, "CAPE", cape == null ? "None" : cape.name(), capeThumb(cape, 48), refresh));
 		column.getChildren().add(slotButton(Slot.WINGS, "WINGS", wings == null ? "None" : wings.name(), wingsThumb(wings, 48), refresh));
 		column.getChildren().add(slotButton(Slot.AURA, "AURA", aura == null ? "None" : aura.name(), auraThumb(aura, 48), refresh));
+		net.veloclient.velo.client.namestyle.NameStyle nameStyle = net.veloclient.launcher.data.NameStyleSetting.style();
+		boolean nameOn = net.veloclient.launcher.data.NameStyleSetting.enabled();
+		Node nameThumb = new NamePreview("Aa", () -> nameStyle, 20, 46);
+		column.getChildren().add(slotButton(Slot.NAME, "NAME STYLE", nameOn ? nameStyle.effect().label : "None", nameThumb, refresh));
 		Region grow = new Region();
 		VBox.setVgrow(grow, Priority.ALWAYS);
 		column.getChildren().addAll(grow, loadoutsCard(refresh));
@@ -250,15 +260,17 @@ public final class CosmeticsView {
 
 	/**
 	 * A saved look: what's worn in every slot plus how - the wings' size/position/flap and the aura's colour, size,
-	 * speed and density - so switching looks brings each one back exactly (older loadouts have no settings: kept as they are).
+	 * speed and density - and the Velo+ name style, so switching looks brings each one back exactly (older loadouts have
+	 * no settings or name style: kept as they are). Same file as the game's Loadouts.
 	 */
 	private record Loadout(String name, String cape, String wings, String aura, WingsCatalog.Settings wingsSettings,
-			AuraEffects.Settings auraSettings) {
+			AuraEffects.Settings auraSettings, String nameStyle, Boolean nameStyleOn) {
 		static Loadout current(String name) {
 			String wings = WingsCatalog.equipped();
 			String aura = AuraCatalog.equipped();
 			return new Loadout(name, CapeLibrary.equippedCapeId().orElse(null), wings, aura,
-					wings == null ? null : WingsCatalog.settings(wings), aura == null ? null : AuraCatalog.settings(aura));
+					wings == null ? null : WingsCatalog.settings(wings), aura == null ? null : AuraCatalog.settings(aura),
+					net.veloclient.launcher.data.NameStyleSetting.style().encode(), net.veloclient.launcher.data.NameStyleSetting.enabled());
 		}
 
 		boolean isWorn() {
@@ -267,7 +279,9 @@ public final class CosmeticsView {
 			return java.util.Objects.equals(cape, CapeLibrary.equippedCapeId().orElse(null)) && java.util.Objects.equals(wings, wornWings)
 					&& java.util.Objects.equals(aura, wornAura)
 					&& (wingsSettings == null || wings == null || wingsSettings.equals(WingsCatalog.settings(wings)))
-					&& (auraSettings == null || aura == null || auraSettings.equals(AuraCatalog.settings(aura)));
+					&& (auraSettings == null || aura == null || auraSettings.equals(AuraCatalog.settings(aura)))
+					&& (nameStyleOn == null || nameStyleOn == net.veloclient.launcher.data.NameStyleSetting.enabled()
+							&& (!nameStyleOn || java.util.Objects.equals(nameStyle, net.veloclient.launcher.data.NameStyleSetting.style().encode())));
 		}
 
 		void wear() {
@@ -283,6 +297,12 @@ public final class CosmeticsView {
 			}
 			if (aura != null && auraSettings != null) {
 				AuraCatalog.setSettings(aura, auraSettings);
+			}
+			if (nameStyleOn != null) {
+				var style = net.veloclient.velo.client.namestyle.NameStyle.decode(nameStyle);
+				net.veloclient.launcher.data.NameStyleSetting.save(style == null ? net.veloclient.launcher.data.NameStyleSetting.style() : style,
+						nameStyleOn && net.veloclient.launcher.social.StoreApi.isPlusCached());
+				NameStyleEditor.forget();
 			}
 		}
 	}
@@ -318,10 +338,10 @@ public final class CosmeticsView {
 	}
 
 	/**
-	 * A colour, size or speed changed: if it belongs to an item of the loadout you're wearing, that loadout takes the
-	 * new value - so every loadout keeps its own colours and settings, and switching brings them back.
+	 * Something you wear changed (an item, a colour, a size, the name style): the loadout you're wearing takes it
+	 * straight away - so every loadout keeps its own items and settings, and switching brings them back.
 	 */
-	private static void syncActiveLoadout() {
+	static void syncActiveLoadout() {
 		String name = activeLoadout();
 		if (name.isEmpty()) {
 			return;
@@ -330,10 +350,9 @@ public final class CosmeticsView {
 		for (int i = 0; i < list.size(); i++) {
 			Loadout l = list.get(i);
 			if (l.name().equals(name)) {
-				boolean sameItems = java.util.Objects.equals(l.cape(), CapeLibrary.equippedCapeId().orElse(null))
-						&& java.util.Objects.equals(l.wings(), WingsCatalog.equipped()) && java.util.Objects.equals(l.aura(), AuraCatalog.equipped());
-				if (sameItems) {
-					list.set(i, Loadout.current(name));
+				Loadout now = Loadout.current(name);
+				if (!now.equals(l)) {
+					list.set(i, now);
 					saveLoadouts(list);
 				}
 				return;
@@ -346,6 +365,7 @@ public final class CosmeticsView {
 			syncInstalled = true;
 			WingsCatalog.SETTINGS_LISTENERS.add(CosmeticsView::syncActiveLoadout);
 			AuraCatalog.SETTINGS_LISTENERS.add(CosmeticsView::syncActiveLoadout);
+			CapeLibrary.EQUIP_LISTENERS.add(CosmeticsView::syncActiveLoadout);
 		}
 	}
 
@@ -449,7 +469,7 @@ public final class CosmeticsView {
 		String glow = switch (slot) {
 			case WINGS -> WingsCatalog.byId(selectedWingsId()).map(WingsCatalog.WingType::accent).orElse("#5aa9ff");
 			case AURA -> AuraCatalog.byId(selectedAuraId()).map(AuraCatalog.AuraType::accent).orElse("#bca6ff");
-			case SKIN -> "#bca6ff";
+			case SKIN, NAME -> "#bca6ff";
 			case CAPE -> "#5ac8ff";
 		};
 		StackPane stage = new StackPane();
@@ -497,7 +517,7 @@ public final class CosmeticsView {
 			case CAPE -> "Cape only";
 			case WINGS -> "Wings only";
 			case AURA -> "Aura only";
-			case SKIN -> "Skin only";
+			case SKIN, NAME -> "Skin only";
 		};
 		for (boolean full : new boolean[] {true, false}) {
 			Button b = new Button(full ? "Full look" : only);
@@ -630,7 +650,7 @@ public final class CosmeticsView {
 			fade.play();
 		};
 		if (cape != null) {
-			CosmeticUi.framesAsync(cape, f -> {
+			CosmeticUi.viewerFramesAsync(cape, f -> {
 				frames[0] = f;
 				arrived[0] = true;
 				build.run();
@@ -717,7 +737,7 @@ public final class CosmeticsView {
 		if (selected == null) {
 			arrived[1] = true;
 		} else {
-			CosmeticUi.framesAsync(selected, f -> {
+			CosmeticUi.viewerFramesAsync(selected, f -> {
 				frames[0] = f;
 				arrived[1] = true;
 				build.run();
@@ -867,7 +887,13 @@ public final class CosmeticsView {
 		importButton.getStyleClass().add("button-sm");
 		importButton.setOnAction(e -> CapeImportDialog.show(owner).ifPresent(result -> {
 			try {
-				CapeLibrary.importPng(result.name(), result.pngFile(), result.preset());
+				if (result.pngFile().getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".gif")) {
+					try (java.io.InputStream in = java.nio.file.Files.newInputStream(result.pngFile())) {
+						CapeLibrary.importAnimatedGif(result.name(), in, result.preset(), null);
+					}
+				} else {
+					CapeLibrary.importPng(result.name(), result.pngFile(), result.preset());
+				}
 				refresh.run();
 			} catch (Exception ex) {
 				error(owner, "Import failed", ex.getMessage());

@@ -34,7 +34,7 @@ import java.util.function.BooleanSupplier;
 /**
  * The Velo menu (R-Shift), 0.9.8 layout:
  * <ul>
- * <li>an icon rail on the left: Modules, Velo+ Addons, then everything else Velo has (Locker, Skins, Friends, Clips,
+ * <li>an icon rail on the left: Modules, Addons (only when installed), then everything else Velo has (Locker, Skins, Friends, Clips,
  * Fight Recap, World Map, Waypoints, Background Queue, Schematics) and Settings, Redstone Mode and Profiles at the
  * bottom - names show on hover;</li>
  * <li>on top: the profile you're on (click to switch), search, and the glowing Edit HUD in the header;</li>
@@ -98,7 +98,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		this.layoutContent();
 	}
 
-	/** Dev-only (screenshot tour): shows the Velo+ Addons view. */
+	/** Dev-only (screenshot tour): shows the Addons view. */
 	public void openMenuForTour() {
 		view = View.ADDONS;
 		chip = 0;
@@ -157,14 +157,10 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 	private void buildRail() {
 		rail.clear();
 		rail.add(new RailItem("grid", "Modules", () -> switchView(View.MODULES), () -> view == View.MODULES, false));
-		rail.add(new RailItem("extensions", hasAddons() ? "Velo+ Addons" : "Velo+ Addons (get Velo+)", () -> {
-			if (hasAddons()) {
-				switchView(View.ADDONS);
-			} else {
-				net.veloclient.velo.client.gui.store.StoreScreen.showPlus();
-				this.client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(this));
-			}
-		}, () -> view == View.ADDONS, false));
+		// Only there when the Addons jar is installed and unlocked for this account - nobody else sees it.
+		if (hasAddons()) {
+			rail.add(new RailItem("extensions", "Addons", () -> switchView(View.ADDONS), () -> view == View.ADDONS, false));
+		}
 		rail.add(new RailItem("skins", "Locker", () -> this.client.setScreen(CapeEquipScreen.open(this, 1)), () -> false, false));
 		rail.add(new RailItem("friends", "Friends", () -> this.client.setScreen(new FriendsScreen(this)), () -> false, false));
 		rail.add(new RailItem("clips", "Clips & Screenshots", () -> this.client.setScreen(new net.veloclient.velo.client.gui.media.MediaScreen(this)),
@@ -183,6 +179,8 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			net.veloclient.velo.client.redstone.RedstoneMode.enter();
 		}, () -> false, true));
 		rail.add(new RailItem("profiles", "Profiles", () -> this.client.setScreen(new ProfileScreen(this)), () -> false, true));
+		rail.add(new RailItem("globe", "Cloud Sync (Velo+)", () -> this.client.setScreen(new CloudSyncScreen(this)), () -> false, true));
+		rail.add(new RailItem("party", "World Hosting", () -> this.client.setScreen(new WorldHostScreen(this)), () -> false, true));
 	}
 
 	private void switchView(View next) {
@@ -220,8 +218,8 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		}
 		if (view == View.ADDONS) {
 			List<Module> addons = ModuleRegistry.byCategory(ModuleCategory.ADDONS);
-			for (int i = 0; i < ModuleTags.ADDON_GROUPS.size(); i++) {
-				ModuleTags.AddonGroup group = ModuleTags.ADDON_GROUPS.get(i);
+			for (int i = 0; i < ModuleTags.addonGroups().size(); i++) {
+				ModuleTags.AddonGroup group = ModuleTags.addonGroups().get(i);
 				if (chip != 0 && chip != i + 1) {
 					continue;
 				}
@@ -450,7 +448,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		int x = mainX();
 		int y = contentY();
 		// The view's title on the left, where the eye starts.
-		MenuKit.text(context, this.textRenderer, MenuKit.displayLg(view == View.ADDONS ? "Velo+ Addons" : "Modules"), x, y + 5, MenuKit.TEXT);
+		MenuKit.text(context, this.textRenderer, MenuKit.displayLg(view == View.ADDONS ? "Addons" : "Modules"), x, y + 5, MenuKit.TEXT);
 
 		// Search on the far right, the profile switcher right before it.
 		boolean focused = search != null && search.isFocused();
@@ -480,7 +478,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		List<String> labels = new ArrayList<>();
 		labels.add("All");
 		if (view == View.ADDONS) {
-			ModuleTags.ADDON_GROUPS.forEach(g -> labels.add(g.name()));
+			ModuleTags.addonGroups().forEach(g -> labels.add(g.name()));
 		} else {
 			for (ModuleCategory category : CATEGORIES) {
 				labels.add(category.displayName());
@@ -499,7 +497,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			}
 			boolean on = i == chip;
 			boolean hover = MenuKit.inside(mouseX, mouseY, x, y, w, 16);
-			int color = view == View.ADDONS && i > 0 ? ModuleTags.ADDON_GROUPS.get(i - 1).color() : MenuKit.accent();
+			int color = view == View.ADDONS && i > 0 ? ModuleTags.addonGroups().get(i - 1).color() : MenuKit.accent();
 			if (on) {
 				VeloDraw.fillRounded(context, x, y, w, 16, 8, VeloUi.withAlpha(color, 0x30));
 				VeloDraw.strokeRounded(context, x, y, w, 16, 8, VeloUi.withAlpha(color, 0xB0));

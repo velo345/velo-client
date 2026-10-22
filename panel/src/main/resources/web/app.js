@@ -63,6 +63,14 @@ const ICONS = {
 	cpu: "M9 9h6v6H9z M4 9h2 M4 15h2 M18 9h2 M18 15h2 M9 4v2 M15 4v2 M9 18v2 M15 18v2 M6 6h12v12H6z",
 	memory: "M3 8h18v8H3z M7 8v8 M11 8v8 M15 8v8 M3 19h18",
 	disk: "M12 3c4.4 0 8 1.3 8 3v12c0 1.7-3.6 3-8 3s-8-1.3-8-3V6c0-1.7 3.6-3 8-3z M4 6c0 1.7 3.6 3 8 3s8-1.3 8-3",
+	monitor: "M3 4h18v12H3z M8 20h8 M12 16v4 M6 12l3-3 2 2 4-4 3 3",
+	clips: "M4 6h12v12H4z M16 10l5-3v10l-5-3",
+	worlds: "M12 3a9 9 0 1 0 .01 0 M3 12h18 M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9 M12 3C9.5 5.6 8.2 8.6 8.2 12s1.3 6.4 3.8 9",
+	capes: "M7 3h10l2 18-7-4-7 4z",
+	partners: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M2 20c0-3 2.7-5 6-5s6 2 6 5 M14 15.3c.6-.2 1.3-.3 2-.3 3.3 0 6 2 6 5",
+	stafflog: "M5 3h11l3 3v15H5z M9 9h6 M9 13h6 M9 17h4",
+	play: "M7 4l13 8-13 8z",
+	trash: "M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13",
 };
 
 function icon(name) {
@@ -496,7 +504,8 @@ function renderLogin(message) {
 
 const PAGES = [
 	["Velo", [["overview", "Overview"], ["players", "Players"], ["store", "Store"]]],
-	["Owner tools", [["cosmetics", "Cosmetics"], ["news", "News"], ["reports", "Reports"], ["addons", "Addons"]]],
+	["Moderation", [["monitor", "Monitoring"], ["clips", "Clips"], ["worlds", "Public worlds"], ["capes", "Custom capes"], ["stafflog", "Staff log"]]],
+	["Owner tools", [["cosmetics", "Cosmetics"], ["news", "News"], ["reports", "Reports"], ["partners", "Partner servers"], ["addons", "Addons"]]],
 	["Machine", [["server", "Server"], ["files", "Files"], ["activity", "Activity log"]]],
 	["", [["account", "Account"]]],
 ];
@@ -796,6 +805,12 @@ async function openPlayer(target) {
 			if (!(await confirmBox("End Velo+?", "This ends " + (v.username || "the player") + "'s membership right now."))) return;
 			await busy(endBtn, async () => { await velo("admin/store/plus", { body: { target: v.uuid, days: 0 } }); render(await velo("admin/store/lookup", { body: { target: v.uuid } })); toast("Velo+ ended"); });
 		};
+		// ---- Addons (invite only, separate from Velo+) ----
+		const addonsBtn = h("button", { class: v.addons ? "btn danger shrink" : "btn primary shrink", type: "button" }, v.addons ? "Take away access" : "Give access");
+		addonsBtn.onclick = async () => {
+			if (v.addons && !(await confirmBox("Take away the Addons?", "They're switched off in " + (v.username || "the player") + "'s profiles at the next launch."))) return;
+			await busy(addonsBtn, async () => { render(await velo("admin/store/addons", { body: { target: v.uuid, granted: !v.addons } })); toast(v.addons ? "Addons access removed" : "Addons access given"); });
+		};
 
 		body.replaceChildren(
 			h("div", { class: "grid kpis" },
@@ -813,6 +828,7 @@ async function openPlayer(target) {
 				v.owned.length ? h("div", { class: "items", style: "grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:14px" }, ownedTiles) : h("p", { class: "muted" }, "None yet"),
 				h("div", { class: "row" }, itemSel, grantBtn)),
 			card("Velo+", plus ? "Active until " + when(v.plusUntil) : "Not a member", null, h("div", { class: "row" }, days, plusBtn, plus ? endBtn : null)),
+			card("Addons", v.addons ? "Has access" : "No access - only players you pick see the Addons anywhere", null, h("div", { class: "row" }, addonsBtn)),
 			staffView && staffView.reports > 0 ? h("div", { class: "notice" }, `${staffView.reports} player report(s) against ${v.username} - `, h("a", { href: "#/reports", onclick: () => dlg.close() }, "open Reports")) : null,
 			card("Ledger", "Last 30 coin changes", null, table(["When", "Reason", "Ref", "num:Change", "num:Balance"], v.ledger.map((l) => [
 				when(l.createdAt), l.reason, h("span", { class: "muted small" }, l.ref || l.actor || ""), (l.delta > 0 ? "+" : "") + fmt(l.delta), fmt(l.balanceAfter)]))));
@@ -1312,7 +1328,7 @@ RENDER.addons = async (root) => {
 		const sync = h("button", { class: "btn", type: "button" }, icon("refresh"), "Sync from GitHub");
 		sync.onclick = () => busy(sync, async () => { const r = await velo("admin/addons/sync", { method: "POST", body: {} }); toast("Synced: " + JSON.stringify(r.stored)); draw(); });
 		root.replaceChildren(
-			card("Velo+ Addons on the server", "One jar per Minecraft version - members download it from here", sync,
+			card("Addons on the server", "One jar per Minecraft version - only players you gave access (Players) download it", sync,
 				table(["Minecraft", "Version", "num:Size", "Uploaded", "SHA-256"], rows.map((r) => [h("b", {}, r.mc), r.version, bytes(r.size), when(r.uploadedAt), h("span", { class: "mono muted" }, (r.sha256 || "").slice(0, 16) + "…")]))),
 			h("div", { class: "stack" }, card("Upload a new build", "Replaces that Minecraft version's jar right away", null, h("div", { class: "row" }, mc, version, file, up))));
 	};
@@ -1596,3 +1612,270 @@ RENDER.account = async (root) => {
 };
 
 boot();
+
+
+// ---- Moderation: monitoring, clips, worlds, custom capes, staff log ----
+
+const reasonPill = (c) => h("span", { class: "pill " + (["inappropriate", "harassment", "scam"].includes(c) ? "bad" : "warn") }, c || "other");
+const blockSelect = () => h("select", { "aria-label": "Also block" }, [["", "Don't block"], [7, "Block 7 days"], [30, "Block 30 days"], [0, "Block for good"]]
+	.map(([v, l]) => h("option", { value: v }, l)));
+
+RENDER.monitor = async (root) => {
+	const kpis = h("div", { class: "grid kpis" });
+	const rows = h("div", { class: "stack" });
+	root.append(kpis, rows);
+	const ui = {};
+	const draw = async () => {
+		const o = await velo("staff/overview");
+		if (!root.isConnected) return;
+		setLive(true, `Live · ${o.online.game} in game`);
+		subtitle("Updated " + new Date().toLocaleTimeString());
+		const openReports = o.reports.clips + o.reports.worlds + o.reports.chat;
+		if (!ui.kpi) {
+			ui.kpi = {
+				online: kpi("Players online", "online", o.online.players, fmt, `${o.online.game} game · ${o.online.launcher} launcher · ${o.online.web} web`, true),
+				worlds: kpi("Hosted worlds", "worlds", o.worlds.open, fmt, `${o.worlds.public} public · ${o.worlds.guests} guests`),
+				clips: kpi("Shared clips", "clips", o.clips.kept, fmt, bytes(o.clips.usedBytes) + " of " + bytes(o.clips.maxBytes)),
+				reports: kpi("Open reports", "reports", openReports, fmt, `${o.reports.clips} clips · ${o.reports.worlds} worlds · ${o.reports.chat} chat`),
+				capes: kpi("Custom capes", "capes", o.capes.custom, fmt, `${o.capes.animated} animated · ${o.capes.unreviewed} not reviewed`),
+				bugs: kpi("New bug reports", "file", o.reports.bugs, fmt, "From the game and the launcher"),
+			};
+			kpis.replaceChildren(...Object.values(ui.kpi));
+		} else {
+			ui.kpi.online.set(o.online.players, `${o.online.game} game · ${o.online.launcher} launcher · ${o.online.web} web`);
+			ui.kpi.worlds.set(o.worlds.open, `${o.worlds.public} public · ${o.worlds.guests} guests`);
+			ui.kpi.clips.set(o.clips.kept, bytes(o.clips.usedBytes) + " of " + bytes(o.clips.maxBytes));
+			ui.kpi.reports.set(openReports, `${o.reports.clips} clips · ${o.reports.worlds} worlds · ${o.reports.chat} chat`);
+			ui.kpi.capes.set(o.capes.custom, `${o.capes.animated} animated · ${o.capes.unreviewed} not reviewed`);
+			ui.kpi.bugs.set(o.reports.bugs);
+		}
+		const m = o.machine;
+		rows.replaceChildren(h("div", { class: "grid cols-2" },
+			card("Velo server", `Up ${duration(m.uptimeMs / 1000)} · ${m.threads} threads · load ${m.load >= 0 ? m.load.toFixed(2) : "–"} on ${m.cpus} CPUs`, null,
+				h("div", { class: "grid", style: "gap:14px" }, meter("Java heap", m.heapUsed, m.heapMax), meter("Clip storage", o.clips.usedBytes, o.clips.maxBytes),
+					h("p", { class: "muted small" }, bytes(m.diskFree) + " free on the data disk"))),
+			card("Needs a look", "Everything waiting for staff", null, h("div", { class: "grid", style: "gap:10px" },
+				[["#/clips", "Clip reports", o.reports.clips], ["#/worlds", "World reports", o.reports.worlds], ["#/reports", "Chat reports", o.reports.chat],
+					["#/capes", "Custom capes to review", o.capes.unreviewed], ["#/reports", "New bug reports", o.reports.bugs]].map(([href, label, n]) =>
+					h("a", { class: "svc-head", href }, h("span", { style: "font-weight:600" }, label), h("span", { class: "pill " + (n ? "warn" : "good") }, n ? fmt(n) + " open" : "All clear")))))),
+			h("div", { class: "grid cols-2" },
+				card("World hosting relay", "Traffic through the relay for worlds open right now", null, h("div", { class: "value-big" }, bytes(o.worlds.relayBytes))),
+				card("Clips", `${fmt(o.clips.uploadsTotal)} shared ever · kept ${o.clips.retentionDays} days`, h("a", { class: "btn small", href: "#/clips" }, "Open"),
+					h("p", { class: "muted small" }, `${fmt(o.clips.last24h)} today · ${fmt(o.clips.last7d)} this week · ${fmt(o.clips.last30d)} this month · ${fmt(o.clips.views)} views`))));
+	};
+	await draw();
+	every(15000, () => draw().catch(() => setLive(false, "Velo server unreachable")));
+};
+
+RENDER.clips = async (root) => {
+	let tab = "reports";
+	let status = "open";
+	let search = "";
+	const tabs = h("div", { class: "tabs", role: "tablist" });
+	const stats = h("div", { class: "stack" });
+	const body = h("div");
+	for (const [t, label] of [["reports", "Reports"], ["all", "All shared clips"]]) {
+		tabs.append(h("button", { role: "tab", type: "button", "data-t": t, "aria-selected": String(t === tab), onclick: () => {
+			tab = t; tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.t === t))); draw();
+		} }, label));
+	}
+	root.append(stats, tabs, body);
+	const drawStats = (st) => {
+		stats.replaceChildren(h("div", { class: "grid kpis" },
+			kpi("Clips kept", "clips", st.kept, fmt, `${fmt(st.uploaders)} players · ${fmt(st.views)} views`, true),
+			kpi("Storage used", "disk", st.usedBytes, bytes, "of " + bytes(st.maxBytes) + " · " + bytes(st.diskFree) + " disk free"),
+			kpi("Shared ever", "trend", st.uploadsTotal, fmt, bytes(st.uploadedBytesTotal) + " uploaded in total"),
+			kpi("Last 7 days", "upload", st.last7d, fmt, `${fmt(st.last24h)} in the last 24 h · ${fmt(st.last30d)} in 30 days`),
+			kpi("Removed", "trash", st.expired + st.evicted + st.removedByStaff, fmt, `${fmt(st.expired)} expired (${st.retentionDays} d) · ${fmt(st.evicted)} for space · ${fmt(st.removedByStaff)} by staff`),
+			kpi("Expiring this week", "refresh", st.expiringThisWeek, fmt, `Clips are deleted ${st.retentionDays} days after sharing`)),
+			h("div", { class: "grid cols-2" },
+				card("Clips shared per day", "Last 30 days", null, barChart({ name: "Clips", data: st.byDay.map((d) => ({ label: dayLabel(d.day), value: d.clips })) })),
+				card("Who uses the most space", "Top 10 by storage", null, table(["Player", "num:Clips", "num:Space"], st.topUploaders.map((u) =>
+					[h("div", { class: "row", style: "gap:8px;align-items:center;flex-wrap:nowrap" }, playerHead(u.uuid, u.username), u.username), fmt(u.clips), bytes(u.bytes)]),
+					(i) => { search = st.topUploaders[i].username; tab = "all"; tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.t === "all"))); draw(); }))));
+	};
+	async function draw() {
+		const data = await velo("staff/clips?limit=200&q=" + encodeURIComponent(search));
+		if (!root.isConnected) return;
+		drawStats(data.stats);
+		if (tab === "reports") {
+			const { reports } = await velo("staff/moderation?kind=clip&status=" + status);
+			subtitle(reports.length + (status === "open" ? " open clip reports" : " clip reports"));
+			const filter = seg([["open", "Open"], ["all", "All"]], status, (x) => { status = x; draw(); });
+			body.replaceChildren(card("Reported clips", "Watch it, then remove it or dismiss the report. One decision closes every report on that clip.", filter,
+				table(["When", "Clip", "Owner", "Reason", "Reports", "Status"], reports.map((r) => [
+					when(r.at), h("b", {}, r.title || r.target), r.ownerName || "–", h("div", {}, reasonPill(r.category), r.reason ? h("div", { class: "muted small" }, r.reason.slice(0, 120)) : null),
+					fmt(r.reportsOnTarget), h("span", { class: "pill " + (r.status === "open" ? "warn" : r.status === "removed" ? "bad" : "good") }, r.exists || r.status !== "open" ? r.status : "deleted")]),
+					(i) => openClip(reports[i].clip, reports[i], draw))));
+		} else {
+			const box = h("input", { type: "search", placeholder: "Search a player, title or clip id", value: search, "aria-label": "Search clips" });
+			box.addEventListener("keydown", (e) => { if (e.key === "Enter") { search = box.value.trim(); draw(); } });
+			subtitle(data.clips.length + " clips");
+			body.replaceChildren(card("Shared clips", "Newest first", box, h("div", { class: "clip-grid" }, data.clips.length ? data.clips.map((c) =>
+				h("button", { class: "clip-card", type: "button", onclick: () => openClip(c, null, draw) },
+					c.thumb ? h("img", { src: c.url + ".jpg", alt: "", loading: "lazy" }) : h("div", { class: "clip-blank" }, icon("clips")),
+					h("div", { class: "clip-meta" }, h("b", {}, c.title), h("span", { class: "muted small" }, `${c.username} · ${Math.round(c.seconds)}s · ${bytes(c.size)} · ${ago(c.createdAt)}`),
+						c.reports ? h("span", { class: "pill bad" }, c.reports + " reports") : null))) : h("p", { class: "muted" }, "No clips"))));
+		}
+	}
+	await draw();
+};
+
+function openClip(c, report, reload) {
+	const note = h("input", { placeholder: "Note (only staff see it)", "aria-label": "Note" });
+	const block = blockSelect();
+	const remove = h("button", { class: "btn danger", type: "button" }, icon("trash"), "Remove clip");
+	const dismiss = h("button", { class: "btn", type: "button" }, "Dismiss reports");
+	const open = report && report.status === "open";
+	remove.onclick = () => busy(remove, async () => {
+		const blockDays = block.value === "" ? null : Number(block.value);
+		if (report) await velo("staff/moderation/resolve", { body: { kind: "clip", target: report.target, action: "remove", note: note.value, blockDays } });
+		else await velo("staff/clips/remove", { body: { id: c.id, note: note.value, blockDays } });
+		toast("Clip removed");
+		dlg.close();
+		reload();
+	});
+	dismiss.onclick = () => busy(dismiss, async () => {
+		await velo("staff/moderation/resolve", { body: { kind: "clip", target: report.target, action: "dismiss", note: note.value } });
+		toast("Reports dismissed");
+		dlg.close();
+		reload();
+	});
+	const dlg = dialog(c ? c.title : (report.title || "Clip"), [
+		c ? h("video", { class: "clip-video", src: c.url + ".mp4", poster: c.thumb ? c.url + ".jpg" : null, controls: true, autoplay: true, playsinline: true })
+			: h("div", { class: "notice" }, "This clip was already deleted."),
+		c ? h("div", { class: "row" },
+			h("div", {}, h("span", { class: "muted small" }, "Clipped by"), h("div", {}, h("b", {}, c.username))),
+			h("div", {}, h("span", { class: "muted small" }, "Shared"), h("div", {}, when(c.createdAt))),
+			h("div", {}, h("span", { class: "muted small" }, "Deleted on its own"), h("div", {}, when(c.expiresAt))),
+			h("div", {}, h("span", { class: "muted small" }, "Size"), h("div", {}, `${bytes(c.size)} · ${c.height}p${c.fps || ""} · ${fmt(c.views)} views`))) : null,
+		report ? h("div", { class: "notice" }, h("b", {}, report.category + ": "), report.reason || "(no reason given)", h("div", { class: "muted small" }, "Reported by " + report.reporterName + " · " + when(report.at))) : null,
+		report && !open ? h("div", { class: "notice" }, "Handled by " + (report.handledBy || "?") + " · " + when(report.handledAt) + " · " + report.status) : null,
+		c ? h("div", { class: "row" }, note, block) : null,
+		c ? h("a", { class: "btn small ghost", href: c.url, target: "_blank", rel: "noopener" }, "Open share page") : null,
+	], c ? (open ? [dismiss, remove] : [remove]) : (open ? [dismiss] : []), true);
+}
+
+RENDER.worlds = async (root) => {
+	const body = h("div", { class: "stack" });
+	root.append(body);
+	const draw = async () => {
+		const [{ worlds, relayBytes }, { reports }] = await Promise.all([velo("staff/worlds"), velo("staff/moderation?kind=world&status=open")]);
+		if (!root.isConnected) return;
+		setLive(true, `Live · ${worlds.length} worlds open`);
+		subtitle(`${worlds.filter((w) => w.visibility !== "friends").length} public · ${worlds.length} open · ${bytes(relayBytes)} through the relay`);
+		const visPill = (v) => h("span", { class: "pill " + (v === "public" ? "red" : v === "request" ? "blue" : "") }, v === "request" ? "Ask to join" : v === "public" ? "Public" : "Friends");
+		body.replaceChildren(
+			card("Reported worlds", "Players reported these while they were listed", null, table(["When", "World", "Host", "Reason", "Reports", "Live"], reports.map((r) => [
+				when(r.at), h("b", {}, r.title), r.ownerName, h("div", {}, reasonPill(r.category), r.reason ? h("div", { class: "muted small" }, r.reason.slice(0, 120)) : null),
+				fmt(r.reportsOnTarget), r.exists ? h("span", { class: "pill good" }, "Open") : h("span", { class: "pill" }, "Closed")]), (i) => openWorld(reports[i].world, reports[i], draw))),
+			card("Open worlds", "Every world hosted right now, busiest first", null, table(["World", "Host", "Visibility", "num:Players", "num:Visitors", "num:Traffic", "Open since", "Reports"],
+				worlds.map((w) => [h("div", {}, h("b", {}, w.name), w.description ? h("div", { class: "muted small" }, w.description) : null),
+					h("div", { class: "row", style: "gap:8px;align-items:center;flex-wrap:nowrap" }, playerHead(w.host, w.hostName), w.hostName), visPill(w.visibility),
+					`${w.guests}/${w.maxPlayers}`, fmt(w.visitors), bytes(w.bytes), ago(w.openedAt), w.reports ? h("span", { class: "pill bad" }, w.reports) : "–"]),
+				(i) => openWorld(worlds[i], null, draw))));
+	};
+	await draw();
+	every(15000, () => draw().catch(() => {}));
+};
+
+function openWorld(w, report, reload) {
+	const note = h("input", { placeholder: "Reason (the host is told)", "aria-label": "Reason" });
+	const block = blockSelect();
+	const down = h("button", { class: "btn danger", type: "button" }, "Take down");
+	const dismiss = h("button", { class: "btn", type: "button" }, "Dismiss reports");
+	const open = report && report.status === "open";
+	down.onclick = async () => {
+		if (!(await confirmBox("Take this world down?", "The host and every guest are disconnected and it leaves Discover."))) return;
+		await busy(down, async () => {
+			const blockDays = block.value === "" ? null : Number(block.value);
+			if (report) await velo("staff/moderation/resolve", { body: { kind: "world", target: report.target, action: "remove", note: note.value, blockDays } });
+			else await velo("staff/worlds/takedown", { body: { id: w.id, note: note.value, blockDays } });
+			toast("World taken down");
+			dlg.close();
+			reload();
+		});
+	};
+	dismiss.onclick = () => busy(dismiss, async () => {
+		await velo("staff/moderation/resolve", { body: { kind: "world", target: report.target, action: "dismiss", note: note.value } });
+		toast("Reports dismissed");
+		dlg.close();
+		reload();
+	});
+	const dlg = dialog(w ? w.name : report.title, [
+		w ? h("div", { class: "row" },
+			h("div", {}, h("span", { class: "muted small" }, "Host"), h("div", {}, h("b", {}, w.hostName))),
+			h("div", {}, h("span", { class: "muted small" }, "Version"), h("div", {}, w.version || "–")),
+			h("div", {}, h("span", { class: "muted small" }, "Players"), h("div", {}, `${w.guests}/${w.maxPlayers} now · ${w.visitors} visited`)),
+			h("div", {}, h("span", { class: "muted small" }, "Mods"), h("div", {}, fmt(w.mods)))) : h("div", { class: "notice" }, "This world isn't open any more."),
+		w && w.description ? h("p", { style: "margin:0" }, w.description) : null,
+		report ? h("div", { class: "notice" }, h("b", {}, report.category + ": "), report.reason || "(no reason given)", h("div", { class: "muted small" }, "Reported by " + report.reporterName + " · " + when(report.at))) : null,
+		w ? h("div", { class: "row" }, note, block) : null,
+	], w ? (open ? [dismiss, down] : [down]) : (open ? [dismiss] : []), true);
+}
+
+RENDER.capes = async (root) => {
+	let filter = "unreviewed";
+	const body = h("div");
+	root.append(body);
+	const draw = async () => {
+		const data = await velo("staff/capes?filter=" + filter);
+		if (!root.isConnected) return;
+		subtitle(`${fmt(data.total)} custom capes · ${fmt(data.animated)} animated`);
+		const pick = seg([["unreviewed", "To review"], ["animated", "Animated"], ["all", "All"]], filter, (f) => { filter = f; draw(); });
+		body.replaceChildren(card("Custom capes", "Uploaded by players (animated ones are Velo+). Keep marks one reviewed; Remove also bans that exact image.", pick,
+			h("div", { class: "clip-grid" }, data.capes.length ? data.capes.map((c) => {
+				const keep = h("button", { class: "btn small", type: "button" }, "Keep");
+				const del = h("button", { class: "btn small danger", type: "button" }, "Remove");
+				keep.onclick = () => busy(keep, async () => { await velo("staff/capes/review", { body: { uuid: c.uuid, action: "keep" } }); toast("Marked reviewed"); draw(); });
+				del.onclick = async () => {
+					if (!(await confirmBox("Remove " + c.username + "'s cape?", "It's taken off and that image can't be uploaded again."))) return;
+					await busy(del, async () => { await velo("staff/capes/review", { body: { uuid: c.uuid, action: "remove" } }); toast("Cape removed"); draw(); });
+				};
+				return h("div", { class: "clip-card cape-card" },
+					h("img", { class: "cape-art", src: "/api/velo/cape/" + c.hash, alt: "Cape of " + c.username, loading: "lazy" }),
+					h("div", { class: "clip-meta" }, h("b", {}, c.username), h("span", { class: "muted small" }, (c.animated ? "Animated · " : "") + bytes(c.size) + (c.at ? " · " + ago(c.at) : "")),
+						h("div", { class: "row", style: "gap:6px" }, c.reviewed ? h("span", { class: "pill good" }, "Reviewed") : keep, del)));
+			}) : h("p", { class: "muted" }, "Nothing to review"))));
+	};
+	await draw();
+};
+
+RENDER.partners = async (root) => {
+	const body = h("div");
+	root.append(body);
+	const draw = async () => {
+		const { partners } = await velo("admin/partners");
+		if (!root.isConnected) return;
+		subtitle(partners.length + " partner servers · edit the list in the launcher's Owner panel");
+		body.replaceChildren(card("Partner servers", "Shown on the game's title screen and in Discover. The icon is the server's own unless you upload one.", null,
+			table(["Icon", "Server", "Status", ""], partners.map((p) => {
+				const file = h("input", { type: "file", accept: "image/png,image/jpeg", class: "sr-only" });
+				const up = h("button", { class: "btn small", type: "button", onclick: () => file.click() }, icon("upload"), "Upload icon");
+				file.onchange = () => busy(up, async () => { await velo("admin/partners/icon?id=" + encodeURIComponent(p.id), { body: file.files[0], headers: { "Content-Type": "application/octet-stream" } }); toast("Icon saved"); draw(); });
+				const reset = p.customIcon ? h("button", { class: "btn small ghost", type: "button", onclick: (e) => busy(e.currentTarget, async () => {
+					await velo("admin/partners/icon?id=" + encodeURIComponent(p.id), { body: new Blob([]), headers: { "Content-Type": "application/octet-stream" } }); toast("Using the server's own icon"); draw(); }) }, "Use server icon") : null;
+				return [p.icon ? h("img", { class: "partner-icon", src: "/api/velo/partners/icon/" + p.id + "?v=" + p.icon, alt: "" }) : h("div", { class: "partner-icon blank" }),
+					h("div", {}, h("b", {}, p.name), h("div", { class: "muted small" }, p.address + (p.versions ? " · " + p.versions : ""))),
+					p.online ? h("span", { class: "pill good" }, h("i"), `${fmt(p.players)}/${fmt(p.max)} online`) : h("span", { class: "pill bad" }, h("i"), "Not answering"),
+					h("div", { class: "row", style: "gap:6px;flex-wrap:nowrap" }, up, reset, file)];
+			}))));
+	};
+	await draw();
+};
+
+RENDER.stafflog = async (root) => {
+	const { log } = await velo("staff/log");
+	const blocks = await velo("staff/blocks");
+	subtitle(log.length + " recent staff actions");
+	const blockRows = (list, what) => list.map((b) => {
+		const lift = h("button", { class: "btn small ghost", type: "button" }, "Lift");
+		lift.onclick = () => busy(lift, async () => { await velo("staff/blocks/set", { body: { what, target: b.uuid, days: -1 } }); toast("Block lifted"); route(document.querySelector(".side"), document.getElementById("main")); });
+		return [b.username, what === "clip" ? "Clip sharing" : "Public worlds", b.reason, b.by, b.until ? when(b.until) : "Until lifted", lift];
+	});
+	root.append(
+		card("Blocks", "Players stopped from sharing clips or listing public worlds", null,
+			table(["Player", "From", "Reason", "By", "Until", ""], [...blockRows(blocks.clips, "clip"), ...blockRows(blocks.worlds, "world")])),
+		card("Staff log", "Every removal, takedown, dismissal and block", null,
+			table(["When", "Who", "Did", "What", "Note"], log.map((a) => [when(a.at), h("b", {}, a.by), a.action, a.target, h("span", { class: "muted small" }, a.note || "")]))));
+};

@@ -38,8 +38,15 @@ import java.util.function.Consumer;
  */
 public final class CosmeticUi {
 
-	/** Decoded cape frames at {@link GifFrames#PREVIEW_WIDTH} (about 5 MB for a 40-frame cape), so a few dozen fit. */
+	/**
+	 * Decoded cape frames for cards and thumbnails: cape-region crops at {@link #CARD_SCALE} px per cape pixel (about 4 MB
+	 * for a 40-frame cape), so a few dozen fit.
+	 */
 	private static final Map<String, List<GifFrames.Frame>> FRAMES = LauncherCaches.lru(30);
+	/** Full-resolution frames for the big 3D viewers - only the few on screen (about 15 MB each for a 1024 px cape). */
+	private static final Map<String, List<GifFrames.Frame>> HD_FRAMES = LauncherCaches.lru(3);
+	private static final int CARD_SCALE = 8;
+	private static final int HD_SCALE = 32;
 	/** Decoding happens off the UI thread, two at a time (a page of capes shouldn't saturate every core). */
 	private static final java.util.concurrent.ExecutorService DECODER = Executors.newFixedThreadPool(2, r -> {
 		Thread t = new Thread(r, "velo-cape-decoder");
@@ -59,10 +66,10 @@ public final class CosmeticUi {
 
 	// ---- Data ----
 
-	private static List<GifFrames.Frame> decode(CapeEntry cape) {
+	private static List<GifFrames.Frame> decode(CapeEntry cape, int scale) {
 		try {
 			if (cape.animated()) {
-				return GifFrames.decode(new ByteArrayInputStream(CapeLibrary.gifBytes(cape)), GifFrames.PREVIEW_WIDTH).frames();
+				return GifFrames.decodeCape(new ByteArrayInputStream(CapeLibrary.gifBytes(cape)), scale).frames();
 			}
 			var image = ImageIO.read(new ByteArrayInputStream(CapeLibrary.textureBytes(cape)));
 			return image == null ? List.of() : List.of(new GifFrames.Frame(image, 100));
@@ -71,9 +78,9 @@ public final class CosmeticUi {
 		}
 	}
 
-	private static List<GifFrames.Frame> decode(StoreItem item) {
+	private static List<GifFrames.Frame> decode(StoreItem item, int scale) {
 		try (var in = StoreCatalog.openGif(item)) {
-			return in == null ? List.of() : GifFrames.decode(in, GifFrames.PREVIEW_WIDTH).frames();
+			return in == null ? List.of() : GifFrames.decodeCape(in, scale).frames();
 		} catch (Throwable e) {
 			return List.of();
 		}
@@ -86,12 +93,26 @@ public final class CosmeticUi {
 
 	/** Blocking decode - only for code already running off the UI thread. */
 	public static List<GifFrames.Frame> frames(CapeEntry cape) {
-		return FRAMES.computeIfAbsent("lib:" + cape.id(), key -> decode(cape));
+		return FRAMES.computeIfAbsent("lib:" + cape.id(), key -> decode(cape, CARD_SCALE));
 	}
 
 	/** Blocking decode - only for code already running off the UI thread. */
 	static List<GifFrames.Frame> frames(StoreItem item) {
-		return FRAMES.computeIfAbsent("store:" + item.id(), key -> decode(item));
+		return FRAMES.computeIfAbsent("store:" + item.id(), key -> decode(item, CARD_SCALE));
+	}
+
+	/** Blocking full-resolution decode for a big 3D viewer - only off the UI thread. */
+	public static List<GifFrames.Frame> viewerFrames(CapeEntry cape) {
+		return HD_FRAMES.computeIfAbsent("lib:" + cape.id(), key -> decode(cape, HD_SCALE));
+	}
+
+	/** Full-resolution frames for a big 3D viewer (see {@link #framesAsync}). */
+	public static void viewerFramesAsync(CapeEntry cape, Consumer<List<GifFrames.Frame>> done) {
+		load(HD_FRAMES, "lib:" + cape.id(), () -> decode(cape, HD_SCALE), done);
+	}
+
+	static void viewerFramesAsync(StoreItem item, Consumer<List<GifFrames.Frame>> done) {
+		load(HD_FRAMES, "store:" + item.id(), () -> decode(item, HD_SCALE), done);
 	}
 
 	/**
@@ -99,26 +120,28 @@ public final class CosmeticUi {
 	 * they're cached already). Several waiting for the same cape share one decode.
 	 */
 	public static void framesAsync(CapeEntry cape, Consumer<List<GifFrames.Frame>> done) {
-		load("lib:" + cape.id(), () -> decode(cape), done);
+		load(FRAMES, "lib:" + cape.id(), () -> decode(cape, CARD_SCALE), done);
 	}
 
 	static void framesAsync(StoreItem item, Consumer<List<GifFrames.Frame>> done) {
-		load("store:" + item.id(), () -> decode(item), done);
+		load(FRAMES, "store:" + item.id(), () -> decode(item, CARD_SCALE), done);
 	}
 
-	private static void load(String key, java.util.function.Supplier<List<GifFrames.Frame>> decode, Consumer<List<GifFrames.Frame>> done) {
-		List<GifFrames.Frame> cached = FRAMES.get(key);
+	private static void load(Map<String, List<GifFrames.Frame>> cache, String key, java.util.function.Supplier<List<GifFrames.Frame>> decode,
+			Consumer<List<GifFrames.Frame>> done) {
+		List<GifFrames.Frame> cached = cache.get(key);
 		if (cached != null) {
 			done.accept(cached);
 			return;
 		}
 		boolean first;
+		String waitKey = (cache == HD_FRAMES ? "hd:" : "") + key;
 		synchronized (WAITING) {
-			List<Consumer<List<GifFrames.Frame>>> waiting = WAITING.get(key);
+			List<Consumer<List<GifFrames.Frame>>> waiting = WAITING.get(waitKey);
 			first = waiting == null;
 			if (first) {
 				waiting = new java.util.ArrayList<>();
-				WAITING.put(key, waiting);
+				WAITING.put(waitKey, waiting);
 			}
 			waiting.add(done);
 		}
@@ -129,11 +152,11 @@ public final class CosmeticUi {
 			List<GifFrames.Frame> frames = decode.get();
 			// A failed decode isn't cached: it may work next time (the file might still be downloading).
 			if (!frames.isEmpty()) {
-				FRAMES.put(key, frames);
+				cache.put(key, frames);
 			}
 			List<Consumer<List<GifFrames.Frame>>> waiting;
 			synchronized (WAITING) {
-				waiting = WAITING.remove(key);
+				waiting = WAITING.remove(waitKey);
 			}
 			Platform.runLater(() -> {
 				if (waiting != null) {

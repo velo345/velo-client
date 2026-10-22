@@ -541,6 +541,19 @@ public final class StoreService {
 		return until != null && until > System.currentTimeMillis() || staffLookup.test(uuid);
 	}
 
+	/** Whether {@code uuid} is a member now or was one at any point after {@code since} (keeps their cloud data for a while). */
+	public boolean wasPlusSince(String uuid, long since) {
+		if (isPlus(uuid)) {
+			return true;
+		}
+		try {
+			StoreDatabase.PlusRow row = db.plusRow(uuid);
+			return row != null && row.until() > since;
+		} catch (Exception e) {
+			return true;
+		}
+	}
+
 	/** When the membership ends (0 if none or over); staff always show at least 30 days ahead. */
 	public long plusUntil(String uuid) {
 		Long until = plusCache.get(uuid);
@@ -566,6 +579,35 @@ public final class StoreService {
 		loadPlus();
 		plusSweep();
 		return until;
+	}
+
+	// ---- Addons (invite only) ----
+
+	private final java.util.Set<String> addonCache = ConcurrentHashMap.newKeySet();
+
+	/** Loads who the owner gave the Addons to (start-up and after every change). */
+	public void loadAddonAccess() {
+		try {
+			java.util.Set<String> fresh = db.addonAccess();
+			addonCache.retainAll(fresh);
+			addonCache.addAll(fresh);
+		} catch (Exception e) {
+			System.out.println("[store] Couldn't load addon access: " + e.getMessage());
+		}
+	}
+
+	/** Whether the owner gave this player the Addons. Nobody else is ever told they exist. */
+	public boolean hasAddons(String uuid) {
+		return uuid != null && addonCache.contains(uuid);
+	}
+
+	/** Owner: gives or takes away the Addons. */
+	public PlayerView adminAddons(String meUuid, String meName, String target, boolean granted) throws Exception {
+		String[] ref = requireOwnerAndResolve(meUuid, meName, target);
+		db.touchWallet(ref[0], ref[1]);
+		db.setAddonAccess(ref[0], granted, meName + "/" + meUuid);
+		loadAddonAccess();
+		return adminLookup(meUuid, meName, ref[0]);
 	}
 
 	/** Owner: ends someone's Velo+ now. */
@@ -808,7 +850,8 @@ public final class StoreService {
 
 	// ---- Owner tools ----
 
-	public record PlayerView(String uuid, String username, int balance, List<String> owned, List<StoreDatabase.LedgerEntry> ledger, long plusUntil) {
+	public record PlayerView(String uuid, String username, int balance, List<String> owned, List<StoreDatabase.LedgerEntry> ledger, long plusUntil,
+			boolean addons) {
 	}
 
 	private String[] requireOwnerAndResolve(String meUuid, String meName, String target) throws Exception {
@@ -824,7 +867,8 @@ public final class StoreService {
 
 	public PlayerView adminLookup(String meUuid, String meName, String target) throws Exception {
 		String[] ref = requireOwnerAndResolve(meUuid, meName, target);
-		return new PlayerView(ref[0], ref[1], db.balance(ref[0]), db.ownedItems(ref[0]), db.ledger(ref[0], 30), plusUntil(ref[0]));
+		return new PlayerView(ref[0], ref[1], db.balance(ref[0]), db.ownedItems(ref[0]), db.ledger(ref[0], 30), plusUntil(ref[0]),
+				hasAddons(ref[0]));
 	}
 
 	/** Owner: gives {@code days} of Velo+ (more than 0), or ends it ({@code days} 0 or less). */

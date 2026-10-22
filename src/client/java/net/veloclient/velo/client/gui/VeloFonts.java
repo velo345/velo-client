@@ -136,6 +136,29 @@ public final class VeloFonts {
 		if (!"velo-client".equals(id.getNamespace())) {
 			return fallback;
 		}
+		// Name Styles mark a styled name's letters with ns/... - drawn in the font the style picked.
+		String nameFont = net.veloclient.velo.client.namestyle.NameStyles.markerFont(id.getPath());
+		if (nameFont != null) {
+			Identifier target = Identifier.of(nameFont.substring(0, nameFont.indexOf(':')), nameFont.substring(nameFont.indexOf(':') + 1));
+			// Above heads the text is drawn big in the world: always the sharpest variant (most oversampling), not the GUI scale's.
+			if (net.veloclient.velo.client.namestyle.NameStyles.isNameTagMarker(id.getPath()) && "velo-client".equals(target.getNamespace())) {
+				String base = target.getPath();
+				// The last variant has the most oversampling (index 0 is oversample 1 - very blurry when drawn big).
+				if (base.equals("ui")) {
+					return UI[MAX_SCALE - 1];
+				}
+				if (base.startsWith("hud_")) {
+					return HUD.computeIfAbsent(base, VeloFonts::fonts)[MAX_SCALE - 1];
+				}
+			}
+			//? if <26.1 {
+			return target.getPath().equals("default") && target.getNamespace().equals("minecraft") ? remap(StyleSpriteSource.DEFAULT)
+					: remap(new StyleSpriteSource.Font(target));
+			//?} else {
+			/*return target.getPath().equals("default") && target.getNamespace().equals("minecraft") ? remap(FontDescription.DEFAULT)
+					: remap(new FontDescription.Resource(target));
+			*///?}
+		}
 		return switch (id.getPath()) {
 			case "body", "ui" -> UI[scaleIndex()];
 			case "tile", "ui_bold" -> UI_BOLD[scaleIndex()];

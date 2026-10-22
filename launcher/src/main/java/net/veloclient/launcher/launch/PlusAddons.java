@@ -17,13 +17,13 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * Velo Client Addons are part of Velo+: they're not in the launcher or on GitHub, the server hands
- * the jar to members. At every launch of a profile this
+ * The Addons are invite only: they're not in the launcher or on GitHub, the server hands the jar to the
+ * players the owner picked. At every launch of a profile this
  * <ul>
- * <li>for a member who added them to the profile (opt-in, the Mods tab's Velo+ card): saves the signed proof the game
+ * <li>for a player with access who added them to the profile (opt-in, the Mods tab's Velo+ card): saves the signed proof the game
  * checks ({@code config/velo-plus.json}) and updates the Addons jar for the profile's Minecraft version (an
  * {@code .jar.disabled} copy stays disabled);</li>
- * <li>for someone who is not (or no longer) a member: disables any Addons jar in the profile;</li>
+ * <li>for someone without access (or no longer): disables any Addons jar in the profile;</li>
  * <li>when the server can't be reached: leaves everything as it is.</li>
  * </ul>
  */
@@ -116,7 +116,7 @@ public final class PlusAddons {
 		}
 	}
 
-	/** At every launch: keeps Addons the player added up to date (or switches them off when Velo+ ended) - never adds them on its own. */
+	/** At every launch: keeps Addons the player added up to date (or switches them off when access ended) - never adds them on its own. */
 	static void sync(Path modsDir, GameVersion version) {
 		sync(modsDir, version, false);
 	}
@@ -125,29 +125,19 @@ public final class PlusAddons {
 
 	/** {@code install}: add them even if the profile doesn't have them yet (the player pressed "Add to this profile"). */
 	private static String sync(Path modsDir, GameVersion version, boolean install) {
-		boolean plus;
+		boolean access;
+		boolean member;
 		try {
-			plus = StoreApi.plusStatus().get("plus").getAsBoolean();
+			JsonObject status = StoreApi.plusStatus();
+			member = status.get("plus").getAsBoolean();
+			// Only the players the owner gave the Addons to; nobody else is told they exist.
+			access = status.has("addons") && status.get("addons").getAsBoolean();
 		} catch (Exception e) {
 			// offline / signed out: no change
 			return "Couldn't reach the Velo server (" + e.getMessage() + ") - check that you're online and signed in.";
 		}
-		try (Stream<Path> files = Files.list(modsDir)) {
-			List<Path> installed = files.filter(PlusAddons::isAddonsJar).toList();
-			if (!plus) {
-				for (Path jar : installed) {
-					String name = jar.getFileName().toString();
-					if (name.endsWith(".jar")) {
-						Files.move(jar, jar.resolveSibling(name + ".disabled"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-						LauncherLog.info("Velo+ ended - disabled " + name);
-					}
-				}
-				return "Velo+ isn't active on this account.";
-			}
-			if (installed.isEmpty() && !install) {
-				return null; // opt-in: only profiles the player added them to
-			}
-			// The proof the game checks before it loads the Addons' modules.
+		if (member || access) {
+			// The signed proof the game checks offline (Velo+ perks, and the Addons claim).
 			try {
 				JsonObject out = new JsonObject();
 				out.addProperty("token", StoreApi.plusToken().get("token").getAsString());
@@ -155,6 +145,22 @@ public final class PlusAddons {
 				Files.writeString(VeloPaths.config().resolve("velo-plus.json"), out.toString(), StandardCharsets.UTF_8);
 			} catch (Exception e) {
 				LauncherLog.warn("Couldn't fetch the Velo+ proof", e);
+			}
+		}
+		try (Stream<Path> files = Files.list(modsDir)) {
+			List<Path> installed = files.filter(PlusAddons::isAddonsJar).toList();
+			if (!access) {
+				for (Path jar : installed) {
+					String name = jar.getFileName().toString();
+					if (name.endsWith(".jar")) {
+						Files.move(jar, jar.resolveSibling(name + ".disabled"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+						LauncherLog.info("No access - disabled " + name);
+					}
+				}
+				return "Not available for this account.";
+			}
+			if (installed.isEmpty() && !install) {
+				return null; // opt-in: only profiles the player added them to
 			}
 			JsonObject entry = null;
 			for (JsonElement e : StoreApi.plusAddons().getAsJsonArray("addons")) {
