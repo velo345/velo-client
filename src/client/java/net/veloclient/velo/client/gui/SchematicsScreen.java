@@ -90,7 +90,7 @@ public final class SchematicsScreen extends VeloWindow {
 		if (browseMode) {
 			int searchButtonWidth = 70;
 			searchField = new TextFieldWidget(this.textRenderer, contentX(), areaTop, contentWidth() - searchButtonWidth - 6, SEARCH_ROW_HEIGHT, Text.literal("Search"));
-			searchField.setPlaceholder(Text.literal("Search schematics..."));
+			searchField.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Search schematics..."));
 			searchField.setText(searchQueryText);
 			searchField.setChangedListener(s -> searchQueryText = s);
 			addDrawableChild(searchField);

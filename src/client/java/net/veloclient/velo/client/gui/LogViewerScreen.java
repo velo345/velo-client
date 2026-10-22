@@ -37,7 +37,7 @@ public final class LogViewerScreen extends VeloWindow {
 	protected void layoutContent() {
 		this.clearChildren();
 		filterBox = new TextFieldWidget(this.textRenderer, contentX(), contentY(), contentWidth() - 240, 18, Text.literal("Filter"));
-		filterBox.setPlaceholder(Text.literal("Filter (case-insensitive substring)..."));
+		filterBox.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Filter (case-insensitive substring)..."));
 		filterBox.setDrawsBackground(false);
 		addDrawableChild(filterBox);
 

@@ -1,7 +1,37 @@
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{page.title}}</title>
+<meta name="description" content="{{page.description}}">
+<meta name="robots" content="{{page.robots}}">
+<link rel="canonical" href="{{page.canonical}}">
+<link rel="alternate" hreflang="en" href="{{page.canonical}}">
+<link rel="alternate" hreflang="x-default" href="{{page.canonical}}">
 <meta name="theme-color" content="{{site.themeColor}}">
-<link rel="icon" type="image/png" href="assets/favicon.png">
-<link rel="preload" href="assets/fonts/inter-regular.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/fonts/inter-bold.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/style.css">
+<meta name="color-scheme" content="dark">
+<meta name="application-name" content="Velo Client">
+<meta name="apple-mobile-web-app-title" content="Velo">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="alternate" type="text/plain" title="LLM summary" href="/llms.txt">
+<meta property="og:site_name" content="{{site.name}}">
+<meta property="og:type" content="{{page.ogType}}">
+<meta property="og:title" content="{{page.title}}">
+<meta property="og:description" content="{{page.description}}">
+<meta property="og:url" content="{{page.canonical}}">
+<meta property="og:image" content="{{page.ogImage}}">
+<meta property="og:image:alt" content="Velo Client - free Minecraft launcher and Fabric client">
+<meta property="og:locale" content="en_US">
+{{#if page.published}}<meta property="article:published_time" content="{{page.published}}">{{/if}}
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{page.title}}">
+<meta name="twitter:description" content="{{page.description}}">
+<meta name="twitter:image" content="{{page.ogImage}}">
+<link rel="preload" href="/assets/fonts/inter-regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/sora-bold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{{asset.css}}">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"{{site.url}}/#org","name":"Velo Client","url":"{{site.url}}","logo":{"@type":"ImageObject","url":"{{site.url}}/assets/icon-512.png","width":512,"height":512},"sameAs":["{{links.github}}","{{links.discord}}"]},{"@type":"WebSite","@id":"{{site.url}}/#site","name":"Velo Client","alternateName":["Velo","Velo Minecraft Client"],"url":"{{site.url}}","publisher":{"@id":"{{site.url}}/#org"},"inLanguage":"en"}]}</script>
+{{#if page.schema}}<script type="application/ld+json">{{page.schema}}</script>{{/if}}
+<script src="{{asset.js}}" defer></script>

@@ -109,6 +109,40 @@ public final class MenuKit {
 		return font(text.getString(), bold ? UI_BOLD : UI);
 	}
 
+	/** {@code text} keeping its own colours and formatting, in Inter semibold - or Sora when {@code sora} (the HUD's fonts). */
+	//? if <26.1 {
+	public static Text inFont(Text text, boolean sora) {
+		var copy = text.copy();
+		copy.setStyle(copy.getStyle().withFont(new net.minecraft.text.StyleSpriteSource.Font(sora ? DISPLAY_SM : UI_BOLD)));
+		return copy;
+	}
+	//?} else {
+	/*public static Text inFont(Text text, boolean sora) {
+		var copy = text.copy();
+		copy.setStyle(copy.getStyle().withFont(new net.minecraft.network.chat.FontDescription.Resource(sora ? DISPLAY_SM : UI_BOLD)));
+		return copy;
+	}
+	*///?}
+
+	/** {@code s} / {@code text} in one of Velo's fonts by name ("hud_sora", "ui_bold"...), keeping the text's own styling. */
+	public static Text inNamedFont(String s, String fontPath) {
+		return font(s, Identifier.of("velo-client", fontPath));
+	}
+
+	//? if <26.1 {
+	public static Text inNamedFont(Text text, String fontPath) {
+		var copy = text.copy();
+		copy.setStyle(copy.getStyle().withFont(new net.minecraft.text.StyleSpriteSource.Font(Identifier.of("velo-client", fontPath))));
+		return copy;
+	}
+	//?} else {
+	/*public static Text inNamedFont(Text text, String fontPath) {
+		var copy = text.copy();
+		copy.setStyle(copy.getStyle().withFont(new net.minecraft.network.chat.FontDescription.Resource(Identifier.of("velo-client", fontPath))));
+		return copy;
+	}
+	*///?}
+
 	//? if <26.1 {
 	private static Text font(String s, Identifier id) {
 		return Text.literal(s).setStyle(Style.EMPTY.withFont(new net.minecraft.text.StyleSpriteSource.Font(id)));

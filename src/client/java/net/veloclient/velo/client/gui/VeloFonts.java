@@ -56,6 +56,12 @@ public final class VeloFonts {
 	*///?}
 
 	private static int hudDepth;
+	/** The HUD Style fonts ({@code hud_<family>}), per scale, made on first use. */
+	//? if <26.1 {
+	private static final java.util.Map<String, StyleSpriteSource[]> HUD = new java.util.concurrent.ConcurrentHashMap<>();
+	//?} else {
+	/*private static final java.util.Map<String, FontDescription[]> HUD = new java.util.concurrent.ConcurrentHashMap<>();
+	*///?}
 
 	private VeloFonts() {
 	}
@@ -141,7 +147,8 @@ public final class VeloFonts {
 			case "hero" -> HERO[scaleIndex()];
 			case "ui_sm" -> UI_SM[scaleIndex()];
 			case "mono" -> MONO[scaleIndex()];
-			default -> fallback;
+			default -> id.getPath().startsWith("hud_") && !Character.isDigit(id.getPath().charAt(id.getPath().length() - 1))
+					? HUD.computeIfAbsent(id.getPath(), VeloFonts::fonts)[scaleIndex()] : fallback;
 		};
 	}
 }

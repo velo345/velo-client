@@ -1,14 +1,15 @@
 {
   "site": {
     "name": "Velo Client",
-    "url": "https://velo-client-flame.vercel.app",
-    "description": "Velo Client: a free Fabric client and launcher for Minecraft 1.21.11, 26.1, 26.2 and 26.3. More FPS, a clean HUD, Friends, Waypoints, 3D capes and tools for server players.",
-    "themeColor": "#0b0707"
+    "url": "https://velo-client.com",
+    "description": "Velo Client is a free Minecraft launcher and Fabric client for 1.21.11, 26.1, 26.2 and 26.3: more FPS out of the box, 108 free modules, a HUD you style yourself, friends and parties, and 3D wings, capes and auras.",
+    "themeColor": "#0b0b0e",
+    "twitter": ""
   },
   "status": {
     "_comment": "downloadsEnabled only controls whether the old local jar in downloads/ is copied into dist/ - real downloads come from GitHub Releases (release.* below). storeLive switches the Velo Coins section from 'coming soon' to live once Tebex is set up on the server; adsLive shows the 'watch ads for coins' card once rewarded ads are switched on.",
     "downloadsEnabled": false,
-    "storeLive": false,
+    "storeLive": true,
     "adsLive": false
   },
   "release": {
@@ -16,18 +17,25 @@
     "version": "0.9.7",
     "channel": "Pre-release",
     "launcherExe": "Velo.Client.Launcher-0.9.7.exe",
-    "launcherDeb": "velo-client-launcher_0.9.7_amd64.deb"
+    "launcherDeb": "velo-client-launcher_0.9.7_amd64.deb",
+    "date": "2026-10-20"
   },
   "minecraft": {
     "version": "1.21.11 · 26.1 · 26.2 · 26.3",
-    "javaVersion": "21+ / 25+"
+    "javaVersion": "21+ / 25+",
+    "list": [
+      "1.21.11",
+      "26.1",
+      "26.2",
+      "26.3"
+    ]
   },
   "links": {
     "fabricInstaller": "https://fabricmc.net/use/installer/",
     "fabricApi": "https://modrinth.com/mod/fabric-api",
     "github": "https://github.com/velo345/velo-client",
     "releases": "https://github.com/velo345/velo-client/releases",
-    "discord": ""
+    "discord": "https://discord.gg/tGwn8RsMpv"
   },
   "legal": {
     "_comment": "",
@@ -35,8 +43,29 @@
     "addressLine1": "In der Au 25A",
     "addressLine2": "53545,Linz am Rhein",
     "country": "Germany",
-    "email": "davidseibert20@gmail.com",
+    "email": "support@velo-client.com",
     "responsiblePersonName": "David Seibert",
-    "lastUpdated": "2026-10-04"
+    "lastUpdated": "2026-10-22",
+    "hostingProvider": "24fire GmbH, Kronenstraße 4, 68723 Schwetzingen, Germany",
+    "hostingLocation": "Germany"
+  },
+  "api": {
+    "_comment": "The Velo server. The web Store reads the catalog from here and signs in with a code from the launcher.",
+    "url": "https://api.velo-client.com"
+  },
+  "plus": {
+    "_comment": "Shown before the live price loads (the server's /v1/plus/status is the real one).",
+    "price": "€9.99",
+    "monthlyCoins": "2,000"
+  },
+  "counts": {
+    "_comment": "Shown across the site - update when modules or Addons are added.",
+    "modules": "108",
+    "addons": "56",
+    "categories": "8"
+  },
+  "seo": {
+    "_comment": "IndexNow tells Bing, Yandex, Seznam and others about new pages right after a deploy (deploy.sh pings it).",
+    "indexNowKey": "a75aae4b980def6cd4e3c3da0e0887cc"
   }
 }

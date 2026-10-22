@@ -1,0 +1,13 @@
+[Unit]
+Description=Velo host firewall (inbound to this machine only; Docker's own rules are untouched)
+After=network-pre.target docker.service
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/velo/firewall.nft
+ExecStop=/usr/sbin/nft delete table inet velo_host
+
+[Install]
+WantedBy=multi-user.target

@@ -76,11 +76,11 @@ public final class EntityCountOverlayModule extends AbstractModule implements Hu
 		}
 
 		int lineHeight = client.textRenderer.fontHeight + 1;
-		context.drawTextWithShadow(client.textRenderer, "Entities: " + cachedTotal, x, y, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, "Entities: " + cachedTotal, x, y, 0xFFFFFFFF);
 		int rowY = y + lineHeight;
 		for (Map.Entry<EntityType<?>, Integer> entry : cachedTop) {
 			String line = "  " + entry.getKey().getName().getString() + ": " + entry.getValue();
-			context.drawTextWithShadow(client.textRenderer, line, x, rowY, 0xFFC8C8C8);
+			net.veloclient.velo.client.hud.HudLook.draw(context, line, x, rowY, 0xFFC8C8C8);
 			rowY += lineHeight;
 		}
 	}

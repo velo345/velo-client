@@ -114,7 +114,7 @@ tasks.register("bundleJavaRuntimeFallback") {
 // reads it back as a classpath resource at runtime instead of independently
 // hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
 // below reuses the same value for the native installer's version.
-def launcherAppVersion = "0.9.7"
+def launcherAppVersion = "0.9.8"
 // A fixed identity for the Windows installer across every version - WiX
 // needs this (--win-upgrade-uuid below) to recognize a new installer as an
 // upgrade of whatever's already installed rather than an unrelated product,
@@ -328,5 +328,20 @@ void runJpackage(List<String> command) {
 	println(output)
 	if (exitCode != 0) {
 		throw new GradleException("jpackage exited with code ${exitCode}:\n${output}")
+	}
+}
+
+// Dev: exports every aura's Store-card animation as PNG frames (see ui/AuraPreviewExport and
+// tools/cosmetics/export_aura_previews.sh, which turns them into animated WebP for the website and the owner panel).
+tasks.register("auraPreviews", JavaExec) {
+	group = "velo"
+	description = "Renders aura preview frames with the launcher's own aura renderer."
+	dependsOn("classes")
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = "net.veloclient.launcher.ui.AuraPreviewExport"
+	args = [project.findProperty("auraOut") ?: layout.buildDirectory.dir("aura-previews").get().asFile.path, "300", "72"]
+	doFirst {
+		def fx = sourceSets.main.runtimeClasspath.filter { it.name.startsWith("javafx-") }
+		jvmArgs = ["--module-path", fx.asPath, "--add-modules", "javafx.controls,javafx.graphics,javafx.swing"]
 	}
 }

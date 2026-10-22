@@ -51,4 +51,21 @@ if [[ "$DEPLOY_ADDONS" == 1 ]]; then
 		echo "No Velo Client Addons built (src/addon submodule not checked out) - skipped"
 	fi
 fi
+# Also into the Velo launcher's "asteriasmp" profile. The launcher rewrites the profile's velo-client jar on every
+# launch from updates/gamejars/26.2.jar (when cache.properties' version is at least the launcher's), so the dev jar
+# goes there too; the addons go in as dev-velo-addons-26.2.jar, a name the launcher's addon sync leaves alone.
+PROFILE_MODS="$HOME/.velo-client/instances/19328a5f-4795-4ebf-953e-9fd951c98611/mods"
+GAMEJARS="$HOME/.velo-client/updates/gamejars"
+if [[ -d "$PROFILE_MODS" ]]; then
+	VERSION=$(basename "$JAR" | sed -E 's/^velo-client-([^+]+)\+.*/\1/')
+	mkdir -p "$GAMEJARS"
+	cp "$JAR" "$GAMEJARS/26.2.jar"
+	echo "version=$VERSION" > "$GAMEJARS/cache.properties"
+	rm -f "$PROFILE_MODS"/velo-client-*.jar "$PROFILE_MODS"/velo-addons-*.jar "$PROFILE_MODS"/dev-velo-addons-*.jar
+	cp "$JAR" "$PROFILE_MODS/velo-client-26.2.jar"
+	if [[ "$DEPLOY_ADDONS" == 1 && -n "${ADDONS_JAR:-}" ]]; then
+		cp "$ADDONS_JAR" "$PROFILE_MODS/dev-velo-addons-26.2.jar"
+	fi
+	echo "Deployed to the launcher's asteriasmp profile ($PROFILE_MODS, version=$VERSION in gamejars)"
+fi
 echo "Also built (not deployed): versions/1.21.11/build/libs/, versions/26.1/build/libs/, versions/26.3/build/libs/"

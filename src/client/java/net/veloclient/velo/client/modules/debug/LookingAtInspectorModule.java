@@ -70,7 +70,7 @@ public final class LookingAtInspectorModule extends AbstractModule implements Hu
 
 	private int drawLine(DrawContext context, int x, int y, int lineHeight, String text) {
 		MinecraftClient client = MinecraftClient.getInstance();
-		context.drawTextWithShadow(client.textRenderer, text, x, y, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, text, x, y, 0xFFFFFFFF);
 		return y + lineHeight;
 	}
 

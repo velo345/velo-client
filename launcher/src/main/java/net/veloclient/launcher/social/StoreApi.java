@@ -454,6 +454,11 @@ public final class StoreApi {
 		}
 	}
 
+	/** A 6-digit code for signing in on velo-client.com ({@code code}, {@code expiresInSeconds}). */
+	public static JsonObject webCode() throws StoreError {
+		return post("/v1/web/code", new JsonObject());
+	}
+
 	/** Which collection the store features (null / blank = the newest one). */
 	public static void adminFeatured(String collectionId) throws StoreError {
 		JsonObject body = new JsonObject();

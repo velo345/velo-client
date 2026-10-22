@@ -56,3 +56,12 @@ in-game copies `src/client/resources/assets/velo-client/font/sora_*.ttf`) are
 are [JetBrains Mono](https://www.jetbrains.com/lp/mono/) by JetBrains. Both are licensed under the
 [SIL Open Font License 1.1](https://openfontlicense.org/); the license texts sit next to the fonts
 (`OFL-Sora.txt`, `OFL-JetBrainsMono.txt`). The bundled files are the Latin static subsets.
+
+## HUD fonts: Space Grotesk, Poppins, IBM Plex Sans
+
+The HUD Style font choices `src/client/resources/assets/velo-client/font/space_grotesk_bold.ttf`
+([Space Grotesk](https://github.com/floriankarsten/space-grotesk) by Florian Karsten),
+`poppins_regular.ttf` ([Poppins](https://github.com/itfoundry/Poppins) by Indian Type Foundry) and
+`ibm_plex_sans_semibold.ttf` ([IBM Plex Sans](https://github.com/IBM/plex) by IBM) are licensed under the
+[SIL Open Font License 1.1](https://openfontlicense.org/); the license texts sit next to the fonts
+(`OFL-SpaceGrotesk.txt`, `OFL-Poppins.txt`, `OFL-IBMPlexSans.txt`).

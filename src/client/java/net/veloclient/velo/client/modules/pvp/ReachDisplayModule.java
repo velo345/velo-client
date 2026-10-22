@@ -163,8 +163,8 @@ public final class ReachDisplayModule extends AbstractModule implements HudModul
 		}
 		String label = String.format(Locale.ROOT, "Reach %.2f", reach < 0 ? 2.87 : reach);
 		VeloDraw.fillRounded(context, x, y, width(), height(), 6, 0x90101014);
-		int textWidth = client.textRenderer.getWidth(label);
-		context.drawTextWithShadow(client.textRenderer, label, x + (width() - textWidth) / 2, y + 6, 0xFFFFFFFF);
+		int textWidth = net.veloclient.velo.client.hud.HudLook.measure(label);
+		net.veloclient.velo.client.hud.HudLook.draw(context, label, x + (width() - textWidth) / 2, y + 6, 0xFFFFFFFF);
 	}
 
 	@Override

@@ -1,0 +1,29 @@
+<!--page {
+	"title": "News & Updates · Velo Client",
+	"description": "Velo Client release notes, new cosmetic collections and community news: what changed in every update of the free Minecraft launcher and Fabric client.",
+	"path": "/news",
+	"active": "news",
+	"priority": "0.8",
+	"changefreq": "weekly",
+	"lastmod": "latest-post",
+	"schema": {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://velo-client.com/"}, {"@type": "ListItem", "position": 2, "name": "News", "item": "https://velo-client.com/news"}]}
+}-->
+<section class="section" aria-labelledby="news-h">
+  <div class="wrap">
+    <div class="store-section-head" style="margin-bottom:30px">
+      <div class="section-head" style="margin:0">
+        <span class="eyebrow fade-up" style="--d:.05s">News</span>
+        <h1 id="news-h" data-split style="font-size:clamp(2.6rem,6vw,4.4rem);font-weight:800;letter-spacing:-0.035em">News &amp; <span class="glow-text">updates</span></h1>
+        <p class="fade-up" style="--d:.45s;margin:0;color:var(--text-2)">Every release, new cosmetic drop and community update, newest first.</p>
+      </div>
+      <div class="filters fade-up" style="--d:.5s" data-filters="#news-grid" role="group" aria-label="Filter news">
+        <button type="button" data-tag="all" aria-pressed="true">All</button>
+        <button type="button" data-tag="update" aria-pressed="false">Updates</button>
+        <button type="button" data-tag="news" aria-pressed="false">Collections</button>
+      </div>
+    </div>
+    <div class="news-grid" id="news-grid">
+{{news.list}}
+    </div>
+  </div>
+</section>

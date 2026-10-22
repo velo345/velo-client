@@ -14,10 +14,16 @@ import net.veloclient.velo.config.ConfigManager;
 public record VeloNetworkConfig(String serverUrl) {
 
 	private static final String MODULE_ID = "network";
-	public static final String DEFAULT_SERVER_URL = "https://client.asteriasmp.net";
+	public static final String DEFAULT_SERVER_URL = "https://api.velo-client.com";
+	/** Where the official server used to live - a {@code network.json} still naming it follows the move. */
+	private static final java.util.Set<String> LEGACY_SERVER_URLS = java.util.Set.of("https://client.asteriasmp.net", "http://client.asteriasmp.net");
 
 	public static VeloNetworkConfig load() {
-		return ConfigManager.load(MODULE_ID, VeloNetworkConfig.class, new VeloNetworkConfig(DEFAULT_SERVER_URL));
+		VeloNetworkConfig config = ConfigManager.load(MODULE_ID, VeloNetworkConfig.class, new VeloNetworkConfig(DEFAULT_SERVER_URL));
+		if (config.isConfigured() && LEGACY_SERVER_URLS.contains(config.normalizedUrl())) {
+			return new VeloNetworkConfig(DEFAULT_SERVER_URL);
+		}
+		return config;
 	}
 
 	/** Null/blank (e.g. a hand-edited {@code network.json} with an empty {@code serverUrl}) opts out entirely - the network module simply stays idle. */

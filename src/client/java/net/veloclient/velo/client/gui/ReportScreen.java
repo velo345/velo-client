@@ -70,7 +70,7 @@ public final class ReportScreen extends VeloWindow {
 		this.clearChildren();
 		int top = contentY() + (candidates != null ? 98 : 74);
 		reason = new TextFieldWidget(this.textRenderer, contentX(), top, contentWidth(), 18, Text.literal("Note"));
-		reason.setPlaceholder(Text.literal("What happened? (optional)"));
+		reason.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("What happened? (optional)"));
 		reason.setMaxLength(500);
 		reason.setText(keep);
 		addDrawableChild(reason);

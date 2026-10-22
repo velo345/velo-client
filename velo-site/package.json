@@ -6,7 +6,6 @@
   "scripts": {
     "build": "node build.js",
     "preview": "npm run build && npx --yes serve dist",
-    "deploy:preview": "npm run build && vercel",
-    "deploy:prod": "npm run build && vercel --prod"
+    "deploy": "bash deploy.sh"
   }
 }

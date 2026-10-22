@@ -175,14 +175,26 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 	public void render(net.minecraft.client.util.math.MatrixStack matrices, net.minecraft.client.render.command.OrderedRenderCommandQueue queue, int light,
 			net.minecraft.client.render.entity.state.PlayerEntityRenderState state, float limbAngle, float limbDistance) {
 		var client = net.minecraft.client.MinecraftClient.getInstance();
-		if (client.world == null || state.invisible) {
+		if (state.invisible) {
 			return;
 		}
-		if (!(client.world.getEntityById(state.id) instanceof net.minecraft.entity.player.PlayerEntity player)) {
+		// The title screen's menu avatar has no entity: it's you.
+		boolean menu = net.veloclient.velo.client.gui.widget.MenuAvatar.is(state.id);
+		net.minecraft.entity.player.PlayerEntity player = menu || client.world == null ? null : client.world.getEntityById(state.id) instanceof net.minecraft.entity.player.PlayerEntity p ? p : null;
+		if (player == null && !menu) {
 			return;
 		}
-		AuraManager.Worn worn = player == client.player ? AuraManager.wornByLocalPlayer()
+		boolean self = menu || player == client.player;
+		AuraManager.Worn worn = self ? AuraManager.wornByLocalPlayer()
 				: AuraManager.parseNetworkValue(net.veloclient.velo.client.network.VeloUserRegistry.auraIdFor(player.getUuid(), player.getGameProfile().name()));
+		// Auras module: hidden for you or for others (previews always show); calmer particles on others if asked.
+		if (!menu && !net.veloclient.velo.client.modules.cosmetics.AuraCosmeticsModule.shows(self)) {
+			return;
+		}
+		if (worn != null && !self && net.veloclient.velo.client.modules.cosmetics.AuraCosmeticsModule.fewerForOthers()) {
+			AuraEffects.Settings base = worn.settings();
+			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.5f, base.color()));
+		}
 		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z);
 		if (geometry == null || geometry.length == 0) {
 			return;
@@ -221,14 +233,26 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 	public void submit(com.mojang.blaze3d.vertex.PoseStack matrices, net.minecraft.client.renderer.SubmitNodeCollector queue, int light,
 			net.minecraft.client.renderer.entity.state.AvatarRenderState state, float limbAngle, float limbDistance) {
 		var client = net.minecraft.client.Minecraft.getInstance();
-		if (client.level == null || state.isInvisible) {
+		if (state.isInvisible) {
 			return;
 		}
-		if (!(client.level.getEntity(state.id) instanceof net.minecraft.world.entity.player.Player player)) {
+		// The title screen's menu avatar has no entity: it's you.
+		boolean menu = net.veloclient.velo.client.gui.widget.MenuAvatar.is(state.id);
+		net.minecraft.world.entity.player.Player player = menu || client.level == null ? null : client.level.getEntity(state.id) instanceof net.minecraft.world.entity.player.Player p ? p : null;
+		if (player == null && !menu) {
 			return;
 		}
-		AuraManager.Worn worn = player == client.player ? AuraManager.wornByLocalPlayer()
+		boolean self = menu || player == client.player;
+		AuraManager.Worn worn = self ? AuraManager.wornByLocalPlayer()
 				: AuraManager.parseNetworkValue(net.veloclient.velo.client.network.VeloUserRegistry.auraIdFor(player.getUUID(), player.getGameProfile().name()));
+		// Auras module: hidden for you or for others (previews always show); calmer particles on others if asked.
+		if (!menu && !net.veloclient.velo.client.modules.cosmetics.AuraCosmeticsModule.shows(self)) {
+			return;
+		}
+		if (worn != null && !self && net.veloclient.velo.client.modules.cosmetics.AuraCosmeticsModule.fewerForOthers()) {
+			AuraEffects.Settings base = worn.settings();
+			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.5f, base.color()));
+		}
 		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z);
 		if (geometry == null || geometry.length == 0) {
 			return;

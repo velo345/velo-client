@@ -8,6 +8,7 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.veloclient.velo.client.gui.title.MenuKit;
 import net.veloclient.velo.client.gui.widget.VeloDraw;
 import net.veloclient.velo.client.gui.widget.VeloStyle;
 import net.veloclient.velo.client.gui.widget.VeloUi;
@@ -24,7 +25,8 @@ import java.util.Map;
  * Velo's Key Binds screen, shown instead of vanilla's (Options > Controls > Key Binds): every
  * binding grouped by category with icons, one search box (finds actions *and* keys - type "G" to
  * see what G does), a filter for conflicts, and rebinding right in the row. Conflicting bindings
- * are marked red and name what they clash with. "Vanilla view" opens Minecraft's own screen once.
+ * are marked red and name what they clash with. The list is a tree of collapsible categories (searching
+ * opens the matches); the keyboard map is the other view. "Vanilla view" opens Minecraft's own screen once.
  */
 public final class VeloKeybindsScreen extends VeloWindow {
 
@@ -33,7 +35,6 @@ public final class VeloKeybindsScreen extends VeloWindow {
 
 	private final List<VeloUi.Hit> hits = new ArrayList<>();
 	private TextFieldWidget search;
-	private String category = null;
 	private boolean conflictsOnly;
 	private KeyBinding listening;
 	private float scroll;
@@ -42,8 +43,13 @@ public final class VeloKeybindsScreen extends VeloWindow {
 	private float maxScroll;
 	private long lastFrameNanos;
 	private String status = "";
-	/** Keyboard map (default) or the searchable list. */
-	private static boolean mapView = true;
+	/** Keyboard map or the searchable list (default). */
+	private static boolean mapView = false;
+	/** Open groups in the list (remembered while the game runs). */
+	private static final java.util.Set<String> EXPANDED = new java.util.HashSet<>();
+	/** How far open each group is (0..1), eased toward its target for the expand animation. */
+	private final Map<String, Float> openness = new java.util.HashMap<>();
+	private long lastAnimNanos;
 	private final KeyboardMapView map = new KeyboardMapView();
 
 	public VeloKeybindsScreen(Screen parent) {
@@ -81,6 +87,13 @@ public final class VeloKeybindsScreen extends VeloWindow {
 		client.execute(() -> client.setScreen(new VeloKeybindsScreen(parent)));
 	}
 
+	/** Dev-only (screenshot tour): open the list on Movement and Gameplay. */
+	public static void expandForTour() {
+		mapView = false;
+		EXPANDED.add("minecraft:movement");
+		EXPANDED.add("minecraft:gameplay");
+	}
+
 	/** The screen open before the current replacement (pause menu, Controls...), for returning to it. */
 	static Screen lastOther() {
 		return lastOther;
@@ -90,9 +103,10 @@ public final class VeloKeybindsScreen extends VeloWindow {
 	protected void layoutContent() {
 		this.clearChildren();
 		String previous = search != null ? search.getText() : "";
-		int searchWidth = Math.max(90, Math.min(200, contentWidth() - 120 - 258));
-		search = new TextFieldWidget(this.textRenderer, contentX(), contentY(), searchWidth, 16, Text.literal("Search"));
-		search.setPlaceholder(Text.literal("Search actions or keys"));
+		int searchWidth = Math.max(110, Math.min(240, contentWidth() - 136 - 280));
+		search = new TextFieldWidget(this.textRenderer, contentX() + 22, contentY() + 6, searchWidth - 28, 12, Text.literal("Search"));
+		search.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Search actions or keys"));
+		search.setDrawsBackground(false);
 		search.setText(previous);
 		search.setChangedListener(v -> {
 			scroll = 0;
@@ -121,6 +135,14 @@ public final class VeloKeybindsScreen extends VeloWindow {
 	}
 
 	@Override
+	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
+		int searchW = search == null ? 200 : search.getWidth() + 28;
+		boolean focused = search != null && search.isFocused();
+		VeloStyle.drawInputField(context, contentX(), contentY(), searchW, 24, focused,
+				VeloUi.inside(mouseX, mouseY, contentX(), contentY(), searchW, 24));
+	}
+
+	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
 		hits.clear();
@@ -133,11 +155,34 @@ public final class VeloKeybindsScreen extends VeloWindow {
 
 		// Top bar: search, keyboard/list, conflicts, reset all, vanilla view.
 		// Right to left: Vanilla view, Reset all, Conflicts; Keyboard / List right after the search box.
-		int searchW = search == null ? 200 : search.getWidth();
-		hits.add(VeloUi.pill(context, x + searchW + 8, y, 62, 16, "Keyboard", mapView ? 1 : 0, mouseX, mouseY, () -> mapView = true));
-		hits.add(VeloUi.pill(context, x + searchW + 72, y, 40, 16, "List", mapView ? 0 : 1, mouseX, mouseY, () -> mapView = false));
-		hits.add(VeloUi.pill(context, x + width - 150 - 102, y, 96, 16, "Conflicts (" + conflictCount + ")", conflictsOnly ? 3 : 0, mouseX, mouseY,
-				() -> {
+		int searchW = search == null ? 200 : search.getWidth() + 28;
+		boolean focused = search != null && search.isFocused();
+		// (The field's box is drawn under the text box, in renderContentLayer - drawn here it covered the text.)
+		VeloDraw.searchGlyph(context, x + 11, y + 12, 10, MenuKit.TEXT_3);
+		// List / Keyboard: a segmented switch.
+		int segX = x + searchW + 8;
+		int segW = 64;
+		VeloDraw.fillRounded(context, segX, y, segW * 2, 24, 7, 0xFF131318);
+		VeloDraw.strokeRounded(context, segX, y, segW * 2, 24, 7, 0x17FFFFFF);
+		VeloDraw.fillRounded(context, segX + 2 + (mapView ? segW : 0), y + 2, segW - 4, 20, 5, VeloUi.withAlpha(MenuKit.accent(), 0x40));
+		for (int i = 0; i < 2; i++) {
+			Text label = MenuKit.ui(i == 0 ? "List" : "Keyboard");
+			boolean on = (i == 1) == mapView;
+			MenuKit.text(context, this.textRenderer, label, segX + i * segW + (segW - this.textRenderer.getWidth(label)) / 2, y + 8, on ? MenuKit.TEXT : MenuKit.TEXT_3);
+			boolean map = i == 1;
+			hits.add(new VeloUi.Hit(segX + i * segW, y, segW, 24, () -> mapView = map));
+		}
+		hits.add(VeloUi.pill(context, x + width - 76, y, 76, 24, "Vanilla view", 0, mouseX, mouseY, this::openVanilla));
+		hits.add(VeloUi.pill(context, x + width - 76 - 6 - 70, y, 70, 24, "Reset all", 0, mouseX, mouseY, () ->
+				this.client.setScreen(new VeloConfirmScreen(this, "Reset every key bind?", "All keys go back to Minecraft's and Velo's defaults.",
+						"Reset all", () -> {
+							for (KeyBinding binding : BindingAccess.all()) {
+								BindingAccess.reset(binding);
+							}
+							status = "All key binds reset";
+						}))));
+		hits.add(VeloUi.pill(context, x + width - 76 - 6 - 70 - 6 - 96, y, 96, 24, conflictCount == 0 ? "No conflicts" : "Conflicts (" + conflictCount + ")",
+				conflictsOnly ? 3 : 0, mouseX, mouseY, () -> {
 					if (mapView) {
 						// Jump to the next key two actions fight over.
 						all.stream().filter(b -> !BindingAccess.conflicts(b).isEmpty()).findFirst()
@@ -148,18 +193,9 @@ public final class VeloKeybindsScreen extends VeloWindow {
 					scroll = 0;
 					scrollTarget = 0;
 				}));
-		hits.add(VeloUi.pill(context, x + width - 72, y, 72, 16, "Vanilla view", 0, mouseX, mouseY, this::openVanilla));
-		hits.add(VeloUi.pill(context, x + width - 150, y, 72, 16, "Reset all", 0, mouseX, mouseY, () ->
-				this.client.setScreen(new VeloConfirmScreen(this, "Reset every key bind?", "All keys go back to Minecraft's and Velo's defaults.",
-						"Reset all", () -> {
-							for (KeyBinding binding : BindingAccess.all()) {
-								BindingAccess.reset(binding);
-							}
-							status = "All key binds reset";
-						}))));
 
 		if (mapView) {
-			map.render(context, this.textRenderer, x, y + 24, width, contentBottom() - 14 - (y + 24), mouseX, mouseY, hits, new KeyboardMapView.Host() {
+			map.render(context, this.textRenderer, x, y + 32, width, contentBottom() - 14 - (y + 32), mouseX, mouseY, hits, new KeyboardMapView.Host() {
 				@Override
 				public void listen(KeyBinding binding) {
 					listening = binding;
@@ -179,49 +215,47 @@ public final class VeloKeybindsScreen extends VeloWindow {
 			String footer = listening != null
 					? "Press a key or mouse button for \"" + BindingAccess.name(listening) + "\" - Esc cancels, Backspace unbinds"
 					: status;
-			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(footer, width), x, contentBottom() - 9,
-					listening != null ? VeloStyle.accent() : VeloStyle.textMuted());
+			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(footer), width), x, contentBottom() - 9,
+					listening != null ? MenuKit.accent() : MenuKit.TEXT_3);
 			return;
 		}
 
-		// Category chips.
+		// The list: one collapsible group per category, like a file tree. Searching or the conflicts
+		// filter opens every group that has a match.
 		Map<String, String> categories = new LinkedHashMap<>();
 		for (KeyBinding binding : all) {
 			categories.putIfAbsent(BindingAccess.categoryId(binding), BindingAccess.categoryLabel(binding));
 		}
-		int chipX = x;
-		int chipY = y + 22;
-		chipX = chip(context, chipX, chipY, null, "All", mouseX, mouseY);
-		for (Map.Entry<String, String> entry : categories.entrySet()) {
-			int w = this.textRenderer.getWidth(entry.getValue()) + 30;
-			if (chipX + w > x + width) {
-				chipX = x;
-				chipY += 20;
-			}
-			chipX = chip(context, chipX, chipY, entry.getKey(), entry.getValue(), mouseX, mouseY);
-		}
-
-		// List.
-		int top = chipY + 24;
+		long now = System.nanoTime();
+		float dt = lastAnimNanos == 0 ? 0.016f : Math.min(0.1f, (now - lastAnimNanos) / 1_000_000_000f);
+		lastAnimNanos = now;
+		int top = y + 32;
 		int bottom = contentBottom() - 14;
 		String q = search == null ? "" : search.getText().trim().toLowerCase(Locale.ROOT);
+		boolean filtering = !q.isEmpty() || conflictsOnly;
+		// Expand / collapse all, top right of the tree.
+		boolean anyOpen = !EXPANDED.isEmpty();
 		context.enableScissor(x, top, x + width, bottom);
 		int rowY = top - Math.round(scroll);
 		int contentHeight = 0;
 		for (Map.Entry<String, String> entry : categories.entrySet()) {
-			if (category != null && !category.equals(entry.getKey())) {
-				continue;
-			}
+			String id = entry.getKey();
+			// Searching for a category ("movement", "velo") shows that whole category, opened.
+			boolean categoryMatches = !q.isEmpty() && entry.getValue().toLowerCase(Locale.ROOT).contains(q);
 			List<KeyBinding> rows = new ArrayList<>();
+			int groupConflicts = 0;
 			for (KeyBinding binding : all) {
-				if (!BindingAccess.categoryId(binding).equals(entry.getKey())) {
+				if (!BindingAccess.categoryId(binding).equals(id)) {
 					continue;
 				}
-				if (conflictsOnly && BindingAccess.conflicts(binding).isEmpty()) {
+				boolean conflict = !BindingAccess.conflicts(binding).isEmpty();
+				if (conflict) {
+					groupConflicts++;
+				}
+				if (conflictsOnly && !conflict) {
 					continue;
 				}
-				if (!q.isEmpty() && !BindingAccess.name(binding).toLowerCase(Locale.ROOT).contains(q)
-						&& !BindingAccess.keyText(binding).toLowerCase(Locale.ROOT).equals(q)
+				if (!q.isEmpty() && !categoryMatches && !BindingAccess.name(binding).toLowerCase(Locale.ROOT).contains(q)
 						&& !BindingAccess.keyText(binding).toLowerCase(Locale.ROOT).contains(q)) {
 					continue;
 				}
@@ -230,67 +264,120 @@ public final class VeloKeybindsScreen extends VeloWindow {
 			if (rows.isEmpty()) {
 				continue;
 			}
-			drawIcon(context, icon(entry.getKey()), x + 2, rowY + 2, 12, VeloStyle.accent());
-			context.drawTextWithShadow(this.textRenderer, entry.getValue().toUpperCase(Locale.ROOT), x + 20, rowY + 4, VeloStyle.textMuted());
-			rowY += 18;
-			contentHeight += 18;
-			for (KeyBinding binding : rows) {
-				drawRow(context, binding, x, rowY, width, mouseX, mouseY, top, bottom);
-				rowY += 24;
-				contentHeight += 24;
+			boolean open = filtering || EXPANDED.contains(id);
+			float t = openness.getOrDefault(id, open ? 1f : 0f);
+			t = net.veloclient.velo.client.gui.widget.VeloAnim.step(t, open ? 1f : 0f, dt * 2.4f);
+			openness.put(id, t);
+			float eased = 1f - (1f - t) * (1f - t) * (1f - t);
+
+			// Group header.
+			boolean headerHover = VeloUi.inside(mouseX, mouseY, x, rowY, width, 28) && mouseY >= top && mouseY < bottom;
+			VeloDraw.fillRounded(context, x, rowY, width, 28, 8, headerHover ? 0xFF1A1A21 : 0xFF131318);
+			VeloDraw.strokeRounded(context, x, rowY, width, 28, 8, headerHover ? 0x26FFFFFF : 0x14FFFFFF);
+			rotatingChevron(context, x + 14, rowY + 14, 7f, eased, open ? MenuKit.TEXT : MenuKit.TEXT_3);
+			VeloDraw.fillRounded(context, x + 26, rowY + 5, 18, 18, 5, VeloUi.withAlpha(MenuKit.accent(), 0x26));
+			drawIcon(context, icon(id), x + 29, rowY + 8, 12, MenuKit.accent());
+			Text label = MenuKit.uiBold(entry.getValue());
+			MenuKit.text(context, this.textRenderer, label, x + 52, rowY + 10, MenuKit.TEXT);
+			Text count = MenuKit.small(String.valueOf(rows.size()));
+			int countX = x + 52 + this.textRenderer.getWidth(label) + 8;
+			int cw = this.textRenderer.getWidth(count) + 10;
+			VeloDraw.fillRounded(context, countX, rowY + 8, cw, 12, 6, 0x14FFFFFF);
+			MenuKit.text(context, this.textRenderer, count, countX + 5, rowY + 10, MenuKit.TEXT_2);
+			if (groupConflicts > 0) {
+				Text warn = MenuKit.small(groupConflicts + (groupConflicts == 1 ? " CONFLICT" : " CONFLICTS"));
+				int ww = this.textRenderer.getWidth(warn) + 10;
+				VeloDraw.fillRounded(context, x + width - ww - 10, rowY + 8, ww, 12, 4, 0x33FF5A5A);
+				MenuKit.text(context, this.textRenderer, warn, x + width - ww - 5, rowY + 10, 0xFFFF8A8A);
 			}
-			rowY += 6;
-			contentHeight += 6;
+			if (rowY + 28 > top && rowY < bottom && !filtering) {
+				int hy = Math.max(rowY, top);
+				hits.add(new VeloUi.Hit(x, hy, width, Math.min(rowY + 28, bottom) - hy, () -> {
+					if (!EXPANDED.remove(id)) {
+						EXPANDED.add(id);
+					}
+				}));
+			}
+			rowY += 32;
+			contentHeight += 32;
+
+			// Its bindings, sliding open under a tree guide line.
+			int full = rows.size() * 24 + 4;
+			int shown = Math.round(full * eased);
+			if (shown > 0) {
+				context.enableScissor(x, Math.max(top, rowY - 4), x + width, Math.min(bottom, rowY + shown));
+				VeloDraw.fillRounded(context, x + 13, rowY - 4, 1, Math.max(1, rows.size() * 24 - 10), 0, 0x1FFFFFFF);
+				int childY = rowY;
+				for (KeyBinding binding : rows) {
+					context.fill(x + 14, childY + 11, x + 22, childY + 12, 0x1FFFFFFF);
+					drawRow(context, binding, x + 24, childY, width - 24, mouseX, mouseY, Math.max(top, rowY), Math.min(bottom, rowY + shown));
+					childY += 24;
+				}
+				context.disableScissor();
+				rowY += shown;
+				contentHeight += shown;
+			}
 		}
 		if (contentHeight == 0) {
-			context.drawTextWithShadow(this.textRenderer, conflictsOnly ? "No conflicts - every key does one thing." : "Nothing matches \"" + q + "\"",
-					x + 4, top + 6, VeloStyle.textMuted());
+			MenuKit.text(context, this.textRenderer, MenuKit.ui(conflictsOnly ? "No conflicts - every key does one thing." : "Nothing matches \"" + q + "\""),
+					x + 4, top + 6, MenuKit.TEXT_3);
 		}
 		context.disableScissor();
-		float max = Math.max(0, contentHeight - (bottom - top));
-		maxScroll = max;
+		maxScroll = Math.max(0, contentHeight - (bottom - top));
+		if (!filtering) {
+			Text all2 = MenuKit.ui(anyOpen ? "Collapse all" : "Expand all");
+			int aw = this.textRenderer.getWidth(all2);
+			boolean hover = VeloUi.inside(mouseX, mouseY, x + width - aw, contentBottom() - 11, aw, 11);
+			MenuKit.text(context, this.textRenderer, all2, x + width - aw, contentBottom() - 9, hover ? MenuKit.TEXT : MenuKit.TEXT_3);
+			hits.add(new VeloUi.Hit(x + width - aw, contentBottom() - 11, aw, 11, () -> {
+				if (anyOpen) {
+					EXPANDED.clear();
+				} else {
+					EXPANDED.addAll(categories.keySet());
+				}
+			}));
+		}
 
 		String footer = listening != null
 				? "Press a key or mouse button for \"" + BindingAccess.name(listening) + "\" - Esc cancels, Backspace unbinds"
 				: status;
-		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(footer, width), x, contentBottom() - 9,
-				listening != null ? VeloStyle.accent() : VeloStyle.textMuted());
+		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(footer), width - 90), x, contentBottom() - 9,
+				listening != null ? MenuKit.accent() : MenuKit.TEXT_3);
 	}
 
-	private int chip(DrawContext context, int x, int y, String id, String label, int mouseX, int mouseY) {
-		boolean active = id == null ? category == null : id.equals(category);
-		int w = this.textRenderer.getWidth(label) + (id == null ? 16 : 30);
-		hits.add(VeloUi.pill(context, x, y, w, 16, id == null ? label : "", active ? 1 : 0, mouseX, mouseY, () -> {
-			category = id;
-			scroll = 0;
-				scrollTarget = 0;
-		}));
-		if (id != null) {
-			drawIcon(context, icon(id), x + 6, y + 3, 10, active ? 0xFFFFFFFF : VeloStyle.textMuted());
-			context.drawTextWithShadow(this.textRenderer, label, x + 20, y + 4, active ? 0xFFFFFFFF : VeloStyle.text());
+	/** A chevron that turns from right (closed) to down (open) as {@code t} goes 0..1. */
+	private static void rotatingChevron(DrawContext context, float cx, float cy, float size, float t, int color) {
+		double a = Math.toRadians(90 * t);
+		float h = size / 2f;
+		float q = size / 4f;
+		float[][] pts = {{-q, -h}, {q, 0}, {-q, h}};
+		float[][] r = new float[3][2];
+		for (int i = 0; i < 3; i++) {
+			r[i][0] = cx + (float) (pts[i][0] * Math.cos(a) - pts[i][1] * Math.sin(a));
+			r[i][1] = cy + (float) (pts[i][0] * Math.sin(a) + pts[i][1] * Math.cos(a));
 		}
-		return x + w + 4;
+		VeloDraw.line(context, r[0][0], r[0][1], r[1][0], r[1][1], 1.4f, color);
+		VeloDraw.line(context, r[1][0], r[1][1], r[2][0], r[2][1], 1.4f, color);
 	}
 
 	private void drawRow(DrawContext context, KeyBinding binding, int x, int y, int width, int mouseX, int mouseY, int top, int bottom) {
 		List<KeyBinding> conflicts = BindingAccess.conflicts(binding);
 		boolean conflict = !conflicts.isEmpty();
 		boolean hovered = VeloUi.inside(mouseX, mouseY, x, y, width, 22) && mouseY >= top && mouseY < bottom;
-		VeloDraw.fillRounded(context, x, y, width, 22, 7, hovered ? VeloStyle.cardHover() : VeloStyle.card());
-		if (conflict) {
-			VeloDraw.strokeRounded(context, x, y, width, 22, 7, 0xC0E05555);
+		if (hovered || conflict) {
+			VeloDraw.fillRounded(context, x, y, width, 22, 6, conflict ? 0x14FF5A5A : 0x0DFFFFFF);
 		}
-		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(BindingAccess.name(binding), width / 2 - 10), x + 10, y + 7, VeloStyle.text());
+		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(BindingAccess.name(binding)), width / 2 - 10), x + 8, y + 7, MenuKit.TEXT);
 		if (conflict) {
 			String with = "Same key as " + BindingAccess.name(conflicts.get(0)) + (conflicts.size() > 1 ? " +" + (conflicts.size() - 1) : "");
-			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(with, width / 2 - 150), x + width / 2, y + 7, 0xFFFF7A7A);
+			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(with), width / 2 - 150), x + width / 2, y + 7, 0xFFFF8A8A);
 		}
 		boolean isListening = binding == listening;
-		String key = isListening ? "> press a key <" : BindingAccess.isUnbound(binding) ? "Not bound" : BindingAccess.keyText(binding);
+		String key = isListening ? "Press a key..." : BindingAccess.isUnbound(binding) ? "Not bound" : BindingAccess.keyText(binding);
 		int keyW = 110;
-		int keyX = x + width - keyW - 34;
+		int keyX = x + width - keyW - 30;
 		boolean visible = y + 22 > top && y < bottom;
-		VeloUi.Hit keyHit = VeloUi.pill(context, keyX, y + 3, keyW, 16, key, isListening ? 1 : conflict ? 3 : 0, mouseX, mouseY, () -> {
+		VeloUi.Hit keyHit = VeloUi.pill(context, keyX, y + 2, keyW, 18, key, isListening ? 1 : conflict ? 3 : 0, mouseX, mouseY, () -> {
 			listening = binding;
 			status = "";
 		});
@@ -298,12 +385,15 @@ public final class VeloKeybindsScreen extends VeloWindow {
 			hits.add(keyHit);
 		}
 		if (!BindingAccess.isDefault(binding)) {
-			VeloUi.Hit reset = VeloUi.pill(context, x + width - 28, y + 3, 22, 16, "R", 0, mouseX, mouseY, () -> {
-				BindingAccess.reset(binding);
-				status = "Reset \"" + BindingAccess.name(binding) + "\" to " + BindingAccess.keyText(binding);
-			});
+			// Back to the default key.
+			boolean resetHover = VeloUi.inside(mouseX, mouseY, x + width - 24, y + 2, 18, 18);
+			VeloDraw.fillRounded(context, x + width - 24, y + 2, 18, 18, 6, resetHover ? 0x26FFFFFF : 0x0DFFFFFF);
+			MenuKit.icon(context, "reset", x + width - 20, y + 6, 10, resetHover ? MenuKit.TEXT : MenuKit.TEXT_3);
 			if (visible) {
-				hits.add(reset);
+				hits.add(new VeloUi.Hit(x + width - 24, y + 2, 18, 18, () -> {
+					BindingAccess.reset(binding);
+					status = "Reset \"" + BindingAccess.name(binding) + "\" to " + BindingAccess.keyText(binding);
+				}));
 			}
 		}
 	}

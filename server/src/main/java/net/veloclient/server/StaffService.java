@@ -34,7 +34,8 @@ final class StaffService {
 	static final String HELPER = "helper";
 	static final String MOD = "mod";
 	static final String ADMIN = "admin";
-	static final Set<String> SERVICES = Set.of("friends", "capes", "parties");
+	/** "network" locks the account out of the whole Velo Network (sign-in refused), the others one feature each. */
+	static final Set<String> SERVICES = Set.of("friends", "capes", "parties", "network");
 	static final Set<String> CATEGORIES = Set.of("spam", "scam", "insult", "harassment", "inappropriate", "other");
 	static final String STAFF_CAPE = "cape_velo_staff";
 	private static final int MAX_REPORTS = 1000;
@@ -234,6 +235,7 @@ final class StaffService {
 			String what = switch (service) {
 				case "friends" -> "the friends system";
 				case "capes" -> "custom capes";
+				case "network" -> "the Velo Network";
 				default -> "parties";
 			};
 			String until = ban.until > 0 ? " until " + java.time.LocalDate.ofInstant(java.time.Instant.ofEpochMilli(ban.until), java.time.ZoneOffset.UTC) : "";

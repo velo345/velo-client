@@ -255,9 +255,23 @@ public final class ScreenshotTour {
 	private static final String SCENES = System.getProperty("velo.screenshotTour.scenes");
 	private static net.veloclient.velo.client.gui.VeloAdvancementsScreen advForTour;
 	private static net.veloclient.velo.client.gui.ModMenuScreen menuForTour;
+	private static net.veloclient.velo.client.gui.store.StoreScreen storeForTour;
 	private static java.util.ArrayDeque<Object[]> queue;
 	private static net.veloclient.velo.client.gui.CapeEquipScreen lockerForTour;
 	private static int nextAt;
+
+	/** A few chat lines with emoji and :shortcodes: for the Emoji Chat screenshot. */
+	private static void emojiChat(MinecraftClient client) {
+		String[] lines = {"<Velo2k> gg everyone :fire: :fire:", "<Steve> that clutch was insane \uD83D\uDE02\uD83D\uDC80",
+				"<Alex> :tada: Velo 0.9.8 is out! :rocket: :heart:", "<Notch> nice build :eyes: :100:"};
+		for (String line : lines) {
+			//? if <26.1 {
+			client.inGameHud.getChatHud().addMessage(net.minecraft.text.Text.literal(line));
+			//?} else {
+			/*if (client.player != null) client.player.sendSystemMessage(net.minecraft.network.chat.Component.literal(line));
+			*///?}
+		}
+	}
 
 	/** Each scene = steps of {delayTicks, Runnable}. Add a scene here instead of running the whole tour. */
 	private static List<Object[]> scene(MinecraftClient client, String name) {
@@ -351,6 +365,26 @@ public final class ScreenshotTour {
 					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.cosmetics.wings.WingsManager.type(System.getProperty("velo.tourWings", "phoenix")).ifPresent(type ->
 							client.setScreen(new net.veloclient.velo.client.gui.store.WingDetailScreen(null, type)))},
 					new Object[] {60, (Runnable) () -> shot(client, "store-wing")});
+			case "storefull" -> List.of(
+					new Object[] {0, (Runnable) () -> {
+						storeForTour = new net.veloclient.velo.client.gui.store.StoreScreen(null);
+						client.setScreen(storeForTour);
+					}},
+					new Object[] {60, (Runnable) () -> shot(client, "store-featured")},
+					new Object[] {2, (Runnable) () -> storeForTour.scrollForTour(-8)},
+					new Object[] {30, (Runnable) () -> shot(client, "store-featured-scrolled")},
+					new Object[] {2, (Runnable) () -> storeForTour.scrollForTour(-30)},
+					new Object[] {30, (Runnable) () -> shot(client, "store-featured-bottom")},
+					new Object[] {2, (Runnable) () -> {
+						net.veloclient.velo.client.gui.store.StoreScreen.showBundles();
+						storeForTour = new net.veloclient.velo.client.gui.store.StoreScreen(null);
+						client.setScreen(storeForTour);
+					}},
+					new Object[] {30, (Runnable) () -> shot(client, "store-bundles")},
+					new Object[] {2, (Runnable) () -> storeForTour.openFirstBundleForTour()},
+					new Object[] {40, (Runnable) () -> shot(client, "store-bundle")},
+					new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.store.OwnerScreen(null))},
+					new Object[] {40, (Runnable) () -> shot(client, "owner")});
 			case "auras" -> {
 				List<Object[]> steps = new java.util.ArrayList<>();
 				steps.add(new Object[] {0, (Runnable) () -> {
@@ -407,6 +441,16 @@ public final class ScreenshotTour {
 						client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null));
 					}},
 					new Object[] {40, (Runnable) () -> shot(client, "store-plus")});
+			case "emoji" -> List.of(
+					new Object[] {0, (Runnable) () -> emojiChat(client)},
+					new Object[] {10, (Runnable) () -> {
+						//? if <26.1 {
+						client.setScreen(new net.minecraft.client.gui.screen.ChatScreen(":fi", false));
+						//?} else {
+						/*client.setScreen(new net.minecraft.client.gui.screens.ChatScreen(":fi", false));
+						*///?}
+					}},
+					new Object[] {25, (Runnable) () -> shot(client, "emoji-chat")});
 			case "friends" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.FriendsScreen())},
 					new Object[] {30, (Runnable) () -> shot(client, "friends")});
@@ -482,6 +526,66 @@ public final class ScreenshotTour {
 					}},
 					new Object[] {30, (Runnable) () -> shot(client, "f3-edit")},
 					new Object[] {2, (Runnable) () -> toggleF3(client, false)});
+			case "screens" -> List.of(
+					new Object[] {0, (Runnable) () -> ModuleRegistry.get("keystrokes")
+							.ifPresent(m -> client.setScreen(new net.veloclient.velo.client.gui.window.ModuleConfigScreen(m, null)))},
+					new Object[] {30, (Runnable) () -> shot(client, "screen-module-keystrokes")},
+					new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.HudEditScreen(null))},
+					new Object[] {30, (Runnable) () -> shot(client, "screen-hud-editor")},
+					new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.SettingsTabScreen(null))},
+					new Object[] {30, (Runnable) () -> shot(client, "screen-settings")},
+					new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.ProfileScreen(null))},
+					new Object[] {30, (Runnable) () -> shot(client, "screen-profiles")},
+					new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.WaypointsScreen(null))},
+					new Object[] {30, (Runnable) () -> shot(client, "screen-waypoints")},
+					new Object[] {2, (Runnable) () -> client.setScreen(net.veloclient.velo.client.gui.CapeEquipScreen.open(null, 0))},
+					new Object[] {40, (Runnable) () -> shot(client, "screen-locker-skin")},
+					new Object[] {2, (Runnable) () -> client.setScreen(net.veloclient.velo.client.gui.CapeEquipScreen.open(null, 2))},
+					new Object[] {40, (Runnable) () -> shot(client, "screen-locker-wings")},
+					new Object[] {2, (Runnable) () -> ModuleRegistry.get("wings-cosmetics")
+							.ifPresent(m -> client.setScreen(new net.veloclient.velo.client.gui.window.ModuleConfigScreen(m, null)))},
+					new Object[] {30, (Runnable) () -> shot(client, "screen-module-wings")},
+					new Object[] {2, (Runnable) () -> {
+						net.veloclient.velo.client.gui.VeloKeybindsScreen.expandForTour();
+						client.setScreen(new net.veloclient.velo.client.gui.VeloKeybindsScreen(null));
+					}},
+					new Object[] {40, (Runnable) () -> shot(client, "screen-controls")},
+					new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.HudEditScreen(null))},
+					new Object[] {30, (Runnable) () -> shot(client, "screen-hud-editor-2")});
+			case "hud" -> List.of(
+					new Object[] {0, (Runnable) () -> {
+						for (String id : List.of("small-caps", "entity-count-overlay", "target-hud", "height-limit", "held-item")) {
+							ModuleRegistry.get(id).ifPresent(m -> m.setEnabled(false));
+						}
+						for (String id : List.of("hud-style", "fps-counter", "ping-display", "clock", "coordinates", "keystrokes", "potion-timers",
+								"armor-durability", "mouse-buttons")) {
+							ModuleRegistry.get(id).ifPresent(m -> m.setEnabled(true));
+						}
+						setChoice("hud-style", "Font", "Inter");
+						setChoice("hud-style", "Background", "None");
+						setChoice("potion-timers", "Style", "List");
+						setChoice("armor-durability", "Style", "Bars");
+						setChoice("keystrokes", "Style", "Glass");
+						hudSetup(client);
+					}},
+					new Object[] {40, (Runnable) () -> shot(client, "hud-inter")},
+					new Object[] {2, (Runnable) () -> {
+						setChoice("hud-style", "Font", "Sora");
+						setChoice("potion-timers", "Style", "Compact");
+					}},
+					new Object[] {10, (Runnable) () -> shot(client, "hud-sora-compact")},
+					new Object[] {2, (Runnable) () -> {
+						setChoice("hud-style", "Font", "Minecraft");
+						setChoice("keystrokes", "Style", "Minecraft");
+					}},
+					new Object[] {10, (Runnable) () -> shot(client, "hud-minecraft")},
+					new Object[] {2, (Runnable) () -> {
+						setChoice("hud-style", "Font", "Inter");
+						setChoice("keystrokes", "Style", "Glass");
+						setChoice("potion-timers", "Style", "List");
+						client.setScreen(new net.veloclient.velo.client.gui.HudEditScreen(null));
+					}},
+					new Object[] {30, (Runnable) () -> shot(client, "hud-editor")});
 			case "mouse" -> List.of(
 					new Object[] {0, (Runnable) () -> {
 						ModuleRegistry.get("mouse-buttons").ifPresent(m -> m.setEnabled(true));
@@ -656,6 +760,27 @@ public final class ScreenshotTour {
 		//? if >=26.2 {
 		/*client.gui.setScreen(new net.minecraft.client.gui.screens.advancements.AdvancementsScreen(client.getConnection().getAdvancements(),
 				client.gui.screen()));
+		*///?}
+	}
+
+	/** "hud" scene: a few effects and damaged diamond armor so Potion Timers and Armor have something to show. */
+	private static void hudSetup(MinecraftClient client) {
+		//? if >=26.2 {
+		/*var server = client.getSingleplayerServer();
+		String name = client.player.getGameProfile().name();
+		if (server != null) {
+			server.execute(() -> {
+				var source = server.createCommandSourceStack();
+				for (String command : List.of("effect give " + name + " minecraft:speed 300 1", "effect give " + name + " minecraft:strength 102",
+						"effect give " + name + " minecraft:fire_resistance 8", "time set day", "weather clear",
+						"item replace entity " + name + " armor.head with minecraft:diamond_helmet[minecraft:damage=40]",
+						"item replace entity " + name + " armor.chest with minecraft:diamond_chestplate[minecraft:damage=300]",
+						"item replace entity " + name + " armor.legs with minecraft:diamond_leggings[minecraft:damage=420]",
+						"item replace entity " + name + " armor.feet with minecraft:diamond_boots[minecraft:damage=10]")) {
+					server.getCommands().performPrefixedCommand(source, command);
+				}
+			});
+		}
 		*///?}
 	}
 

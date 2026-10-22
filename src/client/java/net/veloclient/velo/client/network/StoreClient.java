@@ -24,6 +24,10 @@ import java.util.function.Consumer;
  */
 public final class StoreClient {
 
+	/** Several items for one price (the server's offer); owning some lowers the price, the server works that out. */
+	public record Bundle(String id, String name, String description, List<String> items, int price) {
+	}
+
 	public record CoinPack(String id, int coins, int bonus, double price) {
 		public int total() {
 			return coins + bonus;
@@ -294,7 +298,63 @@ public final class StoreClient {
 
 	/** Every cosmetic with its status, collections and the featured one (owner only). */
 	public static void adminCosmetics(Consumer<JsonObject> onOk, Consumer<String> onError) {
+		if (demo) {
+			onOk.accept(demoAdmin());
+			return;
+		}
 		async(() -> get("/v1/admin/cosmetics"), onOk, onError);
+	}
+
+	/** Screenshot tour: the bundled catalog as the owner panel's data, with mixed statuses and one bundle. */
+	private static JsonObject demoAdmin() {
+		JsonObject data = new JsonObject();
+		com.google.gson.JsonArray items = new com.google.gson.JsonArray();
+		String[] statuses = {"released", "released", "testing", "hidden"};
+		int n = 0;
+		for (var wing : net.veloclient.velo.client.cosmetics.wings.WingsManager.catalog()) {
+			JsonObject item = new JsonObject();
+			item.addProperty("id", wing.itemId());
+			item.addProperty("name", wing.name());
+			item.addProperty("price", wing.price());
+			item.addProperty("status", statuses[n++ % statuses.length]);
+			item.addProperty("collection", wing.collection() == null ? "" : wing.collection());
+			items.add(item);
+		}
+		for (var aura : net.veloclient.velo.client.cosmetics.aura.AuraManager.catalog()) {
+			JsonObject item = new JsonObject();
+			item.addProperty("id", aura.itemId());
+			item.addProperty("name", aura.name());
+			item.addProperty("price", aura.price());
+			item.addProperty("status", statuses[n++ % statuses.length]);
+			items.add(item);
+		}
+		data.add("items", items);
+		com.google.gson.JsonArray collections = new com.google.gson.JsonArray();
+		for (var c : net.veloclient.velo.client.cosmetics.wings.WingsManager.collections()) {
+			JsonObject collection = new JsonObject();
+			collection.addProperty("id", c.id());
+			collection.addProperty("name", c.name());
+			collection.addProperty("tag", c.tag());
+			collection.addProperty("description", c.description());
+			collections.add(collection);
+		}
+		data.add("collections", collections);
+		com.google.gson.JsonArray bundles = new com.google.gson.JsonArray();
+		JsonObject bundle = new JsonObject();
+		bundle.addProperty("id", "starter");
+		bundle.addProperty("name", "Starter Pack");
+		bundle.addProperty("description", "Three favourites for less");
+		com.google.gson.JsonArray bundleItems = new com.google.gson.JsonArray();
+		for (int i = 0; i < Math.min(3, items.size()); i++) {
+			bundleItems.add(items.get(i).getAsJsonObject().get("id").getAsString());
+		}
+		bundle.add("items", bundleItems);
+		bundle.addProperty("price", 3900);
+		bundle.addProperty("active", true);
+		bundles.add(bundle);
+		data.add("bundles", bundles);
+		data.addProperty("featured", collections.isEmpty() ? "" : collections.get(0).getAsJsonObject().get("id").getAsString());
+		return data;
 	}
 
 	/** Changes a cosmetic: only the fields in {@code item} (plus its id) change. */
@@ -306,6 +366,64 @@ public final class StoreClient {
 			net.veloclient.velo.client.cosmetics.CosmeticsCatalog.refresh(true);
 			onOk.accept(r);
 		}, onError);
+	}
+
+	/** Creates or changes a collection (id, name, tag, description). Owner only. */
+	public static void adminCollection(JsonObject collection, Consumer<JsonObject> onOk, Consumer<String> onError) {
+		async(() -> post("/v1/admin/cosmetics/collection", collection), onOk, onError);
+	}
+
+	/** Creates or changes an owner bundle (id, name, description, items, price, active, availableUntil). Owner only. */
+	public static void adminBundle(JsonObject bundle, Consumer<JsonObject> onOk, Consumer<String> onError) {
+		async(() -> post("/v1/admin/cosmetics/bundle", bundle), onOk, onError);
+	}
+
+	public static void adminDeleteBundle(String id, Consumer<JsonObject> onOk, Consumer<String> onError) {
+		JsonObject body = new JsonObject();
+		body.addProperty("id", id);
+		async(() -> post("/v1/admin/cosmetics/bundle/delete", body), onOk, onError);
+	}
+
+	/** Which collection the store features (blank = the newest). Owner only. */
+	public static void adminFeatured(String collectionId, Consumer<JsonObject> onOk, Consumer<String> onError) {
+		JsonObject body = new JsonObject();
+		body.addProperty("collection", collectionId);
+		async(() -> post("/v1/admin/cosmetics/featured", body), onOk, onError);
+	}
+
+	/** Player chat reports ({@code status} "open" or "all"). Staff only. */
+	public static void staffReports(String status, Consumer<JsonObject> onOk, Consumer<String> onError) {
+		if (demo) {
+			JsonObject result = new JsonObject();
+			com.google.gson.JsonArray reports = new com.google.gson.JsonArray();
+			JsonObject report = com.google.gson.JsonParser.parseString("{\"id\":\"r1\",\"category\":\"harassment\",\"reporterName\":\"jeb_\","
+					+ "\"targetName\":\"Griefer42\",\"context\":\"dm\",\"status\":\"open\",\"reason\":\"Keeps spamming me\",\"at\":"
+					+ (System.currentTimeMillis() - 3_600_000L) + ",\"messages\":[{\"fromName\":\"Griefer42\",\"text\":\"give me your base coords\"},"
+					+ "{\"fromName\":\"jeb_\",\"text\":\"no, stop\"}]}").getAsJsonObject();
+			reports.add(report);
+			result.add("reports", reports);
+			onOk.accept(result);
+			return;
+		}
+		async(() -> get("/v1/staff/reports?status=" + status), onOk, onError);
+	}
+
+	/** Closes a report, optionally banning the reported player from friends and parties for {@code days} (0 = for good). */
+	public static void staffResolve(String id, boolean ban, int days, Consumer<JsonObject> onOk, Consumer<String> onError) {
+		JsonObject body = new JsonObject();
+		body.addProperty("id", id);
+		body.addProperty("status", ban ? "actioned" : "dismissed");
+		if (ban) {
+			JsonObject b = new JsonObject();
+			com.google.gson.JsonArray services = new com.google.gson.JsonArray();
+			services.add("friends");
+			services.add("parties");
+			b.add("services", services);
+			b.addProperty("days", days);
+			b.addProperty("reason", "Reported chat");
+			body.add("ban", b);
+		}
+		async(() -> post("/v1/staff/reports/resolve", body), onOk, onError);
 	}
 
 	// ---- Parsing ----
@@ -328,6 +446,31 @@ public final class StoreClient {
 		walletLoaded = true;
 	}
 
+	private static volatile List<Bundle> bundles = List.of();
+	private static volatile List<String> dailyIds = List.of();
+	private static volatile long dailyEndsAt;
+	private static volatile java.util.Map<String, Integer> regularPrices = java.util.Map.of();
+
+	/** The bundles on offer (empty before the catalog loaded). */
+	public static List<Bundle> bundles() {
+		return bundles;
+	}
+
+	/** Today's picks as the server chose them (empty: pick locally, see the Store). */
+	public static List<String> dailyIds() {
+		return dailyIds;
+	}
+
+	/** When today's picks change (0 = unknown: midnight UTC). */
+	public static long dailyEndsAt() {
+		return dailyEndsAt;
+	}
+
+	/** The usual price of an item on a deal today, or null. */
+	public static Integer regularPrice(String itemId) {
+		return regularPrices.get(itemId);
+	}
+
 	/** Item prices from the server's catalog (the server is what actually charges). */
 	private static volatile java.util.Map<String, Integer> prices = java.util.Map.of();
 
@@ -337,16 +480,49 @@ public final class StoreClient {
 		return price != null ? price : fallback;
 	}
 
+	private static volatile boolean catalogLoaded;
+
+	/** Whether the server's catalog (prices, packs, bundles) has arrived this run - or demo data is in. */
+	public static boolean catalogLoaded() {
+		return catalogLoaded || demo;
+	}
+
 	private static void applyCatalog(JsonObject catalog) {
+		catalogLoaded = true;
 		if (catalog.has("items") && catalog.get("items").isJsonArray()) {
 			java.util.Map<String, Integer> map = new java.util.HashMap<>();
+			java.util.Map<String, Integer> regular = new java.util.HashMap<>();
 			for (var element : catalog.getAsJsonArray("items")) {
 				JsonObject item = element.getAsJsonObject();
 				if (item.has("id") && item.has("price")) {
 					map.put(item.get("id").getAsString(), item.get("price").getAsInt());
+					if (item.has("fullPrice") && !item.get("fullPrice").isJsonNull()) {
+						regular.put(item.get("id").getAsString(), item.get("fullPrice").getAsInt());
+					}
 				}
 			}
 			prices = java.util.Map.copyOf(map);
+			regularPrices = java.util.Map.copyOf(regular);
+		}
+		if (catalog.has("bundles") && catalog.get("bundles").isJsonArray()) {
+			List<Bundle> list = new ArrayList<>();
+			for (var element : catalog.getAsJsonArray("bundles")) {
+				JsonObject b = element.getAsJsonObject();
+				List<String> items = new ArrayList<>();
+				b.getAsJsonArray("items").forEach(e -> items.add(e.getAsString()));
+				String description = b.has("description") && !b.get("description").isJsonNull() ? b.get("description").getAsString() : "";
+				list.add(new Bundle(b.get("id").getAsString(), b.get("name").getAsString(), description, List.copyOf(items), b.get("price").getAsInt()));
+			}
+			bundles = List.copyOf(list);
+		}
+		if (catalog.has("daily") && catalog.get("daily").isJsonObject()) {
+			JsonObject daily = catalog.getAsJsonObject("daily");
+			List<String> ids = new ArrayList<>();
+			if (daily.has("items")) {
+				daily.getAsJsonArray("items").forEach(e -> ids.add(e.getAsString()));
+			}
+			dailyIds = List.copyOf(ids);
+			dailyEndsAt = daily.has("endsAt") ? daily.get("endsAt").getAsLong() : 0;
 		}
 		currency = catalog.get("currency").getAsString();
 		checkoutEnabled = catalog.get("checkoutEnabled").getAsBoolean();

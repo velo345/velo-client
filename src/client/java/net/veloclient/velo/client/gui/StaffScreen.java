@@ -65,13 +65,13 @@ public final class StaffScreen extends VeloWindow {
 		this.clearChildren();
 		if (tab == Tab.PLAYER) {
 			nameField = new TextFieldWidget(this.textRenderer, contentX(), contentY() + 22, contentWidth() - 76, 18, Text.literal("Player"));
-			nameField.setPlaceholder(Text.literal("Player name or UUID"));
+			nameField.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Player name or UUID"));
 			nameField.setText(keepName);
 			addDrawableChild(nameField);
 			if (player != null && admin()) {
 				reasonField = new TextFieldWidget(this.textRenderer, contentX() + contentWidth() / 2 + 6, contentY() + 184, contentWidth() / 2 - 6, 18,
 						Text.literal("Reason"));
-				reasonField.setPlaceholder(Text.literal("Reason (shown to them)"));
+				reasonField.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Reason (shown to them)"));
 				reasonField.setText(keepReason);
 				addDrawableChild(reasonField);
 			} else {

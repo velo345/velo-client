@@ -10,6 +10,8 @@ import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.veloclient.velo.client.gui.title.MenuKit;
+import net.veloclient.velo.client.gui.widget.VeloAnim;
 import net.veloclient.velo.client.gui.widget.VeloDraw;
 import net.veloclient.velo.client.gui.widget.VeloStyle;
 import net.veloclient.velo.client.gui.widget.VeloUi;
@@ -32,7 +34,8 @@ import java.util.concurrent.Executors;
 public final class VeloSkinsScreen extends VeloWindow {
 
 	private static final Map<String, Identifier> TEXTURES = new HashMap<>();
-	private static final int PREVIEW_W = 132;
+	private static final int CARD_H = 124;
+	private static final int CARD_GAP = 8;
 
 	private final List<VeloUi.Hit> hits = new ArrayList<>();
 	private TextFieldWidget playerBox;
@@ -47,38 +50,68 @@ public final class VeloSkinsScreen extends VeloWindow {
 	private net.minecraft.client.gui.widget.ClickableWidget preview;
 
 	public VeloSkinsScreen(Screen parent) {
-		super(Text.literal("Skins"), 700, 430);
+		super(Text.literal("Locker"), 940, 580);
 		returnTo(parent);
+		onClosed(net.veloclient.velo.client.skins.SkinTryOn::clear);
+	}
+
+	// The Locker's Skin tab: the other tabs are CapeEquipScreen.
+
+	@Override
+	protected String[] headerTabs() {
+		return CapeEquipScreen.LOCKER_TABS;
+	}
+
+	@Override
+	protected int headerTab() {
+		return 0;
+	}
+
+	@Override
+	protected void selectHeaderTab(int index) {
+		if (index != 0) {
+			net.veloclient.velo.client.skins.SkinTryOn.clear();
+			this.client.setScreen(CapeEquipScreen.open(returnScreen(), index));
+		}
+	}
+
+	private int showcaseX() {
+		return contentX() + CapeEquipScreen.SLOTS_W + 12;
+	}
+
+	private int gridX() {
+		return showcaseX() + CapeEquipScreen.SHOWCASE_WIDTH + 14;
+	}
+
+	private int gridW() {
+		return contentX() + contentWidth() - gridX();
+	}
+
+	/** The toolbar under the heading: username box, Add, then arms + Import PNG on the right. */
+	private int toolbarY() {
+		return contentY() + 22;
+	}
+
+	private int fieldWidth() {
+		return Math.max(90, Math.min(190, gridW() - 64 - 96 - 90 - 24));
 	}
 
 	@Override
 	protected void layoutContent() {
 		this.clearChildren();
 		String previous = playerBox != null ? playerBox.getText() : "";
-		playerBox = new TextFieldWidget(this.textRenderer, contentX() + PREVIEW_W + 10, contentY(), fieldWidth(), 16, Text.literal("Player"));
-		playerBox.setPlaceholder(Text.literal("Username or UUID"));
+		playerBox = new TextFieldWidget(this.textRenderer, gridX() + 22, toolbarY() + 6, fieldWidth() - 28, 12, Text.literal("Player"));
+		playerBox.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Add by username or UUID"));
+		playerBox.setDrawsBackground(false);
 		playerBox.setText(previous);
 		addDrawableChild(playerBox);
-		int stageH = previewStageHeight();
-		preview = net.veloclient.velo.client.gui.widget.SkinModelPreview.create(PREVIEW_W - 16, stageH - 16, () -> {
-			SkinLibrary.Skin skin = previewSkin();
-			return skin == null ? null : texture(skin);
-		}, () -> {
-			SkinLibrary.Skin skin = previewSkin();
-			return skin != null && skin.slim();
-		});
-		preview.setX(contentX() + 8);
-		preview.setY(contentY() + 8);
+		int x = showcaseX() + 6;
+		int y = contentY() + 6;
+		int w = CapeEquipScreen.SHOWCASE_WIDTH - 12;
+		int h = contentBottom() - contentY() - 76;
+		// Your player wearing the skin, with your cape, wings and aura (on the title screen too).
+		preview = new net.veloclient.velo.client.gui.widget.EntityPreviewWidget(x, y, w, h).noStage().zoom(1.35f).spin(0f, 20f);
 		addDrawableChild(preview);
-	}
-
-	/** Username box width: whatever's left of the toolbar after the three buttons. */
-	private int fieldWidth() {
-		return Math.max(70, Math.min(170, contentWidth() - PREVIEW_W - 10 - 64 - 74 - 74 - 18));
-	}
-
-	private int previewStageHeight() {
-		return Math.max(80, contentBottom() - 14 - contentY() - 66);
 	}
 
 	private SkinLibrary.Skin previewSkin() {
@@ -170,105 +203,198 @@ public final class VeloSkinsScreen extends VeloWindow {
 		hits.clear();
 		hoveredSkin = null;
 		hoveringCurrent = false;
-		renderPreviewPanel(context, mouseX, mouseY);
-		int x = contentX() + PREVIEW_W + 10;
-		int y = contentY();
-		int width = contentWidth() - PREVIEW_W - 10;
-		hits.add(VeloUi.pill(context, x + fieldWidth() + 6, y, 64, 16, "Add skin", 1, mouseX, mouseY, this::addPlayer));
-		hits.add(VeloUi.pill(context, x + width - 74, y, 74, 16, "Import PNG", 0, mouseX, mouseY, this::importPng));
-		hits.add(VeloUi.pill(context, x + width - 152, y, 74, 16, slimImport ? "Slim arms" : "Classic arms", slimImport ? 1 : 0,
-				mouseX, mouseY, () -> slimImport = !slimImport));
+		CapeEquipScreen.drawSlots(context, this.textRenderer, contentX(), contentY(), 0, mouseX, mouseY);
+		CapeEquipScreen.drawLoadouts(context, this.textRenderer, contentX(), contentY(), contentBottom(), mouseX, mouseY);
+		renderGrid(context, mouseX, mouseY);
+		// Try the hovered / selected skin on your player for the live preview.
+		SkinLibrary.Skin shown = previewSkin();
+		if (shown == null) {
+			net.veloclient.velo.client.skins.SkinTryOn.clear();
+		} else {
+			net.veloclient.velo.client.skins.SkinTryOn.set(texture(shown), shown.slim());
+		}
+		renderShowcase(context, mouseX, mouseY);
+	}
 
+	/** Heading, toolbar and the skin cards. */
+	private void renderGrid(DrawContext context, int mouseX, int mouseY) {
+		int x = gridX();
+		int width = gridW();
+		List<SkinLibrary.Skin> library = SkinLibrary.all();
+		Text heading = MenuKit.display("Skins");
+		MenuKit.text(context, this.textRenderer, heading, x, contentY() + 1, MenuKit.TEXT);
+		Text count = MenuKit.small(library.size() + " SAVED");
+		int hx = x + this.textRenderer.getWidth(heading) + 8;
+		MenuKit.text(context, this.textRenderer, count, hx, contentY() + 4, MenuKit.TEXT_3);
+		Text hint = MenuKit.ui("hover or click one to try it on");
+		if (hx + this.textRenderer.getWidth(count) + 16 + this.textRenderer.getWidth(hint) <= x + width) {
+			MenuKit.text(context, this.textRenderer, hint, x + width - this.textRenderer.getWidth(hint), contentY() + 2, MenuKit.TEXT_3);
+		}
+
+		// Toolbar: [search icon | username box] [Add]   ...   [Classic | Slim] [Import PNG]
+		int ty = toolbarY();
+		int fw = fieldWidth();
+		boolean focused = playerBox != null && playerBox.isFocused();
+		VeloStyle.drawInputField(context, x, ty, fw, 24, focused, MenuKit.inside(mouseX, mouseY, x, ty, fw, 24));
+		MenuKit.icon(context, "friends", x + 7, ty + 7, 10, MenuKit.TEXT_3);
+		hits.add(button(context, x + fw + 6, ty, 56, "Add", true, mouseX, mouseY, this::addPlayer));
+		int importW = 88;
+		int ix = x + width - importW;
+		hits.add(button(context, ix, ty, importW, "Import PNG", false, mouseX, mouseY, this::importPng));
+		// Arms for imported PNGs: a two-way segmented switch.
+		int segW = 46;
+		int sx = ix - 8 - segW * 2;
+		VeloDraw.fillRounded(context, sx, ty, segW * 2, 24, 7, 0xFF131318);
+		VeloDraw.strokeRounded(context, sx, ty, segW * 2, 24, 7, 0x17FFFFFF);
+		VeloDraw.fillRounded(context, sx + 2 + (slimImport ? segW : 0), ty + 2, segW - 4, 20, 5, VeloUi.withAlpha(MenuKit.accent(), 0x40));
+		for (int i = 0; i < 2; i++) {
+			Text label = MenuKit.ui(i == 0 ? "Classic" : "Slim");
+			boolean on = (i == 1) == slimImport;
+			MenuKit.text(context, this.textRenderer, label, sx + i * segW + (segW - this.textRenderer.getWidth(label)) / 2, ty + 8, on ? MenuKit.TEXT : MenuKit.TEXT_3);
+			boolean slim = i == 1;
+			hits.add(new VeloUi.Hit(sx + i * segW, ty, segW, 24, () -> slimImport = slim));
+		}
+
+		// Cards: "your account" first, then the library.
 		List<SkinLibrary.Skin> skins = new ArrayList<>();
-		// Slot 0 is "Current skin" (what your account wears right now), then the library.
 		skins.add(null);
-		skins.addAll(SkinLibrary.all());
+		skins.addAll(library);
 		String equipped = SkinLibrary.equippedId();
-		int top = y + 24;
-		int bottom = contentBottom() - 14;
-		int columns = Math.max(1, (width + 8) / (88 + 8));
-		int cardW = (width + 8) / columns - 8;
-		int cardH = 118;
+		int top = ty + 34;
+		int bottom = contentBottom() - 16;
+		int columns = Math.max(3, (width + CARD_GAP) / (112 + CARD_GAP));
+		int cardW = (width - (columns - 1) * CARD_GAP) / columns;
 		int rows = (skins.size() + columns - 1) / columns;
-		float max = Math.max(0, rows * (cardH + 8) - (bottom - top));
+		float max = Math.max(0, rows * (CARD_H + CARD_GAP) - CARD_GAP - (bottom - top));
 		scroll = Math.clamp(scroll, 0, max);
 		context.enableScissor(x, top, x + width, bottom);
 		for (int i = 0; i < skins.size(); i++) {
 			SkinLibrary.Skin skin = skins.get(i);
-			int cx = x + (i % columns) * (cardW + 8);
-			int cy = top + (i / columns) * (cardH + 8) - Math.round(scroll);
-			if (skin == null) {
-				renderCurrentCard(context, cx, cy, cardW, cardH, top, bottom, mouseX, mouseY);
+			int cx = x + (i % columns) * (cardW + CARD_GAP);
+			int cy = top + (i / columns) * (CARD_H + CARD_GAP) - Math.round(scroll);
+			if (cy + CARD_H < top || cy > bottom) {
 				continue;
 			}
-			boolean isEquipped = skin.id().equals(equipped);
-			boolean hovered = VeloUi.inside(mouseX, mouseY, cx, cy, cardW, cardH) && mouseY >= top && mouseY < bottom;
-			boolean selected = skin.id().equals(selectedId) && !hovered;
+			boolean hovered = VeloUi.inside(mouseX, mouseY, cx, cy, cardW, CARD_H) && mouseY >= top && mouseY < bottom;
+			boolean selected = skin == null ? selectedId == null : skin.id().equals(selectedId);
+			boolean isEquipped = skin != null && skin.id().equals(equipped);
 			if (hovered) {
-				hoveredSkin = skin;
+				if (skin == null) {
+					hoveringCurrent = true;
+				} else {
+					hoveredSkin = skin;
+				}
 			}
-			VeloDraw.fillRounded(context, cx, cy, cardW, cardH, 8, hovered || selected ? VeloStyle.cardHover() : VeloStyle.card());
-			if (isEquipped) {
-				VeloDraw.strokeRounded(context, cx, cy, cardW, cardH, 8, VeloStyle.accent());
-			} else if (selected) {
-				VeloDraw.strokeRounded(context, cx, cy, cardW, cardH, 8, VeloUi.withAlpha(VeloStyle.text(), 0x40));
+			float t = MenuKit.hover(skin == null ? "skin:current" : "skin:" + skin.id(), hovered);
+			int edge = selected ? MenuKit.accent() : VeloAnim.lerpArgb(0x17FFFFFF, 0x38FFFFFF, t);
+			VeloDraw.fillRounded(context, cx, cy, cardW, CARD_H, 9, VeloAnim.lerpArgb(0xFF131318, 0xFF1A1A21, t));
+			if (selected) {
+				VeloDraw.fillRoundedGradient(context, cx, cy, cardW, CARD_H, 9, VeloUi.withAlpha(MenuKit.accent(), 0x1C), 0x00131318);
 			}
-			Identifier tex = texture(skin);
+			VeloDraw.strokeRounded(context, cx, cy, cardW, CARD_H, 9, edge);
+			// The skin, flat front view, on a soft stage.
+			VeloDraw.fillRounded(context, cx + 6, cy + 6, cardW - 12, 82, 7, 0xFF0E0E12);
+			Identifier tex = skin == null ? net.veloclient.velo.client.gui.widget.SkinModelPreview.currentTexture() : texture(skin);
+			boolean slim = skin == null ? net.veloclient.velo.client.gui.widget.SkinModelPreview.currentSlim() : skin.slim();
 			if (tex != null) {
-				drawFront(context, tex, skin.slim(), cx + cardW / 2 - 16, cy + 8, 2);
+				drawFront(context, tex, slim, cx + cardW / 2 - 16, cy + 6 + 9 - Math.round(2 * t), 2);
 			}
-			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(skin.name(), cardW - 8), cx + 6, cy + 76, VeloStyle.text());
-			context.drawTextWithShadow(this.textRenderer, skin.slim() ? "Slim" : "Classic", cx + 6, cy + 86, VeloStyle.textFaint());
-			boolean visible = cy + cardH > top && cy < bottom;
-			VeloUi.Hit equip = VeloUi.pill(context, cx + 4, cy + cardH - 20, cardW - 26, 16,
-					isEquipped ? "Equipped" : busy ? "..." : "Equip", isEquipped ? 2 : 1, mouseX, mouseY, () -> {
-						if (!isEquipped && !busy) {
-							equip(skin);
+			String name = skin == null ? "Your account" : skin.name();
+			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.uiBold(name), cardW - 16), cx + 8, cy + 95, MenuKit.TEXT);
+			String sub = skin == null ? "Wearing now" : slim ? "Slim arms" : "Classic arms";
+			MenuKit.text(context, this.textRenderer, MenuKit.small(sub.toUpperCase(java.util.Locale.ROOT)), cx + 8, cy + 108, MenuKit.TEXT_3);
+			if (isEquipped) {
+				Text tag = MenuKit.small("EQUIPPED");
+				int tw = this.textRenderer.getWidth(tag) + 10;
+				VeloDraw.fillRounded(context, cx + cardW - tw - 10, cy + 12, tw, 12, 4, VeloUi.withAlpha(MenuKit.accent(), 0xD0));
+				MenuKit.text(context, this.textRenderer, tag, cx + cardW - tw - 5, cy + 14, 0xFFFFFFFF);
+			}
+			int ay = Math.max(cy, top);
+			int ah = Math.min(cy + CARD_H, bottom) - ay;
+			if (skin == null) {
+				// Keep a copy of what your account wears, so you can switch back later.
+				if (hovered) {
+					hits.add(cornerBadge(context, cx + cardW - 26, cy + 12, "+", false, mouseX, mouseY, () -> {
+						if (!busy) {
+							saveCurrent();
 						}
-					});
-			VeloUi.Hit delete = VeloUi.pill(context, cx + cardW - 20, cy + cardH - 20, 16, 16, "x", 0, mouseX, mouseY, () ->
-					this.client.setScreen(new VeloConfirmScreen(this, "Delete \"" + skin.name() + "\"?",
-							"It's removed from your skin library (your current Minecraft skin stays).", "Delete", () -> {
-								try {
-									SkinLibrary.delete(skin);
-								} catch (Exception e) {
-									status = "Couldn't delete: " + e.getMessage();
-								}
-							})));
-			if (visible) {
-				hits.add(equip);
-				hits.add(delete);
-				hits.add(new VeloUi.Hit(cx, Math.max(cy, top), cardW, Math.min(cy + cardH, bottom) - Math.max(cy, top), () -> selectedId = skin.id()));
+					}));
+				}
+				hits.add(new VeloUi.Hit(cx, ay, cardW, ah, () -> selectedId = null));
+				continue;
 			}
+			if (hovered && !isEquipped) {
+				hits.add(cornerBadge(context, cx + cardW - 26, cy + 12, "x", true, mouseX, mouseY, () ->
+						this.client.setScreen(new VeloConfirmScreen(this, "Delete \"" + skin.name() + "\"?",
+								"It's removed from your skin library (your current Minecraft skin stays).", "Delete", () -> {
+									try {
+										SkinLibrary.delete(skin);
+									} catch (Exception e) {
+										status = "Couldn't delete: " + e.getMessage();
+									}
+								}))));
+			}
+			hits.add(new VeloUi.Hit(cx, ay, cardW, ah, () -> selectedId = skin.id()));
 		}
 		context.disableScissor();
-		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(status, contentWidth()), contentX(), contentBottom() - 9, VeloStyle.textMuted());
+		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(status), width), x, contentBottom() - 9, MenuKit.TEXT_3);
 	}
 
-	/** The "Current skin" card: your account's skin right now, with a button to keep a copy in the library. */
-	private void renderCurrentCard(DrawContext context, int cx, int cy, int cardW, int cardH, int top, int bottom, int mouseX, int mouseY) {
-		boolean hovered = VeloUi.inside(mouseX, mouseY, cx, cy, cardW, cardH) && mouseY >= top && mouseY < bottom;
-		boolean selected = selectedId == null && !hovered;
-		if (hovered) {
-			hoveringCurrent = true;
+	/** Round badge in a card's corner: + (save a copy) or × (delete). */
+	private VeloUi.Hit cornerBadge(DrawContext context, int x, int y, String kind, boolean danger, int mouseX, int mouseY, Runnable action) {
+		boolean hover = VeloUi.inside(mouseX, mouseY, x, y, 16, 16);
+		VeloDraw.fillCircle(context, x + 8f, y + 8f, 8f, hover ? (danger ? 0xFFFF4D5A : MenuKit.accent()) : 0xE0202027);
+		if (kind.equals("x")) {
+			VeloDraw.cross(context, x + 8f, y + 8f, 4f, 1.2f, 0xFFFFFFFF);
+		} else {
+			context.fill(x + 4, y + 7, x + 12, y + 9, 0xFFFFFFFF);
+			context.fill(x + 7, y + 4, x + 9, y + 12, 0xFFFFFFFF);
 		}
-		VeloDraw.fillRounded(context, cx, cy, cardW, cardH, 8, hovered || selected ? VeloStyle.cardHover() : VeloStyle.card());
-		VeloDraw.strokeRounded(context, cx, cy, cardW, cardH, 8, selected ? VeloUi.withAlpha(VeloStyle.text(), 0x40) : VeloStyle.border());
-		Identifier tex = net.veloclient.velo.client.gui.widget.SkinModelPreview.currentTexture();
-		if (tex != null) {
-			drawFront(context, tex, net.veloclient.velo.client.gui.widget.SkinModelPreview.currentSlim(), cx + cardW / 2 - 16, cy + 8, 2);
+		return new VeloUi.Hit(x, y, 16, 16, action);
+	}
+
+	/** A 24px toolbar button (accent or quiet). */
+	private VeloUi.Hit button(DrawContext context, int x, int y, int w, String label, boolean primary, int mouseX, int mouseY, Runnable action) {
+		boolean hover = VeloUi.inside(mouseX, mouseY, x, y, w, 24);
+		int fill = primary ? (hover ? VeloAnim.lerpArgb(MenuKit.accent(), 0xFFFFFFFF, 0.15f) : MenuKit.accent()) : hover ? 0x1AFFFFFF : 0x0DFFFFFF;
+		VeloDraw.fillRounded(context, x, y, w, 24, 7, fill);
+		if (!primary) {
+			VeloDraw.strokeRounded(context, x, y, w, 24, 7, hover ? 0x38FFFFFF : 0x17FFFFFF);
 		}
-		context.drawTextWithShadow(this.textRenderer, "Current skin", cx + 6, cy + 76, VeloStyle.text());
-		context.drawTextWithShadow(this.textRenderer, "On your account", cx + 6, cy + 86, VeloStyle.textFaint());
-		VeloUi.Hit save = VeloUi.pill(context, cx + 4, cy + cardH - 20, cardW - 8, 16, busy ? "..." : "Save copy", 0, mouseX, mouseY, () -> {
-			if (!busy) {
-				saveCurrent();
+		Text t = MenuKit.uiBold(label);
+		MenuKit.text(context, this.textRenderer, t, x + (w - this.textRenderer.getWidth(t)) / 2, y + 8, primary ? MenuKit.onAccent() : MenuKit.TEXT);
+		return new VeloUi.Hit(x, y, w, 24, action);
+	}
+
+	/** The stage with the live preview, the skin's name and the Equip button. */
+	private void renderShowcase(DrawContext context, int mouseX, int mouseY) {
+		int x = showcaseX();
+		int y = contentY();
+		int w = CapeEquipScreen.SHOWCASE_WIDTH;
+		int h = contentBottom() - y;
+		VeloDraw.fillRounded(context, x, y, w, h, 10, 0xFF111116);
+		VeloDraw.fillRoundedGradient(context, x, y, w, h, 10, VeloUi.withAlpha(MenuKit.accent(), 0x14), 0x00111116);
+		VeloDraw.strokeRounded(context, x, y, w, h, 10, 0x17FFFFFF);
+		SkinLibrary.Skin skin = previewSkin();
+		boolean slim = skin == null ? net.veloclient.velo.client.gui.widget.SkinModelPreview.currentSlim() : skin.slim();
+		String name = skin == null ? "Your account's skin" : skin.name();
+		int by = contentBottom() - 30;
+		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.displaySm(name), w - 16), x + 10, by - 34, MenuKit.TEXT);
+		MenuKit.text(context, this.textRenderer, MenuKit.ui((slim ? "Slim" : "Classic") + " arms  ·  drag to turn"), x + 10, by - 19, MenuKit.TEXT_3);
+		if (skin == null) {
+			hits.add(button(context, x + 8, by, w - 16, busy ? "Saving..." : "Save a copy", false, mouseX, mouseY, () -> {
+				if (!busy) {
+					saveCurrent();
+				}
+			}));
+			return;
+		}
+		boolean isEquipped = skin.id().equals(SkinLibrary.equippedId());
+		hits.add(button(context, x + 8, by, w - 16, isEquipped ? "Equipped" : busy ? "Uploading..." : "Equip this skin", !isEquipped, mouseX, mouseY, () -> {
+			if (!isEquipped && !busy) {
+				equip(skin);
 			}
-		});
-		if (cy + cardH > top && cy < bottom) {
-			hits.add(save);
-			hits.add(new VeloUi.Hit(cx, Math.max(cy, top), cardW, Math.min(cy + cardH, bottom) - Math.max(cy, top), () -> selectedId = null));
-		}
+		}));
 	}
 
 	/** Copies your current skin into the library (so you can switch back to it later). */
@@ -288,35 +414,6 @@ public final class VeloSkinsScreen extends VeloWindow {
 				done(e.getMessage());
 			}
 		});
-	}
-
-	private void renderPreviewPanel(DrawContext context, int mouseX, int mouseY) {
-		int x = contentX();
-		int y = contentY();
-		int bottom = contentBottom() - 14;
-		VeloDraw.fillRounded(context, x, y, PREVIEW_W, bottom - y, 10, VeloStyle.card());
-		int stageH = previewStageHeight();
-		net.veloclient.velo.client.gui.widget.VeloCapeTile.drawStage(context, x + 4, y + 4, PREVIEW_W - 8, stageH - 8, 0f, false);
-		SkinLibrary.Skin skin = previewSkin();
-		int textY = y + stageH + 4;
-		if (skin == null) {
-			boolean slim = net.veloclient.velo.client.gui.widget.SkinModelPreview.currentSlim();
-			context.drawCenteredTextWithShadow(this.textRenderer, "Your current skin", x + PREVIEW_W / 2, textY, VeloStyle.text());
-			context.drawCenteredTextWithShadow(this.textRenderer, (slim ? "Slim" : "Classic") + " arms  -  drag to turn",
-					x + PREVIEW_W / 2, textY + 11, VeloStyle.textFaint());
-			VeloUi.pill(context, x + 8, bottom - 24, PREVIEW_W - 16, 16, "Wearing it", 2, mouseX, mouseY, () -> { });
-			return;
-		}
-		boolean isEquipped = skin.id().equals(SkinLibrary.equippedId());
-		context.drawCenteredTextWithShadow(this.textRenderer, VeloUi.trim(skin.name(), PREVIEW_W - 12), x + PREVIEW_W / 2, textY, VeloStyle.text());
-		context.drawCenteredTextWithShadow(this.textRenderer, (skin.slim() ? "Slim" : "Classic") + " arms  -  drag to turn",
-				x + PREVIEW_W / 2, textY + 11, VeloStyle.textFaint());
-		hits.add(VeloUi.pill(context, x + 8, bottom - 24, PREVIEW_W - 16, 16,
-				isEquipped ? "Equipped" : busy ? "..." : "Equip this skin", isEquipped ? 2 : 1, mouseX, mouseY, () -> {
-					if (!isEquipped && !busy) {
-						equip(skin);
-					}
-				}));
 	}
 
 	/** Flat front view of a 64x64 skin texture at {@code scale} GUI px per skin pixel (16x32 skin px). */
@@ -402,6 +499,14 @@ public final class VeloSkinsScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseClicked(Click click, boolean doubled) {
+		if (CapeEquipScreen.loadoutClick(click.x(), click.y(), click.button(), contentX(), contentY(), contentBottom())) {
+			return true;
+		}
+		int slot = CapeEquipScreen.slotAt((int) click.x(), (int) click.y(), contentX(), contentY());
+		if (slot > 0) {
+			selectHeaderTab(slot);
+			return true;
+		}
 		for (VeloUi.Hit hit : List.copyOf(hits)) {
 			if (hit.contains(click.x(), click.y())) {
 				hit.action().run();
@@ -423,6 +528,10 @@ public final class VeloSkinsScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+		if (mouseX < gridX()) {
+			// Over the stage: zoom the preview.
+			return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+		}
 		scroll -= (float) verticalAmount * 30;
 		return true;
 	}

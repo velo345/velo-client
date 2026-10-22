@@ -6,6 +6,7 @@ import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.network.PlayerListEntry;
 import net.veloclient.velo.client.hud.HudModule;
 import net.veloclient.velo.client.hud.HudPosition;
+import net.veloclient.velo.client.hud.HudLook;
 import net.veloclient.velo.module.AbstractModule;
 import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
@@ -37,16 +38,20 @@ public final class PingDisplayModule extends AbstractModule implements HudModule
 		}
 		PlayerListEntry entry = handler.getPlayerListEntry(client.player.getUuid());
 		int ping = entry != null ? entry.getLatency() : 0;
-		context.drawTextWithShadow(client.textRenderer, ping + " ms", x, y, 0xFFFFFFFF);
+		if (HudLook.on()) {
+			HudLook.stat(context, x, y, String.valueOf(ping), "ms", ping < 80 ? 0xFF6FE39A : ping < 160 ? 0xFFFFD56A : 0xFFFF7A7E);
+			return;
+		}
+		net.veloclient.velo.client.hud.HudLook.draw(context, ping + " ms", x, y, 0xFFFFFFFF);
 	}
 
 	@Override
 	public int width() {
-		return MinecraftClient.getInstance().textRenderer.getWidth("0000 ms");
+		return HudLook.on() ? HudLook.statWidth("000", "ms") : net.veloclient.velo.client.hud.HudLook.measure("0000 ms");
 	}
 
 	@Override
 	public int height() {
-		return MinecraftClient.getInstance().textRenderer.fontHeight;
+		return HudLook.on() ? HudLook.statHeight() : MinecraftClient.getInstance().textRenderer.fontHeight;
 	}
 }

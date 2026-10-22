@@ -30,7 +30,9 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 	private static final int ROW_GAP = 3;
 	private static final int ICON_BAR_GAP = 2;
 
-	private static final List<String> STYLES = List.of("Classic", "Inventory Slots");
+	private static final List<String> STYLES = List.of("Classic", "Inventory Slots", "Bars");
+	private static final int BARS_ROW = 18;
+	private static final int BARS_BAR = 64;
 	private static final int SLOT = 18;
 
 	private final HudPosition position = new HudPosition(0.02f, 0.17f);
@@ -84,16 +86,25 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 			renderSlots(context, client, x, y);
 			return;
 		}
+		if (style.equals("Bars")) {
+			renderBars(context, client, x, y);
+			return;
+		}
 		int barWidth = effectiveBarWidth();
 		int rowHeight = rowHeight();
 		int lineCenterYOffset = lineCenterYOffset();
 		int lineXOffset = lineXOffset();
 		int rowY = y;
+		int rowX = x;
+		int cellW = classicCellWidth();
 		for (EquipmentSlot slot : SLOTS) {
 			ItemStack stack = client.player.getEquippedStack(slot);
 			if (stack.isEmpty()) {
 				continue;
 			}
+			// Horizontal: the pieces side by side, each a column of icon + bar.
+			int x0 = x;
+			x = rowX;
 			if (showIcon) {
 				context.getMatrices().pushMatrix();
 				context.getMatrices().translate(x, rowY);
@@ -129,8 +140,30 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 			} else if (showText) {
 				drawScaledText(context, client, stack.getName().getString(), lineX, centerY, 0xFFFFFFFF);
 			}
-			rowY += rowHeight + ROW_GAP;
+			x = x0;
+			if (slotsHorizontal) {
+				rowX += cellW + COLUMN_GAP;
+			} else {
+				rowY += rowHeight + ROW_GAP;
+			}
 		}
+	}
+
+	private static final int COLUMN_GAP = 6;
+	private static final int BARS_COL = 22;
+
+	/** One piece's width in the Classic style (icon and its bar/number). */
+	private int classicCellWidth() {
+		int barWidth = effectiveBarWidth();
+		int numberWidth = Math.round(net.veloclient.velo.client.hud.HudLook.measure("0000") * textScale);
+		int barLineWidth = showBar ? barWidth : (showText ? numberWidth : 0);
+		if (showBar && showText) {
+			barLineWidth += 4 + numberWidth;
+		}
+		if (barBelowIcon) {
+			return Math.max(showIcon ? ICON_SIZE : 0, barLineWidth);
+		}
+		return (showIcon ? ICON_SIZE + 5 : 0) + barLineWidth;
 	}
 
 	private boolean slotStyle() {
@@ -161,6 +194,58 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 				*///?}
 			}
 			i++;
+		}
+	}
+
+	/** "Bars": one panel, each piece's icon with a slim bar that empties and turns orange, then red. */
+	private void renderBars(DrawContext context, MinecraftClient client, int x, int y) {
+		net.veloclient.velo.client.hud.HudLook.panel(context, x, y, width(), height());
+		int pad = net.veloclient.velo.client.hud.HudLook.on() && net.veloclient.velo.client.hud.HudLook.hasBackground() ? 6 : 0;
+		int rowY = y + pad;
+		if (slotsHorizontal) {
+			// Side by side: each piece's icon with a short bar under it.
+			int colX = x + pad;
+			for (EquipmentSlot slot : SLOTS) {
+				ItemStack stack = client.player.getEquippedStack(slot);
+				if (stack.isEmpty() && !showEmptySlots) {
+					continue;
+				}
+				if (!stack.isEmpty()) {
+					context.drawItemWithoutEntity(stack, colX + 1, rowY);
+				}
+				int barW = BARS_COL - 4;
+				int barY = rowY + 18;
+				VeloDraw.fillRounded(context, colX, barY, barW, 3, 1, 0x40FFFFFF);
+				if (!stack.isEmpty()) {
+					float fraction = stack.isDamageable() && stack.getMaxDamage() > 0
+							? (float) (stack.getMaxDamage() - stack.getDamage()) / stack.getMaxDamage() : 1f;
+					int color = fraction < 0.2f ? 0xFFFF4D5A : fraction < 0.5f ? 0xFFF7C04A : 0xFF3DDC97;
+					VeloDraw.fillRounded(context, colX, barY, Math.max(2, Math.round(barW * fraction)), 3, 1, color);
+				}
+				colX += BARS_COL;
+			}
+			return;
+		}
+		for (EquipmentSlot slot : SLOTS) {
+			ItemStack stack = client.player.getEquippedStack(slot);
+			if (stack.isEmpty() && !showEmptySlots) {
+				continue;
+			}
+			if (!stack.isEmpty()) {
+				context.drawItemWithoutEntity(stack, x + pad, rowY + 1);
+			}
+			int barX = x + pad + 20;
+			int barY = rowY + BARS_ROW / 2 - 2;
+			VeloDraw.fillRounded(context, barX, barY, BARS_BAR, 4, 2, 0x40FFFFFF);
+			if (!stack.isEmpty() && stack.isDamageable() && stack.getMaxDamage() > 0) {
+				float fraction = (float) (stack.getMaxDamage() - stack.getDamage()) / stack.getMaxDamage();
+				int color = fraction < 0.2f ? 0xFFFF4D5A : fraction < 0.5f ? 0xFFF7C04A : 0xFF3DDC97;
+				int filled = Math.max(2, Math.round(BARS_BAR * fraction));
+				VeloDraw.fillRounded(context, barX, barY, filled, 4, 2, color);
+			} else if (!stack.isEmpty()) {
+				VeloDraw.fillRounded(context, barX, barY, BARS_BAR, 4, 2, 0xFF3DDC97);
+			}
+			rowY += BARS_ROW;
 		}
 	}
 
@@ -208,16 +293,25 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 
 	/** Draws text vertically centered on {@code centerY}, scaled by {@link #textScale}. */
 	private void drawScaledText(DrawContext context, MinecraftClient client, String text, int x, int centerY, int color) {
+		if (net.veloclient.velo.client.hud.HudLook.on()) {
+			int h = Math.round(net.veloclient.velo.client.hud.HudLook.lineHeight() * textScale);
+			context.getMatrices().pushMatrix();
+			context.getMatrices().translate(x, centerY - h / 2f);
+			context.getMatrices().scale(textScale, textScale);
+			net.veloclient.velo.client.hud.HudLook.text(context, net.veloclient.velo.client.hud.HudLook.value(text), 0, 0, color);
+			context.getMatrices().popMatrix();
+			return;
+		}
 		int scaledHeight = Math.round(client.textRenderer.fontHeight * textScale);
 		context.getMatrices().pushMatrix();
 		context.getMatrices().translate(x, centerY - scaledHeight / 2f);
 		context.getMatrices().scale(textScale, textScale);
-		context.drawTextWithShadow(client.textRenderer, text, 0, 0, color);
+		net.veloclient.velo.client.hud.HudLook.draw(context, text, 0, 0, color);
 		context.getMatrices().popMatrix();
 	}
 
 	private int scaledTextWidth(MinecraftClient client, String text) {
-		return Math.round(client.textRenderer.getWidth(text) * textScale);
+		return Math.round(net.veloclient.velo.client.hud.HudLook.measure(text) * textScale);
 	}
 
 	private int textLineHeight() {
@@ -267,16 +361,12 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 		if (slotStyle()) {
 			return slotsHorizontal ? visibleSlots() * SLOT : SLOT;
 		}
-		int barWidth = effectiveBarWidth();
-		int numberWidth = Math.round(MinecraftClient.getInstance().textRenderer.getWidth("0000") * textScale);
-		int barLineWidth = showBar ? barWidth : (showText ? numberWidth : 0);
-		if (showBar && showText) {
-			barLineWidth += 4 + numberWidth;
+		int pad = net.veloclient.velo.client.hud.HudLook.hasBackground() ? 12 : 0;
+		if (style.equals("Bars")) {
+			return (slotsHorizontal ? visibleSlots() * BARS_COL - 4 : 20 + BARS_BAR) + pad;
 		}
-		if (barBelowIcon) {
-			return Math.max(showIcon ? ICON_SIZE : 0, barLineWidth);
-		}
-		return (showIcon ? ICON_SIZE + 5 : 0) + barLineWidth;
+		int cell = classicCellWidth();
+		return slotsHorizontal ? SLOTS.length * cell + (SLOTS.length - 1) * COLUMN_GAP : cell;
 	}
 
 	@Override
@@ -284,8 +374,11 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 		if (slotStyle()) {
 			return slotsHorizontal ? SLOT : visibleSlots() * SLOT;
 		}
+		if (style.equals("Bars")) {
+			return (slotsHorizontal ? 22 : visibleSlots() * BARS_ROW) + (net.veloclient.velo.client.hud.HudLook.hasBackground() ? 12 : 0);
+		}
 		int rowHeight = rowHeight();
-		return SLOTS.length * rowHeight + (SLOTS.length - 1) * ROW_GAP;
+		return slotsHorizontal ? rowHeight : SLOTS.length * rowHeight + (SLOTS.length - 1) * ROW_GAP;
 	}
 
 	@Override

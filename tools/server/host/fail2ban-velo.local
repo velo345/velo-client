@@ -1,0 +1,14 @@
+# /etc/fail2ban/jail.d/velo.local - SSH brute force protection (Debian 12 logs sshd to the journal).
+[DEFAULT]
+banaction = nftables-multiport
+banaction_allports = nftables-allports
+backend = systemd
+bantime = 1h
+bantime.increment = true
+bantime.maxtime = 1w
+findtime = 10m
+maxretry = 5
+
+[sshd]
+enabled = true
+mode = aggressive

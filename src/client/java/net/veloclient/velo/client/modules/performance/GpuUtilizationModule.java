@@ -28,12 +28,12 @@ public final class GpuUtilizationModule extends AbstractModule implements HudMod
 		MinecraftClient client = MinecraftClient.getInstance();
 		double percentage = client.getGpuUtilizationPercentage();
 		int color = percentage > 100 ? 0xFFFF5555 : 0xFFFFFFFF;
-		context.drawTextWithShadow(client.textRenderer, "GPU: " + Math.round(percentage) + "%", x, y, color);
+		net.veloclient.velo.client.hud.HudLook.draw(context, "GPU: " + Math.round(percentage) + "%", x, y, color);
 	}
 
 	@Override
 	public int width() {
-		return MinecraftClient.getInstance().textRenderer.getWidth("GPU: 000%");
+		return net.veloclient.velo.client.hud.HudLook.measure("GPU: 000%");
 	}
 
 	@Override

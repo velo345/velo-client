@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Adds (or resets) an owner-panel account and prints its authenticator secret: sudo velo-panel-adduser <name>
+set -euo pipefail
+[ "$(id -u)" = 0 ] || { echo "run with sudo"; exit 1; }
+PANEL_USERS_FILE=/etc/velo-panel/users.json /usr/bin/java -jar /opt/velo/panel/velo-panel.jar adduser "${1:?usage: velo-panel-adduser <name>}"
+chown velo-panel:root /etc/velo-panel/users.json
+chmod 400 /etc/velo-panel/users.json

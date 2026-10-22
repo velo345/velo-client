@@ -63,7 +63,7 @@ public final class BlockPickerScreen extends VeloWindow {
 		}
 		this.clearChildren();
 		search = new TextFieldWidget(this.textRenderer, contentX(), contentY(), contentWidth(), 16, Text.literal("Search"));
-		search.setPlaceholder(Text.literal("Search blocks..."));
+		search.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Search blocks..."));
 		search.setText(query);
 		search.setChangedListener(q -> scroll = 0);
 		addDrawableChild(search);

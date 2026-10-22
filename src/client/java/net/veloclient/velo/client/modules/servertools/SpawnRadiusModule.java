@@ -102,7 +102,7 @@ public final class SpawnRadiusModule extends AbstractModule implements HudModule
 		}
 		int w = 0;
 		for (Object[] row : legendRows()) {
-			w = Math.max(w, MinecraftClient.getInstance().textRenderer.getWidth((String) row[1]));
+			w = Math.max(w, net.veloclient.velo.client.hud.HudLook.measure((String) row[1]));
 		}
 		return w + 20;
 	}
@@ -119,14 +119,14 @@ public final class SpawnRadiusModule extends AbstractModule implements HudModule
 		}
 		var renderer = MinecraftClient.getInstance().textRenderer;
 		VeloDraw.fillRounded(context, x, y, width(), height(), 5, 0x900C0C10);
-		context.drawTextWithShadow(renderer, "Spawn radius", x + 6, y + 4, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, "Spawn radius", x + 6, y + 4, 0xFFFFFFFF);
 		int rowY = y + 15;
 		for (Object[] row : legendRows()) {
 			int color = (int) row[0];
 			if (color != 0) {
 				context.fill(x + 6, rowY + 2, x + 11, rowY + 7, color | 0xFF000000);
 			}
-			context.drawTextWithShadow(renderer, (String) row[1], x + 15, rowY, color == 0 ? 0xFF9A9AA6 : 0xFFE6E6EA);
+			net.veloclient.velo.client.hud.HudLook.draw(context, (String) row[1], x + 15, rowY, color == 0 ? 0xFF9A9AA6 : 0xFFE6E6EA);
 			rowY += 10;
 		}
 	}

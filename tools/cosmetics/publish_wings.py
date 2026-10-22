@@ -6,7 +6,7 @@ everything else as written in seed.json; items added by import_wings.py start as
     python3 tools/cosmetics/publish_wings.py <id> [<id> ...]     e.g. wings_neon_cyan  (or just neon_cyan)
     python3 tools/cosmetics/publish_wings.py --all
 
-Needs VELO_SERVER_URL (e.g. https://client.asteriasmp.net) and VELO_ADMIN_TOKEN, from the environment
+Needs VELO_SERVER_URL (e.g. https://api.velo-client.com) and VELO_ADMIN_TOKEN, from the environment
 or the .env file in the repository root (never commit that file).
 
 Status, price and time window are better changed afterwards in the launcher's Owner panel - publishing

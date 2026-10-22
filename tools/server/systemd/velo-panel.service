@@ -1,0 +1,39 @@
+[Unit]
+Description=Velo owner panel (panel.velo-client.com)
+After=network-online.target velo-server.service
+Wants=network-online.target
+
+[Service]
+User=velo-panel
+Group=velo
+SupplementaryGroups=systemd-journal adm
+WorkingDirectory=/opt/velo/panel
+EnvironmentFile=/etc/velo/panel.env
+Environment=PANEL_BIND=127.0.0.1
+Environment=PANEL_PORT=8790
+Environment=PANEL_ORIGIN=https://panel.velo-client.com
+Environment=PANEL_USERS_FILE=/etc/velo-panel/users.json
+Environment=PANEL_AUDIT_LOG=/var/lib/velo-panel/audit.log
+Environment=PANEL_SERVICES=velo-server,velo-bot,velo-panel,nginx,velo-backup
+Environment=PANEL_SELF=velo-panel
+Environment="PANEL_FILE_ROOTS=Server data=/opt/velo/server/data;Discord bot=/opt/velo/bot/bot-data;Website=/var/www/velo-client.com;Backups=/opt/velo/backups:ro;nginx logs=/var/log/nginx:ro"
+ExecStart=/usr/bin/java -Xms64m -Xmx256m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -jar /opt/velo/panel/velo-panel.jar
+Restart=always
+RestartSec=5
+UMask=0007
+# The panel restarts services through sudo (an allow-list in /etc/sudoers.d/velo-panel), so it can't use
+# NoNewPrivileges; everything else is locked down and it can only write the folders its file manager offers.
+ProtectSystem=full
+ReadWritePaths=/opt/velo/server/data /opt/velo/bot/bot-data /var/www/velo-client.com /var/lib/velo-panel
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+MemoryMax=450M
+
+[Install]
+WantedBy=multi-user.target

@@ -60,12 +60,12 @@ public final class CapeCosmeticsModule extends AbstractModule implements Configu
 
 	@Override
 	public String shortcutLabel() {
-		return "Open Cosmetics & Store";
+		return "Open Locker";
 	}
 
 	@Override
 	public void openShortcut(net.minecraft.client.gui.screen.Screen parent) {
-		net.minecraft.client.MinecraftClient.getInstance().setScreen(new net.veloclient.velo.client.gui.CapeEquipScreen(parent));
+		net.minecraft.client.MinecraftClient.getInstance().setScreen(net.veloclient.velo.client.gui.CapeEquipScreen.open(parent, 1));
 	}
 
 	@Override

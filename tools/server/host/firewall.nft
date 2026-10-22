@@ -1,0 +1,28 @@
+# Inbound filter for this machine (the INPUT path only). Docker's published ports are forwarded (FORWARD/NAT
+# chains, untouched here); they are also listed below so traffic that does reach the host for them still passes.
+# No global "flush ruleset": that would wipe Docker's rules. Only this table is replaced.
+table inet velo_host
+delete table inet velo_host
+
+table inet velo_host {
+	chain input {
+		type filter hook input priority filter + 10; policy drop;
+
+		iifname "lo" accept
+		ct state established,related accept
+		ct state invalid drop
+
+		# Containers (Caddy reaching nginx on 172.18.0.1:8080, DNS, ...).
+		iifname { "docker0", "br-*" } accept
+
+		meta l4proto icmp icmp type { echo-request, destination-unreachable, time-exceeded, parameter-problem } limit rate 20/second accept
+		meta l4proto ipv6-icmp accept
+
+		# SSH, with a rate limit on new connections (fail2ban bans the rest).
+		tcp dport 22 ct state new limit rate 30/minute burst 20 packets accept
+
+		# Published by Docker (FlipSMP): web, Minecraft, Bedrock, and the other server.
+		tcp dport { 80, 443, 25565, 8192 } accept
+		udp dport { 443, 19132, 25565 } accept
+	}
+}

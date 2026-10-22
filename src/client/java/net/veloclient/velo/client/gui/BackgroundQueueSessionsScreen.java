@@ -62,7 +62,7 @@ public final class BackgroundQueueSessionsScreen extends VeloWindow {
 		chatField = new TextFieldWidget(this.textRenderer, x + 8, contentBottom() - 15, contentWidth() - leftWidth() - 12 - 84, 14, Text.literal("Chat"));
 		chatField.setDrawsBackground(false);
 		chatField.setMaxLength(256);
-		chatField.setPlaceholder(Text.literal(VeloUi.trim("Chat or /command on this server...", chatField.getWidth() - 8)));
+		chatField.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder(VeloUi.trim("Chat or /command on this server...", chatField.getWidth() - 8)));
 		chatField.setText(chatValue);
 		addDrawableChild(chatField);
 	}

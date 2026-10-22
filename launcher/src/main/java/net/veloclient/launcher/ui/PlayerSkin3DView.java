@@ -272,8 +272,13 @@ public final class PlayerSkin3DView {
 		if (frames == null || frames.isEmpty()) {
 			return null;
 		}
-		CapeModel cape = capeModel(frames.get(0).image());
+		boolean animated = frames.size() > 1;
+		CapeModel cape = capeModel(frames.get(0).image(), animated ? ANIMATED_TEXTURE_WIDTH : STILL_TEXTURE_WIDTH);
 		parent.getChildren().add(cape.node);
+		// Each viewer owns its frame textures (made on first show, dropped with the viewer) - a global cache
+		// keyed on the decoded frames kept every frame of every cape ever previewed alive.
+		Image[] textures = new Image[frames.size()];
+		textures[0] = (Image) cape.material.getDiffuseMap();
 
 		AnimationTimer timer = new AnimationTimer() {
 			private int index;
@@ -295,7 +300,10 @@ public final class PlayerSkin3DView {
 				}
 				frameStartNanos = now;
 				index = (index + 1) % frames.size();
-				cape.material.setDiffuseMap(capeTexture(frames.get(index).image()));
+				if (textures[index] == null) {
+					textures[index] = capeTexture(frames.get(index).image(), ANIMATED_TEXTURE_WIDTH);
+				}
+				cape.material.setDiffuseMap(textures[index]);
 			}
 		};
 		timer.start();
@@ -307,13 +315,13 @@ public final class PlayerSkin3DView {
 	private record CapeModel(Group node, Rotate swing, PhongMaterial material) {
 	}
 
-	/** Builds the cape (texture in the standard 64x32 layout at any resolution) hinged at y=0. */
-	private static CapeModel capeModel(BufferedImage image) {
+	/** Builds the cape (texture in the standard 64x32 layout at any resolution, upscaled to about {@code textureWidth}) hinged at y=0. */
+	private static CapeModel capeModel(BufferedImage image, int textureWidth) {
 		double texW = 64;
 		double texH = 64.0 * image.getHeight() / Math.max(1, image.getWidth());
 		MeshView mesh = new MeshView(buildBoxMesh(0, 0, 10, 16, 1, texW, texH));
 		PhongMaterial material = new PhongMaterial();
-		material.setDiffuseMap(capeTexture(image));
+		material.setDiffuseMap(capeTexture(image, textureWidth));
 		mesh.setMaterial(material);
 		mesh.setCullFace(CullFace.NONE);
 		// The cape template's "outside" is its north face; turning the box around makes that face
@@ -325,35 +333,32 @@ public final class PlayerSkin3DView {
 		return new CapeModel(hinge, swing, material);
 	}
 
-	/** Cape frame -> crisp texture (nearest-neighbour upscaled so 3D filtering can't smear it). */
-	private static Image capeTexture(BufferedImage image) {
-		// Animated capes ask for the same frames over and over: each frame's texture is made once.
-		synchronized (CAPE_TEXTURES) {
-			Image cached = CAPE_TEXTURES.get(image);
-			if (cached != null) {
-				return cached;
-			}
-		}
+	/**
+	 * Texture widths. A still cape is one texture, so it gets 2048 px (at 512 an HD cape looked softer than in game).
+	 * Animated capes keep a texture per frame: their frames are already 256 px, so 512 keeps them crisp - they were
+	 * 1024 (2 MB each, 80 MB per 40-frame cape). Thumbnails only need about twice their on-screen size; they used the
+	 * 2048 path, so hovering one animated tile built 40 x 8 MB textures on the UI thread.
+	 */
+	private static final int STILL_TEXTURE_WIDTH = 2048;
+	private static final int ANIMATED_TEXTURE_WIDTH = 512;
+
+	/** Cape frame -> crisp texture, nearest-neighbour upscaled to about {@code targetWidth} so 3D filtering can't smear it. */
+	private static Image capeTexture(BufferedImage image, int targetWidth) {
 		int w = image.getWidth();
 		int h = image.getHeight();
 		int[] argb = image.getRGB(0, 0, w, h, null, 0, w);
-		int factor = Math.max(1, 512 / Math.max(1, w));
-		Image texture = upscale(argb, w, h, factor);
-		synchronized (CAPE_TEXTURES) {
-			CAPE_TEXTURES.put(image, texture);
-		}
-		return texture;
+		int factor = Math.max(1, targetWidth / Math.max(1, w));
+		return upscale(argb, w, h, factor);
 	}
-
-	/** Cape frame -> its texture, dropped together with the frame. */
-	private static final java.util.Map<BufferedImage, Image> CAPE_TEXTURES = new java.util.WeakHashMap<>();
 
 	/**
 	 * A transparent 3D render of just the cape at a three-quarter angle - for cards and lists,
 	 * where a live 3D view per item would be wasteful. Rendered once per call (FX thread).
 	 */
 	public static Image capeThumbnail(BufferedImage capeTexture, double width, double height) {
-		CapeModel cape = capeModel(capeTexture);
+		// The cape covers about half the thumbnail: a texture twice the thumbnail's size is already more than enough texels.
+		int textureWidth = (int) Math.min(1024, Math.max(256, Math.max(width, height) * 2));
+		CapeModel cape = capeModel(capeTexture, textureWidth);
 		cape.swing.setAngle(0);
 		Group model = new Group(cape.node);
 		// The outside of the cape faces +z (away from the body); turn it towards the camera at a three-quarter angle.

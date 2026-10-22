@@ -104,6 +104,9 @@ final class PlusRoutes {
 		server.createContext(path, exchange -> VeloServerApp.handle(exchange, method, ex -> {
 			String token = JsonHttp.bearerToken(ex);
 			SessionRegistry.Session session = registry.session(token);
+			if (session == null && path.startsWith("/v1/admin/")) {
+				session = StoreRoutes.panelSession(ex);
+			}
 			if (session == null) {
 				JsonHttp.writeError(ex, 401, "Unknown or expired session - re-authenticate");
 				return;

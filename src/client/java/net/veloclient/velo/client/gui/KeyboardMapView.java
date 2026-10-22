@@ -30,6 +30,7 @@ final class KeyboardMapView {
 	private static final int MODS = 0xFF3DD6C6;
 	private static final int CONFLICT = 0xFFFF5A5F;
 	private static final int FREE = 0xFF3DDC97;
+	private static final int BUILT_IN_COLOR = 0xFF8A8AA0;
 
 	/** One key cap: its key id, a short label when ours reads better than the game's, and its width in key units. */
 	private record Cap(String id, String label, float units) {
@@ -68,6 +69,21 @@ final class KeyboardMapView {
 
 	/** Keys the operating system takes before Minecraft sees them. */
 	private static final List<String> SYSTEM = List.of("key.keyboard.left.win", "key.keyboard.right.win");
+
+	/** Keys Minecraft itself uses without a key binding - taken, even though no binding lists them. */
+	private static final Map<String, String> BUILT_IN = Map.of(
+			"key.keyboard.escape", "Pause menu · close screens",
+			"key.keyboard.enter", "Send chat · confirm",
+			"key.keyboard.keypad.enter", "Send chat · confirm",
+			"key.keyboard.backspace", "Delete text",
+			"key.keyboard.caps.lock", "Caps lock (typing)",
+			"key.keyboard.f1", "Hide the HUD",
+			"key.keyboard.f3", "Debug screen and F3 shortcuts");
+
+	/** Not free: the system's, or one Minecraft uses on its own. */
+	private static boolean reserved(String id) {
+		return SYSTEM.contains(id) || BUILT_IN.containsKey(id);
+	}
 
 	private String selected = "key.keyboard.v";
 	private boolean showFree = true;
@@ -131,7 +147,7 @@ final class KeyboardMapView {
 			all.add(m[0]);
 		}
 		for (String id : all) {
-			if (!map.containsKey(id) && !SYSTEM.contains(id)) {
+			if (!map.containsKey(id) && !reserved(id)) {
 				free++;
 			}
 		}
@@ -143,7 +159,7 @@ final class KeyboardMapView {
 		MenuKit.text(context, renderer, freeLabel, x + 13, y + 4, showFree ? 0xFFA6F0CF : MenuKit.TEXT_2);
 		hits.add(new VeloUi.Hit(x, y, fw, 15, () -> showFree = !showFree));
 		int lx = x + fw + 12;
-		for (Object[] legend : new Object[][] {{"Minecraft", MINECRAFT}, {"Velo", VELO}, {"Other mods", MODS}, {"Conflict", CONFLICT}}) {
+		for (Object[] legend : new Object[][] {{"Minecraft", MINECRAFT}, {"Velo", VELO}, {"Other mods", MODS}, {"Built in", BUILT_IN_COLOR}, {"Conflict", CONFLICT}}) {
 			Text label = MenuKit.ui((String) legend[0]);
 			int lw = MenuKit.width(renderer, label) + 12;
 			if (lx + lw > x + mapW) {
@@ -156,7 +172,8 @@ final class KeyboardMapView {
 
 		// ---- Keyboard + nav cluster + mouse ----
 		float units = 15f + 0.6f + 3f + 0.6f + 2.6f;
-		float u = Math.min(mapW / units, (h - 24 - 54) / 6.6f);
+		// The whole height is the map now (the old "Not bound yet" list is gone - this view shows what's where).
+		float u = Math.min(mapW / units, (h - 24 - 16) / 6.5f);
 		float gap = Math.max(1f, u * 0.08f);
 		int top = y + 22;
 		String q = host.query().trim().toLowerCase(Locale.ROOT);
@@ -190,48 +207,16 @@ final class KeyboardMapView {
 		VeloDraw.fillRounded(context, mx, my, mw, mh, mw / 2.2f, 0x0AFFFFFF);
 		VeloDraw.strokeRounded(context, mx, my, mw, mh, mw / 2.2f, 1f, 0x17FFFFFF);
 		MenuKit.text(context, renderer, MenuKit.mono("MOUSE"), Math.round(mx), Math.round(my + mh + 4), MenuKit.TEXT_3);
-		drawMouseButton(context, renderer, MOUSE[0], mx + 1, my + 1, mw / 2 - 2, mh * 0.42f, map, q, mouseX, mouseY, hits);
-		drawMouseButton(context, renderer, MOUSE[1], mx + mw / 2 + 1, my + 1, mw / 2 - 2, mh * 0.42f, map, q, mouseX, mouseY, hits);
-		drawMouseButton(context, renderer, MOUSE[2], mx + mw / 2 - u * 0.18f, my + mh * 0.1f, u * 0.36f, mh * 0.24f, map, q, mouseX, mouseY, hits);
-		drawMouseButton(context, renderer, MOUSE[3], mx - 1, my + mh * 0.5f, u * 0.62f, u * 0.5f, map, q, mouseX, mouseY, hits);
-		drawMouseButton(context, renderer, MOUSE[4], mx - 1, my + mh * 0.5f + u * 0.58f, u * 0.62f, u * 0.5f, map, q, mouseX, mouseY, hits);
-
-		// ---- Not bound yet ----
-		int ny = Math.round(top + u * 6.4f) + 6;
-		List<KeyBinding> unbound = BindingAccess.all().stream().filter(BindingAccess::isUnbound).toList();
-		boolean selectedFree = !map.containsKey(selected) && !SYSTEM.contains(selected);
-		MenuKit.text(context, renderer, MenuKit.uiBold("Not bound yet · " + unbound.size()), x, ny, MenuKit.TEXT);
-		Text hint = MenuKit.ui(selectedFree ? "Click one to bind it to " + label(selected) : "Select a free key first");
-		MenuKit.text(context, renderer, hint, x + MenuKit.width(renderer, MenuKit.uiBold("Not bound yet · " + unbound.size())) + 8, ny, MenuKit.TEXT_3);
-		int cx = x;
-		int cy = ny + 12;
-		for (KeyBinding binding : unbound) {
-			Text name = MenuKit.uiBold(BindingAccess.name(binding));
-			int cw = MenuKit.width(renderer, name) + 16;
-			if (cx + cw > x + mapW) {
-				cx = x;
-				cy += 17;
-			}
-			if (cy + 15 > y + h) {
-				break;
-			}
-			boolean hover = VeloUi.inside(mouseX, mouseY, cx, cy, cw, 15);
-			VeloDraw.fillRounded(context, cx, cy, cw, 15, 5, hover && selectedFree ? 0x1A3DDC97 : 0x0DFFFFFF);
-			VeloDraw.strokeRounded(context, cx, cy, cw, 15, 5, hover && selectedFree ? 0x733DDC97 : 0x17FFFFFF);
-			VeloDraw.fillCircle(context, cx + 6, cy + 7.5f, 2f, colorOf(binding));
-			MenuKit.text(context, renderer, name, cx + 11, cy + 4, MenuKit.TEXT);
-			int bx = cx;
-			int by = cy;
-			hits.add(new VeloUi.Hit(bx, by, cw, 15, () -> {
-				if (map.containsKey(selected) || SYSTEM.contains(selected)) {
-					host.status("Select a free key first - the green outlined ones");
-					return;
-				}
-				BindingAccess.bindKeyId(binding, selected);
-				host.status("\"" + BindingAccess.name(binding) + "\" = " + label(selected));
-			}));
-			cx += cw + 4;
-		}
+		// Every button inside the body: left / right either side of the wheel, the side buttons on the left flank.
+		float wheelW = u * 0.42f;
+		float split = mh * 0.44f;
+		drawMouseButton(context, renderer, MOUSE[0], mx + 2, my + 2, mw / 2 - wheelW / 2 - 3, split - 2, map, q, mouseX, mouseY, hits);
+		drawMouseButton(context, renderer, MOUSE[1], mx + mw / 2 + wheelW / 2 + 1, my + 2, mw / 2 - wheelW / 2 - 3, split - 2, map, q, mouseX, mouseY, hits);
+		drawMouseButton(context, renderer, MOUSE[2], mx + (mw - wheelW) / 2, my + mh * 0.1f, wheelW, split - mh * 0.14f, map, q, mouseX, mouseY, hits);
+		float sideW = mw * 0.34f;
+		float sideH = Math.min(u * 0.55f, mh * 0.16f);
+		drawMouseButton(context, renderer, MOUSE[3], mx + 3, my + split + mh * 0.08f, sideW, sideH, map, q, mouseX, mouseY, hits);
+		drawMouseButton(context, renderer, MOUSE[4], mx + 3, my + split + mh * 0.08f + sideH + 3, sideW, sideH, map, q, mouseX, mouseY, hits);
 
 		// ---- Details of the selected key ----
 		aside(context, renderer, x + w - asideW, y, asideW, h, map, mouseX, mouseY, hits, host);
@@ -271,6 +256,7 @@ final class KeyboardMapView {
 		String id = cap.id();
 		positions.put(id, new float[] {x + w / 2, y + h / 2});
 		List<KeyBinding> bindings = map.get(id);
+		boolean builtIn = bindings == null && BUILT_IN.containsKey(id);
 		boolean system = SYSTEM.contains(id);
 		boolean conflict = conflict(bindings);
 		boolean hover = VeloUi.inside(mouseX, mouseY, Math.round(x), Math.round(y), Math.round(w), Math.round(h));
@@ -282,6 +268,9 @@ final class KeyboardMapView {
 		if (system) {
 			fill = 0x14FFFFFF;
 			text = 0xFF6E6E78;
+		} else if (builtIn) {
+			fill = (BUILT_IN_COLOR & 0xFFFFFF) | 0x30000000;
+			text = MenuKit.TEXT;
 		} else if (bindings != null) {
 			fill = (colorOf(bindings.get(0)) & 0xFFFFFF) | 0x38000000;
 			text = MenuKit.TEXT;
@@ -299,7 +288,7 @@ final class KeyboardMapView {
 		VeloDraw.fillRounded(context, x, y, w, h, radius, fill);
 		if (conflict) {
 			VeloDraw.strokeRounded(context, x, y, w, h, radius, 1.2f, CONFLICT);
-		} else if (bindings == null && !system && showFree && matches) {
+		} else if (bindings == null && !system && !builtIn && showFree && matches) {
 			dashed(context, x, y, w, h, 0xB33DDC97);
 		}
 		if (id.equals(selected)) {
@@ -308,7 +297,7 @@ final class KeyboardMapView {
 		// The key's own name, scaled down to fit if it must - never cut short.
 		Text cap1 = MenuKit.uiBold(cap.label() != null ? cap.label() : label(id));
 		int tw = MenuKit.width(renderer, cap1);
-		boolean showTag = bindings != null && w >= 34 && h >= 22;
+		boolean showTag = (bindings != null || builtIn) && w >= 34 && h >= 22;
 		float scale = Math.min(1f, (w - 3) / Math.max(1f, tw));
 		float ty = y + (showTag ? h * 0.18f : (h - MenuKit.H_UI * scale) / 2f);
 		context.getMatrices().pushMatrix();
@@ -318,7 +307,7 @@ final class KeyboardMapView {
 		context.getMatrices().popMatrix();
 		if (showTag) {
 			// The action's name, only when it fits whole - never cut off.
-			String tag = conflict ? bindings.size() + " actions" : BindingAccess.name(bindings.get(0));
+			String tag = builtIn ? BUILT_IN.get(id).split(" · ")[0] : conflict ? bindings.size() + " actions" : BindingAccess.name(bindings.get(0));
 			Text tagText = MenuKit.ui(tag);
 			if (MenuKit.width(renderer, tagText) <= w - 3) {
 				MenuKit.text(context, renderer, tagText, Math.round(x + (w - MenuKit.width(renderer, tagText)) / 2), Math.round(y + h * 0.58f),
@@ -354,7 +343,8 @@ final class KeyboardMapView {
 		MenuKit.panel(context, x, y, w, h, 9);
 		List<KeyBinding> bindings = map.get(selected);
 		boolean system = SYSTEM.contains(selected);
-		boolean free = bindings == null && !system;
+		boolean builtIn = bindings == null && BUILT_IN.containsKey(selected);
+		boolean free = bindings == null && !system && !builtIn;
 		boolean conflict = conflict(bindings);
 		String name = label(selected);
 		Text big = MenuKit.displaySm(name);
@@ -362,7 +352,7 @@ final class KeyboardMapView {
 		VeloDraw.fillRounded(context, x + 10, y + 10, capW, 28, 7, free ? 0x143DDC97 : 0x14FFFFFF);
 		VeloDraw.strokeRounded(context, x + 10, y + 10, capW, 28, 7, free ? FREE : conflict ? CONFLICT : 0x33FFFFFF);
 		MenuKit.text(context, renderer, big, x + 10 + (capW - MenuKit.width(renderer, big)) / 2, y + 10 + (28 - MenuKit.H_DISPLAY_SM) / 2, MenuKit.TEXT);
-		String state = free ? "Free · safe to bind" : system ? "Reserved by your system" : conflict ? bindings.size() + " actions fight over this key"
+		String state = free ? "Free · safe to bind" : system ? "Reserved by your system" : builtIn ? "Built into Minecraft" : conflict ? bindings.size() + " actions fight over this key"
 				: bindings.size() == 1 ? "1 action" : bindings.size() + " actions (Minecraft's own defaults)";
 		int stateColor = free ? FREE : conflict ? 0xFFFF7A7E : MenuKit.TEXT_2;
 		List<String> stateLines = VeloUi.wrap(state, w - 20 - capW - 8);
@@ -433,7 +423,13 @@ final class KeyboardMapView {
 			}
 		} else if (free) {
 			int ly = ry;
-			for (String line : VeloUi.wrap("Nothing uses this key, not even other mods. Pick an action from Not bound yet to bind it here.", w - 20)) {
+			for (String line : VeloUi.wrap("Nothing uses this key, not even other mods - free for anything (in the list view, click an action's key and press this one).", w - 20)) {
+				MenuKit.text(context, renderer, MenuKit.ui(line), x + 10, ly, MenuKit.TEXT_2);
+				ly += 10;
+			}
+		} else if (builtIn) {
+			int ly = ry;
+			for (String line : VeloUi.wrap("Minecraft uses this key itself: " + BUILT_IN.get(selected) + ". Binding something else here would clash with it.", w - 20)) {
 				MenuKit.text(context, renderer, MenuKit.ui(line), x + 10, ly, MenuKit.TEXT_2);
 				ly += 10;
 			}
@@ -449,7 +445,7 @@ final class KeyboardMapView {
 		for (String id : positions.keySet()) {
 			if (map.containsKey(id)) {
 				bound++;
-			} else if (!SYSTEM.contains(id)) {
+			} else if (!reserved(id)) {
 				freeCount++;
 			}
 		}
@@ -470,7 +466,7 @@ final class KeyboardMapView {
 		List<String> candidates = new ArrayList<>();
 		for (Map.Entry<String, float[]> entry : positions.entrySet()) {
 			String id = entry.getKey();
-			if (!map.containsKey(id) && !SYSTEM.contains(id) && id.startsWith("key.keyboard.") && !id.contains("escape")) {
+			if (!map.containsKey(id) && !reserved(id) && id.startsWith("key.keyboard.")) {
 				candidates.add(id);
 			}
 		}

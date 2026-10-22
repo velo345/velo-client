@@ -39,7 +39,7 @@ final class RoleHolders {
 		String after = "0";
 		for (int page = 0; page < 500; page++) {
 			HttpRequest request = HttpRequest.newBuilder(URI.create("https://discord.com/api/v10/guilds/" + guildId + "/members?limit=1000&after=" + after))
-					.header("Authorization", token).header("User-Agent", "DiscordBot (https://velo-client-flame.vercel.app, 1.0)")
+					.header("Authorization", token).header("User-Agent", "DiscordBot (https://velo-client.com, 1.0)")
 					.timeout(Duration.ofSeconds(20)).GET().build();
 			HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
 			if (response.statusCode() == 429) {

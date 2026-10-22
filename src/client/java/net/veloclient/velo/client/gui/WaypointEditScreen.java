@@ -101,7 +101,7 @@ public final class WaypointEditScreen extends VeloWindow {
 		yField = field(x + 6 + coordWidth, y + 50, coordWidth - 10, yValue, 6, "Y");
 		zField = field(x + 6 + coordWidth * 2, y + 50, coordWidth - 10, zValue, 9, "Z");
 		if (creating) {
-			nameField.setPlaceholder(Text.literal(suggestedName));
+			nameField.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder(suggestedName));
 		}
 		if (focusName) {
 			focusName = false;

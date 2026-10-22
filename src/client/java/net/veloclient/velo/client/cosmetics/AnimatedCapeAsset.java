@@ -82,11 +82,17 @@ public final class AnimatedCapeAsset {
 
 	/** Registers an already-decoded GIF (decoded off-thread, e.g. another player's downloaded cape). Render thread only. */
 	public static synchronized AnimatedCapeAsset registerDecoded(String capeId, GifDecoder.Result decoded) throws IOException {
+		return registerDecoded(capeId, decoded, false);
+	}
+
+	/** {@code reloadable}: it can be decoded again from its source, so it's freed after a minute out of view. */
+	public static synchronized AnimatedCapeAsset registerDecoded(String capeId, GifDecoder.Result decoded, boolean reloadable) throws IOException {
 		AnimatedCapeAsset existing = REGISTRY.get(capeId);
 		if (existing != null) {
 			return existing;
 		}
 		AnimatedCapeAsset created = create(capeId, decoded);
+		created.reloadable = reloadable;
 		REGISTRY.put(capeId, created);
 		return created;
 	}

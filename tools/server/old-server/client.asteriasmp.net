@@ -1,0 +1,41 @@
+# Old AsteriaSMP server, after the move: client.asteriasmp.net no longer runs anything itself - it forwards every
+# request to the Velo server on the new machine (api.velo-client.com), so pre-0.9.8 clients keep working for as
+# long as this server and its DNS exist. The player's address rides in X-Velo-Client-IP (the new nginx trusts it
+# only from this server's IP). Certificates stay managed by certbot here.
+server {
+	server_name client.asteriasmp.net;
+	client_max_body_size 64m;
+
+	location / {
+		proxy_pass https://api.velo-client.com;
+		proxy_http_version 1.1;
+		proxy_set_header Host api.velo-client.com;
+		proxy_set_header X-Velo-Client-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $remote_addr;
+		proxy_set_header Connection "";
+		proxy_ssl_server_name on;
+		proxy_ssl_name api.velo-client.com;
+		proxy_ssl_verify on;
+		proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+		proxy_ssl_verify_depth 3;
+		proxy_ssl_protocols TLSv1.2 TLSv1.3;
+		proxy_read_timeout 300s;
+		proxy_send_timeout 300s;
+	}
+
+	listen 443 ssl; # managed by Certbot
+	ssl_certificate /etc/letsencrypt/live/client.asteriasmp.net/fullchain.pem; # managed by Certbot
+	ssl_certificate_key /etc/letsencrypt/live/client.asteriasmp.net/privkey.pem; # managed by Certbot
+	include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+	ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}
+server {
+	if ($host = client.asteriasmp.net) {
+		return 301 https://$host$request_uri;
+	} # managed by Certbot
+
+	client_max_body_size 64m;
+	listen 80;
+	server_name client.asteriasmp.net;
+	return 404; # managed by Certbot
+}

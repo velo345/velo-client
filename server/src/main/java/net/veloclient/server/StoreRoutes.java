@@ -162,6 +162,10 @@ final class StoreRoutes {
 		server.createContext(path, exchange -> VeloServerApp.handle(exchange, method, ex -> {
 			String token = JsonHttp.bearerToken(ex);
 			SessionRegistry.Session session = registry.session(token);
+			if (session == null && path.startsWith("/v1/admin/")) {
+				// The owner panel (panel.velo-client.com) has no Minecraft session: it acts as the first owner with the admin token.
+				session = panelSession(ex);
+			}
 			if (session == null) {
 				JsonHttp.writeError(ex, 401, "Unknown or expired session - re-authenticate");
 				return;
@@ -169,6 +173,24 @@ final class StoreRoutes {
 			registry.touch(token);
 			handler.handle(ex, session);
 		}));
+	}
+
+	private static final String ADMIN_TOKEN = System.getenv("VELO_ADMIN_TOKEN") == null || System.getenv("VELO_ADMIN_TOKEN").isBlank()
+			? null : System.getenv("VELO_ADMIN_TOKEN").trim();
+	private static volatile String panelOwner;
+
+	/** Set by the server app: the uuid the owner panel acts as (the first VELO_OWNERS entry). */
+	static void setPanelOwner(String uuid) {
+		panelOwner = uuid;
+	}
+
+	static SessionRegistry.Session panelSession(HttpExchange exchange) {
+		String header = exchange.getRequestHeaders().getFirst("X-Velo-Admin-Token");
+		if (ADMIN_TOKEN == null || header == null || panelOwner == null || !java.security.MessageDigest.isEqual(
+				ADMIN_TOKEN.getBytes(StandardCharsets.UTF_8), header.getBytes(StandardCharsets.UTF_8))) {
+			return null;
+		}
+		return new SessionRegistry.Session(panelOwner, "Owner panel", SessionRegistry.KIND_WEB, null, null, null, Long.MAX_VALUE);
 	}
 
 	static Map<String, String> query(HttpExchange exchange) {

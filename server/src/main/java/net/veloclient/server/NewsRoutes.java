@@ -44,7 +44,7 @@ final class NewsRoutes {
 			String adminToken) {
 		server.createContext("/v1/news", ex -> VeloServerApp.handle(ex, "GET", e -> {
 			SessionRegistry.Session session = registry.session(JsonHttp.bearerToken(e));
-			boolean owner = session != null && store.isOwner(session.uuid(), session.username());
+			boolean owner = session != null && store.isOwner(session.uuid(), session.username()) || StoreRoutes.panelSession(e) != null;
 			JsonHttp.writeJson(e, 200, news.feed(session == null ? null : session.uuid(), owner));
 		}));
 		server.createContext("/v1/news/image/", ex -> VeloServerApp.handle(ex, "GET", e -> {

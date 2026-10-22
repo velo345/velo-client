@@ -143,6 +143,18 @@ public final class StoreService {
 		return new StoreConfig.Item(item.id, item.name, deal != null ? deal : item.price);
 	}
 
+	/** Every configured owner uuid (VELO_OWNERS entries that are uuids). */
+	public java.util.Set<String> ownerUuids() {
+		java.util.Set<String> out = new java.util.HashSet<>();
+		owners.stream().filter(o -> o.matches("[0-9a-f]{32}")).forEach(out::add);
+		return out;
+	}
+
+	/** The first configured owner uuid (VELO_OWNERS keeps its order), or null. */
+	public String firstOwnerUuid() {
+		return owners.stream().filter(o -> o.matches("[0-9a-f]{32}")).findFirst().orElse(null);
+	}
+
 	public boolean isOwner(String uuid, String username) {
 		return owners.contains(uuid) || (username != null && owners.contains(username.toLowerCase(Locale.ROOT)));
 	}
@@ -170,7 +182,11 @@ public final class StoreService {
 	}
 
 	public record CatalogView(String currency, List<StoreConfig.CoinPack> coinPacks, List<CatalogItem> items,
-			boolean checkoutEnabled, boolean adsEnabled, DailyView daily, List<BundleView> bundles) {
+			boolean checkoutEnabled, boolean adsEnabled, DailyView daily, List<BundleView> bundles, PlusOffer plus) {
+	}
+
+	/** Velo+ as offered (for visitors who aren't signed in - the website shows the live price). */
+	public record PlusOffer(double price, int monthlyCoins, int periodDays) {
 	}
 
 	public CatalogView catalog() {
@@ -182,7 +198,7 @@ public final class StoreService {
 		}
 		return new CatalogView(config.currency, config.coinPacks, items, checkoutEnabled(), adsEnabled(),
 				new DailyView(deals.items(), LocalDate.now(ZoneOffset.UTC).plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()),
-				bundles());
+				bundles(), new PlusOffer(config.plus.price, config.plus.monthlyCoins, config.plus.periodDays));
 	}
 
 	// ---- Daily picks & bundles ----
@@ -1070,7 +1086,7 @@ public final class StoreService {
 
 	/** Owner list from VELO_OWNERS: uuids (dashed or not) and/or usernames, comma separated. */
 	public static Set<String> parseOwners(String env, Function<String, String> normalizeUuid) {
-		Set<String> out = new java.util.HashSet<>();
+		Set<String> out = new java.util.LinkedHashSet<>();
 		if (env == null) {
 			return out;
 		}

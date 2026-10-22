@@ -1,0 +1,8 @@
+[Unit]
+Description=Velo backup (server data, bot data, website)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/velo-backup
+Nice=10
+IOSchedulingClass=idle

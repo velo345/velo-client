@@ -92,7 +92,7 @@ public final class VeloAdvancementsScreen extends VeloWindow {
 		String previous = search != null ? search.getText() : "";
 		int mainX = contentX() + sidebar() + 12;
 		search = new TextFieldWidget(this.textRenderer, mainX, contentY(), Math.min(170, contentWidth() - sidebar() - 140), 16, Text.literal("Search"));
-		search.setPlaceholder(Text.literal("Search advancements..."));
+		search.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Search advancements..."));
 		search.setText(previous);
 		addDrawableChild(search);
 	}

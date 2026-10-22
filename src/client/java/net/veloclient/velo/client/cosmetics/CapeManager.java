@@ -395,6 +395,82 @@ public final class CapeManager {
 				.orElseThrow(() -> new RuntimeException("Failed to load cape texture for " + definition.id())));
 	}
 
+	private static final java.util.Set<String> LOADING = java.util.concurrent.ConcurrentHashMap.newKeySet();
+	private static final java.util.concurrent.ExecutorService LOADER = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+		Thread thread = new Thread(r, "Velo cape loader");
+		thread.setDaemon(true);
+		return thread;
+	});
+
+	/**
+	 * The cape's texture if it's ready, else null - and it starts loading off the render thread, so the Locker opens
+	 * right away and the capes appear one by one instead of the menu freezing while every bundle is decoded.
+	 * Render thread.
+	 */
+	public static Identifier textureIfReady(CapeDefinition definition) {
+		if (definition.animated()) {
+			AnimatedCapeAsset existing = AnimatedCapeAsset.existing(definition.id());
+			if (existing != null) {
+				return existing.identifier();
+			}
+		} else {
+			Identifier cached = TEXTURE_CACHE.get(definition.id());
+			if (cached != null) {
+				return cached;
+			}
+		}
+		if (definition.bundleFile() == null || !Files.isRegularFile(definition.bundleFile())) {
+			return textureIdentifier(definition);
+		}
+		if (LOADING.add(definition.id())) {
+			LOADER.submit(() -> {
+				try {
+					if (definition.animated()) {
+						GifDecoder.Result decoded;
+						try (InputStream in = openAnimatedSource(definition)) {
+							decoded = GifDecoder.decode(in);
+						}
+						MinecraftClient.getInstance().execute(() -> {
+							try {
+								AnimatedCapeAsset.registerDecoded(definition.id(), decoded, true);
+							} catch (IOException e) {
+								net.veloclient.velo.VeloClient.LOGGER.warn("Couldn't load cape {}", definition.id(), e);
+								return;
+							}
+							LOADING.remove(definition.id());
+						});
+					} else {
+						NativeImage image = readBundleImage(definition, "texture.png");
+						MinecraftClient.getInstance().execute(() -> {
+							if (!TEXTURE_CACHE.containsKey(definition.id())) {
+								registerPreloadedTexture(definition.id(), image, definition.name());
+							} else {
+								image.close();
+							}
+							LOADING.remove(definition.id());
+						});
+					}
+				} catch (Throwable t) {
+					// Stays in LOADING: not tried again every frame.
+					net.veloclient.velo.VeloClient.LOGGER.warn("Couldn't load cape {}", definition.id(), t);
+				}
+			});
+		}
+		return null;
+	}
+
+	private static NativeImage readBundleImage(CapeDefinition definition, String entryName) throws IOException {
+		try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(definition.bundleFile()))) {
+			ZipEntry entry;
+			while ((entry = zip.getNextEntry()) != null) {
+				if (entry.getName().equals(entryName)) {
+					return NativeImage.read(zip);
+				}
+			}
+		}
+		throw new IOException("Missing \"" + entryName + "\" in " + definition.bundleFile());
+	}
+
 	/**
 	 * Where an animated cape's GIF comes from when it has to be decoded (again): a library bundle, another player's downloaded
 	 * GIF (a plain file, not a bundle), or - for another player's Store cape, which has no file of its own - the Store's art.

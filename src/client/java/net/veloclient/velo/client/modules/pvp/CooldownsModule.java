@@ -37,7 +37,7 @@ public final class CooldownsModule extends AbstractModule implements HudModule, 
 	private String layout = "Horizontal";
 	private boolean showSeconds = true;
 	private boolean showDecimal = true;
-	private boolean showBackground = true;
+	private boolean showBackground = false;
 	private boolean colorByProgress = true;
 	private int ringColor = 0xFF7C5CFF;
 	private int lastCount = 1;
@@ -114,8 +114,8 @@ public final class CooldownsModule extends AbstractModule implements HudModule, 
 		if (showSeconds) {
 			float seconds = remaining / 20f;
 			String label = showDecimal && seconds < 10f ? String.format(Locale.ROOT, "%.1fs", seconds) : String.format(Locale.ROOT, "%.0fs", Math.ceil(seconds));
-			int width = client.textRenderer.getWidth(label);
-			context.drawTextWithShadow(client.textRenderer, label, x + (CELL - width) / 2, y + CELL + 1, 0xFFFFFFFF);
+			int width = net.veloclient.velo.client.hud.HudLook.measure(label);
+			net.veloclient.velo.client.hud.HudLook.draw(context, label, x + (CELL - width) / 2, y + CELL + 1, 0xFFFFFFFF);
 		}
 	}
 

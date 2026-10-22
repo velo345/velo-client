@@ -58,6 +58,9 @@ public final class WorldMapScreen extends VeloWindow {
 	private boolean armedDelete;
 	private static boolean clickTeleport = true;
 	private long lastNanos;
+	/** The store the zoomed-out tiles were last refreshed for (each time the map opens / the layer changes). */
+	private MapStore lodStore;
+	private boolean loading;
 
 	public WorldMapScreen(Screen parent) {
 		super(Text.literal("World Map"), 10_000, 10_000);
@@ -189,6 +192,9 @@ public final class WorldMapScreen extends VeloWindow {
 		super.render(context, mouseX, mouseY, delta);
 		hits.clear();
 		MapTextures.beginFrame();
+		MapStore.beginFrame();
+		MapLod.beginFrame();
+		loading = false;
 		int left = contentX();
 		int right = contentX() + contentWidth();
 		int top = mapTop();
@@ -204,29 +210,54 @@ public final class WorldMapScreen extends VeloWindow {
 				case BIOMES -> MapTextures.Style.BIOMES;
 				default -> MapTextures.Style.SURFACE;
 			};
-			int minRx = (int) Math.floor(blockX(left) / MapRegion.SIZE);
-			int maxRx = (int) Math.floor(blockX(right) / MapRegion.SIZE);
-			int minRz = (int) Math.floor(blockZ(top) / MapRegion.SIZE);
-			int maxRz = (int) Math.floor(blockZ(bottom) / MapRegion.SIZE);
-			if ((long) (maxRx - minRx + 1) * (maxRz - minRz + 1) <= 400) {
-				for (int rx = minRx; rx <= maxRx; rx++) {
-					for (int rz = minRz; rz <= maxRz; rz++) {
-						MapRegion region = store.region(rx, rz, false);
-						if (region == null) {
-							continue;
-						}
-						Identifier tex = MapTextures.texture(store, region, style);
+			// Detail level: texels about as big as the screen's pixels (level L = 2^L blocks per texel).
+			double pxPerBlock = zoom * context.getMatrices().m00() * net.veloclient.velo.client.util.ClientCompat.guiScale();
+			int level = pxPerBlock >= 1 ? 0 : Math.min(MapLod.MAX_LEVEL, (int) Math.floor(Math.log(1 / pxPerBlock) / Math.log(2)));
+			if (lodStore != store) {
+				lodStore = store;
+				MapLod.refresh(store);
+			}
+			int tileBlocks = MapRegion.SIZE << level;
+			int minTx = (int) Math.floor(blockX(left) / tileBlocks);
+			int maxTx = (int) Math.floor(blockX(right) / tileBlocks);
+			int minTz = (int) Math.floor(blockZ(top) / tileBlocks);
+			int maxTz = (int) Math.floor(blockZ(bottom) / tileBlocks);
+			for (int tx = minTx; tx <= maxTx; tx++) {
+				for (int tz = minTz; tz <= maxTz; tz++) {
+					if (level == 0) {
+						MapRegion region = store.regionForDraw(tx, tz);
+						Identifier tex = region == null ? null : MapTextures.texture(store, region, style);
 						if (tex == null) {
+							// Not read yet: the zoomed-out tile above it (if it's around) stands in.
+							Identifier parent = MapLod.cached(store, style, 1, tx >> 1, tz >> 1);
+							if (parent != null) {
+								drawTile(context, parent, 1, tx >> 1, tz >> 1);
+							}
 							continue;
 						}
-						context.getMatrices().pushMatrix();
-						context.getMatrices().translate(screenX((double) rx * MapRegion.SIZE), screenY((double) rz * MapRegion.SIZE));
-						context.getMatrices().scale(zoom, zoom);
-						context.drawTexture(RenderPipelines.GUI_TEXTURED, tex, 0, 0, 0f, 0f, MapRegion.SIZE, MapRegion.SIZE,
-								MapRegion.SIZE, MapRegion.SIZE, MapRegion.SIZE, MapRegion.SIZE);
-						context.getMatrices().popMatrix();
+						drawTile(context, tex, 0, tx, tz);
 						regionsDrawn++;
+						continue;
 					}
+					if (!MapLod.mayHave(store, level, tx, tz)) {
+						continue;
+					}
+					Identifier tex = MapLod.texture(store, style, level, tx, tz);
+					if (tex == null) {
+						// Still building: show the sharper tiles already there.
+						for (int q = 0; q < 4; q++) {
+							int cx = tx * 2 + (q & 1);
+							int cz = tz * 2 + (q >> 1);
+							Identifier child = level == 1 ? MapTextures.cachedOnly(store, cx, cz, style) : MapLod.cached(store, style, level - 1, cx, cz);
+							if (child != null) {
+								drawTile(context, child, level - 1, cx, cz);
+							}
+						}
+						loading = true;
+						continue;
+					}
+					drawTile(context, tex, level, tx, tz);
+					regionsDrawn++;
 				}
 			}
 		}
@@ -241,8 +272,9 @@ public final class WorldMapScreen extends VeloWindow {
 		if (player != null && WorldMap.currentDimension() != null && WorldMap.currentDimension().equals(viewedDimension)) {
 			drawPlayer(context, screenX(player[0]), screenY(player[2]), (float) player[3]);
 		}
-		if (regionsDrawn == 0) {
-			String message = store == null ? "Join a world to start mapping." : layer == Layer.CAVES
+		if (regionsDrawn == 0 && !loading && (store == null || MapLod.indexed(store))) {
+			boolean nothingAtAll = store != null && !MapLod.anything(store);
+			String message = store == null ? "Join a world to start mapping." : !nothingAtAll ? "Nothing explored in this area yet." : layer == Layer.CAVES
 					? "No caves recorded at this level yet - go underground to map them."
 					: "Nothing explored here yet - walk around and the map fills in.";
 			context.drawTextWithShadow(this.textRenderer, message, mapCenterX() - this.textRenderer.getWidth(message) / 2, mapCenterY() + 18,
@@ -259,6 +291,17 @@ public final class WorldMapScreen extends VeloWindow {
 				drawMenu(context, mouseX, mouseY);
 			}
 		}
+	}
+
+	/** A tile of the map (a region at level 0) at its place and size. */
+	private void drawTile(DrawContext context, Identifier texture, int level, int tx, int tz) {
+		double blocks = (double) MapRegion.SIZE * (1 << level);
+		context.getMatrices().pushMatrix();
+		context.getMatrices().translate(screenX(tx * blocks), screenY(tz * blocks));
+		context.getMatrices().scale(zoom * (1 << level), zoom * (1 << level));
+		context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, 0, 0, 0f, 0f, MapRegion.SIZE, MapRegion.SIZE,
+				MapRegion.SIZE, MapRegion.SIZE, MapRegion.SIZE, MapRegion.SIZE);
+		context.getMatrices().popMatrix();
 	}
 
 	private void drawGrid(DrawContext context, int left, int top, int right, int bottom) {
@@ -427,7 +470,7 @@ public final class WorldMapScreen extends VeloWindow {
 		rx -= 20;
 		hits.add(VeloUi.pill(context, rx, cy, 20, 16, "+", 0, mouseX, mouseY, () -> targetZoom = Math.min(16f, targetZoom * 1.5f)));
 		rx -= 24;
-		hits.add(VeloUi.pill(context, rx, cy, 20, 16, "-", 0, mouseX, mouseY, () -> targetZoom = Math.max(0.05f, targetZoom / 1.5f)));
+		hits.add(VeloUi.pill(context, rx, cy, 20, 16, "-", 0, mouseX, mouseY, () -> targetZoom = Math.max(0.01f, targetZoom / 1.5f)));
 		java.util.List<Object[]> toggles = new ArrayList<>(List.of(
 				new Object[] {"Follow me", follow, (Runnable) () -> follow = !follow},
 				new Object[] {"Waypoints", showWaypoints, (Runnable) () -> showWaypoints = !showWaypoints},
@@ -672,7 +715,7 @@ public final class WorldMapScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-		targetZoom = Math.max(0.05f, Math.min(16f, targetZoom * (verticalAmount > 0 ? 1.25f : 0.8f)));
+		targetZoom = Math.max(0.01f, Math.min(16f, targetZoom * (verticalAmount > 0 ? 1.25f : 0.8f)));
 		return true;
 	}
 

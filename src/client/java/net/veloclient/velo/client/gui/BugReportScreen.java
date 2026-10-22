@@ -70,7 +70,7 @@ public final class BugReportScreen extends VeloWindow {
 		int w = contentWidth();
 		titleBox = new TextFieldWidget(this.textRenderer, x, y, w, 18, Text.literal("Summary"));
 		titleBox.setMaxLength(160);
-		titleBox.setPlaceholder(Text.literal(crashFile != null ? "Short summary (optional)" : "Short summary - e.g. \"World map is black\""));
+		titleBox.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder(crashFile != null ? "Short summary (optional)" : "Short summary - e.g. \"World map is black\""));
 		titleBox.setText(previousTitle);
 		addDrawableChild(titleBox);
 		int boxY = y + 24;

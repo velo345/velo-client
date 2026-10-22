@@ -65,8 +65,8 @@ public final class SessionStatsModule extends AbstractModule implements HudModul
 		long elapsedSeconds = (System.currentTimeMillis() - sessionStartMillis) / 1000;
 		String time = String.format("%02d:%02d:%02d", elapsedSeconds / 3600, (elapsedSeconds / 60) % 60, elapsedSeconds % 60);
 		int lineHeight = client.textRenderer.fontHeight + 1;
-		context.drawTextWithShadow(client.textRenderer, "Session: " + time, x, y, 0xFFFFFFFF);
-		context.drawTextWithShadow(client.textRenderer, "Deaths: " + deaths, x, y + lineHeight, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, "Session: " + time, x, y, 0xFFFFFFFF);
+		net.veloclient.velo.client.hud.HudLook.draw(context, "Deaths: " + deaths, x, y + lineHeight, 0xFFFFFFFF);
 	}
 
 	@Override

@@ -54,7 +54,7 @@ public final class ReplaceScreen extends VeloWindow {
 		from = new TextFieldWidget(this.textRenderer, x, contentY() + 14, fieldW, 16, Text.literal("From"));
 		from.setMaxLength(200);
 		from.setText(fromValue);
-		from.setPlaceholder(Text.literal("Block name(s), e.g. stone or stone, dirt or *"));
+		from.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Block name(s), e.g. stone or stone, dirt or *"));
 		addDrawableChild(from);
 		fromSuggest = new BlockSuggest(from, true);
 		addDrawableChild(new VeloButton(x + w - 20, contentY() + 13, 20, 18, Text.literal("..."),
@@ -62,7 +62,7 @@ public final class ReplaceScreen extends VeloWindow {
 		to = new TextFieldWidget(this.textRenderer, x, contentY() + 50, fieldW, 16, Text.literal("To"));
 		to.setMaxLength(300);
 		to.setText(toValue);
-		to.setPlaceholder(Text.literal("Type a block name, e.g. glass"));
+		to.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder("Type a block name, e.g. glass"));
 		addDrawableChild(to);
 		toSuggest = new BlockSuggest(to, false);
 		addDrawableChild(new VeloButton(x + w - 20, contentY() + 49, 20, 18, Text.literal("..."),

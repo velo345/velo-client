@@ -37,11 +37,11 @@ public final class KeybindConflictCheckerModule extends AbstractModule implement
 		int lineHeight = client.textRenderer.fontHeight + 1;
 		int rowY = y;
 		for (String line : conflicts) {
-			context.drawTextWithShadow(client.textRenderer, line, x, rowY, 0xFFFF5555);
+			net.veloclient.velo.client.hud.HudLook.draw(context, line, x, rowY, 0xFFFF5555);
 			rowY += lineHeight;
 		}
 		if (conflicts.isEmpty()) {
-			context.drawTextWithShadow(client.textRenderer, "No keybind conflicts", x, y, 0xFF55FF55);
+			net.veloclient.velo.client.hud.HudLook.draw(context, "No keybind conflicts", x, y, 0xFF55FF55);
 		}
 	}
 

@@ -57,7 +57,7 @@ What it does:
 
 ```bash
 ./gradlew :bot:shadowJar
-DISCORD_TOKEN=... VELO_ADMIN_TOKEN=... VELO_SERVER_URL=https://client.asteriasmp.net \
+DISCORD_TOKEN=... VELO_ADMIN_TOKEN=... VELO_SERVER_URL=https://api.velo-client.com \
   DISCORD_GUILD_ID=<your server id> java -jar bot/build/libs/velo-bot.jar
 ```
 
@@ -65,7 +65,7 @@ DISCORD_TOKEN=... VELO_ADMIN_TOKEN=... VELO_SERVER_URL=https://client.asteriasmp
 |---|---|
 | `DISCORD_TOKEN` | the bot token |
 | `VELO_ADMIN_TOKEN` | the same value as the Velo server's `VELO_ADMIN_TOKEN` |
-| `VELO_SERVER_URL` | the Velo server (default `https://client.asteriasmp.net`) |
+| `VELO_SERVER_URL` | the Velo server (default `https://api.velo-client.com`) |
 | `DISCORD_GUILD_ID` | your server's id - makes the commands appear at once (otherwise they take up to an hour) |
 | `BOT_DATA_DIR` | where `bot-config.json` lives (default `bot-data`) |
 

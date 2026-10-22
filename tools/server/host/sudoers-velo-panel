@@ -1,0 +1,6 @@
+# /etc/sudoers.d/velo-panel - exactly what the owner panel may run as root, nothing else.
+velo-panel ALL=(root) NOPASSWD: /usr/bin/systemctl start velo-server.service, /usr/bin/systemctl stop velo-server.service, /usr/bin/systemctl restart velo-server.service
+velo-panel ALL=(root) NOPASSWD: /usr/bin/systemctl start velo-bot.service, /usr/bin/systemctl stop velo-bot.service, /usr/bin/systemctl restart velo-bot.service
+velo-panel ALL=(root) NOPASSWD: /usr/bin/systemctl start nginx.service, /usr/bin/systemctl stop nginx.service, /usr/bin/systemctl restart nginx.service
+velo-panel ALL=(root) NOPASSWD: /usr/bin/systemctl start velo-backup.service
+velo-panel ALL=(root) NOPASSWD: /usr/bin/systemctl --no-block restart velo-panel.service

@@ -21,7 +21,7 @@ public final class ArrowCounterModule extends AbstractModule implements HudModul
 
 	private final HudPosition position = new HudPosition(0.72f, 0.86f);
 	private boolean onlyWithBow = false;
-	private boolean showBackground = true;
+	private boolean showBackground = false;
 
 	public ArrowCounterModule() {
 		super("arrow-counter", "Arrow Counter", "Shows how many arrows you have left.", ModuleCategory.PVP, SafetyTag.ALWAYS_SAFE, false);
@@ -63,7 +63,7 @@ public final class ArrowCounterModule extends AbstractModule implements HudModul
 		context.drawItemWithoutEntity(icon, x + 4, y + 3);
 		String label = String.valueOf(count);
 		int color = count == 0 ? 0xFFFF5555 : count < 16 ? 0xFFFFC53D : 0xFFFFFFFF;
-		context.drawTextWithShadow(client.textRenderer, label, x + 24 + (width() - 28 - client.textRenderer.getWidth(label)) / 2, y + 7, color);
+		net.veloclient.velo.client.hud.HudLook.draw(context, label, x + 24 + (width() - 28 - net.veloclient.velo.client.hud.HudLook.measure(label)) / 2, y + 7, color);
 	}
 
 	@Override

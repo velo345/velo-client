@@ -5,6 +5,7 @@ import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.Identifier;
+import net.veloclient.velo.client.gui.widget.VeloDraw;
 import net.veloclient.velo.client.hud.HudModule;
 import net.veloclient.velo.client.hud.HudPosition;
 import net.veloclient.velo.client.theme.Theme;
@@ -42,6 +43,10 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 	private boolean showFacing = true;
 	private int borderColor = 0xFF2A2A2A;
 	private int arrowColor = 0xFFFF4747;
+	/** "Square" or "Round". */
+	private String shape = "Square";
+	/** Round style: N / E / S / W around the rim (they turn with the map). */
+	private boolean compassLetters = true;
 
 	public MinimapModule() {
 		super("minimap", "Minimap", "A rotating top-down minimap of nearby terrain, sampled from vanilla's own map colors.",
@@ -70,6 +75,11 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 		// most likely from the outer HudManager scale transform rounding
 		// the two calls' corners slightly differently - so this corrects
 		// for it directly rather than chasing the rounding itself.
+		if (shape.equals("Round")) {
+			renderRound(context, player, x, y);
+			drawInfo(context, client, player, theme, x, y);
+			return;
+		}
 		context.fill(x, y, x + mapSize, y + mapSize, borderColor);
 
 		int viewportX = x + BORDER_THICKNESS;
@@ -100,14 +110,65 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 			drawPlayerArrow(context, player, viewportX + viewportSize / 2, viewportY + viewportSize / 2);
 		}
 
+		drawInfo(context, client, player, theme, x, y);
+	}
+
+	private void drawInfo(DrawContext context, MinecraftClient client, PlayerEntity player, Theme theme, int x, int y) {
 		int infoY = y + mapSize + 2;
 		if (showCoordinates) {
 			String coords = String.format("%d, %d, %d", player.getBlockX(), player.getBlockY(), player.getBlockZ());
-			context.drawTextWithShadow(client.textRenderer, coords, x, infoY, theme.text());
+			net.veloclient.velo.client.hud.HudLook.draw(context, coords, x, infoY, theme.text());
 			infoY += client.textRenderer.fontHeight + 1;
 		}
 		if (showFacing) {
-			context.drawTextWithShadow(client.textRenderer, facingLabel(player.getYaw()), x, infoY, theme.text());
+			net.veloclient.velo.client.hud.HudLook.draw(context, facingLabel(player.getYaw()), x, infoY, theme.text());
+		}
+	}
+
+	/**
+	 * The round style: the map clipped to a circle by drawing it in thin horizontal bands, each scissored to the
+	 * circle's width at that height (GUI drawing has no masks), then an anti-aliased ring over the stepped edge.
+	 */
+	private void renderRound(DrawContext context, PlayerEntity player, int x, int y) {
+		float r = mapSize / 2f;
+		float cx = x + r;
+		float cy = y + r;
+		int sampleRadius = Math.max(viewRadius, Math.round(viewRadius * 1.5f));
+		Identifier texture = MinimapManager.textureFor(sampleRadius, refreshMillis);
+		VeloDraw.fillCircle(context, cx, cy, r - 1, 0xFF1A1A1A);
+		if (texture != null) {
+			int band = 2;
+			for (int by = y + 1; by < y + mapSize - 1; by += band) {
+				float mid = by + band / 2f - cy;
+				float half = (float) Math.sqrt(Math.max(0, (r - 1) * (r - 1) - mid * mid));
+				if (half < 1) {
+					continue;
+				}
+				context.enableScissor(Math.round(cx - half), by, Math.round(cx + half), by + band);
+				drawRotatedMap(context, player, texture, sampleRadius, x, y, mapSize);
+				context.disableScissor();
+			}
+		}
+		VeloDraw.strokeArc(context, cx, cy, r - BORDER_THICKNESS / 2f, BORDER_THICKNESS + 1, 0, 360, borderColor | 0xFF000000);
+		if (compassLetters) {
+			float angle = rotateWithPlayer ? mapRotationRadians(player.getYaw()) : 0f;
+			String[] letters = {"N", "E", "S", "W"};
+			for (int i = 0; i < 4; i++) {
+				// North is "up" (-z) on the unrotated map; each letter turns with it.
+				double a = angle + i * Math.PI / 2;
+				float lx = cx + (float) Math.sin(a) * (r - 1);
+				float ly = cy - (float) Math.cos(a) * (r - 1);
+				String letter = letters[i];
+				int w = net.veloclient.velo.client.hud.HudLook.measure(letter);
+				VeloDraw.fillCircle(context, lx, ly, 5f, 0xE0101014);
+				net.veloclient.velo.client.hud.HudLook.draw(context, letter, Math.round(lx - w / 2f), Math.round(ly - 4), i == 0 ? arrowColor : 0xFFE4E4E8);
+			}
+		}
+		if (WaypointsModule.showOnMinimap && net.veloclient.velo.client.waypoints.WaypointRenderer.Settings.enabled) {
+			drawWaypoints(context, player, x, y, mapSize);
+		}
+		if (showArrow) {
+			drawPlayerArrow(context, player, Math.round(cx), Math.round(cy));
 		}
 	}
 
@@ -153,9 +214,12 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 			float px = dx * cos - dz * sin;
 			float py = dx * sin + dz * cos;
 			float limit = half - 5;
-			boolean pinned = Math.abs(px) > limit || Math.abs(py) > limit;
+			boolean round = shape.equals("Round");
+			float reach = round ? (float) Math.hypot(px, py) : Math.max(Math.abs(px), Math.abs(py));
+			boolean pinned = reach > limit;
 			if (pinned) {
-				float factor = limit / Math.max(Math.abs(px), Math.abs(py));
+				// On the edge in its direction: the square's border, or the circle's rim.
+				float factor = limit / reach;
 				px *= factor;
 				py *= factor;
 			}
@@ -253,6 +317,8 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
+				new ConfigField.ChoiceField("Shape", List.of("Square", "Round"), () -> shape, v -> shape = v),
+				new ConfigField.ToggleField("Compass Letters (Round)", () -> compassLetters, v -> compassLetters = v),
 				new ConfigField.SliderField("Map Size", 64, 220, () -> mapSize, v -> mapSize = (int) v, v -> Math.round(v) + "px"),
 				new ConfigField.SliderField("View Radius", 24, 200, () -> viewRadius, v -> viewRadius = (int) v, v -> Math.round(v) + " blocks"),
 				new ConfigField.SliderField("Refresh Rate", 200, 3000, () -> refreshMillis, v -> refreshMillis = (int) v, v -> Math.round(v) + "ms"),

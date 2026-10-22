@@ -162,9 +162,9 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 		TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
 		Text line1 = Text.literal(String.format(java.util.Locale.ROOT, "Input: %.1fms (avg %.1fms)", lastLatencyMs, averageLatencyMs()));
 		Text line2 = Text.literal(trackGhostHits ? "Ghost hits: " + ghostHitCount : "");
-		context.drawTextWithShadow(renderer, line1, x, y, hudColor);
+		net.veloclient.velo.client.hud.HudLook.draw(context, line1, x, y, hudColor);
 		if (trackGhostHits) {
-			context.drawTextWithShadow(renderer, line2, x, y + renderer.fontHeight + 2, hudColor);
+			net.veloclient.velo.client.hud.HudLook.draw(context, line2, x, y + renderer.fontHeight + 2, hudColor);
 		}
 	}
 
@@ -174,9 +174,9 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 			return 0;
 		}
 		TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
-		int w = renderer.getWidth(String.format(java.util.Locale.ROOT, "Input: %.1fms (avg %.1fms)", lastLatencyMs, averageLatencyMs()));
+		int w = net.veloclient.velo.client.hud.HudLook.measure(String.format(java.util.Locale.ROOT, "Input: %.1fms (avg %.1fms)", lastLatencyMs, averageLatencyMs()));
 		if (trackGhostHits) {
-			w = Math.max(w, renderer.getWidth("Ghost hits: " + ghostHitCount));
+			w = Math.max(w, net.veloclient.velo.client.hud.HudLook.measure("Ghost hits: " + ghostHitCount));
 		}
 		return w;
 	}

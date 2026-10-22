@@ -93,7 +93,7 @@ public final class SimulationDistanceModule extends AbstractModule implements Hu
 
 	@Override
 	public int width() {
-		return legend ? MinecraftClient.getInstance().textRenderer.getWidth(legendText()) + 20 : 0;
+		return legend ? net.veloclient.velo.client.hud.HudLook.measure(legendText()) + 20 : 0;
 	}
 
 	@Override
@@ -108,7 +108,7 @@ public final class SimulationDistanceModule extends AbstractModule implements Hu
 		}
 		VeloDraw.fillRounded(context, x, y, width(), height(), 5, 0x900C0C10);
 		context.fill(x + 6, y + 5, x + 11, y + 10, color | 0xFF000000);
-		context.drawTextWithShadow(MinecraftClient.getInstance().textRenderer, legendText(), x + 15, y + 4, 0xFFE6E6EA);
+		net.veloclient.velo.client.hud.HudLook.draw(context, legendText(), x + 15, y + 4, 0xFFE6E6EA);
 	}
 
 	@Override
