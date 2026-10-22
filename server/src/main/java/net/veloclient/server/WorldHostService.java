@@ -422,6 +422,8 @@ final class WorldHostService {
 		Ticket ticket = tickets.remove(ticketId);
 		World world = ticket == null ? null : byId.get(ticket.worldId());
 		if (ticket == null || ticket.expires() < System.currentTimeMillis() || world == null || !world.online() || !mayJoin(world, ticket.uuid())) {
+			System.out.println("[relay] join refused (" + (ticket == null ? "unknown ticket" : world == null ? "world closed"
+					: !world.online() ? "host offline" : "not allowed") + ")");
 			write(guest, "ERR not allowed\n");
 			closeQuietly(guest);
 			return;
@@ -446,6 +448,7 @@ final class WorldHostService {
 			world.visitors.add(ticket.uuid());
 			pipe(guest, in, host, world);
 		} catch (Exception e) {
+			System.out.println("[relay] host of " + world.id + " didn't open a stream for " + ticket.username() + ": " + e);
 			write(guest, "ERR host didn't answer\n");
 			closeQuietly(guest);
 		} finally {

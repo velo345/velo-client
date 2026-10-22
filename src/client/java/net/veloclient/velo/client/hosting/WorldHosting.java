@@ -69,6 +69,10 @@ public final class WorldHosting {
 	public record Knock(String uuid, String username, long at) {
 	}
 
+	/** This Velo Client's version - the server turns away World Hosting from versions before the relay fixes. */
+	private static final String CLIENT = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("velo-client")
+			.map(mod -> mod.getMetadata().getVersion().getFriendlyString().replaceAll("\\+.*", "")).orElse("0");
+
 	private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm");
 	private static final int KEEP_BACKUPS = 5;
 
@@ -197,6 +201,12 @@ public final class WorldHosting {
 					throw new IOException("Couldn't open the world");
 				}
 				lanPort = port;
+			} else {
+				// Already open to LAN (Open to LAN, or another mod's hosting): use the port it's really on.
+				lanPort = HostCompat.port();
+			}
+			if (!reachable(lanPort)) {
+				throw new IOException("The world is open to LAN, but not on a port Velo can reach - turn off other world hosting (like Essential's) and try again");
 			}
 			backup();
 			JsonObject body = new JsonObject();
@@ -206,6 +216,7 @@ public final class WorldHosting {
 			body.addProperty("visibility", visibility);
 			// The mods guests need too (they get a warning and "Relaunch with matching mods" if theirs differ).
 			body.add("mods", WorldMods.toJson(WorldMods.content()));
+			body.addProperty("client", CLIENT);
 			JsonObject answer = call("/v1/worlds/open", body);
 			hostKey = answer.get("hostKey").getAsString();
 			relayHost = answer.get("relayHost").getAsString();
@@ -321,21 +332,36 @@ public final class WorldHosting {
 		}
 	}
 
-	/** One guest: a fresh data connection to the relay, piped to the world's LAN port. */
+	/** Whether something accepts connections on this PC's {@code port}. */
+	private static boolean reachable(int port) {
+		if (port <= 0 || port > 65535) {
+			return false;
+		}
+		try (Socket probe = new Socket()) {
+			probe.connect(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 2000);
+			return true;
+		} catch (IOException e) {
+			return false;
+		}
+	}
+
+	/** One guest: the world's LAN port first (so a dead port never reaches the relay), then a data connection piped to it. */
 	private static void openGuest(String stream, String who) {
 		Socket relay = new Socket();
 		Socket world = new Socket();
 		try {
+			int port = HostCompat.published() && HostCompat.port() > 0 ? HostCompat.port() : lanPort;
+			world.connect(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 5000);
+			world.setTcpNoDelay(true);
 			relay.connect(new InetSocketAddress(relayHost, relayPort), 10_000);
 			relay.setTcpNoDelay(true);
 			relay.getOutputStream().write(("DATA " + hostKey + " " + stream + "\n").getBytes(StandardCharsets.UTF_8));
 			relay.getOutputStream().flush();
-			world.connect(new InetSocketAddress(InetAddress.getLoopbackAddress(), lanPort), 5000);
-			world.setTcpNoDelay(true);
 			toast("Joining your world", who + " is connecting");
 			pipe(relay, relay.getInputStream(), world);
 		} catch (IOException e) {
-			VeloClient.LOGGER.debug("World Hosting guest {} failed", who, e);
+			VeloClient.LOGGER.warn("World Hosting: couldn't let {} in", who, e);
+			toast("Couldn't let " + who + " in", e.getMessage() == null ? "Connection failed" : e.getMessage());
 			closeQuietly(relay);
 			closeQuietly(world);
 		}
@@ -676,6 +702,7 @@ public final class WorldHosting {
 	public static void join(String worldId, boolean anyway, Consumer<String> done) {
 		JsonObject body = new JsonObject();
 		body.addProperty("world", worldId);
+		body.addProperty("client", CLIENT);
 		async(() -> {
 			JsonObject answer = call("/v1/worlds/join", body);
 			if (!anyway && answer.has("mods") && answer.get("mods").isJsonArray()) {
@@ -697,28 +724,42 @@ public final class WorldHosting {
 			String ticket = answer.get("ticket").getAsString();
 			String host = answer.get("relayHost").getAsString();
 			int port = answer.get("relayPort").getAsInt();
+			// Through the relay to the host's world first: any problem shows up as a clear message here instead of
+			// Minecraft's bare "Failed to connect". Only then does the game connect to the local end of the pipe.
+			Socket relay = new Socket();
+			InputStream relayIn;
+			try {
+				relay.connect(new InetSocketAddress(host, port), 10_000);
+				relay.setTcpNoDelay(true);
+				relay.getOutputStream().write(("JOIN " + ticket + "\n").getBytes(StandardCharsets.UTF_8));
+				relay.getOutputStream().flush();
+				relay.setSoTimeout(25_000);
+				relayIn = new BufferedInputStream(relay.getInputStream());
+				String hello = readLine(relayIn);
+				if (hello == null || !hello.startsWith("OK")) {
+					throw new IOException(relayError(hello));
+				}
+				relay.setSoTimeout(0);
+			} catch (java.net.SocketTimeoutException e) {
+				closeQuietly(relay);
+				throw new IOException("The host's game didn't answer - ask them to check that their world is still hosted");
+			} catch (java.net.ConnectException e) {
+				closeQuietly(relay);
+				throw new IOException("Couldn't reach the Velo relay (" + host + ":" + port + ") - a firewall may block it");
+			} catch (IOException e) {
+				closeQuietly(relay);
+				throw e;
+			}
 			ServerSocket local = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
 			local.setSoTimeout(30_000);
 			Thread.ofVirtual().name("velo-world-join").start(() -> {
 				try (local) {
 					Socket game = local.accept();
-					Socket relay = new Socket();
-					relay.connect(new InetSocketAddress(host, port), 10_000);
-					relay.setTcpNoDelay(true);
 					game.setTcpNoDelay(true);
-					relay.getOutputStream().write(("JOIN " + ticket + "\n").getBytes(StandardCharsets.UTF_8));
-					relay.getOutputStream().flush();
-					InputStream relayIn = new BufferedInputStream(relay.getInputStream());
-					String hello = readLine(relayIn);
-					if (hello == null || !hello.startsWith("OK")) {
-						closeQuietly(game);
-						closeQuietly(relay);
-						toast("Couldn't join", hello == null ? "The relay closed the connection" : hello.replace("ERR ", ""));
-						return;
-					}
 					pipe(relay, relayIn, game);
 				} catch (IOException e) {
-					VeloClient.LOGGER.debug("Joining a hosted world failed", e);
+					closeQuietly(relay);
+					VeloClient.LOGGER.warn("Joining a hosted world failed", e);
 				}
 			});
 			String label = answer.get("hostName").getAsString() + "'s world";
@@ -808,6 +849,19 @@ public final class WorldHosting {
 		} catch (Exception e) {
 			VeloClient.LOGGER.debug("Bad pending world join", e);
 		}
+	}
+
+	/** The relay's "ERR ..." answer, in words. */
+	private static String relayError(String hello) {
+		if (hello == null) {
+			return "The relay closed the connection";
+		}
+		return switch (hello.replace("ERR ", "")) {
+			case "not allowed" -> "The host doesn't let you in (or the invite expired) - try again";
+			case "full" -> "The world is full";
+			case "host didn't answer" -> "The host's game didn't answer - ask them to check that their world is still hosted";
+			default -> hello.replace("ERR ", "");
+		};
 	}
 
 	static void toast(String title, String text) {

@@ -67,6 +67,7 @@ const ICONS = {
 	clips: "M4 6h12v12H4z M16 10l5-3v10l-5-3",
 	worlds: "M12 3a9 9 0 1 0 .01 0 M3 12h18 M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9 M12 3C9.5 5.6 8.2 8.6 8.2 12s1.3 6.4 3.8 9",
 	capes: "M7 3h10l2 18-7-4-7 4z",
+	updates: "M20 11a8 8 0 1 0-2.3 5.7 M20 4v7h-7 M12 8v5l3 2",
 	partners: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M2 20c0-3 2.7-5 6-5s6 2 6 5 M14 15.3c.6-.2 1.3-.3 2-.3 3.3 0 6 2 6 5",
 	stafflog: "M5 3h11l3 3v15H5z M9 9h6 M9 13h6 M9 17h4",
 	play: "M7 4l13 8-13 8z",
@@ -505,7 +506,7 @@ function renderLogin(message) {
 const PAGES = [
 	["Velo", [["overview", "Overview"], ["players", "Players"], ["store", "Store"]]],
 	["Moderation", [["monitor", "Monitoring"], ["clips", "Clips"], ["worlds", "Public worlds"], ["capes", "Custom capes"], ["stafflog", "Staff log"]]],
-	["Owner tools", [["cosmetics", "Cosmetics"], ["news", "News"], ["reports", "Reports"], ["partners", "Partner servers"], ["addons", "Addons"]]],
+	["Owner tools", [["cosmetics", "Cosmetics"], ["news", "News"], ["reports", "Reports"], ["partners", "Partner servers"], ["updates", "Required update"], ["addons", "Addons"]]],
 	["Machine", [["server", "Server"], ["files", "Files"], ["activity", "Activity log"]]],
 	["", [["account", "Account"]]],
 ];
@@ -1841,27 +1842,134 @@ RENDER.capes = async (root) => {
 	await draw();
 };
 
+// Partner servers: the whole list is saved at once (in order), like the launcher's Owner panel does.
+const partnerFields = (p) => ({ id: p.id || null, name: p.name, address: p.address, description: p.description || "", versions: p.versions || "", accent: p.accent || null });
+const partnerIcon = (p, size = 256) => p.icon
+	? h("img", { class: "partner-icon" + (p.iconSize > 64 ? " hd" : ""), src: "/api/velo/partners/icon/" + p.id + "?s=" + size + "&v=" + p.icon, alt: "" })
+	: h("div", { class: "partner-icon blank" });
+
+function editPartner(p, list, save) {
+	const isNew = !p;
+	p = p || { name: "", address: "", description: "", versions: "", accent: null };
+	const name = h("input", { value: p.name, maxlength: 40, placeholder: "Example Network" });
+	const address = h("input", { value: p.address, maxlength: 259, placeholder: "play.example.net" });
+	const desc = h("textarea", { maxlength: 140, placeholder: "One line about the server (shown in Discover)" }, p.description || "");
+	const versions = h("input", { value: p.versions || "", maxlength: 30, placeholder: "1.21.11 - 26.2" });
+	const useAccent = h("input", { type: "checkbox", checked: !!p.accent });
+	const accent = h("input", { type: "color", value: p.accent || "#e5484d", "aria-label": "Card colour" });
+	const ok = h("button", { class: "btn primary", type: "button" }, isNew ? "Add partner" : "Save");
+	const dlg = dialog(isNew ? "New partner server" : p.name, [
+		h("div", { class: "row" }, field("Name", name), field("Server address", address)),
+		field("Description", desc),
+		h("div", { class: "row" }, field("Versions (shown as is)", versions),
+			h("label", {}, "Card colour", h("div", { class: "row", style: "gap:10px;align-items:center" }, h("label", { class: "check" }, useAccent, "Own colour"), accent))),
+		h("p", { class: "muted small", style: "margin:0" }, "Players join by this address straight from the title screen and Discover. After adding it you can upload a high-resolution icon."),
+	], [h("button", { class: "btn ghost", type: "button", onclick: () => dlg.close() }, "Cancel"), ok]);
+	ok.onclick = () => busy(ok, async () => {
+		const entry = { ...partnerFields(p), name: name.value.trim(), address: address.value.trim(), description: desc.value.trim(), versions: versions.value.trim(),
+			accent: useAccent.checked ? accent.value : null };
+		if (!entry.name || !entry.address) throw new Error("A partner needs a name and an address");
+		const next = list.map(partnerFields);
+		if (isNew) next.push(entry);
+		else next[list.indexOf(p)] = entry;
+		await save(next, isNew ? "Added " + entry.name : "Saved " + entry.name);
+		dlg.close();
+	});
+	name.focus();
+}
+
+function partnerIconDialog(p, reload) {
+	const file = h("input", { type: "file", accept: "image/png,image/jpeg", class: "sr-only" });
+	const preview = h("div", { class: "partner-preview" }, partnerIcon(p, 512));
+	const info = h("p", { class: "muted small", style: "margin:0" }, p.customIcon
+		? "Your upload, " + p.iconSize + "×" + p.iconSize + "."
+		: p.icon ? "The server's own icon (" + p.iconSize + "×" + p.iconSize + ", from its server list ping)." : "No icon yet - the server doesn't send one.");
+	const pick = h("button", { class: "btn primary", type: "button", onclick: () => file.click() }, icon("upload"), "Upload icon");
+	const reset = p.customIcon ? h("button", { class: "btn ghost", type: "button" }, "Use the server's icon") : null;
+	const dlg = dialog("Icon · " + p.name, [preview, info,
+		h("p", { class: "muted small", style: "margin:0" }, "Square PNG or JPEG, up to 4 MB. It's kept at up to 512×512 (server list icons are only 64×64) and every client gets a sharp copy at the size it draws."), file],
+		[reset, pick]);
+	file.onchange = () => busy(pick, async () => {
+		const f = file.files[0];
+		if (!f) return;
+		const size = await new Promise((resolve) => { const img = new Image(); img.onload = () => resolve([img.naturalWidth, img.naturalHeight]); img.onerror = () => resolve(null); img.src = URL.createObjectURL(f); });
+		if (!size) throw new Error("That isn't a PNG or JPEG image");
+		if (Math.min(...size) < 128) toast("That image is only " + size[0] + "×" + size[1] + " - 512×512 looks best", "warn");
+		await velo("admin/partners/icon?id=" + encodeURIComponent(p.id), { body: f, headers: { "Content-Type": "application/octet-stream" } });
+		toast("Icon saved");
+		dlg.close();
+		reload();
+	});
+	if (reset) reset.onclick = () => busy(reset, async () => {
+		await velo("admin/partners/icon?id=" + encodeURIComponent(p.id), { body: new Blob([]), headers: { "Content-Type": "application/octet-stream" } });
+		toast("Using the server's own icon");
+		dlg.close();
+		reload();
+	});
+}
+
 RENDER.partners = async (root) => {
 	const body = h("div");
 	root.append(body);
-	const draw = async () => {
-		const { partners } = await velo("admin/partners");
-		if (!root.isConnected) return;
-		subtitle(partners.length + " partner servers · edit the list in the launcher's Owner panel");
-		body.replaceChildren(card("Partner servers", "Shown on the game's title screen and in Discover. The icon is the server's own unless you upload one.", null,
-			table(["Icon", "Server", "Status", ""], partners.map((p) => {
-				const file = h("input", { type: "file", accept: "image/png,image/jpeg", class: "sr-only" });
-				const up = h("button", { class: "btn small", type: "button", onclick: () => file.click() }, icon("upload"), "Upload icon");
-				file.onchange = () => busy(up, async () => { await velo("admin/partners/icon?id=" + encodeURIComponent(p.id), { body: file.files[0], headers: { "Content-Type": "application/octet-stream" } }); toast("Icon saved"); draw(); });
-				const reset = p.customIcon ? h("button", { class: "btn small ghost", type: "button", onclick: (e) => busy(e.currentTarget, async () => {
-					await velo("admin/partners/icon?id=" + encodeURIComponent(p.id), { body: new Blob([]), headers: { "Content-Type": "application/octet-stream" } }); toast("Using the server's own icon"); draw(); }) }, "Use server icon") : null;
-				return [p.icon ? h("img", { class: "partner-icon", src: "/api/velo/partners/icon/" + p.id + "?v=" + p.icon, alt: "" }) : h("div", { class: "partner-icon blank" }),
-					h("div", {}, h("b", {}, p.name), h("div", { class: "muted small" }, p.address + (p.versions ? " · " + p.versions : ""))),
-					p.online ? h("span", { class: "pill good" }, h("i"), `${fmt(p.players)}/${fmt(p.max)} online`) : h("span", { class: "pill bad" }, h("i"), "Not answering"),
-					h("div", { class: "row", style: "gap:6px;flex-wrap:nowrap" }, up, reset, file)];
-			}))));
+	let partners = [];
+	const save = async (next, message) => {
+		partners = (await velo("admin/partners", { body: { partners: next } })).partners;
+		toast(message);
+		draw();
 	};
-	await draw();
+	const load = async () => {
+		partners = (await velo("admin/partners")).partners;
+		draw();
+	};
+	const draw = () => {
+		if (!root.isConnected) return;
+		subtitle(partners.length + " partner server" + (partners.length === 1 ? "" : "s") + " · shown on the title screen and in Discover");
+		const add = h("button", { class: "btn primary small", type: "button", onclick: () => editPartner(null, partners, save) }, "Add partner");
+		const refresh = h("button", { class: "btn ghost small", type: "button", onclick: (e) => busy(e.currentTarget, load) }, icon("refresh"), "Refresh");
+		const move = (p, by) => (e) => busy(e.currentTarget, async () => {
+			const next = partners.map(partnerFields);
+			const i = partners.indexOf(p);
+			[next[i], next[i + by]] = [next[i + by], next[i]];
+			await save(next, "Order saved");
+		});
+		const rows = partners.map((p, i) => {
+			const iconBtn = h("button", { class: "icon-tile", type: "button", title: "Change icon", "aria-label": "Change the icon of " + p.name, onclick: () => partnerIconDialog(p, load) }, partnerIcon(p, 128));
+			const up = h("button", { class: "btn small ghost", type: "button", disabled: i === 0, "aria-label": "Move up", onclick: move(p, -1) }, "↑");
+			const down = h("button", { class: "btn small ghost", type: "button", disabled: i === partners.length - 1, "aria-label": "Move down", onclick: move(p, 1) }, "↓");
+			const edit = h("button", { class: "btn small", type: "button", onclick: () => editPartner(p, partners, save) }, "Edit");
+			const del = h("button", { class: "btn small danger", type: "button" }, "Remove");
+			del.onclick = async () => {
+				if (!(await confirmBox("Remove " + p.name + "?", "It disappears from the title screen and Discover for everyone (its uploaded icon is deleted too).", "Remove"))) return;
+				busy(del, () => save(partners.filter((x) => x !== p).map(partnerFields), "Removed " + p.name));
+			};
+			return [iconBtn,
+				h("div", {}, h("b", {}, p.name, p.accent ? h("span", { class: "accent-dot", style: "background:" + p.accent, title: p.accent }) : null),
+					h("div", { class: "muted small" }, p.address + (p.versions ? " · " + p.versions : "")),
+					p.description ? h("div", { class: "muted small" }, p.description) : null),
+				h("div", {}, p.online ? h("span", { class: "pill good" }, h("i"), `${fmt(p.players)}/${fmt(p.max)} online`) : h("span", { class: "pill bad" }, h("i"), "Not answering"),
+					h("div", { class: "muted small" }, p.customIcon ? "HD icon " + p.iconSize + "px" : p.icon ? "Server icon " + p.iconSize + "px" : "No icon")),
+				h("div", { class: "row", style: "gap:6px;flex-wrap:nowrap" }, up, down, edit, del)];
+		});
+		body.replaceChildren(card("Partner servers", "Order here is the order players see. Click an icon to upload a high-resolution one.", h("div", { class: "row", style: "gap:6px" }, refresh, add),
+			partners.length ? table(["Icon", "Server", "Status", ""], rows) : h("p", { class: "muted" }, "No partner servers yet - add the first one.")));
+	};
+	await load();
+};
+
+RENDER.updates = async (root) => {
+	const p = await velo("admin/update-policy");
+	const min = h("input", { value: p.minimum || "", placeholder: "0.9.91", "aria-label": "Minimum version" });
+	const msg = h("input", { value: p.message || "", maxlength: 200, placeholder: "What the update fixes (shown in the dialog)" });
+	const save = h("button", { class: "btn primary", type: "button" }, "Save");
+	const clear = h("button", { class: "btn ghost", type: "button" }, "Don't require anything");
+	const now = h("p", { class: "muted small", style: "margin:0" });
+	const show = (x) => { now.textContent = x.minimum ? "Launchers older than " + x.minimum + " open the update dialog on start and before every Play." : "Nothing is required - updates show in the launcher's bell only."; subtitle(x.minimum ? "Required: " + x.minimum + " or newer" : "No required update"); };
+	show(p);
+	save.onclick = () => busy(save, async () => { const x = await velo("admin/update-policy", { body: { minimum: min.value.trim(), message: msg.value.trim() } }); show(x); toast("Saved"); });
+	clear.onclick = () => busy(clear, async () => { const x = await velo("admin/update-policy", { body: { minimum: "", message: "" } }); min.value = ""; msg.value = ""; show(x); toast("Nothing required any more"); });
+	root.append(card("Required update", "For hotfixes everyone needs. Set it only after the GitHub release has its installers - players get pushed to the newest release.", null,
+		h("div", { class: "row" }, field("Minimum version", min), field("Note", msg)), now, h("div", { class: "row", style: "gap:8px" }, save, clear),
+		h("p", { class: "muted small", style: "margin:0" }, "Works for launchers 0.9.91 and newer. World Hosting always requires 0.9.91 (older versions couldn't connect).")));
 };
 
 RENDER.stafflog = async (root) => {

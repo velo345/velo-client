@@ -266,6 +266,42 @@ public final class NameStyles {
 		return tag(text, place, List.of(name));
 	}
 
+	/**
+	 * A tab list row as it is drawn. The row's name is normally tagged earlier ({@code NameStyleTabMixin}), but other
+	 * mods can answer the tab's "name for display" themselves so that hook never runs - this catches those rows. Rows
+	 * that already carry a marker are left alone.
+	 */
+	public static Text tagTabRow(Text text) {
+		if (text == null) {
+			return null;
+		}
+		boolean[] tagged = {false};
+		text.visit((style, part) -> {
+			if (markerOf(style) != null) {
+				tagged[0] = true;
+				return Optional.of(Boolean.TRUE);
+			}
+			return Optional.empty();
+		}, Style.EMPTY);
+		if (tagged[0]) {
+			return text;
+		}
+		String plain = visible(text.getString());
+		List<String> names = new ArrayList<>();
+		String self = selfName();
+		if (styleFor(self, TAB) != null && find(plain, self, 0) >= 0) {
+			names.add(self);
+		}
+		if (viewer().others() && viewer().tab()) {
+			for (String name : net.veloclient.velo.client.network.VeloUserRegistry.styledNames()) {
+				if (!name.equalsIgnoreCase(self) && styleFor(name, TAB) != null && find(plain, name, 0) >= 0) {
+					names.add(name);
+				}
+			}
+		}
+		return names.isEmpty() ? text : tag(text, TAB, names);
+	}
+
 	/** {@code raw} without legacy formatting codes ("\u00a7a" etc.) - what is actually drawn. */
 	private static String visible(String raw) {
 		if (raw.indexOf('\u00a7') < 0) {
