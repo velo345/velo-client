@@ -52,14 +52,24 @@ final class PlusFeatureRoutes {
 	private record RenameRequest(String id, String title) {
 	}
 
+	/** {@code client}: the Velo Client version (sent since 0.9.91). */
 	private record WorldOpen(String name, String version, Boolean friendsCanJoin, String visibility, String description, Integer maxPlayers,
-			List<Map<String, Object>> mods) {
+			List<Map<String, Object>> mods, String client) {
 	}
 
 	private record WorldMember(String uuid, Boolean ban) {
 	}
 
-	private record WorldJoin(String world) {
+	private record WorldJoin(String world, String client) {
+	}
+
+	/** World Hosting before 0.9.91 couldn't connect guests: those clients are asked to update instead of failing. */
+	static final String WORLDS_MIN_CLIENT = "0.9.91";
+
+	private static void requireFixedClient(String client) throws ApiError {
+		if (UpdatePolicy.older(client, WORLDS_MIN_CLIENT)) {
+			throw new ApiError(426, "World Hosting needs Velo Client " + WORLDS_MIN_CLIENT + " - update in the Velo launcher (Settings > Updates) and restart the game");
+		}
 	}
 
 	private record WorldCode(String code, Boolean enabled) {
@@ -87,6 +97,7 @@ final class PlusFeatureRoutes {
 		route(server, registry, "/v1/worlds/open", "POST", (ex, s) -> {
 			requirePlus(store, s);
 			WorldOpen r = JsonHttp.readBody(ex, WorldOpen.class);
+			requireFixedClient(r.client());
 			WorldHostService.World world = worlds.open(s.uuid(), s.username(), r.name(), r.version(), Boolean.TRUE.equals(r.friendsCanJoin()));
 			checkListing(s, r.visibility());
 			worlds.listing(world, r.visibility(), r.description(), r.maxPlayers());
@@ -198,7 +209,9 @@ final class PlusFeatureRoutes {
 			JsonHttp.writeJson(ex, 200, Map.of("worlds", out));
 		});
 		route(server, registry, "/v1/worlds/join", "POST", (ex, s) -> {
-			WorldHostService.World world = worlds.byId(JsonHttp.readBody(ex, WorldJoin.class).world());
+			WorldJoin join = JsonHttp.readBody(ex, WorldJoin.class);
+			requireFixedClient(join.client());
+			WorldHostService.World world = worlds.byId(join.world());
 			if (world == null) {
 				throw new ApiError(404, "That world isn't open any more");
 			}
@@ -211,13 +224,47 @@ final class PlusFeatureRoutes {
 	private record PartnerList(List<PartnerServers.Partner> partners) {
 	}
 
+	private record PolicyRequest(String minimum, String message) {
+	}
+
+	/** {@code GET /v1/update-policy} for everyone (launchers check it on start), {@code POST /v1/admin/update-policy} for the owner. */
+	static void registerUpdatePolicy(HttpServer server, SessionRegistry registry, StoreService store, UpdatePolicy policy) {
+		server.createContext("/v1/update-policy", exchange -> VeloServerApp.handle(exchange, "GET", ex -> {
+			UpdatePolicy.Policy p = policy.get();
+			Map<String, Object> out = new LinkedHashMap<>();
+			out.put("minimum", p.minimum());
+			out.put("message", p.message());
+			JsonHttp.writeJson(ex, 200, out);
+		}));
+		server.createContext("/v1/admin/update-policy", exchange -> VeloServerApp.handle(exchange, exchange.getRequestMethod(), ex -> {
+			SessionRegistry.Session session = registry.session(JsonHttp.bearerToken(ex));
+			if (session == null) {
+				session = StoreRoutes.panelSession(ex);
+			}
+			if (session == null || !store.isOwner(session.uuid(), session.username())) {
+				JsonHttp.writeError(ex, 403, "Only the server owner can do that");
+				return;
+			}
+			UpdatePolicy.Policy p = policy.get();
+			if ("POST".equals(ex.getRequestMethod())) {
+				PolicyRequest r = JsonHttp.readBody(ex, PolicyRequest.class);
+				p = policy.set(r.minimum(), r.message());
+			}
+			Map<String, Object> out = new LinkedHashMap<>();
+			out.put("minimum", p.minimum());
+			out.put("message", p.message());
+			JsonHttp.writeJson(ex, 200, out);
+		}));
+	}
+
 	/** Partner servers: {@code GET /v1/partners} for everyone, {@code GET/POST /v1/admin/partners} for the owner. */
 	static void registerPartners(HttpServer server, SessionRegistry registry, StoreService store, PartnerServers partners) {
 		server.createContext("/v1/partners", exchange -> VeloServerApp.handle(exchange, "GET", ex -> {
 			String path = ex.getRequestURI().getPath();
-			// GET /v1/partners/icon/<id> - the 64x64 icon (the owner's upload, else the server's own).
+			// GET /v1/partners/icon/<id>?s=<px> - the owner's upload (up to 512x512), else the server's own 64x64 icon.
 			if (path.startsWith("/v1/partners/icon/")) {
-				byte[] icon = partners.icon(path.substring("/v1/partners/icon/".length()));
+				byte[] icon = partners.icon(path.substring("/v1/partners/icon/".length()),
+						parseInt(StoreRoutes.query(ex).getOrDefault("s", String.valueOf(PartnerServers.ICON_DEFAULT))));
 				if (icon == null) {
 					JsonHttp.writeError(ex, 404, "No icon");
 					return;
@@ -242,7 +289,7 @@ final class PlusFeatureRoutes {
 				JsonHttp.writeError(ex, 403, "Only the server owner can do that");
 				return;
 			}
-			byte[] png = JsonHttp.readRawBody(ex, 512 * 1024);
+			byte[] png = JsonHttp.readRawBody(ex, 4 * 1024 * 1024);
 			partners.setIcon(StoreRoutes.query(ex).get("id"), png);
 			JsonHttp.writeJson(ex, 200, Map.of("partners", partners.views()));
 		}));

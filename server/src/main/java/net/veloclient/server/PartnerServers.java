@@ -71,6 +71,7 @@ final class PartnerServers {
 		Files.writeString(temp, GSON.toJson(clean), StandardCharsets.UTF_8);
 		Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 		list = List.copyOf(clean);
+		dropStaleIcons();
 		return list;
 	}
 
@@ -99,12 +100,30 @@ final class PartnerServers {
 			// The client caches icons by this, so a new icon shows up without a restart.
 			row.put("icon", icon == null ? null : Integer.toHexString(java.util.Arrays.hashCode(icon)));
 			row.put("customIcon", Files.exists(iconDir.resolve(p.id() + ".png")));
+			row.put("iconSize", iconSize(icon));
 			out.add(row);
 		}
 		return out;
 	}
 
-	/** The owner's uploaded icon, else the server's own, else null. */
+	/** The icon's width in pixels (0 without one). */
+	private static int iconSize(byte[] png) {
+		if (png == null || png.length < 24) {
+			return 0;
+		}
+		// PNG: the IHDR width sits at bytes 16-19.
+		return ((png[16] & 0xFF) << 24) | ((png[17] & 0xFF) << 16) | ((png[18] & 0xFF) << 8) | (png[19] & 0xFF);
+	}
+
+	/** Biggest side an uploaded icon is kept at (server list icons are only 64x64). */
+	static final int ICON_MAX = 512;
+	/** What clients get when they don't ask for a size: sharp at GUI scale 2-3, and what 0.9.9 clients fetch. */
+	static final int ICON_DEFAULT = 128;
+	private static final int MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+
+	private final java.util.Map<String, byte[]> scaled = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** The owner's uploaded icon, else the server's own, else null - at full size. */
 	byte[] icon(String id) {
 		if (id == null || !id.matches("[a-z0-9-]{1,40}")) {
 			return null;
@@ -121,7 +140,65 @@ final class PartnerServers {
 		return st == null ? null : st.favicon();
 	}
 
-	/** Owner upload: a PNG (any size up to 512x512, shown at 64x64); null removes it. */
+	/** The icon at most {@code size} pixels wide (never scaled up; a server's own 64x64 icon stays 64x64). */
+	byte[] icon(String id, int size) {
+		byte[] full = icon(id);
+		if (full == null) {
+			return null;
+		}
+		int side = Math.max(16, Math.min(ICON_MAX, size));
+		String key = id + "/" + side + "/" + java.util.Arrays.hashCode(full);
+		byte[] cached = scaled.get(key);
+		if (cached != null) {
+			return cached;
+		}
+		try {
+			java.awt.image.BufferedImage image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(full));
+			if (image == null || image.getWidth() <= side) {
+				return full;
+			}
+			byte[] out = png(downscale(image, side));
+			if (scaled.size() > 400) {
+				scaled.clear();
+			}
+			scaled.put(key, out);
+			return out;
+		} catch (IOException e) {
+			return full;
+		}
+	}
+
+	/** Square, at most {@code side} px, shrunk in halving steps so detail stays crisp instead of aliased. */
+	static java.awt.image.BufferedImage downscale(java.awt.image.BufferedImage image, int side) {
+		int crop = Math.min(image.getWidth(), image.getHeight());
+		java.awt.image.BufferedImage current = new java.awt.image.BufferedImage(crop, crop, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+		java.awt.Graphics2D g = current.createGraphics();
+		g.drawImage(image, 0, 0, crop, crop, (image.getWidth() - crop) / 2, (image.getHeight() - crop) / 2,
+				(image.getWidth() + crop) / 2, (image.getHeight() + crop) / 2, null);
+		g.dispose();
+		int size = crop;
+		while (size > side) {
+			int next = Math.max(side, size / 2);
+			java.awt.image.BufferedImage smaller = new java.awt.image.BufferedImage(next, next, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+			java.awt.Graphics2D s2 = smaller.createGraphics();
+			s2.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+			s2.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING, java.awt.RenderingHints.VALUE_RENDER_QUALITY);
+			s2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+			s2.drawImage(current, 0, 0, next, next, null);
+			s2.dispose();
+			current = smaller;
+			size = next;
+		}
+		return current;
+	}
+
+	private static byte[] png(java.awt.image.BufferedImage image) throws IOException {
+		java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+		javax.imageio.ImageIO.write(image, "png", out);
+		return out.toByteArray();
+	}
+
+	/** Owner upload: a PNG or JPEG (up to 4 MB), kept square at up to 512x512 - sharper than any server list icon; null removes it. */
 	void setIcon(String id, byte[] png) throws ApiError, IOException {
 		if (list.stream().noneMatch(p -> p.id().equals(id))) {
 			throw new ApiError(404, "No such partner server");
@@ -131,25 +208,37 @@ final class PartnerServers {
 			Files.deleteIfExists(target);
 			return;
 		}
-		if (png.length > 512 * 1024) {
-			throw new ApiError(413, "The icon can be at most 512 KB");
+		if (png.length > MAX_UPLOAD_BYTES) {
+			throw new ApiError(413, "The icon can be at most 4 MB");
 		}
-		java.awt.image.BufferedImage image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
-		if (image == null || image.getWidth() > 512 || image.getHeight() > 512) {
-			throw new ApiError(400, "The icon must be a PNG or JPEG up to 512x512");
+		java.awt.image.BufferedImage image;
+		try {
+			image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
+		} catch (IOException e) {
+			image = null;
 		}
-		// Re-encoded square at 64x64 (what every client shows), so nothing but pixels reaches players.
-		java.awt.image.BufferedImage square = new java.awt.image.BufferedImage(64, 64, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-		java.awt.Graphics2D g = square.createGraphics();
-		g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-		int side = Math.min(image.getWidth(), image.getHeight());
-		g.drawImage(image, 0, 0, 64, 64, (image.getWidth() - side) / 2, (image.getHeight() - side) / 2,
-				(image.getWidth() + side) / 2, (image.getHeight() + side) / 2, null);
-		g.dispose();
+		if (image == null || image.getWidth() > 4096 || image.getHeight() > 4096 || image.getWidth() < 16 || image.getHeight() < 16) {
+			throw new ApiError(400, "The icon must be a PNG or JPEG between 16x16 and 4096x4096");
+		}
+		// Re-encoded (so nothing but pixels reaches players), square, at most 512x512.
 		Files.createDirectories(iconDir);
-		java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
-		javax.imageio.ImageIO.write(square, "png", out);
-		Files.write(target, out.toByteArray());
+		Path temp = Files.createTempFile(iconDir, id + "-", ".tmp");
+		Files.write(temp, png(downscale(image, ICON_MAX)));
+		Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+	}
+
+	/** Removes icons of partners that aren't on the list any more. */
+	private void dropStaleIcons() {
+		try (java.util.stream.Stream<Path> files = Files.exists(iconDir) ? Files.list(iconDir) : java.util.stream.Stream.empty()) {
+			for (Path file : files.toList()) {
+				String name = file.getFileName().toString();
+				if (name.endsWith(".png") && list.stream().noneMatch(p -> (p.id() + ".png").equals(name))) {
+					Files.deleteIfExists(file);
+				}
+			}
+		} catch (IOException ignored) {
+			// Tried again on the next save.
+		}
 	}
 
 	/** Pings every partner (in parallel, a few seconds each at most). */

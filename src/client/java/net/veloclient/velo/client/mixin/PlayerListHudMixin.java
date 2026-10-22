@@ -34,6 +34,8 @@ public abstract class PlayerListHudMixin {
 			ordinal = 0))
 	private void velo$drawNameWithBadge(DrawContext context, TextRenderer textRenderer, Text text, int x, int y, int color) {
 		MinecraftClient client = MinecraftClient.getInstance();
+		// Name Styles, also when another mod kept NameStyleTabMixin from tagging the row.
+		text = net.veloclient.velo.client.namestyle.NameStyles.tagTabRow(text);
 		if (client.player == null || !VeloBadge.isKnownVeloName(text.getString(), client.player.getGameProfile().name())) {
 			context.drawTextWithShadow(textRenderer, text, x, y, color);
 			return;

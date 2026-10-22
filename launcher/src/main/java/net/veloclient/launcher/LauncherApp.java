@@ -3365,6 +3365,10 @@ public final class LauncherApp extends Application {
 
 	/** @param quickPlayTarget nullable "host:port" - when present, launches straight into that server (My Servers' Connect). */
 	private void launchWithProgress(Instance instance, String quickPlayTarget, Button triggerButton, ProgressBar progressBar, Label statusLabel) {
+		if (requiredUpdate != null && availableUpdate != null) {
+			net.veloclient.launcher.ui.UpdateDialog.show(stage, availableUpdate, java.util.Objects.requireNonNullElse(requiredUpdate.message(), ""));
+			return;
+		}
 		// Party leader with "launch together": everyone else's launcher follows.
 		var partyNow = net.veloclient.launcher.social.LauncherSocial.party();
 		if (partyNow != null && net.veloclient.launcher.social.LauncherSocial.isPartyLeader()
@@ -3806,6 +3810,8 @@ public final class LauncherApp extends Application {
 	}
 
 	private net.veloclient.launcher.launch.UpdateService.Release availableUpdate;
+	/** Set when the owner marked this version as too old (see UpdateService#policy): Play asks to update first. */
+	private net.veloclient.launcher.launch.UpdateService.Policy requiredUpdate;
 
 	/**
 	 * Asks GitHub for the latest release in the background. Reveals the sidebar's "Update available"
@@ -3821,9 +3827,15 @@ public final class LauncherApp extends Application {
 		Thread thread = new Thread(() -> {
 			try {
 				var release = net.veloclient.launcher.launch.UpdateService.check();
+				var policy = net.veloclient.launcher.launch.UpdateService.policy();
 				javafx.application.Platform.runLater(() -> {
 					availableUpdate = release.anything() ? release : null;
+					requiredUpdate = policy.required() && availableUpdate != null ? policy : null;
 					refreshNotificationDot();
+					if (status == null && requiredUpdate != null) {
+						// A hotfix everyone needs: don't wait for the bell.
+						net.veloclient.launcher.ui.UpdateDialog.show(stage, availableUpdate, java.util.Objects.requireNonNullElse(requiredUpdate.message(), ""));
+					}
 					if (status != null) {
 						status.setText(availableUpdate == null ? "You're up to date (v" + AppVersion.VERSION + ")"
 								: release.launcherNewer() ? "Version " + release.version() + " is available" : "A newer mod build is available");

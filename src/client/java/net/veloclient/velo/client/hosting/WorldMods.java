@@ -18,10 +18,11 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Which mods a hosted world needs - only the ones that change the world itself (like Essential does): mods the host
- * runs on both sides (new blocks, items, mobs, dimensions...). Client-only mods (minimaps, HUDs, shaders, performance),
- * pure libraries, Minecraft, Fabric and Velo are ignored, and so are extra mods on the guest's side - a server only
- * turns you away when it has content you don't. Guests compare before joining; a difference opens the warning with
+ * Which mods a hosted world needs - only the ones that change the world itself (like Essential does): mods that own
+ * entries in the game's registries (new blocks, items, mobs, effects...), which is exactly what a server turns you away
+ * for. Client-only mods, server-side-only mods (Lithium, WorldEdit, AppleSkin...), libraries (also the ones a loader
+ * generates for plain jars, like {@code org_jetbrains_annotations}), Minecraft, Fabric and Velo are ignored, and so are
+ * extra mods on the guest's side. Guests compare before joining; a difference opens the warning with
  * "Relaunch with matching mods" (the launcher fetches them from Modrinth by each jar's SHA-1).
  */
 public final class WorldMods {
@@ -44,14 +45,55 @@ public final class WorldMods {
 	private WorldMods() {
 	}
 
-	/** This game's content mods (top-level jars only). */
+	/** Ids the loader makes up for plain library jars ({@code org_jetbrains_annotations}, {@code com_google_gson}...). */
+	private static final java.util.regex.Pattern GENERATED_ID = java.util.regex.Pattern.compile(
+			"^(org|com|net|io|me|dev|de|fr|it|uk|edu|javax|jakarta|kotlin|kotlinx|ca|co|gs|info|xyz)_[a-z0-9_.-]+$");
+
+	/** Loader-generated library mods (no fabric.mod.json of their own). */
+	static boolean generated(String id, net.fabricmc.loader.api.metadata.ModMetadata meta) {
+		if (id == null || GENERATED_ID.matcher(id).matches()) {
+			return true;
+		}
+		return meta != null && (meta.containsCustomValue("fabric-loom:generated") || meta.containsCustomValue("fabric-loader:generated"));
+	}
+
+	/** Namespaces that own entries in any built-in registry (blocks, items, entities, effects, sounds...). */
+	private static Set<String> registryNamespaces() {
+		Set<String> namespaces = new java.util.HashSet<>();
+		try {
+			//? if <26.1 {
+			for (var registry : net.minecraft.registry.Registries.REGISTRIES) {
+				for (var id : registry.getIds()) {
+					namespaces.add(id.getNamespace());
+				}
+			}
+			//?} else {
+			/*for (var registry : net.minecraft.core.registries.BuiltInRegistries.REGISTRY) {
+				for (var id : registry.keySet()) {
+					namespaces.add(id.getNamespace());
+				}
+			}
+			*///?}
+		} catch (RuntimeException e) {
+			net.veloclient.velo.VeloClient.LOGGER.debug("Couldn't read registries for World Hosting", e);
+			return null;
+		}
+		return namespaces;
+	}
+
+	/** This game's content mods (top-level jars that add things to the registries). */
 	public static List<Mod> content() {
 		List<Mod> out = new ArrayList<>();
+		Set<String> namespaces = registryNamespaces();
 		for (ModContainer mod : FabricLoader.getInstance().getAllMods()) {
 			var meta = mod.getMetadata();
 			String id = meta.getId();
 			if (BUILT_IN.contains(id) || id.startsWith("fabric-") || id.equals("fabric-api") || id.equals("fabric") || mod.getContainingMod().isPresent()
-					|| !meta.getEnvironment().matches(EnvType.SERVER)) {
+					|| !meta.getEnvironment().matches(EnvType.SERVER) || generated(id, meta)) {
+				continue;
+			}
+			// No registry entries: nothing a guest's game has to know about (registries unreadable: fall back to all).
+			if (namespaces != null && !namespaces.contains(id) && !namespaces.contains(id.replace('-', '_'))) {
 				continue;
 			}
 			String file = null;
@@ -140,7 +182,8 @@ public final class WorldMods {
 		List<Mod> missing = new ArrayList<>();
 		List<String[]> different = new ArrayList<>();
 		for (Mod mod : host) {
-			if (mod.library()) {
+			// Hosts on 0.9.9 also listed generated library jars - nobody can (or has to) install those.
+			if (mod.library() || generated(mod.id(), null)) {
 				continue;
 			}
 			Mod have = mine.remove(mod.id());

@@ -144,6 +144,7 @@ public final class VeloServerApp {
 		PlusFeatureRoutes.registerWorlds(server, registry, store, worlds);
 		PartnerServers partners = new PartnerServers(dataDir);
 		PlusFeatureRoutes.registerPartners(server, registry, store, partners);
+		PlusFeatureRoutes.registerUpdatePolicy(server, registry, store, new UpdatePolicy(dataDir));
 		// Partner icons + player counts for the title screen bar and Discover (clients never ping partners themselves).
 		Executors.newSingleThreadScheduledExecutor(r -> {
 			Thread t = new Thread(r, "velo-partner-ping");

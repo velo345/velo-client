@@ -30,6 +30,19 @@ final class HostCompat {
 		*///?}
 	}
 
+	/** The port the world is open on (also when it was opened to LAN before hosting, by the game or another mod); 0 if none. */
+	static int port() {
+		var server = server();
+		if (server == null) {
+			return 0;
+		}
+		//? if <26.1 {
+		return server.getServerPort();
+		//?} else {
+		/*return server.getPort();
+		*///?}
+	}
+
 	/** Opens the world to LAN on {@code port} (only this PC's relay link uses it), cheats as the world has them. */
 	static boolean open(int port, boolean cheats) {
 		var server = server();

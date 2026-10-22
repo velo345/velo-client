@@ -27,6 +27,14 @@ public final class UpdateDialog {
 	}
 
 	public static void show(Stage owner, UpdateService.Release release) {
+		show(owner, release, null);
+	}
+
+	/**
+	 * {@code required}: non-null when this version is below the owner's minimum - the dialog says the update is needed
+	 * to keep playing (with the owner's note, if any).
+	 */
+	public static void show(Stage owner, UpdateService.Release release, String required) {
 		Dialog<Void> dialog = new Dialog<>();
 		dialog.initOwner(owner);
 		boolean launcher = release.launcherNewer() && release.installer() != null;
@@ -44,6 +52,10 @@ public final class UpdateDialog {
 				: "Updated mod jars for " + String.join(", ", release.modAssets().keySet().stream()
 						.filter(k -> !k.endsWith("-addons")).toList()) + ". They're used from your next game launch - no restart needed.");
 		summary.setWrapText(true);
+		if (required != null) {
+			dialog.setHeaderText("Update required: Velo Client " + release.version());
+			summary.setText("This update is needed to keep playing" + (required.isBlank() ? "." : " - " + required) + "\n" + summary.getText());
+		}
 		TextArea notes = new TextArea(release.notes().isBlank() ? "No release notes." : release.notes());
 		notes.setEditable(false);
 		notes.setWrapText(true);

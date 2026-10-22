@@ -293,6 +293,8 @@ dialog::backdrop { background: rgba(4, 4, 6, .7); backdrop-filter: blur(6px); }
 .toast.err { border-color: rgba(255, 90, 95, .45); box-shadow: 0 16px 40px rgba(0, 0, 0, .55), 0 0 30px rgba(224, 38, 46, .18); }
 .toast i { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; background: var(--good); }
 .toast.err i { background: var(--bad); }
+.toast.warn { border-color: rgba(245, 166, 35, .4); }
+.toast.warn i { background: var(--warn, #f5a623); }
 .error-box { padding: 12px 14px; border-radius: 12px; background: rgba(255, 90, 95, .08); border: 1px solid rgba(255, 90, 95, .3); color: #ffc2c4; }
 .notice { padding: 12px 14px; border-radius: 12px; background: rgba(224, 38, 46, .07); border: 1px solid rgba(224, 38, 46, .22); color: var(--text-2); }
 .skeleton { border-radius: 10px; background: linear-gradient(90deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .09), rgba(255, 255, 255, .04)); background-size: 200% 100%; animation: shimmer 1.3s linear infinite; }
@@ -355,7 +357,13 @@ dialog::backdrop { background: rgba(4, 4, 6, .7); backdrop-filter: blur(6px); }
 .clip-video { width: 100%; max-height: 60vh; border-radius: 12px; background: #000; display: block; }
 .cape-card { cursor: default; }
 .cape-card .cape-art { aspect-ratio: 2 / 1; object-fit: contain; image-rendering: pixelated; background: repeating-conic-gradient(#1c1c22 0 25%, #15151a 0 50%) 0 0 / 16px 16px; }
-.partner-icon { width: 36px; height: 36px; border-radius: 8px; image-rendering: pixelated; display: block; }
+.partner-icon { width: 36px; height: 36px; border-radius: 8px; image-rendering: pixelated; display: block; object-fit: cover; }
+.partner-icon.hd { image-rendering: auto; }
+.icon-tile { padding: 0; border: 1px solid transparent; border-radius: 10px; background: none; cursor: pointer; display: block; }
+.icon-tile:hover, .icon-tile:focus-visible { border-color: var(--accent, #e5484d); }
+.partner-preview { display: grid; place-items: center; padding: 18px; border-radius: 14px; background: var(--surface-2, #17171d); }
+.partner-preview .partner-icon { width: 160px; height: 160px; border-radius: 22px; }
+.accent-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-left: 8px; vertical-align: middle; }
 .partner-icon.blank { background: var(--surface-2, #17171d); }
 .value-big { font: 700 30px/1.15 Inter, sans-serif; letter-spacing: -0.02em; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

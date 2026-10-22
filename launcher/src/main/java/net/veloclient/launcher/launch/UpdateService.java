@@ -363,6 +363,32 @@ public final class UpdateService {
 		return false;
 	}
 
+	/** The owner's minimum version ({@code GET /v1/update-policy}): {@code minimum} null when nothing is required. */
+	public record Policy(String minimum, String message) {
+		/** Whether this launcher is older than the minimum and has to update. */
+		public boolean required() {
+			return minimum != null && compare(AppVersion.VERSION, minimum) < 0;
+		}
+	}
+
+	/** Asks the Velo server whether an update is required; never throws (no answer = nothing required). */
+	public static Policy policy() {
+		try {
+			HttpRequest request = HttpRequest.newBuilder(URI.create(net.veloclient.launcher.social.LauncherSocial.baseUrl() + "/v1/update-policy"))
+					.timeout(Duration.ofSeconds(8)).header("User-Agent", "VeloClientLauncher/" + AppVersion.VERSION).GET().build();
+			HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+			if (response.statusCode() == 200) {
+				JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
+				String min = json.has("minimum") && !json.get("minimum").isJsonNull() ? json.get("minimum").getAsString() : null;
+				String message = json.has("message") && !json.get("message").isJsonNull() ? json.get("message").getAsString() : null;
+				return new Policy(min, message);
+			}
+		} catch (Exception e) {
+			LauncherLog.info("Update policy check failed: " + e);
+		}
+		return new Policy(null, null);
+	}
+
 	/** Compares dotted versions numerically ("0.8.10" > "0.8.9"); non-numeric parts count as 0. */
 	public static int compare(String a, String b) {
 		String[] pa = a.split("[.+-]");
