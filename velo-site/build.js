@@ -105,6 +105,7 @@ function readPosts() {
 		const file = path.join(dir, "post.json");
 		if (!fs.existsSync(file)) continue;
 		const post = JSON.parse(fs.readFileSync(file, "utf8"));
+		if (post.hidden) continue; // a bundle that never shipped on its own (its content is in a later post)
 		post.slug = name.replace(/\./g, "-");
 		post.dir = dir;
 		post.date = post.date || postDate(dir);

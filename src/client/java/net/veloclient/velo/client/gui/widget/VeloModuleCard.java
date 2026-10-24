@@ -166,6 +166,14 @@ public final class VeloModuleCard extends ClickableWidget {
 		VeloDraw.fillRounded(context, x + 9, y + 55, tagW, 11, 4, VeloUi.withAlpha(color, Math.round((0x1A + 0x10 * on) * in)));
 		MenuKit.text(context, renderer, MenuKit.fit(renderer, tagText, w - 26), x + 14, y + 57,
 				VeloUi.withAlpha(VeloAnim.lerpArgb(color, 0xFFFFFFFF, 0.45f), fade));
+		if (module.beta()) {
+			Text beta = MenuKit.small("BETA");
+			int betaW = renderer.getWidth(beta) + 10;
+			if (tagW + 4 + betaW <= w - 18) {
+				VeloDraw.fillRounded(context, x + 9 + tagW + 4, y + 55, betaW, 11, 4, VeloUi.withAlpha(0xFFE0A030, Math.round(0xD0 * in)));
+				MenuKit.text(context, renderer, beta, x + 14 + tagW + 4, y + 57, VeloUi.withAlpha(0xFF1A1206, fade));
+			}
+		}
 	}
 
 	/** The loading placeholder: the card's shapes in faint grey with a soft light sweeping across. */

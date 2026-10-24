@@ -28,6 +28,17 @@ public abstract class ToolSlotHandMixin {
 	private net.minecraft.world.item.ItemStack velo$emptyHand(net.minecraft.world.item.ItemStack original) {
 		return RedstoneMode.toolHeld() ? net.minecraft.world.item.ItemStack.EMPTY : original;
 	}
+
+	// Dev-only (screenshot tour, -Dvelo.tourNoHand): no bare arm in front of promo footage.
+	@org.spongepowered.asm.mixin.injection.Inject(method = "renderPlayerArm", at = @At("HEAD"), cancellable = true, require = 0)
+	private void velo$tourNoArm(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+		if (NO_ARM) {
+			ci.cancel();
+		}
+	}
+
+	@org.spongepowered.asm.mixin.Unique
+	private static final boolean NO_ARM = System.getProperty("velo.tourNoHand") != null;
 }
 *///?} else {
 /*@Mixin(net.minecraft.client.player.FirstPersonHandsAndItems.class)

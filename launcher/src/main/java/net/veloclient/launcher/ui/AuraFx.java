@@ -85,7 +85,7 @@ public final class AuraFx {
 
 			@Override
 			public void handle(long now) {
-				if (now - lastDraw < FRAME_NANOS || !wrapper.isVisible()) {
+				if (now - lastDraw < FRAME_NANOS || !wrapper.isVisible() || !RenderGate.active()) {
 					return;
 				}
 				lastDraw = now;
@@ -216,7 +216,7 @@ public final class AuraFx {
 			@Override
 			public void handle(long now) {
 				// Cards animate at ~30 fps: a page of ten of them at the full refresh rate was most of the Store's cost.
-				if (now - lastDraw < 33_000_000L || !canvas.isVisible()) {
+				if (now - lastDraw < 33_000_000L || !canvas.isVisible() || !RenderGate.active()) {
 					return;
 				}
 				lastDraw = now;

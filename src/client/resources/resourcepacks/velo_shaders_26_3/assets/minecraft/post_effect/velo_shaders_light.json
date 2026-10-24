@@ -1,0 +1,132 @@
+{
+	"targets": {
+		"velo_lit": {},
+		"velo_clouds": {
+			"width": 1280,
+			"height": 720
+		},
+		"velo_rays": {
+			"width": 640,
+			"height": 360
+		},
+		"velo_lightbuf": {
+			"width": 1280,
+			"height": 720
+		}
+	},
+	"passes": [
+		{
+			"vertex_shader": "minecraft:core/screenquad",
+			"fragment_shader": "minecraft:post/velo_clouds",
+			"inputs": [
+				{
+					"sampler_name": "InDepth",
+					"target": "minecraft:main",
+					"use_depth_buffer": true
+				},
+				{
+					"sampler_name": "Noise",
+					"location": "velo-client:cloud_noise",
+					"width": 512,
+					"height": 512,
+					"bilinear": true
+				}
+			],
+			"output": "velo_clouds"
+		},
+		{
+			"vertex_shader": "minecraft:core/screenquad",
+			"fragment_shader": "minecraft:post/velo_rays",
+			"inputs": [
+				{
+					"sampler_name": "InDepth",
+					"target": "minecraft:main",
+					"use_depth_buffer": true
+				}
+			],
+			"output": "velo_rays"
+		},
+		{
+			"vertex_shader": "minecraft:core/screenquad",
+			"fragment_shader": "minecraft:post/velo_lightbuf",
+			"inputs": [
+				{
+					"sampler_name": "InDepth",
+					"target": "minecraft:main",
+					"use_depth_buffer": true
+				},
+				{
+					"sampler_name": "Shadow",
+					"location": "velo-client:shadow_map",
+					"width": 2048,
+					"height": 2048,
+					"bilinear": false
+				},
+				{
+					"sampler_name": "NearShadow",
+					"location": "velo-client:shadow_near",
+					"width": 1024,
+					"height": 1024,
+					"bilinear": false
+				}
+			],
+			"output": "velo_lightbuf"
+		},
+		{
+			"vertex_shader": "minecraft:core/screenquad",
+			"fragment_shader": "minecraft:post/velo_lighting",
+			"inputs": [
+				{
+					"sampler_name": "In",
+					"target": "minecraft:main"
+				},
+				{
+					"sampler_name": "InDepth",
+					"target": "minecraft:main",
+					"use_depth_buffer": true
+				},
+				{
+					"sampler_name": "Clouds",
+					"target": "velo_clouds",
+					"bilinear": true
+				},
+				{
+					"sampler_name": "Rays",
+					"target": "velo_rays",
+					"bilinear": true
+				},
+				{
+					"sampler_name": "LightBuf",
+					"target": "velo_lightbuf",
+					"bilinear": false
+				}
+			],
+			"output": "velo_lit"
+		},
+		{
+			"vertex_shader": "minecraft:core/screenquad",
+			"fragment_shader": "minecraft:post/blit",
+			"inputs": [
+				{
+					"sampler_name": "In",
+					"target": "velo_lit"
+				}
+			],
+			"output": "minecraft:main",
+			"uniforms": {
+				"BlitConfig": [
+					{
+						"name": "ColorModulate",
+						"type": "vec4",
+						"value": [
+							1.0,
+							1.0,
+							1.0,
+							1.0
+						]
+					}
+				]
+			}
+		}
+	]
+}

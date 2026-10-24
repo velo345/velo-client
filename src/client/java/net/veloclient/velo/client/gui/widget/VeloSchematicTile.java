@@ -25,8 +25,9 @@ import java.util.function.Consumer;
  * the icon area shows the matched PhantomMarket thumbnail and title (see
  * {@link net.veloclient.velo.client.schematics.SchematicMatchCache}) and
  * clicking it opens that listing in the system browser; otherwise it shows a
- * plain glyph and filename with no click action. The bottom strip is always
- * a single full-width delete button.
+ * plain glyph and filename with no click action. The bottom strip is a
+ * delete button - split with a convert button (.veloschem <-> .litematic)
+ * when {@code onConvert} is given.
  */
 public final class VeloSchematicTile extends ClickableWidget {
 
@@ -38,10 +39,16 @@ public final class VeloSchematicTile extends ClickableWidget {
 	private final SchematicMatch match;
 	private final Consumer<Path> onDelete;
 	private final Runnable onOpenMatch;
+	private final Consumer<Path> onConvert;
 	private volatile Identifier thumbnail;
 
 	public VeloSchematicTile(int x, int y, int width, int iconHeight, Path file, String displayName, String sizeLabel,
 			SchematicMatch match, Consumer<Path> onDelete, Runnable onOpenMatch) {
+		this(x, y, width, iconHeight, file, displayName, sizeLabel, match, onDelete, onOpenMatch, null);
+	}
+
+	public VeloSchematicTile(int x, int y, int width, int iconHeight, Path file, String displayName, String sizeLabel,
+			SchematicMatch match, Consumer<Path> onDelete, Runnable onOpenMatch, Consumer<Path> onConvert) {
 		super(x, y, width, iconHeight + BOTTOM_STRIP_HEIGHT, Text.literal(match != null && match.found() ? match.title() : displayName));
 		this.file = file;
 		this.displayName = displayName;
@@ -49,6 +56,7 @@ public final class VeloSchematicTile extends ClickableWidget {
 		this.match = match;
 		this.onDelete = onDelete;
 		this.onOpenMatch = onOpenMatch;
+		this.onConvert = onConvert;
 		if (match != null && match.found() && match.thumbnailUrl() != null) {
 			RemoteTextureLoader.load(match.thumbnailUrl(), id -> this.thumbnail = id);
 		}
@@ -66,7 +74,11 @@ public final class VeloSchematicTile extends ClickableWidget {
 	public void onClick(net.minecraft.client.gui.Click click, boolean doubled) {
 		int localY = (int) click.y() - getY();
 		if (localY >= iconAreaHeight()) {
-			onDelete.accept(file);
+			if (onConvert != null && click.x() < getX() + getWidth() / 2.0) {
+				onConvert.accept(file);
+			} else {
+				onDelete.accept(file);
+			}
 		} else if (matched()) {
 			onOpenMatch.run();
 		}
@@ -99,12 +111,25 @@ public final class VeloSchematicTile extends ClickableWidget {
 		context.drawTextWithShadow(textRenderer, sizeLabel, getX() + (getWidth() - sizeWidth) / 2, getY() + iconHeight - 11, 0xFFAAAAAA);
 
 		int stripY = getY() + iconHeight;
-		boolean deleteHovered = isHovered() && mouseY >= stripY;
+		int deleteX = getX();
+		int deleteW = getWidth();
+		if (onConvert != null) {
+			int half = getWidth() / 2;
+			boolean convertHovered = isHovered() && mouseY >= stripY && mouseX < getX() + half;
+			VeloDraw.fillRounded(context, getX(), stripY, half - 1, BOTTOM_STRIP_HEIGHT, 3, convertHovered ? 0xAA3A7BFF : 0x333A7BFF);
+			boolean toLitematic = !file.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".litematic");
+			String convertLabel = trimToWidth(toLitematic ? "> Litematic" : "> Velo", half - 4);
+			context.drawTextWithShadow(textRenderer, convertLabel, getX() + (half - textRenderer.getWidth(convertLabel)) / 2,
+					stripY + (BOTTOM_STRIP_HEIGHT - textRenderer.fontHeight) / 2, 0xFFFFFFFF);
+			deleteX = getX() + half + 1;
+			deleteW = getWidth() - half - 1;
+		}
+		boolean deleteHovered = isHovered() && mouseY >= stripY && mouseX >= deleteX;
 		int deleteColor = deleteHovered ? 0xAAFF5555 : 0x33FF5555;
-		VeloDraw.fillRounded(context, getX(), stripY, getWidth(), BOTTOM_STRIP_HEIGHT, 3, deleteColor);
+		VeloDraw.fillRounded(context, deleteX, stripY, deleteW, BOTTOM_STRIP_HEIGHT, 3, deleteColor);
 		String deleteLabel = "Remove";
 		int labelWidth = textRenderer.getWidth(deleteLabel);
-		context.drawTextWithShadow(textRenderer, deleteLabel, getX() + (getWidth() - labelWidth) / 2,
+		context.drawTextWithShadow(textRenderer, deleteLabel, deleteX + (deleteW - labelWidth) / 2,
 				stripY + (BOTTOM_STRIP_HEIGHT - textRenderer.fontHeight) / 2, 0xFFFFFFFF);
 	}
 

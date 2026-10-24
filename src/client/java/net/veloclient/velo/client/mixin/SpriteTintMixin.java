@@ -44,7 +44,40 @@ public abstract class SpriteTintMixin {
 		}
 	}
 }
-//?} else {
+//?} else if >=26.3 {
+/*@Mixin(net.minecraft.client.gui.GuiGraphicsExtractor.class)
+public abstract class SpriteTintMixin {
+
+	@Inject(method = "blitSprite(Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIIII)V",
+			at = @At("HEAD"), cancellable = true, require = 0)
+	private void velo$tint(com.mojang.blaze3d.pipeline.RenderPipeline pipeline, net.minecraft.resources.Identifier sprite,
+			int x, int y, int width, int height, int color, CallbackInfo ci) {
+		if (color != -1) {
+			return;
+		}
+		int tint = SpriteTints.tintFor(sprite.getNamespace(), sprite.getPath());
+		if (tint != 0 && tint != -1) {
+			ci.cancel();
+			((net.minecraft.client.gui.GuiGraphicsExtractor) (Object) this).blitSprite(pipeline, sprite, x, y, width, height, tint);
+		}
+	}
+
+	@Inject(method = "blitSprite(Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIIIIIIII)V",
+			at = @At("HEAD"), cancellable = true, require = 0)
+	private void velo$tintPart(com.mojang.blaze3d.pipeline.RenderPipeline pipeline, net.minecraft.resources.Identifier sprite,
+			int textureWidth, int textureHeight, int u, int v, int x, int y, int width, int height, int color, CallbackInfo ci) {
+		if (color != -1) {
+			return;
+		}
+		int tint = SpriteTints.tintFor(sprite.getNamespace(), sprite.getPath());
+		if (tint != 0 && tint != -1) {
+			ci.cancel();
+			((net.minecraft.client.gui.GuiGraphicsExtractor) (Object) this).blitSprite(pipeline, sprite, textureWidth, textureHeight, u, v, x, y,
+					width, height, tint);
+		}
+	}
+}
+*///?} else {
 /*@Mixin(net.minecraft.client.gui.GuiGraphicsExtractor.class)
 public abstract class SpriteTintMixin {
 

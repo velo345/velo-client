@@ -158,7 +158,7 @@ public final class SkinLibrary {
 	}
 
 	/** Uploads the skin to the signed-in Minecraft account (Mojang's API). */
-	public static void equip(Skin skin, String minecraftAccessToken) throws IOException, InterruptedException {
+	public static void equip(Skin skin, String minecraftAccessToken, String uuid) throws IOException, InterruptedException {
 		byte[] png = Files.readAllBytes(png(skin));
 		String boundary = "----velo" + UUID.randomUUID().toString().replace("-", "");
 		var body = new java.io.ByteArrayOutputStream();
@@ -183,6 +183,7 @@ public final class SkinLibrary {
 			throw new IOException("Mojang refused the skin (HTTP " + response.statusCode() + ")");
 		}
 		markEquipped(skin);
+		net.veloclient.launcher.social.SkinHeads.update(uuid, png);
 	}
 
 	private static HttpResponse<String> get(String url) throws IOException, InterruptedException {

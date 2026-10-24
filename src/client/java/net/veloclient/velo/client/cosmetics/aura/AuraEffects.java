@@ -148,6 +148,12 @@ public final class AuraEffects {
 		};
 	}
 
+	/** The aura's middle colour (RGB) for Velo Shaders' aura light, or -1 for an unknown id. */
+	public static int glowColor(String auraId, Settings s, float time) {
+		Kind k = auraId == null ? null : kind(auraId);
+		return k == null ? -1 : color(k, s == null ? Settings.DEFAULT : s, 0.5f, 0.3f, time);
+	}
+
 	/** Colour at {@code f} (0..1) between the aura's two colours, or the chosen colour / rainbow. */
 	private static int color(Kind kind, Settings s, float f, float hueSeed, float time) {
 		if (s.color() == RAINBOW) {

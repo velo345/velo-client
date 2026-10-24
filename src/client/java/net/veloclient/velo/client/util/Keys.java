@@ -21,9 +21,11 @@ import org.lwjgl.glfw.GLFW;
  */
 public final class Keys {
 
-	public static final int UNKNOWN = -1;
 	//? if >=26.3 {
-	/*public static final boolean SDL = true;
+	/*// "No key": SDL's unknown scancode is 0. A -1 here (GLFW's) made 26.3 crash on world join - vanilla polls every
+	// bound key's state by index when the game takes focus.
+	public static final int UNKNOWN = InputConstants.UNKNOWN.getValue();
+	public static final boolean SDL = true;
 	public static final int ESCAPE = InputConstants.KEY_ESCAPE;
 	public static final int ENTER = InputConstants.KEY_RETURN;
 	public static final int KP_ENTER = InputConstants.KEY_NUMPADENTER;
@@ -68,6 +70,7 @@ public final class Keys {
 	public static final int MOD_CONTROL = InputConstants.MOD_CONTROL;
 	public static final int PRESS = InputConstants.PRESS;
 	*///?} else {
+	public static final int UNKNOWN = -1;
 	public static final boolean SDL = false;
 	public static final int ESCAPE = GLFW.GLFW_KEY_ESCAPE;
 	public static final int ENTER = GLFW.GLFW_KEY_ENTER;
@@ -135,9 +138,12 @@ public final class Keys {
 		return '0' + d;
 	}
 
-	/** A key code Velo saved before 26.3 (GLFW) in this version's codes; unchanged before 26.3 and for -1. */
+	/** A key code Velo saved before 26.3 (GLFW) in this version's codes; unchanged before 26.3, -1 (unbound) becomes {@link #UNKNOWN}. */
 	public static int fromStored(int glfwCode) {
-		if (!SDL || glfwCode < 0) {
+		if (glfwCode < 0) {
+			return UNKNOWN;
+		}
+		if (!SDL) {
 			return glfwCode;
 		}
 		int i = java.util.Arrays.binarySearch(LEGACY_GLFW, glfwCode);
@@ -151,7 +157,10 @@ public final class Keys {
 
 	/** A key code saved in {@code storedFormat} ("glfw"/"sdl") as this version's code; -1 when the key doesn't exist here. */
 	public static int convert(String storedFormat, int code) {
-		if (code < 0 || format().equals(storedFormat)) {
+		if (code < 0) {
+			return UNKNOWN; // unbound, whichever version saved it
+		}
+		if (format().equals(storedFormat)) {
 			return code;
 		}
 		if (SDL) {

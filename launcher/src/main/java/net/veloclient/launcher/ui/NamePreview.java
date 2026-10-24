@@ -29,6 +29,9 @@ final class NamePreview extends Canvas {
 	private static final AnimationTimer TIMER = new AnimationTimer() {
 		@Override
 		public void handle(long now) {
+			if (!RenderGate.active()) {
+				return;
+			}
 			for (NamePreview preview : java.util.List.copyOf(LIVE)) {
 				preview.draw();
 			}

@@ -482,8 +482,20 @@ public final class VeloSkinsScreen extends VeloWindow {
 		Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
 			try {
 				SkinLibrary.equip(skin, token);
-				net.veloclient.velo.client.gui.widget.SkinModelPreview.refreshCurrent();
-				done("Skin changed to " + skin.name() + " - rejoin a server (or reopen your world) to see it.");
+				//? if <26.1 {
+				var profileId = MinecraftClient.getInstance().getSession().getUuidOrNull();
+				//?} else {
+				/*var profileId = net.minecraft.client.Minecraft.getInstance().getUser().getProfileId();
+				*///?}
+				if (profileId != null) {
+					PlayerHeads.update(profileId.toString(), Files.readAllBytes(SkinLibrary.png(skin)));
+				}
+				MinecraftClient.getInstance().execute(() -> {
+					// Wear it right away: the server only sends your new profile when you rejoin.
+					net.veloclient.velo.client.skins.SkinTryOn.setEquipped(texture(skin), skin.slim());
+					net.veloclient.velo.client.gui.widget.SkinModelPreview.refreshCurrent();
+				});
+				done("Skin changed to " + skin.name() + " - others see it once you rejoin.");
 			} catch (Exception e) {
 				done(e.getMessage());
 			}

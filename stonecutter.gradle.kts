@@ -767,6 +767,9 @@ stonecutter parameters {
 			replace("ClientboundSetTitleTextPacket", "ClientboundSetTitleTextPacket")
 			// Name Styles' glyph hook (Font$PreparedTextBuilder) and Clips Pro's win-title hooks - real Mojmap names.
 			replace("PreparedTextBuilder", "PreparedTextBuilder")
+			// Anti Coords Leak's Font#prepareText hooks (AntiCoordsFontMixin) - real Mojmap names.
+			replace("prepareText(", "prepareText(")
+			replace("Font\$PreparedText;", "Font\$PreparedText;")
 			replace("\"setTitleText\"", "\"setTitleText\"")
 			replace("\"setSubtitleText\"", "\"setSubtitleText\"")
 			// Real Mojmap method (LivingEntityRenderer) that the bare "RenderLayers" rule would mangle.

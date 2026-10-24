@@ -58,7 +58,7 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 	private double particleBudget = 300;
 	private double breakEffects = 6;
 	private double soundRepeats = 3;
-	private boolean notify = true;
+	private boolean notify = false;
 	private double redstoneVolume = 100;
 	private boolean redstoneVolumeOnlyFarmMode = false;
 
@@ -78,7 +78,7 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 
 	public AntiFarmLagModule() {
 		super("anti-farm-lag", "Anti Farm Lag", "Lightens rendering near big redstone farms (observers, pistons, hoppers, TNT) without stopping them.",
-				ModuleCategory.PERFORMANCE, SafetyTag.ALWAYS_SAFE, true);
+				ModuleCategory.PERFORMANCE, SafetyTag.ALWAYS_SAFE, false);
 		instance = this;
 	}
 
@@ -229,7 +229,9 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 	}
 
 	private void flushDue(boolean all) {
-		if (flusher == null || sections.isEmpty()) {
+		// Sections are only ever deferred (pending) while farm mode is active, and switching it off
+		// flushes everything - so outside farm mode there's nothing to walk the whole map for.
+		if (flusher == null || sections.isEmpty() || (!active && !all)) {
 			return;
 		}
 		flushing = true;
@@ -334,6 +336,6 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 				new ConfigField.SliderField("Redstone Sound Volume", 0, 100, () -> redstoneVolume, v -> redstoneVolume = Math.round(v / 5) * 5,
 						v -> (int) (Math.round(v / 5) * 5) + "%"),
 				new ConfigField.ToggleField("Redstone Volume Only In Farm Mode", () -> redstoneVolumeOnlyFarmMode, v -> redstoneVolumeOnlyFarmMode = v),
-				new ConfigField.ToggleField("Notify When Farm Mode Turns On", () -> notify, v -> notify = v));
+				new ConfigField.ToggleField("Farm Mode Notifications", () -> notify, v -> notify = v));
 	}
 }

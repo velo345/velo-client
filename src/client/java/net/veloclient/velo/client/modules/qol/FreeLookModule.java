@@ -109,6 +109,12 @@ public final class FreeLookModule extends AbstractModule implements Configurable
 		forcedYawOffset = yawOffset;
 	}
 
+	/** Dev-only: like {@link #forceForTour}, also setting how far the orbit camera sits. */
+	public static void forceForTour(boolean on, float yawOffset, double distance) {
+		orbitDistance = distance;
+		forceForTour(on, yawOffset);
+	}
+
 	public static boolean isActive() {
 		return active && MinecraftClient.getInstance().player != null;
 	}

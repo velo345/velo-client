@@ -14,28 +14,28 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /*@Mixin(Minecraft.class)
 public abstract class VulkanSurfaceProfileMixin {
 
-	@Inject(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/GpuSurface;acquireNextTexture()V"))
+	@Inject(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/GpuSurface;acquireNextTexture()V"), require = 0)
 	private void velo$acquireStart(boolean advanceGameTime, CallbackInfo ci) {
 		if (RenderProfiler.ENABLED) {
 			RenderProfiler.waitBegin();
 		}
 	}
 
-	@Inject(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/GpuSurface;acquireNextTexture()V", shift = At.Shift.AFTER))
+	@Inject(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/GpuSurface;acquireNextTexture()V", shift = At.Shift.AFTER), require = 0)
 	private void velo$acquireEnd(boolean advanceGameTime, CallbackInfo ci) {
 		if (RenderProfiler.ENABLED) {
 			RenderProfiler.waitEnd("acquire");
 		}
 	}
 
-	@Inject(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/CommandEncoder;submit()V"))
+	@Inject(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/CommandEncoder;submit()V"), require = 0)
 	private void velo$submitStart(boolean advanceGameTime, CallbackInfo ci) {
 		if (RenderProfiler.ENABLED) {
 			RenderProfiler.waitBegin();
 		}
 	}
 
-	@Inject(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/GpuSurface;present()V", shift = At.Shift.AFTER))
+	@Inject(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/GpuSurface;present()V", shift = At.Shift.AFTER), require = 0)
 	private void velo$presentEnd(boolean advanceGameTime, CallbackInfo ci) {
 		if (RenderProfiler.ENABLED) {
 			RenderProfiler.waitEnd("submit+present");

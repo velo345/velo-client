@@ -296,7 +296,13 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.FriendsModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.EmojiChatModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.HideFoliageModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.AntiDeepslateModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.AntiCoordsLeakModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.ContainerAnimationsModule());
+		//? if >=26.2 {
+		/*ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.VeloShadersModule());
+		net.veloclient.velo.client.modules.rendering.VeloShadersModule.registerPack();
+		*///?}
 
 		// Rendering
 		ModuleRegistry.register(new TntTimerModule());

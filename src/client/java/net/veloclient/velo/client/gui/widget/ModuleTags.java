@@ -41,7 +41,7 @@ public final class ModuleTags {
 			Map.entry("boss-bar", "Servers"), Map.entry("server-overlays", "Bed Wars"), Map.entry("height-limit", "Bed Wars"),
 			Map.entry("player-levels", "Minigames"), Map.entry("auto-gg", "Minigames"), Map.entry("mode-presets", "Minigames"),
 			Map.entry("background-queue", "Queues"), Map.entry("clips", "Recording"), Map.entry("free-look", "Recording"),
-			Map.entry("polyblur", "Recording"), Map.entry("time-weather-fog", "Recording"), Map.entry("nick-hider", "Streaming"),
+			Map.entry("polyblur", "Recording"), Map.entry("time-weather-fog", "Recording"), Map.entry("nick-hider", "Streaming"), Map.entry("anti-coords-leak", "Streaming"), Map.entry("anti-deepslate", "Streaming"),
 			Map.entry("zoom", "Everyday"), Map.entry("toggle-sprint", "Everyday"), Map.entry("toggle-sneak", "Everyday"),
 			Map.entry("chat-tweaks", "Servers"), Map.entry("friends", "Social"), Map.entry("party-ping", "Social"),
 			Map.entry("hopper-speed", "Building"), Map.entry("fast-grow", "Building"), Map.entry("fly-speed", "Building"),

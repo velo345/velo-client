@@ -75,7 +75,7 @@ public final class DustAnalyzer {
 		for (int x = x0; x <= x1; x++) {
 			for (int z = center[2] - RADIUS; z <= center[2] + RADIUS; z++) {
 				for (int y = center[1] - HEIGHT; y <= center[1] + HEIGHT; y++) {
-					if (RmWorld.id(RmWorld.state(level, x, y, z)).equals("minecraft:redstone_wire")) {
+					if (isWire(RmWorld.state(level, x, y, z))) {
 						SCAN.add(Wiring.key(x, y, z));
 					}
 				}
@@ -86,6 +86,23 @@ public final class DustAnalyzer {
 		}
 		slice = 0;
 		analyze(level, new HashSet<>(SCAN));
+	}
+
+	/** Last block type checked and whether it was dust: the scan walks long runs of the same block (air, stone). */
+	private static Object lastBlock;
+	private static boolean lastWasWire;
+
+	/**
+	 * Whether this state is redstone dust - by block identity, so the ~7,000 lookups per scan step
+	 * don't each build and compare a registry id string (that was most of this scan's cost).
+	 */
+	private static boolean isWire(Object state) {
+		Object block = RmWorld.blockOf(state);
+		if (block != lastBlock) {
+			lastBlock = block;
+			lastWasWire = RmWorld.id(state).equals("minecraft:redstone_wire");
+		}
+		return lastWasWire;
 	}
 
 	private static boolean isSource(String id) {

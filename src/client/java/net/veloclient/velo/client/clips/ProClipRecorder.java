@@ -148,7 +148,7 @@ public final class ProClipRecorder {
 				if (!QUEUE.offer(new Frame(rgba, width, height, System.nanoTime()))) {
 					FrameGrabber.release(rgba); // encoder busy: the next frame is repeated to keep time
 				}
-			});
+			}, maxHeight);
 		} catch (Throwable t) {
 			VeloClient.LOGGER.warn("Clips Pro stopped: frame capture failed", t);
 			active = false;
@@ -210,11 +210,20 @@ public final class ProClipRecorder {
 		Files.createDirectories(dir);
 		clearBuffer();
 		int outH = Math.min(height, maxHeight) & ~1;
+		// NVENC takes the RGBA frames as they are and converts them to YUV on the GPU (same yuv420p
+		// stream out) - the CPU conversion it replaces was most of ffmpeg's ~1 core at 1080p60. Only
+		// when the frame already has the recorded, even size (26.2 scales it on the GPU first).
+		boolean gpuConvert = "h264_nvenc".equals(encoder.name()) && outH == height && (width & 1) == 0;
 		List<String> command = new ArrayList<>(List.of(ffmpeg.toString(), "-hide_banner", "-loglevel", "error", "-y",
-				"-f", "rawvideo", "-pix_fmt", "rgba", "-video_size", width + "x" + height, "-framerate", String.valueOf(fps), "-i", "pipe:0",
-				// GPU rows come bottom-up; scale only when the window is bigger than the target.
-				"-vf", "vflip" + (outH < height ? ",scale=-2:" + outH + ":flags=bilinear" : ",scale=trunc(iw/2)*2:trunc(ih/2)*2"),
-				"-pix_fmt", "yuv420p"));
+				"-f", "rawvideo", "-pix_fmt", "rgba", "-video_size", width + "x" + height, "-framerate", String.valueOf(fps), "-i", "pipe:0"));
+		if (gpuConvert) {
+			// GPU rows come bottom-up.
+			command.addAll(List.of("-vf", "vflip"));
+		} else {
+			// GPU rows come bottom-up; scale only when the window is bigger than the target.
+			command.addAll(List.of("-vf", "vflip" + (outH < height ? ",scale=-2:" + outH + ":flags=bilinear" : ",scale=trunc(iw/2)*2:trunc(ih/2)*2"),
+					"-pix_fmt", "yuv420p"));
+		}
 		command.addAll(encoder.args());
 		int ring = seconds + 4;
 		command.addAll(List.of("-g", String.valueOf(fps), "-force_key_frames", "expr:gte(t,n_forced*1)",

@@ -84,6 +84,11 @@ public final class NameStyleScreen extends VeloWindow {
 		scroll = amount;
 	}
 
+	/** Dev-only (screenshot tour): picks preset {@code index}, as a click on its tile would. */
+	public void presetForTour(int index) {
+		commit(NameStyle.PRESETS.get(index).style().withPlaces(style.chat(), style.tab(), style.nameTag()));
+	}
+
 	private String playerName() {
 		String name = net.veloclient.velo.client.gui.title.MenuInfo.username();
 		return name == null || name.isEmpty() ? "Steve" : name;

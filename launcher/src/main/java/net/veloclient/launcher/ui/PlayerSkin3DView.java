@@ -161,7 +161,7 @@ public final class PlayerSkin3DView {
 		for (Part part : parts) {
 			addPart(model, texture, uvW, uvH, part.u, part.v, part.w, part.h, part.d, part.cx, part.cy, part.cz);
 		}
-		MeshView layers = buildLayerVoxels(skin, texture, uvW, uvH, parts, scale);
+		MeshView layers = buildLayerVoxels(skin, uvW, uvH, parts, scale);
 		if (layers != null) {
 			model.getChildren().add(layers);
 		}
@@ -231,6 +231,9 @@ public final class PlayerSkin3DView {
 
 				@Override
 				public void handle(long now) {
+					if (!RenderGate.active()) {
+						return;
+					}
 					double dt = last == 0 ? 0 : Math.min(0.05, (now - last) / 1e9);
 					last = now;
 					if (now - lastInteraction[0] > 3_000_000_000L) {
@@ -277,8 +280,10 @@ public final class PlayerSkin3DView {
 		parent.getChildren().add(cape.node);
 		// Each viewer owns its frame textures (made on first show, dropped with the viewer) - a global cache
 		// keyed on the decoded frames kept every frame of every cape ever previewed alive.
-		Image[] textures = new Image[frames.size()];
-		textures[0] = (Image) cape.material.getDiffuseMap();
+		// One material per frame, switched on the mesh: swapping the texture inside one material leaked
+		// native memory in JavaFX's ES2 pipeline on every swap (see VoxelSceneryView's water).
+		PhongMaterial[] materials = new PhongMaterial[frames.size()];
+		materials[0] = cape.material;
 
 		AnimationTimer timer = new AnimationTimer() {
 			private int index;
@@ -286,6 +291,9 @@ public final class PlayerSkin3DView {
 
 			@Override
 			public void handle(long now) {
+				if (!RenderGate.active()) {
+					return;
+				}
 				cape.swing.setAngle(CAPE_REST_ANGLE + Math.sin(now / 9e8) * 3.5 + Math.sin(now / 3.7e8) * 0.8);
 				if (frames.size() <= 1) {
 					return;
@@ -300,10 +308,12 @@ public final class PlayerSkin3DView {
 				}
 				frameStartNanos = now;
 				index = (index + 1) % frames.size();
-				if (textures[index] == null) {
-					textures[index] = capeTexture(frames.get(index).image(), ANIMATED_TEXTURE_WIDTH);
+				if (materials[index] == null) {
+					PhongMaterial material = new PhongMaterial();
+					material.setDiffuseMap(capeTexture(frames.get(index).image(), ANIMATED_TEXTURE_WIDTH));
+					materials[index] = material;
 				}
-				cape.material.setDiffuseMap(textures[index]);
+				cape.mesh.setMaterial(materials[index]);
 			}
 		};
 		timer.start();
@@ -312,7 +322,7 @@ public final class PlayerSkin3DView {
 
 	private static final double CAPE_REST_ANGLE = 9;
 
-	private record CapeModel(Group node, Rotate swing, PhongMaterial material) {
+	private record CapeModel(Group node, Rotate swing, PhongMaterial material, MeshView mesh) {
 	}
 
 	/** Builds the cape (texture in the standard 64x32 layout - or its {@link GifFrames#decodeCape} crop - at any resolution, upscaled to about {@code textureWidth}) hinged at y=0. */
@@ -331,7 +341,7 @@ public final class PlayerSkin3DView {
 		Rotate swing = new Rotate(CAPE_REST_ANGLE, Rotate.X_AXIS);
 		Group hinge = new Group(mesh);
 		hinge.getTransforms().addAll(new javafx.scene.transform.Translate(0, -8, 2.05), swing);
-		return new CapeModel(hinge, swing, material);
+		return new CapeModel(hinge, swing, material, mesh);
 	}
 
 	/**
@@ -397,9 +407,10 @@ public final class PlayerSkin3DView {
 	private static final double LAYER_GAP = 0.02;
 
 	/** One mesh with a small block for every opaque overlay pixel of every part (null if none). */
-	private static MeshView buildLayerVoxels(Image skin, Image texture, double uvW, double uvH, Part[] parts, int scale) {
+	private static MeshView buildLayerVoxels(Image skin, double uvW, double uvH, Part[] parts, int scale) {
 		PixelReader reader = skin.getPixelReader();
 		MeshBuilder list = new MeshBuilder();
+		java.util.Map<Integer, Integer> palette = new java.util.LinkedHashMap<>();
 		for (Part part : parts) {
 			if (part.ou < 0) {
 				continue;
@@ -445,7 +456,7 @@ public final class PlayerSkin3DView {
 			};
 			for (Object[] face : faces) {
 				addLayerFace(list, reader, (double[]) face[0], (double[]) face[1], (double[]) face[2],
-						(double) face[4], (double) face[5], (double) face[6], (double) face[7], center, offset, uvW, uvH, scale);
+						(double) face[4], (double) face[5], (double) face[6], (double) face[7], center, offset, uvW, uvH, scale, palette);
 			}
 		}
 		if (list.points.isEmpty()) {
@@ -457,14 +468,49 @@ public final class PlayerSkin3DView {
 		mesh.getFaces().addAll(toIntArray(list.faces));
 		MeshView view = new MeshView(mesh);
 		PhongMaterial material = new PhongMaterial();
-		material.setDiffuseMap(texture);
+		material.setDiffuseMap(paletteTexture(palette));
 		view.setMaterial(material);
 		view.setCullFace(CullFace.NONE);
 		return view;
 	}
 
+	// The voxels' colours: one solid PALETTE_CELL-sized square each. JavaFX mipmaps 3D textures, and a voxel sampling
+	// a single texel of the skin got blended with its transparent neighbours at the small mip levels these tiny
+	// faces use - the second layer came out greyish next to the base skin. Solid cells keep the exact colour.
+	private static final int PALETTE_SIZE = 512;
+	private static final int PALETTE_CELL = 8;
+	private static final int PALETTE_COLUMNS = PALETTE_SIZE / PALETTE_CELL;
+
+	private static float[] paletteUv(java.util.Map<Integer, Integer> palette, int argb) {
+		int max = PALETTE_COLUMNS * PALETTE_COLUMNS;
+		Integer index = palette.get(argb);
+		if (index == null) {
+			index = palette.size() < max ? palette.size() : 0;
+			if (palette.size() < max) {
+				palette.put(argb, index);
+			}
+		}
+		return new float[] {
+				(float) ((index % PALETTE_COLUMNS) * PALETTE_CELL + PALETTE_CELL / 2.0) / PALETTE_SIZE,
+				(float) ((index / PALETTE_COLUMNS) * PALETTE_CELL + PALETTE_CELL / 2.0) / PALETTE_SIZE};
+	}
+
+	private static Image paletteTexture(java.util.Map<Integer, Integer> palette) {
+		WritableImage image = new WritableImage(PALETTE_SIZE, PALETTE_SIZE);
+		javafx.scene.image.PixelWriter writer = image.getPixelWriter();
+		int[] cell = new int[PALETTE_CELL * PALETTE_CELL];
+		for (var entry : palette.entrySet()) {
+			java.util.Arrays.fill(cell, entry.getKey());
+			int i = entry.getValue();
+			writer.setPixels((i % PALETTE_COLUMNS) * PALETTE_CELL, (i / PALETTE_COLUMNS) * PALETTE_CELL, PALETTE_CELL, PALETTE_CELL,
+					javafx.scene.image.PixelFormat.getIntArgbInstance(), cell, 0, PALETTE_CELL);
+		}
+		return image;
+	}
+
 	private static void addLayerFace(MeshBuilder list, PixelReader reader, double[] c0, double[] c1, double[] c2,
-			double u1, double v1, double u2, double v2, double[] center, double[] offset, double uvW, double uvH, int scale) {
+			double u1, double v1, double u2, double v2, double[] center, double[] offset, double uvW, double uvH, int scale,
+			java.util.Map<Integer, Integer> palette) {
 		int minU = (int) Math.min(u1, u2);
 		int maxU = (int) Math.max(u1, u2);
 		int minV = (int) Math.min(v1, v2);
@@ -494,8 +540,9 @@ public final class PlayerSkin3DView {
 					inner[i] = add(add(inner[i], offset), scale(normal, LAYER_GAP));
 					outer[i] = add(inner[i], scale(normal, LAYER_THICKNESS));
 				}
-				float su = (float) ((tu + 0.5) / uvW);
-				float sv = (float) ((tv + 0.5) / uvH);
+				float[] uv = paletteUv(palette, reader.getArgb(tu * scale + scale / 2, tv * scale + scale / 2) | 0xFF000000);
+				float su = uv[0];
+				float sv = uv[1];
 				addQuad(list, outer[0], outer[1], outer[2], outer[3], su, sv, normal);
 				// Sides only where the neighbouring pixel on this face is empty.
 				if (tv == minV || !opaque(reader, tu, tv - 1, uvW, uvH, scale)) {

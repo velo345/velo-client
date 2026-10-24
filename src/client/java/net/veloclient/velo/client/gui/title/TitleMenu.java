@@ -182,7 +182,9 @@ public final class TitleMenu {
 			String label = widget.getMessage().getString().strip();
 			// Essential lays out its own menu, character and badges around these - never touch them; same for any
 			// placeholder-style widget ("<essential_player>") that only exists to anchor another mod's drawing.
-			if (className.startsWith("gg.essential.") || label.startsWith("<") && label.endsWith(">")) {
+			// Vanilla's copyright line (a clickable text) stays where vanilla puts it - on narrow windows its x fell
+			// inside our column and it became a menu row.
+			if (className.startsWith("gg.essential.") || label.startsWith("<") && label.endsWith(">") || label.startsWith("Copyright Mojang")) {
 				continue;
 			}
 			if (widget == ukulib) {
@@ -209,7 +211,7 @@ public final class TitleMenu {
 			}
 			if (TitleScreenTheme.matchExtraIcon(TitleScreenTheme.TITLE_SIDE_ICONS, label) != null
 					|| label.isEmpty() && TitleScreenTheme.matchExtraIcon(TitleScreenTheme.TITLE_SIDE_ICON_CLASSES, className) != null) {
-				modRows.add(new Row(widget, Text.literal("Replays"), null, false, false, false));
+				modRows.add(new Row(widget, Text.literal("Replays"), null, true, false, false));
 				continue;
 			}
 			String iconKey = TitleScreenTheme.matchExtraIcon(TitleScreenTheme.TITLE_EXTRA_ICONS, label);
@@ -221,7 +223,8 @@ public final class TitleMenu {
 				// Small icon buttons (Mod Menu's and the like) go in the icon row at the bottom, wherever the mod put them.
 				icons.add(new Icon(widget, "extensions"));
 			} else if (meantForMenu && first[2] >= 40) {
-				modRows.add(new Row(widget, Text.literal(label), null, false, false, false));
+				// Same words, size and style as the menu's own rows - a mod's button is just another entry.
+				modRows.add(new Row(widget, Text.literal(label), null, true, false, false));
 			}
 			// Anything else belongs to its mod's own layout: untouched.
 		}
@@ -291,7 +294,13 @@ public final class TitleMenu {
 		}
 		if (showCard && mains * (rowH + 2) + seconds * secondaryH > room) {
 			showCard = false;
+			room += cardBlock;
 		}
+		// Still too many (lots of mods adding entries, small window): the whole column scales down to fit.
+		int needed = mains * (rowH + 2) + seconds * secondaryH;
+		float columnScale = needed > room && room > 0 ? Math.max(0.55f, room / (float) needed) : 1f;
+		// No entry wider than the left part of the screen (long mod labels) - those scale down on their own.
+		int columnMaxW = Math.max(120, Math.min(width - margin * 2, width / 2 - margin));
 		if (showCard) {
 			jumpCard.place(margin, y, cardW, cardH, true);
 			slideIn(context, open, step++);
@@ -308,9 +317,12 @@ public final class TitleMenu {
 			int h = row.main() ? rowH : secondaryH;
 			Text label = !row.main() ? MenuKit.uiBold(row.label().getString())
 					: large ? MenuKit.displayLg(row.label().getString()) : MenuKit.display(row.label().getString());
-			int w = Math.min(width - margin * 2, MenuKit.width(renderer, label) + 30 + (row.badge() != null ? 34 : 0));
+			int w = MenuKit.width(renderer, label) + 30 + (row.badge() != null ? 34 : 0);
+			float scale = Math.min(columnScale, columnMaxW / (float) w);
+			int sw = Math.round(w * scale);
+			int sh = Math.round(h * scale);
 			if (widget instanceof HotspotButton hotspot) {
-				hotspot.place(margin, y, w, h, true);
+				hotspot.place(margin, y, sw, sh, true);
 				if (hotspot != storeRow && hotspot != discoverRow) {
 					ClickableWidget target = byKey.values().stream().filter(v -> PROXIES.get(env.keyOf(v)) == hotspot).findFirst().orElse(null);
 					if (target != null) {
@@ -320,15 +332,17 @@ public final class TitleMenu {
 			} else {
 				widget.setX(margin);
 				widget.setY(y);
-				widget.setWidth(w);
-				widget.setHeight(h);
+				widget.setWidth(sw);
+				widget.setHeight(sh);
 				RESTYLED.add(widget);
 			}
 			slideIn(context, open, step++);
-			drawRow(context, renderer, row, label, margin, y, w, h, large, MenuKit.hover(widget, widget.active && hovered(mouseX, mouseY, widget)));
+			context.getMatrices().translate(margin, y);
+			context.getMatrices().scale(scale, scale);
+			drawRow(context, renderer, row, label, 0, 0, w, h, large, MenuKit.hover(widget, widget.active && hovered(mouseX, mouseY, widget)));
 			context.getMatrices().popMatrix();
-			contentRight = Math.max(contentRight, margin + w);
-			y += h + (row.main() ? 2 : 0);
+			contentRight = Math.max(contentRight, margin + sw);
+			y += Math.round((h + (row.main() ? 2 : 0)) * columnScale);
 		}
 
 		// ---- Footer: you, friends online, small icon buttons - one row, centred on the icons ----

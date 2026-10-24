@@ -121,6 +121,51 @@ public final class RmWorld {
 		return compound instanceof net.minecraft.nbt.NbtCompound c ? c.get(key) : null;
 	}
 
+	// Building NBT for writing .litematic files. Values: Integer, Long, String, long[] or a tag.
+	public static Object nbtCompound() {
+		return new net.minecraft.nbt.NbtCompound();
+	}
+
+	public static void nbtPut(Object compound, String key, Object value) {
+		var c = (net.minecraft.nbt.NbtCompound) compound;
+		switch (value) {
+			case Integer i -> c.putInt(key, i);
+			case Long l -> c.putLong(key, l);
+			case String str -> c.putString(key, str);
+			case long[] longs -> c.putLongArray(key, longs);
+			default -> c.put(key, (net.minecraft.nbt.NbtElement) value);
+		}
+	}
+
+	public static Object nbtList(List<Object> tags) {
+		var list = new net.minecraft.nbt.NbtList();
+		for (Object tag : tags) {
+			list.add((net.minecraft.nbt.NbtElement) tag);
+		}
+		return list;
+	}
+
+	public static Object nbtDoubles(double... values) {
+		var list = new net.minecraft.nbt.NbtList();
+		for (double v : values) {
+			list.add(net.minecraft.nbt.NbtDouble.of(v));
+		}
+		return list;
+	}
+
+	public static Object nbtCopy(Object tag) {
+		return ((net.minecraft.nbt.NbtElement) tag).copy();
+	}
+
+	public static void writeGzipNbt(Path file, Object compound) throws java.io.IOException {
+		net.minecraft.nbt.NbtIo.writeCompressed((net.minecraft.nbt.NbtCompound) compound, file);
+	}
+
+	/** This game's world data version (Litematica's MinecraftDataVersion). */
+	public static int dataVersion() {
+		return net.minecraft.SharedConstants.getGameVersion().dataVersion().id();
+	}
+
 	public static boolean singleplayer() {
 		return net.minecraft.client.MinecraftClient.getInstance().getServer() != null;
 	}
@@ -204,6 +249,11 @@ public final class RmWorld {
 
 	public static String id(Object state) {
 		return net.minecraft.registry.Registries.BLOCK.getId(s(state).getBlock()).toString();
+	}
+
+	/** The state's block (one object per block type, for identity maps). */
+	public static Object blockOf(Object state) {
+		return s(state).getBlock();
 	}
 
 	@SuppressWarnings({"rawtypes", "unchecked"})
@@ -508,7 +558,9 @@ public final class RmWorld {
 		if (player == null || client.interactionManager == null) {
 			return false;
 		}
-		var item = s(state).getBlock().asItem();
+		// Schematic water / lava: the bucket (their blocks have no item).
+		var item = s(state).getBlock() == net.minecraft.block.Blocks.WATER ? net.minecraft.item.Items.WATER_BUCKET
+				: s(state).getBlock() == net.minecraft.block.Blocks.LAVA ? net.minecraft.item.Items.LAVA_BUCKET : s(state).getBlock().asItem();
 		if (item == net.minecraft.item.Items.AIR) {
 			return false;
 		}
@@ -580,6 +632,49 @@ public final class RmWorld {
 
 	public static Object child(Object compound, String key) {
 		return compound instanceof net.minecraft.nbt.CompoundTag c ? c.get(key) : null;
+	}
+
+	public static Object nbtCompound() {
+		return new net.minecraft.nbt.CompoundTag();
+	}
+
+	public static void nbtPut(Object compound, String key, Object value) {
+		var c = (net.minecraft.nbt.CompoundTag) compound;
+		switch (value) {
+			case Integer i -> c.putInt(key, i);
+			case Long l -> c.putLong(key, l);
+			case String str -> c.putString(key, str);
+			case long[] longs -> c.putLongArray(key, longs);
+			default -> c.put(key, (net.minecraft.nbt.Tag) value);
+		}
+	}
+
+	public static Object nbtList(List<Object> tags) {
+		var list = new net.minecraft.nbt.ListTag();
+		for (Object tag : tags) {
+			list.add((net.minecraft.nbt.Tag) tag);
+		}
+		return list;
+	}
+
+	public static Object nbtDoubles(double... values) {
+		var list = new net.minecraft.nbt.ListTag();
+		for (double v : values) {
+			list.add(net.minecraft.nbt.DoubleTag.valueOf(v));
+		}
+		return list;
+	}
+
+	public static Object nbtCopy(Object tag) {
+		return ((net.minecraft.nbt.Tag) tag).copy();
+	}
+
+	public static void writeGzipNbt(Path file, Object compound) throws java.io.IOException {
+		net.minecraft.nbt.NbtIo.writeCompressed((net.minecraft.nbt.CompoundTag) compound, file);
+	}
+
+	public static int dataVersion() {
+		return net.minecraft.SharedConstants.getCurrentVersion().dataVersion().version();
 	}
 
 	public static boolean singleplayer() {
@@ -663,6 +758,10 @@ public final class RmWorld {
 
 	public static String id(Object state) {
 		return net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s(state).getBlock()).toString();
+	}
+
+	public static Object blockOf(Object state) {
+		return s(state).getBlock();
 	}
 
 	@SuppressWarnings({"rawtypes", "unchecked"})
@@ -944,7 +1043,8 @@ public final class RmWorld {
 		if (player == null || client.gameMode == null) {
 			return false;
 		}
-		var item = s(state).getBlock().asItem();
+		var item = s(state).getBlock() == net.minecraft.world.level.block.Blocks.WATER ? net.minecraft.world.item.Items.WATER_BUCKET
+				: s(state).getBlock() == net.minecraft.world.level.block.Blocks.LAVA ? net.minecraft.world.item.Items.LAVA_BUCKET : s(state).getBlock().asItem();
 		if (item == net.minecraft.world.item.Items.AIR) {
 			return false;
 		}

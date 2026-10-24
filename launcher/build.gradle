@@ -99,7 +99,10 @@ tasks.register("bundleJavaRuntimeFallback") {
 	group = "build"
 	description = "Bundles a spare copy of this JDK's own java binary as a launcher resource."
 	def isWindows = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win")
-	def sourceBinary = new File(new File(System.getProperty("java.home"), "bin"), isWindows ? "java.exe" : "java")
+	def binDir = new File(System.getProperty("java.home"), "bin")
+	def sourceBinary = new File(binDir, isWindows ? "java.exe" : "java")
+	// javaw.exe too: the game must run as javaw.exe for Discord to recognise Minecraft (game overlay, "Playing Minecraft").
+	def windowedBinary = new File(binDir, "javaw.exe")
 	def outDir = javaRuntimeResourceRoot.map { it.dir("net/veloclient/launcher/javaruntime") }
 	inputs.file(sourceBinary)
 	outputs.dir(outDir)
@@ -107,6 +110,9 @@ tasks.register("bundleJavaRuntimeFallback") {
 		def dir = outDir.get().asFile
 		dir.mkdirs()
 		new File(dir, sourceBinary.name).bytes = sourceBinary.bytes
+		if (isWindows && windowedBinary.isFile()) {
+			new File(dir, windowedBinary.name).bytes = windowedBinary.bytes
+		}
 	}
 }
 
@@ -114,7 +120,7 @@ tasks.register("bundleJavaRuntimeFallback") {
 // reads it back as a classpath resource at runtime instead of independently
 // hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
 // below reuses the same value for the native installer's version.
-def launcherAppVersion = "0.9.91"
+def launcherAppVersion = "0.9.93"
 // A fixed identity for the Windows installer across every version - WiX
 // needs this (--win-upgrade-uuid below) to recognize a new installer as an
 // upgrade of whatever's already installed rather than an unrelated product,

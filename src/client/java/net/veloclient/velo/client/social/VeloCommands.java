@@ -203,6 +203,16 @@ public final class VeloCommands {
 							shareWaypoint(context.getArgument("name", String.class));
 							return 1;
 						})))
+				.then(ClientCmd.literal("toggle")
+						.then(ClientCmd.argument("module", StringArgumentType.word()).suggests(MODULES)
+								.executes(context -> {
+									toggle(context.getArgument("module", String.class), null);
+									return 1;
+								})
+								.then(ClientCmd.argument("state", StringArgumentType.word()).suggests(ON_OFF).executes(context -> {
+									toggle(context.getArgument("module", String.class), context.getArgument("state", String.class));
+									return 1;
+								}))))
 				.then(ClientCmd.literal("phantom")
 						.executes(context -> {
 							phantom(null);
@@ -356,6 +366,28 @@ public final class VeloCommands {
 	}
 
 	// ---- Phantom / fly speed (also bare /phantom and /flyspeed when the server has neither) ----
+
+	private static final SuggestionProvider<FabricClientCommandSource> MODULES = (context, builder) -> {
+		for (var module : ModuleRegistry.all()) {
+			if (module.id().startsWith(builder.getRemaining().toLowerCase(Locale.ROOT))) {
+				builder.suggest(module.id());
+			}
+		}
+		return builder.buildFuture();
+	};
+
+	/** /velo toggle <module> [on|off]: switches any module by its id (for binds and macros). */
+	private static void toggle(String id, String state) {
+		var module = ModuleRegistry.get(id.toLowerCase(Locale.ROOT)).orElse(null);
+		if (module == null) {
+			VeloChat.error("No module \"" + id + "\".");
+			return;
+		}
+		boolean on = state == null ? !module.isEnabled() : state.equalsIgnoreCase("on");
+		module.setEnabled(on);
+		net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
+		VeloChat.info(module.displayName() + " " + (on ? "on." : "off."));
+	}
 
 	private static void phantom(String state) {
 		var module = ModuleRegistry.get("phantom").orElse(null);

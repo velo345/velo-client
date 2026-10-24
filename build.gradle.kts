@@ -23,6 +23,10 @@ repositories {
 	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
 	// See https://docs.gradle.org/current/userguide/declaring_repositories.html
 	// for more information about repositories.
+	exclusiveContent {
+		forRepository { maven("https://api.modrinth.com/maven") { name = "Modrinth" } }
+		filter { includeGroup("maven.modrinth") }
+	}
 }
 
 loom {
@@ -91,6 +95,15 @@ dependencies {
 	}
 	modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
 	modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
+	// Velo Shaders' shadow pass draws Sodium's chunk meshes a second time from the sun, so it compiles
+	// against Sodium's renderer (compile-only: Sodium itself comes with the launcher's profiles).
+	if (sc.current.version == "26.2") {
+		modCompileOnly("maven.modrinth:sodium:mc26.2-0.9.2-fabric")
+	}
+	if (sc.current.version == "26.3") {
+		// What the launcher installs for 26.3 (the newest Modrinth build).
+		modCompileOnly("maven.modrinth:sodium:mc26.3-0.9.3-beta.1-fabric")
+	}
 }
 
 tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {

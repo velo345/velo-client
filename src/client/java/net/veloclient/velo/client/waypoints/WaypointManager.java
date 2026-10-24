@@ -110,8 +110,21 @@ public final class WaypointManager {
 	}
 
 	public static void save() {
+		version++;
 		ConfigManager.save(CONFIG_ID, data());
 	}
+
+	/** Bumped on every {@link #save()}, so the per-frame {@link #visibleHere()} cache knows when waypoints changed. */
+	private static int version;
+	/** {@link #currentWorldKey()} for the world object it was worked out for (a new world or dimension is a new object). */
+	private static Object keyWorld;
+	private static String cachedKey;
+	private static Object visibleWorld;
+	private static String visibleDimension;
+	private static Object visibleData;
+	private static int visibleVersion = -1;
+	private static int visibleSize = -1;
+	private static List<Waypoint> visibleCache = List.of();
 
 	/**
 	 * Identifies the world you're in: {@code mp:<address>} for a server, {@code sp:<save name>} for
@@ -121,7 +134,13 @@ public final class WaypointManager {
 	public static String currentWorldKey() {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client.world == null) {
+			keyWorld = null;
 			return null;
+		}
+		// The waypoint HUD, minimap and world renderer ask several times per frame; the answer only
+		// changes with the world object.
+		if (client.world == keyWorld && cachedKey != null) {
+			return cachedKey;
 		}
 		String key;
 		String label;
@@ -144,6 +163,8 @@ public final class WaypointManager {
 			data().worldNames.put(key, label);
 			save();
 		}
+		keyWorld = client.world;
+		cachedKey = key;
 		return key;
 	}
 
@@ -217,13 +238,24 @@ public final class WaypointManager {
 		if (world == null || dimension == null) {
 			return List.of();
 		}
+		Data data = data();
+		if (keyWorld == visibleWorld && dimension.equals(visibleDimension) && data == visibleData
+				&& version == visibleVersion && data.waypoints.size() == visibleSize) {
+			return visibleCache;
+		}
 		List<Waypoint> out = new ArrayList<>();
-		for (Waypoint waypoint : data().waypoints) {
+		for (Waypoint waypoint : data.waypoints) {
 			if (waypoint.enabled && waypoint.world.equals(world) && waypoint.dimension.equals(dimension)) {
 				out.add(waypoint);
 			}
 		}
-		return out;
+		visibleWorld = keyWorld;
+		visibleDimension = dimension;
+		visibleData = data;
+		visibleVersion = version;
+		visibleSize = data.waypoints.size();
+		visibleCache = java.util.Collections.unmodifiableList(out);
+		return visibleCache;
 	}
 
 	public static int nextColor() {

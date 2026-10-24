@@ -27,6 +27,8 @@ public final class RmRender {
 	private static final int WRONG_STATE = 0x66FFD21E;
 	private static final int EXTRA = 0x66FF5AD2;
 	private static List<float[]> placementVoxels = List.of();
+	/** Schematic water / lava still to place: {x, y, z, argb, height} (only with Show schematic water / lava on). */
+	private static List<float[]> fluidCells = List.of();
 	/** Missing schematic blocks to draw as real blocks: {x, y, z, state}. */
 	private static volatile List<Object[]> ghostBlocks = List.of();
 	private static int placementTicks;
@@ -40,6 +42,15 @@ public final class RmRender {
 
 	private static void fill(double x0, double y0, double z0, double x1, double y1, double z1, int color) {
 		GizmoDrawing.box(new Box(x0, y0, z0, x1, y1, z1), DrawStyle.filled(color)).ignoreOcclusion();
+	}
+
+	/** Depth-tested: hidden behind blocks in front of it (for the wrong-block overlays, which got overwhelming through walls). */
+	private static void outlineOccluded(double x0, double y0, double z0, double x1, double y1, double z1, int color, float width) {
+		GizmoDrawing.box(new Box(x0, y0, z0, x1, y1, z1), DrawStyle.stroked(color, width));
+	}
+
+	private static void fillOccluded(double x0, double y0, double z0, double x1, double y1, double z1, int color) {
+		GizmoDrawing.box(new Box(x0, y0, z0, x1, y1, z1), DrawStyle.filled(color));
 	}
 
 	/** Locked placements' missing blocks, drawn as real blocks by {@link RmBlockRender}. */
@@ -248,6 +259,7 @@ public final class RmRender {
 		List<Placements.Placement> list = Placements.all();
 		if (list.isEmpty()) {
 			placementVoxels = List.of();
+			fluidCells = List.of();
 			ghostBlocks = List.of();
 			return;
 		}
@@ -261,14 +273,19 @@ public final class RmRender {
 			placementVoxels = collectPlacements(list);
 		}
 		// Wrong (red), wrong state (yellow) and extra blocks where the schematic is empty (pink): a
-		// tinted box plus a solid outline, so they're easy to spot even in a busy build.
+		// tinted box plus a solid outline, so they're easy to spot even in a busy build. Depth-tested: only the ones you
+		// can actually see, not every mistake in the build through the walls.
 		int outlined = 0;
 		for (float[] v : placementVoxels) {
 			int color = (int) v[3];
-			fill(v[0] - 0.01, v[1] - 0.01, v[2] - 0.01, v[0] + 1.01, v[1] + 1.01, v[2] + 1.01, color);
+			fillOccluded(v[0] - 0.01, v[1] - 0.01, v[2] - 0.01, v[0] + 1.01, v[1] + 1.01, v[2] + 1.01, color);
 			if (outlined++ < 3000) {
-				outline(v[0] - 0.01, v[1] - 0.01, v[2] - 0.01, v[0] + 1.01, v[1] + 1.01, v[2] + 1.01, color | 0xFF000000, 2f);
+				outlineOccluded(v[0] - 0.01, v[1] - 0.01, v[2] - 0.01, v[0] + 1.01, v[1] + 1.01, v[2] + 1.01, color | 0xFF000000, 2f);
 			}
+		}
+		// Fluids have no block model, so the hologram pass can't show them: tinted boxes instead, as high as the water is.
+		for (float[] f : fluidCells) {
+			fillOccluded(f[0] + 0.02, f[1], f[2] + 0.02, f[0] + 0.98, f[1] + f[4], f[2] + 0.98, (int) f[3]);
 		}
 		for (Placements.Placement p : list) {
 			if (p.visible && p.locked) {
@@ -292,6 +309,8 @@ public final class RmRender {
 		}
 		List<float[]> out = new ArrayList<>();
 		List<Object[]> ghosts = new ArrayList<>();
+		List<float[]> fluids = new ArrayList<>();
+		boolean showFluids = RmSettings.get().showFluids;
 		int radius = 40;
 		for (Placements.Placement p : list) {
 			if (!p.visible || !p.locked || p.outlineOnly) {
@@ -312,11 +331,23 @@ public final class RmRender {
 						}
 						Object want = v.states[v.index(x, y, z)];
 						Object have = RmWorld.state(level, p.x + x, p.y + y, p.z + z);
-						if (want == have) {
+						if (want == have || sameFunction(want, have)) {
 							continue;
 						}
 						boolean wantAir = RmWorld.isAir(want);
 						if (wantAir && RmWorld.isAir(have)) {
+							continue;
+						}
+						String fluid = fluid(want);
+						if (fluid != null) {
+							// Schematic water / lava: hidden unless switched on; flowing parts count once any of that fluid is there.
+							if (showFluids && fluids.size() < MAX_GHOST_BLOCKS && !(fluid.equals(fluid(have)) && (!source(want) || source(have)))) {
+								if (!RmWorld.isAir(have) && !RmWorld.replaceable(have)) {
+									out.add(new float[] {p.x + x, p.y + y, p.z + z, WRONG_BLOCK});
+								} else {
+									fluids.add(fluidCell(p.x + x, p.y + y, p.z + z, fluid, want));
+								}
+							}
 							continue;
 						}
 						if (wantAir) {
@@ -337,7 +368,70 @@ public final class RmRender {
 			ghosts = new ArrayList<>(ghosts.subList(0, MAX_GHOST_BLOCKS));
 		}
 		ghostBlocks = ghosts;
+		fluidCells = fluids;
 		return out;
+	}
+
+	/** "water" / "lava" for those blocks (a bubble column is water too), else null. */
+	static String fluid(Object state) {
+		if (state == null) {
+			return null;
+		}
+		return switch (RmWorld.id(state)) {
+			case "minecraft:water", "minecraft:bubble_column" -> "water";
+			case "minecraft:lava" -> "lava";
+			default -> null;
+		};
+	}
+
+	/** A source block (level 0), not flowing water / lava. */
+	static boolean source(Object state) {
+		String level = RmWorld.prop(state, "level");
+		return level == null || level.equals("0");
+	}
+
+	private static float[] fluidCell(int x, int y, int z, String fluid, Object state) {
+		int rgb = fluid.equals("lava") ? 0xFF7A1E : 0x3A7BFF;
+		if (source(state)) {
+			return new float[] {x, y, z, 0x70000000 | rgb, 0.9f};
+		}
+		// Flowing: fainter and lower, the way the water stands there.
+		int level = 0;
+		try {
+			level = Integer.parseInt(RmWorld.prop(state, "level"));
+		} catch (NumberFormatException ignored) {
+			// Unknown level: full height.
+		}
+		float height = level >= 8 ? 0.9f : Math.max(0.12f, (8 - level) / 9f);
+		return new float[] {x, y, z, 0x38000000 | rgb, height};
+	}
+
+	/**
+	 * Two different states that work the same, so a placement counts them as right. A crafter facing up or down works
+	 * the same whichever way its top side points ({@code up_north} = {@code up_east}...), and {@code triggered} /
+	 * {@code crafting} only show what it's doing at the moment.
+	 */
+	static boolean sameFunction(Object want, Object have) {
+		if (want == null || have == null || !RmWorld.id(want).equals("minecraft:crafter") || !RmWorld.id(have).equals("minecraft:crafter")) {
+			return false;
+		}
+		String w = RmWorld.prop(want, "orientation");
+		String h = RmWorld.prop(have, "orientation");
+		if (w == null || h == null) {
+			return false;
+		}
+		boolean vertical = w.startsWith("up_") || w.startsWith("down_");
+		if (vertical ? !h.startsWith(w.substring(0, w.indexOf('_') + 1)) : !w.equals(h)) {
+			return false;
+		}
+		Object normalized = RmWorld.with(have, "orientation", w);
+		for (String transientProp : new String[] {"triggered", "crafting"}) {
+			String value = RmWorld.prop(want, transientProp);
+			if (value != null) {
+				normalized = RmWorld.with(normalized, transientProp, value);
+			}
+		}
+		return normalized == want;
 	}
 
 	private static long distance(Object[] g, int[] player) {

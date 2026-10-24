@@ -1,0 +1,110 @@
+{
+  "title": "Velo Client 0.9.93: Velo Shaders (Beta)",
+  "summary": "Shaders that run on Minecraft's new Vulkan renderer: real sun shadows, volumetric clouds, coloured light, a new sky and water - with 8 presets and every detail configurable. Plus Anti Coords Leak, Anti Deepslate and a pile of 26.3 fixes.",
+  "tag": "Update",
+  "version": "0.9.93",
+  "accent": "#ff3b44",
+  "pinned": true,
+  "cover": "file:images/cover.jpg",
+  "blocks": [
+    {
+      "type": "heading",
+      "text": "Velo Shaders (Beta)"
+    },
+    {
+      "type": "text",
+      "text": "Iris and OptiFine-style shader packs can't run on Minecraft's new Vulkan renderer. Velo Shaders can: they're built for it, with **Sodium**, on **26.2 and 26.3**. Turn them on under Rendering > **Velo Shaders**."
+    },
+    {
+      "type": "image",
+      "image": "file:images/shaders-sunset.jpg",
+      "caption": "Velo Shaders, Cinematic preset"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Real sun and moon shadows** from every block, soft far from what casts them, sharp up close - and from players, mobs and your cosmetics too. Your own shadow follows you in first person, even across the clouds when you fly.",
+        "**Volumetric clouds**, god rays and haze, a new sky with an animated sun, moon phases, stars, the Milky Way, shooting stars and aurora.",
+        "**Light in colour**: soul fire glows cyan, redstone red, sea lanterns cool white. Hold a torch and it lights up around you. Auras glow too.",
+        "**Water and lava** of their own: waves, reflections, flowing water that runs downstream, wet ground and puddles in the rain, underwater and in-lava looks.",
+        "**Waving leaves, grass and flowers**, glowing light sources and particles, bloom and colour grading."
+      ]
+    },
+    {
+      "type": "image",
+      "image": "file:images/shaders-player-shadow.jpg",
+      "caption": "Players cast their real shape - wings included"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**8 presets**: Realistic, Cinematic, Golden Hour, Fantasy, Moody, Clear, Vanilla+ and Performance. Nights stay readable in all of them.",
+        "**Every detail is a setting**: shadows, fog, sky colours, sun and moon size, clouds, water colour, bloom, contrast and more - start from a preset and make it yours.",
+        "**Off means off**: with Velo Shaders turned off nothing of them runs, your FPS is exactly what it was."
+      ]
+    },
+    {
+      "type": "callout",
+      "style": "warning",
+      "text": "**Beta:** Velo Shaders are brand new custom Vulkan shaders and not perfect yet. Needs 26.2 or 26.3 with Sodium (the launcher installs it). Tell us what looks off - it gets better with every update."
+    },
+    {
+      "type": "heading",
+      "text": "Anti Coords Leak"
+    },
+    {
+      "type": "text",
+      "text": "Start sharing your screen or the game on Discord and within about a second every coordinate on your screen turns into Minecraft's scrambled magic text: chat, F3, your HUD, waypoints, minimaps, **Litematica's menus and area editor** and any other mod. Stop sharing and they come back. Chunk and region numbers are hidden too - they lead to your base just like coordinates."
+    },
+    {
+      "type": "list",
+      "items": [
+        "Only coordinates: FPS, ping, your GPU (\"RTX 3060\"), versions, player names and other numbers stay readable.",
+        "**Automatic** (default): only while Discord shares. **On**: always hidden. **Off**: never.",
+        "Linux: Discord, Vesktop, WebCord and Legcord on PipeWire. Windows: when Discord captures through Windows' screen capture (Windows 10 2004 and newer)."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Anti Deepslate"
+    },
+    {
+      "type": "text",
+      "text": "Deepslate and stone turn their texture by position, and ores, bedrock, tuff, gravel, diorite, andesite and granite follow the world seed - one screenshot can be enough to find a base. Anti Deepslate draws them all as netherite blocks (or any block you pick). Only how they look changes. Anti Coords Leak switches it on by itself while you share."
+    },
+    {
+      "type": "heading",
+      "text": "Schematics & Redstone Mode"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Save as .litematic** (Ctrl+S) and convert any schematic between .veloschem and .litematic, so friends on Litematica can load your builds. Search when loading (Ctrl+L).",
+        "Wrong blocks only show where you can see them, and a panel next to your crosshair shows what **should** be there and what you **placed**.",
+        "New setting **Show schematic water / lava**."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Fixes & improvements"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**26.3**: joining a world, the Singleplayer screen and some menus could crash or hang - fixed.",
+        "**Skins**: changing your skin in the Locker now shows on servers and in singleplayer right away, and the launcher's account head follows your current skin.",
+        "The launcher's 3D character shows the outer skin layer in its real colours (it looked greyish).",
+        "Title screen: buttons from mods like Flashback's Replays look like the rest of the menu, and the menu shrinks to fit instead of running off small windows.",
+        "**GPU Utilization** HUD shows real numbers (it said 0%).",
+        "**/velo toggle <module>** switches any module from chat or a command keybind.",
+        "The launcher uses less memory while it sits in the background.",
+        "Anti Farm Lag is now off by default, and its notifications too.",
+        "**Discord overlay on Windows** works with the new launcher, and player names above heads no longer vanish from 48 blocks on hologram servers."
+      ]
+    },
+    {
+      "type": "callout",
+      "text": "Update with the bell in the launcher (or Settings > **Updates**). The launcher fixes come with the new launcher version."
+    }
+  ]
+}

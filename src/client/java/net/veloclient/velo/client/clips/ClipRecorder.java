@@ -137,7 +137,7 @@ public final class ClipRecorder {
 						QUEUED.decrementAndGet();
 					}
 				});
-			});
+			}, maxHeight);
 		} catch (Throwable t) {
 			// A GPU hiccup must never take the frame down with it; stop instead of failing every frame.
 			VeloClient.LOGGER.warn("Clip recording stopped: frame capture failed", t);

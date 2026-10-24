@@ -36,8 +36,11 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 	private String style = "Glass";
 	private boolean showLabels = true;
 	private boolean showExtendedKeys = true;
-	private int pressedColor = 0xFFFF4444;
-	private int idleColor = 0x99101010;
+	private static final int DEFAULT_PRESSED = 0xFFFF4444;
+	private static final int DEFAULT_IDLE = 0x99101010;
+
+	private int pressedColor = DEFAULT_PRESSED;
+	private int idleColor = DEFAULT_IDLE;
 
 	public KeystrokesModule() {
 		super("keystrokes", "Keystrokes", "Shows WASD, sneak, jump and sprint key state.",
@@ -99,22 +102,25 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 	private void drawKeyShape(DrawContext context, int x, int y, boolean pressed) {
 		switch (style) {
 			case "Glass" -> {
-				// Frosted keys; a pressed key fills with the HUD accent and glows.
-				int accent = net.veloclient.velo.client.hud.HudLook.on() ? net.veloclient.velo.client.hud.HudLook.accent() : pressedColor;
+				// Frosted keys; a pressed key fills with the HUD accent and glows - unless this module's own colours were changed.
+				int accent = net.veloclient.velo.client.hud.HudLook.own(pressedColor, DEFAULT_PRESSED, net.veloclient.velo.client.hud.HudLook.accent());
 				if (pressed) {
 					VeloDraw.shadow(context, x, y, KEY_SIZE, KEY_SIZE, 6, 8, 2, (accent & 0xFFFFFF) | 0x90000000);
 					VeloDraw.fillRounded(context, x, y, KEY_SIZE, KEY_SIZE, 6, accent | 0xFF000000);
 				} else {
 					// Light frosted key: enough to read the letter, little of the world hidden behind it.
-					VeloDraw.fillRounded(context, x, y, KEY_SIZE, KEY_SIZE, 6, 0x38101016);
+					VeloDraw.fillRounded(context, x, y, KEY_SIZE, KEY_SIZE, 6, idleColor != DEFAULT_IDLE ? idleColor : 0x38101016);
 					VeloDraw.strokeRounded(context, x, y, KEY_SIZE, KEY_SIZE, 6, 0x40FFFFFF);
 				}
 			}
 			case "Outline" -> {
+				boolean ownPressed = pressedColor != DEFAULT_PRESSED;
+				boolean ownIdle = idleColor != DEFAULT_IDLE;
 				if (pressed) {
-					VeloDraw.fillRounded(context, x, y, KEY_SIZE, KEY_SIZE, 5, 0x40FFFFFF);
+					VeloDraw.fillRounded(context, x, y, KEY_SIZE, KEY_SIZE, 5, ownPressed ? (pressedColor & 0xFFFFFF) | 0x40000000 : 0x40FFFFFF);
 				}
-				VeloDraw.strokeRounded(context, x, y, KEY_SIZE, KEY_SIZE, 5, pressed ? 0xFFFFFFFF : 0x90FFFFFF);
+				VeloDraw.strokeRounded(context, x, y, KEY_SIZE, KEY_SIZE, 5, pressed ? (ownPressed ? pressedColor | 0xFF000000 : 0xFFFFFFFF)
+						: ownIdle ? idleColor : 0x90FFFFFF);
 			}
 			case "Minecraft" -> {
 				// The vanilla button look: light top-left edge, dark bottom-right, lighter when held.

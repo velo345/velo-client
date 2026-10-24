@@ -7,6 +7,7 @@ import javafx.scene.paint.PhongMaterial;
 import javafx.scene.shape.CullFace;
 import javafx.scene.shape.MeshView;
 import javafx.scene.shape.TriangleMesh;
+import javafx.scene.transform.Affine;
 import net.veloclient.launcher.data.WingsCatalog;
 
 import java.io.DataInputStream;
@@ -21,6 +22,12 @@ import java.util.Map;
  * "doing" (idle, walk, fly, glide, sneak, swim). Stops by itself when the model leaves the screen.
  *
  * <p>Model space is the viewer's: pixels, y down, +z behind the player, shoulders at y = -8.
+ *
+ * <p>Each half is a static mesh moved by one {@link Affine} per frame. Rewriting the mesh points
+ * every frame (to bend the outer part separately) made JavaFX rebuild the whole mesh - normals,
+ * tangents and fresh native vertex buffers - on every pulse: most of the launcher's CPU while a
+ * winged player was on screen, and native memory that grew ~2 MB a second for as long as it was
+ * (1.5 GB after an afternoon). The bend is now taken at a point two thirds of the way out.
  */
 public final class Wings3D {
 
@@ -42,8 +49,10 @@ public final class Wings3D {
 	private final AnimationTimer timer;
 	private Model model;
 	private WingsCatalog.WingType type;
-	private TriangleMesh mesh;
-	private float[] points;
+	/** One transform per half, in model order; the meshes themselves never change. */
+	private Affine[] transforms = new Affine[0];
+	/** Where along a half (0 shoulder, 1 tip) its rigid pose takes the flex. */
+	private static final float BEND_AT = 0.65f;
 	private Motion motion = Motion.IDLE;
 	private double phase;
 	private float sweep = 0.45f;
@@ -59,6 +68,9 @@ public final class Wings3D {
 		timer = new AnimationTimer() {
 			@Override
 			public void handle(long now) {
+				if (!RenderGate.active()) {
+					return;
+				}
 				step(now);
 			}
 		};
@@ -100,39 +112,30 @@ public final class Wings3D {
 		}
 		type = next;
 		model = m;
-		mesh = new TriangleMesh();
-		int vertices = 0;
-		for (Half h : m.halves) {
-			vertices += h.uv.length / 2;
-		}
-		points = new float[vertices * 3];
-		float[] tex = new float[vertices * 2];
-		int faceCount = 0;
-		for (Half h : m.halves) {
-			faceCount += h.triangles.length / 3;
-		}
-		int[] faces = new int[faceCount * 6];
-		int base = 0;
-		int f = 0;
-		for (Half h : m.halves) {
-			System.arraycopy(h.uv, 0, tex, base * 2, h.uv.length);
+		MeshView[] views = new MeshView[m.halves.length];
+		transforms = new Affine[m.halves.length];
+		for (int i = 0; i < m.halves.length; i++) {
+			Half h = m.halves[i];
+			TriangleMesh mesh = new TriangleMesh();
+			mesh.getPoints().setAll(h.geometry);
+			mesh.getTexCoords().setAll(h.uv);
+			int[] faces = new int[h.triangles.length * 2];
 			for (int t = 0; t < h.triangles.length; t++) {
-				int v = base + h.triangles[t];
-				faces[f++] = v;
-				faces[f++] = v;
+				faces[t * 2] = h.triangles[t];
+				faces[t * 2 + 1] = h.triangles[t];
 			}
-			base += h.uv.length / 2;
+			mesh.getFaces().setAll(faces);
+			MeshView view = new MeshView(mesh);
+			PhongMaterial material = new PhongMaterial();
+			material.setDiffuseMap(m.texture);
+			material.setSpecularColor(javafx.scene.paint.Color.rgb(40, 40, 40));
+			view.setMaterial(material);
+			view.setCullFace(CullFace.NONE);
+			transforms[i] = new Affine();
+			view.getTransforms().setAll(transforms[i]);
+			views[i] = view;
 		}
-		mesh.getPoints().setAll(points);
-		mesh.getTexCoords().setAll(tex);
-		mesh.getFaces().setAll(faces);
-		MeshView view = new MeshView(mesh);
-		PhongMaterial material = new PhongMaterial();
-		material.setDiffuseMap(m.texture);
-		material.setSpecularColor(javafx.scene.paint.Color.rgb(40, 40, 40));
-		view.setMaterial(material);
-		view.setCullFace(CullFace.NONE);
-		node.getChildren().setAll(view);
+		node.getChildren().setAll(views);
 		step(System.nanoTime());
 	}
 
@@ -194,7 +197,7 @@ public final class Wings3D {
 		}
 	}
 
-	/** One frame: ease towards the motion's wingbeat, then bend the mesh into the pose. */
+	/** One frame: ease towards the motion's wingbeat, then pose each half's transform. */
 	private void step(long now) {
 		float dt = last == 0 ? 0 : Math.min(0.1f, (now - last) / 1e9f);
 		last = now;
@@ -272,37 +275,23 @@ public final class Wings3D {
 		float poseLift = lift - amplitude * 0.12f * (float) Math.sin(phase);
 		float bend = -amplitude * 0.25f * flex * (float) Math.sin(phase);
 
-		int base = 0;
 		float attachY = ATTACH_Y + type.offsetY() + settings.offsetY();
 		float attachZ = ATTACH_Z + settings.offsetZ();
 		float size = settings.scale();
-		for (Half half : model.halves) {
-			int s = half.side;
+		for (int i = 0; i < model.halves.length && i < transforms.length; i++) {
+			int s = model.halves[i].side;
 			float l = -s * poseLift;
 			float cosL = (float) Math.cos(l);
 			float sinL = (float) Math.sin(l);
-			int n = half.uv.length / 2;
-			for (int v = 0; v < n; v++) {
-				float w = half.weight[v];
-				float yaw = -s * (poseSweep + bend * w * w);
-				float cy = (float) Math.cos(yaw);
-				float sy = (float) Math.sin(yaw);
-				float gx = half.geometry[v * 3] * size;
-				float gy = half.geometry[v * 3 + 1] * size;
-				float gz = half.geometry[v * 3 + 2] * size;
-				float x = gx * cosL - gy * sinL;
-				float y = gx * sinL + gy * cosL;
-				float bx = x * cy + gz * sy + s * SHOULDER_X;
-				float by = y + attachY;
-				float bz = -x * sy + gz * cy + attachZ;
-				// Body space (blocks, from the neck) -> the viewer's pixels (shoulders at y = -8).
-				int o = (base + v) * 3;
-				points[o] = bx * 16;
-				points[o + 1] = by * 16 - 8;
-				points[o + 2] = bz * 16;
-			}
-			base += n;
+			float yaw = -s * (poseSweep + bend * BEND_AT * BEND_AT);
+			float cy = (float) Math.cos(yaw);
+			float sy = (float) Math.sin(yaw);
+			// pixels = 16 * (RotY(yaw) * RotZ(lift) * size * p + shoulder) - (0, 8, 0), p in the half's own geometry.
+			float px = 16 * size;
+			transforms[i].setToTransform(
+					px * cy * cosL, -px * cy * sinL, px * sy, 16 * s * SHOULDER_X,
+					px * sinL, px * cosL, 0, 16 * attachY - 8,
+					-px * sy * cosL, px * sy * sinL, px * cy, 16 * attachZ);
 		}
-		mesh.getPoints().set(0, points, 0, points.length);
 	}
 }

@@ -21,6 +21,11 @@ public interface Module {
 
 	SafetyTag safetyTag();
 
+	/** Still in development (shown with a BETA badge): works, but not finished or polished yet. */
+	default boolean beta() {
+		return false;
+	}
+
 	/** Whether this module ships enabled by default on a fresh profile. */
 	boolean defaultEnabled();
 

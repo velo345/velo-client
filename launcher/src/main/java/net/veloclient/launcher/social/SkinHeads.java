@@ -31,15 +31,73 @@ public final class SkinHeads {
 	private SkinHeads() {
 	}
 
+	// Called (on the FX thread) with the uuid whose skin just changed.
+	private static final java.util.List<java.util.function.Consumer<String>> LISTENERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+	public static void onChange(java.util.function.Consumer<String> listener) {
+		LISTENERS.add(listener);
+	}
+
+	/**
+	 * A skin known to be current (your own, fresh from Mojang's profile API or just uploaded): replaces
+	 * the cached one - otherwise the 6 h disk cache kept showing the old face, even across restarts.
+	 */
+	public static void update(String uuid, byte[] png) {
+		if (uuid == null || png == null) {
+			return;
+		}
+		String key = uuid.replace("-", "").toLowerCase();
+		Path file = VeloPaths.root().resolve("cache").resolve("heads").resolve(key + ".png");
+		try {
+			if (Files.exists(file) && java.util.Arrays.equals(Files.readAllBytes(file), png)) {
+				Files.setLastModifiedTime(file, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis()));
+				return;
+			}
+			Files.createDirectories(file.getParent());
+			Files.write(file, png);
+		} catch (Exception ignored) {
+			// memory cache below still updates
+		}
+		CACHE.put(key, CompletableFuture.completedFuture(png));
+		javafx.application.Platform.runLater(() -> LISTENERS.forEach(listener -> listener.accept(key)));
+	}
+
 	public static CompletableFuture<byte[]> skin(String uuid) {
 		String key = uuid.replace("-", "").toLowerCase();
 		return CACHE.computeIfAbsent(key, k -> CompletableFuture.supplyAsync(() -> load(k)));
 	}
 
+	/**
+	 * Re-reads a skin from Mojang's public session server, skipping the disk cache - for your own
+	 * account when its login token can't ask the profile API (expired). Fires onChange if it differs.
+	 */
+	public static void refresh(String uuid) {
+		if (uuid == null) {
+			return;
+		}
+		String key = uuid.replace("-", "").toLowerCase();
+		Path file = VeloPaths.root().resolve("cache").resolve("heads").resolve(key + ".png");
+		byte[] before = null;
+		try {
+			before = Files.exists(file) ? Files.readAllBytes(file) : null;
+		} catch (Exception ignored) {
+			// treated as unknown
+		}
+		byte[] now = load(key, true);
+		if (now != null && !java.util.Arrays.equals(before, now)) {
+			CACHE.put(key, CompletableFuture.completedFuture(now));
+			javafx.application.Platform.runLater(() -> LISTENERS.forEach(listener -> listener.accept(key)));
+		}
+	}
+
 	private static byte[] load(String uuid) {
+		return load(uuid, false);
+	}
+
+	private static byte[] load(String uuid, boolean fresh) {
 		Path file = VeloPaths.root().resolve("cache").resolve("heads").resolve(uuid + ".png");
 		try {
-			if (Files.exists(file) && System.currentTimeMillis() - Files.getLastModifiedTime(file).toMillis() < TTL_MILLIS) {
+			if (!fresh && Files.exists(file) && System.currentTimeMillis() - Files.getLastModifiedTime(file).toMillis() < TTL_MILLIS) {
 				return Files.readAllBytes(file);
 			}
 			HttpResponse<String> profile = HTTP.send(HttpRequest.newBuilder(

@@ -26,6 +26,8 @@
 		"PlayerNameTagBadgeMixin",
 		"ScreenAccessMixin",
 		"SessionAccessorMixin",
+		"InputKeyRangeMixin",
+		"GpuUtilizationTimingMixin",
 		"SmallCapsActionBarMixin",
 		"SmallCapsChatMixin",
 		"TitleLogoMixin",

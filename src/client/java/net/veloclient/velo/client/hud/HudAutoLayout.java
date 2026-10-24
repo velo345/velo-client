@@ -20,7 +20,29 @@ public final class HudAutoLayout {
 	private static final int MARGIN = 2;
 	private static final int GAP = 2;
 
+	/** {@link #updateThrottled} re-runs the layout at most this often (~20 Hz), or at once on a resize. */
+	private static final long THROTTLE_NANOS = 50_000_000L;
+	private static long lastUpdate;
+	private static int lastW = -1;
+	private static int lastH = -1;
+
 	private HudAutoLayout() {
+	}
+
+	/**
+	 * The in-game HUD's entry point: element sizes change at text speed (an FPS counter going from 3
+	 * to 4 digits), not frame speed, so laying out every module every frame - at several hundred FPS -
+	 * only burned render-thread time. The HUD editor keeps calling {@link #update} every frame.
+	 */
+	public static void updateThrottled(int screenW, int screenH) {
+		long now = System.nanoTime();
+		if (screenW == lastW && screenH == lastH && now - lastUpdate < THROTTLE_NANOS) {
+			return;
+		}
+		lastUpdate = now;
+		lastW = screenW;
+		lastH = screenH;
+		update(screenW, screenH);
 	}
 
 	public static void update(int screenW, int screenH) {

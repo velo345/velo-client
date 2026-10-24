@@ -145,7 +145,16 @@ public final class SchematicsScreen extends VeloWindow {
 									net.veloclient.velo.client.redstone.SchematicIO.loadToClipboard(file);
 									status = Text.literal("Loaded \"" + displayName + "\" - in Redstone Mode" + net.veloclient.velo.client.redstone.RmKeys.toggleHint() + " aim and left click to paste");
 								}
-								: match != null && match.found() ? () -> openInBrowser(match.postUrl()) : () -> { });
+								: match != null && match.found() ? () -> openInBrowser(match.postUrl()) : () -> { },
+						format == SchematicFormat.VELO || format == SchematicFormat.LITEMATICA ? f -> {
+							// Share with friends on the other client: .veloschem -> .litematic and back.
+							status = Text.literal("Converting \"" + displayName + "\"...");
+							net.veloclient.velo.client.redstone.SchematicIO.convert(f, out -> {
+								status = Text.literal(out != null ? "Saved " + out.getFileName() + (format == SchematicFormat.VELO
+										? " in schematics/ - send it to friends using Litematica" : " under Velo") : "Couldn't convert \"" + displayName + "\"");
+								layoutContent();
+							});
+						} : null);
 				addSelectableChild(tile);
 				scrollRegion.addRow(tile);
 				if (match == null && format != SchematicFormat.VELO && identifyAttempted.add(fileName)) {

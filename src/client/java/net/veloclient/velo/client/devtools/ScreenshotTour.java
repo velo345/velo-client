@@ -636,11 +636,585 @@ public final class ScreenshotTour {
 						}
 					}},
 					new Object[] {40, (Runnable) () -> VeloClient.LOGGER.info("Velo tour advback: after Back = {}", screenName(client))});
+			case "vibe-hud" -> vibeHud(client);
+			case "vibe-orbit" -> vibeOrbit(client);
+			case "vibe-names" -> vibeNames(client);
+			case "vibe-scout" -> vibeScout(client);
+			case "rs" -> redstoneShort(client);
 			default -> {
 				VeloClient.LOGGER.warn("Velo screenshot tour: unknown scene {}", name);
 				yield List.of();
 			}
 		};
+	}
+
+	// ---- Frame sequences for promo edits: one shot per tick. A shot shows the state set one tick earlier,
+	// so step k saves frame k-1 and then sets frame k (vibe-log.txt says where the cursor is per frame). ----
+
+	private static net.veloclient.velo.client.gui.HudEditScreen hudEditForTour;
+	private static final StringBuilder VIBE_LOG = new StringBuilder();
+
+	private static void vibeLog(String line) {
+		VIBE_LOG.append(line).append('\n');
+		try {
+			Files.createDirectories(folder);
+			Files.writeString(folder.resolve("vibe-log.txt"), VIBE_LOG);
+		} catch (Exception e) {
+			VeloClient.LOGGER.warn("Velo screenshot tour: vibe log", e);
+		}
+	}
+
+	private static float ease(float t) {
+		t = Math.clamp(t, 0f, 1f);
+		return t < 0.5f ? 4f * t * t * t : 1f - (float) Math.pow(-2f * t + 2f, 3) / 2f;
+	}
+
+	/** Frames {@code prefix-000..} from {@code count} calls of {@code frame} (frame index in, state for it set). */
+	private static void sequence(List<Object[]> steps, MinecraftClient client, String prefix, int count, java.util.function.IntConsumer frame) {
+		for (int k = 0; k <= count; k++) {
+			int f = k;
+			steps.add(new Object[] {1, (Runnable) () -> {
+				if (f > 0) {
+					rawShot(client, String.format(java.util.Locale.ROOT, "%s-%03d", prefix, f - 1));
+					vibeLog(String.format(java.util.Locale.ROOT, "time %s %d %d", prefix, f - 1, System.nanoTime() / 1_000_000));
+				}
+				if (f < count) {
+					frame.accept(f);
+				}
+			}});
+		}
+	}
+
+	/** Runs commands as the server (26.2 only, like {@link #hudSetup}). */
+	private static void serverCommands(MinecraftClient client, String... commands) {
+		//? if >=26.2 {
+		/*var server = client.getSingleplayerServer();
+		if (server != null) {
+			server.execute(() -> {
+				var source = server.createCommandSourceStack();
+				String me = client.player.getGameProfile().name();
+				for (String command : commands) {
+					server.getCommands().performPrefixedCommand(source, command.replace("@s", me));
+				}
+			});
+		}
+		*///?}
+	}
+
+	private static void clearChat(MinecraftClient client) {
+		//? if >=26.2 {
+		/*client.gui.hud.getChat().clearMessages(false);
+		*///?}
+	}
+
+	private static final String[] VIBE_WORLD = {"time set 11800", "weather clear", "gamerule doDaylightCycle false", "gamerule advance_time false",
+			"gamerule advance_weather false"};
+
+	private static void setHudHidden(MinecraftClient client, boolean hidden) {
+		//? if >=26.2 {
+		/*if (client.gui.hud.isHidden() != hidden) {
+			client.gui.hud.toggle();
+		}
+		*///?}
+	}
+
+	/** Drags Keystrokes across the screen in the HUD editor, lets go, then resizes it. */
+	private static List<Object[]> vibeHud(MinecraftClient client) {
+		List<Object[]> steps = new ArrayList<>();
+		steps.add(new Object[] {0, (Runnable) () -> {
+			for (String id : List.of("small-caps", "entity-count-overlay", "target-hud", "height-limit", "held-item")) {
+				ModuleRegistry.get(id).ifPresent(m -> m.setEnabled(false));
+			}
+			for (String id : List.of("hud-style", "fps-counter", "ping-display", "clock", "coordinates", "keystrokes", "potion-timers",
+					"armor-durability", "mouse-buttons", "cps-counter")) {
+				ModuleRegistry.get(id).ifPresent(m -> m.setEnabled(true));
+			}
+			for (var module : ModuleRegistry.all()) {
+				if (module instanceof net.veloclient.velo.client.hud.HudModule hud) {
+					hud.position().resetToDefault();
+				}
+			}
+			setChoice("hud-style", "Font", "Inter");
+			setChoice("hud-style", "Background", "Glass");
+			setChoice("potion-timers", "Style", "List");
+			setChoice("armor-durability", "Style", "Bars");
+			setChoice("keystrokes", "Style", "Glass");
+			hudSetup(client);
+			serverCommands(client, VIBE_WORLD);
+		}});
+		steps.add(new Object[] {20, (Runnable) () -> clearChat(client)});
+		// Fonts and styles, one still each.
+		String[][] looks = {{"Inter", "Glass"}, {"Sora", "Glass"}, {"Space Grotesk", "Solid"}, {"Poppins", "Glass"}, {"JetBrains Mono", "None"},
+				{"Audiowide", "Glass"}, {"Minecraft", "Solid"}};
+		for (String[] look : looks) {
+			steps.add(new Object[] {30, (Runnable) () -> {
+				setChoice("hud-style", "Font", look[0]);
+				setChoice("hud-style", "Background", look[1]);
+			}});
+			steps.add(new Object[] {12, (Runnable) () -> shot(client, "look-" + look[0].toLowerCase(java.util.Locale.ROOT).replace(' ', '-'))});
+		}
+		steps.add(new Object[] {2, (Runnable) () -> {
+			setChoice("hud-style", "Font", "Inter");
+			setChoice("hud-style", "Background", "Glass");
+			hudEditForTour = new net.veloclient.velo.client.gui.HudEditScreen(null);
+			client.setScreen(hudEditForTour);
+		}});
+		steps.add(new Object[] {40, (Runnable) () -> shot(client, "hudedit")});
+		// {grabX, grabY, startX, startY} once the editor knows where Keystrokes is.
+		float[] at = new float[6];
+		java.util.function.Supplier<net.veloclient.velo.client.hud.HudModule> keys = () -> ModuleRegistry.get("keystrokes")
+				.filter(m -> m instanceof net.veloclient.velo.client.hud.HudModule).map(m -> (net.veloclient.velo.client.hud.HudModule) m).orElseThrow();
+		sequence(steps, client, "hud", 112, f -> {
+			var screen = hudEditForTour;
+			var hud = keys.get();
+			int[] a = screen.areaForTour(hud);
+			float cx;
+			float cy;
+			if (f == 0) {
+				at[0] = a[0];
+				at[1] = a[1];
+				at[2] = screen.width * 0.58f;
+				at[3] = screen.height * 0.40f;
+				vibeLog("gui " + screen.width + " " + screen.height);
+			}
+			float grabDX = a[2] * 0.5f;
+			float grabDY = a[3] * 0.5f;
+			if (f < 12) {
+				// cursor glides in from the middle of the screen
+				float t = ease(f / 11f);
+				cx = screen.width * 0.5f + (at[0] + grabDX - screen.width * 0.5f) * t;
+				cy = screen.height * 0.62f + (at[1] + grabDY - screen.height * 0.62f) * t;
+			} else if (f < 56) {
+				float t = ease((f - 14) / 41f);
+				int x = Math.round(at[0] + (at[2] - at[0]) * t);
+				int y = Math.round(at[1] + (at[3] - at[1]) * t);
+				screen.dragForTour(hud, x, y);
+				cx = x + grabDX;
+				cy = y + grabDY;
+			} else if (f < 64) {
+				if (f == 56) {
+					screen.dragForTour(null, 0, 0);
+				}
+				cx = a[0] + grabDX;
+				cy = a[1] + grabDY;
+			} else if (f < 76) {
+				float t = ease((f - 64) / 11f);
+				cx = a[0] + grabDX + (a[2] - grabDX) * t;
+				cy = a[1] + grabDY + (a[3] - grabDY) * t;
+			} else if (f < 102) {
+				float t = ease((f - 77) / 23f);
+				screen.resizeForTour(hud, 1f + 0.55f * t);
+				int[] now = screen.areaForTour(hud);
+				cx = now[0] + now[2];
+				cy = now[1] + now[3];
+			} else {
+				if (f == 102) {
+					screen.resizeForTour(null, 1f);
+				}
+				cx = a[0] + a[2];
+				cy = a[1] + a[3];
+			}
+			vibeLog(String.format(java.util.Locale.ROOT, "hud %d %.1f %.1f", f, cx, cy));
+		});
+		steps.add(new Object[] {2, (Runnable) () -> {
+			keys.get().position().resetToDefault();
+			hudEditForTour = null;
+		}});
+		return steps;
+	}
+
+	/** -Dvelo.tourScout=x,z;x,z... - drops you on the ground at each spot, looking at -Dvelo.tourLookAt=x,z, and shoots it. */
+	private static List<Object[]> vibeScout(MinecraftClient client) {
+		List<Object[]> steps = new ArrayList<>();
+		String[] look = System.getProperty("velo.tourLookAt", "0,0").split(",");
+		double lx = Double.parseDouble(look[0]);
+		double lz = Double.parseDouble(look[1]);
+		steps.add(new Object[] {0, (Runnable) () -> {
+			serverCommands(client, VIBE_WORLD);
+			serverCommands(client, "gamemode creative @s");
+			setHudHidden(client, true);
+		}});
+		String[] spots = System.getProperty("velo.tourScout", "").split(";");
+		for (int i = 0; i < spots.length; i++) {
+			String[] xz = spots[i].split(",");
+			int n = i;
+			steps.add(new Object[] {5, (Runnable) () -> serverCommands(client, "spreadplayers " + xz[0] + " " + xz[1] + " 0 1 false @s")});
+			steps.add(new Object[] {50, (Runnable) () -> {
+				var player = client.player;
+				float yaw = (float) Math.toDegrees(Math.atan2(-(lx - player.getX()), lz - player.getZ()));
+				serverCommands(client, String.format(java.util.Locale.ROOT, "rotate @s %.1f 5", yaw));
+			}});
+			steps.add(new Object[] {15, (Runnable) () -> {
+				shot(client, "scout-" + n);
+				vibeLog(String.format(java.util.Locale.ROOT, "scout %d %.1f %.1f %.1f", n, client.player.getX(), client.player.getY(), client.player.getZ()));
+			}});
+		}
+		return steps;
+	}
+
+	/** Orbits the camera around you wearing cosmetics: capes, wings, then one aura in every colour. */
+	private static List<Object[]> vibeOrbit(MinecraftClient client) {
+		List<Object[]> steps = new ArrayList<>();
+		String[] capes = System.getProperty("velo.tourCapes", "").split(",");
+		String[] wings = System.getProperty("velo.tourWings", "").split(",");
+		String[] auras = System.getProperty("velo.tourAuras", "storm,inferno,aurora").split(",");
+		steps.add(new Object[] {0, (Runnable) () -> {
+			net.veloclient.velo.client.cosmetics.CosmeticsCatalog.refresh(true);
+			net.veloclient.velo.client.cosmetics.CapeManager.loadLibrary();
+			serverCommands(client, VIBE_WORLD);
+			serverCommands(client, "effect clear @s", "clear @s");
+			// -Dvelo.tourSpot=x,z,yaw: stand on the ground there, facing yaw.
+			String[] spot = System.getProperty("velo.tourSpot", "").split(",");
+			if (spot.length == 3) {
+				serverCommands(client, "spreadplayers " + spot[0] + " " + spot[1] + " 0 1 false @s", "rotate @s " + spot[2] + " 8");
+			}
+			ModuleRegistry.get("free-look").ifPresent(m -> m.setEnabled(true));
+			setHudHidden(client, true);
+			//? if >=26.2 {
+			/*client.options.fov().set(50);
+			client.player.setXRot(12f);
+			*///?}
+		}});
+		float[] yaw = {0f};
+		// Each look: 48 frames of a slow half orbit.
+		java.util.function.BiConsumer<String, Runnable> look = (prefix, dress) -> {
+			float from = prefix.contains("aura") ? 125f : -62f;
+			steps.add(new Object[] {60, dress});
+			sequence(steps, client, prefix, 48, f -> {
+				net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(true, from + yaw[0] + f * 2.6f, 3.6);
+			});
+			steps.add(new Object[] {0, (Runnable) () -> yaw[0] = yaw[0] == 0f ? -14f : 0f});
+		};
+		for (String cape : capes) {
+			if (cape.isBlank()) {
+				continue;
+			}
+			look.accept("orbit-cape-" + cape, () -> {
+				net.veloclient.velo.client.cosmetics.aura.AuraManager.setPreview(null);
+				net.veloclient.velo.client.cosmetics.wings.WingsManager.setPreview(null);
+				net.veloclient.velo.client.cosmetics.CapeManager.library().values().stream()
+						.filter(d -> d.name().equalsIgnoreCase(cape.replace('_', ' '))).findFirst()
+						.ifPresent(net.veloclient.velo.client.cosmetics.CapeManager::setPreviewOverride);
+			});
+		}
+		for (String wing : wings) {
+			if (wing.isBlank()) {
+				continue;
+			}
+			look.accept("orbit-wings-" + wing, () -> {
+				net.veloclient.velo.client.cosmetics.CapeManager.clearPreviewOverride();
+				net.veloclient.velo.client.cosmetics.wings.WingsManager.setPreview(wing);
+			});
+		}
+		// Auras: one each, then the first one through every colour (8 frames per colour).
+		for (String aura : auras) {
+			look.accept("orbit-aura-" + aura, () -> {
+				net.veloclient.velo.client.cosmetics.wings.WingsManager.setPreview(null);
+				net.veloclient.velo.client.cosmetics.aura.AuraManager.setSettings(aura, null);
+				net.veloclient.velo.client.cosmetics.aura.AuraManager.setPreview(aura);
+			});
+		}
+		steps.add(new Object[] {20, (Runnable) () -> net.veloclient.velo.client.cosmetics.aura.AuraManager.setPreview(auras[0])});
+		int colours = net.veloclient.velo.client.cosmetics.aura.AuraEffects.RAINBOW + 1;
+		sequence(steps, client, "orbit-colours", colours * 8, f -> {
+			if (f % 8 == 0) {
+				net.veloclient.velo.client.cosmetics.aura.AuraManager.setSettings(auras[0], new net.veloclient.velo.client.cosmetics.aura.AuraEffects.Settings(1.2f, 1f, 1.3f, f / 8));
+			}
+			net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(true, 150f + f * 0.9f, 3.4);
+		});
+		steps.add(new Object[] {2, (Runnable) () -> {
+			net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(false, 0f);
+			net.veloclient.velo.client.cosmetics.aura.AuraManager.setSettings(auras[0], null);
+			net.veloclient.velo.client.cosmetics.aura.AuraManager.clearPreview();
+			net.veloclient.velo.client.cosmetics.wings.WingsManager.clearPreview();
+			net.veloclient.velo.client.cosmetics.CapeManager.clearPreviewOverride();
+			setHudHidden(client, false);
+		}});
+		return steps;
+	}
+
+	/** The Locker's Name Style page, switching through presets (10 animated frames each). */
+	private static List<Object[]> vibeNames(MinecraftClient client) {
+		List<Object[]> steps = new ArrayList<>();
+		String[] presets = System.getProperty("velo.tourNameStyles", "Velo,Inferno,Aurora,Rainbow,Neon Pink,Gold Rush,Glitch,Galaxy,Vaporwave,Ice & Fire").split(",");
+		var screen = new net.veloclient.velo.client.gui.NameStyleScreen(null);
+		steps.add(new Object[] {0, (Runnable) () -> client.setScreen(screen)});
+		steps.add(new Object[] {40, (Runnable) () -> shot(client, "name-screen")});
+		for (String preset : presets) {
+			int index = -1;
+			for (int i = 0; i < net.veloclient.velo.client.namestyle.NameStyle.PRESETS.size(); i++) {
+				if (net.veloclient.velo.client.namestyle.NameStyle.PRESETS.get(i).name().equals(preset.trim())) {
+					index = i;
+				}
+			}
+			if (index < 0) {
+				continue;
+			}
+			int pick = index;
+			String slug = preset.trim().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z]+", "-");
+			steps.add(new Object[] {1, (Runnable) () -> screen.presetForTour(pick)});
+			sequence(steps, client, "name-" + slug, 12, f -> {
+			});
+		}
+		return steps;
+	}
+
+	// ---- Redstone Mode short: load a .litematic, place it, paste it, build guide, materials, wiring, rewind, save ----
+
+	private static int rx;
+	private static int ry;
+	private static int rz;
+	private static net.veloclient.velo.client.redstone.Placements.Placement rsPlacement;
+	private static final List<int[]> RS_WRONG = new ArrayList<>();
+
+	/** Puts you (flying) at x/y/z looking at tx/ty/tz - world coordinates, feet position. */
+	private static void lookFrom(MinecraftClient client, double x, double y, double z, double tx, double ty, double tz) {
+		double ex = x, ey = y + 1.62, ez = z;
+		float yaw = (float) Math.toDegrees(Math.atan2(-(tx - ex), tz - ez));
+		float pitch = (float) -Math.toDegrees(Math.atan2(ty - ey, Math.hypot(tx - ex, tz - ez)));
+		//? if >=26.2 {
+		/*var p = client.player;
+		p.getAbilities().flying = true;
+		p.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+		p.snapTo(x, y, z, yaw, pitch);
+		p.setYHeadRot(yaw);
+		*///?}
+	}
+
+	/** Camera path through keys {frame, x, y, z, tx, ty, tz} (relative to the base), eased between keys. */
+	private static void camPath(MinecraftClient client, double[][] keys, int f) {
+		int i = 0;
+		while (i < keys.length - 2 && f > keys[i + 1][0]) {
+			i++;
+		}
+		double[] a = keys[i];
+		double[] b = keys[Math.min(keys.length - 1, i + 1)];
+		double t = b[0] == a[0] ? 1 : Math.max(0, Math.min(1, (f - a[0]) / (b[0] - a[0])));
+		t = 0.5 - 0.5 * Math.cos(Math.PI * t);
+		double[] v = new double[7];
+		for (int k = 1; k < 7; k++) {
+			v[k] = a[k] + (b[k] - a[k]) * t;
+		}
+		lookFrom(client, rx + v[1], ry + v[2], rz + v[3], rx + v[4], ry + v[5], rz + v[6]);
+	}
+
+	private static void rsCommands(MinecraftClient client, String... commands) {
+		String[] out = new String[commands.length];
+		for (int i = 0; i < commands.length; i++) {
+			// "{x+3}" style offsets from the base
+			StringBuilder sb = new StringBuilder();
+			java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\{([xyz])([-+]\\d+)?\\}").matcher(commands[i]);
+			while (m.find()) {
+				int base = switch (m.group(1)) {
+					case "x" -> rx;
+					case "y" -> ry;
+					default -> rz;
+				};
+				m.appendReplacement(sb, String.valueOf(base + (m.group(2) == null ? 0 : Integer.parseInt(m.group(2)))));
+			}
+			m.appendTail(sb);
+			out[i] = sb.toString();
+		}
+		serverCommands(client, out);
+	}
+
+	private static List<Object[]> redstoneShort(MinecraftClient client) {
+		List<Object[]> steps = new ArrayList<>();
+		String schematic = System.getProperty("velo.tourSchematic", "1-pumpkin-2-mel-z3hupun1.litematic");
+		var rs = new Object() {
+			net.veloclient.velo.client.redstone.SchematicPickScreen pick;
+			net.veloclient.velo.client.redstone.SchematicSaveScreen save;
+		};
+		// ---- setup: a fresh flat spot, daytime, no chat spam ----
+		steps.add(new Object[] {0, (Runnable) () -> {
+			serverCommands(client, "gamemode creative @s", "gamerule send_command_feedback false", "time set 5000", "weather clear",
+					"gamerule advance_time false", "gamerule advance_weather false",
+					"spreadplayers " + (8000 + (System.currentTimeMillis() / 1000 % 400) * 200) + " 6000 0 1 false @s");
+			setHudHidden(client, false);
+			//? if >=26.2 {
+			/*client.options.fov().set(60);
+			// 60 fps is plenty for one shot per tick and keeps the rest of the PC usable
+			client.options.framerateLimit().set(60);
+			*///?}
+		}});
+		steps.add(new Object[] {60, (Runnable) () -> {
+			rx = (int) Math.floor(client.player.getX());
+			ry = (int) Math.floor(client.player.getY());
+			rz = (int) Math.floor(client.player.getZ());
+			vibeLog("rs base " + rx + " " + ry + " " + rz);
+			clearChat(client);
+			net.veloclient.velo.client.redstone.RmSettings.get().pasteSpeed = 90;
+			// wiring set: a lever on stone, a lamp further on, two walls in the way
+			rsCommands(client, "setblock {x+18} {y} {z+8} stone", "setblock {x+18} {y+1} {z+8} lever[face=floor,facing=south]",
+					"setblock {x+31} {y} {z+29} redstone_lamp",
+					"fill {x+21} {y} {z+14} {x+29} {y+2} {z+14} stone_bricks", "fill {x+24} {y} {z+21} {x+33} {y+2} {z+21} stone_bricks");
+			net.veloclient.velo.client.redstone.RedstoneMode.enter();
+			lookFrom(client, rx + 0.5, ry + 6, rz - 6, rx + 0.5, ry, rz + 39.5);
+		}});
+		// ---- 1. pick the schematic (search) ----
+		steps.add(new Object[] {40, (Runnable) () -> {
+			clearChat(client);
+			rs.pick = new net.veloclient.velo.client.redstone.SchematicPickScreen(null);
+			client.setScreen(rs.pick);
+		}});
+		String query = "pumpkin";
+		sequence(steps, client, "rs-pick", 54, f -> {
+			if (f >= 14 && f < 14 + query.length() * 3 && (f - 14) % 3 == 0) {
+				typeForTour(client, query.substring(0, (f - 14) / 3 + 1));
+			}
+		});
+		// ---- 2. it follows your crosshair, then locks ----
+		steps.add(new Object[] {2, (Runnable) () -> {
+			client.setScreen(null);
+			net.veloclient.velo.client.redstone.SchematicIO.loadToClipboard(net.veloclient.velo.client.redstone.SchematicIO.litematicFolder().resolve(schematic));
+			lookFrom(client, rx + 0.5, ry + 9, rz + 2, rx - 34, ry, rz + 62);
+		}});
+		double[][] place = {{0, .5, 9, 2, -34, 0, 62}, {50, .5, 8, 6, .5, 0, 39.5}, {70, .5, 8, 5, .5, 4, 39.5}};
+		steps.add(new Object[] {25, (Runnable) () -> rsPlacement = net.veloclient.velo.client.redstone.Placements.following()});
+		sequence(steps, client, "rs-place", 72, f -> {
+			camPath(client, place, f);
+			if (f == 52 && rsPlacement != null) {
+				var v = rsPlacement.view();
+				rsPlacement.x = rx - v.sx / 2;
+				rsPlacement.y = ry;
+				rsPlacement.z = rz + 22;
+				rsPlacement.locked = true;
+				vibeLog("rs placement " + v.sx + " " + v.sy + " " + v.sz);
+			}
+		});
+		// ---- 3. paste it, orbiting ----
+		sequence(steps, client, "rs-paste", 150, f -> {
+			var p = rsPlacement;
+			if (p == null) {
+				return;
+			}
+			var v = p.view();
+			double cx = p.x - rx + v.sx / 2.0, cz = p.z - rz + v.sz / 2.0;
+			double ang = Math.toRadians(-118 + f * 0.36);
+			double r = 34 - f * 0.03;
+			double y = 9 + f * 0.05;
+			lookFrom(client, rx + cx + Math.cos(ang) * r, ry + y, rz + cz + Math.sin(ang) * r, rx + cx, ry + v.sy * 0.42, rz + cz);
+			if (f == 6) {
+				net.veloclient.velo.client.redstone.RmOps.paste(v, p.x, p.y, p.z);
+			}
+		});
+		// ---- 4. build guide: some wrong and missing blocks on the front ----
+		steps.add(new Object[] {30, (Runnable) () -> {
+			var p = rsPlacement;
+			var v = p.view();
+			RS_WRONG.clear();
+			List<String> cmds = new ArrayList<>();
+			int n = 0;
+			for (int y = 1; y < Math.min(6, v.sy) && n < 7; y++) {
+				for (int dx = 0; dx < v.sx && n < 7; dx += 3) {
+					int x = p.x + (v.sx / 2 + (dx % 2 == 0 ? dx / 2 : -dx / 2)) % v.sx;
+					int z = p.z;
+					Object want = net.veloclient.velo.client.redstone.Placements.stateAt(x, p.y + y, z);
+					if (want != null && !net.veloclient.velo.client.redstone.RmWorld.isAir(want)) {
+						cmds.add("setblock " + x + " " + (p.y + y) + " " + z + (n % 3 == 2 ? " air" : n % 2 == 0 ? " minecraft:stone" : " minecraft:oak_planks"));
+						RS_WRONG.add(new int[] {x, p.y + y, z, n % 3 == 2 ? 0 : 1});
+						n++;
+					}
+				}
+			}
+			serverCommands(client, cmds.toArray(new String[0]));
+			vibeLog("rs wrong " + RS_WRONG.size());
+		}});
+		sequence(steps, client, "rs-guide", 100, f -> {
+			var p = rsPlacement;
+			int[] w = RS_WRONG.stream().filter(a -> a[3] == 1).findFirst().orElse(new int[] {p.x + 10, p.y + 2, p.z, 1});
+			double tx = w[0] + .5 - rx, ty = w[1] + .5 - ry, tz = w[2] + .5 - rz;
+			double[][] keys = {{0, tx - 9, ty + 4, tz - 16, tx, ty, tz}, {60, tx - 1.2, ty - 1.4, tz - 3.6, tx, ty, tz}, {100, tx - .4, ty - 1.3, tz - 3.4, tx, ty, tz}};
+			camPath(client, keys, f);
+		});
+		// ---- 5. material list ----
+		steps.add(new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.redstone.MaterialListScreen(rsPlacement))});
+		sequence(steps, client, "rs-materials", 50, f -> {
+		});
+		// ---- 6. wiring: lever to lamp, around the walls ----
+		steps.add(new Object[] {2, (Runnable) () -> {
+			client.setScreen(null);
+			net.veloclient.velo.client.redstone.RedstoneMode.selectTool(net.veloclient.velo.client.redstone.RmState.Tool.WIRE);
+			net.veloclient.velo.client.redstone.RedstoneMode.setToolSlot(true);
+		}});
+		double[][] wire = {{0, 13, 6, -2, 18.5, .5, 8.5}, {22, 15, 4, 2, 18.5, .5, 8.5}, {55, 26, 6, 18, 31.5, .5, 29.5}, {85, 25, 22, 12, 25, 0, 20},
+				{125, 25, 22, 12, 25, 0, 20}, {150, 27, 4, 23, 31.5, .5, 29.5}, {175, 27.5, 3.5, 24, 31.5, .5, 29.5}};
+		sequence(steps, client, "rs-wire", 176, f -> {
+			camPath(client, wire, f);
+			if (f == 22) {
+				net.veloclient.velo.client.redstone.RmState.wireStart = new int[] {rx + 18, ry, rz + 8, 5};
+			} else if (f == 55) {
+				net.veloclient.velo.client.redstone.RmState.wireEnd = new int[] {rx + 31, ry, rz + 29, 2};
+				net.veloclient.velo.client.redstone.Wiring.plan(false);
+			} else if (f == 110) {
+				net.veloclient.velo.client.redstone.Wiring.build();
+			} else if (f == 150) {
+				rsCommands(client, "setblock {x+18} {y+1} {z+8} lever[face=floor,facing=south,powered=true]");
+			} else if (f == 151) {
+				// a command-set lever doesn't update the wire; swapping the block under it does
+				rsCommands(client, "setblock {x+18} {y} {z+8} smooth_stone");
+			}
+		});
+		// ---- 7. blow up a corner, then rewind it ----
+		steps.add(new Object[] {2, (Runnable) () -> {
+			var p = rsPlacement;
+			var v = p.view();
+			net.veloclient.velo.client.redstone.RedstoneMode.selectTool(net.veloclient.velo.client.redstone.RmState.Tool.SELECT);
+			net.veloclient.velo.client.redstone.RmState.cornerA = new int[] {p.x - 3, p.y, p.z - 4};
+			net.veloclient.velo.client.redstone.RmState.cornerB = new int[] {p.x + v.sx + 2, p.y + Math.min(v.sy, 16), p.z + 10};
+		}});
+		sequence(steps, client, "rs-rewind", 150, f -> {
+			var p = rsPlacement;
+			var v = p.view();
+			double cx = p.x - rx + v.sx / 2.0, cz = p.z - rz;
+			double[][] keys = {{0, cx - 9, 7, cz - 17, cx, 5, cz + 3}, {150, cx - 4, 6, cz - 13, cx, 5, cz + 3}};
+			camPath(client, keys, f);
+			if (f == 2) {
+				net.veloclient.velo.client.redstone.Timeline.toggle();
+			} else if (f == 6) {
+				int mx = p.x + v.sx / 2;
+				serverCommands(client, "summon tnt " + (mx - 4) + " " + (p.y + 2) + " " + (p.z + 1) + " {fuse:24}",
+						"summon tnt " + (mx + 3) + " " + (p.y + 3) + " " + (p.z + 1) + " {fuse:26}",
+						"summon tnt " + mx + " " + (p.y + 6) + " " + (p.z + 1) + " {fuse:25}",
+						"summon tnt " + (mx - 2) + " " + (p.y + 9) + " " + (p.z + 1) + " {fuse:27}",
+						"summon tnt " + (mx + 2) + " " + (p.y + 1) + " " + (p.z + 2) + " {fuse:24}",
+						"summon tnt " + (mx + 5) + " " + (p.y + 7) + " " + (p.z + 1) + " {fuse:28}");
+			} else if (f == 70) {
+				net.veloclient.velo.client.redstone.Timeline.toggle();
+			} else if (f >= 85 && f <= 140) {
+				net.veloclient.velo.client.redstone.Timeline.seekFraction(1 - ease((f - 85) / 55f));
+			}
+		});
+		steps.add(new Object[] {2, (Runnable) () -> net.veloclient.velo.client.redstone.Timeline.toggle()});
+		// ---- your player, third person, by the lit lamp with the farm behind ----
+		steps.add(new Object[] {4, (Runnable) () -> {
+			//? if >=26.2 {
+			/*client.player.getAbilities().flying = false;
+			*///?}
+			lookFrom(client, rx + 27.5, ry, rz + 26.5, rx + 0.5, ry + 8, rz + 30);
+			ModuleRegistry.get("free-look").ifPresent(m -> m.setEnabled(true));
+		}});
+		sequence(steps, client, "rs-me", 90, f -> net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(true, 150f + f * 0.9f, 4.2));
+		steps.add(new Object[] {2, (Runnable) () -> net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(false, 0f)});
+		// ---- 8. save it for Litematica friends ----
+		steps.add(new Object[] {10, (Runnable) () -> {
+			var p = rsPlacement;
+			var v = p.view();
+			net.veloclient.velo.client.redstone.RmState.cornerA = new int[] {p.x, p.y, p.z};
+			net.veloclient.velo.client.redstone.RmState.cornerB = new int[] {p.x + v.sx - 1, p.y + v.sy - 1, p.z + v.sz - 1};
+			double cx = p.x + v.sx / 2.0, cz = p.z + v.sz / 2.0;
+			lookFrom(client, cx - 30, p.y + 20, cz - 30, cx, p.y + 6, cz);
+			rs.save = new net.veloclient.velo.client.redstone.SchematicSaveScreen();
+			client.setScreen(rs.save);
+		}});
+		sequence(steps, client, "rs-save", 60, f -> {
+			if (f == 3) {
+				typeForTour(client, "pumpkin-melon-farm");
+			} else if (f == 24) {
+				rs.save.litematicForTour(true);
+			}
+		});
+		return steps;
 	}
 
 	private static void runScenes(MinecraftClient client, int t) {
@@ -656,12 +1230,24 @@ public final class ScreenshotTour {
 			queue.add(new Object[] {10, (Runnable) () -> stop(client)});
 			nextAt = t;
 		}
+		// After a hitch the game runs the missed ticks back to back without drawing in between; skip
+		// those, so frame sequences never shoot the same picture twice or jump the camera.
+		long now = System.nanoTime();
+		if (now - lastSceneTick < 30_000_000L) {
+			return;
+		}
+		lastSceneTick = now;
 		while (!queue.isEmpty() && t >= nextAt + (int) queue.peek()[0]) {
 			Object[] step = queue.poll();
-			nextAt = nextAt + (int) step[0];
+			nextAt = t;
 			((Runnable) step[1]).run();
+			if ((int) step[0] > 0) {
+				break;
+			}
 		}
 	}
+
+	private static long lastSceneTick;
 
 	private static final String[][] DEMO_FRIENDS = {
 			{"069a79f444e94726a5befca90e38aaf5", "Notch", "server", "play.hypixel.net"},
@@ -1022,7 +1608,46 @@ public final class ScreenshotTour {
 		//?}
 	}
 
+	private static final java.util.concurrent.ExecutorService RAW_WRITER = java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+		Thread thread = new Thread(r, "velo-tour-writer");
+		thread.setDaemon(true);
+		thread.setPriority(Thread.MIN_PRIORITY);
+		return thread;
+	});
+
+	/** Like {@link #shot}, but saves raw RGBA bytes ({@code name_<w>x<h>.rgba}) off the render thread - fast enough for one per tick. */
+	private static void rawShot(MinecraftClient client, String name) {
+		//? if >=26.2 {
+		/*try {
+			Files.createDirectories(folder);
+			net.minecraft.client.Screenshot.takeScreenshot(client.gameRenderer.mainRenderTarget(), image -> {
+				try (image) {
+					var bytes = image.getPixelBytes();
+					byte[] copy = new byte[bytes.remaining()];
+					bytes.get(copy);
+					Path file = folder.resolve(name + "_" + image.getWidth() + "x" + image.getHeight() + ".rgba");
+					RAW_WRITER.submit(() -> {
+						try {
+							Files.write(file, copy);
+						} catch (Exception e) {
+							VeloClient.LOGGER.error("Velo screenshot tour: saving {} failed", file, e);
+						}
+					});
+				}
+			});
+		} catch (Exception e) {
+			VeloClient.LOGGER.error("Velo screenshot tour: {} failed", name, e);
+		}
+		*///?}
+	}
+
 	private static void stop(MinecraftClient client) {
+		RAW_WRITER.shutdown();
+		try {
+			RAW_WRITER.awaitTermination(60, java.util.concurrent.TimeUnit.SECONDS);
+		} catch (InterruptedException ignored) {
+			// quitting anyway
+		}
 		VeloClient.LOGGER.info("Velo screenshot tour finished");
 		//? if >=26.1 {
 		/*client.stop();

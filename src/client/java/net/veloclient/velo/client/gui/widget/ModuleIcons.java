@@ -39,7 +39,7 @@ public final class ModuleIcons {
 			// Core modules that showed the fallback grid before (tools/icons/module_icons.json)
 			"attack-indicator", "auto-reconnect", "chunk-load-profiler", "entity-detail", "fly-speed", "free-look",
 			"module-profiler", "nick-hider", "phantom", "render-culling", "velo-network", "screen-stretch",
-			"hide-foliage", "container-animations", "emoji-chat");
+			"hide-foliage", "container-animations", "emoji-chat", "anti-coords-leak", "anti-deepslate", "velo-shaders");
 
 	private ModuleIcons() {
 	}

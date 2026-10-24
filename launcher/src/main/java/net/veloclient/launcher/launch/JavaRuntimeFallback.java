@@ -42,6 +42,8 @@ public final class JavaRuntimeFallback {
 
 	private static final String VERSION_MARKER_FILE = ".source-version";
 
+	private static final String RESOURCE_DIR = "/net/veloclient/launcher/javaruntime/";
+
 	private JavaRuntimeFallback() {
 	}
 
@@ -52,8 +54,10 @@ public final class JavaRuntimeFallback {
 		Path cachedRuntimeDir = VeloPaths.root().resolve("java-runtime");
 		Path cachedJava = cachedRuntimeDir.resolve("bin").resolve(exeName);
 		Path versionMarker = cachedRuntimeDir.resolve(VERSION_MARKER_FILE);
+		Path cachedJavaw = cachedRuntimeDir.resolve("bin").resolve("javaw.exe");
 		if (Files.exists(cachedJava) && Files.exists(versionMarker)
-				&& AppVersion.VERSION.equals(readMarker(versionMarker))) {
+				&& AppVersion.VERSION.equals(readMarker(versionMarker))
+				&& (!isWindows || Files.exists(cachedJavaw) || JavaRuntimeFallback.class.getResource(RESOURCE_DIR + "javaw.exe") == null)) {
 			return cachedJava;
 		}
 
@@ -71,13 +75,22 @@ public final class JavaRuntimeFallback {
 		copyRuntimeTree(runningRuntime, cachedRuntimeDir);
 
 		Files.createDirectories(cachedJava.getParent());
-		String resourcePath = "/net/veloclient/launcher/javaruntime/" + exeName;
+		String resourcePath = RESOURCE_DIR + exeName;
 		try (InputStream in = JavaRuntimeFallback.class.getResourceAsStream(resourcePath)) {
 			if (in == null) {
 				throw new IOException("No bundled java runtime fallback found (missing " + resourcePath
 						+ " - was the launcher built with ./gradlew :launcher:build?)");
 			}
 			Files.copy(in, cachedJava, StandardCopyOption.REPLACE_EXISTING);
+		}
+		if (isWindows) {
+			// GameLauncher starts the game with javaw.exe when it's there - Discord only recognises Minecraft as javaw.exe,
+			// so without it there's no Discord game overlay and no "Playing Minecraft" on this launcher.
+			try (InputStream in = JavaRuntimeFallback.class.getResourceAsStream(RESOURCE_DIR + "javaw.exe")) {
+				if (in != null) {
+					Files.copy(in, cachedJavaw, StandardCopyOption.REPLACE_EXISTING);
+				}
+			}
 		}
 		if (!isWindows) {
 			cachedJava.toFile().setExecutable(true);

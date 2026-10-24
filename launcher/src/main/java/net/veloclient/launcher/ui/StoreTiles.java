@@ -185,7 +185,7 @@ public final class StoreTiles {
 		ImageView picture = new ImageView(UiImages.wingPreview(type.id()));
 		picture.setFitHeight(height);
 		picture.setPreserveRatio(true);
-		TranslateTransition bob = new TranslateTransition(Duration.seconds(2.6), picture);
+		TranslateTransition bob = RenderGate.gate(new TranslateTransition(Duration.seconds(2.6), picture));
 		bob.setFromY(3);
 		bob.setToY(-4);
 		bob.setAutoReverse(true);

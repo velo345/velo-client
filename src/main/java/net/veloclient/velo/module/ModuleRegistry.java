@@ -24,6 +24,8 @@ public final class ModuleRegistry {
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final Map<String, Module> MODULES = new LinkedHashMap<>();
+	/** Read-only snapshot for {@link #all()} - the HUD walks it every frame, so it's built once per register, not per call. */
+	private static volatile List<Module> snapshot = List.of();
 
 	private ModuleRegistry() {
 	}
@@ -33,6 +35,7 @@ public final class ModuleRegistry {
 			throw new IllegalStateException("Duplicate module id registered: " + module.id());
 		}
 		MODULES.put(module.id(), module);
+		snapshot = List.copyOf(MODULES.values());
 	}
 
 	public static Optional<Module> get(String id) {
@@ -40,7 +43,7 @@ public final class ModuleRegistry {
 	}
 
 	public static Collection<Module> all() {
-		return List.copyOf(MODULES.values());
+		return snapshot;
 	}
 
 	public static List<Module> byCategory(ModuleCategory category) {

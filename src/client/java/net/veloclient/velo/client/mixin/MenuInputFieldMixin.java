@@ -54,7 +54,46 @@ public abstract class MenuInputFieldMixin {
 	@org.spongepowered.asm.mixin.Unique
 	private boolean velo$centered;
 }
-//?} else {
+//?} else if >=26.3 {
+/*@Mixin(net.minecraft.client.gui.components.EditBox.class)
+public abstract class MenuInputFieldMixin {
+
+	@Redirect(method = "extractWidgetRenderState", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;blitSprite(Lcom/mojang/renderpearl/api/pipeline/RenderPipeline;Lnet/minecraft/resources/Identifier;IIII)V"))
+	private void velo$menuField(net.minecraft.client.gui.GuiGraphicsExtractor context, RenderPipeline pipeline,
+			net.minecraft.resources.Identifier sprite, int x, int y, int width, int height) {
+		var self = (net.minecraft.client.gui.components.AbstractWidget) (Object) this;
+		if (VeloFonts.menuScope()) {
+			VeloStyle.drawInputField(context, x, y, width, height, self.isFocused(), self.isHovered());
+		} else {
+			context.blitSprite(pipeline, sprite, x, y, width, height);
+		}
+	}
+
+	@org.spongepowered.asm.mixin.injection.Inject(method = "extractWidgetRenderState", at = @At("HEAD"))
+	private void velo$centerStart(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta,
+			org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+		var self = (net.minecraft.client.gui.components.EditBox) (Object) this;
+		velo$centered = VeloFonts.menuScope() && !self.isBordered() && self.getHeight() > 9;
+		if (velo$centered) {
+			context.pose().pushMatrix();
+			context.pose().translate(0f, (self.getHeight() - 8) / 2f);
+		}
+	}
+
+	@org.spongepowered.asm.mixin.injection.Inject(method = "extractWidgetRenderState", at = @At("RETURN"))
+	private void velo$centerEnd(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta,
+			org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+		if (velo$centered) {
+			context.pose().popMatrix();
+			velo$centered = false;
+		}
+	}
+
+	@org.spongepowered.asm.mixin.Unique
+	private boolean velo$centered;
+}
+*///?} else {
 /*@Mixin(net.minecraft.client.gui.components.EditBox.class)
 public abstract class MenuInputFieldMixin {
 

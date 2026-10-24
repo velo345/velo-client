@@ -107,6 +107,21 @@
    "name": "Emoji Chat",
    "group": "Core",
    "path": "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M8.3 14.2c1 1.4 2.3 2.1 3.7 2.1s2.7-.7 3.7-2.1 M9 9.5h.01 M15 9.5h.01"
+  },
+  "anti-coords-leak": {
+   "name": "Anti Coords Leak",
+   "group": "Core",
+   "path": "M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z M12 10h.01 M3 3l18 18"
+  },
+  "anti-deepslate": {
+   "name": "Anti Deepslate",
+   "group": "Core",
+   "path": "M12 3l8 4.5v9L12 21l-8-4.5v-9z M4 7.5l8 4.5 8-4.5 M12 12v9"
+  },
+  "velo-shaders": {
+   "name": "Velo Shaders",
+   "group": "Core",
+   "path": "M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8z M12 2v2 M12 20v2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M2 12h2 M20 12h2 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4"
   }
  }
 }

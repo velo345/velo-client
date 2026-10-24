@@ -554,8 +554,15 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 				enabled ? VeloAnim.lerpArgb(color, 0xFF000000, 0.35f) : 0xFF1A1A20);
 		context.drawTexture(RenderPipelines.GUI_TEXTURED, ModuleIcons.textureFor(module.id()), px + 7, y + 19, 0f, 0f, 18, 18, 18, 18, 18, 18,
 				enabled ? 0xFFFFFFFF : 0xFFC9C9D1);
-		Text name = MenuKit.fit(this.textRenderer, MenuKit.display(module.displayName()), pw - tile - 8);
+		Text beta = MenuKit.small("BETA");
+		int betaW = module.beta() ? this.textRenderer.getWidth(beta) + 10 : 0;
+		Text name = MenuKit.fit(this.textRenderer, MenuKit.display(module.displayName()), pw - tile - 8 - (betaW > 0 ? betaW + 6 : 0));
 		MenuKit.text(context, this.textRenderer, name, px + tile + 8, y + 15, MenuKit.TEXT);
+		if (betaW > 0) {
+			int bx = px + tile + 8 + MenuKit.width(this.textRenderer, name) + 6;
+			VeloDraw.fillRounded(context, bx, y + 15, betaW, 11, 4, 0xFFE0A030);
+			MenuKit.text(context, this.textRenderer, beta, bx + 5, y + 17, 0xFF1A1206);
+		}
 		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui("Good for " + ModuleTags.tag(module)), pw - tile - 8),
 				px + tile + 8, y + 30, MenuKit.TEXT_3);
 		int sy = y + 54;

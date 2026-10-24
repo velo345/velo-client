@@ -92,6 +92,14 @@ public final class VoxelSceneryView extends Region {
 	private final Rotate spin = new Rotate(0, Rotate.Y_AXIS);
 	private final PhongMaterial material = new PhongMaterial();
 	private final PhongMaterial waterMaterial = new PhongMaterial();
+	/**
+	 * One finished material per ripple frame; the animation switches the mesh between them. Swapping
+	 * the texture inside one material instead (~9 times a second) made JavaFX's ES2 pipeline set up the
+	 * material's texture again on every swap without releasing the old native state - the launcher
+	 * grew ~2 MB a second while Home was open (1.5 GB after an afternoon).
+	 */
+	private PhongMaterial[] waterMaterials;
+	private MeshView waterView;
 	private final AnimationTimer timer;
 	private final byte[][][] blocks = new byte[SIZE][HEIGHT][SIZE];
 	/** Tile key (texture, direction, 4 corner AO levels) -> atlas slot, in first-use order. */
@@ -114,7 +122,7 @@ public final class VoxelSceneryView extends Region {
 		MeshView island = new MeshView(solid.mesh);
 		island.setMaterial(material);
 		island.setCullFace(CullFace.NONE);
-		MeshView waterView = new MeshView(water.mesh);
+		waterView = new MeshView(water.mesh);
 		waterView.setMaterial(waterMaterial);
 		waterView.setCullFace(CullFace.NONE);
 
@@ -153,15 +161,18 @@ public final class VoxelSceneryView extends Region {
 		timer = new AnimationTimer() {
 			@Override
 			public void handle(long now) {
+				if (!RenderGate.active()) {
+					return;
+				}
 				double dt = last[0] == 0 ? 0 : Math.min(0.05, (now - last[0]) / 1e9);
 				last[0] = now;
 				spin.setAngle((spin.getAngle() + dt * 5) % 360);
 				waterView.setTranslateY(Math.sin(now / 7e8) * 0.03);
 				// Rippling surface: a short loop of pixel-art frames, swapped ~9 times a second.
 				int frame = (int) ((now / 110_000_000L) % WATER_FRAMES);
-				if (frame != waterFrame && waterFrames != null) {
+				if (frame != waterFrame && waterMaterials != null) {
 					waterFrame = frame;
-					waterMaterial.setDiffuseMap(waterFrames[frame]);
+					waterView.setMaterial(waterMaterials[frame]);
 				}
 			}
 		};
@@ -186,10 +197,17 @@ public final class VoxelSceneryView extends Region {
 		material.setDiffuseMap(buildAtlas());
 		Color water = Color.hsb(200 + (((accent.getHue() - 200) % 360 + 540) % 360 - 180) * 0.08, 0.66, 0.82);
 		waterFrames = waterFrames(water);
-		waterMaterial.setDiffuseColor(Color.color(1, 1, 1, 0.82));
-		waterMaterial.setDiffuseMap(waterFrames[0]);
-		waterMaterial.setSpecularColor(Color.gray(0.9));
-		waterMaterial.setSpecularPower(48);
+		PhongMaterial[] materials = new PhongMaterial[waterFrames.length];
+		for (int i = 0; i < materials.length; i++) {
+			PhongMaterial m = i == 0 ? waterMaterial : new PhongMaterial();
+			m.setDiffuseColor(Color.color(1, 1, 1, 0.82));
+			m.setDiffuseMap(waterFrames[i]);
+			m.setSpecularColor(Color.gray(0.9));
+			m.setSpecularPower(48);
+			materials[i] = m;
+		}
+		waterMaterials = materials;
+		waterView.setMaterial(materials[0]);
 		setBackground(new Background(
 				new BackgroundFill(new LinearGradient(0, 0, 0, 1, true, CycleMethod.NO_CYCLE,
 						new Stop(0, background.interpolate(accent, 0.22)),

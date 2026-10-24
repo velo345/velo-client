@@ -210,15 +210,77 @@ public final class Placements {
 			int z = (int) Math.floor(eye[2] + eye[5] * t);
 			Object state = stateAt(x, y, z);
 			Object world = RmWorld.state(level, x, y, z);
-			if (state != null && world != state) {
+			String fluid = RmRender.fluid(state);
+			if (fluid != null && (!RmSettings.get().showFluids
+					|| fluid.equals(RmRender.fluid(world)) && (!RmRender.source(state) || RmRender.source(world)))) {
+				state = null; // hidden schematic water, or already filled: look further
+			} else if (fluid != null) {
+				state = RmWorld.parse("minecraft:" + fluid, java.util.Map.of()); // a bubble column is picked as water too
+			}
+			if (state != null && world != state && !RmRender.sameFunction(state, world)) {
 				if (RmWorld.pickItem(state)) {
 					return true;
 				}
 				RmState.error("You don't have " + RmWorld.id(state).replace("minecraft:", "").replace('_', ' '));
 				return true;
 			}
-			if (!RmWorld.isAir(world)) {
+			if (!RmWorld.isAir(world) && RmRender.fluid(world) == null) {
 				return false;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * What's wrong with the schematic cell you look at, for the crosshair readout: {should be, is there} (either can be
+	 * air), or null when it's right / nothing is looked at. Same ray as {@link #pickLooked}, so it also finds missing
+	 * blocks floating in air.
+	 */
+	public static Object[] lookMismatch() {
+		Object level = RmWorld.clientLevel();
+		if (level == null || PLACEMENTS.isEmpty()) {
+			return null;
+		}
+		double[] eye = RmWorld.eyeAndLook();
+		if (eye == null) {
+			return null;
+		}
+		boolean fluids = RmSettings.get().showFluids;
+		for (double t = 0; t < 8; t += 0.05) {
+			int x = (int) Math.floor(eye[0] + eye[3] * t);
+			int y = (int) Math.floor(eye[1] + eye[4] * t);
+			int z = (int) Math.floor(eye[2] + eye[5] * t);
+			Object world = RmWorld.state(level, x, y, z);
+			boolean inside = inPlacement(x, y, z);
+			Object want = stateAt(x, y, z);
+			if (want != null && RmRender.fluid(want) != null && !fluids) {
+				want = null;
+			}
+			boolean worldSolid = !RmWorld.isAir(world) && RmRender.fluid(world) == null;
+			if (want != null && world != want && !RmRender.sameFunction(want, world)
+					&& !(RmRender.fluid(want) != null && RmRender.fluid(want).equals(RmRender.fluid(world)) && (!RmRender.source(want) || RmRender.source(world)))) {
+				return new Object[] {want, world, x, y, z};
+			}
+			if (worldSolid) {
+				// A block where the schematic has nothing: extra (pink).
+				return inside && want == null ? new Object[] {null, world, x, y, z} : null;
+			}
+		}
+		return null;
+	}
+
+	/** Inside a visible, locked placement's shown layers. */
+	private static synchronized boolean inPlacement(int x, int y, int z) {
+		for (Placement p : PLACEMENTS) {
+			if (!p.visible || !p.locked || p.outlineOnly) {
+				continue;
+			}
+			Clip v = p.view();
+			int lx = x - p.x;
+			int ly = y - p.y;
+			int lz = z - p.z;
+			if (lx >= 0 && ly >= 0 && lz >= 0 && lx < v.sx && ly < v.sy && lz < v.sz && p.shows(lx, ly, lz)) {
+				return true;
 			}
 		}
 		return false;
@@ -241,7 +303,8 @@ public final class Placements {
 					int[] c = counts.computeIfAbsent(id, k -> new int[2]);
 					sample.putIfAbsent(id, state);
 					c[0]++;
-					if (level != null && RmWorld.state(level, p.x + x, p.y + y, p.z + z) == state) {
+					Object have = level == null ? null : RmWorld.state(level, p.x + x, p.y + y, p.z + z);
+					if (have != null && (have == state || RmRender.sameFunction(state, have))) {
 						c[1]++;
 					}
 				}

@@ -107,12 +107,17 @@ public final class HudManager {
 			}
 			return;
 		}
-		HudAutoLayout.update(screenWidth, screenHeight);
+		HudAutoLayout.updateThrottled(screenWidth, screenHeight);
 		net.veloclient.velo.client.waypoints.WaypointRenderer.renderHud(context, screenWidth, screenHeight);
 		net.veloclient.velo.client.modules.qol.PartyPingModule.renderHud(context, screenWidth, screenHeight);
 		net.veloclient.velo.client.redstone.RmAnalysis.renderOutside(context, screenWidth, screenHeight);
 		for (Module module : ModuleRegistry.all()) {
 			if (!(module instanceof HudModule hud) || !hud.isEnabled()) {
+				continue;
+			}
+			if (!ModuleProfiler.enabled) {
+				// No lambda per module per frame unless the Module Profiler overlay is actually open.
+				renderScaled(context, hud, screenWidth, screenHeight, tickDelta);
 				continue;
 			}
 			ModuleProfiler.time(hud.id(), ModuleProfiler.Phase.HUD_RENDER,

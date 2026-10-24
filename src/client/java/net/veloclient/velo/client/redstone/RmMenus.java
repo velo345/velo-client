@@ -110,6 +110,10 @@ final class RmMenus {
 			s.skipAir = !s.skipAir;
 			RmSettings.save();
 		}, () -> s.skipAir));
+		items.add(new RmHud.MenuItem("Show schematic water / lava", null, () -> {
+			s.showFluids = !s.showFluids;
+			RmSettings.save();
+		}, () -> s.showFluids));
 		items.add(new RmHud.MenuItem("Keep redstone running when pasting", null, () -> {
 			s.keepRunning = !s.keepRunning;
 			RmSettings.save();

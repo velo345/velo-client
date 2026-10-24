@@ -318,6 +318,227 @@ public final class SchematicIO {
 		return clip;
 	}
 
+	/** Litematica's schematic format version this writes (current Litematica for 1.21+ reads 7). */
+	private static final int LITEMATIC_VERSION = 7;
+
+	/**
+	 * Writes a clip as a .litematic with one region, so friends without Velo can load it in Litematica: blocks, block
+	 * entities, entities and the scheduled block / fluid ticks.
+	 */
+	public static void saveLitematic(Path file, Clip clip, String name) throws IOException {
+		Files.createDirectories(file.getParent());
+		Map<Object, Integer> paletteIndex = new java.util.IdentityHashMap<>();
+		List<Object> palette = new ArrayList<>();
+		Object air = RmWorld.parse("minecraft:air", Map.of());
+		paletteIndex.put(air, 0);
+		palette.add(air);
+		int[] indices = new int[clip.states.length];
+		int blocks = 0;
+		// Litematica's order: x fastest, then z, then y.
+		int n = 0;
+		for (int y = 0; y < clip.sy; y++) {
+			for (int z = 0; z < clip.sz; z++) {
+				for (int x = 0; x < clip.sx; x++) {
+					Object state = clip.states[clip.index(x, y, z)];
+					if (state == null) {
+						state = air;
+					}
+					Integer index = paletteIndex.get(state);
+					if (index == null) {
+						index = palette.size();
+						paletteIndex.put(state, index);
+						palette.add(state);
+					}
+					if (!RmWorld.isAir(state)) {
+						blocks++;
+					}
+					indices[n++] = index;
+				}
+			}
+		}
+		int bits = Math.max(2, 32 - Integer.numberOfLeadingZeros(Math.max(1, palette.size() - 1)));
+		long[] words = new long[(int) ((indices.length * (long) bits + 63) / 64)];
+		for (int i = 0; i < indices.length; i++) {
+			long bit = (long) i * bits;
+			int word = (int) (bit >>> 6);
+			int offset = (int) (bit & 63);
+			words[word] |= (long) indices[i] << offset;
+			if (offset + bits > 64) {
+				words[word + 1] |= (long) indices[i] >>> (64 - offset);
+			}
+		}
+		List<Object> paletteTags = new ArrayList<>();
+		for (Object state : palette) {
+			Object entry = RmWorld.nbtCompound();
+			RmWorld.nbtPut(entry, "Name", RmWorld.id(state));
+			String text = RmWorld.toText(state);
+			int open = text.indexOf('[');
+			if (open > 0 && text.endsWith("]")) {
+				Object props = RmWorld.nbtCompound();
+				for (String pair : text.substring(open + 1, text.length() - 1).split(",")) {
+					int eq = pair.indexOf('=');
+					if (eq > 0) {
+						RmWorld.nbtPut(props, pair.substring(0, eq), pair.substring(eq + 1));
+					}
+				}
+				RmWorld.nbtPut(entry, "Properties", props);
+			}
+			paletteTags.add(entry);
+		}
+		List<Object> tileEntities = new ArrayList<>();
+		for (int x = 0; x < clip.sx; x++) {
+			for (int y = 0; y < clip.sy; y++) {
+				for (int z = 0; z < clip.sz; z++) {
+					Object be = clip.blockEntities[clip.index(x, y, z)];
+					if (be != null) {
+						Object tag = RmWorld.nbtCopy(be);
+						RmWorld.nbtPut(tag, "x", x);
+						RmWorld.nbtPut(tag, "y", y);
+						RmWorld.nbtPut(tag, "z", z);
+						tileEntities.add(tag);
+					}
+				}
+			}
+		}
+		List<Object> entities = new ArrayList<>();
+		for (Object[] e : clip.entities) {
+			Object tag = RmWorld.nbtCopy(e[4]);
+			RmWorld.nbtPut(tag, "Pos", RmWorld.nbtDoubles((double) e[0], (double) e[1], (double) e[2]));
+			entities.add(tag);
+		}
+		List<Object> blockTicks = new ArrayList<>();
+		List<Object> fluidTicks = new ArrayList<>();
+		int order = 0;
+		for (int[] t : clip.ticks) {
+			Object state = clip.states[t[0]];
+			if (state == null) {
+				continue;
+			}
+			int x = t[0] / (clip.sy * clip.sz);
+			int y = t[0] / clip.sz % clip.sy;
+			int z = t[0] % clip.sz;
+			Object tick = RmWorld.nbtCompound();
+			if (t[3] == 1) {
+				String fluid = RmRender.fluid(state) == null ? "water" : RmRender.fluid(state);
+				RmWorld.nbtPut(tick, "Fluid", "minecraft:" + (RmRender.source(state) ? fluid : "flowing_" + fluid));
+			} else {
+				RmWorld.nbtPut(tick, "Block", RmWorld.id(state));
+			}
+			RmWorld.nbtPut(tick, "Priority", t[2] - 3);
+			RmWorld.nbtPut(tick, "SubTick", (long) order++);
+			RmWorld.nbtPut(tick, "Time", t[1]);
+			RmWorld.nbtPut(tick, "x", x);
+			RmWorld.nbtPut(tick, "y", y);
+			RmWorld.nbtPut(tick, "z", z);
+			(t[3] == 1 ? fluidTicks : blockTicks).add(tick);
+		}
+		Object region = RmWorld.nbtCompound();
+		RmWorld.nbtPut(region, "Position", xyz(0, 0, 0));
+		RmWorld.nbtPut(region, "Size", xyz(clip.sx, clip.sy, clip.sz));
+		RmWorld.nbtPut(region, "BlockStatePalette", RmWorld.nbtList(paletteTags));
+		RmWorld.nbtPut(region, "BlockStates", words);
+		RmWorld.nbtPut(region, "TileEntities", RmWorld.nbtList(tileEntities));
+		RmWorld.nbtPut(region, "Entities", RmWorld.nbtList(entities));
+		RmWorld.nbtPut(region, "PendingBlockTicks", RmWorld.nbtList(blockTicks));
+		RmWorld.nbtPut(region, "PendingFluidTicks", RmWorld.nbtList(fluidTicks));
+		String regionName = name == null || name.isBlank() ? "Region" : name;
+		Object regions = RmWorld.nbtCompound();
+		RmWorld.nbtPut(regions, regionName, region);
+
+		long now = System.currentTimeMillis();
+		Object meta = RmWorld.nbtCompound();
+		RmWorld.nbtPut(meta, "Name", regionName);
+		String author = net.veloclient.velo.client.gui.title.MenuInfo.username();
+		RmWorld.nbtPut(meta, "Author", author == null || author.isBlank() ? "Velo Client" : author);
+		RmWorld.nbtPut(meta, "Description", "Made with Velo Client Redstone Mode");
+		RmWorld.nbtPut(meta, "RegionCount", 1);
+		RmWorld.nbtPut(meta, "TotalVolume", (int) Math.min(Integer.MAX_VALUE, clip.volume()));
+		RmWorld.nbtPut(meta, "TotalBlocks", blocks);
+		RmWorld.nbtPut(meta, "TimeCreated", now);
+		RmWorld.nbtPut(meta, "TimeModified", now);
+		RmWorld.nbtPut(meta, "EnclosingSize", xyz(clip.sx, clip.sy, clip.sz));
+
+		Object root = RmWorld.nbtCompound();
+		RmWorld.nbtPut(root, "MinecraftDataVersion", RmWorld.dataVersion());
+		RmWorld.nbtPut(root, "Version", LITEMATIC_VERSION);
+		RmWorld.nbtPut(root, "SubVersion", 1);
+		RmWorld.nbtPut(root, "Metadata", meta);
+		RmWorld.nbtPut(root, "Regions", regions);
+		RmWorld.writeGzipNbt(file, root);
+	}
+
+	private static Object xyz(int x, int y, int z) {
+		Object tag = RmWorld.nbtCompound();
+		RmWorld.nbtPut(tag, "x", x);
+		RmWorld.nbtPut(tag, "y", y);
+		RmWorld.nbtPut(tag, "z", z);
+		return tag;
+	}
+
+	/** Any .veloschem / .litematic file as a Clip. */
+	public static Clip load(Path file) throws IOException {
+		String name = file.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+		return name.endsWith(".litematic") ? loadLitematic(file) : loadVelo(file);
+	}
+
+	/**
+	 * Converts a .veloschem to .litematic or the other way round, next to where that format lives (litematics in
+	 * schematics/, veloschems in schematics/velo). Background thread; reports in Redstone Mode's message line and to
+	 * {@code done} (the new file, or null) on the client thread.
+	 */
+	public static void convert(Path file, java.util.function.Consumer<Path> done) {
+		Thread thread = new Thread(() -> {
+			Path out = null;
+			String error = null;
+			try {
+				String fileName = file.getFileName().toString();
+				boolean toLitematic = !fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".litematic");
+				String base = fileName.contains(".") ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+				Clip clip = load(file);
+				out = unique((toLitematic ? litematicFolder() : veloFolder()).resolve(base + (toLitematic ? ".litematic" : ".veloschem")));
+				if (toLitematic) {
+					saveLitematic(out, clip, base);
+				} else {
+					save(out, clip, base);
+				}
+			} catch (Exception e) {
+				error = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+				out = null;
+			}
+			Path result = out;
+			String failure = error;
+			net.minecraft.client.MinecraftClient.getInstance().execute(() -> {
+				if (result != null) {
+					RmState.info("Converted to " + result.getFileName());
+				} else {
+					RmState.error("Couldn't convert " + file.getFileName() + ": " + failure);
+				}
+				if (done != null) {
+					done.accept(result);
+				}
+			});
+		}, "velo-schematic-convert");
+		thread.setDaemon(true);
+		thread.start();
+	}
+
+	/** {@code file}, or "name (2).ext", "name (3).ext"... if it already exists. */
+	private static Path unique(Path file) {
+		if (!Files.exists(file)) {
+			return file;
+		}
+		String fileName = file.getFileName().toString();
+		int dot = fileName.lastIndexOf('.');
+		String base = fileName.substring(0, dot);
+		String ext = fileName.substring(dot);
+		for (int i = 2; ; i++) {
+			Path candidate = file.resolveSibling(base + " (" + i + ")" + ext);
+			if (!Files.exists(candidate)) {
+				return candidate;
+			}
+		}
+	}
+
 	/** {{minX, minY, minZ}, {sizeX, sizeY, sizeZ}} of a region (Litematica sizes can be negative). */
 	private static int[][] regionBox(JsonObject region) {
 		JsonObject pos = region.getAsJsonObject("Position");
@@ -358,20 +579,33 @@ public final class SchematicIO {
 
 	/** Saves the current selection as {@code name}.veloschem (captured and written on the server thread). */
 	public static void saveSelection(String name) {
+		saveSelection(name, false);
+	}
+
+	/**
+	 * Saves the current selection as {@code name}.veloschem, or as {@code name}.litematic for friends on Litematica
+	 * (captured and written on the server thread).
+	 */
+	public static void saveSelection(String name, boolean litematic) {
 		int[] b = RmState.box();
 		if (b == null) {
 			RmState.error("Select an area first");
 			return;
 		}
 		String clean = name.replaceAll("[^A-Za-z0-9 _.-]", "_").strip();
-		Path file = veloFolder().resolve((clean.isEmpty() ? "redstone" : clean) + ".veloschem");
+		String base = clean.isEmpty() ? "redstone" : clean;
+		Path file = litematic ? litematicFolder().resolve(base + ".litematic") : veloFolder().resolve(base + ".veloschem");
 		RmWorld.onServer(level -> {
 			Clip clip = RmOps.capture(level, b[0], b[1], b[2], b[3] - b[0] + 1, b[4] - b[1] + 1, b[5] - b[2] + 1, true);
-			// Captured and written on the server thread - a .veloschem is small (palette + ints).
+			// Captured and written on the server thread - a schematic is small (palette + packed indices).
 			try {
-				save(file, clip, clean);
+				if (litematic) {
+					saveLitematic(file, clip, base);
+				} else {
+					save(file, clip, clean);
+				}
 				net.minecraft.client.MinecraftClient.getInstance().execute(() -> RmState.info("Saved " + file.getFileName()
-						+ " - find it under Schematics > Velo"));
+						+ (litematic ? " - in schematics/, ready for Litematica" : " - find it under Schematics > Velo")));
 			} catch (IOException e) {
 				net.minecraft.client.MinecraftClient.getInstance().execute(() -> RmState.error("Couldn't save: " + e.getMessage()));
 			}

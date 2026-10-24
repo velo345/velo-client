@@ -77,6 +77,9 @@ public final class ParticleBackground extends Canvas {
 		timer = new AnimationTimer() {
 			@Override
 			public void handle(long now) {
+				if (!RenderGate.active()) {
+					return;
+				}
 				double deltaSeconds = lastNanos < 0 ? 0 : Math.min(0.05, (now - lastNanos) / 1_000_000_000.0);
 				lastNanos = now;
 				step(deltaSeconds);

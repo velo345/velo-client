@@ -82,6 +82,21 @@ public final class PlayerHeads {
 		return null;
 	}
 
+	/** A skin that just changed (equipped from the Locker): replaces the cached face right away, for the launcher too. */
+	public static void update(String uuid, byte[] skinPng) {
+		String key = uuid.replace("-", "").toLowerCase(java.util.Locale.ROOT);
+		FETCHER.submit(() -> {
+			try {
+				Path file = VeloPaths.root().resolve("cache").resolve("heads").resolve(key + ".png");
+				Files.createDirectories(file.getParent());
+				Files.write(file, skinPng);
+			} catch (Exception ignored) {
+				// the in-memory face below still updates
+			}
+			fetch(key);
+		});
+	}
+
 	private static void fetch(String uuid) {
 		try {
 			byte[] skin = cachedOrDownloaded(uuid);

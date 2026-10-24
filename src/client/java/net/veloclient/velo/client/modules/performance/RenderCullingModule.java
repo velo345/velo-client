@@ -16,7 +16,7 @@ import java.util.List;
  * separately every frame - vanilla keeps them all out to 64+ blocks, and neither Sodium nor
  * frustum culling reduces how many are submitted.
  *
- * <p>Players and mobs are never culled here (that would be a gameplay difference, not a
+ * <p>Armor stands showing a name (server name tags and hologram text) keep vanilla's distance. Players and mobs are never culled here (that would be a gameplay difference, not a
  * rendering one), and beacons / end gateways keep their vanilla distance since their beams are
  * meant to be seen from far away. Rendering-only: nothing about the world or the server changes.
  * The checks run in {@code RenderCullingEntityMixin} / {@code RenderCullingBlockEntityMixin}.

@@ -67,6 +67,8 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	 * shipping it in the first place.
 	 */
 	public static volatile boolean hudCachingEnabled = true;
+	/** See {@link DecoupledPresent}: render as fast as the GPU allows, show the newest frame the display can take. */
+	public static volatile boolean decoupledPresent = true;
 	/**
 	 * Turbo Block Entities: share of each block entity renderer's normal view distance (chests, signs, banners, heads,
 	 * shulkers...) that is still drawn; 1 = vanilla. Read by TurboBlockEntitiesMixin.
@@ -96,7 +98,10 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	private Integer previousBiomeBlend;
 	private InactivityFpsLimit previousInactivityLimit;
 
-	private String preset = "High Quality";
+	// "Default" out of the box: it only turns VSync off and leaves the player's own video settings
+	// alone. "High Quality" as the default raised the view distance to 16 (and clouds, shadows,
+	// mipmaps...) on every launch, so a fresh install ran heavier than the settings the player chose.
+	private String preset = "Default";
 	private int autoTargetFps = 60;
 	private int autoLevel;
 	private boolean autoNotify = false;
@@ -431,6 +436,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				}),
 				new ConfigField.ToggleField("HUD Caching (~20Hz overlay updates)", () -> hudCachingEnabled, v -> hudCachingEnabled = v),
 				new ConfigField.ToggleField("Fast Draw Path (GUI layering + Vulkan draw state)", () -> fastDrawPath, v -> fastDrawPath = v),
+				new ConfigField.ToggleField("Uncapped Rendering (decoupled present, Vulkan)", () -> decoupledPresent, v -> decoupledPresent = v),
 				new ConfigField.ChoiceField("VSync Mode", List.of("Off", "On", "Adaptive"), () -> vsyncMode, this::applyVsyncMode),
 				new ConfigField.SliderField("Max FPS", 10, 260,
 						() -> options.getMaxFps().getValue(), v -> options.getMaxFps().setValue((int) v),

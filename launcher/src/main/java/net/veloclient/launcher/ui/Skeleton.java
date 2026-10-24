@@ -94,7 +94,7 @@ public final class Skeleton {
 
 	private static Node pulse(Region root) {
 		root.setMouseTransparent(true);
-		FadeTransition fade = new FadeTransition(Duration.millis(900), root);
+		FadeTransition fade = RenderGate.gate(new FadeTransition(Duration.millis(900), root));
 		fade.setFromValue(1.0);
 		fade.setToValue(0.45);
 		fade.setAutoReverse(true);

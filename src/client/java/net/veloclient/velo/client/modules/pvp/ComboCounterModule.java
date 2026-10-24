@@ -43,6 +43,10 @@ public final class ComboCounterModule extends AbstractModule implements HudModul
 		String label = (editing && combo == 0 ? 3 : combo) + " Combo";
 		int color = !colorByCombo ? 0xFFFFFFFF : combo >= 5 ? 0xFFFF5CCB : combo >= 3 ? 0xFFFFC53D : 0xFFFFFFFF;
 		if (net.veloclient.velo.client.hud.HudLook.on()) {
+			if (showBackground && !net.veloclient.velo.client.hud.HudLook.hasBackground()) {
+				// The module's own background still shows when HUD Style has none.
+				VeloDraw.fillRounded(context, x - 4, y - 3, width() + 8, height() + 6, 6, 0x90101014);
+			}
 			net.veloclient.velo.client.hud.HudLook.stat(context, x, y, String.valueOf(editing && combo == 0 ? 3 : combo), "combo", color);
 			return;
 		}

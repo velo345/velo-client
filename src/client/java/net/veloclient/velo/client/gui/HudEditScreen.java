@@ -160,6 +160,32 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 		return modules;
 	}
 
+	/** Dev screenshot tour: holds {@code hud} as if dragged so its top-left sits at (x, y); null lets go. */
+	public void dragForTour(HudModule hud, int x, int y) {
+		dragging = hud;
+		if (hud != null) {
+			int w = scaledWidth(hud);
+			int h = scaledHeight(hud);
+			hud.position().set(this.width > w ? x / (float) (this.width - w) : 0f, this.height > h ? y / (float) (this.height - h) : 0f);
+			hud.position().setPlaced(true);
+		}
+	}
+
+	/** Dev screenshot tour: holds {@code hud}'s resize handle at {@code scale}; null lets go. */
+	public void resizeForTour(HudModule hud, float scale) {
+		resizing = hud;
+		if (hud != null) {
+			hud.position().setScale(scale);
+		}
+	}
+
+	/** Dev screenshot tour: {x, y, w, h} of {@code hud} on screen. */
+	public int[] areaForTour(HudModule hud) {
+		int w = scaledWidth(hud);
+		int h = scaledHeight(hud);
+		return new int[] {hud.position().resolveX(this.width, w), hud.position().resolveY(this.height, h), w, h};
+	}
+
 	private int scaledWidth(HudModule hud) {
 		return Math.round(hud.width() * hud.position().scale());
 	}

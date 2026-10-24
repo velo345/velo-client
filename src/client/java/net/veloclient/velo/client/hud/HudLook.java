@@ -133,6 +133,14 @@ public final class HudLook {
 		return style == null ? 0xFFFF4444 : style.accent() | 0xFF000000;
 	}
 
+	/**
+	 * A module's own colour setting against the global style: once the player changed it from the module's default it wins
+	 * (that one module looks the way they set it), otherwise the style's {@code styled} colour applies while HUD Style is on.
+	 */
+	public static int own(int value, int moduleDefault, int styled) {
+		return value != moduleDefault || !on() ? value : styled;
+	}
+
 	public static void text(DrawContext context, Text text, int x, int y, int color) {
 		HudStyleModule style = style();
 		if (style == null || style.shadow()) {

@@ -1225,7 +1225,7 @@ public final class CosmeticsView {
 				}
 				status.setText("Uploading " + chosen.name() + " to your Minecraft account...");
 				host.withFreshSession(fresh -> SkinsSection.run(() -> {
-					SkinLibrary.equip(chosen, fresh.minecraftAccessToken());
+					SkinLibrary.equip(chosen, fresh.minecraftAccessToken(), fresh.uuid());
 					return chosen;
 				}, done -> {
 					CosmeticUi.forgetSkin();

@@ -1,0 +1,164 @@
+{
+	"targets": {
+		"velo_bloom_a": {
+			"width": 480,
+			"height": 270
+		},
+		"velo_bloom_b": {
+			"width": 480,
+			"height": 270
+		},
+		"velo_swap": {}
+	},
+	"passes": [
+		{
+			"vertex_shader": "minecraft:core/screenquad",
+			"fragment_shader": "minecraft:post/velo_bright",
+			"inputs": [
+				{
+					"sampler_name": "In",
+					"target": "minecraft:main",
+					"bilinear": true
+				}
+			],
+			"output": "velo_bloom_a"
+		},
+		{
+			"vertex_shader": "minecraft:core/screenquad",
+			"fragment_shader": "minecraft:post/velo_blur",
+			"inputs": [
+				{
+					"sampler_name": "In",
+					"target": "velo_bloom_a",
+					"bilinear": true
+				}
+			],
+			"output": "velo_bloom_b",
+			"uniforms": {
+				"VeloBlur": [
+					{
+						"name": "BlurDir",
+						"type": "vec2",
+						"value": [
+							1.6,
+							0.0
+						]
+					}
+				]
+			}
+		},
+		{
+			"vertex_shader": "minecraft:core/screenquad",
+			"fragment_shader": "minecraft:post/velo_blur",
+			"inputs": [
+				{
+					"sampler_name": "In",
+					"target": "velo_bloom_b",
+					"bilinear": true
+				}
+			],
+			"output": "velo_bloom_a",
+			"uniforms": {
+				"VeloBlur": [
+					{
+						"name": "BlurDir",
+						"type": "vec2",
+						"value": [
+							0.0,
+							1.6
+						]
+					}
+				]
+			}
+		},
+		{
+			"vertex_shader": "minecraft:core/screenquad",
+			"fragment_shader": "minecraft:post/velo_blur",
+			"inputs": [
+				{
+					"sampler_name": "In",
+					"target": "velo_bloom_a",
+					"bilinear": true
+				}
+			],
+			"output": "velo_bloom_b",
+			"uniforms": {
+				"VeloBlur": [
+					{
+						"name": "BlurDir",
+						"type": "vec2",
+						"value": [
+							3.2,
+							0.0
+						]
+					}
+				]
+			}
+		},
+		{
+			"vertex_shader": "minecraft:core/screenquad",
+			"fragment_shader": "minecraft:post/velo_blur",
+			"inputs": [
+				{
+					"sampler_name": "In",
+					"target": "velo_bloom_b",
+					"bilinear": true
+				}
+			],
+			"output": "velo_bloom_a",
+			"uniforms": {
+				"VeloBlur": [
+					{
+						"name": "BlurDir",
+						"type": "vec2",
+						"value": [
+							0.0,
+							3.2
+						]
+					}
+				]
+			}
+		},
+		{
+			"vertex_shader": "minecraft:core/screenquad",
+			"fragment_shader": "minecraft:post/velo_composite",
+			"inputs": [
+				{
+					"sampler_name": "In",
+					"target": "minecraft:main"
+				},
+				{
+					"sampler_name": "Bloom",
+					"target": "velo_bloom_a",
+					"bilinear": true
+				}
+			],
+			"output": "velo_swap"
+		},
+		{
+			"vertex_shader": "minecraft:core/screenquad",
+			"fragment_shader": "minecraft:post/blit",
+			"inputs": [
+				{
+					"sampler_name": "In",
+					"target": "velo_swap"
+				}
+			],
+			"output": "minecraft:main",
+			"uniforms": {
+				"BlitConfig": [
+					{
+						"name": "ColorModulate",
+						"type": "vec4",
+						"value": [
+							1.0,
+							1.0,
+							1.0,
+							1.0
+						]
+					}
+				]
+			}
+		}
+	]
+}

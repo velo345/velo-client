@@ -127,6 +127,11 @@ public final class LauncherApp extends Application {
 
 	public static void main(String[] args) {
 		LauncherLog.install();
+		// Under Wayland the compositor already presents tear-free; JavaFX's own vsync on top only makes the
+		// NVIDIA driver leak ~4x faster per frame under XWayland (see RenderGate).
+		if ("wayland".equalsIgnoreCase(System.getenv("XDG_SESSION_TYPE")) && System.getProperty("prism.vsync") == null) {
+			System.setProperty("prism.vsync", "false");
+		}
 		if (!SingleInstance.acquire()) {
 			LauncherLog.info("Launcher already running - brought it to the front instead of starting a second one");
 			System.exit(0);
@@ -147,6 +152,12 @@ public final class LauncherApp extends Application {
 
 	private void startLauncher(Stage stage) {
 		this.stage = stage;
+		net.veloclient.launcher.ui.RenderGate.install(stage);
+		net.veloclient.launcher.social.SkinHeads.onChange(uuid -> {
+			if (session != null && session.uuid() != null && session.uuid().replace("-", "").equalsIgnoreCase(uuid)) {
+				refreshAccountBadge();
+			}
+		});
 		VeloPaths.ensureDirectories();
 		theme = ThemeStore.load();
 		// Registers the "Audiowide" family for Font.font()/CSS -fx-font-family
@@ -460,6 +471,29 @@ public final class LauncherApp extends Application {
 			steps.add(new Object[] {"09-crash", (Runnable) () -> net.veloclient.launcher.ui.CrashReportDialog.show(stage,
 					new Instance("tour-demo", "AsteriaSMP", "26.2", null, 0), 1, System.currentTimeMillis(), null)});
 		}
+		if (extra.contains("vibe")) {
+			// Promo shots: Home in every theme preset (in memory only, nothing saved), then with a picture behind it.
+			for (LauncherTheme preset : net.veloclient.launcher.theme.LauncherThemePresets.all().values()) {
+				steps.add(new Object[] {"20-vibe-home-" + preset.name().toLowerCase(java.util.Locale.ROOT).replace(' ', '-'), (Runnable) () -> {
+					theme = preset;
+					applyTheme();
+					showHome();
+				}});
+			}
+			String picture = System.getProperty("velo.tourHomeBg");
+			if (picture != null) {
+				steps.add(new Object[] {"21-vibe-home-bg", (Runnable) () -> {
+					theme = net.veloclient.launcher.theme.LauncherThemePresets.VELO_DARK;
+					applyTheme();
+					tourHomeBackground = java.nio.file.Path.of(picture);
+					showHome();
+				}});
+			}
+			steps.add(new Object[] {"22-vibe-theme-editor", (Runnable) () -> {
+				tourHomeBackground = null;
+				showThemeEditor();
+			}});
+		}
 		if (extra.contains("signin")) {
 			steps.add(new Object[] {"07-signin", (Runnable) () -> net.veloclient.launcher.ui.SignInDialog.demo(stage, theme)});
 		}
@@ -471,6 +505,9 @@ public final class LauncherApp extends Application {
 		}
 		runTourStep(folder, steps, 0);
 	}
+
+	/** Dev-only (launcher tour): a Home background picture shown without Velo+ or saving anything. */
+	private java.nio.file.Path tourHomeBackground;
 
 	/** The tour page being shown (for the dev FPS log). */
 	private static volatile String tourPage = "";
@@ -1209,6 +1246,9 @@ public final class LauncherApp extends Application {
 		stage.focusedProperty().addListener((o, a, b) -> reportActive.run());
 		stage.iconifiedProperty().addListener((o, a, b) -> evaluate.run());
 		stage.focusedProperty().addListener((o, a, b) -> {
+			if (b) {
+				checkAccountSkin(); // back from the game, where the skin may have changed
+			}
 			// Unfocused-with-a-game waits longer: alt-tabbing out for a second shouldn't rebuild pages.
 			idleDelay.setDuration(Duration.seconds(stage.isIconified() ? 4 : 45));
 			evaluate.run();
@@ -1477,8 +1517,8 @@ public final class LauncherApp extends Application {
 		hero.setClip(clip);
 
 		// Velo+: your own picture or GIF fills the whole card instead of the island (and the player standing on it).
-		java.nio.file.Path customBackground = net.veloclient.launcher.social.StoreApi.isPlusCached()
-				? net.veloclient.launcher.data.HomeBackground.file() : null;
+		java.nio.file.Path customBackground = tourHomeBackground != null ? tourHomeBackground
+				: net.veloclient.launcher.social.StoreApi.isPlusCached() ? net.veloclient.launcher.data.HomeBackground.file() : null;
 		if (customBackground != null) {
 			net.veloclient.launcher.ui.CoverImageView cover = new net.veloclient.launcher.ui.CoverImageView(
 					new javafx.scene.image.Image(customBackground.toUri().toString(), true));
@@ -1916,7 +1956,29 @@ public final class LauncherApp extends Application {
 			return;
 		}
 		topBar.setAccount(shown.username(), net.veloclient.launcher.ui.Heads.head(shown.uuid(), shown.username(), 28));
+		checkAccountSkin();
 	}
+
+	/**
+	 * Asks Mojang for the account's current skin (it may have changed in-game, in the Locker or on
+	 * minecraft.net); a different one replaces the cached head and redraws the badge via
+	 * SkinHeads.onChange. At most every 20 s - it runs on every redraw, window focus and game exit.
+	 */
+	private void checkAccountSkin() {
+		MinecraftSession shown = session;
+		if (shown == null || shown.uuid() == null) {
+			return;
+		}
+		long now = System.currentTimeMillis();
+		Long last = skinCheckedAt.get(shown.uuid());
+		if (last != null && now - last < 20_000) {
+			return;
+		}
+		skinCheckedAt.put(shown.uuid(), now);
+		CompletableFuture.runAsync(() -> SkinFetcher.fetch(shown), Executors.newVirtualThreadPerTaskExecutor());
+	}
+
+	private final java.util.Map<String, Long> skinCheckedAt = new java.util.concurrent.ConcurrentHashMap<>();
 
 	/** The last page shown, so an account switch can redraw it with the new account. */
 	private Runnable currentPage = this::showHome;
@@ -3442,6 +3504,7 @@ public final class LauncherApp extends Application {
 						}
 					});
 					int exitCode = result.process().waitFor();
+					Platform.runLater(this::checkAccountSkin);
 					// A non-zero exit after a deliberate Stop is expected
 					// (destroy()'d processes don't exit 0) - not a crash.
 					if (exitCode != 0 && !running.wasStopped()) {

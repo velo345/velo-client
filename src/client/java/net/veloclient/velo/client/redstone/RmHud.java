@@ -126,6 +126,9 @@ public final class RmHud {
 				}
 			}
 			message(context, screenWidth, screenHeight);
+			if (!cursor && menu == null) {
+				lookInfo(context, screenWidth, screenHeight);
+			}
 			if (menu != null) {
 				drawMenu(context);
 			}
@@ -174,6 +177,95 @@ public final class RmHud {
 		boolean error = route == null && job == null && RmState.messageIsError();
 		VeloDraw.fillRounded(context, x - 6, y - 3, tw + 12, 14, 4, 0xC0101016);
 		context.drawTextWithShadow(textRenderer, shown, x, y, error ? 0xFFFF7070 : route != null || job != null ? 0xFFFFD84A : 0xFF8FE3A8);
+	}
+
+	private static long lookCheckedAt;
+	private static Object[] lookCached;
+
+	/**
+	 * Right of the crosshair, while looking at a schematic block that's wrong or missing: what should be there and what
+	 * is, with just the block states that differ (the cell itself is marked red / yellow / pink in the world).
+	 */
+	private static void lookInfo(DrawContext context, int w, int h) {
+		long now = System.currentTimeMillis();
+		if (now - lookCheckedAt > 100) {
+			lookCheckedAt = now;
+			lookCached = Placements.lookMismatch();
+		}
+		Object[] m = lookCached;
+		if (m == null) {
+			return;
+		}
+		Object want = m[0];
+		Object have = m[1];
+		var textRenderer = MinecraftClient.getInstance().textRenderer;
+		java.util.Map<String, String> wantProps = props(want);
+		java.util.Map<String, String> haveProps = props(have);
+		boolean sameBlock = want != null && !RmWorld.isAir(have) && RmWorld.id(want).equals(RmWorld.id(have));
+		String title = want == null ? "Shouldn't be here" : RmWorld.isAir(have) || RmRender.fluid(have) != null ? "Missing" : sameBlock ? "Wrong state" : "Wrong block";
+		int titleColor = want == null ? 0xFFFF7AD8 : sameBlock ? 0xFFFFD84A : RmWorld.isAir(have) || RmRender.fluid(have) != null ? 0xFF8FC8FF : 0xFFFF6060;
+		String wantLine = "Should be: " + (want == null ? "Air" : RmWorld.blockName(want) + diff(wantProps, haveProps, sameBlock));
+		String haveLine = "Placed: " + (RmWorld.isAir(have) ? "Nothing" : RmWorld.blockName(have) + diff(haveProps, wantProps, sameBlock));
+		int textW = Math.max(textRenderer.getWidth(title), Math.max(textRenderer.getWidth(wantLine), textRenderer.getWidth(haveLine)));
+		int x = w / 2 + 14;
+		int y = h / 2 + 8;
+		int boxW = Math.min(textW + 30, w - x - 4);
+		VeloDraw.fillRounded(context, x, y, boxW, 40, 5, 0xD0101016);
+		VeloDraw.fillRounded(context, x, y, 3, 40, 1, titleColor);
+		context.drawTextWithShadow(textRenderer, title, x + 8, y + 4, titleColor);
+		drawStateIcon(context, want, x + 8, y + 15);
+		context.drawTextWithShadow(textRenderer, VeloUi.trim(wantLine, boxW - 30), x + 22, y + 16, 0xFF8FE3A8);
+		drawStateIcon(context, have, x + 8, y + 27);
+		context.drawTextWithShadow(textRenderer, VeloUi.trim(haveLine, boxW - 30), x + 22, y + 28, 0xFFFF9090);
+	}
+
+	private static void drawStateIcon(DrawContext context, Object state, int x, int y) {
+		if (state == null || RmWorld.isAir(state)) {
+			return;
+		}
+		var stack = (net.minecraft.item.ItemStack) RmWorld.blockItem(state);
+		if (stack.isEmpty()) {
+			return;
+		}
+		context.getMatrices().pushMatrix();
+		context.getMatrices().translate(x, y - 1);
+		context.getMatrices().scale(0.625f, 0.625f);
+		context.drawItemWithoutEntity(stack, 0, 0);
+		context.getMatrices().popMatrix();
+	}
+
+	/** "minecraft:repeater[delay=2,facing=north]" -> {delay=2, facing=north}. */
+	private static java.util.Map<String, String> props(Object state) {
+		java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+		if (state == null || RmWorld.isAir(state)) {
+			return out;
+		}
+		String text = RmWorld.toText(state);
+		int open = text.indexOf('[');
+		if (open < 0 || !text.endsWith("]")) {
+			return out;
+		}
+		for (String pair : text.substring(open + 1, text.length() - 1).split(",")) {
+			int eq = pair.indexOf('=');
+			if (eq > 0) {
+				out.put(pair.substring(0, eq), pair.substring(eq + 1));
+			}
+		}
+		return out;
+	}
+
+	/** The states of {@code mine} that differ from {@code other} (only for the same block), as " (facing north)". */
+	private static String diff(java.util.Map<String, String> mine, java.util.Map<String, String> other, boolean sameBlock) {
+		if (!sameBlock) {
+			return "";
+		}
+		StringBuilder sb = new StringBuilder();
+		for (var e : mine.entrySet()) {
+			if (!e.getValue().equals(other.get(e.getKey()))) {
+				sb.append(sb.isEmpty() ? " (" : ", ").append(e.getKey().replace('_', ' ')).append(' ').append(e.getValue().replace('_', ' '));
+			}
+		}
+		return sb.isEmpty() ? "" : sb.append(')').toString();
 	}
 
 	private static void tooltip(DrawContext context, int w, int h) {

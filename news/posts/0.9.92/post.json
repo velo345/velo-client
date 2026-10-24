@@ -1,0 +1,77 @@
+{
+  "hidden": true,
+  "title": "Velo Client 0.9.92: Anti Coords Leak",
+  "summary": "Stream and screen share without giving away your base: coordinates hide themselves the moment Discord starts sharing. Plus Anti Deepslate, schematics you can share with Litematica friends, a cleaner Redstone Mode and the Discord overlay on Windows.",
+  "tag": "Update",
+  "version": "0.9.92",
+  "accent": "#ff3b44",
+  "pinned": true,
+  "blocks": [
+    {
+      "type": "heading",
+      "text": "Anti Coords Leak"
+    },
+    {
+      "type": "text",
+      "text": "Start sharing your screen or the game on Discord and within about a second every coordinate on your screen turns into Minecraft's scrambled magic text: chat, F3, your HUD, waypoints, minimaps, **Litematica's menus and overlays** and any other mod. Stop sharing and they come back."
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Automatic** (default): only while Discord shares. **On**: always hidden. **Off**: never. Switch it any time in the module.",
+        "Linux: works with Discord, Vesktop, WebCord and Legcord on PipeWire (Wayland and most X11 desktops).",
+        "Windows: works when Discord captures through Windows' screen capture (Windows 10 2004 and newer)."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Anti Deepslate"
+    },
+    {
+      "type": "text",
+      "text": "Deepslate's texture is turned by its position, and ores and bedrock follow the world seed, so a single screenshot can be enough to find a base. Anti Deepslate draws deepslate, ores and bedrock as netherite blocks (or any block you pick). Only how they look changes, the real blocks stay. Anti Coords Leak switches it on by itself while you share."
+    },
+    {
+      "type": "heading",
+      "text": "Schematics for everyone"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Save as .litematic**: Ctrl+S in Redstone Mode now lets you choose .veloschem or .litematic, so friends on Litematica can load your builds.",
+        "**Convert**: every schematic in Schematics has a button that turns .veloschem into .litematic and back.",
+        "**Search** when loading a schematic (Ctrl+L)."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Redstone Mode"
+    },
+    {
+      "type": "list",
+      "items": [
+        "Wrong-block colours and outlines no longer show through walls, only where you can actually see the block.",
+        "Look at a wrong block and a panel next to your crosshair shows what **should** be there and what you **placed**, down to the facing or delay that's off.",
+        "Crafters facing up or down count as right whichever way their top points.",
+        "New setting **Show schematic water / lava**: see where the schematic's water and lava go. Middle click picks a water or lava bucket from your inventory."
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Fixes"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Discord overlay on Windows**: the launcher started the game in a way Discord didn't recognise as Minecraft, so the overlay with your call and \"Playing Minecraft\" never showed. Fixed.",
+        "Player names above heads no longer disappear from 48 blocks away on servers that show names with holograms.",
+        "HUD Style no longer overrides colours you set in a module yourself. Change Keystrokes' colours and they show, while everything else keeps the global style."
+      ]
+    },
+    {
+      "type": "callout",
+      "style": "info",
+      "text": "Update with the bell in the launcher (or Settings > **Updates**). The Discord overlay fix comes with the new launcher."
+    }
+  ]
+}

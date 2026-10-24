@@ -174,7 +174,7 @@ public final class CosmeticUi {
 		arc.setStroke(Color.web("#ffffff99"));
 		arc.setStrokeWidth(Math.max(2, size / 9));
 		arc.setStrokeLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
-		javafx.animation.RotateTransition spin = new javafx.animation.RotateTransition(javafx.util.Duration.millis(900), arc);
+		javafx.animation.RotateTransition spin = RenderGate.gate(new javafx.animation.RotateTransition(javafx.util.Duration.millis(900), arc));
 		spin.setByAngle(360);
 		spin.setInterpolator(javafx.animation.Interpolator.LINEAR);
 		spin.setCycleCount(javafx.animation.Animation.INDEFINITE);

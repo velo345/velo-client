@@ -184,6 +184,9 @@ public final class GameLauncher {
 		if (runtime.feature() >= 25) {
 			jvmArgs.add("-XX:+UseCompactObjectHeaders");
 		}
+		// Class Data Sharing: the classes the game loaded last time come from a memory-mapped archive
+		// instead of being parsed and verified again (see CdsArchive).
+		jvmArgs.addAll(CdsArchive.jvmArgs(runtime, instance, runtime.feature() >= 25));
 		// Windows' dual-stack connection ordering can spend the whole
 		// connect timeout on a broken/unreachable IPv6 route before ever
 		// falling back to IPv4 for a specific host, timing the connection

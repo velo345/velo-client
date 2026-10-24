@@ -11,7 +11,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * Distance-culls decorative entities for {@link RenderCullingModule}. {@code shouldRender} is the
  * per-entity, per-frame gate vanilla already uses for frustum culling, and it's handed the camera
  * position directly - so skipping here costs one type check and a distance, and the entity never
- * gets a render state extracted at all.
+ * gets a render state extracted at all. Armor stands showing a name are left alone - servers draw player names
+ * above heads that way, and culling them made names vanish from 48 blocks on.
  */
 //? if <26.1 {
 @Mixin(net.minecraft.client.render.entity.EntityRenderer.class)
@@ -27,7 +28,8 @@ public abstract class RenderCullingEntityMixin {
 				: type == net.minecraft.entity.EntityType.ITEM ? EntityKind.ITEM
 				: type == net.minecraft.entity.EntityType.EXPERIENCE_ORB ? EntityKind.XP
 				: null;
-		if (kind == null) {
+		if (kind == null || kind == EntityKind.ARMOR_STAND && entity.hasCustomName() && entity.isCustomNameVisible()) {
+			// Named armor stands are how servers draw player names and holograms - text, not decoration: vanilla's distance.
 			return;
 		}
 		double dx = entity.getX() - cameraX;
@@ -52,7 +54,35 @@ public abstract class RenderCullingEntityMixin {
 				: type == net.minecraft.world.entity.EntityType.ITEM ? EntityKind.ITEM
 				: type == net.minecraft.world.entity.EntityType.EXPERIENCE_ORB ? EntityKind.XP
 				: null;
-		if (kind == null) {
+		if (kind == null || kind == EntityKind.ARMOR_STAND && entity.hasCustomName() && entity.isCustomNameVisible()) {
+			// Named armor stands are how servers draw player names and holograms - text, not decoration: vanilla's distance.
+			return;
+		}
+		double dx = entity.getX() - cameraX;
+		double dy = entity.getY() - cameraY;
+		double dz = entity.getZ() - cameraZ;
+		if (RenderCullingModule.cullEntity(kind, dx * dx + dy * dy + dz * dz)) {
+			cir.setReturnValue(false);
+		}
+	}
+}
+*///?} else if >=26.3 {
+/*// 26.3 passes the partial tick as well.
+@Mixin(net.minecraft.client.renderer.entity.EntityRenderer.class)
+public abstract class RenderCullingEntityMixin {
+
+	@Inject(method = "shouldRender", at = @At("HEAD"), cancellable = true, require = 0)
+	private void velo$cullFarDecorations(net.minecraft.world.entity.Entity entity, net.minecraft.client.renderer.culling.Frustum frustum,
+			double cameraX, double cameraY, double cameraZ, float partialTick, CallbackInfoReturnable<Boolean> cir) {
+		net.minecraft.world.entity.EntityType<?> type = entity.getType();
+		EntityKind kind = type == net.minecraft.world.entity.EntityTypes.ARMOR_STAND ? EntityKind.ARMOR_STAND
+				: type == net.minecraft.world.entity.EntityTypes.ITEM_FRAME || type == net.minecraft.world.entity.EntityTypes.GLOW_ITEM_FRAME
+						|| type == net.minecraft.world.entity.EntityTypes.PAINTING ? EntityKind.FRAME
+				: type == net.minecraft.world.entity.EntityTypes.ITEM ? EntityKind.ITEM
+				: type == net.minecraft.world.entity.EntityTypes.EXPERIENCE_ORB ? EntityKind.XP
+				: null;
+		if (kind == null || kind == EntityKind.ARMOR_STAND && entity.hasCustomName() && entity.isCustomNameVisible()) {
+			// Named armor stands are how servers draw player names and holograms - text, not decoration: vanilla's distance.
 			return;
 		}
 		double dx = entity.getX() - cameraX;
@@ -77,7 +107,8 @@ public abstract class RenderCullingEntityMixin {
 				: type == net.minecraft.world.entity.EntityTypes.ITEM ? EntityKind.ITEM
 				: type == net.minecraft.world.entity.EntityTypes.EXPERIENCE_ORB ? EntityKind.XP
 				: null;
-		if (kind == null) {
+		if (kind == null || kind == EntityKind.ARMOR_STAND && entity.hasCustomName() && entity.isCustomNameVisible()) {
+			// Named armor stands are how servers draw player names and holograms - text, not decoration: vanilla's distance.
 			return;
 		}
 		double dx = entity.getX() - cameraX;

@@ -77,7 +77,7 @@ public final class DiscoverView {
 			return new JsonObject[] {partners, friends, publicWorlds};
 		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(data -> Platform.runLater(() -> {
 			cards.getChildren().clear();
-			if (data[0] != null) {
+			if (data[0] != null && data[0].has("partners")) {
 				for (JsonElement e : data[0].getAsJsonArray("partners")) {
 					JsonObject p = e.getAsJsonObject();
 					String accent = p.has("accent") && !p.get("accent").isJsonNull() ? p.get("accent").getAsString() : "#ff2d3c";
@@ -110,7 +110,7 @@ public final class DiscoverView {
 				}
 			}
 			java.util.Set<String> shown = new java.util.HashSet<>();
-			if (data[1] != null) {
+			if (data[1] != null && data[1].has("worlds")) {
 				for (JsonElement e : data[1].getAsJsonArray("worlds")) {
 					JsonObject w = e.getAsJsonObject();
 					shown.add(w.get("id").getAsString());
@@ -121,7 +121,7 @@ public final class DiscoverView {
 							w.get("version").getAsString() + "  ·  " + w.get("guests").getAsInt() + " playing", join));
 				}
 			}
-			if (data[2] != null) {
+			if (data[2] != null && data[2].has("worlds")) {
 				for (JsonElement e : data[2].getAsJsonArray("worlds")) {
 					JsonObject w = e.getAsJsonObject();
 					if (shown.contains(w.get("id").getAsString())) {

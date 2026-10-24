@@ -34,17 +34,28 @@ public final class SkinFetcher {
 
 	/** @return the cached/downloaded skin, or null if it couldn't be fetched (offline, no skin set, etc). */
 	public static SkinData fetch(MinecraftSession session) {
+		// Dev-only (launcher tour): -Dvelo.tourSkin=<png> shows that skin instead of the account's.
+		String tourSkin = System.getProperty("velo.tourSkin");
+		if (tourSkin != null && System.getProperty("velo.launcherTour") != null) {
+			try {
+				return new SkinData(Files.readAllBytes(Path.of(tourSkin)), Boolean.getBoolean("velo.tourSkinSlim"));
+			} catch (IOException e) {
+				return null;
+			}
+		}
 		Path cacheFile = VeloPaths.root().resolve("cache").resolve("skins").resolve(session.uuid() + ".png");
 		Path variantFile = VeloPaths.root().resolve("cache").resolve("skins").resolve(session.uuid() + ".variant");
 		try {
 			Fetched fetched = fetchSkinInfo(session.minecraftAccessToken());
 			if (fetched == null) {
+				net.veloclient.launcher.social.SkinHeads.refresh(session.uuid());
 				return readCached(cacheFile, variantFile);
 			}
 			byte[] bytes = download(fetched.url());
 			Files.createDirectories(cacheFile.getParent());
 			Files.write(cacheFile, bytes);
 			Files.writeString(variantFile, fetched.slim() ? "slim" : "classic", StandardCharsets.UTF_8);
+			net.veloclient.launcher.social.SkinHeads.update(session.uuid(), bytes);
 			return new SkinData(bytes, fetched.slim());
 		} catch (Exception e) {
 			return readCached(cacheFile, variantFile);

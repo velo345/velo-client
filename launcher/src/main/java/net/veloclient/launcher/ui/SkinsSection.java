@@ -164,7 +164,7 @@ final class SkinsSection {
 				equip.setText("Uploading...");
 				status.setText("Uploading " + skin.name() + " to your Minecraft account...");
 				host.withFreshSession(fresh -> run(() -> {
-					SkinLibrary.equip(skin, fresh.minecraftAccessToken());
+					SkinLibrary.equip(skin, fresh.minecraftAccessToken(), fresh.uuid());
 					return skin;
 				}, done -> {
 					status.setText("Skin changed to " + skin.name() + ". Servers show it the next time you join.");
