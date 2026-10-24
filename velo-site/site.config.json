@@ -14,12 +14,12 @@
   },
   "release": {
     "_comment": "Bump version on every release - the download buttons link straight to these GitHub release assets.",
-    "version": "0.9.91",
+    "version": "0.9.93",
     "channel": "Pre-release",
-    "launcherExe": "Velo.Client.Launcher-0.9.91.exe",
-    "launcherDeb": "velo-client-launcher_0.9.91_amd64.deb",
-    "date": "2026-10-22",
-    "datePretty": "Oct 22, 2026"
+    "launcherExe": "Velo.Client.Launcher-0.9.93.exe",
+    "launcherDeb": "velo-client-launcher_0.9.93_amd64.deb",
+    "date": "2026-10-24",
+    "datePretty": "Oct 24, 2026"
   },
   "minecraft": {
     "version": "1.21.11 · 26.1 · 26.2 · 26.3",
