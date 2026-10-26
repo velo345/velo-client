@@ -44,6 +44,7 @@ const ICONS = {
 	cosmetics: "M12 3l2.4 5.1 5.6.7-4.1 3.9 1 5.5L12 15.6l-4.9 2.6 1-5.5L4 8.8l5.6-.7z",
 	socials: "M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M10 9.5v5l4.5-2.5z",
 	tiktok: "M14 3v10.5a3.5 3.5 0 1 1-3.5-3.5 M14 3c.4 2.6 2.1 4.2 5 4.5",
+	instagram: "M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4z M12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z M17.2 6.8h.01",
 	youtube: "M3 8.5c0-1.7 1.3-3 3-3h12c1.7 0 3 1.3 3 3v7c0 1.7-1.3 3-3 3H6c-1.7 0-3-1.3-3-3z M10 9.5v5l4.5-2.5z",
 	news: "M4 5h13v14H6a2 2 0 0 1-2-2z M17 9h3v8a2 2 0 0 1-2 2 M8 9h5 M8 13h5",
 	reports: "M12 9v4 M12 17h.01 M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
@@ -1993,17 +1994,26 @@ RENDER.stafflog = async (root) => {
 };
 
 
-// ---- Socials: TikTok / YouTube Shorts views ----
+// ---- Socials: TikTok / YouTube Shorts / Instagram Reels views ----
+
+const PLATFORM_NAMES = { tiktok: "TikTok", youtube: "YouTube", instagram: "Instagram" };
 
 RENDER.socials = async (root) => {
-	const input = h("input", { type: "url", placeholder: "TikTok profile, YouTube channel or a single video link", class: "grow" });
+	const input = h("input", { type: "url", placeholder: "TikTok profile, YouTube channel, Instagram profile or a single video / Reel link", class: "grow" });
 	const addBtn = h("button", { class: "btn primary", type: "button" }, "Track");
 	const refreshBtn = h("button", { class: "btn", type: "button" }, "Refresh now");
 	const body = h("div", { class: "stack" });
-	root.append(card("Track your videos", "YouTube channels (youtube.com/@you) pick up new Shorts by themselves · add TikToks by video link · numbers refresh every 3 hours", null,
-		h("div", { class: "row" }, input, addBtn, refreshBtn)), body);
+	const igInput = h("input", { type: "password", placeholder: "Instagram access token (long-lived, from your Meta app)", class: "grow", autocomplete: "off" });
+	const igBtn = h("button", { class: "btn", type: "button" }, "Connect Instagram");
+	const igState = h("small", { class: "muted" });
+	root.append(card("Track your videos", "YouTube channels and your connected Instagram pick up new videos by themselves · add TikToks by video link · numbers refresh every 3 hours", null,
+		h("div", { class: "row" }, input, addBtn, refreshBtn), h("div", { class: "row" }, igInput, igBtn), igState), body);
 	const draw = (d) => {
 		const t = d.totals;
+		const ig = d.instagram || {};
+		igState.textContent = ig.connected ? `Instagram connected as @${ig.username}` + (ig.error ? " · " + ig.error : " · Reels are picked up by themselves")
+			: "Instagram blocks tools, so Reels need your account's token (Instagram API with Instagram Login) - it renews itself";
+		igBtn.textContent = ig.connected ? "Replace token" : "Connect Instagram";
 		subtitle(d.lastRun ? "Last measured " + ago(d.lastRun) + (d.running ? " · measuring now..." : "") : "Not measured yet - add a profile or video");
 		const pf = d.platforms || {};
 		const share = (k) => (t.views ? Math.round(((pf[k] || {}).views || 0) / t.views * 100) : 0);
@@ -2011,13 +2021,13 @@ RENDER.socials = async (root) => {
 			kpi("Views", "socials", t.views, compact, "+" + compact(t.views24h) + " in 24 h", true),
 			kpi("Likes", "cosmetics", t.likes, compact, "+" + compact(t.likes24h) + " in 24 h"),
 			kpi("Comments", "players", t.comments, compact, ""),
-			kpi("Shares", "socials", t.shares, compact, "TikTok only"),
-			kpi("Videos", "socials", t.videos, fmt, `TikTok ${share("tiktok")}% · YouTube ${share("youtube")}% of views`));
+			kpi("Shares", "socials", t.shares, compact, "TikTok + Instagram"),
+			kpi("Videos", "socials", t.videos, fmt, `TikTok ${share("tiktok")}% · YouTube ${share("youtube")}% · Instagram ${share("instagram")}% of views`));
 		const chart = card("Total views", "All tracked videos, last 30 days", null,
 			lineChart({ series: [{ name: "Views", color: "#ff4d57", points: d.curve }], yFormat: compact, xFormat: (x) => new Date(x).toLocaleDateString() }));
-		const accounts = card("Tracked profiles", d.accounts.length ? "" : "None yet - add your TikTok or YouTube profile above", null,
+		const accounts = card("Tracked profiles", d.accounts.length ? "" : "None yet - add your TikTok, YouTube or Instagram profile above", null,
 			d.accounts.length ? table(["Platform", "Profile", "Checked", ""], d.accounts.map((a) => [
-				h("span", { class: "chip" }, icon(a.platform), a.platform === "tiktok" ? "TikTok" : "YouTube"),
+				h("span", { class: "chip" }, icon(a.platform), PLATFORM_NAMES[a.platform] || a.platform),
 				h("a", { href: a.url, target: "_blank", rel: "noopener" }, a.name || a.url),
 				a.error ? h("span", { class: "bad" }, a.error) : a.checkedAt ? ago(a.checkedAt) + (a.note ? " · " + a.note : "") : "pending",
 				removeBtn(a.url)])) : null);
@@ -2027,7 +2037,7 @@ RENDER.socials = async (root) => {
 			return [
 				h("div", { class: "vid" }, thumb ? h("img", { src: thumb, alt: "", loading: "lazy" }) : h("span", { class: "vid-ph" }, icon(v.platform)),
 					h("div", {}, h("a", { href: v.url, target: "_blank", rel: "noopener" }, v.title || v.url), h("small", { class: "muted" },
-						(v.platform === "tiktok" ? "TikTok" : "YouTube") + (v.published ? " · " + ago(v.published) : "") + (v.error ? " · " + v.error : "")))),
+						(PLATFORM_NAMES[v.platform] || v.platform) + (v.published ? " · " + ago(v.published) : "") + (v.error ? " · " + v.error : "")))),
 				v.views != null ? compact(v.views) : "-", v.views24h != null ? "+" + compact(v.views24h) : "-",
 				v.likes != null ? compact(v.likes) : "-", v.comments != null ? compact(v.comments) : "-", v.shares ? compact(v.shares) : "-", er, removeBtn(v.id)];
 		});
@@ -2050,6 +2060,13 @@ RENDER.socials = async (root) => {
 		setTimeout(() => load().catch(() => {}), 45_000);
 	});
 	input.addEventListener("keydown", (e) => { if (e.key === "Enter") addBtn.click(); });
+	igBtn.onclick = () => busy(igBtn, async () => {
+		if (!igInput.value.trim()) return;
+		draw(await velo("admin/panel/socials/edit", { body: { instagramToken: igInput.value.trim() } }));
+		igInput.value = "";
+		toast("Instagram connected - Reels show up in a minute");
+		setTimeout(() => load().catch(() => {}), 45_000);
+	});
 	refreshBtn.onclick = () => busy(refreshBtn, async () => { draw(await velo("admin/panel/socials/edit", { body: { refresh: true } })); toast("Measuring - give it a minute"); });
 	await load();
 	state.timers.push(setInterval(() => load().catch(() => {}), 60_000));

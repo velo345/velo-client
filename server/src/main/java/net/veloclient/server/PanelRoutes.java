@@ -15,7 +15,10 @@ final class PanelRoutes {
 	private PanelRoutes() {
 	}
 
-	/** TikTok / YouTube Shorts tracking: GET the numbers, POST {"url"} to track, {"remove": key} to stop, {"refresh": true} to measure now. */
+	/**
+	 * TikTok / YouTube Shorts / Instagram Reels tracking: GET the numbers, POST {"url"} to track, {"remove": key} to stop,
+	 * {"refresh": true} to measure now, {"instagramToken": "..."} to connect Instagram ("" disconnects).
+	 */
 	static void registerSocials(HttpServer server, SocialStatsService socials, String adminToken) {
 		admin(server, adminToken, "/v1/admin/panel/socials", ex -> JsonHttp.writeJson(ex, 200, socials.summary()), "GET");
 		admin(server, adminToken, "/v1/admin/panel/socials/edit", ex -> {
@@ -23,6 +26,8 @@ final class PanelRoutes {
 					.getAsJsonObject();
 			if (body.has("remove")) {
 				JsonHttp.writeJson(ex, 200, socials.remove(body.get("remove").getAsString()));
+			} else if (body.has("instagramToken")) {
+				JsonHttp.writeJson(ex, 200, socials.connectInstagram(body.get("instagramToken").getAsString()));
 			} else if (body.has("refresh")) {
 				socials.refreshSoon();
 				JsonHttp.writeJson(ex, 200, socials.summary());
