@@ -215,11 +215,11 @@ vec3 velo_sky(vec3 dir, vec3 vanillaSky, vec3 fog) {
     float sunRadius = mix(0.018, 0.075, velo_sun_size());
     float disc = smoothstep(cos(sunRadius), cos(sunRadius * 0.8), mu);
     float glowAmount = velo_sun_glow();
-    float glow = pow(max(mu, 0.0), mix(500.0, 40.0, glowAmount)) * glowAmount * 0.7
-            + pow(max(mu, 0.0), 5.0) * glowAmount * 0.1 * (0.4 + sunLow);
+    float glow = pow(max(mu, 0.0), mix(500.0, 40.0, glowAmount)) * glowAmount * 0.38
+            + pow(max(mu, 0.0), 5.0) * glowAmount * 0.05 * (0.4 + sunLow);
     vec3 sunColor = mix(vec3(1.0, 0.96, 0.88), sunsetColor, sunLow * 0.65);
     float aboveHorizon = smoothstep(-0.04, 0.03, dir.y);
-    color += sunColor * (disc * 5.0 + glow) * aboveHorizon * (1.0 - rain * 0.85);
+    color += sunColor * (disc * 1.6 + glow) * aboveHorizon * (1.0 - rain * 0.85);
 
     // Night sky: Milky Way, stars, meteors and aurora behind the moon.
     float clearNight = night * aboveHorizon * (1.0 - rain);

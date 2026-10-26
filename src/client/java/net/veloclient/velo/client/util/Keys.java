@@ -48,6 +48,10 @@ public final class Keys {
 	public static final int F7 = InputConstants.KEY_F7;
 	public static final int F9 = InputConstants.KEY_F9;
 	public static final int END = InputConstants.KEY_END;
+	public static final int HOME = InputConstants.KEY_HOME;
+	public static final int PAGE_UP = InputConstants.KEY_PAGEUP;
+	public static final int PAGE_DOWN = InputConstants.KEY_PAGEDOWN;
+	public static final int SLASH = InputConstants.KEY_SLASH;
 	public static final int K = InputConstants.KEY_K;
 	public static final int V = InputConstants.KEY_V;
 	public static final int B = InputConstants.KEY_B;
@@ -94,6 +98,10 @@ public final class Keys {
 	public static final int F7 = GLFW.GLFW_KEY_F7;
 	public static final int F9 = GLFW.GLFW_KEY_F9;
 	public static final int END = GLFW.GLFW_KEY_END;
+	public static final int HOME = GLFW.GLFW_KEY_HOME;
+	public static final int PAGE_UP = GLFW.GLFW_KEY_PAGE_UP;
+	public static final int PAGE_DOWN = GLFW.GLFW_KEY_PAGE_DOWN;
+	public static final int SLASH = GLFW.GLFW_KEY_SLASH;
 	public static final int K = GLFW.GLFW_KEY_K;
 	public static final int V = GLFW.GLFW_KEY_V;
 	public static final int B = GLFW.GLFW_KEY_B;

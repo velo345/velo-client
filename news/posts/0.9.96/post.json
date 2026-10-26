@@ -1,0 +1,116 @@
+{
+ "title": "Velo Client 0.9.96: Build your own resource pack in game",
+ "summary": "A brand-new resource pack menu and a full pack editor inside Minecraft: paint textures with a 3D preview, animate them, recolour anything GIMP-style, replace sounds and music, and edit every JSON and shader file - then reload and see it in your world.",
+ "tag": "Update",
+ "version": "0.9.96",
+ "accent": "#ff3b44",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "heading",
+   "text": "A new resource pack menu"
+  },
+  {
+   "type": "text",
+   "text": "**Options > Resource Packs** looks like the rest of Velo now - and does everything the old menu did: available and selected packs side by side with their icons and descriptions, search, and ordering by dragging. Incompatible packs still ask first, and you can drop .zip files or folders onto the window to add them."
+  },
+  {
+   "type": "image",
+   "image": "file:images/pack-menu.jpg",
+   "caption": "Drag packs between the lists, or use the buttons on each row"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**New pack** creates an empty pack for this game version, with its own icon.",
+    "**Reload** applies your packs and reloads everything - no more F3+T.",
+    "**Make editable copy** unpacks a .zip pack into a folder you can change.",
+    "Prefer the old screen? **Classic screen** is one click away, or switch it back under Settings > Velo screens."
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "The pack editor"
+  },
+  {
+   "type": "text",
+   "text": "Pick a folder pack and press **Edit pack**. Everything in it is sorted into blocks, items, entities, interface, particles, paintings, sounds and music, models, languages, shaders and more. Switch to **From the game** to browse all of Minecraft's own textures and files - one click copies any of them into your pack, ready to change."
+  },
+  {
+   "type": "image",
+   "image": "file:images/pack-browser.jpg",
+   "caption": "Every texture of the game, one click away from your pack"
+  },
+  {
+   "type": "heading",
+   "text": "A real texture editor"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Tools**: pencil, brush, eraser, fill bucket, gradient, line, rectangle, ellipse, colour picker, shading and dither brushes, with mirror drawing.",
+    "**Selections**: rectangle, ellipse, lasso and **magic wand** - add, subtract or intersect them, move what's selected, copy and paste.",
+    "**Live 3D preview** of what you're painting: blocks on their real models (stairs, logs, plants...), items as in your hand, entities on their actual in-game model.",
+    "**Animated textures**: add frames, set the timing per frame, interpolate, onion skin and play it back.",
+    "**Import and export PNGs**, resize the canvas, and undo / redo everything (Ctrl+Z, Ctrl+Y)."
+   ]
+  },
+  {
+   "type": "image",
+   "image": "file:images/texture-editor.jpg",
+   "caption": "Paint on the left, see the block in 3D on the right"
+  },
+  {
+   "type": "text",
+   "text": "**Colorize**, just like in GIMP: turn a whole texture - or only what you selected - into any colour while its shading stays. Hue, saturation and lightness sliders show the result live. Plus hue / saturation, replace colour, brightness / contrast, posterize, noise, invert, grayscale, blur, outline, flip and rotate."
+  },
+  {
+   "type": "image",
+   "image": "file:images/colorize.jpg",
+   "caption": "Colorize: a sea lantern turned red in two seconds"
+  },
+  {
+   "type": "heading",
+   "text": "Sounds and music"
+  },
+  {
+   "type": "text",
+   "text": "Every sound and every song of the game, listed by music, ambient, blocks, entities, items, interface and weather - and you can **play them right in game**. Open one to see its waveform, trim it, change volume and speed, fade it in and out, or **replace it with your own file** (ogg, mp3, wav, flac...). Add extra variants, and set how loud and how often the game plays each one."
+  },
+  {
+   "type": "image",
+   "image": "file:images/sound-editor.jpg",
+   "caption": "Swap the menu music for your own songs"
+  },
+  {
+   "type": "heading",
+   "text": "Edit any file in game"
+  },
+  {
+   "type": "text",
+   "text": "Models, block states, item definitions, languages, sounds.json, pack.mcmeta and shaders open in an editor with syntax colours, line numbers, find & replace and auto-indent. JSON is checked as you type - a mistake gets its line marked in red - and **Format** tidies it up."
+  },
+  {
+   "type": "image",
+   "image": "file:images/code-editor.jpg",
+   "caption": "JSON and GLSL with colours, checking and formatting"
+  },
+  {
+   "type": "text",
+   "text": "When you're done, **Save & reload** puts your pack on and reloads the game's resources - your changes show in the world a moment later."
+  },
+  {
+   "type": "heading",
+   "text": "Also new"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Velo Shaders**: the sun is much softer - a smaller glow, gentler light rays and less haze when you look towards it.",
+    "**Title screen**: partner servers moved to **Discover**, so the title screen is calmer.",
+    "**Pack covers**: set any picture as a pack's icon, or draw one yourself."
+   ]
+  }
+ ]
+}

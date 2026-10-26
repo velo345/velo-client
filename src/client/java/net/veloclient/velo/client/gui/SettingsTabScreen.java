@@ -27,7 +27,7 @@ public final class SettingsTabScreen extends VeloWindow {
 	private final java.util.List<String> cardTitles = new java.util.ArrayList<>();
 
 	public SettingsTabScreen(Screen parent) {
-		super(Text.literal("Settings"), 340, 360);
+		super(Text.literal("Settings"), 340, 384);
 		returnTo(parent);
 	}
 
@@ -56,12 +56,14 @@ public final class SettingsTabScreen extends VeloWindow {
 				}).listening(listeningForMenuKey));
 		y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
 
-		y = section("Velo screens", y, 3);
+		y = section("Velo screens", y, 4);
 		addDrawableChild(screenRow(x, y, width, "Advancements", VeloScreens::advancements, VeloScreens::setAdvancements));
 		y += ROW_HEIGHT;
 		addDrawableChild(screenRow(x, y, width, "Controls (key binds)", VeloScreens::controls, VeloScreens::setControls));
 		y += ROW_HEIGHT;
 		addDrawableChild(screenRow(x, y, width, "Statistics", VeloScreens::statistics, VeloScreens::setStatistics));
+		y += ROW_HEIGHT;
+		addDrawableChild(screenRow(x, y, width, "Resource packs", VeloScreens::resourcePacks, VeloScreens::setResourcePacks));
 		y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
 
 		y = section("Files", y, 1);

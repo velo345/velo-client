@@ -258,7 +258,7 @@ void main() {
         vec3 sunW = velo_light_dir();
         float phase = henyey_greenstein(dot(dir, sunW), 0.7) * 3.0;
         vec3 horizon = mix(VeloSky.rgb, vec3(velo_luma(VeloSky.rgb)), 0.35) * 1.05 + vec3(0.02);
-        vec3 inscatter = horizon * mix(0.25, 1.0, day) + sun_light_color() * phase * mix(0.04, 0.35, day) * (1.0 - rain * 0.7);
+        vec3 inscatter = horizon * mix(0.25, 1.0, day) + sun_light_color() * phase * mix(0.03, 0.2, day) * (1.0 - rain * 0.7);
         if (sky) {
             transmittance = mix(1.0, transmittance, 0.3);
         }

@@ -509,6 +509,38 @@ public final class ScreenshotTour {
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))},
 					new Object[] {3, (Runnable) () -> shot(client, "pause-opening")},
 					new Object[] {30, (Runnable) () -> shot(client, "pause")});
+			case "packs" -> List.of(
+					new Object[] {0, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openPacks(client)},
+					new Object[] {40, (Runnable) () -> shot(client, "packs-list")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openBrowser(client, false)},
+					new Object[] {40, (Runnable) () -> shot(client, "packs-info")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.browserCategory(false,
+							net.veloclient.velo.client.gui.packs.PackContents.Category.BLOCKS)},
+					new Object[] {40, (Runnable) () -> shot(client, "packs-blocks")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.browserCategory(true,
+							net.veloclient.velo.client.gui.packs.PackContents.Category.ITEMS)},
+					new Object[] {80, (Runnable) () -> shot(client, "packs-game-items")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openEditor(client, "minecraft:textures/block/oak_log.png", false, false)},
+					new Object[] {60, (Runnable) () -> shot(client, "editor-block")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openEditor(client, "minecraft:textures/item/diamond_sword.png", true, false)},
+					new Object[] {40, (Runnable) () -> shot(client, "editor-item")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openEditor(client, "minecraft:textures/entity/creeper/creeper.png", false, false)},
+					new Object[] {40, (Runnable) () -> shot(client, "editor-entity")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openEditor(client, "minecraft:textures/block/sea_lantern.png", true, true)},
+					new Object[] {6, (Runnable) () -> shot(client, "editor-colorize-anim")},
+					new Object[] {40, (Runnable) () -> shot(client, "editor-colorize")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openBrowser(client, true)},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.browserCategory(true,
+							net.veloclient.velo.client.gui.packs.PackContents.Category.SOUNDS)},
+					new Object[] {80, (Runnable) () -> shot(client, "packs-sounds")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openSound(client, "minecraft:entity.creeper.primed")},
+					new Object[] {60, (Runnable) () -> shot(client, "sound-editor")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openSound(client, "minecraft:music.menu")},
+					new Object[] {120, (Runnable) () -> shot(client, "sound-music")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openCode(client, "minecraft:models/block/stairs.json")},
+					new Object[] {40, (Runnable) () -> shot(client, "code-json")},
+					new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openCode(client, "minecraft:shaders/core/terrain.fsh")},
+					new Object[] {40, (Runnable) () -> shot(client, "code-glsl")});
 			case "bugreport" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.BugReportScreen(null))},
 					new Object[] {30, (Runnable) () -> shot(client, "bugreport")});
@@ -642,6 +674,7 @@ public final class ScreenshotTour {
 			case "vibe-scout" -> vibeScout(client);
 			case "rs" -> redstoneShort(client);
 			case "rs-layout" -> rsLayout(client);
+			case "shadercine" -> shaderCinematics(client);
 			default -> {
 				VeloClient.LOGGER.warn("Velo screenshot tour: unknown scene {}", name);
 				yield List.of();
@@ -1017,6 +1050,84 @@ public final class ScreenshotTour {
 			out[i] = sb.toString();
 		}
 		serverCommands(client, out);
+	}
+
+	/** Ground height (motion blocking) at x/z, 64 when unknown. */
+	private static int groundAt(MinecraftClient client, double x, double z) {
+		//? if >=26.2 {
+		/*return client.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, (int) Math.floor(x), (int) Math.floor(z));
+		*///?} else {
+		return 64;
+		//?}
+	}
+
+	/** Camera = the (flying, hidden) player: puts the eye at x/y/z looking yaw/pitch. */
+	private static void camAt(MinecraftClient client, double x, double y, double z, float yaw, float pitch) {
+		//? if >=26.2 {
+		/*var p = client.player;
+		p.getAbilities().flying = true;
+		p.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+		p.snapTo(x, y - 1.62, z, yaw, pitch);
+		p.setYHeadRot(yaw);
+		*///?}
+	}
+
+	/**
+	 * Velo Shaders footage for trailers: slow, still-camera shots at golden hour around the "Chalet house" spot
+	 * ({@code -Dvelo.tourSpot=x,z}): a pan over the forest into the sun, a dolly towards the house, a slide through the trees
+	 * and you with wings in third person. One frame per tick = 60 fps footage.
+	 */
+	private static List<Object[]> shaderCinematics(MinecraftClient client) {
+		List<Object[]> steps = new ArrayList<>();
+		String[] spot = System.getProperty("velo.tourSpot", "-151,2332").split(",");
+		double sx = Double.parseDouble(spot[0]), sz = Double.parseDouble(spot[1]);
+		int[] g = {64};
+		steps.add(new Object[] {0, (Runnable) () -> {
+			serverCommands(client, VIBE_WORLD);
+			serverCommands(client, "time set 12350", "gamemode creative @s", "effect clear @s");
+			ModuleRegistry.get("velo-shaders").ifPresent(m -> m.setEnabled(true));
+			setChoice("velo-shaders", "Preset", System.getProperty("velo.tourShaderPreset", "Cinematic"));
+			setHudHidden(client, true);
+			//? if >=26.2 {
+			/*client.options.fov().set(70);
+			client.options.framerateLimit().set(60);
+			*///?}
+			camAt(client, sx + 40, 120, sz, 90, 10);
+		}});
+		steps.add(new Object[] {120, (Runnable) () -> g[0] = groundAt(client, sx, sz)});
+		// 1: high over the forest, turning slowly into the sunset
+		steps.add(new Object[] {2, (Runnable) () -> camAt(client, sx + 45, g[0] + 34, sz + 6, 78, 12)});
+		steps.add(new Object[] {40, (Runnable) () -> { }});
+		sequence(steps, client, "sh-sky", 180, f -> camAt(client, sx + 45 - f * 0.08, g[0] + 34 + f * 0.02, sz + 6, 78 + f * 0.11f, 12 - f * 0.04f));
+		// 2: low dolly towards the house
+		steps.add(new Object[] {2, (Runnable) () -> camAt(client, sx + 26, groundAt(client, sx + 26, sz + 12) + 3, sz + 12, 115, 2)});
+		steps.add(new Object[] {40, (Runnable) () -> { }});
+		sequence(steps, client, "sh-house", 180, f -> {
+			double cx = sx + 26 - f * 0.05, cz = sz + 12 - f * 0.02;
+			camAt(client, cx, groundAt(client, sx + 26, sz + 12) + 3.2, cz, 112 + f * 0.03f, 2 - f * 0.01f);
+		});
+		// 3: sliding sideways through the trees, against the sun
+		steps.add(new Object[] {2, (Runnable) () -> camAt(client, sx - 30, groundAt(client, sx - 30, sz - 8) + 2.5, sz - 8, 90, -4)});
+		steps.add(new Object[] {40, (Runnable) () -> { }});
+		sequence(steps, client, "sh-forest", 180, f -> camAt(client, sx - 30, groundAt(client, sx - 30, sz - 8) + 2.5, sz - 8 + f * 0.035, 90 - f * 0.02f, -4));
+		// 4: you in third person with wings, slow half orbit
+		steps.add(new Object[] {2, (Runnable) () -> {
+			net.veloclient.velo.client.cosmetics.wings.WingsManager.setPreview(System.getProperty("velo.tourWings", "phoenix"));
+			ModuleRegistry.get("free-look").ifPresent(m -> m.setEnabled(true));
+			//? if >=26.2 {
+			/*var p = client.player;
+			p.getAbilities().flying = false;
+			*///?}
+			serverCommands(client, "tp @s " + (sx + 12) + " " + (groundAt(client, sx + 12, sz + 4) + 1) + " " + (sz + 4) + " 90 6");
+		}});
+		steps.add(new Object[] {40, (Runnable) () -> net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(true, 140f, 4.2)});
+		sequence(steps, client, "sh-player", 180, f -> net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(true, 140f + f * 0.25f, 4.2 - f * 0.004));
+		steps.add(new Object[] {2, (Runnable) () -> {
+			net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(false, 0f);
+			net.veloclient.velo.client.cosmetics.wings.WingsManager.clearPreview();
+			setHudHidden(client, false);
+		}});
+		return steps;
 	}
 
 	/** Edit HUD Layout in Redstone Mode with a schematic loaded: drags the Schematics panel around by hand-made mouse events. */

@@ -120,4 +120,68 @@ public final class NativeFileDialog {
 		}
 		throw new IOException("No native file picker found (tried kdialog, zenity)", lastMissing);
 	}
+
+	/**
+	 * A native "save as" dialog for a PNG, starting in the home folder with {@code suggestedName}.
+	 * @return the chosen file (".png" added if missing), or {@code null} if the user cancelled.
+	 */
+	public static Path savePngFile(String promptTitle, String suggestedName) throws IOException, InterruptedException {
+		return saveFile(promptTitle, suggestedName, "PNG images", "png");
+	}
+
+	/**
+	 * A native "save as" dialog for one file type ({@code extensionNoDot}, e.g. "wav"), starting in the home folder.
+	 * @return the chosen file (the extension added if missing), or {@code null} if the user cancelled.
+	 */
+	public static Path saveFile(String promptTitle, String suggestedName, String filterLabel, String extensionNoDot) throws IOException,
+			InterruptedException {
+		String ext = "." + extensionNoDot;
+		String glob = "*" + ext;
+		String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+		String home = System.getProperty("user.home", ".");
+		String output;
+		if (osName.contains("win")) {
+			String script = "Add-Type -AssemblyName System.Windows.Forms; "
+					+ "$f = New-Object System.Windows.Forms.SaveFileDialog; "
+					+ "$f.InitialDirectory = '" + home.replace("'", "''") + "'; "
+					+ "$f.FileName = '" + suggestedName.replace("'", "''") + "'; "
+					+ "$f.Filter = '" + filterLabel.replace("'", "''") + " (" + glob + ")|" + glob + "'; "
+					+ "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.FileName }";
+			output = run(new ProcessBuilder("powershell", "-NoProfile", "-NonInteractive", "-Command", script));
+		} else if (osName.contains("mac") || osName.contains("darwin")) {
+			String script = "try\nPOSIX path of (choose file name with prompt \"" + promptTitle.replace("\"", "'") + "\" default name \""
+					+ suggestedName.replace("\"", "'") + "\")\non error\nreturn \"\"\nend try";
+			output = run(new ProcessBuilder("osascript", "-e", script));
+		} else {
+			String start = Path.of(home, suggestedName).toString();
+			String[][] candidates = {
+					{"kdialog", "--getsavefilename", start, glob + "|" + filterLabel},
+					{"zenity", "--file-selection", "--save", "--confirm-overwrite", "--filename=" + start, "--file-filter=" + filterLabel + " | " + glob},
+			};
+			output = null;
+			IOException lastMissing = null;
+			for (String[] command : candidates) {
+				try {
+					output = run(new ProcessBuilder(command));
+					break;
+				} catch (IOException notInstalled) {
+					lastMissing = notInstalled;
+				}
+			}
+			if (output == null && lastMissing != null) {
+				throw new IOException("No native file picker found (tried kdialog, zenity)", lastMissing);
+			}
+		}
+		if (output == null || output.isBlank()) {
+			return null;
+		}
+		return Path.of(output.toLowerCase(Locale.ROOT).endsWith(ext) ? output : output + ext);
+	}
+
+	/** Runs a dialog process; its trimmed output, or "" when it was cancelled. */
+	private static String run(ProcessBuilder builder) throws IOException, InterruptedException {
+		Process process = builder.redirectErrorStream(false).start();
+		String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+		return process.waitFor() == 0 ? output : "";
+	}
 }

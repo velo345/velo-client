@@ -202,6 +202,7 @@ public final class VeloClientMod implements ClientModInitializer {
 			net.veloclient.velo.client.gui.VeloStatsScreen.maybeReplace(client, screen);
 			net.veloclient.velo.client.gui.VeloKeybindsScreen.maybeReplace(client, screen);
 			net.veloclient.velo.client.gui.VeloAdvancementsScreen.maybeReplace(client, screen);
+			net.veloclient.velo.client.gui.packs.VeloPacksScreen.maybeReplace(client, screen);
 			addSkinsButton(screen, scaledWidth);
 			offerCrashReport(client, screen);
 		});

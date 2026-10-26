@@ -20,6 +20,7 @@ public final class VeloScreens {
 		boolean advancements = true;
 		boolean controls = true;
 		boolean statistics = true;
+		boolean resourcePacks = true;
 	}
 
 	private static Data data;
@@ -64,6 +65,15 @@ public final class VeloScreens {
 
 	public static boolean statistics() {
 		return data().statistics;
+	}
+
+	public static boolean resourcePacks() {
+		return data().resourcePacks;
+	}
+
+	public static void setResourcePacks(boolean on) {
+		data().resourcePacks = on;
+		save();
 	}
 
 	public static void setAdvancements(boolean on) {

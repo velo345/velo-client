@@ -61,5 +61,5 @@ void main() {
     // leaves faint bands.
     vec3 viewDir = normalize(view_pos(texCoord, reversed_z() ? 1.0 : 0.0));
     float towards = pow(max(dot(viewDir, lView), 0.0), 3.0);
-    fragColor = vec4(god_rays(texCoord, lView) * towards * amount * mix(0.35, 1.2, day) * (1.0 - rain * 0.8), 1.0);
+    fragColor = vec4(god_rays(texCoord, lView) * towards * amount * mix(0.25, 0.7, day) * (1.0 - rain * 0.8), 1.0);
 }
