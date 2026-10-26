@@ -267,6 +267,186 @@ public final class PlayerSkin3DView {
 	}
 
 	/**
+	 * Your skin doing an emote: like {@link #createViewer} but every body part sits in its own group around its joint
+	 * (with its overlay voxels), posed every frame from the animation {@code animation} supplies (null = standing).
+	 * The emote's particles rise as glyphs in the scene. Drag to turn, scroll to zoom.
+	 */
+	public static Node createEmoteViewer(byte[] skinPngBytes, boolean slim,
+			java.util.function.Supplier<net.veloclient.launcher.data.EmoteCatalog.Animation> animation) {
+		if (skinPngBytes == null) {
+			return null;
+		}
+		Image raw;
+		try {
+			raw = new Image(new ByteArrayInputStream(skinPngBytes));
+		} catch (RuntimeException e) {
+			return null;
+		}
+		if (raw.isError() || raw.getWidth() < 64 || raw.getHeight() < 32) {
+			return null;
+		}
+		WritableImage skin = normalize(raw);
+		if (skin == null) {
+			return null;
+		}
+		int scale = (int) (skin.getWidth() / 64);
+		Image texture = upscale(skin, Math.max(1, UPSCALE_FACTOR / scale));
+		double armWidth = slim ? 3 : 4;
+		Part[] parts = {
+				new Part(0, 0, 8, 8, 8, 0, -16, 0, 32, 0),
+				new Part(16, 16, 8, 12, 4, 0, -8, 0, 16, 32),
+				new Part(40, 16, armWidth, 12, 4, -(4 + armWidth / 2), -8, 0, 40, 32),
+				new Part(32, 48, armWidth, 12, 4, 4 + armWidth / 2, -8, 0, 48, 48),
+				new Part(0, 16, 4, 12, 4, -2, 4, 0, 0, 32),
+				new Part(16, 48, 4, 12, 4, 2, 4, 0, 0, 48),
+		};
+		// Joints in this space (Minecraft's model space shifted up by 8: the neck is at y = -8).
+		double[][] joints = {{0, -8, 0}, {0, -8, 0}, {-5, -6, 0}, {5, -6, 0}, {-1.9, 4, 0}, {1.9, 4, 0}};
+		Group model = new Group();
+		Group[] groups = new Group[6];
+		javafx.scene.transform.Translate[] pivots = new javafx.scene.transform.Translate[6];
+		Rotate[][] rotations = new Rotate[6][];
+		for (int i = 0; i < parts.length; i++) {
+			Part p = parts[i];
+			Group g = new Group();
+			Part local = new Part(p.u, p.v, p.w, p.h, p.d, p.cx - joints[i][0], p.cy - joints[i][1], p.cz - joints[i][2], p.ou, p.ov);
+			addPart(g, texture, 64, 64, local.u, local.v, local.w, local.h, local.d, local.cx, local.cy, local.cz);
+			MeshView layer = buildLayerVoxels(skin, 64, 64, new Part[] {local}, scale);
+			if (layer != null) {
+				g.getChildren().add(layer);
+			}
+			pivots[i] = new javafx.scene.transform.Translate(joints[i][0], joints[i][1], joints[i][2]);
+			rotations[i] = new Rotate[] {new Rotate(0, Rotate.Z_AXIS), new Rotate(0, Rotate.Y_AXIS), new Rotate(0, Rotate.X_AXIS)};
+			g.getTransforms().addAll(pivots[i], rotations[i][0], rotations[i][1], rotations[i][2]);
+			groups[i] = g;
+			model.getChildren().add(g);
+		}
+		Group rig = new Group(model);
+		// a little turned, front towards the viewer (20 like the profile viewer)
+		Rotate yaw = new Rotate(20, Rotate.Y_AXIS);
+		rig.getTransforms().add(yaw);
+		PerspectiveCamera camera = new PerspectiveCamera(true);
+		camera.setNearClip(0.1);
+		camera.setFarClip(1000);
+		camera.setTranslateZ(-86);
+		camera.setFieldOfView(30);
+		Group particles = new Group();
+		Group sceneRoot = new Group(rig, particles, camera);
+		sceneRoot.getChildren().addAll(new AmbientLight(Color.rgb(150, 150, 150)), keyLight(-1, -1, -1, 0.9), keyLight(1, -0.4, -1, 0.5));
+		StackPane wrapper = new StackPane();
+		SubScene subScene = new SubScene(sceneRoot, 10, 10, true, SceneAntialiasing.BALANCED);
+		subScene.setFill(Color.TRANSPARENT);
+		subScene.setCamera(camera);
+		subScene.widthProperty().bind(wrapper.widthProperty());
+		subScene.heightProperty().bind(wrapper.heightProperty());
+		wrapper.getChildren().add(subScene);
+		double[] lastX = new double[1];
+		wrapper.setOnMousePressed(e -> lastX[0] = e.getSceneX());
+		wrapper.setOnMouseDragged(e -> {
+			yaw.setAngle(yaw.getAngle() + (e.getSceneX() - lastX[0]) * 0.5);
+			lastX[0] = e.getSceneX();
+		});
+		wrapper.addEventHandler(ScrollEvent.SCROLL, e -> {
+			camera.setTranslateZ(Math.max(-180, Math.min(-40, camera.getTranslateZ() + e.getDeltaY() * 0.15)));
+			e.consume();
+		});
+		float[] pose = EmoteFigureFx.REST.clone();
+		java.util.Random random = new java.util.Random();
+		AnimationTimer timer = new AnimationTimer() {
+			private long start;
+			private net.veloclient.launcher.data.EmoteCatalog.Animation shown;
+			private double fired = -1;
+
+			@Override
+			public void handle(long now) {
+				if (!RenderGate.active()) {
+					return;
+				}
+				var a = animation.get();
+				if (a != shown) {
+					shown = a;
+					start = now;
+					fired = -1;
+				}
+				double t = (now - start) / 1e9;
+				System.arraycopy(EmoteFigureFx.REST, 0, pose, 0, pose.length);
+				if (a != null) {
+					double cycle = a.duration() + (a.loop() ? 0 : 0.6);
+					double local = t % cycle;
+					if (local <= a.duration()) {
+						a.pose(local * a.fps(), pose);
+					}
+					int first = (int) Math.floor(Math.max(0, fired) / cycle);
+					int last = (int) Math.floor(t / cycle);
+					for (int k = first; k <= last; k++) {
+						for (var e : a.events()) {
+							double at = k * cycle + e.t();
+							if (e.particle() != null && at > fired && at <= t) {
+								spawn(particles, e, EmoteFigureFx.anchor(pose, EmoteFigureFx.anchorOf(e.at())), Math.toRadians(yaw.getAngle()), random);
+							}
+						}
+					}
+					fired = t;
+				}
+				for (int i = 0; i < 6; i++) {
+					int o = i * 6;
+					pivots[i].setX(pose[o]);
+					pivots[i].setY(pose[o + 1] - 8);
+					pivots[i].setZ(pose[o + 2]);
+					rotations[i][0].setAngle(Math.toDegrees(pose[o + 5]));
+					rotations[i][1].setAngle(Math.toDegrees(pose[o + 4]));
+					rotations[i][2].setAngle(Math.toDegrees(pose[o + 3]));
+				}
+				// particles rise and fade
+				particles.getChildren().removeIf(n -> {
+					double[] life = (double[]) n.getUserData();
+					double age = (now - (long) life[0]) / 1e9;
+					if (age > life[1]) {
+						return true;
+					}
+					n.setTranslateX(life[2] + life[4] * age);
+					n.setTranslateY(life[3] + life[5] * age);
+					n.setOpacity(1 - age / life[1]);
+					return false;
+				});
+			}
+		};
+		wrapper.sceneProperty().addListener((obs, o, n) -> {
+			if (n == null) {
+				timer.stop();
+			} else {
+				timer.start();
+			}
+		});
+		return wrapper;
+	}
+
+	/** An emote particle as a glyph in the scene, at a model-space point turned with the viewer's yaw. */
+	private static void spawn(Group particles, net.veloclient.launcher.data.EmoteCatalog.Event e, double[] point, double yaw, java.util.Random random) {
+		int n = Math.min(6, Math.max(1, e.count() / 3));
+		for (int i = 0; i < n; i++) {
+			Object[] look = EmoteFigureFx.glyph(e);
+			javafx.scene.text.Text glyph = new javafx.scene.text.Text((String) look[0]);
+			glyph.setFill((Color) look[1]);
+			glyph.setFont(javafx.scene.text.Font.font("System", javafx.scene.text.FontWeight.BOLD, 3.2));
+			double spread = Math.max(0.5, e.spread() * 16);
+			double x = point[0] + (random.nextDouble() - 0.5) * spread;
+			double y = point[1] - 8 + (random.nextDouble() - 0.5) * spread;
+			double z = point[2] + (random.nextDouble() - 0.5) * spread;
+			// the rig turns around Y: same rotation for the particle's start
+			double rx = x * Math.cos(yaw) + z * Math.sin(yaw);
+			double rz = -x * Math.sin(yaw) + z * Math.cos(yaw);
+			glyph.setTranslateZ(rz - 2);
+			glyph.setUserData(new double[] {System.nanoTime(), 0.9 + random.nextDouble() * 0.5, rx, y, (random.nextDouble() - 0.5) * 2,
+					-3 - e.up() * 20 - random.nextDouble() * 2});
+			particles.getChildren().add(glyph);
+		}
+		if (particles.getChildren().size() > 60) {
+			particles.getChildren().remove(0, particles.getChildren().size() - 60);
+		}
+	}
+
+	/**
 	 * The real Minecraft cape model: a 10x16x1 box with the cape template's own UV layout (outside,
 	 * inside, edges), hinged at the shoulders, hanging out from the back at a slight angle and
 	 * swaying gently. Animated capes swap the texture per frame. Returns the driving timer.

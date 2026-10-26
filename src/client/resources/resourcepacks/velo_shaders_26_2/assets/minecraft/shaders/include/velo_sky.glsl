@@ -193,7 +193,7 @@ vec3 velo_sky(vec3 dir, vec3 vanillaSky, vec3 fog) {
     float day = VeloSun.w;
     float night = 1.0 - day;
     float rain = VeloSky.a;
-    vec3 sunDir = VeloSun.xyz;
+    vec3 sunDir = velo_sun_dir();
     float up = clamp(dir.y, 0.0, 1.0);
 
     // a deeper, more saturated zenith than vanilla's

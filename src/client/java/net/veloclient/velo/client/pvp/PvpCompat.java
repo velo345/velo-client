@@ -330,6 +330,20 @@ public final class PvpCompat {
 		return new double[] {pos.x, pos.y, pos.z};
 	}
 
+	/** The camera's {yaw, pitch} in degrees this frame. */
+	public static float[] cameraRotation() {
+		//? if <26.1 {
+		var camera = MinecraftClient.getInstance().gameRenderer.getCamera();
+		return new float[] {camera.getYaw(), camera.getPitch()};
+		//?} else if <26.2 {
+		/*var camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+		return new float[] {camera.yRot(), camera.xRot()};
+		*///?} else {
+		/*var camera = Minecraft.getInstance().gameRenderer.mainCamera();
+		return new float[] {camera.yRot(), camera.xRot()};
+		*///?}
+	}
+
 	/**
 	 * Top of the first solid block at or below (x, y, z), scanning at most {@code depth} blocks
 	 * down - the floor under you even mid-jump. NaN if there's nothing solid that close.

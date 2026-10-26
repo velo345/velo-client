@@ -6,7 +6,9 @@ import org.spongepowered.asm.mixin.Pseudo;
 /*import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.BlockRenderer;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.Material;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoublePlantBlock;
 import net.minecraft.world.level.block.KelpBlock;
 import net.minecraft.world.level.block.KelpPlantBlock;
@@ -16,6 +18,7 @@ import net.minecraft.world.level.block.TallSeagrassBlock;
 import net.minecraft.world.level.block.VegetationBlock;
 import net.minecraft.world.level.block.VineBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.veloclient.velo.client.modules.rendering.VeloShadersModule;
 import org.spongepowered.asm.mixin.Final;
@@ -29,8 +32,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Velo Shaders' swaying plants: Sodium writes one material per quad, but a grass blade's base has
  * to stay put while its tip moves - so each vertex carries a sway code in its colour's alpha
- * (255 = rigid, 253 = leaves, 252 = plant tip, 251 = half height of a tall plant, 248 = light source), which the chunk
- * shader decodes and resets to opaque. A 1-4/255 alpha difference is invisible.
+ * (255 = rigid, 253 = leaves, 252 = plant tip, 251 = half height of a tall plant, 248 = light source, 247 = powered
+ * redstone, 246 = glass), which the chunk shader decodes and resets to opaque. A few /255 of alpha is invisible.
+ * Clear glass also moves to the translucent pass, so the whole pane - not just its streaks - can reflect the sky.
  */
 @Pseudo
 //? if >=26.2 {
@@ -47,9 +51,56 @@ public abstract class VeloFoliageSodiumMixin {
 	private static final int TIP = 3;
 	@Unique
 	private static final int HALF = 4;
+	@Unique
+	private static final int REDSTONE = 8;
+	@Unique
+	private static final int GLASS = 9;
+	@Unique
+	private static final java.util.Map<Block, Boolean> GLASS_BLOCKS = new java.util.concurrent.ConcurrentHashMap<>();
 
+	@Unique
+	private static boolean velo$glass(Block block) {
+		return GLASS_BLOCKS.computeIfAbsent(block, b -> {
+			String path = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(b).getPath();
+			return path.contains("glass") && !path.contains("tinted");
+		});
+	}
+
+	// Powered redstone parts: their red bits glow in the chunk shader.
+	@Unique
+	private static boolean velo$redstoneOn(BlockState state) {
+		if (state.is(Blocks.REDSTONE_BLOCK)) {
+			return true;
+		}
+		if (state.is(Blocks.REDSTONE_WIRE)) {
+			return state.getValue(BlockStateProperties.POWER) > 0;
+		}
+		if (state.is(Blocks.REDSTONE_TORCH) || state.is(Blocks.REDSTONE_WALL_TORCH) || state.is(Blocks.REDSTONE_ORE)
+				|| state.is(Blocks.DEEPSLATE_REDSTONE_ORE)) {
+			return state.getValue(BlockStateProperties.LIT);
+		}
+		if (state.is(Blocks.REPEATER) || state.is(Blocks.COMPARATOR) || state.is(Blocks.OBSERVER) || state.is(Blocks.POWERED_RAIL)
+				|| state.is(Blocks.DETECTOR_RAIL) || state.is(Blocks.ACTIVATOR_RAIL)) {
+			return state.getValue(BlockStateProperties.POWERED);
+		}
+		return false;
+	}
+
+	// Clear glass is a cutout block: drawn translucent instead, its see-through part can carry a reflection.
+	@com.llamalad7.mixinextras.injector.ModifyExpressionValue(method = "processQuad", at = @At(value = "INVOKE",
+			target = "Lnet/caffeinemc/mods/sodium/client/render/model/MutableQuadViewImpl;getRenderType()Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;"),
+			require = 0)
+	private ChunkSectionLayer velo$glassLayer(ChunkSectionLayer layer) {
+		if (layer != ChunkSectionLayer.CUTOUT || !VeloShadersModule.glassReflections()) {
+			return layer;
+		}
+		BlockState state = ((VeloBlockRenderContextAccessor) this).velo$state();
+		return state != null && velo$glass(state.getBlock()) ? ChunkSectionLayer.TRANSLUCENT : layer;
+	}
+
+	// Before the quad goes to its pass - translucent quads take the sorting collector's path, not push().
 	@Inject(method = "bufferQuad", at = @At(value = "INVOKE",
-			target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/vertex/builder/ChunkMeshBufferBuilder;push([Lnet/caffeinemc/mods/sodium/client/render/chunk/vertex/format/ChunkVertexEncoder$Vertex;I)V"),
+			target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/terrain/material/Material;bits()I"),
 			require = 0)
 	private void velo$swayCodes(CallbackInfo ci) {
 		if (!VeloShadersModule.active()) {
@@ -60,6 +111,13 @@ public abstract class VeloFoliageSodiumMixin {
 			return;
 		}
 		Block block = state.getBlock();
+		int whole = velo$redstoneOn(state) ? REDSTONE : velo$glass(block) ? GLASS : 0;
+		if (whole != 0) {
+			for (ChunkVertexEncoder.Vertex v : vertices) {
+				v.color = (v.color & 0x00FFFFFF) | ((255 - whole) << 24);
+			}
+			return;
+		}
 		if (state.getLightEmission() > 0) {
 			// a light source: the chunk shader lets its bright texels glow (code 7 = alpha 248)
 			for (ChunkVertexEncoder.Vertex v : vertices) {

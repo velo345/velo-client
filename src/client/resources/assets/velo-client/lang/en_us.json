@@ -25,11 +25,13 @@
 	"key.velo-client.phantom": "Toggle Phantom",
 	"key.velo-client.rm_tool_select": "Tool: Select",
 	"key.velo-client.rm_tool_move": "Tool: Move",
+	"key.velo-client.rm_tool_copy": "Tool: Copy",
 	"key.velo-client.rm_tool_stack": "Tool: Stack",
 	"key.velo-client.rm_tool_wire": "Tool: Redstone Wiring",
 	"key.velo-client.rm_tool_water": "Tool: Water Wiring",
 	"key.velo-client.rm_tick_step": "Frozen: Step Forward",
 	"key.velo-client.rm_tick_back": "Frozen: Step Back",
 	"key.velo-client.rm_tick_play": "Frozen: Play While Held",
-	"key.velo-client.rm_tick_rewind": "Frozen: Rewind 1 Second"
+	"key.velo-client.rm_tick_rewind": "Frozen: Rewind 1 Second",
+	"key.velo-client.emote_wheel": "Emote Wheel"
 }

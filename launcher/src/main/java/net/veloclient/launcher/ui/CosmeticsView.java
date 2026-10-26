@@ -76,12 +76,15 @@ public final class CosmeticsView {
 		}
 	}
 
-	public enum Slot { SKIN, CAPE, WINGS, AURA, NAME }
+	public enum Slot { SKIN, CAPE, WINGS, AURA, NAME, EMOTES }
 
 	private static Slot slot = Slot.CAPE;
 	private static String selectedCape;
 	private static String selectedWings;
 	private static String selectedAura;
+	/** The emote playing on the stage, and the wheel slot (0-7) a click on an emote puts it in. */
+	private static String selectedEmote;
+	private static int selectedWheelSlot;
 	/** Selected saved skin id; null = the skin on your account right now. */
 	private static String selectedSkin;
 	private static int capeFilter;
@@ -104,6 +107,10 @@ public final class CosmeticsView {
 
 	public static void showNameStyleTab() {
 		slot = Slot.NAME;
+	}
+
+	public static void showEmotesTab() {
+		slot = Slot.EMOTES;
 	}
 
 	public static Node build(Stage owner, Host host) {
@@ -142,6 +149,7 @@ public final class CosmeticsView {
 			case WINGS -> wingsPanel(host, refresh);
 			case AURA -> aurasPanel(host, refresh);
 			case NAME -> NameStyleEditor.panel(playerName, refresh);
+			case EMOTES -> emotesPanel(host, refresh);
 		};
 		HBox body = new HBox(0, slots, stage, panel);
 		body.getStyleClass().add("page");
@@ -174,6 +182,19 @@ public final class CosmeticsView {
 		boolean nameOn = net.veloclient.launcher.data.NameStyleSetting.enabled();
 		Node nameThumb = new NamePreview("Aa", () -> nameStyle, 20, 46);
 		column.getChildren().add(slotButton(Slot.NAME, "NAME STYLE", nameOn ? nameStyle.effect().label : "None", nameThumb, refresh));
+		int onWheel = 0;
+		net.veloclient.launcher.data.EmoteCatalog.EmoteType firstOnWheel = null;
+		for (int i = 0; i < net.veloclient.launcher.data.EmoteCatalog.SLOTS; i++) {
+			String id = net.veloclient.launcher.data.EmoteCatalog.slot(i);
+			if (id != null) {
+				onWheel++;
+				if (firstOnWheel == null) {
+					firstOnWheel = net.veloclient.launcher.data.EmoteCatalog.byId(id).orElse(null);
+				}
+			}
+		}
+		Node emoteThumb = firstOnWheel == null ? Icons.icon("sparkles", 22, Color.web("#5A5A63")) : EmoteFigureFx.create(firstOnWheel, 46, 46);
+		column.getChildren().add(slotButton(Slot.EMOTES, "EMOTES", onWheel == 0 ? "None" : onWheel + " on your wheel", emoteThumb, refresh));
 		Region grow = new Region();
 		VBox.setVgrow(grow, Priority.ALWAYS);
 		column.getChildren().addAll(grow, loadoutsCard(refresh));
@@ -471,6 +492,7 @@ public final class CosmeticsView {
 			case AURA -> AuraCatalog.byId(selectedAuraId()).map(AuraCatalog.AuraType::accent).orElse("#bca6ff");
 			case SKIN, NAME -> "#bca6ff";
 			case CAPE -> "#5ac8ff";
+			case EMOTES -> net.veloclient.launcher.data.EmoteCatalog.byId(selectedEmoteId()).map(net.veloclient.launcher.data.EmoteCatalog.EmoteType::accent).orElse("#8b7cf6");
 		};
 		StackPane stage = new StackPane();
 		stage.setMinWidth(300);
@@ -518,6 +540,7 @@ public final class CosmeticsView {
 			case WINGS -> "Wings only";
 			case AURA -> "Aura only";
 			case SKIN, NAME -> "Skin only";
+			case EMOTES -> "Emote";
 		};
 		for (boolean full : new boolean[] {true, false}) {
 			Button b = new Button(full ? "Full look" : only);
@@ -538,11 +561,22 @@ public final class CosmeticsView {
 		lookToggle.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
 		StackPane.setAlignment(lookToggle, Pos.TOP_LEFT);
 		StackPane.setMargin(lookToggle, new Insets(14, 0, 0, 14));
-		if (host.session() != null) {
+		if (host.session() != null && slot != Slot.EMOTES) {
 			stage.getChildren().add(lookToggle);
 		}
 
-		if (fullLook && host.session() != null) {
+		if (slot == Slot.EMOTES) {
+			// you, doing the emote you picked (with its particles)
+			net.veloclient.launcher.data.EmoteCatalog.EmoteType emote = net.veloclient.launcher.data.EmoteCatalog.byId(selectedEmoteId()).orElse(null);
+			if (emote != null) {
+				Node emoteStage = EmoteDetailView.stage(host.session(), emote, 340, 420);
+				if (emoteStage instanceof Region region) {
+					region.getStyleClass().removeAll("cape-stage", "showcase-stage");
+					region.setStyle("-fx-background-color: transparent;");
+				}
+				viewerBox.getChildren().setAll(emoteStage);
+			}
+		} else if (fullLook && host.session() != null) {
 			outfitViewer(host, viewerBox, bottom);
 		} else switch (slot) {
 			case CAPE -> capeViewer(host, viewerBox);
@@ -1133,6 +1167,68 @@ public final class CosmeticsView {
 				if (!isEquipped) {
 					Toasts.show(panel, "Aura equipped - it shows in your next game");
 				}
+				refresh.run();
+			}, null));
+		}
+		return panel;
+	}
+
+	// Emotes
+
+	private static String selectedEmoteId() {
+		if (selectedEmote == null || !net.veloclient.launcher.data.EmoteCatalog.owns(selectedEmote)) {
+			String onSlot = net.veloclient.launcher.data.EmoteCatalog.slot(selectedWheelSlot);
+			selectedEmote = onSlot != null ? onSlot : net.veloclient.launcher.data.EmoteCatalog.owned().stream().findFirst().map(net.veloclient.launcher.data.EmoteCatalog.EmoteType::id).orElse(null);
+		}
+		return selectedEmote == null ? "" : selectedEmote;
+	}
+
+	/** Your emote wheel: pick a slot (1-8), then one of your emotes to put there. The game shows it when you hold B. */
+	private static Node emotesPanel(Host host, Runnable refresh) {
+		List<net.veloclient.launcher.data.EmoteCatalog.EmoteType> owned = net.veloclient.launcher.data.EmoteCatalog.owned();
+		String selected = selectedEmoteId();
+		VBox panel = panelShell("Emotes", owned.size(), storeLink(host, "Get more"));
+		Label hint = new Label("Your emote wheel (hold B in game) - pick a slot, then an emote.");
+		hint.getStyleClass().add("t-muted");
+		hint.setWrapText(true);
+		FlowPane wheel = new FlowPane(8, 8);
+		for (int i = 0; i < net.veloclient.launcher.data.EmoteCatalog.SLOTS; i++) {
+			int index = i;
+			String id = net.veloclient.launcher.data.EmoteCatalog.slot(i);
+			String name = id == null ? "Empty" : net.veloclient.launcher.data.EmoteCatalog.byId(id).map(net.veloclient.launcher.data.EmoteCatalog.EmoteType::name).orElse(id);
+			Button b = new Button((i + 1) + "  " + name);
+			b.getStyleClass().addAll("button-sm", index == selectedWheelSlot ? "primary-button" : "ghost-button");
+			b.setMinWidth(112);
+			b.setOnAction(e -> {
+				selectedWheelSlot = index;
+				if (id != null) {
+					selectedEmote = id;
+				}
+				refresh.run();
+			});
+			wheel.getChildren().add(b);
+		}
+		FlowPane grid = StoreTiles.grid(118, 10);
+		for (net.veloclient.launcher.data.EmoteCatalog.EmoteType emote : owned) {
+			int onSlot = net.veloclient.launcher.data.EmoteCatalog.slotOf(emote.id());
+			grid.getChildren().add(cell(EmoteFigureFx.create(emote, 150, 104), emote.accent(),
+					onSlot >= 0 ? (onSlot + 1) + " · " + emote.name() : emote.name(), onSlot >= 0, emote.id().equals(selected), () -> {
+						selectedEmote = emote.id();
+						net.veloclient.launcher.data.EmoteCatalog.setSlot(selectedWheelSlot, emote.id());
+						Toasts.show(grid, emote.name() + " is on slot " + (selectedWheelSlot + 1) + " - in your next game");
+						refresh.run();
+					}));
+		}
+		VBox content = new VBox(16, hint, wheel, grid);
+		if (owned.isEmpty()) {
+			content.getChildren().setAll(emptyState("No emotes yet", "Wave, dance, flex and celebrate - each emote with its own particles and sounds.", host,
+					"Browse emotes"));
+		}
+		panel.getChildren().add(scroll(content));
+		if (net.veloclient.launcher.data.EmoteCatalog.slot(selectedWheelSlot) != null) {
+			String name = net.veloclient.launcher.data.EmoteCatalog.byId(net.veloclient.launcher.data.EmoteCatalog.slot(selectedWheelSlot)).map(net.veloclient.launcher.data.EmoteCatalog.EmoteType::name).orElse("");
+			panel.getChildren().add(actionBar("Slot " + (selectedWheelSlot + 1) + ": " + name, true, () -> {
+				net.veloclient.launcher.data.EmoteCatalog.setSlot(selectedWheelSlot, null);
 				refresh.run();
 			}, null));
 		}

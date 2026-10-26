@@ -60,12 +60,13 @@ void main() {
     // Sway code in the colour's alpha (255 = rigid): decode, then back to opaque.
     int veloCode = int(255.0 - floor(_vert_color.a * 255.0 + 0.5));
     v_VeloLava = veloCode == 6 ? 1.0 : 0.0;
-    v_VeloEmissive = veloCode == 7 ? 1.0 : 0.0;
+    // material: 1 light source, 2 powered redstone, 3 glass
+    v_VeloEmissive = veloCode >= 7 && veloCode <= 9 ? float(veloCode - 6) : 0.0;
     // 16..31: flowing water, direction (veloCode - 16) / 16 of a turn
     bool veloFlowing = veloCode >= 16 && veloCode <= 31;
     float flowAngle = float(veloCode - 16) / 16.0 * 6.2831853;
     v_VeloFlow = veloFlowing ? vec2(cos(flowAngle), sin(flowAngle)) : vec2(0.0);
-    if ((veloCode >= 5 && veloCode <= 7) || veloFlowing) {
+    if ((veloCode >= 5 && veloCode <= 9) || veloFlowing) {
         _vert_color.a = 1.0;
     }
     if (veloCode >= 2 && veloCode <= 4) {

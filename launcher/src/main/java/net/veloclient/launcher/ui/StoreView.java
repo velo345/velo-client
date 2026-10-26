@@ -81,15 +81,24 @@ public final class StoreView {
 		/** Opens an aura's page. */
 		default void openAura(AuraCatalog.AuraType type) {
 		}
+
+		/** Opens an emote's page. */
+		default void openEmote(net.veloclient.launcher.data.EmoteCatalog.EmoteType type) {
+		}
 	}
 
 	private StoreView() {
 	}
 
-	private enum Page { FEATURED, WINGS, CAPES, AURAS, BUNDLES, PLUS, WISHLIST }
+	private enum Page { FEATURED, WINGS, CAPES, AURAS, EMOTES, BUNDLES, PLUS, WISHLIST }
 
 	/** Which tab was open last (kept while the launcher runs). */
 	private static Page page = Page.FEATURED;
+
+	public static void showEmotesTab() {
+		openBundle = null;
+		page = Page.EMOTES;
+	}
 
 	public static void showAurasTab() {
 		openBundle = null;
@@ -128,7 +137,7 @@ public final class StoreView {
 		heading.setPadding(new Insets(0, 14, 10, 0));
 		HBox tabs = new HBox(24);
 		tabs.setAlignment(Pos.BOTTOM_LEFT);
-		String[] labels = {"Featured", "Wings", "Capes", "Auras", "Bundles", "Velo+"};
+		String[] labels = {"Featured", "Wings", "Capes", "Auras", "Emotes", "Bundles", "Velo+"};
 		for (Page p : Page.values()) {
 			if (p == Page.WISHLIST) {
 				continue;
@@ -141,7 +150,7 @@ public final class StoreView {
 			if (p == Page.PLUS) {
 				tab.setStyle("-fx-text-fill: -velo-accent-text;");
 			}
-			if (p == Page.AURAS) {
+			if (p == Page.EMOTES) {
 				Label badge = new Label("NEW");
 				badge.getStyleClass().addAll("badge", "badge-new");
 				badge.setStyle("-fx-font-size: 9px;");
@@ -200,6 +209,7 @@ public final class StoreView {
 			case WINGS -> buildWings(host, body);
 			case CAPES -> buildCapes(host, body);
 			case AURAS -> buildAuras(host, body);
+			case EMOTES -> buildEmotes(host, body);
 			case BUNDLES -> buildBundles(host, body);
 			case PLUS -> body.getChildren().add(plusPage());
 			case WISHLIST -> buildWishlist(host, body);
@@ -262,6 +272,13 @@ public final class StoreView {
 				page = Page.AURAS;
 				host.rebuild();
 			}, auraGrid(host, auras, 180)));
+		}
+		List<net.veloclient.launcher.data.EmoteCatalog.EmoteType> emotes = net.veloclient.launcher.data.EmoteCatalog.forSale().stream().limit(6).toList();
+		if (!emotes.isEmpty()) {
+			body.getChildren().add(section("Emotes", "Hold B in game · each with its own particles and sounds", "All emotes", () -> {
+				page = Page.EMOTES;
+				host.rebuild();
+			}, emoteGrid(host, emotes, 180)));
 		}
 		List<StoreItem> capes = StoreCatalog.all().stream().filter(StoreItem::inStore).limit(6).toList();
 		if (!capes.isEmpty()) {
@@ -460,6 +477,7 @@ public final class StoreView {
 			WingsCatalog.forSale().forEach(w -> pool.add(w.itemId()));
 			StoreCatalog.forSale().forEach(i -> pool.add(i.id()));
 			AuraCatalog.forSale().forEach(a -> pool.add(a.itemId()));
+			net.veloclient.launcher.data.EmoteCatalog.forSale().forEach(e -> pool.add(e.itemId()));
 			java.util.Collections.sort(pool);
 			java.util.Collections.shuffle(pool, new java.util.Random(LocalDate.now(ZoneOffset.UTC).toEpochDay() * 31L + 7));
 			ids.addAll(pool.subList(0, Math.min(4, pool.size())));
@@ -501,6 +519,10 @@ public final class StoreView {
 		var aura = AuraCatalog.all().stream().filter(a -> a.itemId().equals(itemId)).findFirst();
 		if (aura.isPresent()) {
 			return StoreTiles.auraTile(aura.get(), () -> host.openAura(aura.get()));
+		}
+		var emote = net.veloclient.launcher.data.EmoteCatalog.all().stream().filter(e -> e.itemId().equals(itemId)).findFirst();
+		if (emote.isPresent()) {
+			return StoreTiles.emoteTile(emote.get(), () -> host.openEmote(emote.get()));
 		}
 		var cape = StoreCatalog.all().stream().filter(i -> i.id().equals(itemId)).findFirst();
 		return cape.<Node>map(item -> StoreTiles.capeTile(item, () -> host.openItem(item))).orElse(null);
@@ -654,6 +676,18 @@ public final class StoreView {
 		body.getChildren().add(section("Auras", "Animated effects around you · your colour, size and speed", null, null, auraGrid(host, auras, 200)));
 	}
 
+	private static void buildEmotes(Host host, VBox body) {
+		var emotes = net.veloclient.launcher.data.EmoteCatalog.all().stream().filter(e -> e.inStore() || net.veloclient.launcher.data.EmoteCatalog.owns(e.id())).toList();
+		if (emotes.isEmpty()) {
+			Label empty = new Label("No emotes in the Store right now - check back soon.");
+			empty.getStyleClass().add("t-muted");
+			body.getChildren().add(empty);
+			return;
+		}
+		body.getChildren().add(section("Emotes", "Hold B in game for your emote wheel · particles and sounds included", null, null,
+				emoteGrid(host, emotes, 200)));
+	}
+
 	/** Wishlisted items you don't own yet (owned ones drop off by themselves). */
 	private static List<String> wishedItems() {
 		return StoreApi.wishlist().stream().filter(id -> !StoreApi.owned().contains(id)).sorted().toList();
@@ -671,7 +705,7 @@ public final class StoreView {
 			chip.setMaxSize(52, 52);
 			Label title = new Label("Your wishlist is empty");
 			title.getStyleClass().add("section-title");
-			Label hint = new Label("Press Wishlist on any wings, cape or aura to keep it here - and to show friends what to gift you.");
+			Label hint = new Label("Press Wishlist on any wings, cape, aura or emote to keep it here - and to show friends what to gift you.");
 			hint.getStyleClass().add("t-muted");
 			empty.getChildren().addAll(chip, title, hint);
 			body.getChildren().add(empty);
@@ -681,6 +715,7 @@ public final class StoreView {
 		var wings = WingsCatalog.all().stream().filter(w -> ids.contains(w.itemId())).toList();
 		var capes = StoreCatalog.all().stream().filter(i -> ids.contains(i.id())).toList();
 		var auras = AuraCatalog.all().stream().filter(a -> ids.contains(a.itemId())).toList();
+		var emotes = net.veloclient.launcher.data.EmoteCatalog.all().stream().filter(e -> ids.contains(e.itemId())).toList();
 		String subtitle = ids.size() + (ids.size() == 1 ? " item" : " items") + " · " + String.format(java.util.Locale.ROOT, "%,d", total) + " coins together";
 		boolean first = true;
 		if (!wings.isEmpty()) {
@@ -693,6 +728,10 @@ public final class StoreView {
 		}
 		if (!auras.isEmpty()) {
 			body.getChildren().add(section(first ? "Wishlist" : "Auras", first ? subtitle : auras.size() + " auras", null, null, auraGrid(host, auras, 200)));
+			first = false;
+		}
+		if (!emotes.isEmpty()) {
+			body.getChildren().add(section(first ? "Wishlist" : "Emotes", first ? subtitle : emotes.size() + " emotes", null, null, emoteGrid(host, emotes, 200)));
 		}
 	}
 
@@ -736,6 +775,10 @@ public final class StoreView {
 		if (aura.isPresent()) {
 			return StoreApi.price(itemId, aura.get().price());
 		}
+		var emote = net.veloclient.launcher.data.EmoteCatalog.all().stream().filter(e -> e.itemId().equals(itemId)).findFirst();
+		if (emote.isPresent()) {
+			return StoreApi.price(itemId, emote.get().price());
+		}
 		return StoreCatalog.byId(itemId).map(i -> StoreApi.price(itemId, i.priceCoins())).orElse(0);
 	}
 
@@ -748,6 +791,10 @@ public final class StoreView {
 		var aura = AuraCatalog.all().stream().filter(a -> a.itemId().equals(itemId)).findFirst();
 		if (aura.isPresent()) {
 			return framed(StoreTiles.auraArt(aura.get(), size, size), aura.get().accent(), size);
+		}
+		var emote = net.veloclient.launcher.data.EmoteCatalog.all().stream().filter(e -> e.itemId().equals(itemId)).findFirst();
+		if (emote.isPresent()) {
+			return framed(StoreTiles.emoteArt(emote.get(), size, size), emote.get().accent(), size);
 		}
 		var cape = StoreCatalog.byId(itemId);
 		return cape.map(item -> framed(StoreTiles.capeArt(item, null, size * 0.8), "#8a7dff", size)).orElse(null);
@@ -971,6 +1018,15 @@ public final class StoreView {
 		return grid;
 	}
 
+	private static FlowPane emoteGrid(Host host, List<net.veloclient.launcher.data.EmoteCatalog.EmoteType> emotes, double minTile) {
+		FlowPane grid = StoreTiles.grid(minTile, 16);
+		for (var emote : emotes) {
+			grid.getChildren().add(StoreTiles.emoteTile(emote, () -> host.openEmote(emote)));
+		}
+		UiMotion.stagger(grid, 24);
+		return grid;
+	}
+
 	private static FlowPane auraGrid(Host host, List<AuraCatalog.AuraType> auras, double minTile) {
 		FlowPane grid = StoreTiles.grid(minTile, 16);
 		for (var aura : auras) {
@@ -1018,10 +1074,17 @@ public final class StoreView {
 		Button subscribe = new Button("Subscribe to Velo+");
 		subscribe.getStyleClass().addAll("primary-button", "button-lg");
 		subscribe.setDisable(true);
+		// The yearly plan: one payment, a year of Velo+ (shown once the server says there is one).
+		Button yearly = new Button("Yearly");
+		yearly.getStyleClass().addAll("button-lg");
+		yearly.setVisible(false);
+		yearly.setManaged(false);
+		HBox buttons = new HBox(10, subscribe, yearly);
+		buttons.setAlignment(Pos.CENTER_LEFT);
 		Label message = new Label("Secure checkout in your browser");
 		message.getStyleClass().add("t-muted");
 		message.setWrapText(true);
-		VBox left = new VBox(18, badge, headline, pitch, priceRow, status, subscribe, message);
+		VBox left = new VBox(18, badge, headline, pitch, priceRow, status, buttons, message);
 		left.setMinWidth(380);
 		left.setPrefWidth(480);
 		left.setMaxWidth(500);
@@ -1099,6 +1162,9 @@ public final class StoreView {
 		Node addonSection = section("What's in Velo+", "Everything below switches on the moment you subscribe", null, null, new VBox(14, perks, showPlus));
 
 		Label coinsLabel = coinsRow;
+		// Accounts that never had Velo+ get it free for a week first - one trial per account, no payment involved.
+		boolean[] trialMode = {false};
+		int[] trialDays = {7};
 		CompletableFuture.supplyAsync(() -> {
 			try {
 				return StoreApi.plusStatus();
@@ -1130,8 +1196,67 @@ public final class StoreView {
 			if (!result.get("checkoutEnabled").getAsBoolean()) {
 				message.setText("Subscriptions aren't open on this server yet.");
 			}
+			double yearlyPrice = result.has("yearlyPrice") ? result.get("yearlyPrice").getAsDouble() : 0;
+			if (yearlyPrice > 0 && result.get("checkoutEnabled").getAsBoolean()) {
+				int saved = (int) Math.round(100 - yearlyPrice / (amount * 12) * 100);
+				yearly.setText(String.format(Locale.ROOT, "Yearly  ·  %.2f %s", yearlyPrice, symbol) + (saved > 0 ? "  (-" + saved + "%)" : ""));
+				yearly.setVisible(true);
+				yearly.setManaged(true);
+			}
+			if (!result.get("plus").getAsBoolean() && result.has("trialAvailable") && result.get("trialAvailable").getAsBoolean()) {
+				trialMode[0] = true;
+				trialDays[0] = result.has("trialDays") ? result.get("trialDays").getAsInt() : 7;
+				subscribe.setText("Start " + trialDays[0] + "-day free trial");
+				subscribe.setDisable(false);
+				message.setText("Free for " + trialDays[0] + " days, once per account - no payment, nothing renews by itself.");
+			}
 		}));
+		yearly.setOnAction(e -> {
+			yearly.setDisable(true);
+			message.setText("Opening the payment page...");
+			CompletableFuture.supplyAsync(() -> {
+				try {
+					return (Object) StoreApi.plusCheckout(true);
+				} catch (StoreApi.StoreError error) {
+					return error.getMessage();
+				}
+			}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
+				yearly.setDisable(false);
+				if (result instanceof JsonObject json) {
+					CoinsView.openUrl(json.get("checkoutUrl").getAsString());
+					message.setText("Finish the payment in your browser - a year of Velo+ switches on within a minute.");
+				} else {
+					message.setText(String.valueOf(result));
+				}
+			}));
+		});
 		subscribe.setOnAction(e -> {
+			if (trialMode[0]) {
+				subscribe.setDisable(true);
+				message.setText("Starting your trial...");
+				CompletableFuture.supplyAsync(() -> {
+					try {
+						return (Object) StoreApi.plusTrial();
+					} catch (StoreApi.StoreError error) {
+						return error.getMessage();
+					}
+				}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
+					if (result instanceof JsonObject json) {
+						trialMode[0] = false;
+						status.setText("Velo+ trial  ·  active until " + LocalDate.ofInstant(java.time.Instant.ofEpochMilli(json.get("until").getAsLong()),
+								java.time.ZoneId.systemDefault()));
+						subscribe.setText("Subscribe");
+						subscribe.setDisable(false);
+						showPlus.setVisible(true);
+						showPlus.setManaged(true);
+						message.setText("Velo+ is on for " + trialDays[0] + " days - restart the game to use it everywhere.");
+					} else {
+						subscribe.setDisable(false);
+						message.setText(String.valueOf(result));
+					}
+				}));
+				return;
+			}
 			subscribe.setDisable(true);
 			message.setText("Opening the payment page...");
 			CompletableFuture.supplyAsync(() -> {

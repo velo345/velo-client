@@ -641,6 +641,7 @@ public final class ScreenshotTour {
 			case "vibe-names" -> vibeNames(client);
 			case "vibe-scout" -> vibeScout(client);
 			case "rs" -> redstoneShort(client);
+			case "rs-layout" -> rsLayout(client);
 			default -> {
 				VeloClient.LOGGER.warn("Velo screenshot tour: unknown scene {}", name);
 				yield List.of();
@@ -1016,6 +1017,68 @@ public final class ScreenshotTour {
 			out[i] = sb.toString();
 		}
 		serverCommands(client, out);
+	}
+
+	/** Edit HUD Layout in Redstone Mode with a schematic loaded: drags the Schematics panel around by hand-made mouse events. */
+	private static List<Object[]> rsLayout(MinecraftClient client) {
+		List<Object[]> steps = new ArrayList<>();
+		steps.add(new Object[] {40, (Runnable) () -> {
+			net.veloclient.velo.client.redstone.RedstoneMode.enter();
+			String file = System.getProperty("velo.tourSchematic");
+			if (file != null) {
+				net.veloclient.velo.client.redstone.SchematicIO.loadToClipboard(java.nio.file.Path.of(file));
+			}
+		}});
+		steps.add(new Object[] {60, (Runnable) () -> {
+			var p = net.veloclient.velo.client.redstone.Placements.following();
+			if (p != null) {
+				int[] feet = net.veloclient.velo.client.redstone.RmWorld.playerBlock();
+				p.x = feet[0] + 10;
+				p.y = feet[1];
+				p.z = feet[2] + 10;
+				p.locked = true;
+			}
+		}});
+		steps.add(new Object[] {20, (Runnable) () -> shot(client, "rsl-0-world")});
+		steps.add(new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.HudEditScreen(null))});
+		steps.add(new Object[] {30, (Runnable) () -> shot(client, "rsl-1-editor")});
+		//? if >=26.2 {
+		/*double[] at = {0, 0};
+		steps.add(new Object[] {2, (Runnable) () -> {
+			var panel = net.veloclient.velo.client.redstone.RmHud.allPanels().stream().filter(h -> h instanceof net.veloclient.velo.module.Module m && m.id().equals("rm-schematics")).findFirst().orElse(null);
+			var screen = net.veloclient.velo.client.util.ClientCompat.currentScreen();
+			if (panel == null || screen == null) {
+				vibeLog("rsl: no panel/screen");
+				return;
+			}
+			int w = Math.round(panel.width() * panel.position().scale());
+			int h = Math.round(panel.height() * panel.position().scale());
+			at[0] = panel.position().resolveX(screen.width, w) + 20;
+			at[1] = panel.position().resolveY(screen.height, h) + 10;
+			vibeLog("rsl: screen " + screen.width + "x" + screen.height + " panel " + w + "x" + h + " at " + at[0] + "," + at[1]);
+			screen.mouseClicked(new net.minecraft.client.input.MouseButtonEvent(at[0], at[1], new net.minecraft.client.input.MouseButtonInfo(0, 0)), false);
+		}});
+		for (int i = 1; i <= 12; i++) {
+			int k = i;
+			steps.add(new Object[] {2, (Runnable) () -> {
+				var screen = net.veloclient.velo.client.util.ClientCompat.currentScreen();
+				double x = at[0] + k * 15, y = at[1] + k * 6;
+				screen.mouseDragged(new net.minecraft.client.input.MouseButtonEvent(x, y, new net.minecraft.client.input.MouseButtonInfo(0, 0)), 15, 6);
+				if (k % 4 == 0) {
+					var panel = net.veloclient.velo.client.redstone.RmHud.allPanels().stream().filter(h -> h instanceof net.veloclient.velo.module.Module m && m.id().equals("rm-schematics")).findFirst().get();
+					vibeLog("rsl: drag " + k + " pos " + panel.position().resolveX(screen.width, Math.round(panel.width() * panel.position().scale()))
+							+ "," + panel.position().resolveY(screen.height, Math.round(panel.height() * panel.position().scale())) + " h " + panel.height());
+					shot(client, "rsl-2-drag" + k);
+				}
+			}});
+		}
+		steps.add(new Object[] {2, (Runnable) () -> net.veloclient.velo.client.util.ClientCompat.currentScreen().mouseReleased(new net.minecraft.client.input.MouseButtonEvent(at[0] + 180, at[1] + 72,
+				new net.minecraft.client.input.MouseButtonInfo(0, 0)))});
+		*///?}
+		steps.add(new Object[] {20, (Runnable) () -> shot(client, "rsl-3-released")});
+		steps.add(new Object[] {2, (Runnable) () -> client.setScreen(null)});
+		steps.add(new Object[] {30, (Runnable) () -> shot(client, "rsl-4-world")});
+		return steps;
 	}
 
 	private static List<Object[]> redstoneShort(MinecraftClient client) {

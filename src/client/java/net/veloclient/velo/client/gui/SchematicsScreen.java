@@ -139,13 +139,7 @@ public final class SchematicsScreen extends VeloWindow {
 										status = Text.literal("Couldn't remove: " + e.getMessage());
 									}
 								})),
-						format == SchematicFormat.VELO || (format == SchematicFormat.LITEMATICA && (match == null || !match.found()))
-								? () -> {
-									// Load straight into Redstone Mode's clipboard (paste preview when the mode is on).
-									net.veloclient.velo.client.redstone.SchematicIO.loadToClipboard(file);
-									status = Text.literal("Loaded \"" + displayName + "\" - in Redstone Mode" + net.veloclient.velo.client.redstone.RmKeys.toggleHint() + " aim and left click to paste");
-								}
-								: match != null && match.found() ? () -> openInBrowser(match.postUrl()) : () -> { },
+						match != null && match.found() ? () -> openInBrowser(match.postUrl()) : () -> { },
 						format == SchematicFormat.VELO || format == SchematicFormat.LITEMATICA ? f -> {
 							// Share with friends on the other client: .veloschem -> .litematic and back.
 							status = Text.literal("Converting \"" + displayName + "\"...");
@@ -155,6 +149,13 @@ public final class SchematicsScreen extends VeloWindow {
 								layoutContent();
 							});
 						} : null);
+				if (format == SchematicFormat.VELO || format == SchematicFormat.LITEMATICA) {
+					// Straight into Redstone Mode: the mode switches on and the schematic hangs on your crosshair to place.
+					tile.onLoad(() -> {
+						net.veloclient.velo.client.redstone.SchematicIO.loadToClipboard(file);
+						this.client.setScreen(null);
+					});
+				}
 				addSelectableChild(tile);
 				scrollRegion.addRow(tile);
 				if (match == null && format != SchematicFormat.VELO && identifyAttempted.add(fileName)) {

@@ -114,6 +114,10 @@ final class RmMenus {
 			s.showFluids = !s.showFluids;
 			RmSettings.save();
 		}, () -> s.showFluids));
+		items.add(new RmHud.MenuItem("Schematic borders through blocks", null, () -> {
+			s.bordersThroughBlocks = !s.bordersThroughBlocks;
+			RmSettings.save();
+		}, () -> s.bordersThroughBlocks));
 		items.add(new RmHud.MenuItem("Keep redstone running when pasting", null, () -> {
 			s.keepRunning = !s.keepRunning;
 			RmSettings.save();

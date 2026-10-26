@@ -25,7 +25,9 @@ import java.util.function.Consumer;
  * the icon area shows the matched PhantomMarket thumbnail and title (see
  * {@link net.veloclient.velo.client.schematics.SchematicMatchCache}) and
  * clicking it opens that listing in the system browser; otherwise it shows a
- * plain glyph and filename with no click action. The bottom strip is a
+ * plain glyph and filename. With {@code onLoad} (schematics Redstone Mode can
+ * read) the icon area loads the file straight into Redstone Mode instead, with a
+ * hover label saying so. The bottom strip is a
  * delete button - split with a convert button (.veloschem <-> .litematic)
  * when {@code onConvert} is given.
  */
@@ -40,6 +42,7 @@ public final class VeloSchematicTile extends ClickableWidget {
 	private final Consumer<Path> onDelete;
 	private final Runnable onOpenMatch;
 	private final Consumer<Path> onConvert;
+	private Runnable onLoad;
 	private volatile Identifier thumbnail;
 
 	public VeloSchematicTile(int x, int y, int width, int iconHeight, Path file, String displayName, String sizeLabel,
@@ -66,6 +69,12 @@ public final class VeloSchematicTile extends ClickableWidget {
 		return getHeight() - BOTTOM_STRIP_HEIGHT;
 	}
 
+	/** Clicking the icon area loads the schematic into Redstone Mode (takes over from opening the online match). */
+	public VeloSchematicTile onLoad(Runnable onLoad) {
+		this.onLoad = onLoad;
+		return this;
+	}
+
 	private boolean matched() {
 		return match != null && match.found();
 	}
@@ -79,6 +88,8 @@ public final class VeloSchematicTile extends ClickableWidget {
 			} else {
 				onDelete.accept(file);
 			}
+		} else if (onLoad != null) {
+			onLoad.run();
 		} else if (matched()) {
 			onOpenMatch.run();
 		}
@@ -109,6 +120,17 @@ public final class VeloSchematicTile extends ClickableWidget {
 
 		int sizeWidth = textRenderer.getWidth(sizeLabel);
 		context.drawTextWithShadow(textRenderer, sizeLabel, getX() + (getWidth() - sizeWidth) / 2, getY() + iconHeight - 11, 0xFFAAAAAA);
+
+		if (onLoad != null && isHovered() && mouseY < getY() + iconHeight) {
+			VeloDraw.fillRounded(context, getX() + 2, getY() + 2, getWidth() - 4, iconHeight - 4, 4, 0xC0101016);
+			String[] lines = {"Load in", "Redstone Mode"};
+			int ly = getY() + (iconHeight - 22) / 2;
+			for (String line : lines) {
+				String t = trimToWidth(line, getWidth() - 8);
+				context.drawTextWithShadow(textRenderer, t, getX() + (getWidth() - textRenderer.getWidth(t)) / 2, ly, theme.accentStart());
+				ly += 12;
+			}
+		}
 
 		int stripY = getY() + iconHeight;
 		int deleteX = getX();

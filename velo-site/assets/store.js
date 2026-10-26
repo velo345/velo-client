@@ -197,7 +197,14 @@
 		} catch (e) {
 			store.wallet = null;
 		}
+		try {
+			// Velo+ status says whether this account can still start the free trial (never had Velo+).
+			store.plusStatus = await api("/v1/plus/status");
+		} catch (e) {
+			store.plusStatus = null;
+		}
 		renderWallet();
+		renderPlus();
 	}
 
 	function renderWallet() {
@@ -272,7 +279,8 @@
 				if (viewer) viewer.dispose();
 				stage.replaceChildren();
 				viewer = await window.velo.player3d(stage, { skin: window.velo.skinUrl(meta.uuid), slim: meta.slim, item,
-					fileUrl: window.velo.fileUrl, auraUrl: (id, layer) => `/assets/auras/${id.replace(/^aura_/, "")}${layer ? "-" + layer : ""}.webp` });
+					fileUrl: window.velo.fileUrl, emoteAnim: window.velo.emoteAnim, emoteAnchor: window.velo.emoteAnchor,
+					emotePose: window.velo.emotePose, emoteGlyph: window.velo.emoteGlyph, auraUrl: (id, layer) => `/assets/auras/${id.replace(/^aura_/, "")}${layer ? "-" + layer : ""}.webp` });
 			} catch (e) {
 				stage.replaceChildren(el("span", { class: "hint", style: "position:static" }, "Couldn't load that skin - try another name."));
 			}
@@ -286,14 +294,41 @@
 		const skinBtn = mode(store.token ? "On my skin" : "On a skin", () => showSkin(who.value.trim()));
 		const artBtn = mode("Item", showArt);
 		who.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); skinBtn.click(); } });
-		art.append(stage, el("div", { class: "tryon-bar" }, modes, who), el("span", { class: "hint tryon-hint" }, "Drag to turn"));
+		const bar = el("div", { class: "tryon-bar" }, modes, who);
+		art.append(stage, bar, el("span", { class: "hint tryon-hint" }, "Drag to turn"));
+		// dances come with music: play it here too (the game plays it at the dancer, for everyone around)
+		let music = null;
+		const credit = el("p", { class: "mono", style: "font-size:12px" });
+		if (item.type === "emote") {
+			window.velo.emoteAnim(item).then((a) => {
+				if (!a.credit) return;
+				credit.textContent = "♪ " + a.credit;
+				const btn = el("button", { type: "button", class: "music-btn", "aria-pressed": "false" }, "♪ Music");
+				btn.addEventListener("click", () => {
+					if (music && !music.paused) {
+						music.pause();
+						btn.setAttribute("aria-pressed", "false");
+						return;
+					}
+					if (!music) {
+						music = new Audio(`/assets/emotes/music/${item.id.replace(/^emote_/, "")}.mp3`);
+						music.loop = a.loop;
+						music.volume = 0.6;
+					}
+					music.currentTime = 0;
+					music.play().then(() => { if (viewer) viewer.restartEmote(); }).catch(() => {});
+					btn.setAttribute("aria-pressed", "true");
+				});
+				bar.append(btn);
+			}).catch(() => {});
+		}
 		skinBtn.click();
 		const buy = el("button", { class: "btn btn-primary btn-lg", type: "button" });
 		const gift = el("button", { class: "btn btn-lg", type: "button" }, "Gift to a friend");
 		const coll = (store.cosmetics.collections || []).find((c) => c.id === item.collection);
 		const update = () => {
 			if (owns(item.id)) {
-				buy.replaceChildren("Owned - equip it in the Locker");
+				buy.replaceChildren(item.type === "emote" ? "Owned - it's on your emote wheel (B)" : "Owned - equip it in the Locker");
 				buy.disabled = true;
 			} else if (!p) {
 				buy.replaceChildren(item.unlock === "discord" ? "Free when you link Discord" : "Not for sale right now");
@@ -306,15 +341,15 @@
 		};
 		update();
 		const d = dialog(el("div", { class: "detail" }, art, el("div", { class: "detail-body" },
-			el("span", { class: "eyebrow" }, item.type === "cape" ? "Animated cape" : item.type === "aura" ? "Aura" : "3D wings"),
+			el("span", { class: "eyebrow" }, item.type === "cape" ? "Animated cape" : item.type === "aura" ? "Aura" : item.type === "emote" ? "Emote" : "3D wings"),
 			el("h2", {}, item.name),
 			coll ? el("span", { class: "pill" }, coll.name) : null,
 			el("p", {}, item.description || ""),
 			p ? el("span", { class: "price", style: "font-size:34px" }, el("i", { class: "coin-dot", style: "width:22px;height:22px;margin-right:10px;vertical-align:-2px" }), coins(p.price), p.full ? el("s", { style: "font-size:18px;color:var(--text-3);margin-left:10px" }, coins(p.full)) : null) : null,
 			item.availableUntil ? el("p", { class: "mono" }, "Leaves the Store " + new Date(item.availableUntil).toLocaleDateString()) : null,
 			el("div", { class: "detail-actions" }, buy, gift),
-			el("p", { class: "mono", style: "font-size:12px" }, "Every Velo player sees it on you. Cosmetic only - no gameplay advantage."))));
-		d.addEventListener("close", () => { if (viewer) viewer.dispose(); });
+			el("p", { class: "mono", style: "font-size:12px" }, "Every Velo player sees it on you. Cosmetic only - no gameplay advantage."), credit)));
+		d.addEventListener("close", () => { if (viewer) viewer.dispose(); if (music) music.pause(); });
 		const url = new URL(location.href);
 		url.searchParams.set("item", item.id);
 		history.replaceState(null, "", url);
@@ -327,7 +362,7 @@
 					store.wallet = await api("/v1/store/buy", { body: { itemId: item.id } });
 				});
 				confetti(x, y);
-				toast(item.name + " is yours. Equip it in the Locker.");
+				toast(item.name + (item.type === "emote" ? " is yours - hold B in game to play it." : " is yours. Equip it in the Locker."));
 				renderWallet();
 				render();
 				update();
@@ -387,7 +422,7 @@
 	function render() {
 		if (!store.catalog) return;
 		const shown = store.cosmetics.items.filter((i) => i.inStore || owns(i.id) || i.unlock === "discord");
-		for (const type of ["wings", "cape", "aura"]) {
+		for (const type of ["wings", "cape", "aura", "emote"]) {
 			const grid = $(`[data-grid="${type}"]`);
 			const list = sorted(shown.filter((i) => i.type === type));
 			grid.replaceChildren(...(list.length ? list.map((i) => itemCard(i, type === "cape" ? 10 : 9)) : [el("p", { class: "kind" }, "Nothing matches.")]));
@@ -467,11 +502,28 @@
 		}
 		const btn = $("[data-plus-buy]");
 		const state = $("[data-plus-state]");
+		const yearly = $("[data-plus-yearly]");
+		const member = store.wallet && store.wallet.plus;
+		if (yearly) {
+			const show = plus && plus.yearlyPrice > 0 && store.catalog.checkoutEnabled && !member;
+			yearly.hidden = !show;
+			if (show) {
+				const yp = new Intl.NumberFormat(undefined, { style: "currency", currency: cur }).format(plus.yearlyPrice);
+				const saved = Math.round(100 - plus.yearlyPrice / (plus.price * 12) * 100);
+				yearly.textContent = "Yearly · " + yp + (saved > 0 ? " (save " + saved + "%)" : "");
+			}
+		}
 		const w = store.wallet;
+		const trialDays = (plus && plus.trialDays) || 0;
+		const trial = store.plusStatus && store.plusStatus.trialAvailable;
 		if (w && w.plus) {
 			btn.textContent = "You have Velo+";
 			btn.disabled = true;
 			state.textContent = "Active until " + new Date(w.plusUntil).toLocaleDateString();
+		} else if (trial || (!store.token && trialDays > 0)) {
+			btn.textContent = store.token ? "Start " + trialDays + "-day free trial" : "Sign in for " + trialDays + " days free";
+			btn.disabled = false;
+			state.textContent = "Free for " + trialDays + " days, once per account · no payment, nothing renews by itself";
 		} else if (!store.catalog.checkoutEnabled) {
 			btn.textContent = "Opens soon";
 			btn.disabled = true;
@@ -486,7 +538,22 @@
 		if (!store.token) return openSignIn();
 		const b = e.currentTarget;
 		try {
+			if (store.plusStatus && store.plusStatus.trialAvailable && !(store.wallet && store.wallet.plus)) {
+				await busy(b, async () => { await api("/v1/plus/trial", { body: {} }); });
+				toast("Velo+ is on - restart the game to use it everywhere");
+				await loadWallet();
+				return;
+			}
 			await busy(b, async () => { const r = await api("/v1/plus/checkout", { body: {} }); location.href = r.checkoutUrl; });
+		} catch (x) { toast(x.message, "err"); }
+	});
+
+	const yearlyBtn = $("[data-plus-yearly]");
+	if (yearlyBtn) yearlyBtn.addEventListener("click", async (e) => {
+		if (!store.token) return openSignIn();
+		const b = e.currentTarget;
+		try {
+			await busy(b, async () => { const r = await api("/v1/plus/checkout", { body: { period: "year" } }); location.href = r.checkoutUrl; });
 		} catch (x) { toast(x.message, "err"); }
 	});
 
@@ -501,7 +568,7 @@
 			a.onclick = () => openItem(i);
 			return a;
 		}));
-		const anchor = items[0].type === "cape" ? "#capes" : items[0].type === "aura" ? "#auras" : "#wings";
+		const anchor = items[0].type === "cape" ? "#capes" : items[0].type === "aura" ? "#auras" : items[0].type === "emote" ? "#emotes" : "#wings";
 		box.replaceChildren(el("div", { class: "featured reveal" },
 			el("div", {},
 				el("span", { class: "eyebrow" }, coll.tag || "Collection"),

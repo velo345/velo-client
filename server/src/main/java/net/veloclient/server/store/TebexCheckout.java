@@ -108,8 +108,17 @@ public final class TebexCheckout {
 	 */
 	public Basket createSubscriptionCheckout(String uuid, String username, String name, double price, String returnUrl, String completeUrl)
 			throws Exception {
+		return createSubscriptionCheckout(uuid, username, name, price, returnUrl, completeUrl, false);
+	}
+
+	/** Like {@link #createSubscriptionCheckout(String, String, String, double, String, String)}, renewing every year when {@code yearly}. */
+	public Basket createSubscriptionCheckout(String uuid, String username, String name, double price, String returnUrl, String completeUrl,
+			boolean yearly) throws Exception {
 		JsonObject custom = new JsonObject();
 		custom.addProperty("velo_plus", true);
+		if (yearly) {
+			custom.addProperty("velo_plus_period", "year");
+		}
 		custom.addProperty("velo_uuid", uuid);
 		custom.addProperty("velo_username", username);
 		JsonObject pack = new JsonObject();
@@ -117,7 +126,7 @@ public final class TebexCheckout {
 		pack.addProperty("price", price);
 		pack.addProperty("type", "subscription");
 		pack.addProperty("expiry_length", 1);
-		pack.addProperty("expiry_period", "month");
+		pack.addProperty("expiry_period", yearly ? "year" : "month");
 		pack.add("custom", custom);
 		JsonObject item = new JsonObject();
 		item.add("package", pack);

@@ -1,0 +1,72 @@
+{
+ "title": "Velo Client 0.9.95: Redstone Mode, refined",
+ "summary": "A Copy tool, cleaner Move and Stack, a redesigned Schematics panel and real water flow in schematic previews. Plus a free 7-day Velo+ trial, yearly Velo+, new emote prices and a launch-week gift of 1,000 coins.",
+ "tag": "Update",
+ "version": "0.9.95",
+ "accent": "#ff3b44",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "heading",
+   "text": "Redstone Mode, refined"
+  },
+  {
+   "type": "text",
+   "text": "Building with Redstone Mode is faster now: copying, moving and stacking work the same way, and you're back to your hotbar the moment you're done."
+  },
+  {
+   "type": "list",
+   "items": [
+    "**New Copy tool**: left and right click the corners, scroll to slide a copy where it goes, left click places it - and the selection jumps onto the new copy, so the next scroll places another one right after it. Right click ends it.",
+    "**Move and Stack** work the same way: select, scroll, left click applies, right click cancels. Either way the selection is gone afterwards and scrolling switches hotbar slots again.",
+    "**Load straight into Redstone Mode** from the Schematics screen: click a schematic and it hangs on your crosshair, ready to place.",
+    "**Schematic borders** no longer show through walls - or turn it back on under Settings > Schematic borders through blocks.",
+    "**Water and lava in schematic previews** show how they really flow: the right height per level, an arrow on the surface the way it runs, and a stripe on falling water.",
+    "**Observers, droppers and dispensers** count as right however they ended up powered - like crafters facing up or down already did."
+   ]
+  },
+  {
+   "type": "image",
+   "image": "file:images/schematics-panel.jpg",
+   "caption": "The new Schematics panel: Position, Show and Build, each where you'd look for it"
+  },
+  {
+   "type": "text",
+   "text": "The **Schematics panel** is rebuilt from scratch: one card per schematic with its size and block count, and the open one split into **Position** (pick up, move to you, rotate, flip), **Show** (all layers, one layer or a range, blocks or outline only) and **Build** (materials and paste). No more guessing which of twelve small buttons does what."
+  },
+  {
+   "type": "heading",
+   "text": "Velo+: try it free"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**7 days of Velo+ for free** - once per account that never had Velo+. No payment details, nothing renews by itself. Start it in the launcher's Store, in game or on velo-client.com.",
+    "**Yearly Velo+**: a whole year in one payment, about 17% less than paying monthly - with 2,000 coins every month as usual.",
+    "**Launch week gift**: everyone who signs in to Velo for the first time between November 1 and 8 gets **1,000 Velo Coins** right away."
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Store"
+  },
+  {
+   "type": "text",
+   "text": "The emote shop is smaller and much cheaper for now: **Wave, Cheer, Bow, Shrug, Heart, Facepalm and Backflip** from **300 to 500 coins**. Bigger, more extravagant emotes come back later. Emotes you already own stay yours."
+  },
+  {
+   "type": "heading",
+   "text": "Fixes"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Velo Shaders**: clouds no longer draw over glass, leaves and everything else when you're above the cloud layer.",
+    "**Launcher**: the short black flicker is gone - the launcher had too little graphics memory for its pages and kept throwing pictures away.",
+    "**Pause menu**: the server icon shows for servers joined directly, through a partner card or 'Jump back in', and behind proxies - Velo asks the server itself when it has to and remembers it.",
+    "**Emote wheel**: holding the emote key no longer opens and closes the wheel over and over."
+   ]
+  }
+ ]
+}

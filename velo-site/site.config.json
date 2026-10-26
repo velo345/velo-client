@@ -21,6 +21,13 @@
     "date": "2026-10-24",
     "datePretty": "Oct 24, 2026"
   },
+  "launch": {
+    "_comment": "Velo Client 1.0 - out of beta. The countdown on Home / Download runs to this moment, then says it's out.",
+    "date": "2026-11-01T00:00:00+01:00",
+    "version": "1.0.0",
+    "bonusCoins": "1,000",
+    "bonusWeek": "Nov 1 - Nov 8"
+  },
   "minecraft": {
     "version": "1.21.11 · 26.1 · 26.2 · 26.3",
     "javaVersion": "21+ / 25+",
@@ -46,7 +53,7 @@
     "country": "Germany",
     "email": "support@velo-client.com",
     "responsiblePersonName": "David Seibert",
-    "lastUpdated": "2026-10-22",
+    "lastUpdated": "2026-10-26",
     "hostingProvider": "24fire GmbH, Kronenstraße 4, 68723 Schwetzingen, Germany",
     "hostingLocation": "Germany"
   },
@@ -57,7 +64,8 @@
   "plus": {
     "_comment": "Shown before the live price loads (the server's /v1/plus/status is the real one).",
     "price": "€9.99",
-    "monthlyCoins": "2,000"
+    "monthlyCoins": "2,000",
+    "trialDays": "7"
   },
   "counts": {
     "_comment": "Shown across the site - update when modules are added.",

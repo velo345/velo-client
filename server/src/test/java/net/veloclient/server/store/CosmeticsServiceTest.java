@@ -41,6 +41,25 @@ class CosmeticsServiceTest {
 	}
 
 	@Test
+	void emotesAreSoldWithTheirAnimation() throws Exception {
+		var wave = cosmetics.item("emote_wave");
+		assertNotNull(wave);
+		assertEquals("emote", wave.type);
+		assertTrue(wave.price > 0);
+		assertTrue(cosmetics.buyable("emote_wave"));
+		byte[] anim = cosmetics.file(wave.files.get("anim"));
+		assertNotNull(anim);
+		assertEquals("application/json", CosmeticsService.contentType(anim));
+		// You only show an emote you own.
+		assertFalse(store.mayDisplayCape(ME, "emote_wave"));
+		db.adjust(ME, 5000, "test", null, "test");
+		store.buy(ME, "Me", "emote_wave");
+		assertTrue(store.mayDisplayCape(ME, "emote_wave"));
+		// Any JSON isn't an emote.
+		assertThrows(StoreService.StoreException.class, () -> cosmetics.storeFile("{\"x\":1}".getBytes()));
+	}
+
+	@Test
 	void testingItemsOnlyForOwnersAndPeopleWhoHaveThem() throws Exception {
 		var publicView = cosmetics.catalog(Set.of(), false);
 		assertTrue(publicView.items().stream().noneMatch(i -> i.id().equals("wings_neon_cyan")));

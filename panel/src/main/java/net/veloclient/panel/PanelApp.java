@@ -153,7 +153,7 @@ public final class PanelApp {
 
 	private static void securityHeaders(HttpExchange ex) {
 		var h = ex.getResponseHeaders();
-		h.set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob: https://velo-client.com; media-src 'self' https://velo-client.com; style-src 'self'; script-src 'self'; connect-src 'self'; "
+		h.set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob: https://velo-client.com https://i.ytimg.com; media-src 'self' https://velo-client.com; style-src 'self'; script-src 'self'; connect-src 'self'; "
 				+ "font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'");
 		h.set("X-Frame-Options", "DENY");
 		h.set("X-Content-Type-Options", "nosniff");

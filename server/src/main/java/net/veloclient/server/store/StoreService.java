@@ -182,11 +182,11 @@ public final class StoreService {
 	}
 
 	public record CatalogView(String currency, List<StoreConfig.CoinPack> coinPacks, List<CatalogItem> items,
-			boolean checkoutEnabled, boolean adsEnabled, DailyView daily, List<BundleView> bundles, PlusOffer plus) {
+			boolean checkoutEnabled, boolean adsEnabled, DailyView daily, List<BundleView> bundles, PlusOffer plus, Map<String, Object> launchBonus) {
 	}
 
 	/** Velo+ as offered (for visitors who aren't signed in - the website shows the live price). */
-	public record PlusOffer(double price, int monthlyCoins, int periodDays) {
+	public record PlusOffer(double price, int monthlyCoins, int periodDays, int trialDays, double yearlyPrice) {
 	}
 
 	public CatalogView catalog() {
@@ -198,7 +198,7 @@ public final class StoreService {
 		}
 		return new CatalogView(config.currency, config.coinPacks, items, checkoutEnabled(), adsEnabled(),
 				new DailyView(deals.items(), LocalDate.now(ZoneOffset.UTC).plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()),
-				bundles(), new PlusOffer(config.plus.price, config.plus.monthlyCoins, config.plus.periodDays));
+				bundles(), new PlusOffer(config.plus.price, config.plus.monthlyCoins, config.plus.periodDays, config.plus.trialDays, config.plus.yearlyPrice), launchOffer());
 	}
 
 	// ---- Daily picks & bundles ----
@@ -572,7 +572,7 @@ public final class StoreService {
 		StoreDatabase.PlusRow current = db.plusRow(uuid);
 		long now = System.currentTimeMillis();
 		if ("tebex".equals(source) && txn != null && current != null && "tebex".equals(current.source())
-				&& current.until() - now > (config.plus.periodDays - 3) * 86_400_000L) {
+				&& current.until() - now > (days - 3) * 86_400_000L) {
 			add = 0;
 		}
 		long until = db.extendPlus(uuid, add, source, txn, reference);
@@ -622,6 +622,9 @@ public final class StoreService {
 			long now = System.currentTimeMillis();
 			long month = config.plus.periodDays * 86_400_000L;
 			for (StoreDatabase.PlusRow row : db.activePlus(now)) {
+				if ("trial".equals(row.source())) {
+					continue; // the free trial has the perks, not the coins - they start with the first payment
+				}
 				if (row.lastCoins() == 0 || now - row.lastCoins() >= month) {
 					if (config.plus.monthlyCoins > 0) {
 						db.touchWallet(row.uuid(), null);
@@ -638,12 +641,75 @@ public final class StoreService {
 	public record PlusCheckoutView(String checkoutUrl) {
 	}
 
+	/**
+	 * Launch week welcome gift: an account whose very first Velo sign-in ({@code firstSeen}) falls inside the launch window
+	 * gets the bonus coins once. Called after every verified sign-in; does nothing for everyone else.
+	 */
+	public void launchBonus(String uuid, String username, long firstSeen) {
+		StoreConfig.LaunchBonus bonus = config.launchBonus;
+		if (bonus == null || bonus.coins <= 0 || firstSeen < bonus.from || firstSeen >= bonus.until) {
+			return;
+		}
+		try {
+			if (db.hasLedgerReason(uuid, "launch_bonus")) {
+				return;
+			}
+			db.touchWallet(uuid, username);
+			db.adjust(uuid, bonus.coins, "launch_bonus", null, "launch");
+			System.out.println("[store] Launch bonus " + bonus.coins + " coins for " + username);
+		} catch (Exception e) {
+			System.out.println("[store] Launch bonus failed for " + username + ": " + e.getMessage());
+		}
+	}
+
+	/** The launch offer for the public catalog (website / launcher), or null when there is none or it's over. */
+	public Map<String, Object> launchOffer() {
+		StoreConfig.LaunchBonus bonus = config.launchBonus;
+		if (bonus == null || bonus.coins <= 0 || System.currentTimeMillis() >= bonus.until) {
+			return null;
+		}
+		return Map.of("coins", bonus.coins, "from", bonus.from, "until", bonus.until);
+	}
+
+	/** Whether this account can still start the free trial: never had Velo+ in any form (one trial per account). */
+	public boolean trialAvailable(String uuid) {
+		if (uuid == null || config.plus.trialDays <= 0) {
+			return false;
+		}
+		try {
+			return db.plusRow(uuid) == null;
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	/** Starts the free Velo+ trial ({@code plus.trialDays}); refused for anyone who had Velo+ before. Returns the new end. */
+	public long startTrial(String uuid, String username) throws Exception {
+		if (!trialAvailable(uuid)) {
+			throw new StoreException(409, "The free trial is for accounts that never had Velo+ - and only once");
+		}
+		db.touchWallet(uuid, username);
+		long until = db.extendPlus(uuid, config.plus.trialDays, "trial", "trial:" + uuid, null);
+		loadPlus();
+		System.out.println("[store] Velo+ trial started for " + username + " (" + uuid + ")");
+		return until;
+	}
+
 	public PlusCheckoutView plusCheckout(String uuid, String username) throws Exception {
+		return plusCheckout(uuid, username, false);
+	}
+
+	/** Starts the monthly or (with {@code yearly}) the yearly Velo+ subscription checkout. */
+	public PlusCheckoutView plusCheckout(String uuid, String username, boolean yearly) throws Exception {
 		if (!checkoutEnabled()) {
 			throw new StoreException(503, "Subscriptions aren't set up on this server yet");
 		}
-		TebexCheckout.Basket basket = tebex.createSubscriptionCheckout(uuid, username, "Velo+ (monthly)" + (username != null ? " for " + username : ""),
-				config.plus.price, publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?plus=1");
+		if (yearly && config.plus.yearlyPrice <= 0) {
+			throw new StoreException(400, "There is no yearly Velo+ right now");
+		}
+		TebexCheckout.Basket basket = tebex.createSubscriptionCheckout(uuid, username, (yearly ? "Velo+ (yearly)" : "Velo+ (monthly)")
+				+ (username != null ? " for " + username : ""), yearly ? config.plus.yearlyPrice : config.plus.price,
+				publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?plus=1", yearly);
 		return new PlusCheckoutView(basket.checkoutUrl());
 	}
 
@@ -760,8 +826,9 @@ public final class StoreService {
 				String plusUuid = custom.get("velo_uuid").getAsString();
 				String plusName = custom.has("velo_username") ? custom.get("velo_username").getAsString() : null;
 				String reference = subject.has("recurring_payment_reference") ? subject.get("recurring_payment_reference").getAsString() : null;
-				grantPlus(plusUuid, plusName, config.plus.periodDays, "tebex", txn == null ? "plus:" + System.nanoTime() : txn, reference);
-				System.out.println("[store] Velo+ month for " + plusUuid + " (" + txn + ")");
+				boolean yearly = custom.has("velo_plus_period") && "year".equals(custom.get("velo_plus_period").getAsString());
+				grantPlus(plusUuid, plusName, yearly ? config.plus.yearDays : config.plus.periodDays, "tebex", txn == null ? "plus:" + System.nanoTime() : txn, reference);
+				System.out.println("[store] Velo+ " + (yearly ? "year" : "month") + " for " + plusUuid + " (" + txn + ")");
 				PurchaseListener listener = purchaseListener;
 				if (listener != null) {
 					listener.plusStarted(plusUuid, plusName == null ? db.username(plusUuid) : plusName);
@@ -821,7 +888,8 @@ public final class StoreService {
 		for (String key : keys) {
 			String uuid = db.plusMemberOfPayment(key);
 			if (uuid != null) {
-				grantPlus(uuid, db.username(uuid), config.plus.periodDays, "tebex", "renew:" + eventId, keys.get(0));
+				int days = db.plusPaymentDays(key) >= 300 ? config.plus.yearDays : config.plus.periodDays;
+				grantPlus(uuid, db.username(uuid), days, "tebex", "renew:" + eventId, keys.get(0));
 				System.out.println("[store] Velo+ renewed for " + uuid);
 				return;
 			}

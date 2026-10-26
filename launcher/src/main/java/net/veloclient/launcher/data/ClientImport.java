@@ -31,7 +31,7 @@ import java.util.zip.ZipFile;
 
 /**
  * "Import from another client": finds the Minecraft setups other launchers and clients left on this computer (the vanilla
- * launcher's .minecraft - which Lunar, Badlion and Feather play from too -, Lunar's and Feather's own mod folders, NoRisk,
+ * launcher's .minecraft - which Lunar, Badlion and Dawn play from too -, Lunar's and Dawn's (formerly Feather) own mod folders, NoRisk,
  * the Modrinth App, Prism / MultiMC and CurseForge instances) and copies what's useful into a Velo profile: keybinds and video
  * settings (options.txt), the server list, Fabric mods - looked up on Modrinth by their checksum and fetched in the build for the
  * profile's Minecraft version, so mods from an older version still work -, mod configs, resource packs and shader packs, and
@@ -92,7 +92,7 @@ public final class ClientImport {
 	}
 
 	/** The clients we know where to look for - the first ones are shown even when not found, so you see what's supported. */
-	public static final List<String> CLIENTS = List.of("Minecraft Launcher", "Lunar Client", "Feather Client", "NoRisk Client", "Modrinth App",
+	public static final List<String> CLIENTS = List.of("Minecraft Launcher", "Lunar Client", "Dawn Client", "NoRisk Client", "Modrinth App",
 			"Prism / MultiMC", "CurseForge", "LabyMod", "ATLauncher", "GDLauncher", "FTB App", "Technic", "Other launchers");
 
 	private static final Pattern FABRIC_API_VERSION = Pattern.compile("fabric-api-[^+]+\\+([0-9][0-9a-z.\\-]*)\\.jar", Pattern.CASE_INSENSITIVE);
@@ -143,7 +143,7 @@ public final class ClientImport {
 			String where = b.toString().contains("/.var/app/") ? " (Flatpak)" : "";
 			// A Flatpak client's sandbox .minecraft is that client's, not the vanilla launcher's.
 			String sandboxClient = b.getFileName().toString().toLowerCase(Locale.ROOT).contains("lunar") ? "Lunar Client"
-					: b.getFileName().toString().toLowerCase(Locale.ROOT).contains("feather") ? "Feather Client" : "Minecraft Launcher";
+					: b.getFileName().toString().toLowerCase(Locale.ROOT).matches(".*(dawn|feather).*") ? "Dawn Client" : "Minecraft Launcher";
 			// The vanilla launcher's .minecraft (Badlion, TLauncher, SKLauncher play from it too).
 			for (Path dotMinecraft : distinct(b.resolve(".minecraft"), b.resolve("minecraft"), mac ? b.resolve("minecraft") : null)) {
 				if (!Files.isDirectory(dotMinecraft) || dotMinecraft.getFileName().toString().equals("minecraft") && !mac
@@ -180,11 +180,19 @@ public final class ClientImport {
 				add(sources, "Lunar Client", "Lunar mods " + dir.getFileName() + where, gameForClients, dir, versionFromName(dir.getFileName().toString()),
 						"fabric", null, null);
 			}
-			// Feather: .feather/user-mods/<version>/.
-			for (Path feather : distinct(b.resolve(".feather"), data.resolve("feather"), data.resolve(".feather"))) {
-				for (Path dir : subdirs(feather.resolve("user-mods"), 1)) {
-					add(sources, "Feather Client", "Feather " + dir.getFileName() + where, gameForClients, dir, versionFromName(dir.getFileName().toString()),
+			// Dawn (formerly Feather Client, Flatpak gg.dawn.Launcher): user-mods/<version>/ in .dawn - or the old .feather
+			// folder an install from before the rename still uses - plus per-profile mods folders.
+			for (Path dawn : distinct(b.resolve(".dawn"), data.resolve("dawn"), data.resolve(".dawn"), data.resolve("Dawn"),
+					data.resolve("gg.dawn.Launcher"), b.resolve(".feather"), data.resolve("feather"), data.resolve(".feather"))) {
+				for (Path dir : subdirs(dawn.resolve("user-mods"), 1)) {
+					add(sources, "Dawn Client", "Dawn " + dir.getFileName() + where, gameForClients, dir, versionFromName(dir.getFileName().toString()),
 							"fabric", null, null);
+				}
+				for (Path mods : dirsNamed(dawn.resolve("profiles"), "mods", 3)) {
+					Path profile = mods.getParent();
+					addVersioned(sources, "Dawn Client", "Dawn " + dawn.resolve("profiles").relativize(profile).toString().replace('\\', '/') + where,
+							Files.isRegularFile(profile.resolve("options.txt")) ? profile : gameForClients != null ? gameForClients : profile, mods, null,
+							profile.resolve("resourcepacks"), profile.resolve("shaderpacks"));
 				}
 			}
 			// NoRisk Client: profiles with their own game directories.
@@ -694,7 +702,7 @@ public final class ClientImport {
 			String name = jar.getFileName().toString().toLowerCase(Locale.ROOT);
 			progress.accept("Mods " + i + " / " + jars.size() + "  ·  " + jar.getFileName());
 			if (name.startsWith("velo-client") || name.startsWith("velo-addons") || name.startsWith("fabric-api") || name.contains("lunar")
-					|| name.contains("feather") || name.contains("norisk")) {
+					|| name.contains("feather") || name.contains("dawn-") || name.contains("norisk")) {
 				continue;
 			}
 			String modId = fabricModId(jar);

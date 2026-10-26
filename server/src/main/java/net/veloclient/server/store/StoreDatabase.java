@@ -279,6 +279,17 @@ public final class StoreDatabase implements AutoCloseable {
 		}
 	}
 
+	/** How many days the payment (or its subscription reference) granted - a renewal repeats that. 0 if unknown. */
+	public synchronized int plusPaymentDays(String txnOrReference) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("SELECT days FROM plus_payments WHERE txn = ? OR reference = ? ORDER BY created_at LIMIT 1")) {
+			ps.setString(1, txnOrReference);
+			ps.setString(2, txnOrReference);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getInt(1) : 0;
+			}
+		}
+	}
+
 	public synchronized PlusRow plusRow(String uuid) throws SQLException {
 		try (PreparedStatement ps = connection.prepareStatement("SELECT uuid, until, source, last_coins, started FROM plus WHERE uuid = ?")) {
 			ps.setString(1, uuid);
@@ -396,6 +407,17 @@ public final class StoreDatabase implements AutoCloseable {
 	}
 
 	/** Changes a balance by {@code delta} (may go negative, e.g. after a chargeback); returns the new balance. */
+	/** Whether this account's ledger has an entry with {@code reason} (one-off grants). */
+	public synchronized boolean hasLedgerReason(String uuid, String reason) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("SELECT 1 FROM ledger WHERE uuid = ? AND reason = ? LIMIT 1")) {
+			ps.setString(1, uuid);
+			ps.setString(2, reason);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next();
+			}
+		}
+	}
+
 	public synchronized int adjust(String uuid, int delta, String reason, String ref, String actor) throws SQLException {
 		return inTransaction(() -> adjustInTx(uuid, delta, reason, ref, actor));
 	}

@@ -56,6 +56,44 @@ class PlusTest {
 	}
 
 	@Test
+	void freeTrialOnceWithoutCoinsThenPaidMonthsPayCoins() throws Exception {
+		assertTrue(store.trialAvailable(ME));
+		long until = store.startTrial(ME, "Me");
+		long left = until - System.currentTimeMillis();
+		assertTrue(store.isPlus(ME));
+		assertTrue(left > 6L * 86_400_000L && left <= 7L * 86_400_000L, "seven days");
+		store.plusSweep();
+		assertEquals(0, db.balance(ME), "no monthly coins during the trial");
+		assertFalse(store.trialAvailable(ME));
+		assertThrows(StoreService.StoreException.class, () -> store.startTrial(ME, "Me"), "only once");
+		store.grantPlus(ME, "Me", 30, "tebex", "txn-1", null);
+		assertEquals(store.config().plus.monthlyCoins, db.balance(ME), "the first paid month brings the coins");
+	}
+
+	@Test
+	void noTrialForAccountsThatHadPlus() throws Exception {
+		store.grantPlus(ME, "Me", 30, "owner", null, null);
+		store.endPlus(ME);
+		assertFalse(store.trialAvailable(ME));
+		assertThrows(StoreService.StoreException.class, () -> store.startTrial(ME, "Me"));
+	}
+
+	@Test
+	void launchBonusOnlyForAccountsFirstSeenInLaunchWeekAndOnlyOnce() throws Exception {
+		long from = store.config().launchBonus.from;
+		int coins = store.config().launchBonus.coins;
+		store.launchBonus(OWNER, "Old", from - 1);
+		assertEquals(0, db.balance(OWNER), "accounts from before the launch get nothing");
+		store.launchBonus(ME, "Me", from + 3_600_000L);
+		assertEquals(coins, db.balance(ME));
+		store.launchBonus(ME, "Me", from + 3_600_000L);
+		assertEquals(coins, db.balance(ME), "only once");
+		String late = "22222222222222222222222222222222";
+		store.launchBonus(late, "Late", store.config().launchBonus.until);
+		assertEquals(0, db.balance(late), "the week is over");
+	}
+
+	@Test
 	void ownerCanGiveTemporaryPlusByDays() throws Exception {
 		store.adminPlus(OWNER, "Owner", ME, 7);
 		long left = store.plusUntil(ME) - System.currentTimeMillis();

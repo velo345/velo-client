@@ -29,7 +29,7 @@ import java.util.Locale;
 
 /**
  * The Velo Store, laid out like the launcher's: the pages are tabs in the window header (Featured,
- * Wings, Capes, Auras, Bundles, Velo+), your coins, "My Locker" (and for owners the Owner panel) sit
+ * Wings, Capes, Auras, Emotes, Bundles, Velo+), your coins, "My Locker" (and for owners the Owner panel) sit
  * top right. Featured opens on the newest collection - its name, what it is, "Shop the collection" /
  * "Try on", you wearing its pairs on a turning 3D model with a thumbnail per pair - and under it, as in
  * the launcher: today's picks, bundles, Velo+ and coin packs, auras and capes (the part under the
@@ -38,9 +38,9 @@ import java.util.Locale;
  */
 public final class StoreScreen extends VeloWindow {
 
-	private enum Page { FEATURED, WINGS, CAPES, AURAS, BUNDLES, PLUS }
+	private enum Page { FEATURED, WINGS, CAPES, AURAS, EMOTES, BUNDLES, PLUS }
 
-	private static final String[] TABS = {"Featured", "Wings", "Capes", "Auras", "Bundles", "Velo+"};
+	private static final String[] TABS = {"Featured", "Wings", "Capes", "Auras", "Emotes", "Bundles", "Velo+"};
 	private static final int GAP = 10;
 	private static final long HERO_SECONDS = 4;
 	private static final int THUMB = 34;
@@ -74,6 +74,11 @@ public final class StoreScreen extends VeloWindow {
 		if (!StoreItems.bundles().isEmpty()) {
 			this.client.setScreen(new BundleScreen(this, StoreItems.bundles().get(0)));
 		}
+	}
+
+	/** Opens on the Emotes page next time. */
+	public static void showEmotes() {
+		page = Page.EMOTES;
 	}
 
 	/** Opens on the Auras page next time (the screenshot tour). */
@@ -157,7 +162,7 @@ public final class StoreScreen extends VeloWindow {
 
 	@Override
 	protected String headerTabBadge(int index) {
-		return index == Page.AURAS.ordinal() ? "NEW" : null;
+		return index == Page.EMOTES.ordinal() ? "NEW" : null;
 	}
 
 	@Override
@@ -245,6 +250,18 @@ public final class StoreScreen extends VeloWindow {
 					}
 					var card = new net.veloclient.velo.client.gui.widget.VeloAuraCard(tileWidth, tileHeight, type,
 							() -> this.client.setScreen(new AuraDetailScreen(this, type)));
+					addSelectableChild(card);
+					region.addRow(card);
+				}
+			}, 150);
+			case EMOTES -> layoutGrid(cx, y, cw, () -> {
+				// What's for sale, plus any you own that aren't (testing / limited ones you were given).
+				for (var type : net.veloclient.velo.client.emotes.EmoteCatalog.catalog()) {
+					if (!type.inStore() && !net.veloclient.velo.client.emotes.EmoteCatalog.owns(type.id())) {
+						continue;
+					}
+					var card = new net.veloclient.velo.client.gui.widget.VeloEmoteCard(tileWidth, tileHeight, type,
+							() -> this.client.setScreen(new EmoteDetailScreen(this, type)));
 					addSelectableChild(card);
 					region.addRow(card);
 				}
@@ -365,6 +382,19 @@ public final class StoreScreen extends VeloWindow {
 				var type = auras.get(i);
 				addRegionRow(new net.veloclient.velo.client.gui.widget.VeloAuraCard(w, h, type,
 						() -> this.client.setScreen(new AuraDetailScreen(this, type))), spots, cx + i * (w + GAP), y);
+			}
+			y += h + 18;
+		}
+		List<net.veloclient.velo.client.emotes.EmoteCatalog.EmoteType> emotes = net.veloclient.velo.client.emotes.EmoteCatalog.forSale();
+		if (!emotes.isEmpty()) {
+			headings.add(new Heading(y, "Emotes", "Hold B in game - with particles and sounds"));
+			addRegionRow(link("All emotes", Page.EMOTES), spots, cx + usable - linkWidth("All emotes"), y);
+			y += headH;
+			int h = w * 5 / 4 + 10;
+			for (int i = 0; i < emotes.size() && i < columns; i++) {
+				var type = emotes.get(i);
+				addRegionRow(new net.veloclient.velo.client.gui.widget.VeloEmoteCard(w, h, type,
+						() -> this.client.setScreen(new EmoteDetailScreen(this, type))), spots, cx + i * (w + GAP), y);
 			}
 			y += h + 18;
 		}
@@ -636,10 +666,20 @@ public final class StoreScreen extends VeloWindow {
 
 	private void layoutPlus(int cx, int y, int cw) {
 		boolean member = StoreClient.plus();
-		Text label = Text.literal(member ? "You're Velo+" : String.format(Locale.ROOT, "Subscribe  ·  %.2f %s / month", StoreClient.plusPrice(), StoreClient.currency()));
+		boolean trial = !member && StoreClient.plusTrialAvailable();
+		Text label = Text.literal(member ? "You're Velo+" : trial ? "Start " + StoreClient.plusTrialDays() + "-day free trial"
+				: String.format(Locale.ROOT, "Subscribe  ·  %.2f %s / month", StoreClient.plusPrice(), StoreClient.currency()));
 		int buttonW = Math.min(cw - 36, this.textRenderer.getWidth(label) + 34);
 		VeloButton plusButton = new VeloButton(cx + 18, contentBottom() - 18 - 22, buttonW, 22, label, b -> {
 			if (member) {
+				return;
+			}
+			if (trial) {
+				// Free once per account that never had Velo+ - no payment page.
+				StoreClient.plusTrial(this::layoutContent, error -> {
+					discordError = error;
+					layoutContent();
+				});
 				return;
 			}
 			StoreClient.plusCheckout(VeloUi::openUrl, error -> {
@@ -651,6 +691,17 @@ public final class StoreScreen extends VeloWindow {
 			plusButton.primary();
 		}
 		addDrawableChild(plusButton);
+		if (!member && StoreClient.plusYearlyPrice() > 0) {
+			Text yearLabel = Text.literal(String.format(Locale.ROOT, "Yearly  ·  %.2f %s", StoreClient.plusYearlyPrice(), StoreClient.currency()));
+			int yearW = Math.min(cw - 36 - buttonW - 6, this.textRenderer.getWidth(yearLabel) + 24);
+			if (yearW > 60) {
+				addDrawableChild(new VeloButton(cx + 18 + buttonW + 6, contentBottom() - 18 - 22, yearW, 22, yearLabel,
+						b -> StoreClient.plusCheckout(true, VeloUi::openUrl, error -> {
+							discordError = error;
+							layoutContent();
+						})));
+			}
+		}
 	}
 
 	// ---- Rendering ----

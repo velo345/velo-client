@@ -42,6 +42,9 @@ const ICONS = {
 	players: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M2 21c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5 M16 3.5a4 4 0 0 1 0 7.5 M18.5 14.5c2 .8 3.5 3 3.5 6.5",
 	store: "M3 7h18l-1.5 12.5a2 2 0 0 1-2 1.5h-11a2 2 0 0 1-2-1.5z M8 7V5a4 4 0 0 1 8 0v2",
 	cosmetics: "M12 3l2.4 5.1 5.6.7-4.1 3.9 1 5.5L12 15.6l-4.9 2.6 1-5.5L4 8.8l5.6-.7z",
+	socials: "M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z M10 9.5v5l4.5-2.5z",
+	tiktok: "M14 3v10.5a3.5 3.5 0 1 1-3.5-3.5 M14 3c.4 2.6 2.1 4.2 5 4.5",
+	youtube: "M3 8.5c0-1.7 1.3-3 3-3h12c1.7 0 3 1.3 3 3v7c0 1.7-1.3 3-3 3H6c-1.7 0-3-1.3-3-3z M10 9.5v5l4.5-2.5z",
 	news: "M4 5h13v14H6a2 2 0 0 1-2-2z M17 9h3v8a2 2 0 0 1-2 2 M8 9h5 M8 13h5",
 	reports: "M12 9v4 M12 17h.01 M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
 	addons: "M12 2 3 7v10l9 5 9-5V7z M3 7l9 5 9-5 M12 12v10",
@@ -504,7 +507,7 @@ function renderLogin(message) {
 // ---- Shell & routing ----
 
 const PAGES = [
-	["Velo", [["overview", "Overview"], ["players", "Players"], ["store", "Store"]]],
+	["Velo", [["overview", "Overview"], ["players", "Players"], ["store", "Store"], ["socials", "Socials"]]],
 	["Moderation", [["monitor", "Monitoring"], ["clips", "Clips"], ["worlds", "Public worlds"], ["capes", "Custom capes"], ["stafflog", "Staff log"]]],
 	["Owner tools", [["cosmetics", "Cosmetics"], ["news", "News"], ["reports", "Reports"], ["partners", "Partner servers"], ["updates", "Required update"], ["addons", "Addons"]]],
 	["Machine", [["server", "Server"], ["files", "Files"], ["activity", "Activity log"]]],
@@ -964,6 +967,7 @@ function cape3d(url, k = 9) {
 function cosmeticArt(i, k) {
 	if (i.type === "cape" && i.files && i.files.gif) return cape3d("/api/velo/cosmetics/file/" + i.files.gif, k);
 	if (i.type === "aura") return h("img", { class: "aura-art", src: "/auras/" + i.id.replace(/^aura_/, "") + ".webp", alt: "", loading: "lazy" });
+	if (i.type === "emote") return h("span", { class: "muted" }, "✦ emote");
 	if (i.files && i.files.preview) return h("img", { src: "/api/velo/cosmetics/file/" + i.files.preview, alt: "", loading: "lazy" });
 	return h("span", { class: "muted" }, i.type);
 }
@@ -981,7 +985,7 @@ RENDER.cosmetics = async (root) => {
 	for (const [t, label] of [["items", "Items"], ["bundles", "Bundles"], ["collections", "Collections"]]) {
 		tabs.append(h("button", { role: "tab", type: "button", "data-t": t, "aria-selected": String(t === tab), onclick: () => { tab = t; tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.t === t))); draw(); } }, label));
 	}
-	const filter = h("select", { "aria-label": "Filter" }, h("option", { value: "" }, "All types"), ["wings", "cape", "aura"].map((t) => h("option", { value: t }, t)));
+	const filter = h("select", { "aria-label": "Filter" }, h("option", { value: "" }, "All types"), ["wings", "cape", "aura", "emote"].map((t) => h("option", { value: t }, t)));
 	const statusFilter = h("select", { "aria-label": "Status" }, h("option", { value: "" }, "Any status"), STATUS.map(([v, l]) => h("option", { value: v }, l)));
 	filter.onchange = statusFilter.onchange = () => draw();
 	root.append(tabs, body);
@@ -1986,4 +1990,67 @@ RENDER.stafflog = async (root) => {
 			table(["Player", "From", "Reason", "By", "Until", ""], [...blockRows(blocks.clips, "clip"), ...blockRows(blocks.worlds, "world")])),
 		card("Staff log", "Every removal, takedown, dismissal and block", null,
 			table(["When", "Who", "Did", "What", "Note"], log.map((a) => [when(a.at), h("b", {}, a.by), a.action, a.target, h("span", { class: "muted small" }, a.note || "")]))));
+};
+
+
+// ---- Socials: TikTok / YouTube Shorts views ----
+
+RENDER.socials = async (root) => {
+	const input = h("input", { type: "url", placeholder: "TikTok profile, YouTube channel or a single video link", class: "grow" });
+	const addBtn = h("button", { class: "btn primary", type: "button" }, "Track");
+	const refreshBtn = h("button", { class: "btn", type: "button" }, "Refresh now");
+	const body = h("div", { class: "stack" });
+	root.append(card("Track your videos", "YouTube channels (youtube.com/@you) pick up new Shorts by themselves · add TikToks by video link · numbers refresh every 3 hours", null,
+		h("div", { class: "row" }, input, addBtn, refreshBtn)), body);
+	const draw = (d) => {
+		const t = d.totals;
+		subtitle(d.lastRun ? "Last measured " + ago(d.lastRun) + (d.running ? " · measuring now..." : "") : "Not measured yet - add a profile or video");
+		const pf = d.platforms || {};
+		const share = (k) => (t.views ? Math.round(((pf[k] || {}).views || 0) / t.views * 100) : 0);
+		const kpis = h("div", { class: "grid kpis" },
+			kpi("Views", "socials", t.views, compact, "+" + compact(t.views24h) + " in 24 h", true),
+			kpi("Likes", "cosmetics", t.likes, compact, "+" + compact(t.likes24h) + " in 24 h"),
+			kpi("Comments", "players", t.comments, compact, ""),
+			kpi("Shares", "socials", t.shares, compact, "TikTok only"),
+			kpi("Videos", "socials", t.videos, fmt, `TikTok ${share("tiktok")}% · YouTube ${share("youtube")}% of views`));
+		const chart = card("Total views", "All tracked videos, last 30 days", null,
+			lineChart({ series: [{ name: "Views", color: "#ff4d57", points: d.curve }], yFormat: compact, xFormat: (x) => new Date(x).toLocaleDateString() }));
+		const accounts = card("Tracked profiles", d.accounts.length ? "" : "None yet - add your TikTok or YouTube profile above", null,
+			d.accounts.length ? table(["Platform", "Profile", "Checked", ""], d.accounts.map((a) => [
+				h("span", { class: "chip" }, icon(a.platform), a.platform === "tiktok" ? "TikTok" : "YouTube"),
+				h("a", { href: a.url, target: "_blank", rel: "noopener" }, a.name || a.url),
+				a.error ? h("span", { class: "bad" }, a.error) : a.checkedAt ? ago(a.checkedAt) + (a.note ? " · " + a.note : "") : "pending",
+				removeBtn(a.url)])) : null);
+		const rows = d.videos.map((v) => {
+			const er = v.views ? ((v.likes + v.comments + (v.shares || 0)) / v.views * 100).toFixed(1) + "%" : "-";
+			const thumb = v.platform === "youtube" && v.url ? youtubeThumb(v.url) : null;
+			return [
+				h("div", { class: "vid" }, thumb ? h("img", { src: thumb, alt: "", loading: "lazy" }) : h("span", { class: "vid-ph" }, icon(v.platform)),
+					h("div", {}, h("a", { href: v.url, target: "_blank", rel: "noopener" }, v.title || v.url), h("small", { class: "muted" },
+						(v.platform === "tiktok" ? "TikTok" : "YouTube") + (v.published ? " · " + ago(v.published) : "") + (v.error ? " · " + v.error : "")))),
+				v.views != null ? compact(v.views) : "-", v.views24h != null ? "+" + compact(v.views24h) : "-",
+				v.likes != null ? compact(v.likes) : "-", v.comments != null ? compact(v.comments) : "-", v.shares ? compact(v.shares) : "-", er, removeBtn(v.id)];
+		});
+		const videos = card("Videos", "Sorted by views · engagement = (likes + comments + shares) / views", null,
+			table(["Video", "num:Views", "num:24 h", "num:Likes", "num:Comments", "num:Shares", "num:Engagement", ""], rows));
+		body.replaceChildren(kpis, chart, accounts, videos);
+	};
+	const removeBtn = (key) => {
+		const b = h("button", { class: "btn small ghost", type: "button", title: "Stop tracking" }, "Remove");
+		b.onclick = (e) => { e.stopPropagation(); busy(b, async () => draw(await velo("admin/panel/socials/edit", { body: { remove: key } }))); };
+		return b;
+	};
+	const youtubeThumb = (url) => { const m = url.match(/(?:shorts\/|v=|youtu\.be\/)([A-Za-z0-9_-]{11})/); return m ? `https://i.ytimg.com/vi/${m[1]}/mqdefault.jpg` : null; };
+	const load = async () => draw(await velo("admin/panel/socials"));
+	addBtn.onclick = () => busy(addBtn, async () => {
+		if (!input.value.trim()) return;
+		draw(await velo("admin/panel/socials/edit", { body: { url: input.value.trim() } }));
+		input.value = "";
+		toast("Tracking - first numbers in a minute");
+		setTimeout(() => load().catch(() => {}), 45_000);
+	});
+	input.addEventListener("keydown", (e) => { if (e.key === "Enter") addBtn.click(); });
+	refreshBtn.onclick = () => busy(refreshBtn, async () => { draw(await velo("admin/panel/socials/edit", { body: { refresh: true } })); toast("Measuring - give it a minute"); });
+	await load();
+	state.timers.push(setInterval(() => load().catch(() => {}), 60_000));
 };

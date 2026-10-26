@@ -265,6 +265,21 @@ public final class StoreTiles {
 				dealLabel(price, full), onClick);
 	}
 
+	/** An emote: a little figure doing it on a loop, with its particles. */
+	public static Node emoteArt(net.veloclient.launcher.data.EmoteCatalog.EmoteType type, double width, double height) {
+		return EmoteFigureFx.create(type, width, height);
+	}
+
+	public static VBox emoteTile(net.veloclient.launcher.data.EmoteCatalog.EmoteType type, Runnable onClick) {
+		int price = StoreApi.price(type.itemId(), type.price());
+		boolean owned = net.veloclient.launcher.data.EmoteCatalog.owns(type.id());
+		boolean onWheel = owned && net.veloclient.launcher.data.EmoteCatalog.slotOf(type.id()) >= 0;
+		Integer full = StoreApi.fullPrice(type.itemId());
+		return tile(emoteArt(type, 200, 170), type.accent(), Rarity.of(type.itemId(), price), "Emote", type.name(),
+				onWheel ? State.EQUIPPED : owned ? State.OWNED : type.inStore() ? State.FOR_SALE : State.LOCKED, price, full,
+				dealLabel(price, full), onClick);
+	}
+
 	private static String dealLabel(int price, Integer full) {
 		if (full == null || full <= price || full == 0) {
 			return null;

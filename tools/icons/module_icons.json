@@ -122,6 +122,27 @@
    "name": "Velo Shaders",
    "group": "Core",
    "path": "M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8z M12 2v2 M12 20v2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M2 12h2 M20 12h2 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4"
+  },
+  "no-break-particles": {
+   "name": "No Break Particles",
+   "group": "Core",
+   "path": "M5 9h8v8H5z M15 5l1.5 1.5 M18 9h2 M15 13l1.5-1.5 M3 3l18 18"
+  },
+  "totem-pops": {
+   "name": "Totem Pop Counter",
+   "group": "Core",
+   "path": "M8 4h8v6H8z M10 6.5h.01 M14 6.5h.01 M6 12h12 M9 10v10h6V10 M4 15l2-3 M20 15l-2-3"
+  },
+  "emotes": {
+   "name": "Emotes",
+   "group": "Core",
+   "path": "M12 4.5a1.8 1.8 0 1 0 0.01 0 M12 8v7 M12 15l-3 5 M12 15l3 5 M12 10l-5-4 M12 10l5-4"
+  },
+  "$nav-emotes": {
+   "name": "Emotes (menu icon)",
+   "group": "Core",
+   "path": "M12 4.5a1.8 1.8 0 1 0 0.01 0 M12 8v7 M12 15l-3 5 M12 15l3 5 M12 10l-5-4 M12 10l5-4",
+   "dir": "nav/emotes"
   }
  }
 }

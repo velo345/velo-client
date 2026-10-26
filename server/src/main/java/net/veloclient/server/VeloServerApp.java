@@ -193,6 +193,13 @@ public final class VeloServerApp {
 		SchematicRoutes.register(server, registry, schematics, store);
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));
 		PanelRoutes.register(server, registry, stats, store, adminToken);
+		SocialStatsService socials = new SocialStatsService(dataDir, envOr("VELO_YTDLP", "yt-dlp"), envOr("VELO_YOUTUBE_API_KEY", null));
+		PanelRoutes.registerSocials(server, socials, adminToken);
+		Executors.newSingleThreadScheduledExecutor(r -> {
+			Thread t = new Thread(r, "velo-socials");
+			t.setDaemon(true);
+			return t;
+		}).scheduleAtFixedRate(socials::poll, 2, 180, TimeUnit.MINUTES);
 		Executors.newSingleThreadScheduledExecutor(r -> {
 			Thread t = new Thread(r, "velo-stats-sample");
 			t.setDaemon(true);
@@ -391,11 +398,15 @@ public final class VeloServerApp {
 		String token = registry.createSession(uuid, challenge.username(), challenge.kind());
 		social.onAuthenticated(uuid, challenge.username());
 		stats.signedIn(uuid, challenge.username(), challenge.kind());
+		if (store != null) {
+			store.launchBonus(uuid, challenge.username(), stats.firstSeen(uuid));
+		}
 		JsonHttp.writeJson(exchange, 200, new VerifyResponse(token,
 				SessionRegistry.HEARTBEAT_INTERVAL_SECONDS, SessionRegistry.SESSION_TTL_MILLIS / 1000));
 	}
 
-	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId, String auraId, Boolean idle, Boolean hidePlus, String nameStyle) {
+	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId, String auraId, Boolean idle, Boolean hidePlus, String nameStyle,
+			String emote) {
 	}
 
 	private record HeartbeatResponse(boolean ok, int onlineCount, String capeId) {
@@ -440,6 +451,15 @@ public final class VeloServerApp {
 			if (request.hidePlus() != null) {
 				registry.setPlusHidden(refreshed.uuid(), request.hidePlus());
 			}
+			// Emotes are store items too ("emote_<id>"): only relayed for players who bought them.
+			String emote = request.emote();
+			if (emote != null) {
+				String emoteItem = "emote_" + emote.split(";", 2)[0];
+				if (!store.knownItem(emoteItem) || !store.mayDisplayCape(refreshed.uuid(), emoteItem)) {
+					emote = null;
+				}
+			}
+			registry.setEmote(refreshed.uuid(), emote);
 		}
 		if (refreshed != null && "launcher".equals(refreshed.kind())
 				&& registry.setIdle(request.sessionToken(), Boolean.TRUE.equals(request.idle()))) {

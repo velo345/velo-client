@@ -1,0 +1,394 @@
+{
+ "emote.airhorn": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/airhorn"
+   }
+  ]
+ },
+ "emote.bass_drop": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/bass_drop"
+   }
+  ]
+ },
+ "emote.bats": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/bats"
+   }
+  ]
+ },
+ "emote.boing": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/boing"
+   }
+  ]
+ },
+ "emote.boom": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/boom"
+   }
+  ]
+ },
+ "emote.chime": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/chime"
+   }
+  ]
+ },
+ "emote.clink": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/clink"
+   }
+  ]
+ },
+ "emote.crackle": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/crackle"
+   }
+  ]
+ },
+ "emote.drumroll": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/drumroll"
+   }
+  ]
+ },
+ "emote.dust": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/dust"
+   }
+  ]
+ },
+ "emote.fanfare": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/fanfare"
+   }
+  ]
+ },
+ "emote.ghost": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/ghost"
+   }
+  ]
+ },
+ "emote.grind": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/grind"
+   }
+  ]
+ },
+ "emote.growl": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/growl"
+   }
+  ]
+ },
+ "emote.heart": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/heart"
+   }
+  ]
+ },
+ "emote.hitmarker": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/hitmarker"
+   }
+  ]
+ },
+ "emote.kick_ball": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/kick_ball"
+   }
+  ]
+ },
+ "emote.laser": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/laser"
+   }
+  ]
+ },
+ "emote.magic": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/magic"
+   }
+  ]
+ },
+ "emote.music.afk": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/afk",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.breakdance": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/breakdance",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.floss": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/floss",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.ghost_party": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/ghost_party",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.griddy": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/griddy",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.groove": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/groove",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.hip_hop": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/hip_hop",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.jingle": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/jingle",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.l_dance": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/l_dance",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.shuffle": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/shuffle",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.silly_dance": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/silly_dance",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.sip_tea": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/sip_tea",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.trick_or_treat": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/trick_or_treat",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.music.ymca": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/music/ymca",
+    "stream": true,
+    "attenuation_distance": 32
+   }
+  ]
+ },
+ "emote.organ_sting": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/organ_sting"
+   }
+  ]
+ },
+ "emote.pop": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/pop"
+   }
+  ]
+ },
+ "emote.popper": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/popper"
+   }
+  ]
+ },
+ "emote.power_up": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/power_up"
+   }
+  ]
+ },
+ "emote.sad_trombone": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/sad_trombone"
+   }
+  ]
+ },
+ "emote.slap": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/slap"
+   }
+  ]
+ },
+ "emote.sleigh_bells": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/sleigh_bells"
+   }
+  ]
+ },
+ "emote.slurp": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/slurp"
+   }
+  ]
+ },
+ "emote.snore": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/snore"
+   }
+  ]
+ },
+ "emote.sparkle": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/sparkle"
+   }
+  ]
+ },
+ "emote.splat": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/splat"
+   }
+  ]
+ },
+ "emote.stadium_horn": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/stadium_horn"
+   }
+  ]
+ },
+ "emote.stomp": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/stomp"
+   }
+  ]
+ },
+ "emote.tap": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/tap"
+   }
+  ]
+ },
+ "emote.thunder": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/thunder"
+   }
+  ]
+ },
+ "emote.tsk": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/tsk"
+   }
+  ]
+ },
+ "emote.whistle": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/whistle"
+   }
+  ]
+ },
+ "emote.whoosh": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/whoosh"
+   }
+  ]
+ },
+ "emote.zap": {
+  "sounds": [
+   {
+    "name": "velo-client:emote/zap"
+   }
+  ]
+ }
+}

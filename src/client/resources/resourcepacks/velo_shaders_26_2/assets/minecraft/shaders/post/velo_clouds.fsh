@@ -139,13 +139,14 @@ void main() {
         fragColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
-    // nearest scene depth in this low-res texel's footprint (clouds stop at the closest surface)
+    // farthest scene depth in this low-res texel's footprint: the light pass hides clouds per pixel in front of
+    // anything closer than the layer, so thin foreground (leaves, kelp) no longer punches clear holes around itself
     vec2 px = 0.5 / OutSize;
     float d0 = texture(InDepthSampler, texCoord + vec2(-px.x, -px.y)).r;
     float d1 = texture(InDepthSampler, texCoord + vec2(px.x, -px.y)).r;
     float d2 = texture(InDepthSampler, texCoord + vec2(-px.x, px.y)).r;
     float d3 = texture(InDepthSampler, texCoord + vec2(px.x, px.y)).r;
-    float depth = reversed_z() ? max(max(d0, d1), max(d2, d3)) : min(min(d0, d1), min(d2, d3));
+    float depth = reversed_z() ? min(min(d0, d1), min(d2, d3)) : max(max(d0, d1), max(d2, d3));
     bool sky = is_sky(depth);
     vec3 p = view_pos(texCoord, sky ? (reversed_z() ? 0.0001 : 0.9999) : depth);
     vec3 rd = normalize((VeloInvView * vec4(p, 0.0)).xyz);

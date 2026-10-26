@@ -1,15 +1,59 @@
-# Velo Client
+<p align="center"><img src="velo-site/assets/logo.png" width="120" alt="Velo Client logo"></p>
 
-A cheat-free, anti-cheat-safe, all-in-one QoL/performance/server-testing
-Fabric client mod for Minecraft 1.21.11, in the spirit of Lunar Client /
-Badlion but built explicitly for legitimacy on strict-anticheat servers.
+<h1 align="center">Velo Client</h1>
 
-*Everything you're allowed to have, nothing you're not.*
+<p align="center"><b>A free Minecraft launcher and Fabric client for 1.21.11, 26.1, 26.2 and 26.3.</b><br>
+More FPS out of the box, 100+ free modules, a HUD you style yourself, friends and parties, PvP tools,
+Redstone Mode and 3D wings, capes and auras every Velo player sees.</p>
 
-See [SAFETY.md](SAFETY.md) for a module-by-module breakdown of what every
-feature does and why it doesn't provide an unfair advantage.
+<p align="center">
+  <a href="https://velo-client.com"><b>Website</b></a> ·
+  <a href="https://velo-client.com/download"><b>Download</b></a> ·
+  <a href="https://velo-client.com/features">Features</a> ·
+  <a href="https://velo-client.com/store">Store</a> ·
+  <a href="https://discord.gg/tGwn8RsMpv">Discord</a>
+</p>
 
-## Status
+<p align="center">
+  <a href="https://github.com/velo345/velo-client/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/velo345/velo-client?include_prereleases&label=release&color=e0262e"></a>
+  <a href="https://github.com/velo345/velo-client/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/velo345/velo-client/total?color=e0262e"></a>
+  <img alt="Minecraft" src="https://img.shields.io/badge/Minecraft-1.21.11%20%C2%B7%2026.1%20%C2%B7%2026.2%20%C2%B7%2026.3-3a3a44">
+  <img alt="Loader" src="https://img.shields.io/badge/loader-Fabric-3a3a44">
+</p>
+
+<p align="center"><img src="velo-site/assets/gui/launcher-home.webp" width="860" alt="The Velo Client launcher home screen"></p>
+
+## What you get
+
+- **Performance** - Sodium, Lithium and FerriteCore set up for every profile, plus Velo's own render and startup tweaks.
+- **100+ free modules** - FPS, ping, keystrokes, armor, potions, coordinates, zoom, free look, waypoints, world map and many more.
+- **A HUD you design** - drag and drop every element, 8 fonts and 3 looks, themes for launcher and game.
+- **PvP tools** - Target HUD, damage numbers, combo counter, hit colour, cooldowns, totem pops, kill effects.
+- **Redstone Mode** - select, copy, move and stack builds, auto wiring, schematics (Litematica compatible), tick freeze and rewind.
+- **Velo Shaders** - real shadows, volumetric clouds and reflections that run on Vulkan.
+- **Friends and parties** across servers, clips with a replay buffer, World Hosting for your singleplayer worlds.
+- **Cosmetics** - 3D wings, animated HD capes, auras, emotes and name styles that every Velo player sees.
+- **Moves your setup over** from Lunar Client, Modrinth and CurseForge in a few clicks.
+
+The launcher, the client and all modules are free. Velo+ (free 7-day trial) and Store cosmetics are optional.
+
+<p align="center">
+  <img src="velo-site/assets/gui/ingame-rshift.webp" width="420" alt="Velo Client mod menu in game">
+  <img src="velo-site/assets/gui/locker.webp" width="420" alt="Velo Client cosmetics locker">
+</p>
+
+## Download
+
+Get the launcher for **Windows** or **Linux (.deb)** from [velo-client.com/download](https://velo-client.com/download) or the
+[latest release](https://github.com/velo345/velo-client/releases). On macOS (or in any other Fabric launcher) use the
+`velo-client-<version>+<minecraft>.jar` from the release together with Fabric API.
+
+Velo Client is an independent project and not an official Minecraft product; it is not approved by or associated with
+Mojang or Microsoft.
+
+## Development
+
+### Status
 
 This repository contains a working Fabric mod with 41 modules across
 Performance, Rendering, HUD, Server Tools, QoL, Utility, Debug, and

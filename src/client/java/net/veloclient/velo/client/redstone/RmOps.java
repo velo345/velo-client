@@ -269,6 +269,34 @@ public final class RmOps {
 		});
 	}
 
+	/**
+	 * Places the Copy tool's duplicate at its offset (the original stays). The selection then moves onto the new copy with
+	 * a fresh offset, so the next scroll + left click places another one right after it.
+	 */
+	public static void applyCopy() {
+		int[] b = RmState.box();
+		if (b == null || !RmState.moveActive() || !canEdit()) {
+			return;
+		}
+		int[] s = RmState.size();
+		int[] off = RmState.moveOffset.clone();
+		int rotation = RmState.moveRotation;
+		boolean mirror = RmState.moveMirror;
+		RmWorld.onServer(level -> {
+			Clip copy = capture(level, b[0], b[1], b[2], s[0], s[1], s[2], true).transformed(rotation, mirror);
+			int nx = b[0] + off[0] + (s[0] - copy.sx) / 2;
+			int nz = b[2] + off[2] + (s[2] - copy.sz) / 2;
+			int ny = b[1] + off[1];
+			runJob(level, RmJobs.Source.of(copy), nx, ny, nz, RmSettings.get().skipAir, "Copying", () -> {
+				RmState.cornerA = new int[] {nx, ny, nz};
+				RmState.cornerB = new int[] {nx + copy.sx - 1, ny + copy.sy - 1, nz + copy.sz - 1};
+				RmState.resetTransforms();
+				RmState.copyPlaced = true;
+				RmState.info("Copied - scroll + left click for another, left click again to finish  ·  Ctrl+Z undoes it");
+			});
+		});
+	}
+
 	/** Applies the Stack tool's copies - along up to all three axes at once (a grid) - as one undo step. */
 	public static void applyStack() {
 		int[] b = RmState.box();

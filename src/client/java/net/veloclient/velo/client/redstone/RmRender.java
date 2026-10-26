@@ -99,7 +99,7 @@ public final class RmRender {
 			}
 		} else if (RedstoneMode.toolHeld() && b != null) {
 			switch (RmState.tool) {
-				case MOVE -> previewMove(b);
+				case MOVE, COPY -> previewMove(b);
 				case STACK -> previewStack(b);
 				default -> {
 				}
@@ -263,11 +263,12 @@ public final class RmRender {
 			ghostBlocks = List.of();
 			return;
 		}
+		boolean through = RmSettings.get().bordersThroughBlocks;
 		Placements.Placement following = Placements.following();
 		if (following != null) {
 			Clip v = following.view();
 			ghost(v, following.x, following.y, following.z, 0x80);
-			outline(following.x, following.y, following.z, following.x + v.sx, following.y + v.sy, following.z + v.sz, 0xFFFFD84A, 2f);
+			border(through, following.x, following.y, following.z, following.x + v.sx, following.y + v.sy, following.z + v.sz, 0xFFFFD84A, 2f);
 		}
 		if (++placementTicks % 8 == 0) {
 			placementVoxels = collectPlacements(list);
@@ -283,17 +284,54 @@ public final class RmRender {
 				outlineOccluded(v[0] - 0.01, v[1] - 0.01, v[2] - 0.01, v[0] + 1.01, v[1] + 1.01, v[2] + 1.01, color | 0xFF000000, 2f);
 			}
 		}
-		// Fluids have no block model, so the hologram pass can't show them: tinted boxes instead, as high as the water is.
+		// Fluids have no block model, so the hologram pass can't show them: tinted boxes instead, as high as the water
+		// stands at that level, with an arrow on the surface the way it flows (falling water: a stripe down its side).
 		for (float[] f : fluidCells) {
 			fillOccluded(f[0] + 0.02, f[1], f[2] + 0.02, f[0] + 0.98, f[1] + f[4], f[2] + 0.98, (int) f[3]);
+			flowArrow(f);
 		}
 		for (Placements.Placement p : list) {
 			if (p.visible && p.locked) {
 				Clip v = p.view();
 				int color = p.outlineOnly ? 0xFF4FD8FF : p == Placements.selected() ? 0xFFFF8040 : 0x80FF8040;
-				outline(p.x, p.y, p.z, p.x + v.sx, p.y + v.sy, p.z + v.sz, color, p.outlineOnly ? 3f : 2f);
+				border(through, p.x, p.y, p.z, p.x + v.sx, p.y + v.sy, p.z + v.sz, color, p.outlineOnly ? 3f : 2f);
 			}
 		}
+	}
+
+	private static void border(boolean through, double x0, double y0, double z0, double x1, double y1, double z1, int color, float width) {
+		if (through) {
+			outline(x0, y0, z0, x1, y1, z1, color, width);
+		} else {
+			outlineOccluded(x0, y0, z0, x1, y1, z1, color, width);
+		}
+	}
+
+	/** {x, y, z, argb, height, dx, dz, falling}: a shaft + head on the surface pointing downstream. */
+	private static void flowArrow(float[] f) {
+		int color = ((int) f[3] & 0xFFFFFF) | 0xE0000000;
+		double top = f[1] + f[4] + 0.01;
+		if (f[7] > 0) {
+			// falling: a bright stripe down the middle of each side
+			fillOccluded(f[0] + 0.46, f[1] + 0.05, f[2] - 0.001, f[0] + 0.54, f[1] + 0.95, f[2] + 1.001, color);
+			fillOccluded(f[0] - 0.001, f[1] + 0.05, f[2] + 0.46, f[0] + 1.001, f[1] + 0.95, f[2] + 0.54, color);
+			return;
+		}
+		double dx = f[5], dz = f[6];
+		if (dx == 0 && dz == 0) {
+			return;
+		}
+		double cx = f[0] + 0.5, cz = f[2] + 0.5;
+		for (int i = 0; i < 4; i++) {
+			// shaft: small squares from behind the centre to the tip
+			double t = -0.3 + i * 0.13;
+			double px = cx + dx * t, pz = cz + dz * t;
+			fillOccluded(px - 0.05, top, pz - 0.05, px + 0.05, top + 0.02, pz + 0.05, color);
+		}
+		// head: a wider square row across the direction at the tip
+		double hx = cx + dx * 0.24, hz = cz + dz * 0.24;
+		double sx = Math.abs(dz) * 0.2 + 0.06, sz = Math.abs(dx) * 0.2 + 0.06;
+		fillOccluded(hx - sx, top, hz - sz, hx + sx, top + 0.02, hz + sz, color);
 	}
 
 	/**
@@ -345,7 +383,7 @@ public final class RmRender {
 								if (!RmWorld.isAir(have) && !RmWorld.replaceable(have)) {
 									out.add(new float[] {p.x + x, p.y + y, p.z + z, WRONG_BLOCK});
 								} else {
-									fluids.add(fluidCell(p.x + x, p.y + y, p.z + z, fluid, want));
+									fluids.add(fluidCell(p.x + x, p.y + y, p.z + z, fluid, want, v, x, y, z));
 								}
 							}
 							continue;
@@ -390,10 +428,10 @@ public final class RmRender {
 		return level == null || level.equals("0");
 	}
 
-	private static float[] fluidCell(int x, int y, int z, String fluid, Object state) {
+	private static float[] fluidCell(int x, int y, int z, String fluid, Object state, Clip clip, int cx, int cy, int cz) {
 		int rgb = fluid.equals("lava") ? 0xFF7A1E : 0x3A7BFF;
 		if (source(state)) {
-			return new float[] {x, y, z, 0x70000000 | rgb, 0.9f};
+			return new float[] {x, y, z, 0x70000000 | rgb, 0.9f, 0, 0, 0};
 		}
 		// Flowing: fainter and lower, the way the water stands there.
 		int level = 0;
@@ -403,18 +441,72 @@ public final class RmRender {
 			// Unknown level: full height.
 		}
 		float height = level >= 8 ? 0.9f : Math.max(0.12f, (8 - level) / 9f);
-		return new float[] {x, y, z, 0x38000000 | rgb, height};
+		if (level >= 8) {
+			return new float[] {x, y, z, 0x38000000 | rgb, height, 0, 0, 1};
+		}
+		// Flow goes to the neighbour of the same fluid that is further from the source (a higher level) - or, at the end
+		// of a stream, towards an open cell; the sum of those directions is the arrow (diagonals happen at corners).
+		int fx = 0, fz = 0;
+		int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+		for (int[] d : dirs) {
+			int nx = cx + d[0], nz = cz + d[1];
+			if (nx < 0 || nz < 0 || nx >= clip.sx || nz >= clip.sz) {
+				continue;
+			}
+			Object n = clip.states[clip.index(nx, cy, nz)];
+			String nf = fluid(n);
+			if (fluid.equals(nf) && !source(n)) {
+				int nl;
+				try {
+					nl = Integer.parseInt(RmWorld.prop(n, "level"));
+				} catch (NumberFormatException e) {
+					continue;
+				}
+				if (nl > level || nl >= 8) {
+					fx += d[0];
+					fz += d[1];
+				}
+			}
+		}
+		double len = Math.sqrt(fx * fx + fz * fz);
+		return new float[] {x, y, z, 0x38000000 | rgb, height, len == 0 ? 0 : (float) (fx / len), len == 0 ? 0 : (float) (fz / len), 0};
 	}
 
 	/**
 	 * Two different states that work the same, so a placement counts them as right. A crafter facing up or down works
 	 * the same whichever way its top side points ({@code up_north} = {@code up_east}...), and {@code triggered} /
-	 * {@code crafting} only show what it's doing at the moment.
+	 * {@code crafting} only show what it's doing at the moment. Observers ({@code powered}) and droppers / dispensers
+	 * ({@code triggered}) only differ by the pulse that happened to be running when the schematic was saved - facing up
+	 * or down they're right either way.
 	 */
 	static boolean sameFunction(Object want, Object have) {
-		if (want == null || have == null || !RmWorld.id(want).equals("minecraft:crafter") || !RmWorld.id(have).equals("minecraft:crafter")) {
+		if (want == null || have == null) {
 			return false;
 		}
+		String id = RmWorld.id(want);
+		if (!id.equals(RmWorld.id(have))) {
+			return false;
+		}
+		return switch (id) {
+			case "minecraft:crafter" -> sameCrafter(want, have);
+			case "minecraft:observer" -> withTransient(have, want, "powered") == want;
+			case "minecraft:dropper", "minecraft:dispenser" -> withTransient(have, want, "triggered") == want;
+			default -> false;
+		};
+	}
+
+	/** {@code state} with the given momentary properties copied over from {@code from}. */
+	private static Object withTransient(Object state, Object from, String... props) {
+		for (String prop : props) {
+			String value = RmWorld.prop(from, prop);
+			if (value != null) {
+				state = RmWorld.with(state, prop, value);
+			}
+		}
+		return state;
+	}
+
+	private static boolean sameCrafter(Object want, Object have) {
 		String w = RmWorld.prop(want, "orientation");
 		String h = RmWorld.prop(have, "orientation");
 		if (w == null || h == null) {
@@ -424,14 +516,7 @@ public final class RmRender {
 		if (vertical ? !h.startsWith(w.substring(0, w.indexOf('_') + 1)) : !w.equals(h)) {
 			return false;
 		}
-		Object normalized = RmWorld.with(have, "orientation", w);
-		for (String transientProp : new String[] {"triggered", "crafting"}) {
-			String value = RmWorld.prop(want, transientProp);
-			if (value != null) {
-				normalized = RmWorld.with(normalized, transientProp, value);
-			}
-		}
-		return normalized == want;
+		return withTransient(RmWorld.with(have, "orientation", w), want, "triggered", "crafting") == want;
 	}
 
 	private static long distance(Object[] g, int[] player) {

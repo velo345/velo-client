@@ -1,0 +1,70 @@
+{
+  "title": "Emotes: 31 of them, with real music",
+  "summary": "Dances with music on the beat, trolls, celebrations and seasonal specials - every emote with its own effects, sounds and 3D props. Everyone with Velo sees and hears them.",
+  "tag": "Update",
+  "version": "0.9.94",
+  "accent": "#ff4fd8",
+  "pinned": true,
+  "cover": "file:images/cover.jpg",
+  "blocks": [
+    {
+      "type": "heading",
+      "text": "Hold B. Pick one. Let it play."
+    },
+    {
+      "type": "text",
+      "text": "Emotes are in the **Velo Store** now - **31** at launch. Hold **B** in game for your emote wheel, point at one and let go (or press 1-8). Arrange your wheel in the Locker's Emotes tab. Other Velo players **see and hear** your emotes, and you theirs."
+    },
+    {
+      "type": "heading",
+      "text": "Dances with real music"
+    },
+    {
+      "type": "text",
+      "text": "The dances play actual music, and the moves are **timed to the beat** - the dance is stretched to the track's tempo and its hits land on the drums, so it stays in sync for as long as you keep dancing."
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Floss**, **Griddy**, **Shuffle**, **Y.M.C.A.** (the letters light up above you), **Hip Hop** and **Breakdance** with a boombox next to you",
+        "**Silly Dance** and **Groove**, now with music too",
+        "**Take the L** - an L on your forehead, for every player you just beat"
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Effects made for Velo"
+    },
+    {
+      "type": "text",
+      "text": "No vanilla particles: confetti, shockwave rings, lightning, hand trails, ghosts, bats, snow, hearts and floating letters - drawn like our auras. Every sound is made for Velo too."
+    },
+    {
+      "type": "image",
+      "image": "file:images/props.jpg",
+      "caption": "Some emotes bring props: a boombox, a trophy, a teacup, an air horn, a tombstone..."
+    },
+    {
+      "type": "heading",
+      "text": "Something for every mood"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Trolls**: Air Horn, Sips Tea, AFK (nod off to elevator music), Facepalm",
+        "**Celebrations**: Victory (a golden trophy rises), Thunder Slam, Backflip, Goal!",
+        "**Halloween** (Afterlife collection): Grave Rise, Trick or Treat, Ghost Party",
+        "**Winter** (Yuletide collection): Snowball Fight, Surprise Gift, Jingle Jam with a Santa hat",
+        "**Classics**, reworked: Wave, Cheer, Bow, Flex, Heart, Shrug, Rage and a brand-new No No"
+      ]
+    },
+    {
+      "type": "callout",
+      "text": "Too loud? Mods > Emotes lets you set the emote volume, the music volume and how loud other players' emotes are - or turn music, sounds or effects off."
+    },
+    {
+      "type": "text",
+      "text": "Try every emote on your own skin on velo-client.com/store - with its music."
+    }
+  ]
+}

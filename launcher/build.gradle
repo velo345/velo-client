@@ -26,7 +26,7 @@ application {
 	// - silences the JDK's restricted-native-access warning now, and avoids
 	// it becoming a hard failure on a future JDK that blocks this by default.
 	applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED', '-Xms48m', '-Xmx768m', '-XX:+UseSerialGC', '-XX:MinHeapFreeRatio=10',
-			'-XX:MaxHeapFreeRatio=30', '-XX:TieredStopAtLevel=1', '-XX:ReservedCodeCacheSize=64m', '-Xss512k', '-Dprism.maxvram=256m']
+			'-XX:MaxHeapFreeRatio=30', '-XX:TieredStopAtLevel=1', '-XX:ReservedCodeCacheSize=64m', '-Xss512k', '-Dprism.maxvram=512m']
 }
 
 dependencies {
@@ -120,7 +120,7 @@ tasks.register("bundleJavaRuntimeFallback") {
 // reads it back as a classpath resource at runtime instead of independently
 // hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
 // below reuses the same value for the native installer's version.
-def launcherAppVersion = "0.9.93"
+def launcherAppVersion = "0.9.95"
 // A fixed identity for the Windows installer across every version - WiX
 // needs this (--win-upgrade-uuid below) to recognize a new installer as an
 // upgrade of whatever's already installed rather than an unrelated product,
@@ -319,7 +319,7 @@ tasks.register("jpackageDist") {
 				"--java-options", "-XX:TieredStopAtLevel=1",
 				"--java-options", "-XX:ReservedCodeCacheSize=64m",
 				"--java-options", "-Xss512k",
-				"--java-options", "-Dprism.maxvram=256m"
+				"--java-options", "-Dprism.maxvram=512m"
 		]
 		if (isWindows) {
 			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser", "--win-upgrade-uuid", launcherWindowsUpgradeUuid]

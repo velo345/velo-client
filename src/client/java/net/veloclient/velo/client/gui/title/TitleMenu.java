@@ -99,7 +99,12 @@ public final class TitleMenu {
 		}
 		storeRow = new HotspotButton(Text.literal("Store"), () -> client.setScreen(new StoreScreen(screen)));
 		jumpCard = new HotspotButton(Text.literal("Jump back in"), LastServer::join);
-		storeCard = new HotspotButton(Text.literal("Store"), () -> client.setScreen(new StoreScreen(screen)));
+		storeCard = new HotspotButton(Text.literal("Store"), () -> {
+			if (!net.veloclient.velo.client.emotes.EmoteCatalog.forSale().isEmpty()) {
+				StoreScreen.showEmotes();
+			}
+			client.setScreen(new StoreScreen(screen));
+		});
 		friends = new HotspotButton(Text.literal("Friends"), () -> client.setScreen(new FriendsScreen(screen)));
 		discoverRow = new HotspotButton(Text.literal("Discover"),
 				() -> client.setScreen(net.veloclient.velo.client.gui.WorldHostScreen.discover(screen)));
@@ -635,12 +640,27 @@ public final class TitleMenu {
 		MenuKit.icon(context, icon, x + (size - inner) / 2, y + (size - inner) / 2, inner, active ? 0xFFC9C9D1 : 0xFF66666E);
 	}
 
+	/** Clock key of the title screen's emote figure. */
+	private static final Object STORE_CARD_FIGURE = new Object();
+
 	private static void drawStoreCard(DrawContext context, TextRenderer renderer, int x, int y, int w, int h, float hover) {
 		MenuKit.panel(context, x, y, w, h, 8);
 		if (hover > 0.01f) {
 			VeloDraw.strokeRounded(context, x, y, w, h, 8, VeloAnim.lerpArgb(MenuKit.HAIRLINE, MenuKit.accent(), hover));
 		}
 		VeloDraw.fillRounded(context, x + 6, y + 6, h - 12, h - 12, 5, (MenuKit.accent() & 0xFFFFFF) | 0x2E000000);
+		var emotes = net.veloclient.velo.client.emotes.EmoteCatalog.forSale();
+		if (!emotes.isEmpty()) {
+			// a little figure dancing through the emotes on sale, one after the other
+			var emote = emotes.get((int) (System.currentTimeMillis() / 6000 % emotes.size()));
+			context.enableScissor(x + 6, y + 6, x + h - 6, y + h - 6);
+			net.veloclient.velo.client.gui.widget.EmoteFigure.draw(context, STORE_CARD_FIGURE, emote.id(), x + h / 2f, y + h - 7, (h - 14) / 34f,
+					emote.accent());
+			context.disableScissor();
+			MenuKit.text(context, renderer, MenuKit.mono("NEW: EMOTES"), x + h + 2, y + 8, 0xFFBCA6FF);
+			MenuKit.text(context, renderer, MenuKit.fit(renderer, MenuKit.uiBold(emote.name() + " and more"), w - h - 8), x + h + 2, y + 18, MenuKit.TEXT);
+			return;
+		}
 		MenuKit.icon(context, "store", x + 6 + (h - 12 - 12) / 2, y + 6 + (h - 12 - 12) / 2, 12, MenuKit.accentText());
 		MenuKit.text(context, renderer, MenuKit.mono("NEW IN STORE"), x + h + 2, y + 8, 0xFFBCA6FF);
 		String featured = net.veloclient.velo.client.cosmetics.wings.WingsManager.featured().map(c -> c.name() + " collection").orElse("Wings, capes and auras");

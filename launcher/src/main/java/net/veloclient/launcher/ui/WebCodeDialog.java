@@ -66,7 +66,8 @@ public final class WebCodeDialog {
 		}));
 		countdown.setCycleCount(Timeline.INDEFINITE);
 		countdown.play();
-		dialog.setOnHidden(e -> {
+		// An extra handler: DialogStyling's own setOnHidden removes the dimmed backdrop and must not be replaced.
+		dialog.addEventHandler(javafx.scene.control.DialogEvent.DIALOG_HIDDEN, e -> {
 			countdown.stop();
 			if (open == dialog) {
 				open = null;

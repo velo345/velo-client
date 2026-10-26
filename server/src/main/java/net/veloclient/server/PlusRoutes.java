@@ -40,6 +40,9 @@ final class PlusRoutes {
 			Map<String, Object> out = new java.util.LinkedHashMap<>(Map.of("plus", store.isPlus(s.uuid()), "until", store.plusUntil(s.uuid()),
 					"price", plus.price, "currency", store.config().currency, "monthlyCoins", plus.monthlyCoins, "periodDays", plus.periodDays,
 					"checkoutEnabled", store.checkoutEnabled()));
+			out.put("trialDays", plus.trialDays);
+			out.put("yearlyPrice", plus.yearlyPrice);
+			out.put("trialAvailable", store.trialAvailable(s.uuid()));
 			// Only the players who have them hear about the Addons at all.
 			if (store.hasAddons(s.uuid())) {
 				out.put("addons", true);
@@ -47,7 +50,22 @@ final class PlusRoutes {
 			}
 			JsonHttp.writeJson(ex, 200, out);
 		});
-		route(server, registry, "/v1/plus/checkout", "POST", (ex, s) -> JsonHttp.writeJson(ex, 200, store.plusCheckout(s.uuid(), s.username())));
+		route(server, registry, "/v1/plus/trial", "POST", (ex, s) -> {
+			long until = store.startTrial(s.uuid(), s.username());
+			JsonHttp.writeJson(ex, 200, Map.of("plus", true, "until", until));
+		});
+		route(server, registry, "/v1/plus/checkout", "POST", (ex, s) -> {
+			// {"period": "year"} for the yearly plan; anything else (or no body) is monthly.
+			String body = new String(JsonHttp.readRawBody(ex, 4096), java.nio.charset.StandardCharsets.UTF_8);
+			boolean yearly = false;
+			try {
+				var json = com.google.gson.JsonParser.parseString(body.isBlank() ? "{}" : body).getAsJsonObject();
+				yearly = json.has("period") && "year".equals(json.get("period").getAsString());
+			} catch (RuntimeException ignored) {
+				// not JSON: monthly
+			}
+			JsonHttp.writeJson(ex, 200, store.plusCheckout(s.uuid(), s.username(), yearly));
+		});
 		route(server, registry, "/v1/plus/token", "GET", (ex, s) -> {
 			boolean plusMember = store.isPlus(s.uuid());
 			boolean addonAccess = store.hasAddons(s.uuid());

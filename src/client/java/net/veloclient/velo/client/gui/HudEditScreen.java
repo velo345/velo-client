@@ -307,7 +307,8 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 		// Top centre unless HUD elements live there (boss bar, coordinates...); then above the hotbar,
 		// then the first free strip from the top down. Kept while it stays free, so it doesn't jump around.
 		if (dragging == null && resizing == null && (toolbarY < 0 || toolbarCovers(x, toolbarY, w, h))) {
-			int[] candidates = {8, this.height - h - 64};
+			// Redstone Mode keeps its own toolbar at the top centre: start lower there.
+			int[] candidates = redstone() ? new int[] {this.height / 2 - h / 2 + 40, this.height - h - 64, 8} : new int[] {8, this.height - h - 64};
 			toolbarY = -1;
 			for (int c : candidates) {
 				if (!toolbarCovers(x, c, w, h)) {

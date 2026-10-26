@@ -1,0 +1,128 @@
+{
+ "emotes": [
+  {
+   "id": "wave",
+   "name": "Wave"
+  },
+  {
+   "id": "cheer",
+   "name": "Cheer"
+  },
+  {
+   "id": "shrug",
+   "name": "Shrug"
+  },
+  {
+   "id": "bow",
+   "name": "Bow"
+  },
+  {
+   "id": "no_no",
+   "name": "No No"
+  },
+  {
+   "id": "flex",
+   "name": "Flex"
+  },
+  {
+   "id": "heart",
+   "name": "Heart"
+  },
+  {
+   "id": "facepalm",
+   "name": "Facepalm"
+  },
+  {
+   "id": "victory",
+   "name": "Victory"
+  },
+  {
+   "id": "rage",
+   "name": "Rage"
+  },
+  {
+   "id": "thunder",
+   "name": "Thunder Slam"
+  },
+  {
+   "id": "backflip",
+   "name": "Backflip"
+  },
+  {
+   "id": "goal",
+   "name": "Goal!"
+  },
+  {
+   "id": "airhorn",
+   "name": "Air Horn"
+  },
+  {
+   "id": "sip_tea",
+   "name": "Sips Tea"
+  },
+  {
+   "id": "afk",
+   "name": "AFK"
+  },
+  {
+   "id": "l_dance",
+   "name": "Take the L"
+  },
+  {
+   "id": "silly_dance",
+   "name": "Silly Dance"
+  },
+  {
+   "id": "groove",
+   "name": "Groove"
+  },
+  {
+   "id": "shuffle",
+   "name": "Shuffle"
+  },
+  {
+   "id": "ymca",
+   "name": "Y.M.C.A."
+  },
+  {
+   "id": "hip_hop",
+   "name": "Hip Hop"
+  },
+  {
+   "id": "breakdance",
+   "name": "Breakdance"
+  },
+  {
+   "id": "floss",
+   "name": "Floss"
+  },
+  {
+   "id": "griddy",
+   "name": "Griddy"
+  },
+  {
+   "id": "grave_rise",
+   "name": "Grave Rise"
+  },
+  {
+   "id": "trick_or_treat",
+   "name": "Trick or Treat"
+  },
+  {
+   "id": "ghost_party",
+   "name": "Ghost Party"
+  },
+  {
+   "id": "snowball",
+   "name": "Snowball Fight"
+  },
+  {
+   "id": "gift",
+   "name": "Surprise Gift"
+  },
+  {
+   "id": "jingle",
+   "name": "Jingle Jam"
+  }
+ ]
+}

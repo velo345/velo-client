@@ -9,8 +9,9 @@ public final class RmState {
 
 	public enum Tool {
 		SELECT("select", "Select", "Left click corner 1  ·  right click corner 2  ·  Shift+scroll grows the side you look at"),
-		MOVE("move", "Move", "Left / right click the corners  ·  then scroll along an axis to preview the move (Shift+scroll rotates)  ·  left click applies, right click cancels"),
-		STACK("stack", "Stack", "Left / right click the corners  ·  then scroll along an axis to preview copies (X, Y and Z at once)  ·  left click applies, right click cancels"),
+		MOVE("move", "Move", "Left / right click the corners  ·  scroll along an axis to move it (Shift+scroll rotates)  ·  left click applies, right click cancels"),
+		COPY("copy", "Copy", "Left / right click the corners  ·  scroll to slide a copy, left click places it  ·  scroll + left click again for more  ·  left click without scrolling (or right click) finishes"),
+		STACK("stack", "Stack", "Left / right click the corners  ·  scroll along an axis to add copies (X, Y and Z at once)  ·  left click applies, right click cancels"),
 		WIRE("wire", "Redstone Wire", "Aim at the face the wire starts from and left click  ·  right click the target's face  ·  left click again builds"),
 		WATER("water", "Water Wire", "The highlighted cell in front of the face you aim at is where the stream starts (left click) / ends (right click)"
 				+ "  ·  click a stream to join it  ·  left click again builds");
@@ -30,10 +31,13 @@ public final class RmState {
 	public static int[] cornerA;
 	public static int[] cornerB;
 
-	/** Move tool: offset built with the scroll wheel, plus rotation / mirror. */
+	/** Move and Copy tools: offset built with the scroll wheel, plus rotation / mirror. */
 	public static int[] moveOffset = {0, 0, 0};
 	public static int moveRotation;
 	public static boolean moveMirror;
+
+	/** Copy tool: at least one copy was placed from this selection - the next left click without scrolling finishes. */
+	public static boolean copyPlaced;
 
 	/** Stack tool: extra copies per axis {x, y, z} (negative = the other way); several axes make a grid. */
 	public static int[] stack = {0, 0, 0};
@@ -79,6 +83,7 @@ public final class RmState {
 	public static void clearSelection() {
 		cornerA = null;
 		cornerB = null;
+		copyPlaced = false;
 		resetTransforms();
 	}
 

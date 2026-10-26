@@ -58,7 +58,30 @@ final class SessionRegistry {
 	}
 
 	/** {@code nameStyle}: a Velo+ member's animated name (see {@link #normalizeNameStyle}), null for none. */
-	record OnlineUser(String uuid, String username, String capeId, String wingsId, String auraId, boolean plus, String nameStyle) {
+	/** {@code emote}: the emote being played ("id;seq", see {@link #setEmote}), or null. */
+	record OnlineUser(String uuid, String username, String capeId, String wingsId, String auraId, boolean plus, String nameStyle, String emote) {
+	}
+
+	/** An emote someone plays, until it expires (the client keeps sending it while it plays). */
+	private record PlayingEmote(String value, long expiresAtMillis) {
+	}
+
+	private final Map<String, PlayingEmote> emotes = new java.util.concurrent.ConcurrentHashMap<>();
+	/** How long an emote stays listed after the last heartbeat that carried it. */
+	private static final long EMOTE_TTL_MILLIS = 12_000;
+
+	/** Records (or clears, with null) the emote a player is playing; anything not "id;seq" is dropped. */
+	void setEmote(String uuid, String value) {
+		if (value == null || !value.matches("[a-z0-9_]{1,32};[0-9]{1,6}")) {
+			emotes.remove(uuid);
+			return;
+		}
+		emotes.put(uuid, new PlayingEmote(value, System.currentTimeMillis() + EMOTE_TTL_MILLIS));
+	}
+
+	private String emoteOf(String uuid, long now) {
+		PlayingEmote e = emotes.get(uuid);
+		return e == null || e.expiresAtMillis() < now ? null : e.value();
 	}
 
 	/** Called with a uuid whenever one of its sessions ends or expires - drives friends' presence updates. */
@@ -282,7 +305,7 @@ final class SessionRegistry {
 		return sessionsByToken.values().stream()
 				.filter(s -> s.expiresAtMillis() >= now && s.kind().equals(KIND_GAME))
 				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId(), s.auraId(), plusLookup.test(s.uuid()) && !plusHidden.contains(s.uuid()),
-						plusLookup.test(s.uuid()) ? s.nameStyle() : null))
+						plusLookup.test(s.uuid()) ? s.nameStyle() : null, emoteOf(s.uuid(), now)))
 				.toList();
 	}
 

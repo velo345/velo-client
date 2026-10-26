@@ -76,6 +76,18 @@ final class StatsService {
 		return LocalDate.now(ZoneOffset.UTC).toString();
 	}
 
+	/** When this account first signed in to Velo (0 if unknown). */
+	synchronized long firstSeen(String uuid) {
+		try (PreparedStatement ps = connection.prepareStatement("SELECT first_seen FROM players WHERE uuid = ?")) {
+			ps.setString(1, uuid);
+			try (ResultSet rs = ps.executeQuery()) {
+				return rs.next() ? rs.getLong(1) : 0;
+			}
+		} catch (SQLException e) {
+			return 0;
+		}
+	}
+
 	/** A verified sign-in (game, launcher or web). */
 	synchronized void signedIn(String uuid, String username, String kind) {
 		long now = System.currentTimeMillis();

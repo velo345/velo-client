@@ -77,7 +77,7 @@ final class RmToolSettings {
 					cy += 18;
 				}
 			}
-			case MOVE -> {
+			case MOVE, COPY -> {
 				int[] o = RmState.moveOffset;
 				String move = size == null ? "Select an area first" : "Offset " + o[0] + ", " + o[1] + ", " + o[2]
 						+ (RmState.moveRotation != 0 ? "  ·  " + RmState.moveRotation * 90 + "°" : "") + (RmState.moveMirror ? "  ·  flipped" : "");
@@ -90,7 +90,8 @@ final class RmToolSettings {
 					bx += panel.textButton(context, bx, by, 0, "Rotate", false, () -> RmState.moveRotation = (RmState.moveRotation + 1) % 4) + 4;
 					bx += panel.textButton(context, bx, by, 0, "Flip", false, () -> RmState.moveMirror = !RmState.moveMirror) + 4;
 					bx += panel.textButton(context, bx, by, 0, "Reset", false, RmState::resetTransforms) + 4;
-					panel.textButton(context, bx, by, 0, "Apply", true, RmOps::applyMove);
+					panel.textButton(context, bx, by, 0, RmState.tool == RmState.Tool.COPY ? "Place" : "Apply", true,
+							RmState.tool == RmState.Tool.COPY ? RmOps::applyCopy : RmOps::applyMove);
 				});
 				cy += 18;
 			}

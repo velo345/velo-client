@@ -109,6 +109,11 @@ public final class FightTracker {
 		return opponentId != Integer.MIN_VALUE;
 	}
 
+	/** Entity id of the player you're fighting ({@code Integer.MIN_VALUE} outside a fight). */
+	public static synchronized int opponentId() {
+		return opponentId;
+	}
+
 	private static synchronized void onHit(LivingEntity target, boolean ownHit, boolean crit) {
 		// Teammates (an accidental hit), NPCs and bots don't start or feed a fight.
 		if (!ownHit || !PvpCompat.isOpponent(target)) {

@@ -15,6 +15,23 @@ final class PanelRoutes {
 	private PanelRoutes() {
 	}
 
+	/** TikTok / YouTube Shorts tracking: GET the numbers, POST {"url"} to track, {"remove": key} to stop, {"refresh": true} to measure now. */
+	static void registerSocials(HttpServer server, SocialStatsService socials, String adminToken) {
+		admin(server, adminToken, "/v1/admin/panel/socials", ex -> JsonHttp.writeJson(ex, 200, socials.summary()), "GET");
+		admin(server, adminToken, "/v1/admin/panel/socials/edit", ex -> {
+			var body = com.google.gson.JsonParser.parseString(new String(JsonHttp.readRawBody(ex, 8192), java.nio.charset.StandardCharsets.UTF_8))
+					.getAsJsonObject();
+			if (body.has("remove")) {
+				JsonHttp.writeJson(ex, 200, socials.remove(body.get("remove").getAsString()));
+			} else if (body.has("refresh")) {
+				socials.refreshSoon();
+				JsonHttp.writeJson(ex, 200, socials.summary());
+			} else {
+				JsonHttp.writeJson(ex, 200, socials.add(body.has("url") ? body.get("url").getAsString() : null));
+			}
+		}, "POST");
+	}
+
 	static void register(HttpServer server, SessionRegistry registry, StatsService stats, net.veloclient.server.store.StoreService store, String adminToken) {
 		admin(server, adminToken, "/v1/admin/panel/stats", ex -> {
 			Map<String, String> q = StoreRoutes.query(ex);
@@ -51,7 +68,11 @@ final class PanelRoutes {
 	}
 
 	private static void admin(HttpServer server, String adminToken, String path, Handler handler) {
-		server.createContext(path, exchange -> VeloServerApp.handle(exchange, "GET", ex -> {
+		admin(server, adminToken, path, handler, "GET");
+	}
+
+	private static void admin(HttpServer server, String adminToken, String path, Handler handler, String method) {
+		server.createContext(path, exchange -> VeloServerApp.handle(exchange, method, ex -> {
 			String header = ex.getRequestHeaders().getFirst("X-Velo-Admin-Token");
 			if (adminToken == null || header == null || !java.security.MessageDigest.isEqual(
 					adminToken.getBytes(java.nio.charset.StandardCharsets.UTF_8), header.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {

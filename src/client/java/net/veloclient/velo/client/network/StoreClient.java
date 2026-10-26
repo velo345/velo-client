@@ -51,6 +51,9 @@ public final class StoreClient {
 	private static volatile long plusUntil;
 	private static volatile double plusPrice = 9.99;
 	private static volatile int plusMonthlyCoins = 2000;
+	private static volatile boolean plusTrialAvailable;
+	private static volatile int plusTrialDays = 7;
+	private static volatile double plusYearlyPrice;
 	private static volatile String currency = "EUR";
 	private static volatile List<CoinPack> packs = List.of();
 	private static volatile boolean checkoutEnabled;
@@ -91,6 +94,20 @@ public final class StoreClient {
 	/** What Velo+ costs per month (in the store's currency) and the Velo Coins it includes every month. */
 	public static double plusPrice() {
 		return plusPrice;
+	}
+
+	/** Whether this account can still start the free Velo+ trial (it never had Velo+). */
+	public static boolean plusTrialAvailable() {
+		return plusTrialAvailable;
+	}
+
+	/** The yearly Velo+ price (0 = no yearly plan). */
+	public static double plusYearlyPrice() {
+		return plusYearlyPrice;
+	}
+
+	public static int plusTrialDays() {
+		return plusTrialDays;
 	}
 
 	public static int plusMonthlyCoins() {
@@ -174,6 +191,9 @@ public final class StoreClient {
 				JsonObject status = get("/v1/plus/status");
 				plusPrice = status.get("price").getAsDouble();
 				plusMonthlyCoins = status.get("monthlyCoins").getAsInt();
+				plusTrialAvailable = status.has("trialAvailable") && status.get("trialAvailable").getAsBoolean();
+				plusTrialDays = status.has("trialDays") ? status.get("trialDays").getAsInt() : 7;
+				plusYearlyPrice = status.has("yearlyPrice") ? status.get("yearlyPrice").getAsDouble() : 0;
 			} catch (Exception ignored) {
 				// An older server: the defaults stay.
 			}
@@ -277,9 +297,26 @@ public final class StoreClient {
 		async(() -> post("/v1/admin/store/plus", body), onOk, onError);
 	}
 
+	/** Starts the free Velo+ trial; {@code onOk} runs once it's on (the store refreshes). */
+	public static void plusTrial(Runnable onOk, Consumer<String> onError) {
+		async(() -> post("/v1/plus/trial", new JsonObject()), r -> {
+			plusTrialAvailable = false;
+			refresh(true, onOk);
+		}, onError);
+	}
+
 	/** Starts the Velo+ subscription checkout; {@code onUrl} gets the payment page. */
 	public static void plusCheckout(Consumer<String> onUrl, Consumer<String> onError) {
-		async(() -> post("/v1/plus/checkout", new JsonObject()), r -> onUrl.accept(r.get("checkoutUrl").getAsString()), onError);
+		plusCheckout(false, onUrl, onError);
+	}
+
+	/** Like {@link #plusCheckout(Consumer, Consumer)}, for the yearly plan when {@code yearly}. */
+	public static void plusCheckout(boolean yearly, Consumer<String> onUrl, Consumer<String> onError) {
+		JsonObject body = new JsonObject();
+		if (yearly) {
+			body.addProperty("period", "year");
+		}
+		async(() -> post("/v1/plus/checkout", body), r -> onUrl.accept(r.get("checkoutUrl").getAsString()), onError);
 	}
 
 	/** A code to type as {@code /link <code>} in the Velo Discord (unlocks the Velo Neon cape). */

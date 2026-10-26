@@ -54,7 +54,7 @@ public final class ClientImportView {
 	private static final List<Brand> BRANDS = List.of(
 			new Brand("Minecraft Launcher", "minecraft", "M", "#5ba33b"),
 			new Brand("Lunar Client", "lunar", "L", "#6c74ff"),
-			new Brand("Feather Client", "feather", "F", "#2fb7f5"),
+			new Brand("Dawn Client", "dawn", "D", "#ff8a1f"),
 			new Brand("NoRisk Client", "norisk", "N", "#ef4a52"),
 			new Brand("Modrinth App", "modrinth", "M", "#1bd96a"),
 			new Brand("Prism / MultiMC", "prism", "P", "#b07cff"),

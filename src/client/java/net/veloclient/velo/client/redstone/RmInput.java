@@ -18,7 +18,11 @@ import net.veloclient.velo.client.util.Keys;
  *   look at.</li>
  *   <li>Move - look along an axis and scroll: forward moves the selection that way, backward
  *   towards you; Shift+scroll rotates; left click / Enter applies, right click resets.</li>
+ *   <li>Copy - the same scrolling slides a duplicate; left click places it and the selection follows onto it, so the
+ *   next scroll places another one.</li>
  *   <li>Stack - the same scrolling adds copies (backward = the other way); left click applies.</li>
+ *   <li>Move / Copy / Stack: right click with a preview out cancels and drops the selection, so scrolling goes back to the
+ *   hotbar; applying a move or stack drops it too.</li>
  *   <li>Wire / Water - left click the start, right click the end, left click again builds.</li>
  *   <li>Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+Z / Ctrl+Y, Delete erases, Backspace clears / cancels.</li>
  * </ul>
@@ -50,7 +54,7 @@ public final class RmInput {
 		RedstoneMode.tickSlot();
 		if (!RedstoneMode.active()) {
 			RmKeys.drain(RmKeys.CURSOR, RmKeys.FREEZE, RmKeys.HIDE, RmKeys.RECORD, RmKeys.CANCEL_JOB, RmKeys.TOOL_SELECT, RmKeys.TOOL_MOVE,
-					RmKeys.TOOL_STACK, RmKeys.TOOL_WIRE, RmKeys.TOOL_WATER, RmKeys.STEP, RmKeys.BACK, RmKeys.PLAY, RmKeys.REWIND);
+					RmKeys.TOOL_COPY, RmKeys.TOOL_STACK, RmKeys.TOOL_WIRE, RmKeys.TOOL_WATER, RmKeys.STEP, RmKeys.BACK, RmKeys.PLAY, RmKeys.REWIND);
 			return;
 		}
 		RmAnalysis.tick();
@@ -88,6 +92,7 @@ public final class RmInput {
 		}
 		toolKey(RmKeys.TOOL_SELECT, RmState.Tool.SELECT);
 		toolKey(RmKeys.TOOL_MOVE, RmState.Tool.MOVE);
+		toolKey(RmKeys.TOOL_COPY, RmState.Tool.COPY);
 		toolKey(RmKeys.TOOL_STACK, RmState.Tool.STACK);
 		toolKey(RmKeys.TOOL_WIRE, RmState.Tool.WIRE);
 		toolKey(RmKeys.TOOL_WATER, RmState.Tool.WATER);
@@ -190,6 +195,7 @@ public final class RmInput {
 		}
 		switch (RmState.tool) {
 			case MOVE -> RmOps.applyMove();
+			case COPY -> RmOps.applyCopy();
 			case STACK -> RmOps.applyStack();
 			case WIRE, WATER -> Wiring.build();
 			default -> {
@@ -237,11 +243,14 @@ public final class RmInput {
 					RmState.resetTransforms();
 				}
 			}
-			case MOVE, STACK -> {
+			case MOVE, COPY, STACK -> {
 				// Select first (left/right click the corners, as often as you like); once you've scrolled a
-				// preview out, left click applies it.
+				// preview out, left click applies it. Copy: a second left click without scrolling finishes.
 				if (RmState.moveActive() || RmState.stackCopies() != 0) {
 					confirm();
+				} else if (RmState.tool == RmState.Tool.COPY && RmState.copyPlaced) {
+					RmState.clearSelection();
+					RmState.info("Copying done");
 				} else {
 					int[] look = RmWorld.lookedBlock(256);
 					if (look != null) {
@@ -300,11 +309,13 @@ public final class RmInput {
 					RmState.resetTransforms();
 				}
 			}
-			case MOVE, STACK -> {
-				// Right click: cancel the preview - or, with none, set the second corner.
-				if (RmState.moveActive() || RmState.stackCopies() != 0) {
-					RmState.resetTransforms();
-					RmState.info("Cancelled");
+			case MOVE, COPY, STACK -> {
+				// Right click: cancel the preview and drop the selection (scrolling goes back to the hotbar) - or, with
+				// no preview out, set the second corner.
+				if (RmState.moveActive() || RmState.stackCopies() != 0 || RmState.tool == RmState.Tool.COPY && RmState.copyPlaced) {
+					boolean done = RmState.copyPlaced && !RmState.moveActive();
+					RmState.clearSelection();
+					RmState.info(done ? "Copying done" : "Cancelled");
 				} else {
 					int[] look = RmWorld.lookedBlock(256);
 					if (look != null) {
@@ -361,7 +372,7 @@ public final class RmInput {
 		}
 		return switch (RmState.tool) {
 			case SELECT -> RmKeys.shift() && RmState.hasSelection();
-			case MOVE, STACK -> RmState.hasSelection();
+			case MOVE, COPY, STACK -> RmState.hasSelection();
 			default -> false;
 		};
 	}
@@ -394,7 +405,7 @@ public final class RmInput {
 		int[] d = RmWorld.faceOffset(face);
 		switch (RmState.tool) {
 			case SELECT -> grow(face, step);
-			case MOVE -> {
+			case MOVE, COPY -> {
 				if (RmKeys.shift()) {
 					RmState.moveRotation = Math.floorMod(RmState.moveRotation + step, 4);
 				} else {

@@ -20,7 +20,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Every cosmetic the clients can show - wings and capes - with its art, so adding one never needs a
+ * Every cosmetic the clients can show - wings, capes, auras and emotes - with its art, so adding one never needs a
  * client update: the clients download the catalog and any art they don't ship with.
  *
  * <p>Stored in {@code cosmetics/catalog.json} in the data directory, the art content-addressed under
@@ -41,8 +41,8 @@ public final class CosmeticsService {
 	public static final String STATUS_TESTING = "testing";
 	public static final String STATUS_HIDDEN = "hidden";
 	private static final Set<String> STATUSES = Set.of(STATUS_RELEASED, STATUS_TESTING, STATUS_HIDDEN);
-	private static final Set<String> TYPES = Set.of("wings", "cape", "aura");
-	private static final Pattern ITEM_ID = Pattern.compile("(wings|cape|aura)_[a-z0-9_-]{1,40}");
+	private static final Set<String> TYPES = Set.of("wings", "cape", "aura", "emote");
+	private static final Pattern ITEM_ID = Pattern.compile("(wings|cape|aura|emote)_[a-z0-9_-]{1,40}");
 	private static final Pattern COLLECTION_ID = Pattern.compile("[a-z0-9_-]{1,40}");
 	private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
 	public static final int MAX_FILE_BYTES = 12 * 1024 * 1024;
@@ -453,14 +453,31 @@ public final class CosmeticsService {
 		if (bytes.length >= 4 && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == '8') {
 			return "image/gif";
 		}
+		if (isEmoteAnimation(bytes)) {
+			return "application/json";
+		}
 		return "application/octet-stream";
 	}
 
-	/** Stores an uploaded file (PNG, GIF or a wing mesh only) and returns its sha256. */
+	/** An emote animation (tools/cosmetics/emotes/import_emotes.py): JSON with "frames" and "fps". */
+	static boolean isEmoteAnimation(byte[] bytes) {
+		if (bytes.length < 2 || bytes[0] != '{' || bytes.length > 4 * 1024 * 1024) {
+			return false;
+		}
+		try {
+			com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8)).getAsJsonObject();
+			return json.has("frames") && json.get("frames").isJsonArray() && json.has("fps");
+		} catch (RuntimeException e) {
+			return false;
+		}
+	}
+
+	/** Stores an uploaded file (PNG, GIF, a wing mesh or an emote animation only) and returns its sha256. */
 	public String storeFile(byte[] bytes) throws IOException, StoreService.StoreException {
 		boolean mesh = bytes.length >= 4 && bytes[0] == 'V' && bytes[1] == 'M' && bytes[2] == 'S' && bytes[3] == 'H';
-		if (bytes.length == 0 || bytes.length > MAX_FILE_BYTES || !mesh && contentType(bytes).startsWith("application/")) {
-			throw new StoreService.StoreException(400, "Only PNG, GIF or .vmesh files up to 12 MB");
+		boolean emote = isEmoteAnimation(bytes);
+		if (bytes.length == 0 || bytes.length > MAX_FILE_BYTES || !mesh && !emote && contentType(bytes).startsWith("application/")) {
+			throw new StoreService.StoreException(400, "Only PNG, GIF, .vmesh or emote animation files up to 12 MB");
 		}
 		String sha;
 		try {
@@ -485,14 +502,15 @@ public final class CosmeticsService {
 	 */
 	public synchronized Item upsert(Item change, boolean clearWindow) throws IOException, StoreService.StoreException {
 		if (change == null || change.id == null || !ITEM_ID.matcher(change.id).matches()) {
-			throw new StoreService.StoreException(400, "Item ids look like wings_<name>, cape_<name> or aura_<name> (lowercase, digits, _ or -)");
+			throw new StoreService.StoreException(400, "Item ids look like wings_<name>, cape_<name>, aura_<name> or emote_<name> (lowercase, digits, _ or -)");
 		}
 		Item item = find(change.id);
 		boolean created = item == null;
 		if (created) {
 			item = new Item();
 			item.id = change.id;
-			item.type = change.id.startsWith("wings_") ? "wings" : change.id.startsWith("aura_") ? "aura" : "cape";
+			item.type = change.id.startsWith("wings_") ? "wings" : change.id.startsWith("aura_") ? "aura"
+					: change.id.startsWith("emote_") ? "emote" : "cape";
 			item.name = change.id;
 			item.description = "";
 			item.status = STATUS_TESTING;
@@ -500,7 +518,7 @@ public final class CosmeticsService {
 			item.addedAt = System.currentTimeMillis();
 		}
 		if (change.type != null && !TYPES.contains(change.type)) {
-			throw new StoreService.StoreException(400, "type is wings, cape or aura");
+			throw new StoreService.StoreException(400, "type is wings, cape, aura or emote");
 		}
 		if (change.status != null) {
 			if (!STATUSES.contains(change.status)) {
@@ -573,7 +591,8 @@ public final class CosmeticsService {
 			item.files.putAll(change.files);
 		}
 		// Auras are drawn by code in the clients - no files.
-		List<String> required = "wings".equals(item.type) ? List.of("mesh", "texture") : "cape".equals(item.type) ? List.of("gif") : List.of();
+		List<String> required = "wings".equals(item.type) ? List.of("mesh", "texture") : "cape".equals(item.type) ? List.of("gif")
+				: "emote".equals(item.type) ? List.of("anim") : List.of();
 		for (String role : required) {
 			if (!item.files.containsKey(role)) {
 				throw new StoreService.StoreException(400, "A " + item.type + " item needs its " + role + " file");

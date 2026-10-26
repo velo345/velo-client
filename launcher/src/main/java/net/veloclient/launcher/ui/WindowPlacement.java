@@ -16,7 +16,9 @@ import java.nio.file.Path;
  * screen - on multi-monitor setups (notably KDE) that's often not the monitor you use, so the
  * launcher kept appearing off to the side. Now: the last position/size is remembered and
  * restored if that spot is still on a connected monitor; otherwise (first start, monitor
- * unplugged) it opens centered on the monitor the mouse is on.
+ * unplugged) it opens centered on the monitor the mouse is on, at about 80% of it.
+ * It always opens windowed - a launcher that remembered being maximized (dragging it to the top
+ * does that) kept opening full screen, where the edges don't resize.
  */
 public final class WindowPlacement {
 
@@ -35,20 +37,16 @@ public final class WindowPlacement {
 	/** Call before {@code stage.show()}. */
 	public static void restore(Stage stage, double defaultWidth, double defaultHeight, WindowChrome chrome) {
 		Saved saved = read();
-		if (saved != null && mostlyVisible(saved)) {
-			if (saved.maximized() && chrome != null) {
-				chrome.startMaximized(new Rectangle2D(saved.x(), saved.y(), saved.width(), saved.height()));
-			} else {
-				stage.setX(saved.x());
-				stage.setY(saved.y());
-				stage.setWidth(saved.width());
-				stage.setHeight(saved.height());
-				stage.setMaximized(saved.maximized());
-			}
+		if (saved != null && mostlyVisible(saved) && !fillsScreen(saved)) {
+			stage.setX(saved.x());
+			stage.setY(saved.y());
+			stage.setWidth(saved.width());
+			stage.setHeight(saved.height());
 		} else {
 			Rectangle2D bounds = screenUnderMouse().getVisualBounds();
-			double width = Math.min(defaultWidth, bounds.getWidth() - 40);
-			double height = Math.min(defaultHeight, bounds.getHeight() - 40);
+			// Large but clearly a window: ~80% of the monitor, never smaller than the default size.
+			double width = Math.min(Math.max(defaultWidth, bounds.getWidth() * 0.8), bounds.getWidth() - 80);
+			double height = Math.min(Math.max(defaultHeight, bounds.getHeight() * 0.82), bounds.getHeight() - 60);
 			stage.setWidth(width);
 			stage.setHeight(height);
 			stage.setX(bounds.getMinX() + (bounds.getWidth() - width) / 2);
@@ -82,6 +80,17 @@ public final class WindowPlacement {
 		} catch (Exception e) {
 			return null;
 		}
+	}
+
+	/** Covers (almost) a whole monitor - window managers treat such a window as maximized, so it opens at the default instead. */
+	private static boolean fillsScreen(Saved saved) {
+		for (Screen screen : Screen.getScreens()) {
+			Rectangle2D b = screen.getVisualBounds();
+			if (saved.width() >= b.getWidth() * 0.96 && saved.height() >= b.getHeight() * 0.94) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static boolean mostlyVisible(Saved saved) {

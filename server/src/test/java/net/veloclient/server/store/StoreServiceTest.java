@@ -57,6 +57,24 @@ class StoreServiceTest {
 	}
 
 	@Test
+	void yearlyVeloPlusGrantsAYearAndRenewsAYear() throws Exception {
+		JsonObject paid = json("{\"id\":\"evt-y1\",\"type\":\"payment.completed\",\"subject\":{\"transaction_id\":\"tbx-y1\","
+				+ "\"recurring_payment_reference\":\"sub-y1\",\"price_paid\":{\"amount\":99.99,\"currency\":\"EUR\"},"
+				+ "\"products\":[{\"custom\":{\"velo_plus\":true,\"velo_uuid\":\"" + ME + "\",\"velo_plus_period\":\"year\"}}]}}");
+		store.tebexWebhook(paid);
+		long left = store.plusUntil(ME) - System.currentTimeMillis();
+		assertTrue(left > 364L * 86_400_000L && left <= 365L * 86_400_000L, "a year");
+		store.tebexWebhook(json("{\"id\":\"evt-y2\",\"type\":\"payment.completed\",\"subject\":{\"transaction_id\":\"tbx-y1-dup\","
+				+ "\"products\":[{\"custom\":{\"velo_plus\":true,\"velo_uuid\":\"" + ME + "\",\"velo_plus_period\":\"year\"}}]}}"));
+		assertTrue(store.plusUntil(ME) - System.currentTimeMillis() <= 365L * 86_400_000L, "a duplicate report adds nothing");
+		db.endPlus(ME);
+		store.loadPlus();
+		store.tebexWebhook(json("{\"id\":\"evt-y3\",\"type\":\"recurring-payment.renewed\",\"subject\":{\"reference\":\"sub-y1\"}}"));
+		left = store.plusUntil(ME) - System.currentTimeMillis();
+		assertTrue(left > 364L * 86_400_000L, "the renewal of a yearly plan is a year again");
+	}
+
+	@Test
 	void paidOrderIsCreditedExactlyOnceAndRefundTakesItBack() throws Exception {
 		StoreConfig.CoinPack pack = new StoreConfig().pack("coins_2500");
 		db.createOrder("vo_1", ME, pack, "EUR");

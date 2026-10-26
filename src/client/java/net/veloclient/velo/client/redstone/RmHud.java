@@ -617,7 +617,16 @@ public final class RmHud {
 
 	// ---- schematics (left) ----
 
+	/**
+	 * The loaded schematics as cards: a row each (name, size, show / remove), and the open one split into three labelled
+	 * sections - Position, Show, Build - with segmented controls instead of a wall of same-looking buttons. While one
+	 * still follows the crosshair the card says what to do with it.
+	 */
 	private static final class SchematicsPanel extends Panel {
+		private static final int SECTION = 0xFF8C8C9A;
+		private static final int CARD = 0xFF1C1C24;
+		private static final int CARD_OPEN = 0xFF24242E;
+
 		SchematicsPanel() {
 			super("rm-schematics", "Redstone: Schematics", 0.01f, 0.32f);
 		}
@@ -630,120 +639,197 @@ public final class RmHud {
 		@Override
 		void draw(DrawContext context, int x, int y) {
 			var textRenderer = MinecraftClient.getInstance().textRenderer;
-			width = 190;
+			width = 204;
+			int inner = width - 16;
 			List<Placements.Placement> list = Placements.all();
 			Placements.Placement selected = Placements.selected();
-			List<Runnable> draw = new ArrayList<>();
-			int cy = y + 8;
-			int top = y;
-			draw.add(() -> drawIcon(context, "layers", x + 8, top + 7, 14, ACCENT));
-			draw.add(() -> context.drawTextWithShadow(textRenderer, "Schematics", x + 26, top + 10, TEXT));
-			cy += 18;
-			for (Placements.Placement p : list) {
-				int ry = cy;
-				boolean isSelected = p == selected;
-				draw.add(() -> {
-					if (isSelected) {
-						VeloDraw.fillRounded(context, x + 4, ry - 2, width - 8, 18, 4, 0x40FF4D4D);
-					}
-					context.drawTextWithShadow(textRenderer, VeloUi.trim(p.name, width - 76), x + 8, ry + 3, p.visible ? TEXT : MUTED);
-					iconButton(context, x + width - 62, ry, 14, p.visible ? "view" : "hidden", false, p.visible ? "Hide" : "Show",
-							() -> p.visible = !p.visible);
-					iconButton(context, x + width - 44, ry, 14, p.locked ? "lock" : "unlock", false, p.locked ? "Locked in place" : "Lock here",
-							() -> p.locked = true);
-					iconButton(context, x + width - 26, ry, 14, "close", false, "Remove", () -> Placements.remove(p));
-					hit(x + 4, ry - 2, width - 72, 18, () -> Placements.select(p), null);
-				});
-				cy += 20;
+			if (selected == null || !list.contains(selected)) {
+				selected = list.get(list.size() - 1);
+				Placements.select(selected);
 			}
-			if (selected != null) {
-				cy += 4;
-				Clip v = selected.view();
-				int infoY = cy;
-				String info = v.sx + " x " + v.sy + " x " + v.sz + "  ·  " + v.solidCount() + " blocks"
-						+ (v.entities.isEmpty() ? "" : " · " + v.entities.size() + " entities");
-				draw.add(() -> context.drawTextWithShadow(textRenderer, VeloUi.trim(info, width - 16), x + 8, infoY, MUTED));
-				cy += 14;
-				int inner = width - 16;
-				int rowY = cy;
-				draw.add(() -> settingRow(context, x + 8, rowY, inner, "Layers", switch (selected.layerMode) {
-					case ALL -> "All";
-					case SINGLE -> "Single";
-					case RANGE -> "Range";
-				}, () -> selected.layerMode = Placements.LayerMode.values()[(selected.layerMode.ordinal() + 1) % 3]));
+			Placements.Placement open = selected;
+			List<Runnable> draw = new ArrayList<>();
+			int top = y;
+			// Header: title, count, load
+			draw.add(() -> {
+				drawIcon(context, "layers", x + 8, top + 7, 14, ACCENT);
+				context.drawTextWithShadow(textRenderer, "Schematics", x + 26, top + 10, TEXT);
+				String count = String.valueOf(list.size());
+				int cx = x + 30 + textRenderer.getWidth("Schematics");
+				VeloDraw.fillRounded(context, cx, top + 8, textRenderer.getWidth(count) + 8, 12, 6, 0xFF33333F);
+				context.drawTextWithShadow(textRenderer, count, cx + 4, top + 10, MUTED);
+				textButton(context, x + width - 54, top + 7, 46, "+ Load", false,
+						() -> MinecraftClient.getInstance().setScreen(new SchematicPickScreen(null)));
+			});
+			int cy = y + 28;
+			for (Placements.Placement p : list) {
+				boolean isOpen = p == open;
+				int ry = cy;
+				Clip v = p.view();
+				String sub = !p.locked ? "Placing - follows your aim" : v.sx + "×" + v.sy + "×" + v.sz + "  ·  " + String.format(Locale.ROOT, "%,d", v.solidCount()) + " blocks";
+				draw.add(() -> {
+					VeloDraw.fillRounded(context, x + 6, ry, width - 12, 28, 6, isOpen ? CARD_OPEN : CARD);
+					if (isOpen) {
+						context.fill(x + 6, ry + 6, x + 8, ry + 22, ACCENT);
+					}
+					context.drawTextWithShadow(textRenderer, VeloUi.trim(p.name.replaceAll("\\.(litematic|veloschem)$", ""), width - 70), x + 14, ry + 5,
+							p.visible ? TEXT : MUTED);
+					context.drawTextWithShadow(textRenderer, VeloUi.trim(sub, width - 70), x + 14, ry + 16, !p.locked ? 0xFFFFD84A : MUTED);
+					iconButton(context, x + width - 46, ry + 7, 14, p.visible ? "view" : "hidden", false, p.visible ? "Hide" : "Show",
+							() -> p.visible = !p.visible);
+					iconButton(context, x + width - 28, ry + 7, 14, "close", false, "Remove", () -> Placements.remove(p));
+					hit(x + 6, ry, width - 56, 28, () -> Placements.select(p), null);
+				});
+				cy += 31;
+				if (!isOpen) {
+					continue;
+				}
+				if (!p.locked) {
+					List<String> help = VeloUi.wrap("Aim where it goes  ·  left click locks it  ·  Shift+scroll rotates  ·  right click cancels", inner - 4);
+					for (String line : help) {
+						int ly = cy;
+						draw.add(() -> context.drawTextWithShadow(textRenderer, line, x + 10, ly, 0xFFFFD84A));
+						cy += 10;
+					}
+					cy += 6;
+					continue;
+				}
+				// Position
+				cy = section(draw, context, x, cy, "POSITION");
+				int posY = cy;
+				draw.add(() -> {
+					int bw = (inner - 6) / 4;
+					int bx = x + 8;
+					labelButton(context, bx, posY, bw, "move", "Pick up", "Follows your aim again - left click puts it down", () -> {
+						for (Placements.Placement other : Placements.all()) {
+							other.locked = true;
+						}
+						p.locked = false;
+					});
+					labelButton(context, bx + bw + 2, posY, bw, "back", "To me", "Lower corner to where you stand", () -> {
+						p.moveToFeet();
+						RmState.info("Moved to where you stand");
+					});
+					labelButton(context, bx + (bw + 2) * 2, posY, bw, "rotate", "Rotate", "Turn 90°", () -> p.rotation = (p.rotation + 1) % 4);
+					labelButton(context, bx + (bw + 2) * 3, posY, bw, "flip", "Flip", "Mirror it", () -> p.mirror = !p.mirror);
+				});
+				cy += 30;
+				// Show
+				cy = section(draw, context, x, cy, "SHOW");
+				int layerY = cy;
+				draw.add(() -> segmented(context, x + 8, layerY, inner, new String[] {"All", "One layer", "Range"}, p.layerMode.ordinal(),
+						i -> p.layerMode = Placements.LayerMode.values()[i]));
 				cy += 18;
-				if (selected.layerMode != Placements.LayerMode.ALL) {
+				if (p.layerMode != Placements.LayerMode.ALL) {
 					int axisY = cy;
-					draw.add(() -> settingRow(context, x + 8, axisY, inner, "Axis", String.valueOf(selected.axis).toUpperCase(Locale.ROOT),
-							() -> selected.axis = selected.axis == 'y' ? 'x' : selected.axis == 'x' ? 'z' : 'y'));
-					cy += 18;
-					int layerY = cy;
 					draw.add(() -> {
-						context.drawTextWithShadow(textRenderer, selected.layerMode == Placements.LayerMode.RANGE ? "From" : "Layer", x + 8, layerY + 3, MUTED);
-						feetButton(context, x + width - 112, layerY, () -> selected.layer = selected.layerAtFeet());
-						stepper(context, x + width - 74, layerY, selected.layer, v2 -> selected.layer = Math.max(0, Math.min(selected.layerCount() - 1, v2)));
+						context.drawTextWithShadow(textRenderer, "Axis", x + 8, axisY + 3, MUTED);
+						segmented(context, x + 50, axisY, inner - 42, new String[] {"X", "Y", "Z"}, "xyz".indexOf(p.axis), i -> p.axis = "xyz".charAt(i));
 					});
 					cy += 18;
-					if (selected.layerMode == Placements.LayerMode.RANGE) {
+					int fromY = cy;
+					draw.add(() -> layerRow(context, x + 8, fromY, inner, p.layerMode == Placements.LayerMode.RANGE ? "From" : "Layer", p.layer, p.layerCount(),
+							v2 -> p.layer = Math.max(0, Math.min(p.layerCount() - 1, v2)), () -> p.layer = p.layerAtFeet()));
+					cy += 18;
+					if (p.layerMode == Placements.LayerMode.RANGE) {
 						int toY = cy;
-						draw.add(() -> {
-							context.drawTextWithShadow(textRenderer, "To", x + 8, toY + 3, MUTED);
-							feetButton(context, x + width - 112, toY, () -> selected.layerTo = selected.layerAtFeet());
-							stepper(context, x + width - 74, toY, selected.layerTo,
-									v2 -> selected.layerTo = Math.max(0, Math.min(selected.layerCount() - 1, v2)));
-						});
+						draw.add(() -> layerRow(context, x + 8, toY, inner, "To", p.layerTo, p.layerCount(),
+								v2 -> p.layerTo = Math.max(0, Math.min(p.layerCount() - 1, v2)), () -> p.layerTo = p.layerAtFeet()));
 						cy += 18;
 					}
 				}
-				int placeY = cy;
+				int lookY = cy;
+				draw.add(() -> segmented(context, x + 8, lookY, inner, new String[] {"Blocks", "Outline only"}, p.outlineOnly ? 1 : 0,
+						i -> p.outlineOnly = i == 1));
+				cy += 22;
+				// Build
+				cy = section(draw, context, x, cy, "BUILD");
+				int buildY = cy;
+				boolean single = RmWorld.singleplayer();
 				draw.add(() -> {
-					int bx = x + 8;
-					bx += textButton(context, bx, placeY, 0, "Move Here", false, () -> {
-						selected.moveToFeet();
-						RmState.info("Lower corner moved to where you stand");
-					}) + 4;
-					textButton(context, bx, placeY, 0, selected.outlineOnly ? "Show Blocks" : "Outline Only", selected.outlineOnly,
-							() -> selected.outlineOnly = !selected.outlineOnly);
+					int mw = 72;
+					labelButton(context, x + 8, buildY, mw, "materials", "Materials", "What you need to build it",
+							() -> MinecraftClient.getInstance().setScreen(new MaterialListScreen(p)));
+					int px = x + 8 + mw + 4;
+					int pw = inner - mw - 4;
+					boolean hover = hovered(px, buildY, pw, 26);
+					VeloDraw.fillRounded(context, px, buildY, pw, 26, 6, single ? (hover ? 0xFFD04040 : 0xFFB83030) : 0xFF2A2A33);
+					String label = single ? "Paste into world" : "Build by hand";
+					context.drawTextWithShadow(textRenderer, label, px + (pw - textRenderer.getWidth(label)) / 2, buildY + 5, TEXT);
+					String note = single ? "Ctrl+Z undoes it" : "middle click picks blocks";
+					context.drawTextWithShadow(textRenderer, VeloUi.trim(note, pw - 6), px + (pw - Math.min(textRenderer.getWidth(note), pw - 6)) / 2,
+							buildY + 15, single ? 0xFFFFD0D0 : MUTED);
+					hit(px, buildY, pw, 26, () -> {
+						if (RmWorld.singleplayer()) {
+							RmOps.paste(p.view(), p.x, p.y, p.z);
+						} else {
+							RmState.error("Pasting needs singleplayer - build it by hand using the preview (middle click picks blocks)");
+						}
+					}, null);
 				});
-				cy += 18;
-				int buttonsY = cy;
-				draw.add(() -> {
-					int bx = x + 8;
-					bx += textButton(context, bx, buttonsY, 0, "Rotate", false, () -> selected.rotation = (selected.rotation + 1) % 4) + 4;
-					bx += textButton(context, bx, buttonsY, 0, "Flip", false, () -> selected.mirror = !selected.mirror) + 4;
-					textButton(context, bx, buttonsY, 0, "Materials", false, () -> MinecraftClient.getInstance().setScreen(new MaterialListScreen(selected)));
-				});
-				cy += 18;
-				int pasteY = cy;
-				draw.add(() -> textButton(context, x + 8, pasteY, width - 16, RmWorld.singleplayer() ? "Paste into world" : "Paste (singleplayer only)",
-						true, () -> {
-							if (RmWorld.singleplayer()) {
-								RmOps.paste(selected.view(), selected.x, selected.y, selected.z);
-							} else {
-								RmState.error("Pasting needs singleplayer - build it by hand using the preview (middle click picks blocks)");
-							}
-						}));
-				cy += 18;
+				cy += 32;
 			}
-			height = cy - y + 6;
-			VeloDraw.fillRounded(context, x, y, width, height, 7, BG);
+			height = cy - y + 4;
+			VeloDraw.fillRounded(context, x, y, width, height, 8, BG);
 			for (Runnable r : draw) {
 				r.run();
 			}
 		}
 
-		/** Sets a layer to the one you're standing in (along the placement's layer axis). */
-		private void feetButton(DrawContext context, int x, int y, Runnable set) {
-			hit(x, y, 34, 14, set, "Set to the layer at your feet");
-			textButton(context, x, y, 34, "Feet", false, set);
+		/** A small caps section caption with a hairline; returns the y below it. */
+		private int section(List<Runnable> draw, DrawContext context, int x, int y, String label) {
+			var textRenderer = MinecraftClient.getInstance().textRenderer;
+			draw.add(() -> {
+				context.drawTextWithShadow(textRenderer, label, x + 10, y + 2, SECTION);
+				int lx = x + 14 + textRenderer.getWidth(label);
+				context.fill(lx, y + 6, x + width - 10, y + 7, 0x30FFFFFF);
+			});
+			return y + 13;
 		}
 
-		private void stepper(DrawContext context, int x, int y, int value, java.util.function.IntConsumer set) {
+		/** Icon on top, word below - a button that says what it does. */
+		private void labelButton(DrawContext context, int x, int y, int w, String icon, String label, String tooltip, Runnable action) {
 			var textRenderer = MinecraftClient.getInstance().textRenderer;
-			textButton(context, x, y, 18, "-", false, () -> set.accept(value - 1));
-			String text = String.valueOf(value);
-			context.drawTextWithShadow(textRenderer, text, x + 37 - textRenderer.getWidth(text) / 2, y + 3, TEXT);
-			textButton(context, x + 56, y, 18, "+", false, () -> set.accept(value + 1));
+			boolean hover = hovered(x, y, w, 26);
+			VeloDraw.fillRounded(context, x, y, w, 26, 6, hover ? 0xFF3A3A48 : 0xFF2A2A34);
+			drawIcon(context, icon, x + (w - 10) / 2, y + 3, 10, hover ? 0xFFFFFFFF : 0xFFC8C8D4);
+			String t = VeloUi.trim(label, w - 4);
+			context.drawTextWithShadow(textRenderer, t, x + (w - textRenderer.getWidth(t)) / 2, y + 15, hover ? TEXT : 0xFFD8D8E0);
+			hit(x, y, w, 26, action, tooltip);
+		}
+
+		/** Options side by side, the chosen one filled. */
+		private void segmented(DrawContext context, int x, int y, int w, String[] options, int active, java.util.function.IntConsumer pick) {
+			var textRenderer = MinecraftClient.getInstance().textRenderer;
+			VeloDraw.fillRounded(context, x, y, w, 15, 5, 0xFF16161C);
+			int segment = w / options.length;
+			for (int i = 0; i < options.length; i++) {
+				int sx = x + i * segment;
+				int sw = i == options.length - 1 ? w - segment * i : segment;
+				boolean on = i == active;
+				boolean hover = !on && hovered(sx, y, sw, 15);
+				if (on || hover) {
+					VeloDraw.fillRounded(context, sx + 1, y + 1, sw - 2, 13, 4, on ? 0xFFB83030 : 0xFF2C2C36);
+				}
+				String t = VeloUi.trim(options[i], sw - 4);
+				context.drawTextWithShadow(textRenderer, t, sx + (sw - textRenderer.getWidth(t)) / 2, y + 4, on ? TEXT : MUTED);
+				int index = i;
+				hit(sx, y, sw, 15, () -> pick.accept(index), null);
+			}
+		}
+
+		/** "Layer   [me]  [-] 12 / 40 [+]". */
+		private void layerRow(DrawContext context, int x, int y, int w, String label, int value, int count, java.util.function.IntConsumer set,
+				Runnable atFeet) {
+			var textRenderer = MinecraftClient.getInstance().textRenderer;
+			context.drawTextWithShadow(textRenderer, label, x, y + 3, MUTED);
+			int sx = x + w - 92;
+			textButton(context, sx - 30, y, 26, "me", false, atFeet);
+			hit(sx - 30, y, 26, 14, atFeet, "The layer you're standing in");
+			textButton(context, sx, y, 18, "-", false, () -> set.accept(value - 1));
+			String text = (value + 1) + " / " + count;
+			context.drawTextWithShadow(textRenderer, text, sx + 46 - textRenderer.getWidth(text) / 2, y + 3, TEXT);
+			textButton(context, sx + 74, y, 18, "+", false, () -> set.accept(value + 1));
 		}
 	}
 

@@ -367,3 +367,13 @@ dialog::backdrop { background: rgba(4, 4, 6, .7); backdrop-filter: blur(6px); }
 .partner-icon.blank { background: var(--surface-2, #17171d); }
 .value-big { font: 700 30px/1.15 Inter, sans-serif; letter-spacing: -0.02em; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Socials */
+.row .grow { flex: 1; min-width: 220px; }
+.vid { display: flex; align-items: center; gap: 12px; min-width: 280px; }
+.vid img, .vid-ph { width: 64px; height: 36px; flex: none; border-radius: 6px; object-fit: cover; background: rgba(255, 255, 255, .05); display: grid; place-items: center; }
+.vid-ph svg { width: 18px; height: 18px; opacity: .7; }
+.vid a { display: block; max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip svg { width: 14px; height: 14px; }
+.bad { color: #ff7a7e; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; background: rgba(255, 255, 255, .06); font-size: 12.5px; }

@@ -207,9 +207,23 @@ public final class StoreApi {
 		return plusMember;
 	}
 
+	/** Starts the free Velo+ trial (once per account that never had Velo+): {@code plus}, {@code until}. */
+	public static JsonObject plusTrial() throws StoreError {
+		return post("/v1/plus/trial", new JsonObject());
+	}
+
 	/** Starts the Velo+ subscription: {@code checkoutUrl}. */
 	public static JsonObject plusCheckout() throws StoreError {
-		return post("/v1/plus/checkout", new JsonObject());
+		return plusCheckout(false);
+	}
+
+	/** Starts the monthly or (with {@code yearly}) the yearly Velo+ subscription: {@code checkoutUrl}. */
+	public static JsonObject plusCheckout(boolean yearly) throws StoreError {
+		JsonObject body = new JsonObject();
+		if (yearly) {
+			body.addProperty("period", "year");
+		}
+		return post("/v1/plus/checkout", body);
 	}
 
 	/** A signed proof ({@code token}) the game checks offline - Velo+ members and players with Addons access. */
@@ -556,7 +570,7 @@ public final class StoreApi {
 					{"username":"mossy","joinedAt":1759000000000,"playedSeconds":7200,"rewarded":true,"coins":300}],
 					"invitedBy":null,"canRedeem":true,"redeemUntil":null}""";
 			case "/v1/admin/cosmetics" -> adminDemo();
-			case "/v1/plus/status" -> "{\"plus\":false,\"until\":0,\"price\":9.99,\"currency\":\"EUR\",\"monthlyCoins\":2000,\"periodDays\":30,\"checkoutEnabled\":true}";
+			case "/v1/plus/status" -> "{\"plus\":false,\"until\":0,\"price\":9.99,\"currency\":\"EUR\",\"monthlyCoins\":2000,\"periodDays\":30,\"checkoutEnabled\":true,\"trialDays\":7,\"trialAvailable\":true,\"yearlyPrice\":99.99}";
 			case "/v1/store/wallet" -> "{\"balance\":1340,\"owner\":true,\"owned\":[\"wings_bonedragon\",\"wings_cobweb\",\"wings_wraith\",\"wings_phoenix\",\"aura_orbit\",\"aura_ember\",\"aura_void\"]}";
 			default -> """
 					{"onlineMinutes":42,"loginClaimed":false,"loginClaimable":true,"loginCoins":12,"streak":3,"quests":[

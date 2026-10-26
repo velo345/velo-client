@@ -87,6 +87,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		CapeFeatureRenderer.register();
 		net.veloclient.velo.client.cosmetics.render.WingsFeatureRenderer.register();
 		net.veloclient.velo.client.cosmetics.render.AuraFeatureRenderer.register();
+		net.veloclient.velo.client.cosmetics.render.EmoteFxRenderer.register();
 		net.veloclient.velo.client.network.RewardsReporter.register();
 		registerSocialOverlay();
 		net.veloclient.velo.client.social.PartyFollow.register();
@@ -117,6 +118,7 @@ public final class VeloClientMod implements ClientModInitializer {
 			net.veloclient.velo.client.pvp.FightTracker.tick();
 			net.veloclient.velo.client.serverpacks.GameSession.get().tick(net.veloclient.velo.client.modules.hud.ServerOverlaysModule.active());
 			net.veloclient.velo.client.pvp.EnemyTracker.tick();
+			net.veloclient.velo.client.pvp.TotemPopTracker.tick();
 			net.veloclient.velo.client.modules.performance.AntiFarmLagModule.tickAll();
 			net.veloclient.velo.client.modules.pvp.HitColorModule.tickAll();
 			net.veloclient.velo.client.modules.debug.BetterF3Module.tickShortcuts();
@@ -264,6 +266,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new PotionTimersModule());
 		ModuleRegistry.register(new HeldItemModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.TotemCounterModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.TotemPopsModule());
 		ModuleRegistry.register(new KeystrokesModule());
 		ModuleRegistry.register(new MouseButtonsModule());
 		net.veloclient.velo.client.worldmap.WorldMap.register();
@@ -296,6 +299,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.FriendsModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.EmojiChatModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.HideFoliageModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.NoBreakParticlesModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.AntiDeepslateModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.AntiCoordsLeakModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.ContainerAnimationsModule());
@@ -312,6 +316,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		// Cosmetics (section 6.5)
 		ModuleRegistry.register(new CapeCosmeticsModule());
 		ModuleRegistry.register(new KillEffectsModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.cosmetics.EmotesModule());
 		ModuleRegistry.register(new VeloNetworkModule());
 
 		// Performance (section 6.1)

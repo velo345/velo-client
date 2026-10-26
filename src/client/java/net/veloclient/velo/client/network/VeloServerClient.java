@@ -385,6 +385,10 @@ public final class VeloServerClient {
 		if (nameStyle != null) {
 			body.addProperty("nameStyle", nameStyle);
 		}
+		String emote = net.veloclient.velo.client.emotes.Emotes.networkValue();
+		if (emote != null) {
+			body.addProperty("emote", emote);
+		}
 		JsonObject response = postJson(base + "/v1/heartbeat", body);
 		// Older servers don't echo the cape back - treat that as "accepted as sent".
 		if (!response.has("capeId")) {
@@ -405,6 +409,7 @@ public final class VeloServerClient {
 			}
 			JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
 			Map<String, VeloUserRegistry.Entry> entries = new HashMap<>();
+			Map<String, String> emotes = new HashMap<>();
 			for (var element : json.getAsJsonArray("users")) {
 				JsonObject user = element.getAsJsonObject();
 				String uuid = normalizeUuid(user.has("uuid") ? user.get("uuid").getAsString() : null);
@@ -413,12 +418,16 @@ public final class VeloServerClient {
 				String wingsId = user.has("wingsId") && !user.get("wingsId").isJsonNull() ? user.get("wingsId").getAsString() : null;
 				String auraId = user.has("auraId") && !user.get("auraId").isJsonNull() ? user.get("auraId").getAsString() : null;
 				String nameStyle = user.has("nameStyle") && !user.get("nameStyle").isJsonNull() ? user.get("nameStyle").getAsString() : null;
+				if (uuid != null && user.has("emote") && !user.get("emote").isJsonNull()) {
+					emotes.put(uuid, user.get("emote").getAsString());
+				}
 				if (uuid != null && username != null) {
 					boolean plus = user.has("plus") && !user.get("plus").isJsonNull() && user.get("plus").getAsBoolean();
 					entries.put(uuid, new VeloUserRegistry.Entry(username, capeId, wingsId, auraId, plus, nameStyle));
 				}
 			}
 			VeloUserRegistry.replaceAll(entries);
+			net.veloclient.velo.client.emotes.Emotes.onOnline(emotes);
 		} catch (Exception e) {
 			VeloClient.LOGGER.debug("Velo Network online-list poll failed", e);
 		}

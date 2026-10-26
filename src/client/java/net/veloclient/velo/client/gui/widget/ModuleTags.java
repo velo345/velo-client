@@ -33,7 +33,7 @@ public final class ModuleTags {
 	private static final Map<String, String> TAGS = Map.ofEntries(
 			Map.entry("keystrokes", "PvP"), Map.entry("mouse-buttons", "PvP"), Map.entry("armor-durability", "PvP"),
 			Map.entry("potion-timers", "PvP"), Map.entry("target-hud", "PvP"), Map.entry("cooldowns", "PvP"), Map.entry("combo-counter", "PvP"),
-			Map.entry("totem-counter", "Crystal PvP"), Map.entry("pot-counter", "Pot PvP"), Map.entry("arrow-counter", "Bow PvP"),
+			Map.entry("totem-counter", "Crystal PvP"), Map.entry("totem-pops", "Crystal PvP"), Map.entry("emotes", "Style"), Map.entry("pot-counter", "Pot PvP"), Map.entry("arrow-counter", "Bow PvP"),
 			Map.entry("coordinates", "Survival"), Map.entry("minimap", "Survival"), Map.entry("waypoints", "Survival"),
 			Map.entry("world-map", "Survival"), Map.entry("shulker-preview", "Survival"), Map.entry("session-stats", "Everyday"),
 			Map.entry("fps-counter", "Everyday"), Map.entry("ping-display", "Servers"), Map.entry("clock", "Everyday"),
@@ -55,7 +55,7 @@ public final class ModuleTags {
 			Map.entry("hearts", "Look"), Map.entry("hunger", "Look"), Map.entry("armor-bar", "Look"), Map.entry("xp-bar", "Look"),
 			Map.entry("hotbar", "Look"), Map.entry("small-caps", "Look"), Map.entry("block-outline", "Look"),
 			Map.entry("performance-boost", "More FPS"), Map.entry("render-culling", "More FPS"), Map.entry("entity-detail", "More FPS"),
-			Map.entry("particle-limiter", "More FPS"), Map.entry("hide-foliage", "Clear view"), Map.entry("container-animations", "Style"),
+			Map.entry("particle-limiter", "More FPS"), Map.entry("hide-foliage", "Clear view"), Map.entry("no-break-particles", "Clear view"), Map.entry("container-animations", "Style"),
 			Map.entry("emoji-chat", "Chat"), Map.entry("shader-cache", "Faster start"), Map.entry("full-bright", "Caves"),
 			Map.entry("tnt-timer", "TNT"), Map.entry("velo-network", "Social"), Map.entry("cape-cosmetics", "Look"),
 			Map.entry("kill-effects", "Look"), Map.entry("hud-style", "Look"), Map.entry("wings-cosmetics", "Look"), Map.entry("aura-cosmetics", "Look"));

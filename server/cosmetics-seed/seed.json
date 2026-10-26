@@ -36,6 +36,12 @@
 			"name": "Velo Originals",
 			"tag": "CAPE COLLECTION",
 			"description": "High-res animated capes: the Velo logo in neon, wildfire, glacier, two thunderstorms, gold glyphs - and black and white designs."
+		},
+		{
+			"id": "emotes",
+			"name": "Emotes",
+			"tag": "EMOTE COLLECTION",
+			"description": "Wave, cheer, bow, backflip and more - every emote with its own effects and sounds. Hold B in game for your emote wheel; other Velo players see them too."
 		}
 	],
 	"items": [
@@ -787,6 +793,440 @@
 				"mesh": "wings/ice_star.vmesh",
 				"texture": "wings/ice_star.png",
 				"preview": "wings/ice_star_preview.png"
+			}
+		},
+		{
+			"id": "emote_wave",
+			"type": "emote",
+			"name": "Wave",
+			"description": "A big friendly wave that leaves a trail of sparkles and chimes.",
+			"price": 350,
+			"status": "released",
+			"collection": "emotes",
+			"accent": "#7cc8ff",
+			"files": {
+				"anim": "emotes/wave.vemote.json"
+			},
+			"rev": 2
+		},
+		{
+			"id": "emote_cheer",
+			"type": "emote",
+			"name": "Cheer",
+			"description": "Both arms up - confetti blasts out of your hands.",
+			"price": 400,
+			"status": "released",
+			"collection": "emotes",
+			"accent": "#ffcf5c",
+			"files": {
+				"anim": "emotes/cheer.vemote.json"
+			},
+			"rev": 2
+		},
+		{
+			"id": "emote_groove",
+			"type": "emote",
+			"name": "Groove",
+			"description": "Ride the beat - the dance floor pulses under you. Loops until you move.",
+			"price": 1500,
+			"status": "hidden",
+			"collection": "emotes",
+			"accent": "#6cf0c2",
+			"files": {
+				"anim": "emotes/groove.vemote.json"
+			},
+			"rev": 2
+		},
+		{
+			"id": "emote_bow",
+			"type": "emote",
+			"name": "Bow",
+			"description": "A formal bow inside a spiral of magic that bursts as you bend.",
+			"price": 350,
+			"status": "released",
+			"collection": "emotes",
+			"accent": "#b98cff",
+			"files": {
+				"anim": "emotes/bow.vemote.json"
+			},
+			"rev": 2
+		},
+		{
+			"id": "emote_flex",
+			"type": "emote",
+			"name": "Flex",
+			"description": "Show off both arms with a crackle of raw power.",
+			"price": 900,
+			"status": "hidden",
+			"collection": "emotes",
+			"accent": "#ff9a3c",
+			"files": {
+				"anim": "emotes/flex.vemote.json"
+			},
+			"rev": 2
+		},
+		{
+			"id": "emote_silly_dance",
+			"type": "emote",
+			"name": "Silly Dance",
+			"description": "A goofy dance in a rain of rainbow notes. Loops until you move.",
+			"price": 1400,
+			"status": "hidden",
+			"collection": "emotes",
+			"accent": "#ff6fd8",
+			"files": {
+				"anim": "emotes/silly_dance.vemote.json"
+			},
+			"rev": 2
+		},
+		{
+			"id": "emote_shrug",
+			"type": "emote",
+			"name": "Shrug",
+			"description": "Who knows? A shrug, a puff of confusion and a big question mark.",
+			"price": 300,
+			"status": "released",
+			"collection": "emotes",
+			"accent": "#b0b4c0",
+			"files": {
+				"anim": "emotes/shrug.vemote.json"
+			},
+			"rev": 2
+		},
+		{
+			"id": "emote_victory",
+			"type": "emote",
+			"name": "Victory",
+			"description": "A golden trophy rises in front of you - fanfare, confetti and a shower of stars.",
+			"price": 1500,
+			"status": "hidden",
+			"collection": "emotes",
+			"accent": "#ffd24a",
+			"files": {
+				"anim": "emotes/victory.vemote.json"
+			},
+			"rev": 2
+		},
+		{
+			"id": "emote_no_no",
+			"type": "emote",
+			"name": "No No",
+			"description": "Wag your finger and shake your head - not today.",
+			"price": 600,
+			"status": "hidden",
+			"collection": "emotes",
+			"accent": "#ff7a7a",
+			"files": {
+				"anim": "emotes/no_no.vemote.json"
+			},
+			"rev": 2
+		},
+		{
+			"id": "emote_rage",
+			"type": "emote",
+			"name": "Rage",
+			"description": "Steam out of your ears and shockwaves under every stomp.",
+			"price": 800,
+			"status": "hidden",
+			"collection": "emotes",
+			"accent": "#ff4d4d",
+			"files": {
+				"anim": "emotes/rage.vemote.json"
+			},
+			"rev": 3
+		},
+		{
+			"id": "emote_heart",
+			"type": "emote",
+			"status": "released",
+			"rev": 2,
+			"name": "Heart",
+			"description": "Make a big heart with your arms - and hearts rain down around you.",
+			"price": 400,
+			"collection": "emotes",
+			"accent": "#ff4f7b",
+			"files": {
+				"anim": "emotes/heart.vemote.json"
+			}
+		},
+		{
+			"id": "emote_facepalm",
+			"type": "emote",
+			"status": "released",
+			"rev": 2,
+			"name": "Facepalm",
+			"description": "When your teammate does THAT. Slap, sigh, sweat drop.",
+			"price": 300,
+			"collection": "emotes",
+			"accent": "#9ab0c8",
+			"files": {
+				"anim": "emotes/facepalm.vemote.json"
+			}
+		},
+		{
+			"id": "emote_thunder",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "Thunder Slam",
+			"description": "Charge up and slam the ground - lightning strikes all around you.",
+			"price": 1800,
+			"collection": "emotes",
+			"accent": "#9fd8ff",
+			"files": {
+				"anim": "emotes/thunder.vemote.json"
+			}
+		},
+		{
+			"id": "emote_backflip",
+			"type": "emote",
+			"status": "released",
+			"rev": 2,
+			"name": "Backflip",
+			"description": "A clean backflip with a trail off your feet and a stuck landing.",
+			"price": 500,
+			"collection": "emotes",
+			"accent": "#cfe8ff",
+			"files": {
+				"anim": "emotes/backflip.vemote.json"
+			}
+		},
+		{
+			"id": "emote_goal",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "Goal!",
+			"description": "Kick a ball into the distance - whistle, stadium horn, GOAL.",
+			"price": 1300,
+			"collection": "emotes",
+			"accent": "#5cff7a",
+			"files": {
+				"anim": "emotes/goal.vemote.json"
+			}
+		},
+		{
+			"id": "emote_airhorn",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "Air Horn",
+			"description": "BWAAAH BWAAAH BWAAAAAH. The loudest way to celebrate a play.",
+			"price": 1100,
+			"collection": "emotes",
+			"accent": "#ff3b3b",
+			"files": {
+				"anim": "emotes/airhorn.vemote.json"
+			}
+		},
+		{
+			"id": "emote_sip_tea",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "Sips Tea",
+			"description": "Bring out the good china and sip. Their drama is none of your business.",
+			"price": 1200,
+			"collection": "emotes",
+			"accent": "#e8c48a",
+			"files": {
+				"anim": "emotes/sip_tea.vemote.json"
+			}
+		},
+		{
+			"id": "emote_afk",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "AFK",
+			"description": "Nod off standing up to elevator music. Zzz... loops until you move.",
+			"price": 1000,
+			"collection": "emotes",
+			"accent": "#bfe0ff",
+			"files": {
+				"anim": "emotes/afk.vemote.json"
+			}
+		},
+		{
+			"id": "emote_l_dance",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "Take the L",
+			"description": "An L on your forehead and a hop in your step - for every player you just beat.",
+			"price": 1400,
+			"collection": "emotes",
+			"accent": "#5cff7a",
+			"files": {
+				"anim": "emotes/l_dance.vemote.json"
+			}
+		},
+		{
+			"id": "emote_shuffle",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 1,
+			"name": "Shuffle",
+			"description": "The festival shuffle with neon footwork on every beat.",
+			"price": 1600,
+			"collection": "emotes",
+			"accent": "#3ff0ff",
+			"files": {
+				"anim": "emotes/shuffle.vemote.json"
+			}
+		},
+		{
+			"id": "emote_ymca",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 1,
+			"name": "Y.M.C.A.",
+			"description": "Spell it out - every letter lights up above you on the beat.",
+			"price": 1500,
+			"collection": "emotes",
+			"accent": "#ffd24a",
+			"files": {
+				"anim": "emotes/ymca.vemote.json"
+			}
+		},
+		{
+			"id": "emote_hip_hop",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "Hip Hop",
+			"description": "Drop a boombox and bounce - notes fly out on the beat.",
+			"price": 1600,
+			"collection": "emotes",
+			"accent": "#8a5cff",
+			"files": {
+				"anim": "emotes/hip_hop.vemote.json"
+			}
+		},
+		{
+			"id": "emote_breakdance",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 1,
+			"name": "Breakdance",
+			"description": "Toprock next to your boombox, then hit the floor for a flair. Loops until you move.",
+			"price": 2200,
+			"collection": "emotes",
+			"accent": "#ff8a3c",
+			"files": {
+				"anim": "emotes/breakdance.vemote.json"
+			}
+		},
+		{
+			"id": "emote_floss",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 1,
+			"name": "Floss",
+			"description": "The one and only Floss, with rainbow trails off your hands.",
+			"price": 1400,
+			"collection": "emotes",
+			"accent": "#ff4fd8",
+			"files": {
+				"anim": "emotes/floss.vemote.json"
+			}
+		},
+		{
+			"id": "emote_griddy",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "Griddy",
+			"description": "Heel taps, arm pumps and the goggles. You know the one.",
+			"price": 1500,
+			"collection": "emotes",
+			"accent": "#3ff0ff",
+			"files": {
+				"anim": "emotes/griddy.vemote.json"
+			}
+		},
+		{
+			"id": "emote_grave_rise",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "Grave Rise",
+			"description": "A tombstone grinds out of the earth behind you - and you let out a zombie's scream.",
+			"price": 1600,
+			"collection": "afterlife",
+			"accent": "#7fff5c",
+			"files": {
+				"anim": "emotes/grave_rise.vemote.json"
+			}
+		},
+		{
+			"id": "emote_trick_or_treat",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "Trick or Treat",
+			"description": "Rub your hands, scheme... and a grinning jack-o'-lantern bursts out, spitting bats and candy.",
+			"price": 1800,
+			"collection": "afterlife",
+			"accent": "#ff8a1f",
+			"files": {
+				"anim": "emotes/trick_or_treat.vemote.json"
+			}
+		},
+		{
+			"id": "emote_ghost_party",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "Ghost Party",
+			"description": "Dance in the fog while friendly ghosts circle you. Loops until you move.",
+			"price": 1700,
+			"collection": "afterlife",
+			"accent": "#b47cff",
+			"files": {
+				"anim": "emotes/ghost_party.vemote.json"
+			}
+		},
+		{
+			"id": "emote_snowball",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "Snowball Fight",
+			"description": "Pack a snowball, wind up and let it fly. SPLAT.",
+			"price": 1300,
+			"collection": "yuletide",
+			"accent": "#bfe6ff",
+			"files": {
+				"anim": "emotes/snowball.vemote.json"
+			}
+		},
+		{
+			"id": "emote_gift",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 2,
+			"name": "Surprise Gift",
+			"description": "A present drops at your feet and bursts into confetti and candy canes.",
+			"price": 1300,
+			"collection": "yuletide",
+			"accent": "#ff3b3b",
+			"files": {
+				"anim": "emotes/gift.vemote.json"
+			}
+		},
+		{
+			"id": "emote_jingle",
+			"type": "emote",
+			"status": "hidden",
+			"rev": 3,
+			"name": "Jingle Jam",
+			"description": "Santa hat on, snow falling, Jingle Bells playing - dance it out. Loops until you move.",
+			"price": 1700,
+			"collection": "yuletide",
+			"accent": "#3bd16f",
+			"files": {
+				"anim": "emotes/jingle.vemote.json"
 			}
 		}
 	]

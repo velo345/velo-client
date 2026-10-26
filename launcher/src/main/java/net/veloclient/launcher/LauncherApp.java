@@ -713,7 +713,7 @@ public final class LauncherApp extends Application {
 				{"Invite friends", "Earn Velo Coins", "referral code invite", (Runnable) this::showReferrals, "gift"},
 				{"Settings", "Page", "options preferences memory ram", (Runnable) this::showSettings, "settings"},
 				{"Themes", "Settings · colors", "theme colors appearance custom", (Runnable) this::showThemeEditor, "palette"},
-				{"Switch from another client", "Import keybinds, servers, mods", "lunar feather modrinth curseforge import", (Runnable) this::showClientImport, "swap"},
+				{"Switch from another client", "Import keybinds, servers, mods", "lunar dawn feather modrinth curseforge import", (Runnable) this::showClientImport, "swap"},
 				{"New profile", "Create a profile", "create add instance", (Runnable) this::createNewProfile, "plus"},
 				{"My profile", "Account", "account player stats", (Runnable) () -> { if (session != null) { showAccountProfile(); } else { beginSignIn(); } }, "user"},
 		};
@@ -2902,6 +2902,28 @@ public final class LauncherApp extends Application {
 		setActivePage("store");
 	}
 
+	private void showEmoteDetail(net.veloclient.launcher.data.EmoteCatalog.EmoteType type) {
+		setActivePage("store");
+		currentPage = () -> showEmoteDetail(type);
+		setContent(net.veloclient.launcher.ui.EmoteDetailView.build(new net.veloclient.launcher.ui.EmoteDetailView.Host() {
+			@Override
+			public void openCoins() {
+				showCoins();
+			}
+
+			@Override
+			public MinecraftSession session() {
+				return session;
+			}
+
+			@Override
+			public void goBack() {
+				showStore();
+			}
+		}, type));
+		setActivePage("store");
+	}
+
 	private void showOwner() {
 		currentPage = this::showOwner;
 		setContent(net.veloclient.launcher.ui.OwnerView.build(this::showOwner));
@@ -2976,6 +2998,11 @@ public final class LauncherApp extends Application {
 			@Override
 			public void openAura(net.veloclient.launcher.data.AuraCatalog.AuraType type) {
 				showAuraDetail(type);
+			}
+
+			@Override
+			public void openEmote(net.veloclient.launcher.data.EmoteCatalog.EmoteType type) {
+				showEmoteDetail(type);
 			}
 
 			@Override

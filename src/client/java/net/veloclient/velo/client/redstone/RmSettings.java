@@ -34,6 +34,8 @@ public final class RmSettings {
 		public boolean skipAir = true;
 		/** Schematic placements show their water / lava (blue / orange) so it can be placed in the right spot. */
 		public boolean showFluids = false;
+		/** Schematic placement borders stay visible through blocks; off = hidden behind whatever is in front. */
+		public boolean bordersThroughBlocks = false;
 		/** Unused since the tool slot became its own slot 0; kept so older settings files still load. */
 		public int toolSlot = 8;
 		// Redstone wiring

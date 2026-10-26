@@ -1,0 +1,23 @@
+Velo Client emote music
+
+The dance emotes play excerpts of these tracks by Kevin MacLeod (incompetech.com),
+licensed under Creative Commons: By Attribution 4.0
+https://creativecommons.org/licenses/by/4.0/
+
+  Monkeys Spinning Monkeys        - Silly Dance
+  Show Your Moves                 - Groove
+  Kick Shock                      - Shuffle
+  Disco con Tutti                 - Y.M.C.A.
+  Basic Implosion                 - Hip Hop
+  Rocket Power                    - Breakdance
+  Pixel Peeker Polka - faster     - Floss
+  Zap Beat                        - Griddy
+  Spazzmatica Polka               - Take the L
+  One-eyed Maestro                - Ghost Party
+  Jingle Bells                    - Jingle Jam
+  Local Forecast - Elevator       - AFK
+  Fluffing a Duck                 - Sips Tea
+  Sneaky Snitch                   - Trick or Treat
+
+The excerpts are cut to loop on the beat; the music itself is unchanged.
+All other emote sounds are synthesised for Velo Client (tools/cosmetics/emotes/make_sounds.py).

@@ -28,7 +28,7 @@ public final class KeybindConfig {
 	 * InputConstants#getKey} (Mojmap), and the resulting key's {@code getCode()} (Yarn) ->
 	 * {@code getValue()} (Mojmap) - both diverge by name only.
 	 */
-	private static int currentKeyCode(KeyBinding binding) {
+	public static int currentKeyCode(KeyBinding binding) {
 		//? if <26.1 {
 		return InputUtil.fromTranslationKey(binding.getBoundKeyTranslationKey()).getCode();
 		//?} else {

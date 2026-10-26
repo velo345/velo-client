@@ -356,6 +356,13 @@ public final class VeloDraw {
 		submit(context);
 	}
 
+	/** A filled quadrilateral (any winding) - used for the little 3D-looking emote figures. */
+	public static void fillQuad(DrawContext context, float ax, float ay, float bx, float by, float cx, float cy, float dx, float dy, int color) {
+		begin();
+		quad(ax, ay, color, bx, by, color, cx, cy, color, dx, dy, color);
+		submit(context);
+	}
+
 	/** A filled pie slice (clock-sweep): {@code sweep} degrees from {@code startDegrees}, 0 = 12 o'clock, clockwise. */
 	public static void fillPie(DrawContext context, float cx, float cy, float radius, float startDegrees, float sweep, int color) {
 		if (sweep <= 0f || radius <= 0f) {

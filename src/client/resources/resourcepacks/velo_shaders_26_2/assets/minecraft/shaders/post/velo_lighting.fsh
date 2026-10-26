@@ -58,6 +58,8 @@ vec4 light_buffer(vec2 uv, float viewZ, float slopeTolerance) {
     vec2 f = uv * size - 0.5 - base;
     vec4 sum = vec4(0.0);
     float weights = 0.0;
+    vec4 best = vec4(1.0);
+    float bestDiff = 1e9;
     for (int y = 0; y < 2; y++) {
         for (int x = 0; x < 2; x++) {
             vec2 cell = base + vec2(float(x), float(y));
@@ -68,9 +70,16 @@ vec4 light_buffer(vec2 uv, float viewZ, float slopeTolerance) {
             float w = bilinear * exp(-max(abs(t.a - velo_encode_depth(viewZ)) - 1.5 / 255.0 - slopeTolerance, 0.0) * 160.0) + 1e-4;
             sum += t * w;
             weights += w;
+            // thin things (kelp, grass, fences, leaves...) can have no matching texel at all: then the closest
+            // depth wins instead of an even blend of the background behind them (that drew coloured outlines)
+            float diff = abs(t.a - velo_encode_depth(viewZ));
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                best = t;
+            }
         }
     }
-    return sum / weights;
+    return weights < 0.02 ? best : sum / weights;
 }
 
 void main() {
@@ -83,7 +92,9 @@ void main() {
         uv += vec2(sin(texCoord.y * 28.0 + t * 2.1), cos(texCoord.x * 23.0 + t * 1.7)) * k;
     }
     vec4 base = texture(InSampler, uv);
-    float depth = texture(InDepthSampler, texCoord).r;
+    // depth from the same (wobbled) spot as the colour: otherwise silhouettes got the background's distance -
+    // under water that painted blue outlines around kelp and seagrass
+    float depth = texture(InDepthSampler, uv).r;
     vec3 color = base.rgb;
     if (!velo_on()) {
         fragColor = vec4(color, 1.0);
@@ -103,14 +114,14 @@ void main() {
     }
 
     bool sky = is_sky(depth);
-    vec3 p = view_pos(texCoord, sky ? (reversed_z() ? 0.0001 : 0.9999) : depth);
+    vec3 p = view_pos(uv, sky ? (reversed_z() ? 0.0001 : 0.9999) : depth);
     float dist = length(p);
     // depth change per pixel (uniform control flow for the derivatives), scaled to the light buffer's texel size
     float encoded = velo_encode_depth(p.z);
     float depthSlope = (abs(dFdx(encoded)) + abs(dFdy(encoded))) * (InSize.y / LightBufSize.y) * 1.5;
 
     if (!sky && dist > 0.6) {
-        vec3 n = view_normal_snapped(view_normal(texCoord, p));
+        vec3 n = view_normal_snapped(view_normal(uv, p));
         float near = 1.0 - smoothstep(48.0, 96.0, dist);
         if (debugView == 1) {
             fragColor = vec4(vec3(fract(dist / 4.0)), 1.0);
@@ -124,7 +135,7 @@ void main() {
 
         // AO, sun visibility and sky exposure come from the half-resolution light buffer,
         // upsampled depth-aware (the buffer keeps each texel's view depth in alpha).
-        vec4 buf = light_buffer(texCoord, p.z, depthSlope);
+        vec4 buf = light_buffer(uv, p.z, depthSlope);
         float ao = buf.r;
         if (debugView == 5) {
             fragColor = vec4(vec3(ao), 1.0);
@@ -189,8 +200,20 @@ void main() {
 
     // Volumetric clouds (their own half-resolution pass), cut off by whatever stands in front.
     if (VeloLightInfo3.y > 0.0) {
-        vec4 clouds = texture(CloudsSampler, texCoord);
-        color = color * clouds.a + clouds.rgb;
+        // The cloud texels are coarse: a surface closer than the cloud layer gets none (no cloud fringe
+        // around leaves, kelp or players against a cloudy sky).
+        // Above the clouds (mountains, tall builds, elytra) the same holds looking down: only surfaces past the cloud
+        // plane get them, never the glass or leaves right in front of you.
+        bool cloudsInFront = true;
+        if (!sky) {
+            vec3 dirW = (VeloInvView * vec4(p, 0.0)).xyz / max(dist, 0.001);
+            float toPlane = 192.0 - VeloCam.y;
+            cloudsInFront = abs(dirW.y) > 0.001 && toPlane / dirW.y > 0.0 && dist > toPlane / dirW.y;
+        }
+        if (cloudsInFront) {
+            vec4 clouds = texture(CloudsSampler, uv);
+            color = color * clouds.a + clouds.rgb;
+        }
     }
 
     if (debugView == 11) {

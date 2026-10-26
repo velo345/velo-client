@@ -84,6 +84,10 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 	private double skyClouds = 0.7;
 	private boolean vanillaClouds = false;
 	private double emissiveGlow = 0.6;
+	private double redstoneGlow = 0.7;
+	// Glass
+	private boolean glassReflections = true;
+	private double glassClarity = 0.3;
 	// Post
 	private double bloom = 0.5;
 	private double exposure = 1.0;
@@ -114,6 +118,12 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 
 	public static boolean active() {
 		return active;
+	}
+
+	/** Clear glass is meshed into the translucent pass (VeloFoliageSodiumMixin) so all of it can reflect. Chunk-builder threads. */
+	public static boolean glassReflections() {
+		VeloShadersModule m = instance;
+		return active && m != null && m.glassReflections;
 	}
 
 	public static boolean skyActive() {
@@ -273,7 +283,8 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 		float sy = (float) Math.cos(a);
 		floats[0] = sx;
 		floats[1] = sy;
-		floats[2] = 0f;
+		// The sun moves in the x/y plane: z carries extra settings as an integer (velo_lib.glsl velo_extra()).
+		floats[2] = active && m != null ? (float) (b(m.glassClarity) | (b(m.redstoneGlow) << 8)) : 0f;
 		floats[3] = smoothstep(-0.12f, 0.22f, sy);
 		floats[4] = (float) (cameraX - Math.floor(cameraX / 2048.0) * 2048.0);
 		floats[5] = (float) cameraY;
@@ -385,6 +396,8 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 		skyClouds = 0.7;
 		vanillaClouds = false;
 		emissiveGlow = 0.6;
+		redstoneGlow = 0.7;
+		glassClarity = 0.3;
 		bloom = 0.5;
 		exposure = 1.0;
 		contrast = 1.05;
@@ -591,7 +604,18 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 		fields.add(percent("Night Brightness", 1, () -> nightBrightness, v -> nightBrightness = v));
 		fields.add(new ConfigField.ColorField("Torch Light Color", () -> blockLight, v -> blockLight = v & 0xFFFFFF, false));
 		fields.add(percent("Torch Light Tint", 1, () -> blockLightStrength, v -> blockLightStrength = v));
-		fields.add(percent("Glowing Light Sources", 1, () -> emissiveGlow, v -> emissiveGlow = v));
+		fields.add(percent("Glowing Light Sources & Mobs", 1, () -> emissiveGlow, v -> emissiveGlow = v));
+		fields.add(percent("Redstone Glow", 1, () -> redstoneGlow, v -> redstoneGlow = v));
+		fields.add(new ConfigField.HeaderField("Glass"));
+		fields.add(new ConfigField.ToggleField("Glass Reflections", () -> glassReflections, v -> {
+			boolean changed = glassReflections != v;
+			glassReflections = v;
+			if (changed && active) {
+				// glass moves between the cutout and translucent passes: rebuild the chunks
+				net.veloclient.velo.client.modules.performance.PerformanceBoostModule.reloadRendering();
+			}
+		}));
+		fields.add(percent("Glass Transparency", 1, () -> glassClarity, v -> glassClarity = v));
 		fields.add(new ConfigField.HeaderField("Ray-Traced Light"));
 		fields.add(new ConfigField.ToggleField("Sun Shadow Map (Sodium)", () -> shadowMap, v -> shadowMap = v));
 		fields.add(new ConfigField.ToggleField("Player & Mob Shadows", () -> entityShadows, v -> entityShadows = v));

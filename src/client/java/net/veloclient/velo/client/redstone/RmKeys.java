@@ -29,6 +29,7 @@ public final class RmKeys {
 	public static final KeyBinding TOOL_SLOT = key("rm_tool_slot", Keys.digit(0));
 	public static final KeyBinding TOOL_SELECT = key("rm_tool_select", Keys.UNKNOWN);
 	public static final KeyBinding TOOL_MOVE = key("rm_tool_move", Keys.UNKNOWN);
+	public static final KeyBinding TOOL_COPY = key("rm_tool_copy", Keys.UNKNOWN);
 	public static final KeyBinding TOOL_STACK = key("rm_tool_stack", Keys.UNKNOWN);
 	public static final KeyBinding TOOL_WIRE = key("rm_tool_wire", Keys.UNKNOWN);
 	public static final KeyBinding TOOL_WATER = key("rm_tool_water", Keys.UNKNOWN);

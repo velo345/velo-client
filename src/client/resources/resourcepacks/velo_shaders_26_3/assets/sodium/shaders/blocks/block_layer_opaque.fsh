@@ -108,8 +108,30 @@ void main() {
     vec4 texel = u_UseRGSS ? sampleRGSS(u_BlockTex, v_TexCoord, u_TexelSize) : sampleNearest(u_BlockTex, v_TexCoord, u_TexelSize);
     vec4 color = texel * v_Color; // Apply per-vertex color modulator
 
+    bool veloPassTranslucent = false;
 #ifdef ALPHA_CUTOUT
-    if (color.a < ALPHA_CUTOUT) {
+    veloPassTranslucent = ALPHA_CUTOUT < 0.3;
+#endif
+#if defined(OIT_ACCUMULATE) || defined(OIT_ALPHA_ONLY)
+    veloPassTranslucent = true;
+#endif
+    // Glass (Sodium marks it): thinner streaks for more see-through, and in the translucent pass the clear part
+    // stays (it carries the reflection) instead of being cut away.
+    bool veloGlass = velo_on() && v_VeloEmissive > 2.5;
+    float veloGlassFrame = 1.0;
+    if (veloGlass) {
+        vec2 local = velo_glass_local(v_VeloPos);
+        veloGlassFrame = velo_glass_frame(local);
+        float clarity = velo_glass_clarity() * (1.0 - veloGlassFrame);
+        if (veloPassTranslucent) {
+            color.a *= 1.0 - clarity * 0.8;
+        } else if (velo_hash12(floor(local * 16.0) + 0.5) < clarity) {
+            discard;
+        }
+    }
+
+#ifdef ALPHA_CUTOUT
+    if (color.a < ALPHA_CUTOUT && !(veloGlass && veloPassTranslucent)) {
         discard;
     }
 #endif
@@ -136,9 +158,18 @@ void main() {
             sunShare = 0.0; // it glows by itself: shadows don't darken it
         } else {
             // only real light sources glow (Sodium marks them) - not everything next to a torch
-            color.rgb = v_VeloEmissive > 0.5 ? velo_emissive(lit, texel.rgb, vec2(1.0)) : lit;
+            if (v_VeloEmissive > 2.5) {
+                color = velo_glass(vec4(lit, color.a), v_VeloPos, faceNormal, v_VeloLight, u_FogColor.rgb, veloPassTranslucent);
+            } else if (v_VeloEmissive > 1.5) {
+                color.rgb = velo_redstone(lit, texel.rgb * v_VeloTint.rgb);
+                sunShare = shaded.a * 0.5;
+            } else {
+                color.rgb = v_VeloEmissive > 0.5 ? velo_emissive(lit, texel.rgb, vec2(1.0)) : lit;
+            }
             color.rgb = velo_wet(color.rgb, v_VeloPos, faceNormal, v_VeloLight, u_FogColor.rgb);
-            sunShare = shaded.a;
+            if (sunShare < 0.0) {
+                sunShare = shaded.a;
+            }
         }
         color.rgb = velo_fog(color.rgb, v_VeloPos, u_FogColor.rgb, v_VeloLight.y);
     }

@@ -1,6 +1,6 @@
 <!--page {
 	"title": "Store – Minecraft Wings, Animated Capes & Auras · Velo Client",
-	"description": "The Velo Client Store: 3D wings, animated capes and auras for Minecraft that every Velo player sees. Sign in with your launcher code, buy with Velo Coins, get Velo+.",
+	"description": "The Velo Client Store: 3D wings, animated capes, auras and emotes for Minecraft that every Velo player sees. Sign in with your launcher code, buy with Velo Coins, get Velo+.",
 	"path": "/store",
 	"active": "store",
 	"priority": "0.9",
@@ -21,7 +21,7 @@
   </header>
 
   <nav class="store-tabs" aria-label="Store sections" id="store-tabs">
-    <a href="#featured">Featured</a><a href="#daily">Daily picks</a><a href="#wings">Wings</a><a href="#capes">Capes</a><a href="#auras">Auras</a><a href="#bundles">Bundles</a><a href="#coins">Velo Coins</a><a href="#plus">Velo+</a>
+    <a href="#featured">Featured</a><a href="#daily">Daily picks</a><a href="#wings">Wings</a><a href="#capes">Capes</a><a href="#auras">Auras</a><a href="#emotes">Emotes</a><a href="#bundles">Bundles</a><a href="#coins">Velo Coins</a><a href="#plus">Velo+</a>
   </nav>
 
   <section class="store-section" id="featured" aria-label="Featured collection"><div class="skeleton" style="height:340px"></div></section>
@@ -32,7 +32,7 @@
 
   <div class="toolbar reveal" id="tools">
     <label class="sr-only" for="store-search">Search the Store</label>
-    <input id="store-search" type="search" placeholder="Search wings, capes and auras…" autocomplete="off">
+    <input id="store-search" type="search" placeholder="Search wings, capes, auras and emotes…" autocomplete="off">
     <label class="sr-only" for="store-sort">Sort</label>
     <select id="store-sort"><option value="featured">Featured first</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="name">Name</option></select>
     <label class="sr-only" for="store-owned">Show</label>
@@ -51,6 +51,10 @@
     <div class="store-section-head"><h2 id="auras-h">Auras</h2><span>Particles around you, in the colour, size and speed you choose.</span></div>
     <div class="items" data-grid="aura"></div>
   </section>
+  <section class="store-section" id="emotes" aria-labelledby="emotes-h">
+    <div class="store-section-head"><h2 id="emotes-h">Emotes <span class="pill">New</span></h2><span>Wave, cheer, bow, backflip and more - each with its own effects and sounds. Hold B in game for your emote wheel.</span></div>
+    <div class="items" data-grid="emote"></div>
+  </section>
   <section class="store-section" id="bundles" aria-labelledby="bundles-h">
     <div class="store-section-head"><h2 id="bundles-h">Bundles</h2><span>Several items for one price. Items you own already are taken off.</span></div>
     <div class="bundles" data-grid="bundles"></div>
@@ -58,6 +62,7 @@
 
   <section class="store-section" id="coins" aria-labelledby="coins-h">
     <div class="store-section-head"><h2 id="coins-h">Velo Coins</h2><a href="#free">Get coins for free</a></div>
+    <div class="launch-gift" data-launch-gift><i class="coin-dot"></i><div><strong>Launch week gift: {{launch.bonusCoins}} Velo Coins free</strong><span>Sign in to Velo for the first time during launch week ({{launch.bonusWeek}}) and the coins are on your account right away - no purchase needed.</span></div></div>
     <div class="packs" data-grid="packs"></div>
     <p class="mono" style="margin-top:14px" data-checkout-note>Secure checkout by Tebex. Coins land on your account right after payment.</p>
   </section>
@@ -68,11 +73,12 @@
         <div>
           <span class="plus-badge">VELO+</span>
           <h2 id="plus-store-h">World Hosting, Cloud Sync, Clips Pro, Name Styles, your own Home background and {{plus.monthlyCoins}} coins a month.</h2>
-          <p>Plus animated custom capes, the + badge and the VIP role on Discord. Billed monthly, cancel any time. <a href="/features#plus">What's included</a></p>
+          <p>Plus animated custom capes, the + badge and the VIP role on Discord. Try it free for 7 days (once per account), then billed monthly - cancel any time. <a href="/features#plus">What's included</a></p>
         </div>
         <div style="display:grid;gap:10px;justify-items:start">
           <span class="price" data-plus-price>{{plus.price}}<small> / month</small></span>
           <button class="btn btn-primary btn-lg magnetic" type="button" data-plus-buy>Get Velo+</button>
+          <button class="btn btn-lg" type="button" data-plus-yearly hidden>Yearly</button>
           <span style="font-size:13.5px;color:var(--text-2)" data-plus-state></span>
         </div>
       </div>

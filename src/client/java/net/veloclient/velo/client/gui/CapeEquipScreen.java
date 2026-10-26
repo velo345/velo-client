@@ -72,15 +72,20 @@ public final class CapeEquipScreen extends VeloWindow {
 	// ---- Header (launcher look): Capes / Wings / Auras tabs, "Get more" to the Store ----
 
 	/** The Locker's tabs: Skin is {@link VeloSkinsScreen} (same header, so it reads as one Locker). */
-	public static final String[] LOCKER_TABS = {"Skin", "Capes", "Wings", "Auras", "Name"};
+	public static final String[] LOCKER_TABS = {"Skin", "Capes", "Wings", "Auras", "Name", "Emotes"};
+	/** The Emotes tab ({@link EmoteLockerScreen}: your emote wheel). */
+	public static final int EMOTES_TAB = 5;
 
-	/** Opens the Locker on a tab: 0 Skin, 1 Capes, 2 Wings, 3 Auras, 4 Name (Velo+ Name Styles). */
+	/** Opens the Locker on a tab: 0 Skin, 1 Capes, 2 Wings, 3 Auras, 4 Name (Velo+ Name Styles), 5 Emotes. */
 	public static net.minecraft.client.gui.screen.Screen open(net.minecraft.client.gui.screen.Screen parent, int tab) {
 		if (tab == 0) {
 			return new VeloSkinsScreen(parent);
 		}
 		if (tab == 4) {
 			return new NameStyleScreen(parent);
+		}
+		if (tab == EMOTES_TAB) {
+			return new EmoteLockerScreen(parent);
 		}
 		CapeEquipScreen locker = new CapeEquipScreen(parent);
 		locker.wingsTab = tab == 2;
@@ -100,7 +105,7 @@ public final class CapeEquipScreen extends VeloWindow {
 
 	@Override
 	protected void selectHeaderTab(int index) {
-		if (index == 0 || index == 4) {
+		if (index == 0 || index == 4 || index == EMOTES_TAB) {
 			this.client.setScreen(open(returnScreen(), index));
 			return;
 		}
@@ -200,8 +205,15 @@ public final class CapeEquipScreen extends VeloWindow {
 		}
 		var nameStyle = net.veloclient.velo.client.namestyle.NameStyles.own();
 		String name = net.veloclient.velo.client.namestyle.NameStyles.ownEnabled() ? nameStyle.effect().label : "None";
+		int onWheel = 0;
+		for (int i = 0; i < net.veloclient.velo.client.emotes.EmoteCatalog.SLOTS; i++) {
+			if (net.veloclient.velo.client.emotes.EmoteCatalog.slot(i) != null) {
+				onWheel++;
+			}
+		}
+		String emotes = onWheel == 0 ? "None" : onWheel + " on your wheel";
 		String[][] rows = {{"SKIN", skin == null || skin.isEmpty() ? "Your skin" : skin, "skins"}, {"CAPE", cape, "capes"},
-				{"WINGS", wings, "wings"}, {"AURA", aura, "bolt"}, {"NAME STYLE", name, "theme_editor"}};
+				{"WINGS", wings, "wings"}, {"AURA", aura, "bolt"}, {"NAME STYLE", name, "theme_editor"}, {"EMOTES", emotes, "emotes"}};
 		for (int i = 0; i < rows.length; i++) {
 			int ry = y + i * (SLOT_H + 6);
 			boolean active = activeTab == i;

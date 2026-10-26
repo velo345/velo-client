@@ -1,7 +1,8 @@
 /*
  * Try-on viewer for velo-client.com: a Minecraft player with 3D skin layers (every overlay pixel a small voxel, like
  * the launcher), wearing a cape (animated GIF, frame by frame), real 3D wings from their .vmesh (flapping around the
- * hinge, like in game) or an aura. three.js, self-hosted. Exposes window.velo.player3d(container, options).
+ * hinge, like in game), an aura or an emote (the player does it, with its effects). three.js, self-hosted. Exposes
+ * window.velo.player3d(container, options).
  */
 import * as THREE from "./vendor/three.module.min.js";
 
@@ -137,7 +138,7 @@ async function gifFrames(url) {
 
 /**
  * Mounts a viewer in {@code container}. options: skin (url), slim, item (a cosmetic catalog item or null),
- * fileUrl(hash), auraUrl(id). Returns {setItem(item), setSkin(url, slim), dispose()}.
+ * fileUrl(hash), auraUrl(id). Returns {setItem(item), setSkin(url, slim), restartEmote(), dispose()}.
  */
 async function player3d(container, options) {
 	const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -172,7 +173,7 @@ async function player3d(container, options) {
 
 	const root = new THREE.Group();
 	scene.add(root);
-	let player = null, limbs = {}, worn = null, wornTick = null;
+	let player = null, limbs = {}, worn = null, wornTick = null, emote = null;
 
 	async function buildPlayer(skinUrl, slim) {
 		const img = await loadImage(skinUrl);
@@ -217,6 +218,9 @@ async function player3d(container, options) {
 			rLeg: part("leg", 4, 12, 4, 0, 16, 0, 32, [-2, 12, 0], [0, -6, 0]),
 			lLeg: part("leg", 4, 12, 4, legacy ? 0 : 16, legacy ? 16 : 48, 0, 48, [2, 12, 0], [0, -6, 0]),
 		};
+		// For emotes: how far each group's origin sits from Minecraft's joint for that part (in the part's own frame).
+		limbs.offsets = [[0, 0, 0], [0, -6, 0], [1 - aw / 2, 0, 0], [aw / 2 - 1, 0, 0], [-0.1, 0, 0], [0.1, 0, 0]];
+		for (const k of ["head", "body", "rArm", "lArm", "rLeg", "lLeg"]) limbs[k].userData.rest = limbs[k].position.clone();
 		// All voxels of one limb in one instanced mesh.
 		const byGroup = new Map();
 		voxels.forEach((vx) => { if (!byGroup.has(vx.group)) byGroup.set(vx.group, []); byGroup.get(vx.group).push(vx); });
@@ -311,6 +315,13 @@ async function player3d(container, options) {
 
 	async function setItem(item) {
 		if (worn) { player.remove(worn); worn = null; wornTick = null; }
+		if (emote) {
+			emote.sprites.forEach((sp) => player && player.remove(sp));
+			emote = null;
+			for (const k of ["head", "body", "rArm", "lArm", "rLeg", "lLeg"]) {
+				if (limbs[k]) { limbs[k].position.copy(limbs[k].userData.rest); limbs[k].rotation.set(0, 0, 0, "XYZ"); }
+			}
+		}
 		aura.hidden = true;
 		auraBack.hidden = true;
 		if (!item) return;
@@ -321,6 +332,8 @@ async function player3d(container, options) {
 			} else if (item.type === "wings" && item.files && item.files.mesh && item.files.texture) {
 				const w = await buildWings(item);
 				worn = w.object; wornTick = w.tick; player.add(worn);
+			} else if (item.type === "emote" && options.emoteAnim) {
+				emote = { anim: await options.emoteAnim(item), start: performance.now(), fired: -1, sprites: [], pose: new Float32Array(36) };
 			} else if (item.type === "aura") {
 				aura.src = options.auraUrl(item.id, "front");
 				auraBack.src = options.auraUrl(item.id, "back");
@@ -370,7 +383,9 @@ async function player3d(container, options) {
 		if (!dragging && !reduceMotion) yaw += dt * 0.35;
 		root.rotation.y = yaw;
 		const walk = reduceMotion ? 0 : Math.sin(t / 380) * 0.35;
-		if (limbs.rArm) {
+		if (emote && limbs.rArm) {
+			playEmote(t);
+		} else if (limbs.rArm) {
 			limbs.rArm.rotation.x = walk; limbs.lArm.rotation.x = -walk;
 			limbs.rLeg.rotation.x = -walk; limbs.lLeg.rotation.x = walk;
 			limbs.head.rotation.y = Math.sin(t / 2300) * 0.25;
@@ -382,12 +397,87 @@ async function player3d(container, options) {
 	};
 	requestAnimationFrame(frame);
 
+	// ---- Emotes ----
+	const REST = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -5, 2, 0, 0, 0, 0, 5, 2, 0, 0, 0, 0, -1.9, 12, 0, 0, 0, 0, 1.9, 12, 0, 0, 0, 0];
+	const glyphTextures = new Map();
+	const glyphTexture = (g, color) => {
+		const key = g + color;
+		if (!glyphTextures.has(key)) {
+			const c = document.createElement("canvas");
+			c.width = c.height = 64;
+			const x = c.getContext("2d");
+			x.font = "bold 46px system-ui, sans-serif";
+			x.textAlign = "center";
+			x.textBaseline = "middle";
+			x.shadowColor = "rgba(0,0,0,.45)";
+			x.shadowBlur = 4;
+			x.fillStyle = color;
+			x.fillText(g, 32, 34);
+			const tex = new THREE.CanvasTexture(c);
+			tex.colorSpace = THREE.SRGBColorSpace;
+			glyphTextures.set(key, tex);
+		}
+		return glyphTextures.get(key);
+	};
+	const euler = new THREE.Euler(0, 0, 0, "ZYX");
+	const offset = new THREE.Vector3();
+
+	/** Poses the six parts from the emote (Minecraft model space: y down, front -z) and lets its particles rise. */
+	function playEmote(t) {
+		const a = emote.anim;
+		const sec = reduceMotion ? 1.2 : (t - emote.start) / 1000;
+		const cycle = a.duration + (a.loop ? 0 : 0.6);
+		const local = sec % cycle;
+		const p = emote.pose;
+		for (let i = 0; i < 36; i++) p[i] = REST[i];
+		if (local <= a.duration) options.emotePose(a, local * a.fps, p);
+		["head", "body", "rArm", "lArm", "rLeg", "lLeg"].forEach((k, i) => {
+			const o = i * 6;
+			euler.set(p[o + 3], -p[o + 4], -p[o + 5], "ZYX");
+			limbs[k].rotation.copy(euler);
+			offset.set(...limbs.offsets[i]).applyEuler(euler);
+			limbs[k].position.set(p[o] + offset.x, 24 - p[o + 1] + offset.y, -p[o + 2] + offset.z);
+		});
+		if (!reduceMotion) {
+			for (let k = Math.floor(Math.max(0, emote.fired) / cycle); k <= Math.floor(sec / cycle); k++) {
+				for (const e of a.events) {
+					const at = k * cycle + e.t;
+					if (!e.particle || at <= emote.fired || at > sec) continue;
+					const q = options.emoteAnchor(p, e.at);
+					for (let i = 0; i < Math.min(6, Math.max(1, Math.floor((e.count || 3) / 3))); i++) {
+						const [g, col] = options.emoteGlyph(e.particle, e.color, e.text);
+						const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glyphTexture(g, col), transparent: true, depthWrite: false }));
+						const spread = Math.max(0.5, (e.spread || 0.3) * 16);
+						sp.position.set(q[0] + (Math.random() - 0.5) * spread, 24 - q[1] + (Math.random() - 0.5) * spread, -q[2] + (Math.random() - 0.5) * spread);
+						sp.scale.set(3.2, 3.2, 1);
+						sp.userData = { born: t, life: 900 + Math.random() * 500, vx: (Math.random() - 0.5) * 2, vy: 3 + (e.up || 0.05) * 20 + Math.random() * 2 };
+						player.add(sp);
+						emote.sprites.push(sp);
+					}
+				}
+			}
+			emote.fired = sec;
+		}
+		for (let i = emote.sprites.length - 1; i >= 0; i--) {
+			const sp = emote.sprites[i];
+			const age = t - sp.userData.born;
+			if (age > sp.userData.life) { player.remove(sp); sp.material.dispose(); emote.sprites.splice(i, 1); continue; }
+			sp.position.x += (sp.userData.vx * 16) / 1000;
+			sp.position.y += (sp.userData.vy * 16) / 1000;
+			sp.material.opacity = 1 - age / sp.userData.life;
+		}
+	}
+
 	function dispose() {
 		running = false;
 		ro.disconnect();
 		renderer.dispose();
 	}
-	return { setItem, setSkin, dispose };
+	/** Plays the emote from its start again (so its music, started now, is on the beat). */
+	function restartEmote() {
+		if (emote) { emote.start = performance.now(); emote.fired = -1; }
+	}
+	return { setItem, setSkin, restartEmote, dispose };
 }
 
 window.velo = window.velo || {};

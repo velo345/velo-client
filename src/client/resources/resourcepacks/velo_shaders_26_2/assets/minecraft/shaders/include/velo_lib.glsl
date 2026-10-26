@@ -37,6 +37,55 @@ bool velo_on() {
     return VeloPack != uvec4(0u);
 }
 
+// The sun's direction: it moves in the x/y plane, so VeloSun.z carries packed extra settings instead.
+vec3 velo_sun_dir() {
+    return vec3(VeloSun.xy, 0.0);
+}
+
+// VeloSun.z as an integer: byte 0 glass clarity, byte 1 redstone glow (VeloShadersModule.writeGlobals).
+uint velo_extra() {
+    return uint(max(VeloSun.z, 0.0) + 0.5);
+}
+
+float velo_glass_clarity() {
+    return float(velo_extra() & 255u) / 255.0;
+}
+
+float velo_redstone_glow() {
+    return float((velo_extra() >> 8u) & 255u) / 255.0;
+}
+
+float velo_hash13(vec3 p) {
+    vec3 p3 = fract(p * 0.1031);
+    p3 += dot(p3, p3.zyx + 31.32);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+float velo_noise3(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    vec3 u = f * f * (3.0 - 2.0 * f);
+    float a = mix(mix(velo_hash13(i), velo_hash13(i + vec3(1.0, 0.0, 0.0)), u.x),
+            mix(velo_hash13(i + vec3(0.0, 1.0, 0.0)), velo_hash13(i + vec3(1.0, 1.0, 0.0)), u.x), u.y);
+    float b = mix(mix(velo_hash13(i + vec3(0.0, 0.0, 1.0)), velo_hash13(i + vec3(1.0, 0.0, 1.0)), u.x),
+            mix(velo_hash13(i + vec3(0.0, 1.0, 1.0)), velo_hash13(i + vec3(1.0, 1.0, 1.0)), u.x), u.y);
+    return mix(a, b, u.z);
+}
+
+// Powered redstone (Sodium marks it): its saturated red texels - the dust (its tint follows the power level),
+// torch heads, repeater/comparator torches, the redstone block - glow and gently pulse. albedo: texel x tint.
+vec3 velo_redstone(vec3 color, vec3 albedo) {
+    float g = velo_redstone_glow();
+    if (g <= 0.0) {
+        return color;
+    }
+    float r = albedo.r;
+    float redness = smoothstep(0.22, 0.55, r) * smoothstep(0.35, 0.7, 1.0 - max(albedo.g, albedo.b) / max(r, 0.01));
+    vec3 hot = vec3(1.0, 0.16, 0.06) * (0.5 + r * 0.7);
+    float pulse = 0.9 + 0.1 * sin(VeloCam.w * 2.6);
+    return mix(color, max(color, hot), redness * g * 0.8) + hot * redness * g * 0.32 * pulse;
+}
+
 bool velo_flag(int bit) {
     return ((VeloPack.w >> 24u) & uint(bit)) != 0u;
 }
@@ -148,7 +197,7 @@ vec3 velo_sun_color() {
 
 // What lights the world: the sun by day, the moon (opposite it) by night.
 vec3 velo_light_dir() {
-    return VeloSun.y > -0.08 ? VeloSun.xyz : -VeloSun.xyz;
+    return VeloSun.y > -0.08 ? velo_sun_dir() : -velo_sun_dir();
 }
 
 
@@ -275,7 +324,7 @@ vec3 velo_sky_reflection(vec3 dir, vec3 fogColor) {
     float up = clamp(dir.y, 0.0, 1.0);
     vec3 sky = mix(fogColor, VeloSky.rgb, smoothstep(0.0, 0.55, up));
     // a soft sun halo in the reflection
-    float mu = max(dot(dir, VeloSun.xyz), 0.0);
+    float mu = max(dot(dir, velo_sun_dir()), 0.0);
     sky += velo_sun_color() * pow(mu, 24.0) * 0.35 * VeloSun.w;
     return sky;
 }
@@ -384,14 +433,53 @@ vec3 velo_wet(vec3 color, vec3 relPos, vec3 n, vec2 light, vec3 fogColor) {
     return mix(color, refl, gloss * (0.15 + 0.85 * fresnel));
 }
 
-// Procedural lava: a slowly creeping dark crust with glowing cracks and hot spots.
+// Position on a glass face in blocks (the face's two in-plane axes), for its frame and per-texel streaks.
+vec2 velo_glass_local(vec3 relPos) {
+    vec3 wp = relPos + VeloCam.xyz;
+    vec3 n = abs(velo_face_normal(relPos));
+    return n.x > 0.5 ? wp.zy : n.y > 0.5 ? wp.xz : wp.xy;
+}
+
+// 1 on the block's outer texel ring (the glass frame), 0 inside.
+float velo_glass_frame(vec2 local) {
+    vec2 f = fract(local + 1e-4);
+    return any(lessThan(f, vec2(1.0 / 16.0))) || any(greaterThan(f, vec2(15.0 / 16.0))) ? 1.0 : 0.0;
+}
+
+// Glass: the sky and the sun reflect off the whole pane (more at grazing angles), the frame and streaks keep their
+// lit colour under a thin sheen. In the translucent pass the clear part becomes a faint reflective film.
+vec4 velo_glass(vec4 color, vec3 relPos, vec3 n, vec2 light, vec3 fogColor, bool translucent) {
+    float refl = velo_reflections();
+    vec3 V = normalize(-relPos);
+    float ndv = clamp(abs(dot(n, V)), 0.0, 1.0);
+    float fresnel = 0.05 + 0.95 * pow(1.0 - ndv, 5.0);
+    vec3 R = reflect(-V, dot(n, V) < 0.0 ? -n : n);
+    vec3 sky = velo_sky_reflection(R, fogColor) * mix(0.12, 1.0, light.y * light.y);
+    float rl = max(dot(R, velo_light_dir()), 0.0);
+    vec3 glint = velo_sun_color() * (pow(rl, 900.0) * 6.0 + pow(rl, 90.0) * 0.18) * light.y * light.y * VeloSun.w * (1.0 - VeloSky.a);
+    float sheen = fresnel * refl;
+    if (translucent) {
+        float film = mix(0.07, 0.85, fresnel) * refl;
+        // what the texture lets through stays see-through; the reflection lays over it
+        float a = color.a + film * (1.0 - color.a);
+        vec3 rgb = (color.rgb * color.a + sky * film * (1.0 - color.a)) / max(a, 1e-3);
+        rgb = mix(rgb, sky, sheen * color.a * 0.5) + glint * refl;
+        return vec4(rgb, clamp(a + velo_luma(glint) * refl, 0.0, 1.0));
+    }
+    return vec4(mix(color.rgb, sky, sheen * 0.6) + glint * refl, color.a);
+}
+
+// Procedural lava: a slowly creeping dark crust with glowing cracks and hot spots. 3D noise on the world position:
+// one continuous surface across blocks, faces and source/flowing heights - no seams where the shape changes.
+// Faces that fall (sides, steep flows) churn downwards a little faster.
 vec3 velo_lava(vec3 relPos, vec3 n0) {
     vec3 wp = relPos + VeloCam.xyz;
     float t = VeloCam.w;
-    vec2 p = (n0.y > 0.5 ? wp.xz : vec2(dot(wp.xz, normalize(vec2(-n0.z, n0.x) + 1e-4)), wp.y + t * 0.6)) * 0.9;
-    vec2 warp = vec2(velo_noise2(p * 0.7 + t * 0.05), velo_noise2(p * 0.7 + 17.0 - t * 0.04)) * 1.6;
-    float heat = velo_noise2(p + warp) * 0.6 + velo_noise2(p * 2.3 - warp + t * 0.1) * 0.4;
-    float cracks = 1.0 - abs(velo_noise2(p * 1.6 + warp * 0.8) * 2.0 - 1.0);
+    float steep = 1.0 - clamp(n0.y, 0.0, 1.0);
+    vec3 p = wp * 0.9 + vec3(0.0, t * (0.08 + steep * 0.25), 0.0);
+    vec3 warp = vec3(velo_noise3(p * 0.7 + vec3(0.0, 0.0, t * 0.05)), velo_noise3(p * 0.7 + 17.0 - t * 0.04), 0.0) * 1.6;
+    float heat = velo_noise3(p + warp) * 0.6 + velo_noise3(p * 2.3 - warp + t * 0.1) * 0.4;
+    float cracks = 1.0 - abs(velo_noise3(p * 1.6 + warp * 0.8) * 2.0 - 1.0);
     heat = clamp(heat * 0.7 + pow(cracks, 6.0) * 0.8, 0.0, 1.0);
     vec3 crust = vec3(0.18, 0.04, 0.01);
     vec3 glow = vec3(1.0, 0.38, 0.05);

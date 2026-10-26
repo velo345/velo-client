@@ -109,9 +109,24 @@ public final class StoreConfig {
 		public double price = 9.99;
 		public int periodDays = 30;
 		public int monthlyCoins = 2000;
+		/** Free Velo+ once per account that never had it (0 = no trial). No monthly coins during the trial. */
+		public int trialDays = 7;
+		/** Velo+ for a year, paid at once (0 = only monthly). Members get the monthly coins all year. */
+		public double yearlyPrice = 99.99;
+		public int yearDays = 365;
 	}
 
 	public Plus plus = new Plus();
+
+	/** Launch week: accounts whose first Velo sign-in is inside [from, until) get {@code coins} once. 0 coins = off. */
+	public static final class LaunchBonus {
+		public int coins = 1000;
+		/** 2026-11-01 00:00 CET (Velo Client 1.0) and a week after. */
+		public long from = 1_793_487_600_000L;
+		public long until = 1_793_487_600_000L + 7L * 86_400_000L;
+	}
+
+	public LaunchBonus launchBonus = new LaunchBonus();
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
