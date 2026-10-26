@@ -2003,17 +2003,26 @@ RENDER.socials = async (root) => {
 	const addBtn = h("button", { class: "btn primary", type: "button" }, "Track");
 	const refreshBtn = h("button", { class: "btn", type: "button" }, "Refresh now");
 	const body = h("div", { class: "stack" });
-	const igInput = h("input", { type: "password", placeholder: "Instagram access token (long-lived, from your Meta app)", class: "grow", autocomplete: "off" });
+	const igInput = h("input", { type: "password", placeholder: "or paste an Instagram access token", class: "grow", autocomplete: "off" });
 	const igBtn = h("button", { class: "btn", type: "button" }, "Connect Instagram");
 	const igState = h("small", { class: "muted" });
+	const igLogin = h("button", { class: "btn primary", type: "button" }, "Log in with Instagram");
+	igLogin.onclick = () => busy(igLogin, async () => { location.href = (await velo("admin/panel/socials/edit", { body: { instagramLogin: true } })).url; });
 	root.append(card("Track your videos", "YouTube channels and your connected Instagram pick up new videos by themselves · add TikToks by video link · numbers refresh every 3 hours", null,
-		h("div", { class: "row" }, input, addBtn, refreshBtn), h("div", { class: "row" }, igInput, igBtn), igState), body);
+		h("div", { class: "row" }, input, addBtn, refreshBtn), h("div", { class: "row" }, igLogin, igInput, igBtn), igState), body);
+	const igResult = new URLSearchParams(location.hash.split("?")[1] || "").get("instagram");
+	if (igResult) {
+		toast(igResult === "ok" ? "Instagram connected - Reels show up in a minute" : igResult);
+		history.replaceState(null, "", "#/socials");
+	}
 	const draw = (d) => {
 		const t = d.totals;
 		const ig = d.instagram || {};
 		igState.textContent = ig.connected ? `Instagram connected as @${ig.username}` + (ig.error ? " · " + ig.error : " · Reels are picked up by themselves")
 			: "Instagram blocks tools, so Reels need your account's token (Instagram API with Instagram Login) - it renews itself";
-		igBtn.textContent = ig.connected ? "Replace token" : "Connect Instagram";
+		igBtn.textContent = ig.connected ? "Replace token" : "Use token";
+		igLogin.textContent = ig.connected ? "Log in again" : "Log in with Instagram";
+		igLogin.hidden = !ig.login;
 		subtitle(d.lastRun ? "Last measured " + ago(d.lastRun) + (d.running ? " · measuring now..." : "") : "Not measured yet - add a profile or video");
 		const pf = d.platforms || {};
 		const share = (k) => (t.views ? Math.round(((pf[k] || {}).views || 0) / t.views * 100) : 0);

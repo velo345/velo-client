@@ -26,6 +26,8 @@ final class PanelRoutes {
 					.getAsJsonObject();
 			if (body.has("remove")) {
 				JsonHttp.writeJson(ex, 200, socials.remove(body.get("remove").getAsString()));
+			} else if (body.has("instagramLogin")) {
+				JsonHttp.writeJson(ex, 200, socials.instagramLoginUrl());
 			} else if (body.has("instagramToken")) {
 				JsonHttp.writeJson(ex, 200, socials.connectInstagram(body.get("instagramToken").getAsString()));
 			} else if (body.has("refresh")) {
@@ -35,6 +37,15 @@ final class PanelRoutes {
 				JsonHttp.writeJson(ex, 200, socials.add(body.has("url") ? body.get("url").getAsString() : null));
 			}
 		}, "POST");
+		// Instagram's OAuth redirect (public: guarded by the one-time state the panel got above).
+		server.createContext("/v1/instagram/callback", exchange -> VeloServerApp.handle(exchange, "GET", ex -> {
+			Map<String, String> q = StoreRoutes.query(ex);
+			String target = socials.instagramCallback(q.get("code"), q.get("state"), q.getOrDefault("error_description", q.get("error")));
+			ex.getResponseHeaders().set("Location", target);
+			ex.getResponseHeaders().set("Cache-Control", "no-store");
+			ex.sendResponseHeaders(302, -1);
+			ex.close();
+		}));
 	}
 
 	static void register(HttpServer server, SessionRegistry registry, StatsService stats, net.veloclient.server.store.StoreService store, String adminToken) {

@@ -194,6 +194,8 @@ public final class VeloServerApp {
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));
 		PanelRoutes.register(server, registry, stats, store, adminToken);
 		SocialStatsService socials = new SocialStatsService(dataDir, envOr("VELO_YTDLP", "yt-dlp"), envOr("VELO_YOUTUBE_API_KEY", null));
+		socials.instagramApp(envOr("VELO_INSTAGRAM_APP_ID", null), envOr("VELO_INSTAGRAM_REDIRECT", null),
+				envOr("VELO_INSTAGRAM_APP_SECRET", null), envOr("VELO_INSTAGRAM_APP_SECRET2", null));
 		PanelRoutes.registerSocials(server, socials, adminToken);
 		Executors.newSingleThreadScheduledExecutor(r -> {
 			Thread t = new Thread(r, "velo-socials");

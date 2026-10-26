@@ -35,6 +35,8 @@ import java.util.concurrent.TimeUnit;
  * <p>Instagram blocks tools outright, so Reels come from the official Instagram API (with Instagram Login): the owner
  * pastes a long-lived token of their professional account into the panel once ({@code data/instagram.json}, refreshed
  * here every week so it never runs out). Every Reel of that account is then picked up by itself, with views and shares.
+ * With {@code VELO_INSTAGRAM_APP_ID} / {@code VELO_INSTAGRAM_APP_SECRET} set, the panel's "Log in with Instagram" does the
+ * OAuth login and gets that token by itself (redirect URI: {@value #IG_REDIRECT_DEFAULT}).
  */
 final class SocialStatsService {
 
@@ -85,6 +87,8 @@ final class SocialStatsService {
 
 	private static final String IG = "https://graph.instagram.com/v23.0";
 	private static final long IG_REFRESH_MILLIS = 7L * 86_400_000L;
+	static final String IG_REDIRECT_DEFAULT = "https://api.velo-client.com/v1/instagram/callback";
+	static final String PANEL_SOCIALS = "https://panel.velo-client.com/#/socials";
 
 	private final Path file;
 	private final String ytDlp;
@@ -92,6 +96,11 @@ final class SocialStatsService {
 	private final Path instagramFile;
 	private Data data;
 	private Instagram instagram;
+	private String igAppId;
+	private List<String> igAppSecrets = List.of();
+	private String igRedirect = IG_REDIRECT_DEFAULT;
+	/** OAuth states handed out to the panel (state -> expiry), so only a login the owner started can connect. */
+	private final Map<String, Long> igStates = new java.util.concurrent.ConcurrentHashMap<>();
 	private volatile boolean running;
 
 	SocialStatsService(Path dataDir, String ytDlp, String youtubeKey) throws IOException {
@@ -103,6 +112,68 @@ final class SocialStatsService {
 		this.instagramFile = dataDir.resolve("instagram.json");
 		Instagram ig = Files.exists(instagramFile) ? GSON.fromJson(Files.readString(instagramFile, StandardCharsets.UTF_8), Instagram.class) : null;
 		instagram = ig == null || ig.token == null ? null : ig;
+	}
+
+	/** The Instagram app for "Log in with Instagram". A second secret is tried when the first is refused (app vs Instagram secret). */
+	void instagramApp(String appId, String redirect, String... secrets) {
+		igAppId = appId == null || appId.isBlank() ? null : appId.strip();
+		igAppSecrets = java.util.Arrays.stream(secrets).filter(x -> x != null && !x.isBlank()).map(String::strip).toList();
+		if (redirect != null && !redirect.isBlank()) {
+			igRedirect = redirect.strip();
+		}
+	}
+
+	/** Where the panel sends the owner to allow access. */
+	Map<String, Object> instagramLoginUrl() throws ApiError {
+		if (igAppId == null || igAppSecrets.isEmpty()) {
+			throw new ApiError(503, "Instagram app isn't set up on the server (VELO_INSTAGRAM_APP_ID / _SECRET)");
+		}
+		long now = System.currentTimeMillis();
+		igStates.values().removeIf(expiry -> expiry < now);
+		String state = java.util.UUID.randomUUID().toString().replace("-", "");
+		igStates.put(state, now + 15 * 60_000L);
+		String url = "https://www.instagram.com/oauth/authorize?enable_fb_login=0&force_authentication=1&client_id=" + enc(igAppId)
+				+ "&redirect_uri=" + enc(igRedirect) + "&response_type=code&scope=" + enc("instagram_business_basic,instagram_business_manage_insights")
+				+ "&state=" + state;
+		return Map.of("url", url);
+	}
+
+	/** Instagram sent the owner back: swap the code for a long-lived token and connect. Returns where to send the browser. */
+	String instagramCallback(String code, String state, String error) {
+		Long expiry = state == null ? null : igStates.remove(state);
+		if (expiry == null || expiry < System.currentTimeMillis()) {
+			return PANEL_SOCIALS + "?instagram=" + enc("That login link expired - start it again from the panel");
+		}
+		if (code == null || code.isBlank()) {
+			return PANEL_SOCIALS + "?instagram=" + enc(error != null ? "Instagram: " + error : "Instagram didn't send a code");
+		}
+		String problem = null;
+		for (String secret : igAppSecrets) {
+			try {
+				String form = "client_id=" + enc(igAppId) + "&client_secret=" + enc(secret) + "&grant_type=authorization_code&redirect_uri="
+						+ enc(igRedirect) + "&code=" + enc(code.replaceAll("#_$", ""));
+				HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create("https://api.instagram.com/oauth/access_token"))
+						.timeout(Duration.ofSeconds(20)).header("Content-Type", "application/x-www-form-urlencoded")
+						.POST(HttpRequest.BodyPublishers.ofString(form)).build(), HttpResponse.BodyHandlers.ofString());
+				JsonObject json = JsonParser.parseString(r.body()).getAsJsonObject();
+				String shortToken = str(json, "access_token", null);
+				if (shortToken == null) {
+					problem = str(json, "error_message", str(json, "error_type", "HTTP " + r.statusCode()));
+					continue;
+				}
+				JsonObject longLived = igGet("https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=" + enc(secret), shortToken);
+				connectInstagram(str(longLived, "access_token", shortToken));
+				return PANEL_SOCIALS + "?instagram=ok";
+			} catch (Exception e) {
+				problem = shortError(e);
+			}
+		}
+		System.out.println("[socials] Instagram login failed: " + problem);
+		return PANEL_SOCIALS + "?instagram=" + enc("Instagram login failed: " + problem);
+	}
+
+	private static String enc(String s) {
+		return java.net.URLEncoder.encode(s, StandardCharsets.UTF_8);
 	}
 
 	private synchronized void saveInstagram() {
@@ -689,6 +760,7 @@ final class SocialStatsService {
 		out.put("youtubeApi", youtubeKey != null);
 		Map<String, Object> ig = new LinkedHashMap<>();
 		ig.put("connected", instagram != null);
+		ig.put("login", igAppId != null && !igAppSecrets.isEmpty());
 		if (instagram != null) {
 			ig.put("username", instagram.username);
 			ig.put("error", instagram.error);
