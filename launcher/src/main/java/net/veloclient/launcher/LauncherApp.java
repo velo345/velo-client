@@ -300,6 +300,11 @@ public final class LauncherApp extends Application {
 		List<Instance> instances = InstanceStore.loadAll();
 		List<Object[]> steps = new java.util.ArrayList<>();
 		steps.add(new Object[] {"01-home", (Runnable) this::showHome});
+		steps.add(new Object[] {"01-home-scrolled", (Runnable) () -> {
+			if (content.getChildren().get(0) instanceof ScrollPane scroll) {
+				scroll.setVvalue(1);
+			}
+		}});
 		steps.add(new Object[] {"01a-library", (Runnable) this::showLibrary});
 		steps.add(new Object[] {"01b-news", (Runnable) this::showNews});
 		steps.add(new Object[] {"01c-news-post", (Runnable) () -> showNewsPost(net.veloclient.launcher.ui.NewsView.bannerPosts(
@@ -1439,10 +1444,21 @@ public final class LauncherApp extends Application {
 		});
 
 		VBox recent = buildHomeRecent(targets);
-		// Under the launch options: partner servers and worlds to join (only shown when there are some).
+		// Hero + launch options fill the window exactly as before; partner servers and worlds to join (only shown when
+		// there are some) sit just below it - scroll down to reach them instead of squeezing the hero.
+		VBox fold = new VBox(22, top, recent);
 		Node discover = net.veloclient.launcher.ui.DiscoverView.build(discoverJoiner(), true);
-		page.getChildren().addAll(top, recent, discover);
-		setContent(page);
+		page.getChildren().addAll(fold, discover);
+		ScrollPane scroll = new ScrollPane(page);
+		scroll.setFitToWidth(true);
+		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+		scroll.viewportBoundsProperty().addListener((o, a, b) -> {
+			fold.setMinHeight(b.getHeight());
+			fold.setPrefHeight(b.getHeight());
+			fold.setMaxHeight(b.getHeight());
+		});
+		setContent(scroll);
 		refreshLaunchBar();
 	}
 
