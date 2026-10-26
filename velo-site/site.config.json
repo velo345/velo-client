@@ -14,12 +14,12 @@
   },
   "release": {
     "_comment": "Bump version on every release - the download buttons link straight to these GitHub release assets.",
-    "version": "0.9.93",
+    "version": "0.9.95",
     "channel": "Pre-release",
-    "launcherExe": "Velo.Client.Launcher-0.9.93.exe",
-    "launcherDeb": "velo-client-launcher_0.9.93_amd64.deb",
-    "date": "2026-10-24",
-    "datePretty": "Oct 24, 2026"
+    "launcherExe": "Velo.Client.Launcher-0.9.95.exe",
+    "launcherDeb": "velo-client-launcher_0.9.95_amd64.deb",
+    "date": "2026-10-26",
+    "datePretty": "Oct 26, 2026"
   },
   "launch": {
     "_comment": "Velo Client 1.0 - out of beta. The countdown on Home / Download runs to this moment, then says it's out.",
