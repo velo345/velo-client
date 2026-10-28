@@ -77,6 +77,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 	private int searchW;
 	private int editX;
 	private int editW;
+	private final net.veloclient.velo.client.nowplaying.MediaControls media = new net.veloclient.velo.client.nowplaying.MediaControls();
 
 	private record Heading(int y, String title, String note, int color) {
 	}
@@ -365,6 +366,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			MenuKit.text(context, this.textRenderer, label, tx + 8, ty + 5, VeloUi.withAlpha(MenuKit.TEXT, alpha));
 			context.disableScissor();
 		}
+		media.renderPanel(context, this.textRenderer, mouseX, mouseY, this.width, this.height);
 	}
 
 	@Override
@@ -448,7 +450,8 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		int x = mainX();
 		int y = contentY();
 		// The view's title on the left, where the eye starts.
-		MenuKit.text(context, this.textRenderer, MenuKit.displayLg(view == View.ADDONS ? "Addons" : "Modules"), x, y + 5, MenuKit.TEXT);
+		Text title = MenuKit.displayLg(view == View.ADDONS ? "Addons" : "Modules");
+		MenuKit.text(context, this.textRenderer, title, x, y + 5, MenuKit.TEXT);
 
 		// Search on the far right, the profile switcher right before it.
 		boolean focused = search != null && search.isFocused();
@@ -472,6 +475,9 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			context.fill(px + w - 8 - i, y + 10 + i, px + w - 7 - i, y + 11 + i, 0xFF8A8A95);
 		}
 		hits.add(new VeloUi.Hit(px, y + 1, w, 22, () -> this.client.setScreen(new ProfileScreen(this))));
+		// What's playing, in the gap between the title and the profile switcher.
+		int titleRight = x + this.textRenderer.getWidth(title) + 14;
+		media.renderPill(context, this.textRenderer, px - 8, y + 1, px - 8 - titleRight, mouseX, mouseY);
 	}
 
 	private void drawChips(DrawContext context, int mouseX, int mouseY) {
@@ -715,6 +721,9 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 
 	@Override
 	public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+		if (media.mouseClicked(click.x(), click.y())) {
+			return true;
+		}
 		for (VeloUi.Hit hit : List.copyOf(hits)) {
 			if (hit.contains(click.x(), click.y())) {
 				this.client.getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.UI_BUTTON_CLICK, 1.0f));
@@ -726,7 +735,20 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 	}
 
 	@Override
+	public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
+		return media.mouseDragged(click.x(), click.y()) || super.mouseDragged(click, offsetX, offsetY);
+	}
+
+	@Override
+	public boolean mouseReleased(net.minecraft.client.gui.Click click) {
+		return media.mouseReleased() || super.mouseReleased(click);
+	}
+
+	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+		if (media.mouseScrolled(mouseX, mouseY, verticalAmount)) {
+			return true;
+		}
 		if (region != null && region.scroll(mouseX, mouseY, verticalAmount)) {
 			region.layoutPositioned(spots, pageHeight);
 			return true;

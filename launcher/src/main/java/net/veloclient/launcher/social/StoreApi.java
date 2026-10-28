@@ -196,13 +196,55 @@ public final class StoreApi {
 	/** Velo+: {@code plus}, {@code until}, {@code price}, {@code currency}, {@code monthlyCoins}, {@code periodDays}, {@code checkoutEnabled}. */
 	public static JsonObject plusStatus() throws StoreError {
 		JsonObject status = get("/v1/plus/status");
-		plusMember = status.has("plus") && status.get("plus").getAsBoolean();
+		setPlusMember(status.has("plus") && status.get("plus").getAsBoolean());
 		return status;
 	}
 
-	private static volatile boolean plusMember;
+	/**
+	 * The last known answer, kept on disk: Home is built before the server answered (at start, on every return to
+	 * Home), and must not flash back to the island - or stay there - for a member whose GIF background is set.
+	 */
+	private static final java.nio.file.Path PLUS_FLAG = net.veloclient.launcher.data.VeloPaths.root().resolve("cache").resolve("plus-member");
+	private static volatile boolean plusMember = java.nio.file.Files.exists(PLUS_FLAG);
+	private static final java.util.List<Runnable> PLUS_LISTENERS = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-	/** Whether the last {@link #plusStatus()} answer said Velo+ is active (false until asked). */
+	private static void setPlusMember(boolean member) {
+		if (member == plusMember) {
+			return;
+		}
+		plusMember = member;
+		try {
+			if (member) {
+				java.nio.file.Files.createDirectories(PLUS_FLAG.getParent());
+				java.nio.file.Files.writeString(PLUS_FLAG, "1");
+			} else {
+				java.nio.file.Files.deleteIfExists(PLUS_FLAG);
+			}
+		} catch (java.io.IOException ignored) {
+			// Only a cache.
+		}
+		PLUS_LISTENERS.forEach(Runnable::run);
+	}
+
+	/** Called (on any thread) when the Velo+ answer changes. */
+	public static void onPlusChange(Runnable listener) {
+		PLUS_LISTENERS.add(listener);
+	}
+
+	/** Asks the server again in the background (after connecting or switching accounts). */
+	static void refreshPlusInBackground() {
+		Thread thread = new Thread(() -> {
+			try {
+				plusStatus();
+			} catch (Exception ignored) {
+				// Offline: keep the last answer.
+			}
+		}, "velo-plus-status");
+		thread.setDaemon(true);
+		thread.start();
+	}
+
+	/** Whether the last {@link #plusStatus()} answer said Velo+ is active (the last known one, kept across starts). */
 	public static boolean isPlusCached() {
 		return plusMember;
 	}

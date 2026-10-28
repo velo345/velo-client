@@ -11,6 +11,8 @@ public final class PackTour {
 	private static VeloPacksScreen packs;
 	private static PackBrowserScreen browser;
 	private static TextureEditorScreen editor;
+	private static SoundEditorScreen sound;
+	private static CodeEditorScreen code;
 
 	private PackTour() {
 	}
@@ -70,7 +72,8 @@ public final class PackTour {
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
-		client.setScreen(new SoundEditorScreen(browser, PackBridge.packDir().resolve("Velo Tour Pack"), eventId));
+		sound = new SoundEditorScreen(browser, PackBridge.packDir().resolve("Velo Tour Pack"), eventId);
+		client.setScreen(sound);
 	}
 
 	public static void openCode(MinecraftClient client, String key) {
@@ -81,7 +84,8 @@ public final class PackTour {
 				Files.createDirectories(file.getParent());
 				Files.write(file, PackBridge.readGame(key));
 			}
-			client.setScreen(new CodeEditorScreen(browser, file, key));
+			code = new CodeEditorScreen(browser, file, key);
+			client.setScreen(code);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
@@ -98,5 +102,49 @@ public final class PackTour {
 		if (demo) {
 			editor.demoForTour(colorize);
 		}
+	}
+
+	public static PackBrowserScreen browser() {
+		return browser;
+	}
+
+	public static TextureEditorScreen editor() {
+		return editor;
+	}
+
+	public static SoundEditorScreen sound() {
+		return sound;
+	}
+
+	public static CodeEditorScreen code() {
+		return code;
+	}
+
+	/** Starts from an empty tour pack (earlier runs leave their edits in it). */
+	public static void resetPack() {
+		Path dir = PackBridge.packDir().resolve("Velo Tour Pack");
+		try (var walk = Files.walk(dir)) {
+			for (Path p : walk.sorted(java.util.Comparator.reverseOrder()).toList()) {
+				Files.delete(p);
+			}
+		} catch (java.nio.file.NoSuchFileException ignored) {
+			// nothing to reset
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	/** Removes a copied file from the pack again (e.g. a shader only opened for show). */
+	public static void removeFile(String key) {
+		try {
+			Files.deleteIfExists(PackContents.file(PackBridge.packDir().resolve("Velo Tour Pack"), key));
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	/** Puts the pack on and reloads resources, like Save & reload. */
+	public static void applyAndReload() {
+		browser.applyAndReload();
 	}
 }

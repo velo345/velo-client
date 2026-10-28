@@ -295,8 +295,11 @@ public final class LauncherSocial {
 					authenticate();
 					since = 0;
 					status = "Connected";
-					// The website may have asked for a sign-in code while the launcher was closed.
+					// The website (or the staff panel) may have asked for a sign-in code while the launcher was closed.
 					fetchWebCode();
+					fetchStaffCode();
+					// Velo+ decides the Home background: re-check it with this session.
+					StoreApi.refreshPlusInBackground();
 				}
 				boolean idleNow = isWindowIdle();
 				if (System.currentTimeMillis() - lastHeartbeat > 30_000 || idleNow != lastIdleSent) {
@@ -410,12 +413,53 @@ public final class LauncherSocial {
 		thread.start();
 	}
 
+	/**
+	 * staff.velo-client.com asked for a first sign-in code: fetches it and publishes a {@code staff_code} event whose
+	 * {@code fromName} is the code - LauncherApp shows it right away.
+	 */
+	private static void fetchStaffCode() {
+		Thread thread = new Thread(() -> {
+			try {
+				JsonObject result = getJson("/v1/staffpanel/pending", Duration.ofSeconds(10));
+				if (result.has("code") && !result.get("code").isJsonNull()) {
+					publish(new Event("staff_code", null, null, null, result.get("code").getAsString()));
+				}
+			} catch (Exception e) {
+				LauncherLog.info("Velo staff panel code: " + e);
+			}
+		}, "velo-staff-code");
+		thread.setDaemon(true);
+		thread.start();
+	}
+
+	/** Your staff panel sign-in: {team, enrolled, signedIn, lastSignInAt, lastSignInIp, methods, url}; null when not connected. */
+	public static JsonObject staffPanelStatus() {
+		try {
+			return token == null ? null : getJson("/v1/staffpanel/launcher-status", Duration.ofSeconds(10));
+		} catch (Exception e) {
+			LauncherLog.info("Velo staff panel status: " + e);
+			return null;
+		}
+	}
+
+	/** Signs out of the staff panel everywhere and wipes its sign-in, so it can be set up on another device. */
+	public static void staffPanelSignOut() throws Exception {
+		if (token == null) {
+			throw new IllegalStateException("Not connected to the Velo Network yet");
+		}
+		postJson("/v1/staffpanel/launcher-signout", new JsonObject(), token);
+	}
+
 	private static boolean handleEvent(JsonObject event) {
 		String type = event.get("type").getAsString();
 		JsonElement data = event.get("data");
 		switch (type) {
 			case "web_code" -> {
 				fetchWebCode();
+				return false;
+			}
+			case "staff_code" -> {
+				fetchStaffCode();
 				return false;
 			}
 			case "message" -> {

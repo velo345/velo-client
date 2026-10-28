@@ -236,10 +236,21 @@ public final class LauncherApp extends Application {
 					launchWithProgress(instance, server, launchBar.playButton(), launchBar.progress(), launchBar.statusLabel());
 				}));
 		partyController.setOnChange(this::refreshPartyStrip);
+		// The Velo+ answer came in (or changed): Home shows the member's own background or the island.
+		net.veloclient.launcher.social.StoreApi.onPlusChange(() -> Platform.runLater(() -> {
+			if ("home".equals(activePage)) {
+				showHome();
+			}
+		}));
 		net.veloclient.launcher.social.LauncherSocial.addListener(event -> {
 			if ("web_code".equals(event.type())) {
 				// velo-client.com asked for a sign-in code (fromName carries it).
 				Platform.runLater(() -> net.veloclient.launcher.ui.WebCodeDialog.show(stage, event.fromName()));
+				return;
+			}
+			if ("staff_code".equals(event.type())) {
+				// staff.velo-client.com: the first sign-in of a team member on a new device.
+				Platform.runLater(() -> net.veloclient.launcher.ui.WebCodeDialog.showStaff(stage, event.fromName()));
 				return;
 			}
 			refreshFriendsBadge();

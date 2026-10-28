@@ -318,6 +318,12 @@ public final class AccountProfileView {
 				discordStatus.setText(result == null ? "Not available" : "Not linked - link it in the Store");
 			}
 		}));
+		// Team members: their staff panel sign-in, and signing out of it (so it can be set up on another device).
+		VBox staffBox = new VBox(8);
+		staffBox.setManaged(false);
+		staffBox.setVisible(false);
+		CompletableFuture.supplyAsync(net.veloclient.launcher.social.LauncherSocial::staffPanelStatus, Executors.newVirtualThreadPerTaskExecutor())
+				.thenAccept(status -> Platform.runLater(() -> fillStaffPanel(staffBox, status, host)));
 		Region grow = new Region();
 		VBox.setVgrow(grow, Priority.ALWAYS);
 		Button signOut = new Button("Sign out");
@@ -331,12 +337,64 @@ public final class AccountProfileView {
 			DialogStyling.apply(confirm);
 			confirm.showAndWait().filter(b -> b == ButtonType.OK).ifPresent(b -> host.signOut());
 		});
-		VBox box = new VBox(14, title, microsoft, discord, grow, signOut);
+		VBox box = new VBox(14, title, microsoft, discord, staffBox, grow, signOut);
 		box.getStyleClass().add("card");
 		box.setPadding(new Insets(18));
 		box.setMinWidth(260);
 		box.setPrefWidth(280);
 		return box;
+	}
+
+	private static void fillStaffPanel(VBox box, com.google.gson.JsonObject status, Host host) {
+		if (status == null || !status.has("team") || status.get("team").isJsonNull()) {
+			return;
+		}
+		boolean enrolled = status.get("enrolled").getAsBoolean();
+		boolean signedIn = status.get("signedIn").getAsBoolean();
+		String line;
+		if (!enrolled) {
+			line = "Not set up - open staff.velo-client.com";
+		} else {
+			long at = status.get("lastSignInAt").getAsLong();
+			String when = at == 0 ? "never" : DateTimeFormatter.ofPattern("MMM d, HH:mm", Locale.ENGLISH).withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(at));
+			line = (signedIn ? "Signed in" : "Set up") + " · last sign-in " + when;
+		}
+		Node row = connection("ST", "#E0262E", "Staff panel", line, enrolled);
+		box.getChildren().setAll(row);
+		if (enrolled) {
+			Button out = new Button("Sign out of staff panel");
+			out.getStyleClass().addAll("glass-button", "button-sm");
+			out.setMaxWidth(Double.MAX_VALUE);
+			out.setOnAction(e -> {
+				Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+				confirm.initOwner(host.owner());
+				confirm.setTitle("Staff panel");
+				confirm.setHeaderText("Sign out of the staff panel?");
+				confirm.setContentText("Your session ends and your passkeys, password, pattern and authenticator for the panel are removed. "
+						+ "Next time you open staff.velo-client.com you get a new code here and set it up again - on any device.");
+				DialogStyling.apply(confirm);
+				confirm.showAndWait().filter(b -> b == ButtonType.OK).ifPresent(b -> {
+					out.setDisable(true);
+					CompletableFuture.runAsync(() -> {
+						try {
+							net.veloclient.launcher.social.LauncherSocial.staffPanelSignOut();
+						} catch (Exception ex) {
+							throw new RuntimeException(ex);
+						}
+					}, Executors.newVirtualThreadPerTaskExecutor()).whenComplete((v, error) -> Platform.runLater(() -> {
+						if (error != null) {
+							out.setDisable(false);
+							out.setText("Couldn't sign out - try again");
+						} else {
+							fillStaffPanel(box, net.veloclient.launcher.social.LauncherSocial.staffPanelStatus(), host);
+						}
+					}));
+				});
+			});
+			box.getChildren().add(out);
+		}
+		box.setManaged(true);
+		box.setVisible(true);
 	}
 
 	private static Node connection(String letters, String color, String name, String status, boolean ok) {

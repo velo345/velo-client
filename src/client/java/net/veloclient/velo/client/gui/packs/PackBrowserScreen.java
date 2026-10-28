@@ -1010,6 +1010,17 @@ public final class PackBrowserScreen extends VeloWindow {
 		openCategory(c);
 	}
 
+	/** Dev-only (screenshot tour). */
+	public void scrollForTour(float y) {
+		scroll = y;
+		scrollTarget = y;
+	}
+
+	/** Dev-only (screenshot tour). */
+	public void searchForTour(String text) {
+		search.setText(text);
+	}
+
 	VeloPacksScreen packs() {
 		return packs;
 	}

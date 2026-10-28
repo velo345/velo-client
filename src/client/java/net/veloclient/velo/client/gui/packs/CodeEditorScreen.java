@@ -1444,6 +1444,17 @@ public final class CodeEditorScreen extends VeloWindow {
 
 	// ---- Lifecycle ----
 
+	// ---- Dev-only (screenshot tour) ----
+
+	public void caretForTour(int line, int col) {
+		moveCaret(line, col, false);
+	}
+
+	public void typeForTour(String text) {
+		beginEdit("Type");
+		insert(text);
+	}
+
 	@Override
 	protected void requestClose() {
 		if (dirty() && !discardConfirmed && loadError == null) {

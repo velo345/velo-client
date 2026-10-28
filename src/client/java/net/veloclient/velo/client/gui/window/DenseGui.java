@@ -22,13 +22,16 @@ public final class DenseGui {
 	private static final int FLOOR_WIDTH = 640;
 	private static final int FLOOR_HEIGHT = 360;
 
+	/** Dev-only (-Dvelo.tourNoDense): promo captures keep the plain GUI scale so the UI stays big in portrait crops. */
+	private static final boolean NO_DENSE = System.getProperty("velo.tourNoDense") != null;
+
 	private DenseGui() {
 	}
 
 	/** The scale Velo windows render at: the largest one below the GUI scale that still leaves room, else the GUI scale. */
 	public static int effectiveScale() {
 		int scale = ClientCompat.guiScale();
-		if (scale < 3) {
+		if (scale < 3 || NO_DENSE) {
 			return scale;
 		}
 		int pixelsW = MinecraftClient.getInstance().getWindow().getScaledWidth() * scale;

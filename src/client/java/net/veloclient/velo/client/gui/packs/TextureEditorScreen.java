@@ -2390,6 +2390,94 @@ public final class TextureEditorScreen extends VeloWindow {
 		}
 	}
 
+	// ---- Dev-only (screenshot tour): drives the editor frame by frame for promo captures ----
+
+	/** Screen position of texture pixel coordinates (pixel centres at +0.5). */
+	public float[] screenPointForTour(float px, float py) {
+		computeLayout();
+		if (zoom < 0) {
+			fitView();
+		}
+		return new float[] {viewX + px * zoom, viewY + py * zoom};
+	}
+
+	/** Zoom so {@code cx, cy} (texture pixels) sits in the middle of the canvas; zoom <= 0 fits the texture. */
+	public void viewForTour(float z, float cx, float cy) {
+		computeLayout();
+		if (z <= 0) {
+			fitView();
+			return;
+		}
+		zoom = z;
+		viewX = vpX + vpW / 2f - cx * z;
+		viewY = vpY + vpH / 2f - cy * z;
+	}
+
+	public void toolForTour(String name, int size) {
+		selectTool(Tool.valueOf(name));
+		ts().size = size;
+	}
+
+	public void colorForTour(int argb) {
+		setPrimary(argb);
+	}
+
+	/** Paints a line with the current tool; {@code start} begins a new undo step. */
+	public void strokeForTour(int x0, int y0, int x1, int y1, boolean start) {
+		if (start) {
+			doc.checkpoint(tool.label);
+			touched = new boolean[doc.width * doc.height];
+		}
+		PixelOps.line(x0, y0, x1, y1, (x, y) -> dab(x, y, Keys.MOUSE_LEFT));
+		doc.changed();
+	}
+
+	public void wandForTour(int x, int y, float tolerance) {
+		selectOp = 0;
+		commitSelection(PixelOps.similar(doc.frame(), doc.width, doc.height, x, y, tolerance, true));
+	}
+
+	public void deselectForTour() {
+		deselect();
+	}
+
+	/** Opens (or updates) a filter on the Adjust tab: COLORIZE takes hue, saturation, lightness. */
+	public void filterForTour(String name, float a, float b, float c) {
+		switchTab(1);
+		Filter f = Filter.valueOf(name);
+		if (filter != f) {
+			startFilter(f);
+		}
+		allFrames = true;
+		fa = a;
+		fb = b;
+		fc = c;
+		filterDirty = true;
+	}
+
+	public void applyFilterForTour() {
+		applyFilter();
+	}
+
+	public void tabForTour(int tab) {
+		switchTab(tab);
+	}
+
+	public void previewForTour(float yaw, float pitch, float zoom) {
+		autoRotate = false;
+		this.yaw = yaw;
+		this.pitch = pitch;
+		previewZoom = zoom;
+	}
+
+	public void playForTour(boolean play) {
+		playing = play;
+	}
+
+	public void saveForTour() {
+		save();
+	}
+
 	// ---- Lifecycle ----
 
 	@Override

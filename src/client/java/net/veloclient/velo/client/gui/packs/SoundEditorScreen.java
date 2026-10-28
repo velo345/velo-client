@@ -804,6 +804,34 @@ public final class SoundEditorScreen extends VeloWindow {
 
 	// ---- Lifecycle ----
 
+	// ---- Dev-only (screenshot tour) ----
+
+	/** Moves the trim handles of the open sound (seconds; end < 0 = the whole sound). */
+	public void trimForTour(double start, double end) {
+		State s = current();
+		if (s != null) {
+			s.start = start;
+			s.end = end;
+		}
+	}
+
+	/** Plays the open sound with its edits, silently - the playhead still runs. */
+	public void playForTour() {
+		State s = current();
+		if (s == null || s.source == null) {
+			return;
+		}
+		AudioData.Edits e = s.edits();
+		AudioData result = e.isNone(s.source.seconds()) ? s.source : s.source.apply(e);
+		s.previewOf = result;
+		AudioPreview.play(result, 0, result.frames(), true, 0f);
+	}
+
+	public boolean loadedForTour() {
+		State s = current();
+		return s != null && s.source != null;
+	}
+
 	@Override
 	protected void requestClose() {
 		if (dirty() && !discardConfirmed) {

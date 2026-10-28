@@ -40,7 +40,7 @@ public final class ModuleIcons {
 			"attack-indicator", "auto-reconnect", "chunk-load-profiler", "entity-detail", "fly-speed", "free-look",
 			"module-profiler", "nick-hider", "phantom", "render-culling", "velo-network", "screen-stretch",
 			"hide-foliage", "container-animations", "emoji-chat", "anti-coords-leak", "anti-deepslate", "velo-shaders",
-			"no-break-particles", "totem-pops", "emotes");
+			"no-break-particles", "totem-pops", "emotes", "media-player");
 
 	private ModuleIcons() {
 	}

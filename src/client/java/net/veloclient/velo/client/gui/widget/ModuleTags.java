@@ -36,7 +36,7 @@ public final class ModuleTags {
 			Map.entry("totem-counter", "Crystal PvP"), Map.entry("totem-pops", "Crystal PvP"), Map.entry("emotes", "Style"), Map.entry("pot-counter", "Pot PvP"), Map.entry("arrow-counter", "Bow PvP"),
 			Map.entry("coordinates", "Survival"), Map.entry("minimap", "Survival"), Map.entry("waypoints", "Survival"),
 			Map.entry("world-map", "Survival"), Map.entry("shulker-preview", "Survival"), Map.entry("session-stats", "Everyday"),
-			Map.entry("fps-counter", "Everyday"), Map.entry("ping-display", "Servers"), Map.entry("clock", "Everyday"),
+			Map.entry("fps-counter", "Everyday"), Map.entry("ping-display", "Servers"), Map.entry("clock", "Everyday"), Map.entry("media-player", "Music"),
 			Map.entry("direction-hud", "Everyday"), Map.entry("speed-hud", "Parkour"), Map.entry("scoreboard-hud", "Servers"),
 			Map.entry("boss-bar", "Servers"), Map.entry("server-overlays", "Bed Wars"), Map.entry("height-limit", "Bed Wars"),
 			Map.entry("player-levels", "Minigames"), Map.entry("auto-gg", "Minigames"), Map.entry("mode-presets", "Minigames"),

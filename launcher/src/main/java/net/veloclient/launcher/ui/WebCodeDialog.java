@@ -26,6 +26,21 @@ public final class WebCodeDialog {
 	}
 
 	public static void show(Stage owner, String code) {
+		show(owner, code, "Sign in on velo-client.com", "Your website sign-in code",
+				"Type it on velo-client.com to sign in to the Store. It works once, for 5 minutes.\n"
+						+ "Didn't ask for it? Just close this - nobody can use it without seeing it here.",
+				"Expired - ask for a new code on the website");
+	}
+
+	/** The staff panel's first sign-in on a new device (staff.velo-client.com). */
+	public static void showStaff(Stage owner, String code) {
+		show(owner, code, "Velo Staff panel", "Staff panel sign-in code",
+				"Type it on staff.velo-client.com, then choose a passkey, or a password or pattern with an authenticator app. "
+						+ "It works once, for 5 minutes.\nDidn't ask for it? Close this and tell a manager - nobody can use it without seeing it here.",
+				"Expired - ask for a new code on staff.velo-client.com");
+	}
+
+	private static void show(Stage owner, String code, String windowTitle, String heading, String text, String expired) {
 		if (open != null) {
 			open.close();
 		}
@@ -37,16 +52,15 @@ public final class WebCodeDialog {
 		Dialog<Void> dialog = new Dialog<>();
 		open = dialog;
 		dialog.initOwner(owner);
-		dialog.setTitle("Sign in on velo-client.com");
+		dialog.setTitle(windowTitle);
 		DialogStyling.apply(dialog);
 		dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
 
-		Label title = new Label("Your website sign-in code");
+		Label title = new Label(heading);
 		title.getStyleClass().add("error-dialog-title");
 		Label pretty = new Label(code.substring(0, 3) + " " + code.substring(3));
 		pretty.setStyle("-fx-font-family: 'JetBrains Mono'; -fx-font-size: 44px; -fx-font-weight: bold; -fx-text-fill: -velo-text; -fx-letter-spacing: 6px;");
-		Label hint = new Label("Type it on velo-client.com to sign in to the Store. It works once, for 5 minutes.\n"
-				+ "Didn't ask for it? Just close this - nobody can use it without seeing it here.");
+		Label hint = new Label(text);
 		hint.getStyleClass().add("error-dialog-message");
 		hint.setWrapText(true);
 		Label left = new Label();
@@ -62,7 +76,7 @@ public final class WebCodeDialog {
 		long until = System.currentTimeMillis() + 5 * 60_000L;
 		Timeline countdown = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
 			long ms = until - System.currentTimeMillis();
-			left.setText(ms <= 0 ? "Expired - ask for a new code on the website" : String.format("Copied to your clipboard · expires in %d:%02d", ms / 60_000, ms / 1000 % 60));
+			left.setText(ms <= 0 ? expired : String.format("Copied to your clipboard · expires in %d:%02d", ms / 60_000, ms / 1000 % 60));
 		}));
 		countdown.setCycleCount(Timeline.INDEFINITE);
 		countdown.play();

@@ -133,6 +133,11 @@
    "group": "Core",
    "path": "M8 4h8v6H8z M10 6.5h.01 M14 6.5h.01 M6 12h12 M9 10v10h6V10 M4 15l2-3 M20 15l-2-3"
   },
+  "media-player": {
+   "name": "Media Player",
+   "group": "Core",
+   "path": "M9 18V5l12-2v13 M6 15a3 3 0 1 0 0 6a3 3 0 1 0 0-6 M18 13a3 3 0 1 0 0 6a3 3 0 1 0 0-6"
+  },
   "emotes": {
    "name": "Emotes",
    "group": "Core",

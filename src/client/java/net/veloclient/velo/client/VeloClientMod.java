@@ -263,6 +263,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new PingDisplayModule());
 		ModuleRegistry.register(new CoordinatesModule());
 		ModuleRegistry.register(new ClockModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.MediaPlayerModule());
 		ModuleRegistry.register(new ArmorDurabilityModule());
 		ModuleRegistry.register(new PotionTimersModule());
 		ModuleRegistry.register(new HeldItemModule());
