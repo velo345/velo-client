@@ -1,0 +1,10 @@
+{
+ "slot": "mask",
+ "name": "Oni Mask",
+ "price": 1800,
+ "accent": "#b8202a",
+ "description": "A fierce red demon mask with golden horns, brows and fangs.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

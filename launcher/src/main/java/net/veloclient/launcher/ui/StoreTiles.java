@@ -249,7 +249,7 @@ public final class StoreTiles {
 		Node[] hover = new Node[1];
 		Node art = capeArt(item, hover, 170);
 		Integer full = StoreApi.fullPrice(item.id());
-		VBox tile = tile(art, "#5aa9ff", Rarity.of(item.id(), price), "Animated cape", item.name(),
+		VBox tile = tile(art, "#5aa9ff", Rarity.of(item.id(), price), "Animated cloak", item.name(),
 				owned ? State.OWNED : item.inStore() ? State.FOR_SALE : State.LOCKED, price, full, dealLabel(price, full), onClick);
 		hover[0] = tile;
 		return tile;
@@ -262,6 +262,58 @@ public final class StoreTiles {
 		Integer full = StoreApi.fullPrice(type.itemId());
 		return tile(auraArt(type, 220, 170), type.accent(), Rarity.of(type.itemId(), price), "Aura", type.name(),
 				equipped ? State.EQUIPPED : owned ? State.OWNED : type.inStore() ? State.FOR_SALE : State.LOCKED, price, full,
+				dealLabel(price, full), onClick);
+	}
+
+	/** A kill effect: a still of its best moment. */
+	public static Node killFxArt(net.veloclient.launcher.data.KillFxCatalog.KillFxType type, double width, double height) {
+		boolean owned = net.veloclient.launcher.data.KillFxCatalog.owns(type.id());
+		var settings = owned ? net.veloclient.launcher.data.KillFxCatalog.settings(type.id()) : net.veloclient.velo.client.cosmetics.aura.AuraEffects.Settings.DEFAULT;
+		ImageView image = new ImageView(AuraFx.killFxSnapshot(type.kind(), settings, (int) width, (int) height));
+		image.setMouseTransparent(true);
+		return image;
+	}
+
+	public static VBox killFxTile(net.veloclient.launcher.data.KillFxCatalog.KillFxType type, Runnable onClick) {
+		int price = StoreApi.price(type.itemId(), type.price());
+		boolean owned = net.veloclient.launcher.data.KillFxCatalog.owns(type.id());
+		boolean equipped = type.id().equals(net.veloclient.launcher.data.KillFxCatalog.equipped());
+		Integer full = StoreApi.fullPrice(type.itemId());
+		return tile(killFxArt(type, 220, 170), type.accent(), Rarity.of(type.itemId(), price), "Kill effect", type.name(),
+				equipped ? State.EQUIPPED : owned ? State.OWNED : type.inStore() ? State.FOR_SALE : State.LOCKED, price, full,
+				dealLabel(price, full), onClick);
+	}
+
+	/** A bodywear item: its Store picture (loaded in the background). */
+	public static Node wearArt(net.veloclient.launcher.data.WearCatalog.WearType type, double width) {
+		ImageView image = new ImageView();
+		image.setFitWidth(width);
+		image.setPreserveRatio(true);
+		image.setSmooth(true);
+		image.setMouseTransparent(true);
+		String sha = type.files().get("preview");
+		Thread.ofVirtual().start(() -> {
+			java.nio.file.Path file = WingsCatalog.file(sha);
+			if (file != null) {
+				try (var in = java.nio.file.Files.newInputStream(file)) {
+					javafx.scene.image.Image picture = new javafx.scene.image.Image(in);
+					javafx.application.Platform.runLater(() -> image.setImage(picture));
+				} catch (Exception ignored) {
+					// no picture
+				}
+			}
+		});
+		return image;
+	}
+
+	public static VBox wearTile(net.veloclient.launcher.data.WearCatalog.WearType type, Runnable onClick) {
+		int price = StoreApi.price(type.itemId(), type.price());
+		boolean owned = net.veloclient.launcher.data.WearCatalog.owns(type.id());
+		boolean wearing = type.id().equals(net.veloclient.launcher.data.WearCatalog.equipped(type.slot()));
+		Integer full = StoreApi.fullPrice(type.itemId());
+		String slotName = net.veloclient.launcher.data.WearCatalog.SLOT_NAMES.get(Math.max(0, net.veloclient.launcher.data.WearCatalog.SLOTS.indexOf(type.slot())));
+		return tile(wearArt(type, 210), type.accent(), Rarity.of(type.itemId(), price), slotName, type.name(),
+				wearing ? State.EQUIPPED : owned ? State.OWNED : type.inStore() ? State.FOR_SALE : State.LOCKED, price, full,
 				dealLabel(price, full), onClick);
 	}
 

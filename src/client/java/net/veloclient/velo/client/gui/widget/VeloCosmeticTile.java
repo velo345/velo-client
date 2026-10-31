@@ -19,7 +19,7 @@ import net.veloclient.velo.client.cosmetics.wings.WingsManager;
  */
 public final class VeloCosmeticTile extends ClickableWidget {
 
-	public enum Kind { WINGS, AURA }
+	public enum Kind { WINGS, AURA, WEAR }
 
 	private final Kind kind;
 	private final String id;
@@ -44,7 +44,9 @@ public final class VeloCosmeticTile extends ClickableWidget {
 		this.onClick = onClick;
 		var auraType = kind == Kind.AURA && !id.isEmpty() ? AuraManager.type(id) : java.util.Optional.<AuraManager.AuraType>empty();
 		this.emitter = auraType.map(t -> new AuraEffects.Emitter(t.kind())).orElse(null);
-		this.accent = id.isEmpty() ? 0xFF8A8A9A : kind == Kind.WINGS ? VeloWingCard.accentFor(id) : auraType.map(AuraManager.AuraType::accent).orElse(0xFFFF4D4D);
+		this.accent = id.isEmpty() ? 0xFF8A8A9A : kind == Kind.WINGS ? VeloWingCard.accentFor(id)
+				: kind == Kind.WEAR ? net.veloclient.velo.client.cosmetics.wear.WearManager.type(id).map(t -> t.accent() == null ? 0xFFFF4D4D : t.accent()).orElse(0xFFFF4D4D)
+				: auraType.map(AuraManager.AuraType::accent).orElse(0xFFFF4D4D);
 	}
 
 	@Override
@@ -70,8 +72,8 @@ public final class VeloCosmeticTile extends ClickableWidget {
 		int area = h - nameH - 4;
 		if (id.isEmpty()) {
 			VeloDraw.cross(context, x + w / 2f, y + 3 + area / 2f, 6, 1.3f, 0xFF6A6A7A);
-		} else if (kind == Kind.WINGS) {
-			Identifier picture = VeloWingCard.previewImage(id);
+		} else if (kind == Kind.WINGS || kind == Kind.WEAR) {
+			Identifier picture = kind == Kind.WINGS ? VeloWingCard.previewImage(id) : net.veloclient.velo.client.cosmetics.wear.WearManager.previewTexture(id);
 			if (picture != null) {
 				int pw = Math.min(w - 12, Math.round((area - 4) * 4 / 3f));
 				int ph = pw * 3 / 4;

@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 /**
- * Dev tool: writes every aura's card animation as PNG frames ({@code <out>/<id>/0000.png ...}) using the launcher's
+ * Dev tool: writes every aura's card animation (and every kill effect's, {@code <out>/killfx-<id>/}) as PNG frames ({@code <out>/<id>/0000.png ...}) using the launcher's
  * own renderer, so the website and the owner panel show auras exactly like the Store does.
  * {@code tools/cosmetics/export_aura_previews.sh} runs it and packs the frames into animated WebP.
  *
@@ -31,7 +31,14 @@ public final class AuraPreviewExport {
 		CountDownLatch started = new CountDownLatch(1);
 		Platform.startup(started::countDown);
 		started.await();
-		String[] ids = {"orbit", "ember", "frost", "void", "storm", "matrix", "inferno", "bloom", "heartbeat", "aurora", "hologram", "festive"};
+		String[] ids = {"orbit", "ember", "frost", "void", "storm", "matrix", "inferno", "bloom", "heartbeat", "aurora", "hologram", "festive",
+				"seraph", "sakura", "galaxy", "crystal", "soul", "butterfly", "bass", "firework", "dragon", "ribbon",
+				"raincloud", "koi", "blades", "lantern", "chrono", "pyjama"};
+		if (args.length > 3) {
+			// Only these (comma-separated), e.g. after adding new auras.
+			List<String> only = List.of(args[3].split(","));
+			ids = java.util.Arrays.stream(ids).filter(only::contains).toArray(String[]::new);
+		}
 		for (String id : ids) {
 			CountDownLatch done = new CountDownLatch(1);
 			Exception[] failure = new Exception[1];
@@ -57,6 +64,34 @@ public final class AuraPreviewExport {
 				throw failure[0];
 			}
 			System.out.println("aura " + id + ": " + frames + " frames");
+		}
+		// The kill effects: one play each (with a moment of the figure standing first), into killfx-<id>/.
+		List<String> killIds = net.veloclient.launcher.data.KillFxCatalog.IDS;
+		if (args.length > 3) {
+			List<String> only = List.of(args[3].split(","));
+			killIds = killIds.stream().filter(only::contains).toList();
+		}
+		for (String id : killIds) {
+			CountDownLatch done = new CountDownLatch(1);
+			Exception[] failure = new Exception[1];
+			Platform.runLater(() -> {
+				try {
+					List<WritableImage> images = AuraFx.killFxFrames(net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.kind(id), size, size, fps);
+					Path dir = Files.createDirectories(out.resolve("killfx-" + id));
+					for (int i = 0; i < images.size(); i++) {
+						ImageIO.write(SwingFXUtils.fromFXImage(images.get(i), null), "png", dir.resolve(String.format("%04d.png", i)).toFile());
+					}
+				} catch (Exception e) {
+					failure[0] = e;
+				} finally {
+					done.countDown();
+				}
+			});
+			done.await();
+			if (failure[0] != null) {
+				throw failure[0];
+			}
+			System.out.println("kill effect " + id);
 		}
 		Platform.exit();
 	}

@@ -15,7 +15,7 @@ import java.util.Map;
  * HTTP surface of the Velo Coins economy ({@link StoreService}):
  * <ul>
  * <li>{@code GET /v1/store/catalog} (public) - prices, coin packs, what's enabled</li>
- * <li>{@code GET /v1/store/wallet}, {@code POST /v1/store/buy}, {@code POST /v1/store/checkout},
+ * <li>{@code GET /v1/store/wallet}, {@code POST /v1/store/buy}, {@code POST /v1/store/welcome-gift}, {@code POST /v1/store/checkout},
  * {@code GET /v1/store/order} - signed-in player</li>
  * <li>{@code POST /v1/store/webhook/tebex} - Tebex payment events (signature-checked)</li>
  * <li>{@code POST /v1/admin/store/{lookup,coins,item}} - owner only</li>
@@ -72,6 +72,8 @@ final class StoreRoutes {
 		route(server, registry, "/v1/store/wallet", "GET", (ex, s) -> JsonHttp.writeJson(ex, 200, store.wallet(s.uuid(), s.username())));
 		route(server, registry, "/v1/store/buy", "POST", (ex, s) ->
 				JsonHttp.writeJson(ex, 200, store.buy(s.uuid(), s.username(), JsonHttp.readBody(ex, BuyRequest.class).itemId())));
+		route(server, registry, "/v1/store/welcome-gift", "POST", (ex, s) ->
+				JsonHttp.writeJson(ex, 200, store.claimWelcomeGift(s.uuid(), s.username(), JsonHttp.readBody(ex, BuyRequest.class).itemId())));
 		route(server, registry, "/v1/store/checkout", "POST", (ex, s) ->
 				JsonHttp.writeJson(ex, 200, store.checkout(s.uuid(), s.username(), JsonHttp.readBody(ex, CheckoutRequest.class).packId())));
 		route(server, registry, "/v1/store/gift", "POST", (ex, s) -> {
@@ -109,6 +111,9 @@ final class StoreRoutes {
 			JsonHttp.writeJson(ex, 200, store.adminItem(s.uuid(), s.username(), r.target(), r.itemId(), r.grant()));
 		});
 
+		route(server, registry, "/v1/admin/store/grant-all", "POST", (ex, s) ->
+				JsonHttp.writeJson(ex, 200, store.adminGrantAll(s.uuid(), s.username(), JsonHttp.readBody(ex, AdminLookupRequest.class).target())));
+
 		route(server, registry, "/v1/rewards", "GET", (ex, s) -> JsonHttp.writeJson(ex, 200, store.rewards(s.uuid())));
 		route(server, registry, "/v1/rewards/login", "POST", (ex, s) -> JsonHttp.writeJson(ex, 200, store.claimLogin(s.uuid())));
 		route(server, registry, "/v1/rewards/quest", "POST", (ex, s) ->
@@ -142,11 +147,24 @@ final class StoreRoutes {
 					"adCoins", view.adCoins(), "balance", view.balance()));
 		}));
 
+		server.createContext("/store/done/status", ex -> VeloServerApp.handle(ex, "GET", e -> {
+			StoreService.OrderSummary order = store.orderSummary(query(e).get("order"));
+			if (order == null) {
+				JsonHttp.writeError(e, 404, "Unknown order");
+				return;
+			}
+			JsonHttp.writeJson(e, 200, Map.of("status", order.status(), "coins", order.coins()));
+		}));
+		server.createContext("/store/done.js", ex -> VeloServerApp.handle(ex, "GET", e ->
+				JsonHttp.writeBytes(e, 200, "text/javascript; charset=utf-8", THANKS_JS.getBytes(StandardCharsets.UTF_8), "max-age=300")));
 		server.createContext("/store/done", ex -> VeloServerApp.handle(ex, "GET", e -> {
-			boolean cancelled = query(e).containsKey("cancelled");
-			html(e, cancelled ? "Payment cancelled" : "Thanks for your purchase!",
-					cancelled ? "Nothing was charged. You can close this tab."
-							: "Your Velo Coins arrive in a few seconds - Velo Client updates by itself. You can close this tab.");
+			Map<String, String> q = query(e);
+			if (q.containsKey("cancelled")) {
+				html(e, "Payment cancelled", "Nothing was charged. You can close this tab.");
+				return;
+			}
+			StoreService.OrderSummary order = q.containsKey("order") ? store.orderSummary(q.get("order")) : null;
+			thanksPage(e, q.containsKey("plus"), order, q.get("order"));
 		}));
 		// ads.txt lists the ad sellers allowed on this domain; paste the lines from the ayeT dashboard
 		// (Placements -> your placement -> ads.txt) into data/ads.txt. Read per request, no restart needed.
@@ -232,6 +250,88 @@ final class StoreRoutes {
 				+ escape(title) + "</h1><p>" + escape(message) + "</p></div></body></html>";
 		JsonHttp.writeBytes(exchange, 200, "text/html; charset=utf-8", page.getBytes(StandardCharsets.UTF_8), "no-store");
 	}
+
+	/**
+	 * The thank-you page Tebex sends the buyer to: confetti, their head, the coins counting up - and a live status that
+	 * turns green once the coins are really in their wallet (it asks every 2 s until the webhook has landed). Velo+ gets
+	 * its own welcome.
+	 */
+	private static void thanksPage(HttpExchange exchange, boolean plus, StoreService.OrderSummary order, String orderId) throws java.io.IOException {
+		String head = order == null ? "" : "<img class=head src='/v1/skins/" + escape(order.uuid()) + "/head.png' alt=''>";
+		String title = plus ? "Welcome to Velo+" : "Thanks for your purchase!";
+		String amount = plus ? "<div class=plus>VELO<b>+</b></div>"
+				: order == null ? "<div class=coin>V</div>" : "<div class=amount><span class=coin>V</span><span id=n>" + String.format(java.util.Locale.ROOT, "%,d", order.coins())
+						+ "</span></div><div class=unit>Velo Coins</div>";
+		String sub = plus ? "World Hosting, Cloud Sync, Clips Pro, Name Styles, your own Home background and monthly coins - all switched on."
+				: "Your coins are on their way to your Velo account.";
+		String page = """
+				<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>
+				<title>%s - Velo Client</title><style>
+				:root{color-scheme:dark}*{box-sizing:border-box}
+				body{margin:0;min-height:100vh;display:grid;place-items:center;overflow:hidden;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;
+				color:#f4f2f8;background:radial-gradient(1200px 600px at 50%% -10%%,#5c1414 0%%,#1a0a0a 45%%,#070505 100%%)}
+				canvas{position:fixed;inset:0;pointer-events:none}
+				.card{position:relative;width:min(460px,calc(100vw - 32px));padding:38px 34px 30px;border-radius:24px;text-align:center;
+				background:linear-gradient(180deg,#1d1111ee,#120a0aee);border:1px solid #ffffff1c;box-shadow:0 30px 90px #000a,0 0 0 1px #ff3b3b14 inset;
+				animation:pop .7s cubic-bezier(.2,1.4,.4,1) both}
+				@keyframes pop{from{transform:translateY(24px) scale(.94);opacity:0}}
+				.logo{font-weight:900;letter-spacing:.18em;font-size:13px;color:#ff5a5a;margin-bottom:18px}
+				.head{width:72px;height:72px;image-rendering:pixelated;border-radius:14px;box-shadow:0 10px 30px #0009;margin-bottom:14px;
+				animation:pop .7s .15s cubic-bezier(.2,1.4,.4,1) both}
+				h1{font-size:26px;margin:0 0 6px;letter-spacing:-.02em}
+				.sub{color:#b9b3c6;line-height:1.5;margin:0 0 22px;font-size:15px}
+				.amount{display:flex;align-items:center;justify-content:center;gap:12px;font-size:44px;font-weight:900;letter-spacing:-.03em}
+				.coin{width:46px;height:46px;border-radius:50%%;display:inline-grid;place-items:center;font-size:24px;font-weight:900;color:#7a4a06;
+				background:linear-gradient(135deg,#ffe38a,#f4b82e 55%%,#c9861a);box-shadow:0 6px 24px #f4b82e66;animation:spin 1.6s ease-out both}
+				@keyframes spin{from{transform:rotateY(720deg) scale(.4)}}
+				.unit{color:#f4b82e;font-weight:700;font-size:14px;letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+				.plus{font-size:46px;font-weight:900;letter-spacing:.04em}.plus b{color:#ff3b3b;text-shadow:0 0 24px #ff3b3baa}
+				.status{display:inline-flex;align-items:center;gap:10px;margin-top:24px;padding:10px 16px;border-radius:999px;font-size:14px;font-weight:600;
+				background:#ffffff0d;border:1px solid #ffffff1a;color:#cfc9da;transition:all .4s}
+				.status.ok{background:#1f3d2b;border-color:#3ddc9755;color:#8ff0bd}
+				.dot{width:9px;height:9px;border-radius:50%%;background:#f4b82e;box-shadow:0 0 12px #f4b82e;animation:pulse 1s infinite alternate}
+				.ok .dot{background:#3ddc97;box-shadow:0 0 12px #3ddc97;animation:none}
+				@keyframes pulse{to{opacity:.35}}
+				.close{margin-top:18px;font-size:13px;color:#8a8398}
+				</style></head><body data-order="%s" data-coins="%d"><canvas id=c></canvas><div class=card>
+				<div class=logo>VELO CLIENT</div>%s<h1>%s</h1><p class=sub>%s</p>%s
+				<div><div class="status%s" id=st><span class=dot></span><span id=stt>%s</span></div></div>
+				<div class=close>You can close this tab - Velo Client updates by itself.</div></div>
+				<script src="/store/done.js" defer></script></body></html>
+				""".formatted(escape(title), orderId == null || plus ? "" : escape(orderId), order == null ? 0 : order.coins(), head, escape(title), escape(sub), amount,
+				plus || order != null && "paid".equals(order.status()) ? " ok" : "",
+				plus ? "Velo+ is active on your account" : order != null && "paid".equals(order.status()) ? "In your wallet - enjoy!" : "Confirming your payment...");
+		JsonHttp.writeBytes(exchange, 200, "text/html; charset=utf-8", page.getBytes(StandardCharsets.UTF_8), "no-store");
+	}
+
+	/**
+	 * The thank-you page's script, served as a file: velo-client.com's Content-Security-Policy blocks inline scripts
+	 * (an inline one left the page at "0 coins - Confirming your payment..." for good).
+	 */
+	private static final String THANKS_JS = """
+				const ORDER=document.body.dataset.order||null, COINS=+document.body.dataset.coins||0;
+				// Confetti: Velo red, white and gold, two bursts from the bottom corners, then a gentle rain.
+				const c=document.getElementById('c'),x=c.getContext('2d');let W,H;const P=[];
+				const size=()=>{W=c.width=innerWidth*devicePixelRatio;H=c.height=innerHeight*devicePixelRatio};size();addEventListener('resize',size);
+				const cols=['#ff3b3b','#ff7a3d','#ffffff','#f4b82e','#ffe38a','#ff5a8a'];
+				const burst=(sx,dir,n)=>{for(let i=0;i<n;i++){const a=-Math.PI/2+dir*(Math.random()*.9+.1),s=(10+Math.random()*14)*devicePixelRatio;
+				P.push({x:sx,y:H,vx:Math.cos(a)*s*.55,vy:Math.sin(a)*s,r:Math.random()*6.28,vr:(Math.random()-.5)*.4,w:(6+Math.random()*7)*devicePixelRatio,
+				h:(4+Math.random()*5)*devicePixelRatio,c:cols[i%cols.length],l:1})}};
+				burst(W*.08,1,140);burst(W*.92,-1,140);setTimeout(()=>{burst(W*.5,(Math.random()-.5)*.4,90)},450);
+				let rain=0;const tick=()=>{x.clearRect(0,0,W,H);if(rain<220&&Math.random()<.5){rain++;P.push({x:Math.random()*W,y:-20,vx:0,vy:2*devicePixelRatio,
+				r:Math.random()*6.28,vr:(Math.random()-.5)*.2,w:7*devicePixelRatio,h:4*devicePixelRatio,c:cols[rain%cols.length],l:1})}
+				for(let i=P.length-1;i>=0;i--){const p=P[i];p.vy+=.32*devicePixelRatio;p.vx*=.985;p.vy=Math.min(p.vy,7*devicePixelRatio);p.x+=p.vx;p.y+=p.vy;
+				p.r+=p.vr;if(p.y>H+40){P.splice(i,1);continue}x.save();x.translate(p.x,p.y);x.rotate(p.r);x.scale(1,Math.cos(p.r*2));x.fillStyle=p.c;
+				x.fillRect(-p.w/2,-p.h/2,p.w,p.h);x.restore()}requestAnimationFrame(tick)};tick();
+				// The coins counting up.
+				const n=document.getElementById('n');if(n&&COINS){const t0=performance.now();const step=t=>{const k=Math.min(1,(t-t0)/1400),e=1-Math.pow(1-k,3);
+				n.textContent=Math.round(COINS*e).toLocaleString();if(k<1)requestAnimationFrame(step)};requestAnimationFrame(step)}
+				// Live: green once the coins are really in the wallet.
+				const st=document.getElementById('st'),stt=document.getElementById('stt');
+				const done=()=>{st.classList.add('ok');stt.textContent='In your wallet - enjoy!'};
+				if(ORDER&&!st.classList.contains('ok')){const poll=async()=>{try{const r=await fetch('/store/done/status?order='+encodeURIComponent(ORDER));
+				if(r.ok){const j=await r.json();if(j.status==='paid'){done();return}}}catch(e){}setTimeout(poll,2000)};poll()}
+				""";
 
 	/** The rewarded-ad page: ayeT-Studios' video player in a Velo-styled card; the reward is credited by ayeT's signed callback. */
 	private static void adPage(HttpExchange exchange, StoreService store, String token) throws java.io.IOException {

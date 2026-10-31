@@ -52,7 +52,7 @@ public final class AuraDetailScreen extends VeloWindow {
 		boolean equipped = type.id().equals(AuraManager.equippedId());
 		int price = StoreClient.price(type.itemId(), type.price());
 		VeloButton action = new VeloButton(ix, contentY() + 64, iw, 20, Text.literal(busy ? "..." : equipped ? "Take it off"
-				: owned ? "Equip" : String.format(java.util.Locale.ROOT, "Buy for %,d Velo Coins", price)), b -> action(owned, equipped));
+				: owned ? "Equip" : StoreClient.buyLabel(price)), b -> action(owned, equipped));
 		if (!equipped) {
 			action.primary();
 		}
@@ -120,7 +120,7 @@ public final class AuraDetailScreen extends VeloWindow {
 		busy = true;
 		status = "Buying...";
 		layoutContent();
-		StoreClient.buy(type.itemId(), () -> {
+		StoreClient.buyOrClaim(type.itemId(), () -> {
 			busy = false;
 			AuraManager.equip(type.id());
 			status = "It's yours - equipped!";

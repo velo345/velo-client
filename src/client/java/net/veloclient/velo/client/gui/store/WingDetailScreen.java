@@ -69,7 +69,7 @@ public final class WingDetailScreen extends VeloWindow {
 		boolean equipped = type.id().equals(WingsManager.equippedId());
 		int price = StoreClient.price(type.itemId(), type.price());
 		VeloButton action = new VeloButton(ix, contentY() + 74, iw, 20, Text.literal(busy ? "..." : equipped ? "Take them off"
-				: owned ? "Equip" : String.format(java.util.Locale.ROOT, "Buy for %,d Velo Coins", price)), b -> action(owned, equipped));
+				: owned ? "Equip" : StoreClient.buyLabel(price)), b -> action(owned, equipped));
 		if (!equipped) {
 			action.primary();
 		}
@@ -121,7 +121,7 @@ public final class WingDetailScreen extends VeloWindow {
 		busy = true;
 		status = "Buying...";
 		layoutContent();
-		StoreClient.buy(type.itemId(), () -> {
+		StoreClient.buyOrClaim(type.itemId(), () -> {
 			busy = false;
 			WingsManager.equip(type.id());
 			status = "They're yours - equipped!";
@@ -149,7 +149,7 @@ public final class WingDetailScreen extends VeloWindow {
 	private void set(int field, float v) {
 		WingsManager.Settings s = WingsManager.settings(type.id());
 		WingsManager.setSettings(type.id(), new WingsManager.Settings(field == 0 ? v : s.scale(), field == 1 ? -v : s.offsetY(),
-				field == 2 ? v : s.offsetZ(), field == 3 ? v : s.spread(), field == 4 ? v : s.flapSpeed(), field == 5 ? v : s.flapStrength()));
+				field == 2 ? v : s.offsetZ(), field == 3 ? v : s.spread(), field == 4 ? v : s.flapSpeed(), field == 5 ? v : s.flapStrength(), s.color()));
 	}
 
 	@Override

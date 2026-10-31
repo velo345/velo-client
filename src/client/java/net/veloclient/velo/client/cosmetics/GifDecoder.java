@@ -18,7 +18,7 @@ import java.util.List;
  * Decodes an animated GIF into a flat list of fully-composited frames (each
  * one a complete, standalone {@link NativeImage} at the GIF's logical screen
  * size) plus each frame's display delay. Used for the store's animated capes
- * (design spec's cosmetics store, "Capes" category).
+ * (design spec's cosmetics store, "Cloaks" category).
  *
  * <p>{@code javax.imageio}'s GIF reader hands back each frame as decoded from
  * its own local image descriptor - which can be a smaller sub-rectangle
@@ -96,7 +96,7 @@ public final class GifDecoder {
 				g.drawImage(frameImage, left, top, null);
 				g.dispose();
 
-				frames.add(new Frame(toNativeImage(capeRegion(canvas)), normalizeDelay(delayCentiseconds)));
+				frames.add(new Frame(toNativeImage(shrink(capeRegion(canvas), canvas.getWidth())), normalizeDelay(delayCentiseconds)));
 
 				if ("restoreToBackgroundColor".equals(disposal)) {
 					pendingClearRect = new int[] {left, top, frameImage.getWidth(), frameImage.getHeight()};
@@ -104,7 +104,8 @@ public final class GifDecoder {
 					pendingRestorePrevious = true;
 				}
 			}
-			return new Result(frames, canvas != null ? canvas.getWidth() : 0, canvas != null ? canvas.getHeight() : 0);
+			int factor = canvas == null ? 1 : shrinkFactor(canvas.getWidth());
+			return new Result(frames, canvas != null ? canvas.getWidth() / factor : 0, canvas != null ? canvas.getHeight() / factor : 0);
 		} finally {
 			reader.dispose();
 		}
@@ -180,6 +181,57 @@ public final class GifDecoder {
 		}
 		int scale = canvas.getWidth() / 64;
 		return canvas.getSubimage(0, 0, CAPE_REGION_WIDTH * scale, CAPE_REGION_HEIGHT * scale);
+	}
+
+	/**
+	 * Texels per cape pixel kept in memory. The HD store cloaks are drawn at 32 (2048 x 1024): on a player that's more
+	 * than any screen shows, and 40 frames of it are ~60 MB per cloak - a Locker full of them ran low-RAM PCs out of
+	 * memory. 8 (eight times vanilla) is what most PCs get; with 6 GB or more given to the game, 16.
+	 */
+	private static final int MAX_TEXELS = Runtime.getRuntime().maxMemory() < 6_000L * 1024 * 1024 ? 8 : 16;
+
+	/** By how much a cape layout of this width is shrunk (a power of two, 1 = kept as it is). */
+	private static int shrinkFactor(int layoutWidth) {
+		int factor = 1;
+		while (layoutWidth / factor / 64 > MAX_TEXELS && layoutWidth / factor >= 128) {
+			factor *= 2;
+		}
+		return factor;
+	}
+
+	/** Halves {@code image} until the layout it came from is at most {@link #MAX_TEXELS} per cape pixel (2:1 box filter per halving). */
+	private static BufferedImage shrink(BufferedImage image, int layoutWidth) {
+		int factor = shrinkFactor(layoutWidth);
+		BufferedImage out = image;
+		while (factor > 1) {
+			int w = Math.max(1, out.getWidth() / 2), h = Math.max(1, out.getHeight() / 2);
+			BufferedImage half = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+			Graphics2D g = half.createGraphics();
+			g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+			g.drawImage(out, 0, 0, w, h, null);
+			g.dispose();
+			out = half;
+			factor /= 2;
+		}
+		return out;
+	}
+
+	/**
+	 * Another cape-sized picture (the Dragon Eye's gaze atlas) shrunk the same way: {@code texelsPerCapePixel} is
+	 * what it's drawn at now.
+	 */
+	static NativeImage shrunkForCape(BufferedImage image, int texelsPerCapePixel) {
+		BufferedImage out = image;
+		for (int t = texelsPerCapePixel; t > MAX_TEXELS && out.getWidth() >= 128; t /= 2) {
+			int w = out.getWidth() / 2, h = out.getHeight() / 2;
+			BufferedImage half = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+			Graphics2D g = half.createGraphics();
+			g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+			g.drawImage(out, 0, 0, w, h, null);
+			g.dispose();
+			out = half;
+		}
+		return toNativeImage(out);
 	}
 
 	private static NativeImage toNativeImage(BufferedImage source) {

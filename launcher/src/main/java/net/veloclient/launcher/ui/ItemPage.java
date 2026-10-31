@@ -165,6 +165,9 @@ public final class ItemPage {
 			} else if (owned) {
 				action.setText("Equip " + purchase.noun());
 				action.getStyleClass().add("primary-button");
+			} else if (StoreApi.welcomeGift()) {
+				action.setText("Claim free - welcome gift");
+				action.getStyleClass().add("buy-button");
 			} else if (coins >= 0 && coins < purchase.price() && openCoins != null) {
 				action.setText("Get " + StoreTiles.format(purchase.price() - coins) + " more coins");
 				action.getStyleClass().add("buy-button");
@@ -189,7 +192,7 @@ public final class ItemPage {
 				refresh[0].run();
 				return;
 			}
-			if (coins >= 0 && coins < purchase.price() && openCoins != null) {
+			if (!StoreApi.welcomeGift() && coins >= 0 && coins < purchase.price() && openCoins != null) {
 				openCoins.run();
 				return;
 			}

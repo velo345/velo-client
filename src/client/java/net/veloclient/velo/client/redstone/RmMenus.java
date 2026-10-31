@@ -15,14 +15,8 @@ final class RmMenus {
 
 	static List<RmHud.MenuItem> file() {
 		List<RmHud.MenuItem> items = new ArrayList<>();
-		items.add(RmHud.MenuItem.of("Load schematic...", () -> MinecraftClient.getInstance().setScreen(new SchematicPickScreen(null))));
-		items.add(new RmHud.MenuItem("Save selection as schematic...", null, () -> {
-			if (RmState.hasSelection()) {
-				MinecraftClient.getInstance().setScreen(new SchematicSaveScreen());
-			} else {
-				RmState.error("Select an area first");
-			}
-		}, null));
+		items.add(new RmHud.MenuItem("Load schematic...", "Ctrl+L", () -> MinecraftClient.getInstance().setScreen(new SchematicPickScreen(null)), null));
+		items.add(new RmHud.MenuItem("Save selection as schematic...", null, RmInput::saveSelection, null));
 		items.add(RmHud.MenuItem.of("Open schematics folder", () -> {
 			try {
 				java.nio.file.Files.createDirectories(SchematicIO.veloFolder());

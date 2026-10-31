@@ -1,0 +1,10 @@
+{
+ "slot": "neck",
+ "name": "Iced Cuban",
+ "price": 2200,
+ "accent": "#e6ecf3",
+ "description": "A heavy silver Cuban link set with stones all along the front.",
+ "bone": "body",
+ "mirror": null,
+ "tint": true
+}

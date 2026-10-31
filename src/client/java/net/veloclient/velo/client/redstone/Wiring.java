@@ -248,8 +248,8 @@ public final class Wiring {
 		if (placements.isEmpty()) {
 			return;
 		}
-		if (!RmWorld.singleplayer()) {
-			RmState.error("Building needs singleplayer");
+		if (!RedstoneMode.canEdit()) {
+			RmState.error("Building needs singleplayer creative");
 			return;
 		}
 		boolean through = "Go Through".equals(RmSettings.get().pathMode);

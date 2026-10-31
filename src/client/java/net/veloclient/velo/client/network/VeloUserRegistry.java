@@ -15,10 +15,13 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class VeloUserRegistry {
 
-	/** {@code nameStyle}: a Velo+ member's name style in its wire form (see {@code NameStyle}), or null. */
-	public record Entry(String username, String capeId, String wingsId, String auraId, boolean plus, String nameStyle) {
+	/**
+	 * {@code nameStyle}: a Velo+ member's name style in its wire form (see {@code NameStyle}), or null; {@code wear}: their
+	 * bodywear, "id[:colour],..." (see {@code WearManager}), or null.
+	 */
+	public record Entry(String username, String capeId, String wingsId, String auraId, boolean plus, String nameStyle, String wear) {
 		public Entry(String username, String capeId) {
-			this(username, capeId, null, null, false, null);
+			this(username, capeId, null, null, false, null, null);
 		}
 	}
 
@@ -132,6 +135,15 @@ public final class VeloUserRegistry {
 	public static boolean isPlusName(String name) {
 		Entry entry = entryForName(name);
 		return entry != null && entry.plus();
+	}
+
+	/** The bodywear this player shows ("id[:colour],..."), if any and if they're online. */
+	public static String wearFor(UUID uuid, String username) {
+		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
+		if (entry == null) {
+			entry = entryForName(username);
+		}
+		return entry == null ? null : entry.wear();
 	}
 
 	/** The aura this player has equipped ("id;settings"), if any and if they're online. */

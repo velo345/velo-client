@@ -1,0 +1,10 @@
+{
+ "slot": "face",
+ "name": "Classic Shades",
+ "price": 900,
+ "accent": "#141416",
+ "description": "Bold black-framed sunglasses - recolour the lenses.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

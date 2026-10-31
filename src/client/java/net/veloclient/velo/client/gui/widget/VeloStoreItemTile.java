@@ -72,7 +72,7 @@ public final class VeloStoreItemTile extends ClickableWidget {
 					iconHeight - 16, VeloCapeRender.idleYaw(phase, hover));
 		}
 		TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
-		StoreCard.info(context, textRenderer, x, y, w, h, lift, "Cape", accent, item.name(), owned ? "Owned" : null, item.priceCoins());
+		StoreCard.info(context, textRenderer, x, y, w, h, lift, "Cloak", accent, item.name(), owned ? "Owned" : null, item.priceCoins());
 	}
 
 	private static String trimToWidth(String text, int maxWidth) {

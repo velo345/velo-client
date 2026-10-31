@@ -84,7 +84,7 @@ final class Welcomer {
 		}
 		text.append("grab Velo Client and say hi.");
 		if (config.linkChannelId != null) {
-			text.append("\nLink your Minecraft account in <#").append(config.linkChannelId).append("> for the free **Velo Neon** cape.");
+			text.append("\nLink your Minecraft account in <#").append(config.linkChannelId).append("> for the free **Velo Neon** cloak.");
 		}
 		var embed = new EmbedBuilder().setColor(0xFF3440).setDescription(text);
 		if (card != null) {

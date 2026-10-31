@@ -236,7 +236,7 @@ public final class NewsApi {
 				{"type":"callout","style":"info","text":"Hide your coordinates on the map when you stream."},
 				{"type":"list","items":["Surface, topography and biome layers","Cave layer while underground","Right-click to add a waypoint"]}]},
 				{"id":"demo2","title":"Vote on what comes next","summary":"Tell us which feature we should build next - the poll is open for a week.","tag":"Community","published":true,"publishedAt":1759400000000,"blocks":[]},
-				{"id":"demo3","title":"Spooky season cosmetics","summary":"Four new capes in the Store, only until November.","tag":"Event","published":true,"publishedAt":1759200000000,"blocks":[]}],
+				{"id":"demo3","title":"Spooky season cosmetics","summary":"Four new cloaks in the Store, only until November.","tag":"Event","published":true,"publishedAt":1759200000000,"blocks":[]}],
 				"polls":[{"id":"p1","question":"What should we add next?","description":"Pick up to two.","options":[
 				{"text":"Minimap","votes":182},{"text":"Replay recording","votes":96},{"text":"Chat translation","votes":41}],
 				"multi":true,"closesAt":0,"closed":false,"resultsVisible":true,"totalVotes":260,"myVote":[0],"createdAt":1759500000000}]}""";

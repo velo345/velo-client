@@ -24,12 +24,21 @@ import java.util.List;
  */
 public final class CapeCosmeticsModule extends AbstractModule implements Configurable, net.veloclient.velo.client.gui.window.ModuleShortcut {
 
+	private static final String CLOTH = "Cloth physics";
+	private static final String CLASSIC = "Classic";
+	/** How cloaks are drawn (yours and everyone else's): real cloth, or vanilla's rigid cape and motion. */
+	private static volatile String style = CLOTH;
+
+	public static boolean clothPhysics() {
+		return !CLASSIC.equals(style);
+	}
+
 	public static final KeyBinding OPEN_CAPE_MENU = KeyBindingHelper.registerKeyBinding(new KeyBinding(
 			"key.velo-client.open_cape_menu", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	public CapeCosmeticsModule() {
-		super("cape-cosmetics", "Cosmetic Capes",
-				"Equip a cloth-physics cape from your local library. Purely client-rendered.",
+		super("cape-cosmetics", "Cosmetic Cloaks",
+				"Equip a cloth-physics cloak from your local library. Purely client-rendered.",
 				ModuleCategory.COSMETICS, SafetyTag.COSMETIC_ONLY, true);
 		CapeManager.loadLibrary();
 		ClientTickEvents.END_CLIENT_TICK.register(client ->
@@ -70,6 +79,8 @@ public final class CapeCosmeticsModule extends AbstractModule implements Configu
 
 	@Override
 	public List<ConfigField> configFields() {
-		return List.of(KeybindConfig.field("Open Cape Menu Key", OPEN_CAPE_MENU));
+		return List.of(
+				new ConfigField.ChoiceField("Cloak Style", List.of(CLOTH, CLASSIC), () -> style, v -> style = v),
+				KeybindConfig.field("Open Cloak Menu Key", OPEN_CAPE_MENU));
 	}
 }

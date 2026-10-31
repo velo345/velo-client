@@ -4,8 +4,11 @@
 # from stdin: toggle | next | prev | seek <ms> | vol <0..1>. Exits when stdin closes (the game quit).
 # App volume goes through Core Audio (per-app session volume, the same slider as the Volume Mixer).
 $ErrorActionPreference = 'Stop'
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-[Console]::InputEncoding = [System.Text.Encoding]::UTF8
+# UTF-8 without a byte order mark (a BOM would end up in front of the first line).
+$utf8 = New-Object System.Text.UTF8Encoding $false
+[Console]::OutputEncoding = $utf8
+$stdout = New-Object System.IO.StreamWriter ([Console]::OpenStandardOutput()), $utf8
+$stdout.AutoFlush = $true
 
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 Add-Type -Language CSharp -TypeDefinition @'
@@ -144,7 +147,7 @@ function Save-Thumbnail($props, $key) {
 function Emit {
 	$session = $manager.GetCurrentSession()
 	if (-not $session) {
-		[Console]::Out.WriteLine('none')
+		$stdout.WriteLine('none')
 		return
 	}
 	$app = $session.SourceAppUserModelId
@@ -155,7 +158,7 @@ function Emit {
 		$props = Await ($session.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
 	} catch { }
 	if (-not $props -or -not $props.Title) {
-		[Console]::Out.WriteLine('none')
+		$stdout.WriteLine('none')
 		return
 	}
 	$key = "$app|$($props.Title)|$($props.Artist)"
@@ -191,7 +194,7 @@ function Emit {
 		prev     = $info.Controls.IsPreviousEnabled
 		seek     = $info.Controls.IsPlaybackPositionEnabled
 	}
-	[Console]::Out.WriteLine(($out | ConvertTo-Json -Compress))
+	$stdout.WriteLine(($out | ConvertTo-Json -Compress))
 }
 
 function Run-Command([string] $line) {
@@ -212,7 +215,9 @@ function Run-Command([string] $line) {
 	}
 }
 
-$stdin = [Console]::In
+# Not [Console]::In: on Windows PowerShell 5.1 its ReadLineAsync blocks until a line arrives, so nothing would ever
+# be printed until the first command. A plain StreamReader over stdin reads in the background for real.
+$stdin = New-Object System.IO.StreamReader ([Console]::OpenStandardInput()), $utf8
 $pending = $stdin.ReadLineAsync()
 while ($true) {
 	$ran = $false
@@ -224,7 +229,9 @@ while ($true) {
 		$pending = $stdin.ReadLineAsync()
 	}
 	if ($ran) { Start-Sleep -Milliseconds 120 }
-	try { Emit } catch { [Console]::Out.WriteLine('none') }
-	[Console]::Out.Flush()
+	try { Emit } catch {
+		[Console]::Error.WriteLine("emit: " + $_)
+		$stdout.WriteLine('none')
+	}
 	[void] $pending.Wait(400)
 }

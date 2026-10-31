@@ -1,0 +1,10 @@
+{
+ "slot": "back",
+ "name": "Quiver",
+ "price": 1100,
+ "accent": "#6a3f1f",
+ "description": "A leather quiver full of arrows, slung across your back.",
+ "bone": "body",
+ "mirror": null,
+ "tint": true
+}

@@ -95,7 +95,17 @@ public final class Icons {
 			Map.entry("ticket", "M3 8a2 2 0 0 0 0 4v4h18v-4a2 2 0 0 1 0-4V4H3zM9 4v12"),
 			Map.entry("crown", "M3 8l4 4 5-7 5 7 4-4-2 11H5z"),
 			Map.entry("scissors", "M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"),
-			Map.entry("bug", "M8 9a4 4 0 0 1 8 0v6a4 4 0 0 1-8 0zM12 9v10M4 13h4M16 13h4M5 7l3 2M19 7l-3 2M5 19l3-2M19 19l-3-2"));
+			Map.entry("bug", "M8 9a4 4 0 0 1 8 0v6a4 4 0 0 1-8 0zM12 9v10M4 13h4M16 13h4M5 7l3 2M19 7l-3 2M5 19l3-2M19 19l-3-2"),
+			// bodywear slots
+			Map.entry("skull", "M12 3a8 8 0 0 0-8 8c0 2.6 1.2 4.4 3 5.5V20h10v-3.5c1.8-1.1 3-2.9 3-5.5a8 8 0 0 0-8-8zM9 11.5a1.5 1.5 0 1 1 0 .01M15 11.5a1.5 1.5 0 1 1 0 .01M10 20v-2M14 20v-2M11 15.5h2"),
+			Map.entry("hat", "M8 4h8v11H8zM3 18c3 1.5 15 1.5 18 0M8 12h8"),
+			Map.entry("ears", "M5 15 6 4l5 5M19 15 18 4l-5 5M6 15a6 5 0 0 0 12 0"),
+			Map.entry("glasses", "M2 11h2.5M19.5 11H22M10 13a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 13a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM10 12.5c1.3-1 2.7-1 4 0"),
+			Map.entry("mask", "M4 5c5 2 11 2 16 0v6a8 8 0 0 1-16 0zM7.5 10.5h3M13.5 10.5h3M9 15c2 1.4 4 1.4 6 0"),
+			Map.entry("necklace", "M5 3c0 6 3 10 7 10s7-4 7-10M12 13v2.5M12 15.5 10 18l2 3 2-3z"),
+			Map.entry("watch", "M9 3h6l1 4M9 3 8 7M8 17l1 4h6l1-4M12 9.5V12l1.5 1M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0z"),
+			Map.entry("shoe", "M3 17V8l4 1 2.5-2.5L13 11l6 2a2 2 0 0 1 2 2v2zM3 17h18v2.5H3z"),
+			Map.entry("backpack", "M6 9a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v11H6zM9.5 5V3h5v2M9 13h6v4H9z"));
 
 	private Icons() {
 	}

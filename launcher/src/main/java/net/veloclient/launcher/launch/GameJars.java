@@ -103,7 +103,7 @@ public final class GameJars {
 	 */
 	static byte[] currentBytes(String key) throws IOException {
 		Path cached = UpdateService.gameJarsDir().resolve(key + ".jar");
-		if (Files.exists(cached) && cacheIsCurrent()) {
+		if (!net.veloclient.launcher.AppVersion.DEV && Files.exists(cached) && cacheIsCurrent()) {   // dev: always its own bundled jars
 			return Files.readAllBytes(cached);
 		}
 		try (InputStream in = GameJars.class.getResourceAsStream("/net/veloclient/launcher/gamejars/" + key + ".jar")) {

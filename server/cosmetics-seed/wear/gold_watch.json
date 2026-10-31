@@ -1,0 +1,10 @@
+{
+ "slot": "wrist",
+ "name": "Gold Watch",
+ "price": 1800,
+ "accent": "#e4b94f",
+ "description": "A solid gold watch with a champagne dial.",
+ "bone": "leftArm",
+ "mirror": null,
+ "tint": true
+}

@@ -13,6 +13,10 @@ import java.util.Map;
  * forward, so speed changes never make the wings jump; it runs per rendered frame, so it's smooth
  * at any frame rate. The outer part of each wing lags behind the inner part (it bends with the
  * flap), which is what makes them look soft instead of like two rotating boards.
+ *
+ * <p>Pairs with arms (tentacles, flames, feathers, blades, shards, claws, wisps) move each one on its
+ * own bone chain ({@link WingRigs#pose}) - lazy while standing, faster when moving, wild in the air
+ * and in water - and bat wings' membranes billow ({@link WingRigs#billow}). Clockwork pairs turn their gears, faster the harder the wings beat (see {@link WingRigs}).
  */
 public final class WingAnimator {
 
@@ -32,6 +36,11 @@ public final class WingAnimator {
 		float amplitude = 0.1f;
 		float frequency = 0.5f;
 		float lift = 0.08f;
+		float writhe;
+		float writheSpeed = 0.5f;
+		double writheTime;
+		double gearAngle;
+		double seconds;
 		long lastNanos;
 		long lastSeen;
 	}
@@ -41,8 +50,17 @@ public final class WingAnimator {
 	private WingAnimator() {
 	}
 
-	/** Current pose: sweep back (rad), lift of the tips (rad, positive = up) and the bend of the outer part (rad). */
-	public record Pose(float sweep, float lift, float bend) {
+	/**
+	 * Current pose: sweep back (rad), lift of the tips (rad, positive = up) and the bend of the outer part (rad);
+	 * {@code writhe}: how far the tentacle tips swing (rad, 0 for other wings), {@code writheTime} where the wave is (cycles),
+	 * {@code gearAngle}: how far the drive gear has turned (rad), {@code seconds}: a clock for glints and ripples.
+	 */
+	public record Pose(float sweep, float lift, float bend, float writhe, float writheTime, float gearAngle, float seconds) {
+	}
+
+	/** {@code pose} without the extra moves (arms, membranes): Light Cosmetics. */
+	public static Pose plain(Pose pose) {
+		return new Pose(pose.sweep(), pose.lift(), pose.bend(), 0, pose.writheTime(), pose.gearAngle(), pose.seconds());
 	}
 
 	/** Advances the animation of entity {@code id} to now and returns its pose. Render thread. */
@@ -99,6 +117,28 @@ public final class WingAnimator {
 			frequency = (float) (0.28 + 0.5 * speed);
 			lift = 0.05f;
 		}
+		// Arms (tentacles, feathers, blades...): how wildly they move and how fast. Only pairs with arms use it.
+		float writhe;
+		float writheSpeed;
+		if (motion.swimming()) {
+			writhe = 0.65f;
+			writheSpeed = 1.2f;
+		} else if (motion.gliding()) {
+			// Streaming back in the wind, the tips still flicking.
+			writhe = 0.25f;
+			writheSpeed = 1.4f;
+		} else if (motion.sneaking()) {
+			writhe = 0.2f;
+			writheSpeed = 0.4f;
+		} else if (motion.flying() || !motion.onGround()) {
+			writhe = 0.6f;
+			writheSpeed = (float) (1.0 + 0.4 * speed);
+		} else {
+			writhe = (float) (0.42 + 0.14 * speed);
+			writheSpeed = (float) (0.55 + 0.55 * speed);
+		}
+		writhe *= settings.flapStrength();
+		writheSpeed *= settings.flapSpeed();
 		amplitude *= style.amplitude * settings.flapStrength();
 		frequency *= style.speed * settings.flapSpeed();
 		sweep += settings.spreadRadians();
@@ -109,6 +149,12 @@ public final class WingAnimator {
 		s.amplitude += (amplitude - s.amplitude) * k;
 		s.frequency += (frequency - s.frequency) * k;
 		s.lift += (lift - s.lift) * k;
+		s.writhe += (writhe - s.writhe) * k;
+		s.writheSpeed += (writheSpeed - s.writheSpeed) * k;
+		s.writheTime = (s.writheTime + dt * s.writheSpeed) % 1000.0;
+		// Ticking along while still, spinning up with the wingbeat (a whole number of turns before it wraps).
+		s.seconds = (s.seconds + dt) % 3400.0;
+		s.gearAngle = (s.gearAngle + dt * (0.6 + 4.0 * s.amplitude * s.frequency) * settings.flapSpeed()) % (Math.PI * 2 * 84);
 		s.phase = (s.phase + dt * s.frequency * Math.PI * 2) % (Math.PI * 2);
 
 		// One flap: open out past the rest pose, then sweep back behind it, easing at both ends.
@@ -117,7 +163,7 @@ public final class WingAnimator {
 		float flapLift = s.lift - s.amplitude * 0.12f * (float) Math.sin(s.phase);
 		// The outer part trails the inner part a little: proportional to how fast the flap moves.
 		float bend = -s.amplitude * 0.25f * style.flex * (float) Math.sin(s.phase);
-		return new Pose(flapSweep, flapLift, bend);
+		return new Pose(flapSweep, flapLift, bend, s.writhe, (float) s.writheTime, (float) s.gearAngle, (float) s.seconds);
 	}
 
 	private static void cleanUp(long now) {
@@ -148,6 +194,11 @@ public final class WingAnimator {
 		for (int h = 0; h < model.halves.length; h++) {
 			WingModel.Half half = model.halves[h];
 			float[] src = half.geometry;
+			if (half.arms != null && pose.writhe() > 1e-3f) {
+				WingRigs.pose(half.arms, pose.writhe(), pose.writheTime(), src, 6, half.posed, half.side);
+				src = half.posed;
+			}
+			float billow = model.effect != null ? model.effect.billow() : 0;
 			float[] dst = out[h];
 			if (dst == null || dst.length != src.length) {
 				dst = new float[src.length];
@@ -171,20 +222,57 @@ public final class WingAnimator {
 				cosY[b] = (float) Math.cos(yaw);
 				sinY[b] = (float) Math.sin(yaw);
 			}
+			int[] gear = half.gear;
+			float[] gearCos = null;
+			float[] gearSin = null;
+			if (gear != null) {
+				gearCos = new float[half.gearRatio.length];
+				gearSin = new float[half.gearRatio.length];
+				for (int g = 0; g < gearCos.length; g++) {
+					float a = s * pose.gearAngle() * half.gearRatio[g];
+					gearCos[g] = (float) Math.cos(a);
+					gearSin[g] = (float) Math.sin(a);
+				}
+			}
 			for (int v = 0; v < n; v++) {
 				int i = v * 6;
 				int band = Math.round(half.weight[v] * 8);
 				float cy = cosY[band];
 				float sy = sinY[band];
+				float px = src[i] * scale;
+				float py = src[i + 1] * scale;
+				float pz = src[i + 2] * scale;
+				float qx = src[i + 3];
+				float qy = src[i + 4];
+				float qz = src[i + 5];
+				if (model.shine != null) {
+					pz += WingRigs.ripple(src[i], src[i + 1], half.weight[v], pose.seconds()) * scale;
+				}
+				if (billow > 0) {
+					pz += WingRigs.billow(billow, pose.writhe(), half.weight[v], pose.writheTime()) * scale;
+				}
+				if (gear != null && gear[v] >= 0) {
+					// A gear turns around its own centre (the axis pointing backwards).
+					int g = gear[v];
+					float gx = half.gearPivot[g * 2];
+					float gy = half.gearPivot[g * 2 + 1];
+					float c = gearCos[g];
+					float sn = gearSin[g];
+					float dx = px - gx;
+					float dy = py - gy;
+					px = gx + dx * c - dy * sn;
+					py = gy + dx * sn + dy * c;
+					float n1 = qx * c - qy * sn;
+					qy = qx * sn + qy * c;
+					qx = n1;
+				}
 				// Lift: turn around z (the axis pointing backwards).
-				float sx = src[i] * scale;
-				float sy0 = src[i + 1] * scale;
-				float x = sx * cosL - sy0 * sinL;
-				float y = sx * sinL + sy0 * cosL;
-				float z = src[i + 2] * scale;
-				float nx = src[i + 3] * cosL - src[i + 4] * sinL;
-				float ny = src[i + 3] * sinL + src[i + 4] * cosL;
-				float nz = src[i + 5];
+				float x = px * cosL - py * sinL;
+				float y = px * sinL + py * cosL;
+				float z = pz;
+				float nx = qx * cosL - qy * sinL;
+				float ny = qx * sinL + qy * cosL;
+				float nz = qz;
 				// Sweep: turn around y (vertical).
 				dst[i] = x * cy + z * sy + hingeX;
 				dst[i + 1] = y + attachY;

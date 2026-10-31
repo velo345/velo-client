@@ -28,9 +28,10 @@ import java.util.function.BooleanSupplier;
  */
 public final class RmHud {
 
-	static final int BG = 0xD0121218;
-	static final int BG_HOVER = 0xFF2A2A36;
-	static final int ACCENT = 0xFFFF4D4D;
+	// Follow HUD Style (background, accent) - set every frame by applyStyle().
+	static int BG = 0xD0121218;
+	static int BG_HOVER = 0xFF2A2A36;
+	static int ACCENT = 0xFFFF4D4D;
 	static final int TEXT = 0xFFFFFFFF;
 	static final int MUTED = 0xFF9A9AAE;
 
@@ -115,7 +116,48 @@ public final class RmHud {
 	// ---- HUD pass ----
 
 	/** Called from the HUD while Redstone Mode is on (instead of every other Velo HUD element). */
+	/**
+	 * Overlay text: HUD Style's font while that's on (Inter by default, any of its fonts - also the Minecraft one if picked),
+	 * otherwise Inter - never the pixel font by default.
+	 */
+	static void text(DrawContext context, String s, int x, int y, int color) {
+		if (net.veloclient.velo.client.hud.HudLook.on()) {
+			net.veloclient.velo.client.hud.HudLook.draw(context, s, x, y, color);
+		} else {
+			net.veloclient.velo.client.hud.HudLook.text(context, net.veloclient.velo.client.gui.title.MenuKit.ui(s), x, y + 1, color);
+		}
+	}
+
+	static int width(String s) {
+		return net.veloclient.velo.client.hud.HudLook.on() ? net.veloclient.velo.client.hud.HudLook.measure(s)
+				: net.veloclient.velo.client.hud.HudLook.width(net.veloclient.velo.client.gui.title.MenuKit.ui(s));
+	}
+
+	/** The overlay takes HUD Style's background and accent like every other HUD element (off: Redstone Mode's own look). */
+	private static void applyStyle() {
+		var style = net.veloclient.velo.client.modules.hud.HudStyleModule.get();
+		boolean on = net.veloclient.velo.client.hud.HudLook.on() && style != null;
+		ACCENT = on ? net.veloclient.velo.client.hud.HudLook.accent() : 0xFFFF4D4D;
+		BG = !on ? 0xD0121218 : switch (style.background()) {
+			case "Solid" -> 0xF0141418;
+			case "Glass" -> 0xA00C0C10;
+			default -> 0xC0121218;
+		};
+		BG_HOVER = on && style.background().equals("Glass") ? 0xC02A2A36 : 0xFF2A2A36;
+	}
+
 	public static void render(DrawContext context, int screenWidth, int screenHeight, float tickDelta) {
+		// Vanilla font calls stay vanilla even when Edit HUD Layout (a Velo menu, which swaps in Inter) draws this.
+		net.veloclient.velo.client.gui.VeloFonts.beginHud();
+		try {
+			renderStyled(context, screenWidth, screenHeight, tickDelta);
+		} finally {
+			net.veloclient.velo.client.gui.VeloFonts.endHud();
+		}
+	}
+
+	private static void renderStyled(DrawContext context, int screenWidth, int screenHeight, float tickDelta) {
+		applyStyle();
 		FRAME.clear();
 		hotbarIcon(context, screenWidth, screenHeight);
 		RmAnalysis.renderLabels(context, screenWidth, screenHeight);
@@ -171,12 +213,12 @@ public final class RmHud {
 		}
 		var textRenderer = MinecraftClient.getInstance().textRenderer;
 		String shown = VeloUi.trim(line, Math.min(420, w - 40));
-		int tw = textRenderer.getWidth(shown);
+		int tw = RmHud.width(shown);
 		int x = (w - tw) / 2;
 		int y = h - 62;
 		boolean error = route == null && job == null && RmState.messageIsError();
 		VeloDraw.fillRounded(context, x - 6, y - 3, tw + 12, 14, 4, 0xC0101016);
-		context.drawTextWithShadow(textRenderer, shown, x, y, error ? 0xFFFF7070 : route != null || job != null ? 0xFFFFD84A : 0xFF8FE3A8);
+		RmHud.text(context, shown, x, y, error ? 0xFFFF7070 : route != null || job != null ? 0xFFFFD84A : 0xFF8FE3A8);
 	}
 
 	private static long lookCheckedAt;
@@ -206,17 +248,17 @@ public final class RmHud {
 		int titleColor = want == null ? 0xFFFF7AD8 : sameBlock ? 0xFFFFD84A : RmWorld.isAir(have) || RmRender.fluid(have) != null ? 0xFF8FC8FF : 0xFFFF6060;
 		String wantLine = "Should be: " + (want == null ? "Air" : RmWorld.blockName(want) + diff(wantProps, haveProps, sameBlock));
 		String haveLine = "Placed: " + (RmWorld.isAir(have) ? "Nothing" : RmWorld.blockName(have) + diff(haveProps, wantProps, sameBlock));
-		int textW = Math.max(textRenderer.getWidth(title), Math.max(textRenderer.getWidth(wantLine), textRenderer.getWidth(haveLine)));
+		int textW = Math.max(RmHud.width(title), Math.max(RmHud.width(wantLine), RmHud.width(haveLine)));
 		int x = w / 2 + 14;
 		int y = h / 2 + 8;
 		int boxW = Math.min(textW + 30, w - x - 4);
 		VeloDraw.fillRounded(context, x, y, boxW, 40, 5, 0xD0101016);
 		VeloDraw.fillRounded(context, x, y, 3, 40, 1, titleColor);
-		context.drawTextWithShadow(textRenderer, title, x + 8, y + 4, titleColor);
+		RmHud.text(context, title, x + 8, y + 4, titleColor);
 		drawStateIcon(context, want, x + 8, y + 15);
-		context.drawTextWithShadow(textRenderer, VeloUi.trim(wantLine, boxW - 30), x + 22, y + 16, 0xFF8FE3A8);
+		RmHud.text(context, VeloUi.trim(wantLine, boxW - 30), x + 22, y + 16, 0xFF8FE3A8);
 		drawStateIcon(context, have, x + 8, y + 27);
-		context.drawTextWithShadow(textRenderer, VeloUi.trim(haveLine, boxW - 30), x + 22, y + 28, 0xFFFF9090);
+		RmHud.text(context, VeloUi.trim(haveLine, boxW - 30), x + 22, y + 28, 0xFFFF9090);
 	}
 
 	private static void drawStateIcon(DrawContext context, Object state, int x, int y) {
@@ -281,11 +323,11 @@ public final class RmHud {
 			return;
 		}
 		var textRenderer = MinecraftClient.getInstance().textRenderer;
-		int tw = textRenderer.getWidth(tip);
+		int tw = RmHud.width(tip);
 		int x = (int) Math.min(mouseX + 10, w - tw - 8);
 		int y = (int) Math.min(mouseY + 12, h - 14);
 		VeloDraw.fillRounded(context, x - 4, y - 3, tw + 8, 14, 3, 0xF0101016);
-		context.drawTextWithShadow(textRenderer, tip, x, y, TEXT);
+		RmHud.text(context, tip, x, y, TEXT);
 	}
 
 	// ---- menus ----
@@ -304,7 +346,7 @@ public final class RmHud {
 		var textRenderer = MinecraftClient.getInstance().textRenderer;
 		int width = 150;
 		for (MenuItem item : menu) {
-			width = Math.max(width, textRenderer.getWidth(item.label()) + (item.right() != null ? textRenderer.getWidth(item.right()) + 30 : 30));
+			width = Math.max(width, RmHud.width(item.label()) + (item.right() != null ? RmHud.width(item.right()) + 30 : 30));
 		}
 		int x = Math.round(menuX);
 		int y = Math.round(menuY);
@@ -326,9 +368,9 @@ public final class RmHud {
 			if (item.checked() != null) {
 				VeloDraw.fillRounded(context, x + 7, ry + 3, 8, 8, 2, checked ? ACCENT : 0x50FFFFFF);
 			}
-			context.drawTextWithShadow(textRenderer, item.label(), x + (item.checked() != null ? 20 : 8), ry + 3, TEXT);
+			RmHud.text(context, item.label(), x + (item.checked() != null ? 20 : 8), ry + 3, TEXT);
 			if (item.right() != null) {
-				context.drawTextWithShadow(textRenderer, item.right(), x + width - 8 - textRenderer.getWidth(item.right()), ry + 3, MUTED);
+				RmHud.text(context, item.right(), x + width - 8 - RmHud.width(item.right()), ry + 3, MUTED);
 			}
 			Runnable action = item.action();
 			boolean keepOpen = item.checked() != null;
@@ -469,11 +511,11 @@ public final class RmHud {
 		/** A text button; returns its width. */
 		int textButton(DrawContext context, int x, int y, int w, String label, boolean primary, Runnable action) {
 			var textRenderer = MinecraftClient.getInstance().textRenderer;
-			int width = w > 0 ? w : textRenderer.getWidth(label) + 12;
+			int width = w > 0 ? w : RmHud.width(label) + 12;
 			boolean hover = hovered(x, y, width, 14);
 			int bg = primary ? (hover ? 0xFFD04040 : 0xFFB83030) : hover ? 0xFF33333F : 0xFF24242E;
 			VeloDraw.fillRounded(context, x, y, width, 14, 4, bg);
-			context.drawTextWithShadow(textRenderer, VeloUi.trim(label, width - 6), x + (width - Math.min(textRenderer.getWidth(label), width - 6)) / 2, y + 3, TEXT);
+			RmHud.text(context, VeloUi.trim(label, width - 6), x + (width - Math.min(RmHud.width(label), width - 6)) / 2, y + 3, TEXT);
 			hit(x, y, width, 14, action, null);
 			return width;
 		}
@@ -481,13 +523,13 @@ public final class RmHud {
 		/** "Label ........ value" row; clicking the value runs {@code action}. */
 		void settingRow(DrawContext context, int x, int y, int w, String label, String value, Runnable action) {
 			var textRenderer = MinecraftClient.getInstance().textRenderer;
-			context.drawTextWithShadow(textRenderer, label, x, y + 3, MUTED);
+			RmHud.text(context, label, x, y + 3, MUTED);
 			String shown = VeloUi.trim(value, w / 2);
-			int vw = textRenderer.getWidth(shown) + 10;
+			int vw = RmHud.width(shown) + 10;
 			int vx = x + w - vw;
 			boolean hover = hovered(vx, y, vw, 14);
 			VeloDraw.fillRounded(context, vx, y, vw, 14, 4, hover ? 0xFF3A3A48 : 0xFF26262F);
-			context.drawTextWithShadow(textRenderer, shown, vx + 5, y + 3, TEXT);
+			RmHud.text(context, shown, vx + 5, y + 3, TEXT);
 			hit(vx, y, vw, 14, action, null);
 		}
 	}
@@ -507,46 +549,91 @@ public final class RmHud {
 		@Override
 		void draw(DrawContext context, int x, int y) {
 			int size = 20;
-			RmState.Tool[] tools = RmState.Tool.values();
-			int count = tools.length + 9;
-			width = count * (size + 2) + 16;
-			height = size + 6;
-			VeloDraw.fillRounded(context, x, y, width, height, 7, BG);
-			int bx = x + 4;
 			int by = y + 3;
-			for (RmState.Tool tool : tools) {
-				iconButton(context, bx, by, size, tool.icon, RmState.tool == tool, tool.label, () -> RedstoneMode.selectTool(tool));
-				bx += size + 2;
+			height = size + 6;
+			// Laid out first, drawn after the background (its width depends on what's offered).
+			List<Runnable> draw = new ArrayList<>();
+			int[] bx = {x + 4};
+			boolean edit = RedstoneMode.canEdit();
+			RmState.Tool[] tools = RedstoneMode.tools();
+			if (tools.length > 1) {
+				for (RmState.Tool tool : tools) {
+					int tx = bx[0];
+					draw.add(() -> iconButton(context, tx, by, size, tool.icon, RmState.tool == tool, tool.label, () -> RedstoneMode.selectTool(tool)));
+					bx[0] += size + 2;
+				}
+				separator(draw, context, bx, by, size);
 			}
-			context.fill(bx + 2, by + 3, bx + 3, by + size - 3, 0x40FFFFFF);
-			bx += 8;
-			int menuX = bx;
-			iconButton(context, bx, by, size, "file", false, "File", () -> openMenu(screenX(menuX), screenY(y + height + 2), RmMenus.file()));
-			bx += size + 2;
-			int editX = bx;
-			iconButton(context, bx, by, size, "undo", false, "Edit", () -> openMenu(screenX(editX), screenY(y + height + 2), RmMenus.edit()));
-			bx += size + 2;
-			int viewX = bx;
-			iconButton(context, bx, by, size, "view", false, "View", () -> openMenu(screenX(viewX), screenY(y + height + 2), RmMenus.view()));
-			bx += size + 2;
-			int setX = bx;
-			iconButton(context, bx, by, size, "settings", false, "Settings", () -> openMenu(screenX(setX), screenY(y + height + 2),
-					RmMenus.settings()));
-			bx += size + 2;
-			context.fill(bx + 2, by + 3, bx + 3, by + size - 3, 0x40FFFFFF);
-			bx += 8;
-			iconButton(context, bx, by, size, "freeze", TickControls.frozen(), "Freeze world (F7)", TickControls::toggleFreeze);
-			bx += size + 2;
-			boolean recording = Timeline.phase() == Timeline.Phase.RECORDING;
-			iconButton(context, bx, by, size, "record", recording || Timeline.replayOpen(),
-					recording ? "Stop recording (K)" : Timeline.replayOpen() ? "Leave replay (K)" : "Record selection (K)", Timeline::toggle);
-			bx += size + 2;
-			iconButton(context, bx, by, size, "recordings", false, "Recordings", () -> openMenu(screenX(x + width - 60), screenY(y + height + 2),
-					RmMenus.recordings()));
-			bx += size + 2;
-			iconButton(context, bx, by, size, "hidden", false, "Hide overlay (F9)", RedstoneMode::toggleOverlay);
-			bx += size + 2;
-			iconButton(context, bx, by, size, "exit", false, "Leave Redstone Mode" + RmKeys.toggleHint(), RedstoneMode::exit);
+			// Schematics: load / save right on the bar, not hidden in a menu.
+			bx[0] += labelButton(draw, context, bx[0], by, size, "file", "Load", "Load a schematic (Ctrl+L)",
+					() -> MinecraftClient.getInstance().setScreen(new SchematicPickScreen(null))) + 2;
+			bx[0] += labelButton(draw, context, bx[0], by, size, "save", "Save", RmState.hasSelection()
+					? "Save the selection as a schematic" : "Select an area in slot 0, then save it", RmInput::saveSelection) + 2;
+			separator(draw, context, bx, by, size);
+			int menuX = bx[0];
+			draw.add(() -> iconButton(context, menuX, by, size, "layers", false, "Schematics", () -> openMenu(screenX(menuX), screenY(y + height + 2),
+					RmMenus.file())));
+			bx[0] += size + 2;
+			if (edit) {
+				int editX = bx[0];
+				draw.add(() -> iconButton(context, editX, by, size, "undo", false, "Edit", () -> openMenu(screenX(editX), screenY(y + height + 2),
+						RmMenus.edit())));
+				bx[0] += size + 2;
+			}
+			int viewX = bx[0];
+			draw.add(() -> iconButton(context, viewX, by, size, "view", false, "View", () -> openMenu(screenX(viewX), screenY(y + height + 2),
+					RmMenus.view())));
+			bx[0] += size + 2;
+			int setX = bx[0];
+			draw.add(() -> iconButton(context, setX, by, size, "settings", false, "Settings", () -> openMenu(screenX(setX), screenY(y + height + 2),
+					RmMenus.settings())));
+			bx[0] += size + 2;
+			separator(draw, context, bx, by, size);
+			if (edit) {
+				int fx = bx[0];
+				draw.add(() -> iconButton(context, fx, by, size, "freeze", TickControls.frozen(), "Freeze world (F7)", TickControls::toggleFreeze));
+				bx[0] += size + 2;
+				boolean recording = Timeline.phase() == Timeline.Phase.RECORDING;
+				int rx = bx[0];
+				draw.add(() -> iconButton(context, rx, by, size, "record", recording || Timeline.replayOpen(),
+						recording ? "Stop recording (K)" : Timeline.replayOpen() ? "Leave replay (K)" : "Record selection (K)", Timeline::toggle));
+				bx[0] += size + 2;
+				int lx = bx[0];
+				draw.add(() -> iconButton(context, lx, by, size, "recordings", false, "Recordings", () -> openMenu(screenX(x + width - 60),
+						screenY(y + height + 2), RmMenus.recordings())));
+				bx[0] += size + 2;
+			}
+			int hx = bx[0];
+			draw.add(() -> iconButton(context, hx, by, size, "hidden", false, "Hide overlay (F9)", RedstoneMode::toggleOverlay));
+			bx[0] += size + 2;
+			int ex = bx[0];
+			draw.add(() -> iconButton(context, ex, by, size, "exit", false, "Leave Redstone Mode" + RmKeys.toggleHint(), RedstoneMode::exit));
+			bx[0] += size + 2;
+			width = bx[0] - x + 2;
+			VeloDraw.fillRounded(context, x, y, width, height, 7, BG);
+			for (Runnable r : draw) {
+				r.run();
+			}
+		}
+
+		private void separator(List<Runnable> draw, DrawContext context, int[] bx, int by, int size) {
+			int sx = bx[0];
+			draw.add(() -> context.fill(sx + 2, by + 3, sx + 3, by + size - 3, 0x40FFFFFF));
+			bx[0] += 8;
+		}
+
+		/** An icon + word button as tall as the icon buttons; returns its width. */
+		private int labelButton(List<Runnable> draw, DrawContext context, int bx, int by, int size, String icon, String label, String tooltip,
+				Runnable action) {
+			int w = 6 + 12 + 4 + RmHud.width(label) + 8;
+			draw.add(() -> {
+				boolean hover = hovered(bx, by, w, size);
+				VeloDraw.fillRounded(context, bx, by, w, size, 4, hover ? 0xFF3A3A48 : 0xFF26262F);
+				drawIcon(context, icon, bx + 6, by + (size - 12) / 2, 12, hover ? 0xFFFFFFFF : 0xFFC8C8D4);
+				RmHud.text(context, label, bx + 22, by + (size - 8) / 2, TEXT);
+				hit(bx, by, w, size, action, tooltip);
+			});
+			return w;
 		}
 	}
 
@@ -578,19 +665,19 @@ public final class RmHud {
 			// Background is drawn after measuring: draw content into a list of operations first.
 			List<Runnable> draw = new ArrayList<>();
 			draw.add(() -> drawIcon(context, iconName, x + 8, top + 7, 14, ACCENT));
-			draw.add(() -> context.drawTextWithShadow(textRenderer, title, x + 26, top + 10, TEXT));
+			draw.add(() -> RmHud.text(context, title, x + 26, top + 10, TEXT));
 			cy += 18;
 			int hintY = cy;
 			List<String> hint = VeloUi.wrap(hintText(tool), inner);
 			for (int i = 0; i < hint.size(); i++) {
 				String line = hint.get(i);
 				int ly = hintY + i * 10;
-				draw.add(() -> context.drawTextWithShadow(textRenderer, line, x + 8, ly, MUTED));
+				draw.add(() -> RmHud.text(context, line, x + 8, ly, MUTED));
 			}
 			cy += hint.size() * 10 + 6;
 			if (!RedstoneMode.toolHeld()) {
 				int ly = cy;
-				draw.add(() -> context.drawTextWithShadow(textRenderer, VeloUi.trim("Press 0 or scroll past the hotbar for the tool slot"
+				draw.add(() -> RmHud.text(context, VeloUi.trim("Press 0 or scroll past the hotbar for the tool slot"
 						+ " to use it", inner), x + 8, ly, 0xFFFFD84A));
 				cy += 14;
 			}
@@ -610,6 +697,10 @@ public final class RmHud {
 			}
 			if (Placements.following() != null) {
 				return "Aim where it goes  ·  Shift+scroll rotates  ·  left click locks it in place  ·  right click cancels";
+			}
+			if (tool == RmState.Tool.SELECT && !RedstoneMode.canEdit()) {
+				return "Select an area to save as a schematic  ·  left click corner 1  ·  right click corner 2  ·  Shift+scroll grows"
+						+ " the side you look at";
 			}
 			return tool.hint;
 		}
@@ -653,11 +744,11 @@ public final class RmHud {
 			// Header: title, count, load
 			draw.add(() -> {
 				drawIcon(context, "layers", x + 8, top + 7, 14, ACCENT);
-				context.drawTextWithShadow(textRenderer, "Schematics", x + 26, top + 10, TEXT);
+				RmHud.text(context, "Schematics", x + 26, top + 10, TEXT);
 				String count = String.valueOf(list.size());
-				int cx = x + 30 + textRenderer.getWidth("Schematics");
-				VeloDraw.fillRounded(context, cx, top + 8, textRenderer.getWidth(count) + 8, 12, 6, 0xFF33333F);
-				context.drawTextWithShadow(textRenderer, count, cx + 4, top + 10, MUTED);
+				int cx = x + 30 + RmHud.width("Schematics");
+				VeloDraw.fillRounded(context, cx, top + 8, RmHud.width(count) + 8, 12, 6, 0xFF33333F);
+				RmHud.text(context, count, cx + 4, top + 10, MUTED);
 				textButton(context, x + width - 54, top + 7, 46, "+ Load", false,
 						() -> MinecraftClient.getInstance().setScreen(new SchematicPickScreen(null)));
 			});
@@ -672,9 +763,9 @@ public final class RmHud {
 					if (isOpen) {
 						context.fill(x + 6, ry + 6, x + 8, ry + 22, ACCENT);
 					}
-					context.drawTextWithShadow(textRenderer, VeloUi.trim(p.name.replaceAll("\\.(litematic|veloschem)$", ""), width - 70), x + 14, ry + 5,
+					RmHud.text(context, VeloUi.trim(p.name.replaceAll("\\.(litematic|veloschem)$", ""), width - 70), x + 14, ry + 5,
 							p.visible ? TEXT : MUTED);
-					context.drawTextWithShadow(textRenderer, VeloUi.trim(sub, width - 70), x + 14, ry + 16, !p.locked ? 0xFFFFD84A : MUTED);
+					RmHud.text(context, VeloUi.trim(sub, width - 70), x + 14, ry + 16, !p.locked ? 0xFFFFD84A : MUTED);
 					iconButton(context, x + width - 46, ry + 7, 14, p.visible ? "view" : "hidden", false, p.visible ? "Hide" : "Show",
 							() -> p.visible = !p.visible);
 					iconButton(context, x + width - 28, ry + 7, 14, "close", false, "Remove", () -> Placements.remove(p));
@@ -688,7 +779,7 @@ public final class RmHud {
 					List<String> help = VeloUi.wrap("Aim where it goes  ·  left click locks it  ·  Shift+scroll rotates  ·  right click cancels", inner - 4);
 					for (String line : help) {
 						int ly = cy;
-						draw.add(() -> context.drawTextWithShadow(textRenderer, line, x + 10, ly, 0xFFFFD84A));
+						draw.add(() -> RmHud.text(context, line, x + 10, ly, 0xFFFFD84A));
 						cy += 10;
 					}
 					cy += 6;
@@ -723,7 +814,7 @@ public final class RmHud {
 				if (p.layerMode != Placements.LayerMode.ALL) {
 					int axisY = cy;
 					draw.add(() -> {
-						context.drawTextWithShadow(textRenderer, "Axis", x + 8, axisY + 3, MUTED);
+						RmHud.text(context, "Axis", x + 8, axisY + 3, MUTED);
 						segmented(context, x + 50, axisY, inner - 42, new String[] {"X", "Y", "Z"}, "xyz".indexOf(p.axis), i -> p.axis = "xyz".charAt(i));
 					});
 					cy += 18;
@@ -745,7 +836,7 @@ public final class RmHud {
 				// Build
 				cy = section(draw, context, x, cy, "BUILD");
 				int buildY = cy;
-				boolean single = RmWorld.singleplayer();
+				boolean single = RedstoneMode.canEdit();
 				draw.add(() -> {
 					int mw = 72;
 					labelButton(context, x + 8, buildY, mw, "materials", "Materials", "What you need to build it",
@@ -755,15 +846,15 @@ public final class RmHud {
 					boolean hover = hovered(px, buildY, pw, 26);
 					VeloDraw.fillRounded(context, px, buildY, pw, 26, 6, single ? (hover ? 0xFFD04040 : 0xFFB83030) : 0xFF2A2A33);
 					String label = single ? "Paste into world" : "Build by hand";
-					context.drawTextWithShadow(textRenderer, label, px + (pw - textRenderer.getWidth(label)) / 2, buildY + 5, TEXT);
+					RmHud.text(context, label, px + (pw - RmHud.width(label)) / 2, buildY + 5, TEXT);
 					String note = single ? "Ctrl+Z undoes it" : "middle click picks blocks";
-					context.drawTextWithShadow(textRenderer, VeloUi.trim(note, pw - 6), px + (pw - Math.min(textRenderer.getWidth(note), pw - 6)) / 2,
+					RmHud.text(context, VeloUi.trim(note, pw - 6), px + (pw - Math.min(RmHud.width(note), pw - 6)) / 2,
 							buildY + 15, single ? 0xFFFFD0D0 : MUTED);
 					hit(px, buildY, pw, 26, () -> {
-						if (RmWorld.singleplayer()) {
+						if (RedstoneMode.canEdit()) {
 							RmOps.paste(p.view(), p.x, p.y, p.z);
 						} else {
-							RmState.error("Pasting needs singleplayer - build it by hand using the preview (middle click picks blocks)");
+							RmState.error("Pasting needs singleplayer creative - build it by hand using the preview (middle click picks blocks)");
 						}
 					}, null);
 				});
@@ -780,8 +871,8 @@ public final class RmHud {
 		private int section(List<Runnable> draw, DrawContext context, int x, int y, String label) {
 			var textRenderer = MinecraftClient.getInstance().textRenderer;
 			draw.add(() -> {
-				context.drawTextWithShadow(textRenderer, label, x + 10, y + 2, SECTION);
-				int lx = x + 14 + textRenderer.getWidth(label);
+				RmHud.text(context, label, x + 10, y + 2, SECTION);
+				int lx = x + 14 + RmHud.width(label);
 				context.fill(lx, y + 6, x + width - 10, y + 7, 0x30FFFFFF);
 			});
 			return y + 13;
@@ -794,7 +885,7 @@ public final class RmHud {
 			VeloDraw.fillRounded(context, x, y, w, 26, 6, hover ? 0xFF3A3A48 : 0xFF2A2A34);
 			drawIcon(context, icon, x + (w - 10) / 2, y + 3, 10, hover ? 0xFFFFFFFF : 0xFFC8C8D4);
 			String t = VeloUi.trim(label, w - 4);
-			context.drawTextWithShadow(textRenderer, t, x + (w - textRenderer.getWidth(t)) / 2, y + 15, hover ? TEXT : 0xFFD8D8E0);
+			RmHud.text(context, t, x + (w - RmHud.width(t)) / 2, y + 15, hover ? TEXT : 0xFFD8D8E0);
 			hit(x, y, w, 26, action, tooltip);
 		}
 
@@ -812,7 +903,7 @@ public final class RmHud {
 					VeloDraw.fillRounded(context, sx + 1, y + 1, sw - 2, 13, 4, on ? 0xFFB83030 : 0xFF2C2C36);
 				}
 				String t = VeloUi.trim(options[i], sw - 4);
-				context.drawTextWithShadow(textRenderer, t, sx + (sw - textRenderer.getWidth(t)) / 2, y + 4, on ? TEXT : MUTED);
+				RmHud.text(context, t, sx + (sw - RmHud.width(t)) / 2, y + 4, on ? TEXT : MUTED);
 				int index = i;
 				hit(sx, y, sw, 15, () -> pick.accept(index), null);
 			}
@@ -822,13 +913,13 @@ public final class RmHud {
 		private void layerRow(DrawContext context, int x, int y, int w, String label, int value, int count, java.util.function.IntConsumer set,
 				Runnable atFeet) {
 			var textRenderer = MinecraftClient.getInstance().textRenderer;
-			context.drawTextWithShadow(textRenderer, label, x, y + 3, MUTED);
+			RmHud.text(context, label, x, y + 3, MUTED);
 			int sx = x + w - 92;
 			textButton(context, sx - 30, y, 26, "me", false, atFeet);
 			hit(sx - 30, y, 26, 14, atFeet, "The layer you're standing in");
 			textButton(context, sx, y, 18, "-", false, () -> set.accept(value - 1));
 			String text = (value + 1) + " / " + count;
-			context.drawTextWithShadow(textRenderer, text, sx + 46 - textRenderer.getWidth(text) / 2, y + 3, TEXT);
+			RmHud.text(context, text, sx + 46 - RmHud.width(text) / 2, y + 3, TEXT);
 			textButton(context, sx + 74, y, 18, "+", false, () -> set.accept(value + 1));
 		}
 	}
@@ -853,7 +944,7 @@ public final class RmHud {
 			VeloDraw.fillRounded(context, x, y, width, height, 8, BG);
 			if (Timeline.phase() == Timeline.Phase.RECORDING) {
 				VeloDraw.fillCircle(context, x + 14, y + 17, 4, (System.currentTimeMillis() / 500) % 2 == 0 ? ACCENT : 0xFF802020);
-				context.drawTextWithShadow(textRenderer, "Recording  " + Timeline.recordingFrames() + " ticks", x + 24, y + 13, TEXT);
+				RmHud.text(context, "Recording  " + Timeline.recordingFrames() + " ticks", x + 24, y + 13, TEXT);
 				textButton(context, x + width - 70, y + 10, 62, "Stop (K)", true, Timeline::toggle);
 				return;
 			}
@@ -890,9 +981,9 @@ public final class RmHud {
 			}, null);
 			setSlider(screenX(sx), sw * position().scale());
 			String time = frame + " / " + frames;
-			context.drawTextWithShadow(textRenderer, time, sx + sw + 8, y + 9, TEXT);
+			RmHud.text(context, time, sx + sw + 8, y + 9, TEXT);
 			String speed = String.format(Locale.ROOT, "%.2fx", RmSettings.get().playbackSpeed);
-			context.drawTextWithShadow(textRenderer, speed, sx + sw + 8, y + 20, MUTED);
+			RmHud.text(context, speed, sx + sw + 8, y + 20, MUTED);
 			int rx = x + width - 64;
 			textButton(context, rx, y + 3, 14, "-", false, () -> Timeline.changeSpeed(-1));
 			textButton(context, rx + 16, y + 3, 14, "+", false, () -> Timeline.changeSpeed(1));
@@ -926,27 +1017,27 @@ public final class RmHud {
 				chips.add(new String[] {"REPLAY", null});
 			}
 			String title = "REDSTONE MODE";
-			int w = textRenderer.getWidth(title) + 26;
+			int w = RmHud.width(title) + 26;
 			for (String[] chip : chips) {
-				w += textRenderer.getWidth(chip[0] + (chip[1] != null ? " " + chip[1] : "")) + 12;
+				w += RmHud.width(chip[0] + (chip[1] != null ? " " + chip[1] : "")) + 12;
 			}
 			String hint = cursor ? "Alt: back to game" : "Alt: menu";
-			w += textRenderer.getWidth(hint) + 10;
+			w += RmHud.width(hint) + 10;
 			width = w;
 			height = 16;
 			VeloDraw.fillRounded(context, x, y, width, height, 5, BG);
 			drawIcon(context, "redstone", x + 4, y + 2, 12, ACCENT);
 			int tx = x + 20;
-			context.drawTextWithShadow(textRenderer, title, tx, y + 4, TEXT);
-			tx += textRenderer.getWidth(title) + 6;
+			RmHud.text(context, title, tx, y + 4, TEXT);
+			tx += RmHud.width(title) + 6;
 			for (String[] chip : chips) {
 				String text = chip[0] + (chip[1] != null ? " " + chip[1] : "");
-				int cw = textRenderer.getWidth(text) + 8;
+				int cw = RmHud.width(text) + 8;
 				VeloDraw.fillRounded(context, tx, y + 2, cw, 12, 3, chip[0].equals("REC") ? 0xFFB02020 : 0xFF2E5C9E);
-				context.drawTextWithShadow(textRenderer, text, tx + 4, y + 4, TEXT);
+				RmHud.text(context, text, tx + 4, y + 4, TEXT);
 				tx += cw + 4;
 			}
-			context.drawTextWithShadow(textRenderer, hint, tx + 4, y + 4, MUTED);
+			RmHud.text(context, hint, tx + 4, y + 4, MUTED);
 		}
 	}
 }

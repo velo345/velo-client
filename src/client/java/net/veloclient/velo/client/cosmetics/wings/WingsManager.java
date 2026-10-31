@@ -25,11 +25,13 @@ import java.util.Optional;
  */
 public final class WingsManager {
 
-	/** How each pair moves: feathered flaps softly, bat flaps snappier, crystal is stiffer and slower. */
+	/** How each pair moves: feathered flaps softly, bat flaps snappier, crystal is stiffer and slower, tentacles writhe. */
 	public enum Style {
 		FEATHERED(1f, 1f, 1f),
 		BAT(1.15f, 1.1f, 0.6f),
-		CRYSTAL(0.9f, 1.3f, 0.5f);
+		CRYSTAL(0.9f, 1.3f, 0.5f),
+		/** A gentle base wingbeat; the tentacles themselves writhe (see {@link WingAnimator}). */
+		TENTACLE(0.8f, 0.6f, 0.3f);
 
 		public final float speed;
 		public final float amplitude;
@@ -68,11 +70,17 @@ public final class WingsManager {
 	 * How you wear your wings: size, position on the back, how far they're spread, how fast and how
 	 * strongly they flap. Sent with the equipped id, so everyone sees them the way you set them.
 	 */
-	public record Settings(float scale, float offsetY, float offsetZ, float spread, float flapSpeed, float flapStrength) {
+	public record Settings(float scale, float offsetY, float offsetZ, float spread, float flapSpeed, float flapStrength, int color) {
 		/** Spread 6 degrees: resting a touch further back reads more natural than flat out. */
 		public static final Settings DEFAULT = new Settings(1f, 0f, 0f, 6f, 1f, 1f);
 
+		/** Without a colour: the pair's own ({@link WingRigs#tint} code 0). */
+		public Settings(float scale, float offsetY, float offsetZ, float spread, float flapSpeed, float flapStrength) {
+			this(scale, offsetY, offsetZ, spread, flapSpeed, flapStrength, 0);
+		}
+
 		public Settings {
+			color = color < 0 || color > WingRigs.TINT_RAINBOW ? 0 : color;
 			scale = clamp(scale, 0.4f, 2f, 1f);
 			offsetY = clamp(offsetY, -0.5f, 0.5f, 0f);
 			offsetZ = clamp(offsetZ, -0.2f, 0.5f, 0f);
@@ -90,17 +98,23 @@ public final class WingsManager {
 			return (float) Math.toRadians(spread);
 		}
 
-		/** "100;0;0;0;100;100" - percent / hundredths of a block / degrees, network-safe. */
+		/** "100;0;0;0;100;100;0" - percent / hundredths of a block / degrees / colour code, network-safe (older clients read the first six). */
 		String encode() {
 			return Math.round(scale * 100) + ";" + Math.round(offsetY * 100) + ";" + Math.round(offsetZ * 100) + ";" + Math.round(spread)
-					+ ";" + Math.round(flapSpeed * 100) + ";" + Math.round(flapStrength * 100);
+					+ ";" + Math.round(flapSpeed * 100) + ";" + Math.round(flapStrength * 100) + ";" + color;
+		}
+
+		/** The same with another colour code. */
+		public Settings withColor(int code) {
+			return new Settings(scale, offsetY, offsetZ, spread, flapSpeed, flapStrength, code);
 		}
 
 		static Settings decode(String[] parts, int from) {
 			try {
 				return new Settings(Integer.parseInt(parts[from]) / 100f, Integer.parseInt(parts[from + 1]) / 100f,
 						Integer.parseInt(parts[from + 2]) / 100f, Integer.parseInt(parts[from + 3]),
-						Integer.parseInt(parts[from + 4]) / 100f, Integer.parseInt(parts[from + 5]) / 100f);
+						Integer.parseInt(parts[from + 4]) / 100f, Integer.parseInt(parts[from + 5]) / 100f,
+						parts.length > from + 6 ? Integer.parseInt(parts[from + 6]) : 0);
 			} catch (RuntimeException e) {
 				return DEFAULT;
 			}
@@ -187,7 +201,7 @@ public final class WingsManager {
 			state.perWing().forEach((id, s) -> {
 				if (s != null) {
 					// Through the constructor again, so values from the file are clamped.
-					SETTINGS.put(id, new Settings(s.scale(), s.offsetY(), s.offsetZ(), s.spread(), s.flapSpeed(), s.flapStrength()));
+					SETTINGS.put(id, new Settings(s.scale(), s.offsetY(), s.offsetZ(), s.spread(), s.flapSpeed(), s.flapStrength(), s.color()));
 				}
 			});
 		} else if (state != null && state.settings() != null && equippedId != null) {
@@ -454,12 +468,52 @@ public final class WingsManager {
 					model = WingModel.read(in, id, type.scale());
 				}
 			}
+			WingRigs.Effect effect = WingRigs.effect(id);
+			WingRigs.Sampler texture = null;
+			if (effect != null && effect.glow() != null) {
+				texture = sampler(id, type);
+				if (texture == null && !type.bundled()) {
+					return null; // its glow is picked out of the texture, still downloading
+				}
+			}
+			model = model.withRig(id, type.scale(), type.style() == Style.TENTACLE, texture);
 			MODELS.put(id, model);
 		} catch (Exception e) {
 			FAILED.put(id, System.currentTimeMillis());
 			VeloClient.LOGGER.warn("Couldn't load wings {}", id, e);
 		}
 		return model;
+	}
+
+	/** The pair's texture as pixels, to pick out the parts that glow; null if it can't be read (yet). */
+	private static WingRigs.Sampler sampler(String id, WingType type) {
+		try (InputStream in = type.bundled() ? WingsManager.class.getResourceAsStream("/assets/velo-client/textures/cosmetics/wings/" + id + ".png")
+				: openDownloaded(type.texture())) {
+			if (in == null) {
+				return null;
+			}
+			net.minecraft.client.texture.NativeImage image = net.minecraft.client.texture.NativeImage.read(in);
+			try {
+				int w = image.getWidth();
+				int h = image.getHeight();
+				int[] pixels = new int[w * h];
+				for (int y = 0; y < h; y++) {
+					for (int x = 0; x < w; x++) {
+						pixels[y * w + x] = image.getColorArgb(x, y);
+					}
+				}
+				return (u, v) -> pixels[Math.max(0, Math.min(h - 1, (int) (v * h))) * w + Math.max(0, Math.min(w - 1, (int) (u * w)))];
+			} finally {
+				image.close();
+			}
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	private static InputStream openDownloaded(String sha) throws java.io.IOException {
+		java.nio.file.Path file = sha == null ? null : net.veloclient.velo.client.cosmetics.CosmeticsCatalog.file(sha);
+		return file == null ? null : java.nio.file.Files.newInputStream(file);
 	}
 
 	/** The pair's texture: bundled, or registered from the downloaded file (null until it's there). Render thread only. */

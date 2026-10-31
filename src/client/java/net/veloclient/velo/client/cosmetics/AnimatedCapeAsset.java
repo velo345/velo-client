@@ -75,7 +75,7 @@ public final class AnimatedCapeAsset {
 				created.reloadable = true;
 				return created;
 			} catch (IOException e) {
-				throw new RuntimeException("Failed to decode animated cape texture for " + id, e);
+				throw new RuntimeException("Failed to decode animated cloak texture for " + id, e);
 			}
 		});
 	}
@@ -102,8 +102,8 @@ public final class AnimatedCapeAsset {
 			throw new IOException("GIF has no frames");
 		}
 		Identifier textureId = Identifier.of("velo-client", "cape_anim_" + id.replace('-', '_'));
-		NativeImageBackedTexture texture = decoded.width() >= 512 ? new SmoothTexture(() -> "animated cape " + id, decoded.width(), decoded.height())
-				: new NativeImageBackedTexture(() -> "animated cape " + id, decoded.width(), decoded.height(), false);
+		NativeImageBackedTexture texture = decoded.width() >= 512 ? new SmoothTexture(() -> "animated cloak " + id, decoded.width(), decoded.height())
+				: new NativeImageBackedTexture(() -> "animated cloak " + id, decoded.width(), decoded.height(), false);
 		MinecraftClient.getInstance().getTextureManager().registerTexture(textureId, texture);
 		// Frames only cover the used part of the layout (see GifDecoder#capeRegion): the rest stays transparent.
 		texture.getImage().fillRect(0, 0, decoded.width(), decoded.height(), 0);
@@ -116,7 +116,7 @@ public final class AnimatedCapeAsset {
 	 * HD capes (16 texels per cape pixel) are painted art, not pixel art: sampled bilinearly they stay smooth at every
 	 * size, where nearest sampling turned them jagged and shimmering when drawn smaller than the texture.
 	 */
-	private static final class SmoothTexture extends NativeImageBackedTexture {
+	static final class SmoothTexture extends NativeImageBackedTexture {
 		SmoothTexture(java.util.function.Supplier<String> name, int width, int height) {
 			super(name, width, height, false);
 			//? if <26.1 {
@@ -187,6 +187,7 @@ public final class AnimatedCapeAsset {
 		// MB). Browsing the store used to keep every cape ever previewed for the rest of the
 		// session; ones that can be decoded again are freed after a minute of not being drawn.
 		releaseIdle(60_000);
+		CapeManager.preloadEquipped();
 		for (AnimatedCapeAsset texture : REGISTRY.values()) {
 			if (now - texture.lastUsedNanos > 1_000_000_000L) {
 				texture.lastAdvanceNanos = now;
@@ -199,10 +200,11 @@ public final class AnimatedCapeAsset {
 	/** Frees re-decodable capes not drawn for {@code idleMillis}. Render thread. */
 	public static synchronized void releaseIdle(long idleMillis) {
 		long now = System.nanoTime();
-		var it = REGISTRY.values().iterator();
+		var it = REGISTRY.entrySet().iterator();
 		while (it.hasNext()) {
-			AnimatedCapeAsset asset = it.next();
-			if (asset.reloadable && now - asset.lastUsedNanos > idleMillis * 1_000_000L) {
+			var entry = it.next();
+			AnimatedCapeAsset asset = entry.getValue();
+			if (asset.reloadable && now - asset.lastUsedNanos > idleMillis * 1_000_000L && !CapeManager.pinned(entry.getKey())) {
 				it.remove();
 				asset.release();
 			}

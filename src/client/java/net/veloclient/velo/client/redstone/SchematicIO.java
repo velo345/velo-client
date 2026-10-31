@@ -584,7 +584,7 @@ public final class SchematicIO {
 
 	/**
 	 * Saves the current selection as {@code name}.veloschem, or as {@code name}.litematic for friends on Litematica
-	 * (captured and written on the server thread).
+	 * (captured and written on the server thread; on a server from what this client has loaded).
 	 */
 	public static void saveSelection(String name, boolean litematic) {
 		int[] b = RmState.box();
@@ -595,21 +595,37 @@ public final class SchematicIO {
 		String clean = name.replaceAll("[^A-Za-z0-9 _.-]", "_").strip();
 		String base = clean.isEmpty() ? "redstone" : clean;
 		Path file = litematic ? litematicFolder().resolve(base + ".litematic") : veloFolder().resolve(base + ".veloschem");
+		if (!RmWorld.singleplayer()) {
+			// On a server: capture what this client sees (blocks + the block entity data it was sent), write off-thread.
+			Object level = RmWorld.clientLevel();
+			if (level == null) {
+				return;
+			}
+			Clip clip = RmOps.capture(level, b[0], b[1], b[2], b[3] - b[0] + 1, b[4] - b[1] + 1, b[5] - b[2] + 1, true);
+			Thread thread = new Thread(() -> write(file, clip, clean, base, litematic), "velo-schematic-save");
+			thread.setDaemon(true);
+			thread.start();
+			return;
+		}
 		RmWorld.onServer(level -> {
 			Clip clip = RmOps.capture(level, b[0], b[1], b[2], b[3] - b[0] + 1, b[4] - b[1] + 1, b[5] - b[2] + 1, true);
 			// Captured and written on the server thread - a schematic is small (palette + packed indices).
-			try {
-				if (litematic) {
-					saveLitematic(file, clip, base);
-				} else {
-					save(file, clip, clean);
-				}
-				net.minecraft.client.MinecraftClient.getInstance().execute(() -> RmState.info("Saved " + file.getFileName()
-						+ (litematic ? " - in schematics/, ready for Litematica" : " - find it under Schematics > Velo")));
-			} catch (IOException e) {
-				net.minecraft.client.MinecraftClient.getInstance().execute(() -> RmState.error("Couldn't save: " + e.getMessage()));
-			}
+			write(file, clip, clean, base, litematic);
 		});
+	}
+
+	private static void write(Path file, Clip clip, String clean, String base, boolean litematic) {
+		try {
+			if (litematic) {
+				saveLitematic(file, clip, base);
+			} else {
+				save(file, clip, clean);
+			}
+			net.minecraft.client.MinecraftClient.getInstance().execute(() -> RmState.info("Saved " + file.getFileName()
+					+ (litematic ? " - in schematics/, ready for Litematica" : " - find it under Schematics > Velo")));
+		} catch (IOException e) {
+			net.minecraft.client.MinecraftClient.getInstance().execute(() -> RmState.error("Couldn't save: " + e.getMessage()));
+		}
 	}
 
 	/** Schematic files Redstone Mode can load: .veloschem first, then .litematic. */

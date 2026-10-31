@@ -80,10 +80,14 @@ public final class SkinLibrary {
 		return load().equippedId;
 	}
 
+	/** Run after the equipped skin changed (the Locker keeps the worn loadout in step). */
+	public static final java.util.List<Runnable> LISTENERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
 	public static void markEquipped(Skin skin) throws IOException {
 		Data data = load();
 		data.equippedId = skin.id();
 		save(data);
+		LISTENERS.forEach(Runnable::run);
 	}
 
 	/** Adds a skin PNG (64x64 or legacy 64x32). */

@@ -48,7 +48,7 @@ public final class EmoteDetailScreen extends VeloWindow {
 		int price = StoreClient.price(type.itemId(), type.price());
 		if (!owned) {
 			VeloButton buy = new VeloButton(ix, contentY() + 70, iw, 20,
-					Text.literal(busy ? "..." : String.format(java.util.Locale.ROOT, "Buy for %,d Velo Coins", price)), b -> buy());
+					Text.literal(busy ? "..." : StoreClient.buyLabel(price)), b -> buy());
 			buy.primary();
 			addDrawableChild(buy);
 			return;
@@ -96,7 +96,7 @@ public final class EmoteDetailScreen extends VeloWindow {
 		busy = true;
 		status = "Buying...";
 		layoutContent();
-		StoreClient.buy(type.itemId(), () -> {
+		StoreClient.buyOrClaim(type.itemId(), () -> {
 			busy = false;
 			int slot = EmoteCatalog.slot(0) == null ? 0 : EmoteCatalog.slotOf(type.id());
 			status = slot >= 0 ? "It's yours - on your emote wheel (hold B)" : "It's yours - pick a wheel slot below";

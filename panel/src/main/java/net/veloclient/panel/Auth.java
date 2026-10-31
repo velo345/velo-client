@@ -162,15 +162,48 @@ final class Auth {
 		}
 		lastTotpStep.put(user.username, step);
 		failuresByUser.remove(username.toLowerCase());
+		audit.log(user.username, ip, "sign-in", "");
+		return newSession(ex, user.username, ip, now);
+	}
+
+	/**
+	 * Signs in with a passkey: {@code verify} checks it and returns the account it belongs to (or throws). Shares the
+	 * failure limits with the password sign-in; the account must still exist in the accounts file.
+	 */
+	String loginWithPasskey(HttpExchange ex, java.util.concurrent.Callable<String> verify) {
+		String ip = Http.clientIp(ex);
+		long now = System.currentTimeMillis();
+		if (recent(failuresByIp, ip, now, 15 * 60_000L) >= 5) {
+			throw new Http.Fail(429, "Too many failed sign-ins from your network - try again in 15 minutes");
+		}
+		String username;
+		try {
+			username = verify.call();
+		} catch (Http.Fail f) {
+			fail(ip, "", now, "passkey: " + f.getMessage());
+			throw f;
+		} catch (Exception e) {
+			fail(ip, "", now, "passkey: " + e.getClass().getSimpleName());
+			throw new Http.Fail(400, "Couldn't check that passkey");
+		}
+		User user = user(username);
+		if (user == null) {
+			fail(ip, username, now, "passkey of a removed account");
+			throw new Http.Fail(401, "This account no longer exists");
+		}
+		audit.log(user.username, ip, "sign-in", "passkey");
+		return newSession(ex, user.username, ip, now);
+	}
+
+	private String newSession(HttpExchange ex, String username, String ip, long now) {
 		byte[] raw = new byte[32];
 		RANDOM.nextBytes(raw);
 		String token = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
 		byte[] csrf = new byte[24];
 		RANDOM.nextBytes(csrf);
 		String agent = ex.getRequestHeaders().getFirst("User-Agent");
-		sessions.put(sha256(token), new Session(user.username, Base64.getUrlEncoder().withoutPadding().encodeToString(csrf), now, now, ip,
+		sessions.put(sha256(token), new Session(username, Base64.getUrlEncoder().withoutPadding().encodeToString(csrf), now, now, ip,
 				agent == null ? "" : agent.substring(0, Math.min(agent.length(), 200))));
-		audit.log(user.username, ip, "sign-in", "");
 		return token;
 	}
 

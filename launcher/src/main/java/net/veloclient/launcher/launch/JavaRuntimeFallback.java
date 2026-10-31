@@ -51,7 +51,7 @@ public final class JavaRuntimeFallback {
 	public static Path ensureAvailable() throws IOException {
 		boolean isWindows = OsRules.currentOsName().equals("windows");
 		String exeName = isWindows ? "java.exe" : "java";
-		Path cachedRuntimeDir = VeloPaths.root().resolve("java-runtime");
+		Path cachedRuntimeDir = VeloPaths.sharedRoot().resolve("java-runtime");
 		Path cachedJava = cachedRuntimeDir.resolve("bin").resolve(exeName);
 		Path versionMarker = cachedRuntimeDir.resolve(VERSION_MARKER_FILE);
 		Path cachedJavaw = cachedRuntimeDir.resolve("bin").resolve("javaw.exe");

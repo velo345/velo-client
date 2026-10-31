@@ -1,0 +1,10 @@
+{
+ "slot": "head",
+ "name": "Snapback",
+ "price": 1000,
+ "accent": "#e8473f",
+ "description": "A black snapback with a flat red brim, a patch on the front and a strap at the back.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

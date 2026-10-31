@@ -82,6 +82,22 @@ final class PartyService {
 	private static final RateLimiter.Window[] POSITION_LIMIT = {new RateLimiter.Window(8, 4_000)};
 	private final Map<String, LivePosition> positions = new HashMap<>();
 
+	/**
+	 * A member's Storage Memory for the world they're in (opt-in "Party Sync" in the game): an opaque gzip+base64
+	 * document the server never reads, in memory only, gone when they leave the party or stop updating it.
+	 */
+	record StorageShare(String uuid, String name, String server, String world, long at, String data) {
+	}
+
+	/** What the others get: data only when it changed since their last poll. */
+	record StorageShareView(String uuid, String name, String server, String world, long at, String data) {
+	}
+
+	static final int STORAGE_MAX_CHARS = 1_500_000;
+	private static final long STORAGE_FRESH_MILLIS = 30 * 60_000;
+	private static final RateLimiter.Window[] STORAGE_LIMIT = {new RateLimiter.Window(6, 30_000), new RateLimiter.Window(60, 600_000)};
+	private final Map<String, StorageShare> storage = new HashMap<>();
+
 	private final SocialService social;
 	private final Map<String, Party> parties = new HashMap<>();
 	private final Map<String, String> partyOf = new HashMap<>();
@@ -257,6 +273,7 @@ final class PartyService {
 		party.members.remove(uuid);
 		partyOf.remove(uuid);
 		positions.remove(uuid);
+		storage.remove(uuid);
 		if (party.members.isEmpty()) {
 			parties.remove(party.id);
 			return;
@@ -400,6 +417,42 @@ final class PartyService {
 			if (position != null && !member.equals(me) && now - position.at() <= POSITION_FRESH_MILLIS) {
 				out.add(position);
 			}
+		}
+		return out;
+	}
+
+	// ---- storage sync ----
+
+	/** Stores {@code me}'s shared storage ({@code data} null = stop sharing); only the party gets it. */
+	synchronized void setStorage(String me, String server, String world, String data) throws SocialService.SocialException {
+		social.rateLimit(me, "party-storage", STORAGE_LIMIT);
+		requireParty(me);
+		if (data == null || server == null) {
+			storage.remove(me);
+			return;
+		}
+		if (data.length() > STORAGE_MAX_CHARS) {
+			throw new SocialService.SocialException(413, "Storage too big to share");
+		}
+		storage.put(me, new StorageShare(me, social.usernameOf(me), clip(server, 160), clip(world == null ? "" : world, 40),
+				System.currentTimeMillis(), data));
+	}
+
+	/** The other members' shared storage; {@code data} is left out when it hasn't changed since {@code since}. */
+	synchronized List<StorageShareView> storage(String me, long since) throws SocialService.SocialException {
+		Party party = requireParty(me);
+		long now = System.currentTimeMillis();
+		List<StorageShareView> out = new ArrayList<>();
+		for (String member : party.members) {
+			StorageShare share = storage.get(member);
+			if (share == null || member.equals(me)) {
+				continue;
+			}
+			if (now - share.at() > STORAGE_FRESH_MILLIS) {
+				storage.remove(member);
+				continue;
+			}
+			out.add(new StorageShareView(share.uuid(), share.name(), share.server(), share.world(), share.at(), share.at() > since ? share.data() : null));
 		}
 		return out;
 	}

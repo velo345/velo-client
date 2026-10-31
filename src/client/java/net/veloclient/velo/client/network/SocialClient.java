@@ -154,6 +154,12 @@ public final class SocialClient {
 		return CONVERSATIONS.getOrDefault(uuid, List.of());
 	}
 
+	/** Your friends right now (empty when not connected). */
+	public static List<Friend> friends() {
+		State current = state;
+		return current == null || current.friends == null ? List.of() : List.copyOf(current.friends);
+	}
+
 	public static Friend friend(String uuid) {
 		State current = state;
 		if (current == null || uuid == null) {
@@ -313,6 +319,13 @@ public final class SocialClient {
 			case "world_invite", "world_knock" -> {
 				if (data != null && data.isJsonObject()) {
 					net.veloclient.velo.client.hosting.WorldHosting.onEvent(type, data.getAsJsonObject());
+				}
+				return false;
+			}
+			case "notes", "note_mention" -> {
+				JsonObject payload = data != null && data.isJsonObject() ? data.getAsJsonObject() : new JsonObject();
+				for (var listener : EVENT_LISTENERS) {
+					listener.accept(type, payload);
 				}
 				return false;
 			}
@@ -486,6 +499,40 @@ public final class SocialClient {
 
 	private static volatile JsonObject party;
 	private static final List<java.util.function.BiConsumer<String, JsonObject>> PARTY_LISTENERS = new CopyOnWriteArrayList<>();
+	/** {@code (type, data)} for feature events (notes, note_mention), called on the event thread. */
+	private static final List<java.util.function.BiConsumer<String, JsonObject>> EVENT_LISTENERS = new CopyOnWriteArrayList<>();
+
+	public static void addEventListener(java.util.function.BiConsumer<String, JsonObject> listener) {
+		EVENT_LISTENERS.add(listener);
+	}
+
+	/** A signed-in GET against the Velo API for features with their own routes; completes with the JSON or fails. */
+	public static CompletableFuture<JsonObject> apiGet(String path) {
+		if (demo) {
+			return CompletableFuture.failedFuture(new java.io.IOException("Demo"));
+		}
+		return CompletableFuture.supplyAsync(() -> {
+			try {
+				return get(path, Duration.ofSeconds(15));
+			} catch (Exception e) {
+				throw new java.util.concurrent.CompletionException(new java.io.IOException(errorText(e)));
+			}
+		});
+	}
+
+	/** A signed-in POST against the Velo API; completes with the JSON answer or fails with a readable message. */
+	public static CompletableFuture<JsonObject> apiPost(String path, JsonObject body) {
+		if (demo) {
+			return CompletableFuture.failedFuture(new java.io.IOException("Demo"));
+		}
+		return CompletableFuture.supplyAsync(() -> {
+			try {
+				return post(path, body);
+			} catch (Exception e) {
+				throw new java.util.concurrent.CompletionException(new java.io.IOException(errorText(e)));
+			}
+		});
+	}
 
 	/** The party you're in (members, leader, ...), or null. Managed from the launcher; the game pings and shares into it. */
 	public static JsonObject party() {
@@ -738,6 +785,31 @@ public final class SocialClient {
 				return out;
 			} catch (Exception e) {
 				return List.<JsonObject>of();
+			}
+		});
+	}
+
+	/** Storage Memory party sync: your storage for the world you're in (gzip+base64); {@code data} null stops sharing. */
+	public static CompletableFuture<String> partyStorageShare(String server, String world, String data) {
+		JsonObject body = new JsonObject();
+		body.addProperty("server", server);
+		body.addProperty("world", world);
+		if (data != null) {
+			body.addProperty("data", data);
+		}
+		return action("/v1/party/storage-share", body);
+	}
+
+	/** The other members' shared storage ({@code data} only when newer than {@code since}), or null when unreachable. */
+	public static CompletableFuture<JsonObject> partyStorageShares(long since) {
+		if (demo) {
+			return CompletableFuture.completedFuture(null);
+		}
+		return CompletableFuture.supplyAsync(() -> {
+			try {
+				return get("/v1/party/storage-shares?since=" + since, Duration.ofSeconds(15));
+			} catch (Exception e) {
+				return null;
 			}
 		});
 	}

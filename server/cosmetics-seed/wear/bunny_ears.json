@@ -1,0 +1,10 @@
+{
+ "slot": "ears",
+ "name": "Bunny Ears",
+ "price": 900,
+ "accent": "#ffb6d3",
+ "description": "Tall soft bunny ears in white and pink.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

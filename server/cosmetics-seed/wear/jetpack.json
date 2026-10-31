@@ -1,0 +1,10 @@
+{
+ "slot": "back",
+ "name": "Jetpack",
+ "price": 2000,
+ "accent": "#d33a2c",
+ "description": "Twin red rocket tanks with flames at the nozzles.",
+ "bone": "body",
+ "mirror": null,
+ "tint": true
+}

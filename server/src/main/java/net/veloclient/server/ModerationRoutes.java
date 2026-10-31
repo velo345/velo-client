@@ -51,9 +51,16 @@ final class ModerationRoutes {
 	private static final RateLimiter LIMITS = new RateLimiter();
 	private static final long START = System.currentTimeMillis();
 
+	/** World Notes, for resolving note reports (set before {@link #register}). */
+	private static NotesService notes;
+
+	static void setNotes(NotesService service) {
+		notes = service;
+	}
+
 	static void register(HttpServer server, SessionRegistry registry, ModerationService moderation, StaffService staff, SocialService social,
 			StoreService store, ClipShareService clips, WorldHostService worlds, CapeStore capes, ReportService bugReports, String siteUrl) {
-		Function<String, String> levelOf = uuid -> store.isOwner(uuid, social.usernameOf(uuid)) ? StaffService.ADMIN : staff.level(uuid);
+		Function<String, String> levelOf = uuid -> store.isOwner(uuid, social.usernameOf(uuid)) ? StaffService.MANAGER : staff.level(uuid);
 
 		// ---- Players report ----
 		server.createContext("/v1/clips/report", exchange -> VeloServerApp.handle(exchange, "POST", ex -> {
@@ -107,14 +114,15 @@ final class ModerationRoutes {
 				}
 			}
 			JsonHttp.writeJson(ex, 200, Map.of("reports", out, "openClips", moderation.openCount(ModerationService.CLIP),
-					"openWorlds", moderation.openCount(ModerationService.WORLD)));
+					"openWorlds", moderation.openCount(ModerationService.WORLD), "openNotes", moderation.openCount(ModerationService.NOTE)));
 		});
 		SocialRoutes.route(server, registry, "/v1/staff/moderation/resolve", "POST", (ex, me) -> {
 			String level = requireTeam(levelOf.apply(me));
 			Resolve r = JsonHttp.readBody(ex, Resolve.class);
 			String by = social.usernameOf(me);
 			boolean remove = "remove".equals(r.action());
-			String kind = ModerationService.WORLD.equals(r.kind()) ? ModerationService.WORLD : ModerationService.CLIP;
+			String kind = ModerationService.WORLD.equals(r.kind()) ? ModerationService.WORLD
+					: ModerationService.NOTE.equals(r.kind()) ? ModerationService.NOTE : ModerationService.CLIP;
 			ModerationService.Report any = moderation.reports(kind, "all").stream().filter(x -> x.target.equals(r.target())).findFirst().orElse(null);
 			if (any == null) {
 				throw new ApiError(404, "No report for that");
@@ -123,6 +131,10 @@ final class ModerationRoutes {
 				if (kind.equals(ModerationService.CLIP)) {
 					if (clips.get(r.target()) != null) {
 						clips.removeByStaff(r.target());
+					}
+				} else if (kind.equals(ModerationService.NOTE)) {
+					if (notes != null && notes.get(r.target()) != null) {
+						notes.removeByStaff(r.target());
 					}
 				} else {
 					worlds.takedown(r.target());
@@ -233,12 +245,12 @@ final class ModerationRoutes {
 			String uuid = VeloServerApp.normalizeUuid(r.uuid());
 			CapeStore.StoredCape cape = uuid == null ? null : capes.all().get(uuid);
 			if (cape == null) {
-				throw new ApiError(404, "That player has no custom cape");
+				throw new ApiError(404, "That player has no custom cloak");
 			}
 			String by = social.usernameOf(me);
 			if ("remove".equals(r.action())) {
 				capes.removeAndBan(uuid);
-				moderation.log(by, "removed custom cape", social.usernameOf(uuid) + " (" + cape.type() + ")", null);
+				moderation.log(by, "removed custom cloak", social.usernameOf(uuid) + " (" + cape.type() + ")", null);
 			} else {
 				moderation.markCapeReviewed(cape.hash());
 			}
@@ -247,13 +259,15 @@ final class ModerationRoutes {
 		SocialRoutes.route(server, registry, "/v1/staff/blocks", "GET", (ex, me) -> {
 			requireRank(levelOf.apply(me), StaffService.ADMIN, "Admins only");
 			JsonHttp.writeJson(ex, 200, Map.of("clips", blockViews(moderation.blocks(ModerationService.CLIP), social),
-					"worlds", blockViews(moderation.blocks(ModerationService.WORLD), social)));
+					"worlds", blockViews(moderation.blocks(ModerationService.WORLD), social),
+					"notes", blockViews(moderation.blocks(ModerationService.NOTE), social)));
 		});
 		SocialRoutes.route(server, registry, "/v1/staff/blocks/set", "POST", (ex, me) -> {
 			requireRank(levelOf.apply(me), StaffService.MOD, "Only moderators and up can block players");
 			BlockRequest r = JsonHttp.readBody(ex, BlockRequest.class);
 			SocialService.PlayerRef ref = social.resolvePlayer(r.target());
-			String what = ModerationService.WORLD.equals(r.what()) ? ModerationService.WORLD : ModerationService.CLIP;
+			String what = ModerationService.WORLD.equals(r.what()) ? ModerationService.WORLD
+					: ModerationService.NOTE.equals(r.what()) ? ModerationService.NOTE : ModerationService.CLIP;
 			moderation.block(what, ref.uuid(), r.days(), r.reason(), social.usernameOf(me));
 			moderation.log(social.usernameOf(me), r.days() < 0 ? "lifted " + what + " block" : "blocked " + what, ref.username(), r.reason());
 			JsonHttp.writeJson(ex, 200, Map.of("ok", true));
@@ -280,7 +294,10 @@ final class ModerationRoutes {
 		out.put("capes", Map.of("custom", capes.all().size(), "animated", animated, "unreviewed", unreviewed));
 		long newBugs = bugReports.list().stream().filter(s -> "new".equals(s.status())).count();
 		out.put("reports", Map.of("clips", moderation.openCount(ModerationService.CLIP), "worlds", moderation.openCount(ModerationService.WORLD),
-				"chat", staff.reports("open").size(), "bugs", newBugs));
+				"notes", moderation.openCount(ModerationService.NOTE), "chat", staff.reports("open").size(), "bugs", newBugs));
+		if (notes != null) {
+			out.put("notes", Map.of("total", notes.count()));
+		}
 		Runtime rt = Runtime.getRuntime();
 		Map<String, Object> machine = new LinkedHashMap<>();
 		machine.put("uptimeMs", System.currentTimeMillis() - START);
@@ -375,6 +392,20 @@ final class ModerationRoutes {
 			if (clip != null) {
 				out.put("clip", PlusFeatureRoutes.view(clip, siteUrl));
 			}
+		} else if (ModerationService.NOTE.equals(r.kind)) {
+			NotesService.Note note = notes == null ? null : notes.get(r.target);
+			out.put("exists", note != null);
+			if (note != null) {
+				Map<String, Object> view = new LinkedHashMap<>();
+				view.put("id", note.id);
+				view.put("title", note.title);
+				view.put("text", note.text);
+				view.put("checks", note.checks.size());
+				view.put("image", note.image > 0);
+				view.put("server", note.server);
+				view.put("updated", note.updated);
+				out.put("noteView", view);
+			}
 		} else {
 			WorldHostService.World world = worlds.byId(r.target);
 			out.put("exists", world != null);
@@ -421,20 +452,20 @@ final class ModerationRoutes {
 	}
 
 	/** Any staff level (helpers included); returns the level. */
-	private static String requireTeam(String level) throws ApiError {
+	static String requireTeam(String level) throws ApiError {
 		if (level == null) {
 			throw new ApiError(403, "Velo staff only");
 		}
 		return level;
 	}
 
-	private static void requireRank(String level, String needed, String message) throws ApiError {
+	static void requireRank(String level, String needed, String message) throws ApiError {
 		if (level == null || StaffService.rank(level) < StaffService.rank(needed)) {
 			throw new ApiError(403, message);
 		}
 	}
 
-	private static int parseInt(String value, int fallback) {
+	static int parseInt(String value, int fallback) {
 		try {
 			return value == null ? fallback : Integer.parseInt(value.trim());
 		} catch (NumberFormatException e) {

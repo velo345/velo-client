@@ -170,6 +170,8 @@ public final class PlayerSkin3DView {
 		if (decorate != null) {
 			decorate.accept(model);
 		}
+		// Your bodywear (and the Store's / Locker's try-on).
+		Wear3D.attach(model, slim);
 
 		Group rig = new Group(model);
 

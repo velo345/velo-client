@@ -478,27 +478,35 @@ public final class VeloSkinsScreen extends VeloWindow {
 	private void equip(SkinLibrary.Skin skin) {
 		busy = true;
 		status = "Uploading " + skin.name() + "...";
-		String token = SkinLibrary.gameAccessToken();
 		Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
 			try {
-				SkinLibrary.equip(skin, token);
-				//? if <26.1 {
-				var profileId = MinecraftClient.getInstance().getSession().getUuidOrNull();
-				//?} else {
-				/*var profileId = net.minecraft.client.Minecraft.getInstance().getUser().getProfileId();
-				*///?}
-				if (profileId != null) {
-					PlayerHeads.update(profileId.toString(), Files.readAllBytes(SkinLibrary.png(skin)));
-				}
-				MinecraftClient.getInstance().execute(() -> {
-					// Wear it right away: the server only sends your new profile when you rejoin.
-					net.veloclient.velo.client.skins.SkinTryOn.setEquipped(texture(skin), skin.slim());
-					net.veloclient.velo.client.gui.widget.SkinModelPreview.refreshCurrent();
-				});
+				upload(skin);
 				done("Skin changed to " + skin.name() + " - others see it once you rejoin.");
 			} catch (Exception e) {
 				done(e.getMessage());
 			}
+		});
+	}
+
+	/**
+	 * Puts {@code skin} on your Minecraft account (blocking - call it off the render thread) and shows it on you right
+	 * away; others see it once you rejoin. Used by this screen and by loadouts.
+	 */
+	public static void upload(SkinLibrary.Skin skin) throws Exception {
+		String token = SkinLibrary.gameAccessToken();
+		SkinLibrary.equip(skin, token);
+		//? if <26.1 {
+		var profileId = MinecraftClient.getInstance().getSession().getUuidOrNull();
+		//?} else {
+		/*var profileId = net.minecraft.client.Minecraft.getInstance().getUser().getProfileId();
+		*///?}
+		if (profileId != null) {
+			PlayerHeads.update(profileId.toString(), Files.readAllBytes(SkinLibrary.png(skin)));
+		}
+		MinecraftClient.getInstance().execute(() -> {
+			// Wear it right away: the server only sends your new profile when you rejoin.
+			net.veloclient.velo.client.skins.SkinTryOn.setEquipped(texture(skin), skin.slim());
+			net.veloclient.velo.client.gui.widget.SkinModelPreview.refreshCurrent();
 		});
 	}
 

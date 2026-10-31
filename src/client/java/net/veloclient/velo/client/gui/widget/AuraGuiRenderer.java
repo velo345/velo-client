@@ -44,13 +44,8 @@ public final class AuraGuiRenderer {
 				float zr = x * sin + z * cos;
 				float yr = (float) (y * Math.cos(pitch) - zr * Math.sin(pitch));
 				int a = Math.round(Math.min(1, alpha) * 255);
-				float px = shape == AuraEffects.DISC ? size * 0.6f : size;
-				int cell = switch (shape) {
-					case AuraEffects.STAR -> 1;
-					case AuraEffects.HEART -> 3;
-					case AuraEffects.LEAF -> 4;
-					default -> 0;
-				};
+				float px = AuraEffects.upright(shape) ? size : size * 0.6f;
+				int cell = AuraEffects.cell(shape);
 				sprites.add(new Sprite(cx + xr * scale, feetY - yr * scale, zr, px * scale * 2, (a << 24) | (rgb & 0xFFFFFF), cell));
 			}
 
@@ -67,6 +62,16 @@ public final class AuraGuiRenderer {
 				float facing = Math.abs(nx * sin + nz * cos);
 				float size = Math.max(w, h) * Math.max(0.35f, facing);
 				sprites.add(new Sprite(cx + xr * scale, feetY - yr * scale, zr, size * scale, (a << 24) | (rgb & 0xFFFFFF), cell));
+			}
+
+			@Override
+			public void quad(float[] c, int cell, int rgb, float alpha) {
+				float x = (c[0] + c[3] + c[6] + c[9]) / 4;
+				float y = (c[1] + c[4] + c[7] + c[10]) / 4;
+				float z = (c[2] + c[5] + c[8] + c[11]) / 4;
+				float w = (float) Math.sqrt((c[9] - c[0]) * (c[9] - c[0]) + (c[10] - c[1]) * (c[10] - c[1]) + (c[11] - c[2]) * (c[11] - c[2]));
+				float h = (float) Math.sqrt((c[3] - c[0]) * (c[3] - c[0]) + (c[4] - c[1]) * (c[4] - c[1]) + (c[5] - c[2]) * (c[5] - c[2]));
+				panel(x, y, z, w, h, 0, 1, cell, rgb, alpha);
 			}
 
 			@Override
@@ -95,7 +100,8 @@ public final class AuraGuiRenderer {
 	private static void sprite(DrawContext context, Sprite s) {
 		int size = Math.max(2, Math.round(s.size));
 		context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, ATLAS, Math.round(s.x - size / 2f), Math.round(s.y - size / 2f),
-				(s.cell % 8) * 128f, (s.cell / 8) * 128f, size, size, 128, 128, 1024, 512, s.argb);
+				(s.cell % AuraEffects.ATLAS_COLUMNS) * (float) AuraEffects.ATLAS_CELL, (s.cell / AuraEffects.ATLAS_COLUMNS) * (float) AuraEffects.ATLAS_CELL, size, size,
+				AuraEffects.ATLAS_CELL, AuraEffects.ATLAS_CELL, AuraEffects.ATLAS_CELL * AuraEffects.ATLAS_COLUMNS, AuraEffects.ATLAS_CELL * AuraEffects.ATLAS_ROWS, s.argb);
 	}
 
 	/** A dim, simple player shape for scale. */

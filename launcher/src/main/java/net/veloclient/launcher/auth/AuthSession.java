@@ -115,11 +115,23 @@ public final class AuthSession {
 		}
 	}
 
+	/**
+	 * Writes to a temporary file and moves it over the real one, so a launcher that's killed (or exits) mid-write
+	 * never leaves the sign-in empty or half written.
+	 */
 	private static void write(AccountsFile file) {
 		VeloPaths.ensureDirectories();
 		Path path = VeloPaths.config().resolve(CONFIG_ID);
-		try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
-			GSON.toJson(file, writer);
+		Path tmp = path.resolveSibling(CONFIG_ID + ".tmp");
+		try {
+			try (Writer writer = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
+				GSON.toJson(file, writer);
+			}
+			try {
+				Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+			} catch (java.nio.file.AtomicMoveNotSupportedException e) {
+				Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+			}
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to save account session", e);
 		}

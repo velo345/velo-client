@@ -270,7 +270,15 @@ final class OwnerPlayers {
 				perform(() -> StoreApi.adminItem(uuid, add.getValue(), true), uuid, true);
 			}
 		});
-		HBox addRow = new HBox(8, add, give);
+		// For testing: everything that isn't hidden (testing items too), in one go.
+		Button all = new Button("Give everything");
+		all.getStyleClass().add("ghost-button");
+		all.setOnAction(e -> {
+			if (confirm("Give every cosmetic?", "This player gets every cosmetic that isn't hidden - testing ones too. Ones they own stay as they are.")) {
+				perform(() -> StoreApi.adminGrantAll(uuid), uuid, true);
+			}
+		});
+		HBox addRow = new HBox(8, add, give, all);
 		addRow.setAlignment(Pos.CENTER_LEFT);
 
 		FlowPane grid = new FlowPane(10, 10);
@@ -356,6 +364,13 @@ final class OwnerPlayers {
 				each(targets, t -> StoreApi.adminItem(t, item.getValue(), true), output);
 			}
 		});
+		Button giveAll = new Button("Give every cosmetic");
+		giveAll.getStyleClass().add("ghost-button");
+		giveAll.setOnAction(e -> {
+			if (confirm("Give every cosmetic?", "Each of these players gets every cosmetic that isn't hidden - testing ones too.")) {
+				each(targets, StoreApi::adminGrantAll, output);
+			}
+		});
 		TextField days = new TextField();
 		days.setPromptText("Velo+ days");
 		days.setPrefWidth(110);
@@ -369,7 +384,7 @@ final class OwnerPlayers {
 				output.setText("Velo+: number of days");
 			}
 		});
-		FlowPane actions = new FlowPane(8, 8, amount, coins, item, give, days, plus);
+		FlowPane actions = new FlowPane(8, 8, amount, coins, item, give, giveAll, days, plus);
 		actions.setAlignment(Pos.CENTER_LEFT);
 		return new VBox(8, targets, actions, output);
 	}

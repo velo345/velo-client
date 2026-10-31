@@ -390,5 +390,110 @@
     "name": "velo-client:emote/zap"
    }
   ]
+ },
+ "killfx.blackhole": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/blackhole"
+   }
+  ]
+ },
+ "killfx.frostbite": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/frostbite"
+   }
+  ]
+ },
+ "killfx.glitch": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/glitch"
+   }
+  ]
+ },
+ "killfx.grave": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/grave"
+   }
+  ]
+ },
+ "killfx.jackpot": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/jackpot"
+   }
+  ]
+ },
+ "killfx.katana": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/katana"
+   }
+  ]
+ },
+ "killfx.meteor": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/meteor"
+   }
+  ]
+ },
+ "killfx.orbital": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/orbital"
+   }
+  ]
+ },
+ "killfx.phoenix": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/phoenix"
+   }
+  ]
+ },
+ "killfx.reaper": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/reaper"
+   }
+  ]
+ },
+ "killfx.shadow": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/shadow"
+   }
+  ]
+ },
+ "killfx.shatter": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/shatter"
+   }
+  ]
+ },
+ "killfx.supernova": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/supernova"
+   }
+  ]
+ },
+ "killfx.thunder": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/thunder"
+   }
+  ]
+ },
+ "killfx.tornado": {
+  "sounds": [
+   {
+    "name": "velo-client:killfx/tornado"
+   }
+  ]
  }
 }

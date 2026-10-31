@@ -29,19 +29,43 @@
 			"id": "auras",
 			"name": "Auras",
 			"tag": "AURA COLLECTION",
-			"description": "Animated auras that live around you - stars, embers, snow, a void rift, lightning, code rain, fire, nature, hearts and northern lights. Pick a colour, size and speed."
+			"description": "Animated auras that live around you - stars, embers, snow, a void rift, lightning, code rain, fire, nature, hearts, northern lights, a halo and feathers, sakura, a galaxy, crystals, soul flames, butterflies, a bass drop, fireworks, yin and yang dragons, silk ribbons, a rain cloud, a koi pond, spirit blades, sky lanterns and a clock. Pick a colour, size and speed."
 		},
 		{
 			"id": "velo_originals",
 			"name": "Velo Originals",
 			"tag": "CAPE COLLECTION",
-			"description": "High-res animated capes: the Velo logo in neon, wildfire, glacier, two thunderstorms, gold glyphs - and black and white designs."
+			"description": "High-res animated cloaks: the Velo logo in neon, wildfire, glacier, two thunderstorms, gold glyphs - and black and white designs."
 		},
 		{
 			"id": "emotes",
 			"name": "Emotes",
 			"tag": "EMOTE COLLECTION",
 			"description": "Wave, cheer, bow, backflip and more - every emote with its own effects and sounds. Hold B in game for your emote wheel; other Velo players see them too."
+		},
+		{
+			"id": "kill_effects",
+			"name": "Kill Effects",
+			"tag": "KILL EFFECTS",
+			"description": "Custom kill effects with their own sounds - shatter, orbital strike, black hole, phoenix, soul reaper, glitch, supernova, frostbite, meteor, tornado, R.I.P., thunder god, shadow, katana and jackpot. Played where your kills fall, in your colour."
+		},
+		{
+			"id": "celestial",
+			"name": "Celestial",
+			"tag": "CELESTIAL COLLECTION",
+			"description": "Wings forged in gold and silver, and a pair cut from a living void nebula."
+		},
+		{
+			"id": "relics",
+			"name": "Relics",
+			"tag": "WINGS COLLECTION",
+			"description": "Three new pairs of real 3D wings: a clockwork engine of brass plates and turning gears, eldritch tentacles that never stop moving, and a fan of katana blades."
+		},
+		{
+			"id": "wardrobe",
+			"name": "Wardrobe",
+			"tag": "BODYWEAR",
+			"description": "Hats, ears, glasses, watches, shoes and backpacks - one per slot, all combinable."
 		}
 	],
 	"items": [
@@ -264,12 +288,30 @@
 			}
 		},
 		{
+			"id": "wings_neon",
+			"type": "wings",
+			"name": "Neon Wings",
+			"description": "Glowing neon light traced along sharp wing frames - in any colour you pick, or a cycling rainbow.",
+			"price": 2600,
+			"status": "testing",
+			"collection": "neon",
+			"accent": "#3ff0ff",
+			"style": "bat",
+			"scale": 0.85,
+			"files": {
+				"mesh": "wings/neon_white.vmesh",
+				"texture": "wings/neon_white.png",
+				"preview": "wings/neon_white_preview.png"
+			},
+			"glow": true
+		},
+		{
 			"id": "wings_neon_white",
 			"type": "wings",
 			"name": "Neon White Wings",
 			"description": "Glowing white neon light traced along sharp wing frames.",
 			"price": 2200,
-			"status": "testing",
+			"status": "hidden",
 			"collection": "neon",
 			"accent": "#f4f6ff",
 			"style": "bat",
@@ -287,7 +329,7 @@
 			"name": "Neon Cyan Wings",
 			"description": "Glowing cyan neon light traced along sharp wing frames.",
 			"price": 2200,
-			"status": "testing",
+			"status": "hidden",
 			"collection": "neon",
 			"accent": "#3ff0ff",
 			"style": "bat",
@@ -305,7 +347,7 @@
 			"name": "Neon Pink Wings",
 			"description": "Glowing pink neon light traced along sharp wing frames.",
 			"price": 2200,
-			"status": "testing",
+			"status": "hidden",
 			"collection": "neon",
 			"accent": "#ff4fd8",
 			"style": "bat",
@@ -323,7 +365,7 @@
 			"name": "Neon Purple Wings",
 			"description": "Glowing purple neon light traced along sharp wing frames.",
 			"price": 2200,
-			"status": "testing",
+			"status": "hidden",
 			"collection": "neon",
 			"accent": "#a65cff",
 			"style": "bat",
@@ -341,7 +383,7 @@
 			"name": "Neon Red Wings",
 			"description": "Glowing red neon light traced along sharp wing frames.",
 			"price": 2200,
-			"status": "testing",
+			"status": "hidden",
 			"collection": "neon",
 			"accent": "#ff3b3b",
 			"style": "bat",
@@ -486,10 +528,187 @@
 			"files": {}
 		},
 		{
+			"id": "aura_seraph",
+			"type": "aura",
+			"name": "Seraph",
+			"description": "A golden halo floats above your head, soft light falls around you and glowing feathers drift down, rocking as they fall.",
+			"price": 2600,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#ffd36b",
+			"files": {}
+		},
+		{
+			"id": "aura_sakura",
+			"type": "aura",
+			"name": "Sakura Storm",
+			"description": "Cherry-blossom petals whirl up around you in a spiral of wind while blossoms circle your feet.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#ff8fbd",
+			"files": {}
+		},
+		{
+			"id": "aura_galaxy",
+			"type": "aura",
+			"name": "Galaxy",
+			"description": "A spiral galaxy turns at your feet - star arms, glowing nebula clouds, rising star dust and shooting stars overhead.",
+			"price": 2800,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#a07cff",
+			"files": {}
+		},
+		{
+			"id": "aura_crystal",
+			"type": "aura",
+			"name": "Amethyst",
+			"description": "Crystals float around you, slowly turning and flashing in the light, shedding sparkles over a ring of small crystals.",
+			"price": 2600,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#b47cff",
+			"files": {}
+		},
+		{
+			"id": "aura_soul",
+			"type": "aura",
+			"name": "Soulfire",
+			"description": "Soul flames circle you like will-o'-wisps, trailing ghostly smoke above a ring of flickering blue flames.",
+			"price": 2600,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#3fd8e8",
+			"files": {}
+		},
+		{
+			"id": "aura_butterfly",
+			"type": "aura",
+			"name": "Butterflies",
+			"description": "Glowing butterflies flutter around you on looping paths, wings beating, dropping glitter as they fly.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#8ff7ff",
+			"files": {}
+		},
+		{
+			"id": "aura_bass",
+			"type": "aura",
+			"name": "Bass Drop",
+			"description": "An equalizer ring bounces around your feet to a beat - every kick sends a shockwave across the ground.",
+			"price": 2600,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#ff3fd8",
+			"files": {}
+		},
+		{
+			"id": "aura_firework",
+			"type": "aura",
+			"name": "Fireworks",
+			"description": "Rockets launch around you and burst overhead into peonies, rings and golden willows that crackle as they fall.",
+			"price": 2800,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#ffd84d",
+			"files": {}
+		},
+		{
+			"id": "aura_dragon",
+			"type": "aura",
+			"name": "Yin & Yang",
+			"description": "Two spirit dragons, one of light and one of shadow, chase each other around you above a turning yin-yang, breathing sparks.",
+			"price": 3200,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#fff1d6",
+			"files": {}
+		},
+		{
+			"id": "aura_ribbon",
+			"type": "aura",
+			"name": "Silk Ribbons",
+			"description": "Ribbons of light twist and ripple around you like a dancer's silk, shedding shimmering dust.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#ff9ae0",
+			"files": {}
+		},
+		{
+			"id": "aura_raincloud",
+			"type": "aura",
+			"name": "Rain Cloud",
+			"description": "A little rain cloud follows you around - rain splashes at your feet and now and then a lightning bolt strikes beside you.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#7fb8ff",
+			"files": {}
+		},
+		{
+			"id": "aura_koi",
+			"type": "aura",
+			"name": "Koi Pond",
+			"description": "A glowing pond spreads at your feet - koi circle through it, lily pads drift and ripples spread across the water.",
+			"price": 2800,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#ff7a2e",
+			"files": {}
+		},
+		{
+			"id": "aura_blades",
+			"type": "aura",
+			"name": "Spirit Blades",
+			"description": "Spectral swords hover tip-down in a ring around you, and one by one dive into the ground in a burst of sparks.",
+			"price": 3000,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#8cc4ff",
+			"files": {}
+		},
+		{
+			"id": "aura_lantern",
+			"type": "aura",
+			"name": "Sky Lanterns",
+			"description": "Paper sky lanterns rise glowing around you from a ring of flickering tea lights.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#ffc26b",
+			"files": {}
+		},
+		{
+			"id": "aura_chrono",
+			"type": "aura",
+			"name": "Timekeeper",
+			"description": "A clock dial turns at your feet with its hands sweeping round, gyroscope rings spin around you and gears turn above your shoulders.",
+			"price": 2800,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#ffe3a3",
+			"files": {}
+		},
+		{
+			"id": "aura_pyjama",
+			"type": "aura",
+			"name": "Pyjama",
+			"description": "Bedtime: a crescent moon rocks over your head, a ring of stars twinkles round it, sleepy Zzz float up and little clouds drift at your feet - in any colour you like.",
+			"price": 2600,
+			"status": "testing",
+			"collection": "auras",
+			"accent": "#7c8cff",
+			"files": {}
+		},
+		{
 			"id": "cape_velo_neon",
+			"rev": 1,
 			"type": "cape",
 			"name": "Velo Neon",
-			"description": "The Velo logo traced in red neon - sparks race around it over a scrolling synthwave grid. Free: join the Velo Discord and link your account.",
+			"description": "The Velo logo cut from dark glass, its sharp edges burning white-hot to deep red as a pulse of light races through them. Free: join the Velo Discord and link your account.",
 			"status": "released",
 			"collection": "velo_originals",
 			"files": {
@@ -502,7 +721,7 @@
 			"id": "cape_wildfire",
 			"type": "cape",
 			"name": "Wildfire",
-			"description": "Flames roll up the cape and embers drift into the air.",
+			"description": "Flames roll up the cloak and embers drift into the air.",
 			"price": 1600,
 			"status": "testing",
 			"collection": "velo_originals",
@@ -514,7 +733,7 @@
 			"id": "cape_glacier",
 			"type": "cape",
 			"name": "Glacier",
-			"description": "Ice crystals spread across a frozen cape, a shimmer sweeps over them and frost twinkles.",
+			"description": "Ice crystals spread across a frozen cloak, a shimmer sweeps over them and frost twinkles.",
 			"price": 1600,
 			"status": "testing",
 			"collection": "velo_originals",
@@ -526,7 +745,7 @@
 			"id": "cape_thunderstrike",
 			"type": "cape",
 			"name": "Thunderstrike",
-			"description": "Violet storm clouds and rain - then forked purple lightning tears down the cape and lights up the sky.",
+			"description": "Violet storm clouds and rain - then forked purple lightning tears down the cloak and lights up the sky.",
 			"price": 1700,
 			"status": "testing",
 			"collection": "velo_originals",
@@ -586,7 +805,7 @@
 			"id": "cape_phantom",
 			"type": "cape",
 			"name": "Phantom",
-			"description": "Wisps of dark smoke rise up the cape, glowing faintly violet at their edges.",
+			"description": "Wisps of dark smoke rise up the cloak, glowing faintly violet at their edges.",
 			"price": 1700,
 			"status": "testing",
 			"collection": "velo_originals",
@@ -824,20 +1043,6 @@
 			"rev": 2
 		},
 		{
-			"id": "emote_groove",
-			"type": "emote",
-			"name": "Groove",
-			"description": "Ride the beat - the dance floor pulses under you. Loops until you move.",
-			"price": 1500,
-			"status": "hidden",
-			"collection": "emotes",
-			"accent": "#6cf0c2",
-			"files": {
-				"anim": "emotes/groove.vemote.json"
-			},
-			"rev": 2
-		},
-		{
 			"id": "emote_bow",
 			"type": "emote",
 			"name": "Bow",
@@ -848,34 +1053,6 @@
 			"accent": "#b98cff",
 			"files": {
 				"anim": "emotes/bow.vemote.json"
-			},
-			"rev": 2
-		},
-		{
-			"id": "emote_flex",
-			"type": "emote",
-			"name": "Flex",
-			"description": "Show off both arms with a crackle of raw power.",
-			"price": 900,
-			"status": "hidden",
-			"collection": "emotes",
-			"accent": "#ff9a3c",
-			"files": {
-				"anim": "emotes/flex.vemote.json"
-			},
-			"rev": 2
-		},
-		{
-			"id": "emote_silly_dance",
-			"type": "emote",
-			"name": "Silly Dance",
-			"description": "A goofy dance in a rain of rainbow notes. Loops until you move.",
-			"price": 1400,
-			"status": "hidden",
-			"collection": "emotes",
-			"accent": "#ff6fd8",
-			"files": {
-				"anim": "emotes/silly_dance.vemote.json"
 			},
 			"rev": 2
 		},
@@ -892,48 +1069,6 @@
 				"anim": "emotes/shrug.vemote.json"
 			},
 			"rev": 2
-		},
-		{
-			"id": "emote_victory",
-			"type": "emote",
-			"name": "Victory",
-			"description": "A golden trophy rises in front of you - fanfare, confetti and a shower of stars.",
-			"price": 1500,
-			"status": "hidden",
-			"collection": "emotes",
-			"accent": "#ffd24a",
-			"files": {
-				"anim": "emotes/victory.vemote.json"
-			},
-			"rev": 2
-		},
-		{
-			"id": "emote_no_no",
-			"type": "emote",
-			"name": "No No",
-			"description": "Wag your finger and shake your head - not today.",
-			"price": 600,
-			"status": "hidden",
-			"collection": "emotes",
-			"accent": "#ff7a7a",
-			"files": {
-				"anim": "emotes/no_no.vemote.json"
-			},
-			"rev": 2
-		},
-		{
-			"id": "emote_rage",
-			"type": "emote",
-			"name": "Rage",
-			"description": "Steam out of your ears and shockwaves under every stomp.",
-			"price": 800,
-			"status": "hidden",
-			"collection": "emotes",
-			"accent": "#ff4d4d",
-			"files": {
-				"anim": "emotes/rage.vemote.json"
-			},
-			"rev": 3
 		},
 		{
 			"id": "emote_heart",
@@ -964,20 +1099,6 @@
 			}
 		},
 		{
-			"id": "emote_thunder",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 2,
-			"name": "Thunder Slam",
-			"description": "Charge up and slam the ground - lightning strikes all around you.",
-			"price": 1800,
-			"collection": "emotes",
-			"accent": "#9fd8ff",
-			"files": {
-				"anim": "emotes/thunder.vemote.json"
-			}
-		},
-		{
 			"id": "emote_backflip",
 			"type": "emote",
 			"status": "released",
@@ -992,241 +1113,1370 @@
 			}
 		},
 		{
-			"id": "emote_goal",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 2,
-			"name": "Goal!",
-			"description": "Kick a ball into the distance - whistle, stadium horn, GOAL.",
-			"price": 1300,
-			"collection": "emotes",
-			"accent": "#5cff7a",
-			"files": {
-				"anim": "emotes/goal.vemote.json"
-			}
-		},
-		{
-			"id": "emote_airhorn",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 2,
-			"name": "Air Horn",
-			"description": "BWAAAH BWAAAH BWAAAAAH. The loudest way to celebrate a play.",
-			"price": 1100,
-			"collection": "emotes",
-			"accent": "#ff3b3b",
-			"files": {
-				"anim": "emotes/airhorn.vemote.json"
-			}
-		},
-		{
-			"id": "emote_sip_tea",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 2,
-			"name": "Sips Tea",
-			"description": "Bring out the good china and sip. Their drama is none of your business.",
-			"price": 1200,
-			"collection": "emotes",
-			"accent": "#e8c48a",
-			"files": {
-				"anim": "emotes/sip_tea.vemote.json"
-			}
-		},
-		{
-			"id": "emote_afk",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 2,
-			"name": "AFK",
-			"description": "Nod off standing up to elevator music. Zzz... loops until you move.",
-			"price": 1000,
-			"collection": "emotes",
-			"accent": "#bfe0ff",
-			"files": {
-				"anim": "emotes/afk.vemote.json"
-			}
-		},
-		{
-			"id": "emote_l_dance",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 2,
-			"name": "Take the L",
-			"description": "An L on your forehead and a hop in your step - for every player you just beat.",
-			"price": 1400,
-			"collection": "emotes",
-			"accent": "#5cff7a",
-			"files": {
-				"anim": "emotes/l_dance.vemote.json"
-			}
-		},
-		{
-			"id": "emote_shuffle",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 1,
-			"name": "Shuffle",
-			"description": "The festival shuffle with neon footwork on every beat.",
-			"price": 1600,
-			"collection": "emotes",
-			"accent": "#3ff0ff",
-			"files": {
-				"anim": "emotes/shuffle.vemote.json"
-			}
-		},
-		{
-			"id": "emote_ymca",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 1,
-			"name": "Y.M.C.A.",
-			"description": "Spell it out - every letter lights up above you on the beat.",
-			"price": 1500,
-			"collection": "emotes",
-			"accent": "#ffd24a",
-			"files": {
-				"anim": "emotes/ymca.vemote.json"
-			}
-		},
-		{
-			"id": "emote_hip_hop",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 2,
-			"name": "Hip Hop",
-			"description": "Drop a boombox and bounce - notes fly out on the beat.",
-			"price": 1600,
-			"collection": "emotes",
-			"accent": "#8a5cff",
-			"files": {
-				"anim": "emotes/hip_hop.vemote.json"
-			}
-		},
-		{
-			"id": "emote_breakdance",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 1,
-			"name": "Breakdance",
-			"description": "Toprock next to your boombox, then hit the floor for a flair. Loops until you move.",
-			"price": 2200,
-			"collection": "emotes",
-			"accent": "#ff8a3c",
-			"files": {
-				"anim": "emotes/breakdance.vemote.json"
-			}
-		},
-		{
-			"id": "emote_floss",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 1,
-			"name": "Floss",
-			"description": "The one and only Floss, with rainbow trails off your hands.",
-			"price": 1400,
-			"collection": "emotes",
-			"accent": "#ff4fd8",
-			"files": {
-				"anim": "emotes/floss.vemote.json"
-			}
-		},
-		{
-			"id": "emote_griddy",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 2,
-			"name": "Griddy",
-			"description": "Heel taps, arm pumps and the goggles. You know the one.",
-			"price": 1500,
-			"collection": "emotes",
-			"accent": "#3ff0ff",
-			"files": {
-				"anim": "emotes/griddy.vemote.json"
-			}
-		},
-		{
-			"id": "emote_grave_rise",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 2,
-			"name": "Grave Rise",
-			"description": "A tombstone grinds out of the earth behind you - and you let out a zombie's scream.",
-			"price": 1600,
-			"collection": "afterlife",
-			"accent": "#7fff5c",
-			"files": {
-				"anim": "emotes/grave_rise.vemote.json"
-			}
-		},
-		{
-			"id": "emote_trick_or_treat",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 2,
-			"name": "Trick or Treat",
-			"description": "Rub your hands, scheme... and a grinning jack-o'-lantern bursts out, spitting bats and candy.",
+			"id": "killfx_shatter",
+			"type": "killfx",
+			"name": "Shatter",
+			"description": "Your victim bursts into glowing crystal shards that fly out, bounce and fade.",
 			"price": 1800,
-			"collection": "afterlife",
-			"accent": "#ff8a1f",
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#5cc8ff",
+			"files": {}
+		},
+		{
+			"id": "killfx_orbital",
+			"type": "killfx",
+			"name": "Orbital Strike",
+			"description": "A target ring locks on, then a beam from the sky slams down and scorches the ground.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#ff4d3d",
+			"files": {}
+		},
+		{
+			"id": "killfx_blackhole",
+			"type": "killfx",
+			"name": "Black Hole",
+			"description": "A black hole opens where they fell, swallows everything around it and collapses with a bang.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#7a2bff",
+			"files": {}
+		},
+		{
+			"id": "killfx_phoenix",
+			"type": "killfx",
+			"name": "Phoenix",
+			"description": "A column of fire roars up and a phoenix bursts out of it, wings beating, soaring away in sparks.",
+			"price": 2800,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#ff7a2e",
+			"files": {}
+		},
+		{
+			"id": "killfx_reaper",
+			"type": "killfx",
+			"name": "Soul Reaper",
+			"description": "A scythe slashes twice and the soul is torn out of its chains, rising away.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#1fcf8a",
+			"files": {}
+		},
+		{
+			"id": "killfx_glitch",
+			"type": "killfx",
+			"name": "Glitch",
+			"description": "The body breaks up into pixels that glitch and float away, with binary rain and scan lines.",
+			"price": 2000,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#3ff0ff",
+			"files": {}
+		},
+		{
+			"id": "killfx_supernova",
+			"type": "killfx",
+			"name": "Supernova",
+			"description": "A star collapses, then explodes - rays, shock shells and a glowing nebula.",
+			"price": 2800,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#ff7a3d",
+			"files": {}
+		},
+		{
+			"id": "killfx_frostbite",
+			"type": "killfx",
+			"name": "Frostbite",
+			"description": "Ice spikes erupt around the body, freeze it in a crystal and shatter.",
+			"price": 2200,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#5cb8ff",
+			"files": {}
+		},
+		{
+			"id": "killfx_meteor",
+			"type": "killfx",
+			"name": "Meteor",
+			"description": "A burning meteor streaks down and smashes a crater, throwing rocks and smoke.",
+			"price": 2600,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#ff4a1c",
+			"files": {}
+		},
+		{
+			"id": "killfx_tornado",
+			"type": "killfx",
+			"name": "Tornado",
+			"description": "A whirlwind spins up out of the ground, lifting debris, and blows apart.",
+			"price": 2000,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#8fa8c8",
+			"files": {}
+		},
+		{
+			"id": "killfx_grave",
+			"type": "killfx",
+			"name": "R.I.P.",
+			"description": "A gravestone rises out of the ground among candles and flowers, and a bell tolls.",
+			"price": 1800,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#8c7cff",
+			"files": {}
+		},
+		{
+			"id": "killfx_thunder",
+			"type": "killfx",
+			"name": "Thunder God",
+			"description": "Three forked lightning bolts strike and arcs crawl over the ground.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#6f8cff",
+			"files": {}
+		},
+		{
+			"id": "killfx_shadow",
+			"type": "killfx",
+			"name": "Shadow",
+			"description": "Shadow tendrils burst out of the ground and drag them down into dark smoke, red eyes watching.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#ff2a4a",
+			"files": {}
+		},
+		{
+			"id": "killfx_katana",
+			"type": "killfx",
+			"name": "Katana",
+			"description": "Three katana slashes cross in a flash and the body bursts into cherry blossoms.",
+			"price": 2200,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#ff7fb3",
+			"files": {}
+		},
+		{
+			"id": "killfx_jackpot",
+			"type": "killfx",
+			"name": "Jackpot",
+			"description": "7-7-7 pops up and a fountain of coins rains down.",
+			"price": 2000,
+			"status": "testing",
+			"collection": "kill_effects",
+			"accent": "#ffb52e",
+			"files": {}
+		},
+		{
+			"id": "wings_gold",
+			"type": "wings",
+			"name": "Golden Wings",
+			"description": "Wings forged of polished gold, every feather catching the light.",
+			"price": 3400,
+			"status": "testing",
+			"collection": "celestial",
+			"accent": "#ffc94d",
+			"style": "feathered",
+			"scale": 0.9,
 			"files": {
-				"anim": "emotes/trick_or_treat.vemote.json"
+				"mesh": "wings/gold.vmesh",
+				"texture": "wings/gold.png",
+				"preview": "wings/gold_preview.png"
 			}
 		},
 		{
-			"id": "emote_ghost_party",
-			"type": "emote",
-			"status": "hidden",
+			"id": "wings_silver",
+			"type": "wings",
+			"name": "Silver Wings",
+			"description": "Gleaming silver wings, cool and sharp, edged in moonlight.",
+			"price": 3200,
+			"status": "testing",
+			"collection": "celestial",
+			"accent": "#d8e2f0",
+			"style": "feathered",
+			"scale": 0.9,
+			"files": {
+				"mesh": "wings/silver.vmesh",
+				"texture": "wings/silver.png",
+				"preview": "wings/silver_preview.png"
+			}
+		},
+		{
+			"id": "wings_nebula",
+			"type": "wings",
+			"name": "Nebula Wings",
+			"description": "Wings cut from the void itself - a swirling nebula of stars and violet dust.",
+			"price": 3600,
+			"status": "testing",
+			"collection": "celestial",
+			"accent": "#9a5cff",
+			"style": "crystal",
+			"scale": 0.9,
+			"files": {
+				"mesh": "wings/nebula.vmesh",
+				"texture": "wings/nebula.png",
+				"preview": "wings/nebula_preview.png"
+			}
+		},
+		{
+			"id": "wings_clockwork",
+			"type": "wings",
+			"name": "Clockwork Wings",
+			"description": "Brass and steel plates on a working clockwork frame - gears turn and dials tick as the wings move.",
+			"price": 3200,
+			"status": "testing",
+			"collection": "relics",
+			"accent": "#d9a441",
+			"style": "feathered",
+			"scale": 0.9,
+			"files": {
+				"mesh": "wings/clockwork.vmesh",
+				"texture": "wings/clockwork.png",
+				"preview": "wings/clockwork_preview.png"
+			}
+		},
+		{
+			"id": "wings_tentacle",
+			"type": "wings",
+			"name": "Tentacle Wings",
+			"description": "Eldritch tentacles in place of wings - dark violet, glistening, never quite still.",
+			"price": 3400,
+			"status": "testing",
+			"collection": "relics",
+			"accent": "#8a3cff",
+			"style": "tentacle",
+			"scale": 0.9,
+			"files": {
+				"mesh": "wings/tentacle.vmesh",
+				"texture": "wings/tentacle.png",
+				"preview": "wings/tentacle_preview.png"
+			}
+		},
+		{
+			"id": "wings_katana",
+			"type": "wings",
+			"name": "Katana Wings",
+			"description": "A fan of polished katana blades spread like wings - steel edges catching the light.",
+			"price": 3400,
+			"status": "testing",
+			"collection": "relics",
+			"accent": "#e8edf5",
+			"style": "crystal",
+			"scale": 0.9,
+			"files": {
+				"mesh": "wings/katana.vmesh",
+				"texture": "wings/katana.png",
+				"preview": "wings/katana_preview.png"
+			}
+		},
+		{
+			"id": "cape_soul_wisp",
+			"type": "cape",
+			"name": "Soul Wisp",
+			"description": "A soul light floats in the dark - three trails of violet light spiral round it in 3D while veils of smoke rise past.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "velo_originals",
+			"accent": "#9a5cff",
+			"files": {
+				"gif": "capes/soul_wisp.gif"
+			}
+		},
+		{
+			"id": "cape_event_horizon",
+			"type": "cape",
+			"name": "Event Horizon",
+			"description": "A black hole bending light round itself: its glowing disk turns, its far side lensed over the shadow, a photon ring burning at the edge.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "velo_originals",
+			"accent": "#ff9a3c",
+			"files": {
+				"gif": "capes/event_horizon.gif"
+			}
+		},
+		{
+			"id": "cape_koi_pond",
+			"type": "cape",
+			"name": "Koi Pond",
+			"description": "Two koi chase each other round dark water in a slow yin-yang - light ripples on the pond floor, rings spread and petals drift.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "velo_originals",
+			"accent": "#ff7a4d",
+			"files": {
+				"gif": "capes/koi_pond.gif"
+			}
+		},
+		{
+			"id": "cape_glitch",
+			"type": "cape",
+			"name": "Glitch",
+			"description": "The sharp Velo logo on a dead-black screen that keeps breaking - slices jump, colours split apart, corrupt blocks flash.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "velo_originals",
+			"accent": "#3fd8ff",
+			"files": {
+				"gif": "capes/glitch.gif"
+			}
+		},
+		{
+			"id": "cape_prism",
+			"type": "cape",
+			"name": "Prism",
+			"description": "A white beam strikes a glass prism and fans out into a rainbow that sweeps across the cloak as the prism rocks.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "velo_originals",
+			"accent": "#ffffff",
+			"files": {
+				"gif": "capes/prism.gif"
+			}
+		},
+		{
+			"id": "cape_clockwork",
+			"type": "cape",
+			"name": "Clockwork",
+			"description": "Brass gears meshing tooth for tooth, ruby jewels, a balance wheel swinging on its hairspring - the inside of a watch.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "velo_originals",
+			"accent": "#d9a441",
+			"files": {
+				"gif": "capes/clockwork.gif"
+			}
+		},
+		{
+			"id": "cape_dragon_eye",
+			"type": "cape",
+			"name": "Dragon Eye",
+			"description": "A huge dragon eye set in iridescent scales - its slit pupil narrows and widens, and it watches whoever stands behind you.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "velo_originals",
+			"accent": "#ff8a1a",
+			"files": {
+				"gif": "capes/dragon_eye.gif",
+				"gaze": "capes/dragon_eye_gaze.png"
+			}
+		},
+		{
+			"id": "cape_plasma_orb",
+			"type": "cape",
+			"name": "Plasma Orb",
+			"description": "A glass orb full of writhing plasma - filaments crawl to the glass and one chases a point of contact round the sphere.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "velo_originals",
+			"accent": "#b05cff",
+			"files": {
+				"gif": "capes/plasma_orb.gif"
+			}
+		},
+		{
+			"id": "cape_abyss",
+			"type": "cape",
+			"name": "Abyss",
+			"description": "The deep sea at night: glowing jellyfish pulse their way up through the dark, tentacles trailing, marine snow drifting down.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "velo_originals",
+			"accent": "#3fc8ff",
+			"files": {
+				"gif": "capes/abyss.gif"
+			}
+		},
+		{
+			"id": "cape_bass_drop",
+			"type": "cape",
+			"name": "Bass Drop",
+			"description": "A vinyl record spins on the deck - four beats a loop send rings of sound out and kick the EQ bars, then the drop hits.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "velo_originals",
+			"accent": "#e04dff",
+			"files": {
+				"gif": "capes/bass_drop.gif"
+			}
+		},
+		{
+			"id": "cape_supernova",
+			"type": "cape",
+			"name": "Supernova",
+			"description": "A star swells, collapses and explodes - a flash, a shockwave and glowing debris - and a new star kindles in what's left.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "velo_originals",
+			"accent": "#7aa8ff",
+			"files": {
+				"gif": "capes/supernova.gif"
+			}
+		},
+		{
+			"id": "wear_sneakers",
 			"rev": 2,
-			"name": "Ghost Party",
-			"description": "Dance in the fog while friendly ghosts circle you. Loops until you move.",
-			"price": 1700,
-			"collection": "afterlife",
-			"accent": "#b47cff",
+			"hash": "c797e72c317a6ffe",
+			"type": "wear",
+			"name": "High-Tops",
+			"description": "Red high-top sneakers with white soles and laces.",
+			"price": 1100,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#cf2a2d",
+			"slot": "feet",
+			"model": {
+				"bone": "rightLeg",
+				"mirror": "leftLeg"
+			},
 			"files": {
-				"anim": "emotes/ghost_party.vemote.json"
+				"mesh": "wear/sneakers.vprop",
+				"texture": "wear/sneakers.png",
+				"preview": "wear/sneakers_preview.png",
+				"mesh_l": "wear/sneakers_l.vprop",
+				"mask": "wear/sneakers_mask.png"
 			}
 		},
 		{
-			"id": "emote_snowball",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 2,
-			"name": "Snowball Fight",
-			"description": "Pack a snowball, wind up and let it fly. SPLAT.",
-			"price": 1300,
-			"collection": "yuletide",
-			"accent": "#bfe6ff",
-			"files": {
-				"anim": "emotes/snowball.vemote.json"
-			}
-		},
-		{
-			"id": "emote_gift",
-			"type": "emote",
-			"status": "hidden",
-			"rev": 2,
-			"name": "Surprise Gift",
-			"description": "A present drops at your feet and bursts into confetti and candy canes.",
-			"price": 1300,
-			"collection": "yuletide",
-			"accent": "#ff3b3b",
-			"files": {
-				"anim": "emotes/gift.vemote.json"
-			}
-		},
-		{
-			"id": "emote_jingle",
-			"type": "emote",
-			"status": "hidden",
+			"id": "wear_sandals",
 			"rev": 3,
-			"name": "Jingle Jam",
-			"description": "Santa hat on, snow falling, Jingle Bells playing - dance it out. Loops until you move.",
-			"price": 1700,
-			"collection": "yuletide",
-			"accent": "#3bd16f",
+			"hash": "800043d2f8356e74",
+			"type": "wear",
+			"name": "Sandals",
+			"description": "Summer sandals: a cork sole and two leather straps.",
+			"price": 700,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#c9a06a",
+			"slot": "feet",
+			"model": {
+				"bone": "rightLeg",
+				"mirror": "leftLeg"
+			},
 			"files": {
-				"anim": "emotes/jingle.vemote.json"
+				"mesh": "wear/sandals.vprop",
+				"texture": "wear/sandals.png",
+				"preview": "wear/sandals_preview.png",
+				"mesh_l": "wear/sandals_l.vprop",
+				"mask": "wear/sandals_mask.png"
+			}
+		},
+		{
+			"id": "wear_top_hat",
+			"rev": 2,
+			"hash": "9787b995cefb8f23",
+			"type": "wear",
+			"name": "Top Hat",
+			"description": "A tall black silk top hat with a red satin band - very distinguished.",
+			"price": 1400,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#c52f3c",
+			"slot": "head",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/top_hat.vprop",
+				"texture": "wear/top_hat.png",
+				"preview": "wear/top_hat_preview.png",
+				"mask": "wear/top_hat_mask.png"
+			}
+		},
+		{
+			"id": "wear_beanie",
+			"rev": 3,
+			"hash": "6a2c6d6a90b3a0fd",
+			"type": "wear",
+			"name": "Knit Beanie",
+			"description": "A cosy knitted beanie with a fold-up cuff and a fluffy pompom on top.",
+			"price": 800,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#e9a02b",
+			"slot": "head",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/beanie.vprop",
+				"texture": "wear/beanie.png",
+				"preview": "wear/beanie_preview.png",
+				"mask": "wear/beanie_mask.png"
+			}
+		},
+		{
+			"id": "wear_cat_ears",
+			"rev": 2,
+			"hash": "84cda47b69383e7c",
+			"type": "wear",
+			"name": "Cat Ears",
+			"description": "Fluffy black cat ears with pink insides, on a thin headband.",
+			"price": 900,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#ff9ccb",
+			"slot": "ears",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/cat_ears.vprop",
+				"texture": "wear/cat_ears.png",
+				"preview": "wear/cat_ears_preview.png",
+				"mask": "wear/cat_ears_mask.png"
+			}
+		},
+		{
+			"id": "wear_bunny_ears",
+			"rev": 2,
+			"hash": "ecef60992ed3ad53",
+			"type": "wear",
+			"name": "Bunny Ears",
+			"description": "Tall soft bunny ears in white and pink.",
+			"price": 900,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#ffb6d3",
+			"slot": "ears",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/bunny_ears.vprop",
+				"texture": "wear/bunny_ears.png",
+				"preview": "wear/bunny_ears_preview.png",
+				"mask": "wear/bunny_ears_mask.png"
+			}
+		},
+		{
+			"id": "wear_round_glasses",
+			"rev": 3,
+			"hash": "a6ad4c890da788e3",
+			"type": "wear",
+			"name": "Round Glasses",
+			"description": "Thin round golden wire frames - instant study mode.",
+			"price": 700,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#c99a3a",
+			"slot": "face",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/round_glasses.vprop",
+				"texture": "wear/round_glasses.png",
+				"preview": "wear/round_glasses_preview.png",
+				"mask": "wear/round_glasses_mask.png"
+			}
+		},
+		{
+			"id": "wear_backpack",
+			"rev": 3,
+			"hash": "aaa96bf36b33ee6e",
+			"type": "wear",
+			"name": "Adventure Pack",
+			"description": "A trusty green adventure backpack with a front pocket and buckles.",
+			"price": 1200,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#4f8a4b",
+			"slot": "back",
+			"model": {
+				"bone": "body"
+			},
+			"files": {
+				"mesh": "wear/backpack.vprop",
+				"texture": "wear/backpack.png",
+				"preview": "wear/backpack_preview.png",
+				"mask": "wear/backpack_mask.png"
+			}
+		},
+		{
+			"id": "wear_aviators",
+			"rev": 3,
+			"hash": "4424c520c7ccbf30",
+			"type": "wear",
+			"name": "Aviators",
+			"description": "Gold-framed aviator sunglasses with dark lenses - recolour the frame.",
+			"price": 1000,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#e2bd62",
+			"slot": "face",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/aviators.vprop",
+				"texture": "wear/aviators.png",
+				"preview": "wear/aviators_preview.png",
+				"mask": "wear/aviators_mask.png"
+			}
+		},
+		{
+			"id": "wear_bear_ears",
+			"rev": 3,
+			"hash": "9cefcb3dff32e088",
+			"type": "wear",
+			"name": "Bear Ears",
+			"description": "Round brown teddy-bear ears. Cuddly.",
+			"price": 900,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#7b5232",
+			"slot": "ears",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/bear_ears.vprop",
+				"texture": "wear/bear_ears.png",
+				"preview": "wear/bear_ears_preview.png",
+				"mask": "wear/bear_ears_mask.png"
+			}
+		},
+		{
+			"id": "wear_combat_boots",
+			"rev": 2,
+			"hash": "19c01a1b4bc2e5c2",
+			"type": "wear",
+			"name": "Combat Boots",
+			"description": "Tall black leather boots with a chunky lug sole.",
+			"price": 1300,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#22201f",
+			"slot": "feet",
+			"model": {
+				"bone": "rightLeg",
+				"mirror": "leftLeg"
+			},
+			"files": {
+				"mesh": "wear/combat_boots.vprop",
+				"texture": "wear/combat_boots.png",
+				"preview": "wear/combat_boots_preview.png",
+				"mesh_l": "wear/combat_boots_l.vprop",
+				"mask": "wear/combat_boots_mask.png"
+			}
+		},
+		{
+			"id": "wear_cowboy_hat",
+			"rev": 2,
+			"hash": "f74b1392eda23640",
+			"type": "wear",
+			"name": "Cowboy Hat",
+			"description": "A leather cowboy hat with a curled brim and a pinched crown. Yeehaw.",
+			"price": 1200,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#7a4a26",
+			"slot": "head",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/cowboy_hat.vprop",
+				"texture": "wear/cowboy_hat.png",
+				"preview": "wear/cowboy_hat_preview.png",
+				"mask": "wear/cowboy_hat_mask.png"
+			}
+		},
+		{
+			"id": "wear_crown",
+			"rev": 2,
+			"hash": "00d2e6a2c19f4f66",
+			"type": "wear",
+			"name": "Royal Crown",
+			"description": "A golden crown with eight points and rubies and sapphires all the way round.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#f0c442",
+			"slot": "head",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/crown.vprop",
+				"texture": "wear/crown.png",
+				"preview": "wear/crown_preview.png",
+				"mask": "wear/crown_mask.png"
+			}
+		},
+		{
+			"id": "wear_cyber_visor",
+			"rev": 3,
+			"hash": "6035f444011d8e62",
+			"type": "wear",
+			"name": "Cyber Visor",
+			"description": "A wrap-around visor with a glowing cyan light strip.",
+			"price": 1500,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#26f0ff",
+			"slot": "face",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/cyber_visor.vprop",
+				"texture": "wear/cyber_visor.png",
+				"preview": "wear/cyber_visor_preview.png",
+				"mask": "wear/cyber_visor_mask.png"
+			}
+		},
+		{
+			"id": "wear_devil_horns",
+			"rev": 2,
+			"hash": "7f5956b493abddd5",
+			"type": "wear",
+			"name": "Devil Horns",
+			"description": "Glossy red horns curling up from your head.",
+			"price": 1100,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#c01b23",
+			"slot": "ears",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/devil_horns.vprop",
+				"texture": "wear/devil_horns.png",
+				"preview": "wear/devil_horns_preview.png",
+				"mask": "wear/devil_horns_mask.png"
+			}
+		},
+		{
+			"id": "wear_digital_watch",
+			"rev": 2,
+			"hash": "737727fc1f14b88f",
+			"type": "wear",
+			"name": "Retro Digital",
+			"description": "A chunky retro digital watch with a green LCD.",
+			"price": 900,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#a7c08a",
+			"slot": "wrist",
+			"model": {
+				"bone": "leftArm"
+			},
+			"files": {
+				"mesh": "wear/digital_watch.vprop",
+				"texture": "wear/digital_watch.png",
+				"preview": "wear/digital_watch_preview.png",
+				"mask": "wear/digital_watch_mask.png"
+			}
+		},
+		{
+			"id": "wear_diver_watch",
+			"rev": 2,
+			"hash": "5c37e0a3d6edc0eb",
+			"type": "wear",
+			"name": "Diver Watch",
+			"description": "A steel diver watch with a blue bezel and a deep blue dial.",
+			"price": 1300,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#1f6fd1",
+			"slot": "wrist",
+			"model": {
+				"bone": "leftArm"
+			},
+			"files": {
+				"mesh": "wear/diver_watch.vprop",
+				"texture": "wear/diver_watch.png",
+				"preview": "wear/diver_watch_preview.png",
+				"mask": "wear/diver_watch_mask.png"
+			}
+		},
+		{
+			"id": "wear_fluffy_slippers",
+			"rev": 3,
+			"hash": "eb50690cfd655a5a",
+			"type": "wear",
+			"name": "Bunny Slippers",
+			"description": "Fluffy pink bunny slippers, ears and all.",
+			"price": 1000,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#ffb3cf",
+			"slot": "feet",
+			"model": {
+				"bone": "rightLeg",
+				"mirror": "leftLeg"
+			},
+			"files": {
+				"mesh": "wear/fluffy_slippers.vprop",
+				"texture": "wear/fluffy_slippers.png",
+				"preview": "wear/fluffy_slippers_preview.png",
+				"mesh_l": "wear/fluffy_slippers_l.vprop",
+				"mask": "wear/fluffy_slippers_mask.png"
+			}
+		},
+		{
+			"id": "wear_fox_ears",
+			"rev": 2,
+			"hash": "cc582b2d5e598d7c",
+			"type": "wear",
+			"name": "Fox Ears",
+			"description": "Orange fox ears with cream insides and dark tips.",
+			"price": 1000,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#e8752a",
+			"slot": "ears",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/fox_ears.vprop",
+				"texture": "wear/fox_ears.png",
+				"preview": "wear/fox_ears_preview.png",
+				"mask": "wear/fox_ears_mask.png"
+			}
+		},
+		{
+			"id": "wear_gold_watch",
+			"rev": 2,
+			"hash": "3d438860c6ce7bd3",
+			"type": "wear",
+			"name": "Gold Watch",
+			"description": "A solid gold watch with a champagne dial.",
+			"price": 1800,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#e4b94f",
+			"slot": "wrist",
+			"model": {
+				"bone": "leftArm"
+			},
+			"files": {
+				"mesh": "wear/gold_watch.vprop",
+				"texture": "wear/gold_watch.png",
+				"preview": "wear/gold_watch_preview.png",
+				"mask": "wear/gold_watch_mask.png"
+			}
+		},
+		{
+			"id": "wear_heart_glasses",
+			"rev": 3,
+			"hash": "4bb2cf3a5bec149a",
+			"type": "wear",
+			"name": "Heart Glasses",
+			"description": "Pink heart-shaped sunglasses. Love is in the air.",
+			"price": 900,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#ff4f9a",
+			"slot": "face",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/heart_glasses.vprop",
+				"texture": "wear/heart_glasses.png",
+				"preview": "wear/heart_glasses_preview.png",
+				"mask": "wear/heart_glasses_mask.png"
+			}
+		},
+		{
+			"id": "wear_jetpack",
+			"rev": 2,
+			"hash": "dbe91182cfc91469",
+			"type": "wear",
+			"name": "Jetpack",
+			"description": "Twin red rocket tanks with flames at the nozzles.",
+			"price": 2000,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#d33a2c",
+			"slot": "back",
+			"model": {
+				"bone": "body"
+			},
+			"files": {
+				"mesh": "wear/jetpack.vprop",
+				"texture": "wear/jetpack.png",
+				"preview": "wear/jetpack_preview.png",
+				"mask": "wear/jetpack_mask.png"
+			}
+		},
+		{
+			"id": "wear_katana_back",
+			"rev": 2,
+			"hash": "bd2289a11ea83e74",
+			"type": "wear",
+			"name": "Katana",
+			"description": "A katana in a black lacquered sheath, worn across your back.",
+			"price": 1600,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#b3202e",
+			"slot": "back",
+			"model": {
+				"bone": "body"
+			},
+			"files": {
+				"mesh": "wear/katana_back.vprop",
+				"texture": "wear/katana_back.png",
+				"preview": "wear/katana_back_preview.png",
+				"mask": "wear/katana_back_mask.png"
+			}
+		},
+		{
+			"id": "wear_leather_watch",
+			"rev": 2,
+			"hash": "158aad989bccd32f",
+			"type": "wear",
+			"name": "Classic Watch",
+			"description": "A silver watch with a cream dial on a brown leather strap.",
+			"price": 1100,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#6b3d1f",
+			"slot": "wrist",
+			"model": {
+				"bone": "leftArm"
+			},
+			"files": {
+				"mesh": "wear/leather_watch.vprop",
+				"texture": "wear/leather_watch.png",
+				"preview": "wear/leather_watch_preview.png",
+				"mask": "wear/leather_watch_mask.png"
+			}
+		},
+		{
+			"id": "wear_monocle",
+			"rev": 3,
+			"hash": "2c88ddf6dc414167",
+			"type": "wear",
+			"name": "Monocle",
+			"description": "A golden monocle on a fine chain. Splendid.",
+			"price": 1100,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#e0b04c",
+			"slot": "face",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/monocle.vprop",
+				"texture": "wear/monocle.png",
+				"preview": "wear/monocle_preview.png",
+				"mask": "wear/monocle_mask.png"
+			}
+		},
+		{
+			"id": "wear_quiver",
+			"rev": 3,
+			"hash": "6535f650bb56d7b9",
+			"type": "wear",
+			"name": "Quiver",
+			"description": "A leather quiver full of arrows, slung across your back.",
+			"price": 1100,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#6a3f1f",
+			"slot": "back",
+			"model": {
+				"bone": "body"
+			},
+			"files": {
+				"mesh": "wear/quiver.vprop",
+				"texture": "wear/quiver.png",
+				"preview": "wear/quiver_preview.png",
+				"mask": "wear/quiver_mask.png"
+			}
+		},
+		{
+			"id": "wear_running_shoes",
+			"rev": 2,
+			"hash": "c1a93908979eb29b",
+			"type": "wear",
+			"name": "Runners",
+			"description": "Light mint running shoes with a thick foam sole.",
+			"price": 1100,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#2bd9a0",
+			"slot": "feet",
+			"model": {
+				"bone": "rightLeg",
+				"mirror": "leftLeg"
+			},
+			"files": {
+				"mesh": "wear/running_shoes.vprop",
+				"texture": "wear/running_shoes.png",
+				"preview": "wear/running_shoes_preview.png",
+				"mesh_l": "wear/running_shoes_l.vprop",
+				"mask": "wear/running_shoes_mask.png"
+			}
+		},
+		{
+			"id": "wear_smartwatch",
+			"rev": 2,
+			"hash": "2b2341518d4e3fd9",
+			"type": "wear",
+			"name": "Smartwatch",
+			"description": "A black smartwatch with a glowing screen.",
+			"price": 1200,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#18d8ff",
+			"slot": "wrist",
+			"model": {
+				"bone": "leftArm"
+			},
+			"files": {
+				"mesh": "wear/smartwatch.vprop",
+				"texture": "wear/smartwatch.png",
+				"preview": "wear/smartwatch_preview.png",
+				"mask": "wear/smartwatch_mask.png"
+			}
+		},
+		{
+			"id": "wear_snapback",
+			"rev": 2,
+			"hash": "be8911c704f71cba",
+			"type": "wear",
+			"name": "Snapback",
+			"description": "A black snapback with a flat red brim, a patch on the front and a strap at the back.",
+			"price": 1000,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#e8473f",
+			"slot": "head",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/snapback.vprop",
+				"texture": "wear/snapback.png",
+				"preview": "wear/snapback_preview.png",
+				"mask": "wear/snapback_mask.png"
+			}
+		},
+		{
+			"id": "wear_teddy_backpack",
+			"rev": 2,
+			"hash": "652740fa7752f842",
+			"type": "wear",
+			"name": "Teddy Pack",
+			"description": "A fluffy teddy bear riding on your back.",
+			"price": 1300,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#a8743f",
+			"slot": "back",
+			"model": {
+				"bone": "body"
+			},
+			"files": {
+				"mesh": "wear/teddy_backpack.vprop",
+				"texture": "wear/teddy_backpack.png",
+				"preview": "wear/teddy_backpack_preview.png",
+				"mask": "wear/teddy_backpack_mask.png"
+			}
+		},
+		{
+			"id": "wear_cuban_chain",
+			"rev": 1,
+			"hash": "567ea1e2be246c50",
+			"type": "wear",
+			"name": "Cuban Link",
+			"description": "A thick, heavy gold Cuban link chain. Statement piece.",
+			"price": 1600,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#f4c542",
+			"slot": "neck",
+			"model": {
+				"bone": "body"
+			},
+			"files": {
+				"mesh": "wear/cuban_chain.vprop",
+				"texture": "wear/cuban_chain.png",
+				"preview": "wear/cuban_chain_preview.png",
+				"mask": "wear/cuban_chain_mask.png"
+			}
+		},
+		{
+			"id": "wear_fine_chain",
+			"rev": 1,
+			"hash": "c6025f6b56e5a702",
+			"type": "wear",
+			"name": "Fine Gold Chain",
+			"description": "A thin, delicate gold chain - subtle, it swings a little as you move.",
+			"price": 1000,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#f0c64d",
+			"slot": "neck",
+			"model": {
+				"bone": "body"
+			},
+			"files": {
+				"mesh": "wear/fine_chain.vprop",
+				"texture": "wear/fine_chain.png",
+				"preview": "wear/fine_chain_preview.png",
+				"mask": "wear/fine_chain_mask.png"
+			}
+		},
+		{
+			"id": "wear_iced_chain",
+			"rev": 1,
+			"hash": "030d1a396777bdee",
+			"type": "wear",
+			"name": "Iced Cuban",
+			"description": "A heavy silver Cuban link set with stones all along the front.",
+			"price": 2200,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#e6ecf3",
+			"slot": "neck",
+			"model": {
+				"bone": "body"
+			},
+			"files": {
+				"mesh": "wear/iced_chain.vprop",
+				"texture": "wear/iced_chain.png",
+				"preview": "wear/iced_chain_preview.png",
+				"mask": "wear/iced_chain_mask.png"
+			}
+		},
+		{
+			"id": "wear_medallion_chain",
+			"rev": 1,
+			"hash": "31dfce3c04ca5c68",
+			"type": "wear",
+			"name": "Gold Medallion",
+			"description": "A gold chain with a big round medallion on your chest.",
+			"price": 1400,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#f0c64d",
+			"slot": "neck",
+			"model": {
+				"bone": "body"
+			},
+			"files": {
+				"mesh": "wear/medallion_chain.vprop",
+				"texture": "wear/medallion_chain.png",
+				"preview": "wear/medallion_chain_preview.png",
+				"mask": "wear/medallion_chain_mask.png"
+			}
+		},
+		{
+			"id": "wear_rope_chain",
+			"rev": 1,
+			"hash": "e54082953ce1bde5",
+			"type": "wear",
+			"name": "Gold Cross Chain",
+			"description": "A gold chain with a small cross hanging at the bottom.",
+			"price": 1200,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#e8b93f",
+			"slot": "neck",
+			"model": {
+				"bone": "body"
+			},
+			"files": {
+				"mesh": "wear/rope_chain.vprop",
+				"texture": "wear/rope_chain.png",
+				"preview": "wear/rope_chain_preview.png",
+				"mask": "wear/rope_chain_mask.png"
+			}
+		},
+		{
+			"id": "wear_santa_hat",
+			"rev": 3,
+			"hash": "e5987717d27a8c41",
+			"type": "wear",
+			"name": "Santa Hat",
+			"description": "A floppy red Christmas hat with a fluffy white trim and a pompom.",
+			"price": 1200,
+			"status": "testing",
+			"collection": "yuletide",
+			"accent": "#c8202c",
+			"slot": "head",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/santa_hat.vprop",
+				"texture": "wear/santa_hat.png",
+				"preview": "wear/santa_hat_preview.png",
+				"mask": "wear/santa_hat_mask.png"
+			}
+		},
+		{
+			"id": "wear_scarf",
+			"rev": 2,
+			"hash": "8f3a6ed81232288c",
+			"type": "wear",
+			"name": "Knit Scarf",
+			"description": "A thick, cosy knit scarf wrapped round your neck, the ends hanging down.",
+			"price": 1000,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#c62b35",
+			"slot": "neck",
+			"model": {
+				"bone": "body"
+			},
+			"files": {
+				"mesh": "wear/scarf.vprop",
+				"texture": "wear/scarf.png",
+				"preview": "wear/scarf_preview.png",
+				"mask": "wear/scarf_mask.png"
+			}
+		},
+		{
+			"id": "wear_witch_hat",
+			"rev": 2,
+			"hash": "71d78c69c423d244",
+			"type": "wear",
+			"name": "Witch Hat",
+			"description": "A tall, crooked witch hat with a purple band and a gold buckle.",
+			"price": 1400,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#7b3fc4",
+			"slot": "head",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/witch_hat.vprop",
+				"texture": "wear/witch_hat.png",
+				"preview": "wear/witch_hat_preview.png",
+				"mask": "wear/witch_hat_mask.png"
+			}
+		},
+		{
+			"id": "wear_shades",
+			"rev": 1,
+			"hash": "81f2d9b9102db87e",
+			"type": "wear",
+			"name": "Classic Shades",
+			"description": "Bold black-framed sunglasses - recolour the lenses.",
+			"price": 900,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#141416",
+			"slot": "face",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/shades.vprop",
+				"texture": "wear/shades.png",
+				"preview": "wear/shades_preview.png",
+				"mask": "wear/shades_mask.png"
+			}
+		},
+		{
+			"id": "wear_duality_mask",
+			"rev": 4,
+			"hash": "3d4f0e825470f28e",
+			"type": "wear",
+			"name": "Duality Mask",
+			"description": "Half black, half white - a smile on one side, a frown on the other.",
+			"price": 1600,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#f1efe9",
+			"slot": "mask",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/duality_mask.vprop",
+				"texture": "wear/duality_mask.png",
+				"preview": "wear/duality_mask_preview.png",
+				"mask": "wear/duality_mask_mask.png"
+			}
+		},
+		{
+			"id": "wear_kitsune_mask",
+			"rev": 2,
+			"hash": "4ea85911d3e300c3",
+			"type": "wear",
+			"name": "Kitsune Mask",
+			"description": "A white fox spirit mask with red markings and tall ears.",
+			"price": 1800,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#d0262f",
+			"slot": "mask",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/kitsune_mask.vprop",
+				"texture": "wear/kitsune_mask.png",
+				"preview": "wear/kitsune_mask_preview.png",
+				"mask": "wear/kitsune_mask_mask.png"
+			}
+		},
+		{
+			"id": "wear_neon_respirator",
+			"rev": 2,
+			"hash": "3a780c52d4099fbf",
+			"type": "wear",
+			"name": "Neon Respirator",
+			"description": "A black cyber respirator with glowing neon lines and twin filters.",
+			"price": 1500,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#ff2bd6",
+			"slot": "mask",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/neon_respirator.vprop",
+				"texture": "wear/neon_respirator.png",
+				"preview": "wear/neon_respirator_preview.png",
+				"mask": "wear/neon_respirator_mask.png"
+			}
+		},
+		{
+			"id": "wear_oni_mask",
+			"rev": 2,
+			"hash": "c30d1aaae8a961e0",
+			"type": "wear",
+			"name": "Oni Mask",
+			"description": "A fierce red demon mask with golden horns, brows and fangs.",
+			"price": 1800,
+			"status": "testing",
+			"collection": "wardrobe",
+			"accent": "#b8202a",
+			"slot": "mask",
+			"model": {
+				"bone": "head"
+			},
+			"files": {
+				"mesh": "wear/oni_mask.vprop",
+				"texture": "wear/oni_mask.png",
+				"preview": "wear/oni_mask_preview.png",
+				"mask": "wear/oni_mask_mask.png"
 			}
 		}
 	]

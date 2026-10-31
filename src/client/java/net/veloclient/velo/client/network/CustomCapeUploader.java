@@ -87,7 +87,7 @@ final class CustomCapeUploader {
 			}
 			return capeId;
 		} catch (Exception e) {
-			VeloClient.LOGGER.debug("Custom cape upload failed", e);
+			VeloClient.LOGGER.debug("Custom cloak upload failed", e);
 			return null;
 		}
 	}
@@ -115,7 +115,7 @@ final class CustomCapeUploader {
 		// all worth retrying later. Anything else is the server saying "not this image".
 		if (status != 401 && status != 429 && status < 500) {
 			refused.add(key);
-			VeloClient.LOGGER.warn("Velo Network refused your custom cape ({}): {}", status, response.body());
+			VeloClient.LOGGER.warn("Velo Network refused your custom cloak ({}): {}", status, response.body());
 		}
 		return null;
 	}

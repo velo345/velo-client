@@ -30,7 +30,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 ./gradlew :1.21.11:build :26.1:build :26.2:build :26.3:build -q
 
-JAR=$(ls -t versions/26.2/build/libs/velo-client-*.jar | grep -v sources | head -1)
+JAR=$(ls -t versions/26.2/build/libs/velo-client-*.jar | grep -v sources | grep -v -- "-dev+" | head -1)
 DEST="/home/daviseib/.minecraft/mods/$(basename "$JAR")"
 
 # Remove any other velo-client-*.jar so an old version never lingers
@@ -43,7 +43,7 @@ echo "Deployed $(basename "$JAR") -> $DEST"
 rm -f /home/daviseib/.minecraft/mods/velo-addons-*.jar
 if [[ "$DEPLOY_ADDONS" == 1 ]]; then
 	# The Addons (Velo+) are built from the private submodule src/addon - skipped when it isn't checked out.
-	ADDONS_JAR=$(ls -t versions/26.2/build/libs/velo-addons-*.jar 2>/dev/null | grep -v sources | head -1 || true)
+	ADDONS_JAR=$(ls -t versions/26.2/build/libs/velo-addons-*.jar 2>/dev/null | grep -v sources | grep -v -- "-dev+" | head -1 || true)
 	if [[ -n "$ADDONS_JAR" ]]; then
 		cp "$ADDONS_JAR" "/home/daviseib/.minecraft/mods/$(basename "$ADDONS_JAR")"
 		echo "Deployed $(basename "$ADDONS_JAR") (Velo+ add-on) -> /home/daviseib/.minecraft/mods/"

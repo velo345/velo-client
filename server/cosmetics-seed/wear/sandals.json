@@ -1,0 +1,10 @@
+{
+ "slot": "feet",
+ "name": "Sandals",
+ "price": 700,
+ "accent": "#c9a06a",
+ "description": "Summer sandals: a cork sole and two leather straps.",
+ "bone": "rightLeg",
+ "mirror": "leftLeg",
+ "tint": true
+}

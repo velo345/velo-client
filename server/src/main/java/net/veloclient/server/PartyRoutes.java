@@ -43,6 +43,12 @@ final class PartyRoutes {
 	private record ShareRequest(Map<String, Object> payload) {
 	}
 
+	private record StorageRequest(String server, String world, String data) {
+	}
+
+	private record StorageResponse(long now, java.util.List<PartyService.StorageShareView> shares) {
+	}
+
 	private record PositionsResponse(java.util.List<PartyService.LivePosition> positions) {
 	}
 
@@ -102,6 +108,29 @@ final class PartyRoutes {
 		});
 		SocialRoutes.route(server, registry, "/v1/party/positions", "GET", (ex, me) ->
 				JsonHttp.writeJson(ex, 200, new PositionsResponse(parties.positions(me))));
+		// Storage Memory party sync (opt-in in the game): each member posts their storage, the others poll it.
+		SocialRoutes.route(server, registry, "/v1/party/storage-share", "POST", (ex, me) -> {
+			StorageRequest request = JsonHttp.readBody(ex, StorageRequest.class, PartyService.STORAGE_MAX_CHARS + 2048);
+			parties.setStorage(me, request.server(), request.world(), request.data());
+			JsonHttp.writeJson(ex, 200, new Ok(true));
+		});
+		SocialRoutes.route(server, registry, "/v1/party/storage-shares", "GET", (ex, me) -> {
+			long since = 0;
+			String query = ex.getRequestURI().getQuery();
+			if (query != null) {
+				for (String part : query.split("&")) {
+					if (part.startsWith("since=")) {
+						try {
+							since = Long.parseLong(part.substring(6));
+						} catch (NumberFormatException ignored) {
+							// treat as 0: send everything
+						}
+					}
+				}
+			}
+			long now = System.currentTimeMillis();
+			JsonHttp.writeJson(ex, 200, new StorageResponse(now, parties.storage(me, since)));
+		});
 		SocialRoutes.route(server, registry, "/v1/party/waypoint", "POST", (ex, me) -> {
 			parties.share(me, "waypoint", JsonHttp.readBody(ex, ShareRequest.class).payload());
 			JsonHttp.writeJson(ex, 200, new Ok(true));

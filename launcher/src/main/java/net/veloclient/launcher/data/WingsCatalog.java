@@ -55,8 +55,13 @@ public final class WingsCatalog {
 	}
 
 	/** How a pair is worn: the same fields (and ranges) the game uses. */
-	public record Settings(float scale, float offsetY, float offsetZ, float spread, float flapSpeed, float flapStrength) {
-		public static final Settings DEFAULT = new Settings(1f, 0f, 0f, 6f, 1f, 1f);
+	/** {@code color}: a colour code for recolourable pairs (0 = its own; see the mod's WingRigs#tint). */
+	public record Settings(float scale, float offsetY, float offsetZ, float spread, float flapSpeed, float flapStrength, int color) {
+		public static final Settings DEFAULT = new Settings(1f, 0f, 0f, 6f, 1f, 1f, 0);
+
+		public Settings withColor(int code) {
+			return new Settings(scale, offsetY, offsetZ, spread, flapSpeed, flapStrength, code);
+		}
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -279,7 +284,7 @@ public final class WingsCatalog {
 	}
 
 	/** The cached file for a hash, downloading it first if needed (blocking); null if that fails. */
-	private static Path file(String sha) {
+	public static Path file(String sha) {
 		if (sha == null || !sha.matches("[0-9a-f]{64}")) {
 			return null;
 		}
@@ -411,7 +416,7 @@ public final class WingsCatalog {
 		if (o.has("perWing") && o.get("perWing").isJsonObject() && o.getAsJsonObject("perWing").has(id)) {
 			JsonObject s = o.getAsJsonObject("perWing").getAsJsonObject(id);
 			return new Settings(f(s, "scale", 1f), f(s, "offsetY", 0f), f(s, "offsetZ", 0f), f(s, "spread", 6f), f(s, "flapSpeed", 1f),
-					f(s, "flapStrength", 1f));
+					f(s, "flapStrength", 1f), (int) f(s, "color", 0));
 		}
 		return Settings.DEFAULT;
 	}

@@ -1,0 +1,10 @@
+{
+ "slot": "feet",
+ "name": "Bunny Slippers",
+ "price": 1000,
+ "accent": "#ffb3cf",
+ "description": "Fluffy pink bunny slippers, ears and all.",
+ "bone": "rightLeg",
+ "mirror": "leftLeg",
+ "tint": true
+}

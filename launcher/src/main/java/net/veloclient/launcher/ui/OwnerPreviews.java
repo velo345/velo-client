@@ -27,7 +27,40 @@ final class OwnerPreviews {
 		}
 	};
 
+	/** Two pictures decode at a time, at low priority - a long list used to start one thread per row at once. */
+	private static final java.util.concurrent.ExecutorService DECODER = java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+		Thread t = new Thread(r, "velo-owner-previews");
+		t.setDaemon(true);
+		t.setPriority(Thread.MIN_PRIORITY + 1);
+		return t;
+	});
+	/** Aura / kill effect snapshots render on the UI thread: one per pulse, not a whole page in one frame. */
+	private static final java.util.ArrayDeque<Runnable> FX_QUEUE = new java.util.ArrayDeque<>();
+	private static boolean fxDraining;
+
 	private OwnerPreviews() {
+	}
+
+	private static void onFxThreadSoon(Runnable task) {
+		Platform.runLater(() -> {
+			FX_QUEUE.add(task);
+			if (!fxDraining) {
+				fxDraining = true;
+				drainFx();
+			}
+		});
+	}
+
+	private static void drainFx() {
+		Runnable next = FX_QUEUE.poll();
+		if (next == null) {
+			fxDraining = false;
+			return;
+		}
+		next.run();
+		javafx.animation.PauseTransition gap = new javafx.animation.PauseTransition(javafx.util.Duration.millis(30));
+		gap.setOnFinished(e -> drainFx());
+		gap.play();
 	}
 
 	/** A framed thumbnail for a cosmetic item (a server catalog entry), filled in as soon as its picture is ready. */
@@ -69,8 +102,19 @@ final class OwnerPreviews {
 		if (id.startsWith("aura_")) {
 			var kind = net.veloclient.velo.client.cosmetics.aura.AuraEffects.kind(id.substring(5));
 			if (kind != null) {
-				Platform.runLater(() -> {
+				onFxThreadSoon(() -> {
 					Image image = AuraFx.snapshot(kind, width, height);
+					remember(id, image);
+					done.accept(image);
+				});
+			}
+			return;
+		}
+		if (id.startsWith("killfx_")) {
+			var kind = net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.kind(id.substring(7));
+			if (kind != null) {
+				onFxThreadSoon(() -> {
+					Image image = AuraFx.killFxSnapshot(kind, net.veloclient.velo.client.cosmetics.aura.AuraEffects.Settings.DEFAULT, width, height);
 					remember(id, image);
 					done.accept(image);
 				});
@@ -93,7 +137,7 @@ final class OwnerPreviews {
 				} catch (Exception e) {
 					return null;
 				}
-			}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(image -> {
+			}, DECODER).thenAccept(image -> {
 				if (image != null) {
 					Platform.runLater(() -> {
 						remember(id, image);
@@ -105,7 +149,7 @@ final class OwnerPreviews {
 		}
 		String file = sha;
 		boolean cape = id.startsWith("cape_");
-		CompletableFuture.supplyAsync(() -> cape ? capeFace(file, height) : wingsPicture(file, width, height), Executors.newVirtualThreadPerTaskExecutor())
+		CompletableFuture.supplyAsync(() -> cape ? capeFace(file, height) : wingsPicture(file, width, height), DECODER)
 				.thenAccept(image -> {
 					if (image != null) {
 						Platform.runLater(() -> {

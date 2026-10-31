@@ -2,7 +2,6 @@ package net.veloclient.velo.client.redstone;
 
 import net.minecraft.client.MinecraftClient;
 import net.veloclient.velo.client.modules.redstone.TickJournal;
-import net.veloclient.velo.client.util.ClientCompat;
 
 /**
  * Freezing in Redstone Mode (singleplayer). Nothing is frozen by default: F7 (or the snowflake in
@@ -44,8 +43,8 @@ public final class TickControls {
 	}
 
 	public static void setFrozen(boolean on) {
-		if (on && !ClientCompat.isSingleplayer()) {
-			RmState.error("Freezing only works in singleplayer");
+		if (on && !RedstoneMode.canEdit()) {
+			RmState.error("Freezing needs singleplayer creative");
 			return;
 		}
 		frozen = on;

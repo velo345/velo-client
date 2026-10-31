@@ -1,0 +1,10 @@
+{
+ "slot": "wrist",
+ "name": "Diver Watch",
+ "price": 1300,
+ "accent": "#1f6fd1",
+ "description": "A steel diver watch with a blue bezel and a deep blue dial.",
+ "bone": "leftArm",
+ "mirror": null,
+ "tint": true
+}

@@ -40,6 +40,11 @@ public final class LauncherSettings {
 		public java.util.List<String> handledCrashes = new java.util.ArrayList<>();
 		/** Opt-in: send crash reports (crash report, log, mods, system) automatically, no dialog click needed. */
 		public boolean crashTelemetry;
+		/**
+		 * For weaker PCs: the launcher draws at 30 frames a second (from its next start), wings show without their
+		 * extra effects (moving arms, glow, shine, particles) and previews without auras.
+		 */
+		public boolean performanceMode;
 		/** Minimize the launcher once a game has started (it then frees its memory - see idle mode). */
 		public boolean minimizeOnLaunch = true;
 		/** Party leader: pressing Play also launches every member. */

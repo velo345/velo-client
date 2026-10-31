@@ -20,6 +20,11 @@ public final class VeloPaths {
 	}
 
 	private static Path resolveRoot() {
+		// The dev launcher points its games at its own folder, so dev and release settings never mix.
+		String home = System.getProperty("velo.home");
+		if (home != null && !home.isBlank()) {
+			return Path.of(home);
+		}
 		String os = System.getProperty("os.name", "").toLowerCase();
 		if (os.contains("win")) {
 			String appData = System.getenv("APPDATA");

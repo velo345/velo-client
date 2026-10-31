@@ -200,7 +200,7 @@ public final class OnboardingView {
 	private Node welcome() {
 		VBox features = new VBox(14,
 				feature("zap", "Fast out of the box", "Performance mods and a tuned profile, ready to play."),
-				feature("wings", "Cosmetics everyone sees", "Wings, capes and auras that show on every Velo player."),
+				feature("wings", "Cosmetics everyone sees", "Wings, cloaks and auras that show on every Velo player."),
 				feature("friends", "Play together", "Friends, parties and one-click joining."));
 		Button start = primary("Get started", () -> go(index + 1));
 		return page("WELCOME", "Let's get you set up", "Takes about a minute. You can skip anything.", features, footer(null, start));

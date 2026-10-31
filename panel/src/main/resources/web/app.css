@@ -324,7 +324,8 @@ dialog::backdrop { background: rgba(4, 4, 6, .7); backdrop-filter: blur(6px); }
 	.side { position: fixed; z-index: 20; inset: 0 auto 0 0; width: 268px; transform: translateX(-105%); transition: transform .3s var(--ease); box-shadow: 30px 0 80px rgba(0, 0, 0, .6); }
 	.side.open { transform: none; }
 	.menu-btn { display: grid; }
-	.main { padding-top: 16px; }
+	.main { padding-top: calc(16px + env(safe-area-inset-top)); padding-bottom: env(safe-area-inset-bottom); }
+	.side { padding-top: env(safe-area-inset-top); }
 }
 
 /* ---- 3D cape (CSS): the cape template's six faces cut out of its animated GIF, so it plays as it does in game ---- */

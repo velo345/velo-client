@@ -454,8 +454,10 @@ public final class RmWorld {
 		if (player == null) {
 			return null;
 		}
-		var eye = player.getEyePos();
-		var look = player.getRotationVec(1f);
+		// Interpolated like the rendered camera, so the ray hits what the crosshair shows (also mid-sneak / while moving).
+		float partial = net.minecraft.client.MinecraftClient.getInstance().getRenderTickCounter().getTickProgress(true);
+		var eye = player.getCameraPosVec(partial);
+		var look = player.getRotationVec(partial);
 		return new double[] {eye.x, eye.y, eye.z, look.x, look.y, look.z};
 	}
 
@@ -468,6 +470,12 @@ public final class RmWorld {
 	public static boolean spectator() {
 		var player = net.minecraft.client.MinecraftClient.getInstance().player;
 		return player != null && player.isSpectator();
+	}
+
+	/** Creative or spectator: the editing tools only make sense (and are only offered) there. */
+	public static boolean creative() {
+		var player = net.minecraft.client.MinecraftClient.getInstance().player;
+		return player != null && (player.isCreative() || player.isSpectator());
 	}
 
 	/** Bit i set while hotbar key i+1 is held. */
@@ -549,6 +557,17 @@ public final class RmWorld {
 			out.add(new int[] {e.getId(), e.getStack().getCount()});
 		}
 		return out;
+	}
+
+	/** Whether the held stack is what middle click on {@code state} picks. */
+	public static boolean holdsPickOf(Object state) {
+		var player = net.minecraft.client.MinecraftClient.getInstance().player;
+		if (player == null) {
+			return false;
+		}
+		var item = s(state).getBlock() == net.minecraft.block.Blocks.WATER ? net.minecraft.item.Items.WATER_BUCKET
+				: s(state).getBlock() == net.minecraft.block.Blocks.LAVA ? net.minecraft.item.Items.LAVA_BUCKET : s(state).getBlock().asItem();
+		return player.getMainHandStack().isOf(item);
 	}
 
 	/** Middle click on a schematic block: select / fetch its item from your inventory (creative: create it). */
@@ -948,8 +967,9 @@ public final class RmWorld {
 		if (player == null) {
 			return null;
 		}
-		var eye = player.getEyePosition();
-		var look = player.getViewVector(1f);
+		float partial = net.minecraft.client.Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(true);
+		var eye = player.getEyePosition(partial);
+		var look = player.getViewVector(partial);
 		return new double[] {eye.x, eye.y, eye.z, look.x, look.y, look.z};
 	}
 
@@ -961,6 +981,11 @@ public final class RmWorld {
 	public static boolean spectator() {
 		var player = net.minecraft.client.Minecraft.getInstance().player;
 		return player != null && player.isSpectator();
+	}
+
+	public static boolean creative() {
+		var player = net.minecraft.client.Minecraft.getInstance().player;
+		return player != null && (player.isCreative() || player.isSpectator());
 	}
 
 	public static int hotbarKeysDown() {
@@ -1035,6 +1060,16 @@ public final class RmWorld {
 			out.add(new int[] {e.getId(), e.getItem().getCount()});
 		}
 		return out;
+	}
+
+	public static boolean holdsPickOf(Object state) {
+		var player = net.minecraft.client.Minecraft.getInstance().player;
+		if (player == null) {
+			return false;
+		}
+		var item = s(state).getBlock() == net.minecraft.world.level.block.Blocks.WATER ? net.minecraft.world.item.Items.WATER_BUCKET
+				: s(state).getBlock() == net.minecraft.world.level.block.Blocks.LAVA ? net.minecraft.world.item.Items.LAVA_BUCKET : s(state).getBlock().asItem();
+		return player.getMainHandItem().is(item);
 	}
 
 	public static boolean pickItem(Object state) {

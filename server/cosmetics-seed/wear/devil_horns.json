@@ -1,0 +1,10 @@
+{
+ "slot": "ears",
+ "name": "Devil Horns",
+ "price": 1100,
+ "accent": "#c01b23",
+ "description": "Glossy red horns curling up from your head.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

@@ -21,9 +21,36 @@ public final class WingModel {
 		public final float[] uv;
 		public final float[] weight;
 		public final int[] triangles;
+		/** Its arms ({@link WingRigs#arms}), or null. */
+		public final WingRigs.Arms arms;
+		/** Where the arms are posed each frame (render thread). */
+		public final float[] posed;
+		/** Which gear a vertex belongs to ({@link WingRigs}), -1 for the wing itself; null without gears. */
+		public final int[] gear;
+		/** Per gear: its centre (x, y) in this half's space and its {@link WingRigs.Gear#ratio}. */
+		public final float[] gearPivot;
+		public final float[] gearRatio;
+		/** Per vertex: how much it glows ({@link WingRigs#mask}) and what its glow is keyed on; null without a glow. */
+		public final float[] glowMask;
+		public final float[] glowKey;
+		/** The vertices particles start from; null without particles. */
+		public final int[] sources;
 
 		Half(int side, float[] geometry, float[] uv, float[] weight, int[] triangles) {
+			this(side, geometry, uv, weight, triangles, null, null, null, null, null, null, null);
+		}
+
+		Half(int side, float[] geometry, float[] uv, float[] weight, int[] triangles, int[] gear, float[] gearPivot, float[] gearRatio,
+				WingRigs.Arms arms, float[] glowMask, float[] glowKey, int[] sources) {
 			this.side = side;
+			this.arms = arms;
+			this.posed = arms == null ? null : new float[geometry.length];
+			this.glowMask = glowMask;
+			this.glowKey = glowKey;
+			this.sources = sources;
+			this.gear = gear;
+			this.gearPivot = gearPivot;
+			this.gearRatio = gearRatio;
 			this.geometry = geometry;
 			this.uv = uv;
 			this.weight = weight;
@@ -36,9 +63,153 @@ public final class WingModel {
 	}
 
 	public final Half[] halves;
+	/** How it shines ({@link WingRigs#shine}), or null. */
+	public final WingRigs.Shine shine;
+	/** What it does on top of its wingbeat ({@link WingRigs#effect}), or null. */
+	public final WingRigs.Effect effect;
 
 	private WingModel(Half[] halves) {
+		this(halves, null, null);
+	}
+
+	private WingModel(Half[] halves, WingRigs.Shine shine, WingRigs.Effect effect) {
 		this.halves = halves;
+		this.shine = shine;
+		this.effect = effect;
+	}
+
+	/**
+	 * This model rigged the way pair {@code id} moves: its gears ({@link WingRigs#rig}) added to each half, its arms
+	 * found ({@link WingRigs#arms}; tentacle-style pairs writhe), its glow picked out of {@code texture}
+	 * ({@link WingRigs#effect}; null: no glow) and where its particles start, or set to shine ({@link WingRigs#shine}).
+	 * Itself if it has none of those. {@code scale}: the pair's, as given to {@link #read}.
+	 */
+	public WingModel withRig(String id, float scale, boolean tentacle, WingRigs.Sampler texture) {
+		WingModel geared = withGears(id, scale);
+		WingRigs.Effect effect = WingRigs.effect(id);
+		WingRigs.Motion motion = tentacle ? WingRigs.Motion.WRITHE : effect != null ? effect.motion() : null;
+		WingRigs.Shine shine = WingRigs.shine(id);
+		if (motion == null && effect == null && shine == null) {
+			return geared;
+		}
+		Half[] out = new Half[geared.halves.length];
+		for (int h = 0; h < out.length; h++) {
+			Half half = geared.halves[h];
+			int n = half.vertexCount();
+			float[] g = half.geometry;
+			float far = 1e-4f;
+			for (int v = 0; v < n; v++) {
+				far = Math.max(far, (float) Math.sqrt(g[v * 6] * g[v * 6] + g[v * 6 + 1] * g[v * 6 + 1] + g[v * 6 + 2] * g[v * 6 + 2]));
+			}
+			float[] mask = null;
+			float[] key = null;
+			if (effect != null && effect.glow() != null && texture != null) {
+				mask = new float[n];
+				key = new float[n];
+				for (int v = 0; v < n; v++) {
+					mask[v] = WingRigs.mask(effect.glow(), texture.argb(half.uv[v * 2], half.uv[v * 2 + 1]));
+					float reach = (float) Math.sqrt(g[v * 6] * g[v * 6] + g[v * 6 + 1] * g[v * 6 + 1] + g[v * 6 + 2] * g[v * 6 + 2]) / far;
+					key[v] = WingRigs.glowKey(effect.glow().pattern(), g[v * 6], g[v * 6 + 1], g[v * 6 + 2], half.side, reach);
+				}
+			}
+			int[] sources = null;
+			if (effect != null && effect.particles().length > 0) {
+				java.util.List<Integer> picked = new java.util.ArrayList<>();
+				for (int v = 0; v < n; v++) {
+					float reach = (float) Math.sqrt(g[v * 6] * g[v * 6] + g[v * 6 + 1] * g[v * 6 + 1] + g[v * 6 + 2] * g[v * 6 + 2]) / far;
+					boolean use = switch (effect.source()) {
+						case GLOW -> mask != null && mask[v] > 0.5f;
+						case TIPS -> reach > 0.6f;
+						case ANY -> true;
+					};
+					if (use) {
+						picked.add(v);
+					}
+				}
+				if (picked.size() < 8) {
+					picked.clear();
+					for (int v = 0; v < n; v++) {
+						picked.add(v);
+					}
+				}
+				sources = picked.stream().mapToInt(Integer::intValue).toArray();
+			}
+			WingRigs.Arms arms = motion == null ? null : WingRigs.arms(g, 6, half.triangles, motion);
+			out[h] = new Half(half.side, g, half.uv, half.weight, half.triangles, half.gear, half.gearPivot, half.gearRatio, arms, mask, key, sources);
+		}
+		return new WingModel(out, shine, effect);
+	}
+
+	/** This model with pair {@code id}'s gears ({@link WingRigs#rig}) added to each half, or itself if it has none. */
+	private WingModel withGears(String id, float scale) {
+		WingRigs.Rig rig = WingRigs.rig(id);
+		if (rig == null) {
+			return this;
+		}
+		Half[] out = new Half[halves.length];
+		for (int h = 0; h < halves.length; h++) {
+			Half half = halves[h];
+			int base = half.vertexCount();
+			WingRigs.GearMesh[] meshes = new WingRigs.GearMesh[rig.gears().length];
+			int extra = 0;
+			int extraTris = 0;
+			for (int g = 0; g < meshes.length; g++) {
+				meshes[g] = WingRigs.gearMesh(rig.gears()[g], rig, half.side, scale);
+				extra += meshes[g].uv().length / 2;
+				extraTris += meshes[g].triangles().length;
+			}
+			float[] geometry = java.util.Arrays.copyOf(half.geometry, (base + extra) * 6);
+			float[] uv = java.util.Arrays.copyOf(half.uv, (base + extra) * 2);
+			float[] weight = java.util.Arrays.copyOf(half.weight, base + extra);
+			int[] triangles = java.util.Arrays.copyOf(half.triangles, half.triangles.length + extraTris);
+			int[] gear = new int[base + extra];
+			java.util.Arrays.fill(gear, -1);
+			float[] pivot = new float[meshes.length * 2];
+			float[] ratio = new float[meshes.length];
+			int v0 = base;
+			int t0 = half.triangles.length;
+			for (int g = 0; g < meshes.length; g++) {
+				WingRigs.Gear spec = rig.gears()[g];
+				// Model space (y up, +z towards the wearer) -> body space, like read() does.
+				float cx = half.side * spec.x() * scale;
+				float cy = -spec.y() * scale;
+				float cz = -spec.z() * scale;
+				pivot[g * 2] = cx;
+				pivot[g * 2 + 1] = cy;
+				ratio[g] = spec.ratio();
+				// The gear bends with the part of the wing it sits on.
+				float w = 0;
+				float best = Float.MAX_VALUE;
+				for (int v = 0; v < base; v++) {
+					float dx = half.geometry[v * 6] - cx;
+					float dy = half.geometry[v * 6 + 1] - cy;
+					float d = dx * dx + dy * dy;
+					if (d < best) {
+						best = d;
+						w = half.weight[v];
+					}
+				}
+				WingRigs.GearMesh m = meshes[g];
+				int n = m.uv().length / 2;
+				for (int v = 0; v < n; v++) {
+					geometry[(v0 + v) * 6] = m.geometry()[v * 6] + cx;
+					geometry[(v0 + v) * 6 + 1] = m.geometry()[v * 6 + 1] + cy;
+					geometry[(v0 + v) * 6 + 2] = m.geometry()[v * 6 + 2] + cz;
+					System.arraycopy(m.geometry(), v * 6 + 3, geometry, (v0 + v) * 6 + 3, 3);
+					uv[(v0 + v) * 2] = m.uv()[v * 2];
+					uv[(v0 + v) * 2 + 1] = m.uv()[v * 2 + 1];
+					weight[v0 + v] = w;
+					gear[v0 + v] = g;
+				}
+				for (int i = 0; i < m.triangles().length; i++) {
+					triangles[t0 + i] = m.triangles()[i] + v0;
+				}
+				v0 += n;
+				t0 += m.triangles().length;
+			}
+			out[h] = new Half(half.side, geometry, uv, weight, triangles, gear, pivot, ratio, null, null, null, null);
+		}
+		return new WingModel(out);
 	}
 
 	/** Reads {@code /assets/velo-client/cosmetics/wings/<id>.vmesh}, scaled to blocks. */

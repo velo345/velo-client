@@ -73,6 +73,10 @@ final class CosmeticsRoutes {
 			ItemRequest r = JsonHttp.readBody(e, ItemRequest.class, 64 * 1024);
 			JsonHttp.writeJson(e, 200, cosmetics.upsert(r.item(), r.clearWindow()));
 		});
+		admin(server, registry, store, adminToken, "/v1/admin/cosmetics/item/delete", "POST", e -> {
+			cosmetics.deleteItem(JsonHttp.readBody(e, BundleDelete.class).id());
+			JsonHttp.writeJson(e, 200, Map.of("ok", true));
+		});
 		admin(server, registry, store, adminToken, "/v1/admin/cosmetics/file", "POST", e ->
 				JsonHttp.writeJson(e, 200, Map.of("sha256", cosmetics.storeFile(JsonHttp.readRawBody(e, CosmeticsService.MAX_FILE_BYTES)))));
 		admin(server, registry, store, adminToken, "/v1/admin/cosmetics/collection", "POST", e ->

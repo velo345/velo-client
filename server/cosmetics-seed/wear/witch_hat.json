@@ -1,0 +1,10 @@
+{
+ "slot": "head",
+ "name": "Witch Hat",
+ "price": 1400,
+ "accent": "#7b3fc4",
+ "description": "A tall, crooked witch hat with a purple band and a gold buckle.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

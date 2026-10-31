@@ -38,9 +38,9 @@ import java.util.Locale;
  */
 public final class StoreScreen extends VeloWindow {
 
-	private enum Page { FEATURED, WINGS, CAPES, AURAS, EMOTES, BUNDLES, PLUS }
+	private enum Page { FEATURED, WINGS, CAPES, AURAS, EMOTES, KILLFX, WEAR, BUNDLES, PLUS }
 
-	private static final String[] TABS = {"Featured", "Wings", "Capes", "Auras", "Emotes", "Bundles", "Velo+"};
+	private static final String[] TABS = {"Featured", "Wings", "Cloaks", "Auras", "Emotes", "Kill FX", "Bodywear", "Bundles", "Velo+"};
 	private static final int GAP = 10;
 	private static final long HERO_SECONDS = 4;
 	private static final int THUMB = 34;
@@ -79,6 +79,11 @@ public final class StoreScreen extends VeloWindow {
 	/** Opens on the Emotes page next time. */
 	public static void showEmotes() {
 		page = Page.EMOTES;
+	}
+
+	/** Opens on the Kill FX page next time. */
+	public static void showKillFx() {
+		page = Page.KILLFX;
 	}
 
 	/** Opens on the Auras page next time (the screenshot tour). */
@@ -162,7 +167,7 @@ public final class StoreScreen extends VeloWindow {
 
 	@Override
 	protected String headerTabBadge(int index) {
-		return index == Page.EMOTES.ordinal() ? "NEW" : null;
+		return index == Page.WEAR.ordinal() ? "NEW" : null;
 	}
 
 	@Override
@@ -266,6 +271,36 @@ public final class StoreScreen extends VeloWindow {
 					region.addRow(card);
 				}
 			}, 150);
+			case KILLFX -> layoutGrid(cx, y, cw, () -> {
+				// What's for sale, plus any you own that aren't (and for the owner, the ones still in testing).
+				for (var type : net.veloclient.velo.client.cosmetics.killfx.KillFxManager.catalog()) {
+					if (!type.inStore() && !net.veloclient.velo.client.cosmetics.killfx.KillFxManager.owns(type.id())) {
+						continue;
+					}
+					var card = new net.veloclient.velo.client.gui.widget.VeloKillFxCard(tileWidth, tileHeight, type,
+							() -> this.client.setScreen(new KillFxDetailScreen(this, type)));
+					addSelectableChild(card);
+					region.addRow(card);
+				}
+			}, 150);
+			case WEAR -> layoutGrid(cx, y, cw, () -> {
+				// What's for sale, plus anything you own that isn't, grouped by slot.
+				java.util.List<net.veloclient.velo.client.cosmetics.wear.WearManager.WearType> items = new java.util.ArrayList<>();
+				for (var type : net.veloclient.velo.client.cosmetics.wear.WearManager.all()) {
+					if (type.inStore() || net.veloclient.velo.client.cosmetics.wear.WearManager.owns(type.id())) {
+						items.add(type);
+					}
+				}
+				items.sort(java.util.Comparator.comparingInt((net.veloclient.velo.client.cosmetics.wear.WearManager.WearType type) ->
+						net.veloclient.velo.client.cosmetics.wear.WearManager.SLOTS.indexOf(type.slot())).thenComparing(
+						net.veloclient.velo.client.cosmetics.wear.WearManager.WearType::name));
+				for (var type : items) {
+					var card = new net.veloclient.velo.client.gui.widget.VeloWearCard(tileWidth, tileHeight, type,
+							() -> this.client.setScreen(new WearDetailScreen(this, type)));
+					addSelectableChild(card);
+					region.addRow(card);
+				}
+			}, 150);
 			case BUNDLES -> layoutBundles(cx, y, cw);
 			case PLUS -> layoutPlus(cx, y, cw);
 		}
@@ -327,6 +362,12 @@ public final class StoreScreen extends VeloWindow {
 		// A little air at the top: the display font's caps reach above the line they're drawn at.
 		int y = 6;
 		int headH = 18;
+
+		// The 1.0 welcome gift, while this account can still pick
+		if (StoreClient.welcomeGift()) {
+			addRegionRow(giftBanner(usable, 46), spots, cx, y);
+			y += 46 + 14;
+		}
 
 		// Daily picks
 		List<String> picks = StoreItems.dailyPicks();
@@ -401,8 +442,8 @@ public final class StoreScreen extends VeloWindow {
 		List<net.veloclient.velo.client.store.StoreItem> capes = StoreCatalog.byCategory(StoreCategory.CAPES).stream()
 				.filter(net.veloclient.velo.client.store.StoreItem::inStore).toList();
 		if (!capes.isEmpty()) {
-			headings.add(new Heading(y, "Animated capes", null));
-			addRegionRow(link("All capes", Page.CAPES), spots, cx + usable - linkWidth("All capes"), y);
+			headings.add(new Heading(y, "Animated cloaks", null));
+			addRegionRow(link("All cloaks", Page.CAPES), spots, cx + usable - linkWidth("All cloaks"), y);
 			y += headH;
 			int icon = w * 6 / 5 - StoreCard.INFO_H + 20;
 			for (int i = 0; i < capes.size() && i < columns; i++) {
@@ -486,6 +527,26 @@ public final class StoreScreen extends VeloWindow {
 			VeloDraw.fillRounded(context, sx, py - 1, sw, 10, 3, 0x333DDC97);
 			MenuKit.text(context, this.textRenderer, save, sx + 4, py + 1, MenuKit.GREEN);
 		}
+	}
+
+	/** The welcome gift: pick any one cosmetic for free - opens the capes (every item's button says "Claim free"). */
+	private DrawnCard giftBanner(int width, int height) {
+		return new DrawnCard(width, height, "Welcome gift", (context, x, y, w, h, hover) -> {
+			VeloDraw.fillRounded(context, x, y, w, h, 9, 0xFF16130C);
+			VeloDraw.fillRoundedGradient(context, x, y, w, h, 9, VeloAnim.lerpArgb(0x40F7C04A, 0x66F7C04A, hover), 0x0016130C);
+			VeloDraw.strokeRounded(context, x, y, w, h, 9, VeloAnim.lerpArgb(0x70F7C04A, 0xD0F7C04A, hover));
+			MenuKit.icon(context, "gift", x + 14, y + (h - 16) / 2, 16, MenuKit.GOLD);
+			String until = java.time.LocalDate.ofInstant(java.time.Instant.ofEpochMilli(StoreClient.welcomeGiftUntil()), java.time.ZoneId.systemDefault())
+					.format(java.time.format.DateTimeFormatter.ofPattern("d MMM", java.util.Locale.ENGLISH));
+			int tx = x + 40;
+			MenuKit.text(context, this.textRenderer, MenuKit.display("Welcome to Velo 1.0 - pick one cosmetic, free"), tx, y + h / 2 - 11, MenuKit.TEXT);
+			MenuKit.text(context, this.textRenderer, MenuKit.ui("Any cloak, wings, aura or kill effect in the Store. Open it and press Claim free. Until " + until + "."),
+					tx, y + h / 2 + 4, MenuKit.TEXT_2);
+		}, () -> {
+			page = Page.CAPES;
+			restartPageIn();
+			layoutContent();
+		});
 	}
 
 	/** The Velo+ pitch, as in the launcher: badge, one line of what you get, "Get Velo+". */
@@ -659,9 +720,9 @@ public final class StoreScreen extends VeloWindow {
 			"Cloud Sync: settings, HUD layouts, profiles, waypoints and keybinds on every PC, with restore points",
 			"Clips Pro: a 2-5 minute replay buffer at 1080p60 with sound, auto clips on kills and wins, share links (60 days) and sending to friends",
 			"Name Styles: animated gradients, rainbow, glitch and more on your name - in chat, tab list and above your head",
-			"Animated custom capes: import your own GIF cape and every Velo player sees it move",
+			"Animated custom cloaks: import your own GIF cloak and every Velo player sees it move",
 			"Home background: your own picture or animated GIF on the launcher's Home screen instead of the island",
-			"%,d Velo Coins every month - spend them on wings, capes and auras",
+			"%,d Velo Coins every month - spend them on wings, cloaks and auras",
 			"The Velo+ badge and the VIP role in the Velo Discord"};
 
 	private void layoutPlus(int cx, int y, int cw) {
@@ -831,7 +892,7 @@ public final class StoreScreen extends VeloWindow {
 		VeloDraw.strokeRounded(context, cx, y, cw, CAPE_BANNER_H, 8, 0x17FFFFFF);
 		MenuKit.icon(context, "link", cx + 12, y + (CAPE_BANNER_H - 12) / 2, 12, 0xFF8E9BFF);
 		String line = !discordError.isEmpty() ? discordError
-				: discordCode.isEmpty() ? "The Velo Neon cape is free - link your Discord to get it."
+				: discordCode.isEmpty() ? "The Velo Neon cloak is free - link your Discord to get it."
 				: "Paste /link " + discordCode + " in the Velo Discord.";
 		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(line), cw - 160), cx + 32, y + (CAPE_BANNER_H - 8) / 2,
 				discordError.isEmpty() ? MenuKit.TEXT : MenuKit.RED_TEXT);

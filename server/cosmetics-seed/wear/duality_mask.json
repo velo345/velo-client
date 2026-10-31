@@ -1,0 +1,10 @@
+{
+ "slot": "mask",
+ "name": "Duality Mask",
+ "price": 1600,
+ "accent": "#f1efe9",
+ "description": "Half black, half white - a smile on one side, a frown on the other.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

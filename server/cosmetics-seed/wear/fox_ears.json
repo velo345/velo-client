@@ -1,0 +1,10 @@
+{
+ "slot": "ears",
+ "name": "Fox Ears",
+ "price": 1000,
+ "accent": "#e8752a",
+ "description": "Orange fox ears with cream insides and dark tips.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

@@ -1,0 +1,10 @@
+{
+ "slot": "back",
+ "name": "Teddy Pack",
+ "price": 1300,
+ "accent": "#a8743f",
+ "description": "A fluffy teddy bear riding on your back.",
+ "bone": "body",
+ "mirror": null,
+ "tint": true
+}

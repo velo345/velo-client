@@ -270,7 +270,7 @@ function main() {
 		"## Pages", "",
 		`- [Features](${siteUrl}/features): ${config.counts.modules} free modules (HUD, PvP, performance, quality of life, server tools) and Velo+`,
 		`- [Download](${siteUrl}/download): launcher for Windows (.exe) and Linux (.deb), mod jars for every version`,
-		`- [Store](${siteUrl}/store): cosmetic wings, capes and auras bought with Velo Coins`,
+		`- [Store](${siteUrl}/store): cosmetic wings, cloaks and auras bought with Velo Coins`,
 		`- [News](${siteUrl}/news): release notes`,
 		`- [FAQ](${siteUrl}/#faq)`, "",
 		"## Legal", "",

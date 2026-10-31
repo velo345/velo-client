@@ -1,0 +1,10 @@
+{
+ "slot": "feet",
+ "name": "Runners",
+ "price": 1100,
+ "accent": "#2bd9a0",
+ "description": "Light mint running shoes with a thick foam sole.",
+ "bone": "rightLeg",
+ "mirror": "leftLeg",
+ "tint": true
+}

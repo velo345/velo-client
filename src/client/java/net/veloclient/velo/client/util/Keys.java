@@ -220,10 +220,16 @@ public final class Keys {
 		//?}
 	}
 
-	/** 0 = off, 1 = on, -1 = adaptive. A no-op from 26.3 (SDL + the new renderer pick the present mode from the VSync option). */
+	/**
+	 * 0 = off, 1 = on, -1 = adaptive. A no-op from 26.3 (SDL + the new renderer pick the present mode from the VSync
+	 * option), and on 26.2's Vulkan backend: there's no OpenGL context to set it on (GLFW logged a GL error every
+	 * start), and the present mode follows the VSync option there too.
+	 */
 	public static void setSwapInterval(int interval) {
 		//? if <26.3 {
-		GLFW.glfwSwapInterval(interval);
+		if (GLFW.glfwGetCurrentContext() != 0L) {
+			GLFW.glfwSwapInterval(interval);
+		}
 		//?}
 	}
 }

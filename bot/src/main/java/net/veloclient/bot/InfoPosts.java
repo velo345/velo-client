@@ -72,14 +72,14 @@ final class InfoPosts {
 				files.add(file("free-cape.png"));
 				files.add(file("link-steps.png"));
 				embeds.add(new EmbedBuilder().setColor(0x29E0FF).setImage("attachment://free-cape.png").build());
-				embeds.add(new EmbedBuilder().setColor(0x29E0FF).setTitle("🧥  Claim the free Velo Neon cape")
-						.setDescription("Link your Minecraft account to this Discord and the animated **Velo Neon** cape is yours - it's not sold anywhere else.")
+				embeds.add(new EmbedBuilder().setColor(0x29E0FF).setTitle("🧥  Claim the free Velo Neon cloak")
+						.setDescription("Link your Minecraft account to this Discord and the animated **Velo Neon** cloak is yours - it's not sold anywhere else.")
 						.addField("1 · Open the Store", "In the **Velo Launcher** go to **Store** (in game: **Store → Link Discord**).", false)
 						.addField("2 · Copy your code", "Press **Copy link code**. You get a one-time code like `VELO-AB12CD`.", false)
 						.addField("3 · Paste it here", "Paste the code in " + link + " (or use **/link**). The message is deleted right away and the bot answers you privately.", false)
 						.addField("4 · Wear it", "Done! Open **Cosmetics** and equip **Velo Neon**. Everyone with Velo Client sees it.", false)
 						.setImage("attachment://link-steps.png")
-						.setFooter("Unlinking (/unlink) removes the cape again.").build());
+						.setFooter("Unlinking (/unlink) removes the cloak again.").build());
 			}
 			case "boosters" -> {
 				files.add(file("boosters.png"));
@@ -87,7 +87,7 @@ final class InfoPosts {
 				embeds.add(new EmbedBuilder().setColor(0xF47FFF).setTitle("💖  Boost the server, get rewarded")
 						.setDescription("Boosting keeps Velo Client growing - and as a thank-you you get:")
 						.addField("⭐ 14 days of Velo+", "Every perk of Velo+ on your account, for every boost.", true)
-						.addField("💎 Booster cape", "An exclusive animated cape - yours to keep.", true)
+						.addField("💎 Booster cloak", "An exclusive animated cloak - yours to keep.", true)
 						.addField("🎀 Booster role", "A shiny name in the member list.", true)
 						.addField("How to claim", "1. Boost the server.\n2. Make sure your account is linked (paste your code from **Store → Copy link code** in " + link + ").\n"
 								+ "3. Press **Claim booster reward** below.", false)

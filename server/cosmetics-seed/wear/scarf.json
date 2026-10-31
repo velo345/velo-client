@@ -1,0 +1,10 @@
+{
+ "slot": "neck",
+ "name": "Knit Scarf",
+ "price": 1000,
+ "accent": "#c62b35",
+ "description": "A thick, cosy knit scarf wrapped round your neck, the ends hanging down.",
+ "bone": "body",
+ "mirror": null,
+ "tint": true
+}

@@ -1,0 +1,10 @@
+{
+ "slot": "face",
+ "name": "Aviators",
+ "price": 1000,
+ "accent": "#e2bd62",
+ "description": "Gold-framed aviator sunglasses with dark lenses - recolour the frame.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

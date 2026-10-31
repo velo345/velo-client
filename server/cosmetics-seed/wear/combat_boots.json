@@ -1,0 +1,10 @@
+{
+ "slot": "feet",
+ "name": "Combat Boots",
+ "price": 1300,
+ "accent": "#22201f",
+ "description": "Tall black leather boots with a chunky lug sole.",
+ "bone": "rightLeg",
+ "mirror": "leftLeg",
+ "tint": true
+}

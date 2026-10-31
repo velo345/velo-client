@@ -41,6 +41,8 @@ public final class StoreApi {
 		return walletLoaded;
 	}
 	private static volatile boolean owner;
+	private static volatile boolean welcomeGift;
+	private static volatile long welcomeGiftUntil;
 
 	private StoreApi() {
 	}
@@ -134,10 +136,21 @@ public final class StoreApi {
 		return applyWallet(get("/v1/store/wallet"));
 	}
 
+	/** Buys {@code itemId} - or, while this account still has its 1.0 welcome gift, takes a single item as that, free. */
 	public static JsonObject buy(String itemId) throws StoreError {
 		JsonObject body = new JsonObject();
 		body.addProperty("itemId", itemId);
-		return applyWallet(post("/v1/store/buy", body));
+		boolean gift = welcomeGift && !itemId.startsWith("bundle:");
+		return applyWallet(post(gift ? "/v1/store/welcome-gift" : "/v1/store/buy", body));
+	}
+
+	/** The 1.0 welcome gift: this account may still pick one Store cosmetic for free (the next single item it gets). */
+	public static boolean welcomeGift() {
+		return welcomeGift;
+	}
+
+	public static long welcomeGiftUntil() {
+		return welcomeGiftUntil;
 	}
 
 	public static JsonObject checkout(String packId) throws StoreError {
@@ -183,6 +196,13 @@ public final class StoreApi {
 		body.addProperty("amount", amount);
 		body.addProperty("note", note);
 		return post("/v1/admin/store/coins", body);
+	}
+
+	/** Owner: gives a player every cosmetic that isn't hidden (testing ones too). */
+	public static JsonObject adminGrantAll(String target) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.addProperty("target", target);
+		return post("/v1/admin/store/grant-all", body);
 	}
 
 	public static JsonObject adminItem(String target, String itemId, boolean grant) throws StoreError {
@@ -577,6 +597,8 @@ public final class StoreApi {
 	private static JsonObject applyWallet(JsonObject wallet) {
 		balance = wallet.get("balance").getAsInt();
 		owner = wallet.has("owner") && wallet.get("owner").getAsBoolean();
+		welcomeGift = wallet.has("welcomeGift") && wallet.get("welcomeGift").getAsBoolean();
+		welcomeGiftUntil = wallet.has("welcomeGiftUntil") ? wallet.get("welcomeGiftUntil").getAsLong() : 0;
 		Set<String> items = new HashSet<>();
 		wallet.getAsJsonArray("owned").forEach(e -> items.add(e.getAsString()));
 		owned = Set.copyOf(items);

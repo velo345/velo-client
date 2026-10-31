@@ -23,7 +23,7 @@ public final class CapeImportDialog {
 
 	public static Optional<Result> show(Stage owner) {
 		FileChooser chooser = new FileChooser();
-		chooser.setTitle("Choose a cape texture (PNG, 2:1 ratio, " + CapeLibrary.TEXTURE_WIDTH + "x" + CapeLibrary.TEXTURE_HEIGHT
+		chooser.setTitle("Choose a cloak texture (PNG, 2:1 ratio, " + CapeLibrary.TEXTURE_WIDTH + "x" + CapeLibrary.TEXTURE_HEIGHT
 				+ " up to " + CapeLibrary.MAX_TEXTURE_WIDTH + "x" + CapeLibrary.MAX_TEXTURE_HEIGHT + ")");
 		if (net.veloclient.launcher.social.StoreApi.isPlusCached()) {
 			// Velo+: animated custom capes - every Velo player sees them move.
@@ -37,7 +37,7 @@ public final class CapeImportDialog {
 
 		Dialog<Result> dialog = new Dialog<>();
 		dialog.initOwner(owner);
-		dialog.setTitle("Import Cape");
+		dialog.setTitle("Import Cloak");
 		dialog.setHeaderText("Configure \"" + file.getName() + "\"");
 		DialogStyling.apply(dialog);
 
@@ -64,7 +64,7 @@ public final class CapeImportDialog {
 		grid.addRow(row++, new Label("Segments (perf vs fidelity)"), segments);
 
 		dialog.getDialogPane().setContent(grid);
-		ButtonType confirm = new ButtonType("Import cape", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+		ButtonType confirm = new ButtonType("Import cloak", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
 		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, confirm);
 
 		dialog.setResultConverter(button -> {
@@ -74,7 +74,7 @@ public final class CapeImportDialog {
 			CapePhysicsPresetData preset = new CapePhysicsPresetData(
 					(float) stiffness.getValue(), (float) gravity.getValue(), (float) damping.getValue(),
 					(float) wind.getValue(), (int) Math.round(segments.getValue()));
-			return new Result(nameField.getText().isBlank() ? "Cape" : nameField.getText(), file.toPath(), preset);
+			return new Result(nameField.getText().isBlank() ? "Cloak" : nameField.getText(), file.toPath(), preset);
 		});
 
 		return dialog.showAndWait();

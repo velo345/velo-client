@@ -1,0 +1,10 @@
+{
+ "slot": "neck",
+ "name": "Fine Gold Chain",
+ "price": 1000,
+ "accent": "#f0c64d",
+ "description": "A thin, delicate gold chain - subtle, it swings a little as you move.",
+ "bone": "body",
+ "mirror": null,
+ "tint": true
+}

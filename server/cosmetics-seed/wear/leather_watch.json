@@ -1,0 +1,10 @@
+{
+ "slot": "wrist",
+ "name": "Classic Watch",
+ "price": 1100,
+ "accent": "#6b3d1f",
+ "description": "A silver watch with a cream dial on a brown leather strap.",
+ "bone": "leftArm",
+ "mirror": null,
+ "tint": true
+}

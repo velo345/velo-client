@@ -5,6 +5,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
+import net.veloclient.velo.client.gui.widget.VeloButton;
 import net.veloclient.velo.client.gui.widget.VeloDraw;
 import net.veloclient.velo.client.gui.widget.VeloStyle;
 import net.veloclient.velo.client.gui.widget.VeloUi;
@@ -14,7 +15,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Pick a .veloschem / .litematic to load into Redstone Mode's clipboard (Ctrl+L), with a search over the file names. */
+/**
+ * Pick a .veloschem / .litematic to load as a preview (Ctrl+L), with a search over the file names, and the other schematic
+ * actions right below the list: save the selection, open the folder, browse community schematics.
+ */
 public final class SchematicPickScreen extends VeloWindow {
 
 	private final List<VeloUi.Hit> hits = new ArrayList<>();
@@ -24,6 +28,7 @@ public final class SchematicPickScreen extends VeloWindow {
 	private String query = "";
 
 	private static final int SEARCH_H = 18;
+	private static final int ACTIONS_H = 26;
 
 	public SchematicPickScreen(Screen parent) {
 		super(Text.literal("Load Schematic"), 420, 320);
@@ -45,6 +50,24 @@ public final class SchematicPickScreen extends VeloWindow {
 		});
 		addDrawableChild(search);
 		setInitialFocus(search);
+		int third = (contentWidth() - 8) / 3;
+		int by = contentBottom() - 20;
+		addDrawableChild(new VeloButton(contentX(), by, third, 20, Text.literal(RmState.hasSelection() ? "Save selection" : "Save selection..."),
+				b -> {
+					closeToGame();
+					RmInput.saveSelection();
+				}));
+		addDrawableChild(new VeloButton(contentX() + third + 4, by, third, 20, Text.literal("Open folder"), b -> {
+			try {
+				java.nio.file.Files.createDirectories(SchematicIO.veloFolder());
+			} catch (java.io.IOException ignored) {
+				// Opening reports it.
+			}
+			net.veloclient.velo.client.gui.FileManagerOpener.open(SchematicIO.veloFolder().toFile(), RmState::info);
+		}));
+		addDrawableChild(new VeloButton(contentX() + (third + 4) * 2, by, contentWidth() - (third + 4) * 2, 20, Text.literal("Community..."),
+				b -> net.minecraft.client.MinecraftClient.getInstance()
+						.setScreen(new net.veloclient.velo.client.gui.CommunitySchematicsScreen(null))));
 	}
 
 	/** Files whose name has every word of the search in it (any order, ignoring case, _ and - count as spaces). */
@@ -78,7 +101,8 @@ public final class SchematicPickScreen extends VeloWindow {
 		int y = contentY();
 		int w = contentWidth();
 		if (files.isEmpty()) {
-			for (String line : VeloUi.wrap("No schematics yet. Save one with Ctrl+S in Redstone Mode, or put .litematic files in .minecraft/schematics.",
+			for (String line : VeloUi.wrap("No schematics yet. Select an area in Redstone Mode and press Save, or put .litematic"
+					+ " files in .minecraft/schematics.",
 					w)) {
 				context.drawTextWithShadow(this.textRenderer, line, x, y, VeloUi.muted());
 				y += 11;
@@ -87,7 +111,7 @@ public final class SchematicPickScreen extends VeloWindow {
 		}
 		List<Path> files = shown();
 		int top = y + SEARCH_H + 6;
-		int bottom = contentBottom();
+		int bottom = contentBottom() - ACTIONS_H;
 		if (files.isEmpty()) {
 			context.drawTextWithShadow(this.textRenderer, VeloUi.trim("Nothing matches \"" + query + "\"", w), x, top + 4, VeloUi.muted());
 			return;

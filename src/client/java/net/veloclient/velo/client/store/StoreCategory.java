@@ -3,7 +3,7 @@ package net.veloclient.velo.client.store;
 /** A tab in the Store's left-hand category list. Only {@link #CAPES} exists today - built to grow. */
 public enum StoreCategory {
 
-	CAPES("Capes");
+	CAPES("Cloaks");
 
 	private final String displayName;
 

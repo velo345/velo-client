@@ -30,7 +30,7 @@ public final class DressedPlayer {
 			return CapeLibrary.equippedCapeId().flatMap(id -> CapeLibrary.listAll().stream().filter(c -> c.id().equals(id)).findFirst())
 					.map(CosmeticUi::viewerFrames).orElse(null);
 		} catch (RuntimeException e) {
-			LauncherLog.warn("Could not read the equipped cape", e);
+			LauncherLog.warn("Could not read the equipped cloak", e);
 			return null;
 		}
 	}

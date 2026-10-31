@@ -788,6 +788,9 @@ public final class OwnerScreen extends VeloWindow {
 		int rx = x + leftWidth + 14;
 		int rw = x + width - rx;
 		MenuKit.text(context, this.textRenderer, MenuKit.uiBold("Cosmetics"), rx, ly, MenuKit.TEXT);
+		// For testing: every cosmetic that isn't hidden (testing ones too), in one go.
+		hits.add(VeloUi.pill(context, rx + rw - 104, ly - 2, 100, 14, "Give everything", 1, mouseX, mouseY,
+				() -> playerCall("Giving everything...", uuid(), StoreClient::adminGrantAll)));
 		String query = text("p.give").toLowerCase(Locale.ROOT);
 		boolean giving = !query.isEmpty();
 		List<String> ids = new ArrayList<>();

@@ -109,6 +109,7 @@ final class MinimapManager {
 			return;
 		}
 
+		net.veloclient.velo.client.privacy.MinimapPrivacy.apply(pendingImage, passCenterX, passCenterZ);
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (texture == null || texture.getImage().getWidth() != size) {
 			if (texture != null) {

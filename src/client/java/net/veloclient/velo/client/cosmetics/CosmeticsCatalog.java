@@ -39,9 +39,10 @@ import java.util.concurrent.Executors;
  */
 public final class CosmeticsCatalog {
 
+	/** {@code slot}, {@code bone}, {@code mirrorBone}: bodywear only - where it's worn (see {@code WearManager}). */
 	public record Item(String id, String type, String name, String description, int price, String collection, Integer accent,
 			String style, Float scale, Float offsetY, boolean glow, Map<String, String> files, boolean inStore, Long availableUntil,
-			String status) {
+			String status, String slot, String bone, String mirrorBone) {
 	}
 
 	public record Collection(String id, String name, String tag, String description) {
@@ -239,7 +240,9 @@ public final class CosmeticsCatalog {
 				string(o, "style", null), has(o, "scale") ? o.get("scale").getAsFloat() : null,
 				has(o, "offsetY") ? o.get("offsetY").getAsFloat() : null, has(o, "glow") && o.get("glow").getAsBoolean(), Map.copyOf(files),
 				has(o, "inStore") && o.get("inStore").getAsBoolean(), has(o, "availableUntil") ? o.get("availableUntil").getAsLong() : null,
-				string(o, "status", null));
+				string(o, "status", null), string(o, "slot", null),
+				has(o, "model") && o.get("model").isJsonObject() ? string(o.getAsJsonObject("model"), "bone", null) : null,
+				has(o, "model") && o.get("model").isJsonObject() ? string(o.getAsJsonObject("model"), "mirror", null) : null);
 	}
 
 	private static boolean has(JsonObject o, String key) {

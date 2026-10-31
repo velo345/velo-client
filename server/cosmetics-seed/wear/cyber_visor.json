@@ -1,0 +1,10 @@
+{
+ "slot": "face",
+ "name": "Cyber Visor",
+ "price": 1500,
+ "accent": "#26f0ff",
+ "description": "A wrap-around visor with a glowing cyan light strip.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

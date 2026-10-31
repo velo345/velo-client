@@ -116,7 +116,7 @@ public final class RemoteCapeCache {
 			WAITING.add(capeId);
 			IN_FLIGHT_OR_FAILED_AT.put(capeId, System.currentTimeMillis());
 		} catch (Exception e) {
-			VeloClient.LOGGER.debug("Could not load remote cape {}", capeId, e);
+			VeloClient.LOGGER.debug("Could not load remote cloak {}", capeId, e);
 			// Negative = "failed at"; resolve() retries after RETRY_AFTER_FAILURE_MILLIS (a server
 			// that was briefly unreachable shouldn't hide that cape for the whole session).
 			IN_FLIGHT_OR_FAILED_AT.put(capeId, -System.currentTimeMillis());
@@ -127,11 +127,11 @@ public final class RemoteCapeCache {
 		Optional<StoreItem> item = StoreCatalog.byId(capeCatalogId);
 		if (item.isEmpty()) {
 			// Maybe a cape added on the server that this client hasn't heard of yet - byId asked for it, retry later.
-			throw new NotYet("Unknown store cape (yet): " + capeCatalogId);
+			throw new NotYet("Unknown store cloak (yet): " + capeCatalogId);
 		}
 		byte[] gif;
 		if (!StoreAssets.ready(item.get())) {
-			throw new NotYet("Store cape art still downloading: " + capeCatalogId);
+			throw new NotYet("Store cloak art still downloading: " + capeCatalogId);
 		}
 		try (InputStream in = StoreAssets.openGif(item.get())) {
 			gif = in.readAllBytes();
@@ -143,7 +143,7 @@ public final class RemoteCapeCache {
 				CapePhysicsPreset.defaults(), false, true, capeCatalogId);
 		MinecraftClient.getInstance().execute(() -> {
 			try {
-				AnimatedCapeAsset.registerDecoded(capeCatalogId, decoded);
+				AnimatedCapeAsset.registerDecoded(capeCatalogId, decoded, true);
 				RESOLVED.put(capeCatalogId, Optional.of(definition));
 			} catch (IOException | RuntimeException e) {
 				IN_FLIGHT_OR_FAILED_AT.put(capeCatalogId, -System.currentTimeMillis());
@@ -166,13 +166,13 @@ public final class RemoteCapeCache {
 		}
 		String definitionId = "remote_" + hash;
 		boolean gif = bytes.length > 3 && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F';
-		CapeDefinition definition = new CapeDefinition(definitionId, "Custom cape", cached,
+		CapeDefinition definition = new CapeDefinition(definitionId, "Custom cloak", cached,
 				CapePhysicsPreset.defaults(), false, gif, null);
 		if (gif) {
 			GifDecoder.Result decoded = GifDecoder.decode(new ByteArrayInputStream(bytes));
 			MinecraftClient.getInstance().execute(() -> {
 				try {
-					AnimatedCapeAsset.registerDecoded(definitionId, decoded);
+					AnimatedCapeAsset.registerDecoded(definitionId, decoded, true);
 					RESOLVED.put(capeId, Optional.of(definition));
 				} catch (IOException | RuntimeException e) {
 					IN_FLIGHT_OR_FAILED_AT.put(capeId, -System.currentTimeMillis());
@@ -183,7 +183,7 @@ public final class RemoteCapeCache {
 		NativeImage image = capeHalf(NativeImage.read(new ByteArrayInputStream(bytes)));
 		MinecraftClient.getInstance().execute(() -> {
 			try {
-				CapeManager.registerPreloadedTexture(definitionId, image, "remote cape " + hash);
+				CapeManager.registerPreloadedTexture(definitionId, image, "remote cloak " + hash);
 				CapeManager.composeElytraFor(definitionId, image);
 				RESOLVED.put(capeId, Optional.of(definition));
 			} catch (RuntimeException e) {
@@ -222,15 +222,15 @@ public final class RemoteCapeCache {
 		HttpResponse<InputStream> response = HTTP.send(request, HttpResponse.BodyHandlers.ofInputStream());
 		try (InputStream in = response.body()) {
 			if (response.statusCode() != 200) {
-				throw new IOException("Cape download returned " + response.statusCode());
+				throw new IOException("Cloak download returned " + response.statusCode());
 			}
 			byte[] bytes = in.readNBytes(MAX_DOWNLOAD_BYTES + 1);
 			if (bytes.length > MAX_DOWNLOAD_BYTES) {
-				throw new IOException("Cape download too large");
+				throw new IOException("Cloak download too large");
 			}
 			// Content-addressed: whatever came back must hash to the id we asked for.
 			if (!hash.equals(sha256(bytes))) {
-				throw new IOException("Cape download failed its integrity check");
+				throw new IOException("Cloak download failed its integrity check");
 			}
 			return bytes;
 		}

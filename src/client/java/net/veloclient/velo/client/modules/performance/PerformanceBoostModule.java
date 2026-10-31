@@ -82,6 +82,11 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	 * render-thread time. Read by the GuiLayer* and VulkanDrawState mixins.
 	 */
 	public static volatile boolean fastDrawPath = true;
+	/**
+	 * Light cosmetics, for weaker PCs: wings keep their wingbeat but drop their extra effects (moving arms, glow,
+	 * shine, particles), auras draw fewer particles.
+	 */
+	public static volatile boolean lightCosmetics = false;
 
 	private static final List<String> PRESETS = List.of("Auto", "Default", "Max FPS", "Performance", "Medium Quality", "High Quality");
 	/** Quality steps Auto moves through, best first. */
@@ -436,6 +441,8 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				}),
 				new ConfigField.ToggleField("HUD Caching (~20Hz overlay updates)", () -> hudCachingEnabled, v -> hudCachingEnabled = v),
 				new ConfigField.ToggleField("Fast Draw Path (GUI layering + Vulkan draw state)", () -> fastDrawPath, v -> fastDrawPath = v),
+				new ConfigField.ToggleField("Light Cosmetics (wings without extra effects, fewer aura particles)", () -> lightCosmetics,
+						v -> lightCosmetics = v),
 				new ConfigField.ToggleField("Uncapped Rendering (decoupled present, Vulkan)", () -> decoupledPresent, v -> decoupledPresent = v),
 				new ConfigField.ChoiceField("VSync Mode", List.of("Off", "On", "Adaptive"), () -> vsyncMode, this::applyVsyncMode),
 				new ConfigField.SliderField("Max FPS", 10, 260,

@@ -16,10 +16,10 @@ public final class StorePurchase {
 	/** {@code onDone} runs on the client thread with null on success, else the message to show. */
 	public static void buy(StoreItem item, Consumer<String> onDone) {
 		if (StoreClient.owns(item.id())) {
-			onDone.accept("You already own this cape.");
+			onDone.accept("You already own this cloak.");
 			return;
 		}
-		StoreClient.buy(item.id(), () -> {
+		StoreClient.buyOrClaim(item.id(), () -> {
 			StoreRestore.restoreMissing();
 			onDone.accept(null);
 		}, onDone);

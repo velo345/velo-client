@@ -51,6 +51,11 @@ float velo_glass_clarity() {
     return float(velo_extra() & 255u) / 255.0;
 }
 
+// Byte 2 of VeloSun.z: 0 overworld (sun & sky), 1 nether, 2 end - no sky there, so no sun or sky light either.
+uint velo_dimension() {
+    return (velo_extra() >> 16u) & 255u;
+}
+
 float velo_redstone_glow() {
     return float((velo_extra() >> 8u) & 255u) / 255.0;
 }
@@ -257,6 +262,13 @@ vec4 velo_shade(vec3 albedo, vec2 light, float ndl) {
     float day = VeloSun.w;
     vec3 ambient = velo_skylight() * skyCurve * mix(0.62, 0.34, day) * (0.7 + 0.3 * velo_side_shading_soft(ndl));
     vec3 sun = velo_sunlight() * skyCurve * skyCurve * max(ndl, 0.0) * mix(0.58, 0.88, day);
+    uint dimension = velo_dimension();
+    if (dimension != 0u) {
+        // Nether / End: no sky light and no sun - a steady ambient like vanilla's, warm in the nether, violet in the end.
+        vec3 dimAmbient = dimension == 1u ? vec3(0.090, 0.062, 0.046) : vec3(0.062, 0.056, 0.088);
+        ambient = dimAmbient * (0.7 + 0.3 * velo_side_shading_soft(ndl));
+        sun = vec3(0.0);
+    }
     vec3 blockLight = velo_blocklight_color() * blockCurve;
     vec3 minimum = vec3(0.045, 0.047, 0.058);
     vec3 total = ambient + sun + blockLight + minimum;

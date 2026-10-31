@@ -49,6 +49,8 @@ public final class StoreClient {
 	private static volatile boolean owner;
 	private static volatile boolean plus;
 	private static volatile long plusUntil;
+	private static volatile boolean welcomeGift;
+	private static volatile long welcomeGiftUntil;
 	private static volatile double plusPrice = 9.99;
 	private static volatile int plusMonthlyCoins = 2000;
 	private static volatile boolean plusTrialAvailable;
@@ -115,6 +117,15 @@ public final class StoreClient {
 	}
 
 	/** When your Velo+ ends (epoch millis), 0 if you're not a member. */
+	/** The 1.0 welcome gift: this account may still pick one Store cosmetic for free. */
+	public static boolean welcomeGift() {
+		return welcomeGift;
+	}
+
+	public static long welcomeGiftUntil() {
+		return welcomeGiftUntil;
+	}
+
 	public static long plusUntil() {
 		return plusUntil;
 	}
@@ -226,6 +237,30 @@ public final class StoreClient {
 		}, onError);
 	}
 
+	/** A single item's action: the free welcome gift while it's available, otherwise a normal coin purchase. */
+	public static void buyOrClaim(String itemId, Runnable onOk, Consumer<String> onError) {
+		if (welcomeGift) {
+			claimWelcomeGift(itemId, onOk, onError);
+		} else {
+			buy(itemId, onOk, onError);
+		}
+	}
+
+	/** The label for a single item's buy button (the welcome gift makes it free). */
+	public static String buyLabel(int price) {
+		return welcomeGift ? "Claim free - welcome gift" : String.format(java.util.Locale.ROOT, "Buy for %,d Velo Coins", price);
+	}
+
+	/** Takes {@code itemId} as this account's free welcome gift (once). */
+	public static void claimWelcomeGift(String itemId, Runnable onOk, Consumer<String> onError) {
+		JsonObject body = new JsonObject();
+		body.addProperty("itemId", itemId);
+		async(() -> post("/v1/store/welcome-gift", body), wallet -> {
+			applyWallet(wallet);
+			onOk.run();
+		}, onError);
+	}
+
 	/** Starts a coin-pack checkout; {@code onUrl} gets the Tebex payment page + order id. */
 	public static void checkout(String packId, java.util.function.BiConsumer<String, String> onUrl, Consumer<String> onError) {
 		JsonObject body = new JsonObject();
@@ -322,6 +357,13 @@ public final class StoreClient {
 	/** A code to type as {@code /link <code>} in the Velo Discord (unlocks the Velo Neon cape). */
 	public static void discordCode(Consumer<JsonObject> onOk, Consumer<String> onError) {
 		async(() -> post("/v1/discord/code", new JsonObject()), onOk, onError);
+	}
+
+	/** Gives a player every cosmetic that isn't hidden (testing ones too) - for testing. */
+	public static void adminGrantAll(String target, Consumer<JsonObject> onOk, Consumer<String> onError) {
+		JsonObject body = new JsonObject();
+		body.addProperty("target", target);
+		async(() -> post("/v1/admin/store/grant-all", body), onOk, onError);
 	}
 
 	/** Gives ({@code grant}) or takes away a cosmetic (any status - testing items too). */
@@ -473,6 +515,8 @@ public final class StoreClient {
 		boolean wasPlus = plus;
 		plus = wallet.has("plus") && wallet.get("plus").getAsBoolean();
 		plusUntil = wallet.has("plusUntil") ? wallet.get("plusUntil").getAsLong() : 0;
+		welcomeGift = wallet.has("welcomeGift") && wallet.get("welcomeGift").getAsBoolean();
+		welcomeGiftUntil = wallet.has("welcomeGiftUntil") ? wallet.get("welcomeGiftUntil").getAsLong() : 0;
 		if (plus && !wasPlus || !proofFetched) {
 			// Once per start, and again when you just became a member: the signed proof the offline checks use.
 			proofFetched = true;

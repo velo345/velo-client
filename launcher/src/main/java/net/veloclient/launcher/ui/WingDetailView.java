@@ -82,6 +82,7 @@ public final class WingDetailView {
 		String feel = switch (type.style()) {
 			case "bat" -> "Leathery, snappy wingbeats";
 			case "crystal" -> "Stiff, slow and heavy wingbeats";
+			case "tentacle" -> "Writhing tentacles that curl and whip one by one";
 			default -> "Soft, flowing feathers";
 		};
 		List<String> bullets = List.of(feel + ", animated with how you move", "Seen by every Velo Client player",

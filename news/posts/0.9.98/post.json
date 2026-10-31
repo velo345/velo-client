@@ -1,0 +1,38 @@
+{
+ "title": "Velo Client 0.9.98: Now Playing",
+ "summary": "See what's playing without leaving Minecraft: a popup with the cover when the song changes, and play, skip and volume right in the R-Shift menu. Plus two launcher fixes.",
+ "tag": "Update",
+ "version": "0.9.98",
+ "accent": "#ff3b44",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "heading",
+   "text": "Your music, in game"
+  },
+  {
+   "type": "text",
+   "text": "The new **Media Player** module shows a small popup with the cover, title and artist whenever the song changes - from Spotify, YouTube Music, your browser or any other player. It uses your computer's media controls, so there's nothing to log in to."
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Controls in the R-Shift menu**: play / pause, previous and next, and a clean volume slider.",
+    "**Always in sync**: skip or pause on your phone, keyboard or in the app and the controls follow.",
+    "Turn it on under **Modules > Media Player** - choose where the popup shows and how long."
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Fixes"
+  },
+  {
+   "type": "list",
+   "items": [
+    "Launcher: your own **Velo+ Home background** no longer sometimes disappears and falls back to the island.",
+    "Launcher: sign-in codes for the Velo staff panel show up right away."
+   ]
+  }
+ ]
+}

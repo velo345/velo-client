@@ -68,6 +68,7 @@ final class StaffSync {
 
 	static int rank(String level) {
 		return switch (level == null ? "" : level) {
+			case "manager" -> 3;
 			case "admin" -> 2;
 			case "mod" -> 1;
 			default -> 0;
@@ -84,7 +85,7 @@ final class StaffSync {
 			Map<String, java.util.Set<String>> holders = RoleHolders.of(jda, guild.getId(), config.staffRoles.keySet());
 			for (Map.Entry<String, java.util.Set<String>> member : holders.entrySet()) {
 				for (String roleId : member.getValue()) {
-					// Several staff roles: the highest level wins (admin > mod > helper).
+					// Several staff roles: the highest level wins (manager > admin > mod > helper).
 					String level = config.staffRoles.get(roleId);
 					String previous = levels.get(member.getKey());
 					if (previous == null || rank(level) > rank(previous)) {

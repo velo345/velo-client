@@ -1,0 +1,10 @@
+{
+ "slot": "neck",
+ "name": "Gold Cross Chain",
+ "price": 1200,
+ "accent": "#e8b93f",
+ "description": "A gold chain with a small cross hanging at the bottom.",
+ "bone": "body",
+ "mirror": null,
+ "tint": true
+}

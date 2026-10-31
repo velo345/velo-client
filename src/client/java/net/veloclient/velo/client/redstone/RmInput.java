@@ -10,7 +10,9 @@ import net.veloclient.velo.client.util.Keys;
  * <p>Always (while the mode is on): R leaves, a Left Alt tap frees the mouse for the overlay
  * (Alt+scroll switches tools), F7 freezes, F9 hides the overlay, K records / replays, End stops a
  * running paste, and the arrow keys step ticks while frozen or scrub a replay. Middle click on a
- * schematic preview block picks it from your inventory.
+ * schematic preview block picks it from your inventory. Ctrl+L loads a schematic (saving is a button - Ctrl+S would fire while sprinting backwards).
+ *
+ * <p>Without editing rights (see {@link RedstoneMode#canEdit}) only Select exists: the slot selects an area to save.
  *
  * <p>Only while the Redstone slot is selected in the hotbar (every other slot plays normally):
  * <ul>
@@ -31,7 +33,7 @@ import net.veloclient.velo.client.util.Keys;
  */
 public final class RmInput {
 
-	private static final char[] CTRL_KEYS = {'C', 'X', 'V', 'Y', 'Z'};
+	private static final char[] CTRL_KEYS = {'C', 'X', 'V', 'Y', 'Z', 'L'};
 	private static final boolean[] WAS_DOWN = new boolean[CTRL_KEYS.length];
 	private static boolean deleteDown;
 	private static boolean enterDown;
@@ -39,6 +41,9 @@ public final class RmInput {
 	private static boolean scrollRegistered;
 	private static boolean altDown;
 	private static boolean altScrolled;
+	/** Ticks left in which a picked schematic block is kept in hand (see {@link #guardPick}). */
+	private static int pickGuard;
+	private static int pickRetries;
 
 	private RmInput() {
 	}
@@ -57,6 +62,7 @@ public final class RmInput {
 					RmKeys.TOOL_COPY, RmKeys.TOOL_STACK, RmKeys.TOOL_WIRE, RmKeys.TOOL_WATER, RmKeys.STEP, RmKeys.BACK, RmKeys.PLAY, RmKeys.REWIND);
 			return;
 		}
+		guardPick();
 		RmAnalysis.tick();
 		Placements.tick();
 		Timeline.tick();
@@ -100,7 +106,8 @@ public final class RmInput {
 		boolean ctrl = RmKeys.ctrl();
 		for (int i = 0; i < CTRL_KEYS.length; i++) {
 			boolean down = Keys.isKeyDown(Keys.letter(CTRL_KEYS[i]));
-			if (down && !WAS_DOWN[i] && ctrl && held) {
+			boolean file = CTRL_KEYS[i] == 'L';
+			if (down && !WAS_DOWN[i] && ctrl && (held || file)) {
 				onCtrl(CTRL_KEYS[i]);
 			}
 			WAS_DOWN[i] = down;
@@ -135,12 +142,27 @@ public final class RmInput {
 			case 'V' -> startPaste();
 			case 'Z' -> RmOps.undo();
 			case 'Y' -> RmOps.redo();
+			case 'L' -> MinecraftClient.getInstance().setScreen(new SchematicPickScreen(null));
 			default -> {
 			}
 		}
 	}
 
+	/** Opens the save dialog for the selection (the toolbar's Save button). */
+	public static void saveSelection() {
+		if (RmState.hasSelection()) {
+			MinecraftClient.getInstance().setScreen(new SchematicSaveScreen());
+		} else {
+			RedstoneMode.selectTool(RmState.Tool.SELECT);
+			RmState.error("Select an area first - left click one corner, right click the other");
+		}
+	}
+
 	public static void startPaste() {
+		if (!RedstoneMode.canEdit()) {
+			RmState.error("Pasting needs singleplayer creative");
+			return;
+		}
 		if (RmOps.clipboard() == null) {
 			RmState.error("Clipboard is empty - copy a selection first (Ctrl+C)");
 			return;
@@ -344,7 +366,41 @@ public final class RmInput {
 
 	/** Middle click; true when it picked a schematic block. */
 	public static boolean onPick() {
-		return RedstoneMode.active() && ClientCompat.currentScreen() == null && Placements.pickLooked();
+		if (!RedstoneMode.active() || ClientCompat.currentScreen() != null) {
+			return false;
+		}
+		if (pickGuard > 3) {
+			return true; // a second pick right on the heels of one (doubled click) would grab the world block instead
+		}
+		if (!Placements.pickLooked()) {
+			pickGuard = 0; // a normal pick of a real block - don't switch that back
+			return false;
+		}
+		RedstoneMode.setToolSlot(false);
+		pickGuard = 6;
+		pickRetries = 0;
+		return true;
+	}
+
+	/**
+	 * For a few ticks after a schematic pick, keeps that block in hand: something else switching the slot straight back
+	 * (vanilla / Litematica pick block firing on the same click, a server resync) gets undone. A hotbar key ends it.
+	 */
+	private static void guardPick() {
+		if (pickGuard <= 0) {
+			return;
+		}
+		pickGuard--;
+		Object picked = Placements.lastPicked;
+		if (picked == null || RmWorld.hotbarKeysDown() != 0 || ClientCompat.currentScreen() != null) {
+			pickGuard = 0;
+			return;
+		}
+		if (!RmWorld.holdsPickOf(picked) && pickRetries < 2) {
+			pickRetries++;
+			RmWorld.pickItem(picked);
+			RedstoneMode.setToolSlot(false);
+		}
 	}
 
 	// ---- scroll ----
@@ -381,8 +437,9 @@ public final class RmInput {
 		int step = amount > 0 ? 1 : -1;
 		if (RmKeys.CURSOR.isPressed()) {
 			altScrolled = true;
-			RmState.Tool[] tools = RmState.Tool.values();
-			RedstoneMode.selectTool(tools[Math.floorMod(RmState.tool.ordinal() - step, tools.length)]);
+			RmState.Tool[] tools = RedstoneMode.tools();
+			int at = java.util.Arrays.asList(tools).indexOf(RmState.tool);
+			RedstoneMode.selectTool(tools[Math.floorMod(Math.max(0, at) - step, tools.length)]);
 			return;
 		}
 		Placements.Placement following = Placements.following();

@@ -66,9 +66,18 @@ public final class KillEffectsModule extends AbstractModule implements Configura
 
 	private static final List<String> TRIGGER_OPTIONS =
 			List.of("Any Nearby Death", "Player Killed By Player", "Only My Kills");
-	private static final List<String> EFFECT_OPTIONS = List.of(
-			"Lightning Strike", "Color Burst", "Soul Implosion", "Totem Shatter",
-			"Firework Salute", "Void Pull", "Electric Surge", "Confetti Rain");
+	/** "None", the free effects ({@link net.veloclient.velo.client.cosmetics.killfx.KillFxManager#FREE}), and one from the Store. */
+	private static final String NONE = "None";
+	private static final String FROM_STORE = "From the Store (Locker)";
+	private static final List<String> EFFECT_OPTIONS;
+
+	static {
+		List<String> options = new ArrayList<>();
+		options.add(NONE);
+		options.addAll(net.veloclient.velo.client.cosmetics.killfx.KillFxManager.FREE.values());
+		options.add(FROM_STORE);
+		EFFECT_OPTIONS = List.copyOf(options);
+	}
 	private static final List<String> SOUND_OPTIONS = List.of(
 			"Automatic", "Thunder", "Anvil Land", "Totem", "Wither Spawn",
 			"Ender Dragon Death", "Orb Pickup", "Firework Blast");
@@ -80,17 +89,15 @@ public final class KillEffectsModule extends AbstractModule implements Configura
 	private int tickCounter;
 
 	private String trigger = "Only My Kills";
-	private String effect = "Lightning Strike";
 	private String soundOverride = "Automatic";
-	private int effectColor = 0xFFFF3030;
 	private boolean soundEnabled = true;
 	private boolean includeAllEntities = false;
 
 	public KillEffectsModule() {
 		super("kill-effects", "Kill Effects",
 				"Plays a purely client-side visual effect (with optional sound) when a nearby entity dies - "
-						+ "pick when it triggers and which animation/sound plays.",
-				ModuleCategory.COSMETICS, SafetyTag.COSMETIC_ONLY, false);
+						+ "pick when it triggers and which animation/sound plays. A kill effect from the Store, once equipped, plays instead.",
+				ModuleCategory.COSMETICS, SafetyTag.COSMETIC_ONLY, true);
 		ClientTickEvents.END_CLIENT_TICK.register(client ->
 				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
 		AttackEntityCallback.EVENT.register(this::onAttackEntity);
@@ -146,7 +153,14 @@ public final class KillEffectsModule extends AbstractModule implements Configura
 			default -> true;
 		};
 		if (shouldTrigger) {
-			playEffect(client, victim.getX(), victim.getY() + entityHeight(victim) / 2, victim.getZ());
+			// A kill effect from the Store, when one is equipped; otherwise a free one, if one is.
+			if (net.veloclient.velo.client.cosmetics.killfx.KillFxManager.playEquipped(victim.getX(), victim.getY(), victim.getZ(), soundEnabled)) {
+				return;
+			}
+			String free = net.veloclient.velo.client.cosmetics.killfx.KillFxManager.freeEffect();
+			if (free != null) {
+				playEffect(client, free, victim.getX(), victim.getY() + entityHeight(victim) / 2, victim.getZ());
+			}
 		}
 	}
 
@@ -199,7 +213,20 @@ public final class KillEffectsModule extends AbstractModule implements Configura
 	}
 	*///?}
 
-	private void playEffect(MinecraftClient client, double x, double y, double z) {
+	/** Plays a free effect (its name, see {@link net.veloclient.velo.client.cosmetics.killfx.KillFxManager#FREE}) at (x, y, z) - the Locker's "Try it". */
+	public static void preview(String freeId, double x, double y, double z) {
+		String name = net.veloclient.velo.client.cosmetics.killfx.KillFxManager.FREE.get(freeId);
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (name != null && client.world != null) {
+			net.veloclient.velo.module.ModuleRegistry.get("kill-effects").ifPresent(m -> {
+				if (m instanceof KillEffectsModule module) {
+					module.playEffect(client, name, x, y + 0.9, z);
+				}
+			});
+		}
+	}
+
+	private void playEffect(MinecraftClient client, String effect, double x, double y, double z) {
 		switch (effect) {
 			case "Lightning Strike" -> lightningStrike(client, x, y, z);
 			case "Color Burst" -> colorBurst(client, x, y, z);
@@ -237,7 +264,7 @@ public final class KillEffectsModule extends AbstractModule implements Configura
 	}
 
 	private void colorBurst(MinecraftClient client, double x, double y, double z) {
-		int color = effectColor & 0xFFFFFF;
+		int color = net.veloclient.velo.client.cosmetics.killfx.KillFxManager.freeColor() & 0xFFFFFF;
 		for (int wave = 0; wave < 3; wave++) {
 			for (int i = 0; i < 70; i++) {
 				double angle = RANDOM.nextDouble() * Math.PI * 2;
@@ -415,7 +442,7 @@ public final class KillEffectsModule extends AbstractModule implements Configura
 
 	private void playSound(MinecraftClient client, double x, double y, double z, net.minecraft.sound.SoundEvent sound, float volume, float pitch) {
 		if (soundEnabled) {
-			client.world.playSoundClient(x, y, z, sound, SoundCategory.PLAYERS, volume, pitch, false);
+			client.world.playSoundClient(x, y, z, sound, SoundCategory.PLAYERS, volume * net.veloclient.velo.client.cosmetics.killfx.KillFxManager.volume(), pitch, false);
 		}
 	}
 
@@ -462,7 +489,7 @@ public final class KillEffectsModule extends AbstractModule implements Configura
 
 	private void playSound(MinecraftClient client, double x, double y, double z, net.minecraft.sounds.SoundEvent sound, float volume, float pitch) {
 		if (soundEnabled) {
-			client.world.playLocalSound(x, y, z, sound, SoundCategory.PLAYERS, volume, pitch, false);
+			client.world.playLocalSound(x, y, z, sound, SoundCategory.PLAYERS, volume * net.veloclient.velo.client.cosmetics.killfx.KillFxManager.volume(), pitch, false);
 		}
 	}
 
@@ -490,14 +517,38 @@ public final class KillEffectsModule extends AbstractModule implements Configura
 	}
 	*///?}
 
+	/** The Effect setting mirrors what the Locker equipped (shared with the launcher). */
+	private static String effectChoice() {
+		String id = net.veloclient.velo.client.cosmetics.killfx.KillFxManager.equippedId();
+		if (id == null) {
+			return NONE;
+		}
+		String free = net.veloclient.velo.client.cosmetics.killfx.KillFxManager.FREE.get(id);
+		return free != null ? free : FROM_STORE;
+	}
+
+	private static void chooseEffect(String choice) {
+		if (FROM_STORE.equals(choice)) {
+			return;
+		}
+		String id = null;
+		for (var e : net.veloclient.velo.client.cosmetics.killfx.KillFxManager.FREE.entrySet()) {
+			if (e.getValue().equals(choice)) {
+				id = e.getKey();
+			}
+		}
+		net.veloclient.velo.client.cosmetics.killfx.KillFxManager.equip(id);
+	}
+
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
 				new ConfigField.ChoiceField("Trigger", TRIGGER_OPTIONS, () -> trigger, v -> trigger = v),
 				new ConfigField.ToggleField("Include All Entities (not just players)",
 						() -> includeAllEntities, v -> includeAllEntities = v),
-				new ConfigField.ChoiceField("Effect", EFFECT_OPTIONS, () -> effect, v -> effect = v),
-				new ConfigField.ColorField("Effect Color (Color Burst/Confetti)", () -> effectColor, v -> effectColor = v, false),
+				new ConfigField.ChoiceField("Effect", EFFECT_OPTIONS, KillEffectsModule::effectChoice, KillEffectsModule::chooseEffect),
+				new ConfigField.ColorField("Effect Color (Color Burst/Confetti)", net.veloclient.velo.client.cosmetics.killfx.KillFxManager::freeColor,
+						net.veloclient.velo.client.cosmetics.killfx.KillFxManager::setFreeColor, false),
 				new ConfigField.ToggleField("Play Sound", () -> soundEnabled, v -> soundEnabled = v),
 				new ConfigField.ChoiceField("Kill Sound", SOUND_OPTIONS, () -> soundOverride, v -> soundOverride = v));
 	}

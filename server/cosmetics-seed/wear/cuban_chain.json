@@ -1,0 +1,10 @@
+{
+ "slot": "neck",
+ "name": "Cuban Link",
+ "price": 1600,
+ "accent": "#f4c542",
+ "description": "A thick, heavy gold Cuban link chain. Statement piece.",
+ "bone": "body",
+ "mirror": null,
+ "tint": true
+}

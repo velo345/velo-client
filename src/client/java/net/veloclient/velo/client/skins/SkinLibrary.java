@@ -113,6 +113,7 @@ public final class SkinLibrary {
 		Data data = load();
 		data.equippedId = skin.id();
 		save(data);
+		net.veloclient.velo.client.cosmetics.Loadouts.skinChanged(skin.id());
 	}
 
 	/** Adds a skin PNG (64x64 or legacy 64x32). */

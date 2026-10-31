@@ -253,7 +253,7 @@
 			el("span", { class: "body" },
 				el("b", {}, item.name),
 				el("span", { class: "meta" },
-					el("span", { class: "kind" }, item.type === "cape" ? "Animated cape" : item.type),
+					el("span", { class: "kind" }, item.type === "cape" ? "Animated cloak" : item.type === "killfx" ? "Kill effect" : item.type === "wear" ? "Bodywear" : item.type),
 					p ? el("span", { class: "price-tag" }, el("i", { class: "coin-dot" }), coins(p.price), p.full ? el("s", {}, coins(p.full)) : null)
 						: item.unlock === "discord" ? el("span", { class: "kind" }, "Link Discord") : el("span", { class: "kind" }, "Not for sale"))));
 		card.addEventListener("click", () => openItem(item));
@@ -291,11 +291,12 @@
 			modes.append(b);
 			return b;
 		};
-		const skinBtn = mode(store.token ? "On my skin" : "On a skin", () => showSkin(who.value.trim()));
-		const artBtn = mode("Item", showArt);
-		who.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); skinBtn.click(); } });
-		const bar = el("div", { class: "tryon-bar" }, modes, who);
-		art.append(stage, bar, el("span", { class: "hint tryon-hint" }, "Drag to turn"));
+		const killFx = item.type === "killfx";
+		const skinBtn = killFx ? null : mode(store.token ? "On my skin" : "On a skin", () => showSkin(who.value.trim()));
+		const artBtn = mode(killFx ? "Play" : "Item", showArt);
+		who.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); if (skinBtn) skinBtn.click(); } });
+		const bar = el("div", { class: "tryon-bar" }, modes, killFx ? null : who);
+		art.append(stage, bar, killFx ? null : el("span", { class: "hint tryon-hint" }, "Drag to turn"));
 		// dances come with music: play it here too (the game plays it at the dancer, for everyone around)
 		let music = null;
 		const credit = el("p", { class: "mono", style: "font-size:12px" });
@@ -322,13 +323,44 @@
 				bar.append(btn);
 			}).catch(() => {});
 		}
-		skinBtn.click();
+		// kill effects: the animation from the start, with its sound
+		let sound = null;
+		let hideSound = null;
+		if (killFx) {
+			const btn = el("button", { type: "button", class: "music-btn", "aria-pressed": "false" }, "♪ With sound");
+			let start = 0;
+			btn.addEventListener("click", async () => {
+				if (!sound) {
+					sound = new Audio(`/assets/killfx/${item.id.replace(/^killfx_/, "")}.mp3`);
+					sound.preload = "auto";
+				}
+				sound.pause();
+				const mine = ++start;
+				showArt();
+				// a fresh copy, so the animation starts from its first frame - and the sound with it, once it's decoded
+				const img = stage.querySelector("img");
+				if (img) {
+					img.src = img.src.split("?")[0] + "?r=" + Date.now();
+					try { await img.decode(); } catch (e) { /* plays anyway */ }
+				}
+				if (mine !== start) return;
+				sound.currentTime = 0;
+				sound.volume = 0.7;
+				// the preview shows the figure for a third of a second before the hit
+				setTimeout(() => { if (mine === start && !document.hidden) sound.play().catch(() => {}); }, 330);
+			});
+			// leaving the tab stops it
+			hideSound = () => { if (document.hidden && sound) sound.pause(); };
+			document.addEventListener("visibilitychange", hideSound);
+			bar.append(btn);
+		}
+		(skinBtn || artBtn).click();
 		const buy = el("button", { class: "btn btn-primary btn-lg", type: "button" });
 		const gift = el("button", { class: "btn btn-lg", type: "button" }, "Gift to a friend");
 		const coll = (store.cosmetics.collections || []).find((c) => c.id === item.collection);
 		const update = () => {
 			if (owns(item.id)) {
-				buy.replaceChildren(item.type === "emote" ? "Owned - it's on your emote wheel (B)" : "Owned - equip it in the Locker");
+				buy.replaceChildren(item.type === "emote" ? "Owned - it's on your emote wheel (B)" : killFx ? "Owned - equip it in the Store, in game or in the launcher" : "Owned - equip it in the Locker");
 				buy.disabled = true;
 			} else if (!p) {
 				buy.replaceChildren(item.unlock === "discord" ? "Free when you link Discord" : "Not for sale right now");
@@ -341,15 +373,21 @@
 		};
 		update();
 		const d = dialog(el("div", { class: "detail" }, art, el("div", { class: "detail-body" },
-			el("span", { class: "eyebrow" }, item.type === "cape" ? "Animated cape" : item.type === "aura" ? "Aura" : item.type === "emote" ? "Emote" : "3D wings"),
+			el("span", { class: "eyebrow" }, item.type === "cape" ? "Animated cloak" : item.type === "aura" ? "Aura" : item.type === "emote" ? "Emote" : killFx ? "Kill effect" : item.type === "wear" ? "Bodywear" : "3D wings"),
 			el("h2", {}, item.name),
 			coll ? el("span", { class: "pill" }, coll.name) : null,
 			el("p", {}, item.description || ""),
 			p ? el("span", { class: "price", style: "font-size:34px" }, el("i", { class: "coin-dot", style: "width:22px;height:22px;margin-right:10px;vertical-align:-2px" }), coins(p.price), p.full ? el("s", { style: "font-size:18px;color:var(--text-3);margin-left:10px" }, coins(p.full)) : null) : null,
 			item.availableUntil ? el("p", { class: "mono" }, "Leaves the Store " + new Date(item.availableUntil).toLocaleDateString()) : null,
 			el("div", { class: "detail-actions" }, buy, gift),
-			el("p", { class: "mono", style: "font-size:12px" }, "Every Velo player sees it on you. Cosmetic only - no gameplay advantage."), credit)));
-		d.addEventListener("close", () => { if (viewer) viewer.dispose(); if (music) music.pause(); });
+			el("p", { class: "mono", style: "font-size:12px" }, killFx ? "Plays where your kills fall, with its own sound. Cosmetic only - no gameplay advantage."
+				: "Every Velo player sees it on you. Cosmetic only - no gameplay advantage."), credit)));
+		d.addEventListener("close", () => {
+			if (viewer) viewer.dispose();
+			if (music) music.pause();
+			if (sound) sound.pause();
+			if (hideSound) document.removeEventListener("visibilitychange", hideSound);
+		});
 		const url = new URL(location.href);
 		url.searchParams.set("item", item.id);
 		history.replaceState(null, "", url);
@@ -422,7 +460,7 @@
 	function render() {
 		if (!store.catalog) return;
 		const shown = store.cosmetics.items.filter((i) => i.inStore || owns(i.id) || i.unlock === "discord");
-		for (const type of ["wings", "cape", "aura", "emote"]) {
+		for (const type of ["wings", "cape", "aura", "emote", "killfx", "wear"]) {
 			const grid = $(`[data-grid="${type}"]`);
 			const list = sorted(shown.filter((i) => i.type === type));
 			grid.replaceChildren(...(list.length ? list.map((i) => itemCard(i, type === "cape" ? 10 : 9)) : [el("p", { class: "kind" }, "Nothing matches.")]));
@@ -568,7 +606,7 @@
 			a.onclick = () => openItem(i);
 			return a;
 		}));
-		const anchor = items[0].type === "cape" ? "#capes" : items[0].type === "aura" ? "#auras" : items[0].type === "emote" ? "#emotes" : "#wings";
+		const anchor = items[0].type === "cape" ? "#capes" : items[0].type === "aura" ? "#auras" : items[0].type === "emote" ? "#emotes" : items[0].type === "killfx" ? "#killfx" : items[0].type === "wear" ? "#wear" : "#wings";
 		box.replaceChildren(el("div", { class: "featured reveal" },
 			el("div", {},
 				el("span", { class: "eyebrow" }, coll.tag || "Collection"),

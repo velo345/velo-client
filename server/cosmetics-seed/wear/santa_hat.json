@@ -1,0 +1,10 @@
+{
+ "slot": "head",
+ "name": "Santa Hat",
+ "price": 1200,
+ "accent": "#c8202c",
+ "description": "A floppy red Christmas hat with a fluffy white trim and a pompom.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

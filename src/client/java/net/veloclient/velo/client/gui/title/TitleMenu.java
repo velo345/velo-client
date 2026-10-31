@@ -546,7 +546,7 @@ public final class TitleMenu {
 		}
 		MenuKit.icon(context, "store", x + 6 + (h - 12 - 12) / 2, y + 6 + (h - 12 - 12) / 2, 12, MenuKit.accentText());
 		MenuKit.text(context, renderer, MenuKit.mono("NEW IN STORE"), x + h + 2, y + 8, 0xFFBCA6FF);
-		String featured = net.veloclient.velo.client.cosmetics.wings.WingsManager.featured().map(c -> c.name() + " collection").orElse("Wings, capes and auras");
+		String featured = net.veloclient.velo.client.cosmetics.wings.WingsManager.featured().map(c -> c.name() + " collection").orElse("Wings, cloaks and auras");
 		MenuKit.text(context, renderer, MenuKit.fit(renderer, MenuKit.uiBold(featured), w - h - 8), x + h + 2, y + 18, MenuKit.TEXT);
 	}
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turns a Meshy (or any single-mesh glTF) pair-of-wings .glb into Velo Client's wing assets.
 
-    python3 tools/cosmetics/import_wings.py <wings.glb> <id> "<Display Name>" [--style feathered|bat|crystal] [--scale 0.9]
+    python3 tools/cosmetics/import_wings.py <wings.glb> <id> "<Display Name>" [--style feathered|bat|crystal|tentacle] [--scale 0.9]
         [--dest server|client] [--collection <id>] [--accent #rrggbb] [--price 2500] [--description "..."]
 
 --dest server (the default): the pair lives on the Velo server only - clients download it, no client
@@ -148,8 +148,8 @@ def main():
     parser.add_argument("glb")
     parser.add_argument("id", help="lowercase id, e.g. phoenix")
     parser.add_argument("name", help='shown in the game, e.g. "Phoenix Wings"')
-    parser.add_argument("--style", default="feathered", choices=["feathered", "bat", "crystal"],
-                        help="animation feel: feathered = soft flaps, bat = snappier, crystal = stiff, slower")
+    parser.add_argument("--style", default="feathered", choices=["feathered", "bat", "crystal", "tentacle"],
+                        help="animation feel: feathered = soft flaps, bat = snappier, crystal = stiff, slower, tentacle = writhing arms")
     parser.add_argument("--scale", type=float, default=0.9, help="size on the player (1 = model units as blocks)")
     parser.add_argument("--dest", default="server", choices=["server", "client"])
     parser.add_argument("--collection", default=None)

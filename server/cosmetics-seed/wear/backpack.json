@@ -1,0 +1,10 @@
+{
+ "slot": "back",
+ "name": "Adventure Pack",
+ "price": 1200,
+ "accent": "#4f8a4b",
+ "description": "A trusty green adventure backpack with a front pocket and buckles.",
+ "bone": "body",
+ "mirror": null,
+ "tint": true
+}

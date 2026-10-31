@@ -1,0 +1,10 @@
+{
+ "slot": "wrist",
+ "name": "Retro Digital",
+ "price": 900,
+ "accent": "#a7c08a",
+ "description": "A chunky retro digital watch with a green LCD.",
+ "bone": "leftArm",
+ "mirror": null,
+ "tint": true
+}

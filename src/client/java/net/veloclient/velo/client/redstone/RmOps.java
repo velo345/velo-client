@@ -65,8 +65,8 @@ public final class RmOps {
 	}
 
 	private static boolean canEdit() {
-		if (!RmWorld.singleplayer()) {
-			RmState.error("Editing the world needs singleplayer");
+		if (!RedstoneMode.canEdit()) {
+			RmState.error(RmWorld.singleplayer() ? "Editing the world needs creative mode" : "Editing the world needs singleplayer creative");
 			return false;
 		}
 		return true;

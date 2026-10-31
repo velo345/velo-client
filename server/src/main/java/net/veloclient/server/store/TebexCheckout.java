@@ -1,6 +1,5 @@
 package net.veloclient.server.store;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -13,107 +12,54 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.HexFormat;
 
 /**
- * Talks to the Tebex Checkout API (https://docs.tebex.io/developers/checkout-api/overview) - the
- * server-side flavour of Tebex where WE define the item and its price per checkout, so there's no
- * webstore or package setup to keep in sync. Tebex is the merchant of record: it takes the
- * payment (cards, PayPal, paysafecard, ...), handles VAT/sales tax, refunds and chargebacks, and
- * pays out to you.
+ * Talks to the Tebex Headless API (https://docs.tebex.io/developers/headless-api/overview): the packages (coin packs,
+ * Velo+ monthly / yearly) are set up in the Tebex webstore with their prices; we open a basket, put the package in and
+ * send the player to Tebex's checkout. Tebex is the merchant of record: it takes the payment (cards, PayPal,
+ * paysafecard, ...), handles VAT/sales tax, refunds and chargebacks, and pays out.
+ *
+ * <p>Our order id and the player's uuid ride along in the basket's {@code custom} data and come back in the webhook.
+ * (Tebex's Checkout API, where we set item and price per checkout, is only for registered companies.)
  */
 public final class TebexCheckout {
 
-	private static final String API = "https://checkout.tebex.io/api";
+	private static final String API = "https://headless.tebex.io/api";
 	private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
-	private final String projectId;
-	private final String privateKey;
+	private final String publicToken;
 	private final String webhookSecret;
 
 	public record Basket(String ident, String checkoutUrl) {
 	}
 
-	public TebexCheckout(String projectId, String privateKey, String webhookSecret) {
-		this.projectId = projectId;
-		this.privateKey = privateKey;
+	/** {@code publicToken}: the webstore's public token (Tebex panel - Integrations - API keys). */
+	public TebexCheckout(String publicToken, String webhookSecret) {
+		this.publicToken = publicToken;
 		this.webhookSecret = webhookSecret;
 	}
 
 	public boolean canCheckout() {
-		return projectId != null && privateKey != null;
+		return publicToken != null;
 	}
 
 	public boolean canVerifyWebhooks() {
 		return webhookSecret != null;
 	}
 
-	/**
-	 * Creates a basket holding one coin pack and returns where to send the player. Our order id and
-	 * the player's uuid ride along in the item's {@code custom} map and come back in the webhook.
-	 */
-	public Basket createCheckout(String orderId, String uuid, String username, String itemName, double price,
-			String returnUrl, String completeUrl) throws Exception {
+	/** A basket holding coin pack {@code packageId}, for order {@code orderId}. */
+	public Basket createCheckout(String orderId, String uuid, String username, long packageId, String returnUrl, String completeUrl) throws Exception {
 		JsonObject custom = new JsonObject();
 		custom.addProperty("velo_order", orderId);
 		custom.addProperty("velo_uuid", uuid);
 		custom.addProperty("velo_username", username);
-
-		JsonObject pack = new JsonObject();
-		pack.addProperty("name", itemName);
-		pack.addProperty("price", price);
-		pack.addProperty("type", "single");
-		pack.add("custom", custom);
-		JsonObject item = new JsonObject();
-		item.add("package", pack);
-		item.addProperty("qty", 1);
-		JsonArray items = new JsonArray();
-		items.add(item);
-
-		JsonObject basket = new JsonObject();
-		basket.addProperty("return_url", returnUrl);
-		basket.addProperty("complete_url", completeUrl);
-		basket.add("custom", custom.deepCopy());
-		JsonObject body = new JsonObject();
-		body.add("basket", basket);
-		body.add("items", items);
-
-		String auth = Base64.getEncoder().encodeToString((projectId + ":" + privateKey).getBytes(StandardCharsets.UTF_8));
-		HttpRequest request = HttpRequest.newBuilder(URI.create(API + "/checkout"))
-				.header("Authorization", "Basic " + auth)
-				.header("Content-Type", "application/json")
-				.header("Accept", "application/json")
-				.timeout(Duration.ofSeconds(20))
-				.POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-				.build();
-		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
-		if (response.statusCode() / 100 != 2) {
-			throw new IllegalStateException("Tebex checkout failed (HTTP " + response.statusCode() + "): " + response.body());
-		}
-		JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
-		if (json.has("data") && json.get("data").isJsonObject()) {
-			json = json.getAsJsonObject("data");
-		}
-		String ident = json.get("ident").getAsString();
-		String checkout = json.has("links") && json.getAsJsonObject("links").has("checkout")
-				? json.getAsJsonObject("links").get("checkout").getAsString()
-				: "https://pay.tebex.io/" + ident;
-		return new Basket(ident, checkout);
+		return basket(custom, packageId, returnUrl, completeUrl);
 	}
 
-	/**
-	 * Creates a basket for the Velo+ subscription (a monthly recurring package) and returns where to send the
-	 * player. The player's uuid rides along in {@code custom} ({@code velo_plus}) and comes back in the webhook.
-	 */
-	public Basket createSubscriptionCheckout(String uuid, String username, String name, double price, String returnUrl, String completeUrl)
+	/** A basket holding the Velo+ subscription package {@code packageId} (monthly, or yearly when {@code yearly}). */
+	public Basket createSubscriptionCheckout(String uuid, String username, long packageId, String returnUrl, String completeUrl, boolean yearly)
 			throws Exception {
-		return createSubscriptionCheckout(uuid, username, name, price, returnUrl, completeUrl, false);
-	}
-
-	/** Like {@link #createSubscriptionCheckout(String, String, String, double, String, String)}, renewing every year when {@code yearly}. */
-	public Basket createSubscriptionCheckout(String uuid, String username, String name, double price, String returnUrl, String completeUrl,
-			boolean yearly) throws Exception {
 		JsonObject custom = new JsonObject();
 		custom.addProperty("velo_plus", true);
 		if (yearly) {
@@ -121,32 +67,42 @@ public final class TebexCheckout {
 		}
 		custom.addProperty("velo_uuid", uuid);
 		custom.addProperty("velo_username", username);
-		JsonObject pack = new JsonObject();
-		pack.addProperty("name", name);
-		pack.addProperty("price", price);
-		pack.addProperty("type", "subscription");
-		pack.addProperty("expiry_length", 1);
-		pack.addProperty("expiry_period", yearly ? "year" : "month");
-		pack.add("custom", custom);
-		JsonObject item = new JsonObject();
-		item.add("package", pack);
-		item.addProperty("qty", 1);
-		JsonArray items = new JsonArray();
-		items.add(item);
-		JsonObject basket = new JsonObject();
-		basket.addProperty("return_url", returnUrl);
-		basket.addProperty("complete_url", completeUrl);
-		basket.add("custom", custom.deepCopy());
-		JsonObject body = new JsonObject();
-		body.add("basket", basket);
-		body.add("items", items);
-		return post(body);
+		return basket(custom, packageId, returnUrl, completeUrl);
 	}
 
-	private Basket post(JsonObject body) throws Exception {
-		String auth = Base64.getEncoder().encodeToString((projectId + ":" + privateKey).getBytes(StandardCharsets.UTF_8));
-		HttpRequest request = HttpRequest.newBuilder(URI.create(API + "/checkout"))
-				.header("Authorization", "Basic " + auth)
+	private Basket basket(JsonObject custom, long packageId, String returnUrl, String completeUrl)
+			throws Exception {
+		JsonObject create = new JsonObject();
+		create.addProperty("complete_url", completeUrl);
+		create.addProperty("cancel_url", returnUrl);
+		create.addProperty("complete_auto_redirect", true);
+		create.add("custom", custom.deepCopy());
+		JsonObject basket = data(send("/accounts/" + publicToken + "/baskets", create));
+		String ident = basket.get("ident").getAsString();
+		JsonObject add = new JsonObject();
+		add.addProperty("package_id", packageId);
+		add.addProperty("quantity", 1);
+		// on the package too: the webhook reports it per product (where the handler reads it first)
+		add.add("custom", custom.deepCopy());
+		JsonObject filled = data(send("/baskets/" + ident + "/packages", add));
+		String checkout = checkoutLink(filled);
+		if (checkout == null) {
+			checkout = checkoutLink(basket);
+		}
+		return new Basket(ident, checkout != null ? checkout : "https://pay.tebex.io/" + ident);
+	}
+
+	private static String checkoutLink(JsonObject basket) {
+		return basket.has("links") && basket.get("links").isJsonObject() && basket.getAsJsonObject("links").has("checkout")
+				? basket.getAsJsonObject("links").get("checkout").getAsString() : null;
+	}
+
+	private static JsonObject data(JsonObject json) {
+		return json.has("data") && json.get("data").isJsonObject() ? json.getAsJsonObject("data") : json;
+	}
+
+	private static JsonObject send(String path, JsonObject body) throws Exception {
+		HttpRequest request = HttpRequest.newBuilder(URI.create(API + path))
 				.header("Content-Type", "application/json")
 				.header("Accept", "application/json")
 				.timeout(Duration.ofSeconds(20))
@@ -154,17 +110,10 @@ public final class TebexCheckout {
 				.build();
 		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
 		if (response.statusCode() / 100 != 2) {
-			throw new IllegalStateException("Tebex checkout failed (HTTP " + response.statusCode() + "): " + response.body());
+			throw new IllegalStateException("Tebex " + path.replaceAll("/accounts/[^/]+", "/accounts/*") + " failed (HTTP " + response.statusCode() + "): "
+					+ response.body());
 		}
-		JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
-		if (json.has("data") && json.get("data").isJsonObject()) {
-			json = json.getAsJsonObject("data");
-		}
-		String ident = json.get("ident").getAsString();
-		String checkout = json.has("links") && json.getAsJsonObject("links").has("checkout")
-				? json.getAsJsonObject("links").get("checkout").getAsString()
-				: "https://pay.tebex.io/" + ident;
-		return new Basket(ident, checkout);
+		return JsonParser.parseString(response.body()).getAsJsonObject();
 	}
 
 	/**

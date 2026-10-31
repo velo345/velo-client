@@ -1,0 +1,10 @@
+{
+ "slot": "back",
+ "name": "Katana",
+ "price": 1600,
+ "accent": "#b3202e",
+ "description": "A katana in a black lacquered sheath, worn across your back.",
+ "bone": "body",
+ "mirror": null,
+ "tint": true
+}

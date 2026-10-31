@@ -16,7 +16,7 @@ public final class StorePurchase {
 	/** Returns null on success, else the message to show. */
 	public static String buy(StoreItem item) {
 		if (StoreOwnership.owns(item.id())) {
-			return "You already own this cape.";
+			return "You already own this cloak.";
 		}
 		try {
 			StoreApi.buy(item.id());

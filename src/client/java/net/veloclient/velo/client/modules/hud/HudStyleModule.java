@@ -9,8 +9,8 @@ import net.veloclient.velo.module.SafetyTag;
 import java.util.List;
 
 /**
- * One look for every Velo HUD element (0.9.8): the font (Inter, Sora, Space Grotesk, Poppins, IBM Plex Sans, JetBrains Mono,
- * Audiowide or the Minecraft font), what's behind the text
+ * One look for every Velo HUD element (0.9.8) - Redstone Mode's overlay included: the font (Inter, Sora, Space Grotesk, Poppins,
+ * IBM Plex Sans, JetBrains Mono, Audiowide or the Minecraft font), what's behind the text
  * (nothing, frosted glass or a solid panel), an accent colour and the text shadow. Read through
  * {@link net.veloclient.velo.client.hud.HudLook}. Switched off, the HUD looks exactly as it did before 0.9.8 -
  * Minecraft font, no panels. It's a module so it rides along with profiles like every other setting.

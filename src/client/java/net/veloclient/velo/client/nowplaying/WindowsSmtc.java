@@ -62,8 +62,17 @@ final class WindowsSmtc implements MediaBackend {
 			System.arraycopy(body, 0, withBom, 3, body.length);
 			Files.write(script, withBom);
 		}
-		process = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass",
-				"-File", script.toString()).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+		// The helper's errors go to logs/velo-nowplaying.log, so a machine where it can't read the media session says why.
+		Path log = Path.of("logs", "velo-nowplaying.log");
+		try {
+			Files.createDirectories(log.getParent());
+		} catch (IOException ignored) {
+			log = null;
+		}
+		ProcessBuilder builder = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass",
+				"-File", script.toString());
+		builder.redirectError(log == null ? ProcessBuilder.Redirect.DISCARD : ProcessBuilder.Redirect.to(log.toFile()));
+		process = builder.start();
 		OutputStream stdin = process.getOutputStream();
 		commands = new java.io.OutputStreamWriter(stdin, StandardCharsets.UTF_8);
 		lineAt = 0;
@@ -78,7 +87,7 @@ final class WindowsSmtc implements MediaBackend {
 			String line;
 			while ((line = in.readLine()) != null) {
 				lineAt = System.nanoTime();
-				line = line.trim();
+				line = line.replace("\uFEFF", "").trim();
 				if (line.equals("none")) {
 					latest = null;
 				} else if (line.startsWith("{")) {

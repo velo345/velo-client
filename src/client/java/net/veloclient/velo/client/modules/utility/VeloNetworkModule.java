@@ -16,7 +16,7 @@ import java.util.List;
  * Client's own official server by default - so this client can see the
  * "which client is this player using" badge and equipped cape on *other*
  * online Velo Client users, not just itself - Store capes by catalog id, and
- * (with "Share Custom Cape" on) your own imported cape, uploaded once to that
+ * (with "Share Custom Cloak" on) your own imported cape, uploaded once to that
  * server. On by default; still a genuine no-op if {@code network.json} is
  * hand-edited to blank out {@code serverUrl}.
  */
@@ -24,7 +24,7 @@ public final class VeloNetworkModule extends AbstractModule implements Configura
 
 	public VeloNetworkModule() {
 		super("velo-network", "Velo Network",
-				"See other online Velo Client users' badge and cape, and share yours (including your own custom cape) with them.",
+				"See other online Velo Client users' badge and cloak, and share yours (including your own custom cloak) with them.",
 				ModuleCategory.COSMETICS, SafetyTag.COSMETIC_ONLY, true);
 	}
 
@@ -40,7 +40,7 @@ public final class VeloNetworkModule extends AbstractModule implements Configura
 
 	@Override
 	public List<ConfigField> configFields() {
-		return List.of(new ConfigField.ToggleField("Share Custom Cape",
+		return List.of(new ConfigField.ToggleField("Share Custom Cloak",
 				() -> VeloServerClient.shareCustomCapes, v -> VeloServerClient.shareCustomCapes = v),
 				new ConfigField.ToggleField("Show the + of Velo+ on my badge",
 						net.veloclient.velo.client.network.PlusBadgeSetting::show, net.veloclient.velo.client.network.PlusBadgeSetting::set),

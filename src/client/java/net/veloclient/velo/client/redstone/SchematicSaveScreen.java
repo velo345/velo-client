@@ -8,7 +8,7 @@ import net.veloclient.velo.client.gui.widget.VeloUi;
 import net.veloclient.velo.client.gui.window.VeloWindow;
 
 /**
- * Name and save the selection (Ctrl+S in Redstone Mode) as a .veloschem, or as a .litematic to share with friends who
+ * Name and save the selection (Save in Redstone Mode) as a .veloschem, or as a .litematic to share with friends who
  * use Litematica instead of Velo.
  */
 public final class SchematicSaveScreen extends VeloWindow {

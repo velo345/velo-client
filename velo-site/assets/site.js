@@ -213,7 +213,7 @@ function cape3d(url, k = 12, draggable = false) {
 		face.style.backgroundImage = `url("${url}")`;
 		rig.append(face);
 	}
-	const box = el("div", { class: "cape3d", role: "img", "aria-label": "3D cape preview" }, rig);
+	const box = el("div", { class: "cape3d", role: "img", "aria-label": "3D cloak preview" }, rig);
 	box.style.setProperty("--k", k + "px");
 	if (draggable) {
 		let dragging = false, startX = 0, yaw = -20;
@@ -423,6 +423,7 @@ function cosmeticArt(item, k = 12, draggable = false) {
 	if (item.type === "emote") return emoteFigure(item);
 	if (item.type === "cape" && item.files && item.files.gif) return cape3d(fileUrl(item.files.gif), k, draggable);
 	if (item.type === "aura") return el("img", { class: "aura-img", src: `/assets/auras/${item.id.replace(/^aura_/, "")}.webp`, alt: item.name + " aura", loading: "lazy", decoding: "async" });
+	if (item.type === "killfx") return el("img", { class: "aura-img", src: `/assets/killfx/${item.id.replace(/^killfx_/, "")}.webp`, alt: item.name + " kill effect", loading: "lazy", decoding: "async" });
 	if (item.files && item.files.preview) return el("img", { src: fileUrl(item.files.preview), alt: item.name, loading: "lazy", decoding: "async" });
 	return el("span", {}, item.name);
 }

@@ -381,6 +381,10 @@ public final class VeloServerClient {
 		if (auraId != null) {
 			body.addProperty("auraId", auraId);
 		}
+		String wear = net.veloclient.velo.client.cosmetics.wear.WearManager.networkValue();
+		if (wear != null) {
+			body.addProperty("wear", wear);
+		}
 		String nameStyle = net.veloclient.velo.client.namestyle.NameStyles.networkValue();
 		if (nameStyle != null) {
 			body.addProperty("nameStyle", nameStyle);
@@ -418,12 +422,13 @@ public final class VeloServerClient {
 				String wingsId = user.has("wingsId") && !user.get("wingsId").isJsonNull() ? user.get("wingsId").getAsString() : null;
 				String auraId = user.has("auraId") && !user.get("auraId").isJsonNull() ? user.get("auraId").getAsString() : null;
 				String nameStyle = user.has("nameStyle") && !user.get("nameStyle").isJsonNull() ? user.get("nameStyle").getAsString() : null;
+				String wear = user.has("wear") && !user.get("wear").isJsonNull() ? user.get("wear").getAsString() : null;
 				if (uuid != null && user.has("emote") && !user.get("emote").isJsonNull()) {
 					emotes.put(uuid, user.get("emote").getAsString());
 				}
 				if (uuid != null && username != null) {
 					boolean plus = user.has("plus") && !user.get("plus").isJsonNull() && user.get("plus").getAsBoolean();
-					entries.put(uuid, new VeloUserRegistry.Entry(username, capeId, wingsId, auraId, plus, nameStyle));
+					entries.put(uuid, new VeloUserRegistry.Entry(username, capeId, wingsId, auraId, plus, nameStyle, wear));
 				}
 			}
 			VeloUserRegistry.replaceAll(entries);

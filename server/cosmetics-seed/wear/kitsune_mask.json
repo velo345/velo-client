@@ -1,0 +1,10 @@
+{
+ "slot": "mask",
+ "name": "Kitsune Mask",
+ "price": 1800,
+ "accent": "#d0262f",
+ "description": "A white fox spirit mask with red markings and tall ears.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

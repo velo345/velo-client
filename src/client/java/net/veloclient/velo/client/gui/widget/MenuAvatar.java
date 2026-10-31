@@ -51,8 +51,10 @@ public final class MenuAvatar {
 		net.minecraft.util.AssetInfo.TextureAsset cape = base.cape();
 		var definition = CapeManager.renderCape();
 		if (definition.isPresent()) {
-			net.minecraft.util.Identifier texture = CapeManager.textureIdentifier(definition.get());
-			cape = new net.minecraft.util.AssetInfo.TextureAssetInfo(texture, texture);
+			net.minecraft.util.Identifier texture = CapeManager.textureIfReady(definition.get());
+			if (texture != null) {
+				cape = new net.minecraft.util.AssetInfo.TextureAssetInfo(texture, texture);
+			}
 		}
 		return new net.minecraft.entity.player.SkinTextures(body, cape, base.elytra(), model, base.secure());
 	}
@@ -79,8 +81,10 @@ public final class MenuAvatar {
 		net.minecraft.core.ClientAsset.Texture cape = base.cape();
 		var definition = CapeManager.renderCape();
 		if (definition.isPresent()) {
-			net.minecraft.resources.Identifier texture = CapeManager.textureIdentifier(definition.get());
-			cape = new net.minecraft.core.ClientAsset.ResourceTexture(texture, texture);
+			net.minecraft.resources.Identifier texture = CapeManager.textureIfReady(definition.get());
+			if (texture != null) {
+				cape = new net.minecraft.core.ClientAsset.ResourceTexture(texture, texture);
+			}
 		}
 		return new net.minecraft.world.entity.player.PlayerSkin(body, cape, base.elytra(), model, base.secure());
 	}

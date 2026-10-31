@@ -34,7 +34,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * skips registering its own render layer whenever Wavey Capes is present, so
  * this is the only place a Velo cape gets attached to the local player in
  * that case - the rest of the time (Wavey Capes absent) Velo's own
- * ClothSimulator-driven render layer handles the cape directly instead.
+ * ClothCape-driven render layer handles the cape directly instead.
  *
  * <p>The elytra field, unlike the cape one, is touched unconditionally
  * (Wavey Capes or not) - real elytra rendering is 100% vanilla's own system
@@ -97,8 +97,10 @@ public abstract class LocalPlayerSkinCapeMixin {
 			// The two-arg constructor with the SAME identifier for both id
 			// and texturePath is what actually binds our registered
 			// texture.
-			Identifier capeTexture = CapeManager.textureIdentifier(definition);
-			capeAsset = new AssetInfo.TextureAssetInfo(capeTexture, capeTexture);
+			Identifier capeTexture = CapeManager.textureIfReady(definition);
+			if (capeTexture != null) {
+				capeAsset = new AssetInfo.TextureAssetInfo(capeTexture, capeTexture);
+			}
 		}
 		AssetInfo.TextureAsset elytraAsset = original.elytra();
 		if (elytraTexture.isPresent()) {
@@ -153,8 +155,10 @@ public abstract class LocalPlayerSkinCapeMixin {
 			// the identifier, which never resolves for our
 			// dynamically-registered texture. Two-arg constructor, same
 			// identifier twice.
-			Identifier capeTexture = CapeManager.textureIdentifier(definition);
-			capeAsset = new ClientAsset.ResourceTexture(capeTexture, capeTexture);
+			Identifier capeTexture = CapeManager.textureIfReady(definition);
+			if (capeTexture != null) {
+				capeAsset = new ClientAsset.ResourceTexture(capeTexture, capeTexture);
+			}
 		}
 		ClientAsset.Texture elytraAsset = original.elytra();
 		if (elytraTexture.isPresent()) {

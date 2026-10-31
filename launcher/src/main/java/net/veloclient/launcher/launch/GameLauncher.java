@@ -196,6 +196,9 @@ public final class GameLauncher {
 		// JVM to resolve IPv4-only sidesteps it; it's the standard fix for
 		// this exact class of intermittent Minecraft connection timeout.
 		jvmArgs.add("-Djava.net.preferIPv4Stack=true");
+		if (net.veloclient.launcher.AppVersion.DEV) {   // the dev game shares the dev launcher's folder (pets, loadouts, Locker)
+			jvmArgs.add("-Dvelo.home=" + net.veloclient.launcher.data.VeloPaths.root());
+		}
 		if (instance.extraJvmArgs() != null && !instance.extraJvmArgs().isBlank()) {
 			for (String arg : instance.extraJvmArgs().trim().split("\\s+")) {
 				jvmArgs.add(arg);

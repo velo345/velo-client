@@ -148,7 +148,7 @@ public final class StaffScreen extends VeloWindow {
 	private void renderPlayer(DrawContext context, int x, int y, int width, int mouseX, int mouseY) {
 		hits.add(VeloUi.pill(context, x + width - 70, y, 70, 18, "Look up", 1, mouseX, mouseY, () -> lookup(nameField.getText().trim())));
 		if (player == null) {
-			context.drawTextWithShadow(this.textRenderer, "Look a player up to see their info, censor a custom cape" + (admin() ? " or ban them." : "."),
+			context.drawTextWithShadow(this.textRenderer, "Look a player up to see their info, censor a custom cloak" + (admin() ? " or ban them." : "."),
 					x, y + 30, VeloUi.muted());
 			return;
 		}
@@ -167,7 +167,7 @@ public final class StaffScreen extends VeloWindow {
 		// Custom cape: what it looks like, and censoring it.
 		int cy = top + 60;
 		int half = width / 2 - 6;
-		context.drawTextWithShadow(this.textRenderer, "Custom cape", x, cy, ThemeManager.active().text());
+		context.drawTextWithShadow(this.textRenderer, "Custom cloak", x, cy, ThemeManager.active().text());
 		String hash = player.has("customCape") && !player.get("customCape").isJsonNull() ? player.get("customCape").getAsString() : null;
 		if (hash == null) {
 			context.drawTextWithShadow(this.textRenderer, "None uploaded", x, cy + 14, VeloUi.muted());
@@ -183,7 +183,7 @@ public final class StaffScreen extends VeloWindow {
 				}
 			}
 			boolean sure = ("censor:" + uuid).equals(armed);
-			hits.add(VeloUi.pill(context, x + 52, cy + 14, 110, 18, sure ? "Click to confirm" : "Censor cape", 3, mouseX, mouseY, () -> {
+			hits.add(VeloUi.pill(context, x + 52, cy + 14, 110, 18, sure ? "Click to confirm" : "Censor cloak", 3, mouseX, mouseY, () -> {
 				if (!sure) {
 					armed = "censor:" + uuid;
 					return;
@@ -193,7 +193,7 @@ public final class StaffScreen extends VeloWindow {
 				body.addProperty("target", uuid);
 				call("/v1/staff/censor-cape", body, json -> {
 					player = json;
-					say("Cape removed - that image can't be used again.", false);
+					say("Cloak removed - that image can't be used again.", false);
 				});
 			}));
 			for (String line : VeloUi.wrap("Removes it for everyone and blocks the same image from being uploaded again.", half - 52)) {
@@ -227,7 +227,7 @@ public final class StaffScreen extends VeloWindow {
 			by += 30;
 		}
 		int sx = bx;
-		for (String[] s : new String[][] {{"friends", "Friends"}, {"capes", "Capes"}, {"parties", "Parties"}}) {
+		for (String[] s : new String[][] {{"friends", "Friends"}, {"capes", "Cloaks"}, {"parties", "Parties"}}) {
 			int w = this.textRenderer.getWidth(s[1]) + 14;
 			boolean on = services.contains(s[0]);
 			hits.add(VeloUi.pill(context, sx, by + 14, w, 16, s[1], on ? 1 : 0, mouseX, mouseY, () -> {

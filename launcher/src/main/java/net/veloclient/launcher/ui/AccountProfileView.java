@@ -267,7 +267,7 @@ public final class AccountProfileView {
 				}
 			});
 		}
-		items.getChildren().add(worn(capeArt, cape == null ? "No cape" : cape.name()));
+		items.getChildren().add(worn(capeArt, cape == null ? "No cloak" : cape.name()));
 		javafx.scene.Node wingsArt = wings == null ? new Region() : new javafx.scene.image.ImageView(new javafx.scene.image.Image(
 				net.veloclient.launcher.data.WingsCatalog.openPreview(wings.id()), 0, 74, true, true));
 		items.getChildren().add(worn(wingsArt, wings == null ? "No wings" : wings.name()));

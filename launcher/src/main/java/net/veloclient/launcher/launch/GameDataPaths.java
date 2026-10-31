@@ -18,7 +18,7 @@ public final class GameDataPaths {
 	}
 
 	private static Path root() {
-		return VeloPaths.root().resolve("gamedata");
+		return VeloPaths.sharedRoot().resolve("gamedata");
 	}
 
 	public static Path versionDir(String mcVersion) {

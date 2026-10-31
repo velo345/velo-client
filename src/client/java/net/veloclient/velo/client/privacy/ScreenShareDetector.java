@@ -171,8 +171,16 @@ public final class ScreenShareDetector {
 		return false;
 	}
 
+	/**
+	 * A Discord entry still capturing - and Discord actually running: a capture that ended with a crash keeps
+	 * LastUsedTimeStop at 0 for good, which would otherwise read as "sharing" forever.
+	 */
 	private static boolean activeCapture(String key, long start, long stop) {
-		return isDiscord(key) && start > 0 && stop == 0;
+		return isDiscord(key) && start > 0 && stop == 0 && discordRunning();
+	}
+
+	private static boolean discordRunning() {
+		return ProcessHandle.allProcesses().anyMatch(p -> p.info().command().map(c -> isDiscord(c.toLowerCase(Locale.ROOT))).orElse(false));
 	}
 
 	private static long qword(String line) {

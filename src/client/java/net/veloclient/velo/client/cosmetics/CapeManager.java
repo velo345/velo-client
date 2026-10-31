@@ -149,7 +149,7 @@ public final class CapeManager {
 	public static void update(String capeId, String newName, CapePhysicsPreset newPreset) throws IOException {
 		CapeDefinition existing = LIBRARY.get(capeId);
 		if (existing == null) {
-			throw new IOException("Unknown cape id: " + capeId);
+			throw new IOException("Unknown cloak id: " + capeId);
 		}
 		Path tempFile = Files.createTempFile(existing.bundleFile().getParent(), "cape-update-", ".velocape");
 		try (ZipInputStream in = new ZipInputStream(Files.newInputStream(existing.bundleFile()));
@@ -349,11 +349,11 @@ public final class CapeManager {
 	public static void exportCape(String capeId, Path destination) throws IOException {
 		CapeDefinition definition = LIBRARY.get(capeId);
 		if (definition == null) {
-			throw new IOException("Unknown cape id: " + capeId);
+			throw new IOException("Unknown cloak id: " + capeId);
 		}
 		if (definition.animated()) {
 			// Animated capes are Velo Store items - sharing the bundle would hand them out for free.
-			throw new IOException("Animated capes are Velo Store items and can't be exported");
+			throw new IOException("Animated cloaks are Velo Store items and can't be exported");
 		}
 		Files.copy(definition.bundleFile(), destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 	}
@@ -362,7 +362,7 @@ public final class CapeManager {
 	public static CapeDefinition importBundle(Path bundleFile) throws IOException {
 		VeloPaths.ensureDirectories();
 		if (bundleIsAnimated(bundleFile)) {
-			throw new IOException("Animated capes are only available from the Velo Store");
+			throw new IOException("Animated cloaks are only available from the Velo Store");
 		}
 		Path copy = VeloPaths.capes().resolve(bundleFile.getFileName());
 		Files.copy(bundleFile, copy, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -394,12 +394,37 @@ public final class CapeManager {
 			return AnimatedCapeAsset.getOrRegister(definition.id(), () -> openAnimatedSource(definition)).identifier();
 		}
 		return TEXTURE_CACHE.computeIfAbsent(definition.id(), id -> registerFromBundle(definition, "texture.png", "cape_" + id.replace('-', '_'))
-				.orElseThrow(() -> new RuntimeException("Failed to load cape texture for " + definition.id())));
+				.orElseThrow(() -> new RuntimeException("Failed to load cloak texture for " + definition.id())));
 	}
 
 	private static final java.util.Set<String> LOADING = java.util.concurrent.ConcurrentHashMap.newKeySet();
+	/** When a background load last failed (Store art not downloaded yet...) - tried again after a few seconds. */
+	private static final Map<String, Long> FAILED_AT = new java.util.concurrent.ConcurrentHashMap<>();
+	private static int preloadTicks;
+
+	/**
+	 * The cloak you wear (or preview) stays decoded: in first person it isn't drawn, and freeing it after a minute
+	 * meant decoding the whole HD GIF again the moment you pressed F5 or opened your inventory.
+	 */
+	public static boolean pinned(String definitionId) {
+		return renderCape().map(d -> d.id().equals(definitionId)).orElse(false);
+	}
+
+	/** Called every client tick: starts loading the worn cloak in the background before it's ever drawn. */
+	public static void preloadEquipped() {
+		if (++preloadTicks % 40 != 0) {
+			return;
+		}
+		renderCape().ifPresent(definition -> {
+			try {
+				textureIfReady(definition);
+			} catch (RuntimeException ignored) {
+				// art not there yet: tried again in 2 s
+			}
+		});
+	}
 	private static final java.util.concurrent.ExecutorService LOADER = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
-		Thread thread = new Thread(r, "Velo cape loader");
+		Thread thread = new Thread(r, "Velo cloak loader");
 		thread.setDaemon(true);
 		return thread;
 	});
@@ -421,9 +446,14 @@ public final class CapeManager {
 				return cached;
 			}
 		}
-		if (definition.bundleFile() == null || !Files.isRegularFile(definition.bundleFile())) {
+		if (!definition.animated() && (definition.bundleFile() == null || !Files.isRegularFile(definition.bundleFile()))) {
 			return textureIdentifier(definition);
 		}
+		Long failed = FAILED_AT.get(definition.id());
+		if (failed != null && System.currentTimeMillis() - failed < 5000) {
+			return null;
+		}
+		// Decoding an HD GIF takes hundreds of ms and lots of memory - never on the render thread.
 		if (LOADING.add(definition.id())) {
 			LOADER.submit(() -> {
 				try {
@@ -436,7 +466,7 @@ public final class CapeManager {
 							try {
 								AnimatedCapeAsset.registerDecoded(definition.id(), decoded, true);
 							} catch (IOException e) {
-								net.veloclient.velo.VeloClient.LOGGER.warn("Couldn't load cape {}", definition.id(), e);
+								net.veloclient.velo.VeloClient.LOGGER.warn("Couldn't load cloak {}", definition.id(), e);
 								return;
 							}
 							LOADING.remove(definition.id());
@@ -453,8 +483,10 @@ public final class CapeManager {
 						});
 					}
 				} catch (Throwable t) {
-					// Stays in LOADING: not tried again every frame.
-					net.veloclient.velo.VeloClient.LOGGER.warn("Couldn't load cape {}", definition.id(), t);
+					// Tried again after a few seconds (Store art may still be downloading), never every frame.
+					FAILED_AT.put(definition.id(), System.currentTimeMillis());
+					LOADING.remove(definition.id());
+					net.veloclient.velo.VeloClient.LOGGER.debug("Couldn't load cloak {} yet", definition.id(), t);
 				}
 			});
 		}
@@ -493,7 +525,7 @@ public final class CapeManager {
 		}
 		String itemId = definition.sourceItemId() != null ? definition.sourceItemId() : definition.id();
 		var item = net.veloclient.velo.client.store.StoreCatalog.byId(itemId)
-				.orElseThrow(() -> new RuntimeException("No art for cape " + itemId + " yet"));
+				.orElseThrow(() -> new RuntimeException("No art for cloak " + itemId + " yet"));
 		return net.veloclient.velo.client.store.StoreAssets.openGif(item);
 	}
 
@@ -557,11 +589,13 @@ public final class CapeManager {
 			return Optional.ofNullable(COMPOSED_ELYTRA.get(definition.id()));
 		}
 		if (definition.animated()) {
+			// Loads in the background; the elytra gets its art once that's done.
 			try {
-				return Optional.of(AnimatedCapeAsset.getOrRegister(definition.id(), () -> openAnimatedSource(definition)).elytraIdentifier());
-			} catch (RuntimeException e) {
-				return Optional.empty();
+				textureIfReady(definition);
+			} catch (RuntimeException ignored) {
+				// no art yet
 			}
+			return Optional.empty();
 		}
 		if (definition.bundleFile() == null || !Files.isRegularFile(definition.bundleFile())) {
 			return Optional.empty();
@@ -654,7 +688,7 @@ public final class CapeManager {
 
 	// sourceItemId is absent from meta.json written before this field existed
 	// - Gson leaves it null rather than failing to parse, so old bundles just
-	// come back as "not a Store cape" (accurate: they predate Store capes
+	// come back as "not a Store cloak" (accurate: they predate Store capes
 	// tracking provenance at all).
 	private record Meta(String id, String name, String sourceItemId, boolean custom) {
 		Meta(String id, String name, String sourceItemId) {

@@ -30,6 +30,7 @@ import javafx.stage.Stage;
 import net.veloclient.launcher.auth.MinecraftSession;
 import net.veloclient.launcher.auth.SkinFetcher;
 import net.veloclient.launcher.data.AuraCatalog;
+import net.veloclient.launcher.data.KillFxCatalog;
 import net.veloclient.launcher.data.CapeEntry;
 import net.veloclient.launcher.data.CapeLibrary;
 import net.veloclient.launcher.data.GifFrames;
@@ -76,12 +77,17 @@ public final class CosmeticsView {
 		}
 	}
 
-	public enum Slot { SKIN, CAPE, WINGS, AURA, NAME, EMOTES }
+	public enum Slot { SKIN, CAPE, WINGS, AURA, NAME, EMOTES, KILLFX, WEAR, PETS }
 
 	private static Slot slot = Slot.CAPE;
 	private static String selectedCape;
 	private static String selectedWings;
 	private static String selectedAura;
+	/** The kill effect picked in the Kill FX tab ("" = none), null = the equipped one. */
+	private static String selectedKillFx;
+	/** The Bodywear tab: the slot being browsed and the item picked ("" = none, null = what's worn there). */
+	private static String wearSlot = "head";
+	private static String selectedWear;
 	/** The emote playing on the stage, and the wheel slot (0-7) a click on an emote puts it in. */
 	private static String selectedEmote;
 	private static int selectedWheelSlot;
@@ -113,6 +119,10 @@ public final class CosmeticsView {
 		slot = Slot.EMOTES;
 	}
 
+	public static void showKillFxTab() {
+		slot = Slot.KILLFX;
+	}
+
 	public static Node build(Stage owner, Host host) {
 		installLoadoutSync();
 		StackPane page = new StackPane();
@@ -139,6 +149,10 @@ public final class CosmeticsView {
 	}
 
 	private static Node content(Stage owner, Host host, Runnable refresh) {
+		if (slot != Slot.WEAR) {
+			// Bodywear try-on only lives in its own tab.
+			net.veloclient.launcher.data.WearCatalog.clearPreview();
+		}
 		VBox slots = slotsColumn(host, refresh);
 		String playerName = host.session() == null ? null : host.session().username();
 		StackPane stage = slot == Slot.NAME ? NameStyleEditor.stage(playerName) : stage(host, refresh);
@@ -150,6 +164,9 @@ public final class CosmeticsView {
 			case AURA -> aurasPanel(host, refresh);
 			case NAME -> NameStyleEditor.panel(playerName, refresh);
 			case EMOTES -> emotesPanel(host, refresh);
+			case KILLFX -> killFxPanel(host, refresh);
+			case WEAR -> wearPanel(host, refresh);
+			case PETS -> petsPanel(refresh);
 		};
 		HBox body = new HBox(0, slots, stage, panel);
 		body.getStyleClass().add("page");
@@ -162,7 +179,7 @@ public final class CosmeticsView {
 	private static VBox slotsColumn(Host host, Runnable refresh) {
 		Label title = new Label("Locker");
 		title.getStyleClass().add("page-title");
-		VBox column = new VBox(8, title);
+		VBox column = new VBox(5, title);
 		VBox.setMargin(title, new Insets(0, 0, 10, 4));
 		column.setMinWidth(250);
 		column.setPrefWidth(270);
@@ -174,10 +191,10 @@ public final class CosmeticsView {
 		AuraCatalog.AuraType aura = AuraCatalog.byId(AuraCatalog.equipped() == null ? "" : AuraCatalog.equipped()).orElse(null);
 		MinecraftSession session = host.session();
 		column.getChildren().add(slotButton(Slot.SKIN, "SKIN", session == null ? "Sign in" : session.username(),
-				session == null ? Icons.icon("skin", 22, Color.web("#8A8A95")) : Heads.head(session.uuid(), session.username(), 48), refresh));
-		column.getChildren().add(slotButton(Slot.CAPE, "CAPE", cape == null ? "None" : cape.name(), capeThumb(cape, 48), refresh));
-		column.getChildren().add(slotButton(Slot.WINGS, "WINGS", wings == null ? "None" : wings.name(), wingsThumb(wings, 48), refresh));
-		column.getChildren().add(slotButton(Slot.AURA, "AURA", aura == null ? "None" : aura.name(), auraThumb(aura, 48), refresh));
+				session == null ? Icons.icon("skin", 22, Color.web("#8A8A95")) : Heads.head(session.uuid(), session.username(), 38), refresh));
+		column.getChildren().add(slotButton(Slot.CAPE, "CLOAK", cape == null ? "None" : cape.name(), capeThumb(cape, 38), refresh));
+		column.getChildren().add(slotButton(Slot.WINGS, "WINGS", wings == null ? "None" : wings.name(), wingsThumb(wings, 38), refresh));
+		column.getChildren().add(slotButton(Slot.AURA, "AURA", aura == null ? "None" : aura.name(), auraThumb(aura, 38), refresh));
 		net.veloclient.velo.client.namestyle.NameStyle nameStyle = net.veloclient.launcher.data.NameStyleSetting.style();
 		boolean nameOn = net.veloclient.launcher.data.NameStyleSetting.enabled();
 		Node nameThumb = new NamePreview("Aa", () -> nameStyle, 20, 46);
@@ -193,33 +210,57 @@ public final class CosmeticsView {
 				}
 			}
 		}
-		Node emoteThumb = firstOnWheel == null ? Icons.icon("sparkles", 22, Color.web("#5A5A63")) : EmoteFigureFx.create(firstOnWheel, 46, 46);
+		Node emoteThumb = firstOnWheel == null ? Icons.icon("sparkles", 22, Color.web("#5A5A63")) : EmoteFigureFx.create(firstOnWheel, 38, 38);
 		column.getChildren().add(slotButton(Slot.EMOTES, "EMOTES", onWheel == 0 ? "None" : onWheel + " on your wheel", emoteThumb, refresh));
+		String killFx = KillFxCatalog.equipped();
+		Node killFxThumb = killFx != null && KillFxCatalog.IDS.contains(killFx)
+				? new ImageView(AuraFx.killFxSnapshot(KillFxCatalog.byId(killFx).orElseThrow().kind(), KillFxCatalog.settings(killFx), 38, 38))
+				: Icons.icon("skull", 22, Color.web(killFx == null ? "#5A5A63" : "#8A8A95"));
+		column.getChildren().add(slotButton(Slot.KILLFX, "KILL EFFECT", KillFxCatalog.name(killFx), killFxThumb, refresh));
+		int worn = 0;
+		for (String s : net.veloclient.launcher.data.WearCatalog.SLOTS) {
+			if (net.veloclient.launcher.data.WearCatalog.equipped(s) != null) {
+				worn++;
+			}
+		}
+		column.getChildren().add(slotButton(Slot.WEAR, "BODYWEAR", worn == 0 ? "None" : worn + (worn == 1 ? " item" : " items"),
+				Icons.icon("hat", 22, Color.web(worn == 0 ? "#5A5A63" : "#8A8A95")), refresh));
+		if (net.veloclient.launcher.AppVersion.DEV) {   // pets are still in the dev build
+			String pet = net.veloclient.launcher.data.PetsSetting.equipped();
+			column.getChildren().add(slotButton(Slot.PETS, "PET", net.veloclient.launcher.data.PetsSetting.name(pet),
+					pet == null ? Icons.icon("sparkles", 22, Color.web("#5A5A63")) : petImage(pet, 38), refresh));
+		}
 		Region grow = new Region();
 		VBox.setVgrow(grow, Priority.ALWAYS);
-		column.getChildren().addAll(grow, loadoutsCard(refresh));
+		column.getChildren().addAll(grow, loadoutsCard(host, refresh));
 		return column;
 	}
 
 	private static Node slotButton(Slot target, String kind, String value, Node thumb, Runnable refresh) {
 		StackPane thumbBox = new StackPane(thumb);
-		thumbBox.setMinSize(52, 52);
-		thumbBox.setMaxSize(52, 52);
-		thumbBox.setStyle("-fx-background-color: -velo-surface-2; -fx-background-radius: 11;");
-		Rectangle clip = new Rectangle(52, 52);
-		clip.setArcWidth(22);
-		clip.setArcHeight(22);
+		// Compact rows: eight slots (Bodywear made it eight) and the looks card still fit a normal window.
+		thumbBox.setMinSize(40, 40);
+		thumbBox.setMaxSize(40, 40);
+		thumbBox.setStyle("-fx-background-color: -velo-surface-2; -fx-background-radius: 9;");
+		if (thumb instanceof javafx.scene.image.ImageView image) {
+			image.setFitWidth(Math.min(image.getFitWidth() <= 0 ? 40 : image.getFitWidth(), 40));
+			image.setFitHeight(Math.min(image.getFitHeight() <= 0 ? 40 : image.getFitHeight(), 40));
+			image.setPreserveRatio(true);
+		}
+		Rectangle clip = new Rectangle(40, 40);
+		clip.setArcWidth(18);
+		clip.setArcHeight(18);
 		thumbBox.setClip(clip);
 		Label kindLabel = new Label(kind);
 		kindLabel.setStyle("-fx-text-fill: -velo-text-3; -fx-font-family: 'Inter'; -fx-font-weight: bold; -fx-font-size: 10px;");
 		Label valueLabel = new Label(value);
 		valueLabel.getStyleClass().add("t-strong");
-		valueLabel.setStyle("-fx-font-size: 14px;" + (value.equals("None") ? " -fx-text-fill: -velo-text-3;" : ""));
-		VBox text = new VBox(3, kindLabel, valueLabel);
+		valueLabel.setStyle("-fx-font-size: 13px;" + (value.equals("None") ? " -fx-text-fill: -velo-text-3;" : ""));
+		VBox text = new VBox(1, kindLabel, valueLabel);
 		text.setMinWidth(0);
-		HBox row = new HBox(14, thumbBox, text);
+		HBox row = new HBox(12, thumbBox, text);
 		row.setAlignment(Pos.CENTER_LEFT);
-		row.setPadding(new Insets(9));
+		row.setPadding(new Insets(6, 9, 6, 9));
 		boolean active = slot == target;
 		row.setStyle("-fx-background-radius: 14; -fx-border-radius: 14; -fx-cursor: hand; " + (active
 				? "-fx-background-color: -velo-surface-2; -fx-border-color: -velo-accent-line; -fx-border-width: 1;"
@@ -228,7 +269,7 @@ public final class CosmeticsView {
 			Region bar = new Region();
 			bar.setMinWidth(3);
 			bar.setMaxWidth(3);
-			bar.setMinHeight(32);
+			bar.setMinHeight(26);
 			bar.setStyle("-fx-background-color: -velo-accent-text; -fx-background-radius: 2;");
 			row.getChildren().add(0, bar);
 			HBox.setMargin(bar, new Insets(0, -6, 0, -6));
@@ -285,13 +326,40 @@ public final class CosmeticsView {
 	 * no settings or name style: kept as they are). Same file as the game's Loadouts.
 	 */
 	private record Loadout(String name, String cape, String wings, String aura, WingsCatalog.Settings wingsSettings,
-			AuraEffects.Settings auraSettings, String nameStyle, Boolean nameStyleOn) {
+			AuraEffects.Settings auraSettings, String nameStyle, Boolean nameStyleOn, java.util.Map<String, String> wear,
+			java.util.Map<String, Integer> wearColors, java.util.Map<String, Integer> wearOffsets, java.util.Map<String, Integer> wearDepths,
+			String killFx, String skin, java.util.Map<String, String> extras) {
 		static Loadout current(String name) {
 			String wings = WingsCatalog.equipped();
 			String aura = AuraCatalog.equipped();
+			java.util.Map<String, String> wear = equippedWear();
+			java.util.Map<String, Integer> colors = new java.util.TreeMap<>();
+			java.util.Map<String, Integer> offsets = new java.util.TreeMap<>();
+			java.util.Map<String, Integer> depths = new java.util.TreeMap<>();
+			for (String id : wear.values()) {
+				putNonZero(colors, id, net.veloclient.launcher.data.WearCatalog.color(id));
+				putNonZero(offsets, id, net.veloclient.launcher.data.WearCatalog.offset(id));
+				putNonZero(depths, id, net.veloclient.launcher.data.WearCatalog.depth(id));
+			}
+			String killFx = KillFxCatalog.equipped();
 			return new Loadout(name, CapeLibrary.equippedCapeId().orElse(null), wings, aura,
 					wings == null ? null : WingsCatalog.settings(wings), aura == null ? null : AuraCatalog.settings(aura),
-					net.veloclient.launcher.data.NameStyleSetting.style().encode(), net.veloclient.launcher.data.NameStyleSetting.enabled());
+					net.veloclient.launcher.data.NameStyleSetting.style().encode(), net.veloclient.launcher.data.NameStyleSetting.enabled(),
+					wear, colors, offsets, depths, killFx == null ? "" : killFx, currentSkin(), currentExtras());
+		}
+
+		/** What looks keep beyond the built-in slots: the dev build's pet. */
+		private static java.util.Map<String, String> currentExtras() {
+			if (!net.veloclient.launcher.AppVersion.DEV) {
+				return null;
+			}
+			return new java.util.TreeMap<>(java.util.Map.of("pet", java.util.Objects.requireNonNullElse(net.veloclient.launcher.data.PetsSetting.equipped(), "")));
+		}
+
+		private static void putNonZero(java.util.Map<String, Integer> map, String id, int value) {
+			if (value != 0) {
+				map.put(id, value);
+			}
 		}
 
 		boolean isWorn() {
@@ -302,10 +370,15 @@ public final class CosmeticsView {
 					&& (wingsSettings == null || wings == null || wingsSettings.equals(WingsCatalog.settings(wings)))
 					&& (auraSettings == null || aura == null || auraSettings.equals(AuraCatalog.settings(aura)))
 					&& (nameStyleOn == null || nameStyleOn == net.veloclient.launcher.data.NameStyleSetting.enabled()
-							&& (!nameStyleOn || java.util.Objects.equals(nameStyle, net.veloclient.launcher.data.NameStyleSetting.style().encode())));
+							&& (!nameStyleOn || java.util.Objects.equals(nameStyle, net.veloclient.launcher.data.NameStyleSetting.style().encode())))
+					&& (wear == null || wear.equals(equippedWear()))
+					&& (killFx == null || killFx.equals(java.util.Objects.requireNonNullElse(KillFxCatalog.equipped(), "")))
+					&& (skin == null || skin.equals(currentSkin()))
+					&& (extras == null || !net.veloclient.launcher.AppVersion.DEV || extras.get("pet") == null
+							|| extras.get("pet").equals(java.util.Objects.requireNonNullElse(net.veloclient.launcher.data.PetsSetting.equipped(), "")));
 		}
 
-		void wear() {
+		void wear(Host host) {
 			if (cape == null) {
 				CapeLibrary.unequip();
 			} else {
@@ -325,7 +398,55 @@ public final class CosmeticsView {
 						nameStyleOn && net.veloclient.launcher.social.StoreApi.isPlusCached());
 				NameStyleEditor.forget();
 			}
+			if (wear != null) {
+				net.veloclient.launcher.data.WearCatalog.clearPreview();
+				for (String s : net.veloclient.launcher.data.WearCatalog.SLOTS) {
+					String id = wear.get(s);
+					if (id != null) {
+						net.veloclient.launcher.data.WearCatalog.setColor(id, wearColors == null ? 0 : wearColors.getOrDefault(id, 0));
+						net.veloclient.launcher.data.WearCatalog.setPlacement(id, wearOffsets == null ? 0 : wearOffsets.getOrDefault(id, 0), wearDepths == null ? 0 : wearDepths.getOrDefault(id, 0));
+					}
+					net.veloclient.launcher.data.WearCatalog.equip(s, id);
+				}
+			}
+			if (killFx != null) {
+				KillFxCatalog.equip(killFx.isEmpty() ? null : killFx);
+			}
+			if (extras != null && extras.get("pet") != null && net.veloclient.launcher.AppVersion.DEV) {
+				net.veloclient.launcher.data.PetsSetting.equip(extras.get("pet").isEmpty() ? null : extras.get("pet"));
+			}
+			if (skin != null && !skin.equals(SkinLibrary.equippedId()) && host.session() != null) {
+				SkinLibrary.Skin chosen = SkinLibrary.all().stream().filter(s -> s.id().equals(skin)).findFirst().orElse(null);
+				if (chosen != null) {
+					// Uploading to Mojang takes a moment (and can be refused for changing too often).
+					wantedSkin = chosen.id();
+					host.withFreshSession(fresh -> SkinsSection.run(() -> {
+						SkinLibrary.equip(chosen, fresh.minecraftAccessToken(), fresh.uuid());
+						return chosen;
+					}, done -> CosmeticUi.forgetSkin(), error -> {
+					}));
+				}
+			}
 		}
+	}
+
+	/** What's in every bodywear slot: slot -> item id. */
+	private static java.util.Map<String, String> equippedWear() {
+		java.util.Map<String, String> out = new java.util.TreeMap<>();
+		for (String s : net.veloclient.launcher.data.WearCatalog.SLOTS) {
+			String id = net.veloclient.launcher.data.WearCatalog.equipped(s);
+			if (id != null) {
+				out.put(s, id);
+			}
+		}
+		return out;
+	}
+
+	/** The skin a loadout asked for while its upload runs (or was refused - it stays the loadout's skin). */
+	private static String wantedSkin;
+
+	private static String currentSkin() {
+		return wantedSkin != null ? wantedSkin : SkinLibrary.equippedId();
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -381,12 +502,20 @@ public final class CosmeticsView {
 		}
 	}
 
-	private static void installLoadoutSync() {
+	/** Keeps the worn loadout in step with every change, wherever it's made (Locker, Store pages) - from launcher start. */
+	public static void installLoadoutSync() {
 		if (!syncInstalled) {
 			syncInstalled = true;
 			WingsCatalog.SETTINGS_LISTENERS.add(CosmeticsView::syncActiveLoadout);
 			AuraCatalog.SETTINGS_LISTENERS.add(CosmeticsView::syncActiveLoadout);
 			CapeLibrary.EQUIP_LISTENERS.add(CosmeticsView::syncActiveLoadout);
+			net.veloclient.launcher.data.WearCatalog.LISTENERS.add(CosmeticsView::syncActiveLoadout);
+			KillFxCatalog.LISTENERS.add(CosmeticsView::syncActiveLoadout);
+			net.veloclient.launcher.data.PetsSetting.LISTENERS.add(CosmeticsView::syncActiveLoadout);
+			SkinLibrary.LISTENERS.add(() -> {
+				wantedSkin = null;
+				syncActiveLoadout();
+			});
 		}
 	}
 
@@ -415,7 +544,7 @@ public final class CosmeticsView {
 		}
 	}
 
-	private static Node loadoutsCard(Runnable refresh) {
+	private static Node loadoutsCard(Host host, Runnable refresh) {
 		Label title = new Label("Loadouts");
 		title.getStyleClass().add("t-strong");
 		FlowPane chips = new FlowPane(6, 6);
@@ -431,7 +560,7 @@ public final class CosmeticsView {
 			chip.setOnAction(e -> {
 				// Not synced while switching: applying B's colours mustn't overwrite A when both use the same items.
 				setActiveLoadout("");
-				loadout.wear();
+				loadout.wear(host);
 				setActiveLoadout(loadout.name());
 				// Show the look just put on, not what was being browsed before.
 				selectedCape = null;
@@ -466,7 +595,7 @@ public final class CosmeticsView {
 		save.setOnAction(e -> {
 			TextInputDialog dialog = new TextInputDialog("Look " + (list.size() + 1));
 			dialog.setTitle("Save loadout");
-			dialog.setHeaderText("Name this look - cape, wings and aura, with their sizes, colours and motion");
+			dialog.setHeaderText("Name this look - cloak, wings, aura, bodywear, kill effect, skin and name style, with their colours and settings");
 			DialogStyling.apply(dialog);
 			dialog.showAndWait().map(String::strip).filter(n -> !n.isEmpty()).ifPresent(name -> {
 				List<Loadout> next = loadouts();
@@ -493,6 +622,9 @@ public final class CosmeticsView {
 			case SKIN, NAME -> "#bca6ff";
 			case CAPE -> "#5ac8ff";
 			case EMOTES -> net.veloclient.launcher.data.EmoteCatalog.byId(selectedEmoteId()).map(net.veloclient.launcher.data.EmoteCatalog.EmoteType::accent).orElse("#8b7cf6");
+			case KILLFX -> KillFxCatalog.byId(selectedKillFxId()).map(KillFxCatalog.KillFxType::accent).orElse("#ff5c5c");
+			case WEAR -> "#ffb13b";
+			case PETS -> net.veloclient.launcher.data.PetsSetting.byId(selectedPetId()).map(net.veloclient.launcher.data.PetsSetting.Pet::accent).orElse("#ff3a2a");
 		};
 		StackPane stage = new StackPane();
 		stage.setMinWidth(300);
@@ -536,11 +668,14 @@ public final class CosmeticsView {
 		HBox lookToggle = new HBox(2);
 		lookToggle.getStyleClass().add("segment-bar");
 		String only = switch (slot) {
-			case CAPE -> "Cape only";
+			case CAPE -> "Cloak only";
 			case WINGS -> "Wings only";
 			case AURA -> "Aura only";
 			case SKIN, NAME -> "Skin only";
 			case EMOTES -> "Emote";
+			case KILLFX -> "Kill effect";
+			case WEAR -> "Bodywear";
+			case PETS -> "Pet";
 		};
 		for (boolean full : new boolean[] {true, false}) {
 			Button b = new Button(full ? "Full look" : only);
@@ -561,11 +696,15 @@ public final class CosmeticsView {
 		lookToggle.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
 		StackPane.setAlignment(lookToggle, Pos.TOP_LEFT);
 		StackPane.setMargin(lookToggle, new Insets(14, 0, 0, 14));
-		if (host.session() != null && slot != Slot.EMOTES) {
+		if (host.session() != null && slot != Slot.EMOTES && slot != Slot.KILLFX && slot != Slot.PETS) {
 			stage.getChildren().add(lookToggle);
 		}
 
-		if (slot == Slot.EMOTES) {
+		if (slot == Slot.PETS) {
+			viewerBox.getChildren().setAll(petStage());
+		} else if (slot == Slot.KILLFX) {
+			viewerBox.getChildren().setAll(killFxStage());
+		} else if (slot == Slot.EMOTES) {
 			// you, doing the emote you picked (with its particles)
 			net.veloclient.launcher.data.EmoteCatalog.EmoteType emote = net.veloclient.launcher.data.EmoteCatalog.byId(selectedEmoteId()).orElse(null);
 			if (emote != null) {
@@ -579,6 +718,18 @@ public final class CosmeticsView {
 		} else if (fullLook && host.session() != null) {
 			outfitViewer(host, viewerBox, bottom);
 		} else switch (slot) {
+			case WEAR -> {
+				if (host.session() != null) {
+					viewerBox.getChildren().setAll(CosmeticUi.spinner(30));
+					CosmeticUi.skin(host.session(), data -> {
+						double yaw = "back".equals(wearSlot) ? 160 : 25;
+						Node viewer = data == null ? null : PlayerSkin3DView.createViewer(data.pngBytes(), data.slim(), null, true, yaw, false);
+						if (viewer != null) {
+							viewerBox.getChildren().setAll(viewer);
+						}
+					});
+				}
+			}
 			case CAPE -> capeViewer(host, viewerBox);
 			case WINGS -> wingsViewer(host, viewerBox, bottom);
 			case AURA -> {
@@ -933,7 +1084,7 @@ public final class CosmeticsView {
 				error(owner, "Import failed", ex.getMessage());
 			}
 		}));
-		VBox panel = panelShell("Capes", capes.size(), importButton, storeLink(host, "Get more"));
+		VBox panel = panelShell("Cloaks", capes.size(), importButton, storeLink(host, "Get more"));
 		HBox filters = new HBox(6);
 		String[] names = {"All", "Animated", "Static"};
 		for (int i = 0; i < names.length; i++) {
@@ -950,7 +1101,7 @@ public final class CosmeticsView {
 			filters.getChildren().add(chip);
 		}
 		FlowPane grid = StoreTiles.grid(118, 10);
-		grid.getChildren().add(cell(Icons.icon("close", 26, Color.web("#5A5A63")), "#000000", "No cape", equipped == null, selected == null, () -> {
+		grid.getChildren().add(cell(Icons.icon("close", 26, Color.web("#5A5A63")), "#000000", "No cloak", equipped == null, selected == null, () -> {
 			CapeLibrary.unequip();
 			selectedCape = null;
 			refresh.run();
@@ -986,7 +1137,7 @@ public final class CosmeticsView {
 					CapeLibrary.unequip();
 				} else {
 					CapeLibrary.equip(chosen.id());
-					Toasts.show(panel, "Cape equipped");
+					Toasts.show(panel, "Cloak equipped");
 				}
 				refresh.run();
 			}, () -> {
@@ -1084,7 +1235,7 @@ public final class CosmeticsView {
 				WingsCatalog.Settings s = current[0];
 				float v = n.floatValue();
 				current[0] = new WingsCatalog.Settings(field == 0 ? v : s.scale(), field == 1 ? -v : s.offsetY(), field == 2 ? v : s.offsetZ(),
-						field == 3 ? v : s.spread(), field == 4 ? v : s.flapSpeed(), field == 5 ? v : s.flapStrength());
+						field == 3 ? v : s.spread(), field == 4 ? v : s.flapSpeed(), field == 5 ? v : s.flapStrength(), s.color());
 				if (wingsModel[0] != null) {
 					wingsModel[0].settings(current[0]);
 				}
@@ -1095,6 +1246,27 @@ public final class CosmeticsView {
 				}
 			});
 			slider.setOnMouseReleased(e -> WingsCatalog.setSettings(type.id(), current[0]));
+		}
+		if (net.veloclient.velo.client.cosmetics.wings.WingRigs.recolorable(type.id())) {
+			// Colour: the hues round the wheel, then white, then a cycling rainbow.
+			int white = net.veloclient.velo.client.cosmetics.wings.WingRigs.TINT_WHITE;
+			int rainbow = net.veloclient.velo.client.cosmetics.wings.WingRigs.TINT_RAINBOW;
+			Slider colour = new Slider(1, rainbow, current[0].color() <= 0 ? white : current[0].color());
+			colour.setBlockIncrement(1);
+			box.getChildren().add(sliderRow("Colour", colour, () -> colour.getValue() >= rainbow - 0.5 ? "Rainbow"
+					: colour.getValue() >= white - 0.5 ? "White" : Math.round(colour.getValue() - 1) + "°"));
+			colour.valueProperty().addListener((obs, o, n) -> {
+				current[0] = current[0].withColor((int) Math.round(n.doubleValue()));
+				if (wingsModel[0] != null) {
+					wingsModel[0].settings(current[0]);
+				}
+			});
+			colour.valueChangingProperty().addListener((obs, was, now) -> {
+				if (!now) {
+					WingsCatalog.setSettings(type.id(), current[0]);
+				}
+			});
+			colour.setOnMouseReleased(e -> WingsCatalog.setSettings(type.id(), current[0]));
 		}
 		Label note = new Label("Saved for the game - it picks them up the next time it starts.");
 		note.getStyleClass().add("t-muted");
@@ -1171,6 +1343,293 @@ public final class CosmeticsView {
 			}, null));
 		}
 		return panel;
+	}
+
+	// Kill effects
+
+	private static String selectedKillFxId() {
+		if (selectedKillFx == null) {
+			String equipped = KillFxCatalog.equipped();
+			return equipped == null ? "" : equipped;
+		}
+		return selectedKillFx;
+	}
+
+	/** The stage's kill effect card (Store effects), the sound starting with it when one was just picked. */
+	private static final boolean[] killFxSound = {false};
+	private static Node killFxCard;
+
+	// ---- Pets (dev build) ----
+
+	private static String selectedPet;
+
+	private static String selectedPetId() {
+		if (selectedPet == null) {
+			String equipped = net.veloclient.launcher.data.PetsSetting.equipped();
+			selectedPet = equipped == null ? "" : equipped;
+		}
+		return selectedPet;
+	}
+
+	private static ImageView petImage(String id, double size) {
+		var in = CosmeticsView.class.getResourceAsStream("/net/veloclient/launcher/pets/" + id + ".jpg");
+		ImageView view = new ImageView(in == null ? null : new javafx.scene.image.Image(in, size * 2, size * 2, true, true));
+		view.setFitWidth(size);
+		view.setFitHeight(size);
+		javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle(size, size);
+		clip.setArcWidth(size * 0.35);
+		clip.setArcHeight(size * 0.35);
+		view.setClip(clip);
+		return view;
+	}
+
+	/** The picked pet, big. */
+	private static Node petStage() {
+		String id = selectedPetId();
+		if (id.isEmpty()) {
+			Label none = new Label("No pet - pick one on the right");
+			none.getStyleClass().add("t-muted");
+			return none;
+		}
+		VBox box = new VBox(14, petImage(id, 340));
+		Label name = new Label(net.veloclient.launcher.data.PetsSetting.name(id));
+		name.getStyleClass().add("t-heading");
+		box.getChildren().add(name);
+		box.setAlignment(Pos.CENTER);
+		return box;
+	}
+
+	private static Node petsPanel(Runnable refresh) {
+		String equipped = net.veloclient.launcher.data.PetsSetting.equipped();
+		String selected = selectedPetId();
+		VBox panel = panelShell("Pets", net.veloclient.launcher.data.PetsSetting.ALL.size());
+		FlowPane grid = StoreTiles.grid(118, 10);
+		grid.getChildren().add(cell(Icons.icon("close", 26, Color.web("#5A5A63")), "#8a8a95", "None", equipped == null, selected.isEmpty(), () -> {
+			selectedPet = "";
+			refresh.run();
+		}));
+		for (var pet : net.veloclient.launcher.data.PetsSetting.ALL) {
+			grid.getChildren().add(cell(petImage(pet.id(), 104), pet.accent(), pet.name(), pet.id().equals(equipped), pet.id().equals(selected), () -> {
+				selectedPet = pet.id();
+				refresh.run();
+			}));
+		}
+		VBox content = new VBox(16, grid);
+		Label hint = new Label("Dev build: your pet follows you in the dev client. Tricks, size and when it reacts to hits are the Pets (Dev) module's settings in game.");
+		hint.getStyleClass().add("stage-hint");
+		hint.setWrapText(true);
+		content.getChildren().add(hint);
+		panel.getChildren().add(scroll(content));
+		boolean isEquipped = selected.isEmpty() ? equipped == null : selected.equals(equipped);
+		if (!isEquipped) {
+			panel.getChildren().add(actionBar(net.veloclient.launcher.data.PetsSetting.name(selected.isEmpty() ? null : selected), false, () -> {
+				net.veloclient.launcher.data.PetsSetting.equip(selected.isEmpty() ? null : selected);
+				Toasts.show(panel, selected.isEmpty() ? "Pet put away" : "Pet picked - it joins you in your next game");
+				refresh.run();
+			}, null));
+		}
+		return panel;
+	}
+
+	private static Node killFxStage() {
+		String id = selectedKillFxId();
+		if (!KillFxCatalog.IDS.contains(id)) {
+			Label line = new Label(id.isEmpty() ? "No kill effect" : KillFxCatalog.name(id));
+			line.getStyleClass().add("t-strong");
+			Label hint = new Label(id.isEmpty() ? "Pick one on the right" : "Free · vanilla particles and sounds - see it in game");
+			hint.getStyleClass().add("t-muted");
+			VBox box = new VBox(8, Icons.icon("skull", 34, Color.web("#5A5A63")), line, hint);
+			box.setAlignment(Pos.CENTER);
+			killFxCard = null;
+			return box;
+		}
+		KillFxCatalog.KillFxType type = KillFxCatalog.byId(id).orElseThrow();
+		killFxCard = AuraFx.killFxCard(type.kind(), () -> KillFxCatalog.settings(id), 340, 420, () -> {
+			if (killFxSound[0]) {
+				killFxSound[0] = false;
+				KillFxSound.play(id);
+			}
+		});
+		return killFxCard;
+	}
+
+	private static Node killFxPanel(Host host, Runnable refresh) {
+		String equipped = KillFxCatalog.equipped();
+		String selected = selectedKillFxId();
+		List<KillFxCatalog.KillFxType> owned = KillFxCatalog.all().stream().filter(k -> KillFxCatalog.owns(k.id())).toList();
+		VBox panel = panelShell("Kill effects", owned.size() + KillFxCatalog.FREE.size(), storeLink(host, "Get more"));
+		FlowPane grid = StoreTiles.grid(118, 10);
+		Runnable pick = refresh;
+		java.util.function.BiConsumer<String, Node> add = (id, art) -> grid.getChildren().add(cell(art,
+				KillFxCatalog.byId(id).map(KillFxCatalog.KillFxType::accent).orElse("#8a8a95"), KillFxCatalog.name(id.isEmpty() ? null : id),
+				id.isEmpty() ? equipped == null : id.equals(equipped), id.equals(selected), () -> {
+					selectedKillFx = id;
+					killFxSound[0] = KillFxCatalog.IDS.contains(id);
+					KillFxSound.stop();
+					pick.run();
+				}));
+		add.accept("", Icons.icon("close", 26, Color.web("#5A5A63")));
+		for (String id : KillFxCatalog.FREE.keySet()) {
+			Label free = new Label("FREE");
+			free.setStyle("-fx-text-fill: #7be07b; -fx-font-weight: bold; -fx-font-size: 11px;");
+			VBox art = new VBox(6, Icons.icon("skull", 26, Color.web("#C9C9D1")), free);
+			art.setAlignment(Pos.CENTER);
+			art.setMinSize(150, 104);
+			add.accept(id, art);
+		}
+		for (KillFxCatalog.KillFxType type : owned) {
+			ImageView art = new ImageView(AuraFx.killFxSnapshot(type.kind(), KillFxCatalog.settings(type.id()), 150, 104));
+			art.setFitWidth(150);
+			art.setFitHeight(104);
+			add.accept(type.id(), art);
+		}
+		VBox content = new VBox(16, grid);
+		// Settings: how loud, which colour, play it again with its sound.
+		VBox settings = new VBox(10);
+		Label title = new Label("Settings");
+		title.getStyleClass().add("t-heading");
+		settings.getChildren().addAll(title, KillFxDetailView.volume());
+		if (KillFxCatalog.IDS.contains(selected)) {
+			KillFxCatalog.KillFxType type = KillFxCatalog.byId(selected).orElseThrow();
+			Button replay = new Button("Play with sound");
+			replay.getStyleClass().add("secondary-button");
+			replay.setOnAction(e -> {
+				KillFxSound.stop();
+				killFxSound[0] = true;
+				AuraFx.restartKillFx(killFxCard);
+			});
+			settings.getChildren().addAll(replay, KillFxDetailView.colours(type, s -> { }));
+		} else if (selected.equals("free_burst") || selected.equals("free_confetti")) {
+			settings.getChildren().add(freeColours());
+		}
+		Label when = new Label("When it plays (only your kills, any player...) is the Kill Effects module's setting in game.");
+		when.getStyleClass().add("stage-hint");
+		when.setWrapText(true);
+		settings.getChildren().add(when);
+		settings.getStyleClass().add("card");
+		settings.setPadding(new Insets(16));
+		content.getChildren().add(settings);
+		panel.getChildren().add(scroll(content));
+		boolean isEquipped = selected.isEmpty() ? equipped == null : selected.equals(equipped);
+		if (!isEquipped || !selected.isEmpty()) {
+			panel.getChildren().add(actionBar(KillFxCatalog.name(selected.isEmpty() ? null : selected), isEquipped, () -> {
+				KillFxCatalog.equip(isEquipped || selected.isEmpty() ? null : selected);
+				if (!isEquipped && !selected.isEmpty()) {
+					Toasts.show(panel, "Kill effect equipped - it plays in your next game");
+				}
+				refresh.run();
+			}, null));
+		}
+		return panel;
+	}
+
+	/**
+	 * The Bodywear tab: a slot at a time (hats, ears, glasses, watches, shoes, back); click an item you own to try it on,
+	 * Wear / Take off, and a colour for recolourable ones. Every slot is worn at the same time.
+	 */
+	private static Node wearPanel(Host host, Runnable refresh) {
+		String equipped = net.veloclient.launcher.data.WearCatalog.equipped(wearSlot);
+		String selected = selectedWear == null ? (equipped == null ? "" : equipped) : selectedWear;
+		net.veloclient.launcher.data.WearCatalog.setPreview(wearSlot, selected.isEmpty() ? null : selected);
+		var all = net.veloclient.launcher.data.WearCatalog.all();
+		List<net.veloclient.launcher.data.WearCatalog.WearType> owned = all.stream()
+				.filter(w -> net.veloclient.launcher.data.WearCatalog.owns(w.id())).toList();
+		VBox panel = panelShell("Bodywear", owned.size(), storeLink(host, "Get more"));
+		// The slots as small icon chips that wrap onto a second row instead of being cut off.
+		FlowPane chips = new FlowPane(4, 4);
+		chips.getStyleClass().add("wear-slot-bar");
+		for (int i = 0; i < net.veloclient.launcher.data.WearCatalog.SLOTS.size(); i++) {
+			String s = net.veloclient.launcher.data.WearCatalog.SLOTS.get(i);
+			boolean active = s.equals(wearSlot);
+			Button chip = new Button(net.veloclient.launcher.data.WearCatalog.SLOT_NAMES.get(i),
+					Icons.icon(net.veloclient.launcher.data.WearCatalog.SLOT_ICONS.get(i), 14, active ? Color.WHITE : Color.web("#A6A6B0"), 1.8));
+			chip.getStyleClass().setAll("button", "wear-slot-chip", "no-motion");
+			chip.setGraphicTextGap(5);
+			chip.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+			if (active) {
+				chip.getStyleClass().add("wear-slot-chip-active");
+			}
+			chip.setOnAction(e -> {
+				net.veloclient.launcher.data.WearCatalog.clearPreview();
+				wearSlot = s;
+				selectedWear = null;
+				refresh.run();
+			});
+			chips.getChildren().add(chip);
+		}
+		FlowPane grid = StoreTiles.grid(118, 10);
+		java.util.function.BiConsumer<String, Node> add = (id, art) -> grid.getChildren().add(cell(art,
+				id.isEmpty() ? "#8a8a95" : all.stream().filter(w -> w.id().equals(id)).findFirst().map(net.veloclient.launcher.data.WearCatalog.WearType::accent).orElse("#8a8a95"),
+				id.isEmpty() ? "None" : all.stream().filter(w -> w.id().equals(id)).findFirst().map(net.veloclient.launcher.data.WearCatalog.WearType::name).orElse(id),
+				id.isEmpty() ? equipped == null : id.equals(equipped), id.equals(selected), () -> {
+					selectedWear = id;
+					refresh.run();
+				}));
+		add.accept("", Icons.icon("close", 26, Color.web("#5A5A63")));
+		for (var type : owned) {
+			if (type.slot().equals(wearSlot)) {
+				add.accept(type.id(), StoreTiles.wearArt(type, 150));
+			}
+		}
+		VBox content = new VBox(16, chips, grid);
+		var selectedType = all.stream().filter(w -> w.id().equals(selected)).findFirst().orElse(null);
+		boolean height = selectedType != null && net.veloclient.launcher.data.WearCatalog.owns(selectedType.id())
+				&& net.veloclient.launcher.data.WearCatalog.adjustable(selectedType.slot());
+		if (selectedType != null && (selectedType.tintable() || height)) {
+			VBox settings = new VBox(14);
+			if (selectedType.tintable()) {
+				settings.getChildren().add(WearDetailView.colour(selectedType));
+			}
+			if (height) {
+				settings.getChildren().add(WearDetailView.placement(selectedType));
+			}
+			settings.getStyleClass().add("card");
+			settings.setPadding(new Insets(16));
+			content.getChildren().add(settings);
+		}
+		if (owned.stream().noneMatch(w -> w.slot().equals(wearSlot))) {
+			Label none = new Label("Nothing for this slot yet - the Store's Bodywear tab has hats, ears, glasses, masks, chains, watches, shoes and backpacks.");
+			none.getStyleClass().add("t-muted");
+			none.setWrapText(true);
+			content.getChildren().add(none);
+		}
+		panel.getChildren().add(scroll(content));
+		boolean isEquipped = selected.isEmpty() ? equipped == null : selected.equals(equipped);
+		if (!selected.isEmpty()) {
+			panel.getChildren().add(actionBar(selectedType == null ? selected : selectedType.name(), isEquipped, () -> {
+				net.veloclient.launcher.data.WearCatalog.equip(wearSlot, isEquipped ? null : selected);
+				net.veloclient.launcher.data.WearCatalog.clearPreview();
+				selectedWear = null;
+				refresh.run();
+			}, null));
+		}
+		return panel;
+	}
+
+	/** The free Color Burst / Confetti Rain colour. */
+	private static Node freeColours() {
+		Label label = new Label("Colour (Color Burst, Confetti Rain)");
+		label.getStyleClass().add("page-subtitle");
+		HBox swatches = new HBox(6);
+		int current = KillFxCatalog.freeColor() & 0xFFFFFF;
+		for (int i = 0; i < AuraEffects.PALETTE.length; i++) {
+			int rgb = AuraEffects.PALETTE[i];
+			Region cell = new Region();
+			cell.setMinSize(22, 22);
+			cell.setMaxSize(22, 22);
+			cell.setStyle(String.format("-fx-background-color: #%06x; -fx-background-radius: 6; -fx-border-radius: 6; -fx-border-width: 2; -fx-cursor: hand;"
+					+ " -fx-border-color: %s;", rgb, rgb == current ? "white" : "transparent"));
+			javafx.scene.control.Tooltip.install(cell, new javafx.scene.control.Tooltip(AuraEffects.PALETTE_NAMES[i]));
+			cell.setOnMouseClicked(e -> {
+				KillFxCatalog.setFreeColor(0xFF000000 | rgb);
+				for (Node other : swatches.getChildren()) {
+					other.setStyle(other.getStyle().replaceAll("-fx-border-color: [^;]*;", "-fx-border-color: transparent;"));
+				}
+				cell.setStyle(cell.getStyle().replaceAll("-fx-border-color: [^;]*;", "-fx-border-color: white;"));
+			});
+			swatches.getChildren().add(cell);
+		}
+		return new VBox(6, label, swatches);
 	}
 
 	// Emotes

@@ -1,0 +1,10 @@
+{
+ "slot": "head",
+ "name": "Royal Crown",
+ "price": 2400,
+ "accent": "#f0c442",
+ "description": "A golden crown with eight points and rubies and sapphires all the way round.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

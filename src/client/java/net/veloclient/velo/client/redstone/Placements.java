@@ -194,7 +194,11 @@ public final class Placements {
 	 * Middle click: the first schematic block along your view that the world is still missing,
 	 * picked from your inventory like vanilla pick block. True when it handled the click.
 	 */
+	/** The block the last successful {@link #pickLooked} picked. */
+	static Object lastPicked;
+
 	public static boolean pickLooked() {
+		lastPicked = null;
 		var player = net.veloclient.velo.client.pvp.PvpCompat.localPlayer();
 		Object level = RmWorld.clientLevel();
 		if (player == null || level == null || PLACEMENTS.isEmpty()) {
@@ -219,6 +223,7 @@ public final class Placements {
 			}
 			if (state != null && world != state && !RmRender.sameFunction(state, world)) {
 				if (RmWorld.pickItem(state)) {
+					lastPicked = state;
 					return true;
 				}
 				RmState.error("You don't have " + RmWorld.id(state).replace("minecraft:", "").replace('_', ' '));

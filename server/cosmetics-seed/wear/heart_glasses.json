@@ -1,0 +1,10 @@
+{
+ "slot": "face",
+ "name": "Heart Glasses",
+ "price": 900,
+ "accent": "#ff4f9a",
+ "description": "Pink heart-shaped sunglasses. Love is in the air.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

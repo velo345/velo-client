@@ -124,6 +124,10 @@ public final class ModuleStateStore {
 				for (ConfigField field : configurable.configFields()) {
 					Object value = saved.fields().get(field.label());
 					if (value == null) {
+						// Settings saved before capes were renamed cloaks.
+						value = saved.fields().get(field.label().replace("Cloak", "Cape"));
+					}
+					if (value == null) {
 						continue;
 					}
 					if (field instanceof ConfigField.SliderField slider && value instanceof Number number) {

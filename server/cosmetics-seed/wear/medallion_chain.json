@@ -1,0 +1,10 @@
+{
+ "slot": "neck",
+ "name": "Gold Medallion",
+ "price": 1400,
+ "accent": "#f0c64d",
+ "description": "A gold chain with a big round medallion on your chest.",
+ "bone": "body",
+ "mirror": null,
+ "tint": true
+}

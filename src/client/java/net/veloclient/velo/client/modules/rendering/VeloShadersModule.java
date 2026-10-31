@@ -39,6 +39,8 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 
 	// Water
 	private boolean water = true;
+	/** Velo's own animated lava (off by default: plain Minecraft lava reads better to most). */
+	private boolean shaderLava = false;
 	private double waveHeight = 1.0;
 	private double reflections = 0.85;
 	private double waterClarity = 0.45;
@@ -120,6 +122,12 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 		return active;
 	}
 
+	/** Whether lava is meshed with Velo's lava look (VeloFluidSodiumMixin). Chunk-builder threads. */
+	public static boolean shaderLava() {
+		VeloShadersModule m = instance;
+		return active && m != null && m.shaderLava;
+	}
+
 	/** Clear glass is meshed into the translucent pass (VeloFoliageSodiumMixin) so all of it can reflect. Chunk-builder threads. */
 	public static boolean glassReflections() {
 		VeloShadersModule m = instance;
@@ -128,7 +136,24 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 
 	public static boolean skyActive() {
 		VeloShadersModule m = instance;
-		return active && m != null && m.sky;
+		return active && m != null && m.sky && dimension() == 0;
+	}
+
+	/**
+	 * 0 = a world with sun and sky, 1 = the nether, 2 = the end (also servers' extra nether / end worlds). Nether and
+	 * end have no sky light and their "time" doesn't move the sun - sun light, shadows, god rays, clouds, stars and the
+	 * overworld sky colours made them look completely wrong; the shaders give them their own steady ambient instead.
+	 */
+	public static int dimension() {
+		String id = net.veloclient.velo.client.util.ClientCompat.dimensionId();
+		if (id == null) {
+			return 0;
+		}
+		String path = id.substring(id.indexOf(':') + 1);
+		if (path.contains("nether")) {
+			return 1;
+		}
+		return path.equals("the_end") || path.endsWith("_the_end") || path.endsWith("_end") ? 2 : 0;
 	}
 
 	// Dev: -Dvelo.shaderAB=true cycles through feature sets every 8 s (logged) to measure what each costs.
@@ -152,7 +177,7 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 	public static boolean shadowMapActive() {
 		VeloShadersModule m = instance;
 		int ab = abPhase();
-		return lightActive() && m.shadowMap && m.rtShadows > 0.01 && SODIUM && ab != 2;
+		return lightActive() && m.shadowMap && m.rtShadows > 0.01 && SODIUM && ab != 2 && dimension() == 0;
 	}
 
 	/** Entities are drawn into the shadow map (real silhouettes; replaces the capsule shadows). */
@@ -249,6 +274,16 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 		info[14] = VeloShadowMap.SIZE;
 		// VeloLightInfo3.y: shader cloud coverage (the light pass draws the volumetric layer).
 		info[9] = abPhase() == 1 ? 0f : (float) m.skyClouds;
+		if (dimension() != 0) {
+			// Nether / end: no sun - no sun shadows, rays, sunlit fog or clouds. AO and coloured light stay.
+			info[1] = 0f;
+			info[6] = 0f;
+			info[7] = 0f;
+			info[8] = 0f;
+			info[9] = 0f;
+			info[11] = 0f;
+			info[12] = 0f;
+		}
 	}
 
 	private static int countHandheld() {
@@ -278,13 +313,15 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 	 */
 	public static void writeGlobals(float[] floats, int[] packs, double cameraX, double cameraY, double cameraZ, float rain) {
 		VeloShadersModule m = instance;
+		int dimension = dimension();
 		double a = sunAngle;
-		float sx = (float) -Math.sin(a);
-		float sy = (float) Math.cos(a);
+		// Nether / end: a fixed light from straight above (their time of day means nothing).
+		float sx = dimension == 0 ? (float) -Math.sin(a) : 0f;
+		float sy = dimension == 0 ? (float) Math.cos(a) : 1f;
 		floats[0] = sx;
 		floats[1] = sy;
 		// The sun moves in the x/y plane: z carries extra settings as an integer (velo_lib.glsl velo_extra()).
-		floats[2] = active && m != null ? (float) (b(m.glassClarity) | (b(m.redstoneGlow) << 8)) : 0f;
+		floats[2] = active && m != null ? (float) (b(m.glassClarity) | (b(m.redstoneGlow) << 8) | (dimension << 16)) : 0f;
 		floats[3] = smoothstep(-0.12f, 0.22f, sy);
 		floats[4] = (float) (cameraX - Math.floor(cameraX / 2048.0) * 2048.0);
 		floats[5] = (float) cameraY;
@@ -298,21 +335,22 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 			java.util.Arrays.fill(packs, 0);
 			return;
 		}
-		int flags = (m.water ? 1 : 0) | (m.sky ? 2 : 0) | (m.groundFog ? 4 : 0) | (lightActive() && m.volumetricFog > 0.01 ? 8 : 0)
+		boolean open = dimension == 0;
+		int flags = (m.water ? 1 : 0) | (m.sky && open ? 2 : 0) | (m.groundFog && open ? 4 : 0) | (lightActive() && m.volumetricFog > 0.01 && open ? 8 : 0)
 				| ((int) Math.round(Math.max(0, Math.min(1, m.emissiveGlow)) * 7) << 5); // bits 5-7: emissive glow 0-7
 		packs[0] = pack(m.lighting / 1.5, m.sunWarmth, m.nightBrightness, m.wavingPlants);
 		packs[1] = rgbA(m.blockLight, m.blockLightStrength);
 		packs[2] = rgbA(m.waterTint, m.waterClarity);
 		packs[3] = b(m.waveHeight / 2) | (b(m.reflections) << 8) | (b(m.fogDensity) << 16) | (flags << 24);
 		packs[4] = pack(m.bloom / 1.5, m.exposure / 2, m.contrast / 2, m.saturation / 2);
-		packs[5] = pack(m.vignette, m.sunSize, m.sunGlow, m.moonSize);
-		packs[6] = b(m.starBrightness) | (b(m.starDensity) << 8) | (b(m.aurora) << 16) | ((moonPhase & 7) << 24);
-		packs[7] = b(m.fogSkyBlend) | (b(m.sunsetIntensity) << 8) | (b(m.tintAmount) << 16);
+		packs[5] = open ? pack(m.vignette, m.sunSize, m.sunGlow, m.moonSize) : pack(m.vignette, 0, 0, 0);
+		packs[6] = open ? b(m.starBrightness) | (b(m.starDensity) << 8) | (b(m.aurora) << 16) | ((moonPhase & 7) << 24) : 0;
+		packs[7] = open ? b(m.fogSkyBlend) | (b(m.sunsetIntensity) << 8) | (b(m.tintAmount) << 16) : b(m.tintAmount) << 16;
 		packs[8] = rgbA(m.zenithTint, m.zenithTintAmount);
 		packs[9] = rgbA(m.horizonTint, m.horizonTintAmount);
 		packs[10] = rgbA(m.sunsetColor, 1);
 		packs[11] = rgbA(m.tint, m.tintAmount);
-		packs[12] = pack(m.milkyWay, m.shootingStars, m.skyClouds, 0);
+		packs[12] = open ? pack(m.milkyWay, m.shootingStars, m.skyClouds, 0) : 0;
 		packs[13] = 0;
 		packs[14] = 0;
 		packs[15] = 0;
@@ -597,6 +635,14 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 		fields.add(percent("Reflections", 1, () -> reflections, v -> reflections = v));
 		fields.add(percent("Water Clarity", 1, () -> waterClarity, v -> waterClarity = v));
 		fields.add(new ConfigField.ColorField("Water Color", () -> waterTint, v -> waterTint = v & 0xFFFFFF, false));
+		fields.add(new ConfigField.ToggleField("Shader Lava", () -> shaderLava, v -> {
+			boolean changed = shaderLava != v;
+			shaderLava = v;
+			if (changed && active) {
+				// the lava look is baked into the chunk meshes: rebuild them
+				net.veloclient.velo.client.modules.performance.PerformanceBoostModule.reloadRendering();
+			}
+		}));
 		fields.add(new ConfigField.HeaderField("Light"));
 		fields.add(percent("Lighting", 1.5, () -> lighting, v -> lighting = v));
 		fields.add(percent("Sun Warmth", 1, () -> sunWarmth, v -> sunWarmth = v));

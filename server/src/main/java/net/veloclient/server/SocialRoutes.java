@@ -160,6 +160,12 @@ final class SocialRoutes {
 					handler.handle(ex, panel.uuid());
 					return;
 				}
+				// The staff panel (staff.velo-client.com): its own cookie session, as that team member.
+				String member = StaffPanel.authorize(ex);
+				if (member != null) {
+					handler.handle(ex, member);
+					return;
+				}
 			}
 			if (session == null) {
 				JsonHttp.writeError(ex, 401, "Unknown or expired session - re-authenticate");

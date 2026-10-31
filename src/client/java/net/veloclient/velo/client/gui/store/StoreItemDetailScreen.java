@@ -87,7 +87,7 @@ public final class StoreItemDetailScreen extends VeloWindow {
 
 		boolean owned = StoreOwnership.owns(item.id());
 		actionButton = new VeloButton(infoX, actionY, infoWidth, 20,
-				Text.literal(owned ? "Equip" : "Buy for " + item.priceCoins() + " Velo Coins"), b -> onAction());
+				Text.literal(owned ? "Equip" : net.veloclient.velo.client.network.StoreClient.buyLabel(item.priceCoins())), b -> onAction());
 		if (!owned) {
 			actionButton.primary();
 		}
@@ -118,7 +118,7 @@ public final class StoreItemDetailScreen extends VeloWindow {
 		StorePurchase.buy(item, error -> {
 			busy = false;
 			if (error == null) {
-				status = Text.literal("Purchased \"" + item.name() + "\" - it's in your cape library!");
+				status = Text.literal("Purchased \"" + item.name() + "\" - it's in your cloak library!");
 				layoutContent();
 			} else if (error.startsWith("Not enough")) {
 				status = Text.literal(error + " - get more under Velo Coins.");
@@ -149,7 +149,7 @@ public final class StoreItemDetailScreen extends VeloWindow {
 		int infoWidth = contentX() + contentWidth() - infoX;
 		int y = contentY() + 4;
 
-		context.drawTextWithShadow(this.textRenderer, TitleScreenTheme.tileFont("CAPE  ·  ANIMATED"),
+		context.drawTextWithShadow(this.textRenderer, TitleScreenTheme.tileFont("CLOAK  ·  ANIMATED"),
 				infoX, y, VeloStyle.accent());
 		y += 14;
 		context.getMatrices().pushMatrix();

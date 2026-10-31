@@ -67,13 +67,13 @@ final class Boosters {
 			} catch (ServerApi.ApiException e) {
 				System.err.println("Couldn't record a boost: " + e.getMessage());
 			}
-			String reward = (boosts > 1 ? "**" + boosts * 14 + " days of Velo+** (14 per boost)" : "**14 days of Velo+**") + " and the exclusive **Booster cape**";
+			String reward = (boosts > 1 ? "**" + boosts * 14 + " days of Velo+** (14 per boost)" : "**14 days of Velo+**") + " and the exclusive **Booster cloak**";
 			String body;
 			boolean showClaim;
 			if (credit != null && credit.granted()) {
 				body = "<@" + who + "> just boosted **" + guild.getName() + "**" + (boosts > 1 ? " **" + boosts + " times**" : "") + " - you're awesome!\n\n"
 						+ "Already on your account **" + credit.username() + "**: +" + credit.days() + " days of Velo+ (now until <t:" + credit.plusUntil() / 1000
-						+ ":D>)" + (credit.newCape() ? " and the **Booster cape**" : "") + ". Every boost adds another 14 days on top.";
+						+ ":D>)" + (credit.newCape() ? " and the **Booster cloak**" : "") + ". Every boost adds another 14 days on top.";
 				showClaim = false;
 			} else {
 				body = "<@" + who + "> just boosted **" + guild.getName() + "**" + (boosts > 1 ? " **" + boosts + " times**" : "") + " - you're awesome!\n\n"
@@ -114,7 +114,7 @@ final class Boosters {
 				} else {
 					reply = "✨ Done! " + (claim.days() > 14 ? "+" + claim.days() + " days for your boosts - " : "") + "**" + claim.username()
 							+ "** has Velo+ until <t:" + claim.plusUntil() / 1000 + ":D>"
-							+ (claim.newCape() ? " and the **Booster cape** is in your Cosmetics." : ".") + " Thank you for boosting! 💖";
+							+ (claim.newCape() ? " and the **Booster cloak** is in your Cosmetics." : ".") + " Thank you for boosting! 💖";
 				}
 				event.getHook().sendMessage(reply).queue();
 			} catch (ServerApi.ApiException e) {

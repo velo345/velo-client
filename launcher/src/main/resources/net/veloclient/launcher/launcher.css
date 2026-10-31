@@ -3298,3 +3298,144 @@
 .window-button:hover .window-glyph { -fx-stroke: -velo-text; }
 .window-button-close:hover .window-glyph { -fx-stroke: white; }
 .window-button:focused { -fx-border-color: transparent; }
+
+/* Bodywear slot tabs: small icon chips that wrap instead of being cut off */
+.wear-slot-bar {
+	-fx-hgap: 4;
+	-fx-vgap: 4;
+}
+
+.wear-slot-chip {
+	-fx-background-color: -velo-surface;
+	-fx-border-color: -velo-hairline;
+	-fx-background-radius: 999;
+	-fx-border-radius: 999;
+	-fx-padding: 5 11 5 9;
+	-fx-text-fill: #a6a6b0;
+	-fx-font-family: "Inter Medium";
+	-fx-font-size: 12px;
+	-fx-cursor: hand;
+}
+
+.wear-slot-chip:hover {
+	-fx-background-color: -velo-hover;
+	-fx-text-fill: -velo-text;
+}
+
+.wear-slot-chip-active, .wear-slot-chip-active:hover {
+	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
+	-fx-border-color: transparent;
+	-fx-text-fill: -velo-on-accent;
+	-fx-font-family: "Inter SemiBold";
+}
+
+/* Colour pickers: readable on the dark theme (Modena draws the code in black) */
+.color-picker {
+	-fx-background-color: -velo-surface-2;
+	-fx-border-color: -velo-hairline;
+	-fx-background-radius: 8;
+	-fx-border-radius: 8;
+	-fx-padding: 2 4 2 4;
+}
+
+.color-picker:hover {
+	-fx-background-color: -velo-hover;
+}
+
+.color-picker .color-picker-label {
+	-fx-text-fill: -velo-text;
+	-fx-font-family: "Inter Medium";
+	-fx-font-size: 12px;
+}
+
+.color-picker .color-picker-label .picker-color-rect {
+	-fx-arc-width: 6;
+	-fx-arc-height: 6;
+	-fx-stroke: rgba(255, 255, 255, 0.25);
+}
+
+.color-picker .arrow-button {
+	-fx-background-color: transparent;
+}
+
+.color-picker .arrow {
+	-fx-background-color: #a6a6b0;
+}
+
+.color-palette {
+	-fx-background-color: -velo-surface-2;
+	-fx-border-color: -velo-hairline;
+	-fx-background-radius: 10;
+	-fx-border-radius: 10;
+	-fx-padding: 10;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 18, 0, 0, 6);
+}
+
+.color-palette .label, .color-palette .hyperlink {
+	-fx-text-fill: -velo-text;
+}
+
+.color-palette .hyperlink {
+	-fx-text-fill: -velo-accent-text;
+	-fx-border-color: transparent;
+}
+
+.color-palette .color-square .color-rect {
+	-fx-arc-width: 4;
+	-fx-arc-height: 4;
+}
+
+.color-palette .separator .line {
+	-fx-border-color: -velo-hairline;
+}
+
+.custom-color-dialog {
+	-fx-background-color: -velo-surface;
+	-fx-padding: 14;
+}
+
+.custom-color-dialog .label {
+	-fx-text-fill: -velo-text;
+}
+
+.custom-color-dialog .text-field, .custom-color-dialog .spinner .text-field, .custom-color-dialog .web-field {
+	-fx-background-color: -velo-surface-2;
+	-fx-text-fill: -velo-text;
+	-fx-border-color: -velo-hairline;
+	-fx-background-radius: 6;
+	-fx-border-radius: 6;
+}
+
+.custom-color-dialog .toggle-button {
+	-fx-background-color: -velo-surface-2;
+	-fx-text-fill: #a6a6b0;
+	-fx-background-radius: 6;
+}
+
+.custom-color-dialog .toggle-button:selected {
+	-fx-background-color: -velo-surface-3;
+	-fx-text-fill: -velo-text;
+}
+
+.custom-color-dialog .button {
+	-fx-background-color: -velo-surface-2;
+	-fx-text-fill: -velo-text;
+	-fx-background-radius: 8;
+	-fx-padding: 6 14 6 14;
+}
+
+.custom-color-dialog .button:default {
+	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
+	-fx-text-fill: -velo-on-accent;
+}
+
+.custom-color-dialog .color-rect-pane, .custom-color-dialog #color-rect-pane, .custom-color-dialog .controls-pane {
+	-fx-background-color: transparent;
+}
+
+/* the theme editor's bare swatches stay bare */
+.swatch-picker, .swatch-picker:hover {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-padding: 0;
+}

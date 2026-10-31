@@ -67,7 +67,7 @@ public final class JavaRuntimeProvider {
 			// Older JSONs without a component name: the newest generic one.
 		}
 		LauncherLog.info("Launcher runs on Java " + own + " but this version needs Java " + required + " - using Mojang's " + component);
-		Path dir = VeloPaths.root().resolve("runtimes").resolve(component);
+		Path dir = VeloPaths.sharedRoot().resolve("runtimes").resolve(component);
 		Path binary = runtimeBinary(dir);
 		if (Files.exists(dir.resolve(COMPLETE_MARKER)) && Files.exists(binary)) {
 			return new JavaRuntime(binary, required, false);

@@ -85,7 +85,7 @@ public final class StoreItemDetailView {
 				() -> StorePurchase.buy(item), "cape", item.inStore());
 		return ItemPage.build(host::goBack, host::openCoins, stage, null,
 				host.session() == null ? null : "Drag to rotate  ·  scroll to zoom",
-				"#5aa9ff", "Capes", StoreTiles.Rarity.of(item.id(), price), item.name(), item.description(),
+				"#5aa9ff", "Cloaks", StoreTiles.Rarity.of(item.id(), price), item.name(), item.description(),
 				List.of("Animated, with real cloth physics in-game", "Seen by every Velo Client player", "Works with elytra and wings"), null, purchase);
 	}
 

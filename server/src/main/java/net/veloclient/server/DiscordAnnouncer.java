@@ -91,7 +91,7 @@ final class DiscordAnnouncer {
 			if (online.capeId() != null && !online.capeId().startsWith("custom:")) {
 				wearing.add("🧣  " + name(online.capeId()));
 			} else if (online.capeId() != null) {
-				wearing.add("🧣  Custom cape");
+				wearing.add("🧣  Custom cloak");
 			}
 			if (online.auraId() != null) {
 				wearing.add("✨  " + name("aura_" + online.auraId().split(";", 2)[0]));
@@ -108,7 +108,7 @@ final class DiscordAnnouncer {
 		embed.add("thumbnail", thumb);
 		JsonArray fields = new JsonArray();
 		fields.add(field("Wearing", wearing.isEmpty() ? "_nothing equipped (or offline)_" : String.join("\n", wearing), true));
-		fields.add(field("Collection", wings + " wings  ·  " + capes + " capes  ·  " + auras + " auras", true));
+		fields.add(field("Collection", wings + " wings  ·  " + capes + " cloaks  ·  " + auras + " auras", true));
 		fields.add(field("Balance", String.format(Locale.ROOT, "%,d coins", balance), true));
 		embed.add("fields", fields);
 		if (wingsPreview != null) {

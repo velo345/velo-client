@@ -1,0 +1,10 @@
+{
+ "slot": "face",
+ "name": "Round Glasses",
+ "price": 800,
+ "accent": "#c99a3a",
+ "description": "Thin round golden wire frames - instant study mode.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

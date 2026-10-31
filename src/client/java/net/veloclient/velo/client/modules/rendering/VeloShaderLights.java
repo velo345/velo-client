@@ -65,7 +65,7 @@ public final class VeloShaderLights {
 
 	/**
 	 * Fills {@code out} with up to MAX lights (8 floats each, positions made camera-relative) and
-	 * returns how many: held lights first, then the nearest blocks.
+	 * returns how many: held lights, auras and burning entities first, then the nearest blocks.
 	 */
 	public static int collect(float[] out, double camX, double camY, double camZ, boolean handheld) {
 		int count = 0;
@@ -145,6 +145,33 @@ public final class VeloShaderLights {
 				out[o + 5] = ((rgb >> 8) & 0xFF) / 255f;
 				out[o + 6] = (rgb & 0xFF) / 255f;
 				out[o + 7] = 1.95f;
+				count++;
+			}
+		}
+		*///?}
+		//? if >=26.2 {
+		/*// Anything burning - mobs, players, you - lights its surroundings with a flickering fire glow.
+		if (mc.level != null && count < 12) {
+			float time = (System.nanoTime() % 1_000_000_000_000L) / 1e9f;
+			float partial = mc.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+			var near = new net.minecraft.world.phys.AABB(camX - 32, camY - 32, camZ - 32, camX + 32, camY + 32, camZ + 32);
+			var burning = mc.level.getEntities((net.minecraft.world.entity.Entity) null, near, e -> e.isOnFire() && !e.isInvisible());
+			burning.sort((a, b) -> Double.compare(a.distanceToSqr(camX, camY, camZ), b.distanceToSqr(camX, camY, camZ)));
+			for (var e : burning) {
+				if (count >= 12) {
+					break;
+				}
+				var pos = e.getPosition(partial);
+				float flicker = 0.82f + 0.12f * (float) Math.sin(time * 13f + e.getId()) + 0.06f * (float) Math.sin(time * 31f + e.getId() * 3);
+				int o = count * 8;
+				out[o] = (float) (pos.x - camX);
+				out[o + 1] = (float) (pos.y + e.getBbHeight() * 0.5 - camY);
+				out[o + 2] = (float) (pos.z - camZ);
+				out[o + 3] = 8.5f;
+				out[o + 4] = 1.0f;
+				out[o + 5] = 0.5f;
+				out[o + 6] = 0.18f;
+				out[o + 7] = flicker;
 				count++;
 			}
 		}

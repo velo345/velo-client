@@ -194,6 +194,14 @@ public final class StoreDatabase implements AutoCloseable {
 	 * {@code txn} (the payment) is remembered: a payment counts once, and its days can be taken back on a refund.
 	 */
 	public synchronized long extendPlus(String uuid, int days, String source, String txn, String reference) throws SQLException {
+		return extendPlus(uuid, days, source, txn, reference, 0);
+	}
+
+	/**
+	 * Like {@link #extendPlus(String, int, String, String, String)}; with {@code atLeast} > 0 the membership is set to
+	 * last until at least then instead of adding {@code days} (a subscription payment covering a calendar period).
+	 */
+	public synchronized long extendPlus(String uuid, int days, String source, String txn, String reference, long atLeast) throws SQLException {
 		return inTransaction(() -> {
 			long now = System.currentTimeMillis();
 			if (txn != null) {
@@ -216,7 +224,7 @@ public final class StoreDatabase implements AutoCloseable {
 				}
 			}
 			long current = plusUntil(uuid);
-			long until = Math.max(now, current) + days * 86_400_000L;
+			long until = atLeast > 0 ? Math.max(current, atLeast) : Math.max(now, current) + days * 86_400_000L;
 			try (PreparedStatement ps = connection.prepareStatement(
 					"INSERT INTO plus(uuid, until, source, last_coins, started) VALUES(?, ?, ?, 0, ?) "
 							+ "ON CONFLICT(uuid) DO UPDATE SET until = excluded.until, source = excluded.source")) {
@@ -474,6 +482,24 @@ public final class StoreDatabase implements AutoCloseable {
 			adjustInTx(uuid, -price, "buy_item", itemId, null);
 			insertOwned(uuid, itemId, "purchase");
 			return BuyResult.OK;
+		});
+	}
+
+	/**
+	 * A one-off free item: grants {@code itemId} unless the account already used {@code reason} (ledger) or owns it.
+	 * Returns "ok", "claimed" or "owned".
+	 */
+	public synchronized String claimOnce(String uuid, String itemId, String reason) throws SQLException {
+		return inTransaction(() -> {
+			if (hasLedgerReason(uuid, reason)) {
+				return "claimed";
+			}
+			if (owns(uuid, itemId)) {
+				return "owned";
+			}
+			insertOwned(uuid, itemId, reason);
+			adjustInTx(uuid, 0, reason, itemId, null);
+			return "ok";
 		});
 	}
 

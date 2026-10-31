@@ -433,6 +433,40 @@ public final class ScreenshotTour {
 				}
 				yield steps;
 			}
+			case "killfx" -> {
+				// The Store's Kill FX tab, a few effect pages, then each effect played for real in front of you.
+				List<Object[]> steps = new java.util.ArrayList<>();
+				steps.add(new Object[] {0, (Runnable) () -> {
+					net.veloclient.velo.client.gui.store.StoreScreen.showKillFx();
+					client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null));
+				}});
+				steps.add(new Object[] {60, (Runnable) () -> shot(client, "store-killfx")});
+				steps.add(new Object[] {2, (Runnable) () -> client.setScreen(net.veloclient.velo.client.gui.CapeEquipScreen.open(null,
+						net.veloclient.velo.client.gui.CapeEquipScreen.KILLFX_TAB))});
+				steps.add(new Object[] {40, (Runnable) () -> shot(client, "locker-killfx")});
+				for (String id : List.of("orbital", "phoenix", "grave")) {
+					steps.add(new Object[] {2, (Runnable) () -> net.veloclient.velo.client.cosmetics.killfx.KillFxManager.type(id).ifPresent(type ->
+							client.setScreen(new net.veloclient.velo.client.gui.store.KillFxDetailScreen(null, type)))});
+					steps.add(new Object[] {25, (Runnable) () -> shot(client, "killfx-page-" + id)});
+				}
+				steps.add(new Object[] {2, (Runnable) () -> client.setScreen(null)});
+				String only = System.getProperty("velo.tourKillFx", "");
+				for (String id : net.veloclient.velo.client.cosmetics.killfx.KillFxManager.IDS) {
+					if (!only.isEmpty() && !List.of(only.split(",")).contains(id)) {
+						continue;
+					}
+					steps.add(new Object[] {20, (Runnable) () -> {
+						var player = net.veloclient.velo.client.pvp.PvpCompat.localPlayer();
+						float yaw = (float) Math.toRadians(net.veloclient.velo.client.pvp.PvpCompat.cameraRotation()[0]);
+						double x = net.veloclient.velo.client.pvp.PvpCompat.x(player) - Math.sin(yaw) * 6;
+						double z = net.veloclient.velo.client.pvp.PvpCompat.z(player) + Math.cos(yaw) * 6;
+						net.veloclient.velo.client.cosmetics.killfx.KillFxManager.play(id, x, net.veloclient.velo.client.pvp.PvpCompat.y(player), z, false);
+					}});
+					steps.add(new Object[] {8, (Runnable) () -> shot(client, "killfx-" + id + "-a")});
+					steps.add(new Object[] {12, (Runnable) () -> shot(client, "killfx-" + id + "-b")});
+				}
+				yield steps;
+			}
 			case "title" -> {
 				// The title panorama + theme editor (accent buttons) for every preset. setActive saves
 				// theme.json, so run this with -Duser.home=<temp>.
@@ -495,7 +529,15 @@ public final class ScreenshotTour {
 					}},
 					new Object[] {40, (Runnable) () -> shot(client, "locker")},
 					new Object[] {2, (Runnable) () -> lockerForTour.showTabForTour(1)},
-					new Object[] {40, (Runnable) () -> shot(client, "locker-wings")});
+					// -Dvelo.tourWings=<id>: those wings on the preview (two shots: they move).
+					new Object[] {2, (Runnable) () -> {
+						String wings = System.getProperty("velo.tourWings");
+						if (wings != null) {
+							net.veloclient.velo.client.cosmetics.wings.WingsManager.setPreview(wings);
+						}
+					}},
+					new Object[] {40, (Runnable) () -> shot(client, "locker-wings")},
+					new Object[] {12, (Runnable) () -> shot(client, "locker-wings-later")});
 			case "storecapes" -> List.of(
 					new Object[] {0, (Runnable) () -> {
 						net.veloclient.velo.client.gui.store.StoreScreen.showCapes();
@@ -673,9 +715,24 @@ public final class ScreenshotTour {
 			case "vibe-names" -> vibeNames(client);
 			case "vibe-scout" -> vibeScout(client);
 			case "rs" -> redstoneShort(client);
+			case "vibe-packs" -> vibePacks(client);
+			case "vibe-packs-code" -> vibePacksCode(client);
 			case "rs-layout" -> rsLayout(client);
 			case "shadercine" -> shaderCinematics(client);
 			default -> {
+				// Dev-build features bring their own scenes ("dev:notes" -> net.veloclient.velo.dev.DevTour).
+				if (name.startsWith("dev:")) {
+					try {
+						Class<?> tour = Class.forName("net.veloclient.velo.dev.DevTour");
+						@SuppressWarnings("unchecked")
+						List<Object[]> steps = (List<Object[]>) tour.getMethod("scene", String.class, java.util.function.Consumer.class)
+								.invoke(null, name.substring(4), (java.util.function.Consumer<String>) shotName -> shot(client, shotName));
+						yield steps;
+					} catch (ReflectiveOperationException e) {
+						VeloClient.LOGGER.warn("Velo screenshot tour: no dev scene {} ({})", name, e.toString());
+						yield List.of();
+					}
+				}
 				VeloClient.LOGGER.warn("Velo screenshot tour: unknown scene {}", name);
 				yield List.of();
 			}
@@ -1189,6 +1246,318 @@ public final class ScreenshotTour {
 		steps.add(new Object[] {20, (Runnable) () -> shot(client, "rsl-3-released")});
 		steps.add(new Object[] {2, (Runnable) () -> client.setScreen(null)});
 		steps.add(new Object[] {30, (Runnable) () -> shot(client, "rsl-4-world")});
+		return steps;
+	}
+
+	/** Logs where the (post-composited) cursor is for frame {@code f} of a sequence, in GUI units; {@code down} = pressed. */
+	private static void cursorLog(String prefix, int f, float x, float y, boolean down) {
+		vibeLog(String.format(java.util.Locale.ROOT, "cur %s %d %.1f %.1f %d", prefix, f, x, y, down ? 1 : 0));
+	}
+
+	private static float[] glide(float[] a, float[] b, float t) {
+		float e = ease(t);
+		return new float[] {a[0] + (b[0] - a[0]) * e, a[1] + (b[1] - a[1]) * e};
+	}
+
+	/** Spins the floating sword next to the creeper (item display, yaw in degrees). */
+	private static void swordYaw(MinecraftClient client, float yaw) {
+		serverCommands(client, String.format(java.util.Locale.ROOT, "data merge entity @e[type=item_display,tag=velotour,limit=1] {Rotation:[%.1ff,0f]}", yaw));
+	}
+
+	/** The world shot used before and after the pack: push in on the creeper between the sea lantern pillars. */
+	private static void packsWorld(List<Object[]> steps, MinecraftClient client, String prefix) {
+		double[][] keys = {{0, -2.5, 0.25, 2.6, 5.5, 1.2, 0.5}, {110, 1.6, 0.05, 1.0, 5.5, 1.3, 0.5}};
+		steps.add(new Object[] {2, (Runnable) () -> {
+			client.setScreen(null);
+			camPath(client, keys, 0);
+		}});
+		steps.add(new Object[] {20, (Runnable) () -> camPath(client, keys, 0)});
+		sequence(steps, client, prefix, 111, f -> {
+			camPath(client, keys, f);
+			swordYaw(client, -90 + f * 3.2f);
+		});
+	}
+
+	/** A shader line typed into terrain.fsh (never saved; the copy is removed from the pack afterwards). */
+	private static void packsCode(List<Object[]> steps, MinecraftClient client) {
+		steps.add(new Object[] {4, (Runnable) () -> {
+			net.veloclient.velo.client.gui.packs.PackTour.openCode(client, "minecraft:shaders/core/terrain.fsh");
+		}});
+		// after the first frame, once the editor knows its text width (else it scrolls sideways)
+		steps.add(new Object[] {6, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.code().caretForTour(90, 0)});
+		steps.add(new Object[] {20, (Runnable) () -> {
+		}});
+		String line = "    color.rgb *= vec3(1.0, 0.35, 0.9); // velo tint\n";
+		sequence(steps, client, "pk-code", 70, f -> {
+			int at = Math.min(line.length(), f * 2);
+			int before = Math.min(line.length(), Math.max(0, f - 1) * 2);
+			if (at > before) {
+				net.veloclient.velo.client.gui.packs.PackTour.code().typeForTour(line.substring(before, at));
+			}
+		});
+	}
+
+	/** Only the code editor shot of {@link #vibePacks}. */
+	private static List<Object[]> vibePacksCode(MinecraftClient client) {
+		List<Object[]> steps = new ArrayList<>();
+		steps.add(new Object[] {0, (Runnable) () -> {
+			lookFrom(client, -154, 126, 2331.5, -121, 131, 2331.5);
+			setHudHidden(client, true);
+			net.veloclient.velo.client.gui.packs.PackTour.openPacks(client);
+		}});
+		steps.add(new Object[] {20, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openBrowser(client, false)});
+		steps.add(new Object[] {20, (Runnable) () -> {
+		}});
+		packsCode(steps, client);
+		steps.add(new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.removeFile("minecraft:shaders/core/terrain.fsh")});
+		return steps;
+	}
+
+	/** Resource pack editor promo: the world before, the pack menu and editors driven frame by frame, the world after the reload. */
+	private static List<Object[]> vibePacks(MinecraftClient client) {
+		List<Object[]> steps = new ArrayList<>();
+		steps.add(new Object[] {0, (Runnable) () -> {
+			net.veloclient.velo.client.gui.packs.PackTour.resetPack();
+			serverCommands(client, VIBE_WORLD);
+			serverCommands(client, "gamemode creative @s", "difficulty easy", "gamerule send_command_feedback false", "effect clear @s", "clear @s",
+					"spreadplayers -151 2332 0 1 false @s");
+			setHudHidden(client, true);
+			//? if >=26.2 {
+			/*client.options.fov().set(70);
+			client.options.framerateLimit().set(60);
+			*///?}
+		}});
+		steps.add(new Object[] {50, (Runnable) () -> {
+			rx = (int) Math.floor(client.player.getX());
+			ry = (int) Math.floor(client.player.getY());
+			rz = (int) Math.floor(client.player.getZ());
+			vibeLog("packs base " + rx + " " + ry + " " + rz);
+			clearChat(client);
+			rsCommands(client, "kill @e[type=creeper]", "kill @e[type=item_display,tag=velotour]",
+					"fill {x-3} {y} {z-5} {x+9} {y+6} {z+5} air", "fill {x-3} {y-1} {z-5} {x+9} {y-1} {z+5} grass_block",
+					"fill {x+6} {y} {z-3} {x+6} {y+2} {z-3} sea_lantern", "fill {x+6} {y} {z+3} {x+6} {y+2} {z+3} sea_lantern");
+			serverCommands(client, String.format(java.util.Locale.ROOT,
+					"summon creeper %.1f %d %.1f {NoAI:1b,Silent:1b,PersistenceRequired:1b,Rotation:[90f,0f]}", rx + 5.5, ry, rz + 0.5));
+			serverCommands(client, String.format(java.util.Locale.ROOT,
+					"summon item_display %.1f %.2f %.1f {Tags:[\"velotour\"],item:{id:\"minecraft:diamond_sword\",count:1},item_display:\"fixed\","
+							+ "transformation:{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,0f],scale:[1.1f,1.1f,1.1f]}}",
+					rx + 4.0, ry + 1.25, rz + 2.6));
+		}});
+		// ---- the world before ----
+		packsWorld(steps, client, "pk-world0");
+
+		// ---- pack menu + browser ----
+		steps.add(new Object[] {2, (Runnable) () -> {
+			lookFrom(client, rx - 3, ry + 1, rz + 0.5, rx + 30, ry + 5, rz + 0.5);
+			net.veloclient.velo.client.gui.packs.PackTour.openPacks(client);
+		}});
+		steps.add(new Object[] {30, (Runnable) () -> vibeLog("gui " + net.veloclient.velo.client.util.ClientCompat.currentScreen().width + " " + net.veloclient.velo.client.util.ClientCompat.currentScreen().height)});
+		sequence(steps, client, "pk-menu", 40, f -> {
+		});
+		steps.add(new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openBrowser(client, true)});
+		net.veloclient.velo.client.gui.packs.PackContents.Category[] cats = {
+				net.veloclient.velo.client.gui.packs.PackContents.Category.BLOCKS, net.veloclient.velo.client.gui.packs.PackContents.Category.ITEMS,
+				net.veloclient.velo.client.gui.packs.PackContents.Category.ENTITIES, net.veloclient.velo.client.gui.packs.PackContents.Category.PARTICLES,
+				net.veloclient.velo.client.gui.packs.PackContents.Category.PAINTINGS, net.veloclient.velo.client.gui.packs.PackContents.Category.INTERFACE,
+				net.veloclient.velo.client.gui.packs.PackContents.Category.ENVIRONMENT};
+		// every category once so their thumbnails are loaded before the frames
+		for (var c : cats) {
+			steps.add(new Object[] {25, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.browserCategory(true, c)});
+		}
+		steps.add(new Object[] {25, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.browserCategory(true, cats[0])});
+		sequence(steps, client, "pk-cats", cats.length * 6, f -> {
+			if (f % 6 == 0) {
+				net.veloclient.velo.client.gui.packs.PackTour.browserCategory(true, cats[f / 6]);
+			}
+		});
+		steps.add(new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.browserCategory(true,
+				net.veloclient.velo.client.gui.packs.PackContents.Category.ITEMS)});
+		// scroll down once so thumbnails further down are loaded too
+		steps.add(new Object[] {20, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.browser().scrollForTour(1400)});
+		steps.add(new Object[] {40, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.browser().scrollForTour(0)});
+		sequence(steps, client, "pk-scroll", 90, f -> net.veloclient.velo.client.gui.packs.PackTour.browser().scrollForTour(1400 * ease(f / 89f)));
+		steps.add(new Object[] {2, (Runnable) () -> {
+			net.veloclient.velo.client.gui.packs.PackTour.browser().scrollForTour(0);
+			net.veloclient.velo.client.gui.packs.PackTour.browserCategory(true, net.veloclient.velo.client.gui.packs.PackContents.Category.ENTITIES);
+		}});
+		String query = "creeper";
+		sequence(steps, client, "pk-search", 40, f -> {
+			if (f >= 4 && f < 4 + query.length() * 3 && (f - 4) % 3 == 0) {
+				net.veloclient.velo.client.gui.packs.PackTour.browser().searchForTour(query.substring(0, (f - 4) / 3 + 1));
+			}
+		});
+
+		// ---- creeper: red eyes ----
+		steps.add(new Object[] {2, (Runnable) () -> {
+			net.veloclient.velo.client.gui.packs.PackTour.browser().searchForTour("");
+			net.veloclient.velo.client.gui.packs.PackTour.openEditor(client, "minecraft:textures/entity/creeper/creeper.png", false, false);
+		}});
+		steps.add(new Object[] {40, (Runnable) () -> {
+			var ed = net.veloclient.velo.client.gui.packs.PackTour.editor();
+			ed.toolForTour("PENCIL", 1);
+			ed.colorForTour(0xFFFF2B36);
+			ed.viewForTour(0, 0, 0);
+			ed.previewForTour(0, 6, 1.25f);
+		}});
+		int[][] eyes = {{9, 10}, {10, 10}, {9, 11}, {10, 11}, {13, 10}, {14, 10}, {13, 11}, {14, 11}};
+		int[] eyeColors = {0xFFFF4A52, 0xFFFF4A52, 0xFFD3101C, 0xFFD3101C, 0xFFFF4A52, 0xFFFF4A52, 0xFFD3101C, 0xFFD3101C};
+		float[] fitZoom = new float[1];
+		sequence(steps, client, "pk-eyes", 170, f -> {
+			var ed = net.veloclient.velo.client.gui.packs.PackTour.editor();
+			if (f == 0) {
+				float[] a = ed.screenPointForTour(0, 0);
+				float[] b = ed.screenPointForTour(1, 0);
+				fitZoom[0] = b[0] - a[0];
+			}
+			// zoom from the whole texture onto the face, paint, zoom back out
+			float z;
+			if (f < 22) {
+				float e = ease(f / 21f);
+				z = fitZoom[0] + (34 - fitZoom[0]) * e;
+				ed.viewForTour(z, 32 + (12 - 32) * e, 16 + (12 - 16) * e);
+			} else if (f >= 140) {
+				float e = ease((f - 140) / 29f);
+				z = 34 + (fitZoom[0] - 34) * e;
+				ed.viewForTour(z, 12 + (32 - 12) * e, 12 + (16 - 12) * e);
+			} else {
+				ed.viewForTour(34, 12, 12);
+			}
+			ed.previewForTour(-18 + f * 0.22f, 6, 1.25f);
+			// eight pixels, 13 frames each: glide over, press on frame 8
+			float[] cur;
+			boolean down = false;
+			if (f < 24) {
+				float[] from = {ed.width * 0.62f, ed.height * 0.78f};
+				cur = glide(from, ed.screenPointForTour(eyes[0][0] + 0.5f, eyes[0][1] + 0.5f), f / 23f);
+			} else if (f < 24 + eyes.length * 13) {
+				int k = (f - 24) / 13;
+				int g = (f - 24) % 13;
+				float[] at = ed.screenPointForTour(eyes[k][0] + 0.5f, eyes[k][1] + 0.5f);
+				float[] prev = k == 0 ? at : ed.screenPointForTour(eyes[k - 1][0] + 0.5f, eyes[k - 1][1] + 0.5f);
+				cur = glide(prev, at, Math.min(1, g / 7f));
+				if (g == 8) {
+					ed.colorForTour(eyeColors[k]);
+					ed.strokeForTour(eyes[k][0], eyes[k][1], eyes[k][0], eyes[k][1], true);
+				}
+				down = g >= 8 && g <= 10;
+			} else {
+				int[] last = eyes[eyes.length - 1];
+				cur = ed.screenPointForTour(last[0] + 0.5f, last[1] + 0.5f);
+				cur = glide(cur, new float[] {cur[0] + 40, cur[1] + 60}, (f - 128) / 20f);
+			}
+			cursorLog("pk-eyes", f, cur[0], cur[1], down);
+		});
+		// a full turn of the creeper with its new eyes
+		sequence(steps, client, "pk-creeper3d", 120, f -> net.veloclient.velo.client.gui.packs.PackTour.editor().previewForTour(-40 + f * 3f, 8, 1.3f));
+		steps.add(new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.editor().saveForTour()});
+
+		// ---- diamond sword: magic wand + colorize ----
+		steps.add(new Object[] {4, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openEditor(client, "minecraft:textures/item/diamond_sword.png", false, false)});
+		steps.add(new Object[] {40, (Runnable) () -> {
+			var ed = net.veloclient.velo.client.gui.packs.PackTour.editor();
+			ed.toolForTour("WAND", 1);
+			ed.viewForTour(0, 0, 0);
+			ed.previewForTour(30, 10, 1.1f);
+			ed.colorForTour(0xFFE3262B);
+		}});
+		sequence(steps, client, "pk-wand", 36, f -> {
+			var ed = net.veloclient.velo.client.gui.packs.PackTour.editor();
+			ed.previewForTour(30 + f * 2.5f, 10, 1.1f);
+			float[] at = ed.screenPointForTour(12.5f, 3.5f);
+			float[] cur = glide(new float[] {at[0] + 90, at[1] + 80}, at, f / 16f);
+			if (f == 18) {
+				ed.wandForTour(12, 3, 0.3f);
+			}
+			cursorLog("pk-wand", f, cur[0], cur[1], f >= 18 && f <= 20);
+		});
+		sequence(steps, client, "pk-swordhue", 90, f -> {
+			var ed = net.veloclient.velo.client.gui.packs.PackTour.editor();
+			ed.previewForTour(120 + f * 2.5f, 10, 1.1f);
+			float hue = 185 + 175 * ease(f / 80f);
+			ed.filterForTour("COLORIZE", hue % 360, 0.85f, 0.02f);
+		});
+		steps.add(new Object[] {2, (Runnable) () -> {
+			var ed = net.veloclient.velo.client.gui.packs.PackTour.editor();
+			ed.filterForTour("COLORIZE", 358, 0.85f, 0.02f);
+			ed.applyFilterForTour();
+			ed.deselectForTour();
+			ed.tabForTour(0);
+		}});
+		sequence(steps, client, "pk-sword3d", 90, f -> net.veloclient.velo.client.gui.packs.PackTour.editor().previewForTour(f * 4f, 12, 1.15f));
+		steps.add(new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.editor().saveForTour()});
+
+		// ---- sea lantern: colorize every frame, then play the animation ----
+		steps.add(new Object[] {4, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openEditor(client, "minecraft:textures/block/sea_lantern.png", false, false)});
+		steps.add(new Object[] {40, (Runnable) () -> {
+			var ed = net.veloclient.velo.client.gui.packs.PackTour.editor();
+			ed.viewForTour(0, 0, 0);
+			ed.previewForTour(35, 28, 1f);
+			ed.colorForTour(0xFFB04DFF);
+			ed.filterForTour("COLORIZE", 0, 0.8f, 0.05f);
+		}});
+		sequence(steps, client, "pk-hue", 140, f -> {
+			var ed = net.veloclient.velo.client.gui.packs.PackTour.editor();
+			ed.filterForTour("COLORIZE", (f * 360f / 120f) % 360, 0.8f, 0.05f);
+		});
+		steps.add(new Object[] {2, (Runnable) () -> {
+			var ed = net.veloclient.velo.client.gui.packs.PackTour.editor();
+			ed.filterForTour("COLORIZE", 278, 0.8f, 0.05f);
+			ed.applyFilterForTour();
+			ed.tabForTour(0);
+			ed.playForTour(true);
+		}});
+		steps.add(new Object[] {20, (Runnable) () -> {
+		}});
+		sequence(steps, client, "pk-anim", 120, f -> net.veloclient.velo.client.gui.packs.PackTour.editor().previewForTour(35 + f * 3f, 26, 1.05f));
+		steps.add(new Object[] {2, (Runnable) () -> {
+			var ed = net.veloclient.velo.client.gui.packs.PackTour.editor();
+			ed.playForTour(false);
+			ed.saveForTour();
+		}});
+
+		// ---- sounds: trim the menu music, play it ----
+		steps.add(new Object[] {4, (Runnable) () -> {
+			net.veloclient.velo.client.gui.packs.PackTour.openBrowser(client, true);
+			net.veloclient.velo.client.gui.packs.PackTour.browserCategory(true, net.veloclient.velo.client.gui.packs.PackContents.Category.SOUNDS);
+		}});
+		sequence(steps, client, "pk-sounds", 40, f -> net.veloclient.velo.client.gui.packs.PackTour.browser().scrollForTour(f < 10 ? 0 : 500 * ease((f - 10) / 29f)));
+		steps.add(new Object[] {4, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openSound(client, "minecraft:music.menu")});
+		steps.add(new Object[] {120, (Runnable) () -> {
+		}});
+		sequence(steps, client, "pk-sound", 120, f -> {
+			var snd = net.veloclient.velo.client.gui.packs.PackTour.sound();
+			if (f < 50) {
+				float e = ease(f / 49f);
+				snd.trimForTour(48 * e, 306.5 - 96 * e);
+			}
+			if (f == 52) {
+				snd.playForTour();
+			}
+		});
+		steps.add(new Object[] {2, (Runnable) net.veloclient.velo.client.gui.packs.AudioPreview::stop});
+
+		packsCode(steps, client);
+		steps.add(new Object[] {2, (Runnable) () -> {
+			net.veloclient.velo.client.gui.packs.PackTour.removeFile("minecraft:shaders/core/terrain.fsh");
+			net.veloclient.velo.client.gui.packs.PackTour.openBrowser(client, false);
+			net.veloclient.velo.client.gui.packs.PackTour.browserCategory(false, net.veloclient.velo.client.gui.packs.PackContents.Category.BLOCKS);
+		}});
+		steps.add(new Object[] {20, (Runnable) () -> {
+		}});
+		sequence(steps, client, "pk-inpack", 30, f -> {
+		});
+
+		// ---- apply + reload, then the same world shot ----
+		steps.add(new Object[] {2, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.applyAndReload()});
+		steps.add(new Object[] {200, (Runnable) () -> client.setScreen(null)});
+		packsWorld(steps, client, "pk-world1");
+		// close-up orbit around the creeper's new eyes
+		sequence(steps, client, "pk-orbit", 120, f -> {
+			double ang = Math.toRadians(180 - 50 + 100 * ease(f / 119f));
+			double r = 2.3;
+			lookFrom(client, rx + 5.5 + Math.cos(ang) * r, ry - 0.1, rz + 0.5 + Math.sin(ang) * r, rx + 5.5, ry + 1.35, rz + 0.5);
+			swordYaw(client, f * 3.2f);
+		});
 		return steps;
 	}
 

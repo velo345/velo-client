@@ -28,7 +28,7 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 	private static final int LIGHT = 0xF000F0;
 
 	/** Geometry for one player: x y z u v color per vertex, 4 vertices per quad - every quad both ways round (the render type culls). */
-	private static final class Mesh implements AuraEffects.Out {
+	static final class Mesh implements AuraEffects.Out {
 		float[] data = new float[6 * 4 * 1024];
 		int size;
 
@@ -50,12 +50,16 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			return (a << 24) | (rgb & 0xFFFFFF);
 		}
 
+		/** Half a texel, so linear filtering never reaches into the neighbouring cell. */
+		private static final float INSET_U = 0.5f / (AuraEffects.ATLAS_CELL * AuraEffects.ATLAS_COLUMNS);
+		private static final float INSET_V = 0.5f / (AuraEffects.ATLAS_CELL * AuraEffects.ATLAS_ROWS);
+
 		/** A quad from 4 corners (x y z each) showing atlas {@code cell} (8 x 4 grid), seen from both sides. */
 		private void quad(float[] c, int cell, int color) {
-			float u0 = (cell % 8) / 8f;
-			float v0 = (cell / 8) / 4f;
-			float u1 = u0 + 1 / 8f;
-			float v1 = v0 + 1 / 4f;
+			float u0 = (cell % AuraEffects.ATLAS_COLUMNS) / (float) AuraEffects.ATLAS_COLUMNS + INSET_U;
+			float v0 = (cell / AuraEffects.ATLAS_COLUMNS) / (float) AuraEffects.ATLAS_ROWS + INSET_V;
+			float u1 = u0 + 1f / AuraEffects.ATLAS_COLUMNS - 2 * INSET_U;
+			float v1 = v0 + 1f / AuraEffects.ATLAS_ROWS - 2 * INSET_V;
 			vertex(c[0], c[1], c[2], u0, v0, color);
 			vertex(c[3], c[4], c[5], u0, v1, color);
 			vertex(c[6], c[7], c[8], u1, v1, color);
@@ -68,25 +72,38 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 
 		@Override
 		public void sprite(float x, float y, float z, float size, int rgb, float alpha, int shape) {
+			sprite(x, y, z, size, rgb, alpha, shape, 0);
+		}
+
+		@Override
+		public void sprite(float x, float y, float z, float size, int rgb, float alpha, int shape, float rot) {
 			if (alpha <= 0.01f || size <= 0.001f) {
 				return;
 			}
 			int color = color(rgb, alpha);
-			float h = size;
-			int cell = switch (shape) {
-				case AuraEffects.STAR -> 1;
-				case AuraEffects.HEART -> 3;
-				case AuraEffects.LEAF -> 4;
-				default -> 0;
-			};
+			int cell = AuraEffects.cell(shape);
+			// Corner offsets turned by rot: (-h, +h) top-left, (-h, -h) bottom-left, (+h, -h), (+h, +h).
+			float c = (float) Math.cos(rot) * size;
+			float s = (float) Math.sin(rot) * size;
+			float ax = -c - s;
+			float ay = -s + c;
+			float bx = -c + s;
+			float by = -s - c;
 			// Upright quads: v = 0 at the top of the cell.
-			if (shape != AuraEffects.DISC) {
-				quad(new float[] {x - h, y + h, z, x - h, y - h, z, x + h, y - h, z, x + h, y + h, z}, cell, color);
-				quad(new float[] {x, y + h, z - h, x, y - h, z - h, x, y - h, z + h, x, y + h, z + h}, cell, color);
+			if (AuraEffects.upright(shape)) {
+				quad(new float[] {x + ax, y + ay, z, x + bx, y + by, z, x - ax, y - ay, z, x - bx, y - by, z}, cell, color);
+				quad(new float[] {x, y + ay, z + ax, x, y + by, z + bx, x, y - ay, z - ax, x, y - by, z - bx}, cell, color);
 			}
-			// Ground plane (not for hearts: they only read upright).
-			if (shape != AuraEffects.HEART) {
-				quad(new float[] {x - h, y, z - h, x - h, y, z + h, x + h, y, z + h, x + h, y, z - h}, cell, color);
+			// Ground plane: the cell's top towards -z, turned by rot.
+			if (AuraEffects.flat(shape)) {
+				quad(new float[] {x + ax, y, z - ay, x + bx, y, z - by, x - ax, y, z + ay, x - bx, y, z + by}, cell, color);
+			}
+		}
+
+		@Override
+		public void quad(float[] corners, int cell, int rgb, float alpha) {
+			if (alpha > 0.01f) {
+				quad(corners, cell, color(rgb, alpha));
 			}
 		}
 
@@ -133,6 +150,11 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			return null;
 		}
 		AuraEffects.Emitter emitter = AuraManager.emitter(key, kind);
+		// The ground under them (blocks only - never another player below), for things that lie on it.
+		// (No world - the title screen's avatar: its feet are the ground.)
+		double ground = net.veloclient.velo.client.pvp.PvpCompat.localPlayer() == null ? y
+				: net.veloclient.velo.client.pvp.PvpCompat.groundBelow(x, y + 0.01, z, 24);
+		emitter.ground(Double.isNaN(ground) ? Float.NaN : (float) Math.min(0, ground - y));
 		float dt = emitter.tick(System.nanoTime());
 		emitter.update(dt, worn.settings(), x, y, z);
 		Mesh mesh = new Mesh();
@@ -140,11 +162,11 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 		return java.util.Arrays.copyOf(mesh.data, mesh.size);
 	}
 
-	private interface Sink {
+	interface Sink {
 		void accept(float x, float y, float z, int color, float u, float v);
 	}
 
-	private static void emit(float[] g, Matrix4f pose, Sink sink) {
+	static void emit(float[] g, Matrix4f pose, Sink sink) {
 		Vector3f p = new Vector3f();
 		for (int i = 0; i < g.length; i += 6) {
 			pose.transformPosition(g[i], g[i + 1], g[i + 2], p);
@@ -152,7 +174,7 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 		}
 	}
 
-	private static final String TEXTURE_PATH = "textures/cosmetics/aura/atlas.png";
+	static final String TEXTURE_PATH = "textures/cosmetics/aura/atlas.png";
 
 	//? if <26.1 {
 	public AuraFeatureRenderer(net.minecraft.client.render.entity.feature.FeatureRendererContext<
@@ -194,6 +216,11 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 		if (worn != null && !self && net.veloclient.velo.client.modules.cosmetics.AuraCosmeticsModule.fewerForOthers()) {
 			AuraEffects.Settings base = worn.settings();
 			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.5f, base.color()));
+		}
+		// Light Cosmetics (Performance Boost): fewer particles on everyone.
+		if (worn != null && net.veloclient.velo.client.modules.performance.PerformanceBoostModule.lightCosmetics) {
+			AuraEffects.Settings base = worn.settings();
+			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.4f, base.color()));
 		}
 		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z);
 		if (geometry == null || geometry.length == 0) {
@@ -252,6 +279,11 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 		if (worn != null && !self && net.veloclient.velo.client.modules.cosmetics.AuraCosmeticsModule.fewerForOthers()) {
 			AuraEffects.Settings base = worn.settings();
 			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.5f, base.color()));
+		}
+		// Light Cosmetics (Performance Boost): fewer particles on everyone.
+		if (worn != null && net.veloclient.velo.client.modules.performance.PerformanceBoostModule.lightCosmetics) {
+			AuraEffects.Settings base = worn.settings();
+			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.4f, base.color()));
 		}
 		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z);
 		if (geometry == null || geometry.length == 0) {

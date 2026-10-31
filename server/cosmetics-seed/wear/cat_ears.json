@@ -1,0 +1,10 @@
+{
+ "slot": "ears",
+ "name": "Cat Ears",
+ "price": 900,
+ "accent": "#ff9ccb",
+ "description": "Fluffy black cat ears with pink insides, on a thin headband.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

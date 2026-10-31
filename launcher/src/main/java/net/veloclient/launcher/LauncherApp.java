@@ -125,17 +125,31 @@ public final class LauncherApp extends Application {
 	/** The launch target Play currently starts (see {@link #currentTarget()}). */
 	private HomeLaunchTarget homeCurrentTarget;
 
+	/** Startup timing (System.nanoTime): main entered, JavaFX start(), window shown (splash), Home built. */
+	private static long mainAt;
+	private static long startAt;
+	private static long shownAt;
+	private static long homeAt;
+	/** Covers the window while Home is built at startup, then reveals it (see {@link #finishStartup}). */
+	private net.veloclient.launcher.ui.LauncherSplash splash;
+
 	public static void main(String[] args) {
+		mainAt = System.nanoTime();
 		LauncherLog.install();
 		// Under Wayland the compositor already presents tear-free; JavaFX's own vsync on top only makes the
 		// NVIDIA driver leak ~4x faster per frame under XWayland (see RenderGate).
 		if ("wayland".equalsIgnoreCase(System.getenv("XDG_SESSION_TYPE")) && System.getProperty("prism.vsync") == null) {
 			System.setProperty("prism.vsync", "false");
 		}
+		// Performance mode: half the frames - half the GPU work (and half the driver leak, see RenderGate).
+		if (net.veloclient.launcher.data.LauncherSettings.get().performanceMode && System.getProperty("javafx.animation.pulse") == null) {
+			System.setProperty("javafx.animation.pulse", "30");
+		}
 		if (!SingleInstance.acquire()) {
 			LauncherLog.info("Launcher already running - brought it to the front instead of starting a second one");
 			System.exit(0);
 		}
+		ClassPreloader.start();
 		launch(args);
 	}
 
@@ -151,6 +165,7 @@ public final class LauncherApp extends Application {
 	}
 
 	private void startLauncher(Stage stage) {
+		startAt = System.nanoTime();
 		this.stage = stage;
 		net.veloclient.launcher.ui.RenderGate.install(stage);
 		net.veloclient.launcher.social.SkinHeads.onChange(uuid -> {
@@ -183,10 +198,14 @@ public final class LauncherApp extends Application {
 		root.setTop(buildTopBar());
 		root.setCenter(content);
 		root.setBottom(buildLaunchBar());
-		showHome();
+		// Home itself is built once the window is up, behind the splash (finishStartup).
 
 		layers = new StackPane(root);
 		net.veloclient.launcher.ui.LauncherErrors.install(layers);
+		splash = new net.veloclient.launcher.ui.LauncherSplash(theme, net.veloclient.launcher.ui.UiImages.resource(AppVersion.DEV
+				? "/net/veloclient/launcher/images/logo-dev.png" : "/net/veloclient/launcher/images/logo.png", 240, 240), "v" + AppVersion.VERSION);
+		root.setOpacity(0);
+		layers.getChildren().add(splash);
 		Scene scene = new Scene(layers, 1100, 680);
 		scene.getStylesheets().add(getClass().getResource("/net/veloclient/launcher/launcher.css").toExternalForm());
 		applyTheme();
@@ -194,8 +213,8 @@ public final class LauncherApp extends Application {
 		scene.getAccelerators().put(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.K, javafx.scene.input.KeyCombination.SHORTCUT_DOWN),
 				() -> topBar.searchField().requestFocus());
 
-		stage.getIcons().add(new Image(getClass().getResourceAsStream("/net/veloclient/launcher/images/logo.png")));
-		stage.setTitle("Velo Client Launcher");
+		stage.getIcons().add(new Image(getClass().getResourceAsStream(AppVersion.DEV ? "/net/veloclient/launcher/images/logo-dev.png" : "/net/veloclient/launcher/images/logo.png")));
+		stage.setTitle(AppVersion.DEV ? "Velo Client Launcher (DEV)" : "Velo Client Launcher");
 		// Our own window frame: the top bar is the title bar, with minimize / maximize / close on its right.
 		windowChrome = net.veloclient.launcher.ui.WindowChrome.install(stage);
 		windowChrome.dragWith(topBar);
@@ -216,6 +235,30 @@ public final class LauncherApp extends Application {
 		net.veloclient.launcher.ui.WindowPlacement.restore(stage, 1100, 680, windowChrome);
 		boolean firstStart = ensureDefaultProfile();
 		stage.show();
+		shownAt = System.nanoTime();
+		splash.intro(() -> {
+			try {
+				finishStartup(firstStart);
+			} catch (Throwable error) {
+				// Never stay stuck on the splash: show whatever got built and say what broke.
+				root.setOpacity(1);
+				layers.getChildren().remove(splash);
+				error.printStackTrace();
+				net.veloclient.launcher.ui.LauncherErrors.showReportDialog(null, error, true);
+			}
+		});
+	}
+
+	/** The rest of startup, once the splash is on screen: builds Home, reveals it, then everything that needs it. */
+	private void finishStartup(boolean firstStart) {
+		showHome();
+		net.veloclient.launcher.ui.CosmeticsView.installLoadoutSync();
+		homeAt = System.nanoTime();
+		splash.reveal(root, () -> {
+			layers.getChildren().remove(splash);
+			splash = null;
+		});
+		logStartup();
 		if (firstStart) {
 			offerClientImport();
 		}
@@ -346,6 +389,14 @@ public final class LauncherApp extends Application {
 			steps.add(new Object[] {"05e-wings", (Runnable) () -> showWingDetail(net.veloclient.launcher.data.WingsCatalog.all().stream()
 					.filter(w -> w.id().equals("shadowfang")).findFirst().orElse(net.veloclient.launcher.data.WingsCatalog.all().get(0)))});
 		}
+		// -Dvelo.tourWings=tentacle,clockwork -> the detail page of each of these pairs (two shots: the animation moves).
+		for (String id : System.getProperty("velo.tourWings", "").split(",")) {
+			net.veloclient.launcher.data.WingsCatalog.byId(id.trim()).ifPresent(type -> {
+				steps.add(new Object[] {"05e-wings-" + type.id(), (Runnable) () -> showWingDetail(type)});
+				steps.add(new Object[] {"05e-wings-" + type.id() + "-later", (Runnable) () -> {
+				}});
+			});
+		}
 		steps.add(new Object[] {"05h-owner", (Runnable) this::showOwner});
 		steps.add(new Object[] {"05i-auras", (Runnable) () -> {
 			net.veloclient.launcher.ui.StoreView.showAurasTab();
@@ -355,7 +406,7 @@ public final class LauncherApp extends Application {
 			net.veloclient.launcher.ui.StoreView.showPlusTab();
 			showStore();
 		}});
-		steps.add(new Object[] {"05j-aura", (Runnable) () -> showAuraDetail(net.veloclient.launcher.data.AuraCatalog.byId("storm").orElseThrow())});
+		steps.add(new Object[] {"05j-aura", (Runnable) () -> showAuraDetail(net.veloclient.launcher.data.AuraCatalog.byId(System.getProperty("velo.tourAura", "storm")).orElseThrow())});
 		steps.add(new Object[] {"04c-cosmetics-auras", (Runnable) () -> {
 			net.veloclient.launcher.ui.CosmeticsView.showAurasTab();
 			showCosmetics();
@@ -520,6 +571,32 @@ public final class LauncherApp extends Application {
 			net.veloclient.launcher.ui.FxStallWatchdog.start();
 		}
 		runTourStep(folder, steps, 0);
+	}
+
+	/**
+	 * Logs where the startup time went, once the first frame with the window is out: JVM start to main, main to
+	 * JavaFX's start(), building Home, and showing. {@code -Dvelo.startupProbe} exits right after (for measuring).
+	 */
+	private void logStartup() {
+		javafx.animation.AnimationTimer firstFrame = new javafx.animation.AnimationTimer() {
+			@Override
+			public void handle(long now) {
+				stop();
+				long frameAt = System.nanoTime();
+				long jvm = ProcessHandle.current().info().startInstant()
+						.map(start -> java.time.Duration.between(start, java.time.Instant.now()).toMillis() - (frameAt - mainAt) / 1_000_000).orElse(-1L);
+				LauncherLog.info(String.format(java.util.Locale.ROOT,
+						"Startup: JVM to main ~%d ms, main to JavaFX %d ms, window (splash) up %d ms later, Home built %d ms after that"
+								+ " (incl. intro), first Home frame %d ms later - %d ms after main",
+						jvm, (startAt - mainAt) / 1_000_000, (shownAt - startAt) / 1_000_000, (homeAt - shownAt) / 1_000_000,
+						(frameAt - homeAt) / 1_000_000, (frameAt - mainAt) / 1_000_000));
+				if (System.getProperty("velo.startupProbe") != null) {
+					Platform.exit();
+					System.exit(0);
+				}
+			}
+		};
+		firstFrame.start();
 	}
 
 	/** Dev-only (launcher tour): a Home background picture shown without Velo+ or saving anything. */
@@ -718,10 +795,10 @@ public final class LauncherApp extends Application {
 				{"Home", "Page", "start", (Runnable) this::showHome, "home"},
 				{"Library", "Page · all profiles", "profiles instances", (Runnable) this::showLibrary, "library"},
 				{"Servers", "Page", "multiplayer", (Runnable) this::showServers, "server"},
-				{"Store", "Page · wings, capes, auras", "shop buy cosmetics", (Runnable) this::showStore, "store"},
+				{"Store", "Page · wings, cloaks, auras", "shop buy cosmetics", (Runnable) this::showStore, "store"},
 				{"Velo+", "Store · subscription", "plus membership cloud clips name style", (Runnable) this::showPlus, "crown"},
 				{"Get coins", "Store · Velo Coins", "coins buy balance", (Runnable) this::showCoins, "store"},
-				{"Locker", "Page · your cosmetics", "cosmetics capes wings auras equip", (Runnable) this::showCosmetics, "locker"},
+				{"Locker", "Page · your cosmetics", "cosmetics cloaks capes wings auras equip", (Runnable) this::showCosmetics, "locker"},
 				{"Skins", "Locker · change your skin", "skin change upload", (Runnable) this::showSkins, "skin"},
 				{"News", "Page", "updates changelog", (Runnable) this::showNews, "news"},
 				{"Clips", "Page · recordings & screenshots", "media video screenshots", (Runnable) this::showMedia, "clips"},
@@ -747,8 +824,14 @@ public final class LauncherApp extends Application {
 		}
 		for (var cape : net.veloclient.launcher.data.StoreCatalog.all()) {
 			if (cape.inStore()) {
-				entries.add(new net.veloclient.launcher.ui.HomeSearch.Entry(cape.name(), "Store · Cape", false, "cape store item",
+				entries.add(new net.veloclient.launcher.ui.HomeSearch.Entry(cape.name(), "Store · Cloak", false, "cloak store item",
 						() -> showStoreItemDetail(cape), () -> searchIcon("cape")));
+			}
+		}
+		for (var effect : net.veloclient.launcher.data.KillFxCatalog.all()) {
+			if (effect.inStore()) {
+				entries.add(new net.veloclient.launcher.ui.HomeSearch.Entry(effect.name(), "Store · Kill effect", false, "kill effect store item",
+						() -> showKillFxDetail(effect), () -> searchIcon("aura")));
 			}
 		}
 		for (var aura : net.veloclient.launcher.data.AuraCatalog.all()) {
@@ -2929,6 +3012,50 @@ public final class LauncherApp extends Application {
 		setActivePage("store");
 	}
 
+	private void showKillFxDetail(net.veloclient.launcher.data.KillFxCatalog.KillFxType type) {
+		setActivePage("store");
+		currentPage = () -> showKillFxDetail(type);
+		setContent(net.veloclient.launcher.ui.KillFxDetailView.build(new net.veloclient.launcher.ui.KillFxDetailView.Host() {
+			@Override
+			public void openCoins() {
+				showCoins();
+			}
+
+			@Override
+			public MinecraftSession session() {
+				return session;
+			}
+
+			@Override
+			public void goBack() {
+				showStore();
+			}
+		}, type));
+		setActivePage("store");
+	}
+
+	private void showWearDetail(net.veloclient.launcher.data.WearCatalog.WearType type) {
+		setActivePage("store");
+		currentPage = () -> showWearDetail(type);
+		setContent(net.veloclient.launcher.ui.WearDetailView.build(new net.veloclient.launcher.ui.WearDetailView.Host() {
+			@Override
+			public void openCoins() {
+				showCoins();
+			}
+
+			@Override
+			public MinecraftSession session() {
+				return session;
+			}
+
+			@Override
+			public void goBack() {
+				showStore();
+			}
+		}, type));
+		setActivePage("store");
+	}
+
 	private void showEmoteDetail(net.veloclient.launcher.data.EmoteCatalog.EmoteType type) {
 		setActivePage("store");
 		currentPage = () -> showEmoteDetail(type);
@@ -3025,6 +3152,16 @@ public final class LauncherApp extends Application {
 			@Override
 			public void openAura(net.veloclient.launcher.data.AuraCatalog.AuraType type) {
 				showAuraDetail(type);
+			}
+
+			@Override
+			public void openKillFx(net.veloclient.launcher.data.KillFxCatalog.KillFxType type) {
+				showKillFxDetail(type);
+			}
+
+			@Override
+			public void openWear(net.veloclient.launcher.data.WearCatalog.WearType type) {
+				showWearDetail(type);
 			}
 
 			@Override
@@ -3938,6 +4075,12 @@ public final class LauncherApp extends Application {
 		if (System.getProperty("velo.launcherTour") != null) {
 			return;
 		}
+		if (AppVersion.DEV) {   // a dev build never replaces itself or its client jars with a release
+			if (status != null) {
+				status.setText("Dev build - updates are off");
+			}
+			return;
+		}
 		if (status != null) {
 			status.setText("Checking...");
 		}
@@ -4001,6 +4144,17 @@ public final class LauncherApp extends Application {
 			data.minimizeOnLaunch = minimize.isSelected();
 			net.veloclient.launcher.data.LauncherSettings.save(data);
 		});
+		javafx.scene.control.CheckBox performance = new javafx.scene.control.CheckBox();
+		performance.setSelected(net.veloclient.launcher.data.LauncherSettings.get().performanceMode);
+		performance.setOnAction(e -> {
+			net.veloclient.launcher.data.LauncherSettings.Data data = net.veloclient.launcher.data.LauncherSettings.get();
+			data.performanceMode = performance.isSelected();
+			net.veloclient.launcher.data.LauncherSettings.save(data);
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(updates, "Performance mode", "For weaker PCs - fewer animations, less GPU",
+				"The launcher draws at 30 frames a second (after a restart), wings show without their extra effects (moving parts,"
+						+ " glow, shine, particles) and previews without auras. In the game, the same is Performance Boost > Light Cosmetics.",
+				performance);
 		net.veloclient.launcher.ui.SettingsUi.row(updates, "Minimize when the game starts", "The launcher frees its memory while it's in the background",
 				"While minimized (or in the background with a game running) the launcher drops the page you were on, stops all animations"
 						+ " and empties its image caches, so it uses as little RAM and CPU as possible while you play.", minimize);
@@ -4081,7 +4235,7 @@ public final class LauncherApp extends Application {
 		content.getChildren().add(account);
 
 		VBox files = net.veloclient.launcher.ui.SettingsUi.card("Files");
-		net.veloclient.launcher.ui.SettingsUi.row(files, "Launcher data", "Profiles, capes and settings",
+		net.veloclient.launcher.ui.SettingsUi.row(files, "Launcher data", "Profiles, cloaks and settings",
 				"Profiles: " + VeloPaths.profiles() + "\nCapes: " + VeloPaths.capes() + "\nManifest: " + VeloPaths.manifestFile(),
 				openFolderButton(VeloPaths.root()));
 		net.veloclient.launcher.ui.SettingsUi.row(files, "Launcher logs", "Attach these when reporting a launcher bug", null,

@@ -120,7 +120,7 @@ final class CapeStore {
 		byte[] normalized;
 		if (isGif(bytes)) {
 			if (!plus) {
-				throw new RejectedUpload(403, "Animated custom capes are part of Velo+");
+				throw new RejectedUpload(403, "Animated custom cloaks are part of Velo+");
 			}
 			validateGif(bytes);
 			normalized = bytes;
@@ -129,11 +129,11 @@ final class CapeStore {
 			normalized = reencodePng(bytes);
 			cape = new StoredCape(sha256(normalized), "png", now);
 		} else {
-			throw new RejectedUpload(400, "Only PNG capes are supported");
+			throw new RejectedUpload(400, "Only PNG cloaks are supported");
 		}
 
 		if (bannedHashes.contains(cape.hash())) {
-			throw new RejectedUpload(403, "This cape was removed by a server admin");
+			throw new RejectedUpload(403, "This cloak was removed by a server admin");
 		}
 		Path target = directory.resolve(cape.fileName());
 		if (!Files.exists(target)) {
@@ -219,10 +219,10 @@ final class CapeStore {
 	/** Cape layout is 2:1 (cape only) or 1:1 (cape on top, elytra below), scaled from vanilla's 64x32. */
 	private static void validateDimensions(int width, int height, int maxWidth) throws RejectedUpload {
 		if (width < 64 || width > maxWidth || width % 64 != 0) {
-			throw new RejectedUpload(400, "Cape width must be a multiple of 64 between 64 and " + maxWidth + " (got " + width + ")");
+			throw new RejectedUpload(400, "Cloak width must be a multiple of 64 between 64 and " + maxWidth + " (got " + width + ")");
 		}
 		if (height != width / 2 && height != width) {
-			throw new RejectedUpload(400, "Cape must be 2:1 (cape) or 1:1 (cape + elytra) - got " + width + "x" + height);
+			throw new RejectedUpload(400, "Cloak must be 2:1 (cloak) or 1:1 (cloak + elytra) - got " + width + "x" + height);
 		}
 	}
 
@@ -238,13 +238,13 @@ final class CapeStore {
 				reader.setInput(in, false, false);
 				int frames = reader.getNumImages(true);
 				if (frames < 1 || frames > MAX_ANIMATED_FRAMES) {
-					throw new RejectedUpload(400, "An animated cape can have 1 to " + MAX_ANIMATED_FRAMES + " frames (got " + frames + ")");
+					throw new RejectedUpload(400, "An animated cloak can have 1 to " + MAX_ANIMATED_FRAMES + " frames (got " + frames + ")");
 				}
 				int width = reader.getWidth(0);
 				int height = reader.getHeight(0);
 				validateDimensions(width, height, MAX_ANIMATED_WIDTH);
 				if ((long) width * height * frames > MAX_ANIMATED_PIXELS) {
-					throw new RejectedUpload(400, "Animated cape too big - use fewer frames or a smaller size");
+					throw new RejectedUpload(400, "Animated cloak too big - use fewer frames or a smaller size");
 				}
 				for (int i = 0; i < frames; i++) {
 					reader.read(i);

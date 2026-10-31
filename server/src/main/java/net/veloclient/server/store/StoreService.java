@@ -503,12 +503,15 @@ public final class StoreService {
 		}
 	}
 
-	public record WalletView(int balance, List<String> owned, boolean owner, boolean plus, long plusUntil) {
+	/** {@code welcomeGift}: this account may still pick its free cosmetic (see {@link #claimWelcomeGift}); {@code welcomeGiftUntil} when that ends. */
+	public record WalletView(int balance, List<String> owned, boolean owner, boolean plus, long plusUntil, boolean welcomeGift, long welcomeGiftUntil) {
 	}
 
 	public WalletView wallet(String uuid, String username) throws Exception {
 		db.touchWallet(uuid, username);
-		return new WalletView(db.balance(uuid), db.ownedItems(uuid), isOwner(uuid, username), isPlus(uuid), plusUntil(uuid));
+		boolean gift = welcomeGiftAvailable(uuid);
+		return new WalletView(db.balance(uuid), db.ownedItems(uuid), isOwner(uuid, username), isPlus(uuid), plusUntil(uuid), gift,
+				gift ? config.welcomeGift.until : 0);
 	}
 
 	// ---- Velo+ ----
@@ -561,21 +564,28 @@ public final class StoreService {
 		return staffLookup.test(uuid) ? Math.max(real, System.currentTimeMillis() + 30L * 86_400_000L) : real;
 	}
 
+	/** Days a Tebex payment's membership runs past its billing period, so a renewal charged a little late leaves no gap. */
+	private static final int RENEWAL_GRACE_DAYS = 3;
+
 	/**
-	 * Adds a month (or {@code days}) of Velo+ and pays out the monthly coins if they're due. A Tebex payment
-	 * that arrives while an earlier Tebex month still has most of its time left (a renewal reported twice by
-	 * two different events) is recorded without adding days again.
+	 * Adds a month (or {@code days}) of Velo+ and pays out the monthly coins if they're due.
+	 *
+	 * <p>A Tebex subscription bills by the calendar (the same day each month or year - 28 to 31 days apart), so its
+	 * payment makes the membership last until one calendar month / year from now plus {@link #RENEWAL_GRACE_DAYS}, not
+	 * a fixed number of days added on: no gap before a renewal in a 31-day month, and no drift over the year. A renewal
+	 * reported twice changes nothing; days left from the free trial are kept on top.
 	 */
 	public long grantPlus(String uuid, String username, int days, String source, String txn, String reference) throws Exception {
 		db.touchWallet(uuid, username);
-		int add = days;
-		StoreDatabase.PlusRow current = db.plusRow(uuid);
-		long now = System.currentTimeMillis();
-		if ("tebex".equals(source) && txn != null && current != null && "tebex".equals(current.source())
-				&& current.until() - now > (days - 3) * 86_400_000L) {
-			add = 0;
+		long atLeast = 0;
+		if ("tebex".equals(source)) {
+			StoreDatabase.PlusRow current = db.plusRow(uuid);
+			long now = System.currentTimeMillis();
+			long from = current != null && "trial".equals(current.source()) && current.until() > now ? current.until() : now;
+			java.time.ZonedDateTime start = java.time.Instant.ofEpochMilli(from).atZone(java.time.ZoneOffset.UTC);
+			atLeast = (days >= 300 ? start.plusYears(1) : start.plusMonths(1)).plusDays(RENEWAL_GRACE_DAYS).toInstant().toEpochMilli();
 		}
-		long until = db.extendPlus(uuid, add, source, txn, reference);
+		long until = db.extendPlus(uuid, days, source, txn, reference, atLeast);
 		loadPlus();
 		plusSweep();
 		return until;
@@ -625,7 +635,9 @@ public final class StoreService {
 				if ("trial".equals(row.source())) {
 					continue; // the free trial has the perks, not the coins - they start with the first payment
 				}
-				if (row.lastCoins() == 0 || now - row.lastCoins() >= month) {
+				// Not in a membership's last days (a subscription's renewal grace): those coins come with the renewal.
+				boolean endingSoon = row.until() - now <= (RENEWAL_GRACE_DAYS + 2) * 86_400_000L;
+				if (row.lastCoins() == 0 || now - row.lastCoins() >= month && !endingSoon) {
 					if (config.plus.monthlyCoins > 0) {
 						db.touchWallet(row.uuid(), null);
 						db.adjust(row.uuid(), config.plus.monthlyCoins, "plus_monthly", null, "plus");
@@ -660,6 +672,49 @@ public final class StoreService {
 		} catch (Exception e) {
 			System.out.println("[store] Launch bonus failed for " + username + ": " + e.getMessage());
 		}
+	}
+
+	private static final String WELCOME_GIFT = "welcome_gift";
+
+	/** Whether the welcome gift is running and this account hasn't picked its free cosmetic yet. */
+	public boolean welcomeGiftAvailable(String uuid) {
+		StoreConfig.WelcomeGift gift = config.welcomeGift;
+		long now = System.currentTimeMillis();
+		if (uuid == null || gift == null || gift.from <= 0 || now < gift.from || now >= gift.until) {
+			return false;
+		}
+		try {
+			return !db.hasLedgerReason(uuid, WELCOME_GIFT);
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	/** The welcome gift: any one cosmetic that's for sale in the Store right now, free, once per account. */
+	public WalletView claimWelcomeGift(String uuid, String username, String itemId) throws Exception {
+		if (!welcomeGiftAvailable(uuid)) {
+			throw new StoreException(409, "You've already picked your free cosmetic (or the welcome gift has ended)");
+		}
+		if (itemId == null || itemId.startsWith("bundle:") || sellable(itemId) == null) {
+			throw new StoreException(404, "Pick a cosmetic that's in the Store right now");
+		}
+		db.touchWallet(uuid, username);
+		switch (db.claimOnce(uuid, itemId, WELCOME_GIFT)) {
+			case "claimed" -> throw new StoreException(409, "You've already picked your free cosmetic");
+			case "owned" -> throw new StoreException(409, "You already own that one - pick something new");
+			default -> System.out.println("[store] Welcome gift " + itemId + " for " + username);
+		}
+		return wallet(uuid, username);
+	}
+
+	/** The welcome gift's window for the public catalog, or null when it isn't running. */
+	public Map<String, Object> welcomeGiftOffer() {
+		StoreConfig.WelcomeGift gift = config.welcomeGift;
+		long now = System.currentTimeMillis();
+		if (gift == null || gift.from <= 0 || now >= gift.until) {
+			return null;
+		}
+		return Map.of("from", gift.from, "until", gift.until);
 	}
 
 	/** The launch offer for the public catalog (website / launcher), or null when there is none or it's over. */
@@ -707,8 +762,11 @@ public final class StoreService {
 		if (yearly && config.plus.yearlyPrice <= 0) {
 			throw new StoreException(400, "There is no yearly Velo+ right now");
 		}
-		TebexCheckout.Basket basket = tebex.createSubscriptionCheckout(uuid, username, (yearly ? "Velo+ (yearly)" : "Velo+ (monthly)")
-				+ (username != null ? " for " + username : ""), yearly ? config.plus.yearlyPrice : config.plus.price,
+		long packageId = config.tebexPackage(yearly ? "plus_year" : "plus_month");
+		if (packageId == 0) {
+			throw new StoreException(503, "Velo+ isn't set up in the Tebex webstore yet");
+		}
+		TebexCheckout.Basket basket = tebex.createSubscriptionCheckout(uuid, username, packageId,
 				publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?plus=1", yearly);
 		return new PlusCheckoutView(basket.checkoutUrl());
 	}
@@ -755,16 +813,28 @@ public final class StoreService {
 		if (pack == null) {
 			throw new StoreException(404, "Unknown coin pack");
 		}
+		long packageId = config.tebexPackage(pack.id());
+		if (packageId == 0) {
+			throw new StoreException(503, "This coin pack isn't set up in the Tebex webstore yet");
+		}
 		String orderId = "vo_" + randomHex(12);
 		db.createOrder(orderId, uuid, pack, config.currency);
-		String name = String.format(Locale.ROOT, "%,d Velo Coins", pack.totalCoins()) + (username != null ? " for " + username : "");
-		TebexCheckout.Basket basket = tebex.createCheckout(orderId, uuid, username, name, pack.price(),
+		TebexCheckout.Basket basket = tebex.createCheckout(orderId, uuid, username, packageId,
 				publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?order=" + orderId);
 		db.setBasket(orderId, basket.ident());
 		return new CheckoutView(orderId, basket.checkoutUrl());
 	}
 
 	public record OrderView(String orderId, String status, int coins, int balance) {
+	}
+
+	/** What the thank-you page may show for an order (its id is the secret): status, coins and whose it is (for the head). */
+	public record OrderSummary(String status, int coins, String uuid) {
+	}
+
+	public OrderSummary orderSummary(String orderId) throws Exception {
+		StoreDatabase.Order order = orderId == null || !orderId.matches("vo_[0-9a-f]{12,32}") ? null : db.order(orderId);
+		return order == null ? null : new OrderSummary(order.status(), order.coins(), order.uuid());
 	}
 
 	public OrderView order(String uuid, String orderId) throws Exception {
@@ -815,12 +885,16 @@ public final class StoreService {
 		}
 		double paid = subject.has("price_paid") ? subject.getAsJsonObject("price_paid").get("amount").getAsDouble() : -1;
 		String paidCurrency = subject.has("price_paid") ? subject.getAsJsonObject("price_paid").get("currency").getAsString() : "";
+		// Webstore (Headless) baskets carry our data on the basket; Checkout API ones did on each product.
+		com.google.gson.JsonObject basketCustom = subject.has("custom") && subject.get("custom").isJsonObject() ? subject.getAsJsonObject("custom") : null;
 		for (var element : subject.getAsJsonArray("products")) {
 			com.google.gson.JsonObject product = element.getAsJsonObject();
-			if (!product.has("custom") || !product.get("custom").isJsonObject()) {
+			com.google.gson.JsonObject custom = product.has("custom") && product.get("custom").isJsonObject() ? product.getAsJsonObject("custom") : basketCustom;
+			if (custom == null) {
+				String key = product.has("id") && product.get("id").isJsonPrimitive() ? config.tebexKey(product.get("id").getAsLong()) : null;
+				System.out.println("[store] Paid webhook without our custom data (" + txn + ", package " + key + ") - needs review");
 				continue;
 			}
-			com.google.gson.JsonObject custom = product.getAsJsonObject("custom");
 			if (custom.has("velo_plus") && custom.has("velo_uuid")) {
 				// The Velo+ subscription: a month, then the coins and perks follow from the membership.
 				String plusUuid = custom.get("velo_uuid").getAsString();
@@ -974,6 +1048,23 @@ public final class StoreService {
 		} else {
 			db.revokeItem(ref[0], itemId, meName + "/" + meUuid);
 		}
+		return adminLookup(meUuid, meName, ref[0]);
+	}
+
+	/** Owner: gives a player every cosmetic that isn't hidden (testing ones too) - for testing. Owned ones are skipped. */
+	public PlayerView adminGrantAll(String meUuid, String meName, String target) throws Exception {
+		String[] ref = requireOwnerAndResolve(meUuid, meName, target);
+		if (cosmetics == null) {
+			throw new StoreException(503, "The cosmetics catalog isn't loaded");
+		}
+		db.touchWallet(ref[0], ref[1]);
+		int given = 0;
+		for (String itemId : cosmetics.visibleItemIds()) {
+			if (db.grantItem(ref[0], itemId, meName + "/" + meUuid)) {
+				given++;
+			}
+		}
+		System.out.println("[store] " + meName + " gave " + ref[1] + " every cosmetic (" + given + " new)");
 		return adminLookup(meUuid, meName, ref[0]);
 	}
 

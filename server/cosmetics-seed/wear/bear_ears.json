@@ -1,0 +1,10 @@
+{
+ "slot": "ears",
+ "name": "Bear Ears",
+ "price": 900,
+ "accent": "#7b5232",
+ "description": "Round brown teddy-bear ears. Cuddly.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

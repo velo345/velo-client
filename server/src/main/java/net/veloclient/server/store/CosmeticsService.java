@@ -41,8 +41,10 @@ public final class CosmeticsService {
 	public static final String STATUS_TESTING = "testing";
 	public static final String STATUS_HIDDEN = "hidden";
 	private static final Set<String> STATUSES = Set.of(STATUS_RELEASED, STATUS_TESTING, STATUS_HIDDEN);
-	private static final Set<String> TYPES = Set.of("wings", "cape", "aura", "emote");
-	private static final Pattern ITEM_ID = Pattern.compile("(wings|cape|aura|emote)_[a-z0-9_-]{1,40}");
+	private static final Set<String> TYPES = Set.of("wings", "cape", "aura", "emote", "killfx", "wear");
+	private static final Pattern ITEM_ID = Pattern.compile("(wings|cape|aura|emote|killfx|wear)_[a-z0-9_-]{1,40}");
+	/** Where bodywear sits: one item per slot, every slot combinable. */
+	public static final Set<String> WEAR_SLOTS = Set.of("head", "ears", "face", "mask", "neck", "wrist", "feet", "back");
 	private static final Pattern COLLECTION_ID = Pattern.compile("[a-z0-9_-]{1,40}");
 	private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
 	public static final int MAX_FILE_BYTES = 12 * 1024 * 1024;
@@ -72,6 +74,14 @@ public final class CosmeticsService {
 		public Boolean glow;
 		/** How it's earned instead of bought ("discord" = linking your Discord account); such an item is never sold, whatever its status. */
 		public String unlock;
+		/** Bodywear: its slot ({@link #WEAR_SLOTS}). */
+		public String slot;
+		/**
+		 * Bodywear: the model, drawn the same way by the game, the launcher and the website - {"parts": [{"bone":
+		 * "head|body|rightArm|leftArm|rightLeg|leftLeg", "boxes": [[x, y, z, w, h, d, "#rrggbb"], ...]}]}, in skin pixels
+		 * from the bone's pivot (Minecraft model space: y down, the face towards -z).
+		 */
+		public com.google.gson.JsonElement model;
 		public Map<String, String> files;
 		public long addedAt;
 		/** Seed revision: when the bundled seed's revision is higher, the item's art (and text) is refreshed from it - owner-set price/status/window stay. */
@@ -187,6 +197,10 @@ public final class CosmeticsService {
 						if (s.description != null) {
 							existing.description = s.description;
 						}
+						if (s.model != null) {
+							existing.model = s.model;
+							existing.slot = s.slot;
+						}
 						existing.rev = s.rev;
 						changed = true;
 					}
@@ -272,7 +286,7 @@ public final class CosmeticsService {
 	/** What a client may see of an item: everything except the owner-only status details. */
 	public record ItemView(String id, String type, String name, String description, int price, String collection, String accent,
 			String style, Float scale, Float offsetY, Boolean glow, Map<String, String> files, boolean inStore, Long availableUntil, String status,
-			String unlock) {
+			String unlock, String slot, com.google.gson.JsonElement model) {
 	}
 
 	public record CollectionView(String id, String name, String tag, String description) {
@@ -284,7 +298,7 @@ public final class CosmeticsService {
 	private static ItemView view(Item i, long now, boolean withStatus) {
 		boolean inStore = inStore(i, now);
 		return new ItemView(i.id, i.type, i.name, i.description, i.price, i.collection, i.accent, i.style, i.scale, i.offsetY, i.glow,
-				Map.copyOf(i.files), inStore, inStore ? i.availableUntil : null, withStatus ? i.status : null, i.unlock);
+				Map.copyOf(i.files), inStore, inStore ? i.availableUntil : null, withStatus ? i.status : null, i.unlock, i.slot, i.model);
 	}
 
 	/**
@@ -320,7 +334,7 @@ public final class CosmeticsService {
 		}
 		ItemView v = view(item, System.currentTimeMillis(), false);
 		return new ItemView(v.id(), v.type(), v.name(), v.description(), 0, v.collection(), v.accent(), v.style(), v.scale(), v.offsetY(), v.glow(),
-				v.files(), v.inStore(), null, null, v.unlock());
+				v.files(), v.inStore(), null, null, v.unlock(), v.slot(), v.model());
 	}
 
 	/** Released items in their window, for the old {@code /v1/store/catalog} price list. */
@@ -424,7 +438,37 @@ public final class CosmeticsService {
 		save();
 	}
 
+	/**
+	 * Takes a hidden item out of the catalog for good (only hidden ones - nothing in a store or being tested; and not
+	 * while a bundle still lists it). It also has to leave the bundled seed, or the next start puts it back.
+	 */
+	public synchronized void deleteItem(String id) throws IOException, StoreService.StoreException {
+		Item item = find(id);
+		if (item == null) {
+			throw new StoreService.StoreException(404, "No such item");
+		}
+		if (!STATUS_HIDDEN.equals(item.status)) {
+			throw new StoreService.StoreException(409, "Only hidden items can be deleted - hide it first");
+		}
+		if (data.bundles != null && data.bundles.stream().anyMatch(b -> b.items != null && b.items.contains(id))) {
+			throw new StoreService.StoreException(409, "A bundle still contains it");
+		}
+		data.items.remove(item);
+		save();
+	}
+
 	public record AdminView(String featured, List<Collection> collections, List<Item> items, List<Bundle> bundles) {
+	}
+
+	/** Every item that isn't hidden (released and testing alike) - for the owner's "give everything" button. */
+	public synchronized List<String> visibleItemIds() {
+		List<String> out = new ArrayList<>();
+		for (Item i : data.items) {
+			if (!STATUS_HIDDEN.equals(i.status)) {
+				out.add(i.id);
+			}
+		}
+		return out;
 	}
 
 	public synchronized AdminView admin() {
@@ -472,12 +516,13 @@ public final class CosmeticsService {
 		}
 	}
 
-	/** Stores an uploaded file (PNG, GIF, a wing mesh or an emote animation only) and returns its sha256. */
+	/** Stores an uploaded file (PNG, GIF, a wing or bodywear mesh or an emote animation only) and returns its sha256. */
 	public String storeFile(byte[] bytes) throws IOException, StoreService.StoreException {
-		boolean mesh = bytes.length >= 4 && bytes[0] == 'V' && bytes[1] == 'M' && bytes[2] == 'S' && bytes[3] == 'H';
+		boolean mesh = bytes.length >= 4 && bytes[0] == 'V' && (bytes[1] == 'M' && bytes[2] == 'S' && bytes[3] == 'H'
+				|| bytes[1] == 'P' && bytes[2] == 'R' && bytes[3] == 'P');
 		boolean emote = isEmoteAnimation(bytes);
 		if (bytes.length == 0 || bytes.length > MAX_FILE_BYTES || !mesh && !emote && contentType(bytes).startsWith("application/")) {
-			throw new StoreService.StoreException(400, "Only PNG, GIF, .vmesh or emote animation files up to 12 MB");
+			throw new StoreService.StoreException(400, "Only PNG, GIF, .vmesh, .vprop or emote animation files up to 12 MB");
 		}
 		String sha;
 		try {
@@ -502,7 +547,7 @@ public final class CosmeticsService {
 	 */
 	public synchronized Item upsert(Item change, boolean clearWindow) throws IOException, StoreService.StoreException {
 		if (change == null || change.id == null || !ITEM_ID.matcher(change.id).matches()) {
-			throw new StoreService.StoreException(400, "Item ids look like wings_<name>, cape_<name>, aura_<name> or emote_<name> (lowercase, digits, _ or -)");
+			throw new StoreService.StoreException(400, "Item ids look like wings_<name>, cape_<name>, aura_<name>, emote_<name>, killfx_<name> or wear_<name> (lowercase, digits, _ or -)");
 		}
 		Item item = find(change.id);
 		boolean created = item == null;
@@ -510,7 +555,7 @@ public final class CosmeticsService {
 			item = new Item();
 			item.id = change.id;
 			item.type = change.id.startsWith("wings_") ? "wings" : change.id.startsWith("aura_") ? "aura"
-					: change.id.startsWith("emote_") ? "emote" : "cape";
+					: change.id.startsWith("emote_") ? "emote" : change.id.startsWith("killfx_") ? "killfx" : change.id.startsWith("wear_") ? "wear" : "cape";
 			item.name = change.id;
 			item.description = "";
 			item.status = STATUS_TESTING;
@@ -563,9 +608,18 @@ public final class CosmeticsService {
 			}
 			item.accent = change.accent.toLowerCase(Locale.ROOT);
 		}
+		if (change.slot != null) {
+			if (!WEAR_SLOTS.contains(change.slot)) {
+				throw new StoreService.StoreException(400, "slot is one of " + WEAR_SLOTS);
+			}
+			item.slot = change.slot;
+		}
+		if (change.model != null) {
+			item.model = change.model;
+		}
 		if (change.style != null) {
-			if (!Set.of("feathered", "bat", "crystal").contains(change.style)) {
-				throw new StoreService.StoreException(400, "style is feathered, bat or crystal");
+			if (!Set.of("feathered", "bat", "crystal", "tentacle").contains(change.style)) {
+				throw new StoreService.StoreException(400, "style is feathered, bat, crystal or tentacle");
 			}
 			item.style = change.style;
 		}
@@ -590,7 +644,7 @@ public final class CosmeticsService {
 			item.files = new LinkedHashMap<>(item.files);
 			item.files.putAll(change.files);
 		}
-		// Auras are drawn by code in the clients - no files.
+		// Auras and kill effects are drawn by code in the clients - no files.
 		List<String> required = "wings".equals(item.type) ? List.of("mesh", "texture") : "cape".equals(item.type) ? List.of("gif")
 				: "emote".equals(item.type) ? List.of("anim") : List.of();
 		for (String role : required) {

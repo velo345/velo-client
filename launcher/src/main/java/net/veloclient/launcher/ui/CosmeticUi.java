@@ -44,9 +44,13 @@ public final class CosmeticUi {
 	 */
 	private static final Map<String, List<GifFrames.Frame>> FRAMES = LauncherCaches.lru(30);
 	/** Full-resolution frames for the big 3D viewers - only the few on screen (about 15 MB each for a 1024 px cape). */
-	private static final Map<String, List<GifFrames.Frame>> HD_FRAMES = LauncherCaches.lru(3);
+	private static final Map<String, List<GifFrames.Frame>> HD_FRAMES = LauncherCaches.lru(2);
 	private static final int CARD_SCALE = 8;
-	private static final int HD_SCALE = 32;
+	/**
+	 * The big 3D viewers: 16 texels per cape pixel is sharp at any size the launcher shows a player (the HD store
+	 * cloaks come at 32 - 61 MB per cloak decoded, that ran small PCs out of memory); 8 with a small heap.
+	 */
+	private static final int HD_SCALE = Runtime.getRuntime().maxMemory() < 512L * 1024 * 1024 ? 8 : 16;
 	/** Decoding happens off the UI thread, two at a time (a page of capes shouldn't saturate every core). */
 	private static final java.util.concurrent.ExecutorService DECODER = Executors.newFixedThreadPool(2, r -> {
 		Thread t = new Thread(r, "velo-cape-decoder");

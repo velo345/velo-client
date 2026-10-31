@@ -85,6 +85,9 @@ public final class VeloBot extends ListenerAdapter {
 		bot.staff.start();
 		bot.giveaways = new Giveaways(jda, config, bot.server);
 		bot.giveaways.start();
+		// The staff panel (staff.velo-client.com) reaches tickets and staff roles through the Velo server and this local API.
+		new StaffBridge(jda, config, bot.tickets, bot.staff, adminToken).start(env("BOT_BRIDGE_BIND", "127.0.0.1"),
+				Integer.parseInt(env("BOT_BRIDGE_PORT", "8792")));
 		System.out.println("Velo bot online as " + jda.getSelfUser().getName());
 	}
 
@@ -100,7 +103,7 @@ public final class VeloBot extends ListenerAdapter {
 		List<SlashCommandData> commands = new ArrayList<>();
 		commands.add(Commands.slash("link", "Link your Minecraft account with the code from Velo Client (only you see the answer)")
 				.addOption(OptionType.STRING, "code", "The code Velo Client shows you", true));
-		commands.add(Commands.slash("unlink", "Unlink your Minecraft account (the Velo Neon cape is removed)"));
+		commands.add(Commands.slash("unlink", "Unlink your Minecraft account (the Velo Neon cloak is removed)"));
 		commands.add(Commands.slash("roles", "Ping roles members can pick").setDefaultPermissions(admin).addSubcommands(
 				new SubcommandData("add", "Put a role on the panel").addOptions(new OptionData(OptionType.ROLE, "role", "The role to give", true),
 						new OptionData(OptionType.STRING, "label", "Button text, e.g. News", true),
@@ -134,12 +137,13 @@ public final class VeloBot extends ListenerAdapter {
 						new OptionData(OptionType.CHANNEL, "donations", "Channel for purchase announcements", false),
 						new OptionData(OptionType.CHANNEL, "reports", "Channel for bug / crash reports", false),
 						new OptionData(OptionType.CHANNEL, "player-reports", "Channel for reported friend / party chat messages (staff only!)", false)),
-				new SubcommandData("staff-role", "Members with this role are on the Velo team (staff cape, Velo+, maybe in-game staff tools)").addOptions(
+				new SubcommandData("staff-role", "Members with this role are on the Velo team (staff cloak, Velo+, maybe in-game staff tools)").addOptions(
 						new OptionData(OptionType.ROLE, "role", "The role", true),
 						new OptionData(OptionType.STRING, "level", "What they may do", true)
-								.addChoice("Helper - staff cape and Velo+, no moderation tools", "helper")
-								.addChoice("Moderator - look up players, censor capes", "mod")
-								.addChoice("Admin - also bans and player reports", "admin")),
+								.addChoice("Helper - staff cloak and Velo+, no moderation tools", "helper")
+								.addChoice("Moderator - look up players, censor cloaks", "mod")
+								.addChoice("Admin - also bans and player reports", "admin")
+								.addChoice("Manager - everything, sees all punishments and manages the team", "manager")),
 				new SubcommandData("staff-role-remove", "This role no longer makes someone Velo staff").addOptions(new OptionData(OptionType.ROLE, "role", "The role", true)),
 				new SubcommandData("welcome", "Post a welcome card for every new member in a channel").addOptions(
 						new OptionData(OptionType.CHANNEL, "channel", "Where welcomes go", true),
@@ -160,8 +164,8 @@ public final class VeloBot extends ListenerAdapter {
 				.addOptions(new OptionData(OptionType.CHANNEL, "channel", "Where", true), new OptionData(OptionType.ROLE, "role", "Who to ping", true),
 						new OptionData(OptionType.STRING, "message", "The announcement", true), new OptionData(OptionType.STRING, "title", "Title", false)));
 		OptionData postKind = new OptionData(OptionType.STRING, "post", "Which post", true).addChoice("📜 Rules", "rules")
-				.addChoice("⬇️ How to download", "download").addChoice("🧥 Free Velo Neon cape", "free-cape").addChoice("💖 Booster perks (with Claim button)", "boosters");
-		commands.add(Commands.slash("post", "Post a ready-made info message (rules, download, free cape, boosters)").setDefaultPermissions(admin)
+				.addChoice("⬇️ How to download", "download").addChoice("🧥 Free Velo Neon cloak", "free-cape").addChoice("💖 Booster perks (with Claim button)", "boosters");
+		commands.add(Commands.slash("post", "Post a ready-made info message (rules, download, free cloak, boosters)").setDefaultPermissions(admin)
 				.addOptions(postKind, new OptionData(OptionType.CHANNEL, "channel", "Where", true)));
 		commands.add(Commands.slash("giveaway", "Giveaways - prizes go straight onto the winners' Velo accounts").setDefaultPermissions(admin).addSubcommands(
 				new SubcommandData("start", "Start a giveaway").addOptions(
@@ -289,7 +293,7 @@ public final class VeloBot extends ListenerAdapter {
 	}
 
 	private static String linkedMessage(ServerApi.Linked linked) {
-		return "✅ Linked to **" + linked.username() + "**! The **Velo Neon** cape is now in your cosmetics.";
+		return "✅ Linked to **" + linked.username() + "**! The **Velo Neon** cloak is now in your cosmetics.";
 	}
 
 	private void grantLinkedRole(Guild guild, net.dv8tion.jda.api.entities.Member member) {
@@ -312,7 +316,7 @@ public final class VeloBot extends ListenerAdapter {
 					event.getGuild().removeRoleFromMember(event.getMember(), role).queue(null, e -> { });
 				}
 			}
-			event.getHook().sendMessage(removed ? "Unlinked. The Velo Neon cape is removed - link again any time." : "You weren't linked.").queue();
+			event.getHook().sendMessage(removed ? "Unlinked. The Velo Neon cloak is removed - link again any time." : "You weren't linked.").queue();
 			if (vip != null) {
 				vip.runNow();
 			}
@@ -456,7 +460,8 @@ public final class VeloBot extends ListenerAdapter {
 					event.reply("Only the person who opened the ticket or the team can close it.").setEphemeral(true).queue();
 					return;
 				}
-				tickets.closeTicket(channel, ticket, event.getUser(), event.getOption("reason") == null ? "" : event.getOption("reason").getAsString(), event);
+				tickets.closeTicket(channel, ticket, event.getUser().getAsMention(), event.getUser().getName(),
+						event.getOption("reason") == null ? "" : event.getOption("reason").getAsString(), notice -> event.reply(notice).queue());
 			}
 			default -> event.reply("Unknown subcommand").setEphemeral(true).queue();
 		}
@@ -540,9 +545,10 @@ public final class VeloBot extends ListenerAdapter {
 				String level = event.getOption("level").getAsString();
 				config.staffRoles.put(role.getId(), level);
 				config.save();
-				String perks = level.equals("helper") ? "the Velo Staff cape and Velo+ (no moderation tools)"
-						: "the Velo Staff cape, Velo+ and `/velostaff` in game";
+				String perks = level.equals("helper") ? "the Velo Staff cloak and Velo+ (no moderation tools)"
+						: "the Velo Staff cloak, Velo+ and `/velostaff` in game";
 				event.reply(role.getAsMention() + " now makes members Velo **" + switch (level) {
+					case "manager" -> "managers";
 					case "admin" -> "admins";
 					case "helper" -> "helpers";
 					default -> "moderators";

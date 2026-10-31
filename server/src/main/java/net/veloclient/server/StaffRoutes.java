@@ -65,14 +65,17 @@ final class StaffRoutes {
 
 	static void register(HttpServer server, SessionRegistry registry, StaffService staff, SocialService social, PartyService parties, CapeStore capes,
 			StoreService store, CosmeticsService cosmetics, DiscordLinks links, DiscordAnnouncer announcer, String adminToken) {
-		java.util.function.Function<String, String> levelOf = uuid -> store.isOwner(uuid, social.usernameOf(uuid)) ? StaffService.ADMIN : staff.level(uuid);
+		java.util.function.Function<String, String> levelOf = uuid -> store.isOwner(uuid, social.usernameOf(uuid)) ? StaffService.MANAGER : staff.level(uuid);
 
 		SocialRoutes.route(server, registry, "/v1/staff/me", "GET", (ex, me) -> {
 			Map<String, Object> out = new LinkedHashMap<>();
 			String level = levelOf.apply(me);
 			// "level" unlocks the staff tools in the client (/velostaff): helpers have none, so theirs is null; "team" says they're on it.
-			out.put("level", StaffService.rank(level) > 0 ? level : null);
-			out.put("team", level);
+			// Clients before managers existed know "admin" as the top: a manager is an admin to them; "role" has the real one.
+			String compat = StaffService.MANAGER.equals(level) ? StaffService.ADMIN : level;
+			out.put("level", StaffService.rank(level) > 0 ? compat : null);
+			out.put("team", compat);
+			out.put("role", level);
 			JsonHttp.writeJson(ex, 200, out);
 		});
 		SocialRoutes.route(server, registry, "/v1/staff/lookup", "POST", (ex, me) -> {
@@ -84,9 +87,9 @@ final class StaffRoutes {
 			require(levelOf.apply(me), StaffService.MOD);
 			SocialService.PlayerRef ref = social.resolvePlayer(JsonHttp.readBody(ex, TargetRequest.class).target());
 			if (!capes.removeAndBan(ref.uuid())) {
-				throw new SocialService.SocialException(404, ref.username() + " has no custom cape uploaded");
+				throw new SocialService.SocialException(404, ref.username() + " has no custom cloak uploaded");
 			}
-			System.out.println("[staff] " + social.usernameOf(me) + " censored the custom cape of " + ref.username());
+			System.out.println("[staff] " + social.usernameOf(me) + " censored the custom cloak of " + ref.username());
 			JsonHttp.writeJson(ex, 200, lookup(ref, staff, social, capes, levelOf));
 		});
 		SocialRoutes.route(server, registry, "/v1/staff/ban", "POST", (ex, me) -> {
@@ -204,7 +207,7 @@ final class StaffRoutes {
 				}
 			}
 			if (revoked > 0 || !changes.get(1).isEmpty()) {
-				System.out.println("[staff] Left the team: " + changes.get(1).size() + ", staff capes taken back: " + revoked);
+				System.out.println("[staff] Left the team: " + changes.get(1).size() + ", staff cloaks taken back: " + revoked);
 			}
 			Map<String, Object> out = new LinkedHashMap<>();
 			out.put("staff", fresh.size());

@@ -51,6 +51,16 @@ final class StoreItems {
 		return net.veloclient.velo.client.emotes.EmoteCatalog.type(itemId.substring(net.veloclient.velo.client.emotes.EmoteCatalog.ITEM_PREFIX.length()));
 	}
 
+	private static Optional<net.veloclient.velo.client.cosmetics.killfx.KillFxManager.KillFxType> killFx(String itemId) {
+		if (itemId == null || !itemId.startsWith(net.veloclient.velo.client.cosmetics.killfx.KillFxManager.ITEM_PREFIX)) {
+			return Optional.empty();
+		}
+		return net.veloclient.velo.client.cosmetics.killfx.KillFxManager.type(itemId.substring(net.veloclient.velo.client.cosmetics.killfx.KillFxManager.ITEM_PREFIX.length()));
+	}
+
+	/** Looping previews for the small item pictures, one per item. */
+	private static final java.util.Map<String, net.veloclient.velo.client.gui.widget.KillFxGuiRenderer.Loop> KILLFX_ART = new java.util.HashMap<>();
+
 	/** The item's Store card (opens its page), or null if it's unknown here. */
 	static ClickableWidget card(Screen parent, String itemId, int width, int height) {
 		MinecraftClient client = MinecraftClient.getInstance();
@@ -66,6 +76,11 @@ final class StoreItems {
 		if (emote.isPresent()) {
 			return new net.veloclient.velo.client.gui.widget.VeloEmoteCard(width, height, emote.get(),
 					() -> client.setScreen(new EmoteDetailScreen(parent, emote.get())));
+		}
+		var killFx = killFx(itemId);
+		if (killFx.isPresent()) {
+			return new net.veloclient.velo.client.gui.widget.VeloKillFxCard(width, height, killFx.get(),
+					() -> client.setScreen(new KillFxDetailScreen(parent, killFx.get())));
 		}
 		return StoreCatalog.byId(itemId).<ClickableWidget>map(item -> new VeloStoreItemTile(0, 0, width, height - net.veloclient.velo.client.gui.widget.StoreCard.INFO_H,
 				item, () -> client.setScreen(new StoreItemDetailScreen(parent, item)))).orElse(null);
@@ -84,6 +99,10 @@ final class StoreItems {
 		var emote = emote(itemId);
 		if (emote.isPresent()) {
 			return StoreClient.price(itemId, emote.get().price());
+		}
+		var killFx = killFx(itemId);
+		if (killFx.isPresent()) {
+			return StoreClient.price(itemId, killFx.get().price());
 		}
 		return StoreCatalog.byId(itemId).map(i -> StoreClient.price(itemId, i.priceCoins())).orElse(0);
 	}
@@ -106,6 +125,10 @@ final class StoreItems {
 		if (emote(itemId).isPresent()) {
 			return StoreClient.owns(itemId);
 		}
+		var killFx = killFx(itemId);
+		if (killFx.isPresent()) {
+			return net.veloclient.velo.client.cosmetics.killfx.KillFxManager.owns(killFx.get().id());
+		}
 		return StoreOwnership.owns(itemId);
 	}
 
@@ -113,13 +136,15 @@ final class StoreItems {
 		return wings(itemId).map(WingsManager.WingType::name)
 				.or(() -> aura(itemId).map(AuraManager.AuraType::name))
 				.or(() -> emote(itemId).map(net.veloclient.velo.client.emotes.EmoteCatalog.EmoteType::name))
+				.or(() -> killFx(itemId).map(net.veloclient.velo.client.cosmetics.killfx.KillFxManager.KillFxType::name))
 				.or(() -> StoreCatalog.byId(itemId).map(StoreItem::name)).orElse(itemId);
 	}
 
 	static int accent(String itemId) {
 		return wings(itemId).map(WingsManager.WingType::accent)
 				.or(() -> aura(itemId).map(AuraManager.AuraType::accent))
-				.or(() -> emote(itemId).map(net.veloclient.velo.client.emotes.EmoteCatalog.EmoteType::accent)).orElse(0xFF8B7CF6);
+				.or(() -> emote(itemId).map(net.veloclient.velo.client.emotes.EmoteCatalog.EmoteType::accent))
+				.or(() -> killFx(itemId).map(net.veloclient.velo.client.cosmetics.killfx.KillFxManager.KillFxType::accent)).orElse(0xFF8B7CF6);
 	}
 
 	/** A small square picture of the item on a glow in its colour. */
@@ -153,6 +178,15 @@ final class StoreItems {
 			context.disableScissor();
 			return;
 		}
+		var killFx = killFx(itemId);
+		if (killFx.isPresent()) {
+			var loop = KILLFX_ART.computeIfAbsent(itemId, k -> new net.veloclient.velo.client.gui.widget.KillFxGuiRenderer.Loop(killFx.get().kind()));
+			context.enableScissor(x, y, x + size, y + size);
+			net.veloclient.velo.client.gui.widget.KillFxGuiRenderer.draw(context, loop, AuraEffects.Settings.DEFAULT, x + size / 2f, y + size * 0.78f,
+					size / 5.2f, 0.5);
+			context.disableScissor();
+			return;
+		}
 		StoreCatalog.byId(itemId).ifPresent(item -> {
 			AnimatedCapeAsset preview = StoreAssets.preview(item);
 			if (preview != null) {
@@ -174,6 +208,7 @@ final class StoreItems {
 			StoreCatalog.all().stream().filter(StoreItem::inStore).forEach(i -> pool.add(i.id()));
 			AuraManager.forSale().forEach(a -> pool.add(a.itemId()));
 			net.veloclient.velo.client.emotes.EmoteCatalog.forSale().forEach(e -> pool.add(e.itemId()));
+			net.veloclient.velo.client.cosmetics.killfx.KillFxManager.forSale().forEach(k -> pool.add(k.itemId()));
 			Collections.sort(pool);
 			Collections.shuffle(pool, new Random(LocalDate.now(ZoneOffset.UTC).toEpochDay() * 31L + 7));
 			ids.addAll(pool.subList(0, Math.min(4, pool.size())));

@@ -8,7 +8,10 @@ plugins {
 // DO NOT set group here - loom-back-compat needs it set before its own
 // plugin application resolves per-node dependencies.
 group = property("mod.group") as String
-version = "${property("mod.version")}+${sc.current.version}"
+// Dev build (./build-dev.sh or -PveloDev=true): unreleased features from src/dev ride inside the client jar, which is
+// versioned "<version>-dev" so it can never be mistaken for a release. Production builds never see src/dev.
+val veloDev = (findProperty("veloDev") as String?)?.toBoolean() == true
+version = "${property("mod.version")}${if (veloDev) "-dev" else ""}+${sc.current.version}"
 
 base {
 	archivesName.set(property("mod.id") as String)
@@ -57,6 +60,18 @@ val hasAddons = rootProject.file("src/addon/resources/fabric.mod.json").exists()
 val addon: SourceSet = sourceSets.create("addon") {
 	compileClasspath += sourceSets["main"].output + sourceSets["client"].output + sourceSets["client"].compileClasspath
 	runtimeClasspath += sourceSets["main"].output + sourceSets["client"].output + sourceSets["client"].runtimeClasspath
+}
+
+// src/dev: features still being built (see veloDev above). Always compiled, so it can't rot, but only packed into the
+// client jar of a dev build.
+val dev: SourceSet = sourceSets.create("dev") {
+	compileClasspath += sourceSets["main"].output + sourceSets["client"].output + sourceSets["client"].compileClasspath
+	runtimeClasspath += sourceSets["main"].output + sourceSets["client"].output + sourceSets["client"].runtimeClasspath
+}
+if (veloDev) {
+	tasks.named<Jar>("jar") { from(dev.output) }
+	// Dev client runs (screenshot tours of dev features) need the dev classes too.
+	tasks.named<JavaExec>("runClient") { classpath(dev.output) }
 }
 
 loom {
@@ -119,9 +134,13 @@ tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") 
 	inputs.property("version", modVersion)
 	inputs.property("minecraftDependency", minecraftDependency)
 	inputs.property("javaVersion", javaVersion)
+	// The dev build's own mixins (src/dev/resources/velo-dev.mixins.json) are only listed in a dev jar.
+	val devMixins = if (veloDev) ",\n\t\t\"velo-dev.mixins.json\"" else ""
+	inputs.property("devMixins", devMixins)
 
 	filesMatching("fabric.mod.json") {
-		expand("version" to modVersion, "minecraft_dependency" to minecraftDependency, "java_version" to javaVersion)
+		expand("version" to modVersion, "minecraft_dependency" to minecraftDependency, "java_version" to javaVersion,
+				"dev_mixins" to devMixins)
 	}
 }
 

@@ -47,11 +47,18 @@ public final class AuraFx {
 	 * A glow, (shape {@link #LINE}) a beam from (x, y) to (x2, y2) {@code radius} wide, or (shape {@link #PANEL}) an
 	 * upright card {@code radius} wide and {@code x2} tall showing atlas cell {@code (int) y2}.
 	 */
-	private record Sprite(double x, double y, double depth, double radius, int rgb, double alpha, int shape, double x2, double y2) {
+	private record Sprite(double x, double y, double depth, double radius, int rgb, double alpha, int shape, double x2, double y2, double[] corners) {
+		Sprite(double x, double y, double depth, double radius, int rgb, double alpha, int shape, double x2, double y2) {
+			this(x, y, depth, radius, rgb, alpha, shape, x2, y2, null);
+		}
 	}
 
 	private static final int LINE = 99;
 	private static final int PANEL = 98;
+	/** A free quad (wings, ribbons): {@code corners} on screen, atlas cell {@code (int) y2}. */
+	private static final int QUAD = 97;
+	/** A newer atlas shape ({@code shape} - {@link #ATLAS_SHAPE}), turned by {@code x2}. */
+	private static final int ATLAS_SHAPE = 1 << 12;
 	/** Code-rain characters the default font surely has (the game's atlas has katakana; fonts here might not). */
 	private static final String GLYPHS = "0123457ABCDEFHXZ";
 	private static final javafx.scene.text.Font GLYPH_FONT = javafx.scene.text.Font.font("Monospaced", javafx.scene.text.FontWeight.BOLD, 12);
@@ -64,6 +71,10 @@ public final class AuraFx {
 
 	/** Shows {@code shown} (re-read every frame) around the player of a viewer made by PlayerSkin3DView. */
 	public static void attach(Node viewer, Supplier<Shown> shown) {
+		// Performance mode: no auras on previews.
+		if (net.veloclient.launcher.data.LauncherSettings.get().performanceMode) {
+			return;
+		}
 		if (!(viewer instanceof StackPane wrapper) || !(wrapper.getProperties().get("velo.yaw") instanceof Rotate yaw)
 				|| !(wrapper.getProperties().get("velo.camera") instanceof PerspectiveCamera camera)
 				|| !(wrapper.getProperties().get("velo.subScene") instanceof SubScene)) {
@@ -243,6 +254,164 @@ public final class AuraFx {
 		return canvas;
 	}
 
+	// ---- Kill effects (KillFxEffects): the same sprites, a wider shot ----
+
+	/** How far back the camera stands for kill effects (model units; KillFxEffects.previewFraming scales it for tall ones). */
+	private static final double KILL_DISTANCE = 190;
+
+	/** The burst seen at {@code angle}, facing that camera. */
+	private static List<Sprite> projectKill(net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.Burst burst, AuraEffects.Settings settings,
+			double width, double height, double angle) {
+		float[] framing = net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.previewFraming(burst.kind());
+		double distance = KILL_DISTANCE * framing[1];
+		double focal = (height / 2) / Math.tan(Math.toRadians(15));
+		double k = focal / distance;
+		return project(out -> burst.draw(settings, out), width / 2, height / 2 + (framing[0] * UNIT - FEET_Y) * k, focal, distance, angle);
+	}
+
+	private static net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.Burst killBurst(net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.Kind kind,
+			double angle) {
+		return new net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.Burst(kind, 7).facing(Math.sin(angle), -Math.cos(angle));
+	}
+
+	/** A Store card / page picture of a kill effect: it plays over and over, on a dim figure until the hit. */
+	public static Node killFxCard(net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.Kind kind, Supplier<AuraEffects.Settings> settings,
+			double width, double height, Runnable onStart) {
+		Canvas back = new Canvas(width, height);
+		Canvas shape = new Canvas(width, height);
+		Canvas front = new Canvas(width, height);
+		StackPane canvas = new StackPane(back, shape, front);
+		canvas.setMouseTransparent(true);
+		double angle = 0.45;
+		float[] framing = net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.previewFraming(kind);
+		double focal = (height / 2) / Math.tan(Math.toRadians(15));
+		double k = focal / (KILL_DISTANCE * framing[1]);
+		double cy = height / 2 + (framing[0] * UNIT - FEET_Y) * k;
+		var burst = new Object() {
+			net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.Burst value;
+			double idle = 0.4;
+		};
+		AnimationTimer timer = new AnimationTimer() {
+			private long last;
+
+			@Override
+			public void handle(long now) {
+				if (now - last < 33_000_000L || !canvas.isVisible() || !RenderGate.active()) {
+					return;
+				}
+				float dt = last == 0 ? 0 : (float) Math.min(0.1, (now - last) / 1e9);
+				last = now;
+				if (burst.value == null || burst.value.done()) {
+					burst.idle += dt;
+					if (burst.idle < (burst.value == null ? 0.4 : 0.8)) {
+						clear(back);
+						clear(front);
+						return;
+					}
+					burst.value = killBurst(kind, angle);
+					burst.idle = 0;
+					if (onStart != null) {
+						onStart.run();
+					}
+				}
+				burst.value.update(dt, settings.get());
+				List<Sprite> sprites = projectKill(burst.value, settings.get(), width, height, angle);
+				clear(back);
+				clear(front);
+				clear(shape);
+				// The victim stands there until the hit.
+				double fade = Math.max(0, 1 - burst.value.time() * 5);
+				if (fade > 0) {
+					GraphicsContext g = shape.getGraphicsContext2D();
+					g.setGlobalAlpha(fade);
+					silhouette(g, width / 2, cy, k);
+					g.setGlobalAlpha(1);
+				}
+				draw(back.getGraphicsContext2D(), sprites, KILL_DISTANCE, false, false);
+				draw(front.getGraphicsContext2D(), sprites, KILL_DISTANCE, true, false);
+			}
+		};
+		canvas.sceneProperty().addListener((obs, oldScene, newScene) -> {
+			if (newScene == null) {
+				timer.stop();
+				// Left the page: its sound goes with it.
+				KillFxSound.stop();
+			} else {
+				timer.start();
+			}
+		});
+		// Starts the effect over right now (onStart runs with it - a sound starts in step with the picture).
+		canvas.getProperties().put(KILL_RESTART, (Runnable) () -> {
+			burst.value = null;
+			burst.idle = 10;
+		});
+		return canvas;
+	}
+
+	/** The key of a kill effect card's "start over now" Runnable in its node properties. */
+	public static final String KILL_RESTART = "velo.killfx.restart";
+
+	/** Starts a card made by {@link #killFxCard} over now. */
+	public static void restartKillFx(Node card) {
+		if (card != null && card.getProperties().get(KILL_RESTART) instanceof Runnable restart) {
+			restart.run();
+		}
+	}
+
+	/** A still of a kill effect at its most striking moment (cards in long lists). FX thread; cached. */
+	public static javafx.scene.image.Image killFxSnapshot(net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.Kind kind, AuraEffects.Settings settings,
+			double width, double height) {
+		return SNAPSHOTS.computeIfAbsent("killfx:" + kind + "@" + settings.encode() + "@" + (int) width + "x" + (int) height, key -> {
+			var burst = killBurst(kind, 0.45);
+			for (int i = 0; i < Math.round(net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.highlight(kind) * 30); i++) {
+				burst.update(1 / 30f, settings);
+			}
+			Canvas canvas = new Canvas(width, height);
+			GraphicsContext g = canvas.getGraphicsContext2D();
+			List<Sprite> sprites = projectKill(burst, settings, width, height, 0.45);
+			draw(g, sprites, KILL_DISTANCE, false, true);
+			draw(g, sprites, KILL_DISTANCE, true, true);
+			javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+			params.setFill(Color.TRANSPARENT);
+			return canvas.snapshot(params, null);
+		});
+	}
+
+	/** Every frame of one play of a kill effect (exported as the website's previews by AuraPreviewExport). FX thread. */
+	public static List<javafx.scene.image.WritableImage> killFxFrames(net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.Kind kind, int width,
+			int height, int fps) {
+		AuraEffects.Settings settings = AuraEffects.Settings.DEFAULT;
+		var burst = killBurst(kind, 0.45);
+		float[] framing = net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.previewFraming(kind);
+		double focal = (height / 2.0) / Math.tan(Math.toRadians(15));
+		double k = focal / (KILL_DISTANCE * framing[1]);
+		double cy = height / 2.0 + (framing[0] * UNIT - FEET_Y) * k;
+		Canvas canvas = new Canvas(width, height);
+		GraphicsContext g = canvas.getGraphicsContext2D();
+		javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+		params.setFill(Color.TRANSPARENT);
+		List<javafx.scene.image.WritableImage> out = new ArrayList<>();
+		int frames = (int) Math.ceil((net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.duration(kind) + 0.9) * fps);
+		for (int i = 0; i < frames; i++) {
+			// A moment of the victim standing, then the effect.
+			if (i >= fps / 3) {
+				burst.update(1f / fps, settings);
+			}
+			clear(canvas);
+			double fade = i < fps / 3 ? 1 : Math.max(0, 1 - burst.time() * 5);
+			List<Sprite> sprites = projectKill(burst, settings, width, height, 0.45);
+			draw(g, sprites, KILL_DISTANCE, false, true);
+			if (fade > 0) {
+				g.setGlobalAlpha(fade);
+				silhouette(g, width / 2.0, cy, k);
+				g.setGlobalAlpha(1);
+			}
+			draw(g, sprites, KILL_DISTANCE, true, true);
+			out.add(canvas.snapshot(params, null));
+		}
+		return out;
+	}
+
 	private static void clear(Canvas canvas) {
 		GraphicsContext g = canvas.getGraphicsContext2D();
 		g.setGlobalBlendMode(BlendMode.SRC_OVER);
@@ -252,12 +421,22 @@ public final class AuraFx {
 	/** The aura's sprites on screen (model space: x right, y down, feet at FEET_Y; turned by {@code angle}). */
 	private static List<Sprite> project(AuraEffects.Emitter emitter, AuraEffects.Settings settings, double cx, double cy, double focal,
 			double distance, double angle) {
+		return project(out -> emitter.draw(settings, 0, 0, 0, out), cx, cy, focal, distance, angle);
+	}
+
+	/** Whatever {@code drawer} draws, on screen (the same projection as an aura's). */
+	private static List<Sprite> project(java.util.function.Consumer<AuraEffects.Out> drawer, double cx, double cy, double focal, double distance,
+			double angle) {
 		double cos = Math.cos(angle);
 		double sin = Math.sin(angle);
 		List<Sprite> out = new ArrayList<>();
-		emitter.draw(settings, 0, 0, 0, new AuraEffects.Out() {
+		drawer.accept(new AuraEffects.Out() {
 			@Override
 			public void sprite(float x, float y, float z, float size, int rgb, float alpha, int shape) {
+				if ((shape & 0xFF) >= AuraEffects.HALO) {
+					sprite(x, y, z, size, rgb, alpha, shape, 0);
+					return;
+				}
 				if (alpha <= 0.02f) {
 					return;
 				}
@@ -272,6 +451,37 @@ public final class AuraFx {
 				}
 				double k = focal / d;
 				out.add(new Sprite(cx + rx * k, cy + my * k, rz, size * UNIT * k, rgb, alpha, shape, 0, 0));
+			}
+
+			@Override
+			public void sprite(float x, float y, float z, float size, int rgb, float alpha, int shape, float rot) {
+				if ((shape & 0xFF) < AuraEffects.HALO) {
+					sprite(x, y, z, size, rgb, alpha, shape);
+					return;
+				}
+				double[] c = alpha <= 0.02f ? null : point(x, y, z);
+				if (c != null) {
+					out.add(new Sprite(c[0], c[1], c[2], size * UNIT * focal / c[3], rgb, alpha, ATLAS_SHAPE + shape, rot, 0));
+				}
+			}
+
+			@Override
+			public void quad(float[] q, int cell, int rgb, float alpha) {
+				if (alpha <= 0.02f) {
+					return;
+				}
+				double[] screen = new double[8];
+				double depth = 0;
+				for (int i = 0; i < 4; i++) {
+					double[] c = point(q[i * 3], q[i * 3 + 1], q[i * 3 + 2]);
+					if (c == null) {
+						return;
+					}
+					screen[i * 2] = c[0];
+					screen[i * 2 + 1] = c[1];
+					depth += c[2] / 4;
+				}
+				out.add(new Sprite(screen[0], screen[1], depth, 0, rgb, alpha, QUAD, 0, cell, screen));
 			}
 
 			@Override
@@ -364,6 +574,43 @@ public final class AuraFx {
 		return image;
 	}
 
+	private static javafx.scene.image.Image atlas;
+	private static final java.util.Map<Integer, javafx.scene.image.Image> CELLS = new java.util.HashMap<>();
+	private static final int CELL_PX = 64;
+
+	/** Atlas cell {@code cell} tinted {@code rgb} (colours snapped to 16 levels), {@link #CELL_PX} px, made once. */
+	private static javafx.scene.image.Image cellImage(int cell, int rgb) {
+		int key = cell << 24 | (rgb & 0xF0F0F0);
+		javafx.scene.image.Image cached = CELLS.get(key);
+		if (cached != null) {
+			return cached;
+		}
+		if (CELLS.size() > 800) {
+			CELLS.clear();
+		}
+		if (atlas == null) {
+			try (var in = AuraFx.class.getResourceAsStream("/net/veloclient/launcher/aura/atlas.png")) {
+				atlas = in == null ? new javafx.scene.image.WritableImage(CELL_PX * AuraEffects.ATLAS_COLUMNS, CELL_PX * AuraEffects.ATLAS_ROWS)
+						: new javafx.scene.image.Image(in, CELL_PX * AuraEffects.ATLAS_COLUMNS, CELL_PX * AuraEffects.ATLAS_ROWS, false, true);
+			} catch (java.io.IOException e) {
+				atlas = new javafx.scene.image.WritableImage(CELL_PX * AuraEffects.ATLAS_COLUMNS, CELL_PX * AuraEffects.ATLAS_ROWS);
+			}
+		}
+		javafx.scene.image.PixelReader reader = atlas.getPixelReader();
+		javafx.scene.image.WritableImage image = new javafx.scene.image.WritableImage(CELL_PX, CELL_PX);
+		javafx.scene.image.PixelWriter writer = image.getPixelWriter();
+		int ox = (cell % AuraEffects.ATLAS_COLUMNS) * CELL_PX;
+		int oy = (cell / AuraEffects.ATLAS_COLUMNS) * CELL_PX;
+		int tint = rgb & 0xF0F0F0 | 0x080808;
+		for (int y = 0; y < CELL_PX; y++) {
+			for (int x = 0; x < CELL_PX; x++) {
+				writer.setArgb(x, y, (reader.getArgb(ox + x, oy + y) & 0xFF000000) | tint);
+			}
+		}
+		CELLS.put(key, image);
+		return image;
+	}
+
 	private static final java.util.Map<Integer, javafx.scene.image.Image> CURTAINS = new java.util.HashMap<>();
 	private static final java.util.Map<Integer, javafx.scene.image.Image> GLYPH_IMAGES = new java.util.HashMap<>();
 
@@ -432,6 +679,31 @@ public final class AuraFx {
 					g.drawImage(curtainImage(s.rgb), s.x - w / 2, s.y - h / 2, w, h);
 				}
 				g.setGlobalAlpha(1);
+				continue;
+			}
+			if (s.shape == QUAD) {
+				// The cell stretched onto the quad (an affine fit through its first, second and last corner).
+				double[] q = s.corners;
+				g.save();
+				g.setGlobalAlpha(Math.min(1, s.alpha * boost));
+				g.transform(q[6] - q[0], q[7] - q[1], q[2] - q[0], q[3] - q[1], q[0], q[1]);
+				g.drawImage(cellImage((int) s.y2, s.rgb), 0, 0, 1, 1);
+				g.restore();
+				continue;
+			}
+			if (s.shape >= ATLAS_SHAPE) {
+				int shape = s.shape - ATLAS_SHAPE;
+				double r = Math.max(1, s.radius);
+				g.save();
+				g.setGlobalAlpha(Math.min(1, s.alpha * boost));
+				g.translate(s.x, s.y);
+				if (!AuraEffects.upright(shape)) {
+					// Lying flat: seen from about head height, squashed.
+					g.scale(1, 0.28);
+				}
+				g.rotate(Math.toDegrees(-s.x2));
+				g.drawImage(cellImage(AuraEffects.cell(shape), s.rgb), -r, -r, r * 2, r * 2);
+				g.restore();
 				continue;
 			}
 			if (s.shape == AuraEffects.HEART) {

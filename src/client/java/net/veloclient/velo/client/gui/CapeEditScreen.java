@@ -34,7 +34,7 @@ public final class CapeEditScreen extends VeloWindow {
 	private Text status = Text.literal("");
 
 	public CapeEditScreen(Screen parent, CapeDefinition definition) {
-		super(Text.literal("Edit Cape"), 380, 340);
+		super(Text.literal("Edit Cloak"), 380, 340);
 		this.definition = definition;
 		this.preset = definition.physicsPreset();
 		returnTo(parent);
@@ -60,7 +60,7 @@ public final class CapeEditScreen extends VeloWindow {
 
 		if (WaveyCapesCompat.isLoaded()) {
 			addRow(new VeloLabel(scrollRegion.x(), 0, scrollRegion.viewportWidth(), ROW_HEIGHT,
-					"Physics below: Wavey Capes is installed and renders this cape itself, so these only take effect once it's removed.",
+					"Physics below: Wavey Capes is installed and renders this cloak itself, so these only take effect once it's removed.",
 					0xFFFFAA55));
 		}
 

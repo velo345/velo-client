@@ -16,6 +16,8 @@ import java.util.Properties;
 public final class AppVersion {
 
 	public static final String VERSION = load();
+	/** A dev build (./build-dev.sh): unreleased client features, its own data folder, no self-updates. */
+	public static final boolean DEV = loadDev();
 
 	private AppVersion() {
 	}
@@ -34,5 +36,18 @@ public final class AppVersion {
 			// Fall through to the hardcoded default below.
 		}
 		return "0.5.3";
+	}
+
+	private static boolean loadDev() {
+		try (InputStream in = AppVersion.class.getResourceAsStream("/net/veloclient/launcher/version.properties")) {
+			if (in != null) {
+				Properties props = new Properties();
+				props.load(in);
+				return Boolean.parseBoolean(props.getProperty("dev", "false").trim());
+			}
+		} catch (IOException ignored) {
+			// not a dev build
+		}
+		return false;
 	}
 }

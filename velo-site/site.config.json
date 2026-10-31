@@ -2,7 +2,7 @@
   "site": {
     "name": "Velo Client",
     "url": "https://velo-client.com",
-    "description": "Velo Client is a free Minecraft launcher and Fabric client for 1.21.11, 26.1, 26.2 and 26.3: more FPS out of the box, 108 free modules, a HUD you style yourself, friends and parties, and 3D wings, capes and auras.",
+    "description": "Velo Client is a free Minecraft launcher and Fabric client for 1.21.11, 26.1, 26.2 and 26.3: more FPS out of the box, 108 free modules, a HUD you style yourself, friends and parties, and 3D wings, cloaks and auras.",
     "themeColor": "#0b0b0e",
     "twitter": ""
   },
@@ -14,12 +14,12 @@
   },
   "release": {
     "_comment": "Bump version on every release - the download buttons link straight to these GitHub release assets.",
-    "version": "0.9.96",
-    "channel": "Pre-release",
-    "launcherExe": "Velo.Client.Launcher-0.9.96.exe",
-    "launcherDeb": "velo-client-launcher_0.9.96_amd64.deb",
-    "date": "2026-10-26",
-    "datePretty": "Oct 26, 2026"
+    "version": "1.0.0",
+    "channel": "Release",
+    "launcherExe": "Velo.Client.Launcher-1.0.0.exe",
+    "launcherDeb": "velo-client-launcher_1.0.0_amd64.deb",
+    "date": "2026-11-01",
+    "datePretty": "Nov 1, 2026"
   },
   "launch": {
     "_comment": "Velo Client 1.0 - out of beta. The countdown on Home / Download runs to this moment, then says it's out.",
@@ -53,7 +53,7 @@
     "country": "Germany",
     "email": "support@velo-client.com",
     "responsiblePersonName": "David Seibert",
-    "lastUpdated": "2026-10-26",
+    "lastUpdated": "2026-10-29",
     "hostingProvider": "24fire GmbH, Kronenstraße 4, 68723 Schwetzingen, Germany",
     "hostingLocation": "Germany"
   },

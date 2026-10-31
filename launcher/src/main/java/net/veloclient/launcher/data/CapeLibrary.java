@@ -72,7 +72,7 @@ public final class CapeLibrary {
 		boolean withinBounds = width >= TEXTURE_WIDTH && height >= TEXTURE_HEIGHT
 				&& width <= MAX_TEXTURE_WIDTH && height <= MAX_TEXTURE_HEIGHT;
 		if (!validRatio || !withinBounds) {
-			throw new IOException("Cape textures must keep the 2:1 cape ratio (e.g. 64x32, 128x64, ... up to "
+			throw new IOException("Cloak textures must keep the 2:1 cloak ratio (e.g. 64x32, 128x64, ... up to "
 					+ MAX_TEXTURE_WIDTH + "x" + MAX_TEXTURE_HEIGHT + ") - got " + width + "x" + height + ".");
 		}
 
@@ -122,7 +122,7 @@ public final class CapeLibrary {
 
 	public static void exportBundle(CapeEntry entry, Path destination) throws IOException {
 		if (entry.animated()) {
-			throw new IOException("Animated capes are Velo Store items and can't be exported");
+			throw new IOException("Animated cloaks are Velo Store items and can't be exported");
 		}
 		Files.copy(entry.bundleFile(), destination, StandardCopyOption.REPLACE_EXISTING);
 	}
@@ -146,7 +146,7 @@ public final class CapeLibrary {
 				}
 			}
 		}
-		throw new IOException("Cape bundle is missing its " + entryName + ": " + entry.bundleFile());
+		throw new IOException("Cloak bundle is missing its " + entryName + ": " + entry.bundleFile());
 	}
 
 	public static void delete(CapeEntry entry) throws IOException {
@@ -186,7 +186,7 @@ public final class CapeLibrary {
 		try (var writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
 			GSON.toJson(new EquipState(capeId), writer);
 		} catch (IOException e) {
-			throw new RuntimeException("Failed to save cape equip state", e);
+			throw new RuntimeException("Failed to save cloak equip state", e);
 		}
 		EQUIP_LISTENERS.forEach(Runnable::run);
 	}

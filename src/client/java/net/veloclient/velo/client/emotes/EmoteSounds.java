@@ -25,6 +25,25 @@ public final class EmoteSounds {
 		start(player, id, volume, pitch, false, false);
 	}
 
+	/** A one-shot flat UI sound that can be stopped ({@link Handle#fadeOut()}) - previews that end when you leave them. */
+	public static Handle ui(String id, float volume) {
+		return start(null, id, volume, 1f, false, false);
+	}
+
+	/** A one-shot effect sound at a fixed spot in the world (kill effects: the victim is gone a moment later). */
+	public static void playAt(double x, double y, double z, String id, float volume, float pitch) {
+		if (id == null || volume <= 0.001f) {
+			return;
+		}
+		try {
+			Sound sound = new Sound(id, null, volume, pitch, false, false);
+			sound.fixAt(x, y, z);
+			play(sound);
+		} catch (RuntimeException e) {
+			// unknown id / no sound engine
+		}
+	}
+
 	/** Music for an emote, looping until stopped ({@code loop}) or once; null when it can't play. */
 	public static Handle music(Object player, String id, float volume, boolean loop) {
 		return start(player, id, volume, 1f, true, loop);
@@ -77,6 +96,15 @@ public final class EmoteSounds {
 			this.x = follow.getX();
 			this.y = follow.getY() + 1.0;
 			this.z = follow.getZ();
+		}
+
+		/** Plays in 3D at (x, y, z) instead of following someone. */
+		void fixAt(double x, double y, double z) {
+			this.relative = false;
+			this.attenuationType = net.minecraft.client.sound.SoundInstance.AttenuationType.LINEAR;
+			this.x = x;
+			this.y = y;
+			this.z = z;
 		}
 
 		@Override
@@ -151,6 +179,15 @@ public final class EmoteSounds {
 			this.x = follow.getX();
 			this.y = follow.getY() + 1.0;
 			this.z = follow.getZ();
+		}
+
+		// Plays in 3D at (x, y, z) instead of following someone.
+		void fixAt(double x, double y, double z) {
+			this.relative = false;
+			this.attenuation = net.minecraft.client.resources.sounds.SoundInstance.Attenuation.LINEAR;
+			this.x = x;
+			this.y = y;
+			this.z = z;
 		}
 
 		@Override

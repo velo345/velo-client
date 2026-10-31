@@ -38,6 +38,7 @@ function s(tag, attrs, ...children) {
 }
 
 const ICONS = {
+	notes: "M6 3h9l4 4v14H6z M15 3v4h4 M9 11h7 M9 15h7 M9 19h4",
 	overview: "M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z",
 	players: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M2 21c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5 M16 3.5a4 4 0 0 1 0 7.5 M18.5 14.5c2 .8 3.5 3 3.5 6.5",
 	store: "M3 7h18l-1.5 12.5a2 2 0 0 1-2 1.5h-11a2 2 0 0 1-2-1.5z M8 7V5a4 4 0 0 1 8 0v2",
@@ -76,6 +77,7 @@ const ICONS = {
 	stafflog: "M5 3h11l3 3v15H5z M9 9h6 M9 13h6 M9 17h4",
 	play: "M7 4l13 8-13 8z",
 	trash: "M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13",
+	key: "M8 11a4 4 0 1 0 .01 0 M10.8 12.2 20 3 M17 6l2.5 2.5 M14.5 8.5l2 2",
 };
 
 function icon(name) {
@@ -154,7 +156,7 @@ async function api(path, opts = {}) {
 	const method = opts.method || (body !== undefined ? "POST" : "GET");
 	if (method !== "GET" && state.csrf) headers["X-CSRF-Token"] = state.csrf;
 	const res = await fetch(path, { method, headers, body, credentials: "same-origin", cache: "no-store" });
-	if (res.status === 401 && path !== "/api/login") {
+	if (res.status === 401 && path !== "/api/login" && !path.startsWith("/api/passkey/login")) {
 		state.me = null;
 		renderLogin("You were signed out - sign in again.");
 		throw new ApiError(401, "Signed out");
@@ -179,7 +181,7 @@ async function busy(button, fn) {
 	try {
 		return await fn();
 	} catch (e) {
-		if (e.status !== 401) toast(e.message, "err");
+		if (e.status !== 401 && e.name !== "NotAllowedError" && e.name !== "AbortError" && e.name !== "InvalidStateError") toast(e.message, "err");
 		throw e;
 	} finally {
 		button.disabled = false;
@@ -477,12 +479,25 @@ function renderLogin(message) {
 	const code = h("input", { id: "c", class: "code-input", inputmode: "numeric", autocomplete: "one-time-code", pattern: "[0-9 ]{6,7}", maxlength: 7, required: true, placeholder: "000000" });
 	const err = h("div", { class: "error-box", hidden: !message }, message || "");
 	const submit = h("button", { class: "btn primary block", type: "submit" }, "Sign in");
+	const passkey = h("button", { class: "btn block", type: "button", hidden: !window.PublicKeyCredential }, icon("key"), "Sign in with passkey");
+	passkey.onclick = async () => {
+		err.hidden = true;
+		try {
+			await busy(passkey, passkeySignIn);
+			await boot();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => null);
+		} catch (x) {
+			if (x && x.name === "NotAllowedError") return; // cancelled on the device
+			err.textContent = x.message;
+			err.hidden = false;
+		}
+	};
 	const form = h("form", { novalidate: false },
 		h("label", { for: "u" }, "Name", user),
 		h("label", { for: "p" }, "Password", pass),
 		h("label", { for: "c" }, "Code from your authenticator app", code),
-		err, submit,
-		h("p", { class: "hint" }, "Two-step sign-in is required. An invisible bot check runs in your browser; after 5 wrong tries the panel blocks your network for 15 minutes."));
+		err, submit, passkey,
+		h("p", { class: "hint" }, "Two-step sign-in is required (or a passkey with your fingerprint or face, added under Account). An invisible bot check runs in your browser; after 5 wrong tries the panel blocks your network for 15 minutes."));
 	form.addEventListener("submit", async (e) => {
 		e.preventDefault();
 		err.hidden = true;
@@ -505,11 +520,49 @@ function renderLogin(message) {
 		form)));
 }
 
+// ---- Passkeys (WebAuthn) ----
+
+const b64u = {
+	enc: (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+	dec: (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), (c) => c.charCodeAt(0)),
+};
+
+async function passkeySignIn() {
+	const o = await api("/api/passkey/login/options", { body: {} });
+	const cred = await navigator.credentials.get({ publicKey: {
+		challenge: b64u.dec(o.challenge), rpId: o.rpId, timeout: o.timeout, userVerification: o.userVerification, allowCredentials: [],
+	} });
+	const r = cred.response;
+	await api("/api/passkey/login", { body: {
+		id: cred.id, clientDataJSON: b64u.enc(r.clientDataJSON), authenticatorData: b64u.enc(r.authenticatorData), signature: b64u.enc(r.signature),
+	} });
+}
+
+async function passkeyAdd(name) {
+	const o = await api("/api/passkey/register/options", { body: {} });
+	const cred = await navigator.credentials.create({ publicKey: {
+		challenge: b64u.dec(o.challenge), rp: o.rp, timeout: o.timeout, attestation: o.attestation,
+		user: { id: b64u.dec(o.user.id), name: o.user.name, displayName: o.user.displayName },
+		pubKeyCredParams: o.pubKeyCredParams, authenticatorSelection: o.authenticatorSelection,
+		excludeCredentials: o.exclude.map((id) => ({ type: "public-key", id: b64u.dec(id) })),
+	} });
+	return api("/api/passkey/register", { body: {
+		name, clientDataJSON: b64u.enc(cred.response.clientDataJSON), attestationObject: b64u.enc(cred.response.attestationObject),
+	} });
+}
+
+function deviceName() {
+	const ua = navigator.userAgent;
+	const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Mac/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "Device";
+	const browser = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "";
+	return browser ? os + " · " + browser : os;
+}
+
 // ---- Shell & routing ----
 
 const PAGES = [
 	["Velo", [["overview", "Overview"], ["players", "Players"], ["store", "Store"], ["socials", "Socials"]]],
-	["Moderation", [["monitor", "Monitoring"], ["clips", "Clips"], ["worlds", "Public worlds"], ["capes", "Custom capes"], ["stafflog", "Staff log"]]],
+	["Moderation", [["monitor", "Monitoring"], ["clips", "Clips"], ["worlds", "Public worlds"], ["notes", "World notes"], ["capes", "Custom capes"], ["stafflog", "Staff log"]]],
 	["Owner tools", [["cosmetics", "Cosmetics"], ["news", "News"], ["reports", "Reports"], ["partners", "Partner servers"], ["updates", "Required update"], ["addons", "Addons"]]],
 	["Machine", [["server", "Server"], ["files", "Files"], ["activity", "Activity log"]]],
 	["", [["account", "Account"]]],
@@ -788,6 +841,13 @@ async function openPlayer(target) {
 		const itemSel = h("select", { "aria-label": "Item" }, (cat.items || []).filter((i) => !v.owned.includes(i.id)).map((i) => h("option", { value: i.id }, `${i.name} (${i.type})`)));
 		const grantBtn = h("button", { class: "btn shrink", type: "button" }, "Give item");
 		grantBtn.onclick = () => busy(grantBtn, async () => { render(await velo("admin/store/item", { body: { target: v.uuid, itemId: itemSel.value, grant: true } })); toast("Item given"); });
+		// For testing: every cosmetic that isn't hidden (testing ones too), in one go.
+		const allBtn = h("button", { class: "btn shrink", type: "button" }, "Give everything");
+		allBtn.onclick = () => busy(allBtn, async () => {
+			if (!(await confirmBox("Give every cosmetic?", "This player gets every cosmetic that isn't hidden - testing ones too. Ones they own stay."))) return;
+			render(await velo("admin/store/grant-all", { body: { target: v.uuid } }));
+			toast("Every cosmetic given");
+		});
 		const ownedTiles = v.owned.map((id) => {
 			const it = byId[id] || { id, name: id, type: id.split("_")[0] };
 			const take = h("button", { class: "btn small danger", type: "button" }, "Take back");
@@ -831,7 +891,7 @@ async function openPlayer(target) {
 			card("Coins", "Positive adds, the ledger keeps the reason", null, h("div", { class: "row" }, amount, note, coinsBtn, takeBtn)),
 			card("Owned items", v.owned.length + " cosmetics", null,
 				v.owned.length ? h("div", { class: "items", style: "grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:14px" }, ownedTiles) : h("p", { class: "muted" }, "None yet"),
-				h("div", { class: "row" }, itemSel, grantBtn)),
+				h("div", { class: "row" }, itemSel, grantBtn, allBtn)),
 			card("Velo+", plus ? "Active until " + when(v.plusUntil) : "Not a member", null, h("div", { class: "row" }, days, plusBtn, plus ? endBtn : null)),
 			card("Addons", v.addons ? "Has access" : "No access - only players you pick see the Addons anywhere", null, h("div", { class: "row" }, addonsBtn)),
 			staffView && staffView.reports > 0 ? h("div", { class: "notice" }, `${staffView.reports} player report(s) against ${v.username} - `, h("a", { href: "#/reports", onclick: () => dlg.close() }, "open Reports")) : null,
@@ -968,6 +1028,7 @@ function cape3d(url, k = 9) {
 function cosmeticArt(i, k) {
 	if (i.type === "cape" && i.files && i.files.gif) return cape3d("/api/velo/cosmetics/file/" + i.files.gif, k);
 	if (i.type === "aura") return h("img", { class: "aura-art", src: "/auras/" + i.id.replace(/^aura_/, "") + ".webp", alt: "", loading: "lazy" });
+	if (i.type === "killfx") return h("img", { class: "aura-art", src: "/killfx/" + i.id.replace(/^killfx_/, "") + ".webp", alt: "", loading: "lazy" });
 	if (i.type === "emote") return h("span", { class: "muted" }, "✦ emote");
 	if (i.files && i.files.preview) return h("img", { src: "/api/velo/cosmetics/file/" + i.files.preview, alt: "", loading: "lazy" });
 	return h("span", { class: "muted" }, i.type);
@@ -986,7 +1047,7 @@ RENDER.cosmetics = async (root) => {
 	for (const [t, label] of [["items", "Items"], ["bundles", "Bundles"], ["collections", "Collections"]]) {
 		tabs.append(h("button", { role: "tab", type: "button", "data-t": t, "aria-selected": String(t === tab), onclick: () => { tab = t; tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.t === t))); draw(); } }, label));
 	}
-	const filter = h("select", { "aria-label": "Filter" }, h("option", { value: "" }, "All types"), ["wings", "cape", "aura", "emote"].map((t) => h("option", { value: t }, t)));
+	const filter = h("select", { "aria-label": "Filter" }, h("option", { value: "" }, "All types"), ["wings", "cape", "aura", "emote", "killfx"].map((t) => h("option", { value: t }, t === "killfx" ? "kill effect" : t)));
 	const statusFilter = h("select", { "aria-label": "Status" }, h("option", { value: "" }, "Any status"), STATUS.map(([v, l]) => h("option", { value: v }, l)));
 	filter.onchange = statusFilter.onchange = () => draw();
 	root.append(tabs, body);
@@ -1607,11 +1668,37 @@ RENDER.account = async (root) => {
 		await api("/api/logout-all", { method: "POST" });
 		renderLogin("Signed out on every device.");
 	};
+	const keys = h("div");
+	const drawKeys = (list) => keys.replaceChildren(list.length
+		? table(["Passkey", "Added", "Last used", ""], list.map((k) => {
+			const del = h("button", { class: "btn small danger", type: "button" }, "Remove");
+			del.onclick = async () => {
+				if (!(await confirmBox("Remove this passkey?", k.name + " can't sign in to the panel any more."))) return;
+				drawKeys((await api("/api/passkey/delete", { body: { id: k.id } })).passkeys);
+				toast("Passkey removed");
+			};
+			return [h("b", {}, k.name), when(k.createdAt), k.lastUsed ? ago(k.lastUsed) : h("span", { class: "muted" }, "never"), del];
+		}))
+		: h("p", { class: "muted", style: "margin:0" }, "No passkey yet. Add one on your phone to sign in with your fingerprint or face."));
+	const add = h("button", { class: "btn primary", type: "button", hidden: !window.PublicKeyCredential }, icon("key"), "Add passkey on this device");
+	add.onclick = async () => {
+		try {
+			const r = await busy(add, () => passkeyAdd(deviceName()));
+			drawKeys(r.passkeys);
+			toast("Passkey added - next time tap \"Sign in with passkey\"");
+		} catch (x) {
+			if (x && (x.name === "NotAllowedError" || x.name === "AbortError")) return;
+			toast(x.name === "InvalidStateError" ? "This device already has a passkey for the panel" : x.message, "err");
+		}
+	};
+	drawKeys((await api("/api/passkeys")).passkeys);
 	root.append(
+		card("Passkeys", "Fingerprint, face or screen lock instead of password + code. Tip: open the panel on your phone and use \"Add to Home Screen\" for an app icon.", add, keys),
 		card("Signed in as " + me.username, "Sessions end after 30 minutes without activity and after 12 hours at most", all,
 			table(["Address", "Browser", "Signed in", "Last active"], me.sessions.map((x) => [h("span", { class: "mono" }, x.ip), h("span", { class: "muted small" }, x.userAgent), when(x.createdAt), ago(x.lastSeen)]))),
 		h("div", { class: "stack" }, card("Security", "", null, h("ul", { style: "margin:0;padding-left:18px;color:var(--text-2);display:grid;gap:6px" },
 			h("li", {}, "Sign-in needs your password and a one-time code from your authenticator app; each code works once."),
+			h("li", {}, "A passkey replaces both, but only with your fingerprint, face or device PIN; it only works on panel.velo-client.com."),
 			h("li", {}, "5 failed tries block the network for 15 minutes; 10 lock the account for 15 minutes."),
 			h("li", {}, "Add or reset an account on the server: sudo velo-panel-adduser <name>."),
 			h("li", {}, "Every change is written to the activity log.")))));
@@ -1820,6 +1907,118 @@ function openWorld(w, report, reload) {
 	], w ? (open ? [dismiss, down] : [down]) : (open ? [dismiss] : []), true);
 }
 
+// ---- World Notes ----
+
+RENDER.notes = async (root) => {
+	let tab = "reports";
+	let status = "open";
+	let search = "";
+	const tabs = h("div", { class: "tabs", role: "tablist" });
+	const body = h("div");
+	for (const [t, label] of [["reports", "Reports"], ["all", "All shared notes"]]) {
+		tabs.append(h("button", { role: "tab", type: "button", "data-t": t, "aria-selected": String(t === tab), onclick: () => {
+			tab = t; tabs.querySelectorAll("button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.t === t))); draw();
+		} }, label));
+	}
+	root.append(tabs, body);
+	async function draw() {
+		if (tab === "reports") {
+			const { reports } = await velo("staff/moderation?kind=note&status=" + status);
+			if (!root.isConnected) return;
+			subtitle(reports.length + (status === "open" ? " open note reports" : " note reports"));
+			const filter = seg([["open", "Open"], ["all", "All"]], status, (x) => { status = x; draw(); });
+			body.replaceChildren(card("Reported notes", "Read it, then remove it or dismiss the report. One decision closes every report on that note.", filter,
+				table(["When", "Note", "Owner", "Reason", "Reports", "Status"], reports.map((r) => [
+					when(r.at), h("b", {}, r.title || r.target), r.ownerName || "–",
+					h("div", {}, reasonPill(r.category), r.reason ? h("div", { class: "muted small" }, r.reason.slice(0, 120)) : null),
+					fmt(r.reportsOnTarget), h("span", { class: "pill " + (r.status === "open" ? "warn" : r.status === "removed" ? "bad" : "good") }, r.exists || r.status !== "open" ? r.status : "deleted")]),
+					(i) => openNote(reports[i].target, reports[i], draw))));
+		} else {
+			const data = await velo("staff/notes?limit=300&q=" + encodeURIComponent(search));
+			if (!root.isConnected) return;
+			subtitle(`${fmt(data.total)} shared notes · ${fmt(data.openReports)} open reports`);
+			const box = h("input", { type: "search", placeholder: "Search a player, title, text, server or note id", value: search, "aria-label": "Search notes" });
+			box.addEventListener("keydown", (e) => { if (e.key === "Enter") { search = box.value.trim(); draw(); } });
+			body.replaceChildren(card("Shared notes", "Newest change first", box,
+				table(["Updated", "Note", "Owner", "Server", "Shared", "Has", "Reports"], data.notes.map((n) => [
+					ago(n.updated), h("div", {}, h("b", {}, n.title || "(untitled)"), n.preview ? h("div", { class: "muted small" }, n.preview) : null),
+					h("div", { class: "player" }, playerHead(n.owner, n.ownerName), n.ownerName), h("span", { class: "muted small" }, n.server.replace(/^mp:/, "")),
+					n.share === "friends" ? "All friends" : fmt(n.sharedWith) + " people",
+					[n.checks ? n.checks + " checks" : null, n.strokes ? "drawing" : null, n.image ? "picture" : null].filter(Boolean).join(" · ") || "–",
+					n.reports ? h("span", { class: "pill bad" }, n.reports) : "–"]),
+					(i) => openNote(data.notes[i].id, null, draw))));
+		}
+	}
+	await draw();
+};
+
+/** Draws a note's whiteboard strokes (256x160 board) onto a canvas. */
+function boardCanvas(strokes) {
+	const c = h("canvas", { width: 512, height: 320, class: "note-board", style: "width:100%;max-width:512px;border-radius:10px;background:#f7f4ea" });
+	const g = c.getContext("2d");
+	g.scale(2, 2);
+	g.lineCap = "round";
+	g.lineJoin = "round";
+	for (const st of strokes || []) {
+		const argb = st.c >>> 0;
+		g.strokeStyle = (argb >>> 24) === 0 ? "#f7f4ea" : "#" + (argb & 0xffffff).toString(16).padStart(6, "0");
+		g.lineWidth = st.w;
+		g.beginPath();
+		for (let i = 0; i + 1 < st.p.length; i += 2) (i === 0 ? g.moveTo : g.lineTo).call(g, st.p[i], st.p[i + 1]);
+		if (st.p.length === 2) g.lineTo(st.p[0] + 0.1, st.p[1]);
+		g.stroke();
+	}
+	return c;
+}
+
+async function openNote(id, report, reload) {
+	let view = null;
+	try {
+		view = await velo("staff/notes/view?id=" + encodeURIComponent(id));
+	} catch {
+		view = null;
+	}
+	const n = view && view.note;
+	const reason = h("input", { placeholder: "Reason (shown to the owner if blocked)", "aria-label": "Reason" });
+	const block = blockSelect();
+	const del = h("button", { class: "btn danger", type: "button" }, "Remove note");
+	const dismiss = h("button", { class: "btn", type: "button" }, "Dismiss reports");
+	const open = report && report.status === "open";
+	del.onclick = async () => {
+		if (!(await confirmBox("Remove this note?", "It disappears for the owner and everyone it was shared with."))) return;
+		await busy(del, async () => {
+			const blockDays = block.value === "" ? null : Number(block.value);
+			if (report) await velo("staff/moderation/resolve", { body: { kind: "note", target: id, action: "remove", note: reason.value, blockDays } });
+			else await velo("staff/notes/remove", { body: { id, note: reason.value, blockDays } });
+			toast("Note removed");
+			dlg.close();
+			reload();
+		});
+	};
+	dismiss.onclick = () => busy(dismiss, async () => {
+		await velo("staff/moderation/resolve", { body: { kind: "note", target: id, action: "dismiss", note: reason.value } });
+		toast("Reports dismissed");
+		dlg.close();
+		reload();
+	});
+	const where = n ? `${n.server.replace(/^mp:/, "")} · ${(n.dim || "").replace("minecraft:", "")} ${Math.round(n.x)}, ${Math.round(n.y)}, ${Math.round(n.z)}` : "";
+	const reports = view ? view.reports : [];
+	const dlg = dialog(n ? (n.title || "Note") : (report ? report.title : "Note"), [
+		n ? h("div", { class: "row" },
+			h("div", {}, h("span", { class: "muted small" }, "Owner"), h("div", { class: "player" }, playerHead(n.owner, n.ownerName), h("b", {}, n.ownerName))),
+			h("div", {}, h("span", { class: "muted small" }, "Where"), h("div", {}, where)),
+			h("div", {}, h("span", { class: "muted small" }, "Shared with"), h("div", {}, n.share === "friends" ? "All their friends" : (Object.values(n.names || {}).join(", ") || "nobody"))),
+			h("div", {}, h("span", { class: "muted small" }, "Last change"), h("div", {}, (n.editorName || n.ownerName) + " · " + ago(n.updated)))) : h("div", { class: "notice" }, "This note doesn't exist any more."),
+		n && n.text ? h("pre", { style: "white-space:pre-wrap;margin:0;font:inherit;background:var(--panel-2,rgba(255,255,255,.04));padding:12px;border-radius:10px" }, n.text) : null,
+		n && n.checks && n.checks.length ? h("ul", { style: "margin:0;padding-left:18px" }, n.checks.map((c) => h("li", {}, (c.done ? "☑ " : "☐ ") + c.text + (c.doneBy ? " — " + c.doneBy : "")))) : null,
+		n && n.board && n.board.length ? boardCanvas(n.board) : null,
+		view && view.png ? h("img", { src: "data:image/png;base64," + view.png, alt: "Picture on the note", style: "max-width:100%;border-radius:10px;image-rendering:pixelated" }) : null,
+		reports.length ? h("div", { class: "stack" }, reports.slice(0, 6).map((r) => h("div", { class: "notice" }, reasonPill(r.category), " ", r.reason || "(no reason given)",
+			h("div", { class: "muted small" }, "Reported by " + r.reporterName + " · " + when(r.at) + " · " + r.status)))) : null,
+		n ? h("div", { class: "row" }, reason, block) : null,
+	], n ? (open ? [dismiss, del] : [del]) : (open ? [dismiss] : []), true);
+}
+
 RENDER.capes = async (root) => {
 	let filter = "unreviewed";
 	const body = h("div");
@@ -1984,11 +2183,12 @@ RENDER.stafflog = async (root) => {
 	const blockRows = (list, what) => list.map((b) => {
 		const lift = h("button", { class: "btn small ghost", type: "button" }, "Lift");
 		lift.onclick = () => busy(lift, async () => { await velo("staff/blocks/set", { body: { what, target: b.uuid, days: -1 } }); toast("Block lifted"); route(document.querySelector(".side"), document.getElementById("main")); });
-		return [b.username, what === "clip" ? "Clip sharing" : "Public worlds", b.reason, b.by, b.until ? when(b.until) : "Until lifted", lift];
+		return [b.username, what === "clip" ? "Clip sharing" : what === "note" ? "World notes" : "Public worlds", b.reason, b.by, b.until ? when(b.until) : "Until lifted", lift];
 	});
 	root.append(
-		card("Blocks", "Players stopped from sharing clips or listing public worlds", null,
-			table(["Player", "From", "Reason", "By", "Until", ""], [...blockRows(blocks.clips, "clip"), ...blockRows(blocks.worlds, "world")])),
+		card("Blocks", "Players stopped from sharing clips, listing public worlds or using World Notes", null,
+			table(["Player", "From", "Reason", "By", "Until", ""], [...blockRows(blocks.clips, "clip"), ...blockRows(blocks.worlds, "world"),
+				...blockRows(blocks.notes || [], "note")])),
 		card("Staff log", "Every removal, takedown, dismissal and block", null,
 			table(["When", "Who", "Did", "What", "Note"], log.map((a) => [when(a.at), h("b", {}, a.by), a.action, a.target, h("span", { class: "muted small" }, a.note || "")]))));
 };

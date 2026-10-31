@@ -41,6 +41,7 @@ public final class PanelApp {
 	private static Auth auth;
 	private static final ProofOfWork POW = new ProofOfWork();
 	private static Audit audit;
+	private static Passkeys passkeys;
 	private static Metrics metrics;
 	private static Services services;
 	private static FileManager files;
@@ -66,6 +67,8 @@ public final class PanelApp {
 				.map(String::trim).filter(s -> !s.isEmpty()).toList(), env("PANEL_SELF", "velo-panel"));
 		files = new FileManager(env("PANEL_FILE_ROOTS", null));
 		origin = env("PANEL_ORIGIN", "https://panel.velo-client.com");
+		Path auditLog = Path.of(env("PANEL_AUDIT_LOG", "audit.log")).toAbsolutePath();
+		passkeys = new Passkeys(Path.of(env("PANEL_PASSKEYS_FILE", auditLog.resolveSibling("passkeys.json").toString())), origin);
 		veloUrl = env("VELO_SERVER_URL", "http://127.0.0.1:8787").replaceAll("/+$", "");
 		adminToken = env("VELO_ADMIN_TOKEN", null);
 		if (adminToken == null) {
@@ -117,7 +120,8 @@ public final class PanelApp {
 	// ---- Static UI ----
 
 	private static final Map<String, String> TYPES = Map.of("html", "text/html; charset=utf-8", "css", "text/css; charset=utf-8",
-			"js", "text/javascript; charset=utf-8", "png", "image/png", "svg", "image/svg+xml", "ico", "image/x-icon", "woff2", "font/woff2");
+			"js", "text/javascript; charset=utf-8", "png", "image/png", "svg", "image/svg+xml", "ico", "image/x-icon", "woff2", "font/woff2",
+			"webmanifest", "application/manifest+json", "json", "application/json");
 
 	private static void staticFile(HttpExchange ex) throws IOException {
 		try (ex) {
@@ -142,7 +146,7 @@ public final class PanelApp {
 				String ext = path.substring(path.lastIndexOf('.') + 1);
 				securityHeaders(ex);
 				ex.getResponseHeaders().set("Content-Type", TYPES.getOrDefault(ext, "application/octet-stream"));
-				ex.getResponseHeaders().set("Cache-Control", path.equals("/index.html") ? "no-cache" : "public, max-age=300");
+				ex.getResponseHeaders().set("Cache-Control", path.equals("/index.html") || path.equals("/sw.js") ? "no-cache" : "public, max-age=300");
 				ex.sendResponseHeaders(200, body.length);
 				try (OutputStream out = ex.getResponseBody()) {
 					out.write(body);
@@ -154,7 +158,7 @@ public final class PanelApp {
 	private static void securityHeaders(HttpExchange ex) {
 		var h = ex.getResponseHeaders();
 		h.set("Content-Security-Policy", "default-src 'self'; img-src 'self' data: blob: https://velo-client.com https://i.ytimg.com; media-src 'self' https://velo-client.com; style-src 'self'; script-src 'self'; connect-src 'self'; "
-				+ "font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'");
+				+ "font-src 'self'; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'");
 		h.set("X-Frame-Options", "DENY");
 		h.set("X-Content-Type-Options", "nosniff");
 		h.set("Referrer-Policy", "no-referrer");
@@ -201,6 +205,23 @@ public final class PanelApp {
 					Http.json(ex, 200, Map.of("ok", true));
 					return;
 				}
+				if (path.startsWith("/api/passkey/login") && method.equals("POST")) {
+					String origin = ex.getRequestHeaders().getFirst("Origin");
+					if (origin != null && !origin.equals(PanelApp.origin)) {
+						throw new Http.Fail(403, "Cross-site request refused");
+					}
+					if (path.equals("/api/passkey/login/options")) {
+						Http.json(ex, 200, passkeys.loginOptions());
+						return;
+					}
+					if (path.equals("/api/passkey/login")) {
+						Passkeys.LoginRequest request = Http.read(ex, Passkeys.LoginRequest.class);
+						String token = auth.loginWithPasskey(ex, () -> passkeys.login(request));
+						ex.getResponseHeaders().add("Set-Cookie", auth.setCookie(token));
+						Http.json(ex, 200, Map.of("ok", true));
+						return;
+					}
+				}
 				Auth.Session session = auth.session(ex);
 				if (session == null) {
 					if (path.equals("/api/logout")) {
@@ -231,6 +252,22 @@ public final class PanelApp {
 		switch (method + " " + path) {
 			case "GET /api/me" -> Http.json(ex, 200, Map.of("username", s.username(), "csrf", s.csrf(), "sessions", auth.sessionsOf(s.username()),
 					"services", services.units(), "roots", files.roots()));
+			case "GET /api/passkeys" -> Http.json(ex, 200, Map.of("passkeys", passkeys.list(s.username())));
+			case "POST /api/passkey/register/options" -> Http.json(ex, 200, passkeys.registerOptions(s.username()));
+			case "POST /api/passkey/register" -> {
+				Passkeys.RegisterRequest r = Http.read(ex, Passkeys.RegisterRequest.class);
+				passkeys.register(s.username(), r);
+				audit.log(s.username(), ip, "passkey added", r.name() == null ? "" : r.name());
+				Http.json(ex, 200, Map.of("passkeys", passkeys.list(s.username())));
+			}
+			case "POST /api/passkey/delete" -> {
+				Map<?, ?> r = Http.read(ex, Map.class);
+				if (!passkeys.remove(s.username(), String.valueOf(r.get("id")))) {
+					throw new Http.Fail(404, "No such passkey");
+				}
+				audit.log(s.username(), ip, "passkey removed", "");
+				Http.json(ex, 200, Map.of("passkeys", passkeys.list(s.username())));
+			}
 			case "POST /api/logout" -> {
 				auth.logout(ex);
 				ex.getResponseHeaders().add("Set-Cookie", Auth.clearCookie());

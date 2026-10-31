@@ -16,6 +16,8 @@ public final class VeloShadowMap {
 	/** Half-size of the shadowed area around the player, in blocks. */
 	public static final float RADIUS = 96f;
 	private static final float DEPTH = 256f;
+	/** How far the sun moves before the shadow camera turns with it (radians, 0.4 degrees). */
+	private static final double SUN_STEP = Math.toRadians(0.4);
 
 	/** Inside the shadow pass: Sodium's draws go to the shadow map, its shader takes the cheap path. */
 	public static volatile boolean rendering;
@@ -91,7 +93,19 @@ public final class VeloShadowMap {
 			return false;
 		}
 		frames++;
-		org.joml.Vector3f dir = new org.joml.Vector3f(lx, ly, lz).normalize();
+		// The sun creeps across the sky every frame; a shadow map turned with it re-rasterises every edge slightly
+		// differently each frame, so edges crawl. Like Iris/OptiFine's shadow interval, the camera only turns in
+		// small steps (the sun moves ~0.3 degrees a second, so a step comes every second or two and is barely visible).
+		double angle = Math.atan2(lx, ly);
+		angle = Math.round(angle / SUN_STEP) * SUN_STEP;
+		org.joml.Vector3f dir = new org.joml.Vector3f((float) Math.sin(angle), (float) Math.cos(angle), lz).normalize();
+		// Below ~18 degrees a 96-block map turns every tree into a streak across the screen: shadows stop growing there.
+		float minElevation = 0.31f;
+		if (dir.y < minElevation) {
+			float horizontal = (float) Math.sqrt(dir.x * dir.x + dir.z * dir.z);
+			float scale = horizontal < 1e-4f ? 0f : (float) Math.sqrt(1 - minElevation * minElevation) / horizontal;
+			dir.set(dir.x * scale, minElevation, dir.z * scale);
+		}
 		// The sun crosses the sky in the X/Y plane, so Z is always a usable "up".
 		org.joml.Vector3f up = new org.joml.Vector3f(0f, 0f, 1f);
 		org.joml.Vector3f right = new org.joml.Vector3f(up).cross(dir).normalize();

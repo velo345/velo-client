@@ -1,0 +1,10 @@
+{
+ "slot": "face",
+ "name": "Monocle",
+ "price": 1100,
+ "accent": "#e0b04c",
+ "description": "A golden monocle on a fine chain. Splendid.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

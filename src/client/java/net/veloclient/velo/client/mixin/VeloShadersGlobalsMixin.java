@@ -61,10 +61,11 @@ public abstract class VeloShadersGlobalsMixin {
 		Matrix4f view = cam == null || cam.viewRotationMatrix == null ? new Matrix4f() : cam.viewRotationMatrix;
 		builder.putMat4f(proj).putMat4f(new Matrix4f(proj).invert()).putMat4f(view).putMat4f(new Matrix4f(view).invert());
 		boolean zZeroToOne = com.mojang.blaze3d.systems.RenderSystem.getDevice().getDeviceInfo().isZZeroToOne();
-		// The sun camera for this frame's shadow pass (sun by day, moon by night).
+		// The sun camera for this frame's shadow pass (sun by day, moon by night). The sun moves in the x/y plane;
+		// FRAME_FLOATS[2] carries packed settings (velo_extra), never a direction - it used to tip the sun flat along z.
 		float[] f2 = VeloShadersModule.FRAME_FLOATS;
 		float sign = f2[1] > -0.08f ? 1f : -1f;
-		VeloShadowMap.update(f2[0] * sign, f2[1] * sign, f2[2] * sign, camera.x, camera.y, camera.z, zZeroToOne,
+		VeloShadowMap.update(f2[0] * sign, f2[1] * sign, 0f, camera.x, camera.y, camera.z, zZeroToOne,
 				net.minecraft.client.Minecraft.getInstance().getFps());
 		builder.putMat4f(VeloShadowMap.SHADER);
 		float[] info = VELO_INFO;

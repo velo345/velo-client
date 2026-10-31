@@ -313,6 +313,62 @@ async function player3d(container, options) {
 		return { object: back, tick };
 	}
 
+	// Bodywear: a .vprop mesh in its bone's space (Minecraft model space: skin pixels, y down, the face towards -z), put
+	// where that bone's joint is here (y up, the face towards the camera at +z): (x, y, z) -> joint + (x, -y, -z).
+	const WEAR_JOINTS = { head: [0, 24, 0], body: [0, 24, 0], rightArm: [-5, 22, 0], leftArm: [5, 22, 0], rightLeg: [-1.9, 12, 0], leftLeg: [1.9, 12, 0] };
+	let currentSlim = false;
+	async function readVprop(url) {
+		const view = new DataView(await (await fetch(url)).arrayBuffer());
+		let o = 8;
+		const n = view.getInt32(o); o += 4;
+		const pos = new Float32Array(n * 3), nrm = new Float32Array(n * 3), uv = new Float32Array(n * 2);
+		for (let i = 0; i < n; i++) {
+			for (let k = 0; k < 3; k++) pos[i * 3 + k] = view.getFloat32(o + k * 4);
+			for (let k = 0; k < 3; k++) nrm[i * 3 + k] = view.getFloat32(o + 12 + k * 4);
+			uv[i * 2] = view.getFloat32(o + 24);
+			uv[i * 2 + 1] = view.getFloat32(o + 28);
+			o += 32;
+		}
+		const count = view.getInt32(o); o += 4;
+		const index = new Uint32Array(count);
+		for (let i = 0; i < count; i++) index[i] = view.getInt32(o + i * 4);
+		return { pos, nrm, uv, index };
+	}
+	async function buildWear(item) {
+		const group = new THREE.Group();
+		const texture = await new THREE.TextureLoader().loadAsync(options.fileUrl(item.files.texture));
+		texture.colorSpace = THREE.SRGBColorSpace;
+		texture.flipY = false;
+		const mat = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide });
+		const model = item.model || { bone: "head" };
+		const parts = [[model.bone, item.files.mesh]];
+		if (model.mirror && item.files.mesh_l) parts.push([model.mirror, item.files.mesh_l]);
+		for (const [bone, sha] of parts) {
+			const m = await readVprop(options.fileUrl(sha));
+			const joint = WEAR_JOINTS[bone] || WEAR_JOINTS.head;
+			// Slim arms are 3 wide: squeeze arm items towards the arm's inner edge, like the game.
+			const squeeze = currentSlim ? (bone === "leftArm" ? -1 : bone === "rightArm" ? 1 : 0) : 0;
+			const pos = new Float32Array(m.pos.length), nrm = new Float32Array(m.nrm.length);
+			for (let i = 0; i < m.pos.length; i += 3) {
+				let x = m.pos[i];
+				if (squeeze) x = squeeze + (x - squeeze) * 0.75;
+				pos[i] = joint[0] + x;
+				pos[i + 1] = joint[1] - m.pos[i + 1];
+				pos[i + 2] = joint[2] - m.pos[i + 2];
+				nrm[i] = m.nrm[i];
+				nrm[i + 1] = -m.nrm[i + 1];
+				nrm[i + 2] = -m.nrm[i + 2];
+			}
+			const geo = new THREE.BufferGeometry();
+			geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+			geo.setAttribute("normal", new THREE.BufferAttribute(nrm, 3));
+			geo.setAttribute("uv", new THREE.BufferAttribute(m.uv, 2));
+			geo.setIndex(new THREE.BufferAttribute(m.index, 1));
+			group.add(new THREE.Mesh(geo, mat));
+		}
+		return { object: group, tick: null };
+	}
+
 	async function setItem(item) {
 		if (worn) { player.remove(worn); worn = null; wornTick = null; }
 		if (emote) {
@@ -332,6 +388,9 @@ async function player3d(container, options) {
 			} else if (item.type === "wings" && item.files && item.files.mesh && item.files.texture) {
 				const w = await buildWings(item);
 				worn = w.object; wornTick = w.tick; player.add(worn);
+			} else if (item.type === "wear" && item.files && item.files.mesh && item.files.texture) {
+				const w = await buildWear(item);
+				worn = w.object; wornTick = w.tick; player.add(worn);
 			} else if (item.type === "emote" && options.emoteAnim) {
 				emote = { anim: await options.emoteAnim(item), start: performance.now(), fired: -1, sprites: [], pose: new Float32Array(36) };
 			} else if (item.type === "aura") {
@@ -346,6 +405,7 @@ async function player3d(container, options) {
 	}
 
 	async function setSkin(url, slim) {
+		currentSlim = !!slim;
 		const next = await buildPlayer(url, slim);
 		if (player) {
 			if (worn) { player.remove(worn); next.add(worn); }
@@ -357,7 +417,7 @@ async function player3d(container, options) {
 
 	await setSkin(options.skin, options.slim);
 	await setItem(options.item);
-	const facesBack = options.item && (options.item.type === "cape" || options.item.type === "wings");
+	const facesBack = options.item && (options.item.type === "cape" || options.item.type === "wings" || options.item.type === "wear" && options.item.slot === "back");
 	let yaw = facesBack ? Math.PI * 0.85 : 0.45, dragging = false, lastX = 0, lastT = 0, running = true;
 	canvas.addEventListener("pointerdown", (e) => { dragging = true; lastX = e.clientX; canvas.setPointerCapture(e.pointerId); });
 	canvas.addEventListener("pointermove", (e) => { if (dragging) { yaw += (e.clientX - lastX) * 0.012; lastX = e.clientX; } });

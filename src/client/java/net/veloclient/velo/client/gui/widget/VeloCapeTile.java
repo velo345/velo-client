@@ -26,7 +26,7 @@ import java.util.function.Consumer;
  * at UV (1,1) in the standard 64x32 cape template - the part actually
  * visible on a player's back) instead of the raw flat PNG, which includes
  * the mirrored front panel and unused padding and reads as a meaningless
- * strip of pixels rather than "a cape" at a glance.
+ * strip of pixels rather than "a cloak" at a glance.
  */
 public final class VeloCapeTile extends ClickableWidget {
 

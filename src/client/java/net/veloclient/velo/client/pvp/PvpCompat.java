@@ -430,6 +430,39 @@ public final class PvpCompat {
 
 	// ---------------------------------------------------------------- items
 
+	/** Totems of Undying you carry (inventory, hotbar and off hand); -1 outside a world. */
+	public static int totemsCarried() {
+		//? if <26.1 {
+		var player = MinecraftClient.getInstance().player;
+		if (player == null) {
+			return -1;
+		}
+		var inventory = player.getInventory();
+		int count = 0;
+		for (int i = 0; i < inventory.size(); i++) {
+			ItemStack stack = inventory.getStack(i);
+			if (stack.isOf(net.minecraft.item.Items.TOTEM_OF_UNDYING)) {
+				count += stack.getCount();
+			}
+		}
+		return count;
+		//?} else {
+		/*var player = Minecraft.getInstance().player;
+		if (player == null) {
+			return -1;
+		}
+		var inventory = player.getInventory();
+		int count = 0;
+		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			ItemStack stack = inventory.getItem(i);
+			if (stack.is(net.minecraft.world.item.Items.TOTEM_OF_UNDYING)) {
+				count += stack.getCount();
+			}
+		}
+		return count;
+		*///?}
+	}
+
 	public static ItemStack mainHand(LivingEntity entity) {
 		//? if <26.1 {
 		return entity.getMainHandStack();

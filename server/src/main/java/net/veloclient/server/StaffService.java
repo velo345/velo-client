@@ -23,7 +23,9 @@ import java.util.UUID;
  *   <li><b>helper</b> - on the team: the staff cape and Velo+, no moderation tools;</li>
  *   <li><b>mod</b> and up - look players up and censor a custom cape (it's removed and that exact image can't be used again);</li>
  *   <li><b>admin</b> and up - ban a player from online services (friends &amp; messages, custom capes, parties) for a while or for good,
- *   and review the chat reports players send.</li>
+ *   and review the chat reports players send;</li>
+ *   <li><b>manager</b> (and the owner) - everything, plus every punishment on record and the team itself: change levels, add and
+ *   remove staff (through their Discord roles), reset someone's staff panel sign-in.</li>
  * </ul>
  * Staff have Velo+ and the Velo Staff cape for as long as they're staff. Reports carry up to 25 recent messages only when the
  * reporter ticked that box. Everything persists in {@code staff.json}.
@@ -34,6 +36,7 @@ final class StaffService {
 	static final String HELPER = "helper";
 	static final String MOD = "mod";
 	static final String ADMIN = "admin";
+	static final String MANAGER = "manager";
 	/** "network" locks the account out of the whole Velo Network (sign-in refused), the others one feature each. */
 	static final Set<String> SERVICES = Set.of("friends", "capes", "parties", "network");
 	static final Set<String> CATEGORIES = Set.of("spam", "scam", "insult", "harassment", "inappropriate", "other");
@@ -146,7 +149,7 @@ final class StaffService {
 	}
 
 	static int rank(String level) {
-		return ADMIN.equals(level) ? 2 : MOD.equals(level) ? 1 : 0;
+		return MANAGER.equals(level) ? 3 : ADMIN.equals(level) ? 2 : MOD.equals(level) ? 1 : 0;
 	}
 
 	synchronized Map<String, Member> staff() {
@@ -199,6 +202,13 @@ final class StaffService {
 		return ban.services.contains(service) ? ban : null;
 	}
 
+	/** Every ban on record (expired ones dropped). */
+	synchronized Map<String, Ban> bans() {
+		long now = System.currentTimeMillis();
+		data.bans.entrySet().removeIf(e -> e.getValue().until > 0 && e.getValue().until < now);
+		return new LinkedHashMap<>(data.bans);
+	}
+
 	synchronized Ban ban(String uuid) {
 		return data.bans.get(uuid);
 	}
@@ -234,7 +244,7 @@ final class StaffService {
 		if (ban != null) {
 			String what = switch (service) {
 				case "friends" -> "the friends system";
-				case "capes" -> "custom capes";
+				case "capes" -> "custom cloaks";
 				case "network" -> "the Velo Network";
 				default -> "parties";
 			};
@@ -350,7 +360,8 @@ final class StaffService {
 	static String normalizeLevel(String level) {
 		String l = level == null ? "" : level.toLowerCase(Locale.ROOT).strip();
 		return switch (l) {
-			case "admin", "administrator", "owner", "manager" -> ADMIN;
+			case "manager", "owner" -> MANAGER;
+			case "admin", "administrator" -> ADMIN;
 			case "mod", "moderator", "staff" -> MOD;
 			case "helper", "support", "team" -> HELPER;
 			default -> null;

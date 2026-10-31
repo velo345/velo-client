@@ -38,7 +38,7 @@ public abstract class VeloFluidSodiumMixin {
 	@Inject(method = "render", at = @At("HEAD"), require = 0)
 	private void velo$fluidType(CallbackInfo ci, @com.llamalad7.mixinextras.sugar.Local(argsOnly = true) FluidState fluidState) {
 		velo$water = fluidState.is(FluidTags.WATER);
-		velo$code = !VeloShadersModule.active() ? 0 : velo$water ? 5 : fluidState.is(FluidTags.LAVA) ? 6 : 0;
+		velo$code = !VeloShadersModule.active() ? 0 : velo$water ? 5 : fluidState.is(FluidTags.LAVA) && VeloShadersModule.shaderLava() ? 6 : 0;
 	}
 
 	// The flow Sodium samples for the top face: flowing water gets its direction (16 steps) in the code.

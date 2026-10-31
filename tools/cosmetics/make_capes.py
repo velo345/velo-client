@@ -1458,8 +1458,8 @@ def booster(phase):
     return vignette(tonemap(img * 1.05), 0.2)
 
 
+# velo_neon and booster are rendered in real 3D by cape3d/render_cape3d.py since 0.9.97.
 CAPES = {
-    "velo_neon": velo_neon,
     "wildfire": wildfire,
     "glacier": glacier,
     "thunderstrike": thunderstrike,
@@ -1477,7 +1477,6 @@ CAPES = {
     "festive_lights": festive_lights,
     "gift_wrap": gift_wrap,
     "velo_staff": velo_staff,
-    "booster": booster,
     "haunted": haunted,
     "jack_o_lantern": jack_o_lantern,
     "witching_hour": witching_hour,

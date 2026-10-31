@@ -125,7 +125,7 @@ public final class CoinsView {
 		balance.setStyle("-fx-text-fill: -velo-gold;");
 		HBox amount = new HBox(14, CosmeticUi.coin(44), balance);
 		amount.setAlignment(Pos.CENTER_LEFT);
-		Label sub = new Label("Spend them on wings, capes, auras and bundles. Earn more for free every day.");
+		Label sub = new Label("Spend them on wings, cloaks, auras and bundles. Earn more for free every day.");
 		sub.getStyleClass().add("t-body");
 		sub.setWrapText(true);
 		HBox actions = new HBox(10);
@@ -495,6 +495,9 @@ public final class CoinsView {
 		revoke.getStyleClass().add("danger-ghost-button");
 		revoke.setOnAction(e -> run(() -> StoreApi.adminItem(player.getText().trim(), item.getValue(), false),
 				view -> result.setText(describe(view)), result::setText));
+		Button all = new Button("Give everything");
+		all.getStyleClass().add("ghost-button");
+		all.setOnAction(e -> run(() -> StoreApi.adminGrantAll(player.getText().trim()), view -> result.setText(describe(view)), result::setText));
 		Button lookup = new Button("Look up");
 		lookup.getStyleClass().add("ghost-button");
 		lookup.setOnAction(e -> run(() -> StoreApi.adminLookup(player.getText().trim()),
@@ -503,7 +506,7 @@ public final class CoinsView {
 		grant.getStyleClass().add("ghost-button");
 		HBox row1 = new HBox(8, player, amount, note, give);
 		row1.setAlignment(Pos.CENTER_LEFT);
-		HBox row2 = new HBox(8, item, grant, revoke, lookup);
+		HBox row2 = new HBox(8, item, grant, revoke, all, lookup);
 		row2.setAlignment(Pos.CENTER_LEFT);
 		Label hint = note("Full catalog, bundles and players live in Store > Owner panel.");
 		result.getStyleClass().setAll("label", "t-mono");

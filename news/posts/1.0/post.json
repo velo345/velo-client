@@ -1,0 +1,164 @@
+{
+ "title": "Velo Client 1.0 is here",
+ "summary": "The full release: bodywear, kill effects, 14 new HD cloaks with real cloth physics, new wings and auras, a free cosmetic for you - plus shaders that finally get the Nether and End right, a cleaner Redstone Mode and smoother cloaks.",
+ "tag": "Release",
+ "version": "1.0",
+ "accent": "#ff3b44",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "text",
+   "text": "**Velo Client 1.0** - one free launcher and client with 108 modules, performance built in, and 3D cosmetics everyone sees. Thank you to everyone who played the betas, reported bugs and told us what to build. Here's everything that's new."
+  },
+  {
+   "type": "callout",
+   "style": "success",
+   "text": "**Welcome gift:** pick **any one cosmetic in the Store for free** - once per account, for a limited time. Open the **Store** and look for **Claim free**."
+  },
+  {
+   "type": "heading",
+   "text": "Bodywear"
+  },
+  {
+   "type": "image",
+   "image": "file:images/bodywear.jpg",
+   "caption": "Oni Mask - one of 42 new bodywear items."
+  },
+  {
+   "type": "text",
+   "text": "A whole new cosmetic type: **42 items** you wear on your player - and everyone with Velo sees them."
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Hats & ears**: Top Hat, Cowboy Hat, Royal Crown, Snapback, Knit Beanie, Witch Hat, Devil Horns, Cat, Bunny, Fox and Bear Ears.",
+    "**Glasses & masks**: Aviators, Round Glasses, Heart Glasses, Classic Shades, Monocle, Cyber Visor, Oni, Kitsune and Duality Mask, Neon Respirator.",
+    "**Chains & watches**: Cuban Link, Iced Cuban, Fine Gold Chain, Gold Medallion, Gold Cross Chain, Knit Scarf, Gold, Diver, Classic and Retro Digital watches, a Smartwatch.",
+    "**Shoes & backpacks**: High-Tops, Runners, Combat Boots, Sandals, Bunny Slippers, Adventure Pack, Teddy Pack, Jetpack, Quiver, Katana.",
+    "**Your colour**: recolour most items with presets or any colour you pick, and nudge masks and glasses up, down or closer to your face.",
+    "Chains and scarves **swing** as you move. One item per slot - head, ears, face, mask, neck, wrist, feet and back."
+   ]
+  },
+  {
+   "type": "image",
+   "image": "file:images/shades.jpg",
+   "caption": "Classic Shades."
+  },
+  {
+   "type": "heading",
+   "text": "Kill effects"
+  },
+  {
+   "type": "image",
+   "image": "file:images/killfx.jpg",
+   "caption": "Every kill effect comes with its own sound."
+  },
+  {
+   "type": "text",
+   "text": "**15 kill effects** play where your opponent goes down: Shatter, Orbital Strike, Black Hole, Phoenix, Soul Reaper, Glitch, Supernova, Frostbite, Meteor, Tornado, R.I.P., Thunder God, Shadow, Katana and Jackpot. Each has its own sound, and you can preview them in the Locker - in game and in the launcher."
+  },
+  {
+   "type": "heading",
+   "text": "14 new HD cloaks - with real cloth"
+  },
+  {
+   "type": "image",
+   "image": "file:images/cloaks.jpg",
+   "caption": "Plasma Orb, Abyss and Bass Drop."
+  },
+  {
+   "type": "list",
+   "items": [
+    "**New**: Soul Wisp, Event Horizon, Koi Pond, Glitch, Prism, Clockwork, Plasma Orb, Abyss, Bass Drop, Supernova, Kintsugi, Circuit and Holo Grid - each designed in 3D, every side and edge, with its own animation.",
+    "**Dragon Eye** watches you: stand behind someone wearing it and the eye follows you.",
+    "**Cloth physics**: cloaks are now real fabric - they trail behind you when you walk, sprint and fly, flutter at the hem and drape over your back. Prefer the old look? **Cloak Style > Classic** in the Cloak module.",
+    "Every cloak now has much **sharper art**."
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "New wings and auras"
+  },
+  {
+   "type": "image",
+   "image": "file:images/wings.jpg",
+   "caption": "Clockwork Wings."
+  },
+  {
+   "type": "list",
+   "items": [
+    "**8 new wings**: Golden, Silver, Nebula, Clockwork, Tentacle, Katana, Neon and Sci-Fi Circuit.",
+    "**18 new auras**: Aurora, Hologram, Seraph, Sakura Storm, Galaxy, Amethyst, Soulfire, Butterflies, Bass Drop, Fireworks, Yin & Yang, Silk Ribbons, Rain Cloud, Koi Pond, Spirit Blades, Sky Lanterns, Timekeeper and Pyjama.",
+    "**Looks** remember everything now: cloak, wings, aura, bodywear with its colours, kill effect and skin - switch your whole outfit with one click."
+   ]
+  },
+  {
+   "type": "image",
+   "image": "file:images/auras.jpg",
+   "caption": "Bloom, Heartbeat and Aurora."
+  },
+  {
+   "type": "heading",
+   "text": "Velo Shaders"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**The Nether and the End look right**: no more sun, sky, clouds or sunlight shadows where there's no sky - they get their own steady light, warm in the Nether and violet in the End. Torches, lava and glowstone still light up the scene.",
+    "Steadier sun shadows (no more crawling edges), and burning mobs throw flickering light.",
+    "**Shader Lava** is its own setting (off by default)."
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "HUD and Redstone Mode"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Redstone Mode's overlay** got a clean modern font instead of the pixel font.",
+    "It **follows HUD Style** now: pick its font (Inter, Sora, Poppins, JetBrains Mono and more), background, accent colour and text shadow together with the rest of your HUD.",
+    "**Load** and **Save** are right on the Redstone toolbar now (load also with **Ctrl+L**), and the load window can save your selection, open the folder and browse community schematics.",
+    "**Save schematics on servers too** - select an area and save what you see.",
+    "The editing tools (Move, Copy, Stack, wires, paste, freeze) show up only where you can use them: in singleplayer creative. Everywhere else the tool slot simply selects an area to save.",
+    "**Middle click** on a schematic block picks the right block reliably - also while sneaking."
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Anti Coords Leak"
+  },
+  {
+   "type": "list",
+   "items": [
+    "While your coordinates are hidden, **dropped items scatter randomly** (only on your screen), so the way they fly can't give your direction away.",
+    "Water shows the **same colour in every biome**, and the **minimap** can be blurred, faked or hidden."
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Performance and fixes"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Cloaks load in the background**: no more short freeze when you press F5 or open your inventory, and the cloak you wear is ready before you ever see it.",
+    "**Less memory**: other players' cloaks are freed when nobody's around to see them, so long sessions on busy servers no longer creep towards running out of RAM.",
+    "Launcher: the window **opens right away** with a new startup animation while Home loads behind it.",
+    "Launcher: windows **resize and move properly** on Linux desktops with Wayland (KDE).",
+    "Lots of smaller fixes all over the client and launcher."
+   ]
+  },
+  {
+   "type": "callout",
+   "style": "info",
+   "text": "Velo Client 1.0 runs on **1.21.11, 26.1, 26.2 and 26.3**. Update the launcher and press Play - your profiles, modules and cosmetics come along."
+  },
+  {
+   "type": "button",
+   "text": "Open the Store",
+   "url": "https://velo-client.com/store"
+  }
+ ]
+}

@@ -138,8 +138,8 @@ public final class Timeline {
 			RmState.error("Select the area to record first, then press K");
 			return;
 		}
-		if (!RmWorld.singleplayer()) {
-			RmState.error("Recording needs singleplayer");
+		if (!RedstoneMode.canEdit()) {
+			RmState.error("Recording needs singleplayer creative");
 			return;
 		}
 		if (RmState.volume() > MAX_VOLUME) {

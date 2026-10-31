@@ -1,0 +1,10 @@
+{
+ "slot": "head",
+ "name": "Cowboy Hat",
+ "price": 1200,
+ "accent": "#7a4a26",
+ "description": "A leather cowboy hat with a curled brim and a pinched crown. Yeehaw.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

@@ -85,12 +85,20 @@ public final class StoreView {
 		/** Opens an emote's page. */
 		default void openEmote(net.veloclient.launcher.data.EmoteCatalog.EmoteType type) {
 		}
+
+		/** Opens a kill effect's page. */
+		default void openKillFx(net.veloclient.launcher.data.KillFxCatalog.KillFxType type) {
+		}
+
+		/** Opens a bodywear item's page. */
+		default void openWear(net.veloclient.launcher.data.WearCatalog.WearType type) {
+		}
 	}
 
 	private StoreView() {
 	}
 
-	private enum Page { FEATURED, WINGS, CAPES, AURAS, EMOTES, BUNDLES, PLUS, WISHLIST }
+	private enum Page { FEATURED, WINGS, CAPES, AURAS, EMOTES, KILLFX, WEAR, BUNDLES, PLUS, WISHLIST }
 
 	/** Which tab was open last (kept while the launcher runs). */
 	private static Page page = Page.FEATURED;
@@ -137,7 +145,7 @@ public final class StoreView {
 		heading.setPadding(new Insets(0, 14, 10, 0));
 		HBox tabs = new HBox(24);
 		tabs.setAlignment(Pos.BOTTOM_LEFT);
-		String[] labels = {"Featured", "Wings", "Capes", "Auras", "Emotes", "Bundles", "Velo+"};
+		String[] labels = {"Featured", "Wings", "Cloaks", "Auras", "Emotes", "Kill FX", "Bodywear", "Bundles", "Velo+"};
 		for (Page p : Page.values()) {
 			if (p == Page.WISHLIST) {
 				continue;
@@ -150,7 +158,7 @@ public final class StoreView {
 			if (p == Page.PLUS) {
 				tab.setStyle("-fx-text-fill: -velo-accent-text;");
 			}
-			if (p == Page.EMOTES) {
+			if (p == Page.WEAR) {
 				Label badge = new Label("NEW");
 				badge.getStyleClass().addAll("badge", "badge-new");
 				badge.setStyle("-fx-font-size: 9px;");
@@ -210,6 +218,8 @@ public final class StoreView {
 			case CAPES -> buildCapes(host, body);
 			case AURAS -> buildAuras(host, body);
 			case EMOTES -> buildEmotes(host, body);
+			case KILLFX -> buildKillFx(host, body);
+			case WEAR -> buildWear(host, body);
 			case BUNDLES -> buildBundles(host, body);
 			case PLUS -> body.getChildren().add(plusPage());
 			case WISHLIST -> buildWishlist(host, body);
@@ -257,6 +267,9 @@ public final class StoreView {
 		if (collectionWings.isEmpty()) {
 			collectionWings = forSale;
 		}
+		if (StoreApi.welcomeGift()) {
+			body.getChildren().add(welcomeGiftBanner(host));
+		}
 		if (!collectionWings.isEmpty()) {
 			body.getChildren().add(featuredHero(host, collection, collectionWings));
 		}
@@ -282,7 +295,7 @@ public final class StoreView {
 		}
 		List<StoreItem> capes = StoreCatalog.all().stream().filter(StoreItem::inStore).limit(6).toList();
 		if (!capes.isEmpty()) {
-			body.getChildren().add(section("Animated capes", null, "All capes", () -> {
+			body.getChildren().add(section("Animated cloaks", null, "All cloaks", () -> {
 				page = Page.CAPES;
 				host.rebuild();
 			}, capeGrid(host, capes, 180)));
@@ -478,6 +491,7 @@ public final class StoreView {
 			StoreCatalog.forSale().forEach(i -> pool.add(i.id()));
 			AuraCatalog.forSale().forEach(a -> pool.add(a.itemId()));
 			net.veloclient.launcher.data.EmoteCatalog.forSale().forEach(e -> pool.add(e.itemId()));
+			net.veloclient.launcher.data.KillFxCatalog.forSale().forEach(k -> pool.add(k.itemId()));
 			java.util.Collections.sort(pool);
 			java.util.Collections.shuffle(pool, new java.util.Random(LocalDate.now(ZoneOffset.UTC).toEpochDay() * 31L + 7));
 			ids.addAll(pool.subList(0, Math.min(4, pool.size())));
@@ -523,6 +537,10 @@ public final class StoreView {
 		var emote = net.veloclient.launcher.data.EmoteCatalog.all().stream().filter(e -> e.itemId().equals(itemId)).findFirst();
 		if (emote.isPresent()) {
 			return StoreTiles.emoteTile(emote.get(), () -> host.openEmote(emote.get()));
+		}
+		var killFx = net.veloclient.launcher.data.KillFxCatalog.all().stream().filter(k -> k.itemId().equals(itemId)).findFirst();
+		if (killFx.isPresent()) {
+			return StoreTiles.killFxTile(killFx.get(), () -> host.openKillFx(killFx.get()));
 		}
 		var cape = StoreCatalog.all().stream().filter(i -> i.id().equals(itemId)).findFirst();
 		return cape.<Node>map(item -> StoreTiles.capeTile(item, () -> host.openItem(item))).orElse(null);
@@ -661,7 +679,7 @@ public final class StoreView {
 
 	private static void buildCapes(Host host, VBox body) {
 		var items = StoreCatalog.all().stream().filter(i -> i.inStore() || StoreOwnership.owns(i.id())).toList();
-		body.getChildren().add(section("Animated capes", items.size() + " capes", null, null, capeGrid(host, items, 200)));
+		body.getChildren().add(section("Animated cloaks", items.size() + " cloaks", null, null, capeGrid(host, items, 200)));
 		body.getChildren().add(discordBanner());
 	}
 
@@ -674,6 +692,50 @@ public final class StoreView {
 			return;
 		}
 		body.getChildren().add(section("Auras", "Animated effects around you · your colour, size and speed", null, null, auraGrid(host, auras, 200)));
+	}
+
+	private static void buildKillFx(Host host, VBox body) {
+		// For sale, owned - and for the owner the ones still in testing.
+		var effects = net.veloclient.launcher.data.KillFxCatalog.all().stream()
+				.filter(k -> k.inStore() || net.veloclient.launcher.data.KillFxCatalog.owns(k.id()) || StoreApi.isOwner()).toList();
+		if (effects.isEmpty()) {
+			Label empty = new Label("No kill effects in the Store right now - check back soon.");
+			empty.getStyleClass().add("t-muted");
+			body.getChildren().add(empty);
+			return;
+		}
+		FlowPane grid = StoreTiles.grid(200, 16);
+		for (var effect : effects) {
+			grid.getChildren().add(StoreTiles.killFxTile(effect, () -> host.openKillFx(effect)));
+		}
+		UiMotion.stagger(grid, 24);
+		body.getChildren().add(section("Kill effects", "Custom particles and sounds where your kills fall · your colour", null, null, grid));
+	}
+
+	private static void buildWear(Host host, VBox body) {
+		var all = net.veloclient.launcher.data.WearCatalog.all().stream()
+				.filter(w -> w.inStore() || net.veloclient.launcher.data.WearCatalog.owns(w.id()) || StoreApi.isOwner()).toList();
+		if (all.isEmpty()) {
+			Label empty = new Label("No bodywear in the Store right now - check back soon.");
+			empty.getStyleClass().add("t-muted");
+			body.getChildren().add(empty);
+			return;
+		}
+		// One section per slot: hats, ears, glasses, watches, shoes, backpacks.
+		for (int s = 0; s < net.veloclient.launcher.data.WearCatalog.SLOTS.size(); s++) {
+			String slot = net.veloclient.launcher.data.WearCatalog.SLOTS.get(s);
+			var items = all.stream().filter(w -> w.slot().equals(slot)).toList();
+			if (items.isEmpty()) {
+				continue;
+			}
+			FlowPane grid = StoreTiles.grid(200, 16);
+			for (var item : items) {
+				grid.getChildren().add(StoreTiles.wearTile(item, () -> host.openWear(item)));
+			}
+			UiMotion.stagger(grid, 24);
+			body.getChildren().add(section(net.veloclient.launcher.data.WearCatalog.SLOT_NAMES.get(s),
+					s == 0 ? "One per slot, all worn at once · recolour most of them" : null, null, null, grid));
+		}
 	}
 
 	private static void buildEmotes(Host host, VBox body) {
@@ -705,7 +767,7 @@ public final class StoreView {
 			chip.setMaxSize(52, 52);
 			Label title = new Label("Your wishlist is empty");
 			title.getStyleClass().add("section-title");
-			Label hint = new Label("Press Wishlist on any wings, cape, aura or emote to keep it here - and to show friends what to gift you.");
+			Label hint = new Label("Press Wishlist on any wings, cloak, aura or emote to keep it here - and to show friends what to gift you.");
 			hint.getStyleClass().add("t-muted");
 			empty.getChildren().addAll(chip, title, hint);
 			body.getChildren().add(empty);
@@ -723,7 +785,7 @@ public final class StoreView {
 			first = false;
 		}
 		if (!capes.isEmpty()) {
-			body.getChildren().add(section(first ? "Wishlist" : "Capes", first ? subtitle : capes.size() + " capes", null, null, capeGrid(host, capes, 200)));
+			body.getChildren().add(section(first ? "Wishlist" : "Cloaks", first ? subtitle : capes.size() + " cloaks", null, null, capeGrid(host, capes, 200)));
 			first = false;
 		}
 		if (!auras.isEmpty()) {
@@ -1044,9 +1106,9 @@ public final class StoreView {
 			{"download", "Cloud Sync & restore points", "Settings, HUD layouts, profiles, waypoints and keybinds on every PC. Roll back to any of 30 restore points."},
 			{"clips", "Clips Pro", "A 2-5 minute replay buffer at 1080p60 with sound, automatic clips on kills and wins, share links (kept 60 days) and sending clips to friends."},
 			{"sparkles", "Name Styles", "21 animated effects, your colours, 9 fonts and icons - on your name in chat, the tab list and above your head."},
-			{"cape", "Animated custom capes", "Import your own GIF cape and every Velo player sees it move."},
+			{"cape", "Animated custom cloaks", "Import your own GIF cloak and every Velo player sees it move."},
 			{"image", "Your Home background", "Put your own picture or animated GIF on the launcher's Home screen instead of the island - always scaled to fill the card."},
-			{"gift", "Velo Coins every month", "Spend them on wings, capes and auras in the Store."},
+			{"gift", "Velo Coins every month", "Spend them on wings, cloaks and auras in the Store."},
 			{"crown", "The + badge & VIP role", "A red plus next to your name for every Velo player, and the VIP role on Discord."}};
 
 	/**
@@ -1111,10 +1173,10 @@ public final class StoreView {
 		table.addRow(0, padded(whatHead), freeHead, plusHead);
 		String[][] rows = {
 				{"Velo Client, launcher, free cosmetics", "Everything you have today", "y"},
-				{"Velo Coins every month", "Spend on wings, capes and auras", "n"},
+				{"Velo Coins every month", "Spend on wings, cloaks and auras", "n"},
 				{"World Hosting", "Your world for friends from anywhere, no port forwarding", "n"},
 				{"Cloud Sync & Clips Pro", "Backups on every PC, 1080p60 clips with share links", "n"},
-				{"Name Styles & animated capes", "Animated names, your own GIF cape", "n"},
+				{"Name Styles & animated cloaks", "Animated names, your own GIF cloak", "n"},
 				{"Your Home background", "Your own picture or GIF in the launcher", "n"},
 				{"The Velo+ badge", "In chat, tab list and above your head", "n"},
 				{"VIP role in the Discord", "Given automatically once linked", "n"},
@@ -1299,12 +1361,42 @@ public final class StoreView {
 	 * "Velo Neon - free: join our Discord and link your account". Shows your link status (loaded off the UI
 	 * thread); the button copies a code to paste in the Discord's configured link channel.
 	 */
+	/** The 1.0 welcome gift: this account may pick any one cosmetic for free - every item's button says "Claim free". */
+	private static Node welcomeGiftBanner(Host host) {
+		StackPane icon = new StackPane(Icons.icon("gift", 22, Color.web("#F7C04A")));
+		icon.setMinSize(48, 48);
+		icon.setMaxSize(48, 48);
+		icon.setStyle("-fx-background-color: rgba(247,192,74,0.18); -fx-background-radius: 12;");
+		Label title = new Label("Welcome to Velo 1.0 - pick one cosmetic, free");
+		title.getStyleClass().add("t-strong");
+		title.setStyle("-fx-font-size: 16px;");
+		String until = java.time.LocalDate.ofInstant(java.time.Instant.ofEpochMilli(StoreApi.welcomeGiftUntil()), java.time.ZoneId.systemDefault())
+				.format(java.time.format.DateTimeFormatter.ofPattern("d MMMM", java.util.Locale.ENGLISH));
+		Label text = new Label("Any cloak, wings, aura or kill effect in the Store - open it and press Claim free. One per account, until " + until + ".");
+		text.getStyleClass().add("t-muted");
+		text.setWrapText(true);
+		VBox words = new VBox(3, title, text);
+		HBox.setHgrow(words, Priority.ALWAYS);
+		Button browse = new Button("Browse cloaks");
+		browse.getStyleClass().add("buy-button");
+		browse.setOnAction(e -> {
+			page = Page.CAPES;
+			host.rebuild();
+		});
+		HBox box = new HBox(16, icon, words, browse);
+		box.setAlignment(Pos.CENTER_LEFT);
+		box.getStyleClass().add("card");
+		box.setStyle("-fx-border-color: rgba(247,192,74,0.55); -fx-background-color: linear-gradient(to right, rgba(247,192,74,0.16), rgba(247,192,74,0.02));");
+		box.setPadding(new Insets(16, 18, 16, 16));
+		return box;
+	}
+
 	private static Node discordBanner() {
 		StackPane icon = new StackPane(Icons.icon("link", 20, Color.web("#8EA1FF")));
 		icon.setMinSize(46, 46);
 		icon.setMaxSize(46, 46);
 		icon.setStyle("-fx-background-color: rgba(88,101,242,0.18); -fx-background-radius: 12;");
-		Label title = new Label("Velo Neon cape · free with Discord");
+		Label title = new Label("Velo Neon cloak · free with Discord");
 		title.getStyleClass().add("t-strong");
 		title.setStyle("-fx-font-size: 15px;");
 		Label status = new Label("Join the Velo Discord and link your Minecraft account. It isn't sold in the Store.");
@@ -1338,7 +1430,7 @@ public final class StoreView {
 			invite[0] = result.has("inviteUrl") && !result.get("inviteUrl").isJsonNull() ? result.get("inviteUrl").getAsString() : "";
 			join.setDisable(invite[0].isBlank());
 			if (result.has("linked") && result.get("linked").getAsBoolean()) {
-				status.setText("Linked as " + result.get("discordName").getAsString() + " - the cape is in your Locker.");
+				status.setText("Linked as " + result.get("discordName").getAsString() + " - the cloak is in your Locker.");
 				status.setStyle("-fx-text-fill: -velo-green;");
 				getCode.setDisable(true);
 				getCode.setText("Linked");

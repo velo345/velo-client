@@ -21,7 +21,7 @@ final class RmToolSettings {
 			Clip clip = RmOps.clipboard();
 			int ly = cy;
 			if (clip != null) {
-				draw.add(() -> context.drawTextWithShadow(textRenderer, clip.sx + " x " + clip.sy + " x " + clip.sz + "  ·  " + clip.solidCount() + " blocks",
+				draw.add(() -> RmHud.text(context, clip.sx + " x " + clip.sy + " x " + clip.sz + "  ·  " + clip.solidCount() + " blocks",
 						x, ly, RmHud.TEXT));
 				cy += 14;
 			}
@@ -50,9 +50,21 @@ final class RmToolSettings {
 		switch (RmState.tool) {
 			case SELECT -> {
 				int ly = cy;
-				draw.add(() -> context.drawTextWithShadow(textRenderer, VeloUi.trim(selection, w), x, ly, 0xFF4FD8FF));
+				draw.add(() -> RmHud.text(context, VeloUi.trim(selection, w), x, ly, 0xFF4FD8FF));
 				cy += 14;
-				if (size != null) {
+				if (size != null && !RedstoneMode.canEdit()) {
+					// No editing rights: selecting is only for saving a schematic.
+					int by = cy;
+					draw.add(() -> {
+						int bx = x;
+						bx += panel.textButton(context, bx, by, 0, "Save as schematic", true, RmInput::saveSelection) + 4;
+						panel.textButton(context, bx, by, 0, "Clear", false, RmState::clearSelection);
+					});
+					cy += 18;
+				} else if (size != null) {
+					int by0 = cy;
+					draw.add(() -> panel.textButton(context, x, by0, w, "Save as schematic", true, RmInput::saveSelection));
+					cy += 18;
 					int by = cy;
 					draw.add(() -> {
 						int bx = x;
@@ -62,11 +74,7 @@ final class RmToolSettings {
 					});
 					cy += 18;
 					int by2 = cy;
-					draw.add(() -> {
-						int bx = x;
-						bx += panel.textButton(context, bx, by2, 0, "Replace...", false, () -> MinecraftClient.getInstance().setScreen(new ReplaceScreen())) + 4;
-						panel.textButton(context, bx, by2, 0, "Save...", false, () -> MinecraftClient.getInstance().setScreen(new SchematicSaveScreen()));
-					});
+					draw.add(() -> panel.textButton(context, x, by2, 0, "Replace...", false, () -> MinecraftClient.getInstance().setScreen(new ReplaceScreen())));
 					cy += 18;
 					int by3 = cy;
 					draw.add(() -> {
@@ -82,7 +90,7 @@ final class RmToolSettings {
 				String move = size == null ? "Select an area first" : "Offset " + o[0] + ", " + o[1] + ", " + o[2]
 						+ (RmState.moveRotation != 0 ? "  ·  " + RmState.moveRotation * 90 + "°" : "") + (RmState.moveMirror ? "  ·  flipped" : "");
 				int ly = cy;
-				draw.add(() -> context.drawTextWithShadow(textRenderer, VeloUi.trim(move, w), x, ly, RmHud.TEXT));
+				draw.add(() -> RmHud.text(context, VeloUi.trim(move, w), x, ly, RmHud.TEXT));
 				cy += 14;
 				int by = cy;
 				draw.add(() -> {
@@ -99,7 +107,7 @@ final class RmToolSettings {
 				String stack = size == null ? "Select an area first" : RmState.stackCopies() == 0 ? "Scroll while looking along an axis"
 						: RmState.stackCopies() + " copies  ·  " + stackAxes();
 				int ly = cy;
-				draw.add(() -> context.drawTextWithShadow(textRenderer, VeloUi.trim(stack, w), x, ly, RmHud.TEXT));
+				draw.add(() -> RmHud.text(context, VeloUi.trim(stack, w), x, ly, RmHud.TEXT));
 				cy += 14;
 				int by = cy;
 				draw.add(() -> {
@@ -160,7 +168,7 @@ final class RmToolSettings {
 		List<String> lines = VeloUi.wrap(status, w);
 		for (String line : lines.subList(0, Math.min(4, lines.size()))) {
 			int ly = cy;
-			draw.add(() -> context.drawTextWithShadow(textRenderer, line, x, ly, RmHud.MUTED));
+			draw.add(() -> RmHud.text(context, line, x, ly, RmHud.MUTED));
 			cy += 10;
 		}
 		if (!Wiring.preview().isEmpty()) {

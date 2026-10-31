@@ -71,7 +71,9 @@ final class WebRoutes {
 				JsonHttp.writeError(ex, 401, "Sign in to the Velo launcher first");
 				return;
 			}
-			String code = registry.takeRequestedWebCode(session.uuid(), session.username());
+			// Launchers from before the staff panel show a staff panel code the website-code way.
+			String staffCode = StaffPanel.codeForOldLauncher(session.uuid());
+			String code = staffCode != null ? staffCode : registry.takeRequestedWebCode(session.uuid(), session.username());
 			Map<String, Object> out = new java.util.HashMap<>();
 			out.put("code", code);
 			out.put("expiresInSeconds", SessionRegistry.WEB_CODE_TTL_MILLIS / 1000);

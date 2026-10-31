@@ -1,0 +1,10 @@
+{
+ "slot": "head",
+ "name": "Knit Beanie",
+ "price": 900,
+ "accent": "#e9a02b",
+ "description": "A cosy knitted beanie with a fold-up cuff and a fluffy pompom on top.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

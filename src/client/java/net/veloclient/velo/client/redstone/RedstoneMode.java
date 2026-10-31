@@ -76,9 +76,9 @@ public final class RedstoneMode {
 		toolSlot = true;
 		lastHotbarSlot = RmWorld.selectedSlot();
 		AxiomCompat.leaveToolSlot();
-		RmState.info(RmWorld.singleplayer()
+		RmState.info(canEdit()
 				? "Redstone Mode - tools are in slot 0 (press 0 or scroll past the hotbar), tap Alt for the menu"
-				: "Redstone Mode (server) - analysis and schematic previews; editing needs singleplayer");
+				: "Redstone Mode - slot 0 selects an area to save as a schematic; editing tools need singleplayer creative");
 	}
 
 	public static void exit() {
@@ -89,6 +89,23 @@ public final class RedstoneMode {
 		Timeline.closeReplay();
 		TickControls.exit();
 		RmSettings.save();
+	}
+
+	/**
+	 * Whether the world editing tools (Move / Copy / Stack / wires, paste, undo, freeze, recordings) are available: only in
+	 * singleplayer creative / spectator. Everywhere else the tool slot only selects an area to save as a schematic.
+	 */
+	public static boolean canEdit() {
+		return RmWorld.singleplayer() && RmWorld.creative();
+	}
+
+	public static boolean toolAllowed(RmState.Tool tool) {
+		return tool == RmState.Tool.SELECT || canEdit();
+	}
+
+	/** The tools offered right now (just Select without editing rights). */
+	public static RmState.Tool[] tools() {
+		return canEdit() ? RmState.Tool.values() : new RmState.Tool[] {RmState.Tool.SELECT};
 	}
 
 	/** Whether the Redstone tool slot is selected (the tools only work then). */
@@ -116,6 +133,15 @@ public final class RedstoneMode {
 		}
 		if (!active) {
 			return;
+		}
+		if (!toolAllowed(RmState.tool)) {
+			// Lost the rights (switched to survival, left for a server): back to plain selecting.
+			RmState.tool = RmState.Tool.SELECT;
+			RmState.resetTransforms();
+			RmState.pasting = false;
+			Wiring.clearPreview();
+			RmState.wireStart = null;
+			RmState.wireEnd = null;
 		}
 		if (zero) {
 			setToolSlot(true);
@@ -160,6 +186,10 @@ public final class RedstoneMode {
 
 	/** Picks a tool and jumps to the Redstone slot. */
 	public static void selectTool(RmState.Tool tool) {
+		if (!toolAllowed(tool)) {
+			RmState.error(tool.label + " needs singleplayer creative");
+			return;
+		}
 		if (RmState.tool != tool) {
 			RmState.tool = tool;
 			RmState.resetTransforms();

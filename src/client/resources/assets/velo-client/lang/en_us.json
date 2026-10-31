@@ -4,6 +4,8 @@
 	"key.velo-client.world_map": "Open World Map",
 	"key.velo-client.open_friends": "Open Friends",
 	"key.velo-client.open_waypoints": "Open Waypoints",
+	"key.velo-client.storage_memory": "Open Storage Memory",
+	"key.velo-client.world_notes": "World Notes",
 	"key.velo-client.new_waypoint": "New Waypoint Here",
 	"key.velo-client.add_waypoint": "Add Waypoint (old)",
 	"key.velo-client.queue_menu": "Open Background Queue",

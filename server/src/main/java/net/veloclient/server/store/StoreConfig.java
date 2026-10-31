@@ -104,6 +104,32 @@ public final class StoreConfig {
 
 	public Rewards rewards = new Rewards();
 
+	/** The Tebex webstore's package ids (Headless API): coin pack id, {@code plus_month}, {@code plus_year}. */
+	public static final java.util.Map<String, Long> DEFAULT_TEBEX_PACKAGES = java.util.Map.of(
+			"plus_month", 7774709L, "plus_year", 7774713L,
+			"coins_1200", 7774732L, "coins_2500", 7774735L, "coins_5500", 7774742L, "coins_15000", 7774750L);
+
+	/** Overrides of {@link #DEFAULT_TEBEX_PACKAGES} from store.json. */
+	public java.util.Map<String, Long> tebexPackages;
+
+	/** The Tebex package for {@code key}, or 0 when there is none. */
+	public long tebexPackage(String key) {
+		Long id = tebexPackages != null ? tebexPackages.get(key) : null;
+		if (id == null) {
+			id = DEFAULT_TEBEX_PACKAGES.get(key);
+		}
+		return id == null ? 0 : id;
+	}
+
+	/** What a Tebex package id is: a coin pack id, {@code plus_month} or {@code plus_year}; null if none of ours. */
+	public String tebexKey(long packageId) {
+		java.util.Map<String, Long> all = new java.util.HashMap<>(DEFAULT_TEBEX_PACKAGES);
+		if (tebexPackages != null) {
+			all.putAll(tebexPackages);
+		}
+		return all.entrySet().stream().filter(e -> e.getValue() == packageId).map(java.util.Map.Entry::getKey).findFirst().orElse(null);
+	}
+
 	/** The Velo+ subscription: what it costs (shown), how long a payment lasts, and the monthly coins it includes. */
 	public static final class Plus {
 		public double price = 9.99;
@@ -127,6 +153,18 @@ public final class StoreConfig {
 	}
 
 	public LaunchBonus launchBonus = new LaunchBonus();
+
+	/**
+	 * The 1.0 welcome gift: from {@code from} until {@code until}, every account (new or old) may pick one cosmetic from
+	 * the Store for free, once. {@code from} 0 = off.
+	 */
+	public static final class WelcomeGift {
+		/** 2026-11-01 00:00 CET (Velo Client 1.0) and three months after. */
+		public long from = 1_793_487_600_000L;
+		public long until = 1_793_487_600_000L + 90L * 86_400_000L;
+	}
+
+	public WelcomeGift welcomeGift = new WelcomeGift();
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 

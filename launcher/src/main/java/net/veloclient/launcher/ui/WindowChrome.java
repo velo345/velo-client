@@ -32,6 +32,7 @@ import java.util.List;
  * The launcher's own window frame (no OS title bar): the top bar moves the window, a double click or dragging to
  * the top edge maximizes it, every edge and corner resizes it, and minimize / maximize / close sit at the right
  * of the top bar. Maximize fills the screen's usable area (not over the taskbar), on whichever screen the window is.
+ * On Linux the window manager does the moving and resizing ({@link NativeWindowDrag}) where it can.
  */
 public final class WindowChrome {
 
@@ -171,6 +172,12 @@ public final class WindowChrome {
 					return;
 				}
 				moving = true;
+				if (!maximized.get() && NativeWindowDrag.move(stage, mx, my)) {
+					// the window manager moves it from here, with the desktop's own snapping
+					armed = false;
+					moving = false;
+					return;
+				}
 				if (maximized.get()) {
 					// Pulling a maximized window down restores its size under the cursor, at the same relative spot.
 					double ratio = grabX / stage.getWidth();
@@ -229,6 +236,11 @@ public final class WindowChrome {
 			}
 			Cursor c = edgeCursor(e.getSceneX(), e.getSceneY(), scene);
 			if (c == null) {
+				return;
+			}
+			if (NativeWindowDrag.resize(stage, c, e.getScreenX(), e.getScreenY())) {
+				// the window manager resizes it (the scene follows its real size)
+				e.consume();
 				return;
 			}
 			resizing = c;

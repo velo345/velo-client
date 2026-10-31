@@ -1,0 +1,10 @@
+{
+ "slot": "head",
+ "name": "Top Hat",
+ "price": 1400,
+ "accent": "#c52f3c",
+ "description": "A tall black silk top hat with a red satin band - very distinguished.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

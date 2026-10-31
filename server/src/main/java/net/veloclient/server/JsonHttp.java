@@ -18,7 +18,7 @@ final class JsonHttp {
 	private static final int MAX_BODY_BYTES = 16 * 1024;
 
 	// serializeNulls: a null capeId has to reach the client as an explicit null (heartbeat uses it
-	// to signal "your cape was not accepted"), not as a missing field.
+	// to signal "your cloak was not accepted"), not as a missing field.
 	private static final Gson GSON = new GsonBuilder().serializeNulls().create();
 
 	private JsonHttp() {

@@ -1,19 +1,20 @@
 <!--page {
-	"title": "Store – Minecraft Wings, Animated Capes & Auras · Velo Client",
-	"description": "The Velo Client Store: 3D wings, animated capes, auras and emotes for Minecraft that every Velo player sees. Sign in with your launcher code, buy with Velo Coins, get Velo+.",
+	"title": "Store – Minecraft Wings, Animated Cloaks & Auras · Velo Client",
+	"description": "The Velo Client Store: animated 3D wings, cloaks, auras, emotes, kill effects and bodywear - hats, glasses, chains, scarves, watches, shoes, backpacks - for Minecraft that every Velo player sees. Sign in with your launcher code, buy with Velo Coins, get Velo+.",
 	"path": "/store",
 	"active": "store",
 	"priority": "0.9",
 	"changefreq": "daily",
-	"images": ["/assets/store/wings_phoenix.webp", "/assets/store/cape_thunderstrike.webp", "/assets/store/aura_void.webp"],
+	"images": ["/assets/store/wings_clockwork.webp", "/assets/store/cape_plasma_orb.webp", "/assets/store/wear_top_hat.webp"],
 	"schema": {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://velo-client.com/"}, {"@type": "ListItem", "position": 2, "name": "Store", "item": "https://velo-client.com/store"}]}
 }-->
 <div class="wrap" id="store">
   <header class="store-head">
     <div>
       <span class="eyebrow fade-up" style="--d:.05s">Store</span>
-      <h1 data-split style="font-size:clamp(2.4rem,5.4vw,4rem);font-weight:800;letter-spacing:-0.035em">Wings, capes &amp; <span class="glow-text">auras</span>.</h1>
+      <h1 data-split style="font-size:clamp(2.4rem,5.4vw,4rem);font-weight:800;letter-spacing:-0.035em">Wings, cloaks &amp; <span class="glow-text">auras</span>.</h1>
       <p class="fade-up" style="--d:.45s;margin:10px 0 0;color:var(--text-2)">Every Velo player sees them. Try anything on your own skin first - purchases go straight to your Minecraft account.</p>
+      <p class="fade-up welcome-gift" style="--d:.55s;margin:12px 0 0"><span class="pill">Gift</span> Velo Client 1.0 is out: every player picks <strong>one cosmetic for free</strong> - any one in the Store.</p>
     </div>
     <div class="wallet fade-up" style="--d:.5s" id="wallet">
       <button class="btn btn-primary magnetic" type="button" data-signin>Sign in to buy</button>
@@ -21,7 +22,7 @@
   </header>
 
   <nav class="store-tabs" aria-label="Store sections" id="store-tabs">
-    <a href="#featured">Featured</a><a href="#daily">Daily picks</a><a href="#wings">Wings</a><a href="#capes">Capes</a><a href="#auras">Auras</a><a href="#emotes">Emotes</a><a href="#bundles">Bundles</a><a href="#coins">Velo Coins</a><a href="#plus">Velo+</a>
+    <a href="#featured">Featured</a><a href="#daily">Daily picks</a><a href="#wings">Wings</a><a href="#capes">Cloaks</a><a href="#auras">Auras</a><a href="#emotes">Emotes</a><a href="#killfx">Kill FX</a><a href="#wear">Bodywear</a><a href="#bundles">Bundles</a><a href="#coins">Velo Coins</a><a href="#plus">Velo+</a>
   </nav>
 
   <section class="store-section" id="featured" aria-label="Featured collection"><div class="skeleton" style="height:340px"></div></section>
@@ -32,7 +33,7 @@
 
   <div class="toolbar reveal" id="tools">
     <label class="sr-only" for="store-search">Search the Store</label>
-    <input id="store-search" type="search" placeholder="Search wings, capes, auras and emotes…" autocomplete="off">
+    <input id="store-search" type="search" placeholder="Search wings, cloaks, auras, emotes and kill effects…" autocomplete="off">
     <label class="sr-only" for="store-sort">Sort</label>
     <select id="store-sort"><option value="featured">Featured first</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="name">Name</option></select>
     <label class="sr-only" for="store-owned">Show</label>
@@ -40,11 +41,11 @@
   </div>
 
   <section class="store-section" id="wings" aria-labelledby="wings-h">
-    <div class="store-section-head"><h2 id="wings-h">Wings</h2><span>Real 3D wings that flap with you. Tune size and flap in game.</span></div>
+    <div class="store-section-head"><h2 id="wings-h">Wings</h2><span>Real 3D wings that flap with you - and come alive: flames lick, tentacles writhe, blades fan, gears turn, metal shines. Neon recolours to any shade.</span></div>
     <div class="items" data-grid="wings"></div>
   </section>
   <section class="store-section" id="capes" aria-labelledby="capes-h">
-    <div class="store-section-head"><h2 id="capes-h">Animated capes</h2><span>Drag a cape to turn it. The Velo Neon cape is free when you link Discord.</span></div>
+    <div class="store-section-head"><h2 id="capes-h">Animated cloaks</h2><span>Drag a cloak to turn it. The Velo Neon cloak is free when you link Discord.</span></div>
     <div class="items" data-grid="cape"></div>
   </section>
   <section class="store-section" id="auras" aria-labelledby="auras-h">
@@ -54,6 +55,14 @@
   <section class="store-section" id="emotes" aria-labelledby="emotes-h">
     <div class="store-section-head"><h2 id="emotes-h">Emotes <span class="pill">New</span></h2><span>Wave, cheer, bow, backflip and more - each with its own effects and sounds. Hold B in game for your emote wheel.</span></div>
     <div class="items" data-grid="emote"></div>
+  </section>
+  <section class="store-section" id="killfx" aria-labelledby="killfx-h">
+    <div class="store-section-head"><h2 id="killfx-h">Kill effects <span class="pill">New</span></h2><span>Custom particles and sounds where your kills fall - shatter, orbital strike, black hole, phoenix and more, in your colour.</span></div>
+    <div class="items" data-grid="killfx"></div>
+  </section>
+  <section class="store-section" id="wear" aria-labelledby="wear-h">
+    <div class="store-section-head"><h2 id="wear-h">Bodywear <span class="pill">New</span></h2><span>Hats, ears, glasses, gold chains, scarves, watches, shoes and backpacks - one per slot, all worn at once, most of them in any colour you pick.</span></div>
+    <div class="items" data-grid="wear"></div>
   </section>
   <section class="store-section" id="bundles" aria-labelledby="bundles-h">
     <div class="store-section-head"><h2 id="bundles-h">Bundles</h2><span>Several items for one price. Items you own already are taken off.</span></div>
@@ -73,7 +82,7 @@
         <div>
           <span class="plus-badge">VELO+</span>
           <h2 id="plus-store-h">World Hosting, Cloud Sync, Clips Pro, Name Styles, your own Home background and {{plus.monthlyCoins}} coins a month.</h2>
-          <p>Plus animated custom capes, the + badge and the VIP role on Discord. Try it free for 7 days (once per account), then billed monthly - cancel any time. <a href="/features#plus">What's included</a></p>
+          <p>Plus animated custom cloaks, the + badge and the VIP role on Discord. Try it free for 7 days (once per account), then billed monthly - cancel any time. <a href="/features#plus">What's included</a></p>
         </div>
         <div style="display:grid;gap:10px;justify-items:start">
           <span class="price" data-plus-price>{{plus.price}}<small> / month</small></span>

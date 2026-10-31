@@ -6,7 +6,10 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"AdvancementsScreenAccessor",
+		"AntiCoordsExemptLineMixin",
+		"AntiCoordsExemptMixin",
 		"AntiCoordsFontMixin",
+		"AntiCoordsWaterMixin",
 		"AntiDeepslateModelMixin",
 		"AntiFarmLagBreakMixin",
 		"AntiFarmLagItemMixin",

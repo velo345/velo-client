@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Deploys the Velo server (jar), its nginx config, the host firewall and the share page script to the production box,
+# Deploys the Velo server (jar), its nginx config, the host firewall, the share page script and the staff panel app
+# (staff-site/) to the production box,
 # keeping a backup of what was there. Safe to run again. Clients are NOT released by this.
 #
 #   tools/server/deploy-server.sh            -> velo-new (the ssh alias in ~/.ssh/config)
@@ -9,6 +10,9 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 TARGET="${1:-velo-new}"
 
 ./gradlew :server:shadowJar -q
+# The staff panel's static app (staff.velo-client.com) - before nginx, whose config serves it.
+ssh "$TARGET" 'install -d -m 2775 -g velo /var/www/staff.velo-client.com'
+rsync -rlptz --delete --chmod=D2775,F664 --exclude staff.part.js staff-site/ "$TARGET:/var/www/staff.velo-client.com/"
 scp -q server/build/libs/velo-server.jar tools/server/nginx/velo.conf tools/server/host/firewall.nft velo-site/assets/clip.js "$TARGET:/tmp/"
 ssh "$TARGET" 'bash -s' <<'REMOTE'
 set -euo pipefail

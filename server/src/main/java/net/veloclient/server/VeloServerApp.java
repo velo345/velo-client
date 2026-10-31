@@ -46,8 +46,8 @@ public final class VeloServerApp {
 		try {
 			var storeConfig = net.veloclient.server.store.StoreConfig.load(dataDir);
 			var storeDb = new net.veloclient.server.store.StoreDatabase(dataDir.resolve("store.db"));
-			var tebex = new net.veloclient.server.store.TebexCheckout(envOr("TEBEX_PROJECT_ID", null),
-					envOr("TEBEX_PRIVATE_KEY", null), envOr("TEBEX_WEBHOOK_SECRET", null));
+			var tebex = new net.veloclient.server.store.TebexCheckout(envOr("TEBEX_PUBLIC_TOKEN", null),
+					envOr("TEBEX_WEBHOOK_SECRET", envOr("TEBEX_WEBBHOOK_SECRET", null)));
 			store = new net.veloclient.server.store.StoreService(storeConfig, storeDb, tebex,
 					net.veloclient.server.store.StoreService.parseOwners(envOr("VELO_OWNERS", null), VeloServerApp::normalizeUuid),
 					envOr("VELO_PUBLIC_URL", null),
@@ -130,6 +130,11 @@ public final class VeloServerApp {
 		ClipShareService clipShares = new ClipShareService(dataDir, Long.parseLong(envOr("VELO_CLIPS_MAX_GB", "40")) * 1024 * 1024 * 1024,
 				ClipShareService.MIN_FREE_DISK, Integer.parseInt(envOr("VELO_CLIPS_RETENTION_DAYS", String.valueOf(ClipShareService.DEFAULT_RETENTION_DAYS))));
 		ModerationService moderation = new ModerationService(dataDir);
+		// The staff panel (staff.velo-client.com): launcher-code first sign-in, passkeys/password/pattern + authenticator.
+		java.util.function.Predicate<String> isOwner = uuid -> store.isOwner(uuid, social.usernameOf(uuid));
+		StaffPanel staffPanel = new StaffPanel(dataDir, envOr("VELO_STAFF_ORIGIN", "https://staff.velo-client.com"), social,
+				uuid -> isOwner.test(uuid) ? StaffService.MANAGER : staff.level(uuid), isOwner);
+		staffPanel.register(server, registry, staff, moderation, discordLinks, envOr("VELO_BOT_URL", "http://127.0.0.1:8792"), adminToken);
 		PlusFeatureRoutes.setModeration(moderation);
 		PlusFeatureRoutes.register(server, registry, store, cloud, clipShares, envOr("VELO_SITE_URL", "https://velo-client.com"));
 		// World Hosting: a raw TCP relay next to the HTTP API (its own port, not behind the web proxy).
@@ -186,6 +191,11 @@ public final class VeloServerApp {
 			System.out.println("VELO_PLUS_SIGNING_KEY not set - no Velo+ proofs for the game");
 		}
 		reportService.setListener(announcer::report);
+		// World Notes (shared in-world notes): players' routes + staff list / read / remove.
+		NotesService notes = new NotesService(dataDir, social, parties, moderation);
+		ModerationRoutes.setNotes(notes);
+		NotesRoutes.register(server, registry, notes, moderation, social,
+				uuid -> store.isOwner(uuid, social.usernameOf(uuid)) ? StaffService.MANAGER : staff.level(uuid));
 		ModerationRoutes.register(server, registry, moderation, staff, social, store, clipShares, worlds, capes, reportService,
 				envOr("VELO_SITE_URL", "https://velo-client.com"));
 		NewsRoutes.register(server, registry, new NewsService(dataDir), reportService, store, adminToken);
@@ -235,10 +245,11 @@ public final class VeloServerApp {
 		server.start();
 		System.out.println("Velo Client server listening on port " + port + " (data: " + dataDir + ")");
 		if (adminToken == null) {
-			System.out.println("VELO_ADMIN_TOKEN not set - the admin cape-removal endpoint is disabled");
+			System.out.println("VELO_ADMIN_TOKEN not set - the admin cloak-removal endpoint is disabled");
 		}
 		System.out.println("Store: coin checkout " + (store.checkoutEnabled() ? "ON" : "OFF (set TEBEX_PROJECT_ID, TEBEX_PRIVATE_KEY, VELO_PUBLIC_URL)")
-				+ ", Tebex webhooks " + (envOr("TEBEX_WEBHOOK_SECRET", null) != null ? "ON" : "OFF (set TEBEX_WEBHOOK_SECRET)")
+				+ ", Tebex checkout " + (envOr("TEBEX_PUBLIC_TOKEN", null) != null ? "ON" : "OFF (set TEBEX_PUBLIC_TOKEN)")
+				+ ", Tebex webhooks " + (envOr("TEBEX_WEBHOOK_SECRET", envOr("TEBEX_WEBBHOOK_SECRET", null)) != null ? "ON" : "OFF (set TEBEX_WEBHOOK_SECRET)")
 				+ ", rewarded ads " + (store.adsEnabled() ? "ON" : "OFF (set AYET_PLACEMENT_ID, AYET_ADSLOT, AYET_API_KEY, VELO_PUBLIC_URL)"));
 	}
 
@@ -407,8 +418,9 @@ public final class VeloServerApp {
 				SessionRegistry.HEARTBEAT_INTERVAL_SECONDS, SessionRegistry.SESSION_TTL_MILLIS / 1000));
 	}
 
+	/** {@code wear}: equipped bodywear, "id,id,..." (item ids without "wear_"). */
 	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId, String auraId, Boolean idle, Boolean hidePlus, String nameStyle,
-			String emote) {
+			String emote, String wear) {
 	}
 
 	private record HeartbeatResponse(boolean ok, int onlineCount, String capeId) {
@@ -462,6 +474,21 @@ public final class VeloServerApp {
 				}
 			}
 			registry.setEmote(refreshed.uuid(), emote);
+			// Bodywear: store items too ("wear_<id>", optionally ":<rrggbb>" or an old ":<hue code>", then height and depth ":<quarter px>"), each shown only if it's owned.
+			String wear = null;
+			if (request.wear() != null && request.wear().length() <= 400) {
+				java.util.List<String> shown = new java.util.ArrayList<>();
+				for (String entry : request.wear().split(",")) {
+					String id = entry.split(":", 2)[0];
+					String item = "wear_" + id;
+					if (entry.matches("[a-z0-9_-]{1,40}(:([0-9]{1,3}|[0-9a-f]{6})?(:-?[0-9](:-?[0-9])?)?)?") && shown.size() < 8 && store.knownItem(item)
+							&& store.mayDisplayCape(refreshed.uuid(), item)) {
+						shown.add(entry);
+					}
+				}
+				wear = shown.isEmpty() ? null : String.join(",", shown);
+			}
+			registry.setWear(refreshed.uuid(), wear);
 		}
 		if (refreshed != null && "launcher".equals(refreshed.kind())
 				&& registry.setIdle(request.sessionToken(), Boolean.TRUE.equals(request.idle()))) {
@@ -515,7 +542,7 @@ public final class VeloServerApp {
 			return;
 		}
 		if (staff != null && staff.banFor(session.uuid(), "capes") != null) {
-			JsonHttp.writeError(exchange, 403, "You're banned from custom capes: " + staff.banFor(session.uuid(), "capes").reason);
+			JsonHttp.writeError(exchange, 403, "You're banned from custom cloaks: " + staff.banFor(session.uuid(), "capes").reason);
 			return;
 		}
 		byte[] bytes = JsonHttp.readRawBody(exchange, CapeStore.MAX_UPLOAD_BYTES);
@@ -540,7 +567,7 @@ public final class VeloServerApp {
 		String hash = path.substring(path.lastIndexOf('/') + 1);
 		CapeStore.StoredFile file = capes.read(hash, store::isPlus);
 		if (file == null) {
-			JsonHttp.writeError(exchange, 404, "No such cape");
+			JsonHttp.writeError(exchange, 404, "No such cloak");
 			return;
 		}
 		// Content-addressed, so a given URL's bytes can never change - clients and any proxy/CDN

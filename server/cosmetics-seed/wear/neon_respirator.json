@@ -1,0 +1,10 @@
+{
+ "slot": "mask",
+ "name": "Neon Respirator",
+ "price": 1500,
+ "accent": "#ff2bd6",
+ "description": "A black cyber respirator with glowing neon lines and twin filters.",
+ "bone": "head",
+ "mirror": null,
+ "tint": true
+}

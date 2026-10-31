@@ -1,0 +1,10 @@
+{
+ "slot": "wrist",
+ "name": "Smartwatch",
+ "price": 1200,
+ "accent": "#18d8ff",
+ "description": "A black smartwatch with a glowing screen.",
+ "bone": "leftArm",
+ "mirror": null,
+ "tint": true
+}

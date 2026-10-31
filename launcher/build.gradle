@@ -25,7 +25,9 @@ application {
 	// webp-imageio (RemoteIconLoader) loads a native decoder via System.load()
 	// - silences the JDK's restricted-native-access warning now, and avoids
 	// it becoming a hard failure on a future JDK that blocks this by default.
-	applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED', '-Xms48m', '-Xmx768m', '-XX:+UseSerialGC', '-XX:MinHeapFreeRatio=10',
+	// The --add-* open JavaFX's window internals for NativeWindowDrag (the window manager moves/resizes the window on Linux).
+	applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED', '--add-exports=javafx.graphics/com.sun.javafx.stage=ALL-UNNAMED',
+			'--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED', '--add-opens=javafx.graphics/com.sun.javafx.tk.quantum=ALL-UNNAMED', '-Xms48m', '-Xmx768m', '-XX:+UseSerialGC', '-XX:MinHeapFreeRatio=10',
 			'-XX:MaxHeapFreeRatio=30', '-XX:TieredStopAtLevel=1', '-XX:ReservedCodeCacheSize=64m', '-Xss512k', '-Dprism.maxvram=512m']
 }
 
@@ -49,6 +51,8 @@ test {
 // can always install the right jar into a profile's mods folder without
 // needing the rest of this monorepo checked out alongside it.
 def gameVersions = ["1.21.11", "26.1", "26.2", "26.3"]
+// Dev build (./build-dev.sh / -PveloDev=true): bundles the dev client jars (with src/dev) and runs on its own data folder.
+def veloDev = (findProperty("veloDev") ?: "false").toString().toBoolean()
 // Resolved eagerly at configuration time (plain java.io.File, not a live
 // Project reference) so the doLast below stays configuration-cache-safe.
 def libsDirs = gameVersions.collectEntries { v -> [(v): rootProject.file("versions/${v}/build/libs")] }
@@ -65,13 +69,16 @@ tasks.register("bundleGameJars") {
 	gameVersions.each { v ->
 		inputs.files(fileTree(libsDirs[v]) { include "velo-client-*.jar", "velo-addons-*.jar"; exclude "*-sources.jar" })
 	}
+	// which flavour gets bundled is part of the output (dev and release jars sit side by side in libs/)
+	inputs.property("dev", veloDev)
 	outputs.dir(gameJarsOutputDir)
 	doLast {
 		def outDir = gameJarsOutputDir.get().asFile
 		outDir.mkdirs()
 		gameVersions.each { v ->
 			def libsDir = libsDirs[v]
-			def matches = libsDir.listFiles({ f -> f.name.startsWith("velo-client-") && f.name.endsWith(".jar") && !f.name.contains("-sources") } as FileFilter)
+			def matches = libsDir.listFiles({ f -> f.name.startsWith("velo-client-") && f.name.endsWith(".jar") && !f.name.contains("-sources")
+					&& f.name.contains("-dev+") == veloDev } as FileFilter)
 			if (matches == null || matches.length == 0) {
 				throw new GradleException("Expected a built velo-client jar for Minecraft ${v} in ${libsDir}, found none")
 			}
@@ -120,7 +127,7 @@ tasks.register("bundleJavaRuntimeFallback") {
 // reads it back as a classpath resource at runtime instead of independently
 // hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
 // below reuses the same value for the native installer's version.
-def launcherAppVersion = "0.9.98"
+def launcherAppVersion = "1.0.0"
 // A fixed identity for the Windows installer across every version - WiX
 // needs this (--win-upgrade-uuid below) to recognize a new installer as an
 // upgrade of whatever's already installed rather than an unrelated product,
@@ -136,11 +143,12 @@ tasks.register("writeLauncherVersion") {
 	description = "Writes launcherAppVersion into a version.properties resource for AppVersion to read at runtime."
 	def outDir = launcherVersionResourceRoot.map { it.dir("net/veloclient/launcher") }
 	inputs.property("version", launcherAppVersion)
+	inputs.property("dev", veloDev)
 	outputs.dir(outDir)
 	doLast {
 		def dir = outDir.get().asFile
 		dir.mkdirs()
-		new File(dir, "version.properties").text = "version=${launcherAppVersion}\n"
+		new File(dir, "version.properties").text = "version=${launcherAppVersion}\ndev=${veloDev}\n"
 	}
 }
 
@@ -157,6 +165,13 @@ tasks.register("bundleWingAssets", Copy) {
 	}
 	into(wingAssetsResourceRoot.map { it.dir("net/veloclient/launcher/wings") })
 }
+// The auras' particle atlas, so the launcher draws the same feathers, petals, wings and ribbons as the game.
+tasks.register("bundleAuraAtlas", Copy) {
+	group = "build"
+	description = "Copies the mod's aura texture atlas into launcher resources."
+	from(rootProject.file("src/client/resources/assets/velo-client/textures/cosmetics/aura")) { include("atlas.png") }
+	into(wingAssetsResourceRoot.map { it.dir("net/veloclient/launcher/aura") })
+}
 
 // The auras' animation code is plain Java shared with the mod: compiled into the launcher too, so its
 // previews move exactly like the game's.
@@ -166,6 +181,13 @@ tasks.register("bundleAuraEffects", Copy) {
 	description = "Copies the mod's AuraEffects (plain Java) into launcher sources."
 	from(rootProject.file("src/client/java/net/veloclient/velo/client/cosmetics/aura")) { include("AuraEffects.java") }
 	into(auraSourceRoot.map { it.dir("net/veloclient/velo/client/cosmetics/aura") })
+}
+// The Store's kill effects too (plain Java, drawn with the auras' sprites).
+tasks.register("bundleKillFxEffects", Copy) {
+	group = "build"
+	description = "Copies the mod's KillFxEffects (plain Java) into launcher sources."
+	from(rootProject.file("src/client/java/net/veloclient/velo/client/cosmetics/killfx")) { include("KillFxEffects.java") }
+	into(auraSourceRoot.map { it.dir("net/veloclient/velo/client/cosmetics/killfx") })
 }
 // Name Styles too (plain Java): the Locker's previews animate exactly like names in game.
 tasks.register("bundleNameStyles", Copy) {
@@ -180,7 +202,21 @@ tasks.register("bundleClipCore", Copy) {
 	from(rootProject.file("src/client/java/net/veloclient/velo/client/clips/core")) { include("*.java") }
 	into(auraSourceRoot.map { it.dir("net/veloclient/velo/client/clips/core") })
 }
-tasks.named("compileJava") { dependsOn("bundleAuraEffects", "bundleNameStyles", "bundleClipCore") }
+// Tentacle and clockwork rigs (plain Java), so the launcher's wings move like the game's.
+tasks.register("bundleWingRigs", Copy) {
+	group = "build"
+	description = "Copies the mod's WingRigs (plain Java) into launcher sources."
+	from(rootProject.file("src/client/java/net/veloclient/velo/client/cosmetics/wings")) { include("WingRigs.java") }
+	into(auraSourceRoot.map { it.dir("net/veloclient/velo/client/cosmetics/wings") })
+}
+// Bodywear colours (plain Java): the same recolouring as the game.
+tasks.register("bundleWearTint", Copy) {
+	group = "build"
+	description = "Copies the mod's WearTint (plain Java) into launcher sources."
+	from(rootProject.file("src/client/java/net/veloclient/velo/client/cosmetics/wear")) { include("WearTint.java") }
+	into(auraSourceRoot.map { it.dir("net/veloclient/velo/client/cosmetics/wear") })
+}
+tasks.named("compileJava") { dependsOn("bundleWingRigs", "bundleWearTint", "bundleAuraEffects", "bundleKillFxEffects", "bundleNameStyles", "bundleClipCore") }
 
 sourceSets {
 	main {
@@ -197,7 +233,7 @@ sourceSets {
 }
 
 tasks.named("processResources") {
-	dependsOn("bundleGameJars", "bundleJavaRuntimeFallback", "writeLauncherVersion", "bundleWingAssets")
+	dependsOn("bundleGameJars", "bundleJavaRuntimeFallback", "writeLauncherVersion", "bundleWingAssets", "bundleAuraAtlas")
 }
 
 // The javafx plugin's "run" task reaches into Project internals
@@ -307,6 +343,10 @@ tasks.register("jpackageDist") {
 				"--java-options", "--module-path=\$APPDIR",
 				"--java-options", "--add-modules=javafx.controls,javafx.graphics,javafx.swing",
 				"--java-options", "--enable-native-access=ALL-UNNAMED",
+				// JavaFX's window internals for NativeWindowDrag (the window manager moves/resizes the window on Linux)
+				"--java-options", "--add-exports=javafx.graphics/com.sun.javafx.stage=ALL-UNNAMED",
+				"--java-options", "--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED",
+				"--java-options", "--add-opens=javafx.graphics/com.sun.javafx.tk.quantum=ALL-UNNAMED",
 				// Memory: without a cap the JVM may take a quarter of the PC's RAM and G1 rarely hands
 				// it back - the launcher idles at ~60 MB of live data. SerialGC has no background GC
 				// threads and, with MaxHeapFreeRatio, shrinks the heap after a collection (idle mode
@@ -359,6 +399,10 @@ tasks.register("auraPreviews", JavaExec) {
 	classpath = sourceSets.main.runtimeClasspath
 	mainClass = "net.veloclient.launcher.ui.AuraPreviewExport"
 	args = [project.findProperty("auraOut") ?: layout.buildDirectory.dir("aura-previews").get().asFile.path, "300", "72"]
+	// -PauraOnly=id,id renders just those.
+	if (project.findProperty("auraOnly")) {
+		args += [project.findProperty("auraOnly").toString()]
+	}
 	doFirst {
 		def fx = sourceSets.main.runtimeClasspath.filter { it.name.startsWith("javafx-") }
 		jvmArgs = ["--module-path", fx.asPath, "--add-modules", "javafx.controls,javafx.graphics,javafx.swing"]

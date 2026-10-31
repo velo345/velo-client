@@ -260,7 +260,7 @@ final class Tickets {
 			return;
 		}
 		if (ticket.claimedBy != null) {
-			event.reply("Already claimed by <@" + ticket.claimedBy + ">.").setEphemeral(true).queue();
+			event.reply("Already claimed by " + (ticket.claimedBy.startsWith("panel:") ? ticket.claimedBy.substring(6) : "<@" + ticket.claimedBy + ">") + ".").setEphemeral(true).queue();
 			return;
 		}
 		ticket.claimedBy = event.getUser().getId();
@@ -269,6 +269,20 @@ final class Tickets {
 		log(event.getGuild(), new EmbedBuilder().setTitle("🙋  Ticket claimed  ·  #" + String.format("%04d", ticket.number)).setColor(0x5865F2)
 				.addField("By", event.getUser().getAsMention(), true).addField("Channel", "<#" + ticket.channelId + ">", true)
 				.setTimestamp(Instant.now()).build(), null);
+	}
+
+	/** A claim from the staff panel: {@code who} is a mention when the member linked Discord, else their name. */
+	boolean claimFor(TextChannel channel, BotConfig.Ticket ticket, String discordId, String who) {
+		if (ticket.claimedBy != null) {
+			return false;
+		}
+		ticket.claimedBy = discordId != null ? discordId : "panel:" + who;
+		config.save();
+		channel.sendMessage("🙋 " + who + " is taking care of this ticket.").queue();
+		log(channel.getGuild(), new EmbedBuilder().setTitle("🙋  Ticket claimed  ·  #" + String.format("%04d", ticket.number)).setColor(0x5865F2)
+				.addField("By", who + " (staff panel)", true).addField("Channel", "<#" + ticket.channelId + ">", true)
+				.setTimestamp(Instant.now()).build(), null);
+		return true;
 	}
 
 	/** Close button: ask for an optional reason. */
@@ -294,20 +308,21 @@ final class Tickets {
 			return;
 		}
 		String reason = event.getValue("reason") == null ? "" : event.getValue("reason").getAsString().strip();
-		closeTicket(channel, ticket, event.getUser(), reason, event);
+		closeTicket(channel, ticket, event.getUser().getAsMention(), event.getUser().getName(), reason, notice -> event.reply(notice).queue());
 	}
 
-	/** Used by the Close modal and {@code /ticket close}. */
-	void closeTicket(TextChannel channel, BotConfig.Ticket ticket, User closer, String reason, net.dv8tion.jda.api.interactions.callbacks.IReplyCallback reply) {
-		reply.reply("🔒 Closing this ticket - saving the transcript...").queue();
+	/** Used by the Close modal, {@code /ticket close} and the staff panel; {@code notice} posts the "closing" line. */
+	void closeTicket(TextChannel channel, BotConfig.Ticket ticket, String closerMention, String closerName, String reason,
+			java.util.function.Consumer<String> notice) {
+		notice.accept("🔒 Closing this ticket - saving the transcript...");
 		channel.getIterableHistory().takeAsync(3000).thenAccept(newestFirst -> {
 			List<Message> messages = new ArrayList<>(newestFirst);
 			Collections.reverse(messages);
 			byte[] transcript = transcript(ticket, messages);
 			EmbedBuilder embed = new EmbedBuilder().setTitle("🔒  Ticket closed  ·  #" + String.format("%04d", ticket.number)).setColor(0xED4245)
 					.addField("Opened by", "<@" + ticket.userId + "> (" + ticket.userName + ")", true).addField("Type", config.type(ticket.type).label, true)
-					.addField("Claimed by", ticket.claimedBy == null ? "nobody" : "<@" + ticket.claimedBy + ">", true)
-					.addField("Closed by", closer.getAsMention(), true).addField("Messages", String.valueOf(messages.size()), true)
+					.addField("Claimed by", ticket.claimedBy == null ? "nobody" : ticket.claimedBy.startsWith("panel:") ? ticket.claimedBy.substring(6) : "<@" + ticket.claimedBy + ">", true)
+					.addField("Closed by", closerMention, true).addField("Messages", String.valueOf(messages.size()), true)
 					.addField("Open for", duration(System.currentTimeMillis() - ticket.createdAt), true).addField("Subject", ticket.subject, false)
 					.setTimestamp(Instant.now());
 			if (!reason.isBlank()) {
@@ -323,7 +338,7 @@ final class Tickets {
 				config.tickets.remove(ticket.channelId);
 				config.save();
 			}
-			channel.delete().reason("Ticket closed by " + closer.getName()).queueAfter(4, TimeUnit.SECONDS);
+			channel.delete().reason("Ticket closed by " + closerName).queueAfter(4, TimeUnit.SECONDS);
 		}).exceptionally(error -> {
 			channel.sendMessage("Couldn't save the transcript: " + error.getMessage()).queue();
 			return null;

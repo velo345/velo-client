@@ -54,7 +54,9 @@ public final class AppleSkinCompat {
 							};
 						});
 				Object fabricEvent = event.getField("EVENT").get(null);
-				fabricEvent.getClass().getMethod("register", Object.class).invoke(fabricEvent, listener);
+				// Through the public Event type: the object is Fabric's internal ArrayBackedEvent, whose class we may
+				// not call into ("cannot access a member ... with modifiers public").
+				Class.forName("net.fabricmc.fabric.api.event.Event").getMethod("register", Object.class).invoke(fabricEvent, listener);
 			} catch (ReflectiveOperationException | RuntimeException e) {
 				VeloClient.LOGGER.info("Couldn't hook AppleSkin's {} overlay: {}", name, e.toString());
 			}

@@ -1,0 +1,10 @@
+{
+ "slot": "feet",
+ "name": "High-Tops",
+ "price": 1200,
+ "accent": "#cf2a2d",
+ "description": "Red high-top sneakers with white soles and laces.",
+ "bone": "rightLeg",
+ "mirror": "leftLeg",
+ "tint": true
+}

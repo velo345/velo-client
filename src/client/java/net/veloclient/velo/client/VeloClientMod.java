@@ -86,8 +86,10 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.util.MemoryStatsRecorder.start();
 		CapeFeatureRenderer.register();
 		net.veloclient.velo.client.cosmetics.render.WingsFeatureRenderer.register();
+		net.veloclient.velo.client.cosmetics.render.WearFeatureRenderer.register();
 		net.veloclient.velo.client.cosmetics.render.AuraFeatureRenderer.register();
 		net.veloclient.velo.client.cosmetics.render.EmoteFxRenderer.register();
+		net.veloclient.velo.client.cosmetics.render.KillFxRenderer.register();
 		net.veloclient.velo.client.network.RewardsReporter.register();
 		registerSocialOverlay();
 		net.veloclient.velo.client.social.PartyFollow.register();
@@ -97,7 +99,10 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.gui.title.LastServer.register();
 		net.veloclient.velo.client.stats.PlayTimeDays.register();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
-				client -> net.veloclient.velo.client.cosmetics.AnimatedCapeAsset.tickAll());
+				client -> {
+					net.veloclient.velo.client.cosmetics.AnimatedCapeAsset.tickAll();
+					net.veloclient.velo.client.cosmetics.GazeCapes.tick();
+				});
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				net.veloclient.velo.client.gui.RemoteTextureLoader::tick);
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
@@ -149,6 +154,17 @@ public final class VeloClientMod implements ClientModInitializer {
 	 * skipped rather than taking the client down with it.
 	 */
 	private void loadAddons() {
+		// A dev build (./build-dev.sh, see build.gradle.kts) carries unreleased features from src/dev inside this jar;
+		// production jars don't contain the class, so this does nothing there.
+		try {
+			Class.forName("net.veloclient.velo.dev.VeloDev").asSubclass(net.veloclient.velo.client.addon.VeloAddon.class)
+					.getDeclaredConstructor().newInstance().onVeloInitialize();
+			VeloClient.LOGGER.info("Loaded the Velo Client dev features");
+		} catch (ClassNotFoundException production) {
+			// a release build
+		} catch (Throwable t) {
+			VeloClient.LOGGER.error("Velo Client dev features failed to initialize", t);
+		}
 		for (var container : net.fabricmc.loader.api.FabricLoader.getInstance()
 				.getEntrypointContainers(net.veloclient.velo.client.addon.VeloAddon.ENTRYPOINT, net.veloclient.velo.client.addon.VeloAddon.class)) {
 			try {

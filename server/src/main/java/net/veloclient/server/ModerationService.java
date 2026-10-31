@@ -27,6 +27,8 @@ final class ModerationService {
 
 	static final String CLIP = "clip";
 	static final String WORLD = "world";
+	/** Shared World Notes (the note id). */
+	static final String NOTE = "note";
 	static final Set<String> CATEGORIES = Set.of("inappropriate", "harassment", "cheating", "spam", "scam", "copyright", "other");
 	private static final int MAX_REPORTS = 3000;
 	private static final int MAX_LOG = 1000;
@@ -67,6 +69,8 @@ final class ModerationService {
 		List<Report> reports = new ArrayList<>();
 		Map<String, Block> shareBlocks = new LinkedHashMap<>();
 		Map<String, Block> hostBlocks = new LinkedHashMap<>();
+		/** No creating / editing / sharing World Notes. */
+		Map<String, Block> noteBlocks = new LinkedHashMap<>();
 		List<Action> log = new ArrayList<>();
 		/** Cape hashes a staff member looked at and kept. */
 		List<String> reviewedCapes = new ArrayList<>();
@@ -99,6 +103,9 @@ final class ModerationService {
 		}
 		if (data.log == null) {
 			data.log = new ArrayList<>();
+		}
+		if (data.noteBlocks == null) {
+			data.noteBlocks = new LinkedHashMap<>();
 		}
 		if (data.reviewedCapes == null) {
 			data.reviewedCapes = new ArrayList<>();
@@ -223,9 +230,17 @@ final class ModerationService {
 		return active(data.hostBlocks, uuid);
 	}
 
+	private Map<String, Block> blockMap(String what) {
+		return CLIP.equals(what) ? data.shareBlocks : NOTE.equals(what) ? data.noteBlocks : data.hostBlocks;
+	}
+
+	synchronized Block blockOf(String what, String uuid) {
+		return active(blockMap(what), uuid);
+	}
+
 	/** {@code days} 0 = until lifted, negative = lift. */
 	synchronized void block(String what, String uuid, int days, String reason, String by) {
-		Map<String, Block> blocks = CLIP.equals(what) ? data.shareBlocks : data.hostBlocks;
+		Map<String, Block> blocks = blockMap(what);
 		if (days < 0) {
 			blocks.remove(uuid);
 		} else {
@@ -240,17 +255,18 @@ final class ModerationService {
 	}
 
 	synchronized Map<String, Block> blocks(String what) {
-		Map<String, Block> blocks = CLIP.equals(what) ? data.shareBlocks : data.hostBlocks;
+		Map<String, Block> blocks = blockMap(what);
 		blocks.entrySet().removeIf(e -> e.getValue().until > 0 && e.getValue().until < System.currentTimeMillis());
 		return new LinkedHashMap<>(blocks);
 	}
 
 	/** 403 with a readable reason when the player is blocked from sharing clips / listing worlds. */
 	void check(String what, String uuid) throws ApiError {
-		Block b = CLIP.equals(what) ? shareBlock(uuid) : hostBlock(uuid);
+		Block b = blockOf(what, uuid);
 		if (b != null) {
 			String until = b.until > 0 ? " until " + java.time.LocalDate.ofInstant(java.time.Instant.ofEpochMilli(b.until), java.time.ZoneOffset.UTC) : "";
-			throw new ApiError(403, (CLIP.equals(what) ? "You can't share clips" : "You can't list public worlds") + until + ": " + b.reason);
+			String what2 = CLIP.equals(what) ? "You can't share clips" : NOTE.equals(what) ? "You can't use World Notes" : "You can't list public worlds";
+			throw new ApiError(403, what2 + until + ": " + b.reason);
 		}
 	}
 
