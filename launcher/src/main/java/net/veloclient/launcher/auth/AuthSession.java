@@ -127,13 +127,43 @@ public final class AuthSession {
 			try (Writer writer = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
 				GSON.toJson(file, writer);
 			}
-			try {
-				Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-			} catch (java.nio.file.AtomicMoveNotSupportedException e) {
-				Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-			}
+			moveIntoPlace(tmp, path);
 		} catch (IOException e) {
-			throw new RuntimeException("Failed to save account session", e);
+			// Never fatal: the signed-in session still works for this run, it just has to sign in again next start.
+			net.veloclient.launcher.LauncherLog.warn("Failed to save account session", e);
+		}
+	}
+
+	/**
+	 * Windows refuses to replace a file another process (antivirus, OneDrive, a second launcher) has open for a
+	 * moment, so retry briefly and fall back to writing the file in place.
+	 */
+	private static void moveIntoPlace(Path tmp, Path path) throws IOException {
+		IOException last = null;
+		for (int attempt = 0; attempt < 5; attempt++) {
+			try {
+				try {
+					Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+				} catch (java.nio.file.AtomicMoveNotSupportedException e) {
+					Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+				}
+				return;
+			} catch (IOException e) {
+				last = e;
+				try {
+					Thread.sleep(60L * (attempt + 1));
+				} catch (InterruptedException interrupted) {
+					Thread.currentThread().interrupt();
+					break;
+				}
+			}
+		}
+		try {
+			Files.write(path, Files.readAllBytes(tmp));
+			Files.deleteIfExists(tmp);
+		} catch (IOException e) {
+			e.addSuppressed(last);
+			throw e;
 		}
 	}
 }

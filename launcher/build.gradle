@@ -127,7 +127,7 @@ tasks.register("bundleJavaRuntimeFallback") {
 // reads it back as a classpath resource at runtime instead of independently
 // hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
 // below reuses the same value for the native installer's version.
-def launcherAppVersion = "1.0.0"
+def launcherAppVersion = "1.0.1"
 // A fixed identity for the Windows installer across every version - WiX
 // needs this (--win-upgrade-uuid below) to recognize a new installer as an
 // upgrade of whatever's already installed rather than an unrelated product,
@@ -202,6 +202,13 @@ tasks.register("bundleClipCore", Copy) {
 	from(rootProject.file("src/client/java/net/veloclient/velo/client/clips/core")) { include("*.java") }
 	into(auraSourceRoot.map { it.dir("net/veloclient/velo/client/clips/core") })
 }
+// Custom cloak uploads (plain Java): the same cloak detection and picture-to-cloak conversion as the game.
+tasks.register("bundleCapeArt", Copy) {
+	group = "build"
+	description = "Copies the mod's CapeArt (plain Java) into launcher sources."
+	from(rootProject.file("src/client/java/net/veloclient/velo/client/cosmetics/capeart")) { include("CapeArt.java") }
+	into(auraSourceRoot.map { it.dir("net/veloclient/velo/client/cosmetics/capeart") })
+}
 // Tentacle and clockwork rigs (plain Java), so the launcher's wings move like the game's.
 tasks.register("bundleWingRigs", Copy) {
 	group = "build"
@@ -216,7 +223,7 @@ tasks.register("bundleWearTint", Copy) {
 	from(rootProject.file("src/client/java/net/veloclient/velo/client/cosmetics/wear")) { include("WearTint.java") }
 	into(auraSourceRoot.map { it.dir("net/veloclient/velo/client/cosmetics/wear") })
 }
-tasks.named("compileJava") { dependsOn("bundleWingRigs", "bundleWearTint", "bundleAuraEffects", "bundleKillFxEffects", "bundleNameStyles", "bundleClipCore") }
+tasks.named("compileJava") { dependsOn("bundleCapeArt", "bundleWingRigs", "bundleWearTint", "bundleAuraEffects", "bundleKillFxEffects", "bundleNameStyles", "bundleClipCore") }
 
 sourceSets {
 	main {

@@ -43,7 +43,7 @@ public final class VeloCosmeticTile extends ClickableWidget {
 		this.owned = owned;
 		this.onClick = onClick;
 		var auraType = kind == Kind.AURA && !id.isEmpty() ? AuraManager.type(id) : java.util.Optional.<AuraManager.AuraType>empty();
-		this.emitter = auraType.map(t -> new AuraEffects.Emitter(t.kind())).orElse(null);
+		this.emitter = auraType.map(t -> AuraGuiRenderer.shared(id, t.kind(), owned ? AuraManager.settings(id) : AuraEffects.Settings.DEFAULT)).orElse(null);
 		this.accent = id.isEmpty() ? 0xFF8A8A9A : kind == Kind.WINGS ? VeloWingCard.accentFor(id)
 				: kind == Kind.WEAR ? net.veloclient.velo.client.cosmetics.wear.WearManager.type(id).map(t -> t.accent() == null ? 0xFFFF4D4D : t.accent()).orElse(0xFFFF4D4D)
 				: auraType.map(AuraManager.AuraType::accent).orElse(0xFFFF4D4D);

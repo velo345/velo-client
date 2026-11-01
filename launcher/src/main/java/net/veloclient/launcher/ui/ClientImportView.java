@@ -432,7 +432,7 @@ public final class ClientImportView {
 			ScaleTransition pop = new ScaleTransition(Duration.millis(420), badge);
 			pop.setToX(1);
 			pop.setToY(1);
-			pop.setInterpolator(javafx.animation.Interpolator.SPLINE(0.3, 1.6, 0.5, 1));
+			pop.setInterpolator(javafx.animation.Interpolator.SPLINE(0.3, 1, 0.5, 1));
 			FadeTransition fade = new FadeTransition(Duration.millis(260), box);
 			fade.setFromValue(0);
 			fade.setToValue(1);

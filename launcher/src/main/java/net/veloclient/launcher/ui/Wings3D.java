@@ -119,7 +119,7 @@ public final class Wings3D {
 		timer = new AnimationTimer() {
 			@Override
 			public void handle(long now) {
-				if (!RenderGate.active()) {
+				if (!RenderGate.visible(node)) {
 					return;
 				}
 				step(now);

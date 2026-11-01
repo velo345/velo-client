@@ -262,6 +262,7 @@ public final class VeloScrollRegion {
 			return false;
 		}
 		scrollOffset = Math.max(0, scrollOffset - amount * 22);
+		lastScrollNanos = System.nanoTime();
 		remember();
 		if (lastNanos == 0) {
 			// Owner draws rows itself (never calls renderRows), so nothing would ease the offset.
@@ -270,11 +271,25 @@ public final class VeloScrollRegion {
 		return true;
 	}
 
+	/** When any region last moved its content (wheel or easing). */
+	private static volatile long lastScrollNanos;
+
+	/**
+	 * True while some list is scrolling (and a moment after): animated tiles freeze their simulation meanwhile and just
+	 * redraw their last frame, so scrolling a page full of auras stays smooth.
+	 */
+	public static boolean scrolling() {
+		return System.nanoTime() - lastScrollNanos < 120_000_000L;
+	}
+
 	/** Eases the drawn offset toward the target and re-lays-out rows while it moves. */
 	private void animate() {
 		long now = System.nanoTime();
 		float dt = VeloStyle.frameDelta(lastNanos, now);
 		lastNanos = now;
+		if (shownOffset != scrollOffset) {
+			lastScrollNanos = now;
+		}
 		if (Math.abs(shownOffset - scrollOffset) < 0.25) {
 			if (shownOffset != scrollOffset) {
 				shownOffset = scrollOffset;

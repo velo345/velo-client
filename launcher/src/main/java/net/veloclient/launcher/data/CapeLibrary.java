@@ -34,8 +34,8 @@ public final class CapeLibrary {
 	public static final int TEXTURE_WIDTH = 64;
 	public static final int TEXTURE_HEIGHT = 32;
 	/** HD cape textures are accepted at any multiple of the base 2:1 template up to this size (matches vanilla's UV normalization, which is resolution-independent). */
-	public static final int MAX_TEXTURE_WIDTH = 512;
-	public static final int MAX_TEXTURE_HEIGHT = 256;
+	public static final int MAX_TEXTURE_WIDTH = 2048;
+	public static final int MAX_TEXTURE_HEIGHT = 1024;
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final String EQUIP_STATE_FILE = "cosmetics-cape.json";
@@ -83,6 +83,41 @@ public final class CapeLibrary {
 			zip.putNextEntry(new ZipEntry("texture.png"));
 			Files.copy(pngFile, zip);
 			zip.closeEntry();
+
+			zip.putNextEntry(new ZipEntry("physics.json"));
+			zip.write(GSON.toJson(preset).getBytes(StandardCharsets.UTF_8));
+			zip.closeEntry();
+
+			zip.putNextEntry(new ZipEntry("meta.json"));
+			zip.write(GSON.toJson(new Meta(id, name, null)).getBytes(StandardCharsets.UTF_8));
+			zip.closeEntry();
+		}
+		return new CapeEntry(id, name, bundleFile, preset, false);
+	}
+
+	/**
+	 * Imports a cloak texture already in the 64 x 32 layout (from the upload dialog, after {@code CapeArt} detected or
+	 * converted it): a square texture is a cloak on top and its elytra below, written as texture.png + elytra.png like
+	 * the game does.
+	 */
+	public static CapeEntry importTexture(String name, BufferedImage texture, CapePhysicsPresetData preset) throws IOException {
+		int width = texture.getWidth();
+		boolean combined = texture.getHeight() == width;
+		if (width < TEXTURE_WIDTH || width > MAX_TEXTURE_WIDTH || width % TEXTURE_WIDTH != 0 || (!combined && texture.getHeight() * 2 != width)) {
+			throw new IOException("Not a cloak texture (" + width + "x" + texture.getHeight() + ").");
+		}
+		VeloPaths.ensureDirectories();
+		String id = UUID.randomUUID().toString();
+		Path bundleFile = VeloPaths.capes().resolve(sanitize(name) + "-" + id.substring(0, 8) + ".velocape");
+		try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(bundleFile))) {
+			zip.putNextEntry(new ZipEntry("texture.png"));
+			ImageIO.write(texture.getSubimage(0, 0, width, width / 2), "png", zip);
+			zip.closeEntry();
+			if (combined) {
+				zip.putNextEntry(new ZipEntry("elytra.png"));
+				ImageIO.write(texture.getSubimage(0, width / 2, width, width / 2), "png", zip);
+				zip.closeEntry();
+			}
 
 			zip.putNextEntry(new ZipEntry("physics.json"));
 			zip.write(GSON.toJson(preset).getBytes(StandardCharsets.UTF_8));

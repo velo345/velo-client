@@ -841,7 +841,7 @@ public final class CapeEquipScreen extends VeloWindow {
 			scrollRegion.addRow(tile);
 		}
 
-		VeloButton importTile = new VeloButton(0, 0, capeTileW, regionTileH, Text.literal("+ Import"), b -> pickFile());
+		VeloButton importTile = new VeloButton(0, 0, capeTileW, regionTileH, Text.literal("+ Your own cloak"), b -> pickFile());
 		addSelectableChild(importTile);
 		scrollRegion.addRow(importTile);
 
@@ -860,33 +860,37 @@ public final class CapeEquipScreen extends VeloWindow {
 		status = Text.literal("Opening file picker...");
 		Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
 			try {
-				// Velo+ members can import animated (GIF) capes too.
+				// Any picture works: a cloak texture is used as it is, anything else is turned into a cloak.
+				// Velo+ members keep GIFs animated.
 				boolean plus = net.veloclient.velo.client.namestyle.NameStyles.plus();
-				Path file = plus ? NativeFileDialog.pickImageFile("Choose a cloak PNG or animated GIF") : NativeFileDialog.pickPngFile("Choose a cloak PNG");
+				Path file = NativeFileDialog.pickPictureFile("Upload your own cloak - a cloak texture or any picture");
 				if (file == null) {
 					MinecraftClient.getInstance().execute(() -> status = Text.literal(""));
 					return;
 				}
+				MinecraftClient.getInstance().execute(() -> status = Text.literal("Making your cloak..."));
 				String fileName = file.getFileName().toString();
 				int dot = fileName.lastIndexOf('.');
 				String name = dot > 0 ? fileName.substring(0, dot) : fileName;
+				net.veloclient.velo.client.cosmetics.CapeUpload.Prepared prepared;
+				try {
+					prepared = net.veloclient.velo.client.cosmetics.CapeUpload.prepare(file, plus);
+				} catch (IOException e) {
+					MinecraftClient.getInstance().execute(() -> status = Text.literal("Upload failed: " + e.getMessage()));
+					return;
+				}
 				MinecraftClient.getInstance().execute(() -> {
 					try {
-						if (fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".gif")) {
-							if (!plus) {
-								status = Text.literal("Animated custom cloaks are part of Velo+");
-								return;
-							}
-							try (java.io.InputStream in = java.nio.file.Files.newInputStream(file)) {
-								CapeManager.importAnimatedGif(name, in, CapePhysicsPreset.defaults());
-							}
+						if (prepared.gif() != null) {
+							CapeManager.importAnimatedGif(name, new java.io.ByteArrayInputStream(prepared.gif()), CapePhysicsPreset.defaults());
 						} else {
-							CapeManager.importCape(name, file, CapePhysicsPreset.defaults());
+							CapeManager.importCape(name, prepared.png(), CapePhysicsPreset.defaults());
+							java.nio.file.Files.deleteIfExists(prepared.png());
 						}
-						status = Text.literal("Imported \"" + name + "\"");
+						status = Text.literal(prepared.message());
 						layoutContent();
 					} catch (IOException e) {
-						status = Text.literal("Import failed: " + e.getMessage());
+						status = Text.literal("Upload failed: " + e.getMessage());
 					}
 				});
 			} catch (Throwable t) {
@@ -926,7 +930,7 @@ public final class CapeEquipScreen extends VeloWindow {
 		if (wingsTab && selectedWings != null && !selectedWings.isEmpty()) {
 			MenuKit.text(context, this.textRenderer, MenuKit.small("HOW YOU WEAR THIS PAIR"), gridX, contentBottom() - settingsHeight() + 1, MenuKit.TEXT_3);
 		}
-		String hint = aurasTab ? "click one to try it on" : wingsTab ? "click a pair to try it on" : "click one to preview it on you";
+		String hint = aurasTab ? "click one to try it on" : wingsTab ? "click a pair to try it on" : "upload any picture or GIF - it becomes a cloak";
 		Text hintText = MenuKit.ui(hint);
 		int right = contentX() + contentWidth();
 		if (hx + this.textRenderer.getWidth(countText) + 16 + this.textRenderer.getWidth(hintText) <= right) {

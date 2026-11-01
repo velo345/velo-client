@@ -47,11 +47,16 @@ public final class EmoteFigureFx {
 		long start = System.nanoTime();
 		double[] fired = {-1};
 		AnimationTimer timer = new AnimationTimer() {
+			private long last;
+
 			@Override
 			public void handle(long now) {
-				if (!RenderGate.active()) {
+				// ~30 fps, only while on screen, and holding still while the page scrolls: a grid of these
+				// (the Emotes tab, the Store) used to redraw every one of them at full rate, scrolled out of view too.
+				if (now - last < 33_000_000L || RenderGate.scrolling() || !RenderGate.visible(canvas)) {
 					return;
 				}
+				last = now;
 				draw(canvas, animation[0], accent, (now - start) / 1e9, sprites, fired);
 			}
 		};

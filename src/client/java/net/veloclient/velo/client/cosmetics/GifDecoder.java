@@ -43,6 +43,22 @@ public final class GifDecoder {
 	}
 
 	public static Result decode(InputStream in) throws IOException {
+		List<Frame> frames = new ArrayList<>();
+		int[] size = new int[2];
+		decodeCanvases(in, (canvas, delay) -> {
+			size[0] = canvas.getWidth();
+			size[1] = canvas.getHeight();
+			frames.add(new Frame(toNativeImage(shrink(capeRegion(canvas), canvas.getWidth())), delay));
+		});
+		int factor = frames.isEmpty() ? 1 : shrinkFactor(size[0]);
+		return new Result(frames, size[0] / factor, size[1] / factor);
+	}
+
+	/**
+	 * Every frame as the whole composited picture (disposal methods applied) with its delay in ms - for the cloak
+	 * upload, which looks at the full picture. The canvas passed is reused: copy what you keep.
+	 */
+	public static void decodeCanvases(InputStream in, java.util.function.BiConsumer<BufferedImage, Integer> sink) throws IOException {
 		ImageReader reader = ImageIO.getImageReadersByFormatName("gif").next();
 		try (ImageInputStream iis = ImageIO.createImageInputStream(in)) {
 			reader.setInput(iis, false);
@@ -56,7 +72,6 @@ public final class GifDecoder {
 			boolean pendingRestorePrevious = false;
 
 			int frameCount = reader.getNumImages(true);
-			List<Frame> frames = new ArrayList<>(frameCount);
 			for (int i = 0; i < frameCount; i++) {
 				BufferedImage frameImage = reader.read(i);
 				IIOMetadata metadata = reader.getImageMetadata(i);
@@ -96,7 +111,7 @@ public final class GifDecoder {
 				g.drawImage(frameImage, left, top, null);
 				g.dispose();
 
-				frames.add(new Frame(toNativeImage(shrink(capeRegion(canvas), canvas.getWidth())), normalizeDelay(delayCentiseconds)));
+				sink.accept(canvas, normalizeDelay(delayCentiseconds));
 
 				if ("restoreToBackgroundColor".equals(disposal)) {
 					pendingClearRect = new int[] {left, top, frameImage.getWidth(), frameImage.getHeight()};
@@ -104,8 +119,6 @@ public final class GifDecoder {
 					pendingRestorePrevious = true;
 				}
 			}
-			int factor = canvas == null ? 1 : shrinkFactor(canvas.getWidth());
-			return new Result(frames, canvas != null ? canvas.getWidth() / factor : 0, canvas != null ? canvas.getHeight() / factor : 0);
 		} finally {
 			reader.dispose();
 		}

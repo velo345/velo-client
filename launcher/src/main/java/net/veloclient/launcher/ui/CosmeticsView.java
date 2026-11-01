@@ -1067,23 +1067,30 @@ public final class CosmeticsView {
 		List<CapeEntry> capes = CapeLibrary.listAll();
 		String equipped = CapeLibrary.equippedCapeId().orElse(null);
 		String selected = selectedCapeId();
-		Button importButton = new Button("Import");
+		Runnable upload = () -> CapeImportDialog.show(owner).ifPresent(result -> {
+			Toasts.show(owner.getScene().getRoot(), "Making your cloak...");
+			Thread.ofVirtual().start(() -> {
+				try {
+					CapeImportDialog.Prepared prepared = result.prepare().call();
+					if (prepared.gif() != null) {
+						CapeLibrary.importAnimatedGif(result.name(), new java.io.ByteArrayInputStream(prepared.gif()), result.preset(), null);
+					} else {
+						CapeLibrary.importTexture(result.name(), prepared.texture(), result.preset());
+					}
+					javafx.application.Platform.runLater(() -> {
+						Toasts.show(owner.getScene().getRoot(), "\"" + result.name() + "\" added to your cloaks");
+						refresh.run();
+					});
+				} catch (Exception ex) {
+					javafx.application.Platform.runLater(() -> error(owner, "Upload failed", ex.getMessage()));
+				}
+			});
+		});
+		Button importButton = new Button("Upload");
 		importButton.setGraphic(Icons.icon("upload", 14, Color.web("#E4E4E8")));
 		importButton.getStyleClass().add("button-sm");
-		importButton.setOnAction(e -> CapeImportDialog.show(owner).ifPresent(result -> {
-			try {
-				if (result.pngFile().getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".gif")) {
-					try (java.io.InputStream in = java.nio.file.Files.newInputStream(result.pngFile())) {
-						CapeLibrary.importAnimatedGif(result.name(), in, result.preset(), null);
-					}
-				} else {
-					CapeLibrary.importPng(result.name(), result.pngFile(), result.preset());
-				}
-				refresh.run();
-			} catch (Exception ex) {
-				error(owner, "Import failed", ex.getMessage());
-			}
-		}));
+		importButton.setTooltip(new javafx.scene.control.Tooltip("Upload your own cloak: a cloak texture, or any picture or GIF"));
+		importButton.setOnAction(e -> upload.run());
 		VBox panel = panelShell("Cloaks", capes.size(), importButton, storeLink(host, "Get more"));
 		HBox filters = new HBox(6);
 		String[] names = {"All", "Animated", "Static"};
@@ -1101,6 +1108,12 @@ public final class CosmeticsView {
 			filters.getChildren().add(chip);
 		}
 		FlowPane grid = StoreTiles.grid(118, 10);
+		// Your own cloak, up front: any picture works, it's turned into a cloak (elytra included).
+		Label uploadHint = new Label("Any picture or GIF");
+		uploadHint.setStyle("-fx-font-size: 10px; -fx-text-fill: #8A8A96;");
+		VBox uploadArt = new VBox(6, Icons.icon("upload", 26, Color.web("#5ac8ff")), uploadHint);
+		uploadArt.setAlignment(Pos.CENTER);
+		grid.getChildren().add(cell(uploadArt, "#5ac8ff", "Your own cloak", false, false, upload));
 		grid.getChildren().add(cell(Icons.icon("close", 26, Color.web("#5A5A63")), "#000000", "No cloak", equipped == null, selected == null, () -> {
 			CapeLibrary.unequip();
 			selectedCape = null;

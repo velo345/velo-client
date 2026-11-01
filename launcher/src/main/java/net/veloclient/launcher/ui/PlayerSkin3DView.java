@@ -193,6 +193,7 @@ public final class PlayerSkin3DView {
 				keyLight(1, -0.4, -1, 0.5));
 
 		StackPane wrapper = new StackPane();
+		sceneRoot.getProperties().put(RenderGate.VIEWER, wrapper);
 		SubScene subScene = new SubScene(sceneRoot, 10, 10, true, SceneAntialiasing.BALANCED);
 		subScene.setFill(Color.TRANSPARENT);
 		subScene.setCamera(camera);
@@ -233,7 +234,7 @@ public final class PlayerSkin3DView {
 
 				@Override
 				public void handle(long now) {
-					if (!RenderGate.active()) {
+					if (!RenderGate.visible(wrapper)) {
 						return;
 					}
 					double dt = last == 0 ? 0 : Math.min(0.05, (now - last) / 1e9);
@@ -336,6 +337,7 @@ public final class PlayerSkin3DView {
 		Group sceneRoot = new Group(rig, particles, camera);
 		sceneRoot.getChildren().addAll(new AmbientLight(Color.rgb(150, 150, 150)), keyLight(-1, -1, -1, 0.9), keyLight(1, -0.4, -1, 0.5));
 		StackPane wrapper = new StackPane();
+		sceneRoot.getProperties().put(RenderGate.VIEWER, wrapper);
 		SubScene subScene = new SubScene(sceneRoot, 10, 10, true, SceneAntialiasing.BALANCED);
 		subScene.setFill(Color.TRANSPARENT);
 		subScene.setCamera(camera);
@@ -361,7 +363,7 @@ public final class PlayerSkin3DView {
 
 			@Override
 			public void handle(long now) {
-				if (!RenderGate.active()) {
+				if (!RenderGate.visible(wrapper)) {
 					return;
 				}
 				var a = animation.get();
@@ -473,7 +475,7 @@ public final class PlayerSkin3DView {
 
 			@Override
 			public void handle(long now) {
-				if (!RenderGate.active()) {
+				if (!RenderGate.visible(cape.node)) {
 					return;
 				}
 				cape.swing.setAngle(CAPE_REST_ANGLE + Math.sin(now / 9e8) * 3.5 + Math.sin(now / 3.7e8) * 0.8);

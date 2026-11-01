@@ -45,6 +45,9 @@ public final class RenderGate {
 			if (e instanceof javafx.scene.input.MouseEvent || e instanceof javafx.scene.input.KeyEvent
 					|| e instanceof javafx.scene.input.ScrollEvent) {
 				lastInput = System.currentTimeMillis();
+				if (e instanceof javafx.scene.input.ScrollEvent) {
+					lastScrollNanos = System.nanoTime();
+				}
 				if (!RECENT_INPUT.get()) {
 					RECENT_INPUT.set(true);
 				}
@@ -79,6 +82,72 @@ public final class RenderGate {
 
 	public static boolean active() {
 		return ACTIVE.get();
+	}
+
+	private static volatile long lastScrollNanos;
+
+	/** True while the user is scrolling (and a moment after): decorative tiles hold their frame meanwhile. */
+	public static boolean scrolling() {
+		return System.nanoTime() - lastScrollNanos < 150_000_000L;
+	}
+
+	private static final String SEEN_AT = "velo.renderGate.seenAt";
+	private static final String SEEN = "velo.renderGate.seen";
+
+	/**
+	 * Whether an animation on {@code node} is worth drawing this frame: the window is {@link #active()}, the node is in a
+	 * showing scene, visible all the way up, and at least partly inside the viewport of the ScrollPane it sits in (and
+	 * the window). Rows scrolled out of view kept repainting before, which is what made long Locker/Store pages crawl.
+	 * The (somewhat costly) bounds check is redone at most every 200 ms per node.
+	 */
+	public static boolean visible(javafx.scene.Node node) {
+		if (!ACTIVE.get()) {
+			return false;
+		}
+		long now = System.nanoTime();
+		var props = node.getProperties();
+		if (props.get(SEEN_AT) instanceof Long at && now - at < 200_000_000L && props.get(SEEN) instanceof Boolean seen) {
+			return seen;
+		}
+		boolean seen = computeVisible(node);
+		props.put(SEEN_AT, now);
+		props.put(SEEN, seen);
+		return seen;
+	}
+
+	/** Put on a SubScene's root: the node outside it that shows it, so 3D models inside can be checked too. */
+	public static final String VIEWER = "velo.renderGate.viewer";
+
+	private static boolean computeVisible(javafx.scene.Node node) {
+		javafx.scene.Node top = node;
+		while (top.getParent() != null) {
+			top = top.getParent();
+		}
+		if (node.getScene() != null && top != node.getScene().getRoot()) {
+			// Inside a SubScene: judge by the viewer showing it (unknown viewer: assume yes).
+			return !(top.getProperties().get(VIEWER) instanceof javafx.scene.Node viewer) || computeVisible(viewer);
+		}
+		javafx.scene.Scene scene = node.getScene();
+		if (scene == null || scene.getWindow() == null || !scene.getWindow().isShowing()) {
+			return false;
+		}
+		javafx.geometry.Bounds bounds = node.localToScene(node.getBoundsInLocal());
+		if (bounds == null || bounds.getMaxX() < 0 || bounds.getMaxY() < 0 || bounds.getMinX() > scene.getWidth() || bounds.getMinY() > scene.getHeight()) {
+			return false;
+		}
+		for (javafx.scene.Node n = node; n != null; n = n.getParent()) {
+			if (!n.isVisible() || n.getOpacity() <= 0.01) {
+				return false;
+			}
+			if (n instanceof javafx.scene.control.ScrollPane pane && pane != node) {
+				javafx.scene.Node viewport = pane.lookup(".viewport");
+				javafx.geometry.Bounds view = (viewport != null ? viewport : pane).localToScene((viewport != null ? viewport : pane).getBoundsInLocal());
+				if (view != null && !view.intersects(bounds)) {
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 
 	public static ReadOnlyBooleanProperty activeProperty() {

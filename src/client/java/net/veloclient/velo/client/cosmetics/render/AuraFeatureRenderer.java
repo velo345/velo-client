@@ -31,6 +31,21 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 	static final class Mesh implements AuraEffects.Out {
 		float[] data = new float[6 * 4 * 1024];
 		int size;
+		/** Unit x/z direction from the player towards the viewer, for {@link AuraEffects#FACING} sprites. */
+		float faceX;
+		float faceZ = 1;
+		/**
+		 * Rise per block towards +z for things lying flat (tan of the tilt). 0 in the world; GUI previews look at the
+		 * player dead level, which showed a halo or a ground ring only as a line or from below - there they lean
+		 * towards the viewer so their top shows.
+		 */
+		float flatTilt;
+
+		/** Empties the mesh for reuse (keeps its buffer, so building a frame allocates nothing). */
+		Mesh reset() {
+			size = 0;
+			return this;
+		}
 
 		void vertex(float x, float y, float z, float u, float v, int color) {
 			if (size + 6 > data.length) {
@@ -56,18 +71,26 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 
 		/** A quad from 4 corners (x y z each) showing atlas {@code cell} (8 x 4 grid), seen from both sides. */
 		private void quad(float[] c, int cell, int color) {
+			quad(c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9], c[10], c[11], cell, color);
+		}
+
+		private void quad(float x0, float y0, float z0, float x1, float y1, float z1, float x2, float y2, float z2, float x3, float y3, float z3,
+				int cell, int color) {
+			if (size + 48 > data.length) {
+				data = java.util.Arrays.copyOf(data, Math.max(data.length * 2, size + 48));
+			}
 			float u0 = (cell % AuraEffects.ATLAS_COLUMNS) / (float) AuraEffects.ATLAS_COLUMNS + INSET_U;
 			float v0 = (cell / AuraEffects.ATLAS_COLUMNS) / (float) AuraEffects.ATLAS_ROWS + INSET_V;
 			float u1 = u0 + 1f / AuraEffects.ATLAS_COLUMNS - 2 * INSET_U;
 			float v1 = v0 + 1f / AuraEffects.ATLAS_ROWS - 2 * INSET_V;
-			vertex(c[0], c[1], c[2], u0, v0, color);
-			vertex(c[3], c[4], c[5], u0, v1, color);
-			vertex(c[6], c[7], c[8], u1, v1, color);
-			vertex(c[9], c[10], c[11], u1, v0, color);
-			vertex(c[9], c[10], c[11], u1, v0, color);
-			vertex(c[6], c[7], c[8], u1, v1, color);
-			vertex(c[3], c[4], c[5], u0, v1, color);
-			vertex(c[0], c[1], c[2], u0, v0, color);
+			vertex(x0, y0, z0, u0, v0, color);
+			vertex(x1, y1, z1, u0, v1, color);
+			vertex(x2, y2, z2, u1, v1, color);
+			vertex(x3, y3, z3, u1, v0, color);
+			vertex(x3, y3, z3, u1, v0, color);
+			vertex(x2, y2, z2, u1, v1, color);
+			vertex(x1, y1, z1, u0, v1, color);
+			vertex(x0, y0, z0, u0, v0, color);
 		}
 
 		@Override
@@ -89,14 +112,23 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			float ay = -s + c;
 			float bx = -c + s;
 			float by = -s - c;
+			if (AuraEffects.facing(shape)) {
+				// One upright quad square to the viewer; its right edge along the viewer's right (faceZ, -faceX).
+				float rx = faceZ;
+				float rz = -faceX;
+				quad(x + rx * ax, y + ay, z + rz * ax, x + rx * bx, y + by, z + rz * bx, x - rx * ax, y - ay, z - rz * ax, x - rx * bx, y - by, z - rz * bx,
+						cell, color);
+				return;
+			}
 			// Upright quads: v = 0 at the top of the cell.
 			if (AuraEffects.upright(shape)) {
-				quad(new float[] {x + ax, y + ay, z, x + bx, y + by, z, x - ax, y - ay, z, x - bx, y - by, z}, cell, color);
-				quad(new float[] {x, y + ay, z + ax, x, y + by, z + bx, x, y - ay, z - ax, x, y - by, z - bx}, cell, color);
+				quad(x + ax, y + ay, z, x + bx, y + by, z, x - ax, y - ay, z, x - bx, y - by, z, cell, color);
+				quad(x, y + ay, z + ax, x, y + by, z + bx, x, y - ay, z - ax, x, y - by, z - bx, cell, color);
 			}
 			// Ground plane: the cell's top towards -z, turned by rot.
 			if (AuraEffects.flat(shape)) {
-				quad(new float[] {x + ax, y, z - ay, x + bx, y, z - by, x - ax, y, z + ay, x - bx, y, z + by}, cell, color);
+				float t = flatTilt;
+				quad(x + ax, y - ay * t, z - ay, x + bx, y - by * t, z - by, x - ax, y + ay * t, z + ay, x - bx, y + by * t, z + by, cell, color);
 			}
 		}
 
@@ -115,8 +147,7 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			// Tangent to the ring (left to right seen from outside).
 			float tx = -nz * w / 2;
 			float tz = nx * w / 2;
-			quad(new float[] {x + tx, y + h / 2, z + tz, x + tx, y - h / 2, z + tz, x - tx, y - h / 2, z - tz, x - tx, y + h / 2, z - tz}, cell,
-					color(rgb, alpha));
+			quad(x + tx, y + h / 2, z + tz, x + tx, y - h / 2, z + tz, x - tx, y - h / 2, z - tz, x - tx, y + h / 2, z - tz, cell, color(rgb, alpha));
 		}
 
 		@Override
@@ -143,6 +174,34 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 		}
 	}
 
+	/** Scratch mesh for {@link #geometry} (render thread only): its buffer is reused instead of 96 KB per player per frame. */
+	private static final Mesh SCRATCH = new Mesh();
+
+	/**
+	 * Points {@link AuraEffects#FACING} sprites at the viewer, from the pose after {@link #toWorld} (whose space is world
+	 * directions at the feet). In the world that pose holds no camera turn, only the feet's offset from the camera; a GUI
+	 * preview's pose is scaled up to pixels, and there the player is turned with bodyYaw 180 = facing the screen, so the
+	 * viewer is always on the -z side.
+	 */
+	private static void aim(Matrix4f pose) {
+		float scale = (float) Math.sqrt(pose.m00() * pose.m00() + pose.m01() * pose.m01() + pose.m02() * pose.m02());
+		if (scale > 4) {
+			SCRATCH.faceX = 0;
+			SCRATCH.faceZ = -1;
+			// The viewer is at -z, so the far side (+z) goes up: about 20 degrees, like looking on from a little above.
+			SCRATCH.flatTilt = 0.36f;
+			return;
+		}
+		SCRATCH.flatTilt = 0;
+		float dx = -pose.m30();
+		float dz = -pose.m32();
+		float len = (float) Math.sqrt(dx * dx + dz * dz);
+		if (len > 1e-3f) {
+			SCRATCH.faceX = dx / len;
+			SCRATCH.faceZ = dz / len;
+		}
+	}
+
 	/** Builds this frame's geometry for a player (or null when they wear no aura). */
 	private static float[] geometry(Object key, AuraManager.Worn worn, double x, double y, double z) {
 		AuraEffects.Kind kind = worn == null ? null : AuraEffects.kind(worn.id());
@@ -157,7 +216,7 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 		emitter.ground(Double.isNaN(ground) ? Float.NaN : (float) Math.min(0, ground - y));
 		float dt = emitter.tick(System.nanoTime());
 		emitter.update(dt, worn.settings(), x, y, z);
-		Mesh mesh = new Mesh();
+		Mesh mesh = SCRATCH.reset();
 		emitter.draw(worn.settings(), x, y, z, mesh);
 		return java.util.Arrays.copyOf(mesh.data, mesh.size);
 	}
@@ -222,12 +281,14 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			AuraEffects.Settings base = worn.settings();
 			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.4f, base.color()));
 		}
-		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z);
-		if (geometry == null || geometry.length == 0) {
-			return;
-		}
 		matrices.push();
 		toWorld(matrices, state.bodyYaw);
+		aim(matrices.peek().getPositionMatrix());
+		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z);
+		if (geometry == null || geometry.length == 0) {
+			matrices.pop();
+			return;
+		}
 		var texture = net.minecraft.util.Identifier.of("velo-client", TEXTURE_PATH);
 		queue.submitCustom(matrices, net.minecraft.client.render.RenderLayers.eyes(texture), (entry, consumer) ->
 				emit(geometry, entry.getPositionMatrix(), (x, y, z, color, u, v) -> consumer.vertex(x, y, z, color, u, v,
@@ -285,12 +346,14 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			AuraEffects.Settings base = worn.settings();
 			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.4f, base.color()));
 		}
-		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z);
-		if (geometry == null || geometry.length == 0) {
-			return;
-		}
 		matrices.pushPose();
 		toWorld(matrices, state.bodyRot);
+		aim(matrices.last().pose());
+		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z);
+		if (geometry == null || geometry.length == 0) {
+			matrices.popPose();
+			return;
+		}
 		var texture = net.minecraft.resources.Identifier.fromNamespaceAndPath("velo-client", TEXTURE_PATH);
 		queue.submitCustomGeometry(matrices, net.minecraft.client.renderer.rendertype.RenderTypes.eyes(texture), (pose2, consumer) ->
 				emit(geometry, new Matrix4f(pose2.pose()), (x, y, z, color, u, v) -> consumer.addVertex(x, y, z, color, u, v,

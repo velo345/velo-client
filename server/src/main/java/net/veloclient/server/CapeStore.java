@@ -41,13 +41,18 @@ import java.util.concurrent.ConcurrentHashMap;
 final class CapeStore {
 
 	static final String CUSTOM_PREFIX = "custom:";
-	static final int MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
+	// nginx takes 16 MB on the API; a busy 1024 px animated cloak with many frames gets close to 10 MB.
+	static final int MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 
 	private static final int MAX_STATIC_WIDTH = 2048;
-	private static final int MAX_ANIMATED_WIDTH = 512;
+	// Games show animated cloaks at up to 1024 px detail (Store ones too), so more would only cost bandwidth.
+	private static final int MAX_ANIMATED_WIDTH = 1024;
 	private static final int MAX_ANIMATED_FRAMES = 128;
-	// Decoded pixel budget for one animated cape (width * height * frames) - ~64 MB of RGBA.
-	private static final long MAX_ANIMATED_PIXELS = 16L * 1024 * 1024;
+	/**
+	 * Decoded pixel budget for one animated cape, counted on the 22 x 17 corner of the 64 x 32 layout that clients keep
+	 * of every frame (the rest is never drawn): 128 frames at 1024 x 512 are ~12M.
+	 */
+	private static final long MAX_ANIMATED_REGION_PIXELS = 24L * 1024 * 1024;
 	private static final long MIN_UPLOAD_INTERVAL_MILLIS = 10_000;
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -243,7 +248,7 @@ final class CapeStore {
 				int width = reader.getWidth(0);
 				int height = reader.getHeight(0);
 				validateDimensions(width, height, MAX_ANIMATED_WIDTH);
-				if ((long) width * height * frames > MAX_ANIMATED_PIXELS) {
+				if ((long) width * height * frames * (22 * 17) > MAX_ANIMATED_REGION_PIXELS * (64 * 32)) {
 					throw new RejectedUpload(400, "Animated cloak too big - use fewer frames or a smaller size");
 				}
 				for (int i = 0; i < frames; i++) {

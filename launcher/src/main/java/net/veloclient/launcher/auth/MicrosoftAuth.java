@@ -80,6 +80,11 @@ public final class MicrosoftAuth {
 	private DeviceCodeInfo requestDeviceCode() {
 		String form = "client_id=" + urlEncode(clientId) + "&scope=" + urlEncode(SCOPE);
 		JsonObject response = postForm(DEVICE_CODE_URL, form);
+		if (!response.has("device_code") || !response.has("user_code")) {
+			String error = response.has("error_description") ? response.get("error_description").getAsString()
+					: response.has("error") ? response.get("error").getAsString() : response.toString();
+			throw new AuthException("Microsoft didn't hand out a sign-in code: " + error);
+		}
 		return new DeviceCodeInfo(
 				response.get("device_code").getAsString(),
 				response.get("user_code").getAsString(),
@@ -173,6 +178,9 @@ public final class MicrosoftAuth {
 	}
 
 	private XboxToken parseXboxToken(JsonObject response) {
+		if (!response.has("Token") || !response.has("DisplayClaims")) {
+			throw new AuthException("Xbox Live sign-in failed: " + response);
+		}
 		String token = response.get("Token").getAsString();
 		String uhs = response.getAsJsonObject("DisplayClaims").getAsJsonArray("xui").get(0).getAsJsonObject().get("uhs").getAsString();
 		return new XboxToken(token, uhs);
@@ -190,7 +198,10 @@ public final class MicrosoftAuth {
 		} catch (AuthException e) {
 			throw translateMinecraftLoginError(e);
 		}
-		return new McLogin(response.get("access_token").getAsString(), response.get("expires_in").getAsInt());
+		if (!response.has("access_token")) {
+			throw translateMinecraftLoginError(new AuthException("Minecraft sign-in failed: " + response));
+		}
+		return new McLogin(response.get("access_token").getAsString(), response.has("expires_in") ? response.get("expires_in").getAsInt() : 86400);
 	}
 
 	private AuthException translateMinecraftLoginError(AuthException original) {

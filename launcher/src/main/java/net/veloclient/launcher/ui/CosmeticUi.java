@@ -220,6 +220,15 @@ public final class CosmeticUi {
 		return rendered[index];
 	}
 
+	/** Whether {@link #frameThumbnail} has that frame already (so showing it costs nothing). */
+	private static boolean frameReady(String key, List<GifFrames.Frame> frames, int index, double width, double height) {
+		if (index == 0) {
+			return THUMBNAILS.containsKey(key + "@" + (int) width + "x" + (int) height);
+		}
+		Image[] rendered = FRAME_THUMBNAILS.get(key + "@" + (int) width + "x" + (int) height);
+		return rendered != null && index < rendered.length && rendered[index] != null;
+	}
+
 	/**
 	 * Plays an animated cape's frames in {@code view} while the mouse is over {@code hoverTarget}
 	 * (or all the time when {@code always}), back to the first frame afterwards. Static capes are
@@ -237,9 +246,13 @@ public final class CosmeticUi {
 		int loopMillis = total;
 		long[] start = {0};
 		int[] shown = {0};
+		long[] lastRender = {0};
 		javafx.animation.AnimationTimer timer = new javafx.animation.AnimationTimer() {
 			@Override
 			public void handle(long now) {
+				if (always && !RenderGate.visible(view)) {
+					return;
+				}
 				if (start[0] == 0) {
 					start[0] = now;
 				}
@@ -253,6 +266,14 @@ public final class CosmeticUi {
 					}
 				}
 				if (index != shown[0]) {
+					// A frame not rendered yet is a 3D snapshot on this thread: at most one per 40 ms (and none mid-scroll),
+					// keeping the last frame meanwhile - the first loop of a hovered cape used to render every frame at once.
+					if (!frameReady(key, frames, index, width, height)) {
+						if (now - lastRender[0] < 40_000_000L || RenderGate.scrolling()) {
+							return;
+						}
+						lastRender[0] = now;
+					}
 					shown[0] = index;
 					view.setImage(frameThumbnail(key, frames, index, width, height));
 				}

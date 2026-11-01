@@ -115,6 +115,12 @@ public final class AuraEffects {
 	/** Added to a shape: only its ground-plane quad (a ring lying flat) / only its two upright quads (a flame standing up). */
 	public static final int FLAT = 1 << 8;
 	public static final int UPRIGHT = 1 << 9;
+	/**
+	 * Added to a shape: one upright quad turned to face whoever looks at it, instead of two crossed ones - for
+	 * shapes with a front that must read the right way round (the moon, "Z"), which crossed quads show mirrored,
+	 * doubled or edge-on depending on where you stand.
+	 */
+	public static final int FACING = 1 << 10;
 
 	/** Atlas layout: {@link #ATLAS_COLUMNS} x {@link #ATLAS_ROWS} cells of {@link #ATLAS_CELL} pixels. */
 	public static final int ATLAS_CELL = 256;
@@ -276,7 +282,12 @@ public final class AuraEffects {
 
 	/** Whether a sprite gets its ground-plane quad (hearts only read upright). */
 	public static boolean flat(int shape) {
-		return (shape & UPRIGHT) == 0 && (shape & 0xFF) != HEART;
+		return (shape & (UPRIGHT | FACING)) == 0 && (shape & 0xFF) != HEART;
+	}
+
+	/** Whether a sprite is a single viewer-facing quad ({@link #FACING}). */
+	public static boolean facing(int shape) {
+		return (shape & FACING) != 0;
 	}
 
 	private AuraEffects() {
@@ -1920,8 +1931,8 @@ public final class AuraEffects {
 				case PYJAMA -> {
 					if (p.shape == SNOOZE) {
 						// Growing as it rises and fades.
-						out.sprite(x, y, z, p.size * (1 + 0.9f * f), mix(color(kind, s, 0.15f, p.seed, time), 0xFFFFFF, 0.25f), fade(p, 2, 1) * 0.95f,
-								SNOOZE | UPRIGHT, p.rot);
+						out.sprite(x, y, z, p.size * (1 + 0.7f * f), mix(color(kind, s, 0.15f, p.seed, time), 0xFFFFFF, 0.25f), fade(p, 2, 1) * 0.95f,
+								SNOOZE | FACING, p.rot);
 					} else if (p.shape == SMOKE) {
 						out.sprite(x, y, z, p.size, mix(color(kind, s, 1f, p.seed, time), 0xFFFFFF, 0.55f), fade(p, 1, 0.8f) * 0.32f, SMOKE);
 					} else {
@@ -2600,18 +2611,18 @@ public final class AuraEffects {
 
 		private void emitPyjama(float t, Settings s, double px, double py, double pz) {
 			float sz = s.size();
-			// Zzz floating up from your head.
+			// Zzz drifting up beside your head (kept low enough that previews never cut them off).
 			for (int k = count(t, 1.1f * s.density(), 0); k > 0; k--) {
 				float a = rnd(0, TAU);
-				P p = spawn(px + Math.cos(a) * 0.22 * sz, py + 1.95, pz + Math.sin(a) * 0.22 * sz, rnd(2.4f, 3f), rnd(0.07f, 0.1f) * sz, SNOOZE);
-				p.vy = rnd(0.22f, 0.3f);
+				P p = spawn(px + Math.cos(a) * 0.3 * sz, py + 1.7, pz + Math.sin(a) * 0.3 * sz, rnd(2f, 2.5f), rnd(0.06f, 0.085f) * sz, SNOOZE);
+				p.vy = rnd(0.16f, 0.22f);
 				p.spin = rnd(1.6f, 2.2f);
 			}
 			// Stars winking on and off around you.
 			for (int k = count(t, 4 * s.density(), 1); k > 0; k--) {
 				float a = rnd(0, TAU);
 				float r = rnd(0.6f, 1.2f) * sz;
-				P p = spawn(px + Math.cos(a) * r, py + rnd(0.3f, 2.3f), pz + Math.sin(a) * r, rnd(1.2f, 2f), rnd(0.05f, 0.08f) * sz, STAR);
+				P p = spawn(px + Math.cos(a) * r, py + rnd(0.3f, 2.1f), pz + Math.sin(a) * r, rnd(1.2f, 2f), rnd(0.05f, 0.08f) * sz, STAR);
 				p.vy = rnd(-0.03f, 0.03f);
 			}
 			// Little clouds at your feet.
@@ -2626,19 +2637,21 @@ public final class AuraEffects {
 			float sz = s.size();
 			// Night falling at your feet.
 			out.sprite(0, 0.03f, 0, 1.2f * sz, color(kind, s, 1f, 0, time), 0.2f, DISC);
-			// The moon, rocking gently over your head, with its glow.
+			// The moon, rocking gently right over your head, with its glow. It faces the viewer: crossed quads showed
+			// it mirrored or edge-on from most sides, and an offset to one side sat in front of your face facing east.
 			float rock = 0.18f * sin(time * 0.8f);
-			float bob = 0.04f * sin(time * 1.1f);
+			float bob = 0.035f * sin(time * 1.1f);
 			int moon = color(kind, s, 0f, 0, time);
-			out.sprite(0.3f * sz, 2.3f + bob, 0, 0.75f * sz, moon, 0.3f, GLOW);
-			out.sprite(0.3f * sz, 2.3f + bob, 0, 0.3f * sz, mix(moon, 0xFFFFFF, 0.35f), 0.98f, MOON | UPRIGHT, rock);
+			float moonY = 1.8f + 0.32f * sz + bob;
+			out.sprite(0, moonY, 0, 0.5f * sz, moon, 0.26f, GLOW);
+			out.sprite(0, moonY, 0, 0.24f * sz, mix(moon, 0xFFFFFF, 0.35f), 0.98f, MOON | FACING, rock);
 			// A ring of stars circling slowly round your head, each twinkling.
 			for (int i = 0; i < 10; i++) {
 				float a = i * TAU / 10 + time * 0.25f;
 				float r = 0.75f * sz;
 				float tw = 0.55f + 0.45f * sin(time * (2.3f + i % 3) + i * 1.7f);
 				int c = color(kind, s, i % 2 == 0 ? 0f : 1f, i / 10f, time);
-				out.sprite(r * cos(a), 1.95f + 0.08f * sin(time + i), r * sin(a), 0.07f * sz * (0.7f + 0.5f * tw), mix(c, 0xFFFFFF, 0.3f), tw, STAR);
+				out.sprite(r * cos(a), 1.9f + 0.08f * sin(time + i), r * sin(a), 0.07f * sz * (0.7f + 0.5f * tw), mix(c, 0xFFFFFF, 0.3f), tw, STAR);
 			}
 		}
 

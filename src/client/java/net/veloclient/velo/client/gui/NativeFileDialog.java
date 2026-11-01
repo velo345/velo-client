@@ -32,6 +32,11 @@ public final class NativeFileDialog {
 	}
 
 	/** A PNG or (for animated capes) GIF image. */
+	/** Any picture a cloak can be made from: PNG, JPG or GIF. */
+	public static Path pickPictureFile(String promptTitle) throws IOException, InterruptedException {
+		return pickFile(promptTitle, "Pictures", "png", "jpg", "jpeg", "gif");
+	}
+
 	public static Path pickImageFile(String promptTitle) throws IOException, InterruptedException {
 		return pickFile(promptTitle, "Images", "png", "gif");
 	}

@@ -95,17 +95,30 @@ public final class SignInDialog {
 				}));
 				Platform.runLater(() -> {
 					view.stage.close();
-					onSuccess.accept(session);
+					// Whatever the page refresh after sign-in throws must not look like a failed sign-in crash:
+					// the session is already valid at this point.
+					try {
+						onSuccess.accept(session);
+					} catch (RuntimeException e) {
+						net.veloclient.launcher.LauncherLog.warn("After sign-in", e);
+					}
 				});
 			} catch (AuthException e) {
+				if (Thread.currentThread().isInterrupted()) {
+					return; // Cancelled by the user - no "Sign-in failed" popup.
+				}
 				Platform.runLater(() -> {
 					view.stage.close();
 					onError.accept(e.getMessage());
 				});
-			} catch (Exception e) {
+			} catch (Throwable e) {
+				if (Thread.currentThread().isInterrupted()) {
+					return;
+				}
+				net.veloclient.launcher.LauncherLog.warn("Sign-in failed", e);
 				Platform.runLater(() -> {
 					view.stage.close();
-					onError.accept("Unexpected error: " + e.getMessage());
+					onError.accept("Unexpected error: " + e);
 				});
 			}
 		});
@@ -170,7 +183,13 @@ public final class SignInDialog {
 		view.open.setDisable(true);
 		view.open.setMaxWidth(Double.MAX_VALUE);
 		view.open.setOnAction(e -> {
-			openInBrowser(view.url, view.status);
+			String url = view.url;
+			// Off the FX thread: AWT's Desktop on the JavaFX thread can hang or crash on some Windows setups.
+			Thread.ofVirtual().start(() -> {
+				if (!openInBrowser(url)) {
+					Platform.runLater(() -> view.status.setText("Couldn't open a browser automatically - copy the code and open " + url + " yourself."));
+				}
+			});
 			view.setStep(2);
 			view.status.setText("Paste the code on the Microsoft page and sign in - this window finishes by itself.");
 		});
@@ -236,11 +255,8 @@ public final class SignInDialog {
 	 * command, and only silently gives up after all of them fail (the code
 	 * is still shown/copyable either way).
 	 */
-	private static void openInBrowser(String url, Label status) {
-		if (tryAwtDesktop(url) || tryOsCommand(url)) {
-			return;
-		}
-		status.setText("Couldn't open a browser automatically - copy the code and open " + url + " yourself.");
+	private static boolean openInBrowser(String url) {
+		return tryOsCommand(url) || tryAwtDesktop(url);
 	}
 
 	private static boolean tryAwtDesktop(String url) {
@@ -249,8 +265,8 @@ public final class SignInDialog {
 				Desktop.getDesktop().browse(URI.create(url));
 				return true;
 			}
-		} catch (Exception ignored) {
-			// Fall through to the OS-command fallback.
+		} catch (Throwable ignored) {
+			// Nothing else left to try.
 		}
 		return false;
 	}
@@ -274,8 +290,13 @@ public final class SignInDialog {
 	}
 
 	private static void copyToClipboard(String text) {
-		ClipboardContent content = new ClipboardContent();
-		content.putString(text);
-		Clipboard.getSystemClipboard().setContent(content);
+		try {
+			ClipboardContent content = new ClipboardContent();
+			content.putString(text);
+			Clipboard.getSystemClipboard().setContent(content);
+		} catch (RuntimeException e) {
+			// Another app holding the Windows clipboard - the code is still shown big.
+			net.veloclient.launcher.LauncherLog.warn("Clipboard", e);
+		}
 	}
 }

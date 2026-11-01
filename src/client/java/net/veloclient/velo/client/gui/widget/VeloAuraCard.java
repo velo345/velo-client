@@ -25,7 +25,8 @@ public final class VeloAuraCard extends ClickableWidget {
 		super(0, 0, width, height, Text.literal(type.name()));
 		this.type = type;
 		this.onOpen = onOpen;
-		this.emitter = new AuraEffects.Emitter(type.kind());
+		this.emitter = AuraGuiRenderer.shared(type.id(), type.kind(),
+				AuraManager.owns(type.id()) ? AuraManager.settings(type.id()) : AuraEffects.Settings.DEFAULT);
 	}
 
 	@Override
