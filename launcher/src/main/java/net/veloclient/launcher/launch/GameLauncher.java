@@ -72,6 +72,8 @@ public final class GameLauncher {
 			FabricApiInstaller.installInto(modsDir, version);
 			listener.onPhase("Checking recommended mods...");
 			PerformanceModsInstaller.installInto(instance.id(), modsDir, version);
+			ForeignClientJars.disableIn(modsDir);
+			ImmediatelyFastConfig.fixIn(InstancePaths.gameDir(instance.id()));
 		}
 
 		JsonArray vanillaLibraries = vanilla.getAsJsonArray("libraries");

@@ -274,7 +274,8 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		previousInactivityLimit = options.getInactivityFpsLimit().getValue();
 
 		applyPreset(preset);
-		if (dynamicFps) {
+		// (Not while profiling: the profiled window has no focus or input, and AFK capping would hold it at 30 FPS.)
+		if (dynamicFps && !net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
 			options.getInactivityFpsLimit().setValue(InactivityFpsLimit.AFK);
 		}
 		// applyPreset() above writes straight to the GameOptions values, same as every
@@ -435,7 +436,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				new ConfigField.ToggleField("Auto: Notify On Quality Change", () -> autoNotify, v -> autoNotify = v),
 				new ConfigField.ToggleField("Dynamic FPS (throttle when unfocused/AFK)", () -> dynamicFps, v -> {
 					dynamicFps = v;
-					if (isEnabled()) {
+					if (isEnabled() && !net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
 						options.getInactivityFpsLimit().setValue(v ? InactivityFpsLimit.AFK : InactivityFpsLimit.MINIMIZED);
 					}
 				}),

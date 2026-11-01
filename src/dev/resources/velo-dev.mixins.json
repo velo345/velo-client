@@ -13,8 +13,7 @@
 		"ChunkAnimatorShaderMixin",
 		"ItemPhysicsRendererMixin",
 		"ItemPhysicsStateMixin",
-		"PetRideMixin",
-		"SeamlessReloadMixin"
+		"PetRideMixin"
 	],
 	"injectors": {
 		"defaultRequire": 0

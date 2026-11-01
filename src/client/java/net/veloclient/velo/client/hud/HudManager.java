@@ -75,7 +75,13 @@ public final class HudManager {
 		});
 	}
 
+	/** Dev profiling only: {@code -Dvelo.profileNoHud=true} leaves Velo's HUD out, to measure what it costs. */
+	private static final boolean PROFILE_NO_HUD = Boolean.getBoolean("velo.profileNoHud");
+
 	private static void onHudRender(DrawContext context, net.minecraft.client.render.RenderTickCounter tickCounter) {
+		if (PROFILE_NO_HUD) {
+			return;
+		}
 		MinecraftClient client = MinecraftClient.getInstance();
 		//? if <26.1 {
 		if (client.options.hudHidden) {

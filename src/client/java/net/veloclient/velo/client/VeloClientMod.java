@@ -73,6 +73,8 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.cloud.CloudSync.applyPendingAtStartup();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				client -> net.veloclient.velo.client.cloud.CloudSync.tick());
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
+				net.veloclient.velo.client.devtools.StartupTimer::tick);
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(
 				client -> net.veloclient.velo.client.cloud.CloudSync.onStop());
 		// Before any profile loads: saved keybinds convert between GLFW (<26.3) and SDL (26.3+) codes.
@@ -320,6 +322,8 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.NoBreakParticlesModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.AntiDeepslateModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.AntiCoordsLeakModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.SeamlessReloadModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.ContainerAnimationsModule());
 		//? if >=26.2 {
 		/*ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.VeloShadersModule());

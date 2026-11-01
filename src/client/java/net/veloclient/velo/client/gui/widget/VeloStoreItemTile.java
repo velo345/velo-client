@@ -66,10 +66,24 @@ public final class VeloStoreItemTile extends ClickableWidget {
 		int accent = 0xFF8B7CF6;
 		int h = getHeight();
 		int lift = StoreCard.frame(context, x, y, w, h, hover, accent);
-		AnimatedCapeAsset preview = StoreAssets.preview(item);
+		// A still thumbnail (first frame, loaded off-thread and cached); the animation only for the one under the mouse.
+		AnimatedCapeAsset preview = isHovered() ? StoreAssets.preview(item) : null;
+		float yaw = VeloCapeRender.idleYaw(phase, hover);
 		if (preview != null) {
 			VeloCapeRender.draw(context, preview.identifier(), preview.width(), preview.height(), x + w / 2f, y - lift + iconHeight - 6,
-					iconHeight - 16, VeloCapeRender.idleYaw(phase, hover));
+					iconHeight - 16, yaw);
+		} else {
+			var thumb = StoreAssets.thumbnail(item);
+			if (thumb != null) {
+				VeloCapeRender.draw(context, thumb.id(), thumb.width(), thumb.height(), x + w / 2f, y - lift + iconHeight - 6, iconHeight - 16, yaw);
+			} else {
+				// Loading: a soft pulse where the cloak will be.
+				float pulse = 0.5f + 0.5f * (float) Math.sin(now / 2.5e8);
+				int pw = Math.max(8, w / 4);
+				int ph = Math.max(10, iconHeight - 36);
+				VeloDraw.fillRounded(context, x + (w - pw) / 2, y - lift + (iconHeight - ph) / 2, pw, ph, 4,
+						VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x0A + 0x10 * pulse)));
+			}
 		}
 		TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
 		StoreCard.info(context, textRenderer, x, y, w, h, lift, "Cloak", accent, item.name(), owned ? "Owned" : null, item.priceCoins());

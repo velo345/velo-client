@@ -188,9 +188,10 @@ final class StoreItems {
 			return;
 		}
 		StoreCatalog.byId(itemId).ifPresent(item -> {
-			AnimatedCapeAsset preview = StoreAssets.preview(item);
-			if (preview != null) {
-				VeloCapeRender.draw(context, preview.identifier(), preview.width(), preview.height(), x + size / 2f, y + size - 3, size - 8,
+			// Bundle cards show many of these at once: still thumbnails, never a full GIF decode.
+			var thumb = StoreAssets.thumbnail(item);
+			if (thumb != null) {
+				VeloCapeRender.draw(context, thumb.id(), thumb.width(), thumb.height(), x + size / 2f, y + size - 3, size - 8,
 						VeloCapeRender.idleYaw(0f, 0f));
 			}
 		});

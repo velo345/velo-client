@@ -31,6 +31,21 @@ public final class VeloDraw {
 	// Ring scratch: up to 4 corners x (MAX_SEGMENTS + 1) points.
 	private static final int MAX_SEGMENTS = 16;
 	private static final float[][] RINGS = new float[4][4 * (MAX_SEGMENTS + 1) * 2];
+	/** cos/sin of a quarter arc in {@code segments} steps, for every segment count {@link #ring} uses. */
+	private static final float[][] ARC_COS = new float[MAX_SEGMENTS + 1][];
+	private static final float[][] ARC_SIN = new float[MAX_SEGMENTS + 1][];
+
+	static {
+		for (int segments = 1; segments <= MAX_SEGMENTS; segments++) {
+			ARC_COS[segments] = new float[segments + 1];
+			ARC_SIN[segments] = new float[segments + 1];
+			for (int s = 0; s <= segments; s++) {
+				double a = (Math.PI / 2) * s / segments;
+				ARC_COS[segments][s] = (float) Math.cos(a);
+				ARC_SIN[segments][s] = (float) Math.sin(a);
+			}
+		}
+	}
 
 	private VeloDraw() {
 	}
@@ -150,11 +165,35 @@ public final class VeloDraw {
 			float rad = reach - inset;
 			float cx = corner == 0 || corner == 3 ? x + reach : x + w - reach;
 			float cy = corner <= 1 ? y + reach : y + h - reach;
-			double start = Math.PI + corner * Math.PI / 2;
+			// The corner's quarter arc runs from PI + corner * PI/2: cos/sin of that are the quarter arc's own values
+			// swapped and negated - from a table instead of two trig calls per point of every shape every frame.
+			float[] arcCos = ARC_COS[segments];
+			float[] arcSin = ARC_SIN[segments];
 			for (int s = 0; s <= segments; s++) {
-				double a = start + (Math.PI / 2) * s / segments;
-				out[n * 2] = cx + (float) Math.cos(a) * rad;
-				out[n * 2 + 1] = cy + (float) Math.sin(a) * rad;
+				float c = arcCos[s];
+				float sn = arcSin[s];
+				float dx;
+				float dy;
+				switch (corner) {
+					case 0 -> {
+						dx = -c;
+						dy = -sn;
+					}
+					case 1 -> {
+						dx = sn;
+						dy = -c;
+					}
+					case 2 -> {
+						dx = c;
+						dy = sn;
+					}
+					default -> {
+						dx = -sn;
+						dy = c;
+					}
+				}
+				out[n * 2] = cx + dx * rad;
+				out[n * 2 + 1] = cy + dy * rad;
 				n++;
 			}
 		}

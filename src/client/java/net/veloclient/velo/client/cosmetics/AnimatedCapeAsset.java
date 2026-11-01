@@ -197,6 +197,14 @@ public final class AnimatedCapeAsset {
 		}
 	}
 
+	/** Drops the decoded texture of {@code capeId} (its art changed), so the next draw decodes the new art. Render thread. */
+	public static synchronized void forget(String capeId) {
+		AnimatedCapeAsset asset = REGISTRY.remove(capeId);
+		if (asset != null) {
+			asset.release();
+		}
+	}
+
 	/** Frees re-decodable capes not drawn for {@code idleMillis}. Render thread. */
 	public static synchronized void releaseIdle(long idleMillis) {
 		long now = System.nanoTime();

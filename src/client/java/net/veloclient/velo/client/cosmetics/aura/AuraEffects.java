@@ -109,6 +109,14 @@ public final class AuraEffects {
 	public static final int COIN = 25;
 	/** A great feathered wing (hinge on the left, leading edge up), for {@link Out#quad}. */
 	public static final int BIRD_WING = 26;
+	/**
+	 * How far (blocks) a preview of {@code kind} is moved down so its top isn't cut off: previews frame about 2.2 blocks
+	 * above the feet, and a few auras float higher (Pyjama's moon).
+	 */
+	public static float previewDrop(Kind kind) {
+		return kind == Kind.PYJAMA ? 0.35f : 0f;
+	}
+
 	/** A crescent moon (horns to the right) and a sleepy "Z", for Pyjama. */
 	public static final int MOON = 27;
 	public static final int SNOOZE = 28;
@@ -2642,8 +2650,10 @@ public final class AuraEffects {
 			float rock = 0.18f * sin(time * 0.8f);
 			float bob = 0.035f * sin(time * 1.1f);
 			int moon = color(kind, s, 0f, 0, time);
-			float moonY = 1.8f + 0.32f * sz + bob;
-			out.sprite(0, moonY, 0, 0.5f * sz, moon, 0.26f, GLOW);
+			// Sizes are half-widths in the world: at 2.12 the moon reached down to 1.88 and its glow to eye level, so it
+			// sat in your head. Now its lowest point clears the top of the head (and a hat).
+			float moonY = 2.0f + 0.32f * sz + bob;
+			out.sprite(0, moonY, 0, 0.4f * sz, moon, 0.26f, GLOW);
 			out.sprite(0, moonY, 0, 0.24f * sz, mix(moon, 0xFFFFFF, 0.35f), 0.98f, MOON | FACING, rock);
 			// A ring of stars circling slowly round your head, each twinkling.
 			for (int i = 0; i < 10; i++) {

@@ -260,6 +260,34 @@ public final class CapeManager {
 	}
 
 	/**
+	 * Swaps the art of a library cape bought in the Store for the Store's current art (it was updated on the server):
+	 * the bundle keeps its id, name and physics, only {@code frames.gif} is replaced. Before, a library copy stayed on
+	 * the art it was bought with while the Store already showed the new one. Render thread (drops the old texture).
+	 */
+	public static void replaceAnimatedArt(CapeDefinition definition, byte[] gif) throws IOException {
+		Path bundle = definition.bundleFile();
+		Path temp = bundle.resolveSibling(bundle.getFileName() + ".tmp");
+		try (ZipInputStream in = new ZipInputStream(Files.newInputStream(bundle));
+				ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(temp))) {
+			out.putNextEntry(new ZipEntry("frames.gif"));
+			out.write(gif);
+			out.closeEntry();
+			ZipEntry entry;
+			while ((entry = in.getNextEntry()) != null) {
+				if (entry.getName().equals("frames.gif")) {
+					continue;
+				}
+				out.putNextEntry(new ZipEntry(entry.getName()));
+				in.transferTo(out);
+				out.closeEntry();
+			}
+		}
+		Files.move(temp, bundle, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+		AnimatedCapeAsset.forget(definition.id());
+		FAILED_AT.remove(definition.id());
+	}
+
+	/**
 	 * Builds a throwaway, never-saved-to-the-library {@link CapeDefinition}
 	 * for the Store's "try before you buy" preview - same bundle shape {@link
 	 * #importAnimatedGif} writes, just to a temp file instead of {@link

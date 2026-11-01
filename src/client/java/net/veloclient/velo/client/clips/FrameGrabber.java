@@ -96,7 +96,13 @@ final class FrameGrabber {
 	}
 
 	/** Frees the pool (recording turned off). Buffers still in flight are dropped when they come back. */
-	static synchronized void clear() {
+	static void clear() {
+		// Outside the lock: a running copy may need it to hand its buffer back.
+		finishCopies();
+		clearPools();
+	}
+
+	private static synchronized void clearPools() {
 		FREE.clear();
 		allocated = 0;
 		poolBytes = -1;
@@ -123,6 +129,7 @@ final class FrameGrabber {
 	 * down (aspect kept, even size) - the sink gets the size it really has.
 	 */
 	static boolean grab(Sink sink, int maxHeight) {
+		drainDone();
 		MinecraftClient client = MinecraftClient.getInstance();
 		//? if <26.1 {
 		var texture = client.getFramebuffer().getColorAttachment();
@@ -195,25 +202,76 @@ final class FrameGrabber {
 		final int h = height;
 		GpuBuffer buffer = acquireGpu(bytes);
 		encoder.copyTextureToBuffer(texture, buffer, 0L, () -> {
-			boolean handed = false;
-			//? if <26.2 {
-			try (var view = encoder.mapBuffer(buffer, true, false)) {
-			//?} else {
-			/*try (var view = buffer.map(true, false)) {
-			*///?}
+			// Mapped here (render thread); the copy out of the mapping - several MB per captured frame from uncached
+			// readback memory, 5-7% of the render thread with Clips on - runs on the copier thread. Unmapping and handing
+			// the buffer back go into DONE, which only the render thread runs (drainDone), and stopping waits for copies.
+			try {
+				//? if <26.2 {
+				var view = encoder.mapBuffer(buffer, true, false);
+				//?} else {
+				/*var view = buffer.map(true, false);
+				*///?}
 				ByteBuffer src = view.data();
-				dest.clear();
-				dest.put(0, src, 0, Math.min(bytes, src.remaining()));
-				handed = true;
-				sink.accept(dest, w, h);
+				IN_FLIGHT.incrementAndGet();
+				COPIER.execute(() -> {
+					boolean handed = false;
+					try {
+						dest.clear();
+						dest.put(0, src, 0, Math.min(bytes, src.remaining()));
+						handed = true;
+						sink.accept(dest, w, h);
+					} catch (Throwable t) {
+						if (!handed) {
+							release(dest);
+						}
+					} finally {
+						DONE.add(() -> {
+							view.close();
+							releaseGpu(buffer, bytes);
+						});
+						IN_FLIGHT.decrementAndGet();
+					}
+				});
 			} catch (Throwable t) {
-				if (!handed) {
-					release(dest);
-				}
-			} finally {
+				release(dest);
 				releaseGpu(buffer, bytes);
 			}
 		}, 0);
 		return true;
+	}
+
+	private static final java.util.concurrent.ExecutorService COPIER = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+		Thread thread = new Thread(r, "Velo clip frame copy");
+		thread.setDaemon(true);
+		return thread;
+	});
+	/** Unmaps + buffer hand-backs of finished copies, run on the render thread only. */
+	private static final java.util.concurrent.ConcurrentLinkedQueue<Runnable> DONE = new java.util.concurrent.ConcurrentLinkedQueue<>();
+	private static final java.util.concurrent.atomic.AtomicInteger IN_FLIGHT = new java.util.concurrent.atomic.AtomicInteger();
+
+	static {
+		// The game must not tear the GPU device down under a mapped readback buffer.
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> finishCopies());
+	}
+
+	/** Render thread: unmaps and hands back the buffers of finished copies. */
+	private static void drainDone() {
+		Runnable task;
+		while ((task = DONE.poll()) != null) {
+			try {
+				task.run();
+			} catch (Throwable ignored) {
+				// a buffer closed meanwhile - nothing left to hand back
+			}
+		}
+	}
+
+	/** Render thread: waits (at most 2 s) for copies still running, then cleans up after them. */
+	private static void finishCopies() {
+		long until = System.nanoTime() + 2_000_000_000L;
+		while (IN_FLIGHT.get() > 0 && System.nanoTime() < until) {
+			Thread.onSpinWait();
+		}
+		drainDone();
 	}
 }

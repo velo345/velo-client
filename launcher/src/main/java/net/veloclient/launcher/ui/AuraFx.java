@@ -155,10 +155,10 @@ public final class AuraFx {
 			double focal = (height / 2) / Math.tan(Math.toRadians(15));
 			double distance = 95;
 			Canvas canvas = new Canvas(width, height);
-			List<Sprite> sprites = project(emitter, settings, width / 2, height / 2 - 6, focal, distance, 0.5);
+			List<Sprite> sprites = project(emitter, settings, width / 2, height / 2 - 6 + drop(kind, height), focal, distance, 0.5);
 			GraphicsContext g = canvas.getGraphicsContext2D();
 			draw(g, sprites, distance, false, true);
-			silhouette(g, width / 2, height / 2 - 6, focal / distance);
+			silhouette(g, width / 2, height / 2 - 6 + drop(kind, height), focal / distance);
 			draw(g, sprites, distance, true, true);
 			javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
 			params.setFill(Color.TRANSPARENT);
@@ -194,13 +194,13 @@ public final class AuraFx {
 		for (int i = 0; i < frames; i++) {
 			emitter.update(1f / fps, settings, 0, 0, 0);
 			double angle = 0.5 + 0.35 * Math.sin(2 * Math.PI * i / frames);
-			List<Sprite> sprites = project(emitter, settings, width / 2.0, height / 2.0 - 6, focal, distance, angle);
+			List<Sprite> sprites = project(emitter, settings, width / 2.0, height / 2.0 - 6 + drop(kind, height), focal, distance, angle);
 			clear(canvas);
 			if (layer != 2) {
 				draw(g, sprites, distance, false, true);
 			}
 			if (layer == 0) {
-				silhouette(g, width / 2.0, height / 2.0 - 6, focal / distance);
+				silhouette(g, width / 2.0, height / 2.0 - 6 + drop(kind, height), focal / distance);
 			}
 			if (layer != 1) {
 				draw(g, sprites, distance, true, true);
@@ -210,6 +210,11 @@ public final class AuraFx {
 		return out;
 	}
 
+	/** Pixels a picture {@code height} tall moves down for an aura that floats higher (see AuraEffects#previewDrop). */
+	private static double drop(AuraEffects.Kind kind, double height) {
+		return AuraEffects.previewDrop(kind) * UNIT * ((height / 2) / Math.tan(Math.toRadians(15))) / 95;
+	}
+
 	/** A Store card's picture: the aura around a dim player shape, turning slowly. */
 	public static Node card(AuraEffects.Kind kind, Supplier<AuraEffects.Settings> settings, double width, double height) {
 		// Behind / player shape (drawn once) / in front.
@@ -217,7 +222,7 @@ public final class AuraFx {
 		Canvas shape = new Canvas(width, height);
 		Canvas front = new Canvas(width, height);
 		double focal0 = (height / 2) / Math.tan(Math.toRadians(15));
-		silhouette(shape.getGraphicsContext2D(), width / 2, height / 2 - 6, focal0 / 95);
+		silhouette(shape.getGraphicsContext2D(), width / 2, height / 2 - 6 + drop(kind, height), focal0 / 95);
 		StackPane canvas = new StackPane(back, shape, front);
 		canvas.setMouseTransparent(true);
 		AuraEffects.Emitter emitter = new AuraEffects.Emitter(kind);
@@ -237,7 +242,7 @@ public final class AuraFx {
 				double focal = (height / 2) / Math.tan(Math.toRadians(15));
 				double distance = 95;
 				double angle = now / 4e9;
-				List<Sprite> sprites = project(emitter, s, width / 2, height / 2 - 6, focal, distance, angle);
+				List<Sprite> sprites = project(emitter, s, width / 2, height / 2 - 6 + drop(kind, height), focal, distance, angle);
 				clear(back);
 				clear(front);
 				draw(back.getGraphicsContext2D(), sprites, distance, false, false);

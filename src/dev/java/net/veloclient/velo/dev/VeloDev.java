@@ -20,8 +20,6 @@ public final class VeloDev implements VeloAddon {
 		ModuleRegistry.register(new net.veloclient.velo.dev.tweaks.BetterTabListModule());
 		ModuleRegistry.register(new net.veloclient.velo.dev.tweaks.ChatHeadsModule());
 		ModuleRegistry.register(new net.veloclient.velo.dev.tweaks.BlockBreakProgressModule());
-		ModuleRegistry.register(new net.veloclient.velo.dev.tweaks.SeamlessReloadModule());
-		ModuleRegistry.register(new net.veloclient.velo.dev.tweaks.VeloLoadingScreenModule());
 		ModuleRegistry.register(new net.veloclient.velo.dev.storage.StorageMemoryModule());
 		ModuleRegistry.register(new net.veloclient.velo.dev.notes.NotesModule());
 		//? if >=26.2 {

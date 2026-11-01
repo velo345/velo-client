@@ -83,6 +83,7 @@ public final class RenderProfiler {
 	}
 
 	public static void frameEnd() {
+		GpuPassTimer.endFrame();
 		if (frameStart == 0) {
 			return;
 		}

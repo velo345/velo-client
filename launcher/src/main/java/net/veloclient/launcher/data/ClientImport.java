@@ -702,7 +702,8 @@ public final class ClientImport {
 			String name = jar.getFileName().toString().toLowerCase(Locale.ROOT);
 			progress.accept("Mods " + i + " / " + jars.size() + "  ·  " + jar.getFileName());
 			if (name.startsWith("velo-client") || name.startsWith("velo-addons") || name.startsWith("fabric-api") || name.contains("lunar")
-					|| name.contains("feather") || name.contains("dawn-") || name.contains("norisk")) {
+					|| name.contains("feather") || name.contains("dawn-") || name.contains("norisk")
+					|| net.veloclient.launcher.launch.ForeignClientJars.isForeignClient(jar)) {
 				continue;
 			}
 			String modId = fabricModId(jar);

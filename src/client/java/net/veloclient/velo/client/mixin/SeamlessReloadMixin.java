@@ -1,6 +1,6 @@
-package net.veloclient.velo.dev.mixin;
+package net.veloclient.velo.client.mixin;
 
-import net.veloclient.velo.dev.tweaks.SeamlessReloadModule;
+import net.veloclient.velo.client.modules.performance.SeamlessReloadModule;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -30,10 +30,10 @@ public abstract class SeamlessReloadMixin {
 	@Inject(method = "render", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$seamless(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		if (!reloading) {
-			if (net.veloclient.velo.dev.tweaks.VeloLoadingScreenModule.active()) {
+			if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.active()) {
 				ci.cancel();
 				float doneFor = reloadCompleteTime > -1L ? (net.minecraft.util.Util.getMeasuringTimeMs() - reloadCompleteTime) / 1000f : -1f;
-				if (net.veloclient.velo.dev.tweaks.VeloLoadingScreenModule.render(context, reload.getProgress(), doneFor, offset -> {
+				if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.render(context, reload.getProgress(), doneFor, offset -> {
 					if (client.currentScreen != null) {
 						context.getMatrices().pushMatrix();
 						context.getMatrices().translate(0f, offset);
@@ -80,10 +80,10 @@ public abstract class SeamlessReloadMixin {
 	@Inject(method = "extractRenderState", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$seamless(net.minecraft.client.gui.GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a, CallbackInfo ci) {
 		if (!fadeIn) {
-			if (net.veloclient.velo.dev.tweaks.VeloLoadingScreenModule.active()) {
+			if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.active()) {
 				ci.cancel();
 				float doneFor = fadeOutStart > -1L ? (net.minecraft.util.Util.getMillis() - fadeOutStart) / 1000f : -1f;
-				if (net.veloclient.velo.dev.tweaks.VeloLoadingScreenModule.render(graphics, reload.getActualProgress(), doneFor, offset -> {
+				if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.render(graphics, reload.getActualProgress(), doneFor, offset -> {
 					if (minecraft.screen != null) {
 						graphics.pose().pushMatrix();
 						graphics.pose().translate(0f, offset);
@@ -130,10 +130,10 @@ public abstract class SeamlessReloadMixin {
 	@Inject(method = "extractRenderState", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$seamless(net.minecraft.client.gui.GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a, CallbackInfo ci) {
 		if (!fadeIn) {
-			if (net.veloclient.velo.dev.tweaks.VeloLoadingScreenModule.active()) {
+			if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.active()) {
 				ci.cancel();
 				float doneFor = fadeOutStart > -1L ? (net.minecraft.util.Util.getMillis() - fadeOutStart) / 1000f : -1f;
-				if (net.veloclient.velo.dev.tweaks.VeloLoadingScreenModule.render(graphics, reload.getActualProgress(), doneFor, offset -> {
+				if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.render(graphics, reload.getActualProgress(), doneFor, offset -> {
 					if (minecraft.gui.screen() != null) {
 						graphics.pose().pushMatrix();
 						graphics.pose().translate(0f, offset);

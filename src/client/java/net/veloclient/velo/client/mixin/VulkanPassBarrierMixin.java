@@ -57,6 +57,10 @@ public abstract class VulkanPassBarrierMixin {
 	private VkCommandBuffer currentCommandBuffer;
 
 	@Shadow
+	@org.spongepowered.asm.mixin.Final
+	private com.mojang.blaze3d.vulkan.VulkanDevice device;
+
+	@Shadow
 	private void memoryBarrier(MemoryStack stack) {
 		throw new AssertionError();
 	}
@@ -86,6 +90,9 @@ public abstract class VulkanPassBarrierMixin {
 		if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
 			net.veloclient.velo.client.devtools.RenderProfiler.op("pass:" + descriptor.label().get() + (velo$mainTargetPass ? "[main]" : "[other]")
 					+ (velo$open ? (PassBarriers.canContinue(descriptor, velo$openKey) ? "+merge" : "+close") : ""));
+		}
+		if (net.veloclient.velo.client.devtools.GpuPassTimer.ENABLED) {
+			net.veloclient.velo.client.devtools.GpuPassTimer.mark(device.vkDevice(), currentCommandBuffer, "pass:" + descriptor.label().get());
 		}
 		if (velo$open) {
 			if (velo$mainTargetPass && PassBarriers.canContinue(descriptor, velo$openKey)) {
@@ -160,6 +167,9 @@ public abstract class VulkanPassBarrierMixin {
 	@Inject(method = "endCommandBuffer", at = @At("HEAD"))
 	private void velo$closeBeforeEnd(CallbackInfo ci) {
 		velo$closeOpen();
+		if (net.veloclient.velo.client.devtools.GpuPassTimer.ENABLED) {
+			net.veloclient.velo.client.devtools.GpuPassTimer.endCommandBuffer(device.vkDevice(), currentCommandBuffer);
+		}
 	}
 
 	@Redirect(method = {"clearColorTexture", "clearColorAndDepthTextures", "clearDepthTexture", "writeToBuffer", "copyToBuffer",
@@ -170,6 +180,11 @@ public abstract class VulkanPassBarrierMixin {
 			net.veloclient.velo.client.devtools.RenderProfiler.op("xfer:" + StackWalker.getInstance().walk(f -> f.skip(1).findFirst().map(StackWalker.StackFrame::getMethodName).orElse("?"))
 					+ "<-" + StackWalker.getInstance().walk(f -> f.skip(2).filter(fr -> !fr.getClassName().contains("VulkanCommandEncoder") && !fr.getClassName().contains("CommandEncoder"))
 					.findFirst().map(fr -> fr.getClassName().substring(fr.getClassName().lastIndexOf('.') + 1) + "." + fr.getMethodName()).orElse("?")));
+		}
+		if (net.veloclient.velo.client.devtools.GpuPassTimer.ENABLED) {
+			net.veloclient.velo.client.devtools.GpuPassTimer.mark(device.vkDevice(), currentCommandBuffer, "xfer:"
+					+ StackWalker.getInstance().walk(f -> f.skip(1).filter(fr -> !fr.getClassName().contains("CommandEncoder"))
+							.findFirst().map(fr -> fr.getClassName().substring(fr.getClassName().lastIndexOf('.') + 1) + "." + fr.getMethodName()).orElse("?")));
 		}
 		if (PassBarriers.enabled()) {
 			PassBarriers.afterTransfer(commandBuffer(), stack);

@@ -336,6 +336,10 @@ public final class CoordScrambler {
 		if (s == null || s.isEmpty() || !hasDigit(s)) {
 			return s;
 		}
+		// Most strings (HUD values) have no § codes: look them up as they are, without building the plain copy.
+		if (s.indexOf('§') < 0 && hits(s).isEmpty()) {
+			return s;
+		}
 		// Plain text without § codes, and where each plain character sits in s.
 		StringBuilder plain = new StringBuilder(s.length());
 		int[] at = new int[s.length() + 1];

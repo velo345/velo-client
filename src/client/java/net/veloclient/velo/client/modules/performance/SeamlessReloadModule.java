@@ -1,4 +1,4 @@
-package net.veloclient.velo.dev.tweaks;
+package net.veloclient.velo.client.modules.performance;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -12,7 +12,7 @@ import net.veloclient.velo.module.SafetyTag;
 import java.util.List;
 
 /**
- * Seamless Resource Reload (dev build): no red Mojang screen when resources reload (resource packs, F3+T, Velo
+ * Seamless Resource Reload: no red Mojang screen when resources reload (resource packs, F3+T, Velo
  * Shaders). The game keeps drawing the world and HUD behind that screen anyway - it only covers them - so the overlay
  * is replaced by a small progress bar. Packs can't be loaded texture by texture (atlases are stitched in one go), so
  * the reload takes as long as before and the last moment, when everything is swapped in, is still a short hitch. The

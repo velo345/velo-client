@@ -1,4 +1,4 @@
-package net.veloclient.velo.dev.tweaks;
+package net.veloclient.velo.client.modules.qol;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
@@ -13,7 +13,7 @@ import net.veloclient.velo.module.SafetyTag;
 import java.io.InputStream;
 
 /**
- * Velo Loading Screen (dev build): the startup load shows the title screen's panorama, blurred, with the Velo logo and
+ * Velo Loading Screen: the startup load shows the title screen's panorama, blurred, with the Velo logo and
  * a thin progress bar instead of the red Mojang screen. When loading is done the bar and logo fade away while the title
  * screen slides up into place - quicker than vanilla's two-second fade, so the game is ready no later than before.
  *
@@ -23,8 +23,8 @@ import java.io.InputStream;
  */
 public final class VeloLoadingScreenModule extends AbstractModule {
 
-	private static final Identifier BACKGROUND = Identifier.of("velo-client", "dev_loading_background");
-	private static final Identifier LOGO = Identifier.of("velo-client", "dev_loading_logo");
+	private static final Identifier BACKGROUND = Identifier.of("velo-client", "loading_background");
+	private static final Identifier LOGO = Identifier.of("velo-client", "loading_logo");
 	/** The part of the panorama the title screen opens on (TitleScreenTheme: duel on the right of a 16:9 view). */
 	private static final int CROP_X = 1458;
 	private static final int CROP_W = 2048;

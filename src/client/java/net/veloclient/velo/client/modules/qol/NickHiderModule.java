@@ -8,7 +8,7 @@ import net.veloclient.velo.module.SafetyTag;
  * Replaces every other player's in-world nametag with obfuscated (§k-style)
  * gibberish, purely for streaming/recording privacy - nothing sent to the
  * server changes, and only this client's own rendering is affected (see
- * {@link net.veloclient.velo.client.mixin.NickHiderMixin}). The local
+ * {@link net.veloclient.velo.client.mixin.PlayerNameTagBadgeMixin}). The local
  * player's own nametag is left untouched.
  */
 public final class NickHiderModule extends AbstractModule {

@@ -51,8 +51,8 @@ public final class AntiCoordsLeakModule extends AbstractModule implements Config
 
 	public AntiCoordsLeakModule() {
 		super("anti-coords-leak", "Anti Coords Leak",
-				"Hides every coordinate on screen (chat, F3, HUD, waypoints, Litematica, any mod) while you screen share on Discord - "
-						+ "automatically, or always on.",
+				"Hides every coordinate on screen (chat, F3, HUD, waypoints, Litematica, any mod) while you share your screen or record "
+						+ "(Discord, OBS, browsers, any app) - automatically, or always on.",
 				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, true);
 		ClientTickEvents.END_CLIENT_TICK.register(client -> update());
 	}
@@ -139,6 +139,6 @@ public final class AntiCoordsLeakModule extends AbstractModule implements Config
 			return "Coordinates are always hidden";
 		}
 		return ScreenShareDetector.sharing() ? "Sharing now (" + ScreenShareDetector.source() + ") - coordinates hidden"
-				: "Hides coordinates while Discord shares your screen";
+				: "Hides coordinates while your screen is shared or recorded";
 	}
 }

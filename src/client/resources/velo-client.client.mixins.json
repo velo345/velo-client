@@ -21,7 +21,6 @@
 		"DenseGuiScreenMixin",
 		"ScissorHoverMixin",
 		"StretchProjectionMixin",
-		"NickHiderMixin",
 		"PlayerListHudMixin",
 		"PlayerNameTagBadgeMixin",
 		"ScreenAccessMixin",

@@ -12,12 +12,56 @@ public final class StoreAssets {
 	private StoreAssets() {
 	}
 
-	/** The item's animated texture, previewable before it's ever been bought - registered under the catalog id, separate from whatever id it gets once actually imported into the cape library on purchase. */
+	private static final String MOD_VERSION = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("velo-client")
+			.map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("dev");
+	private static final java.util.Set<String> LOADING = java.util.concurrent.ConcurrentHashMap.newKeySet();
+	private static final java.util.concurrent.ExecutorService LOADER = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+		Thread thread = new Thread(r, "Velo store cloak loader");
+		thread.setDaemon(true);
+		return thread;
+	});
+
+	/**
+	 * The item's animated texture, previewable before it's ever been bought - registered under the catalog id, separate
+	 * from whatever id it gets once actually imported into the cape library on purchase. Null until it's decoded: that
+	 * happens off the render thread (a 2048 px, 40-frame GIF took the game down for a second per tile). Render thread.
+	 */
 	public static AnimatedCapeAsset preview(StoreItem item) {
+		AnimatedCapeAsset existing = AnimatedCapeAsset.existing(item.id());
+		if (existing != null || !ready(item)) {
+			return existing;
+		}
+		if (LOADING.add(item.id())) {
+			LOADER.submit(() -> {
+				try {
+					net.veloclient.velo.client.cosmetics.GifDecoder.Result decoded;
+					try (InputStream in = openGif(item)) {
+						decoded = net.veloclient.velo.client.cosmetics.GifDecoder.decode(in);
+					}
+					MinecraftClient.getInstance().execute(() -> {
+						try {
+							AnimatedCapeAsset.registerDecoded(item.id(), decoded, true);
+						} catch (IOException ignored) {
+							// Shown as its still thumbnail.
+						}
+						LOADING.remove(item.id());
+					});
+				} catch (Exception e) {
+					LOADING.remove(item.id());
+				}
+			});
+		}
+		return null;
+	}
+
+	/** A still first-frame picture of the item for grids (see {@link net.veloclient.velo.client.cosmetics.CapeThumbnails}); null while it's made. */
+	public static net.veloclient.velo.client.cosmetics.CapeThumbnails.Thumb thumbnail(StoreItem item) {
 		if (!ready(item)) {
 			return null;
 		}
-		return AnimatedCapeAsset.getOrRegister(item.id(), () -> openGif(item));
+		// Keyed by the art's version: the server file's hash, or the bundled file's path (changes with new art).
+		String version = item.gifSha() != null ? item.gifSha() : String.valueOf(item.gifResource()) + "-" + MOD_VERSION;
+		return net.veloclient.velo.client.cosmetics.CapeThumbnails.get(item.id() + "-" + Integer.toHexString(version.hashCode()), () -> openGif(item));
 	}
 
 	/** Whether the art is there: bundled, or a server-only cape's GIF downloaded (starts the download if not). */

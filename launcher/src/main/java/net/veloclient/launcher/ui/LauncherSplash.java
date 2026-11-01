@@ -193,28 +193,94 @@ public final class LauncherSplash extends StackPane {
 	/** Zooms the logo through the screen and fades the launcher ({@code content}) in under it; {@code done} removes the splash. */
 	public void reveal(Node content, Runnable done) {
 		setMouseTransparent(true);
-		content.setOpacity(0);
-		content.setScaleX(0.965);
-		content.setScaleY(0.965);
 		ScaleTransition logoZoom = scale(logo, 1.5, 380, EASE_IN);
 		ScaleTransition ringsBurst = scale(rings, 2.6, 460, UiMotion.EASE_OUT);
 		ScaleTransition glowFlash = scale(glow, 3.2, 460, UiMotion.EASE_OUT);
 		TranslateTransition wordDrop = new TranslateTransition(Duration.millis(260), word);
 		wordDrop.setToY(14);
 		wordDrop.setInterpolator(EASE_IN);
-		ScaleTransition contentIn = scale(content, 1, 480, UiMotion.EASE_OUT);
-		contentIn.setDelay(Duration.millis(120));
 		ParallelTransition all = new ParallelTransition(logoZoom, fade(logo, 0, 300, 80), ringsBurst, fade(rings, 0, 380, 0), glowFlash,
-				fade(glow, 0, 460, 0), wordDrop, fade(word, 0, 200, 0), fade(version, 0, 160, 0), fade(this, 0, 300, 200),
-				contentIn, fade(content, 1, 360, 120));
+				fade(glow, 0, 460, 0), wordDrop, fade(word, 0, 200, 0), fade(version, 0, 160, 0), fade(this, 0, 300, 200));
+		// The launcher comes in piece by piece as the logo bursts: the top bar drops in, the launch bar rises, and the
+		// page's blocks slide up one after another.
+		List<Node> moved = new ArrayList<>();
+		content.setOpacity(1);
+		if (content instanceof javafx.scene.layout.BorderPane frame) {
+			slideIn(all, moved, frame.getTop(), 0, -22, 140);
+			slideIn(all, moved, frame.getBottom(), 0, 34, 220);
+			int delay = 180;
+			for (Node block : blocks(frame.getCenter())) {
+				slideIn(all, moved, block, 0, 30, delay);
+				delay += 70;
+			}
+		} else {
+			content.setOpacity(0);
+			content.setScaleX(0.965);
+			content.setScaleY(0.965);
+			ScaleTransition contentIn = scale(content, 1, 480, UiMotion.EASE_OUT);
+			contentIn.setDelay(Duration.millis(120));
+			all.getChildren().addAll(contentIn, fade(content, 1, 360, 120));
+		}
 		all.setOnFinished(e -> {
 			idle.forEach(Animation::stop);
+			for (Node node : moved) {
+				node.setTranslateX(0);
+				node.setTranslateY(0);
+				node.setOpacity(1);
+			}
 			content.setScaleX(1);
 			content.setScaleY(1);
 			content.setOpacity(1);
 			done.run();
 		});
 		all.play();
+	}
+
+	/** Starts {@code node} offset by ({@code dx}, {@code dy}) and see-through, and adds its glide home to {@code all}. */
+	private static void slideIn(ParallelTransition all, List<Node> moved, Node node, double dx, double dy, int delay) {
+		if (node == null) {
+			return;
+		}
+		moved.add(node);
+		node.setOpacity(0);
+		node.setTranslateX(dx);
+		node.setTranslateY(dy);
+		TranslateTransition glide = new TranslateTransition(Duration.millis(560), node);
+		glide.setToX(0);
+		glide.setToY(0);
+		glide.setInterpolator(BACK_OUT);
+		glide.setDelay(Duration.millis(delay));
+		all.getChildren().addAll(glide, fade(node, 1, 380, delay));
+	}
+
+	/**
+	 * The visible blocks of a page, top to bottom, for the staggered slide-in: through a scroll pane and the page's
+	 * column, one level into a column that groups several blocks (Home's first screen). At most six; anything further down is
+	 * below the fold and simply there.
+	 */
+	private static List<Node> blocks(Node center) {
+		List<Node> out = new ArrayList<>();
+		Node page = center;
+		if (page instanceof StackPane stack && stack.getChildren().size() == 1) {
+			page = stack.getChildren().get(0);
+		}
+		if (page instanceof javafx.scene.control.ScrollPane scroll) {
+			page = scroll.getContent();
+		}
+		if (!(page instanceof VBox column) || column.getChildren().isEmpty()) {
+			if (center != null) {
+				out.add(center);
+			}
+			return out;
+		}
+		for (Node child : column.getChildren()) {
+			if (child instanceof VBox group && group.getChildren().size() >= 2) {
+				out.addAll(group.getChildren());
+			} else {
+				out.add(child);
+			}
+		}
+		return out.size() > 6 ? new ArrayList<>(out.subList(0, 6)) : out;
 	}
 
 	private static FadeTransition fade(Node node, double to, int millis, int delay) {

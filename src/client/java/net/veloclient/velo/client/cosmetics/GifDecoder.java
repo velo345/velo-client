@@ -55,6 +55,30 @@ public final class GifDecoder {
 	}
 
 	/**
+	 * Just the first frame, on the GIF's full canvas - a fraction of a full decode (one frame instead of 40 of a 2048 px
+	 * Store cloak), for still thumbnails.
+	 */
+	public static BufferedImage firstFrame(InputStream in) throws IOException {
+		ImageReader reader = ImageIO.getImageReadersByFormatName("gif").next();
+		try (ImageInputStream iis = ImageIO.createImageInputStream(in)) {
+			reader.setInput(iis, false);
+			BufferedImage frame = reader.read(0);
+			int w = readScreenSize(reader, true);
+			int h = readScreenSize(reader, false);
+			IIOMetadataNode root = (IIOMetadataNode) reader.getImageMetadata(0).getAsTree("javax_imageio_gif_image_1.0");
+			int left = intAttr(findChild(root, "ImageDescriptor"), "imageLeftPosition", 0);
+			int top = intAttr(findChild(root, "ImageDescriptor"), "imageTopPosition", 0);
+			BufferedImage canvas = new BufferedImage(w > 0 ? w : frame.getWidth(), h > 0 ? h : frame.getHeight(), BufferedImage.TYPE_INT_ARGB);
+			Graphics2D g = canvas.createGraphics();
+			g.drawImage(frame, left, top, null);
+			g.dispose();
+			return canvas;
+		} finally {
+			reader.dispose();
+		}
+	}
+
+	/**
 	 * Every frame as the whole composited picture (disposal methods applied) with its delay in ms - for the cloak
 	 * upload, which looks at the full picture. The canvas passed is reused: copy what you keep.
 	 */
