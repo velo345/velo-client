@@ -419,8 +419,64 @@ window.velo.emotePose = emotePose;
 window.velo.emoteAnchor = emoteAnchor;
 window.velo.emoteGlyph = emoteGlyph;
 
+// Pets: a turntable sprite sheet (8 x 6 frames, 16 fps). Cards show the still preview and only fetch + play the
+// sheet while hovered (or while on screen on touch devices); one shared timer drives every playing pet.
+const PET_COLS = 8, PET_FRAMES = 48;
+const petsPlaying = new Set();
+let petTimer = 0;
+const petTick = () => {
+	const f = Math.floor((performance.now() * 16) / 1000) % PET_FRAMES;
+	for (const n of petsPlaying) {
+		if (!n.isConnected) { petsPlaying.delete(n); continue; }
+		n.style.backgroundPosition = `${((f % PET_COLS) / (PET_COLS - 1)) * 100}% ${(Math.floor(f / PET_COLS) / (PET_FRAMES / PET_COLS - 1)) * 100}%`;
+	}
+	if (!petsPlaying.size) { clearInterval(petTimer); petTimer = 0; }
+};
+function petArt(item, always) {
+	const files = item.files || {};
+	const n = el("span", { class: "pet-art", role: "img", "aria-label": item.name });
+	if (files.preview) n.style.backgroundImage = `url("${fileUrl(files.preview)}")`;
+	if (!files.sheet || reduceMotion) return n;
+	let sheet = null;
+	const play = () => {
+		if (!sheet) {
+			sheet = new Image();
+			sheet.decoding = "async";
+			sheet.src = fileUrl(files.sheet);
+		}
+		const go = () => {
+			if (!n.dataset.want) return;
+			n.classList.add("sheet");
+			n.style.backgroundImage = `url("${sheet.src}")`;
+			petsPlaying.add(n);
+			if (!petTimer) petTimer = setInterval(petTick, 1000 / 16);
+			petTick();
+		};
+		n.dataset.want = "1";
+		if (sheet.complete && sheet.naturalWidth) go(); else sheet.decode().then(go, () => {});
+	};
+	const stop = () => {
+		delete n.dataset.want;
+		if (!petsPlaying.delete(n)) return;
+		n.classList.remove("sheet");
+		n.style.backgroundPosition = "";
+		if (files.preview) n.style.backgroundImage = `url("${fileUrl(files.preview)}")`;
+	};
+	if (always || !matchMedia("(pointer: fine)").matches) {
+		new IntersectionObserver(([e]) => (e.isIntersecting ? play() : stop()), { threshold: 0.4 }).observe(n);
+	} else {
+		requestAnimationFrame(() => {
+			const host = n.closest(".item, button") || n;
+			host.addEventListener("pointerenter", play);
+			host.addEventListener("pointerleave", stop);
+		});
+	}
+	return n;
+}
+
 function cosmeticArt(item, k = 12, draggable = false) {
 	if (item.type === "emote") return emoteFigure(item);
+	if (item.type === "pet") return petArt(item, draggable);
 	if (item.type === "cape" && item.files && item.files.gif) return cape3d(fileUrl(item.files.gif), k, draggable);
 	if (item.type === "aura") return el("img", { class: "aura-img", src: `/assets/auras/${item.id.replace(/^aura_/, "")}.webp`, alt: item.name + " aura", loading: "lazy", decoding: "async" });
 	if (item.type === "killfx") return el("img", { class: "aura-img", src: `/assets/killfx/${item.id.replace(/^killfx_/, "")}.webp`, alt: item.name + " kill effect", loading: "lazy", decoding: "async" });

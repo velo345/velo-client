@@ -133,7 +133,7 @@ public final class Loadouts {
 	}
 
 	private static Path activeFile() {
-		return VeloPaths.config().resolve("loadout-active.txt");
+		return VeloPaths.accountConfig("loadout-active.txt");
 	}
 
 	/** Every saved look (re-read when the launcher changed the file). */

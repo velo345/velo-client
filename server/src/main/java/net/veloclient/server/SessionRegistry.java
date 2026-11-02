@@ -61,7 +61,7 @@ final class SessionRegistry {
 	/** {@code emote}: the emote being played ("id;seq", see {@link #setEmote}), or null. */
 	/** {@code wear}: the bodywear shown, "id[:colour],..." (item ids without "wear_", colour codes 1-360 hue), or null. */
 	record OnlineUser(String uuid, String username, String capeId, String wingsId, String auraId, boolean plus, String nameStyle, String emote,
-			String wear) {
+			String wear, String pet) {
 	}
 
 	/** An emote someone plays, until it expires (the client keeps sending it while it plays). */
@@ -81,12 +81,25 @@ final class SessionRegistry {
 		emotes.put(uuid, new PlayingEmote(value, System.currentTimeMillis() + EMOTE_TTL_MILLIS));
 	}
 
+	/** The pet each in-game player has out ("pet_" item id without the prefix, already checked against what they own). */
+	private final Map<String, String> pets = new java.util.concurrent.ConcurrentHashMap<>();
+
+	void setPet(String uuid, String value) {
+		if (value == null || !value.matches("[a-z0-9_]{1,40}")) {
+			pets.remove(uuid);
+			return;
+		}
+		pets.put(uuid, value);
+	}
+
 	/** The bodywear each in-game player shows (already checked against what they own). */
 	private final Map<String, String> wear = new java.util.concurrent.ConcurrentHashMap<>();
 
 	/** Records (or clears, with null) a player's bodywear: up to 6, "id[:colour],id,...". */
 	void setWear(String uuid, String value) {
-		if (value == null || !value.matches("[a-z0-9_-]{1,40}(:[0-9]{1,3})?(,[a-z0-9_-]{1,40}(:[0-9]{1,3})?){0,5}")) {
+		// Each entry was checked on the way in (VeloServerApp): only the overall shape here - colours can be 6 hex digits
+		// and carry height/depth, which the old hue-only pattern threw away (recoloured bodywear vanished for others).
+		if (value == null || value.length() > 400 || !value.matches("[a-z0-9_:,-]+")) {
 			wear.remove(uuid);
 			return;
 		}
@@ -319,7 +332,7 @@ final class SessionRegistry {
 		return sessionsByToken.values().stream()
 				.filter(s -> s.expiresAtMillis() >= now && s.kind().equals(KIND_GAME))
 				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId(), s.auraId(), plusLookup.test(s.uuid()) && !plusHidden.contains(s.uuid()),
-						plusLookup.test(s.uuid()) ? s.nameStyle() : null, emoteOf(s.uuid(), now), wear.get(s.uuid())))
+						plusLookup.test(s.uuid()) ? s.nameStyle() : null, emoteOf(s.uuid(), now), wear.get(s.uuid()), pets.get(s.uuid())))
 				.toList();
 	}
 

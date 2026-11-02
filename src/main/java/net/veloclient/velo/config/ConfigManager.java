@@ -23,8 +23,12 @@ public final class ConfigManager {
 	private ConfigManager() {
 	}
 
+	/** What an account wears - kept per Minecraft account ({@link VeloPaths#accountConfig}). */
+	private static final java.util.Set<String> PER_ACCOUNT = java.util.Set.of("cosmetics-cape", "cosmetics-wings", "cosmetics-wear",
+			"cosmetics-killfx", "cosmetics-aura", "cosmetics-emotes");
+
 	private static Path fileFor(String moduleId) {
-		return VeloPaths.config().resolve(moduleId + ".json");
+		return PER_ACCOUNT.contains(moduleId) ? VeloPaths.accountConfig(moduleId + ".json") : VeloPaths.config().resolve(moduleId + ".json");
 	}
 
 	/** Returns {@code defaultValue} if no config file exists yet or it fails to parse. */

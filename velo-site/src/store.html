@@ -22,7 +22,7 @@
   </header>
 
   <nav class="store-tabs" aria-label="Store sections" id="store-tabs">
-    <a href="#featured">Featured</a><a href="#daily">Daily picks</a><a href="#wings">Wings</a><a href="#capes">Cloaks</a><a href="#auras">Auras</a><a href="#emotes">Emotes</a><a href="#killfx">Kill FX</a><a href="#wear">Bodywear</a><a href="#bundles">Bundles</a><a href="#coins">Velo Coins</a><a href="#plus">Velo+</a>
+    <a href="#featured">Featured</a><a href="#daily">Daily picks</a><a href="#wings">Wings</a><a href="#capes">Cloaks</a><a href="#auras">Auras</a><a href="#emotes">Emotes</a><a href="#killfx">Kill FX</a><a href="#wear">Bodywear</a><a href="#pets">Pets</a><a href="#bundles">Bundles</a><a href="#coins">Velo Coins</a><a href="#plus">Velo+</a>
   </nav>
 
   <section class="store-section" id="featured" aria-label="Featured collection"><div class="skeleton" style="height:340px"></div></section>
@@ -33,7 +33,7 @@
 
   <div class="toolbar reveal" id="tools">
     <label class="sr-only" for="store-search">Search the Store</label>
-    <input id="store-search" type="search" placeholder="Search wings, cloaks, auras, emotes and kill effects…" autocomplete="off">
+    <input id="store-search" type="search" placeholder="Search wings, cloaks, pets, auras, emotes…" autocomplete="off">
     <label class="sr-only" for="store-sort">Sort</label>
     <select id="store-sort"><option value="featured">Featured first</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="name">Name</option></select>
     <label class="sr-only" for="store-owned">Show</label>
@@ -63,6 +63,10 @@
   <section class="store-section" id="wear" aria-labelledby="wear-h">
     <div class="store-section-head"><h2 id="wear-h">Bodywear <span class="pill">New</span></h2><span>Hats, ears, glasses, gold chains, scarves, watches, shoes and backpacks - one per slot, all worn at once, most of them in any colour you pick.</span></div>
     <div class="items" data-grid="wear"></div>
+  </section>
+  <section class="store-section" id="pets" aria-labelledby="pets-h" hidden>
+    <div class="store-section-head"><h2 id="pets-h">Pets <span class="pill">New</span></h2><span>A companion that follows you, does tricks, naps on your shoulder - and grows big enough to ride. Hover one to see it move.</span></div>
+    <div class="items" data-grid="pet"></div>
   </section>
   <section class="store-section" id="bundles" aria-labelledby="bundles-h">
     <div class="store-section-head"><h2 id="bundles-h">Bundles</h2><span>Several items for one price. Items you own already are taken off.</span></div>

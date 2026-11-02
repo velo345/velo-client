@@ -60,7 +60,6 @@ public final class GameLauncher {
 
 		listener.onPhase("Resolving version info...");
 		JsonObject vanilla = MojangVersionService.fetchVersionDetail(version.id());
-		JsonObject fabric = FabricMetaService.fetchLoaderProfile(version);
 		listener.onProgress(1.0);
 
 		Path modsDir = InstancePaths.modsDir(instance.id());
@@ -75,6 +74,8 @@ public final class GameLauncher {
 			ForeignClientJars.disableIn(modsDir);
 			ImmediatelyFastConfig.fixIn(InstancePaths.gameDir(instance.id()));
 		}
+		String loader = LoaderVersions.resolveFor(instance.id(), version, modsDir);
+		JsonObject fabric = FabricMetaService.fetchLoaderProfile(version, loader);
 
 		JsonArray vanillaLibraries = vanilla.getAsJsonArray("libraries");
 		JsonArray fabricLibraries = fabric.has("libraries") ? fabric.getAsJsonArray("libraries") : new JsonArray();
@@ -106,7 +107,9 @@ public final class GameLauncher {
 		}
 		listener.onProgress(1.0);
 
-		JavaRuntimeProvider.JavaRuntime runtime = JavaRuntimeProvider.forVersion(vanilla, listener);
+		// The launcher's own (newer) Java runs every version - unless a mod only accepts the version's own Java.
+		boolean ownJavaOk = net.veloclient.launcher.doctor.ModRequirements.acceptsJava(modsDir, Runtime.version().feature());
+		JavaRuntimeProvider.JavaRuntime runtime = JavaRuntimeProvider.forVersion(vanilla, listener, !ownJavaOk);
 
 		listener.onPhase("Starting Minecraft...");
 		return startProcess(instance, version, vanilla, fabric, libraries, clientJar, nativesDir, session, quickPlayServerAddress, runId, runtime);
@@ -198,6 +201,11 @@ public final class GameLauncher {
 		// JVM to resolve IPv4-only sidesteps it; it's the standard fix for
 		// this exact class of intermittent Minecraft connection timeout.
 		jvmArgs.add("-Djava.net.preferIPv4Stack=true");
+		GraphicsApi.applyPending(instance.id());
+		// The Doctor explains and fixes mod problems itself - Fabric's own error window would only stand in its way.
+		jvmArgs.add("-Dfabric.noGui=true");
+		// Which account's cosmetics the game wears (config/accounts/<uuid>/) - the same files the launcher's Locker edits.
+		jvmArgs.add("-Dvelo.account=" + session.uuid().replace("-", ""));
 		if (net.veloclient.launcher.AppVersion.DEV) {   // the dev game shares the dev launcher's folder (pets, loadouts, Locker)
 			jvmArgs.add("-Dvelo.home=" + net.veloclient.launcher.data.VeloPaths.root());
 		}

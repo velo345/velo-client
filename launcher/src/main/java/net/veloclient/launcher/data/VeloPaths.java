@@ -72,6 +72,54 @@ public final class VeloPaths {
 		return ROOT.resolve("config");
 	}
 
+	/** The Minecraft account (dashless uuid) the per-account files belong to; null = none known yet. */
+	private static volatile String account;
+
+	public static void setAccount(String uuid) {
+		account = uuid == null || uuid.isBlank() ? null : uuid.replace("-", "").toLowerCase(java.util.Locale.ROOT);
+	}
+
+	public static String account() {
+		return account;
+	}
+
+	/**
+	 * A config file that belongs to one Minecraft account - what it wears (cloak, wings, aura, ...), its name style,
+	 * its active look. These used to be global, so a second account showed the first one's cosmetics locally while
+	 * everyone else saw nothing (the server only accepts what the account owns). The old global file goes once to
+	 * the first account that asks for it ({@code accounts/legacy-owner.txt}), never to a second one.
+	 */
+	public static Path accountConfig(String fileName) {
+		String uuid = account;
+		if (uuid == null) {
+			return config().resolve(fileName);
+		}
+		Path dir = config().resolve("accounts").resolve(uuid);
+		Path file = dir.resolve(fileName);
+		Path legacy = config().resolve(fileName);
+		if (!Files.isDirectory(dir)) {
+			try {
+				Files.createDirectories(dir);
+			} catch (IOException ignored) {
+				// The write after this reports it.
+			}
+		}
+		if (!Files.exists(file) && Files.exists(legacy)) {
+			try {
+				Path owner = config().resolve("accounts").resolve("legacy-owner.txt");
+				if (!Files.exists(owner)) {
+					Files.writeString(owner, uuid);
+				}
+				if (uuid.equals(Files.readString(owner).strip())) {
+					Files.copy(legacy, file);
+				}
+			} catch (IOException ignored) {
+				// Starts empty for this account then.
+			}
+		}
+		return file;
+	}
+
 	public static Path profiles() {
 		return ROOT.resolve("profiles");
 	}

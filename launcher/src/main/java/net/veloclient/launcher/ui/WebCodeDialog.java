@@ -8,8 +8,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.util.Duration;
@@ -45,6 +43,10 @@ public final class WebCodeDialog {
 			open.close();
 		}
 		if (owner != null) {
+			// Closed to the tray, the window is hidden - a dialog owned by a hidden stage never appears.
+			if (!owner.isShowing()) {
+				owner.show();
+			}
 			owner.setIconified(false);
 			owner.toFront();
 			owner.requestFocus();
@@ -67,16 +69,16 @@ public final class WebCodeDialog {
 		left.getStyleClass().add("error-dialog-message");
 		Button copy = new Button("Copy code");
 		copy.getStyleClass().add("primary-button");
-		copy.setOnAction(e -> {
-			copyToClipboard(code);
-			copy.setText("Copied");
-		});
-		copyToClipboard(code);
+		copy.setOnAction(e -> copy.setText(Clipboards.copy(code) ? "Copied" : "Copy failed - type it by hand"));
+		boolean copied = Clipboards.copy(code);
+		if (!copied) {
+			copy.setText("Copy again");
+		}
 
 		long until = System.currentTimeMillis() + 5 * 60_000L;
 		Timeline countdown = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
 			long ms = until - System.currentTimeMillis();
-			left.setText(ms <= 0 ? expired : String.format("Copied to your clipboard · expires in %d:%02d", ms / 60_000, ms / 1000 % 60));
+			left.setText(ms <= 0 ? expired : String.format((copied ? "Copied to your clipboard · " : "") + "expires in %d:%02d", ms / 60_000, ms / 1000 % 60));
 		}));
 		countdown.setCycleCount(Timeline.INDEFINITE);
 		countdown.play();
@@ -94,11 +96,5 @@ public final class WebCodeDialog {
 		root.setPrefWidth(460);
 		dialog.getDialogPane().setContent(root);
 		dialog.show();
-	}
-
-	private static void copyToClipboard(String code) {
-		ClipboardContent content = new ClipboardContent();
-		content.putString(code);
-		Clipboard.getSystemClipboard().setContent(content);
 	}
 }

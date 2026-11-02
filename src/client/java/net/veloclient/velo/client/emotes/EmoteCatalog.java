@@ -87,6 +87,11 @@ public final class EmoteCatalog {
 
 	// ---- The wheel ----
 
+	/** The wheel changed in the launcher's Locker: read it again. */
+	public static synchronized void reloadFromDisk() {
+		slots = null;
+	}
+
 	private static synchronized String[] slots() {
 		if (slots == null) {
 			WheelState state = net.veloclient.velo.config.ConfigManager.load("cosmetics-emotes", WheelState.class, new WheelState(null, null));

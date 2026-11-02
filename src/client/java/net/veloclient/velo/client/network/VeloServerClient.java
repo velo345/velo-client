@@ -39,6 +39,11 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public final class VeloServerClient {
 
+	/** Extra heartbeat fields from features outside the core (dev build: the pet you have out). */
+	public static final java.util.List<java.util.function.Consumer<JsonObject>> HEARTBEAT_EXTRAS = new java.util.concurrent.CopyOnWriteArrayList<>();
+	/** Called with the online list's users after each poll (dev build: other players' pets). */
+	public static final java.util.List<java.util.function.Consumer<com.google.gson.JsonArray>> ONLINE_LISTENERS = new java.util.concurrent.CopyOnWriteArrayList<>();
+
 	// Deliberately independent of the server-advertised heartbeat interval
 	// (see VerifyResponse#heartbeatIntervalSeconds) - a short, fixed period
 	// keeps newly-joined players' badges appearing quickly for everyone else
@@ -393,6 +398,9 @@ public final class VeloServerClient {
 		if (emote != null) {
 			body.addProperty("emote", emote);
 		}
+		for (var extra : HEARTBEAT_EXTRAS) {
+			extra.accept(body);
+		}
 		JsonObject response = postJson(base + "/v1/heartbeat", body);
 		// Older servers don't echo the cape back - treat that as "accepted as sent".
 		if (!response.has("capeId")) {
@@ -433,6 +441,9 @@ public final class VeloServerClient {
 			}
 			VeloUserRegistry.replaceAll(entries);
 			net.veloclient.velo.client.emotes.Emotes.onOnline(emotes);
+			for (var listener : ONLINE_LISTENERS) {
+				listener.accept(json.getAsJsonArray("users"));
+			}
 		} catch (Exception e) {
 			VeloClient.LOGGER.debug("Velo Network online-list poll failed", e);
 		}

@@ -103,6 +103,8 @@ public final class LauncherSocial {
 
 	private static volatile MinecraftSession session;
 	private static volatile String token;
+	/** Swaps an expired Minecraft token for a fresh one (Microsoft refresh token) - set by LauncherApp. */
+	private static volatile java.util.function.UnaryOperator<MinecraftSession> tokenRefresher;
 	private static volatile State state;
 	private static volatile String status = "Not signed in";
 	private static volatile Thread worker;
@@ -175,6 +177,10 @@ public final class LauncherSocial {
 	}
 
 	/** (Re)starts for {@code newSession} - call on sign-in/account switch; null signs out. */
+	public static void setTokenRefresher(java.util.function.UnaryOperator<MinecraftSession> refresher) {
+		tokenRefresher = refresher;
+	}
+
 	public static synchronized void setSession(MinecraftSession newSession) {
 		if (demo) {
 			session = newSession;
@@ -185,6 +191,9 @@ public final class LauncherSocial {
 		if (newSession != null && !changed) {
 			return;
 		}
+		// Everything per account (Locker files, wallet, Velo+) follows the account that is signed in now.
+		VeloPaths.setAccount(newSession == null ? null : newSession.uuid());
+		StoreApi.resetForAccount();
 		token = null;
 		state = null;
 		CONVERSATIONS.clear();
@@ -295,11 +304,13 @@ public final class LauncherSocial {
 					authenticate();
 					since = 0;
 					status = "Connected";
+					net.veloclient.launcher.Connectivity.reportSuccess();
 					// The website (or the staff panel) may have asked for a sign-in code while the launcher was closed.
 					fetchWebCode();
 					fetchStaffCode();
 					// Velo+ decides the Home background: re-check it with this session.
 					StoreApi.refreshPlusInBackground();
+					publish(new Event("connected", null, null, null, null));
 				}
 				boolean idleNow = isWindowIdle();
 				if (System.currentTimeMillis() - lastHeartbeat > 30_000 || idleNow != lastIdleSent) {
@@ -341,6 +352,7 @@ public final class LauncherSocial {
 				sleep(e.code >= 500 ? 15_000 : 5_000);
 				since = 0;
 			} catch (Exception e) {
+				net.veloclient.launcher.Connectivity.reportFailure(e);
 				status = "Can't reach the Velo server - retrying";
 				LauncherLog.info("Velo social: " + e);
 				state = null;
@@ -365,10 +377,43 @@ public final class LauncherSocial {
 		if (current == null) {
 			throw new IllegalStateException("not signed in");
 		}
+		// Launchers stay open for days (tray, PC asleep overnight): the 24 h Minecraft token runs out and the
+		// connection - and with it website/staff sign-in codes - used to stay dead until a restart.
 		if (current.isAccessTokenExpired()) {
-			status = "Your sign-in expired - restart the launcher or sign in again";
+			current = refreshToken(current);
+		}
+		try {
+			authenticate(current);
+		} catch (HttpStatus e) {
+			if (e.code != 403 && e.code != 401) {
+				throw e;
+			}
+			// Mojang refused a token that looked valid (revoked, or the clock was off): one fresh token, one retry.
+			authenticate(refreshToken(current));
+		}
+	}
+
+	private static MinecraftSession refreshToken(MinecraftSession current) {
+		java.util.function.UnaryOperator<MinecraftSession> refresher = tokenRefresher;
+		MinecraftSession fresh = null;
+		try {
+			fresh = refresher == null ? null : refresher.apply(current);
+		} catch (Exception e) {
+			LauncherLog.info("Velo social: token refresh failed: " + e);
+		}
+		if (fresh == null) {
+			status = "Your sign-in expired - sign in again";
 			throw new IllegalStateException("access token expired");
 		}
+		synchronized (LauncherSocial.class) {
+			if (session != null && session.uuid().equals(fresh.uuid())) {
+				session = fresh;
+			}
+		}
+		return fresh;
+	}
+
+	private static void authenticate(MinecraftSession current) throws Exception {
 		String uuid = current.uuid().replace("-", "").toLowerCase();
 		JsonObject challenge = new JsonObject();
 		challenge.addProperty("uuid", uuid);

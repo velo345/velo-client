@@ -1,21 +1,27 @@
 <!--page {
 	"title": "Velo Client – Free Minecraft Launcher & Fabric Client (1.21.11 – 26.3)",
-	"description": "Velo Client is a free Minecraft launcher and Fabric client: more FPS out of the box, 108 free modules, a HUD you style yourself, friends and parties, PvP tools and 3D cosmetics. For 1.21.11, 26.1, 26.2 and 26.3.",
+	"description": "Velo Client is a free Minecraft launcher and Fabric client: more FPS out of the box, 119 free modules, a HUD you style yourself, friends and parties, PvP tools and 3D cosmetics. For 1.21.11, 26.1, 26.2 and 26.3.",
 	"path": "/",
 	"active": "home",
 	"priority": "1.0",
 	"changefreq": "weekly",
 	"lastmod": "latest-post",
-	"images": ["/assets/gui/launcher-home.webp", "/assets/gui/ingame-title.webp", "/assets/gui/ingame-locker.webp"],
+	"css": "home.css",
+	"js": "home.js",
+	"headScript": "intro-gate.js",
+	"bodyClass": "v2 home",
+	"ogImage": "/assets/hero/og.jpg",
+	"preload": "/assets/hero/hero-1600.webp",
+	"images": ["/assets/hero/hero-2560.webp", "/assets/shots/l-home.webp", "/assets/shots/title-velo-dark.webp", "/assets/shots/l-locker.webp"],
 	"schema": [
-		{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Velo Client", "applicationCategory": "GameApplication", "applicationSubCategory": "Minecraft client", "operatingSystem": "Windows 10, Windows 11, Linux", "softwareVersion": "1.0.0", "datePublished": "2026-11-01", "url": "https://velo-client.com/", "downloadUrl": "https://velo-client.com/download", "screenshot": ["https://velo-client.com/assets/gui/launcher-home.webp", "https://velo-client.com/assets/gui/ingame-title.webp", "https://velo-client.com/assets/gui/ingame-locker.webp"], "image": "https://velo-client.com/assets/og-image.jpg", "description": "A free Minecraft launcher and Fabric client with performance mods built in, 108 free modules, a customizable HUD, friends and parties, PvP tools and 3D cosmetics.", "featureList": ["Performance mods (Sodium, Lithium, FerriteCore) installed automatically", "108 free modules", "Drag-and-drop HUD editor", "Friends, parties and chat across servers", "World map and waypoints", "Clips: save the last 30 seconds", "Redstone Mode", "Emoji in chat like Discord", "Animated 3D wings, cloaks, auras, emotes, kill effects and bodywear"], "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR", "availability": "https://schema.org/InStock"}, "publisher": {"@id": "https://velo-client.com/#org"}},
+		{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Velo Client", "applicationCategory": "GameApplication", "applicationSubCategory": "Minecraft client", "operatingSystem": "Windows 10, Windows 11, Linux", "softwareVersion": "1.0.0", "datePublished": "2026-11-01", "url": "https://velo-client.com/", "downloadUrl": "https://velo-client.com/download", "screenshot": ["https://velo-client.com/assets/shots/l-home.webp", "https://velo-client.com/assets/shots/title-velo-dark.webp", "https://velo-client.com/assets/shots/l-locker.webp"], "image": "https://velo-client.com/assets/hero/og.jpg", "description": "A free Minecraft launcher and Fabric client with performance mods built in, 119 free modules, a customizable HUD, friends and parties, PvP tools and 3D cosmetics.", "featureList": ["Performance mods (Sodium, Lithium, FerriteCore) installed automatically", "119 free modules", "Drag-and-drop HUD editor", "Friends, parties and chat across servers", "World map and waypoints", "Clips: save the last 30 seconds", "Redstone Mode", "Emoji in chat like Discord", "Animated 3D wings, cloaks, auras, emotes, kill effects and bodywear"], "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR", "availability": "https://schema.org/InStock"}, "publisher": {"@id": "https://velo-client.com/#org"}},
 		{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
-			{"@type": "Question", "name": "Is Velo Client free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. The launcher, the client and all 108 modules are free. Velo+ and Store cosmetics are optional and never needed to play."}},
+			{"@type": "Question", "name": "Is Velo Client free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. The launcher, the client and all 119 modules are free. Velo+ and Store cosmetics are optional and never needed to play."}},
 			{"@type": "Question", "name": "Which Minecraft versions does Velo Client support?", "acceptedAnswer": {"@type": "Answer", "text": "Minecraft Java Edition 1.21.11, 26.1, 26.2 and 26.3 on Fabric. The launcher installs the right build for every profile."}},
 			{"@type": "Question", "name": "Can I keep my own mods?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Every profile is a normal Fabric instance: add mods from Modrinth inside the launcher or drop in your own jars. The Velo mod also works in any other Fabric launcher."}},
 			{"@type": "Question", "name": "Is Velo Client allowed on servers?", "acceptedAnswer": {"@type": "Answer", "text": "The client is made for normal play on any server. Always follow the rules of the server you join."}},
 			{"@type": "Question", "name": "Can I move over from Lunar Client, Modrinth or CurseForge?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. The launcher finds your existing Lunar, Modrinth and CurseForge setups and imports their mods, settings and servers in a few clicks."}},
-			{"@type": "Question", "name": "What is Velo+?", "acceptedAnswer": {"@type": "Answer", "text": "An optional monthly subscription: World Hosting for your friends, Cloud Sync with restore points, Clips Pro (1080p60 replay buffer and share links), animated Name Styles, animated custom cloaks, 2,000 Velo Coins every month, the + badge and the VIP role on Discord. Monthly or yearly, cancel any time."}},
+			{"@type": "Question", "name": "What is Velo+?", "acceptedAnswer": {"@type": "Answer", "text": "An optional monthly subscription: World Hosting for your friends, Cloud Sync with restore points, Clips Pro (1080p60 replay buffer, share links in 1080p60 for 60 days), picture and whiteboard World Notes, animated Name Styles, animated custom cloaks, 2,000 Velo Coins every month, the + badge and the VIP role on Discord. Monthly or yearly, cancel any time."}},
 			{"@type": "Question", "name": "Is there a free trial of Velo+?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Every account that never had Velo+ can try it free for 7 days, once. No payment details are needed and it ends by itself."}},
 			{"@type": "Question", "name": "Is Velo Client out of beta?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Velo Client 1.0 came out on November 1, 2026. Everyone who signs in to Velo for the first time during launch week (November 1 to 8) gets 1,000 Velo Coins free, and every player can pick one Store cosmetic for free."}},
 			{"@type": "Question", "name": "How do I get Velo Coins?", "acceptedAnswer": {"@type": "Answer", "text": "Earn them free from daily rewards, quests and inviting friends, get them every month with Velo+, or buy a coin pack."}},
@@ -23,305 +29,220 @@
 		]}
 	]
 }-->
-<section class="hero">
-  <div class="wrap hero-copy">
-    <a class="pill fade-up" style="--d:.05s" href="/news/1-0"><b>NEW</b> Velo Client 1.0: bodywear, kill effects, HD cloaks &amp; a free cosmetic <span aria-hidden="true">→</span></a>
-    <h1 data-split>Minecraft, but <span class="glow-text">sharper</span>.</h1>
-    <p class="lead fade-up" style="--d:.55s">A free launcher and Fabric client. More FPS out of the box, {{counts.modules}} free modules, a HUD you style yourself, friends and parties, and 3D wings, cloaks and auras every Velo player sees.</p>
-    <div class="hero-cta fade-up" style="--d:.7s">
-      <a class="btn btn-primary btn-lg magnetic" href="{{download.exe}}" data-download="windows">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5l7-1v7H3zM11 4.4 21 3v8.5H11zM3 12.5h7v7l-7-1zM11 12.5h10V21l-10-1.4z"/></svg>
+<div class="intro" aria-hidden="true" data-intro>
+  <div class="intro-grid" data-intro-grid></div>
+  <div class="intro-mark"><img src="/assets/logo.png" alt="" width="64" height="64"><span>VELO</span></div>
+</div>
+
+<section class="h-hero" data-hero>
+  <picture class="h-hero-bg" data-hero-bg>
+    <source media="(max-width: 760px)" srcset="/assets/hero/hero-mobile.webp">
+    <img src="/assets/hero/hero-1600.webp" srcset="/assets/hero/hero-1600.webp 1600w, /assets/hero/hero-2560.webp 2560w" sizes="100vw" width="2560" height="1440" alt="A Velo player in the Velo Neon cloak on a floating island at night" fetchpriority="high">
+  </picture>
+  <div class="h-hero-shade" aria-hidden="true"></div>
+  <div class="h-wrap h-hero-copy">
+    <a class="h-kicker h-in" style="--d:0" href="/news/1-0"><span>NEW</span> Velo Client 1.0 is out →</a>
+    <h1 class="h-title">
+      <span class="h-line"><span style="--d:1">Less setup.</span></span>
+      <span class="h-line"><span style="--d:2">More game.</span></span>
+    </h1>
+    <p class="h-lead h-in" style="--d:4">Profiles, mods, servers, friends and your cosmetics in one place, then one click and you're in. {{counts.modules}} free modules and the performance mods come built in.</p>
+    <div class="h-cta h-in" style="--d:5">
+      <a class="h-btn h-btn-red" href="{{download.exe}}" data-download="windows">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5l7-1v7H3zM11 4.4 21 3v8.5H11zM3 12.5h7v7l-7-1zM11 12.5h10V21l-10-1.4z"/></svg>
         Download for Windows
       </a>
-      <a class="btn btn-lg" href="/download">Linux, mod jars &amp; more</a>
+      <a class="h-btn" href="/download">Linux &amp; mod jars</a>
     </div>
-    {{> launch-countdown}}
-    <div class="hero-meta fade-up" style="--d:.85s"><span>v{{release.version}}</span><span>Minecraft {{minecraft.version}}</span><span>Free forever</span></div>
+    <div class="h-meta h-in" style="--d:6"><span>v{{release.version}}</span><span>Minecraft {{minecraft.version}}</span><span>Free forever</span></div>
   </div>
-  <div class="stage" aria-label="The Velo launcher and in-game menus">
-    <div class="stage-inner">
-      <div class="screen left"><img src="/assets/gui/ingame-title-800.webp" srcset="/assets/gui/ingame-title-800.webp 800w, /assets/gui/ingame-title.webp 1600w" sizes="(max-width: 760px) 0px, 640px" width="1600" height="840" alt="The animated Velo title screen in Minecraft" fetchpriority="low"></div>
-      <div class="screen main"><img src="/assets/gui/launcher-home.webp" srcset="/assets/gui/launcher-home-800.webp 800w, /assets/gui/launcher-home.webp 1591w" sizes="(max-width: 760px) 92vw, 1000px" width="1591" height="944" alt="The Velo launcher home screen with Continue playing, What's new and recent profiles" fetchpriority="high"></div>
-      <div class="screen right"><img src="/assets/gui/ingame-locker-800.webp" srcset="/assets/gui/ingame-locker-800.webp 800w, /assets/gui/ingame-locker.webp 1600w" sizes="(max-width: 760px) 0px, 640px" width="1600" height="840" alt="The Locker in game: wings, cloaks and auras on a 3D preview" fetchpriority="low"></div>
-    </div>
-    <div class="float-chip" style="left:6%;top:14%;--d:1.3s"><i>⚡</i><span>Performance mods<small>Sodium &amp; co. built in</small></span></div>
-    <div class="float-chip" style="right:5%;top:8%;--d:1.5s;animation-delay:-2s, 1.5s"><i>◆</i><span>{{counts.modules}} modules<small>all free</small></span></div>
-    <div class="float-chip" style="right:9%;top:52%;--d:1.7s;animation-delay:-4s, 1.7s"><i>●</i><span>Friends online<small>on every server</small></span></div>
-    <div class="stage-fade"></div>
+  <div class="h-hero-foot h-wrap h-in" style="--d:7">
+    <span>Velo Neon cloak · rendered from the real cloak art</span>
+    <a href="#launcher" class="h-scroll">Take the tour <span aria-hidden="true">↓</span></a>
   </div>
 </section>
 
-<div class="marquee" aria-label="Works with">
-  <div class="marquee-track">
-    <span><b>Ships with</b></span><span>Sodium</span><span>Lithium</span><span>FerriteCore</span><span>EntityCulling</span><span>ImmediatelyFast</span><span>ModernFix</span><span>Mod Menu</span><span><b>Imports from</b></span><span>Lunar Client</span><span>Modrinth</span><span>CurseForge</span><span><b>Minecraft</b></span><span>1.21.11</span><span>26.1</span><span>26.2</span><span>26.3</span>
-    <span aria-hidden="true"><b>Ships with</b></span><span aria-hidden="true">Sodium</span><span aria-hidden="true">Lithium</span><span aria-hidden="true">FerriteCore</span><span aria-hidden="true">EntityCulling</span><span aria-hidden="true">ImmediatelyFast</span><span aria-hidden="true">ModernFix</span><span aria-hidden="true">Mod Menu</span><span aria-hidden="true"><b>Imports from</b></span><span aria-hidden="true">Lunar Client</span><span aria-hidden="true">Modrinth</span><span aria-hidden="true">CurseForge</span><span aria-hidden="true"><b>Minecraft</b></span><span aria-hidden="true">1.21.11</span><span aria-hidden="true">26.1</span><span aria-hidden="true">26.2</span><span aria-hidden="true">26.3</span>
+<div class="h-ticker" aria-hidden="true">
+  <div class="h-ticker-track">
+    <span>{{counts.modules}} free modules</span><i>/</i><span>Sodium, Lithium &amp; FerriteCore built in</span><i>/</i><span>Import from Lunar, Modrinth, CurseForge</span><i>/</i><span>Minecraft 1.21.11 – 26.3</span><i>/</i><span>Friends &amp; parties on every server</span><i>/</i><span>Clips of your last 30 seconds</span><i>/</i>
+    <span>{{counts.modules}} free modules</span><i>/</i><span>Sodium, Lithium &amp; FerriteCore built in</span><i>/</i><span>Import from Lunar, Modrinth, CurseForge</span><i>/</i><span>Minecraft 1.21.11 – 26.3</span><i>/</i><span>Friends &amp; parties on every server</span><i>/</i><span>Clips of your last 30 seconds</span><i>/</i>
   </div>
 </div>
 
-<section class="section" aria-labelledby="numbers">
-  <div class="wrap">
-    <h2 id="numbers" class="sr-only">Velo Client in numbers</h2>
-    <div class="stats">
-      <div class="card stat spot reveal" style="--i:0"><b><span data-count="{{counts.modules}}">{{counts.modules}}</span></b><span>modules, every one of them free</span></div>
-      <div class="card stat spot reveal" style="--i:1"><b><span data-count="4">4</span></b><span>Minecraft versions, 1.21.11 to 26.3</span></div>
-      <div class="card stat spot reveal" style="--i:2"><b><span data-count="60">60</span></b><span>fps clips in 1080p with Clips Pro</span></div>
-      <div class="card stat spot reveal" style="--i:3"><b><em>€</em>0</b><span>to download and play. Always.</span></div>
+<section class="h-sec" id="launcher" aria-labelledby="launcher-h">
+  <div class="h-wrap">
+    <header class="h-head reveal">
+      <div><span class="h-num">01 / Launcher</span><h2 id="launcher-h">Click through<br>the real app.</h2></div>
+      <p>Every picture on this page is a real capture of Velo Client {{release.version}}. Switch pages like you would in the launcher, and tap the numbered points on Home.</p>
+    </header>
+    <div class="h-window reveal" data-tabs="launcher">
+      <div class="h-window-bar" role="tablist" aria-label="Launcher pages">
+        <span class="h-window-label">LAUNCHER</span>
+        <button role="tab" aria-selected="true" data-tab="0">Home</button>
+        <button role="tab" aria-selected="false" data-tab="1">Library</button>
+        <button role="tab" aria-selected="false" data-tab="2">Servers</button>
+        <button role="tab" aria-selected="false" data-tab="3">Store</button>
+        <button role="tab" aria-selected="false" data-tab="4">Locker</button>
+        <button role="tab" aria-selected="false" data-tab="5">Clips</button>
+      </div>
+      <div class="h-stage h-stage-launcher">
+        <img class="on" data-pane="0" src="/assets/shots/l-home.webp" srcset="/assets/shots/l-home-800.webp 800w, /assets/shots/l-home.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="898" alt="Velo launcher Home: continue playing LuckySMP, what's new, jump back in" loading="lazy">
+        <img data-pane="1" src="/assets/shots/l-library.webp" srcset="/assets/shots/l-library-800.webp 800w, /assets/shots/l-library.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="898" alt="Velo launcher Library with profiles for 26.2 and 1.21.11" loading="lazy">
+        <img data-pane="2" src="/assets/shots/l-servers.webp" srcset="/assets/shots/l-servers-800.webp 800w, /assets/shots/l-servers.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="898" alt="Velo launcher Servers with live ping and player counts" loading="lazy">
+        <img data-pane="3" src="/assets/shots/l-store.webp" srcset="/assets/shots/l-store-800.webp 800w, /assets/shots/l-store.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="898" alt="Velo launcher Store with a featured wings collection" loading="lazy">
+        <img data-pane="4" src="/assets/shots/l-locker.webp" srcset="/assets/shots/l-locker-800.webp 800w, /assets/shots/l-locker.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="934" alt="Velo launcher Locker with cloak, wings and aura on a 3D player" loading="lazy">
+        <img data-pane="5" src="/assets/shots/l-clips.webp" srcset="/assets/shots/l-clips-800.webp 800w, /assets/shots/l-clips.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="898" alt="Velo launcher Clips and screenshots" loading="lazy">
+        <div class="h-spots" data-spots>
+          <button type="button" style="left:4.6%;top:35%" data-spot="0" aria-label="Continue playing">1</button>
+          <button type="button" style="left:46.4%;top:3.6%" data-spot="1" aria-label="Search everything">2</button>
+          <button type="button" style="left:63.6%;top:3.6%" data-spot="2" aria-label="Velo Coins">3</button>
+          <button type="button" style="left:73.4%;top:11.4%" data-spot="3" aria-label="What's new">4</button>
+          <button type="button" style="left:2.2%;top:65.4%" data-spot="4" aria-label="Jump back in">5</button>
+          <button type="button" style="left:83.6%;top:92.4%" data-spot="5" aria-label="Connect">6</button>
+        </div>
+      </div>
+      <div class="h-caption" aria-live="polite">
+        <div><span class="h-caption-k" data-cap-k>HOME</span><strong data-cap-t>Continue where you left off</strong></div>
+        <p data-cap-p>Your last server with its mods and hours played up front. Connect starts the game straight onto it. Tap the numbered points.</p>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="section" aria-labelledby="gui" data-showcase>
-  <div class="wrap">
-    <div class="section-head reveal">
-      <span class="eyebrow">The new GUI</span>
-      <h2 id="gui">One look, from the launcher <span class="grad">into the game.</span></h2>
-      <p>Velo 0.9.7 redesigned everything you touch: the launcher, the title screen, the pause menu, the Store and the Locker. Scroll through it.</p>
-    </div>
-    <div class="showcase">
-      <div class="showcase-steps">
-        <article class="step" data-label="Launcher · Home">
-          <span class="eyebrow">Launcher</span>
-          <h3>Pick up where you left off.</h3>
-          <p>Home opens on the server you played last, one click from Connect. News, your recent profiles and friends' activity sit around it.</p>
-          <img class="step-shot" src="/assets/gui/launcher-home-800.webp" width="800" height="475" alt="Launcher home" loading="lazy">
-        </article>
-        <article class="step" data-label="Launcher · Library">
-          <span class="eyebrow">Library</span>
-          <h3>Every profile, ready to play.</h3>
-          <p>Each profile is a clean Fabric instance with its own mods, packs and settings. Velo installs Fabric, Java and the performance mods for you.</p>
-          <ul><li>Mods from Modrinth in one search</li><li>Import from Lunar, Modrinth and CurseForge</li><li>Memory set automatically for your PC</li></ul>
-          <img class="step-shot" src="/assets/gui/library-800.webp" width="800" height="475" alt="Launcher library" loading="lazy">
-        </article>
-        <article class="step" data-label="In game · Title screen">
-          <span class="eyebrow">In game</span>
-          <h3>A title screen that's alive.</h3>
-          <p>A ray-traced 3D world with a live sword duel, glowing in your theme colour. Your last server is one click away.</p>
-          <img class="step-shot" src="/assets/gui/ingame-title-800.webp" width="800" height="420" alt="Velo title screen" loading="lazy">
-        </article>
-        <article class="step" data-label="In game · Pause menu">
-          <span class="eyebrow">Pause menu</span>
-          <h3>Your toggles, right where you pause.</h3>
-          <p>Favourite modules, friends, clips and settings live in the pause menu, so you never dig through screens mid-game.</p>
-          <img class="step-shot" src="/assets/gui/ingame-pause-800.webp" width="800" height="420" alt="Velo pause menu" loading="lazy">
-        </article>
-        <article class="step" data-label="In game · Locker">
-          <span class="eyebrow">Locker</span>
-          <h3>Dress up on your own skin.</h3>
-          <p>Wings, cloaks and auras on a live 3D preview of your skin. Tune size, spread and flap, and every Velo player sees the result.</p>
-          <img class="step-shot" src="/assets/gui/ingame-locker-800.webp" width="800" height="420" alt="Velo Locker" loading="lazy">
-        </article>
-        <article class="step" data-label="Launcher · Store">
-          <span class="eyebrow">Store</span>
-          <h3>Daily picks, bundles and gifts.</h3>
-          <p>Try every cosmetic in 3D before you buy it with Velo Coins. Send gifts to friends and catch the daily picks.</p>
-          <img class="step-shot" src="/assets/gui/store-800.webp" width="800" height="475" alt="Velo Store" loading="lazy">
-        </article>
-        <article class="step" data-label="Launcher · Servers">
-          <span class="eyebrow">Servers &amp; friends</span>
-          <h3>See where your friends play.</h3>
-          <p>Live player counts for your servers, friends' presence, chat from the launcher and party invites that bring everyone to the same server.</p>
-          <img class="step-shot" src="/assets/gui/servers-800.webp" width="800" height="475" alt="Velo servers page" loading="lazy">
-        </article>
-        <article class="step" data-label="Launcher · Clips">
-          <span class="eyebrow">Clips</span>
-          <h3>That play? Already saved.</h3>
-          <p>Press F8 and Velo keeps the last 30 seconds. Watch them and share them right from the launcher.</p>
-          <img class="step-shot" src="/assets/gui/clips-800.webp" width="800" height="475" alt="Velo clips" loading="lazy">
-        </article>
+<section class="h-sec" id="ingame" aria-labelledby="ingame-h">
+  <div class="h-wrap">
+    <header class="h-head reveal">
+      <div><span class="h-num">02 / In game</span><h2 id="ingame-h">Your game,<br>your look.</h2></div>
+      <p>Pick a menu theme and see the title screen exactly as it opens. Everything you need in game sits one key away.</p>
+    </header>
+    <div class="h-split">
+      <div class="reveal" data-tabs="themes">
+        <div class="h-stage h-frame">
+          <img class="on" data-pane="0" src="/assets/shots/title-velo-dark.webp" srcset="/assets/shots/title-velo-dark-800.webp 800w, /assets/shots/title-velo-dark.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo title screen, Velo Dark theme" loading="lazy">
+          <img data-pane="1" src="/assets/shots/title-midnight.webp" srcset="/assets/shots/title-midnight-800.webp 800w, /assets/shots/title-midnight.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo title screen, Midnight theme" loading="lazy">
+          <img data-pane="2" src="/assets/shots/title-nord.webp" srcset="/assets/shots/title-nord-800.webp 800w, /assets/shots/title-nord.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo title screen, Nord theme" loading="lazy">
+          <img data-pane="3" src="/assets/shots/title-monochrome.webp" srcset="/assets/shots/title-monochrome-800.webp 800w, /assets/shots/title-monochrome.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo title screen, Monochrome theme" loading="lazy">
+          <img data-pane="4" src="/assets/shots/title-emerald.webp" srcset="/assets/shots/title-emerald-800.webp 800w, /assets/shots/title-emerald.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo title screen, Emerald theme" loading="lazy">
+          <img data-pane="5" src="/assets/shots/title-sunset.webp" srcset="/assets/shots/title-sunset-800.webp 800w, /assets/shots/title-sunset.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo title screen, Sunset theme" loading="lazy">
+        </div>
+        <div class="h-chips" role="tablist" aria-label="Menu theme">
+          <button role="tab" aria-selected="true" data-tab="0"><i style="--c:#ff4444"></i>Velo Dark</button>
+          <button role="tab" aria-selected="false" data-tab="1"><i style="--c:#3b5bff"></i>Midnight</button>
+          <button role="tab" aria-selected="false" data-tab="2"><i style="--c:#88c0d0"></i>Nord</button>
+          <button role="tab" aria-selected="false" data-tab="3"><i style="--c:#bbbbbb"></i>Monochrome</button>
+          <button role="tab" aria-selected="false" data-tab="4"><i style="--c:#2ecc71"></i>Emerald</button>
+          <button role="tab" aria-selected="false" data-tab="5"><i style="--c:#ff8040"></i>Sunset</button>
+        </div>
       </div>
-      <div class="showcase-view">
-        <div class="device">
-          <img src="/assets/gui/launcher-home.webp" alt="" class="on">
-          <img src="/assets/gui/library.webp" alt="" loading="lazy">
-          <img src="/assets/gui/ingame-title.webp" alt="" loading="lazy">
-          <img src="/assets/gui/ingame-pause.webp" alt="" loading="lazy">
-          <img src="/assets/gui/ingame-locker.webp" alt="" loading="lazy">
-          <img src="/assets/gui/store.webp" alt="" loading="lazy">
-          <img src="/assets/gui/servers.webp" alt="" loading="lazy">
-          <img src="/assets/gui/clips.webp" alt="" loading="lazy">
-          <span class="device-label">Launcher · Home</span>
+      <div class="reveal" data-tabs="ingame">
+        <div class="h-list" role="tablist" aria-label="In-game screens">
+          <button role="tab" aria-selected="true" data-tab="0"><b>01</b><span><strong>Right Shift menu</strong><small>{{counts.modules}} modules, searchable, with the HUD editor</small></span><em></em></button>
+          <button role="tab" aria-selected="false" data-tab="1"><b>02</b><span><strong>Locker in game</strong><small>Change your look without leaving the server</small></span><em></em></button>
+          <button role="tab" aria-selected="false" data-tab="2"><b>03</b><span><strong>Friends</strong><small>Messages and party invites while you play</small></span><em></em></button>
+          <button role="tab" aria-selected="false" data-tab="3"><b>04</b><span><strong>Emoji chat</strong><small>Real emoji in chat, :shortcodes: included</small></span><em></em></button>
+        </div>
+        <div class="h-stage h-frame">
+          <img class="on" data-pane="0" src="/assets/shots/g-rshift.webp" srcset="/assets/shots/g-rshift-800.webp 800w, /assets/shots/g-rshift.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo Right Shift menu with module cards" loading="lazy">
+          <img data-pane="1" src="/assets/shots/g-locker.webp" srcset="/assets/shots/g-locker-800.webp 800w, /assets/shots/g-locker.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo Locker in game with cloaks" loading="lazy">
+          <img data-pane="2" src="/assets/shots/g-friends.webp" srcset="/assets/shots/g-friends-800.webp 800w, /assets/shots/g-friends.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo friends list in game" loading="lazy">
+          <img data-pane="3" src="/assets/shots/g-emoji.webp" srcset="/assets/shots/g-emoji-800.webp 800w, /assets/shots/g-emoji.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Emoji suggestions in Minecraft chat" loading="lazy">
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="section rshift-section" aria-labelledby="rshift-h">
-  <div class="wrap">
-    <div class="section-head center reveal">
-      <span class="eyebrow">The Velo menu · Right Shift</span>
-      <h2 id="rshift-h">Every module, <span class="grad">one key away.</span></h2>
-      <p>Press Right Shift in game. Cards with a big icon and what each module is good for, a profile per game mode, quick settings on the side and Edit HUD one click away.</p>
-    </div>
-    <div class="rshift-stage reveal">
-      <div class="rshift-frame tilt-big">
-        <img src="/assets/gui/ingame-rshift.webp" srcset="/assets/gui/ingame-rshift-800.webp 800w, /assets/gui/ingame-rshift.webp 1600w" sizes="(max-width: 900px) 94vw, 1100px" width="1600" height="900" alt="The Velo menu in game: module cards with icons and tags, categories, profiles, search and quick settings" loading="lazy">
+<section class="h-sec" id="locker" aria-labelledby="locker-h">
+  <div class="h-wrap">
+    <header class="h-head reveal">
+      <div><span class="h-num">03 / Locker</span><h2 id="locker-h">Seen by everyone<br>on Velo.</h2></div>
+      <p>Cloaks with cloth physics, wings, auras, emotes and bodywear. Equip them in the launcher or in game and every Velo player around you sees them.</p>
+    </header>
+    <div class="h-window reveal" data-tabs="locker">
+      <div class="h-window-bar" role="tablist" aria-label="Locker">
+        <span class="h-window-label">LOCKER</span>
+        <button role="tab" aria-selected="true" data-tab="0">Cloaks</button>
+        <button role="tab" aria-selected="false" data-tab="1">Wings</button>
+        <button role="tab" aria-selected="false" data-tab="2">Auras</button>
+        <button role="tab" aria-selected="false" data-tab="3">Skins</button>
+        <a class="h-window-link" href="/store">Open the Store →</a>
       </div>
-      <div class="rshift-notes">
-        <div class="card spot"><b>{{counts.modules}} modules</b><span>HUD, PvP, performance, quality of life, server tools - each with its own icon and "good for" tag.</span></div>
-        <div class="card spot"><b>Profiles</b><span>SMP, Bed Wars, Practice... switch your whole setup per game mode from the top.</span></div>
-        <div class="card spot"><b>Quick settings</b><span>The most used options right on the side, everything else one click deeper.</span></div>
+      <div class="h-stage h-stage-locker">
+        <img class="on" data-pane="0" src="/assets/shots/l-locker.webp" srcset="/assets/shots/l-locker-800.webp 800w, /assets/shots/l-locker.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="934" alt="Locker, Cloaks tab: Obsidian cloak equipped" loading="lazy">
+        <img data-pane="1" src="/assets/shots/l-locker-wings.webp" srcset="/assets/shots/l-locker-wings-800.webp 800w, /assets/shots/l-locker-wings.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="934" alt="Locker, Wings tab with size, height and flap settings" loading="lazy">
+        <img data-pane="2" src="/assets/shots/l-locker-auras.webp" srcset="/assets/shots/l-locker-auras-800.webp 800w, /assets/shots/l-locker-auras.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="934" alt="Locker, Auras tab with colour and density" loading="lazy">
+        <img data-pane="3" src="/assets/shots/l-locker-skins.webp" srcset="/assets/shots/l-locker-skins-800.webp 800w, /assets/shots/l-locker-skins.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="934" alt="Locker, Skins tab with your saved skins" loading="lazy">
+      </div>
+      <div class="h-facts">
+        <div><b>Cloth physics</b><span>Cloaks swing, fold and catch the wind.</span></div>
+        <div><b>Your own cloak</b><span>Any picture or GIF becomes a cloak, elytra included.</span></div>
+        <div><b>Loadouts</b><span>Save a look, switch in one click, per account.</span></div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="section" aria-labelledby="everything">
-  <div class="wrap">
-    <div class="section-head reveal">
-      <span class="eyebrow">Features</span>
-      <h2 id="everything">Everything you'd install ten mods for.</h2>
-      <p>Built in, designed to work together, and saved per profile. Turn on what you need, leave the rest.</p>
-    </div>
-    <div class="bento">
-      <article class="card tile big spot reveal" style="--i:0">
-        <span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l5-5 4 4 7-8M15 8h5v5"/></svg></span>
-        <h3>More FPS, zero setup</h3>
-        <p>Sodium, Lithium, FerriteCore, EntityCulling and ImmediatelyFast come installed. Performance Boost presets, adaptive render distance, Render Culling for laggy lobbies and a Shader Cache for faster starts.</p>
-        <div class="tags"><span>Performance Boost</span><span>Render Culling</span><span>Shader Cache</span><span>Particle Limiter</span><span>Anti Farm Lag</span></div>
-      </article>
-      <article class="card tile spot reveal" style="--i:1">
-        <span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4H20v5.5L10 19.5l-5.5-5.5zM7 17l-3 3"/></svg></span>
-        <h3>Built for PvP</h3>
-        <p>1.7/1.8 animations, hit colour, cooldowns, reach display, Target HUD and a Fight Recap after every fight.</p>
-      </article>
-      <article class="card tile spot reveal" style="--i:2">
-        <span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v4h-7zM14 10h7v11h-7zM3 13h7v8H3z"/></svg></span>
-        <h3>A HUD you style</h3>
-        <p>Keystrokes, CPS, armor, potions, coordinates and more. Drag them, pick a style, font and background.</p>
-      </article>
-      <article class="card tile big spot reveal" style="--i:0">
-        <span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18.5 14.4c1.9.7 3 2.7 3 5.6"/></svg></span>
-        <h3>Friends and parties</h3>
-        <p>See where friends play, chat in game (press O) or from the launcher, start a party with live locations and voice groups, share waypoints.</p>
-        <div class="tile-img"><img src="/assets/gui/ingame-friends-800.webp" width="800" height="420" alt="Friends panel in game" loading="lazy"></div>
-      </article>
-      <article class="card tile wide spot reveal" style="--i:1">
-        <span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></svg></span>
-        <h3>Redstone Mode</h3>
-        <p>Press R and the game turns into a redstone editor: freeze and step ticks, copy, paste and stack with undo, schematics as holograms and community schematics.</p>
-        <div class="tags"><span>Tick timeline</span><span>Schematics</span><span>Wiring</span><span>Bulk replace</span></div>
-      </article>
-      <article class="card tile wide spot reveal" style="--i:0">
-        <span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14"/></svg></span>
-        <h3>World map &amp; waypoints</h3>
-        <p>Everything you explore, mapped. Death points, beams, minimap dots and lists per world.</p>
-      </article>
-      <article class="card tile wide spot reveal" style="--i:1">
-        <span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7M17 15l3 3-3 3"/></svg></span>
-        <h3>Background Queue</h3>
-        <p>Wait in a long server queue while you play somewhere else. Velo switches you over when it's your turn.</p>
-      </article>
-      <article class="card tile wide spot reveal" style="--i:2">
-        <span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.3 4.9 5.2.6-3.9 3.6 1.1 5.2L12 14.7 7.3 17.3l1.1-5.2-3.9-3.6 5.2-.6z"/></svg></span>
-        <h3>Quality of life</h3>
-        <p>Zoom, Free Look, Toggle Sprint, Auto Reconnect, Shulker Preview, chat tweaks and more.</p>
-      </article>
-      <article class="card tile wide spot reveal" style="--i:0">
-        <span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.3 14.2c1 1.4 2.3 2.1 3.7 2.1s2.7-.7 3.7-2.1M9 9.5h.01M15 9.5h.01"/></svg></span>
-        <h3>Emoji Chat</h3>
-        <p>Emoji show as colour pictures in chat, like on Discord. Type :fire: or :skull: - Tab completes, and everyone sees a real emoji.</p>
-        <div class="tile-img"><img src="/assets/gui/ingame-emoji-800.webp" width="800" height="450" alt="Emoji in Minecraft chat with suggestions" loading="lazy"></div>
-      </article>
-      <article class="card tile wide spot reveal" style="--i:1">
-        <span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 20c0-4 .8-8 2.5-11M11 20c0-5 .2-9 1.2-13M16.5 20c0-4-.8-7-2.5-10M3.5 20h17M3 3l18 18"/></svg></span>
-        <h3>Hide Foliage &amp; Turbo Block Entities</h3>
-        <p>Hide grass, seagrass, sprouts and leaf litter for a clear view, and stop drawing far-away chests and signs - more FPS where it counts.</p>
-        <div class="tags"><span>Clear view</span><span>Fewer polygons</span><span>Chest-heavy servers</span><span>Container Animations</span></div>
-      </article>
-    </div>
-    <p class="reveal" style="text-align:center;margin-top:28px"><a class="btn" href="/features">See all {{counts.modules}} modules</a></p>
-  </div>
-</section>
-
-<section class="section" aria-labelledby="cos">
-  <div class="wrap">
-    <div class="section-head center reveal">
-      <span class="eyebrow">Cosmetics</span>
-      <h2 id="cos">Wings, cloaks, kill effects and bodywear <span class="grad">everyone sees.</span></h2>
-      <p>Real 3D wings that come alive - flames lick, tentacles writhe, gears turn, metal shines - animated cloaks with cloth physics, auras you tune to your colour, kill effects with their own sounds, and hats, glasses, gold chains, watches, shoes and backpacks you mix and recolour in any colour. Every Velo player sees them.</p>
-      <p style="margin-top:10px"><span class="pill"><b>Gift</b> Velo Client 1.0 is out: every player picks one cosmetic for free</span></p>
-    </div>
-    <div class="cosmetics">
-      <a class="card cos-card reveal" style="--i:0" href="/store#wings">
-        <span class="cos-art" data-cosmetic="wings_clockwork,wings_phoenix" data-type="wings"><img src="/assets/store/wings_clockwork.webp" alt="Clockwork Wings" loading="lazy"></span>
-        <span class="cos-body"><span class="kind">3D wings</span><h3 data-name>Clockwork Wings</h3><p>Gears turn, metal shines - size, spread and flap are yours to tune.</p></span>
-      </a>
-      <a class="card cos-card reveal" style="--i:1" href="/store#capes">
-        <span class="cos-art" data-cosmetic="cape_plasma_orb,cape_dragon_eye,cape_thunderstrike" data-type="cape"><img src="/assets/store/cape_plasma_orb.webp" alt="Plasma Orb cloak" loading="lazy"></span>
-        <span class="cos-body"><span class="kind">HD cloak</span><h3 data-name>Plasma Orb</h3><p>Real cloth, every side drawn - plays in game exactly like here.</p></span>
-      </a>
-      <a class="card cos-card reveal" style="--i:2" href="/store#killfx">
-        <span class="cos-art" data-cosmetic="killfx_blackhole,killfx_phoenix" data-type="killfx"><img class="aura-img" src="/assets/killfx/blackhole.webp" alt="Black Hole kill effect" loading="lazy"></span>
-        <span class="cos-body"><span class="kind">Kill effect</span><h3 data-name>Black Hole</h3><p>Plays where your opponent goes down - with its own sound.</p></span>
-      </a>
-      <a class="card cos-card reveal" style="--i:3" href="/store#wear">
-        <span class="cos-art" data-cosmetic="wear_top_hat,wear_aviators" data-type="wear"><img src="/assets/store/wear_top_hat.webp" alt="Top Hat" loading="lazy"></span>
-        <span class="cos-body"><span class="kind">Bodywear</span><h3 data-name>Top Hat</h3><p>One per slot, all at once - in any colour.</p></span>
-      </a>
-    </div>
-    <p class="reveal" style="text-align:center;margin-top:28px"><a class="btn btn-primary magnetic" href="/store">Open the Store</a></p>
-  </div>
-</section>
-
-<section class="section" aria-labelledby="themes-h">
-  <div class="wrap">
-    <div class="section-head reveal">
-      <span class="eyebrow">Themes</span>
-      <h2 id="themes-h">Make it yours.</h2>
-      <p>Velo Dark, Emerald, Sunset, Midnight and more: one click recolours the launcher and the whole in-game interface.</p>
-    </div>
-    <div class="themes">
-      <figure class="theme reveal" style="--i:0;margin:0"><img src="/assets/gui/title-velo-dark.webp" width="1200" height="675" alt="Velo Dark theme title screen" loading="lazy"><span>Velo Dark</span></figure>
-      <figure class="theme reveal" style="--i:1;margin:0"><img src="/assets/gui/title-emerald.webp" width="1200" height="675" alt="Emerald theme title screen" loading="lazy"><span>Emerald</span></figure>
-      <figure class="theme reveal" style="--i:2;margin:0"><img src="/assets/gui/title-sunset.webp" width="1200" height="675" alt="Sunset theme title screen" loading="lazy"><span>Sunset</span></figure>
-      <figure class="theme reveal" style="--i:3;margin:0"><img src="/assets/gui/title-midnight.webp" width="1200" height="675" alt="Midnight theme title screen" loading="lazy"><span>Midnight</span></figure>
-    </div>
-  </div>
-</section>
-
-<section class="section" aria-labelledby="plus-h">
-  <div class="wrap">
-    <div class="plus-card reveal">
-      <div class="plus-top">
-        <div>
-          <span class="plus-badge">VELO+</span>
-          <h2 id="plus-h">Host your world, keep your setup in the cloud, clip everything.</h2>
-          <p>Cloud Sync with restore points, Clips Pro at 1080p60 with share links, World Hosting for your friends, animated Name Styles, animated custom cloaks, your own Home background in the launcher, Velo Coins every month and the + badge. Cancel any time.</p>
+<section class="h-sec h-plus" id="plus" aria-labelledby="plus-h">
+  <div class="h-wrap">
+    <header class="h-head reveal">
+      <div><span class="h-num h-num-plus">04 / Velo<b>+</b></span><h2 id="plus-h">Host your world.<br>Keep your setup.</h2></div>
+      <p>Velo is free and stays free. Velo+ adds the things that cost us servers to run, and keeps Velo independent.</p>
+    </header>
+    <div class="h-plus-grid">
+      <div class="h-plus-offer reveal">
+        <div class="h-price"><span>{{plus.price}}</span><small>per month · or yearly</small></div>
+        <ul class="h-plus-list" role="tablist" aria-label="Velo+ features" data-tabs-control="plus">
+          <li><button role="tab" aria-selected="true" data-tab="0"><strong>World Hosting</strong><small>Your world for friends, no port forwarding</small></button></li>
+          <li><button role="tab" aria-selected="false" data-tab="1"><strong>Name Styles</strong><small>Animated names in chat, tab list and above your head</small></button></li>
+          <li><button role="tab" aria-selected="false" data-tab="2"><strong>Cloud Sync</strong><small>Restore points for your setup on every PC</small></button></li>
+          <li><button role="tab" aria-selected="false" data-tab="3"><strong>Discover</strong><small>Join friends' worlds and public worlds</small></button></li>
+          <li><button role="tab" aria-selected="false" data-tab="4"><strong>Everything in Velo+</strong><small>{{plus.monthlyCoins}} coins a month, Clips Pro, the + badge</small></button></li>
+        </ul>
+        <div class="h-cta">
+          <a class="h-btn h-btn-red" href="/store#plus">Try {{plus.trialDays}} days free</a>
+          <a class="h-btn" href="/features#plus">Compare</a>
         </div>
-        <div style="display:grid;gap:12px;justify-items:start">
-          <span class="price">{{plus.price}}<small> / month</small></span>
-          <a class="btn btn-primary btn-lg magnetic" href="/features#plus">See what's included</a>
+        <p class="h-fine">Free for {{plus.trialDays}} days, once per account. No payment details, nothing renews by itself.</p>
+      </div>
+      <div class="reveal" data-tabs="plus">
+        <div class="h-stage h-frame">
+          <img class="on" data-pane="0" src="/assets/shots/g-host.webp" srcset="/assets/shots/g-host-800.webp 800w, /assets/shots/g-host.webp 1600w" sizes="(max-width: 980px) 100vw, 720px" width="1600" height="900" alt="World Hosting: play this world with friends" loading="lazy">
+          <img data-pane="1" src="/assets/shots/g-namestyle.webp" srcset="/assets/shots/g-namestyle-800.webp 800w, /assets/shots/g-namestyle.webp 1600w" sizes="(max-width: 980px) 100vw, 720px" width="1600" height="900" alt="Name Styles with presets and live preview" loading="lazy">
+          <img data-pane="2" src="/assets/shots/g-cloud.webp" srcset="/assets/shots/g-cloud-800.webp 800w, /assets/shots/g-cloud.webp 1600w" sizes="(max-width: 980px) 100vw, 720px" width="1600" height="900" alt="Cloud Sync with restore points" loading="lazy">
+          <img data-pane="3" src="/assets/shots/g-discover.webp" srcset="/assets/shots/g-discover-800.webp 800w, /assets/shots/g-discover.webp 1600w" sizes="(max-width: 980px) 100vw, 720px" width="1600" height="900" alt="Discover worlds to join" loading="lazy">
+          <img data-pane="4" src="/assets/shots/l-plus.webp" srcset="/assets/shots/l-plus-800.webp 800w, /assets/shots/l-plus.webp 1600w" sizes="(max-width: 980px) 100vw, 720px" width="1600" height="898" alt="Velo+ in the launcher Store: what you get" loading="lazy">
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<section class="section" aria-labelledby="news-h">
-  <div class="wrap">
-    <div class="store-section-head reveal">
-      <h2 id="news-h" style="font-size:clamp(1.8rem,3vw,2.4rem)">What's new</h2>
-      <a href="/news">All news →</a>
-    </div>
-    <div class="news-grid">
+<section class="h-sec" aria-labelledby="news-h">
+  <div class="h-wrap">
+    <header class="h-head reveal">
+      <div><span class="h-num">05 / News</span><h2 id="news-h">What's new</h2></div>
+      <a class="h-link" href="/news">All news →</a>
+    </header>
+    <div class="news-grid h-news">
 {{news.latest}}
     </div>
   </div>
 </section>
 
-<section class="section" id="faq" aria-labelledby="faq-h">
-  <div class="wrap">
-    <div class="section-head center reveal"><span class="eyebrow">FAQ</span><h2 id="faq-h">Questions, answered.</h2></div>
-    <div class="faq">
-      <details class="reveal"><summary>Is Velo Client free?</summary><div class="answer"><p>Yes. The launcher, the client and all {{counts.modules}} modules are free. Velo+ and Store cosmetics are optional and never needed to play.</p></div></details>
-      <details class="reveal"><summary>Which Minecraft versions does Velo Client support?</summary><div class="answer"><p>Minecraft Java Edition {{minecraft.version}} on Fabric. The launcher installs the right build for every profile.</p></div></details>
-      <details class="reveal"><summary>Can I keep my own mods?</summary><div class="answer"><p>Yes. Every profile is a normal Fabric instance: add mods from Modrinth inside the launcher or drop in your own jars. The Velo mod also works in any other Fabric launcher.</p></div></details>
-      <details class="reveal"><summary>Is Velo Client allowed on servers?</summary><div class="answer"><p>The client is made for normal play on any server. Always follow the rules of the server you join.</p></div></details>
-      <details class="reveal"><summary>Can I move over from Lunar Client, Modrinth or CurseForge?</summary><div class="answer"><p>Yes. The launcher finds your existing Lunar, Modrinth and CurseForge setups and imports their mods, settings and servers in a few clicks.</p></div></details>
-      <details class="reveal"><summary>What is Velo+?</summary><div class="answer"><p>An optional monthly subscription: World Hosting for your friends, Cloud Sync with restore points, Clips Pro (1080p60 replay buffer and share links), animated Name Styles, animated custom cloaks, {{plus.monthlyCoins}} Velo Coins every month, the + badge and the VIP role on Discord. Cancel any time.</p></div></details>
-      <details class="reveal"><summary>How do I get Velo Coins?</summary><div class="answer"><p>Earn them free from daily rewards, quests and inviting friends, get them every month with Velo+, or buy a coin pack.</p></div></details>
-      <details class="reveal"><summary>Does Velo Client run on Mac?</summary><div class="answer"><p>The launcher is available for Windows and Linux. On macOS you can use the Velo mod jars in any Fabric launcher.</p></div></details>
+<section class="h-sec" id="faq" aria-labelledby="faq-h">
+  <div class="h-wrap h-faq-wrap">
+    <header class="h-head reveal">
+      <div><span class="h-num">06 / FAQ</span><h2 id="faq-h">Questions,<br>answered.</h2></div>
+    </header>
+    <div class="h-faq">
+<details class="reveal"><summary>Is Velo Client free?</summary><div class="answer"><p>Yes. The launcher, the client and all {{counts.modules}} modules are free. Velo+ and Store cosmetics are optional and never needed to play.</p></div></details>
+<details class="reveal"><summary>Which Minecraft versions does Velo Client support?</summary><div class="answer"><p>Minecraft Java Edition {{minecraft.version}} on Fabric. The launcher installs the right build for every profile.</p></div></details>
+<details class="reveal"><summary>Can I keep my own mods?</summary><div class="answer"><p>Yes. Every profile is a normal Fabric instance: add mods from Modrinth inside the launcher or drop in your own jars. The Velo mod also works in any other Fabric launcher.</p></div></details>
+<details class="reveal"><summary>Is Velo Client allowed on servers?</summary><div class="answer"><p>The client is made for normal play on any server. Always follow the rules of the server you join.</p></div></details>
+<details class="reveal"><summary>Can I move over from Lunar Client, Modrinth or CurseForge?</summary><div class="answer"><p>Yes. The launcher finds your existing Lunar, Modrinth and CurseForge setups and imports their mods, settings and servers in a few clicks.</p></div></details>
+<details class="reveal"><summary>What is Velo+?</summary><div class="answer"><p>An optional monthly subscription: World Hosting for your friends, Cloud Sync with restore points, Clips Pro (1080p60 replay buffer, share links in 1080p60 for 60 days), picture and whiteboard World Notes, animated Name Styles, animated custom cloaks, {{plus.monthlyCoins}} Velo Coins every month, the + badge and the VIP role on Discord. Cancel any time.</p></div></details>
+<details class="reveal"><summary>How do I get Velo Coins?</summary><div class="answer"><p>Earn them free from daily rewards, quests and inviting friends, get them every month with Velo+, or buy a coin pack.</p></div></details>
+<details class="reveal"><summary>Does Velo Client run on Mac?</summary><div class="answer"><p>The launcher is available for Windows and Linux. On macOS you can use the Velo mod jars in any Fabric launcher.</p></div></details>
     </div>
   </div>
 </section>

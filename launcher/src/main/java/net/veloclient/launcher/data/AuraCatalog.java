@@ -103,7 +103,7 @@ public final class AuraCatalog {
 	// ---- Equipped and settings (config/cosmetics-aura.json, shared with the game) ----
 
 	private static Path file() {
-		return VeloPaths.config().resolve("cosmetics-aura.json");
+		return VeloPaths.accountConfig("cosmetics-aura.json");
 	}
 
 	private static JsonObject read() {

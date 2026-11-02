@@ -397,10 +397,15 @@ public final class PauseMenu {
 		if (essentialMode) {
 			// Essential's character goes right next to the menu - it has to stay in the left half of the screen (see
 			// EssentialAnchors) - and the cards after it, when they fit before Essential's side menu; else they give way.
-			EssentialAnchors.Plan plan = EssentialAnchors.plan(width, margin + colW, false);
-			if (plan != null) {
+			// One top anchor here (Back to Game) - split anyway: see anchorForEssential (a wide anchor, its left edge off-screen).
+			EssentialAnchors.Plan plan = EssentialAnchors.plan(width, margin + colW, true);
+			if (plan != null && plan.playerShown()) {
 				cardX = EssentialAnchors.playerRight(margin + colW) + 14;
 				room = cardX + cardW + 8 <= EssentialAnchors.menuLeft(width, plan.topX() + EssentialAnchors.ANCHOR_W);
+			} else if (plan != null) {
+				// No room for Essential's character: it goes, its side menu (host, invite...) stays - right of our cards if they fit.
+				cardX = margin + colW + 16;
+				room = cardX + cardW + 8 <= EssentialAnchors.menuLeft(width, plan.menuX() + EssentialAnchors.ANCHOR_W);
 			} else {
 				room = true;
 			}
@@ -457,8 +462,15 @@ public final class PauseMenu {
 	private static void anchorForEssential(Map<String, ClickableWidget> anchors, EssentialAnchors.Plan plan) {
 		for (ClickableWidget widget : anchors.values()) {
 			int[] first = FIRST_SEEN.get(widget);
-			widget.setX(plan == null ? -10000 : plan.topX());
-			widget.setWidth(EssentialAnchors.ANCHOR_W);
+			if (plan != null && !plan.playerShown()) {
+				// Essential takes its character from this button's left edge and its side menu from its right edge: one
+				// very wide anchor puts the character off-screen and keeps the side menu where the plan wants it.
+				widget.setX(plan.topX());
+				widget.setWidth(plan.menuX() + EssentialAnchors.ANCHOR_W - plan.topX());
+			} else {
+				widget.setX(plan == null ? -10000 : plan.topX());
+				widget.setWidth(EssentialAnchors.ANCHOR_W);
+			}
 			if (first != null) {
 				widget.setY(first[1]);
 				widget.setHeight(first[3]);

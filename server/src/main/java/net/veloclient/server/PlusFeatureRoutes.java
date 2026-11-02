@@ -358,8 +358,8 @@ final class PlusFeatureRoutes {
 
 		// ---- Clips Pro ----
 		clipService = clips;
+		// Every Velo player can share clips (free: 720p30, fewer, 30 days; Velo+: up to 1080p60, more, longer).
 		route(server, registry, "/v1/clips/upload", "POST", (ex, s) -> {
-			requirePlus(store, s);
 			if (moderation != null) {
 				moderation.check(ModerationService.CLIP, s.uuid());
 			}
@@ -369,7 +369,7 @@ final class PlusFeatureRoutes {
 			long length = lengthHeader == null ? -1 : Long.parseLong(lengthHeader.trim());
 			ClipShareService.Meta meta = new ClipShareService.Meta(q.get("title"), parseDouble(q.get("seconds")), parseInt(q.get("width")),
 					parseInt(q.get("height")), parseInt(q.get("fps")), q.get("trigger"), q.get("server"));
-			ClipShareService.Clip clip = clips.upload(s.uuid(), s.username(), meta, ex.getRequestBody(), length);
+			ClipShareService.Clip clip = clips.upload(s.uuid(), s.username(), meta, ex.getRequestBody(), length, store.isPlus(s.uuid()));
 			JsonHttp.writeJson(ex, 200, view(clip, siteUrl));
 		});
 		route(server, registry, "/v1/clips/thumb", "POST", (ex, s) -> {
@@ -378,12 +378,15 @@ final class PlusFeatureRoutes {
 		});
 		route(server, registry, "/v1/clips/mine", "GET", (ex, s) -> {
 			Map<String, Object> out = new LinkedHashMap<>();
-			out.put("plus", store.isPlus(s.uuid()));
+			boolean plus = store.isPlus(s.uuid());
+			ClipShareService.Limits limits = clips.limits(plus);
+			out.put("plus", plus);
 			out.put("clips", clips.of(s.uuid()).stream().map(c -> view(c, siteUrl)).toList());
 			out.put("usedBytes", clips.usedBytes(s.uuid()));
-			out.put("maxBytes", ClipShareService.MAX_USER_BYTES);
-			out.put("maxClipBytes", ClipShareService.MAX_CLIP_BYTES);
-			out.put("retentionDays", clips.retentionDays());
+			out.put("maxBytes", limits.maxBytes());
+			out.put("maxClipBytes", limits.maxClipBytes());
+			out.put("maxClips", limits.maxClips());
+			out.put("retentionDays", limits.retentionDays());
 			JsonHttp.writeJson(ex, 200, out);
 		});
 		route(server, registry, "/v1/clips/delete", "POST", (ex, s) -> {

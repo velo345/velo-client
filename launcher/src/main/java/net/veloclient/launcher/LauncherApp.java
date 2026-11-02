@@ -136,6 +136,11 @@ public final class LauncherApp extends Application {
 	public static void main(String[] args) {
 		mainAt = System.nanoTime();
 		LauncherLog.install();
+		// Linux: AWT (clipboard, browser fallback) must load the same GTK 3 as JavaFX - mixing in GTK 2 aborts the whole process.
+		if (System.getProperty("jdk.gtk.version") == null) {
+			System.setProperty("jdk.gtk.version", "3");
+		}
+		NativeCrashCheck.scan();
 		// Under Wayland the compositor already presents tear-free; JavaFX's own vsync on top only makes the
 		// NVIDIA driver leak ~4x faster per frame under XWayland (see RenderGate).
 		if ("wayland".equalsIgnoreCase(System.getenv("XDG_SESSION_TYPE")) && System.getProperty("prism.vsync") == null) {
@@ -195,7 +200,7 @@ public final class LauncherApp extends Application {
 		content = new StackPane();
 		content.setPadding(new Insets(24, 32, 22, 32));
 
-		root.setTop(buildTopBar());
+		root.setTop(new javafx.scene.layout.VBox(buildTopBar(), net.veloclient.launcher.ui.OfflineBanner.build(this::retryOnline)));
 		root.setCenter(content);
 		root.setBottom(buildLaunchBar());
 		// Home itself is built once the window is up, behind the splash (finishStartup).
@@ -239,6 +244,7 @@ public final class LauncherApp extends Application {
 		splash.intro(() -> {
 			try {
 				finishStartup(firstStart);
+				javafx.application.Platform.runLater(() -> NativeCrashCheck.offer(stage));
 			} catch (Throwable error) {
 				// Never stay stuck on the splash: show whatever got built and say what broke.
 				root.setOpacity(1);
@@ -272,6 +278,48 @@ public final class LauncherApp extends Application {
 			stage.toFront();
 		}));
 
+		net.veloclient.launcher.social.LauncherSocial.setTokenRefresher(expired -> {
+			try {
+				MinecraftSession fresh = new MicrosoftAuth(MICROSOFT_CLIENT_ID).signInWithRefreshToken(expired.microsoftRefreshToken());
+				AuthSession.save(fresh);
+				Platform.runLater(() -> {
+					if (session != null && session.uuid().equals(fresh.uuid())) {
+						session = fresh;
+					}
+				});
+				return fresh;
+			} catch (Exception e) {
+				throw new IllegalStateException(e);
+			}
+		});
+		installLockerWatch();
+		// After a Doctor fix in the crash dialog, the profile starts again the way it was started (same server).
+		net.veloclient.launcher.ui.CrashReportDialog.relaunch = inst -> Platform.runLater(() -> {
+			Instance fresh = InstanceStore.loadAll().stream().filter(i -> i.id().equals(inst.id())).findFirst().orElse(inst);
+			showHome();
+			launchWithProgress(fresh, lastQuickPlay.getOrDefault(fresh.id(), java.util.Optional.empty()).orElse(null),
+					launchBar.playButton(), launchBar.progress(), launchBar.statusLabel());
+		});
+		{
+			// Read every profile's mods once in the background, so the Doctor's checks (Play, profile page) are instant.
+			Thread.ofVirtual().start(() -> {
+				try {
+					Thread.sleep(8000);
+					for (Instance inst : InstanceStore.loadAll()) {
+						net.veloclient.launcher.doctor.Doctor.check(inst);
+					}
+				} catch (Exception ignored) {
+					// Only a warm-up.
+				}
+			});
+		}
+		// Ctrl+Shift+B: report a bug from anywhere.
+		stage.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, e -> {
+			if (e.getCode() == javafx.scene.input.KeyCode.B && e.isShortcutDown() && e.isShiftDown()) {
+				net.veloclient.launcher.ui.BugReportDialog.show(stage);
+				e.consume();
+			}
+		});
 		attemptSilentSignIn();
 		partyController = new net.veloclient.launcher.party.PartyController(stage, this::currentProfile,
 				(instance, server) -> Platform.runLater(() -> {
@@ -294,6 +342,11 @@ public final class LauncherApp extends Application {
 			if ("staff_code".equals(event.type())) {
 				// staff.velo-client.com: the first sign-in of a team member on a new device.
 				Platform.runLater(() -> net.veloclient.launcher.ui.WebCodeDialog.showStaff(stage, event.fromName()));
+				return;
+			}
+			if ("connected".equals(event.type())) {
+				// Connected as this account (after start or a switch): its wallet decides what the Locker and Store unlock.
+				Platform.runLater(this::refreshOwned);
 				return;
 			}
 			refreshFriendsBadge();
@@ -711,6 +764,8 @@ public final class LauncherApp extends Application {
 	private net.veloclient.launcher.ui.LaunchBar launchBar;
 	/** The top-bar page the window is on ("home", "store", ...; "" for a sub page like a profile). */
 	private String activePage = "home";
+	/** The server each profile was last started for (empty = no server) - a Doctor relaunch goes to the same place. */
+	private final java.util.Map<String, java.util.Optional<String>> lastQuickPlay = new java.util.concurrent.ConcurrentHashMap<>();
 
 	private net.veloclient.launcher.ui.TopBar buildTopBar() {
 		TextField search = net.veloclient.launcher.ui.HomeSearch.create(this::globalSearchEntries);
@@ -805,6 +860,8 @@ public final class LauncherApp extends Application {
 				{"Friends", "Page · friends & party", "chat party social", (Runnable) this::showFriends, "friends"},
 				{"Invite friends", "Earn Velo Coins", "referral code invite", (Runnable) this::showReferrals, "gift"},
 				{"Settings", "Page", "options preferences memory ram", (Runnable) this::showSettings, "settings"},
+				{"Report a bug", "Send the Velo team a bug report", "bug report problem broken issue feedback",
+						(Runnable) () -> net.veloclient.launcher.ui.BugReportDialog.show(stage), "bug"},
 				{"Themes", "Settings · colors", "theme colors appearance custom", (Runnable) this::showThemeEditor, "palette"},
 				{"Switch from another client", "Import keybinds, servers, mods", "lunar dawn feather modrinth curseforge import", (Runnable) this::showClientImport, "swap"},
 				{"New profile", "Create a profile", "create add instance", (Runnable) this::createNewProfile, "plus"},
@@ -1637,17 +1694,20 @@ public final class LauncherApp extends Application {
 			cover.prefHeightProperty().bind(hero.heightProperty());
 			hero.getChildren().add(cover);
 		} else {
-		if (homeScenery == null) {
+		// The 3D island only where JavaFX can draw 3D (some Linux setups can't - the card keeps its colours there).
+		if (homeScenery == null && net.veloclient.launcher.ui.PlayerSkin3DView.supports3d()) {
 			homeScenery = new net.veloclient.launcher.ui.VoxelSceneryView();
 		}
-		homeScenery.setTheme(accentColor(), Color.web(cssColor(theme.background())));
-		homeScenery.setTranslateX(0);
-		StackPane art = new StackPane(homeScenery);
-		art.setMinSize(0, 0);
-		art.setMouseTransparent(true);
-		// The island sits right of center, so the text on the left stays readable.
-		art.translateXProperty().bind(hero.widthProperty().multiply(0.18));
-		hero.getChildren().add(art);
+		if (homeScenery != null) {
+			homeScenery.setTheme(accentColor(), Color.web(cssColor(theme.background())));
+			homeScenery.setTranslateX(0);
+			StackPane art = new StackPane(homeScenery);
+			art.setMinSize(0, 0);
+			art.setMouseTransparent(true);
+			// The island sits right of center, so the text on the left stays readable.
+			art.translateXProperty().bind(hero.widthProperty().multiply(0.18));
+			hero.getChildren().add(art);
+		}
 
 		javafx.scene.shape.Ellipse playerShadow = new javafx.scene.shape.Ellipse(58, 13);
 		playerShadow.setMouseTransparent(true);
@@ -2039,7 +2099,9 @@ public final class LauncherApp extends Application {
 		MenuItem delete = new MenuItem("Delete profile");
 		delete.getStyleClass().add("menu-item-danger");
 		delete.setOnAction(e -> confirmDeleteInstance(instance));
-		return List.of(edit, memory, new SeparatorMenuItem(), duplicate, export, new SeparatorMenuItem(), delete);
+		MenuItem shareCode = new MenuItem("Share as code");
+		shareCode.setOnAction(e -> net.veloclient.launcher.ui.ProfileCodeDialog.showShare(stage, instance));
+		return List.of(edit, memory, new SeparatorMenuItem(), duplicate, shareCode, export, new SeparatorMenuItem(), delete);
 	}
 
 	private Button profileMenu(Instance instance) {
@@ -2532,11 +2594,74 @@ public final class LauncherApp extends Application {
 
 	// ---- Sign-in ----
 
+	/**
+	 * The game's Locker writes the same files: what you equip in-game (or a cloak added there, or a bought one landing
+	 * in the library) shows up here without reopening the page. Equip changes made while this window has focus came
+	 * from this window itself - its own page already redrew - so only library changes redraw then.
+	 */
+	private void installLockerWatch() {
+		String[] files = {"cosmetics-cape.json", "cosmetics-wings.json", "cosmetics-aura.json", "cosmetics-wear.json",
+				"cosmetics-killfx.json", "cosmetics-emotes.json", "name-style.json", "loadout-active.txt"};
+		long[] last = {Long.MIN_VALUE, Long.MIN_VALUE};
+		String[] lastAccount = {null};
+		javafx.animation.Timeline watch = new javafx.animation.Timeline(new javafx.animation.KeyFrame(javafx.util.Duration.millis(700), e -> {
+			long equip = 0;
+			for (String name : files) {
+				equip = equip * 31 + lockerStamp(net.veloclient.launcher.data.VeloPaths.accountConfig(name));
+			}
+			long capes = 0;
+			try (var list = java.nio.file.Files.list(VeloPaths.capes())) {
+				for (java.nio.file.Path p : list.filter(p -> p.toString().endsWith(".velocape")).toList()) {
+					capes = capes * 31 + p.getFileName().hashCode() + lockerStamp(p);
+				}
+			} catch (Exception ignored) {
+				// No library yet.
+			}
+			String account = net.veloclient.launcher.data.VeloPaths.account();
+			boolean fresh = last[0] == Long.MIN_VALUE || !java.util.Objects.equals(account, lastAccount[0]);
+			boolean libraryChanged = !fresh && capes != last[1];
+			boolean equipChanged = !fresh && equip != last[0] && !stage.isFocused();
+			last[0] = equip;
+			last[1] = capes;
+			lastAccount[0] = account;
+			if ((libraryChanged || equipChanged) && currentPage != null && ("locker".equals(activePage) || "home".equals(activePage))) {
+				currentPage.run();
+			}
+		}));
+		watch.setCycleCount(javafx.animation.Animation.INDEFINITE);
+		watch.play();
+	}
+
+	private static long lockerStamp(java.nio.file.Path file) {
+		try {
+			return java.nio.file.Files.exists(file) ? java.nio.file.Files.getLastModifiedTime(file).toMillis() ^ java.nio.file.Files.size(file) << 40 : 0;
+		} catch (Exception e) {
+			return -1;
+		}
+	}
+
+	/** The offline banner's "Try again": checks now; back online, the account refreshes and the page loads again. */
+	private void retryOnline() {
+		Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
+			boolean online = Connectivity.checkNow();
+			Platform.runLater(() -> {
+				if (online && session != null && session.isAccessTokenExpired()) {
+					requireSignedIn(s -> { });
+				}
+				if (!Connectivity.offline() && currentPage != null) {
+					currentPage.run();
+				}
+			});
+		});
+	}
+
 	private void attemptSilentSignIn() {
 		Optional<MinecraftSession> cached = AuthSession.loadCached();
 		if (cached.isEmpty()) {
 			return;
 		}
+		// Pages built before the refresh finishes already read this account's Locker files.
+		net.veloclient.launcher.data.VeloPaths.setAccount(cached.get().uuid());
 		Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
 			try {
 				MinecraftSession restored = cached.get();
@@ -2548,6 +2673,13 @@ public final class LauncherApp extends Application {
 				MinecraftSession finalSession = restored;
 				Platform.runLater(() -> onSignedIn(finalSession));
 			} catch (Exception e) {
+				if (Connectivity.keepAccount(e)) {
+					// Started without internet: stay signed in with the saved account (it refreshes once we're online).
+					Connectivity.reportFailure(e);
+					MinecraftSession saved = cached.get();
+					Platform.runLater(() -> onSignedIn(saved));
+					return;
+				}
 				// Only this account's refresh token is actually dead - drop
 				// just that one rather than every saved account, and fall
 				// back to whichever other one (if any) is now active.
@@ -2951,6 +3083,7 @@ public final class LauncherApp extends Application {
 	private void refreshOwned() {
 		Runnable page = currentPage;
 		java.util.Set<String> before = net.veloclient.launcher.social.StoreApi.owned();
+		boolean loadedBefore = net.veloclient.launcher.social.StoreApi.walletLoaded();
 		java.util.concurrent.CompletableFuture.runAsync(() -> {
 			try {
 				net.veloclient.launcher.social.StoreApi.wallet();
@@ -2958,7 +3091,7 @@ public final class LauncherApp extends Application {
 			} catch (net.veloclient.launcher.social.StoreApi.StoreError ignored) {
 				return;
 			}
-			if (!net.veloclient.launcher.social.StoreApi.owned().equals(before)) {
+			if (!loadedBefore || !net.veloclient.launcher.social.StoreApi.owned().equals(before)) {
 				// The catalog lists owned testing items too.
 				net.veloclient.launcher.data.WingsCatalog.refresh();
 				javafx.application.Platform.runLater(() -> {
@@ -3031,6 +3164,28 @@ public final class LauncherApp extends Application {
 				showStore();
 			}
 		}, type));
+		setActivePage("store");
+	}
+
+	private void showPetDetail(net.veloclient.launcher.data.PetsSetting.StorePet pet) {
+		setActivePage("store");
+		currentPage = () -> showPetDetail(pet);
+		setContent(net.veloclient.launcher.ui.PetDetailView.build(new net.veloclient.launcher.ui.PetDetailView.Host() {
+			@Override
+			public void openCoins() {
+				showCoins();
+			}
+
+			@Override
+			public MinecraftSession session() {
+				return session;
+			}
+
+			@Override
+			public void goBack() {
+				showStore();
+			}
+		}, pet));
 		setActivePage("store");
 	}
 
@@ -3157,6 +3312,11 @@ public final class LauncherApp extends Application {
 			@Override
 			public void openKillFx(net.veloclient.launcher.data.KillFxCatalog.KillFxType type) {
 				showKillFxDetail(type);
+			}
+
+			@Override
+			public void openPet(net.veloclient.launcher.data.PetsSetting.StorePet pet) {
+				showPetDetail(pet);
 			}
 
 			@Override
@@ -3646,6 +3806,29 @@ public final class LauncherApp extends Application {
 		// older velo-client jar forever, since nothing else ever touches an
 		// existing profile's mods folder again after it's created.
 		GameJars.installInto(InstancePaths.modsDir(instance.id()), GameVersion.byId(instance.mcVersion()));
+		lastQuickPlay.put(instance.id(), java.util.Optional.ofNullable(quickPlayTarget));
+		// Velo Doctor: something that would crash the game is offered a fix first - "Fix all & play" starts right after.
+		if (System.getProperty("velo.launcherTour") == null) {
+			try {
+				var diagnosis = net.veloclient.launcher.doctor.Doctor.check(instance);
+				if (diagnosis.issues().stream().anyMatch(i -> i.severity() == net.veloclient.launcher.doctor.Diagnosis.Severity.CRASH)
+						&& !net.veloclient.launcher.ui.DoctorDialog.confirmLaunch(stage, instance, diagnosis)) {
+					return;
+				}
+			} catch (RuntimeException e) {
+				LauncherLog.warn("Doctor check failed - launching anyway", e);
+			}
+		}
+		// Known server with mod rules (owner panel): a heads-up about mods it doesn't allow - never a block.
+		if (quickPlayTarget != null && System.getProperty("velo.launcherTour") == null) {
+			var rules = net.veloclient.launcher.data.ServerProfiles.forAddress(quickPlayTarget);
+			if (rules != null && !net.veloclient.launcher.data.ServerProfiles.hidden(rules.id())) {
+				var check = net.veloclient.launcher.data.ServerProfiles.check(instance, rules);
+				if (!check.clean() && !net.veloclient.launcher.ui.ServerRulesDialog.confirm(stage, check)) {
+					return;
+				}
+			}
+		}
 		requireSignedIn(activeSession -> {
 			triggerButton.setDisable(true);
 			progressBar.setProgress(0);
@@ -3696,6 +3879,16 @@ public final class LauncherApp extends Application {
 					});
 					int exitCode = result.process().waitFor();
 					Platform.runLater(this::checkAccountSkin);
+					{
+						// The Doctor learns from every run: fixes that helped, crashes that came back, fixes players found.
+						try {
+							String[] texts = exitCode != 0 ? net.veloclient.launcher.ui.CrashReportDialog.texts(instance, startedAt, result.logFile()) : new String[2];
+							net.veloclient.launcher.doctor.Doctor.onGameExit(instance, exitCode, System.currentTimeMillis() - startedAt, running.wasStopped(),
+									texts[0], texts[1]);
+						} catch (RuntimeException e) {
+							LauncherLog.warn("Doctor exit check failed", e);
+						}
+					}
 					// A non-zero exit after a deliberate Stop is expected
 					// (destroy()'d processes don't exit 0) - not a crash.
 					if (exitCode != 0 && !running.wasStopped()) {
@@ -3732,11 +3925,23 @@ public final class LauncherApp extends Application {
 				try {
 					var auth = new MicrosoftAuth(MICROSOFT_CLIENT_ID);
 					MinecraftSession refreshed = auth.signInWithRefreshToken(session.microsoftRefreshToken());
+					Connectivity.reportSuccess();
 					Platform.runLater(() -> {
 						onSignedIn(refreshed);
 						action.accept(refreshed);
 					});
 				} catch (Exception e) {
+					if (Connectivity.keepAccount(e)) {
+						// No internet: the sign-in wasn't rejected, it just couldn't be checked. Keep the account and start
+						// anyway - singleplayer and LAN work, servers need the connection back.
+						Connectivity.reportFailure(e);
+						Platform.runLater(() -> {
+							net.veloclient.launcher.ui.Toasts.show(content, "info", "#f7c04a", Connectivity.offline() ? "Offline - starting with your saved account (singleplayer & LAN)"
+									: "Microsoft sign-in is down right now - starting with your saved account");
+							action.accept(session);
+						});
+						return;
+					}
 					// Only this account's refresh token is dead - drop just
 					// that one and fall back to another saved account if one
 					// exists, same as a manual sign-out.
@@ -3831,6 +4036,9 @@ public final class LauncherApp extends Application {
 		MenuItem fromZip = new MenuItem("From a profile .zip");
 		fromZip.setOnAction(e -> importInstance());
 		importButton.getItems().addAll(fromClient, fromZip);
+		MenuItem fromCode = new MenuItem("From a code (VELO-...)");
+		fromCode.setOnAction(e -> net.veloclient.launcher.ui.ProfileCodeDialog.showJoin(stage, this::showInstanceDetail));
+		importButton.getItems().add(0, fromCode);
 		Button create = new Button("New profile");
 		create.setGraphic(net.veloclient.launcher.ui.Icons.icon("plus", 16, Color.WHITE, 2.2));
 		create.getStyleClass().add("primary-button");
@@ -4207,21 +4415,26 @@ public final class LauncherApp extends Application {
 						failed.addProperty("error", error.getMessage());
 						return failed;
 					}
-				}).thenAccept(result -> Platform.runLater(() -> {
-					codeButton.setDisable(false);
-					if (result.has("error")) {
-						webCode.setText("");
-						net.veloclient.launcher.ui.Toasts.show(codeButton, result.get("error").getAsString());
-						return;
-					}
-					String code = result.get("code").getAsString();
-					webCode.setText(code.substring(0, 3) + " " + code.substring(3));
-					codeButton.setText("New code");
-					javafx.scene.input.ClipboardContent clip = new javafx.scene.input.ClipboardContent();
-					clip.putString(code);
-					javafx.scene.input.Clipboard.getSystemClipboard().setContent(clip);
-					net.veloclient.launcher.ui.Toasts.show(codeButton, "Copied - works for 5 minutes");
-				}));
+				}, Executors.newVirtualThreadPerTaskExecutor()).handle((result, thrown) -> {
+					// Any failure lands here - before, an unexpected exception left the button greyed out with nothing shown.
+					Platform.runLater(() -> {
+						codeButton.setDisable(false);
+						if (thrown != null || result == null || result.has("error") || !result.has("code")) {
+							webCode.setText("");
+							String why = result != null && result.has("error") ? result.get("error").getAsString()
+									: "Couldn't get a code - check your connection and try again";
+							net.veloclient.launcher.ui.Toasts.show(codeButton, why);
+							return;
+						}
+						String code = result.get("code").getAsString();
+						// The code is always visible, so typing it works even when the clipboard doesn't.
+						webCode.setText(code.substring(0, 3) + " " + code.substring(3));
+						codeButton.setText("New code");
+						net.veloclient.launcher.ui.Toasts.show(codeButton, net.veloclient.launcher.ui.Clipboards.copy(code)
+								? "Copied - works for 5 minutes" : "Type the code shown - works for 5 minutes");
+					});
+					return null;
+				});
 			});
 			net.veloclient.launcher.ui.SettingsUi.row(account, "Website sign-in", "Buy in the Store on velo-client.com with this account",
 					"Get a code, then type it on velo-client.com. It works once, for 5 minutes. The website never sees your Microsoft login.",

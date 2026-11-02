@@ -155,8 +155,15 @@ public final class TitleMenu {
 		List<Icon> icons = new ArrayList<>();
 		ClickableWidget ukulib = env.ukulib();
 		int columnRight = margin + 260;
+		// A mod that adds its button again on every frame or re-init would otherwise fill the screen with copies.
+		java.util.Set<String> seen = new java.util.HashSet<>();
 		for (ClickableWidget widget : env.buttons()) {
 			if (widget instanceof HotspotButton) {
+				continue;
+			}
+			String identity = widget.getClass().getName() + "|" + widget.getMessage().getString().strip();
+			if (!seen.add(identity) && (env.keyOf(widget) == null || !MAIN_KEYS.contains(env.keyOf(widget)))) {
+				widget.visible = false;
 				continue;
 			}
 			int[] first = FIRST_SEEN.computeIfAbsent(widget, w -> new int[] {w.getX(), w.getY(), w.getWidth(), w.getHeight()});
@@ -204,7 +211,9 @@ public final class TitleMenu {
 			String iconKey = TitleScreenTheme.matchExtraIcon(TitleScreenTheme.TITLE_EXTRA_ICONS, label);
 			boolean iconOnly = label.isEmpty() || first[2] <= 24 && first[3] <= 24;
 			boolean meantForMenu = Math.abs(first[0] + first[2] / 2 - width / 2) <= 110 || first[0] < columnRight;
-			if (iconKey != null) {
+			if ((iconKey != null || iconOnly) && icons.size() >= 10 || meantForMenu && first[2] >= 40 && modRows.size() >= 8) {
+				widget.visible = false;   // more than any real setup has - don't let a misbehaving mod take over the menu
+			} else if (iconKey != null) {
 				icons.add(new Icon(widget, iconKey));
 			} else if (iconOnly) {
 				// Small icon buttons (Mod Menu's and the like) go in the icon row at the bottom, wherever the mod put them.

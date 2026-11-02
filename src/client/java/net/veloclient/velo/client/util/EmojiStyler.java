@@ -45,6 +45,11 @@ public final class EmojiStyler {
 		boolean[] changed = {false};
 		MutableText result = Text.empty();
 		input.visit((style, string) -> {
+			if (net.veloclient.velo.client.namestyle.NameStyles.isMarked(style)) {
+				// A name style's icon (❤, ⚡, ☠...) is coloured with the name - as an emoji image it went white.
+				result.append(Text.literal(string).setStyle(style));
+				return Optional.empty();
+			}
 			String text = EmojiData.replaceShortcodes(string);
 			StringBuilder plain = new StringBuilder();
 			for (int i = 0; i < text.length(); ) {
@@ -87,6 +92,11 @@ public final class EmojiStyler {
 		boolean[] changed = {false};
 		MutableComponent result = Component.empty();
 		input.visit((style, string) -> {
+			if (net.veloclient.velo.client.namestyle.NameStyles.isMarked(style)) {
+				// A name style's icon (❤, ⚡, ☠...) is coloured with the name - as an emoji image it went white.
+				result.append(Component.literal(string).setStyle(style));
+				return Optional.empty();
+			}
 			String text = EmojiData.replaceShortcodes(string);
 			StringBuilder plain = new StringBuilder();
 			for (int i = 0; i < text.length(); ) {

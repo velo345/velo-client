@@ -26,7 +26,10 @@ final class NotesRoutes {
 	private record CheckRequest(String id, String check, boolean done) {
 	}
 
-	private record BoardRequest(String id, List<NotesService.Stroke> strokes, boolean clear) {
+	private record LiveRequest(String id, String sid, NotesService.Stroke stroke) {
+	}
+
+	private record BoardRequest(String id, List<NotesService.Stroke> strokes, boolean clear, List<String> sids) {
 	}
 
 	private record ImageRequest(String id, String png) {
@@ -58,7 +61,12 @@ final class NotesRoutes {
 		});
 		SocialRoutes.route(server, registry, "/v1/notes/board", "POST", (ex, me) -> {
 			BoardRequest r = JsonHttp.readBody(ex, BoardRequest.class, 256 * 1024);
-			JsonHttp.writeJson(ex, 200, notes.board(me, r.id(), r.strokes(), r.clear()));
+			JsonHttp.writeJson(ex, 200, notes.board(me, r.id(), r.strokes(), r.clear(), r.sids()));
+		});
+		SocialRoutes.route(server, registry, "/v1/notes/live", "POST", (ex, me) -> {
+			LiveRequest r = JsonHttp.readBody(ex, LiveRequest.class, 64 * 1024);
+			notes.live(me, r.id(), r.sid(), r.stroke());
+			JsonHttp.writeJson(ex, 200, java.util.Map.of("ok", true));
 		});
 		SocialRoutes.route(server, registry, "/v1/notes/image", "POST", (ex, me) -> {
 			ImageRequest r = JsonHttp.readBody(ex, ImageRequest.class, NotesService.MAX_IMAGE_BYTES * 2);
@@ -95,7 +103,7 @@ final class NotesRoutes {
 			Map<String, String> q = StoreRoutes.query(ex);
 			int limit = Math.max(1, Math.min(500, ModerationRoutes.parseInt(q.get("limit"), 150)));
 			Map<String, Object> out = new LinkedHashMap<>();
-			out.put("notes", notes.staffList(q.get("q"), "1".equals(q.get("reported")), limit));
+			out.put("notes", notes.staffList(q.get("q"), "1".equals(q.get("reported")), q.get("kind"), limit));
 			out.put("total", notes.count());
 			out.put("openReports", moderation.openCount(ModerationService.NOTE));
 			JsonHttp.writeJson(ex, 200, out);

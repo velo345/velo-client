@@ -62,6 +62,29 @@ public final class StoreApi {
 		WALLET_LISTENERS.forEach(Runnable::run);
 	}
 
+	/**
+	 * Another Minecraft account is signed in: forget everything the last one owned (coins, items, owner, gift,
+	 * wishlist, Velo+) so nothing shows as unlocked until this account's wallet has answered.
+	 */
+	public static void resetForAccount() {
+		balance = -1;
+		owned = Set.of();
+		walletLoaded = false;
+		owner = false;
+		welcomeGift = false;
+		welcomeGiftUntil = 0;
+		synchronized (StoreApi.class) {
+			WISHLIST.clear();
+			wishlistLoaded = false;
+		}
+		fireWallet();
+		boolean member = java.nio.file.Files.exists(plusFlag());
+		if (member != plusMember) {
+			plusMember = member;
+			PLUS_LISTENERS.forEach(Runnable::run);
+		}
+	}
+
 	public static boolean owns(String itemId) {
 		return owned.contains(itemId);
 	}
@@ -224,8 +247,12 @@ public final class StoreApi {
 	 * The last known answer, kept on disk: Home is built before the server answered (at start, on every return to
 	 * Home), and must not flash back to the island - or stay there - for a member whose GIF background is set.
 	 */
-	private static final java.nio.file.Path PLUS_FLAG = net.veloclient.launcher.data.VeloPaths.root().resolve("cache").resolve("plus-member");
-	private static volatile boolean plusMember = java.nio.file.Files.exists(PLUS_FLAG);
+	private static java.nio.file.Path plusFlag() {
+		String account = net.veloclient.launcher.data.VeloPaths.account();
+		return net.veloclient.launcher.data.VeloPaths.root().resolve("cache").resolve(account == null ? "plus-member" : "plus-member-" + account);
+	}
+
+	private static volatile boolean plusMember = java.nio.file.Files.exists(plusFlag());
 	private static final java.util.List<Runnable> PLUS_LISTENERS = new java.util.concurrent.CopyOnWriteArrayList<>();
 
 	private static void setPlusMember(boolean member) {
@@ -235,10 +262,10 @@ public final class StoreApi {
 		plusMember = member;
 		try {
 			if (member) {
-				java.nio.file.Files.createDirectories(PLUS_FLAG.getParent());
-				java.nio.file.Files.writeString(PLUS_FLAG, "1");
+				java.nio.file.Files.createDirectories(plusFlag().getParent());
+				java.nio.file.Files.writeString(plusFlag(), "1");
 			} else {
-				java.nio.file.Files.deleteIfExists(PLUS_FLAG);
+				java.nio.file.Files.deleteIfExists(plusFlag());
 			}
 		} catch (java.io.IOException ignored) {
 			// Only a cache.
@@ -554,7 +581,7 @@ public final class StoreApi {
 	}
 
 	private static java.nio.file.Path wishlistFile() {
-		return net.veloclient.launcher.data.VeloPaths.config().resolve("wishlist.json");
+		return net.veloclient.launcher.data.VeloPaths.accountConfig("wishlist.json");
 	}
 
 	private static synchronized void loadWishlist() {

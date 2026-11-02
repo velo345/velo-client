@@ -41,8 +41,8 @@ public final class CosmeticsService {
 	public static final String STATUS_TESTING = "testing";
 	public static final String STATUS_HIDDEN = "hidden";
 	private static final Set<String> STATUSES = Set.of(STATUS_RELEASED, STATUS_TESTING, STATUS_HIDDEN);
-	private static final Set<String> TYPES = Set.of("wings", "cape", "aura", "emote", "killfx", "wear");
-	private static final Pattern ITEM_ID = Pattern.compile("(wings|cape|aura|emote|killfx|wear)_[a-z0-9_-]{1,40}");
+	private static final Set<String> TYPES = Set.of("wings", "cape", "aura", "emote", "killfx", "wear", "pet");
+	private static final Pattern ITEM_ID = Pattern.compile("(wings|cape|aura|emote|killfx|wear|pet)_[a-z0-9_-]{1,40}");
 	/** Where bodywear sits: one item per slot, every slot combinable. */
 	public static final Set<String> WEAR_SLOTS = Set.of("head", "ears", "face", "mask", "neck", "wrist", "feet", "back");
 	private static final Pattern COLLECTION_ID = Pattern.compile("[a-z0-9_-]{1,40}");
@@ -497,6 +497,9 @@ public final class CosmeticsService {
 		if (bytes.length >= 4 && bytes[0] == 'G' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == '8') {
 			return "image/gif";
 		}
+		if (bytes.length >= 3 && bytes[0] == (byte) 0xFF && bytes[1] == (byte) 0xD8 && bytes[2] == (byte) 0xFF) {
+			return "image/jpeg";   // pet preview sheets
+		}
 		if (isEmoteAnimation(bytes)) {
 			return "application/json";
 		}
@@ -522,7 +525,7 @@ public final class CosmeticsService {
 				|| bytes[1] == 'P' && bytes[2] == 'R' && bytes[3] == 'P');
 		boolean emote = isEmoteAnimation(bytes);
 		if (bytes.length == 0 || bytes.length > MAX_FILE_BYTES || !mesh && !emote && contentType(bytes).startsWith("application/")) {
-			throw new StoreService.StoreException(400, "Only PNG, GIF, .vmesh, .vprop or emote animation files up to 12 MB");
+			throw new StoreService.StoreException(400, "Only PNG, JPEG, GIF, .vmesh, .vprop or emote animation files up to 12 MB");
 		}
 		String sha;
 		try {
@@ -547,7 +550,7 @@ public final class CosmeticsService {
 	 */
 	public synchronized Item upsert(Item change, boolean clearWindow) throws IOException, StoreService.StoreException {
 		if (change == null || change.id == null || !ITEM_ID.matcher(change.id).matches()) {
-			throw new StoreService.StoreException(400, "Item ids look like wings_<name>, cape_<name>, aura_<name>, emote_<name>, killfx_<name> or wear_<name> (lowercase, digits, _ or -)");
+			throw new StoreService.StoreException(400, "Item ids look like wings_<name>, cape_<name>, aura_<name>, emote_<name>, killfx_<name>, wear_<name> or pet_<name> (lowercase, digits, _ or -)");
 		}
 		Item item = find(change.id);
 		boolean created = item == null;
@@ -555,7 +558,7 @@ public final class CosmeticsService {
 			item = new Item();
 			item.id = change.id;
 			item.type = change.id.startsWith("wings_") ? "wings" : change.id.startsWith("aura_") ? "aura"
-					: change.id.startsWith("emote_") ? "emote" : change.id.startsWith("killfx_") ? "killfx" : change.id.startsWith("wear_") ? "wear" : "cape";
+					: change.id.startsWith("emote_") ? "emote" : change.id.startsWith("killfx_") ? "killfx" : change.id.startsWith("wear_") ? "wear" : change.id.startsWith("pet_") ? "pet" : "cape";
 			item.name = change.id;
 			item.description = "";
 			item.status = STATUS_TESTING;
@@ -646,7 +649,7 @@ public final class CosmeticsService {
 		}
 		// Auras and kill effects are drawn by code in the clients - no files.
 		List<String> required = "wings".equals(item.type) ? List.of("mesh", "texture") : "cape".equals(item.type) ? List.of("gif")
-				: "emote".equals(item.type) ? List.of("anim") : List.of();
+				: "emote".equals(item.type) ? List.of("anim") : "pet".equals(item.type) ? List.of("sheet") : List.of();
 		for (String role : required) {
 			if (!item.files.containsKey(role)) {
 				throw new StoreService.StoreException(400, "A " + item.type + " item needs its " + role + " file");

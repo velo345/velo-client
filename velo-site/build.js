@@ -184,6 +184,14 @@ function main() {
 			active: meta.active || "",
 			bodyClass: meta.bodyClass || "",
 			published: meta.published || "",
+			// Page-only stylesheet/script ("css": "home.css", "js": "home.js" in assets/), cache-busted like site.css.
+			extraHead: [
+				meta.css ? `<link rel="stylesheet" href="/assets/${meta.css}?v=${hashOf(path.join(ROOT, "assets", meta.css))}">` : "",
+				meta.js ? `<script src="/assets/${meta.js}?v=${hashOf(path.join(ROOT, "assets", meta.js))}" defer></script>` : "",
+				meta.preload ? `<link rel="preload" as="image" href="${meta.preload}" fetchpriority="high">` : "",
+				// Runs before the first paint (the CSP allows no inline scripts), e.g. to cover the page until an intro starts.
+				meta.headScript ? `<script src="/assets/${meta.headScript}?v=${hashOf(path.join(ROOT, "assets", meta.headScript))}"></script>` : "",
+			].join(""),
 		};
 		const pageTokens = { ...tokens };
 		for (const [k, v] of Object.entries(page)) pageTokens[`page.${k}`] = v;

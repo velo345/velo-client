@@ -66,6 +66,12 @@
 			"name": "Wardrobe",
 			"tag": "BODYWEAR",
 			"description": "Hats, ears, glasses, watches, shoes and backpacks - one per slot, all combinable."
+		},
+		{
+			"id": "pets",
+			"name": "Velo Pets",
+			"tag": "PETS",
+			"description": "Companions that follow you everywhere - they walk and fly with you, do tricks, ride on your shoulder and celebrate your kills. Everyone with Velo sees them."
 		}
 	],
 	"items": [
@@ -2478,6 +2484,291 @@
 				"preview": "wear/oni_mask_preview.png",
 				"mask": "wear/oni_mask_mask.png"
 			}
+		},
+		{
+			"id": "pet_ember",
+			"type": "pet",
+			"name": "Ember Drake",
+			"description": "A little fire drake on burning wings that follows you everywhere and lands on your shoulder when you stop.",
+			"price": 3200,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#ff3a2a",
+			"files": {
+				"sheet": "pets/ember_sheet.jpg",
+				"preview": "pets/ember_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_frost",
+			"type": "pet",
+			"name": "Frost Drake",
+			"description": "An ice drake with frosted wings that follows you everywhere.",
+			"price": 3200,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#38b6ff",
+			"files": {
+				"sheet": "pets/frost_sheet.jpg",
+				"preview": "pets/frost_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_shadow",
+			"type": "pet",
+			"name": "Shadow Drake",
+			"description": "A drake of living shadow with violet eyes.",
+			"price": 3200,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#8a3cff",
+			"files": {
+				"sheet": "pets/shadow_sheet.jpg",
+				"preview": "pets/shadow_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_void",
+			"type": "pet",
+			"name": "Void Drake",
+			"description": "A drake from beyond the End, glowing purple.",
+			"price": 3200,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#c040ff",
+			"files": {
+				"sheet": "pets/void_sheet.jpg",
+				"preview": "pets/void_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_bone",
+			"type": "pet",
+			"name": "Bone Drake",
+			"description": "The bare bones of a dragon, held together by a sickly green glow.",
+			"price": 3200,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#6dff4a",
+			"files": {
+				"sheet": "pets/bone_sheet.jpg",
+				"preview": "pets/bone_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_ghost",
+			"type": "pet",
+			"name": "Boo the Ghost",
+			"description": "A shy little ghost that floats after you wherever you go.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#78d8ff",
+			"files": {
+				"sheet": "pets/ghost_sheet.jpg",
+				"preview": "pets/ghost_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_owl",
+			"type": "pet",
+			"name": "Aurora Owl",
+			"description": "A snowy owl with glowing aurora wingtips that perches on your shoulder.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#3ff0c8",
+			"files": {
+				"sheet": "pets/owl_sheet.jpg",
+				"preview": "pets/owl_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_panda",
+			"type": "pet",
+			"name": "Momo the Red Panda",
+			"description": "A fluffy red panda that trots after you and naps when you're away.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#ff8a3a",
+			"files": {
+				"sheet": "pets/panda_sheet.jpg",
+				"preview": "pets/panda_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_jelly",
+			"type": "pet",
+			"name": "Nebula Jelly",
+			"description": "A glowing jellyfish that drifts through the air beside you.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#ff5ad8",
+			"files": {
+				"sheet": "pets/jelly_sheet.jpg",
+				"preview": "pets/jelly_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_moon",
+			"type": "pet",
+			"name": "Luna the Pyjama Moon",
+			"description": "A sleepy crescent moon in a striped nightcap, floating along with you.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#7fa8ff",
+			"files": {
+				"sheet": "pets/moon_sheet.jpg",
+				"preview": "pets/moon_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_shark",
+			"type": "pet",
+			"name": "Finn the Sky Shark",
+			"description": "A small shark that swims through the air around you.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#5aa0ff",
+			"files": {
+				"sheet": "pets/shark_sheet.jpg",
+				"preview": "pets/shark_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_kitsune",
+			"type": "pet",
+			"name": "Yuki the Kitsune",
+			"description": "A white fox spirit with glowing blue tails.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#5ab4ff",
+			"files": {
+				"sheet": "pets/kitsune_sheet.jpg",
+				"preview": "pets/kitsune_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_penguin",
+			"type": "pet",
+			"name": "Pebble the Penguin",
+			"description": "A tiny penguin that waddles after you.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#7fd0ff",
+			"files": {
+				"sheet": "pets/penguin_sheet.jpg",
+				"preview": "pets/penguin_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_hedgehog",
+			"type": "pet",
+			"name": "Piko the Hedgehog",
+			"description": "A spiky hedgehog that scurries along behind you.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#d8a070",
+			"files": {
+				"sheet": "pets/hedgehog_sheet.jpg",
+				"preview": "pets/hedgehog_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_toucan",
+			"type": "pet",
+			"name": "Toco the Toucan",
+			"description": "A colourful toucan that flies with you and lands on your shoulder.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#ffb020",
+			"files": {
+				"sheet": "pets/toucan_sheet.jpg",
+				"preview": "pets/toucan_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_monkey",
+			"type": "pet",
+			"name": "Kiki the Capuchin",
+			"description": "A cheeky capuchin that follows you and climbs onto your shoulder.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#e0a060",
+			"files": {
+				"sheet": "pets/monkey_sheet.jpg",
+				"preview": "pets/monkey_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_tiger",
+			"type": "pet",
+			"name": "Raja the Tiger Cub",
+			"description": "A tiger cub that pads after you - and grows big enough to ride.",
+			"price": 2400,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#ff9a2a",
+			"files": {
+				"sheet": "pets/tiger_sheet.jpg",
+				"preview": "pets/tiger_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_mini",
+			"type": "pet",
+			"name": "Mini-Me",
+			"description": "A tiny you in your own skin, following you around and sitting on your shoulder.",
+			"price": 1800,
+			"status": "testing",
+			"collection": "pets",
+			"accent": "#ffc23a",
+			"files": {
+				"sheet": "pets/mini_sheet.jpg",
+				"preview": "pets/mini_preview.jpg"
+			},
+			"rev": 1
+		},
+		{
+			"id": "pet_reindeer",
+			"type": "pet",
+			"name": "Jingle the Reindeer",
+			"description": "A reindeer with a glowing red nose - here for Christmas.",
+			"price": 2400,
+			"status": "hidden",
+			"collection": "yuletide",
+			"accent": "#ff3b3b",
+			"files": {
+				"sheet": "pets/reindeer_sheet.jpg",
+				"preview": "pets/reindeer_preview.jpg"
+			},
+			"rev": 1
 		}
 	]
 }

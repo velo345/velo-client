@@ -101,7 +101,7 @@ public final class ProfileScreen extends VeloWindow {
 			VeloDraw.fillRounded(context, x + 9, cy + 9, 24, 24, 7, isActive ? MenuKit.accent() : 0x14FFFFFF);
 			Text letter = MenuKit.uiBold(name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(java.util.Locale.ROOT));
 			MenuKit.text(context, this.textRenderer, letter, x + 21 - this.textRenderer.getWidth(letter) / 2, cy + 17, isActive ? MenuKit.onAccent() : MenuKit.TEXT);
-			int actionsW = hovered ? 118 : isActive ? 56 : 0;
+			int actionsW = hovered ? 176 : isActive ? 56 : 0;
 			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.uiBold(name), w - 52 - actionsW), x + 42, cy + 11, MenuKit.TEXT);
 			MenuKit.text(context, this.textRenderer, MenuKit.ui(isActive ? "In use" : "Click to switch"), x + 42, cy + 23, isActive ? MenuKit.accent() : MenuKit.TEXT_3);
 			int ay = Math.max(cy, top);
@@ -111,6 +111,10 @@ public final class ProfileScreen extends VeloWindow {
 				if (!isActive) {
 					bx -= 52;
 					hits.add(VeloUi.pill(context, bx, cy + 12, 52, 18, "Delete", 0, mouseX, mouseY, () -> delete(name)));
+					bx -= 6;
+				} else {
+					bx -= 52;
+					hits.add(VeloUi.pill(context, bx, cy + 12, 52, 18, "Reset", 0, mouseX, mouseY, () -> resetActive(name)));
 					bx -= 6;
 				}
 				bx -= 58;
@@ -187,6 +191,16 @@ public final class ProfileScreen extends VeloWindow {
 		status = Text.literal("Renamed to \"" + newName + "\"");
 		nameBox.setText("");
 		layoutContent();
+	}
+
+	/** Every module, setting and HUD position of the active profile back to Velo's defaults (after asking). */
+	private void resetActive(String name) {
+		this.client.setScreen(new VeloConfirmScreen(this, "Reset \"" + name + "\" to defaults?",
+				"All modules, their settings and your HUD layout in this profile go back to how Velo ships. Your other profiles stay.",
+				"Reset", () -> {
+					status = Text.literal(net.veloclient.velo.client.profile.VeloProfileStore.resetActiveToDefaults()
+							? "\"" + name + "\" is back to defaults" : "Try again in a moment");
+				}));
 	}
 
 	private void delete(String name) {

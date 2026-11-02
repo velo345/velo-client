@@ -66,12 +66,13 @@ final class StaffBridge {
 		try {
 			HttpServer server = HttpServer.create(new InetSocketAddress(bind, port), 0);
 			route(server, "/health", ex -> Map.of("ok", true));
-			route(server, "/tickets", ex -> list());
-			route(server, "/tickets/messages", ex -> messages(query(ex, "id")));
+			route(server, "/tickets", ex -> list(Viewer.of(query(ex, "viewer"), query(ex, "all"))));
+			route(server, "/tickets/messages", ex -> messages(query(ex, "id"), Viewer.of(query(ex, "viewer"), query(ex, "all"))));
 			route(server, "/tickets/reply", ex -> reply(body(ex)));
 			route(server, "/tickets/claim", ex -> claim(body(ex)));
 			route(server, "/tickets/close", ex -> close(body(ex)));
 			route(server, "/staff/level", ex -> setLevel(body(ex)));
+			route(server, "/posts/refresh", ex -> InfoPosts.refreshAll(jda, config));
 			server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(4));
 			server.start();
 			System.out.println("Staff panel bridge on " + bind + ":" + port);
@@ -131,13 +132,84 @@ final class StaffBridge {
 
 	// ---- Tickets ----
 
-	private Object list() {
+	/**
+	 * Who's asking: the staff member's Discord id, or everything for managers and the owner. A team member sees a
+	 * ticket only when one of their Discord roles handles its type - the same rule as the ticket channels on Discord,
+	 * so a helper never sees bug reports or purchases. Types without staff roles are for managers only.
+	 */
+	private record Viewer(String discordId, boolean all) {
+		static Viewer of(String discordId, String all) {
+			return new Viewer(discordId != null && discordId.matches("\\d{5,25}") ? discordId : null, "1".equals(all));
+		}
+
+		static Viewer of(JsonObject r) {
+			return of(str(r, "staffDiscordId"), r.has("all") && !r.get("all").isJsonNull() && r.get("all").getAsBoolean() ? "1" : null);
+		}
+	}
+
+	private final Map<String, CachedRoles> rolesCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+	private record CachedRoles(java.util.Set<String> ids, long at) {
+	}
+
+	/** The member's role ids across the bot's guilds (cached for a minute; members leave the cache, so they're fetched). */
+	private java.util.Set<String> rolesOf(String discordId) {
+		CachedRoles hit = rolesCache.get(discordId);
+		if (hit != null && System.currentTimeMillis() - hit.at < 60_000) {
+			return hit.ids;
+		}
+		java.util.Set<String> ids = new java.util.HashSet<>();
+		for (Guild g : jda.getGuilds()) {
+			Member m = g.getMemberById(discordId);
+			if (m == null) {
+				try {
+					m = g.retrieveMemberById(discordId).submit().get(10, TimeUnit.SECONDS);
+				} catch (Exception e) {
+					continue;
+				}
+			}
+			for (Role role : m.getRoles()) {
+				ids.add(role.getId());
+			}
+		}
+		rolesCache.put(discordId, new CachedRoles(ids, System.currentTimeMillis()));
+		return ids;
+	}
+
+	private boolean sees(Viewer v, BotConfig.Ticket t) {
+		if (v.all) {
+			return true;
+		}
+		if (v.discordId == null) {
+			return false;
+		}
+		BotConfig.TicketType type = config.type(t.type);
+		List<String> handlers = new ArrayList<>(type.staffRoleIds);
+		if (config.supportRoleId != null) {
+			handlers.add(config.supportRoleId);
+		}
+		java.util.Set<String> mine = rolesOf(v.discordId);
+		return handlers.stream().anyMatch(mine::contains);
+	}
+
+	private BotConfig.Ticket ticket(String id, Viewer v) throws Fail {
+		BotConfig.Ticket t = ticket(id);
+		if (!sees(v, t)) {
+			throw new Fail(404, "That ticket is closed or doesn't exist");
+		}
+		return t;
+	}
+
+	private Object list(Viewer v) {
 		List<Map<String, Object>> out = new ArrayList<>();
 		List<BotConfig.Ticket> open;
 		synchronized (config) {
 			open = new ArrayList<>(config.tickets.values());
 		}
 		for (BotConfig.Ticket t : open) {
+			if (!sees(v, t)) {
+				continue;
+			}
 			Map<String, Object> row = new LinkedHashMap<>();
 			row.put("id", t.channelId);
 			row.put("number", t.number);
@@ -189,8 +261,8 @@ final class StaffBridge {
 		return channel;
 	}
 
-	private Object messages(String id) throws Exception {
-		BotConfig.Ticket t = ticket(id);
+	private Object messages(String id, Viewer v) throws Exception {
+		BotConfig.Ticket t = ticket(id, v);
 		List<Message> newestFirst = channel(t).getHistory().retrievePast(100).submit().get(15, TimeUnit.SECONDS);
 		List<Message> messages = new ArrayList<>(newestFirst);
 		Collections.reverse(messages);
@@ -225,14 +297,14 @@ final class StaffBridge {
 			out.add(row);
 		}
 		Map<String, Object> result = new LinkedHashMap<>();
-		result.put("ticket", ((List<?>) ((Map<?, ?>) list()).get("tickets")).stream()
+		result.put("ticket", ((List<?>) ((Map<?, ?>) list(v)).get("tickets")).stream()
 				.filter(r -> id.equals(((Map<?, ?>) r).get("id"))).findFirst().orElse(null));
 		result.put("messages", out);
 		return result;
 	}
 
 	private Object reply(JsonObject r) throws Exception {
-		BotConfig.Ticket t = ticket(str(r, "id"));
+		BotConfig.Ticket t = ticket(str(r, "id"), Viewer.of(r));
 		String text = str(r, "text");
 		if (text == null || text.isBlank()) {
 			throw new Fail(400, "Write a message");
@@ -244,7 +316,7 @@ final class StaffBridge {
 	}
 
 	private Object claim(JsonObject r) throws Fail {
-		BotConfig.Ticket t = ticket(str(r, "id"));
+		BotConfig.Ticket t = ticket(str(r, "id"), Viewer.of(r));
 		String discordId = str(r, "staffDiscordId");
 		String who = discordId != null ? "<@" + discordId + ">" : "**" + str(r, "staffName") + "**";
 		if (!tickets.claimFor(channel(t), t, discordId, discordId != null ? who : str(r, "staffName"))) {
@@ -254,7 +326,7 @@ final class StaffBridge {
 	}
 
 	private Object close(JsonObject r) throws Fail {
-		BotConfig.Ticket t = ticket(str(r, "id"));
+		BotConfig.Ticket t = ticket(str(r, "id"), Viewer.of(r));
 		String discordId = str(r, "staffDiscordId");
 		String name = str(r, "staffName");
 		String reason = str(r, "reason");

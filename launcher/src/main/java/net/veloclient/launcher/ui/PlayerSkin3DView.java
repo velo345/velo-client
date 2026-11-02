@@ -119,11 +119,52 @@ public final class PlayerSkin3DView {
 		return createViewer(skinPngBytes, slim, capeFrames, interactive, initialYaw, autoSpin, null);
 	}
 
+	/**
+	 * Whether this PC can draw JavaFX 3D. Some Linux setups (software rendering, virtual machines, a few drivers) can't -
+	 * there every 3D player becomes a flat front view instead of a 3D scene that fails or takes the launcher down.
+	 */
+	private static Boolean supports3d;
+
+	public static boolean supports3d() {
+		if (supports3d == null) {
+			supports3d = javafx.application.Platform.isSupported(javafx.application.ConditionalFeature.SCENE3D)
+					&& !Boolean.getBoolean("velo.no3d");
+			if (!supports3d) {
+				net.veloclient.launcher.LauncherLog.info("No JavaFX 3D on this PC (prism " + System.getProperty("prism.order", "default")
+						+ ") - players are shown flat");
+			}
+		}
+		return supports3d;
+	}
+
+	/** The flat stand-in for a 3D player: the skin's front, scaled up crisply. */
+	private static Node flat(byte[] skinPngBytes, boolean slim) {
+		try {
+			java.awt.image.BufferedImage src = javax.imageio.ImageIO.read(new ByteArrayInputStream(skinPngBytes));
+			Image front = src == null ? null : SkinsSection.front(src, slim);
+			if (front == null) {
+				return null;
+			}
+			javafx.scene.image.ImageView view = new javafx.scene.image.ImageView(front);
+			view.setPreserveRatio(true);
+			view.setFitHeight(260);
+			view.setSmooth(false);
+			StackPane box = new StackPane(view);
+			box.setMinSize(0, 0);
+			return box;
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
 	/** {@code decorate}: adds more to the player model (wings), in its own space. */
 	public static Node createViewer(byte[] skinPngBytes, boolean slim, List<GifFrames.Frame> capeFrames, boolean interactive,
 			double initialYaw, boolean autoSpin, java.util.function.Consumer<Group> decorate) {
 		if (skinPngBytes == null) {
 			return null;
+		}
+		if (!supports3d()) {
+			return flat(skinPngBytes, slim);
 		}
 		Image raw;
 		try {
@@ -278,6 +319,9 @@ public final class PlayerSkin3DView {
 			java.util.function.Supplier<net.veloclient.launcher.data.EmoteCatalog.Animation> animation) {
 		if (skinPngBytes == null) {
 			return null;
+		}
+		if (!supports3d()) {
+			return flat(skinPngBytes, slim);
 		}
 		Image raw;
 		try {
@@ -886,6 +930,15 @@ public final class PlayerSkin3DView {
 						int ty = (c[1] + c[3]) * scale + dy;
 						writer.setColor(tx, ty, reader.getColor(sx, sy));
 					}
+				}
+			}
+		}
+		// Like vanilla: the base layer is always opaque - half-transparent pixels there render patchy otherwise.
+		PixelReader done = out.getPixelReader();
+		for (int[] r : new int[][] {{0, 0, 32, 16}, {0, 16, 64, 32}, {16, 48, 48, 64}}) {
+			for (int y = r[1] * scale; y < r[3] * scale; y++) {
+				for (int x = r[0] * scale; x < r[2] * scale; x++) {
+					writer.setArgb(x, y, done.getArgb(x, y) | 0xFF000000);
 				}
 			}
 		}

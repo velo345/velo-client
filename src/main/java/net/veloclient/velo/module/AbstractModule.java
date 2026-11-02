@@ -73,6 +73,9 @@ public abstract class AbstractModule implements Module {
 
 	@Override
 	public void setEnabled(boolean enabled) {
+		if (enabled && ModuleLocks.locked(id)) {
+			return; // the server you're on switched this off (Velo Bridge)
+		}
 		this.enabled = enabled;
 		if (enabled && !started) {
 			started = true;

@@ -80,7 +80,7 @@ public final class NameStyles {
 	// ---- Your own style ----
 
 	private static Path file() {
-		return VeloPaths.config().resolve("name-style.json");
+		return VeloPaths.accountConfig("name-style.json");
 	}
 
 	/** Rereads {@code name-style.json} if it changed (the launcher may have edited it); cheap, checked at most twice a second. */
@@ -243,7 +243,8 @@ public final class NameStyles {
 			return null;
 		}
 		List<String> names = chatNames();
-		if (names.isEmpty()) {
+		if (names.isEmpty() || isTagged(message)) {
+			// Chat-stacking mods (and some servers' edits) add the same line again: tagging it twice put the icon in twice.
 			return message;
 		}
 		String plain = visible(message.getString()).toLowerCase(java.util.Locale.ROOT);
@@ -275,15 +276,7 @@ public final class NameStyles {
 		if (text == null) {
 			return null;
 		}
-		boolean[] tagged = {false};
-		text.visit((style, part) -> {
-			if (markerOf(style) != null) {
-				tagged[0] = true;
-				return Optional.of(Boolean.TRUE);
-			}
-			return Optional.empty();
-		}, Style.EMPTY);
-		if (tagged[0]) {
+		if (isTagged(text)) {
 			return text;
 		}
 		String plain = visible(text.getString());
@@ -493,6 +486,15 @@ public final class NameStyles {
 
 	private static boolean isSelf(String name) {
 		return name != null && name.equalsIgnoreCase(selfName());
+	}
+
+	/** Whether {@code style} is a letter (or icon) of a styled name - other text effects leave those alone. */
+	public static boolean isMarked(Style style) {
+		return markerOf(style) != null;
+	}
+
+	private static boolean isTagged(Text text) {
+		return text.visit((style, part) -> markerOf(style) != null ? Optional.of(Boolean.TRUE) : Optional.empty(), Style.EMPTY).isPresent();
 	}
 
 	/** {place, font, letter, length} for a marked style, else null. */

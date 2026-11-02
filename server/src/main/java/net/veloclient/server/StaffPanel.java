@@ -121,6 +121,8 @@ final class StaffPanel {
 	private final Function<String, String> levelOf;
 	private final java.util.function.Predicate<String> owner;
 	private final RateLimiter limiter = new RateLimiter();
+	/** Set by {@link #register}: who's linked to which Discord account (ticket visibility). */
+	private DiscordLinks discordLinks;
 	private final ProofOfWork pow = new ProofOfWork();
 	/** Launcher codes asked for (uuid -> until) and handed to the launcher (uuid -> code). */
 	private final Map<String, Long> requested = new ConcurrentHashMap<>();
@@ -536,6 +538,7 @@ final class StaffPanel {
 	void register(HttpServer server, SessionRegistry registry, StaffService staff, ModerationService moderation, DiscordLinks links,
 			String botUrl, String adminToken) {
 		BotBridge bot = new BotBridge(botUrl, adminToken);
+		this.discordLinks = links;
 
 		// ---- First sign-in: a code in the launcher ----
 		server.createContext("/v1/staffpanel/challenge", exchange -> VeloServerApp.handle(exchange, "GET", ex -> JsonHttp.writeJson(ex, 200, pow.issue())));
@@ -1046,7 +1049,7 @@ final class StaffPanel {
 		// ---- Discord tickets (through the bot) ----
 		SocialRoutes.route(server, registry, "/v1/staff/tickets", "GET", (ex, me) -> {
 			requireRank(levelOf.apply(me), StaffService.HELPER);
-			JsonHttp.writeBytes(ex, 200, "application/json", bot.get("/tickets"), "no-store");
+			JsonHttp.writeBytes(ex, 200, "application/json", bot.get("/tickets?" + ticketViewer(me)), "no-store");
 		});
 		SocialRoutes.route(server, registry, "/v1/staff/tickets/messages", "GET", (ex, me) -> {
 			requireRank(levelOf.apply(me), StaffService.HELPER);
@@ -1054,7 +1057,7 @@ final class StaffPanel {
 			if (!id.matches("\\d{5,25}")) {
 				throw new ApiError(400, "Unknown ticket");
 			}
-			JsonHttp.writeBytes(ex, 200, "application/json", bot.get("/tickets/messages?id=" + id), "no-store");
+			JsonHttp.writeBytes(ex, 200, "application/json", bot.get("/tickets/messages?id=" + id + "&" + ticketViewer(me)), "no-store");
 		});
 		for (String action : List.of("reply", "claim", "close")) {
 			SocialRoutes.route(server, registry, "/v1/staff/tickets/" + action, "POST", (ex, me) -> {
@@ -1068,6 +1071,7 @@ final class StaffPanel {
 				body.put("staffName", social.usernameOf(me));
 				DiscordLinks.Link link = links.byUuid(me);
 				body.put("staffDiscordId", link == null ? null : link.discordId());
+				body.put("all", seesAllTickets(me));
 				body.put("text", r.text() == null ? null : r.text().strip());
 				body.put("reason", r.reason() == null ? null : r.reason().strip());
 				if ("reply".equals(action) && (r.text() == null || r.text().isBlank() || r.text().length() > 1900)) {
@@ -1080,6 +1084,16 @@ final class StaffPanel {
 				JsonHttp.writeBytes(ex, 200, "application/json", result, "no-store");
 			});
 		}
+	}
+
+	/** Managers and the owner see every ticket; everyone else only the types their Discord roles handle (the bot checks). */
+	private boolean seesAllTickets(String me) {
+		return isOwner(me) || StaffService.rank(levelOf.apply(me)) >= StaffService.rank(StaffService.MANAGER);
+	}
+
+	private String ticketViewer(String me) {
+		DiscordLinks.Link link = discordLinks.byUuid(me);
+		return "viewer=" + (link == null ? "" : link.discordId()) + (seesAllTickets(me) ? "&all=1" : "");
 	}
 
 	private boolean isOwner(String uuid) {

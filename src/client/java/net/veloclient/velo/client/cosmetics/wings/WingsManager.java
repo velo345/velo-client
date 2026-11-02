@@ -193,6 +193,20 @@ public final class WingsManager {
 		}
 		net.veloclient.velo.client.cosmetics.CosmeticsCatalog.refresh(false);
 		sync();
+		loadEquip();
+	}
+
+	/** Changed in the launcher's Locker: read the worn pair and its settings again (never saves). */
+	public static synchronized void reloadFromDisk() {
+		if (!loaded) {
+			load();
+			return;
+		}
+		SETTINGS.clear();
+		loadEquip();
+	}
+
+	private static void loadEquip() {
 		// The saved choice is kept even for a pair this client doesn't know yet (a server-only one): the
 		// server catalog arrives a moment later.
 		EquipState state = net.veloclient.velo.config.ConfigManager.load("cosmetics-wings", EquipState.class, new EquipState(null, null, null));

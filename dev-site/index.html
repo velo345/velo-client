@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Velo Bridge - native features for Velo Client players on your server</title>
+<meta name="description" content="Velo Bridge is a free plugin for Paper, Purpur and Folia. Teammate outlines, waypoints, native toasts and countdowns, Discord presence, mod hints, transfers and more - for every player on Velo Client.">
+<meta property="og:title" content="Velo Bridge for server owners">
+<meta property="og:description" content="One jar. Teammates, waypoints, native UI, Discord presence, mod hints and transfers for Velo Client players.">
+<meta property="og:image" content="https://dev.velo-client.com/shots/toast-v2.webp">
+<meta name="theme-color" content="#0b0b0c">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="/favicon.png">
+<link rel="preload" href="/fonts/archivo-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter-regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/style.css?v=d850a4cb">
+<script src="/app.js?v=d850a4cb" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav" id="nav">
+	<div class="wrap nav-in">
+		<a class="brand" href="/"><img src="/logo.png" alt="" width="28" height="28"><span>VELO</span><em>BRIDGE</em></a>
+		<nav class="nav-links" id="nav-links" aria-label="Sections">
+			<a href="#features">Features</a>
+			<a href="#setup">Setup</a>
+			<a href="#api">API</a>
+			<a href="#protocol">Protocol</a>
+			<a href="#modules">Modules</a>
+			<a href="#faq">FAQ</a>
+			<a href="https://velo-client.com" class="nav-out">velo-client.com ↗</a>
+		</nav>
+		<div class="nav-act">
+			<a class="btn btn-red btn-sm" href="/downloads/VeloBridge-1.0.0.jar" download>Download</a>
+			<button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span></button>
+		</div>
+	</div>
+</header>
+
+<main id="main">
+<!-- Hero: a real console command next to the real result -->
+<section class="hero wrap">
+	<div class="hero-copy">
+		<span class="kicker in" style="--d:0">FREE · PAPER · PURPUR · FOLIA · 1.20.5+</span>
+		<h1><span class="line"><span style="--d:1">Talk to Velo</span></span><span class="line"><span style="--d:2">players from</span></span><span class="line"><span style="--d:3">your server.</span></span></h1>
+		<p class="lead in" style="--d:4">One jar. Teammate outlines through walls, waypoints, native toasts and countdowns, camera effects, Discord presence, mod hints and proxy-free transfers. Players without Velo never notice it's there.</p>
+		<div class="cta in" style="--d:5">
+			<a class="btn btn-red" href="/downloads/VeloBridge-1.0.0.jar" download><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>VeloBridge 1.0.0</a>
+			<a class="btn" href="#setup">Set it up in a minute</a>
+		</div>
+		<ul class="points in" style="--d:6">
+			<li>Can't kick, ban or slow anyone down</li>
+			<li>Toasts and bars carry your server's name</li>
+			<li>Java API and an open protocol</li>
+		</ul>
+	</div>
+
+	<div class="console in" style="--d:3" data-tabs="console">
+		<div class="win-bar" role="tablist" aria-label="Try a command">
+			<span class="win-label">CONSOLE</span>
+			<button role="tab" aria-selected="true" data-tab="0">toast</button>
+			<button role="tab" aria-selected="false" data-tab="1">countdown</button>
+			<button role="tab" aria-selected="false" data-tab="2">tint</button>
+			<button role="tab" aria-selected="false" data-tab="3">mod hints</button>
+		</div>
+		<div class="term">
+			<div class="term-line"><span class="prompt">&gt;</span> <span class="typed" data-typed></span><span class="caret" aria-hidden="true">▍</span></div>
+			<div class="term-out" data-out></div>
+		</div>
+		<div class="stage">
+			<img class="on" data-pane="0" src="/shots/toast-v2.webp" srcset="/shots/toast-v2-800.webp 800w, /shots/toast-v2.webp 1600w" sizes="(max-width: 1000px) 100vw, 640px" width="1600" height="900" alt="Toast, progress bar and waypoint from the server in Velo Client">
+			<img data-pane="1" src="/shots/countdown-v2.webp" srcset="/shots/countdown-v2-800.webp 800w, /shots/countdown-v2.webp 1600w" sizes="(max-width: 1000px) 100vw, 640px" width="1600" height="900" alt="Countdown ring from the server in Velo Client">
+			<img data-pane="2" src="/shots/tint-v2.webp" srcset="/shots/tint-v2-800.webp 800w, /shots/tint-v2.webp 1600w" sizes="(max-width: 1000px) 100vw, 640px" width="1600" height="900" alt="Red tint and vignette from the server in Velo Client">
+			<img data-pane="3" src="/shots/modhints-v2.webp" srcset="/shots/modhints-v2-800.webp 800w, /shots/modhints-v2.webp 1600w" sizes="(max-width: 1000px) 100vw, 640px" width="1600" height="900" alt="A server's mod hint dialog in Velo Client">
+			<span class="stage-note">Real capture · Paper 26.2 test server</span>
+		</div>
+	</div>
+</section>
+
+<div class="strip" aria-label="Platforms">
+	<div class="wrap strip-in"><span>RUNS ON</span><b>Paper</b><b>Purpur</b><b>Folia</b><b>Pufferfish</b><b>Spigot*</b><span class="mute">Minecraft 1.20.5 – 26.x · Java 21+</span></div>
+</div>
+
+<!-- Features: pick one, switch between API / command / config -->
+<section class="sec wrap" id="features">
+	<header class="head reveal">
+		<div><span class="num">01 / FEATURES</span><h2>Fourteen features,<br>one plugin.</h2></div>
+		<p>No resource-pack hacks. Everything you send is drawn by Velo itself in its own fonts, crisp at every GUI scale. Toasts and bars carry your server's name.</p>
+	</header>
+	<div class="explorer reveal" data-explorer>
+		<div class="ex-list" role="tablist" aria-label="Features" data-ex-list></div>
+		<div class="ex-main">
+			<div class="ex-head"><h3 data-ex-name></h3><p data-ex-text></p></div>
+			<div class="win-bar" role="tablist" aria-label="Code" data-ex-code-tabs>
+				<button role="tab" aria-selected="true" data-code="java">Java API</button>
+				<button role="tab" aria-selected="false" data-code="cmd">Command</button>
+				<button role="tab" aria-selected="false" data-code="cfg">config.yml</button>
+				<button type="button" class="win-copy" data-ex-copy>Copy</button>
+			</div>
+			<pre class="code ex-code" data-ex-code></pre>
+			<figure class="ex-shot" data-ex-shot hidden><img alt="" data-ex-img width="1600" height="900" loading="lazy"><figcaption>Real capture · Paper 26.2</figcaption></figure>
+		</div>
+	</div>
+</section>
+
+<!-- Setup -->
+<section class="sec wrap" id="setup">
+	<header class="head reveal">
+		<div><span class="num">02 / SETUP</span><h2>Live in a minute.</h2></div>
+		<div class="seg" role="tablist" aria-label="Server software" data-platforms>
+			<button role="tab" aria-selected="true" data-p="Paper">Paper</button>
+			<button role="tab" aria-selected="false" data-p="Purpur">Purpur</button>
+			<button role="tab" aria-selected="false" data-p="Folia">Folia</button>
+			<button role="tab" aria-selected="false" data-p="Spigot">Spigot</button>
+		</div>
+	</header>
+	<ol class="steps reveal">
+		<li><b>1</b><h3>Drop in the jar</h3><p>Put <code>VeloBridge-1.0.0.jar</code> into <code>plugins/</code> and restart <span data-pname>Paper</span>. On a network, install it on every backend server.</p><p class="pnote" data-pnote>Region and entity schedulers, so it's ready for Folia too.</p></li>
+		<li><b>2</b><h3>Name your server</h3><p>In <code>plugins/VeloBridge/config.yml</code> set the name and colour players see on everything you send.</p>
+<pre class="code mini"><span class="k">server</span>:
+  <span class="k">name</span>: <span class="s">"SkyWars.gg"</span>
+  <span class="k">color</span>: <span class="s">"#5aa9ff"</span></pre></li>
+		<li><b>3</b><h3>Reload and try it</h3><p>Run <code>/velobridge reload</code>, then <code>/velobridge countdown * 5 Test</code>. Every Velo player sees it, nobody else is touched.</p>
+<pre class="code mini"><span class="p">&gt;</span> velobridge players
+<span class="o">3 of 41 players use Velo</span></pre></li>
+	</ol>
+	<div class="config reveal">
+		<div class="win-bar"><span class="win-label">plugins/VeloBridge/config.yml</span><button class="win-copy copy" data-copy-target="config-code" type="button">Copy</button></div>
+		<pre class="code" id="config-code">Loading…</pre>
+	</div>
+</section>
+
+<!-- API -->
+<section class="sec wrap" id="api">
+	<header class="head reveal">
+		<div><span class="num">03 / JAVA API</span><h2>Five lines to a feature<br>players talk about.</h2></div>
+		<p>Add <code>softdepend: [VeloBridge]</code> to your plugin.yml and compile against the jar. Every call is safe for players without Velo and from any thread, Folia included.</p>
+	</header>
+	<div class="api reveal" data-tabs="api">
+		<div class="win-bar" role="tablist" aria-label="Examples">
+			<button role="tab" aria-selected="true" data-tab="0">Native UI</button>
+			<button role="tab" aria-selected="false" data-tab="1">Teammates</button>
+			<button role="tab" aria-selected="false" data-tab="2">Transfers</button>
+			<button role="tab" aria-selected="false" data-tab="3">Anti-cheat</button>
+			<button role="tab" aria-selected="false" data-tab="4">Gradle</button>
+		</div>
+		<div class="api-panes">
+<pre class="code" data-pane="0"><span class="c">// A round starts: countdown, then a toast and a red pulse.</span>
+<span class="k">if</span> (VeloBridge.<span class="f">isVelo</span>(player)) {
+    VeloBridge.<span class="f">countdown</span>(player, <span class="s">"Round 2"</span>, <span class="n">5</span>);
+    VeloBridge.<span class="f">progress</span>(player, <span class="s">"capture"</span>, <span class="s">"Island capture"</span>, <span class="n">0.4</span>);
+    VeloBridge.<span class="f">toast</span>(player, <span class="s">"Round 2"</span>, <span class="s">"The island shrinks in 30 seconds"</span>, <span class="n">6</span>);
+    VeloBridge.<span class="f">vignette</span>(player, <span class="s">"#ff3b3b"</span>, <span class="n">0.5</span>, <span class="n">1500</span>);
+    VeloBridge.<span class="f">shake</span>(player, <span class="n">0.4</span>, <span class="n">600</span>);
+}</pre>
+<pre class="code" data-pane="1" hidden><span class="c">// Show each player their team - outline through walls, names, edge arrows.</span>
+<span class="k">for</span> (Team team : game.<span class="f">teams</span>()) {
+    <span class="k">for</span> (Player p : team.<span class="f">players</span>()) {
+        VeloBridge.<span class="f">teammates</span>(p, team.<span class="f">players</span>(), team.<span class="f">hexColor</span>(), <span class="n">0</span>);
+    }
+}
+<span class="c">// The objective, for everyone:</span>
+Bukkit.<span class="f">getOnlinePlayers</span>().<span class="f">forEach</span>(p -&gt;
+    VeloBridge.<span class="f">waypoint</span>(p, <span class="s">"core"</span>, coreLocation, <span class="s">"Enemy core"</span>, <span class="s">"#e0262e"</span>, <span class="n">0</span>));</pre>
+<pre class="code" data-pane="2" hidden><span class="c">// Send the player to the lobby they reach fastest - no proxy.</span>
+List&lt;String&gt; lobbies = List.<span class="f">of</span>(<span class="s">"eu.lobby.gg"</span>, <span class="s">"us.lobby.gg"</span>, <span class="s">"asia.lobby.gg"</span>);
+VeloBridge.<span class="f">pings</span>(player, lobbies).<span class="f">thenAccept</span>(ms -&gt; {
+    String best = ms.<span class="f">entrySet</span>().<span class="f">stream</span>()
+        .<span class="f">filter</span>(e -&gt; e.<span class="f">getValue</span>() &gt;= <span class="n">0</span>)
+        .<span class="f">min</span>(Map.Entry.<span class="f">comparingByValue</span>())
+        .<span class="f">map</span>(Map.Entry::<span class="f">getKey</span>).<span class="f">orElse</span>(lobbies.<span class="f">get</span>(<span class="n">0</span>));
+    VeloBridge.<span class="f">transfer</span>(player, best, <span class="n">25565</span>);
+});</pre>
+<pre class="code" data-pane="3" hidden><span class="c">// React to exactly the Velo module that matters in your mode.</span>
+<span class="a">@EventHandler</span>
+<span class="k">public void</span> <span class="f">onModules</span>(VeloModulesChangeEvent e) {
+    <span class="k">if</span> (inHideAndSeek(e.<span class="f">getPlayer</span>()) &amp;&amp; e.<span class="f">getActive</span>().<span class="f">contains</span>(<span class="s">"freelook"</span>)) {
+        VeloBridge.<span class="f">disableModules</span>(e.<span class="f">getPlayer</span>(), List.<span class="f">of</span>(<span class="s">"freelook"</span>), <span class="s">"Not in hide &amp; seek"</span>);
+    }
+}
+
+<span class="a">@EventHandler</span>
+<span class="k">public void</span> <span class="f">onVelo</span>(VeloPlayerJoinEvent e) {
+    getLogger().<span class="f">info</span>(e.<span class="f">getPlayer</span>().<span class="f">getName</span>() + <span class="s">" uses Velo "</span> + e.<span class="f">getVelo</span>().<span class="f">veloVersion</span>());
+}</pre>
+<pre class="code" data-pane="4" hidden><span class="c">// build.gradle(.kts) - put the jar into libs/</span>
+dependencies {
+    <span class="f">compileOnly</span>(<span class="f">files</span>(<span class="s">"libs/VeloBridge-1.0.0.jar"</span>))
+}
+
+<span class="c"># plugin.yml</span>
+<span class="k">softdepend</span>: [VeloBridge]</pre>
+		</div>
+		<div class="ref">
+			<div><b>Players</b><span>isVelo · info · onlineVeloPlayers</span></div>
+			<div><b>UI</b><span>toast · countdown · progress · removeProgress</span></div>
+			<div><b>Effects</b><span>shake · vignette · tint · clearEffects</span></div>
+			<div><b>World</b><span>teammates · waypoint · removeWaypoint</span></div>
+			<div><b>Presence</b><span>presence</span></div>
+			<div><b>Modules</b><span>disableModules</span></div>
+			<div><b>Network</b><span>transfer · pings</span></div>
+			<div><b>Events</b><span>VeloPlayerJoinEvent · VeloModulesChangeEvent</span></div>
+		</div>
+	</div>
+</section>
+
+<!-- Protocol -->
+<section class="sec wrap" id="protocol">
+	<header class="head reveal">
+		<div><span class="num">04 / PROTOCOL</span><h2>velo:bridge</h2></div>
+		<p>Minestom, Velocity, your own server: one plugin channel, one UTF-8 JSON object per message, the type in <code>"t"</code>. Unknown types and fields are ignored on both sides.</p>
+	</header>
+	<div class="proto reveal">
+		<div class="proto-tools">
+			<input type="search" placeholder="Filter: try “way” or “ping”" aria-label="Filter messages" data-proto-q>
+			<div class="seg" role="tablist" aria-label="Direction" data-proto-dir>
+				<button role="tab" aria-selected="true" data-d="">All</button>
+				<button role="tab" aria-selected="false" data-d="s2c">Server → client</button>
+				<button role="tab" aria-selected="false" data-d="c2s">Client → server</button>
+			</div>
+		</div>
+		<div class="proto-rows" data-proto-rows></div>
+		<div class="proto-count" data-proto-count></div>
+	</div>
+<pre class="code reveal"><span class="c">// Server → client, raw bytes on velo:bridge (no length prefix)</span>
+{ <span class="s">"t"</span>: <span class="s">"toast"</span>, <span class="s">"title"</span>: <span class="s">"Round 2"</span>, <span class="s">"text"</span>: <span class="s">"The island shrinks in 30 seconds"</span>, <span class="s">"seconds"</span>: <span class="n">6</span> }</pre>
+</section>
+
+<!-- Modules -->
+<section class="sec wrap" id="modules">
+	<header class="head reveal">
+		<div><span class="num">05 / MODULE IDS</span><h2>Every Velo module<br>you can switch off.</h2></div>
+		<p>Use these ids in <code>disabled-modules</code> and <code>disableModules(...)</code>. Click one to copy it.</p>
+	</header>
+	<div class="modules reveal">
+		<div class="mod-tools">
+			<input id="mod-search" type="search" placeholder="Search modules: freelook, minimap, zoom…" aria-label="Search modules">
+			<div class="mod-cats" id="mod-cats"></div>
+		</div>
+		<div class="mod-list" id="mod-list"></div>
+	</div>
+</section>
+
+<!-- FAQ -->
+<section class="sec wrap faq-wrap" id="faq">
+	<header class="head reveal"><div><span class="num">06 / FAQ</span><h2>Questions server<br>owners ask.</h2></div></header>
+	<div class="faq">
+		<details><summary>Does it change anything for players without Velo?</summary><p>No. The plugin only ever talks to players who said hello on the Velo channel. Everyone else gets no packets, no messages, nothing.</p></details>
+		<details><summary>Can it kick or ban players for their mods?</summary><p>No, on purpose. Mod hints are checked on the player's own PC and shown as a heads-up; nothing is reported back or enforced, so a wrong match can never cost anyone their account. The only enforced thing is switching off Velo's own modules you listed.</p></details>
+		<details><summary>How do players know it's my server and not Velo?</summary><p>Toasts and progress bars carry your server's name in your colour, and your mod hints say "From &lt;your server&gt;". Velo's own UI never looks like that. Players can also hide your mod hints for good.</p></details>
+		<details><summary>What do you collect with <code>stats: true</code>?</summary><p>Your server name, software, Minecraft version, players online, how many use Velo and which Velo versions. No player names, UUIDs or IPs. Set <code>stats: false</code> and nothing is sent.</p></details>
+		<details><summary>Does it work on Folia and networks?</summary><p>Yes. It uses Folia's region and entity schedulers (which Paper and Purpur have too) and falls back to Bukkit's on Spigot. On a network, install it on every backend; transfers work between any servers, with or without a proxy.</p></details>
+		<details><summary>Which versions?</summary><p>Servers on Minecraft 1.20.5 and newer (Java 21+). Players on any Velo version with Bridge support.</p></details>
+	</div>
+</section>
+
+<section class="wrap partner reveal">
+	<div><h2>Become a Velo partner server.</h2><p>Install Bridge, keep stats on and get in touch. Partner servers get featured in the Velo launcher.</p></div>
+	<div class="cta"><a class="btn btn-red" href="/downloads/VeloBridge-1.0.0.jar" download>Download VeloBridge</a><a class="btn" href="https://velo-client.com">About Velo Client</a></div>
+</section>
+</main>
+
+<footer class="foot wrap">
+	<span>© Velo Client · Velo Bridge 1.0.0</span>
+	<span class="mute">Not affiliated with Mojang or Microsoft.</span>
+	<a href="https://velo-client.com">velo-client.com</a>
+</footer>
+</body>
+</html>

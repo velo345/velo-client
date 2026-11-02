@@ -248,16 +248,18 @@ public final class MenuKit {
 
 	// ---- Motion ----
 
-	private static final Map<Object, float[]> HOVER = new WeakHashMap<>();
+	private static final Map<Object, double[]> HOVER = new WeakHashMap<>();
 
 	/** Eased 0..1 hover progress per object (a widget, a hotspot), stepped every frame it's asked. */
 	public static float hover(Object key, boolean hovered) {
-		float[] state = HOVER.computeIfAbsent(key, k -> new float[] {0f, 0f});
-		long now = System.nanoTime() / 1_000_000L;
-		float dt = state[1] == 0f ? 0f : Math.min(0.1f, (now - state[1]) / 1000f);
+		// [0] the fade, [1] the last frame in nanoseconds. A double on purpose: as milliseconds-since-boot in a float the
+		// time only moved in 16 ms steps after a couple of days of uptime, and every hover fade stuttered.
+		double[] state = HOVER.computeIfAbsent(key, k -> new double[] {0, 0});
+		long now = System.nanoTime();
+		float dt = state[1] == 0 ? 0f : (float) Math.min(0.1, (now - state[1]) / 1e9);
 		state[1] = now;
-		state[0] = VeloAnim.step(state[0], hovered ? 1f : 0f, dt);
-		return state[0];
+		state[0] = VeloAnim.step((float) state[0], hovered ? 1f : 0f, dt);
+		return (float) state[0];
 	}
 
 	public static boolean inside(int mouseX, int mouseY, int x, int y, int w, int h) {

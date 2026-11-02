@@ -1,0 +1,716 @@
+[
+ {
+  "id": "actionbar-log",
+  "name": "Action Bar Log",
+  "description": "Keeps a short scrollback of action bar messages.",
+  "category": "hud"
+ },
+ {
+  "id": "anti-coords-leak",
+  "name": "Anti Coords Leak",
+  "description": "Hides every coordinate on screen (chat, F3, HUD, waypoints, Litematica, any mod) while you share your screen or record ",
+  "category": "qol"
+ },
+ {
+  "id": "anti-deepslate",
+  "name": "Anti Deepslate",
+  "description": "Draws deepslate, stone types, gravel, ores and bedrock as one plain block (netherite by default) so their rotation and patterns can't reveal ",
+  "category": "rendering"
+ },
+ {
+  "id": "anti-farm-lag",
+  "name": "Anti Farm Lag",
+  "description": "Lightens rendering near big redstone farms (observers, pistons, hoppers, TNT) without stopping them.",
+  "category": "performance"
+ },
+ {
+  "id": "armor-durability",
+  "name": "Armor & Durability",
+  "description": "Shows each equipped armor piece's durability, inventory-style.",
+  "category": "hud"
+ },
+ {
+  "id": "armor-bar",
+  "name": "Armor Bar",
+  "description": "Recolor the armor points above your hearts or draw your own armor icon.",
+  "category": "hud"
+ },
+ {
+  "id": "arrow-counter",
+  "name": "Arrow Counter",
+  "description": "Shows how many arrows you have left.",
+  "category": "pvp"
+ },
+ {
+  "id": "attack-indicator",
+  "name": "Attack Indicator",
+  "description": "Shows the attack charge bar under your custom crosshair, styled and colored the way you like.",
+  "category": "pvp"
+ },
+ {
+  "id": "aura-cosmetics",
+  "name": "Auras",
+  "description": "Show or hide auras - yours and other players' - and calm down other players' particles in busy fights.",
+  "category": "cosmetics"
+ },
+ {
+  "id": "auto-gg",
+  "name": "Auto GG",
+  "description": "Sends \"gg\" in chat when a minigame ends (Hypixel, Bed Wars, SkyWars, Duels...).",
+  "category": "pvp"
+ },
+ {
+  "id": "auto-reconnect",
+  "name": "Auto Reconnect",
+  "description": "Automatically reconnects after an unexpected disconnect, waiting progressively longer between ",
+  "category": "qol"
+ },
+ {
+  "id": "background-queue",
+  "name": "Background Queue Session",
+  "description": "Keep a server connected in the background so you hold your spot (e.g. in a queue) while you play ",
+  "category": "server_tools"
+ },
+ {
+  "id": "better-f3",
+  "name": "Better F3",
+  "description": "A cleaner F3 screen: compact see-through panels, Nether/Overworld coordinates for portals, ",
+  "category": "debug"
+ },
+ {
+  "id": "block-outline",
+  "name": "Block Outline",
+  "description": "Replaces the default selected-block outline with a customizable color and line width.",
+  "category": "rendering"
+ },
+ {
+  "id": "looking-at-inspector",
+  "name": "Block/Entity Inspector",
+  "description": "Shows extended info (registry id, NBT, UUID) for the block or entity you're looking at.",
+  "category": "debug"
+ },
+ {
+  "id": "boss-bar",
+  "name": "Boss Bar",
+  "description": "Move, scale or hide boss bars - in the HUD editor you get an example bar when no boss is around.",
+  "category": "hud"
+ },
+ {
+  "id": "chat-tweaks",
+  "name": "Chat",
+  "description": "Stacks repeated messages as (5x), timestamps, highlights your name, hides spam words, longer history.",
+  "category": "qol"
+ },
+ {
+  "id": "chunk-border-overlay",
+  "name": "Chunk Boundary Overlay",
+  "description": "Renders chunk and chunk-section borders around you, for build/world-gen testing, with ",
+  "category": "server_tools"
+ },
+ {
+  "id": "chunk-load-profiler",
+  "name": "Chunk Load Profiler",
+  "description": "Highlights how long each chunk took to load relative to others (green = normal, red = ",
+  "category": "server_tools"
+ },
+ {
+  "id": "client-log-viewer",
+  "name": "Client Log Viewer",
+  "description": "In-game log viewer with a text filter and one-click session export.",
+  "category": "server_tools"
+ },
+ {
+  "id": "clips",
+  "name": "Clips",
+  "description": "Save the last 30 seconds of gameplay with one key (F8). Velo+ Clips Pro: 2-5 minutes at 1080p60, auto clips and share links.",
+  "category": "qol"
+ },
+ {
+  "id": "clock",
+  "name": "Clock",
+  "description": "Displays the current real-world time.",
+  "category": "hud"
+ },
+ {
+  "id": "combo-counter",
+  "name": "Combo Counter",
+  "description": "Counts the hits you land in a row without getting hit back.",
+  "category": "pvp"
+ },
+ {
+  "id": "command-keybinds",
+  "name": "Command Keybinds",
+  "description": "Bind a key to instantly run a chat command, like /spawn.",
+  "category": "qol"
+ },
+ {
+  "id": "container-animations",
+  "name": "Container Animations",
+  "description": "Containers pop, slide or zoom in when opened and ease out when closed, and items fly to where they land - shift-clicks, hotbar keys and Mouse Tweaks too.",
+  "category": "rendering"
+ },
+ {
+  "id": "cooldowns",
+  "name": "Cooldowns",
+  "description": "Circular cooldown timers for ender pearls, wind charges, shields and every other item cooldown.",
+  "category": "pvp"
+ },
+ {
+  "id": "coordinates",
+  "name": "Coordinates",
+  "description": "Displays your current X/Y/Z position.",
+  "category": "hud"
+ },
+ {
+  "id": "copy-coordinates",
+  "name": "Copy Coordinates",
+  "description": "Copies your current X/Y/Z to the clipboard with one keypress.",
+  "category": "qol"
+ },
+ {
+  "id": "cape-cosmetics",
+  "name": "Cosmetic Cloaks",
+  "description": "Equip a cloth-physics cloak from your local library. Purely client-rendered.",
+  "category": "cosmetics"
+ },
+ {
+  "id": "custom-crosshair",
+  "name": "Custom Crosshair",
+  "description": "Replaces the vanilla crosshair with one from your library - draw your own or import a PNG.",
+  "category": "pvp"
+ },
+ {
+  "id": "damage-numbers",
+  "name": "Damage Numbers",
+  "description": "Shows the damage players take (and heal) above their heads for a moment after each hit.",
+  "category": "pvp"
+ },
+ {
+  "id": "direction-hud",
+  "name": "Direction",
+  "description": "A compass strip showing which way you're facing.",
+  "category": "pvp"
+ },
+ {
+  "id": "emoji-chat",
+  "name": "Emoji Chat",
+  "description": "Shows emoji as colour pictures in chat, turns :shortcodes: into emoji when you send them and suggests emoji as you type - Tab completes.",
+  "category": "qol"
+ },
+ {
+  "id": "emotes",
+  "name": "Emotes",
+  "description": "Emote wheel: hold B, point at an emote and let go (or press 1-8) - with effects, props, sounds and music. Get emotes in the Store.",
+  "category": "cosmetics"
+ },
+ {
+  "id": "enemy-effects",
+  "name": "Enemy Effects",
+  "description": "Shows other players' potion effects and roughly how long they last above their heads.",
+  "category": "pvp"
+ },
+ {
+  "id": "enemy-hunger",
+  "name": "Enemy Hunger",
+  "description": "Estimates other players' hunger and saturation and shows it above their heads.",
+  "category": "pvp"
+ },
+ {
+  "id": "entity-count-overlay",
+  "name": "Entity Count Overlay",
+  "description": "Shows loaded entity counts by type, for diagnosing entity lag on your own server.",
+  "category": "server_tools"
+ },
+ {
+  "id": "entity-detail",
+  "name": "Entity Detail Distance (Experimental)",
+  "description": "Far-away mobs and players skip armor, held items and other extra layers - big FPS gains in crowded areas.",
+  "category": "performance"
+ },
+ {
+  "id": "fast-grow",
+  "name": "Fast Grow",
+  "description": "Singleplayer: crops, amethyst, saplings and other growing blocks grow up to 100x faster.",
+  "category": "qol"
+ },
+ {
+  "id": "fight-recap",
+  "name": "Fight Recap",
+  "description": "After a fight: hits, combo, reach and damage both ways, a hit timeline - and an automatic clip.",
+  "category": "pvp"
+ },
+ {
+  "id": "fly-speed",
+  "name": "Fly Speed",
+  "description": "Fly faster in creative, spectator and singleplayer (up to 10x).",
+  "category": "qol"
+ },
+ {
+  "id": "fov",
+  "name": "FOV",
+  "description": "Your field of view plus separate sliders for movement FOV kick, nausea distortion and damage tilt.",
+  "category": "pvp"
+ },
+ {
+  "id": "fps-counter",
+  "name": "FPS Counter",
+  "description": "Shows current frames per second.",
+  "category": "hud"
+ },
+ {
+  "id": "frame-time-graph",
+  "name": "Frame Time Graph",
+  "description": "Rolling graph of per-frame render time in milliseconds.",
+  "category": "performance"
+ },
+ {
+  "id": "free-look",
+  "name": "Free Look",
+  "description": "Hold the free look key to orbit the camera freely around your player in third person, without ",
+  "category": "qol"
+ },
+ {
+  "id": "friends",
+  "name": "Friends",
+  "description": "Friends list, messages and popups. Press O to open it; see where friends are playing.",
+  "category": "qol"
+ },
+ {
+  "id": "full-bright",
+  "name": "Full Bright",
+  "description": "Makes everything lit at all read as fully bright (vanilla Night Vision rendering, always on).",
+  "category": "rendering"
+ },
+ {
+  "id": "mode-presets",
+  "name": "Game Mode Presets",
+  "description": "Loads a different Velo profile per game mode (Bed Wars, duels, SkyWars...) and switches back after.",
+  "category": "server_tools"
+ },
+ {
+  "id": "gpu-utilization",
+  "name": "GPU Utilization",
+  "description": "Shows current GPU utilization percentage.",
+  "category": "performance"
+ },
+ {
+  "id": "health-indicator",
+  "name": "Health Indicator",
+  "description": "Shows other players' hearts above their heads when they're not at full health.",
+  "category": "pvp"
+ },
+ {
+  "id": "hearts",
+  "name": "Hearts",
+  "description": "Recolor your hearts or use your own heart icon.",
+  "category": "hud"
+ },
+ {
+  "id": "height-limit",
+  "name": "Height Limit",
+  "description": "Blocks left until the build height limit and the void - for Bed Wars and SkyWars.",
+  "category": "pvp"
+ },
+ {
+  "id": "held-item",
+  "name": "Held Item",
+  "description": "Shows the icon and count of the item in your main hand.",
+  "category": "hud"
+ },
+ {
+  "id": "hide-foliage",
+  "name": "Hide Foliage",
+  "description": "Hides grass, ferns, dry grass, bushes, seagrass, nether sprouts and roots, leaf litter and more - clearer views and fewer polygons.",
+  "category": "rendering"
+ },
+ {
+  "id": "hit-color",
+  "name": "Hit Color",
+  "description": "Pick the hurt flash color and strength for players, mobs and yourself - and tint armor and trims too.",
+  "category": "pvp"
+ },
+ {
+  "id": "hit-particles",
+  "name": "Hit Particles",
+  "description": "Extra particles when your hits land - a separate look for normal hits and crits.",
+  "category": "pvp"
+ },
+ {
+  "id": "hit-sounds",
+  "name": "Hit Sounds",
+  "description": "Plays a sound only you hear when your hits land - another one for crits.",
+  "category": "pvp"
+ },
+ {
+  "id": "hitbox-visualizer",
+  "name": "Hitbox Visualizer",
+  "description": "Renders entity hitbox outlines for build/plugin testing, with a customizable color and line width.",
+  "category": "server_tools"
+ },
+ {
+  "id": "hopper-speed",
+  "name": "Hopper Speed",
+  "description": "Singleplayer: items per hopper transfer (1-64), transfer cooldown, or no hopper transfers at all.",
+  "category": "qol"
+ },
+ {
+  "id": "hotbar",
+  "name": "Hotbar Colors",
+  "description": "Color your hotbar's slots and the outline of the selected slot.",
+  "category": "hud"
+ },
+ {
+  "id": "hud-style",
+  "name": "HUD Style",
+  "description": "One font, background and accent colour for every HUD element - Inter, Sora, Space Grotesk, Poppins and more, ",
+  "category": "hud"
+ },
+ {
+  "id": "hunger",
+  "name": "Hunger & Saturation",
+  "description": "Outlines your food icons by how much saturation you have left, and lets you recolor or replace the food icon.",
+  "category": "hud"
+ },
+ {
+  "id": "input-sampler",
+  "name": "Input Latency Sub-Tick Sampling",
+  "description": "Timestamps mouse clicks off the main thread so latency doesn't depend on frame rate, and (optionally) polls input again at the start of every tick to notice clicks sooner during FPS stalls.",
+  "category": "performance"
+ },
+ {
+  "id": "item-position",
+  "name": "Item Position",
+  "description": "Move, rotate and resize your held items in first person - per hand, plus lower shield.",
+  "category": "pvp"
+ },
+ {
+  "id": "keybind-conflict-checker",
+  "name": "Keybind Conflict Checker",
+  "description": "Lists keybinds that are bound to the same key as another binding.",
+  "category": "debug"
+ },
+ {
+  "id": "keystrokes",
+  "name": "Keystrokes",
+  "description": "Shows WASD, sneak, jump and sprint key state.",
+  "category": "hud"
+ },
+ {
+  "id": "kill-effects",
+  "name": "Kill Effects",
+  "description": "Plays a purely client-side visual effect (with optional sound) when a nearby entity dies - ",
+  "category": "cosmetics"
+ },
+ {
+  "id": "light-level-overlay",
+  "name": "Light Level Overlay",
+  "description": "Shows block light levels on nearby surface blocks, highlighting where hostile mobs can spawn.",
+  "category": "server_tools"
+ },
+ {
+  "id": "low-fire",
+  "name": "Low Fire",
+  "description": "Lowers the fire overlay while you burn so you can still see - or hides it with Fire Resistance.",
+  "category": "pvp"
+ },
+ {
+  "id": "low-health-warning",
+  "name": "Low Health Warning",
+  "description": "Red glow around the screen (and a heartbeat) when your health is low.",
+  "category": "pvp"
+ },
+ {
+  "id": "memory-monitor",
+  "name": "Memory & GC Monitor",
+  "description": "Shows JVM heap usage and allocation rate.",
+  "category": "performance"
+ },
+ {
+  "id": "minimap",
+  "name": "Minimap",
+  "description": "A rotating top-down minimap of nearby terrain, sampled from vanilla's own map colors.",
+  "category": "hud"
+ },
+ {
+  "id": "module-profiler",
+  "name": "Module Profiler",
+  "description": "Shows live processing time (avg/peak ms) per module, broken down by tick/world-render/HUD-render, to track down performance regressions.",
+  "category": "debug"
+ },
+ {
+  "id": "mouse-buttons",
+  "name": "Mouse Buttons",
+  "description": "Shows mouse button state (left, right and middle in the Mouse style) with live CPS - as boxes, text or a mouse.",
+  "category": "hud"
+ },
+ {
+  "id": "nick-hider",
+  "name": "Nick Hider",
+  "description": "Hides other players' nametags above their heads by scrambling them into obfuscated gibberish.",
+  "category": "qol"
+ },
+ {
+  "id": "no-break-particles",
+  "name": "No Break Particles",
+  "description": "Removes the particles when a block breaks and while you mine it - cleaner view, sounds stay.",
+  "category": "rendering"
+ },
+ {
+  "id": "old-animations",
+  "name": "Old Animations",
+  "description": "1.7 / 1.8 animations: no cooldown hand drop, sword blocking, block-hitting, old rod and more.",
+  "category": "pvp"
+ },
+ {
+  "id": "packet-traffic-monitor",
+  "name": "Packet Traffic Monitor",
+  "description": "Shows inbound/outbound packet counts by type, for diagnosing plugin packet spam.",
+  "category": "server_tools"
+ },
+ {
+  "id": "particle-debug-overlay",
+  "name": "Particle Debug Overlay",
+  "description": "Shows active particle count and type breakdown.",
+  "category": "server_tools"
+ },
+ {
+  "id": "particle-limiter",
+  "name": "Particle Limiter",
+  "description": "Caps particle density to MINIMAL to reduce lag from particle-heavy areas.",
+  "category": "performance"
+ },
+ {
+  "id": "party-ping",
+  "name": "Party",
+  "description": "Party chat (/party), pings (V), invites and shared waypoints - parties live in the Friends menu.",
+  "category": "qol"
+ },
+ {
+  "id": "performance-boost",
+  "name": "Performance Boost",
+  "description": "Presets and individually-tunable settings for maximum FPS - view distance, entities, particles, VSync, HUD caching and more.",
+  "category": "performance"
+ },
+ {
+  "id": "phantom",
+  "name": "Phantom",
+  "description": "Singleplayer: don't trigger pressure plates, tripwires or sculk, and fly through walls in creative.",
+  "category": "qol"
+ },
+ {
+  "id": "ping-display",
+  "name": "Ping Display",
+  "description": "Shows your connection latency to the server.",
+  "category": "hud"
+ },
+ {
+  "id": "player-levels",
+  "name": "Player Levels",
+  "description": "Ranks the players in your game by the stars / level / ELO shown in the tab list.",
+  "category": "hud"
+ },
+ {
+  "id": "polyblur",
+  "name": "PolyBlur",
+  "description": "Motion blur that responds to how fast you're turning or moving - not a constant filter.",
+  "category": "performance"
+ },
+ {
+  "id": "pot-counter",
+  "name": "Pot Counter",
+  "description": "Shows how many healing splash potions you have left.",
+  "category": "pvp"
+ },
+ {
+  "id": "potion-timers",
+  "name": "Potion Effect Timers",
+  "description": "Shows active potion effects with icon and remaining duration.",
+  "category": "hud"
+ },
+ {
+  "id": "reach-display",
+  "name": "Reach Display",
+  "description": "A red circle on the ground showing exactly how far you can hit - green when someone is in reach.",
+  "category": "pvp"
+ },
+ {
+  "id": "render-culling",
+  "name": "Render Culling",
+  "description": "Stops drawing far-away armor stands, item frames, dropped items, XP, signs and chests - big FPS win in busy lobbies.",
+  "category": "performance"
+ },
+ {
+  "id": "resource-reload-hotkeys",
+  "name": "Resource/Shader Reload Hotkeys",
+  "description": "Hotkeys to reload resource packs and (if Iris is installed) shaders without restarting.",
+  "category": "debug"
+ },
+ {
+  "id": "scoreboard-hud",
+  "name": "Scoreboard",
+  "description": "Repositions, scales, or hides the server's scoreboard sidebar - appears here automatically whenever a server actually sets one.",
+  "category": "hud"
+ },
+ {
+  "id": "screen-stretch",
+  "name": "Screen Stretch",
+  "description": "Stretched resolution: draw the world as 4:3, 5:4, 16:10 or your own shape and stretch it across your monitor - ",
+  "category": "rendering"
+ },
+ {
+  "id": "seamless-reload",
+  "name": "Seamless Resource Reload",
+  "description": "Reloading resource packs no longer shows the red Mojang screen - you keep playing while it loads.",
+  "category": "performance"
+ },
+ {
+  "id": "server-overlays",
+  "name": "Server Overlays",
+  "description": "Bed Wars teams & generator timers, final kills, event timers, win streak - adapts to the server and game.",
+  "category": "hud"
+ },
+ {
+  "id": "session-auto-fixer",
+  "name": "Session Auto-Fixer",
+  "description": "When a server kicks you for an invalid/expired session, refreshes your saved Velo account ",
+  "category": "qol"
+ },
+ {
+  "id": "session-stats",
+  "name": "Session Stats",
+  "description": "Tracks deaths and time played this session, locally only.",
+  "category": "hud"
+ },
+ {
+  "id": "shader-cache",
+  "name": "Shader Cache",
+  "description": "Saves compiled shaders and Vulkan pipelines to disk, so startup and resource-pack reloads skip recompiling them.",
+  "category": "performance"
+ },
+ {
+  "id": "shulker-preview",
+  "name": "Shulker Preview",
+  "description": "Hold Shift over a shulker box or bundle to see what's inside. Ctrl+Shift opens it next to your inventory so you can ",
+  "category": "qol"
+ },
+ {
+  "id": "simulation-distance",
+  "name": "Simulation Distance",
+  "description": "Shows the chunks the server simulates around you (crops, redstone, mob spawning) ",
+  "category": "server_tools"
+ },
+ {
+  "id": "small-caps",
+  "name": "Small Caps",
+  "description": "Renders chat, action bar and Velo's own HUD text in small capitals instead of normal case, ",
+  "category": "qol"
+ },
+ {
+  "id": "spawn-radius",
+  "name": "Spawn Radius",
+  "description": "Spheres around you showing where mobs can spawn and despawn (24 / 32 / 128 blocks), ",
+  "category": "server_tools"
+ },
+ {
+  "id": "speed-hud",
+  "name": "Speed",
+  "description": "Shows how fast you're moving in blocks per second.",
+  "category": "qol"
+ },
+ {
+  "id": "target-hud",
+  "name": "Target HUD",
+  "description": "Shows the player you're fighting: health, armor, distance and who's winning.",
+  "category": "pvp"
+ },
+ {
+  "id": "time-weather-fog",
+  "name": "Time, Weather & Fog",
+  "description": "Locks the local time-of-day and weather to a fixed state, and lets you customize or fully ",
+  "category": "rendering"
+ },
+ {
+  "id": "tnt-timer",
+  "name": "TNT Timer",
+  "description": "Shows a live countdown above primed TNT, with a customizable color and text size.",
+  "category": "rendering"
+ },
+ {
+  "id": "toggle-sneak",
+  "name": "Toggle Sneak",
+  "description": "Press sneak once to toggle it on/off instead of holding it.",
+  "category": "qol"
+ },
+ {
+  "id": "toggle-sprint",
+  "name": "Toggle Sprint",
+  "description": "Press sprint once to toggle it on/off instead of holding it.",
+  "category": "qol"
+ },
+ {
+  "id": "totem-counter",
+  "name": "Totem Counter",
+  "description": "Shows how many Totems of Undying you carry, with the totem icon.",
+  "category": "pvp"
+ },
+ {
+  "id": "totem-pops",
+  "name": "Totem Pop Counter",
+  "description": "How many totems your opponent popped this life - or how many you popped and have left. Resets on death.",
+  "category": "pvp"
+ },
+ {
+  "id": "tps-tick-graph",
+  "name": "TPS & Tick Graph",
+  "description": "Shows server tick time (singleplayer/LAN) or connection packet rate as a proxy on remote servers.",
+  "category": "server_tools"
+ },
+ {
+  "id": "velo-loading-screen",
+  "name": "Velo Loading Screen",
+  "description": "A clean Velo loading screen at startup instead of the red Mojang one.",
+  "category": "qol"
+ },
+ {
+  "id": "velo-network",
+  "name": "Velo Network",
+  "description": "See other online Velo Client users' badge and cloak, and share yours (including your own custom cloak) with them.",
+  "category": "cosmetics"
+ },
+ {
+  "id": "velo-shaders",
+  "name": "Velo Shaders",
+  "description": "Beta: custom Vulkan shaders, still in development. Shaders that run on Vulkan, fully customizable: presets, waving water with reflections, warm light, nicer fog, a custom sky with sun, moon, stars and aurora, bloom and colour grading - at a fraction of the usual shader cost.",
+  "category": "rendering"
+ },
+ {
+  "id": "waypoints",
+  "name": "Waypoints",
+  "description": "Per-world waypoints with beams, on-screen distance markers and minimap dots. P opens the menu, N adds one where you stand.",
+  "category": "hud"
+ },
+ {
+  "id": "wings-cosmetics",
+  "name": "Wings",
+  "description": "Show or hide 3D wings - yours and other players' - and whether they flap as you move.",
+  "category": "cosmetics"
+ },
+ {
+  "id": "world-border-visualizer",
+  "name": "World Border Visualizer",
+  "description": "Highlights the world border boundary in 3D, using the server-enforced bounds.",
+  "category": "server_tools"
+ },
+ {
+  "id": "xp-bar",
+  "name": "XP & Locator Bar",
+  "description": "Color the experience bar, the locator bar and the XP level number.",
+  "category": "hud"
+ },
+ {
+  "id": "zoom",
+  "name": "Zoom",
+  "description": "Hold the zoom key to smoothly narrow your FOV, spyglass-style. Scroll while held to adjust.",
+  "category": "qol"
+ }
+]

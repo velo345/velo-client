@@ -69,12 +69,23 @@ public final class VeloClientMod implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		// Cosmetics are per Minecraft account: the Velo launcher says which (-Dvelo.account), other launchers via --uuid.
+		if (net.veloclient.velo.config.VeloPaths.account() == null) {
+			String[] args = net.fabricmc.loader.api.FabricLoader.getInstance().getLaunchArguments(false);
+			for (int i = 0; i + 1 < args.length; i++) {
+				if ("--uuid".equals(args[i])) {
+					net.veloclient.velo.config.VeloPaths.setAccount(args[i + 1]);
+				}
+			}
+		}
 		// A Cloud Sync restore waiting for this start goes in before anything reads its settings.
 		net.veloclient.velo.client.cloud.CloudSync.applyPendingAtStartup();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				client -> net.veloclient.velo.client.cloud.CloudSync.tick());
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				net.veloclient.velo.client.devtools.StartupTimer::tick);
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
+				client -> net.veloclient.velo.client.cosmetics.LockerFileSync.tick());
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(
 				client -> net.veloclient.velo.client.cloud.CloudSync.onStop());
 		// Before any profile loads: saved keybinds convert between GLFW (<26.3) and SDL (26.3+) codes.
@@ -156,16 +167,15 @@ public final class VeloClientMod implements ClientModInitializer {
 	 * skipped rather than taking the client down with it.
 	 */
 	private void loadAddons() {
-		// A dev build (./build-dev.sh, see build.gradle.kts) carries unreleased features from src/dev inside this jar;
-		// production jars don't contain the class, so this does nothing there.
+		// The features that started in the dev build (pets, notes, storage, bridge...) register here, like an add-on.
 		try {
 			Class.forName("net.veloclient.velo.dev.VeloDev").asSubclass(net.veloclient.velo.client.addon.VeloAddon.class)
 					.getDeclaredConstructor().newInstance().onVeloInitialize();
-			VeloClient.LOGGER.info("Loaded the Velo Client dev features");
-		} catch (ClassNotFoundException production) {
-			// a release build
+			VeloClient.LOGGER.info("Loaded the Velo Client feature modules");
+		} catch (ClassNotFoundException missing) {
+			// not packed (a stripped-down build)
 		} catch (Throwable t) {
-			VeloClient.LOGGER.error("Velo Client dev features failed to initialize", t);
+			VeloClient.LOGGER.error("Velo Client feature modules failed to initialize", t);
 		}
 		for (var container : net.fabricmc.loader.api.FabricLoader.getInstance()
 				.getEntrypointContainers(net.veloclient.velo.client.addon.VeloAddon.ENTRYPOINT, net.veloclient.velo.client.addon.VeloAddon.class)) {

@@ -32,6 +32,7 @@
 <link rel="preload" href="/assets/fonts/inter-regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/sora-bold.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="{{asset.css}}">
+{{page.extraHead}}
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"{{site.url}}/#org","name":"Velo Client","url":"{{site.url}}","logo":{"@type":"ImageObject","url":"{{site.url}}/assets/icon-512.png","width":512,"height":512},"sameAs":["{{links.github}}","{{links.discord}}"]},{"@type":"WebSite","@id":"{{site.url}}/#site","name":"Velo Client","alternateName":["Velo","Velo Minecraft Client"],"url":"{{site.url}}","publisher":{"@id":"{{site.url}}/#org"},"inLanguage":"en"}]}</script>
 {{#if page.schema}}<script type="application/ld+json">{{page.schema}}</script>{{/if}}
 <script src="{{asset.js}}" defer></script>

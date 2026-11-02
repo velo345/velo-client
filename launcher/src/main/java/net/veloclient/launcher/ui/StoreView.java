@@ -78,6 +78,10 @@ public final class StoreView {
 		default void openOwner() {
 		}
 
+		/** Opens a pet's page. */
+		default void openPet(net.veloclient.launcher.data.PetsSetting.StorePet pet) {
+		}
+
 		/** Opens an aura's page. */
 		default void openAura(AuraCatalog.AuraType type) {
 		}
@@ -98,7 +102,7 @@ public final class StoreView {
 	private StoreView() {
 	}
 
-	private enum Page { FEATURED, WINGS, CAPES, AURAS, EMOTES, KILLFX, WEAR, BUNDLES, PLUS, WISHLIST }
+	private enum Page { FEATURED, WINGS, CAPES, AURAS, EMOTES, KILLFX, WEAR, PETS, BUNDLES, PLUS, WISHLIST }
 
 	/** Which tab was open last (kept while the launcher runs). */
 	private static Page page = Page.FEATURED;
@@ -145,7 +149,7 @@ public final class StoreView {
 		heading.setPadding(new Insets(0, 14, 10, 0));
 		HBox tabs = new HBox(24);
 		tabs.setAlignment(Pos.BOTTOM_LEFT);
-		String[] labels = {"Featured", "Wings", "Cloaks", "Auras", "Emotes", "Kill FX", "Bodywear", "Bundles", "Velo+"};
+		String[] labels = {"Featured", "Wings", "Cloaks", "Auras", "Emotes", "Kill FX", "Bodywear", "Pets", "Bundles", "Velo+"};
 		for (Page p : Page.values()) {
 			if (p == Page.WISHLIST) {
 				continue;
@@ -158,7 +162,7 @@ public final class StoreView {
 			if (p == Page.PLUS) {
 				tab.setStyle("-fx-text-fill: -velo-accent-text;");
 			}
-			if (p == Page.WEAR) {
+			if (p == Page.PETS) {
 				Label badge = new Label("NEW");
 				badge.getStyleClass().addAll("badge", "badge-new");
 				badge.setStyle("-fx-font-size: 9px;");
@@ -220,6 +224,7 @@ public final class StoreView {
 			case EMOTES -> buildEmotes(host, body);
 			case KILLFX -> buildKillFx(host, body);
 			case WEAR -> buildWear(host, body);
+			case PETS -> buildPets(host, body);
 			case BUNDLES -> buildBundles(host, body);
 			case PLUS -> body.getChildren().add(plusPage());
 			case WISHLIST -> buildWishlist(host, body);
@@ -710,6 +715,23 @@ public final class StoreView {
 		}
 		UiMotion.stagger(grid, 24);
 		body.getChildren().add(section("Kill effects", "Custom particles and sounds where your kills fall · your colour", null, null, grid));
+	}
+
+	private static void buildPets(Host host, VBox body) {
+		var pets = net.veloclient.launcher.data.PetsSetting.storePets().stream()
+				.filter(p -> p.inStore() || net.veloclient.launcher.data.PetsSetting.owns(p.pet().id()) || StoreApi.isOwner()).toList();
+		if (pets.isEmpty()) {
+			Label empty = new Label("No pets in the Store right now - check back soon.");
+			empty.getStyleClass().add("t-muted");
+			body.getChildren().add(empty);
+			return;
+		}
+		FlowPane grid = StoreTiles.grid(200, 16);
+		for (var pet : pets) {
+			grid.getChildren().add(StoreTiles.petTile(pet, () -> host.openPet(pet)));
+		}
+		UiMotion.stagger(grid, 24);
+		body.getChildren().add(section("Pets", "They follow you everywhere, do tricks and ride on your shoulder · hover to see them move", null, null, grid));
 	}
 
 	private static void buildWear(Host host, VBox body) {
@@ -1451,10 +1473,10 @@ public final class StoreView {
 				getCode.setDisable(false);
 				if (result instanceof JsonObject json) {
 					String code = json.get("code").getAsString();
-					javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
-					content.putString(code);
-					javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
-					status.setText("Copied! Paste it in the Discord link channel (valid " + json.get("expiresInSeconds").getAsLong() / 60 + " min).");
+					long minutes = json.get("expiresInSeconds").getAsLong() / 60;
+					status.setText(Clipboards.copy(code)
+							? "Copied! Paste it in the Discord link channel (valid " + minutes + " min)."
+							: "Your code: " + code + " - type it in the Discord link channel (valid " + minutes + " min).");
 					if (invite[0].isBlank() && json.has("inviteUrl")) {
 						invite[0] = json.get("inviteUrl").getAsString();
 						join.setDisable(invite[0].isBlank());

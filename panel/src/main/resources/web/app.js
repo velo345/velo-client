@@ -49,6 +49,9 @@ const ICONS = {
 	youtube: "M3 8.5c0-1.7 1.3-3 3-3h12c1.7 0 3 1.3 3 3v7c0 1.7-1.3 3-3 3H6c-1.7 0-3-1.3-3-3z M10 9.5v5l4.5-2.5z",
 	news: "M4 5h13v14H6a2 2 0 0 1-2-2z M17 9h3v8a2 2 0 0 1-2 2 M8 9h5 M8 13h5",
 	reports: "M12 9v4 M12 17h.01 M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
+	doctor: "M22 12h-4l-3 9L9 3l-3 9H2",
+	serverrules: "M12 2 4 5v6c0 5 3.4 9.3 8 11 4.6-1.7 8-6 8-11V5z M9 12l2 2 4-4",
+	bridge: "M4 12h4 M16 12h4 M8 12a4 4 0 0 0 8 0 4 4 0 0 0-8 0 M12 4v4 M12 16v4",
 	addons: "M12 2 3 7v10l9 5 9-5V7z M3 7l9 5 9-5 M12 12v10",
 	server: "M4 4h16v6H4z M4 14h16v6H4z M8 7h.01 M8 17h.01",
 	files: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
@@ -563,7 +566,7 @@ function deviceName() {
 const PAGES = [
 	["Velo", [["overview", "Overview"], ["players", "Players"], ["store", "Store"], ["socials", "Socials"]]],
 	["Moderation", [["monitor", "Monitoring"], ["clips", "Clips"], ["worlds", "Public worlds"], ["notes", "World notes"], ["capes", "Custom capes"], ["stafflog", "Staff log"]]],
-	["Owner tools", [["cosmetics", "Cosmetics"], ["news", "News"], ["reports", "Reports"], ["partners", "Partner servers"], ["updates", "Required update"], ["addons", "Addons"]]],
+	["Owner tools", [["cosmetics", "Cosmetics"], ["news", "News"], ["reports", "Reports"], ["doctor", "Launcher Doctor"], ["serverrules", "Server mod rules"], ["bridge", "Velo Bridge servers"], ["partners", "Partner servers"], ["updates", "Required update"], ["addons", "Addons"]]],
 	["Machine", [["server", "Server"], ["files", "Files"], ["activity", "Activity log"]]],
 	["", [["account", "Account"]]],
 ];
@@ -1352,17 +1355,186 @@ async function openReport(id, reload) {
 	const save = h("button", { class: "btn primary", type: "button" }, "Set status");
 	const del = h("button", { class: "btn danger", type: "button" }, "Delete");
 	const details = Object.entries(r).filter(([k, v]) => typeof v !== "object" && !["message", "title"].includes(k));
+	const learned = r.doctor && r.doctor.learned;
+	const addFix = learned ? h("button", { class: "btn primary", type: "button" }, icon("doctor"), "Add fix to Doctor") : null;
+	if (addFix) addFix.onclick = () => openDoctorApprove({ reportId: id, summary: learned.summary, diff: learned.diff || [], tried: learned.tried || [], excerpt: learned.excerpt }, reload);
 	const dlg = dialog(r.title || "Report", [
+		learned ? h("div", { class: "notice" }, h("b", {}, "The player fixed this themselves: "), doctorDiff(learned.diff || [])) : null,
 		h("p", { style: "margin:0;white-space:pre-wrap" }, r.message || ""),
 		table(["Field", "Value"], details.map(([k, v]) => [k, k.endsWith("At") ? when(v) : String(v)])),
 		...Object.entries(r).filter(([, v]) => v && typeof v === "object").map(([k, v]) => h("details", {}, h("summary", { style: "cursor:pointer;font-weight:600" }, k), h("pre", { class: "logs", style: "height:auto;max-height:360px" }, typeof v === "string" ? v : JSON.stringify(v, null, 2)))),
 		h("div", { class: "row" }, status, save),
-	], [del], true);
+	], addFix ? [del, addFix] : [del], true);
 	save.onclick = () => busy(save, async () => { await velo("admin/reports/status", { body: { id, status: status.value } }); toast("Status saved"); reload(); });
 	del.onclick = async () => {
 		if (!(await confirmBox("Delete this report?", "It can't be restored."))) return;
 		await velo("admin/reports/delete", { body: { id } });
 		toast("Report deleted");
+		dlg.close();
+		reload();
+	};
+}
+
+// ---- Launcher Doctor ----
+
+const DOCTOR_OPS = { disable: "Turn off", enable: "Turn on", remove: "Remove", install: "Install", update: "Update", graphics: "Graphics API →", memory: "Memory →", "shaders-off": "Turn shaders off" };
+
+function doctorDiff(diff) {
+	if (!diff.length) return h("span", { class: "muted" }, "nothing recorded");
+	return h("span", {}, diff.map((d, i) => h("span", { class: "pill", style: "margin:2px 4px 2px 0" },
+		(DOCTOR_OPS[d.op] || d.op) + " " + (d.name || d.mod || d.value || "") + (d.op === "memory" ? (d.value === "0" ? " auto" : " MB") : "") + (d.note ? " (" + d.note + ")" : ""))));
+}
+
+RENDER.doctor = async (root) => {
+	const draw = async () => {
+		const { candidates, rules } = await velo("admin/doctor");
+		subtitle(candidates.length + " fixes players found · " + rules.length + " active");
+		root.replaceChildren(
+			card("Fixes players found", "Crashes the Doctor couldn't fix, and what the player changed that made it work. Approve one and every launcher offers it for that crash.", null,
+				table(["Seen", "Crash", "What fixed it", "Doctor tried", "Last", "num:Players"], candidates.map((c) => [
+					when(c.lastAt), h("div", {}, h("b", {}, (c.summary || "(no summary)").slice(0, 110)), h("div", { class: "muted small" }, (c.minecraft || "?") + " · " + c.signature)),
+					doctorDiff(c.diff || []), h("span", { class: "muted small" }, (c.tried || []).join(", ") || "–"), c.lastUsername || "–", fmt(c.count)]),
+				(i) => openDoctorApprove(candidates[i], draw))),
+			card("Active Doctor rules", "Offered first whenever the same crash happens.", null,
+				table(["Approved", "Title", "Fix", "Crash"], rules.map((r) => [when(r.approvedAt), h("b", {}, r.title), doctorDiff(r.actions || []),
+					h("span", { class: "muted small" }, (r.minecraft || "") + " · " + (r.pattern ? "pattern" : r.signature))]),
+				(i) => openDoctorRule(rules[i], draw))));
+	};
+	await draw();
+};
+
+function openDoctorApprove(c, reload) {
+	const title = h("input", { value: c.summary ? "A known crash: " + c.summary.slice(0, 80) : "", placeholder: "What players read, e.g. \"Sodium 0.6 crashes with this shader pack\"", "aria-label": "Title" });
+	const detail = h("input", { placeholder: "One sentence why (optional)", "aria-label": "Detail" });
+	const fixLabel = h("input", { placeholder: "Button text, e.g. \"Update Sodium\" (optional)", "aria-label": "Fix label" });
+	const pattern = h("input", { placeholder: "Regex on the crash text to also match other versions (optional)", "aria-label": "Pattern" });
+	const approve = h("button", { class: "btn primary", type: "button" }, "Approve as fix");
+	const reject = c.id ? h("button", { class: "btn danger", type: "button" }, "Reject") : null;
+	const dlg = dialog("Doctor fix", [
+		h("div", { class: "notice" }, h("b", {}, "What fixed it: "), doctorDiff(c.diff || [])),
+		(c.tried || []).length ? h("p", { class: "muted small", style: "margin:0" }, "The Doctor had tried: " + c.tried.join(", ")) : null,
+		h("label", {}, "Title", title), h("label", {}, "Detail", detail), h("label", {}, "Fix button", fixLabel), h("label", {}, "Match pattern", pattern),
+		c.excerpt ? h("details", {}, h("summary", { style: "cursor:pointer;font-weight:600" }, "Crash"), h("pre", { class: "logs", style: "height:auto;max-height:320px" }, c.excerpt)) : null,
+	], reject ? [reject, approve] : [approve], true);
+	approve.onclick = () => busy(approve, async () => {
+		await velo("admin/doctor/approve", { body: { candidateId: c.id || null, reportId: c.reportId || null, title: title.value, detail: detail.value, fixLabel: fixLabel.value, pattern: pattern.value } });
+		toast("Approved - every launcher offers this fix now");
+		dlg.close();
+		reload();
+	});
+	if (reject) reject.onclick = () => busy(reject, async () => {
+		await velo("admin/doctor/reject", { body: { candidateId: c.id } });
+		toast("Rejected");
+		dlg.close();
+		reload();
+	});
+}
+
+function openDoctorRule(r, reload) {
+	const del = h("button", { class: "btn danger", type: "button" }, "Delete rule");
+	const dlg = dialog(r.title, [h("p", { style: "margin:0" }, r.detail || ""), h("div", { class: "notice" }, h("b", {}, (r.fixLabel || "Fix") + ": "), doctorDiff(r.actions || [])),
+		h("p", { class: "muted small", style: "margin:0" }, "Signature " + r.signature + (r.pattern ? " · pattern " + r.pattern : ""))], [del]);
+	del.onclick = async () => {
+		if (!(await confirmBox("Delete this rule?", "Launchers stop offering this fix within a few hours."))) return;
+		await velo("admin/doctor/rule/delete", { body: { id: r.id } });
+		toast("Rule deleted");
+		dlg.close();
+		reload();
+	};
+}
+
+// ---- Velo Bridge servers ----
+
+RENDER.bridge = async (root) => {
+	const draw = async () => {
+		const o = await velo("admin/bridge/servers");
+		subtitle(o.onlineServers + " servers online with Velo Bridge · " + fmt(o.veloPlayersNow) + " Velo players on them now");
+		const live = (s) => Date.now() - s.lastSeen < 15 * 60 * 1000;
+		const versions = Object.entries(o.versions || {}).sort((a, b) => b[1] - a[1]);
+		root.replaceChildren(
+			h("div", { class: "grid kpis" },
+				kpi("Servers online", "bridge", o.onlineServers, fmt, "running Velo Bridge right now"),
+				kpi("Velo players on them", "players", o.veloPlayersNow, fmt, "across all Bridge servers"),
+				kpi("Known servers", "server", o.servers.length, fmt, "seen in the last 30 days")),
+			versions.length ? card("Velo versions on Bridge servers", "What players are on right now", null,
+				h("div", { class: "row" }, versions.map(([v, c]) => h("span", { class: "pill" }, v + " · " + c)))) : null,
+			card("Servers", "Anonymous numbers the plugin reports every 5 minutes - no player names", null,
+				table(["Server", "Status", "num:Velo / online", "num:Peak Velo", "Software", "Minecraft", "Plugin", "Last seen"], o.servers.map((s) => [
+					h("div", {}, h("b", {}, s.name || "(unnamed)"), h("div", { class: "muted small" }, s.ip || "")),
+					h("span", { class: "pill " + (live(s) ? "good" : "") }, live(s) ? "online" : "offline"),
+					fmt(s.velo) + " / " + fmt(s.online), fmt(s.peakVelo), h("span", { class: "muted small" }, s.software || "–"),
+					s.minecraft || "–", s.plugin || "–", when(s.lastSeen)]))));
+	};
+	await draw();
+	every(60_000, draw);
+};
+
+// ---- Server mod rules ----
+
+const RULE_MATCH = { id: "Mod id", modrinth: "Modrinth project", name: "Name contains" };
+
+RENDER.serverrules = async (root) => {
+	const draw = async () => {
+		const { profiles, presets } = await velo("admin/servers/profiles");
+		subtitle(profiles.length + " servers with mod rules · only warnings, never enforced");
+		const add = h("button", { class: "btn primary", type: "button" }, icon("plus"), "Add server");
+		add.onclick = () => openServerRules({ name: "", addresses: [], recommend: [], forbid: [], note: "" }, presets, draw);
+		root.replaceChildren(card("Server mod rules", "Players joining these servers from the launcher get a heads-up about mods the server doesn't allow (and recommends). They can always play anyway and hide it per server.", add,
+			table(["Server", "Addresses", "num:Not allowed", "num:Recommended", "Updated"], profiles.map((p) => [
+				h("b", {}, p.name), h("span", { class: "muted small" }, p.addresses.join(", ")), fmt(p.forbid.length), fmt(p.recommend.length), when(p.updatedAt)]),
+			(i) => openServerRules(profiles[i], presets, draw))));
+	};
+	await draw();
+};
+
+function openServerRules(p, presets, reload) {
+	const state = { recommend: [...(p.recommend || [])], forbid: [...(p.forbid || [])] };
+	const name = h("input", { value: p.name || "", placeholder: "Hypixel", "aria-label": "Name" });
+	const addresses = h("input", { value: (p.addresses || []).join(", "), placeholder: "hypixel.net, *.hypixel.net", "aria-label": "Addresses" });
+	const note = h("input", { value: p.note || "", placeholder: "Optional note players see, e.g. a link to the server's allowed mods", "aria-label": "Note" });
+	const lists = { forbid: h("div", { class: "rule-list" }), recommend: h("div", { class: "rule-list" }) };
+	const paint = (key) => lists[key].replaceChildren(...(state[key].length ? state[key].map((r, i) => h("span", { class: "pill rule-pill" },
+		(RULE_MATCH[r.match] || r.match) + ": " + (r.label && r.label !== r.value ? r.label + " (" + r.value + ")" : r.value),
+		h("button", { class: "icon-btn tiny", type: "button", "aria-label": "Remove", onclick: () => { state[key].splice(i, 1); paint(key); } }, icon("close"))))
+		: [h("span", { class: "muted small" }, "None")]));
+	const adder = (key) => {
+		const match = h("select", { "aria-label": "Match" }, Object.entries(RULE_MATCH).map(([v, l]) => h("option", { value: v }, l)));
+		const value = h("input", { placeholder: key === "forbid" ? "e.g. freecam" : "e.g. sodium", "aria-label": "Value" });
+		const label = h("input", { placeholder: "Shown as (optional)", "aria-label": "Label" });
+		const btn = h("button", { class: "btn", type: "button" }, "Add");
+		btn.onclick = () => {
+			if (!value.value.trim()) return;
+			state[key].push({ match: match.value, value: value.value.trim(), label: label.value.trim() || value.value.trim() });
+			value.value = ""; label.value = "";
+			paint(key);
+		};
+		return h("div", { class: "row" }, match, value, label, btn);
+	};
+	const presetButtons = h("div", { class: "row" }, presets.map((pr) => h("button", { class: "btn ghost small", type: "button", title: pr.description, onclick: () => {
+		for (const e of pr.entries) if (!state.forbid.some((r) => r.match === e.match && r.value === e.value)) state.forbid.push({ ...e });
+		paint("forbid");
+		toast(pr.name + " added");
+	} }, icon("plus"), pr.name)));
+	paint("forbid"); paint("recommend");
+	const save = h("button", { class: "btn primary", type: "button" }, "Save");
+	const del = p.id ? h("button", { class: "btn danger", type: "button" }, "Delete") : null;
+	const dlg = dialog(p.id ? p.name : "New server", [
+		h("label", {}, "Name", name), h("label", {}, "Addresses (comma separated, * for subdomains)", addresses),
+		h("h3", { style: "margin:8px 0 0" }, "Not allowed"), h("p", { class: "muted small", style: "margin:0" }, "Quick add:"), presetButtons, lists.forbid, adder("forbid"),
+		h("h3", { style: "margin:8px 0 0" }, "Recommended"), lists.recommend, adder("recommend"),
+		h("label", {}, "Note", note),
+	], del ? [del, save] : [save], true);
+	save.onclick = () => busy(save, async () => {
+		await velo("admin/servers/profiles/save", { body: { id: p.id || null, name: name.value, addresses: addresses.value.split(",").map((x) => x.trim()).filter(Boolean),
+			note: note.value, forbid: state.forbid, recommend: state.recommend } });
+		toast("Saved - launchers pick it up within an hour");
+		dlg.close();
+		reload();
+	});
+	if (del) del.onclick = async () => {
+		if (!(await confirmBox("Delete the rules for " + p.name + "?", "Players stop getting warnings for this server."))) return;
+		await velo("admin/servers/profiles/delete", { body: { id: p.id } });
+		toast("Deleted");
 		dlg.close();
 		reload();
 	};

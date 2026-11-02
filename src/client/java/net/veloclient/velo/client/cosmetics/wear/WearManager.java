@@ -125,6 +125,16 @@ public final class WearManager {
 
 	// ---- what you wear ----
 
+	/** Changed in the launcher's Locker: read it again (never saves - the launcher wrote it). */
+	public static synchronized void reloadFromDisk() {
+		loaded = false;
+		SLOTS_WORN.clear();
+		COLORS.clear();
+		OFFSETS.clear();
+		DEPTHS.clear();
+		ensureLoaded();
+	}
+
 	private static synchronized void ensureLoaded() {
 		if (loaded) {
 			return;

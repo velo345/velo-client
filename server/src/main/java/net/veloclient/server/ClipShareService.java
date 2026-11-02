@@ -37,7 +37,7 @@ import java.util.function.Predicate;
  */
 final class ClipShareService {
 
-	static final long MAX_CLIP_BYTES = 40L * 1024 * 1024;
+	static final long MAX_CLIP_BYTES = 60L * 1024 * 1024;   // Velo+: up to 2 minutes at 1080p60
 	static final long MAX_USER_BYTES = 500L * 1024 * 1024;
 	static final long MIN_FREE_DISK = 10L * 1024 * 1024 * 1024;
 	private final long minFreeDisk;
@@ -45,26 +45,41 @@ final class ClipShareService {
 	static final int MAX_USER_CLIPS = 100;
 	static final int MAX_THUMB_BYTES = 1024 * 1024;
 	static final long KEEP_AFTER_PLUS_MILLIS = 30L * 86_400_000L;
+	/** Free players can share too: smaller (the game sends 720p30), fewer and for a shorter time than Velo+. */
+	static final int FREE_USER_CLIPS = 30;
+	static final long FREE_USER_BYTES = 200L * 1024 * 1024;
+	static final long FREE_CLIP_BYTES = 15L * 1024 * 1024;
+	static final int FREE_RETENTION_DAYS = 30;
+
+	/** The limits for one player: Velo+ or free. */
+	record Limits(int maxClips, long maxBytes, long maxClipBytes, int retentionDays) {
+	}
+
+	Limits limits(boolean plus) {
+		return plus ? new Limits(MAX_USER_CLIPS, MAX_USER_BYTES, MAX_CLIP_BYTES, retentionDays())
+				: new Limits(FREE_USER_CLIPS, FREE_USER_BYTES, FREE_CLIP_BYTES, Math.min(FREE_RETENTION_DAYS, retentionDays()));
+	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final SecureRandom RANDOM = new SecureRandom();
 	private static final String ALPHABET = "0123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
 
 	/** A shared clip. {@code server} only when the uploader left it in. */
+	/** {@code free}: shared without Velo+ (kept {@link #FREE_RETENTION_DAYS} days, and not tied to a membership). */
 	record Clip(String id, String uuid, String username, String title, long createdAt, double seconds, int width, int height, int fps,
-			long size, String trigger, String server, long views, boolean thumb, long lastViewedAt) {
+			long size, String trigger, String server, long views, boolean thumb, long lastViewedAt, boolean free) {
 
 		Clip withViews(long count) {
 			return new Clip(id, uuid, username, title, createdAt, seconds, width, height, fps, size, trigger, server, count, thumb,
-					System.currentTimeMillis());
+					System.currentTimeMillis(), free);
 		}
 
 		Clip withThumb() {
-			return new Clip(id, uuid, username, title, createdAt, seconds, width, height, fps, size, trigger, server, views, true, lastViewedAt);
+			return new Clip(id, uuid, username, title, createdAt, seconds, width, height, fps, size, trigger, server, views, true, lastViewedAt, free);
 		}
 
 		Clip withTitle(String newTitle) {
-			return new Clip(id, uuid, username, newTitle, createdAt, seconds, width, height, fps, size, trigger, server, views, thumb, lastViewedAt);
+			return new Clip(id, uuid, username, newTitle, createdAt, seconds, width, height, fps, size, trigger, server, views, thumb, lastViewedAt, free);
 		}
 
 		/** When it was last watched (or made, if never). */
@@ -148,14 +163,16 @@ final class ClipShareService {
 	}
 
 	/** Streams the upload ({@code length} bytes, or -1 if unknown) to disk and lists it. */
-	Clip upload(String uuid, String username, Meta meta, InputStream body, long length) throws ApiError, IOException {
-		if (length > MAX_CLIP_BYTES) {
-			throw new ApiError(413, "A shared clip can be at most " + MAX_CLIP_BYTES / 1024 / 1024 + " MB - trim it first");
+	Clip upload(String uuid, String username, Meta meta, InputStream body, long length, boolean plus) throws ApiError, IOException {
+		Limits limits = limits(plus);
+		if (length > limits.maxClipBytes()) {
+			throw new ApiError(413, "A shared clip can be at most " + limits.maxClipBytes() / 1024 / 1024 + " MB - trim it first");
 		}
-		if (of(uuid).size() >= MAX_USER_CLIPS) {
-			throw new ApiError(413, "You have " + MAX_USER_CLIPS + " shared clips - delete some first");
+		if (of(uuid).size() >= limits.maxClips()) {
+			throw new ApiError(413, "You have " + limits.maxClips() + " shared clips - remove one to share this one"
+					+ (plus ? "" : " (Velo+ keeps up to " + MAX_USER_CLIPS + ")"));
 		}
-		long room = MAX_USER_BYTES - usedBytes(uuid);
+		long room = limits.maxBytes() - usedBytes(uuid);
 		if (length > room) {
 			throw new ApiError(413, "Not enough space left for shared clips - delete some first");
 		}
@@ -165,7 +182,7 @@ final class ClipShareService {
 		}
 		Path temp = Files.createTempFile(dir, "upload-", ".tmp");
 		try {
-			long size = copyLimited(body, temp, Math.min(MAX_CLIP_BYTES, room));
+			long size = copyLimited(body, temp, Math.min(limits.maxClipBytes(), room));
 			if (!isMp4(temp)) {
 				throw new ApiError(400, "Not an MP4 video");
 			}
@@ -174,7 +191,7 @@ final class ClipShareService {
 			String title = CloudBackupService.clean(meta.title(), 80);
 			Clip clip = new Clip(id, uuid, username, title == null ? "Clip by " + username : title, System.currentTimeMillis(),
 					Math.max(0, Math.min(3600, meta.seconds())), clamp(meta.width(), 0, 7680), clamp(meta.height(), 0, 4320), clamp(meta.fps(), 0, 240),
-					size, CloudBackupService.clean(meta.trigger(), 16), CloudBackupService.clean(meta.server(), 80), 0, false, 0);
+					size, CloudBackupService.clean(meta.trigger(), 16), CloudBackupService.clean(meta.server(), 80), 0, false, 0, !plus);
 			clips.put(id, clip);
 			countUpload(size);
 			save();
@@ -268,7 +285,8 @@ final class ClipShareService {
 		long now = System.currentTimeMillis();
 		for (Clip clip : List.copyOf(clips.values())) {
 			boolean expired = now >= expiresAt(clip);
-			if (expired || !stillKept.test(clip.uuid())) {
+			// A Velo+ clip goes a while after the membership ended; a free one just lives out its days.
+			if (expired || !clip.free() && !stillKept.test(clip.uuid())) {
 				if (expired) {
 					synchronized (this) {
 						stats.expired++;
@@ -289,7 +307,7 @@ final class ClipShareService {
 
 	/** When the clip gets deleted on its own. */
 	long expiresAt(Clip clip) {
-		return clip.createdAt() + retentionMillis;
+		return clip.createdAt() + (clip.free() ? Math.min(retentionMillis, FREE_RETENTION_DAYS * 86_400_000L) : retentionMillis);
 	}
 
 	int retentionDays() {

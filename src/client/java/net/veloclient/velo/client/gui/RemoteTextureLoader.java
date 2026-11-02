@@ -102,13 +102,23 @@ public final class RemoteTextureLoader {
 	 * under {@code key}, replacing any earlier texture with that key. Released like the downloads.
 	 */
 	public static void fromBytes(String key, byte[] png, Consumer<Identifier> onLoaded) {
+		fromBytes(key, png, true, onLoaded);
+	}
+
+	/**
+	 * Like {@link #fromBytes(String, byte[], Consumer)}; {@code releasable = false} keeps the texture out of the
+	 * 30-second release for textures drawn in the world (World Notes pictures) - the caller frees it.
+	 */
+	public static void fromBytes(String key, byte[] png, boolean releasable, Consumer<Identifier> onLoaded) {
 		DOWNLOADS.submit(() -> {
 			try {
 				NativeImage image = NativeImage.read(new ByteArrayInputStream(png));
 				Identifier identifier = Identifier.of("velo-client", "local/" + Integer.toHexString(key.hashCode()));
 				MinecraftClient.getInstance().execute(() -> {
 					MinecraftClient.getInstance().getTextureManager().registerTexture(identifier, new NativeImageBackedTexture(() -> key, image));
-					CACHE.put("local:" + key, identifier);
+					if (releasable) {
+						CACHE.put("local:" + key, identifier);
+					}
 					onLoaded.accept(identifier);
 				});
 			} catch (Exception ignored) {

@@ -96,7 +96,7 @@ public final class WearCatalog {
 	// ---- what's worn ----
 
 	private static Path path() {
-		return VeloPaths.config().resolve("cosmetics-wear.json");
+		return VeloPaths.accountConfig("cosmetics-wear.json");
 	}
 
 	private static State read() {

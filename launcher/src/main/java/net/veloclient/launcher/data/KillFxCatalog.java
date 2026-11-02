@@ -138,7 +138,7 @@ public final class KillFxCatalog {
 	// ---- Equipped and colours (config/cosmetics-killfx.json, shared with the game) ----
 
 	private static Path file() {
-		return VeloPaths.config().resolve("cosmetics-killfx.json");
+		return VeloPaths.accountConfig("cosmetics-killfx.json");
 	}
 
 	private static JsonObject read() {

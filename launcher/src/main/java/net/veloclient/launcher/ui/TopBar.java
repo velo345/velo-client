@@ -168,9 +168,11 @@ public final class TopBar extends HBox {
 		StackPane.setMargin(bellDot, new Insets(8, 9, 0, 0));
 		bellBox.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
 
+		Button bug = iconButton("bug", "Report a bug (Ctrl+Shift+B)", null);
+		bug.setOnAction(e -> BugReportDialog.show(bug.getScene().getWindow()));
 		Button settings = iconButton("settings", "Settings", () -> host.navigate("settings"));
 		tabs.put("settings", settings);
-		HBox icons = new HBox(2, friendsBox, bellBox, settings);
+		HBox icons = new HBox(2, friendsBox, bellBox, bug, settings);
 		icons.setAlignment(Pos.CENTER);
 		HBox.setMargin(icons, new Insets(0, 6, 0, 6));
 		getChildren().add(icons);

@@ -81,6 +81,13 @@ public final class AuraManager {
 	private AuraManager() {
 	}
 
+	/** Changed in the launcher's Locker: read it again (never saves - the launcher wrote it). */
+	public static synchronized void reloadFromDisk() {
+		loaded = false;
+		SETTINGS.clear();
+		load();
+	}
+
 	private static synchronized void load() {
 		if (loaded) {
 			return;

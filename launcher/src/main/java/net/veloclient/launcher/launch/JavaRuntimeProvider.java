@@ -55,10 +55,18 @@ public final class JavaRuntimeProvider {
 	}
 
 	public static synchronized JavaRuntime forVersion(JsonObject versionJson, LaunchProgressListener listener) throws IOException {
+		return forVersion(versionJson, listener, false);
+	}
+
+	/** {@code exact}: use the version's own Java even when the launcher's is newer (a mod only accepts that one). */
+	public static synchronized JavaRuntime forVersion(JsonObject versionJson, LaunchProgressListener listener, boolean exact) throws IOException {
 		int required = requiredFeature(versionJson);
 		int own = Runtime.version().feature();
-		if (own >= required) {
+		if (own == required || own > required && !exact) {
 			return new JavaRuntime(ownBinary(), own, true);
+		}
+		if (exact && own > required) {
+			LauncherLog.info("A mod needs exactly Java " + required + " - using Mojang's runtime instead of the launcher's Java " + own);
 		}
 		String component = "java-runtime-delta";
 		try {

@@ -474,23 +474,32 @@ public final class ProClipRecorder {
 	 * Android and Discord. Without an AV1 encoder in this FFmpeg: H.264 with the same cap instead.
 	 */
 	public static void compressForSharing(Path in, Path out, double lastSeconds) throws IOException, InterruptedException {
+		compressForSharing(in, out, lastSeconds, false);
+	}
+
+	/**
+	 * The share copy: free players' at 720p30 and squeezed hard (~4 MB per 30 s), Velo+'s at up to 1080p60 and finer
+	 * (~12 MB per 30 s). AV1 + Opus where FFmpeg has them, else H.264 + AAC.
+	 */
+	public static void compressForSharing(Path in, Path out, double lastSeconds, boolean plus) throws IOException, InterruptedException {
 		List<String> command = new ArrayList<>(List.of(FfmpegTool.binary().toString(), "-hide_banner", "-loglevel", "error", "-y"));
 		if (lastSeconds > 0) {
 			command.addAll(List.of("-sseof", "-" + lastSeconds));
 		}
-		command.addAll(List.of("-i", in.toString(), "-vf", "hqdn3d=3:2:4:4,scale=-2:'min(720,ih)':flags=lanczos,fps='min(60,source_fps)'",
-				"-pix_fmt", "yuv420p"));
+		String filter = plus ? "hqdn3d=2:1.5:3:3,scale=-2:'min(1080,ih)':flags=lanczos,fps='min(60,source_fps)'"
+				: "hqdn3d=3:2:4:4,scale=-2:'min(720,ih)':flags=lanczos,fps='min(30,source_fps)'";
+		command.addAll(List.of("-i", in.toString(), "-vf", filter, "-pix_fmt", "yuv420p"));
 		if (FfmpegTool.hasEncoder("libsvtav1")) {
-			command.addAll(List.of("-c:v", "libsvtav1", "-preset", "8", "-crf", "50", "-g", "300", "-svtav1-params",
-					"tune=0:enable-overlays=1:scd=1:film-grain=0:mbr=1000:lp=" + BACKGROUND_THREADS));
+			command.addAll(List.of("-c:v", "libsvtav1", "-preset", "8", "-crf", plus ? "46" : "50", "-g", "300", "-svtav1-params",
+					"tune=0:enable-overlays=1:scd=1:film-grain=0:mbr=" + (plus ? 2400 : 900) + ":lp=" + BACKGROUND_THREADS));
 		} else {
-			command.addAll(List.of("-c:v", "libx264", "-preset", "slow", "-tune", "animation", "-crf", "32", "-maxrate", "1500k", "-bufsize", "3000k",
-					"-profile:v", "high", "-threads", String.valueOf(BACKGROUND_THREADS)));
+			command.addAll(List.of("-c:v", "libx264", "-preset", "slow", "-tune", "animation", "-crf", plus ? "27" : "32",
+					"-maxrate", plus ? "3500k" : "1300k", "-bufsize", plus ? "7000k" : "2600k", "-profile:v", "high", "-threads", String.valueOf(BACKGROUND_THREADS)));
 		}
 		if (FfmpegTool.hasEncoder("libopus")) {
-			command.addAll(List.of("-c:a", "libopus", "-b:a", "48k", "-ac", "2"));
+			command.addAll(List.of("-c:a", "libopus", "-b:a", plus ? "96k" : "48k", "-ac", "2"));
 		} else {
-			command.addAll(List.of("-c:a", "aac", "-b:a", "64k"));
+			command.addAll(List.of("-c:a", "aac", "-b:a", plus ? "128k" : "64k"));
 		}
 		command.addAll(List.of("-movflags", "+faststart", out.toString()));
 		run(command, 3600);

@@ -577,19 +577,20 @@ public final class TitleScreenTheme {
 	}
 
 	/** Per-button hover fade, keyed by position (the static drawer has no widget to keep state on). */
-	private static final java.util.Map<Long, float[]> HOVER = new java.util.HashMap<>();
+	private static final java.util.Map<Long, double[]> HOVER = new java.util.HashMap<>();
 
 	private static float hoverProgress(int x, int y, boolean hovered) {
 		long key = ((long) x << 32) ^ (y & 0xFFFFFFFFL);
-		float[] state = HOVER.computeIfAbsent(key, k -> new float[] {0f, 0f});
+		// The last frame in nanoseconds as a double (see MenuKit.hover - a float of ms-since-boot made hovers stutter).
+		double[] state = HOVER.computeIfAbsent(key, k -> new double[] {0, 0});
 		long now = System.nanoTime();
-		float dt = state[1] == 0f ? 0f : Math.min(0.1f, (now / 1_000_000L - state[1]) / 1000f);
-		state[1] = now / 1_000_000L;
-		state[0] = VeloAnim.step(state[0], hovered ? 1f : 0f, dt);
+		float dt = state[1] == 0 ? 0f : (float) Math.min(0.1, (now - state[1]) / 1e9);
+		state[1] = now;
+		state[0] = VeloAnim.step((float) state[0], hovered ? 1f : 0f, dt);
 		if (HOVER.size() > 256) {
 			HOVER.clear();
 		}
-		return state[0];
+		return (float) state[0];
 	}
 
 	/**

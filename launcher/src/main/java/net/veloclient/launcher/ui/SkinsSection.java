@@ -343,9 +343,17 @@ final class SkinsSection {
 
 	static Image front(SkinLibrary.Skin skin, java.nio.file.Path file) {
 		try {
-			BufferedImage src = ImageIO.read(file.toFile());
+			return front(ImageIO.read(file.toFile()), skin.slim());
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	/** The same from a decoded skin (also the launcher's stand-in for 3D players on PCs without 3D support). */
+	static Image front(BufferedImage src, boolean slim) {
+		try {
 			boolean legacy = src.getHeight() == 32;
-			int armW = skin.slim() ? 3 : 4;
+			int armW = slim ? 3 : 4;
 			BufferedImage out = new BufferedImage(16, 32, BufferedImage.TYPE_INT_ARGB);
 			// Base layer.
 			copy(src, out, 8, 8, 8, 8, 4, 0);                     // head

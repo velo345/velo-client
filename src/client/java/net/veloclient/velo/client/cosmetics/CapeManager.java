@@ -64,6 +64,22 @@ public final class CapeManager {
 	private CapeManager() {
 	}
 
+	/** The library or the equipped cloak changed on disk (launcher Locker, an upload): read both again. */
+	public static synchronized void reloadFromDisk() {
+		loaded = false;
+		loadLibrary();
+	}
+
+	/** Only the equipped cloak changed on disk - no need to read every bundle again. */
+	public static synchronized void reloadEquipped() {
+		if (!loaded) {
+			loadLibrary();
+			return;
+		}
+		EquipState state = net.veloclient.velo.config.ConfigManager.load("cosmetics-cape", EquipState.class, new EquipState(null));
+		equippedCapeId = state.equippedCapeId();
+	}
+
 	public static synchronized void loadLibrary() {
 		if (loaded) {
 			return;
@@ -82,12 +98,38 @@ public final class CapeManager {
 		equippedCapeId = state.equippedCapeId();
 	}
 
+	/**
+	 * The cloaks this account may wear. Bought Store cloaks are files in the one shared library, so without this a
+	 * second account listed (and "wore") the first one's purchases - nobody else saw them, the server refuses them.
+	 */
 	public static Map<String, CapeDefinition> library() {
+		Map<String, CapeDefinition> usable = new LinkedHashMap<>();
+		LIBRARY.forEach((id, def) -> {
+			if (usable(def)) {
+				usable.put(id, def);
+			}
+		});
+		return java.util.Collections.unmodifiableMap(usable);
+	}
+
+	/** Every bundle on disk, whoever bought it - for the Store restore (which downloads what's missing). */
+	public static Map<String, CapeDefinition> allBundles() {
 		return Map.copyOf(LIBRARY);
 	}
 
+	private static boolean usable(CapeDefinition def) {
+		String item = def.sourceItemId();
+		if (item == null || item.isBlank()) {
+			return true; // the player's own uploaded pictures work on every account
+		}
+		if (!net.veloclient.velo.client.network.StoreClient.walletLoaded()) {
+			return def.id().equals(equippedCapeId); // until the wallet answers, only what this account had on
+		}
+		return net.veloclient.velo.client.network.StoreClient.owns(item) || net.veloclient.velo.client.network.StoreClient.isOwner();
+	}
+
 	public static Optional<CapeDefinition> equipped() {
-		return Optional.ofNullable(equippedCapeId).map(LIBRARY::get);
+		return Optional.ofNullable(equippedCapeId).map(LIBRARY::get).filter(CapeManager::usable);
 	}
 
 	/** The Store catalog id of the equipped cape, if it's a purchased Store cape (see {@link CapeDefinition#sourceItemId()}) - what {@code VeloServerClient} publishes to a Velo Client server. */

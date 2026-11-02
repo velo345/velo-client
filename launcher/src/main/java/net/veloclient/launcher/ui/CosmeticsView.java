@@ -225,11 +225,9 @@ public final class CosmeticsView {
 		}
 		column.getChildren().add(slotButton(Slot.WEAR, "BODYWEAR", worn == 0 ? "None" : worn + (worn == 1 ? " item" : " items"),
 				Icons.icon("hat", 22, Color.web(worn == 0 ? "#5A5A63" : "#8A8A95")), refresh));
-		if (net.veloclient.launcher.AppVersion.DEV) {   // pets are still in the dev build
-			String pet = net.veloclient.launcher.data.PetsSetting.equipped();
-			column.getChildren().add(slotButton(Slot.PETS, "PET", net.veloclient.launcher.data.PetsSetting.name(pet),
-					pet == null ? Icons.icon("sparkles", 22, Color.web("#5A5A63")) : petImage(pet, 38), refresh));
-		}
+		String pet = net.veloclient.launcher.data.PetsSetting.equipped();
+		column.getChildren().add(slotButton(Slot.PETS, "PET", net.veloclient.launcher.data.PetsSetting.name(pet),
+				pet == null ? Icons.icon("sparkles", 22, Color.web("#5A5A63")) : petImage(pet, 38), refresh));
 		Region grow = new Region();
 		VBox.setVgrow(grow, Priority.ALWAYS);
 		column.getChildren().addAll(grow, loadoutsCard(host, refresh));
@@ -348,11 +346,8 @@ public final class CosmeticsView {
 					wear, colors, offsets, depths, killFx == null ? "" : killFx, currentSkin(), currentExtras());
 		}
 
-		/** What looks keep beyond the built-in slots: the dev build's pet. */
+		/** What looks keep beyond the built-in slots: the pet. */
 		private static java.util.Map<String, String> currentExtras() {
-			if (!net.veloclient.launcher.AppVersion.DEV) {
-				return null;
-			}
 			return new java.util.TreeMap<>(java.util.Map.of("pet", java.util.Objects.requireNonNullElse(net.veloclient.launcher.data.PetsSetting.equipped(), "")));
 		}
 
@@ -374,7 +369,7 @@ public final class CosmeticsView {
 					&& (wear == null || wear.equals(equippedWear()))
 					&& (killFx == null || killFx.equals(java.util.Objects.requireNonNullElse(KillFxCatalog.equipped(), "")))
 					&& (skin == null || skin.equals(currentSkin()))
-					&& (extras == null || !net.veloclient.launcher.AppVersion.DEV || extras.get("pet") == null
+					&& (extras == null || extras.get("pet") == null
 							|| extras.get("pet").equals(java.util.Objects.requireNonNullElse(net.veloclient.launcher.data.PetsSetting.equipped(), "")));
 		}
 
@@ -412,7 +407,7 @@ public final class CosmeticsView {
 			if (killFx != null) {
 				KillFxCatalog.equip(killFx.isEmpty() ? null : killFx);
 			}
-			if (extras != null && extras.get("pet") != null && net.veloclient.launcher.AppVersion.DEV) {
+			if (extras != null && extras.get("pet") != null) {
 				net.veloclient.launcher.data.PetsSetting.equip(extras.get("pet").isEmpty() ? null : extras.get("pet"));
 			}
 			if (skin != null && !skin.equals(SkinLibrary.equippedId()) && host.session() != null) {
@@ -453,14 +448,16 @@ public final class CosmeticsView {
 
 	/** The loadout being worn (picked or saved last); changes to its items' settings are saved into it. */
 	private static String activeLoadout;
+	private static String activeLoadoutAccount;
 	private static boolean syncInstalled;
 
 	private static Path activeLoadoutFile() {
-		return VeloPaths.config().resolve("loadout-active.txt");
+		return VeloPaths.accountConfig("loadout-active.txt");
 	}
 
 	private static String activeLoadout() {
-		if (activeLoadout == null) {
+		if (activeLoadout == null || !java.util.Objects.equals(activeLoadoutAccount, VeloPaths.account())) {
+			activeLoadoutAccount = VeloPaths.account();
 			try {
 				activeLoadout = Files.exists(activeLoadoutFile()) ? Files.readString(activeLoadoutFile(), StandardCharsets.UTF_8).strip() : "";
 			} catch (java.io.IOException e) {
@@ -1372,7 +1369,7 @@ public final class CosmeticsView {
 	private static final boolean[] killFxSound = {false};
 	private static Node killFxCard;
 
-	// ---- Pets (dev build) ----
+	// ---- Pets ----
 
 	private static String selectedPet;
 
@@ -1422,19 +1419,27 @@ public final class CosmeticsView {
 			refresh.run();
 		}));
 		for (var pet : net.veloclient.launcher.data.PetsSetting.ALL) {
-			grid.getChildren().add(cell(petImage(pet.id(), 104), pet.accent(), pet.name(), pet.id().equals(equipped), pet.id().equals(selected), () -> {
+			Node cell = cell(petImage(pet.id(), 104), pet.accent(), pet.name(), pet.id().equals(equipped), pet.id().equals(selected), () -> {
 				selectedPet = pet.id();
 				refresh.run();
-			}));
+			});
+			if (!net.veloclient.launcher.data.PetsSetting.owns(pet.id())) {
+				cell.setOpacity(0.45);   // not yours yet - in the Store
+			}
+			grid.getChildren().add(cell);
 		}
 		VBox content = new VBox(16, grid);
-		Label hint = new Label("Dev build: your pet follows you in the dev client. Tricks, size and when it reacts to hits are the Pets (Dev) module's settings in game.");
+		boolean selectedOwned = selected.isEmpty() || net.veloclient.launcher.data.PetsSetting.owns(selected);
+		Label hint = new Label(selectedOwned ? "Your pet follows you in game. Tricks, size and when it reacts to hits are the Pets module's settings in game."
+				: net.veloclient.launcher.data.PetsSetting.name(selected) + " is in the Store - "
+						+ net.veloclient.launcher.data.PetsSetting.storePet(selected).map(p -> String.format(java.util.Locale.ROOT, "%,d Velo Coins", StoreApi.price(p.itemId(), p.price()))).orElse("open the Store")
+						+ ". Buy it there and it's yours to take out here.");
 		hint.getStyleClass().add("stage-hint");
 		hint.setWrapText(true);
 		content.getChildren().add(hint);
 		panel.getChildren().add(scroll(content));
 		boolean isEquipped = selected.isEmpty() ? equipped == null : selected.equals(equipped);
-		if (!isEquipped) {
+		if (!isEquipped && selectedOwned) {
 			panel.getChildren().add(actionBar(net.veloclient.launcher.data.PetsSetting.name(selected.isEmpty() ? null : selected), false, () -> {
 				net.veloclient.launcher.data.PetsSetting.equip(selected.isEmpty() ? null : selected);
 				Toasts.show(panel, selected.isEmpty() ? "Pet put away" : "Pet picked - it joins you in your next game");

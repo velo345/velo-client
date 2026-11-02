@@ -35,7 +35,7 @@ public final class StoreRestore {
 
 	public static void restoreMissing() {
 		for (String itemId : StoreClient.owned()) {
-			boolean present = CapeManager.library().values().stream()
+			boolean present = CapeManager.allBundles().values().stream()
 					.map(CapeDefinition::sourceItemId).anyMatch(id -> Objects.equals(id, itemId));
 			if (present) {
 				refreshArtIfChanged(itemId);
@@ -68,7 +68,7 @@ public final class StoreRestore {
 	private static void refreshArtIfChanged(String itemId) {
 		StoreCatalog.byId(itemId).filter(StoreAssets::ready).ifPresent(item -> {
 			String version = item.gifSha() != null ? item.gifSha() : String.valueOf(item.gifResource());
-			CapeManager.library().values().stream()
+			CapeManager.allBundles().values().stream()
 					.filter(d -> Objects.equals(d.sourceItemId(), itemId) && d.animated() && d.bundleFile() != null)
 					.forEach(definition -> {
 						if (!CHECKED.add(definition.id() + "|" + version)) {

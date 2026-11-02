@@ -1,0 +1,36 @@
+plugins {
+	id 'java'
+}
+
+// Velo Bridge - the server plugin (Paper, Purpur, Folia, Pufferfish; Spigot with fewer features).
+group = 'net.veloclient'
+version = '1.0.0'
+
+repositories {
+	mavenCentral()
+	maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+}
+
+java {
+	// Servers from 1.20.5 on run Java 21; 26.x servers run 25 and load this just the same.
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+	withSourcesJar()
+}
+
+dependencies {
+	// 1.21.4 API: transfer packets and the region schedulers Folia needs; older 1.20.5+ servers load it fine.
+	compileOnly 'io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT'
+}
+
+def pluginVersion = version.toString()
+processResources {
+	inputs.property 'version', pluginVersion
+	filesMatching('plugin.yml') {
+		expand 'version': pluginVersion
+	}
+}
+
+jar {
+	archiveFileName = "VeloBridge-${pluginVersion}.jar"
+}

@@ -317,6 +317,19 @@ public final class StoreTiles {
 				dealLabel(price, full), onClick);
 	}
 
+	/** A pet: its still picture, and its turntable while the tile is hovered. */
+	public static VBox petTile(net.veloclient.launcher.data.PetsSetting.StorePet pet, Runnable onClick) {
+		int price = StoreApi.price(pet.itemId(), pet.price());
+		boolean owned = net.veloclient.launcher.data.PetsSetting.owns(pet.pet().id());
+		boolean out = pet.pet().id().equals(net.veloclient.launcher.data.PetsSetting.equipped());
+		Integer full = StoreApi.fullPrice(pet.itemId());
+		PetSheetView art = new PetSheetView(pet, 170, false);
+		VBox tile = tile(art, pet.pet().accent(), Rarity.of(pet.itemId(), price), "Pet", pet.pet().name(),
+				out ? State.EQUIPPED : owned ? State.OWNED : pet.inStore() ? State.FOR_SALE : State.LOCKED, price, full, dealLabel(price, full), onClick);
+		tile.hoverProperty().addListener((o, was, now) -> art.play(now));
+		return tile;
+	}
+
 	/** An emote: a little figure doing it on a loop, with its particles. */
 	public static Node emoteArt(net.veloclient.launcher.data.EmoteCatalog.EmoteType type, double width, double height) {
 		return EmoteFigureFx.create(type, width, height);

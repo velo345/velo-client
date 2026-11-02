@@ -130,6 +130,13 @@ public final class VeloSkinsScreen extends VeloWindow {
 		return null;
 	}
 
+	/** Dev-only (screenshot tour): wears the Locker's equipped skin on your own player, like after equipping it. */
+	public static void wearEquippedForTour() {
+		String id = SkinLibrary.equippedId();
+		SkinLibrary.all().stream().filter(skin -> skin.id().equals(id)).findFirst()
+				.ifPresent(skin -> net.veloclient.velo.client.skins.SkinTryOn.setEquipped(texture(skin), skin.slim()));
+	}
+
 	private static Identifier texture(SkinLibrary.Skin skin) {
 		return TEXTURES.computeIfAbsent(skin.id(), id -> {
 			try (var in = Files.newInputStream(SkinLibrary.png(skin))) {
@@ -144,13 +151,29 @@ public final class VeloSkinsScreen extends VeloWindow {
 	}
 
 	/**
-	 * Converts an old 64x32 skin to the 64x64 layout the player model expects (mirrored left
-	 * limbs, see-through hat if it was fully opaque), the same way vanilla loads them.
+	 * Loads a skin the way vanilla does: an old 64x32 skin becomes the 64x64 layout (mirrored left limbs, see-through hat
+	 * if it was fully opaque), and the base layer is made fully opaque - skins with half-transparent pixels there
+	 * otherwise render patchy, as if the shading were off.
 	 */
 	private static NativeImage modernize(NativeImage source) {
-		if (source.getHeight() != 32) {
-			return source;
+		NativeImage image = source.getHeight() == 32 ? upgrade(source) : source;
+		if (image.getWidth() == 64 && image.getHeight() == 64) {
+			opaque(image, 0, 0, 32, 16);
+			opaque(image, 0, 16, 64, 32);
+			opaque(image, 16, 48, 48, 64);
 		}
+		return image;
+	}
+
+	private static void opaque(NativeImage image, int x1, int y1, int x2, int y2) {
+		for (int y = y1; y < y2; y++) {
+			for (int x = x1; x < x2; x++) {
+				image.setColorArgb(x, y, image.getColorArgb(x, y) | 0xFF000000);
+			}
+		}
+	}
+
+	private static NativeImage upgrade(NativeImage source) {
 		NativeImage image = new NativeImage(64, 64, true);
 		for (int y = 0; y < 32; y++) {
 			for (int x = 0; x < 64; x++) {

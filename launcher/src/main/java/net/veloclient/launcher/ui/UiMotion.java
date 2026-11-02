@@ -26,6 +26,23 @@ import javafx.util.Duration;
 public final class UiMotion {
 
 	public static final Interpolator EASE_OUT = Interpolator.SPLINE(0.2, 0.8, 0.25, 1);
+	/**
+	 * Ease-out that overshoots a little and settles - for things that pop in. Interpolator.SPLINE can't do this:
+	 * JavaFX throws for control points outside [0,1] (that exception blanked whole views).
+	 */
+	public static final Interpolator BACK_OUT = back(1.70158);
+	/** A softer overshoot, for things that slide. */
+	public static final Interpolator BACK_OUT_SOFT = back(0.9);
+
+	private static Interpolator back(double s) {
+		return new Interpolator() {
+			@Override
+			protected double curve(double t) {
+				double u = t - 1;
+				return 1 + u * u * ((s + 1) * u + s);
+			}
+		};
+	}
 	private static final String KEY = "velo.motion";
 
 	private UiMotion() {

@@ -16,11 +16,18 @@ public final class VeloConfirmScreen extends VeloWindow {
 	private final String message;
 	private final String confirmLabel;
 	private final Runnable onConfirm;
+	private final String cancelLabel;
 	private List<String> lines = List.of();
 
 	public VeloConfirmScreen(Screen parent, String title, String message, String confirmLabel, Runnable onConfirm) {
-		super(Text.literal(title), 280, 140);
+		this(parent, title, message, "Cancel", confirmLabel, onConfirm, 280, 140);
+	}
+
+	/** A bigger notice: its own size and a different label on the dismiss button ("Got it"). */
+	public VeloConfirmScreen(Screen parent, String title, String message, String cancelLabel, String confirmLabel, Runnable onConfirm, int width, int height) {
+		super(Text.literal(title), width, height);
 		this.message = message;
+		this.cancelLabel = cancelLabel;
 		this.confirmLabel = confirmLabel;
 		this.onConfirm = onConfirm;
 		returnTo(parent);
@@ -32,7 +39,7 @@ public final class VeloConfirmScreen extends VeloWindow {
 		lines = VeloUi.wrap(message, contentWidth());
 		int buttonWidth = (contentWidth() - 8) / 2;
 		int y = contentBottom() - 20;
-		addDrawableChild(new VeloButton(contentX(), y, buttonWidth, 20, Text.literal("Cancel"), b -> requestClose()));
+		addDrawableChild(new VeloButton(contentX(), y, buttonWidth, 20, Text.literal(cancelLabel), b -> requestClose()));
 		addDrawableChild(new VeloButton(contentX() + buttonWidth + 8, y, buttonWidth, 20, Text.literal(confirmLabel), b -> {
 			onConfirm.run();
 			requestClose();

@@ -36,8 +36,8 @@ public final class NewsApi {
 	private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
 			.followRedirects(HttpClient.Redirect.NORMAL).build();
 	private static final Gson GSON = new Gson();
-	/** Dev-only: the screenshot tour shows sample posts instead of talking to the real server. */
-	private static final boolean DEMO = System.getProperty("velo.launcherTour") != null;
+	/** Dev-only: the screenshot tour shows sample posts instead of talking to the real server ({@code -Dvelo.tourRealNews} keeps the real feed, for website shots). */
+	private static final boolean DEMO = System.getProperty("velo.launcherTour") != null && !Boolean.getBoolean("velo.tourRealNews");
 
 	private NewsApi() {
 	}

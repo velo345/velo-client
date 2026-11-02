@@ -130,6 +130,19 @@ public final class PerformanceModsInstaller {
 			state.gameVersion = version.id();
 
 			Files.createDirectories(modsDir);
+			// One we installed that another mod no longer accepts (Nvidium wants exactly Sodium 0.9.2...): swap it below.
+			for (Map.Entry<String, String> mod : MODS.entrySet()) {
+				String fileName = state.installed.get(mod.getKey());
+				Path file = fileName == null ? null : modsDir.resolve(fileName);
+				if (file != null && Files.exists(file)) {
+					String installed = net.veloclient.launcher.doctor.ModRequirements.versionOf(file);
+					if (installed != null && !net.veloclient.launcher.doctor.ModRequirements.acceptsMod(modsDir, mod.getValue(), installed)) {
+						LauncherLog.info("Another mod needs a different " + mod.getKey() + " than " + installed + " - picking one that fits");
+						Files.delete(file);
+						state.installed.remove(mod.getKey());
+					}
+				}
+			}
 			Set<String> presentModIds = installedModIds(modsDir);
 			for (Map.Entry<String, String> mod : MODS.entrySet()) {
 				String slug = mod.getKey();
@@ -153,10 +166,30 @@ public final class PerformanceModsInstaller {
 	private static Optional<String> installOne(String slug, GameVersion version, Path modsDir, Set<String> presentModIds) throws IOException {
 		List<ModrinthClient.ProjectVersion> candidates = ModrinthClient.versions(slug, version.id());
 		// Modrinth lists newest first.
-		Optional<ModrinthClient.ProjectVersion> chosen = candidates.stream()
+		List<ModrinthClient.ProjectVersion> fitting = candidates.stream()
 				.filter(v -> v.gameVersions() != null && v.gameVersions().contains(version.id()))
 				.filter(v -> v.loaders() != null && v.loaders().contains("fabric"))
-				.findFirst();
+				.toList();
+		Optional<ModrinthClient.ProjectVersion> chosen = fitting.stream().findFirst();
+		String modId = MODS.get(slug);
+		if (chosen.isPresent() && net.veloclient.launcher.doctor.ModRequirements.constrains(modsDir, modId)) {
+			// Another mod wants a certain version of it: the newest build every mod accepts (read from the jar itself -
+			// Modrinth's version names don't match fabric.mod.json's).
+			chosen = Optional.empty();
+			for (ModrinthClient.ProjectVersion candidate : fitting.stream().limit(12).toList()) {
+				ModrinthClient.VersionFile f = candidate.primaryFile().orElse(null);
+				if (f == null || f.filename() == null || !f.filename().endsWith(".jar") || f.filename().contains("/")) {
+					continue;
+				}
+				Path cached = GameDataPaths.libraries().resolve("modrinth").resolve(slug).resolve(f.filename());
+				Downloader.ensure(URI.create(f.url()), cached, f.sha1(), f.size(), b -> { });
+				String v = net.veloclient.launcher.doctor.ModRequirements.versionOf(cached);
+				if (v != null && net.veloclient.launcher.doctor.ModRequirements.acceptsMod(modsDir, modId, v)) {
+					chosen = Optional.of(candidate);
+					break;
+				}
+			}
+		}
 		if (chosen.isEmpty()) {
 			return Optional.empty();
 		}

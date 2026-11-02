@@ -65,7 +65,9 @@ final class CustomCapeUploader {
 				localHash = sha256(bytes);
 				localHashByBundle.put(bundleKey, localHash);
 			}
-			String key = base + "|" + localHash;
+			// Per account: the server only accepts a custom:<hash> this same account uploaded, so a second account
+			// reusing the first one's id published a cloak nobody else could see.
+			String key = base + "|" + net.veloclient.velo.config.VeloPaths.account() + "|" + localHash;
 			synchronized (CustomCapeUploader.class) {
 				String known = cache().capeIdByKey().get(key);
 				if (known != null) {

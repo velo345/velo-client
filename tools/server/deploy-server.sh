@@ -10,6 +10,10 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 TARGET="${1:-velo-new}"
 
 ./gradlew :server:shadowJar -q
+# dev.velo-client.com (Velo Bridge docs + plugin jar): module list, config.yml and the jar are built first.
+tools/devsite/build.sh
+ssh "$TARGET" 'install -d -m 2775 -g velo /var/www/dev.velo-client.com'
+rsync -rlptz --delete --chmod=D2775,F664 dev-site/ "$TARGET:/var/www/dev.velo-client.com/"
 # The staff panel's static app (staff.velo-client.com) - before nginx, whose config serves it.
 ssh "$TARGET" 'install -d -m 2775 -g velo /var/www/staff.velo-client.com'
 rsync -rlptz --delete --chmod=D2775,F664 --exclude staff.part.js staff-site/ "$TARGET:/var/www/staff.velo-client.com/"

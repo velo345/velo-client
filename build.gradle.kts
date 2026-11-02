@@ -72,6 +72,8 @@ if (veloDev) {
 	tasks.named<Jar>("jar") { from(dev.output) }
 	// Dev client runs (screenshot tours of dev features) need the dev classes too.
 	tasks.named<JavaExec>("runClient") { classpath(dev.output) }
+	// ...and its resources (pet textures, note art) as part of the mod, not just loose classpath files.
+	loom.mods.named("velo-client") { sourceSet(dev) }
 }
 
 loom {
@@ -135,7 +137,7 @@ tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") 
 	inputs.property("minecraftDependency", minecraftDependency)
 	inputs.property("javaVersion", javaVersion)
 	// The dev build's own mixins (src/dev/resources/velo-dev.mixins.json) are only listed in a dev jar.
-	val devMixins = if (veloDev) ",\n\t\t\"velo-dev.mixins.json\"" else ""
+	val devMixins = if (veloDev && rootProject.file("src/dev/resources/velo-dev.mixins.json").exists()) ",\n\t\t\"velo-dev.mixins.json\"" else ""
 	inputs.property("devMixins", devMixins)
 
 	filesMatching("fabric.mod.json") {

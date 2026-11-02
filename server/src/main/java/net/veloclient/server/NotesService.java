@@ -51,12 +51,16 @@ final class NotesService {
 	static final int BOARD_W = 256;
 	static final int BOARD_H = 160;
 	static final Set<String> STYLES = Set.of("paper", "sticky", "glass", "sign", "neon");
+	/** "note" (text, checklist, extras), "image" (only a picture) or "board" (only a whiteboard). The last two are Velo+. */
+	static final Set<String> KINDS = Set.of("note", "image", "board");
 
 	private static final RateLimiter.Window[] CREATE_LIMIT = {new RateLimiter.Window(15, 600_000), new RateLimiter.Window(60, 86_400_000)};
 	private static final RateLimiter.Window[] SAVE_LIMIT = {new RateLimiter.Window(30, 60_000), new RateLimiter.Window(400, 3_600_000)};
 	private static final RateLimiter.Window[] CHECK_LIMIT = {new RateLimiter.Window(60, 60_000)};
 	private static final RateLimiter.Window[] BOARD_LIMIT = {new RateLimiter.Window(40, 10_000), new RateLimiter.Window(1500, 3_600_000)};
 	private static final RateLimiter.Window[] IMAGE_LIMIT = {new RateLimiter.Window(5, 600_000), new RateLimiter.Window(30, 86_400_000)};
+	/** Strokes while they're being drawn (relayed to the others, never stored). */
+	private static final RateLimiter.Window[] LIVE_LIMIT = {new RateLimiter.Window(120, 10_000)};
 	private static final RateLimiter.Window[] MENTION_LIMIT = {new RateLimiter.Window(30, 3_600_000)};
 	private static final long MENTION_REPEAT_MILLIS = 10 * 60_000;
 	private static final Pattern MENTION = Pattern.compile("@([A-Za-z0-9_]{2,16})");
@@ -104,8 +108,12 @@ final class NotesService {
 		String share = "people";
 		List<String> people = new ArrayList<>();
 		Map<String, String> names = new LinkedHashMap<>();
-		/** "owner" or "everyone" (everyone who sees it may edit text and board). */
+		/** "owner", "everyone" (everyone who sees it may edit text and board) or "picked" (only {@link #editors}). */
 		String edit = "owner";
+		/** With edit "picked": the people (of those it's shared with) who may edit and draw too. */
+		List<String> editors = new ArrayList<>();
+		/** See {@link #KINDS}. */
+		String kind = "note";
 		List<String> mentions = new ArrayList<>();
 		/** Mentioned people who haven't opened it since. */
 		List<String> unread = new ArrayList<>();
@@ -128,7 +136,11 @@ final class NotesService {
 	private final Map<String, Long> lastMention = new HashMap<>();
 	private volatile boolean dirty;
 
-	NotesService(Path dataDir, SocialService social, PartyService parties, ModerationService moderation) {
+	/** Whether a player has Velo+ (pictures and picture / whiteboard notes are Velo+). */
+	private final java.util.function.Predicate<String> plus;
+
+	NotesService(Path dataDir, SocialService social, PartyService parties, ModerationService moderation, java.util.function.Predicate<String> plus) {
+		this.plus = plus;
 		this.file = dataDir.resolve("notes.json");
 		this.images = dataDir.resolve("notes-images");
 		this.social = social;
@@ -179,7 +191,7 @@ final class NotesService {
 	}
 
 	private boolean edits(Note note, String uuid) {
-		return note.owner.equals(uuid) || "everyone".equals(note.edit) && sees(note, uuid);
+		return note.owner.equals(uuid) || ("everyone".equals(note.edit) || "picked".equals(note.edit) && note.editors.contains(uuid)) && sees(note, uuid);
 	}
 
 	/** Everyone who sees the note right now. */
@@ -272,6 +284,8 @@ final class NotesService {
 		String share;
 		List<String> people;
 		String edit;
+		List<String> editors;
+		String kind;
 	}
 
 	synchronized NoteView save(String me, NoteInput in) throws ApiError {
@@ -310,6 +324,12 @@ final class NotesService {
 		}
 		limit(me, "notes-save", SAVE_LIMIT);
 		boolean owner = note.owner.equals(me);
+		if (in.kind != null && (created || owner) && KINDS.contains(in.kind) && !in.kind.equals(note.kind)) {
+			if (!"note".equals(in.kind) && !plus.test(me)) {
+				throw new ApiError(403, "Picture and whiteboard notes are part of Velo+");
+			}
+			note.kind = in.kind;
+		}
 		if (in.dim != null && (created || owner)) {
 			note.dim = clip(in.dim, 60);
 			note.x = coord(in.x, note.x);
@@ -348,13 +368,24 @@ final class NotesService {
 				note.share = "friends".equals(in.share) ? "friends" : "people";
 			}
 			if (in.edit != null) {
-				note.edit = "everyone".equals(in.edit) ? "everyone" : "owner";
+				note.edit = "everyone".equals(in.edit) || "picked".equals(in.edit) ? in.edit : "owner";
 			}
 			if (in.people != null) {
 				setPeople(note, me, in.people);
 			}
+			if (in.editors != null) {
+				List<String> editors = new ArrayList<>();
+				for (String uuid : in.editors) {
+					if (uuid != null && !uuid.equals(me) && !editors.contains(uuid) && sees(note, uuid) && editors.size() < MAX_PEOPLE) {
+						editors.add(uuid);
+						note.names.putIfAbsent(uuid, social.usernameOf(uuid));
+					}
+				}
+				note.editors = editors;
+			}
+			note.editors.removeIf(u -> !sees(note, u));
 		}
-		if (note.title == null && note.text == null && note.checks.isEmpty()) {
+		if (note.title == null && note.text == null && note.checks.isEmpty() && "note".equals(note.kind)) {
 			note.title = "Note";
 		}
 		touch(note, me);
@@ -443,17 +474,22 @@ final class NotesService {
 		throw new ApiError(404, "That checklist item is gone");
 	}
 
-	synchronized NoteView board(String me, String id, List<Stroke> strokes, boolean clear) throws ApiError {
+	synchronized NoteView board(String me, String id, List<Stroke> strokes, boolean clear, List<String> sids) throws ApiError {
 		moderation.check(ModerationService.NOTE, me);
 		Note note = require(id, me);
 		if (!edits(note, me)) {
 			throw new ApiError(403, "Only " + note.ownerName + " can draw on this note");
+		}
+		if (!plus.test(note.owner)) {
+			// The owner's Velo+ carries the board - people it's shared with draw along for free.
+			throw new ApiError(403, "Whiteboards are part of Velo+");
 		}
 		limit(me, "notes-board", BOARD_LIMIT);
 		if (clear) {
 			note.board = new ArrayList<>();
 		}
 		int points = note.board.stream().mapToInt(s -> s.p.length / 2).sum();
+		List<Stroke> added = new ArrayList<>();
 		if (strokes != null) {
 			for (Stroke in : strokes) {
 				if (in == null || in.p == null || in.p.length < 2 || note.board.size() >= MAX_STROKES) {
@@ -472,12 +508,56 @@ final class NotesService {
 					stroke.p[i * 2 + 1] = Math.max(0, Math.min(BOARD_H, in.p[i * 2 + 1]));
 				}
 				note.board.add(stroke);
+				added.add(stroke);
 				points += n;
 			}
 		}
 		touch(note, me);
+		// Whoever has the board open applies just these strokes (live, no reload); everyone else refreshes as usual.
+		Map<String, Object> event = new LinkedHashMap<>();
+		event.put("server", note.server);
+		event.put("id", note.id);
+		event.put("clear", clear);
+		event.put("strokes", added);
+		event.put("sids", sids == null ? List.of() : sids);
+		event.put("by", social.usernameOf(me));
+		event.put("version", note.version);
+		for (String uuid : audience(note)) {
+			if (!uuid.equals(me)) {
+				social.pushEvent(uuid, "note_board", event);
+			}
+		}
 		broadcast(note, false);
 		return new NoteView(strip(note), note.owner.equals(me), true, false);
+	}
+
+	/**
+	 * A stroke while it's being drawn: relayed to the others who see the note so they watch it appear, never stored. The
+	 * finished stroke comes through {@link #board} with the same {@code sid}, which replaces it.
+	 */
+	synchronized void live(String me, String id, String sid, Stroke stroke) throws ApiError {
+		Note note = require(id, me);
+		if (!edits(note, me) || !plus.test(note.owner) || sid == null || sid.length() > 24 || stroke == null || stroke.p == null) {
+			return;
+		}
+		limit(me, "notes-live", LIVE_LIMIT);
+		int n = Math.min(stroke.p.length / 2, 400);
+		int[] p = new int[n * 2];
+		for (int i = 0; i < n * 2; i++) {
+			p[i] = Math.max(0, Math.min(i % 2 == 0 ? BOARD_W : BOARD_H, stroke.p[i]));
+		}
+		Map<String, Object> event = new LinkedHashMap<>();
+		event.put("id", note.id);
+		event.put("sid", sid);
+		event.put("by", social.usernameOf(me));
+		event.put("c", stroke.c);
+		event.put("w", Math.max(1, Math.min(16, stroke.w)));
+		event.put("p", p);
+		for (String uuid : audience(note)) {
+			if (!uuid.equals(me)) {
+				social.pushEvent(uuid, "note_live", event);
+			}
+		}
 	}
 
 	/** Sets ({@code png} base64) or removes ({@code null}) the note's picture. */
@@ -486,6 +566,9 @@ final class NotesService {
 		Note note = require(id, me);
 		if (!edits(note, me)) {
 			throw new ApiError(403, "Only " + note.ownerName + " can change the picture");
+		}
+		if (png != null && !plus.test(me)) {
+			throw new ApiError(403, "Pictures on notes are part of Velo+");
 		}
 		limit(me, "notes-image", IMAGE_LIMIT);
 		Path path = images.resolve(note.id + ".png");
@@ -648,17 +731,17 @@ final class NotesService {
 	// ---- Staff ----
 
 	record StaffRow(String id, String owner, String ownerName, String title, String preview, String server, String dim, double x, double y,
-			double z, long created, long updated, int sharedWith, String share, boolean image, int checks, int strokes, int reports) {
+			double z, long created, long updated, int sharedWith, String share, boolean image, int checks, int strokes, int reports, String kind, String edit, int editors) {
 	}
 
-	synchronized List<StaffRow> staffList(String query, boolean reportedOnly, int limit) {
+	synchronized List<StaffRow> staffList(String query, boolean reportedOnly, String kind, int limit) {
 		String q = query == null ? "" : query.toLowerCase(Locale.ROOT).strip();
 		List<StaffRow> out = new ArrayList<>();
 		List<Note> all = new ArrayList<>(data.notes.values());
 		all.sort((a, b) -> Long.compare(b.updated, a.updated));
 		for (Note note : all) {
 			int reports = moderation.openAgainst(ModerationService.NOTE, note.id);
-			if (reportedOnly && reports == 0) {
+			if (reportedOnly && reports == 0 || kind != null && KINDS.contains(kind) && !kind.equals(note.kind == null ? "note" : note.kind)) {
 				continue;
 			}
 			if (!q.isEmpty() && !(note.id.equals(q) || contains(note.ownerName, q) || contains(note.title, q) || contains(note.text, q)
@@ -667,7 +750,8 @@ final class NotesService {
 			}
 			String preview = note.text == null ? "" : note.text.length() > 140 ? note.text.substring(0, 140) + "..." : note.text;
 			out.add(new StaffRow(note.id, note.owner, note.ownerName, note.title, preview, note.server, note.dim, note.x, note.y, note.z,
-					note.created, note.updated, note.people.size(), note.share, note.image > 0, note.checks.size(), note.board.size(), reports));
+					note.created, note.updated, note.people.size(), note.share, note.image > 0, note.checks.size(), note.board.size(), reports,
+					note.kind == null ? "note" : note.kind, note.edit == null ? "owner" : note.edit, note.editors.size()));
 			if (out.size() >= limit) {
 				break;
 			}

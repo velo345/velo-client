@@ -31,7 +31,7 @@ public final class StorePurchase {
 	public static void restoreMissing() {
 		for (String itemId : StoreApi.owned()) {
 			StoreCatalog.byId(itemId).ifPresent(item -> {
-				boolean present = CapeLibrary.listAll().stream().anyMatch(c -> c.animated() && c.name().equals(item.name()));
+				boolean present = CapeLibrary.listAllBundles().stream().anyMatch(c -> c.animated() && c.name().equals(item.name()));
 				if (present) {
 					return;
 				}

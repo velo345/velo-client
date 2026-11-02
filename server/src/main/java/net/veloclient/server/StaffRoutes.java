@@ -289,7 +289,9 @@ final class StaffRoutes {
 				JsonHttp.writeError(e, 404, "No picture for that item");
 				return;
 			}
-			JsonHttp.writeBytes(e, 200, "image/png", png, "public, max-age=3600");
+			// pets come as JPEG previews
+			boolean jpeg = png.length > 2 && (png[0] & 0xff) == 0xff && (png[1] & 0xff) == 0xd8;
+			JsonHttp.writeBytes(e, 200, jpeg ? "image/jpeg" : "image/png", png, "public, max-age=3600");
 		}));
 	}
 

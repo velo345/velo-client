@@ -84,6 +84,19 @@ public final class VeloProfileStore {
 	 */
 	private static boolean deferredLoadDone;
 
+	/** Every module and HUD element as it ships (captured at startup, before the saved profile was applied). */
+	private static VeloProfile defaults;
+
+	/** Puts every module, setting and HUD position of the active profile back to how Velo ships; false if not ready yet. */
+	public static boolean resetActiveToDefaults() {
+		if (defaults == null) {
+			return false;
+		}
+		applyToLive(defaults);
+		saveActive();
+		return true;
+	}
+
 	public static void loadActiveDeferred() {
 		if (deferredLoadArmed) {
 			return;
@@ -97,6 +110,8 @@ public final class VeloProfileStore {
 				return;
 			}
 			deferredLoadDone = true;
+			// Before any saved profile is applied every module is still as it ships: that's what "Reset to defaults" restores.
+			defaults = captureCurrent("defaults");
 			String name = VeloProfileManager.activeName();
 			VeloProfileManager.loadByName(name).ifPresentOrElse(
 					VeloProfileStore::applyToLive,

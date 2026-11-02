@@ -123,6 +123,9 @@ final class SocialStatsService {
 		}
 	}
 
+	private volatile String lastConnectedState;
+	private volatile long lastConnectedAt;
+
 	/** Where the panel sends the owner to allow access. */
 	Map<String, Object> instagramLoginUrl() throws ApiError {
 		if (igAppId == null || igAppSecrets.isEmpty()) {
@@ -142,6 +145,10 @@ final class SocialStatsService {
 	String instagramCallback(String code, String state, String error) {
 		Long expiry = state == null ? null : igStates.remove(state);
 		if (expiry == null || expiry < System.currentTimeMillis()) {
+			// Browsers sometimes call the callback twice: the first call connected, the second must not show "failed".
+			if (state != null && state.equals(lastConnectedState) && System.currentTimeMillis() - lastConnectedAt < 120_000) {
+				return PANEL_SOCIALS + "?instagram=ok";
+			}
 			return PANEL_SOCIALS + "?instagram=" + enc("That login link expired - start it again from the panel");
 		}
 		if (code == null || code.isBlank()) {
@@ -163,6 +170,8 @@ final class SocialStatsService {
 				}
 				JsonObject longLived = igGet("https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=" + enc(secret), shortToken);
 				connectInstagram(str(longLived, "access_token", shortToken));
+				lastConnectedState = state;
+				lastConnectedAt = System.currentTimeMillis();
 				return PANEL_SOCIALS + "?instagram=ok";
 			} catch (Exception e) {
 				problem = shortError(e);
@@ -690,6 +699,11 @@ final class SocialStatsService {
 
 	private static String shortError(Exception e) {
 		String m = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+		if (m.contains("API access blocked")) {
+			// Meta answers this for every call, even /me, when the app itself is restricted - no token or code change helps.
+			return "Meta blocked this app's API access - open developers.facebook.com, your app's dashboard, and clear the alert there"
+					+ " (usually Data Use Checkup, a missing privacy policy URL, or the app is in Development mode without your account as a tester)";
+		}
 		return m.length() > 160 ? m.substring(0, 160) : m;
 	}
 

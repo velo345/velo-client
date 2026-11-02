@@ -66,7 +66,11 @@ public final class CrashReportDialog {
 		}
 	}
 
-	public static void show(Stage owner, Instance instance, int exitCode, long startedAt, Path runLog) {
+	/** Starts a profile again (with the server it was started for) - set by the launcher; the Doctor's fixes use it. */
+	public static volatile java.util.function.Consumer<Instance> relaunch;
+
+	/** {crash report text or null, game log tail or null} of the run that started at {@code startedAt}. */
+	public static String[] texts(Instance instance, long startedAt, Path runLog) {
 		Path crashFile = crashReport(instance, startedAt);
 		String crash = crashFile == null ? null : read(crashFile, 400_000);
 		String log = runLog != null && Files.exists(runLog) ? tail(runLog, 3000) : null;
@@ -74,6 +78,30 @@ public final class CrashReportDialog {
 		if (Files.exists(latestLog) && modified(latestLog) >= startedAt) {
 			log = tail(latestLog, 3000);
 		}
+		if (crash == null) {
+			// The JVM itself died (graphics driver, memory): it leaves hs_err_pid*.log in the game folder instead.
+			Path nativeCrash = newest(InstancePaths.gameDir(instance.id()), "hs_err_pid", startedAt);
+			if (nativeCrash != null) {
+				crash = read(nativeCrash, 200_000);
+			}
+		}
+		return new String[] {crash, log};
+	}
+
+	private static Path newest(Path dir, String prefix, long since) {
+		try (var files = Files.list(dir)) {
+			return files.filter(p -> p.getFileName().toString().startsWith(prefix) && modified(p) >= since - 2000)
+					.max(Comparator.comparingLong(CrashReportDialog::modified)).orElse(null);
+		} catch (IOException e) {
+			return null;
+		}
+	}
+
+	public static void show(Stage owner, Instance instance, int exitCode, long startedAt, Path runLog) {
+		Path crashFile = crashReport(instance, startedAt);
+		String[] texts = texts(instance, startedAt, runLog);
+		String crash = texts[0];
+		String log = texts[1];
 		String cause = cause(crash, log);
 
 		Dialog<Void> dialog = new Dialog<>();
@@ -150,6 +178,7 @@ public final class CrashReportDialog {
 
 		String crashText = crash;
 		String logText = log;
+		DoctorPanel[] doctorPanel = new DoctorPanel[1];
 		boolean[] sentOnce = {false};
 		java.util.function.Supplier<JsonObject> buildReport = () -> {
 			JsonObject report = new JsonObject();
@@ -166,6 +195,9 @@ public final class CrashReportDialog {
 			if (includeLog.isSelected()) {
 				report.addProperty("crash", crashText);
 				report.addProperty("log", logText);
+			}
+			if (doctorPanel[0] != null) {
+				report.add("doctor", net.veloclient.launcher.doctor.Doctor.reportData(instance, doctorPanel[0].diagnosis()));
 			}
 			return report;
 		};
@@ -186,6 +218,43 @@ public final class CrashReportDialog {
 		});
 
 		VBox root = new VBox(14, header, askLabel, message, new VBox(6, includeLog, autoSend), what, actions, status);
+		{
+			try {
+			// Velo Doctor: what crashed it in plain words, fixes - and after fixing, straight back into the game.
+			net.veloclient.launcher.doctor.Diagnosis diagnosis = net.veloclient.launcher.doctor.Doctor.afterCrash(instance, crashText, logText, exitCode);
+			doctorPanel[0] = DoctorPanel.create(instance, DoctorPanel.Mode.CRASH, diagnosis,
+					() -> net.veloclient.launcher.doctor.Doctor.afterCrash(instance, crashText, logText, exitCode), new DoctorPanel.Host() {
+						@Override
+						public void fixed(boolean all) {
+							sentOnce[0] = true; // fixed, not reported - no automatic telemetry for this one
+							dialog.close();
+							var again = relaunch;
+							if (again != null) {
+								again.accept(instance);
+							}
+						}
+
+						@Override
+						public void report(net.veloclient.launcher.doctor.Diagnosis d) {
+							message.requestFocus();
+							send.fire();
+						}
+					});
+			root.getChildren().add(1, doctorPanel[0].node());
+			root.setPrefWidth(640);
+			// The fix goes bottom right, before Send report: the natural last click, and the one that actually helps.
+			Button fixAll = doctorPanel[0].takeFixAllButton();
+			actions.getChildren().add(actions.getChildren().indexOf(send), fixAll);
+			if (fixAll.isVisible()) {
+				send.getStyleClass().remove("primary-button");
+				send.getStyleClass().add("glass-button");
+			}
+			} catch (RuntimeException e) {
+				// The crash dialog (and its report) must always appear, whatever the Doctor does.
+				doctorPanel[0] = null;
+				net.veloclient.launcher.LauncherLog.warn("Doctor failed in the crash dialog", e);
+			}
+		}
 		root.setPadding(new Insets(6));
 		root.setPrefWidth(560);
 		root.getStyleClass().add("crash-dialog");
@@ -231,6 +300,11 @@ public final class CrashReportDialog {
 		} catch (IOException ignored) {
 			// Worst case the game asks once more.
 		}
+	}
+
+	/** For the Doctor: {@link #cause}. */
+	public static String causeOf(String crash, String log) {
+		return cause(crash, log);
 	}
 
 	/** The one line that says what broke: the crash report's description + first exception, or the last error in the log. */

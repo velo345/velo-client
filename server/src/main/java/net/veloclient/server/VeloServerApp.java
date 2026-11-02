@@ -192,13 +192,17 @@ public final class VeloServerApp {
 		}
 		reportService.setListener(announcer::report);
 		// World Notes (shared in-world notes): players' routes + staff list / read / remove.
-		NotesService notes = new NotesService(dataDir, social, parties, moderation);
+		NotesService notes = new NotesService(dataDir, social, parties, moderation, uuid -> store != null && store.isPlus(uuid));
 		ModerationRoutes.setNotes(notes);
 		NotesRoutes.register(server, registry, notes, moderation, social,
 				uuid -> store.isOwner(uuid, social.usernameOf(uuid)) ? StaffService.MANAGER : staff.level(uuid));
 		ModerationRoutes.register(server, registry, moderation, staff, social, store, clipShares, worlds, capes, reportService,
 				envOr("VELO_SITE_URL", "https://velo-client.com"));
 		NewsRoutes.register(server, registry, new NewsService(dataDir), reportService, store, adminToken);
+		new DoctorService(dataDir).register(server, registry, reportService, adminToken);
+		new ProfileShareService(dataDir).register(server, registry);
+		new ServerProfileService(dataDir).register(server, adminToken);
+		new BridgeService(dataDir).register(server, adminToken);
 		SchematicShareService schematics = new SchematicShareService(dataDir);
 		SchematicRoutes.register(server, registry, schematics, store);
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));
@@ -420,7 +424,7 @@ public final class VeloServerApp {
 
 	/** {@code wear}: equipped bodywear, "id,id,..." (item ids without "wear_"). */
 	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId, String auraId, Boolean idle, Boolean hidePlus, String nameStyle,
-			String emote, String wear) {
+			String emote, String wear, String pet) {
 	}
 
 	private record HeartbeatResponse(boolean ok, int onlineCount, String capeId) {
@@ -489,6 +493,12 @@ public final class VeloServerApp {
 				wear = shown.isEmpty() ? null : String.join(",", shown);
 			}
 			registry.setWear(refreshed.uuid(), wear);
+			// Pets: store items too ("pet_<id>"), shown to others only if owned.
+			String pet = request.pet();
+			if (pet != null && (!pet.matches("[a-z0-9_]{1,40}") || !store.knownItem("pet_" + pet) || !store.mayDisplayCape(refreshed.uuid(), "pet_" + pet))) {
+				pet = null;
+			}
+			registry.setPet(refreshed.uuid(), pet);
 		}
 		if (refreshed != null && "launcher".equals(refreshed.kind())
 				&& registry.setIdle(request.sessionToken(), Boolean.TRUE.equals(request.idle()))) {

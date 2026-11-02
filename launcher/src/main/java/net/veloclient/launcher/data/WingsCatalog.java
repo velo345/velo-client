@@ -370,7 +370,7 @@ public final class WingsCatalog {
 	// ---- Equipped pair and settings ----
 
 	private static Path configFile() {
-		return VeloPaths.config().resolve("cosmetics-wings.json");
+		return VeloPaths.accountConfig("cosmetics-wings.json");
 	}
 
 	private static JsonObject read() {

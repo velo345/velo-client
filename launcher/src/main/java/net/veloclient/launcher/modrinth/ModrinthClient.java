@@ -80,7 +80,10 @@ public final class ModrinthClient {
 			List<String> loaders,
 			List<VersionFile> files,
 			@SerializedName("date_published") String datePublished,
-			List<Dependency> dependencies) {
+			List<Dependency> dependencies,
+			@SerializedName("version_type") String versionType,
+			/** Markdown, as the author wrote it (may be empty). */
+			String changelog) {
 
 		public Optional<VersionFile> primaryFile() {
 			return files.stream().filter(VersionFile::primary).findFirst().or(() -> files.stream().findFirst());

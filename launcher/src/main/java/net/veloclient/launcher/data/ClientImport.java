@@ -710,6 +710,19 @@ public final class ClientImport {
 			if (modId != null && present.contains(modId)) {
 				continue;
 			}
+			// Already built for this Minecraft version: take exactly this jar. Swapping it for Modrinth's newest broke
+			// working setups - Sodium 0.8.12 became 0.8.15-beta and Voxy (which needs exactly <= 0.8.12) crashed the game.
+			if (modId != null && madeFor(jar, mcVersion, lookup)) {
+				String hash = lookup.sha1().get(jar);
+				ModrinthClient.ProjectVersion owner = hash == null ? null : lookup.owner().get(hash);
+				if (owner != null) {
+					projects.add(owner.projectId());
+				}
+				Files.copy(jar, to.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+				present.add(modId);
+				imported++;
+				continue;
+			}
 			try {
 				Path fetched = fetchForVersion(jar, modId, mcVersion, projects, lookup);
 				if (fetched == FOUND_ALREADY) {
@@ -891,6 +904,20 @@ public final class ClientImport {
 	}
 
 	/** A jar's declared Minecraft range, checked loosely: "*", the exact version, or a prefix like "~26.2" / ">=26.2". */
+	/**
+	 * Whether the jar is known to be built for {@code mcVersion}: Modrinth lists that version for this exact file, or
+	 * its fabric.mod.json names it (a jar without any Minecraft requirement doesn't count - that's no proof).
+	 */
+	private static boolean madeFor(Path jar, String mcVersion, Lookup lookup) {
+		String hash = lookup.sha1().get(jar);
+		ModrinthClient.ProjectVersion owner = hash == null ? null : lookup.owner().get(hash);
+		if (owner != null && owner.gameVersions() != null) {
+			return owner.gameVersions().contains(mcVersion);
+		}
+		JsonObject json = fabricJson(jar);
+		return json != null && json.has("depends") && json.getAsJsonObject("depends").has("minecraft") && runsOn(jar, mcVersion);
+	}
+
 	private static boolean runsOn(Path jar, String mcVersion) {
 		JsonObject json = fabricJson(jar);
 		if (json == null || !json.has("depends") || !json.getAsJsonObject("depends").has("minecraft")) {

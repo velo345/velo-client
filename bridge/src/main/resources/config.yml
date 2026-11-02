@@ -1,0 +1,71 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Velo Bridge - https://dev.velo-client.com
+#  Everything here only reaches players using Velo Client. Other players are
+#  never affected, and nothing here can kick or ban anyone.
+# ─────────────────────────────────────────────────────────────────────────────
+
+server:
+  # Shown on everything the server sends ("From <name>"), so players always know
+  # a message came from your server and not from Velo Client itself.
+  name: "My Server"
+  # Accent color for your toasts, countdowns and progress bars (hex).
+  color: "#5aa9ff"
+
+# Mod hints. Velo checks the player's mods ON THEIR PC and only shows a warning -
+# nothing is enforced and the player can hide it for your server.
+mod-rules:
+  # Ready-made lists: cheat-clients (Wurst, Meteor, Glazed, LiquidBounce, ...),
+  # often-banned (X-Ray, Freecam, Baritone, auto clickers, ...), radar (minimap entity radar).
+  forbid-presets: [cheat-clients]
+  # Your own. match: id (fabric mod id) | modrinth (project slug or id) | name (part of the mod name / file)
+  forbid:
+    # - { match: id, value: "freecam", label: "Freecam" }
+  recommend:
+    # - { match: modrinth, value: "simple-voice-chat", label: "Simple Voice Chat" }
+  message: "Using these can get you banned here."
+
+# Velo Client modules switched OFF while playing here. Unlike mod hints this IS
+# enforced (you decided it, there are no false positives). Players see which
+# modules your server turned off. Module ids: https://dev.velo-client.com/modules
+disabled-modules:
+  # - freelook
+  # - minimap-radar
+
+# Server-driven Discord / friends status. Placeholders: %server% %online% %max% %world%
+presence:
+  enabled: true
+  details: "Playing on %server%"
+  state: "%online%/%max% online"
+
+# Download your resource pack(s) in the background before players join, so the
+# pack prompt finishes instantly. id must be the UUID you use for setResourcePack.
+precache-packs:
+  # - { id: "7a5d6c1e-0000-0000-0000-000000000001", url: "https://example.com/pack.zip", sha1: "0123456789abcdef0123456789abcdef01234567" }
+
+# Servers players may be transferred to (/velobridge transfer, API). Velo also
+# warms up the connection to these so the switch is faster.
+transfer-targets:
+  # lobby: "lobby.example.com:25565"
+  # survival: "survival.example.com"
+
+# World Notes (Velo's floating notes) on your server.
+notes:
+  enabled: true
+  max-per-player: 20
+  # Pictures on notes and picture-only notes. false: they aren't shown or placed here.
+  images: true
+  # Whiteboard notes and drawings on notes. false: they aren't shown or placed here.
+  whiteboards: true
+  # Areas where nobody can place notes.
+  blocked-areas:
+    # - { name: "Spawn", world: "world", x1: -100, z1: -100, x2: 100, z2: 100 }
+
+# Tell new Velo players about Velo-only features of your server (once per player).
+welcome-toast:
+  enabled: false
+  title: "Welcome!"
+  text: "This server supports Velo Client features."
+
+# Anonymous numbers for the Velo team (Velo players online, Velo versions).
+# Lets us list your server as a Velo partner. No player names or UUIDs.
+stats: true

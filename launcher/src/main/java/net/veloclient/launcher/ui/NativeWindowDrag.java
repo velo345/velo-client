@@ -122,6 +122,12 @@ final class NativeWindowDrag {
 		if (!System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("linux") || Boolean.getBoolean("velo.noNativeDrag")) {
 			return false;
 		}
+		// Only where it's needed (KDE: JavaFX's own drag breaks under its Wayland/XWayland) - a native call can't be caught
+		// if it goes wrong, so other desktops keep JavaFX's own window moving.
+		String desktop = String.valueOf(System.getenv("XDG_CURRENT_DESKTOP")).toUpperCase(java.util.Locale.ROOT);
+		if (!desktop.contains("KDE") && !Boolean.getBoolean("velo.nativeDrag")) {
+			return false;
+		}
 		try {
 			Linker linker = Linker.nativeLinker();
 			SymbolLookup gdk = SymbolLookup.libraryLookup("libgdk-3.so.0", Arena.global());

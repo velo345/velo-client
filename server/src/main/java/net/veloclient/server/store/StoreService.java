@@ -197,7 +197,8 @@ public final class StoreService {
 			items.add(new CatalogItem(item.id(), item.name(), deal != null ? deal : item.price(), deal != null ? item.price() : null));
 		}
 		return new CatalogView(config.currency, config.coinPacks, items, checkoutEnabled(), adsEnabled(),
-				new DailyView(deals.items(), LocalDate.now(ZoneOffset.UTC).plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()),
+				// a pick taken off sale since this morning (made a Discord reward, hidden...) drops out right away
+				new DailyView(deals.items().stream().filter(id -> items.stream().anyMatch(i -> i.id().equals(id))).toList(), LocalDate.now(ZoneOffset.UTC).plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()),
 				bundles(), new PlusOffer(config.plus.price, config.plus.monthlyCoins, config.plus.periodDays, config.plus.trialDays, config.plus.yearlyPrice), launchOffer());
 	}
 

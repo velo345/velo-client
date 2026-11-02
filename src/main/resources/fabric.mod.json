@@ -16,7 +16,8 @@
 	"environment": "client",
 	"mixins": [
 		"velo-client.client.mixins.json",
-		"velo-client.client.optional.mixins.json"${dev_mixins}
+		"velo-client.client.optional.mixins.json",
+		"velo-client.features.mixins.json"${dev_mixins}
 	],
 	"entrypoints": {
 		"main": [

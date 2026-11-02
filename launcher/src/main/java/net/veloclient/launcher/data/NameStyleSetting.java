@@ -21,7 +21,7 @@ public final class NameStyleSetting {
 	}
 
 	private static Path file() {
-		return VeloPaths.config().resolve("name-style.json");
+		return VeloPaths.accountConfig("name-style.json");
 	}
 
 	public static NameStyle style() {

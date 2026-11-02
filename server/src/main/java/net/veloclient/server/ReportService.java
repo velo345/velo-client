@@ -49,6 +49,12 @@ final class ReportService {
 		String note;
 		/** Sent automatically (opt-in crash telemetry) rather than by the player pressing Send. */
 		boolean auto;
+		/** Launcher "Report a bug": launcher, game, cosmetics, store, mods, other. */
+		String area;
+		/** Launcher: which page / profile the report came from. */
+		com.google.gson.JsonObject context;
+		/** Launcher Doctor: what it found, which fixes it tried, what the player changed afterwards. */
+		com.google.gson.JsonObject doctor;
 	}
 
 	/**
@@ -101,6 +107,9 @@ final class ReportService {
 		report.log = tail(incoming.log);
 		report.crash = clip(incoming.crash, MAX_LOG_CHARS);
 		report.auto = incoming.auto;
+		report.area = clip(incoming.area, 24);
+		report.context = small(incoming.context);
+		report.doctor = small(incoming.doctor);
 		write(report);
 		Summary summary = summary(report);
 		index.put(report.id, summary);
@@ -113,6 +122,11 @@ final class ReportService {
 			}
 		}
 		return report.id;
+	}
+
+	/** Free-form JSON from a launcher, dropped when it's unreasonably big. */
+	private static com.google.gson.JsonObject small(com.google.gson.JsonObject json) {
+		return json == null || json.toString().length() > 200_000 ? null : json;
 	}
 
 	List<Summary> list() {

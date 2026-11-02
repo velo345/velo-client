@@ -3439,3 +3439,293 @@
 	-fx-border-color: transparent;
 	-fx-padding: 0;
 }
+
+/* ---- Profile tools: version dropdown + multi-select (dev) ---- */
+.version-chip {
+	-fx-background-color: rgba(255, 255, 255, 0.05);
+	-fx-border-color: rgba(255, 255, 255, 0.08);
+	-fx-background-radius: 999;
+	-fx-border-radius: 999;
+	-fx-padding: 2 9 2 10;
+	-fx-font-family: "JetBrains Mono";
+	-fx-font-size: 11px;
+	-fx-text-fill: -velo-text-2;
+	-fx-graphic-text-gap: 5;
+	-fx-cursor: hand;
+}
+.version-chip:hover {
+	-fx-background-color: rgba(90, 169, 255, 0.14);
+	-fx-border-color: rgba(90, 169, 255, 0.35);
+	-fx-text-fill: #cfe4ff;
+}
+.version-menu-header { -fx-text-fill: -velo-text-3; -fx-font-size: 11px; -fx-padding: 2 6 2 6; }
+.version-menu-row {
+	-fx-background-radius: 9;
+	-fx-padding: 7 10 7 10;
+	-fx-cursor: hand;
+}
+.version-menu-row:hover { -fx-background-color: rgba(255, 255, 255, 0.06); }
+.version-menu-row-current { -fx-background-color: rgba(125, 211, 160, 0.08); }
+.version-menu-number { -fx-text-fill: -velo-text; -fx-font-weight: bold; -fx-font-size: 12.5px; }
+.version-tag-pill { -fx-background-radius: 999; -fx-padding: 1 7 1 7; -fx-font-size: 10px; -fx-font-weight: bold; }
+.version-tag-newest { -fx-background-color: rgba(90, 169, 255, 0.16); -fx-text-fill: #8cc4ff; }
+.version-tag-beta { -fx-background-color: rgba(247, 192, 74, 0.14); -fx-text-fill: #f7c04a; }
+
+.select-mode-on {
+	-fx-background-color: rgba(90, 169, 255, 0.18);
+	-fx-border-color: rgba(90, 169, 255, 0.45);
+}
+.mod-row-selected, .mod-row-selected:hover {
+	-fx-background-color: rgba(90, 169, 255, 0.10);
+	-fx-border-color: transparent transparent rgba(90, 169, 255, 0.25) transparent;
+}
+.select-bar {
+	-fx-background-color: rgba(22, 24, 32, 0.94);
+	-fx-background-radius: 16;
+	-fx-border-color: rgba(255, 255, 255, 0.10);
+	-fx-border-radius: 16;
+	-fx-padding: 9 10 9 16;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.55), 28, 0.2, 0, 8);
+}
+.select-bar-count { -fx-text-fill: -velo-text; -fx-font-weight: bold; -fx-font-size: 13px; -fx-min-width: 90; }
+.select-bar-link {
+	-fx-background-color: transparent;
+	-fx-text-fill: #8cc4ff;
+	-fx-padding: 4 6 4 6;
+	-fx-cursor: hand;
+}
+.select-bar-link:hover { -fx-underline: true; }
+.select-bar-button {
+	-fx-background-color: rgba(255, 255, 255, 0.06);
+	-fx-background-radius: 10;
+	-fx-border-color: rgba(255, 255, 255, 0.08);
+	-fx-border-radius: 10;
+	-fx-padding: 6 12 6 10;
+	-fx-text-fill: -velo-text;
+	-fx-graphic-text-gap: 6;
+}
+.select-bar-button:hover { -fx-background-color: rgba(255, 255, 255, 0.11); }
+.select-bar-danger { -fx-text-fill: #ff9a9a; }
+.select-bar-danger:hover { -fx-background-color: rgba(255, 90, 90, 0.16); -fx-border-color: rgba(255, 90, 90, 0.35); }
+.select-check { -fx-padding: 0 4 0 0; }
+.gapi-pill {
+	-fx-background-color: rgba(255, 255, 255, 0.05);
+	-fx-background-radius: 999;
+	-fx-border-color: rgba(255, 255, 255, 0.08);
+	-fx-border-radius: 999;
+	-fx-padding: 2;
+}
+.gapi-knob {
+	-fx-background-color: linear-gradient(to bottom, rgba(120, 180, 255, 0.35), rgba(90, 140, 255, 0.22));
+	-fx-background-radius: 999;
+	-fx-effect: dropshadow(gaussian, rgba(90, 150, 255, 0.35), 10, 0, 0, 0);
+}
+.gapi-segment { -fx-text-fill: -velo-text-3; -fx-font-size: 11.5px; -fx-font-weight: bold; -fx-padding: 4 0 4 0; -fx-cursor: hand; }
+.gapi-segment.gapi-on { -fx-text-fill: white; }
+.badge-clickable { -fx-cursor: hand; -fx-graphic-text-gap: 6; }
+.badge-clickable:hover { -fx-background-color: rgba(90, 169, 255, 0.16); -fx-text-fill: #cfe4ff; }
+.migrate-title { -fx-text-fill: -velo-text; -fx-font-size: 18px; -fx-font-weight: bold; }
+.migrate-target {
+	-fx-background-color: rgba(255, 255, 255, 0.04);
+	-fx-background-radius: 14;
+	-fx-border-color: rgba(255, 255, 255, 0.08);
+	-fx-border-radius: 14;
+	-fx-padding: 14 18 14 18;
+	-fx-min-width: 130;
+	-fx-cursor: hand;
+}
+.migrate-target:hover {
+	-fx-background-color: rgba(90, 169, 255, 0.10);
+	-fx-border-color: rgba(90, 169, 255, 0.40);
+}
+.migrate-target-version { -fx-text-fill: -velo-text; -fx-font-family: "JetBrains Mono"; -fx-font-size: 20px; -fx-font-weight: bold; }
+.migrate-target-kind { -fx-font-size: 11px; -fx-font-weight: bold; }
+.migrate-up { -fx-text-fill: #7dd3a0; }
+.migrate-down { -fx-text-fill: #f7c04a; }
+.migrate-progress .bar { -fx-background-radius: 999; -fx-background-insets: 0; }
+.migrate-progress .track { -fx-background-radius: 999; }
+.migrate-group { -fx-background-color: rgba(255, 255, 255, 0.03); -fx-background-radius: 12; -fx-padding: 10 12 10 12; }
+.migrate-missing { -fx-border-color: transparent transparent transparent rgba(247, 192, 74, 0.7); -fx-border-width: 0 0 0 3; }
+.migrate-unknown { -fx-border-color: transparent transparent transparent rgba(169, 169, 179, 0.5); -fx-border-width: 0 0 0 3; }
+.migrate-ok { -fx-border-color: transparent transparent transparent rgba(125, 211, 160, 0.7); -fx-border-width: 0 0 0 3; }
+.migrate-group-title { -fx-text-fill: -velo-text; -fx-font-weight: bold; -fx-font-size: 12.5px; -fx-graphic-text-gap: 7; }
+.migrate-row { -fx-padding: 3 2 3 2; }
+.migrate-row-name { -fx-text-fill: -velo-text-2; -fx-font-size: 12px; }
+.migrate-row-kind { -fx-text-fill: -velo-text-3; -fx-font-size: 10px; -fx-min-width: 42; }
+.migrate-row-note { -fx-text-fill: -velo-text-3; -fx-font-family: "JetBrains Mono"; -fx-font-size: 11px; }
+.migrate-options { -fx-background-color: rgba(255, 255, 255, 0.03); -fx-background-radius: 12; -fx-padding: 12; }
+.migrate-done-badge {
+	-fx-background-color: rgba(125, 211, 160, 0.14);
+	-fx-background-radius: 999;
+	-fx-min-width: 72; -fx-min-height: 72; -fx-max-width: 72; -fx-max-height: 72;
+	-fx-effect: dropshadow(gaussian, rgba(125, 211, 160, 0.45), 24, 0.1, 0, 0);
+}
+
+/* ---- Velo Doctor ---- */
+.doctor-header {
+	-fx-background-color: linear-gradient(to right, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
+	-fx-background-radius: 16;
+	-fx-border-color: rgba(255, 255, 255, 0.07);
+	-fx-border-radius: 16;
+	-fx-padding: 16 18 16 16;
+}
+.doctor-headline { -fx-text-fill: -velo-text; -fx-font-size: 17px; -fx-font-weight: bold; }
+.doctor-subline { -fx-text-fill: -velo-text-3; -fx-font-size: 12.5px; }
+.doctor-ring-count { -fx-text-fill: #ff9a9a; -fx-font-size: 18px; -fx-font-weight: bold; }
+.doctor-ring-ok { -fx-background-color: rgba(125, 211, 160, 0.10); -fx-background-radius: 999; -fx-effect: dropshadow(gaussian, rgba(125, 211, 160, 0.35), 18, 0, 0, 0); }
+.doctor-ring-bad { -fx-background-color: rgba(255, 122, 122, 0.10); -fx-background-radius: 999; -fx-effect: dropshadow(gaussian, rgba(255, 122, 122, 0.35), 18, 0, 0, 0); }
+.doctor-fix-all {
+	-fx-background-color: linear-gradient(to bottom right, #6f8cff, #9b6bff);
+	-fx-text-fill: white;
+	-fx-font-weight: bold;
+	-fx-graphic-text-gap: 7;
+	-fx-effect: dropshadow(gaussian, rgba(124, 110, 255, 0.45), 14, 0.1, 0, 3);
+}
+.doctor-fix-all:hover { -fx-background-color: linear-gradient(to bottom right, #8099ff, #a97dff); }
+.doctor-card {
+	-fx-background-color: rgba(255, 255, 255, 0.035);
+	-fx-background-radius: 14;
+	-fx-border-color: transparent transparent transparent rgba(255, 255, 255, 0.15);
+	-fx-border-width: 0 0 0 3;
+	-fx-border-radius: 14;
+	-fx-padding: 14 14 14 14;
+}
+.doctor-card:hover { -fx-background-color: rgba(255, 255, 255, 0.055); }
+.doctor-crash { -fx-border-color: transparent transparent transparent rgba(255, 122, 122, 0.85); }
+.doctor-problem { -fx-border-color: transparent transparent transparent rgba(247, 192, 74, 0.85); }
+.doctor-tip { -fx-border-color: transparent transparent transparent rgba(125, 187, 255, 0.6); }
+.doctor-report {
+	-fx-background-color: rgba(255, 179, 107, 0.08);
+	-fx-border-color: rgba(255, 179, 107, 0.35);
+	-fx-border-width: 1;
+}
+.doctor-working { -fx-opacity: 0.6; }
+.doctor-card-title { -fx-text-fill: -velo-text; -fx-font-weight: bold; -fx-font-size: 13.5px; }
+.doctor-card-detail { -fx-text-fill: -velo-text-2; -fx-font-size: 12.5px; }
+.doctor-option {
+	-fx-background-color: rgba(255, 255, 255, 0.05);
+	-fx-background-radius: 999;
+	-fx-border-color: rgba(255, 255, 255, 0.09);
+	-fx-border-radius: 999;
+	-fx-padding: 5 12 5 12;
+	-fx-text-fill: -velo-text-2;
+	-fx-font-size: 12px;
+	-fx-graphic-text-gap: 7;
+	-fx-cursor: hand;
+}
+.doctor-option:hover { -fx-background-color: rgba(255, 255, 255, 0.09); }
+.doctor-option:selected {
+	-fx-background-color: rgba(111, 140, 255, 0.18);
+	-fx-border-color: rgba(111, 140, 255, 0.55);
+	-fx-text-fill: white;
+}
+.doctor-recommended {
+	-fx-background-color: rgba(125, 211, 160, 0.16);
+	-fx-background-radius: 999;
+	-fx-text-fill: #8fe0b2;
+	-fx-font-size: 9.5px;
+	-fx-font-weight: bold;
+	-fx-padding: 1 6 1 6;
+}
+.doctor-tried { -fx-text-fill: -velo-text-3; -fx-font-size: 11.5px; -fx-strikethrough: true; }
+.doctor-fix {
+	-fx-background-color: rgba(255, 255, 255, 0.08);
+	-fx-background-radius: 10;
+	-fx-text-fill: -velo-text;
+	-fx-font-weight: bold;
+	-fx-padding: 6 16 6 16;
+}
+.doctor-fix:hover { -fx-background-color: rgba(111, 140, 255, 0.28); }
+.doctor-tick {
+	-fx-background-color: rgba(125, 211, 160, 0.16);
+	-fx-background-radius: 999;
+	-fx-min-width: 30; -fx-min-height: 30; -fx-max-width: 30; -fx-max-height: 30;
+}
+.doctor-progress .bar { -fx-background-color: linear-gradient(to right, #6f8cff, #9b6bff); -fx-background-radius: 999; -fx-background-insets: 0; }
+.doctor-progress .track { -fx-background-radius: 999; }
+.snav-count-ok { -fx-text-fill: #8fe0b2; -fx-background-color: rgba(125, 211, 160, 0.14); }
+.snav-count-bad { -fx-text-fill: #ffb0b0; -fx-background-color: rgba(255, 122, 122, 0.18); }
+
+/* Multi-select: a real square check box with a tick - every other CheckBox in the launcher is a switch. */
+.check-box.select-check { -fx-label-padding: 0; -fx-padding: 0 6 0 0; }
+.check-box.select-check .box {
+	-fx-background-color: rgba(255, 255, 255, 0.04);
+	-fx-background-radius: 6;
+	-fx-border-color: rgba(255, 255, 255, 0.28);
+	-fx-border-width: 1.5;
+	-fx-border-radius: 6;
+	-fx-padding: 4;
+}
+.check-box.select-check:hover .box { -fx-background-color: rgba(90, 169, 255, 0.10); -fx-border-color: rgba(90, 169, 255, 0.7); }
+.check-box.select-check .mark {
+	-fx-shape: "M 1 5.5 L 4.2 8.6 L 10 1.8";
+	-fx-background-color: transparent;
+	-fx-padding: 5;
+	-fx-scale-shape: true;
+}
+.check-box.select-check:selected .box {
+	-fx-background-color: #5aa9ff;
+	-fx-border-color: #5aa9ff;
+	-fx-padding: 4;
+}
+.check-box.select-check:selected .mark {
+	-fx-shape: "M 1.2 5.6 L 1.2 5.6 L 4.2 8.6 L 10.6 2.2 L 9.4 1 L 4.2 6.2 L 2.4 4.4 Z";
+	-fx-background-color: white;
+}
+
+/* ---- Offline banner ---- */
+.offline-banner {
+	-fx-background-color: linear-gradient(to right, rgba(247, 192, 74, 0.16), rgba(247, 192, 74, 0.06));
+	-fx-border-color: transparent transparent rgba(247, 192, 74, 0.25) transparent;
+	-fx-border-width: 0 0 1 0;
+	-fx-padding: 8 18 8 18;
+}
+.offline-title { -fx-text-fill: #f7c04a; -fx-font-weight: bold; -fx-font-size: 12.5px; }
+.offline-text { -fx-text-fill: -velo-text-2; -fx-font-size: 12px; }
+.offline-retry {
+	-fx-background-color: rgba(247, 192, 74, 0.18);
+	-fx-background-radius: 999;
+	-fx-text-fill: #ffd98a;
+	-fx-font-size: 11.5px;
+	-fx-font-weight: bold;
+	-fx-padding: 4 12 4 12;
+}
+.offline-retry:hover { -fx-background-color: rgba(247, 192, 74, 0.3); }
+
+/* ---- Changelog ---- */
+.changelog {
+	-fx-background-color: rgba(255, 255, 255, 0.035);
+	-fx-background-radius: 12;
+	-fx-padding: 12 14 12 14;
+}
+.changelog-heading { -fx-text-fill: -velo-text; -fx-font-weight: bold; -fx-font-size: 13px; }
+.changelog-version { -fx-text-fill: #8cc4ff; -fx-font-family: "JetBrains Mono"; -fx-font-size: 11.5px; -fx-padding: 6 0 0 0; }
+.changelog-subheading { -fx-text-fill: -velo-text; -fx-font-weight: bold; -fx-font-size: 12px; }
+.changelog-line { -fx-text-fill: -velo-text-2; -fx-font-size: 12px; }
+
+/* ---- Profile codes ---- */
+.share-code {
+	-fx-font-family: "JetBrains Mono";
+	-fx-font-size: 30px;
+	-fx-font-weight: bold;
+	-fx-text-fill: white;
+	-fx-background-color: linear-gradient(to bottom right, rgba(111, 140, 255, 0.25), rgba(155, 107, 255, 0.2));
+	-fx-background-radius: 14;
+	-fx-padding: 10 18 10 18;
+}
+.share-code-field { -fx-font-family: "JetBrains Mono"; -fx-font-size: 16px; }
+.share-preview { -fx-background-color: rgba(255, 255, 255, 0.04); -fx-background-radius: 12; -fx-padding: 12; }
+.share-preview-name { -fx-text-fill: -velo-text; -fx-font-weight: bold; -fx-font-size: 15px; }
+
+/* ---- Server mod rules ---- */
+.rules-head { -fx-text-fill: -velo-text; -fx-font-weight: bold; -fx-padding: 4 0 0 0; }
+.rules-bad { -fx-text-fill: #ffb0b0; }
+.rules-good { -fx-text-fill: #8fe0b2; }
+.server-rule-badge {
+	-fx-background-color: rgba(255, 140, 90, 0.14);
+	-fx-background-radius: 999;
+	-fx-text-fill: #ffb08a;
+	-fx-font-size: 10.5px;
+	-fx-font-weight: bold;
+	-fx-padding: 1 8 1 8;
+}

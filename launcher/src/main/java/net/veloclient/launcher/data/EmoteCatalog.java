@@ -192,7 +192,7 @@ public final class EmoteCatalog {
 	// ---- The wheel (config/cosmetics-emotes.json, shared with the game) ----
 
 	private static Path file() {
-		return VeloPaths.config().resolve("cosmetics-emotes.json");
+		return VeloPaths.accountConfig("cosmetics-emotes.json");
 	}
 
 	private static JsonObject read() {

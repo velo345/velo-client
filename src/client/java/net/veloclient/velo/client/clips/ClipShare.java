@@ -17,14 +17,15 @@ import java.time.Duration;
 import java.util.function.Consumer;
 
 /**
- * Clips Pro share links: squeezes a clip down hard on your PC first ({@link ProClipRecorder#compressForSharing}: AV1 +
- * Opus, at most 1080p60 and the last 2 minutes - a tiny fraction of the recording), uploads it to the
- * Velo server and hands back {@code https://velo-client.com/c/<id>}, which plays in any browser and embeds in Discord.
+ * Clip share links, for everyone: squeezes a clip down hard on your PC first ({@link ProClipRecorder#compressForSharing}:
+ * AV1 + Opus - free players at 720p30 and at most the last minute, Velo+ at up to 1080p60 and the last 2 minutes), uploads it
+ * to the Velo server and hands back {@code https://velo-client.com/c/<id>}, which plays in any browser and embeds in Discord.
  * The link is kept in the clip's sidecar, so sharing it again just copies it.
  */
 public final class ClipShare {
 
-	private static final double SHARE_MAX_SECONDS = 120;
+	private static final double SHARE_MAX_SECONDS_PLUS = 120;
+	private static final double SHARE_MAX_SECONDS_FREE = 60;
 
 	private ClipShare() {
 	}
@@ -58,8 +59,17 @@ public final class ClipShare {
 			Path part = null;
 			boolean trimmed = from >= 0 && to > from;
 			try {
+				boolean plus = net.veloclient.velo.client.namestyle.NameStyles.plus();
+				double maxSeconds = plus ? SHARE_MAX_SECONDS_PLUS : SHARE_MAX_SECONDS_FREE;
 				if (FfmpegTool.binary() == null) {
-					throw new IOException("Clips Pro needs FFmpeg - turn on Clips Pro in the Clips settings first");
+					// Sharing needs FFmpeg for the small copy - fetch it once (Clips Pro would have).
+					say(progress, "Getting the video tools (once)...");
+					java.util.concurrent.CompletableFuture<String> ready = new java.util.concurrent.CompletableFuture<>();
+					FfmpegTool.ensure(ready::complete);
+					String problem = ready.get(10, java.util.concurrent.TimeUnit.MINUTES);
+					if (problem != null || FfmpegTool.binary() == null) {
+						throw new IOException(problem != null ? problem : "Couldn't get FFmpeg");
+					}
 				}
 				Path dir = ClipRecorder.clipsDir().resolve(".share");
 				Files.createDirectories(dir);
@@ -72,10 +82,10 @@ public final class ClipShare {
 					source = part;
 					seconds = to - from;
 				}
-				double keep = seconds > SHARE_MAX_SECONDS ? SHARE_MAX_SECONDS : 0;
-				say(progress, keep > 0 ? "Compressing the last 2 minutes..." : "Compressing...");
+				double keep = seconds > maxSeconds ? maxSeconds : 0;
+				say(progress, keep > 0 ? (plus ? "Compressing the last 2 minutes..." : "Compressing the last minute...") : "Compressing...");
 				temp = dir.resolve(clip.getFileName().toString().replaceFirst("\\.(avi|mp4)$", "") + ".share.mp4");
-				ProClipRecorder.compressForSharing(source, temp, keep);
+				ProClipRecorder.compressForSharing(source, temp, keep, plus);
 				say(progress, String.format(java.util.Locale.ROOT, "Uploading %.1f MB...", Files.size(temp) / 1024.0 / 1024.0));
 				JsonObject answer = upload(temp, meta, keep > 0 ? keep : seconds);
 				url = answer.get("url").getAsString();

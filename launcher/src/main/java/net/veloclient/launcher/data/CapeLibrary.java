@@ -43,7 +43,29 @@ public final class CapeLibrary {
 	private CapeLibrary() {
 	}
 
+	/** Store item id per bundle (null for the player's own pictures), filled while reading metadata. */
+	private static final java.util.Map<Path, String> SOURCE_ITEMS = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/**
+	 * The cloaks the signed-in account may wear. Bought Store cloaks are files in the one shared library - without
+	 * this a second account listed the first one's purchases as unlocked, and the server refused them.
+	 */
 	public static List<CapeEntry> listAll() {
+		String equipped = equippedCapeId().orElse(null);
+		return listAllBundles().stream().filter(entry -> {
+			String item = SOURCE_ITEMS.get(entry.bundleFile());
+			if (item == null || item.isEmpty()) {
+				return true;
+			}
+			if (!net.veloclient.launcher.social.StoreApi.walletLoaded()) {
+				return entry.id().equals(equipped);
+			}
+			return net.veloclient.launcher.social.StoreApi.owns(item) || net.veloclient.launcher.social.StoreApi.isOwner();
+		}).toList();
+	}
+
+	/** Every bundle on disk, whoever bought it - for restoring purchases. */
+	public static List<CapeEntry> listAllBundles() {
 		VeloPaths.ensureDirectories();
 		List<CapeEntry> capes = new ArrayList<>();
 		try (var files = Files.list(VeloPaths.capes())) {
@@ -192,7 +214,7 @@ public final class CapeLibrary {
 	}
 
 	public static Optional<String> equippedCapeId() {
-		Path file = VeloPaths.config().resolve(EQUIP_STATE_FILE);
+		Path file = VeloPaths.accountConfig(EQUIP_STATE_FILE);
 		if (!Files.exists(file)) {
 			return Optional.empty();
 		}
@@ -217,7 +239,7 @@ public final class CapeLibrary {
 
 	private static void saveEquipState(String capeId) {
 		VeloPaths.ensureDirectories();
-		Path file = VeloPaths.config().resolve(EQUIP_STATE_FILE);
+		Path file = VeloPaths.accountConfig(EQUIP_STATE_FILE);
 		try (var writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
 			GSON.toJson(new EquipState(capeId), writer);
 		} catch (IOException e) {
@@ -270,6 +292,7 @@ public final class CapeLibrary {
 			// Animated capes come from the Velo Store (it records the item id) or a Velo+ member's own GIF import.
 			return Optional.empty();
 		}
+		SOURCE_ITEMS.put(bundleFile, meta.sourceItemId == null ? "" : meta.sourceItemId);
 		return Optional.of(new CapeEntry(meta.id, meta.name, bundleFile, preset, animated));
 	}
 

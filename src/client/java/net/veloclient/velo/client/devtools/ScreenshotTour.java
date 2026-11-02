@@ -589,6 +589,22 @@ public final class ScreenshotTour {
 			case "settings" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.SettingsTabScreen(null))},
 					new Object[] {30, (Runnable) () -> shot(client, "settings")});
+			// Velo Bridge on a real server: the test server's console fires toast / progress / waypoint / countdown /
+			// tint+vignette at fixed times after the join (see the bridge test script); this only waits and shoots.
+			case "bridge" -> List.of(
+					// Clean shots: only the server's UI (profiles aren't saved during a tour, so nothing sticks).
+					new Object[] {0, (Runnable) () -> {
+						ModuleRegistry.byCategory(net.veloclient.velo.module.ModuleCategory.HUD).forEach(m -> m.setEnabled(false));
+						for (String id : List.of("minimap", "keystrokes", "entity-count-overlay", "coordinates", "fps-counter", "gpu-utilization")) {
+							ModuleRegistry.get(id).ifPresent(m -> m.setEnabled(false));
+						}
+					}},
+					new Object[] {70, (Runnable) () -> shot(client, "bridge-1-modhints")},
+					new Object[] {2, (Runnable) () -> client.setScreen(null)},
+					new Object[] {50, (Runnable) () -> shot(client, "bridge-2-toast-progress-waypoint")},
+					new Object[] {80, (Runnable) () -> shot(client, "bridge-3-countdown")},
+					new Object[] {30, (Runnable) () -> shot(client, "bridge-3b-countdown")},
+					new Object[] {80, (Runnable) () -> shot(client, "bridge-4-tint-vignette")});
 			case "bossbar" -> List.of(
 					new Object[] {0, (Runnable) () -> {
 						ModuleRegistry.get("boss-bar").ifPresent(m -> m.setEnabled(true));
@@ -710,6 +726,9 @@ public final class ScreenshotTour {
 						}
 					}},
 					new Object[] {40, (Runnable) () -> VeloClient.LOGGER.info("Velo tour advback: after Back = {}", screenName(client))});
+			case "skin" -> List.<Object[]>of(
+					new Object[] {0, (Runnable) net.veloclient.velo.client.gui.VeloSkinsScreen::wearEquippedForTour});
+			case "hero" -> hero(client);
 			case "vibe-hud" -> vibeHud(client);
 			case "vibe-orbit" -> vibeOrbit(client);
 			case "vibe-names" -> vibeNames(client);
@@ -720,6 +739,11 @@ public final class ScreenshotTour {
 			case "rs-layout" -> rsLayout(client);
 			case "shadercine" -> shaderCinematics(client);
 			default -> {
+				// "theme:Velo_Dark" switches the menu theme for the scenes after it (saves theme.json - use -Duser.home=<temp>).
+				if (name.startsWith("theme:")) {
+					var preset = net.veloclient.velo.client.theme.ThemePresets.all().get(name.substring(6).replace('_', ' '));
+					yield preset == null ? List.of() : List.<Object[]>of(new Object[] {0, (Runnable) () -> net.veloclient.velo.client.theme.ThemeManager.setActive(preset)});
+				}
 				// Dev-build features bring their own scenes ("dev:notes" -> net.veloclient.velo.dev.DevTour).
 				if (name.startsWith("dev:")) {
 					try {
@@ -807,6 +831,68 @@ public final class ScreenshotTour {
 			client.gui.hud.toggle();
 		}
 		*///?}
+	}
+
+	/**
+	 * Website hero shots: golden hour, no HUD, the orbit camera around your player from a few angles - first in the equipped
+	 * look, then in -Dvelo.tourHeroCape (cloak name) / -Dvelo.tourHeroWings / -Dvelo.tourHeroAura if given.
+	 */
+	private static List<Object[]> hero(MinecraftClient client) {
+		List<Object[]> steps = new ArrayList<>();
+		float[] yaws = {150f, 200f, 120f, 30f};
+		double[] dist = {3.4, 4.2, 5.2, 3.8};
+		steps.add(new Object[] {0, (Runnable) () -> {
+			net.veloclient.velo.client.cosmetics.CosmeticsCatalog.refresh(true);
+			net.veloclient.velo.client.cosmetics.CapeManager.loadLibrary();
+			serverCommands(client, VIBE_WORLD);
+			serverCommands(client, "effect clear @s", "clear @s");
+			String[] spot = System.getProperty("velo.tourSpot", "").split(",");
+			if (spot.length == 3) {
+				serverCommands(client, "spreadplayers " + spot[0] + " " + spot[1] + " 0 1 false @s", "rotate @s " + spot[2] + " 8");
+			}
+			ModuleRegistry.get("free-look").ifPresent(m -> m.setEnabled(true));
+			setHudHidden(client, true);
+			//? if >=26.2 {
+			/*client.options.fov().set(50);
+			client.player.setXRot(10f);
+			*///?}
+		}});
+		java.util.function.Consumer<String> angles = prefix -> {
+			for (int i = 0; i < yaws.length; i++) {
+				int k = i;
+				steps.add(new Object[] {k == 0 ? 60 : 4, (Runnable) () ->
+						net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(true, yaws[k], dist[k])});
+				steps.add(new Object[] {30, (Runnable) () -> shot(client, prefix + "-" + k)});
+			}
+		};
+		angles.accept("hero-equipped");
+		String cape = System.getProperty("velo.tourHeroCape");
+		String wings = System.getProperty("velo.tourHeroWings");
+		String aura = System.getProperty("velo.tourHeroAura");
+		if (cape != null || wings != null || aura != null) {
+			steps.add(new Object[] {2, (Runnable) () -> {
+				if (cape != null) {
+					net.veloclient.velo.client.cosmetics.CapeManager.library().values().stream()
+							.filter(d -> d.name().equalsIgnoreCase(cape)).findFirst()
+							.ifPresent(net.veloclient.velo.client.cosmetics.CapeManager::setPreviewOverride);
+				}
+				if (wings != null) {
+					net.veloclient.velo.client.cosmetics.wings.WingsManager.setPreview(wings);
+				}
+				if (aura != null) {
+					net.veloclient.velo.client.cosmetics.aura.AuraManager.setPreview(aura);
+				}
+			}});
+			angles.accept("hero-styled");
+		}
+		steps.add(new Object[] {2, (Runnable) () -> {
+			net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(false, 0f);
+			net.veloclient.velo.client.cosmetics.aura.AuraManager.clearPreview();
+			net.veloclient.velo.client.cosmetics.wings.WingsManager.clearPreview();
+			net.veloclient.velo.client.cosmetics.CapeManager.clearPreviewOverride();
+			setHudHidden(client, false);
+		}});
+		return steps;
 	}
 
 	/** Drags Keystrokes across the screen in the HUD editor, lets go, then resizes it. */

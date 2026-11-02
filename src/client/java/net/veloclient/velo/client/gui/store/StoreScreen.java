@@ -41,6 +41,24 @@ public final class StoreScreen extends VeloWindow {
 	private enum Page { FEATURED, WINGS, CAPES, AURAS, EMOTES, KILLFX, WEAR, BUNDLES, PLUS }
 
 	private static final String[] TABS = {"Featured", "Wings", "Cloaks", "Auras", "Emotes", "Kill FX", "Bodywear", "Bundles", "Velo+"};
+
+	/** Cards for a Store tab added from outside the core (dev build: Pets), at the size the grid gives them. */
+	@FunctionalInterface
+	public interface CardFactory {
+		java.util.List<net.minecraft.client.gui.widget.ClickableWidget> cards(net.minecraft.client.gui.screen.Screen store, int tileWidth, int tileHeight);
+	}
+
+	private record ExtraPage(String label, String badge, CardFactory cards) {
+	}
+
+	private static final java.util.List<ExtraPage> EXTRA_PAGES = new java.util.ArrayList<>();
+	/** The open added tab (index into EXTRA_PAGES), or -1 for one of the Store's own. */
+	private static int extraPage = -1;
+
+	/** Adds a tab after the Store's own (its cards come from {@code cards}); {@code badge} like "NEW", or null. */
+	public static void registerPage(String label, String badge, CardFactory cards) {
+		EXTRA_PAGES.add(new ExtraPage(label, badge, cards));
+	}
 	private static final int GAP = 10;
 	private static final long HERO_SECONDS = 4;
 	private static final int THUMB = 34;
@@ -49,16 +67,19 @@ public final class StoreScreen extends VeloWindow {
 
 	/** Opens on the Velo+ page next time (the screenshot tour). */
 	public static void showPlus() {
+		extraPage = -1;
 		page = Page.PLUS;
 	}
 
 	/** Opens on the Capes page next time (the screenshot tour). */
 	public static void showCapes() {
+		extraPage = -1;
 		page = Page.CAPES;
 	}
 
 	/** Opens on the Bundles page next time (the screenshot tour). */
 	public static void showBundles() {
+		extraPage = -1;
 		page = Page.BUNDLES;
 	}
 
@@ -78,16 +99,19 @@ public final class StoreScreen extends VeloWindow {
 
 	/** Opens on the Emotes page next time. */
 	public static void showEmotes() {
+		extraPage = -1;
 		page = Page.EMOTES;
 	}
 
 	/** Opens on the Kill FX page next time. */
 	public static void showKillFx() {
+		extraPage = -1;
 		page = Page.KILLFX;
 	}
 
 	/** Opens on the Auras page next time (the screenshot tour). */
 	public static void showAuras() {
+		extraPage = -1;
 		page = Page.AURAS;
 	}
 
@@ -151,23 +175,52 @@ public final class StoreScreen extends VeloWindow {
 
 	@Override
 	protected String[] headerTabs() {
-		return TABS;
+		if (EXTRA_PAGES.isEmpty()) {
+			return TABS;
+		}
+		String[] tabs = java.util.Arrays.copyOf(TABS, TABS.length + EXTRA_PAGES.size());
+		for (int i = 0; i < EXTRA_PAGES.size(); i++) {
+			tabs[TABS.length + i] = EXTRA_PAGES.get(i).label();
+		}
+		return tabs;
 	}
 
 	@Override
 	protected int headerTab() {
-		return page.ordinal();
+		return extraPage >= 0 && extraPage < EXTRA_PAGES.size() ? TABS.length + extraPage : page.ordinal();
 	}
 
 	@Override
 	protected void selectHeaderTab(int index) {
-		page = Page.values()[index];
+		if (index >= TABS.length) {
+			extraPage = index - TABS.length;
+		} else {
+			extraPage = -1;
+			page = Page.values()[index];
+		}
 		layoutContent();
 	}
 
 	@Override
 	protected String headerTabBadge(int index) {
+		if (index >= TABS.length) {
+			return EXTRA_PAGES.get(index - TABS.length).badge();
+		}
 		return index == Page.WEAR.ordinal() ? "NEW" : null;
+	}
+
+	/** The Store's own tab on show, or null while an added one is open. */
+	private static Page shownPage() {
+		return extraPage >= 0 ? null : page;
+	}
+
+	/** Opens the Store on an added tab by its label (e.g. "Pets"). */
+	public static void showPage(String label) {
+		for (int i = 0; i < EXTRA_PAGES.size(); i++) {
+			if (EXTRA_PAGES.get(i).label().equals(label)) {
+				extraPage = i;
+			}
+		}
 	}
 
 	@Override
@@ -237,6 +290,16 @@ public final class StoreScreen extends VeloWindow {
 		int cx = contentX();
 		int y = contentY();
 		int cw = contentWidth();
+		if (extraPage >= 0 && extraPage < EXTRA_PAGES.size()) {
+			CardFactory factory = EXTRA_PAGES.get(extraPage).cards();
+			layoutGrid(cx, y, cw, () -> {
+				for (var card : factory.cards(this, tileWidth, tileHeight)) {
+					addSelectableChild(card);
+					region.addRow(card);
+				}
+			}, 150);
+			return;
+		}
 		switch (page) {
 			case FEATURED -> layoutFeatured(cx, y, cw);
 			case WINGS -> layoutGrid(cx, y, cw, () -> {
@@ -772,7 +835,7 @@ public final class StoreScreen extends VeloWindow {
 		int cx = contentX();
 		int cw = contentWidth();
 		int y = contentY();
-		switch (page) {
+		switch (shownPage() == null ? Page.WINGS : page) {
 			case FEATURED -> renderHeroBackground(context, cx, y, cw);
 			case BUNDLES -> {
 				if (StoreItems.bundles().isEmpty()) {
@@ -788,10 +851,10 @@ public final class StoreScreen extends VeloWindow {
 
 	@Override
 	protected void renderOverlayLayer(DrawContext context, int mouseX, int mouseY, float delta) {
-		if (page == Page.FEATURED) {
+		if (shownPage() == Page.FEATURED) {
 			renderHero(context, contentX(), contentY(), contentWidth(), mouseX, mouseY);
 		}
-		if (region != null && (page == Page.FEATURED || page == Page.BUNDLES)) {
+		if (region != null && (shownPage() == Page.FEATURED || shownPage() == Page.BUNDLES)) {
 			region.renderRows(context, mouseX, mouseY, delta);
 			region.renderScissorStart(context);
 			int top = region.pageTop();
@@ -940,7 +1003,7 @@ public final class StoreScreen extends VeloWindow {
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
 		if (region != null && region.scroll(mouseX, mouseY, verticalAmount)) {
-			if (page == Page.FEATURED || page == Page.BUNDLES) {
+			if (shownPage() == Page.FEATURED || shownPage() == Page.BUNDLES) {
 				region.layoutPositioned(pageSpots, pageHeight);
 			} else {
 				region.layoutGrid(columns, tileWidth, tileHeight, GAP);
@@ -952,7 +1015,7 @@ public final class StoreScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
-		if (page == Page.FEATURED) {
+		if (shownPage() == Page.FEATURED) {
 			List<WingsManager.WingType> all = featuredWings();
 			int cx = contentX();
 			int cw = contentWidth();

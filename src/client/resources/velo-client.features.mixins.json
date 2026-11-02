@@ -1,0 +1,25 @@
+{
+	"required": false,
+	"minVersion": "0.8",
+	"package": "net.veloclient.velo.dev.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"BetterTabListMixin",
+		"BiomeSeedAccessor",
+		"BreakProgressAccessor",
+		"ChatHeadsBackendMixin",
+		"ChatHeadsFocusedMixin",
+		"ChatHeadsSplitMixin",
+		"ChunkAnimatorShaderMixin",
+		"ItemPhysicsRendererMixin",
+		"ItemPhysicsStateMixin",
+		"PetRideMixin",
+		"PetRideCameraMixin",
+		"BridgeGlowMixin",
+		"BridgeGlowColorMixin",
+		"BridgeShakeMixin"
+	],
+	"injectors": {
+		"defaultRequire": 0
+	}
+}

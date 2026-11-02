@@ -383,14 +383,13 @@ public final class MediaScreen extends VeloWindow {
 		if (viewing.clip()) {
 			boolean member = net.veloclient.velo.client.namestyle.NameStyles.plus();
 			boolean trimmed = proPlayer != null && proPlayer.trimmed();
-			String shareLabel = !member ? "Share · Velo+" : sharing ? "Sharing..." : trimmed ? "Share part" : "Share";
+			// Everyone can share: free at 720p30 for 30 days (up to 30 links), Velo+ at up to 1080p60 for 60 days (up to 100).
+			String shareLabel = sharing ? "Sharing..." : trimmed ? "Share part" : "Share";
 			hits.add(iconPill(context, x + width - 324, y, 104, "share", shareLabel, 1, mouseX, mouseY, () -> {
-				if (member) {
-					share();
-				} else {
-					status = "Share links are part of Velo+ (shared clips stay online for "
-							+ net.veloclient.velo.client.clips.core.ClipTools.DEFAULT_RETENTION_DAYS + " days)";
+				if (!member && lastUrl == null && net.veloclient.velo.client.clips.ClipShare.sharedUrl(viewing.meta()) == null) {
+					status = "Sharing at 720p30 · online for 30 days · Velo+ shares in 1080p60 for 60 days";
 				}
+				share();
 			}));
 			if (trimmed) {
 				hits.add(iconPill(context, x + width - 444, y, 114, "scissors", savingTrim ? "Saving..." : "Save trimmed", 1, mouseX, mouseY, this::saveTrimmed));

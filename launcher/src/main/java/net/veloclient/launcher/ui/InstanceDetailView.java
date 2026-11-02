@@ -102,10 +102,21 @@ public final class InstanceDetailView {
 		title.getStyleClass().add("t-title");
 		Label mc = new Label("Minecraft " + instance.mcVersion());
 		mc.getStyleClass().addAll("badge", "badge-grey", "badge-mono");
-		Label loader = new Label("Fabric");
-		loader.getStyleClass().addAll("badge", "badge-grey", "badge-mono");
+		{
+			// Click the version to move the whole profile up or down.
+			mc.setGraphic(Icons.icon("chevrons-updown", 11, javafx.scene.paint.Color.web("#A9A9B3"), 2.2));
+			mc.setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
+			mc.getStyleClass().add("badge-clickable");
+			Tooltip.install(mc, new Tooltip("Change Minecraft version"));
+			mc.setOnMouseClicked(e -> VersionMigration.show(overlayHost, instance, onBack));
+		}
+		Label loader = LoaderPicker.chip(instance, null);
 		HBox chips = new HBox(8, mc, loader);
 		chips.setAlignment(Pos.CENTER_LEFT);
+		Node graphicsApi = GraphicsApiToggle.build(instance);
+		if (graphicsApi != null) {
+			chips.getChildren().add(graphicsApi);
+		}
 		if (header != null && header.meta() != null && !header.meta().isBlank()) {
 			Label meta = new Label(header.meta());
 			meta.getStyleClass().add("t-muted");
@@ -149,6 +160,30 @@ public final class InstanceDetailView {
 		sections.put("Datapacks", () -> DatapacksTabView.build(owner, overlayHost, instance, theme));
 		sections.put("Schematics", () -> SchematicsTabView.build(owner, overlayHost, instance, theme));
 		sections.put("Modpacks", () -> ModpacksTabView.build(owner, overlayHost, instance, theme));
+		@SuppressWarnings("unchecked")
+		java.util.function.Consumer<net.veloclient.launcher.doctor.Diagnosis>[] doctorBadge = new java.util.function.Consumer[1];
+		{
+			sections.put("Doctor", () -> DoctorPanel.section(instance, new DoctorPanel.Host() {
+				@Override
+				public void shown(net.veloclient.launcher.doctor.Diagnosis diagnosis) {
+					if (doctorBadge[0] != null) {
+						doctorBadge[0].accept(diagnosis);
+					}
+				}
+
+				@Override
+				public void fixed(boolean all) {
+					// The other sections were built before the fixes - they're rebuilt when opened next.
+					built.keySet().removeIf(k -> !k.equals("Doctor"));
+				}
+
+				@Override
+				public void report(net.veloclient.launcher.doctor.Diagnosis diagnosis) {
+					BugReportDialog.show(owner, "Doctor couldn't fix: " + (diagnosis.issues().isEmpty() ? instance.name() : diagnosis.issues().get(0).title()),
+							null, net.veloclient.launcher.doctor.Doctor.reportData(instance, diagnosis));
+				}
+			}));
+		}
 		java.util.Map<String, Long> counts = new java.util.HashMap<>();
 		counts.put("Mods", userFileCount(InstancePaths.modsDir(instance.id())));
 		counts.put("Resource packs", userFileCount(InstancePaths.resourcePacksDir(instance.id())));
@@ -188,10 +223,28 @@ public final class InstanceDetailView {
 			navButtons.put(name, button);
 			nav.getChildren().add(button);
 		}
+		if (navButtons.containsKey("Doctor")) {
+			// The badge fills in once the (cached, quick) check is done: a red count, or a green tick.
+			Button doctor = navButtons.get("Doctor");
+			doctorBadge[0] = d -> {
+				long serious = d.issues().stream().filter(i -> i.severity() != net.veloclient.launcher.doctor.Diagnosis.Severity.TIP).count();
+				Label badge = new Label(serious == 0 ? "✓" : String.valueOf(serious));
+				badge.getStyleClass().addAll("snav-count", serious == 0 ? "snav-count-ok" : "snav-count-bad");
+				doctor.setGraphic(badge);
+				doctor.setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
+			};
+			CompletableFuture.supplyAsync(() -> net.veloclient.launcher.doctor.Doctor.check(instance), Executors.newVirtualThreadPerTaskExecutor())
+					.thenAccept(d -> Platform.runLater(() -> doctorBadge[0].accept(d)));
+		}
 		Region divider = new Region();
 		divider.getStyleClass().add("hairline-h");
 		VBox.setMargin(divider, new Insets(10, 4, 10, 4));
 		nav.getChildren().add(divider);
+		{
+			Button migrate = navButton("Change version", null);
+			migrate.setOnAction(e -> VersionMigration.show(overlayHost, instance, onBack));
+			nav.getChildren().add(migrate);
+		}
 		if (header != null && header.javaSettings() != null) {
 			Button java = navButton("Java & memory", null);
 			java.setGraphic(null);
@@ -402,6 +455,8 @@ public final class InstanceDetailView {
 		filter.setPrefWidth(220);
 
 		UpdateTracker updates = new UpdateTracker();
+		// Multi-select and the per-row version dropdown.
+		PackSelection selection = new PackSelection(owner, instance, kind, folder, noun);
 		Button updateAll = new Button();
 		updateAll.getStyleClass().add("update-all-button");
 		updateAll.setVisible(false);
@@ -419,7 +474,7 @@ public final class InstanceDetailView {
 			double offsetPx = scroll.getVvalue() * Math.max(0, contentHeight - viewport);
 			updates.clear();
 			refreshInstalledList(owner, overlayHost, installedList, instance, theme, kind, folder, identifyAttempted, listRefresh[0],
-					openDetail, filter.getText(), updates, count, noun);
+					openDetail, filter.getText(), updates, count, noun, selection);
 			if (offsetPx > 0) {
 				restoreScroll(scroll, installedList, offsetPx);
 			}
@@ -496,6 +551,9 @@ public final class InstanceDetailView {
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		HBox toolbar = new HBox(8, count, filter, spacer, bulkProgress, updateAll, openFolderButton, importButton, addButton);
+		if (selection != null) {
+			toolbar.getChildren().add(4, selection.modeButton);
+		}
 		toolbar.setAlignment(Pos.CENTER_LEFT);
 		toolbar.getStyleClass().add("pack-toolbar");
 
@@ -504,8 +562,17 @@ public final class InstanceDetailView {
 			root.getChildren().add(PlusAddonsCard.build(instance, () -> listRefresh[0].run()));
 		}
 		root.getChildren().add(scroll);
+		if (selection == null) {
+			listRefresh[0].run();
+			return new InstalledView(root, listRefresh[0]);
+		}
+		selection.setRefresh(listRefresh[0]);
 		listRefresh[0].run();
-		return new InstalledView(root, listRefresh[0]);
+		StackPane layered = new StackPane(root, selection.bar());
+		StackPane.setAlignment(selection.bar(), Pos.BOTTOM_CENTER);
+		StackPane.setMargin(selection.bar(), new Insets(0, 0, 14, 0));
+		selection.installKeys(layered);
+		return new InstalledView(layered, listRefresh[0]);
 	}
 
 	/** Re-applies a pixel scroll offset once the rebuilt rows have been laid out. */
@@ -573,8 +640,11 @@ public final class InstanceDetailView {
 
 	private static void refreshInstalledList(Stage owner, StackPane overlayHost, VBox list, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
 			Path folder, Set<String> identifyAttempted, Runnable refresh, java.util.function.Consumer<String> openDetail,
-			String filterText, UpdateTracker updates, Label countLabel, String noun) {
+			String filterText, UpdateTracker updates, Label countLabel, String noun, PackSelection selection) {
 		list.getChildren().clear();
+		if (selection != null) {
+			selection.beginRows();
+		}
 		try {
 			Files.createDirectories(folder);
 		} catch (IOException ignored) {
@@ -611,14 +681,26 @@ public final class InstanceDetailView {
 				}
 			}
 			if (asset != null) {
-				rows.add(() -> list.getChildren().add(buildKnownRow(owner, overlayHost, instance, theme, kind, folder, file, disabled, asset, refresh,
-						openDetail, updates)));
+				rows.add(() -> {
+					Node row = buildKnownRow(owner, overlayHost, instance, theme, kind, folder, file, disabled, asset, refresh, openDetail, updates);
+					if (selection != null) {
+						selection.decorate((HBox) row, file, true);
+					}
+					list.getChildren().add(row);
+				});
 			} else {
 				rows.add(() -> {
-					list.getChildren().add(buildUnknownRow(instance, theme, kind, folder, file, disabled, identifyAttempted, refresh));
+					Node row = buildUnknownRow(instance, theme, kind, folder, file, disabled, identifyAttempted, refresh);
+					if (selection != null) {
+						selection.decorate((HBox) row, file, !isManagedFile(kind, enabledName(fileName)));
+					}
+					list.getChildren().add(row);
 					autoIdentify(instance, kind, file, identifyAttempted, refresh);
 				});
 			}
+		}
+		if (selection != null) {
+			rows.add(selection::endRows);
 		}
 		addRowsInBatches(list, rows);
 	}
@@ -669,6 +751,12 @@ public final class InstanceDetailView {
 		return isDisabled(fileName) ? fileName.substring(0, fileName.length() - DISABLED_SUFFIX.length()) : fileName;
 	}
 
+	/** Velo Client, Fabric API and the Addons jar are kept up to date by the launcher - never picked, toggled or deleted by hand. */
+	private static boolean isManagedFile(InstalledAssetStore.Kind kind, String fileName) {
+		return kind == InstalledAssetStore.Kind.MOD
+				&& (fileName.startsWith("velo-client-") || fileName.startsWith("fabric-api-") || fileName.startsWith("velo-addons-"));
+	}
+
 	/** A quiet trash button that shows on row hover. */
 	private static Button removeButton(Runnable action) {
 		Button remove = new Button();
@@ -717,13 +805,33 @@ public final class InstanceDetailView {
 		Label title = new Label(asset.title() + (disabled ? "  (disabled)" : ""));
 		title.setFont(Font.font("Inter", FontWeight.BOLD, 13));
 		title.setTextFill(text(theme));
-		Label meta = new Label("v" + asset.versionNumber());
-		meta.getStyleClass().add("version-tag");
-		meta.setTextFill(text(theme));
+		Node meta;
+		{
+			HBox chipRow = new HBox(VersionDropdown.chip(instance, kind, asset, version -> {
+				// Picking a version for a disabled one means you want to use it: it comes back enabled.
+				if (disabled) {
+					try {
+						Files.move(file, file.resolveSibling(enabledName(file.getFileName().toString())), StandardCopyOption.REPLACE_EXISTING);
+					} catch (IOException ignored) {
+						// Installed next to it then; the Doctor flags the duplicate.
+					}
+				}
+				installPicked(owner, instance, kind, folder, version, asset.filename(), refresh);
+			}));
+			chipRow.setAlignment(Pos.CENTER_LEFT);
+			meta = chipRow;
+		}
 		info.getChildren().addAll(title, meta);
 		Label builtin = builtinHint(null, asset.title());
 		if (builtin != null) {
 			info.getChildren().add(builtin);
+		}
+		if (kind == InstalledAssetStore.Kind.MOD) {
+			for (String rule : net.veloclient.launcher.data.ServerProfiles.badgesFor(file, asset)) {
+				Label badge = new Label(rule);
+				badge.getStyleClass().add("server-rule-badge");
+				info.getChildren().add(badge);
+			}
 		}
 		HBox.setHgrow(info, Priority.ALWAYS);
 		row.getChildren().add(info);
@@ -834,7 +942,7 @@ public final class InstanceDetailView {
 				updateBadge.setVisible(false);
 				updateBadge.setManaged(false);
 				updates.remove(asset);
-				showVersionPicker(overlayHost, theme, instance, asset.title(), List.of(newest), plan ->
+				showVersionPicker(overlayHost, theme, instance, asset.title(), List.of(newest), asset.versionId(), kind.modrinthProjectType(), plan ->
 						installWithDependencies(owner, instance, kind, folder, plan, asset.filename(), progress, refresh));
 			});
 		};
@@ -1094,6 +1202,13 @@ public final class InstanceDetailView {
 	 */
 	static void showVersionPicker(StackPane overlayHost, LauncherTheme theme, Instance instance, String projectTitle,
 			List<ModrinthClient.ProjectVersion> versions, java.util.function.Consumer<InstallPlan> onConfirm) {
+		showVersionPicker(overlayHost, theme, instance, projectTitle, versions, null, null, onConfirm);
+	}
+
+	/** {@code installedVersionId} (nullable): an update - "What's new" then lists every version since that one. */
+	static void showVersionPicker(StackPane overlayHost, LauncherTheme theme, Instance instance, String projectTitle,
+			List<ModrinthClient.ProjectVersion> versions, String installedVersionId, String projectType,
+			java.util.function.Consumer<InstallPlan> onConfirm) {
 		VBox card = new VBox(12);
 		card.getStyleClass().addAll("glass-panel", "modal-card");
 		card.setMaxWidth(420);
@@ -1124,10 +1239,23 @@ public final class InstanceDetailView {
 		});
 
 		DependencyChecklist dependencyChecklist = new DependencyChecklist();
-		combo.setOnAction(e -> dependencyChecklist.refresh(instance, combo.getValue()));
+		// Dev build first: the author's notes for what this version (or update) changes.
+		VBox changelog = new VBox();
+		Runnable showChangelog = () -> {
+			ModrinthClient.ProjectVersion picked = combo.getValue();
+			if (picked != null) {
+				changelog.getChildren().setAll(ChangelogView.between(picked.projectId(), instance.mcVersion(),
+						projectType != null ? projectType : "mod", installedVersionId, picked));
+			}
+		};
+		combo.setOnAction(e -> {
+			dependencyChecklist.refresh(instance, combo.getValue());
+			showChangelog.run();
+		});
 		dependencyChecklist.refresh(instance, combo.getValue());
+		showChangelog.run();
 
-		VBox scrollableContent = new VBox(10, combo, dependencyChecklist.node);
+		VBox scrollableContent = new VBox(10, combo, dependencyChecklist.node, changelog);
 		ScrollPane scroll = new ScrollPane(scrollableContent);
 		scroll.setFitToWidth(true);
 		scroll.getStyleClass().add("scroll-pane");
@@ -1160,6 +1288,31 @@ public final class InstanceDetailView {
 		});
 
 		overlayHost.getChildren().add(backdrop);
+	}
+
+	/**
+	 * A version picked in a row's dropdown: switches to it (up or down) and adds the required dependencies it needs
+	 * that aren't installed yet - no second dialog.
+	 */
+	private static void installPicked(Stage owner, Instance instance, InstalledAssetStore.Kind kind, Path folder, ModrinthClient.ProjectVersion version,
+			String oldFilename, Runnable refresh) {
+		Toasts.show(owner.getScene().getRoot(), "download", "#7dbbff", "Switching to " + version.versionNumber() + "...");
+		CompletableFuture.runAsync(() -> {
+			List<ModrinthClient.ProjectVersion> deps = kind == InstalledAssetStore.Kind.MOD
+					? DependencyChecklist.resolveRows(instance, version.requiredDependencies()).stream()
+							.filter(r -> !r.alreadyInstalled() && r.resolvedVersion() != null).map(DependencyChecklist.Row::resolvedVersion).toList()
+					: List.of();
+			downloadAndRecord(instance, kind, folder, version, oldFilename, fraction -> { });
+			Path modsDir = InstancePaths.modsDir(instance.id());
+			for (ModrinthClient.ProjectVersion dep : deps) {
+				downloadAndRecord(instance, InstalledAssetStore.Kind.MOD, modsDir, dep, null, fraction -> { });
+			}
+			Platform.runLater(() -> {
+				Toasts.show(owner.getScene().getRoot(), "check", "#7dd3a0", "Now on " + version.versionNumber()
+						+ (deps.isEmpty() ? "" : " (+" + deps.size() + (deps.size() == 1 ? " dependency)" : " dependencies)")));
+				refresh.run();
+			});
+		}, Executors.newVirtualThreadPerTaskExecutor());
 	}
 
 	/** @param oldFilenameToRemove nullable - forwarded to the main version's install so an update replaces the old file (see {@link #installVersion}); dependency installs never have one since they're always fresh. */
@@ -1198,7 +1351,7 @@ public final class InstanceDetailView {
 		}, Executors.newVirtualThreadPerTaskExecutor());
 	}
 
-	private static void downloadAndRecord(Instance instance, InstalledAssetStore.Kind kind, Path folder, ModrinthClient.ProjectVersion version,
+	static void downloadAndRecord(Instance instance, InstalledAssetStore.Kind kind, Path folder, ModrinthClient.ProjectVersion version,
 			String oldFilenameToRemove, java.util.function.DoubleConsumer onProgress) {
 		Optional<ModrinthClient.VersionFile> fileOpt = version.primaryFile();
 		if (fileOpt.isEmpty()) {

@@ -626,6 +626,7 @@ RENDER.notes = async (root) => {
 	let tab = "reports";
 	let status = "open";
 	let search = "";
+	let kind = "";
 	const tabs = h("div", { class: "tabs", role: "tablist" });
 	const body = h("div");
 	for (const [t, label] of [["reports", "Reports"], ["all", "All shared notes"]]) {
@@ -647,16 +648,19 @@ RENDER.notes = async (root) => {
 					fmt(r.reportsOnTarget), h("span", { class: "pill " + (r.status === "open" ? "warn" : r.status === "removed" ? "bad" : "good") }, r.exists || r.status !== "open" ? r.status : "deleted")]),
 					(i) => openNote(reports[i].target, reports[i], draw))));
 		} else {
-			const data = await velo("staff/notes?limit=300&q=" + encodeURIComponent(search));
+			const data = await velo("staff/notes?limit=300&q=" + encodeURIComponent(search) + (kind ? "&kind=" + kind : ""));
 			if (!root.isConnected) return;
 			subtitle(`${fmt(data.total)} shared notes · ${fmt(data.openReports)} open reports`);
 			const box = h("input", { type: "search", placeholder: "Search a player, title, text, server or note id", value: search, "aria-label": "Search notes" });
 			box.addEventListener("keydown", (e) => { if (e.key === "Enter") { search = box.value.trim(); draw(); } });
-			body.replaceChildren(card("Shared notes", "Newest change first", box,
+			const kinds = seg([["", "All"], ["note", "Notes"], ["image", "Pictures"], ["board", "Whiteboards"]], kind, (x) => { kind = x; draw(); });
+			body.replaceChildren(card("Shared notes", "Newest change first", h("div", { class: "row" }, kinds, box),
 				table(["Updated", "Note", "Owner", "Server", "Shared", "Has", "Reports"], data.notes.map((n) => [
-					ago(n.updated), h("div", {}, h("b", {}, n.title || "(untitled)"), n.preview ? h("div", { class: "muted small" }, n.preview) : null),
+					ago(n.updated), h("div", {}, h("b", {}, n.title || "(untitled)"), " ", NOTE_KIND[n.kind] ? h("span", { class: "pill" }, NOTE_KIND[n.kind]) : null,
+						n.preview ? h("div", { class: "muted small" }, n.preview) : null),
 					h("div", { class: "player" }, playerHead(n.owner, n.ownerName), n.ownerName), h("span", { class: "muted small" }, n.server.replace(/^mp:/, "")),
-					n.share === "friends" ? "All friends" : fmt(n.sharedWith) + " people",
+					h("div", {}, n.share === "friends" ? "All friends" : fmt(n.sharedWith) + " people",
+						n.edit && n.edit !== "owner" ? h("div", { class: "muted small" }, n.edit === "everyone" ? "everyone may edit" : fmt(n.editors) + " may edit") : null),
 					[n.checks ? n.checks + " checks" : null, n.strokes ? "drawing" : null, n.image ? "picture" : null].filter(Boolean).join(" · ") || "–",
 					n.reports ? h("span", { class: "pill bad" }, n.reports) : "–"]),
 					(i) => openNote(data.notes[i].id, null, draw))));
@@ -664,6 +668,8 @@ RENDER.notes = async (root) => {
 	}
 	await draw();
 };
+
+const NOTE_KIND = { image: "Picture", board: "Whiteboard" };
 
 /** Draws a note's whiteboard strokes (256x160 board) onto a canvas. */
 function boardCanvas(strokes) {
@@ -721,6 +727,8 @@ async function openNote(id, report, reload) {
 			h("div", {}, h("span", { class: "muted small" }, "Owner"), h("div", { class: "player" }, playerHead(n.owner, n.ownerName), h("b", {}, n.ownerName))),
 			h("div", {}, h("span", { class: "muted small" }, "Where"), h("div", {}, where)),
 			h("div", {}, h("span", { class: "muted small" }, "Shared with"), h("div", {}, n.share === "friends" ? "All their friends" : (Object.values(n.names || {}).join(", ") || "nobody"))),
+			h("div", {}, h("span", { class: "muted small" }, "Kind · editing"), h("div", {}, (NOTE_KIND[n.kind] || "Note") + " · "
+				+ (n.edit === "everyone" ? "everyone it's shared with may edit" : n.edit === "picked" ? "may edit: " + ((n.editors || []).map((u) => (n.names || {})[u] || u.slice(0, 8)).join(", ") || "nobody") : "only the owner edits"))),
 			h("div", {}, h("span", { class: "muted small" }, "Last change"), h("div", {}, (n.editorName || n.ownerName) + " · " + ago(n.updated)))) : h("div", { class: "notice" }, "This note doesn't exist any more."),
 		n && n.text ? h("pre", { style: "white-space:pre-wrap;margin:0;font:inherit;background:var(--panel-2,rgba(255,255,255,.04));padding:12px;border-radius:10px" }, n.text) : null,
 		n && n.checks && n.checks.length ? h("ul", { style: "margin:0;padding-left:18px" }, n.checks.map((c) => h("li", {}, (c.done ? "☑ " : "☐ ") + c.text + (c.doneBy ? " — " + c.doneBy : "")))) : null,

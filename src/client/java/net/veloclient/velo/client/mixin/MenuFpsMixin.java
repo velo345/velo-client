@@ -8,7 +8,8 @@ import org.spongepowered.asm.mixin.injection.ModifyConstant;
 /**
  * Menus outside a world (title screen, world list, server list) run at up to 120 FPS instead of
  * vanilla's fixed 60 - smoother menu animations and panorama on high-refresh screens, still well
- * below the uncapped in-game rate. Never above the player's own Max Framerate.
+ * below the uncapped in-game rate. Never above the player's own Max Framerate, and never above the
+ * monitor's refresh rate: 120 frames on a 75 Hz screen only paced unevenly (menus felt laggy).
  */
 //? if >=26.1 {
 /*@Mixin(com.mojang.blaze3d.platform.FramerateLimitTracker.class)
@@ -19,7 +20,7 @@ public abstract class MenuFpsMixin {
 
 	@ModifyConstant(method = "getFramerateLimit", constant = @Constant(intValue = 60), require = 0)
 	private int velo$menuFps(int vanilla) {
-		return Math.min(120, framerateLimit);
+		return Math.min(net.veloclient.velo.client.util.MenuFps.cap(), framerateLimit);
 	}
 }
 *///?} else {
@@ -31,7 +32,7 @@ public abstract class MenuFpsMixin {
 
 	@ModifyConstant(method = "update", constant = @Constant(intValue = 60), require = 0)
 	private int velo$menuFps(int vanilla) {
-		return Math.min(120, maxFps);
+		return Math.min(net.veloclient.velo.client.util.MenuFps.cap(), maxFps);
 	}
 }
 //?}

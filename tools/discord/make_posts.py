@@ -75,14 +75,17 @@ def text(img, xy, s, f, fill=(255, 255, 255), shadow=True, anchor="la"):
 
 
 def pill(img, xy, s, f, bg, fg=(255, 255, 255)):
-    d = ImageDraw.Draw(img)
+    # On its own layer: drawing straight onto an RGBA image replaces alpha, so translucent pills punched holes.
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
     l, t, r, b = d.textbbox(xy, s, font=f)
     d.rounded_rectangle([l - 16, t - 9, r + 16, b + 9], radius=(b - t + 18) // 2, fill=bg)
-    d.text(xy, s, font=f, fill=fg)
+    img.alpha_composite(layer)
+    ImageDraw.Draw(img).text(xy, s, font=f, fill=fg)
 
 
 def cape_front(name, frame=0, scale=3):
-    """The front face of a cape (64x32 layout, any resolution) from its animated GIF, scaled crisply."""
+    """The front face of a cloak (64x32 layout, any resolution) from its animated GIF, scaled crisply."""
     gif = Image.open(os.path.join(CAPES, name + ".gif"))
     gif.seek(frame % getattr(gif, "n_frames", 1))
     im = gif.convert("RGBA")
@@ -92,7 +95,7 @@ def cape_front(name, frame=0, scale=3):
 
 
 def framed(face, radius=10):
-    """A cape face with a soft drop shadow and rounded corners."""
+    """A cloak face with a soft drop shadow and rounded corners."""
     pad = 40
     out = Image.new("RGBA", (face.width + pad * 2, face.height + pad * 2), (0, 0, 0, 0))
     sh = Image.new("RGBA", out.size, (0, 0, 0, 0))
@@ -135,24 +138,25 @@ def rules():
 
 
 def download():
-    img = header("download", "GET VELO CLIENT", "Free · Windows · macOS · Linux", (40, 8, 10), (14, 10, 12), (255, 80, 60), 2)
+    img = header("download", "GET VELO CLIENT", "Free · Windows · Linux", (40, 8, 10), (14, 10, 12), (255, 80, 60), 2)
     pill(img, (256, 296), "velo-client.com", font("Inter-Bold.ttf", 24), (255, 77, 77, 210))
     finish(img, "download.png")
 
 
 def free_cape():
-    img = gradient((6, 22, 36), (10, 8, 22))
-    grid(img, (80, 220, 255), 14)
-    glow(img, (900, 200), 260, (40, 220, 255), 120)
-    glow(img, (1040, 120), 160, (190, 80, 255), 90)
-    sparkles(img, 90, (150, 240, 255), 3)
+    # Velo Neon is red since the HD redesign (1.0)
+    img = gradient((38, 6, 10), (12, 8, 12))
+    grid(img, (255, 90, 90), 14)
+    glow(img, (900, 200), 260, (255, 40, 50), 120)
+    glow(img, (1040, 120), 160, (255, 120, 60), 80)
+    sparkles(img, 90, (255, 170, 170), 3)
     for i, (frame, x, y, sc) in enumerate([(12, 880, 50, 2), (0, 720, 20, 2)]):
         face = framed(cape_front("velo_neon", frame, sc))
         img.alpha_composite(face, (x, y))
-    text(img, (70, 104), "VELO NEON", font("Audiowide-Regular.ttf", 84), fill=(140, 245, 255))
-    text(img, (74, 212), "The animated cape - free for", font("Inter-SemiBold.ttf", 32))
+    text(img, (70, 104), "VELO NEON", font("Audiowide-Regular.ttf", 84), fill=(255, 120, 120))
+    text(img, (74, 212), "The animated cloak - free for", font("Inter-SemiBold.ttf", 32))
     text(img, (74, 254), "everyone who links their Discord.", font("Inter-SemiBold.ttf", 32))
-    pill(img, (78, 322), "FREE  ·  NOT SOLD ANYWHERE", font("Inter-ExtraBold.ttf", 22), (41, 224, 255, 230), (6, 22, 36))
+    pill(img, (78, 322), "FREE  ·  NOT SOLD ANYWHERE", font("Inter-ExtraBold.ttf", 22), (255, 77, 77, 235), (38, 6, 10))
     finish(img, "free-cape.png")
 
 
@@ -168,7 +172,7 @@ def boosters():
     text(img, (74, 196), "Boost the server, get rewarded:", font("Inter-SemiBold.ttf", 32))
     f = font("Inter-ExtraBold.ttf", 24)
     pill(img, (78, 268), "14 DAYS VELO+", f, (244, 127, 255, 235), (40, 8, 46))
-    pill(img, (330, 268), "BOOSTER CAPE", f, (255, 255, 255, 40))
+    pill(img, (330, 268), "BOOSTER CLOAK", f, (255, 255, 255, 40))
     pill(img, (78, 330), "BOOSTER ROLE", f, (255, 255, 255, 40))
     finish(img, "boosters.png")
 
