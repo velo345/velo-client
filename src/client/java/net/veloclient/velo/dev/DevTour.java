@@ -337,6 +337,9 @@ public final class DevTour {
 			start[1] = now[1];
 		}));
 		steps.add(step(40, () -> shot.accept("dev-notesview-front")));
+		steps.add(step(2, () -> hud(true)));
+		steps.add(step(6, () -> shot.accept("dev-notesview-clean")));
+		steps.add(step(2, () -> hud(false)));
 		steps.add(step(2, () -> turn(start[0] + 25, start[1])));
 		steps.add(step(8, () -> shot.accept("dev-notesview-right")));
 		steps.add(step(2, () -> turn(start[0] - 35, start[1])));
