@@ -464,15 +464,24 @@ public final class CloudSync {
 		if (!state().enabled() || VeloServerClient.sessionToken() == null || !member() || busy || Files.exists(pendingFile())) {
 			return;
 		}
-		try {
-			byte[] zip = zip(collect());
-			String hash = sha256(zip);
-			if (!hash.equals(state().lastHash())) {
-				upload(zip, null, true);
-				done("Backed up when the game closed", hash);
+		// At most 4 s: a slow connection used to hold the game open until Minecraft's shutdown watchdog killed it
+		// ("Client shutdown: Watchdog"). Whatever doesn't make it is backed up on the next start or by the timer.
+		Thread backup = Thread.ofPlatform().daemon(true).name("velo-cloud-sync-exit").start(() -> {
+			try {
+				byte[] zip = zip(collect());
+				String hash = sha256(zip);
+				if (!hash.equals(state().lastHash())) {
+					upload(zip, null, true);
+					done("Backed up when the game closed", hash);
+				}
+			} catch (Exception e) {
+				VeloClient.LOGGER.debug("Cloud Sync: no backup on exit", e);
 			}
-		} catch (Exception e) {
-			VeloClient.LOGGER.debug("Cloud Sync: no backup on exit", e);
+		});
+		try {
+			backup.join(4000);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		}
 	}
 

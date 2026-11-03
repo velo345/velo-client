@@ -35,7 +35,21 @@ public final class VeloProfileManager {
 		return VeloPaths.savedProfiles().resolve(sanitize(name) + ".json");
 	}
 
+	/**
+	 * Which saved profile this game uses. A launcher profile made since 1.1.1 has its own marker in its folder
+	 * ({@code velo/active-profile.json}, written by the Velo launcher), so a new profile starts with Velo's defaults
+	 * instead of taking over another profile's modules (recoloured hearts, 1.8 animations...). Older profiles have
+	 * none and keep sharing the global one, as before.
+	 */
 	private static Path activeMarkerFile() {
+		try {
+			Path local = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("velo").resolve("active-profile.json");
+			if (Files.exists(local)) {
+				return local;
+			}
+		} catch (RuntimeException | LinkageError ignored) {
+			// no loader (tools, tests): the global marker
+		}
 		return VeloPaths.config().resolve("active-profile.json");
 	}
 

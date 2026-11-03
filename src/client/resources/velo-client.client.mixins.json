@@ -6,6 +6,8 @@
 	"client": [
 		"ActionBarOverlayMixin",
 		"AtmosphericFogMixin",
+		"OwnPingMixin",
+		"TabListCacheMixin",
 		"BlockOutlineCancelMixin",
 		"CameraFreeLookMixin",
 		"ChatHudMixin",

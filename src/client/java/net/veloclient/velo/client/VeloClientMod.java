@@ -88,12 +88,17 @@ public final class VeloClientMod implements ClientModInitializer {
 				client -> net.veloclient.velo.client.cosmetics.LockerFileSync.tick());
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(
 				client -> net.veloclient.velo.client.cloud.CloudSync.onStop());
+		// The launcher's Stop / Relaunch asks the game to close instead of killing it (saves the world).
+		net.veloclient.velo.client.util.CloseRequest.register();
+		// Your real ping (tab list row, Ping HUD) - servers often send fake per-player pings.
+		net.veloclient.velo.client.util.OwnPing.register();
 		// Before any profile loads: saved keybinds convert between GLFW (<26.3) and SDL (26.3+) codes.
 		net.veloclient.velo.profile.ModuleStateStore.currentKeyFormat = net.veloclient.velo.client.util.Keys.format();
 		net.veloclient.velo.profile.ModuleStateStore.keyConverter = net.veloclient.velo.client.util.Keys::convert;
 		registerModules();
 		loadAddons();
 		HudManager.register();
+		net.veloclient.velo.client.sound.VeloUiSounds.register();
 		VeloKeybinds.register();
 		net.veloclient.velo.client.keybind.MenuKeySync.register();
 		net.veloclient.velo.client.util.MemoryStatsRecorder.start();
@@ -176,6 +181,16 @@ public final class VeloClientMod implements ClientModInitializer {
 			// not packed (a stripped-down build)
 		} catch (Throwable t) {
 			VeloClient.LOGGER.error("Velo Client feature modules failed to initialize", t);
+		}
+		// Dev builds only (src/dev): features that aren't released yet.
+		try {
+			Class.forName("net.veloclient.velo.preview.VeloPreview").asSubclass(net.veloclient.velo.client.addon.VeloAddon.class)
+					.getDeclaredConstructor().newInstance().onVeloInitialize();
+			VeloClient.LOGGER.info("Loaded the dev build's preview features");
+		} catch (ClassNotFoundException missing) {
+			// a release build
+		} catch (Throwable t) {
+			VeloClient.LOGGER.error("Preview features failed to initialize", t);
 		}
 		for (var container : net.fabricmc.loader.api.FabricLoader.getInstance()
 				.getEntrypointContainers(net.veloclient.velo.client.addon.VeloAddon.ENTRYPOINT, net.veloclient.velo.client.addon.VeloAddon.class)) {

@@ -114,7 +114,16 @@ public final class BugReportDialog {
 				sys.addProperty("OS", System.getProperty("os.name") + " " + System.getProperty("os.version") + " (" + System.getProperty("os.arch") + ")");
 				sys.addProperty("Java (launcher)", System.getProperty("java.version"));
 				report.add("system", sys);
-				report.addProperty("log", tail(VeloPaths.logs().resolve("launcher.log"), 600));
+				StringBuilder log = new StringBuilder(orEmpty(tail(VeloPaths.logs().resolve("launcher.log"), 600, 90_000)));
+				// The run before this one too: people often report after restarting the launcher.
+				String previousRun = tail(VeloPaths.logs().resolve("launcher.log.1"), 300, 45_000);
+				if (previousRun != null && !previousRun.isBlank()) {
+					log.append("\n\n==== Previous launcher run (launcher.log.1) ====\n").append(previousRun);
+				}
+				// "The game doesn't start" reports used to carry only the launcher log: add the game side of the profile
+				// that ran last - its log, its newest crash report and its mods.
+				lastGame(report, sys, log);
+				report.addProperty("log", log.toString());
 			}
 			if (context != null) {
 				report.add("context", context);
@@ -148,15 +157,109 @@ public final class BugReportDialog {
 		return line.length() > 80 ? line.substring(0, 80) + "..." : line;
 	}
 
-	private static String tail(Path file, int lines) {
+	private static void lastGame(JsonObject report, JsonObject sys, StringBuilder log) {
+		try {
+			net.veloclient.launcher.instance.Instance newest = null;
+			long newestAt = 0;
+			for (var instance : net.veloclient.launcher.instance.InstanceStore.loadAll()) {
+				Path latest = net.veloclient.launcher.instance.InstancePaths.gameDir(instance.id()).resolve("logs").resolve("latest.log");
+				if (java.nio.file.Files.exists(latest)) {
+					long at = java.nio.file.Files.getLastModifiedTime(latest).toMillis();
+					if (at > newestAt) {
+						newestAt = at;
+						newest = instance;
+					}
+				}
+			}
+			if (newest == null) {
+				return;
+			}
+			Path dir = net.veloclient.launcher.instance.InstancePaths.gameDir(newest.id());
+			sys.addProperty("Profile", newest.name());
+			sys.addProperty("Minecraft", newest.mcVersion());
+			log.append("\n\n==== Game log of \"").append(newest.name()).append("\" (latest.log) ====\n");
+			log.append(orEmpty(tail(dir.resolve("logs").resolve("latest.log"), 1500, 220_000)));
+			// The start before (Minecraft keeps it as logs/<date>-<n>.log.gz): the broken start is often not the last one.
+			Path previous = newest(dir.resolve("logs"), ".log.gz", 1, 7).stream().findFirst().orElse(null);
+			if (previous != null) {
+				log.append("\n\n==== Previous game log (").append(previous.getFileName()).append(") ====\n");
+				log.append(orEmpty(tail(previous, 600, 90_000)));
+			}
+			// The two newest crash reports of the last week, from the top - that's where the exception is (the end is
+			// only the mod list). Vanilla never writes them into latest.log.
+			for (Path crash : newest(dir.resolve("crash-reports"), ".txt", 2, 7)) {
+				log.append("\n\n==== Crash report (").append(crash.getFileName()).append(") ====\n");
+				log.append(orEmpty(head(crash, 300, 60_000)));
+			}
+			Path mods = dir.resolve("mods");
+			if (java.nio.file.Files.isDirectory(mods)) {
+				com.google.gson.JsonArray list = new com.google.gson.JsonArray();
+				try (var files = java.nio.file.Files.list(mods)) {
+					files.map(f -> f.getFileName().toString()).filter(n -> n.endsWith(".jar") || n.endsWith(".disabled")).sorted().forEach(list::add);
+				}
+				report.add("mods", list);
+			}
+		} catch (Exception e) {
+			log.append("\n(couldn't attach the game log: ").append(e).append(")");
+		}
+	}
+
+	/** The newest {@code count} files ending in {@code suffix} changed within {@code days}, newest first. */
+	static List<Path> newest(Path dir, String suffix, int count, int days) {
+		if (!Files.isDirectory(dir)) {
+			return List.of();
+		}
+		long since = System.currentTimeMillis() - days * 24L * 3600_000L;
+		try (var files = Files.list(dir)) {
+			return files.filter(f -> f.getFileName().toString().endsWith(suffix) && f.toFile().lastModified() >= since)
+					.sorted(java.util.Comparator.comparingLong((Path f) -> f.toFile().lastModified()).reversed())
+					.limit(count).toList();
+		} catch (Exception e) {
+			return List.of();
+		}
+	}
+
+	/**
+	 * All lines of a log, .gz or not, never failing on its encoding: Windows writes logs in the system code page
+	 * (Cp1252 on French/German PCs), where strict UTF-8 reading threw and the log went missing from the report.
+	 */
+	private static List<String> lines(Path file) throws java.io.IOException {
+		byte[] bytes = Files.readAllBytes(file);
+		if (file.getFileName().toString().endsWith(".gz")) {
+			try (var in = new java.util.zip.GZIPInputStream(new java.io.ByteArrayInputStream(bytes))) {
+				bytes = in.readAllBytes();
+			}
+		}
+		var decoder = StandardCharsets.UTF_8.newDecoder()
+				.onMalformedInput(java.nio.charset.CodingErrorAction.REPLACE)
+				.onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPLACE);
+		return decoder.decode(java.nio.ByteBuffer.wrap(bytes)).toString().lines().toList();
+	}
+
+	private static String tail(Path file, int lines, int maxChars) {
 		try {
 			if (!Files.exists(file)) {
 				return null;
 			}
-			List<String> all = Files.readAllLines(file, StandardCharsets.UTF_8);
-			return String.join("\n", all.subList(Math.max(0, all.size() - lines), all.size()));
+			List<String> all = lines(file);
+			String text = String.join("\n", all.subList(Math.max(0, all.size() - lines), all.size()));
+			return text.length() > maxChars ? text.substring(text.length() - maxChars) : text;
 		} catch (Exception e) {
-			return null;
+			return "(couldn't read " + file.getFileName() + ": " + e + ")";
 		}
+	}
+
+	private static String head(Path file, int lines, int maxChars) {
+		try {
+			List<String> all = lines(file);
+			String text = String.join("\n", all.subList(0, Math.min(lines, all.size())));
+			return text.length() > maxChars ? text.substring(0, maxChars) : text;
+		} catch (Exception e) {
+			return "(couldn't read " + file.getFileName() + ": " + e + ")";
+		}
+	}
+
+	private static String orEmpty(String text) {
+		return text == null ? "" : text;
 	}
 }

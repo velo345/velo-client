@@ -35,7 +35,7 @@ public abstract class BetterTabListMixin {
 	@Inject(method = "renderLatencyIcon", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$ping(net.minecraft.client.gui.DrawContext context, int width, int x, int y, net.minecraft.client.network.PlayerListEntry entry,
 			CallbackInfo ci) {
-		if (BetterTabListModule.drawPing(context, width, x, y, entry.getLatency())) {
+		if (BetterTabListModule.drawPing(context, width, x, y, BetterTabListModule.shownLatency(entry.getProfile().id(), entry.getLatency()))) {
 			ci.cancel();
 		}
 	}
@@ -62,7 +62,7 @@ public abstract class BetterTabListMixin {
 	@Inject(method = "extractPingIcon", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$ping(net.minecraft.client.gui.GuiGraphicsExtractor graphics, int slotWidth, int xo, int yo,
 			net.minecraft.client.multiplayer.PlayerInfo info, CallbackInfo ci) {
-		if (BetterTabListModule.drawPing(graphics, slotWidth, xo, yo, info.getLatency())) {
+		if (BetterTabListModule.drawPing(graphics, slotWidth, xo, yo, BetterTabListModule.shownLatency(info.getProfile().id(), info.getLatency()))) {
 			ci.cancel();
 		}
 	}

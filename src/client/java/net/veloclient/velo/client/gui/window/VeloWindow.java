@@ -48,6 +48,8 @@ public abstract class VeloWindow extends Screen {
 	private static long lastWindowFrameNanos;
 	private boolean openDecided;
 	private boolean handedOff;
+	/** The shared rail's drawing state while this window is a page of the one-window menu. */
+	private final MenuShell.State shellState = new MenuShell.State();
 
 	protected VeloWindow(Text title, int windowWidth, int windowHeight) {
 		super(title);
@@ -93,10 +95,16 @@ public abstract class VeloWindow extends Screen {
 			this.height = (int) Math.floor(MinecraftClient.getInstance().getWindow().getScaledHeight() * factor);
 		}
 		int margin = 12;
-		windowWidth = Math.min(requestedWidth, Math.max(160, this.width - margin * 2));
-		windowHeight = Math.min(requestedHeight, Math.max(120, this.height - margin * 2));
+		boolean shell = shell();
+		windowWidth = Math.min(shell ? MenuShell.WIDTH : requestedWidth, Math.max(160, this.width - margin * 2));
+		windowHeight = Math.min(shell ? MenuShell.HEIGHT : requestedHeight, Math.max(120, this.height - margin * 2));
 		windowX = Math.max(0, (this.width - windowWidth) / 2);
 		windowY = Math.max(0, (this.height - windowHeight) / 2);
+		if (shell && MenuShell.savedX != Integer.MIN_VALUE) {
+			// every page of the menu sits where the frame was dragged to
+			windowX = Math.max(0, Math.min(MenuShell.savedX, this.width - windowWidth));
+			windowY = Math.max(0, Math.min(MenuShell.savedY, this.height - windowHeight));
+		}
 		layoutContent();
 	}
 
@@ -104,7 +112,22 @@ public abstract class VeloWindow extends Screen {
 	protected abstract void layoutContent();
 
 	protected int contentX() {
-		return windowX + PADDING;
+		return windowX + PADDING + shellInset();
+	}
+
+	/** True for the pages of the one-window Velo menu (dev build): shared frame and rail, see {@link MenuShell}. */
+	protected final boolean shell() {
+		return net.veloclient.velo.client.Preview.ON && this instanceof MenuPage;
+	}
+
+	/** Room the rail takes on the left of a menu page, plus centring for pages with a max content width. */
+	private int shellInset() {
+		if (!shell()) {
+			return 0;
+		}
+		int avail = windowWidth - PADDING * 2 - MenuShell.RAIL - MenuShell.GAP;
+		int max = ((MenuPage) this).shellMaxContentWidth();
+		return MenuShell.RAIL + MenuShell.GAP + Math.max(0, (avail - max) / 2);
 	}
 
 	protected int contentY() {
@@ -112,6 +135,10 @@ public abstract class VeloWindow extends Screen {
 	}
 
 	protected int contentWidth() {
+		if (shell()) {
+			int avail = windowWidth - PADDING * 2 - MenuShell.RAIL - MenuShell.GAP;
+			return Math.min(avail, ((MenuPage) this).shellMaxContentWidth());
+		}
 		return windowWidth - PADDING * 2;
 	}
 
@@ -131,6 +158,9 @@ public abstract class VeloWindow extends Screen {
 				handedOff = true;
 				openProgress = 1f;
 				restartPageIn();
+				net.veloclient.velo.client.sound.VeloUiSounds.tab();
+			} else if (springAnimation() || shell()) {
+				net.veloclient.velo.client.sound.VeloUiSounds.menuOpen();
 			}
 		}
 		lastWindowFrameNanos = frameNanos;
@@ -141,7 +171,7 @@ public abstract class VeloWindow extends Screen {
 			openProgress = 1f;
 			springScale = 1f;
 			springRise = 0f;
-		} else if (springAnimation()) {
+		} else if (springAnimation() || shell()) {
 			springStep();
 		} else {
 			openProgress = VeloAnim.step(openProgress, closing ? 0f : 1f, Math.max(deltaSeconds, 1 / 60f) * 4.5f);
@@ -165,8 +195,9 @@ public abstract class VeloWindow extends Screen {
 		context.fill(0, 0, this.width, this.height, (int) (0x70 * openProgress) << 24);
 
 		// Opens with a gentle scale-up + rise, closes with the reverse.
-		float scale = springAnimation() ? springScale : 0.955f + 0.045f * openProgress;
-		float rise = springAnimation() ? springRise : (1f - openProgress) * 10f;
+		boolean spring = springAnimation() || shell();
+		float scale = spring ? springScale : 0.955f + 0.045f * openProgress;
+		float rise = spring ? springRise : (1f - openProgress) * 10f;
 		context.getMatrices().pushMatrix();
 		float centerX = windowX + windowWidth / 2f;
 		float centerY = windowY + windowHeight / 2f;
@@ -208,25 +239,110 @@ public abstract class VeloWindow extends Screen {
 				VeloUi.withAlpha(0xFFFFFFFF, alpha), closeHover);
 		VeloDraw.cross(context, closeX + CLOSE_SIZE / 2f, closeY + CLOSE_SIZE / 2f, 6.5f, 1.3f, glyph);
 
+		String railId = shell() ? ((MenuPage) this).railId() : null;
+		if (railId != null) {
+			MenuShell.draw(context, shellState, windowX + PADDING, windowY + HEADER_HEIGHT + PADDING, contentBottom(), railId, mouseX, mouseY,
+					openProgress);
+		}
 		if (openProgress > 0.4f) {
-			if (showingSkeleton()) {
-				drawSkeleton(context);
-			} else {
-				renderContentLayer(context, mouseX, mouseY, delta);
-				super.render(context, mouseX, mouseY, delta);
-				renderOverlayLayer(context, mouseX, mouseY, delta);
+			// a page switched to from the rail slides in from the direction you moved; the frame and rail stay put
+			float slide = railId != null ? MenuShell.slideIn(railId) : 0f;
+			if (slide != 0f) {
+				context.getMatrices().pushMatrix();
+				context.getMatrices().translate(0f, slide);
+			}
+			// After a tab switch the new page glides in from the side it came from (down/up for the Locker's slot
+			// column, right/left for header tabs), clipped to the page so nothing spills over the frame.
+			float glide = 1f - pageIn();
+			int[] glideArea = glide > 0f && (slideX != 0 || slideY != 0) ? pageArea() : null;
+			fixedStripRight = Integer.MIN_VALUE;
+			pageOffsetX = glideArea == null ? 0f : glide * SLIDE_PX * slideX;
+			pageOffsetY = glideArea == null ? 0f : glide * SLIDE_PX * slideY;
+			if (glideArea != null) {
+				context.enableScissor(glideArea[0], glideArea[1], glideArea[0] + glideArea[2], glideArea[1] + glideArea[3]);
+				context.getMatrices().pushMatrix();
+				context.getMatrices().translate(pageOffsetX, pageOffsetY);
+			}
+			try {
+				if (showingSkeleton()) {
+					drawSkeleton(context);
+				} else {
+					renderContentLayer(context, mouseX, mouseY, delta);
+					super.render(context, mouseX, mouseY, delta);
+					renderOverlayLayer(context, mouseX, mouseY, delta);
+				}
+			} finally {
+				if (glideArea != null) {
+					context.getMatrices().popMatrix();
+					context.disableScissor();
+				}
+				pageOffsetX = 0f;
+				pageOffsetY = 0f;
+			}
+			if (slide != 0f) {
+				context.getMatrices().popMatrix();
 			}
 			// A new page fades in after a tab switch - in place: moving the content made the whole window jump, and
 			// hovering missed while it was still sliding.
 			float page = pageIn();
 			if (page < 1f) {
-				int[] area = pageArea();
+				int[] area = pageArea().clone();
+				if (fixedStripRight > area[0] && fixedStripRight < area[0] + area[2]) {
+					// the Locker's slot column didn't change - only the page beside it fades in
+					area[2] -= fixedStripRight - area[0];
+					area[0] = fixedStripRight;
+				}
 				VeloDraw.fillRounded(context, area[0], area[1], area[2], area[3], 6,
 						(glass & 0x00FFFFFF) | (Math.round(0xD8 * (1f - page) * openProgress) << 24));
+			}
+			if (railId != null) {
+				MenuShell.drawLabels(context, this.textRenderer, shellState, mouseX, mouseY);
 			}
 		}
 
 		context.getMatrices().popMatrix();
+		lastTabs = headerTabs();
+		lastTab = headerTab();
+	}
+
+	private static final float SLIDE_PX = 16f;
+	/** The tab set and tab the last drawn window showed - a new page compares itself with it to know its direction. */
+	private static String[] lastTabs;
+	private static int lastTab = -1;
+	/** When a Locker slot row was last clicked: a switch right after it slides vertically (the slots are a column). */
+	private static long slotClickNanos;
+	private int slideX;
+	private int slideY;
+	/** The current page offset while it glides in - parts that must stay put (the Locker's slot column) undo it. */
+	private static float pageOffsetX;
+	private static float pageOffsetY;
+
+	/** Right edge of a fixed column drawn this frame (the Locker's slots), or MIN_VALUE. */
+	private static int fixedStripRight = Integer.MIN_VALUE;
+
+	/** Called while drawing a column that stays put on page switches (excluded from the fade-in). */
+	public static void fixedStrip(int right) {
+		fixedStripRight = right;
+	}
+
+	/** A Locker slot row was clicked (see {@link #slotClickNanos}). */
+	public static void noteSlotClick() {
+		slotClickNanos = System.nanoTime();
+	}
+
+	/** Draws {@code body} where it would be without the page glide (for fixed parts inside the content). */
+	public static void unshifted(DrawContext context, Runnable body) {
+		if (pageOffsetX == 0f && pageOffsetY == 0f) {
+			body.run();
+			return;
+		}
+		context.getMatrices().pushMatrix();
+		context.getMatrices().translate(-pageOffsetX, -pageOffsetY);
+		try {
+			body.run();
+		} finally {
+			context.getMatrices().popMatrix();
+		}
 	}
 
 	/**
@@ -372,7 +488,8 @@ public abstract class VeloWindow extends Screen {
 			if (mouseX >= tabX[i] - 6 && mouseX < tabX[i] + tabW[i] + 6 && mouseY >= windowY && mouseY < windowY + HEADER_HEIGHT) {
 				if (i != headerTab()) {
 					selectHeaderTab(i);
-					contentShownAt = System.nanoTime();
+					restartPageIn();
+					net.veloclient.velo.client.sound.VeloUiSounds.tab();
 				}
 				return true;
 			}
@@ -385,7 +502,7 @@ public abstract class VeloWindow extends Screen {
 
 	/** 0..1 eased progress of the current page's entrance (after a tab switch). */
 	protected float pageIn() {
-		float t = Math.min(1f, (System.nanoTime() - contentShownAt) / 200_000_000f);
+		float t = Math.min(1f, (System.nanoTime() - contentShownAt) / 260_000_000f);
 		return 1f - (float) Math.pow(1f - t, 3);
 	}
 
@@ -397,6 +514,19 @@ public abstract class VeloWindow extends Screen {
 	/** Restarts the page entrance (call when a subclass switches pages its own way). */
 	protected void restartPageIn() {
 		contentShownAt = System.nanoTime();
+		// Which way to glide: compared with the tab the last window showed, if it was the same set of tabs.
+		slideX = 0;
+		slideY = 0;
+		int now = headerTab();
+		String[] tabs = headerTabs();
+		if (now >= 0 && lastTab >= 0 && now != lastTab && tabs != null && java.util.Arrays.equals(tabs, lastTabs)) {
+			int direction = Integer.signum(now - lastTab);
+			if (System.nanoTime() - slotClickNanos < 400_000_000L) {
+				slideY = direction;
+			} else {
+				slideX = direction;
+			}
+		}
 	}
 
 	private static final int CLOSE_SIZE = 18;
@@ -431,6 +561,9 @@ public abstract class VeloWindow extends Screen {
 	public boolean mouseClicked(Click click, boolean doubled) {
 		int mouseX = (int) click.x();
 		int mouseY = (int) click.y();
+		if (shell() && MenuShell.click(this, shellState, ((MenuPage) this).railId(), click.x(), click.y())) {
+			return true;
+		}
 		if (mouseY >= windowY && mouseY <= windowY + HEADER_HEIGHT) {
 			if (isOverClose(mouseX, mouseY)) {
 				requestClose();
@@ -483,6 +616,10 @@ public abstract class VeloWindow extends Screen {
 			// let it drag fully or partially off-screen.
 			windowX = Math.max(0, Math.min(windowX, Math.max(0, this.width - windowWidth)));
 			windowY = Math.max(0, Math.min(windowY, Math.max(0, this.height - windowHeight)));
+			if (shell()) {
+				MenuShell.savedX = windowX;
+				MenuShell.savedY = windowY;
+			}
 			layoutContent();
 			return true;
 		}
@@ -499,8 +636,15 @@ public abstract class VeloWindow extends Screen {
 	}
 
 	protected void requestClose() {
+		if (!closing && shell() && returnScreen instanceof MenuPage) {
+			// one window: Esc on any page closes the menu, it doesn't walk back through the pages you visited
+			returnScreen = null;
+		}
 		if (!closing) {
 			closingAtNanos = System.nanoTime();
+			if (returnScreen == null && (springAnimation() || handedOff || shell())) {
+				net.veloclient.velo.client.sound.VeloUiSounds.menuClose();
+			}
 		}
 		closing = true;
 	}

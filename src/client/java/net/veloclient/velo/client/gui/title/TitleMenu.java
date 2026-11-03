@@ -126,6 +126,9 @@ public final class TitleMenu {
 
 	/** Call at the start of the screen's render: vanilla mustn't paint what we paint. */
 	public static void beforeVanilla() {
+		if (broken) {
+			return;
+		}
 		for (ClickableWidget widget : RESTYLED) {
 			widget.visible = false;
 		}
@@ -135,8 +138,36 @@ public final class TitleMenu {
 		return w.visible && MenuKit.inside(mouseX, mouseY, w.getX(), w.getY(), w.getWidth(), w.getHeight());
 	}
 
-	/** Lays out and paints the whole menu; call after vanilla rendered. */
+	/** Set once the Velo menu threw: the rest of the session shows the plain menu (with every mod's buttons) instead of crashing. */
+	private static boolean broken;
+
+	/**
+	 * Lays out and paints the whole menu; call after vanilla rendered. Never throws: the title screen also draws under
+	 * the loading screen at startup, so one odd mod button must not take the whole game down.
+	 */
 	public static void render(DrawContext context, int width, int height, int mouseX, int mouseY, Env env) {
+		if (broken) {
+			return;
+		}
+		try {
+			renderMenu(context, width, height, mouseX, mouseY, env);
+		} catch (RuntimeException | LinkageError e) {
+			broken = true;
+			for (ClickableWidget widget : RESTYLED) {
+				widget.visible = true;
+			}
+			org.slf4j.LoggerFactory.getLogger("velo-client").error("Velo title menu failed - showing the plain menu for this session", e);
+		}
+	}
+
+	private static String labelOf(ClickableWidget widget) {
+		var message = widget.getMessage();
+		String text = message != null ? message.getString() : null;
+		return text != null ? text.strip() : "";
+	}
+
+	private static void renderMenu(DrawContext context, int width, int height, int mouseX, int mouseY, Env env) {
+		net.veloclient.velo.client.sound.VeloUiSounds.gameLoaded();
 		TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
 		for (ClickableWidget widget : RESTYLED) {
 			widget.visible = true;
@@ -161,7 +192,7 @@ public final class TitleMenu {
 			if (widget instanceof HotspotButton) {
 				continue;
 			}
-			String identity = widget.getClass().getName() + "|" + widget.getMessage().getString().strip();
+			String identity = widget.getClass().getName() + "|" + labelOf(widget);
 			if (!seen.add(identity) && (env.keyOf(widget) == null || !MAIN_KEYS.contains(env.keyOf(widget)))) {
 				widget.visible = false;
 				continue;
@@ -173,7 +204,7 @@ public final class TitleMenu {
 				continue;
 			}
 			String className = widget.getClass().getName();
-			String label = widget.getMessage().getString().strip();
+			String label = labelOf(widget);
 			// Essential lays out its own menu, character and badges around these - never touch them; same for any
 			// placeholder-style widget ("<essential_player>") that only exists to anchor another mod's drawing.
 			// Vanilla's copyright line (a clickable text) stays where vanilla puts it - on narrow windows its x fell

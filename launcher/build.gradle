@@ -27,8 +27,8 @@ application {
 	// it becoming a hard failure on a future JDK that blocks this by default.
 	// The --add-* open JavaFX's window internals for NativeWindowDrag (the window manager moves/resizes the window on Linux).
 	applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED', '--add-exports=javafx.graphics/com.sun.javafx.stage=ALL-UNNAMED',
-			'--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED', '--add-opens=javafx.graphics/com.sun.javafx.tk.quantum=ALL-UNNAMED', '-Xms48m', '-Xmx768m', '-XX:+UseSerialGC', '-XX:MinHeapFreeRatio=10',
-			'-XX:MaxHeapFreeRatio=30', '-XX:TieredStopAtLevel=1', '-XX:ReservedCodeCacheSize=64m', '-Xss512k', '-Dprism.maxvram=512m']
+			'--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED', '--add-opens=javafx.graphics/com.sun.javafx.tk.quantum=ALL-UNNAMED', '-Xms48m', '-Xmx768m', '-XX:+UseG1GC', '-XX:G1PeriodicGCInterval=5000', '-XX:G1HeapRegionSize=1m',
+			'-XX:ParallelGCThreads=2', '-XX:ConcGCThreads=1', '-XX:MinHeapFreeRatio=10', '-XX:MaxHeapFreeRatio=20', '-XX:TieredStopAtLevel=1', '-XX:ReservedCodeCacheSize=64m', '-Xss512k', '-XX:+UseCompactObjectHeaders', '-Dprism.maxvram=512m']
 }
 
 dependencies {
@@ -127,7 +127,7 @@ tasks.register("bundleJavaRuntimeFallback") {
 // reads it back as a classpath resource at runtime instead of independently
 // hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
 // below reuses the same value for the native installer's version.
-def launcherAppVersion = "1.1.0"
+def launcherAppVersion = "1.1.1"
 // A fixed identity for the Windows installer across every version - WiX
 // needs this (--win-upgrade-uuid below) to recognize a new installer as an
 // upgrade of whatever's already installed rather than an unrelated product,
@@ -252,6 +252,25 @@ tasks.named("run") {
 	notCompatibleWithConfigurationCache("org.openjfx.javafxplugin wires the module path via Task.extensions at execution time")
 }
 
+// launch-launcher-dev.sh: writes the java command line for the built launcher (a java @argfile) so the dev launcher
+// runs as its own process - started through "gradlew :launcher:run" it lived inside the Gradle daemon, which kept
+// ~2.5 GB (-Xmx2G build JVM) next to the launcher for as long as it was open.
+tasks.register("devRunArgs") {
+	dependsOn("classes")
+	notCompatibleWithConfigurationCache("reads the runtime classpath at execution time")
+	def out = layout.buildDirectory.file("dev-run.args")
+	doLast {
+		def cp = project.sourceSets.main.runtimeClasspath
+		def fx = cp.filter { it.name.startsWith("javafx-") }.asPath
+		def rest = cp.filter { !it.name.startsWith("javafx-") }.asPath
+		def q = { String a -> '"' + a.replace("\\", "\\\\").replace('"', '\\"') + '"' }
+		def lines = ["--module-path", q(fx), "--add-modules", "javafx.controls,javafx.graphics,javafx.swing"]
+		lines += project.application.applicationDefaultJvmArgs.collect { q(it.toString()) }
+		lines += ["-cp", q(rest), project.application.mainClass.get()]
+		out.get().asFile.text = lines.join("\n") + "\n"
+	}
+}
+
 // Packages this app as a single native installer file for whoever's running
 // this task's OS, via the JDK's own jpackage tool - no separate Java install
 // needed by whoever downloads the result, since jpackage bundles a private
@@ -354,18 +373,24 @@ tasks.register("jpackageDist") {
 				"--java-options", "--add-exports=javafx.graphics/com.sun.javafx.stage=ALL-UNNAMED",
 				"--java-options", "--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED",
 				"--java-options", "--add-opens=javafx.graphics/com.sun.javafx.tk.quantum=ALL-UNNAMED",
-				// Memory: without a cap the JVM may take a quarter of the PC's RAM and G1 rarely hands
-				// it back - the launcher idles at ~60 MB of live data. SerialGC has no background GC
-				// threads and, with MaxHeapFreeRatio, shrinks the heap after a collection (idle mode
-				// forces one). C1-only JIT keeps compiler memory/threads down; a UI doesn't need C2.
+				// Memory: capped heap, and G1 with a periodic collection every 5 s that hands unused heap back to the OS
+				// concurrently. Measured 2026-11-03 (whole-launcher tour, warm cache): SerialGC sat at 830-1150 MB and
+				// only shrank after a full GC; G1 like this 620-790 MB, peak 830 instead of 1177. Few GC threads - a UI
+				// doesn't need more. C1-only JIT keeps compiler memory/threads down; a UI doesn't need C2.
 				"--java-options", "-Xms48m",
 				"--java-options", "-Xmx768m",
-				"--java-options", "-XX:+UseSerialGC",
+				"--java-options", "-XX:+UseG1GC",
+				"--java-options", "-XX:G1PeriodicGCInterval=5000",
+				"--java-options", "-XX:G1HeapRegionSize=1m",
+				"--java-options", "-XX:ParallelGCThreads=2",
+				"--java-options", "-XX:ConcGCThreads=1",
 				"--java-options", "-XX:MinHeapFreeRatio=10",
-				"--java-options", "-XX:MaxHeapFreeRatio=30",
+				"--java-options", "-XX:MaxHeapFreeRatio=20",
 				"--java-options", "-XX:TieredStopAtLevel=1",
 				"--java-options", "-XX:ReservedCodeCacheSize=64m",
 				"--java-options", "-Xss512k",
+				// Java 25: 8-byte object headers instead of 12 - every object smaller, ~10-20% less heap for the same UI.
+				"--java-options", "-XX:+UseCompactObjectHeaders",
 				"--java-options", "-Dprism.maxvram=512m"
 		]
 		if (isWindows) {

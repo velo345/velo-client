@@ -454,7 +454,7 @@ final class NewsEditorView {
 		NewsView.run(() -> {
 			byte[] bytes = Files.readAllBytes(file);
 			String id = NewsApi.uploadImage(bytes);
-			NewsUi.remember(id, new Image(new ByteArrayInputStream(bytes)));
+			NewsUi.remember(id, NewsUi.decode(bytes));
 			return id;
 		}, id -> {
 			status.setText("Image uploaded.");
@@ -505,7 +505,7 @@ final class NewsEditorView {
 			Path path = dir.resolve(value.substring("file:".length())).normalize();
 			byte[] bytes = Files.readAllBytes(path);
 			String id = NewsApi.uploadImage(bytes);
-			NewsUi.remember(id, new Image(new ByteArrayInputStream(bytes)));
+			NewsUi.remember(id, NewsUi.decode(bytes));
 			object.addProperty(key, id);
 		}
 	}

@@ -37,7 +37,9 @@ public final class PingDisplayModule extends AbstractModule implements HudModule
 			return;
 		}
 		PlayerListEntry entry = handler.getPlayerListEntry(client.player.getUuid());
-		int ping = entry != null ? entry.getLatency() : 0;
+		// Velo's own measurement (OwnPing) - the server's number for you is often fake or seconds old.
+		int measured = net.veloclient.velo.client.util.OwnPing.ms();
+		int ping = measured >= 0 ? measured : entry != null ? entry.getLatency() : 0;
 		if (HudLook.on()) {
 			HudLook.stat(context, x, y, String.valueOf(ping), "ms", ping < 80 ? 0xFF6FE39A : ping < 160 ? 0xFFFFD56A : 0xFFFF7A7E);
 			return;

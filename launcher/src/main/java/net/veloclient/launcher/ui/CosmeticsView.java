@@ -80,6 +80,8 @@ public final class CosmeticsView {
 	public enum Slot { SKIN, CAPE, WINGS, AURA, NAME, EMOTES, KILLFX, WEAR, PETS }
 
 	private static Slot slot = Slot.CAPE;
+	/** Set by a slot click: -1 / 1 = the next build slides its panel in from above / below (the slots are a column). */
+	private static int pendingSlide;
 	private static String selectedCape;
 	private static String selectedWings;
 	private static String selectedAura;
@@ -168,6 +170,10 @@ public final class CosmeticsView {
 			case WEAR -> wearPanel(host, refresh);
 			case PETS -> petsPanel(refresh);
 		};
+		if (pendingSlide != 0) {
+			slideIn(panel, pendingSlide);
+			pendingSlide = 0;
+		}
 		HBox body = new HBox(0, slots, stage, panel);
 		body.getStyleClass().add("page");
 		VBox.setVgrow(body, Priority.ALWAYS);
@@ -274,10 +280,31 @@ public final class CosmeticsView {
 		}
 		row.getStyleClass().add("motion-card");
 		row.setOnMouseClicked(e -> {
+			if (slot == target) {
+				return;
+			}
+			// The slots are listed in enum order: a slot further down slides the new panel up from below, and back.
+			pendingSlide = Integer.signum(target.ordinal() - slot.ordinal());
 			slot = target;
+			UiSounds.tab();
 			refresh.run();
 		});
 		return row;
+	}
+
+	/**
+	 * The new slot's panel glides in vertically (with the list's direction) and fades up, instead of a hard cut. Opacity
+	 * only on the panel - never on the 3D stage, where it can blank the SubScene.
+	 */
+	private static void slideIn(Node panel, int direction) {
+		panel.setOpacity(0);
+		panel.setTranslateY(28 * direction);
+		javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(javafx.util.Duration.millis(200), panel);
+		fade.setToValue(1);
+		javafx.animation.TranslateTransition glide = new javafx.animation.TranslateTransition(javafx.util.Duration.millis(300), panel);
+		glide.setToY(0);
+		glide.setInterpolator(javafx.animation.Interpolator.SPLINE(0.16, 1, 0.3, 1));
+		new javafx.animation.ParallelTransition(fade, glide).play();
 	}
 
 	private static Node capeThumb(CapeEntry cape, double size) {

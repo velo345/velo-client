@@ -15,7 +15,18 @@ import net.veloclient.velo.client.gui.window.VeloWindow;
  * rows in {@link ModMenuScreen} (Theme Editor, Open Mods Folder), folded in
  * here to cut down on side-nav clutter.
  */
-public final class SettingsTabScreen extends VeloWindow {
+public final class SettingsTabScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "settings";
+	}
+
+	@Override
+	public int shellMaxContentWidth() {
+		return 440;
+	}
+
 
 	private static final int ROW_HEIGHT = 22;
 	private static final int CARD_PAD = 8;
@@ -45,6 +56,18 @@ public final class SettingsTabScreen extends VeloWindow {
 				() -> net.veloclient.velo.client.theme.ThemeManager.active().name(), null,
 				b -> this.client.setScreen(new ThemeEditorScreen(this))));
 		y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
+
+		if (net.veloclient.velo.client.Preview.ON) {
+			y = section("Sound", y, 2);
+			addDrawableChild(new VeloValueRow(x, y, width, ROW_HEIGHT, Text.literal("Interface sounds"), VeloValueRow.Kind.CHOICE,
+					() -> net.veloclient.velo.client.sound.UiPrefs.sounds() ? "On" : "Off", null,
+					b -> net.veloclient.velo.client.sound.UiPrefs.setSounds(!net.veloclient.velo.client.sound.UiPrefs.sounds())));
+			y += ROW_HEIGHT;
+			addDrawableChild(new VeloValueRow(x, y, width, ROW_HEIGHT, Text.literal("Title screen music"), VeloValueRow.Kind.CHOICE,
+					() -> net.veloclient.velo.client.sound.UiPrefs.titleMusic() ? "On" : "Off", null,
+					b -> net.veloclient.velo.client.sound.UiPrefs.setTitleMusic(!net.veloclient.velo.client.sound.UiPrefs.titleMusic())));
+			y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
+		}
 
 		y = section("Controls", y, 1);
 		var menuKey = net.veloclient.velo.client.keybind.VeloKeybinds.OPEN_MOD_MENU;

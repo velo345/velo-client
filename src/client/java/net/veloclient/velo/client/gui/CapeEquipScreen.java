@@ -32,7 +32,13 @@ import java.util.concurrent.Executors;
  * separate name field, the filename becomes the cape's name (rename it
  * afterward if you want something else).
  */
-public final class CapeEquipScreen extends VeloWindow {
+public final class CapeEquipScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "skins";
+	}
+
 
 	private static final int TILE_WIDTH = 86;
 	private static final int TILE_ICON_HEIGHT = 112;
@@ -234,6 +240,12 @@ public final class CapeEquipScreen extends VeloWindow {
 
 	/** The Locker's slot column (shared with the Skin tab, {@link VeloSkinsScreen}). */
 	public static void drawSlots(DrawContext context, net.minecraft.client.font.TextRenderer font, int x, int y, int activeTab, int mouseX, int mouseY) {
+		// The slot column stays put while the page next to it glides in after a switch.
+		net.veloclient.velo.client.gui.window.VeloWindow.fixedStrip(x + SLOTS_W + 8);
+		net.veloclient.velo.client.gui.window.VeloWindow.unshifted(context, () -> drawSlotsInPlace(context, font, x, y, activeTab, mouseX, mouseY));
+	}
+
+	private static void drawSlotsInPlace(DrawContext context, net.minecraft.client.font.TextRenderer font, int x, int y, int activeTab, int mouseX, int mouseY) {
 		String cape = CapeManager.equipped().map(CapeDefinition::name).orElse("None");
 		String wingsId = net.veloclient.velo.client.cosmetics.wings.WingsManager.equippedId();
 		String wings = wingsId == null ? "None" : net.veloclient.velo.client.cosmetics.wings.WingsManager.type(wingsId)
@@ -383,6 +395,7 @@ public final class CapeEquipScreen extends VeloWindow {
 	public static int slotAt(int mouseX, int mouseY, int x, int y) {
 		for (int i = 0; i < LOCKER_TABS.length; i++) {
 			if (MenuKit.inside(mouseX, mouseY, x, y + i * (SLOT_H + 6), SLOTS_W, SLOT_H)) {
+				net.veloclient.velo.client.gui.window.VeloWindow.noteSlotClick();
 				return i;
 			}
 		}

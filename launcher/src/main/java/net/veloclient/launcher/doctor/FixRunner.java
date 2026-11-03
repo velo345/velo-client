@@ -86,6 +86,14 @@ final class FixRunner {
 				return changed;
 			}
 			case Action.DisableShaders ignored -> disableShaders(instance);
+			case Action.LowerRenderDistance r -> lowerRenderDistance(instance, r.max());
+			case Action.SetLoader l -> {
+				net.veloclient.launcher.launch.GameVersion version = net.veloclient.launcher.launch.GameVersion.byId(instance.mcVersion());
+				if (version == null) {
+					throw new IOException("unknown Minecraft version " + instance.mcVersion());
+				}
+				net.veloclient.launcher.launch.LoaderVersions.set(instance.id(), version, l.version());
+			}
 		}
 		return instance;
 	}
@@ -231,6 +239,36 @@ final class FixRunner {
 			Files.move(replaces, backups.resolve(replaces.getFileName()), StandardCopyOption.REPLACE_EXISTING);
 			InstalledAssetStore.forget(instance.id(), InstalledAssetStore.Kind.MOD, replaces.getFileName().toString().replace(".disabled", ""));
 		}
+	}
+
+	private static void lowerRenderDistance(Instance instance, int max) throws IOException {
+		Path options = InstancePaths.gameDir(instance.id()).resolve("options.txt");
+		if (!Files.exists(options)) {
+			Files.writeString(options, "renderDistance:" + max + "\nsimulationDistance:" + Math.min(max, 8) + "\n", StandardCharsets.UTF_8);
+			return;
+		}
+		List<String> lines = new ArrayList<>(Files.readAllLines(options, StandardCharsets.UTF_8));
+		boolean found = false;
+		for (int i = 0; i < lines.size(); i++) {
+			String line = lines.get(i);
+			for (String key : new String[] {"renderDistance:", "simulationDistance:"}) {
+				if (line.startsWith(key)) {
+					found |= key.equals("renderDistance:");
+					try {
+						int value = Integer.parseInt(line.substring(key.length()).strip());
+						if (value > max) {
+							lines.set(i, key + max);
+						}
+					} catch (NumberFormatException e) {
+						lines.set(i, key + max);
+					}
+				}
+			}
+		}
+		if (!found) {
+			lines.add("renderDistance:" + max);
+		}
+		Files.write(options, lines, StandardCharsets.UTF_8);
 	}
 
 	private static void disableShaders(Instance instance) throws IOException {

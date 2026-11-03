@@ -22,7 +22,18 @@ import java.util.Locale;
  * Velo+ Cloud Sync: whether it's on, what happened last, how much of your cloud is used, "Back up now", and every
  * restore point (newest first) to restore, pin (kept no matter what) or delete. Restoring backs up what you have first.
  */
-public final class CloudSyncScreen extends VeloWindow {
+public final class CloudSyncScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "globe";
+	}
+
+	@Override
+	public int shellMaxContentWidth() {
+		return 700;
+	}
+
 
 	private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.ENGLISH).withZone(ZoneId.systemDefault());
 	private static final int ROW_H = 34;

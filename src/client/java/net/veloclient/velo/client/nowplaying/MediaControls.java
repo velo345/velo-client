@@ -3,8 +3,6 @@ package net.veloclient.velo.client.nowplaying;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.veloclient.velo.client.gui.title.MenuKit;
 import net.veloclient.velo.client.gui.widget.VeloAnim;
@@ -360,7 +358,7 @@ public final class MediaControls {
 		}
 		for (Hit hit : List.copyOf(hits)) {
 			if (hit.contains(mx, my)) {
-				MinecraftClient.getInstance().getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.UI_BUTTON_CLICK, 1.0f));
+				net.veloclient.velo.client.sound.VeloUiSounds.click(1.0f);
 				hit.action().run();
 				return true;
 			}

@@ -31,7 +31,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Everything eases: cards rise in one after another when a tab opens, buttons and cards light up on hover, the
  * list scrolls smoothly, and a live dot breathes on what's online.
  */
-public final class WorldHostScreen extends VeloWindow {
+public final class WorldHostScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "party";
+	}
+
 
 	private record Hit(int x, int y, int w, int h, Runnable action) {
 		boolean contains(double mx, double my) {

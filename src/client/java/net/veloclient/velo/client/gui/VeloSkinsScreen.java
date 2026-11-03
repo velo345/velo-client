@@ -31,7 +31,13 @@ import java.util.concurrent.Executors;
  * card, equip with one click (uploads it to your Minecraft account), add from a username/UUID or a
  * PNG. Same library as the launcher's profile page.
  */
-public final class VeloSkinsScreen extends VeloWindow {
+public final class VeloSkinsScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "skins";
+	}
+
 
 	private static final Map<String, Identifier> TEXTURES = new HashMap<>();
 	private static final int CARD_H = 124;

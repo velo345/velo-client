@@ -21,7 +21,13 @@ import java.util.List;
  * it plays on you in 3D (with its sounds) whenever you pick one. Emotes you don't own yet are shown dimmed and open
  * their Store page. The wheel is what holding B in game offers.
  */
-public final class EmoteLockerScreen extends VeloWindow {
+public final class EmoteLockerScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "skins";
+	}
+
 
 	private static final int TILE = 64;
 	private static final int TILE_GAP = 8;

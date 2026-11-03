@@ -744,6 +744,19 @@ public final class ScreenshotTour {
 					var preset = net.veloclient.velo.client.theme.ThemePresets.all().get(name.substring(6).replace('_', ' '));
 					yield preset == null ? List.of() : List.<Object[]>of(new Object[] {0, (Runnable) () -> net.veloclient.velo.client.theme.ThemeManager.setActive(preset)});
 				}
+				// Unreleased preview features (dev build): "preview:guide" -> net.veloclient.velo.preview.PreviewTour.
+				if (name.startsWith("preview:")) {
+					try {
+						Class<?> tour = Class.forName("net.veloclient.velo.preview.PreviewTour");
+						@SuppressWarnings("unchecked")
+						List<Object[]> steps = (List<Object[]>) tour.getMethod("scene", String.class, java.util.function.Consumer.class)
+								.invoke(null, name.substring(8), (java.util.function.Consumer<String>) shotName -> shot(client, shotName));
+						yield steps;
+					} catch (ReflectiveOperationException e) {
+						VeloClient.LOGGER.warn("Velo screenshot tour: no preview scene {} ({})", name, e.toString());
+						yield List.of();
+					}
+				}
 				// Dev-build features bring their own scenes ("dev:notes" -> net.veloclient.velo.dev.DevTour).
 				if (name.startsWith("dev:")) {
 					try {

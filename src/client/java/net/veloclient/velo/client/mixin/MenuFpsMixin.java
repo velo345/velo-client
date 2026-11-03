@@ -22,6 +22,13 @@ public abstract class MenuFpsMixin {
 	private int velo$menuFps(int vanilla) {
 		return Math.min(net.veloclient.velo.client.util.MenuFps.cap(), framerateLimit);
 	}
+
+	@org.spongepowered.asm.mixin.injection.Inject(method = "getFramerateLimit", at = @org.spongepowered.asm.mixin.injection.At("RETURN"), cancellable = true, require = 0)
+	private void velo$pauseMenuFps(org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Integer> cir) {
+		if (net.veloclient.velo.client.util.MenuFps.pauseMenuOpen()) {
+			cir.setReturnValue(Math.min(cir.getReturnValue(), net.veloclient.velo.client.util.MenuFps.cap()));
+		}
+	}
 }
 *///?} else {
 @Mixin(net.minecraft.client.option.InactivityFpsLimiter.class)
@@ -33,6 +40,14 @@ public abstract class MenuFpsMixin {
 	@ModifyConstant(method = "update", constant = @Constant(intValue = 60), require = 0)
 	private int velo$menuFps(int vanilla) {
 		return Math.min(net.veloclient.velo.client.util.MenuFps.cap(), maxFps);
+	}
+
+	/** The Escape menu over a world: capped like the other menus (see MenuFps.pauseMenuOpen). */
+	@org.spongepowered.asm.mixin.injection.Inject(method = "update", at = @org.spongepowered.asm.mixin.injection.At("RETURN"), cancellable = true, require = 0)
+	private void velo$pauseMenuFps(org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Integer> cir) {
+		if (net.veloclient.velo.client.util.MenuFps.pauseMenuOpen()) {
+			cir.setReturnValue(Math.min(cir.getReturnValue(), net.veloclient.velo.client.util.MenuFps.cap()));
+		}
 	}
 }
 //?}

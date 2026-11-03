@@ -81,12 +81,30 @@ public final class Connectivity {
 	 * A sign-in failure that says nothing about the account: no connection, or the service is down ("HTTP 503 from
 	 * https://...") - the saved account stays. Only a real rejection signs it out.
 	 */
+	/**
+	 * True only when Microsoft itself refused the saved refresh token (expired, revoked, password changed): then the
+	 * account really has to sign in again. Everything else - rate limits, outages, a hiccup in the Xbox / Mojang steps -
+	 * keeps the account and retries later instead of signing the player out.
+	 */
+	public static boolean accountDead(Throwable error) {
+		for (Throwable t = error; t != null && t.getCause() != t; t = t.getCause()) {
+			String m = t.getMessage();
+			if (m != null && m.contains("Refresh token rejected")
+					&& (m.contains("invalid_grant") || m.contains("interaction_required") || m.contains("consent_required"))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	public static boolean keepAccount(Throwable error) {
 		if (isNetwork(error)) {
 			return true;
 		}
 		for (Throwable t = error; t != null && t.getCause() != t; t = t.getCause()) {
-			if (t.getMessage() != null && t.getMessage().matches("(?s)HTTP 5\\d\\d from .*")) {
+			// 5xx: the service is down; 429: Mojang / Xbox rate-limited us for a moment. Neither means the account is bad -
+			// dropping it there signed people out for nothing (and the fresh sign-in then hit the same limit).
+			if (t.getMessage() != null && t.getMessage().matches("(?s)HTTP (5\\d\\d|429) from .*")) {
 				return true;
 			}
 		}

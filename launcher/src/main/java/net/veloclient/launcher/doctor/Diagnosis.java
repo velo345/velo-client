@@ -124,6 +124,28 @@ public record Diagnosis(List<Issue> issues, String crashSignature, String crashS
 			}
 		}
 
+		/** Caps render and simulation distance in options.txt at {@code max} chunks (lower settings stay as they are). */
+		record LowerRenderDistance(int max) implements Action {
+			public String key() {
+				return "render-distance:" + max;
+			}
+
+			public String target() {
+				return "render-distance";
+			}
+		}
+
+		/** Launches the profile with this Fabric Loader build from now on ({@code null} = Velo's tested one). */
+		record SetLoader(String version) implements Action {
+			public String key() {
+				return "loader:" + version;
+			}
+
+			public String target() {
+				return "loader";
+			}
+		}
+
 		/** Turns shaders off in Iris (the shader pack stays installed). */
 		record DisableShaders() implements Action {
 			public String key() {

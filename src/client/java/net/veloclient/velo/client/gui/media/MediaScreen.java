@@ -36,7 +36,13 @@ import java.util.stream.Stream;
  * stepping; the fight recap sits alongside when the clip came from a fight. Share (Velo+) gives a link to copy or send
  * to a Velo friend. Screenshots page with the arrow keys. Open folder and delete on both.
  */
-public final class MediaScreen extends VeloWindow {
+public final class MediaScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "clips";
+	}
+
 
 	/** A clip (with its sidecar) or a screenshot. */
 	public record Item(Path file, boolean clip, long modified, Path thumbnail, JsonObject meta) {

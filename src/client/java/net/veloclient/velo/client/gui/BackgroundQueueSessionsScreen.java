@@ -27,7 +27,18 @@ import java.util.List;
  * switch to it, peek at it on the HUD, or leave it for good; its live chat (you can type into it),
  * action bar, title and scoreboard.
  */
-public final class BackgroundQueueSessionsScreen extends VeloWindow {
+public final class BackgroundQueueSessionsScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "queue";
+	}
+
+	@Override
+	public int shellMaxContentWidth() {
+		return 700;
+	}
+
 
 	private static final int MAX_LEFT_WIDTH = 196;
 	private static final int ROW_HEIGHT = 34;

@@ -75,7 +75,7 @@ final class PollEditor {
 			NewsView.run(() -> {
 				byte[] bytes = Files.readAllBytes(file.toPath());
 				String id = NewsApi.uploadImage(bytes);
-				NewsUi.remember(id, new Image(new ByteArrayInputStream(bytes)));
+				NewsUi.remember(id, NewsUi.decode(bytes));
 				return id;
 			}, id -> {
 				image[0] = id;

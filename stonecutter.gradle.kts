@@ -774,6 +774,11 @@ stonecutter parameters {
 			replace("\"setSubtitleText\"", "\"setSubtitleText\"")
 			// Real Mojmap method (LivingEntityRenderer) that the bare "RenderLayers" rule would mangle.
 			replace("shouldRenderLayers", "shouldRenderLayers")
+			// World Notes draw their text like signs do: SubmitNodeCollector#submitText + Component#getVisualOrderText (real Mojmap).
+			replace("submitText(", "submitText(")
+			replace("getVisualOrderText", "getVisualOrderText")
+			// Tab list width cache (TabListCacheMixin): Font#width(FormattedText) - real Mojmap type.
+			replace("FormattedText", "FormattedText")
 			// Mojmap consume effect class used by PvpCompat - the bare StatusEffect rule would
 			// turn it into the nonexistent "ApplyMobEffectsConsumeEffect".
 			replace("ApplyStatusEffectsConsumeEffect", "ApplyStatusEffectsConsumeEffect")

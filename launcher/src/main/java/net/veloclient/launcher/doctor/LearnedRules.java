@@ -159,6 +159,16 @@ final class LearnedRules {
 			case "shaders-off" -> {
 				return new Action.DisableShaders();
 			}
+			case "loader" -> {
+				return str(a, "value") == null ? null : new Action.SetLoader(str(a, "value"));
+			}
+			case "render-distance" -> {
+				try {
+					return new Action.LowerRenderDistance(Math.max(2, Integer.parseInt(str(a, "value"))));
+				} catch (RuntimeException e) {
+					return null;
+				}
+			}
 			default -> {
 				return null;
 			}

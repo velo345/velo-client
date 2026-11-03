@@ -59,6 +59,53 @@ public final class BetterTabListModule extends AbstractModule implements Configu
 		return vanilla || m != null && m.alwaysHeads;
 	}
 
+	private static long hiddenCheckedAt;
+	private static boolean serverHidesPings;
+
+	/**
+	 * The ping to show for one row: your own row gets Velo's real measurement ({@link OwnPing}); for the others the
+	 * server's number - unless the server hides them (everyone at 0-1 ms on a real server while your own measured ping is
+	 * clearly higher), then -1 ("?") instead of a fake 1 ms. The check runs at most once a second.
+	 */
+	public static int shownLatency(java.util.UUID id, int server) {
+		int own = net.veloclient.velo.client.util.OwnPing.ms();
+		//? if <26.1 {
+		var client = MinecraftClient.getInstance();
+		java.util.UUID me = client.player == null ? null : client.player.getUuid();
+		//?} else {
+		/*var client = net.minecraft.client.Minecraft.getInstance();
+		java.util.UUID me = client.player == null ? null : client.player.getUUID();
+		*///?}
+		if (own >= 0 && id != null && id.equals(me)) {
+			return own;
+		}
+		long now = System.currentTimeMillis();
+		if (now - hiddenCheckedAt > 1000) {
+			hiddenCheckedAt = now;
+			boolean allTiny = true;
+			int count = 0;
+			//? if <26.1 {
+			var handler = client.getNetworkHandler();
+			if (handler != null) {
+				for (var entry : handler.getPlayerList()) {
+					count++;
+					allTiny &= entry.getLatency() <= 1;
+				}
+			}
+			//?} else {
+			/*var connection = client.getConnection();
+			if (connection != null) {
+				for (var entry : connection.getOnlinePlayers()) {
+					count++;
+					allTiny &= entry.getLatency() <= 1;
+				}
+			}
+			*///?}
+			serverHidesPings = count > 1 && allTiny && own > 8 && !net.veloclient.velo.client.util.ClientCompat.isSingleplayer();
+		}
+		return serverHidesPings ? -1 : server;
+	}
+
 	/**
 	 * Draws the ping where vanilla puts its signal bars ({@code x + slotWidth - 11}).
 	 *

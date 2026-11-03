@@ -6,8 +6,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.client.gui.screen.narration.NarrationPart;
 import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.veloclient.velo.client.gui.title.TitleScreenTheme;
@@ -64,9 +62,9 @@ public final class VeloModuleTile extends ClickableWidget {
 			setter.accept(newValue);
 			net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
 			pressedAt = System.nanoTime();
-			client.getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.UI_BUTTON_CLICK, newValue ? 1.1f : 0.9f));
+			net.veloclient.velo.client.sound.VeloUiSounds.toggle(newValue);
 		} else {
-			client.getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.UI_BUTTON_CLICK, 1.0f));
+			net.veloclient.velo.client.sound.VeloUiSounds.click(1.0f);
 			pressedAt = System.nanoTime();
 			onOpenSettings.run();
 		}

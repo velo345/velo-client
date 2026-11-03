@@ -33,12 +33,15 @@ public abstract class SeamlessReloadMixin {
 			if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.active()) {
 				ci.cancel();
 				float doneFor = reloadCompleteTime > -1L ? (net.minecraft.util.Util.getMeasuringTimeMs() - reloadCompleteTime) / 1000f : -1f;
-				if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.render(context, reload.getProgress(), doneFor, offset -> {
+				if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.safeRender(context, reload.getProgress(), doneFor, offset -> {
 					if (client.currentScreen != null) {
 						context.getMatrices().pushMatrix();
-						context.getMatrices().translate(0f, offset);
-						client.currentScreen.renderWithTooltip(context, mouseX, mouseY, delta);
-						context.getMatrices().popMatrix();
+						try {
+							context.getMatrices().translate(0f, offset);
+							client.currentScreen.renderWithTooltip(context, mouseX, mouseY, delta);
+						} finally {
+							context.getMatrices().popMatrix();
+						}
 					}
 				})) {
 					client.setOverlay(null);
@@ -57,11 +60,15 @@ public abstract class SeamlessReloadMixin {
 			client.setOverlay(null);
 			return;
 		}
-		if (client.currentScreen != null) {
-			client.currentScreen.renderWithTooltip(context, mouseX, mouseY, delta);
+		try {
+			if (client.currentScreen != null) {
+				client.currentScreen.renderWithTooltip(context, mouseX, mouseY, delta);
+			}
+			velo$progress = Math.max(velo$progress, reload.getProgress());
+			SeamlessReloadModule.drawProgress(context, velo$progress);
+		} catch (RuntimeException | LinkageError e) {
+			SeamlessReloadModule.fail(e);
 		}
-		velo$progress = Math.max(velo$progress, reload.getProgress());
-		SeamlessReloadModule.drawProgress(context, velo$progress);
 	}
 }
 //?} else if <26.2 {
@@ -83,12 +90,15 @@ public abstract class SeamlessReloadMixin {
 			if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.active()) {
 				ci.cancel();
 				float doneFor = fadeOutStart > -1L ? (net.minecraft.util.Util.getMillis() - fadeOutStart) / 1000f : -1f;
-				if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.render(graphics, reload.getActualProgress(), doneFor, offset -> {
+				if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.safeRender(graphics, reload.getActualProgress(), doneFor, offset -> {
 					if (minecraft.screen != null) {
 						graphics.pose().pushMatrix();
-						graphics.pose().translate(0f, offset);
-						minecraft.screen.extractRenderStateWithTooltipAndSubtitles(graphics, mouseX, mouseY, a);
-						graphics.pose().popMatrix();
+						try {
+							graphics.pose().translate(0f, offset);
+							minecraft.screen.extractRenderStateWithTooltipAndSubtitles(graphics, mouseX, mouseY, a);
+						} finally {
+							graphics.pose().popMatrix();
+						}
 					}
 				})) {
 					minecraft.setOverlay(null);
@@ -107,11 +117,15 @@ public abstract class SeamlessReloadMixin {
 			minecraft.setOverlay(null);
 			return;
 		}
-		if (minecraft.screen != null) {
-			minecraft.screen.extractRenderStateWithTooltipAndSubtitles(graphics, mouseX, mouseY, a);
+		try {
+			if (minecraft.screen != null) {
+				minecraft.screen.extractRenderStateWithTooltipAndSubtitles(graphics, mouseX, mouseY, a);
+			}
+			velo$progress = Math.max(velo$progress, reload.getActualProgress());
+			SeamlessReloadModule.drawProgress(graphics, velo$progress);
+		} catch (RuntimeException | LinkageError e) {
+			SeamlessReloadModule.fail(e);
 		}
-		velo$progress = Math.max(velo$progress, reload.getActualProgress());
-		SeamlessReloadModule.drawProgress(graphics, velo$progress);
 	}
 }
 *///?} else {
@@ -133,12 +147,15 @@ public abstract class SeamlessReloadMixin {
 			if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.active()) {
 				ci.cancel();
 				float doneFor = fadeOutStart > -1L ? (net.minecraft.util.Util.getMillis() - fadeOutStart) / 1000f : -1f;
-				if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.render(graphics, reload.getActualProgress(), doneFor, offset -> {
+				if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.safeRender(graphics, reload.getActualProgress(), doneFor, offset -> {
 					if (minecraft.gui.screen() != null) {
 						graphics.pose().pushMatrix();
-						graphics.pose().translate(0f, offset);
-						minecraft.gui.screen().extractRenderStateWithTooltipAndSubtitles(graphics, mouseX, mouseY, a);
-						graphics.pose().popMatrix();
+						try {
+							graphics.pose().translate(0f, offset);
+							minecraft.gui.screen().extractRenderStateWithTooltipAndSubtitles(graphics, mouseX, mouseY, a);
+						} finally {
+							graphics.pose().popMatrix();
+						}
 					}
 				})) {
 					minecraft.gui.setOverlay(null);
@@ -157,11 +174,15 @@ public abstract class SeamlessReloadMixin {
 			minecraft.gui.setOverlay(null);
 			return;
 		}
-		if (minecraft.gui.screen() != null) {
-			minecraft.gui.screen().extractRenderStateWithTooltipAndSubtitles(graphics, mouseX, mouseY, a);
+		try {
+			if (minecraft.gui.screen() != null) {
+				minecraft.gui.screen().extractRenderStateWithTooltipAndSubtitles(graphics, mouseX, mouseY, a);
+			}
+			velo$progress = Math.max(velo$progress, reload.getActualProgress());
+			SeamlessReloadModule.drawProgress(graphics, velo$progress);
+		} catch (RuntimeException | LinkageError e) {
+			SeamlessReloadModule.fail(e);
 		}
-		velo$progress = Math.max(velo$progress, reload.getActualProgress());
-		SeamlessReloadModule.drawProgress(graphics, velo$progress);
 	}
 }
 *///?}

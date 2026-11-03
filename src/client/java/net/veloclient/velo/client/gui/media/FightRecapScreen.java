@@ -32,7 +32,18 @@ import java.util.concurrent.ConcurrentHashMap;
  * ways, best combo, crits, accuracy, reach, damage. Links to the fight's clip when one was saved,
  * or saves one right now while the fight is still in the replay buffer.
  */
-public final class FightRecapScreen extends VeloWindow {
+public final class FightRecapScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "fight_recap";
+	}
+
+	@Override
+	public int shellMaxContentWidth() {
+		return 680;
+	}
+
 
 	private static final Gson GSON = new Gson();
 	private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH).withZone(ZoneId.systemDefault());

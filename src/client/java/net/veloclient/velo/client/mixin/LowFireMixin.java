@@ -4,7 +4,9 @@ import net.veloclient.velo.client.modules.pvp.LowFireModule;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /** Low Fire: the first-person fire overlay is drawn lower (or not at all with Fire Resistance). */
@@ -38,6 +40,12 @@ public abstract class LowFireMixin {
 			matrices.pop();
 		}
 	}
+
+	/** Opacity: the overlay's vertex alpha (vanilla 0.9) scaled down. */
+	@ModifyConstant(method = "renderFireOverlay", constant = @Constant(floatValue = 0.9f), require = 0)
+	private static float velo$alpha(float alpha) {
+		return alpha * LowFireModule.alpha();
+	}
 }
 //?} else if <26.2 {
 /*@Mixin(net.minecraft.client.renderer.ScreenEffectRenderer.class)
@@ -69,6 +77,12 @@ public abstract class LowFireMixin {
 			pose.popPose();
 		}
 	}
+
+	// Opacity: the overlay's vertex alpha (vanilla 0.9) scaled down.
+	@ModifyConstant(method = "renderFire", constant = @Constant(floatValue = 0.9f), require = 0)
+	private static float velo$alpha(float alpha) {
+		return alpha * LowFireModule.alpha();
+	}
 }
 *///?} else {
 /*@Mixin(net.minecraft.client.renderer.ScreenEffectRenderer.class)
@@ -99,6 +113,13 @@ public abstract class LowFireMixin {
 			velo$pushed = false;
 			pose.popPose();
 		}
+	}
+
+	// Opacity: the quad's color (vanilla 0xE5FFFFFF, alpha 0.9) gets a lower alpha.
+	@ModifyConstant(method = "buildFireQuad", constant = @Constant(intValue = 0xE5FFFFFF), require = 0)
+	private static int velo$alpha(int color) {
+		int a = Math.round(((color >>> 24) & 0xFF) * LowFireModule.alpha());
+		return (color & 0x00FFFFFF) | (a << 24);
 	}
 }
 *///?}

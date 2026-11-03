@@ -25,7 +25,13 @@ import java.util.Map;
  * one from the Store - with its colour and how loud it is. The selected one plays on the stage (with its sound when
  * you pick it); "Try it" plays it for real in front of you. When it plays is the Kill Effects module's setting.
  */
-public final class KillFxLockerScreen extends VeloWindow {
+public final class KillFxLockerScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "skins";
+	}
+
 
 	private static final int TILE = 64;
 	private static final int TILE_GAP = 8;

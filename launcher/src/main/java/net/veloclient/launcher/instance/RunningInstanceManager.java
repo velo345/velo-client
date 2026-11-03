@@ -70,9 +70,38 @@ public final class RunningInstanceManager {
 			return stopRequested.get();
 		}
 
+		/**
+		 * Stop button: asks the game to close like its window's X (it saves the world and settings), and only if it's
+		 * still running after 15 s ends the process. On Windows {@link Process#destroy()} is a hard kill - it used to
+		 * be the first and only step, so Stop and Relaunch lost unsaved progress.
+		 */
 		public void stop() {
 			if (stopRequested.compareAndSet(false, true)) {
-				process.destroy();
+				if (!requestClose()) {
+					process.destroy();
+					return;
+				}
+				process.onExit().orTimeout(15, java.util.concurrent.TimeUnit.SECONDS).whenComplete((p, timeout) -> {
+					if (timeout != null && process.isAlive()) {
+						process.destroy();
+					}
+				});
+			}
+		}
+
+		/**
+		 * Asks the running game to quit on its own - the Velo mod checks {@code velo/close-request} in the profile every
+		 * second and shuts down the normal way. False when the request couldn't be written.
+		 */
+		public boolean requestClose() {
+			stopRequested.set(true);
+			try {
+				Path request = InstancePaths.gameDir(instance.id()).resolve("velo").resolve("close-request");
+				java.nio.file.Files.createDirectories(request.getParent());
+				java.nio.file.Files.writeString(request, String.valueOf(process.pid()));
+				return true;
+			} catch (Exception e) {
+				return false;
 			}
 		}
 	}

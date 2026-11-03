@@ -29,8 +29,17 @@ public final class CapeCosmeticsModule extends AbstractModule implements Configu
 	/** How cloaks are drawn (yours and everyone else's): real cloth, or vanilla's rigid cape and motion. */
 	private static volatile String style = CLOTH;
 
+	private static final String WAVEY = "Wavey Capes";
+	/** With Wavey Capes installed: let it animate the cloaks (the old, only behaviour) instead of Velo. */
+	private static volatile boolean useWavey = true;
+
 	public static boolean clothPhysics() {
 		return !CLASSIC.equals(style);
+	}
+
+	/** True when Wavey Capes draws the cloaks: installed, and (in a dev build) picked as the cloak style. */
+	public static boolean waveyActive() {
+		return net.veloclient.velo.client.cosmetics.WaveyCapesCompat.isLoaded() && (!net.veloclient.velo.client.Preview.ON || useWavey);
 	}
 
 	public static final KeyBinding OPEN_CAPE_MENU = KeyBindingHelper.registerKeyBinding(new KeyBinding(
@@ -77,10 +86,36 @@ public final class CapeCosmeticsModule extends AbstractModule implements Configu
 		net.minecraft.client.MinecraftClient.getInstance().setScreen(net.veloclient.velo.client.gui.CapeEquipScreen.open(parent, 1));
 	}
 
+	/** Cloth / Classic, plus Wavey Capes when it's installed (dev build). */
+	private static ConfigField styleField() {
+		boolean wavey = net.veloclient.velo.client.Preview.ON && net.veloclient.velo.client.cosmetics.WaveyCapesCompat.isLoaded();
+		if (!wavey) {
+			return new ConfigField.ChoiceField("Cloak Style", List.of(CLOTH, CLASSIC), () -> style, v -> style = v);
+		}
+		return new ConfigField.ChoiceField("Cloak Style", List.of(CLOTH, CLASSIC, WAVEY), () -> useWavey ? WAVEY : style, v -> {
+			useWavey = WAVEY.equals(v);
+			if (!useWavey) {
+				style = v;
+			}
+		});
+	}
+
+	/** For the first-start guide's preview: "Cloth physics", "Classic" or "Wavey Capes". */
+	public static String styleName() {
+		return waveyActive() ? WAVEY : style;
+	}
+
+	public static void setStyleName(String value) {
+		useWavey = WAVEY.equals(value);
+		if (!useWavey && (CLOTH.equals(value) || CLASSIC.equals(value))) {
+			style = value;
+		}
+	}
+
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
-				new ConfigField.ChoiceField("Cloak Style", List.of(CLOTH, CLASSIC), () -> style, v -> style = v),
+				styleField(),
 				KeybindConfig.field("Open Cloak Menu Key", OPEN_CAPE_MENU));
 	}
 }

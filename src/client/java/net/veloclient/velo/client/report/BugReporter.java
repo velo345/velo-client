@@ -111,6 +111,53 @@ public final class BugReporter {
 	}
 
 	/**
+	 * The start before this one (Minecraft keeps it as logs/<date>-<n>.log.gz) and up to two crash reports of the last
+	 * week (from the top, where the exception is) - a problem is often in the run before the one the player reports from.
+	 * {@code skip} (the crash report sent on its own) isn't repeated.
+	 */
+	static String earlierLogs(Path skip) {
+		StringBuilder out = new StringBuilder();
+		try {
+			for (Path previous : newest(gameDir().resolve("logs"), ".log.gz", 1)) {
+				byte[] bytes;
+				try (var in = new java.util.zip.GZIPInputStream(Files.newInputStream(previous))) {
+					bytes = in.readNBytes(8_000_000);
+				}
+				List<String> lines = new String(bytes, StandardCharsets.UTF_8).lines().toList();
+				String text = String.join("\n", lines.subList(Math.max(0, lines.size() - 600), lines.size()));
+				out.append("\n\n==== Previous game log (").append(previous.getFileName()).append(") ====\n")
+						.append(text.length() > 90_000 ? text.substring(text.length() - 90_000) : text);
+			}
+			int added = 0;
+			for (Path crash : newest(gameDir().resolve("crash-reports"), ".txt", 3)) {
+				if (added == 2 || skip != null && crash.toAbsolutePath().equals(skip.toAbsolutePath())) {
+					continue;
+				}
+				added++;
+				List<String> lines = new String(Files.readAllBytes(crash), StandardCharsets.UTF_8).lines().toList();
+				String text = String.join("\n", lines.subList(0, Math.min(300, lines.size())));
+				out.append("\n\n==== Crash report (").append(crash.getFileName()).append(") ====\n")
+						.append(text.length() > 60_000 ? text.substring(0, 60_000) : text);
+			}
+		} catch (Exception | LinkageError e) {
+			out.append("\n(couldn't attach earlier logs: ").append(e).append(")");
+		}
+		return out.toString();
+	}
+
+	private static List<Path> newest(Path dir, String suffix, int count) throws java.io.IOException {
+		if (!Files.isDirectory(dir)) {
+			return List.of();
+		}
+		long since = System.currentTimeMillis() - 7L * 24 * 3600_000L;
+		try (var files = Files.list(dir)) {
+			return files.filter(f -> f.getFileName().toString().endsWith(suffix) && f.toFile().lastModified() >= since)
+					.sorted(java.util.Comparator.comparingLong((Path f) -> f.toFile().lastModified()).reversed())
+					.limit(count).toList();
+		}
+	}
+
+	/**
 	 * Sends a report. {@code system} must have been collected on the render thread; this does the
 	 * file reading and upload in the background and calls back on the render thread.
 	 */
@@ -137,7 +184,10 @@ public final class BugReporter {
 				report.add("mods", new Gson().toJsonTree(mods).getAsJsonArray());
 				report.add("modules", new Gson().toJsonTree(modules).getAsJsonArray());
 				if (includeLogs) {
-					report.addProperty("log", logTail());
+					// Older material first: the server trims an oversized report from the front, and this game's log matters most.
+					String earlier = earlierLogs(crashFile);
+					String now = java.util.Objects.toString(logTail(), "(no latest.log)");
+					report.addProperty("log", earlier.isEmpty() ? now : earlier.strip() + "\n\n==== This game's log (latest.log) ====\n" + now);
 					if (crashFile != null) {
 						report.addProperty("crash", Files.readString(crashFile, StandardCharsets.UTF_8));
 					}

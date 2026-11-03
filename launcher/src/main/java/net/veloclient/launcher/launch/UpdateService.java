@@ -322,6 +322,13 @@ public final class UpdateService {
 			throw new IOException("Download of " + asset.name() + " failed (" + response.statusCode() + ")");
 		}
 		long total = response.headers().firstValueAsLong("Content-Length").orElse(asset.size());
+		MessageDigest digest;
+		try {
+			digest = MessageDigest.getInstance("SHA-256");
+		} catch (Exception e) {
+			throw new IllegalStateException(e);
+		}
+		// hashed while streaming: reading a ~100 MB installer back in one array ran small launcher heaps out of memory
 		try (InputStream in = response.body(); var out = Files.newOutputStream(target)) {
 			byte[] buffer = new byte[64 * 1024];
 			long done = 0;
@@ -329,6 +336,7 @@ public final class UpdateService {
 			int read;
 			while ((read = in.read(buffer)) > 0) {
 				out.write(buffer, 0, read);
+				digest.update(buffer, 0, read);
 				done += read;
 				if (done - lastReport > 256 * 1024 || done == total) {
 					lastReport = done;
@@ -336,7 +344,7 @@ public final class UpdateService {
 				}
 			}
 		}
-		if (asset.sha256() != null && !asset.sha256().equalsIgnoreCase(sha256(Files.readAllBytes(target)))) {
+		if (asset.sha256() != null && !asset.sha256().equalsIgnoreCase(HexFormat.of().formatHex(digest.digest()))) {
 			Files.deleteIfExists(target);
 			throw new IOException("Download of " + asset.name() + " was corrupted - try again");
 		}

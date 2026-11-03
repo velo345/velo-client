@@ -97,7 +97,8 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 		// Wavey Capes has no API to register with, but its own fallback renderer picks up whatever the local player's
 		// real cape texture resolves to (see LocalPlayerSkinCapeMixin) - registering our own layer on top of that
 		// would double-render the cloak, so we step aside and let it take over.
-		if (net.veloclient.velo.client.cosmetics.WaveyCapesCompat.isLoaded()) {
+		// (dev build: the layer stays registered and steps aside per frame while Wavey Capes is the picked style)
+		if (net.veloclient.velo.client.cosmetics.WaveyCapesCompat.isLoaded() && !net.veloclient.velo.client.Preview.ON) {
 			return;
 		}
 		LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, entityRenderer, helper, context) -> {
@@ -112,6 +113,9 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 	@Override
 	public void render(MatrixStack matrixStack, OrderedRenderCommandQueue queue, int light,
 			PlayerEntityRenderState state, float limbAngle, float limbDistance) {
+		if (net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.waveyActive()) {
+			return;
+		}
 		MinecraftClient client = MinecraftClient.getInstance();
 		PlayerEntity localPlayer = client.player;
 		if (localPlayer != null && state.id == localPlayer.getId()) {
@@ -185,7 +189,8 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 
 	public static void register() {
 		CapeManager.loadLibrary();
-		if (net.veloclient.velo.client.cosmetics.WaveyCapesCompat.isLoaded()) {
+		// (dev build: the layer stays registered and steps aside per frame while Wavey Capes is the picked style)
+		if (net.veloclient.velo.client.cosmetics.WaveyCapesCompat.isLoaded() && !net.veloclient.velo.client.Preview.ON) {
 			return;
 		}
 		LivingEntityRenderLayerRegistrationCallback.EVENT.register((entityType, entityRenderer, registrationHelper, context) -> {
@@ -199,6 +204,9 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 	@Override
 	public void submit(PoseStack matrixStack, SubmitNodeCollector queue, int light,
 			AvatarRenderState state, float limbAngle, float limbDistance) {
+		if (net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.waveyActive()) {
+			return;
+		}
 		Minecraft client = Minecraft.getInstance();
 		Player localPlayer = client.player;
 		if (localPlayer != null && state.id == localPlayer.getId()) {

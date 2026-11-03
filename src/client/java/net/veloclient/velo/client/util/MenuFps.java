@@ -23,6 +23,23 @@ public final class MenuFps {
 		return cap;
 	}
 
+	/**
+	 * The Escape menu is open over a world. Vanilla doesn't cap that at all (only menus outside a world), so it drew the
+	 * world and its blur as fast as it could - uneven pacing on high-FPS PCs, and a hot iGPU (players called it laggy).
+	 */
+	public static boolean pauseMenuOpen() {
+		//? if <26.1 {
+		var client = net.minecraft.client.MinecraftClient.getInstance();
+		return client.world != null && client.currentScreen instanceof net.minecraft.client.gui.screen.GameMenuScreen;
+		//?} else if <26.2 {
+		/*var client = net.minecraft.client.Minecraft.getInstance();
+		return client.level != null && client.screen instanceof net.minecraft.client.gui.screens.PauseScreen;
+		*///?} else {
+		/*var client = net.minecraft.client.Minecraft.getInstance();
+		return client.level != null && client.gui.screen() instanceof net.minecraft.client.gui.screens.PauseScreen;
+		*///?}
+	}
+
 	private static int refreshRate() {
 		//? if <26.1 {
 		return net.minecraft.client.MinecraftClient.getInstance().getWindow().getRefreshRate();

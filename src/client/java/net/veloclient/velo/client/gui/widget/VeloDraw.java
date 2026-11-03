@@ -124,8 +124,29 @@ public final class VeloDraw {
 		quad(x0, y0, color, x0, y1, color, x1, y1, color, x1, y0, color);
 	}
 
+	/**
+	 * Receives the shapes instead of the GUI while set (World Notes draw the same card as real geometry in the world):
+	 * {@code count} quads, 4 corners each, {@code xy} interleaved, one ARGB colour per corner.
+	 */
+	public interface ShapeSink {
+		void quads(float[] xy, int[] colors, int count);
+	}
+
+	private static ShapeSink capture;
+	private static float capturePixel = 0.5f;
+
+	/** Sends every shape to {@code sink} (null = back to the GUI); {@code pixel} is the anti-aliasing fringe in its units. */
+	public static void capture(ShapeSink sink, float pixel) {
+		capture = sink;
+		capturePixel = pixel;
+	}
+
 	private static void submit(DrawContext context) {
 		if (batching || quadCount == 0) {
+			return;
+		}
+		if (capture != null) {
+			capture.quads(xy, colors, quadCount);
 			return;
 		}
 		VeloShapeElement.submit(context, xy, colors, quadCount,
@@ -134,7 +155,7 @@ public final class VeloDraw {
 
 	/** One screen pixel in GUI units - the width of the anti-aliasing fringe. */
 	private static float pixel() {
-		return 1f / Math.max(1, ClientCompat.guiScale());
+		return capture != null ? capturePixel : 1f / Math.max(1, ClientCompat.guiScale());
 	}
 
 	private static int transparent(int argb) {
@@ -147,7 +168,7 @@ public final class VeloDraw {
 	}
 
 	private static int segmentsFor(float radius) {
-		float px = radius * Math.max(1, ClientCompat.guiScale());
+		float px = radius * (capture != null ? 4 : Math.max(1, ClientCompat.guiScale()));
 		return Math.max(1, Math.min(MAX_SEGMENTS, (int) Math.ceil(px / 2.2f) + 1));
 	}
 

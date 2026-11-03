@@ -215,6 +215,8 @@ public final class LauncherApp extends Application {
 		scene.getStylesheets().add(getClass().getResource("/net/veloclient/launcher/launcher.css").toExternalForm());
 		applyTheme();
 		net.veloclient.launcher.ui.UiMotion.install(scene);
+		net.veloclient.launcher.ui.UiSounds.install(scene);
+		net.veloclient.launcher.ui.UiSounds.preload();
 		scene.getAccelerators().put(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.K, javafx.scene.input.KeyCombination.SHORTCUT_DOWN),
 				() -> topBar.searchField().requestFocus());
 
@@ -635,6 +637,7 @@ public final class LauncherApp extends Application {
 			@Override
 			public void handle(long now) {
 				stop();
+				net.veloclient.launcher.ui.UiSounds.startup();
 				long frameAt = System.nanoTime();
 				long jvm = ProcessHandle.current().info().startInstant()
 						.map(start -> java.time.Duration.between(start, java.time.Instant.now()).toMillis() - (frameAt - mainAt) / 1_000_000).orElse(-1L);
@@ -691,6 +694,15 @@ public final class LauncherApp extends Application {
 
 	private void runTourStep(java.nio.file.Path folder, List<Object[]> steps, int index) {
 		if (index >= steps.size()) {
+			// -Dvelo.launcherTourStay=40: back to Home and stay open that many seconds (memory after settling).
+			long stay = Long.getLong("velo.launcherTourStay", 0);
+			if (stay > 0) {
+				showHome();
+				javafx.animation.PauseTransition linger = new javafx.animation.PauseTransition(Duration.seconds(stay));
+				linger.setOnFinished(e -> Platform.exit());
+				linger.play();
+				return;
+			}
 			Platform.exit();
 			return;
 		}
@@ -1056,7 +1068,10 @@ public final class LauncherApp extends Application {
 		Instance instance = running.instance();
 		String server = running.serverAddress();
 		launchBar.setRelaunching(true);
-		running.stop();
+		// Ask, don't kill: the game saves and closes itself; a request that can't be written falls back to stopping it.
+		if (!running.requestClose()) {
+			running.stop();
+		}
 		running.process().onExit().orTimeout(60, java.util.concurrent.TimeUnit.SECONDS).whenComplete((process, error) -> Platform.runLater(() -> {
 			if (error != null && running.process().isAlive()) {
 				// Didn't close within a minute (stuck): leave it to the player rather than force-killing a game that may be saving.
@@ -1410,6 +1425,31 @@ public final class LauncherApp extends Application {
 			evaluate.run();
 		});
 		stage.showingProperty().addListener((o, a, b) -> evaluate.run());
+		installQuietTrim();
+	}
+
+	private long lastInputNanos = System.nanoTime();
+	private boolean trimWanted = true;
+
+	/**
+	 * In front, too: the heap only shrinks after a collection, so one heavy page (3D views,
+	 * big pictures) used to keep the launcher at its peak for as long as it stayed open. Once nobody has touched it for
+	 * a few seconds and a good chunk of the heap sits unused, collect - the short pause lands while no one is clicking.
+	 */
+	private void installQuietTrim() {
+		stage.addEventFilter(javafx.scene.input.InputEvent.ANY, e -> lastInputNanos = System.nanoTime());
+		javafx.animation.Timeline check = new javafx.animation.Timeline(new javafx.animation.KeyFrame(Duration.seconds(6), e -> {
+			if (idle || System.nanoTime() - lastInputNanos < 12_000_000_000L) {
+				return;
+			}
+			long unused = Runtime.getRuntime().freeMemory(); // committed but not in use
+			if (trimWanted || unused > 96L * 1024 * 1024) {
+				trimWanted = false;
+				System.gc();
+			}
+		}));
+		check.setCycleCount(javafx.animation.Animation.INDEFINITE);
+		check.play();
 	}
 
 	private void enterIdle() {
@@ -1419,7 +1459,7 @@ public final class LauncherApp extends Application {
 		idle = true;
 		content.getChildren().clear();
 		net.veloclient.launcher.ui.LauncherCaches.trimAll();
-		// With SerialGC + MaxHeapFreeRatio (see launcher/build.gradle) a full collection also shrinks the heap.
+		// A full collection shrinks the heap right away (G1 + MaxHeapFreeRatio, see launcher/build.gradle).
 		System.gc();
 		LauncherLog.info("Launcher idle - page released, caches cleared");
 	}
@@ -1439,6 +1479,7 @@ public final class LauncherApp extends Application {
 		boolean rebuilt = net.veloclient.launcher.ui.ScrollKeeper.samePage(previous, node);
 		List<?> scroll = rebuilt ? net.veloclient.launcher.ui.ScrollKeeper.captureAll(previous) : List.of();
 		content.getChildren().setAll(node);
+		trimWanted = true; // the old page's views and textures are garbage now
 		if (rebuilt) {
 			net.veloclient.launcher.ui.ScrollKeeper.restoreAll(node, scroll);
 		} else {
@@ -2673,9 +2714,13 @@ public final class LauncherApp extends Application {
 				MinecraftSession finalSession = restored;
 				Platform.runLater(() -> onSignedIn(finalSession));
 			} catch (Exception e) {
-				if (Connectivity.keepAccount(e)) {
-					// Started without internet: stay signed in with the saved account (it refreshes once we're online).
-					Connectivity.reportFailure(e);
+				LauncherLog.warn("Silent sign-in failed", e);
+				if (!Connectivity.accountDead(e)) {
+					// Offline, rate-limited or a Microsoft/Xbox/Mojang hiccup: stay signed in with the saved account
+					// (it refreshes on Play / once we're online). Only a refused refresh token signs the account out.
+					if (Connectivity.keepAccount(e)) {
+						Connectivity.reportFailure(e);
+					}
 					MinecraftSession saved = cached.get();
 					Platform.runLater(() -> onSignedIn(saved));
 					return;
@@ -3472,6 +3517,40 @@ public final class LauncherApp extends Application {
 		}
 	}
 
+	/** Settings > Sound & guides (dev build): interface sounds, the in-game title track, the first-start guide. */
+	private VBox soundAndGuidesCard() {
+		VBox card = net.veloclient.launcher.ui.SettingsUi.card("Sound & guides");
+		net.veloclient.launcher.data.InterfacePrefs.Data prefs = net.veloclient.launcher.data.InterfacePrefs.get();
+		javafx.scene.control.CheckBox sounds = new javafx.scene.control.CheckBox();
+		sounds.setSelected(prefs.sounds);
+		sounds.setOnAction(e -> {
+			var data = net.veloclient.launcher.data.InterfacePrefs.get();
+			data.sounds = sounds.isSelected();
+			net.veloclient.launcher.data.InterfacePrefs.save(data);
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(card, "Interface sounds", "Soft clicks, switches and swells - here and in the game",
+				"The launcher and the Velo menus in the game play their own quiet sounds. Off: the game uses Minecraft's click again.", sounds);
+		javafx.scene.control.CheckBox music = new javafx.scene.control.CheckBox();
+		music.setSelected(prefs.titleMusic);
+		music.setOnAction(e -> {
+			var data = net.veloclient.launcher.data.InterfacePrefs.get();
+			data.titleMusic = music.isSelected();
+			net.veloclient.launcher.data.InterfacePrefs.save(data);
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(card, "Title screen music", "A calm Velo track on the title screen instead of Minecraft's menu music",
+				"Follows the game's Music volume slider and fades out when you join a world.", music);
+		javafx.scene.control.CheckBox guides = new javafx.scene.control.CheckBox();
+		guides.setSelected(prefs.guides);
+		guides.setOnAction(e -> {
+			var data = net.veloclient.launcher.data.InterfacePrefs.get();
+			data.guides = guides.isSelected();
+			net.veloclient.launcher.data.InterfacePrefs.save(data);
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(card, "First-start guide", "New profiles walk you through the main settings once",
+				"Shows on a new profile's first title screen, with live previews - and can always be skipped. Off: no profile shows it.", guides);
+		return card;
+	}
+
 	/**
 	 * First start with no profiles at all: creates a ready-to-play "Velo Client" profile on Minecraft 26.2 (with Velo Client and Fabric
 	 * API installed), so a new player can press Play straight away. Only ever once - deleting every profile later doesn't bring it back.
@@ -3778,6 +3857,7 @@ public final class LauncherApp extends Application {
 
 	/** @param quickPlayTarget nullable "host:port" - when present, launches straight into that server (My Servers' Connect). */
 	private void launchWithProgress(Instance instance, String quickPlayTarget, Button triggerButton, ProgressBar progressBar, Label statusLabel) {
+		net.veloclient.launcher.ui.UiSounds.launch();
 		if (requiredUpdate != null && availableUpdate != null) {
 			net.veloclient.launcher.ui.UpdateDialog.show(stage, availableUpdate, java.util.Objects.requireNonNullElse(requiredUpdate.message(), ""));
 			return;
@@ -3788,37 +3868,61 @@ public final class LauncherApp extends Application {
 				&& net.veloclient.launcher.data.LauncherSettings.get().partyLaunchTogether && partyNow.getAsJsonArray("members").size() > 1) {
 			net.veloclient.launcher.social.LauncherSocial.partyLaunch(quickPlayTarget, instance.mcVersion());
 		}
-		// Quick system check (memory, swap, disk, other games running) - only real problems interrupt.
-		if (System.getProperty("velo.launcherTour") == null) {
-			try {
-				var warnings = net.veloclient.launcher.launch.SystemHealth.warnings(net.veloclient.launcher.launch.SystemHealth.check(instance));
-				if (!warnings.isEmpty() && !net.veloclient.launcher.ui.SystemCheckDialog.confirmLaunch(stage, warnings)) {
-					return;
-				}
-			} catch (RuntimeException e) {
-				LauncherLog.warn("System check failed - launching anyway", e);
-			}
-		}
-		// Refreshes velo-client's own jar from whatever is bundled in THIS
-		// running launcher build before every single launch (cheap local
-		// file copy, no network - see GameJars) - otherwise a profile
-		// created under an older launcher version would keep running that
-		// older velo-client jar forever, since nothing else ever touches an
-		// existing profile's mods folder again after it's created.
-		GameJars.installInto(InstancePaths.modsDir(instance.id()), GameVersion.byId(instance.mcVersion()));
 		lastQuickPlay.put(instance.id(), java.util.Optional.ofNullable(quickPlayTarget));
-		// Velo Doctor: something that would crash the game is offered a fix first - "Fix all & play" starts right after.
-		if (System.getProperty("velo.launcherTour") == null) {
+		// The checks below read every mod file (the Doctor scans nested jars too) and copy jars: on a big modpack and a
+		// slow disk that's seconds. They used to run right here on the UI thread - the launcher froze after Play.
+		// Now they run in the background with "Checking your mods..." on the bar, and only the dialogs come back here.
+		triggerButton.setDisable(true);
+		statusLabel.setText("Checking your mods...");
+		statusLabel.setVisible(true);
+		statusLabel.setManaged(true);
+		boolean tour = System.getProperty("velo.launcherTour") != null;
+		Thread.ofVirtual().name("velo-prelaunch").start(() -> {
+			java.util.List<net.veloclient.launcher.launch.SystemHealth.Finding> warnings = java.util.List.of();
+			net.veloclient.launcher.doctor.Diagnosis diagnosis = null;
+			if (!tour) {
+				// Quick system check (memory, swap, disk, other games running) - only real problems interrupt.
+				try {
+					warnings = net.veloclient.launcher.launch.SystemHealth.warnings(net.veloclient.launcher.launch.SystemHealth.check(instance));
+				} catch (RuntimeException e) {
+					LauncherLog.warn("System check failed - launching anyway", e);
+				}
+			}
+			// Refreshes velo-client's own jar from whatever is bundled in THIS running launcher build before every launch -
+			// otherwise a profile created under an older launcher would keep its older velo-client jar forever.
 			try {
-				var diagnosis = net.veloclient.launcher.doctor.Doctor.check(instance);
-				if (diagnosis.issues().stream().anyMatch(i -> i.severity() == net.veloclient.launcher.doctor.Diagnosis.Severity.CRASH)
-						&& !net.veloclient.launcher.ui.DoctorDialog.confirmLaunch(stage, instance, diagnosis)) {
+				GameJars.installInto(InstancePaths.modsDir(instance.id()), GameVersion.byId(instance.mcVersion()));
+			} catch (RuntimeException e) {
+				LauncherLog.warn("Couldn't refresh the Velo jars - launching anyway", e);
+			}
+			if (!tour) {
+				// Velo Doctor: something that would crash the game is offered a fix first - "Fix all & play" starts right after.
+				try {
+					diagnosis = net.veloclient.launcher.doctor.Doctor.check(instance);
+				} catch (RuntimeException e) {
+					LauncherLog.warn("Doctor check failed - launching anyway", e);
+				}
+			}
+			java.util.List<net.veloclient.launcher.launch.SystemHealth.Finding> finalWarnings = warnings;
+			net.veloclient.launcher.doctor.Diagnosis finalDiagnosis = diagnosis;
+			Platform.runLater(() -> {
+				triggerButton.setDisable(false);
+				statusLabel.setVisible(false);
+				statusLabel.setManaged(false);
+				if (!finalWarnings.isEmpty() && !net.veloclient.launcher.ui.SystemCheckDialog.confirmLaunch(stage, finalWarnings)) {
 					return;
 				}
-			} catch (RuntimeException e) {
-				LauncherLog.warn("Doctor check failed - launching anyway", e);
-			}
-		}
+				if (finalDiagnosis != null && finalDiagnosis.issues().stream().anyMatch(i -> i.severity() == net.veloclient.launcher.doctor.Diagnosis.Severity.CRASH)
+						&& !net.veloclient.launcher.ui.DoctorDialog.confirmLaunch(stage, instance, finalDiagnosis)) {
+					return;
+				}
+				continueLaunch(instance, quickPlayTarget, triggerButton, progressBar, statusLabel);
+			});
+		});
+	}
+
+	/** The part of a launch after the checks (back on the UI thread): server rules, sign-in, then starting the game. */
+	private void continueLaunch(Instance instance, String quickPlayTarget, Button triggerButton, ProgressBar progressBar, Label statusLabel) {
 		// Known server with mod rules (owner panel): a heads-up about mods it doesn't allow - never a block.
 		if (quickPlayTarget != null && System.getProperty("velo.launcherTour") == null) {
 			var rules = net.veloclient.launcher.data.ServerProfiles.forAddress(quickPlayTarget);
@@ -3931,7 +4035,8 @@ public final class LauncherApp extends Application {
 						action.accept(refreshed);
 					});
 				} catch (Exception e) {
-					if (Connectivity.keepAccount(e)) {
+					LauncherLog.warn("Sign-in refresh before launch failed", e);
+					if (!Connectivity.accountDead(e)) {
 						// No internet: the sign-in wasn't rejected, it just couldn't be checked. Keep the account and start
 						// anyway - singleplayer and LAN work, servers need the connection back.
 						Connectivity.reportFailure(e);
@@ -4394,6 +4499,9 @@ public final class LauncherApp extends Application {
 				"Make your own colors and share them as a code.", themeButton);
 		appearance.getChildren().add(homeBackgroundRow());
 		content.getChildren().add(1, appearance);
+		if (AppVersion.DEV) {
+			content.getChildren().add(2, soundAndGuidesCard());
+		}
 
 		VBox account = net.veloclient.launcher.ui.SettingsUi.card("Account");
 		if (session != null) {

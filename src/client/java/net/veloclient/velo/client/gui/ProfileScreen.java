@@ -23,7 +23,18 @@ import java.util.List;
  * layout. Click a card to switch (the outgoing profile is saved first); Rename / Delete show on hover;
  * the box at the bottom creates a new one from your current setup.
  */
-public final class ProfileScreen extends VeloWindow {
+public final class ProfileScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "profiles";
+	}
+
+	@Override
+	public int shellMaxContentWidth() {
+		return 500;
+	}
+
 
 	private static final int CARD_H = 42;
 	private static final int CARD_GAP = 6;

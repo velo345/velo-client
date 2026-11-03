@@ -42,7 +42,7 @@ public final class CosmeticUi {
 	 * Decoded cape frames for cards and thumbnails: cape-region crops at {@link #CARD_SCALE} px per cape pixel (about 4 MB
 	 * for a 40-frame cape), so a few dozen fit.
 	 */
-	private static final Map<String, List<GifFrames.Frame>> FRAMES = LauncherCaches.lru(30);
+	private static final Map<String, List<GifFrames.Frame>> FRAMES = LauncherCaches.lru(12);
 	/** Full-resolution frames for the big 3D viewers - only the few on screen (about 15 MB each for a 1024 px cape). */
 	private static final Map<String, List<GifFrames.Frame>> HD_FRAMES = LauncherCaches.lru(2);
 	private static final int CARD_SCALE = 8;
@@ -61,7 +61,7 @@ public final class CosmeticUi {
 	private static final Map<String, List<Consumer<List<GifFrames.Frame>>>> WAITING = new java.util.HashMap<>();
 	private static final Map<String, Image> THUMBNAILS = LauncherCaches.lru(120);
 	/** Hover animation frames, one array per cape and size - in THUMBNAILS, three 40-frame capes evicted each other's frames and every hover re-rendered them all. */
-	private static final Map<String, Image[]> FRAME_THUMBNAILS = LauncherCaches.lru(10);
+	private static final Map<String, Image[]> FRAME_THUMBNAILS = LauncherCaches.lru(4); // ~2 MB a frame set; only the hovered card animates
 	private static volatile String skinOwner;
 	private static volatile SkinFetcher.SkinData skin;
 

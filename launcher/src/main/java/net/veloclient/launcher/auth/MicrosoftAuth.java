@@ -259,18 +259,60 @@ public final class MicrosoftAuth {
 		return send(request);
 	}
 
+	/**
+	 * Sends with up to three tries: Mojang's login_with_xbox and Xbox Live answer 429 (rate limit) and 5xx now and then,
+	 * and a single dropped connection used to fail the whole sign-in. Waits as long as Retry-After says (up to 10 s).
+	 */
 	private JsonObject send(HttpRequest request) {
-		try {
-			HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-			JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
-			if (response.statusCode() >= 400 && !json.has("error") && !json.has("device_code")) {
-				throw new AuthException("HTTP " + response.statusCode() + " from " + request.uri() + ": " + response.body());
+		AuthException last = null;
+		for (int attempt = 0; attempt < 3; attempt++) {
+			if (attempt > 0) {
+				sleep(retryDelay(last, attempt));
 			}
-			return json;
-		} catch (AuthException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new AuthException("Network error talking to " + request.uri().getHost(), e);
+			try {
+				HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+				int status = response.statusCode();
+				String body = response.body() == null ? "" : response.body();
+				JsonObject json;
+				try {
+					json = body.isBlank() ? new JsonObject() : JsonParser.parseString(body).getAsJsonObject();
+				} catch (RuntimeException notJson) {
+					// an HTML error page or an empty body from a proxy / outage
+					json = new JsonObject();
+				}
+				if (status == 429 || status >= 500) {
+					last = new AuthException("HTTP " + status + " from " + request.uri() + ": " + body);
+					last.retryAfterSeconds = response.headers().firstValue("Retry-After").map(MicrosoftAuth::parseSeconds).orElse(-1);
+					continue;
+				}
+				if (status >= 400 && !json.has("error") && !json.has("device_code")) {
+					throw new AuthException("HTTP " + status + " from " + request.uri() + ": " + body);
+				}
+				return json;
+			} catch (AuthException e) {
+				throw e;
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new AuthException("Sign-in interrupted.");
+			} catch (Exception e) {
+				last = new AuthException("Network error talking to " + request.uri().getHost(), e);
+			}
+		}
+		throw last;
+	}
+
+	private static long retryDelay(AuthException last, int attempt) {
+		if (last != null && last.retryAfterSeconds > 0) {
+			return Math.min(10, last.retryAfterSeconds) * 1000L;
+		}
+		return attempt == 1 ? 1200L : 3500L;
+	}
+
+	private static int parseSeconds(String value) {
+		try {
+			return Integer.parseInt(value.trim());
+		} catch (NumberFormatException e) {
+			return -1;
 		}
 	}
 

@@ -58,7 +58,7 @@ public abstract class TitleScreenMixin {
 
 	@Unique
 	private static String velo$keyOf(Text text) {
-		return text.getContent() instanceof TranslatableTextContent t ? t.getKey() : null;
+		return text != null && text.getContent() instanceof TranslatableTextContent t ? t.getKey() : null;
 	}
 
 	/** ukulib's icon-only button (empty label, so nothing to match by text) - kept by ukulib in a field of this name. */
@@ -130,7 +130,7 @@ public abstract class TitleScreenMixin {
 
 	@Unique
 	private static String velo$keyOf(Text text) {
-		return text.getContents() instanceof TranslatableContents t ? t.getKey() : null;
+		return text != null && text.getContents() instanceof TranslatableContents t ? t.getKey() : null;
 	}
 
 	@Unique

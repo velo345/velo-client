@@ -32,7 +32,13 @@ import java.util.Map;
  * own status, "add friend", and your friends with live presence. Right: a chat with the selected
  * friend, or the Requests / Blocked / Notifications views picked from the bar on top.
  */
-public final class FriendsScreen extends VeloWindow {
+public final class FriendsScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "friends";
+	}
+
 
 	private enum View { PARTY, CHAT, REQUESTS, BLOCKED, NOTIFICATIONS }
 

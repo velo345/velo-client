@@ -1,0 +1,13 @@
+{
+	"required": false,
+	"minVersion": "0.8",
+	"package": "net.veloclient.velo.preview.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"RideableAlphaRenderMixin",
+		"RideableAlphaStateMixin"
+	],
+	"injectors": {
+		"defaultRequire": 0
+	}
+}

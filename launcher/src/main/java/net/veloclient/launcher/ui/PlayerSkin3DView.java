@@ -587,6 +587,8 @@ public final class PlayerSkin3DView {
 		int w = image.getWidth();
 		int h = image.getHeight();
 		int[] argb = image.getRGB(0, 0, w, h, null, 0, w);
+		// Upscaled even for HD cloaks: JavaFX samples 3D textures bilinearly, and the nearest-neighbour blow-up keeps the
+		// edges crisp when the cloak fills the view (the owner wants that sharpness - don't trade it for memory).
 		int factor = Math.max(1, targetWidth / Math.max(1, w));
 		return upscale(argb, w, h, factor);
 	}

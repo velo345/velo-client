@@ -50,7 +50,7 @@ public abstract class AtmosphericFogMixin {
 		data.environmentalEnd = (float) (data.environmentalEnd / thickness);
 	}
 }
-//?} else {
+//?} else if <26.3 {
 /*@Mixin(AtmosphericFogEnvironment.class)
 public abstract class AtmosphericFogMixin {
 
@@ -59,6 +59,30 @@ public abstract class AtmosphericFogMixin {
 			CallbackInfoReturnable<Integer> cir) {
 		if (TimeWeatherFogModule.isFogColorOverrideActive()) {
 			cir.setReturnValue(TimeWeatherFogModule.fogColorOverrideValue());
+		}
+	}
+
+	@Inject(method = "setupFog", at = @At("TAIL"))
+	private void velo$overrideDistance(FogData data, Camera camera, ClientLevel level, float f,
+			DeltaTracker deltaTracker, CallbackInfo ci) {
+		if (!TimeWeatherFogModule.isFogDistanceOverrideActive()) {
+			return;
+		}
+		double thickness = TimeWeatherFogModule.fogThicknessValue();
+		data.environmentalStart = (float) (data.environmentalStart / thickness);
+		data.environmentalEnd = (float) (data.environmentalEnd / thickness);
+	}
+}
+*///?} else {
+/*@Mixin(AtmosphericFogEnvironment.class)
+public abstract class AtmosphericFogMixin {
+
+	@Inject(method = "getBaseColor", at = @At("RETURN"), cancellable = true)
+	private void velo$overrideColor(ClientLevel level, Camera camera, int viewDistance, float skyDarkness,
+			CallbackInfoReturnable<org.joml.Vector3fc> cir) {
+		if (TimeWeatherFogModule.isFogColorOverrideActive()) {
+			int c = TimeWeatherFogModule.fogColorOverrideValue();
+			cir.setReturnValue(new org.joml.Vector3f(((c >> 16) & 0xFF) / 255f, ((c >> 8) & 0xFF) / 255f, (c & 0xFF) / 255f));
 		}
 	}
 

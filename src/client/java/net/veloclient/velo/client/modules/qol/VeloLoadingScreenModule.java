@@ -52,9 +52,34 @@ public final class VeloLoadingScreenModule extends AbstractModule {
 		prepare.start();
 	}
 
+	/** Set when drawing failed once: vanilla's loading screen takes over for the rest of this start. */
+	private static volatile boolean failed;
+	private static long lastErrorLog;
+
 	public static boolean active() {
 		VeloLoadingScreenModule m = instance;
-		return m != null && m.isEnabled();
+		// RRLS ("Remove Reloading Screen") draws the overlay inside its own mini renderer - the two fought over it.
+		return m != null && m.isEnabled() && !failed && !net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("rrls");
+	}
+
+	/**
+	 * {@link #render} that can't take the start down: any exception (ours, or a mod drawing the title screen behind it)
+	 * switches the Velo loading screen off and hands the overlay back to vanilla, which then finishes as normal. Before,
+	 * an exception left the pose stack one push deeper every frame until it overflowed - and since the overlay only goes
+	 * away when this returns true, the game sat on the loading screen.
+	 */
+	public static boolean safeRender(DrawContext context, float progress, float doneFor, java.util.function.IntConsumer screen) {
+		try {
+			return render(context, progress, doneFor, screen) || doneFor > OUTRO_SECONDS + 3f;
+		} catch (Throwable t) {
+			failed = true;
+			long now = System.currentTimeMillis();
+			if (now - lastErrorLog > 5000) {
+				lastErrorLog = now;
+				net.veloclient.velo.VeloClient.LOGGER.error("Velo loading screen failed - using Minecraft's own from here", t);
+			}
+			return doneFor >= 0f;
+		}
 	}
 
 	// ---------------------------------------------------------------- background thread

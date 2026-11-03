@@ -110,6 +110,17 @@ final class CrashAnalyzer {
 					"It had " + now + " MB and needed more - big mod lists, high render distance and shaders all add up.", fixes, List.of()));
 		}
 
+		// MixinExtras inside an older loader casting another mod's annotations (YACL & co.): fixed in the loader's newer one.
+		// The loader that really ran (the log says), else the profile's setting.
+		Matcher ranLoader = RAN_LOADER.matcher(text);
+		String loaderRan = ranLoader.find() ? ranLoader.group(1) : s.loaderVersion();
+		if (trace.contains("com.llamalad7.mixinextras") && trace.contains("ClassCastException")
+				&& loaderRan != null && net.veloclient.launcher.launch.LoaderVersions.compare(loaderRan, "0.19.5") < 0) {
+			issues.add(new Issue("mixinextras-loader", Severity.CRASH, "This Fabric Loader is too old for your mods",
+					"Fabric Loader " + loaderRan + " ships a MixinExtras that breaks on some mods' code. 0.19.5 fixes it.",
+					List.of(new Fix("Use Fabric Loader 0.19.5", "Velo's tested version", List.of(new Action.SetLoader("0.19.5")))), List.of()));
+		}
+
 		Matcher version = CLASS_VERSION.matcher(trace);
 		if (version.find()) {
 			int needs = Integer.parseInt(version.group(2)) - 44;
@@ -175,7 +186,11 @@ final class CrashAnalyzer {
 		if (text.contains("java.lang.OutOfMemoryError")) {
 			culprit = null; // whatever happened to run when memory ran out isn't the cause
 		}
-		boolean shaderCrash = (culprit != null && "iris".equals(culprit.id()) || text.contains("net.irisshaders")) && text.toLowerCase().contains("shader");
+		// Only the error itself: every log of an Iris player mentions net.irisshaders and "shader" somewhere, which made
+		// unrelated crashes (a watchdog at shutdown...) read as "the shader pack crashed the game".
+		String primary = primaryTrace(crash, trace);
+		boolean shaderCrash = (culprit != null && "iris".equals(culprit.id()) || primary.contains("net.irisshaders"))
+				&& primary.toLowerCase(java.util.Locale.ROOT).contains("shader");
 		if (shaderCrash) {
 			List<Fix> fixes = new ArrayList<>(List.of(new Fix("Turn shaders off", "The shader pack stays installed", List.of(new Action.DisableShaders()))));
 			ModScanner.ModInfo iris = s.enabledById("iris");
@@ -266,6 +281,34 @@ final class CrashAnalyzer {
 						"It needs " + wrong.group(3).replace("any version ", "") + ", this profile is " + s.instance().mcVersion() + ".", fixes, List.of()));
 				continue;
 			}
+			if (depId.equals("fabricloader")) {
+				// The loader isn't a file in mods/: switch the profile to a build that fits (the version Fabric names).
+				Matcher at = VERSION_NUMBER.matcher(wrong.group(3));
+				if (at.find()) {
+					fixes.add(new Fix("Use Fabric Loader " + at.group(), "Instead of " + wrong.group(6) + " - only for this profile",
+							List.of(new Action.SetLoader(at.group()))));
+				}
+				if (mod != null) {
+					fixes.add(update(mod, false));
+					fixes.add(off(mod));
+				}
+				issues.add(new Issue("dep-version:" + modId + ":fabricloader", Severity.CRASH, modName + " needs a newer Fabric Loader",
+						"It wants " + wrong.group(3).replace("any version ", "") + ", this profile runs " + wrong.group(6) + ".", fixes, List.of()));
+				continue;
+			}
+			if (depId.equals("java")) {
+				Matcher at = VERSION_NUMBER.matcher(wrong.group(3));
+				String wanted = at.find() ? at.group() : wrong.group(3);
+				if (mod != null) {
+					fixes.add(update(mod, true));
+					fixes.add(off(mod));
+				}
+				issues.add(new Issue("dep-version:" + modId + ":java", Severity.CRASH, modName + " needs Java " + wanted,
+						"It only runs on " + wrong.group(3).replace("any version ", "") + " of Java, the game had Java " + wrong.group(6)
+								+ ". Velo starts the next launch with the Java the mod accepts when it can; a newer version of the mod fixes it for good.",
+						fixes, List.of()));
+				continue;
+			}
 			if (dep != null) {
 				fixes.add(new Fix("Get a fitting " + depName, "Switches " + depName + " to a version " + modName + " accepts",
 						List.of(new Action.Update(dep.file(), dep.displayName(), depId, false))));
@@ -287,15 +330,48 @@ final class CrashAnalyzer {
 			ModScanner.ModInfo a = s.enabledById(aId);
 			ModScanner.ModInfo b = s.enabledById(bId);
 			List<Fix> fixes = new ArrayList<>();
-			if (b != null) {
-				fixes.add(off(b));
-			}
-			if (a != null) {
+			// First offer to turn off the one fewer other mods need (Sodium next to VulkanMod + its add-ons, say).
+			boolean aFirst = a != null && b != null && dependents(s, aId) < dependents(s, bId);
+			if (aFirst) {
 				fixes.add(off(a));
+				fixes.add(off(b));
+			} else {
+				if (b != null) {
+					fixes.add(off(b));
+				}
+				if (a != null) {
+					fixes.add(off(a));
+				}
 			}
 			issues.add(new Issue("breaks:" + aId + ":" + bId, Severity.CRASH, clash.group(1) + " doesn't work with " + clash.group(4),
 					"Fabric won't start with both installed. Keep one.", fixes, List.of()));
 		}
+	}
+
+	/** How many enabled mods list {@code id} as a dependency. */
+	private static int dependents(Snapshot s, String id) {
+		int count = 0;
+		for (ModScanner.ModInfo mod : s.enabledMods()) {
+			if (mod.depends() != null && mod.depends().containsKey(id)) {
+				count++;
+			}
+		}
+		return count;
+	}
+
+	private static final Pattern RAN_LOADER = Pattern.compile("with Fabric Loader (\\d[\\w.+\\-]*)");
+	private static final Pattern VERSION_NUMBER = Pattern.compile("\\d+(?:\\.\\d+)*(?:[-+][\\w.]+)?");
+
+	/**
+	 * The error itself: in a crash report the part before the "detailed walkthrough" (the exception and its causes),
+	 * otherwise the log's error lines.
+	 */
+	static String primaryTrace(String crash, String trace) {
+		if (crash != null) {
+			int end = crash.indexOf("A detailed walkthrough of the error");
+			return end > 0 ? crash.substring(0, end) : crash;
+		}
+		return trace;
 	}
 
 	private static final Pattern LOG_NOISE = Pattern.compile("^\\[[\\d:.]+\\] \\[[^\\]]*/(?:WARN|INFO|DEBUG|TRACE)\\]");

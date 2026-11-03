@@ -77,15 +77,17 @@ public abstract class LocalPlayerSkinCapeMixin {
 			return;
 		}
 		CapeDefinition definition = equipped.get();
-		boolean overrideCape = WaveyCapesCompat.isLoaded();
+		boolean overrideCape = net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.waveyActive();
+		// Wavey Capes installed but Velo picked to draw: report no cape, or Wavey would draw one on top of ours.
+		boolean hideCape = WaveyCapesCompat.isLoaded() && !overrideCape;
 		// Only painted while an elytra is actually worn (it is re-made from the cape art every animation frame).
 		var elytraTexture = ((AbstractClientPlayerEntity) (Object) this).getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).getItem()
 				== net.minecraft.item.Items.ELYTRA ? CapeManager.elytraTextureIdentifier(definition) : java.util.Optional.<Identifier>empty();
-		if (!overrideCape && elytraTexture.isEmpty()) {
+		if (!overrideCape && !hideCape && elytraTexture.isEmpty()) {
 			return;
 		}
 		SkinTextures original = cir.getReturnValue();
-		AssetInfo.TextureAsset capeAsset = original.cape();
+		AssetInfo.TextureAsset capeAsset = hideCape ? null : original.cape();
 		if (overrideCape) {
 			// The single-arg TextureAssetInfo(Identifier) constructor does
 			// NOT reuse that identifier as the texturePath - it derives a
@@ -140,14 +142,16 @@ public abstract class LocalPlayerSkinCapeMixin {
 			return;
 		}
 		CapeDefinition definition = equipped.get();
-		boolean overrideCape = WaveyCapesCompat.isLoaded();
+		boolean overrideCape = net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.waveyActive();
+		// Wavey Capes installed but Velo picked to draw: report no cape, or Wavey would draw one on top of ours.
+		boolean hideCape = WaveyCapesCompat.isLoaded() && !overrideCape;
 		var elytraTexture = ((AbstractClientPlayer) (Object) this).getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem()
 				== net.minecraft.world.item.Items.ELYTRA ? CapeManager.elytraTextureIdentifier(definition) : java.util.Optional.<Identifier>empty();
-		if (!overrideCape && elytraTexture.isEmpty()) {
+		if (!overrideCape && !hideCape && elytraTexture.isEmpty()) {
 			return;
 		}
 		PlayerSkin original = cir.getReturnValue();
-		ClientAsset.Texture capeAsset = original.cape();
+		ClientAsset.Texture capeAsset = hideCape ? null : original.cape();
 		if (overrideCape) {
 			// Same real bug/fix as the 1.21.11 branch above: the single-arg
 			// ResourceTexture(Identifier) constructor derives a DIFFERENT

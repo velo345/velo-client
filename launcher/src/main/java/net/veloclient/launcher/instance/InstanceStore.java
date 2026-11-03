@@ -60,11 +60,70 @@ public final class InstanceStore {
 	}
 
 	public static Instance createNew(String name, String mcVersion, InstanceIcon icon) {
+		// The first-start guide only makes sense once: the very first launch with Velo ever (its default profile) - not
+		// on profiles made later, and not again after deleting every profile (remembered in config/guide-offered).
+		Path offered = net.veloclient.launcher.data.VeloPaths.root().resolve("config").resolve("guide-offered");
+		boolean first = loadAll().isEmpty() && !Files.exists(offered);
 		String id = UUID.randomUUID().toString();
 		Instance instance = new Instance(id, name, mcVersion, icon, System.currentTimeMillis());
 		InstancePaths.ensureDirectories(id);
 		save(instance);
+		if (first) {
+			markGuidePending(id);
+			try {
+				Files.createDirectories(offered.getParent());
+				Files.writeString(offered, java.time.Instant.now().toString(), StandardCharsets.UTF_8);
+			} catch (IOException ignored) {
+				// worst case the guide is offered on a later first profile too
+			}
+		}
+		giveOwnVeloProfile(id, name);
 		return instance;
+	}
+
+	/**
+	 * A new profile gets its own Velo settings profile (its folder's {@code velo/active-profile.json}, read by the game)
+	 * named after it - so it starts with Velo's defaults instead of taking over the modules another profile turned on
+	 * (recoloured hearts, 1.8 animations...). The name never matches an existing settings profile, or that one would load.
+	 */
+	private static void giveOwnVeloProfile(String id, String name) {
+		try {
+			String base = name == null || name.isBlank() ? "Profile" : name.strip();
+			String chosen = base;
+			for (int n = 2; Files.exists(net.veloclient.launcher.data.VeloPaths.root().resolve("saved-profiles").resolve(fileName(chosen) + ".json")); n++) {
+				chosen = base + " " + n;
+			}
+			Path marker = InstancePaths.gameDir(id).resolve("velo").resolve("active-profile.json");
+			Files.createDirectories(marker.getParent());
+			com.google.gson.JsonObject json = new com.google.gson.JsonObject();
+			json.addProperty("name", chosen);
+			Files.writeString(marker, json.toString(), StandardCharsets.UTF_8);
+		} catch (IOException | RuntimeException ignored) {
+			// then it shares the global settings profile, like profiles always did
+		}
+	}
+
+	/** The file name the game and the launcher's ProfileStore give a settings profile. */
+	private static String fileName(String profileName) {
+		return profileName.toLowerCase().replaceAll("[^a-z0-9_-]+", "-");
+	}
+
+	/**
+	 * A brand-new profile shows Velo's first-start guide once, on its first title screen (the game deletes the file when
+	 * the guide is finished or skipped). Only the very first profile; later ones, duplicates and imports never get it.
+	 * Dev build only until the guide ships.
+	 */
+	private static void markGuidePending(String id) {
+		if (!net.veloclient.launcher.AppVersion.DEV) {
+			return;
+		}
+		try {
+			Path marker = InstancePaths.gameDir(id).resolve("velo").resolve("guide-pending");
+			Files.createDirectories(marker.getParent());
+			Files.writeString(marker, java.time.Instant.now().toString(), StandardCharsets.UTF_8);
+		} catch (IOException ignored) {
+			// no guide for this profile - harmless
+		}
 	}
 
 	public static void save(Instance instance) {

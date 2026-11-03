@@ -37,6 +37,92 @@ public final class NotesRenderer {
 	static void register() {
 		HudElementRegistry.attachElementBefore(VanillaHudElements.CROSSHAIR, Identifier.of("velo-client", "dev_world_notes"),
 				(context, tickCounter) -> render(context));
+		NoteWorld.register();
+	}
+
+	/** The card the world pass found under the crosshair, with where its hint goes. */
+	private static volatile NoteWorld.Card aimedCard;
+
+	/**
+	 * Called by the world pass every frame: the near notes as world cards (far ones stay HUD pins), and which one the
+	 * crosshair is on. Built with this frame's camera, so facing cards turn with you without a frame of lag.
+	 */
+	static List<NoteWorld.Card> worldCards() {
+		aimedCard = null;
+		if (!NotesModule.active() || !StorageMc.inWorld() || !NotesModule.showInWorld() && !NotePlacer.active()) {
+			return List.of();
+		}
+		double[] camera = NoteWorld.cameraPosition();
+		double[] eye = NotesMc.eye();
+		if (eye == null) {
+			return List.of();
+		}
+		Note moving = NotePlacer.moving();
+		List<Note> notes = new ArrayList<>(NoteStore.here());
+		if (moving != null) {
+			notes.removeIf(n -> n.id.equals(moving.id));
+			notes.add(moving);
+		}
+		double max = Math.min(NotesModule.distance(), PIN_DISTANCE);
+		List<Placed> near = new ArrayList<>();
+		for (Note note : notes) {
+			if (!note.mine && !NotesModule.showOthers() || note != moving && !note.showsHere()) {
+				continue;
+			}
+			double dx = note.x - camera[0];
+			double dy = note.y - camera[1];
+			double dz = note.z - camera[2];
+			double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+			if (distance <= max && distance >= 0.4 || note == moving) {
+				near.add(new Placed(note, distance));
+			}
+		}
+		// Far ones first: translucent cards blend over what's behind them.
+		near.sort(Comparator.comparingDouble(Placed::distance).reversed());
+		float[] rot = net.veloclient.velo.client.pvp.PvpCompat.cameraRotation();
+		double yaw = Math.toRadians(rot[0]);
+		double pitch = Math.toRadians(rot[1]);
+		double[] look = {-Math.sin(yaw) * Math.cos(pitch), -Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)};
+		Note lastAimed = aimed;
+		List<NoteWorld.Card> cards = new ArrayList<>();
+		NoteWorld.Card best = null;
+		for (Placed p : near) {
+			Note note = p.note();
+			double size = WORLD_W * note.size * NotesModule.scale();
+			double scale = size / NoteCard.W;
+			double[] right = right(note, camera);
+			boolean glow = note.unread || note == lastAimed;
+			NoteWorld.Card card = NoteWorld.build(note, note.x, note.y + bob(note), note.z, right[0], right[1], scale, p.distance(),
+					fadeFor(p.distance()), glow);
+			cards.add(card);
+			if (note != moving && p.distance() < 10 && NoteWorld.hit(card, camera, look) != null
+					&& (best == null || p.distance() < best.distance())) {
+				best = card;
+			}
+		}
+		aimedCard = best;
+		return cards;
+	}
+
+	/** The card's right-hand direction (x, z): towards the viewer's right for facing notes, the wall's for fixed ones. */
+	private static double[] right(Note note, double[] viewer) {
+		if (note.face) {
+			double dx = note.x - viewer[0];
+			double dz = note.z - viewer[2];
+			double len = Math.max(0.001, Math.sqrt(dx * dx + dz * dz));
+			return new double[] {-dz / len, dx / len};
+		}
+		double yaw = Math.toRadians(note.yaw);
+		double rx = -Math.cos(yaw);
+		double rz = -Math.sin(yaw);
+		// From behind, mirror it so it still reads (a note, not a one-sided sign).
+		double nx = Math.sin(yaw);
+		double nz = -Math.cos(yaw);
+		if ((viewer[0] - note.x) * nx + (viewer[2] - note.z) * nz < 0) {
+			rx = -rx;
+			rz = -rz;
+		}
+		return new double[] {rx, rz};
 	}
 
 	/** The note under your crosshair (within reach), or null. */
@@ -90,14 +176,31 @@ public final class NotesRenderer {
 		int sh = context.getScaledWindowHeight();
 		Note best = null;
 		double bestDistance = Double.MAX_VALUE;
+		boolean worldCards = !NoteWorld.broken();
+		if (worldCards) {
+			// Near cards are real things in the world now (NoteWorld); the HUD keeps the far pins and the aim hint.
+			NoteWorld.Card card = aimedCard;
+			if (card != null) {
+				float[] at = screen(card.cx(), card.cy() - card.height() / 2.0 * card.scale(), card.cz(), sw, sh);
+				if (at != null && card.note() != NotePlacer.moving()) {
+					hint(context, at[0], at[1] + 6, card.note());
+				}
+				aimed = card.note();
+			}
+		}
 		for (Placed p : placed) {
+			if (worldCards && p.distance() <= PIN_DISTANCE) {
+				continue;
+			}
 			boolean hit = p.distance() > PIN_DISTANCE ? drawPin(context, p.note(), p.distance(), sw, sh) : drawCard(context, p.note(), p.distance(), sw, sh);
 			if (hit && p.distance() < 10 && p.distance() < bestDistance && p.note() != moving) {
 				best = p.note();
 				bestDistance = p.distance();
 			}
 		}
-		aimed = best;
+		if (!worldCards) {
+			aimed = best;
+		}
 	}
 
 	/** Line of sight to the note's centre, cached ~200 ms per note. */

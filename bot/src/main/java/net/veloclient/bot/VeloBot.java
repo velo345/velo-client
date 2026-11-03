@@ -241,17 +241,61 @@ public final class VeloBot extends ListenerAdapter {
 				|| !event.getChannel().getId().equals(config.linkChannelId)) {
 			return;
 		}
-		String code = event.getMessage().getContentRaw().strip();
-		if (!LINK_CODE.matcher(code).matches()) {
+		String text = event.getMessage().getContentRaw().strip();
+		String code = null;
+		if (LINK_CODE.matcher(text).matches()) {
+			code = text;
+		} else {
+			// "here is my code VELO-AB12CD" - only the prefixed form inside other text (a bare 6-letter word could be anything)
+			java.util.regex.Matcher inside = PREFIXED_CODE.matcher(text);
+			if (inside.find()) {
+				code = inside.group();
+			}
+		}
+		if (code == null) {
+			removeChatter(event);
 			return;
 		}
+		String found = code;
 		event.getMessage().delete().queue(
-				ignored -> link(event, code),
+				ignored -> link(event, found),
 				error -> {
 					System.err.println("Couldn't delete a Discord link-code message: " + error.getMessage());
 					event.getChannel().sendMessage("I couldn't safely process that code. Please check that I have Manage Messages in this channel.")
 							.queue(null, sendError -> System.err.println("Couldn't report link-code deletion failure: " + sendError.getMessage()));
 				});
+	}
+
+	private static final Pattern PREFIXED_CODE = Pattern.compile("(?i)\\bVELO-[A-HJ-NP-Z2-9]{6}\\b");
+	private final java.util.Map<String, Long> lastChatterHint = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/**
+	 * The link channel is only for codes: anything else (chat, questions, pictures) is deleted, and its author gets a
+	 * short hint how linking works - privately, at most once a minute. Staff (Manage Messages) can still post there.
+	 */
+	private void removeChatter(MessageReceivedEvent event) {
+		var member = event.getMember();
+		if (member != null && member.hasPermission(event.getGuildChannel(), Permission.MESSAGE_MANAGE)) {
+			return;
+		}
+		if (event.getMessage().getType().isSystem()) {
+			return;
+		}
+		event.getMessage().delete().queue(null, error -> System.err.println("Couldn't remove a message from the link channel: " + error.getMessage()));
+		long now = System.currentTimeMillis();
+		Long last = lastChatterHint.get(event.getAuthor().getId());
+		if (last != null && now - last < 60_000) {
+			return;
+		}
+		lastChatterHint.put(event.getAuthor().getId(), now);
+		if (lastChatterHint.size() > 5000) {
+			lastChatterHint.clear();
+		}
+		String hint = "<#" + config.linkChannelId + "> is only for linking your account. In Velo Client open **Store → Copy link code**"
+				+ " and paste just the code (like `VELO-AB12CD`) there, or use **/link**. Questions? Open a ticket.";
+		event.getAuthor().openPrivateChannel().flatMap(channel -> channel.sendMessage(hint)).queue(null, dmClosed ->
+				event.getChannel().sendMessage(event.getAuthor().getAsMention() + " " + hint)
+						.queue(message -> message.delete().queueAfter(12, java.util.concurrent.TimeUnit.SECONDS, null, e -> { }), e -> { }));
 	}
 
 	/** A code typed in the link channel: the answer goes to the member privately (DM), not to the whole channel. */

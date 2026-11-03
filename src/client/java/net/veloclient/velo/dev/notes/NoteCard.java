@@ -43,16 +43,21 @@ public final class NoteCard {
 
 	/** Height of the card for this note ({@code full}: the whole text and list, as in the editor preview). */
 	public static int height(Note note, boolean full) {
-		return layout(note, full, null, 0, 0, 0xFF);
+		return layout(note, full, null, false, 0, 0, 0xFF);
 	}
 
 	/** Draws the card; {@code alpha} fades it (0..255), {@code glow} outlines it (aimed at / unread). Returns its height. */
 	public static int draw(DrawContext context, Note note, boolean full, boolean glow, int alpha) {
-		return layout(note, full, context, 0, 0, alpha);
+		return layout(note, full, context, true, 0, 0, alpha);
 	}
 
-	/** One pass that measures (context null) or draws. */
-	private static int layout(Note note, boolean full, DrawContext context, int ox, int oy, int alpha) {
+	/** Draws the card into {@link NoteWorld}'s recorder (real geometry in the world) instead of the GUI. */
+	static int record(Note note, int alpha) {
+		return layout(note, false, null, true, 0, 0, alpha);
+	}
+
+	/** One pass that measures ({@code draw} false) or draws - into the GUI, or (context null) into {@link NoteWorld}. */
+	private static int layout(Note note, boolean full, DrawContext context, boolean draw, int ox, int oy, int alpha) {
 		var renderer = MinecraftClient.getInstance().textRenderer;
 		Look look = look(note);
 		int inner = W - PAD * 2;
@@ -70,7 +75,13 @@ public final class NoteCard {
 		int titleX = PAD;
 		if (note.icon != null && (plain || titled)) {
 			int iy = y - 3;
-			body.add(() -> StorageMc.drawItem(context, StorageMc.stack(note.icon, 1), ox + PAD - 1, oy + iy, ""));
+			body.add(() -> {
+				if (NoteWorld.recording()) {
+					NoteWorld.item(note.icon, ox + PAD - 1, oy + iy, alpha);
+				} else {
+					StorageMc.drawItem(context, StorageMc.stack(note.icon, 1), ox + PAD - 1, oy + iy, "");
+				}
+			});
 			titleX += 17;
 		}
 		if (plain || titled) {
@@ -133,7 +144,7 @@ public final class NoteCard {
 					int color = fade(check.done ? look.muted : look.text, alpha);
 					text(context, renderer, line, ox + PAD + 11, oy + cy, color, look.shadow);
 					if (check.done) {
-						context.fill(ox + PAD + 11, oy + cy + 4, ox + PAD + 11 + renderer.getWidth(line), oy + cy + 5, color);
+						fill(context, ox + PAD + 11, oy + cy + 4, ox + PAD + 11 + renderer.getWidth(line), oy + cy + 5, color);
 					}
 				});
 				y += 10;
@@ -155,14 +166,18 @@ public final class NoteCard {
 		}
 
 		// Picture.
-		Identifier picture = context == null ? null : NoteStore.texture(note);
+		Identifier picture = draw ? NoteStore.texture(note) : null;
 		if (images && (note.image > 0 && !note.isBoard() || note.isImage())) {
 			float aspect = NoteImages.aspect(note);
 			int ph = Math.max(20, Math.min(inner, Math.round(inner / Math.max(0.3f, aspect))));
 			int py = y;
 			body.add(() -> {
 				if (picture != null && note.image > 0) {
-					context.drawTexture(RenderPipelines.GUI_TEXTURED, picture, ox + PAD, oy + py, 0f, 0f, inner, ph, inner, ph);
+					if (NoteWorld.recording()) {
+						NoteWorld.texture(picture, ox + PAD, oy + py, inner, ph, alpha);
+					} else {
+						context.drawTexture(RenderPipelines.GUI_TEXTURED, picture, ox + PAD, oy + py, 0f, 0f, inner, ph, inner, ph);
+					}
 				} else {
 					VeloDraw.fillRounded(context, ox + PAD, oy + py, inner, ph, 3, fade(withAlpha(look.muted, 0x30), alpha));
 					text(context, renderer, MenuKit.ui(note.image == 0 ? "No picture yet" : note.mine || NotesModule.othersPictures() ? "Picture..." : "Picture hidden"), ox + PAD + 4, oy + py + 4,
@@ -187,7 +202,7 @@ public final class NoteCard {
 		y += 10 + PAD - 2;
 
 		int h = y;
-		if (context != null) {
+		if (draw) {
 			background(context, note, look, ox, oy, h, alpha);
 			for (Runnable part : body) {
 				part.run();
@@ -209,11 +224,11 @@ public final class NoteCard {
 		switch (note.style) {
 			case "sticky" -> {
 				VeloDraw.shadow(context, x, y, W, h, 2, 6, 2, fade(0x40000000, alpha));
-				context.fill(x, y, x + W, y + h - 10, fade(look.bg, alpha));
-				context.fill(x, y + h - 10, x + W - 10, y + h, fade(look.bg, alpha));
+				fill(context, x, y, x + W, y + h - 10, fade(look.bg, alpha));
+				fill(context, x, y + h - 10, x + W - 10, y + h, fade(look.bg, alpha));
 				// Folded corner.
 				VeloDraw.fillQuad(context, x + W - 10, y + h - 10, x + W, y + h - 10, x + W - 10, y + h, x + W - 10, y + h, fade(look.edge, alpha));
-				context.fill(x, y, x + W, y + 3, fade(mix(c, 0xFF000000, 0.1f), alpha));
+				fill(context, x, y, x + W, y + 3, fade(mix(c, 0xFF000000, 0.1f), alpha));
 			}
 			case "glass" -> {
 				VeloDraw.shadow(context, x, y, W, h, 8, 8, 3, fade(0x50000000, alpha));
@@ -226,7 +241,7 @@ public final class NoteCard {
 				VeloDraw.fillRounded(context, x, y, W, h, 3, fade(look.edge, alpha));
 				VeloDraw.fillRounded(context, x + 2, y + 2, W - 4, h - 4, 2, fade(look.bg, alpha));
 				for (int py = y + 14; py < y + h - 4; py += 14) {
-					context.fill(x + 3, py, x + W - 3, py + 1, fade(0x22000000, alpha));
+					fill(context, x + 3, py, x + W - 3, py + 1, fade(0x22000000, alpha));
 				}
 			}
 			case "neon" -> {
@@ -279,7 +294,20 @@ public final class NoteCard {
 		if (((color >>> 24) & 0xFF) < 8) {
 			return;
 		}
+		if (NoteWorld.recording()) {
+			NoteWorld.text(value, x, y, color, shadow);
+			return;
+		}
 		context.drawText(renderer, value, x, y, color, shadow);
+	}
+
+	/** A plain rectangle - in the world it goes through the same shape recorder as the rounded ones. */
+	private static void fill(DrawContext context, int x1, int y1, int x2, int y2, int color) {
+		if (NoteWorld.recording()) {
+			VeloDraw.fillRounded(null, x1, y1, x2 - x1, y2 - y1, 0, color);
+			return;
+		}
+		context.fill(x1, y1, x2, y2, color);
 	}
 
 	static int fade(int argb, int alpha) {

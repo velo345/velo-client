@@ -198,6 +198,13 @@ public final class MemoryPlanner {
 			}
 		}
 
+		// A start that ran out of memory never gets to write its stats - remember it from its crash report instead.
+		int oomFloor = instance == null ? 0 : recentOomFloorMb(instance);
+		if (oomFloor > minimumNeed) {
+			minimumNeed = oomFloor;
+			target = Math.max(target, oomFloor);
+			reasons.add("The last start ran out of memory");
+		}
 		int cap = tierCapMb(totalMb);
 		minimumNeed = Math.max(Math.min(ABSOLUTE_MIN_MB, cap), Math.min(minimumNeed, cap));
 		int result = Math.max(minimumNeed, Math.min(cap, target));
@@ -270,6 +277,42 @@ public final class MemoryPlanner {
 	private record Learned(long peakLiveMb, double gcPercent, boolean nearOom) {
 	}
 
+	private static final java.util.regex.Pattern XMX = java.util.regex.Pattern.compile("-Xmx(\\d+)([mMgG])");
+
+	/**
+	 * The heap a crash report from the last two weeks ran out of (plus 1 GB), when that crash is newer than the
+	 * memory stats; 0 when there's none.
+	 */
+	static int recentOomFloorMb(Instance instance) {
+		Path dir = InstancePaths.gameDir(instance.id()).resolve("crash-reports");
+		Path stats = InstancePaths.gameDir(instance.id()).resolve("velo").resolve("memory-stats.json");
+		try (var files = Files.list(dir)) {
+			long since = System.currentTimeMillis() - 14L * 24 * 3600 * 1000;
+			if (Files.exists(stats)) {
+				since = Math.max(since, Files.getLastModifiedTime(stats).toMillis());
+			}
+			long after = since;
+			int floor = 0;
+			for (Path file : files.filter(f -> f.getFileName().toString().endsWith(".txt")).toList()) {
+				if (Files.getLastModifiedTime(file).toMillis() < after || Files.size(file) > 4_000_000) {
+					continue;
+				}
+				String text = Files.readString(file, StandardCharsets.UTF_8);
+				if (!text.contains("java.lang.OutOfMemoryError: Java heap space")) {
+					continue;
+				}
+				java.util.regex.Matcher m = XMX.matcher(text);
+				if (m.find()) {
+					int mb = Integer.parseInt(m.group(1)) * (m.group(2).equalsIgnoreCase("g") ? 1024 : 1);
+					floor = Math.max(floor, mb + 1024);
+				}
+			}
+			return floor;
+		} catch (Exception e) {
+			return 0;
+		}
+	}
+
 	private static Learned readLearned(Instance instance) {
 		Path file = InstancePaths.gameDir(instance.id()).resolve("velo").resolve("memory-stats.json");
 		try {
@@ -290,7 +333,7 @@ public final class MemoryPlanner {
 		}
 	}
 
-	private static int readRenderDistance(Path gameDir) {
+	public static int readRenderDistance(Path gameDir) {
 		try {
 			Path options = gameDir.resolve("options.txt");
 			if (!Files.exists(options)) {

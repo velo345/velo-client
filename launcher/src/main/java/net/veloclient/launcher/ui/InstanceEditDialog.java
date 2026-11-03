@@ -93,7 +93,7 @@ public final class InstanceEditDialog {
 		content.setPrefWidth(460);
 		content.getChildren().addAll(
 				labeled("Name", nameField),
-				labeled("Minecraft version", versionBox),
+				labeled("Minecraft version", net.veloclient.launcher.AppVersion.DEV ? versionTiles(versionBox) : versionBox),
 				labeled("Icon", iconPicker));
 
 		dialog.getDialogPane().setContent(content);
@@ -116,6 +116,43 @@ public final class InstanceEditDialog {
 		});
 
 		return dialog.showAndWait();
+	}
+
+	/**
+	 * Dev build: the versions as picture tiles (VersionArt) instead of a drop-down - picking one sets the (hidden) box the
+	 * dialog reads its result from.
+	 */
+	private static Node versionTiles(ComboBox<String> versionBox) {
+		FlowPane tiles = new FlowPane(8, 8);
+		tiles.setPrefWrapLength(460);
+		ToggleGroup group = new ToggleGroup();
+		GameVersion[] all = GameVersion.values();
+		for (int i = all.length - 1; i >= 0; i--) {
+			String id = all[i].id();
+			ToggleButton button = new ToggleButton();
+			button.setGraphic(VersionArt.tile(id, i == all.length - 1, 104));
+			button.setToggleGroup(group);
+			button.setUserData(id);
+			button.setStyle(tileStyle(false));
+			button.selectedProperty().addListener((obs, was, now) -> button.setStyle(tileStyle(now)));
+			button.setOnAction(e -> {
+				if (!button.isSelected()) {
+					button.setSelected(true); // a choice can't be un-picked
+				}
+				versionBox.setValue(id);
+			});
+			if (id.equals(versionBox.getValue())) {
+				button.setSelected(true);
+			}
+			tiles.getChildren().add(button);
+		}
+		return tiles;
+	}
+
+	private static String tileStyle(boolean selected) {
+		return "-fx-padding: 3; -fx-background-radius: 12; -fx-border-radius: 12; -fx-border-width: 2; -fx-cursor: hand;"
+				+ (selected ? " -fx-background-color: rgba(255,59,68,0.18); -fx-border-color: #ff3b44;"
+						: " -fx-background-color: transparent; -fx-border-color: rgba(255,255,255,0.08);");
 	}
 
 	private static VBox labeled(String label, javafx.scene.Node control) {

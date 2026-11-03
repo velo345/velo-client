@@ -3,8 +3,6 @@ package net.veloclient.velo.client.gui;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.veloclient.velo.client.gui.title.MenuKit;
 import net.veloclient.velo.client.gui.title.QuickToggles;
@@ -45,7 +43,7 @@ import java.util.function.BooleanSupplier;
  * </ul>
  * Opens with a spring and cascades its cards in (see {@link VeloWindow#springAnimation()}).
  */
-public final class ModMenuScreen extends VeloWindow implements ModuleConfigScreen.Reopenable {
+public final class ModMenuScreen extends VeloWindow implements ModuleConfigScreen.Reopenable, net.veloclient.velo.client.gui.window.MenuPage {
 
 	private static final int RAIL = 30;
 	private static final int DRAWER = 180;
@@ -89,6 +87,26 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		super(Text.literal("Velo Client"), 840, 520);
 	}
 
+	/** The menu on Modules or Addons (the one-window menu's rail opens it like this). */
+	public static ModMenuScreen forView(boolean addons) {
+		View next = addons && hasAddons() ? View.ADDONS : View.MODULES;
+		if (view != next) {
+			view = next;
+			chip = next == View.ADDONS ? 0 : 1;
+			selectedId = null;
+		}
+		return new ModMenuScreen();
+	}
+
+	public static boolean addonsAvailable() {
+		return hasAddons();
+	}
+
+	@Override
+	public String railId() {
+		return view == View.ADDONS ? "addons" : "modules";
+	}
+
 	@Override
 	protected boolean springAnimation() {
 		return true;
@@ -113,7 +131,8 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 	// ---- Geometry ----
 
 	private int mainX() {
-		return contentX() + RAIL + 12;
+		// the one-window menu draws the shared rail and already moved the content past it
+		return contentX() + (shell() ? 0 : RAIL + 12);
 	}
 
 	private int drawerX() {
@@ -186,6 +205,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 
 	private void switchView(View next) {
 		if (view != next) {
+			net.veloclient.velo.client.sound.VeloUiSounds.tab();
 			view = next;
 			chip = next == View.ADDONS ? 0 : 1;
 			selectedId = null;
@@ -332,7 +352,9 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 	@Override
 	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
 		hits.clear();
-		drawRail(context, mouseX, mouseY);
+		if (!shell()) {
+			drawRail(context, mouseX, mouseY);
+		}
 		drawTopRow(context, mouseX, mouseY);
 		drawChips(context, mouseX, mouseY);
 	}
@@ -344,7 +366,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		long now = System.nanoTime();
 		float dt = VeloStyle.frameDelta(railNanos, now);
 		railNanos = now;
-		for (int i = 0; i < railBoxes.size(); i++) {
+		for (int i = 0; i < (shell() ? 0 : railBoxes.size()); i++) {
 			int[] box = railBoxes.get(i);
 			boolean over = MenuKit.inside(mouseX, mouseY, box[0], box[1], box[2], box[2]);
 			float t = VeloAnim.step(railHover.getOrDefault(i, 0f), over ? 1f : 0f, dt * 1.4f);
@@ -513,6 +535,9 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			MenuKit.text(context, this.textRenderer, label, x + 7, y + 4, on ? 0xFFFFFFFF : hover ? 0xFFE4E4E8 : 0xFF9A9AA6);
 			int index = i;
 			hits.add(new VeloUi.Hit(x, y, w, 16, () -> {
+				if (chip != index) {
+					net.veloclient.velo.client.sound.VeloUiSounds.tab();
+				}
 				chip = index;
 				if (search != null) {
 					search.setText("");
@@ -726,7 +751,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		}
 		for (VeloUi.Hit hit : List.copyOf(hits)) {
 			if (hit.contains(click.x(), click.y())) {
-				this.client.getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.UI_BUTTON_CLICK, 1.0f));
+				net.veloclient.velo.client.sound.VeloUiSounds.click(1.0f);
 				hit.action().run();
 				return true;
 			}

@@ -31,6 +31,7 @@ public final class DevTour {
 		return switch (name) {
 			case "storage" -> storage(shot);
 			case "notes" -> notes(shot);
+			case "notesview" -> notesView(shot);
 			case "pets" -> pets(shot);
 			case "perch" -> perch(shot);
 			default -> List.of();
@@ -314,6 +315,79 @@ public final class DevTour {
 		steps.add(step(25, () -> shot.accept("dev-notes-move")));
 		steps.add(step(2, () -> client().setScreen(null)));
 		return steps;
+	}
+
+	/**
+	 * The world cards from several views - straight on, turned right / left, looking down, from far back - with one
+	 * fixed wall note at an angle, to check they sit still in the world (no sliding / skewing while you turn).
+	 */
+	private static List<Object[]> notesView(Consumer<String> shot) {
+		List<Object[]> steps = new ArrayList<>();
+		float[] start = new float[2];
+		steps.add(step(0, DevTour::tidyWorld));
+		steps.add(step(10, () -> {
+			seedNotes();
+			if (DEMO.size() > 3) {
+				Note wall = DEMO.get(3);
+				wall.face = false;
+				wall.yaw = look()[0] + 40; // a sign on a wall, turned 40 degrees away from you
+			}
+			float[] now = look();
+			start[0] = now[0];
+			start[1] = now[1];
+		}));
+		steps.add(step(40, () -> shot.accept("dev-notesview-front")));
+		steps.add(step(2, () -> turn(start[0] + 25, start[1])));
+		steps.add(step(8, () -> shot.accept("dev-notesview-right")));
+		steps.add(step(2, () -> turn(start[0] - 35, start[1])));
+		steps.add(step(8, () -> shot.accept("dev-notesview-left")));
+		steps.add(step(2, () -> turn(start[0], start[1] + 30)));
+		steps.add(step(8, () -> shot.accept("dev-notesview-down")));
+		steps.add(step(2, () -> {
+			turn(start[0], start[1]);
+			back(14);
+		}));
+		steps.add(step(12, () -> shot.accept("dev-notesview-far")));
+		steps.add(step(2, () -> turn(start[0] + 20, start[1])));
+		steps.add(step(8, () -> shot.accept("dev-notesview-far-turned")));
+		return steps;
+	}
+
+	private static float[] look() {
+		var player = client().player;
+		//? if <26.1 {
+		return player == null ? new float[2] : new float[] {player.getYaw(), player.getPitch()};
+		//?} else {
+		/*return player == null ? new float[2] : new float[] {player.getYRot(), player.getXRot()};
+		*///?}
+	}
+
+	private static void turn(float yaw, float pitch) {
+		var player = client().player;
+		if (player == null) {
+			return;
+		}
+		//? if <26.1 {
+		player.setYaw(yaw);
+		player.setPitch(pitch);
+		//?} else {
+		/*player.setYRot(yaw);
+		player.setXRot(pitch);
+		*///?}
+	}
+
+	/** Steps the player {@code blocks} straight back (a server-side teleport, so it sticks). */
+	private static void back(int blocks) {
+		var player = client().player;
+		if (player == null) {
+			return;
+		}
+		float yaw = look()[0];
+		//? if <26.1 {
+		player.networkHandler.sendChatCommand("tp @s ^ ^ ^-" + blocks);
+		//?} else {
+		/*player.connection.sendCommand("tp @s ^ ^ ^-" + blocks);
+		*///?}
 	}
 
 	/** Five notes in an arc in front of you, one per look. */

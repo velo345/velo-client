@@ -20,7 +20,13 @@ import java.util.List;
  * and goes into the look you have on, like every other slot. Its settings (size, tricks, hit reactions) are the Pets
  * module's.
  */
-public final class PetsLockerScreen extends VeloWindow {
+public final class PetsLockerScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "skins";
+	}
+
 
 	private static final int TILE = 64;
 	private static final int TILE_GAP = 8;

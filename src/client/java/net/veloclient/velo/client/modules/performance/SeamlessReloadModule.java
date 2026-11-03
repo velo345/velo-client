@@ -34,7 +34,20 @@ public final class SeamlessReloadModule extends AbstractModule implements Config
 
 	public static boolean active() {
 		SeamlessReloadModule m = instance;
-		return m != null && m.isEnabled();
+		// RRLS ("Remove Reloading Screen") already does this its own way and draws the overlay inside its mini
+		// renderer, whose context can't draw text - the open screen threw every frame there (seen joining servers).
+		return m != null && m.isEnabled() && !failed && !RRLS;
+	}
+
+	private static final boolean RRLS = net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("rrls");
+	private static boolean failed;
+
+	/** A reload overlay that threw: Velo steps aside for the rest of the session and vanilla's overlay takes over. */
+	public static void fail(Throwable t) {
+		if (!failed) {
+			failed = true;
+			net.veloclient.velo.VeloClient.LOGGER.error("Seamless Reload failed - using Minecraft's reload screen from here", t);
+		}
 	}
 
 	/** The small "Reloading resources" pill drawn instead of the overlay. */

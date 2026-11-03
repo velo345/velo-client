@@ -495,5 +495,132 @@
     "name": "velo-client:killfx/tornado"
    }
   ]
+ },
+ "music.title_ambient": {
+  "sounds": [
+   {
+    "name": "velo-client:music/title_ambient",
+    "stream": true
+   }
+  ]
+ },
+ "ui.click": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/click"
+   }
+  ]
+ },
+ "ui.game_loaded": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/game_loaded"
+   }
+  ]
+ },
+ "ui.guide_back": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/guide_back"
+   }
+  ]
+ },
+ "ui.guide_done": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/guide_done"
+   }
+  ]
+ },
+ "ui.guide_next": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/guide_next"
+   }
+  ]
+ },
+ "ui.hover": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/hover"
+   }
+  ]
+ },
+ "ui.launch": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/launch"
+   }
+  ]
+ },
+ "ui.launcher_start": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/launcher_start"
+   }
+  ]
+ },
+ "ui.menu_close": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/menu_close"
+   }
+  ]
+ },
+ "ui.menu_open": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/menu_open"
+   }
+  ]
+ },
+ "ui.pause_close": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/pause_close"
+   }
+  ]
+ },
+ "ui.pause_open": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/pause_open"
+   }
+  ]
+ },
+ "ui.slider": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/slider"
+   }
+  ]
+ },
+ "ui.tab": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/tab"
+   }
+  ]
+ },
+ "ui.toggle_off": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/toggle_off"
+   }
+  ]
+ },
+ "ui.toggle_on": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/toggle_on"
+   }
+  ]
+ },
+ "ui.welcome": {
+  "sounds": [
+   {
+    "name": "velo-client:ui/welcome"
+   }
+  ]
  }
 }

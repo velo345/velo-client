@@ -195,9 +195,9 @@ public final class ClientImport {
 							profile.resolve("resourcepacks"), profile.resolve("shaderpacks"));
 				}
 			}
-			// NoRisk Client: profiles with their own game directories.
+			// NoRisk Client: profiles with their own game directories (launcher v3 keeps them in noriskclientv3/profiles).
 			for (Path norisk : distinct(b.resolve(".norisk"), data.resolve("norisk"), data.resolve("NoRiskClient"), data.resolve("noriskclient"),
-					data.resolve("gg.norisk.app"), b.resolve(".noriskclient"))) {
+					data.resolve("noriskclientv3"), data.resolve("gg.norisk.app"), b.resolve(".noriskclient"))) {
 				for (Path dir : gameDirsBelow(norisk, 5)) {
 					add(sources, "NoRisk Client", "NoRisk " + dir.getFileName() + where, dir, dir.resolve("mods"));
 				}

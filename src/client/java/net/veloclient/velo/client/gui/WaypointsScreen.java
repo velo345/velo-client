@@ -27,7 +27,18 @@ import java.util.Locale;
  * dimension, search by name, and per waypoint: show/hide, edit (name, color, icon, position),
  * share with friends, delete. Also bulk-deletes this world's death waypoints.
  */
-public final class WaypointsScreen extends VeloWindow {
+public final class WaypointsScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "waypoints";
+	}
+
+	@Override
+	public int shellMaxContentWidth() {
+		return 680;
+	}
+
 
 	private static final int ROW_HEIGHT = 30;
 	private static final List<String> BASE_DIMENSIONS = List.of("minecraft:overworld", "minecraft:the_nether", "minecraft:the_end");

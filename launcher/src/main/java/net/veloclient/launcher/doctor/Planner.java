@@ -123,6 +123,7 @@ final class Planner {
 		List<ModScanner.ModInfo> installed = new ArrayList<>();
 		String api = s.graphicsApi();
 		Integer ram = s.ramMaxMb();
+		String loader = s.loaderVersion();
 		for (Fix fix : fixes) {
 			for (Action action : fix.actions()) {
 				switch (action) {
@@ -136,6 +137,9 @@ final class Planner {
 					case Action.SetMemory m -> ram = m.maxMb() == 0 ? null : m.maxMb();
 					case Action.DisableShaders ignored -> {
 					}
+					case Action.LowerRenderDistance ignored -> {
+					}
+					case Action.SetLoader l -> loader = l.version() == null ? loader : l.version();
 				}
 			}
 		}
@@ -162,6 +166,6 @@ final class Planner {
 				packs.add(new Snapshot.Pack(pack.file(), on, on && pack.broken(), pack.name()));
 			}
 		}
-		return new Snapshot(s.instance(), mods, packs, s.shaders(), api, ram, s.javaMajor(), s.loaderVersion(), s.modAssets());
+		return new Snapshot(s.instance(), mods, packs, s.shaders(), api, ram, s.javaMajor(), loader, s.modAssets());
 	}
 }

@@ -41,7 +41,18 @@ import java.util.stream.Stream;
  * Litematica if neither is, or if both are) - see
  * {@link SchematicFormat#defaultFormat()}.
  */
-public final class SchematicsScreen extends VeloWindow {
+public final class SchematicsScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "schematics";
+	}
+
+	@Override
+	public int shellMaxContentWidth() {
+		return 620;
+	}
+
 
 	private static final int TILE_WIDTH = 84;
 	private static final int TILE_ICON_HEIGHT = 62;

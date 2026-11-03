@@ -30,8 +30,25 @@ public final class FabricApiInstaller {
 			String targetName = "fabric-api-" + apiVersion + ".jar";
 			String relativePath = "net/fabricmc/fabric-api/fabric-api/" + apiVersion + "/" + targetName;
 			Path cached = GameDataPaths.libraries().resolve(relativePath);
-			Downloader.ensure(URI.create(MAVEN_BASE_URL + relativePath), cached, null, -1, b -> { });
+			try {
+				Downloader.ensure(URI.create(MAVEN_BASE_URL + relativePath), cached, null, -1, b -> { });
+			} catch (IOException mavenDown) {
+				// Fabric's Maven is unreachable for some players (or just slow): the same file is on Modrinth.
+				if (!fromModrinth(version, apiVersion, cached)) {
+					throw mavenDown;
+				}
+			}
 			Path target = modsDir.resolve(targetName);
+			// A newer Fabric API already in the folder (the Doctor or the player put it there because a mod needs it):
+			// keep it. Swapping it back to ours on every launch undid the Doctor's fix and the game failed the same way again.
+			try (Stream<Path> existing = Files.list(modsDir)) {
+				for (Path file : existing.filter(FabricApiInstaller::isFabricApiJar).toList()) {
+					String have = versionOf(file);
+					if (have != null && newer(apiVersion, have, version.id()).equals(have) && !have.equals(apiVersion)) {
+						return;
+					}
+				}
+			}
 			// Already the right file: leave it alone. Rewriting it on every launch failed on Windows
 			// whenever the same profile was already running (the jar is locked by that game).
 			boolean upToDate = Files.exists(target) && Files.size(target) == Files.size(cached);
@@ -71,7 +88,19 @@ public final class FabricApiInstaller {
 					return best;
 				}
 			} catch (Exception e) {
-				// offline: fall through to what's cached
+				// Maven slow / unreachable: try Modrinth, then what's cached
+			}
+			try {
+				for (var v : net.veloclient.launcher.modrinth.ModrinthClient.versions("fabric-api", id)) {
+					if (v.versionNumber() != null) {
+						best = newer(best, v.versionNumber(), id);
+					}
+				}
+				if (!best.equals(version.fabricApiVersion())) {
+					return best;
+				}
+			} catch (Exception e) {
+				// offline
 			}
 			Path dir = GameDataPaths.libraries().resolve("net/fabricmc/fabric-api/fabric-api");
 			try (Stream<Path> cached = Files.isDirectory(dir) ? Files.list(dir) : Stream.empty()) {
@@ -115,6 +144,29 @@ public final class FabricApiInstaller {
 			}
 		}
 		return out;
+	}
+
+	private static boolean fromModrinth(GameVersion version, String apiVersion, Path cached) {
+		try {
+			for (var v : net.veloclient.launcher.modrinth.ModrinthClient.versions("fabric-api", version.id())) {
+				if (apiVersion.equals(v.versionNumber())) {
+					var file = v.primaryFile().orElse(null);
+					if (file != null) {
+						Downloader.ensure(URI.create(file.url()), cached, file.sha1(), file.size(), b -> { });
+						return true;
+					}
+				}
+			}
+		} catch (Exception e) {
+			// both down
+		}
+		return false;
+	}
+
+	/** "0.161.0+26.2" from "fabric-api-0.161.0+26.2.jar" (null if the name isn't like that). */
+	private static String versionOf(Path jar) {
+		String name = jar.getFileName().toString();
+		return name.startsWith("fabric-api-") && name.endsWith(".jar") ? name.substring("fabric-api-".length(), name.length() - 4) : null;
 	}
 
 	private static boolean isFabricApiJar(Path path) {

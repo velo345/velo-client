@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
  */
 public final class NewsUi {
 
-	private static final Map<String, Image> IMAGES = LauncherCaches.lru(30);
+	private static final Map<String, Image> IMAGES = LauncherCaches.lru(16);
 	private static final Pattern INLINE = Pattern.compile("\\*\\*(.+?)\\*\\*|\\*(.+?)\\*|`(.+?)`|\\[(.+?)]\\((https?://[^)\\s]+)\\)");
 
 	private NewsUi() {
@@ -64,12 +64,39 @@ public final class NewsUi {
 		}
 		Executors.newVirtualThreadPerTaskExecutor().submit(() -> {
 			byte[] bytes = NewsApi.image(id);
-			Image image = bytes == null ? null : new Image(new ByteArrayInputStream(bytes));
+			Image image = bytes == null ? null : decode(bytes);
 			if (image != null && !image.isError()) {
 				IMAGES.put(id, image);
 			}
 			Platform.runLater(() -> onReady.accept(image != null && !image.isError() ? image : null));
 		});
+	}
+
+	/** Widest a news picture is ever shown (the Home banner on a large window); bigger ones are decoded down to it. */
+	private static final int MAX_WIDTH = 1280;
+
+	/**
+	 * A news picture at most {@link #MAX_WIDTH} wide: posts carry 1920x1080 art (8 MB decoded each, kept in the heap and
+	 * on the graphics card), but no view shows them that big. Never scaled up.
+	 */
+	static Image decode(byte[] bytes) {
+		int width = 0;
+		try (var in = javax.imageio.ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
+			var readers = javax.imageio.ImageIO.getImageReaders(in);
+			if (readers.hasNext()) {
+				var reader = readers.next();
+				try {
+					reader.setInput(in, true, true);
+					width = reader.getWidth(0);
+				} finally {
+					reader.dispose();
+				}
+			}
+		} catch (Exception | LinkageError ignored) {
+			// unknown size: decode as it is
+		}
+		return width > MAX_WIDTH ? new Image(new ByteArrayInputStream(bytes), MAX_WIDTH, 0, true, true)
+				: new Image(new ByteArrayInputStream(bytes));
 	}
 
 	/** Puts an already-known image into the cache (the editor uses this right after an upload). */

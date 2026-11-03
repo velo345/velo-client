@@ -272,12 +272,37 @@ public final class Doctor {
 			fixes.add(new Fix("Switch to " + (other.equals(net.veloclient.launcher.launch.GraphicsApi.OPENGL) ? "OpenGL" : "Vulkan"),
 					"The other graphics API often avoids a driver problem", List.of(new Action.SetGraphicsApi(other))));
 		}
+		long systemMb = net.veloclient.launcher.launch.MemoryPlanner.totalSystemMb();
+		int renderDistance = net.veloclient.launcher.launch.MemoryPlanner.readRenderDistance(
+				net.veloclient.launcher.instance.InstancePaths.gameDir(s.instance().id()));
+		// Windows ends a program that stopped responding with 0xCFFFFFFF - on small PCs that's the RAM running full.
+		boolean hung = exitCode == -805306369;
+		boolean smallPc = systemMb > 0 && systemMb < 10_000;
+		int safeDistance = smallPc ? 8 : 12;
+		if (renderDistance > safeDistance && (hung || smallPc)) {
+			fixes.add(0, new Fix("Lower the render distance to " + safeDistance, "From " + renderDistance + " chunks - far less memory and work",
+					List.of(new Action.LowerRenderDistance(safeDistance))));
+		}
 		if (s.ramMaxMb() != null) {
 			fixes.add(new Fix("Use automatic memory", "A fixed amount can be too much or too little for your PC", List.of(new Action.SetMemory(0))));
 		}
-		return new Issue("sudden-exit", Severity.CRASH, "Minecraft closed without an error",
-				"No crash report (exit code " + exitCode + "). That's almost always the graphics driver or memory - update the graphics driver"
-						+ " (NVIDIA / AMD / Intel website); lowering the render distance helps too.", fixes, List.of());
+		String why;
+		if (hung) {
+			why = "Windows closed it because it stopped responding (exit code " + exitCode + ")."
+					+ (smallPc ? " Your PC has " + Math.round(systemMb / 1024.0) + " GB of RAM, which runs full quickly - close the browser"
+							+ " and other programs while playing." : " That's usually a full memory or the graphics driver.");
+		} else if (exitCode == -1073740791) {
+			why = "A program part inside the game stopped it on purpose (exit code " + exitCode + ", 0xC0000409). Almost always the"
+					+ " graphics driver or an overlay (Discord, MSI Afterburner / RivaTuner, Overwolf) - update the driver from the"
+					+ " NVIDIA / AMD / Intel website and turn overlays off.";
+		} else if (exitCode == -1073741819) {
+			why = "Something inside the game read memory it wasn't allowed to (exit code " + exitCode + ", 0xC0000005) - nearly always"
+					+ " the graphics driver. Update it from the NVIDIA / AMD / Intel website.";
+		} else {
+			why = "No crash report (exit code " + exitCode + "). That's almost always the graphics driver or memory - update the graphics"
+					+ " driver (NVIDIA / AMD / Intel website); lowering the render distance helps too.";
+		}
+		return new Issue("sudden-exit", Severity.CRASH, "Minecraft closed without an error", why, fixes, List.of());
 	}
 
 	/** Nothing pointed at a culprit: offer turning off what was added since the game last worked. */

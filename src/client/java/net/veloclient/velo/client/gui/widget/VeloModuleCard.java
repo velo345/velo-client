@@ -6,8 +6,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.client.gui.screen.narration.NarrationPart;
 import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.veloclient.velo.client.gui.title.MenuKit;
@@ -67,13 +65,13 @@ public final class VeloModuleCard extends ClickableWidget {
 			module.setEnabled(value);
 			net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
 			net.veloclient.velo.client.gui.title.QuickToggles.touch(module.id());
-			client.getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.UI_BUTTON_CLICK, value ? 1.15f : 0.9f));
+			net.veloclient.velo.client.sound.VeloUiSounds.toggle(value);
 			return;
 		}
 		long now = System.currentTimeMillis();
 		boolean twice = doubled || now - lastClick < 320;
 		lastClick = now;
-		client.getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.UI_BUTTON_CLICK, 1.0f));
+		net.veloclient.velo.client.sound.VeloUiSounds.click(1.0f);
 		if (twice) {
 			onOpen.run();
 		} else {

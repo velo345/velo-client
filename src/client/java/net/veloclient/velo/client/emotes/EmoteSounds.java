@@ -36,7 +36,7 @@ public final class EmoteSounds {
 			return;
 		}
 		try {
-			Sound sound = new Sound(id, null, volume, pitch, false, false);
+			Sound sound = new Sound(id, null, volume, pitch, false, false, false);
 			sound.fixAt(x, y, z);
 			play(sound);
 		} catch (RuntimeException e) {
@@ -49,12 +49,29 @@ public final class EmoteSounds {
 		return start(player, id, volume, 1f, true, loop);
 	}
 
+	/**
+	 * Background music for menus (the title track): Music volume slider, loops, fades in over ~2 s and out on
+	 * {@link Handle#fadeOut()}.
+	 */
+	public static Handle menuMusic(String id, float volume) {
+		if (id == null || volume <= 0.001f) {
+			return null;
+		}
+		try {
+			Sound sound = new Sound(id, null, volume, 1f, true, true, true);
+			play(sound);
+			return sound;
+		} catch (RuntimeException e) {
+			return null;
+		}
+	}
+
 	private static Handle start(Object player, String id, float volume, float pitch, boolean music, boolean loop) {
 		if (id == null || volume <= 0.001f) {
 			return null;
 		}
 		try {
-			Sound sound = new Sound(id, player, volume, pitch, music, loop);
+			Sound sound = new Sound(id, player, volume, pitch, music, loop, false);
 			play(sound);
 			return sound;
 		} catch (RuntimeException e) {
@@ -72,14 +89,21 @@ public final class EmoteSounds {
 		private float target;
 		private float fade = 1f;
 		private boolean fading;
+		/** Menu music: plays in the Music category and fades in instead of starting at full volume. */
+		private boolean rising;
 
-		Sound(String id, Object player, float volume, float pitch, boolean music, boolean loop) {
+
+		Sound(String id, Object player, float volume, float pitch, boolean music, boolean loop, boolean menu) {
 			super(net.minecraft.sound.SoundEvent.of(net.minecraft.util.Identifier.of(id)),
-					music ? net.minecraft.sound.SoundCategory.RECORDS : net.minecraft.sound.SoundCategory.PLAYERS,
+					menu ? net.minecraft.sound.SoundCategory.MUSIC : music ? net.minecraft.sound.SoundCategory.RECORDS : net.minecraft.sound.SoundCategory.PLAYERS,
 					net.minecraft.util.math.random.Random.create());
+			if (menu) {
+				this.rising = true;
+				this.fade = 0.02f;
+			}
 			this.follow = player instanceof net.minecraft.entity.Entity e ? e : null;
 			this.target = volume;
-			this.volume = volume;
+			this.volume = Math.max(0.0001f, volume * fade);
 			this.pitch = pitch;
 			this.repeat = loop;
 			this.repeatDelay = 0;
@@ -117,11 +141,13 @@ public final class EmoteSounds {
 				move();
 			}
 			if (fading) {
-				fade -= 0.125f; // 0.4 s
+				fade -= rising ? 0.05f : 0.125f; // 1 s for menu music, 0.4 s otherwise
 				if (fade <= 0f) {
 					setDone();
 					return;
 				}
+			} else if (rising && fade < 1f) {
+				fade = Math.min(1f, fade + 0.025f); // 2 s
 			}
 			this.volume = Math.max(0.0001f, target * fade);
 		}
@@ -156,14 +182,21 @@ public final class EmoteSounds {
 		private float target;
 		private float fade = 1f;
 		private boolean fading;
+		// Menu music: plays in the Music category and fades in instead of starting at full volume.
+		private boolean rising;
 
-		Sound(String id, Object player, float volume, float pitch, boolean music, boolean loop) {
+
+		Sound(String id, Object player, float volume, float pitch, boolean music, boolean loop, boolean menu) {
 			super(net.minecraft.sounds.SoundEvent.createVariableRangeEvent(net.minecraft.resources.Identifier.parse(id)),
-					music ? net.minecraft.sounds.SoundSource.RECORDS : net.minecraft.sounds.SoundSource.PLAYERS,
+					menu ? net.minecraft.sounds.SoundSource.MUSIC : music ? net.minecraft.sounds.SoundSource.RECORDS : net.minecraft.sounds.SoundSource.PLAYERS,
 					net.minecraft.util.RandomSource.create());
+			if (menu) {
+				this.rising = true;
+				this.fade = 0.02f;
+			}
 			this.follow = player instanceof net.minecraft.world.entity.Entity e ? e : null;
 			this.target = volume;
-			this.volume = volume;
+			this.volume = Math.max(0.0001f, volume * fade);
 			this.pitch = pitch;
 			this.looping = loop;
 			if (follow == null) {
@@ -200,11 +233,13 @@ public final class EmoteSounds {
 				move();
 			}
 			if (fading) {
-				fade -= 0.125f; // 0.4 s
+				fade -= rising ? 0.05f : 0.125f; // 1 s for menu music, 0.4 s otherwise
 				if (fade <= 0f) {
 					stop0();
 					return;
 				}
+			} else if (rising && fade < 1f) {
+				fade = Math.min(1f, fade + 0.025f); // 2 s
 			}
 			this.volume = Math.max(0.0001f, target * fade);
 		}

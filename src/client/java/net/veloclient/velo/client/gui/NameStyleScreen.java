@@ -22,7 +22,13 @@ import java.util.List;
  * change is saved at once to the file the launcher's Locker shares, so your name changes in game (and for other Velo
  * players) while you click. Without Velo+ you can try everything here, but it isn't switched on.
  */
-public final class NameStyleScreen extends VeloWindow {
+public final class NameStyleScreen extends VeloWindow implements net.veloclient.velo.client.gui.window.MenuPage {
+
+	@Override
+	public String railId() {
+		return "skins";
+	}
+
 
 	private static final int CHAT_SLOT = 0;
 	private static final int TAB_SLOT = 1;
