@@ -1270,8 +1270,9 @@ public final class StoreView {
 				coinsLabel.setText(StoreTiles.format(coins) + " Velo Coins every month");
 			}
 			if (result.get("plus").getAsBoolean()) {
-				status.setText("You're Velo+  ·  active until " + LocalDate.ofInstant(java.time.Instant.ofEpochMilli(result.get("until").getAsLong()),
-						java.time.ZoneId.systemDefault()));
+				long until = result.get("until").getAsLong();
+				status.setText(until > 7258118400000L ? "You're Velo+  ·  forever"
+						: "You're Velo+  ·  active until " + LocalDate.ofInstant(java.time.Instant.ofEpochMilli(until), java.time.ZoneId.systemDefault()));
 				subscribe.setText("Extend / manage");
 				showPlus.setVisible(true);
 				showPlus.setManaged(true);

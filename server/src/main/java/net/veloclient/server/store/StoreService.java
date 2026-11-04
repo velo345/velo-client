@@ -182,7 +182,7 @@ public final class StoreService {
 	}
 
 	public record CatalogView(String currency, List<StoreConfig.CoinPack> coinPacks, List<CatalogItem> items,
-			boolean checkoutEnabled, boolean adsEnabled, DailyView daily, List<BundleView> bundles, PlusOffer plus, Map<String, Object> launchBonus) {
+			boolean checkoutEnabled, boolean adsEnabled, DailyView daily, List<BundleView> bundles, PlusOffer plus, Map<String, Object> launchBonus, Integer partnerCodePercent) {
 	}
 
 	/** Velo+ as offered (for visitors who aren't signed in - the website shows the live price). */
@@ -199,7 +199,8 @@ public final class StoreService {
 		return new CatalogView(config.currency, config.coinPacks, items, checkoutEnabled(), adsEnabled(),
 				// a pick taken off sale since this morning (made a Discord reward, hidden...) drops out right away
 				new DailyView(deals.items().stream().filter(id -> items.stream().anyMatch(i -> i.id().equals(id))).toList(), LocalDate.now(ZoneOffset.UTC).plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()),
-				bundles(), new PlusOffer(config.plus.price, config.plus.monthlyCoins, config.plus.periodDays, config.plus.trialDays, config.plus.yearlyPrice), launchOffer());
+				bundles(), new PlusOffer(config.plus.price, config.plus.monthlyCoins, config.plus.periodDays, config.plus.trialDays, config.plus.yearlyPrice), launchOffer(),
+				partnerCodesLive() ? PartnerCodes.PERCENT : null);
 	}
 
 	// ---- Daily picks & bundles ----
@@ -807,6 +808,55 @@ public final class StoreService {
 	}
 
 	public CheckoutView checkout(String uuid, String username, String packId) throws Exception {
+		return checkout(uuid, username, packId, null);
+	}
+
+	private PartnerCodes partnerCodes;
+	private String partnerCoupon;
+
+	/** Partner codes and the Tebex coupon that gives their discount ({@code TEBEX_PARTNER_COUPON}; null = codes can't be used yet). */
+	public void setPartnerCodes(PartnerCodes codes, String tebexCoupon) {
+		this.partnerCodes = codes;
+		this.partnerCoupon = tebexCoupon == null || tebexCoupon.isBlank() ? null : tebexCoupon.trim();
+	}
+
+	public PartnerCodes partnerCodes() {
+		return partnerCodes;
+	}
+
+	public boolean partnerCodesLive() {
+		return partnerCodes != null && partnerCoupon != null && checkoutEnabled();
+	}
+
+	/** A coin pack's price with a partner code: {@link PartnerCodes#PERCENT}% off, rounded to the cent like Tebex does. */
+	public static double codePrice(double price) {
+		return Math.round(price * (100 - PartnerCodes.PERCENT)) / 100.0;
+	}
+
+	public record CodeView(String code, String partner, int percent, boolean live) {
+	}
+
+	/** What the Store shows for an entered partner code (404 if there's no such active code). */
+	public CodeView partnerCode(String input) throws StoreException {
+		PartnerCodes.Code code = partnerCodes == null ? null : partnerCodes.find(input);
+		if (code == null) {
+			throw new StoreException(404, "That partner code doesn't exist");
+		}
+		return new CodeView(code.code(), code.partner(), PartnerCodes.PERCENT, partnerCodesLive());
+	}
+
+	/** A coin pack checkout, with a partner code taking {@link PartnerCodes#PERCENT}% off (codes never work on Velo+). */
+	public CheckoutView checkout(String uuid, String username, String packId, String codeInput) throws Exception {
+		PartnerCodes.Code code = null;
+		if (codeInput != null && !codeInput.isBlank()) {
+			code = partnerCodes == null ? null : partnerCodes.find(codeInput);
+			if (code == null) {
+				throw new StoreException(404, "That partner code doesn't exist");
+			}
+			if (!partnerCodesLive()) {
+				throw new StoreException(503, "Partner codes can't be used right now - try again later or buy without one");
+			}
+		}
 		if (!checkoutEnabled()) {
 			throw new StoreException(503, "Buying coins isn't set up on this server yet");
 		}
@@ -819,9 +869,23 @@ public final class StoreService {
 			throw new StoreException(503, "This coin pack isn't set up in the Tebex webstore yet");
 		}
 		String orderId = "vo_" + randomHex(12);
-		db.createOrder(orderId, uuid, pack, config.currency);
-		TebexCheckout.Basket basket = tebex.createCheckout(orderId, uuid, username, packageId,
-				publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?order=" + orderId);
+		TebexCheckout.Basket basket;
+		if (code != null) {
+			// The webhook's "paid at least the price" check then runs against the discounted price.
+			db.createOrder(orderId, uuid, pack, config.currency, code.code(), codePrice(pack.price()));
+			try {
+				basket = tebex.createCheckout(orderId, uuid, username, packageId,
+						publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?order=" + orderId, partnerCoupon, code.code());
+			} catch (Exception e) {
+				db.flagOrder(orderId, "failed", null);
+				System.out.println("[store] Partner code checkout failed (" + code.code() + "): " + e.getMessage());
+				throw new StoreException(503, "Partner codes can't be used right now - try again later or buy without one");
+			}
+		} else {
+			db.createOrder(orderId, uuid, pack, config.currency);
+			basket = tebex.createCheckout(orderId, uuid, username, packageId,
+					publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?order=" + orderId);
+		}
 		db.setBasket(orderId, basket.ident());
 		return new CheckoutView(orderId, basket.checkoutUrl());
 	}
@@ -920,7 +984,7 @@ public final class StoreService {
 				continue;
 			}
 			boolean uuidMatches = custom.has("velo_uuid") && order.uuid().equals(custom.get("velo_uuid").getAsString());
-			boolean priceOk = paid < 0 || !paidCurrency.equalsIgnoreCase(order.currency()) || paid + 0.01 >= order.price();
+			boolean priceOk = paid < 0 || !paidCurrency.equalsIgnoreCase(order.currency()) || paid + 0.02 >= order.price(); // a cent or two of rounding (coupons)
 			if (!uuidMatches || !priceOk) {
 				db.flagOrder(orderId, "review", txn);
 				System.out.println("[store] Order " + orderId + " needs review (uuid ok: " + uuidMatches + ", paid " + paid + " "
@@ -1025,6 +1089,22 @@ public final class StoreService {
 		} else {
 			endPlus(ref[0]);
 		}
+		return adminLookup(meUuid, meName, ref[0]);
+	}
+
+	/** "Forever" Velo+: the membership's end date (31 Dec 9999). Clients show anything past {@link #FOREVER_FROM} as forever. */
+	public static final long FOREVER = 253402214400000L;
+	/** Memberships ending after this (year 2200) count as forever. */
+	public static final long FOREVER_FROM = 7258118400000L;
+
+	/** Owner: Velo+ that never ends (staff, partners, giveaways); ending it works like for anyone else. */
+	public PlayerView adminPlusForever(String meUuid, String meName, String target) throws Exception {
+		String[] ref = requireOwnerAndResolve(meUuid, meName, target);
+		db.touchWallet(ref[0], ref[1]);
+		db.extendPlus(ref[0], 0, "owner:" + meName + ":forever", null, null, FOREVER);
+		loadPlus();
+		plusSweep();
+		System.out.println("[store] " + meName + " gave " + ref[1] + " Velo+ forever");
 		return adminLookup(meUuid, meName, ref[0]);
 	}
 

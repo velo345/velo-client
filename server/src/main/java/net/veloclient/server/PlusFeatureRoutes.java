@@ -257,6 +257,17 @@ final class PlusFeatureRoutes {
 		}));
 	}
 
+	/** Each partner's active partner codes (the website shows them on the partner page). */
+	private static List<Map<String, Object>> withCodes(List<Map<String, Object>> views, StoreService store) {
+		var codes = store.partnerCodes();
+		if (codes != null && store.partnerCodesLive()) {
+			for (Map<String, Object> row : views) {
+				row.put("codes", codes.codesOf((String) row.get("id")));
+			}
+		}
+		return views;
+	}
+
 	/** Partner servers: {@code GET /v1/partners} for everyone, {@code GET/POST /v1/admin/partners} for the owner. */
 	static void registerPartners(HttpServer server, SessionRegistry registry, StoreService store, PartnerServers partners) {
 		server.createContext("/v1/partners", exchange -> VeloServerApp.handle(exchange, "GET", ex -> {
@@ -278,7 +289,7 @@ final class PlusFeatureRoutes {
 				}
 				return;
 			}
-			JsonHttp.writeJson(ex, 200, Map.of("partners", partners.views()));
+			JsonHttp.writeJson(ex, 200, Map.of("partners", withCodes(partners.views(), store)));
 		}));
 		server.createContext("/v1/admin/partners/icon", exchange -> VeloServerApp.handle(exchange, "POST", ex -> {
 			SessionRegistry.Session session = registry.session(JsonHttp.bearerToken(ex));

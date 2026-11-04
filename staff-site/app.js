@@ -230,6 +230,31 @@ function confirmBox(title, text, okLabel = "Confirm", danger = true) {
 	});
 }
 
+/**
+ * Review view for a cloak texture: the whole texture as big as the screen allows (click to see it at full size and
+ * scroll around), next to the front and back exactly as players see them on the cloak, scaled up.
+ */
+function capeZoom(src, title, meta) {
+	let dlg;
+	const crop = (label, x) => {
+		const img = h("img", { src, alt: label, draggable: "false" });
+		// Cloak layout 64x32: front at (1,1), back at (12,1), each 10x16.
+		img.style.cssText = `width:640%;height:200%;left:${-x * 10}%;top:-6.25%`;
+		return h("figure", { class: "cz-crop" }, h("div", { class: "cz-face" }, img), h("figcaption", {}, label));
+	};
+	const full = h("img", { class: "cz-full", src, alt: title, draggable: "false" });
+	const stage = h("div", { class: "cz-stage", title: "Click to zoom" }, full);
+	stage.addEventListener("click", () => stage.classList.toggle("actual"));
+	dlg = dialog(title, h("div", { class: "cz" }, stage, h("div", { class: "cz-side" }, crop("Front", 1), crop("Back", 12), meta || null)), [], true);
+	dlg.classList.add("cape-zoom");
+	return dlg;
+}
+
+/** A copy of a card's button for the zoom view: clicks the real one and closes the zoom. */
+function proxy(button) {
+	return h("button", { class: button.className, type: "button", onclick: (e) => { e.target.closest("dialog")?.close(); button.click(); } }, button.textContent);
+}
+
 // ---- Charts (SVG, drawn in, crosshair + tooltip) ----
 
 function niceMax(v) {
@@ -759,7 +784,8 @@ RENDER.cloaks = async (root) => {
 					await busy(del, async () => { await velo("staff/capes/review", { body: { uuid: c.uuid, action: "remove" } }); toast("Cloak removed"); draw(); });
 				};
 				return h("div", { class: "clip-card cape-card" },
-					h("img", { class: "cape-art", src: "/v1/cape/" + c.hash, alt: "Cloak of " + c.username, loading: "lazy" }),
+					h("img", { class: "cape-art", src: "/v1/cape/" + c.hash, alt: "Cloak of " + c.username, loading: "lazy", title: "Click to enlarge",
+						onclick: () => capeZoom("/v1/cape/" + c.hash, c.username + "'s cloak", h("div", { class: "row", style: "gap:6px" }, h("b", {}, c.username), c.reviewed ? h("span", { class: "pill good" }, "Reviewed") : proxy(keep), proxy(del))) }),
 					h("div", { class: "clip-meta" }, h("b", {}, c.username), h("span", { class: "muted small" }, (c.animated ? "Animated · " : "") + bytes(c.size) + (c.at ? " · " + ago(c.at) : "")),
 						h("div", { class: "row", style: "gap:6px" }, c.reviewed ? h("span", { class: "pill good" }, "Reviewed") : keep, del)));
 			}) : h("p", { class: "muted" }, "Nothing to review"))));
@@ -1482,7 +1508,7 @@ function playerCard(p, refresh) {
 		activity ? h("p", { class: "muted small" }, activity) : null,
 		banActive ? h("div", { class: "notice" }, h("b", {}, "Banned from " + ban.services.join(", ") + ": "), ban.reason,
 			h("div", { class: "muted small" }, "by " + ban.by + " · " + when(ban.at) + " · " + (ban.until ? "until " + when(ban.until) : "until lifted"))) : null,
-		p.customCape ? h("div", { class: "cloak-preview" }, h("span", { class: "muted small" }, "Custom cloak"), h("img", { class: "cape-art", src: "/v1/cape/" + p.customCape, alt: "Custom cloak" })) : null,
+		p.customCape ? h("div", { class: "cloak-preview" }, h("span", { class: "muted small" }, "Custom cloak"), h("img", { class: "cape-art", src: "/v1/cape/" + p.customCape, alt: "Custom cloak", title: "Click to enlarge", onclick: () => capeZoom("/v1/cape/" + p.customCape, "Custom cloak") })) : null,
 		actions.childNodes.length ? actions : null);
 }
 

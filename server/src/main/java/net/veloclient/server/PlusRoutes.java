@@ -23,7 +23,7 @@ final class PlusRoutes {
 	private PlusRoutes() {
 	}
 
-	private record GrantRequest(String target, int days) {
+	private record GrantRequest(String target, int days, boolean forever) {
 	}
 
 	private record AddonGrantRequest(String target, boolean granted) {
@@ -121,7 +121,8 @@ final class PlusRoutes {
 		// Owner (a session) gives or ends Velo+; a negative or zero number of days ends it.
 		route(server, registry, "/v1/admin/store/plus", "POST", (ex, s) -> {
 			GrantRequest r = JsonHttp.readBody(ex, GrantRequest.class);
-			JsonHttp.writeJson(ex, 200, store.adminPlus(s.uuid(), s.username(), r.target(), r.days()));
+			JsonHttp.writeJson(ex, 200, r.forever() ? store.adminPlusForever(s.uuid(), s.username(), r.target())
+					: store.adminPlus(s.uuid(), s.username(), r.target(), r.days()));
 		});
 		// Owner gives or takes away the Addons (independent of Velo+).
 		route(server, registry, "/v1/admin/store/addons", "POST", (ex, s) -> {

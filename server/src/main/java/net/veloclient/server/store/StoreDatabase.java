@@ -98,6 +98,13 @@ public final class StoreDatabase implements AutoCloseable {
 						created_at INTEGER NOT NULL,
 						updated_at INTEGER NOT NULL)""");
 			st.execute("CREATE INDEX IF NOT EXISTS orders_txn ON orders(transaction_id)");
+			// Which partner code a coin order used (and what the pack cost without it) - the partner stats.
+			st.execute("""
+					CREATE TABLE IF NOT EXISTS order_codes (
+						order_id TEXT PRIMARY KEY,
+						code TEXT NOT NULL,
+						full_price REAL NOT NULL)""");
+			st.execute("CREATE INDEX IF NOT EXISTS order_codes_code ON order_codes(code)");
 			// Rewards: one row per player per UTC day.
 			st.execute("""
 					CREATE TABLE IF NOT EXISTS daily (
@@ -571,6 +578,64 @@ public final class StoreDatabase implements AutoCloseable {
 			ps.setString(6, currency);
 			ps.setLong(7, now);
 			ps.setLong(8, now);
+			ps.executeUpdate();
+		}
+	}
+
+	/** A coin order that used a partner code: it's created at the discounted price; {@code fullPrice} is the pack's own. */
+	public synchronized void createOrder(String orderId, String uuid, StoreConfig.CoinPack pack, String currency, String code, double price)
+			throws SQLException {
+		inTransaction(() -> {
+			try (PreparedStatement ps = connection.prepareStatement(
+					"INSERT INTO orders(order_id, uuid, pack_id, coins, price, currency, status, created_at, updated_at) "
+							+ "VALUES(?, ?, ?, ?, ?, ?, 'pending', ?, ?)")) {
+				long now = System.currentTimeMillis();
+				ps.setString(1, orderId);
+				ps.setString(2, uuid);
+				ps.setString(3, pack.id());
+				ps.setInt(4, pack.totalCoins());
+				ps.setDouble(5, price);
+				ps.setString(6, currency);
+				ps.setLong(7, now);
+				ps.setLong(8, now);
+				ps.executeUpdate();
+			}
+			try (PreparedStatement ps = connection.prepareStatement("INSERT INTO order_codes(order_id, code, full_price) VALUES(?, ?, ?)")) {
+				ps.setString(1, orderId);
+				ps.setString(2, code);
+				ps.setDouble(3, pack.price());
+				ps.executeUpdate();
+			}
+			return null;
+		});
+	}
+
+	/** Per partner code: paid orders, money taken (after the discount), coins, distinct buyers, last purchase; refunds left out. */
+	public synchronized java.util.Map<String, java.util.Map<String, Object>> partnerCodeStats() throws SQLException {
+		java.util.Map<String, java.util.Map<String, Object>> out = new java.util.HashMap<>();
+		try (Statement st = connection.createStatement(); ResultSet rs = st.executeQuery(
+				"SELECT c.code, COUNT(*), COALESCE(SUM(o.price), 0), COALESCE(SUM(o.coins), 0), COUNT(DISTINCT o.uuid), MAX(o.created_at), "
+						+ "SUM(CASE WHEN o.created_at >= " + (System.currentTimeMillis() - 30L * 86_400_000L) + " THEN 1 ELSE 0 END) "
+						+ "FROM order_codes c JOIN orders o ON o.order_id = c.order_id WHERE o.status = 'paid' GROUP BY c.code")) {
+			while (rs.next()) {
+				java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+				row.put("orders", rs.getInt(2));
+				row.put("revenue", Math.round(rs.getDouble(3) * 100) / 100.0);
+				row.put("coins", rs.getLong(4));
+				row.put("buyers", rs.getInt(5));
+				row.put("lastAt", rs.getLong(6));
+				row.put("orders30d", rs.getInt(7));
+				out.put(rs.getString(1), row);
+			}
+		}
+		return out;
+	}
+
+	/** A renamed partner code keeps its stats. */
+	public synchronized void renamePartnerCode(String from, String to) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("UPDATE order_codes SET code = ? WHERE code = ?")) {
+			ps.setString(1, to);
+			ps.setString(2, from);
 			ps.executeUpdate();
 		}
 	}

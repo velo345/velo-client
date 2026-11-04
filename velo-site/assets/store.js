@@ -480,6 +480,7 @@
 		const bundles = $('[data-grid="bundles"]');
 		bundles.replaceChildren(...(store.catalog.bundles.length ? store.catalog.bundles.map(bundleCard) : [el("p", { class: "kind" }, "No bundles right now - check back soon.")]));
 		$("#bundles").hidden = !store.catalog.bundles.length;
+		renderCodeBox();
 		renderPacks();
 		renderPlus();
 	}
@@ -511,18 +512,78 @@
 				buy));
 	}
 
+	// Partner codes: ?code=XYZ links or typed in; a valid one takes a few percent off every coin pack (never Velo+).
+	const CODE_KEY = "velo.partnerCode";
+	function storedCode() {
+		try { return localStorage.getItem(CODE_KEY); } catch { return null; }
+	}
+	function keepCode(code) {
+		try { code ? localStorage.setItem(CODE_KEY, code) : localStorage.removeItem(CODE_KEY); } catch { /* private mode */ }
+	}
+	async function checkCode(input) {
+		const code = String(input || "").trim().toUpperCase();
+		if (!code) return null;
+		return api("/v1/store/code?c=" + encodeURIComponent(code), { auth: false });
+	}
+
+	function renderCodeBox() {
+		const box = $("[data-code-box]");
+		const percent = store.catalog.partnerCodePercent;
+		if (!box || !percent || !store.catalog.checkoutEnabled) { if (box) box.hidden = true; store.code = null; return; }
+		box.hidden = false;
+		const input = el("input", { type: "text", placeholder: "Partner code", maxlength: "24", autocomplete: "off", spellcheck: "false", "aria-label": "Partner code" });
+		const apply = el("button", { class: "btn btn-sm", type: "button" }, "Apply");
+		const info = el("span", { class: "code-info" });
+		const show = () => {
+			if (store.code) {
+				input.value = store.code.code;
+				input.disabled = true;
+				apply.textContent = "Remove";
+				info.className = "code-info ok";
+				info.replaceChildren(el("b", {}, store.code.partner), " · " + percent + "% off every coin pack");
+				box.classList.add("applied");
+			} else {
+				input.disabled = false;
+				apply.textContent = "Apply";
+				info.className = "code-info";
+				info.textContent = "From a partner server or creator? Their code takes " + percent + "% off every coin pack.";
+				box.classList.remove("applied");
+			}
+		};
+		const submit = async () => {
+			if (store.code) { store.code = null; keepCode(null); input.value = ""; show(); renderPacks(); return; }
+			try {
+				await busy(apply, async () => { store.code = await checkCode(input.value); });
+				keepCode(store.code.code);
+				show();
+				renderPacks();
+				toast(store.code.partner + "'s code applied: " + percent + "% off");
+			} catch (x) {
+				info.className = "code-info bad";
+				info.textContent = x.status === 404 || /exist/.test(x.message) ? "That code doesn't exist." : x.message;
+			}
+		};
+		input.addEventListener("input", () => { input.value = input.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""); });
+		input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+		apply.addEventListener("click", submit);
+		box.replaceChildren(el("span", { class: "code-tag", "aria-hidden": "true" }, "%"), input, apply, info);
+		show();
+	}
+
 	function renderPacks() {
 		const grid = $('[data-grid="packs"]');
 		const on = store.catalog.checkoutEnabled;
 		const cur = store.catalog.currency || "EUR";
 		const money = new Intl.NumberFormat(undefined, { style: "currency", currency: cur });
+		const percent = store.code ? store.catalog.partnerCodePercent || 0 : 0;
+		const priceOf = (pack) => percent ? Math.round(pack.price * (100 - percent)) / 100 : pack.price;
 		grid.replaceChildren(...store.catalog.coinPacks.map((pack, i) => {
-			const b = el("button", { class: "btn " + (i === 2 ? "btn-primary" : ""), type: "button", disabled: !on }, on ? money.format(pack.price) : "Opens soon");
+			const b = el("button", { class: "btn " + (i === 2 ? "btn-primary" : ""), type: "button", disabled: !on }, on ? money.format(priceOf(pack)) : "Opens soon");
 			b.addEventListener("click", async () => {
 				if (!store.token) return openSignIn();
 				try {
 					await busy(b, async () => {
-						const r = await api("/v1/store/checkout", { body: { packId: pack.id } });
+						const r = await api("/v1/store/checkout", { body: { packId: pack.id, code: store.code ? store.code.code : null } });
 						location.href = r.checkoutUrl;
 					});
 				} catch (x) { toast(x.message, "err"); }
@@ -532,7 +593,7 @@
 				el("i", { class: "coin-dot", style: "width:34px;height:34px" }),
 				el("span", { class: "big" }, coins(pack.coins + (pack.bonus || 0))),
 				pack.bonus ? el("span", { class: "bonus" }, "+" + coins(pack.bonus) + " bonus") : el("span", { class: "kind" }, "Velo Coins"),
-				el("span", { class: "kind" }, money.format(pack.price)), b);
+				el("span", { class: "kind" }, percent ? [el("s", {}, money.format(pack.price)), " ", el("span", { class: "code-price" }, money.format(priceOf(pack)))] : money.format(pack.price)), b);
 		}));
 		$("[data-checkout-note]").textContent = on
 			? "Secure checkout by Tebex (our reseller). Coins land on your account right after payment."
@@ -660,6 +721,10 @@
 			store.catalog = catalog;
 			store.cosmetics = cosmetics;
 			cosmetics.items.forEach((i) => (store.byId[i.id] = i));
+			const linked = new URLSearchParams(location.search).get("code") || storedCode();
+			if (linked && catalog.partnerCodePercent) {
+				try { store.code = await checkCode(linked); keepCode(store.code.code); } catch { keepCode(null); }
+			}
 			await loadWallet();
 			renderWallet();
 			renderFeatured();

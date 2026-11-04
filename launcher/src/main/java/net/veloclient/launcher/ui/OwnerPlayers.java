@@ -145,7 +145,7 @@ final class OwnerPlayers {
 
 		FlowPane tiles = new FlowPane(12, 12,
 				stat("Coins", String.format(Locale.ROOT, "%,d", balance), "balance"),
-				stat("Velo+", plus ? remaining(plusUntil) : "Not subscribed", plus ? "until " + date(plusUntil) : "no membership"),
+				plusUntil > 7258118400000L ? stat("Velo+", "Forever", "never runs out") : stat("Velo+", plus ? remaining(plusUntil) : "Not subscribed", plus ? "until " + date(plusUntil) : "no membership"),
 				stat("Cosmetics", String.valueOf(owned.size()), owned.isEmpty() ? "owns nothing" : "owned"),
 				stat("Addons", addons ? "Access" : "No access", addons ? "given by the owner" : "invite only"));
 
@@ -231,7 +231,14 @@ final class OwnerPlayers {
 				perform(() -> StoreApi.adminPlus(uuid, 0), uuid, true);
 			}
 		});
-		HBox row = new HBox(8, custom, give, end);
+		Button forever = new Button("Forever");
+		forever.getStyleClass().add("ghost-button");
+		forever.setOnAction(e -> {
+			if (confirm("Velo+ forever?", "Their membership never runs out (monthly coins included) until you end it.")) {
+				perform(() -> StoreApi.adminPlusForever(uuid), uuid, true);
+			}
+		});
+		HBox row = new HBox(8, custom, give, forever, end);
 		row.setAlignment(Pos.CENTER_LEFT);
 		return section("Velo+", new VBox(8, quick, row,
 				hint("Days add to what they have. Coins, badge and the Velo+ features switch on within a minute; the Discord role follows once linked.")));

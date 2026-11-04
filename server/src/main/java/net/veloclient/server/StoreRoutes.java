@@ -40,7 +40,28 @@ final class StoreRoutes {
 	private record BuyRequest(String itemId) {
 	}
 
-	private record CheckoutRequest(String packId) {
+	private record CheckoutRequest(String packId, String code) {
+	}
+
+	private record PartnerCodeRequest(String action, String previous, net.veloclient.server.store.PartnerCodes.Code code) {
+	}
+
+	private static Map<String, Object> partnerCodesView(StoreService store) throws Exception {
+		var stats = store.database().partnerCodeStats();
+		java.util.List<Map<String, Object>> rows = new java.util.ArrayList<>();
+		for (var c : store.partnerCodes().all()) {
+			Map<String, Object> row = new java.util.LinkedHashMap<>();
+			row.put("code", c.code());
+			row.put("partner", c.partner());
+			row.put("partnerId", c.partnerId());
+			row.put("active", c.active());
+			row.put("note", c.note());
+			row.put("createdAt", c.createdAt());
+			row.put("stats", stats.getOrDefault(c.code(), Map.of("orders", 0, "revenue", 0, "coins", 0, "buyers", 0, "lastAt", 0, "orders30d", 0)));
+			rows.add(row);
+		}
+		return Map.of("codes", rows, "percent", net.veloclient.server.store.PartnerCodes.PERCENT, "live", store.partnerCodesLive(),
+				"currency", store.config().currency);
 	}
 
 	private record GiftRequest(String itemId, String to, String note) {
@@ -74,8 +95,35 @@ final class StoreRoutes {
 				JsonHttp.writeJson(ex, 200, store.buy(s.uuid(), s.username(), JsonHttp.readBody(ex, BuyRequest.class).itemId())));
 		route(server, registry, "/v1/store/welcome-gift", "POST", (ex, s) ->
 				JsonHttp.writeJson(ex, 200, store.claimWelcomeGift(s.uuid(), s.username(), JsonHttp.readBody(ex, BuyRequest.class).itemId())));
-		route(server, registry, "/v1/store/checkout", "POST", (ex, s) ->
-				JsonHttp.writeJson(ex, 200, store.checkout(s.uuid(), s.username(), JsonHttp.readBody(ex, CheckoutRequest.class).packId())));
+		route(server, registry, "/v1/store/checkout", "POST", (ex, s) -> {
+			CheckoutRequest r = JsonHttp.readBody(ex, CheckoutRequest.class);
+			JsonHttp.writeJson(ex, 200, store.checkout(s.uuid(), s.username(), r.packId(), r.code()));
+		});
+		// GET /v1/store/code?c=<code> - a partner code's partner and discount (the Store shows it before checkout).
+		server.createContext("/v1/store/code", ex -> VeloServerApp.handle(ex, "GET", e -> JsonHttp.writeJson(e, 200, store.partnerCode(query(e).get("c")))));
+		// Owner: partner codes with their stats; POST {action: "save", previous, code: {...}} or {action: "delete", previous}.
+		route(server, registry, "/v1/admin/partner-codes", null, (ex, s) -> {
+			if (!store.isOwner(s.uuid(), s.username())) {
+				JsonHttp.writeError(ex, 403, "Only the server owner can do that");
+				return;
+			}
+			if ("POST".equals(ex.getRequestMethod())) {
+				PartnerCodeRequest r = JsonHttp.readBody(ex, PartnerCodeRequest.class);
+				var codes = store.partnerCodes();
+				if ("delete".equals(r.action())) {
+					codes.delete(r.previous());
+				} else {
+					var saved = codes.save(r.previous(), r.code());
+					String prev = net.veloclient.server.store.PartnerCodes.normalize(r.previous());
+					if (prev != null && !prev.equals(saved.code())) {
+						store.database().renamePartnerCode(prev, saved.code());
+					}
+				}
+				System.out.println("[store] " + s.username() + " " + ("delete".equals(r.action()) ? "deleted" : "saved") + " partner code "
+						+ (r.code() != null ? r.code().code() : r.previous()));
+			}
+			JsonHttp.writeJson(ex, 200, partnerCodesView(store));
+		});
 		route(server, registry, "/v1/store/gift", "POST", (ex, s) -> {
 			GiftRequest r = JsonHttp.readBody(ex, GiftRequest.class);
 			JsonHttp.writeJson(ex, 200, store.gift(s.uuid(), s.username(), r.itemId(), r.to()));
@@ -177,7 +225,7 @@ final class StoreRoutes {
 	}
 
 	private static void route(HttpServer server, SessionRegistry registry, String path, String method, Authed handler) {
-		server.createContext(path, exchange -> VeloServerApp.handle(exchange, method, ex -> {
+		server.createContext(path, exchange -> VeloServerApp.handle(exchange, method == null ? exchange.getRequestMethod() : method, ex -> {
 			String token = JsonHttp.bearerToken(ex);
 			SessionRegistry.Session session = registry.session(token);
 			if (session == null && path.startsWith("/v1/admin/")) {

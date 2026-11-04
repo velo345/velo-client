@@ -196,8 +196,15 @@ public final class CoinsView {
 
 	// ---- Coin packs ----
 
+	/** The partner code entered in this launcher run (kept while switching pages). */
+	private static String partnerCode;
+	private static String partnerName;
+
 	private static Node packs(JsonObject catalog, Label status, Runnable reload) {
 		FlowPane grid = StoreTiles.grid(190, 14);
+		int codePercent = catalog.has("partnerCodePercent") && !catalog.get("partnerCodePercent").isJsonNull()
+				? catalog.get("partnerCodePercent").getAsInt() : 0;
+		java.util.List<Runnable> repricers = new java.util.ArrayList<>();
 		JsonArray packs = catalog.getAsJsonArray("coinPacks");
 		String currency = catalog.get("currency").getAsString();
 		boolean enabled = catalog.get("checkoutEnabled").getAsBoolean();
@@ -228,6 +235,11 @@ public final class CoinsView {
 			buy.setDisable(!enabled);
 			String packId = pack.get("id").getAsString();
 			buy.setOnAction(e -> startCheckout(packId, buy, status, reload));
+			if (enabled) {
+				repricers.add(() -> buy.setText(partnerCode == null ? formatPrice(price, currency)
+						: formatPrice(Math.round(price * (100 - codePercent)) / 100.0, currency) + "  (-" + codePercent + "%)"));
+				repricers.get(repricers.size() - 1).run();
+			}
 			VBox body = new VBox(10, art, amountRow, extra, buy);
 			body.getStyleClass().add("card");
 			body.setPadding(new javafx.geometry.Insets(12, 12, 14, 12));
@@ -246,13 +258,73 @@ public final class CoinsView {
 				note(enabled ? "Secure checkout by Tebex: cards, PayPal, paysafecard and more. Opens in your browser."
 						: "Buying coins isn't open yet."));
 		secure.setAlignment(Pos.CENTER_LEFT);
-		return new VBox(12, grid, secure);
+		if (!enabled || codePercent <= 0) {
+			partnerCode = null;
+			return new VBox(12, grid, secure);
+		}
+		return new VBox(12, codeRow(codePercent, repricers), grid, secure);
+	}
+
+	/** "Partner code" field: a valid code takes a few percent off every coin pack (never Velo+). */
+	private static Node codeRow(int percent, java.util.List<Runnable> repricers) {
+		TextField field = new TextField(partnerCode == null ? "" : partnerCode);
+		field.setPromptText("Partner code");
+		field.setPrefWidth(180);
+		field.setTextFormatter(new javafx.scene.control.TextFormatter<String>(change -> {
+			change.setText(change.getText().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9_-]", ""));
+			return change.getControlNewText().length() <= 24 ? change : null;
+		}));
+		Button apply = new Button(partnerCode == null ? "Apply" : "Remove");
+		apply.getStyleClass().add("ghost-button");
+		Label info = new Label(partnerCode == null ? "Got a code from a partner server or creator? " + percent + "% off every coin pack."
+				: partnerName + "'s code · " + percent + "% off");
+		info.getStyleClass().add("t-muted");
+		Runnable reprice = () -> repricers.forEach(Runnable::run);
+		Runnable submit = () -> {
+			if (partnerCode != null) {
+				partnerCode = null;
+				partnerName = null;
+				field.clear();
+				field.setDisable(false);
+				apply.setText("Apply");
+				info.setText("Got a code from a partner server or creator? " + percent + "% off every coin pack.");
+				info.setStyle("");
+				reprice.run();
+				return;
+			}
+			String code = field.getText().trim();
+			if (code.isEmpty()) {
+				return;
+			}
+			apply.setDisable(true);
+			run(() -> StoreApi.partnerCode(code), result -> {
+				apply.setDisable(false);
+				partnerCode = result.get("code").getAsString();
+				partnerName = result.get("partner").getAsString();
+				field.setText(partnerCode);
+				field.setDisable(true);
+				apply.setText("Remove");
+				info.setText(partnerName + "'s code · " + percent + "% off");
+				info.setStyle("-fx-text-fill: #4ade80;");
+				reprice.run();
+			}, error -> {
+				apply.setDisable(false);
+				info.setText(error.contains("doesn't exist") || error.contains("404") ? "That code doesn't exist" : error);
+				info.setStyle("-fx-text-fill: #ff6b73;");
+			});
+		};
+		field.setDisable(partnerCode != null);
+		field.setOnAction(e -> submit.run());
+		apply.setOnAction(e -> submit.run());
+		HBox row = new HBox(8, field, apply, info);
+		row.setAlignment(Pos.CENTER_LEFT);
+		return row;
 	}
 
 	private static void startCheckout(String packId, Button button, Label status, Runnable reload) {
 		button.setDisable(true);
 		status.setText("Opening secure checkout...");
-		run(() -> StoreApi.checkout(packId), result -> {
+		run(() -> StoreApi.checkout(packId, partnerCode), result -> {
 			String orderId = result.get("orderId").getAsString();
 			openUrl(result.get("checkoutUrl").getAsString());
 			status.setText("Finish the payment in your browser - your coins appear here automatically.");

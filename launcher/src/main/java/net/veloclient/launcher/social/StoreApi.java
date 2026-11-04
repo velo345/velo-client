@@ -177,9 +177,22 @@ public final class StoreApi {
 	}
 
 	public static JsonObject checkout(String packId) throws StoreError {
+		return checkout(packId, null);
+	}
+
+	/** A coin pack checkout; {@code code}: a partner code (a few percent off), or null. */
+	public static JsonObject checkout(String packId, String code) throws StoreError {
 		JsonObject body = new JsonObject();
 		body.addProperty("packId", packId);
+		if (code != null) {
+			body.addProperty("code", code);
+		}
 		return post("/v1/store/checkout", body);
+	}
+
+	/** A partner code's partner and discount ({@code code, partner, percent}); fails with 404 for an unknown code. */
+	public static JsonObject partnerCode(String code) throws StoreError {
+		return get("/v1/store/code?c=" + URLEncoder.encode(code, StandardCharsets.UTF_8));
 	}
 
 	public static JsonObject order(String orderId) throws StoreError {
@@ -383,6 +396,14 @@ public final class StoreApi {
 		JsonObject body = new JsonObject();
 		body.addProperty("target", target);
 		body.addProperty("days", days);
+		return post("/v1/admin/store/plus", body);
+	}
+
+	/** Owner: Velo+ that never runs out (until ended). */
+	public static JsonObject adminPlusForever(String target) throws StoreError {
+		JsonObject body = new JsonObject();
+		body.addProperty("target", target);
+		body.addProperty("forever", true);
 		return post("/v1/admin/store/plus", body);
 	}
 

@@ -76,6 +76,7 @@ const ICONS = {
 	worlds: "M12 3a9 9 0 1 0 .01 0 M3 12h18 M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9 M12 3C9.5 5.6 8.2 8.6 8.2 12s1.3 6.4 3.8 9",
 	capes: "M7 3h10l2 18-7-4-7 4z",
 	updates: "M20 11a8 8 0 1 0-2.3 5.7 M20 4v7h-7 M12 8v5l3 2",
+	codes: "M3 12V4h8l10 10-8 8z M7.5 7.5h.01",
 	partners: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M2 20c0-3 2.7-5 6-5s6 2 6 5 M14 15.3c.6-.2 1.3-.3 2-.3 3.3 0 6 2 6 5",
 	stafflog: "M5 3h11l3 3v15H5z M9 9h6 M9 13h6 M9 17h4",
 	play: "M7 4l13 8-13 8z",
@@ -224,6 +225,31 @@ function confirmBox(title, text, okLabel = "Confirm", danger = true) {
 		cancel.addEventListener("click", () => dlg.close());
 		dlg.addEventListener("close", () => resolve(answer));
 	});
+}
+
+/**
+ * Review view for a cloak texture: the whole texture as big as the screen allows (click to see it at full size and
+ * scroll around), next to the front and back exactly as players see them on the cloak, scaled up.
+ */
+function capeZoom(src, title, meta) {
+	let dlg;
+	const crop = (label, x) => {
+		const img = h("img", { src, alt: label, draggable: "false" });
+		// Cloak layout 64x32: front at (1,1), back at (12,1), each 10x16.
+		img.style.cssText = `width:640%;height:200%;left:${-x * 10}%;top:-6.25%`;
+		return h("figure", { class: "cz-crop" }, h("div", { class: "cz-face" }, img), h("figcaption", {}, label));
+	};
+	const full = h("img", { class: "cz-full", src, alt: title, draggable: "false" });
+	const stage = h("div", { class: "cz-stage", title: "Click to zoom" }, full);
+	stage.addEventListener("click", () => stage.classList.toggle("actual"));
+	dlg = dialog(title, h("div", { class: "cz" }, stage, h("div", { class: "cz-side" }, crop("Front", 1), crop("Back", 12), meta || null)), [], true);
+	dlg.classList.add("cape-zoom");
+	return dlg;
+}
+
+/** A copy of a card's button for the zoom view: clicks the real one and closes the zoom. */
+function proxy(button) {
+	return h("button", { class: button.className, type: "button", onclick: (e) => { e.target.closest("dialog")?.close(); button.click(); } }, button.textContent);
 }
 
 // ---- Charts (SVG, drawn in, crosshair + tooltip) ----
@@ -566,7 +592,7 @@ function deviceName() {
 const PAGES = [
 	["Velo", [["overview", "Overview"], ["players", "Players"], ["store", "Store"], ["socials", "Socials"]]],
 	["Moderation", [["monitor", "Monitoring"], ["clips", "Clips"], ["worlds", "Public worlds"], ["notes", "World notes"], ["capes", "Custom capes"], ["stafflog", "Staff log"]]],
-	["Owner tools", [["cosmetics", "Cosmetics"], ["news", "News"], ["reports", "Reports"], ["doctor", "Launcher Doctor"], ["serverrules", "Server mod rules"], ["bridge", "Velo Bridge servers"], ["partners", "Partner servers"], ["updates", "Required update"], ["addons", "Addons"]]],
+	["Owner tools", [["cosmetics", "Cosmetics"], ["news", "News"], ["reports", "Reports"], ["doctor", "Launcher Doctor"], ["serverrules", "Server mod rules"], ["bridge", "Velo Bridge servers"], ["partners", "Partner servers"], ["codes", "Partner codes"], ["updates", "Required update"], ["addons", "Addons"]]],
 	["Machine", [["server", "Server"], ["files", "Files"], ["activity", "Activity log"]]],
 	["", [["account", "Account"]]],
 ];
@@ -827,6 +853,7 @@ async function openPlayer(target) {
 	const render = (v) => {
 		view = v;
 		const plus = v.plusUntil > Date.now();
+		const forever = v.plusUntil > 7258118400000; // past the year 2200 = given forever
 		// ---- Coins ----
 		const amount = h("input", { type: "number", value: "1000", "aria-label": "Coins" });
 		const note = h("input", { placeholder: "Reason (shown in the ledger)", "aria-label": "Reason" });
@@ -869,6 +896,11 @@ async function openPlayer(target) {
 		const plusBtn = h("button", { class: "btn primary shrink", type: "button" }, "Give Velo+ days");
 		const endBtn = h("button", { class: "btn danger shrink", type: "button" }, "End Velo+");
 		plusBtn.onclick = () => busy(plusBtn, async () => { await velo("admin/store/plus", { body: { target: v.uuid, days: parseInt(days.value, 10) || 30 } }); render(await velo("admin/store/lookup", { body: { target: v.uuid } })); toast("Velo+ extended"); });
+		const foreverBtn = h("button", { class: "btn shrink", type: "button" }, "Velo+ forever");
+		foreverBtn.onclick = async () => {
+			if (!(await confirmBox("Velo+ forever for " + v.username + "?", "Their membership never runs out (monthly coins included) until you end it here.", "Give forever", false))) return;
+			await busy(foreverBtn, async () => { await velo("admin/store/plus", { body: { target: v.uuid, forever: true } }); render(await velo("admin/store/lookup", { body: { target: v.uuid } })); toast("Velo+ forever"); });
+		};
 		endBtn.onclick = async () => {
 			if (!(await confirmBox("End Velo+?", "This ends " + (v.username || "the player") + "'s membership right now."))) return;
 			await busy(endBtn, async () => { await velo("admin/store/plus", { body: { target: v.uuid, days: 0 } }); render(await velo("admin/store/lookup", { body: { target: v.uuid } })); toast("Velo+ ended"); });
@@ -884,7 +916,7 @@ async function openPlayer(target) {
 			h("div", { class: "grid kpis" },
 				kpi("Coins", "coins", v.balance, fmt),
 				kpi("Items owned", "cosmetics", v.owned.length, fmt),
-				h("div", { class: "card kpi" }, h("div", { class: "label" }, icon("plus"), "Velo+"), h("div", { class: "value", style: "font-size:20px" }, plus ? "Member" : "No"), h("div", { class: "sub" }, plus ? "until " + when(v.plusUntil) : "–")),
+				h("div", { class: "card kpi" }, h("div", { class: "label" }, icon("plus"), "Velo+"), h("div", { class: "value", style: "font-size:20px" }, plus ? "Member" : "No"), h("div", { class: "sub" }, plus ? (forever ? "forever" : "until " + when(v.plusUntil)) : "–")),
 				h("div", { class: "card kpi" }, h("div", { class: "label" }, icon("online"), "Status"),
 					h("div", { class: "value", style: "font-size:20px" }, live.length ? "Online" : "Offline"),
 					h("div", { class: "sub" }, live.length ? live.map((x) => x.kind).join(" + ") : staffView && staffView.level ? "Staff: " + staffView.level : "–"))),
@@ -895,7 +927,7 @@ async function openPlayer(target) {
 			card("Owned items", v.owned.length + " cosmetics", null,
 				v.owned.length ? h("div", { class: "items", style: "grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:14px" }, ownedTiles) : h("p", { class: "muted" }, "None yet"),
 				h("div", { class: "row" }, itemSel, grantBtn, allBtn)),
-			card("Velo+", plus ? "Active until " + when(v.plusUntil) : "Not a member", null, h("div", { class: "row" }, days, plusBtn, plus ? endBtn : null)),
+			card("Velo+", plus ? (forever ? "Active forever" : "Active until " + when(v.plusUntil)) : "Not a member", null, h("div", { class: "row" }, days, plusBtn, forever ? null : foreverBtn, plus ? endBtn : null)),
 			card("Addons", v.addons ? "Has access" : "No access - only players you pick see the Addons anywhere", null, h("div", { class: "row" }, addonsBtn)),
 			staffView && staffView.reports > 0 ? h("div", { class: "notice" }, `${staffView.reports} player report(s) against ${v.username} - `, h("a", { href: "#/reports", onclick: () => dlg.close() }, "open Reports")) : null,
 			card("Ledger", "Last 30 coin changes", null, table(["When", "Reason", "Ref", "num:Change", "num:Balance"], v.ledger.map((l) => [
@@ -2210,12 +2242,88 @@ RENDER.capes = async (root) => {
 					await busy(del, async () => { await velo("staff/capes/review", { body: { uuid: c.uuid, action: "remove" } }); toast("Cape removed"); draw(); });
 				};
 				return h("div", { class: "clip-card cape-card" },
-					h("img", { class: "cape-art", src: "/api/velo/cape/" + c.hash, alt: "Cape of " + c.username, loading: "lazy" }),
+					h("img", { class: "cape-art", src: "/api/velo/cape/" + c.hash, alt: "Cape of " + c.username, loading: "lazy", title: "Click to enlarge",
+						onclick: () => capeZoom("/api/velo/cape/" + c.hash, c.username + "'s cape", h("div", { class: "row", style: "gap:6px" }, h("b", {}, c.username), c.reviewed ? h("span", { class: "pill good" }, "Reviewed") : proxy(keep), proxy(del))) }),
 					h("div", { class: "clip-meta" }, h("b", {}, c.username), h("span", { class: "muted small" }, (c.animated ? "Animated · " : "") + bytes(c.size) + (c.at ? " · " + ago(c.at) : "")),
 						h("div", { class: "row", style: "gap:6px" }, c.reviewed ? h("span", { class: "pill good" }, "Reviewed") : keep, del)));
 			}) : h("p", { class: "muted" }, "Nothing to review"))));
 	};
 	await draw();
+};
+
+// Partner codes: players enter one in the Store and pay less for coin packs (never Velo+); every paid order counts for the code.
+function editCode(c, partners, reload) {
+	const isNew = !c;
+	c = c || { code: "", partner: "", partnerId: null, active: true, note: "" };
+	const code = h("input", { value: c.code, placeholder: "LUCKYSMP", maxlength: "24", autocapitalize: "characters", spellcheck: "false" });
+	code.addEventListener("input", () => { const at = code.selectionStart; code.value = code.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""); code.setSelectionRange(at, at); });
+	const partner = h("input", { value: c.partner, placeholder: "LuckySMP", maxlength: "40" });
+	const server = h("select", {}, h("option", { value: "" }, "None"), partners.map((p) => h("option", { value: p.id, selected: p.id === c.partnerId }, p.name)));
+	server.addEventListener("change", () => { if (!partner.value.trim() && server.value) partner.value = server.selectedOptions[0].textContent; });
+	const active = h("input", { type: "checkbox", checked: c.active });
+	const note = h("input", { value: c.note || "", placeholder: "Deal, payout, contact... (only you see this)", maxlength: "200" });
+	const ok = h("button", { class: "btn primary", type: "button" }, isNew ? "Add code" : "Save");
+	const dlg = dialog(isNew ? "New partner code" : c.code, h("div", { class: "grid", style: "gap:12px" },
+		hintField("Code", code, "What players type in the Store. Letters, digits, - and _."),
+		hintField("Partner", partner, "Who it's for - shown to the player when the code works."),
+		hintField("Partner server", server, "Optional: the website's partner page shows the code with this server."),
+		h("label", { class: "row", style: "gap:8px" }, active, "Active (off = refused at checkout, stats kept)"),
+		hintField("Note", note)), [ok]);
+	ok.onclick = () => busy(ok, async () => {
+		if (!code.value || !partner.value.trim()) throw new Error("A code needs a name and a partner");
+		await velo("admin/partner-codes", { body: { action: "save", previous: isNew ? null : c.code,
+			code: { code: code.value, partner: partner.value.trim(), partnerId: server.value || null, active: active.checked, note: note.value.trim() || null } } });
+		dlg.close();
+		toast(isNew ? "Code " + code.value + " added" : "Saved");
+		reload();
+	});
+}
+
+function hintField(label, input, hint) {
+	return h("label", {}, label, input, hint ? h("span", { class: "muted small", style: "display:block;margin-top:4px;font-weight:400" }, hint) : null);
+}
+
+RENDER.codes = async (root) => {
+	const body = h("div");
+	root.append(body);
+	const load = async () => {
+		const [data, partners] = await Promise.all([velo("admin/partner-codes"), velo("admin/partners").then((r) => r.partners).catch(() => [])]);
+		if (!root.isConnected) return;
+		const money = new Intl.NumberFormat(undefined, { style: "currency", currency: data.currency || "EUR" });
+		const total = data.codes.reduce((a, c) => ({ orders: a.orders + c.stats.orders, revenue: a.revenue + c.stats.revenue, month: a.month + c.stats.orders30d }), { orders: 0, revenue: 0, month: 0 });
+		subtitle(`${data.codes.length} code${data.codes.length === 1 ? "" : "s"} · ${data.percent}% off Velo Coins · never on Velo+`);
+		const add = h("button", { class: "btn primary small", type: "button", onclick: () => editCode(null, partners, load) }, icon("plus"), "New code");
+		const status = data.live ? null : h("div", { class: "notice warn" },
+			h("b", {}, "Codes can't be used yet. "),
+			"Create one coupon in Tebex (Marketing → Coupons): ", h("b", {}, data.percent + "% off"), ", on the ", h("b", {}, "Velo Coins"),
+			" category, single purchases only, unlimited uses, no expiry. Put its code into TEBEX_PARTNER_COUPON in /etc/velo/server.env and restart velo-server.");
+		const rows = data.codes.map((c) => {
+			const edit = h("button", { class: "btn small", type: "button", onclick: () => editCode(c, partners, load) }, "Edit");
+			const copy = h("button", { class: "btn small ghost", type: "button", title: "Copy the Store link with this code", onclick: async () => {
+				await navigator.clipboard.writeText("https://velo-client.com/store?code=" + encodeURIComponent(c.code) + "#coins"); toast("Link copied");
+			} }, "Copy link");
+			const del = h("button", { class: "btn small danger", type: "button" }, "Delete");
+			del.onclick = async () => {
+				if (!(await confirmBox("Delete " + c.code + "?", "Players can't use it any more. Its past orders stay in the money stats, but its numbers here are gone (switch it off instead to keep them).", "Delete"))) return;
+				await busy(del, async () => { await velo("admin/partner-codes", { body: { action: "delete", previous: c.code } }); toast("Deleted " + c.code); load(); });
+			};
+			const server = partners.find((p) => p.id === c.partnerId);
+			return [
+				h("div", {}, h("b", { class: "mono" }, c.code), h("div", { class: "muted small" }, c.partner + (server ? " · " + server.name : ""))),
+				c.active ? h("span", { class: "pill good" }, h("i"), "Active") : h("span", { class: "pill" }, h("i"), "Off"),
+				h("div", {}, h("b", {}, fmt(c.stats.orders)), h("div", { class: "muted small" }, fmt(c.stats.orders30d) + " in 30 days · " + fmt(c.stats.buyers) + " buyer" + (c.stats.buyers === 1 ? "" : "s"))),
+				h("div", {}, h("b", {}, money.format(c.stats.revenue)), h("div", { class: "muted small" }, fmt(c.stats.coins) + " coins")),
+				h("div", { class: "muted small" }, c.stats.lastAt ? ago(c.stats.lastAt) : "never", c.note ? h("div", {}, c.note) : null),
+				h("div", { class: "row", style: "gap:6px;flex-wrap:nowrap" }, copy, edit, del)];
+		});
+		body.replaceChildren(
+			h("div", { class: "kpis" }, kpi("Orders with a code", "store", total.orders, fmt, fmt(total.month) + " in the last 30 days"),
+				kpi("Paid with codes", "coins", total.revenue, (n) => money.format(n), "after the " + data.percent + "% off")),
+			status,
+			card("Partner codes", "Players type a code in the Store (website or launcher) or open a code link, and pay " + data.percent + "% less for coin packs. Velo+ subscriptions never take codes.", add,
+				data.codes.length ? table(["Code", "", "Orders", "Paid", "Last used", ""], rows) : h("p", { class: "muted" }, "No codes yet - add the first one.")));
+	};
+	await load();
 };
 
 // Partner servers: the whole list is saved at once (in order), like the launcher's Owner panel does.

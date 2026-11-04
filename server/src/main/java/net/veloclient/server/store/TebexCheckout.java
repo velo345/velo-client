@@ -50,11 +50,33 @@ public final class TebexCheckout {
 
 	/** A basket holding coin pack {@code packageId}, for order {@code orderId}. */
 	public Basket createCheckout(String orderId, String uuid, String username, long packageId, String returnUrl, String completeUrl) throws Exception {
+		return createCheckout(orderId, uuid, username, packageId, returnUrl, completeUrl, null, null);
+	}
+
+	/**
+	 * Like {@link #createCheckout(String, String, String, long, String, String)}; with a {@code coupon} (the partner code
+	 * discount) it's put on the basket too, and the checkout fails if Tebex doesn't take it - nobody pays full price
+	 * believing their code worked.
+	 */
+	public Basket createCheckout(String orderId, String uuid, String username, long packageId, String returnUrl, String completeUrl,
+			String coupon, String partnerCode) throws Exception {
 		JsonObject custom = new JsonObject();
 		custom.addProperty("velo_order", orderId);
 		custom.addProperty("velo_uuid", uuid);
 		custom.addProperty("velo_username", username);
-		return basket(custom, packageId, returnUrl, completeUrl);
+		if (partnerCode != null) {
+			custom.addProperty("velo_code", partnerCode);
+		}
+		Basket basket = basket(custom, packageId, returnUrl, completeUrl);
+		if (coupon != null) {
+			JsonObject body = new JsonObject();
+			body.addProperty("coupon_code", coupon);
+			JsonObject after = data(send("/accounts/" + publicToken + "/baskets/" + basket.ident() + "/coupons", body));
+			if (!after.has("coupons") || !after.get("coupons").isJsonArray() || after.getAsJsonArray("coupons").isEmpty()) {
+				throw new IllegalStateException("Tebex didn't apply the partner coupon");
+			}
+		}
+		return basket;
 	}
 
 	/** A basket holding the Velo+ subscription package {@code packageId} (monthly, or yearly when {@code yearly}). */

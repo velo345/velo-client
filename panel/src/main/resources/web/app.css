@@ -382,3 +382,22 @@ dialog::backdrop { background: rgba(4, 4, 6, .7); backdrop-filter: blur(6px); }
 .rule-pill { display: inline-flex; align-items: center; gap: 6px; }
 .icon-btn.tiny { width: 18px; height: 18px; padding: 0; }
 .icon-btn.tiny svg { width: 12px; height: 12px; }
+
+/* Cloak review zoom */
+.cape-card .cape-art, .cloak-preview .cape-art { cursor: zoom-in; transition: transform .15s; }
+.cape-card .cape-art:hover { transform: scale(1.02); }
+dialog.cape-zoom { width: min(1280px, 100vw - 32px); max-width: none; }
+.cz { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 18px; align-items: start; }
+.cz-stage { border-radius: 10px; border: 1px solid var(--line-2); overflow: hidden; cursor: zoom-in; max-height: 72vh;
+	background: repeating-conic-gradient(#1c1c22 0 25%, #15151a 0 50%) 0 0 / 16px 16px; }
+.cz-full { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+.cz-stage.actual { overflow: auto; cursor: zoom-out; }
+.cz-stage.actual .cz-full { width: auto; max-width: none; min-width: 200%; }
+.cz-side { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-content: start; }
+.cz-side > :not(figure) { grid-column: 1 / -1; }
+.cz-crop { margin: 0; display: grid; gap: 6px; }
+.cz-face { position: relative; aspect-ratio: 10 / 16; overflow: hidden; border-radius: 8px; border: 1px solid var(--line-2);
+	background: repeating-conic-gradient(#1c1c22 0 25%, #15151a 0 50%) 0 0 / 12px 12px; }
+.cz-face img { position: absolute; max-width: none; image-rendering: pixelated; }
+.cz-crop figcaption { font-size: 12px; color: var(--text-2); text-align: center; }
+@media (max-width: 760px) { .cz { grid-template-columns: 1fr; } }

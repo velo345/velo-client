@@ -195,7 +195,7 @@ function main() {
 		};
 		const pageTokens = { ...tokens };
 		for (const [k, v] of Object.entries(page)) pageTokens[`page.${k}`] = v;
-		for (const id of ["home", "features", "plus", "store", "news", "download"]) pageTokens[`nav.${id}`] = page.active === id ? "aria-current=\"page\"" : "";
+		for (const id of ["home", "features", "plus", "store", "news", "download", "partners"]) pageTokens[`nav.${id}`] = page.active === id ? "aria-current=\"page\"" : "";
 		const html = render(layout.replace("{{page.body}}", body), pageTokens, file);
 		const out = path.join(DIST, relPath);
 		fs.mkdirSync(path.dirname(out), { recursive: true });

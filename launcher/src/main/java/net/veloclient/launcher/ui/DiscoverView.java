@@ -60,8 +60,8 @@ public final class DiscoverView {
 			strip.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 			strip.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 			strip.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
-			strip.setMinHeight(170);
-			strip.setPrefHeight(170);
+			strip.setMinHeight(196);
+			strip.setPrefHeight(196);
 			box.getChildren().add(strip);
 		} else {
 			box.getChildren().add(cards);
@@ -80,33 +80,10 @@ public final class DiscoverView {
 			if (data[0] != null && data[0].has("partners")) {
 				for (JsonElement e : data[0].getAsJsonArray("partners")) {
 					JsonObject p = e.getAsJsonObject();
-					String accent = p.has("accent") && !p.get("accent").isJsonNull() ? p.get("accent").getAsString() : "#ff2d3c";
 					Button join = new Button("Join");
 					join.getStyleClass().add("primary-button");
 					join.setOnAction(ev -> joiner.server(p.get("address").getAsString(), join));
-					boolean online = p.has("online") && p.get("online").getAsBoolean();
-					String status = online ? String.format(java.util.Locale.ROOT, "%,d online", p.get("players").getAsInt()) : "Offline";
-					Node card = card("PARTNER", accent, p.get("name").getAsString(), text(p, "description", p.get("address").getAsString()),
-							status + "  ·  " + p.get("address").getAsString() + (text(p, "versions", "").isEmpty() ? "" : "  ·  " + text(p, "versions", "")), join);
-					String base = net.veloclient.launcher.social.LauncherSocial.baseUrl();
-					if (base != null && p.has("icon") && !p.get("icon").isJsonNull()) {
-						javafx.scene.image.ImageView icon = new javafx.scene.image.ImageView(new javafx.scene.image.Image(
-								base + "/v1/partners/icon/" + p.get("id").getAsString() + "?v=" + p.get("icon").getAsString(), 40, 40, true, false, true));
-						icon.setFitWidth(40);
-						icon.setFitHeight(40);
-						javafx.scene.shape.Rectangle round = new javafx.scene.shape.Rectangle(40, 40);
-						round.setArcWidth(12);
-						round.setArcHeight(12);
-						icon.setClip(round);
-						VBox inner = (VBox) card;
-						Node tag = inner.getChildren().get(0);
-						Node name = inner.getChildren().get(1);
-						inner.getChildren().removeAll(tag, name);
-						HBox head = new HBox(10, icon, new VBox(4, tag, name));
-						head.setAlignment(Pos.CENTER_LEFT);
-						inner.getChildren().add(0, head);
-					}
-					cards.getChildren().add(card);
+					cards.getChildren().add(partnerCard(p, join));
 				}
 			}
 			java.util.Set<String> shown = new java.util.HashSet<>();
@@ -210,6 +187,101 @@ public final class DiscoverView {
 
 	private static String text(JsonObject o, String key, String fallback) {
 		return o.has(key) && !o.get(key).isJsonNull() && !o.get(key).getAsString().isBlank() ? o.get(key).getAsString() : fallback;
+	}
+
+	/**
+	 * A partner server: its icon big on an accent-tinted card, live player count, the address (click to copy) and its
+	 * partner code, if it has one, as a ticket-style badge.
+	 */
+	private static Node partnerCard(JsonObject p, Button join) {
+		String accent = p.has("accent") && !p.get("accent").isJsonNull() ? p.get("accent").getAsString() : "#ff2d3c";
+		String address = p.get("address").getAsString();
+		boolean online = p.has("online") && p.get("online").getAsBoolean();
+
+		javafx.scene.layout.StackPane iconBox = new javafx.scene.layout.StackPane();
+		iconBox.setMinSize(56, 56);
+		iconBox.setMaxSize(56, 56);
+		iconBox.setStyle("-fx-background-color: " + accent + "26; -fx-background-radius: 14; -fx-border-color: " + accent + "55;"
+				+ " -fx-border-radius: 14; -fx-border-width: 1;");
+		String base = net.veloclient.launcher.social.LauncherSocial.baseUrl();
+		if (base != null && p.has("icon") && !p.get("icon").isJsonNull()) {
+			javafx.scene.image.ImageView icon = new javafx.scene.image.ImageView(new javafx.scene.image.Image(
+					base + "/v1/partners/icon/" + p.get("id").getAsString() + "?s=128&v=" + p.get("icon").getAsString(), 112, 112, true, true, true));
+			icon.setFitWidth(56);
+			icon.setFitHeight(56);
+			icon.setSmooth(true);
+			javafx.scene.shape.Rectangle round = new javafx.scene.shape.Rectangle(56, 56);
+			round.setArcWidth(28);
+			round.setArcHeight(28);
+			icon.setClip(round);
+			iconBox.getChildren().add(icon);
+		} else {
+			Label letter = new Label(p.get("name").getAsString().substring(0, 1).toUpperCase(java.util.Locale.ROOT));
+			letter.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 24px; -fx-font-weight: 900;");
+			iconBox.getChildren().add(letter);
+		}
+
+		Label tag = new Label("PARTNER");
+		tag.setStyle("-fx-background-color: " + accent + "; -fx-text-fill: white; -fx-background-radius: 5; -fx-padding: 2 7 2 7;"
+				+ " -fx-font-size: 9.5px; -fx-font-weight: 900;");
+		Label name = new Label(p.get("name").getAsString());
+		name.getStyleClass().add("t-strong");
+		name.setStyle("-fx-font-size: 17px;");
+		javafx.scene.shape.Circle dot = new javafx.scene.shape.Circle(3.5, javafx.scene.paint.Color.web(online ? "#3ddc97" : "#6b6b75"));
+		Label players = new Label(online ? String.format(java.util.Locale.ROOT, "%,d online", p.get("players").getAsInt()) : "Offline");
+		players.setStyle("-fx-text-fill: " + (online ? "#3ddc97" : "-velo-text-3") + "; -fx-font-size: 11.5px; -fx-font-weight: 700;");
+		HBox live = new HBox(6, dot, players);
+		live.setAlignment(Pos.CENTER_LEFT);
+		String versions = text(p, "versions", "");
+		if (!versions.isEmpty()) {
+			Label v = new Label("·  " + versions);
+			v.setStyle("-fx-text-fill: -velo-text-3; -fx-font-size: 11.5px;");
+			live.getChildren().add(v);
+		}
+		HBox top = new HBox(12, iconBox, new VBox(4, new HBox(8, name, tag), live));
+		((HBox) ((VBox) top.getChildren().get(1)).getChildren().get(0)).setAlignment(Pos.CENTER_LEFT);
+		top.setAlignment(Pos.CENTER_LEFT);
+
+		Label description = new Label(text(p, "description", ""));
+		description.getStyleClass().add("t-muted");
+		description.setWrapText(true);
+		description.setMaxHeight(38);
+
+		Button copy = new Button(address);
+		copy.setGraphic(Icons.icon("copy", 12, javafx.scene.paint.Color.web("#A9A9B3")));
+		copy.getStyleClass().add("ghost-button");
+		copy.setStyle("-fx-font-size: 11.5px; -fx-padding: 4 9 4 9;");
+		copy.setTooltip(new javafx.scene.control.Tooltip("Copy the address"));
+		copy.setOnAction(ev -> {
+			javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+			content.putString(address);
+			javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
+			Toasts.show(copy, "Address copied");
+		});
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+		HBox bottom = new HBox(8, copy, spacer, join);
+		bottom.setAlignment(Pos.CENTER_LEFT);
+
+		Region grow = new Region();
+		VBox.setVgrow(grow, Priority.ALWAYS);
+		VBox card = new VBox(10, top, description);
+		if (p.has("codes") && p.get("codes").isJsonArray() && !p.getAsJsonArray("codes").isEmpty()) {
+			Label code = new Label("Code " + p.getAsJsonArray("codes").get(0).getAsString() + "  ·  10% off Velo Coins");
+			code.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 11px; -fx-font-weight: 800; -fx-border-color: " + accent + "88;"
+					+ " -fx-border-style: segments(4, 3); -fx-border-radius: 6; -fx-padding: 3 8 3 8;");
+			card.getChildren().add(code);
+		}
+		card.getChildren().addAll(grow, bottom);
+		card.getStyleClass().add("card");
+		card.setPadding(new Insets(16));
+		card.setPrefSize(340, 170);
+		card.setMinWidth(300);
+		card.setStyle("-fx-background-color: linear-gradient(to bottom right, " + accent + "2e 0%, " + accent + "0a 45%, transparent 100%), -velo-surface;"
+				+ " -fx-border-color: " + accent + "40; -fx-border-width: 1; -fx-border-radius: 14; -fx-background-radius: 14;");
+		card.setOnMouseEntered(e -> card.setTranslateY(-2));
+		card.setOnMouseExited(e -> card.setTranslateY(0));
+		return card;
 	}
 
 	private static Node card(String kind, String accent, String name, String line, String meta, Button action) {
