@@ -60,12 +60,12 @@ final class CosmeticsRoutes {
 		}));
 		server.createContext("/v1/cosmetics/file/", ex -> VeloServerApp.handle(ex, "GET", e -> {
 			String sha = e.getRequestURI().getPath().substring("/v1/cosmetics/file/".length());
-			byte[] bytes = cosmetics.file(sha);
-			if (bytes == null) {
+			CosmeticsService.FileRef file = cosmetics.fileRef(sha);
+			if (file == null) {
 				JsonHttp.writeError(e, 404, "No such file");
 				return;
 			}
-			JsonHttp.writeBytes(e, 200, CosmeticsService.contentType(bytes), bytes, "public, max-age=31536000, immutable");
+			JsonHttp.writeFile(e, file.path(), file.size(), file.contentType(), sha, "public, max-age=31536000, immutable");
 		}));
 
 		admin(server, registry, store, adminToken, "/v1/admin/cosmetics", "GET", e -> JsonHttp.writeJson(e, 200, cosmetics.admin()));

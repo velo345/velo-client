@@ -82,6 +82,31 @@ final class JsonHttp {
 		}
 	}
 
+	/**
+	 * Streams a file from disk (a small buffer, not the whole file in memory - art files are up to 12 MB and many
+	 * players load them at once). {@code etag}: the content hash, answered with 304 when the client has it.
+	 */
+	static void writeFile(HttpExchange exchange, java.nio.file.Path path, long size, String contentType, String etag, String cacheControl)
+			throws IOException {
+		exchange.getResponseHeaders().set("Content-Type", contentType);
+		if (cacheControl != null) {
+			exchange.getResponseHeaders().set("Cache-Control", cacheControl);
+		}
+		if (etag != null) {
+			exchange.getResponseHeaders().set("ETag", "\"" + etag + "\"");
+			String ifNone = exchange.getRequestHeaders().getFirst("If-None-Match");
+			if (ifNone != null && ifNone.contains(etag)) {
+				exchange.sendResponseHeaders(304, -1);
+				exchange.close();
+				return;
+			}
+		}
+		exchange.sendResponseHeaders(200, size);
+		try (var out = exchange.getResponseBody()) {
+			java.nio.file.Files.copy(path, out);
+		}
+	}
+
 	static void writeJson(HttpExchange exchange, int status, Object body) throws IOException {
 		byte[] bytes = GSON.toJson(body).getBytes(StandardCharsets.UTF_8);
 		exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");

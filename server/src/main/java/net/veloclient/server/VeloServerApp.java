@@ -576,14 +576,14 @@ public final class VeloServerApp {
 	private static void handleCapeDownload(HttpExchange exchange, CapeStore capes) throws IOException {
 		String path = exchange.getRequestURI().getPath();
 		String hash = path.substring(path.lastIndexOf('/') + 1);
-		CapeStore.StoredFile file = capes.read(hash, store::isPlus);
+		CapeStore.FileRef file = capes.locate(hash, store::isPlus);
 		if (file == null) {
 			JsonHttp.writeError(exchange, 404, "No such cloak");
 			return;
 		}
 		// Content-addressed, so a given URL's bytes can never change - clients and any proxy/CDN
-		// in front of this can cache it forever.
-		JsonHttp.writeBytes(exchange, 200, file.contentType(), file.bytes(), "public, max-age=31536000, immutable");
+		// in front of this can cache it forever. Streamed from disk: HD and animated cloaks are several MB each.
+		JsonHttp.writeFile(exchange, file.path(), java.nio.file.Files.size(file.path()), file.contentType(), hash, "public, max-age=31536000, immutable");
 	}
 
 	private record AdminRemoveRequest(String uuid) {

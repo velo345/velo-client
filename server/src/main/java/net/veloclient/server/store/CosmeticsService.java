@@ -490,6 +490,31 @@ public final class CosmeticsService {
 		return Files.exists(path) ? Files.readAllBytes(path) : null;
 	}
 
+	/** A stored art file on disk: streamed to clients, never read into memory per request. */
+	public record FileRef(java.nio.file.Path path, long size, String contentType) {
+	}
+
+	/** Content types by sha256 (files never change, so each is sniffed once). */
+	private final java.util.Map<String, String> fileTypes = new java.util.concurrent.ConcurrentHashMap<>();
+
+	public FileRef fileRef(String sha256) throws IOException {
+		if (sha256 == null || !SHA256.matcher(sha256).matches()) {
+			return null;
+		}
+		Path path = filesDir.resolve(sha256);
+		if (!Files.exists(path)) {
+			return null;
+		}
+		String type = fileTypes.get(sha256);
+		if (type == null) {
+			type = contentType(Files.readAllBytes(path));
+			if (fileTypes.size() < 20_000) {
+				fileTypes.put(sha256, type);
+			}
+		}
+		return new FileRef(path, Files.size(path), type);
+	}
+
 	public static String contentType(byte[] bytes) {
 		if (bytes.length >= 4 && bytes[0] == (byte) 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G') {
 			return "image/png";

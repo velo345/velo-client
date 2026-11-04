@@ -208,6 +208,24 @@ final class CapeStore {
 	record StoredFile(byte[] bytes, String contentType) {
 	}
 
+	/** Where a cape's file is (streamed by the download route), with the same rules as {@link #read}. */
+	record FileRef(Path path, String contentType) {
+	}
+
+	FileRef locate(String hash, java.util.function.Predicate<String> plusLookup) {
+		if (hash == null || !hash.matches("[0-9a-f]{64}")) {
+			return null;
+		}
+		for (Map.Entry<String, StoredCape> entry : byUuid.entrySet()) {
+			StoredCape cape = entry.getValue();
+			if (cape.hash().equals(hash) && (!"gif".equals(cape.type()) || plusLookup.test(entry.getKey()))) {
+				Path file = directory.resolve(cape.fileName());
+				return Files.exists(file) ? new FileRef(file, cape.contentType()) : null;
+			}
+		}
+		return null;
+	}
+
 	private void deleteIfUnreferenced(StoredCape cape) throws IOException {
 		boolean stillUsed = byUuid.values().stream().anyMatch(c -> c.hash().equals(cape.hash()));
 		if (!stillUsed) {
