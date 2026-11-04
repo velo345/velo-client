@@ -32,12 +32,12 @@ public final class UiSounds {
 	}
 
 	private static boolean on() {
-		return AppVersion.DEV && InterfacePrefs.get().sounds;
+		return InterfacePrefs.get().sounds;
 	}
 
 	/** Loads the clips in the background (call once at startup). */
 	public static void preload() {
-		if (!AppVersion.DEV || loading) {
+		if (loading) {
 			return;
 		}
 		loading = true;
@@ -94,9 +94,6 @@ public final class UiSounds {
 	 * buttons. One filter on the scene instead of a call in every handler.
 	 */
 	public static void install(Scene scene) {
-		if (!AppVersion.DEV) {
-			return;
-		}
 		scene.addEventFilter(ActionEvent.ACTION, e -> {
 			Object target = e.getTarget();
 			long now = System.nanoTime();

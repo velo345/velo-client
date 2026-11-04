@@ -128,13 +128,9 @@ final class VersionMigration {
 			number.getStyleClass().add("migrate-target-version");
 			Label kind = new Label(up ? "Upgrade" : "Downgrade");
 			kind.getStyleClass().addAll("migrate-target-kind", up ? "migrate-up" : "migrate-down");
-			if (net.veloclient.launcher.AppVersion.DEV) {
-				// dev build: the version's picture on top of the tile
-				tile.getChildren().add(VersionArt.tile(version.id(), false, 132));
-				tile.getChildren().addAll(kind);
-			} else {
-				tile.getChildren().addAll(Icons.icon(up ? "chevron-up" : "chevron-down", 18, Color.web(up ? "#7dd3a0" : "#f7c04a"), 2.4), number, kind);
-			}
+			// the version's picture on top of the tile
+			tile.getChildren().add(VersionArt.tile(version.id(), false, VersionArt.TILE_W));
+			tile.getChildren().addAll(kind);
 			if (i == all.length - 1) {
 				Label newest = new Label("Newest");
 				newest.getStyleClass().addAll("version-tag-pill", "version-tag-newest");

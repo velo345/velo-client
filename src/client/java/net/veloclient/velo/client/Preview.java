@@ -7,7 +7,8 @@ package net.veloclient.velo.client;
  */
 public final class Preview {
 
-	public static final boolean ON = present("net.veloclient.velo.devbuild.DevBuild");
+	/** Released with 1.1.2: everything behind this is live for everyone (kept as a switch for the next previews). */
+	public static final boolean ON = true;
 
 	private Preview() {
 	}

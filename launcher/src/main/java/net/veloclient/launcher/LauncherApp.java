@@ -271,6 +271,12 @@ public final class LauncherApp extends Application {
 			offerClientImport();
 		}
 		installIdleMode();
+		// The version tiles' pictures: rendered once in the background, a while after start (cached for good after).
+		javafx.animation.PauseTransition artLater = new javafx.animation.PauseTransition(Duration.seconds(30));
+		artLater.setOnFinished(e -> net.veloclient.launcher.ui.VersionArt.prewarm(
+				java.util.Arrays.stream(net.veloclient.launcher.launch.GameVersion.values()).map(net.veloclient.launcher.launch.GameVersion::id).toList(),
+				() -> !RunningInstanceManager.running().isEmpty()));
+		artLater.play();
 		// World Hosting: "Relaunch with matching mods" from the game.
 		net.veloclient.launcher.party.WorldRelaunch.start(instance -> launchWithProgress(instance, null, new Button(), new ProgressBar(), new Label()),
 				(title, text) -> showPlaceholderAlert(title, text));
@@ -4499,9 +4505,7 @@ public final class LauncherApp extends Application {
 				"Make your own colors and share them as a code.", themeButton);
 		appearance.getChildren().add(homeBackgroundRow());
 		content.getChildren().add(1, appearance);
-		if (AppVersion.DEV) {
-			content.getChildren().add(2, soundAndGuidesCard());
-		}
+		content.getChildren().add(2, soundAndGuidesCard());
 
 		VBox account = net.veloclient.launcher.ui.SettingsUi.card("Account");
 		if (session != null) {

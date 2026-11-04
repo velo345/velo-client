@@ -90,13 +90,17 @@ public final class InstanceEditDialog {
 
 		VBox content = new VBox(18);
 		content.setPadding(new Insets(4, 0, 4, 0));
-		content.setPrefWidth(460);
+		content.setPrefWidth((VersionArt.TILE_W + 10) * 2 + 8 + 24);
 		content.getChildren().addAll(
 				labeled("Name", nameField),
-				labeled("Minecraft version", net.veloclient.launcher.AppVersion.DEV ? versionTiles(versionBox) : versionBox),
+				labeled("Minecraft version", versionTiles(versionBox)),
 				labeled("Icon", iconPicker));
 
 		dialog.getDialogPane().setContent(content);
+		// wide enough for two version tiles side by side (the pane didn't follow the content's preferred width)
+		double paneWidth = (VersionArt.TILE_W + 10) * 2 + 8 + 24 + 64;
+		dialog.getDialogPane().setPrefWidth(paneWidth);
+		dialog.getDialogPane().setMinWidth(paneWidth);
 		boolean creating = initialName == null || initialName.isBlank();
 		ButtonType confirm = new ButtonType(creating ? "Create profile" : "Save", ButtonBar.ButtonData.OK_DONE);
 		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, confirm);
@@ -119,18 +123,19 @@ public final class InstanceEditDialog {
 	}
 
 	/**
-	 * Dev build: the versions as picture tiles (VersionArt) instead of a drop-down - picking one sets the (hidden) box the
+	 * The versions as picture tiles (VersionArt) instead of a drop-down - picking one sets the (hidden) box the
 	 * dialog reads its result from.
 	 */
 	private static Node versionTiles(ComboBox<String> versionBox) {
 		FlowPane tiles = new FlowPane(8, 8);
-		tiles.setPrefWrapLength(460);
+		// each tile button is the picture + 3 px padding + 2 px border on both sides; two per row with the 8 px gap
+		tiles.setPrefWrapLength((VersionArt.TILE_W + 10) * 2 + 8 + 12);
 		ToggleGroup group = new ToggleGroup();
 		GameVersion[] all = GameVersion.values();
 		for (int i = all.length - 1; i >= 0; i--) {
 			String id = all[i].id();
 			ToggleButton button = new ToggleButton();
-			button.setGraphic(VersionArt.tile(id, i == all.length - 1, 104));
+			button.setGraphic(VersionArt.tile(id, i == all.length - 1, VersionArt.TILE_W));
 			button.setToggleGroup(group);
 			button.setUserData(id);
 			button.setStyle(tileStyle(false));

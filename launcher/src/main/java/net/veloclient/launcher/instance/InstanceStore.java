@@ -111,12 +111,8 @@ public final class InstanceStore {
 	/**
 	 * A brand-new profile shows Velo's first-start guide once, on its first title screen (the game deletes the file when
 	 * the guide is finished or skipped). Only the very first profile; later ones, duplicates and imports never get it.
-	 * Dev build only until the guide ships.
 	 */
 	private static void markGuidePending(String id) {
-		if (!net.veloclient.launcher.AppVersion.DEV) {
-			return;
-		}
 		try {
 			Path marker = InstancePaths.gameDir(id).resolve("velo").resolve("guide-pending");
 			Files.createDirectories(marker.getParent());

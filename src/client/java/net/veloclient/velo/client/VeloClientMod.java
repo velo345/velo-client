@@ -186,7 +186,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		try {
 			Class.forName("net.veloclient.velo.preview.VeloPreview").asSubclass(net.veloclient.velo.client.addon.VeloAddon.class)
 					.getDeclaredConstructor().newInstance().onVeloInitialize();
-			VeloClient.LOGGER.info("Loaded the dev build's preview features");
+			VeloClient.LOGGER.info("Loaded the guide, menu and interface sound features");
 		} catch (ClassNotFoundException missing) {
 			// a release build
 		} catch (Throwable t) {
