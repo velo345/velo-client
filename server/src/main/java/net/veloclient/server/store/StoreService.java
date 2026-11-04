@@ -826,14 +826,21 @@ public final class StoreService {
 		return partnerCodes != null && checkoutEnabled() && partnerCodes.anyUsable();
 	}
 
-	/** Tries the code on a throwaway Tebex basket (does Tebex take it, how much cheaper is the basket) and keeps the answer. */
+	/** Tries the code on a throwaway Tebex basket (coupon or creator code? how much cheaper is the basket?) and keeps the answer. */
 	public PartnerCodes.Code checkPartnerCode(String code) throws Exception {
 		PartnerCodes.Code c = partnerCodes.all().stream().filter(x -> x.code().equals(code)).findFirst().orElse(null);
 		if (c == null || !checkoutEnabled() || config.coinPacks.isEmpty()) {
 			return c;
 		}
-		TebexCheckout.CodeCheck check = tebex.check(config.tebexPackage(config.coinPacks.get(0).id()), c.tebexName(), c.creator());
-		return partnerCodes.recordCheck(code, check.ok(), check.percent());
+		long packageId = config.tebexPackage(config.coinPacks.get(0).id());
+		// Same name in Tebex: a coupon, else a creator code.
+		TebexCheckout.CodeCheck check = tebex.check(packageId, c.tebexName(), false);
+		String type = "coupon";
+		if (!check.ok()) {
+			check = tebex.check(packageId, c.tebexName(), true);
+			type = "creator";
+		}
+		return partnerCodes.recordCheck(code, check.ok(), check.ok() ? type : null, check.percent());
 	}
 
 	/** A coin pack's price with {@code percent} off, rounded to the cent like Tebex does. */

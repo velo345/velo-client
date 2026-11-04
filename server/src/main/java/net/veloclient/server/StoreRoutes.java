@@ -56,7 +56,7 @@ final class StoreRoutes {
 			row.put("partnerId", c.partnerId());
 			row.put("active", c.active());
 			row.put("note", c.note());
-			row.put("type", c.creator() ? "creator" : "coupon");
+			row.put("type", c.type());
 			row.put("tebexCode", c.tebexCode());
 			row.put("tebexName", c.tebexName());
 			row.put("tebexOk", c.tebexOk());

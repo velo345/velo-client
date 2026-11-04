@@ -135,7 +135,6 @@ public final class TebexCheckout {
 			int percent = before > 0 && now >= 0 && now < before ? (int) Math.round((before - now) / before * 100) : 0;
 			return new CodeCheck(true, Math.max(0, Math.min(90, percent)));
 		} catch (Exception e) {
-			System.out.println("[store] Tebex didn't take " + (creator ? "creator code " : "coupon ") + tebexCode + ": " + e.getMessage());
 			return new CodeCheck(false, 0);
 		}
 	}

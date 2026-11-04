@@ -16,14 +16,15 @@ import java.util.Locale;
 /**
  * Partner codes: a player enters one in the Store, and the purchase counts for the partner. Never for Velo+.
  *
- * <p>The codes are ours (owner panel: add, change, delete) and kept in {@code <data>/partner-codes.json}. Each is tied
- * to one thing in Tebex, made in the Tebex panel, that the server puts on the basket at checkout:
+ * <p>The codes are ours (owner panel: add, change, delete) and kept in {@code <data>/partner-codes.json}. Each matches a
+ * code of the same name made in the Tebex panel, which the server puts on the basket at checkout - and finds out by
+ * itself which kind it is:
  * <ul>
- * <li>{@code coupon}: a Tebex coupon - the player pays less (e.g. 10% on the Velo Coins category);</li>
- * <li>{@code creator}: a Tebex creator code - Tebex pays the partner a share of the sale.</li>
+ * <li>a Tebex coupon: the player pays less (e.g. 10% on the Velo Coins category);</li>
+ * <li>a Tebex creator code: the player pays less and Tebex pays the partner a share.</li>
  * </ul>
- * When a code is saved the server tries it on a throwaway Tebex basket: whether Tebex takes it and how much cheaper the
- * basket gets ({@link Code#percent()}, what the Store then shows). A code Tebex doesn't take is never offered to
+ * When a code is saved the server tries it on a throwaway Tebex basket - as a coupon, else as a creator code - and keeps
+ * which one Tebex took and how much cheaper the basket got ({@link Code#percent()}, what the Store then shows). A code Tebex doesn't take is never offered to
  * players. Which code an order used is kept in the store database for the partner stats.
  */
 public final class PartnerCodes {
@@ -52,8 +53,8 @@ public final class PartnerCodes {
 			return tebexCode == null || tebexCode.isBlank() ? code : tebexCode;
 		}
 
-		Code withCheck(boolean ok, int percent) {
-			return new Code(code, partner, partnerId, active, note, createdAt, type, tebexCode, ok, percent, System.currentTimeMillis());
+		Code withCheck(boolean ok, String foundType, int percent) {
+			return new Code(code, partner, partnerId, active, note, createdAt, foundType, tebexCode, ok, percent, System.currentTimeMillis());
 		}
 	}
 
@@ -144,8 +145,7 @@ public final class PartnerCodes {
 		if (at < 0 && next.size() >= MAX) {
 			throw new StoreService.StoreException(400, "At most " + MAX + " partner codes");
 		}
-		String type = "creator".equals(incoming.type()) ? "creator" : "coupon";
-		Code clean = new Code(code, partner, partnerId, incoming.active(), note, createdAt, type, tebexName(incoming.tebexCode()), null, 0, 0);
+		Code clean = new Code(code, partner, partnerId, incoming.active(), note, createdAt, null, tebexName(incoming.tebexCode()), null, 0, 0);
 		if (at >= 0) {
 			next.set(at, clean);
 		} else {
@@ -164,12 +164,12 @@ public final class PartnerCodes {
 	}
 
 	/** Stores what the Tebex check found for {@code code}. */
-	public synchronized Code recordCheck(String code, boolean ok, int percent) throws IOException {
+	public synchronized Code recordCheck(String code, boolean ok, String foundType, int percent) throws IOException {
 		List<Code> next = new ArrayList<>(list);
 		Code out = null;
 		for (int i = 0; i < next.size(); i++) {
 			if (next.get(i).code().equals(code)) {
-				out = next.get(i).withCheck(ok, percent);
+				out = next.get(i).withCheck(ok, foundType, percent);
 				next.set(i, out);
 			}
 		}
