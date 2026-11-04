@@ -279,8 +279,7 @@ final class PartnerServers {
 				port = Integer.parseInt(srv[1]);
 			}
 		}
-		try (java.net.Socket socket = new java.net.Socket()) {
-			socket.connect(new java.net.InetSocketAddress(host, port), 4000);
+		try (java.net.Socket socket = connect(host, port)) {
 			socket.setSoTimeout(5000);
 			java.io.DataOutputStream out = new java.io.DataOutputStream(socket.getOutputStream());
 			java.io.ByteArrayOutputStream handshake = new java.io.ByteArrayOutputStream();
@@ -326,6 +325,27 @@ final class PartnerServers {
 		} catch (Exception e) {
 			return new Status(false, 0, 0, null, null, now);
 		}
+	}
+
+	/**
+	 * Connects to the first address that answers, IPv4 first: a name can resolve to IPv6 addresses this host has no
+	 * route to, and Java would otherwise only try the first one.
+	 */
+	private static java.net.Socket connect(String host, int port) throws IOException {
+		java.net.InetAddress[] all = java.net.InetAddress.getAllByName(host);
+		java.util.Arrays.sort(all, java.util.Comparator.comparingInt(a -> a instanceof java.net.Inet4Address ? 0 : 1));
+		IOException last = new IOException("No address for " + host);
+		for (int i = 0; i < Math.min(all.length, 4); i++) {
+			java.net.Socket socket = new java.net.Socket();
+			try {
+				socket.connect(new java.net.InetSocketAddress(all[i], port), 4000);
+				return socket;
+			} catch (IOException e) {
+				socket.close();
+				last = e;
+			}
+		}
+		throw last;
 	}
 
 	/** {host, port} from the {@code _minecraft._tcp} SRV record, or null. */

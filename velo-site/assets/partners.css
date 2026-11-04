@@ -30,7 +30,7 @@
 /* ---- Sections ---- */
 .pt-sec { padding: clamp(70px, 9vw, 120px) 0 0; }
 .pt-hero + .pt-sec { padding-top: clamp(20px, 3vw, 40px); }
-.pt-last { padding-bottom: clamp(70px, 9vw, 120px); }
+.pt-last { padding-bottom: 0; }
 .pt-head { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; }
 .pt-head h2 { font-size: clamp(26px, 3vw, 38px); font-weight: 800; white-space: nowrap; }
 .pt-rule { flex: 1; height: 1px; background: var(--p-line); }
