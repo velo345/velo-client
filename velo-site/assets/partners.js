@@ -62,7 +62,7 @@
 		const c = el("article", { class: "pt-card" },
 			el("div", { class: "pt-card-top" }, icon, el("div", {}, el("h3", {}, p.name), live)),
 			p.description ? el("p", {}, p.description) : null,
-			code ? el("a", { class: "pt-card-code", href: codeLink(code) }, "Code " + code + " · 10% off Velo Coins") : null,
+			code ? el("a", { class: "pt-card-code", href: codeLink(code.code) }, "Code " + code.code + (code.percent > 0 ? " · " + code.percent + "% off Velo Coins" : "")) : null,
 			el("div", { class: "pt-ip" }, el("code", {}, p.address), copyButton(p.address)));
 		c.style.setProperty("--a", accentOf(p));
 		return c;
@@ -84,8 +84,9 @@
 				const code = (p.codes || [])[0];
 				const ticket = $("[data-code]", box);
 				if (code && ticket) {
-					$("[data-code-value]", ticket).textContent = code;
-					$("[data-code-link]", ticket).href = codeLink(code);
+					$("[data-code-value]", ticket).textContent = code.code;
+					$("[data-code-off]", ticket).textContent = code.percent > 0 ? code.percent + "% off every Velo Coins pack" : "Supports " + p.name + " when you buy Velo Coins";
+					$("[data-code-link]", ticket).href = codeLink(code.code);
 					ticket.hidden = false;
 				}
 			});

@@ -528,8 +528,8 @@
 
 	function renderCodeBox() {
 		const box = $("[data-code-box]");
-		const percent = store.catalog.partnerCodePercent;
-		if (!box || !percent || !store.catalog.checkoutEnabled) { if (box) box.hidden = true; store.code = null; return; }
+		if (!box || store.catalog.partnerCodePercent == null || !store.catalog.checkoutEnabled) { if (box) box.hidden = true; store.code = null; return; }
+		const off = (c) => c.percent > 0 ? c.percent + "% off every coin pack" : "your purchase supports them";
 		box.hidden = false;
 		const input = el("input", { type: "text", placeholder: "Partner code", maxlength: "24", autocomplete: "off", spellcheck: "false", "aria-label": "Partner code" });
 		const apply = el("button", { class: "btn btn-sm", type: "button" }, "Apply");
@@ -540,13 +540,13 @@
 				input.disabled = true;
 				apply.textContent = "Remove";
 				info.className = "code-info ok";
-				info.replaceChildren(el("b", {}, store.code.partner), " · " + percent + "% off every coin pack");
+				info.replaceChildren(el("b", {}, store.code.partner), " · " + off(store.code));
 				box.classList.add("applied");
 			} else {
 				input.disabled = false;
 				apply.textContent = "Apply";
 				info.className = "code-info";
-				info.textContent = "From a partner server or creator? Their code takes " + percent + "% off every coin pack.";
+				info.textContent = "Got a code from a partner server or creator? Enter it here.";
 				box.classList.remove("applied");
 			}
 		};
@@ -557,7 +557,7 @@
 				keepCode(store.code.code);
 				show();
 				renderPacks();
-				toast(store.code.partner + "'s code applied: " + percent + "% off");
+				toast(store.code.partner + "'s code applied" + (store.code.percent > 0 ? ": " + store.code.percent + "% off" : ""));
 			} catch (x) {
 				info.className = "code-info bad";
 				info.textContent = x.status === 404 || /exist/.test(x.message) ? "That code doesn't exist." : x.message;
@@ -575,7 +575,7 @@
 		const on = store.catalog.checkoutEnabled;
 		const cur = store.catalog.currency || "EUR";
 		const money = new Intl.NumberFormat(undefined, { style: "currency", currency: cur });
-		const percent = store.code ? store.catalog.partnerCodePercent || 0 : 0;
+		const percent = store.code ? store.code.percent || 0 : 0;
 		const priceOf = (pack) => percent ? Math.round(pack.price * (100 - percent)) / 100 : pack.price;
 		grid.replaceChildren(...store.catalog.coinPacks.map((pack, i) => {
 			const b = el("button", { class: "btn " + (i === 2 ? "btn-primary" : ""), type: "button", disabled: !on }, on ? money.format(priceOf(pack)) : "Opens soon");
@@ -722,7 +722,7 @@
 			store.cosmetics = cosmetics;
 			cosmetics.items.forEach((i) => (store.byId[i.id] = i));
 			const linked = new URLSearchParams(location.search).get("code") || storedCode();
-			if (linked && catalog.partnerCodePercent) {
+			if (linked && catalog.partnerCodePercent != null) {
 				try { store.code = await checkCode(linked); keepCode(store.code.code); } catch { keepCode(null); }
 			}
 			await loadWallet();

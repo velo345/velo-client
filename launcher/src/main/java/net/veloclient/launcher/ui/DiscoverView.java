@@ -267,7 +267,9 @@ public final class DiscoverView {
 		VBox.setVgrow(grow, Priority.ALWAYS);
 		VBox card = new VBox(10, top, description);
 		if (p.has("codes") && p.get("codes").isJsonArray() && !p.getAsJsonArray("codes").isEmpty()) {
-			Label code = new Label("Code " + p.getAsJsonArray("codes").get(0).getAsString() + "  ·  10% off Velo Coins");
+			JsonObject first = p.getAsJsonArray("codes").get(0).getAsJsonObject();
+			int off = first.has("percent") ? first.get("percent").getAsInt() : 0;
+			Label code = new Label("Code " + first.get("code").getAsString() + (off > 0 ? "  ·  " + off + "% off Velo Coins" : ""));
 			code.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 11px; -fx-font-weight: 800; -fx-border-color: " + accent + "88;"
 					+ " -fx-border-style: segments(4, 3); -fx-border-radius: 6; -fx-padding: 3 8 3 8;");
 			card.getChildren().add(code);

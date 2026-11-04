@@ -199,11 +199,11 @@ public final class CoinsView {
 	/** The partner code entered in this launcher run (kept while switching pages). */
 	private static String partnerCode;
 	private static String partnerName;
+	private static int partnerPercent;
 
 	private static Node packs(JsonObject catalog, Label status, Runnable reload) {
 		FlowPane grid = StoreTiles.grid(190, 14);
-		int codePercent = catalog.has("partnerCodePercent") && !catalog.get("partnerCodePercent").isJsonNull()
-				? catalog.get("partnerCodePercent").getAsInt() : 0;
+		boolean codes = catalog.has("partnerCodePercent") && !catalog.get("partnerCodePercent").isJsonNull();
 		java.util.List<Runnable> repricers = new java.util.ArrayList<>();
 		JsonArray packs = catalog.getAsJsonArray("coinPacks");
 		String currency = catalog.get("currency").getAsString();
@@ -236,8 +236,8 @@ public final class CoinsView {
 			String packId = pack.get("id").getAsString();
 			buy.setOnAction(e -> startCheckout(packId, buy, status, reload));
 			if (enabled) {
-				repricers.add(() -> buy.setText(partnerCode == null ? formatPrice(price, currency)
-						: formatPrice(Math.round(price * (100 - codePercent)) / 100.0, currency) + "  (-" + codePercent + "%)"));
+				repricers.add(() -> buy.setText(partnerCode == null || partnerPercent <= 0 ? formatPrice(price, currency)
+						: formatPrice(Math.round(price * (100 - partnerPercent)) / 100.0, currency) + "  (-" + partnerPercent + "%)"));
 				repricers.get(repricers.size() - 1).run();
 			}
 			VBox body = new VBox(10, art, amountRow, extra, buy);
@@ -258,15 +258,20 @@ public final class CoinsView {
 				note(enabled ? "Secure checkout by Tebex: cards, PayPal, paysafecard and more. Opens in your browser."
 						: "Buying coins isn't open yet."));
 		secure.setAlignment(Pos.CENTER_LEFT);
-		if (!enabled || codePercent <= 0) {
+		if (!enabled || !codes) {
 			partnerCode = null;
 			return new VBox(12, grid, secure);
 		}
-		return new VBox(12, codeRow(codePercent, repricers), grid, secure);
+		return new VBox(12, codeRow(repricers), grid, secure);
+	}
+
+	private static String applied() {
+		return partnerName + "'s code  ·  " + (partnerPercent > 0 ? partnerPercent + "% off" : "supports them");
 	}
 
 	/** "Partner code" field: a valid code takes a few percent off every coin pack (never Velo+). */
-	private static Node codeRow(int percent, java.util.List<Runnable> repricers) {
+	private static Node codeRow(java.util.List<Runnable> repricers) {
+		String hint = "Got a code from a partner server or creator? Enter it here.";
 		TextField field = new TextField(partnerCode == null ? "" : partnerCode);
 		field.setPromptText("Partner code");
 		field.setPrefWidth(180);
@@ -276,8 +281,7 @@ public final class CoinsView {
 		}));
 		Button apply = new Button(partnerCode == null ? "Apply" : "Remove");
 		apply.getStyleClass().add("ghost-button");
-		Label info = new Label(partnerCode == null ? "Got a code from a partner server or creator? " + percent + "% off every coin pack."
-				: partnerName + "'s code · " + percent + "% off");
+		Label info = new Label(partnerCode == null ? hint : applied());
 		info.getStyleClass().add("t-muted");
 		Runnable reprice = () -> repricers.forEach(Runnable::run);
 		Runnable submit = () -> {
@@ -287,7 +291,7 @@ public final class CoinsView {
 				field.clear();
 				field.setDisable(false);
 				apply.setText("Apply");
-				info.setText("Got a code from a partner server or creator? " + percent + "% off every coin pack.");
+				info.setText(hint);
 				info.setStyle("");
 				reprice.run();
 				return;
@@ -301,10 +305,11 @@ public final class CoinsView {
 				apply.setDisable(false);
 				partnerCode = result.get("code").getAsString();
 				partnerName = result.get("partner").getAsString();
+				partnerPercent = result.has("percent") ? result.get("percent").getAsInt() : 0;
 				field.setText(partnerCode);
 				field.setDisable(true);
 				apply.setText("Remove");
-				info.setText(partnerName + "'s code · " + percent + "% off");
+				info.setText(applied());
 				info.setStyle("-fx-text-fill: #4ade80;");
 				reprice.run();
 			}, error -> {

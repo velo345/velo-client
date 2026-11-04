@@ -50,33 +50,94 @@ public final class TebexCheckout {
 
 	/** A basket holding coin pack {@code packageId}, for order {@code orderId}. */
 	public Basket createCheckout(String orderId, String uuid, String username, long packageId, String returnUrl, String completeUrl) throws Exception {
-		return createCheckout(orderId, uuid, username, packageId, returnUrl, completeUrl, null, null);
-	}
-
-	/**
-	 * Like {@link #createCheckout(String, String, String, long, String, String)}; with a {@code coupon} (the partner code
-	 * discount) it's put on the basket too, and the checkout fails if Tebex doesn't take it - nobody pays full price
-	 * believing their code worked.
-	 */
-	public Basket createCheckout(String orderId, String uuid, String username, long packageId, String returnUrl, String completeUrl,
-			String coupon, String partnerCode) throws Exception {
 		JsonObject custom = new JsonObject();
 		custom.addProperty("velo_order", orderId);
 		custom.addProperty("velo_uuid", uuid);
 		custom.addProperty("velo_username", username);
-		if (partnerCode != null) {
-			custom.addProperty("velo_code", partnerCode);
-		}
+		return basket(custom, packageId, returnUrl, completeUrl);
+	}
+
+	/**
+	 * Like {@link #createCheckout(String, String, String, long, String, String)} with a partner code: its Tebex coupon
+	 * ({@code creator} false) or creator code ({@code creator} true) goes on the basket too, and the checkout fails if
+	 * Tebex doesn't take it - nobody pays a price the Store didn't promise.
+	 */
+	public Basket createCheckout(String orderId, String uuid, String username, long packageId, String returnUrl, String completeUrl,
+			String tebexCode, boolean creator, String partnerCode) throws Exception {
+		JsonObject custom = new JsonObject();
+		custom.addProperty("velo_order", orderId);
+		custom.addProperty("velo_uuid", uuid);
+		custom.addProperty("velo_username", username);
+		custom.addProperty("velo_code", partnerCode);
 		Basket basket = basket(custom, packageId, returnUrl, completeUrl);
-		if (coupon != null) {
-			JsonObject body = new JsonObject();
-			body.addProperty("coupon_code", coupon);
-			JsonObject after = data(send("/accounts/" + publicToken + "/baskets/" + basket.ident() + "/coupons", body));
-			if (!after.has("coupons") || !after.get("coupons").isJsonArray() || after.getAsJsonArray("coupons").isEmpty()) {
-				throw new IllegalStateException("Tebex didn't apply the partner coupon");
-			}
+		JsonObject after = apply(basket.ident(), tebexCode, creator);
+		if (!creator && !hasCoupon(after)) {
+			throw new IllegalStateException("Tebex didn't apply the coupon " + tebexCode);
 		}
 		return basket;
+	}
+
+	/** Puts a coupon or creator code on a basket; returns the basket as Tebex answers (4xx = it doesn't know the code). */
+	private JsonObject apply(String basketIdent, String tebexCode, boolean creator) throws Exception {
+		JsonObject body = new JsonObject();
+		body.addProperty(creator ? "creator_code" : "coupon_code", tebexCode);
+		send("/accounts/" + publicToken + "/baskets/" + basketIdent + (creator ? "/creator-codes" : "/coupons"), body);
+		// Tebex only answers {"success": true}: the basket itself tells what was applied.
+		JsonObject basket = data(get("/accounts/" + publicToken + "/baskets/" + basketIdent));
+		if (creator && !(basket.has("creator_code") && basket.get("creator_code").isJsonPrimitive())) {
+			throw new IllegalStateException("Tebex didn't keep the creator code " + tebexCode);
+		}
+		return basket;
+	}
+
+	private static JsonObject get(String path) throws Exception {
+		HttpRequest request = HttpRequest.newBuilder(URI.create(API + path)).header("Accept", "application/json").timeout(Duration.ofSeconds(20)).GET().build();
+		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+		if (response.statusCode() / 100 != 2) {
+			throw new IllegalStateException("Tebex GET failed (HTTP " + response.statusCode() + ")");
+		}
+		return JsonParser.parseString(response.body()).getAsJsonObject();
+	}
+
+	private static boolean hasCoupon(JsonObject basket) {
+		return basket.has("coupons") && basket.get("coupons").isJsonArray() && !basket.getAsJsonArray("coupons").isEmpty();
+	}
+
+	private static double total(JsonObject basket) {
+		for (String key : new String[] {"base_price", "total_price"}) {
+			if (basket.has(key) && basket.get(key).isJsonPrimitive()) {
+				return basket.get(key).getAsDouble();
+			}
+		}
+		return -1;
+	}
+
+	/** What a throwaway basket says about a partner code: whether Tebex takes it, and how many percent cheaper it makes the basket. */
+	public record CodeCheck(boolean ok, int percent) {
+	}
+
+	public CodeCheck check(long packageId, String tebexCode, boolean creator) {
+		try {
+			JsonObject create = new JsonObject();
+			create.addProperty("complete_url", "https://velo-client.com/store");
+			create.addProperty("cancel_url", "https://velo-client.com/store");
+			JsonObject basket = data(send("/accounts/" + publicToken + "/baskets", create));
+			String ident = basket.get("ident").getAsString();
+			JsonObject add = new JsonObject();
+			add.addProperty("package_id", packageId);
+			add.addProperty("quantity", 1);
+			double before = total(data(send("/baskets/" + ident + "/packages", add)));
+			JsonObject after = apply(ident, tebexCode, creator);
+			if (!creator && !hasCoupon(after)) {
+				return new CodeCheck(false, 0);
+			}
+			double now = total(after);
+			int percent = before > 0 && now >= 0 && now < before ? (int) Math.round((before - now) / before * 100) : 0;
+			return new CodeCheck(true, Math.max(0, Math.min(90, percent)));
+		} catch (Exception e) {
+			System.out.println("[store] Tebex didn't take " + (creator ? "creator code " : "coupon ") + tebexCode + ": " + e.getMessage());
+			return new CodeCheck(false, 0);
+		}
 	}
 
 	/** A basket holding the Velo+ subscription package {@code packageId} (monthly, or yearly when {@code yearly}). */

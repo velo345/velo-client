@@ -200,7 +200,7 @@ public final class StoreService {
 				// a pick taken off sale since this morning (made a Discord reward, hidden...) drops out right away
 				new DailyView(deals.items().stream().filter(id -> items.stream().anyMatch(i -> i.id().equals(id))).toList(), LocalDate.now(ZoneOffset.UTC).plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()),
 				bundles(), new PlusOffer(config.plus.price, config.plus.monthlyCoins, config.plus.periodDays, config.plus.trialDays, config.plus.yearlyPrice), launchOffer(),
-				partnerCodesLive() ? PartnerCodes.PERCENT : null);
+				partnerCodesLive() ? 0 : null);
 	}
 
 	// ---- Daily picks & bundles ----
@@ -812,25 +812,33 @@ public final class StoreService {
 	}
 
 	private PartnerCodes partnerCodes;
-	private String partnerCoupon;
 
-	/** Partner codes and the Tebex coupon that gives their discount ({@code TEBEX_PARTNER_COUPON}; null = codes can't be used yet). */
-	public void setPartnerCodes(PartnerCodes codes, String tebexCoupon) {
+	public void setPartnerCodes(PartnerCodes codes) {
 		this.partnerCodes = codes;
-		this.partnerCoupon = tebexCoupon == null || tebexCoupon.isBlank() ? null : tebexCoupon.trim();
 	}
 
 	public PartnerCodes partnerCodes() {
 		return partnerCodes;
 	}
 
+	/** Whether any partner code can be used now (the Store shows the code field then). */
 	public boolean partnerCodesLive() {
-		return partnerCodes != null && partnerCoupon != null && checkoutEnabled();
+		return partnerCodes != null && checkoutEnabled() && partnerCodes.anyUsable();
 	}
 
-	/** A coin pack's price with a partner code: {@link PartnerCodes#PERCENT}% off, rounded to the cent like Tebex does. */
-	public static double codePrice(double price) {
-		return Math.round(price * (100 - PartnerCodes.PERCENT)) / 100.0;
+	/** Tries the code on a throwaway Tebex basket (does Tebex take it, how much cheaper is the basket) and keeps the answer. */
+	public PartnerCodes.Code checkPartnerCode(String code) throws Exception {
+		PartnerCodes.Code c = partnerCodes.all().stream().filter(x -> x.code().equals(code)).findFirst().orElse(null);
+		if (c == null || !checkoutEnabled() || config.coinPacks.isEmpty()) {
+			return c;
+		}
+		TebexCheckout.CodeCheck check = tebex.check(config.tebexPackage(config.coinPacks.get(0).id()), c.tebexName(), c.creator());
+		return partnerCodes.recordCheck(code, check.ok(), check.percent());
+	}
+
+	/** A coin pack's price with {@code percent} off, rounded to the cent like Tebex does. */
+	public static double codePrice(double price, int percent) {
+		return Math.round(price * (100 - percent)) / 100.0;
 	}
 
 	public record CodeView(String code, String partner, int percent, boolean live) {
@@ -842,10 +850,13 @@ public final class StoreService {
 		if (code == null) {
 			throw new StoreException(404, "That partner code doesn't exist");
 		}
-		return new CodeView(code.code(), code.partner(), PartnerCodes.PERCENT, partnerCodesLive());
+		if (!code.usable() || !checkoutEnabled()) {
+			throw new StoreException(503, "That code can't be used right now");
+		}
+		return new CodeView(code.code(), code.partner(), code.percent(), true);
 	}
 
-	/** A coin pack checkout, with a partner code taking {@link PartnerCodes#PERCENT}% off (codes never work on Velo+). */
+	/** A coin pack checkout, with a partner code (its coupon or creator code goes on the Tebex basket; never on Velo+). */
 	public CheckoutView checkout(String uuid, String username, String packId, String codeInput) throws Exception {
 		PartnerCodes.Code code = null;
 		if (codeInput != null && !codeInput.isBlank()) {
@@ -853,8 +864,8 @@ public final class StoreService {
 			if (code == null) {
 				throw new StoreException(404, "That partner code doesn't exist");
 			}
-			if (!partnerCodesLive()) {
-				throw new StoreException(503, "Partner codes can't be used right now - try again later or buy without one");
+			if (!code.usable()) {
+				throw new StoreException(503, "That code can't be used right now - try again later or buy without one");
 			}
 		}
 		if (!checkoutEnabled()) {
@@ -872,10 +883,10 @@ public final class StoreService {
 		TebexCheckout.Basket basket;
 		if (code != null) {
 			// The webhook's "paid at least the price" check then runs against the discounted price.
-			db.createOrder(orderId, uuid, pack, config.currency, code.code(), codePrice(pack.price()));
+			db.createOrder(orderId, uuid, pack, config.currency, code.code(), codePrice(pack.price(), code.percent()));
 			try {
 				basket = tebex.createCheckout(orderId, uuid, username, packageId,
-						publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?order=" + orderId, partnerCoupon, code.code());
+						publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?order=" + orderId, code.tebexName(), code.creator(), code.code());
 			} catch (Exception e) {
 				db.flagOrder(orderId, "failed", null);
 				System.out.println("[store] Partner code checkout failed (" + code.code() + "): " + e.getMessage());

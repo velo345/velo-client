@@ -2254,27 +2254,33 @@ RENDER.capes = async (root) => {
 // Partner codes: players enter one in the Store and pay less for coin packs (never Velo+); every paid order counts for the code.
 function editCode(c, partners, reload) {
 	const isNew = !c;
-	c = c || { code: "", partner: "", partnerId: null, active: true, note: "" };
+	c = c || { code: "", partner: "", partnerId: null, active: true, note: "", type: "coupon", tebexCode: null };
 	const code = h("input", { value: c.code, placeholder: "LUCKYSMP", maxlength: "24", autocapitalize: "characters", spellcheck: "false" });
 	code.addEventListener("input", () => { const at = code.selectionStart; code.value = code.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ""); code.setSelectionRange(at, at); });
 	const partner = h("input", { value: c.partner, placeholder: "LuckySMP", maxlength: "40" });
 	const server = h("select", {}, h("option", { value: "" }, "None"), partners.map((p) => h("option", { value: p.id, selected: p.id === c.partnerId }, p.name)));
 	server.addEventListener("change", () => { if (!partner.value.trim() && server.value) partner.value = server.selectedOptions[0].textContent; });
 	const active = h("input", { type: "checkbox", checked: c.active });
+	const type = h("select", {}, h("option", { value: "coupon", selected: c.type !== "creator" }, "Coupon - the player pays less"),
+		h("option", { value: "creator", selected: c.type === "creator" }, "Creator code - the partner gets a share"));
+	const tebex = h("input", { value: c.tebexCode || "", placeholder: "Same as the code", maxlength: "40", spellcheck: "false" });
 	const note = h("input", { value: c.note || "", placeholder: "Deal, payout, contact... (only you see this)", maxlength: "200" });
 	const ok = h("button", { class: "btn primary", type: "button" }, isNew ? "Add code" : "Save");
 	const dlg = dialog(isNew ? "New partner code" : c.code, h("div", { class: "grid", style: "gap:12px" },
 		hintField("Code", code, "What players type in the Store. Letters, digits, - and _."),
 		hintField("Partner", partner, "Who it's for - shown to the player when the code works."),
 		hintField("Partner server", server, "Optional: the website's partner page shows the code with this server."),
+		hintField("In Tebex it's a", type, "Make it in the Tebex panel first (Coupons, or Creator codes). Saving checks it against Tebex."),
+		hintField("Name in Tebex", tebex, "Only if it's called differently there."),
 		h("label", { class: "row", style: "gap:8px" }, active, "Active (off = refused at checkout, stats kept)"),
 		hintField("Note", note)), [ok]);
 	ok.onclick = () => busy(ok, async () => {
 		if (!code.value || !partner.value.trim()) throw new Error("A code needs a name and a partner");
 		await velo("admin/partner-codes", { body: { action: "save", previous: isNew ? null : c.code,
-			code: { code: code.value, partner: partner.value.trim(), partnerId: server.value || null, active: active.checked, note: note.value.trim() || null } } });
+			code: { code: code.value, partner: partner.value.trim(), partnerId: server.value || null, active: active.checked, note: note.value.trim() || null,
+				type: type.value, tebexCode: tebex.value.trim() || null } } });
 		dlg.close();
-		toast(isNew ? "Code " + code.value + " added" : "Saved");
+		toast(isNew ? "Code " + code.value + " added - checked against Tebex" : "Saved and checked against Tebex");
 		reload();
 	});
 }
@@ -2291,12 +2297,8 @@ RENDER.codes = async (root) => {
 		if (!root.isConnected) return;
 		const money = new Intl.NumberFormat(undefined, { style: "currency", currency: data.currency || "EUR" });
 		const total = data.codes.reduce((a, c) => ({ orders: a.orders + c.stats.orders, revenue: a.revenue + c.stats.revenue, month: a.month + c.stats.orders30d }), { orders: 0, revenue: 0, month: 0 });
-		subtitle(`${data.codes.length} code${data.codes.length === 1 ? "" : "s"} · ${data.percent}% off Velo Coins · never on Velo+`);
+		subtitle(`${data.codes.length} code${data.codes.length === 1 ? "" : "s"} · coin packs only, never Velo+`);
 		const add = h("button", { class: "btn primary small", type: "button", onclick: () => editCode(null, partners, load) }, icon("plus"), "New code");
-		const status = data.live ? null : h("div", { class: "notice warn" },
-			h("b", {}, "Codes can't be used yet. "),
-			"Create one coupon in Tebex (Marketing → Coupons): ", h("b", {}, data.percent + "% off"), ", on the ", h("b", {}, "Velo Coins"),
-			" category, single purchases only, unlimited uses, no expiry. Put its code into TEBEX_PARTNER_COUPON in /etc/velo/server.env and restart velo-server.");
 		const rows = data.codes.map((c) => {
 			const edit = h("button", { class: "btn small", type: "button", onclick: () => editCode(c, partners, load) }, "Edit");
 			const copy = h("button", { class: "btn small ghost", type: "button", title: "Copy the Store link with this code", onclick: async () => {
@@ -2308,20 +2310,25 @@ RENDER.codes = async (root) => {
 				await busy(del, async () => { await velo("admin/partner-codes", { body: { action: "delete", previous: c.code } }); toast("Deleted " + c.code); load(); });
 			};
 			const server = partners.find((p) => p.id === c.partnerId);
+			const recheck = h("button", { class: "btn small ghost", type: "button", title: "Ask Tebex again" }, "Check");
+			recheck.onclick = () => busy(recheck, async () => { await velo("admin/partner-codes", { body: { action: "check", previous: c.code } }); load(); });
+			const kind = c.type === "creator" ? "Creator code" : "Coupon";
+			const tebexState = c.tebexOk
+				? h("div", {}, h("span", { class: "pill good" }, h("i"), kind), h("div", { class: "muted small" }, c.tebexName + (c.percent > 0 ? " · " + c.percent + "% off" : " · no discount")))
+				: h("div", {}, h("span", { class: "pill bad" }, h("i"), c.checkedAt ? "Not in Tebex" : "Not checked"), h("div", { class: "muted small" }, kind + " " + c.tebexName + " - make it in Tebex, then Check"));
 			return [
 				h("div", {}, h("b", { class: "mono" }, c.code), h("div", { class: "muted small" }, c.partner + (server ? " · " + server.name : ""))),
-				c.active ? h("span", { class: "pill good" }, h("i"), "Active") : h("span", { class: "pill" }, h("i"), "Off"),
+				c.active ? tebexState : h("span", { class: "pill" }, h("i"), "Off"),
 				h("div", {}, h("b", {}, fmt(c.stats.orders)), h("div", { class: "muted small" }, fmt(c.stats.orders30d) + " in 30 days · " + fmt(c.stats.buyers) + " buyer" + (c.stats.buyers === 1 ? "" : "s"))),
 				h("div", {}, h("b", {}, money.format(c.stats.revenue)), h("div", { class: "muted small" }, fmt(c.stats.coins) + " coins")),
 				h("div", { class: "muted small" }, c.stats.lastAt ? ago(c.stats.lastAt) : "never", c.note ? h("div", {}, c.note) : null),
-				h("div", { class: "row", style: "gap:6px;flex-wrap:nowrap" }, copy, edit, del)];
+				h("div", { class: "row", style: "gap:6px;flex-wrap:nowrap" }, recheck, copy, edit, del)];
 		});
 		body.replaceChildren(
 			h("div", { class: "kpis" }, kpi("Orders with a code", "store", total.orders, fmt, fmt(total.month) + " in the last 30 days"),
-				kpi("Paid with codes", "coins", total.revenue, (n) => money.format(n), "after the " + data.percent + "% off")),
-			status,
-			card("Partner codes", "Players type a code in the Store (website or launcher) or open a code link, and pay " + data.percent + "% less for coin packs. Velo+ subscriptions never take codes.", add,
-				data.codes.length ? table(["Code", "", "Orders", "Paid", "Last used", ""], rows) : h("p", { class: "muted" }, "No codes yet - add the first one.")));
+				kpi("Paid with codes", "coins", total.revenue, (n) => money.format(n), "after discounts")),
+			card("Partner codes", "Players type a code in the Store (website or launcher) or open a code link. Each code is a Tebex coupon (the player pays less) or a Tebex creator code (the partner gets a share). Velo+ subscriptions never take codes.", add,
+				data.codes.length ? table(["Code", "Tebex", "Orders", "Paid", "Last used", ""], rows) : h("p", { class: "muted" }, "No codes yet - add the first one.")));
 	};
 	await load();
 };

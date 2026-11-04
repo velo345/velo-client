@@ -14,25 +14,47 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Partner (affiliate) codes: a player who enters one pays {@link #PERCENT}% less for a Velo Coins pack, and the
- * purchase counts for the partner. Never for Velo+ subscriptions.
+ * Partner codes: a player enters one in the Store, and the purchase counts for the partner. Never for Velo+.
  *
- * <p>The codes are ours alone (owner panel: add, change, delete) and kept in {@code <data>/partner-codes.json}. The
- * discount itself is one Tebex coupon ({@code TEBEX_PARTNER_COUPON}, 10% on the Velo Coins category, unlimited, never
- * expiring) that the server puts on the basket whenever a valid code is used - so a new partner code needs no Tebex
- * change. Which code an order used is kept in the store database for the partner stats.
+ * <p>The codes are ours (owner panel: add, change, delete) and kept in {@code <data>/partner-codes.json}. Each is tied
+ * to one thing in Tebex, made in the Tebex panel, that the server puts on the basket at checkout:
+ * <ul>
+ * <li>{@code coupon}: a Tebex coupon - the player pays less (e.g. 10% on the Velo Coins category);</li>
+ * <li>{@code creator}: a Tebex creator code - Tebex pays the partner a share of the sale.</li>
+ * </ul>
+ * When a code is saved the server tries it on a throwaway Tebex basket: whether Tebex takes it and how much cheaper the
+ * basket gets ({@link Code#percent()}, what the Store then shows). A code Tebex doesn't take is never offered to
+ * players. Which code an order used is kept in the store database for the partner stats.
  */
 public final class PartnerCodes {
 
-	/** What a code takes off a coin pack. The Tebex coupon gives the same. */
-	public static final int PERCENT = 10;
 	static final int MAX = 200;
 
 	/**
-	 * {@code partnerId}: the partner server it belongs to (shown on the website's partner page), optional;
-	 * {@code partner}: who it's for (display name); {@code active}: off = refused at checkout but kept with its stats.
+	 * {@code partnerId}: the partner server it belongs to (website partner page), optional; {@code partner}: who it's for;
+	 * {@code active}: off = refused at checkout but kept with its stats; {@code type}: "coupon" or "creator";
+	 * {@code tebexCode}: its name in Tebex (null = the same as {@code code}); {@code tebexOk}, {@code percent},
+	 * {@code checkedAt}: what the last check against Tebex found.
 	 */
-	public record Code(String code, String partner, String partnerId, boolean active, String note, long createdAt) {
+	public record Code(String code, String partner, String partnerId, boolean active, String note, long createdAt,
+			String type, String tebexCode, Boolean tebexOk, int percent, long checkedAt) {
+
+		/** Players can use it: switched on and Tebex took it at the last check. */
+		public boolean usable() {
+			return active && Boolean.TRUE.equals(tebexOk);
+		}
+
+		public boolean creator() {
+			return "creator".equals(type);
+		}
+
+		public String tebexName() {
+			return tebexCode == null || tebexCode.isBlank() ? code : tebexCode;
+		}
+
+		Code withCheck(boolean ok, int percent) {
+			return new Code(code, partner, partnerId, active, note, createdAt, type, tebexCode, ok, percent, System.currentTimeMillis());
+		}
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -76,11 +98,11 @@ public final class PartnerCodes {
 	}
 
 	/** The active codes of one partner server (the website lists them on the partner page). */
-	public List<String> codesOf(String partnerId) {
-		List<String> out = new ArrayList<>();
+	public List<java.util.Map<String, Object>> codesOf(String partnerId) {
+		List<java.util.Map<String, Object>> out = new ArrayList<>();
 		for (Code code : list) {
-			if (code.active() && partnerId != null && partnerId.equals(code.partnerId())) {
-				out.add(code.code());
+			if (code.usable() && partnerId != null && partnerId.equals(code.partnerId())) {
+				out.add(java.util.Map.of("code", code.code(), "percent", code.percent()));
 			}
 		}
 		return out;
@@ -122,7 +144,8 @@ public final class PartnerCodes {
 		if (at < 0 && next.size() >= MAX) {
 			throw new StoreService.StoreException(400, "At most " + MAX + " partner codes");
 		}
-		Code clean = new Code(code, partner, partnerId, incoming.active(), note, createdAt);
+		String type = "creator".equals(incoming.type()) ? "creator" : "coupon";
+		Code clean = new Code(code, partner, partnerId, incoming.active(), note, createdAt, type, tebexName(incoming.tebexCode()), null, 0, 0);
 		if (at >= 0) {
 			next.set(at, clean);
 		} else {
@@ -130,6 +153,35 @@ public final class PartnerCodes {
 		}
 		write(next);
 		return clean;
+	}
+
+	private static String tebexName(String value) {
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		String v = value.trim();
+		return v.matches("[A-Za-z0-9_-]{1,40}") ? v : null;
+	}
+
+	/** Stores what the Tebex check found for {@code code}. */
+	public synchronized Code recordCheck(String code, boolean ok, int percent) throws IOException {
+		List<Code> next = new ArrayList<>(list);
+		Code out = null;
+		for (int i = 0; i < next.size(); i++) {
+			if (next.get(i).code().equals(code)) {
+				out = next.get(i).withCheck(ok, percent);
+				next.set(i, out);
+			}
+		}
+		if (out != null) {
+			write(next);
+		}
+		return out;
+	}
+
+	/** Whether any code can be used right now (the Store shows the code field then). */
+	public boolean anyUsable() {
+		return list.stream().anyMatch(Code::usable);
 	}
 
 	public synchronized boolean delete(String input) throws IOException {

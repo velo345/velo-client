@@ -95,7 +95,7 @@ public final class VeloServerApp {
 		PartyService parties = new PartyService(social);
 		PartyRoutes.register(server, registry, social, parties);
 		ReportService reportService = new ReportService(dataDir);
-		store.setPartnerCodes(new net.veloclient.server.store.PartnerCodes(dataDir), envOr("TEBEX_PARTNER_COUPON", null));
+		store.setPartnerCodes(new net.veloclient.server.store.PartnerCodes(dataDir));
 		StoreRoutes.register(server, registry, store, dataDir);
 		StoreRoutes.setPanelOwner(store.firstOwnerUuid());
 		WebRoutes.register(server, registry, social, new SkinService(dataDir));

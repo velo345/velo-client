@@ -56,11 +56,18 @@ final class StoreRoutes {
 			row.put("partnerId", c.partnerId());
 			row.put("active", c.active());
 			row.put("note", c.note());
+			row.put("type", c.creator() ? "creator" : "coupon");
+			row.put("tebexCode", c.tebexCode());
+			row.put("tebexName", c.tebexName());
+			row.put("tebexOk", c.tebexOk());
+			row.put("percent", c.percent());
+			row.put("checkedAt", c.checkedAt());
+			row.put("usable", c.usable());
 			row.put("createdAt", c.createdAt());
 			row.put("stats", stats.getOrDefault(c.code(), Map.of("orders", 0, "revenue", 0, "coins", 0, "buyers", 0, "lastAt", 0, "orders30d", 0)));
 			rows.add(row);
 		}
-		return Map.of("codes", rows, "percent", net.veloclient.server.store.PartnerCodes.PERCENT, "live", store.partnerCodesLive(),
+		return Map.of("codes", rows, "live", store.partnerCodesLive(),
 				"currency", store.config().currency);
 	}
 
@@ -112,12 +119,15 @@ final class StoreRoutes {
 				var codes = store.partnerCodes();
 				if ("delete".equals(r.action())) {
 					codes.delete(r.previous());
+				} else if ("check".equals(r.action())) {
+					store.checkPartnerCode(net.veloclient.server.store.PartnerCodes.normalize(r.previous()));
 				} else {
 					var saved = codes.save(r.previous(), r.code());
 					String prev = net.veloclient.server.store.PartnerCodes.normalize(r.previous());
 					if (prev != null && !prev.equals(saved.code())) {
 						store.database().renamePartnerCode(prev, saved.code());
 					}
+					store.checkPartnerCode(saved.code());
 				}
 				System.out.println("[store] " + s.username() + " " + ("delete".equals(r.action()) ? "deleted" : "saved") + " partner code "
 						+ (r.code() != null ? r.code().code() : r.previous()));
