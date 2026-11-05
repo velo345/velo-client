@@ -119,6 +119,10 @@ public final class HudManager {
 			return;
 		}
 		MinecraftClient client = MinecraftClient.getInstance();
+		// A title screen opened while a world is still loaded (a mod, a disconnect): no HUD behind it.
+		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.minecraft.client.gui.screen.TitleScreen) {
+			return;
+		}
 		//? if <26.1 {
 		if (client.options.hudHidden) {
 			return;
