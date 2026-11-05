@@ -22,7 +22,7 @@ public abstract class GpuUtilizationTimingMixin {
 				|| GpuUtilizationModule.showing && id.equals(net.minecraft.client.gui.components.debug.DebugScreenEntries.GPU_UTILIZATION);
 	}
 }
-*///?} else {
+*///?} else if >=1.21.2 {
 @Mixin(targets = "net.minecraft.client.MinecraftClient")
 public abstract class GpuUtilizationTimingMixin {
 
@@ -34,4 +34,9 @@ public abstract class GpuUtilizationTimingMixin {
 				|| GpuUtilizationModule.showing && id.equals(net.minecraft.client.gui.hud.debug.DebugHudEntries.GPU_UTILIZATION);
 	}
 }
-//?}
+//?} else {
+/*// 1.21.1: hooks a system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class GpuUtilizationTimingMixin {
+}
+*///?}

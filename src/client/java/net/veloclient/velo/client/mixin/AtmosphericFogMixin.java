@@ -3,8 +3,10 @@ package net.veloclient.velo.client.mixin;
 //? if <26.1 {
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.RenderTickCounter;
+//? if >=1.21.2 {
 import net.minecraft.client.render.fog.AtmosphericFogModifier;
 import net.minecraft.client.render.fog.FogData;
+//?}
 import net.minecraft.client.world.ClientWorld;
 //?} else {
 /*import net.minecraft.client.Camera;
@@ -27,7 +29,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * own separate ones) since those represent a genuinely different medium the
  * player is standing in, not "the normal sky fog" this module customizes.
  */
-//? if <1.21.11 {
+//? if <1.21.2 {
+/*// 1.21.1: fog came from BackgroundRenderer - the custom fog colour/distance is left out there.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class AtmosphericFogMixin {
+}
+*///?} else if <1.21.11 {
 /*// 1.21.10: the colour comes from the shared StandardFogModifier (only the open-air one is changed), and the distance
 // hook takes the camera's entity + block position instead of the camera.
 @Mixin({net.minecraft.client.render.fog.StandardFogModifier.class, AtmosphericFogModifier.class})

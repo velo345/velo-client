@@ -177,7 +177,11 @@ public final class AnticheatTestController {
 
     private static void sendPlayerPosition(Object networkHandler, double x, double y, double z, boolean onGround) {
         //? if <26.1 {
+        //? if <1.21.2 {
+        /*var packet = new PlayerMoveC2SPacket.PositionAndOnGround(x, y, z, onGround);
+        *///?} else {
         var packet = new PlayerMoveC2SPacket.PositionAndOnGround(x, y, z, onGround, false);
+        //?}
         ((net.minecraft.client.network.ClientPlayNetworkHandler) networkHandler).sendPacket(packet);
         //?} else {
         /*var packet = new ServerboundMovePlayerPacket.Pos(x, y, z, onGround, false);
@@ -188,7 +192,15 @@ public final class AnticheatTestController {
     private static void sendVehiclePosition(Object networkHandler, double x, double y, double z,
                                              float yaw, float pitch, boolean onGround) {
         //? if <26.1 {
+        //? if <1.21.2 {
+        /*var vehicle = net.minecraft.client.MinecraftClient.getInstance().player == null ? null : net.minecraft.client.MinecraftClient.getInstance().player.getVehicle();
+        if (vehicle == null) {
+        return;
+        }
+        var packet = new VehicleMoveC2SPacket(vehicle);
+        *///?} else {
         var packet = new VehicleMoveC2SPacket(new Vec3d(x, y, z), yaw, pitch, onGround);
+        //?}
         ((net.minecraft.client.network.ClientPlayNetworkHandler) networkHandler).sendPacket(packet);
         //?} else {
         /*var packet = new ServerboundMoveVehiclePacket(new Vec3(x, y, z), yaw, pitch, onGround);

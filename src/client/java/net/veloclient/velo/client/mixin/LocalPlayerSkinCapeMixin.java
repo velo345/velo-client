@@ -4,7 +4,11 @@ package net.veloclient.velo.client.mixin;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.entity.player.SkinTextures;
+//? if <1.21.2 {
+/*// (no AssetInfo before 1.21.9)
+*///?} else {
 import net.minecraft.util.AssetInfo;
+//?}
 import net.minecraft.util.Identifier;
 //?} else {
 /*import net.minecraft.client.Minecraft;
@@ -43,7 +47,56 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * same per-player-skin mechanism this mixin hooks for the cape), so there's
  * nothing Wavey-Capes-specific about it at all.
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*@Mixin(AbstractClientPlayerEntity.class)
+public abstract class LocalPlayerSkinCapeMixin {
+
+	// 1.21.1: SkinTextures holds the texture identifiers directly (texture, url, cape, elytra, model, secure).
+	@Inject(method = "getSkinTextures", at = @At("RETURN"), cancellable = true)
+	private void velo$tryOnSkin(CallbackInfoReturnable<SkinTextures> cir) {
+		Identifier skin = net.veloclient.velo.client.skins.SkinTryOn.texture();
+		if (skin == null || (Object) this != MinecraftClient.getInstance().player) {
+			return;
+		}
+		SkinTextures original = cir.getReturnValue();
+		cir.setReturnValue(new SkinTextures(skin, null, original.capeTexture(), original.elytraTexture(),
+				net.veloclient.velo.client.skins.SkinTryOn.slim() ? SkinTextures.Model.SLIM : SkinTextures.Model.WIDE, original.secure()));
+	}
+
+	@Inject(method = "getSkinTextures", at = @At("RETURN"), cancellable = true)
+	private void velo$overrideCapeAndElytra(CallbackInfoReturnable<SkinTextures> cir) {
+		java.util.Optional<CapeDefinition> equipped;
+		if ((Object) this == MinecraftClient.getInstance().player) {
+			equipped = CapeManager.renderCape();
+		} else {
+			AbstractClientPlayerEntity self = (AbstractClientPlayerEntity) (Object) this;
+			equipped = net.veloclient.velo.client.cosmetics.RemoteCapeCache.resolve(
+					net.veloclient.velo.client.network.VeloUserRegistry.capeIdFor(self.getUuid(), self.getGameProfile().getName()));
+		}
+		if (equipped.isEmpty()) {
+			return;
+		}
+		CapeDefinition definition = equipped.get();
+		boolean overrideCape = net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.waveyActive();
+		boolean hideCape = WaveyCapesCompat.isLoaded() && !overrideCape;
+		var elytraTexture = ((AbstractClientPlayerEntity) (Object) this).getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).getItem()
+				== net.minecraft.item.Items.ELYTRA ? CapeManager.elytraTextureIdentifier(definition) : java.util.Optional.<Identifier>empty();
+		if (!overrideCape && !hideCape && elytraTexture.isEmpty()) {
+			return;
+		}
+		SkinTextures original = cir.getReturnValue();
+		Identifier cape = hideCape ? null : original.capeTexture();
+		if (overrideCape) {
+			Identifier capeTexture = CapeManager.textureIfReady(definition);
+			if (capeTexture != null) {
+				cape = capeTexture;
+			}
+		}
+		Identifier elytra = elytraTexture.orElse(original.elytraTexture());
+		cir.setReturnValue(new SkinTextures(original.texture(), original.textureUrl(), cape, elytra, original.model(), original.secure()));
+	}
+}
+*///?} else if <26.1 {
 @Mixin(AbstractClientPlayerEntity.class)
 public abstract class LocalPlayerSkinCapeMixin {
 

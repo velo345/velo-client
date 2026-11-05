@@ -259,12 +259,21 @@ public final class VeloClientMod implements ClientModInitializer {
 				net.veloclient.velo.client.modules.qol.ShulkerPreview.render(s, context, mouseX, mouseY);
 				net.veloclient.velo.client.social.NotificationOverlay.renderOverScreen(s, context, mouseX, mouseY);
 			});
+			//? if <1.21.2 {
+			/*net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents.allowMouseClick(screen).register((s, x, y, button) ->
+					!net.veloclient.velo.client.modules.qol.ShulkerPreview.click(s, x, y, button));
+			net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents.allowKeyPress(screen).register((s, key, scancode, modifiers) ->
+					!(key == net.veloclient.velo.client.util.Keys.ESCAPE && net.veloclient.velo.client.modules.qol.ShulkerPreview.escape(s)));
+			net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents.allowMouseClick(screen).register((s, x, y, button) ->
+					!net.veloclient.velo.client.social.NotificationOverlay.click(x, y));
+			*///?} else {
 			net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents.allowMouseClick(screen).register((s, click) ->
 					!net.veloclient.velo.client.modules.qol.ShulkerPreview.click(s, click.x(), click.y(), click.button()));
 			net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents.allowKeyPress(screen).register((s, key) ->
 					!(key.key() == net.veloclient.velo.client.util.Keys.ESCAPE && net.veloclient.velo.client.modules.qol.ShulkerPreview.escape(s)));
 			net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents.allowMouseClick(screen).register((s, click) ->
 					!net.veloclient.velo.client.social.NotificationOverlay.click(click.x(), click.y()));
+			//?}
 		});
 	}
 

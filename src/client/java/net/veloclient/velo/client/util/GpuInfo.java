@@ -17,11 +17,21 @@ public final class GpuInfo {
 			return cached.isEmpty() ? null : cached;
 		}
 		try {
+			//? if <1.21.2 {
+			/*cached = com.mojang.blaze3d.platform.GlDebugInfo.getRenderer() + " (OpenGL " + com.mojang.blaze3d.platform.GlDebugInfo.getVersion() + ")";
+			if (true) {
+				return cached;
+			}
+			Object device = null;
+			*///?} else {
 			var device = com.mojang.blaze3d.systems.RenderSystem.tryGetDevice();
 			if (device == null) {
 				return null;
 			}
-			//? if <26.2 {
+			//?}
+			//? if <1.21.2 {
+			/*// (set above)
+			*///?} else if <26.2 {
 			cached = device.getRenderer() + " (" + device.getBackendName() + " " + device.getVersion() + ")";
 			//?} else {
 			/*var info = device.getDeviceInfo();

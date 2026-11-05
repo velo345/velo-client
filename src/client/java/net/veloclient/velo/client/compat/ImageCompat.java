@@ -17,6 +17,20 @@ public final class ImageCompat {
 		return swap(image.getColor(x, y));
 	}
 
+	/^* The native pixel address (1.21.1 keeps it private: the first long field is it). ^/
+	public static long pointer(NativeImage image) {
+		try {
+			for (var f : NativeImage.class.getDeclaredFields()) {
+				if (f.getType() == long.class && !java.lang.reflect.Modifier.isStatic(f.getModifiers())) {
+					f.setAccessible(true);
+					return f.getLong(image);
+				}
+			}
+		} catch (ReflectiveOperationException ignored) {
+		}
+		return 0;
+	}
+
 	public static void setColorArgb(NativeImage image, int x, int y, int argb) {
 		image.setColor(x, y, swap(argb));
 	}

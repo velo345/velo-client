@@ -14,7 +14,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * that entity is submitted its model asks for vanilla's translucent layer and gets the alpha in its color - exactly how
  * vanilla shows invisible mobs to spectators. Layers (saddle, armor) keep drawing normally.
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class RideableAlphaRenderMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.render.entity.LivingEntityRenderer.class)
 public abstract class RideableAlphaRenderMixin {
 

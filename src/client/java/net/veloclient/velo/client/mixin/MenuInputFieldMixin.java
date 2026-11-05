@@ -1,6 +1,8 @@
 package net.veloclient.velo.client.mixin;
 
+//? if >=1.21.2 {
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+//?}
 import net.veloclient.velo.client.gui.VeloFonts;
 import net.veloclient.velo.client.gui.widget.VeloStyle;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,7 +17,12 @@ import org.spongepowered.asm.mixin.injection.Redirect;
  * <p>Also: a borderless field (screens that draw their own box around it) puts its text at the
  * very top of the widget in vanilla; inside Velo menus it's shifted to the vertical center.
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class MenuInputFieldMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.gui.widget.TextFieldWidget.class)
 public abstract class MenuInputFieldMixin {
 

@@ -11,7 +11,9 @@ public final class HitColorEquipment {
 
 	/** Hit Color category of a living render state ({@code HitColorModule.SELF/PLAYER/HOSTILE/PASSIVE}). */
 	public static int category(Object renderState) {
-		//? if <26.1 {
+		//? if <1.21.2 {
+		/*return net.veloclient.velo.client.modules.pvp.HitColorModule.PASSIVE; // 1.21.1: not used (no render states)
+		*///?} else if <26.1 {
 		var state = (net.minecraft.client.render.entity.state.LivingEntityRenderState) renderState;
 		if (state instanceof net.minecraft.client.render.entity.state.PlayerEntityRenderState player) {
 			return player.id == PvpCompat.localPlayerId() ? net.veloclient.velo.client.modules.pvp.HitColorModule.SELF

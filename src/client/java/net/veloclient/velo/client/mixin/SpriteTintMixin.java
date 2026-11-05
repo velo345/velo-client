@@ -11,7 +11,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * sprite is drawn untinted (color -1) and a module wants a tint for it, the draw is re-issued with
  * that color instead. The re-issued call has a different color, so it passes straight through.
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class SpriteTintMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.gui.DrawContext.class)
 public abstract class SpriteTintMixin {
 

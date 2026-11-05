@@ -19,7 +19,15 @@ public abstract class PetRideCameraMixin {
 	protected abstract void setPos(double x, double y, double z);
 
 	@Shadow
+	//? if <1.21.2 {
+	/*public abstract net.minecraft.util.math.Vec3d getPos();
+
+	private net.minecraft.util.math.Vec3d getCameraPos() {
+		return getPos();
+	}
+	*///?} else {
 	public abstract net.minecraft.util.math.Vec3d getCameraPos();
+	//?}
 
 	@Inject(method = "update", at = @At("TAIL"))
 	private void velo$rideCamera(CallbackInfo ci) {

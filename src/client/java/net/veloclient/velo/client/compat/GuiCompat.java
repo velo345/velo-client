@@ -31,6 +31,16 @@ public final class GuiCompat {
 		}
 	}
 
+	/^* GUI rotation (radians) on 1.21.1's 3D MatrixStack. ^/
+	public static void rotate(net.minecraft.client.util.math.MatrixStack m, float radians) {
+		m.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Z.rotation(radians));
+	}
+
+	/^* Multiplies a 2D GUI transform (Matrix3x2f) into 1.21.1's 3D MatrixStack. ^/
+	public static void mul(net.minecraft.client.util.math.MatrixStack m, org.joml.Matrix3x2f t) {
+		m.peek().getPositionMatrix().mul(new org.joml.Matrix4f(t.m00, t.m01, 0, 0, t.m10, t.m11, 0, 0, 0, 0, 1, 0, t.m20, t.m21, 0, 1));
+	}
+
 	// drawTexture(pipeline, id, x, y, u, v, w, h, texW, texH[, color])
 	public static void drawTexture(DrawContext c, Object p, Identifier id, int x, int y, float u, float v, int w, int h, int tw, int th) {
 		drawTexture(c, p, id, x, y, u, v, w, h, w, h, tw, th, 0xFFFFFFFF);

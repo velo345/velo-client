@@ -9,7 +9,9 @@ import net.minecraft.client.render.command.OrderedRenderCommandQueue;
 import net.minecraft.client.render.entity.feature.FeatureRenderer;
 import net.minecraft.client.render.entity.feature.FeatureRendererContext;
 import net.minecraft.client.render.entity.model.EntityModelLayers;
+//? if >=1.21.2 {
 import net.minecraft.client.render.entity.model.PlayerCapeModel;
+//?}
 import net.minecraft.client.render.entity.state.PlayerEntityRenderState;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.EntityType;
@@ -56,7 +58,10 @@ import java.util.Map;
  * Client simply don't see it. Other players get a cloak here when they're online with Velo Client on the Velo
  * Network server and wear a Store cloak ({@link net.veloclient.velo.client.cosmetics.RemoteCapeCache}).
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*public final class CapeFeatureRenderer extends FeatureRenderer<net.minecraft.client.network.AbstractClientPlayerEntity,
+		net.minecraft.client.render.entity.model.PlayerEntityModel<net.minecraft.client.network.AbstractClientPlayerEntity>> {
+*///?} else if <26.1 {
 public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRenderState, net.minecraft.client.render.entity.model.PlayerEntityModel> {
 //?} else {
 /*public final class CapeFeatureRenderer extends RenderLayer<AvatarRenderState, PlayerModel> {
@@ -81,15 +86,40 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 	/** Past this distance the cloth isn't simulated at all: it keeps its last shape (a few pixels on screen). */
 	private static final double FROZEN_SQ = 48 * 48;
 
-	/** The "Classic" style (Cloak settings): vanilla's own cape model and motion, 1 px thick. */
+	/** The "Classic" style (Cloak settings): vanilla's own cape model and motion, 1 px thick (1.21.1: none - cloth instead). */
+	//? if <1.21.2 {
+	/*private final Object classic = null;
+	*///?} else {
 	private final PlayerCapeModel classic;
+	//?}
 
-	//? if <26.1 {
+	//? if <1.21.2 {
+	/*public CapeFeatureRenderer(FeatureRendererContext<net.minecraft.client.network.AbstractClientPlayerEntity,
+			net.minecraft.client.render.entity.model.PlayerEntityModel<net.minecraft.client.network.AbstractClientPlayerEntity>> context,
+			net.minecraft.client.render.entity.EntityRendererFactory.Context models) {
+		super(context);
+	}
+
+	@Override
+	public void render(MatrixStack matrixStack, net.minecraft.client.render.VertexConsumerProvider consumers, int light,
+			net.minecraft.client.network.AbstractClientPlayerEntity player, float limbAngle, float limbDistance, float tickDelta,
+			float animationProgress, float headYaw, float headPitch) {
+		draw(matrixStack, OrderedRenderCommandQueue.of(consumers), light, PlayerEntityRenderState.of(player, tickDelta));
+	}
+	*///?} else if <26.1 {
 	public CapeFeatureRenderer(FeatureRendererContext<PlayerEntityRenderState, net.minecraft.client.render.entity.model.PlayerEntityModel> context,
 			net.minecraft.client.render.entity.EntityRendererFactory.Context models) {
 		super(context);
 		this.classic = new PlayerCapeModel(models.getPart(EntityModelLayers.PLAYER_CAPE));
 	}
+
+	@Override
+	public void render(MatrixStack matrixStack, OrderedRenderCommandQueue queue, int light,
+			PlayerEntityRenderState state, float limbAngle, float limbDistance) {
+		draw(matrixStack, queue, light, state);
+	}
+	//?}
+	//? if <26.1 {
 
 	@SuppressWarnings("unchecked")
 	public static void register() {
@@ -105,14 +135,17 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 			if (entityType != EntityType.PLAYER || !(entityRenderer instanceof FeatureRendererContext)) {
 				return;
 			}
+			//? if <1.21.2 {
+			/*helper.register(new CapeFeatureRenderer((FeatureRendererContext<net.minecraft.client.network.AbstractClientPlayerEntity,
+					net.minecraft.client.render.entity.model.PlayerEntityModel<net.minecraft.client.network.AbstractClientPlayerEntity>>) entityRenderer, context));
+			*///?} else {
 			helper.register(new CapeFeatureRenderer(
 					(FeatureRendererContext<PlayerEntityRenderState, net.minecraft.client.render.entity.model.PlayerEntityModel>) entityRenderer, context));
+			//?}
 		});
 	}
 
-	@Override
-	public void render(MatrixStack matrixStack, OrderedRenderCommandQueue queue, int light,
-			PlayerEntityRenderState state, float limbAngle, float limbDistance) {
+	private void draw(MatrixStack matrixStack, OrderedRenderCommandQueue queue, int light, PlayerEntityRenderState state) {
 		if (net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.waveyActive()) {
 			return;
 		}
@@ -163,7 +196,7 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 			return;
 		}
 		Identifier texture = net.veloclient.velo.client.cosmetics.GazeCapes.texture(definition, state.id, base);
-		if (!net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.clothPhysics()) {
+		if (!net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.clothPhysics() && this.classic != null) {
 			// Classic: vanilla's cape model, posed by vanilla from the render state.
 			queue.submitModel(this.classic, state, matrixStack, RenderLayers.entityCutoutNoCull(texture), light, OverlayTexture.DEFAULT_UV, state.outlineColor, null);
 			return;

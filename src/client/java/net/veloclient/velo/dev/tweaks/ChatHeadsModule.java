@@ -104,7 +104,14 @@ public final class ChatHeadsModule extends AbstractModule implements Configurabl
 		if (line instanceof HeadLine head && head.sender() != null) {
 			int alpha = Math.round(Math.max(0f, Math.min(1f, opacity)) * 255);
 			if (alpha > 3) {
+				//? if <1.21.2 {
+				/*com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+				context.setShaderColor(1f, 1f, 1f, alpha / 255f);
+				net.minecraft.client.gui.PlayerSkinDrawer.draw(context, head.sender().getSkinTextures(), 0, y, 8);
+				context.setShaderColor(1f, 1f, 1f, 1f);
+				*///?} else {
 				net.minecraft.client.gui.PlayerSkinDrawer.draw(context, head.sender().getSkinTextures(), 0, y, 8, (alpha << 24) | 0xFFFFFF);
+				//?}
 			}
 		}
 	}

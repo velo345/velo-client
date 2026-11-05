@@ -1,7 +1,9 @@
 package net.veloclient.velo.client.hud;
 
+//? if >=1.21.2 {
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
+//?}
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.Identifier;
@@ -22,7 +24,40 @@ public final class HudManager {
 	private HudManager() {
 	}
 
+	/** 1.21.1 (no HUD element registry): which vanilla parts Velo's own modules draw instead (VanillaHudGateMixin). */
+	public static boolean hidesVanillaEffects() {
+		return ModuleRegistry.get("potion-timers").map(Module::isEnabled).orElse(false);
+	}
+
+	public static boolean hidesVanillaBossBar() {
+		return ModuleRegistry.get("boss-bar").map(Module::isEnabled).orElse(false);
+	}
+
+	public static boolean hidesVanillaScoreboard() {
+		return ModuleRegistry.get("scoreboard-hud").map(Module::isEnabled).orElse(false);
+	}
+
+	/** 1.21.1: draws Velo's crosshair instead of vanilla's when one is equipped; false = vanilla draws its own. */
+	public static boolean drawCustomCrosshair(DrawContext context) {
+		var module = ModuleRegistry.get("custom-crosshair").orElse(null);
+		MinecraftClient client = MinecraftClient.getInstance();
+		if (!(module instanceof net.veloclient.velo.client.modules.qol.CustomCrosshairModule) || !module.isEnabled()
+				|| !client.options.getPerspective().isFirstPerson()) {
+			return false;
+		}
+		boolean hit = client.targetedEntity instanceof net.minecraft.entity.LivingEntity && client.targetedEntity.isAlive();
+		net.veloclient.velo.client.modules.qol.CustomCrosshairModule.renderIfEquipped(context,
+				context.getScaledWindowWidth(), context.getScaledWindowHeight(), hit);
+		net.veloclient.velo.client.modules.qol.AttackIndicatorModule.renderUnderCrosshair(context,
+				context.getScaledWindowWidth(), context.getScaledWindowHeight(),
+				((net.veloclient.velo.client.modules.qol.CustomCrosshairModule) module).size());
+		return true;
+	}
+
 	public static void register() {
+		//? if <1.21.2 {
+		/*net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register(HudManager::onHudRender);
+		*///?} else {
 		HudElementRegistry.attachElementAfter(VanillaHudElements.HOTBAR, HUD_LAYER_ID, HudManager::onHudRender);
 		// Suppress vanilla's own status effect icons (top-right corner)
 		// while our Potion Effect Timers module is enabled, so effects
@@ -73,6 +108,7 @@ public final class HudManager {
 				vanilla.render(context, tickCounter);
 			}
 		});
+		//?}
 	}
 
 	/** Dev profiling only: {@code -Dvelo.profileNoHud=true} leaves Velo's HUD out, to measure what it costs. */

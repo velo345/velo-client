@@ -81,7 +81,11 @@ public final class VideoView {
 				texture = (NativeImageBackedTexture) MinecraftClient.getInstance().getTextureManager().getTexture(id);
 			}
 			//? if <26.1 {
+			//? if <1.21.2 {
+			/*long pointer = net.veloclient.velo.client.compat.ImageCompat.pointer(image);
+			*///?} else {
 			long pointer = image.imageId();
+			//?}
 			//?} else {
 			/*long pointer = image.getPointer();
 			*///?}

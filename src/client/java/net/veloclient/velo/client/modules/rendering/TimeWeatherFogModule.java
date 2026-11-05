@@ -94,7 +94,11 @@ public final class TimeWeatherFogModule extends AbstractModule implements Config
 
 	private void applyFogToggle(boolean wantDisabled) {
 		if (wantDisabled != vanillaFogCurrentlyDisabledByUs) {
+			//? if <1.21.2 {
+			/*// (1.21.1: vanilla fog stays)
+			*///?} else {
 			FogRenderer.toggleFog();
+			//?}
 			vanillaFogCurrentlyDisabledByUs = wantDisabled;
 		}
 	}
@@ -112,7 +116,11 @@ public final class TimeWeatherFogModule extends AbstractModule implements Config
 		// last-vs-current interpolation state. shouldTickTimeOfDay=false
 		// already keeps it frozen on its own between changes.
 		if (!timeMode.equals(lastAppliedTimeMode)) {
+			//? if <1.21.2 {
+			/*client.world.setTimeOfDay(fixed);
+			*///?} else {
 			client.world.setTime(client.world.getTime(), fixed, false);
+			//?}
 			lastAppliedTimeMode = timeMode;
 		}
 	}

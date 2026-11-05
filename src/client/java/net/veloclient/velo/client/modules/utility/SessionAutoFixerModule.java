@@ -498,8 +498,12 @@ public final class SessionAutoFixerModule extends AbstractModule {
 	//? if <26.1 {
 	private void applyAndReconnect(MinecraftClient client, VeloAccountAuth.RefreshedSession refreshed) {
 		Session current = client.getSession();
+		//? if <1.21.2 {
+		/*Session newSession = new Session(refreshed.username(), parseUuid(refreshed.uuid()), refreshed.accessToken(), current.getXuid(), current.getClientId(), Session.AccountType.MSA);
+		*///?} else {
 		Session newSession = new Session(refreshed.username(), parseUuid(refreshed.uuid()), refreshed.accessToken(),
 				current.getXuid(), current.getClientId());
+		//?}
 		((SessionAccessorMixin) client).velo$setSession(newSession);
 		// The fix is done once the new session is in - a later kick must be able to start a new one.
 		fixing = false;

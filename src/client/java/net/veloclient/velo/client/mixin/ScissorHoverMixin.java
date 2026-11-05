@@ -31,7 +31,12 @@ public abstract class ScissorHoverMixin {
 			return;
 		}
 		DrawContext self = (DrawContext) (Object) this;
+		//? if <1.21.2 {
+		/*var m4 = self.getMatrices().peek().getPositionMatrix();
+		org.joml.Matrix3x2f pose = new org.joml.Matrix3x2f(m4.m00(), m4.m01(), m4.m10(), m4.m11(), m4.m30(), m4.m31());
+		*///?} else {
 		org.joml.Matrix3x2f pose = new org.joml.Matrix3x2f(self.getMatrices());
+		//?}
 		if (pose.m00 == 1f && pose.m11 == 1f && pose.m01 == 0f && pose.m10 == 0f && pose.m20 == 0f && pose.m21 == 0f) {
 			return;
 		}

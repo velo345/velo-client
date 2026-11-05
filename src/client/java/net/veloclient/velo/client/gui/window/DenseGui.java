@@ -31,6 +31,11 @@ public final class DenseGui {
 	/** The scale Velo windows render at: the largest one below the GUI scale that still leaves room, else the GUI scale. */
 	public static int effectiveScale() {
 		int scale = ClientCompat.guiScale();
+		//? if <1.21.2 {
+		/*if (true) {
+			return scale; // 1.21.1: the mouse can't be remapped (no getScaledX), so no dense windows
+		}
+		*///?}
 		if (scale < 3 || NO_DENSE) {
 			return scale;
 		}

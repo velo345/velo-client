@@ -27,7 +27,15 @@ public final class MenuAvatar {
 		return (System.currentTimeMillis() % 3_600_000L) / 50f;
 	}
 
-	//? if <26.1 {
+	//? if <1.21.2 {
+	/*// 1.21.1: Velo's small render-state stand-in (the menu avatar itself isn't drawn there, see EntityPreviewWidget).
+	public static net.veloclient.velo.client.compat.PlayerEntityRenderState build() {
+		var state = new net.veloclient.velo.client.compat.PlayerEntityRenderState();
+		state.id = ID;
+		state.skinTextures = SkinModelPreview.current();
+		return state;
+	}
+	*///?} else if <26.1 {
 	public static net.minecraft.client.render.entity.state.PlayerEntityRenderState build() {
 		var state = new net.minecraft.client.render.entity.state.PlayerEntityRenderState();
 		state.entityType = net.minecraft.entity.EntityType.PLAYER;
@@ -42,6 +50,7 @@ public final class MenuAvatar {
 		return state;
 	}
 
+	//? if >=1.21.2 {
 	private static net.minecraft.entity.player.SkinTextures skin() {
 		net.minecraft.entity.player.SkinTextures base = SkinModelPreview.current();
 		net.minecraft.util.Identifier tryOn = SkinTryOn.texture();
@@ -58,6 +67,7 @@ public final class MenuAvatar {
 		}
 		return new net.minecraft.entity.player.SkinTextures(body, cape, base.elytra(), model, base.secure());
 	}
+	//?}
 	//?} else {
 	/*public static net.minecraft.client.renderer.entity.state.AvatarRenderState build() {
 		var state = new net.minecraft.client.renderer.entity.state.AvatarRenderState();

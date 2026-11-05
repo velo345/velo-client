@@ -1,10 +1,14 @@
 package net.veloclient.velo.client.gui.widget;
 
+//? if >=1.21.2 {
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+//?}
 import net.minecraft.client.gui.DrawContext;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix3x2fc;
-//? if <26.1 {
+//? if <1.21.2 {
+/*import net.minecraft.client.render.VertexConsumer;
+*///?} else if <26.1 {
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.ScreenRect;
 import net.minecraft.client.gui.render.state.SimpleGuiElementRenderState;
@@ -30,7 +34,20 @@ import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
  * single element pays it once and produces the exact same pixels (the GUI mesh is plain quads,
  * so one element can carry any number of them).
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*/^* 1.21.1: no GUI render states - the quads go straight into the GUI buffer with the current matrix. ^/
+final class VeloShapeElement {
+
+	static void submit(DrawContext context, float[] xy, int[] colors, int quadCount, int minX, int minY, int maxX, int maxY) {
+		org.joml.Matrix4f matrix = context.getMatrices().peek().getPositionMatrix();
+		VertexConsumer vertices = context.getVertexConsumers().getBuffer(net.minecraft.client.render.RenderLayer.getGui());
+		for (int v = 0; v < quadCount * 4; v++) {
+			vertices.vertex(matrix, xy[v * 2], xy[v * 2 + 1], 0).color(colors[v]);
+		}
+		context.draw();
+	}
+}
+*///?} else if <26.1 {
 record VeloShapeElement(Matrix3x2fc pose, float[] xy, int[] colors, int quadCount, ScreenRect scissorArea, ScreenRect bounds)
 		implements SimpleGuiElementRenderState {
 

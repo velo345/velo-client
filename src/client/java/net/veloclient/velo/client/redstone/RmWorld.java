@@ -439,8 +439,13 @@ public final class RmWorld {
 
 	/** Spawns a saved entity at x/y/z with its own fresh id. Server level. */
 	public static void spawnEntity(Object level, Object tag, double x, double y, double z, float yaw) {
+		//? if <1.21.2 {
+		/*var entity = net.minecraft.entity.EntityType.loadEntityWithPassengers(((net.minecraft.nbt.NbtCompound) tag).copy(), w(level),
+				java.util.function.Function.identity());
+		*///?} else {
 		var entity = net.minecraft.entity.EntityType.loadEntityWithPassengers(((net.minecraft.nbt.NbtCompound) tag).copy(), w(level),
 				net.minecraft.entity.SpawnReason.LOAD, net.minecraft.entity.LoadedEntityProcessor.NOOP);
+		//?}
 		if (entity != null) {
 			entity.setUuid(java.util.UUID.randomUUID());
 			entity.refreshPositionAndAngles(x, y, z, yaw, entity.getPitch());

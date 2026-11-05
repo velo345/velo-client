@@ -11,7 +11,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(Mouse.class)
 public abstract class DenseGuiMouseMixin {
 
-	//? if <26.1 {
+	//? if <1.21.2 {
+	/*// 1.21.1: Velo windows use the plain GUI scale (DenseGui.effectiveScale), nothing to map
+	*///?} else if <26.1 {
 	@Inject(method = "getScaledX", at = @At("RETURN"), cancellable = true)
 	private void velo$denseX(net.minecraft.client.util.Window window, CallbackInfoReturnable<Double> cir) {
 		if (DenseGui.active()) {

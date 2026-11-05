@@ -10,7 +10,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * Pets: riding your pet draws you sitting (vanilla's riding pose) on its back - the model is lifted by the saddle
  * height through the render offset; the real player, its hitbox and the camera stay where they are.
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class PetRideMixin {
+	// 1.21.1: no player render state to pose - you ride your pet standing
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.render.entity.PlayerEntityRenderer.class)
 public abstract class PetRideMixin {
 

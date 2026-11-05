@@ -34,7 +34,8 @@
 		"TitleLogoMixin",
 		"TitlePanoramaMixin",
 		"TitleScreenMixin",
-		"TitleSplashMixin"
+		"TitleSplashMixin",
+		"VanillaHudGateMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

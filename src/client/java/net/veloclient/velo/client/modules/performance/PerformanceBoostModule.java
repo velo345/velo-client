@@ -4,7 +4,11 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.CloudRenderMode;
 import net.minecraft.client.option.GameOptions;
 import net.minecraft.client.option.GraphicsMode;
+//? if <1.21.2 {
+/*// (no inactivity FPS limit before 1.21.2)
+*///?} else {
 import net.minecraft.client.option.InactivityFpsLimit;
+//?}
 import net.minecraft.particle.ParticlesMode;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.veloclient.velo.module.AbstractModule;
@@ -101,7 +105,11 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	private Boolean previousVsync;
 	private CloudRenderMode previousClouds;
 	private Integer previousBiomeBlend;
+	//? if <1.21.2 {
+	/*private Object previousInactivityLimit;
+	*///?} else {
 	private InactivityFpsLimit previousInactivityLimit;
+	//?}
 
 	// "Default" out of the box: it only turns VSync off and leaves the player's own video settings
 	// alone. "High Quality" as the default raised the view distance to 16 (and clouds, shadows,
@@ -271,12 +279,20 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		previousVsync = options.getEnableVsync().getValue();
 		previousClouds = options.getCloudRenderMode().getValue();
 		previousBiomeBlend = options.getBiomeBlendRadius().getValue();
+		//? if <1.21.2 {
+		/*previousInactivityLimit = null;
+		*///?} else {
 		previousInactivityLimit = options.getInactivityFpsLimit().getValue();
+		//?}
 
 		applyPreset(preset);
 		// (Not while profiling: the profiled window has no focus or input, and AFK capping would hold it at 30 FPS.)
 		if (dynamicFps && !net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+			//? if <1.21.2 {
+			/*// 1.21.1 keeps its own background FPS
+			*///?} else {
 			options.getInactivityFpsLimit().setValue(InactivityFpsLimit.AFK);
+			//?}
 		}
 		// applyPreset() above writes straight to the GameOptions values, same as every
 		// individual slider/toggle below already does - but unlike those, this path never called
@@ -303,7 +319,11 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		options.getEnableVsync().setValue(previousVsync);
 		options.getCloudRenderMode().setValue(previousClouds);
 		options.getBiomeBlendRadius().setValue(previousBiomeBlend);
+		//? if <1.21.2 {
+		/*//
+		*///?} else {
 		options.getInactivityFpsLimit().setValue(previousInactivityLimit);
+		//?}
 		previousGraphics = null;
 		// Same reasoning as onEnable() above - restoring the previous values directly needs the
 		// same explicit refresh to actually take visible effect again.
@@ -437,7 +457,11 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				new ConfigField.ToggleField("Dynamic FPS (throttle when unfocused/AFK)", () -> dynamicFps, v -> {
 					dynamicFps = v;
 					if (isEnabled() && !net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+						//? if <1.21.2 {
+						/*//
+						*///?} else {
 						options.getInactivityFpsLimit().setValue(v ? InactivityFpsLimit.AFK : InactivityFpsLimit.MINIMIZED);
+						//?}
 					}
 				}),
 				new ConfigField.ToggleField("HUD Caching (~20Hz overlay updates)", () -> hudCachingEnabled, v -> hudCachingEnabled = v),

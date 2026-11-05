@@ -445,11 +445,19 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 
 	//? if <26.1 {
 	private static Object skinTexture(LivingEntity self) {
+		//? if <1.21.2 {
+		/*return self instanceof net.minecraft.client.network.AbstractClientPlayerEntity p ? p.getSkinTextures().texture() : null;
+		*///?} else {
 		return self instanceof net.minecraft.client.network.AbstractClientPlayerEntity p ? p.getSkin().body().texturePath() : null;
+		//?}
 	}
 
 	private static boolean slimSkin(LivingEntity self) {
+		//? if <1.21.2 {
+		/*return self instanceof net.minecraft.client.network.AbstractClientPlayerEntity p && p.getSkinTextures().model() == net.minecraft.client.util.SkinTextures.Model.SLIM;
+		*///?} else {
 		return self instanceof net.minecraft.client.network.AbstractClientPlayerEntity p && p.getSkin().model() == net.minecraft.entity.player.PlayerSkinType.SLIM;
+		//?}
 	}
 	//?} else {
 	/*private static Object skinTexture(LivingEntity self) {

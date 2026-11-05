@@ -32,7 +32,16 @@ public abstract class PlayerListHudMixin {
 	@Redirect(method = "render", at = @At(value = "INVOKE",
 			target = "Lnet/minecraft/client/gui/DrawContext;drawTextWithShadow(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/text/Text;III)V",
 			ordinal = 0))
+	//? if <1.21.2 {
+	/*private int velo$drawNameWithBadge(DrawContext context, TextRenderer textRenderer, Text text, int x, int y, int color) {
+		velo$drawName(context, textRenderer, text, x, y, color);
+		return x + textRenderer.getWidth(text);
+	}
+
+	private void velo$drawName(DrawContext context, TextRenderer textRenderer, Text text, int x, int y, int color) {
+	*///?} else {
 	private void velo$drawNameWithBadge(DrawContext context, TextRenderer textRenderer, Text text, int x, int y, int color) {
+	//?}
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client.player == null) {
 			context.drawTextWithShadow(textRenderer, text, x, y, color);

@@ -437,7 +437,11 @@ public final class KillEffectsModule extends AbstractModule implements Configura
 	}
 
 	private void spawnColoredDust(MinecraftClient client, double x, double y, double z, double vx, double vy, double vz, int color, float scale) {
+		//? if <1.21.2 {
+		/*client.world.addParticle(new DustParticleEffect(new org.joml.Vector3f((color >> 16 & 255) / 255f, (color >> 8 & 255) / 255f, (color & 255) / 255f), scale), x, y, z, vx, vy, vz);
+		*///?} else {
 		client.world.addParticleClient(new DustParticleEffect(color, scale), x, y, z, vx, vy, vz);
+		//?}
 	}
 
 	private void playSound(MinecraftClient client, double x, double y, double z, net.minecraft.sound.SoundEvent sound, float volume, float pitch) {

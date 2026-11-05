@@ -28,11 +28,18 @@ public abstract class EmojiSuggestMixin {
 	}
 
 	@Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true, require = 0)
+	//? if <1.21.2 {
+	/*private void velo$emojiKeys(int key, int scanCode, int modifiers, CallbackInfoReturnable<Boolean> cir) {
+		if (!EmojiChatModule.suggestions() || chatField == null || !EmojiSuggest.visible()) {
+			return;
+		}
+	*///?} else {
 	private void velo$emojiKeys(net.minecraft.client.input.KeyInput input, CallbackInfoReturnable<Boolean> cir) {
 		if (!EmojiChatModule.suggestions() || chatField == null || !EmojiSuggest.visible()) {
 			return;
 		}
 		int key = input.key();
+	//?}
 		if (key == Keys.TAB) {
 			EmojiSuggest.Completion done = EmojiSuggest.complete(chatField.getText(), chatField.getCursor());
 			if (done != null) {

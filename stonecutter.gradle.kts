@@ -58,7 +58,122 @@ stonecutter parameters {
 				replace("net.minecraft.entity.player.SkinTextures", "net.minecraft.client.util.SkinTextures")
 				replace("net.minecraft.entity.player.PlayerSkinType", "net.minecraft.client.util.SkinTextures.Model")
 				replace("PlayerSkinType.", "net.minecraft.client.util.SkinTextures.Model.")
+				replace("com.mojang.blaze3d.buffers.GpuBuffer", "net.veloclient.velo.client.compat.GpuBuffer")
+				replace("net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry", "net.veloclient.velo.client.compat.HudElementRegistry")
+				replace("net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements", "net.veloclient.velo.client.compat.VanillaHudElements")
+				// Render states (1.21.2) and the command queue (1.21.9): Velo's stand-ins that draw immediately.
+				// Feature renderers were typed by the player entity, not a render state (longer pattern wins over the one below).
+				replace("net.minecraft.client.render.entity.state.PlayerEntityRenderState, net.minecraft.client.render.entity.model.PlayerEntityModel>",
+						"net.minecraft.client.network.AbstractClientPlayerEntity, net.minecraft.client.render.entity.model.PlayerEntityModel<net.minecraft.client.network.AbstractClientPlayerEntity>>")
+				replace("net.minecraft.client.render.entity.state.PlayerEntityRenderState", "net.veloclient.velo.client.compat.PlayerEntityRenderState")
+				replace("net.minecraft.client.render.command.OrderedRenderCommandQueue", "net.veloclient.velo.client.compat.OrderedRenderCommandQueue")
+				replace("context.commandQueue()", "net.veloclient.velo.client.compat.OrderedRenderCommandQueue.of(context.consumers())")
+				// Hotbar slot was a public field; particles, NBT text, slot overlay, data/pack version, registries, chunk checks.
+				replace("getInventory().getSelectedSlot()", "getInventory().selectedSlot")
+				replace("inventory.getSelectedSlot()", "inventory.selectedSlot")
+				replace("player.getInventory().setSelectedSlot(slot);", "player.getInventory().selectedSlot = slot;")
+				replace("player.getInventory().setSelectedSlot(0);", "player.getInventory().selectedSlot = 0;")
+				replace("inventory.setSelectedSlot(i);", "inventory.selectedSlot = i;")
+				replace(".addParticleClient(", ".addParticle(")
+				replace("StringNbtReader.readCompound(", "StringNbtReader.parse(")
+				replace(".drawStackOverlay(", ".drawItemInSlot(")
+				replace("getGameVersion().dataVersion().id()", "getGameVersion().getSaveVersion().getId()")
+				replace("getGameVersion().packVersion(net.minecraft.resource.ResourceType.CLIENT_RESOURCES).major()", "getGameVersion().getResourceVersion(net.minecraft.resource.ResourceType.CLIENT_RESOURCES)")
+				replace(".isOpaqueFullCube()", ".isOpaqueFullCube(net.minecraft.world.EmptyBlockView.INSTANCE, net.minecraft.util.math.BlockPos.ORIGIN)")
+				replace(".isPosLoaded(", ".isChunkLoaded(")
+				replace("getRegistryManager().getOrThrow(", "getRegistryManager().get(")
+				// Widgets' children are vanilla Elements (numbers in 1.21.1); key categories were translation strings.
+				replace("child.mouseClicked(click, doubled)", "child.mouseClicked(click.x(), click.y(), click.button())")
+				replace("forward.onClick(click, doubled)", "forward.onClick(click.x(), click.y())")
+				replace("KeyBinding.Category CATEGORY", "String CATEGORY")
+				replace("binding.getId()", "binding.getTranslationKey()")
+				replace(".getDynamicDeltaTicks()", ".getLastFrameDuration()")
+				replace("com.mojang.blaze3d.pipeline.RenderPipeline pipeline", "Object pipeline")
+				replace("context.drawTexture(pipeline, texture,", "net.veloclient.velo.client.compat.GuiCompat.drawTexture(context, pipeline, texture,")
+				// Odds and ends with a direct 1.21.1 counterpart.
+				replace("var view = net.minecraft.storage.NbtWriteView.create(net.minecraft.util.ErrorReporter.EMPTY, w(level).getRegistryManager());", "var view = new net.minecraft.nbt.NbtCompound();")
+				replace("if (entity.saveSelfData(view)) {", "if (entity.saveSelfNbt(view)) {")
+				replace("entity.getYaw(), view.getNbt()}", "entity.getYaw(), view}")
+				replace("matrices.mul(new Matrix3x2f(", "net.veloclient.velo.client.compat.GuiCompat.mul(matrices, new Matrix3x2f(")
+				replace("client.joinWorld(session.world);", "client.joinWorld(session.world, net.minecraft.client.gui.screen.DownloadingTerrainScreen.WorldEntryReason.OTHER);")
+				replace("client.disconnectWithSavingScreen();", "client.disconnect();")
+				replace("client.getPacketApplyBatcher().apply();", "// (1.21.1 applies packets directly)")
+				replace("public void onFilesDropped(List<Path> paths) {", "public void filesDragged(List<Path> paths) {")
+				replace("images.get(current).getColorArgb(px, py)", "net.veloclient.velo.client.compat.ImageCompat.getColorArgb(images.get(current), px, py)")
+				replace("((net.minecraft.client.gui.screen.Screen) (Object) this).getTextRenderer()", "net.minecraft.client.MinecraftClient.getInstance().textRenderer")
+				replace("withFont(FONT)", "withFont(net.veloclient.velo.client.compat.StyleSpriteSource.id(FONT))")
+				replace("return MinecraftClient.getInstance().getWindow().getScaleFactor();", "return (int) MinecraftClient.getInstance().getWindow().getScaleFactor();")
+				replace("context.getMatrices().m00()", "context.getMatrices().peek().getPositionMatrix().m00()")
+				replace("binding.getCategory().id().toString()", "binding.getCategory()")
+				replace("binding.getCategory().getLabel().getString()", "net.minecraft.text.Text.translatable(binding.getCategory()).getString()")
+				replace("new net.minecraft.client.gui.screen.ChatScreen(\":fi\", false)", "new net.minecraft.client.gui.screen.ChatScreen(\":fi\")")
+				replace(".playSoundClient(", ".playSound(")
+				replace("Direction.fromHorizontalDegrees(", "Direction.fromRotation(")
+				replace("net.minecraft.entity.vehicle.AbstractBoatEntity", "net.minecraft.entity.vehicle.BoatEntity")
+				replace("PositionAndOnGround(x, y + 0.0625, z, false, collision)", "PositionAndOnGround(x, y + 0.0625, z, false)")
+				replace("PositionAndOnGround(x, y, z, false, collision)", "PositionAndOnGround(x, y, z, false)")
+				replace("player.getItemCooldownManager().isCoolingDown(stack)", "player.getItemCooldownManager().isCoolingDown(stack.getItem())")
+				replace("static void setCloudRange(int v) { o().getCloudRenderDistance().setValue(v); }", "static void setCloudRange(int v) { }")
+				replace("ColorHelper.fromFloats(", "ColorHelper.Argb.fromFloats(")
+				replace("server.getCommandManager().parseAndExecute(", "server.getCommandManager().executeWithPrefix(")
+				replace("import net.minecraft.client.render.DefaultFramebufferSet;", "// (1.21.1: no framebuffer sets)")
+				replace("import net.minecraft.client.render.fog.FogRenderer;", "// (1.21.1: fog came from BackgroundRenderer)")
+				// Skin previews: 1.21.1's skin provider / model loader names and SkinTextures record.
+				replace("supplySkinTextures(client.getGameProfile(), false)", "getSkinTexturesSupplier(client.getGameProfile())")
+				replace("currentSkin().body().texturePath()", "currentSkin().texture()")
+				replace("getLoadedEntityModels()", "getEntityModelLoader()")
+				replace("SkinTextures.create(new AssetInfo.TextureAssetInfo(id, id), null, null, slim.getAsBoolean() ? PlayerSkinType.SLIM : PlayerSkinType.WIDE)",
+						"new SkinTextures(id, null, null, null, slim.getAsBoolean() ? SkinTextures.Model.SLIM : SkinTextures.Model.WIDE, false)")
+				replace("import net.minecraft.util.AssetInfo;", "// (no AssetInfo before 1.21.9)")
+				// Storage Memory: villager data getters; no item model component (1.21.2) to remember.
+				replace("data.profession().getIdAsString(), data.level()", "\"minecraft:\" + data.getProfession().id(), data.getLevel()")
+				replace("var model = stack.get(net.minecraft.component.DataComponentTypes.ITEM_MODEL);", "Object model = null; // no item model component before 1.21.2")
+				replace("stack.set(net.minecraft.component.DataComponentTypes.ITEM_MODEL, key);", "// (1.21.1: no item model component)")
+				// Pack screen: the organizer's change callback took no pack; model layers had getters.
+				replace("ResourcePackOrganizer(pack -> onChanged.run(),", "ResourcePackOrganizer(() -> onChanged.run(),")
+				replace("l.id() + \"#\" + l.name()", "l.getId() + \"#\" + l.getName()")
+				// Entity: prev* positions and elytra flight before 1.21.2 renamed them last* / gliding.
+				replace("player.lastX", "player.prevX")
+				replace("player.lastY", "player.prevY")
+				replace("player.lastZ", "player.prevZ")
+				replace(".isGliding()", ".isFallFlying()")
+				// ModelPart: rotate() / pivot* before 1.21.2 renamed them applyTransform() / origin*.
+				replace(".applyTransform(", ".rotate(")
+				replace(".originX", ".pivotX")
+				replace(".originY", ".pivotY")
+				replace(".originZ", ".pivotZ")
+				// authlib before 1.21.9: GameProfile getters, not record accessors.
+				replace("getGameProfile().name()", "getGameProfile().getName()")
+				replace("getGameProfile().id()", "getGameProfile().getId()")
+				replace("getProfile().name()", "getProfile().getName()")
+				replace("getProfile().id()", "getProfile().getId()")
+				// Fonts: 1.21.1 styles hold the font Identifier itself (compat.StyleSpriteSource converts).
+				replace("net.minecraft.text.StyleSpriteSource", "net.veloclient.velo.client.compat.StyleSpriteSource")
+				replace("style.getFont()", "net.veloclient.velo.client.compat.StyleSpriteSource.of(style.getFont())")
+				replace(".withFont(marker(place, font, i, length))", ".withFont(net.veloclient.velo.client.compat.StyleSpriteSource.id(marker(place, font, i, length)))")
 			}
+			// FeatureRenderer.render(matrices, queue, light, state, limbAngle, limbDistance) -> 1.21.1's entity signature;
+			// the queue and the state are made at the top of the body so the rest stays as it is.
+			regex(true) { replace("public void render\\((?:net\\.minecraft\\.client\\.util\\.math\\.)?MatrixStack (\\w+), (?:[\\w.]*)OrderedRenderCommandQueue (\\w+), int (\\w+),\\s*(?:[\\w.]*)PlayerEntityRenderState (\\w+), float (\\w+), float (\\w+)\\) \\{",
+					"public void render(net.minecraft.client.util.math.MatrixStack $1, net.minecraft.client.render.VertexConsumerProvider veloConsumers, int $3, net.minecraft.client.network.AbstractClientPlayerEntity veloPlayer, float $5, float $6, float veloTickDelta, float veloAnimation, float veloHeadYaw, float veloHeadPitch) {\n\t\tvar $2 = net.veloclient.velo.client.compat.OrderedRenderCommandQueue.of(veloConsumers);\n\t\tvar $4 = net.veloclient.velo.client.compat.PlayerEntityRenderState.of(veloPlayer, veloTickDelta);",
+					"(?!x)x", "") }
+			// Widget click handlers: 1.21.1's onClick(x, y) - the event is rebuilt at the top so the body stays the same.
+			regex(true) { replace("public void onClick\\((?:net\\.minecraft\\.client\\.gui\\.)?Click (\\w+), boolean (\\w+)\\) \\{",
+					"public void onClick(double veloX, double veloY) {\n\t\tnet.veloclient.velo.client.compat.Click $1 = new net.veloclient.velo.client.compat.Click(veloX, veloY, 0);\n\t\tboolean $2 = false;", "(?!x)x", "") }
+			// KeyBinding.Category.create(Identifier.of("ns", "name")) -> the 1.21.1 category key string.
+			regex(true) { replace("KeyBinding\\.Category\\.create\\(Identifier\\.of\\(\"([^\"]+)\", \"([^\"]+)\"\\)\\)", "\"key.category.$1.$2\"", "(?!x)x", "") }
+			// GUI matrix rotate / multiply (Matrix3x2f) -> GuiCompat over 1.21.1's MatrixStack.
+			regex(true) { replace("([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)*)\\.getMatrices\\(\\)\\.(rotate|mul)\\(", "net.veloclient.velo.client.compat.GuiCompat.$2($1.getMatrices(), ", "(?!x)x", "") }
+			// DrawContext's text calls returned the end x (int) until 1.21.6: mixin descriptors end in I there.
+			regex(true) { replace("(drawText(?:WithShadow)?\\(Lnet/minecraft/client/font/TextRenderer;L[\\w/]+;IIIZ?\\))V", "$1I", "(?!x)x", "") }
+			regex(true) { replace("(int color, boolean shadow,\\s*)CallbackInfo ci\\)", "$1org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Integer> ci)", "(?!x)x", "") }
+			// client.disconnect(Text) -> 1.21.1's disconnect(Screen) with a message screen.
+			regex(true) { replace("client\\.disconnect\\(((?:net\\.minecraft\\.text\\.)?Text\\.literal\\(\"[^\"]*\"\\))\\)", "client.disconnect(new net.minecraft.client.gui.screen.MessageScreen($1))", "(?!x)x", "") }
+			// NativeImageBackedTexture had no debug-name supplier before 1.21.4.
+			regex(true) { replace("new NativeImageBackedTexture\\(\\(\\) -> [^,]+?, ", "new NativeImageBackedTexture(", "(?!x)x", "") }
+			regex(true) { replace("super\\(name, (\\w+), (\\w+), false\\)", "super($1, $2, false)", "(?!x)x", "") }
+			// Style.withFont(new StyleSpriteSource.Font(id)) -> Style.withFont((id)) - the id is the font in 1.21.1.
+			regex(true) { replace("\\.withFont\\(new (?:[\\w.]+\\.)?StyleSpriteSource\\.Font\\(", ".withFont((", "(?!x)x", "") }
 			// NativeImage's ARGB accessors (1.21.2+) -> ImageCompat over 1.21.1's ABGR getColor / setColor.
 			regex(true) { replace("([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)*(?:\\[[^\\]]*\\])?)\\.(getColorArgb|setColorArgb)\\(", "net.veloclient.velo.client.compat.ImageCompat.$2($1, ", "(?!x)x", "") }
 			// Those handlers override nothing in 1.21.1's Screen: drop their @Override.

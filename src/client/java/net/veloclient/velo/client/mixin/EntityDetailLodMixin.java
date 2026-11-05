@@ -2,7 +2,9 @@ package net.veloclient.velo.client.mixin;
 
 //? if <26.1 {
 import net.minecraft.client.render.entity.LivingEntityRenderer;
+//? if >=1.21.2 {
 import net.minecraft.client.render.entity.state.LivingEntityRenderState;
+//?}
 //?} else {
 /*import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
@@ -14,6 +16,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Entity Detail Distance: skips a living entity's extra render layers past the configured distance. */
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class EntityDetailLodMixin {
+}
+*///?} else {
 @Mixin(LivingEntityRenderer.class)
 public abstract class EntityDetailLodMixin {
 
@@ -43,3 +51,4 @@ public abstract class EntityDetailLodMixin {
 	}
 	*///?}
 }
+//?}

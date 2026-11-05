@@ -59,7 +59,9 @@ public final class GuiCellMaskList<E> extends ArrayList<E> {
 	}
 
 	private void include(Object element) {
-		//? if <26.1 {
+		//? if <1.21.2 {
+		/*// 1.21.1: no GUI render state elements to mask
+		*///?} else if <26.1 {
 		if (element instanceof net.minecraft.client.gui.render.state.GuiElementRenderState state) {
 			net.minecraft.client.gui.ScreenRect bounds = state.bounds();
 			if (bounds != null) {

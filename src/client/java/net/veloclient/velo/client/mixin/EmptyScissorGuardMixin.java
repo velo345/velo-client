@@ -1,6 +1,8 @@
 package net.veloclient.velo.client.mixin;
 
+//? if >=1.21.2 {
 import com.mojang.blaze3d.systems.RenderPass;
+//?}
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -12,6 +14,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * scissor, and RenderPass then throws "Scissor size must be >0" - a hard crash. An empty clip should
  * simply show nothing, so it's replaced by a 1x1 scissor far outside the framebuffer.
  */
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class EmptyScissorGuardMixin {
+}
+*///?} else {
 @Mixin(net.minecraft.client.gui.render.GuiRenderer.class)
 public abstract class EmptyScissorGuardMixin {
 
@@ -33,3 +41,4 @@ public abstract class EmptyScissorGuardMixin {
 	}
 	*///?}
 }
+//?}

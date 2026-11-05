@@ -28,7 +28,7 @@ fi
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-./gradlew :1.21.10:build :1.21.11:build :26.1:build :26.2:build :26.3:build -q
+./gradlew :1.21.1:build :1.21.10:build :1.21.11:build :26.1:build :26.2:build :26.3:build -q
 
 JAR=$(ls -t versions/26.2/build/libs/velo-client-*.jar | grep -v sources | grep -v -- "-dev+" | head -1)
 DEST="/home/daviseib/.minecraft/mods/$(basename "$JAR")"

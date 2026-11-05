@@ -18,8 +18,12 @@ public abstract class LowFireMixin {
 	private static boolean velo$pushed;
 
 	@Inject(method = "renderFireOverlay", at = @At("HEAD"), cancellable = true, require = 0)
+	//? if <1.21.2 {
+	/*private static void velo$lower(net.minecraft.client.MinecraftClient client, net.minecraft.client.util.math.MatrixStack matrices, CallbackInfo ci) {
+	*///?} else {
 	private static void velo$lower(net.minecraft.client.util.math.MatrixStack matrices, net.minecraft.client.render.VertexConsumerProvider consumers,
 			net.minecraft.client.texture.Sprite sprite, CallbackInfo ci) {
+	//?}
 		if (LowFireModule.hide()) {
 			ci.cancel();
 			return;
@@ -33,8 +37,12 @@ public abstract class LowFireMixin {
 	}
 
 	@Inject(method = "renderFireOverlay", at = @At("RETURN"), require = 0)
+	//? if <1.21.2 {
+	/*private static void velo$restore(net.minecraft.client.MinecraftClient client, net.minecraft.client.util.math.MatrixStack matrices, CallbackInfo ci) {
+	*///?} else {
 	private static void velo$restore(net.minecraft.client.util.math.MatrixStack matrices, net.minecraft.client.render.VertexConsumerProvider consumers,
 			net.minecraft.client.texture.Sprite sprite, CallbackInfo ci) {
+	//?}
 		if (velo$pushed) {
 			velo$pushed = false;
 			matrices.pop();

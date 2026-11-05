@@ -185,7 +185,11 @@ public final class BetterF3Module extends AbstractModule implements Configurable
 	public static void toggleF3() {
 		var client = MinecraftClient.getInstance();
 		//? if <26.1 {
+		//? if <1.21.2 {
+		/*client.getDebugHud().toggleDebugHud();
+		*///?} else {
 		client.debugHudEntryList.toggleF3Enabled();
+		//?}
 		//?} else {
 		/*client.debugEntries.toggleDebugOverlay();
 		*///?}

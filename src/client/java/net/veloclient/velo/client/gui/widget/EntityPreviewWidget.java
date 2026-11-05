@@ -5,10 +5,16 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
 import net.minecraft.client.gui.widget.ClickableWidget;
 //? if <26.1 {
+//? if >=1.21.2 {
 import net.minecraft.client.render.entity.EntityRenderManager;
+//?}
 import net.minecraft.client.render.entity.EntityRenderer;
+//? if >=1.21.2 {
 import net.minecraft.client.render.entity.state.EntityRenderState;
+//?}
+//? if >=1.21.2 {
 import net.minecraft.client.render.entity.state.LivingEntityRenderState;
+//?}
 import net.minecraft.entity.EntityPose;
 //?} else {
 /*import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
@@ -145,6 +151,7 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		int size = Math.round(Math.min(getWidth(), getHeight()) * 2 / 5f * zoom);
 		// The entity is drawn as its own picture-in-picture element, which ignores the GUI pose: map the box (dense Velo
 		// windows, the window open animation) by hand.
+		//? if >=1.21.2 {
 		var pose = context.getMatrices();
 		org.joml.Vector2f a = pose.transformPosition(x1, y1, new org.joml.Vector2f());
 		org.joml.Vector2f b = pose.transformPosition(x2, y2, new org.joml.Vector2f());
@@ -153,6 +160,7 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		y1 = Math.round(a.y);
 		x2 = Math.round(b.x);
 		y2 = Math.round(b.y);
+		//?}
 
 		if (player == null) {
 			// No world yet (title screen): your skin and cosmetics on a bare render state.
@@ -163,7 +171,32 @@ public final class EntityPreviewWidget extends ClickableWidget {
 
 	}
 
-	//? if <26.1 {
+	//? if <1.21.2 {
+	/*// 1.21.1 draws the entity itself inside the GUI pose; turned by setting its yaw for the one draw.
+	private static void drawRotatableEntity(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees, net.minecraft.entity.LivingEntity entity,
+			net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag wingsTag, boolean tagged) {
+		float body = entity.bodyYaw, head = entity.headYaw, prevHead = entity.prevHeadYaw, yaw = entity.getYaw(), pitch = entity.getPitch();
+		entity.bodyYaw = 180f + yawDegrees;
+		entity.setYaw(180f + yawDegrees);
+		entity.headYaw = entity.getYaw();
+		entity.prevHeadYaw = entity.getYaw();
+		entity.setPitch(0);
+		context.enableScissor(x1, y1, x2, y2);
+		net.minecraft.client.gui.screen.ingame.InventoryScreen.drawEntity(context, (x1 + x2) / 2f, (y1 + y2) / 2f + size * entity.getHeight() / 2f, size,
+				new Vector3f(), new Quaternionf().rotateZ((float) Math.PI), null, entity);
+		context.disableScissor();
+		entity.bodyYaw = body;
+		entity.headYaw = head;
+		entity.prevHeadYaw = prevHead;
+		entity.setYaw(yaw);
+		entity.setPitch(pitch);
+	}
+
+	private static void drawMenuAvatar(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees,
+			net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag wingsTag, boolean tagged) {
+		// 1.21.1: no render states to draw a player without a world - the menu shows no avatar there.
+	}
+	*///?} else if <26.1 {
 	private static void drawRotatableEntity(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees, net.minecraft.entity.LivingEntity entity,
 			net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag wingsTag, boolean tagged) {
 		Quaternionf worldRotation = new Quaternionf().rotateZ((float) Math.PI);
@@ -254,6 +287,29 @@ public final class EntityPreviewWidget extends ClickableWidget {
 	}
 	*///?}
 
+	//? if <1.21.2 {
+	/*@Override
+	public boolean mouseDragged(double mouseX, double mouseY, int button, double offsetX, double offsetY) {
+		if (dragging) {
+			yawDegrees += (float) ((mouseX - lastDragX) * DEGREES_PER_DRAG_PIXEL);
+			lastDragX = mouseX;
+			return true;
+		}
+		return super.mouseDragged(mouseX, mouseY, button, offsetX, offsetY);
+	}
+
+	@Override
+	public boolean mouseReleased(double mouseX, double mouseY, int button) {
+		dragging = false;
+		return super.mouseReleased(mouseX, mouseY, button);
+	}
+
+	@Override
+	public void onClick(double mouseX, double mouseY) {
+		dragging = true;
+		lastDragX = mouseX;
+	}
+	*///?} else {
 	@Override
 	public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
 		if (dragging) {
@@ -275,6 +331,7 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		dragging = false;
 		return super.mouseReleased(click);
 	}
+	//?}
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {

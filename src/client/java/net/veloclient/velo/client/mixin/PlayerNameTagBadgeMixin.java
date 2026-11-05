@@ -44,8 +44,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(EntityRenderer.class)
 public abstract class PlayerNameTagBadgeMixin {
 
+	//? if <1.21.2 {
+	/*@org.spongepowered.asm.mixin.injection.ModifyVariable(method = "renderLabelIfPresent", at = @At("HEAD"), argsOnly = true)
+	private Text velo$label(Text text, Entity entity, Text label, net.minecraft.client.util.math.MatrixStack matrices,
+			net.minecraft.client.render.VertexConsumerProvider consumers, int light, float tickDelta) {
+		CallbackInfoReturnable<Text> cir = new CallbackInfoReturnable<>("renderLabelIfPresent", true, text);
+		velo$playerNameTag(entity, cir);
+		return cir.getReturnValue();
+	}
+
+	private void velo$playerNameTag(Entity entity, CallbackInfoReturnable<Text> cir) {
+	*///?} else {
 	@Inject(method = "getDisplayName", at = @At("RETURN"), cancellable = true)
 	private void velo$playerNameTag(Entity entity, CallbackInfoReturnable<Text> cir) {
+	//?}
 		Text original = cir.getReturnValue();
 		if (original == null || !(entity instanceof PlayerEntity player)) {
 			return;

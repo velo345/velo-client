@@ -10,7 +10,17 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
  * the font id here moves Velo menus onto Inter without touching any call site - see
  * {@link VeloFonts} for the scope and the per-GUI-scale font trick.
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: every glyph lookup asks getFontStorage(Identifier) for the font.
+@Mixin(net.minecraft.client.font.TextRenderer.class)
+public abstract class MenuFontMixin {
+
+	@ModifyVariable(method = "getFontStorage", at = @At("HEAD"), argsOnly = true)
+	private net.minecraft.util.Identifier velo$menuFont(net.minecraft.util.Identifier id) {
+		return net.veloclient.velo.client.compat.StyleSpriteSource.id(VeloFonts.remap(net.veloclient.velo.client.compat.StyleSpriteSource.of(id)));
+	}
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.font.TextRenderer.class)
 public abstract class MenuFontMixin {
 

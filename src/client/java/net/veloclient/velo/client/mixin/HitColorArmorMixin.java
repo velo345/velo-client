@@ -11,7 +11,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * HitColorEquipmentMixin} can apply it to the armor layers and trims (vanilla always draws armor
  * untinted). Cleared right after, so nothing else ever picks it up.
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class HitColorArmorMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.render.entity.feature.ArmorFeatureRenderer.class)
 public abstract class HitColorArmorMixin {
 

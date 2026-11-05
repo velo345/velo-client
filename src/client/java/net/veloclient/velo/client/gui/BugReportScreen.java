@@ -76,8 +76,12 @@ public final class BugReportScreen extends VeloWindow {
 		int boxY = y + 24;
 		int boxH = Math.max(40, contentBottom() - 64 - boxY);
 		//? if <26.1 {
+		//? if <1.21.2 {
+		/*net.minecraft.client.gui.widget.EditBoxWidget box = new net.minecraft.client.gui.widget.EditBoxWidget(this.textRenderer, x + 2, boxY + 2, w - 4, boxH - 4, Text.literal("What happened"), Text.empty());
+		*///?} else {
 		net.minecraft.client.gui.widget.EditBoxWidget box = net.minecraft.client.gui.widget.EditBoxWidget.builder().x(x + 2).y(boxY + 2)
 				.hasBackground(false).build(this.textRenderer, w - 4, boxH - 4, Text.literal("What happened"));
+		//?}
 		box.setMaxLength(4000);
 		//?} else {
 		/*net.minecraft.client.gui.components.MultiLineEditBox box = net.minecraft.client.gui.components.MultiLineEditBox.builder().setX(x + 2).setY(boxY + 2)

@@ -13,7 +13,12 @@ import java.util.List;
  * Short-circuits vanilla's per-list "does anything here intersect the new element" scan when the
  * list's cell mask proves nothing can (see {@link GuiCellMaskList} for why that's exact).
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class GuiLayerIntersectMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.gui.render.state.GuiRenderState.class)
 public abstract class GuiLayerIntersectMixin {
 

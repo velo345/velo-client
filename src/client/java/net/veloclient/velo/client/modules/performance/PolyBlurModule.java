@@ -49,7 +49,11 @@ public final class PolyBlurModule extends AbstractModule implements Configurable
 	// full-screen framebuffers on every single blurred frame, which caused the very stutter a
 	// motion-blur effect is worst at hiding. Entries unused for 3 frames are released.
 	//? if <26.1 {
+	//? if <1.21.2 {
+	/*private static final Object POOL = null; // 1.21.1: no motion blur
+	*///?} else {
 	private static final net.minecraft.client.util.memory.ObjectPool POOL = new net.minecraft.client.util.memory.ObjectPool(3);
+	//?}
 	//?} else {
 	/*private static final com.mojang.blaze3d.resource.CrossFrameResourcePool POOL = new com.mojang.blaze3d.resource.CrossFrameResourcePool(3);
 	*///?}
@@ -122,12 +126,24 @@ public final class PolyBlurModule extends AbstractModule implements Configurable
 
 		try {
 			Identifier effectId = STRENGTH_EFFECTS.getOrDefault(strength, STRENGTH_EFFECTS.get("Medium"));
+			//? if <1.21.2 {
+			/*PostEffectProcessor processor = null;
+			*///?} else {
 			PostEffectProcessor processor = LOADED.computeIfAbsent(effectId,
 					id -> client.getShaderLoader().loadPostEffect(id, DefaultFramebufferSet.MAIN_ONLY));
+			//?}
 			if (processor != null) {
 				//? if <26.1 {
+				//? if <1.21.2 {
+				/*//
+				*///?} else {
 				processor.render(client.getFramebuffer(), POOL);
+				//?}
+				//? if <1.21.2 {
+				/*//
+				*///?} else {
 				POOL.decrementLifespan();
+				//?}
 				//?} else if <26.2 {
 				/*processor.process(client.getMainRenderTarget(), POOL);
 				POOL.endFrame();
@@ -156,7 +172,11 @@ public final class PolyBlurModule extends AbstractModule implements Configurable
 	@Override
 	public void onDisable() {
 		havePrevious = false;
+		//? if <1.21.2 {
+		/*//
+		*///?} else {
 		POOL.clear();
+		//?}
 	}
 
 	@Override

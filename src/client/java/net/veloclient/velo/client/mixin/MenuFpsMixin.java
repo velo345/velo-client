@@ -30,7 +30,7 @@ public abstract class MenuFpsMixin {
 		}
 	}
 }
-*///?} else {
+*///?} else if >=1.21.2 {
 @Mixin(net.minecraft.client.option.InactivityFpsLimiter.class)
 public abstract class MenuFpsMixin {
 
@@ -50,4 +50,9 @@ public abstract class MenuFpsMixin {
 		}
 	}
 }
-//?}
+//?} else {
+/*// 1.21.1: hooks a system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class MenuFpsMixin {
+}
+*///?}

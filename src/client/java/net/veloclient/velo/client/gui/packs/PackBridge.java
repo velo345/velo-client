@@ -490,7 +490,11 @@ public final class PackBridge {
 	public static float[] entityQuads(String layer) {
 		List<Float> out = new ArrayList<>();
 		try {
-			//? if <26.1 {
+			//? if <1.21.2 {
+			/*if (true) {
+				return null; // 1.21.1 keeps a model's faces private: 2D editing only
+			}
+			*///?} else if <26.1 {
 			var key = net.minecraft.client.render.entity.model.EntityModelLayers.getLayers()
 					.filter(l -> (l.id() + "#" + l.name()).equals(layer)).findFirst().orElse(null);
 			if (key == null) {

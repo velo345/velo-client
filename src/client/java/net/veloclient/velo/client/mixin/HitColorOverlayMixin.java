@@ -11,7 +11,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * single static place vanilla computes it for every living entity (and the armor layer reads it
  * back through {@code HitColorArmorMixin}).
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class HitColorOverlayMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.render.entity.LivingEntityRenderer.class)
 public abstract class HitColorOverlayMixin {
 

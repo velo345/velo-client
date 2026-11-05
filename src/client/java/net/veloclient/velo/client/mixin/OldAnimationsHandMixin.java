@@ -20,7 +20,12 @@ public abstract class OldAnimationsHandMixin {
 	@Inject(method = "renderFirstPersonItem", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$begin(net.minecraft.client.network.AbstractClientPlayerEntity player, float tickProgress, float pitch,
 			net.minecraft.util.Hand hand, float swingProgress, net.minecraft.item.ItemStack item, float equipProgress,
-			net.minecraft.client.util.math.MatrixStack matrices, net.minecraft.client.render.command.OrderedRenderCommandQueue queue,
+			net.minecraft.client.util.math.MatrixStack matrices,
+			//? if <1.21.2 {
+			/*net.minecraft.client.render.VertexConsumerProvider queue,
+			*///?} else {
+			net.minecraft.client.render.command.OrderedRenderCommandQueue queue,
+			//?}
 			int light, CallbackInfo ci) {
 		OldAnimTransforms.currentStack = item;
 		OldAnimTransforms.currentIsMainHand = hand == net.minecraft.util.Hand.MAIN_HAND;

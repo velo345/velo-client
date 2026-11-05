@@ -11,7 +11,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * answers with the replacement block's model for deepslate, ores and bedrock - so their rotation and patterns never
  * reach the screen. The blocks themselves are untouched.
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class AntiDeepslateModelMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.render.block.BlockModels.class)
 public abstract class AntiDeepslateModelMixin {
 

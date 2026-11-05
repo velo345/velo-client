@@ -7,7 +7,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /** Anti Farm Lag: dropped item stacks draw a single model instead of up to five while in farm mode. */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class AntiFarmLagItemMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.render.entity.ItemEntityRenderer.class)
 public abstract class AntiFarmLagItemMixin {
 

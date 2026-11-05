@@ -13,7 +13,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Item Physics: remembers whether a dropped item is on the ground, and swaps vanilla's bob + spin for the module's pose
  * right before the item is drawn (the method pushed the pose stack first, so pop + push is back to the entity origin).
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class ItemPhysicsRendererMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.render.entity.ItemEntityRenderer.class)
 public abstract class ItemPhysicsRendererMixin {
 

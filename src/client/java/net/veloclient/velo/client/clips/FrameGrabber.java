@@ -75,6 +75,9 @@ final class FrameGrabber {
 	}
 
 	private static GpuBuffer acquireGpu(long bytes) {
+		//? if <1.21.2 {
+		/*return null;
+		*///?} else {
 		if (bytes != gpuBytes) {
 			GPU_FREE.forEach(GpuBuffer::close);
 			GPU_FREE.clear();
@@ -85,6 +88,7 @@ final class FrameGrabber {
 		}
 		// 9 = USAGE_MAP_READ | USAGE_COPY_DST, exactly what vanilla's screenshot uses.
 		return com.mojang.blaze3d.systems.RenderSystem.getDevice().createBuffer(() -> "Velo clip frame", 9, (int) bytes); // int: 1.21.10's size is an int, widens on newer
+		//?}
 	}
 
 	private static void releaseGpu(GpuBuffer buffer, long bytes) {
@@ -131,6 +135,32 @@ final class FrameGrabber {
 	static boolean grab(Sink sink, int maxHeight) {
 		drainDone();
 		MinecraftClient client = MinecraftClient.getInstance();
+		//? if <1.21.2 {
+		/*// 1.21.1 is OpenGL only: read the frame straight back (rows come bottom first, as the sink wants them).
+		var fb = client.getFramebuffer();
+		int w121 = fb.textureWidth;
+		int h121 = fb.textureHeight;
+		ByteBuffer out = acquire(w121 * h121 * 4);
+		if (out == null) {
+			return false;
+		}
+		com.mojang.blaze3d.platform.GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER, fb.fbo);
+		out.clear();
+		org.lwjgl.opengl.GL11.glPixelStorei(org.lwjgl.opengl.GL11.GL_PACK_ALIGNMENT, 1);
+		org.lwjgl.opengl.GL11.glReadPixels(0, 0, w121, h121, org.lwjgl.opengl.GL11.GL_RGBA, org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE, out);
+		com.mojang.blaze3d.platform.GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER, 0);
+		IN_FLIGHT.incrementAndGet();
+		COPIER.execute(() -> {
+			try {
+				sink.accept(out, w121, h121);
+			} catch (Throwable t) {
+				release(out);
+			} finally {
+				IN_FLIGHT.decrementAndGet();
+			}
+		});
+		return true;
+		*///?} else {
 		//? if <26.1 {
 		var texture = client.getFramebuffer().getColorAttachment();
 		//?} else if <26.2 {
@@ -238,6 +268,7 @@ final class FrameGrabber {
 			}
 		}, 0);
 		return true;
+		//?}
 	}
 
 	private static final java.util.concurrent.ExecutorService COPIER = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {

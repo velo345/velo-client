@@ -476,7 +476,11 @@ public final class NameStyles {
 			// A soft halo in the letter's own colour (translucent), not a hard dark copy. In chat and the tab list the text
 			// is small: a strong coloured copy one pixel off smears the letters, so it's kept faint there.
 			int alpha = marker[0] == CHAT || marker[0] == TAB ? 0x48000000 : 0x8C000000;
+			//? if <1.21.2 {
+			/*// (1.21.1: text has no own shadow colour)
+			*///?} else {
 			out = out.withShadowColor(alpha | NameStyleEffects.glow(rgb));
+			//?}
 		}
 		if (NameStyleEffects.scrambled(nameStyle, marker[2], seconds)) {
 			out = out.withObfuscated(true);

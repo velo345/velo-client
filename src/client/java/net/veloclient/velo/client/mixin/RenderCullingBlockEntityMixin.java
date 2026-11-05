@@ -15,7 +15,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * field name in every supported version), so it follows a detached/free camera correctly.
  * Beacons and end gateways are left alone - their beams are meant to be seen from afar.
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class RenderCullingBlockEntityMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.render.block.entity.BlockEntityRenderManager.class)
 public abstract class RenderCullingBlockEntityMixin {
 

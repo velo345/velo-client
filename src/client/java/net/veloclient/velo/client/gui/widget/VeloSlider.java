@@ -46,9 +46,15 @@ public final class VeloSlider extends ClickableWidget {
 	}
 
 	@Override
+	//? if <1.21.2 {
+	/*protected void onDrag(double mouseX, double mouseY, double offsetX, double offsetY) {
+		applyFromMouseX(mouseX);
+	}
+	*///?} else {
 	protected void onDrag(Click click, double offsetX, double offsetY) {
 		applyFromMouseX(click.x());
 	}
+	//?}
 
 	private void applyFromMouseX(double mouseX) {
 		double fraction = (mouseX - getX()) / (double) getWidth();

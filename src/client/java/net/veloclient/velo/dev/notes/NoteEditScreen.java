@@ -192,7 +192,10 @@ public final class NoteEditScreen extends VeloWindow {
 			int top = y + kindBar();
 			int boxY = top + 54;
 			int boxH = 70;
-			//? if <26.1 {
+			//? if <1.21.2 {
+			/*net.minecraft.client.gui.widget.EditBoxWidget box = new net.minecraft.client.gui.widget.EditBoxWidget(this.textRenderer, x + 2, boxY + 2, w - 4, boxH - 4,
+					Text.literal("Write something... @name pings them"), Text.empty());
+			*///?} else if <26.1 {
 			net.minecraft.client.gui.widget.EditBoxWidget box = net.minecraft.client.gui.widget.EditBoxWidget.builder().x(x + 2).y(boxY + 2)
 					.hasBackground(false).build(this.textRenderer, w - 4, boxH - 4, Text.literal("Write something... @name pings them"));
 			box.setMaxLength(2000);

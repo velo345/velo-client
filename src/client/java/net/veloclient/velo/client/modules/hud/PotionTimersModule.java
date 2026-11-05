@@ -62,7 +62,9 @@ public final class PotionTimersModule extends AbstractModule implements HudModul
 		int iconX = x + pad;
 		for (StatusEffectInstance effect : effects) {
 			int iconY = rowY + (row - ICON_SIZE) / 2;
-			//? if <26.1 {
+			//? if <1.21.2 {
+			/*context.drawSprite(iconX, iconY, 0, ICON_SIZE, ICON_SIZE, net.minecraft.client.MinecraftClient.getInstance().getStatusEffectSpriteManager().getSprite(effect.getEffectType()));
+			*///?} else if <26.1 {
 			context.drawGuiTexture(RenderPipelines.GUI_TEXTURED, InGameHud.getEffectTexture(effect.getEffectType()), iconX, iconY, ICON_SIZE, ICON_SIZE);
 			//?} else if <26.2 {
 			/*context.blitSprite(RenderPipelines.GUI_TEXTURED, Gui.getMobEffectSprite(effect.getEffect()), iconX, iconY, ICON_SIZE, ICON_SIZE);

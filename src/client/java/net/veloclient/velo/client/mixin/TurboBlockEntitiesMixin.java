@@ -12,7 +12,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * renderer's view distance x the Performance Boost slider aren't extracted for drawing at all - the big win on
  * servers with thousands of chests and signs. Every block entity passes through this one method (Sodium too).
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class TurboBlockEntitiesMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.render.block.entity.BlockEntityRenderManager.class)
 public abstract class TurboBlockEntitiesMixin {
 

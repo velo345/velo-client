@@ -105,7 +105,7 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 			f3StateAtPress = net.veloclient.velo.client.modules.debug.BetterF3Module.f3Open();
 			return true;
 		}
-		return super.keyPressed(input);
+		return velo$superKeyPressed(input);
 	}
 
 	/**
@@ -124,7 +124,7 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 			resizing = null;
 			return true;
 		}
-		return super.keyReleased(input);
+		return velo$superKeyReleased(input);
 	}
 
 	private List<HudModule> enabledHudModules() {
@@ -362,7 +362,7 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 				return true;
 			}
 		}
-		if (super.mouseClicked(click, doubled)) {
+		if (velo$superMouseClicked(click, doubled)) {
 			return true;
 		}
 		int mouseX = (int) click.x();
@@ -419,7 +419,7 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 			dragging.position().setPlaced(true);
 			return true;
 		}
-		return super.mouseDragged(click, offsetX, offsetY);
+		return velo$superMouseDragged(click, offsetX, offsetY);
 	}
 
 	@Override
@@ -433,7 +433,7 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 			resizing = null;
 			return true;
 		}
-		return super.mouseReleased(click);
+		return velo$superMouseReleased(click);
 	}
 
 	@Override
@@ -458,4 +458,72 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 		net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
 		this.client.setScreen(null);
 	}
+
+	// ---- 1.21.1: vanilla input still comes as numbers; the screen uses 1.21.9's event objects ----
+	private boolean velo$superKeyPressed(net.minecraft.client.input.KeyInput c) {
+		//? if <1.21.2 {
+		/*return super.keyPressed(c.key(), c.scancode(), c.modifiers());
+		*///?} else {
+		return super.keyPressed(c);
+		//?}
+	}
+
+	private boolean velo$superKeyReleased(net.minecraft.client.input.KeyInput c) {
+		//? if <1.21.2 {
+		/*return super.keyReleased(c.key(), c.scancode(), c.modifiers());
+		*///?} else {
+		return super.keyReleased(c);
+		//?}
+	}
+
+	private boolean velo$superMouseClicked(net.minecraft.client.gui.Click c, boolean d) {
+		//? if <1.21.2 {
+		/*return super.mouseClicked(c.x(), c.y(), c.button());
+		*///?} else {
+		return super.mouseClicked(c, d);
+		//?}
+	}
+
+	private boolean velo$superMouseDragged(net.minecraft.client.gui.Click c, double dx, double dy) {
+		//? if <1.21.2 {
+		/*return super.mouseDragged(c.x(), c.y(), c.button(), dx, dy);
+		*///?} else {
+		return super.mouseDragged(c, dx, dy);
+		//?}
+	}
+
+	private boolean velo$superMouseReleased(net.minecraft.client.gui.Click c) {
+		//? if <1.21.2 {
+		/*return super.mouseReleased(c.x(), c.y(), c.button());
+		*///?} else {
+		return super.mouseReleased(c);
+		//?}
+	}
+
+	//? if <1.21.2 {
+	/*@Override
+	public boolean mouseClicked(double x, double y, int button) {
+		return mouseClicked(new net.veloclient.velo.client.compat.Click(x, y, button), net.veloclient.velo.client.compat.Click.doubled(x, y, button));
+	}
+
+	@Override
+	public boolean mouseReleased(double x, double y, int button) {
+		return mouseReleased(new net.veloclient.velo.client.compat.Click(x, y, button));
+	}
+
+	@Override
+	public boolean mouseDragged(double x, double y, int button, double dx, double dy) {
+		return mouseDragged(new net.veloclient.velo.client.compat.Click(x, y, button), dx, dy);
+	}
+
+	@Override
+	public boolean keyPressed(int key, int scancode, int modifiers) {
+		return keyPressed(new net.veloclient.velo.client.compat.KeyInput(key, scancode, modifiers));
+	}
+
+	@Override
+	public boolean keyReleased(int key, int scancode, int modifiers) {
+		return keyReleased(new net.veloclient.velo.client.compat.KeyInput(key, scancode, modifiers));
+	}
+	*///?}
 }

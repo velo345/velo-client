@@ -3,7 +3,11 @@ package net.veloclient.velo.client.pvp;
 //? if <26.1 {
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.component.DataComponentTypes;
+//? if <1.21.2 {
+/*// 1.21.1: food effects come from FoodComponent
+*///?} else {
 import net.minecraft.component.type.ConsumableComponent;
+//?}
 import net.minecraft.component.type.FoodComponent;
 import net.minecraft.component.type.PotionContentsComponent;
 import net.minecraft.entity.Entity;
@@ -14,16 +18,32 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.thrown.PotionEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+//? if <1.21.2 {
+/*// (no consume effects before 1.21.2)
+*///?} else {
 import net.minecraft.item.consume.ApplyEffectsConsumeEffect;
+//?}
+//? if <1.21.2 {
+/*//
+*///?} else {
 import net.minecraft.item.consume.ConsumeEffect;
+//?}
 import net.minecraft.particle.ParticleEffect;
+//? if <1.21.2 {
+/*import net.minecraft.particle.EntityEffectParticleEffect;
+*///?} else {
 import net.minecraft.particle.TintedParticleEffect;
+//?}
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
+//? if <1.21.2 {
+/*// (no sprite text objects before 1.21.9)
+*///?} else {
 import net.minecraft.text.object.AtlasTextObjectContents;
+//?}
 import net.minecraft.util.Identifier;
 //?} else {
 /*import net.minecraft.client.Minecraft;
@@ -590,7 +610,16 @@ public final class PvpCompat {
 	/** Effects eating/drinking {@code stack} applies (golden apples, suspicious stew...), certain ones only. */
 	public static List<EffectSpec> consumeEffects(ItemStack stack) {
 		List<EffectSpec> list = new ArrayList<>();
-		//? if <26.1 {
+		//? if <1.21.2 {
+		/*var food = stack.get(DataComponentTypes.FOOD);
+		if (food != null) {
+			for (var entry : food.effects()) {
+				if (entry.probability() >= 1f) {
+					list.add(spec(entry.effect()));
+				}
+			}
+		}
+		*///?} else if <26.1 {
 		ConsumableComponent consumable = stack.get(DataComponentTypes.CONSUMABLE);
 		if (consumable != null) {
 			for (ConsumeEffect effect : consumable.onConsumeEffects()) {
@@ -618,12 +647,19 @@ public final class PvpCompat {
 
 	/** Ticks it takes to eat/drink {@code stack}, or -1 if it isn't consumable. */
 	public static int consumeTicks(ItemStack stack) {
-		//? if <26.1 {
+		//? if <1.21.2 {
+		/*var food = stack.get(DataComponentTypes.FOOD);
+		if (food != null) {
+			return Math.round(food.eatSeconds() * 20f);
+		}
+		return stack.getUseAction() == net.minecraft.util.UseAction.DRINK ? 32 : -1;
+		*///?} else if <26.1 {
 		ConsumableComponent consumable = stack.get(DataComponentTypes.CONSUMABLE);
+		return consumable == null ? -1 : Math.round(consumable.consumeSeconds() * 20f);
 		//?} else {
 		/*Consumable consumable = stack.get(DataComponents.CONSUMABLE);
-		*///?}
 		return consumable == null ? -1 : Math.round(consumable.consumeSeconds() * 20f);
+		*///?}
 	}
 
 	/** {nutrition, saturation} of a food stack, or null. */
@@ -762,7 +798,11 @@ public final class PvpCompat {
 				continue;
 			}
 			//? if <26.1 {
+			//? if <1.21.2 {
+			/*Identifier id = Registries.ITEM.getId(stack.getItem()); // cooldowns are per item before 1.21.2
+			*///?} else {
 			Identifier id = ((net.minecraft.entity.player.ItemCooldownManager) manager).getGroup(stack);
+			//?}
 			//?} else {
 			/*Identifier id = ((net.minecraft.world.item.ItemCooldowns) manager).getCooldownGroup(stack);
 			*///?}
@@ -867,7 +907,11 @@ public final class PvpCompat {
 	//? if <26.1 {
 	private static String particleKey(ParticleEffect particle) {
 		String type = String.valueOf(Registries.PARTICLE_TYPE.getId(particle.getType()));
+		//? if <1.21.2 {
+		/*if (particle instanceof EntityEffectParticleEffect tinted) {
+		*///?} else {
 		if (particle instanceof TintedParticleEffect tinted) {
+		//?}
 			return type + "#" + rgb(tinted.getRed(), tinted.getGreen(), tinted.getBlue());
 		}
 		return type;
@@ -999,7 +1043,11 @@ public final class PvpCompat {
 			case "Sparks" -> net.minecraft.particle.ParticleTypes.ELECTRIC_SPARK;
 			case "Notes" -> net.minecraft.particle.ParticleTypes.NOTE;
 			case "Cloud" -> net.minecraft.particle.ParticleTypes.CLOUD;
+			//? if <1.21.2 {
+			/*case "Dust" -> new net.minecraft.particle.DustParticleEffect(new org.joml.Vector3f((rgb >> 16 & 255) / 255f, (rgb >> 8 & 255) / 255f, (rgb & 255) / 255f), 1.0f);
+			*///?} else {
 			case "Dust" -> new net.minecraft.particle.DustParticleEffect(rgb & 0xFFFFFF, 1.0f);
+			//?}
 			default -> net.minecraft.particle.ParticleTypes.CRIT;
 		};
 		for (int i = 0; i < count; i++) {
@@ -1099,7 +1147,11 @@ public final class PvpCompat {
 	/** A GUI-atlas sprite drawn inline as one text glyph, e.g. "hud/heart/full" or "mob_effect/speed". */
 	//? if <26.1 {
 	public static MutableText sprite(String path) {
+		//? if <1.21.2 {
+		/*return Text.literal(path.contains("heart") ? "\u2764" : path.startsWith("mob_effect") ? "\u2022" : "\u25A0"); // no inline sprites before 1.21.9
+		*///?} else {
 		return Text.object(new AtlasTextObjectContents(Identifier.of("minecraft", "gui"), Identifier.of("minecraft", path)));
+		//?}
 	}
 
 	public static MutableText literal(String text, int rgb) {

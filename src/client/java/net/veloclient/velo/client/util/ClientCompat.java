@@ -187,8 +187,12 @@ public final class ClientCompat {
 		Quaternionf rotation = new Quaternionf(camera.getRotation());
 		float fov = (float) client.options.getFov().getValue().intValue();
 		if (client.player != null) {
+			//? if <1.21.2 {
+			/*fov *= client.player.getFovMultiplier();
+			*///?} else {
 			fov *= client.player.getFovMultiplier(client.options.getPerspective().isFirstPerson(),
 					client.options.getFovEffectScale().getValue().floatValue());
+			//?}
 		}
 		//?} else if <26.2 {
 		/*var camera = client.gameRenderer.getMainCamera();

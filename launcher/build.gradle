@@ -50,7 +50,7 @@ test {
 // into the launcher's own resources, so it's a fully self-contained app that
 // can always install the right jar into a profile's mods folder without
 // needing the rest of this monorepo checked out alongside it.
-def gameVersions = ["1.21.10", "1.21.11", "26.1", "26.2", "26.3"]
+def gameVersions = ["1.21.1", "1.21.10", "1.21.11", "26.1", "26.2", "26.3"]
 // Dev build (./build-dev.sh / -PveloDev=true): bundles the dev client jars (with src/dev) and runs on its own data folder.
 def veloDev = (findProperty("veloDev") ?: "false").toString().toBoolean()
 // Resolved eagerly at configuration time (plain java.io.File, not a live

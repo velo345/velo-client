@@ -6,7 +6,12 @@ import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
 /** The XP level number's color (vanilla's green, 0xFF80FF20) for the XP Bar module. */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class XpLevelColorMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.gui.hud.bar.Bar.class)
 public interface XpLevelColorMixin {
 

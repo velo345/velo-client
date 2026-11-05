@@ -36,7 +36,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(WorldRenderer.class)
 public abstract class BlockOutlineCancelMixin {
 
+	//? if <1.21.2 {
+	/*@Inject(method = "drawBlockOutline", at = @At("HEAD"), cancellable = true)
+	*///?} else {
 	@Inject(method = "renderTargetBlockOutline", at = @At("HEAD"), cancellable = true)
+	//?}
 	private void velo$cancelVanillaOutline(CallbackInfo ci) {
 		if (BlockOutlineModule.shouldReplaceVanillaOutline()) {
 			ci.cancel();

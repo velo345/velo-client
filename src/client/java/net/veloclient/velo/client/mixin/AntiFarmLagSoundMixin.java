@@ -7,7 +7,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Anti Farm Lag: the same block/neutral sound plays at most a few times per tick in farm mode. */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: this feature hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class AntiFarmLagSoundMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.sound.SoundManager.class)
 public abstract class AntiFarmLagSoundMixin {
 

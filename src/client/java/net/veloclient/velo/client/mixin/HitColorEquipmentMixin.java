@@ -9,7 +9,12 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
  * HitColorArmorMixin} has a tint set for the current (hurt) entity, it's multiplied into the tint
  * color every armor, trim and glint layer is submitted with.
  */
-//? if <26.1 {
+//? if <1.21.2 {
+/*// 1.21.1: hooks a render system that came later - left out on 1.21.1.
+@Mixin(net.minecraft.client.MinecraftClient.class)
+public abstract class HitColorEquipmentMixin {
+}
+*///?} else if <26.1 {
 @Mixin(net.minecraft.client.render.entity.equipment.EquipmentRenderer.class)
 public abstract class HitColorEquipmentMixin {
 
