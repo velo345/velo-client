@@ -1,0 +1,39 @@
+plugins {
+	id 'fabric-loom' version '1.18-SNAPSHOT'
+	id 'ploceus' version '1.18-SNAPSHOT'
+}
+
+base {
+	archivesName = project.archives_base_name
+}
+version = "${project.version}+mc${project.minecraft_version}"
+group = project.maven_group
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	mappings ploceus.featherMappings(project.feather_build)
+	ploceus.dependOsl(project.osl_version)
+}
+
+processResources {
+	inputs.property 'version', version
+	filesMatching('fabric.mod.json') {
+		expand 'version': version
+	}
+}
+
+// Velo's launcher runs 1.8.9 on Java 25 (Ornithe + Pylon/LWJGL 3); Java 17 keeps records, switch and java.net.http.
+tasks.withType(JavaCompile).configureEach {
+	it.options.encoding = 'UTF-8'
+	it.options.release = 17
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_17
+	targetCompatibility = JavaVersion.VERSION_17
+}

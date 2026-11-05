@@ -57,6 +57,19 @@ def veloDev = (findProperty("veloDev") ?: "false").toString().toBoolean()
 // Project reference) so the doLast below stays configuration-cache-safe.
 def libsDirs = gameVersions.collectEntries { v -> [(v): rootProject.file("versions/${v}/build/libs")] }
 def gameJarsResourceRoot = layout.buildDirectory.dir("generated/gamejars")
+// 1.8.9 is its own Ornithe build (legacy/, own Gradle wrapper and Loom) - built here and bundled like the others.
+def legacyDir = rootProject.file("legacy")
+def legacyLibs = new File(legacyDir, "build/libs")
+tasks.register("buildLegacyJar", Exec) {
+	group = "build"
+	description = "Builds the 1.8.9 velo-client jar (legacy/, Ornithe)."
+	notCompatibleWithConfigurationCache("Runs a separate Gradle build")
+	workingDir legacyDir
+	commandLine(System.getProperty("os.name").toLowerCase().contains("win") ? ["cmd", "/c", "gradlew.bat", "build"] : ["./gradlew", "build"])
+	inputs.dir(new File(legacyDir, "src"))
+	inputs.files(new File(legacyDir, "build.gradle"), new File(legacyDir, "gradle.properties"))
+	outputs.dir(legacyLibs)
+}
 def gameJarsOutputDir = gameJarsResourceRoot.map { it.dir("net/veloclient/launcher/gamejars") }
 
 tasks.register("bundleGameJars") {
@@ -66,6 +79,8 @@ tasks.register("bundleGameJars") {
 	// not something the configuration cache can track precisely.
 	notCompatibleWithConfigurationCache("Copies a sibling project's build output jar, resolved after that project builds")
 	gameVersions.each { v -> dependsOn(":${v}:build") }
+	dependsOn("buildLegacyJar")
+	inputs.dir(legacyLibs)
 	gameVersions.each { v ->
 		inputs.files(fileTree(libsDirs[v]) { include "velo-client-*.jar", "velo-addons-*.jar"; exclude "*-sources.jar" })
 	}
@@ -87,6 +102,11 @@ tasks.register("bundleGameJars") {
 			def newest = { File[] files -> files.max { it.lastModified() } }
 			new File(outDir, "${v}.jar").bytes = newest(matches).bytes
 		}
+		def legacy = legacyLibs.listFiles({ f -> f.name.startsWith("velo-client-") && f.name.endsWith("+mc1.8.9.jar") } as FileFilter)
+		if (legacy == null || legacy.length == 0) {
+			throw new GradleException("Expected a built 1.8.9 velo-client jar in ${legacyLibs}, found none")
+		}
+		new File(outDir, "1.8.9.jar").bytes = legacy.max { it.lastModified() }.bytes
 		// When these jars were bundled - the updater only treats a same-version release as a
 		// hotfix if its jars were uploaded after this (jar bytes aren't reproducible across builds).
 		new File(outDir, "build.properties").text = "builtAt=${System.currentTimeMillis()}\n"

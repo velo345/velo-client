@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "velo-client",
+	"version": "${version}",
+	"name": "Velo Client",
+	"description": "Velo Client for Minecraft 1.8.9: Velo cloaks, badges and Velo Network.",
+	"authors": [
+		"Velo Client"
+	],
+	"contact": {
+		"homepage": "https://velo-client.com"
+	},
+	"license": "All-Rights-Reserved",
+	"icon": "assets/velo-client/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client-init": [
+			"net.veloclient.legacy.VeloLegacy"
+		]
+	},
+	"mixins": [
+		"velo-legacy.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.17.3",
+		"minecraft": "1.8.9",
+		"osl-entrypoints": ">=0.4.0",
+		"osl-resource-loader": "*",
+		"osl-lifecycle-events": "*"
+	}
+}
