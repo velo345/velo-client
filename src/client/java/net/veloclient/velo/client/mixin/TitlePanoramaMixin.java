@@ -40,6 +40,9 @@ public abstract class TitlePanoramaMixin {
 
 	@Inject(method = "renderPanoramaBackground", at = @At("HEAD"), cancellable = true)
 	private void velo$panorama(DrawContext context, float delta, CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		if (!(((Object) this) instanceof TitleScreen self)) {
 			return;
 		}
@@ -53,6 +56,9 @@ public abstract class TitlePanoramaMixin {
 
 	@Inject(method = "extractPanorama", at = @At("HEAD"), cancellable = true)
 	private void velo$panorama(GuiGraphicsExtractor context, float delta, CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		if (!(((Object) this) instanceof TitleScreen self)) {
 			return;
 		}

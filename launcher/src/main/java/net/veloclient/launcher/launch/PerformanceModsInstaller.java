@@ -72,17 +72,42 @@ public final class PerformanceModsInstaller {
 		// Mod Menu isn't installed any more: Velo's own Mods page lists every mod and opens their settings (2026-11-05).
 	}
 
+	/**
+	 * 1.8.9 / 1.9.4 on Ornithe (Java 25) - the stack OneClient and Dolphin run, each a Modrinth "ornithe" build:
+	 * Pylon (LWJGL 3 + SDL 3 instead of LWJGL 2: needed on Java 25, fixes stuck keys and high-polling-rate mouse lag),
+	 * Argentum (Sodium for 1.8.9) + its Extras, Cera (OptiFine resource-pack features on Argentum: CTM, custom items/GUIs),
+	 * Sarcio (memory leaks, allocations, faster server pings), Exploint (exploit patches). (AsyncLogger needs a newer log4j than 1.8.9 has.) Most are 1.8.9-only;
+	 * 1.9.4 gets what exists for it.
+	 */
+	private static final Map<String, String> LEGACY_MODS = new LinkedHashMap<>();
+
+	static {
+		LEGACY_MODS.put("pylon", "pylon");
+		LEGACY_MODS.put("argentum", "argentum");
+		LEGACY_MODS.put("argentum-extras", "argentum-extras");
+		LEGACY_MODS.put("cera", "cera");
+		LEGACY_MODS.put("sarcio", "sarcio");
+		LEGACY_MODS.put("exploint", "exploint");
+		LEGACY_MODS.put("windows-priority-boost", "windows-priority-boost");
+	}
+
+	private static Map<String, String> modsFor(GameVersion version) {
+		return version.ornithe() ? LEGACY_MODS : MODS;
+	}
+
 	/** Mods only installed on one OS ({@link OsRules#currentOsName()}): slug -> os name. */
 	private static final Map<String, String> ONLY_ON = Map.of("windows-priority-boost", "windows");
 
 	/** Modrinth project ids of mods this list installs itself, so another one may require them: project id -> mod id. */
-	private static final Map<String, String> OWN_DEPENDENCIES = Map.of("AANobbMI", "sodium");
+	private static final Map<String, String> OWN_DEPENDENCIES = Map.of("AANobbMI", "sodium",
+			// Ornithe Standard Libraries (installed like Fabric API) and Argentum (for its Extras and Cera)
+			"EHGtwpJv", "osl", "QRMV06RW", "argentum");
 
 	/** Ours that need another one of ours (slug -> required mod id): taken out again when the player removes that one. */
-	private static final Map<String, String> NEEDS = Map.of("cull-fewer-leaves", "sodium");
+	private static final Map<String, String> NEEDS = Map.of("cull-fewer-leaves", "sodium", "argentum-extras", "argentum", "cera", "argentum");
 
 	/** Ours that refuse to load next to another mod ("breaks" in their fabric.mod.json): slug -> that mod's id. */
-	private static final Map<String, String> CLASHES = Map.of("cull-fewer-leaves", "moreculling");
+	private static final Map<String, String> CLASHES = Map.of("cull-fewer-leaves", "moreculling", "sarcio", "zirconium");
 
 	/** Installed by older launchers, now part of Velo: removed again unless another mod needs them. */
 	private static final Map<String, String> RETIRED = Map.of("modmenu", "modmenu", "placeholder-api", "placeholder-api");
@@ -153,7 +178,7 @@ public final class PerformanceModsInstaller {
 
 			Files.createDirectories(modsDir);
 			// One we installed that another mod no longer accepts (Nvidium wants exactly Sodium 0.9.2...): swap it below.
-			for (Map.Entry<String, String> mod : MODS.entrySet()) {
+			for (Map.Entry<String, String> mod : modsFor(version).entrySet()) {
 				String fileName = state.installed.get(mod.getKey());
 				Path file = fileName == null ? null : modsDir.resolve(fileName);
 				if (file != null && Files.exists(file)) {
@@ -193,7 +218,7 @@ public final class PerformanceModsInstaller {
 					LauncherLog.info("Removed " + fileName + " - it needs " + need.getValue() + ", which isn't installed any more");
 				}
 			}
-			for (Map.Entry<String, String> mod : MODS.entrySet()) {
+			for (Map.Entry<String, String> mod : modsFor(version).entrySet()) {
 				String slug = mod.getKey();
 				// Installed by us before: either still there, or the player removed/disabled it on
 				// purpose - either way, nothing to do.
@@ -224,14 +249,14 @@ public final class PerformanceModsInstaller {
 	}
 
 	private static Optional<String> installOne(String slug, GameVersion version, Path modsDir, Set<String> presentModIds) throws IOException {
-		List<ModrinthClient.ProjectVersion> candidates = ModrinthClient.versions(slug, version.id());
+		List<ModrinthClient.ProjectVersion> candidates = ModrinthClient.versions(slug, version.id(), "mod", version.modrinthLoader());
 		// Modrinth lists newest first.
 		List<ModrinthClient.ProjectVersion> fitting = candidates.stream()
 				.filter(v -> v.gameVersions() != null && v.gameVersions().contains(version.id()))
-				.filter(v -> v.loaders() != null && v.loaders().contains("fabric"))
+				.filter(v -> v.loaders() != null && v.loaders().contains(version.modrinthLoader()))
 				.toList();
 		Optional<ModrinthClient.ProjectVersion> chosen = fitting.stream().findFirst();
-		String modId = MODS.get(slug);
+		String modId = modsFor(version).get(slug);
 		if (chosen.isPresent() && net.veloclient.launcher.doctor.ModRequirements.constrains(modsDir, modId)) {
 			// Another mod wants a certain version of it: the newest build every mod accepts (read from the jar itself -
 			// Modrinth's version names don't match fabric.mod.json's).
@@ -273,7 +298,7 @@ public final class PerformanceModsInstaller {
 		Downloader.ensure(URI.create(file.url()), cached, file.sha1(), file.size(), b -> { });
 		Path dest = modsDir.resolve(file.filename());
 		Files.copy(cached, dest, StandardCopyOption.REPLACE_EXISTING);
-		presentModIds.add(MODS.get(slug));
+		presentModIds.add(modsFor(version).get(slug));
 		LauncherLog.info("Installed performance mod " + file.filename() + " for " + version.id());
 		return Optional.of(file.filename());
 	}

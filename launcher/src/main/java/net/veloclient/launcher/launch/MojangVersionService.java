@@ -26,6 +26,15 @@ public final class MojangVersionService {
 		return MetaCache.getOrFetch("minecraft-" + mcVersion, () -> fetchVersionDetailUncached(mcVersion));
 	}
 
+	/**
+	 * 1.8.9 / 1.9.4 on Ornithe: Ornithe's copy of the version JSON (gen 2) - Mojang's, with a maintained LWJGL 2 build
+	 * whose natives load on today's systems and Java. That's what Ornithe's mods are tested against.
+	 */
+	public static JsonObject fetchOrnitheVersionDetail(String mcVersion) throws IOException {
+		return MetaCache.getOrFetch("ornithe-minecraft-" + mcVersion,
+				() -> getJson("https://ornithemc.net/mc-versions/gen2/version/manifest/" + mcVersion + ".json"));
+	}
+
 	private static JsonObject fetchVersionDetailUncached(String mcVersion) throws IOException {
 		JsonObject manifest = getJson(VERSION_MANIFEST_URL);
 		JsonArray versions = manifest.getAsJsonArray("versions");

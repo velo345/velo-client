@@ -44,6 +44,9 @@ public abstract class EscapeMenuMixin {
 
 	@Inject(method = "init", at = @At("RETURN"))
 	private void velo$restyle(CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.pause()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		GameMenuScreen self = (GameMenuScreen) (Object) this;
 		List<Drawable> drawables = ((ScreenAccessMixin) (Object) this).velo$drawables();
 		@SuppressWarnings("unchecked")
@@ -93,12 +96,18 @@ public abstract class EscapeMenuMixin {
 
 	@Inject(method = "render", at = @At("HEAD"))
 	private void velo$beforeVanilla(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.pause()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		GameMenuScreen self = (GameMenuScreen) (Object) this;
 		PauseMenu.beforeVanilla(context, self.width, self.height);
 	}
 
 	@Inject(method = "render", at = @At("RETURN"))
 	private void velo$overlay(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.pause()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		GameMenuScreen self = (GameMenuScreen) (Object) this;
 		List<Drawable> drawables = ((ScreenAccessMixin) (Object) this).velo$drawables();
 		PauseMenu.render(context, self.width, self.height, mouseX, mouseY, new PauseMenu.Env() {
@@ -136,6 +145,9 @@ public abstract class EscapeMenuMixin {
 
 	@Inject(method = "init", at = @At("RETURN"))
 	private void velo$restyle(CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.pause()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		PauseScreen self = (PauseScreen) (Object) this;
 		List<Renderable> renderables = ((ScreenAccessMixin) (Object) this).velo$drawables();
 		@SuppressWarnings("unchecked")
@@ -185,12 +197,18 @@ public abstract class EscapeMenuMixin {
 
 	@Inject(method = "extractRenderState", at = @At("HEAD"))
 	private void velo$beforeVanilla(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.pause()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		PauseScreen self = (PauseScreen) (Object) this;
 		PauseMenu.beforeVanilla(context, self.width, self.height);
 	}
 
 	@Inject(method = "extractRenderState", at = @At("RETURN"))
 	private void velo$overlay(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.pause()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		PauseScreen self = (PauseScreen) (Object) this;
 		List<Renderable> renderables = ((ScreenAccessMixin) (Object) this).velo$drawables();
 		PauseMenu.render(context, self.width, self.height, mouseX, mouseY, new PauseMenu.Env() {

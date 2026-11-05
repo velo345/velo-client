@@ -152,13 +152,18 @@ public final class ModrinthClient {
 	 *                    else returns every published version, unfiltered.
 	 */
 	public static List<ProjectVersion> versions(String projectId, String gameVersion, String projectType) throws IOException {
+		return versions(projectId, gameVersion, projectType, "fabric");
+	}
+
+	/** Mods for another loader: "ornithe" for 1.8.9 / 1.9.4 ({@code GameVersion#modrinthLoader()}). */
+	public static List<ProjectVersion> versions(String projectId, String gameVersion, String projectType, String loader) throws IOException {
 		StringBuilder url = new StringBuilder(API_BASE).append("/project/").append(encode(projectId)).append("/version");
 		List<String> params = new ArrayList<>();
 		if (versionSensitive(projectType)) {
 			params.add("game_versions=" + encode("[\"" + gameVersion + "\"]"));
 		}
 		if (loaderSensitive(projectType)) {
-			params.add("loaders=" + encode("[\"fabric\"]"));
+			params.add("loaders=" + encode("[\"" + loader + "\"]"));
 		}
 		if (!params.isEmpty()) {
 			url.append('?').append(String.join("&", params));

@@ -61,7 +61,8 @@ public final class GameLauncher {
 		// Minecraft, its assets and maybe a Java runtime: ~1.5 GB on a first start. Say so up front instead of failing half-way.
 		LaunchErrors.requireFreeSpace(GameDataPaths.assetsRoot(), 1536L * 1024 * 1024);
 		listener.onPhase("Resolving version info...");
-		JsonObject vanilla = MojangVersionService.fetchVersionDetail(version.id());
+		JsonObject vanilla = version.ornithe() ? MojangVersionService.fetchOrnitheVersionDetail(version.id())
+				: MojangVersionService.fetchVersionDetail(version.id());
 		listener.onProgress(1.0);
 
 		Path modsDir = InstancePaths.modsDir(instance.id());
@@ -119,8 +120,9 @@ public final class GameLauncher {
 
 		// The launcher's own (newer) Java runs every version - unless a mod only accepts the version's own Java.
 		boolean ownJavaOk = net.veloclient.launcher.doctor.ModRequirements.acceptsJava(modsDir, Runtime.version().feature());
-		// 1.8.9 / 1.9.4 (LWJGL 2, Java 8 era) run on Mojang's Java 8, like the official launcher does.
-		boolean exact = !ownJavaOk || JavaRuntimeProvider.requiredFeature(vanilla) < 17;
+		// 1.8.9 / 1.9.4 run on Ornithe with the launcher's Java 25 (Argentum is built for it; Pylon brings LWJGL 3, so the
+		// Java 8-only LWJGL 2 never loads) - like OneClient does. Without Ornithe they'd need Mojang's Java 8.
+		boolean exact = !ownJavaOk || JavaRuntimeProvider.requiredFeature(vanilla) < 17 && !version.ornithe();
 		JavaRuntimeProvider.JavaRuntime runtime = JavaRuntimeProvider.forVersion(vanilla, listener, exact);
 
 		listener.onPhase("Starting Minecraft...");
@@ -221,6 +223,7 @@ public final class GameLauncher {
 		// this exact class of intermittent Minecraft connection timeout.
 		jvmArgs.add("-Djava.net.preferIPv4Stack=true");
 		GraphicsApi.applyPending(instance.id());
+		LegacyOptions.apply(instance.id(), version, InstancePaths.modsDir(instance.id()));
 		// The Doctor explains and fixes mod problems itself - Fabric's own error window would only stand in its way.
 		jvmArgs.add("-Dfabric.noGui=true");
 		// Which account's cosmetics the game wears (config/accounts/<uuid>/) - the same files the launcher's Locker edits.
@@ -260,7 +263,10 @@ public final class GameLauncher {
 			for (String arg : vanilla.get("minecraftArguments").getAsString().trim().split("\\s+")) {
 				gameArgs.add(substitute(arg, values));
 			}
-			// No Quick Play before 1.20: the old --server / --port arguments do the same.
+		}
+		// No Quick Play before 1.20: the old --server / --port arguments do the same (Ornithe's 1.8.9 JSON uses the
+		// modern "arguments" format, so this goes by the version, not by the JSON).
+		if (version.legacy() || !modernArgs) {
 			if (quickPlayServerAddress != null && !quickPlayServerAddress.isBlank()) {
 				String host = quickPlayServerAddress;
 				String port = "25565";

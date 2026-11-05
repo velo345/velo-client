@@ -26,11 +26,11 @@ public final class FabricMetaService {
 	/** The same for a specific loader build (a profile that picked another one, see {@link LoaderVersions}). */
 	public static JsonObject fetchLoaderProfile(GameVersion version, String loader) throws IOException {
 		// Pinned loader version -> the profile never changes; fetched once, then served from disk.
-		return MetaCache.getOrFetch("fabric-" + version.id() + "-" + loader, () -> fetchUncached(version, loader));
+		return MetaCache.getOrFetch((version.ornithe() ? "ornithe2-" : "fabric-") + version.id() + "-" + loader, () -> fetchUncached(version, loader));
 	}
 
 	private static JsonObject fetchUncached(GameVersion version, String loader) throws IOException {
-		String url = version.metaBase() + "/v2/versions/loader/" + version.id() + "/" + loader + "/profile/json";
+		String url = version.loaderProfileUrl(loader);
 		HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(20)).GET().build();
 		try {
 			HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
@@ -38,10 +38,33 @@ public final class FabricMetaService {
 				throw new IOException("HTTP " + response.statusCode() + " fetching Fabric loader profile for Minecraft "
 						+ version.id() + " (loader " + loader + ") from " + url);
 			}
-			return JsonParser.parseString(response.body()).getAsJsonObject();
+			JsonObject profile = JsonParser.parseString(response.body()).getAsJsonObject();
+			if (version.ornithe()) {
+				addLibraryUpgrades(version, profile);
+			}
+			return profile;
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new IOException("Interrupted fetching " + url, e);
 		}
+	}
+
+	/**
+	 * Ornithe runs old versions with newer libraries than they shipped with (log4j 2.19, slf4j 2, fastutil, gson 2.10,
+	 * jopt-simple 5, Ornithe's log4j patch...): its meta lists them per version. They go into the loader profile, whose
+	 * libraries win over vanilla's with the same group:artifact ({@link LibraryResolver#resolve}).
+	 */
+	private static void addLibraryUpgrades(GameVersion version, JsonObject profile) throws IOException, InterruptedException {
+		String url = version.metaBase() + "/v3/versions/gen2/libraries/" + version.id();
+		HttpResponse<String> response = CLIENT.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(20)).GET().build(),
+				HttpResponse.BodyHandlers.ofString());
+		if (response.statusCode() >= 400) {
+			throw new IOException("HTTP " + response.statusCode() + " fetching Ornithe's libraries for Minecraft " + version.id() + " from " + url);
+		}
+		com.google.gson.JsonArray libraries = profile.has("libraries") ? profile.getAsJsonArray("libraries") : new com.google.gson.JsonArray();
+		for (var library : JsonParser.parseString(response.body()).getAsJsonArray()) {
+			libraries.add(library);
+		}
+		profile.add("libraries", libraries);
 	}
 }

@@ -23,11 +23,17 @@ public abstract class TitleLogoMixin {
 
 	@Inject(method = "draw(Lnet/minecraft/client/gui/DrawContext;IF)V", at = @At("HEAD"), cancellable = true)
 	private void velo$cancel(CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // vanilla title screen picked (Settings > Velo screens)
+		}
 		ci.cancel();
 	}
 
 	@Inject(method = "draw(Lnet/minecraft/client/gui/DrawContext;IFI)V", at = @At("HEAD"), cancellable = true)
 	private void velo$cancelWithOffset(CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // vanilla title screen picked (Settings > Velo screens)
+		}
 		ci.cancel();
 	}
 }
@@ -37,11 +43,17 @@ public abstract class TitleLogoMixin {
 
 	@Inject(method = "extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IF)V", at = @At("HEAD"), cancellable = true)
 	private void velo$cancel(CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // vanilla title screen picked (Settings > Velo screens)
+		}
 		ci.cancel();
 	}
 
 	@Inject(method = "extractRenderState(Lnet/minecraft/client/gui/GuiGraphicsExtractor;IFI)V", at = @At("HEAD"), cancellable = true)
 	private void velo$cancelWithOffset(CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // vanilla title screen picked (Settings > Velo screens)
+		}
 		ci.cancel();
 	}
 }

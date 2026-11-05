@@ -42,36 +42,23 @@ public abstract class PlayerListHudMixin {
 	*///?} else {
 	private void velo$drawNameWithBadge(DrawContext context, TextRenderer textRenderer, Text text, int x, int y, int color) {
 	//?}
-		MinecraftClient client = MinecraftClient.getInstance();
-		if (client.player == null) {
-			context.drawTextWithShadow(textRenderer, text, x, y, color);
-			return;
-		}
-		// The same row name comes back every frame (TabListCache keeps it): decide its Name Style and badge once.
-		Object[] row = (Object[]) net.veloclient.velo.client.util.TabListCache.row(text);
+		Object[] row = net.veloclient.velo.client.gui.TabNames.rowFor(text);
+		int room = net.veloclient.velo.client.gui.TabNames.room(x);
 		if (row == null) {
-			// Name Styles, also when another mod kept NameStyleTabMixin from tagging the row.
-			Text tagged = net.veloclient.velo.client.namestyle.NameStyles.tagTabRow(text);
-			String plain = tagged.getString();
-			String own = client.player.getGameProfile().name();
-			boolean known = VeloBadge.isKnownVeloName(plain, own);
-			row = new Object[] {tagged, known, known && VeloBadge.isPlus(plain, own)};
-			net.veloclient.velo.client.util.TabListCache.storeRow(text, row);
+			net.veloclient.velo.client.gui.TabNames.draw(context, textRenderer, text, x, y, color, room);
+			return;
 		}
 		text = (Text) row[0];
 		if (!(Boolean) row[1]) {
-			context.drawTextWithShadow(textRenderer, text, x, y, color);
+			net.veloclient.velo.client.gui.TabNames.draw(context, textRenderer, text, x, y, color, room);
 			return;
 		}
-		// Before the name (like Lunar/NoRisk), not after it - the name
-		// itself is shifted right by the badge's width plus a gap so
-		// nothing overlaps, matching how those clients reserve the space.
-		// Vertically centered against the actual row/font height rather
-		// than a fixed offset, so it stays centered regardless of VeloBadge.SIZE.
+		// Before the name (like Lunar/NoRisk), not after it - the name is shifted right by the badge's width plus a gap
+		// (TabNames measured the column with it), vertically centered against the font height.
 		boolean plus = (Boolean) row[2];
-		int shift = VeloBadge.width(plus) + 3;
+		int shift = net.veloclient.velo.client.gui.TabNames.badgeShift(plus);
 		int badgeY = y + (textRenderer.fontHeight - VeloBadge.SIZE) / 2;
 		VeloBadge.draw(context, x, badgeY, plus);
-		context.drawTextWithShadow(textRenderer, text, x + shift, y, color);
+		net.veloclient.velo.client.gui.TabNames.draw(context, textRenderer, text, x + shift, y, color, room - shift);
 	}
 }

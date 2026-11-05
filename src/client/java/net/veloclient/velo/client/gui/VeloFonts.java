@@ -81,8 +81,8 @@ public final class VeloFonts {
 			return false;
 		}
 		Screen screen = ClientCompat.currentScreen();
-		return screen instanceof VeloWindow || screen instanceof HudEditScreen || screen instanceof TitleScreen
-				|| screen instanceof GameMenuScreen;
+		return screen instanceof VeloWindow || screen instanceof HudEditScreen || screen instanceof TitleScreen && VeloScreens.title()
+				|| screen instanceof GameMenuScreen && VeloScreens.pause();
 	}
 
 	private static int scaleIndex() {

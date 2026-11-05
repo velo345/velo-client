@@ -24,6 +24,7 @@
 		"ScissorHoverMixin",
 		"StretchProjectionMixin",
 		"PlayerListHudMixin",
+		"TabListLayoutMixin",
 		"PlayerNameTagBadgeMixin",
 		"ScreenAccessMixin",
 		"SessionAccessorMixin",

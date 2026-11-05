@@ -45,6 +45,9 @@ public abstract class TitleScreenMixin {
 
 	@Inject(method = "init", at = @At("RETURN"))
 	private void velo$restyle(CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		TitleScreen self = (TitleScreen) (Object) this;
 		@SuppressWarnings("unchecked")
 		List<Element> children = (List<Element>) self.children();
@@ -75,11 +78,17 @@ public abstract class TitleScreenMixin {
 
 	@Inject(method = "render", at = @At("HEAD"))
 	private void velo$beforeVanilla(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		TitleMenu.beforeVanilla();
 	}
 
 	@Inject(method = "render", at = @At("RETURN"))
 	private void velo$overlay(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		TitleScreen self = (TitleScreen) (Object) this;
 		List<Drawable> drawables = ((ScreenAccessMixin) (Object) this).velo$drawables();
 		TitleMenu.render(context, self.width, self.height, mouseX, mouseY, new TitleMenu.Env() {
@@ -117,6 +126,9 @@ public abstract class TitleScreenMixin {
 
 	@Inject(method = "init", at = @At("RETURN"))
 	private void velo$restyle(CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		TitleScreen self = (TitleScreen) (Object) this;
 		@SuppressWarnings("unchecked")
 		List<GuiEventListener> children = (List<GuiEventListener>) self.children();
@@ -146,11 +158,17 @@ public abstract class TitleScreenMixin {
 
 	@Inject(method = "extractRenderState", at = @At("HEAD"))
 	private void velo$beforeVanilla(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		TitleMenu.beforeVanilla();
 	}
 
 	@Inject(method = "extractRenderState", at = @At("RETURN"))
 	private void velo$overlay(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // the player picked vanilla's screen (Settings > Screens)
+		}
 		TitleScreen self = (TitleScreen) (Object) this;
 		List<Renderable> renderables = ((ScreenAccessMixin) (Object) this).velo$drawables();
 		TitleMenu.render(context, self.width, self.height, mouseX, mouseY, new TitleMenu.Env() {

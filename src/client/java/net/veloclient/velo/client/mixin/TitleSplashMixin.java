@@ -22,6 +22,9 @@ public abstract class TitleSplashMixin {
 
 	@Inject(method = "render", at = @At("HEAD"), cancellable = true)
 	private void velo$cancel(CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // vanilla title screen picked (Settings > Velo screens)
+		}
 		ci.cancel();
 	}
 }
@@ -31,6 +34,9 @@ public abstract class TitleSplashMixin {
 
 	@Inject(method = "extractRenderState", at = @At("HEAD"), cancellable = true)
 	private void velo$cancel(CallbackInfo ci) {
+		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
+			return; // vanilla title screen picked (Settings > Velo screens)
+		}
 		ci.cancel();
 	}
 }

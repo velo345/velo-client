@@ -18,20 +18,76 @@ public final class FabricApiInstaller {
 
 	private static final String MAVEN_BASE_URL = "https://maven.fabricmc.net/";
 	private static final String METADATA = MAVEN_BASE_URL + "net/fabricmc/fabric-api/fabric-api/maven-metadata.xml";
-	/** 1.8.9 / 1.9.4: Legacy Fabric API, same maven layout under its own group. */
-	private static final String LEGACY_MAVEN = "https://maven.legacyfabric.net/";
-	private static final String LEGACY_GROUP = "net/legacyfabric/legacy-fabric-api/legacy-fabric-api/";
-
 	private static String maven(GameVersion version) {
-		return version.legacy() ? LEGACY_MAVEN : MAVEN_BASE_URL;
+		return MAVEN_BASE_URL;
 	}
 
 	private static String group(GameVersion version) {
-		return version.legacy() ? LEGACY_GROUP : "net/fabricmc/fabric-api/fabric-api/";
+		return "net/fabricmc/fabric-api/fabric-api/";
 	}
 
 	private static String prefix(GameVersion version) {
-		return version.legacy() ? "legacy-fabric-api-" : "fabric-api-";
+		return "fabric-api-";
+	}
+
+	/** Modrinth project of Ornithe Standard Libraries - what Fabric API is on Fabric, for 1.8.9 / 1.9.4. */
+	private static final String OSL = "osl";
+
+	/**
+	 * 1.8.9 / 1.9.4 (Ornithe): the newest OSL build for the version from Modrinth (cached; offline the cached one), and any
+	 * Legacy Fabric API a profile still has from before the switch to Ornithe goes - it can't load there.
+	 */
+	private static void installOsl(Path modsDir, GameVersion version) {
+		try {
+			Files.createDirectories(modsDir);
+			try (Stream<Path> existing = Files.list(modsDir)) {
+				for (Path file : existing.filter(p -> p.getFileName().toString().startsWith("legacy-fabric-api-")).toList()) {
+					Files.deleteIfExists(file);
+				}
+			}
+			Path cacheDir = GameDataPaths.libraries().resolve("modrinth").resolve(OSL).resolve(version.id());
+			Path cached = null;
+			try {
+				for (var v : net.veloclient.launcher.modrinth.ModrinthClient.versions(OSL, version.id(), "mod", "ornithe")) {
+					var file = v.primaryFile().orElse(null);
+					if (file != null && file.filename() != null && file.filename().endsWith(".jar") && !file.filename().contains("/")) {
+						cached = cacheDir.resolve(file.filename());
+						Downloader.ensure(URI.create(file.url()), cached, file.sha1(), file.size(), b -> { });
+						break;
+					}
+				}
+			} catch (IOException offline) {
+				try (Stream<Path> files = Files.isDirectory(cacheDir) ? Files.list(cacheDir) : Stream.empty()) {
+					cached = files.filter(p -> p.toString().endsWith(".jar")).max(java.util.Comparator.comparing(Path::toString)).orElse(null);
+				}
+				if (cached == null) {
+					throw offline;
+				}
+			}
+			if (cached == null) {
+				throw new IOException("No Ornithe Standard Libraries build for Minecraft " + version.id());
+			}
+			Path target = modsDir.resolve(cached.getFileName().toString());
+			try (Stream<Path> existing = Files.list(modsDir)) {
+				for (Path file : existing.filter(p -> isOslJar(p) && !p.getFileName().equals(target.getFileName())).toList()) {
+					try {
+						Files.delete(file);
+					} catch (IOException locked) {
+						// in use by a running game - cleaned up later
+					}
+				}
+			}
+			if (!Files.exists(target) || Files.size(target) != Files.size(cached)) {
+				Files.copy(cached, target, StandardCopyOption.REPLACE_EXISTING);
+			}
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to install Ornithe Standard Libraries into " + modsDir, e);
+		}
+	}
+
+	private static boolean isOslJar(Path path) {
+		String name = path.getFileName().toString();
+		return name.startsWith("osl-") && name.endsWith(".jar") || name.startsWith("ornithe-standard-libraries-") && name.endsWith(".jar");
 	}
 	private static final java.util.Map<String, String> NEWEST = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -39,6 +95,10 @@ public final class FabricApiInstaller {
 	}
 
 	public static void installInto(Path modsDir, GameVersion version) {
+		if (version.ornithe()) {
+			installOsl(modsDir, version);
+			return;
+		}
 		try {
 			Files.createDirectories(modsDir);
 			String apiVersion = newestFor(version);
@@ -49,7 +109,7 @@ public final class FabricApiInstaller {
 				Downloader.ensure(URI.create(maven(version) + relativePath), cached, null, -1, b -> { });
 			} catch (IOException mavenDown) {
 				// Fabric's Maven is unreachable for some players (or just slow): the same file is on Modrinth.
-				if (version.legacy() || !fromModrinth(version, apiVersion, cached)) {
+				if (!fromModrinth(version, apiVersion, cached)) {
 					throw mavenDown;
 				}
 			}
@@ -93,7 +153,7 @@ public final class FabricApiInstaller {
 			try {
 				var client = java.net.http.HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(8))
 						.followRedirects(java.net.http.HttpClient.Redirect.NORMAL).build();
-				var response = client.send(java.net.http.HttpRequest.newBuilder(URI.create(version.legacy() ? LEGACY_MAVEN + LEGACY_GROUP + "maven-metadata.xml" : METADATA))
+				var response = client.send(java.net.http.HttpRequest.newBuilder(URI.create(METADATA))
 						.timeout(java.time.Duration.ofSeconds(10)).GET().build(), java.net.http.HttpResponse.BodyHandlers.ofString());
 				if (response.statusCode() == 200) {
 					var m = java.util.regex.Pattern.compile("<version>([^<]+)</version>").matcher(response.body());
@@ -104,9 +164,6 @@ public final class FabricApiInstaller {
 				}
 			} catch (Exception e) {
 				// Maven slow / unreachable: try Modrinth, then what's cached
-			}
-			if (version.legacy()) {
-				return best;
 			}
 			try {
 				for (var v : net.veloclient.launcher.modrinth.ModrinthClient.versions("fabric-api", id)) {

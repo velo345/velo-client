@@ -57,6 +57,7 @@ public final class SettingsTabScreen extends VeloWindow implements net.veloclien
 				b -> this.client.setScreen(new ThemeEditorScreen(this))));
 		y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
 
+
 		if (net.veloclient.velo.client.Preview.ON) {
 			y = section("Sound", y, 2);
 			addDrawableChild(new VeloValueRow(x, y, width, ROW_HEIGHT, Text.literal("Interface sounds"), VeloValueRow.Kind.CHOICE,
@@ -79,14 +80,18 @@ public final class SettingsTabScreen extends VeloWindow implements net.veloclien
 				}).listening(listeningForMenuKey));
 		y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
 
-		y = section("Velo screens", y, 4);
-		addDrawableChild(screenRow(x, y, width, "Advancements", VeloScreens::advancements, VeloScreens::setAdvancements));
+		// Two columns: six switches in three rows, so the page still fits without scrolling.
+		y = section("Velo screens", y, 3);
+		int half = (width - CARD_PAD) / 2;
+		int right = x + half + CARD_PAD;
+		addDrawableChild(screenRow(x, y, half, "Title screen", VeloScreens::title, VeloScreens::setTitle));
+		addDrawableChild(screenRow(right, y, half, "Pause menu", VeloScreens::pause, VeloScreens::setPause));
 		y += ROW_HEIGHT;
-		addDrawableChild(screenRow(x, y, width, "Controls (key binds)", VeloScreens::controls, VeloScreens::setControls));
+		addDrawableChild(screenRow(x, y, half, "Resource packs", VeloScreens::resourcePacks, VeloScreens::setResourcePacks));
+		addDrawableChild(screenRow(right, y, half, "Controls (key binds)", VeloScreens::controls, VeloScreens::setControls));
 		y += ROW_HEIGHT;
-		addDrawableChild(screenRow(x, y, width, "Statistics", VeloScreens::statistics, VeloScreens::setStatistics));
-		y += ROW_HEIGHT;
-		addDrawableChild(screenRow(x, y, width, "Resource packs", VeloScreens::resourcePacks, VeloScreens::setResourcePacks));
+		addDrawableChild(screenRow(x, y, half, "Statistics", VeloScreens::statistics, VeloScreens::setStatistics));
+		addDrawableChild(screenRow(right, y, half, "Advancements", VeloScreens::advancements, VeloScreens::setAdvancements));
 		y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
 
 		y = section("Files", y, 1);

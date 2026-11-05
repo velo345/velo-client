@@ -93,13 +93,12 @@ public final class LoaderVersions {
 
 	/** Every loader Fabric offers for {@code mcVersion} that Velo runs on, newest first. */
 	public static List<Build> available(String mcVersion) throws IOException {
-		String base = "https://meta.fabricmc.net";
+		String url = "https://meta.fabricmc.net/v2/versions/loader/" + mcVersion;
 		for (GameVersion v : GameVersion.values()) {
 			if (v.id().equals(mcVersion)) {
-				base = v.metaBase();
+				url = v.loaderListUrl();
 			}
 		}
-		String url = base + "/v2/versions/loader/" + mcVersion;
 		HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(20)).GET().build();
 		try {
 			HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());

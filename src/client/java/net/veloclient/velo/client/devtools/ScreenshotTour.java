@@ -586,6 +586,22 @@ public final class ScreenshotTour {
 			case "bugreport" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.BugReportScreen(null))},
 					new Object[] {30, (Runnable) () -> shot(client, "bugreport")});
+			// Settings > Velo screens set to Vanilla for the title screen and the pause menu, then back to Velo.
+			case "vanillamenus" -> List.of(
+					new Object[] {0, (Runnable) () -> {
+						net.veloclient.velo.client.gui.VeloScreens.setTitle(false);
+						net.veloclient.velo.client.gui.VeloScreens.setPause(false);
+						client.setScreen(new net.minecraft.client.gui.screen.TitleScreen());
+					}},
+					new Object[] {40, (Runnable) () -> shot(client, "vanilla-title")},
+					new Object[] {2, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))},
+					new Object[] {30, (Runnable) () -> shot(client, "vanilla-pause")},
+					new Object[] {2, (Runnable) () -> {
+						net.veloclient.velo.client.gui.VeloScreens.setTitle(true);
+						net.veloclient.velo.client.gui.VeloScreens.setPause(true);
+						client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true));
+					}},
+					new Object[] {30, (Runnable) () -> shot(client, "velo-pause")});
 			case "settings" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.SettingsTabScreen(null))},
 					new Object[] {30, (Runnable) () -> shot(client, "settings")});

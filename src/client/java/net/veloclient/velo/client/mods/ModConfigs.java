@@ -35,7 +35,7 @@ public final class ModConfigs {
 	}
 
 	/** Never offered as "turn off": the game and Velo itself need them. */
-	private static final Set<String> CORE = Set.of("minecraft", "java", "fabricloader", "fabric-api", "velo-client", "mixinextras", "legacy-fabric-api");
+	private static final Set<String> CORE = Set.of("minecraft", "java", "fabricloader", "fabric-api", "velo-client", "mixinextras", "osl", "pylon");
 
 	private static Map<String, Function<Screen, Screen>> factories;
 	/** Switched off / on this session (applies on the next start). */

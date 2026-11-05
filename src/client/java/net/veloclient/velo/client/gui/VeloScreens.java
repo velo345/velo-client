@@ -21,6 +21,8 @@ public final class VeloScreens {
 		boolean controls = true;
 		boolean statistics = true;
 		boolean resourcePacks = true;
+		boolean title = true;
+		boolean pause = true;
 	}
 
 	private static Data data;
@@ -69,6 +71,26 @@ public final class VeloScreens {
 
 	public static boolean resourcePacks() {
 		return data().resourcePacks;
+	}
+
+	/** Velo's title screen (buttons, background, logo) - off: Minecraft's own. */
+	public static boolean title() {
+		return data().title;
+	}
+
+	public static void setTitle(boolean on) {
+		data().title = on;
+		save();
+	}
+
+	/** Velo's pause menu - off: Minecraft's own. */
+	public static boolean pause() {
+		return data().pause;
+	}
+
+	public static void setPause(boolean on) {
+		data().pause = on;
+		save();
 	}
 
 	public static void setResourcePacks(boolean on) {
