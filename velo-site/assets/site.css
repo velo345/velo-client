@@ -635,3 +635,14 @@ dialog::backdrop { background: rgba(4, 4, 6, .72); backdrop-filter: blur(8px); }
 [hidden] { display: none !important; }
 .nav-links .nav-servers { color: #8cc4ff; }
 .nav-links .nav-servers::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #5aa9ff; box-shadow: 0 0 8px #5aa9ff; margin-right: 7px; vertical-align: 2px; }
+
+/* Store: the Discord banner sits above the tabs (it used to be one line under Cloaks). */
+.store-discord{display:flex;align-items:center;gap:16px;margin:22px 0 6px;padding:16px 18px;border-radius:16px;text-decoration:none;color:var(--text);
+  border:1.5px solid rgba(88,101,242,.55);background:linear-gradient(90deg,rgba(88,101,242,.22),rgba(88,101,242,.04));transition:border-color .2s,transform .2s}
+.store-discord:hover{border-color:rgba(88,101,242,.9);transform:translateY(-1px)}
+.store-discord-icon{flex:none;display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:rgba(88,101,242,.22);color:#8EA1FF}
+.store-discord-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.store-discord-text strong{font-size:1.05rem}
+.store-discord-text span{color:var(--text-2);font-size:.92rem}
+.store-discord-btn{flex:none;background:#5865F2;color:#fff;border-color:transparent}
+@media (max-width:640px){.store-discord{flex-wrap:wrap}.store-discord-btn{width:100%;text-align:center}}

@@ -239,7 +239,7 @@ public final class MemoryPlanner {
 		List<String> args = new ArrayList<>();
 		args.add("-Xmx" + plan.maxMb() + "m");
 		args.add("-Xms" + plan.minMb() + "m");
-		if (plan.gc() == Gc.ZGC) {
+		if (plan.gc() == Gc.ZGC && javaFeature >= 15) {
 			// Generational ZGC: pauses well under a millisecond regardless of heap size, and it
 			// returns unused memory (ZUncommit, on by default). SoftMaxHeapSize keeps it aiming lower
 			// unless the game genuinely needs more.
@@ -265,7 +265,9 @@ public final class MemoryPlanner {
 			args.add("-XX:+ParallelRefProcEnabled");
 			// Give memory back: a periodic concurrent cycle when no GC ran for a while (menus, AFK)
 			// lets G1 shrink the heap, and the free-ratio bounds stop it keeping lots of empty heap.
-			args.add("-XX:G1PeriodicGCInterval=30000");
+			if (javaFeature >= 12) {
+				args.add("-XX:G1PeriodicGCInterval=30000"); // JDK 12+: Java 8 (1.8.9) refuses to start with it
+			}
 			args.add("-XX:MinHeapFreeRatio=10");
 			args.add("-XX:MaxHeapFreeRatio=30");
 		}

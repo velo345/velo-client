@@ -132,7 +132,11 @@ public final class JavaRuntimeProvider {
 			for (FileJob job : jobs) {
 				futures.add(executor.submit((Callable<Void>) () -> {
 					Downloader.ensure(URI.create(job.url()), job.path(), job.sha1(), job.size(),
-							n -> listener.onProgress(Math.min(1.0, done.addAndGet(n) / (double) Math.max(1, total))));
+							n -> {
+								long now = done.addAndGet(n);
+								listener.onProgress(Math.min(1.0, now / (double) Math.max(1, total)));
+								listener.onBytes(now, total);
+							});
 					if (job.executable()) {
 						job.path().toFile().setExecutable(true);
 					}

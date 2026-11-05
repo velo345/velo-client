@@ -146,6 +146,17 @@ public record Diagnosis(List<Issue> issues, String crashSignature, String crashS
 			}
 		}
 
+		/** Deletes the profile's {@code .fabric} folder: Fabric remaps the game again on the next start. */
+		record ClearFabricCache() implements Action {
+			public String key() {
+				return "fabric-cache:clear";
+			}
+
+			public String target() {
+				return "fabric-cache";
+			}
+		}
+
 		/** Turns shaders off in Iris (the shader pack stays installed). */
 		record DisableShaders() implements Action {
 			public String key() {

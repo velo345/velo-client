@@ -38,6 +38,10 @@ public final class LibraryResolver {
 					continue;
 				}
 				String name = library.get("name").getAsString();
+				// Natives-only (LWJGL 2's lwjgl-platform, jinput-platform): no class jar, NativesExtractor unpacks them.
+				if (library.has("natives") && (!library.has("downloads") || !library.getAsJsonObject("downloads").has("artifact"))) {
+					continue;
+				}
 				String coordinate = coordinateKey(name);
 				byCoordinate.computeIfAbsent(coordinate, k -> resolveOne(library, name));
 			}

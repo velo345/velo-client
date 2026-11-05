@@ -50,7 +50,7 @@ test {
 // into the launcher's own resources, so it's a fully self-contained app that
 // can always install the right jar into a profile's mods folder without
 // needing the rest of this monorepo checked out alongside it.
-def gameVersions = ["1.21.11", "26.1", "26.2", "26.3"]
+def gameVersions = ["1.21.10", "1.21.11", "26.1", "26.2", "26.3"]
 // Dev build (./build-dev.sh / -PveloDev=true): bundles the dev client jars (with src/dev) and runs on its own data folder.
 def veloDev = (findProperty("veloDev") ?: "false").toString().toBoolean()
 // Resolved eagerly at configuration time (plain java.io.File, not a live
@@ -395,10 +395,34 @@ tasks.register("jpackageDist") {
 		]
 		if (isWindows) {
 			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser", "--win-upgrade-uuid", launcherWindowsUpgradeUuid]
-		} else if (!isMac) {
+		}
+		List<String> appImage = new ArrayList<>(command)
+		if (!isWindows && !isMac) {
 			command += ["--linux-shortcut"]
 		}
 		runJpackage(command)
+		// Linux without dpkg (Arch, Fedora, ...): the same app as a plain folder with its runtime, packed as
+		// velo-client-launcher-<version>-linux-x64.tar.gz - what packaging/aur/PKGBUILD installs to /opt.
+		if (!isWindows && !isMac) {
+			File imageDir = new File(dist, "app-image")
+			int type = appImage.indexOf("--type")
+			appImage.set(type + 1, "app-image")
+			appImage.set(appImage.indexOf("--dest") + 1, imageDir.absolutePath)
+			runJpackage(appImage)
+			File app = new File(imageDir, "Velo Client Launcher")
+			File renamed = new File(imageDir, "velo-client-launcher")
+			if (!app.renameTo(renamed)) {
+				throw new GradleException("jpackage app-image not found at " + app)
+			}
+			String tarName = "velo-client-launcher-${launcherAppVersion}-linux-x64.tar.gz"
+			Process tar = new ProcessBuilder("tar", "-czf", new File(dist, tarName).absolutePath, "-C", imageDir.absolutePath, "velo-client-launcher")
+					.redirectErrorStream(true).start()
+			String tarOut = tar.inputStream.getText("UTF-8")
+			if (tar.waitFor() != 0) {
+				throw new GradleException("tar failed: " + tarOut)
+			}
+			imageDir.deleteDir()
+		}
 	}
 }
 

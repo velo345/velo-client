@@ -65,7 +65,10 @@ public final class Doctor {
 		if (crashIssues.isEmpty() && exitCode != 0 && (text == null || !CrashAnalyzer.errorsOnly(text).matches("(?s).*\\b\\w+(Exception|Error)\\b.*"))) {
 			crashIssues.add(suddenExit(s, exitCode));
 		}
-		if (crashIssues.isEmpty() && result.signature() != null) {
+		// A sudden exit names nothing: what changed since the last good start is often the answer (a hang at the
+		// loading screen with two new mods - lowering the render distance doesn't touch that).
+		boolean onlySudden = crashIssues.size() == 1 && "sudden-exit".equals(crashIssues.get(0).id());
+		if ((crashIssues.isEmpty() || onlySudden) && result.signature() != null) {
 			Issue sinceGood = sinceLastGood(s, memory);
 			if (sinceGood != null) {
 				crashIssues.add(sinceGood);
@@ -107,7 +110,8 @@ public final class Doctor {
 		String id = issue.id();
 		return !(id.startsWith("culprit") || id.startsWith("learned:") || id.startsWith("missing-") || id.equals("oom") || id.equals("vulkan-crash")
 				|| id.equals("opengl-driver") || id.equals("shader-crash") || id.equals("packs-crash") || id.equals("since-last-good")
-				|| id.equals("sudden-exit") || id.equals("gpu-driver-crash") || id.equals("native-oom"));
+				|| id.equals("sudden-exit") || id.equals("gpu-driver-crash") || id.equals("native-oom") || id.equals("fabric-cache")
+				|| id.equals("mod-file-gone") || id.equals("particle-mod"));
 	}
 
 	private static Issue filterTried(Issue issue, Set<String> failed) {

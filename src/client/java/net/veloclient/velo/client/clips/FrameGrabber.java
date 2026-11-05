@@ -84,7 +84,7 @@ final class FrameGrabber {
 			return GPU_FREE.pop();
 		}
 		// 9 = USAGE_MAP_READ | USAGE_COPY_DST, exactly what vanilla's screenshot uses.
-		return com.mojang.blaze3d.systems.RenderSystem.getDevice().createBuffer(() -> "Velo clip frame", 9, bytes);
+		return com.mojang.blaze3d.systems.RenderSystem.getDevice().createBuffer(() -> "Velo clip frame", 9, (int) bytes); // int: 1.21.10's size is an int, widens on newer
 	}
 
 	private static void releaseGpu(GpuBuffer buffer, long bytes) {
@@ -201,7 +201,7 @@ final class FrameGrabber {
 		final int w = width;
 		final int h = height;
 		GpuBuffer buffer = acquireGpu(bytes);
-		encoder.copyTextureToBuffer(texture, buffer, 0L, () -> {
+		encoder.copyTextureToBuffer(texture, buffer, 0, () -> {
 			// Mapped here (render thread); the copy out of the mapping - several MB per captured frame from uncached
 			// readback memory, 5-7% of the render thread with Clips on - runs on the copier thread. Unmapping and handing
 			// the buffer back go into DONE, which only the render thread runs (drainDone), and stopping waits for copies.

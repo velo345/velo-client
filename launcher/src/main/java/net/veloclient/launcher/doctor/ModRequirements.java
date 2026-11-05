@@ -46,6 +46,21 @@ public final class ModRequirements {
 		return true;
 	}
 
+	/** Whether an enabled mod other than the file {@code except} (top level or nested) requires {@code modId}. */
+	public static boolean someoneDepends(Path modsDir, String modId, String except) {
+		for (ModScanner.ModInfo mod : ModScanner.scan(modsDir)) {
+			if (!mod.enabled() || mod.file() != null && mod.file().getFileName().toString().equals(except)) {
+				continue;
+			}
+			List<JsonElement> found = new ArrayList<>();
+			collect(mod, modId, found);
+			if (!found.isEmpty()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** Whether any enabled mod asks for a particular version of {@code modId}. */
 	public static boolean constrains(Path modsDir, String modId) {
 		return !requirements(modsDir, modId).isEmpty();

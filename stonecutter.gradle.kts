@@ -34,7 +34,64 @@ stonecutter parameters {
 	dependencies["fapi"] = node.project.property("deps.fabric_api") as String
 
 	replacements {
-		string(current.parsed >= "26.1") {
+		// 1.21.1: the GUI still draws with a 3D MatrixStack (1.21.6 made it a 2D Matrix3x2fStack). Forward-only (1.21.1 is
+		// never active): the regexes' reverse pattern "(?!x)x" never matches.
+		if (current.parsed < "1.21.2") {
+			string(true) {
+				replace(".pushMatrix()", ".push()")
+				replace(".popMatrix()", ".pop()")
+				replace("net.minecraft.client.gl.RenderPipelines", "net.veloclient.velo.client.compat.RenderPipelines")
+				// 1.21.9's input events: Velo's records (vanilla input reaches them through VeloWindow's bridges).
+				replace("net.minecraft.client.gui.Click", "net.veloclient.velo.client.compat.Click")
+				replace("net.minecraft.client.input.KeyInput", "net.veloclient.velo.client.compat.KeyInput")
+				replace("net.minecraft.client.input.CharInput", "net.veloclient.velo.client.compat.CharInput")
+				// Fabric's world render events moved to a .world package (and renamed the matrices) after 1.21.1.
+				replace("net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents", "net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents")
+				replace("net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext", "net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext")
+				replace("context.matrices()", "context.matrixStack()")
+				replace(".getEntityPos()", ".getPos()")
+				replace(".getCameraPos()", ".getPos()")
+				// Renamed in 1.21.2: world height, partial ticks; moved: particle setting, skin textures + model.
+				replace(".getTopYInclusive()", ".getTopY()")
+				replace(".getTickProgress(", ".getTickDelta(")
+				replace("net.minecraft.particle.ParticlesMode", "net.minecraft.client.option.ParticlesMode")
+				replace("net.minecraft.entity.player.SkinTextures", "net.minecraft.client.util.SkinTextures")
+				replace("net.minecraft.entity.player.PlayerSkinType", "net.minecraft.client.util.SkinTextures.Model")
+				replace("PlayerSkinType.", "net.minecraft.client.util.SkinTextures.Model.")
+			}
+			// NativeImage's ARGB accessors (1.21.2+) -> ImageCompat over 1.21.1's ABGR getColor / setColor.
+			regex(true) { replace("([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)*(?:\\[[^\\]]*\\])?)\\.(getColorArgb|setColorArgb)\\(", "net.veloclient.velo.client.compat.ImageCompat.$2($1, ", "(?!x)x", "") }
+			// Those handlers override nothing in 1.21.1's Screen: drop their @Override.
+			regex(true) { replace("@Override(\\s+public boolean (?:mouseClicked|mouseReleased|mouseDragged|keyPressed|keyReleased|charTyped)\\()(?=(?:final )?(?:[\\w.]+\\.)?(?:Click|KeyInput|CharInput)\\b)", "$1", "(?!x)x", "") }
+			// Texture draws with a pipeline (1.21.5+) go through GuiCompat (no pipeline, colour as shader colour).
+			regex(true) { replace("([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)*)\\.(drawTexture|drawGuiTexture)\\((?=\\s*(?:[\\w.]+\\.)?RenderPipelines\\.)", "net.veloclient.velo.client.compat.GuiCompat.$2($1, ", "(?!x)x", "") }
+			regex(true) { replace("\\.translate\\(((?:[^,()]|\\([^()]*\\))+),((?:[^,()]|\\([^()]*\\))+)\\)", ".translate($1,$2, 0)", "(?!x)x", "") }
+			regex(true) { replace("\\.scale\\(((?:[^,()]|\\([^()]*\\))+),((?:[^,()]|\\([^()]*\\))+)\\)", ".scale($1,$2, 1)", "(?!x)x", "") }
+		}
+		// 1.21.10 has no Gizmo system: the overlays use Velo's own stand-ins (render/gizmo). Older than the sources'
+		// version and never active, so this only ever runs forward.
+		if (current.parsed < "1.21.11") string(true) {
+			replace("net.minecraft.world.debug.gizmo.GizmoDrawing", "net.veloclient.velo.client.render.gizmo.GizmoDrawing")
+			replace("net.minecraft.world.debug.gizmo.TextGizmo", "net.veloclient.velo.client.render.gizmo.TextGizmo")
+			replace("net.minecraft.client.render.DrawStyle", "net.veloclient.velo.client.render.gizmo.DrawStyle")
+			// RenderLayers (the factory class) came in 1.21.11; before, the same layers were RenderLayer.get*().
+			replace("import net.minecraft.client.render.RenderLayers;", "import net.minecraft.client.render.RenderLayer;")
+			replace("RenderLayers.entityCutoutNoCull(", "RenderLayer.getEntityCutoutNoCull(")
+			replace("RenderLayers.entityTranslucent(", "RenderLayer.getEntityTranslucent(")
+			replace("RenderLayers.eyes(", "RenderLayer.getEyes(")
+			replace("RenderLayers.text(", "RenderLayer.getText(")
+			// PositionedSoundInstance.ui(...) was master(...) - same arguments.
+			replace("PositionedSoundInstance.ui(", "PositionedSoundInstance.master(")
+			replace("net.minecraft.client.util.memory.ObjectPool", "net.minecraft.client.util.Pool")
+			// The hand's re-equip height followed the attack cooldown directly.
+			replace("getHandEquippingProgress(", "getAttackCooldownProgress(")
+			replace("net.minecraft.entity.LoadedEntityProcessor.NOOP", "java.util.function.Function.identity()")
+			// 1.21.11 renamed the graphics mode option to "preset".
+			replace("options.getPreset()", "options.getGraphicsMode()")
+		}
+		// Only for versions at or after the sources' own (1.21.11): Stonecutter applies a false condition in REVERSE,
+		// which turned every Mojmap word back into Yarn in older versions (1.21.10's Map.Entry.getValue() -> getText()).
+		if (current.parsed >= "1.21.11") string(current.parsed >= "26.1") {
 
 			// --- Fully-qualified path swaps: package changed, simple name
 			// didn't. Safe as a blanket rule since the source pattern
@@ -1014,7 +1071,9 @@ stonecutter parameters {
 		// VideoSettingsScreen makes on an option change is
 		// Minecraft#levelExtractor.allChanged(), confirmed by javap -c on
 		// the real Options/VideoSettingsScreen classes).
-		string(current.parsed >= "26.2") {
+		// Only for versions at or after the sources' own (1.21.11): Stonecutter applies a false condition in REVERSE,
+		// which turned every Mojmap word back into Yarn in older versions (1.21.10's Map.Entry.getValue() -> getText()).
+		if (current.parsed >= "1.21.11") string(current.parsed >= "26.2") {
 			// Minecraft#screen/#setScreen(Screen) moved onto a new Gui field
 			// (Minecraft#gui) as #screen()/#setScreen(Screen) - verified via
 			// javap. IMPORTANT: this is deliberately a SUFFIX-only rule
@@ -1064,7 +1123,9 @@ stonecutter parameters {
 		// package) - no rule shares a start position with an older rule.
 		// VulkanBindGroupLayout and glsl.IntermediaryShaderModule have no 26.3
 		// counterpart; the two mixins using them are //? if <26.3 only.
-		string(current.parsed >= "26.3") {
+		// Only for versions at or after the sources' own (1.21.11): Stonecutter applies a false condition in REVERSE,
+		// which turned every Mojmap word back into Yarn in older versions (1.21.10's Map.Entry.getValue() -> getText()).
+		if (current.parsed >= "1.21.11") string(current.parsed >= "26.3") {
 			// 26.3 swapped GLFW for SDL3; the keyboard input type is KEYBOARD
 			// now. Suffix-only so it never starts where "InputUtil" rules do.
 			replace(".Type.KEYSYM", ".Type.KEYBOARD")

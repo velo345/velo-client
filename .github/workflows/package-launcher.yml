@@ -22,7 +22,8 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            asset-glob: launcher/build/jpackage-dist/*.deb
+            # .deb for Debian/Ubuntu, .tar.gz (app folder + runtime) for Arch (packaging/aur) and other distros
+            asset-glob: launcher/build/jpackage-dist/*.deb launcher/build/jpackage-dist/*.tar.gz
           - os: windows-latest
             asset-glob: launcher/build/jpackage-dist/*.exe
           # macOS build intentionally excluded for now - re-add a
@@ -45,7 +46,7 @@ jobs:
 
       - name: Build mod jars (all 3 supported Minecraft versions)
         shell: bash
-        run: ./gradlew :1.21.11:build :26.1:build :26.2:build :26.3:build -q
+        run: ./gradlew :1.21.10:build :1.21.11:build :26.1:build :26.2:build :26.3:build -q
 
       - name: Build launcher installer
         shell: bash
@@ -54,7 +55,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: velo-client-launcher-${{ matrix.os }}
-          path: ${{ matrix.asset-glob }}
+          path: launcher/build/jpackage-dist/*
           if-no-files-found: error
 
       - name: Attach to the tag's release

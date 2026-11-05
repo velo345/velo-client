@@ -166,6 +166,7 @@ function main() {
 	const dl = (file) => `${config.links.releases}/download/v${rel.version}/${file}`;
 	tokens["download.exe"] = dl(rel.launcherExe);
 	tokens["download.deb"] = dl(rel.launcherDeb);
+	tokens["download.tar"] = dl(rel.launcherTar);
 	for (const mc of config.minecraft.list) tokens[`download.mod.${mc.replace(/\./g, "_")}`] = dl(`velo-client-${rel.version}+${mc}.jar`);
 
 	fs.rmSync(DIST, { recursive: true, force: true });

@@ -9,6 +9,16 @@ mod.version = "1.1.2"
 deps.fabric_loader = "0.19.5"
 loomx.loom_version = "1.17-SNAPSHOT"
 
+["1.21.1"]
+# Yarn; last builds of both (meta.fabricmc.net / maven.fabricmc.net).
+deps.yarn_mappings = "1.21.1+build.3"
+deps.fabric_api = "0.116.17+1.21.1"
+
+["1.21.10"]
+# Yarn like 1.21.11; the last build of both, verified against meta.fabricmc.net / maven.fabricmc.net.
+deps.yarn_mappings = "1.21.10+build.3"
+deps.fabric_api = "0.138.4+1.21.10"
+
 ["1.21.11"]
 # Known-working config this project already shipped with before the
 # Stonecutter migration - unchanged on purpose so this version keeps

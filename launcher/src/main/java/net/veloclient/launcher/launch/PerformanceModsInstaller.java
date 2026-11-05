@@ -60,10 +60,11 @@ public final class PerformanceModsInstaller {
 		MODS.put("modernfix", "modernfix");
 		// Not performance: physics for capes (Velo Client detects it and hands it Velo's capes). Fetched from Modrinth like the rest, never bundled.
 		MODS.put("wavey-capes", "waveycapes");
-		// Not performance either: Mod Menu is how players find their mods. Its library first (Modrinth lists it as required).
-		MODS.put("placeholder-api", "placeholder-api");
-		MODS.put("modmenu", "modmenu");
+		// Mod Menu isn't installed any more: Velo's own Mods page lists every mod and opens their settings (2026-11-05).
 	}
+
+	/** Installed by older launchers, now part of Velo: removed again unless another mod needs them. */
+	private static final Map<String, String> RETIRED = Map.of("modmenu", "modmenu", "placeholder-api", "placeholder-api");
 
 	/** Modrinth's project id for Fabric API - always satisfied here. */
 	private static final String FABRIC_API_PROJECT_ID = "P7dR8mSH";
@@ -141,6 +142,15 @@ public final class PerformanceModsInstaller {
 						Files.delete(file);
 						state.installed.remove(mod.getKey());
 					}
+				}
+			}
+			for (Map.Entry<String, String> retired : RETIRED.entrySet()) {
+				String fileName = state.installed.get(retired.getKey());
+				if (fileName != null && !net.veloclient.launcher.doctor.ModRequirements.someoneDepends(modsDir, retired.getValue(), fileName)) {
+					Files.deleteIfExists(modsDir.resolve(fileName));
+					Files.deleteIfExists(modsDir.resolve(fileName + ".disabled"));
+					state.installed.remove(retired.getKey());
+					LauncherLog.info("Removed " + fileName + " - Velo's Mods page does what it did");
 				}
 			}
 			Set<String> presentModIds = installedModIds(modsDir);

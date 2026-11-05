@@ -176,7 +176,7 @@ public final class EmoteWheelScreen extends Screen {
 			wheelKeyDown = true;
 			return true;
 		}
-		return super.keyPressed(input);
+		return velo$superKeyPressed(input);
 	}
 
 	@Override
@@ -193,7 +193,7 @@ public final class EmoteWheelScreen extends Screen {
 				return true;
 			}
 		}
-		return super.keyReleased(input);
+		return velo$superKeyReleased(input);
 	}
 
 	@Override
@@ -208,6 +208,48 @@ public final class EmoteWheelScreen extends Screen {
 			this.client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null));
 			return true;
 		}
-		return super.mouseClicked(click, doubled);
+		return velo$superMouseClicked(click, doubled);
 	}
+
+	// ---- 1.21.1: vanilla input still comes as numbers; the screens use 1.21.9's event objects ----
+	private boolean velo$superKeyPressed(net.minecraft.client.input.KeyInput c) {
+		//? if <1.21.2 {
+		/*return super.keyPressed(c.key(), c.scancode(), c.modifiers());
+		*///?} else {
+		return super.keyPressed(c);
+		//?}
+	}
+
+	private boolean velo$superKeyReleased(net.minecraft.client.input.KeyInput c) {
+		//? if <1.21.2 {
+		/*return super.keyReleased(c.key(), c.scancode(), c.modifiers());
+		*///?} else {
+		return super.keyReleased(c);
+		//?}
+	}
+
+	private boolean velo$superMouseClicked(net.minecraft.client.gui.Click c, boolean d) {
+		//? if <1.21.2 {
+		/*return super.mouseClicked(c.x(), c.y(), c.button());
+		*///?} else {
+		return super.mouseClicked(c, d);
+		//?}
+	}
+
+	//? if <1.21.2 {
+	/*@Override
+	public boolean mouseClicked(double x, double y, int button) {
+		return mouseClicked(new net.veloclient.velo.client.compat.Click(x, y, button), net.veloclient.velo.client.compat.Click.doubled(x, y, button));
+	}
+
+	@Override
+	public boolean keyPressed(int key, int scancode, int modifiers) {
+		return keyPressed(new net.veloclient.velo.client.compat.KeyInput(key, scancode, modifiers));
+	}
+
+	@Override
+	public boolean keyReleased(int key, int scancode, int modifiers) {
+		return keyReleased(new net.veloclient.velo.client.compat.KeyInput(key, scancode, modifiers));
+	}
+	*///?}
 }

@@ -199,6 +199,15 @@ public final class LauncherApp extends Application {
 		root.getStyleClass().add("root");
 		content = new StackPane();
 		content.setPadding(new Insets(24, 32, 22, 32));
+		// A page taller than the window (Locker on a small screen at 125 % scaling) is centred by the StackPane and
+		// spilled over the top bar - painted after it, so it also swallowed every click on the tabs ("no way back").
+		javafx.scene.shape.Rectangle contentClip = new javafx.scene.shape.Rectangle();
+		contentClip.widthProperty().bind(content.widthProperty());
+		contentClip.heightProperty().bind(content.heightProperty());
+		content.setClip(contentClip);
+		// ...and its minimum height used to grow the whole window layout past the window, so `layers` centred it and
+		// pushed the top bar above the screen (Locker, unmaximized). The page area takes what's left, never more.
+		content.setMinSize(0, 0);
 
 		root.setTop(new javafx.scene.layout.VBox(buildTopBar(), net.veloclient.launcher.ui.OfflineBanner.build(this::retryOnline)));
 		root.setCenter(content);
@@ -3949,8 +3958,16 @@ public final class LauncherApp extends Application {
 			statusLabel.setText("Starting...");
 
 			LaunchProgressListener listener = new LaunchProgressListener() {
+				private volatile String phase = "Starting...";
+				private volatile long phaseStart = System.nanoTime();
+				private volatile long lastShown;
+				private volatile boolean fractionQueued;
+				private volatile double fraction;
+
 				@Override
 				public void onPhase(String phase) {
+					this.phase = phase;
+					this.phaseStart = System.nanoTime();
 					Platform.runLater(() -> {
 						statusLabel.setText(phase);
 						progressBar.setProgress(0);
@@ -3959,7 +3976,41 @@ public final class LauncherApp extends Application {
 
 				@Override
 				public void onProgress(double fraction) {
-					Platform.runLater(() -> progressBar.setProgress(fraction));
+					// Thousands of small files call this: one UI update per frame at most.
+					this.fraction = fraction;
+					if (!fractionQueued) {
+						fractionQueued = true;
+						Platform.runLater(() -> {
+							fractionQueued = false;
+							progressBar.setProgress(this.fraction);
+						});
+					}
+				}
+
+				@Override
+				public void onBytes(long done, long total) {
+					long now = System.nanoTime();
+					if (now - lastShown < 250_000_000L && done < total) {
+						return;
+					}
+					lastShown = now;
+					double seconds = Math.max(0.001, (now - phaseStart) / 1e9);
+					double speed = done / seconds;
+					String text = phase.replaceAll("\\.\\.\\.$", "") + "  ·  " + mb(done) + " / " + mb(total) + " MB";
+					if (seconds > 1.5 && speed > 1024) {
+						text += "  ·  " + String.format(java.util.Locale.ROOT, "%.1f MB/s", speed / (1024 * 1024));
+						long left = (long) ((total - done) / speed);
+						if (left > 0 && done < total) {
+							text += "  ·  " + (left >= 60 ? left / 60 + " min " + left % 60 + " s" : left + " s") + " left";
+						}
+					}
+					String shown = text;
+					Platform.runLater(() -> statusLabel.setText(shown));
+				}
+
+				private String mb(long bytes) {
+					return bytes >= 100L * 1024 * 1024 ? String.valueOf(bytes / (1024 * 1024))
+							: String.format(java.util.Locale.ROOT, "%.1f", bytes / (1024.0 * 1024));
 				}
 			};
 
@@ -4004,14 +4055,17 @@ public final class LauncherApp extends Application {
 					if (exitCode != 0 && !running.wasStopped()) {
 						Platform.runLater(() -> net.veloclient.launcher.ui.CrashReportDialog.show(stage, instance, exitCode, startedAt, result.logFile()));
 					}
-				} catch (Exception e) {
+				} catch (Throwable e) {
+					// Throwable, not Exception: an OutOfMemoryError / missing class used to skip this and leave Play pressed for good.
+					LauncherLog.warn("Launch of " + instance.name() + " failed", e);
+					var why = net.veloclient.launcher.launch.LaunchErrors.explain(e);
 					Platform.runLater(() -> {
 						triggerButton.setDisable(false);
 						progressBar.setVisible(false);
 						progressBar.setManaged(false);
 						statusLabel.setVisible(false);
 						statusLabel.setManaged(false);
-						ErrorDialog.show(stage, "Couldn't launch " + instance.name(), e.getMessage(), stackTraceOf(e), null);
+						ErrorDialog.show(stage, why.ours() ? "Couldn't launch " + instance.name() : why.title(), why.message(), stackTraceOf(e), null);
 					});
 				}
 			});

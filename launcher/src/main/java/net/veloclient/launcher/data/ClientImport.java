@@ -55,6 +55,9 @@ public final class ClientImport {
 		}
 
 		public int modCount() {
+			if (modsDir != null && modsDir.getFileName() != null && modsDir.getFileName().toString().startsWith(NoRiskMods.MARKER)) {
+				return NoRiskMods.count(modsDir);
+			}
 			return modJars(modsDir).size();
 		}
 
@@ -198,8 +201,18 @@ public final class ClientImport {
 			// NoRisk Client: profiles with their own game directories (launcher v3 keeps them in noriskclientv3/profiles).
 			for (Path norisk : distinct(b.resolve(".norisk"), data.resolve("norisk"), data.resolve("NoRiskClient"), data.resolve("noriskclient"),
 					data.resolve("noriskclientv3"), data.resolve("gg.norisk.app"), b.resolve(".noriskclient"))) {
-				for (Path dir : gameDirsBelow(norisk, 5)) {
-					add(sources, "NoRisk Client", "NoRisk " + dir.getFileName() + where, dir, dir.resolve("mods"));
+				// One source per profile from NoRisk's database (ten "NRC <version>" profiles share one folder); by folder only
+				// when it can't be read.
+				List<NoRiskMods.Profile> profiles = Files.isRegularFile(norisk.resolve("meta").resolve("app.db")) ? NoRiskMods.profiles(norisk) : List.of();
+				for (NoRiskMods.Profile profile : profiles) {
+					add(sources, "NoRisk Client", "NoRisk " + profile.name() + where, profile.dir(), NoRiskMods.sourceModsDir(profile),
+							profile.mcVersion(), profile.loader(), null, null);
+				}
+				if (profiles.isEmpty()) {
+					for (Path dir : gameDirsBelow(norisk, 5)) {
+						add(sources, "NoRisk Client", "NoRisk " + dir.getFileName() + where, dir, dir.resolve("mods"), NoRiskMods.lastPlayedVersion(dir),
+								null, null, null);
+					}
 				}
 			}
 			// Modrinth App profiles (the Flatpak keeps them in its sandbox's data folder).
@@ -569,6 +582,9 @@ public final class ClientImport {
 
 	/** The mod jars of a folder: its own *.jar plus a "dependencies" subfolder (Lunar puts libraries there). */
 	static List<Path> modJars(Path dir) {
+		if (dir != null && dir.getFileName() != null && dir.getFileName().toString().startsWith(NoRiskMods.MARKER)) {
+			return NoRiskMods.jars(dir);
+		}
 		if (dir == null || !Files.isDirectory(dir)) {
 			return List.of();
 		}
@@ -581,6 +597,12 @@ public final class ClientImport {
 				s.filter(p -> p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".jar") && Files.isRegularFile(p)).sorted().forEach(out::add);
 			} catch (IOException ignored) {
 				// unreadable
+			}
+		}
+		// NoRisk v3 plays from its mod cache, not this folder (that's why imports came out short).
+		for (Path jar : NoRiskMods.jars(dir)) {
+			if (!out.contains(jar)) {
+				out.add(jar);
 			}
 		}
 		return out;
@@ -681,6 +703,7 @@ public final class ClientImport {
 	 */
 	private static int[] importMods(Path from, Path to, String mcVersion, Consumer<String> progress) throws IOException {
 		Files.createDirectories(to);
+		NoRiskMods.fetchMissing(from, progress);
 		List<Path> jars = modJars(from);
 		java.util.Set<String> projects = new java.util.HashSet<>();
 		java.util.Set<String> present = new java.util.HashSet<>();
@@ -702,7 +725,7 @@ public final class ClientImport {
 			String name = jar.getFileName().toString().toLowerCase(Locale.ROOT);
 			progress.accept("Mods " + i + " / " + jars.size() + "  ·  " + jar.getFileName());
 			if (name.startsWith("velo-client") || name.startsWith("velo-addons") || name.startsWith("fabric-api") || name.contains("lunar")
-					|| name.contains("feather") || name.contains("dawn-") || name.contains("norisk")
+					|| name.contains("feather") || name.contains("dawn-") || name.contains("norisk") || name.startsWith("nrc-")
 					|| net.veloclient.launcher.launch.ForeignClientJars.isForeignClient(jar)) {
 				continue;
 			}

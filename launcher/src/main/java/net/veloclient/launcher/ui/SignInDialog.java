@@ -46,6 +46,9 @@ public final class SignInDialog {
 		final Button copy = new Button("Copy");
 		final Button open = new Button("Open login page");
 		final Button cancel = new Button("Cancel");
+		/** The login address, always visible and selectable: on some PCs the browser never opens (and Windows still says it did). */
+		final javafx.scene.control.TextField link = new javafx.scene.control.TextField(LOGIN_URL_FALLBACK);
+		final Button copyLink = new Button("Copy link");
 		final ProgressIndicator spinner = new ProgressIndicator();
 		final Label[] steps = new Label[3];
 		String url = LOGIN_URL_FALLBACK;
@@ -68,6 +71,7 @@ public final class SignInDialog {
 		void fill(String userCode, String verificationUri) {
 			url = verificationUri == null || verificationUri.isBlank() ? LOGIN_URL_FALLBACK : verificationUri;
 			code.setText(userCode);
+			link.setText(url);
 			copy.setDisable(false);
 			open.setDisable(false);
 			copyToClipboard(userCode);
@@ -187,7 +191,11 @@ public final class SignInDialog {
 			// Off the FX thread: AWT's Desktop on the JavaFX thread can hang or crash on some Windows setups.
 			Thread.ofVirtual().start(() -> {
 				if (!openInBrowser(url)) {
-					Platform.runLater(() -> view.status.setText("Couldn't open a browser automatically - copy the code and open " + url + " yourself."));
+					Platform.runLater(() -> {
+						view.status.setText("Couldn't open a browser - copy the link below and open it yourself.");
+						view.link.requestFocus();
+						view.link.selectAll();
+					});
 				}
 			});
 			view.setStep(2);
@@ -198,6 +206,25 @@ public final class SignInDialog {
 		HBox actions = new HBox(10, view.cancel, view.open);
 		actions.setAlignment(Pos.CENTER);
 
+		// Browser didn't open? The address to paste into any browser yourself (or open on your phone).
+		Label linkCaption = new Label("Browser didn't open? Paste this link into any browser - also works on your phone:");
+		linkCaption.setWrapText(true);
+		linkCaption.getStyleClass().add("signin-note");
+		view.link.setEditable(false);
+		view.link.setFocusTraversable(false);
+		view.link.setOnMouseClicked(e -> view.link.selectAll());
+		HBox.setHgrow(view.link, javafx.scene.layout.Priority.ALWAYS);
+		view.copyLink.getStyleClass().add("signin-copy");
+		view.copyLink.setOnAction(e -> {
+			copyToClipboard(view.link.getText());
+			view.copied.setText("Link copied - paste it in your browser, then copy the code again");
+			view.copy.setText("Copy code");
+			pop(view.copied);
+		});
+		HBox linkRow = new HBox(8, view.link, view.copyLink);
+		linkRow.setAlignment(Pos.CENTER_LEFT);
+		VBox linkBox = new VBox(6, linkCaption, linkRow);
+
 		view.spinner.setPrefSize(16, 16);
 		view.spinner.setMaxSize(16, 16);
 		view.status.getStyleClass().add("signin-status");
@@ -205,7 +232,7 @@ public final class SignInDialog {
 		HBox statusRow = new HBox(8, view.spinner, view.status);
 		statusRow.setAlignment(Pos.CENTER_LEFT);
 
-		VBox box = new VBox(16, heading, sub, stepRow, codeCard, note, actions, statusRow);
+		VBox box = new VBox(16, heading, sub, stepRow, codeCard, note, actions, linkBox, statusRow);
 		box.setAlignment(Pos.TOP_CENTER);
 		box.setPadding(new Insets(28));
 		box.getStyleClass().add("signin-dialog");

@@ -1669,7 +1669,7 @@ public final class GuideScreen extends Screen {
 				return true;
 			}
 		}
-		return super.mouseClicked(click, doubled);
+		return velo$superMouseClicked(click, doubled);
 	}
 
 	@Override
@@ -1678,7 +1678,7 @@ public final class GuideScreen extends Screen {
 			dragTo(click.x());
 			return true;
 		}
-		return super.mouseDragged(click, offsetX, offsetY);
+		return velo$superMouseDragged(click, offsetX, offsetY);
 	}
 
 	@Override
@@ -1687,7 +1687,7 @@ public final class GuideScreen extends Screen {
 			dragging = null;
 			return true;
 		}
-		return super.mouseReleased(click);
+		return velo$superMouseReleased(click);
 	}
 
 	private void dragTo(double screenX) {
@@ -1717,11 +1717,66 @@ public final class GuideScreen extends Screen {
 			go(step - 1);
 			return true;
 		}
-		return super.keyPressed(input);
+		return velo$superKeyPressed(input);
 	}
 
 	@Override
 	public void close() {
 		finish();
 	}
+
+	// ---- 1.21.1: vanilla input still comes as numbers; the screens use 1.21.9's event objects ----
+	private boolean velo$superKeyPressed(net.minecraft.client.input.KeyInput c) {
+		//? if <1.21.2 {
+		/*return super.keyPressed(c.key(), c.scancode(), c.modifiers());
+		*///?} else {
+		return super.keyPressed(c);
+		//?}
+	}
+
+	private boolean velo$superMouseClicked(net.minecraft.client.gui.Click c, boolean d) {
+		//? if <1.21.2 {
+		/*return super.mouseClicked(c.x(), c.y(), c.button());
+		*///?} else {
+		return super.mouseClicked(c, d);
+		//?}
+	}
+
+	private boolean velo$superMouseDragged(net.minecraft.client.gui.Click c, double dx, double dy) {
+		//? if <1.21.2 {
+		/*return super.mouseDragged(c.x(), c.y(), c.button(), dx, dy);
+		*///?} else {
+		return super.mouseDragged(c, dx, dy);
+		//?}
+	}
+
+	private boolean velo$superMouseReleased(net.minecraft.client.gui.Click c) {
+		//? if <1.21.2 {
+		/*return super.mouseReleased(c.x(), c.y(), c.button());
+		*///?} else {
+		return super.mouseReleased(c);
+		//?}
+	}
+
+	//? if <1.21.2 {
+	/*@Override
+	public boolean mouseClicked(double x, double y, int button) {
+		return mouseClicked(new net.veloclient.velo.client.compat.Click(x, y, button), net.veloclient.velo.client.compat.Click.doubled(x, y, button));
+	}
+
+	@Override
+	public boolean mouseReleased(double x, double y, int button) {
+		return mouseReleased(new net.veloclient.velo.client.compat.Click(x, y, button));
+	}
+
+	@Override
+	public boolean mouseDragged(double x, double y, int button, double dx, double dy) {
+		return mouseDragged(new net.veloclient.velo.client.compat.Click(x, y, button), dx, dy);
+	}
+
+	@Override
+	public boolean keyPressed(int key, int scancode, int modifiers) {
+		return keyPressed(new net.veloclient.velo.client.compat.KeyInput(key, scancode, modifiers));
+	}
+	*///?}
 }

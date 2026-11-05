@@ -95,6 +95,11 @@ public final class VeloClientMod implements ClientModInitializer {
 		// Before any profile loads: saved keybinds convert between GLFW (<26.3) and SDL (26.3+) codes.
 		net.veloclient.velo.profile.ModuleStateStore.currentKeyFormat = net.veloclient.velo.client.util.Keys.format();
 		net.veloclient.velo.profile.ModuleStateStore.keyConverter = net.veloclient.velo.client.util.Keys::convert;
+		//? if <1.21.11 {
+		/*net.veloclient.velo.client.render.gizmo.GizmoDrawing.init();
+		*///?}
+		// Velo is the mod list: mods' Mod Menu settings screens load without Mod Menu installed.
+		net.veloclient.velo.client.mods.ModMenuApiShim.install();
 		registerModules();
 		loadAddons();
 		HudManager.register();

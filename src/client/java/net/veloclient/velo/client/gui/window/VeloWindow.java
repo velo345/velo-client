@@ -427,6 +427,11 @@ public abstract class VeloWindow extends Screen {
 	}
 
 	private int[] tabX = new int[0];
+
+	/** Where the header tabs end (x), so header extras can stay clear of them; 0 without tabs. */
+	protected int headerTabsEnd() {
+		return tabX.length == 0 || tabW == null || tabW.length != tabX.length ? 0 : tabX[tabX.length - 1] + tabW[tabX.length - 1];
+	}
 	private int[] tabW = new int[0];
 	private float underlineX = -1;
 	private float underlineW;
@@ -604,7 +609,7 @@ public abstract class VeloWindow extends Screen {
 			}
 			return false;
 		}
-		return super.mouseClicked(click, doubled);
+		return velo$superMouseClicked(click, doubled);
 	}
 
 	@Override
@@ -623,7 +628,7 @@ public abstract class VeloWindow extends Screen {
 			layoutContent();
 			return true;
 		}
-		return super.mouseDragged(click, offsetX, offsetY);
+		return velo$superMouseDragged(click, offsetX, offsetY);
 	}
 
 	@Override
@@ -632,7 +637,7 @@ public abstract class VeloWindow extends Screen {
 			draggingHeader = false;
 			return true;
 		}
-		return super.mouseReleased(click);
+		return velo$superMouseReleased(click);
 	}
 
 	protected void requestClose() {
@@ -699,4 +704,75 @@ public abstract class VeloWindow extends Screen {
 	public void close() {
 		requestClose();
 	}
+
+	// ---- 1.21.1: vanilla input still comes as numbers; the screens use 1.21.9's event objects ----
+
+	//? if <1.21.2 {
+	/*public boolean keyPressed(net.veloclient.velo.client.compat.KeyInput input) {
+		return super.keyPressed(input.key(), input.scancode(), input.modifiers());
+	}
+
+	@Override
+	public boolean keyPressed(int key, int scancode, int modifiers) {
+		return keyPressed(new net.veloclient.velo.client.compat.KeyInput(key, scancode, modifiers));
+	}
+
+	public boolean keyReleased(net.veloclient.velo.client.compat.KeyInput input) {
+		return super.keyReleased(input.key(), input.scancode(), input.modifiers());
+	}
+
+	@Override
+	public boolean keyReleased(int key, int scancode, int modifiers) {
+		return keyReleased(new net.veloclient.velo.client.compat.KeyInput(key, scancode, modifiers));
+	}
+
+	public boolean charTyped(net.veloclient.velo.client.compat.CharInput input) {
+		return super.charTyped((char) input.codepoint(), input.modifiers());
+	}
+
+	@Override
+	public boolean charTyped(char chr, int modifiers) {
+		return charTyped(new net.veloclient.velo.client.compat.CharInput(chr, modifiers));
+	}
+	*///?}
+	private boolean velo$superMouseClicked(net.minecraft.client.gui.Click c, boolean d) {
+		//? if <1.21.2 {
+		/*return super.mouseClicked(c.x(), c.y(), c.button());
+		*///?} else {
+		return super.mouseClicked(c, d);
+		//?}
+	}
+
+	private boolean velo$superMouseDragged(net.minecraft.client.gui.Click c, double dx, double dy) {
+		//? if <1.21.2 {
+		/*return super.mouseDragged(c.x(), c.y(), c.button(), dx, dy);
+		*///?} else {
+		return super.mouseDragged(c, dx, dy);
+		//?}
+	}
+
+	private boolean velo$superMouseReleased(net.minecraft.client.gui.Click c) {
+		//? if <1.21.2 {
+		/*return super.mouseReleased(c.x(), c.y(), c.button());
+		*///?} else {
+		return super.mouseReleased(c);
+		//?}
+	}
+
+	//? if <1.21.2 {
+	/*@Override
+	public boolean mouseClicked(double x, double y, int button) {
+		return mouseClicked(new net.veloclient.velo.client.compat.Click(x, y, button), net.veloclient.velo.client.compat.Click.doubled(x, y, button));
+	}
+
+	@Override
+	public boolean mouseReleased(double x, double y, int button) {
+		return mouseReleased(new net.veloclient.velo.client.compat.Click(x, y, button));
+	}
+
+	@Override
+	public boolean mouseDragged(double x, double y, int button, double dx, double dy) {
+		return mouseDragged(new net.veloclient.velo.client.compat.Click(x, y, button), dx, dy);
+	}
+	*///?}
 }

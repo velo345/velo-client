@@ -30,7 +30,7 @@ public final class FabricMetaService {
 	}
 
 	private static JsonObject fetchUncached(GameVersion version, String loader) throws IOException {
-		String url = "https://meta.fabricmc.net/v2/versions/loader/" + version.id() + "/" + loader + "/profile/json";
+		String url = version.metaBase() + "/v2/versions/loader/" + version.id() + "/" + loader + "/profile/json";
 		HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(20)).GET().build();
 		try {
 			HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());

@@ -27,7 +27,32 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * own separate ones) since those represent a genuinely different medium the
  * player is standing in, not "the normal sky fog" this module customizes.
  */
-//? if <26.1 {
+//? if <1.21.11 {
+/*// 1.21.10: the colour comes from the shared StandardFogModifier (only the open-air one is changed), and the distance
+// hook takes the camera's entity + block position instead of the camera.
+@Mixin({net.minecraft.client.render.fog.StandardFogModifier.class, AtmosphericFogModifier.class})
+public abstract class AtmosphericFogMixin {
+
+	@Inject(method = "getFogColor", at = @At("RETURN"), cancellable = true, require = 0)
+	private void velo$overrideColor(ClientWorld world, Camera camera, int viewDistance, float skyDarkness,
+			CallbackInfoReturnable<Integer> cir) {
+		if ((Object) this instanceof AtmosphericFogModifier && TimeWeatherFogModule.isFogColorOverrideActive()) {
+			cir.setReturnValue(TimeWeatherFogModule.fogColorOverrideValue());
+		}
+	}
+
+	@Inject(method = "applyStartEndModifier", at = @At("TAIL"), require = 0)
+	private void velo$overrideDistance(FogData data, net.minecraft.entity.Entity entity, net.minecraft.util.math.BlockPos pos,
+			ClientWorld clientWorld, float f, RenderTickCounter renderTickCounter, CallbackInfo ci) {
+		if (!TimeWeatherFogModule.isFogDistanceOverrideActive()) {
+			return;
+		}
+		double thickness = TimeWeatherFogModule.fogThicknessValue();
+		data.environmentalStart = (float) (data.environmentalStart / thickness);
+		data.environmentalEnd = (float) (data.environmentalEnd / thickness);
+	}
+}
+*///?} else if <26.1 {
 @Mixin(AtmosphericFogModifier.class)
 public abstract class AtmosphericFogMixin {
 

@@ -11,7 +11,35 @@ final class VideoOptions {
 	private VideoOptions() {
 	}
 
-	//? if <26.1 {
+	//? if <1.21.11 {
+	/*private static net.minecraft.client.option.GameOptions o() {
+		return net.minecraft.client.MinecraftClient.getInstance().options;
+	}
+
+	// 1.21.10: leaves and transparency were part of the graphics mode; fade, weather radius, vignette and filtering
+	// didn't exist yet (left alone).
+	static boolean smoothLighting() { return o().getAo().getValue(); }
+	static void setSmoothLighting(boolean v) { o().getAo().setValue(v); }
+	static boolean fancyLeaves() { return o().getGraphicsMode().getValue() != net.minecraft.client.option.GraphicsMode.FAST; }
+	static void setFancyLeaves(boolean v) { }
+	static boolean improvedTransparency() { return o().getGraphicsMode().getValue() == net.minecraft.client.option.GraphicsMode.FABULOUS; }
+	static void setImprovedTransparency(boolean v) {
+		var mode = o().getGraphicsMode();
+		if (v) {
+			mode.setValue(net.minecraft.client.option.GraphicsMode.FABULOUS);
+		} else if (mode.getValue() == net.minecraft.client.option.GraphicsMode.FABULOUS) {
+			mode.setValue(net.minecraft.client.option.GraphicsMode.FANCY);
+		}
+	}
+	static double chunkFade() { return 0; }
+	static void setChunkFade(double v) { }
+	static void setMenuBlur(int v) { o().getMenuBackgroundBlurriness().setValue(v); }
+	static void setWeatherRadius(int v) { }
+	static void setCloudRange(int v) { o().getCloudRenderDistance().setValue(v); }
+	static void setVignette(boolean v) { }
+	static void setTextureFilteringOff() { }
+	static int currentFps() { return net.minecraft.client.MinecraftClient.getInstance().getCurrentFps(); }
+	*///?} else if <26.1 {
 	private static net.minecraft.client.option.GameOptions o() {
 		return net.minecraft.client.MinecraftClient.getInstance().options;
 	}

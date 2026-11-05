@@ -139,6 +139,8 @@ final class Planner {
 					}
 					case Action.LowerRenderDistance ignored -> {
 					}
+					case Action.ClearFabricCache ignored -> {
+					}
 					case Action.SetLoader l -> loader = l.version() == null ? loader : l.version();
 				}
 			}

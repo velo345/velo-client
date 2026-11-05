@@ -49,6 +49,14 @@ public final class InstalledAssetStore {
 		return InstancePaths.dir(instanceId).resolve(kind.fileName);
 	}
 
+	private static Path folder(String instanceId, Kind kind) {
+		return switch (kind) {
+			case MOD -> InstancePaths.modsDir(instanceId);
+			case RESOURCE_PACK -> InstancePaths.resourcePacksDir(instanceId);
+			case SHADER_PACK -> InstancePaths.shaderPacksDir(instanceId);
+		};
+	}
+
 	public static List<InstalledAsset> loadAll(String instanceId, Kind kind) {
 		Path file = file(instanceId, kind);
 		if (!Files.exists(file)) {
@@ -56,7 +64,16 @@ public final class InstalledAssetStore {
 		}
 		try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
 			List<InstalledAsset> assets = GSON.fromJson(reader, new TypeToken<List<InstalledAsset>>() {}.getType());
-			return assets != null ? assets : new ArrayList<>();
+			if (assets == null) {
+				return new ArrayList<>();
+			}
+			// Only what's really on disk: a record whose file was deleted by hand, by another tool or never finished
+			// downloading made the browser say "Installed" for a mod that wasn't in the folder (Simple Voice Chat).
+			Path folder = folder(instanceId, kind);
+			assets.removeIf(a -> a == null || a.filename() == null || !Files.exists(folder.resolve(a.filename()))
+					&& !Files.exists(folder.resolve(a.filename() + ".disabled"))
+					&& !(a.filename().endsWith(".disabled") && Files.exists(folder.resolve(a.filename().substring(0, a.filename().length() - 9)))));
+			return assets;
 		} catch (IOException | JsonParseException e) {
 			// A corrupt registry (partial write, manual edit, ...) used to throw
 			// JsonSyntaxException uncaught here - not an IOException, so this

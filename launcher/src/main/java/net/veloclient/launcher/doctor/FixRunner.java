@@ -86,6 +86,7 @@ final class FixRunner {
 				return changed;
 			}
 			case Action.DisableShaders ignored -> disableShaders(instance);
+			case Action.ClearFabricCache ignored -> clearFabricCache(instance);
 			case Action.LowerRenderDistance r -> lowerRenderDistance(instance, r.max());
 			case Action.SetLoader l -> {
 				net.veloclient.launcher.launch.GameVersion version = net.veloclient.launcher.launch.GameVersion.byId(instance.mcVersion());
@@ -96,6 +97,19 @@ final class FixRunner {
 			}
 		}
 		return instance;
+	}
+
+	/** Fabric's remapped game jars and processed mods - all rebuilt on the next start. */
+	private static void clearFabricCache(Instance instance) throws IOException {
+		Path cache = InstancePaths.gameDir(instance.id()).resolve(".fabric");
+		if (!Files.exists(cache)) {
+			return;
+		}
+		try (var walk = Files.walk(cache)) {
+			for (Path p : walk.sorted(java.util.Comparator.reverseOrder()).toList()) {
+				Files.deleteIfExists(p);
+			}
+		}
 	}
 
 	/** The file as it is on disk now, enabled or disabled. */

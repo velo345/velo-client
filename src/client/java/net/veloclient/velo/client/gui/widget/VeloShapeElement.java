@@ -50,8 +50,10 @@ record VeloShapeElement(Matrix3x2fc pose, float[] xy, int[] colors, int quadCoun
 
 	@Override
 	public void setupVertices(VertexConsumer vertices) {
+		// A Matrix3x2f copy: 1.21.10 only takes the class, newer versions the interface too.
+		org.joml.Matrix3x2f matrix = new org.joml.Matrix3x2f(pose);
 		for (int v = 0; v < quadCount * 4; v++) {
-			vertices.vertex(pose, xy[v * 2], xy[v * 2 + 1]).color(colors[v]);
+			vertices.vertex(matrix, xy[v * 2], xy[v * 2 + 1]).color(colors[v]);
 		}
 	}
 

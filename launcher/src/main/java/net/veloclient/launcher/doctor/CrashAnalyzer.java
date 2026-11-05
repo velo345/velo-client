@@ -97,6 +97,7 @@ final class CrashAnalyzer {
 
 		fabricResolution(s, text, issues);
 		nativeCrash(s, text, issues);
+		gameFiles(s, text, issues);
 
 		if (text.contains("java.lang.OutOfMemoryError")) {
 			int now = s.ramMaxMb() != null ? s.ramMaxMb() : net.veloclient.launcher.launch.MemoryPlanner.plan(s.instance()).maxMb();
@@ -376,13 +377,27 @@ final class CrashAnalyzer {
 
 	private static final Pattern LOG_NOISE = Pattern.compile("^\\[[\\d:.]+\\] \\[[^\\]]*/(?:WARN|INFO|DEBUG|TRACE)\\]");
 
-	/** The text without INFO/WARN log lines - stack traces, ERROR lines and crash report sections stay. */
+	/** A stack trace's own lines: the exception, "at ...", "Caused by:", "... 3 more". */
+	private static final Pattern TRACE_LINE = Pattern.compile("^(?:\\s+at |\\s*\\.\\.\\. \\d+ more|Caused by: |Suppressed: |\\s+Suppressed: |[\\w.$]+(?:Exception|Error|Throwable)(?::|$))");
+
+	/**
+	 * The text without INFO/WARN log lines - ERROR lines, their stack traces and crash report sections stay. A stack trace
+	 * printed under a WARN/INFO line belongs to that line and goes too: "Velo friends: request timed out" with its trace
+	 * (an offline PC) used to read as "Velo Client crashed".
+	 */
 	static String errorsOnly(String text) {
 		StringBuilder out = new StringBuilder(text.length());
+		boolean inNoise = false;
 		for (String line : text.split("\\R")) {
-			if (!LOG_NOISE.matcher(line).find()) {
-				out.append(line).append('\n');
+			if (LOG_NOISE.matcher(line).find()) {
+				inNoise = true;
+				continue;
 			}
+			if (inNoise && TRACE_LINE.matcher(line).find()) {
+				continue;
+			}
+			inNoise = false;
+			out.append(line).append('\n');
 		}
 		return out.toString();
 	}
@@ -414,6 +429,54 @@ final class CrashAnalyzer {
 			issues.add(new Issue("gpu-driver-crash", Severity.CRASH, "Your graphics driver crashed",
 					"The crash happened inside " + lib + " - updating the graphics driver (NVIDIA / AMD / Intel website) fixes this almost always.",
 					fixes, List.of()));
+		}
+	}
+
+	private static final Pattern MOD_FILE_GONE = Pattern.compile("NoSuchFileException: (\\S*[\\\\/]mods[\\\\/]([^\\\\/\\r\\n]+\\.jar))");
+
+	/**
+	 * Files under the game broke rather than a mod: Fabric's remapped game jar half-written (the PC ran out of memory or
+	 * disk, an antivirus held / removed the .tmp) - every later start reads the broken jar again, so clear it; or a mod
+	 * jar that vanished between Fabric listing the folder and opening it.
+	 */
+	private static void gameFiles(Snapshot s, String text, List<Issue> issues) {
+		String trace = errorsOnly(text);
+		boolean brokenRemap = text.contains("remappedJars") && (trace.contains("ZipException") || trace.contains("zip END header")
+				|| trace.contains("error remapping game jars") || trace.contains("NoSuchFileException") || trace.contains("AccessDeniedException"))
+				|| trace.contains("error remapping game jars");
+		if (brokenRemap) {
+			issues.add(new Issue("fabric-cache", Severity.CRASH, "Fabric's game files are broken",
+					"Fabric couldn't finish preparing Minecraft (low memory or disk space, or an antivirus took its temporary file)."
+							+ " Velo clears them and Fabric builds them again on the next start - add the VeloClient folder to your"
+							+ " antivirus exceptions if this keeps happening.",
+					List.of(new Fix("Rebuild Fabric's game files", "Takes a minute on the next start", List.of(new Action.ClearFabricCache()))),
+					List.of()));
+		}
+		Matcher gone = MOD_FILE_GONE.matcher(trace);
+		if (gone.find() && trace.contains("ModResolutionException")) {
+			issues.add(new Issue("mod-file-gone", Severity.CRASH, gone.group(2) + " disappeared while the game started",
+					"Something removed or locked that mod file right after Fabric found it - usually an antivirus, or the mods"
+							+ " folder changed while Minecraft was starting. Start again; add the VeloClient folder to your antivirus"
+							+ " exceptions if it happens again.",
+					List.of(), List.of()));
+		}
+		// Vanilla code dying on a null particle (firework sparks...): a particle mod returned none. Nothing else on the stack.
+		if (trace.contains("Ticking Particle") || text.contains("Description: Ticking Particle")) {
+			List<Action> off = new ArrayList<>();
+			List<String> names = new ArrayList<>();
+			for (ModScanner.ModInfo mod : s.enabledMods()) {
+				String id = mod.id() == null ? "" : mod.id().toLowerCase(java.util.Locale.ROOT);
+				String name = mod.displayName() == null ? "" : mod.displayName().toLowerCase(java.util.Locale.ROOT);
+				if ((id.contains("particle") || name.contains("particle")) && !isVelo(mod)) {
+					off.add(new Action.Disable(mod.file(), mod.displayName()));
+					names.add(mod.displayName());
+				}
+			}
+			if (!off.isEmpty()) {
+				issues.add(new Issue("particle-mod", Severity.CRASH, "A particle mod broke a particle",
+						"Minecraft crashed updating a particle another mod changed or removed - " + String.join(", ", names) + ".",
+						List.of(new Fix("Turn " + (names.size() == 1 ? names.get(0) : "particle mods") + " off", null, off)), List.of()));
+			}
 		}
 	}
 

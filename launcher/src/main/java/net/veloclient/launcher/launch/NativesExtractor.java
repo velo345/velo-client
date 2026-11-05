@@ -25,6 +25,14 @@ public final class NativesExtractor {
 	}
 
 	public static void prepare(Path nativesDir, JsonArray vanillaLibraries) throws IOException {
+		prepare(nativesDir, vanillaLibraries, null);
+	}
+
+	/**
+	 * {@code loaderLibraries}: Legacy Fabric replaces LWJGL 2 with its own build whose natives sit next to it on its maven
+	 * ({@code natives} map, no {@code downloads}) - unpacked after vanilla's so the matching ones win.
+	 */
+	public static void prepare(Path nativesDir, JsonArray vanillaLibraries, JsonArray loaderLibraries) throws IOException {
 		if (Files.exists(nativesDir)) {
 			try (var stream = Files.walk(nativesDir)) {
 				for (Path path : stream.sorted(java.util.Comparator.reverseOrder()).toList()) {
@@ -33,9 +41,34 @@ public final class NativesExtractor {
 			}
 		}
 		Files.createDirectories(nativesDir);
-		if (vanillaLibraries == null) {
+		if (vanillaLibraries != null) {
+			extractAll(nativesDir, vanillaLibraries);
+		}
+		if (loaderLibraries == null) {
 			return;
 		}
+		for (var element : loaderLibraries) {
+			JsonObject library = element.getAsJsonObject();
+			if (!library.has("natives") || library.has("downloads") || !library.has("name")) {
+				continue;
+			}
+			JsonObject natives = library.getAsJsonObject("natives");
+			String osKey = OsRules.currentOsName();
+			if (!natives.has(osKey)) {
+				continue;
+			}
+			String classifier = natives.get(osKey).getAsString().replace("${arch}", "64");
+			String[] parts = library.get("name").getAsString().split(":");
+			String base = library.has("url") ? library.get("url").getAsString() : "https://maven.fabricmc.net/";
+			base = base.endsWith("/") ? base : base + "/";
+			String path = parts[0].replace('.', '/') + "/" + parts[1] + "/" + parts[2] + "/" + parts[1] + "-" + parts[2] + "-" + classifier + ".jar";
+			Path jarPath = GameDataPaths.libraries().resolve(path);
+			Downloader.ensure(java.net.URI.create(base + path), jarPath, null, -1, b -> { });
+			extractJar(jarPath, nativesDir);
+		}
+	}
+
+	private static void extractAll(Path nativesDir, JsonArray vanillaLibraries) throws IOException {
 		for (var element : vanillaLibraries) {
 			JsonObject library = element.getAsJsonObject();
 			if (!library.has("natives") || !library.has("downloads")) {
@@ -53,7 +86,7 @@ public final class NativesExtractor {
 			if (!natives.has(osKey)) {
 				continue;
 			}
-			String classifier = natives.get(osKey).getAsString();
+			String classifier = natives.get(osKey).getAsString().replace("${arch}", "64");
 			JsonObject classifiers = downloads.getAsJsonObject("classifiers");
 			if (!classifiers.has(classifier)) {
 				continue;

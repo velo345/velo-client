@@ -58,6 +58,8 @@ public final class GameLauncher {
 		GameDataPaths.ensureDirectories(version.id());
 		InstancePaths.ensureDirectories(instance.id());
 
+		// Minecraft, its assets and maybe a Java runtime: ~1.5 GB on a first start. Say so up front instead of failing half-way.
+		LaunchErrors.requireFreeSpace(GameDataPaths.assetsRoot(), 1536L * 1024 * 1024);
 		listener.onPhase("Resolving version info...");
 		JsonObject vanilla = MojangVersionService.fetchVersionDetail(version.id());
 		listener.onProgress(1.0);
@@ -91,25 +93,35 @@ public final class GameLauncher {
 		AtomicLong clientDone = new AtomicLong();
 		Downloader.ensure(URI.create(clientDownload.get("url").getAsString()), clientJar,
 				clientDownload.get("sha1").getAsString(), clientSize,
-				n -> listener.onProgress(Math.min(1.0, clientDone.addAndGet(n) / (double) Math.max(1, clientSize))));
+				n -> {
+					long now = clientDone.addAndGet(n);
+					listener.onProgress(Math.min(1.0, now / (double) Math.max(1, clientSize)));
+					listener.onBytes(now, clientSize);
+				});
 
 		listener.onPhase("Downloading assets...");
 		var indexInfo = AssetInstaller.readAssetIndexInfo(vanilla);
 		List<AssetInstaller.AssetObject> assets = AssetInstaller.loadIndex(indexInfo);
 		long totalAssetBytes = assets.stream().mapToLong(AssetInstaller.AssetObject::size).sum();
 		AtomicLong assetsDone = new AtomicLong();
-		AssetInstaller.downloadAll(assets, n -> listener.onProgress(Math.min(1.0, assetsDone.addAndGet(n) / (double) Math.max(1, totalAssetBytes))));
+		AssetInstaller.downloadAll(assets, n -> {
+			long now = assetsDone.addAndGet(n);
+			listener.onProgress(Math.min(1.0, now / (double) Math.max(1, totalAssetBytes)));
+			listener.onBytes(now, totalAssetBytes);
+		});
 
 		listener.onPhase("Preparing natives...");
 		Path nativesDir = InstancePaths.dir(instance.id()).resolve("natives");
 		if (!alreadyRunning || !Files.isDirectory(nativesDir)) {
-			NativesExtractor.prepare(nativesDir, vanillaLibraries);
+			NativesExtractor.prepare(nativesDir, vanillaLibraries, fabricLibraries);
 		}
 		listener.onProgress(1.0);
 
 		// The launcher's own (newer) Java runs every version - unless a mod only accepts the version's own Java.
 		boolean ownJavaOk = net.veloclient.launcher.doctor.ModRequirements.acceptsJava(modsDir, Runtime.version().feature());
-		JavaRuntimeProvider.JavaRuntime runtime = JavaRuntimeProvider.forVersion(vanilla, listener, !ownJavaOk);
+		// 1.8.9 / 1.9.4 (LWJGL 2, Java 8 era) run on Mojang's Java 8, like the official launcher does.
+		boolean exact = !ownJavaOk || JavaRuntimeProvider.requiredFeature(vanilla) < 17;
+		JavaRuntimeProvider.JavaRuntime runtime = JavaRuntimeProvider.forVersion(vanilla, listener, exact);
 
 		listener.onPhase("Starting Minecraft...");
 		return startProcess(instance, version, vanilla, fabric, libraries, clientJar, nativesDir, session, quickPlayServerAddress, runId, runtime);
@@ -122,8 +134,11 @@ public final class GameLauncher {
 		try {
 			List<Future<?>> futures = libraries.stream()
 					.<Future<?>>map(lib -> executor.submit((Callable<Void>) () -> {
-						Downloader.ensure(lib.url(), lib.path(), lib.sha1(), lib.size(),
-								n -> listener.onProgress(Math.min(1.0, done.addAndGet(n) / (double) Math.max(1, totalBytes))));
+						Downloader.ensure(lib.url(), lib.path(), lib.sha1(), lib.size(), n -> {
+							long now = done.addAndGet(n);
+							listener.onProgress(Math.min(1.0, now / (double) Math.max(1, totalBytes)));
+							listener.onBytes(now, totalBytes);
+						});
 						return null;
 					}))
 					.toList();
@@ -164,6 +179,10 @@ public final class GameLauncher {
 		values.put("launcher_name", LAUNCHER_NAME);
 		values.put("launcher_version", AppVersion.VERSION);
 		values.put("classpath", classpath);
+		// Pre-1.13 version JSONs: one "minecraftArguments" string with these extra placeholders.
+		values.put("user_properties", "{}");
+		values.put("auth_session", session.minecraftAccessToken());
+		values.put("game_assets", GameDataPaths.assetsRoot().toAbsolutePath().toString());
 		Set<String> activeFeatures = Set.of();
 		if (quickPlayServerAddress != null && !quickPlayServerAddress.isBlank()) {
 			values.put("quickPlayMultiplayer", quickPlayServerAddress);
@@ -214,7 +233,17 @@ public final class GameLauncher {
 				jvmArgs.add(arg);
 			}
 		}
-		jvmArgs.addAll(resolveArguments(vanilla.getAsJsonObject("arguments").getAsJsonArray("jvm"), values, activeFeatures));
+		boolean modernArgs = vanilla.has("arguments");
+		if (modernArgs) {
+			jvmArgs.addAll(resolveArguments(vanilla.getAsJsonObject("arguments").getAsJsonArray("jvm"), values, activeFeatures));
+		} else {
+			// What launchers pass to old versions themselves (their JSON has no "jvm" list).
+			jvmArgs.add("-Djava.library.path=" + values.get("natives_directory"));
+			jvmArgs.add("-Dminecraft.launcher.brand=" + LAUNCHER_NAME);
+			jvmArgs.add("-Dminecraft.launcher.version=" + AppVersion.VERSION);
+			jvmArgs.add("-cp");
+			jvmArgs.add(classpath);
+		}
 		if (fabric.has("arguments") && fabric.getAsJsonObject("arguments").has("jvm")) {
 			jvmArgs.addAll(resolveArguments(fabric.getAsJsonObject("arguments").getAsJsonArray("jvm"), values, activeFeatures));
 		}
@@ -225,7 +254,24 @@ public final class GameLauncher {
 		}
 
 		List<String> gameArgs = new ArrayList<>();
-		gameArgs.addAll(resolveArguments(vanilla.getAsJsonObject("arguments").getAsJsonArray("game"), values, activeFeatures));
+		if (modernArgs) {
+			gameArgs.addAll(resolveArguments(vanilla.getAsJsonObject("arguments").getAsJsonArray("game"), values, activeFeatures));
+		} else if (vanilla.has("minecraftArguments")) {
+			for (String arg : vanilla.get("minecraftArguments").getAsString().trim().split("\\s+")) {
+				gameArgs.add(substitute(arg, values));
+			}
+			// No Quick Play before 1.20: the old --server / --port arguments do the same.
+			if (quickPlayServerAddress != null && !quickPlayServerAddress.isBlank()) {
+				String host = quickPlayServerAddress;
+				String port = "25565";
+				int colon = host.lastIndexOf(':');
+				if (colon > 0 && host.indexOf(':') == colon) {
+					port = host.substring(colon + 1);
+					host = host.substring(0, colon);
+				}
+				gameArgs.addAll(List.of("--server", host, "--port", port));
+			}
+		}
 		if (fabric.has("arguments") && fabric.getAsJsonObject("arguments").has("game")) {
 			gameArgs.addAll(resolveArguments(fabric.getAsJsonObject("arguments").getAsJsonArray("game"), values, activeFeatures));
 		}

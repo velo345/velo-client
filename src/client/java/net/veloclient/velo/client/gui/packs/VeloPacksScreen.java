@@ -188,7 +188,9 @@ public final class VeloPacksScreen extends VeloWindow {
 		if (!PackBridge.canSelect(entry)) {
 			return;
 		}
-		if (!PackBridge.compatible(entry)) {
+		// Packs made for another version almost always work (textures are textures): use them straight away. Only a pack
+		// Minecraft can't even read the format of still asks.
+		if (!PackBridge.compatible(entry) && PackBridge.versionBadge(entry) == null) {
 			String id = PackBridge.id(entry);
 			this.client.setScreen(new VeloConfirmScreen(this, "Incompatible pack", PackBridge.compatibilityQuestion(entry).getString(), "Use anyway",
 					() -> {
@@ -409,7 +411,7 @@ public final class VeloPacksScreen extends VeloWindow {
 		MenuKit.text(context, this.textRenderer, title, textX, y + 6, VeloUi.withAlpha(MenuKit.TEXT, textAlpha));
 		int bx = textX + this.textRenderer.getWidth(title) + 6;
 		for (String b : badges) {
-			bx += PackUi.badge(context, bx, y + 5, b, b.equals("Incompatible") ? 0xFFFF7A7E : b.equals("Folder") ? MenuKit.GREEN : MenuKit.TEXT_2) + 4;
+			bx += PackUi.badge(context, bx, y + 5, b, b.equals("Incompatible") ? 0xFFFF7A7E : b.endsWith(" version") ? 0xFFF7C04A : b.equals("Folder") ? MenuKit.GREEN : MenuKit.TEXT_2) + 4;
 		}
 		List<String> lines = VeloUi.wrap(PackBridge.description(entry).getString(), Math.max(30, textW));
 		for (int i = 0; i < Math.min(2, lines.size()); i++) {
@@ -424,7 +426,8 @@ public final class VeloPacksScreen extends VeloWindow {
 	private List<String> badges(Object entry) {
 		List<String> out = new ArrayList<>();
 		if (!PackBridge.compatible(entry)) {
-			out.add("Incompatible");
+			String badge = PackBridge.versionBadge(entry);
+			out.add(badge != null ? badge : "Incompatible");
 		}
 		String id = PackBridge.id(entry);
 		Path file = fileOf(id);
@@ -495,7 +498,7 @@ public final class VeloPacksScreen extends VeloWindow {
 		ty += 3;
 		int badgeX = x + 10;
 		for (String b : badges(entry)) {
-			badgeX += PackUi.badge(context, badgeX, ty, b, b.equals("Incompatible") ? 0xFFFF7A7E : b.equals("Folder") ? MenuKit.GREEN : MenuKit.TEXT_2) + 4;
+			badgeX += PackUi.badge(context, badgeX, ty, b, b.equals("Incompatible") ? 0xFFFF7A7E : b.endsWith(" version") ? 0xFFF7C04A : b.equals("Folder") ? MenuKit.GREEN : MenuKit.TEXT_2) + 4;
 		}
 		if (PackBridge.isSelected(entry)) {
 			PackUi.badge(context, badgeX, ty, "Selected", VeloStyle.accent() | 0xFF000000);

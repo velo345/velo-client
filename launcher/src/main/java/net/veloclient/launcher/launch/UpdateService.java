@@ -137,9 +137,12 @@ public final class UpdateService {
 			return new Release(version, notes, page, false, null, modJars(assets, version));
 		}
 		String os = System.getProperty("os.name", "").toLowerCase();
+		// A .deb only where dpkg installs it. Arch & co. run the tar.gz build from their package manager (AUR
+		// velo-client-launcher): updates come through it, the launcher must not install around it.
+		boolean debian = !os.contains("win") && !os.contains("mac") && (onPath("dpkg") || onPath("apt"));
 		for (Asset asset : assets) {
 			if (os.contains("win") && asset.name().endsWith(".exe")
-					|| !os.contains("win") && !os.contains("mac") && asset.name().endsWith(".deb")) {
+					|| debian && asset.name().endsWith(".deb")) {
 				installer = asset;
 			}
 		}

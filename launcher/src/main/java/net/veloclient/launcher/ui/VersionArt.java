@@ -105,6 +105,18 @@ public final class VersionArt {
 
 	/** From disk when it was rendered before with the real game textures, else rendered now (and saved if it can be). */
 	static BufferedImage picture(String version) throws Exception {
+		// Rendered in Blender at release time (tools/release/version_tiles.py): a diorama of what's new in that version,
+		// with real lighting. The ray-traced scene below is only for versions without one.
+		if (!Boolean.getBoolean("velo.versionArtNoCache")) {
+			try (var in = VersionArt.class.getResourceAsStream("/net/veloclient/launcher/images/versions/" + version + ".jpg")) {
+				if (in != null) {
+					BufferedImage bundled = ImageIO.read(in);
+					if (bundled != null) {
+						return bundled;
+					}
+				}
+			}
+		}
 		Path file = cacheFile(version);
 		boolean noCache = Boolean.getBoolean("velo.versionArtNoCache"); // previews while designing the scenes
 		if (!noCache && Files.isRegularFile(file)) {

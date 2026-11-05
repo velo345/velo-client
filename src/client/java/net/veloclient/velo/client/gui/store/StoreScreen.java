@@ -223,6 +223,10 @@ public final class StoreScreen extends VeloWindow {
 		}
 	}
 
+	private static final String DISCORD_INVITE = "https://discord.gg/tGwn8RsMpv";
+	private int discordX;
+	private int discordW;
+
 	@Override
 	protected void renderHeaderExtras(DrawContext context, int mouseX, int mouseY) {
 		int h = 18;
@@ -247,12 +251,25 @@ public final class StoreScreen extends VeloWindow {
 		VeloDraw.strokeRounded(context, lockerX, y, lockerW, h, 6, lockerHover ? 0x38FFFFFF : 0x17FFFFFF);
 		MenuKit.icon(context, "cosmetics", lockerX + 8, y + 4, 10, lockerHover ? MenuKit.TEXT : MenuKit.TEXT_2);
 		MenuKit.text(context, this.textRenderer, locker, lockerX + 22, y + (h - 8) / 2, lockerHover ? MenuKit.TEXT : MenuKit.TEXT_2);
+		// The Discord on every tab (free Velo Neon cloak, giveaways) - it used to be a line on the Cloaks tab only.
+		Text discord = MenuKit.uiBold("Discord");
+		discordW = 8 + 10 + 4 + this.textRenderer.getWidth(discord) + 8;
+		discordX = lockerX - 8 - discordW;
+		if (discordX < headerTabsEnd() + 10) {
+			discordW = 0; // a small window: the tabs need the room (the Cloaks tab still has the banner)
+			discordX = lockerX;
+		} else {
+			boolean discordHover = MenuKit.inside(mouseX, mouseY, discordX, y, discordW, h);
+			VeloDraw.fillRounded(context, discordX, y, discordW, h, 6, discordHover ? 0xFF6B77F5 : 0xFF5865F2);
+			MenuKit.icon(context, "link", discordX + 8, y + 4, 10, 0xFFFFFFFF);
+			MenuKit.text(context, this.textRenderer, discord, discordX + 22, y + (h - 8) / 2, 0xFFFFFFFF);
+		}
 		// Owner panel, for owners (the server checks every call anyway).
 		ownerW = 0;
 		if (StoreClient.isOwner()) {
 			Text owner = MenuKit.ui("Owner panel");
 			ownerW = 8 + 10 + 4 + this.textRenderer.getWidth(owner) + 8;
-			ownerX = lockerX - 8 - ownerW;
+			ownerX = discordX - 8 - ownerW;
 			boolean ownerHover = MenuKit.inside(mouseX, mouseY, ownerX, y, ownerW, h);
 			VeloDraw.fillRounded(context, ownerX, y, ownerW, h, 6, ownerHover ? 0x1AFFFFFF : 0x0DFFFFFF);
 			VeloDraw.strokeRounded(context, ownerX, y, ownerW, h, 6, ownerHover ? 0x38FFFFFF : 0x17FFFFFF);
@@ -271,6 +288,10 @@ public final class StoreScreen extends VeloWindow {
 		}
 		if (MenuKit.inside(mouseX, mouseY, lockerX, y, lockerW, h)) {
 			this.client.setScreen(new net.veloclient.velo.client.gui.CapeEquipScreen(this));
+			return true;
+		}
+		if (discordW > 0 && MenuKit.inside(mouseX, mouseY, discordX, y, discordW, h)) {
+			VeloUi.openUrl(DISCORD_INVITE);
 			return true;
 		}
 		if (ownerW > 0 && MenuKit.inside(mouseX, mouseY, ownerX, y, ownerW, h)) {

@@ -67,6 +67,11 @@ public final class GameJars {
 			Files.createDirectories(modsDir);
 			byte[] bundled = currentBytes(version.id());
 			if (bundled == null) {
+				if (version.ordinal() < GameVersion.MC_1_21_11.ordinal()) {
+					// Velo isn't built for this version yet: the profile plays with the player's own mods.
+					LauncherLog.info("No velo-client jar for Minecraft " + version.id() + " yet - launching without it");
+					return;
+				}
 				throw new IllegalStateException("No bundled velo-client jar for Minecraft " + version.id()
 						+ " (was the launcher built with ./gradlew :launcher:build?)");
 			}

@@ -815,6 +815,23 @@ public final class StoreService {
 
 	public void setPartnerCodes(PartnerCodes codes) {
 		this.partnerCodes = codes;
+		// Codes added straight to partner-codes.json (not through the panel) were never tried on Tebex, so players
+		// couldn't use them: check those once in the background after start.
+		if (codes != null) {
+			Thread.ofVirtual().name("partner-code-check").start(() -> {
+				for (PartnerCodes.Code c : codes.all()) {
+					if (c.checkedAt() == 0) {
+						try {
+							PartnerCodes.Code checked = checkPartnerCode(c.code());
+							System.out.println("[store] partner code " + c.code() + " checked on Tebex: "
+									+ (checked != null && Boolean.TRUE.equals(checked.tebexOk()) ? checked.type() + " " + checked.percent() + "%" : "not found"));
+						} catch (Exception e) {
+							System.out.println("[store] partner code " + c.code() + " check failed: " + e);
+						}
+					}
+				}
+			});
+		}
 	}
 
 	public PartnerCodes partnerCodes() {

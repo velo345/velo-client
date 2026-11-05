@@ -18,7 +18,9 @@ public final class VeloDev implements VeloAddon {
 		ModuleRegistry.register(new net.veloclient.velo.dev.tweaks.GlintColorizerModule());
 		ModuleRegistry.register(new net.veloclient.velo.dev.tweaks.ItemPhysicsModule());
 		ModuleRegistry.register(new net.veloclient.velo.dev.tweaks.BetterTabListModule());
-		ModuleRegistry.register(new net.veloclient.velo.dev.tweaks.ChatHeadsModule());
+		//? if >=1.21.11 {
+		ModuleRegistry.register(new net.veloclient.velo.dev.tweaks.ChatHeadsModule()); // 1.21.10's chat has no per-line hook
+		//?}
 		ModuleRegistry.register(new net.veloclient.velo.dev.tweaks.BlockBreakProgressModule());
 		ModuleRegistry.register(new net.veloclient.velo.dev.storage.StorageMemoryModule());
 		ModuleRegistry.register(new net.veloclient.velo.dev.notes.NotesModule());

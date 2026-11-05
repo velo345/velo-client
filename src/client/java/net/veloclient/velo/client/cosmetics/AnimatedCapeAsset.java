@@ -119,7 +119,9 @@ public final class AnimatedCapeAsset {
 	static final class SmoothTexture extends NativeImageBackedTexture {
 		SmoothTexture(java.util.function.Supplier<String> name, int width, int height) {
 			super(name, width, height, false);
-			//? if <26.1 {
+			//? if <1.21.11 {
+			/*setFilter(true, false); // 1.21.10: no sampler cache yet
+			*///?} else if <26.1 {
 			this.sampler = com.mojang.blaze3d.systems.RenderSystem.getSamplerCache().get(com.mojang.blaze3d.textures.FilterMode.LINEAR);
 			//?} else {
 			/*this.sampler = com.mojang.blaze3d.systems.RenderSystem.getSamplerCache().getClampToEdge(com.mojang.blaze3d.textures.FilterMode.LINEAR);

@@ -1,0 +1,47 @@
+# Maintainer: Velo Client <support@velo-client.com>
+# Velo Client Launcher for Arch Linux: the release's prebuilt app folder (own Java runtime inside), installed to /opt.
+# Updated per release by tools/release/update_aur.sh (version + checksum + .SRCINFO).
+pkgname=velo-client-launcher-bin
+pkgver=1.1.2
+pkgrel=1
+pkgdesc="Launch Minecraft with your Velo Client mod profiles"
+arch=('x86_64')
+url="https://velo-client.com"
+license=('LicenseRef-proprietary')
+# JavaFX draws through GTK 3; Minecraft (LWJGL) needs OpenGL/Vulkan, X11/Wayland libs and sound.
+depends=('gtk3' 'libxtst' 'libxrandr' 'libxxf86vm' 'libxi' 'alsa-lib' 'libglvnd' 'xdg-utils' 'hicolor-icon-theme')
+optdepends=('vulkan-icd-loader: Vulkan renderer on Minecraft 26.x'
+            'pipewire-pulse: sound and Clips audio on PipeWire systems'
+            'gamemode: Feral GameMode while playing')
+provides=('velo-client-launcher')
+conflicts=('velo-client-launcher')
+options=('!strip' '!debug')
+source=("velo-client-launcher-${pkgver}-linux-x64.tar.gz::https://github.com/velo345/velo-client/releases/download/v${pkgver}/velo-client-launcher-${pkgver}-linux-x64.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+	install -d "${pkgdir}/opt"
+	cp -a "${srcdir}/velo-client-launcher" "${pkgdir}/opt/velo-client-launcher"
+
+	# A small wrapper (the jpackage launcher finds its runtime next to its real path).
+	install -Dm755 /dev/stdin "${pkgdir}/usr/bin/velo-client-launcher" <<'EOF'
+#!/bin/sh
+exec "/opt/velo-client-launcher/bin/Velo Client Launcher" "$@"
+EOF
+
+	install -Dm644 "${srcdir}/velo-client-launcher/lib/Velo Client Launcher.png" \
+		"${pkgdir}/usr/share/icons/hicolor/256x256/apps/velo-client-launcher.png"
+
+	install -Dm644 /dev/stdin "${pkgdir}/usr/share/applications/velo-client-launcher.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Velo Client Launcher
+GenericName=Minecraft Launcher
+Comment=Launch Minecraft with your Velo Client mod profiles
+Exec=velo-client-launcher
+Icon=velo-client-launcher
+Terminal=false
+Categories=Game;
+Keywords=minecraft;velo;launcher;
+EOF
+}

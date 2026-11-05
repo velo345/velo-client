@@ -18,6 +18,21 @@ public final class FabricApiInstaller {
 
 	private static final String MAVEN_BASE_URL = "https://maven.fabricmc.net/";
 	private static final String METADATA = MAVEN_BASE_URL + "net/fabricmc/fabric-api/fabric-api/maven-metadata.xml";
+	/** 1.8.9 / 1.9.4: Legacy Fabric API, same maven layout under its own group. */
+	private static final String LEGACY_MAVEN = "https://maven.legacyfabric.net/";
+	private static final String LEGACY_GROUP = "net/legacyfabric/legacy-fabric-api/legacy-fabric-api/";
+
+	private static String maven(GameVersion version) {
+		return version.legacy() ? LEGACY_MAVEN : MAVEN_BASE_URL;
+	}
+
+	private static String group(GameVersion version) {
+		return version.legacy() ? LEGACY_GROUP : "net/fabricmc/fabric-api/fabric-api/";
+	}
+
+	private static String prefix(GameVersion version) {
+		return version.legacy() ? "legacy-fabric-api-" : "fabric-api-";
+	}
 	private static final java.util.Map<String, String> NEWEST = new java.util.concurrent.ConcurrentHashMap<>();
 
 	private FabricApiInstaller() {
@@ -27,14 +42,14 @@ public final class FabricApiInstaller {
 		try {
 			Files.createDirectories(modsDir);
 			String apiVersion = newestFor(version);
-			String targetName = "fabric-api-" + apiVersion + ".jar";
-			String relativePath = "net/fabricmc/fabric-api/fabric-api/" + apiVersion + "/" + targetName;
+			String targetName = prefix(version) + apiVersion + ".jar";
+			String relativePath = group(version) + apiVersion + "/" + targetName;
 			Path cached = GameDataPaths.libraries().resolve(relativePath);
 			try {
-				Downloader.ensure(URI.create(MAVEN_BASE_URL + relativePath), cached, null, -1, b -> { });
+				Downloader.ensure(URI.create(maven(version) + relativePath), cached, null, -1, b -> { });
 			} catch (IOException mavenDown) {
 				// Fabric's Maven is unreachable for some players (or just slow): the same file is on Modrinth.
-				if (!fromModrinth(version, apiVersion, cached)) {
+				if (version.legacy() || !fromModrinth(version, apiVersion, cached)) {
 					throw mavenDown;
 				}
 			}
@@ -78,7 +93,7 @@ public final class FabricApiInstaller {
 			try {
 				var client = java.net.http.HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(8))
 						.followRedirects(java.net.http.HttpClient.Redirect.NORMAL).build();
-				var response = client.send(java.net.http.HttpRequest.newBuilder(URI.create(METADATA))
+				var response = client.send(java.net.http.HttpRequest.newBuilder(URI.create(version.legacy() ? LEGACY_MAVEN + LEGACY_GROUP + "maven-metadata.xml" : METADATA))
 						.timeout(java.time.Duration.ofSeconds(10)).GET().build(), java.net.http.HttpResponse.BodyHandlers.ofString());
 				if (response.statusCode() == 200) {
 					var m = java.util.regex.Pattern.compile("<version>([^<]+)</version>").matcher(response.body());
@@ -89,6 +104,9 @@ public final class FabricApiInstaller {
 				}
 			} catch (Exception e) {
 				// Maven slow / unreachable: try Modrinth, then what's cached
+			}
+			if (version.legacy()) {
+				return best;
 			}
 			try {
 				for (var v : net.veloclient.launcher.modrinth.ModrinthClient.versions("fabric-api", id)) {
@@ -166,11 +184,12 @@ public final class FabricApiInstaller {
 	/** "0.161.0+26.2" from "fabric-api-0.161.0+26.2.jar" (null if the name isn't like that). */
 	private static String versionOf(Path jar) {
 		String name = jar.getFileName().toString();
-		return name.startsWith("fabric-api-") && name.endsWith(".jar") ? name.substring("fabric-api-".length(), name.length() - 4) : null;
+		String prefix = name.startsWith("legacy-fabric-api-") ? "legacy-fabric-api-" : "fabric-api-";
+		return name.startsWith(prefix) && name.endsWith(".jar") ? name.substring(prefix.length(), name.length() - 4) : null;
 	}
 
 	private static boolean isFabricApiJar(Path path) {
 		String name = path.getFileName().toString();
-		return name.startsWith("fabric-api-") && name.endsWith(".jar");
+		return (name.startsWith("fabric-api-") || name.startsWith("legacy-fabric-api-")) && name.endsWith(".jar");
 	}
 }

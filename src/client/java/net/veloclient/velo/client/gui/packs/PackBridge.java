@@ -145,6 +145,12 @@ public final class PackBridge {
 		return e(entry).getCompatibility().isCompatible();
 	}
 
+	/** "Older version" / "Newer version" for a pack made for another pack format (enum names TOO_OLD/TOO_NEW in every mapping). */
+	public static String versionBadge(Object entry) {
+		String name = ((Enum<?>) e(entry).getCompatibility()).name();
+		return name.contains("OLD") ? "Older version" : name.contains("NEW") ? "Newer version" : null;
+	}
+
 	/** Why the pack is incompatible ("made for a newer version"), shown on its row. */
 	public static Text compatibilityNote(Object entry) {
 		//? if <26.1 {

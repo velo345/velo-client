@@ -60,6 +60,7 @@ public final class MenuShell {
 		if (net.veloclient.velo.client.gui.ModMenuScreen.addonsAvailable()) {
 			out.add(new Entry("addons", "extensions", "Addons", false, p -> net.veloclient.velo.client.gui.ModMenuScreen.forView(true)));
 		}
+		out.add(new Entry("mods", "extensions", "Mods", false, net.veloclient.velo.client.mods.ModConfigs::modList));
 		out.add(new Entry("skins", "skins", "Locker", false, p -> net.veloclient.velo.client.gui.CapeEquipScreen.open(p, 1)));
 		out.add(new Entry("friends", "friends", "Friends", false, p -> new net.veloclient.velo.client.gui.FriendsScreen(p)));
 		out.add(new Entry("clips", "clips", "Clips & Screenshots", false, p -> new net.veloclient.velo.client.gui.media.MediaScreen(p)));

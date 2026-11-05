@@ -109,7 +109,11 @@ public abstract class ContainerAnimationsMixin {
 	}
 
 	@Inject(method = "drawSlot", at = @At("HEAD"), cancellable = true, require = 0)
+	//? if <1.21.11 {
+	/*private void velo$hideIncoming(net.minecraft.client.gui.DrawContext context, net.minecraft.screen.slot.Slot slot, CallbackInfo ci) {
+	*///?} else {
 	private void velo$hideIncoming(net.minecraft.client.gui.DrawContext context, net.minecraft.screen.slot.Slot slot, int mouseX, int mouseY, CallbackInfo ci) {
+	//?}
 		if (ContainerAnimationsModule.itemMovement() && ContainerAnimationsModule.hiddenUntilLanded(slot.id)) {
 			ci.cancel();
 		}

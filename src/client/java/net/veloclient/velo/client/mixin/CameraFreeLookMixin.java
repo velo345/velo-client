@@ -54,7 +54,11 @@ public abstract class CameraFreeLookMixin {
 	protected abstract void setPos(double x, double y, double z);
 
 	@Inject(method = "update", at = @At("TAIL"))
+	//? if <1.21.11 {
+	/*private void velo$applyFreeLook(net.minecraft.world.BlockView area, net.minecraft.entity.Entity focusedEntity,
+	*///?} else {
 	private void velo$applyFreeLook(net.minecraft.world.World area, net.minecraft.entity.Entity focusedEntity,
+	//?}
 			boolean thirdPerson, boolean inverseView, float tickDelta, CallbackInfo ci) {
 		if (!FreeLookModule.isActive() || focusedEntity == null) {
 			return;

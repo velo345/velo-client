@@ -216,7 +216,13 @@ public final class StoreView {
 		Bundle bundle = openBundle == null ? null : bundles().stream().filter(b -> b.id().equals(openBundle)).findFirst().orElse(null);
 		if (bundle != null) {
 			body.getChildren().add(bundlePage(host, bundle));
-		} else switch (page) {
+		} else {
+			// The Discord (free cloak, giveaways, VIP role) sits at the top of every tab - at the bottom nobody found it.
+			if (page != Page.PLUS && page != Page.FEATURED) {
+				body.getChildren().add(discordBanner());
+			}
+		}
+		if (bundle == null) switch (page) {
 			case FEATURED -> buildFeatured(host, body);
 			case WINGS -> buildWings(host, body);
 			case CAPES -> buildCapes(host, body);
@@ -275,6 +281,7 @@ public final class StoreView {
 		if (StoreApi.welcomeGift()) {
 			body.getChildren().add(welcomeGiftBanner(host));
 		}
+		body.getChildren().add(discordBanner());
 		if (!collectionWings.isEmpty()) {
 			body.getChildren().add(featuredHero(host, collection, collectionWings));
 		}
@@ -305,7 +312,6 @@ public final class StoreView {
 				host.rebuild();
 			}, capeGrid(host, capes, 180)));
 		}
-		body.getChildren().add(discordBanner());
 	}
 
 	private static Node section(String title, String subtitle, String linkText, Runnable onLink, Node content) {
@@ -685,7 +691,6 @@ public final class StoreView {
 	private static void buildCapes(Host host, VBox body) {
 		var items = StoreCatalog.all().stream().filter(i -> i.inStore() || StoreOwnership.owns(i.id())).toList();
 		body.getChildren().add(section("Animated cloaks", items.size() + " cloaks", null, null, capeGrid(host, items, 200)));
-		body.getChildren().add(discordBanner());
 	}
 
 	private static void buildAuras(Host host, VBox body) {
@@ -1414,15 +1419,18 @@ public final class StoreView {
 		return box;
 	}
 
+	private static final String PUBLIC_DISCORD = "https://discord.gg/tGwn8RsMpv";
+
 	private static Node discordBanner() {
 		StackPane icon = new StackPane(Icons.icon("link", 20, Color.web("#8EA1FF")));
 		icon.setMinSize(46, 46);
 		icon.setMaxSize(46, 46);
 		icon.setStyle("-fx-background-color: rgba(88,101,242,0.18); -fx-background-radius: 12;");
-		Label title = new Label("Velo Neon cloak · free with Discord");
+		Label title = new Label("Join the Velo Discord · free Velo Neon cloak");
 		title.getStyleClass().add("t-strong");
-		title.setStyle("-fx-font-size: 15px;");
-		Label status = new Label("Join the Velo Discord and link your Minecraft account. It isn't sold in the Store.");
+		title.setStyle("-fx-font-size: 17px;");
+		Label status = new Label("Giveaways, sales first, the VIP role and help - link your Minecraft account there and the cloak is yours."
+				+ " It isn't sold in the Store.");
 		status.getStyleClass().add("t-muted");
 		status.setWrapText(true);
 		VBox text = new VBox(3, title, status);
@@ -1432,12 +1440,14 @@ public final class StoreView {
 		getCode.setDisable(true);
 		Button join = new Button("Join the Discord");
 		join.setStyle("-fx-background-color: #5865F2; -fx-border-color: transparent; -fx-text-fill: white;");
-		join.setDisable(true);
-		String[] invite = {""};
+		// The public invite works signed out too; the server's (when it answers) wins.
+		String[] invite = {PUBLIC_DISCORD};
 		HBox box = new HBox(16, icon, text, getCode, join);
 		box.setAlignment(Pos.CENTER_LEFT);
 		box.getStyleClass().add("card");
-		box.setPadding(new Insets(16, 18, 16, 16));
+		box.setPadding(new Insets(18, 20, 18, 18));
+		box.setStyle("-fx-border-color: rgba(88,101,242,0.55); -fx-border-width: 1.5; -fx-border-radius: 14;"
+				+ " -fx-background-color: linear-gradient(to right, rgba(88,101,242,0.20), rgba(88,101,242,0.04));");
 		join.setOnAction(e -> CoinsView.openUrl(invite[0]));
 		CompletableFuture.supplyAsync(() -> {
 			try {
@@ -1450,8 +1460,9 @@ public final class StoreView {
 				status.setText("Sign in to link your Discord.");
 				return;
 			}
-			invite[0] = result.has("inviteUrl") && !result.get("inviteUrl").isJsonNull() ? result.get("inviteUrl").getAsString() : "";
-			join.setDisable(invite[0].isBlank());
+			if (result.has("inviteUrl") && !result.get("inviteUrl").isJsonNull() && !result.get("inviteUrl").getAsString().isBlank()) {
+				invite[0] = result.get("inviteUrl").getAsString();
+			}
 			if (result.has("linked") && result.get("linked").getAsBoolean()) {
 				status.setText("Linked as " + result.get("discordName").getAsString() + " - the cloak is in your Locker.");
 				status.setStyle("-fx-text-fill: -velo-green;");

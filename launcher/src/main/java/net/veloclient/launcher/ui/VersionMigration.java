@@ -69,6 +69,11 @@ final class VersionMigration {
 		boolean moves() {
 			return target != null;
 		}
+
+		/** Resource and shader packs work across versions: without a newer download they simply come along as they are. */
+		boolean pack() {
+			return kind != InstalledAssetStore.Kind.MOD;
+		}
 	}
 
 	private record Plan(String targetVersion, List<Item> items, List<ModrinthClient.ProjectVersion> extraDependencies) {
@@ -179,7 +184,8 @@ final class VersionMigration {
 		folders.forEach((kind, folder) -> {
 			Map<String, InstalledAsset> known = InstalledAssetStore.asMap(InstalledAssetStore.loadAll(instance.id(), kind));
 			try (Stream<Path> files = Files.list(folder)) {
-				for (Path file : files.filter(Files::isRegularFile).sorted().toList()) {
+				// Packs can be unpacked folders too (most self-made ones are) - those used to be left behind.
+				for (Path file : files.filter(p -> Files.isRegularFile(p) || kind != InstalledAssetStore.Kind.MOD && Files.isDirectory(p)).sorted().toList()) {
 					String name = file.getFileName().toString();
 					String enabled = name.endsWith(".disabled") ? name.substring(0, name.length() - ".disabled".length()) : name;
 					if (kind == InstalledAssetStore.Kind.MOD && (enabled.startsWith("velo-client-") || enabled.startsWith("fabric-api-")
@@ -255,8 +261,9 @@ final class VersionMigration {
 	private static void reviewStep(VBox card, Instance instance, Plan plan, Runnable close, Runnable onDone) {
 		boolean downgrade = indexOf(plan.targetVersion()) < indexOf(instance.mcVersion());
 		List<Item> moving = plan.items().stream().filter(Item::moves).toList();
-		List<Item> missing = plan.items().stream().filter(i -> !i.moves() && i.checked()).toList();
-		List<Item> unchecked = plan.items().stream().filter(i -> !i.moves() && !i.checked()).toList();
+		List<Item> missing = plan.items().stream().filter(i -> !i.moves() && i.checked() && !i.pack()).toList();
+		List<Item> unchecked = plan.items().stream().filter(i -> !i.moves() && !i.checked() && !i.pack()).toList();
+		List<Item> packsAsIs = plan.items().stream().filter(i -> !i.moves() && i.pack()).toList();
 		long mods = plan.items().stream().filter(i -> i.kind() == InstalledAssetStore.Kind.MOD).count();
 		long modsMoving = moving.stream().filter(i -> i.kind() == InstalledAssetStore.Kind.MOD).count();
 
@@ -273,6 +280,10 @@ final class VersionMigration {
 		if (!unchecked.isEmpty()) {
 			groups.getChildren().add(group("Can't be checked (not on Modrinth)", "migrate-unknown", "info", "#A9A9B3", unchecked,
 					item -> item.kind() == InstalledAssetStore.Kind.MOD ? "kept, disabled" : "kept as is"));
+		}
+		if (!packsAsIs.isEmpty()) {
+			groups.getChildren().add(group("Coming along as they are", "migrate-ok", "check", "#7dd3a0", packsAsIs,
+					item -> "pack works on " + plan.targetVersion()));
 		}
 		if (!moving.isEmpty()) {
 			groups.getChildren().add(group("Moving", "migrate-ok", "check", "#7dd3a0", moving,
@@ -430,7 +441,11 @@ final class VersionMigration {
 					InstalledAssetStore.record(target.id(), item.kind(), item.asset());
 				}
 			} else if (copy) {
-				Files.copy(item.file(), targetFolder.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+				if (Files.isDirectory(item.file())) {
+					copyTree(item.file(), targetFolder.resolve(fileName));
+				} else {
+					Files.copy(item.file(), targetFolder.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
+				}
 				if (item.asset() != null) {
 					InstalledAssetStore.record(target.id(), item.kind(), item.asset());
 				}

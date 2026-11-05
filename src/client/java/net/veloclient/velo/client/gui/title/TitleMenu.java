@@ -146,7 +146,9 @@ public final class TitleMenu {
 	 * the loading screen at startup, so one odd mod button must not take the whole game down.
 	 */
 	public static void render(DrawContext context, int width, int height, int mouseX, int mouseY, Env env) {
-		if (broken) {
+		// The loading screen can draw the title screen before its init() made our widgets (seen with Essential on
+		// 26.2): wait for them instead of marking the menu broken for the whole session.
+		if (broken || jumpCard == null || storeRow == null || storeCard == null || friends == null || discoverRow == null) {
 			return;
 		}
 		try {

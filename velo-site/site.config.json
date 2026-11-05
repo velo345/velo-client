@@ -18,6 +18,7 @@
     "channel": "Release",
     "launcherExe": "Velo.Client.Launcher-1.1.2.exe",
     "launcherDeb": "velo-client-launcher_1.1.2_amd64.deb",
+    "launcherTar": "velo-client-launcher-1.1.2-linux-x64.tar.gz",
     "date": "2026-11-04",
     "datePretty": "Nov 4, 2026"
   },
