@@ -24,7 +24,7 @@ import java.util.List;
  * old single-preset "Performance Mode". The granular sliders/toggles below
  * the preset picker are live views straight onto vanilla's own options -
  * always editable, not gated behind this module's own enable switch - so
- * picking "Performance" and then nudging just the view distance back up
+ * picking "Max FPS" and then nudging just the view distance back up
  * doesn't require re-toggling anything.
  *
  * <p>A few things worth being upfront about, since some of what's marketed
@@ -92,9 +92,9 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	 */
 	public static volatile boolean lightCosmetics = false;
 
-	private static final List<String> PRESETS = List.of("Auto", "Default", "Max FPS", "Performance", "Medium Quality", "High Quality");
+	private static final List<String> PRESETS = List.of("Auto", "Default", "Max FPS", "Medium Quality", "High Quality");
 	/** Quality steps Auto moves through, best first. */
-	private static final List<String> AUTO_LEVELS = List.of("High Quality", "Medium Quality", "Performance", "Max FPS");
+	private static final List<String> AUTO_LEVELS = List.of("High Quality", "Medium Quality", "Max FPS");
 	private static final int ADAPTIVE_MIN_DISTANCE = 5;
 	private static final int ADAPTIVE_WINDOW_TICKS = 60;
 
@@ -342,15 +342,17 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 			return;
 		}
 		switch (name) {
-			case "Max FPS" -> {
+			// One fast preset (it used to be two, "Performance" and "Max FPS", that differed only by 2 chunks of view
+			// distance - confusing). Distance capped at 8: below that PvP players lose sight of others.
+			case "Max FPS", "Performance" -> {
 				options.getPreset().setValue(GraphicsMode.FAST);
 				options.getParticles().setValue(ParticlesMode.MINIMAL);
 				options.getEntityShadows().setValue(false);
 				if (!keepDistance) {
-					options.getViewDistance().setValue(Math.min(options.getViewDistance().getValue(), 6));
+					options.getViewDistance().setValue(Math.min(options.getViewDistance().getValue(), 8));
 				}
 				if (!keepDistance) {
-					options.getSimulationDistance().setValue(Math.min(options.getSimulationDistance().getValue(), 6));
+					options.getSimulationDistance().setValue(Math.min(options.getSimulationDistance().getValue(), 8));
 				}
 				applyVsyncMode("Off");
 				options.getCloudRenderMode().setValue(CloudRenderMode.OFF);
@@ -359,20 +361,6 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				options.getMipmapLevels().setValue(0);
 				applyLowCostRendering();
 				VideoOptions.setWeatherRadius(3);
-			}
-			case "Performance" -> {
-				options.getPreset().setValue(GraphicsMode.FAST);
-				options.getParticles().setValue(ParticlesMode.MINIMAL);
-				options.getEntityShadows().setValue(false);
-				if (!keepDistance) {
-					options.getViewDistance().setValue(Math.min(options.getViewDistance().getValue(), 8));
-				}
-				applyVsyncMode("Off");
-				options.getCloudRenderMode().setValue(CloudRenderMode.OFF);
-				options.getBiomeBlendRadius().setValue(0);
-				options.getEntityDistanceScaling().setValue(0.75);
-				options.getMipmapLevels().setValue(0);
-				applyLowCostRendering();
 			}
 			case "Medium Quality" -> {
 				options.getPreset().setValue(GraphicsMode.FAST);
@@ -442,12 +430,13 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		GameOptions options = MinecraftClient.getInstance().options;
 		List<ConfigField> fields = new java.util.ArrayList<>(List.of(
 				new ConfigField.ChoiceField("Preset", PRESETS, () -> preset, v -> {
-					preset = v;
+					// saved before the merge: "Performance" is Max FPS now
+					preset = v.equals("Performance") ? "Max FPS" : v;
 					if (v.equals("Auto")) {
 						autoLevel = 0;
 					}
 					if (isEnabled()) {
-						applyPreset(v);
+						applyPreset(preset);
 						refreshRendering();
 					}
 				}),

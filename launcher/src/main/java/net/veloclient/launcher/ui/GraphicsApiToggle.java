@@ -30,7 +30,7 @@ final class GraphicsApiToggle {
 		if (!GraphicsApi.supported(instance.mcVersion())) {
 			return null;
 		}
-		boolean[] opengl = {GraphicsApi.OPENGL.equals(GraphicsApi.read(instance.id()))};
+		boolean[] opengl = {GraphicsApi.OPENGL.equals(GraphicsApi.effective(instance.id()))};
 		Region knob = new Region();
 		knob.getStyleClass().add("gapi-knob");
 		knob.setMinSize(SEGMENT, 24);

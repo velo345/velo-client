@@ -27,7 +27,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * Installs a small, curated set of widely-used Fabric optimization mods (plus Wavey Capes, for nicer capes, and Mod Menu) into a profile, from
+ * Installs a curated set of widely-used Fabric optimization mods (plus Wavey Capes, for nicer capes, and Mod Menu) into a profile, from
  * their official Modrinth releases - the single biggest FPS lever there is. Most of the frame
  * rate gap between vanilla and "PvP clients" comes from exactly this kind of engine-level work
  * (Sodium's rewritten chunk renderer alone is typically 2-3x or more), which no in-game
@@ -58,10 +58,31 @@ public final class PerformanceModsInstaller {
 		MODS.put("entityculling", "entityculling");
 		MODS.put("immediatelyfast", "immediatelyfast");
 		MODS.put("modernfix", "modernfix");
+		// Added 2026-11-05 after an A/B on 26.2 (same world, Velo + the mods above): Gnetum spreads HUD drawing over
+		// frames (Vulkan +24%, OpenGL +9%), Ixeris polls window/input events off the render thread (with Gnetum:
+		// Vulkan +29%, OpenGL +19%). ScalableLux (-4%), Optimized Block Entities and AsyncLogger showed no gain there.
+		MODS.put("gnetum", "gnetum");
+		MODS.put("ixeris", "ixeris");
+		// Culls leaf faces hidden by other leaves (fancy leaves keep their look): +19% in a forest world. Needs Sodium.
+		MODS.put("cull-fewer-leaves", "cull-fewer-leaves");
+		// Registers the render thread with Windows' "Games" scheduler class (MMCSS); does nothing elsewhere.
+		MODS.put("windows-priority-boost", "windows-priority-boost");
 		// Not performance: physics for capes (Velo Client detects it and hands it Velo's capes). Fetched from Modrinth like the rest, never bundled.
 		MODS.put("wavey-capes", "waveycapes");
 		// Mod Menu isn't installed any more: Velo's own Mods page lists every mod and opens their settings (2026-11-05).
 	}
+
+	/** Mods only installed on one OS ({@link OsRules#currentOsName()}): slug -> os name. */
+	private static final Map<String, String> ONLY_ON = Map.of("windows-priority-boost", "windows");
+
+	/** Modrinth project ids of mods this list installs itself, so another one may require them: project id -> mod id. */
+	private static final Map<String, String> OWN_DEPENDENCIES = Map.of("AANobbMI", "sodium");
+
+	/** Ours that need another one of ours (slug -> required mod id): taken out again when the player removes that one. */
+	private static final Map<String, String> NEEDS = Map.of("cull-fewer-leaves", "sodium");
+
+	/** Ours that refuse to load next to another mod ("breaks" in their fabric.mod.json): slug -> that mod's id. */
+	private static final Map<String, String> CLASHES = Map.of("cull-fewer-leaves", "moreculling");
 
 	/** Installed by older launchers, now part of Velo: removed again unless another mod needs them. */
 	private static final Map<String, String> RETIRED = Map.of("modmenu", "modmenu", "placeholder-api", "placeholder-api");
@@ -154,6 +175,24 @@ public final class PerformanceModsInstaller {
 				}
 			}
 			Set<String> presentModIds = installedModIds(modsDir);
+			Set<String> loading = enabledModIds(modsDir);
+			for (Map.Entry<String, String> clash : CLASHES.entrySet()) {
+				String fileName = state.installed.get(clash.getKey());
+				if (fileName != null && Files.exists(modsDir.resolve(fileName)) && loading.contains(clash.getValue())) {
+					// the player added the other one (MoreCulling): theirs wins, ours would stop the game from starting
+					Files.deleteIfExists(modsDir.resolve(fileName));
+					LauncherLog.info("Removed " + fileName + " - it can't run next to " + clash.getValue());
+				}
+			}
+			for (Map.Entry<String, String> need : NEEDS.entrySet()) {
+				String fileName = state.installed.get(need.getKey());
+				if (fileName != null && Files.exists(modsDir.resolve(fileName)) && !loading.contains(need.getValue())) {
+					// e.g. Cull Fewer Leaves without Sodium wouldn't even start the game
+					Files.deleteIfExists(modsDir.resolve(fileName));
+					state.installed.remove(need.getKey());
+					LauncherLog.info("Removed " + fileName + " - it needs " + need.getValue() + ", which isn't installed any more");
+				}
+			}
 			for (Map.Entry<String, String> mod : MODS.entrySet()) {
 				String slug = mod.getKey();
 				// Installed by us before: either still there, or the player removed/disabled it on
@@ -161,8 +200,19 @@ public final class PerformanceModsInstaller {
 				if (state.installed.containsKey(slug) || presentModIds.contains(mod.getValue())) {
 					continue;
 				}
+				String clash = CLASHES.get(slug);
+				if (clash != null && presentModIds.contains(clash)) {
+					continue;
+				}
+				String os = ONLY_ON.get(slug);
+				if (os != null && !os.equals(OsRules.currentOsName())) {
+					continue;
+				}
 				try {
-					installOne(slug, version, modsDir, presentModIds).ifPresent(fileName -> state.installed.put(slug, fileName));
+					installOne(slug, version, modsDir, presentModIds).ifPresent(fileName -> {
+						state.installed.put(slug, fileName);
+						writeDefaultConfig(slug, modsDir.getParent());
+					});
 				} catch (IOException | RuntimeException e) {
 					LauncherLog.warn("Skipping performance mod " + slug + " for " + version.id(), e);
 				}
@@ -204,8 +254,11 @@ public final class PerformanceModsInstaller {
 			return Optional.empty();
 		}
 		ModrinthClient.ProjectVersion projectVersion = chosen.get();
+		Set<String> loading = enabledModIds(modsDir);
 		boolean unmetDependency = projectVersion.requiredDependencies().stream()
-				.anyMatch(d -> !FABRIC_API_PROJECT_ID.equals(d.projectId()) && !PLACEHOLDER_API_PROJECT_ID.equals(d.projectId()));
+				.anyMatch(d -> !FABRIC_API_PROJECT_ID.equals(d.projectId()) && !PLACEHOLDER_API_PROJECT_ID.equals(d.projectId())
+						// one of ours (Sodium for Cull Fewer Leaves) - fine while it's really in the folder
+						&& !loading.contains(OWN_DEPENDENCIES.getOrDefault(d.projectId(), "\0")));
 		if (unmetDependency) {
 			// Fabric API is always installed alongside velo-client (FabricApiInstaller); anything
 			// else would need resolving, which this installer doesn't guess at - skip that mod.
@@ -225,13 +278,46 @@ public final class PerformanceModsInstaller {
 		return Optional.of(file.filename());
 	}
 
+	/**
+	 * Velo's starting config for a mod it just installed, only when the player has none yet. Gnetum: no "HUD FPS"
+	 * counter of its own on screen (Velo has its FPS display).
+	 */
+	private static void writeDefaultConfig(String slug, Path gameDir) {
+		// A full file (Gnetum's own defaults, one value changed): a partial one could leave its other settings unset.
+		String file = switch (slug) {
+			case "gnetum" -> "gnetum.json";
+			default -> null;
+		};
+		if (file == null) {
+			return;
+		}
+		Path target = gameDir.resolve("config").resolve(file);
+		try (InputStream in = PerformanceModsInstaller.class.getResourceAsStream("/net/veloclient/launcher/modconfig/" + file)) {
+			if (in != null && !Files.exists(target)) {
+				Files.createDirectories(target.getParent());
+				Files.copy(in, target);
+			}
+		} catch (IOException e) {
+			LauncherLog.warn("Couldn't write the default config for " + slug, e);
+		}
+	}
+
 	/** Mod ids (plus "provides" aliases) of every jar in {@code modsDir}, enabled or disabled. */
 	private static Set<String> installedModIds(Path modsDir) throws IOException {
+		return modIds(modsDir, true);
+	}
+
+	/** Mod ids of the jars that will really load (not .disabled). */
+	private static Set<String> enabledModIds(Path modsDir) throws IOException {
+		return modIds(modsDir, false);
+	}
+
+	private static Set<String> modIds(Path modsDir, boolean withDisabled) throws IOException {
 		Set<String> ids = new HashSet<>();
 		try (Stream<Path> files = Files.list(modsDir)) {
 			for (Path jar : files.filter(p -> {
 				String name = p.getFileName().toString();
-				return name.endsWith(".jar") || name.endsWith(".jar.disabled");
+				return name.endsWith(".jar") || withDisabled && name.endsWith(".jar.disabled");
 			}).toList()) {
 				try (ZipFile zip = new ZipFile(jar.toFile())) {
 					ZipEntry entry = zip.getEntry("fabric.mod.json");

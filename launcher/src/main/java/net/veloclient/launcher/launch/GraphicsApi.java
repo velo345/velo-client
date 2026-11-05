@@ -43,7 +43,16 @@ public final class GraphicsApi {
 		return InstancePaths.gameDir(instanceId).resolve("options.txt");
 	}
 
-	/** {@link #VULKAN}, {@link #OPENGL} or {@link #DEFAULT} (the game's default is Vulkan). */
+	/**
+	 * What the profile really runs: {@link #VULKAN} only when the player picked it. The game's "default" tries OpenGL
+	 * first (26.2/26.3 {@code PreferredGraphicsApi.getBackendsToTry}: GL then Vulkan for DEFAULT and OPENGL), so
+	 * default counts as OpenGL.
+	 */
+	public static String effective(String instanceId) {
+		return VULKAN.equals(read(instanceId)) ? VULKAN : OPENGL;
+	}
+
+	/** {@link #VULKAN}, {@link #OPENGL} or {@link #DEFAULT} as written in options.txt (default runs OpenGL, see {@link #effective}). */
 	public static String read(String instanceId) {
 		try {
 			Path file = options(instanceId);
@@ -62,7 +71,7 @@ public final class GraphicsApi {
 
 	/** True when the profile actually runs on OpenGL - Iris and other GL-only mods need that. */
 	public static boolean isOpenGl(String instanceId, String mcVersion) {
-		return !supported(mcVersion) || OPENGL.equals(read(instanceId));
+		return !supported(mcVersion) || OPENGL.equals(effective(instanceId));
 	}
 
 	private static Path pending(String instanceId) {

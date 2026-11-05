@@ -57,7 +57,7 @@ record Snapshot(Instance instance, List<ModScanner.ModInfo> mods, List<Pack> pac
 		GameVersion version = GameVersion.byId(instance.mcVersion());
 		String loader = version == null ? "0.19.5" : net.veloclient.launcher.launch.LoaderVersions.forInstance(instance.id(), version);
 		Map<String, InstalledAsset> assets = InstalledAssetStore.asMap(InstalledAssetStore.loadAll(instance.id(), InstalledAssetStore.Kind.MOD));
-		String api = GraphicsApi.supported(instance.mcVersion()) ? GraphicsApi.read(instance.id()) : GraphicsApi.OPENGL;
+		String api = GraphicsApi.supported(instance.mcVersion()) ? GraphicsApi.effective(instance.id()) : GraphicsApi.OPENGL;
 		Integer ram = instance.ramMaxMb() == null || net.veloclient.launcher.launch.MemoryPlanner.isLegacyDefault(instance) ? null : instance.ramMaxMb();
 		return new Snapshot(instance, mods, packs, shaders, api, ram, javaFor(instance.mcVersion()), loader, assets);
 	}
