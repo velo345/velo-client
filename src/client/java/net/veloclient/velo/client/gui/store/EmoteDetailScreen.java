@@ -48,7 +48,7 @@ public final class EmoteDetailScreen extends VeloWindow {
 		int price = StoreClient.price(type.itemId(), type.price());
 		if (!owned) {
 			VeloButton buy = new VeloButton(ix, contentY() + 70, iw, 20,
-					Text.literal(busy ? "..." : StoreClient.buyLabel(price)), b -> buy());
+					Text.literal(busy ? "..." : StoreClient.buyLabel(price)), b -> PurchaseConfirm.ask(this, type.name(), price, this::buy));
 			buy.primary();
 			addDrawableChild(buy);
 			return;

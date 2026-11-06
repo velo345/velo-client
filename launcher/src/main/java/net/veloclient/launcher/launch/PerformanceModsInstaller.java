@@ -67,6 +67,19 @@ public final class PerformanceModsInstaller {
 		MODS.put("cull-fewer-leaves", "cull-fewer-leaves");
 		// Registers the render thread with Windows' "Games" scheduler class (MMCSS); does nothing elsewhere.
 		MODS.put("windows-priority-boost", "windows-priority-boost");
+		// Added 2026-11-05 after a second 26.2 A/B (Chalet house, Velo + everything above, two rounds each): these five
+		// together loaded cleanly next to Velo and cost nothing (1707 vs 1662 FPS, inside run-to-run noise); their gains
+		// are in places that scene doesn't hit. BadOptimizations: CPU work outside rendering. Better Block Entities:
+		// chests/signs/beds baked into the chunk mesh (needs Sodium). Particle Core: particle culling and batching
+		// (needs Fabric Language Kotlin + Fzzy Config, installed just before it). Krypton: leaner network stack.
+		// Fast IP Ping: no reverse DNS lookup for numeric server addresses (server list pings instantly).
+		MODS.put("badoptimizations", "badoptimizations");
+		MODS.put("better-block-entities", "betterblockentities");
+		MODS.put("fabric-language-kotlin", "fabric-language-kotlin");
+		MODS.put("fzzy-config", "fzzy_config");
+		MODS.put("particle-core", "particle_core");
+		MODS.put("krypton", "krypton");
+		MODS.put("fast-ip-ping", "fastipping");
 		// Not performance: physics for capes (Velo Client detects it and hands it Velo's capes). Fetched from Modrinth like the rest, never bundled.
 		MODS.put("wavey-capes", "waveycapes");
 		// Mod Menu isn't installed any more: Velo's own Mods page lists every mod and opens their settings (2026-11-05).
@@ -101,10 +114,13 @@ public final class PerformanceModsInstaller {
 	/** Modrinth project ids of mods this list installs itself, so another one may require them: project id -> mod id. */
 	private static final Map<String, String> OWN_DEPENDENCIES = Map.of("AANobbMI", "sodium",
 			// Ornithe Standard Libraries (installed like Fabric API) and Argentum (for its Extras and Cera)
-			"EHGtwpJv", "osl", "QRMV06RW", "argentum");
+			"EHGtwpJv", "osl", "QRMV06RW", "argentum",
+			// Fabric Language Kotlin and Fzzy Config (for Particle Core)
+			"Ha28R6CL", "fabric-language-kotlin", "hYykXjDp", "fzzy_config");
 
 	/** Ours that need another one of ours (slug -> required mod id): taken out again when the player removes that one. */
-	private static final Map<String, String> NEEDS = Map.of("cull-fewer-leaves", "sodium", "argentum-extras", "argentum", "cera", "argentum");
+	private static final Map<String, String> NEEDS = Map.of("cull-fewer-leaves", "sodium", "argentum-extras", "argentum", "cera", "argentum",
+			"better-block-entities", "sodium", "fzzy-config", "fabric-language-kotlin", "particle-core", "fzzy_config");
 
 	/** Ours that refuse to load next to another mod ("breaks" in their fabric.mod.json): slug -> that mod's id. */
 	private static final Map<String, String> CLASHES = Map.of("cull-fewer-leaves", "moreculling", "sarcio", "zirconium");

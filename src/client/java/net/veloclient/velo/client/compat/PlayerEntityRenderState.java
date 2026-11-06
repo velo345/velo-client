@@ -20,6 +20,7 @@ public class PlayerEntityRenderState {
 	public int outlineColor;
 	public double squaredDistanceToCamera;
 	public SkinTextures skinTextures;
+	public net.minecraft.item.ItemStack equippedChestStack = net.minecraft.item.ItemStack.EMPTY;
 
 	public static PlayerEntityRenderState of(AbstractClientPlayerEntity player, float tickDelta) {
 		PlayerEntityRenderState s = new PlayerEntityRenderState();
@@ -34,6 +35,7 @@ public class PlayerEntityRenderState {
 		var camera = MinecraftClient.getInstance().gameRenderer.getCamera();
 		s.squaredDistanceToCamera = camera == null ? 0 : player.squaredDistanceTo(camera.getPos());
 		s.skinTextures = player.getSkinTextures();
+		s.equippedChestStack = player.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST);
 		return s;
 	}
 }

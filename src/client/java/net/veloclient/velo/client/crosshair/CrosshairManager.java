@@ -51,11 +51,13 @@ public final class CrosshairManager {
 		} catch (IOException ignored) {
 			// No crosshairs directory content yet; library just stays empty.
 		}
-		if (LIBRARY.isEmpty()) {
+		boolean fresh = LIBRARY.isEmpty();
+		if (fresh) {
 			seedDefaults();
 		}
 		EquipState state = ConfigManager.load("crosshair-equip", EquipState.class, new EquipState(null));
-		equippedId = state.equippedId();
+		equippedId = fresh ? equippedId : state.equippedId();
+		seedCenteredPresets(fresh);
 	}
 
 	public static Map<String, CrosshairDefinition> library() {
@@ -274,6 +276,88 @@ public final class CrosshairManager {
 		dot.close();
 
 		equippedId = crossDef.id();
+	}
+
+	/**
+	 * The centred preset set (2026-11-06): 15x15 canvases, so every shape has one real centre pixel and lines the same
+	 * length on each side. Added once to every library (a marker file remembers it); they're ordinary editable entries.
+	 */
+	private static void seedCenteredPresets(boolean fresh) {
+		Path marker = VeloPaths.crosshairs().resolve(".presets-v2");
+		if (Files.exists(marker)) {
+			return;
+		}
+		int n = 15, c = 7;
+		String first = null;
+		String[] names = {"Cross", "Cross + Dot", "Outlined Cross", "Dot", "Small Plus", "Circle", "X", "T", "Thick Cross", "Bracket Dot"};
+		for (int k = 0; k < names.length; k++) {
+			NativeImage img = new NativeImage(n, n, false);
+			img.fillRect(0, 0, n, n, 0);
+			int w = 0xFFFFFFFF, black = 0xC0000000;
+			switch (k) {
+				case 0, 1, 2 -> {
+					for (int d = 2; d <= 6; d++) {
+						img.setColorArgb(c + d, c, w); img.setColorArgb(c - d, c, w); img.setColorArgb(c, c + d, w); img.setColorArgb(c, c - d, w);
+					}
+					if (k >= 1) img.setColorArgb(c, c, w);
+					if (k == 2) outline(img, black);
+				}
+				case 3 -> { for (int dx = -1; dx <= 1; dx++) for (int dy = -1; dy <= 1; dy++) img.setColorArgb(c + dx, c + dy, w); outline(img, black); }
+				case 4 -> { for (int d = -3; d <= 3; d++) { img.setColorArgb(c + d, c, w); img.setColorArgb(c, c + d, w); } }
+				case 5 -> {
+					for (int y = 0; y < n; y++) for (int x = 0; x < n; x++) {
+						double r = Math.hypot(x - c, y - c);
+						if (Math.abs(r - 5.2) < 0.6) img.setColorArgb(x, y, w);
+					}
+					img.setColorArgb(c, c, w);
+				}
+				case 6 -> { for (int d = 2; d <= 5; d++) { img.setColorArgb(c + d, c + d, w); img.setColorArgb(c - d, c - d, w); img.setColorArgb(c + d, c - d, w); img.setColorArgb(c - d, c + d, w); } }
+				case 7 -> { for (int d = 2; d <= 6; d++) { img.setColorArgb(c + d, c, w); img.setColorArgb(c - d, c, w); img.setColorArgb(c, c + d, w); } img.setColorArgb(c, c, w); }
+				case 8 -> {
+					for (int d = 2; d <= 6; d++) for (int t = -1; t <= 1; t++) {
+						img.setColorArgb(c + d, c + t, w); img.setColorArgb(c - d, c + t, w); img.setColorArgb(c + t, c + d, w); img.setColorArgb(c + t, c - d, w);
+					}
+				}
+				default -> {
+					img.setColorArgb(c, c, w);
+					for (int d = 0; d <= 2; d++) {
+						img.setColorArgb(c - 5, c - 5 + d, w); img.setColorArgb(c - 5 + d, c - 5, w);
+						img.setColorArgb(c + 5, c - 5 + d, w); img.setColorArgb(c + 5 - d, c - 5, w);
+						img.setColorArgb(c - 5, c + 5 - d, w); img.setColorArgb(c - 5 + d, c + 5, w);
+						img.setColorArgb(c + 5, c + 5 - d, w); img.setColorArgb(c + 5 - d, c + 5, w);
+					}
+				}
+			}
+			CrosshairDefinition def = new CrosshairDefinition(UUID.randomUUID().toString(), names[k], n, CrosshairDefinition.HitMode.COLOR_SWAP,
+					Map.of(w, 0xFFFF4444));
+			save(def, img, null);
+			img.close();
+			if (first == null) first = def.id();
+		}
+		if (fresh && first != null) {
+			equippedId = first;
+		}
+		try {
+			Files.writeString(marker, "presets v2\n");
+		} catch (IOException ignored) {
+			// worst case they get added again next start
+		}
+	}
+
+	/** A dark pixel round every white pixel (on empty pixels only): readable on bright sky and snow. */
+	private static void outline(NativeImage img, int color) {
+		int n = img.getWidth();
+		boolean[] on = new boolean[n * n];
+		for (int y = 0; y < n; y++) for (int x = 0; x < n; x++) on[y * n + x] = (img.getColorArgb(x, y) >>> 24) > 0;
+		for (int y = 0; y < n; y++) for (int x = 0; x < n; x++) {
+			if (on[y * n + x]) continue;
+			boolean near = false;
+			for (int dy = -1; dy <= 1 && !near; dy++) for (int dx = -1; dx <= 1; dx++) {
+				int xx = x + dx, yy = y + dy;
+				if (xx >= 0 && yy >= 0 && xx < n && yy < n && on[yy * n + xx]) { near = true; break; }
+			}
+			if (near) img.setColorArgb(x, y, color);
+		}
 	}
 
 	private record Meta(String id, String name, int canvasSize, String hitMode, Map<Integer, Integer> colorSwap) {

@@ -167,6 +167,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.exportManifest();
 		AnticheatTestController.initIfEnabled();
 		net.veloclient.velo.client.devtools.ScreenshotTour.initIfRequested();
+		net.veloclient.velo.client.devtools.CosmeticsBench.register();
 		VeloClient.LOGGER.info("Velo Client ready ({} modules registered)", ModuleRegistry.all().size());
 	}
 
@@ -281,6 +282,9 @@ public final class VeloClientMod implements ClientModInitializer {
 		// PvP
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.OldAnimationsModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.ItemPositionModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.HoldUpItemsModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.ParticleSizeModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.ColorGradingModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.HitColorModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.HitParticlesModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.CooldownsModule());
@@ -349,6 +353,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ToggleSprintModule());
 		ModuleRegistry.register(new ToggleSneakModule());
 		ModuleRegistry.register(new ZoomModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.CenteredInventoryModule());
 		ModuleRegistry.register(new CustomCrosshairModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.AttackIndicatorModule());
 		ModuleRegistry.register(new MinimapModule());

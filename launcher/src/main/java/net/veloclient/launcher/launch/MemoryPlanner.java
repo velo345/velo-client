@@ -158,44 +158,54 @@ public final class MemoryPlanner {
 
 	/** @return {target heap, least heap this profile should run with} */
 	private static int[] automaticMb(Instance instance, long totalMb, List<String> reasons) {
-		int target;
-		int minimumNeed;
+		// What the setup needs (mods, render distance, packs, shaders) - always the floor.
+		int need = BASELINE_MB;
+		if (instance != null) {
+			int mods = countJars(InstancePaths.modsDir(instance.id()));
+			if (mods > BUNDLED_MODS) {
+				need += (mods - BUNDLED_MODS) * 35;
+				reasons.add(mods + " mods installed");
+			}
+			int renderDistance = readRenderDistance(InstancePaths.gameDir(instance.id()));
+			if (renderDistance > 12) {
+				need += (renderDistance - 12) * 90;
+				reasons.add("Render distance " + renderDistance);
+			}
+			long packsMb = folderSizeMb(InstancePaths.resourcePacksDir(instance.id()));
+			if (packsMb > 50) {
+				need += (int) Math.min(1536, packsMb * 0.8);
+				reasons.add(packsMb + " MB of resource packs");
+			}
+			if (countFiles(InstancePaths.shaderPacksDir(instance.id())) > 0) {
+				need += 700;
+				reasons.add("Shader packs installed");
+			}
+		}
+		int target = (int) (need * 1.5);
+		int minimumNeed = (int) (need * 1.2);
+		// What recent sessions really used can only RAISE that: a session spent in the menu or a quiet area measured
+		// ~700 MB, and Automatic then handed a 50-mod profile on a 32 GB PC just 2 GB (2026-11-06, bug report).
 		Learned learned = instance == null ? null : readLearned(instance);
 		if (learned != null) {
 			double headroom = learned.gcPercent > 3 || learned.nearOom ? 2.0 : 1.7;
-			target = (int) (learned.peakLiveMb * headroom) + 384;
-			minimumNeed = (int) (learned.peakLiveMb * (learned.nearOom ? 1.6 : 1.35)) + 384;
-			reasons.add(String.format(Locale.ROOT, "Recent sessions needed up to %.1f GB%s", learned.peakLiveMb / 1024.0,
-					learned.nearOom ? " and nearly ran out" : learned.gcPercent > 3
-							? String.format(Locale.ROOT, " and spent %.0f%% of the time collecting garbage", learned.gcPercent) : ""));
-		} else {
-			int need = BASELINE_MB;
-			if (instance != null) {
-				int mods = countJars(InstancePaths.modsDir(instance.id()));
-				if (mods > BUNDLED_MODS) {
-					need += (mods - BUNDLED_MODS) * 35;
-					reasons.add(mods + " mods installed");
-				}
-				int renderDistance = readRenderDistance(InstancePaths.gameDir(instance.id()));
-				if (renderDistance > 12) {
-					need += (renderDistance - 12) * 90;
-					reasons.add("Render distance " + renderDistance);
-				}
-				long packsMb = folderSizeMb(InstancePaths.resourcePacksDir(instance.id()));
-				if (packsMb > 50) {
-					need += (int) Math.min(1536, packsMb * 0.8);
-					reasons.add(packsMb + " MB of resource packs");
-				}
-				if (countFiles(InstancePaths.shaderPacksDir(instance.id())) > 0) {
-					need += 700;
-					reasons.add("Shader packs installed");
-				}
+			int learnedTarget = (int) (learned.peakLiveMb * headroom) + 384;
+			int learnedNeed = (int) (learned.peakLiveMb * (learned.nearOom ? 1.6 : 1.35)) + 384;
+			if (learnedTarget > target) {
+				reasons.add(String.format(Locale.ROOT, "Recent sessions needed up to %.1f GB%s", learned.peakLiveMb / 1024.0,
+						learned.nearOom ? " and nearly ran out" : learned.gcPercent > 3
+								? String.format(Locale.ROOT, " and spent %.0f%% of the time collecting garbage", learned.gcPercent) : ""));
 			}
-			target = (int) (need * 1.5);
-			minimumNeed = (int) (need * 1.2);
-			if (reasons.isEmpty()) {
-				reasons.add("Standard setup");
-			}
+			target = Math.max(target, learnedTarget);
+			minimumNeed = Math.max(minimumNeed, learnedNeed);
+		}
+		// A PC with plenty of RAM gets plenty: fewer, shorter garbage collections cost nothing there.
+		int pcFloor = totalMb >= 30_000 ? 6144 : totalMb >= 15_000 ? 4096 : totalMb >= 11_000 ? 3072 : 0;
+		if (pcFloor > target) {
+			target = pcFloor;
+			reasons.add(String.format(Locale.ROOT, "Room to spare on this %.0f GB PC", totalMb / 1024.0));
+		}
+		if (reasons.isEmpty()) {
+			reasons.add("Standard setup");
 		}
 
 		// A start that ran out of memory never gets to write its stats - remember it from its crash report instead.

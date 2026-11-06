@@ -16,11 +16,13 @@ public final class LowFireModule extends AbstractModule implements Configurable 
 
 	private double lower = 0.25;
 	private boolean hideWithFireRes = false;
+	/** Height of the flames drawn on burning players and mobs (1 = vanilla) - tall flames hide the person you're fighting. */
+	private double entityFireHeight = 0.5;
 	/** How opaque the fire overlay is drawn (1 = vanilla); dev build only for now. */
 	private double opacity = 1.0;
 
 	public LowFireModule() {
-		super("low-fire", "Low Fire", "Lowers the fire overlay while you burn so you can still see - or hides it with Fire Resistance.",
+		super("low-fire", "Low Fire", "Lowers the fire overlay while you burn and shrinks the flames on burning players and mobs - or hides it with Fire Resistance.",
 				ModuleCategory.PVP, SafetyTag.COSMETIC_ONLY, false);
 		instance = this;
 	}
@@ -29,6 +31,12 @@ public final class LowFireModule extends AbstractModule implements Configurable 
 	public static float offset() {
 		LowFireModule m = instance;
 		return m == null || !m.isEnabled() ? 0f : (float) m.lower;
+	}
+
+	/** Scale for the flames on burning entities (1 = vanilla). */
+	public static float entityFireScale() {
+		LowFireModule m = instance;
+		return m == null || !m.isEnabled() ? 1f : (float) m.entityFireHeight;
 	}
 
 	/** Multiplier for the fire overlay's alpha (1 = vanilla). */
@@ -74,6 +82,8 @@ public final class LowFireModule extends AbstractModule implements Configurable 
 					v -> Math.round(v * 100) + "%"));
 		}
 		fields.add(new ConfigField.ToggleField("Hide Fire Completely With Fire Resistance", () -> hideWithFireRes, v -> hideWithFireRes = v));
+		fields.add(new ConfigField.SliderField("Fire Height On Players & Mobs", 0.1, 1.0, () -> entityFireHeight,
+				v -> entityFireHeight = Math.round(v * 20) / 20.0, v -> v >= 0.999 ? "Vanilla" : Math.round(v * 100) + "%"));
 		return fields;
 	}
 }

@@ -214,7 +214,23 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 	 * enough for creative flight. It also looks a little ahead where the pet walks, so it hops up a step before it
 	 * reaches it instead of sliding into the block. NaN = nothing below (the brain keeps the ground it had).
 	 */
+	/** Ground per pet, reused while it hasn't moved much (the search below ran every frame: up to 2 x 48 block lookups). */
+	private static final java.util.Map<PetBrain, double[]> GROUND = new java.util.WeakHashMap<>();
+
 	private static double groundFor(PetBrain brain, double[] pos) {
+		double[] at0 = brain.position();
+		long now = System.nanoTime();
+		double px = at0 == null ? pos[0] : at0[0], pz = at0 == null ? pos[2] : at0[2];
+		double[] c = GROUND.get(brain);
+		if (c != null && now - (long) c[0] < 50_000_000L && Math.abs(px - c[1]) < 0.15 && Math.abs(pz - c[2]) < 0.15 && Math.abs(pos[1] - c[3]) < 0.25) {
+			return c[4];
+		}
+		double ground = searchGround(brain, pos);
+		GROUND.put(brain, new double[] {now, px, pz, pos[1], ground});
+		return ground;
+	}
+
+	private static double searchGround(PetBrain brain, double[] pos) {
 		double[] at = brain.position();
 		if (at == null) {
 			return PvpCompat.groundBelow(pos[0], pos[1] + 0.5, pos[2], 6);

@@ -69,7 +69,7 @@ public final class WingDetailScreen extends VeloWindow {
 		boolean equipped = type.id().equals(WingsManager.equippedId());
 		int price = StoreClient.price(type.itemId(), type.price());
 		VeloButton action = new VeloButton(ix, contentY() + 74, iw, 20, Text.literal(busy ? "..." : equipped ? "Take them off"
-				: owned ? "Equip" : StoreClient.buyLabel(price)), b -> action(owned, equipped));
+				: owned ? "Equip" : StoreClient.buyLabel(price)), b -> { if (owned) action(owned, equipped); else PurchaseConfirm.ask(this, type.name(), price, () -> action(owned, equipped)); });
 		if (!equipped) {
 			action.primary();
 		}

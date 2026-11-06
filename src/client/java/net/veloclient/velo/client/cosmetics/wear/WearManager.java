@@ -339,7 +339,8 @@ public final class WearManager {
 			return null;
 		}
 		try (InputStream in = java.nio.file.Files.newInputStream(file)) {
-			return EmoteProps.read(in);
+			// at most ~2,000 triangles: the Meshy originals (up to 21k) cost far more than they show at this size
+			return net.veloclient.velo.client.cosmetics.render.MeshLod.simplify(EmoteProps.read(in), 2000);
 		}
 	}
 

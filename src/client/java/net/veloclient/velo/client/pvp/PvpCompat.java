@@ -672,6 +672,15 @@ public final class PvpCompat {
 		return food == null ? null : new float[] {food.nutrition(), food.saturation()};
 	}
 
+	/** A placeable block (BlockItem). */
+	public static boolean isBlockItem(ItemStack stack) {
+		//? if <26.1 {
+		return stack.getItem() instanceof net.minecraft.item.BlockItem;
+		//?} else {
+		/*return stack.getItem() instanceof net.minecraft.world.item.BlockItem;
+		*///?}
+	}
+
 	/** Registry id of the stack's item, e.g. "minecraft:arrow". */
 	public static String itemId(ItemStack stack) {
 		//? if <26.1 {

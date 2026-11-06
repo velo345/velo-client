@@ -22,7 +22,7 @@ import java.util.List;
  */
 public final class CustomCrosshairModule extends AbstractModule implements Configurable {
 
-	private int size = 16;
+	private int size = 15;
 
 	public CustomCrosshairModule() {
 		super("custom-crosshair", "Custom Crosshair", "Replaces the vanilla crosshair with one from your library - draw your own or import a PNG.",
@@ -67,7 +67,12 @@ public final class CustomCrosshairModule extends AbstractModule implements Confi
 	public List<ConfigField> configFields() {
 		return List.of(
 				new ConfigField.ActionButtonField("Manage Crosshairs...", CustomCrosshairModule::openLibrary),
-				new ConfigField.SliderField("Size", 4, 64, () -> size, v -> size = (int) v, v -> (int) v + "px"));
+				new ConfigField.SliderField("Size", 5, 63, () -> size, v -> size = odd(v), v -> odd(v) + "px"));
+	}
+
+	/** Odd sizes only: an odd crosshair has one real centre pixel, so it sits exactly on the middle of the screen. */
+	private static int odd(double v) {
+		return Math.max(5, 2 * (int) Math.floor((Math.round(v) - 1) / 2.0) + 1);
 	}
 
 	private static void openLibrary() {

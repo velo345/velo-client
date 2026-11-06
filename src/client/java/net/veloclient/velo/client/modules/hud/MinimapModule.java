@@ -30,7 +30,6 @@ import java.util.List;
 public final class MinimapModule extends AbstractModule implements HudModule, Configurable {
 
 	private static final int BORDER_THICKNESS = 2;
-	private static final int ARROW_SIZE = 6;
 
 	private final HudPosition position = new HudPosition(0.85f, 0.02f);
 
@@ -39,6 +38,7 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 	private int refreshMillis = 750;
 	private boolean rotateWithPlayer = true;
 	private boolean showArrow = true;
+	private double arrowSize = 6;
 	private boolean showCoordinates = true;
 	private boolean showFacing = true;
 	private int borderColor = 0xFF2A2A2A;
@@ -191,8 +191,9 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 		}
 		context.getMatrices().scale(scale, scale);
 		context.getMatrices().translate(-(sampleRadius + offsetX), -(sampleRadius + offsetZ));
+		int texturePixels = textureSize * MinimapManager.PX;
 		context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, 0, 0, 0f, 0f,
-				textureSize, textureSize, textureSize, textureSize, textureSize, textureSize);
+				textureSize, textureSize, texturePixels, texturePixels, texturePixels, texturePixels);
 		context.getMatrices().popMatrix();
 	}
 
@@ -243,21 +244,30 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 
 	private void drawPlayerArrow(DrawContext context, PlayerEntity player, int centerX, int centerY) {
 		float angle = rotateWithPlayer ? 0f : (float) Math.toRadians(player.getYaw() + 180);
+		float size = (float) arrowSize;
+		// a dark outline first (one pixel bigger all round), then the arrow: readable on any terrain and at any size
+		drawArrowShape(context, centerX, centerY, angle, size + 1.6f, 0xE0101014);
+		drawArrowShape(context, centerX, centerY, angle, size, arrowColor | 0xFF000000);
+	}
+
+	/** An arrowhead with a notched back, rotated by hand (not through the matrix stack, so the map's zoom never stretches it). */
+	private static void drawArrowShape(DrawContext context, int centerX, int centerY, float angle, float size, int color) {
 		float sin = (float) Math.sin(angle);
 		float cos = (float) Math.cos(angle);
-		// A small filled triangle, rotated by hand (three points around the
-		// origin) rather than through the matrix stack, so its thickness
-		// doesn't get stretched by the map's own zoom scale.
-		int[][] localPoints = {{0, -ARROW_SIZE}, {-ARROW_SIZE / 2, ARROW_SIZE / 2}, {ARROW_SIZE / 2, ARROW_SIZE / 2}};
-		int[] xs = new int[3];
-		int[] ys = new int[3];
-		for (int i = 0; i < 3; i++) {
-			int lx = localPoints[i][0];
-			int ly = localPoints[i][1];
-			xs[i] = centerX + Math.round(lx * cos - ly * sin);
-			ys[i] = centerY + Math.round(lx * sin + ly * cos);
+		float[][] tris = {
+				{0, -size, -size * 0.62f, size * 0.62f, 0, size * 0.28f},
+				{0, -size, 0, size * 0.28f, size * 0.62f, size * 0.62f}};
+		for (float[] t : tris) {
+			int[] xs = new int[3];
+			int[] ys = new int[3];
+			for (int i = 0; i < 3; i++) {
+				float lx = t[i * 2];
+				float ly = t[i * 2 + 1];
+				xs[i] = centerX + Math.round(lx * cos - ly * sin);
+				ys[i] = centerY + Math.round(lx * sin + ly * cos);
+			}
+			fillTriangle(context, xs, ys, color);
 		}
-		fillTriangle(context, xs, ys, arrowColor);
 	}
 
 	/** Cheap scanline triangle fill - the arrow is only ever 3 points, not worth pulling in a general polygon renderer for. */
@@ -324,6 +334,7 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 				new ConfigField.SliderField("Refresh Rate", 200, 3000, () -> refreshMillis, v -> refreshMillis = (int) v, v -> Math.round(v) + "ms"),
 				new ConfigField.ToggleField("Rotate With Player", () -> rotateWithPlayer, v -> rotateWithPlayer = v),
 				new ConfigField.ToggleField("Show Player Arrow", () -> showArrow, v -> showArrow = v),
+				new ConfigField.SliderField("Arrow Size", 3, 18, () -> arrowSize, v -> arrowSize = Math.round(v * 2) / 2.0, v -> String.format(java.util.Locale.ROOT, "%.1f", v)),
 				new ConfigField.ToggleField("Show Coordinates", () -> showCoordinates, v -> showCoordinates = v),
 				new ConfigField.ToggleField("Show Facing", () -> showFacing, v -> showFacing = v),
 				new ConfigField.ColorField("Border Color", () -> borderColor, v -> borderColor = v, false),

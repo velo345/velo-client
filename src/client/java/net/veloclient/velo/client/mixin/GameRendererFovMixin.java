@@ -36,7 +36,7 @@ public abstract class GameRendererFovMixin {
 	@Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
 	private void velo$applyZoom(Camera camera, float tickProgress, boolean changingFov, CallbackInfoReturnable<Float> cir) {
 		if (changingFov && ZoomModule.isOverrideActive()) {
-			cir.setReturnValue(ZoomModule.currentOverrideFov());
+			cir.setReturnValue(ZoomModule.apply(cir.getReturnValueF()));
 		}
 	}
 }
@@ -47,7 +47,7 @@ public abstract class GameRendererFovMixin {
 	@Inject(method = "calculateFov", at = @At("RETURN"), cancellable = true)
 	private void velo$applyZoom(float partialTicks, CallbackInfoReturnable<Float> cir) {
 		if (ZoomModule.isOverrideActive()) {
-			cir.setReturnValue(ZoomModule.currentOverrideFov());
+			cir.setReturnValue(ZoomModule.apply(cir.getReturnValueF()));
 		}
 	}
 }

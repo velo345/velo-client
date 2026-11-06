@@ -141,6 +141,7 @@ public final class HudManager {
 		// every other vanilla HUD element (health/food/XP/chat/etc) and all
 		// our own modules below still haven't - applying the blur pass here
 		// blurs the world without smearing anything drawn on top of it.
+		net.veloclient.velo.client.modules.rendering.ColorGradingModule.applyIfActive();
 		net.veloclient.velo.client.modules.performance.PolyBlurModule.applyIfActive();
 		float tickDelta = tickCounter.getTickProgress(true);
 		int screenWidth = client.getWindow().getScaledWidth();

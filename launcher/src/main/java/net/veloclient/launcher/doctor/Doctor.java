@@ -287,7 +287,8 @@ public final class Doctor {
 			fixes.add(0, new Fix("Lower the render distance to " + safeDistance, "From " + renderDistance + " chunks - far less memory and work",
 					List.of(new Action.LowerRenderDistance(safeDistance))));
 		}
-		if (s.ramMaxMb() != null) {
+		if (s.ramMaxMb() != null && (hung || smallPc)) {
+			// only when the crash looks memory-related: offered for every crash, "Fix all" threw away the player's own RAM setting
 			fixes.add(new Fix("Use automatic memory", "A fixed amount can be too much or too little for your PC", List.of(new Action.SetMemory(0))));
 		}
 		String why;

@@ -46,7 +46,7 @@ public final class WearDetailScreen extends VeloWindow {
 		boolean wearing = type.id().equals(WearManager.equipped(type.slot()));
 		int price = StoreClient.price(type.itemId(), type.price());
 		VeloButton action = new VeloButton(ix, contentY() + 74, iw, 20, Text.literal(busy ? "..." : wearing ? "Take it off"
-				: owned ? "Wear it" : StoreClient.buyLabel(price)), b -> action(owned, wearing));
+				: owned ? "Wear it" : StoreClient.buyLabel(price)), b -> { if (owned) action(owned, wearing); else PurchaseConfirm.ask(this, type.name(), price, () -> action(owned, wearing)); });
 		if (!wearing) {
 			action.primary();
 		}

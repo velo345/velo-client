@@ -110,7 +110,13 @@ public final class PerformanceSettingsView {
 				refresh[0].run();
 			}
 		});
-		fixed.valueProperty().addListener((obs, o, n) -> fixedLabel.setText(gb((int) (Math.round(n.doubleValue() / 256.0) * 256))));
+		fixed.valueProperty().addListener((obs, o, n) -> {
+			fixedLabel.setText(gb((int) (Math.round(n.doubleValue() / 256.0) * 256)));
+			// A click on the track or the arrow keys change the value without a drag: save those too (a drag saves on release).
+			if (!fixed.isValueChanging()) {
+				refresh[0].run();
+			}
+		});
 		driverCache.setOnAction(e -> refresh[0].run());
 
 		SettingsUi.row(card, "RAM", pcInfo,

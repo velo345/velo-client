@@ -30,7 +30,7 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 	private static final int ROW_GAP = 3;
 	private static final int ICON_BAR_GAP = 2;
 
-	private static final List<String> STYLES = List.of("Classic", "Inventory Slots", "Bars");
+	private static final List<String> STYLES = List.of("Classic", "Durability Only", "Inventory Slots", "Bars");
 	private static final int BARS_ROW = 18;
 	private static final int BARS_BAR = 64;
 	private static final int SLOT = 18;
@@ -76,8 +76,37 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 		return barMatchesIcon ? ICON_SIZE : barWidth;
 	}
 
+	/** "Durability Only": the Classic layout with just the numbers (no icon, no bar), each one centred in its column. */
+	private boolean numbersOnly() {
+		return style.equals("Durability Only");
+	}
+
+	private <T> T asNumbersOnly(java.util.function.Supplier<T> body) {
+		if (!numbersOnly()) {
+			return body.get();
+		}
+		boolean icon = showIcon, bar = showBar, text = showText;
+		showIcon = false;
+		showBar = false;
+		showText = true;
+		try {
+			return body.get();
+		} finally {
+			showIcon = icon;
+			showBar = bar;
+			showText = text;
+		}
+	}
+
 	@Override
 	public void render(DrawContext context, int x, int y, float tickDelta) {
+		asNumbersOnly(() -> {
+			renderInner(context, x, y);
+			return null;
+		});
+	}
+
+	private void renderInner(DrawContext context, int x, int y) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client.player == null) {
 			return;
@@ -105,14 +134,22 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 			// Horizontal: the pieces side by side, each a column of icon + bar.
 			int x0 = x;
 			x = rowX;
+			boolean stacked = barBelowIcon || !showIcon;
 			if (showIcon) {
 				context.getMatrices().pushMatrix();
-				context.getMatrices().translate(x, rowY);
+				context.getMatrices().translate(stacked ? x + (cellW - ICON_SIZE) / 2 : x, rowY);
 				context.drawItemWithoutEntity(stack, 0, 0);
 				context.getMatrices().popMatrix();
 			}
 			int lineX = x + lineXOffset;
 			int centerY = rowY + lineCenterYOffset;
+			if (stacked) {
+				// the bar/number line centred in its cell, not stuck to the left edge
+				String number = stack.isDamageable() ? String.valueOf(stack.getMaxDamage() - stack.getDamage()) : stack.getName().getString();
+				int textW = showText ? scaledTextWidth(client, number) : 0;
+				int lineW = showBar && stack.isDamageable() ? barWidth + (showText ? 4 + textW : 0) : textW;
+				lineX = x + Math.max(0, (cellW - lineW) / 2);
+			}
 			if (stack.isDamageable()) {
 				int maxDamage = stack.getMaxDamage();
 				int remaining = maxDamage - stack.getDamage();
@@ -358,6 +395,10 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 
 	@Override
 	public int width() {
+		return asNumbersOnly(this::widthInner);
+	}
+
+	private int widthInner() {
 		if (slotStyle()) {
 			return slotsHorizontal ? visibleSlots() * SLOT : SLOT;
 		}
@@ -371,6 +412,10 @@ public final class ArmorDurabilityModule extends AbstractModule implements HudMo
 
 	@Override
 	public int height() {
+		return asNumbersOnly(this::heightInner);
+	}
+
+	private int heightInner() {
 		if (slotStyle()) {
 			return slotsHorizontal ? SLOT : visibleSlots() * SLOT;
 		}

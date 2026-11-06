@@ -34,6 +34,9 @@ public final class ModuleStateStore {
 	public static String currentKeyFormat = "glfw";
 	public static java.util.function.BiFunction<String, Integer, Integer> keyConverter = (format, code) -> code;
 
+	/** Field key for {@link Configurable#extraState()}. */
+	private static final String EXTRA_STATE = "__extra";
+
 	private ModuleStateStore() {
 	}
 
@@ -43,6 +46,9 @@ public final class ModuleStateStore {
 			Map<String, Object> fields = new LinkedHashMap<>();
 			if (module instanceof Configurable configurable) {
 				for (ConfigField field : configurable.configFields()) {
+					if (!configurable.persistField(field.label())) {
+						continue;
+					}
 					if (field instanceof ConfigField.SliderField slider) {
 						fields.put(slider.label(), slider.get().getAsDouble());
 					} else if (field instanceof ConfigField.ToggleField toggle) {
@@ -58,6 +64,10 @@ public final class ModuleStateStore {
 					} else if (field instanceof ConfigField.KeybindField keybind) {
 						fields.put(keybind.label(), keybind.getKeyCode().getAsInt());
 					}
+				}
+				String extra = configurable.extraState();
+				if (extra != null) {
+					fields.put(EXTRA_STATE, extra);
 				}
 			}
 			result.put(module.id(), new ModuleSnapshot(module.isEnabled(), fields));
@@ -122,6 +132,9 @@ public final class ModuleStateStore {
 			}
 			if (module instanceof Configurable configurable) {
 				for (ConfigField field : configurable.configFields()) {
+					if (!configurable.persistField(field.label())) {
+						continue;
+					}
 					Object value = saved.fields().get(field.label());
 					if (value == null) {
 						// Settings saved before capes were renamed cloaks.
@@ -156,6 +169,9 @@ public final class ModuleStateStore {
 						chord.set().accept(keyCodes);
 					}
 				}
+			}
+			if (module instanceof Configurable configurable && saved.fields().get(EXTRA_STATE) instanceof String extra) {
+				configurable.restoreExtraState(extra);
 			}
 			// Applied after fields: modules like Performance Boost read
 			// their own field state (e.g. which preset is selected) from

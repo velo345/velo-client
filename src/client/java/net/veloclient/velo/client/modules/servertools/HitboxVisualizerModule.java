@@ -116,13 +116,29 @@ public final class HitboxVisualizerModule extends AbstractModule implements Conf
 				//?} else {
 				/*for (EnderDragonPart part : dragon.getSubEntities()) {
 				*///?}
-					GizmoDrawing.box(part.getBoundingBox(), style);
+					GizmoDrawing.box(velo$lerped(part, part.getBoundingBox()), style);
 				}
 				continue;
 			}
-			GizmoDrawing.box(entity.getBoundingBox(), style);
+			GizmoDrawing.box(velo$lerped(entity, entity.getBoundingBox()), style);
 		}
 	}
+
+	/**
+	 * The box where the entity is drawn this frame: getBoundingBox() sits at the last tick position (20 a second), the
+	 * model at the frame's interpolated one - so the box trailed behind moving players and stepped.
+	 */
+	//? if <26.1 {
+	private static net.minecraft.util.math.Box velo$lerped(Entity entity, net.minecraft.util.math.Box box) {
+		double[] p = net.veloclient.velo.client.pvp.PvpCompat.renderPos(entity);
+		return box.offset(p[0] - entity.getX(), p[1] - entity.getY(), p[2] - entity.getZ());
+	}
+	//?} else {
+	/*private static net.minecraft.world.phys.AABB velo$lerped(Entity entity, net.minecraft.world.phys.AABB box) {
+		double[] p = net.veloclient.velo.client.pvp.PvpCompat.renderPos(entity);
+		return box.move(p[0] - entity.getX(), p[1] - entity.getY(), p[2] - entity.getZ());
+	}
+	*///?}
 
 	private static Kind kindOf(Entity entity) {
 		if (entity instanceof PlayerEntity) {

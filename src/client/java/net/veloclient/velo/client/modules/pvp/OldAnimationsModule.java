@@ -136,7 +136,7 @@ public final class OldAnimationsModule extends AbstractModule implements Configu
 	public List<ConfigField> configFields() {
 		return List.of(
 				new ConfigField.ToggleField("1.8 Swing (No Cooldown Hand Drop)", () -> noCooldownDrop, v -> noCooldownDrop = v),
-				new ConfigField.SliderField("Swing Duration (ticks)", 2, 16, () -> swingTicks, v -> swingTicks = Math.round(v),
+				new ConfigField.SliderField("Swing Duration (ticks)", 2, 40, () -> swingTicks, v -> swingTicks = Math.round(v),
 						v -> (int) Math.round(v) + (Math.round(v) == 6 ? " (vanilla)" : "")),
 				new ConfigField.ChoiceField("1.7 Sword Blocking", BLOCK_MODES, () -> blockMode, v -> blockMode = v),
 				new ConfigField.ToggleField("Hide Shield While Sword-Blocking", () -> hideShield, v -> hideShield = v),

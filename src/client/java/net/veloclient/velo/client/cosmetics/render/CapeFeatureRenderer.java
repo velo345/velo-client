@@ -196,9 +196,16 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 			return;
 		}
 		Identifier texture = net.veloclient.velo.client.cosmetics.GazeCapes.texture(definition, state.id, base);
+		// A chestplate: back and down a little, like vanilla's cape - else the cloak sits inside the armour.
+		boolean armour = !state.equippedChestStack.isEmpty();
 		if (!net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.clothPhysics() && this.classic != null) {
 			// Classic: vanilla's cape model, posed by vanilla from the render state.
+			matrixStack.push();
+			if (armour) {
+				matrixStack.translate(0.0F, -0.053125F, 0.06875F);
+			}
 			queue.submitModel(this.classic, state, matrixStack, RenderLayers.entityCutoutNoCull(texture), light, OverlayTexture.DEFAULT_UV, state.outlineColor, null);
+			matrixStack.pop();
 			return;
 		}
 		var model = this.getContextModel();
@@ -209,6 +216,9 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 				gui ? 0 : state.squaredDistanceToCamera);
 		matrixStack.push();
 		body.applyTransform(matrixStack);
+		if (armour) {
+			matrixStack.translate(0.0F, -0.053125F, 0.06875F);
+		}
 		queue.submitCustom(matrixStack, RenderLayers.entityCutoutNoCull(texture), (entry, consumer) ->
 				emit(geometry, entry.getPositionMatrix(), entry.getNormalMatrix(), (x, y, z, u, v, nx, ny, nz) ->
 						consumer.vertex(x, y, z, 0xFFFFFFFF, u, v, OverlayTexture.DEFAULT_UV, light, nx, ny, nz)));
@@ -286,9 +296,16 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 			return;
 		}
 		Identifier texture = net.veloclient.velo.client.cosmetics.GazeCapes.texture(definition, state.id, base);
+		// A chestplate: back and down a little, like vanilla's cape - else the cloak sits inside the armour.
+		boolean armour = !state.chestEquipment.isEmpty();
 		if (!net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.clothPhysics()) {
 			// Classic: vanilla's cape model, posed by vanilla from the render state.
+			matrixStack.pushPose();
+			if (armour) {
+				matrixStack.translate(0.0F, -0.053125F, 0.06875F);
+			}
 			queue.submitModel(this.classic, state, matrixStack, RenderTypes.entitySolid(texture), light, OverlayTexture.NO_OVERLAY, state.outlineColor, null);
+			matrixStack.popPose();
 			return;
 		}
 		PlayerModel model = this.getParentModel();
@@ -299,6 +316,9 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 				gui ? 0 : state.distanceToCameraSq);
 		matrixStack.pushPose();
 		body.translateAndRotate(matrixStack);
+		if (armour) {
+			matrixStack.translate(0.0F, -0.053125F, 0.06875F);
+		}
 		queue.submitCustomGeometry(matrixStack, RenderTypes.entityCutout(texture), (pose, consumer) ->
 				emit(geometry, new Matrix4f(pose.pose()), new Matrix3f(pose.normal()), (x, y, z, u, v, nx, ny, nz) ->
 						consumer.addVertex(x, y, z, 0xFFFFFFFF, u, v, OverlayTexture.NO_OVERLAY, light, nx, ny, nz)));

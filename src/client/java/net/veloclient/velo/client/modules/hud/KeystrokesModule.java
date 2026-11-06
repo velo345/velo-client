@@ -41,6 +41,11 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 
 	private int pressedColor = DEFAULT_PRESSED;
 	private int idleColor = DEFAULT_IDLE;
+	private static final List<String> SPACE_MODES = List.of("Same Size", "Wide");
+	/** "Wide" = a full-width space bar under WASD (Shift and Sprint sit above it as two half-width keys). */
+	private String spaceBar = "Same Size";
+	private double spaceHeight = 14;
+	private boolean showSneakSprint = true;
 
 	public KeystrokesModule() {
 		super("keystrokes", "Keystrokes", "Shows WASD, sneak, jump and sprint key state.",
@@ -60,6 +65,8 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 	private String labelFont;
 	private final int[] keyX = new int[7];
 	private final int[] keyY = new int[7];
+	private final int[] keyW = new int[7];
+	private final int[] keyH = new int[7];
 	private final KeyBinding[] keys = new KeyBinding[7];
 
 	@Override
@@ -74,7 +81,16 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 		n = put(n, options.leftKey, x, row2);
 		n = put(n, options.backKey, mid, row2);
 		n = put(n, options.rightKey, x + 2 * (KEY_SIZE + GAP), row2);
-		if (showExtendedKeys) {
+		if (showExtendedKeys && wideSpace()) {
+			int half = (wasdWidth - GAP) / 2;
+			int spaceY = row3;
+			if (showSneakSprint) {
+				n = put(n, options.sneakKey, x, row3, half, KEY_SIZE);
+				n = put(n, options.sprintKey, x + wasdWidth - half, row3, half, KEY_SIZE);
+				spaceY = row3 + KEY_SIZE + GAP;
+			}
+			n = put(n, options.jumpKey, x, spaceY, wasdWidth, (int) spaceHeight);
+		} else if (showExtendedKeys) {
 			n = put(n, options.sneakKey, x, row3);
 			n = put(n, options.jumpKey, mid, row3);
 			n = put(n, options.sprintKey, x + 2 * (KEY_SIZE + GAP), row3);
@@ -82,7 +98,7 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 		// Every key's shape goes out as one gui element (vanilla's layering cost grows with each element).
 		VeloDraw.beginBatch();
 		for (int i = 0; i < n; i++) {
-			drawKeyShape(context, keyX[i], keyY[i], keys[i].isPressed());
+			drawKeyShape(context, keyX[i], keyY[i], keyW[i], keyH[i], keys[i].isPressed());
 		}
 		VeloDraw.endBatch(context);
 		if (showLabels) {
@@ -93,48 +109,60 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 	}
 
 	private int put(int n, KeyBinding binding, int x, int y) {
+		return put(n, binding, x, y, KEY_SIZE, KEY_SIZE);
+	}
+
+	private int put(int n, KeyBinding binding, int x, int y, int w, int h) {
 		keys[n] = binding;
 		keyX[n] = x;
 		keyY[n] = y;
+		keyW[n] = w;
+		keyH[n] = h;
 		return n + 1;
 	}
 
-	private void drawKeyShape(DrawContext context, int x, int y, boolean pressed) {
+	private boolean wideSpace() {
+		return "Wide".equals(spaceBar);
+	}
+
+	private void drawKeyShape(DrawContext context, int x, int y, int kw, int kh, boolean pressed) {
+		int r6 = Math.min(6, kh / 2), r5 = Math.min(5, kh / 2), r3 = Math.min(3, kh / 2);
 		switch (style) {
 			case "Glass" -> {
 				// Frosted keys; a pressed key fills with the HUD accent and glows - unless this module's own colours were changed.
 				int accent = net.veloclient.velo.client.hud.HudLook.own(pressedColor, DEFAULT_PRESSED, net.veloclient.velo.client.hud.HudLook.accent());
 				if (pressed) {
-					VeloDraw.shadow(context, x, y, KEY_SIZE, KEY_SIZE, 6, 8, 2, (accent & 0xFFFFFF) | 0x90000000);
-					VeloDraw.fillRounded(context, x, y, KEY_SIZE, KEY_SIZE, 6, accent | 0xFF000000);
+					VeloDraw.shadow(context, x, y, kw, kh, r6, 8, 2, (accent & 0xFFFFFF) | 0x90000000);
+					VeloDraw.fillRounded(context, x, y, kw, kh, r6, accent | 0xFF000000);
 				} else {
 					// Light frosted key: enough to read the letter, little of the world hidden behind it.
-					VeloDraw.fillRounded(context, x, y, KEY_SIZE, KEY_SIZE, 6, idleColor != DEFAULT_IDLE ? idleColor : 0x38101016);
-					VeloDraw.strokeRounded(context, x, y, KEY_SIZE, KEY_SIZE, 6, 0x40FFFFFF);
+					VeloDraw.fillRounded(context, x, y, kw, kh, r6, idleColor != DEFAULT_IDLE ? idleColor : 0x38101016);
+					VeloDraw.strokeRounded(context, x, y, kw, kh, r6, 0x40FFFFFF);
 				}
 			}
 			case "Outline" -> {
 				boolean ownPressed = pressedColor != DEFAULT_PRESSED;
 				boolean ownIdle = idleColor != DEFAULT_IDLE;
 				if (pressed) {
-					VeloDraw.fillRounded(context, x, y, KEY_SIZE, KEY_SIZE, 5, ownPressed ? (pressedColor & 0xFFFFFF) | 0x40000000 : 0x40FFFFFF);
+					VeloDraw.fillRounded(context, x, y, kw, kh, r5, ownPressed ? (pressedColor & 0xFFFFFF) | 0x40000000 : 0x40FFFFFF);
 				}
-				VeloDraw.strokeRounded(context, x, y, KEY_SIZE, KEY_SIZE, 5, pressed ? (ownPressed ? pressedColor | 0xFF000000 : 0xFFFFFFFF)
+				VeloDraw.strokeRounded(context, x, y, kw, kh, r5, pressed ? (ownPressed ? pressedColor | 0xFF000000 : 0xFFFFFFFF)
 						: ownIdle ? idleColor : 0x90FFFFFF);
 			}
 			case "Minecraft" -> {
 				// The vanilla button look: light top-left edge, dark bottom-right, lighter when held.
-				context.fill(x, y, x + KEY_SIZE, y + KEY_SIZE, pressed ? 0xFFC6C6C6 : 0xFF6F6F6F);
-				context.fill(x, y, x + KEY_SIZE, y + 1, pressed ? 0xFFFFFFFF : 0xFF9A9A9A);
-				context.fill(x, y, x + 1, y + KEY_SIZE, pressed ? 0xFFFFFFFF : 0xFF9A9A9A);
-				context.fill(x, y + KEY_SIZE - 1, x + KEY_SIZE, y + KEY_SIZE, pressed ? 0xFF8B8B8B : 0xFF3F3F3F);
-				context.fill(x + KEY_SIZE - 1, y, x + KEY_SIZE, y + KEY_SIZE, pressed ? 0xFF8B8B8B : 0xFF3F3F3F);
+				context.fill(x, y, x + kw, y + kh, pressed ? 0xFFC6C6C6 : 0xFF6F6F6F);
+				context.fill(x, y, x + kw, y + 1, pressed ? 0xFFFFFFFF : 0xFF9A9A9A);
+				context.fill(x, y, x + 1, y + kh, pressed ? 0xFFFFFFFF : 0xFF9A9A9A);
+				context.fill(x, y + kh - 1, x + kw, y + kh, pressed ? 0xFF8B8B8B : 0xFF3F3F3F);
+				context.fill(x + kw - 1, y, x + kw, y + kh, pressed ? 0xFF8B8B8B : 0xFF3F3F3F);
 			}
-			default -> VeloDraw.fillRounded(context, x, y, KEY_SIZE, KEY_SIZE, 3, pressed ? pressedColor : idleColor);
+			default -> VeloDraw.fillRounded(context, x, y, kw, kh, r3, pressed ? pressedColor : idleColor);
 		}
 	}
 
 	private void drawLabel(DrawContext context, int i, int x, int y, KeyBinding binding) {
+		int kw = keyW[i], kh = keyH[i];
 		MinecraftClient client = MinecraftClient.getInstance();
 		boolean pressed = binding.isPressed();
 		int textColor = style.equals("Minecraft") && pressed ? 0xFF3F3F3F : 0xFFFFFFFF;
@@ -159,23 +187,23 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 		}
 		if (hudFont && styledLabels[i] != null) {
 			float w = labelWidths[i];
-			float s = w > KEY_SIZE - 4 ? (KEY_SIZE - 4) / (float) w : 1f;
+			float s = Math.min(w > kw - 4 ? (kw - 4) / (float) w : 1f, kh < 14 ? (kh - 2) / 9f : 1f);
 			context.getMatrices().pushMatrix();
 			// TTF advances have no trailing gap (unlike Minecraft's font): centre the full width, not snapped to pixels.
-			context.getMatrices().translate(x + (KEY_SIZE - w * s) / 2f, centred(y, GLYPH_HEIGHT, s));
+			context.getMatrices().translate(x + (kw - w * s) / 2f, centred(y, kh, GLYPH_HEIGHT, s));
 			context.getMatrices().scale(s, s);
 			net.veloclient.velo.client.hud.HudLook.text(context, (net.minecraft.text.Text) styledLabels[i], 0, 0, textColor);
 			context.getMatrices().popMatrix();
 			return;
 		}
 		int textWidth = (int) labelWidths[i];
-		float scale = textWidth > KEY_SIZE - 4 ? (KEY_SIZE - 4) / (float) textWidth : 1f;
+		float scale = Math.min(textWidth > kw - 4 ? (kw - 4) / (float) textWidth : 1f, kh < 14 ? (kh - 2) / 9f : 1f);
 		if (scale == 1f) {
-			context.drawTextWithShadow(client.textRenderer, labels[i], (int) centred(x, textWidth - 1, 1f), (int) centred(y, GLYPH_HEIGHT, 1f), textColor);
+			context.drawTextWithShadow(client.textRenderer, labels[i], (int) centred(x, kw, textWidth - 1, 1f), (int) centred(y, kh, GLYPH_HEIGHT, 1f), textColor);
 			return;
 		}
 		context.getMatrices().pushMatrix();
-		context.getMatrices().translate(centred(x, textWidth - 1, scale), centred(y, GLYPH_HEIGHT, scale));
+		context.getMatrices().translate(centred(x, kw, textWidth - 1, scale), centred(y, kh, GLYPH_HEIGHT, scale));
 		context.getMatrices().scale(scale, scale);
 		context.drawTextWithShadow(client.textRenderer, labels[i], 0, 0, textColor);
 		context.getMatrices().popMatrix();
@@ -185,8 +213,8 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 	private static final int GLYPH_HEIGHT = 7;
 
 	/** Where text {@code size} wide/tall (at {@code scale}) starts so its glyphs sit in the middle of the key - on whole pixels when unscaled (rounded down: the shadow takes the pixel below/right). */
-	private static float centred(int start, int size, float scale) {
-		float offset = (KEY_SIZE - size * scale) / 2f;
+	private static float centred(int start, int box, int size, float scale) {
+		float offset = (box - size * scale) / 2f;
 		return start + (scale == 1f ? (float) Math.floor(offset) : offset);
 	}
 
@@ -214,8 +242,11 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 
 	@Override
 	public int height() {
-		int rows = showExtendedKeys ? 3 : 2;
-		return rows * (KEY_SIZE + GAP) - GAP;
+		int h = 2 * (KEY_SIZE + GAP) - GAP;
+		if (showExtendedKeys && wideSpace()) {
+			return h + (showSneakSprint ? KEY_SIZE + GAP : 0) + GAP + (int) spaceHeight;
+		}
+		return showExtendedKeys ? h + GAP + KEY_SIZE : h;
 	}
 
 	@Override
@@ -224,6 +255,9 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 				new ConfigField.ChoiceField("Style", STYLES, () -> style, v -> style = v),
 				new ConfigField.ToggleField("Show Key Labels", () -> showLabels, v -> showLabels = v),
 				new ConfigField.ToggleField("Show Sneak/Jump/Sprint Row", () -> showExtendedKeys, v -> showExtendedKeys = v),
+				new ConfigField.ChoiceField("Space Bar", SPACE_MODES, () -> spaceBar, v -> spaceBar = v),
+				new ConfigField.SliderField("Space Bar Height", 8, 30, () -> spaceHeight, v -> spaceHeight = Math.round(v), v -> (int) Math.round(v) + " px"),
+				new ConfigField.ToggleField("Shift & Sprint Above Wide Space", () -> showSneakSprint, v -> showSneakSprint = v),
 				new ConfigField.ColorField("Pressed Color", () -> pressedColor, v -> pressedColor = v, true),
 				new ConfigField.ColorField("Idle Color", () -> idleColor, v -> idleColor = v, true));
 	}

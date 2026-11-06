@@ -26,8 +26,32 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		net.minecraft.client.renderer.entity.state.AvatarRenderState, net.minecraft.client.model.player.PlayerModel> {
 *///?}
 
-	/** Reused per frame and per player: the deformed vertices (submitted geometry gets its own copy). */
+	/**
+	 * The posed wing per wearer, reused for up to 1/75 s: posing runs every vertex through the rig, and doing that on
+	 * every frame at a few hundred FPS cost ~15% of a third-person frame for no visible difference.
+	 */
+	private record Posed(WingModel model, long nanos, float[][] geometry) {
+	}
+
+	private final java.util.Map<Integer, Posed> posedCache = new java.util.HashMap<>();
+	/** Glow colours per posed geometry (same lifetime as {@link #posed}). Render thread. */
+	private static final java.util.Map<float[][], int[][]> GLOW_COLORS = new java.util.WeakHashMap<>();
 	private float[][] scratch;
+
+	private float[][] posed(int key, WingModel model, WingAnimator.Pose pose, WingsManager.Worn worn, float offsetY) {
+		long now = System.nanoTime();
+		Posed cached = posedCache.get(key);
+		if (cached != null && cached.model() == model && now - cached.nanos() < 13_333_333L) {
+			return cached.geometry();
+		}
+		scratch = WingAnimator.deform(model, pose, worn.settings(), offsetY, scratch);
+		float[][] geometry = copy(scratch);
+		if (posedCache.size() > 256) {
+			posedCache.clear();
+		}
+		posedCache.put(key, new Posed(model, now, geometry));
+		return geometry;
+	}
 
 	//? if <26.1 {
 	public WingsFeatureRenderer(net.minecraft.client.render.entity.feature.FeatureRendererContext<
@@ -94,14 +118,15 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		WingAnimator.Pose pose = WingAnimator.pose(tag != null ? tag.key() : state.id, motion, type.style(), worn.settings());
 		// Light Cosmetics (Performance Boost): just the wingbeat - no moving arms, glow, shine or particles.
 		boolean plainWings = net.veloclient.velo.client.modules.performance.PerformanceBoostModule.lightCosmetics;
+		// Someone else's wings far away: just the wingbeat - glow, shine and particles are invisible at that size anyway.
+		plainWings |= !self && player != null && client.player != null && player.squaredDistanceTo(client.player) > 24 * 24;
 		if (plainWings) {
 			pose = WingAnimator.plain(pose);
 		}
 		// A recolourable pair (white art): the wearer's colour.
 		int tint = WingRigs.recolorable(id) ? WingRigs.tint(worn.settings().color(), pose.seconds()) : -1;
 		int wingColor = tint < 0 ? 0xFFFFFFFF : 0xFF000000 | tint;
-		scratch = WingAnimator.deform(model, pose, worn.settings(), type.offsetY(), scratch);
-		float[][] geometry = copy(scratch);
+		float[][] geometry = posed(state.id, model, pose, worn, type.offsetY());
 		var texture = WingsManager.texture(id);
 		if (texture == null) {
 			return; // a server-only pair whose texture is still downloading
@@ -198,14 +223,15 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		WingAnimator.Pose pose = WingAnimator.pose(tag != null ? tag.key() : state.id, motion, type.style(), worn.settings());
 		// Light Cosmetics (Performance Boost): just the wingbeat - no moving arms, glow, shine or particles.
 		boolean plainWings = net.veloclient.velo.client.modules.performance.PerformanceBoostModule.lightCosmetics;
+		// Someone else's wings far away: just the wingbeat - glow, shine and particles are invisible at that size anyway.
+		plainWings |= !self && player != null && client.player != null && player.distanceToSqr(client.player) > 24 * 24;
 		if (plainWings) {
 			pose = WingAnimator.plain(pose);
 		}
 		// A recolourable pair (white art): the wearer's colour.
 		int tint = WingRigs.recolorable(id) ? WingRigs.tint(worn.settings().color(), pose.seconds()) : -1;
 		int wingColor = tint < 0 ? 0xFFFFFFFF : 0xFF000000 | tint;
-		scratch = WingAnimator.deform(model, pose, worn.settings(), type.offsetY(), scratch);
-		float[][] geometry = copy(scratch);
+		float[][] geometry = posed(state.id, model, pose, worn, type.offsetY());
 		var texture = WingsManager.texture(id);
 		if (texture == null) {
 			return; // a server-only pair whose texture is still downloading
@@ -217,8 +243,16 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		queue.submitCustomGeometry(matrices, net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture), (pose2, consumer) -> {
 			Matrix4f position = new Matrix4f(pose2.pose());
 			Matrix3f normal = new Matrix3f(pose2.normal());
-			emit(model, geometry, position, normal, (x, y, z, u, v, nx, ny, nz) -> consumer.addVertex(x, y, z, wingColor, u, v,
-					net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, drawLight, nx, ny, nz));
+			boolean fast = true;
+			for (int h = 0; h < model.halves.length && fast; h++) {
+				WingModel.Half half = model.halves[h];
+				fast = CosmeticVertexWriter.writeQuads(consumer, MeshLod.quadIndices(half.triangles), half.vertexCount(), geometry[h], 6, 0, 3,
+						half.uv, 2, 0, 1f, 0f, position, normal, wingColor, null, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, drawLight);
+			}
+			if (!fast) {
+				emit(model, geometry, position, normal, (x, y, z, u, v, nx, ny, nz) -> consumer.addVertex(x, y, z, wingColor, u, v,
+						net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, drawLight, nx, ny, nz));
+			}
 		});
 		if (model.shine != null && !plainWings) {
 			float seconds = pose.seconds();
@@ -232,8 +266,12 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 			float size = worn.settings().scale();
 			queue.submitCustomGeometry(matrices, net.minecraft.client.renderer.rendertype.RenderTypes.eyes(
 					net.minecraft.resources.Identifier.fromNamespaceAndPath("velo-client", SHINE_TEXTURE)),
-					(pose2, consumer) -> emitGlow(model, geometry, seconds, tint, new Matrix4f(pose2.pose()), (x, y, z, color, u, v) ->
-							consumer.addVertex(x, y, z, color, u, v, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, 0xF000F0, 0, 1, 0)));
+					(pose2, consumer) -> {
+						if (!glowBulk(model, geometry, seconds, tint, new Matrix4f(pose2.pose()), new Matrix3f(pose2.normal()), consumer)) {
+							emitGlow(model, geometry, seconds, tint, new Matrix4f(pose2.pose()), (x, y, z, color, u, v) ->
+									consumer.addVertex(x, y, z, color, u, v, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, 0xF000F0, 0, 1, 0));
+						}
+					});
 			queue.submitCustomGeometry(matrices, net.minecraft.client.renderer.rendertype.RenderTypes.eyes(
 					net.minecraft.resources.Identifier.fromNamespaceAndPath("velo-client", PARTICLE_TEXTURE)),
 					(pose2, consumer) -> emitParticles(model, geometry, seconds, size, tint, new Matrix4f(pose2.pose()), (x, y, z, color, u, v) ->
@@ -262,30 +300,90 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 			glow = WingRigs.tinted(glow, tint);
 		}
 		Vector3f p = new Vector3f();
-		int[] color = new int[3];
 		for (int h = 0; h < model.halves.length; h++) {
 			WingModel.Half half = model.halves[h];
 			if (half.glowMask == null) {
 				continue;
 			}
 			float[] g = geometry[h];
-			int[] tris = half.triangles;
-			for (int t = 0; t < tris.length; t += 3) {
-				int max = 0;
-				for (int c = 0; c < 3; c++) {
-					int v = tris[t + c];
-					color[c] = WingRigs.glowColor(glow, half.glowKey[v], half.glowMask[v], seconds);
-					max = Math.max(max, color[c] >>> 24);
+			// once per vertex (it used to be once per triangle corner), and only when the wing was posed anew
+			int[][] cachedColors = GLOW_COLORS.computeIfAbsent(geometry, k -> new int[model.halves.length][]);
+			int[] color = cachedColors[h];
+			if (color == null) {
+				int n = half.vertexCount();
+				color = new int[n];
+				for (int v = 0; v < n; v++) {
+					color[v] = WingRigs.glowColor(glow, half.glowKey[v], half.glowMask[v], seconds);
 				}
-				if (max < 4) {
-					continue;
+				cachedColors[h] = color;
+			}
+			emitColoredQuads(MeshLod.quadIndices(half.triangles), color, g, position, p, sink);
+		}
+	}
+
+	private static final float[] GLOW_UV = {0.25f, 0.5f};
+
+	/** The glow pass through the bulk writer (26.2+); false = take the vertex-by-vertex path. */
+	private static boolean glowBulk(WingModel model, float[][] geometry, float seconds, int tint, Matrix4f position, Matrix3f normal, Object consumer) {
+		WingRigs.Glow glow = model.effect.glow();
+		if (glow == null) {
+			return true;
+		}
+		if (tint >= 0) {
+			glow = WingRigs.tinted(glow, tint);
+		}
+		int[][] cachedColors = GLOW_COLORS.computeIfAbsent(geometry, k -> new int[model.halves.length][]);
+		for (int h = 0; h < model.halves.length; h++) {
+			WingModel.Half half = model.halves[h];
+			if (half.glowMask == null) {
+				continue;
+			}
+			int[] color = cachedColors[h];
+			if (color == null) {
+				color = new int[half.vertexCount()];
+				for (int v = 0; v < color.length; v++) {
+					color[v] = WingRigs.glowColor(glow, half.glowKey[v], half.glowMask[v], seconds);
 				}
-				for (int corner = 0; corner < 4; corner++) {
-					int c = Math.min(corner, 2);
-					int i = tris[t + c] * 6;
-					position.transformPosition(g[i], g[i + 1], g[i + 2], p);
-					sink.accept(p.x, p.y, p.z, color[c], 0.25f, 0.5f);
-				}
+				cachedColors[h] = color;
+			}
+			// only the quads that visibly glow (the rest was written, uploaded and depth-sorted for nothing)
+			int[] lit = litQuads(MeshLod.quadIndices(half.triangles), color);
+			if (lit.length == 0) {
+				continue;
+			}
+			if (!CosmeticVertexWriter.writeQuads(consumer, lit, half.vertexCount(), geometry[h], 6, 0, 3,
+					GLOW_UV, 0, 0, 1f, 0f, position, normal, 0, color, 0xA0000 /* no overlay */, 0xF000F0)) {
+				return h == 0 ? false : true;
+			}
+		}
+		return true;
+	}
+
+	/** The quads with any corner bright enough to see (alpha >= 4). */
+	private static int[] litQuads(int[] quads, int[] color) {
+		int[] out = new int[quads.length];
+		int m = 0;
+		for (int q = 0; q < quads.length; q += 4) {
+			if ((color[quads[q]] >>> 24) >= 4 || (color[quads[q + 1]] >>> 24) >= 4 || (color[quads[q + 2]] >>> 24) >= 4 || (color[quads[q + 3]] >>> 24) >= 4) {
+				System.arraycopy(quads, q, out, m, 4);
+				m += 4;
+			}
+		}
+		return m == out.length ? quads : java.util.Arrays.copyOf(out, m);
+	}
+
+	/** Quads of a full-bright pass: one colour per vertex, quads that are (almost) invisible left out. */
+	private static void emitColoredQuads(int[] quads, int[] color, float[] g, Matrix4f position, Vector3f p, ShineSink sink) {
+		for (int q = 0; q < quads.length; q += 4) {
+			int max = Math.max(Math.max(color[quads[q]] >>> 24, color[quads[q + 1]] >>> 24), Math.max(color[quads[q + 2]] >>> 24, color[quads[q + 3]] >>> 24));
+			if (max < 4) {
+				continue;
+			}
+			for (int corner = 0; corner < 4; corner++) {
+				int v = quads[q + corner];
+				int i = v * 6;
+				position.transformPosition(g[i], g[i + 1], g[i + 2], p);
+				sink.accept(p.x, p.y, p.z, color[v], 0.25f, 0.5f);
 			}
 		}
 	}
@@ -351,40 +449,26 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 	private static void emitShine(WingModel model, float[][] geometry, float seconds, Matrix4f position, ShineSink sink) {
 		int tint = model.shine.color();
 		Vector3f p = new Vector3f();
-		int[] color = new int[3];
 		float[] star = new float[3];
 		for (int h = 0; h < model.halves.length; h++) {
 			WingModel.Half half = model.halves[h];
 			float[] g = geometry[h];
-			int[] tris = half.triangles;
-			for (int t = 0; t < tris.length; t += 3) {
-				int max = 0;
-				for (int c = 0; c < 3; c++) {
-					int v = tris[t + c];
-					int i = v * 6;
-					float band = WingRigs.band(half.geometry[i], half.geometry[i + 1], half.side);
-					float hot = WingRigs.glintCore(band, seconds) + WingRigs.specular(g[i + 3], g[i + 4], g[i + 5]) * 0.55f;
-					float halo = WingRigs.glint(band, seconds) * 0.45f;
-					float a = Math.min(1f, hot + halo);
-					// The hotter, the whiter.
-					float white = Math.min(1f, hot * 1.4f);
-					int r = Math.round(((tint >> 16) & 0xFF) + (255 - ((tint >> 16) & 0xFF)) * white);
-					int gr = Math.round(((tint >> 8) & 0xFF) + (255 - ((tint >> 8) & 0xFF)) * white);
-					int b = Math.round((tint & 0xFF) + (255 - (tint & 0xFF)) * white);
-					int alpha = Math.round(a * 235);
-					color[c] = alpha << 24 | r << 16 | gr << 8 | b;
-					max = Math.max(max, alpha);
-				}
-				if (max < 4) {
-					continue;
-				}
-				for (int corner = 0; corner < 4; corner++) {
-					int c = Math.min(corner, 2);
-					int i = tris[t + c] * 6;
-					position.transformPosition(g[i], g[i + 1], g[i + 2], p);
-					sink.accept(p.x, p.y, p.z, color[c], 0.25f, 0.5f);
-				}
+			int vertices = half.vertexCount();
+			int[] color = new int[vertices];
+			for (int v = 0; v < vertices; v++) {
+				int i = v * 6;
+				float band = WingRigs.band(half.geometry[i], half.geometry[i + 1], half.side);
+				float hot = WingRigs.glintCore(band, seconds) + WingRigs.specular(g[i + 3], g[i + 4], g[i + 5]) * 0.55f;
+				float halo = WingRigs.glint(band, seconds) * 0.45f;
+				float a = Math.min(1f, hot + halo);
+				// The hotter, the whiter.
+				float white = Math.min(1f, hot * 1.4f);
+				int r = Math.round(((tint >> 16) & 0xFF) + (255 - ((tint >> 16) & 0xFF)) * white);
+				int gr = Math.round(((tint >> 8) & 0xFF) + (255 - ((tint >> 8) & 0xFF)) * white);
+				int b = Math.round((tint & 0xFF) + (255 - (tint & 0xFF)) * white);
+				color[v] = Math.round(a * 235) << 24 | r << 16 | gr << 8 | b;
 			}
+			emitColoredQuads(MeshLod.quadIndices(half.triangles), color, g, position, p, sink);
 			// Stars: a flat four-pointed sprite on the feather, a little behind it so it isn't hidden by it.
 			for (int k = 0; k < WingRigs.STARS; k++) {
 				WingRigs.star(k, h, seconds, half.vertexCount(), star);
@@ -420,26 +504,24 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		return out;
 	}
 
-	/** Every triangle of both halves as a quad (last corner twice), transformed by the pose. */
+	/** Both halves as quads (paired triangles, {@link MeshLod#quadIndices}), transformed by the pose. */
 	private static void emit(WingModel model, float[][] geometry, Matrix4f position, Matrix3f normal, VertexSink sink) {
 		Vector3f p = new Vector3f();
 		Vector3f n = new Vector3f();
 		for (int h = 0; h < model.halves.length; h++) {
 			WingModel.Half half = model.halves[h];
 			float[] g = geometry[h];
-			int[] tris = half.triangles;
-			for (int t = 0; t < tris.length; t += 3) {
-				for (int corner = 0; corner < 4; corner++) {
-					int v = tris[t + Math.min(corner, 2)];
-					int i = v * 6;
-					position.transformPosition(g[i], g[i + 1], g[i + 2], p);
-					normal.transform(g[i + 3], g[i + 4], g[i + 5], n);
-					float length = n.length();
-					if (length > 1e-6f) {
-						n.div(length);
-					}
-					sink.accept(p.x, p.y, p.z, half.uv[v * 2], half.uv[v * 2 + 1], n.x, n.y, n.z);
+			int[] quads = MeshLod.quadIndices(half.triangles);
+			for (int k = 0; k < quads.length; k++) {
+				int v = quads[k];
+				int i = v * 6;
+				position.transformPosition(g[i], g[i + 1], g[i + 2], p);
+				normal.transform(g[i + 3], g[i + 4], g[i + 5], n);
+				float length = n.length();
+				if (length > 1e-6f) {
+					n.div(length);
 				}
+				sink.accept(p.x, p.y, p.z, half.uv[v * 2], half.uv[v * 2 + 1], n.x, n.y, n.z);
 			}
 		}
 	}

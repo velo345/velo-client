@@ -95,6 +95,11 @@ public final class InstanceSettingsDialog {
 			}
 			int min = (int) Math.round(minSlider.getValue());
 			int max = (int) Math.max(min, Math.round(maxSlider.getValue()));
+			if (max == 4096 && min == 4096) {
+				// 4096/4096 is what old launchers saved without asking (MemoryPlanner.isLegacyDefault treats it as
+				// Automatic) - a real choice of 4 GB is stored with a minimum one MB lower so it's kept.
+				min = 4095;
+			}
 			return instance.withSettings(min, max, extraArgs.isEmpty() ? null : extraArgs);
 		});
 

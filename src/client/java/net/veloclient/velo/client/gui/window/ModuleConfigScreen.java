@@ -424,6 +424,13 @@ public final class ModuleConfigScreen extends VeloWindow {
 		// (Screen's default handling routes through VeloWindow.close(),
 		// which itself calls this) - one override for both paths.
 		net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
+		// Many settings (Max FPS, view distance...) are vanilla options: write options.txt too, or a restart before
+		// vanilla saved it on its own brought the old values back.
+		//? if <26.1 {
+		net.minecraft.client.MinecraftClient.getInstance().options.write();
+		//?} else {
+		/*net.minecraft.client.Minecraft.getInstance().options.save();
+		*///?}
 		super.requestClose();
 	}
 }

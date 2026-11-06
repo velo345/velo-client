@@ -87,7 +87,7 @@ public final class StoreItemDetailScreen extends VeloWindow {
 
 		boolean owned = StoreOwnership.owns(item.id());
 		actionButton = new VeloButton(infoX, actionY, infoWidth, 20,
-				Text.literal(owned ? "Equip" : net.veloclient.velo.client.network.StoreClient.buyLabel(item.priceCoins())), b -> onAction());
+				Text.literal(owned ? "Equip" : net.veloclient.velo.client.network.StoreClient.buyLabel(item.priceCoins())), b -> { if (owned) onAction(); else PurchaseConfirm.ask(this, item.name(), item.priceCoins(), this::onAction); });
 		if (!owned) {
 			actionButton.primary();
 		}

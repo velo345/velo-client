@@ -115,6 +115,8 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	// alone. "High Quality" as the default raised the view distance to 16 (and clouds, shadows,
 	// mipmaps...) on every launch, so a fresh install ran heavier than the settings the player chose.
 	private String preset = "Default";
+	/** Set while the saved profile is applied (fields first, then enable): onEnable must not re-apply the preset then. */
+	private long restoredFromProfileNanos;
 	private int autoTargetFps = 60;
 	private int autoLevel;
 	private boolean autoNotify = false;
@@ -285,7 +287,13 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		previousInactivityLimit = options.getInactivityFpsLimit().getValue();
 		//?}
 
-		applyPreset(preset);
+		if (restoredFromProfileNanos != 0 && System.nanoTime() - restoredFromProfileNanos < 3_000_000_000L) {
+			// Started with the saved profile: its fields already hold exactly what the player set - re-applying the
+			// preset here overwrote every tweak made after picking it (view distance, clouds, VSync...) on each start.
+			restoredFromProfileNanos = 0;
+		} else {
+			applyPreset(preset);
+		}
 		// (Not while profiling: the profiled window has no focus or input, and AFK capping would hold it at 30 FPS.)
 		if (dynamicFps && !net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
 			//? if <1.21.2 {
@@ -514,6 +522,23 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 					VideoOptions::graphicsBackend, VideoOptions::setGraphicsBackend));
 		}
 		return fields;
+	}
+
+	/** Profile hook: marks that the fields were just restored, so the following enable keeps them. Always saved. */
+	@Override
+	public String extraState() {
+		return "1";
+	}
+
+	@Override
+	public void restoreExtraState(String state) {
+		restoredFromProfileNanos = System.nanoTime(); // only the enable right after this restore keeps the fields
+	}
+
+	/** The Graphics API belongs to options.txt (the launcher sets it there) - a profile copy would overwrite the launcher's choice. */
+	@Override
+	public boolean persistField(String label) {
+		return !label.startsWith("Graphics API");
 	}
 
 	/**

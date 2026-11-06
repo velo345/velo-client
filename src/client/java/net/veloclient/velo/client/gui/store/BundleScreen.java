@@ -48,7 +48,7 @@ public final class BundleScreen extends VeloWindow {
 		boolean all = owned == bundle.items().size();
 		if (bundle.price() >= 0) {
 			Text label = Text.literal(all ? "Owned" : owned > 0 ? "Buy the rest" : "Buy bundle");
-			VeloButton buy = new VeloButton(cx, contentBottom() - 24, infoW, 24, label, b -> buy());
+			VeloButton buy = new VeloButton(cx, contentBottom() - 24, infoW, 24, label, b -> { if (all) buy(); else PurchaseConfirm.ask(this, bundle.name(), Math.max(0, bundle.price()), this::buy); });
 			buy.active = !all && !busy;
 			if (!all) {
 				buy.primary();

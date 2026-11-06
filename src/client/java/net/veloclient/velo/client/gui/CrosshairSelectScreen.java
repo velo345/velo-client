@@ -92,7 +92,7 @@ public final class CrosshairSelectScreen extends VeloWindow {
 		int y = contentY() + 30;
 		int w = (contentWidth() - 3 * 8) / 4;
 		int x = contentX();
-		for (int size : new int[] {8, 16, 32, 64}) {
+		for (int size : new int[] {9, 15, 31, 63}) {
 			int finalSize = size;
 			addDrawableChild(new VeloButton(x, y, w, 24, Text.literal(size + "x" + size), b -> {
 				CrosshairDefinition created = CrosshairManager.createBlank("New Crosshair", finalSize);

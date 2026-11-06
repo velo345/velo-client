@@ -15,9 +15,11 @@ import net.veloclient.velo.module.SafetyTag;
  * potion), just always-on - it cannot reveal anything with zero received
  * light as anything other than black, the same limit Night Vision itself has.
  */
-public final class FullBrightModule extends AbstractModule {
+public final class FullBrightModule extends AbstractModule implements net.veloclient.velo.module.Configurable {
 
 	private static volatile boolean active;
+	/** The lightning sky flash brightens a world that's already full-bright: it washes everything in an odd tint. */
+	private static volatile boolean hideLightningFlash = true;
 	private double savedGamma = -1;
 
 	public FullBrightModule() {
@@ -27,6 +29,17 @@ public final class FullBrightModule extends AbstractModule {
 
 	public static boolean isActive() {
 		return active;
+	}
+
+	/** Read by LightningFlashMixin: drop the sky flash while Full Bright is on. */
+	public static boolean hideFlash() {
+		return active && hideLightningFlash;
+	}
+
+	@Override
+	public java.util.List<net.veloclient.velo.module.ConfigField> configFields() {
+		return java.util.List.of(new net.veloclient.velo.module.ConfigField.ToggleField("Hide Lightning Flash",
+				() -> hideLightningFlash, v -> hideLightningFlash = v));
 	}
 
 	@Override

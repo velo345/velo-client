@@ -54,6 +54,12 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 			return;
 		}
 		boolean self = menu || player == client.player;
+		if (net.veloclient.velo.client.devtools.CosmeticsBench.hideWear) {
+			return;
+		}
+		if (!self && player != null && client.player != null && velo$far(player, client.player)) {
+			return; // someone else's bodywear 32+ blocks away is a pixel or two: not worth thousands of vertices
+		}
 		java.util.List<WearManager.Worn> worn = self ? WearManager.wornByLocalPlayer()
 				: WearManager.parseNetworkValue(net.veloclient.velo.client.network.VeloUserRegistry.wearFor(player.getUuid(), player.getGameProfile().name()));
 		if (worn.isEmpty()) {
@@ -129,6 +135,12 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 			return;
 		}
 		boolean self = menu || player == client.player;
+		if (net.veloclient.velo.client.devtools.CosmeticsBench.hideWear) {
+			return;
+		}
+		if (!self && player != null && client.player != null && velo$far(player, client.player)) {
+			return; // someone else's bodywear 32+ blocks away is a pixel or two: not worth thousands of vertices
+		}
 		java.util.List<WearManager.Worn> worn = self ? WearManager.wornByLocalPlayer()
 				: WearManager.parseNetworkValue(net.veloclient.velo.client.network.VeloUserRegistry.wearFor(player.getUUID(), player.getGameProfile().name()));
 		if (worn.isEmpty()) {
@@ -168,9 +180,15 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 				if (swing != null && "neck".equals(type.slot())) {
 					swing(matrices.last().pose(), matrices.last().normal(), swing);
 				}
-				queue.submitCustomGeometry(matrices, net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture), (pose2, consumer) ->
+				queue.submitCustomGeometry(matrices, net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture), (pose2, consumer) -> {
+					float[] mv = mesh.vertices();
+					if (!CosmeticVertexWriter.writeQuads(consumer, MeshLod.quads(mesh), mv.length / 8, mv, 8, 0, 3, mv, 8, 6, 1f / 16f, squeeze,
+							new Matrix4f(pose2.pose()), new Matrix3f(pose2.normal()), 0xFFFFFFFF, null,
+							net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, light)) {
 						emit(mesh, squeeze, new Matrix4f(pose2.pose()), new Matrix3f(pose2.normal()), (x, y, z, u, v, nx, ny, nz) -> consumer.addVertex(x, y, z,
-								0xFFFFFFFF, u, v, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, light, nx, ny, nz)));
+								0xFFFFFFFF, u, v, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, light, nx, ny, nz));
+					}
+				});
 				matrices.popPose();
 			}
 		}
@@ -182,6 +200,14 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 		float pivot = 0.5f / 16f;
 		pose.translate(0, pivot, 0).rotateX(-swing[0]).rotateZ(-swing[1]).translate(0, -pivot, 0);
 		normal.rotateX(-swing[0]).rotateZ(-swing[1]);
+	}
+
+	private static boolean velo$far(Object a, Object b) {
+		//? if <26.1 {
+		return ((net.minecraft.entity.Entity) a).squaredDistanceTo((net.minecraft.entity.Entity) b) > 32 * 32;
+		//?} else {
+		/*return ((net.minecraft.world.entity.Entity) a).distanceToSqr((net.minecraft.world.entity.Entity) b) > 32 * 32;
+		*///?}
 	}
 
 	/** Hats and ears make way for a helmet, shoes for boots. */
@@ -202,27 +228,25 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 		void accept(float x, float y, float z, float u, float v, float nx, float ny, float nz);
 	}
 
-	/** Every triangle as a quad (last corner twice); skin pixels to blocks, squeezed to a slim arm when {@code squeeze} != 0. */
+	/** The mesh as quads (paired triangles, see {@link MeshLod#quads}); skin pixels to blocks, squeezed to a slim arm when {@code squeeze} != 0. */
 	private static void emit(EmoteProps.Mesh mesh, float squeeze, Matrix4f position, Matrix3f normal, VertexSink sink) {
 		float[] v = mesh.vertices();
-		int[] tris = mesh.triangles();
+		int[] quads = MeshLod.quads(mesh);
 		Vector3f p = new Vector3f();
 		Vector3f n = new Vector3f();
-		for (int t = 0; t < tris.length; t += 3) {
-			for (int corner = 0; corner < 4; corner++) {
-				int i = tris[t + Math.min(corner, 2)] * 8;
-				float x = v[i];
-				if (squeeze != 0) {
-					x = squeeze + (x - squeeze) * 0.75f;
-				}
-				position.transformPosition(x / 16f, v[i + 1] / 16f, v[i + 2] / 16f, p);
-				normal.transform(v[i + 3], v[i + 4], v[i + 5], n);
-				float length = n.length();
-				if (length > 1e-6f) {
-					n.div(length);
-				}
-				sink.accept(p.x, p.y, p.z, v[i + 6], v[i + 7], n.x, n.y, n.z);
+		for (int k = 0; k < quads.length; k++) {
+			int i = quads[k] * 8;
+			float x = v[i];
+			if (squeeze != 0) {
+				x = squeeze + (x - squeeze) * 0.75f;
 			}
+			position.transformPosition(x / 16f, v[i + 1] / 16f, v[i + 2] / 16f, p);
+			normal.transform(v[i + 3], v[i + 4], v[i + 5], n);
+			float length = n.length();
+			if (length > 1e-6f) {
+				n.div(length);
+			}
+			sink.accept(p.x, p.y, p.z, v[i + 6], v[i + 7], n.x, n.y, n.z);
 		}
 	}
 }

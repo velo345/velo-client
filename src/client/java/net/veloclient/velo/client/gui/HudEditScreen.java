@@ -28,7 +28,9 @@ import java.util.List;
  */
 public final class HudEditScreen extends Screen implements net.veloclient.velo.client.gui.window.ModuleConfigScreen.Reopenable {
 
-	private static final float GRID_SIZE = 0.01f;
+	/** Where inside the grab area the resize started, so the size doesn't jump on the first move. */
+	private float resizeGrabX;
+	private float resizeGrabY;
 	private static final int BADGE_SIZE = 12;
 	private static final int HANDLE_SIZE = 8;
 	private static final int BANNER_HEIGHT = 22;
@@ -246,7 +248,7 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 				}
 				int handleX = x + w - HANDLE_SIZE / 2 + 2;
 				int handleY = y + h - HANDLE_SIZE / 2 + 2;
-				boolean handleHovered = hud == resizing || isInside(mouseX, mouseY, handleX - 2, handleY - 2, HANDLE_SIZE + 4, HANDLE_SIZE + 4);
+				boolean handleHovered = hud == resizing || onResizeCorner(mouseX, mouseY, x, y, w, h);
 				VeloDraw.fillCircle(context, handleX + HANDLE_SIZE / 2f, handleY + HANDLE_SIZE / 2f, handleHovered ? 5f : 4f, accent);
 				VeloDraw.fillCircle(context, handleX + HANDLE_SIZE / 2f, handleY + HANDLE_SIZE / 2f, handleHovered ? 2.5f : 2f, 0xFFFFFFFF);
 			}
@@ -379,10 +381,10 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 				hud.setEnabled(false);
 				return true;
 			}
-			int handleX = x + w - HANDLE_SIZE / 2 + 2;
-			int handleY = y + h - HANDLE_SIZE / 2 + 2;
-			if (isInside(mouseX, mouseY, handleX - 2, handleY - 2, HANDLE_SIZE + 4, HANDLE_SIZE + 4)) {
+			if (onResizeCorner(mouseX, mouseY, x, y, w, h)) {
 				resizing = hud;
+				resizeGrabX = (float) (x + w - mouseX);
+				resizeGrabY = (float) (y + h - mouseY);
 				return true;
 			}
 			if (isInside(mouseX, mouseY, x, y, w, h)) {
@@ -395,6 +397,20 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 		return false;
 	}
 
+	/**
+	 * The resize grab area: a generous square round the bottom-right corner (half inside the element, half outside),
+	 * and the last few pixels along the bottom and right edges near it - the old 12 px dot was hard to hit.
+	 */
+	private static boolean onResizeCorner(double mouseX, double mouseY, int x, int y, int w, int h) {
+		int r = 9;
+		double cx = x + w, cy = y + h;
+		if (Math.abs(mouseX - cx) <= r && Math.abs(mouseY - cy) <= r) {
+			return true;
+		}
+		int edge = Math.min(Math.min(w, h) / 3, 16);
+		return mouseX >= cx - edge && mouseX <= cx && mouseY >= cy - edge && mouseY <= cy;
+	}
+
 	@Override
 	public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
 		if (resizing != null) {
@@ -402,8 +418,8 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 			int h = scaledHeight(resizing);
 			int x = resizing.position().resolveX(this.width, w);
 			int y = resizing.position().resolveY(this.height, h);
-			float fromWidth = resizing.width() > 0 ? ((float) click.x() - x) / resizing.width() : 1f;
-			float fromHeight = resizing.height() > 0 ? ((float) click.y() - y) / resizing.height() : 1f;
+			float fromWidth = resizing.width() > 0 ? ((float) click.x() + resizeGrabX - x) / resizing.width() : 1f;
+			float fromHeight = resizing.height() > 0 ? ((float) click.y() + resizeGrabY - y) / resizing.height() : 1f;
 			resizing.position().setScale(Math.max(fromWidth, fromHeight));
 			return true;
 		}
@@ -425,7 +441,7 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 	@Override
 	public boolean mouseReleased(net.minecraft.client.gui.Click click) {
 		if (dragging != null) {
-			dragging.position().snapToGrid(GRID_SIZE);
+			// no snapping on release: it stays exactly where it was dropped (the 1% grid made it jump)
 			dragging = null;
 			return true;
 		}

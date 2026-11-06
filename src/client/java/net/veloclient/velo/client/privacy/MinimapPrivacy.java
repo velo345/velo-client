@@ -25,12 +25,24 @@ public final class MinimapPrivacy {
 
 	/** Rewrites a freshly sampled minimap image (centred on world column centerX/centerZ) if hiding asks for it. */
 	public static void apply(NativeImage image, int centerX, int centerZ) {
+		apply(image, centerX, centerZ, 1);
+	}
+
+	/** True when {@link #apply} overwrites every pixel anyway (fake or hidden map): the real terrain needn't be sampled. */
+	public static boolean replacesAll() {
+		String s = style;
+		return net.veloclient.velo.client.modules.qol.AntiCoordsLeakModule.hiding() && (HIDDEN.equals(s) || FAKE.equals(s));
+	}
+
+	/** {@code pixelsPerBlock}: the minimap draws each block as a small square of pixels. */
+	public static void apply(NativeImage image, int centerX, int centerZ, int pixelsPerBlock) {
 		if (!net.veloclient.velo.client.modules.qol.AntiCoordsLeakModule.hiding()) {
 			return;
 		}
 		String s = style;
 		int size = image.getWidth();
-		int radius = size / 2;
+		int ppb = Math.max(1, pixelsPerBlock);
+		int radius = size / ppb / 2;
 		switch (s) {
 			case HIDDEN -> {
 				for (int y = 0; y < size; y++) {
@@ -40,21 +52,27 @@ public final class MinimapPrivacy {
 				}
 			}
 			case FAKE -> {
-				for (int y = 0; y < size; y++) {
-					for (int x = 0; x < size; x++) {
-						image.setColorArgb(x, y, fakeColumn(centerX + x - radius + OFFSET_X, centerZ + y - radius + OFFSET_Z));
+				// one noise lookup per block (not per pixel): this was the minimap's biggest cost with Anti Coords Leak on
+				for (int by = 0; by * ppb < size; by++) {
+					for (int bx = 0; bx * ppb < size; bx++) {
+						int c = fakeColumn(centerX + bx - radius + OFFSET_X, centerZ + by - radius + OFFSET_Z);
+						for (int j = 0; j < ppb && by * ppb + j < size; j++) {
+							for (int i = 0; i < ppb && bx * ppb + i < size; i++) {
+								image.setColorArgb(bx * ppb + i, by * ppb + j, c);
+							}
+						}
 					}
 				}
 			}
-			case BLURRED -> blur(image, size);
+			case BLURRED -> blur(image, size, ppb);
 			default -> {
 			}
 		}
 	}
 
-	private static void blur(NativeImage image, int size) {
+	private static void blur(NativeImage image, int size, int ppb) {
 		// 8x8 block average, then a soft blur over the blocks: shapes the size of a house are gone.
-		int block = 8;
+		int block = 8 * ppb;
 		int cells = (size + block - 1) / block;
 		float[] r = new float[cells * cells];
 		float[] g = new float[cells * cells];

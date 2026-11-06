@@ -42,6 +42,16 @@ public final class PetRenderer {
 		}
 	}
 
+	/** Corner order [0, 2, 3, 1] of each box face (made once, not per face per frame). */
+	private static final int[][] FACE_ORDER = new int[6][];
+
+	static {
+		for (int face = 0; face < 6; face++) {
+			int base = face * 4;
+			FACE_ORDER[face] = new int[] {base, base + 2, base + 3, base + 1};
+		}
+	}
+
 	/** The drawn pet's lowest and highest point last frame, in blocks above the player's feet (riding sizes and seats by it). */
 	static volatile float lastBottom;
 	static volatile float lastTop = 1f;
@@ -79,8 +89,7 @@ public final class PetRenderer {
 			if (node.type == PetModel.BOX) {
 				root.mul(chain[i], world);
 				for (int face = 0; face < 6; face++) {
-					int base = face * 4;
-					int[] order = {base, base + 2, base + 3, base + 1};
+					int[] order = FACE_ORDER[face];
 					for (int k = 0; k < 4; k++) {
 						int vi = order[k];
 						world.transformPosition(node.pos[vi * 3], node.pos[vi * 3 + 1], node.pos[vi * 3 + 2], c[k]);
@@ -444,15 +453,26 @@ public final class PetRenderer {
 				var layer = m.transparent ? net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucent(texture)
 						: net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture);
 				int color = argb(m.transparent ? alpha : 1, 1, 1, 1);
-				queue.submitCustomGeometry(matrices, layer, (pose2, consumer) -> emit(data, size, new Matrix4f(pose2.pose()), (x, y, z, u, v, nx, ny, nz) ->
-						consumer.addVertex(x, y, z, color, u, v, overlay, light, nx, ny, nz)));
+				queue.submitCustomGeometry(matrices, layer, (pose2, consumer) -> {
+					Matrix4f pm = new Matrix4f(pose2.pose());
+					if (!net.veloclient.velo.client.cosmetics.render.CosmeticVertexWriter.writeSequential(consumer, size / 8, data, 8, 0, 5, 3,
+							pm, new org.joml.Matrix3f(pm), color, overlay, light)) {
+						emit(data, size, pm, (x, y, z, u, v, nx, ny, nz) -> consumer.addVertex(x, y, z, color, u, v, overlay, light, nx, ny, nz));
+					}
+				});
 			}
 			float glow = glow(pose.emissive[batch.material]) * (m.transparent ? alpha : 1);
 			if (m.emissive >= 0 && glow > 0.01f) {
 				float[] tint = pose.emissiveColor;
 				int color = argb(glow, tint[batch.material * 3], tint[batch.material * 3 + 1], tint[batch.material * 3 + 2]);
 				queue.submitCustomGeometry(matrices, net.minecraft.client.renderer.rendertype.RenderTypes.eyes(id(model.textures[m.emissive])), (pose2, consumer) ->
-						emit(data, size, new Matrix4f(pose2.pose()), (x, y, z, u, v, nx, ny, nz) -> consumer.addVertex(x, y, z, color, u, v, overlay, 0xF000F0, nx, ny, nz)));
+						{
+							Matrix4f pm = new Matrix4f(pose2.pose());
+							if (!net.veloclient.velo.client.cosmetics.render.CosmeticVertexWriter.writeSequential(consumer, size / 8, data, 8, 0, 5, 3,
+									pm, new org.joml.Matrix3f(pm), color, overlay, 0xF000F0)) {
+								emit(data, size, pm, (x, y, z, u, v, nx, ny, nz) -> consumer.addVertex(x, y, z, color, u, v, overlay, 0xF000F0, nx, ny, nz));
+							}
+						});
 			}
 		}
 		FxBatch[] fx = buildFx(frame.brain(), frame.ox(), frame.oy(), frame.oz());

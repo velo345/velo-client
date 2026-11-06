@@ -34,7 +34,7 @@ public final class CrosshairEditorScreen {
 			@Override
 			public List<Integer> sizes() {
 				List<Integer> sizes = new ArrayList<>(List.of(definition.canvasSize()));
-				for (int s : new int[] {8, 16, 32, 64}) {
+				for (int s : new int[] {9, 15, 31, 63}) {
 					if (!sizes.contains(s)) {
 						sizes.add(s);
 					}
