@@ -134,11 +134,21 @@ public final class VeloDraw {
 
 	private static ShapeSink capture;
 	private static float capturePixel = 0.5f;
+	private static float capturePixelsPerUnit = 4f;
 
 	/** Sends every shape to {@code sink} (null = back to the GUI); {@code pixel} is the anti-aliasing fringe in its units. */
 	public static void capture(ShapeSink sink, float pixel) {
+		capture(sink, pixel, 4f);
+	}
+
+	/**
+	 * Like {@link #capture(ShapeSink, float)}, with how many screen pixels one captured unit covers - corners get as many
+	 * segments as that size needs (World Notes: a card across the room needs 2 per corner, not 15).
+	 */
+	public static void capture(ShapeSink sink, float pixel, float pixelsPerUnit) {
 		capture = sink;
 		capturePixel = pixel;
+		capturePixelsPerUnit = pixelsPerUnit;
 	}
 
 	private static void submit(DrawContext context) {
@@ -168,7 +178,7 @@ public final class VeloDraw {
 	}
 
 	private static int segmentsFor(float radius) {
-		float px = radius * (capture != null ? 4 : Math.max(1, ClientCompat.guiScale()));
+		float px = radius * (capture != null ? capturePixelsPerUnit : Math.max(1, ClientCompat.guiScale()));
 		return Math.max(1, Math.min(MAX_SEGMENTS, (int) Math.ceil(px / 2.2f) + 1));
 	}
 

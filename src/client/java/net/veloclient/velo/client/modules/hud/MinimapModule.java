@@ -274,6 +274,10 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 	private static void fillTriangle(DrawContext context, int[] xs, int[] ys, int color) {
 		int minY = Math.min(ys[0], Math.min(ys[1], ys[2]));
 		int maxY = Math.max(ys[0], Math.max(ys[1], ys[2]));
+		// Rows with the same span go out as one rectangle (the arrow's flat parts were one fill per pixel row).
+		int runX0 = 0;
+		int runX1 = -1;
+		int runY = minY;
 		for (int py = minY; py <= maxY; py++) {
 			double minX = Double.MAX_VALUE;
 			double maxX = -Double.MAX_VALUE;
@@ -291,9 +295,19 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 					maxX = Math.max(maxX, x);
 				}
 			}
-			if (minX <= maxX) {
-				context.fill((int) Math.round(minX), py, (int) Math.round(maxX) + 1, py + 1, color);
+			int x0 = minX <= maxX ? (int) Math.round(minX) : 0;
+			int x1 = minX <= maxX ? (int) Math.round(maxX) + 1 : -1;
+			if (x0 != runX0 || x1 != runX1) {
+				if (runX1 > runX0) {
+					context.fill(runX0, runY, runX1, py, color);
+				}
+				runX0 = x0;
+				runX1 = x1;
+				runY = py;
 			}
+		}
+		if (runX1 > runX0) {
+			context.fill(runX0, runY, runX1, maxY + 1, color);
 		}
 	}
 

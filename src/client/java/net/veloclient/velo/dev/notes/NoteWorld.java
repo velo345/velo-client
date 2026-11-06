@@ -91,22 +91,98 @@ final class NoteWorld {
 	record Card(Note note, List<Op> ops, int height, double cx, double cy, double cz, double rx, double rz, double scale, double distance) {
 	}
 
-	/** Records {@code note} as the card the world pass will draw ({@code glow}: the aimed-at / unread outline). */
+	/** A card's recorded parts, kept while nothing that changes its look changes (see {@link #build}). */
+	private record Recorded(long fingerprint, int alpha, int detail, List<Op> ops, int height) {
+	}
+
+	private static final Map<Note, Recorded> RECORDED = new java.util.IdentityHashMap<>();
+
+	/**
+	 * Records {@code note} as the card the world pass will draw ({@code glow}: the aimed-at / unread outline).
+	 *
+	 * <p>Recording a card (layout, text, every rounded shape tessellated) used to happen for every card every frame -
+	 * about 10% of the render thread with a few cards in view (JFR, 2026-11-06). Now a card is recorded again only when
+	 * its content, fade or detail level changes; where it stands and its bobbing are only the matrix. Corners get as many
+	 * segments as the card's size on screen needs. Neon cards pulse, so they stay live; the glow outline pulses too and
+	 * is recorded on top each frame.
+	 */
 	static Card build(Note note, double cx, double cy, double cz, double rx, double rz, double scale, double distance, int alpha, boolean glow) {
-		List<Op> ops = new ArrayList<>();
-		recording = ops;
-		VeloDraw.capture((xy, colors, count) -> ops.add(new Shapes(java.util.Arrays.copyOf(xy, count * 8), java.util.Arrays.copyOf(colors, count * 4), count)), 0.45f);
+		// Screen pixels per card unit: card unit = scale blocks; at 70 degrees FOV one block at distance d spans
+		// about height * 0.714 / d pixels. Rounded to powers of two so walking doesn't re-record all the time.
+		double height = windowHeight();
+		double pixelsPerUnit = scale * height * 0.714 / Math.max(0.5, distance);
+		int detail = (int) Math.max(0, Math.min(5, Math.round(Math.log(Math.max(0.125, pixelsPerUnit) * 8) / Math.log(2))));
+		float segmentScale = (float) Math.pow(2, detail) / 8f;
+		long fingerprint = fingerprint(note);
+		boolean live = "neon".equals(note.style);
+		Recorded cached = live ? null : RECORDED.get(note);
+		List<Op> ops;
 		int h;
-		try {
-			h = NoteCard.record(note, alpha);
-			if (glow) {
-				NoteCard.glow(null, note, h, alpha);
+		if (cached != null && cached.fingerprint() == fingerprint && cached.alpha() == alpha && cached.detail() == detail) {
+			ops = cached.ops();
+			h = cached.height();
+		} else {
+			ops = new ArrayList<>();
+			h = record(ops, segmentScale, () -> NoteCard.record(note, alpha));
+			if (!live) {
+				if (RECORDED.size() > 128) {
+					RECORDED.clear();
+				}
+				RECORDED.put(note, new Recorded(fingerprint, alpha, detail, ops, h));
 			}
+		}
+		if (glow) {
+			List<Op> withGlow = new ArrayList<>(ops);
+			int cardHeight = h;
+			record(withGlow, segmentScale, () -> {
+				NoteCard.glow(null, note, cardHeight, alpha);
+				return cardHeight;
+			});
+			ops = withGlow;
+		}
+		return new Card(note, ops, h, cx, cy, cz, rx, rz, scale, distance);
+	}
+
+	private static int record(List<Op> into, float pixelsPerUnit, java.util.function.IntSupplier body) {
+		recording = into;
+		VeloDraw.capture((xy, colors, count) -> into.add(new Shapes(java.util.Arrays.copyOf(xy, count * 8), java.util.Arrays.copyOf(colors, count * 4), count)),
+				0.45f, pixelsPerUnit);
+		try {
+			return body.getAsInt();
 		} finally {
 			VeloDraw.capture(null, 0.5f);
 			recording = null;
 		}
-		return new Card(note, ops, h, cx, cy, cz, rx, rz, scale, distance);
+	}
+
+	/** Everything a card's look depends on (besides fade and detail), hashed. Strings cache their hash, so this is cheap. */
+	private static long fingerprint(Note note) {
+		long h = note.version * 31L + note.updated;
+		h = h * 31 + java.util.Objects.hashCode(note.title);
+		h = h * 31 + java.util.Objects.hashCode(note.text);
+		h = h * 31 + java.util.Objects.hashCode(note.style);
+		h = h * 31 + note.color;
+		h = h * 31 + java.util.Objects.hashCode(note.icon);
+		h = h * 31 + java.util.Objects.hashCode(note.ownerName);
+		h = h * 31 + java.util.Objects.hashCode(note.editorName);
+		h = h * 31 + java.util.Objects.hashCode(note.share);
+		h = h * 31 + note.people.size();
+		h = h * 31 + note.image;
+		h = h * 31 + java.util.Objects.hashCode(note.png);
+		h = h * 31 + System.identityHashCode(note.board) * 7L + note.board.size();
+		for (Note.Check check : note.checks) {
+			h = h * 31 + java.util.Objects.hashCode(check.text) * 2L + (check.done ? 1 : 0);
+		}
+		h = h * 31 + (Note.imagesHere() ? 1 : 0) + (Note.whiteboardsHere() ? 2 : 0);
+		return h;
+	}
+
+	private static double windowHeight() {
+		//? if <26.1 {
+		return Math.max(1, net.minecraft.client.MinecraftClient.getInstance().getWindow().getFramebufferHeight());
+		//?} else {
+		/*return Math.max(1, net.minecraft.client.Minecraft.getInstance().getWindow().getHeight());
+		*///?}
 	}
 
 	/**
