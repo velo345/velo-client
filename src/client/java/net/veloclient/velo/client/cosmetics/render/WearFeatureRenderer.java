@@ -180,8 +180,14 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 				if (swing != null && "neck".equals(type.slot())) {
 					swing(matrices.last().pose(), matrices.last().normal(), swing);
 				}
-				queue.submitCustomGeometry(matrices, net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture), (pose2, consumer) -> {
+				var cutout = net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture);
+				queue.submitCustomGeometry(matrices, cutout, (pose2, consumer) -> {
 					float[] mv = mesh.vertices();
+					// GPU path (26.2): the mesh is uploaded once and only its matrix goes out each frame - see GpuCosmetics.
+					if (GpuCosmetics.record(mesh, MeshLod.quads(mesh), mv, 1f / 16f, squeeze, cutout, pose2.pose(), light,
+							net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)) {
+						return;
+					}
 					if (!CosmeticVertexWriter.writeQuads(consumer, MeshLod.quads(mesh), mv.length / 8, mv, 8, 0, 3, mv, 8, 6, 1f / 16f, squeeze,
 							new Matrix4f(pose2.pose()), new Matrix3f(pose2.normal()), 0xFFFFFFFF, null,
 							net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, light)) {

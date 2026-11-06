@@ -46,6 +46,20 @@ public final class CosmeticsBench {
 							.ifPresent(net.veloclient.velo.client.cosmetics.CapeManager::setPreviewOverride);
 				}
 			}
+			// -Dvelo.benchShot=<png>: one screenshot in F5 after the cosmetics settled (checks the GPU cosmetics path visually).
+			String shot = System.getProperty("velo.benchShot");
+			if (shot != null && (ticks == 200 || ticks == 202)) {
+				//? if >=26.2 {
+				/*java.nio.file.Path file = java.nio.file.Path.of(ticks == 200 ? shot : shot.replace(".png", "-b.png"));
+				net.minecraft.client.Screenshot.takeScreenshot(client.gameRenderer.mainRenderTarget(), image -> {
+					try (image) {
+						image.writeToFile(file);
+					} catch (Exception e) {
+						net.veloclient.velo.VeloClient.LOGGER.error("bench screenshot failed", e);
+					}
+				});
+				*///?}
+			}
 			if (ticks >= 20) {
 				//? if <26.1 {
 				client.options.setPerspective(net.minecraft.client.option.Perspective.THIRD_PERSON_BACK);

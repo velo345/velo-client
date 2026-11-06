@@ -120,6 +120,8 @@
 		"VulkanDecoupledFrameMixin",
 		"VulkanDecoupledSurfaceMixin",
 		"VulkanDeviceCloseMixin",
+		"GpuCosmeticsMixin",
+		"GpuCosmeticsPipelinesAccessor",
 		"VulkanDrawStateMixin",
 		"VulkanFrameProfileMixin",
 		"VulkanPassBarrierMixin",

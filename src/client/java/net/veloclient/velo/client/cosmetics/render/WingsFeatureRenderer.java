@@ -240,7 +240,21 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		int drawLight = type.glow() ? 0xF000F0 : light;
 		matrices.pushPose();
 		this.getParentModel().body.translateAndRotate(matrices);
-		queue.submitCustomGeometry(matrices, net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture), (pose2, consumer) -> {
+		var cutout = net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture);
+		int wearer = state.id;
+		queue.submitCustomGeometry(matrices, cutout, (pose2, consumer) -> {
+			// GPU path (26.2): each half's posed shape is uploaded when it changes (75 times a second), each frame only the
+			// matrix goes out - see GpuCosmetics.
+			boolean gpu = true;
+			for (int h = 0; h < model.halves.length && gpu; h++) {
+				WingModel.Half half = model.halves[h];
+				gpu = GpuCosmetics.recordDynamic(java.util.List.of(wearer, h, model), geometry[h], MeshLod.quadIndices(half.triangles),
+						half.vertexCount(), geometry[h], 6, 0, 3, half.uv, 2, 0, wingColor, cutout, pose2.pose(), drawLight,
+						net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY);
+			}
+			if (gpu) {
+				return;
+			}
 			Matrix4f position = new Matrix4f(pose2.pose());
 			Matrix3f normal = new Matrix3f(pose2.normal());
 			boolean fast = true;
