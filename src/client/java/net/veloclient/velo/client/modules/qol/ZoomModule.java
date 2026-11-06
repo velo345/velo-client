@@ -72,8 +72,6 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 	/** The zoom as a factor on tan(fov/2), animated in log space so every step of the zoom feels equally fast. */
 	private static double logZoom;
 	private static long lastFrameNanos;
-	private static boolean restoreSmoothCamera;
-	private static boolean savedSmoothCamera;
 
 	public ZoomModule() {
 		super("zoom", "Zoom", "Hold the zoom key to smoothly narrow your FOV, spyglass-style. Scroll while held to adjust.",
@@ -128,7 +126,8 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 		// glides in and settles exactly where the mouse put it - it never overshoots and never turns further than the
 		// mouse moved (vanilla's cinematic camera does both). Not zoomed: new movement goes through directly, and only
 		// what is still pending from the zoom finishes its glide, so letting go of the key doesn't jump.
-		double tau = 0.02 + 0.13 * mouseSmoothing;               // 20 .. 150 ms, 85 ms at the default
+		// 20 .. 400 ms; finer steps at the soft end (owner wanted far more smoothing): 50% = ~155 ms
+		double tau = 0.02 + 0.38 * Math.pow(mouseSmoothing, 1.5);
 		double catchUp = dt <= 0 ? 0 : 1 - Math.exp(-dt / tau);
 		double out;
 		if (zooming) {
@@ -194,7 +193,9 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 			setSmoothCamera(true);
 		} else if (!held && zooming) {
 			zooming = false;
-			setSmoothCamera(false);
+		}
+		if (zooming) {
+			setSmoothCamera(true); // keep vanilla's cinematic off while zoomed, even if its key is pressed meanwhile
 		}
 	}
 
@@ -204,24 +205,18 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 	 * state comes back when the zoom ends.
 	 */
 	private static void setSmoothCamera(boolean on) {
-		var options = MinecraftClient.getInstance().options;
-		if (on) {
-			//? if <26.1 {
-			savedSmoothCamera = options.smoothCameraEnabled;
-			options.smoothCameraEnabled = false; // vanilla's cinematic glide would add momentum on top
-			//?} else {
-			/*savedSmoothCamera = options.smoothCamera;
-			options.smoothCamera = false;
-			*///?}
-			restoreSmoothCamera = true;
-		} else if (restoreSmoothCamera) {
-			restoreSmoothCamera = false;
-			//? if <26.1 {
-			options.smoothCameraEnabled = savedSmoothCamera;
-			//?} else {
-			/*options.smoothCamera = savedSmoothCamera;
-			*///?}
+		// Only ever turns vanilla's cinematic camera OFF (while zooming, every tick): the zoom has its own momentum-free
+		// smoothing. It used to save the player's state on zoom start and restore it on release, and players kept ending up
+		// in cinematic mode after every zoom (owner, 2026-11-06) - Velo never turns it on any more.
+		if (!on) {
+			return;
 		}
+		var options = MinecraftClient.getInstance().options;
+		//? if <26.1 {
+		options.smoothCameraEnabled = false;
+		//?} else {
+		/*options.smoothCamera = false;
+		*///?}
 	}
 
 	@Override
@@ -238,8 +233,8 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 				new ConfigField.SliderField("Scroll Step", 0.03, 0.3, () -> scrollStep, v -> scrollStep = Math.round(v * 100) / 100.0,
 						v -> Math.round(v * 100) + "% per notch"),
 				new ConfigField.ToggleField("Lower Sensitivity While Zoomed", () -> scaleSensitivity, v -> scaleSensitivity = v),
-				new ConfigField.SliderField("Mouse Smoothing While Zoomed", 0, 1, () -> mouseSmoothing, v -> mouseSmoothing = Math.round(v * 20) / 20.0,
-						v -> v < .01 ? "Off" : Math.round(v * 100) + "%"),
+				new ConfigField.SliderField("Mouse Smoothing While Zoomed", 0, 1, () -> mouseSmoothing, v -> mouseSmoothing = Math.round(v * 50) / 50.0,
+						v -> v < .01 ? "Off" : Math.round((0.02 + 0.38 * Math.pow(v, 1.5)) * 1000) + " ms"),
 				KeybindConfig.field("Zoom Key", ZOOM_KEY));
 	}
 }
