@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draws the auras' texture atlas (textures/cosmetics/aura/atlas.png): an 8x6 grid of 256px cells, white
+"""Draws the auras' texture atlas (textures/cosmetics/aura/atlas.png): an 8x8 grid of 256px cells (rows 7-8 partly free), white
 with the shape in alpha (the game tints it per particle). Every cell fades to nothing before its border,
 so the linear filtering (atlas.png.mcmeta) never bleeds a neighbour in.
 
@@ -11,7 +11,8 @@ so the linear filtering (atlas.png.mcmeta) never bleeds a neighbour in.
     32 koi (seen from above, head up), 33 sword (tip up), 34 paper lantern, 35 gear, 36 lily pad, 37 clock dial,
     38 pixel (a soft-edged square), 39 slash (a crescent, its bright edge outwards), 40 ghost, 41 starburst (rays),
     42 ground cracks, 43 tombstone (R.I.P.), 44 coin, 45 bird wing (hinge on the left edge, leading edge at the top,
-    feathers fanning out to the right and down), 46 crescent moon (horns to the right), 47 sleepy "Z"
+    feathers fanning out to the right and down), 46 crescent moon (horns to the right), 47 sleepy "Z",
+    48 isometric lucky block body, 49 its "?" marks and corner studs (drawn on top of 48)
     - the kill effects (cosmetics/killfx) draw with these too
 
     python3 tools/cosmetics/make_aura_atlas.py
@@ -565,13 +566,96 @@ def snooze():
     return to_image(border_fade(np.asarray(img) / 255.0))
 
 
+QMARK = [".XXX.", "XX.XX", "...XX", "..XX.", ".XX..", ".....", ".XX.."]
+
+
+def _lucky_faces(scale=4):
+    """The three visible faces of an isometric lucky block, rendered big: per pixel the face (0 none, 1 top,
+    2 left, 3 right) and the face coordinates u (across) and v (down the face), all 0..1."""
+    n = C * scale
+    ax = (np.arange(n) + 0.5) / n * 2 - 1
+    px, py = np.meshgrid(ax, ax)
+    k = 0.8
+    ex, ey, ez = np.array([0.74, 0.43]) * k, np.array([-0.74, 0.43]) * k, np.array([0.0, 0.86]) * k
+    top = np.array([0.0, -0.86]) * k
+    left, front = top + ey, top + ex + ey
+    faces = [(1, left, -ey, ex), (2, left, ex, ez), (3, front, -ey, ez)]   # origin, u axis, v axis
+    face = np.zeros((n, n), int)
+    U = np.zeros((n, n))
+    V = np.zeros((n, n))
+    for fid, o, a, b in faces:
+        m = np.linalg.inv(np.array([[a[0], b[0]], [a[1], b[1]]]))
+        dx, dy = px - o[0], py - o[1]
+        u = m[0, 0] * dx + m[0, 1] * dy
+        v = m[1, 0] * dx + m[1, 1] * dy
+        inside = (u >= 0) & (u <= 1) & (v >= 0) & (v <= 1) & (face == 0)
+        face[inside] = fid
+        U[inside] = u[inside]
+        V[inside] = v[inside]
+    return face, U, V
+
+
+def _qmark(u, v):
+    col = np.floor((u - 0.22) / 0.56 * 5).astype(int)
+    row = np.floor((v - 0.14) / 0.72 * 7).astype(int)
+    ok = (col >= 0) & (col < 5) & (row >= 0) & (row < 7)
+    out = np.zeros_like(u, dtype=bool)
+    for r in range(7):
+        for c in range(5):
+            if QMARK[r][c] == "X":
+                out |= ok & (row == r) & (col == c)
+    return out
+
+
+def _studs(u, v):
+    near = lambda x: (x > 0.07) & (x < 0.17) | (x > 0.83) & (x < 0.93)
+    return near(u) & near(v)
+
+
+def _shrink(a, scale=4):
+    big = Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8))
+    return np.asarray(big.resize((C, C), Image.LANCZOS)) / 255.0
+
+
+def lucky_block():
+    """An isometric lucky block (tinted gold): top lit, left half, right dim, a darker rim band round every face and
+    dark spots where the "?" and the corner studs go - cell 49 lays those on top in lavender."""
+    face, u, v = _lucky_faces()
+    shade = np.choose(face, [0.0, 1.0, 0.78, 0.56])
+    edge = np.minimum(np.minimum(u, 1 - u), np.minimum(v, 1 - v))
+    a = shade * np.where(edge < 0.06, 0.55, 1.0)
+    q = _qmark(u, v) | _studs(u, v)
+    ring = ndimage_dilate(q, 10) & ~q
+    a = np.where(ring, a * 0.18, a)
+    a = np.where(q, a * 0.3, a)
+    a = np.where(face == 0, 0.0, a)
+    # the seams between the faces stay dark, so the block reads as a solid cube
+    small = _shrink(a)
+    img = with_halo(to_image(small), 6, 0.25)
+    return to_image(border_fade(np.asarray(img) / 255.0, 0.96))
+
+
+def lucky_marks():
+    """The lucky block's "?" on each face and its corner studs, matching cell 48 (tinted lavender)."""
+    face, u, v = _lucky_faces()
+    q = (_qmark(u, v) | _studs(u, v)) & (face > 0)
+    a = q * np.choose(face, [0.0, 1.0, 0.9, 0.8])
+    img = with_halo(to_image(_shrink(a)), 5, 0.35)
+    return to_image(border_fade(np.asarray(img) / 255.0, 0.96))
+
+
+def ndimage_dilate(mask, r):
+    img = Image.fromarray((mask * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(2 * r + 1))
+    return np.asarray(img) > 127
+
+
 def main():
-    atlas = Image.new("L", (C * 8, C * 6), 0)
+    atlas = Image.new("L", (C * 8, C * 8), 0)
     cells = {0: glow(), 1: star(), 2: beam(), 3: shape(heart), 4: shape(leaf), 5: curtain(), 6: halo(), 7: smoke(),
              24: feather(), 25: petal(), 26: shard(), 27: flame(), 28: sparkle(), 29: wing(), 30: ribbon(), 31: taiji(),
              32: koi(), 33: sword(), 34: lantern(), 35: gear(), 36: lily(), 37: dial(),
              38: pixel(), 39: slash(), 40: ghost(), 41: starburst(), 42: cracks(), 43: tombstone(), 44: coin(), 45: bird_wing(),
-             46: moon(), 47: snooze()}
+             46: moon(), 47: snooze(), 48: lucky_block(), 49: lucky_marks()}
     for i, ch in enumerate(GLYPHS):
         cells[8 + i] = glyph(ch)
     for index, img in cells.items():

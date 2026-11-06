@@ -33,7 +33,7 @@ public final class AuraPreviewExport {
 		started.await();
 		String[] ids = {"orbit", "ember", "frost", "void", "storm", "matrix", "inferno", "bloom", "heartbeat", "aurora", "hologram", "festive",
 				"seraph", "sakura", "galaxy", "crystal", "soul", "butterfly", "bass", "firework", "dragon", "ribbon",
-				"raincloud", "koi", "blades", "lantern", "chrono", "pyjama"};
+				"raincloud", "koi", "blades", "lantern", "chrono", "pyjama", "lucky"};
 		if (args.length > 3) {
 			// Only these (comma-separated), e.g. after adding new auras.
 			List<String> only = List.of(args[3].split(","));

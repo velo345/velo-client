@@ -23,7 +23,7 @@ public final class AuraManager {
 	/** The auras, in the order the Store shows them. */
 	public static final List<String> IDS = List.of("orbit", "ember", "frost", "void", "storm", "matrix", "inferno", "bloom", "heartbeat", "aurora", "hologram", "festive",
 			"seraph", "sakura", "galaxy", "crystal", "soul", "butterfly", "bass", "firework", "dragon", "ribbon",
-			"raincloud", "koi", "blades", "lantern", "chrono", "pyjama");
+			"raincloud", "koi", "blades", "lantern", "chrono", "pyjama", "lucky");
 
 	public record AuraType(String id, String name, String description, int price, boolean inStore, int accent) {
 		public String itemId() {
@@ -69,7 +69,8 @@ public final class AuraManager {
 			Map.entry("blades", new String[] {"Spirit Blades", "Spectral swords hover tip-down in a ring around you, and one by one dive into the ground in a burst of sparks."}),
 			Map.entry("lantern", new String[] {"Sky Lanterns", "Paper sky lanterns rise glowing around you from a ring of flickering tea lights."}),
 			Map.entry("chrono", new String[] {"Timekeeper", "A clock dial turns at your feet with its hands sweeping round, gyroscope rings spin around you and gears turn above your shoulders."}),
-			Map.entry("pyjama", new String[] {"Pyjama", "Bedtime: a crescent moon rocks over your head, a ring of stars twinkles round it, sleepy Zzz float up and little clouds drift at your feet - in any colour you like."}));
+			Map.entry("pyjama", new String[] {"Pyjama", "Bedtime: a crescent moon rocks over your head, a ring of stars twinkles round it, sleepy Zzz float up and little clouds drift at your feet - in any colour you like."}),
+			Map.entry("lucky", new String[] {"Lucky", "LuckySMP's lucky blocks circle you and pop in showers of spinning gold coins, gold dust rising over a golden glow."}));
 
 	private static boolean loaded;
 	private static String equippedId;

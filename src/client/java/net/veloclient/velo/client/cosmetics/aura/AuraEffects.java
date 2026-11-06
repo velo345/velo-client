@@ -72,7 +72,9 @@ public final class AuraEffects {
 		/** A clock dial at your feet with sweeping hands, gyroscope rings and turning gears. */
 		CHRONO,
 		/** Bedtime: a crescent moon rocking over your head, a ring of stars twinkling round it, sleepy Zzz floating up, little clouds at your feet. */
-		PYJAMA
+		PYJAMA,
+		/** LuckySMP: lucky blocks circling you, each popping now and then in a shower of spinning gold coins, over a golden glow. */
+		LUCKY
 	}
 
 	/** Sprite shapes: a soft glowing ball, a four-pointed star, a flat glow on the ground plane, a heart, a leaf. */
@@ -120,6 +122,9 @@ public final class AuraEffects {
 	/** A crescent moon (horns to the right) and a sleepy "Z", for Pyjama. */
 	public static final int MOON = 27;
 	public static final int SNOOZE = 28;
+	/** An isometric lucky block (tint it gold) and its "?" marks and studs (tint them lavender, drawn on top). */
+	public static final int LUCKY_BLOCK = 29;
+	public static final int LUCKY_MARKS = 30;
 	/** Added to a shape: only its ground-plane quad (a ring lying flat) / only its two upright quads (a flame standing up). */
 	public static final int FLAT = 1 << 8;
 	public static final int UPRIGHT = 1 << 9;
@@ -133,9 +138,9 @@ public final class AuraEffects {
 	/** Atlas layout: {@link #ATLAS_COLUMNS} x {@link #ATLAS_ROWS} cells of {@link #ATLAS_CELL} pixels. */
 	public static final int ATLAS_CELL = 256;
 	public static final int ATLAS_COLUMNS = 8;
-	public static final int ATLAS_ROWS = 6;
+	public static final int ATLAS_ROWS = 8;
 
-	/** Atlas cells (8 x 6 grid, see tools/cosmetics/make_aura_atlas.py) for {@link Out#panel}. */
+	/** Atlas cells (8 x 8 grid, see tools/cosmetics/make_aura_atlas.py) for {@link Out#panel}. */
 	public static final int CELL_CURTAIN = 5;
 	public static final int CELL_GLYPH = 8;
 	/** A butterfly wing (hinge on the left edge, front at the top) and a silk band's profile, for {@link Out#quad}. */
@@ -279,6 +284,8 @@ public final class AuraEffects {
 			case BIRD_WING -> 45;
 			case MOON -> 46;
 			case SNOOZE -> 47;
+			case LUCKY_BLOCK -> 48;
+			case LUCKY_MARKS -> 49;
 			default -> 0;
 		};
 	}
@@ -331,6 +338,7 @@ public final class AuraEffects {
 			case "lantern" -> Kind.LANTERN;
 			case "chrono" -> Kind.CHRONO;
 			case "pyjama" -> Kind.PYJAMA;
+			case "lucky" -> Kind.LUCKY;
 			default -> null;
 		};
 	}
@@ -368,6 +376,7 @@ public final class AuraEffects {
 			case LANTERN -> new int[] {0xFFD27A, 0xFF7A2E};
 			case CHRONO -> new int[] {0xFFE3A3, 0x4DD8FF};
 			case PYJAMA -> new int[] {0xFFE9A8, 0x7C8CFF};
+			case LUCKY -> new int[] {0xFFD23F, 0xC9B0FF};
 		};
 	}
 
@@ -556,6 +565,7 @@ public final class AuraEffects {
 				case LANTERN -> emitLanterns(t, s, px, py, pz);
 				case CHRONO -> emitChrono(t, s, px, py, pz);
 				case PYJAMA -> emitPyjama(t, s, px, py, pz);
+				case LUCKY -> emitLucky(t, s, px, py, pz);
 			}
 			for (int i = particles.size() - 1; i >= 0; i--) {
 				P p = particles.get(i);
@@ -1010,6 +1020,7 @@ public final class AuraEffects {
 				case LANTERN -> drawLanterns(s, out);
 				case CHRONO -> drawChrono(s, out);
 				case PYJAMA -> drawPyjama(s, out);
+				case LUCKY -> drawLucky(s, out);
 			}
 			for (P p : particles) {
 				float f = p.age / p.life;
@@ -1827,6 +1838,15 @@ public final class AuraEffects {
 					p.x = px + dx * Math.cos(w) - dz * Math.sin(w);
 					p.z = pz + dx * Math.sin(w) + dz * Math.cos(w);
 				}
+				case LUCKY -> {
+					if (p.shape == COIN) {
+						p.vy -= 5.5f * t;
+						p.rot += p.spin * t;
+						float drag = Math.max(0, 1 - 0.6f * t);
+						p.vx *= drag;
+						p.vz *= drag;
+					}
+				}
 				case PYJAMA -> {
 					if (p.shape == SNOOZE) {
 						// Swaying from side to side as it floats up, like a lullaby.
@@ -1936,6 +1956,18 @@ public final class AuraEffects {
 					}
 				}
 				case CHRONO -> out.sprite(x, y, z, p.size, color(kind, s, p.seed, p.seed, time), fade(p, 3, 1.5f) * twinkle(p, 9), p.shape);
+				case LUCKY -> {
+					if (p.shape == COIN) {
+						// A coin flipping as it flies: its width follows the spin, so it really turns over.
+						float flip = Math.abs(cos(p.rot));
+						int c = s.color() == 0 ? mix(0xFFB21C, 0xFFE36A, 0.5f + 0.5f * sin(p.rot)) : color(kind, s, 0.2f, p.seed, time);
+						float a = fade(p, 12, 2.5f);
+						out.sprite(x, y, z, p.size * (0.35f + 0.65f * flip), c, a, COIN | FACING, p.seed * 2);
+						out.sprite(x, y, z, p.size * 1.6f, c, a * 0.18f, GLOW);
+					} else {
+						out.sprite(x, y, z, p.size, color(kind, s, 0.1f + 0.3f * p.seed, p.seed, time), fade(p, 4, 1.5f) * twinkle(p, 10), SPARKLE);
+					}
+				}
 				case PYJAMA -> {
 					if (p.shape == SNOOZE) {
 						// Growing as it rises and fades.
@@ -2638,6 +2670,85 @@ public final class AuraEffects {
 				float a = rnd(0, TAU);
 				float r = rnd(0.5f, 0.9f) * sz;
 				spawn(px + Math.cos(a) * r, py + rnd(0.05f, 0.25f), pz + Math.sin(a) * r, rnd(3f, 4f), rnd(0.25f, 0.35f) * sz, SMOKE);
+			}
+		}
+
+		private static final int LUCKY_BLOCKS = 3;
+		private static final float LUCKY_POP = 2.6f;
+		private float luckyLast;
+
+		/** Where lucky block {@code i} is at {@code at} seconds (player space, feet at 0). */
+		private float[] luckyPos(int i, float at, float sz) {
+			float a = at * 0.55f + i * TAU / LUCKY_BLOCKS;
+			float r = 0.82f * sz;
+			return new float[] {r * cos(a), 1.12f + 0.13f * sin(at * 1.5f + i * 2.1f), r * sin(a)};
+		}
+
+		/** 0 right after block {@code i} pops, rising to 1 by its next pop. */
+		private float luckyCycle(int i, float at) {
+			float c = at / LUCKY_POP + i / (float) LUCKY_BLOCKS;
+			return c - (float) Math.floor(c);
+		}
+
+		private void emitLucky(float t, Settings s, double px, double py, double pz) {
+			float sz = s.size();
+			float before = luckyLast;
+			luckyLast = time;
+			for (int i = 0; i < LUCKY_BLOCKS; i++) {
+				if (before <= 0 || luckyCycle(i, time) >= luckyCycle(i, before)) {
+					continue;
+				}
+				// Block i just popped: a shower of coins out and up, a few sparkles.
+				float[] b = luckyPos(i, time, sz);
+				int coins = Math.max(3, Math.round(7 * s.density()));
+				for (int k = 0; k < coins; k++) {
+					float a = rnd(0, TAU);
+					float out = rnd(0.5f, 1.1f) * sz;
+					P p = spawn(px + b[0], py + b[1] + 0.12f * sz, pz + b[2], rnd(0.8f, 1.05f), rnd(0.065f, 0.085f) * sz, COIN);
+					p.vx = cos(a) * out + b[0] * 0.6f;
+					p.vz = sin(a) * out + b[2] * 0.6f;
+					p.vy = rnd(1.6f, 2.4f) * (0.7f + 0.3f * sz);
+					p.spin = rnd(9f, 14f) * (random.nextBoolean() ? 1 : -1);
+					p.rot = rnd(0, TAU);
+				}
+				for (int k = 0; k < 6; k++) {
+					P p = spawn(px + b[0] + rnd(-0.2f, 0.2f) * sz, py + b[1] + rnd(-0.15f, 0.25f) * sz, pz + b[2] + rnd(-0.2f, 0.2f) * sz,
+							rnd(0.5f, 0.8f), rnd(0.04f, 0.07f) * sz, SPARKLE);
+					p.vy = rnd(0.3f, 0.7f);
+				}
+			}
+			// Gold dust rising round you.
+			for (int k = count(t, 3.5f * s.density(), 0); k > 0; k--) {
+				float a = rnd(0, TAU);
+				float r = rnd(0.35f, 0.9f) * sz;
+				P p = spawn(px + Math.cos(a) * r, py + rnd(0.1f, 1.4f), pz + Math.sin(a) * r, rnd(1.2f, 1.8f), rnd(0.03f, 0.05f) * sz, SPARKLE);
+				p.vy = rnd(0.25f, 0.45f);
+			}
+		}
+
+		private void drawLucky(Settings s, Out out) {
+			float sz = s.size();
+			int gold = s.color() == 0 ? 0xFFC531 : color(kind, s, 0.3f, 0, time);
+			int marks = s.color() == 0 ? 0xD9C7FF : mix(color(kind, s, 0f, 0, time), 0xFFFFFF, 0.55f);
+			// A golden glow and a slowly turning ring of coins at your feet.
+			out.sprite(0, 0.03f, 0, 1.2f * sz, gold, 0.22f, DISC);
+			out.sprite(0, 0.04f, 0, 0.95f * sz, gold, 0.35f + 0.1f * sin(time * 2), HALO | FLAT);
+			for (int i = 0; i < 10; i++) {
+				float a = i * TAU / 10 + time * 0.35f;
+				float r = 0.7f * sz;
+				out.sprite(r * cos(a), 0.06f, r * sin(a), 0.07f * sz, mix(gold, 0xFFFFFF, 0.2f), 0.8f, COIN | FLAT, -a - TAU / 4);
+			}
+			for (int i = 0; i < LUCKY_BLOCKS; i++) {
+				float[] b = luckyPos(i, time, sz);
+				float c = luckyCycle(i, time);
+				// Pops: a quick swell and flash right after the coins fly, and a little wind-up shake before the next.
+				float swell = (float) Math.exp(-c * 14) * 0.28f;
+				float shake = c > 0.85f ? sin(time * 60) * 0.12f * (c - 0.85f) / 0.15f : 0;
+				float size = 0.26f * sz * (1 + swell);
+				float rock = 0.12f * sin(time * 1.3f + i * 2) + shake;
+				out.sprite(b[0], b[1], b[2], size * 1.9f, gold, 0.22f + swell * 1.6f, GLOW);
+				out.sprite(b[0], b[1], b[2], size, gold, 0.97f, LUCKY_BLOCK | FACING, rock);
+				out.sprite(b[0], b[1], b[2], size, marks, 0.95f, LUCKY_MARKS | FACING, rock);
 			}
 		}
 
