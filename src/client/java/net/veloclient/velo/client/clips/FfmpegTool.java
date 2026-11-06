@@ -78,6 +78,15 @@ public final class FfmpegTool {
 			binary = bundled();
 		} else if (works("ffmpeg")) {
 			binary = Path.of("ffmpeg");
+		} else {
+			// macOS: a game started from the Dock doesn't get the shell's PATH, so Homebrew's FFmpeg (Apple Silicon:
+			// /opt/homebrew, Intel: /usr/local) isn't found by name - and the downloaded build is Intel-only.
+			for (String candidate : new String[] {"/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"}) {
+				if (Files.isExecutable(Path.of(candidate)) && works(candidate)) {
+					binary = Path.of(candidate);
+					break;
+				}
+			}
 		}
 		return binary;
 	}

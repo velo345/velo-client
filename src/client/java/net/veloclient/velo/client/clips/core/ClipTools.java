@@ -63,7 +63,16 @@ public final class ClipTools {
 		if (Files.isExecutable(own) && works(own.toString())) {
 			return own;
 		}
-		return works("ffmpeg") ? Path.of("ffmpeg") : null;
+		if (works("ffmpeg")) {
+			return Path.of("ffmpeg");
+		}
+		// macOS: Homebrew's FFmpeg isn't on a Dock-started app's PATH (see FfmpegTool#binary).
+		for (String candidate : new String[] {"/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"}) {
+			if (Files.isExecutable(Path.of(candidate)) && works(candidate)) {
+				return Path.of(candidate);
+			}
+		}
+		return null;
 	}
 
 	private static boolean works(String command) {

@@ -97,14 +97,7 @@ public final class NoteCard {
 		String bodyText = note.text == null ? null : note.title != null && !note.title.isBlank() ? note.text
 				: note.text.strip().contains("\n") ? note.text.strip().substring(note.text.strip().indexOf('\n') + 1) : null;
 		if (plain && bodyText != null && !bodyText.isBlank()) {
-			List<String> lines = new ArrayList<>();
-			for (String paragraph : bodyText.split("\n", -1)) {
-				if (paragraph.isBlank()) {
-					lines.add("");
-					continue;
-				}
-				lines.addAll(VeloUi.wrap(paragraph, inner));
-			}
+			List<String> lines = wrapped(bodyText, inner);
 			int max = full ? 40 : 5;
 			for (int i = 0; i < lines.size() && i < max; i++) {
 				String line = i == max - 1 && lines.size() > max ? VeloUi.trim(lines.get(i) + " ...", inner) : lines.get(i);
@@ -209,6 +202,32 @@ public final class NoteCard {
 			}
 		}
 		return h;
+	}
+
+	// Cards are laid out every frame (the world cards are re-recorded each frame): wrapping their text measured every
+	// word with the font each time - 2.5% of the render thread with a few notes in view (JFR, 2026-11-06).
+	private static final java.util.Map<String, List<String>> WRAPPED = new java.util.HashMap<>();
+
+	private static List<String> wrapped(String bodyText, int inner) {
+		String key = inner + "\u0000" + bodyText;
+		List<String> cached = WRAPPED.get(key);
+		if (cached != null) {
+			return cached;
+		}
+		List<String> lines = new ArrayList<>();
+		for (String paragraph : bodyText.split("\n", -1)) {
+			if (paragraph.isBlank()) {
+				lines.add("");
+				continue;
+			}
+			lines.addAll(VeloUi.wrap(paragraph, inner));
+		}
+		if (WRAPPED.size() > 256) {
+			WRAPPED.clear();
+		}
+		lines = List.copyOf(lines);
+		WRAPPED.put(key, lines);
+		return lines;
 	}
 
 	private static String sharedLabel(Note note) {
