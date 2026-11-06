@@ -121,6 +121,7 @@
 		"VulkanDecoupledSurfaceMixin",
 		"VulkanDeviceCloseMixin",
 		"GpuCosmeticsMixin",
+		"MenuWidgetDrawMixin",
 		"GpuCosmeticsPipelinesAccessor",
 		"VulkanDrawStateMixin",
 		"VulkanFrameProfileMixin",

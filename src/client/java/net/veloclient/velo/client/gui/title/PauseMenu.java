@@ -63,6 +63,15 @@ public final class PauseMenu {
 	private static final Map<ClickableWidget, int[]> FIRST_SEEN = new WeakHashMap<>();
 	private static final Set<ClickableWidget> RESTYLED = Collections.newSetFromMap(new WeakHashMap<>());
 
+	/**
+	 * Whether {@code widget} is a real button Velo paints itself here - MenuWidgetDrawMixin skips vanilla's drawing of it
+	 * always, not only while vanilla renders the screen (anything drawing the widgets outside that made the vanilla
+	 * buttons flash in the middle when hovering ours - bug report, 2026-11-06).
+	 */
+	public static boolean paintsItself(Object widget) {
+		return widget instanceof ClickableWidget w && RESTYLED.contains(w);
+	}
+
 	private static HotspotButton veloMenu;
 	private static HotspotButton store;
 	private static HotspotButton friends;

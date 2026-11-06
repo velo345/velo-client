@@ -62,6 +62,15 @@ public final class TitleMenu {
 	/** Widgets painted by us this screen: hidden while vanilla draws, visible (clickable) otherwise. */
 	private static final Set<ClickableWidget> RESTYLED = Collections.newSetFromMap(new WeakHashMap<>());
 
+	/**
+	 * Whether {@code widget} is a real button Velo paints itself here - MenuWidgetDrawMixin skips vanilla's drawing of it
+	 * always, not only while vanilla renders the screen (anything drawing the widgets outside that made the vanilla
+	 * buttons flash in the middle when hovering ours - bug report, 2026-11-06).
+	 */
+	public static boolean paintsItself(Object widget) {
+		return widget instanceof ClickableWidget w && RESTYLED.contains(w);
+	}
+
 	private static HotspotButton storeRow;
 	private static HotspotButton jumpCard;
 	private static HotspotButton storeCard;
