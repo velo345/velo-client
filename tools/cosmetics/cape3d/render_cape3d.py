@@ -85,6 +85,42 @@ def text_sdf(text="VELO CLIENT", spacing=0.32):
 	return (d / TEXT_W).astype("f4")
 
 
+# Blocky pixel glyphs (Minecraft-title style) for scenes that set `// @pixeltext "WORD" "WORD2"`.
+PIXEL_GLYPHS = {
+	"L": ["XX....", "XX....", "XX....", "XX....", "XX....", "XXXXXX", "XXXXXX"],
+	"U": ["XX..XX", "XX..XX", "XX..XX", "XX..XX", "XX..XX", "XXXXXX", ".XXXX."],
+	"C": [".XXXXX", "XXXXXX", "XX....", "XX....", "XX....", "XXXXXX", ".XXXXX"],
+	"K": ["XX..XX", "XX.XXX", "XXXXX.", "XXXX..", "XXXXX.", "XX.XXX", "XX..XX"],
+	"Y": ["XX..XX", "XX..XX", "XXXXXX", ".XXXX.", "..XX..", "..XX..", "..XX.."],
+	"S": [".XXXXX", "XXXXXX", "XX....", "XXXXX.", ".XXXXX", "....XX", "XXXXX."],
+	"M": ["XX...XX", "XXX.XXX", "XXXXXXX", "XX.X.XX", "XX...XX", "XX...XX", "XX...XX"],
+	"P": ["XXXXX.", "XXXXXX", "XX..XX", "XXXXXX", "XXXXX.", "XX....", "XX...."],
+}
+
+
+def pixel_text_sdf(text, cell=29):
+	"""Signed distance to a word in PIXEL_GLYPHS (one blank column between letters), centred in a TEXT_W x TEXT_H box,
+	in units of the box width - the same mapping as text_sdf, so text2()-style sampling works."""
+	cols = []
+	for i, ch in enumerate(text):
+		g = PIXEL_GLYPHS[ch]
+		if i:
+			cols.append(["."] * 7)
+		for x in range(len(g[0])):
+			cols.append([row[x] for row in g])
+	w, h = len(cols) * cell, 7 * cell
+	img = Image.new("L", (TEXT_W, TEXT_H), 0)
+	draw = ImageDraw.Draw(img)
+	x0, y0 = (TEXT_W - w) // 2, (TEXT_H - h) // 2
+	for cx, col in enumerate(cols):
+		for cy, v in enumerate(col):
+			if v == "X":
+				draw.rectangle((x0 + cx * cell, y0 + cy * cell, x0 + (cx + 1) * cell - 1, y0 + (cy + 1) * cell - 1), fill=255)
+	inside = np.asarray(img) > 127
+	d = ndimage.distance_transform_edt(~inside) - ndimage.distance_transform_edt(inside)
+	return (d / TEXT_W).astype("f4")
+
+
 class Renderer:
 	def __init__(self, cape_id):
 		self.ctx = moderngl.create_standalone_context(backend="egl")
@@ -121,6 +157,17 @@ class Renderer:
 			self.text.repeat_x = self.text.repeat_y = False
 			self.text.use(2)
 			self.set("uText", 2)
+		pm = re.search(r'//\s*@pixeltext\s+"([^"]+)"(?:\s+"([^"]+)")?', scene)
+		if pm:
+			for k, word in enumerate((pm.group(1), pm.group(2))):
+				name = "uText" if k == 0 else "uText2"
+				if word and name in self.prog:
+					tex = self.ctx.texture((TEXT_W, TEXT_H), 1, pixel_text_sdf(word).tobytes(), dtype="f4")
+					tex.filter = (moderngl.LINEAR, moderngl.LINEAR)
+					tex.repeat_x = tex.repeat_y = False
+					tex.use(2 + k)
+					self.set(name, 2 + k)
+					setattr(self, name, tex)
 		self.set("uLogoMargin", margin)
 		self.fbos = {}
 		# A cape can bring data its shader needs (a layout, say) in capes/<id>.py: uniforms() -> {name: value}.
@@ -292,7 +339,23 @@ def turntable(textures, size=(420, 560)):
 
 
 def save_gif(frames, path, delay):
-	paletted = [f.quantize(colors=256, method=Image.Quantize.LIBIMAGEQUANT, dither=Image.Dither.FLOYDSTEINBERG) for f in frames]
+	from PIL import features
+	if not features.check("libimagequant"):
+		# this Pillow lacks libimagequant (e.g. the moderngl venv): let the system python, which has it, encode the gif
+		import subprocess, tempfile
+		with tempfile.TemporaryDirectory() as tmp:
+			names = []
+			for i, f in enumerate(frames):
+				names.append(f"{tmp}/{i:04d}.png")
+				f.save(names[-1])
+			code = ("import sys;from PIL import Image;fs=[Image.open(n).convert('RGB') for n in sys.argv[3:]];"
+				"p=[f.quantize(colors=256,method=Image.Quantize.LIBIMAGEQUANT,dither=Image.Dither.FLOYDSTEINBERG) for f in fs];"
+				"p[0].save(sys.argv[1],save_all=True,append_images=p[1:],duration=int(sys.argv[2]),loop=0,disposal=1,optimize=False)")
+			if subprocess.run(["/usr/bin/python3", "-c", code, str(path), str(delay), *names]).returncode == 0:
+				return
+		paletted = [f.quantize(colors=256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.FLOYDSTEINBERG) for f in frames]
+	else:
+		paletted = [f.quantize(colors=256, method=Image.Quantize.LIBIMAGEQUANT, dither=Image.Dither.FLOYDSTEINBERG) for f in frames]
 	paletted[0].save(path, save_all=True, append_images=paletted[1:], duration=delay, loop=0, disposal=1, optimize=False)
 
 
