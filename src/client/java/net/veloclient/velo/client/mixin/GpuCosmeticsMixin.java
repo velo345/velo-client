@@ -1,7 +1,7 @@
 package net.veloclient.velo.client.mixin;
 
 import org.spongepowered.asm.mixin.Mixin;
-//? if >=26.2 && <26.3 {
+//? if >=26.2 {
 /*import net.veloclient.velo.client.cosmetics.render.GpuCosmetics;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -33,6 +33,31 @@ public abstract class GpuCosmeticsMixin {
 
 	@Inject(method = "finishExecute", at = @At("TAIL"), require = 0)
 	private void velo$drawLeftoverGpuCosmetics(net.minecraft.client.renderer.feature.FeatureFrameContext context, CallbackInfo ci) {
+		GpuCosmetics.flushAll();
+	}
+}
+*///?} else if >=26.3 {
+/*@Mixin(net.minecraft.client.renderer.feature.RenderTypeFeatureRenderer.class)
+public abstract class GpuCosmeticsMixin {
+
+	// 26.3 draws every group inside a render pass it hands in: the cosmetics go into the same pass (opaque groups only -
+	// translucent geometry runs through OIT there and stays on the CPU path for now).
+	@Inject(method = "executeGroup", at = @At("TAIL"), require = 0)
+	private void velo$drawGpuCosmetics(net.minecraft.client.renderer.feature.FeatureFrameContext context, net.minecraft.client.renderer.oit.OitStage stage,
+			com.mojang.renderpearl.api.commands.RenderPass pass, int index, java.util.List<?> submits, boolean translucent, CallbackInfo ci) {
+		if (!((Object) this instanceof net.minecraft.client.renderer.feature.CustomFeatureRenderer)) {
+			return;
+		}
+		for (Object submit : submits) {
+			if (submit instanceof net.minecraft.client.renderer.feature.CustomFeatureRenderer.Submit s && s.renderType().hasBlending()) {
+				return;
+			}
+		}
+		GpuCosmetics.flushInto(pass);
+	}
+
+	@Inject(method = "finishExecute", at = @At("TAIL"), require = 0)
+	private void velo$dropLeftoverGpuCosmetics(net.minecraft.client.renderer.feature.FeatureFrameContext context, CallbackInfo ci) {
 		GpuCosmetics.flushAll();
 	}
 }

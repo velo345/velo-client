@@ -20,8 +20,7 @@ import java.util.Set;
  */
 public final class VeloMixinPlugin implements IMixinConfigPlugin {
 
-	private static final Set<String> ONLY_26_2 = Set.of("VulkanBarrierProbeMixin", "VulkanPassBarrierMixin", "VulkanSurfaceProfileMixin",
-			"GpuCosmeticsMixin", "GpuCosmeticsPipelinesAccessor");
+	private static final Set<String> ONLY_26_2 = Set.of("VulkanBarrierProbeMixin", "VulkanPassBarrierMixin", "VulkanSurfaceProfileMixin");
 	/** Patch vanilla's own terrain path, which Sodium replaces wholesale. */
 	private static final Set<String> VANILLA_TERRAIN = Set.of("ChunkSlicePrepMixin", "SectionMeshSlotsMixin", "UberBufferSlotsMixin");
 
@@ -44,6 +43,10 @@ public final class VeloMixinPlugin implements IMixinConfigPlugin {
 			return false;
 		}
 		if (renderPearl && ONLY_26_2.contains(simpleName)) {
+			return false;
+		}
+		// GPU cosmetics: the Vulkan-era renderers (26.2 and 26.3) only.
+		if (simpleName.startsWith("GpuCosmetics") && !hasVulkan) {
 			return false;
 		}
 		// Velo Shaders: the Vulkan versions (26.2 and 26.3).
