@@ -54,15 +54,14 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 	/**
 	 * Mouse smoothing while zoomed (0 = off .. 1 = softest): every mouse movement is spread over a few milliseconds instead of
 	 * landing as one jump - far into a zoom one mouse count is a visible step. Unlike vanilla's cinematic camera it has no
-	 * momentum: the camera never turns further than the mouse moved, and stops within ~10-50 ms of the mouse stopping.
+	 * momentum: the camera trails the mouse and settles exactly where it was aimed, never further.
 	 * (Replaces "Cinematic Camera While Zoomed", whose glide felt like the camera kept going on its own - owner, 2026-11-06.)
 	 */
 	private static volatile double mouseSmoothing = 0.5;
-	/** Movement not applied yet (x, y), when each axis was last turned, and when the mouse last moved on it. */
+	/** Movement not applied yet (x, y) and when each axis was last turned. */
 	private static final double[] PENDING = new double[2];
 	private static final long[] LAST_TURN = new long[2];
-	private static final long[] LAST_INPUT = new long[2];
-	/** Mouse look scaled to the zoom: same aim feel at every zoom, stops instantly (no cinematic glide). */
+		/** Mouse look scaled to the zoom: same aim feel at every zoom, stops instantly (no cinematic glide). */
 	private static volatile boolean scaleSensitivity = true;
 	private static volatile double zoomInSpeed = 1.0;
 	private static volatile double zoomOutSpeed = 1.0;
@@ -117,24 +116,28 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 	public static double look(int axis, double raw) {
 		double scaled = raw * sensitivityFactor();
 		long now = System.nanoTime();
-		if (!zooming || mouseSmoothing < 0.01) {
-			double out = scaled + PENDING[axis]; // whatever was still pending lands at once - nothing glides on
-			PENDING[axis] = 0;
-			LAST_TURN[axis] = 0;
-			return out;
-		}
 		double dt = LAST_TURN[axis] == 0 ? 0 : Math.min(0.05, (now - LAST_TURN[axis]) / 1e9);
 		LAST_TURN[axis] = now;
-		PENDING[axis] += scaled;
-		if (raw != 0) {
-			LAST_INPUT[axis] = now;
+		// Smoothing off: everything at once.
+		if (mouseSmoothing < 0.01) {
+			double out = scaled + PENDING[axis];
+			PENDING[axis] = 0;
+			return out;
 		}
-		double tau = 0.006 + 0.034 * mouseSmoothing;            // 6 .. 40 ms
-		if (now - LAST_INPUT[axis] > 12_000_000L) {
-			tau *= 0.3;                                          // the mouse stopped: finish the last bit fast
+		// The camera trails the mouse: each frame it covers a share of the way still to go (exponential catch-up), so it
+		// glides in and settles exactly where the mouse put it - it never overshoots and never turns further than the
+		// mouse moved (vanilla's cinematic camera does both). Not zoomed: new movement goes through directly, and only
+		// what is still pending from the zoom finishes its glide, so letting go of the key doesn't jump.
+		double tau = 0.02 + 0.13 * mouseSmoothing;               // 20 .. 150 ms, 85 ms at the default
+		double catchUp = dt <= 0 ? 0 : 1 - Math.exp(-dt / tau);
+		double out;
+		if (zooming) {
+			PENDING[axis] += scaled;
+			out = PENDING[axis] * catchUp;
+		} else {
+			out = scaled + PENDING[axis] * catchUp;
 		}
-		double out = dt <= 0 ? 0 : PENDING[axis] * (1 - Math.exp(-dt / tau));
-		PENDING[axis] -= out;
+		PENDING[axis] -= zooming ? out : out - scaled;
 		if (Math.abs(PENDING[axis]) < 1e-3) {
 			out += PENDING[axis];
 			PENDING[axis] = 0;
