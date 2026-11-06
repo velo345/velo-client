@@ -76,6 +76,9 @@ public final class InstanceSettingsDialog {
 		CheckBox perfMods = new CheckBox("Install recommended mods (Sodium, Lithium, FerriteCore, EntityCulling, ImmediatelyFast, ModernFix, Wavey Capes, Mod Menu)");
 		perfMods.setSelected(perfState.enabled);
 		grid.add(perfMods, 0, 6, 3, 1);
+		CheckBox distantHorizons = new CheckBox("Distant Horizons - see terrain far past your render distance (uses more RAM and CPU)");
+		distantHorizons.setSelected(perfState.distantHorizons);
+		grid.add(distantHorizons, 0, 7, 3, 1);
 
 		dialog.getDialogPane().setContent(grid);
 		ButtonType confirm = new ButtonType("Save", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
@@ -85,8 +88,9 @@ public final class InstanceSettingsDialog {
 			if (button != confirm) {
 				return null;
 			}
-			if (perfState.enabled != perfMods.isSelected()) {
+			if (perfState.enabled != perfMods.isSelected() || perfState.distantHorizons != distantHorizons.isSelected()) {
 				perfState.enabled = perfMods.isSelected();
+				perfState.distantHorizons = distantHorizons.isSelected();
 				PerformanceModsInstaller.writeState(instance.id(), perfState);
 			}
 			String extraArgs = extraArgsField.getText().trim();

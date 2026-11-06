@@ -145,6 +145,11 @@ public final class PerformanceModsInstaller {
 		public boolean enabled = true;
 		public String gameVersion;
 		public Map<String, String> installed = new LinkedHashMap<>();
+		/** Opt-in, per profile (profile settings): Distant Horizons for LOD terrain far past the render distance. */
+		public boolean distantHorizons = false;
+		/** The Distant Horizons jar Velo put in the mods folder (null: none of ours), and which game version it's for. */
+		public String distantHorizonsFile;
+		public String distantHorizonsGameVersion;
 	}
 
 	private PerformanceModsInstaller() {
@@ -182,7 +187,10 @@ public final class PerformanceModsInstaller {
 	public static void installInto(String instanceId, Path modsDir, GameVersion version) {
 		try {
 			State state = readState(instanceId);
+			// Its own switch, independent of the recommended mods: a player can want far terrain with no other mods.
+			syncDistantHorizons(state, modsDir, version);
 			if (!state.enabled) {
+				writeState(instanceId, state);
 				return;
 			}
 			// A profile moved to another Minecraft version needs builds for that version - drop our
@@ -269,6 +277,11 @@ public final class PerformanceModsInstaller {
 	}
 
 	private static Optional<String> installOne(String slug, GameVersion version, Path modsDir, Set<String> presentModIds) throws IOException {
+		return installOne(slug, modsFor(version).get(slug), version, modsDir, presentModIds);
+	}
+
+	private static Optional<String> installOne(String slug, String modId, GameVersion version, Path modsDir, Set<String> presentModIds)
+			throws IOException {
 		List<ModrinthClient.ProjectVersion> candidates = ModrinthClient.versions(slug, version.id(), "mod", version.modrinthLoader());
 		// Modrinth lists newest first.
 		List<ModrinthClient.ProjectVersion> fitting = candidates.stream()
@@ -276,7 +289,6 @@ public final class PerformanceModsInstaller {
 				.filter(v -> v.loaders() != null && v.loaders().contains(version.modrinthLoader()))
 				.toList();
 		Optional<ModrinthClient.ProjectVersion> chosen = fitting.stream().findFirst();
-		String modId = modsFor(version).get(slug);
 		if (chosen.isPresent() && net.veloclient.launcher.doctor.ModRequirements.constrains(modsDir, modId)) {
 			// Another mod wants a certain version of it: the newest build every mod accepts (read from the jar itself -
 			// Modrinth's version names don't match fabric.mod.json's).
@@ -318,9 +330,50 @@ public final class PerformanceModsInstaller {
 		Downloader.ensure(URI.create(file.url()), cached, file.sha1(), file.size(), b -> { });
 		Path dest = modsDir.resolve(file.filename());
 		Files.copy(cached, dest, StandardCopyOption.REPLACE_EXISTING);
-		presentModIds.add(modsFor(version).get(slug));
+		presentModIds.add(modId);
 		LauncherLog.info("Installed performance mod " + file.filename() + " for " + version.id());
 		return Optional.of(file.filename());
+	}
+
+	private static final String DH_SLUG = "distanthorizons";
+	private static final String DH_MOD_ID = "distanthorizons";
+
+	/**
+	 * Distant Horizons: LOD terrain - far chunks drawn as simplified meshes, so the landscape reaches many times past
+	 * the render distance at a fraction of the cost of real chunks. Off by default (it builds its LOD data on the CPU in
+	 * the background and keeps a database per world, so it costs RAM and disk); since DH 3.3 it renders through Mojang's
+	 * own render API on 26.2+, so it works on Vulkan as well as OpenGL.
+	 *
+	 * <p>On: installs the build for this game version (swapping ours when the profile changed version). Off: removes only
+	 * the jar Velo installed - a Distant Horizons the player added themselves is never touched either way.
+	 */
+	private static void syncDistantHorizons(State state, Path modsDir, GameVersion version) {
+		try {
+			Path ours = state.distantHorizonsFile == null ? null : modsDir.resolve(state.distantHorizonsFile);
+			boolean stale = ours != null && !version.id().equals(state.distantHorizonsGameVersion);
+			if (ours != null && (!state.distantHorizons || stale)) {
+				Files.deleteIfExists(ours);
+				Files.deleteIfExists(modsDir.resolve(state.distantHorizonsFile + ".disabled"));
+				LauncherLog.info("Removed " + state.distantHorizonsFile + (stale ? " - the profile now runs another version" : " - Distant Horizons switched off"));
+				state.distantHorizonsFile = null;
+				state.distantHorizonsGameVersion = null;
+				ours = null;
+			}
+			if (!state.distantHorizons || ours != null && Files.exists(ours)) {
+				return;
+			}
+			Files.createDirectories(modsDir);
+			Set<String> present = installedModIds(modsDir);
+			if (present.contains(DH_MOD_ID)) {
+				return; // the player's own copy
+			}
+			installOne(DH_SLUG, DH_MOD_ID, version, modsDir, present).ifPresentOrElse(fileName -> {
+				state.distantHorizonsFile = fileName;
+				state.distantHorizonsGameVersion = version.id();
+			}, () -> LauncherLog.info("No Distant Horizons build for " + version.id() + " - launching without it"));
+		} catch (IOException | RuntimeException e) {
+			LauncherLog.warn("Couldn't set up Distant Horizons - launching without changes", e);
+		}
 	}
 
 	/**
