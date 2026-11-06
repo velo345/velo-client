@@ -69,8 +69,18 @@ public final class OsRules {
 
 	private static boolean archMatches(String ruleArch) {
 		String arch = System.getProperty("os.arch", "").toLowerCase(java.util.Locale.ROOT);
+		boolean jvmIsArm = arch.contains("aarch64") || arch.contains("arm");
 		boolean jvmIs64Bit = arch.contains("64");
-		boolean ruleIs32Bit = ruleArch.equals("x86") || ruleArch.equals("32");
+		String rule = ruleArch.toLowerCase(java.util.Locale.ROOT);
+		// Apple Silicon / Windows on ARM: an "arm64" rule must not also match Intel/AMD machines (and vice versa),
+		// otherwise both CPUs' natives or JVM arguments land on the command line.
+		if (rule.equals("arm64") || rule.equals("aarch64")) {
+			return jvmIsArm && jvmIs64Bit;
+		}
+		if (rule.equals("x86_64") || rule.equals("amd64") || rule.equals("x64")) {
+			return !jvmIsArm && jvmIs64Bit;
+		}
+		boolean ruleIs32Bit = rule.equals("x86") || rule.equals("32");
 		return jvmIs64Bit != ruleIs32Bit;
 	}
 }

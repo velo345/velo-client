@@ -167,7 +167,7 @@ public abstract class VulkanDrawStateMixin {
 			return;
 		}
 		for (int i = 0; i < velo$changedCount; i++) {
-			if (velo$changed[i].equals(name)) {
+			if (velo$changed[i] == name || velo$changed[i].equals(name)) {
 				return;
 			}
 		}
@@ -207,7 +207,8 @@ public abstract class VulkanDrawStateMixin {
 				String name = velo$changed[c];
 				int binding = -1;
 				for (int i = 0; i < entries.size(); i++) {
-					if (entries.get(i).name().equals(name)) {
+					String entryName = entries.get(i).name();
+					if (entryName == name || entryName.equals(name)) { // mostly the same interned constant: skip the char compare
 						binding = i;
 						break;
 					}

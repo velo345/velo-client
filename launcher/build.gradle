@@ -416,9 +416,16 @@ tasks.register("jpackageDist") {
 		if (isWindows) {
 			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser", "--win-upgrade-uuid", launcherWindowsUpgradeUuid]
 		}
+		if (isMac) {
+			command += ["--mac-package-identifier", "net.veloclient.launcher", "--mac-package-name", "Velo Client"]
+		}
 		List<String> appImage = new ArrayList<>(command)
 		if (!isWindows && !isMac) {
 			command += ["--linux-shortcut"]
+		}
+		if (isMac) {
+			buildMacDmg(appImage, dist, launcherAppVersion)
+			return
 		}
 		runJpackage(command)
 		// Linux without dpkg (Arch, Fedora, ...): the same app as a plain folder with its runtime, packed as
@@ -443,6 +450,52 @@ tasks.register("jpackageDist") {
 			}
 			imageDir.deleteDir()
 		}
+	}
+}
+
+// macOS: one .dmg per CPU, built on that CPU's runner (jpackage bundles the JDK that runs it, so an
+// arm64 JDK gives an Apple Silicon app and an x64 JDK an Intel one - see .github/workflows/package-launcher.yml).
+// The app is built as an app-image first and signed ad hoc over the whole bundle (no Apple developer
+// certificate yet): Apple Silicon refuses to run unsigned code at all, and an ad-hoc signature that
+// covers every nested binary keeps the bundle's seal consistent, so Gatekeeper shows its normal
+// "unidentified developer" prompt (right-click > Open, or Open Anyway in Privacy & Security) instead
+// of "is damaged and can't be opened". Then the dmg is packed from that signed image and named
+// velo-client-launcher-<version>-macos-<arm64|x64>.dmg - UpdateService picks the asset by that suffix.
+void buildMacDmg(List<String> appImageCommand, File dist, String version) {
+	String arch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT)
+	String archSuffix = arch.contains("aarch64") || arch.contains("arm") ? "arm64" : "x64"
+	File imageDir = new File(dist, "app-image")
+	List<String> image = new ArrayList<>(appImageCommand)
+	image.set(image.indexOf("--type") + 1, "app-image")
+	image.set(image.indexOf("--dest") + 1, imageDir.absolutePath)
+	runJpackage(image)
+	File app = new File(imageDir, "Velo Client Launcher.app")
+	if (!app.isDirectory()) {
+		throw new GradleException("jpackage app-image not found at " + app)
+	}
+	runTool(["xattr", "-cr", app.absolutePath])
+	runTool(["codesign", "--force", "--deep", "--sign", "-", "--timestamp=none", app.absolutePath])
+	runTool(["codesign", "--verify", "--deep", "--strict", app.absolutePath])
+	String jpackageBin = new File(new File(System.getProperty("java.home"), "bin"), "jpackage").absolutePath
+	runJpackage([jpackageBin, "--type", "dmg", "--app-image", app.absolutePath, "--dest", dist.absolutePath,
+			"--name", "Velo Client Launcher", "--app-version", version, "--vendor", "Velo Client",
+			"--mac-package-identifier", "net.veloclient.launcher"])
+	File dmg = dist.listFiles().find { it.name.endsWith(".dmg") }
+	if (dmg == null) {
+		throw new GradleException("jpackage produced no .dmg in " + dist)
+	}
+	File renamed = new File(dist, "velo-client-launcher-${version}-macos-${archSuffix}.dmg")
+	if (!dmg.renameTo(renamed)) {
+		throw new GradleException("Couldn't rename " + dmg + " to " + renamed)
+	}
+	imageDir.deleteDir()
+}
+
+void runTool(List<String> command) {
+	Process process = new ProcessBuilder(command).redirectErrorStream(true).start()
+	String output = process.inputStream.getText("UTF-8")
+	if (process.waitFor() != 0) {
+		throw new GradleException(command[0] + " failed:\n" + output)
 	}
 }
 

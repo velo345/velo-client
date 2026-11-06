@@ -97,9 +97,14 @@ public final class UpdateDialog {
 						boolean started = UpdateService.runInstaller(release, text -> Platform.runLater(() -> status.setText(text)),
 								f -> Platform.runLater(() -> progress.setProgress(f < 0 ? ProgressBar.INDETERMINATE_PROGRESS : f)));
 						if (started) {
-							boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
-							Platform.runLater(() -> status.setText(windows ? "The installer takes over now - Velo Client closes." : "Installed - restarting Velo Client..."));
-							if (!windows) {
+							String os = System.getProperty("os.name", "").toLowerCase();
+							boolean windows = os.contains("win");
+							// macOS: the disk image opens in Finder - the player drags the app over the old one, so nothing to relaunch.
+							boolean mac = os.contains("mac") || os.contains("darwin");
+							Platform.runLater(() -> status.setText(windows ? "The installer takes over now - Velo Client closes."
+									: mac ? "Drag Velo Client Launcher into Applications (replace the old one) - Velo Client closes."
+									: "Installed - restarting Velo Client..."));
+							if (!windows && !mac) {
 								// The package manager finished replacing the files: start the new launcher once this one is gone.
 								UpdateService.relaunch();
 							}

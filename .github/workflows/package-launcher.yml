@@ -26,9 +26,13 @@ jobs:
             asset-glob: launcher/build/jpackage-dist/*.deb launcher/build/jpackage-dist/*.tar.gz
           - os: windows-latest
             asset-glob: launcher/build/jpackage-dist/*.exe
-          # macOS build intentionally excluded for now - re-add a
-          # macos-latest entry (asset-glob: launcher/build/jpackage-dist/*.dmg)
-          # whenever it's ready to ship again.
+          # macOS: one runner per CPU, since jpackage bundles the JDK that runs it -
+          # macos-latest is Apple Silicon (arm64), macos-15-intel is Intel (x64).
+          # launcher/build.gradle names the results ...-macos-arm64.dmg / ...-macos-x64.dmg.
+          - os: macos-latest
+            asset-glob: launcher/build/jpackage-dist/*.dmg
+          - os: macos-15-intel
+            asset-glob: launcher/build/jpackage-dist/*.dmg
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

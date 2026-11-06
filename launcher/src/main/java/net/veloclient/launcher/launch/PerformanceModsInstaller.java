@@ -80,6 +80,10 @@ public final class PerformanceModsInstaller {
 		MODS.put("particle-core", "particle_core");
 		MODS.put("krypton", "krypton");
 		MODS.put("fast-ip-ping", "fastipping");
+		// Added 2026-11-06: C2ME runs chunk generation, loading and saving on every CPU core instead of the integrated
+		// server's few threads - singleplayer and LAN worlds load and generate new terrain much faster on many-core CPUs,
+		// and the render thread stops waiting on chunks. Pure server-side work: on a multiplayer server it does nothing.
+		MODS.put("c2me-fabric", "c2me");
 		// Not performance: physics for capes (Velo Client detects it and hands it Velo's capes). Fetched from Modrinth like the rest, never bundled.
 		MODS.put("wavey-capes", "waveycapes");
 		// Mod Menu isn't installed any more: Velo's own Mods page lists every mod and opens their settings (2026-11-05).

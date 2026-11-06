@@ -140,9 +140,12 @@ public final class UpdateService {
 		// A .deb only where dpkg installs it. Arch & co. run the tar.gz build from their package manager (AUR
 		// velo-client-launcher): updates come through it, the launcher must not install around it.
 		boolean debian = !os.contains("win") && !os.contains("mac") && (onPath("dpkg") || onPath("apt"));
+		// macOS: one disk image per CPU (...-macos-arm64.dmg for Apple Silicon, ...-macos-x64.dmg for Intel).
+		String macDmg = os.contains("mac") ? "-macos-" + macArch() + ".dmg" : null;
 		for (Asset asset : assets) {
 			if (os.contains("win") && asset.name().endsWith(".exe")
-					|| debian && asset.name().endsWith(".deb")) {
+					|| debian && asset.name().endsWith(".deb")
+					|| macDmg != null && asset.name().endsWith(macDmg)) {
 				installer = asset;
 			}
 		}
@@ -253,6 +256,12 @@ public final class UpdateService {
 	 * Downloads this OS's installer and starts it. Returns true when the installer is running and the
 	 * launcher should now close; false if this OS has no installer (open the release page instead).
 	 */
+	/** "arm64" on Apple Silicon, "x64" on Intel Macs - matches the release's dmg names (see launcher/build.gradle). */
+	static String macArch() {
+		String arch = System.getProperty("os.arch", "").toLowerCase(java.util.Locale.ROOT);
+		return arch.contains("aarch64") || arch.contains("arm") ? "arm64" : "x64";
+	}
+
 	public static boolean runInstaller(Release release, Consumer<String> status) throws IOException, InterruptedException {
 		return runInstaller(release, status, f -> { });
 	}
@@ -272,10 +281,15 @@ public final class UpdateService {
 			Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
 		}
 		progress.accept(-1);
-		status.accept("Installing - confirm the password prompt");
 		String os = System.getProperty("os.name", "").toLowerCase();
+		status.accept(os.contains("mac") ? "Opening the update..." : "Installing - confirm the password prompt");
 		if (os.contains("win")) {
 			new ProcessBuilder(file.toString()).start();
+			return true;
+		}
+		if (os.contains("mac")) {
+			// Mounts the disk image and shows it in Finder; the player drags the new app over the old one.
+			new ProcessBuilder("open", file.toString()).start();
 			return true;
 		}
 		// Linux: a graphical sudo prompt installs the .deb; without pkexec hand it to the package app.

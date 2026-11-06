@@ -44,20 +44,42 @@ public final class VulkanPipelineCache {
 		return thread;
 	});
 
-	private static VkDevice device;
-	private static long cache;
-	private static boolean dirty;
+	private static volatile VkDevice device;
+	private static volatile long cache;
+	private static volatile boolean dirty;
 	private static ScheduledFuture<?> pendingSave;
+	// VkPipelineCache is internally synchronized, so pipelines compile in parallel (read lock) - this used to be one
+	// global lock around vkCreateGraphicsPipelines, which put every pipeline compile, from every compile thread, in
+	// a single line. Only creating and destroying the cache object itself takes the write lock.
+	private static final java.util.concurrent.locks.ReentrantReadWriteLock LOCK = new java.util.concurrent.locks.ReentrantReadWriteLock();
 
 	private VulkanPipelineCache() {
 	}
 
 	// Replaces vanilla's {@code vkCreateGraphicsPipelines(device, 0L, ...)} - same call, plus our cache.
-	public static synchronized int createGraphicsPipelines(VkDevice vkDevice, long ignoredCache, VkGraphicsPipelineCreateInfo.Buffer info,
+	public static int createGraphicsPipelines(VkDevice vkDevice, long ignoredCache, VkGraphicsPipelineCreateInfo.Buffer info,
 			VkAllocationCallbacks allocator, LongBuffer pipelines) {
-		long handle = ShaderCache.enabled ? handleFor(vkDevice) : 0L;
+		if (!ShaderCache.enabled) {
+			return VK12.vkCreateGraphicsPipelines(vkDevice, 0L, info, allocator, pipelines);
+		}
+		if (device != vkDevice || cache == 0L) {
+			LOCK.writeLock().lock();
+			try {
+				handleFor(vkDevice);
+			} finally {
+				LOCK.writeLock().unlock();
+			}
+		}
+		long handle;
+		int result;
 		long started = System.nanoTime();
-		int result = VK12.vkCreateGraphicsPipelines(vkDevice, handle, info, allocator, pipelines);
+		LOCK.readLock().lock();
+		try {
+			handle = device == vkDevice ? cache : 0L;
+			result = VK12.vkCreateGraphicsPipelines(vkDevice, handle, info, allocator, pipelines);
+		} finally {
+			LOCK.readLock().unlock();
+		}
 		ShaderCache.recordPipeline(System.nanoTime() - started);
 		if (handle != 0L) {
 			dirty = true;
@@ -66,6 +88,7 @@ public final class VulkanPipelineCache {
 		return result;
 	}
 
+	// Caller holds the write lock.
 	private static long handleFor(VkDevice vkDevice) {
 		if (device == vkDevice && cache != 0L) {
 			return cache;
@@ -132,7 +155,7 @@ public final class VulkanPipelineCache {
 		}
 	}
 
-	private static void scheduleSave() {
+	private static synchronized void scheduleSave() {
 		if (pendingSave != null) {
 			pendingSave.cancel(false);
 		}
@@ -140,7 +163,19 @@ public final class VulkanPipelineCache {
 		pendingSave = SAVER.schedule(() -> Minecraft.getInstance().execute(VulkanPipelineCache::saveNow), SAVE_DELAY_SECONDS, TimeUnit.SECONDS);
 	}
 
-	public static synchronized void saveNow() {
+	public static void saveNow() {
+		// Read lock: reading the cache's data may run alongside pipeline creation, just not alongside its destruction.
+		LOCK.readLock().lock();
+		try {
+			saveLocked();
+		} finally {
+			LOCK.readLock().unlock();
+		}
+	}
+
+	private static void saveLocked() {
+		VkDevice device = VulkanPipelineCache.device;
+		long cache = VulkanPipelineCache.cache;
 		if (!dirty || device == null || cache == 0L) {
 			return;
 		}
@@ -174,18 +209,25 @@ public final class VulkanPipelineCache {
 	}
 
 	// The device is about to be destroyed: save, then free our cache object while the device still exists.
-	public static synchronized void onDeviceClosing(VkDevice closing) {
-		if (closing != device || cache == 0L) {
-			return;
+	public static void onDeviceClosing(VkDevice closing) {
+		LOCK.writeLock().lock();
+		try {
+			if (closing != device || cache == 0L) {
+				return;
+			}
+			synchronized (VulkanPipelineCache.class) {
+				if (pendingSave != null) {
+					pendingSave.cancel(false);
+				}
+			}
+			dirty = true;
+			saveLocked();
+			VK10.vkDestroyPipelineCache(device, cache, null);
+			cache = 0L;
+			device = null;
+		} finally {
+			LOCK.writeLock().unlock();
 		}
-		if (pendingSave != null) {
-			pendingSave.cancel(false);
-		}
-		dirty = true;
-		saveNow();
-		VK10.vkDestroyPipelineCache(device, cache, null);
-		cache = 0L;
-		device = null;
 	}
 	*///?}
 }

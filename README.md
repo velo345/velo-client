@@ -44,9 +44,13 @@ The launcher, the client and all modules are free. Velo+ (free 7-day trial) and 
 
 ## Download
 
-Get the launcher for **Windows** or **Linux (.deb)** from [velo-client.com/download](https://velo-client.com/download) or the
-[latest release](https://github.com/velo345/velo-client/releases). On macOS (or in any other Fabric launcher) use the
+Get the launcher for **Windows**, **Linux (.deb / .tar.gz)** or **macOS** from [velo-client.com/download](https://velo-client.com/download) or the
+[latest release](https://github.com/velo345/velo-client/releases). In any other Fabric launcher, use the
 `velo-client-<version>+<minecraft>.jar` from the release together with Fabric API.
+
+On macOS pick the disk image for your Mac: `velo-client-launcher-<version>-macos-arm64.dmg` for Apple Silicon
+(M1 and newer), `velo-client-launcher-<version>-macos-x64.dmg` for Intel. The app isn't notarized by Apple yet, so the
+first start needs **right-click → Open** (or **System Settings → Privacy & Security → Open Anyway**).
 
 Velo Client is an independent project and not an official Minecraft product; it is not approved by or associated with
 Mojang or Microsoft.

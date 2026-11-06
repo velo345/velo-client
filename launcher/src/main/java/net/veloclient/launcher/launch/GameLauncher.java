@@ -222,6 +222,7 @@ public final class GameLauncher {
 		// JVM to resolve IPv4-only sidesteps it; it's the standard fix for
 		// this exact class of intermittent Minecraft connection timeout.
 		jvmArgs.add("-Djava.net.preferIPv4Stack=true");
+		FirstRunOptions.apply(instance.id()); // first: the two below can create options.txt
 		GraphicsApi.applyPending(instance.id());
 		LegacyOptions.apply(instance.id(), version, InstancePaths.modsDir(instance.id()));
 		// The Doctor explains and fixes mod problems itself - Fabric's own error window would only stand in its way.

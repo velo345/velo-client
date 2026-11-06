@@ -28,8 +28,15 @@ public final class DecoupledPresent {
 	private DecoupledPresent() {
 	}
 
+	/**
+	 * macOS runs Vulkan through MoltenVK on a CAMetalLayer, which only has 2-3 drawables and whose acquire waits on
+	 * {@code nextDrawable} whatever timeout it's given - a non-waiting acquire there just misses frames instead of
+	 * freeing the render thread, so decoupled present stays off and the Mac keeps vanilla's pacing.
+	 */
+	private static final boolean MAC = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("mac");
+
 	public static boolean active() {
-		if (!PerformanceBoostModule.decoupledPresent) {
+		if (!PerformanceBoostModule.decoupledPresent || MAC) {
 			return false;
 		}
 		net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
