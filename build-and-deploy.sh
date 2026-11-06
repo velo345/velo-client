@@ -68,4 +68,20 @@ if [[ -d "$PROFILE_MODS" ]]; then
 	fi
 	echo "Deployed to the launcher's asteriasmp profile ($PROFILE_MODS, version=$VERSION in gamejars)"
 fi
-echo "Also built (not deployed): versions/1.21.11/build/libs/, versions/26.1/build/libs/, versions/26.3/build/libs/"
+# Every other launcher profile and Minecraft version too (owner, 2026-11-06: "really in my launcher, not just one dev
+# profile"): each version's jar into the launcher's cache, and into every profile's mods folder for its version.
+if [[ -d "$GAMEJARS" ]]; then
+	for VDIR in versions/*/; do
+		V=$(basename "$VDIR")
+		VJAR=$(ls "$VDIR"build/libs/velo-client-*+"$V".jar 2>/dev/null | grep -v -- '-sources' | head -1)
+		[[ -n "$VJAR" ]] && cp "$VJAR" "$GAMEJARS/$V.jar"
+	done
+	for INST in "$HOME"/.velo-client/instances/*/; do
+		[[ -f "$INST/instance.json" && -d "$INST/mods" ]] || continue
+		V=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('mcVersion',''))" "$INST/instance.json" 2>/dev/null)
+		VJAR=$(ls versions/"$V"/build/libs/velo-client-*+"$V".jar 2>/dev/null | grep -v -- '-sources' | head -1)
+		OLD=$(ls "$INST/mods" | grep -E '^velo-client.*\.jar$' | head -1)
+		[[ -n "$VJAR" && -n "$OLD" ]] && cp "$VJAR" "$INST/mods/$OLD"
+	done
+	echo "Deployed every version into the launcher's cache and every profile's mods folder"
+fi
