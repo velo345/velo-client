@@ -206,14 +206,26 @@ const API = "";
 const fileUrl = (hash) => `${API}/v1/cosmetics/file/${hash}`;
 
 /** A cape as a small 3D model: its animated GIF mapped onto the cape template's six faces. Drag to turn it. */
+// Cards load their art only when they come near the screen: CSS backgrounds don't lazy-load, so a cloak page fetched and
+// decoded every cloak's animation at once.
+const capeLazy = "IntersectionObserver" in window ? new IntersectionObserver((entries) => {
+	for (const e of entries) {
+		if (!e.isIntersecting) continue;
+		capeLazy.unobserve(e.target);
+		for (const face of e.target.querySelectorAll(".face")) face.style.backgroundImage = `url("${e.target.dataset.art}")`;
+	}
+}, { rootMargin: "300px 0px" }) : null;
+
 function cape3d(url, k = 12, draggable = false) {
 	const rig = el("div", { class: "rig" });
+	const lazy = capeLazy && !draggable;
 	for (const f of ["in", "l", "r", "t", "b", "out"]) {
 		const face = el("div", { class: "face " + f });
-		face.style.backgroundImage = `url("${url}")`;
+		if (!lazy) face.style.backgroundImage = `url("${url}")`;
 		rig.append(face);
 	}
 	const box = el("div", { class: "cape3d", role: "img", "aria-label": "3D cloak preview" }, rig);
+	if (lazy) { box.dataset.art = url; capeLazy.observe(box); }
 	box.style.setProperty("--k", k + "px");
 	if (draggable) {
 		let dragging = false, startX = 0, yaw = -20;
