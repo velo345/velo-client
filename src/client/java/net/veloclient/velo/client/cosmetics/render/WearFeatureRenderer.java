@@ -71,6 +71,9 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 		var model = this.getContextModel();
 		float[] swing = player != null && worn.stream().anyMatch(w -> WearManager.type(w.id()).map(t -> "neck".equals(t.slot())).orElse(false))
 				? net.veloclient.velo.client.cosmetics.wear.NeckSwing.update(state.id, state.x, state.y, state.z, state.bodyYaw) : null;
+		// Full mesh unless Cosmetics Quality lightens this wearer (others further away / Lite)
+		boolean lite = net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.lite(state.id, self,
+				player == null || client.player == null || self ? 0 : player.squaredDistanceTo(client.player));
 		for (WearManager.Worn item : worn) {
 			WearManager.WearType type = WearManager.type(item.id()).orElse(null);
 			WearManager.Model art = type == null ? null : WearManager.model(item.id());
@@ -80,7 +83,7 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 			}
 			for (int side = 0; side < (type.mirrorBone() != null ? 2 : 1); side++) {
 				String boneName = side == 0 ? type.bone() : type.mirrorBone();
-				EmoteProps.Mesh mesh = side == 0 ? art.mesh() : art.mirrored();
+				EmoteProps.Mesh mesh = art.mesh(side, !lite);
 				net.minecraft.client.model.ModelPart bone = switch (boneName) {
 					case "body" -> model.body;
 					case "rightArm" -> model.rightArm;
@@ -152,6 +155,9 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 		var model = this.getParentModel();
 		float[] swing = player != null && worn.stream().anyMatch(w -> WearManager.type(w.id()).map(t -> "neck".equals(t.slot())).orElse(false))
 				? net.veloclient.velo.client.cosmetics.wear.NeckSwing.update(state.id, state.x, state.y, state.z, state.bodyRot) : null;
+		// Full mesh unless Cosmetics Quality lightens this wearer (others further away / Lite)
+		boolean lite = net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.lite(state.id, self,
+				player == null || client.player == null || self ? 0 : player.distanceToSqr(client.player));
 		for (WearManager.Worn item : worn) {
 			WearManager.WearType type = WearManager.type(item.id()).orElse(null);
 			WearManager.Model art = type == null ? null : WearManager.model(item.id());
@@ -161,7 +167,10 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 			}
 			for (int side = 0; side < (type.mirrorBone() != null ? 2 : 1); side++) {
 				String boneName = side == 0 ? type.bone() : type.mirrorBone();
-				EmoteProps.Mesh mesh = side == 0 ? art.mesh() : art.mirrored();
+				EmoteProps.Mesh full = art.mesh(side, true);
+				EmoteProps.Mesh mesh = art.mesh(side, !lite);
+				// on the GPU path the full mesh costs next to nothing (uploaded once): yours and nearby players' stay full even in Lite
+				EmoteProps.Mesh gpuMesh = self || !lite ? full : mesh;
 				net.minecraft.client.model.geom.ModelPart bone = switch (boneName) {
 					case "body" -> model.body;
 					case "rightArm" -> model.rightArm;
@@ -182,12 +191,12 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 				}
 				var cutout = net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture);
 				queue.submitCustomGeometry(matrices, cutout, (pose2, consumer) -> {
-					float[] mv = mesh.vertices();
 					// GPU path (26.2): the mesh is uploaded once and only its matrix goes out each frame - see GpuCosmetics.
-					if (GpuCosmetics.record(mesh, MeshLod.quads(mesh), mv, 1f / 16f, squeeze, cutout, pose2.pose(), light,
+					if (GpuCosmetics.record(gpuMesh, MeshLod.quads(gpuMesh), gpuMesh.vertices(), 1f / 16f, squeeze, cutout, pose2.pose(), light,
 							net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)) {
 						return;
 					}
+					float[] mv = mesh.vertices();
 					if (!CosmeticVertexWriter.writeQuads(consumer, MeshLod.quads(mesh), mv.length / 8, mv, 8, 0, 3, mv, 8, 6, 1f / 16f, squeeze,
 							new Matrix4f(pose2.pose()), new Matrix3f(pose2.normal()), 0xFFFFFFFF, null,
 							net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, light)) {

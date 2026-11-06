@@ -61,8 +61,16 @@ public final class WearManager {
 		return "face".equals(slot) || "mask".equals(slot) || "back".equals(slot);
 	}
 
-	/** Loaded art: the mesh (and the left-foot one for mirrored items). */
-	public record Model(EmoteProps.Mesh mesh, EmoteProps.Mesh mirrored) {
+	/**
+	 * Loaded art: the mesh (and the left-foot one for mirrored items) as made, plus a simplified copy of each (at most
+	 * ~2,000 triangles, see MeshLod) for where the full one would cost more than it shows: other players further away,
+	 * and Lite on the CPU path. The simplified copy merges vertices, which bends thin parts and smears the texture - it
+	 * must never be what you see up close (a chain looked broken with it, 2026-11-07).
+	 */
+	public record Model(EmoteProps.Mesh mesh, EmoteProps.Mesh mirrored, EmoteProps.Mesh lod, EmoteProps.Mesh lodMirrored) {
+		public EmoteProps.Mesh mesh(int side, boolean full) {
+			return side == 0 ? (full ? mesh : lod) : (full ? mirrored : lodMirrored);
+		}
 	}
 
 	/** Saved: what's in each slot and every item's colour. */
@@ -332,7 +340,7 @@ public final class WearManager {
 				EmoteProps.Mesh mirrored = type.mirrorBone() != null ? readMesh(type.files().get("mesh_l")) : null;
 				if (mesh != null && (type.mirrorBone() == null || mirrored != null)) {
 					synchronized (WearManager.class) {
-						MODELS.put(id, new Model(mesh, mirrored));
+						MODELS.put(id, new Model(mesh, mirrored, lod(mesh), lod(mirrored)));
 					}
 				}
 			} catch (Exception e) {
@@ -353,9 +361,13 @@ public final class WearManager {
 			return null;
 		}
 		try (InputStream in = java.nio.file.Files.newInputStream(file)) {
-			// at most ~2,000 triangles: the Meshy originals (up to 21k) cost far more than they show at this size
-			return net.veloclient.velo.client.cosmetics.render.MeshLod.simplify(EmoteProps.read(in), 2000);
+			return EmoteProps.read(in);
 		}
+	}
+
+	/** The simplified copy (at most ~2,000 triangles; the Meshy originals have up to 21k). */
+	private static EmoteProps.Mesh lod(EmoteProps.Mesh mesh) {
+		return mesh == null ? null : net.veloclient.velo.client.cosmetics.render.MeshLod.simplify(mesh, 2000);
 	}
 
 	/**
