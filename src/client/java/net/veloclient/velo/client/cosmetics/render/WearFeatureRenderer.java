@@ -210,9 +210,11 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 
 	private static boolean velo$far(Object a, Object b) {
 		//? if <26.1 {
-		return ((net.minecraft.entity.Entity) a).squaredDistanceTo((net.minecraft.entity.Entity) b) > 32 * 32;
+		return net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.hideWear(false,
+				((net.minecraft.entity.Entity) a).squaredDistanceTo((net.minecraft.entity.Entity) b));
 		//?} else {
-		/*return ((net.minecraft.world.entity.Entity) a).distanceToSqr((net.minecraft.world.entity.Entity) b) > 32 * 32;
+		/*return net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.hideWear(false,
+				((net.minecraft.world.entity.Entity) a).distanceToSqr((net.minecraft.world.entity.Entity) b));
 		*///?}
 	}
 

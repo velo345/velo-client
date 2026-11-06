@@ -117,9 +117,9 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		}
 		WingAnimator.Pose pose = WingAnimator.pose(tag != null ? tag.key() : state.id, motion, type.style(), worn.settings());
 		// Light Cosmetics (Performance Boost): just the wingbeat - no moving arms, glow, shine or particles.
-		boolean plainWings = net.veloclient.velo.client.modules.performance.PerformanceBoostModule.lightCosmetics;
-		// Someone else's wings far away: just the wingbeat - glow, shine and particles are invisible at that size anyway.
-		plainWings |= !self && player != null && client.player != null && player.squaredDistanceTo(client.player) > 24 * 24;
+		// Cosmetics Quality: the Lite version (just the wingbeat - no glow, shine or particles) where it decides so.
+		boolean plainWings = net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.lite(state.id, self,
+				self || player == null || client.player == null ? 0 : player.squaredDistanceTo(client.player));
 		if (plainWings) {
 			pose = WingAnimator.plain(pose);
 		}
@@ -222,9 +222,9 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		}
 		WingAnimator.Pose pose = WingAnimator.pose(tag != null ? tag.key() : state.id, motion, type.style(), worn.settings());
 		// Light Cosmetics (Performance Boost): just the wingbeat - no moving arms, glow, shine or particles.
-		boolean plainWings = net.veloclient.velo.client.modules.performance.PerformanceBoostModule.lightCosmetics;
-		// Someone else's wings far away: just the wingbeat - glow, shine and particles are invisible at that size anyway.
-		plainWings |= !self && player != null && client.player != null && player.distanceToSqr(client.player) > 24 * 24;
+		// Cosmetics Quality: the Lite version (just the wingbeat - no glow, shine or particles) where it decides so.
+		boolean plainWings = net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.lite(state.id, self,
+				self || player == null || client.player == null ? 0 : player.distanceToSqr(client.player));
 		if (plainWings) {
 			pose = WingAnimator.plain(pose);
 		}

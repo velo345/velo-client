@@ -356,6 +356,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ZoomModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.CenteredInventoryModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.C2meModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.CosmeticsQualityModule());
 		ModuleRegistry.register(new CustomCrosshairModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.AttackIndicatorModule());
 		ModuleRegistry.register(new MinimapModule());

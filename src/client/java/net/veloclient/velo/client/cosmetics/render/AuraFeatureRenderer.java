@@ -276,8 +276,9 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			AuraEffects.Settings base = worn.settings();
 			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.5f, base.color()));
 		}
-		// Light Cosmetics (Performance Boost): fewer particles on everyone.
-		if (worn != null && net.veloclient.velo.client.modules.performance.PerformanceBoostModule.lightCosmetics) {
+		// Cosmetics Quality: the Lite version (fewer particles) where it decides so.
+		if (worn != null && net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.lite(state.id, self,
+				self || player == null || client.player == null ? 0 : player.squaredDistanceTo(client.player))) {
 			AuraEffects.Settings base = worn.settings();
 			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.4f, base.color()));
 		}
@@ -341,8 +342,9 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			AuraEffects.Settings base = worn.settings();
 			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.5f, base.color()));
 		}
-		// Light Cosmetics (Performance Boost): fewer particles on everyone.
-		if (worn != null && net.veloclient.velo.client.modules.performance.PerformanceBoostModule.lightCosmetics) {
+		// Cosmetics Quality: the Lite version (fewer particles) where it decides so.
+		if (worn != null && net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.lite(state.id, self,
+				self || player == null || client.player == null ? 0 : player.distanceToSqr(client.player))) {
 			AuraEffects.Settings base = worn.settings();
 			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.4f, base.color()));
 		}

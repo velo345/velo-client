@@ -18,6 +18,9 @@ package net.veloclient.velo.client.cosmetics.render;
  */
 public final class GpuCosmetics {
 
+	/** Cosmetics Quality's "GPU Cosmetics" switch (off: every cosmetic takes the CPU path). */
+	public static volatile boolean enabled = true;
+
 	private GpuCosmetics() {
 	}
 
@@ -65,7 +68,7 @@ public final class GpuCosmetics {
 	// this frame. False when it can't go through the GPU path - then the caller writes the vertices as before.
 	public static boolean record(Object meshIdentity, int[] quads, float[] data, float scale, float squeeze,
 			net.minecraft.client.renderer.rendertype.RenderType type, org.joml.Matrix4f pose, int light, int overlay) {
-		if (failed || quads.length == 0 || quads.length % 4 != 0 || offscreen()) {
+		if (failed || !enabled || quads.length == 0 || quads.length % 4 != 0 || offscreen()) {
 			return false;
 		}
 		try {
@@ -88,7 +91,7 @@ public final class GpuCosmetics {
 	public static boolean recordDynamic(Object key, Object version, int[] quads, int vertexCount, float[] data, int stride, int posOff, int nrmOff,
 			float[] uv, int uvStride, int uvOff, int[] colors, int argb, net.minecraft.client.renderer.rendertype.RenderType type,
 			org.joml.Matrix4f pose, int light, int overlay) {
-		if (failed || quads.length == 0 || quads.length % 4 != 0 || offscreen()) {
+		if (failed || !enabled || quads.length == 0 || quads.length % 4 != 0 || offscreen()) {
 			return false;
 		}
 		try {
@@ -330,7 +333,7 @@ public final class GpuCosmetics {
 
 	public static boolean record(Object meshIdentity, int[] quads, float[] data, float scale, float squeeze,
 			net.minecraft.client.renderer.rendertype.RenderType type, org.joml.Matrix4f pose, int light, int overlay) {
-		if (failed || quads.length == 0 || quads.length % 4 != 0 || type.hasBlending()) {
+		if (failed || !enabled || quads.length == 0 || quads.length % 4 != 0 || type.hasBlending()) {
 			return false;
 		}
 		try {
@@ -359,7 +362,7 @@ public final class GpuCosmetics {
 	public static boolean recordDynamic(Object key, Object version, int[] quads, int vertexCount, float[] data, int stride, int posOff, int nrmOff,
 			float[] uv, int uvStride, int uvOff, int[] colors, int argb, net.minecraft.client.renderer.rendertype.RenderType type,
 			org.joml.Matrix4f pose, int light, int overlay) {
-		if (failed || quads.length == 0 || quads.length % 4 != 0 || type.hasBlending()) {
+		if (failed || !enabled || quads.length == 0 || quads.length % 4 != 0 || type.hasBlending()) {
 			return false;
 		}
 		try {

@@ -437,6 +437,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	public List<ConfigField> configFields() {
 		GameOptions options = MinecraftClient.getInstance().options;
 		List<ConfigField> fields = new java.util.ArrayList<>(List.of(
+				new ConfigField.HeaderField("Preset"),
 				new ConfigField.ChoiceField("Preset", PRESETS, () -> preset, v -> {
 					// saved before the merge: "Performance" is Max FPS now
 					preset = v.equals("Performance") ? "Max FPS" : v;
@@ -451,6 +452,12 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				new ConfigField.SliderField("Auto: Target FPS", 30, 240, () -> autoTargetFps, v -> autoTargetFps = (int) Math.round(v / 5) * 5,
 						v -> (int) Math.round(v / 5) * 5 + " FPS"),
 				new ConfigField.ToggleField("Auto: Notify On Quality Change", () -> autoNotify, v -> autoNotify = v),
+				new ConfigField.HeaderField("Frame Rate"),
+				new ConfigField.SliderField("Max FPS", 10, 260,
+						() -> options.getMaxFps().getValue(), v -> options.getMaxFps().setValue((int) v),
+						v -> (int) v >= 260 ? "Unlimited" : String.valueOf((int) v)),
+				new ConfigField.ChoiceField("VSync Mode", List.of("Off", "On", "Adaptive"), () -> vsyncMode, this::applyVsyncMode),
+				new ConfigField.ToggleField("Uncapped Rendering (decoupled present, Vulkan)", () -> decoupledPresent, v -> decoupledPresent = v),
 				new ConfigField.ToggleField("Dynamic FPS (throttle when unfocused/AFK)", () -> dynamicFps, v -> {
 					dynamicFps = v;
 					if (isEnabled() && !net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
@@ -461,15 +468,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 						//?}
 					}
 				}),
-				new ConfigField.ToggleField("HUD Caching (~20Hz overlay updates)", () -> hudCachingEnabled, v -> hudCachingEnabled = v),
-				new ConfigField.ToggleField("Fast Draw Path (GUI layering + Vulkan draw state)", () -> fastDrawPath, v -> fastDrawPath = v),
-				new ConfigField.ToggleField("Light Cosmetics (wings without extra effects, fewer aura particles)", () -> lightCosmetics,
-						v -> lightCosmetics = v),
-				new ConfigField.ToggleField("Uncapped Rendering (decoupled present, Vulkan)", () -> decoupledPresent, v -> decoupledPresent = v),
-				new ConfigField.ChoiceField("VSync Mode", List.of("Off", "On", "Adaptive"), () -> vsyncMode, this::applyVsyncMode),
-				new ConfigField.SliderField("Max FPS", 10, 260,
-						() -> options.getMaxFps().getValue(), v -> options.getMaxFps().setValue((int) v),
-						v -> (int) v >= 260 ? "Unlimited" : String.valueOf((int) v)),
+				new ConfigField.HeaderField("View Distance"),
 				new ConfigField.SliderField("View Distance", 2, 32,
 						() -> options.getViewDistance().getValue(), v -> {
 							options.getViewDistance().setValue((int) v);
@@ -481,26 +480,6 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 						}, v -> String.valueOf((int) v)),
 				new ConfigField.SliderField("Simulation Distance", 5, 32,
 						() -> options.getSimulationDistance().getValue(), v -> options.getSimulationDistance().setValue((int) v), v -> String.valueOf((int) v)),
-				new ConfigField.SliderField("Turbo Entities (entity distance)", 0.5, 5.0,
-						() -> options.getEntityDistanceScaling().getValue(),
-						v -> { options.getEntityDistanceScaling().setValue(v); refreshRendering(); },
-						v -> Math.round(v * 100) + "%"),
-				new ConfigField.SliderField("Turbo Block Entities (chest, sign & banner distance)", 0.25, 1.0,
-						() -> turboBlockEntities, v -> turboBlockEntities = Math.round(v * 20) / 20.0,
-						v -> v >= 0.999 ? "Vanilla" : Math.round(v * 100) + "%"),
-				new ConfigField.ToggleField("Entity Shadows", () -> options.getEntityShadows().getValue(),
-						v -> { options.getEntityShadows().setValue(v); refreshRendering(); }),
-				new ConfigField.ToggleField("Clouds", () -> options.getCloudRenderMode().getValue() != CloudRenderMode.OFF,
-						v -> { options.getCloudRenderMode().setValue(v ? CloudRenderMode.FAST : CloudRenderMode.OFF); refreshRendering(); }),
-				new ConfigField.SliderField("Biome Blend", 0, 7,
-						() -> options.getBiomeBlendRadius().getValue(),
-						v -> { options.getBiomeBlendRadius().setValue((int) v); refreshRendering(); }, v -> String.valueOf((int) v)),
-				new ConfigField.SliderField("Mipmap Levels", 0, 4,
-						() -> options.getMipmapLevels().getValue(),
-						v -> { options.getMipmapLevels().setValue((int) v); reloadRendering(); }, v -> String.valueOf((int) v)),
-				new ConfigField.ChoiceField("Particles", List.of("Minimal", "Decreased", "All"),
-						() -> particlesLabel(options.getParticles().getValue()),
-						v -> { options.getParticles().setValue(particlesFromLabel(v)); refreshRendering(); }),
 				new ConfigField.ToggleField("Adaptive Render Distance", () -> adaptiveDistance, v -> {
 					adaptiveDistance = v;
 					if (!v) {
@@ -509,18 +488,57 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				}),
 				new ConfigField.SliderField("Adaptive Target FPS", 30, 240, () -> targetFps, v -> targetFps = (int) v,
 						v -> (int) v + " FPS"),
+				new ConfigField.SliderField("Turbo Entities (entity distance)", 0.5, 5.0,
+						() -> options.getEntityDistanceScaling().getValue(),
+						v -> { options.getEntityDistanceScaling().setValue(v); refreshRendering(); },
+						v -> Math.round(v * 100) + "%"),
+				new ConfigField.SliderField("Turbo Block Entities (chest, sign & banner distance)", 0.25, 1.0,
+						() -> turboBlockEntities, v -> turboBlockEntities = Math.round(v * 20) / 20.0,
+						v -> v >= 0.999 ? "Vanilla" : Math.round(v * 100) + "%"),
+				new ConfigField.HeaderField("Visuals"),
+				new ConfigField.ChoiceField("Particles", List.of("Minimal", "Decreased", "All"),
+						() -> particlesLabel(options.getParticles().getValue()),
+						v -> { options.getParticles().setValue(particlesFromLabel(v)); refreshRendering(); }),
+				new ConfigField.ToggleField("Entity Shadows", () -> options.getEntityShadows().getValue(),
+						v -> { options.getEntityShadows().setValue(v); refreshRendering(); }),
+				new ConfigField.ToggleField("Clouds", () -> options.getCloudRenderMode().getValue() != CloudRenderMode.OFF,
+						v -> { options.getCloudRenderMode().setValue(v ? CloudRenderMode.FAST : CloudRenderMode.OFF); refreshRendering(); }),
 				new ConfigField.ToggleField("Smooth Lighting", VideoOptions::smoothLighting,
 						v -> { VideoOptions.setSmoothLighting(v); refreshRendering(); }),
 				new ConfigField.ToggleField("Fancy Leaves", VideoOptions::fancyLeaves,
 						v -> { VideoOptions.setFancyLeaves(v); refreshRendering(); }),
 				new ConfigField.ToggleField("Improved Transparency", VideoOptions::improvedTransparency,
 						v -> { VideoOptions.setImprovedTransparency(v); reloadRendering(); }),
+				new ConfigField.SliderField("Biome Blend", 0, 7,
+						() -> options.getBiomeBlendRadius().getValue(),
+						v -> { options.getBiomeBlendRadius().setValue((int) v); refreshRendering(); }, v -> String.valueOf((int) v)),
+				new ConfigField.SliderField("Mipmap Levels", 0, 4,
+						() -> options.getMipmapLevels().getValue(),
+						v -> { options.getMipmapLevels().setValue((int) v); reloadRendering(); }, v -> String.valueOf((int) v)),
 				new ConfigField.ToggleField("Chunk Fade-In", () -> VideoOptions.chunkFade() > 0,
-						v -> VideoOptions.setChunkFade(v ? 0.75 : 0.0))));
+						v -> VideoOptions.setChunkFade(v ? 0.75 : 0.0)),
+				new ConfigField.HeaderField("Velo Engine"),
+				new ConfigField.ToggleField("Fast Draw Path (GUI layering + Vulkan draw state)", () -> fastDrawPath, v -> fastDrawPath = v),
+				new ConfigField.ToggleField("HUD Caching (~20Hz overlay updates)", () -> hudCachingEnabled, v -> hudCachingEnabled = v)
+));
 		if (VideoOptions.hasGraphicsBackendChoice()) {
 			fields.add(new ConfigField.ChoiceField("Graphics API (restart)", List.of("Default", "OpenGL", "Vulkan"),
 					VideoOptions::graphicsBackend, VideoOptions::setGraphicsBackend));
 		}
+		// Cosmetics: their own module (detail per player, GPU path) - one click from here.
+		fields.add(new ConfigField.HeaderField("Cosmetics"));
+		fields.add(new ConfigField.ActionButtonField("Cosmetics Quality...", () -> net.veloclient.velo.module.ModuleRegistry.get("cosmetics-quality")
+				.ifPresent(module -> {
+					var client = MinecraftClient.getInstance();
+					//? if <26.1 {
+					var back = client.currentScreen;
+					//?} else if <26.2 {
+					/*var back = client.screen;
+					*///?} else {
+					/*var back = client.gui.screen();
+					*///?}
+					client.setScreen(new net.veloclient.velo.client.gui.window.ModuleConfigScreen(module, () -> client.setScreen(back)));
+				})));
 		return fields;
 	}
 
