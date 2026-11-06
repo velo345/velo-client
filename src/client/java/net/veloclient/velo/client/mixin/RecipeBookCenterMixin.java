@@ -21,6 +21,24 @@ public abstract class RecipeBookCenterMixin {
 	@Shadow
 	public abstract boolean isOpen();
 
+	@Shadow
+	private int parentWidth;
+
+	// The book's widgets (search field, filter button, tabs, recipe page) are placed in reset() right after it sets
+	// leftOffset = 86 - only moving the offset later (findLeftEdge) moved the book's background but left its widgets on
+	// top of the inventory (owner, 2026-11-06). Set our offset there, before anything is placed.
+	@Inject(method = "reset", at = @At(value = "FIELD", target = "Lnet/minecraft/client/gui/screen/recipebook/RecipeBookWidget;leftOffset:I",
+			opcode = org.objectweb.asm.Opcodes.PUTFIELD, shift = At.Shift.AFTER), require = 0)
+	private void velo$centerWidgets(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+		if (narrow || !CenteredInventoryModule.on()) {
+			return;
+		}
+		int offset = CenteredInventoryModule.bookOffset(parentWidth, 176);
+		if (offset >= 0) {
+			leftOffset = offset;
+		}
+	}
+
 	@Inject(method = "findLeftEdge", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$center(int width, int backgroundWidth, CallbackInfoReturnable<Integer> cir) {
 		if (!isOpen() || narrow) {
@@ -47,6 +65,22 @@ public abstract class RecipeBookCenterMixin {
 
 	@Shadow
 	public abstract boolean isVisible();
+
+	@Shadow
+	private int width;
+
+	// See the branch above: the widgets are placed in initVisuals() right after xOffset = 86.
+	@Inject(method = "initVisuals", at = @At(value = "FIELD", target = "Lnet/minecraft/client/gui/screens/recipebook/RecipeBookComponent;xOffset:I",
+			opcode = org.objectweb.asm.Opcodes.PUTFIELD, shift = At.Shift.AFTER), require = 0)
+	private void velo$centerWidgets(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+		if (widthTooNarrow || !CenteredInventoryModule.on()) {
+			return;
+		}
+		int offset = CenteredInventoryModule.bookOffset(width, 176);
+		if (offset >= 0) {
+			xOffset = offset;
+		}
+	}
 
 	@Inject(method = "updateScreenPosition", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$center(int width, int imageWidth, CallbackInfoReturnable<Integer> cir) {

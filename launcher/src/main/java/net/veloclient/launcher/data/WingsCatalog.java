@@ -154,10 +154,13 @@ public final class WingsCatalog {
 					}
 				}
 			}
-			// Server-only capes' GIFs too.
+			// Server-only capes' art too - the small card when there is one (the full GIF loads when a viewer opens it).
 			for (JsonObject cape : serverItems("cape")) {
-				if (cape.has("files") && cape.getAsJsonObject("files").has("gif")) {
-					file(cape.getAsJsonObject("files").get("gif").getAsString());
+				JsonObject files = cape.has("files") ? cape.getAsJsonObject("files") : null;
+				if (files != null && files.has("card")) {
+					file(files.get("card").getAsString());
+				} else if (files != null && files.has("gif")) {
+					file(files.get("gif").getAsString());
 				}
 			}
 			return changed;

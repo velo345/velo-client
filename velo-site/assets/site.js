@@ -477,7 +477,9 @@ function petArt(item, always) {
 function cosmeticArt(item, k = 12, draggable = false) {
 	if (item.type === "emote") return emoteFigure(item);
 	if (item.type === "pet") return petArt(item, draggable);
-	if (item.type === "cape" && item.files && item.files.gif) return cape3d(fileUrl(item.files.gif), k, draggable);
+	// Cards get the small "card" art (768 px, ~1 MB) when there is one - the full 2048 px GIF (~8 MB, 40 frames) per card made
+	// the cloak pages crawl; the detail view (draggable) still shows the full art.
+	if (item.type === "cape" && item.files && item.files.gif) return cape3d(fileUrl(!draggable && item.files.card ? item.files.card : item.files.gif), k, draggable);
 	if (item.type === "aura") return el("img", { class: "aura-img", src: `/assets/auras/${item.id.replace(/^aura_/, "")}.webp`, alt: item.name + " aura", loading: "lazy", decoding: "async" });
 	if (item.type === "killfx") return el("img", { class: "aura-img", src: `/assets/killfx/${item.id.replace(/^killfx_/, "")}.webp`, alt: item.name + " kill effect", loading: "lazy", decoding: "async" });
 	if (item.files && item.files.preview) return el("img", { src: fileUrl(item.files.preview), alt: item.name, loading: "lazy", decoding: "async" });

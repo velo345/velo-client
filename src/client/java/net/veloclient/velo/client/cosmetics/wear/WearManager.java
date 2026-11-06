@@ -308,29 +308,43 @@ public final class WearManager {
 		return at != null && System.currentTimeMillis() - at < 30_000;
 	}
 
-	/** The item's meshes, loaded on first use; null until its files have downloaded. Render thread. */
+	private static final java.util.Set<String> LOADING = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+	/**
+	 * The item's meshes, loaded on first use; null until its files have downloaded and the mesh is ready. Render thread.
+	 *
+	 * <p>Reading and simplifying a mesh (up to 21k triangles down to 2k) takes tens of milliseconds - done here it froze
+	 * the frame that first showed the item (opening the Store or the Locker with bodywear in view, JFR 2026-11-06). It
+	 * runs on a background thread now; the item simply appears a few frames later.
+	 */
 	public static synchronized Model model(String id) {
 		Model model = MODELS.get(id);
 		if (model != null || failedRecently(id)) {
 			return model;
 		}
 		WearType type = type(id).orElse(null);
-		if (type == null) {
+		if (type == null || !LOADING.add(id)) {
 			return null;
 		}
-		try {
-			EmoteProps.Mesh mesh = readMesh(type.files().get("mesh"));
-			EmoteProps.Mesh mirrored = type.mirrorBone() != null ? readMesh(type.files().get("mesh_l")) : null;
-			if (mesh == null || type.mirrorBone() != null && mirrored == null) {
-				return null;
+		Thread.ofVirtual().name("velo-wear-mesh").start(() -> {
+			try {
+				EmoteProps.Mesh mesh = readMesh(type.files().get("mesh"));
+				EmoteProps.Mesh mirrored = type.mirrorBone() != null ? readMesh(type.files().get("mesh_l")) : null;
+				if (mesh != null && (type.mirrorBone() == null || mirrored != null)) {
+					synchronized (WearManager.class) {
+						MODELS.put(id, new Model(mesh, mirrored));
+					}
+				}
+			} catch (Exception e) {
+				synchronized (WearManager.class) {
+					FAILED.put(id, System.currentTimeMillis());
+				}
+				VeloClient.LOGGER.warn("Couldn't load bodywear {}", id, e);
+			} finally {
+				LOADING.remove(id);
 			}
-			model = new Model(mesh, mirrored);
-			MODELS.put(id, model);
-		} catch (Exception e) {
-			FAILED.put(id, System.currentTimeMillis());
-			VeloClient.LOGGER.warn("Couldn't load bodywear {}", id, e);
-		}
-		return model;
+		});
+		return null;
 	}
 
 	private static EmoteProps.Mesh readMesh(String sha) throws java.io.IOException {

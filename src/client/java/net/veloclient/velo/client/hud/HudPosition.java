@@ -14,7 +14,9 @@ public final class HudPosition {
 
 	private float xFraction;
 	private float yFraction;
-	private float scale = 1.0f;
+	/** New elements (and "Reset Layout") start a touch smaller than 1:1 - the full-size defaults crowded the screen (owner, 2026-11-06). */
+	public static final float DEFAULT_SCALE = 0.9f;
+	private float scale = DEFAULT_SCALE;
 	private final float defaultXFraction;
 	private final float defaultYFraction;
 	private final Corner corner;
@@ -85,7 +87,7 @@ public final class HudPosition {
 	/** Back to the element's built-in default spot and size - the HUD editor's "Reset Layout". */
 	public void resetToDefault() {
 		set(defaultXFraction, defaultYFraction);
-		scale = 1.0f;
+		scale = DEFAULT_SCALE;
 		placed = false;
 	}
 

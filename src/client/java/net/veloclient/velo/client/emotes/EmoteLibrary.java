@@ -150,7 +150,22 @@ public final class EmoteLibrary {
 	}
 
 	/** The bundled display names (before the catalog is in). */
+	private static volatile Map<String, String> bundledNames;
+
+	/**
+	 * The bundled emotes' ids and names. Read once: the Locker asked for the catalog every frame, and that re-read and
+	 * re-parsed emotes.json from the jar each time (JFR, 2026-11-06).
+	 */
 	static Map<String, String> bundledNames() {
+		Map<String, String> known = bundledNames;
+		if (known == null) {
+			known = java.util.Collections.unmodifiableMap(readBundledNames());
+			bundledNames = known;
+		}
+		return known;
+	}
+
+	private static Map<String, String> readBundledNames() {
 		Map<String, String> out = new LinkedHashMap<>();
 		try (InputStream in = EmoteLibrary.class.getResourceAsStream("/assets/velo-client/emotes/emotes.json")) {
 			if (in != null) {

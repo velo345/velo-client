@@ -92,10 +92,26 @@ public final class RenderProfiler {
 		frameStart = System.nanoTime();
 	}
 
+	/** -Dvelo.hitchLog=true: every frame over 25 ms is logged with the screen that was open (opening the Store, the Locker...). */
+	private static final boolean HITCH_LOG = Boolean.getBoolean("velo.hitchLog");
+
 	public static void frameEnd() {
 		GpuPassTimer.endFrame();
 		if (frameStart == 0) {
 			return;
+		}
+		if (HITCH_LOG) {
+			long ms = (System.nanoTime() - frameStart) / 1_000_000;
+			if (ms > 25) {
+				//? if <26.1 {
+				var screen = net.minecraft.client.MinecraftClient.getInstance().currentScreen;
+				//?} else if <26.2 {
+				/*var screen = net.minecraft.client.Minecraft.getInstance().screen;
+				*///?} else {
+				/*var screen = net.minecraft.client.Minecraft.getInstance().gui.screen();
+				*///?}
+				VeloClient.LOGGER.info("Velo hitch: " + ms + " ms frame, screen " + (screen == null ? "none" : screen.getClass().getSimpleName()));
+			}
 		}
 		frameNanos += System.nanoTime() - frameStart;
 		if (frames == 0) {

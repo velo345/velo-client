@@ -72,6 +72,18 @@ public final class CosmeticUi {
 
 	private static List<GifFrames.Frame> decode(CapeEntry cape, int scale) {
 		try {
+			// Cards: the server's small card art when there is one (a 2048 px, 40-frame GIF per card made the Locker crawl).
+			String card = scale == CARD_SCALE && cape.animated() ? net.veloclient.launcher.data.StoreCatalog.cardSha(cape.id()) : null;
+			if (card != null) {
+				try (var in = net.veloclient.launcher.data.WingsCatalog.openFile(card)) {
+					List<GifFrames.Frame> frames = GifFrames.decodeCape(in, scale).frames();
+					if (!frames.isEmpty()) {
+						return frames;
+					}
+				} catch (Throwable ignored) {
+					// fall back to the full GIF below
+				}
+			}
 			if (cape.animated()) {
 				return GifFrames.decodeCape(new ByteArrayInputStream(CapeLibrary.gifBytes(cape)), scale).frames();
 			}
@@ -83,7 +95,7 @@ public final class CosmeticUi {
 	}
 
 	private static List<GifFrames.Frame> decode(StoreItem item, int scale) {
-		try (var in = StoreCatalog.openGif(item)) {
+		try (var in = scale == CARD_SCALE ? StoreCatalog.openCard(item) : StoreCatalog.openGif(item)) {
 			return in == null ? List.of() : GifFrames.decodeCape(in, scale).frames();
 		} catch (Throwable e) {
 			return List.of();

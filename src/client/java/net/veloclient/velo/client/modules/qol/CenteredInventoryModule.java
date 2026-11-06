@@ -26,7 +26,8 @@ public final class CenteredInventoryModule extends AbstractModule {
 	public static int bookOffset(int screenWidth, int containerWidth) {
 		int containerX = (screenWidth - containerWidth) / 2;
 		int bookX = containerX - 147 - 2;
-		if (bookX < 2) {
+		// The book's tabs hang ~30 px out to its left: without room for them, vanilla's layout (container pushed right) it is.
+		if (bookX < 34) {
 			return -1;
 		}
 		return (screenWidth - 147) / 2 - bookX;

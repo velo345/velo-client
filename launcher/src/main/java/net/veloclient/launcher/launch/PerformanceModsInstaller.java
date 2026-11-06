@@ -149,6 +149,9 @@ public final class PerformanceModsInstaller {
 		/** The Distant Horizons jar Velo put in the mods folder (null: none of ours), and which game version it's for. */
 		public String distantHorizonsFile;
 		public String distantHorizonsGameVersion;
+		/** The C2ME jar Velo installed because the in-game "C2ME (Experimental)" module asked for it, and its game version. */
+		public String c2meFile;
+		public String c2meGameVersion;
 	}
 
 	private PerformanceModsInstaller() {
@@ -188,6 +191,7 @@ public final class PerformanceModsInstaller {
 			State state = readState(instanceId);
 			// Its own switch, independent of the recommended mods: a player can want far terrain with no other mods.
 			syncDistantHorizons(state, modsDir, version);
+			syncC2me(instanceId, state, modsDir, version);
 			if (!state.enabled) {
 				writeState(instanceId, state);
 				return;
@@ -372,6 +376,50 @@ public final class PerformanceModsInstaller {
 			}, () -> LauncherLog.info("No Distant Horizons build for " + version.id() + " - launching without it"));
 		} catch (IOException | RuntimeException e) {
 			LauncherLog.warn("Couldn't set up Distant Horizons - launching without changes", e);
+		}
+	}
+
+	/**
+	 * C2ME, opt-in from the game: the "C2ME (Experimental)" module writes {@code config/velo-client/experimental-mods.properties}
+	 * ({@code c2me=true/false}) in the profile's game folder; the next launch installs C2ME for this version or removes
+	 * the copy Velo installed. A C2ME the player added themselves is never touched.
+	 */
+	private static void syncC2me(String instanceId, State state, Path modsDir, GameVersion version) {
+		try {
+			Path flags = net.veloclient.launcher.instance.InstancePaths.gameDir(instanceId).resolve("config").resolve("velo-client")
+					.resolve("experimental-mods.properties");
+			boolean wanted = false;
+			if (Files.exists(flags)) {
+				java.util.Properties props = new java.util.Properties();
+				try (var in = Files.newBufferedReader(flags, java.nio.charset.StandardCharsets.UTF_8)) {
+					props.load(in);
+				}
+				wanted = Boolean.parseBoolean(props.getProperty("c2me", "false"));
+			}
+			Path ours = state.c2meFile == null ? null : modsDir.resolve(state.c2meFile);
+			boolean stale = ours != null && !version.id().equals(state.c2meGameVersion);
+			if (ours != null && (!wanted || stale)) {
+				Files.deleteIfExists(ours);
+				Files.deleteIfExists(modsDir.resolve(state.c2meFile + ".disabled"));
+				LauncherLog.info("Removed " + state.c2meFile + (stale ? " - the profile now runs another version" : " - C2ME switched off in game"));
+				state.c2meFile = null;
+				state.c2meGameVersion = null;
+				ours = null;
+			}
+			if (!wanted || ours != null && Files.exists(ours)) {
+				return;
+			}
+			Files.createDirectories(modsDir);
+			Set<String> present = installedModIds(modsDir);
+			if (present.contains("c2me")) {
+				return; // the player's own copy
+			}
+			installOne("c2me-fabric", "c2me", version, modsDir, present).ifPresentOrElse(fileName -> {
+				state.c2meFile = fileName;
+				state.c2meGameVersion = version.id();
+			}, () -> LauncherLog.info("No C2ME build for " + version.id() + " - launching without it"));
+		} catch (IOException | RuntimeException e) {
+			LauncherLog.warn("Couldn't set up C2ME - launching without changes", e);
 		}
 	}
 

@@ -106,6 +106,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.sound.VeloUiSounds.register();
 		VeloKeybinds.register();
 		net.veloclient.velo.client.keybind.MenuKeySync.register();
+		net.veloclient.velo.client.util.ClassWarmup.register();
 		net.veloclient.velo.client.util.MemoryStatsRecorder.start();
 		CapeFeatureRenderer.register();
 		net.veloclient.velo.client.cosmetics.render.WingsFeatureRenderer.register();
@@ -354,6 +355,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ToggleSneakModule());
 		ModuleRegistry.register(new ZoomModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.CenteredInventoryModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.C2meModule());
 		ModuleRegistry.register(new CustomCrosshairModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.AttackIndicatorModule());
 		ModuleRegistry.register(new MinimapModule());

@@ -547,6 +547,29 @@ public final class ScreenshotTour {
 			case "title1" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.TitleScreen())},
 					new Object[] {45, (Runnable) () -> shot(client, "title")});
+			case "huddefault" -> List.of(
+					new Object[] {0, (Runnable) () -> {
+						client.setScreen(null);
+						for (var module : ModuleRegistry.all()) {
+							if (module instanceof net.veloclient.velo.client.hud.HudModule hud) {
+								hud.position().resetToDefault();
+							}
+						}
+						for (String id : List.of("fps-counter", "ping-display", "coordinates", "clock", "keystrokes", "mouse-buttons",
+								"armor-durability", "potion-timers", "totem-counter", "minimap", "scoreboard-hud", "cps-counter")) {
+							ModuleRegistry.get(id).ifPresent(m -> m.setEnabled(true));
+						}
+						for (String id : List.of("entity-count-overlay", "held-item", "target-hud")) {
+							ModuleRegistry.get(id).ifPresent(m -> m.setEnabled(false));
+						}
+						statusBarsSetup(client);
+					}},
+					new Object[] {40, (Runnable) () -> shot(client, "hud-default")});
+			case "recipebook" -> List.of(
+					new Object[] {0, (Runnable) () -> statusBarsSetup(client)},
+					new Object[] {30, (Runnable) () -> openInventory(client)},
+					new Object[] {10, (Runnable) () -> toggleRecipeBook(client)},
+					new Object[] {20, (Runnable) () -> shot(client, "recipebook-open")});
 			case "pause" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))},
 					new Object[] {3, (Runnable) () -> shot(client, "pause-opening")},
@@ -2086,6 +2109,31 @@ public final class ScreenshotTour {
 				player.getInventory().setItem(9, box);
 				player.getInventory().setItem(10, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.EMERALD, 12));
 			});
+		}
+		*///?}
+	}
+
+	/** Opens the recipe book of the open inventory screen, the way its button does (26.2+: reflection on the component). */
+	private static void toggleRecipeBook(MinecraftClient client) {
+		//? if >=26.2 {
+		/*Object screen = client.gui.screen();
+		try {
+			for (Class<?> c = screen.getClass(); c != null; c = c.getSuperclass()) {
+				for (var field : c.getDeclaredFields()) {
+					if (field.getType().getSimpleName().equals("RecipeBookComponent")) {
+						field.setAccessible(true);
+						Object book = field.get(screen);
+						if (!(boolean) book.getClass().getMethod("isVisible").invoke(book)) {
+							book.getClass().getMethod("toggleVisibility").invoke(book);
+						}
+						// what the book's button does next: re-place the screen around the open book
+						((net.minecraft.client.gui.screens.Screen) screen).resize(client.getWindow().getGuiScaledWidth(), client.getWindow().getGuiScaledHeight());
+						return;
+					}
+				}
+			}
+		} catch (ReflectiveOperationException e) {
+			net.veloclient.velo.VeloClient.LOGGER.warn("Tour: couldn't open the recipe book", e);
 		}
 		*///?}
 	}

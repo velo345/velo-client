@@ -55,6 +55,25 @@ public final class StoreCatalog {
 		return all().stream().filter(item -> item.id().equals(id)).findFirst();
 	}
 
+	/**
+	 * The sha256 of a cape's small "card" art on the server (768 px instead of the full 2048 px GIF), or null when it has
+	 * none - cards and grids decode this one; viewers and wearing use the full GIF.
+	 */
+	public static String cardSha(String id) {
+		for (com.google.gson.JsonObject o : WingsCatalog.serverItems("cape")) {
+			if (o.has("id") && o.get("id").getAsString().equals(id) && o.has("files") && o.getAsJsonObject("files").has("card")) {
+				return o.getAsJsonObject("files").get("card").getAsString();
+			}
+		}
+		return null;
+	}
+
+	/** The art a card shows: the card file when the server has one, else the full GIF (see {@link #openGif}). */
+	public static InputStream openCard(StoreItem item) {
+		String card = item.gifResourcePath() == null ? cardSha(item.id()) : null;
+		return card != null ? WingsCatalog.openFile(card) : openGif(item);
+	}
+
 	/** The cape's GIF: bundled, or the server's file (downloaded first if needed - call off the UI thread when you can). */
 	public static InputStream openGif(StoreItem item) {
 		if (item.gifResourcePath() == null) {

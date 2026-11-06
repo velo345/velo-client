@@ -130,12 +130,26 @@ public final class CosmeticsCatalog {
 				apply(json);
 				Files.createDirectories(cacheDir());
 				Files.writeString(cacheDir().resolve("catalog.json"), body, StandardCharsets.UTF_8);
-				// Fetch the art of everything listed now, so cards and models are there when needed.
+				// Fetch the art of everything listed now, so cards and models are there when needed - for cloaks with a card
+				// only the card: the full 2048 px GIFs (~8 MB each, 170 MB for all) come when one is worn or opened.
 				for (Item item : items.values()) {
-					item.files().values().forEach(CosmeticsCatalog::file);
+					prefetch(item);
 				}
 			} catch (Exception e) {
 				VeloClient.LOGGER.debug("Couldn't load the cosmetics catalog: {}", e.toString());
+			}
+		});
+	}
+
+	private static void prefetch(Item item) {
+		java.util.Map<String, String> files = item.files();
+		if (files == null) {
+			return;
+		}
+		boolean cardOnly = "cape".equals(item.type()) && files.containsKey("card");
+		files.forEach((role, sha) -> {
+			if (!cardOnly || "card".equals(role)) {
+				file(sha);
 			}
 		});
 	}
@@ -155,7 +169,7 @@ public final class CosmeticsCatalog {
 				Item item = parseItem(JsonParser.parseString(get("/v1/cosmetics/item?id="
 						+ java.net.URLEncoder.encode(id, StandardCharsets.UTF_8))).getAsJsonObject());
 				looked.put(id, item);
-				item.files().values().forEach(CosmeticsCatalog::file);
+				item.files().values().forEach(CosmeticsCatalog::file); // someone wears it: the full art is needed
 				version++;
 			} catch (Exception e) {
 				VeloClient.LOGGER.debug("Couldn't look up cosmetic {}: {}", id, e.toString());

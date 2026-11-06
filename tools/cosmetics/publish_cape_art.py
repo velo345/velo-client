@@ -15,6 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from publish_wings import SEED, call, env  # noqa: E402
+from publish_cape_cards import make_card  # noqa: E402
 
 
 def main():
@@ -33,9 +34,16 @@ def main():
         if item["id"] not in live:
             print(f"skipped {item['id']}: not on the server (publish it with publish_wings.py)")
             continue
-        sha = call(base, token, "/v1/admin/cosmetics/file", (SEED / rel).read_bytes(), "application/octet-stream")["sha256"]
+        gif = (SEED / rel).read_bytes()
+        sha = call(base, token, "/v1/admin/cosmetics/file", gif, "application/octet-stream")["sha256"]
+        files = {"gif": sha}
+        # The small card art for grids, always made from this exact gif (see publish_cape_cards.py).
+        card = make_card(gif)
+        if card is not None:
+            files["card"] = call(base, token, "/v1/admin/cosmetics/file", card, "application/octet-stream")["sha256"]
+            files["card_of"] = sha
         call(base, token, "/v1/admin/cosmetics/item",
-             json.dumps({"item": {"id": item["id"], "files": {"gif": sha}}, "clearWindow": False}).encode(), "application/json")
+             json.dumps({"item": {"id": item["id"], "files": files}, "clearWindow": False}).encode(), "application/json")
         print(f"updated {item['id']} -> {sha[:12]}")
         done += 1
     print(f"{done} cape(s) updated")

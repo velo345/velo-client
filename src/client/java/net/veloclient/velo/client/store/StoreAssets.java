@@ -56,12 +56,38 @@ public final class StoreAssets {
 
 	/** A still first-frame picture of the item for grids (see {@link net.veloclient.velo.client.cosmetics.CapeThumbnails}); null while it's made. */
 	public static net.veloclient.velo.client.cosmetics.CapeThumbnails.Thumb thumbnail(StoreItem item) {
+		// A small "card" version of the art (768 px instead of the full 2048 px GIF, ~1 MB instead of ~8 MB) when the
+		// server has one: a grid needs only that, the full GIF is fetched for the one hovered, opened or worn.
+		String card = item.gifResource() == null ? cardSha(item.id()) : null;
+		if (card != null) {
+			java.nio.file.Path file = net.veloclient.velo.client.cosmetics.CosmeticsCatalog.file(card);
+			if (file == null) {
+				return null; // downloading
+			}
+			return net.veloclient.velo.client.cosmetics.CapeThumbnails.get(item.id() + "-card-" + card.substring(0, Math.min(12, card.length())), () -> {
+				try {
+					return java.nio.file.Files.newInputStream(file);
+				} catch (IOException e) {
+					throw new RuntimeException("Failed to open the card art of " + item.id(), e);
+				}
+			});
+		}
 		if (!ready(item)) {
 			return null;
 		}
 		// Keyed by the art's version: the server file's hash, or the bundled file's path (changes with new art).
 		String version = item.gifSha() != null ? item.gifSha() : String.valueOf(item.gifResource()) + "-" + MOD_VERSION;
 		return net.veloclient.velo.client.cosmetics.CapeThumbnails.get(item.id() + "-" + Integer.toHexString(version.hashCode()), () -> openGif(item));
+	}
+
+	/** The sha256 of the item's small card art on the server, or null when it has none. */
+	private static String cardSha(String id) {
+		for (var c : net.veloclient.velo.client.cosmetics.CosmeticsCatalog.items()) {
+			if (c.id().equals(id)) {
+				return c.files() == null ? null : c.files().get("card");
+			}
+		}
+		return null;
 	}
 
 	/** Whether the art is there: bundled, or a server-only cape's GIF downloaded (starts the download if not). */
