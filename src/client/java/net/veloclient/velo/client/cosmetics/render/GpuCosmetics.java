@@ -251,7 +251,7 @@ public final class GpuCosmetics {
 		int count = quads.length;
 		java.nio.ByteBuffer bytes = org.lwjgl.system.MemoryUtil.memAlloc(count * STRIDE);
 		try {
-			fill(bytes, quads, data, 8, 0, 5, data, 8, 3, null, scale, squeeze);
+			fill(bytes, quads, data, 8, 0, 3, data, 8, 6, null, scale, squeeze); // EmoteProps layout: x y z, nx ny nz, u v
 			bytes.flip();
 			var buffer = com.mojang.blaze3d.systems.RenderSystem.getDevice().createBuffer(() -> "Velo cosmetic mesh",
 					com.mojang.blaze3d.buffers.GpuBuffer.USAGE_VERTEX, bytes);
@@ -342,7 +342,7 @@ public final class GpuCosmetics {
 			if (mesh == null) {
 				java.nio.ByteBuffer bytes = org.lwjgl.system.MemoryUtil.memAlloc(quads.length * STRIDE);
 				try {
-					fill(bytes, quads, data, 8, 0, 5, data, 8, 3, null, scale, squeeze);
+					fill(bytes, quads, data, 8, 0, 3, data, 8, 6, null, scale, squeeze); // EmoteProps layout: x y z, nx ny nz, u v
 					bytes.flip();
 					mesh = new GpuMesh(com.mojang.blaze3d.systems.RenderSystem.getDevice().createBuffer(() -> "Velo cosmetic mesh",
 							com.mojang.renderpearl.api.buffers.GpuBuffer.USAGE_VERTEX, bytes), quads.length / 4);
