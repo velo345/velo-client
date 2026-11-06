@@ -65,6 +65,14 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 	private static volatile boolean scaleSensitivity = true;
 	private static volatile double zoomInSpeed = 1.0;
 	private static volatile double zoomOutSpeed = 1.0;
+	/** How long zooming in / out takes (seconds): an eased glide that lands exactly on the zoom, not a slow exponential creep. */
+	private static volatile double zoomInTime = 0.11;
+	private static volatile double zoomOutTime = 0.13;
+	/** The running glide: where it started (log zoom), when, and whether it's the zoom-in one. */
+	private static double glideFrom;
+	private static long glideStart;
+	private static boolean glideZoomIn;
+	private static boolean glideActive;
 	/** How much one scroll notch zooms (ratio per notch). */
 	private static volatile double scrollStep = 0.12;
 
@@ -160,12 +168,27 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 		double dt = lastFrameNanos == 0 ? 0 : Math.min(0.1, (now - lastFrameNanos) / 1e9);
 		lastFrameNanos = now;
 		double target = zooming ? Math.log(Math.tan(Math.toRadians(currentZoomFov) / 2) / Math.tan(Math.toRadians(vanillaFov) / 2)) : 0;
-		double rate = (26 - 22 * smoothness) * (zooming ? zoomInSpeed : zoomOutSpeed);   // 26/s (snappy) .. 4/s (very soft)
-		logZoom += (target - logZoom) * (1 - Math.exp(-rate * dt));
+		// Key down / up starts a glide of exactly zoomInTime / zoomOutTime (ease-out cubic: fast start, soft landing on the
+		// target); once it has landed, scroll changes follow quickly (60 ms) so scrolling stays smooth too.
+		if (!glideActive || glideZoomIn != zooming) {
+			glideActive = true;
+			glideZoomIn = zooming;
+			glideFrom = logZoom;
+			glideStart = now;
+		}
+		double duration = zooming ? zoomInTime : zoomOutTime;
+		double t = duration <= 0.001 ? 1 : (now - glideStart) / 1e9 / duration;
+		if (t < 1) {
+			double eased = 1 - Math.pow(1 - t, 3);
+			logZoom = glideFrom + (target - glideFrom) * eased;
+		} else {
+			logZoom += (target - logZoom) * (1 - Math.exp(-dt / 0.06));
+		}
 		if (!zooming && Math.abs(logZoom) < SETTLE_EPSILON * 0.01) {
 			// back at the normal FOV: hand it back to vanilla so the sprint FOV kick works again right away
 			logZoom = 0;
 			overrideActive = false;
+			glideActive = false;
 		}
 		double half = Math.atan(Math.tan(Math.toRadians(vanillaFov) / 2) * Math.exp(logZoom));
 		return (float) Math.toDegrees(half * 2);
@@ -224,12 +247,10 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 		return List.of(
 				new ConfigField.SliderField("Zoom FOV", MIN_ZOOM_FOV, MAX_ZOOM_FOV,
 						() -> targetZoomFov, v -> targetZoomFov = (float) v, v -> String.valueOf((int) v)),
-				new ConfigField.SliderField("Smoothness", 0, 1, () -> smoothness, v -> smoothness = v,
-						v -> v < .05 ? "Instant-ish" : Math.round(v * 100) + "%"),
-				new ConfigField.SliderField("Zoom In Speed", 0.2, 3, () -> zoomInSpeed, v -> zoomInSpeed = Math.round(v * 20) / 20.0,
-						v -> String.format(java.util.Locale.ROOT, "%.2fx", v)),
-				new ConfigField.SliderField("Zoom Out Speed", 0.2, 3, () -> zoomOutSpeed, v -> zoomOutSpeed = Math.round(v * 20) / 20.0,
-						v -> String.format(java.util.Locale.ROOT, "%.2fx", v)),
+				new ConfigField.SliderField("Zoom In Time", 0, 0.4, () -> zoomInTime, v -> zoomInTime = Math.round(v * 100) / 100.0,
+						v -> v < .005 ? "Instant" : Math.round(v * 1000) + " ms"),
+				new ConfigField.SliderField("Zoom Out Time", 0, 0.4, () -> zoomOutTime, v -> zoomOutTime = Math.round(v * 100) / 100.0,
+						v -> v < .005 ? "Instant" : Math.round(v * 1000) + " ms"),
 				new ConfigField.SliderField("Scroll Step", 0.03, 0.3, () -> scrollStep, v -> scrollStep = Math.round(v * 100) / 100.0,
 						v -> Math.round(v * 100) + "% per notch"),
 				new ConfigField.ToggleField("Lower Sensitivity While Zoomed", () -> scaleSensitivity, v -> scaleSensitivity = v),
