@@ -210,6 +210,21 @@ public final class GameLauncher {
 		if (runtime.feature() >= 25) {
 			jvmArgs.add("-XX:+UseCompactObjectHeaders");
 		}
+		if (runtime.feature() >= 17) {
+			// JIT code cache: the default 240 MB fills up with Fabric + Velo's modules + a modpack's mixins, and then
+			// HotSpot switches the JIT compiler off for the rest of the session ("CodeCache is full. Compiler has been
+			// disabled") - the game keeps running, but on slower code, and FPS sinks over the session. Reserving more only
+			// costs address space; the cache only commits what it really uses.
+			jvmArgs.add("-XX:ReservedCodeCacheSize=512m");
+			// Big CPUs with several memory nodes (Threadripper, EPYC, dual-socket Xeon): the heap is allocated next to
+			// the core that uses it instead of across the slower interconnect. A no-op on ordinary single-node desktops.
+			jvmArgs.add("-XX:+UseNUMA");
+			if (MemoryPlanner.isLinux() && memoryPlan.maxMb() >= 4096) {
+				// Linux: 2 MB pages for the heap (madvise, the kernel's default THP mode) - far fewer TLB misses walking
+				// Minecraft's large heap. Where THP is switched off the JVM only prints a warning and uses normal pages.
+				jvmArgs.add("-XX:+UseTransparentHugePages");
+			}
+		}
 		// Class Data Sharing: the classes the game loaded last time come from a memory-mapped archive
 		// instead of being parsed and verified again (see CdsArchive).
 		jvmArgs.addAll(CdsArchive.jvmArgs(runtime, instance, runtime.feature() >= 25));
@@ -317,6 +332,12 @@ public final class GameLauncher {
 			env.putIfAbsent("__GL_SHADER_DISK_CACHE", "1");
 			env.putIfAbsent("__GL_SHADER_DISK_CACHE_SKIP_CLEANUP", "1");
 			env.putIfAbsent("MESA_SHADER_CACHE_MAX_SIZE", "2G");
+		}
+		if (MemoryPlanner.isLinux() && GraphicsApi.isOpenGl(instance.id(), version.id())) {
+			// Mesa (AMD / Intel on Linux), OpenGL: glthread moves the driver's own work for every GL call off the render
+			// thread onto a second core. Minecraft's render thread is the usual bottleneck on fast GPUs, so this turns
+			// idle GPU time into frames. Ignored by NVIDIA's driver and by Vulkan; a player's own setting wins.
+			builder.environment().putIfAbsent("mesa_glthread", "true");
 		}
 		return new LaunchResult(builder.start(), logFile, runId);
 	}
