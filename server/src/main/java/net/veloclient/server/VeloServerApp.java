@@ -35,6 +35,7 @@ public final class VeloServerApp {
 	private static net.veloclient.server.store.StoreService store;
 	/** Installs, daily actives and online samples for the owner panel. */
 	private static StatsService stats;
+	private static PartnerPlayRewards partnerRewards;
 
 	public static void main(String[] args) throws IOException {
 		int port = resolvePort();
@@ -102,6 +103,7 @@ public final class VeloServerApp {
 		CosmeticsRoutes.register(server, registry, store, cosmetics, adminToken);
 		// Discord: linking (unlocks the Velo Neon cape) and announcements through channel webhooks.
 		DiscordLinks discordLinks = new DiscordLinks(dataDir, store);
+		partnerRewards = new PartnerPlayRewards(dataDir, store);
 		DiscordRoutes.register(server, registry, store, discordLinks, envOr("VELO_DISCORD_INVITE", null), adminToken);
 		DiscordAnnouncer announcer = new DiscordAnnouncer(envOr("VELO_DISCORD_DONATIONS_WEBHOOK", null), envOr("VELO_DISCORD_REPORTS_WEBHOOK", null),
 				envOr("VELO_PUBLIC_URL", null), cosmetics, registry, store.database());
@@ -467,6 +469,11 @@ public final class VeloServerApp {
 		}
 		if (refreshed != null && "game".equals(refreshed.kind())) {
 			store.onGameHeartbeat(refreshed.uuid());
+			if (partnerRewards != null) {
+				SocialService.Activity activity = social.gameActivity(refreshed.uuid());
+				partnerRewards.onGameHeartbeat(refreshed.uuid(), refreshed.username(), activity == null ? null : activity.kind(),
+						activity == null ? null : activity.detail());
+			}
 			if (request.hidePlus() != null) {
 				registry.setPlusHidden(refreshed.uuid(), request.hidePlus());
 			}

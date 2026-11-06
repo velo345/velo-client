@@ -710,6 +710,32 @@
 			"files": {}
 		},
 		{
+			"id": "cape_luckysmp",
+			"type": "cape",
+			"name": "LuckySMP",
+			"description": "LuckySMP's logo in gold and chrome while lucky blocks fall all around it. Free: play 10 minutes on luckysmp.net with Velo.",
+			"price": 0,
+			"unlock": "luckysmp",
+			"status": "released",
+			"collection": "velo_originals",
+			"accent": "#ffc531",
+			"files": {
+				"gif": "capes/luckysmp.gif"
+			}
+		},
+		{
+			"id": "aura_lucky",
+			"type": "aura",
+			"name": "Lucky",
+			"description": "LuckySMP's lucky blocks circle you and pop in showers of spinning gold coins, gold dust rising over a golden glow. Free: play 10 minutes on luckysmp.net with Velo.",
+			"price": 0,
+			"unlock": "luckysmp",
+			"status": "released",
+			"collection": "auras",
+			"accent": "#ffc531",
+			"files": {}
+		},
+		{
 			"id": "cape_velo_neon",
 			"rev": 1,
 			"type": "cape",

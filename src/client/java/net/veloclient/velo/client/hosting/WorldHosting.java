@@ -549,7 +549,7 @@ public final class WorldHosting {
 	 * is null when it has none.
 	 */
 	public record Partner(String id, String name, String address, String description, String versions, int accent, boolean online, int players,
-			int max, String iconUrl) {
+			int max, String iconUrl, String rewardText, String rewardCape) {
 	}
 
 	private static volatile List<Partner> partnerCache = List.of();
@@ -579,12 +579,26 @@ public final class WorldHosting {
 					String accent = o.has("accent") && !o.get("accent").isJsonNull() ? o.get("accent").getAsString() : null;
 					String id = o.has("id") && !o.get("id").isJsonNull() ? o.get("id").getAsString() : "";
 					String icon = o.has("icon") && !o.get("icon").isJsonNull() ? base + "/v1/partners/icon/" + id + "?v=" + o.get("icon").getAsString() : null;
+					// what playing there gives (the server's partner play rewards): a line and the cloak to preview
+					String rewardText = null;
+					String rewardCape = null;
+					if (o.has("reward") && o.get("reward").isJsonObject()) {
+						JsonObject reward = o.getAsJsonObject("reward");
+						rewardText = reward.has("text") ? reward.get("text").getAsString() : null;
+						if (reward.has("items") && reward.get("items").isJsonArray()) {
+							for (JsonElement item : reward.getAsJsonArray("items")) {
+								if (item.getAsString().startsWith("cape_")) {
+									rewardCape = item.getAsString();
+								}
+							}
+						}
+					}
 					out.add(new Partner(id, o.get("name").getAsString(), o.get("address").getAsString(),
 							o.has("description") && !o.get("description").isJsonNull() ? o.get("description").getAsString() : "",
 							o.has("versions") && !o.get("versions").isJsonNull() ? o.get("versions").getAsString() : "",
 							accent == null ? 0 : 0xFF000000 | Integer.parseInt(accent.substring(1), 16),
 							o.has("online") && o.get("online").getAsBoolean(), o.has("players") ? o.get("players").getAsInt() : 0,
-							o.has("max") ? o.get("max").getAsInt() : 0, icon));
+							o.has("max") ? o.get("max").getAsInt() : 0, icon, rewardText, rewardCape));
 				}
 				partnerCache = List.copyOf(out);
 				partnersFetchedAt = System.currentTimeMillis();

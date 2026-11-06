@@ -274,6 +274,9 @@ public final class DiscoverView {
 					+ " -fx-border-style: segments(4, 3); -fx-border-radius: 6; -fx-padding: 3 8 3 8;");
 			card.getChildren().add(code);
 		}
+		if (p.has("reward") && p.get("reward").isJsonObject()) {
+			card.getChildren().add(rewardRow(p.getAsJsonObject("reward"), accent));
+		}
 		card.getChildren().addAll(grow, bottom);
 		card.getStyleClass().add("card");
 		card.setPadding(new Insets(16));
@@ -284,6 +287,65 @@ public final class DiscoverView {
 		card.setOnMouseEntered(e -> card.setTranslateY(-2));
 		card.setOnMouseExited(e -> card.setTranslateY(0));
 		return card;
+	}
+
+	/**
+	 * What playing there gives (server's PartnerPlayRewards): the cloak's front as a little picture (from its card art) and
+	 * the line saying how to get it.
+	 */
+	private static Node rewardRow(JsonObject reward, String accent) {
+		javafx.scene.image.ImageView preview = new javafx.scene.image.ImageView();
+		preview.setFitWidth(30);
+		preview.setFitHeight(48);
+		preview.setPreserveRatio(true);
+		preview.setSmooth(true);
+		Label line = new Label(text(reward, "text", ""));
+		line.setWrapText(true);
+		line.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 11.5px; -fx-font-weight: 700;");
+		Label gift = new Label("FREE REWARD");
+		gift.setStyle("-fx-text-fill: white; -fx-background-color: " + accent + "; -fx-background-radius: 4; -fx-padding: 1 6 1 6;"
+				+ " -fx-font-size: 9px; -fx-font-weight: 900;");
+		VBox words = new VBox(3, gift, line);
+		HBox row = new HBox(10, preview, words);
+		row.setAlignment(Pos.CENTER_LEFT);
+		row.setStyle("-fx-background-color: " + accent + "14; -fx-background-radius: 10; -fx-border-color: " + accent + "44;"
+				+ " -fx-border-radius: 10; -fx-padding: 6 10 6 8;");
+		HBox.setHgrow(words, Priority.ALWAYS);
+		String cape = null;
+		if (reward.has("items") && reward.get("items").isJsonArray()) {
+			for (var item : reward.getAsJsonArray("items")) {
+				if (item.getAsString().startsWith("cape_")) {
+					cape = item.getAsString();
+				}
+			}
+		}
+		String base = net.veloclient.launcher.social.LauncherSocial.baseUrl();
+		if (cape != null && base != null) {
+			String id = cape;
+			Thread.ofVirtual().name("velo-partner-reward").start(() -> {
+				try {
+					java.net.http.HttpClient http = java.net.http.HttpClient.newHttpClient();
+					String body = http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/cosmetics/item?id=" + id)).build(),
+							java.net.http.HttpResponse.BodyHandlers.ofString()).body();
+					JsonObject files = com.google.gson.JsonParser.parseString(body).getAsJsonObject().getAsJsonObject("files");
+					String sha = files.has("card") ? files.get("card").getAsString() : files.get("gif").getAsString();
+					byte[] gif = http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/cosmetics/file/" + sha)).build(),
+							java.net.http.HttpResponse.BodyHandlers.ofByteArray()).body();
+					java.awt.image.BufferedImage frame = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(gif));
+					if (frame == null) {
+						return;
+					}
+					// the cloak's front: x 1..11, y 1..17 of the 64 x 32 layout
+					int px = frame.getWidth() / 64;
+					java.awt.image.BufferedImage front = frame.getSubimage(px, px, 10 * px, 16 * px);
+					javafx.scene.image.Image image = javafx.embed.swing.SwingFXUtils.toFXImage(front, null);
+					javafx.application.Platform.runLater(() -> preview.setImage(image));
+				} catch (Exception ignored) {
+					// just no picture
+				}
+			});
+		}
+		return row;
 	}
 
 	private static Node card(String kind, String accent, String name, String line, String meta, Button action) {

@@ -217,7 +217,7 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 			int columns = w >= 560 ? 3 : 2;
 			int gap = 8;
 			int tileW = (w - gap * (columns - 1)) / columns;
-			int tileH = 62;
+			int tileH = partners.stream().anyMatch(pt -> pt.rewardText() != null) ? 82 : 62;
 			for (int i = 0; i < partners.size(); i++) {
 				WorldHosting.Partner partner = partners.get(i);
 				int tx = x + (i % columns) * (tileW + gap);
@@ -297,6 +297,25 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 					MenuKit.GREEN);
 		} else {
 			MenuKit.text(context, this.textRenderer, MenuKit.small("OFFLINE RIGHT NOW"), tx, y + 41, MenuKit.TEXT_3);
+		}
+		if (partner.rewardText() != null) {
+			// The free reward for playing there, with the cloak itself turning on the right.
+			int capeSize = 34;
+			int textW = tw - (partner.rewardCape() != null ? capeSize + 6 : 0);
+			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.small("FREE REWARD"), textW), tx, y + 56, accent);
+			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(partner.rewardText()), textW), tx, y + 66, MenuKit.TEXT_2);
+			if (partner.rewardCape() != null) {
+				int capeX = x + w - 10 - capeSize / 2;
+				int capeY = y + 6 + capeSize;
+				net.veloclient.velo.client.cosmetics.CosmeticsCatalog.requestItem(partner.rewardCape());
+				net.veloclient.velo.client.store.StoreCatalog.byId(partner.rewardCape()).ifPresent(item -> {
+					var thumb = net.veloclient.velo.client.store.StoreAssets.thumbnail(item);
+					if (thumb != null) {
+						net.veloclient.velo.client.gui.widget.VeloCapeRender.draw(context, thumb.id(), thumb.width(), thumb.height(),
+								capeX, capeY, capeSize, net.veloclient.velo.client.gui.widget.VeloCapeRender.idleYaw(0f, 0f));
+					}
+				});
+			}
 		}
 		int bw = 48;
 		pill(context, x + w - bw - 8, y + h - 26, bw, 18, "Join", true, mouseX, mouseY, dt,

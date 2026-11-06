@@ -265,6 +265,13 @@ final class PlusFeatureRoutes {
 				row.put("codes", codes.codesOf((String) row.get("id")));
 			}
 		}
+		// What playing there gives (PartnerPlayRewards): clients show it with a preview next to the partner.
+		for (Map<String, Object> row : views) {
+			Map<String, Object> reward = PartnerPlayRewards.rewardView((String) row.get("address"));
+			if (reward != null) {
+				row.put("reward", reward);
+			}
+		}
 		return views;
 	}
 

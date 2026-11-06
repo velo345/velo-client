@@ -730,6 +730,11 @@ final class SocialService {
 		refreshPresence(me);
 	}
 
+	/** What {@code uuid}'s game last reported (kind, detail), or null - for partner play rewards. */
+	Activity gameActivity(String uuid) {
+		return gamePresence.get(uuid);
+	}
+
 	void setPresence(String me, String kind, String detail) throws SocialException {
 		limit(me, "presence", PRESENCE_LIMIT);
 		String safeKind = switch (kind == null ? "" : kind) {

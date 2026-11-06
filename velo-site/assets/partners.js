@@ -63,6 +63,7 @@
 			el("div", { class: "pt-card-top" }, icon, el("div", {}, el("h3", {}, p.name), live)),
 			p.description ? el("p", {}, p.description) : null,
 			code ? el("a", { class: "pt-card-code", href: codeLink(code.code) }, "Code " + code.code + (code.percent > 0 ? " · " + code.percent + "% off Velo Coins" : "")) : null,
+			p.reward ? el("p", { class: "pt-card-reward" }, el("b", {}, "Free reward: "), p.reward.text) : null,
 			el("div", { class: "pt-ip" }, el("code", {}, p.address), copyButton(p.address)));
 		c.style.setProperty("--a", accentOf(p));
 		return c;
@@ -80,6 +81,27 @@
 				if (live) {
 					live.textContent = p.online ? nf.format(p.players) + " online" : "Offline";
 					live.classList.toggle("on", !!p.online);
+				}
+				// What playing there gives: the cloak (3D, card art) and the aura (its preview), plus how to get them.
+				const reward = $("[data-reward]", box);
+				if (reward && p.reward) {
+					$("[data-reward-text]", reward).textContent = p.reward.text;
+					const items = p.reward.items || [];
+					const aura = items.find((i) => i.startsWith("aura_"));
+					const auraImg = $("[data-reward-aura]", reward);
+					if (aura && auraImg) {
+						auraImg.src = "/assets/auras/" + aura.replace(/^aura_/, "") + ".webp";
+						auraImg.alt = "The aura you get";
+						auraImg.hidden = false;
+					}
+					const cape = items.find((i) => i.startsWith("cape_"));
+					const capeSlot = $("[data-reward-cape]", reward);
+					if (cape && capeSlot && window.velo && window.velo.cosmeticArt) {
+						fetch("/v1/cosmetics/item?id=" + encodeURIComponent(cape)).then((r) => (r.ok ? r.json() : null)).then((item) => {
+							if (item) capeSlot.replaceChildren(window.velo.cosmeticArt(item, 6));
+						}).catch(() => {});
+					}
+					reward.hidden = false;
 				}
 				const code = (p.codes || [])[0];
 				const ticket = $("[data-code]", box);
