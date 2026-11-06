@@ -61,7 +61,8 @@ import java.util.List;
  *       there's headroom), so a heavy area costs chunks instead of frame drops.</li>
  * </ul>
  */
-public final class PerformanceBoostModule extends AbstractModule implements Configurable {
+public final class PerformanceBoostModule extends AbstractModule implements Configurable,
+		net.veloclient.velo.client.gui.window.ModuleDashboard {
 
 	/**
 	 * Read by other modules to throttle expensive per-frame work (e.g. counting every loaded
@@ -142,7 +143,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 
 	public PerformanceBoostModule() {
 		super("performance-boost", "Performance Boost",
-				"Presets and individually-tunable settings for maximum FPS - view distance, entities, particles, VSync, HUD caching and more.",
+				"Presets and individually tunable settings for maximum FPS.",
 				ModuleCategory.PERFORMANCE, SafetyTag.ALWAYS_SAFE, true);
 		ClientTickEvents.END_CLIENT_TICK.register(this::tickAdaptiveDistance);
 		ClientTickEvents.END_CLIENT_TICK.register(this::tickAuto);
@@ -540,6 +541,193 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 					client.setScreen(new net.veloclient.velo.client.gui.window.ModuleConfigScreen(module, () -> client.setScreen(back)));
 				})));
 		return fields;
+	}
+
+	// ---- Dashboard (the big settings window, see ModuleDashboard) ----
+
+	private boolean gpuTimingBefore;
+
+	@Override
+	public void dashboardOpened() {
+		// vanilla only measures GPU time while something shows it
+		gpuTimingBefore = GpuUtilizationModule.showing;
+		GpuUtilizationModule.showing = true;
+	}
+
+	@Override
+	public void dashboardClosed() {
+		GpuUtilizationModule.showing = gpuTimingBefore;
+	}
+
+	@Override
+	public List<Stat> dashboardStats() {
+		MinecraftClient client = MinecraftClient.getInstance();
+		GameOptions options = client.options;
+		int fps = net.veloclient.velo.client.gui.title.MenuInfo.fps();
+		int target = preset.equals("Auto") ? autoTargetFps : adaptiveDistance ? targetFps : 60;
+		int fpsColor = fps >= target ? 0xFF4ADE80 : fps >= target * 0.6 ? 0xFFF5B942 : 0xFFF87171;
+		int cap = options.getMaxFps().getValue();
+		String frame = fps > 0 ? String.format(java.util.Locale.ROOT, "%.1f ms", 1000.0 / fps) : "-";
+		double gpu = client.getGpuUtilizationPercentage();
+		String gpuText = gpu > 0 ? Math.round(Math.min(100, gpu)) + "%" : "...";
+		int gpuColor = gpu > 100 ? 0xFFF87171 : 0xFFF4F4F6;
+		String describe = net.veloclient.velo.client.util.GpuInfo.describe();
+		String api = describe == null ? "" : describe.contains("Vulkan") ? "Vulkan" : "OpenGL";
+		String presetValue = !isEnabled() ? "Off" : preset.replace(" Quality", "");
+		return List.of(
+				new Stat("FPS", String.valueOf(fps), cap >= 260 ? "uncapped" : "cap " + cap, fpsColor, -1f, true),
+				new Stat("Frame", frame, "", 0xFFF4F4F6),
+				new Stat("GPU", gpuText, api, gpuColor, (float) Math.min(1, gpu / 100), false),
+				new Stat("View", String.valueOf(options.getViewDistance().getValue()), adaptiveDistance ? "adaptive" : "chunks", 0xFFF4F4F6,
+						options.getViewDistance().getValue() / 32f, false),
+				new Stat("Preset", presetValue, preset.endsWith(" Quality") && isEnabled() ? "quality" : "", isEnabled() ? 0xFFF4F4F6 : 0xFF9A9AA6));
+	}
+
+	@Override
+	public String cardChoice() {
+		return "Preset";
+	}
+
+	@Override
+	public String cardBlurb(String option) {
+		return switch (option) {
+			case "Auto" -> "Holds target FPS";
+			case "Default" -> "Your own settings";
+			case "Max FPS" -> "Fastest";
+			case "Medium Quality" -> "Balanced";
+			case "High Quality" -> "Best visuals";
+			default -> "";
+		};
+	}
+
+	@Override
+	public int[] cardMeters(String option) {
+		return switch (option) {
+			case "Auto" -> new int[] {4, 4};
+			case "Default" -> new int[] {3, 3};
+			case "Max FPS" -> new int[] {5, 1};
+			case "Medium Quality" -> new int[] {4, 3};
+			case "High Quality" -> new int[] {2, 5};
+			default -> null;
+		};
+	}
+
+	@Override
+	public String sectionSummary(String section) {
+		GameOptions options = MinecraftClient.getInstance().options;
+		return switch (section) {
+			case "Preset" -> !isEnabled() ? "Off" : preset.equals("Auto") ? "Auto · " + autoLevelName() : preset;
+			case "Frame Rate" -> {
+				int cap = options.getMaxFps().getValue();
+				yield (cap >= 260 ? "Unlimited" : cap + " FPS") + " · VSync " + vsyncMode;
+			}
+			case "View Distance" -> options.getViewDistance().getValue() + " chunks" + (adaptiveDistance ? " · adaptive" : "");
+			case "Visuals" -> "Particles " + particlesLabel(options.getParticles().getValue());
+			case "Velo Engine" -> ((fastDrawPath ? 1 : 0) + (hudCachingEnabled ? 1 : 0)) + " of 2 on";
+			case "Cosmetics" -> {
+				var module = net.veloclient.velo.module.ModuleRegistry.get("cosmetics-quality").orElse(null);
+				if (module == null || !module.isEnabled()) {
+					yield "Full detail";
+				}
+				String mode = "";
+				if (module instanceof Configurable configurable) {
+					for (ConfigField field : configurable.configFields()) {
+						if (field instanceof ConfigField.ChoiceField choice) {
+							mode = choice.get().get();
+							break;
+						}
+					}
+				}
+				yield mode + (net.veloclient.velo.client.cosmetics.render.GpuCosmetics.enabled ? " · GPU" : "");
+			}
+			default -> null;
+		};
+	}
+
+	@Override
+	public String dashboardTip() {
+		if (!isEnabled()) {
+			return "Performance Boost is off - the switch at the top right turns it on.";
+		}
+		GameOptions options = MinecraftClient.getInstance().options;
+		int fps = net.veloclient.velo.client.gui.title.MenuInfo.fps();
+		int target = preset.equals("Auto") ? autoTargetFps : adaptiveDistance ? targetFps : 60;
+		int distance = options.getViewDistance().getValue();
+		if (fps > 0 && fps < target) {
+			if (distance > 12 && !adaptiveDistance) {
+				return "Below " + target + " FPS: View Distance (" + distance + ") is the biggest gain - try 12, or Adaptive.";
+			}
+			if (!preset.equals("Auto") && !preset.equals("Max FPS")) {
+				return "Below " + target + " FPS: the Auto preset lowers quality only while your FPS drops.";
+			}
+			return "Still slow? Particles Minimal and Clouds off help on weaker GPUs.";
+		}
+		if (vsyncMode.equals("On")) {
+			return "VSync caps FPS at your monitor's refresh rate - Adaptive avoids the stutter below it.";
+		}
+		return null;
+	}
+
+	private String autoLevelName() {
+		return AUTO_LEVELS.get(Math.max(0, Math.min(AUTO_LEVELS.size() - 1, autoLevel))).replace(" Quality", "");
+	}
+
+	@Override
+	public String cardStatus(String option) {
+		if (!option.equals("Auto") || !isEnabled()) {
+			return null;
+		}
+		String level = AUTO_LEVELS.get(Math.max(0, Math.min(AUTO_LEVELS.size() - 1, autoLevel)));
+		return "Now: " + level.replace(" Quality", "");
+	}
+
+	@Override
+	public String sectionHint(String section) {
+		return switch (section) {
+			case "Preset" -> "Pick a starting point - every setting stays adjustable in the other sections.";
+			case "Frame Rate" -> "How many frames are drawn, and when to save power.";
+			case "View Distance" -> "How far the world and entities load - the biggest FPS lever.";
+			case "Visuals" -> "Vanilla video settings that cost frames.";
+			case "Velo Engine" -> "Velo's own rendering speed-ups. Leave them on unless something looks wrong.";
+			case "Cosmetics" -> "Cloaks, wings and auras: full detail near you, lighter further away and in crowds.";
+			default -> null;
+		};
+	}
+
+	@Override
+	public List<ConfigField> sectionOverride(String section) {
+		if (section.equals("Preset")) {
+			// The cards, Auto's own settings while Auto runs, and the three settings people change most.
+			java.util.Map<String, ConfigField> byLabel = new java.util.HashMap<>();
+			for (ConfigField field : configFields()) {
+				if (!(field instanceof ConfigField.HeaderField)) { // "Preset" / "View Distance" are section titles too
+					byLabel.putIfAbsent(field.label(), field);
+				}
+			}
+			List<ConfigField> fields = new java.util.ArrayList<>();
+			fields.add(byLabel.get("Preset"));
+			if (preset.equals("Auto")) {
+				fields.add(byLabel.get("Auto: Target FPS"));
+				fields.add(byLabel.get("Auto: Notify On Quality Change"));
+			}
+			fields.add(new ConfigField.HeaderField("Quick Settings"));
+			fields.add(byLabel.get("Max FPS"));
+			fields.add(byLabel.get("View Distance"));
+			fields.add(byLabel.get("VSync Mode"));
+			fields.removeIf(java.util.Objects::isNull);
+			return fields;
+		}
+		if (section.equals("Cosmetics")) {
+			// Cosmetics Quality's own settings, right here (still saved by that module)
+			var module = net.veloclient.velo.module.ModuleRegistry.get("cosmetics-quality").orElse(null);
+			if (module instanceof Configurable configurable) {
+				List<ConfigField> fields = new java.util.ArrayList<>();
+				fields.add(new ConfigField.ToggleField("Cosmetics Quality", module::isEnabled, module::setEnabled));
+				fields.addAll(configurable.configFields());
+				return fields;
+			}
+		}
+		return null;
 	}
 
 	/** Profile hook: marks that the fields were just restored, so the following enable keeps them. Always saved. */

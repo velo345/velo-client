@@ -23,7 +23,8 @@ public final class VeloSectionHeader extends ClickableWidget {
 	protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
 		String label = getMessage().getString().toUpperCase(java.util.Locale.ROOT);
 		var textRenderer = MinecraftClient.getInstance().textRenderer;
-		int x = getX() + 9;
+		// flush with the rows' labels below it (an indent made every title look shifted)
+		int x = getX();
 		int y = getY() + getHeight() - 11;
 		// Drawn at native size (scaling the per-GUI-scale font down made it pixelated), in the
 		// semibold UI font, with a little letter spacing so it reads as a caption.
@@ -32,6 +33,11 @@ public final class VeloSectionHeader extends ClickableWidget {
 			net.minecraft.text.Text ch = net.veloclient.velo.client.gui.title.TitleScreenTheme.tileFont(String.valueOf(label.charAt(i)));
 			context.drawTextWithShadow(textRenderer, ch, cursor, y, VeloStyle.textFaint());
 			cursor += textRenderer.getWidth(ch) + 1;
+		}
+		// a hairline after the title marks where the group starts
+		int lineX = cursor + 6;
+		if (lineX < getX() + getWidth()) {
+			context.fill(lineX, y + 3, getX() + getWidth(), y + 4, VeloStyle.border());
 		}
 	}
 

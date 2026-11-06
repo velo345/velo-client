@@ -276,6 +276,17 @@ public final class ScreenshotTour {
 	/** Each scene = steps of {delayTicks, Runnable}. Add a scene here instead of running the whole tour. */
 	private static List<Object[]> scene(MinecraftClient client, String name) {
 		return switch (name) {
+			case "perfboost" -> {
+				var dash = new net.veloclient.velo.client.gui.window.ModuleConfigScreen(ModuleRegistry.get("performance-boost").orElseThrow(), null);
+				List<Object[]> steps = new java.util.ArrayList<>();
+				steps.add(new Object[] {2, (Runnable) () -> client.setScreen(dash)});
+				String[] sections = {"Preset", "Frame Rate", "View Distance", "Visuals", "Velo Engine", "Cosmetics"};
+				for (String section : sections) {
+					steps.add(new Object[] {2, (Runnable) () -> dash.selectSectionForTour(section)});
+					steps.add(new Object[] {30, (Runnable) () -> shot(client, "perfboost-" + section.toLowerCase(java.util.Locale.ROOT).replace(' ', '-'))});
+				}
+				yield steps;
+			}
 			case "veloplus" -> {
 				var nameScreen = new net.veloclient.velo.client.gui.NameStyleScreen(null);
 				yield List.of(
