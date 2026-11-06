@@ -7,9 +7,8 @@ import net.veloclient.velo.client.gui.TabNames;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArgs;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 
 /**
  * Tab list layout ({@link TabNames}): vanilla measures each name (first width call in render), measures each score
@@ -45,12 +44,21 @@ public abstract class TabListLayoutMixin {
 		original.call(context, x1, y1, x2, y2, color);
 	}
 
-	@ModifyArgs(method = "render", at = @At(value = "INVOKE",
-			target = "Lnet/minecraft/client/gui/hud/PlayerListHud;renderScoreboardObjective(Lnet/minecraft/scoreboard/ScoreboardObjective;ILnet/minecraft/client/gui/hud/PlayerListHud$ScoreDisplayEntry;IILjava/util/UUID;Lnet/minecraft/client/gui/DrawContext;)V"))
-	private void velo$scoreRange(Args args) {
-		int[] range = TabNames.scoreRange(args.get(3), args.get(4));
-		args.set(3, range[0]);
-		args.set(4, range[1]);
+	// Two @ModifyArg, not @ModifyArgs: the call passes PlayerListHud's private ScoreDisplayEntry, and @ModifyArgs' generated
+	// Args class may not access it - IllegalAccessError crash whenever a server showed scores in the tab list (1.2.0 report).
+	// The right edge first (declaration order = run order): it picks the shift the left edge then uses.
+	@ModifyArg(method = "render", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/client/gui/hud/PlayerListHud;renderScoreboardObjective(Lnet/minecraft/scoreboard/ScoreboardObjective;ILnet/minecraft/client/gui/hud/PlayerListHud$ScoreDisplayEntry;IILjava/util/UUID;Lnet/minecraft/client/gui/DrawContext;)V"),
+			index = 4)
+	private int velo$scoreRight(int right) {
+		return TabNames.scoreRight(right);
+	}
+
+	@ModifyArg(method = "render", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/client/gui/hud/PlayerListHud;renderScoreboardObjective(Lnet/minecraft/scoreboard/ScoreboardObjective;ILnet/minecraft/client/gui/hud/PlayerListHud$ScoreDisplayEntry;IILjava/util/UUID;Lnet/minecraft/client/gui/DrawContext;)V"),
+			index = 3)
+	private int velo$scoreLeft(int left) {
+		return TabNames.scoreLeft(left);
 	}
 }
 //?} else {
@@ -81,12 +89,19 @@ public abstract class TabListLayoutMixin {
 		original.call(context, x1, y1, x2, y2, color);
 	}
 
-	@ModifyArgs(method = "extractRenderState", at = @At(value = "INVOKE",
-			target = "Lnet/minecraft/client/gui/components/PlayerTabOverlay;extractTablistScore(Lnet/minecraft/world/scores/Objective;ILnet/minecraft/client/gui/components/PlayerTabOverlay$ScoreDisplayEntry;IILjava/util/UUID;Lnet/minecraft/client/gui/GuiGraphicsExtractor;)V"))
-	private void velo$scoreRange(Args args) {
-		int[] range = TabNames.scoreRange(args.get(3), args.get(4));
-		args.set(3, range[0]);
-		args.set(4, range[1]);
+	// See the branch above: @ModifyArg (one int each), never @ModifyArgs over the private ScoreDisplayEntry.
+	@ModifyArg(method = "extractRenderState", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/client/gui/components/PlayerTabOverlay;extractTablistScore(Lnet/minecraft/world/scores/Objective;ILnet/minecraft/client/gui/components/PlayerTabOverlay$ScoreDisplayEntry;IILjava/util/UUID;Lnet/minecraft/client/gui/GuiGraphicsExtractor;)V"),
+			index = 4)
+	private int velo$scoreRight(int right) {
+		return TabNames.scoreRight(right);
+	}
+
+	@ModifyArg(method = "extractRenderState", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/client/gui/components/PlayerTabOverlay;extractTablistScore(Lnet/minecraft/world/scores/Objective;ILnet/minecraft/client/gui/components/PlayerTabOverlay$ScoreDisplayEntry;IILjava/util/UUID;Lnet/minecraft/client/gui/GuiGraphicsExtractor;)V"),
+			index = 3)
+	private int velo$scoreLeft(int left) {
+		return TabNames.scoreLeft(left);
 	}
 }
 *///?}

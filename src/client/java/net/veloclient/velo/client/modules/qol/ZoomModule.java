@@ -51,7 +51,17 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 	private static volatile float currentZoomFov = 20f;
 	/** 0 = snappy, 1 = very soft; how long the zoom takes to settle. */
 	private static volatile double smoothness = 0.55;
-	private static volatile boolean smoothCameraWhileZoomed;
+	/**
+	 * Mouse smoothing while zoomed (0 = off .. 1 = softest): every mouse movement is spread over a few milliseconds instead of
+	 * landing as one jump - far into a zoom one mouse count is a visible step. Unlike vanilla's cinematic camera it has no
+	 * momentum: the camera never turns further than the mouse moved, and stops within ~10-50 ms of the mouse stopping.
+	 * (Replaces "Cinematic Camera While Zoomed", whose glide felt like the camera kept going on its own - owner, 2026-11-06.)
+	 */
+	private static volatile double mouseSmoothing = 0.5;
+	/** Movement not applied yet (x, y), when each axis was last turned, and when the mouse last moved on it. */
+	private static final double[] PENDING = new double[2];
+	private static final long[] LAST_TURN = new long[2];
+	private static final long[] LAST_INPUT = new long[2];
 	/** Mouse look scaled to the zoom: same aim feel at every zoom, stops instantly (no cinematic glide). */
 	private static volatile boolean scaleSensitivity = true;
 	private static volatile double zoomInSpeed = 1.0;
@@ -92,10 +102,44 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 
 	/** Factor for mouse look while zoomed (1 = normal): the zoom's own ratio, read by ZoomSensitivityMixin. */
 	public static double sensitivityFactor() {
-		if (!overrideActive || !scaleSensitivity) {
+		// Only while the key is held: following the zoom-out animation made the sensitivity climb back over a few
+		// hundred ms after letting go, which felt like the camera speeding up on its own.
+		if (!overrideActive || !zooming || !scaleSensitivity) {
 			return 1.0;
 		}
 		return Math.max(0.02, Math.min(1.0, Math.exp(logZoom)));
+	}
+
+	/**
+	 * One axis of mouse look (0 = x, 1 = y) for this frame, from ZoomSensitivityMixin: scaled to the zoom and, while zoomed,
+	 * smoothed without momentum (see {@link #mouseSmoothing}).
+	 */
+	public static double look(int axis, double raw) {
+		double scaled = raw * sensitivityFactor();
+		long now = System.nanoTime();
+		if (!zooming || mouseSmoothing < 0.01) {
+			double out = scaled + PENDING[axis]; // whatever was still pending lands at once - nothing glides on
+			PENDING[axis] = 0;
+			LAST_TURN[axis] = 0;
+			return out;
+		}
+		double dt = LAST_TURN[axis] == 0 ? 0 : Math.min(0.05, (now - LAST_TURN[axis]) / 1e9);
+		LAST_TURN[axis] = now;
+		PENDING[axis] += scaled;
+		if (raw != 0) {
+			LAST_INPUT[axis] = now;
+		}
+		double tau = 0.006 + 0.034 * mouseSmoothing;            // 6 .. 40 ms
+		if (now - LAST_INPUT[axis] > 12_000_000L) {
+			tau *= 0.3;                                          // the mouse stopped: finish the last bit fast
+		}
+		double out = dt <= 0 ? 0 : PENDING[axis] * (1 - Math.exp(-dt / tau));
+		PENDING[axis] -= out;
+		if (Math.abs(PENDING[axis]) < 1e-3) {
+			out += PENDING[axis];
+			PENDING[axis] = 0;
+		}
+		return out;
 	}
 
 	/** Called from {@link net.veloclient.velo.client.mixin.MouseScrollMixin} - positive amount is scroll-up (zoom in further). */
@@ -161,10 +205,10 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 		if (on) {
 			//? if <26.1 {
 			savedSmoothCamera = options.smoothCameraEnabled;
-			options.smoothCameraEnabled = smoothCameraWhileZoomed;
+			options.smoothCameraEnabled = false; // vanilla's cinematic glide would add momentum on top
 			//?} else {
 			/*savedSmoothCamera = options.smoothCamera;
-			options.smoothCamera = smoothCameraWhileZoomed;
+			options.smoothCamera = false;
 			*///?}
 			restoreSmoothCamera = true;
 		} else if (restoreSmoothCamera) {
@@ -191,7 +235,8 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 				new ConfigField.SliderField("Scroll Step", 0.03, 0.3, () -> scrollStep, v -> scrollStep = Math.round(v * 100) / 100.0,
 						v -> Math.round(v * 100) + "% per notch"),
 				new ConfigField.ToggleField("Lower Sensitivity While Zoomed", () -> scaleSensitivity, v -> scaleSensitivity = v),
-				new ConfigField.ToggleField("Cinematic Camera While Zoomed (keeps gliding)", () -> smoothCameraWhileZoomed, v -> smoothCameraWhileZoomed = v),
+				new ConfigField.SliderField("Mouse Smoothing While Zoomed", 0, 1, () -> mouseSmoothing, v -> mouseSmoothing = Math.round(v * 20) / 20.0,
+						v -> v < .01 ? "Off" : Math.round(v * 100) + "%"),
 				KeybindConfig.field("Zoom Key", ZOOM_KEY));
 	}
 }

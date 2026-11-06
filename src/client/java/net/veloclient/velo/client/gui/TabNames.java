@@ -81,6 +81,21 @@ public final class TabNames {
 	}
 
 	/** The score's x range moved left when the row is narrower than vanilla planned, so it stays clear of the ping. */
+	/** The shift {@link #scoreRight} chose for the score being drawn, used by {@link #scoreLeft} (called right after it). */
+	private static int scoreShift;
+
+	/** The score's right edge, kept clear of the ping (TabListLayoutMixin, before {@link #scoreLeft}). */
+	public static int scoreRight(int right) {
+		int limit = rowRight == Integer.MAX_VALUE ? right : rowRight - 12;
+		scoreShift = Math.max(0, right - limit);
+		return right - scoreShift;
+	}
+
+	/** The score's left edge, moved by the same shift as {@link #scoreRight}. */
+	public static int scoreLeft(int left) {
+		return scoreShift > 0 ? Math.max(rowLeft, left - scoreShift) : left;
+	}
+
 	public static int[] scoreRange(int left, int right) {
 		int limit = rowRight == Integer.MAX_VALUE ? right : rowRight - 12;
 		if (right > limit) {

@@ -111,7 +111,7 @@ public final class Doctor {
 		return !(id.startsWith("culprit") || id.startsWith("learned:") || id.startsWith("missing-") || id.equals("oom") || id.equals("vulkan-crash")
 				|| id.equals("opengl-driver") || id.equals("shader-crash") || id.equals("packs-crash") || id.equals("since-last-good")
 				|| id.equals("sudden-exit") || id.equals("gpu-driver-crash") || id.equals("native-oom") || id.equals("fabric-cache")
-				|| id.equals("mod-file-gone") || id.equals("particle-mod"));
+				|| id.equals("mod-file-gone") || id.equals("particle-mod") || id.equals("loose-libraries"));
 	}
 
 	private static Issue filterTried(Issue issue, Set<String> failed) {

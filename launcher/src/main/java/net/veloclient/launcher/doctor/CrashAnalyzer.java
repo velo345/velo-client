@@ -98,6 +98,7 @@ final class CrashAnalyzer {
 		fabricResolution(s, text, issues);
 		nativeCrash(s, text, issues);
 		gameFiles(s, text, issues);
+		looseLibraries(s, text, issues);
 
 		if (text.contains("java.lang.OutOfMemoryError")) {
 			int now = s.ramMaxMb() != null ? s.ramMaxMb() : net.veloclient.launcher.launch.MemoryPlanner.plan(s.instance()).maxMb();
@@ -204,6 +205,13 @@ final class CrashAnalyzer {
 			if (isVelo(culprit)) {
 				issues.add(new Issue("culprit-velo", Severity.CRASH, "Velo Client crashed",
 						"This one is on us. Send the report below so we can fix it - it includes everything we need.", List.of(), List.of()));
+			} else if (madeForObfuscatedMinecraft(s, trace)) {
+				// 26.x ships with Mojang's own names: a mod asking for net/minecraft/class_310 was built for 1.21 or older, and
+				// no update of that jar will run here (Combat Hitboxes on 26.3, 2026-11-06 - the Doctor kept updating it).
+				issues.add(new Issue("culprit-oldmc:" + culprit.id(), Severity.CRASH, culprit.displayName() + " is made for an older Minecraft",
+						culprit.displayName() + " was built for Minecraft 1.21 or older and can't run on " + s.instance().mcVersion()
+								+ ". Turn it off, or look for a version made for " + s.instance().mcVersion() + ".",
+						List.of(off(culprit)), List.of()));
 			} else {
 				issues.add(new Issue("culprit:" + culprit.id(), Severity.CRASH, culprit.displayName() + " crashed the game",
 						"The crash happened inside " + culprit.displayName() + ". A newer version usually fixes it; otherwise turn it off.",
@@ -226,6 +234,14 @@ final class CrashAnalyzer {
 			}
 		}
 		return new Result(signature, summary, issues);
+	}
+
+	private static final Pattern OBFUSCATED_MC = Pattern.compile("NoClassDefFoundError: net[/.]minecraft[/.]class_\\d+|NoSuchMethodError: .*net[/.]minecraft[/.]class_\\d+");
+
+	/** A 26.x game (Mojang names, no obfuscation) crashing on an intermediary class name - the mod is for an older version. */
+	private static boolean madeForObfuscatedMinecraft(Snapshot s, String trace) {
+		String mc = s.instance().mcVersion();
+		return mc != null && !mc.startsWith("1.") && OBFUSCATED_MC.matcher(trace).find();
 	}
 
 	/**
@@ -432,6 +448,40 @@ final class CrashAnalyzer {
 		}
 	}
 
+	/**
+	 * Libraries sitting loose in the mods folder - a standalone MixinExtras or single Fabric API modules, usually copied in
+	 * from another client's unpacked dependencies (a Lunar import put MixinExtras 0.2.2 next to Fabric API: its old
+	 * injector rejected Fabric API's own mixins and the game never started; the Doctor blamed Fabric API, 2026-11-05).
+	 * Fabric Loader and Fabric API bring their own copies, so these are turned off when a mixin crash happens.
+	 */
+	private static void looseLibraries(Snapshot s, String text, List<Issue> issues) {
+		if (!text.contains("Mixin") && !text.contains("mixin")) {
+			return;
+		}
+		boolean fabricApi = false;
+		List<ModScanner.ModInfo> loose = new ArrayList<>();
+		for (ModScanner.ModInfo mod : s.enabledMods()) {
+			String id = mod.id() == null ? "" : mod.id();
+			if (id.equals("fabric-api") || id.equals("fabric")) {
+				fabricApi = true;
+			} else if (id.equals("mixinextras") || id.matches("fabric-[a-z0-9-]+-(v\\d+|base)")) {
+				loose.add(mod);
+			}
+		}
+		if (loose.isEmpty() || !fabricApi && loose.stream().noneMatch(m -> "mixinextras".equals(m.id()))) {
+			return;
+		}
+		List<Action> off = new ArrayList<>();
+		for (ModScanner.ModInfo mod : loose) {
+			off.add(new Action.Disable(mod.file(), mod.displayName()));
+		}
+		issues.add(new Issue("loose-libraries", Severity.CRASH, "Old library files in your mods folder",
+				loose.size() + " file" + (loose.size() == 1 ? " is" : "s are") + " a library, not a mod (like "
+						+ loose.get(0).displayName() + ") - usually copied over from another client. Fabric already brings newer"
+						+ " copies, and these old ones break other mods.",
+				List.of(new Fix("Turn the old libraries off", "They stay in the folder, turned off", off)), List.of()));
+	}
+
 	private static final Pattern MOD_FILE_GONE = Pattern.compile("NoSuchFileException: (\\S*[\\\\/]mods[\\\\/]([^\\\\/\\r\\n]+\\.jar))");
 
 	/**
@@ -443,7 +493,9 @@ final class CrashAnalyzer {
 		String trace = errorsOnly(text);
 		boolean brokenRemap = text.contains("remappedJars") && (trace.contains("ZipException") || trace.contains("zip END header")
 				|| trace.contains("error remapping game jars") || trace.contains("NoSuchFileException") || trace.contains("AccessDeniedException"))
-				|| trace.contains("error remapping game jars");
+				|| trace.contains("error remapping game jars")
+				// printed by Knot without an ERROR level, so errorsOnly() can miss it (onlys, 2026-11-05)
+				|| text.contains("error remapping game jars") && text.contains("remappedJars");
 		if (brokenRemap) {
 			issues.add(new Issue("fabric-cache", Severity.CRASH, "Fabric's game files are broken",
 					"Fabric couldn't finish preparing Minecraft (low memory or disk space, or an antivirus took its temporary file)."

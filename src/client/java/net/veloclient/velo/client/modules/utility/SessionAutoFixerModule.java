@@ -325,11 +325,42 @@ public final class SessionAutoFixerModule extends AbstractModule {
 	 * connected" / "logged in from another location" (the old connection is still timing out), Mojang's session
 	 * servers being busy - just get retried with a growing pause, no token refresh needed.
 	 */
+	/**
+	 * "Connection timed out: getsockopt" on Windows, on every server: nothing answers at all, which is almost always Windows
+	 * Firewall (or an antivirus) blocking the game's Java - the firewall prompt was dismissed on the first start (bug report
+	 * 2026-11-05: Zunless couldn't join LuckySMP or any other server). A button opens the firewall's "Allow an app" page.
+	 */
+	private boolean firewallHint(Screen screen, String reason) {
+		boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+		if (!windows || !(reason.contains("getsockopt") || reason.contains("connection timed out"))) {
+			return false;
+		}
+		Text label = Text.literal("Can't reach any server? Allow Minecraft in the firewall");
+		Runnable open = () -> {
+			try {
+				new ProcessBuilder("control.exe", "/name", "Microsoft.WindowsFirewall", "/page", "pageConfigureApps").start();
+			} catch (java.io.IOException e) {
+				net.veloclient.velo.VeloClient.LOGGER.warn("Couldn't open the firewall settings", e);
+			}
+		};
+		//? if <26.1 {
+		Screens.getButtons(screen).add(ButtonWidget.builder(label, b -> open.run())
+				.dimensions(screen.width / 2 - 150, screen.height - 48, 300, 20).build());
+		//?} else {
+		/*Screens.getWidgets(screen).add(Button.builder(label, b -> open.run())
+				.bounds(screen.width / 2 - 150, screen.height - 48, 300, 20).build());
+		*///?}
+		return true;
+	}
+
 	private void retryIfTemporary(MinecraftClient client, Screen screen) {
 		if (!(screen instanceof DisconnectedScreen disconnected)) {
 			return;
 		}
 		String reason = reasonText(disconnected).toLowerCase(Locale.ROOT);
+		if (firewallHint(screen, reason)) {
+			return;
+		}
 		boolean temporary = reason.contains("too fast") || reason.contains("already connected") || reason.contains("logged in from another")
 				|| reason.contains("throttl") || reason.contains("try again later") || reason.contains("serversunavailable")
 				|| reason.contains("servers are unavailable") || reason.contains("authentication servers");

@@ -15,12 +15,12 @@ public abstract class ZoomSensitivityMixin {
 
 	@ModifyVariable(method = "changeLookDirection", at = @At("HEAD"), ordinal = 0, argsOnly = true, require = 0)
 	private double velo$zoomX(double dx) {
-		return (Object) this == net.minecraft.client.MinecraftClient.getInstance().player ? dx * ZoomModule.sensitivityFactor() : dx;
+		return (Object) this == net.minecraft.client.MinecraftClient.getInstance().player ? ZoomModule.look(0, dx) : dx;
 	}
 
 	@ModifyVariable(method = "changeLookDirection", at = @At("HEAD"), ordinal = 1, argsOnly = true, require = 0)
 	private double velo$zoomY(double dy) {
-		return (Object) this == net.minecraft.client.MinecraftClient.getInstance().player ? dy * ZoomModule.sensitivityFactor() : dy;
+		return (Object) this == net.minecraft.client.MinecraftClient.getInstance().player ? ZoomModule.look(1, dy) : dy;
 	}
 }
 //?} else {
@@ -29,12 +29,12 @@ public abstract class ZoomSensitivityMixin {
 
 	@ModifyVariable(method = "turn", at = @At("HEAD"), ordinal = 0, argsOnly = true, require = 0)
 	private double velo$zoomX(double dx) {
-		return (Object) this == net.minecraft.client.Minecraft.getInstance().player ? dx * ZoomModule.sensitivityFactor() : dx;
+		return (Object) this == net.minecraft.client.Minecraft.getInstance().player ? ZoomModule.look(0, dx) : dx;
 	}
 
 	@ModifyVariable(method = "turn", at = @At("HEAD"), ordinal = 1, argsOnly = true, require = 0)
 	private double velo$zoomY(double dy) {
-		return (Object) this == net.minecraft.client.Minecraft.getInstance().player ? dy * ZoomModule.sensitivityFactor() : dy;
+		return (Object) this == net.minecraft.client.Minecraft.getInstance().player ? ZoomModule.look(1, dy) : dy;
 	}
 }
 *///?}

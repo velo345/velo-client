@@ -580,6 +580,26 @@ public final class ClientImport {
 		return null;
 	}
 
+	/**
+	 * A library another client unpacked from its mods, not a mod of its own: Lunar's dependencies/ holds the jars nested
+	 * in mods, named with a hash ({@code fabric-entity-events-v1-3.0.5+4ebb5c083e-c57b74e2adb457ee.jar}). Fabric Loader
+	 * unpacks those from the mods itself; copied in as loose jars they win over newer ones - MixinExtras 0.2.2 from a Lunar
+	 * import broke Fabric API's injections and the game never started (6 crash reports, 2026-11-05). Fabric API modules and
+	 * MixinExtras are never imported either: Fabric API and the loader bring their own.
+	 */
+	static boolean bundledLibrary(Path jar, String modId) {
+		String name = jar.getFileName().toString().toLowerCase(Locale.ROOT);
+		Path parent = jar.getParent();
+		boolean inDependencies = parent != null && parent.getFileName() != null && parent.getFileName().toString().equals("dependencies");
+		if (inDependencies && name.matches(".*-[0-9a-f]{15,16}\\.jar")) {
+			return true;
+		}
+		if (modId == null) {
+			return false;
+		}
+		return modId.equals("mixinextras") || modId.matches("fabric-[a-z0-9-]+-(v\\d+|base)") || modId.equals("fabric-api-lookup-api-v1");
+	}
+
 	/** The mod jars of a folder: its own *.jar plus a "dependencies" subfolder (Lunar puts libraries there). */
 	static List<Path> modJars(Path dir) {
 		if (dir != null && dir.getFileName() != null && dir.getFileName().toString().startsWith(NoRiskMods.MARKER)) {
@@ -731,6 +751,10 @@ public final class ClientImport {
 			}
 			String modId = fabricModId(jar);
 			if (modId != null && present.contains(modId)) {
+				continue;
+			}
+			if (bundledLibrary(jar, modId)) {
+				skipped++;
 				continue;
 			}
 			// Already built for this Minecraft version: take exactly this jar. Swapping it for Modrinth's newest broke
