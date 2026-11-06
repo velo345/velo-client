@@ -186,6 +186,9 @@ public abstract class VulkanDrawStateMixin {
 		if (!PerformanceBoostModule.fastDrawPath || velo$needsFullPush || pipeline != velo$pushedPipeline
 				|| velo$changedCount == 0 || VulkanRenderPass.VALIDATION || !velo$pushPartial()) {
 			// Vanilla's full push runs next; it re-establishes every binding for this pipeline.
+			if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+				net.veloclient.velo.client.devtools.RenderProfiler.fullPushes++;
+			}
 			velo$pushedPipeline = pipeline;
 			velo$needsFullPush = !PerformanceBoostModule.fastDrawPath;
 			velo$changedCount = 0;
@@ -193,6 +196,9 @@ public abstract class VulkanDrawStateMixin {
 		}
 		anyDescriptorDirty = false;
 		velo$changedCount = 0;
+		if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+			net.veloclient.velo.client.devtools.RenderProfiler.partialPushes++;
+		}
 		ci.cancel();
 	}
 
@@ -250,8 +256,14 @@ public abstract class VulkanDrawStateMixin {
 		long handle = vertexBuffer != null ? ((VulkanGpuBuffer) vertexBuffer.buffer()).vkBuffer() : 0L;
 		long offset = vertexBuffer != null ? vertexBuffer.offset() : 0L;
 		if (PerformanceBoostModule.fastDrawPath && velo$vertexHandle[slot] == handle && velo$vertexOffset[slot] == offset) {
+			if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+				net.veloclient.velo.client.devtools.RenderProfiler.skippedBinds++;
+			}
 			ci.cancel();
 			return;
+		}
+		if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+			net.veloclient.velo.client.devtools.RenderProfiler.binds++;
 		}
 		velo$vertexHandle[slot] = handle;
 		velo$vertexOffset[slot] = offset;
@@ -261,8 +273,14 @@ public abstract class VulkanDrawStateMixin {
 	private void velo$skipSameIndexBuffer(GpuBuffer indexBuffer, IndexType indexType, CallbackInfo ci) {
 		long handle = ((VulkanGpuBuffer) indexBuffer).vkBuffer();
 		if (PerformanceBoostModule.fastDrawPath && velo$indexHandle == handle && velo$indexType == indexType) {
+			if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+				net.veloclient.velo.client.devtools.RenderProfiler.skippedBinds++;
+			}
 			ci.cancel();
 			return;
+		}
+		if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+			net.veloclient.velo.client.devtools.RenderProfiler.binds++;
 		}
 		velo$indexHandle = handle;
 		velo$indexType = indexType;
@@ -363,6 +381,9 @@ public abstract class VulkanDrawStateMixin {
 		if (!PerformanceBoostModule.fastDrawPath || velo$needsFullPush || pipeline != velo$pushedPipeline
 				|| velo$changedCount == 0 || !velo$pushPartial()) {
 			// Vanilla's full push runs next; it re-establishes every binding for this pipeline.
+			if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+				net.veloclient.velo.client.devtools.RenderProfiler.fullPushes++;
+			}
 			velo$pushedPipeline = pipeline;
 			velo$needsFullPush = !PerformanceBoostModule.fastDrawPath;
 			velo$changedCount = 0;
@@ -370,6 +391,9 @@ public abstract class VulkanDrawStateMixin {
 		}
 		anyDescriptorDirty = false;
 		velo$changedCount = 0;
+		if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+			net.veloclient.velo.client.devtools.RenderProfiler.partialPushes++;
+		}
 		ci.cancel();
 	}
 
@@ -425,8 +449,14 @@ public abstract class VulkanDrawStateMixin {
 		long handle = vertexBuffer != null ? ((com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer) vertexBuffer.buffer()).vkBuffer() : 0L;
 		long offset = vertexBuffer != null ? vertexBuffer.offset() : 0L;
 		if (PerformanceBoostModule.fastDrawPath && velo$vertexHandle[slot] == handle && velo$vertexOffset[slot] == offset) {
+			if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+				net.veloclient.velo.client.devtools.RenderProfiler.skippedBinds++;
+			}
 			ci.cancel();
 			return;
+		}
+		if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+			net.veloclient.velo.client.devtools.RenderProfiler.binds++;
 		}
 		velo$vertexHandle[slot] = handle;
 		velo$vertexOffset[slot] = offset;
@@ -437,8 +467,14 @@ public abstract class VulkanDrawStateMixin {
 			com.mojang.renderpearl.api.pipeline.IndexType indexType, CallbackInfo ci) {
 		long handle = ((com.mojang.renderpearl.backend.vulkan.VulkanGpuBuffer) indexBuffer).vkBuffer();
 		if (PerformanceBoostModule.fastDrawPath && velo$indexHandle == handle && velo$indexType == indexType) {
+			if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+				net.veloclient.velo.client.devtools.RenderProfiler.skippedBinds++;
+			}
 			ci.cancel();
 			return;
+		}
+		if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+			net.veloclient.velo.client.devtools.RenderProfiler.binds++;
 		}
 		velo$indexHandle = handle;
 		velo$indexType = indexType;

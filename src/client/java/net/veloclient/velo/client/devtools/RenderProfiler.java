@@ -12,6 +12,16 @@ public final class RenderProfiler {
 	public static final boolean ENABLED = Boolean.getBoolean("velo.renderProfile");
 	/** Draw calls seen since {@link #begin()} - counted at the Vulkan draw calls on 26.3, where the old per-layer draw lists are gone. */
 	public static int drawCalls;
+	/**
+	 * Descriptor work per draw (VulkanDrawStateMixin, Vulkan): full = vanilla re-pushed the whole set, partial = only the
+	 * changed uniform buffers went out. Together with the skipped vertex/index binds this says how much per-draw CPU work
+	 * is left besides the draw call itself - if nearly every push is already partial and terrain still costs a lot, only
+	 * fewer draws (merging sections) can make it cheaper.
+	 */
+	public static long fullPushes;
+	public static long partialPushes;
+	public static long skippedBinds;
+	public static long binds;
 	/** Vanilla full memory barriers recorded (VulkanBarrierProbeMixin), reset with each log line. */
 	public static long barriers;
 	private static final java.util.Map<String, Integer> BARRIER_FROM = new java.util.TreeMap<>();
@@ -110,6 +120,13 @@ public final class RenderProfiler {
 					net.veloclient.velo.client.modules.performance.PerformanceBoostModule.fastDrawPath ? "on" : "off",
 					frameNanos / 600e6, extractNanos / 600e6, terrainNanos / 600e6, terrainDraws / 600, acquireNanos / 600e6, presentNanos / 600e6, barriers / 600));
 			barriers = 0;
+			long pushes = fullPushes + partialPushes;
+			if (pushes + binds + skippedBinds > 0) {
+				VeloClient.LOGGER.info(String.format(java.util.Locale.ROOT,
+						"Velo render profile descriptors/frame: %.0f full pushes, %.0f partial (%.0f%% partial) | buffer binds %.0f done, %.0f skipped",
+						fullPushes / 600.0, partialPushes / 600.0, pushes == 0 ? 0.0 : 100.0 * partialPushes / pushes, binds / 600.0, skippedBinds / 600.0));
+			}
+			fullPushes = partialPushes = skippedBinds = binds = 0;
 			if (!BARRIER_FROM.isEmpty()) {
 				StringBuilder sb = new StringBuilder("Velo render profile barriers/frame by caller:");
 				BARRIER_FROM.forEach((k, v) -> sb.append(' ').append(k).append('=').append(String.format(java.util.Locale.ROOT, "%.1f", v / 600.0)));
