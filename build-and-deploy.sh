@@ -71,15 +71,18 @@ fi
 # Every other launcher profile and Minecraft version too (owner, 2026-11-06: "really in my launcher, not just one dev
 # profile"): each version's jar into the launcher's cache, and into every profile's mods folder for its version.
 if [[ -d "$GAMEJARS" ]]; then
+	VERSION=${VERSION:-$(basename "$JAR" | sed -E 's/^velo-client-([^+]+)\+.*/\1/')}
 	for VDIR in versions/*/; do
 		V=$(basename "$VDIR")
-		VJAR=$(ls "$VDIR"build/libs/velo-client-*+"$V".jar 2>/dev/null | grep -v -- '-sources' | head -1)
-		[[ -n "$VJAR" ]] && cp "$VJAR" "$GAMEJARS/$V.jar"
+		# exactly this build's jar - build/libs keeps every old version too (0.8.2 ...), never pick by pattern alone
+		VJAR="${VDIR}build/libs/velo-client-${VERSION}+${V}.jar"
+		[[ -f "$VJAR" ]] && cp "$VJAR" "$GAMEJARS/$V.jar"
 	done
 	for INST in "$HOME"/.velo-client/instances/*/; do
 		[[ -f "$INST/instance.json" && -d "$INST/mods" ]] || continue
 		V=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('mcVersion',''))" "$INST/instance.json" 2>/dev/null)
-		VJAR=$(ls versions/"$V"/build/libs/velo-client-*+"$V".jar 2>/dev/null | grep -v -- '-sources' | head -1)
+		VJAR="versions/$V/build/libs/velo-client-${VERSION}+${V}.jar"
+		[[ -f "$VJAR" ]] || VJAR=""
 		OLD=$(ls "$INST/mods" | grep -E '^velo-client.*\.jar$' | head -1)
 		[[ -n "$VJAR" && -n "$OLD" ]] && cp "$VJAR" "$INST/mods/$OLD"
 	done
