@@ -25,6 +25,7 @@ public final class GpuCosmetics {
 	/*private static final int STRIDE = 36; // DefaultVertexFormat.ENTITY
 	private static volatile boolean failed = Boolean.getBoolean("velo.cpuCosmetics");
 	private static com.mojang.blaze3d.pipeline.RenderPipeline pipeline;
+	private static com.mojang.blaze3d.pipeline.RenderPipeline glowPipeline;
 
 	private record GpuMesh(com.mojang.blaze3d.buffers.GpuBuffer vertices, int quadCount) {
 	}
@@ -85,8 +86,8 @@ public final class GpuCosmetics {
 	// A changing mesh (wings): {@code version} is the shape object - a new one means new vertices. Positions/normals come
 	// from {@code data} (stride, offsets), uv from {@code uv}; {@code argb} tints the whole mesh (recoloured pairs).
 	public static boolean recordDynamic(Object key, Object version, int[] quads, int vertexCount, float[] data, int stride, int posOff, int nrmOff,
-			float[] uv, int uvStride, int uvOff, int argb, net.minecraft.client.renderer.rendertype.RenderType type, org.joml.Matrix4f pose,
-			int light, int overlay) {
+			float[] uv, int uvStride, int uvOff, int[] colors, int argb, net.minecraft.client.renderer.rendertype.RenderType type,
+			org.joml.Matrix4f pose, int light, int overlay) {
 		if (failed || quads.length == 0 || quads.length % 4 != 0 || offscreen()) {
 			return false;
 		}
@@ -109,7 +110,7 @@ public final class GpuCosmetics {
 				upload = () -> {
 					java.nio.ByteBuffer bytes = org.lwjgl.system.MemoryUtil.memAlloc(count * STRIDE);
 					try {
-						fill(bytes, quads, data, stride, posOff, nrmOff, uv, uvStride, uvOff, 1f, 0f);
+						fill(bytes, quads, data, stride, posOff, nrmOff, uv, uvStride, uvOff, colors, 1f, 0f);
 						bytes.flip();
 						com.mojang.blaze3d.systems.RenderSystem.getDevice().createCommandEncoder().writeToBuffer(target.slice(), bytes);
 					} finally {
@@ -125,8 +126,9 @@ public final class GpuCosmetics {
 		}
 	}
 
-	// Draws what this frame recorded (render thread, during the feature pass).
-	public static void flush() {
+	// Draws what this frame recorded for one phase (render thread, right after vanilla's custom geometry group of that phase):
+	// opaque cosmetics with the opaque group, glow (blended) with the translucent one - same order as the CPU path.
+	public static void flush(boolean translucentPhase) {
 		if (PENDING.isEmpty()) {
 			return;
 		}
@@ -134,16 +136,44 @@ public final class GpuCosmetics {
 			PENDING.clear();
 			return;
 		}
+		java.util.List<Draw> now = new java.util.ArrayList<>();
+		java.util.Iterator<Draw> it = PENDING.iterator();
+		while (it.hasNext()) {
+			Draw d = it.next();
+			if (d.type().hasBlending() == translucentPhase) {
+				now.add(d);
+				it.remove();
+			}
+		}
+		draw(now);
+	}
+
+	// Whatever is left at the end of the feature pass (a phase without vanilla geometry of its own).
+	public static void flushAll() {
+		if (PENDING.isEmpty()) {
+			return;
+		}
+		java.util.List<Draw> now = new java.util.ArrayList<>(PENDING);
+		PENDING.clear();
+		if (!failed && !offscreen()) {
+			draw(now);
+		}
+	}
+
+	private static void draw(java.util.List<Draw> drawsNow) {
+		if (drawsNow.isEmpty()) {
+			return;
+		}
 		try {
 			var indices = com.mojang.blaze3d.systems.RenderSystem.getSequentialBuffer(com.mojang.blaze3d.PrimitiveTopology.QUADS);
 			org.joml.Matrix4f view = com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrixCopy();
 			var uniforms = com.mojang.blaze3d.systems.RenderSystem.getDynamicUniforms();
-			for (Draw draw : PENDING) {
+			for (Draw draw : drawsNow) {
 				if (draw.upload() != null) {
 					draw.upload().run();
 				}
 			}
-			for (Draw draw : PENDING) {
+			for (Draw draw : drawsNow) {
 				int c = draw.argb();
 				org.joml.Vector4f tint = new org.joml.Vector4f((c >> 16 & 0xFF) / 255f, (c >> 8 & 0xFF) / 255f, (c & 0xFF) / 255f, (c >>> 24) / 255f);
 				int indexCount = draw.mesh().quadCount() * 6;
@@ -153,13 +183,13 @@ public final class GpuCosmetics {
 				int overlayV = draw.overlay() >>> 16;
 				var transforms = uniforms.writeTransform(new org.joml.Matrix4f(view).mul(draw.pose()), tint,
 						new org.joml.Vector3f(draw.light() & 0xFFFF, draw.light() >>> 16, overlayU + overlayV * 16), draw.pose());
-				new net.minecraft.client.renderer.rendertype.PreparedRenderType(pipeline(), prepared.outputTarget(), transforms,
+				new net.minecraft.client.renderer.rendertype.PreparedRenderType(draw.type().hasBlending() ? glowPipeline() : pipeline(),
+						prepared.outputTarget(), transforms,
 						prepared.scissorState(), prepared.textures())
 						.drawFromBuffer(draw.mesh().vertices(), indexBuffer, indices.type(), 0, 0, indexCount);
 			}
 		} catch (Throwable t) {
 			fail(t);
-		} finally {
 			PENDING.clear();
 		}
 	}
@@ -191,12 +221,34 @@ public final class GpuCosmetics {
 		return pipeline;
 	}
 
+	// vanilla's eyes pipeline (emissive, alpha-blended, no depth write) with the cosmetic vertex shader - wing glow
+	private static com.mojang.blaze3d.pipeline.RenderPipeline glowPipeline() {
+		if (glowPipeline == null) {
+			glowPipeline = com.mojang.blaze3d.pipeline.RenderPipeline.builder(net.veloclient.velo.client.mixin.GpuCosmeticsPipelinesAccessor.velo$globals())
+					.withBindGroupLayout(net.minecraft.client.renderer.BindGroupLayouts.MATRICES_PROJECTION)
+					.withBindGroupLayout(net.minecraft.client.renderer.BindGroupLayouts.FOG)
+					.withLocation(net.minecraft.resources.Identifier.fromNamespaceAndPath("velo-client", "pipeline/cosmetic_glow"))
+					.withVertexShader(net.minecraft.resources.Identifier.fromNamespaceAndPath("velo-client", "core/cosmetic"))
+					.withFragmentShader("core/entity")
+					.withShaderDefine("EMISSIVE")
+					.withShaderDefine("NO_OVERLAY")
+					.withShaderDefine("NO_CARDINAL_LIGHTING")
+					.withBindGroupLayout(net.minecraft.client.renderer.BindGroupLayouts.SAMPLER0)
+					.withColorTargetState(new com.mojang.blaze3d.pipeline.ColorTargetState(com.mojang.blaze3d.pipeline.BlendFunction.TRANSLUCENT))
+					.withVertexBinding(0, com.mojang.blaze3d.vertex.DefaultVertexFormat.ENTITY)
+					.withPrimitiveTopology(com.mojang.blaze3d.PrimitiveTopology.QUADS)
+					.withDepthStencilState(new com.mojang.blaze3d.pipeline.DepthStencilState(com.mojang.blaze3d.platform.CompareOp.GREATER_THAN_OR_EQUAL, false))
+					.build();
+		}
+		return glowPipeline;
+	}
+
 	// The mesh in its own space, scaled (and slim-arm squeezed) like CosmeticVertexWriter does it, one quad per 4 corners.
 	private static GpuMesh upload(int[] quads, float[] data, float scale, float squeeze) {
 		int count = quads.length;
 		java.nio.ByteBuffer bytes = org.lwjgl.system.MemoryUtil.memAlloc(count * STRIDE);
 		try {
-			fill(bytes, quads, data, 8, 0, 5, data, 8, 3, scale, squeeze);
+			fill(bytes, quads, data, 8, 0, 5, data, 8, 3, null, scale, squeeze);
 			bytes.flip();
 			var buffer = com.mojang.blaze3d.systems.RenderSystem.getDevice().createBuffer(() -> "Velo cosmetic mesh",
 					com.mojang.blaze3d.buffers.GpuBuffer.USAGE_VERTEX, bytes);
@@ -208,7 +260,7 @@ public final class GpuCosmetics {
 
 	// ENTITY-format vertices (36 bytes) for the corners in {@code quads}; light and overlay come from the draw's uniform.
 	private static void fill(java.nio.ByteBuffer bytes, int[] quads, float[] data, int stride, int posOff, int nrmOff, float[] uv, int uvStride,
-			int uvOff, float scale, float squeeze) {
+			int uvOff, int[] colors, float scale, float squeeze) {
 		int noOverlay = net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY;
 		for (int v : quads) {
 			int i = v * stride;
@@ -217,7 +269,8 @@ public final class GpuCosmetics {
 				x = squeeze + (x - squeeze) * 0.75f;
 			}
 			bytes.putFloat(x * scale).putFloat(data[i + posOff + 1] * scale).putFloat(data[i + posOff + 2] * scale);
-			bytes.putInt(0xFFFFFFFF);                         // colour: the draw's tint (ColorModulator)
+			int c = colors == null ? 0xFFFFFFFF : colors[v];      // per-vertex colour (glow), else white; the draw's tint on top
+			bytes.putInt(c & 0xFF00FF00 | (c >> 16) & 0xFF | (c & 0xFF) << 16);
 			int iu = v * uvStride + uvOff;
 			bytes.putFloat(uv[iu]).putFloat(uv[iu + 1]);
 			bytes.putInt(noOverlay);
@@ -242,11 +295,14 @@ public final class GpuCosmetics {
 	}
 
 	public static boolean recordDynamic(Object key, Object version, int[] quads, int vertexCount, float[] data, int stride, int posOff, int nrmOff,
-			float[] uv, int uvStride, int uvOff, int argb, Object type, Object pose, int light, int overlay) {
+			float[] uv, int uvStride, int uvOff, int[] colors, int argb, Object type, Object pose, int light, int overlay) {
 		return false;
 	}
 
-	public static void flush() {
+	public static void flush(boolean translucentPhase) {
+	}
+
+	public static void flushAll() {
 	}
 	//?}
 }

@@ -249,7 +249,7 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 			for (int h = 0; h < model.halves.length && gpu; h++) {
 				WingModel.Half half = model.halves[h];
 				gpu = GpuCosmetics.recordDynamic(java.util.List.of(wearer, h, model), geometry[h], MeshLod.quadIndices(half.triangles),
-						half.vertexCount(), geometry[h], 6, 0, 3, half.uv, 2, 0, wingColor, cutout, pose2.pose(), drawLight,
+						half.vertexCount(), geometry[h], 6, 0, 3, half.uv, 2, 0, null, wingColor, cutout, pose2.pose(), drawLight,
 						net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY);
 			}
 			if (gpu) {
@@ -278,9 +278,13 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		if (model.effect != null && !plainWings) {
 			float seconds = pose.seconds();
 			float size = worn.settings().scale();
-			queue.submitCustomGeometry(matrices, net.minecraft.client.renderer.rendertype.RenderTypes.eyes(
-					net.minecraft.resources.Identifier.fromNamespaceAndPath("velo-client", SHINE_TEXTURE)),
+			var glowType = net.minecraft.client.renderer.rendertype.RenderTypes.eyes(
+					net.minecraft.resources.Identifier.fromNamespaceAndPath("velo-client", SHINE_TEXTURE));
+			queue.submitCustomGeometry(matrices, glowType,
 					(pose2, consumer) -> {
+						if (gpuGlow(model, geometry, seconds, tint, glowType, pose2.pose(), wearer)) {
+							return; // GPU path (26.2)
+						}
 						if (!glowBulk(model, geometry, seconds, tint, new Matrix4f(pose2.pose()), new Matrix3f(pose2.normal()), consumer)) {
 							emitGlow(model, geometry, seconds, tint, new Matrix4f(pose2.pose()), (x, y, z, color, u, v) ->
 									consumer.addVertex(x, y, z, color, u, v, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, 0xF000F0, 0, 1, 0));
@@ -369,6 +373,53 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 					GLOW_UV, 0, 0, 1f, 0f, position, normal, 0, color, 0xA0000 /* no overlay */, 0xF000F0)) {
 				return h == 0 ? false : true;
 			}
+		}
+		return true;
+	}
+
+	/** Lit quads per glow colour array - the same until the pair is re-posed (75 times a second), not every frame. */
+	private static final java.util.Map<int[], int[]> LIT = new java.util.WeakHashMap<>();
+
+	/**
+	 * The glow pass through {@link GpuCosmetics} (26.2): each half's lit quads with their glow colours, rewritten when the
+	 * pose changes; false when it can't (the caller writes vertices as before).
+	 */
+	private static boolean gpuGlow(WingModel model, float[][] geometry, float seconds, int tint, Object type, Object pose, int wearer) {
+		WingRigs.Glow glow = model.effect.glow();
+		if (glow == null) {
+			return true;
+		}
+		if (tint >= 0) {
+			glow = WingRigs.tinted(glow, tint);
+		}
+		int[][] cachedColors = GLOW_COLORS.computeIfAbsent(geometry, k -> new int[model.halves.length][]);
+		for (int h = 0; h < model.halves.length; h++) {
+			WingModel.Half half = model.halves[h];
+			if (half.glowMask == null) {
+				continue;
+			}
+			int[] color = cachedColors[h];
+			if (color == null) {
+				color = new int[half.vertexCount()];
+				for (int v = 0; v < color.length; v++) {
+					color[v] = WingRigs.glowColor(glow, half.glowKey[v], half.glowMask[v], seconds);
+				}
+				cachedColors[h] = color;
+			}
+			int[] colors = color;
+			int[] lit = LIT.computeIfAbsent(colors, c -> litQuads(MeshLod.quadIndices(half.triangles), c));
+			if (lit.length == 0) {
+				continue;
+			}
+			//? if >=26.2 && <26.3 {
+			/*if (!GpuCosmetics.recordDynamic(java.util.List.of(wearer, "glow", h, model), colors, lit, half.vertexCount(), geometry[h], 6, 0, 3,
+					GLOW_UV, 0, 0, colors, 0xFFFFFFFF, (net.minecraft.client.renderer.rendertype.RenderType) type, (Matrix4f) pose, 0xF000F0,
+					net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)) {
+				return false;
+			}
+			*///?} else {
+			return false;
+			//?}
 		}
 		return true;
 	}

@@ -20,8 +20,20 @@ public abstract class GpuCosmeticsMixin {
 	private void velo$drawGpuCosmetics(net.minecraft.client.renderer.feature.FeatureFrameContext context, int index, java.util.List<?> submits,
 			boolean translucent, CallbackInfo ci) {
 		if ((Object) this instanceof net.minecraft.client.renderer.feature.CustomFeatureRenderer) {
-			GpuCosmetics.flush();
+			boolean blended = false;
+			for (Object submit : submits) {
+				if (submit instanceof net.minecraft.client.renderer.feature.CustomFeatureRenderer.Submit s && s.renderType().hasBlending()) {
+					blended = true;
+					break;
+				}
+			}
+			GpuCosmetics.flush(blended);
 		}
+	}
+
+	@Inject(method = "finishExecute", at = @At("TAIL"), require = 0)
+	private void velo$drawLeftoverGpuCosmetics(net.minecraft.client.renderer.feature.FeatureFrameContext context, CallbackInfo ci) {
+		GpuCosmetics.flushAll();
 	}
 }
 *///?} else {
