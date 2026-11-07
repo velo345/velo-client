@@ -156,14 +156,19 @@ public final class HudManager {
 		}
 		HudAutoLayout.updateThrottled(screenWidth, screenHeight);
 		net.veloclient.velo.client.waypoints.WaypointRenderer.renderHud(context, screenWidth, screenHeight);
+		net.veloclient.velo.client.modules.performance.AntiFarmLagModule.renderItemLabels(context, screenWidth, screenHeight);
 		net.veloclient.velo.client.modules.qol.PartyPingModule.renderHud(context, screenWidth, screenHeight);
 		net.veloclient.velo.client.redstone.RmAnalysis.renderOutside(context, screenWidth, screenHeight);
-		// Velo Turbo: the modules redraw at most 360 times a second; frames in between reuse what they drew.
-		if (HudFrameCache.replay(context, screenWidth, screenHeight)) {
+		// Velo Turbo: the modules redraw at most 360 times a second; frames in between reuse what they drew. In whole-HUD
+		// mode the recording already wraps the entire HUD (TurboHudWholeMixin) - the modules just draw into it.
+		boolean whole = HudFrameCache.wholeHud();
+		if (!whole && HudFrameCache.replay(context, screenWidth, screenHeight)) {
 			net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
 			return;
 		}
-		HudFrameCache.beginRecord(context, screenWidth, screenHeight);
+		if (!whole) {
+			HudFrameCache.beginRecord(context, screenWidth, screenHeight);
+		}
 		boolean completed = false;
 		try {
 			for (Module module : ModuleRegistry.all()) {
@@ -180,7 +185,9 @@ public final class HudManager {
 			}
 			completed = true;
 		} finally {
-			HudFrameCache.endRecord(context, completed);
+			if (!whole) {
+				HudFrameCache.endRecord(context, completed);
+			}
 		}
 		net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
 	}

@@ -287,6 +287,17 @@ public final class Doctor {
 			fixes.add(0, new Fix("Lower the render distance to " + safeDistance, "From " + renderDistance + " chunks - far less memory and work",
 					List.of(new Action.LowerRenderDistance(safeDistance))));
 		}
+		if (hung) {
+			// Ixeris polls window events on its own thread; when that thread stopped during startup the window froze white
+			// ("not responding") until Windows ended it - several reports on 1.21.11, 2026-11-06/07.
+			for (ModScanner.ModInfo mod : s.enabledMods()) {
+				if ("ixeris".equals(mod.id())) {
+					fixes.add(0, new Fix("Turn Ixeris off", "It can freeze the window while the game starts",
+							List.of(new Action.Disable(mod.file(), mod.displayName()))));
+					break;
+				}
+			}
+		}
 		if (s.ramMaxMb() != null && (hung || smallPc)) {
 			// only when the crash looks memory-related: offered for every crash, "Fix all" threw away the player's own RAM setting
 			fixes.add(new Fix("Use automatic memory", "A fixed amount can be too much or too little for your PC", List.of(new Action.SetMemory(0))));

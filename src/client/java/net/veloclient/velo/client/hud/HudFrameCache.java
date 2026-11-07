@@ -36,6 +36,15 @@ public final class HudFrameCache {
 	private HudFrameCache() {
 	}
 
+	/**
+	 * Whole-HUD mode (TurboHudWholeMixin): when Gnetum isn't caching (not installed, or the tuner found a light HUD), the
+	 * entire vanilla + Velo HUD - hotbar, chat, scoreboard, every module - is recorded and replayed like the modules are:
+	 * Gnetum's saving on the CPU without its full-screen blend on the GPU (the hotbar alone was 9% of a frame).
+	 */
+	public static boolean wholeHud() {
+		return allowed() && !net.veloclient.velo.client.modules.performance.HudCacheTuner.gnetumCaching();
+	}
+
 	public static void invalidate() {
 		valid = false;
 	}

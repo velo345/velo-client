@@ -254,6 +254,16 @@ public final class PerformanceModsInstaller {
 					LauncherLog.info("Removed " + fileName + " - it can't run next to " + clash.getValue());
 				}
 			}
+			if (!ixerisSafe(version)) {
+				String fileName = state.installed.get("ixeris");
+				if (fileName != null) {
+					// Installed by an earlier launcher: on 1.21.x under Windows its event thread stopped during startup and
+					// the game hung with a white "not responding" window (bug reports, 2026-11-06/07).
+					Files.deleteIfExists(modsDir.resolve(fileName));
+					state.installed.remove("ixeris");
+					LauncherLog.info("Removed " + fileName + " - it can hang the game on start on this version");
+				}
+			}
 			for (Map.Entry<String, String> need : NEEDS.entrySet()) {
 				String fileName = state.installed.get(need.getKey());
 				if (fileName != null && Files.exists(modsDir.resolve(fileName)) && !loading.contains(need.getValue())) {
@@ -272,6 +282,9 @@ public final class PerformanceModsInstaller {
 				}
 				String clash = CLASHES.get(slug);
 				if (clash != null && presentModIds.contains(clash)) {
+					continue;
+				}
+				if (slug.equals("ixeris") && !ixerisSafe(version)) {
 					continue;
 				}
 				String os = ONLY_ON.get(slug);
@@ -458,6 +471,17 @@ public final class PerformanceModsInstaller {
 		} catch (IOException e) {
 			LauncherLog.warn("Couldn't write the default config for " + slug, e);
 		}
+	}
+
+	/**
+	 * Ixeris moves window event polling off the render thread. On 1.21.x (OpenGL) under Windows its polling thread stopped
+	 * during startup in several reports and the game hung on a white "not responding" window until Windows killed it
+	 * (exit -805306369). It stays where it was measured to help and no hang was reported: the Vulkan versions (26.2+)
+	 * and other systems.
+	 */
+	static boolean ixerisSafe(GameVersion version) {
+		boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+		return !windows || !version.id().startsWith("1.");
 	}
 
 	/** Mod ids (plus "provides" aliases) of every jar in {@code modsDir}, enabled or disabled. */

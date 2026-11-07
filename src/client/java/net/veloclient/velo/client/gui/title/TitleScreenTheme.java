@@ -403,6 +403,26 @@ public final class TitleScreenTheme {
 	 * twice (at 0 and one width further) which covers every wrap position. Time is measured
 	 * with {@code nanoTime} deltas as doubles - a float of epoch millis loses all precision.
 	 */
+	private static boolean panoramaFailed;
+
+	/**
+	 * Draws Velo's background; false (and vanilla's panorama for the rest of the session) when that failed - a driver or
+	 * a mod breaking it must leave a working title screen, not a broken or black one.
+	 */
+	public static boolean tryDrawPanorama(DrawContext context, int screenWidth, int screenHeight) {
+		if (panoramaFailed) {
+			return false;
+		}
+		try {
+			drawPanorama(context, screenWidth, screenHeight);
+			return true;
+		} catch (RuntimeException | LinkageError e) {
+			panoramaFailed = true;
+			org.slf4j.LoggerFactory.getLogger("velo-client").error("Velo title background failed - using Minecraft's for this session", e);
+			return false;
+		}
+	}
+
 	public static void drawPanorama(DrawContext context, int screenWidth, int screenHeight) {
 		Theme theme = ThemeManager.active();
 		long now = System.nanoTime();

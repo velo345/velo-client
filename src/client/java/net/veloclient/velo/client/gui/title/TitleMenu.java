@@ -96,6 +96,16 @@ public final class TitleMenu {
 
 	/** Velo's own clickable entries, created with the screen (the mixin adds them as children). */
 	public static List<ClickableWidget> createHotspots(Screen screen) {
+		try {
+			return createHotspotsUnsafe(screen);
+		} catch (RuntimeException | LinkageError e) {
+			broken = true;
+			org.slf4j.LoggerFactory.getLogger("velo-client").error("Velo title menu couldn't be built - showing the plain menu for this session", e);
+			return new ArrayList<>();
+		}
+	}
+
+	private static List<ClickableWidget> createHotspotsUnsafe(Screen screen) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (animatedFor != screen) {
 			animatedFor = screen;
@@ -135,7 +145,9 @@ public final class TitleMenu {
 
 	/** Call at the start of the screen's render: vanilla mustn't paint what we paint. */
 	public static void beforeVanilla() {
-		if (broken) {
+		// Vanilla's buttons are only hidden when the Velo menu can really paint over them: before, a menu whose widgets
+		// never got created (another mod's init order, an error) left the title screen with no buttons at all.
+		if (broken || !ready()) {
 			return;
 		}
 		for (ClickableWidget widget : RESTYLED) {
@@ -149,6 +161,11 @@ public final class TitleMenu {
 
 	/** Set once the Velo menu threw: the rest of the session shows the plain menu (with every mod's buttons) instead of crashing. */
 	private static boolean broken;
+	private static int missingFrames;
+
+	private static boolean ready() {
+		return jumpCard != null && storeRow != null && storeCard != null && friends != null && discoverRow != null;
+	}
 
 	/**
 	 * Lays out and paints the whole menu; call after vanilla rendered. Never throws: the title screen also draws under
@@ -157,9 +174,18 @@ public final class TitleMenu {
 	public static void render(DrawContext context, int width, int height, int mouseX, int mouseY, Env env) {
 		// The loading screen can draw the title screen before its init() made our widgets (seen with Essential on
 		// 26.2): wait for them instead of marking the menu broken for the whole session.
-		if (broken || jumpCard == null || storeRow == null || storeCard == null || friends == null || discoverRow == null) {
+		if (broken || !ready()) {
+			if (!broken && animatedFor != null && System.nanoTime() - openedAt > 2_000_000_000L && ++missingFrames > 120) {
+				// still no widgets two seconds after the screen opened: the plain menu for this session
+				broken = true;
+				org.slf4j.LoggerFactory.getLogger("velo-client").warn("Velo title menu never got its widgets - showing the plain menu for this session");
+			}
+			for (ClickableWidget widget : RESTYLED) {
+				widget.visible = true;
+			}
 			return;
 		}
+		missingFrames = 0;
 		try {
 			renderMenu(context, width, height, mouseX, mouseY, env);
 		} catch (RuntimeException | LinkageError e) {

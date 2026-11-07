@@ -71,6 +71,9 @@ public final class VeloMixinPlugin implements IMixinConfigPlugin {
 		if (simpleName.startsWith("TurboPacket") && !hasVulkan) {
 			return false;
 		}
+		if (simpleName.startsWith("TurboEntity") && !hasVulkan) {
+			return false;
+		}
 		if (simpleName.startsWith("TurboSky") && !hasVulkan) {
 			return false;
 		}

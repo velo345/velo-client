@@ -100,6 +100,22 @@ final class CrashAnalyzer {
 		gameFiles(s, text, issues);
 		looseLibraries(s, text, issues);
 
+		if (text.contains("Could not reserve enough space for") || text.contains("Invalid maximum heap size")
+				|| text.contains("Invalid initial heap size") || text.contains("The specified size exceeds the maximum representable size")) {
+			// The JVM refused to start at all: more memory was set than this PC (or a 32-bit Java) can hand out right now.
+			long free = net.veloclient.launcher.launch.MemoryPlanner.availableSystemMb();
+			int fits = (int) Math.max(1024, Math.min(physicalMb() * 0.5, free > 0 ? free * 0.8 : physicalMb() * 0.5));
+			fits = fits / 256 * 256;
+			List<Fix> fixes = new ArrayList<>();
+			fixes.add(new Fix("Use automatic memory", "Velo picks an amount that fits your PC and learns what it needs", List.of(new Action.SetMemory(0))));
+			if (s.ramMaxMb() != null && fits < s.ramMaxMb()) {
+				fixes.add(new Fix("Use " + fits + " MB", "Down from " + s.ramMaxMb() + " MB", List.of(new Action.SetMemory(fits))));
+			}
+			issues.add(new Issue("heap-reserve", Severity.CRASH, "Too much memory set for this PC",
+					"Java couldn't reserve " + (s.ramMaxMb() != null ? s.ramMaxMb() + " MB" : "the memory") + " for Minecraft"
+							+ (free > 0 ? " - only about " + free + " MB are free right now" : "") + ", so the game couldn't start.",
+					fixes, List.of()));
+		}
 		if (text.contains("java.lang.OutOfMemoryError")) {
 			int now = s.ramMaxMb() != null ? s.ramMaxMb() : net.veloclient.launcher.launch.MemoryPlanner.plan(s.instance()).maxMb();
 			int more = Math.min(now + 2048, (int) (physicalMb() * 0.7));

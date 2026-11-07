@@ -46,8 +46,9 @@ public abstract class TitlePanoramaMixin {
 		if (!(((Object) this) instanceof TitleScreen self)) {
 			return;
 		}
-		TitleScreenTheme.drawPanorama(context, self.width, self.height);
-		ci.cancel();
+		if (TitleScreenTheme.tryDrawPanorama(context, self.width, self.height)) {
+			ci.cancel();
+		}
 	}
 }
 //?} else {
@@ -62,8 +63,9 @@ public abstract class TitlePanoramaMixin {
 		if (!(((Object) this) instanceof TitleScreen self)) {
 			return;
 		}
-		TitleScreenTheme.drawPanorama(context, self.width, self.height);
-		ci.cancel();
+		if (TitleScreenTheme.tryDrawPanorama(context, self.width, self.height)) {
+			ci.cancel();
+		}
 	}
 }
 *///?}

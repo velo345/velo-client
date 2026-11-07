@@ -174,7 +174,10 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.devtools.ScreenshotTour.initIfRequested();
 		net.veloclient.velo.client.devtools.CosmeticsBench.register();
 		net.veloclient.velo.client.devtools.MoveBench.register();
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
+				net.veloclient.velo.client.modules.performance.HudCacheTuner::tick);
 		net.veloclient.velo.client.devtools.FarmBench.register();
+		net.veloclient.velo.client.devtools.ItemBench.register();
 		VeloClient.LOGGER.info("Velo Client ready ({} modules registered)", ModuleRegistry.all().size());
 	}
 
