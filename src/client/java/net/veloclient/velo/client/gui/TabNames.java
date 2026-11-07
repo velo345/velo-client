@@ -58,7 +58,7 @@ public final class TabNames {
 			Object[] row = rowFor(text);
 			if (row != null) {
 				int width = textRenderer.getWidth((Text) row[0]);
-				return (Boolean) row[1] ? width + badgeShift((Boolean) row[2]) : width;
+				return (Boolean) row[1] ? width + badgeShift((Integer) row[2]) : width;
 			}
 		}
 		//? if <26.1 {
@@ -68,8 +68,8 @@ public final class TabNames {
 		*///?}
 	}
 
-	public static int badgeShift(boolean plus) {
-		return VeloBadge.width(plus) + 3;
+	public static int badgeShift(int kind) {
+		return VeloBadge.width(kind) + 3;
 	}
 
 	/** Room for the name drawn at {@code x}: up to where the score column (then the ping) begins. */
@@ -105,7 +105,7 @@ public final class TabNames {
 		return new int[] {left, right};
 	}
 
-	/** {styled name, Velo user?, Velo+?} for a tab row, cached per row text (null without a player). */
+	/** {styled name, Velo user?, badge kind (VeloBadge.NORMAL/PLUS/OG)} for a tab row, cached per row text (null without a player). */
 	public static Object[] rowFor(Text text) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client.player == null) {
@@ -118,7 +118,7 @@ public final class TabNames {
 			String plain = tagged.getString();
 			String own = client.player.getGameProfile().name();
 			boolean known = VeloBadge.isKnownVeloName(plain, own);
-			row = new Object[] {tagged, known, known && VeloBadge.isPlus(plain, own)};
+			row = new Object[] {tagged, known, known ? VeloBadge.kind(plain, own) : VeloBadge.NORMAL};
 			net.veloclient.velo.client.util.TabListCache.storeRow(text, row);
 		}
 		return row;

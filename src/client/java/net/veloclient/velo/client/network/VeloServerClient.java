@@ -382,6 +382,8 @@ public final class VeloServerClient {
 		}
 		// Whether to show the + of Velo+ on your badge to others (shared with the launcher's setting).
 		body.addProperty("hidePlus", !PlusBadgeSetting.show());
+		// The OG badge instead of the normal one (opt-in; the server only shows it for eligible accounts).
+		body.addProperty("og", OgBadgeSetting.use());
 		String auraId = net.veloclient.velo.client.cosmetics.aura.AuraManager.networkValue();
 		if (auraId != null) {
 			body.addProperty("auraId", auraId);
@@ -402,6 +404,9 @@ public final class VeloServerClient {
 			extra.accept(body);
 		}
 		JsonObject response = postJson(base + "/v1/heartbeat", body);
+		if (response.has("ogEligible")) {
+			OgBadgeSetting.setEligible(response.get("ogEligible").getAsBoolean());
+		}
 		// Older servers don't echo the cape back - treat that as "accepted as sent".
 		if (!response.has("capeId")) {
 			return capeId;
@@ -436,7 +441,8 @@ public final class VeloServerClient {
 				}
 				if (uuid != null && username != null) {
 					boolean plus = user.has("plus") && !user.get("plus").isJsonNull() && user.get("plus").getAsBoolean();
-					entries.put(uuid, new VeloUserRegistry.Entry(username, capeId, wingsId, auraId, plus, nameStyle, wear));
+					boolean og = user.has("og") && !user.get("og").isJsonNull() && user.get("og").getAsBoolean();
+					entries.put(uuid, new VeloUserRegistry.Entry(username, capeId, wingsId, auraId, plus, nameStyle, wear, og));
 				}
 			}
 			VeloUserRegistry.replaceAll(entries);

@@ -317,7 +317,15 @@ public final class LauncherSocial {
 					JsonObject body = new JsonObject();
 					body.addProperty("sessionToken", token);
 					body.addProperty("idle", idleNow);
-					postJson("/v1/heartbeat", body, null);
+					JsonObject beat = postJson("/v1/heartbeat", body, null);
+					// The OG badge (first two weeks): remembered for the game too; the first time, the launcher says thanks.
+					if (beat.has("ogEligible")) {
+						boolean og = beat.get("ogEligible").getAsBoolean();
+						net.veloclient.launcher.data.OgBadgeSetting.setEligible(og);
+						if (og && !net.veloclient.launcher.data.OgBadgeSetting.thanked()) {
+							publish(new Event("og_badge", null, null, null, null));
+						}
+					}
 					lastIdleSent = idleNow;
 					lastHeartbeat = System.currentTimeMillis();
 				}

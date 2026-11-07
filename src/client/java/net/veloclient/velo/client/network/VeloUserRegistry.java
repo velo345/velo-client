@@ -19,9 +19,9 @@ public final class VeloUserRegistry {
 	 * {@code nameStyle}: a Velo+ member's name style in its wire form (see {@code NameStyle}), or null; {@code wear}: their
 	 * bodywear, "id[:colour],..." (see {@code WearManager}), or null.
 	 */
-	public record Entry(String username, String capeId, String wingsId, String auraId, boolean plus, String nameStyle, String wear) {
+	public record Entry(String username, String capeId, String wingsId, String auraId, boolean plus, String nameStyle, String wear, boolean og) {
 		public Entry(String username, String capeId) {
-			this(username, capeId, null, null, false, null, null);
+			this(username, capeId, null, null, false, null, null, false);
 		}
 	}
 
@@ -129,6 +129,21 @@ public final class VeloUserRegistry {
 			entry = entryForName(username);
 		}
 		return entry != null && entry.plus();
+	}
+
+	/** Whether this player (UUID first, then name) shows the OG badge. */
+	public static boolean isOg(UUID uuid, String username) {
+		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
+		if (entry == null) {
+			entry = entryForName(username);
+		}
+		return entry != null && entry.og();
+	}
+
+	/** Whether the player called {@code name} shows the OG badge. */
+	public static boolean isOgName(String name) {
+		Entry entry = entryForName(name);
+		return entry != null && entry.og();
 	}
 
 	/** Whether the player called {@code name} is a Velo+ member. */

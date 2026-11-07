@@ -361,6 +361,11 @@ public final class LauncherApp extends Application {
 				Platform.runLater(() -> net.veloclient.launcher.ui.WebCodeDialog.showStaff(stage, event.fromName()));
 				return;
 			}
+			if ("og_badge".equals(event.type())) {
+				// One of the first players: a thank-you with the OG badge, once.
+				Platform.runLater(() -> net.veloclient.launcher.ui.OgBadgeDialog.show(stage));
+				return;
+			}
 			if ("connected".equals(event.type())) {
 				// Connected as this account (after start or a switch): its wallet decides what the Locker and Store unlock.
 				Platform.runLater(this::refreshOwned);

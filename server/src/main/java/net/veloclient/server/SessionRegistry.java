@@ -30,6 +30,8 @@ final class SessionRegistry {
 	private final Map<String, Session> sessionsByToken = new ConcurrentHashMap<>();
 	/** Members who chose not to show their Velo+ badge (the game says so with every heartbeat). */
 	private final java.util.Set<String> plusHidden = ConcurrentHashMap.newKeySet();
+	/** Players showing the OG badge (eligible, and switched on in the game - the heartbeat says so). */
+	private final java.util.Set<String> ogShown = ConcurrentHashMap.newKeySet();
 	/** Launcher sessions whose window has been in the background for a while: still connected, but not shown as online. */
 	private final java.util.Set<String> idleTokens = ConcurrentHashMap.newKeySet();
 
@@ -60,8 +62,9 @@ final class SessionRegistry {
 	/** {@code nameStyle}: a Velo+ member's animated name (see {@link #normalizeNameStyle}), null for none. */
 	/** {@code emote}: the emote being played ("id;seq", see {@link #setEmote}), or null. */
 	/** {@code wear}: the bodywear shown, "id[:colour],..." (item ids without "wear_", colour codes 1-360 hue), or null. */
+	/** {@code og}: shows the OG badge (eligible and switched on, see {@link OgBadge}). */
 	record OnlineUser(String uuid, String username, String capeId, String wingsId, String auraId, boolean plus, String nameStyle, String emote,
-			String wear, String pet) {
+			String wear, String pet, boolean og) {
 	}
 
 	/** An emote someone plays, until it expires (the client keeps sending it while it plays). */
@@ -268,6 +271,15 @@ final class SessionRegistry {
 		}
 	}
 
+	/** The game's heartbeat carries whether this (eligible) player shows the OG badge. */
+	void setOg(String uuid, boolean shown) {
+		if (shown) {
+			ogShown.add(uuid);
+		} else {
+			ogShown.remove(uuid);
+		}
+	}
+
 	/** The game's heartbeat carries whether this player wants their Velo+ badge shown. */
 	void setPlusHidden(String uuid, boolean hidden) {
 		if (hidden) {
@@ -332,7 +344,7 @@ final class SessionRegistry {
 		return sessionsByToken.values().stream()
 				.filter(s -> s.expiresAtMillis() >= now && s.kind().equals(KIND_GAME))
 				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId(), s.auraId(), plusLookup.test(s.uuid()) && !plusHidden.contains(s.uuid()),
-						plusLookup.test(s.uuid()) ? s.nameStyle() : null, emoteOf(s.uuid(), now), wear.get(s.uuid()), pets.get(s.uuid())))
+						plusLookup.test(s.uuid()) ? s.nameStyle() : null, emoteOf(s.uuid(), now), wear.get(s.uuid()), pets.get(s.uuid()), ogShown.contains(s.uuid())))
 				.toList();
 	}
 

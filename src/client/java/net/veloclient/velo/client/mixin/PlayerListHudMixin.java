@@ -55,10 +55,10 @@ public abstract class PlayerListHudMixin {
 		}
 		// Before the name (like Lunar/NoRisk), not after it - the name is shifted right by the badge's width plus a gap
 		// (TabNames measured the column with it), vertically centered against the font height.
-		boolean plus = (Boolean) row[2];
-		int shift = net.veloclient.velo.client.gui.TabNames.badgeShift(plus);
+		int kind = (Integer) row[2];
+		int shift = net.veloclient.velo.client.gui.TabNames.badgeShift(kind);
 		int badgeY = y + (textRenderer.fontHeight - VeloBadge.SIZE) / 2;
-		VeloBadge.draw(context, x, badgeY, plus);
+		VeloBadge.draw(context, x, badgeY, kind);
 		net.veloclient.velo.client.gui.TabNames.draw(context, textRenderer, text, x + shift, y, color, room - shift);
 	}
 }

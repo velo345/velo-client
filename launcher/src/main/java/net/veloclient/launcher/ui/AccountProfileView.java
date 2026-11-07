@@ -127,6 +127,22 @@ public final class AccountProfileView {
 					AccountProfileView.class.getResourceAsStream("/net/veloclient/launcher/images/velo-plus-badge.png"), 54, 26, true, true));
 			badges.getChildren().add(plus);
 		}
+		if (net.veloclient.launcher.data.OgBadgeSetting.eligible()) {
+			// One of the first players: the OG badge, shown to others only while switched on.
+			javafx.scene.image.ImageView og = new javafx.scene.image.ImageView(OgBadgeDialog.badgeImage(52));
+			javafx.scene.control.CheckBox useOg = new javafx.scene.control.CheckBox("Show OG badge");
+			useOg.setSelected(net.veloclient.launcher.data.OgBadgeSetting.use());
+			og.setOpacity(useOg.isSelected() ? 1 : 0.45);
+			useOg.setOnAction(e -> {
+				net.veloclient.launcher.data.OgBadgeSetting.setUse(useOg.isSelected());
+				og.setOpacity(useOg.isSelected() ? 1 : 0.45);
+				Toasts.show(useOg, useOg.isSelected() ? "OG badge on - others see it within a minute" : "Normal badge again");
+			});
+			javafx.scene.control.Tooltip.install(og, new javafx.scene.control.Tooltip("OG - one of the first players of Velo"));
+			HBox ogBox = new HBox(6, og, useOg);
+			ogBox.setAlignment(Pos.CENTER_LEFT);
+			badges.getChildren().add(ogBox);
+		}
 		Label java = new Label("Java Edition");
 		java.getStyleClass().addAll("badge", "badge-grey");
 		Label microsoft = new Label("Microsoft account");

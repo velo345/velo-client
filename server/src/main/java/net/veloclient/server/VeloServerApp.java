@@ -35,6 +35,7 @@ public final class VeloServerApp {
 	private static net.veloclient.server.store.StoreService store;
 	/** Installs, daily actives and online samples for the owner panel. */
 	private static StatsService stats;
+	private static OgBadge og;
 	private static PartnerPlayRewards partnerRewards;
 
 	public static void main(String[] args) throws IOException {
@@ -70,6 +71,7 @@ public final class VeloServerApp {
 
 		try {
 			stats = new StatsService(dataDir);
+			og = new OgBadge(stats, Long.parseLong(envOr("VELO_OG_CUTOFF", String.valueOf(OgBadge.DEFAULT_CUTOFF))));
 		} catch (java.sql.SQLException e) {
 			throw new IOException("Couldn't open the stats database", e);
 		}
@@ -427,10 +429,11 @@ public final class VeloServerApp {
 
 	/** {@code wear}: equipped bodywear, "id,id,..." (item ids without "wear_"). */
 	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId, String auraId, Boolean idle, Boolean hidePlus, String nameStyle,
-			String emote, String wear, String pet) {
+			String emote, String wear, String pet, Boolean og) {
 	}
 
-	private record HeartbeatResponse(boolean ok, int onlineCount, String capeId) {
+	/** {@code ogEligible}: this account may switch to the OG badge (see {@link OgBadge}). */
+	private record HeartbeatResponse(boolean ok, int onlineCount, String capeId, boolean ogEligible) {
 	}
 
 	private static void handleHeartbeat(HttpExchange exchange, SessionRegistry registry, CapeStore capes) throws IOException {
@@ -477,6 +480,7 @@ public final class VeloServerApp {
 			if (request.hidePlus() != null) {
 				registry.setPlusHidden(refreshed.uuid(), request.hidePlus());
 			}
+			registry.setOg(refreshed.uuid(), Boolean.TRUE.equals(request.og()) && og != null && og.eligible(refreshed.uuid()));
 			// Emotes are store items too ("emote_<id>"): only relayed for players who bought them.
 			String emote = request.emote();
 			if (emote != null) {
@@ -519,7 +523,8 @@ public final class VeloServerApp {
 		}
 		// Echoes the cape id actually accepted, so a client whose custom cape was removed (or a
 		// server whose data was reset) notices and can re-upload instead of silently showing nothing.
-		JsonHttp.writeJson(exchange, 200, new HeartbeatResponse(true, registry.onlineCount(), refreshed.capeId()));
+		JsonHttp.writeJson(exchange, 200, new HeartbeatResponse(true, registry.onlineCount(), refreshed.capeId(),
+				og != null && og.eligible(refreshed.uuid())));
 	}
 
 	private record EndRequest(String sessionToken) {
@@ -531,7 +536,7 @@ public final class VeloServerApp {
 		if (request.sessionToken() != null) {
 			registry.endGameSessions(request.sessionToken());
 		}
-		JsonHttp.writeJson(exchange, 200, new HeartbeatResponse(true, registry.onlineCount(), null));
+		JsonHttp.writeJson(exchange, 200, new HeartbeatResponse(true, registry.onlineCount(), null, false));
 	}
 
 	private static void handleEnd(HttpExchange exchange, SessionRegistry registry) throws IOException {
@@ -539,7 +544,7 @@ public final class VeloServerApp {
 		if (request.sessionToken() != null) {
 			registry.endSession(request.sessionToken());
 		}
-		JsonHttp.writeJson(exchange, 200, new HeartbeatResponse(true, registry.onlineCount(), null));
+		JsonHttp.writeJson(exchange, 200, new HeartbeatResponse(true, registry.onlineCount(), null, false));
 	}
 
 	private record OnlineResponse(List<SessionRegistry.OnlineUser> users, long serverTimeMillis) {

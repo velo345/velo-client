@@ -55,6 +55,14 @@ public final class VeloBadge {
 	/** The Velo+ badge (U+E051): the logo with a red plus behind it - 192 x 128, so 1.5 times as wide as it is tall. */
 	private static final String PLUS_GLYPH = "\uE051";
 	private static final Identifier PLUS_TEXTURE = Identifier.of("velo-client", "textures/font/badge_plus_glyph.png");
+	/** The OG badge (U+E052): the logo in gold and "OG" - 256 x 128, twice as wide as it is tall. See OgBadgeSetting. */
+	private static final String OG_GLYPH = "\uE052";
+	private static final Identifier OG_TEXTURE = Identifier.of("velo-client", "textures/font/badge_og_glyph.png");
+
+	/** Which badge: the logo, the Velo+ one, or the OG one (OG wins - it's the one the player chose). */
+	public static final int NORMAL = 0;
+	public static final int PLUS = 1;
+	public static final int OG = 2;
 
 	private VeloBadge() {
 	}
@@ -141,6 +149,49 @@ public final class VeloBadge {
 		return false;
 	}
 
+	/** Your own badge: OG when you chose it (and may), else Velo+ when you're a member. */
+	public static int ownKind() {
+		if (net.veloclient.velo.client.network.OgBadgeSetting.showing()) {
+			return OG;
+		}
+		return net.veloclient.velo.client.network.StoreClient.plus() ? PLUS : NORMAL;
+	}
+
+	/** Another player's badge (UUID first, then name). */
+	public static int kindOf(java.util.UUID uuid, String name) {
+		if (net.veloclient.velo.client.network.VeloUserRegistry.isOg(uuid, name)) {
+			return OG;
+		}
+		return net.veloclient.velo.client.network.VeloUserRegistry.isPlus(uuid, name) ? PLUS : NORMAL;
+	}
+
+	/** The badge for the name in {@code text} (yours or an online player's) - only asked once {@link #isKnownVeloName} said it has one. */
+	public static int kind(String text, String ownName) {
+		if (isOwnName(text, ownName)) {
+			return ownKind();
+		}
+		int length = text.length();
+		int start = -1;
+		boolean plus = false;
+		for (int i = 0; i <= length; i++) {
+			boolean nameChar = i < length && isNameChar(text.charAt(i));
+			if (nameChar && start < 0) {
+				start = i;
+			} else if (!nameChar && start >= 0) {
+				int runLength = i - start;
+				if (runLength >= 3 && runLength <= 16) {
+					String run = text.substring(start, i);
+					if (net.veloclient.velo.client.network.VeloUserRegistry.isOgName(run)) {
+						return OG;
+					}
+					plus |= net.veloclient.velo.client.network.VeloUserRegistry.isPlusName(run);
+				}
+				start = -1;
+			}
+		}
+		return plus ? PLUS : NORMAL;
+	}
+
 	private static boolean isNameChar(char c) {
 		return Character.isLetterOrDigit(c) || c == '_';
 	}
@@ -153,6 +204,20 @@ public final class VeloBadge {
 	/** The badge's width: {@link #SIZE}, or 1.5 times that for the Velo+ one (logo and plus). */
 	public static int width(boolean plus) {
 		return plus ? SIZE * 3 / 2 : SIZE;
+	}
+
+	/** The width of badge {@code kind} ({@link #NORMAL}, {@link #PLUS}, {@link #OG}). */
+	public static int width(int kind) {
+		return kind == OG ? SIZE * 2 : width(kind == PLUS);
+	}
+
+	/** Draws badge {@code kind}. */
+	public static void draw(DrawContext context, int x, int y, int kind) {
+		if (kind == OG) {
+			context.drawTexture(RenderPipelines.GUI_TEXTURED, OG_TEXTURE, x, y, 0f, 0f, width(OG), SIZE, 256, 128, 256, 128);
+			return;
+		}
+		draw(context, x, y, kind == PLUS);
 	}
 
 	/** Draws the badge, or the Velo+ one (the logo with a red plus behind it). */
@@ -188,6 +253,12 @@ public final class VeloBadge {
 
 	/** Same, with the Velo+ badge (logo and a red plus) when {@code plus}. */
 	public static Text prefixWithBadge(Text original, boolean plus) {
+		return prefixWithBadge(original, plus ? PLUS : NORMAL);
+	}
+
+	/** Same, with badge {@code kind}. */
+	public static Text prefixWithBadge(Text original, int kind) {
+		boolean plus = kind == PLUS;
 		Identifier fontId = Identifier.of("velo-client", "badge");
 		//? if <26.1 {
 		Style badgeStyle = Style.EMPTY.withFont(new net.minecraft.text.StyleSpriteSource.Font(fontId));
@@ -195,7 +266,7 @@ public final class VeloBadge {
 		/*Style badgeStyle = Style.EMPTY.withFont(new net.minecraft.network.chat.FontDescription.Resource(fontId));
 		*///?}
 		MutableText result = Text.empty();
-		result.append(Text.literal(plus ? PLUS_GLYPH : GLYPH).setStyle(badgeStyle));
+		result.append(Text.literal(kind == OG ? OG_GLYPH : plus ? PLUS_GLYPH : GLYPH).setStyle(badgeStyle));
 		result.append(original);
 		return result;
 	}

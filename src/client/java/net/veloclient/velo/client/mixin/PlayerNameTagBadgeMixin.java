@@ -71,8 +71,8 @@ public abstract class PlayerNameTagBadgeMixin {
 			tag = NameStyles.tagName(original, name, NameStyles.NAME_TAG);
 		}
 		if (self || VeloUserRegistry.isOnline(player.getUuid(), name)) {
-			boolean plus = self ? net.veloclient.velo.client.network.StoreClient.plus() : VeloUserRegistry.isPlus(player.getUuid(), name);
-			tag = VeloBadge.prefixWithBadge(tag, plus);
+			int kind = self ? VeloBadge.ownKind() : VeloBadge.kindOf(player.getUuid(), name);
+			tag = VeloBadge.prefixWithBadge(tag, kind);
 		}
 		if (tag != original) {
 			cir.setReturnValue(tag);
@@ -98,8 +98,8 @@ public abstract class PlayerNameTagBadgeMixin {
 			tag = NameStyles.tagName(original, name, NameStyles.NAME_TAG);
 		}
 		if (self || VeloUserRegistry.isOnline(player.getUUID(), name)) {
-			boolean plus = self ? net.veloclient.velo.client.network.StoreClient.plus() : VeloUserRegistry.isPlus(player.getUUID(), name);
-			tag = VeloBadge.prefixWithBadge(tag, plus);
+			int kind = self ? VeloBadge.ownKind() : VeloBadge.kindOf(player.getUUID(), name);
+			tag = VeloBadge.prefixWithBadge(tag, kind);
 		}
 		if (tag != original) {
 			cir.setReturnValue(tag);

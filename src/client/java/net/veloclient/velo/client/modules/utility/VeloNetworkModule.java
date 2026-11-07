@@ -40,6 +40,23 @@ public final class VeloNetworkModule extends AbstractModule implements Configura
 
 	@Override
 	public List<ConfigField> configFields() {
+		List<ConfigField> fields = new java.util.ArrayList<>(baseFields());
+		if (net.veloclient.velo.client.network.OgBadgeSetting.eligible()) {
+			// One of the first players (server-decided): opt-in OG badge instead of the normal one.
+			fields.add(1, new ConfigField.ChoiceField("Badge", List.of("Normal", "OG"),
+					() -> net.veloclient.velo.client.network.OgBadgeSetting.use() ? "OG" : "Normal",
+					v -> net.veloclient.velo.client.network.OgBadgeSetting.setUse("OG".equals(v))));
+		}
+		return fields;
+	}
+
+	/** The badge choice lives in og-badge.json (shared with the launcher) - a profile copy would undo a launcher switch. */
+	@Override
+	public boolean persistField(String label) {
+		return !"Badge".equals(label);
+	}
+
+		private List<ConfigField> baseFields() {
 		return List.of(new ConfigField.ToggleField("Share Custom Cloak",
 				() -> VeloServerClient.shareCustomCapes, v -> VeloServerClient.shareCustomCapes = v),
 				new ConfigField.ToggleField("Show the + of Velo+ on my badge",
