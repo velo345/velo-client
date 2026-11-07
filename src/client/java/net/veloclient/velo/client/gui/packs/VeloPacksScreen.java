@@ -290,6 +290,10 @@ public final class VeloPacksScreen extends VeloWindow {
 		bx -= 92;
 		hits.add(PackUi.button(context, bx, y + 3, 88, 18, "Open folder", 0, true, mouseX, mouseY,
 				() -> FileManagerOpener.open(PackBridge.packDir().toFile(), this::setStatus)));
+		bx -= 100;
+		// Modrinth's resource packs, installed straight into the folder this screen watches.
+		hits.add(PackUi.button(context, bx, y + 3, 96, 18, "Get packs", 1, true, mouseX, mouseY,
+				() -> this.client.setScreen(new PackLibraryScreen(this))));
 
 		// Two lists + details.
 		int listTop = y + 34;

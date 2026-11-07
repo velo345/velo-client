@@ -226,6 +226,16 @@ public final class LauncherApp extends Application {
 		net.veloclient.launcher.ui.UiMotion.install(scene);
 		net.veloclient.launcher.ui.UiSounds.install(scene);
 		net.veloclient.launcher.ui.UiSounds.preload();
+		scene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, ev -> {
+			if (ev.getCode() == javafx.scene.input.KeyCode.SHIFT) {
+				shiftHeld = true;
+			}
+		});
+		scene.addEventFilter(javafx.scene.input.KeyEvent.KEY_RELEASED, ev -> {
+			if (ev.getCode() == javafx.scene.input.KeyCode.SHIFT) {
+				shiftHeld = false;
+			}
+		});
 		scene.getAccelerators().put(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.K, javafx.scene.input.KeyCombination.SHORTCUT_DOWN),
 				() -> topBar.searchField().requestFocus());
 
@@ -4452,6 +4462,8 @@ public final class LauncherApp extends Application {
 	 * button when there's something new; {@code status} (nullable) is the Settings row to report into.
 	 */
 	private static volatile boolean updateResultChecked;
+	/** Shift held down anywhere in the launcher window (see the update test channel). */
+	private static volatile boolean shiftHeld;
 
 	private void checkForUpdates(Label status) {
 		if (System.getProperty("velo.launcherTour") != null) {
@@ -4519,10 +4531,12 @@ public final class LauncherApp extends Application {
 		Button checkButton = new Button(availableUpdate != null ? "Update" : "Check for updates");
 		checkButton.getStyleClass().add("primary-button");
 		// Shift + click: the update test channel (updatetest-* pre-releases) - for testing the updater without a release.
+		// Shift is read from the mouse event and from the keyboard (a tester's Shift + click once went unnoticed on Windows);
+		// a file updates/test-channel.txt turns the channel on without any key at all.
 		boolean[] shift = {false};
-		checkButton.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, ev -> shift[0] = ev.isShiftDown());
+		checkButton.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, ev -> shift[0] = ev.isShiftDown() || shiftHeld);
 		checkButton.setOnAction(e -> {
-			if (shift[0]) {
+			if (shift[0] || shiftHeld || net.veloclient.launcher.launch.UpdateService.testChannelFile()) {
 				shift[0] = false;
 				net.veloclient.launcher.launch.UpdateService.testChannel = true;
 				availableUpdate = null;
@@ -4539,6 +4553,11 @@ public final class LauncherApp extends Application {
 		net.veloclient.launcher.ui.SettingsUi.row(updates, "Velo Client", "Launcher and mod - updated right here, no website needed",
 				"Downloads the latest GitHub release. New mod builds apply to every profile on its next launch;"
 						+ " a new launcher version installs itself and restarts the launcher.", updateStatus, checkButton);
+		Button repairButton = new Button("Repair");
+		repairButton.setOnAction(e -> net.veloclient.launcher.ui.RepairDialog.show(stage));
+		net.veloclient.launcher.ui.SettingsUi.row(updates, "Repair Velo Client", "Something broken? Reinstalls the current mod and launcher",
+				"Puts the current Velo mod back into every profile, clears Fabric's cache and downloads the current build again -"
+						+ " optionally reinstalls the launcher too. Worlds, settings and other mods stay as they are.", repairButton);
 		javafx.scene.control.CheckBox minimize = new javafx.scene.control.CheckBox();
 		minimize.setSelected(net.veloclient.launcher.data.LauncherSettings.get().minimizeOnLaunch);
 		minimize.setOnAction(e -> {

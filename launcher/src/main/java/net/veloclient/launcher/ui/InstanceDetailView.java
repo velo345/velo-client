@@ -771,26 +771,70 @@ public final class InstanceDetailView {
 		return remove;
 	}
 
-	private static CheckBox buildEnabledToggle(Path file, boolean disabled, Runnable refresh) {
+	private static CheckBox buildEnabledToggle(Instance instance, Path file, boolean disabled, Runnable refresh) {
 		CheckBox toggle = new CheckBox();
 		toggle.setSelected(!disabled);
 		toggle.setTooltip(new Tooltip(disabled ? "Disabled - click to enable" : "Enabled - click to disable without removing it"));
-		toggle.setOnAction(e -> setFileEnabled(file, toggle.isSelected(), refresh));
+		toggle.setOnAction(e -> setFileEnabled(instance, file, toggle.isSelected(), refresh));
 		return toggle;
 	}
 
 	/** Renames {@code file} to add/strip the {@value #DISABLED_SUFFIX} suffix so it does/doesn't get loaded, then refreshes the list. */
-	private static void setFileEnabled(Path file, boolean enable, Runnable refresh) {
+	private static void setFileEnabled(Instance instance, Path file, boolean enable, Runnable refresh) {
 		String fileName = file.getFileName().toString();
 		String targetName = enable ? enabledName(fileName) : (isDisabled(fileName) ? fileName : fileName + DISABLED_SUFFIX);
 		if (!targetName.equals(fileName)) {
 			try {
+				clearReadOnly(file);
 				Files.move(file, file.resolveSibling(targetName), StandardCopyOption.REPLACE_EXISTING);
-			} catch (IOException ignored) {
-				// Best-effort - the row just keeps its old state if this fails.
+			} catch (IOException e) {
+				explainFileProblem(instance, file, enable ? "turn on" : "turn off", e);
 			}
 		}
 		refresh.run();
+	}
+
+	/**
+	 * Deletes a mod/pack file, saying why when it can't. It used to fail silently ("I can't delete any mod", bug report
+	 * 2026-11-07): on Windows a file can't be deleted while the game has it open, and files copied over from other launchers
+	 * are sometimes read-only. Read-only is cleared first; anything else is explained and logged.
+	 */
+	static boolean deleteFile(Instance instance, Path file) {
+		try {
+			clearReadOnly(file);
+			Files.deleteIfExists(file);
+			return true;
+		} catch (IOException e) {
+			explainFileProblem(instance, file, "remove", e);
+			return false;
+		}
+	}
+
+	private static void clearReadOnly(Path file) {
+		try {
+			var dos = Files.getFileAttributeView(file, java.nio.file.attribute.DosFileAttributeView.class);
+			if (dos != null && dos.readAttributes().isReadOnly()) {
+				dos.setReadOnly(false);
+			}
+		} catch (IOException | UnsupportedOperationException ignored) {
+			// not Windows / no attribute - the delete itself says what's wrong
+		}
+	}
+
+	private static void explainFileProblem(Instance instance, Path file, String what, IOException e) {
+		net.veloclient.launcher.LauncherLog.warn("Couldn't " + what + " " + file, e);
+		boolean running = instance != null && net.veloclient.launcher.instance.RunningInstanceManager.countRunning(instance.id()) > 0;
+		String why = running ? "The game is still running with this profile and has the file open - close Minecraft and try again."
+				: e instanceof java.nio.file.AccessDeniedException || String.valueOf(e.getMessage()).contains("used by another process")
+						? "Another program has the file open (often a running game or an antivirus scan) - close Minecraft and try again."
+						: "Windows refused it: " + e.getMessage();
+		Platform.runLater(() -> {
+			javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.WARNING);
+			alert.setHeaderText("Couldn't " + what + " " + file.getFileName());
+			alert.setContentText(why);
+			DialogStyling.apply(alert);
+			alert.show();
+		});
 	}
 
 	private static Node buildKnownRow(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind, Path folder,
@@ -854,15 +898,12 @@ public final class InstanceDetailView {
 		}
 
 		Button remove = removeButton(() -> {
-			try {
-				Files.deleteIfExists(file);
+			if (deleteFile(instance, file)) {
 				InstalledAssetStore.forget(instance.id(), kind, enabledName(file.getFileName().toString()));
-			} catch (IOException ignored) {
-				// Best-effort.
 			}
 			refresh.run();
 		});
-		row.getChildren().addAll(progress, updateBadge, remove, buildEnabledToggle(file, disabled, refresh));
+		row.getChildren().addAll(progress, updateBadge, remove, buildEnabledToggle(instance, file, disabled, refresh));
 		return row;
 	}
 
@@ -894,13 +935,9 @@ public final class InstanceDetailView {
 
 		if (!protectedFile) {
 			row.getChildren().addAll(removeButton(() -> {
-				try {
-					Files.deleteIfExists(file);
-				} catch (IOException ignored) {
-					// Best-effort.
-				}
+				deleteFile(instance, file);
 				refresh.run();
-			}), buildEnabledToggle(file, disabled, refresh));
+			}), buildEnabledToggle(instance, file, disabled, refresh));
 		} else {
 			Label managed = new Label("Managed");
 			managed.getStyleClass().addAll("badge", "badge-grey");

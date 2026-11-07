@@ -171,9 +171,13 @@ public final class CrashReportDialog {
 		folder.getStyleClass().add("glass-button");
 		Path folderPath = crashFile != null ? crashFile.getParent() : InstancePaths.gameDir(instance.id()).resolve("logs");
 		folder.setOnAction(e -> openFolder(folderPath));
+		// When nothing else helps: put the current Velo mod (and, if wanted, the launcher) back fresh.
+		Button repair = new Button("Repair Velo");
+		repair.getStyleClass().add("glass-button");
+		repair.setOnAction(e -> RepairDialog.show(owner));
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
-		HBox actions = new HBox(8, copy, folder, spacer, send);
+		HBox actions = new HBox(8, copy, folder, repair, spacer, send);
 		actions.setAlignment(Pos.CENTER_LEFT);
 
 		String crashText = crash;

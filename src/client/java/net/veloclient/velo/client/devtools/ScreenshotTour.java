@@ -585,6 +585,12 @@ public final class ScreenshotTour {
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))},
 					new Object[] {3, (Runnable) () -> shot(client, "pause-opening")},
 					new Object[] {30, (Runnable) () -> shot(client, "pause")});
+			case "packlib" -> List.of(
+					new Object[] {0, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openPacks(client)},
+					new Object[] {40, (Runnable) () -> shot(client, "packlib-toolbar")},
+					new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.packs.PackLibraryScreen(
+							net.veloclient.velo.client.util.ClientCompat.currentScreen()))},
+					new Object[] {160, (Runnable) () -> shot(client, "packlib")});
 			case "packs" -> List.of(
 					new Object[] {0, (Runnable) () -> net.veloclient.velo.client.gui.packs.PackTour.openPacks(client)},
 					new Object[] {40, (Runnable) () -> shot(client, "packs-list")},

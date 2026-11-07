@@ -244,6 +244,11 @@ public final class UpdateService {
 	 */
 	public static volatile boolean testChannel;
 
+	/** updates/test-channel.txt exists: the test channel without Shift (for testers). */
+	public static boolean testChannelFile() {
+		return Files.exists(updatesDir().resolve("test-channel.txt"));
+	}
+
 	/** True if the jar GameJars would install for {@code key} already matches {@code asset}. */
 	private static boolean alreadyHave(String key, Asset asset) {
 		try {
@@ -340,6 +345,14 @@ public final class UpdateService {
 		String os = System.getProperty("os.name", "").toLowerCase();
 		markPending(release.version());
 		if (os.contains("win")) {
+			if (Files.exists(passiveFailedFile())) {
+				// The quiet install didn't arrive last time: this time the installer's own wizard, like before 1.2.5.
+				log("Last quiet install failed - starting the installer's wizard instead");
+				Files.deleteIfExists(passiveFailedFile());
+				status.accept("Opening the installer - follow its steps");
+				new ProcessBuilder(file.toString()).start();
+				return true;
+			}
 			status.accept("Installing - Windows may ask once for permission");
 			startWindowsInstall(file);
 			return true;
@@ -388,6 +401,10 @@ public final class UpdateService {
 		cmd.append("timeout /t 3 /nobreak >nul\r\n");
 		cmd.append("echo [%date% %time%] script: starting the installer>>\"").append(log).append("\"\r\n");
 		cmd.append("\"").append(installer).append("\" /passive /norestart /l*v \"").append(msiLog).append("\"");
+		if (repairMode) {
+			// the same version over itself: reinstall every file instead of "already installed"
+			cmd.append(" REINSTALL=ALL REINSTALLMODE=amus");
+		}
 		if (installDir != null) {
 			// the folder the launcher runs from now, so a player's own install location survives the update
 			cmd.append(" INSTALLDIR=\"").append(installDir).append("\"");
@@ -404,6 +421,155 @@ public final class UpdateService {
 		log("Starting " + script + " (install dir " + installDir + ")");
 		new ProcessBuilder("cmd.exe", "/c", "start", "\"Velo update\"", "/min", "cmd.exe", "/c", script.toString())
 				.redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+	}
+
+	/**
+	 * "Repair Velo" (Settings, and the launch-failure dialog): puts back what this launcher would install fresh. The mod jars
+	 * the updater downloaded are dropped (the ones built into this launcher are used), every profile's Velo jar is removed so
+	 * the next launch copies it in again, Fabric's remapped-jar cache is cleared (it rebuilds itself), and the newest mod build
+	 * of this release line is fetched again. Profiles that are running right now are left alone. With {@code launcherToo} the
+	 * launcher itself is reinstalled from this version's release (Windows: a quiet repair install; Linux: apt --reinstall) -
+	 * returns true when that installer now runs and the launcher should close.
+	 */
+	public static boolean repair(boolean launcherToo, Consumer<String> status, Consumer<Transfer> progress) throws IOException, InterruptedException {
+		log("Repair started (launcher too: " + launcherToo + ", version " + AppVersion.VERSION + ")");
+		status.accept("Clearing downloaded mod builds...");
+		Path jars = gameJarsDir();
+		if (Files.isDirectory(jars)) {
+			try (var files = Files.list(jars)) {
+				for (Path f : files.toList()) {
+					Files.deleteIfExists(f);
+				}
+			}
+		}
+		int profiles = 0;
+		int skipped = 0;
+		for (net.veloclient.launcher.instance.Instance instance : net.veloclient.launcher.instance.InstanceStore.loadAll()) {
+			if (net.veloclient.launcher.instance.RunningInstanceManager.countRunning(instance.id()) > 0) {
+				skipped++;
+				log("Repair: " + instance.name() + " is running - left alone");
+				continue;
+			}
+			status.accept("Repairing " + instance.name() + "...");
+			Path mods = net.veloclient.launcher.instance.InstancePaths.modsDir(instance.id());
+			if (Files.isDirectory(mods)) {
+				try (var files = Files.list(mods)) {
+					for (Path f : files.toList()) {
+						String n = f.getFileName().toString();
+						if (n.startsWith("velo-client-") && n.endsWith(".jar")) {
+							try {
+								Files.deleteIfExists(f);
+							} catch (IOException e) {
+								log("Repair: couldn't remove " + f + ": " + e);
+							}
+						}
+					}
+				}
+			}
+			Path fabric = net.veloclient.launcher.instance.InstancePaths.gameDir(instance.id()).resolve(".fabric");
+			if (Files.isDirectory(fabric)) {
+				try (var walk = Files.walk(fabric)) {
+					for (Path f : walk.sorted(java.util.Comparator.reverseOrder()).toList()) {
+						try {
+							Files.deleteIfExists(f);
+						} catch (IOException e) {
+							log("Repair: couldn't clear " + f + ": " + e);
+						}
+					}
+				}
+			}
+			profiles++;
+		}
+		log("Repair: " + profiles + " profiles reset, " + skipped + " running ones skipped");
+		status.accept("Fetching the current mod builds...");
+		Release release = null;
+		try {
+			release = check();
+			if (!release.modAssets().isEmpty()) {
+				installModUpdatesTracked(release, status, progress);
+			}
+		} catch (IOException e) {
+			log("Repair: release check failed (the mod built into this launcher is used): " + e);
+		}
+		if (!launcherToo || !packaged()) {
+			status.accept("Repaired " + profiles + " profile" + (profiles == 1 ? "" : "s") + (skipped > 0 ? " (" + skipped + " running - close them and repair again)" : "")
+					+ ". The next game launch installs Velo fresh.");
+			return false;
+		}
+		if (release != null && release.launcherNewer() && release.installer() != null) {
+			// A newer launcher is out anyway: installing that repairs it too.
+			return runInstallerTracked(release, status, progress);
+		}
+		Asset installer = installerForVersion(AppVersion.VERSION);
+		if (installer == null) {
+			status.accept("Mods repaired. No launcher installer for this system in release " + AppVersion.VERSION + " - get it from velo-client.com.");
+			return false;
+		}
+		Path file = updatesDir().resolve(installer.name());
+		status.accept("Downloading the launcher again");
+		Path tmp = updatesDir().resolve(installer.name() + ".part");
+		Files.createDirectories(updatesDir());
+		download(installer, tmp, progress);
+		Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+		String os = System.getProperty("os.name", "").toLowerCase();
+		if (os.contains("win")) {
+			status.accept("Reinstalling - Windows may ask once for permission");
+			repairMode = true;
+			try {
+				startWindowsInstall(file);
+			} finally {
+				repairMode = false;
+			}
+			return true;
+		}
+		if (os.contains("mac")) {
+			new ProcessBuilder("open", file.toString()).start();
+			return true;
+		}
+		if (onPath("pkexec") && onPath("apt")) {
+			Process process = new ProcessBuilder("pkexec", "apt", "install", "-y", "--reinstall", file.toString()).redirectErrorStream(true).start();
+			String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+			log("Repair reinstall exited with " + process.waitFor() + ": " + output.strip().lines().reduce((a, b) -> b).orElse(""));
+			if (process.exitValue() != 0) {
+				throw new IOException("The launcher couldn't be reinstalled (was the password prompt cancelled?)");
+			}
+			relaunch();
+			return true;
+		}
+		new ProcessBuilder("xdg-open", file.toString()).start();
+		return true;
+	}
+
+	/** Set while a repair starts the Windows installer: the same version installs over itself (msiexec repair mode). */
+	private static boolean repairMode;
+
+	/** This OS's installer in the release tagged {@code v<version>}, or null. */
+	private static Asset installerForVersion(String version) throws IOException, InterruptedException {
+		HttpRequest request = HttpRequest.newBuilder(URI.create("https://api.github.com/repos/velo345/velo-client/releases/tags/v" + version))
+				.timeout(Duration.ofSeconds(15)).header("Accept", "application/vnd.github+json")
+				.header("User-Agent", "VeloClientLauncher/" + AppVersion.VERSION).GET().build();
+		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+		if (response.statusCode() != 200) {
+			log("Repair: release v" + version + " not found (" + response.statusCode() + ")");
+			return null;
+		}
+		String os = System.getProperty("os.name", "").toLowerCase();
+		boolean debian = !os.contains("win") && !os.contains("mac") && (onPath("dpkg") || onPath("apt"));
+		String macDmg = os.contains("mac") ? "-macos-" + macArch() + ".dmg" : null;
+		for (JsonElement element : JsonParser.parseString(response.body()).getAsJsonObject().getAsJsonArray("assets")) {
+			JsonObject a = element.getAsJsonObject();
+			String name = a.get("name").getAsString();
+			if (os.contains("win") && name.endsWith(".exe") || debian && name.endsWith(".deb") || macDmg != null && name.endsWith(macDmg)) {
+				String digest = a.has("digest") && !a.get("digest").isJsonNull() ? a.get("digest").getAsString() : null;
+				return new Asset(name, a.get("browser_download_url").getAsString(), a.get("size").getAsLong(),
+						digest != null && digest.startsWith("sha256:") ? digest.substring(7) : null, 0, a.get("id").getAsLong());
+			}
+		}
+		return null;
+	}
+
+	private static Path passiveFailedFile() {
+		return updatesDir().resolve("quiet-install-failed.txt");
 	}
 
 	private static Path pendingFile() {
@@ -476,13 +642,21 @@ public final class UpdateService {
 			}
 			return null;
 		}
+		if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
+			try {
+				Files.writeString(passiveFailedFile(), to);   // next try: the normal installer wizard
+			} catch (IOException ignored) {
+				// stays quiet next time too
+			}
+		}
 		long age = System.currentTimeMillis() - Long.parseLong(props.getProperty("startedAt", "0"));
 		log("Still on " + AppVersion.VERSION + " after trying to update to " + to + " (installer exit " + exit + ", " + age / 1000 + " s ago)");
 		String why = exit == null ? "the installer didn't finish"
 				: exit.equals("1602") ? "the installation was cancelled (or Windows' permission prompt was declined)"
 				: exit.equals("1618") ? "another installation was running at the same time"
 				: exit.equals("0") ? "the installer finished but the old version is still here" : "the installer stopped with code " + exit;
-		return "The update to " + to + " didn't install - " + why + ". Try again from the bell; the details are in " + logFile() + ".";
+		return "The update to " + to + " didn't install - " + why + ". Try again from the bell (this time with the normal installer);"
+				+ " the details are in " + logFile() + ".";
 	}
 
 	/**
