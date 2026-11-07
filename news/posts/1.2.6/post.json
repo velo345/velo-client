@@ -1,0 +1,75 @@
+{
+ "title": "Velo Client 1.2.6: item farms without the lag",
+ "summary": "Thousands of dropped items no longer tank your FPS: Velo groups them and shows how many there are. Plus a safer main menu and fixes for hangs and memory errors.",
+ "tag": "Update",
+ "version": "1.2.6",
+ "accent": "#e0262e",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "text",
+   "text": "**Velo Client 1.2.6** goes after the biggest FPS killer on farm servers: piles of dropped items. Also in it: a main menu that can't break any more, and fixes for Windows hangs and memory errors."
+  },
+  {
+   "type": "heading",
+   "text": "Item farms in Anti Farm Lag"
+  },
+  {
+   "type": "image",
+   "image": "file:images/itemfarm.jpg",
+   "caption": "About 3000 items drifting in water streams: grouped, with a count over each group."
+  },
+  {
+   "type": "list",
+   "items": [
+    "When lots of items are around, Velo switches to **item farm mode**: items close to you stay fully detailed, further away they are grouped and drawn once",
+    "A **count label** (x37) shows how many items each group holds",
+    "**Max Drawn Items** (default 1000) caps how many are drawn at all",
+    "Far-away items also update less often on your PC",
+    "In our test with ~3000 items: **97 → 408 FPS**, 1% lows 42 → 110"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Labels your way"
+  },
+  {
+   "type": "image",
+   "image": "file:images/cover.jpg",
+   "caption": "Glass background, Sora font, 150% size."
+  },
+  {
+   "type": "text",
+   "text": "In Anti Farm Lag you pick the label **font** (or follow HUD Style), the **background** (None, Soft, Glass, Solid), the **size** (50-200%) and from how many items a group gets a label. Or turn labels off."
+  },
+  {
+   "type": "heading",
+   "text": "Faster HUD"
+  },
+  {
+   "type": "list",
+   "items": [
+    "The whole HUD is reused when nothing changed",
+    "Velo tests by itself whether Gnetum's HUD caching actually helps on your PC and turns it off if it doesn't",
+    "Entity visibility checks are cached (Vulkan)"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Fixed"
+  },
+  {
+   "type": "list",
+   "items": [
+    "Black or broken main menu: if the Velo title screen or panorama fails (GPU drivers, other mods), Minecraft's own menu shows instead",
+    "Game hanging on Windows with 1.21.x: Ixeris is no longer installed there, and the Doctor offers to turn it off",
+    "\"Could not reserve enough space\" and invalid memory settings: the Doctor explains it and sets fitting RAM"
+   ]
+  },
+  {
+   "type": "callout",
+   "text": "Anti Farm Lag is off by default - turn it on in the Performance tab. The launcher updates itself, just open it."
+  }
+ ]
+}
