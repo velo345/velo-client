@@ -1,0 +1,50 @@
+{
+	"title": "Velo Client 1.2: 3x faster cosmetics, more versions, a smoother zoom",
+	"summary": "Wings, bodywear and pets cost a third of the frame time they used to, five more performance mods come built in, Velo runs on 1.21.10, 1.21.1 and 1.8.9 - plus Color Grading, Item Position per item, Hold Up Items and a pile of fixes.",
+	"tag": "Update",
+	"version": "1.2",
+	"accent": "#e0262e",
+	"pinned": true,
+	"cover": "file:images/cover.jpg",
+	"blocks": [
+		{"type": "text", "text": "**Velo Client 1.2** is about speed: your cosmetics, the mods we install for you and the settings that used to forget themselves. And it brings a few new toys for PvP and screenshots."},
+
+		{"type": "heading", "text": "Cosmetics, 3x faster"},
+		{"type": "image", "image": "file:images/fps.jpg", "caption": "Third person, same PC and spot - wings, aura, cloak and four bodywear items."},
+		{"type": "text", "text": "Press F5 with wings and bodywear on and your FPS used to drop hard. Now cosmetics cost about a third of what they did: bodywear is drawn with far fewer points, vertices go straight into the GPU buffer, and wings only re-pose when you'd see a difference."},
+		{"type": "list", "items": [
+			"**Other players' cosmetics** far away skip their glow, shine and bodywear - on busy servers that's a lot of FPS back.",
+			"**Pets** got the same treatment and no longer search the ground every frame."
+		]},
+
+		{"type": "heading", "text": "Five more performance mods, built in"},
+		{"type": "text", "text": "The launcher now also installs **BadOptimizations**, **Better Block Entities**, **Particle Core**, **Krypton** and **Fast IP Ping** - tested next to Velo with no FPS cost, each helping where it counts (chests and signs, particles, the network, the server list)."},
+
+		{"type": "heading", "text": "More Minecraft versions"},
+		{"type": "text", "text": "Velo now runs on **1.21.10** and **1.21.1**, and **1.8.9 / 1.9.4** start on Ornithe with the fast 1.8.9 stack - with Velo cloaks, badges and Velo Network."},
+
+		{"type": "heading", "text": "New"},
+		{"type": "list", "items": [
+			"**Zoom**: a smooth animation at any FPS, sliders for speed and smoothness, and lower sensitivity while zoomed - the camera stops the moment your mouse does. Scrolling changes only the current zoom.",
+			"**Item Position per item type**: swords, axes, maces, blocks, food... each can sit somewhere else, and your empty hand moves too.",
+			"**Color Grading**: saturation, vibrance, contrast, warmth, vignette and sharpen - with presets like Vivid, Cinematic and Crisp PvP.",
+			"**Hold Up Items**: hold your item (or both arms) out in front, zombie-style.",
+			"**Particle Size**, **Centered Inventory** (the recipe book no longer pushes your inventory aside) and **centered crosshair presets** at 15x15.",
+			"**Keystrokes** with a wide space bar, a **minimap** arrow size and a sharper map, and an **Armor HUD** that shows just the durability.",
+			"**Low Fire** also lowers the flames on other players and mobs.",
+			"**The Store asks before every purchase.**"
+		]},
+
+		{"type": "heading", "text": "Fixed"},
+		{"type": "list", "items": [
+			"Performance Boost settings (Max FPS, view distance...) and the Graphics API no longer reset after a restart.",
+			"RAM set in the launcher sticks, and Automatic gives strong PCs more memory.",
+			"The Hitbox module's boxes sit exactly on players instead of trailing behind.",
+			"Cloaks sit behind chestplates, and emotes move your armour too.",
+			"The HUD editor no longer snaps, and the resize corner is easier to grab.",
+			"Lightning no longer tints the world with Full Bright on."
+		]},
+
+		{"type": "callout", "style": "info", "text": "The launcher updates itself - just open it. Your profiles get the new version on their next start."}
+	]
+}

@@ -1,52 +1,95 @@
 <!--page {
-	"title": "Download Velo Client – Free Minecraft Launcher for Windows & Linux",
-	"description": "Download Velo Client 1.1 for free: the launcher for Windows (.exe) and Linux (.deb, .tar.gz), or the Fabric mod for Minecraft 1.21.11, 26.1, 26.2 and 26.3.",
+	"title": "Download Velo Client – Free Minecraft Launcher for Windows, macOS & Linux",
+	"description": "Download Velo Client for free: the launcher for Windows (.exe), macOS (Apple Silicon and Intel) and Linux (.deb, .tar.gz for Arch, Fedora and more), or the mod for Minecraft 1.21.1 to 26.3 and 1.8.9.",
 	"path": "/download",
 	"active": "download",
 	"priority": "0.9",
 	"changefreq": "weekly",
 	"lastmod": "latest-post",
 	"schema": [
-		{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Velo Client Launcher", "applicationCategory": "GameApplication", "operatingSystem": "Windows 10, Windows 11, Linux", "softwareVersion": "1.1.0", "downloadUrl": "https://velo-client.com/download", "fileSize": "153MB", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "publisher": {"@id": "https://velo-client.com/#org"}},
+		{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Velo Client Launcher", "applicationCategory": "GameApplication", "operatingSystem": "Windows 10, Windows 11, macOS, Linux", "softwareVersion": "1.2.2", "downloadUrl": "https://velo-client.com/download", "fileSize": "153MB", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "publisher": {"@id": "https://velo-client.com/#org"}},
 		{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://velo-client.com/"}, {"@type": "ListItem", "position": 2, "name": "Download", "item": "https://velo-client.com/download"}]}
 	]
 }-->
-<section class="section" aria-labelledby="dl-h">
+<section class="section dl-hero" aria-labelledby="dl-h">
   <div class="wrap">
     <div class="section-head center">
       <span class="eyebrow fade-up" style="--d:.05s">Download</span>
       <h1 id="dl-h" data-split style="font-size:clamp(2.6rem,6vw,4.4rem);font-weight:800;letter-spacing:-0.04em">Get Velo Client</h1>
-      <p class="fade-up" style="--d:.5s">Version {{release.version}} · released {{release.datePretty}} · <a href="/news/0-9-95">What's new</a> · free</p>
+      <p class="fade-up" style="--d:.5s">Version {{release.version}} · released {{release.datePretty}} · <a href="/news">What's new</a> · free forever</p>
     </div>
     {{> launch-countdown}}
-    <div class="dl-grid">
-      <article class="card dl best spot reveal" style="--i:0" id="windows">
+    <div class="dl-detect reveal" id="dl-detect" data-os="windows">
+      <div class="dl-detect-os">
+        <span class="dl-detect-icon" data-for="windows"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5l7-1v7H3zM11 4.4 21 3v8.5H11zM3 12.5h7v7l-7-1zM11 12.5h10V21l-10-1.4z"/></svg></span>
+        <span class="dl-detect-icon" data-for="mac"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.6-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.2 1-4 2.5-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.1-1.2 2.9-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.4-.9-2.4-4.1zM14 5.5c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.6 2.8-1.4z"/></svg></span>
+        <span class="dl-detect-icon" data-for="linux"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-2 0-3 2-3 4.5 0 1.5-.5 3-1.5 4.5S5 15 5 17c0 2.5 3 4 7 4s7-1.5 7-4c0-2-1.5-3.5-2.5-5S15 9 15 7.5C15 5 14 3 12 3zM10 8h.01M14 8h.01M10.5 10.5h3"/></svg></span>
+        <div>
+          <span class="dl-detect-kicker">Recommended for you</span>
+          <strong class="dl-detect-name">Velo Client for <span data-os-name>Windows</span></strong>
+        </div>
+      </div>
+      <div class="dl-detect-actions">
+        <a class="btn btn-primary btn-lg magnetic" data-for="windows" href="{{download.exe}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg> Download for Windows</a>
+        <a class="btn btn-primary btn-lg magnetic" data-for="mac" href="{{download.dmgArm}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg> Apple Silicon</a>
+        <a class="btn btn-lg" data-for="mac" href="{{download.dmgX64}}">Intel Mac</a>
+        <a class="btn btn-primary btn-lg magnetic" data-for="linux" href="{{download.deb}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg> Ubuntu / Debian (.deb)</a>
+        <a class="btn btn-lg" data-for="linux" href="{{download.tar}}">Arch, Fedora &amp; others</a>
+      </div>
+      <a class="dl-detect-other" href="#all">Other systems and the mod</a>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="all" style="padding-top:0" aria-label="All downloads">
+  <div class="wrap">
+    <div class="dl-grid dl-grid4">
+      <article class="card dl spot reveal" style="--i:0" id="windows">
         <span class="os"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5l7-1v7H3zM11 4.4 21 3v8.5H11zM3 12.5h7v7l-7-1zM11 12.5h10V21l-10-1.4z"/></svg></span>
         <h2>Windows</h2>
-        <p>The launcher with everything included: Java, Fabric and performance mods install themselves. Windows 10 and 11.</p>
+        <p>The launcher with everything included: Java, Fabric and the performance mods install themselves. Windows 10 and 11.</p>
         <a class="btn btn-primary btn-lg magnetic" href="{{download.exe}}">Download .exe</a>
-        <span class="mono">{{release.launcherExe}} · 153 MB</span>
+        <span class="mono">{{release.launcherExe}}</span>
       </article>
-      <article class="card dl spot reveal" style="--i:1" id="linux">
+      <article class="card dl spot reveal" style="--i:1" id="macos">
+        <span class="os"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.6-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.2 1-4 2.5-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.1-1.2 2.9-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.4-.9-2.4-4.1zM14 5.5c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.6 2.8-1.4z"/></svg></span>
+        <h2>macOS <span class="dl-new">New</span></h2>
+        <p>For Macs with Apple Silicon (M1 and newer) and Intel. Not sure? Apple menu → About This Mac → Chip.</p>
+        <div class="dl-pair">
+          <a class="btn btn-primary btn-lg magnetic" href="{{download.dmgArm}}">Apple Silicon</a>
+          <a class="btn btn-lg" href="{{download.dmgX64}}">Intel</a>
+        </div>
+        <details class="dl-help"><summary>First start on a Mac</summary>
+          <p>Drag Velo into Applications. macOS asks before opening apps from outside the App Store the first time: right-click the app → <b>Open</b> → <b>Open</b>, or allow it under System Settings → Privacy &amp; Security.</p>
+        </details>
+      </article>
+      <article class="card dl spot reveal" style="--i:2" id="linux">
         <span class="os"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-2 0-3 2-3 4.5 0 1.5-.5 3-1.5 4.5S5 15 5 17c0 2.5 3 4 7 4s7-1.5 7-4c0-2-1.5-3.5-2.5-5S15 9 15 7.5C15 5 14 3 12 3zM10 8h.01M14 8h.01M10.5 10.5h3"/></svg></span>
         <h2>Linux</h2>
-        <p>For Ubuntu, Debian, Mint and other Debian-based systems. Install with your software centre or <code>sudo apt install ./velo-client-launcher_{{release.version}}_amd64.deb</code>.</p>
-        <a class="btn btn-lg" href="{{download.deb}}">Download .deb</a>
-        <span class="mono">{{release.launcherDeb}} · 134 MB</span>
-        <p>Arch, Fedora and others: the same launcher as a folder with its own Java. Unpack it and start <code>bin/Velo Client Launcher</code>.</p>
-        <a class="btn btn-lg" href="{{download.tar}}">Download .tar.gz</a>
+        <p>Ubuntu, Debian, Mint, Pop!_OS: the <code>.deb</code>. Arch, Fedora, openSUSE and everything else: the <code>.tar.gz</code> with its own Java.</p>
+        <div class="dl-pair">
+          <a class="btn btn-lg" href="{{download.deb}}">.deb</a>
+          <a class="btn btn-lg" href="{{download.tar}}">.tar.gz</a>
+        </div>
+        <details class="dl-help"><summary>Arch &amp; other distros</summary>
+          <pre class="dl-code"><code>tar -xzf velo-client-launcher-{{release.version}}-linux-x64.tar.gz
+./"Velo Client Launcher/bin/Velo Client Launcher"</code></pre>
+          <p>On Debian-based systems: <code>sudo apt install ./{{release.launcherDeb}}</code></p>
+        </details>
       </article>
-      <article class="card dl spot reveal" style="--i:2" id="mod">
+      <article class="card dl spot reveal" style="--i:3" id="mod">
         <span class="os"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4.5L20 8v8l-8 4.5L4 16zM4 8l8 4.5L20 8M12 12.5V21"/></svg></span>
         <h2>Mod only</h2>
-        <p>Just the Velo mod for your own Fabric setup, in any launcher (including on macOS). Needs <a href="{{links.fabricInstaller}}" rel="noopener">Fabric Loader</a> and <a href="{{links.fabricApi}}" rel="noopener">Fabric API</a>.</p>
-        <div class="versions">
-          <a class="btn btn-sm" href="{{download.mod.1_21_11}}">1.21.11</a>
-          <a class="btn btn-sm" href="{{download.mod.26_1}}">26.1</a>
-          <a class="btn btn-sm" href="{{download.mod.26_2}}">26.2</a>
-          <a class="btn btn-sm" href="{{download.mod.26_3}}">26.3</a>
+        <p>Just Velo for your own setup in any launcher. Needs <a href="{{links.fabricInstaller}}" rel="noopener">Fabric Loader</a> + <a href="{{links.fabricApi}}" rel="noopener">Fabric API</a>; 1.8.9 runs on Ornithe.</p>
+        <div class="dl-versions">
+          <a class="dl-ver" href="{{download.mod.26_3}}"><b>26.3</b><span>latest</span></a>
+          <a class="dl-ver" href="{{download.mod.26_2}}"><b>26.2</b></a>
+          <a class="dl-ver" href="{{download.mod.26_1}}"><b>26.1</b></a>
+          <a class="dl-ver" href="{{download.mod.1_21_11}}"><b>1.21.11</b></a>
+          <a class="dl-ver" href="{{download.mod.1_21_10}}"><b>1.21.10</b></a>
+          <a class="dl-ver" href="{{download.mod.1_21_1}}"><b>1.21.1</b></a>
+          <a class="dl-ver dl-ver-legacy" href="{{download.legacy}}"><b>1.8.9</b><span>Ornithe</span></a>
         </div>
-        <span class="mono">velo-client-{{release.version}}+&lt;version&gt;.jar</span>
       </article>
     </div>
   </div>
@@ -69,11 +112,24 @@
         <div><dt>Versions</dt><dd>{{minecraft.version}}</dd></div>
         <div><dt>Java</dt><dd>Included with the launcher</dd></div>
         <div><dt>Memory</dt><dd>Set automatically for your PC</dd></div>
-        <div><dt>Systems</dt><dd>Windows 10/11, Debian-based Linux</dd></div>
+        <div><dt>Systems</dt><dd>Windows 10/11, macOS, Linux (x64)</dd></div>
       </dl>
     </div>
   </div>
   <div class="wrap reveal" style="margin-top:16px">
-    <div class="notice">Windows SmartScreen may warn about a new app the first time: choose <b>More info → Run anyway</b>. Every release is also published on <a href="{{links.releases}}" rel="noopener">GitHub</a>. Only download Velo from this site or GitHub.</div>
+    <div class="notice">Windows SmartScreen and macOS may ask before opening a new app the first time - on Windows choose <b>More info → Run anyway</b>. Every release is also published on <a href="{{links.releases}}" rel="noopener">GitHub</a>. Only download Velo from this site or GitHub.</div>
   </div>
 </section>
+
+<script>
+(function () {
+  var box = document.getElementById("dl-detect");
+  if (!box) return;
+  var ua = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || "";
+  ua = ua.toLowerCase();
+  var os = /mac|iphone|ipad/.test(ua) ? "mac" : /linux|x11|cros/.test(ua) && !/android/.test(ua) ? "linux" : "windows";
+  box.setAttribute("data-os", os);
+  var name = box.querySelector("[data-os-name]");
+  if (name) name.textContent = os === "mac" ? "macOS" : os === "linux" ? "Linux" : "Windows";
+})();
+</script>

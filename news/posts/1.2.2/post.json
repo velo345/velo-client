@@ -1,0 +1,54 @@
+{
+	"title": "Velo Client 1.2.2: 1000+ FPS with your cosmetics on, a real performance dashboard, the OG badge",
+	"summary": "Cosmetics are now drawn on your graphics card, Performance Boost became a dashboard with live numbers, Cosmetics Quality keeps crowded lobbies fast, the launcher runs on macOS - and everyone from the first two weeks gets the gold OG badge.",
+	"tag": "Update",
+	"version": "1.2.2",
+	"accent": "#e0262e",
+	"pinned": true,
+	"cover": "file:images/cover.jpg",
+	"blocks": [
+		{"type": "text", "text": "**Velo Client 1.2.2** is the fastest Velo yet. Wings, bodywear and glow used to cost you hundreds of frames in third person - now they barely cost any. On our test PC: **over 1000 FPS in F5 with a full outfit on.**"},
+
+		{"type": "heading", "text": "Cosmetics on the GPU"},
+		{"type": "text", "text": "Until now every wing and every piece of bodywear was re-built point by point on your CPU, every frame. On **26.2 and 26.3** they are now uploaded to your graphics card once, and only their position is sent each frame. Wings, bodywear and the wing glow all take this path."},
+		{"type": "list", "items": [
+			"**Third person with a full outfit:** 760 → 1120 FPS on 26.2 (without cosmetics: 1440).",
+			"Bodywear keeps its **full detail** - chains, hats and details look exactly as designed.",
+			"Can be switched off under Performance Boost → Cosmetics if a driver ever misbehaves."
+		]},
+
+		{"type": "heading", "text": "Performance Boost, redesigned"},
+		{"type": "image", "image": "file:images/dashboard.jpg", "caption": "Live FPS with a graph, frame time, GPU load, view distance - and every setting one click away."},
+		{"type": "text", "text": "Performance Boost now opens as a big dashboard: **live numbers at the top**, the presets as cards with how fast and how good each one looks, and every setting sorted into sections - each showing its current state, so you see everything without digging. When your FPS drops below target, it tells you what helps most."},
+
+		{"type": "heading", "text": "Cosmetics Quality"},
+		{"type": "text", "text": "A lobby full of wings and auras no longer tanks your FPS. On **Auto** (the default) your own cosmetics and the nearest players' stay in full detail, everyone else gets a lighter version - and when FPS drops below 60, Auto lightens even more. Prefer everything in full, or everything light? Pick **Full** or **Lite**."},
+
+		{"type": "heading", "text": "The OG badge"},
+		{"type": "image", "image": "file:images/og.jpg", "caption": "Gold, next to your name - in chat, the tab list and above your head."},
+		{"type": "text", "text": "Everyone who got Velo in its **first two weeks** (until 14 November) can show the **gold OG badge** instead of the normal one. It's a thank-you for being here from the start. It's off until you switch it on - the launcher asks you once, and you can switch any time on the **Account page** or in the game under **Velo Network**."},
+		{"type": "callout", "style": "success", "text": "Not OG yet? Get Velo before **15 November** and the badge is yours too."},
+
+		{"type": "heading", "text": "New"},
+		{"type": "list", "items": [
+			"**macOS:** the launcher now runs on Apple Silicon and Intel Macs.",
+			"**Zoom:** glides in and out (speed adjustable), the camera follows your mouse smoothly and stops exactly where you aim - no drifting, no spinning.",
+			"**LuckySMP:** play 10 minutes on luckysmp.net with Velo and get the **LuckySMP cloak** and the **Lucky aura** for free.",
+			"**C2ME** as an experimental module for faster chunk loading.",
+			"**Distant Horizons** can be switched on per profile.",
+			"A smaller, tidier default HUD."
+		]},
+
+		{"type": "heading", "text": "Fixed"},
+		{"type": "list", "items": [
+			"Store and Locker open instantly - in the game, the launcher and on the website.",
+			"Zoom no longer switches on vanilla's cinematic camera after you let go.",
+			"The pause menu no longer flashes vanilla buttons while you hover ours.",
+			"Opening the recipe book with Centered Inventory no longer overlaps your inventory.",
+			"The tab list no longer crashes on servers with scores.",
+			"Fixes from your crash reports: Launcher Doctor recognises more problems, and importing from other clients is more reliable."
+		]},
+
+		{"type": "callout", "style": "info", "text": "The launcher updates itself - just open it. Your profiles get the new version on their next start."}
+	]
+}
