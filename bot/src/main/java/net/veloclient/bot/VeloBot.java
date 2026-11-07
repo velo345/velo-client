@@ -73,7 +73,9 @@ public final class VeloBot extends ListenerAdapter {
 			System.exit(1);
 		}
 		BotConfig config = BotConfig.load(Path.of(env("BOT_DATA_DIR", "bot-data")));
-		VeloBot bot = new VeloBot(config, new ServerApi(serverUrl, adminToken));
+		ServerApi server = new ServerApi(serverUrl, adminToken);
+		Thread.ofVirtual().start(server::items);   // the giveaway prize picker answers from this cache (Discord waits 3 s at most)
+		VeloBot bot = new VeloBot(config, server);
 		// MESSAGE_CONTENT (a privileged intent - switch it on in the Discord developer portal) lets ticket transcripts include what was said.
 		JDA jda = JDABuilder.createLight(token, GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MEMBERS)
 				.setMemberCachePolicy(MemberCachePolicy.NONE).setActivity(Activity.playing("Velo Client")).addEventListeners(bot).build();

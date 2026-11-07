@@ -128,11 +128,29 @@ final class ServerApi {
 	private volatile java.util.Map<String, String> items = java.util.Map.of();
 	private volatile long itemsAt;
 
-	/** Every cosmetic the server knows (id to name) - the Store's items and the uploaded wings/capes; cached for 5 minutes. */
+	/**
+	 * Every cosmetic the server knows (id to name) - the Store's items and the uploaded wings/capes. Answers from the cache
+	 * right away and refreshes it in the background every 5 minutes: Discord drops an autocomplete answer after 3 seconds,
+	 * and a slow first fetch left the prize picker empty (the typed "Name (id)" text was then taken as the item id).
+	 */
 	java.util.Map<String, String> items() {
-		if (System.currentTimeMillis() - itemsAt < 300_000 && !items.isEmpty()) {
-			return items;
+		if (items.isEmpty()) {
+			refreshItems();
+		} else if (System.currentTimeMillis() - itemsAt >= 300_000 && refreshing.compareAndSet(false, true)) {
+			Thread.ofVirtual().start(() -> {
+				try {
+					refreshItems();
+				} finally {
+					refreshing.set(false);
+				}
+			});
 		}
+		return items;
+	}
+
+	private final java.util.concurrent.atomic.AtomicBoolean refreshing = new java.util.concurrent.atomic.AtomicBoolean();
+
+	private void refreshItems() {
 		java.util.Map<String, String> fresh = new java.util.TreeMap<>();
 		for (String path : new String[] {"/v1/store/catalog", "/v1/cosmetics/catalog"}) {
 			try {
@@ -154,7 +172,42 @@ final class ServerApi {
 			items = fresh;
 			itemsAt = System.currentTimeMillis();
 		}
-		return items;
+	}
+
+	/**
+	 * The item id behind what was typed or picked: the id itself, the picker's "Name (id)" text, or the exact name
+	 * (ignoring case, only when one item has it). Null when nothing matches.
+	 */
+	String resolveItem(String typed) {
+		return resolveItem(typed, items());
+	}
+
+	static String resolveItem(String typed, java.util.Map<String, String> known) {
+		if (typed == null) {
+			return null;
+		}
+		String t = typed.trim();
+		if (known.containsKey(t)) {
+			return t;
+		}
+		var inParens = java.util.regex.Pattern.compile("\\(([a-z0-9_-]+)\\)\\s*$").matcher(t);
+		if (inParens.find() && known.containsKey(inParens.group(1))) {
+			return inParens.group(1);
+		}
+		String lower = t.toLowerCase(java.util.Locale.ROOT);
+		if (known.containsKey(lower)) {
+			return lower;
+		}
+		String match = null;
+		for (var e : known.entrySet()) {
+			if (e.getValue().equalsIgnoreCase(t)) {
+				if (match != null) {
+					return null;   // two items share that name - the id is needed
+				}
+				match = e.getKey();
+			}
+		}
+		return match;
 	}
 
 	/** A cosmetic's display name (falls back to the id when the server doesn't know it). */

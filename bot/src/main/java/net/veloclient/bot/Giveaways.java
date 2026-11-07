@@ -172,6 +172,15 @@ final class Giveaways {
 						.setEphemeral(true).queue();
 				return;
 			}
+		} else {
+			// the picker sends the id; a typed name or the picker's "Name (id)" text works too
+			String id = server.resolveItem(value);
+			if (id == null) {
+				event.reply("The Velo server doesn't know a cosmetic `" + value + "`. Pick one from the list (start typing its name) or give its id, e.g. `pet_ember`.")
+						.setEphemeral(true).queue();
+				return;
+			}
+			value = id;
 		}
 		event.deferReply(true).queue();
 		BotConfig.Giveaway g = new BotConfig.Giveaway();
@@ -194,7 +203,6 @@ final class Giveaways {
 				default -> finalValue + (finalValue.equals("1") ? " day" : " days") + " of Velo+";
 			};
 			g.title = event.getOption("title") != null ? event.getOption("title").getAsString() : g.prizeName;
-			boolean unknownItem = type.equals("cosmetic") && !server.items().containsKey(finalValue);
 			// Re-upload the picture: Discord attachment links expire, the message's own file doesn't.
 			byte[] image = imageUrl != null ? ServerApi.download(imageUrl) : type.equals("cosmetic") ? server.card(finalValue) : null;
 			g.hasImage = image != null;
@@ -206,8 +214,7 @@ final class Giveaways {
 				g.messageId = message.getId();
 				config.giveaways.put(g.id, g);
 				config.save();
-				event.getHook().sendMessage("🎁 Giveaway `" + g.id + "` is live in " + channel.getAsMention() + " - ends <t:" + g.endsAt / 1000 + ":R>."
-						+ (unknownItem ? "\n⚠️ The Velo server doesn't list a cosmetic `" + finalValue + "` - check the id (`/giveaway cancel " + g.id + "` if it's wrong)." : "")).queue();
+				event.getHook().sendMessage("🎁 Giveaway `" + g.id + "` is live in " + channel.getAsMention() + " - ends <t:" + g.endsAt / 1000 + ":R>.").queue();
 			}, e -> event.getHook().sendMessage("Couldn't post it: " + e.getMessage()).queue());
 		});
 	}
@@ -335,7 +342,13 @@ final class Giveaways {
 				break;
 			}
 			try {
-				String name = server.grant(id, g.prizeType.equals("cosmetic") ? "item" : g.prizeType, g.prizeValue, "giveaway " + g.id);
+				// giveaways started before the fix may hold the picker's "Name (id)" text instead of the id
+				String prize = g.prizeValue;
+				if (g.prizeType.equals("cosmetic")) {
+					String resolved = server.resolveItem(prize);
+					prize = resolved != null ? resolved : prize;
+				}
+				String name = server.grant(id, g.prizeType.equals("cosmetic") ? "item" : g.prizeType, prize, "giveaway " + g.id);
 				if (name != null) {
 					won.add(id);
 				}
