@@ -3,11 +3,11 @@
 # (staff-site/) to the production box,
 # keeping a backup of what was there. Safe to run again. Clients are NOT released by this.
 #
-#   tools/server/deploy-server.sh            -> velo-new (the ssh alias in ~/.ssh/config)
+#   tools/server/deploy-server.sh            -> velo-brand (the ssh alias in ~/.ssh/config; production since 2026-11-07)
 #   tools/server/deploy-server.sh user@host
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
-TARGET="${1:-velo-new}"
+TARGET="${1:-velo-brand}"
 
 ./gradlew :server:shadowJar -q
 # dev.velo-client.com (Velo Bridge docs + plugin jar): module list, config.yml and the jar are built first.

@@ -2,14 +2,14 @@
 # Builds the site and uploads it to the server's /var/www/velo-client.com (nginx serves it behind Caddy; see
 # tools/server/setup-velo-host.sh), then tells search engines about the pages through IndexNow.
 #
-#   velo-site/deploy.sh                    build + upload to velo-new (the ssh alias of the production server)
+#   velo-site/deploy.sh                    build + upload to velo-brand (the ssh alias of the production server)
 #   velo-site/deploy.sh user@host          another server
-#   velo-site/deploy.sh velo-new --dry-run show what would change
+#   velo-site/deploy.sh velo-brand --dry-run show what would change
 #
 # rsync deletes files that are gone from dist/ - the folder only ever holds the build.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
-TARGET="${1:-velo-new}"
+TARGET="${1:-velo-brand}"
 DRY=()
 [[ "${2:-}" == "--dry-run" ]] && DRY=(--dry-run)
 REMOTE_DIR="${REMOTE_DIR:-/var/www/velo-client.com}"
