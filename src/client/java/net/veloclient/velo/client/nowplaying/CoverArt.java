@@ -27,7 +27,8 @@ import java.time.Duration;
  */
 public final class CoverArt {
 
-	private static final int SIZE = 96;
+	/** Big enough for 1:1 pixels at GUI scale 4+ (96 got upscaled with nearest sampling - blocky covers). */
+	private static final int SIZE = 256;
 	private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(6))
 			.followRedirects(HttpClient.Redirect.NORMAL).build();
 
@@ -80,7 +81,7 @@ public final class CoverArt {
 						return;
 					}
 					Identifier id = Identifier.of("velo-client", "nowplaying/cover_" + mine);
-					MinecraftClient.getInstance().getTextureManager().registerTexture(id, new NativeImageBackedTexture(() -> "velo cover", nativeImage));
+					MinecraftClient.getInstance().getTextureManager().registerTexture(id, new SmoothCover(nativeImage));
 					swap(id, color);
 				});
 			} catch (Exception ignored) {
@@ -152,6 +153,19 @@ public final class CoverArt {
 		int side = Math.min(image.getWidth(), image.getHeight());
 		int sx = (image.getWidth() - side) / 2;
 		int sy = (image.getHeight() - side) / 2;
+		// Halve in steps first: one bicubic step from a 640+ px cover down to SIZE aliases (sparkly edges).
+		while (side >= SIZE * 4) {
+			int half = side / 2;
+			BufferedImage step = new BufferedImage(half, half, BufferedImage.TYPE_INT_ARGB);
+			Graphics2D hg = step.createGraphics();
+			hg.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+			hg.drawImage(image, 0, 0, half, half, sx, sy, sx + side, sy + side, null);
+			hg.dispose();
+			image = step;
+			side = half;
+			sx = 0;
+			sy = 0;
+		}
 		BufferedImage out = new BufferedImage(SIZE, SIZE, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D g = out.createGraphics();
 		g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
@@ -197,6 +211,24 @@ public final class CoverArt {
 		java.awt.Color.RGBtoHSB(r, gr, b, hsb);
 		int rgb = java.awt.Color.HSBtoRGB(hsb[0], Math.min(0.85f, Math.max(0.45f, hsb[1])), Math.max(0.82f, hsb[2]));
 		return 0xFF000000 | rgb & 0xFFFFFF;
+	}
+
+	/** Covers are photos: sampled bilinearly they stay smooth at any HUD scale (nearest made them blocky). */
+	private static final class SmoothCover extends NativeImageBackedTexture {
+		SmoothCover(NativeImage image) {
+			//? if <1.21.2 {
+			/*super(image);
+			*///?} else {
+			super(() -> "velo cover", image);
+			//?}
+			//? if <1.21.11 {
+			/*setFilter(true, false);
+			*///?} else if <26.1 {
+			this.sampler = com.mojang.blaze3d.systems.RenderSystem.getSamplerCache().get(com.mojang.blaze3d.textures.FilterMode.LINEAR);
+			//?} else {
+			/*this.sampler = com.mojang.blaze3d.systems.RenderSystem.getSamplerCache().getClampToEdge(com.mojang.blaze3d.textures.FilterMode.LINEAR);
+			*///?}
+		}
 	}
 
 	private static NativeImage toNative(BufferedImage image) {

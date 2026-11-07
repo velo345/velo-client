@@ -158,17 +158,29 @@ public final class HudManager {
 		net.veloclient.velo.client.waypoints.WaypointRenderer.renderHud(context, screenWidth, screenHeight);
 		net.veloclient.velo.client.modules.qol.PartyPingModule.renderHud(context, screenWidth, screenHeight);
 		net.veloclient.velo.client.redstone.RmAnalysis.renderOutside(context, screenWidth, screenHeight);
-		for (Module module : ModuleRegistry.all()) {
-			if (!(module instanceof HudModule hud) || !hud.isEnabled()) {
-				continue;
+		// Velo Turbo: the modules redraw at most 360 times a second; frames in between reuse what they drew.
+		if (HudFrameCache.replay(context, screenWidth, screenHeight)) {
+			net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
+			return;
+		}
+		HudFrameCache.beginRecord(context, screenWidth, screenHeight);
+		boolean completed = false;
+		try {
+			for (Module module : ModuleRegistry.all()) {
+				if (!(module instanceof HudModule hud) || !hud.isEnabled()) {
+					continue;
+				}
+				if (!ModuleProfiler.enabled) {
+					// No lambda per module per frame unless the Module Profiler overlay is actually open.
+					renderScaled(context, hud, screenWidth, screenHeight, tickDelta);
+					continue;
+				}
+				ModuleProfiler.time(hud.id(), ModuleProfiler.Phase.HUD_RENDER,
+						() -> renderScaled(context, hud, screenWidth, screenHeight, tickDelta));
 			}
-			if (!ModuleProfiler.enabled) {
-				// No lambda per module per frame unless the Module Profiler overlay is actually open.
-				renderScaled(context, hud, screenWidth, screenHeight, tickDelta);
-				continue;
-			}
-			ModuleProfiler.time(hud.id(), ModuleProfiler.Phase.HUD_RENDER,
-					() -> renderScaled(context, hud, screenWidth, screenHeight, tickDelta));
+			completed = true;
+		} finally {
+			HudFrameCache.endRecord(context, completed);
 		}
 		net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
 	}
@@ -192,6 +204,8 @@ public final class HudManager {
 		}
 		// HUD modules keep the vanilla font even when drawn inside the HUD editor (a Velo screen).
 		net.veloclient.velo.client.gui.VeloFonts.beginHud();
+		// Text in a scaled element picks the glyph atlas for its real on-screen size (was the GUI scale's: blocky at 150%).
+		float previousPoseScale = net.veloclient.velo.client.gui.VeloFonts.setHudPoseScale(scale);
 		boolean pushed = false;
 		try {
 			if (scale == 1.0f) {
@@ -216,6 +230,7 @@ public final class HudManager {
 			if (pushed) {
 				context.getMatrices().popMatrix();
 			}
+			net.veloclient.velo.client.gui.VeloFonts.setHudPoseScale(previousPoseScale);
 			net.veloclient.velo.client.gui.VeloFonts.endHud();
 			if (smallCapsEligible) {
 				net.veloclient.velo.client.modules.qol.SmallCapsModule.setHudRenderActive(false);

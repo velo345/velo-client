@@ -25,10 +25,22 @@ package net.veloclient.velo.client.devtools;
 	private GpuPassTimer() {
 	}
 
+	private static org.lwjgl.vulkan.VkDevice lastDevice;
+	private static org.lwjgl.vulkan.VkCommandBuffer lastCommandBuffer;
+
+	// A mark inside the pass that was begun last (GUI draws): same command buffer as that pass.
+	public static void markInPass(String label) {
+		if (ENABLED && lastCommandBuffer != null) {
+			mark(lastDevice, lastCommandBuffer, label);
+		}
+	}
+
 	public static void mark(org.lwjgl.vulkan.VkDevice device, org.lwjgl.vulkan.VkCommandBuffer commandBuffer, String label) {
 		if (!ENABLED || commandBuffer == null) {
 			return;
 		}
+		lastDevice = device;
+		lastCommandBuffer = commandBuffer;
 		if (pools == null) {
 			create(device);
 		}
@@ -110,7 +122,7 @@ package net.veloclient.velo.client.devtools;
 
 	private static void log() {
 		StringBuilder sb = new StringBuilder(String.format(java.util.Locale.ROOT, "Velo GPU passes (avg us/frame, %.0f us total):", gpuNanos / 600e3));
-		TOTAL.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue()[0], a.getValue()[0])).limit(25)
+		TOTAL.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue()[0], a.getValue()[0])).limit(40)
 				.forEach(e -> sb.append(String.format(java.util.Locale.ROOT, "%n  %7.1f us  %5.1f x  %s", e.getValue()[0] / 600e3,
 						e.getValue()[1] / 600.0, e.getKey())));
 		net.veloclient.velo.VeloClient.LOGGER.info(sb.toString());
@@ -127,6 +139,9 @@ public final class GpuPassTimer {
 	}
 
 	public static void endFrame() {
+	}
+
+	public static void markInPass(String label) {
 	}
 }
 //?}

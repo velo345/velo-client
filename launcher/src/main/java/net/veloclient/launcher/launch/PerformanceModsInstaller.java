@@ -125,8 +125,12 @@ public final class PerformanceModsInstaller {
 	private static final Map<String, String> NEEDS = Map.of("cull-fewer-leaves", "sodium", "argentum-extras", "argentum", "cera", "argentum",
 			"better-block-entities", "sodium", "fzzy-config", "fabric-language-kotlin", "particle-core", "fzzy_config");
 
-	/** Ours that refuse to load next to another mod ("breaks" in their fabric.mod.json): slug -> that mod's id. */
-	private static final Map<String, String> CLASHES = Map.of("cull-fewer-leaves", "moreculling", "sarcio", "zirconium");
+	/**
+	 * Ours that refuse to load (or misbehave) next to another mod: slug -> that mod's id. Gnetum caches the HUD in
+	 * Minecraft's own framebuffers, which VulkanMod replaces - hotbar and FPS display flickered (bug report, 2026-11-07).
+	 */
+	private static final Map<String, String> CLASHES = Map.of("cull-fewer-leaves", "moreculling", "sarcio", "zirconium",
+			"gnetum", "vulkanmod");
 
 	/** Installed by older launchers, now part of Velo: removed again unless another mod needs them. */
 	private static final Map<String, String> RETIRED = Map.of("modmenu", "modmenu", "placeholder-api", "placeholder-api");
@@ -152,6 +156,8 @@ public final class PerformanceModsInstaller {
 		/** The C2ME jar Velo installed because the in-game "C2ME (Experimental)" module asked for it, and its game version. */
 		public String c2meFile;
 		public String c2meGameVersion;
+		public String alternateCurrentFile;
+		public String alternateCurrentGameVersion;
 	}
 
 	private PerformanceModsInstaller() {
@@ -191,7 +197,15 @@ public final class PerformanceModsInstaller {
 			State state = readState(instanceId);
 			// Its own switch, independent of the recommended mods: a player can want far terrain with no other mods.
 			syncDistantHorizons(state, modsDir, version);
-			syncC2me(instanceId, state, modsDir, version);
+			syncOptIn(instanceId, "c2me", "c2me-fabric", "c2me", "C2ME", modsDir, version, state.c2meFile, state.c2meGameVersion, (file, game) -> {
+				state.c2meFile = file;
+				state.c2meGameVersion = game;
+			});
+			syncOptIn(instanceId, "alternate-current", "alternate-current", "alternate-current", "Alternate Current", modsDir, version,
+					state.alternateCurrentFile, state.alternateCurrentGameVersion, (file, game) -> {
+						state.alternateCurrentFile = file;
+						state.alternateCurrentGameVersion = game;
+					});
 			if (!state.enabled) {
 				writeState(instanceId, state);
 				return;
@@ -380,11 +394,13 @@ public final class PerformanceModsInstaller {
 	}
 
 	/**
-	 * C2ME, opt-in from the game: the "C2ME (Experimental)" module writes {@code config/velo-client/experimental-mods.properties}
-	 * ({@code c2me=true/false}) in the profile's game folder; the next launch installs C2ME for this version or removes
-	 * the copy Velo installed. A C2ME the player added themselves is never touched.
+	 * A mod the player opts into from the game (C2ME, Alternate Current): its module writes {@code key=true/false} to
+	 * {@code config/velo-client/experimental-mods.properties} in the profile's game folder; the next launch installs it
+	 * for this version or removes the copy Velo installed. A copy the player added themselves is never touched.
+	 * {@code file}/{@code gameVersion} are what Velo installed so far; {@code store} records the new state.
 	 */
-	private static void syncC2me(String instanceId, State state, Path modsDir, GameVersion version) {
+	private static void syncOptIn(String instanceId, String key, String slug, String modId, String label, Path modsDir, GameVersion version,
+			String file, String gameVersion, java.util.function.BiConsumer<String, String> store) {
 		try {
 			Path flags = net.veloclient.launcher.instance.InstancePaths.gameDir(instanceId).resolve("config").resolve("velo-client")
 					.resolve("experimental-mods.properties");
@@ -394,16 +410,15 @@ public final class PerformanceModsInstaller {
 				try (var in = Files.newBufferedReader(flags, java.nio.charset.StandardCharsets.UTF_8)) {
 					props.load(in);
 				}
-				wanted = Boolean.parseBoolean(props.getProperty("c2me", "false"));
+				wanted = Boolean.parseBoolean(props.getProperty(key, "false"));
 			}
-			Path ours = state.c2meFile == null ? null : modsDir.resolve(state.c2meFile);
-			boolean stale = ours != null && !version.id().equals(state.c2meGameVersion);
+			Path ours = file == null ? null : modsDir.resolve(file);
+			boolean stale = ours != null && !version.id().equals(gameVersion);
 			if (ours != null && (!wanted || stale)) {
 				Files.deleteIfExists(ours);
-				Files.deleteIfExists(modsDir.resolve(state.c2meFile + ".disabled"));
-				LauncherLog.info("Removed " + state.c2meFile + (stale ? " - the profile now runs another version" : " - C2ME switched off in game"));
-				state.c2meFile = null;
-				state.c2meGameVersion = null;
+				Files.deleteIfExists(modsDir.resolve(file + ".disabled"));
+				LauncherLog.info("Removed " + file + (stale ? " - the profile now runs another version" : " - " + label + " switched off in game"));
+				store.accept(null, null);
 				ours = null;
 			}
 			if (!wanted || ours != null && Files.exists(ours)) {
@@ -411,15 +426,13 @@ public final class PerformanceModsInstaller {
 			}
 			Files.createDirectories(modsDir);
 			Set<String> present = installedModIds(modsDir);
-			if (present.contains("c2me")) {
+			if (present.contains(modId)) {
 				return; // the player's own copy
 			}
-			installOne("c2me-fabric", "c2me", version, modsDir, present).ifPresentOrElse(fileName -> {
-				state.c2meFile = fileName;
-				state.c2meGameVersion = version.id();
-			}, () -> LauncherLog.info("No C2ME build for " + version.id() + " - launching without it"));
+			installOne(slug, modId, version, modsDir, present).ifPresentOrElse(fileName -> store.accept(fileName, version.id()),
+					() -> LauncherLog.info("No " + label + " build for " + version.id() + " - launching without it"));
 		} catch (IOException | RuntimeException e) {
-			LauncherLog.warn("Couldn't set up C2ME - launching without changes", e);
+			LauncherLog.warn("Couldn't set up " + label + " - launching without changes", e);
 		}
 	}
 

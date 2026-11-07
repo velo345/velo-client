@@ -23,6 +23,10 @@ import java.util.Map;
  * just updates at e.g. 5 fps instead of 20). Your own block placing/breaking is never delayed.</li>
  * <li><b>Piston animations</b> - moving pistons/blocks further away than the set distance skip the
  * 2-tick slide (they still appear in their new place).</li>
+ * <li><b>Moving blocks</b> - blocks pistons are moving use flat lighting (rebuilt every frame, smooth light was the
+ * biggest cost in a piston farm).</li>
+ * <li><b>Light</b> - light checks in sections that keep changing are collected and released at a bounded rate per tick,
+ * so light near the machine can trail by up to about a second.</li>
  * <li><b>Item stacks</b> - dropped item stacks draw one model instead of up to five.</li>
  * <li><b>Particles</b> - a per-tick budget for particles, and for block-break effects (64
  * particles each: piston/TNT/flying-machine farms break hundreds of blocks a second). Blocks you
@@ -42,6 +46,19 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 	public interface SectionFlusher {
 		void dirty(int x, int y, int z);
 	}
+
+	/** Runs a held-back light check on the client's light engine (set by TurboFarmLightMixin). */
+	public interface LightFlusher {
+		void check(long blockPos);
+	}
+
+	/** Light checks released per tick: bounds the light engine's work in any one frame. */
+	private static final int LIGHT_CHECKS_PER_TICK = 128;
+	/** True while moving blocks are built in farm mode (flat lighting, see TurboSodiumFlatMovingMixin). */
+	public static volatile boolean flatMovingBlocks;
+	private static LightFlusher lightFlusher;
+	private static boolean lightFlushing;
+	private final it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet deferredLight = new it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet();
 
 	private static final List<String> MODES = List.of("Auto", "Always On");
 	private static final List<String> SENSITIVITY = List.of("Low", "Medium", "High");
@@ -65,7 +82,9 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 	private boolean active;
 	private long tick;
 	/** Sections near you that kept changing this second (redstone clocks, farms) - see {@link #sectionDecision}. */
-	private final java.util.Set<Long> hotThisSecond = new java.util.HashSet<>();
+	// fastutil, not HashMap<Long, ...>: the packed x/y/z keys collided so badly in Long.hashCode that buckets turned into
+	// trees - TreeNode.find showed up in every chunk-load hitch. These mix the hash and don't box.
+	private final it.unimi.dsi.fastutil.longs.LongOpenHashSet hotThisSecond = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
 	private int lastHot;
 	private long worldSince;
 	private int hotSeconds;
@@ -73,7 +92,7 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 	private int particlesThisTick;
 	private int breaksThisTick;
 	private final Map<String, Integer> soundsThisTick = new HashMap<>();
-	private final Map<Long, long[]> sections = new HashMap<>();
+	private final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<long[]> sections = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
 	private Object lastWorld;
 
 	public AntiFarmLagModule() {
@@ -121,6 +140,8 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 			lastWorld = world;
 			sections.clear();
 			hotThisSecond.clear();
+			deferredLight.clear();
+			lightFlusher = null;
 			worldSince = tick;
 			setActive(false);
 		}
@@ -128,6 +149,7 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 			return;
 		}
 		flushDue(false);
+		releaseLight(LIGHT_CHECKS_PER_TICK);
 		if (tick % 20 == 0) {
 			lastHot = hotThisSecond.size();
 			hotThisSecond.clear();
@@ -156,12 +178,47 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 		}
 	}
 
+	/**
+	 * Farm mode: holds a client light check back when its section keeps changing. Render thread only - the integrated
+	 * server's engine calls in from its own threads and always goes through.
+	 */
+	public static boolean deferLightCheck(long blockPos, int sectionX, int sectionY, int sectionZ, LightFlusher flusher) {
+		AntiFarmLagModule m = on();
+		if (m == null || !m.active || lightFlushing || !"Render thread".equals(Thread.currentThread().getName())) {
+			return false;
+		}
+		long key = (((long) sectionX) & 0x3FFFFF) << 42 | (((long) sectionY) & 0xFFFFF) << 22 | (((long) sectionZ) & 0x3FFFFF);
+		long[] state = m.sections.get(key);
+		if (state == null || state[1] < 3) {
+			return false;
+		}
+		lightFlusher = flusher;
+		m.deferredLight.add(blockPos);
+		return true;
+	}
+
+	private void releaseLight(int count) {
+		LightFlusher flusher = lightFlusher;
+		if (flusher == null || deferredLight.isEmpty()) {
+			return;
+		}
+		lightFlushing = true;
+		try {
+			for (int i = 0; i < count && !deferredLight.isEmpty(); i++) {
+				flusher.check(deferredLight.removeFirstLong());
+			}
+		} finally {
+			lightFlushing = false;
+		}
+	}
+
 	private void setActive(boolean value) {
 		if (active == value) {
 			return;
 		}
 		active = value;
 		if (!value) {
+			releaseLight(Integer.MAX_VALUE);
 			flushDue(true);
 			sections.clear();
 		}

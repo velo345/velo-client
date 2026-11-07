@@ -32,12 +32,12 @@ public final class C2meModule extends AbstractModule {
 
 	@Override
 	public void onEnable() {
-		write(true);
+		writeFlag(KEY, true);
 	}
 
 	@Override
 	public void onDisable() {
-		write(false);
+		writeFlag(KEY, false);
 	}
 
 	/** Whether C2ME is actually running in this session (the launcher installed it, or the player did). */
@@ -45,7 +45,8 @@ public final class C2meModule extends AbstractModule {
 		return FabricLoader.getInstance().isModLoaded("c2me");
 	}
 
-	private static void write(boolean wanted) {
+	/** Records an opt-in mod choice for the launcher, which applies it before the next start. */
+	static void writeFlag(String key, boolean wanted) {
 		Path file = FabricLoader.getInstance().getConfigDir().resolve("velo-client").resolve("experimental-mods.properties");
 		try {
 			java.util.Properties props = new java.util.Properties();
@@ -54,16 +55,16 @@ public final class C2meModule extends AbstractModule {
 					props.load(in);
 				}
 			}
-			if (String.valueOf(wanted).equals(props.getProperty(KEY))) {
+			if (String.valueOf(wanted).equals(props.getProperty(key))) {
 				return;
 			}
-			props.setProperty(KEY, String.valueOf(wanted));
+			props.setProperty(key, String.valueOf(wanted));
 			Files.createDirectories(file.getParent());
 			try (var out = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
 				props.store(out, "Written by Velo Client - read by the Velo launcher before the game starts");
 			}
 		} catch (IOException e) {
-			VeloClient.LOGGER.warn("Couldn't save the C2ME choice", e);
+			VeloClient.LOGGER.warn("Couldn't save the {} choice", key, e);
 		}
 	}
 }

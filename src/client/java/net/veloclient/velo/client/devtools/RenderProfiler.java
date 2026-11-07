@@ -41,6 +41,10 @@ public final class RenderProfiler {
 	}
 	/** With {@code -Dvelo.renderProfileAB=true}, flips the Fast Draw Path toggle every block for a same-scene A/B. */
 	private static final boolean AB = Boolean.getBoolean("velo.renderProfileAB");
+	/** {@code -Dvelo.renderProfileAB=particles}: flips Velo Turbo's particle section culling instead. */
+	private static final boolean AB_PARTICLES = "particles".equals(System.getProperty("velo.renderProfileAB"));
+	/** {@code -Dvelo.renderProfileAB=turbo}: flips the Velo Turbo master switch. */
+	private static final boolean AB_TURBO = "turbo".equals(System.getProperty("velo.renderProfileAB"));
 
 	private static long frameStart;
 	private static long frames;
@@ -89,6 +93,7 @@ public final class RenderProfiler {
 	}
 
 	public static void frameBegin() {
+		MoveBench.frameStart();
 		frameStart = System.nanoTime();
 	}
 
@@ -97,6 +102,7 @@ public final class RenderProfiler {
 
 	public static void frameEnd() {
 		GpuPassTimer.endFrame();
+		MoveBench.frame(System.nanoTime());
 		if (frameStart == 0) {
 			return;
 		}
@@ -132,8 +138,10 @@ public final class RenderProfiler {
 					client.getGpuUtilizationPercentage(), client.getCurrentFps() * 1.0,
 					net.veloclient.velo.client.modules.performance.DecoupledPresent.shownFps()));
 			VeloClient.LOGGER.info(String.format(java.util.Locale.ROOT,
-					"Velo render profile [fast draw %s] (avg/frame over 600): frame %.3f ms | extract %.3f ms | record terrain %.3f ms (%d draws) | wait acquire %.3f ms | submit+present %.3f ms | %d barriers",
+					"Velo render profile [fast draw %s, particle cull %s, turbo %s] (avg/frame over 600): frame %.3f ms | extract %.3f ms | record terrain %.3f ms (%d draws) | wait acquire %.3f ms | submit+present %.3f ms | %d barriers",
 					net.veloclient.velo.client.modules.performance.PerformanceBoostModule.fastDrawPath ? "on" : "off",
+					net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turboParticleCull ? "on" : "off",
+					net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo ? "on" : "off",
 					frameNanos / 600e6, extractNanos / 600e6, terrainNanos / 600e6, terrainDraws / 600, acquireNanos / 600e6, presentNanos / 600e6, barriers / 600));
 			barriers = 0;
 			long pushes = fullPushes + partialPushes;
@@ -152,6 +160,16 @@ public final class RenderProfiler {
 			frameNanos = extractNanos = prepareNanos = terrainNanos = terrainDraws = acquireNanos = presentNanos = 0;
 			if (AB) {
 				net.veloclient.velo.client.modules.performance.PerformanceBoostModule.fastDrawPath ^= true;
+			}
+			VeloClient.LOGGER.info("Velo render profile HUD cache: " + net.veloclient.velo.client.hud.HudFrameCache.replays + " replays, "
+					+ net.veloclient.velo.client.hud.HudFrameCache.records + " records");
+			net.veloclient.velo.client.hud.HudFrameCache.replays = 0;
+			net.veloclient.velo.client.hud.HudFrameCache.records = 0;
+			if (AB_TURBO) {
+				net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo ^= true;
+			}
+			if (AB_PARTICLES) {
+				net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turboParticleCull ^= true;
 			}
 		}
 	}

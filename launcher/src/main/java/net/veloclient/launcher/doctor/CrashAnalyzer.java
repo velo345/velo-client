@@ -455,20 +455,32 @@ final class CrashAnalyzer {
 	 * Fabric Loader and Fabric API bring their own copies, so these are turned off when a mixin crash happens.
 	 */
 	private static void looseLibraries(Snapshot s, String text, List<Issue> issues) {
-		if (!text.contains("Mixin") && !text.contains("mixin")) {
+		boolean mixin = text.contains("Mixin") || text.contains("mixin");
+		boolean classLoading = CLASS_LOADING.matcher(errorsOnly(text)).find();
+		if (!mixin && !classLoading) {
 			return;
 		}
 		boolean fabricApi = false;
 		List<ModScanner.ModInfo> loose = new ArrayList<>();
+		List<ModScanner.ModInfo> copiedLibraries = new ArrayList<>();
 		for (ModScanner.ModInfo mod : s.enabledMods()) {
 			String id = mod.id() == null ? "" : mod.id();
 			if (id.equals("fabric-api") || id.equals("fabric")) {
 				fabricApi = true;
+			} else if (LUNAR_LIBRARY.matcher(mod.file().getFileName().toString().toLowerCase(java.util.Locale.ROOT)).matches()) {
+				// Lunar's dependencies/ copy of a library a mod nests (named <group>_<artifact>-<version>-<16 hex>.jar): an old
+				// copy loose in the folder wins over the newer one inside the mod - Noxesium 3.0.0 next to Lunar's
+				// noxesium-api 2.7.6 died with NoClassDefFoundError (zelvak1O, 2026-11-07).
+				copiedLibraries.add(mod);
 			} else if (id.equals("mixinextras") || id.matches("fabric-[a-z0-9-]+-(v\\d+|base)")) {
 				loose.add(mod);
 			}
 		}
-		if (loose.isEmpty() || !fabricApi && loose.stream().noneMatch(m -> "mixinextras".equals(m.id()))) {
+		if (!mixin || !fabricApi && loose.stream().noneMatch(m -> "mixinextras".equals(m.id()))) {
+			loose.clear();
+		}
+		loose.addAll(copiedLibraries);
+		if (loose.isEmpty()) {
 			return;
 		}
 		List<Action> off = new ArrayList<>();
@@ -481,6 +493,12 @@ final class CrashAnalyzer {
 						+ " copies, and these old ones break other mods.",
 				List.of(new Fix("Turn the old libraries off", "They stay in the folder, turned off", off)), List.of()));
 	}
+
+	/** Lunar's names for unpacked nested libraries: group_artifact-version-hash.jar (15-16 hex digits). */
+	private static final Pattern LUNAR_LIBRARY = Pattern.compile("[a-z0-9]+(_[a-z0-9.\\-]+)+-.+-[0-9a-f]{15,16}\\.jar");
+	/** A class or member that another jar was built against is missing - the typical sign of an old library copy. */
+	private static final Pattern CLASS_LOADING = Pattern.compile("NoClassDefFoundError|ClassNotFoundException|NoSuchMethodError|NoSuchFieldError"
+			+ "|IncompatibleClassChangeError|AbstractMethodError");
 
 	private static final Pattern MOD_FILE_GONE = Pattern.compile("NoSuchFileException: (\\S*[\\\\/]mods[\\\\/]([^\\\\/\\r\\n]+\\.jar))");
 

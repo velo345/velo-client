@@ -40,7 +40,7 @@ public final class TargetHudModule extends AbstractModule implements HudModule, 
 
 	public TargetHudModule() {
 		super("target-hud", "Target HUD", "Shows the player you're fighting: health, armor, distance and who's winning.",
-				ModuleCategory.PVP, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.PVP, SafetyTag.CHECK_SERVER_RULES, false);
 	}
 
 	@Override

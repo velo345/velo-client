@@ -40,6 +40,7 @@ public final class StartupTimer {
 		if (EXIT_AFTER > 0 && !stopping && System.currentTimeMillis() - readyAt > EXIT_AFTER * 1000L) {
 			stopping = true;
 			VeloClient.LOGGER.info("Velo profile run: quitting after {} s", EXIT_AFTER);
+			MoveBench.finish();
 			//? if >=26.1 {
 			/*client.stop();
 			*///?} else {

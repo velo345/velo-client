@@ -670,10 +670,14 @@ public final class InstanceDetailView {
 		var known = InstalledAssetStore.asMap(InstalledAssetStore.loadAll(instance.id(), kind));
 		String needle = filterText == null ? "" : filterText.strip().toLowerCase(Locale.ROOT);
 		List<Runnable> rows = new java.util.ArrayList<>();
+		List<Path> unknownFiles = new java.util.ArrayList<>();
 		for (Path file : files) {
 			String fileName = file.getFileName().toString();
 			boolean disabled = isDisabled(fileName);
 			InstalledAsset asset = known.get(enabledName(fileName));
+			if (asset == null) {
+				unknownFiles.add(file);
+			}
 			if (!needle.isEmpty()) {
 				String haystack = (asset != null ? asset.title() + " " : "") + fileName;
 				if (!haystack.toLowerCase(Locale.ROOT).contains(needle)) {
@@ -695,7 +699,6 @@ public final class InstanceDetailView {
 						selection.decorate((HBox) row, file, !isManagedFile(kind, enabledName(fileName)));
 					}
 					list.getChildren().add(row);
-					autoIdentify(instance, kind, file, identifyAttempted, refresh);
 				});
 			}
 		}
@@ -703,6 +706,7 @@ public final class InstanceDetailView {
 			rows.add(selection::endRows);
 		}
 		addRowsInBatches(list, rows);
+		autoIdentify(instance, kind, unknownFiles, identifyAttempted, refresh);
 	}
 
 	/**
@@ -905,24 +909,64 @@ public final class InstanceDetailView {
 		return row;
 	}
 
-	/** Looks the file up on Modrinth by sha1 automatically (no button) the first time it's seen as unrecognized; silently stays a plain row if Modrinth doesn't know it. */
-	private static void autoIdentify(Instance instance, InstalledAssetStore.Kind kind, Path file, Set<String> identifyAttempted, Runnable refresh) {
-		String fileName = file.getFileName().toString();
-		String enabledFileName = enabledName(fileName);
-		if (enabledFileName.startsWith("velo-client-") || enabledFileName.startsWith("fabric-api-") || enabledFileName.startsWith("velo-addons-")
-				|| !identifyAttempted.add(fileName)) {
+	/**
+	 * Looks every unrecognized file up on Modrinth by sha1 automatically (no button), in two requests for all of them: one
+	 * {@code POST /version_files} and one {@code GET /projects}. It used to be two requests per file, all at once - after an
+	 * import from Lunar (30-100 mods) Modrinth throttled the burst, the failures were silent and only tried once, so almost
+	 * every mod stayed "not on Modrinth" although Modrinth knew it by checksum. A failed lookup may be tried again on the next
+	 * refresh; files Modrinth doesn't know stay plain rows.
+	 */
+	private static void autoIdentify(Instance instance, InstalledAssetStore.Kind kind, List<Path> files, Set<String> identifyAttempted, Runnable refresh) {
+		List<Path> todo = new java.util.ArrayList<>();
+		for (Path file : files) {
+			String fileName = file.getFileName().toString();
+			String enabledFileName = enabledName(fileName);
+			if (enabledFileName.startsWith("velo-client-") || enabledFileName.startsWith("fabric-api-") || enabledFileName.startsWith("velo-addons-")
+					|| !identifyAttempted.add(fileName)) {
+				continue;
+			}
+			todo.add(file);
+		}
+		if (todo.isEmpty()) {
 			return;
 		}
 		CompletableFuture.runAsync(() -> {
-			try {
-				String sha1 = Downloader.sha1Of(file);
-				ModrinthClient.versionByFileSha1(sha1).ifPresent(v -> ModrinthClient.getProject(v.projectId()).ifPresent(project ->
-						InstalledAssetStore.record(instance.id(), kind, new InstalledAsset(project.id(), v.id(), enabledFileName,
-								project.title(), project.description(), project.iconUrl(), v.versionNumber(), kind.modrinthProjectType()))));
-			} catch (IOException ignored) {
-				// Stays an unknown row.
+			java.util.Map<String, Path> byHash = new java.util.LinkedHashMap<>();
+			for (Path file : todo) {
+				try {
+					byHash.put(Downloader.sha1Of(file), file);
+				} catch (IOException ignored) {
+					// unreadable: stays an unknown row
+				}
 			}
-			Platform.runLater(refresh);
+			boolean recorded = false;
+			try {
+				java.util.Map<String, ModrinthClient.ProjectVersion> versions = ModrinthClient.versionsByFileSha1(byHash.keySet());
+				java.util.Set<String> projectIds = new java.util.LinkedHashSet<>();
+				versions.values().forEach(v -> projectIds.add(v.projectId()));
+				java.util.Map<String, ModrinthClient.Project> projects = new java.util.HashMap<>();
+				for (ModrinthClient.Project project : ModrinthClient.projects(projectIds)) {
+					projects.put(project.id(), project);
+				}
+				for (var entry : versions.entrySet()) {
+					ModrinthClient.ProjectVersion v = entry.getValue();
+					ModrinthClient.Project project = projects.get(v.projectId());
+					Path file = byHash.get(entry.getKey());
+					if (project == null || file == null) {
+						continue;
+					}
+					InstalledAssetStore.record(instance.id(), kind, new InstalledAsset(project.id(), v.id(), enabledName(file.getFileName().toString()),
+							project.title(), project.description(), project.iconUrl(), v.versionNumber(), kind.modrinthProjectType()));
+					recorded = true;
+				}
+			} catch (IOException | RuntimeException e) {
+				// Offline or throttled: let the next refresh try these again.
+				todo.forEach(file -> identifyAttempted.remove(file.getFileName().toString()));
+				return;
+			}
+			if (recorded) {
+				Platform.runLater(refresh);
+			}
 		}, Executors.newVirtualThreadPerTaskExecutor());
 	}
 
@@ -1007,10 +1051,16 @@ public final class InstanceDetailView {
 
 		int[] offset = {0};
 		int pageSize = 40;
+		// Every new search gets a number; answers of older ones are dropped. Without it the first "relevance" load (or a
+		// search typed a moment earlier) could answer last and replace or mix into the results ("search bugs out").
+		int[] generation = {0};
 
 		Runnable[] loadPage = new Runnable[1];
 		loadPage[0] = () -> {
 			boolean firstPage = offset[0] == 0;
+			int requestGeneration = generation[0];
+			int requestOffset = offset[0];
+			String text = query.getText();
 			loadMore.setDisable(true);
 			String sortIndex = switch (sort.getValue()) {
 				case "Downloads" -> "downloads";
@@ -1021,11 +1071,14 @@ public final class InstanceDetailView {
 			};
 			CompletableFuture.supplyAsync(() -> {
 				try {
-					return ModrinthClient.search(query.getText(), kind.modrinthProjectType(), instance.mcVersion(), sortIndex, offset[0], pageSize);
+					return ModrinthClient.search(text, kind.modrinthProjectType(), instance.mcVersion(), sortIndex, requestOffset, pageSize);
 				} catch (IOException e) {
 					return e;
 				}
 			}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
+				if (requestGeneration != generation[0] || requestOffset != offset[0]) {
+					return;   // a newer search (or page) was asked for meanwhile
+				}
 				loadMore.setDisable(false);
 				if (result instanceof Exception ex) {
 					if (firstPage) {
@@ -1057,6 +1110,7 @@ public final class InstanceDetailView {
 		};
 
 		Runnable runSearch = () -> {
+			generation[0]++;
 			offset[0] = 0;
 			results.getChildren().setAll(loadingLabel(theme));
 			loadMore.setVisible(false);

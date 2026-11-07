@@ -930,6 +930,19 @@ stonecutter parameters {
 			// EntityRenderState#boundingBoxHeight (NameTagLinesMixin) - the bare Box rule would
 			// turn it into "boundingAABBHeight".
 			replace("boundingBoxHeight", "boundingBoxHeight")
+			// SodiumWorldRenderer#isBoxVisible (SodiumVisibility, Velo Turbo particle culling) - Sodium's real name.
+			replace("isBoxVisible(", "isBoxVisible(")
+			// Sodium's real package (TurboSodiumCacheCleanupMixin) - the world -> level rule would rewrite it.
+			replace("sodium.client.world.cloned", "sodium.client.world.cloned")
+			// HudFrameCache (Velo Turbo HUD cache) - real Mojmap GuiRenderState names containing "Text".
+			replace("GuiTextRenderState", "GuiTextRenderState")
+			replace("state.addText((", "state.addText((")
+			replace("real.addText(", "real.addText(")
+			replace("public void addText(net.minecraft.client.renderer.state.gui", "public void addText(net.minecraft.client.renderer.state.gui")
+			replace("public void forEachText(java.util", "public void forEachText(java.util")
+			replace("real.forEachText(", "real.forEachText(")
+			replace("super.addText(", "super.addText(")
+			replace("super.forEachText(", "super.forEachText(")
 			// Display.TextDisplay (HologramAccessor / PvpCompat) - the bare Text rule would make it
 			// "ComponentDisplay".
 			replace("Display.TextDisplay", "Display.TextDisplay")

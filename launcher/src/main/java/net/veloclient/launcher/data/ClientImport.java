@@ -70,10 +70,11 @@ public final class ClientImport {
 		}
 
 		public int worldCount() {
-			if (gameDir == null || !Files.isDirectory(gameDir.resolve("saves"))) {
+			Path saves = savesDir();
+			if (saves == null || !Files.isDirectory(saves)) {
 				return 0;
 			}
-			try (Stream<Path> s = Files.list(gameDir.resolve("saves"))) {
+			try (Stream<Path> s = Files.list(saves)) {
 				return (int) s.filter(p -> Files.isRegularFile(p.resolve("level.dat"))).count();
 			} catch (IOException e) {
 				return 0;
@@ -81,7 +82,51 @@ public final class ClientImport {
 		}
 
 		public boolean hasConfig() {
-			return gameDir != null && Files.isDirectory(gameDir.resolve("config"));
+			Path config = configDir();
+			return config != null && Files.isDirectory(config);
+		}
+
+		/** The worlds folder: the game directory's, or for a Lunar profile the shared .minecraft's (see {@link #shared}). */
+		public Path savesDir() {
+			return shared("saves");
+		}
+
+		public Path configDir() {
+			return shared("config");
+		}
+
+		/**
+		 * Lunar profiles (.lunarclient/profiles/&lt;name&gt;) keep their own options.txt and server list, but worlds and mod
+		 * configs stay in the shared .minecraft next to .lunarclient - imports from Lunar used to find no worlds at all.
+		 */
+		private Path shared(String name) {
+			if (gameDir == null) {
+				return null;
+			}
+			Path own = gameDir.resolve(name);
+			if (hasEntries(own)) {
+				return own;
+			}
+			for (Path p = gameDir; p != null; p = p.getParent()) {
+				if (p.getFileName() != null && p.getFileName().toString().equals(".lunarclient") && p.getParent() != null) {
+					Path common = p.getParent().resolve(".minecraft").resolve(name);
+					if (hasEntries(common)) {
+						return common;
+					}
+				}
+			}
+			return own;
+		}
+
+		private static boolean hasEntries(Path dir) {
+			if (!Files.isDirectory(dir)) {
+				return false;
+			}
+			try (Stream<Path> s = Files.list(dir)) {
+				return s.findAny().isPresent();
+			} catch (IOException e) {
+				return false;
+			}
 		}
 
 		/** Anything worth importing at all. */
@@ -95,7 +140,7 @@ public final class ClientImport {
 	}
 
 	/** The clients we know where to look for - the first ones are shown even when not found, so you see what's supported. */
-	public static final List<String> CLIENTS = List.of("Minecraft Launcher", "Lunar Client", "Dawn Client", "NoRisk Client", "Modrinth App",
+	public static final List<String> CLIENTS = List.of("Minecraft Launcher", "Lunar Client", "OneClient", "Dawn Client", "NoRisk Client", "Modrinth App",
 			"Prism / MultiMC", "CurseForge", "LabyMod", "ATLauncher", "GDLauncher", "FTB App", "Technic", "Other launchers");
 
 	private static final Pattern FABRIC_API_VERSION = Pattern.compile("fabric-api-[^+]+\\+([0-9][0-9a-z.\\-]*)\\.jar", Pattern.CASE_INSENSITIVE);
@@ -221,6 +266,22 @@ public final class ClientImport {
 					add(sources, "Modrinth App", dir.getFileName() + where, dir, dir.resolve("mods"), modrinthVersion(dir), modrinthLoader(dir), null, null);
 				}
 			}
+			// OneClient (Polyfrost): one shared .minecraft (settings, worlds, servers, configs) and a mods folder per Minecraft
+			// version under clusters/<version> <loader>/ - one source per cluster that has mods.
+			Path oneClient = data.resolve("Polyfrost").resolve("OneClient");
+			if (Files.isDirectory(oneClient.resolve("clusters"))) {
+				Path shared = oneClient.resolve(".minecraft");
+				for (Path cluster : subdirs(oneClient.resolve("clusters"), 1)) {
+					if (modJars(cluster.resolve("mods")).isEmpty()) {
+						continue;
+					}
+					String label = cluster.getFileName().toString();
+					String version = label.split(" ")[0];
+					String loader = label.toLowerCase(Locale.ROOT).contains("forge") ? "forge" : "fabric";
+					add(sources, "OneClient", label + where, Files.isDirectory(shared) ? shared : cluster, cluster.resolve("mods"), version, loader,
+							cluster.resolve("resourcepacks"), cluster.resolve("shaderpacks"));
+				}
+			}
 			// Prism Launcher / PolyMC / MultiMC instances.
 			for (Path prism : distinct(data.resolve("PrismLauncher"), data.resolve("PolyMC"), data.resolve("multimc"), data.resolve("MultiMC"),
 					b.resolve("PrismLauncher"), b.resolve("MultiMC"), b.resolve(".local/share/multimc"))) {
@@ -263,6 +324,14 @@ public final class ClientImport {
 		curseRoots.add(home.resolve("curseforge/minecraft/Instances"));
 		for (Path docs : documents) {
 			curseRoots.add(docs.resolve("curseforge/minecraft/Instances"));
+		}
+		// CurseForge lets players move its folder (Settings > Minecraft), usually to another drive: "CurseForge is
+		// downloaded, Velo doesn't recognize it" (bug report, 2026-11-07). Windows paths ignore case.
+		if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
+			for (Path root : java.nio.file.FileSystems.getDefault().getRootDirectories()) {
+				curseRoots.add(root.resolve("curseforge/minecraft/Instances"));
+				curseRoots.add(root.resolve("Games/curseforge/minecraft/Instances"));
+			}
 		}
 		for (Path cf : distinct(curseRoots.toArray(Path[]::new))) {
 			for (Path dir : subdirs(cf, 1)) {
@@ -600,6 +669,18 @@ public final class ClientImport {
 		return modId.equals("mixinextras") || modId.matches("fabric-[a-z0-9-]+-(v\\d+|base)") || modId.equals("fabric-api-lookup-api-v1");
 	}
 
+	/**
+	 * Mods that are part of another client rather than something the player chose: OneClient's OneConfig and PolyPlus (with
+	 * Polydium inside - its license doesn't allow passing it on). Velo has its own version of what they do.
+	 */
+	static boolean otherClientsOwnMod(String modId) {
+		if (modId == null) {
+			return false;
+		}
+		String id = modId.toLowerCase(Locale.ROOT);
+		return id.startsWith("oneconfig") || id.startsWith("polyplus") || id.startsWith("polydium") || id.startsWith("oneclient");
+	}
+
 	/** The mod jars of a folder: its own *.jar plus a "dependencies" subfolder (Lunar puts libraries there). */
 	static List<Path> modJars(Path dir) {
 		if (dir != null && dir.getFileName() != null && dir.getFileName().toString().startsWith(NoRiskMods.MARKER)) {
@@ -668,7 +749,7 @@ public final class ClientImport {
 			}
 			if (options.configs() && source.hasConfig()) {
 				progress.accept("Mod configs...");
-				copyTree(source.gameDir().resolve("config"), game.resolve("config"), false);
+				copyTree(source.configDir(), game.resolve("config"), false);
 				done.add("mod configs");
 			}
 			if (options.resourcePacks() && source.resourcePackCount() > 0) {
@@ -683,7 +764,7 @@ public final class ClientImport {
 			}
 			if (options.worlds() && source.worldCount() > 0) {
 				progress.accept("Worlds (this can take a while)...");
-				copyTree(source.gameDir().resolve("saves"), InstancePaths.savesDir(instanceId), false);
+				copyTree(source.savesDir(), InstancePaths.savesDir(instanceId), false);
 				done.add(source.worldCount() + " worlds");
 			}
 		} catch (IOException e) {
@@ -753,7 +834,7 @@ public final class ClientImport {
 			if (modId != null && present.contains(modId)) {
 				continue;
 			}
-			if (bundledLibrary(jar, modId)) {
+			if (bundledLibrary(jar, modId) || otherClientsOwnMod(modId)) {
 				skipped++;
 				continue;
 			}

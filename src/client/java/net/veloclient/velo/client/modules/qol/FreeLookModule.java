@@ -65,7 +65,7 @@ public final class FreeLookModule extends AbstractModule implements Configurable
 		super("free-look", "Free Look",
 				"Hold the free look key to orbit the camera freely around your player in third person, without "
 						+ "turning your player or moving.",
-				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.QOL, SafetyTag.CHECK_SERVER_RULES, false);
 		ClientTickEvents.END_CLIENT_TICK.register(client ->
 				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
 	}

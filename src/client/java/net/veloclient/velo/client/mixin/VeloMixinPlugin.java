@@ -20,7 +20,8 @@ import java.util.Set;
  */
 public final class VeloMixinPlugin implements IMixinConfigPlugin {
 
-	private static final Set<String> ONLY_26_2 = Set.of("VulkanBarrierProbeMixin", "VulkanPassBarrierMixin", "VulkanSurfaceProfileMixin");
+	private static final Set<String> ONLY_26_2 = Set.of("VulkanBarrierProbeMixin", "VulkanPassBarrierMixin", "VulkanSurfaceProfileMixin",
+			"VulkanThreadedSubmitMixin", "VulkanThreadedQueueMixin", "VulkanThreadedSubmissionMixin", "VulkanThreadedSurfaceMixin", "VulkanThreadedFrameMixin", "VulkanOutlineSkipMixin", "VulkanGuiDrawProfileMixin", "TurboSkyDeferMixin", "TurboSkyPipelineMixin");
 	/** Patch vanilla's own terrain path, which Sodium replaces wholesale. */
 	private static final Set<String> VANILLA_TERRAIN = Set.of("ChunkSlicePrepMixin", "SectionMeshSlotsMixin", "UberBufferSlotsMixin");
 
@@ -58,6 +59,22 @@ public final class VeloMixinPlugin implements IMixinConfigPlugin {
 		// The shadow pass lives in Sodium's renderer.
 		if ((simpleName.startsWith("VeloShadow") || simpleName.startsWith("VeloSodium") || simpleName.startsWith("VeloFoliage")
 				|| simpleName.startsWith("VeloBlockRender") || simpleName.startsWith("VeloFluid")) && !sodium) {
+			return false;
+		}
+		// Velo Turbo culling that reads Sodium's section tree: Vulkan-era versions with Sodium only.
+		if (simpleName.startsWith("TurboSodium") && !(sodium && hasVulkan)) {
+			return false;
+		}
+		if (simpleName.startsWith("TurboFarm") && !hasVulkan) {
+			return false;
+		}
+		if (simpleName.startsWith("TurboPacket") && !hasVulkan) {
+			return false;
+		}
+		if (simpleName.startsWith("TurboSky") && !hasVulkan) {
+			return false;
+		}
+		if (simpleName.startsWith("TurboHud") && !hasVulkan) {
 			return false;
 		}
 		return hasVulkan || !mixinClassName.contains(".Vulkan");

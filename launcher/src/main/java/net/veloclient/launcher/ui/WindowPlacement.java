@@ -38,10 +38,15 @@ public final class WindowPlacement {
 	public static void restore(Stage stage, double defaultWidth, double defaultHeight, WindowChrome chrome) {
 		Saved saved = read();
 		if (saved != null && mostlyVisible(saved) && !fillsScreen(saved)) {
-			stage.setX(saved.x());
-			stage.setY(saved.y());
-			stage.setWidth(saved.width());
-			stage.setHeight(saved.height());
+			// Kept inside the usable area of its monitor (above the taskbar): a window remembered from a bigger
+			// screen or another scaling put its bottom row of buttons under the Windows taskbar.
+			Rectangle2D b = screenFor(saved).getVisualBounds();
+			double width = Math.min(saved.width(), b.getWidth());
+			double height = Math.min(saved.height(), b.getHeight());
+			stage.setWidth(width);
+			stage.setHeight(height);
+			stage.setX(Math.max(b.getMinX(), Math.min(saved.x(), b.getMaxX() - width)));
+			stage.setY(Math.max(b.getMinY(), Math.min(saved.y(), b.getMaxY() - height)));
 		} else {
 			Rectangle2D bounds = screenUnderMouse().getVisualBounds();
 			// Large but clearly a window: ~80% of the monitor, never smaller than the default size.
@@ -108,6 +113,30 @@ public final class WindowPlacement {
 			}
 		}
 		return visible >= 0.6 * saved.width() * saved.height();
+	}
+
+	/**
+	 * Lowers the window's minimum size to the usable area of the monitor it opens on. The launcher's own minimum
+	 * (1200 x 760) is taller than many laptops' usable area - 1366 x 768 minus the taskbar, or 1920 x 1080 at 150%
+	 * scaling (1280 x 680) - and the window manager then made the window taller than the screen: buttons ended up under
+	 * the taskbar, and maximized the page was cut off (bug report, 2026-11-07).
+	 */
+	public static void fitMinimumToScreen(Stage stage, double minWidth, double minHeight) {
+		Rectangle2D b = screenFor(new Saved(stage.getX(), stage.getY(), Math.max(1, stage.getWidth()), Math.max(1, stage.getHeight()), false))
+				.getVisualBounds();
+		stage.setMinWidth(Math.min(minWidth, b.getWidth()));
+		stage.setMinHeight(Math.min(minHeight, b.getHeight()));
+		if (stage.getHeight() > b.getHeight()) {
+			stage.setHeight(b.getHeight());
+		}
+		if (stage.getWidth() > b.getWidth()) {
+			stage.setWidth(b.getWidth());
+		}
+	}
+
+	private static Screen screenFor(Saved saved) {
+		var screens = Screen.getScreensForRectangle(saved.x(), saved.y(), saved.width(), saved.height());
+		return screens.isEmpty() ? Screen.getPrimary() : screens.get(0);
 	}
 
 	private static Screen screenUnderMouse() {

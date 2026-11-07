@@ -34,7 +34,7 @@ public final class StorageMemoryModule extends AbstractModule implements Configu
 	public StorageMemoryModule() {
 		super("storage-memory", "Storage Memory",
 				"Remembers what's in your chests, shulker boxes and ender chest per server, plus villager trades and work stations. Y opens the search.",
-				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, true);
+				ModuleCategory.QOL, SafetyTag.CHECK_SERVER_RULES, true);
 		instance = this;
 		StorageCapture.register();
 		StorageHighlight.register();

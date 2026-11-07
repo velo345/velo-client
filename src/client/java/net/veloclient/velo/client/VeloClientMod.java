@@ -80,6 +80,10 @@ public final class VeloClientMod implements ClientModInitializer {
 		}
 		// A Cloud Sync restore waiting for this start goes in before anything reads its settings.
 		net.veloclient.velo.client.cloud.CloudSync.applyPendingAtStartup();
+		// Dedicated GPUs on "Default" (= OpenGL) move to Vulkan once; undoes itself if that start fails.
+		net.veloclient.velo.client.modules.performance.AutoVulkan.beforeOptionsLoad();
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STARTED.register(
+				client -> net.veloclient.velo.client.modules.performance.AutoVulkan.onStarted());
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				client -> net.veloclient.velo.client.cloud.CloudSync.tick());
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
@@ -169,6 +173,8 @@ public final class VeloClientMod implements ClientModInitializer {
 		AnticheatTestController.initIfEnabled();
 		net.veloclient.velo.client.devtools.ScreenshotTour.initIfRequested();
 		net.veloclient.velo.client.devtools.CosmeticsBench.register();
+		net.veloclient.velo.client.devtools.MoveBench.register();
+		net.veloclient.velo.client.devtools.FarmBench.register();
 		VeloClient.LOGGER.info("Velo Client ready ({} modules registered)", ModuleRegistry.all().size());
 	}
 
@@ -356,6 +362,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ZoomModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.CenteredInventoryModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.C2meModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.AlternateCurrentModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.CosmeticsQualityModule());
 		ModuleRegistry.register(new CustomCrosshairModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.AttackIndicatorModule());

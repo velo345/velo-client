@@ -30,10 +30,14 @@ import net.minecraft.text.StyleSpriteSource;
 public final class VeloFonts {
 
 	private static final int MAX_SCALE = 6;
+	/** HUD fonts (HUD Style families, Inter, Inter bold) go further: a scaled-up HUD element at GUI scale 4 needs 8x. */
+	private static final int MAX_HUD_SCALE = 8;
+	/** The scale the HUD element being drawn is posed at (HudManager.renderScaled), so its text gets a matching atlas. */
+	private static float hudPoseScale = 1f;
 
 	//? if <26.1 {
-	private static final StyleSpriteSource[] UI = fonts("ui");
-	private static final StyleSpriteSource[] UI_BOLD = fonts("ui_bold");
+	private static final StyleSpriteSource[] UI = fonts("ui", MAX_HUD_SCALE);
+	private static final StyleSpriteSource[] UI_BOLD = fonts("ui_bold", MAX_HUD_SCALE);
 	private static final StyleSpriteSource[] TITLE = fonts("title");
 	private static final StyleSpriteSource[] BIG = fonts("big");
 	private static final StyleSpriteSource[] DISPLAY = fonts("display");
@@ -43,10 +47,10 @@ public final class VeloFonts {
 	private static final StyleSpriteSource[] UI_SM = fonts("ui_sm");
 	private static final StyleSpriteSource[] MONO = fonts("mono");
 	//?} else {
-	/*private static final FontDescription[] UI = fonts("ui");
+	/*private static final FontDescription[] UI = fonts("ui", MAX_HUD_SCALE);
 	private static final FontDescription[] HERO = fonts("hero");
 	private static final FontDescription[] UI_SM = fonts("ui_sm");
-	private static final FontDescription[] UI_BOLD = fonts("ui_bold");
+	private static final FontDescription[] UI_BOLD = fonts("ui_bold", MAX_HUD_SCALE);
 	private static final FontDescription[] TITLE = fonts("title");
 	private static final FontDescription[] BIG = fonts("big");
 	private static final FontDescription[] DISPLAY = fonts("display");
@@ -85,6 +89,22 @@ public final class VeloFonts {
 				|| screen instanceof GameMenuScreen && VeloScreens.pause();
 	}
 
+	/** Sets the pose scale of the HUD element about to draw; returns the previous one to restore. */
+	public static float setHudPoseScale(float scale) {
+		float previous = hudPoseScale;
+		hudPoseScale = scale > 0 ? scale : 1f;
+		return previous;
+	}
+
+	/** Atlas for HUD-capable fonts: inside the HUD the element's own scale counts too (texels 1:1 on screen pixels). */
+	private static int hudScaleIndex() {
+		if (hudDepth == 0) {
+			return scaleIndex();
+		}
+		int scale = Math.round(ClientCompat.guiScale() * hudPoseScale);
+		return Math.max(1, Math.min(MAX_HUD_SCALE, scale)) - 1;
+	}
+
 	private static int scaleIndex() {
 		// A dense Velo window draws at a finer scale - its text uses that scale's atlas (the HUD under it keeps the real one).
 		int scale = hudDepth == 0 && net.veloclient.velo.client.gui.window.DenseGui.active()
@@ -94,11 +114,19 @@ public final class VeloFonts {
 
 	//? if <26.1 {
 	private static StyleSpriteSource[] fonts(String base) {
-		StyleSpriteSource[] out = new StyleSpriteSource[MAX_SCALE];
-		for (int i = 0; i < MAX_SCALE; i++) {
+		return fonts(base, MAX_SCALE);
+	}
+
+	private static StyleSpriteSource[] fonts(String base, int count) {
+		StyleSpriteSource[] out = new StyleSpriteSource[count];
+		for (int i = 0; i < count; i++) {
 			out[i] = new StyleSpriteSource.Font(Identifier.of("velo-client", base + "_" + (i + 1)));
 		}
 		return out;
+	}
+
+	private static StyleSpriteSource[] hudFonts(String base) {
+		return fonts(base, MAX_HUD_SCALE);
 	}
 
 	public static StyleSpriteSource remap(StyleSpriteSource source) {
@@ -114,11 +142,19 @@ public final class VeloFonts {
 	private static StyleSpriteSource remapVelo(Identifier id, StyleSpriteSource fallback) {
 	//?} else {
 	/*private static FontDescription[] fonts(String base) {
-		FontDescription[] out = new FontDescription[MAX_SCALE];
-		for (int i = 0; i < MAX_SCALE; i++) {
+		return fonts(base, MAX_SCALE);
+	}
+
+	private static FontDescription[] fonts(String base, int count) {
+		FontDescription[] out = new FontDescription[count];
+		for (int i = 0; i < count; i++) {
 			out[i] = new FontDescription.Resource(Identifier.of("velo-client", base + "_" + (i + 1)));
 		}
 		return out;
+	}
+
+	private static FontDescription[] hudFonts(String base) {
+		return fonts(base, MAX_HUD_SCALE);
 	}
 
 	public static FontDescription remap(FontDescription source) {
@@ -145,10 +181,10 @@ public final class VeloFonts {
 				String base = target.getPath();
 				// The last variant has the most oversampling (index 0 is oversample 1 - very blurry when drawn big).
 				if (base.equals("ui")) {
-					return UI[MAX_SCALE - 1];
+					return UI[MAX_HUD_SCALE - 1];
 				}
 				if (base.startsWith("hud_")) {
-					return HUD.computeIfAbsent(base, VeloFonts::fonts)[MAX_SCALE - 1];
+					return HUD.computeIfAbsent(base, VeloFonts::hudFonts)[MAX_HUD_SCALE - 1];
 				}
 			}
 			//? if <26.1 {
@@ -160,8 +196,8 @@ public final class VeloFonts {
 			*///?}
 		}
 		return switch (id.getPath()) {
-			case "body", "ui" -> UI[scaleIndex()];
-			case "tile", "ui_bold" -> UI_BOLD[scaleIndex()];
+			case "body", "ui" -> UI[hudScaleIndex()];
+			case "tile", "ui_bold" -> UI_BOLD[hudScaleIndex()];
 			case "title" -> TITLE[scaleIndex()];
 			case "big" -> BIG[scaleIndex()];
 			case "display" -> DISPLAY[scaleIndex()];
@@ -171,7 +207,7 @@ public final class VeloFonts {
 			case "ui_sm" -> UI_SM[scaleIndex()];
 			case "mono" -> MONO[scaleIndex()];
 			default -> id.getPath().startsWith("hud_") && !Character.isDigit(id.getPath().charAt(id.getPath().length() - 1))
-					? HUD.computeIfAbsent(id.getPath(), VeloFonts::fonts)[scaleIndex()] : fallback;
+					? HUD.computeIfAbsent(id.getPath(), VeloFonts::hudFonts)[hudScaleIndex()] : fallback;
 		};
 	}
 }

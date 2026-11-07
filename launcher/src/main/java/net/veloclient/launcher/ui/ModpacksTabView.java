@@ -152,10 +152,14 @@ public final class ModpacksTabView {
 
 		int[] offset = {0};
 		int pageSize = 30;
+		int[] generation = {0};   // older searches' answers are dropped (see InstanceDetailView's browser)
 
 		Runnable[] loadPage = new Runnable[1];
 		loadPage[0] = () -> {
 			boolean firstPage = offset[0] == 0;
+			int requestGeneration = generation[0];
+			int requestOffset = offset[0];
+			String text = query.getText();
 			loadMore.setDisable(true);
 			String sortIndex = switch (sort.getValue()) {
 				case "Downloads" -> "downloads";
@@ -166,11 +170,14 @@ public final class ModpacksTabView {
 			};
 			CompletableFuture.supplyAsync(() -> {
 				try {
-					return ModrinthClient.search(query.getText(), "modpack", instance.mcVersion(), sortIndex, offset[0], pageSize);
+					return ModrinthClient.search(text, "modpack", instance.mcVersion(), sortIndex, requestOffset, pageSize);
 				} catch (IOException e) {
 					return e;
 				}
 			}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
+				if (requestGeneration != generation[0] || requestOffset != offset[0]) {
+					return;
+				}
 				loadMore.setDisable(false);
 				if (result instanceof Exception ex) {
 					if (firstPage) {
@@ -202,6 +209,7 @@ public final class ModpacksTabView {
 		};
 
 		Runnable runSearch = () -> {
+			generation[0]++;
 			offset[0] = 0;
 			results.getChildren().setAll(InstanceDetailView.loadingLabel(theme));
 			loadMore.setVisible(false);

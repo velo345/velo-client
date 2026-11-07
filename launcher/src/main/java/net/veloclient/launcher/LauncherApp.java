@@ -249,6 +249,8 @@ public final class LauncherApp extends Application {
 		stage.setMinWidth(MIN_WIDTH);
 		stage.setMinHeight(MIN_HEIGHT);
 		net.veloclient.launcher.ui.WindowPlacement.restore(stage, 1100, 680, windowChrome);
+		// ...but never bigger than the monitor's usable area (small laptop screens, 125-150% Windows scaling).
+		net.veloclient.launcher.ui.WindowPlacement.fitMinimumToScreen(stage, MIN_WIDTH, MIN_HEIGHT);
 		boolean firstStart = ensureDefaultProfile();
 		stage.show();
 		shownAt = System.nanoTime();
@@ -4449,6 +4451,8 @@ public final class LauncherApp extends Application {
 	 * Asks GitHub for the latest release in the background. Reveals the sidebar's "Update available"
 	 * button when there's something new; {@code status} (nullable) is the Settings row to report into.
 	 */
+	private static volatile boolean updateResultChecked;
+
 	private void checkForUpdates(Label status) {
 		if (System.getProperty("velo.launcherTour") != null) {
 			return;
@@ -4463,6 +4467,15 @@ public final class LauncherApp extends Application {
 			status.setText("Checking...");
 		}
 		Thread thread = new Thread(() -> {
+			if (!updateResultChecked) {
+				// The first check after a start: did a launcher update started last time arrive? (update.log has the details)
+				updateResultChecked = true;
+				String problem = net.veloclient.launcher.launch.UpdateService.afterRestart();
+				if (problem != null) {
+					javafx.application.Platform.runLater(() -> net.veloclient.launcher.ui.ErrorDialog.show(stage, "Update didn't install", problem,
+							null, net.veloclient.launcher.launch.UpdateService.logFile().getParent()));
+				}
+			}
 			try {
 				var release = net.veloclient.launcher.launch.UpdateService.check();
 				var policy = net.veloclient.launcher.launch.UpdateService.policy();
@@ -4505,7 +4518,18 @@ public final class LauncherApp extends Application {
 		updateStatus.getStyleClass().add("settings-row-hint");
 		Button checkButton = new Button(availableUpdate != null ? "Update" : "Check for updates");
 		checkButton.getStyleClass().add("primary-button");
+		// Shift + click: the update test channel (updatetest-* pre-releases) - for testing the updater without a release.
+		boolean[] shift = {false};
+		checkButton.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, ev -> shift[0] = ev.isShiftDown());
 		checkButton.setOnAction(e -> {
+			if (shift[0]) {
+				shift[0] = false;
+				net.veloclient.launcher.launch.UpdateService.testChannel = true;
+				availableUpdate = null;
+				updateStatus.setText("Update test channel on - checking...");
+				checkForUpdates(updateStatus);
+				return;
+			}
 			if (availableUpdate != null) {
 				net.veloclient.launcher.ui.UpdateDialog.show(stage, availableUpdate);
 			} else {

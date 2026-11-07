@@ -63,11 +63,26 @@ public final class UpdateDialog {
 		notes.setPrefColumnCount(56);
 		Label status = new Label();
 		status.setWrapText(true);
+		Label detail = new Label();
+		detail.getStyleClass().add("version-tag");
+		Button openLog = new Button("Open the update log");
+		openLog.setVisible(false);
+		openLog.setManaged(false);
+		openLog.setOnAction(e -> {
+			try {
+				java.nio.file.Path dir = UpdateService.logFile().getParent();
+				java.nio.file.Files.createDirectories(dir);
+				String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+				new ProcessBuilder(os.contains("win") ? "explorer.exe" : os.contains("mac") ? "open" : "xdg-open", dir.toString()).start();
+			} catch (Exception ex) {
+				status.setText("The log is at " + UpdateService.logFile());
+			}
+		});
 		ProgressBar progress = new ProgressBar();
 		progress.setMaxWidth(Double.MAX_VALUE);
 		progress.setVisible(false);
 		progress.setManaged(false);
-		VBox body = new VBox(10, summary, notes, progress, status);
+		VBox body = new VBox(10, summary, notes, progress, detail, status, openLog);
 		body.setPadding(new Insets(4, 0, 0, 0));
 		dialog.getDialogPane().setContent(body);
 
@@ -87,21 +102,25 @@ public final class UpdateDialog {
 			later.setDisable(true);
 			progress.setVisible(true);
 			progress.setManaged(true);
+			openLog.setVisible(false);
+			openLog.setManaged(false);
+			java.util.function.Consumer<UpdateService.Transfer> track = t -> Platform.runLater(() -> {
+				progress.setProgress(t.fraction() < 0 ? ProgressBar.INDETERMINATE_PROGRESS : t.fraction());
+				detail.setText(describe(t));
+			});
 			Thread worker = new Thread(() -> {
 				try {
 					if (!release.modAssets().isEmpty()) {
-						UpdateService.installModUpdates(release, text -> Platform.runLater(() -> status.setText(text)),
-								f -> Platform.runLater(() -> progress.setProgress(f < 0 ? ProgressBar.INDETERMINATE_PROGRESS : f)));
+						UpdateService.installModUpdatesTracked(release, text -> Platform.runLater(() -> status.setText(text)), track);
 					}
 					if (launcher) {
-						boolean started = UpdateService.runInstaller(release, text -> Platform.runLater(() -> status.setText(text)),
-								f -> Platform.runLater(() -> progress.setProgress(f < 0 ? ProgressBar.INDETERMINATE_PROGRESS : f)));
+						boolean started = UpdateService.runInstallerTracked(release, text -> Platform.runLater(() -> status.setText(text)), track);
 						if (started) {
 							String os = System.getProperty("os.name", "").toLowerCase();
 							boolean windows = os.contains("win");
 							// macOS: the disk image opens in Finder - the player drags the app over the old one, so nothing to relaunch.
 							boolean mac = os.contains("mac") || os.contains("darwin");
-							Platform.runLater(() -> status.setText(windows ? "The installer takes over now - Velo Client closes."
+							Platform.runLater(() -> status.setText(windows ? "Installing - Velo Client closes and starts again by itself when it's done."
 									: mac ? "Drag Velo Client Launcher into Applications (replace the old one) - Velo Client closes."
 									: "Installed - restarting Velo Client..."));
 							if (!windows && !mac) {
@@ -130,7 +149,11 @@ public final class UpdateDialog {
 					Platform.runLater(() -> {
 						progress.setVisible(false);
 						progress.setManaged(false);
-						status.setText("Update failed: " + e.getMessage());
+						detail.setText("");
+						status.setText("Update failed: " + e.getMessage() + "\nPressing Update again continues where the download stopped.");
+						openLog.setVisible(true);
+						openLog.setManaged(true);
+						update.setText("Try again");
 						update.setDisable(false);
 						later.setDisable(false);
 					});
@@ -140,5 +163,26 @@ public final class UpdateDialog {
 			worker.start();
 		});
 		dialog.showAndWait();
+	}
+
+	/** "12.3 / 98.0 MB  ·  4.2 MB/s  ·  about 20 s left" (+ the attempt when it's a retry). */
+	static String describe(UpdateService.Transfer t) {
+		StringBuilder sb = new StringBuilder();
+		sb.append(String.format(java.util.Locale.ROOT, "%.1f", t.done() / 1048576.0));
+		if (t.total() > 0) {
+			sb.append(String.format(java.util.Locale.ROOT, " / %.1f", t.total() / 1048576.0));
+		}
+		sb.append(" MB");
+		if (t.bytesPerSecond() > 0) {
+			sb.append(String.format(java.util.Locale.ROOT, "  \u00b7  %.1f MB/s", t.bytesPerSecond() / 1048576.0));
+			if (t.total() > 0) {
+				long left = (long) Math.ceil((t.total() - t.done()) / t.bytesPerSecond());
+				sb.append("  \u00b7  about ").append(left >= 90 ? (left + 30) / 60 + " min" : left + " s").append(" left");
+			}
+		}
+		if (t.attempt() > 1) {
+			sb.append("  \u00b7  try ").append(t.attempt());
+		}
+		return sb.toString();
 	}
 }

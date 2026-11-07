@@ -64,7 +64,7 @@ public final class RenderCullingModule extends AbstractModule implements Configu
 		return distance >= OFF ? Double.MAX_VALUE : (double) distance * distance;
 	}
 
-	private static RenderCullingModule active() {
+	public static RenderCullingModule active() {
 		RenderCullingModule module = instance;
 		return module != null && module.isEnabled() ? module : null;
 	}

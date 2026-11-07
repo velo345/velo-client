@@ -96,6 +96,18 @@
   "category": "hud"
  },
  {
+  "id": "c2me",
+  "name": "C2ME (Experimental)",
+  "description": "Faster world generation and loading in singleplayer on every CPU core. Applies on your next start from the Velo launcher.",
+  "category": "performance"
+ },
+ {
+  "id": "centered-inventory",
+  "name": "Centered Inventory",
+  "description": "Keeps your inventory in the middle of the screen when the recipe book opens.",
+  "category": "qol"
+ },
+ {
   "id": "chat-tweaks",
   "name": "Chat",
   "description": "Stacks repeated messages as (5x), timestamps, highlights your name, hides spam words, longer history.",
@@ -130,6 +142,12 @@
   "name": "Clock",
   "description": "Displays the current real-world time.",
   "category": "hud"
+ },
+ {
+  "id": "color-grading",
+  "name": "Color Grading",
+  "description": "Post effects on the picture: saturation, vibrance, contrast, brightness, warmth, vignette and sharpening.",
+  "category": "rendering"
  },
  {
   "id": "combo-counter",
@@ -348,6 +366,12 @@
   "category": "server_tools"
  },
  {
+  "id": "hold-up-items",
+  "name": "Hold Up Items",
+  "description": "Holds your item arm (or both arms) straight out in front, zombie-style, in third person.",
+  "category": "rendering"
+ },
+ {
   "id": "hopper-speed",
   "name": "Hopper Speed",
   "description": "Singleplayer: items per hopper transfer (1-64), transfer cooldown, or no hopper transfers at all.",
@@ -380,7 +404,7 @@
  {
   "id": "item-position",
   "name": "Item Position",
-  "description": "Move, rotate and resize your held items in first person - per hand, plus lower shield.",
+  "description": "Move, rotate and resize your held items and hand in first person - for all items or per item type.",
   "category": "pvp"
  },
  {
@@ -410,7 +434,7 @@
  {
   "id": "low-fire",
   "name": "Low Fire",
-  "description": "Lowers the fire overlay while you burn so you can still see - or hides it with Fire Resistance.",
+  "description": "Lowers the fire overlay while you burn and shrinks the flames on burning players and mobs - or hides it with Fire Resistance.",
   "category": "pvp"
  },
  {
@@ -478,6 +502,12 @@
   "name": "Particle Limiter",
   "description": "Caps particle density to MINIMAL to reduce lag from particle-heavy areas.",
   "category": "performance"
+ },
+ {
+  "id": "particle-size",
+  "name": "Particle Size",
+  "description": "Makes particles smaller (less clutter in fights) or bigger.",
+  "category": "rendering"
  },
  {
   "id": "party-ping",

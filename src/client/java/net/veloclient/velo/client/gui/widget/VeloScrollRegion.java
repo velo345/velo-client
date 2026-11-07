@@ -282,6 +282,13 @@ public final class VeloScrollRegion {
 		return System.nanoTime() - lastScrollNanos < 120_000_000L;
 	}
 
+	/** The part of the drawn offset below one GUI pixel, as a shift in GUI units snapped to whole screen pixels. */
+	private float subPixelShift() {
+		double rest = Math.round(shownOffset) - shownOffset;
+		int scale = Math.max(1, net.veloclient.velo.client.util.ClientCompat.guiScale());
+		return (float) (Math.round(rest * scale) / (double) scale);
+	}
+
 	/** Eases the drawn offset toward the target and re-lays-out rows while it moves. */
 	private void animate() {
 		long now = System.nanoTime();
@@ -290,7 +297,7 @@ public final class VeloScrollRegion {
 		if (shownOffset != scrollOffset) {
 			lastScrollNanos = now;
 		}
-		if (Math.abs(shownOffset - scrollOffset) < 0.25) {
+		if (Math.abs(shownOffset - scrollOffset) < 0.5 / Math.max(1, net.veloclient.velo.client.util.ClientCompat.guiScale())) {
 			if (shownOffset != scrollOffset) {
 				shownOffset = scrollOffset;
 				if (lastLayout != null) {
@@ -319,11 +326,28 @@ public final class VeloScrollRegion {
 		return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
 	}
 
+	private boolean shifted;
+
+	/**
+	 * Clips to the region. Rows sit on whole GUI pixels (3 screen pixels at scale 3), so the eased offset used to move in
+	 * visible 3px steps: everything drawn until {@link #renderScissorEnd} (rows and the owner's headings alike) also gets
+	 * the rest of the offset as a pose shift snapped to real screen pixels, so every frame moves smoothly.
+	 */
 	public void renderScissorStart(DrawContext context) {
 		context.enableScissor(x, y, x + width, y + height);
+		float subPixel = subPixelShift();
+		shifted = subPixel != 0f;
+		if (shifted) {
+			context.getMatrices().pushMatrix();
+			context.getMatrices().translate(0f, subPixel);
+		}
 	}
 
 	public void renderScissorEnd(DrawContext context) {
+		if (shifted) {
+			context.getMatrices().popMatrix();
+			shifted = false;
+		}
 		context.disableScissor();
 	}
 

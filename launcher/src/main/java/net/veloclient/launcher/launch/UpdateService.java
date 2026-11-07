@@ -91,9 +91,28 @@ public final class UpdateService {
 		HttpRequest request = HttpRequest.newBuilder(URI.create(RELEASES)).timeout(Duration.ofSeconds(15))
 				.header("Accept", "application/vnd.github+json").header("User-Agent", "VeloClientLauncher/" + AppVersion.VERSION)
 				.GET().build();
-		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-		if (response.statusCode() != 200) {
-			throw new IOException("GitHub answered " + response.statusCode());
+		HttpResponse<String> response = null;
+		for (int attempt = 1; attempt <= 2; attempt++) {
+			try {
+				response = HTTP.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+				if (response.statusCode() == 200) {
+					break;
+				}
+				// 403/429 from GitHub is usually its limit of 60 checks per hour and IP (shared networks hit it)
+				log("Update check: GitHub answered " + response.statusCode() + " (rate limit left "
+						+ response.headers().firstValue("x-ratelimit-remaining").orElse("?") + ")");
+			} catch (IOException e) {
+				log("Update check attempt " + attempt + " failed: " + e);
+				if (attempt == 2) {
+					throw e;
+				}
+			}
+			if (attempt == 1) {
+				Thread.sleep(2000);
+			}
+		}
+		if (response == null || response.statusCode() != 200) {
+			throw new IOException("GitHub answered " + (response == null ? "nothing" : response.statusCode()));
 		}
 		// Releases are published as pre-releases, so /releases/latest doesn't see them: take the
 		// highest version among the recent non-draft releases instead.
@@ -101,6 +120,12 @@ public final class UpdateService {
 		for (JsonElement element : JsonParser.parseString(response.body()).getAsJsonArray()) {
 			JsonObject candidate = element.getAsJsonObject();
 			if (candidate.get("draft").getAsBoolean()) {
+				continue;
+			}
+			// Update-test releases ("updatetest-1.2.4") exist only for testers on the test channel; everyone else skips
+			// them (older launchers read such a tag as version 0.1.2.4, below any real release, so they skip it too).
+			boolean testRelease = candidate.get("tag_name").getAsString().startsWith(TEST_TAG);
+			if (testRelease != testChannel) {
 				continue;
 			}
 			if (json == null || compare(tag(candidate), tag(json)) > 0) {
@@ -150,7 +175,10 @@ public final class UpdateService {
 			}
 		}
 
-		Map<String, Asset> mods = modJars(assets, version);
+		Map<String, Asset> mods = testChannel ? Map.of() : modJars(assets, version);
+		if (testChannel) {
+			log("Test channel: " + version + " (" + (installer == null ? "no installer for this OS" : installer.name()) + ")");
+		}
 		return new Release(version, notes, page, launcherNewer, installer, mods);
 	}
 
@@ -204,8 +232,17 @@ public final class UpdateService {
 	}
 
 	private static String tag(JsonObject release) {
-		return release.get("tag_name").getAsString().replaceFirst("^v", "");
+		return release.get("tag_name").getAsString().replaceFirst("^v", "").replaceFirst("^" + TEST_TAG, "");
 	}
+
+	private static final String TEST_TAG = "updatetest-";
+
+	/**
+	 * Update test channel (Shift + click on "Check for updates" in Settings): only "updatetest-&lt;version&gt;" pre-releases,
+	 * launcher installer only (no mod jars), so a tester can run the whole update - download, passive install, restart,
+	 * check - without a public release. Logged like every update in update.log.
+	 */
+	public static volatile boolean testChannel;
 
 	/** True if the jar GameJars would install for {@code key} already matches {@code asset}. */
 	private static boolean alreadyHave(String key, Asset asset) {
@@ -231,6 +268,12 @@ public final class UpdateService {
 	/** {@code progress}: 0..1 of the current download (or -1 when its size is unknown). */
 	public static void installModUpdates(Release release, Consumer<String> status, java.util.function.DoubleConsumer progress)
 			throws IOException, InterruptedException {
+		installModUpdatesTracked(release, status, t -> progress.accept(t.fraction()));
+	}
+
+	public static void installModUpdatesTracked(Release release, Consumer<String> status, Consumer<Transfer> progress)
+			throws IOException, InterruptedException {
+		log("Mod update to " + release.version() + ": " + release.modAssets().keySet());
 		Path dir = gameJarsDir();
 		Files.createDirectories(dir);
 		int done = 0;
@@ -263,30 +306,45 @@ public final class UpdateService {
 	}
 
 	public static boolean runInstaller(Release release, Consumer<String> status) throws IOException, InterruptedException {
-		return runInstaller(release, status, f -> { });
+		return runInstallerTracked(release, status, t -> { });
 	}
 
 	public static boolean runInstaller(Release release, Consumer<String> status, java.util.function.DoubleConsumer progress)
+			throws IOException, InterruptedException {
+		return runInstallerTracked(release, status, t -> progress.accept(t.fraction()));
+	}
+
+	/**
+	 * Downloads this OS's installer and starts it. Returns true when the installer is running and the launcher should now
+	 * close; false if this OS has no installer (open the release page instead).
+	 */
+	public static boolean runInstallerTracked(Release release, Consumer<String> status, Consumer<Transfer> progress)
 			throws IOException, InterruptedException {
 		Asset installer = release.installer();
 		if (installer == null) {
 			return false;
 		}
+		log("Launcher update " + AppVersion.VERSION + " -> " + release.version() + " (" + installer.name() + ", " + installer.size() + " bytes)");
 		Files.createDirectories(updatesDir());
 		Path file = updatesDir().resolve(installer.name());
-		if (!Files.exists(file) || Files.size(file) != installer.size()) {
-			status.accept("Downloading " + installer.name());
+		boolean complete = Files.exists(file) && Files.size(file) == installer.size()
+				&& (installer.sha256() == null || installer.sha256().equalsIgnoreCase(sha256Of(file)));
+		if (!complete) {
+			status.accept("Downloading the new launcher");
 			Path tmp = updatesDir().resolve(installer.name() + ".part");
 			download(installer, tmp, progress);
 			Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+		} else {
+			log("Installer already downloaded and verified");
 		}
-		progress.accept(-1);
 		String os = System.getProperty("os.name", "").toLowerCase();
-		status.accept(os.contains("mac") ? "Opening the update..." : "Installing - confirm the password prompt");
+		markPending(release.version());
 		if (os.contains("win")) {
-			new ProcessBuilder(file.toString()).start();
+			status.accept("Installing - Windows may ask once for permission");
+			startWindowsInstall(file);
 			return true;
 		}
+		status.accept(os.contains("mac") ? "Opening the update..." : "Installing - confirm the password prompt");
 		if (os.contains("mac")) {
 			// Mounts the disk image and shows it in Finder; the player drags the new app over the old one.
 			new ProcessBuilder("open", file.toString()).start();
@@ -298,14 +356,133 @@ public final class UpdateService {
 					: List.of("pkexec", "dpkg", "-i", file.toString());
 			Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
 			String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-			if (process.waitFor() != 0) {
-				LauncherLog.warn("Installer exited with " + process.exitValue() + ": " + output, null);
+			log("Package install exited with " + process.waitFor() + ": " + output.strip().lines().reduce((a, b) -> b).orElse(""));
+			if (process.exitValue() != 0) {
+				clearPending();
 				throw new IOException("The update couldn't be installed (was the password prompt cancelled?)");
 			}
 			return true;
 		}
 		new ProcessBuilder("xdg-open", file.toString()).start();
 		return true;
+	}
+
+	/**
+	 * Windows: no clicking through the installer any more. A small script waits until this launcher has closed (so no file
+	 * is in use), runs jpackage's installer passively - a progress bar only, into the folder the launcher is installed in,
+	 * with a verbose Windows Installer log next to update.log - and starts the new launcher when it's done. jpackage's .exe
+	 * hands its arguments to msiexec; should an installer ever ignore them, it simply shows its normal wizard as before.
+	 * The script logs the installer's exit code, which the next start reads (see {@link #afterRestart()}).
+	 */
+	private static void startWindowsInstall(Path installer) throws IOException {
+		String app = System.getProperty("jpackage.app-path");
+		Path appExe = app == null ? null : Path.of(app);
+		Path installDir = appExe == null ? null : appExe.getParent();
+		Path msiLog = updatesDir().resolve("installer.log");
+		Path script = updatesDir().resolve("run-update.cmd");
+		Path log = logFile();
+		StringBuilder cmd = new StringBuilder();
+		cmd.append("@echo off\r\n");
+		cmd.append("chcp 65001 >nul\r\n");
+		cmd.append("echo [%date% %time%] script: waiting for the launcher to close>>\"").append(log).append("\"\r\n");
+		cmd.append("timeout /t 3 /nobreak >nul\r\n");
+		cmd.append("echo [%date% %time%] script: starting the installer>>\"").append(log).append("\"\r\n");
+		cmd.append("\"").append(installer).append("\" /passive /norestart /l*v \"").append(msiLog).append("\"");
+		if (installDir != null) {
+			// the folder the launcher runs from now, so a player's own install location survives the update
+			cmd.append(" INSTALLDIR=\"").append(installDir).append("\"");
+		}
+		cmd.append("\r\n");
+		cmd.append("set code=%errorlevel%\r\n");
+		cmd.append("echo [%date% %time%] script: installer exit code %code%>>\"").append(log).append("\"\r\n");
+		cmd.append("echo %code%>\"").append(updatesDir().resolve("installer-exit.txt")).append("\"\r\n");
+		if (appExe != null) {
+			cmd.append("start \"\" \"").append(appExe).append("\"\r\n");
+		}
+		Files.writeString(script, cmd.toString(), StandardCharsets.UTF_8);
+		Files.deleteIfExists(updatesDir().resolve("installer-exit.txt"));
+		log("Starting " + script + " (install dir " + installDir + ")");
+		new ProcessBuilder("cmd.exe", "/c", "start", "\"Velo update\"", "/min", "cmd.exe", "/c", script.toString())
+				.redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+	}
+
+	private static Path pendingFile() {
+		return updatesDir().resolve("pending-update.properties");
+	}
+
+	private static void markPending(String version) {
+		Properties props = new Properties();
+		props.setProperty("from", AppVersion.VERSION);
+		props.setProperty("to", version);
+		props.setProperty("startedAt", String.valueOf(System.currentTimeMillis()));
+		try (var out = Files.newBufferedWriter(pendingFile())) {
+			props.store(out, "Launcher update in progress");
+		} catch (IOException e) {
+			log("Couldn't write the pending marker: " + e);
+		}
+	}
+
+	private static void clearPending() {
+		try {
+			Files.deleteIfExists(pendingFile());
+		} catch (IOException ignored) {
+			// next check simply finds it again
+		}
+	}
+
+	/**
+	 * Called once at launcher start: if an update was started, did it arrive? Returns null when there's nothing to say,
+	 * else a short message for the player (the details are in update.log / installer.log). Cleans the installer up on
+	 * success.
+	 */
+	public static String afterRestart() {
+		Path pending = pendingFile();
+		if (!Files.exists(pending)) {
+			return null;
+		}
+		Properties props = new Properties();
+		try (var in = Files.newBufferedReader(pending)) {
+			props.load(in);
+		} catch (IOException e) {
+			clearPending();
+			return null;
+		}
+		String to = props.getProperty("to", "");
+		String exit = null;
+		try {
+			Path exitFile = updatesDir().resolve("installer-exit.txt");
+			if (Files.exists(exitFile)) {
+				exit = Files.readString(exitFile).strip();
+			}
+		} catch (IOException ignored) {
+			// unknown
+		}
+		clearPending();
+		if (compare(AppVersion.VERSION, to) >= 0) {
+			log("Update to " + to + " arrived (installer exit " + exit + ")");
+			try (var files = Files.list(updatesDir())) {
+				files.filter(f -> {
+					String n = f.getFileName().toString();
+					return n.endsWith(".exe") || n.endsWith(".deb") || n.endsWith(".dmg") || n.endsWith(".part");
+				}).forEach(f -> {
+					try {
+						Files.deleteIfExists(f);
+					} catch (IOException ignored) {
+						// left for next time
+					}
+				});
+			} catch (IOException ignored) {
+				// nothing to clean
+			}
+			return null;
+		}
+		long age = System.currentTimeMillis() - Long.parseLong(props.getProperty("startedAt", "0"));
+		log("Still on " + AppVersion.VERSION + " after trying to update to " + to + " (installer exit " + exit + ", " + age / 1000 + " s ago)");
+		String why = exit == null ? "the installer didn't finish"
+				: exit.equals("1602") ? "the installation was cancelled (or Windows' permission prompt was declined)"
+				: exit.equals("1618") ? "another installation was running at the same time"
+				: exit.equals("0") ? "the installer finished but the old version is still here" : "the installer stopped with code " + exit;
+		return "The update to " + to + " didn't install - " + why + ". Try again from the bell; the details are in " + logFile() + ".";
 	}
 
 	/**
@@ -331,39 +508,161 @@ public final class UpdateService {
 		}
 	}
 
-	private static void download(Asset asset, Path target, java.util.function.DoubleConsumer progress) throws IOException, InterruptedException {
-		HttpRequest request = HttpRequest.newBuilder(URI.create(asset.url())).timeout(Duration.ofMinutes(10))
-				.header("User-Agent", "VeloClientLauncher/" + AppVersion.VERSION).GET().build();
-		HttpResponse<InputStream> response = HTTP.send(request, HttpResponse.BodyHandlers.ofInputStream());
-		if (response.statusCode() != 200) {
-			throw new IOException("Download of " + asset.name() + " failed (" + response.statusCode() + ")");
+	/** Where a download stands, for the progress display. {@code total} is -1 when unknown. */
+	public record Transfer(String file, long done, long total, double bytesPerSecond, int attempt) {
+
+		public double fraction() {
+			return total > 0 ? Math.min(1.0, done / (double) total) : -1;
 		}
-		long total = response.headers().firstValueAsLong("Content-Length").orElse(asset.size());
-		MessageDigest digest;
-		try {
-			digest = MessageDigest.getInstance("SHA-256");
-		} catch (Exception e) {
-			throw new IllegalStateException(e);
+	}
+
+	private static final int ATTEMPTS = 5;
+	/** No byte for this long = the connection hangs: dropped and tried again (resuming). */
+	private static final long STALL_MS = 30_000;
+
+	/**
+	 * Downloads with resume and retries: the partial file stays between attempts and the next one asks only for the rest
+	 * (HTTP Range - GitHub's release storage supports it), up to {@value #ATTEMPTS} attempts with growing pauses, and a
+	 * connection that delivers nothing for 30 s is dropped instead of hanging forever (a plain read has no timeout). The
+	 * whole file is checked against the release's SHA-256 at the end; a mismatch starts over once from zero. Every attempt
+	 * is written to update.log.
+	 */
+	private static void download(Asset asset, Path target, Consumer<Transfer> progress) throws IOException, InterruptedException {
+		IOException last = null;
+		boolean restartedAfterBadHash = false;
+		for (int attempt = 1; attempt <= ATTEMPTS; attempt++) {
+			try {
+				downloadOnce(asset, target, progress, attempt);
+				if (asset.sha256() != null) {
+					String actual = sha256Of(target);
+					if (!asset.sha256().equalsIgnoreCase(actual)) {
+						log("Checksum mismatch for " + asset.name() + " (expected " + asset.sha256() + ", got " + actual + ")");
+						Files.deleteIfExists(target);
+						if (restartedAfterBadHash) {
+							throw new IOException("Download of " + asset.name() + " was corrupted twice - check your connection or antivirus");
+						}
+						restartedAfterBadHash = true;
+						continue;
+					}
+				}
+				log("Downloaded " + asset.name() + " (" + Files.size(target) + " bytes, attempt " + attempt + ")");
+				return;
+			} catch (IOException e) {
+				last = e;
+				log("Attempt " + attempt + "/" + ATTEMPTS + " for " + asset.name() + " failed: " + e);
+				if (attempt < ATTEMPTS) {
+					Thread.sleep(Math.min(15_000L, 1000L << (attempt - 1)));
+				}
+			}
 		}
-		// hashed while streaming: reading a ~100 MB installer back in one array ran small launcher heaps out of memory
-		try (InputStream in = response.body(); var out = Files.newOutputStream(target)) {
+		throw new IOException("Download of " + asset.name() + " failed after " + ATTEMPTS + " attempts: "
+				+ (last == null ? "unknown error" : last.getMessage()), last);
+	}
+
+	private static void downloadOnce(Asset asset, Path target, Consumer<Transfer> progress, int attempt) throws IOException, InterruptedException {
+		long have = Files.exists(target) ? Files.size(target) : 0;
+		if (asset.size() > 0 && have > asset.size()) {
+			Files.delete(target);
+			have = 0;
+		}
+		if (asset.size() > 0 && have == asset.size()) {
+			return;   // complete from an earlier attempt - only the checksum is left
+		}
+		HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(asset.url())).timeout(Duration.ofSeconds(30))
+				.header("User-Agent", "VeloClientLauncher/" + AppVersion.VERSION).GET();
+		if (have > 0) {
+			builder.header("Range", "bytes=" + have + "-");
+		}
+		HttpResponse<InputStream> response = HTTP.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+		int code = response.statusCode();
+		boolean append = code == 206 && have > 0;
+		if (code != 200 && code != 206) {
+			response.body().close();
+			throw new IOException("server answered " + code);
+		}
+		if (!append) {
+			have = 0;
+		}
+		long total = asset.size() > 0 ? asset.size()
+				: response.headers().firstValueAsLong("Content-Length").orElse(-1L) + (append ? have : 0);
+		log("Attempt " + attempt + ": " + asset.name() + " HTTP " + code + (append ? ", resuming at " + have : "") + ", total " + total);
+		InputStream in = response.body();
+		long[] lastByte = {System.currentTimeMillis()};
+		java.util.concurrent.ScheduledExecutorService watchdog = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+			Thread t = new Thread(r, "velo-update-watchdog");
+			t.setDaemon(true);
+			return t;
+		});
+		boolean[] stalled = {false};
+		watchdog.scheduleAtFixedRate(() -> {
+			if (System.currentTimeMillis() - lastByte[0] > STALL_MS) {
+				stalled[0] = true;
+				try {
+					in.close();
+				} catch (IOException ignored) {
+					// closing is all we want
+				}
+			}
+		}, 5, 5, java.util.concurrent.TimeUnit.SECONDS);
+		long started = System.nanoTime();
+		long startBytes = have;
+		long done = have;
+		try (in; var out = append ? Files.newOutputStream(target, java.nio.file.StandardOpenOption.APPEND)
+				: Files.newOutputStream(target)) {
 			byte[] buffer = new byte[64 * 1024];
-			long done = 0;
 			long lastReport = 0;
 			int read;
 			while ((read = in.read(buffer)) > 0) {
 				out.write(buffer, 0, read);
-				digest.update(buffer, 0, read);
 				done += read;
+				lastByte[0] = System.currentTimeMillis();
 				if (done - lastReport > 256 * 1024 || done == total) {
 					lastReport = done;
-					progress.accept(total > 0 ? Math.min(1.0, done / (double) total) : -1);
+					double seconds = (System.nanoTime() - started) / 1e9;
+					progress.accept(new Transfer(asset.name(), done, total, seconds > 0.2 ? (done - startBytes) / seconds : 0, attempt));
 				}
 			}
+		} catch (IOException e) {
+			throw stalled[0] ? new IOException("no data for " + STALL_MS / 1000 + " s (at " + done + " bytes)", e) : e;
+		} finally {
+			watchdog.shutdownNow();
 		}
-		if (asset.sha256() != null && !asset.sha256().equalsIgnoreCase(HexFormat.of().formatHex(digest.digest()))) {
-			Files.deleteIfExists(target);
-			throw new IOException("Download of " + asset.name() + " was corrupted - try again");
+		if (total > 0 && done < total) {
+			throw new IOException("connection ended at " + done + " of " + total + " bytes");
+		}
+	}
+
+	private static String sha256Of(Path file) throws IOException {
+		try (InputStream in = Files.newInputStream(file)) {
+			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+			byte[] buffer = new byte[64 * 1024];
+			int read;
+			while ((read = in.read(buffer)) > 0) {
+				digest.update(buffer, 0, read);
+			}
+			return HexFormat.of().formatHex(digest.digest());
+		} catch (java.security.NoSuchAlgorithmException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
+	/** update.log in the updates folder (kept across the installer run and restarts) plus the launcher log. */
+	public static Path logFile() {
+		return updatesDir().resolve("update.log");
+	}
+
+	static synchronized void log(String message) {
+		LauncherLog.info("Updater: " + message);
+		try {
+			Files.createDirectories(updatesDir());
+			Path file = logFile();
+			if (Files.exists(file) && Files.size(file) > 512 * 1024) {
+				Files.move(file, updatesDir().resolve("update.log.1"), StandardCopyOption.REPLACE_EXISTING);
+			}
+			Files.writeString(file, "[" + java.time.LocalDateTime.now().withNano(0) + "] " + message + System.lineSeparator(),
+					StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+		} catch (IOException ignored) {
+			// the launcher log still has it
 		}
 	}
 

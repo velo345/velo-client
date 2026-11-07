@@ -31,7 +31,7 @@ public final class HealthIndicatorModule extends AbstractModule implements Confi
 
 	public HealthIndicatorModule() {
 		super("health-indicator", "Health Indicator", "Shows other players' hearts above their heads when they're not at full health.",
-				ModuleCategory.PVP, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.PVP, SafetyTag.CHECK_SERVER_RULES, false);
 		instance = this;
 		NameTagLines.register(0, HealthIndicatorModule::line);
 	}

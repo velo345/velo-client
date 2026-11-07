@@ -42,7 +42,7 @@ public final class ReachDisplayModule extends AbstractModule implements HudModul
 
 	public ReachDisplayModule() {
 		super("reach-display", "Reach Display", "A red circle on the ground showing exactly how far you can hit - green when someone is in reach.",
-				ModuleCategory.PVP, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.PVP, SafetyTag.CHECK_SERVER_RULES, false);
 		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context -> renderWorld());
 	}
 

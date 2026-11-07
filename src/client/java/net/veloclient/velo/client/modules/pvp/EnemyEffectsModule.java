@@ -30,7 +30,7 @@ public final class EnemyEffectsModule extends AbstractModule implements Configur
 
 	public EnemyEffectsModule() {
 		super("enemy-effects", "Enemy Effects", "Shows other players' potion effects and roughly how long they last above their heads.",
-				ModuleCategory.PVP, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.PVP, SafetyTag.CHECK_SERVER_RULES, false);
 		instance = this;
 		NameTagLines.register(20, EnemyEffectsModule::line);
 	}

@@ -54,6 +54,7 @@ public final class ClientImportView {
 	private static final List<Brand> BRANDS = List.of(
 			new Brand("Minecraft Launcher", "minecraft", "M", "#5ba33b"),
 			new Brand("Lunar Client", "lunar", "L", "#6c74ff"),
+			new Brand("OneClient", "oneclient", "O", "#1a6bff"),
 			new Brand("Dawn Client", "dawn", "D", "#ff8a1f"),
 			new Brand("NoRisk Client", "norisk", "N", "#ef4a52"),
 			new Brand("Modrinth App", "modrinth", "M", "#1bd96a"),
@@ -67,7 +68,7 @@ public final class ClientImportView {
 			new Brand("Technic", "technic", "T", "#e2462f"),
 			new Brand("Other launchers", "other", "+", "#7a7f8c"));
 	/** The always-shown tiles (the rest only when found). */
-	private static final int CORE_BRANDS = 7;
+	private static final int CORE_BRANDS = 8;
 
 	/** The client's logo at {@code size} px, or its letter in a coloured circle. */
 	static Node brandLogo(String client, double size) {
@@ -255,7 +256,8 @@ public final class ClientImportView {
 			addOption(options, Part.CONFIGS, ICON_CONFIG, "Mod settings", source.hasConfig() ? "" : null, true);
 			addOption(options, Part.PACKS, ICON_PACKS, "Resource packs", source.resourcePackCount() > 0 ? String.valueOf(source.resourcePackCount()) : null, true);
 			addOption(options, Part.SHADERS, ICON_SHADERS, "Shaders", source.shaderPackCount() > 0 ? String.valueOf(source.shaderPackCount()) : null, true);
-			addOption(options, Part.WORLDS, ICON_WORLDS, "Worlds", source.worldCount() > 0 ? String.valueOf(source.worldCount()) : null, false);
+			// Worlds come along by default too (owner, 2026-11-07): moving clients should bring everything.
+			addOption(options, Part.WORLDS, ICON_WORLDS, "Worlds", source.worldCount() > 0 ? String.valueOf(source.worldCount()) : null, true);
 			whatCard = card("2", "What should come along?", options);
 			if (picked.containsKey(Part.MODS)) {
 				whatCard.getChildren().add(hint("Mods are downloaded again in the right version for your new profile."));

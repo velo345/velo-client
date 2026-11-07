@@ -50,7 +50,7 @@ public final class MinimapModule extends AbstractModule implements HudModule, Co
 
 	public MinimapModule() {
 		super("minimap", "Minimap", "A rotating top-down minimap of nearby terrain, sampled from vanilla's own map colors.",
-				ModuleCategory.HUD, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.HUD, SafetyTag.CHECK_SERVER_RULES, false);
 	}
 
 	@Override

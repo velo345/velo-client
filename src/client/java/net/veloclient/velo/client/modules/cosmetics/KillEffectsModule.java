@@ -84,7 +84,13 @@ public final class KillEffectsModule extends AbstractModule implements Configura
 	private static final int ATTACK_ATTRIBUTION_WINDOW_TICKS = 100;
 	private static final double NEARBY_PLAYER_RADIUS = 6.0;
 
-	private final Map<UUID, Float> lastHealth = new HashMap<>();
+	// By entity id in primitive maps: this runs over every tracked entity each tick (a fresh HashSet<UUID> and boxed
+	// floats per tick showed up in the tick frames that make the 1% lows).
+	private final it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap lastHealth = new it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap();
+	private final it.unimi.dsi.fastutil.ints.IntOpenHashSet seenIds = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
+	{
+		lastHealth.defaultReturnValue(Float.NaN);
+	}
 	private final Map<UUID, Integer> lastAttackedByMeTick = new HashMap<>();
 	private int tickCounter;
 
@@ -129,18 +135,26 @@ public final class KillEffectsModule extends AbstractModule implements Configura
 		}
 		List<PlayerEntity> players = trackedPlayers(client);
 		List<LivingEntity> watched = includeAllEntities ? trackedLivingEntities(client) : List.copyOf(players);
-		Set<UUID> currentIds = new HashSet<>();
+		seenIds.clear();
 		for (LivingEntity entity : watched) {
-			UUID id = entity.getUuid();
-			currentIds.add(id);
+			int id = entity.getId();
+			seenIds.add(id);
 			float health = entity.getHealth();
-			Float previous = lastHealth.put(id, health);
-			if (previous != null && previous > 0f && (health <= 0f || !entity.isAlive())) {
+			float previous = lastHealth.put(id, health);
+			if (!Float.isNaN(previous) && previous > 0f && (health <= 0f || !entity.isAlive())) {
 				onEntityDied(client, entity, players);
 			}
 		}
-		lastHealth.keySet().retainAll(currentIds);
-		lastAttackedByMeTick.keySet().retainAll(currentIds);
+		if (lastHealth.size() > seenIds.size()) {
+			lastHealth.keySet().removeIf(id -> !seenIds.contains(id));
+		}
+		if (!lastAttackedByMeTick.isEmpty()) {
+			Set<UUID> currentIds = new HashSet<>();
+			for (LivingEntity entity : watched) {
+				currentIds.add(entity.getUuid());
+			}
+			lastAttackedByMeTick.keySet().retainAll(currentIds);
+		}
 	}
 
 	private void onEntityDied(MinecraftClient client, LivingEntity victim, List<PlayerEntity> allPlayers) {

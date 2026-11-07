@@ -87,6 +87,17 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	 * render-thread time. Read by the GuiLayer* and VulkanDrawState mixins.
 	 */
 	public static volatile boolean fastDrawPath = true;
+	/** Velo Turbo master switch (for A/B runs: -Dvelo.renderProfileAB=turbo flips it); each part also has its own. */
+	public static volatile boolean turbo = !Boolean.getBoolean("velo.turboOff");
+	/** Velo Turbo: skip particles in chunk sections Sodium culled (behind walls, underground). */
+	public static volatile boolean turboParticleCull = true;
+	/** Velo Turbo: Velo's HUD modules redraw at most 360 times a second, frames in between reuse the draw list. */
+	public static volatile boolean hudFrameCache = true;
+	/**
+	 * Velo Turbo: incoming packets (chunk batches) spread over frames by a time budget. Off: two A/B rounds while moving
+	 * (2026-11-07) showed no change in average FPS or lows - single chunk packets are the slow part and can't be split.
+	 */
+	public static volatile boolean packetPacing = Boolean.getBoolean("velo.packetPacing");
 	/**
 	 * Light cosmetics, for weaker PCs: wings keep their wingbeat but drop their extra effects (moving arms, glow,
 	 * shine, particles), auras draw fewer particles.
@@ -296,7 +307,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 			applyPreset(preset);
 		}
 		// (Not while profiling: the profiled window has no focus or input, and AFK capping would hold it at 30 FPS.)
-		if (dynamicFps && !net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+		if (dynamicFps && !net.veloclient.velo.client.devtools.RenderProfiler.ENABLED && !Boolean.getBoolean("velo.benchNoAfk")) {
 			//? if <1.21.2 {
 			/*// 1.21.1 keeps its own background FPS
 			*///?} else {
@@ -461,7 +472,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				new ConfigField.ToggleField("Uncapped Rendering (decoupled present, Vulkan)", () -> decoupledPresent, v -> decoupledPresent = v),
 				new ConfigField.ToggleField("Dynamic FPS (throttle when unfocused/AFK)", () -> dynamicFps, v -> {
 					dynamicFps = v;
-					if (isEnabled() && !net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+					if (isEnabled() && !net.veloclient.velo.client.devtools.RenderProfiler.ENABLED && !Boolean.getBoolean("velo.benchNoAfk")) {
 						//? if <1.21.2 {
 						/*//
 						*///?} else {

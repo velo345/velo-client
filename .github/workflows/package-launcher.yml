@@ -8,6 +8,11 @@ name: Package Launcher
 # results straight onto that tag's GitHub release).
 on:
   workflow_dispatch:
+    inputs:
+      launcher_version:
+        description: "Launcher version for this build (empty = the one in launcher/build.gradle) - e.g. an update-test target"
+        required: false
+        default: ""
   push:
     tags:
       - "v*"
@@ -54,7 +59,7 @@ jobs:
 
       - name: Build launcher installer
         shell: bash
-        run: ./gradlew :launcher:jpackageDist -q
+        run: ./gradlew :launcher:jpackageDist -q ${{ github.event.inputs.launcher_version != '' && format('-PlauncherVersion={0}', github.event.inputs.launcher_version) || '' }}
 
       - uses: actions/upload-artifact@v4
         with:

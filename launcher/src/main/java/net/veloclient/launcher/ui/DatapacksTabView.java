@@ -309,15 +309,21 @@ public final class DatapacksTabView {
 		VBox.setVgrow(resultsScroll, Priority.ALWAYS);
 		root.getChildren().add(resultsScroll);
 
+		int[] generation = {0};   // older searches' answers are dropped
 		Runnable runSearch = () -> {
+			int requestGeneration = ++generation[0];
+			String text = query.getText();
 			results.getChildren().setAll(InstanceDetailView.loadingLabel(theme));
 			CompletableFuture.supplyAsync(() -> {
 				try {
-					return ModrinthClient.search(query.getText(), "datapack", instance.mcVersion(), "relevance", 0, 40);
+					return ModrinthClient.search(text, "datapack", instance.mcVersion(), "relevance", 0, 40);
 				} catch (IOException e) {
 					return e;
 				}
 			}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
+				if (requestGeneration != generation[0]) {
+					return;
+				}
 				if (result instanceof Exception ex) {
 					results.getChildren().setAll(InstanceDetailView.messageLabel("Search failed: " + ex.getMessage(), theme));
 					return;

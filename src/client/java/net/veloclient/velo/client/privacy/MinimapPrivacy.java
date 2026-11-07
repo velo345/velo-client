@@ -52,10 +52,13 @@ public final class MinimapPrivacy {
 				}
 			}
 			case FAKE -> {
-				// one noise lookup per block (not per pixel): this was the minimap's biggest cost with Anti Coords Leak on
+				// one noise lookup per block (not per pixel), and only for blocks that scrolled in since the last pass:
+				// the fake terrain is a pure function of the column, so the rest is reused from the cached grid.
+				int blocks = (size + ppb - 1) / ppb;
+				int[] grid = fakeGrid(centerX - radius + OFFSET_X, centerZ - radius + OFFSET_Z, blocks);
 				for (int by = 0; by * ppb < size; by++) {
 					for (int bx = 0; bx * ppb < size; bx++) {
-						int c = fakeColumn(centerX + bx - radius + OFFSET_X, centerZ + by - radius + OFFSET_Z);
+						int c = grid[by * blocks + bx];
 						for (int j = 0; j < ppb && by * ppb + j < size; j++) {
 							for (int i = 0; i < ppb && bx * ppb + i < size; i++) {
 								image.setColorArgb(bx * ppb + i, by * ppb + j, c);
@@ -118,6 +121,37 @@ public final class MinimapPrivacy {
 
 	private static float lerp(float a, float b, float t) {
 		return a + (b - a) * t;
+	}
+
+	private static int[] cachedGrid;
+	private static int cachedX = Integer.MIN_VALUE;
+	private static int cachedZ;
+	private static int cachedSize;
+
+	/** Fake colours for a blocks x blocks square starting at world column (x0, z0); overlap with the last call is copied. */
+	private static synchronized int[] fakeGrid(int x0, int z0, int blocks) {
+		int[] old = cachedGrid;
+		if (!net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo) {
+			old = null;
+		}
+		if (old != null && cachedSize == blocks && cachedX == x0 && cachedZ == z0) {
+			return old;
+		}
+		int[] grid = new int[blocks * blocks];
+		boolean reuse = old != null && cachedSize == blocks;
+		for (int by = 0; by < blocks; by++) {
+			int oy = z0 + by - cachedZ;
+			for (int bx = 0; bx < blocks; bx++) {
+				int ox = x0 + bx - cachedX;
+				grid[by * blocks + bx] = reuse && ox >= 0 && ox < blocks && oy >= 0 && oy < blocks
+						? old[oy * blocks + ox] : fakeColumn(x0 + bx, z0 + by);
+			}
+		}
+		cachedGrid = grid;
+		cachedX = x0;
+		cachedZ = z0;
+		cachedSize = blocks;
+		return grid;
 	}
 
 	/** Plausible terrain from value noise: lakes, beaches, meadows and darker forest. */

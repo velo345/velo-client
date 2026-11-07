@@ -36,7 +36,7 @@ public final class DamageNumbersModule extends AbstractModule implements Configu
 
 	public DamageNumbersModule() {
 		super("damage-numbers", "Damage Numbers", "Shows the damage players take (and heal) above their heads for a moment after each hit.",
-				ModuleCategory.PVP, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.PVP, SafetyTag.CHECK_SERVER_RULES, false);
 		instance = this;
 		NameTagLines.register(-10, (id, hasScore) -> line(id));
 	}

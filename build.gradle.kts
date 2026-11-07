@@ -146,6 +146,15 @@ tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") 
 	}
 }
 
+// GPU cosmetics' vertex shaders exist for 26.2/26.3 only. Minecraft reads every shader file of every mod at resource
+// load, and 1.21.x has no minecraft:sample_lightmap.glsl: the import failed, the whole resource reload failed and the
+// game stayed black (Velo 1.2.2 on 1.21.11, 2026-11-07). Older jars don't ship them at all.
+tasks.named<ProcessResources>("processClientResources") {
+	if (sc.current.parsed < "26.2") {
+		exclude("assets/velo-client/shaders/core/cosmetic*.vsh")
+	}
+}
+
 tasks.named<ProcessResources>("processAddonResources") {
 	val modVersion = project.version.toString()
 	val minecraftDependency = "~${sc.current.version}"

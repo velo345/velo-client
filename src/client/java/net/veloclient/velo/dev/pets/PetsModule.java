@@ -415,6 +415,11 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 			m.brain = new PetBrain(model);
 		}
 		long now = System.nanoTime();
+		// Hidden in first person (not riding): nobody sees the pose, it only has to keep following - 60 Hz is plenty
+		// (it used to run its whole animation every frame, ~2% of the render thread at high FPS).
+		if (net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo && m.hideFirstPerson && !m.ride && firstPerson() && m.lastNanos != 0 && now - m.lastNanos < 16_000_000L) {
+			return null;
+		}
 		float dt = m.lastNanos == 0 ? 0.016f : (now - m.lastNanos) / 1e9f;
 		m.lastNanos = now;
 		double[] pos = PvpCompat.renderPos(self);

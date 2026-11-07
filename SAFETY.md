@@ -49,6 +49,16 @@ grep -rn "sendPacket\|ClientPlayerEntity#setVelocity\|noClip" src/
 | Entity Count Overlay | Server Tools | Check Server Rules | Iterates `ClientWorld#getEntities()` — entities already loaded and rendered by the client for this exact reason. Cannot see anything beyond render distance. |
 | Chunk Boundary Overlay | Server Tools | Check Server Rules | Toggles vanilla's own F3+G chunk-border debug renderer (`DebugHudProfile#setEntryVisibility`) independent of whether the F3 panel is open — it's Mojang's own rendering, not a reimplementation. |
 | Hitbox Visualizer | Server Tools | Check Server Rules | Same mechanism as Chunk Boundary Overlay, toggling vanilla's F3+B entity-hitbox renderer. Draws the exact box the server already uses for hit detection — nothing wider, nothing extra, and it provides no combat timing information. Off by default; some servers ban any hitbox rendering outright regardless of fidelity, hence the tag. |
+| Totem Pop Counter | PvP | Check Server Rules | Counts totem pops from the status packets every client receives. Nothing hidden is read, but it is opponent information some PvP servers don't allow. |
+| Enemy Hunger | PvP | Check Server Rules | Estimates another player's hunger from what the client can see of them. An estimate, but still opponent information. |
+| Enemy Effects | PvP | Check Server Rules | Shows other players' potion effects from data the server already sends. Opponent information. |
+| Health Indicator | PvP | Check Server Rules | Shows other players' hearts from data the server already sends. Opponent information. |
+| Target HUD | PvP | Check Server Rules | Health, armor and distance of the player you're fighting, from data the server already sends. Opponent information. |
+| Damage Numbers | PvP | Check Server Rules | Shows damage other players take from their health changes. Opponent information. |
+| Reach Display | PvP | Check Server Rules | Draws your own attack range. It doesn't change reach, but some servers count range helpers as an advantage. |
+| Minimap | HUD | Check Server Rules | Draws the chunks your client already has loaded, nothing beyond render distance. Many servers still don't allow minimaps, so check first. |
+| Free Look | QoL | Check Server Rules | Turns only the camera, the server still sees where you really look. Some PvP servers ban looking around without turning. |
+| Storage Memory | QoL | Check Server Rules | Remembers containers you opened yourself, nothing the server didn't show you. Some servers don't allow remembering and searching storage this way. |
 | World Border Visualizer | Server Tools | Always Safe | Draws a box along `ClientWorld#getWorldBorder()`'s existing bounds — the server-enforced boundary the client already knows about and is already prevented from crossing. |
 | Light Level Overlay | Server Tools | Always Safe | Reads `World#getLightLevel` and the heightmap for already-loaded chunk columns near you and labels them via the same `GizmoDrawing` API vanilla's own debug renderers use. Cannot see through unloaded chunks. |
 | TPS & Tick Graph | Server Tools | Always Safe | On singleplayer/LAN, reads the local `IntegratedServer`'s real tick time (same number vanilla's F3 shows). On a remote server, falls back to `ClientConnection`'s own packet-rate counters rather than guessing at a TPS figure the client was never sent. |

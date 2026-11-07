@@ -22,7 +22,9 @@ public final class DustAnalyzer {
 
 	private static final int RADIUS = 20;
 	private static final int HEIGHT = 8;
-	private static final int SLICES = 4;
+	// 12 thin slices, one per tick (was 4 thick ones every 3rd tick): same 0.6 s for a full scan, a third of the work in
+	// any single tick frame - those tick frames are what the 1% lows are made of.
+	private static final int SLICES = 12;
 	private static final int[][] SIDES = {{1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}};
 
 	private static volatile List<int[]> flagged = List.of();
@@ -54,9 +56,6 @@ public final class DustAnalyzer {
 				flagged = List.of();
 				labels = List.of();
 			}
-			return;
-		}
-		if (++ticks % 3 != 0) {
 			return;
 		}
 		Object level = RmWorld.clientLevel();

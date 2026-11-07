@@ -48,7 +48,7 @@ public final class TotemPopsModule extends AbstractModule implements HudModule, 
 	public TotemPopsModule() {
 		super("totem-pops", "Totem Pop Counter",
 				"How many totems your opponent popped this life - or how many you popped and have left. Resets on death.",
-				ModuleCategory.PVP, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.PVP, SafetyTag.CHECK_SERVER_RULES, false);
 	}
 
 	@Override

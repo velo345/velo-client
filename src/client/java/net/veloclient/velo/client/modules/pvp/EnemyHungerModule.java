@@ -27,7 +27,7 @@ public final class EnemyHungerModule extends AbstractModule implements Configura
 
 	public EnemyHungerModule() {
 		super("enemy-hunger", "Enemy Hunger", "Estimates other players' hunger and saturation and shows it above their heads.",
-				ModuleCategory.PVP, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.PVP, SafetyTag.CHECK_SERVER_RULES, false);
 		instance = this;
 		NameTagLines.register(10, EnemyHungerModule::line);
 	}

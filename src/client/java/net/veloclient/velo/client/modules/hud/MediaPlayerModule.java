@@ -32,7 +32,7 @@ public final class MediaPlayerModule extends AbstractModule implements HudModule
 	public static final String ID = "media-player";
 	private static final List<String> STYLES = List.of("Popup", "Widget", "Pill");
 	private static final int CARD_W = 176;
-	private static final int CARD_H = 48;
+	private static final int CARD_H = 60;
 	private static final int PILL_W = 136;
 	private static final int PILL_H = 18;
 	private static final int PANEL = 0xE80D0D11;
@@ -185,17 +185,16 @@ public final class MediaPlayerModule extends AbstractModule implements HudModule
 		}
 	}
 
+	/**
+	 * One calm surface: cover, title and artist, the transport row, and a full-width time line. The colour comes only
+	 * from the cover (pause button and progress); no glow, gradient, border or header line competing with the text.
+	 */
 	private void drawCard(DrawContext context, int x, int y, MediaState state, float alpha, long now) {
 		int tint = tint();
 		int w = CARD_W;
 		int h = CARD_H;
-		VeloDraw.shadow(context, x, y, w, h, 11, 12, 3, VeloUi.withAlpha(0xFF000000, Math.round(0x90 * alpha)));
-		if (CoverArt.has()) {
-			VeloDraw.shadow(context, x, y, w, h, 11, 9, 0, VeloUi.withAlpha(tint, Math.round(0x38 * alpha * (0.6f + 0.4f * energy))));
-		}
-		VeloDraw.fillRounded(context, x, y, w, h, 11, VeloUi.withAlpha(PANEL, Math.round(0xE8 * alpha)));
-		VeloDraw.fillRoundedGradient(context, x, y, w, h, 11, VeloUi.withAlpha(tint, Math.round(0x34 * alpha)), 0x00000000);
-		VeloDraw.strokeRounded(context, x, y, w, h, 11, VeloUi.withAlpha(VeloAnim.lerpArgb(0xFFFFFFFF, tint, 0.5f), Math.round(0x30 * alpha)));
+		VeloDraw.shadow(context, x, y, w, h, 7, 8, 2, VeloUi.withAlpha(0xFF000000, Math.round(0x50 * alpha)));
+		VeloDraw.fillRounded(context, x, y, w, h, 7, VeloUi.withAlpha(PANEL, Math.round(0xC8 * alpha)));
 
 		// Cover, with a soft pop on every song change.
 		int size = 36;
@@ -206,44 +205,68 @@ public final class MediaPlayerModule extends AbstractModule implements HudModule
 		context.getMatrices().translate(cx + size / 2f, cy + size / 2f);
 		context.getMatrices().scale(pop, pop);
 		context.getMatrices().translate(-(cx + size / 2f), -(cy + size / 2f));
-		VeloDraw.fillRounded(context, cx, cy, size, size, 7, VeloUi.withAlpha(0xFF1E1E26, Math.round(0xFF * alpha)));
 		if (CoverArt.has()) {
 			CoverArt.draw(context, cx, cy, size, alpha);
 		} else {
+			VeloDraw.fillRounded(context, cx, cy, size, size, 4, VeloUi.withAlpha(0xFF1E1E26, Math.round(0xFF * alpha)));
 			MediaGlyphs.note(context, cx + size / 2f, cy + size / 2f, 16, VeloUi.withAlpha(tint, Math.round(0xD0 * alpha)));
 		}
-		VeloDraw.strokeRounded(context, cx, cy, size, size, 3, VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x22 * alpha)));
 		context.getMatrices().popMatrix();
 
-		int tx = x + 50;
-		int tw = w - 50 - 8;
-		// Header: bars + where it plays.
-		int headColor = VeloUi.withAlpha(VeloAnim.lerpArgb(0xFF8E8E9A, tint, 0.55f), Math.round(0xFF * alpha));
-		float eqW = MediaGlyphs.equalizer(context, tx, y + 13, 6, energy, headColor);
-		String head = state == null ? "MEDIA" : (state.playing() ? "NOW PLAYING" : "PAUSED") + "  ·  " + state.playerLabel().toUpperCase();
-		HudLook.text(context, MenuKit.fit(MinecraftClient.getInstance().textRenderer, MenuKit.small(head), tw - (int) eqW - 4), tx + (int) eqW + 4,
-				y + 7, headColor);
-
+		int tx = x + 48;
+		int tw = w - 48 - 8;
 		// Title and artist: the old pair slides up and out while the new one comes in.
 		float swap = Math.min(1f, (now - textSwapAt) / 380_000_000f);
 		float e = 1f - (1f - swap) * (1f - swap) * (1f - swap);
-		context.enableScissor(tx, y + 15, tx + tw, y + 39);
+		context.enableScissor(tx, y + 4, tx + tw, y + 27);
 		if (swap < 1f && !oldTitle.isEmpty()) {
 			int oy = Math.round(-e * 10);
-			textPair(context, tx, y + 17 + oy, tw, oldTitle, oldArtist, alpha * (1f - e), now);
+			textPair(context, tx, y + 6 + oy, tw, oldTitle, oldArtist, alpha * (1f - e), now);
 		}
-		textPair(context, tx, y + 17 + Math.round((1f - e) * 10), tw, shownTitle, shownArtist, alpha * (oldTitle.isEmpty() ? 1f : e), now);
+		textPair(context, tx, y + 6 + Math.round((1f - e) * 10), tw, shownTitle, shownArtist, alpha * (oldTitle.isEmpty() ? 1f : e), now);
 		context.disableScissor();
 
-		// Progress.
-		int by = y + h - 7;
-		VeloDraw.fillRounded(context, tx, by, tw, 2, 1, VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x1C * alpha)));
-		if (state != null && state.lengthMs() > 0) {
-			float p = state.positionNow() / (float) state.lengthMs();
-			int pw = Math.max(2, Math.round(tw * p));
-			VeloDraw.fillRounded(context, tx, by, pw, 2, 1, VeloUi.withAlpha(tint, Math.round(0xFF * alpha)));
-			VeloDraw.fillCircle(context, tx + pw, by + 1f, 1.8f + energy * 0.4f, VeloUi.withAlpha(0xFFFFFFFF, Math.round(0xF0 * alpha)));
+		// Transport row: shows the state; the working buttons are in the Velo menu.
+		float mid = tx + tw / 2f;
+		float row = y + 35;
+		int soft = VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x70 * alpha));
+		MediaGlyphs.skip(context, mid - 19, row, 7, -1, soft);
+		MediaGlyphs.skip(context, mid + 19, row, 7, 1, soft);
+		VeloDraw.fillCircle(context, mid, row, 7.5f, VeloUi.withAlpha(tint, Math.round(0xFF * alpha)));
+		int glyph = VeloUi.withAlpha(0xFF101014, Math.round(0xFF * alpha));
+		if (state != null && state.playing()) {
+			MediaGlyphs.pause(context, mid, row, 7, glyph);
+		} else {
+			MediaGlyphs.play(context, mid, row, 7, glyph);
 		}
+
+		// Time line across the whole card.
+		int by = y + h - 9;
+		long length = state == null ? 0 : state.lengthMs();
+		long position = state == null ? 0 : Math.max(0, Math.min(length, state.positionNow()));
+		Text from = HudLook.label(clock(position));
+		Text to = HudLook.label(clock(length));
+		int timeColor = VeloUi.withAlpha(0xFFA9A9B3, Math.round(0xFF * alpha));
+		int fromW = HudLook.width(from);
+		int toW = HudLook.width(to);
+		HudLook.text(context, from, x + 6, by - 3, timeColor);
+		HudLook.text(context, to, x + w - 6 - toW, by - 3, timeColor);
+		int bx = x + 6 + fromW + 5;
+		int bw = w - 12 - fromW - toW - 10;
+		VeloDraw.fillRounded(context, bx, by, bw, 2, 1, VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x26 * alpha)));
+		if (length > 0) {
+			int pw = Math.max(2, Math.round(bw * (position / (float) length)));
+			VeloDraw.fillRounded(context, bx, by, pw, 2, 1, VeloUi.withAlpha(tint, Math.round(0xFF * alpha)));
+			VeloDraw.fillCircle(context, bx + pw, by + 1f, 2f, VeloUi.withAlpha(tint, Math.round(0xFF * alpha)));
+		}
+	}
+
+	/** 3:07 or 1:02:07. */
+	private static String clock(long ms) {
+		long seconds = ms / 1000;
+		long hours = seconds / 3600;
+		return hours > 0 ? String.format(java.util.Locale.ROOT, "%d:%02d:%02d", hours, seconds / 60 % 60, seconds % 60)
+				: String.format(java.util.Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60);
 	}
 
 	private void textPair(DrawContext context, int x, int y, int w, String title, String artist, float alpha, long now) {
@@ -287,7 +310,6 @@ public final class MediaPlayerModule extends AbstractModule implements HudModule
 		int h = PILL_H;
 		VeloDraw.shadow(context, x, y, w, h, h / 2, 8, 2, VeloUi.withAlpha(0xFF000000, Math.round(0x70 * alpha)));
 		VeloDraw.fillRounded(context, x, y, w, h, h / 2, VeloUi.withAlpha(PANEL, Math.round(0xE0 * alpha)));
-		VeloDraw.strokeRounded(context, x, y, w, h, h / 2, VeloUi.withAlpha(tint, Math.round(0x50 * alpha)));
 		int size = 12;
 		if (CoverArt.has()) {
 			CoverArt.draw(context, x + 3, y + 3, size, alpha);
