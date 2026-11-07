@@ -1,0 +1,99 @@
+{
+ "title": "Velo Client 1.2.5: Pack Library, one-click Repair, and a launcher that updates itself properly",
+ "summary": "Browse and install resource packs right in the game, fix a broken install with one button, import from OneClient with your worlds - plus +17% FPS on Vulkan and an updater that no longer gives up.",
+ "tag": "Update",
+ "version": "1.2.5",
+ "accent": "#e0262e",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "text",
+   "text": "**Velo Client 1.2.5** is about the things that should just work: getting packs, fixing a broken install, moving over from another client and updating - plus another big FPS step on Vulkan."
+  },
+  {
+   "type": "heading",
+   "text": "Pack Library"
+  },
+  {
+   "type": "image",
+   "image": "file:images/packlib.jpg",
+   "caption": "Resource Packs > Get packs: every Modrinth resource pack for your version, right in the game."
+  },
+  {
+   "type": "list",
+   "items": [
+    "Search and sort by relevance, downloads or newest",
+    "**Install** puts the pack straight into your list - it shows up under Available right away",
+    "Packs made for another version are installed too (textures carry over)"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Repair Velo"
+  },
+  {
+   "type": "image",
+   "image": "file:images/repair.jpg",
+   "caption": "Settings > Updates & system > Repair - also right in the crash window."
+  },
+  {
+   "type": "text",
+   "text": "Something broken and no idea why? **Repair** puts the current Velo mod back into every profile, clears Fabric's cache and downloads the current build again. **Repair everything** also reinstalls the launcher. Your worlds, settings and other mods stay exactly as they are."
+  },
+  {
+   "type": "heading",
+   "text": "Faster on Vulkan"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**+17% FPS** in our benchmark scene on 26.2 (2690 → 3160 FPS), 1% lows up too",
+    "Minecraft drew two invisible full-screen passes every frame - the entity-outline layer with nothing glowing and the vignette in daylight. Velo skips them when they can't change a pixel."
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Moving to Velo"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Import from OneClient** - mods, worlds, settings, servers and configs",
+    "Imports bring your **worlds** by default (Lunar imports found none before)",
+    "CurseForge folders on other drives are found, mod and pack pictures appear right after importing"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "A launcher that updates properly"
+  },
+  {
+   "type": "list",
+   "items": [
+    "Broken downloads continue where they stopped and retry by themselves",
+    "On Windows the update installs **without clicking through the installer** and the launcher starts again on its own",
+    "Live progress with speed and time left - and a log for every step (updates/update.log)",
+    "The window fits small and scaled screens: no more buttons under the taskbar"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Fixed"
+  },
+  {
+   "type": "list",
+   "items": [
+    "Black/white screen on 1.21.x after updating to 1.2.2",
+    "Flickering hotbar with VulkanMod",
+    "Crash with old Lunar library copies (the Doctor turns them off)",
+    "Removing a mod failed silently - now it says why (usually the game is still running)",
+    "Mod search results could mix when typing fast"
+   ]
+  },
+  {
+   "type": "callout",
+   "text": "The launcher updates itself - just open it. New download: velo-client.com/download"
+  }
+ ]
+}
