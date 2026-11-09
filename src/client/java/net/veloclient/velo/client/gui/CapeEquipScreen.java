@@ -726,14 +726,16 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		}
 		if (net.veloclient.velo.client.cosmetics.wings.WingRigs.recolorable(selectedWings)) {
 			// Colour: the hues round the wheel, then white, then a cycling rainbow.
-			addDrawableChild(new net.veloclient.velo.client.gui.widget.VeloSlider(gridX, y + 3 * 24, listWidth, 20, "Colour", 1,
+			// Pairs with their own colour (grey art, e.g. Chain Wings) start the slider at "Own".
+			boolean own = net.veloclient.velo.client.cosmetics.wings.WingRigs.ownTint(selectedWings) >= 0;
+			addDrawableChild(new net.veloclient.velo.client.gui.widget.VeloSlider(gridX, y + 3 * 24, listWidth, 20, "Colour", own ? 0 : 1,
 					net.veloclient.velo.client.cosmetics.wings.WingRigs.TINT_RAINBOW, () -> {
 						int code = net.veloclient.velo.client.cosmetics.wings.WingsManager.settings(selectedWings).color();
-						return code <= 0 ? net.veloclient.velo.client.cosmetics.wings.WingRigs.TINT_WHITE : code;
+						return code <= 0 ? own ? 0 : net.veloclient.velo.client.cosmetics.wings.WingRigs.TINT_WHITE : code;
 					}, v -> net.veloclient.velo.client.cosmetics.wings.WingsManager.setSettings(selectedWings,
 							net.veloclient.velo.client.cosmetics.wings.WingsManager.settings(selectedWings).withColor((int) Math.round(v))),
 					v -> (double) Math.round(v), v -> v >= net.veloclient.velo.client.cosmetics.wings.WingRigs.TINT_RAINBOW ? "Rainbow"
-							: v >= net.veloclient.velo.client.cosmetics.wings.WingRigs.TINT_WHITE ? "White" : Math.round(v - 1) + "°"));
+							: v >= net.veloclient.velo.client.cosmetics.wings.WingRigs.TINT_WHITE ? "White" : v < 0.5 ? "Own" : Math.round(v - 1) + "°"));
 		}
 		Text reset = Text.literal("Reset");
 		int resetW = this.textRenderer.getWidth(reset) + 20;

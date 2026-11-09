@@ -615,9 +615,14 @@ public final class CapeManager {
 	 * off-thread (see {@link RemoteCapeCache}). Render thread only.
 	 */
 	public static Identifier registerPreloadedTexture(String definitionId, NativeImage image, String label) {
+		return registerPreloadedTexture(definitionId, image, label, false);
+	}
+
+	/** {@code smooth}: sampled bilinearly (painted art, not pixel art). */
+	public static Identifier registerPreloadedTexture(String definitionId, NativeImage image, String label, boolean smooth) {
 		Identifier identifier = Identifier.of("velo-client", "cape_" + definitionId.replace('-', '_'));
 		MinecraftClient.getInstance().getTextureManager()
-				.registerTexture(identifier, new NativeImageBackedTexture(() -> label, image));
+				.registerTexture(identifier, smooth ? new AnimatedCapeAsset.SmoothTexture(() -> label, image) : new NativeImageBackedTexture(() -> label, image));
 		TEXTURE_CACHE.put(definitionId, identifier);
 		return identifier;
 	}

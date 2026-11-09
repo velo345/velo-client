@@ -144,8 +144,9 @@ public final class ProClipRecorder {
 		}
 		nextGrabNanos = Math.max(nextGrabNanos + interval, now - interval);
 		try {
+			final long shownAt = now;   // when the frame was shown, not when its GPU copy arrived (that jittered the timing)
 			FrameGrabber.grab((rgba, width, height) -> {
-				if (!QUEUE.offer(new Frame(rgba, width, height, System.nanoTime()))) {
+				if (!QUEUE.offer(new Frame(rgba, width, height, shownAt))) {
 					FrameGrabber.release(rgba); // encoder busy: the next frame is repeated to keep time
 				}
 			}, maxHeight);

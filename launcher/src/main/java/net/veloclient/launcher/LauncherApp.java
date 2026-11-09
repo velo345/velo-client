@@ -2976,6 +2976,39 @@ public final class LauncherApp extends Application {
 			public void world(String worldId, String version, Button trigger) {
 				joinHostedWorld(worldId, version, trigger);
 			}
+
+			@Override
+			public void preview(String itemId) {
+				if (itemId.startsWith(net.veloclient.launcher.data.AuraCatalog.ITEM_PREFIX)) {
+					net.veloclient.launcher.data.AuraCatalog.byId(itemId.substring(net.veloclient.launcher.data.AuraCatalog.ITEM_PREFIX.length()))
+							.ifPresent(type -> showAuraDetail(type));
+					return;
+				}
+				var known = net.veloclient.launcher.data.StoreCatalog.byId(itemId);
+				if (known.isPresent()) {
+					showStoreItemDetail(known.get());
+					return;
+				}
+				// A partner's cloak isn't in the public catalog: its page is built from the item itself.
+				String base = net.veloclient.launcher.social.LauncherSocial.baseUrl();
+				if (base == null) {
+					return;
+				}
+				Thread.ofVirtual().name("velo-reward-preview").start(() -> {
+					try {
+						String body = java.net.http.HttpClient.newHttpClient().send(java.net.http.HttpRequest.newBuilder(
+								java.net.URI.create(base + "/v1/cosmetics/item?id=" + java.net.URLEncoder.encode(itemId, java.nio.charset.StandardCharsets.UTF_8))).build(),
+								java.net.http.HttpResponse.BodyHandlers.ofString()).body();
+						com.google.gson.JsonObject o = com.google.gson.JsonParser.parseString(body).getAsJsonObject();
+						String sha = o.has("files") && o.getAsJsonObject("files").has("gif") ? o.getAsJsonObject("files").get("gif").getAsString() : null;
+						var item = new net.veloclient.launcher.data.StoreItem(itemId, o.has("name") ? o.get("name").getAsString() : itemId,
+								o.has("description") && !o.get("description").isJsonNull() ? o.get("description").getAsString() : "", 0, null, sha, false);
+						javafx.application.Platform.runLater(() -> showStoreItemDetail(item));
+					} catch (Exception e) {
+						net.veloclient.launcher.LauncherLog.info("Reward preview failed: " + e.getMessage());
+					}
+				});
+			}
 		};
 	}
 
@@ -3550,6 +3583,52 @@ public final class LauncherApp extends Application {
 	}
 
 	/** Settings > Sound & guides (dev build): interface sounds, the in-game title track, the first-start guide. */
+	// Settings > AI Access: the game's local API for AI agents (at your own risk), hidden start, the prompt to give an AI.
+	private VBox aiAccessCard() {
+		VBox card = net.veloclient.launcher.ui.SettingsUi.card("AI Access");
+		var data = net.veloclient.launcher.data.LauncherSettings.get();
+		javafx.scene.control.CheckBox on = new javafx.scene.control.CheckBox();
+		on.setSelected(data.aiAccess);
+		on.setOnAction(e -> {
+			var d = net.veloclient.launcher.data.LauncherSettings.get();
+			d.aiAccess = on.isSelected();
+			net.veloclient.launcher.data.LauncherSettings.save(d);
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(card, "AI access (at your own risk)", "Let AI agents drive the game through a local API",
+				"The game opens an API on 127.0.0.1:" + net.veloclient.launcher.launch.GameLauncher.AI_PORT + " (only this PC, token required):"
+						+ " Velo Rewind replays and video exports, recording, joining worlds and servers, screenshots, Velo modules, resource packs,"
+						+ " shaders and mods. Moving, chatting and inventory only work in singleplayer or on servers where you're an operator."
+						+ " Takes effect on the next launch.", on);
+		javafx.scene.control.CheckBox hidden = new javafx.scene.control.CheckBox();
+		hidden.setSelected(data.aiHidden);
+		boolean canHide = net.veloclient.launcher.launch.GameLauncher.hiddenDisplayAvailable();
+		hidden.setDisable(!canHide);
+		hidden.setOnAction(e -> {
+			var d = net.veloclient.launcher.data.LauncherSettings.get();
+			d.aiHidden = hidden.isSelected();
+			net.veloclient.launcher.data.LauncherSettings.save(d);
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(card, "Start the game hidden", "No game window - the AI plays and records in the background",
+				"With AI access on, the game runs without a window (Linux: in an invisible display; Windows / macOS: the game hides its"
+						+ " window once it has started) - nothing on your screen, your mouse and keyboard stay yours. Close it through the"
+						+ " API (POST /quit) or the launcher's Stop button.", hidden);
+		Button copy = new Button("Copy prompt");
+		copy.setOnAction(e -> {
+			String prompt = "Velo Client (Minecraft) is running with its AI API at http://127.0.0.1:" + net.veloclient.launcher.launch.GameLauncher.AI_PORT
+					+ " - send 'Authorization: Bearer " + net.veloclient.launcher.launch.GameLauncher.aiToken() + "' with every request."
+					+ " GET / returns the full description of every endpoint (replays, video export, recording, worlds, chat, input,"
+					+ " inventory, modules, resource packs, shaders, mods). Start with GET /player and GET /status.";
+			javafx.scene.input.ClipboardContent clip = new javafx.scene.input.ClipboardContent();
+			clip.putString(prompt);
+			javafx.scene.input.Clipboard.getSystemClipboard().setContent(clip);
+			copy.setText("Copied");
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(card, "Prompt for your AI", "Address, token and where the docs are",
+				"Paste it into Claude Code, Codex or another agent. The token stays the same; anyone with it can control the game"
+						+ " while it runs, so keep it to yourself.", copy);
+		return card;
+	}
+
 	private VBox soundAndGuidesCard() {
 		VBox card = net.veloclient.launcher.ui.SettingsUi.card("Sound & guides");
 		net.veloclient.launcher.data.InterfacePrefs.Data prefs = net.veloclient.launcher.data.InterfacePrefs.get();
@@ -3888,9 +3967,29 @@ public final class LauncherApp extends Application {
 	}
 
 	/** @param quickPlayTarget nullable "host:port" - when present, launches straight into that server (My Servers' Connect). */
+	/**
+	 * Profiles between a Play click and their game process being up. A second click meanwhile (some Play buttons, like the
+	 * home page's, aren't the one that gets disabled; double-clicks; impatient spam) started the game again and again -
+	 * players reported dozens of copies opening. Now it only says it's on its way.
+	 */
+	private final java.util.Set<String> starting = java.util.concurrent.ConcurrentHashMap.newKeySet();
+	private final java.util.Map<String, Long> startingSince = new java.util.concurrent.ConcurrentHashMap<>();
+
 	private void launchWithProgress(Instance instance, String quickPlayTarget, Button triggerButton, ProgressBar progressBar, Label statusLabel) {
+		// a start that never finished (sign-in closed, a dialog dismissed oddly) mustn't block Play for good
+		Long since = startingSince.get(instance.id());
+		if (since != null && System.currentTimeMillis() - since > 120_000) {
+			starting.remove(instance.id());
+		}
+		if (!starting.add(instance.id())) {
+			net.veloclient.launcher.ui.Toasts.show(content, "info", "#5aa9ff", instance.name() + " is already starting...");
+			return;
+		}
+		startingSince.put(instance.id(), System.currentTimeMillis());
+		net.veloclient.launcher.ui.Toasts.show(content, "info", "#3ddc97", "Starting " + instance.name() + "...");
 		net.veloclient.launcher.ui.UiSounds.launch();
 		if (requiredUpdate != null && availableUpdate != null) {
+			starting.remove(instance.id());
 			net.veloclient.launcher.ui.UpdateDialog.show(stage, availableUpdate, java.util.Objects.requireNonNullElse(requiredUpdate.message(), ""));
 			return;
 		}
@@ -3942,10 +4041,12 @@ public final class LauncherApp extends Application {
 				statusLabel.setVisible(false);
 				statusLabel.setManaged(false);
 				if (!finalWarnings.isEmpty() && !net.veloclient.launcher.ui.SystemCheckDialog.confirmLaunch(stage, finalWarnings)) {
+					starting.remove(instance.id());
 					return;
 				}
 				if (finalDiagnosis != null && finalDiagnosis.issues().stream().anyMatch(i -> i.severity() == net.veloclient.launcher.doctor.Diagnosis.Severity.CRASH)
 						&& !net.veloclient.launcher.ui.DoctorDialog.confirmLaunch(stage, instance, finalDiagnosis)) {
+					starting.remove(instance.id());
 					return;
 				}
 				continueLaunch(instance, quickPlayTarget, triggerButton, progressBar, statusLabel);
@@ -3961,6 +4062,7 @@ public final class LauncherApp extends Application {
 			if (rules != null && !net.veloclient.launcher.data.ServerProfiles.hidden(rules.id())) {
 				var check = net.veloclient.launcher.data.ServerProfiles.check(instance, rules);
 				if (!check.clean() && !net.veloclient.launcher.ui.ServerRulesDialog.confirm(stage, check)) {
+					starting.remove(instance.id());
 					return;
 				}
 			}
@@ -4037,6 +4139,7 @@ public final class LauncherApp extends Application {
 					GameLauncher.LaunchResult result = GameLauncher.launch(instance, activeSession, listener, quickPlayTarget);
 					RunningInstanceManager.RunningInstance running =
 							RunningInstanceManager.register(instance, result.process(), result.logFile(), quickPlayTarget);
+					starting.remove(instance.id());
 					QuickLaunchStore.recordLaunch(instance.id(), quickPlayTarget);
 					Platform.runLater(() -> {
 						// Re-enable right away (not "not until it exits") -
@@ -4057,6 +4160,15 @@ public final class LauncherApp extends Application {
 					});
 					int exitCode = result.process().waitFor();
 					Platform.runLater(this::checkAccountSkin);
+					// The game closed: bring the launcher back (it was minimized on launch) - unless another game still runs.
+					Platform.runLater(() -> {
+						if (net.veloclient.launcher.data.LauncherSettings.get().minimizeOnLaunch && RunningInstanceManager.running().isEmpty()) {
+							stage.setIconified(false);
+							stage.show();
+							stage.toFront();
+							stage.requestFocus();
+						}
+					});
 					{
 						// The Doctor learns from every run: fixes that helped, crashes that came back, fixes players found.
 						try {
@@ -4074,6 +4186,7 @@ public final class LauncherApp extends Application {
 					}
 				} catch (Throwable e) {
 					// Throwable, not Exception: an OutOfMemoryError / missing class used to skip this and leave Play pressed for good.
+					starting.remove(instance.id());
 					LauncherLog.warn("Launch of " + instance.name() + " failed", e);
 					var why = net.veloclient.launcher.launch.LaunchErrors.explain(e);
 					Platform.runLater(() -> {
@@ -4597,6 +4710,7 @@ public final class LauncherApp extends Application {
 						+ " No worlds, screenshots or chat beyond what's in the log.", telemetry);
 		content.getChildren().add(updates);
 		content.getChildren().addAll(net.veloclient.launcher.ui.PerformanceSettingsView.build(theme));
+		content.getChildren().add(aiAccessCard());
 
 		VBox appearance = net.veloclient.launcher.ui.SettingsUi.card("Appearance");
 		appearance.getChildren().add(themePicker());

@@ -153,7 +153,8 @@
 		"VulkanThreadedSubmissionMixin",
 		"VulkanThreadedSubmitMixin",
 		"VulkanThreadedSurfaceMixin",
-		"XpLevelColorMixin"
+		"XpLevelColorMixin",
+		"TurboChunkSkySourcesMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

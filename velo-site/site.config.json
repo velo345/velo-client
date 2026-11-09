@@ -50,6 +50,7 @@
     "fabricApi": "https://modrinth.com/mod/fabric-api",
     "github": "https://github.com/velo345/velo-client",
     "releases": "https://github.com/velo345/velo-client/releases",
+    "downloadMirror": "https://velo-client.com/dl",
     "discord": "https://discord.gg/tGwn8RsMpv"
   },
   "legal": {

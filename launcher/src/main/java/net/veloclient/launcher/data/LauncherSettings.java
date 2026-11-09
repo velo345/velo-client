@@ -47,6 +47,12 @@ public final class LauncherSettings {
 		public boolean performanceMode;
 		/** Minimize the launcher once a game has started (it then frees its memory - see idle mode). */
 		public boolean minimizeOnLaunch = true;
+		/** AI Access: the game opens its local AI API (127.0.0.1) so AI agents can drive it - see the game's velo-rewind/AI.md. */
+		public boolean aiAccess;
+		/** Linux: start the game in an invisible display (kwin_wayland --virtual or xvfb-run) while AI Access is on. */
+		public boolean aiHidden;
+		/** The API's token, the same for every profile and launch. */
+		public String aiToken = "";
 		/** Party leader: pressing Play also launches every member. */
 		public boolean partyLaunchTogether = true;
 		/** Party member: launch when the leader does (asks with a short countdown). */

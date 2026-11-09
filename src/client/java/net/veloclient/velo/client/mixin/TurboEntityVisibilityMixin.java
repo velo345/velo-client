@@ -15,9 +15,30 @@ import org.spongepowered.asm.mixin.injection.At;
 /*@Mixin(net.minecraft.client.renderer.extract.LevelExtractor.class)
 public abstract class TurboEntityVisibilityMixin {
 
+	// Once per frame: did the camera move since the last frame? Then no answer can be reused this frame, and the
+	// per-entity compare + store (1.4% of every frame while moving) is skipped altogether.
+	@org.spongepowered.asm.mixin.Unique
+	private static double velo$lastX, velo$lastY, velo$lastZ;
+	@org.spongepowered.asm.mixin.Unique
+	private static float velo$lastXRot, velo$lastYRot;
+	@org.spongepowered.asm.mixin.Unique
+	private static boolean velo$camMoved = true;
+	@org.spongepowered.asm.mixin.Unique
+	private static long velo$frameNanos;
+
 	@org.spongepowered.asm.mixin.injection.Inject(method = "extractVisibleEntities", at = @At("HEAD"))
 	private void velo$newItemFrame(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
 		AntiFarmLagModule.beginItemFrame();
+		net.minecraft.client.Camera camera = net.minecraft.client.Minecraft.getInstance().gameRenderer.mainCamera();
+		net.minecraft.world.phys.Vec3 pos = camera.position();
+		velo$camMoved = pos.x != velo$lastX || pos.y != velo$lastY || pos.z != velo$lastZ
+				|| camera.xRot() != velo$lastXRot || camera.yRot() != velo$lastYRot;
+		velo$lastX = pos.x;
+		velo$lastY = pos.y;
+		velo$lastZ = pos.z;
+		velo$lastXRot = camera.xRot();
+		velo$lastYRot = camera.yRot();
+		velo$frameNanos = System.nanoTime();
 	}
 
 	@WrapOperation(method = "isEntityVisible", at = @At(value = "INVOKE",
@@ -45,7 +66,7 @@ public abstract class TurboEntityVisibilityMixin {
 				return shown;
 			}
 		}
-		if (!PerformanceBoostModule.turbo || !(entity instanceof EntityVisCache cache)) {
+		if (!PerformanceBoostModule.turbo || velo$camMoved || !(entity instanceof EntityVisCache cache)) {
 			return original.call(dispatcher, entity, frustum, camX, camY, camZ, partialTick);
 		}
 		net.minecraft.client.Camera camera = net.minecraft.client.Minecraft.getInstance().gameRenderer.mainCamera();
@@ -55,7 +76,7 @@ public abstract class TurboEntityVisibilityMixin {
 		double x = entity.getX();
 		double y = entity.getY();
 		double z = entity.getZ();
-		long now = System.nanoTime();
+		long now = velo$frameNanos;
 		long at = cache.velo$visTime();
 		if (at != 0 && now - at < EntityVisCache.MAX_AGE_NANOS && cache.velo$visMatches(camX, camY, camZ, xRot, yRot, fov, x, y, z)) {
 			return cache.velo$visResult();
@@ -69,9 +90,30 @@ public abstract class TurboEntityVisibilityMixin {
 /*@Mixin(net.minecraft.client.renderer.extract.LevelExtractor.class)
 public abstract class TurboEntityVisibilityMixin {
 
+	// Once per frame: did the camera move since the last frame? Then no answer can be reused this frame, and the
+	// per-entity compare + store (1.4% of every frame while moving) is skipped altogether.
+	@org.spongepowered.asm.mixin.Unique
+	private static double velo$lastX, velo$lastY, velo$lastZ;
+	@org.spongepowered.asm.mixin.Unique
+	private static float velo$lastXRot, velo$lastYRot;
+	@org.spongepowered.asm.mixin.Unique
+	private static boolean velo$camMoved = true;
+	@org.spongepowered.asm.mixin.Unique
+	private static long velo$frameNanos;
+
 	@org.spongepowered.asm.mixin.injection.Inject(method = "extractVisibleEntities", at = @At("HEAD"))
 	private void velo$newItemFrame(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
 		AntiFarmLagModule.beginItemFrame();
+		net.minecraft.client.Camera camera = net.minecraft.client.Minecraft.getInstance().gameRenderer.mainCamera();
+		net.minecraft.world.phys.Vec3 pos = camera.position();
+		velo$camMoved = pos.x != velo$lastX || pos.y != velo$lastY || pos.z != velo$lastZ
+				|| camera.xRot() != velo$lastXRot || camera.yRot() != velo$lastYRot;
+		velo$lastX = pos.x;
+		velo$lastY = pos.y;
+		velo$lastZ = pos.z;
+		velo$lastXRot = camera.xRot();
+		velo$lastYRot = camera.yRot();
+		velo$frameNanos = System.nanoTime();
 	}
 
 	@WrapOperation(method = "isEntityVisible", at = @At(value = "INVOKE",
@@ -99,7 +141,7 @@ public abstract class TurboEntityVisibilityMixin {
 				return shown;
 			}
 		}
-		if (!PerformanceBoostModule.turbo || !(entity instanceof EntityVisCache cache)) {
+		if (!PerformanceBoostModule.turbo || velo$camMoved || !(entity instanceof EntityVisCache cache)) {
 			return original.call(dispatcher, entity, frustum, camX, camY, camZ);
 		}
 		net.minecraft.client.Camera camera = net.minecraft.client.Minecraft.getInstance().gameRenderer.mainCamera();
@@ -109,7 +151,7 @@ public abstract class TurboEntityVisibilityMixin {
 		double x = entity.getX();
 		double y = entity.getY();
 		double z = entity.getZ();
-		long now = System.nanoTime();
+		long now = velo$frameNanos;
 		long at = cache.velo$visTime();
 		if (at != 0 && now - at < EntityVisCache.MAX_AGE_NANOS && cache.velo$visMatches(camX, camY, camZ, xRot, yRot, fov, x, y, z)) {
 			return cache.velo$visResult();

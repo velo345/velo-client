@@ -172,6 +172,18 @@ public final class TitleMenu {
 	 * the loading screen at startup, so one odd mod button must not take the whole game down.
 	 */
 	public static void render(DrawContext context, int width, int height, int mouseX, int mouseY, Env env) {
+		if (net.veloclient.velo.client.gui.VeloFonts.needsHealthCheck()) {
+			TextRenderer fontCheck = MinecraftClient.getInstance().textRenderer;
+			net.veloclient.velo.client.gui.VeloFonts.beginHealthCheck();
+			int narrow = 0, wide = 0;
+			try {
+				narrow = MenuKit.width(fontCheck, Text.literal("iiiiiiii"));
+				wide = MenuKit.width(fontCheck, Text.literal("WWWWWWWW"));
+			} catch (RuntimeException ignored) {
+				// counts as broken
+			}
+			net.veloclient.velo.client.gui.VeloFonts.endHealthCheck(narrow, wide);
+		}
 		// The loading screen can draw the title screen before its init() made our widgets (seen with Essential on
 		// 26.2): wait for them instead of marking the menu broken for the whole session.
 		if (broken || !ready()) {
@@ -273,7 +285,8 @@ public final class TitleMenu {
 			}
 			if (TitleScreenTheme.matchExtraIcon(TitleScreenTheme.TITLE_SIDE_ICONS, label) != null
 					|| label.isEmpty() && TitleScreenTheme.matchExtraIcon(TitleScreenTheme.TITLE_SIDE_ICON_CLASSES, className) != null) {
-				modRows.add(new Row(widget, Text.literal("Replays"), null, true, false, false));
+				modRows.add(new Row(widget, Text.literal(label.toLowerCase(java.util.Locale.ROOT).contains("rewind") ? "Velo Rewind" : "Replays"),
+						null, true, false, false));
 				continue;
 			}
 			String iconKey = TitleScreenTheme.matchExtraIcon(TitleScreenTheme.TITLE_EXTRA_ICONS, label);

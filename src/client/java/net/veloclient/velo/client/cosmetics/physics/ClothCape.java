@@ -161,10 +161,22 @@ public final class ClothCape {
 	 * with the legs; {@code still} turns off wind (menus, previews).
 	 */
 	public void simulate(CapePhysicsPreset preset, float legBack, boolean still, boolean far) {
+		simulate(preset, legBack, still, far, 0f);
+	}
+
+	/**
+	 * {@code minInterval}: seconds that must have passed before the cloth steps again. At 700+ FPS it used to step every
+	 * frame (at least one step + all constraint passes per frame per cloak): 24 cloaked players cost 22% of the render
+	 * thread (2026-11-08). The time adds up meanwhile, so the motion is the same - just updated less often.
+	 */
+	/** Constraint passes per step (Cosmetics Quality: High 4, Medium 3, Low 2). */
+	public int maxIterations = ITERATIONS;
+
+	public void simulate(CapePhysicsPreset preset, float legBack, boolean still, boolean far, float minInterval) {
 		long now = System.nanoTime();
 		lastUsedNanos = now;
 		float elapsed = Math.min(0.1f, (now - lastNanos) / 1e9f);
-		if (elapsed < 0.0015f) {
+		if (elapsed < Math.max(0.0015f, minInterval)) {
 			// A second draw in the same frame (a shadow pass): nothing to step - the time is kept for the next one.
 			// Stepping it anyway as a sliver of a step threw away the cloth's speed, a different damping per frame rate.
 			return;
@@ -173,7 +185,7 @@ public final class ClothCape {
 		// Steps follow the frame time (smooth at any frame rate); integrate() corrects for unequal steps. Far away
 		// players take half as many, with fewer passes - nobody sees the difference at that distance.
 		float target = far ? STEP * 2 : STEP;
-		int iterations = far ? 2 : ITERATIONS;
+		int iterations = far ? 2 : Math.min(ITERATIONS, maxIterations);
 		int steps = Math.max(1, Math.min(10, Math.round(elapsed / target)));
 		float h = elapsed / steps;
 
@@ -204,8 +216,26 @@ public final class ClothCape {
 		return out.set((float) Math.cos(heading) * strength, 0.15f * (float) Math.sin(t * 1.7f + k), (float) Math.sin(heading) * strength);
 	}
 
+	// Per step: sin/cos of the row and column parts of the two flutter waves (sin(a + b) = sin a cos b + cos a sin b),
+	// instead of two Math.sin per particle.
+	private final float[] rowSin1 = new float[ROWS], rowCos1 = new float[ROWS], rowSin2 = new float[ROWS], rowCos2 = new float[ROWS];
+	private final float[] colSin1 = new float[COLS], colCos1 = new float[COLS], colSin2 = new float[COLS], colCos2 = new float[COLS];
+
 	private void integrate(float h, Vector3f gravity, Vector3f wind, float air, float drag) {
 		float h2 = h * h;
+		for (int r = 0; r < ROWS; r++) {
+			double a1 = time * 9f - r * 0.7f + seed, a2 = time * 14f - r * 1.1f;
+			rowSin1[r] = (float) Math.sin(a1);
+			rowCos1[r] = (float) Math.cos(a1);
+			rowSin2[r] = (float) Math.sin(a2);
+			rowCos2[r] = (float) Math.cos(a2);
+		}
+		for (int c = 0; c < COLS; c++) {
+			colSin1[c] = (float) Math.sin(c * 0.35f);
+			colCos1[c] = (float) Math.cos(c * 0.35f);
+			colSin2[c] = (float) Math.sin(-c * 0.6f);
+			colCos2[c] = (float) Math.cos(-c * 0.6f);
+		}
 		// Time-corrected Verlet: (x - x_old) moved over the previous step; scaled to this step it's the same velocity.
 		float carry = Math.min(2f, h / lastStep) * 0.992f;
 		float prevStep = lastStep;
@@ -230,8 +260,8 @@ public final class ClothCape {
 				float azz = gravity.z - k * n * nz[i] - drag * rz - REL_DAMP * (vz - fz[i]);
 				// Flutter: travelling ripples, stronger with airspeed and toward the hem, along the normal.
 				// Kept gentle: real thin cloth flaps much harder, but that reads as jitter on a player model.
-				float flutter = air * Math.min(speed, 7f) * hem * hem * 0.35f
-						* (float) (Math.sin(time * 9f - r * 0.7f + c * 0.35f + seed) + 0.4 * Math.sin(time * 14f - r * 1.1f - c * 0.6f));
+				float wave = rowSin1[r] * colCos1[c] + rowCos1[r] * colSin1[c] + 0.4f * (rowSin2[r] * colCos2[c] + rowCos2[r] * colSin2[c]);
+				float flutter = air * Math.min(speed, 7f) * hem * hem * 0.35f * wave;
 				axx += flutter * nx[i];
 				ayy += flutter * ny[i];
 				azz += flutter * nz[i];
@@ -252,49 +282,75 @@ public final class ClothCape {
 		}
 	}
 
-	private void constrain(float bend) {
+	// Every link of the grid in the order constrain() always walked them, built once: endpoints, rest length, stiffness
+	// (NaN = the bend stiffness of the preset) and how much each end moves (0 for the sewn-on top row).
+	private static final int[] LA, LB;
+	private static final float[] LREST, LSTIFF, LWA, LWB;
+	static {
+		float sx = WIDTH / (COLS - 1), sy = LENGTH / (ROWS - 1), sd = (float) Math.sqrt(sx * sx + sy * sy);
+		java.util.List<float[]> links = new java.util.ArrayList<>();
 		for (int r = 0; r < ROWS; r++) {
 			for (int c = 0; c < COLS; c++) {
 				int i = r * COLS + c;
 				if (c + 1 < COLS) {
-					link(i, i + 1, dx, 1f);
+					links.add(new float[] {i, i + 1, sx, 1f});
 				}
 				if (r + 1 < ROWS) {
-					link(i, i + COLS, dy, 1f);
+					links.add(new float[] {i, i + COLS, sy, 1f});
 					if (c + 1 < COLS) {
-						link(i, i + COLS + 1, diag, 0.6f);
-						link(i + 1, i + COLS, diag, 0.6f);
+						links.add(new float[] {i, i + COLS + 1, sd, 0.6f});
+						links.add(new float[] {i + 1, i + COLS, sd, 0.6f});
 					}
 				}
 				if (c + 2 < COLS) {
-					link(i, i + 2, 2 * dx, bend);
+					links.add(new float[] {i, i + 2, 2 * sx, Float.NaN});
 				}
 				if (r + 2 < ROWS) {
-					link(i, i + 2 * COLS, 2 * dy, bend);
+					links.add(new float[] {i, i + 2 * COLS, 2 * sy, Float.NaN});
 				}
 			}
 		}
+		links.removeIf(l -> l[0] < COLS && l[1] < COLS);   // both ends sewn on: never moves
+		int n = links.size();
+		LA = new int[n];
+		LB = new int[n];
+		LREST = new float[n];
+		LSTIFF = new float[n];
+		LWA = new float[n];
+		LWB = new float[n];
+		for (int k = 0; k < n; k++) {
+			float[] l = links.get(k);
+			int a = (int) l[0], b = (int) l[1];
+			boolean pinA = a < COLS, pinB = b < COLS;
+			LA[k] = a;
+			LB[k] = b;
+			LREST[k] = l[2];
+			LSTIFF[k] = l[3];
+			LWA[k] = pinA ? 0 : pinB ? 1 : 0.5f;
+			LWB[k] = pinB ? 0 : pinA ? 1 : 0.5f;
+		}
 	}
 
-	private void link(int a, int b, float rest, float stiffness) {
-		float ex = px[b] - px[a], ey = py[b] - py[a], ez = pz[b] - pz[a];
-		float d = (float) Math.sqrt(ex * ex + ey * ey + ez * ez);
-		if (d < 1e-6f) {
-			return;
+	private void constrain(float bend) {
+		final float[] px = this.px, py = this.py, pz = this.pz;
+		for (int k = 0, n = LA.length; k < n; k++) {
+			int a = LA[k], b = LB[k];
+			float ex = px[b] - px[a], ey = py[b] - py[a], ez = pz[b] - pz[a];
+			float d2 = ex * ex + ey * ey + ez * ez;
+			if (d2 < 1e-12f) {
+				continue;
+			}
+			float d = (float) Math.sqrt(d2);
+			float stiff = LSTIFF[k];
+			float diff = (stiff != stiff ? bend : stiff) * (d - LREST[k]) / d;
+			float wa = LWA[k] * diff, wb = LWB[k] * diff;
+			px[a] += ex * wa;
+			py[a] += ey * wa;
+			pz[a] += ez * wa;
+			px[b] -= ex * wb;
+			py[b] -= ey * wb;
+			pz[b] -= ez * wb;
 		}
-		float diff = stiffness * (d - rest) / d;
-		boolean pinA = a < COLS, pinB = b < COLS;
-		if (pinA && pinB) {
-			return;
-		}
-		float wa = pinA ? 0 : pinB ? 1 : 0.5f;
-		float wb = pinB ? 0 : pinA ? 1 : 0.5f;
-		px[a] += ex * diff * wa;
-		py[a] += ey * diff * wa;
-		pz[a] += ez * diff * wa;
-		px[b] -= ex * diff * wb;
-		py[b] -= ey * diff * wb;
-		pz[b] -= ez * diff * wb;
 	}
 
 	/**

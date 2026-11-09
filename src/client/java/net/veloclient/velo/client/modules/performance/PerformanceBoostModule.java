@@ -482,7 +482,8 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				}),
 				new ConfigField.HeaderField("View Distance"),
 				new ConfigField.SliderField("View Distance", 2, 32,
-						() -> options.getViewDistance().getValue(), v -> {
+						// while Adaptive Render Distance has lowered it, the profile keeps the player's own value
+						() -> adaptiveBaseline > 0 ? adaptiveBaseline : options.getViewDistance().getValue(), v -> {
 							options.getViewDistance().setValue((int) v);
 							// A manual change is the new ceiling adaptive mode works under.
 							if (adaptiveBaseline > 0) {

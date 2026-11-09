@@ -66,8 +66,9 @@ final class NoRiskMods {
 				out.add(new Profile(str(row.get("id")), str(row.get("name")), dir, str(row.get("game_version")),
 						str(row.get("loader")), str(row.get("selected_norisk_pack_id"))));
 			}
-		} catch (IOException | RuntimeException e) {
-			net.veloclient.launcher.LauncherLog.info("NoRisk app.db unreadable (" + e.getMessage() + ") - importing by folder");
+		} catch (IOException | RuntimeException | StackOverflowError | OutOfMemoryError e) {
+			// our small SQLite reader on a database it doesn't understand: by folder instead
+			net.veloclient.launcher.LauncherLog.info("NoRisk app.db unreadable (" + e + ") - importing by folder");
 		}
 		return out;
 	}

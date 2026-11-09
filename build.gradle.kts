@@ -30,6 +30,10 @@ repositories {
 		forRepository { maven("https://api.modrinth.com/maven") { name = "Modrinth" } }
 		filter { includeGroup("maven.modrinth") }
 	}
+	exclusiveContent {
+		forRepository { maven("https://maven.maxhenkel.de/repository/public") { name = "Simple Voice Chat" } }
+		filter { includeGroup("de.maxhenkel.voicechat") }
+	}
 }
 
 loom {
@@ -112,6 +116,8 @@ dependencies {
 	}
 	modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
 	modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
+	// Velo Rewind records Simple Voice Chat through its client API (a plugin it calls when installed; nothing happens otherwise).
+	"clientCompileOnly"("de.maxhenkel.voicechat:voicechat-api:2.6.27")
 	// Velo Shaders' shadow pass draws Sodium's chunk meshes a second time from the sun, so it compiles
 	// against Sodium's renderer (compile-only: Sodium itself comes with the launcher's profiles).
 	if (sc.current.version == "26.2") {

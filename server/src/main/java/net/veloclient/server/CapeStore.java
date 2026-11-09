@@ -72,6 +72,11 @@ final class CapeStore {
 	private final Path indexFile;
 	private final Path bannedFile;
 	private final java.util.Set<String> bannedHashes = ConcurrentHashMap.newKeySet();
+	/** Catalog cloak shown instead of a cloak staff removed (black, "REDACTED"), until the player picks another one. */
+	static final String REDACTED_CAPE = "cape_redacted";
+	private final Path redactedFile;
+	/** Players whose custom cloak staff removed: they show {@link #REDACTED_CAPE} while they'd otherwise show it. */
+	private final java.util.Set<String> redactedUuids = ConcurrentHashMap.newKeySet();
 	private final Map<String, StoredCape> byUuid = new ConcurrentHashMap<>();
 	private final Map<String, Long> lastUploadMillis = new ConcurrentHashMap<>();
 
@@ -79,7 +84,15 @@ final class CapeStore {
 		this.directory = dataDirectory.resolve("capes");
 		this.indexFile = dataDirectory.resolve("capes.json");
 		this.bannedFile = dataDirectory.resolve("banned-capes.json");
+		this.redactedFile = dataDirectory.resolve("redacted-capes.json");
 		Files.createDirectories(directory);
+		if (Files.exists(redactedFile)) {
+			java.util.List<String> redacted = GSON.fromJson(Files.readString(redactedFile, StandardCharsets.UTF_8),
+					new TypeToken<java.util.List<String>>() { }.getType());
+			if (redacted != null) {
+				redactedUuids.addAll(redacted);
+			}
+		}
 		if (Files.exists(bannedFile)) {
 			java.util.List<String> banned = GSON.fromJson(Files.readString(bannedFile, StandardCharsets.UTF_8),
 					new TypeToken<java.util.List<String>>() { }.getType());
@@ -148,6 +161,7 @@ final class CapeStore {
 		}
 		StoredCape previous = byUuid.put(uuid, cape);
 		saveIndex();
+		setRedacted(uuid, false);   // a new, accepted cloak replaces the redacted one
 		if (previous != null && !previous.hash().equals(cape.hash())) {
 			deleteIfUnreferenced(previous);
 		}
@@ -161,10 +175,29 @@ final class CapeStore {
 			return false;
 		}
 		bannedHashes.add(cape.hash());
+		setRedacted(uuid, true);
 		Path temp = Files.createTempFile(bannedFile.getParent(), "banned-", ".json.tmp");
 		Files.writeString(temp, GSON.toJson(bannedHashes), StandardCharsets.UTF_8);
 		Files.move(temp, bannedFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 		return remove(uuid);
+	}
+
+	boolean isBanned(String hash) {
+		return hash != null && bannedHashes.contains(hash);
+	}
+
+	boolean isRedacted(String uuid) {
+		return uuid != null && redactedUuids.contains(uuid);
+	}
+
+	/** Marks (or clears) a player whose cloak staff removed; saved so it survives restarts. */
+	synchronized void setRedacted(String uuid, boolean redacted) throws IOException {
+		if (redacted ? !redactedUuids.add(uuid) : !redactedUuids.remove(uuid)) {
+			return;
+		}
+		Path temp = Files.createTempFile(redactedFile.getParent(), "redacted-", ".json.tmp");
+		Files.writeString(temp, GSON.toJson(redactedUuids), StandardCharsets.UTF_8);
+		Files.move(temp, redactedFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 	}
 
 	/** Every custom cape by player, for the staff review list. */

@@ -921,6 +921,8 @@ stonecutter parameters {
 			// Shields for real Mojmap packet class names that contain "Text" - without these the
 			// bare "Text" -> "Component" rule below mangles them (BackgroundQueue's GhostPackets).
 			replace("ClientboundSetActionBarTextPacket", "ClientboundSetActionBarTextPacket")
+			// Mojmap's EditBox (26.x blocks, Velo Rewind's save screen) - the bare Box rule would make it "EditAABB".
+			replace("components.EditBox", "components.EditBox")
 			// GuiRenderState$Node#addText (GuiLayerListMixin's method list) - the
 			// bare Text rule turned it into "addComponent", so the require = 0
 			// redirect silently never applied to text.

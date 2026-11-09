@@ -168,7 +168,7 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 		List<Object[]> near = new java.util.ArrayList<>();
 		for (LivingEntity other : PvpCompat.otherPlayers()) {
 			String id = remotePets.get(uuidOf(other));
-			if (id == null) {
+			if (id == null || net.veloclient.velo.client.cosmetics.CosmeticHide.hidden(String.valueOf(uuidOf(other)), "pets")) {
 				continue;
 			}
 			double[] pos = PvpCompat.renderPos(other);

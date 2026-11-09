@@ -1001,7 +1001,11 @@ public final class StoreService {
 				String plusName = custom.has("velo_username") ? custom.get("velo_username").getAsString() : null;
 				String reference = subject.has("recurring_payment_reference") ? subject.get("recurring_payment_reference").getAsString() : null;
 				boolean yearly = custom.has("velo_plus_period") && "year".equals(custom.get("velo_plus_period").getAsString());
-				grantPlus(plusUuid, plusName, yearly ? config.plus.yearDays : config.plus.periodDays, "tebex", txn == null ? "plus:" + System.nanoTime() : txn, reference);
+				String plusTxn = txn == null ? "plus:" + System.nanoTime() : txn;
+				grantPlus(plusUuid, plusName, yearly ? config.plus.yearDays : config.plus.periodDays, "tebex", plusTxn, reference);
+				if (paid >= 0) {
+					db.setPlusPrice(plusTxn, paid, paidCurrency);
+				}
 				System.out.println("[store] Velo+ " + (yearly ? "year" : "month") + " for " + plusUuid + " (" + txn + ")");
 				PurchaseListener listener = purchaseListener;
 				if (listener != null) {

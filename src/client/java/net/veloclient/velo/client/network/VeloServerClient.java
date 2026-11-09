@@ -157,6 +157,7 @@ public final class VeloServerClient {
 			String base = serverBaseUrl();
 			if (base != null && sessionToken.get() != null) {
 				poll(base);
+				fetchOfflineLooks(base);
 			}
 		}, POLL_INTERVAL_SECONDS, POLL_INTERVAL_SECONDS, TimeUnit.SECONDS);
 	}
@@ -240,6 +241,7 @@ public final class VeloServerClient {
 				return;
 			}
 			poll(base);
+			fetchOfflineLooks(base);
 			reportReachable("Connected");
 		} catch (HttpStatusException e) {
 			reportUnreachable(e.status >= 500
@@ -466,6 +468,41 @@ public final class VeloServerClient {
 		} catch (Exception ignored) {
 			// Not worth surfacing - the session will simply expire on its own.
 		}
+	}
+
+	/**
+	 * The last in-game look of players we see who aren't online with Velo right now (they play on another client) - asked
+	 * for in batches of up to 100 the render code queued (see VeloUserRegistry#offline). Failing is harmless.
+	 */
+	private static void fetchOfflineLooks(String base) {
+		java.util.List<String> wanted = VeloUserRegistry.takeWanted(100);
+		if (wanted.isEmpty()) {
+			return;
+		}
+		try {
+			JsonObject body = new JsonObject();
+			com.google.gson.JsonArray uuids = new com.google.gson.JsonArray();
+			wanted.forEach(uuids::add);
+			body.add("uuids", uuids);
+			JsonObject json = postJson(base + "/v1/cosmetics/of", body);
+			Map<String, VeloUserRegistry.Entry> found = new HashMap<>();
+			for (var element : json.getAsJsonArray("users")) {
+				JsonObject user = element.getAsJsonObject();
+				String uuid = normalizeUuid(user.has("uuid") ? user.get("uuid").getAsString() : null);
+				if (uuid == null) {
+					continue;
+				}
+				found.put(uuid, new VeloUserRegistry.Entry("", str(user, "capeId"), str(user, "wingsId"), str(user, "auraId"), false, null,
+						str(user, "wear"), false));
+			}
+			VeloUserRegistry.putOffline(wanted, found);
+		} catch (Exception e) {
+			// older server or a network blip: they're asked for again later
+		}
+	}
+
+	private static String str(JsonObject json, String field) {
+		return json.has(field) && !json.get(field).isJsonNull() ? json.get(field).getAsString() : null;
 	}
 
 	static JsonObject postJson(String url, JsonObject payload) throws Exception {

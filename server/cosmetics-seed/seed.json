@@ -713,7 +713,7 @@
 			"id": "cape_luckysmp",
 			"type": "cape",
 			"name": "LuckySMP",
-			"description": "LuckySMP's logo in gold and chrome while lucky blocks fall all around it. Free: play 10 minutes on luckysmp.net with Velo.",
+			"description": "LuckySMP's lucky block and logo on a dark pixel cloak in a glowing gold frame. Free: play 10 minutes on luckysmp.net with Velo.",
 			"price": 0,
 			"unlock": "luckysmp",
 			"status": "released",
@@ -2795,6 +2795,24 @@
 				"preview": "pets/reindeer_preview.jpg"
 			},
 			"rev": 1
+		},
+		{
+			"id": "wings_chainwings",
+			"type": "wings",
+			"name": "Chain Wings",
+			"description": "Neon crimson blade wings with a chrome ornament - plasma flows from the root out into the tips, chains with sickle blades swing as you move. Recolour them in the Locker.",
+			"price": 4200,
+			"status": "hidden",
+			"collection": "relics",
+			"accent": "#c3122b",
+			"style": "feathered",
+			"scale": 1.25,
+			"glow": true,
+			"files": {
+				"mesh": "wings/chainwings.vmesh",
+				"texture": "wings/chainwings.png",
+				"preview": "wings/chainwings_preview.png"
+			}
 		}
 	]
 }

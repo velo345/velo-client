@@ -66,8 +66,49 @@ final class PanelRoutes {
 		admin(server, adminToken, "/v1/admin/panel/store", ex -> {
 			int days = clamp(StoreRoutes.query(ex).get("days"), 30, 7, 365);
 			long now = System.currentTimeMillis();
-			JsonHttp.writeJson(ex, 200, store.database().panelSummary(now - days * 86_400_000L, now, store.ownerUuids()));
+			JsonHttp.writeJson(ex, 200, store.database().panelSummary(now - days * 86_400_000L, now, store.ownerUuids(), store.config().plus.price, store.config().plus.yearlyPrice));
 		});
+	}
+
+	/**
+	 * Owner actions on the Store page: {@code store/void} {"orderId"} takes a test payment out (deleted in Tebex - no refund
+	 * webhook comes), {@code store/announce} {"orderId"} or {"plusUuid"} posts a purchase to the donations channel again
+	 * (one that was missed while the webhook didn't work).
+	 */
+	static void registerStoreActions(HttpServer server, net.veloclient.server.store.StoreService store, DiscordAnnouncer announcer, String adminToken) {
+		admin(server, adminToken, "/v1/admin/panel/store/void", ex -> {
+			var body = com.google.gson.JsonParser.parseString(new String(JsonHttp.readRawBody(ex, 4096), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+			var order = store.database().voidOrder(body.get("orderId").getAsString());
+			if (order == null) {
+				JsonHttp.writeError(ex, 404, "No such order");
+				return;
+			}
+			System.out.println("[store] Owner voided order " + order.orderId() + " (" + order.coins() + " coins, was " + order.status() + ")");
+			JsonHttp.writeJson(ex, 200, Map.of("ok", true, "wasStatus", order.status(), "coins", order.coins()));
+		}, "POST");
+		admin(server, adminToken, "/v1/admin/panel/store/announce", ex -> {
+			var body = com.google.gson.JsonParser.parseString(new String(JsonHttp.readRawBody(ex, 4096), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+			if (!announcer.donationsEnabled()) {
+				JsonHttp.writeError(ex, 409, "The donations webhook isn't set up (VELO_DISCORD_DONATIONS_WEBHOOK)");
+				return;
+			}
+			var db = store.database();
+			if (body.has("orderId")) {
+				var order = db.order(body.get("orderId").getAsString());
+				if (order == null || !"paid".equals(order.status())) {
+					JsonHttp.writeError(ex, 404, "No paid order with that id");
+					return;
+				}
+				announcer.donation(order, db.username(order.uuid()), db.balance(order.uuid()));
+			} else if (body.has("plusUuid")) {
+				String uuid = body.get("plusUuid").getAsString().replace("-", "");
+				announcer.plus(uuid, db.username(uuid));
+			} else {
+				JsonHttp.writeError(ex, 400, "orderId or plusUuid");
+				return;
+			}
+			JsonHttp.writeJson(ex, 200, Map.of("ok", true));
+		}, "POST");
 	}
 
 	private static int clamp(String value, int fallback, int min, int max) {

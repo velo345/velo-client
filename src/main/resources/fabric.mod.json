@@ -18,9 +18,13 @@
 		"velo-client.client.mixins.json",
 		"velo-client.client.optional.mixins.json",
 		"velo-client.features.mixins.json",
-		"velo-client.preview.mixins.json"${dev_mixins}
+		"velo-client.preview.mixins.json",
+		"velo-client.devbuild.mixins.json"${dev_mixins}
 	],
 	"entrypoints": {
+		"voicechat": [
+			"net.veloclient.velo.devbuild.rewind.RewindVoicePlugin"
+		],
 		"main": [
 			"net.veloclient.velo.VeloClient"
 		],

@@ -137,6 +137,8 @@ final class Planner {
 					case Action.SetMemory m -> ram = m.maxMb() == 0 ? null : m.maxMb();
 					case Action.DisableShaders ignored -> {
 					}
+					case Action.UseG1 ignored -> {
+					}
 					case Action.LowerRenderDistance ignored -> {
 					}
 					case Action.ClearFabricCache ignored -> {

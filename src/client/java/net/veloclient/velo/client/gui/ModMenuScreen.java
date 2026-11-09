@@ -589,10 +589,19 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		int betaW = module.beta() ? this.textRenderer.getWidth(beta) + 10 : 0;
 		Text name = MenuKit.fit(this.textRenderer, MenuKit.display(module.displayName()), pw - tile - 8 - (betaW > 0 ? betaW + 6 : 0));
 		MenuKit.text(context, this.textRenderer, name, px + tile + 8, y + 15, MenuKit.TEXT);
+		int badgeX = px + tile + 8 + MenuKit.width(this.textRenderer, name) + 6;
 		if (betaW > 0) {
-			int bx = px + tile + 8 + MenuKit.width(this.textRenderer, name) + 6;
-			VeloDraw.fillRounded(context, bx, y + 15, betaW, 11, 4, 0xFFE0A030);
-			MenuKit.text(context, this.textRenderer, beta, bx + 5, y + 17, 0xFF1A1206);
+			VeloDraw.fillRounded(context, badgeX, y + 15, betaW, 11, 4, 0xFFE0A030);
+			MenuKit.text(context, this.textRenderer, beta, badgeX + 5, y + 17, 0xFF1A1206);
+			badgeX += betaW + 4;
+		}
+		if (module.isNew()) {
+			Text fresh = MenuKit.small("NEW");
+			int newW = this.textRenderer.getWidth(fresh) + 10;
+			if (badgeX + newW <= px + pw) {
+				VeloDraw.fillRounded(context, badgeX, y + 15, newW, 11, 4, (MenuKit.accent() & 0xFFFFFF) | 0x30000000);
+				MenuKit.text(context, this.textRenderer, fresh, badgeX + 5, y + 17, VeloAnim.lerpArgb(MenuKit.accent(), 0xFFFFFFFF, 0.35f));
+			}
 		}
 		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui("Good for " + ModuleTags.tag(module)), pw - tile - 8),
 				px + tile + 8, y + 30, MenuKit.TEXT_3);

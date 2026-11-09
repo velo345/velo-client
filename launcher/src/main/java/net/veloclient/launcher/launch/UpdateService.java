@@ -48,6 +48,14 @@ import java.util.function.Consumer;
 public final class UpdateService {
 
 	private static final String RELEASES = "https://api.github.com/repos/velo345/velo-client/releases?per_page=15";
+	/**
+	 * Velo's own copy of the releases (tools/release/mirror_release.sh): the same JSON as GitHub's release list with every
+	 * download pointing at velo-client.com/dl/v&lt;version&gt;/&lt;file&gt;. Used when GitHub doesn't answer - its release downloads
+	 * time out for signed-out users now and then.
+	 */
+	static final String MIRROR = "https://velo-client.com/dl/";
+	private static final String MIRROR_RELEASES = MIRROR + "releases.json";
+	private static final String GITHUB_DOWNLOADS = "https://github.com/velo345/velo-client/releases/download/";
 	private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
 			.followRedirects(HttpClient.Redirect.NORMAL).build();
 
@@ -86,38 +94,62 @@ public final class UpdateService {
 		return updatesDir().resolve("gamejars");
 	}
 
-	/** Fetches the latest release and works out what's new for this install. */
-	public static Release check() throws IOException, InterruptedException {
+	/** GitHub's list of recent releases (two tries), or an IOException when it doesn't answer 200. */
+	private static String githubReleases() throws IOException, InterruptedException {
 		HttpRequest request = HttpRequest.newBuilder(URI.create(RELEASES)).timeout(Duration.ofSeconds(15))
 				.header("Accept", "application/vnd.github+json").header("User-Agent", "VeloClientLauncher/" + AppVersion.VERSION)
 				.GET().build();
 		HttpResponse<String> response = null;
+		IOException failure = null;
 		for (int attempt = 1; attempt <= 2; attempt++) {
 			try {
 				response = HTTP.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
 				if (response.statusCode() == 200) {
-					break;
+					return response.body();
 				}
 				// 403/429 from GitHub is usually its limit of 60 checks per hour and IP (shared networks hit it)
 				log("Update check: GitHub answered " + response.statusCode() + " (rate limit left "
 						+ response.headers().firstValue("x-ratelimit-remaining").orElse("?") + ")");
 			} catch (IOException e) {
+				failure = e;
 				log("Update check attempt " + attempt + " failed: " + e);
-				if (attempt == 2) {
-					throw e;
-				}
 			}
 			if (attempt == 1) {
 				Thread.sleep(2000);
 			}
 		}
-		if (response == null || response.statusCode() != 200) {
-			throw new IOException("GitHub answered " + (response == null ? "nothing" : response.statusCode()));
+		throw failure != null ? failure : new IOException("GitHub answered " + (response == null ? "nothing" : response.statusCode()));
+	}
+
+	/** The Velo server's copy of the release list (same JSON shape, downloads on velo-client.com). */
+	private static String mirrorReleases() throws IOException, InterruptedException {
+		HttpRequest request = HttpRequest.newBuilder(URI.create(MIRROR_RELEASES)).timeout(Duration.ofSeconds(15))
+				.header("User-Agent", "VeloClientLauncher/" + AppVersion.VERSION).GET().build();
+		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+		if (response.statusCode() != 200) {
+			throw new IOException("Neither GitHub nor the Velo server answered (Velo server: " + response.statusCode() + ")");
+		}
+		return response.body();
+	}
+
+	/** The Velo server's copy of a GitHub release download, or null for any other URL. */
+	static String mirrorUrl(String url) {
+		return url != null && url.startsWith(GITHUB_DOWNLOADS) ? MIRROR + url.substring(GITHUB_DOWNLOADS.length()) : null;
+	}
+
+	/** Fetches the latest release and works out what's new for this install. */
+	public static Release check() throws IOException, InterruptedException {
+		String body;
+		try {
+			body = githubReleases();
+		} catch (IOException e) {
+			log("GitHub unreachable for the update check (" + e.getMessage() + ") - asking the Velo server");
+			body = mirrorReleases();
 		}
 		// Releases are published as pre-releases, so /releases/latest doesn't see them: take the
 		// highest version among the recent non-draft releases instead.
 		JsonObject json = null;
-		for (JsonElement element : JsonParser.parseString(response.body()).getAsJsonArray()) {
+		for (JsonElement element : JsonParser.parseString(body).getAsJsonArray()) {
 			JsonObject candidate = element.getAsJsonObject();
 			if (candidate.get("draft").getAsBoolean()) {
 				continue;
@@ -353,7 +385,7 @@ public final class UpdateService {
 				new ProcessBuilder(file.toString()).start();
 				return true;
 			}
-			status.accept("Installing - Windows may ask once for permission");
+			status.accept("Updating in the background - Velo restarts by itself");
 			startWindowsInstall(file);
 			return true;
 		}
@@ -381,8 +413,9 @@ public final class UpdateService {
 	}
 
 	/**
-	 * Windows: no clicking through the installer any more. A small script waits until this launcher has closed (so no file
-	 * is in use), runs jpackage's installer passively - a progress bar only, into the folder the launcher is installed in,
+	 * Windows: no clicking through the installer any more. A hidden script (no console window) waits until this launcher has
+	 * closed (so no file is in use), runs jpackage's installer quietly in the background - falling back to the passive mode
+	 * with the permission prompt when a machine-wide install needs admin rights - into the folder the launcher is installed in,
 	 * with a verbose Windows Installer log next to update.log - and starts the new launcher when it's done. jpackage's .exe
 	 * hands its arguments to msiexec; should an installer ever ignore them, it simply shows its normal wizard as before.
 	 * The script logs the installer's exit code, which the next start reads (see {@link #afterRestart()}).
@@ -398,19 +431,39 @@ public final class UpdateService {
 		cmd.append("@echo off\r\n");
 		cmd.append("chcp 65001 >nul\r\n");
 		cmd.append("echo [%date% %time%] script: waiting for the launcher to close>>\"").append(log).append("\"\r\n");
-		cmd.append("timeout /t 3 /nobreak >nul\r\n");
-		cmd.append("echo [%date% %time%] script: starting the installer>>\"").append(log).append("\"\r\n");
-		cmd.append("\"").append(installer).append("\" /passive /norestart /l*v \"").append(msiLog).append("\"");
+		// no console here (and stdin is a pipe), so "timeout" would quit at once: ping waits the 3 s instead
+		cmd.append("ping -n 4 127.0.0.1 >nul\r\n");
+		StringBuilder props = new StringBuilder(" /norestart /l*v \"").append(msiLog).append("\"");
 		if (repairMode) {
 			// the same version over itself: reinstall every file instead of "already installed"
-			cmd.append(" REINSTALL=ALL REINSTALLMODE=amus");
+			props.append(" REINSTALL=ALL REINSTALLMODE=amus");
 		}
 		if (installDir != null) {
 			// the folder the launcher runs from now, so a player's own install location survives the update
-			cmd.append(" INSTALLDIR=\"").append(installDir).append("\"");
+			props.append(" INSTALLDIR=\"").append(installDir).append("\"");
 		}
-		cmd.append("\r\n");
+		// first fully in the background (no window at all); an install that needs admin rights can't ask for them quietly,
+		// so then once more with the permission prompt and a small progress bar
+		cmd.append("echo [%date% %time%] script: starting the installer quietly>>\"").append(log).append("\"\r\n");
+		cmd.append("\"").append(installer).append("\" /quiet").append(props).append("\r\n");
 		cmd.append("set code=%errorlevel%\r\n");
+		cmd.append("if \"%code%\"==\"0\" goto done\r\n");
+		cmd.append("if \"%code%\"==\"3010\" goto done\r\n");
+		// A machine-wide install needs admin rights. Started without them, the installer raises its rights halfway and its
+		// final step can't use the temp folder - Windows Installer error 2503 (reported 2026-11-08). So: started elevated
+		// from the beginning (one permission prompt) and still quiet; the visible installer only if that was refused too.
+		cmd.append("echo [%date% %time%] script: quiet install exit %code% - again with admin rights>>\"").append(log).append("\"\r\n");
+		String psArgs = ("/quiet" + props).replace("'", "''");
+		cmd.append("powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command \"try { $p = Start-Process -FilePath '")
+				.append(installer.toString().replace("'", "''")).append("' -ArgumentList '").append(psArgs.replace("\"", "\\\""))
+				.append("' -Verb RunAs -Wait -PassThru; exit $p.ExitCode } catch { exit 1223 }\"\r\n");
+		cmd.append("set code=%errorlevel%\r\n");
+		cmd.append("if \"%code%\"==\"0\" goto done\r\n");
+		cmd.append("if \"%code%\"==\"3010\" goto done\r\n");
+		cmd.append("echo [%date% %time%] script: elevated install exit %code% - showing the installer>>\"").append(log).append("\"\r\n");
+		cmd.append("\"").append(installer).append("\" /passive").append(props).append("\r\n");
+		cmd.append("set code=%errorlevel%\r\n");
+		cmd.append(":done\r\n");
 		cmd.append("echo [%date% %time%] script: installer exit code %code%>>\"").append(log).append("\"\r\n");
 		cmd.append("echo %code%>\"").append(updatesDir().resolve("installer-exit.txt")).append("\"\r\n");
 		if (appExe != null) {
@@ -419,8 +472,11 @@ public final class UpdateService {
 		Files.writeString(script, cmd.toString(), StandardCharsets.UTF_8);
 		Files.deleteIfExists(updatesDir().resolve("installer-exit.txt"));
 		log("Starting " + script + " (install dir " + installDir + ")");
-		new ProcessBuilder("cmd.exe", "/c", "start", "\"Velo update\"", "/min", "cmd.exe", "/c", script.toString())
+		// Started directly, not through "start": Java creates child processes with CREATE_NO_WINDOW, so no console pops up,
+		// and the script outlives this launcher (Windows doesn't end child processes with their parent).
+		Process p = new ProcessBuilder("cmd.exe", "/d", "/c", script.toString())
 				.redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+		p.getOutputStream().close();
 	}
 
 	/**
@@ -548,15 +604,32 @@ public final class UpdateService {
 		HttpRequest request = HttpRequest.newBuilder(URI.create("https://api.github.com/repos/velo345/velo-client/releases/tags/v" + version))
 				.timeout(Duration.ofSeconds(15)).header("Accept", "application/vnd.github+json")
 				.header("User-Agent", "VeloClientLauncher/" + AppVersion.VERSION).GET().build();
-		HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-		if (response.statusCode() != 200) {
-			log("Repair: release v" + version + " not found (" + response.statusCode() + ")");
-			return null;
+		JsonObject release = null;
+		try {
+			HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+			if (response.statusCode() == 200) {
+				release = JsonParser.parseString(response.body()).getAsJsonObject();
+			} else {
+				log("Repair: GitHub answered " + response.statusCode() + " for v" + version);
+			}
+		} catch (IOException e) {
+			log("Repair: GitHub unreachable (" + e.getMessage() + ")");
+		}
+		if (release == null) {
+			for (JsonElement element : JsonParser.parseString(mirrorReleases()).getAsJsonArray()) {
+				if (element.getAsJsonObject().get("tag_name").getAsString().equals("v" + version)) {
+					release = element.getAsJsonObject();
+				}
+			}
+			if (release == null) {
+				log("Repair: release v" + version + " not found");
+				return null;
+			}
 		}
 		String os = System.getProperty("os.name", "").toLowerCase();
 		boolean debian = !os.contains("win") && !os.contains("mac") && (onPath("dpkg") || onPath("apt"));
 		String macDmg = os.contains("mac") ? "-macos-" + macArch() + ".dmg" : null;
-		for (JsonElement element : JsonParser.parseString(response.body()).getAsJsonObject().getAsJsonArray("assets")) {
+		for (JsonElement element : release.getAsJsonArray("assets")) {
 			JsonObject a = element.getAsJsonObject();
 			String name = a.get("name").getAsString();
 			if (os.contains("win") && name.endsWith(".exe") || debian && name.endsWith(".deb") || macDmg != null && name.endsWith(macDmg)) {
@@ -704,9 +777,15 @@ public final class UpdateService {
 	private static void download(Asset asset, Path target, Consumer<Transfer> progress) throws IOException, InterruptedException {
 		IOException last = null;
 		boolean restartedAfterBadHash = false;
+		String mirror = mirrorUrl(asset.url());
 		for (int attempt = 1; attempt <= ATTEMPTS; attempt++) {
 			try {
-				downloadOnce(asset, target, progress, attempt);
+				// Two tries at GitHub, then the Velo server's copy (same bytes, so a partial file resumes there)
+				Asset from = mirror != null && attempt > 2 ? new Asset(asset.name(), mirror, asset.size(), asset.sha256(), asset.updatedAt(), asset.id()) : asset;
+				if (from != asset && attempt == 3) {
+					log("GitHub download of " + asset.name() + " keeps failing - switching to the Velo server");
+				}
+				downloadOnce(from, target, progress, attempt);
 				if (asset.sha256() != null) {
 					String actual = sha256Of(target);
 					if (!asset.sha256().equalsIgnoreCase(actual)) {

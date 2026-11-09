@@ -31,7 +31,7 @@ final class FrameGrabber {
 		void accept(ByteBuffer rgba, int width, int height);
 	}
 
-	private static final int POOL = 3;
+	private static final int POOL = 4;
 	private static final ArrayDeque<ByteBuffer> FREE = new ArrayDeque<>();
 	private static int allocated;
 	private static int poolBytes;

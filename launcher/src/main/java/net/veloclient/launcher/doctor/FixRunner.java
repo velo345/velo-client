@@ -85,6 +85,12 @@ final class FixRunner {
 				InstanceStore.save(changed);
 				return changed;
 			}
+			case Action.UseG1 ignored -> {
+				var settings = net.veloclient.launcher.data.LauncherSettings.copy(net.veloclient.launcher.data.LauncherSettings.get());
+				settings.gc = net.veloclient.launcher.data.LauncherSettings.GcMode.G1;
+				net.veloclient.launcher.data.LauncherSettings.save(settings);
+				return instance;
+			}
 			case Action.DisableShaders ignored -> disableShaders(instance);
 			case Action.ClearFabricCache ignored -> clearFabricCache(instance);
 			case Action.LowerRenderDistance r -> lowerRenderDistance(instance, r.max());
@@ -199,7 +205,8 @@ final class FixRunner {
 				currentVersion = byHash.get().id();
 			}
 		}
-		Optional<ModrinthClient.ProjectVersion> newest = projectId == null ? Optional.empty() : newest(projectId, instance.mcVersion());
+		Optional<ModrinthClient.ProjectVersion> newest = projectId == null ? Optional.empty()
+				: u.requirement() != null ? fitting(projectId, instance.mcVersion(), u.requirement()) : newest(projectId, instance.mcVersion());
 		if (newest.isEmpty() || newest.get().id().equals(currentVersion)) {
 			if (u.orElseDisable()) {
 				setEnabled(file, false);
@@ -218,10 +225,29 @@ final class FixRunner {
 		if (requirement == null) {
 			return Optional.empty();
 		}
+		// "0.9.3-beta.3+mc26.3" (no operator): exactly that version - the build metadata after + doesn't count
+		if (requirement.matches("[0-9][^\\s<>=~^*]*")) {
+			String exact = requirement.contains("+") ? requirement.substring(0, requirement.indexOf('+')) : requirement;
+			return ModrinthClient.versions(projectId, mcVersion, "mod").stream()
+					.filter(v -> bare(v.versionNumber()).equalsIgnoreCase(exact) || v.versionNumber().equalsIgnoreCase(requirement))
+					.max(Comparator.comparing(ModrinthClient.ProjectVersion::datePublished));
+		}
 		return ModrinthClient.versions(projectId, mcVersion, "mod").stream()
 				.filter(v -> VersionPredicate.matches(requirement, v.versionNumber())
-						|| v.versionNumber().contains("-") && VersionPredicate.matches(requirement, v.versionNumber().substring(v.versionNumber().lastIndexOf('-') + 1)))
+						|| v.versionNumber().contains("-") && VersionPredicate.matches(requirement, v.versionNumber().substring(v.versionNumber().lastIndexOf('-') + 1))
+						|| VersionPredicate.matches(requirement, bare(v.versionNumber())))
 				.max(Comparator.comparing(ModrinthClient.ProjectVersion::datePublished));
+	}
+
+	/**
+	 * A Modrinth version number without the Minecraft prefix and loader suffix it often carries:
+	 * "mc26.3-0.9.3-beta.3-fabric" -> "0.9.3-beta.3" (what the mod's own fabric.mod.json says, minus build metadata).
+	 */
+	static String bare(String versionNumber) {
+		String v = versionNumber.replaceFirst("^(?i)(mc)?\\d+\\.\\d+(\\.\\d+)?[-+_]", "");
+		v = v.replaceFirst("(?i)[-+](fabric|quilt|forge|neoforge)$", "");
+		int plus = v.indexOf('+');
+		return plus > 0 ? v.substring(0, plus) : v;
 	}
 
 	private static Optional<ModrinthClient.ProjectVersion> newest(String projectId, String mcVersion) throws IOException {

@@ -55,21 +55,27 @@ public final class ClientImport {
 		}
 
 		public int modCount() {
-			if (modsDir != null && modsDir.getFileName() != null && modsDir.getFileName().toString().startsWith(NoRiskMods.MARKER)) {
-				return NoRiskMods.count(modsDir);
-			}
-			return modJars(modsDir).size();
+			return cachedCount("mods:" + modsDir, () -> {
+				if (modsDir != null && modsDir.getFileName() != null && modsDir.getFileName().toString().startsWith(NoRiskMods.MARKER)) {
+					return NoRiskMods.count(modsDir);
+				}
+				return modJars(modsDir).size();
+			});
 		}
 
 		public int resourcePackCount() {
-			return packCount(resourcePacksDir, "pack.mcmeta");
+			return cachedCount("packs:" + resourcePacksDir, () -> packCount(resourcePacksDir, "pack.mcmeta"));
 		}
 
 		public int shaderPackCount() {
-			return packCount(shaderPacksDir, "shaders");
+			return cachedCount("shaders:" + shaderPacksDir, () -> packCount(shaderPacksDir, "shaders"));
 		}
 
 		public int worldCount() {
+			return cachedCount("worlds:" + gameDir, this::countWorlds);
+		}
+
+		private int countWorlds() {
 			Path saves = savesDir();
 			if (saves == null || !Files.isDirectory(saves)) {
 				return 0;
@@ -192,6 +198,7 @@ public final class ClientImport {
 			// A Flatpak client's sandbox .minecraft is that client's, not the vanilla launcher's.
 			String sandboxClient = b.getFileName().toString().toLowerCase(Locale.ROOT).contains("lunar") ? "Lunar Client"
 					: b.getFileName().toString().toLowerCase(Locale.ROOT).matches(".*(dawn|feather).*") ? "Dawn Client" : "Minecraft Launcher";
+			probe(".minecraft", () -> {
 			// The vanilla launcher's .minecraft (Badlion, TLauncher, SKLauncher play from it too).
 			for (Path dotMinecraft : distinct(b.resolve(".minecraft"), b.resolve("minecraft"), mac ? b.resolve("minecraft") : null)) {
 				if (!Files.isDirectory(dotMinecraft) || dotMinecraft.getFileName().toString().equals("minecraft") && !mac
@@ -213,8 +220,10 @@ public final class ClientImport {
 							versionFromName(version.getFileName().toString()), "fabric", null, null);
 				}
 			}
+			});
 			Path gameForClients = Files.isDirectory(b.resolve(".minecraft")) ? b.resolve(".minecraft") : null;
 
+			probe("Lunar Client", () -> {
 			// Lunar Client: .lunarclient/profiles/<profile>/mods/fabric-<version>/ (older: profiles/lunar/<version>/mods/...).
 			// Settings and worlds are in .minecraft; resource packs and shaders per profile.
 			Path lunar = b.resolve(".lunarclient");
@@ -228,6 +237,8 @@ public final class ClientImport {
 				add(sources, "Lunar Client", "Lunar mods " + dir.getFileName() + where, gameForClients, dir, versionFromName(dir.getFileName().toString()),
 						"fabric", null, null);
 			}
+			});
+			probe("Dawn Client", () -> {
 			// Dawn (formerly Feather Client, Flatpak gg.dawn.Launcher): user-mods/<version>/ in .dawn - or the old .feather
 			// folder an install from before the rename still uses - plus per-profile mods folders.
 			for (Path dawn : distinct(b.resolve(".dawn"), data.resolve("dawn"), data.resolve(".dawn"), data.resolve("Dawn"),
@@ -243,6 +254,8 @@ public final class ClientImport {
 							profile.resolve("resourcepacks"), profile.resolve("shaderpacks"));
 				}
 			}
+			});
+			probe("NoRisk Client", () -> {
 			// NoRisk Client: profiles with their own game directories (launcher v3 keeps them in noriskclientv3/profiles).
 			for (Path norisk : distinct(b.resolve(".norisk"), data.resolve("norisk"), data.resolve("NoRiskClient"), data.resolve("noriskclient"),
 					data.resolve("noriskclientv3"), data.resolve("gg.norisk.app"), b.resolve(".noriskclient"))) {
@@ -260,12 +273,16 @@ public final class ClientImport {
 					}
 				}
 			}
+			});
+			probe("Modrinth App", () -> {
 			// Modrinth App profiles (the Flatpak keeps them in its sandbox's data folder).
 			for (Path app : distinct(data.resolve("ModrinthApp"), data.resolve("com.modrinth.theseus"), b.resolve("ModrinthApp"))) {
 				for (Path dir : subdirs(app.resolve("profiles"), 1)) {
 					add(sources, "Modrinth App", dir.getFileName() + where, dir, dir.resolve("mods"), modrinthVersion(dir), modrinthLoader(dir), null, null);
 				}
 			}
+			});
+			probe("OneClient", () -> {
 			// OneClient (Polyfrost): one shared .minecraft (settings, worlds, servers, configs) and a mods folder per Minecraft
 			// version under clusters/<version> <loader>/ - one source per cluster that has mods.
 			Path oneClient = data.resolve("Polyfrost").resolve("OneClient");
@@ -282,6 +299,8 @@ public final class ClientImport {
 							cluster.resolve("resourcepacks"), cluster.resolve("shaderpacks"));
 				}
 			}
+			});
+			probe("Prism / MultiMC", () -> {
 			// Prism Launcher / PolyMC / MultiMC instances.
 			for (Path prism : distinct(data.resolve("PrismLauncher"), data.resolve("PolyMC"), data.resolve("multimc"), data.resolve("MultiMC"),
 					b.resolve("PrismLauncher"), b.resolve("MultiMC"), b.resolve(".local/share/multimc"))) {
@@ -291,12 +310,16 @@ public final class ClientImport {
 					add(sources, "Prism / MultiMC", instanceName(dir) + where, game, game.resolve("mods"), info[0], info[1], null, null);
 				}
 			}
+			});
+			probe("ATLauncher", () -> {
 			// ATLauncher.
 			for (Path at : distinct(data.resolve("ATLauncher"), b.resolve("ATLauncher"), b.resolve(".atlauncher"))) {
 				for (Path dir : subdirs(at.resolve("instances"), 1)) {
 					add(sources, "ATLauncher", dir.getFileName() + where, dir, dir.resolve("mods"));
 				}
 			}
+			});
+			probe("GDLauncher", () -> {
 			// GDLauncher (Carbon: data/instances/<name>/instance, legacy "next": instances/<name>).
 			for (Path gd : distinct(data.resolve("gdlauncher_carbon"), config.resolve("gdlauncher_carbon"), data.resolve("gdlauncher_next"),
 					config.resolve("gdlauncher_next"), b.resolve("gdlauncher_next"))) {
@@ -308,16 +331,21 @@ public final class ClientImport {
 					add(sources, "GDLauncher", dir.getFileName() + where, dir, dir.resolve("mods"));
 				}
 			}
+			});
+			probe("FTB App", () -> {
 			// FTB App.
 			for (Path ftb : distinct(b.resolve(".ftba"), data.resolve(".ftba"), data.resolve("ftba"))) {
 				for (Path dir : subdirs(ftb.resolve("instances"), 1)) {
 					add(sources, "FTB App", instanceName(dir) + where, dir, dir.resolve("mods"));
 				}
 			}
+			});
+			probe("Technic", () -> {
 			// Technic.
 			for (Path dir : subdirs(b.resolve(".technic/modpacks"), 1)) {
 				add(sources, "Technic", dir.getFileName() + where, dir, dir.resolve("mods"));
 			}
+			});
 		}
 		// CurseForge: <home or Documents>/curseforge/minecraft/Instances/<name> (Documents may be localised, e.g. ~/Dokumente).
 		List<Path> curseRoots = new ArrayList<>();
@@ -329,17 +357,178 @@ public final class ClientImport {
 		// downloaded, Velo doesn't recognize it" (bug report, 2026-11-07). Windows paths ignore case.
 		if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
 			for (Path root : java.nio.file.FileSystems.getDefault().getRootDirectories()) {
+				// a disconnected network drive or an empty card reader can block a file check for half a minute
+				if (!answersQuickly(root)) {
+					LauncherLog.info("Client import: skipped drive " + root + " (didn't answer within 1.5 s)");
+					continue;
+				}
 				curseRoots.add(root.resolve("curseforge/minecraft/Instances"));
 				curseRoots.add(root.resolve("Games/curseforge/minecraft/Instances"));
 			}
 		}
+		probe("CurseForge", () -> {
 		for (Path cf : distinct(curseRoots.toArray(Path[]::new))) {
 			for (Path dir : subdirs(cf, 1)) {
 				String[] info = curseInfo(dir);
 				add(sources, "CurseForge", dir.getFileName().toString(), dir, dir.resolve("mods"), info[0], info[1], null, null);
 			}
 		}
+		});
+		// The page shows every source's counts: work them out here, in the background (they list folders and open
+		// zips - on the UI thread, with many profiles or a slow drive, that froze the import window).
+		long warm = System.nanoTime();
+		try (var pool = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+			List<java.util.concurrent.Future<?>> jobs = new ArrayList<>();
+			for (Source source : sources) {
+				jobs.add(pool.submit(() -> {
+					source.modCount();
+					source.resourcePackCount();
+					source.shaderPackCount();
+					source.worldCount();
+				}));
+			}
+			for (var job : jobs) {
+				try {
+					job.get(10, java.util.concurrent.TimeUnit.SECONDS);
+				} catch (Exception | Error e) {
+					job.cancel(true);
+				}
+			}
+		}
+		LauncherLog.info("Client import: found " + sources.size() + " sources, counted in " + (System.nanoTime() - warm) / 1_000_000 + " ms");
 		return sources;
+	}
+
+	/** A mod in a source, as the import page lists it. {@code title}/{@code iconUrl}: from Modrinth once known. */
+	public record ModInfo(Path jar, String name, String title, String iconUrl) {
+	}
+
+	/** The source's mods with the names their fabric.mod.json gives (quick, local). */
+	public static List<ModInfo> listMods(Source source) {
+		List<ModInfo> out = new ArrayList<>();
+		for (Path jar : modJars(source.modsDir())) {
+			String name = null;
+			try {
+				JsonObject json = fabricJson(jar);
+				if (json != null && json.has("name")) {
+					name = json.get("name").getAsString();
+				}
+			} catch (RuntimeException ignored) {
+				// unreadable jar: the file name
+			}
+			out.add(new ModInfo(jar, name != null ? name : jar.getFileName().toString().replaceFirst("\\.jar$", ""), null, null));
+		}
+		return out;
+	}
+
+	/**
+	 * Modrinth's project (title + icon) for as many of these mods as it knows: by checksum first, then by mod id as the
+	 * project slug. Missing ones aren't in the map. Network - never on the UI thread.
+	 */
+	public static java.util.Map<Path, ModrinthClient.Project> identify(List<Path> jars) {
+		java.util.Map<Path, ModrinthClient.Project> out = new java.util.HashMap<>();
+		try {
+			java.util.Map<Path, String> sha1 = new java.util.HashMap<>();
+			for (Path jar : jars) {
+				try {
+					sha1.put(jar, Downloader.sha1Of(jar));
+				} catch (IOException | RuntimeException ignored) {
+					// unreadable
+				}
+			}
+			java.util.Map<String, ModrinthClient.ProjectVersion> owner = ModrinthClient.versionsByFileSha1(sha1.values());
+			java.util.Map<Path, String> projectOf = new java.util.HashMap<>();
+			java.util.Set<String> slugs = new java.util.LinkedHashSet<>();
+			for (Path jar : jars) {
+				ModrinthClient.ProjectVersion v = sha1.containsKey(jar) ? owner.get(sha1.get(jar)) : null;
+				if (v != null) {
+					projectOf.put(jar, v.projectId());
+				} else {
+					slugs.addAll(slugCandidates(jar, fabricModId(jar)));
+				}
+			}
+			java.util.Set<String> wanted = new java.util.LinkedHashSet<>(projectOf.values());
+			wanted.addAll(slugs);
+			java.util.Map<String, ModrinthClient.Project> byKey = new java.util.HashMap<>();
+			List<String> all = new ArrayList<>(wanted);
+			for (int i = 0; i < all.size(); i += 200) {
+				for (ModrinthClient.Project project : ModrinthClient.projects(all.subList(i, Math.min(all.size(), i + 200)))) {
+					byKey.put(project.id(), project);
+					if (project.slug() != null) {
+						byKey.put(project.slug(), project);
+					}
+				}
+			}
+			for (Path jar : jars) {
+				ModrinthClient.Project project = projectOf.containsKey(jar) ? byKey.get(projectOf.get(jar)) : null;
+				if (project == null) {
+					for (String slug : slugCandidates(jar, fabricModId(jar))) {
+						project = byKey.get(slug);
+						if (project != null) {
+							break;
+						}
+					}
+				}
+				if (project != null) {
+					out.put(jar, project);
+				}
+			}
+			LauncherLog.info("Client import: Modrinth knows " + out.size() + " of " + jars.size() + " mods");
+		} catch (IOException | RuntimeException e) {
+			LauncherLog.info("Client import: Modrinth lookup for the mod list failed (" + e.getMessage() + ")");
+		}
+		return out;
+	}
+
+	private interface Probe {
+		void run() throws Exception;
+	}
+
+	/**
+	 * One launcher's detection: whatever goes wrong in it (an unreadable folder, a database our reader can't parse - even a
+	 * StackOverflowError) only leaves that launcher out; the import window used to crash or load forever instead.
+	 */
+	private static void probe(String client, Probe probe) {
+		long start = System.nanoTime();
+		try {
+			probe.run();
+		} catch (Exception | StackOverflowError | OutOfMemoryError | LinkageError e) {
+			LauncherLog.warn("Client import: looking for " + client + " failed - skipped", e instanceof Exception ex ? ex : new RuntimeException(e));
+		}
+		long ms = (System.nanoTime() - start) / 1_000_000;
+		if (ms > 500) {
+			LauncherLog.info("Client import: " + client + " took " + ms + " ms");
+		}
+	}
+
+	/** Whether a drive root answers a file check within 1.5 s. */
+	private static boolean answersQuickly(Path root) {
+		var task = java.util.concurrent.CompletableFuture.supplyAsync(() -> Files.isDirectory(root),
+				java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor());
+		try {
+			return task.get(1500, java.util.concurrent.TimeUnit.MILLISECONDS);
+		} catch (Exception e) {
+			task.cancel(true);
+			return false;
+		}
+	}
+
+	/** Counts per folder, worked out once (see the end of detect). */
+	private static final java.util.Map<String, Integer> COUNTS = new java.util.concurrent.ConcurrentHashMap<>();
+
+	private static int cachedCount(String key, java.util.function.IntSupplier count) {
+		Integer known = COUNTS.get(key);
+		if (known != null) {
+			return known;
+		}
+		int n;
+		try {
+			n = count.getAsInt();
+		} catch (RuntimeException | StackOverflowError e) {
+			n = 0;
+		}
+		COUNTS.put(key, n);
+		return n;
 	}
 
 	private static Path env(String name, Path fallback) {
@@ -726,14 +915,34 @@ public final class ClientImport {
 
 	/** Copies the chosen parts of {@code source} into the profile {@code instanceId} (on Minecraft {@code mcVersion}). Returns a summary. */
 	public static String importInto(Source source, Options options, String instanceId, String mcVersion, Consumer<String> progress) {
+		return importInto(source, options, instanceId, mcVersion, progress, f -> { });
+	}
+
+	/**
+	 * {@code fraction}: 0..1 of the whole import (the parts that run, weighted: mods by count, folders by bytes). A file or
+	 * folder that can't be read is skipped and the rest goes on; nothing here may end without a summary (an unreadable
+	 * folder used to throw out of the background task and leave the page loading forever).
+	 */
+	public static String importInto(Source source, Options options, String instanceId, String mcVersion, Consumer<String> progress,
+			java.util.function.DoubleConsumer fraction) {
 		Path game = InstancePaths.gameDir(instanceId);
 		List<String> done = new ArrayList<>();
+		// Parts that run, each a slice of the bar.
+		int parts = (options.settings() && source.hasOptions() ? 1 : 0) + (options.servers() && source.hasServers() ? 1 : 0)
+				+ (options.mods() && source.modCount() > 0 ? 3 : 0) + (options.configs() && source.hasConfig() ? 1 : 0)
+				+ (options.resourcePacks() && source.resourcePackCount() > 0 ? 1 : 0) + (options.shaderPacks() && source.shaderPackCount() > 0 ? 1 : 0)
+				+ (options.worlds() && source.worldCount() > 0 ? 3 : 0);
+		double[] base = {0};
+		double total = Math.max(1, parts);
+		java.util.function.BiConsumer<Integer, Double> part = (weight, f) -> fraction.accept(Math.min(1, (base[0] + weight * Math.max(0, Math.min(1, f))) / total));
 		try {
 			Files.createDirectories(game);
 			if (options.settings() && source.hasOptions()) {
 				progress.accept("Keybinds & settings...");
 				mergeOptions(source.gameDir().resolve("options.txt"), game.resolve("options.txt"));
 				done.add("keybinds & settings");
+				base[0] += 1;
+				fraction.accept(base[0] / total);
 			}
 			if (options.servers() && source.hasServers()) {
 				Path target = game.resolve("servers.dat");
@@ -742,35 +951,46 @@ public final class ClientImport {
 				}
 				Files.copy(source.gameDir().resolve("servers.dat"), target, StandardCopyOption.REPLACE_EXISTING);
 				done.add("server list");
+				base[0] += 1;
+				fraction.accept(base[0] / total);
 			}
 			if (options.mods() && source.modCount() > 0) {
-				int[] result = importMods(source.modsDir(), InstancePaths.modsDir(instanceId), mcVersion, progress);
+				int[] result = importMods(source.modsDir(), InstancePaths.modsDir(instanceId), mcVersion, progress, f -> part.accept(3, f));
+				base[0] += 3;
 				done.add(result[0] + " mods" + (result[1] > 0 ? " (" + result[1] + " skipped - no Fabric build for " + mcVersion + ")" : ""));
 			}
 			if (options.configs() && source.hasConfig()) {
 				progress.accept("Mod configs...");
-				copyTree(source.configDir(), game.resolve("config"), false);
+				copyTree(source.configDir(), game.resolve("config"), false, f -> part.accept(1, f));
 				done.add("mod configs");
+				base[0] += 1;
 			}
 			if (options.resourcePacks() && source.resourcePackCount() > 0) {
 				progress.accept("Resource packs...");
-				copyTree(source.resourcePacksDir(), InstancePaths.resourcePacksDir(instanceId), false);
+				copyTree(source.resourcePacksDir(), InstancePaths.resourcePacksDir(instanceId), false, f -> part.accept(1, f));
 				done.add(source.resourcePackCount() + " resource packs");
+				base[0] += 1;
 			}
 			if (options.shaderPacks() && source.shaderPackCount() > 0) {
 				progress.accept("Shader packs...");
-				copyTree(source.shaderPacksDir(), InstancePaths.shaderPacksDir(instanceId), false);
+				copyTree(source.shaderPacksDir(), InstancePaths.shaderPacksDir(instanceId), false, f -> part.accept(1, f));
 				done.add(source.shaderPackCount() + " shader packs");
+				base[0] += 1;
 			}
 			if (options.worlds() && source.worldCount() > 0) {
 				progress.accept("Worlds (this can take a while)...");
-				copyTree(source.savesDir(), InstancePaths.savesDir(instanceId), false);
+				copyTree(source.savesDir(), InstancePaths.savesDir(instanceId), false, f -> {
+					part.accept(3, f);
+					progress.accept("Worlds  ·  " + Math.round(f * 100) + "%");
+				});
 				done.add(source.worldCount() + " worlds");
+				base[0] += 3;
 			}
-		} catch (IOException e) {
+		} catch (IOException | RuntimeException e) {
 			LauncherLog.warn("Import from " + source.name() + " failed part-way", e);
 			done.add("stopped: " + e.getMessage());
 		}
+		fraction.accept(1);
 		return done.isEmpty() ? "Nothing to import" : "Imported " + String.join(", ", done) + ".";
 	}
 
@@ -802,11 +1022,12 @@ public final class ClientImport {
 	 * A Fabric jar Modrinth doesn't know is copied when it says it runs on that version. Velo Client, Fabric API and other clients'
 	 * own jars are left out. Returns {imported, skipped}.
 	 */
-	private static int[] importMods(Path from, Path to, String mcVersion, Consumer<String> progress) throws IOException {
+	private static int[] importMods(Path from, Path to, String mcVersion, Consumer<String> progress, java.util.function.DoubleConsumer fraction)
+			throws IOException {
 		Files.createDirectories(to);
 		NoRiskMods.fetchMissing(from, progress);
 		List<Path> jars = modJars(from);
-		java.util.Set<String> projects = new java.util.HashSet<>();
+		java.util.Set<String> projects = java.util.concurrent.ConcurrentHashMap.newKeySet();
 		java.util.Set<String> present = new java.util.HashSet<>();
 		try (Stream<Path> s = Files.list(to)) {
 			for (Path jar : s.filter(p -> p.getFileName().toString().endsWith(".jar")).toList()) {
@@ -818,19 +1039,22 @@ public final class ClientImport {
 		}
 		int imported = 0;
 		int skipped = 0;
-		int i = 0;
 		progress.accept("Looking up " + jars.size() + " mods on Modrinth...");
+		fraction.accept(0.05);
 		Lookup lookup = bulkLookup(jars, mcVersion);
+		fraction.accept(0.15);
+		// 1) what each jar needs - local checks only
+		List<Path> fetch = new ArrayList<>();
+		java.util.Map<Path, String> ids = new java.util.HashMap<>();
 		for (Path jar : jars) {
-			i++;
 			String name = jar.getFileName().toString().toLowerCase(Locale.ROOT);
-			progress.accept("Mods " + i + " / " + jars.size() + "  ·  " + jar.getFileName());
 			if (name.startsWith("velo-client") || name.startsWith("velo-addons") || name.startsWith("fabric-api") || name.contains("lunar")
 					|| name.contains("feather") || name.contains("dawn-") || name.contains("norisk") || name.startsWith("nrc-")
 					|| net.veloclient.launcher.launch.ForeignClientJars.isForeignClient(jar)) {
 				continue;
 			}
 			String modId = fabricModId(jar);
+			ids.put(jar, modId);
 			if (modId != null && present.contains(modId)) {
 				continue;
 			}
@@ -846,36 +1070,71 @@ public final class ClientImport {
 				if (owner != null) {
 					projects.add(owner.projectId());
 				}
-				Files.copy(jar, to.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
-				present.add(modId);
-				imported++;
+				try {
+					Files.copy(jar, to.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+					present.add(modId);
+					imported++;
+				} catch (IOException e) {
+					skipped++;
+					LauncherLog.info("Import: couldn't copy " + jar.getFileName() + ": " + e.getMessage());
+				}
+				continue;
+			}
+			fetch.add(jar);
+		}
+		// 2) the Modrinth downloads, six at a time (one after another took minutes for a big mod list)
+		java.util.Map<Path, Object> fetched = new java.util.concurrent.ConcurrentHashMap<>();
+		java.util.concurrent.atomic.AtomicInteger finished = new java.util.concurrent.atomic.AtomicInteger();
+		java.util.concurrent.Semaphore slots = new java.util.concurrent.Semaphore(6);
+		try (var pool = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+			for (Path jar : fetch) {
+				pool.submit(() -> {
+					slots.acquireUninterruptibly();
+					try {
+						Path got = fetchForVersion(jar, ids.get(jar), mcVersion, projects, lookup);
+						fetched.put(jar, got == null ? Boolean.FALSE : got);
+					} catch (IOException | RuntimeException e) {
+						LauncherLog.info("Modrinth lookup failed for " + jar.getFileName() + ": " + e.getMessage());
+						fetched.put(jar, Boolean.FALSE);
+					} finally {
+						slots.release();
+						int n = finished.incrementAndGet();
+						progress.accept("Mods " + n + " / " + fetch.size() + "  ·  " + jar.getFileName());
+						fraction.accept(0.15 + 0.8 * n / Math.max(1, fetch.size()));
+					}
+				});
+			}
+		}
+		// 3) put them in place, in the original order (so which of two jars for one mod wins stays the same)
+		for (Path jar : fetch) {
+			Object got = fetched.get(jar);
+			String modId = ids.get(jar);
+			if (got == FOUND_ALREADY) {
 				continue;
 			}
 			try {
-				Path fetched = fetchForVersion(jar, modId, mcVersion, projects, lookup);
-				if (fetched == FOUND_ALREADY) {
-					continue;
-				}
-				if (fetched != null) {
-					String id = fabricModId(fetched);
+				if (got instanceof Path path) {
+					String id = fabricModId(path);
 					if (id == null || present.add(id)) {
-						Files.copy(fetched, to.resolve(fetched.getFileName().toString()), StandardCopyOption.REPLACE_EXISTING);
+						Files.copy(path, to.resolve(path.getFileName().toString()), StandardCopyOption.REPLACE_EXISTING);
 						imported++;
 					}
 					continue;
 				}
-			} catch (IOException | RuntimeException e) {
-				LauncherLog.info("Modrinth lookup failed for " + jar.getFileName() + ": " + e.getMessage());
-			}
-			if (modId != null && runsOn(jar, mcVersion)) {
-				Files.copy(jar, to.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
-				present.add(modId);
-				imported++;
-			} else {
+				if (modId != null && runsOn(jar, mcVersion)) {
+					Files.copy(jar, to.resolve(jar.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+					present.add(modId);
+					imported++;
+				} else {
+					skipped++;
+					LauncherLog.info("Import: no Fabric build of " + jar.getFileName() + " for " + mcVersion);
+				}
+			} catch (IOException e) {
 				skipped++;
-				LauncherLog.info("Import: no Fabric build of " + jar.getFileName() + " for " + mcVersion);
+				LauncherLog.info("Import: couldn't copy " + jar.getFileName() + ": " + e.getMessage());
 			}
 		}
+		fraction.accept(1);
 		return new int[] {imported, skipped};
 	}
 
@@ -1065,18 +1324,60 @@ public final class ClientImport {
 	}
 
 	private static void copyTree(Path from, Path to, boolean overwrite) throws IOException {
+		copyTree(from, to, overwrite, f -> { });
+	}
+
+	/**
+	 * Copies a folder; files or folders that can't be read (in use, no permission, a broken link) are skipped and logged
+	 * instead of stopping everything. {@code fraction}: 0..1 by bytes copied.
+	 */
+	private static void copyTree(Path from, Path to, boolean overwrite, java.util.function.DoubleConsumer fraction) throws IOException {
 		if (!Files.isDirectory(from)) {
 			return;
 		}
-		try (Stream<Path> files = Files.walk(from)) {
-			for (Path file : files.filter(Files::isRegularFile).toList()) {
-				Path dest = to.resolve(from.relativize(file).toString());
-				if (!overwrite && Files.exists(dest)) {
-					continue;
+		List<Path> files = new ArrayList<>();
+		long[] totalBytes = {0};
+		Files.walkFileTree(from, new java.nio.file.SimpleFileVisitor<>() {
+			@Override
+			public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
+				if (attrs.isRegularFile()) {
+					files.add(file);
+					totalBytes[0] += attrs.size();
 				}
-				Files.createDirectories(dest.getParent());
-				Files.copy(file, dest, StandardCopyOption.REPLACE_EXISTING);
+				return java.nio.file.FileVisitResult.CONTINUE;
 			}
+
+			@Override
+			public java.nio.file.FileVisitResult visitFileFailed(Path file, IOException e) {
+				LauncherLog.info("Import: skipped unreadable " + file + " (" + e.getMessage() + ")");
+				return java.nio.file.FileVisitResult.CONTINUE;
+			}
+		});
+		long copied = 0;
+		int skipped = 0;
+		long lastReport = 0;
+		for (Path file : files) {
+			Path dest = to.resolve(from.relativize(file).toString());
+			long size = 0;
+			try {
+				size = Files.size(file);
+				if (overwrite || !Files.exists(dest)) {
+					Files.createDirectories(dest.getParent());
+					Files.copy(file, dest, StandardCopyOption.REPLACE_EXISTING);
+				}
+			} catch (IOException | RuntimeException e) {
+				skipped++;
+				LauncherLog.info("Import: couldn't copy " + file + " (" + e.getMessage() + ")");
+			}
+			copied += size;
+			if (copied - lastReport > 4L * 1024 * 1024 || copied == totalBytes[0]) {
+				lastReport = copied;
+				fraction.accept(totalBytes[0] == 0 ? 1 : copied / (double) totalBytes[0]);
+			}
+		}
+		fraction.accept(1);
+		if (skipped > 0) {
+			LauncherLog.info("Import: " + skipped + " file(s) from " + from + " couldn't be copied (in use or no permission)");
 		}
 	}
 }

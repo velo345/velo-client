@@ -15,7 +15,7 @@ DRY=()
 REMOTE_DIR="${REMOTE_DIR:-/var/www/velo-client.com}"
 
 node build.js
-rsync -rlptz --delete --chmod=D2775,F664 "${DRY[@]}" dist/ "$TARGET:$REMOTE_DIR/"
+rsync -rlptz --delete --exclude=/dl/ --chmod=D2775,F664 "${DRY[@]}" dist/ "$TARGET:$REMOTE_DIR/"
 [[ ${#DRY[@]} -gt 0 ]] && exit 0
 ssh "$TARGET" "chgrp -R velo '$REMOTE_DIR' 2>/dev/null || true"
 echo "Deployed to https://velo-client.com"

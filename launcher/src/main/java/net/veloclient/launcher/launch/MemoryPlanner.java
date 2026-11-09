@@ -113,9 +113,19 @@ public final class MemoryPlanner {
 
 		Gc gc = switch (settings.gc) {
 			case ZGC -> Gc.ZGC;
-			// G1 is the safe default: it's the most memory-efficient collector and returns unused heap.
-			// ZGC needs noticeably more headroom for the same game and is only used when picked.
-			default -> Gc.G1;
+			case G1 -> Gc.G1;
+			// Automatic: ZGC where memory allows it. Measured 2026-11-08 (26.2, moving, 4 GB heap): G1's young pauses
+			// (10-20 ms, 30+ per 40 s) were 10 of the 11 frames over 15 ms; generational ZGC raised the 1% lows from
+			// ~190 to ~230 FPS and the 0.1% lows from ~70 to ~85, but the process used ~1.8 GB more (4.8 vs 3.0 GB).
+			// So: ZGC only on 16 GB+ PCs with that much free right now, else G1 (the most memory-efficient).
+			default -> {
+				long zgcExtra = Math.round(maxMb * 0.45);
+				boolean roomy = totalMb >= 15_000 && (availableMb <= 0 || availableMb - overhead - SAFETY_MB - maxMb - zgcExtra >= 0);
+				if (roomy) {
+					reasons.add("ZGC: smoother frames, enough free memory for it");
+				}
+				yield roomy ? Gc.ZGC : Gc.G1;
+			}
 		};
 		int minMb = Math.min(maxMb, Math.max(1024, Math.min(2048, maxMb / 3)));
 		return new Plan(maxMb, minMb, gc, automatic, reasons, warning);
@@ -263,7 +273,8 @@ public final class MemoryPlanner {
 			// allocation rate of short-lived objects (the widely used Aikar-style recipe);
 			// region size scales with the heap so humongous allocations stay rare.
 			args.add("-XX:+UseG1GC");
-			args.add("-XX:MaxGCPauseMillis=40");
+			// 15 ms instead of the classic 40: same 1% lows in the 2026-11-08 bench, less memory (2.3-2.6 vs 2.9-3.0 GB).
+			args.add("-XX:MaxGCPauseMillis=15");
 			args.add("-XX:+UnlockExperimentalVMOptions");
 			args.add("-XX:G1NewSizePercent=" + (plan.maxMb() >= 8192 ? 30 : 20));
 			args.add("-XX:G1MaxNewSizePercent=" + (plan.maxMb() >= 8192 ? 40 : 50));

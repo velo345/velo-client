@@ -33,6 +33,8 @@ public final class VeloServerApp {
 	/** Staff, online-service bans and player reports. */
 	static StaffService staff;
 	private static net.veloclient.server.store.StoreService store;
+	/** Everyone's last in-game look, for players on another client (see LastCosmetics). */
+	private static LastCosmetics lastLooks;
 	/** Installs, daily actives and online samples for the owner panel. */
 	private static StatsService stats;
 	private static OgBadge og;
@@ -88,6 +90,8 @@ public final class VeloServerApp {
 		server.createContext("/v1/session/end-game", exchange -> handle(exchange, "POST", ex -> handleEndGame(ex, registry)));
 		server.createContext("/v1/heartbeat", exchange -> handle(exchange, "POST", ex -> handleHeartbeat(ex, registry, capes)));
 		server.createContext("/v1/online", exchange -> handle(exchange, "GET", ex -> handleOnline(ex, registry)));
+		lastLooks = new LastCosmetics(dataDir);
+		server.createContext("/v1/cosmetics/of", exchange -> handle(exchange, "POST", ex -> handleCosmeticsOf(ex, registry, capes)));
 		server.createContext("/v1/cape/upload", exchange -> handle(exchange, "POST", ex -> handleCapeUpload(ex, registry, capes)));
 		server.createContext("/v1/cape/remove", exchange -> handle(exchange, "POST", ex -> handleCapeRemove(ex, registry, capes)));
 		// GET /v1/cape/<sha256> - the path suffix is the hash (see handleCapeDownload).
@@ -109,6 +113,8 @@ public final class VeloServerApp {
 		DiscordRoutes.register(server, registry, store, discordLinks, envOr("VELO_DISCORD_INVITE", null), adminToken);
 		DiscordAnnouncer announcer = new DiscordAnnouncer(envOr("VELO_DISCORD_DONATIONS_WEBHOOK", null), envOr("VELO_DISCORD_REPORTS_WEBHOOK", null),
 				envOr("VELO_PUBLIC_URL", null), cosmetics, registry, store.database());
+		System.out.println("Discord: purchase announcements " + (announcer.donationsEnabled() ? "ON"
+				: envOr("VELO_DISCORD_DONATIONS_WEBHOOK", null) == null ? "OFF (set VELO_DISCORD_DONATIONS_WEBHOOK)" : "OFF - VELO_DISCORD_DONATIONS_WEBHOOK isn't a Discord webhook URL"));
 		store.setPurchaseListener(new net.veloclient.server.store.StoreService.PurchaseListener() {
 			@Override
 			public void coinsPurchased(net.veloclient.server.store.StoreDatabase.Order order, String username, int balance) {
@@ -212,6 +218,7 @@ public final class VeloServerApp {
 		SchematicRoutes.register(server, registry, schematics, store);
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));
 		PanelRoutes.register(server, registry, stats, store, adminToken);
+		PanelRoutes.registerStoreActions(server, store, announcer, adminToken);
 		SocialStatsService socials = new SocialStatsService(dataDir, envOr("VELO_YTDLP", "yt-dlp"), envOr("VELO_YOUTUBE_API_KEY", null));
 		socials.instagramApp(envOr("VELO_INSTAGRAM_APP_ID", null), envOr("VELO_INSTAGRAM_REDIRECT", null),
 				envOr("VELO_INSTAGRAM_APP_SECRET", null), envOr("VELO_INSTAGRAM_APP_SECRET2", null));
@@ -436,6 +443,49 @@ public final class VeloServerApp {
 	private record HeartbeatResponse(boolean ok, int onlineCount, String capeId, boolean ogEligible) {
 	}
 
+	private record CosmeticsOfRequest(java.util.List<String> uuids) {
+	}
+
+	private record LookView(String uuid, String capeId, String wingsId, String auraId, String wear, String pet) {
+	}
+
+	private record CosmeticsOfResponse(java.util.List<LookView> users) {
+	}
+
+	/**
+	 * POST {"uuids": [...]} (up to 200): the last in-game look of each Velo player among them who isn't online with Velo right
+	 * now - so their cloak, wings and the rest still show while they play on another client. The cloak is checked again
+	 * (a removed custom cloak shows the redacted one, a Store cloak only while they own it).
+	 */
+	private static void handleCosmeticsOf(HttpExchange exchange, SessionRegistry registry, CapeStore capes) throws IOException {
+		CosmeticsOfRequest request = JsonHttp.readBody(exchange, CosmeticsOfRequest.class);
+		java.util.Set<String> online = new java.util.HashSet<>();
+		for (SessionRegistry.OnlineUser user : registry.onlineUsers()) {
+			online.add(user.uuid());
+		}
+		java.util.List<LookView> out = new java.util.ArrayList<>();
+		java.util.List<String> uuids = request == null || request.uuids() == null ? java.util.List.of() : request.uuids();
+		for (String raw : uuids.subList(0, Math.min(200, uuids.size()))) {
+			String uuid = normalizeUuid(raw);
+			if (uuid == null || online.contains(uuid)) {
+				continue;
+			}
+			LastCosmetics.Look look = lastLooks == null ? null : lastLooks.get(uuid);
+			if (look == null || look.empty()) {
+				continue;
+			}
+			String cape = look.capeId();
+			if (cape != null && cape.startsWith(CapeStore.CUSTOM_PREFIX)) {
+				String hash = capes.hashFor(uuid, store.isPlus(uuid));
+				cape = capes.isRedacted(uuid) ? CapeStore.REDACTED_CAPE : hash != null && cape.equals(CapeStore.CUSTOM_PREFIX + hash) ? cape : null;
+			} else if (cape != null && !CapeStore.REDACTED_CAPE.equals(cape) && !store.mayDisplayCape(uuid, cape)) {
+				cape = null;
+			}
+			out.add(new LookView(uuid, cape, look.wingsId(), look.auraId(), look.wear(), look.pet()));
+		}
+		JsonHttp.writeJson(exchange, 200, new CosmeticsOfResponse(out));
+	}
+
 	private static void handleHeartbeat(HttpExchange exchange, SessionRegistry registry, CapeStore capes) throws IOException {
 		HeartbeatRequest request = JsonHttp.readBody(exchange, HeartbeatRequest.class);
 		if (request.sessionToken() == null || request.sessionToken().isBlank()) {
@@ -448,6 +498,19 @@ public final class VeloServerApp {
 				: capes.hashFor(session.uuid(), store.isPlus(session.uuid()));
 		// Store capes are only shown for players who actually own them (server-side ownership).
 		String capeId = session != null && !store.mayDisplayCape(session.uuid(), request.capeId()) ? null : request.capeId();
+		// Staff removed this player's custom cloak: everyone sees the black "REDACTED" cloak instead, while the player
+		// still has the removed one on (it's cached on their side, so their client keeps sending it or nothing) - picking
+		// a Store cloak or uploading a new accepted one ends it.
+		if (session != null && capes.isRedacted(session.uuid())) {
+			String wanted = request.capeId();
+			boolean removedOne = wanted == null || wanted.isBlank()
+					|| wanted.startsWith(CapeStore.CUSTOM_PREFIX) && capes.isBanned(wanted.substring(CapeStore.CUSTOM_PREFIX.length()).trim());
+			if (removedOne) {
+				capeId = CapeStore.REDACTED_CAPE;
+			} else if (wanted.startsWith(CapeStore.CUSTOM_PREFIX) || capeId != null) {
+				capes.setRedacted(session.uuid(), false);
+			}
+		}
 		// Wings are store items too ("wings_<id>"): only shown for players who bought them.
 		String wingsId = request.wingsId();
 		if (session != null && wingsId != null) {
@@ -511,6 +574,9 @@ public final class VeloServerApp {
 				pet = null;
 			}
 			registry.setPet(refreshed.uuid(), pet);
+			if (lastLooks != null) {
+				lastLooks.record(refreshed.uuid(), refreshed.capeId(), refreshed.wingsId(), refreshed.auraId(), wear, pet);
+			}
 		}
 		if (refreshed != null && "launcher".equals(refreshed.kind())
 				&& registry.setIdle(request.sessionToken(), Boolean.TRUE.equals(request.idle()))) {

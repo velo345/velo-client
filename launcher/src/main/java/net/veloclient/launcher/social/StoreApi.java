@@ -744,6 +744,9 @@ public final class StoreApi {
 			// Dev-only tour against a test server (-Dvelo.serverUrl + -Dvelo.adminToken): real owner data.
 			return send(request(path).header("X-Velo-Admin-Token", System.getProperty("velo.adminToken")).GET().build());
 		}
+		if (DEMO && path.equals("/v1/partners")) {
+			return send(request(path).GET().build());   // public anyway: the tour shows the real partner cards
+		}
 		if (DEMO) {
 			return demo(path);
 		}

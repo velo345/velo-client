@@ -62,15 +62,22 @@ public final class WorldMapScreen extends VeloWindow {
 	private MapStore lodStore;
 	private boolean loading;
 
+	/** Zoom every time the map opens: about 240 blocks across a 1080p screen - your surroundings, readable. */
+	private static final float OPEN_ZOOM = 2f;
+
 	public WorldMapScreen(Screen parent) {
 		super(Text.literal("World Map"), 10_000, 10_000);
 		returnTo(parent);
+		// Every open starts on you: your dimension, following you, at a zoom where you can see what's around you.
 		String current = WorldMap.currentDimension();
-		if (viewedDimension == null || current != null && !current.equals(viewedDimension) && follow) {
+		if (current != null) {
 			viewedDimension = current;
 		}
+		follow = true;
+		zoom = OPEN_ZOOM;
+		targetZoom = OPEN_ZOOM;
 		double[] player = MapCompat.player();
-		if (player != null && (follow || Double.isNaN(centerX))) {
+		if (player != null) {
 			centerX = player[0];
 			centerZ = player[2];
 		}

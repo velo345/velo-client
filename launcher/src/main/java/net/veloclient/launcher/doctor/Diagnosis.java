@@ -93,7 +93,12 @@ public record Diagnosis(List<Issue> issues, String crashSignature, String crashS
 		}
 
 		/** Replaces the file with the newest version made for this Minecraft version - or turns it off if there's none. */
-		record Update(Path file, String name, String modId, boolean orElseDisable) implements Action {
+		/** {@code requirement}: the version range another mod asked for (Fabric's words turned into a range), or null for the newest. */
+		record Update(Path file, String name, String modId, boolean orElseDisable, String requirement) implements Action {
+			public Update(Path file, String name, String modId, boolean orElseDisable) {
+				this(file, name, modId, orElseDisable, null);
+			}
+
 			public String key() {
 				return "update:" + modId;
 			}
@@ -158,6 +163,17 @@ public record Diagnosis(List<Issue> issues, String crashSignature, String crashS
 		}
 
 		/** Turns shaders off in Iris (the shader pack stays installed). */
+		/** Launcher-wide: the G1 garbage collector instead of ZGC (ZGC needs ~45% more memory for the same game). */
+		record UseG1() implements Action {
+			public String key() {
+				return "gc:g1";
+			}
+
+			public String target() {
+				return "gc";
+			}
+		}
+
 		record DisableShaders() implements Action {
 			public String key() {
 				return "shaders:off";

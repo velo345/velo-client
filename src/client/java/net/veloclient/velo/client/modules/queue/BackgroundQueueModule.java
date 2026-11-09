@@ -116,13 +116,14 @@ public final class BackgroundQueueModule extends AbstractModule implements Confi
 
 	private void onTick(MinecraftClient client) {
 		BackgroundQueueManager.tick();
+		boolean replay = BackgroundQueueManager.suspended.getAsBoolean();
 		while (OPEN_MENU.wasPressed()) {
-			if (isEnabled() && ClientCompat.currentScreen() == null) {
+			if (isEnabled() && !replay && ClientCompat.currentScreen() == null) {
 				client.setScreen(new BackgroundQueueSessionsScreen(null, null));
 			}
 		}
 		while (QUICK_SWITCH.wasPressed()) {
-			if (isEnabled() && ClientCompat.currentScreen() == null) {
+			if (isEnabled() && !replay && ClientCompat.currentScreen() == null) {
 				quickSwitch(client);
 			}
 		}

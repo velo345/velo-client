@@ -36,7 +36,58 @@ public final class VeloUserRegistry {
 	// UUID instead of their real one, so a UUID-only lookup never matched anyone there.
 	private static volatile Map<String, Entry> byLowerName = Map.of();
 
+	// Velo players who are on another client right now: their last in-game look from the server (/v1/cosmetics/of), so
+	// their cloak, wings, aura and bodywear still show - like Lunar and Dawn do. No badge: that's only for who's online.
+	private static final Map<String, Entry> OFFLINE = new ConcurrentHashMap<>();
+	private static final Map<String, Long> ASKED_AT = new ConcurrentHashMap<>();
+	private static final Set<String> WANTED = ConcurrentHashMap.newKeySet();
+	private static final long ASK_AGAIN_MILLIS = 5 * 60_000L;
+
 	private VeloUserRegistry() {
+	}
+
+	/** Someone else's last look while they aren't online with Velo; asks the server for it (batched) when not known yet. */
+	private static Entry offline(UUID uuid) {
+		if (uuid == null) {
+			return null;
+		}
+		String key = dashless(uuid);
+		Entry known = OFFLINE.get(key);
+		if (known == null && !BY_UUID.containsKey(key)) {
+			Long at = ASKED_AT.get(key);
+			if (at == null || System.currentTimeMillis() - at > ASK_AGAIN_MILLIS) {
+				WANTED.add(key);
+			}
+		}
+		return known;
+	}
+
+	/** Up to {@code max} players whose look should be asked for now (network thread). */
+	public static java.util.List<String> takeWanted(int max) {
+		java.util.List<String> out = new java.util.ArrayList<>();
+		for (var it = WANTED.iterator(); it.hasNext() && out.size() < max; ) {
+			out.add(it.next());
+			it.remove();
+		}
+		long now = System.currentTimeMillis();
+		for (String key : out) {
+			ASKED_AT.put(key, now);
+		}
+		return out;
+	}
+
+	/** The server's answer for {@code asked}: their looks (players without one are forgotten). */
+	public static void putOffline(java.util.Collection<String> asked, Map<String, Entry> found) {
+		for (String key : asked) {
+			if (!found.containsKey(key)) {
+				OFFLINE.remove(key);
+			}
+		}
+		OFFLINE.putAll(found);
+		if (ASKED_AT.size() > 5000) {
+			ASKED_AT.clear();
+			OFFLINE.clear();
+		}
 	}
 
 	/** Wholesale-replaces the online set from a fresh {@code /v1/online} response. */
@@ -101,10 +152,16 @@ public final class VeloUserRegistry {
 	/** The Store cape catalog id this player has equipped, if any and if they're online. */
 	public static String capeIdFor(UUID uuid) {
 		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
+		if (entry == null) {
+			entry = offline(uuid);
+		}
 		return entry == null ? null : entry.capeId();
 	}
 
 	public static String capeIdFor(UUID uuid, String username) {
+		if (net.veloclient.velo.client.cosmetics.CosmeticHide.hidden(uuid, "cape")) {
+			return null;
+		}
 		String byUuid = capeIdFor(uuid);
 		if (byUuid != null) {
 			return byUuid;
@@ -115,9 +172,15 @@ public final class VeloUserRegistry {
 
 	/** The 3D wings this player has equipped (a bundled cosmetic id), if any and if they're online. */
 	public static String wingsIdFor(UUID uuid, String username) {
+		if (net.veloclient.velo.client.cosmetics.CosmeticHide.hidden(uuid, "cosmetics")) {
+			return null;
+		}
 		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
 		if (entry == null) {
 			entry = entryForName(username);
+		}
+		if (entry == null) {
+			entry = offline(uuid);
 		}
 		return entry == null ? null : entry.wingsId();
 	}
@@ -154,18 +217,30 @@ public final class VeloUserRegistry {
 
 	/** The bodywear this player shows ("id[:colour],..."), if any and if they're online. */
 	public static String wearFor(UUID uuid, String username) {
+		if (net.veloclient.velo.client.cosmetics.CosmeticHide.hidden(uuid, "cosmetics")) {
+			return null;
+		}
 		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
 		if (entry == null) {
 			entry = entryForName(username);
+		}
+		if (entry == null) {
+			entry = offline(uuid);
 		}
 		return entry == null ? null : entry.wear();
 	}
 
 	/** The aura this player has equipped ("id;settings"), if any and if they're online. */
 	public static String auraIdFor(UUID uuid, String username) {
+		if (net.veloclient.velo.client.cosmetics.CosmeticHide.hidden(uuid, "cosmetics")) {
+			return null;
+		}
 		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
 		if (entry == null) {
 			entry = entryForName(username);
+		}
+		if (entry == null) {
+			entry = offline(uuid);
 		}
 		return entry == null ? null : entry.auraId();
 	}

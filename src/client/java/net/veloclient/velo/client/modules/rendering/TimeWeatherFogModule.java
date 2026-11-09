@@ -167,13 +167,20 @@ public final class TimeWeatherFogModule extends AbstractModule implements Config
 		return module != null ? module.fogColor : 0xFFFFFFFF;
 	}
 
+	/** Velo Rewind's fog track while watching a recording (null = none) - wins over this module's own value. */
+	public static volatile Double externalFogThickness;
+
 	/** Read from {@code AtmosphericFogMixin} - whether to rescale the atmospheric fog start/end distances this frame. */
 	public static boolean isFogDistanceOverrideActive() {
-		return isFogColorOverrideActive();
+		return externalFogThickness != null || isFogColorOverrideActive();
 	}
 
 	/** Higher = thicker/closer fog (distances are divided by this). */
 	public static double fogThicknessValue() {
+		Double external = externalFogThickness;
+		if (external != null) {
+			return Math.max(0.05, external);
+		}
 		TimeWeatherFogModule module = instance;
 		return module != null ? Math.max(0.1, module.fogThickness) : 1.0;
 	}

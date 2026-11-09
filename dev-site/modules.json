@@ -6,6 +6,12 @@
   "category": "hud"
  },
  {
+  "id": "alternate-current",
+  "name": "Alternate Current (Singleplayer only)",
+  "description": "Singleplayer only: faster redstone dust in your own worlds, no effect on servers. Machines that rely on vanilla's ",
+  "category": "performance"
+ },
+ {
   "id": "anti-coords-leak",
   "name": "Anti Coords Leak",
   "description": "Hides every coordinate on screen (chat, F3, HUD, waypoints, Litematica, any mod) while you share your screen or record ",
@@ -190,6 +196,12 @@
   "name": "Cosmetic Cloaks",
   "description": "Equip a cloth-physics cloak from your local library. Purely client-rendered.",
   "category": "cosmetics"
+ },
+ {
+  "id": "cosmetics-quality",
+  "name": "Cosmetics Quality",
+  "description": "High, Medium or Low detail for wings, auras, bodywear and cloaks - Medium keeps crowded lobbies smooth.",
+  "category": "performance"
  },
  {
   "id": "custom-crosshair",
@@ -486,6 +498,12 @@
   "category": "pvp"
  },
  {
+  "id": "own-name-tag",
+  "name": "Own Name Tag",
+  "description": "See your own name tag - badge and name style included - in third person (F5).",
+  "category": "qol"
+ },
+ {
   "id": "packet-traffic-monitor",
   "name": "Packet Traffic Monitor",
   "description": "Shows inbound/outbound packet counts by type, for diagnosing plugin packet spam.",
@@ -518,7 +536,7 @@
  {
   "id": "performance-boost",
   "name": "Performance Boost",
-  "description": "Presets and individually-tunable settings for maximum FPS - view distance, entities, particles, VSync, HUD caching and more.",
+  "description": "Presets and individually tunable settings for maximum FPS.",
   "category": "performance"
  },
  {

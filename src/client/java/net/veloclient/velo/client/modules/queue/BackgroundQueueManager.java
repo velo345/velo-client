@@ -471,6 +471,9 @@ public final class BackgroundQueueManager {
 	}
 
 	/** Every client tick: notice background connections that dropped. */
+	/** True while Background Queue must stay out of the way (a Velo Rewind replay is open): no demote, no switching. */
+	public static volatile java.util.function.BooleanSupplier suspended = () -> false;
+
 	public static void tick() {
 		for (Session session : List.copyOf(SESSIONS.values())) {
 			if (session.singleplayer || session.connection == null) {
@@ -499,6 +502,9 @@ public final class BackgroundQueueManager {
 
 	/** Sends what you're playing to the background. Returns the session key, or null if there's nothing to capture. */
 	public static String demote() {
+		if (suspended.getAsBoolean()) {
+			return null; // a Velo Rewind replay isn't a server to keep in the background
+		}
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client.getNetworkHandler() == null) {
 			return null;
@@ -610,6 +616,9 @@ public final class BackgroundQueueManager {
 	 * live connection back - see the class doc for the details and the fallbacks.
 	 */
 	public static void promote(String key) {
+		if (suspended.getAsBoolean()) {
+			return;
+		}
 		Session session = SESSIONS.get(key);
 		if (session == null) {
 			return;

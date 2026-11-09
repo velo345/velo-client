@@ -31,6 +31,9 @@ import java.util.regex.Pattern;
 public final class CoordScrambler {
 
 	private static final Pattern NUMBER = Pattern.compile("(?<![\\w.])-?\\d+(?:[.,]\\d+)?(?![\\w])");
+	// A number glued to a lone axis letter: "x20", "z-340", "Y64" - a mod wrote coordinates like that and they slipped through
+	// (NUMBER wants no letter right before the digits). Not "1920x1080" (a digit before the x) or "max20" (part of a word).
+	private static final Pattern GLUED = Pattern.compile("(?i)(?<![a-z0-9_.])[xyz](-?\\d+(?:[.,]\\d+)?)(?![\\w])");
 	// The axis letter on its own: not part of a word or a name ("Steve_X 1234" isn't a label).
 	private static final Pattern AXIS_BEFORE = Pattern.compile("(?i)(?:^|[^a-z0-9_])(x|y|z)\\s*[:=]?\\s*[\\[(]?\\s*$");
 	/** What may stand between the numbers of one coordinate: spaces, or a comma / slash / semicolon with spaces. */
@@ -170,6 +173,15 @@ public final class CoordScrambler {
 		while (m.find()) {
 			numbers.add(new int[] {m.start(), m.end()});
 		}
+		java.util.Set<Integer> glued = new java.util.HashSet<>();
+		Matcher g = GLUED.matcher(text);
+		while (g.find()) {
+			numbers.add(new int[] {g.start(1), g.end(1)});
+			glued.add(g.start(1));
+		}
+		if (!glued.isEmpty()) {
+			numbers.sort(java.util.Comparator.comparingInt(n -> n[0]));
+		}
 		if (numbers.isEmpty()) {
 			return NONE;
 		}
@@ -199,6 +211,9 @@ public final class CoordScrambler {
 				int[] n = numbers.get(j);
 				double v = Math.abs(value(text, n));
 				char axis = axisBefore(text, n[0]);
+				if (glued.contains(n[0]) && v < 10) {
+					continue;   // "x2", "x5": a multiplier, not a position
+				}
 				if (axis == 0 && (unitAfter(text, n[1]) || nameBefore(lower, n[0]))) {
 					continue;
 				}

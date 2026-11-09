@@ -17,8 +17,12 @@ final class DiscordWebhook {
 	private DiscordWebhook() {
 	}
 
+	/** Discord's webhook URLs, with or without an API version - the bot's /setup webhooks hands out ".../api/v10/webhooks/...". */
+	private static final java.util.regex.Pattern URL = java.util.regex.Pattern.compile(
+			"https://(?:(?:ptb|canary)\\.)?discord(?:app)?\\.com/api/(?:v\\d+/)?webhooks/\\d+/[\\w-]+");
+
 	static boolean valid(String url) {
-		return url != null && url.startsWith("https://discord.com/api/webhooks/") || url != null && url.startsWith("https://discordapp.com/api/webhooks/");
+		return url != null && URL.matcher(url.trim()).matches();
 	}
 
 	static void send(String url, JsonObject payload) {

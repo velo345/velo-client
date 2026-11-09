@@ -131,6 +131,10 @@ public final class ClientImportView {
 		VBox.setVgrow(scroll, Priority.ALWAYS);
 
 		CompletableFuture.supplyAsync(ClientImport::detect, Executors.newVirtualThreadPerTaskExecutor())
+				.exceptionally(e -> {
+					net.veloclient.launcher.LauncherLog.warn("Client import: looking for other clients failed", e);
+					return java.util.List.of();
+				})
 				.thenAccept(sources -> Platform.runLater(() -> new Flow(steps, sources, installLoaderJars, openProfile).start()));
 		return wrapper;
 	}
@@ -261,6 +265,7 @@ public final class ClientImportView {
 			whatCard = card("2", "What should come along?", options);
 			if (picked.containsKey(Part.MODS)) {
 				whatCard.getChildren().add(hint("Mods are downloaded again in the right version for your new profile."));
+				whatCard.getChildren().add(modList(source));
 			}
 			buildWhere();
 			steps.getChildren().setAll(steps.getChildren().get(0), whatCard, whereCard);
@@ -405,8 +410,18 @@ public final class ClientImportView {
 			UiMotion.enter(working);
 			steps.getChildren().get(0).setDisable(true);
 			whatCard.setDisable(true);
+			bar.setProgress(0);
+			double[] shown = {0};
 			CompletableFuture.supplyAsync(() -> ClientImport.importInto(chosen, options, instance.id(), instance.mcVersion(),
-					text -> Platform.runLater(() -> status.setText(text))), Executors.newVirtualThreadPerTaskExecutor())
+					text -> Platform.runLater(() -> status.setText(text)),
+					f -> {
+						// never backwards, and not a runLater per byte
+						if (f >= shown[0] + 0.005 || f >= 1) {
+							shown[0] = f;
+							Platform.runLater(() -> bar.setProgress(Math.max(bar.getProgress(), f)));
+						}
+					}), Executors.newVirtualThreadPerTaskExecutor())
+					.exceptionally(e -> "The import stopped: " + (e.getCause() != null ? e.getCause().getMessage() : e.getMessage()))
 					.thenAccept(summary -> Platform.runLater(() -> done(instance, summary)));
 		}
 
@@ -439,6 +454,59 @@ public final class ClientImportView {
 			fade.setFromValue(0);
 			fade.setToValue(1);
 			new ParallelTransition(pop, fade).play();
+		}
+
+		/**
+		 * The source's mods: names at once, then Modrinth's titles and icons as they're found - a spinner while it looks,
+		 * the Velo icon for a mod it doesn't know.
+		 */
+		Node modList(ClientImport.Source source) {
+			FlowPane grid = new FlowPane(6, 6);
+			grid.setPrefWrapLength(560);
+			ClientImport.Source asked = source;
+			CompletableFuture.supplyAsync(() -> ClientImport.listMods(asked), Executors.newVirtualThreadPerTaskExecutor())
+					.exceptionally(e -> java.util.List.of())
+					.thenAccept(mods -> Platform.runLater(() -> {
+						if (chosen != asked) {
+							return;
+						}
+						int shown = Math.min(mods.size(), 60);
+						java.util.Map<java.nio.file.Path, StackPane> icons = new java.util.HashMap<>();
+						java.util.Map<java.nio.file.Path, Label> names = new java.util.HashMap<>();
+						for (ClientImport.ModInfo mod : mods.subList(0, shown)) {
+							StackPane icon = new StackPane();
+							icon.setPrefSize(22, 22);
+							icon.setMinSize(22, 22);
+							javafx.scene.control.ProgressIndicator spin = new javafx.scene.control.ProgressIndicator();
+							spin.setPrefSize(16, 16);
+							spin.setMaxSize(16, 16);
+							icon.getChildren().add(spin);
+							Label name = new Label(mod.name());
+							name.setStyle("-fx-text-fill: #d6d9e0; -fx-font-size: 12px;");
+							HBox chip = new HBox(6, icon, name);
+							chip.setAlignment(Pos.CENTER_LEFT);
+							chip.setStyle("-fx-background-color: rgba(255,255,255,0.05); -fx-background-radius: 8; -fx-padding: 4 9 4 5;");
+							grid.getChildren().add(chip);
+							icons.put(mod.jar(), icon);
+							names.put(mod.jar(), name);
+						}
+						if (mods.size() > shown) {
+							grid.getChildren().add(hint("+ " + (mods.size() - shown) + " more"));
+						}
+						java.util.List<java.nio.file.Path> jars = mods.subList(0, shown).stream().map(ClientImport.ModInfo::jar).toList();
+						CompletableFuture.supplyAsync(() -> ClientImport.identify(jars), Executors.newVirtualThreadPerTaskExecutor())
+								.exceptionally(e -> java.util.Map.of())
+								.thenAccept(found -> Platform.runLater(() -> {
+									for (var entry : icons.entrySet()) {
+										var project = found.get(entry.getKey());
+										entry.getValue().getChildren().setAll(InstanceDetailView.iconView(project == null ? null : project.iconUrl(), 22));
+										if (project != null && project.title() != null) {
+											names.get(entry.getKey()).setText(project.title());
+										}
+									}
+								}));
+					}));
+			return grid;
 		}
 
 		boolean on(Part part) {

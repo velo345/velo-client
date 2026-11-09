@@ -316,7 +316,7 @@ final class Rules {
 		return id.equals("feather") || id.startsWith("feather-") ? "Feather" : null;
 	}
 
-	private static boolean irisShadersOn(Snapshot s) {
+	static boolean irisShadersOn(Snapshot s) {
 		try {
 			java.nio.file.Path props = net.veloclient.launcher.instance.InstancePaths.gameDir(s.instance().id()).resolve("config").resolve("iris.properties");
 			if (!java.nio.file.Files.exists(props)) {

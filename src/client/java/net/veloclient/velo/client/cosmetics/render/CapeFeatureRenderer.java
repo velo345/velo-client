@@ -219,8 +219,10 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 		if (armour) {
 			matrixStack.translate(0.0F, -0.053125F, 0.06875F);
 		}
+		int[] grid = gui ? new int[] {1, 1} : net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.capeGrid(
+				state.id == net.veloclient.velo.client.pvp.PvpCompat.localPlayerId());
 		queue.submitCustom(matrixStack, RenderLayers.entityCutoutNoCull(texture), (entry, consumer) ->
-				emit(geometry, entry.getPositionMatrix(), entry.getNormalMatrix(), (x, y, z, u, v, nx, ny, nz) ->
+				emit(geometry, entry.getPositionMatrix(), entry.getNormalMatrix(), grid[0], grid[1], (x, y, z, u, v, nx, ny, nz) ->
 						consumer.vertex(x, y, z, 0xFFFFFFFF, u, v, OverlayTexture.DEFAULT_UV, light, nx, ny, nz)));
 		matrixStack.pop();
 	}
@@ -319,8 +321,10 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 		if (armour) {
 			matrixStack.translate(0.0F, -0.053125F, 0.06875F);
 		}
+		int[] grid = gui ? new int[] {1, 1} : net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.capeGrid(
+				state.id == net.veloclient.velo.client.pvp.PvpCompat.localPlayerId());
 		queue.submitCustomGeometry(matrixStack, RenderTypes.entityCutout(texture), (pose, consumer) ->
-				emit(geometry, new Matrix4f(pose.pose()), new Matrix3f(pose.normal()), (x, y, z, u, v, nx, ny, nz) ->
+				emit(geometry, new Matrix4f(pose.pose()), new Matrix3f(pose.normal()), grid[0], grid[1], (x, y, z, u, v, nx, ny, nz) ->
 						consumer.addVertex(x, y, z, 0xFFFFFFFF, u, v, OverlayTexture.NO_OVERLAY, light, nx, ny, nz)));
 		matrixStack.popPose();
 	}
@@ -346,7 +350,10 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 		}
 		boolean far = distanceSq > FAR_SQ;
 		cloth.frame(worldFromBody, x + origin.x, y + origin.y, z + origin.z);
-		cloth.simulate(preset, legBack, false, far);
+		// Cosmetics Quality: how often the cloth steps (GUI previews always every frame) - see CosmeticsQualityModule.clothRate.
+		float rate = gui ? 0f : net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.clothRate(id == net.veloclient.velo.client.pvp.PvpCompat.localPlayerId());
+		cloth.maxIterations = gui ? 4 : net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.clothIterations();
+		cloth.simulate(preset, legBack, false, far, rate <= 0 ? 0f : 1f / rate);
 		cloth.lastYaw = bodyYaw;
 		return cloth.snapshot();
 	}
@@ -397,6 +404,14 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 	 * cape model, so every cape texture lands the same way round.
 	 */
 	private static void emit(float[] g, Matrix4f position, Matrix3f normal, VertexSink sink) {
+		emit(g, position, normal, 1, 1, sink);
+	}
+
+	/**
+	 * {@code sc} / {@code sr}: draw every sc-th column and sr-th row of the cloth grid (Cosmetics Quality - fewer vertices
+	 * for others' cloaks; (cols-1) = 8 and (rows-1) = 14 must divide by them).
+	 */
+	private static void emit(float[] g, Matrix4f position, Matrix3f normal, int sc, int sr, VertexSink sink) {
 		int cols = ClothCape.COLS, rows = ClothCape.ROWS;
 		float half = THICKNESS / 2;
 		Vector3f p = new Vector3f(), n = new Vector3f();
@@ -416,11 +431,11 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 			}
 			sink.accept(p.x, p.y, p.z, u / 64f, v / 32f, n.x, n.y, n.z);
 		};
-		for (int r = 0; r + 1 < rows; r++) {
-			float v0 = 1 + 16f * r / (rows - 1), v1 = 1 + 16f * (r + 1) / (rows - 1);
-			for (int c = 0; c + 1 < cols; c++) {
-				float s0 = c / (cols - 1f), s1 = (c + 1) / (cols - 1f);
-				int a = r * cols + c, b = a + 1, d = a + cols, cc = d + 1;
+		for (int r = 0; r + sr < rows; r += sr) {
+			float v0 = 1 + 16f * r / (rows - 1), v1 = 1 + 16f * (r + sr) / (rows - 1);
+			for (int c = 0; c + sc < cols; c += sc) {
+				float s0 = c / (cols - 1f), s1 = (c + sc) / (cols - 1f);
+				int a = r * cols + c, b = a + sc, d = a + sr * cols, cc = d + sc;
 				// Outside: (b - a) x (c - b) points out, as on vanilla's quads.
 				e.vertex(out, a, 1, 11 - 10 * s0, v0);
 				e.vertex(out, b, 1, 11 - 10 * s1, v0);
@@ -434,9 +449,9 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 			}
 		}
 		// Side edges (a sliver of the template's 1 px edge columns) and the hem.
-		for (int r = 0; r + 1 < rows; r++) {
-			float v0 = 1 + 16f * r / (rows - 1), v1 = 1 + 16f * (r + 1) / (rows - 1);
-			int l0 = r * cols, l1 = l0 + cols, r0 = l0 + cols - 1, r1 = r0 + cols;
+		for (int r = 0; r + sr < rows; r += sr) {
+			float v0 = 1 + 16f * r / (rows - 1), v1 = 1 + 16f * (r + sr) / (rows - 1);
+			int l0 = r * cols, l1 = l0 + sr * cols, r0 = l0 + cols - 1, r1 = r0 + sr * cols;
 			e.vertex(in, l0, 1, 11.5f, v0);
 			e.vertex(out, l0, 1, 11.5f, v0);
 			e.vertex(out, l1, 1, 11.5f, v1);
@@ -447,12 +462,12 @@ public final class CapeFeatureRenderer extends FeatureRenderer<PlayerEntityRende
 			e.vertex(out, r1, 1, 0.5f, v1);
 		}
 		int last = (rows - 1) * cols;
-		for (int c = 0; c + 1 < cols; c++) {
-			float u0 = 11 + 10f * c / (cols - 1), u1 = 11 + 10f * (c + 1) / (cols - 1);
+		for (int c = 0; c + sc < cols; c += sc) {
+			float u0 = 11 + 10f * c / (cols - 1), u1 = 11 + 10f * (c + sc) / (cols - 1);
 			e.vertex(out, last + c, 1, u0, 0.5f);
 			e.vertex(in, last + c, 1, u0, 0.5f);
-			e.vertex(in, last + c + 1, 1, u1, 0.5f);
-			e.vertex(out, last + c + 1, 1, u1, 0.5f);
+			e.vertex(in, last + c + sc, 1, u1, 0.5f);
+			e.vertex(out, last + c + sc, 1, u1, 0.5f);
 		}
 	}
 

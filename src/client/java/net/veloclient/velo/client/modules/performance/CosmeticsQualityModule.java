@@ -13,21 +13,25 @@ import java.util.Set;
 
 /**
  * Cosmetics Quality: how much detail cosmetics get, so a crowded lobby full of wings, auras and bodywear doesn't eat the
- * frame rate (owner, 2026-11-06).
+ * frame rate (owner, 2026-11-06; three levels since 2026-11-08 - "1100 FPS down to 100" with many wearers in full).
  * <ul>
- * <li><b>Auto</b> (default): your own cosmetics in full; other players in full only when they're among the nearest
- * {@code budget} wearers and within {@code fullDistance} - the rest get the Lite version (wings without glow, shine and
- * particles, fewer aura particles). Below 60 FPS the budget halves. Others' bodywear past {@code wearDistance} isn't drawn.</li>
- * <li><b>Full</b>: everything in full detail at any distance.</li>
- * <li><b>Lite</b>: the Lite version on everyone, yourself included; others' bodywear only up close.</li>
+ * <li><b>High</b>: your own cosmetics in full; other players in full only when they're among the nearest {@code budget}
+ * wearers and within {@code fullDistance} - the rest lighter. Below 60 FPS the budget halves. Others' bodywear past
+ * {@code wearDistance} isn't drawn.</li>
+ * <li><b>Medium</b> (default, the former Lite): the light version on everyone, yourself included - wings without glow,
+ * shine and particles, fewer aura particles, the simplified bodywear mesh; others' bodywear only up close (12 blocks);
+ * other players' animated cloaks change frames at most 20 times a second.</li>
+ * <li><b>Low</b>: Medium plus far fewer vertices (bodywear at ~500 instead of ~2,000 triangles), half the aura particles
+ * again, others' bodywear within 6 blocks, others' wings and auras within 24, cloaks at half the texture resolution and
+ * other players' animated cloaks at 10 frames a second.</li>
  * </ul>
  * The ranking is rebuilt from what was drawn in the last ~50 ms, so it costs nothing per cosmetic.
  */
 public final class CosmeticsQualityModule extends AbstractModule implements Configurable {
 
-	public static final List<String> MODES = List.of("Auto", "Full", "Lite");
+	public static final List<String> MODES = List.of("High", "Medium", "Low");
 
-	private static volatile String mode = "Auto";
+	private static volatile String mode = "Medium";
 	private static volatile int budget = 8;
 	private static volatile double fullDistance = 24;
 	private static volatile double wearDistance = 32;
@@ -42,7 +46,7 @@ public final class CosmeticsQualityModule extends AbstractModule implements Conf
 
 	public CosmeticsQualityModule() {
 		super("cosmetics-quality", "Cosmetics Quality",
-				"Full detail where it counts: Auto keeps your own and the nearest players' cosmetics in full and lightens the rest.",
+				"High, Medium or Low detail for wings, auras, bodywear and cloaks - Medium keeps crowded lobbies smooth.",
 				ModuleCategory.PERFORMANCE, SafetyTag.ALWAYS_SAFE, true);
 	}
 
@@ -56,9 +60,34 @@ public final class CosmeticsQualityModule extends AbstractModule implements Conf
 		enabled = false;
 	}
 
+	/** 0 = High, 1 = Medium, 2 = Low. */
+	public static int level() {
+		String m = effectiveMode();
+		return "Low".equals(m) ? 2 : "High".equals(m) || "Full".equals(m) ? 0 : 1;
+	}
+
+	public static boolean low() {
+		return level() == 2;
+	}
+
+	// Saved profiles name the old modes: Full = High; Lite and the old default Auto = Medium (the new default).
+	private static void setMode(String value) {
+		mode = switch (value == null ? "" : value) {
+			case "High", "Full" -> "High";
+			case "Low" -> "Low";
+			default -> "Medium";
+		};
+		net.veloclient.velo.client.cosmetics.AnimatedCapeAsset.qualityChanged();
+	}
+
+	private static final String FORCED = System.getProperty("velo.cosmeticsQuality");   // bench override
+
 	private static String effectiveMode() {
+		if (FORCED != null) {
+			return FORCED;
+		}
 		if (PerformanceBoostModule.lightCosmetics) {
-			return "Lite"; // the old Performance Boost switch, from profiles saved before this module
+			return "Medium"; // the old Performance Boost switch, from profiles saved before this module
 		}
 		return enabled ? mode : "Full";
 	}
@@ -72,7 +101,7 @@ public final class CosmeticsQualityModule extends AbstractModule implements Conf
 		if ("Full".equals(m)) {
 			return false;
 		}
-		if ("Lite".equals(m)) {
+		if (!"High".equals(m)) {
 			return true;
 		}
 		if (self) {
@@ -91,8 +120,61 @@ public final class CosmeticsQualityModule extends AbstractModule implements Conf
 		if ("Full".equals(m)) {
 			return false;
 		}
-		double limit = "Lite".equals(m) ? Math.min(12, wearDistance) : wearDistance;
+		double limit = "Low".equals(m) ? Math.min(6, wearDistance) : "Medium".equals(m) ? Math.min(12, wearDistance) : wearDistance;
 		return distSq > limit * limit;
+	}
+
+	/** Cloth cloak steps per second ({@code self}: your own cloak): High 240/120, Medium 144/72, Low 60/30. */
+	public static float clothRate(boolean self) {
+		int l = level();
+		float own = l == 0 ? 240 : l == 1 ? 144 : 60;
+		return self ? own : own / 2;
+	}
+
+	/** Cloth constraint passes per step: High 4, Medium 3, Low 2. */
+	public static int clothIterations() {
+		int l = level();
+		return l == 0 ? 4 : l == 1 ? 3 : 2;
+	}
+
+	/** How long wings poses and aura particles are reused before they're rebuilt (nanoseconds). */
+	public static long poseNanos(boolean self) {
+		int l = level();
+		if (l == 0 || l == 1 && self) {
+			return 13_333_333L;   // 75 Hz
+		}
+		return l == 1 || self ? 25_000_000L : 40_000_000L;   // 40 Hz / 25 Hz
+	}
+
+	private static final int[] GRID_FULL = {1, 1}, GRID_HALF = {2, 2}, GRID_QUARTER = {4, 2};
+
+	/**
+	 * Cloth cloak mesh: every n-th column / row of the 9 x 15 cloth grid. High all; Medium others half (4x fewer
+	 * vertices); Low yours half and others a quarter of the columns.
+	 */
+	public static int[] capeGrid(boolean self) {
+		int l = level();
+		if (l == 0 || l == 1 && self) {
+			return GRID_FULL;
+		}
+		return l == 2 && !self ? GRID_QUARTER : GRID_HALF;
+	}
+
+	/** Low: someone else's wings and aura further than 24 blocks aren't drawn. */
+	public static boolean hideFar(boolean self, double distSq) {
+		return !self && low() && distSq > 24 * 24;
+	}
+
+	/** Texels per cape pixel cloak textures are decoded at: High keeps the RAM-based default, Low halves it. */
+	public static int capeTexels(int ramDefault) {
+		int l = level();
+		return l == 2 ? Math.max(4, ramDefault / 2) : l == 1 ? Math.min(ramDefault, 8) : ramDefault;
+	}
+
+	/** Shortest time between two frame changes of someone else's animated cloak (each is a texture upload); 0 = no limit. */
+	public static long otherCapeFrameNanos() {
+		int l = level();
+		return l == 2 ? 100_000_000L : l == 1 ? 50_000_000L : 0L;
 	}
 
 	private static synchronized void note(int id, double distSq) {
@@ -130,10 +212,10 @@ public final class CosmeticsQualityModule extends AbstractModule implements Conf
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
-				new ConfigField.ChoiceField("Quality", MODES, () -> mode, v -> mode = v),
+				new ConfigField.ChoiceField("Quality", MODES, () -> mode, CosmeticsQualityModule::setMode),
 				new ConfigField.ToggleField("GPU Cosmetics (much faster in F5, 26.2+)", () -> net.veloclient.velo.client.cosmetics.render.GpuCosmetics.enabled,
 						v -> net.veloclient.velo.client.cosmetics.render.GpuCosmetics.enabled = v),
-				new ConfigField.HeaderField("Auto"),
+				new ConfigField.HeaderField("High"),
 				new ConfigField.SliderField("Full Detail Players", 1, 32, () -> budget, v -> budget = (int) Math.round(v),
 						v -> String.valueOf((int) Math.round(v))),
 				new ConfigField.SliderField("Full Detail Distance", 8, 64, () -> fullDistance, v -> fullDistance = Math.round(v),

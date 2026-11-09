@@ -16,7 +16,9 @@ public final class EmojiSuggest {
 	public record Completion(String text, int cursor) {
 	}
 
-	private static final int MAX = 6;
+	private static final int MAX = 40;
+	private static final int SHOWN = 8;
+	private static int scroll;
 	private static List<EmojiData.Suggestion> current = List.of();
 	private static String query;
 	private static int selected;
@@ -33,8 +35,9 @@ public final class EmojiSuggest {
 		}
 		if (!q.equals(query)) {
 			query = q;
-			current = EmojiData.search(q, MAX);
+			current = q.isEmpty() ? EmojiData.starters(MAX) : EmojiData.search(q, MAX);
 			selected = 0;
+			scroll = 0;
 		}
 	}
 
@@ -45,6 +48,11 @@ public final class EmojiSuggest {
 	public static void move(int delta) {
 		if (!current.isEmpty()) {
 			selected = Math.floorMod(selected + delta, current.size());
+			if (selected < scroll) {
+				scroll = selected;
+			} else if (selected >= scroll + SHOWN) {
+				scroll = selected - SHOWN + 1;
+			}
 		}
 	}
 
@@ -71,24 +79,34 @@ public final class EmojiSuggest {
 		}
 		TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
 		int row = 12;
+		int shown = Math.min(SHOWN, current.size() - scroll);
 		int width = 0;
 		for (EmojiData.Suggestion s : current) {
-			width = Math.max(width, textRenderer.getWidth(":" + s.name() + ":"));
+			width = Math.max(width, textRenderer.getWidth(":" + s.name() + ":") + (s.symbol() ? Math.max(0, textRenderer.getWidth(s.emoji()) - 10) : 0));
 		}
-		width += 30;
-		int height = current.size() * row + 6;
+		width += 34;
+		int height = shown * row + 6;
 		int top = bottom - height;
 		context.fill(x, top, x + width, bottom, 0xE6121217);
 		context.fill(x, top, x + 2, bottom, 0xFFE0262E);
-		for (int i = 0; i < current.size(); i++) {
+		for (int k = 0; k < shown; k++) {
+			int i = scroll + k;
 			EmojiData.Suggestion s = current.get(i);
-			int y = top + 3 + i * row;
+			int y = top + 3 + k * row;
 			if (i == selected) {
 				context.fill(x + 2, y - 1, x + width, y + row - 1, 0x66E0262E);
 			}
-			context.drawTextWithShadow(textRenderer, EmojiStyler.glyph(s.emoji()), x + 6, y + 1, 0xFFFFFFFF);
-			context.drawTextWithShadow(textRenderer, Text.literal(":" + s.name() + ":"), x + 20, y + 1, i == selected ? 0xFFFFFFFF : 0xFFB4B4BE);
+			Text glyph = s.symbol() ? Text.literal(s.emoji()) : EmojiStyler.glyph(s.emoji());
+			context.drawTextWithShadow(textRenderer, glyph, x + 6, y + 1, 0xFFFFFFFF);
+			int nameX = x + 20 + (s.symbol() ? Math.max(0, textRenderer.getWidth(s.emoji()) - 10) : 0);
+			context.drawTextWithShadow(textRenderer, Text.literal(":" + s.name() + ":"), nameX, y + 1, i == selected ? 0xFFFFFFFF : 0xFFB4B4BE);
 		}
-		context.drawTextWithShadow(textRenderer, Text.literal("Tab"), x + width - textRenderer.getWidth("Tab") - 4, top + 3 + selected * row + 1, 0xFF8F8F9A);
+		if (current.size() > SHOWN) {
+			// a thin scroll bar on the right
+			int barH = Math.max(6, height * SHOWN / current.size());
+			int barY = top + (height - barH) * scroll / Math.max(1, current.size() - SHOWN);
+			context.fill(x + width - 2, barY, x + width, barY + barH, 0x80FFFFFF);
+		}
+		context.drawTextWithShadow(textRenderer, Text.literal("Tab"), x + width - textRenderer.getWidth("Tab") - 5, top + 3 + (selected - scroll) * row + 1, 0xFF8F8F9A);
 	}
 }

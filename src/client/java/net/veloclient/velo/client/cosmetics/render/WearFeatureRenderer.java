@@ -83,7 +83,7 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 			}
 			for (int side = 0; side < (type.mirrorBone() != null ? 2 : 1); side++) {
 				String boneName = side == 0 ? type.bone() : type.mirrorBone();
-				EmoteProps.Mesh mesh = art.mesh(side, !lite);
+				EmoteProps.Mesh mesh = net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.low() && art.lowMesh(side) != null ? art.lowMesh(side) : art.mesh(side, !lite);
 				net.minecraft.client.model.ModelPart bone = switch (boneName) {
 					case "body" -> model.body;
 					case "rightArm" -> model.rightArm;
@@ -168,9 +168,9 @@ public final class WearFeatureRenderer extends net.minecraft.client.render.entit
 			for (int side = 0; side < (type.mirrorBone() != null ? 2 : 1); side++) {
 				String boneName = side == 0 ? type.bone() : type.mirrorBone();
 				EmoteProps.Mesh full = art.mesh(side, true);
-				EmoteProps.Mesh mesh = art.mesh(side, !lite);
+				EmoteProps.Mesh mesh = net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.low() && art.lowMesh(side) != null ? art.lowMesh(side) : art.mesh(side, !lite);
 				// on the GPU path the full mesh costs next to nothing (uploaded once): yours and nearby players' stay full even in Lite
-				EmoteProps.Mesh gpuMesh = self || !lite ? full : mesh;
+				EmoteProps.Mesh gpuMesh = net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.low() || !(self || !lite) ? mesh : full;
 				net.minecraft.client.model.geom.ModelPart bone = switch (boneName) {
 					case "body" -> model.body;
 					case "rightArm" -> model.rightArm;

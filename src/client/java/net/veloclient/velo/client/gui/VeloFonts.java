@@ -60,6 +60,40 @@ public final class VeloFonts {
 	*///?}
 
 	private static int hudDepth;
+
+	// Font health (2026-11-08): on some Windows PCs Velo's TrueType fonts never load and every Velo menu - the title
+	// screen first - showed no text at all. The title screen measures "iiiiiiii" against "WWWWWWWW" in Velo's font every
+	// couple of seconds; when they come out the same (the missing-glyph box) or empty, Velo menus use Minecraft's own font
+	// until a later check (after a resource reload) finds Velo's fonts working.
+	private static volatile boolean broken;
+	private static boolean checking;
+	private static long lastCheckNanos;
+
+	/** Whether the title screen should measure the fonts now. */
+	public static boolean needsHealthCheck() {
+		return System.nanoTime() - lastCheckNanos > 2_000_000_000L;
+	}
+
+	/** Measure with Velo's fonts active (even when they were found broken), then {@link #endHealthCheck}. */
+	public static void beginHealthCheck() {
+		checking = true;
+	}
+
+	public static void endHealthCheck(int narrowWidth, int wideWidth) {
+		checking = false;
+		lastCheckNanos = System.nanoTime();
+		boolean bad = narrowWidth <= 0 || wideWidth <= 0 || narrowWidth >= wideWidth;
+		if (bad != broken) {
+			org.slf4j.LoggerFactory.getLogger("velo-client").warn(bad
+					? "Velo's fonts didn't load (iiiiiiii = " + narrowWidth + " px, WWWWWWWW = " + wideWidth + " px) - Velo menus use Minecraft's font"
+					: "Velo's fonts work again");
+		}
+		broken = bad;
+	}
+
+	public static boolean fontsBroken() {
+		return broken && !checking;
+	}
 	/** The HUD Style fonts ({@code hud_<family>}), per scale, made on first use. */
 	//? if <26.1 {
 	private static final java.util.Map<String, StyleSpriteSource[]> HUD = new java.util.concurrent.ConcurrentHashMap<>();
@@ -81,7 +115,7 @@ public final class VeloFonts {
 
 	/** True while the default font should be swapped for Inter. */
 	public static boolean menuScope() {
-		if (hudDepth > 0) {
+		if (hudDepth > 0 || fontsBroken()) {
 			return false;
 		}
 		Screen screen = ClientCompat.currentScreen();
@@ -134,6 +168,9 @@ public final class VeloFonts {
 			return menuScope() ? UI[scaleIndex()] : source;
 		}
 		if (source instanceof StyleSpriteSource.Font font) {
+			if (fontsBroken() && "velo-client".equals(font.id().getNamespace())) {
+				return StyleSpriteSource.DEFAULT;
+			}
 			return remapVelo(font.id(), source);
 		}
 		return source;
@@ -162,6 +199,9 @@ public final class VeloFonts {
 			return menuScope() ? UI[scaleIndex()] : source;
 		}
 		if (source instanceof FontDescription.Resource font) {
+			if (fontsBroken() && "velo-client".equals(font.id().getNamespace())) {
+				return FontDescription.DEFAULT;
+			}
 			return remapVelo(font.id(), source);
 		}
 		return source;

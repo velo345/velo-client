@@ -91,6 +91,8 @@ public final class Wings3D {
 	/** A recolourable pair: its material (tinted every frame - the rainbow cycles). */
 	private PhongMaterial wingMaterial;
 	private boolean recolorable;
+	/** The shown pair's id (its own colour, {@link WingRigs#ownTint}). */
+	private String recolorId;
 	private int shownTint = -2;
 	private static final Map<Integer, javafx.scene.image.Image> SPRITES = new HashMap<>();
 	/** Per gear view: its turn, centre (x, y), ratio and side. */
@@ -184,6 +186,7 @@ public final class Wings3D {
 		material.setDiffuseMap(m.texture);
 		wingMaterial = material;
 		recolorable = WingRigs.recolorable(next.id());
+		recolorId = next.id();
 		material.setSpecularColor(javafx.scene.paint.Color.rgb(40, 40, 40));
 		if (WingRigs.shine(next.id()) != null) {
 			// Polished metal: a bright, tight highlight that slides over the feathers as they turn.
@@ -664,7 +667,7 @@ public final class Wings3D {
 			}
 		}
 		fxSeconds = (fxSeconds + dt) % 3400.0;
-		int tint = recolorable ? WingRigs.tint(settings.color(), (float) fxSeconds) : -1;
+		int tint = recolorable ? WingRigs.tint(recolorId, settings.color(), (float) fxSeconds) : -1;
 		if (recolorable && tint != shownTint && wingMaterial != null) {
 			shownTint = tint;
 			int c = tint < 0 ? 0xFFFFFF : tint;

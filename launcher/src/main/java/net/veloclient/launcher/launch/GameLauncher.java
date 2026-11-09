@@ -236,7 +236,11 @@ public final class GameLauncher {
 		// shows up for some players/some servers on Windows. Forcing the
 		// JVM to resolve IPv4-only sidesteps it; it's the standard fix for
 		// this exact class of intermittent Minecraft connection timeout.
-		jvmArgs.add("-Djava.net.preferIPv4Stack=true");
+		// preferIPv4ADDRESSES, not preferIPv4Stack (2026-11-08): the stack flag turned IPv6 off completely, so players on
+		// IPv6-only / NAT64 networks got "Network is unreachable: getsockopt", slow or missing server list pings, and some
+		// hosts only worked under another name (eu.hypixel.net) - things no other launcher has. This keeps IPv4 first
+		// (the Windows timeout fix above) and still connects over IPv6 where a host or network has nothing else.
+		jvmArgs.add("-Djava.net.preferIPv4Addresses=true");
 		FirstRunOptions.apply(instance.id()); // first: the two below can create options.txt
 		GraphicsApi.applyPending(instance.id());
 		LegacyOptions.apply(instance.id(), version, InstancePaths.modsDir(instance.id()));
@@ -244,6 +248,12 @@ public final class GameLauncher {
 		jvmArgs.add("-Dfabric.noGui=true");
 		// Which account's cosmetics the game wears (config/accounts/<uuid>/) - the same files the launcher's Locker edits.
 		jvmArgs.add("-Dvelo.account=" + session.uuid().replace("-", ""));
+		var aiSettings = net.veloclient.launcher.data.LauncherSettings.get();
+		if (aiSettings.aiAccess) {
+			// the game's local AI API (see the launcher's Settings > AI Access)
+			jvmArgs.add("-Dvelo.aiApi=" + AI_PORT);
+			jvmArgs.add("-Dvelo.aiToken=" + aiToken());
+		}
 		if (net.veloclient.launcher.AppVersion.DEV) {   // the dev game shares the dev launcher's folder (pets, loadouts, Locker)
 			jvmArgs.add("-Dvelo.home=" + net.veloclient.launcher.data.VeloPaths.root());
 		}
@@ -317,6 +327,14 @@ public final class GameLauncher {
 		command.add(mainClass);
 		command.addAll(gameArgs);
 
+		if (aiSettings.aiAccess && aiSettings.aiHidden) {
+			if (MemoryPlanner.isLinux() && (onPath("kwin_wayland") || onPath("xvfb-run"))) {
+				command = hiddenDisplay(command, InstancePaths.logsDir(instance.id()).resolve("hidden-start.sh"));
+			} else {
+				// Windows / macOS (and Linux without a virtual display): the game hides its own window once it's up
+				command.add(command.indexOf(mainClass), "-Dvelo.hiddenWindow=true");
+			}
+		}
 		Files.createDirectories(gameDir);
 		Path logFile = InstancePaths.logsDir(instance.id()).resolve("launcher_" + runId + ".log");
 		ProcessBuilder builder = new ProcessBuilder(command)
@@ -383,5 +401,59 @@ public final class GameLauncher {
 			result = result.replace("${" + entry.getKey() + "}", entry.getValue());
 		}
 		return result;
+	}
+
+	public static final int AI_PORT = 25620;
+
+	/** The AI API token (made once, kept in the launcher's settings). */
+	public static synchronized String aiToken() {
+		var data = net.veloclient.launcher.data.LauncherSettings.get();
+		if (data.aiToken == null || data.aiToken.length() < 32) {
+			byte[] b = new byte[24];
+			new java.security.SecureRandom().nextBytes(b);
+			data.aiToken = java.util.HexFormat.of().formatHex(b);
+			net.veloclient.launcher.data.LauncherSettings.save(data);
+		}
+		return data.aiToken;
+	}
+
+	/** Every system can start the game hidden: Linux in a virtual display where there is one, otherwise the game hides its window. */
+	public static boolean hiddenDisplayAvailable() {
+		return true;
+	}
+
+	// The game inside an invisible display: KWin's virtual Wayland session (real GPU through Xwayland) or Xvfb.
+	private static List<String> hiddenDisplay(List<String> command, Path script) throws IOException {
+		if (onPath("kwin_wayland")) {
+			StringBuilder sh = new StringBuilder("#!/bin/sh\nexec");
+			for (String c : command) {
+				sh.append(" '").append(c.replace("'", "'\\''")).append('\'');
+			}
+			sh.append('\n');
+			Files.createDirectories(script.getParent());
+			Files.writeString(script, sh.toString());
+			script.toFile().setExecutable(true, true);
+			return List.of("kwin_wayland", "--virtual", "--xwayland", "--no-lockscreen", "--width", "1600", "--height", "900",
+					"--exit-with-session", script.toString());
+		}
+		if (onPath("xvfb-run")) {
+			List<String> out = new ArrayList<>(List.of("xvfb-run", "-a", "-s", "-screen 0 1600x900x24"));
+			out.addAll(command);
+			return out;
+		}
+		return command;
+	}
+
+	private static boolean onPath(String tool) {
+		String path = System.getenv("PATH");
+		if (path == null) {
+			return false;
+		}
+		for (String dir : path.split(java.io.File.pathSeparator)) {
+			if (Files.isExecutable(Path.of(dir, tool))) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

@@ -71,6 +71,15 @@ public abstract class VulkanDrawStateMixin {
 	@Shadow
 	@Final
 	protected HashMap<String, GpuBufferSlice> uniforms;
+	// What this pass last bound per sampler name (vanilla's map holds a protected record type).
+	@Unique
+	private final String[] velo$texNames = new String[6];
+	@Unique
+	private final Object[] velo$texViews = new Object[6];
+	@Unique
+	private final Object[] velo$texSamplers = new Object[6];
+	@Unique
+	private int velo$texNext;
 
 	@Unique
 	private boolean velo$needsFullPush = true;
@@ -102,8 +111,30 @@ public abstract class VulkanDrawStateMixin {
 		velo$needsFullPush = true;
 	}
 
-	@Inject(method = "bindTexture", at = @At("HEAD"))
+	@Inject(method = "bindTexture", at = @At("HEAD"), cancellable = true)
 	private void velo$textureChanged(String name, @Nullable GpuTextureView view, @Nullable GpuSampler sampler, CallbackInfo ci) {
+		// Sodium binds the same block atlas + sampler again for every region and layer; vanilla still marks the whole
+		// descriptor set dirty each time, so the partial push never got a chance (0% partial pushes with Sodium).
+		// Re-binding exactly what is bound changes nothing - skip it, dirty flag included.
+		int slot = -1;
+		for (int i = 0; i < velo$texNames.length; i++) {
+			if (velo$texNames[i] != null && (velo$texNames[i] == name || velo$texNames[i].equals(name))) {
+				slot = i;
+				break;
+			}
+		}
+		if (PerformanceBoostModule.fastDrawPath && view != null && sampler != null && slot >= 0
+				&& velo$texViews[slot] == view && velo$texSamplers[slot] == sampler) {
+			ci.cancel();
+			return;
+		}
+		if (slot < 0) {
+			slot = velo$texNext;
+			velo$texNext = (slot + 1) % velo$texNames.length;
+		}
+		velo$texNames[slot] = name;
+		velo$texViews[slot] = view;
+		velo$texSamplers[slot] = sampler;
 		velo$needsFullPush = true;
 	}
 

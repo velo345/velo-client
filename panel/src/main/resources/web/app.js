@@ -1010,6 +1010,18 @@ function cosmeticsCard(live, byId, sv, refresh) {
 // ---- Store & money ----
 
 let storeDays = 30;
+/** An order's state: a checkout nobody paid within an hour was abandoned (Tebex sends nothing for that) - grey, not "pending". */
+function orderPill(o) {
+	const abandoned = o.status === "pending" && Date.now() - o.createdAt > 3600000;
+	const label = abandoned ? "abandoned" : o.status === "pending" ? "checkout open" : o.status;
+	const cls = o.status === "paid" ? "good" : abandoned ? "" : o.status === "pending" ? "warn" : "bad";
+	return h("span", { class: "pill " + cls, title: abandoned ? "Clicked buy, never paid" : o.status === "pending" ? "In Tebex checkout right now" : "" }, label);
+}
+/** Takes an owner test payment out of the Store (Tebex sends no webhook when a payment is deleted there). */
+async function voidOrder(btn, o, redraw) {
+	if (!confirm(`Remove this ${euro(o.price)} payment by ${o.username || o.uuid.slice(0, 8)} as a test?\n\n${fmt(o.coins)} coins are taken back from the wallet and it no longer counts as revenue.`)) return;
+	await busy(btn, async () => { await velo("admin/panel/store/void", { body: { orderId: o.orderId } }); toast("Test payment removed"); await redraw(); });
+}
 RENDER.store = async (root) => {
 	const draw = async () => {
 		const m = await velo("admin/panel/store?days=" + storeDays);
@@ -1020,15 +1032,15 @@ RENDER.store = async (root) => {
 		const byDay = Object.fromEntries(m.daily.map((d) => [d.day, d]));
 		root.replaceChildren(
 			h("div", { class: "grid kpis" },
-				kpi("Revenue", "coins", m.revenue, euro, `${euro(m.revenueInRange)} in ${storeDays} days`, true),
-				kpi("Paid orders", "store", m.paidOrders, fmt, m.reversedOrders ? m.reversedOrders + " refunded or charged back" : "No refunds"),
+				kpi("Revenue", "coins", m.revenue, euro, `${euro(m.revenueInRange)} in ${storeDays} days · coins ${euro(m.revenueCoins || 0)} · Velo+ ${euro(m.revenuePlus || 0)}`, true),
+				kpi("Paid orders", "store", m.paidOrders + (m.plusPayments || 0), fmt, `${fmt(m.paidOrders)} coin packs · ${fmt(m.plusPayments || 0)} Velo+` + (m.reversedOrders ? " · " + m.reversedOrders + " refunded" : "")),
 				kpi("Velo+ members", "plus", m.plusMembers, fmt),
 				kpi("Store purchases", "cosmetics", m.itemPurchases, fmt, compact(m.coinsSpent) + " coins spent"),
 				kpi("Coins in wallets", "coins", m.coinsInCirculation, compact, fmt(m.wallets) + " player wallets · owners not counted"),
 				kpi("Coins sold", "trend", m.coinsSold, compact)),
 			h("div", { class: "stack" },
 				h("div", { class: "grid cols-2" },
-					card("Revenue per day", "Paid coin orders (Tebex)", seg([[7, "7d"], [30, "30d"], [90, "90d"], [365, "1y"]], storeDays, (d) => { storeDays = d; draw(); }),
+					card("Revenue per day", "Coin packs + Velo+ (Tebex)", seg([[7, "7d"], [30, "30d"], [90, "90d"], [365, "1y"]], storeDays, (d) => { storeDays = d; draw(); }),
 						barChart({ name: "Revenue", data: days.map((d) => ({ label: dayLabel(d), value: byDay[d] ? byDay[d].revenue : 0 })), yFormat: euro })),
 					card("Coins spent per day", "Items and bundles bought with coins", null,
 						barChart({ name: "Coins spent", color: "var(--series-2)", data: days.map((d) => ({ label: dayLabel(d), value: byDay[d] ? byDay[d].coinsSpent : 0 })), yFormat: compact }))),
@@ -1037,9 +1049,11 @@ RENDER.store = async (root) => {
 					card("Latest purchases", "Store buys and coin packs", null, table(["When", "Player", "What", "num:Coins"], m.recentPurchases.slice(0, 15).map((p) => [
 						when(p.createdAt), p.username || p.uuid.slice(0, 8), p.reason === "purchase_coins" ? "Coin pack" : names[(p.ref || "").split(":")[0]] || p.ref || p.reason,
 						(p.coins > 0 ? "+" : "") + fmt(p.coins)]), (i) => openPlayer(m.recentPurchases[i].uuid)))),
-				card("Orders", "Real-money coin orders", null, table(["When", "Player", "Pack", "num:Coins", "num:Price", "Status"], m.recentOrders.map((o) => [
+				card("Orders", "Real-money coin orders", null, table(["When", "Player", "Pack", "num:Coins", "num:Price", "Status", ""], m.recentOrders.map((o) => [
 					when(o.createdAt), o.username || o.uuid.slice(0, 8), o.packId, fmt(o.coins), euro(o.price),
-					h("span", { class: "pill " + (o.status === "paid" ? "good" : o.status === "pending" ? "warn" : "bad") }, o.status)]), (i) => openPlayer(m.recentOrders[i].uuid)))));
+					orderPill(o),
+					o.status === "paid" ? h("button", { class: "btn small ghost", type: "button", title: "A test payment deleted in Tebex: takes the coins back and removes it from revenue and these lists",
+						onclick: (e) => { e.stopPropagation(); voidOrder(e.currentTarget, o, draw); } }, "Remove test") : ""]), (i) => openPlayer(m.recentOrders[i].uuid)))));
 	};
 	await draw();
 };

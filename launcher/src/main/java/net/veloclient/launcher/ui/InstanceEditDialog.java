@@ -96,7 +96,17 @@ public final class InstanceEditDialog {
 				labeled("Minecraft version", versionTiles(versionBox)),
 				labeled("Icon", iconPicker));
 
-		dialog.getDialogPane().setContent(content);
+		// On a small laptop screen (or with Windows display scaling) the tiles + icons were taller than the screen and the
+		// Create / Cancel buttons ended up below it (bug report, 2026-11-08): the content scrolls, the buttons always show.
+		javafx.scene.control.ScrollPane scroll = new javafx.scene.control.ScrollPane(content);
+		scroll.setFitToWidth(true);
+		scroll.setHbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);
+		scroll.getStyleClass().add("scroll-pane");
+		scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+		double screenH = javafx.stage.Screen.getPrimary().getVisualBounds().getHeight();
+		scroll.setMaxHeight(Math.max(260, screenH - 230));
+		scroll.setPrefViewportHeight(Math.min(content.prefHeight(-1) + 8, Math.max(260, screenH - 230)));
+		dialog.getDialogPane().setContent(scroll);
 		// wide enough for two version tiles side by side (the pane didn't follow the content's preferred width)
 		double paneWidth = (VersionArt.TILE_W + 10) * 2 + 8 + 24 + 64;
 		dialog.getDialogPane().setPrefWidth(paneWidth);

@@ -25,7 +25,42 @@ import java.util.regex.Pattern;
  */
 public final class EmojiData {
 
-	public record Suggestion(String name, String emoji) {
+	/** {@code symbol}: a plain text symbol (★ ♥ →) - drawn in the normal font, not as an emoji picture. */
+	public record Suggestion(String name, String emoji, boolean symbol) {
+		public Suggestion(String name, String emoji) {
+			this(name, emoji, false);
+		}
+	}
+
+	/** Text symbols worth typing in chat (they render in Minecraft's own font on every server). */
+	private static final String[][] SYMBOLS = {
+			{"star", "★"}, {"star_outline", "☆"}, {"sparkle", "✦"}, {"heart", "❤"}, {"heart_small", "♥"}, {"check", "✔"},
+			{"cross", "✖"}, {"arrow_right", "→"}, {"arrow_left", "←"}, {"arrow_up", "↑"}, {"arrow_down", "↓"}, {"double_arrow", "»"},
+			{"swords", "⚔"}, {"skull", "☠"}, {"lightning", "⚡"}, {"crown", "♛"}, {"diamond", "♦"}, {"spade", "♠"},
+			{"club", "♣"}, {"music", "♪"}, {"notes", "♫"}, {"sun", "☀"}, {"cloud", "☁"}, {"snow", "❄"}, {"flower", "✿"},
+			{"warning", "⚠"}, {"infinity", "∞"}, {"bullet", "•"}, {"dot", "·"}, {"play", "▶"}, {"square", "■"}, {"circle", "●"},
+			{"smile", "☺"}, {"peace", "☮"}, {"yinyang", "☯"}, {"gear", "⚙"}, {"pencil", "✎"}, {"scissors", "✂"}, {"plane", "✈"},
+			{"mail", "✉"}, {"phone", "☎"}, {"coffee", "☕"}, {"hourglass", "⌛"}, {"flag", "⚑"}, {"male", "♂"}, {"female", "♀"},
+			{"degree", "°"}, {"copyright", "©"}, {"tm", "™"}, {"section", "§"}, {"plusminus", "±"}, {"times", "×"}, {"divide", "÷"},
+			{"approx", "≈"}, {"not_equal", "≠"}, {"euro", "€"}, {"pound", "£"}, {"yen", "¥"}, {"shrug", "¯\\_(ツ)_/¯"},
+			{"tableflip", "(╯°□°)╯︵ ┻━┻"}, {"lenny", "( ͡° ͜ʖ ͡°)"}};
+
+	/** What a bare ":" shows: symbols first, then popular emoji. */
+	public static List<Suggestion> starters(int limit) {
+		load();
+		List<Suggestion> out = new ArrayList<>();
+		for (String[] s : SYMBOLS) {
+			if (out.size() < limit * 2 / 3) {
+				out.add(new Suggestion(s[0], s[1], true));
+			}
+		}
+		for (String name : popular) {
+			String emoji = byName.get(name);
+			if (emoji != null && out.size() < limit) {
+				out.add(new Suggestion(name, emoji));
+			}
+		}
+		return out;
 	}
 
 	private static final Pattern SHORTCODE = Pattern.compile(":([a-z0-9_+\\-]{1,32}):");
@@ -104,6 +139,11 @@ public final class EmojiData {
 				out.add(new Suggestion(name, emoji));
 			}
 		};
+		for (String[] sym : SYMBOLS) {
+			if (sym[0].startsWith(q) && out.size() < limit && seen.add("sym:" + sym[0])) {
+				out.add(new Suggestion(sym[0], sym[1], true));
+			}
+		}
 		for (String name : popular) {
 			if (name.startsWith(q)) {
 				add.accept(name);
@@ -128,13 +168,13 @@ public final class EmojiData {
 			return null;
 		}
 		int colon = text.lastIndexOf(':', cursor - 1);
-		if (colon < 0 || cursor - colon - 1 < 2) {
+		if (colon < 0) {
 			return null;
 		}
 		if (colon > 0 && !Character.isWhitespace(text.charAt(colon - 1))) {
 			return null;
 		}
 		String q = text.substring(colon + 1, cursor);
-		return q.matches("[a-zA-Z0-9_+\\-]{2,32}") ? q : null;
+		return q.matches("[a-zA-Z0-9_+\\-]{0,32}") ? q : null;
 	}
 }

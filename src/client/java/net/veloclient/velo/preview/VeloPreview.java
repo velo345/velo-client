@@ -13,5 +13,13 @@ public final class VeloPreview implements VeloAddon {
 	public void onVeloInitialize() {
 		ModuleRegistry.register(new net.veloclient.velo.preview.tweaks.RideableOpacityModule());
 		net.veloclient.velo.preview.guide.GuideTrigger.register();
+		// Dev build only (src/dev, ./build-dev.sh): features still being tested - release jars don't contain the class.
+		try {
+			Class.forName("net.veloclient.velo.devbuild.DevFeatures").asSubclass(VeloAddon.class).getDeclaredConstructor().newInstance().onVeloInitialize();
+		} catch (ClassNotFoundException releaseBuild) {
+			// not a dev build
+		} catch (ReflectiveOperationException | RuntimeException | LinkageError e) {
+			net.veloclient.velo.VeloClient.LOGGER.error("Dev build features failed to initialize", e);
+		}
 	}
 }

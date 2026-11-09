@@ -164,12 +164,23 @@ public final class VeloModuleCard extends ClickableWidget {
 		VeloDraw.fillRounded(context, x + 9, y + 55, tagW, 11, 4, VeloUi.withAlpha(color, Math.round((0x1A + 0x10 * on) * in)));
 		MenuKit.text(context, renderer, MenuKit.fit(renderer, tagText, w - 26), x + 14, y + 57,
 				VeloUi.withAlpha(VeloAnim.lerpArgb(color, 0xFFFFFFFF, 0.45f), fade));
+		int badgeX = x + 9 + tagW + 4;
 		if (module.beta()) {
 			Text beta = MenuKit.small("BETA");
 			int betaW = renderer.getWidth(beta) + 10;
 			if (tagW + 4 + betaW <= w - 18) {
-				VeloDraw.fillRounded(context, x + 9 + tagW + 4, y + 55, betaW, 11, 4, VeloUi.withAlpha(0xFFE0A030, Math.round(0xD0 * in)));
-				MenuKit.text(context, renderer, beta, x + 14 + tagW + 4, y + 57, VeloUi.withAlpha(0xFF1A1206, fade));
+				VeloDraw.fillRounded(context, badgeX, y + 55, betaW, 11, 4, VeloUi.withAlpha(0xFFE0A030, Math.round(0xD0 * in)));
+				MenuKit.text(context, renderer, beta, badgeX + 5, y + 57, VeloUi.withAlpha(0xFF1A1206, fade));
+				badgeX += betaW + 4;
+			}
+		}
+		if (module.isNew()) {
+			// quiet: accent text on a faint accent wash, no solid block
+			Text fresh = MenuKit.small("NEW");
+			int newW = renderer.getWidth(fresh) + 10;
+			if (badgeX + newW <= x + w - 9) {
+				VeloDraw.fillRounded(context, badgeX, y + 55, newW, 11, 4, VeloUi.withAlpha(MenuKit.accent(), Math.round(0x30 * in)));
+				MenuKit.text(context, renderer, fresh, badgeX + 5, y + 57, VeloUi.withAlpha(VeloAnim.lerpArgb(MenuKit.accent(), 0xFFFFFFFF, 0.35f), fade));
 			}
 		}
 	}

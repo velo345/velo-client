@@ -67,9 +67,15 @@ public final class WearManager {
 	 * and Lite on the CPU path. The simplified copy merges vertices, which bends thin parts and smears the texture - it
 	 * must never be what you see up close (a chain looked broken with it, 2026-11-07).
 	 */
-	public record Model(EmoteProps.Mesh mesh, EmoteProps.Mesh mirrored, EmoteProps.Mesh lod, EmoteProps.Mesh lodMirrored) {
+	public record Model(EmoteProps.Mesh mesh, EmoteProps.Mesh mirrored, EmoteProps.Mesh lod, EmoteProps.Mesh lodMirrored,
+			EmoteProps.Mesh low, EmoteProps.Mesh lowMirrored) {
 		public EmoteProps.Mesh mesh(int side, boolean full) {
 			return side == 0 ? (full ? mesh : lod) : (full ? mirrored : lodMirrored);
+		}
+
+		/** Cosmetics Quality Low: the ~500 triangle copy. */
+		public EmoteProps.Mesh lowMesh(int side) {
+			return side == 0 ? low : lowMirrored;
 		}
 	}
 
@@ -340,7 +346,7 @@ public final class WearManager {
 				EmoteProps.Mesh mirrored = type.mirrorBone() != null ? readMesh(type.files().get("mesh_l")) : null;
 				if (mesh != null && (type.mirrorBone() == null || mirrored != null)) {
 					synchronized (WearManager.class) {
-						MODELS.put(id, new Model(mesh, mirrored, lod(mesh), lod(mirrored)));
+						MODELS.put(id, new Model(mesh, mirrored, lod(mesh), lod(mirrored), lowLod(mesh), lowLod(mirrored)));
 					}
 				}
 			} catch (Exception e) {
@@ -363,6 +369,11 @@ public final class WearManager {
 		try (InputStream in = java.nio.file.Files.newInputStream(file)) {
 			return EmoteProps.read(in);
 		}
+	}
+
+	/** Cosmetics Quality Low: a much coarser copy (~500 triangles). */
+	private static EmoteProps.Mesh lowLod(EmoteProps.Mesh mesh) {
+		return mesh == null ? null : net.veloclient.velo.client.cosmetics.render.MeshLod.simplify(mesh, 500);
 	}
 
 	/** The simplified copy (at most ~2,000 triangles; the Meshy originals have up to 21k). */

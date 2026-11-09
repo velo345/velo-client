@@ -50,9 +50,9 @@ void main() { gl_Position = vec4(pos, 0.0, 1.0); }
 """
 
 
-def logo_sdf(size=1024, margin=0.12):
+def logo_sdf(size=1024, margin=0.12, path=None):
 	"""Signed distance to the logo's silhouette, in logo widths, over a square with {margin} around the logo."""
-	logo = Image.open(ROOT / "Logo.png").convert("RGBA")
+	logo = Image.open(path or ROOT / "Logo.png").convert("RGBA")
 	inner = int(size / (1 + 2 * margin))
 	alpha = np.asarray(logo.resize((inner, inner), Image.LANCZOS), dtype=float)[:, :, 3] / 255
 	canvas = np.zeros((size, size))
@@ -124,7 +124,12 @@ def pixel_text_sdf(text, cell=29):
 class Renderer:
 	def __init__(self, cape_id):
 		self.ctx = moderngl.create_standalone_context(backend="egl")
-		scene = (HERE / "capes" / f"{cape_id}.glsl").read_text()
+		# a cape id, or a path to a .glsl scene kept outside the repo (private one-offs)
+		scene_path = Path(cape_id) if cape_id.endswith(".glsl") else HERE / "capes" / f"{cape_id}.glsl"
+		scene = scene_path.read_text()
+		# `// @logo "file.png"` swaps the Velo logo for another picture (its alpha is the silhouette), relative to the scene
+		lm = re.search(r'//\s*@logo\s+"([^"]+)"', scene)
+		logo_path = (scene_path.parent / lm.group(1)) if lm else None
 		# `#include "kit.glsl"` pulls in a shared file (only one level, enough for the kit).
 		scene = re.sub(r'^#include "([^"]+)"\s*$', lambda m: (HERE / m.group(1)).read_text(), scene, flags=re.M)
 		src = (HERE / "common.glsl").read_text() + "\n" + scene
@@ -132,14 +137,14 @@ class Renderer:
 		quad = np.array([-1, -1, 1, -1, -1, 1, 1, 1], dtype="f4")
 		self.vao = self.ctx.vertex_array(self.prog, [(self.ctx.buffer(quad), "2f", "pos")])
 		margin = 0.12
-		sdf = logo_sdf(margin=margin)
+		sdf = logo_sdf(margin=margin, path=logo_path)
 		self.logo = self.ctx.texture(sdf.shape[::-1], 1, sdf.tobytes(), dtype="f4")
 		self.logo.filter = (moderngl.LINEAR, moderngl.LINEAR)
 		self.logo.repeat_x = self.logo.repeat_y = False
 		self.logo.use(0)
 		self.set("uLogo", 0)
 		# The logo's own colours (same square, same margin), for scenes that paint it as it really looks.
-		art = Image.open(ROOT / "Logo.png").convert("RGBA")
+		art = Image.open(logo_path or ROOT / "Logo.png").convert("RGBA")
 		inner = int(1024 / (1 + 2 * margin))
 		canvas = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
 		canvas.paste(art.resize((inner, inner), Image.LANCZOS), ((1024 - inner) // 2, (1024 - inner) // 2))
@@ -157,6 +162,14 @@ class Renderer:
 			self.text.repeat_x = self.text.repeat_y = False
 			self.text.use(2)
 			self.set("uText", 2)
+		m2 = re.search(r'//\s*@text2\s+"([^"]+)"', scene)
+		if m2 and "uText2" in self.prog:
+			# a second wordmark in the same font (a scene samples it like text2(), from its own uText2)
+			self.text2 = self.ctx.texture((TEXT_W, TEXT_H), 1, text_sdf(m2.group(1)).tobytes(), dtype="f4")
+			self.text2.filter = (moderngl.LINEAR, moderngl.LINEAR)
+			self.text2.repeat_x = self.text2.repeat_y = False
+			self.text2.use(3)
+			self.set("uText2", 3)
 		pm = re.search(r'//\s*@pixeltext\s+"([^"]+)"(?:\s+"([^"]+)")?', scene)
 		if pm:
 			for k, word in enumerate((pm.group(1), pm.group(2))):
@@ -364,8 +377,11 @@ def main():
 	ap.add_argument("cape")
 	ap.add_argument("--preview-only", action="store_true", help="don't write the server seed gif")
 	ap.add_argument("--frames", type=int, default=FRAMES)
+	ap.add_argument("--gif-out", help="also write the full cape layout gif here (e.g. a cloak to upload)")
+	ap.add_argument("--gif-width", type=int, default=2048, help="width of --gif-out (uploaded animated cloaks: up to 1024)")
 	args = ap.parse_args()
 	r = Renderer(args.cape)
+	args.cape = Path(args.cape).stem if args.cape.endswith(".glsl") else args.cape
 	textures, outsides, insides = [], [], []
 	for i in range(args.frames):
 		tex, faces = frame_texture(r, i / args.frames)
@@ -380,6 +396,10 @@ def main():
 		OUT.mkdir(parents=True, exist_ok=True)
 		save_gif(textures, OUT / f"{args.cape}.gif", delay)
 		print(f"wrote {(OUT / f'{args.cape}.gif').relative_to(ROOT)} ({(OUT / f'{args.cape}.gif').stat().st_size // 1024} KB)")
+	if args.gif_out:
+		w = args.gif_width
+		save_gif([t.resize((w, w // 2), Image.LANCZOS) for t in textures], Path(args.gif_out), delay)
+		print(f"wrote {args.gif_out} ({Path(args.gif_out).stat().st_size // 1024} KB)")
 	# Previews: the outside big, a contact sheet of every face, a 3D swing.
 	textures[0].save(PREVIEW / f"{args.cape}-texture.png")
 	save_gif(outsides, PREVIEW / f"{args.cape}-outside.gif", delay)

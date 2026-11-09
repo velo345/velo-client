@@ -48,10 +48,12 @@ public final class ClipRecorder {
 	private static final long MAX_BUFFER_BYTES = 160L * 1024 * 1024;
 	private static final ArrayDeque<Frame> RING = new ArrayDeque<>();
 	private static final AtomicInteger QUEUED = new AtomicInteger();
-	private static final ExecutorService ENCODER = Executors.newSingleThreadExecutor(r -> {
+	// Two encoders at normal-minus-one priority: one at MIN+1 fell behind at 720p+ / 60 FPS (the game's own threads
+	// starved it), the pool ran dry and frames were skipped - choppy clips (2026-11-08).
+	private static final ExecutorService ENCODER = Executors.newFixedThreadPool(2, r -> {
 		Thread thread = new Thread(r, "velo-clip-encoder");
 		thread.setDaemon(true);
-		thread.setPriority(Thread.MIN_PRIORITY + 1);
+		thread.setPriority(Thread.NORM_PRIORITY - 1);
 		return thread;
 	});
 	private static final ExecutorService WRITER = Executors.newSingleThreadExecutor(r -> {
@@ -67,7 +69,8 @@ public final class ClipRecorder {
 	private static volatile float quality = 0.75f;
 	private static long nextCaptureNanos;
 	private static long bufferedBytes;
-	private static byte[] scratch = new byte[0];
+	private static final ThreadLocal<byte[][]> SCRATCH = ThreadLocal.withInitial(() -> new byte[][] {new byte[0]});
+	private static final ThreadLocal<ImageWriter> JPEG_WRITER = ThreadLocal.withInitial(() -> ImageIO.getImageWritersByFormatName("jpeg").next());
 
 	private ClipRecorder() {
 	}
@@ -105,8 +108,15 @@ public final class ClipRecorder {
 		return FabricLoader.getInstance().getGameDir().resolve("velo-clips");
 	}
 
+	/** Another frame consumer (Velo Rewind's video export): runs first, every rendered frame. */
+	public static volatile Runnable frameHook;
+
 	/** Called at the end of every rendered frame (GameRenderer#render). */
 	public static void onFrameRendered() {
+		Runnable hook = frameHook;
+		if (hook != null) {
+			hook.run();
+		}
 		if (ProClipRecorder.active()) {
 			ProClipRecorder.onFrameRendered();
 			return;
@@ -118,15 +128,17 @@ public final class ClipRecorder {
 			return;
 		}
 		long now = System.nanoTime();
-		if (now < nextCaptureNanos || QUEUED.get() >= 3) {
+		if (now < nextCaptureNanos || QUEUED.get() >= 4) {
 			return;
 		}
 		long interval = 1_000_000_000L / fps;
 		nextCaptureNanos = Math.max(nextCaptureNanos + interval, now - interval);
 		try {
+			// The frame's time is when it was shown (now), not when its GPU copy arrived a frame or two later - stamping it
+			// on arrival made the gaps between frames jitter, which the saved clip played back as stutter.
+			final long stamp = now;
 			FrameGrabber.grab((rgba, width, height) -> {
 				QUEUED.incrementAndGet();
-				long stamp = System.nanoTime();
 				ENCODER.execute(() -> {
 					try {
 						encode(rgba, width, height, stamp);
@@ -150,9 +162,11 @@ public final class ClipRecorder {
 		int outW = Math.max(2, Math.round(width * (outH / (float) height)) & ~1);
 		outH &= ~1;
 		int bytes = width * height * 4;
-		if (scratch.length < bytes) {
-			scratch = new byte[bytes];
+		byte[][] holder = SCRATCH.get();
+		if (holder[0].length < bytes) {
+			holder[0] = new byte[bytes];
 		}
+		byte[] scratch = holder[0];
 		rgba.get(0, scratch, 0, bytes);
 		BufferedImage image = new BufferedImage(outW, outH, BufferedImage.TYPE_3BYTE_BGR);
 		byte[] out = ((DataBufferByte) image.getRaster().getDataBuffer()).getData();
@@ -178,7 +192,15 @@ public final class ClipRecorder {
 		}
 		byte[] jpeg = jpeg(image, quality);
 		synchronized (RING) {
-			RING.addLast(new Frame(jpeg, stamp, outW, outH));
+			// two encoders can finish out of order: keep the ring sorted by time
+			Frame frame = new Frame(jpeg, stamp, outW, outH);
+			if (RING.isEmpty() || RING.getLast().nanos <= stamp) {
+				RING.addLast(frame);
+			} else {
+				Frame later = RING.pollLast();
+				RING.addLast(frame);
+				RING.addLast(later);
+			}
 			bufferedBytes += jpeg.length;
 			long keep = (long) seconds * 1_000_000_000L;
 			while (!RING.isEmpty() && (stamp - RING.getFirst().nanos > keep || bufferedBytes > MAX_BUFFER_BYTES)) {
@@ -188,7 +210,7 @@ public final class ClipRecorder {
 	}
 
 	static byte[] jpeg(BufferedImage image, float quality) throws IOException {
-		ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
+		ImageWriter writer = JPEG_WRITER.get();   // one per thread, reused (creating one per frame was most of the setup cost)
 		try {
 			ImageWriteParam param = writer.getDefaultWriteParam();
 			param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
@@ -200,7 +222,7 @@ public final class ClipRecorder {
 			}
 			return bytes.toByteArray();
 		} finally {
-			writer.dispose();
+			writer.reset();
 		}
 	}
 
@@ -217,6 +239,7 @@ public final class ClipRecorder {
 		synchronized (RING) {
 			frames = new ArrayList<>(RING);
 		}
+		frames.sort(java.util.Comparator.comparingLong(Frame::nanos));
 		if (lastSeconds > 0 && !frames.isEmpty()) {
 			long cut = frames.getLast().nanos - (long) (lastSeconds * 1e9);
 			frames.removeIf(f -> f.nanos < cut);
@@ -235,10 +258,20 @@ public final class ClipRecorder {
 				String name = "clip-" + DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss").format(LocalDateTime.now());
 				Path file = clipsDir().resolve(name + ".avi");
 				double length = (frames.getLast().nanos - frames.getFirst().nanos) / 1e9;
-				double clipFps = length > 0 ? (frames.size() - 1) / length : fps;
-				List<byte[]> jpegs = new ArrayList<>(frames.size());
-				for (Frame frame : frames) {
-					jpegs.add(frame.jpeg);
+				// Constant frame rate: one picture per 1/fps of real time - where a frame is missing (skipped while the
+				// encoders were busy) the last one is shown a little longer, instead of time jumping ahead (stutter).
+				int clipRate = fps;
+				double clipFps = clipRate;
+				long step = 1_000_000_000L / clipRate, t0 = frames.getFirst().nanos;
+				int slots = (int) Math.max(2, Math.round(length * clipRate) + 1);
+				List<byte[]> jpegs = new ArrayList<>(slots);
+				int j = 0;
+				for (int k = 0; k < slots; k++) {
+					long t = t0 + k * step;
+					while (j + 1 < frames.size() && frames.get(j + 1).nanos <= t + step / 2) {
+						j++;
+					}
+					jpegs.add(frames.get(j).jpeg);
 				}
 				MjpegAvi.write(file, jpegs, clipFps, last.width, last.height);
 				Files.write(clipsDir().resolve(name + ".jpg"), frames.get(frames.size() * 2 / 3).jpeg);

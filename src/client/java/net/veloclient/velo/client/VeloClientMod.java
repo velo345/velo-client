@@ -173,6 +173,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		AnticheatTestController.initIfEnabled();
 		net.veloclient.velo.client.devtools.ScreenshotTour.initIfRequested();
 		net.veloclient.velo.client.devtools.CosmeticsBench.register();
+		net.veloclient.velo.client.devtools.CrowdBench.register();
 		net.veloclient.velo.client.devtools.MoveBench.register();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				net.veloclient.velo.client.modules.performance.HudCacheTuner::tick);
@@ -357,6 +358,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ScoreboardHudModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.BossBarModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.ShulkerPreviewModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.qol.OwnNameTagModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.debug.BetterF3Module());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.servertools.SpawnRadiusModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.servertools.SimulationDistanceModule());

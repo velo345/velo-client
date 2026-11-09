@@ -22,6 +22,14 @@ public interface Module {
 	SafetyTag safetyTag();
 
 	/** Still in development (shown with a BETA badge): works, but not finished or polished yet. */
+	/** New in this release: the module list shows a small NEW tag. */
+	default boolean isNew() {
+		return NEW.contains(id());
+	}
+
+	/** The modules that are new in the current release (cleared when the next one ships). */
+	java.util.Set<String> NEW = java.util.Set.of("velo-rewind", "numbered-inventories", "color-codes", "shield-indicator");
+
 	default boolean beta() {
 		return false;
 	}

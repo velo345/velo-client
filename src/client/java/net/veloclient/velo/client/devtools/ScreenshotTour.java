@@ -1152,16 +1152,19 @@ public final class ScreenshotTour {
 				net.veloclient.velo.client.cosmetics.wings.WingsManager.setPreview(wing);
 			});
 		}
-		// Auras: one each, then the first one through every colour (8 frames per colour).
-		for (String aura : auras) {
+		// Auras: one each, then the first one through every colour (8 frames per colour). -Dvelo.tourAuras=none skips them.
+		boolean noAuras = "none".equals(auras[0]);
+		for (String aura : noAuras ? new String[0] : auras) {
 			look.accept("orbit-aura-" + aura, () -> {
 				net.veloclient.velo.client.cosmetics.wings.WingsManager.setPreview(null);
 				net.veloclient.velo.client.cosmetics.aura.AuraManager.setSettings(aura, null);
 				net.veloclient.velo.client.cosmetics.aura.AuraManager.setPreview(aura);
 			});
 		}
-		steps.add(new Object[] {20, (Runnable) () -> net.veloclient.velo.client.cosmetics.aura.AuraManager.setPreview(auras[0])});
-		int colours = net.veloclient.velo.client.cosmetics.aura.AuraEffects.RAINBOW + 1;
+		int colours = noAuras ? 0 : net.veloclient.velo.client.cosmetics.aura.AuraEffects.RAINBOW + 1;
+		if (!noAuras) {
+			steps.add(new Object[] {20, (Runnable) () -> net.veloclient.velo.client.cosmetics.aura.AuraManager.setPreview(auras[0])});
+		}
 		sequence(steps, client, "orbit-colours", colours * 8, f -> {
 			if (f % 8 == 0) {
 				net.veloclient.velo.client.cosmetics.aura.AuraManager.setSettings(auras[0], new net.veloclient.velo.client.cosmetics.aura.AuraEffects.Settings(1.2f, 1f, 1.3f, f / 8));

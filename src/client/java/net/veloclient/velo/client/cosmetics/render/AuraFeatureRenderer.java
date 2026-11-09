@@ -202,6 +202,32 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 		}
 	}
 
+	private record CachedAura(long nanos, float[] geometry, String id) {
+	}
+
+	private static final java.util.Map<Object, CachedAura> AURA_CACHE = new java.util.HashMap<>();
+
+	/**
+	 * Cosmetics Quality: the particles are simulated and rebuilt at most at the pose rate (High 75 Hz; Medium others 40 Hz;
+	 * Low 40 / 25 Hz) - in between the last geometry is drawn again (it's relative to the wearer, so it moves with them).
+	 */
+	private static float[] geometry(Object key, AuraManager.Worn worn, double x, double y, double z, boolean self) {
+		long now = System.nanoTime();
+		CachedAura cached = AURA_CACHE.get(key);
+		if (worn != null && cached != null && cached.id().equals(worn.id())
+				&& now - cached.nanos() < net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.poseNanos(self)) {
+			return cached.geometry();
+		}
+		float[] built = geometry(key, worn, x, y, z);
+		if (worn != null && built != null) {
+			if (AURA_CACHE.size() > 256) {
+				AURA_CACHE.clear();
+			}
+			AURA_CACHE.put(key, new CachedAura(now, built, worn.id()));
+		}
+		return built;
+	}
+
 	/** Builds this frame's geometry for a player (or null when they wear no aura). */
 	private static float[] geometry(Object key, AuraManager.Worn worn, double x, double y, double z) {
 		AuraEffects.Kind kind = worn == null ? null : AuraEffects.kind(worn.id());
@@ -277,15 +303,18 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.5f, base.color()));
 		}
 		// Cosmetics Quality: the Lite version (fewer particles) where it decides so.
+		if (net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.hideFar(self, self || player == null || client.player == null ? 0 : player.squaredDistanceTo(client.player))) {
+			return; // Low: someone else's aura far away
+		}
 		if (worn != null && net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.lite(state.id, self,
 				self || player == null || client.player == null ? 0 : player.squaredDistanceTo(client.player))) {
 			AuraEffects.Settings base = worn.settings();
-			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.4f, base.color()));
+			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * (net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.low() ? 0.2f : 0.4f), base.color()));
 		}
 		matrices.push();
 		toWorld(matrices, state.bodyYaw);
 		aim(matrices.peek().getPositionMatrix());
-		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z);
+		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z, self);
 		if (geometry == null || geometry.length == 0) {
 			matrices.pop();
 			return;
@@ -343,15 +372,18 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.5f, base.color()));
 		}
 		// Cosmetics Quality: the Lite version (fewer particles) where it decides so.
+		if (net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.hideFar(self, self || player == null || client.player == null ? 0 : player.distanceToSqr(client.player))) {
+			return; // Low: someone else's aura far away
+		}
 		if (worn != null && net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.lite(state.id, self,
 				self || player == null || client.player == null ? 0 : player.distanceToSqr(client.player))) {
 			AuraEffects.Settings base = worn.settings();
-			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.4f, base.color()));
+			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * (net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.low() ? 0.2f : 0.4f), base.color()));
 		}
 		matrices.pushPose();
 		toWorld(matrices, state.bodyRot);
 		aim(matrices.last().pose());
-		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z);
+		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z, self);
 		if (geometry == null || geometry.length == 0) {
 			matrices.popPose();
 			return;

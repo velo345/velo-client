@@ -225,18 +225,24 @@ public final class GifDecoder {
 	 * than any screen shows, and 40 frames of it are ~60 MB per cloak - a Locker full of them ran low-RAM PCs out of
 	 * memory. 8 (eight times vanilla) is what most PCs get; with 6 GB or more given to the game, 16.
 	 */
-	private static final int MAX_TEXELS = Runtime.getRuntime().maxMemory() < 6_000L * 1024 * 1024 ? 8 : 16;
+	private static final int RAM_TEXELS = Runtime.getRuntime().maxMemory() < 6_000L * 1024 * 1024 ? 8 : 16;
+
+	/** Cosmetics Quality picks it too: Medium at most 8, Low half of what RAM allows. */
+	private static int maxTexels() {
+		return net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.capeTexels(RAM_TEXELS);
+	}
 
 	/** By how much a cape layout of this width is shrunk (a power of two, 1 = kept as it is). */
 	private static int shrinkFactor(int layoutWidth) {
 		int factor = 1;
-		while (layoutWidth / factor / 64 > MAX_TEXELS && layoutWidth / factor >= 128) {
+		int max = maxTexels();
+		while (layoutWidth / factor / 64 > max && layoutWidth / factor >= 128) {
 			factor *= 2;
 		}
 		return factor;
 	}
 
-	/** Halves {@code image} until the layout it came from is at most {@link #MAX_TEXELS} per cape pixel (2:1 box filter per halving). */
+	/** Halves {@code image} until the layout it came from is at most {@link #maxTexels()} per cape pixel (2:1 box filter per halving). */
 	private static BufferedImage shrink(BufferedImage image, int layoutWidth) {
 		int factor = shrinkFactor(layoutWidth);
 		BufferedImage out = image;
@@ -259,7 +265,7 @@ public final class GifDecoder {
 	 */
 	static NativeImage shrunkForCape(BufferedImage image, int texelsPerCapePixel) {
 		BufferedImage out = image;
-		for (int t = texelsPerCapePixel; t > MAX_TEXELS && out.getWidth() >= 128; t /= 2) {
+		for (int t = texelsPerCapePixel; t > maxTexels() && out.getWidth() >= 128; t /= 2) {
 			int w = out.getWidth() / 2, h = out.getHeight() / 2;
 			BufferedImage half = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
 			Graphics2D g = half.createGraphics();

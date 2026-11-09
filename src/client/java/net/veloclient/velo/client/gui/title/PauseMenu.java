@@ -42,6 +42,16 @@ import java.util.WeakHashMap;
  */
 public final class PauseMenu {
 
+	/**
+	 * A recorder's live status for the pause menu ("REC 1:23", "Paused 0:40") - set by Velo Rewind; null shows nothing.
+	 */
+	public static volatile java.util.function.Supplier<String> recordingStatus = () -> null;
+
+	// This frame's recording buttons (a recorder mod's or Velo Rewind's), drawn as small icon buttons on the quick-access card.
+	private static final List<ClickableWidget> recordWidgets = new ArrayList<>();
+	private static final List<String> recordIcons = new ArrayList<>();
+	private static Env recordEnv;
+
 	public interface Env {
 		List<ClickableWidget> buttons();
 
@@ -213,6 +223,9 @@ public final class PauseMenu {
 		java.util.Map<String, ClickableWidget> byKey = new java.util.HashMap<>();
 		List<Row> modRows = new ArrayList<>();
 		Row modsRow = null;
+		recordWidgets.clear();
+		recordIcons.clear();
+		recordEnv = env;
 		List<ClickableWidget> iconWidgets = new ArrayList<>();
 		List<String> iconKeys = new ArrayList<>();
 		ClickableWidget ukulib = env.ukulib();
@@ -261,7 +274,9 @@ public final class PauseMenu {
 				}
 			}
 			if (recording != null) {
-				modRows.add(new Row(widget, label, recording, null));
+				// Start / pause / stop of a recorder: small square buttons on the quick-access card (see recordButtons).
+				recordWidgets.add(widget);
+				recordIcons.add(recording);
 			} else if (iconKey != null && (meantForMenu || first[2] <= 24)) {
 				iconWidgets.add(widget);
 				iconKeys.add(iconKey);
@@ -429,7 +444,17 @@ public final class PauseMenu {
 		int cy = top;
 		cy = serverCard(context, renderer, cardX, cy, cardW);
 		cy += 8;
+		int beforeToggles = cy;
 		cy = togglesCard(context, renderer, cardX, cy, cardW, mouseX, mouseY, height - top);
+		if (cy < beforeToggles && !recordWidgets.isEmpty()) {
+			// No room for the toggles: the recording buttons get a slim card of their own.
+			cy = beforeToggles;
+			MenuKit.panel(context, cardX, cy, cardW, 32, 9);
+			recordButtons(context, renderer, cardX + 8, cardX + cardW - 8, cy + 8, mouseX, mouseY);
+			cy += 32;
+		} else if (cy < beforeToggles) {
+			cy = beforeToggles - 8;
+		}
 		JsonObject party = SocialClient.party();
 		if (party != null && party.has("members") && party.getAsJsonArray("members").size() > 1 && cy + 60 < height - top - 26) {
 			cy += 8;
@@ -569,6 +594,7 @@ public final class PauseMenu {
 		MenuKit.text(context, renderer, rec, tx + 2 + favW + 7, ty + 4, showRecent ? MenuKit.TEXT : 0xFF9D9DA8);
 		tabFavorites.place(tx + 2, ty, favW, 16, true);
 		tabRecent.place(tx + 2 + favW, ty, recW, 16, true);
+		recordButtons(context, renderer, tx + favW + recW + 10, x + w - 8, ty, mouseX, mouseY);
 
 		shownToggles = modules.subList(0, rows);
 		int ry = y + 28;
@@ -595,6 +621,51 @@ public final class PauseMenu {
 		MenuKit.text(context, renderer, all, x + 10, ry + 8,
 				VeloAnim.lerpArgb(MenuKit.accentText(), 0xFFFFFFFF, MenuKit.hover(allModules, hovered(mouseX, mouseY, allModules))));
 		return y + h;
+	}
+
+	/**
+	 * The recording controls, right-aligned in [left, right] at y: 16 px square icon buttons, a pulsing red dot and the
+	 * recorder's status (when it reports one and there's room).
+	 */
+	private static void recordButtons(DrawContext context, TextRenderer renderer, int left, int right, int y, int mouseX, int mouseY) {
+		if (recordWidgets.isEmpty()) {
+			return;
+		}
+		int size = 16;
+		int bx = right - recordWidgets.size() * (size + 4) + 4;
+		for (int i = 0; i < recordWidgets.size(); i++) {
+			ClickableWidget widget = recordWidgets.get(i);
+			if (recordEnv != null) {
+				recordEnv.undraw(widget);
+			}
+			widget.setX(bx);
+			widget.setY(y);
+			widget.setWidth(size);
+			widget.setHeight(size);
+			float hover = MenuKit.hover(widget, hovered(mouseX, mouseY, widget));
+			String icon = recordIcons.get(i);
+			boolean stop = icon.equals("record_stop") || icon.equals("record_cancel");
+			int base = stop ? 0x1FFF5A5F : 0x14FFFFFF;
+			VeloDraw.fillRounded(context, bx, y, size, size, 5, VeloAnim.lerpArgb(base, stop ? 0x55FF5A5F : 0x30FFFFFF, hover));
+			if (hover > 0.01f) {
+				VeloDraw.strokeRounded(context, bx, y, size, size, 5, VeloAnim.lerpArgb(0x00FFFFFF, stop ? 0xFFFF5A5F : 0x80FFFFFF, hover));
+			}
+			MenuKit.icon(context, icon, bx + 4, y + 4, 8, stop ? 0xFFFF7A7E : 0xFFE4E4E8);
+			bx += size + 4;
+		}
+		String status = recordingStatus.get();
+		int statusRight = right - recordWidgets.size() * (size + 4) - 2;
+		if (status != null && !status.isEmpty()) {
+			Text label = MenuKit.mono(status);
+			int lw = MenuKit.width(renderer, label);
+			if (statusRight - lw - 10 >= left) {
+				boolean paused = status.startsWith("Paused");
+				float pulse = paused ? 1f : 0.55f + 0.45f * (float) Math.abs(Math.sin(System.currentTimeMillis() / 400.0));
+				int dot = paused ? 0xFFB0B0BA : (Math.round(255 * pulse) << 24) | 0xFF4A50;
+				VeloDraw.fillCircle(context, statusRight - lw - 6, y + size / 2f, 3f, dot);
+				MenuKit.text(context, renderer, label, statusRight - lw, y + (size - MenuKit.H_MONO) / 2, paused ? 0xFF9D9DA8 : 0xFFFF7A7E);
+			}
+		}
 	}
 
 	private static void hideToggles() {

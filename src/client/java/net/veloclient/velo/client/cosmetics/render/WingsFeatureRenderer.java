@@ -41,7 +41,9 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 	private float[][] posed(int key, WingModel model, WingAnimator.Pose pose, WingsManager.Worn worn, float offsetY) {
 		long now = System.nanoTime();
 		Posed cached = posedCache.get(key);
-		if (cached != null && cached.model() == model && now - cached.nanos() < 13_333_333L) {
+		// Cosmetics Quality: how long a pose is reused (High 75 Hz; Medium others 40 Hz; Low 40 Hz yours, 25 Hz others').
+		long reuse = net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.poseNanos(key == net.veloclient.velo.client.pvp.PvpCompat.localPlayerId());
+		if (cached != null && cached.model() == model && now - cached.nanos() < reuse) {
 			return cached.geometry();
 		}
 		scratch = WingAnimator.deform(model, pose, worn.settings(), offsetY, scratch);
@@ -118,6 +120,9 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		WingAnimator.Pose pose = WingAnimator.pose(tag != null ? tag.key() : state.id, motion, type.style(), worn.settings());
 		// Light Cosmetics (Performance Boost): just the wingbeat - no moving arms, glow, shine or particles.
 		// Cosmetics Quality: the Lite version (just the wingbeat - no glow, shine or particles) where it decides so.
+		if (net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.hideFar(self, self || player == null || client.player == null ? 0 : player.squaredDistanceTo(client.player))) {
+			return; // Low: someone else's wings far away
+		}
 		boolean plainWings = net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.lite(state.id, self,
 				self || player == null || client.player == null ? 0 : player.squaredDistanceTo(client.player));
 		if (plainWings) {
@@ -133,6 +138,25 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		}
 		// Neon pairs glow: full brightness whatever the light around.
 		int drawLight = type.glow() ? 0xF000F0 : light;
+		if (net.veloclient.velo.client.cosmetics.wings.ChainWings.is(id)) {
+			// Chain Wings: tinted plates, chrome, the wave and the glint, swinging chains (ChainWings).
+			java.util.List<net.veloclient.velo.client.cosmetics.wings.ChainWings.Pass> passes = net.veloclient.velo.client.cosmetics.wings.ChainWings.frame(tag != null ? (Object) ("preview" + tag.key()) : (Object) state.id,
+					model, geometry, pose.seconds(), tint, tag != null || player == null ? null
+							: new net.veloclient.velo.client.cosmetics.wings.ChainWings.World(state.x, state.y, state.z, state.bodyYaw),
+					type.scale() * worn.settings().scale(),
+					// the chains and the wave are the pair: your own always has them, except on Low
+					net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.low() || plainWings && !self);
+			matrices.push();
+			this.getContextModel().body.applyTransform(matrices);
+			queue.submitCustom(matrices, net.minecraft.client.render.RenderLayers.entityCutoutNoCull(texture), (entry, consumer) ->
+					chainPasses(passes, net.veloclient.velo.client.cosmetics.wings.ChainWings.CUTOUT, entry.getPositionMatrix(), entry.getNormalMatrix(), consumer, 0xF000F0));
+			queue.submitCustom(matrices, net.minecraft.client.render.RenderLayers.entityTranslucent(texture), (entry, consumer) ->
+					chainPasses(passes, net.veloclient.velo.client.cosmetics.wings.ChainWings.BLEND, entry.getPositionMatrix(), entry.getNormalMatrix(), consumer, 0xF000F0));
+			queue.submitCustom(matrices, net.minecraft.client.render.RenderLayers.eyes(texture), (entry, consumer) ->
+					chainPasses(passes, net.veloclient.velo.client.cosmetics.wings.ChainWings.GLOW, entry.getPositionMatrix(), entry.getNormalMatrix(), consumer, 0xF000F0));
+			matrices.pop();
+			return;
+		}
 		matrices.push();
 		this.getContextModel().body.applyTransform(matrices);
 		queue.submitCustom(matrices, net.minecraft.client.render.RenderLayers.entityCutoutNoCull(texture), (entry, consumer) -> {
@@ -158,6 +182,29 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 							consumer.vertex(x, y, z, color, u, v, net.minecraft.client.render.OverlayTexture.DEFAULT_UV, 0xF000F0, 0, 1, 0)));
 		}
 		matrices.pop();
+	}
+
+	/** Chain Wings' draws of one kind (cutout or glow): the bulk writer where it can, vertex by vertex otherwise. */
+	private static void chainPasses(java.util.List<net.veloclient.velo.client.cosmetics.wings.ChainWings.Pass> passes, int layer, Matrix4f position, Matrix3f normal,
+			net.minecraft.client.render.VertexConsumer consumer, int light) {
+		for (net.veloclient.velo.client.cosmetics.wings.ChainWings.Pass p : passes) {
+			if (p.layer() != layer || p.quads().length == 0) {
+				continue;
+			}
+			if (CosmeticVertexWriter.writeQuads(consumer, p.quads(), p.vertexCount(), p.data(), 6, 0, 3, p.uv(), 2, 0, 1f, 0f, position, normal,
+					0xFFFFFFFF, p.colors(), net.minecraft.client.render.OverlayTexture.DEFAULT_UV, light)) {
+				continue;
+			}
+			Vector3f pos = new Vector3f();
+			Vector3f nrm = new Vector3f();
+			float[] d = p.data();
+			for (int v : p.quads()) {
+				position.transformPosition(d[v * 6], d[v * 6 + 1], d[v * 6 + 2], pos);
+				normal.transform(d[v * 6 + 3], d[v * 6 + 4], d[v * 6 + 5], nrm);
+				consumer.vertex(pos.x, pos.y, pos.z, p.colors() == null ? 0xFFFFFFFF : p.colors()[v], p.uv()[v * 2], p.uv()[v * 2 + 1],
+						net.minecraft.client.render.OverlayTexture.DEFAULT_UV, light, nrm.x, nrm.y, nrm.z);
+			}
+		}
 	}
 	//?} else {
 	/*public WingsFeatureRenderer(net.minecraft.client.renderer.entity.RenderLayerParent<
@@ -223,6 +270,9 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		WingAnimator.Pose pose = WingAnimator.pose(tag != null ? tag.key() : state.id, motion, type.style(), worn.settings());
 		// Light Cosmetics (Performance Boost): just the wingbeat - no moving arms, glow, shine or particles.
 		// Cosmetics Quality: the Lite version (just the wingbeat - no glow, shine or particles) where it decides so.
+		if (net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.hideFar(self, self || player == null || client.player == null ? 0 : player.distanceToSqr(client.player))) {
+			return; // Low: someone else's wings far away
+		}
 		boolean plainWings = net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.lite(state.id, self,
 				self || player == null || client.player == null ? 0 : player.distanceToSqr(client.player));
 		if (plainWings) {
@@ -238,6 +288,28 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 		}
 		// Neon pairs glow: full brightness whatever the light around.
 		int drawLight = type.glow() ? 0xF000F0 : light;
+		if (net.veloclient.velo.client.cosmetics.wings.ChainWings.is(id)) {
+			// Chain Wings: tinted plates, chrome, the wave and the glint, swinging chains (ChainWings).
+			java.util.List<net.veloclient.velo.client.cosmetics.wings.ChainWings.Pass> passes = net.veloclient.velo.client.cosmetics.wings.ChainWings.frame(tag != null ? (Object) ("preview" + tag.key()) : (Object) state.id,
+					model, geometry, pose.seconds(), tint, tag != null || player == null ? null
+							: new net.veloclient.velo.client.cosmetics.wings.ChainWings.World(state.x, state.y, state.z, state.bodyRot),
+					type.scale() * worn.settings().scale(),
+					// the chains and the wave are the pair: your own always has them, except on Low
+					net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.low() || plainWings && !self);
+			matrices.pushPose();
+			this.getParentModel().body.translateAndRotate(matrices);
+			var chainCut = net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture);
+			var chainBlend = net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucent(texture);
+			var chainGlow = net.minecraft.client.renderer.rendertype.RenderTypes.eyes(texture);
+			queue.submitCustomGeometry(matrices, chainCut, (pose2, consumer) ->
+					chainPasses(passes, net.veloclient.velo.client.cosmetics.wings.ChainWings.CUTOUT, chainCut, pose2.pose(), pose2.normal(), consumer, 0xF000F0));
+			queue.submitCustomGeometry(matrices, chainBlend, (pose2, consumer) ->
+					chainPasses(passes, net.veloclient.velo.client.cosmetics.wings.ChainWings.BLEND, chainBlend, pose2.pose(), pose2.normal(), consumer, 0xF000F0));
+			queue.submitCustomGeometry(matrices, chainGlow, (pose2, consumer) ->
+					chainPasses(passes, net.veloclient.velo.client.cosmetics.wings.ChainWings.GLOW, chainGlow, pose2.pose(), pose2.normal(), consumer, 0xF000F0));
+			matrices.popPose();
+			return;
+		}
 		matrices.pushPose();
 		this.getParentModel().body.translateAndRotate(matrices);
 		var cutout = net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture);
@@ -296,6 +368,36 @@ public final class WingsFeatureRenderer extends net.minecraft.client.render.enti
 							consumer.addVertex(x, y, z, color, u, v, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, 0xF000F0, 0, 1, 0)));
 		}
 		matrices.popPose();
+	}
+
+	// Chain Wings' draws of one kind (cutout or glow): the GPU path (26.2), the bulk writer, or vertex by vertex.
+	private static void chainPasses(java.util.List<net.veloclient.velo.client.cosmetics.wings.ChainWings.Pass> passes, int layer,
+			net.minecraft.client.renderer.rendertype.RenderType type, Matrix4f pose, Matrix3f normalMatrix,
+			com.mojang.blaze3d.vertex.VertexConsumer consumer, int light) {
+		for (net.veloclient.velo.client.cosmetics.wings.ChainWings.Pass p : passes) {
+			if (p.layer() != layer || p.quads().length == 0) {
+				continue;
+			}
+			if (GpuCosmetics.recordDynamic(p.key(), p.version(), p.quads(), p.vertexCount(), p.data(), 6, 0, 3, p.uv(), 2, 0, p.colors(),
+					0xFFFFFFFF, type, pose, light, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)) {
+				continue;
+			}
+			Matrix4f position = new Matrix4f(pose);
+			Matrix3f normal = new Matrix3f(normalMatrix);
+			if (CosmeticVertexWriter.writeQuads(consumer, p.quads(), p.vertexCount(), p.data(), 6, 0, 3, p.uv(), 2, 0, 1f, 0f, position, normal,
+					0xFFFFFFFF, p.colors(), net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, light)) {
+				continue;
+			}
+			Vector3f pos = new Vector3f();
+			Vector3f nrm = new Vector3f();
+			float[] d = p.data();
+			for (int v : p.quads()) {
+				position.transformPosition(d[v * 6], d[v * 6 + 1], d[v * 6 + 2], pos);
+				normal.transform(d[v * 6 + 3], d[v * 6 + 4], d[v * 6 + 5], nrm);
+				consumer.addVertex(pos.x, pos.y, pos.z, p.colors() == null ? 0xFFFFFFFF : p.colors()[v], p.uv()[v * 2], p.uv()[v * 2 + 1],
+						net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, light, nrm.x, nrm.y, nrm.z);
+			}
+		}
 	}
 	*///?}
 

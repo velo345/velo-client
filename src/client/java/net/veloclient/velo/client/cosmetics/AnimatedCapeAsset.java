@@ -49,6 +49,9 @@ public final class AnimatedCapeAsset {
 	/** Last time the elytra texture was asked for - it is only repainted while an elytra is actually being drawn. */
 	private long elytraUsedNanos;
 	private int frameIndex = -1;
+	private long lastFrameChangeNanos;
+	/** The cloak you wear: always animates at full rate (set in tickAll). */
+	private boolean owned;
 	private long msIntoCurrentFrame;
 	private long lastAdvanceNanos = -1;
 	/** Last time something asked for this texture (i.e. it's being drawn) - see {@link #tickAll}. */
@@ -116,9 +119,23 @@ public final class AnimatedCapeAsset {
 	 * HD capes (16 texels per cape pixel) are painted art, not pixel art: sampled bilinearly they stay smooth at every
 	 * size, where nearest sampling turned them jagged and shimmering when drawn smaller than the texture.
 	 */
-	static final class SmoothTexture extends NativeImageBackedTexture {
+	public static final class SmoothTexture extends NativeImageBackedTexture {
 		SmoothTexture(java.util.function.Supplier<String> name, int width, int height) {
 			super(name, width, height, false);
+			smooth();
+		}
+
+		/** A finished picture, sampled smoothly (Chain Wings' painted atlas). */
+		public SmoothTexture(java.util.function.Supplier<String> name, NativeImage image) {
+			//? if <1.21.2 {
+			/*super(image);
+			*///?} else {
+			super(name, image);
+			//?}
+			smooth();
+		}
+
+		private void smooth() {
 			//? if <1.21.11 {
 			/*setFilter(true, false); // 1.21.10: no sampler cache yet
 			*///?} else if <26.1 {
@@ -183,14 +200,27 @@ public final class AnimatedCapeAsset {
 	 * but frozen - each frame change is a full texture upload, and uploading capes nobody can see
 	 * 20 times a second was wasted GPU bandwidth.
 	 */
+	private static volatile boolean qualityChanged;
+
+	/** Cosmetics Quality changed: cloaks that can be decoded again are, at the new resolution (on their next draw). */
+	public static void qualityChanged() {
+		qualityChanged = true;
+	}
+
 	public static synchronized void tickAll() {
 		long now = System.nanoTime();
+		if (qualityChanged) {
+			qualityChanged = false;
+			releaseIdle(0);
+		}
 		// Every frame of a GIF is kept decoded in native memory (a large animated cape is tens of
 		// MB). Browsing the store used to keep every cape ever previewed for the rest of the
 		// session; ones that can be decoded again are freed after a minute of not being drawn.
 		releaseIdle(60_000);
 		CapeManager.preloadEquipped();
-		for (AnimatedCapeAsset texture : REGISTRY.values()) {
+		for (var entry : REGISTRY.entrySet()) {
+			AnimatedCapeAsset texture = entry.getValue();
+			texture.owned = CapeManager.pinned(entry.getKey());
 			if (now - texture.lastUsedNanos > 1_000_000_000L) {
 				texture.lastAdvanceNanos = now;
 				continue;
@@ -242,6 +272,11 @@ public final class AnimatedCapeAsset {
 			return;
 		}
 		msIntoCurrentFrame += elapsedMs;
+		// Cosmetics Quality: frame changes (each a texture upload) at most every so often - except your own cloak.
+		long minGap = owned ? 0 : net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.otherCapeFrameNanos();
+		if (minGap > 0 && nowNanos - lastFrameChangeNanos < minGap) {
+			return;
+		}
 		int index = Math.max(frameIndex, 0);
 		int currentDelay = Math.max(1, frames.get(index).delayMillis());
 		int guard = 0;
@@ -254,6 +289,7 @@ public final class AnimatedCapeAsset {
 		// in one tick, and uploading each skipped one (a full texture upload each, 4 MB+ for a
 		// large cape) just made the hitch worse.
 		if (index != frameIndex) {
+			lastFrameChangeNanos = nowNanos;
 			applyFrame(index);
 		}
 	}

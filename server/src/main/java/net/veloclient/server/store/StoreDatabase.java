@@ -66,6 +66,14 @@ public final class StoreDatabase implements AutoCloseable {
 						days INTEGER NOT NULL,
 						reference TEXT,
 						created_at INTEGER NOT NULL)""");
+			// what a Velo+ payment actually cost (added 2026-11-08; older rows fall back to the list price in the panel)
+			for (String col : new String[] {"price REAL", "currency TEXT"}) {
+				try {
+					st.execute("ALTER TABLE plus_payments ADD COLUMN " + col);
+				} catch (SQLException ignored) {
+					// already there
+				}
+			}
 			st.execute("""
 					CREATE TABLE IF NOT EXISTS ledger (
 						id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -681,6 +689,41 @@ public final class StoreDatabase implements AutoCloseable {
 		setStatus(orderId, status, transactionId);
 	}
 
+	/**
+	 * The owner's own test payment (deleted in Tebex, so no refund webhook ever comes): marks the order "void" and takes the
+	 * coins it credited back, so it drops out of revenue and the panel's lists. Returns the order as it was, or null.
+	 */
+	/** Remembers what a Velo+ payment cost (the panel's revenue). */
+	public synchronized void setPlusPrice(String txn, double price, String currency) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement("UPDATE plus_payments SET price = ?, currency = ? WHERE txn = ?")) {
+			ps.setDouble(1, price);
+			ps.setString(2, currency);
+			ps.setString(3, txn);
+			ps.executeUpdate();
+		}
+	}
+
+	public synchronized Order voidOrder(String orderId) throws SQLException {
+		return inTransaction(() -> {
+			Order order;
+			try (PreparedStatement ps = connection.prepareStatement(
+					"SELECT order_id, uuid, pack_id, coins, price, currency, status, transaction_id, created_at FROM orders WHERE order_id = ?")) {
+				ps.setString(1, orderId);
+				try (ResultSet rs = ps.executeQuery()) {
+					order = rs.next() ? readOrder(rs) : null;
+				}
+			}
+			if (order == null || "void".equals(order.status())) {
+				return order;
+			}
+			if ("paid".equals(order.status())) {
+				adjustInTx(order.uuid(), -order.coins(), "void", order.transactionId(), "owner");
+			}
+			setStatus(order.orderId(), "void", null);
+			return order;
+		});
+	}
+
 	/** A paid order was refunded or charged back: take its coins back (the balance may go negative). */
 	public synchronized int reverseByTransaction(String transactionId, String newStatus) throws SQLException {
 		return inTransaction(() -> {
@@ -1141,6 +1184,17 @@ public final class StoreDatabase implements AutoCloseable {
 	 * Velo+ members, plus the latest orders and item purchases. {@code since} limits the per-day series.
 	 */
 	public synchronized Map<String, Object> panelSummary(long since, long now, java.util.Set<String> excludeFromWallets) throws SQLException {
+		return panelSummary(since, now, excludeFromWallets, 9.99, 99.99);
+	}
+
+	/** Paid Velo+ payments (not trials or owner grants): their price, or the list price for rows from before prices were kept. */
+	private static String plusPaidSql(double month, double year) {
+		return "SELECT created_at, COALESCE(price, CASE WHEN days >= 300 THEN " + year + " ELSE " + month + " END) FROM plus_payments "
+				+ "WHERE txn LIKE 'tbx-%' OR txn LIKE 'renew:%'";
+	}
+
+	public synchronized Map<String, Object> panelSummary(long since, long now, java.util.Set<String> excludeFromWallets, double plusMonth, double plusYear)
+			throws SQLException {
 		Map<String, Object> out = new java.util.LinkedHashMap<>();
 		try (Statement st = connection.createStatement()) {
 			try (ResultSet rs = st.executeQuery("SELECT COUNT(*), COALESCE(SUM(price), 0), COALESCE(SUM(coins), 0) FROM orders WHERE status = 'paid'")) {
@@ -1154,6 +1208,25 @@ public final class StoreDatabase implements AutoCloseable {
 				out.put("paidOrdersInRange", rs.getLong(1));
 				out.put("revenueInRange", rs.getDouble(2));
 			}
+			// Velo+ payments count as revenue too
+			long plusPaid = 0, plusPaidInRange = 0;
+			double plusRevenue = 0, plusRevenueInRange = 0;
+			try (ResultSet rs = st.executeQuery(plusPaidSql(plusMonth, plusYear))) {
+				while (rs.next()) {
+					plusPaid++;
+					plusRevenue += rs.getDouble(2);
+					if (rs.getLong(1) >= since) {
+						plusPaidInRange++;
+						plusRevenueInRange += rs.getDouble(2);
+					}
+				}
+			}
+			out.put("revenueCoins", out.get("revenue"));
+			out.put("revenuePlus", plusRevenue);
+			out.put("plusPayments", plusPaid);
+			out.put("revenue", (double) out.get("revenue") + plusRevenue);
+			out.put("revenueInRange", (double) out.get("revenueInRange") + plusRevenueInRange);
+			out.put("paidOrdersInRange", (long) out.get("paidOrdersInRange") + plusPaidInRange);
 			try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM orders WHERE status IN ('refunded', 'chargeback')")) {
 				rs.next();
 				out.put("reversedOrders", rs.getLong(1));
@@ -1202,13 +1275,21 @@ public final class StoreDatabase implements AutoCloseable {
 					days.computeIfAbsent(rs.getString(1), k -> new double[2])[1] = rs.getDouble(2);
 				}
 			}
+			try (ResultSet rs = st.executeQuery(plusPaidSql(plusMonth, plusYear))) {
+				while (rs.next()) {
+					if (rs.getLong(1) >= since) {
+						String day = java.time.Instant.ofEpochMilli(rs.getLong(1)).atZone(java.time.ZoneOffset.UTC).toLocalDate().toString();
+						days.computeIfAbsent(day, k -> new double[2])[0] += rs.getDouble(2);
+					}
+				}
+			}
 			List<Map<String, Object>> series = new ArrayList<>();
 			days.forEach((day, v) -> series.add(Map.of("day", day, "revenue", v[0], "coinsSpent", (long) v[1])));
 			out.put("daily", series);
 		}
 		List<Map<String, Object>> orders = new ArrayList<>();
 		try (PreparedStatement ps = connection.prepareStatement("SELECT o.order_id, o.uuid, w.username, o.pack_id, o.coins, o.price, o.currency, o.status, o.created_at "
-				+ "FROM orders o LEFT JOIN wallets w ON w.uuid = o.uuid ORDER BY o.created_at DESC LIMIT 50");
+				+ "FROM orders o LEFT JOIN wallets w ON w.uuid = o.uuid WHERE o.status != 'void' ORDER BY o.created_at DESC LIMIT 50");
 				ResultSet rs = ps.executeQuery()) {
 			while (rs.next()) {
 				Map<String, Object> row = new java.util.LinkedHashMap<>();
@@ -1227,7 +1308,9 @@ public final class StoreDatabase implements AutoCloseable {
 		out.put("recentOrders", orders);
 		List<Map<String, Object>> purchases = new ArrayList<>();
 		try (PreparedStatement ps = connection.prepareStatement("SELECT l.uuid, w.username, l.reason, l.ref, l.delta, l.created_at FROM ledger l "
-				+ "LEFT JOIN wallets w ON w.uuid = l.uuid WHERE l.reason IN ('buy_item', 'buy_bundle', 'gift_item', 'purchase_coins') ORDER BY l.id DESC LIMIT 50");
+				+ "LEFT JOIN wallets w ON w.uuid = l.uuid WHERE l.reason IN ('buy_item', 'buy_bundle', 'gift_item', 'purchase_coins') "
+				+ "AND NOT (l.reason = 'purchase_coins' AND l.ref IN (SELECT transaction_id FROM orders WHERE status = 'void' AND transaction_id IS NOT NULL)) "
+				+ "ORDER BY l.id DESC LIMIT 50");
 				ResultSet rs = ps.executeQuery()) {
 			while (rs.next()) {
 				Map<String, Object> row = new java.util.LinkedHashMap<>();

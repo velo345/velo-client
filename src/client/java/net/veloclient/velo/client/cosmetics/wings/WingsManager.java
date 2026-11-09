@@ -539,7 +539,7 @@ public final class WingsManager {
 		if (type.bundled()) {
 			return Identifier.of("velo-client", "textures/cosmetics/wings/" + id + ".png");
 		}
-		return downloaded(type.texture(), "wings " + id);
+		return downloaded(type.texture(), "wings " + id, ChainWings.is(id));
 	}
 
 	/** The pair's still picture for cards (null until downloaded). Render thread only. */
@@ -551,10 +551,10 @@ public final class WingsManager {
 		if (type.bundled()) {
 			return Identifier.of("velo-client", "textures/cosmetics/wings/" + id + "_preview.png");
 		}
-		return downloaded(type.preview(), "wings preview " + id);
+		return downloaded(type.preview(), "wings preview " + id, false);
 	}
 
-	private static Identifier downloaded(String sha, String label) {
+	private static Identifier downloaded(String sha, String label, boolean smooth) {
 		if (sha == null) {
 			return null;
 		}
@@ -568,7 +568,7 @@ public final class WingsManager {
 		}
 		try (InputStream in = java.nio.file.Files.newInputStream(file)) {
 			net.minecraft.client.texture.NativeImage image = net.minecraft.client.texture.NativeImage.read(in);
-			Identifier id = net.veloclient.velo.client.cosmetics.CapeManager.registerPreloadedTexture("wingtex_" + sha.substring(0, 24), image, label);
+			Identifier id = net.veloclient.velo.client.cosmetics.CapeManager.registerPreloadedTexture("wingtex_" + sha.substring(0, 24), image, label, smooth);
 			TEXTURES.put(sha, id);
 			return id;
 		} catch (Exception e) {

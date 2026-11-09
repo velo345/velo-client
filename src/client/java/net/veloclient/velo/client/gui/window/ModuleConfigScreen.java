@@ -793,6 +793,31 @@ public final class ModuleConfigScreen extends VeloWindow {
 		return lines;
 	}
 
+	private boolean saved;
+
+	/**
+	 * Settings windows are also left without requestClose - the one-window menu switches pages, a key opens another
+	 * screen, the game leaves the world - and those changes were never saved (Performance Boost settings "came back"
+	 * after a restart). Whatever replaces this screen, the profile and options.txt are written once.
+	 */
+	@Override
+	public void removed() {
+		if (!saved) {
+			saveSettings();
+		}
+		super.removed();
+	}
+
+	private void saveSettings() {
+		saved = true;
+		net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
+		//? if <26.1 {
+		net.minecraft.client.MinecraftClient.getInstance().options.write();
+		//?} else {
+		/*net.minecraft.client.Minecraft.getInstance().options.save();
+		*///?}
+	}
+
 	@Override
 	protected void requestClose() {
 		// Covers both the Done button (calls this directly) and Escape
@@ -801,14 +826,9 @@ public final class ModuleConfigScreen extends VeloWindow {
 		if (dash != null) {
 			dash.dashboardClosed();
 		}
-		net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
 		// Many settings (Max FPS, view distance...) are vanilla options: write options.txt too, or a restart before
 		// vanilla saved it on its own brought the old values back.
-		//? if <26.1 {
-		net.minecraft.client.MinecraftClient.getInstance().options.write();
-		//?} else {
-		/*net.minecraft.client.Minecraft.getInstance().options.save();
-		*///?}
+		saveSettings();
 		super.requestClose();
 	}
 }

@@ -43,6 +43,8 @@ final class CrashAnalyzer {
 			"- Mod '(.+?)' \\(([a-z0-9_\\-]+)\\) \\S+ requires (.+?) of (?:mod )?(?:'(.+?)' \\()?([a-z0-9_\\-]+)\\)?, which is missing!");
 	private static final Pattern FABRIC_WRONG = Pattern.compile(
 			"- Mod '(.+?)' \\(([a-z0-9_\\-]+)\\) \\S+ requires (.+?) of (?:mod )?'(.+?)' \\(([a-z0-9_\\-]+)\\), but only the wrong version is present: (\\S+?)!");
+	private static final Pattern CLASS_TWEAKER_NAMESPACE = Pattern.compile(
+			"(?s)Failed to read classTweaker file from mod ([a-z0-9_\\-]+).{0,600}?Namespace \\((\\w+)\\) does not match current runtime namespace");
 	private static final Pattern FABRIC_CLASH = Pattern.compile(
 			"- Mod '(.+?)' \\(([a-z0-9_\\-]+)\\) \\S+ is incompatible with (.+?) of mod '(.+?)' \\(([a-z0-9_\\-]+)\\), yet a conflicting version is present");
 
@@ -115,6 +117,46 @@ final class CrashAnalyzer {
 					"Java couldn't reserve " + (s.ramMaxMb() != null ? s.ramMaxMb() + " MB" : "the memory") + " for Minecraft"
 							+ (free > 0 ? " - only about " + free + " MB are free right now" : "") + ", so the game couldn't start.",
 					fixes, List.of()));
+		}
+		// A mod whose access widener / class tweaker is in Mojang's names (built for 26.x) on a version that runs intermediary
+		// names, or the other way round: Fabric refuses to start. The message names the mod.
+		Matcher tweaker = CLASS_TWEAKER_NAMESPACE.matcher(text);
+		if (tweaker.find()) {
+			ModScanner.ModInfo mod = s.enabledById(tweaker.group(1));
+			List<Fix> fixes = new ArrayList<>();
+			if (mod != null) {
+				fixes.add(update(mod, true));
+				fixes.add(off(mod));
+			}
+			issues.add(new Issue("tweaker-namespace:" + tweaker.group(1), Severity.CRASH,
+					(mod != null ? mod.displayName() : tweaker.group(1)) + " is built for another Minecraft version",
+					"Its files use the names of " + (tweaker.group(2).equals("named") ? "Minecraft 26.x" : "Minecraft 1.21 and older")
+							+ ", this profile is " + s.instance().mcVersion() + ". Get the build for " + s.instance().mcVersion() + " or turn it off.",
+					fixes, List.of()));
+		}
+		// Remove Reloading Screen (RRLS) re-uploads texture atlases on its own thread of events - with Vulkan its pipelines
+		// aren't ready then ("Pipeline is not valid"). Seen 2026-11-08.
+		if (text.contains("Pipeline is not valid") && text.contains("rrls")) {
+			ModScanner.ModInfo rrls = s.enabledById("rrls");
+			if (rrls != null) {
+				List<Fix> fixes = new ArrayList<>(List.of(off(rrls)));
+				if (GraphicsApi.supported(s.instance().mcVersion()) && !GraphicsApi.OPENGL.equals(s.graphicsApi())) {
+					fixes.add(new Fix("Switch to OpenGL", "RRLS works there", List.of(new Action.SetGraphicsApi(GraphicsApi.OPENGL))));
+				}
+				issues.add(new Issue("rrls-vulkan", Severity.CRASH, "Remove Reloading Screen doesn't work with Vulkan",
+						"RRLS reloads textures at a moment Vulkan isn't ready for and the game crashes.", fixes, List.of()));
+			}
+		}
+		// ZGC (picked automatically on roomy PCs since 2026-11-08) needs ~45% more memory than G1 for the same game: when a
+		// game that ran with it ran out of memory - in Java, or the JVM itself couldn't get native memory - offer G1 first.
+		boolean ranZgc = text.contains("-XX:+UseZGC") || text.contains("Z Garbage Collector");
+		boolean nativeOom = text.contains("There is insufficient memory for the Java Runtime Environment")
+				|| text.contains("Native memory allocation (mmap) failed") || text.contains("Native memory allocation (malloc) failed");
+		if (ranZgc && (text.contains("java.lang.OutOfMemoryError") || nativeOom)) {
+			issues.add(new Issue("oom-zgc", Severity.CRASH, "Minecraft ran out of memory with ZGC",
+					"Velo used the ZGC garbage collector for smoother frames, but it needs more memory than this PC had free. G1 uses "
+							+ "noticeably less - frames stay smooth enough and the game fits.",
+					List.of(new Fix("Use the G1 garbage collector", "Less memory, all profiles (Settings > Memory)", List.of(new Action.UseG1()))), List.of()));
 		}
 		if (text.contains("java.lang.OutOfMemoryError")) {
 			int now = s.ramMaxMb() != null ? s.ramMaxMb() : net.veloclient.launcher.launch.MemoryPlanner.plan(s.instance()).maxMb();
@@ -209,6 +251,20 @@ final class CrashAnalyzer {
 		String primary = primaryTrace(crash, trace);
 		boolean shaderCrash = (culprit != null && "iris".equals(culprit.id()) || primary.contains("net.irisshaders"))
 				&& primary.toLowerCase(java.util.Locale.ROOT).contains("shader");
+		// Iris on the Vulkan-era renderer leaves a render pass open (its shadow pass): the game then dies at the NEXT pass,
+		// with no Iris in that stack - 9 reports from one player on 26.3 read as "it crashed after you added 3 mods".
+		boolean irisShadersOn = s.enabledById("iris") != null && Rules.irisShadersOn(s);
+		if (!shaderCrash && irisShadersOn && (primary.contains("Render pass had debug groups left open")
+				|| primary.contains("Close the existing render pass before creating a new one"))) {
+			shaderCrash = true;
+			culprit = s.enabledById("iris");
+		}
+		if (shaderCrash && GraphicsApi.supported(s.instance().mcVersion()) && !GraphicsApi.OPENGL.equals(s.graphicsApi())) {
+			issues.add(new Issue("iris-vulkan", Severity.CRASH, "Shaders need OpenGL",
+					"Iris shader packs run on OpenGL. With Vulkan its passes clash with the game's and it crashes.",
+					List.of(new Fix("Switch to OpenGL", "Shaders keep working - applies on the next start",
+							List.of(new Action.SetGraphicsApi(GraphicsApi.OPENGL)))), List.of()));
+		}
 		if (shaderCrash) {
 			List<Fix> fixes = new ArrayList<>(List.of(new Fix("Turn shaders off", "The shader pack stays installed", List.of(new Action.DisableShaders()))));
 			ModScanner.ModInfo iris = s.enabledById("iris");
@@ -343,8 +399,10 @@ final class CrashAnalyzer {
 				continue;
 			}
 			if (dep != null) {
+				// The exact version asked for: the newest one didn't fit either (Reese's Sodium Options wants exactly
+				// 0.9.3-beta.3 of Sodium - "update" kept installing another one and the crash came back, 2026-11-08).
 				fixes.add(new Fix("Get a fitting " + depName, "Switches " + depName + " to a version " + modName + " accepts",
-						List.of(new Action.Update(dep.file(), dep.displayName(), depId, false))));
+						List.of(new Action.Update(dep.file(), dep.displayName(), depId, false, fabricRange(wrong.group(3))))));
 			}
 			if (mod != null) {
 				fixes.add(update(mod, false));

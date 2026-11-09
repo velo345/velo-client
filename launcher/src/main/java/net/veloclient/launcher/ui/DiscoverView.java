@@ -33,6 +33,10 @@ public final class DiscoverView {
 		void server(String address, Button trigger);
 
 		void world(String worldId, String version, Button trigger);
+
+		/** Opens a reward's own page (cloak / aura) to look at it. */
+		default void preview(String itemId) {
+		}
 	}
 
 	private DiscoverView() {
@@ -60,8 +64,9 @@ public final class DiscoverView {
 			strip.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 			strip.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
 			strip.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
-			strip.setMinHeight(196);
-			strip.setPrefHeight(196);
+			// as tall as the cards (a fixed 196 px cut the partner card with its reward and put a scroll bar under it)
+			strip.prefViewportHeightProperty().bind(cards.heightProperty());
+			strip.minViewportHeightProperty().bind(cards.heightProperty());
 			box.getChildren().add(strip);
 		} else {
 			box.getChildren().add(cards);
@@ -83,7 +88,7 @@ public final class DiscoverView {
 					Button join = new Button("Join");
 					join.getStyleClass().add("primary-button");
 					join.setOnAction(ev -> joiner.server(p.get("address").getAsString(), join));
-					cards.getChildren().add(partnerCard(p, join));
+					cards.getChildren().add(partnerCard(p, join, joiner));
 				}
 			}
 			java.util.Set<String> shown = new java.util.HashSet<>();
@@ -193,7 +198,7 @@ public final class DiscoverView {
 	 * A partner server: its icon big on an accent-tinted card, live player count, the address (click to copy) and its
 	 * partner code, if it has one, as a ticket-style badge.
 	 */
-	private static Node partnerCard(JsonObject p, Button join) {
+	private static Node partnerCard(JsonObject p, Button join, Joiner joiner) {
 		String accent = p.has("accent") && !p.get("accent").isJsonNull() ? p.get("accent").getAsString() : "#ff2d3c";
 		String address = p.get("address").getAsString();
 		boolean online = p.has("online") && p.get("online").getAsBoolean();
@@ -275,7 +280,7 @@ public final class DiscoverView {
 			card.getChildren().add(code);
 		}
 		if (p.has("reward") && p.get("reward").isJsonObject()) {
-			card.getChildren().add(rewardRow(p.getAsJsonObject("reward"), accent));
+			card.getChildren().add(rewardRow(p.getAsJsonObject("reward"), accent, joiner));
 		}
 		card.getChildren().addAll(grow, bottom);
 		card.getStyleClass().add("card");
@@ -290,59 +295,84 @@ public final class DiscoverView {
 	}
 
 	/**
-	 * What playing there gives (server's PartnerPlayRewards): the cloak's front as a little picture (from its card art) and
-	 * the line saying how to get it.
+	 * What playing there gives (server's PartnerPlayRewards), as one tidy line: the cloak's front, "Play 10 min - free" with
+	 * the items' names, and a button per item that opens its page to look at it (the 3D preview on your skin). The server's
+	 * full sentence is the tooltip.
 	 */
-	private static Node rewardRow(JsonObject reward, String accent) {
+	private static Node rewardRow(JsonObject reward, String accent, Joiner joiner) {
 		javafx.scene.image.ImageView preview = new javafx.scene.image.ImageView();
-		preview.setFitWidth(30);
-		preview.setFitHeight(48);
+		preview.setFitWidth(22);
+		preview.setFitHeight(35);
 		preview.setPreserveRatio(true);
 		preview.setSmooth(true);
-		Label line = new Label(text(reward, "text", ""));
-		line.setWrapText(true);
-		line.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 11.5px; -fx-font-weight: 700;");
-		Label gift = new Label("FREE REWARD");
-		gift.setStyle("-fx-text-fill: white; -fx-background-color: " + accent + "; -fx-background-radius: 4; -fx-padding: 1 6 1 6;"
-				+ " -fx-font-size: 9px; -fx-font-weight: 900;");
-		VBox words = new VBox(3, gift, line);
-		HBox row = new HBox(10, preview, words);
-		row.setAlignment(Pos.CENTER_LEFT);
-		row.setStyle("-fx-background-color: " + accent + "14; -fx-background-radius: 10; -fx-border-color: " + accent + "44;"
-				+ " -fx-border-radius: 10; -fx-padding: 6 10 6 8;");
+		javafx.scene.layout.StackPane thumb = new javafx.scene.layout.StackPane(preview);
+		thumb.setMinSize(30, 40);
+		thumb.setMaxSize(30, 40);
+		thumb.setStyle("-fx-background-color: rgba(0,0,0,0.25); -fx-background-radius: 7;");
+		int minutes = reward.has("minutes") ? reward.get("minutes").getAsInt() : 0;
+		Label headline = new Label(minutes > 0 ? "Play " + minutes + " min here  ·  free" : "Free reward");
+		headline.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 11.5px; -fx-font-weight: 800;");
+		Label items = new Label("");
+		items.setStyle("-fx-text-fill: -velo-text-2; -fx-font-size: 11px;");
+		items.setWrapText(true);
+		HBox buttons = new HBox(6);
+		buttons.setAlignment(Pos.CENTER_LEFT);
+		VBox words = new VBox(3, headline, items, buttons);
+		words.setAlignment(Pos.CENTER_LEFT);
 		HBox.setHgrow(words, Priority.ALWAYS);
-		String cape = null;
+		HBox row = new HBox(10, thumb, words);
+		row.setAlignment(Pos.CENTER_LEFT);
+		row.setStyle("-fx-background-color: " + accent + "12; -fx-background-radius: 10; -fx-padding: 6 8 6 6;");
+		String text = text(reward, "text", "");
+		if (!text.isEmpty()) {
+			javafx.scene.control.Tooltip.install(row, new javafx.scene.control.Tooltip(text));
+		}
+		List<String> ids = new ArrayList<>();
 		if (reward.has("items") && reward.get("items").isJsonArray()) {
 			for (var item : reward.getAsJsonArray("items")) {
-				if (item.getAsString().startsWith("cape_")) {
-					cape = item.getAsString();
-				}
+				ids.add(item.getAsString());
 			}
 		}
+		for (String id : ids) {
+			Button look = new Button(id.startsWith("cape_") ? "Cloak" : id.startsWith("aura_") ? "Aura" : "Item");
+			look.setGraphic(Icons.icon("eye", 11, javafx.scene.paint.Color.web("#C9CBD3")));
+			look.getStyleClass().add("ghost-button");
+			look.setStyle("-fx-font-size: 11px; -fx-padding: 2 8 2 7;");
+			look.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+			look.setTooltip(new javafx.scene.control.Tooltip("Preview it"));
+			look.setOnAction(e -> joiner.preview(id));
+			buttons.getChildren().add(look);
+		}
 		String base = net.veloclient.launcher.social.LauncherSocial.baseUrl();
-		if (cape != null && base != null) {
-			String id = cape;
+		if (base != null && !ids.isEmpty()) {
 			Thread.ofVirtual().name("velo-partner-reward").start(() -> {
-				try {
-					java.net.http.HttpClient http = java.net.http.HttpClient.newHttpClient();
-					String body = http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/cosmetics/item?id=" + id)).build(),
-							java.net.http.HttpResponse.BodyHandlers.ofString()).body();
-					JsonObject files = com.google.gson.JsonParser.parseString(body).getAsJsonObject().getAsJsonObject("files");
-					String sha = files.has("card") ? files.get("card").getAsString() : files.get("gif").getAsString();
-					byte[] gif = http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/cosmetics/file/" + sha)).build(),
-							java.net.http.HttpResponse.BodyHandlers.ofByteArray()).body();
-					java.awt.image.BufferedImage frame = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(gif));
-					if (frame == null) {
-						return;
+				java.net.http.HttpClient http = java.net.http.HttpClient.newHttpClient();
+				List<String> names = new ArrayList<>();
+				for (String id : ids) {
+					try {
+						String body = http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/cosmetics/item?id=" + id)).build(),
+								java.net.http.HttpResponse.BodyHandlers.ofString()).body();
+						JsonObject item = com.google.gson.JsonParser.parseString(body).getAsJsonObject();
+						names.add(text(item, "name", id) + (id.startsWith("cape_") ? " Cloak" : id.startsWith("aura_") ? " Aura" : ""));
+						if (id.startsWith("cape_") && item.has("files")) {
+							JsonObject files = item.getAsJsonObject("files");
+							String sha = files.has("card") ? files.get("card").getAsString() : files.get("gif").getAsString();
+							byte[] gif = http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(base + "/v1/cosmetics/file/" + sha)).build(),
+									java.net.http.HttpResponse.BodyHandlers.ofByteArray()).body();
+							java.awt.image.BufferedImage frame = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(gif));
+							if (frame != null) {
+								// the cloak's front: x 1..11, y 1..17 of the 64 x 32 layout
+								int px = frame.getWidth() / 64;
+								javafx.scene.image.Image image = javafx.embed.swing.SwingFXUtils.toFXImage(frame.getSubimage(px, px, 10 * px, 16 * px), null);
+								javafx.application.Platform.runLater(() -> preview.setImage(image));
+							}
+						}
+					} catch (Exception ignored) {
+						// just no name / picture for this one
 					}
-					// the cloak's front: x 1..11, y 1..17 of the 64 x 32 layout
-					int px = frame.getWidth() / 64;
-					java.awt.image.BufferedImage front = frame.getSubimage(px, px, 10 * px, 16 * px);
-					javafx.scene.image.Image image = javafx.embed.swing.SwingFXUtils.toFXImage(front, null);
-					javafx.application.Platform.runLater(() -> preview.setImage(image));
-				} catch (Exception ignored) {
-					// just no picture
 				}
+				String line = String.join(" + ", names.stream().map(n -> n.replace(" Cloak Cloak", " Cloak").replace(" Aura Aura", " Aura")).toList());
+				javafx.application.Platform.runLater(() -> items.setText(line));
 			});
 		}
 		return row;

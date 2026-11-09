@@ -1,0 +1,156 @@
+{
+ "title": "Velo Client 1.3: Velo Rewind",
+ "summary": "Record in 3D, fly through it, edit it on a timeline and export it as a video with sound. Plus an account switcher, new modules and AI access.",
+ "tag": "Update",
+ "version": "1.3.0",
+ "accent": "#e0262e",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "text",
+   "text": "**Velo Client 1.3** brings **Velo Rewind**: record what happens around you as a real 3D replay, fly through it, edit it on a timeline and export it as a video, for YouTube or TikTok, with sound. Plus an account switcher, new modules and a launcher that gives AI agents a way in."
+  },
+  {
+   "type": "heading",
+   "text": "Velo Rewind"
+  },
+  {
+   "type": "image",
+   "image": "file:images/editor.jpg",
+   "caption": "The editor: timeline with keyframes, camera path, world settings per clip."
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Record** with F6 or from the pause menu: start, pause, stop. Follows you across server switches",
+    "Replays are **3D**: fly anywhere, through blocks, and watch from any angle",
+    "**Timeline**: several clips, keyframes for camera position, angle, roll and FOV, time of day, rain, fog and speed. Smooth, linear or eased",
+    "Pause and the camera path shows in the world, like in Blender",
+    "**Camera follow**: the camera keeps a player or item in view and moves with it (behind, orbit, fixed)",
+    "**Players menu**: everyone in the recording, search, hide one or all, click to fly to them",
+    "Per player: hide their **cloak, cosmetics, pets, name tag or glow**, swap their **skin**"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Export with sound"
+  },
+  {
+   "type": "image",
+   "image": "file:images/export.jpg",
+   "caption": "The export runs right in the editor. The video only shows the world: no HUD, no chat, no menus."
+  },
+  {
+   "type": "list",
+   "items": [
+    "Formats: **YouTube 16:9**, **TikTok 9:16**, square, up to 1440p and 60 FPS",
+    "**Sound**: everything you hear, or only the recorded voice tracks",
+    "Records **Simple Voice Chat** (each player as their own track), optionally your microphone and system audio like Discord",
+    "**Volume per source** (players, mobs, blocks, music, voice, each player) as a clip value or with keyframes",
+    "Done sound and **Open folder** when it's finished"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Green screen"
+  },
+  {
+   "type": "image",
+   "image": "file:images/greenscreen.jpg",
+   "caption": "Background: Green screen. Players and mobs stay, the world goes."
+  },
+  {
+   "type": "text",
+   "text": "Per clip the background can be the world, the sky without terrain, **green**, **blue** or **black**. Ready for keying in your video editor."
+  },
+  {
+   "type": "heading",
+   "text": "Never lost"
+  },
+  {
+   "type": "list",
+   "items": [
+    "Recordings are saved every few seconds: even after a crash you get them back (\"recovered\")",
+    "Closing the game saves the running recording",
+    "Edits save themselves, with **Undo / Redo** (Ctrl+Z / Ctrl+Y) and backups"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Account switcher"
+  },
+  {
+   "type": "image",
+   "image": "file:images/accounts.jpg",
+   "caption": "Top right on the title screen."
+  },
+  {
+   "type": "text",
+   "text": "Switch between the accounts you signed in with in the launcher, **right in the game, no restart**. Velo Rewind sits right next to it."
+  },
+  {
+   "type": "heading",
+   "text": "New modules"
+  },
+  {
+   "type": "image",
+   "image": "file:images/numbers.jpg",
+   "caption": "Numbered Inventories: small numbers behind the items."
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Numbered Inventories**: numbers every slot, from 0 like plugin configs count them. Great for server owners",
+    "**Color Codes** (F4): pick a colour from the world or a palette, copy it as hex, &-code, MiniMessage and more, with gradients",
+    "**Shield Indicator**: see when a shield is up or disabled",
+    "**Own Name Tag** is now on for everyone"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "AI access (at your own risk)"
+  },
+  {
+   "type": "image",
+   "image": "file:images/ai.jpg",
+   "caption": "Built by an AI through the local API."
+  },
+  {
+   "type": "text",
+   "text": "Launcher → Settings → **AI Access**: AI agents like Claude Code can drive the game through a local API (only on your PC, with a token). They can edit replays and export videos, record, take screenshots and clips, change Velo modules, resource packs and shaders. Playing (moving, chat, inventory, building) only works in singleplayer or where you're an operator. The game can even run **without a window**."
+  },
+  {
+   "type": "heading",
+   "text": "Also new"
+  },
+  {
+   "type": "list",
+   "items": [
+    "Emoji suggestions show up as soon as you type **:**, symbols included",
+    "The map opens centred on you and follows you",
+    "Your cosmetics now show for players on other clients too",
+    "New **LuckySMP cloak**",
+    "Launcher: the Play button reacts at once and can't start the game twice; the launcher comes back when the game closes",
+    "Launcher: downloads fall back to our own mirror when GitHub is slow",
+    "Smarter memory: ZGC on PCs with lots of RAM, G1 otherwise",
+    "Client import: faster, shows icons, skips broken files"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Fixed"
+  },
+  {
+   "type": "list",
+   "items": [
+    "Connection errors on some servers (IPv6)",
+    "Performance Boost settings not being kept after a restart",
+    "Game hanging when refreshing chat",
+    "Title screen without text on some Windows PCs",
+    "More Doctor fixes for crashes with Iris, Vulkan and memory",
+    "Lots more from your bug reports 💙"
+   ]
+  }
+ ]
+}

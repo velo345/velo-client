@@ -163,7 +163,9 @@ function main() {
 	tokens["asset.store"] = `/assets/store.js?v=${hashOf(path.join(ROOT, "assets", "store.js"))}`;
 	tokens["asset.skin3d"] = `/assets/skin3d.js?v=${hashOf(path.join(ROOT, "assets", "skin3d.js"))}`;
 	const rel = config.release;
-	const dl = (file) => `${config.links.releases}/download/v${rel.version}/${file}`;
+	// downloadMirror: our own copy of the release files (velo-client.com/dl/v<version>/, uploaded next to the site and kept
+	// by deploy.sh) - GitHub's release downloads time out for signed-out users now and then. Empty = straight from GitHub.
+	const dl = (file) => config.links.downloadMirror ? `${config.links.downloadMirror}/v${rel.version}/${file}` : `${config.links.releases}/download/v${rel.version}/${file}`;
 	tokens["download.exe"] = dl(rel.launcherExe);
 	tokens["download.deb"] = dl(rel.launcherDeb);
 	tokens["download.tar"] = dl(rel.launcherTar);
