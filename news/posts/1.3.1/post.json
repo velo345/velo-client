@@ -1,0 +1,71 @@
+{
+ "title": "Velo Client 1.3.1: exact export",
+ "summary": "Exports that never lose a frame, names that really disappear, faster GPU encoding and a much easier way in for AI agents.",
+ "tag": "Update",
+ "version": "1.3.1",
+ "accent": "#e0262e",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "text",
+   "text": "**Velo Client 1.3.1** makes Velo Rewind ready for real videos: exports that never lose a frame, names that really disappear, and a much easier way in for AI agents."
+  },
+  {
+   "type": "heading",
+   "text": "Exact export"
+  },
+  {
+   "type": "image",
+   "image": "file:images/export.jpg",
+   "caption": "Cancel or stop at any time, the video only shows the world."
+  },
+  {
+   "type": "list",
+   "items": [
+    "Exports now render **frame by frame**: every frame is in the video and the timing is exact, however long rendering takes. No more videos that play too fast",
+    "Recorded voice chat stays **perfectly in sync**",
+    "Uses your **graphics card's encoder** (NVIDIA, AMD, Intel, Mac): much faster",
+    "**Cancel** or **Stop & keep** at any time, also with Esc",
+    "Pick the **system audio device and microphone** in the Velo Rewind settings"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Names gone, really"
+  },
+  {
+   "type": "list",
+   "items": [
+    "Hiding name tags now works on players too, including the **score line** under the name",
+    "Server **holograms** with ranks or money above a hidden player are left out",
+    "New: **Hide on everyone** in the World tab hides every name tag and name hologram in a clip"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Smoother replays"
+  },
+  {
+   "type": "list",
+   "items": [
+    "Camera follow no longer flies through walls and leaves",
+    "Clicking a player in the Players menu flies the camera to them",
+    "Players menu clicks no longer go through to the timeline"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "For AI agents"
+  },
+  {
+   "type": "list",
+   "items": [
+    "A complete, much clearer guide (AI.md and GET /) with every endpoint, recipes and errors",
+    "\"self\" as a follow target, a list of every player in a recording, entity filters, sound settings",
+    "Start a profile from the command line: --launch <profile>",
+    "A hidden game no longer captures the mouse on Windows"
+   ]
+  }
+ ]
+}

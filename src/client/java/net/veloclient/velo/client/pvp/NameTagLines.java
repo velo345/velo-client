@@ -41,7 +41,13 @@ public final class NameTagLines {
 		PROVIDERS.sort(Comparator.comparingInt(Provider::order));
 	}
 
+	/** Entities whose lines must not show (Velo Rewind: name tags hidden in a replay). */
+	public static volatile java.util.function.IntPredicate hidden = id -> false;
+
 	public static synchronized List<Object> lines(int entityId, boolean hasScoreLine) {
+		if (hidden.test(entityId)) {
+			return List.of();
+		}
 		if (PROVIDERS.isEmpty() || entityId == PvpCompat.localPlayerId()) {
 			return List.of();
 		}

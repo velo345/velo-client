@@ -29,6 +29,10 @@ public final class RewindAudio {
 	public static volatile boolean recordVoice = true;
 	public static volatile boolean recordMic;
 	public static volatile boolean recordSystem;
+	/** The system audio ("everything you hear") source to record from; "" = find it automatically. */
+	public static volatile String systemDevice = "";
+	/** The microphone to record from (without Simple Voice Chat); "" = the system's default. */
+	public static volatile String micDevice = "";
 	/** Simple Voice Chat's plugin is running (so the mic comes from it). */
 	static volatile boolean voicechat;
 
@@ -96,7 +100,7 @@ public final class RewindAudio {
 	// The default microphone through Java Sound (only without Simple Voice Chat).
 	private static void micLoop() {
 		javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(RATE, 16, 1, true, false);
-		try (javax.sound.sampled.TargetDataLine line = javax.sound.sampled.AudioSystem.getTargetDataLine(format)) {
+		try (javax.sound.sampled.TargetDataLine line = micLine(format)) {
 			line.open(format, RATE / 5 * 2);
 			line.start();
 			byte[] buf = new byte[960 * 2];
@@ -111,6 +115,77 @@ public final class RewindAudio {
 		} catch (Exception e) {
 			org.slf4j.LoggerFactory.getLogger("Velo Rewind").warn("Velo Rewind: no microphone to record", e);
 		}
+	}
+
+	private static javax.sound.sampled.TargetDataLine micLine(javax.sound.sampled.AudioFormat format) throws Exception {
+		String want = micDevice;
+		if (want != null && !want.isBlank()) {
+			for (var info : javax.sound.sampled.AudioSystem.getMixerInfo()) {
+				if (info.getName().equals(want)) {
+					return javax.sound.sampled.AudioSystem.getTargetDataLine(format, info);
+				}
+			}
+		}
+		return javax.sound.sampled.AudioSystem.getTargetDataLine(format);
+	}
+
+	// ---- devices (the settings and the AI API list them) ----
+
+	private static List<String> systemCache;
+	private static long systemCacheAt;
+
+	/** Sources "everything you hear" can be recorded from: PulseAudio / PipeWire sources (monitors first), DirectShow audio devices. */
+	public static synchronized List<String> systemDevices() {
+		if (systemCache != null && System.currentTimeMillis() - systemCacheAt < 60_000) {
+			return systemCache;
+		}
+		List<String> out = new ArrayList<>();
+		String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+		try {
+			if (os.contains("linux")) {
+				Process p = new ProcessBuilder("pactl", "list", "short", "sources").redirectErrorStream(true).start();
+				for (String line : new String(p.getInputStream().readAllBytes()).split("\n")) {
+					String[] cols = line.split("\t");
+					if (cols.length > 1) {
+						out.add(cols[1]);
+					}
+				}
+				out.sort((a, b) -> Boolean.compare(!a.endsWith(".monitor"), !b.endsWith(".monitor")));
+			} else if (os.contains("win")) {
+				java.nio.file.Path ffmpeg = net.veloclient.velo.client.clips.FfmpegTool.binary();
+				if (ffmpeg != null) {
+					Process p = new ProcessBuilder(ffmpeg.toString(), "-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy")
+							.redirectErrorStream(true).start();
+					for (String line : new String(p.getInputStream().readAllBytes()).split("\n")) {
+						int a = line.indexOf('"');
+						int b = line.lastIndexOf('"');
+						if (a >= 0 && b > a && line.contains("(audio)")) {
+							out.add(line.substring(a + 1, b));
+						}
+					}
+				}
+			}
+		} catch (Exception ignored) {
+		}
+		systemCache = out;
+		systemCacheAt = System.currentTimeMillis();
+		return out;
+	}
+
+	/** Microphones Java can record from. */
+	public static List<String> micDevices() {
+		List<String> out = new ArrayList<>();
+		javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(RATE, 16, 1, true, false);
+		for (var info : javax.sound.sampled.AudioSystem.getMixerInfo()) {
+			try {
+				if (javax.sound.sampled.AudioSystem.getMixer(info).isLineSupported(new javax.sound.sampled.DataLine.Info(
+						javax.sound.sampled.TargetDataLine.class, format))) {
+					out.add(info.getName());
+				}
+			} catch (Exception ignored) {
+			}
+		}
+		return out;
 	}
 
 	// Reads raw little-endian PCM in 20 ms blocks.
@@ -184,10 +259,20 @@ public final class RewindAudio {
 		if (os.contains("linux")) {
 			return onPath("parec") || net.veloclient.velo.client.clips.FfmpegTool.binary() != null;
 		}
-		return os.contains("win") && net.veloclient.velo.client.clips.FfmpegTool.binary() != null;
+		if (!os.contains("win") || net.veloclient.velo.client.clips.FfmpegTool.binary() == null) {
+			return false;
+		}
+		try {
+			return windowsLoopback(net.veloclient.velo.client.clips.FfmpegTool.binary()) != null; // a Stereo Mix / cable / chosen device
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	private static String defaultMonitor() {
+		if (systemDevice != null && !systemDevice.isBlank()) {
+			return systemDevice;
+		}
 		try {
 			Process p = new ProcessBuilder("pactl", "get-default-sink").redirectErrorStream(true).start();
 			String sinkName = new String(p.getInputStream().readAllBytes()).trim();
@@ -202,6 +287,9 @@ public final class RewindAudio {
 	private static String windowsDevice;
 
 	private static String windowsLoopback(java.nio.file.Path ffmpeg) throws Exception {
+		if (systemDevice != null && !systemDevice.isBlank()) {
+			return systemDevice;
+		}
 		if (windowsDevice != null) {
 			return windowsDevice.isEmpty() ? null : windowsDevice;
 		}

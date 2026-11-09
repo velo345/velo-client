@@ -125,7 +125,9 @@ final class RewindPlayer {
 		Matcher id = Pattern.compile("\"selfId\":\\s*(-?\\d+)").matcher(meta);
 		selfId = id.find() ? Integer.parseInt(id.group(1)) : -1;
 		Matcher uuid = Pattern.compile("\"selfUuid\":\\s*\"([0-9a-f-]+)\"").matcher(meta);
-		selfUuid = uuid.find() ? uuidBytes(UUID.fromString(uuid.group(1))) : null;
+		boolean hasSelf = uuid.find();
+		recordedSelf = hasSelf ? uuid.group(1) : null;
+		selfUuid = hasSelf ? uuidBytes(UUID.fromString(uuid.group(1))) : null;
 		if (selfUuid != null) {
 			// stable per recording, so hidden entities / skin swaps saved for the recorder's own player still match
 			fakeUuid = uuidBytes(UUID.nameUUIDFromBytes(("velo-rewind:" + uuid.group(1)).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
@@ -145,6 +147,100 @@ final class RewindPlayer {
 	}
 
 	// After every edit: saved once the changes settle (see RewindAutosave), and an undo step.
+	// The recording player's UUID inside the replay (it's swapped so the viewer's own account never clashes with it).
+	UUID replaySelfUuid() {
+		ByteBuffer b = ByteBuffer.wrap(fakeUuid);
+		return new UUID(b.getLong(), b.getLong());
+	}
+
+	private final String recordedSelf;
+
+	// The recording player's real UUID (meta.json selfUuid) - asking for it finds them under their replay UUID.
+	String recordedSelfUuid() {
+		return recordedSelf == null ? "" : recordedSelf;
+	}
+
+	int selfEntityId() {
+		return selfId;
+	}
+
+	// ---- every player in the whole recording (the AI API's GET /players), scanned once in the background ----
+
+	private volatile List<Object[]> playersScan; // {uuid, name, firstTick, lastTick, self}
+	private volatile boolean scanning;
+
+	List<Object[]> players() {
+		if (playersScan == null && !scanning) {
+			scanning = true;
+			Thread.ofPlatform().daemon().name("velo-rewind-players").start(this::scanPlayers);
+		}
+		return playersScan;
+	}
+
+	private void scanPlayers() {
+		java.util.Map<UUID, Object[]> out = new java.util.LinkedHashMap<>();
+		java.util.Map<UUID, String> names = new java.util.HashMap<>();
+		java.util.Map<Integer, UUID> byId = new java.util.HashMap<>();
+		ProtocolInfo<?> info = RewindRecorder.playProtocol();
+		UUID self = selfUuid == null ? null : replaySelfUuid();
+		try (RewindReader r = new RewindReader(file)) {
+			for (int seg = 0; seg < segments.size(); seg++) {
+				int tick = segmentStart(seg);
+				int end = tick + segments.get(seg)[1];
+				java.util.Set<UUID> present = new java.util.HashSet<>();
+				try (RewindReader.Frames frames = r.open("seg-" + seg + ".bin")) {
+					for (RewindReader.Frame f; (f = frames.next()) != null; ) {
+						if (f.type() == RewindWriter.F_TICK) {
+							tick++;
+							continue;
+						}
+						if (f.type() != RewindWriter.F_PACKET) {
+							continue;
+						}
+						byte[] body = f.body().clone();
+						if (selfUuid != null) {
+							replace(body, selfUuid, fakeUuid);
+						}
+						Packet<?> p = decode(info, body);
+						if (p instanceof net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket pi) {
+							for (var e : pi.entries()) {
+								if (e.profile() != null) {
+									names.put(e.profileId(), e.profile().name());
+								}
+							}
+						} else if (p instanceof net.minecraft.network.protocol.game.ClientboundAddEntityPacket add
+								&& net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(add.getType()).getPath().equals("player")) {
+							byId.put(add.getId(), add.getUUID());
+							present.add(add.getUUID());
+							int t = tick;
+							out.computeIfAbsent(add.getUUID(), k -> new Object[] {k, null, t, t, k.equals(self)});
+						} else if (p instanceof net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket rm) {
+							for (int id : RewindCompat.removedIds(rm)) {
+								UUID u = byId.get(id);
+								if (u != null && out.containsKey(u)) {
+									out.get(u)[3] = tick;
+									present.remove(u);
+								}
+							}
+						}
+					}
+				} catch (Exception ignored) {
+					// a cut-off segment: everything before counts
+				}
+				for (UUID u : present) {
+					out.get(u)[3] = end; // still there when the segment ended
+				}
+			}
+		} catch (Exception e) {
+			LOG.warn("Velo Rewind: couldn't scan the players of {}", file.getFileName(), e);
+		}
+		for (Object[] row : out.values()) {
+			row[1] = names.getOrDefault((UUID) row[0], ((UUID) row[0]).equals(self) ? "(you)" : null);
+		}
+		playersScan = new ArrayList<>(out.values());
+		scanning = false;
+	}
+
 	void saveEdits() {
 		autosave.changed();
 	}

@@ -13,6 +13,10 @@ public final class RewindExport {
 
 	public static void beforeGui() {
 	}
+
+	public static long clock(long realMs) {
+		return realMs;
+	}
 }
 //?} else {
 /*import net.minecraft.client.Minecraft;
@@ -99,6 +103,21 @@ public final class RewindExport {
 		if (!preGui() || live && liveHud) {
 			frame(); // (a live clip with the HUD wants the whole frame)
 		}
+	}
+
+	// ---- exact export: the game runs on a clock that moves exactly 1/fps per captured frame (RewindClockMixin), so
+	// no frame is ever lost and the video's timing is right however slowly it renders ----
+
+	private static volatile boolean exact;
+	private static double virtualMs;
+	private static long exportSample = -1;
+
+	// Minecraft's game clock (RewindClockMixin): virtual while an exact export renders.
+	public static long clock(long realMs) {
+		if (exact && state == State.RENDERING) {
+			return (long) virtualMs;
+		}
+		return realMs;
 	}
 
 	// A live clip (AI API: POST /clip): the normal game for a few seconds instead of a replay clip.
@@ -219,8 +238,13 @@ public final class RewindExport {
 				nextFrameNanos = 0;
 				audioStarted = false;
 				audioUsed = null;
+				// what the speakers play can only be recorded in real time; everything else renders frame by frame
+				exact = !(audioMode.equals(AUDIO_MODES.get(0)) && RewindAudio.loopbackAvailable());
+				virtualMs = net.minecraft.util.Util.getMillis();
+				exportSample = -1;
+				RewindSound.exporting = exact;
 				state = State.RENDERING;
-				message = "Rendering";
+				message = exact ? "Rendering frame by frame" : "Rendering (real time)";
 				ClipRecorder.frameHook = RewindExport::frameAfterGui;
 			} catch (Exception e) {
 				fail("Couldn't start: " + e.getMessage(), e);
@@ -265,20 +289,39 @@ public final class RewindExport {
 		}
 		long now = System.nanoTime();
 		long interval = 1_000_000_000L / fps;
-		if (now < nextFrameNanos) {
-			return;
+		if (!exact) {
+			if (now < nextFrameNanos) {
+				return;
+			}
+			nextFrameNanos = nextFrameNanos == 0 ? now + interval : Math.max(nextFrameNanos + interval, now - interval);
 		}
-		nextFrameNanos = nextFrameNanos == 0 ? now + interval : Math.max(nextFrameNanos + interval, now - interval);
 		lastActivity = now;
 		if (!audioStarted) {
 			audioStarted = true;
 			startAudio();
 		}
-		FrameCapture.grab((rgba, width, height) -> {
-			if (!QUEUE.offer(new Object[] {rgba, width, height})) {
+		boolean took = FrameCapture.grab((rgba, width, height) -> {
+			try {
+				// exact: wait for the encoder instead of dropping the frame
+				if (!QUEUE.offer(new Object[] {rgba, width, height}, exact ? 10 : 0, TimeUnit.SECONDS)) {
+					FrameCapture.release(rgba);
+				}
+			} catch (InterruptedException e) {
 				FrameCapture.release(rgba);
 			}
 		}, 2160);
+		if (exact && took) {
+			// this frame is in: the world moves on by exactly one frame, and its sound with it
+			virtualMs += 1000.0 / fps;
+			if (audioOut != null && "voice tracks".equals(audioUsed)) {
+				if (exportSample < 0 && p != null) {
+					exportSample = (long) p.position() * (RewindAudio.RATE / 20);
+				}
+				int n = RewindAudio.RATE / fps;
+				RewindSound.mixExport(exportSample, n, audioOut);
+				exportSample += n;
+			}
+		}
 		if (writer == null) {
 			writer = Thread.ofPlatform().daemon().name("velo-rewind-export").start(RewindExport::writeLoop);
 		}
@@ -312,6 +355,20 @@ public final class RewindExport {
 		}
 	}
 
+	// The fastest good H.264 encoder here: the GPU's (NVENC, AMF, Quick Sync, VideoToolbox), else x264 "veryfast".
+	private static List<String> videoCodec() {
+		var enc = FfmpegTool.encoder(20_000);
+		String name = enc == null ? "libx264" : enc.name();
+		LOG.info("Velo Rewind export encoder: {}", name);
+		return switch (name) {
+			case "h264_nvenc" -> List.of("-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", "19", "-b:v", "0");
+			case "h264_amf" -> List.of("-c:v", "h264_amf", "-quality", "quality", "-rc", "cqp", "-qp_i", "18", "-qp_p", "20");
+			case "h264_qsv" -> List.of("-c:v", "h264_qsv", "-global_quality", "20");
+			case "h264_videotoolbox" -> List.of("-c:v", "h264_videotoolbox", "-b:v", "24000k");
+			default -> List.of("-c:v", "libx264", "-preset", "veryfast", "-crf", "18");
+		};
+	}
+
 	private static void startEncoder(int w, int h) throws Exception {
 		// cut the window to the format, centred, then scale to the resolution
 		int cw = w;
@@ -327,8 +384,9 @@ public final class RewindExport {
 		String filter = "vflip,crop=" + cw + ":" + ch + ":" + (w - cw) / 2 + ":" + (h - ch) / 2 + scale;
 		List<String> cmd = new ArrayList<>(List.of(FfmpegTool.binary().toString(), "-hide_banner", "-loglevel", "error", "-y",
 				"-f", "rawvideo", "-pix_fmt", "rgba", "-video_size", w + "x" + h, "-framerate", String.valueOf(fps), "-i", "pipe:0",
-				"-vf", filter, "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-movflags", "+faststart",
-				output.toString()));
+				"-vf", filter, "-pix_fmt", "yuv420p"));
+		cmd.addAll(videoCodec());
+		cmd.addAll(List.of("-movflags", "+faststart", output.toString()));
 		process = new ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(output.resolveSibling("export.log").toFile()).start();
 		OutputStream stdin = process.getOutputStream();
 		pipe = Channels.newChannel(stdin);
@@ -360,7 +418,9 @@ public final class RewindExport {
 				}
 				LOG.info("Velo Rewind export: no way to record the speakers here - using the voice tracks");
 			}
-			RewindSound.capture = audioOut;
+			if (!exact) {
+				RewindSound.capture = audioOut; // real time: the live mix is copied
+			}
 			audioUsed = "voice tracks";
 		} catch (Exception e) {
 			LOG.warn("Velo Rewind export: no sound", e);
@@ -421,6 +481,8 @@ public final class RewindExport {
 	private static void finish() {
 		Minecraft mc = Minecraft.getInstance();
 		ClipRecorder.frameHook = null;
+		exact = false;
+		RewindSound.exporting = false;
 		stopAudio();
 		state = State.FINISHING;
 		message = "Saving the video...";
@@ -472,10 +534,54 @@ public final class RewindExport {
 		});
 	}
 
+	// Stop here and keep what's rendered so far.
 	static void cancel() {
 		if (state == State.RENDERING) {
 			finish();
+		} else {
+			abort();
 		}
+	}
+
+	// Throw the export away: nothing is saved (any state).
+	static void abort() {
+		LOG.info("Velo Rewind export: cancelled");
+		ClipRecorder.frameHook = null;
+		exact = false;
+		RewindSound.exporting = false;
+		live = false;
+		stopAudio();
+		Process proc = process;
+		Path out = output;
+		state = State.IDLE;
+		message = "";
+		Minecraft mc = Minecraft.getInstance();
+		setHud(mc, hudWasHidden);
+		RewindPlayer p = RewindPlayer.current();
+		if (p != null && !p.paused()) {
+			p.togglePause();
+		}
+		Thread.ofVirtual().start(() -> {
+			try {
+				if (writer != null) {
+					writer.join(3000);
+				}
+				if (proc != null) {
+					proc.destroyForcibly();
+					proc.waitFor(5, TimeUnit.SECONDS);
+				}
+				if (out != null) {
+					Files.deleteIfExists(out);
+				}
+			} catch (Exception ignored) {
+			} finally {
+				process = null;
+				pipe = null;
+				writer = null;
+				QUEUE.forEach(f -> FrameCapture.release((ByteBuffer) f[0]));
+				QUEUE.clear();
+			}
+		});
 	}
 
 	static void reset() {

@@ -133,6 +133,8 @@ public final class LauncherApp extends Application {
 	/** Covers the window while Home is built at startup, then reveals it (see {@link #finishStartup}). */
 	private net.veloclient.launcher.ui.LauncherSplash splash;
 
+	private static volatile String cliLaunch;
+
 	public static void main(String[] args) {
 		mainAt = System.nanoTime();
 		LauncherLog.install();
@@ -149,6 +151,13 @@ public final class LauncherApp extends Application {
 		// Performance mode: half the frames - half the GPU work (and half the driver leak, see RenderGate).
 		if (net.veloclient.launcher.data.LauncherSettings.get().performanceMode && System.getProperty("javafx.animation.pulse") == null) {
 			System.setProperty("javafx.animation.pulse", "30");
+		}
+		// --launch <profile id or name>: start that profile right away (scripts, AI agents) - also through a running launcher
+		for (int i = 0; i + 1 < args.length; i++) {
+			if (args[i].equals("--launch")) {
+				cliLaunch = args[i + 1];
+				SingleInstance.message = "launch " + cliLaunch;
+			}
 		}
 		if (!SingleInstance.acquire()) {
 			LauncherLog.info("Launcher already running - brought it to the front instead of starting a second one");
@@ -301,6 +310,10 @@ public final class LauncherApp extends Application {
 		// World Hosting: "Relaunch with matching mods" from the game.
 		net.veloclient.launcher.party.WorldRelaunch.start(instance -> launchWithProgress(instance, null, new Button(), new ProgressBar(), new Label()),
 				(title, text) -> showPlaceholderAlert(title, text));
+		net.veloclient.launcher.SingleInstance.onLaunch(id -> launchFromCommandLine(id));
+		if (cliLaunch != null) {
+			launchFromCommandLine(cliLaunch);
+		}
 		net.veloclient.launcher.SingleInstance.onActivate(() -> Platform.runLater(() -> {
 			stage.setIconified(false);
 			stage.show();
@@ -3614,10 +3627,20 @@ public final class LauncherApp extends Application {
 						+ " API (POST /quit) or the launcher's Stop button.", hidden);
 		Button copy = new Button("Copy prompt");
 		copy.setOnAction(e -> {
-			String prompt = "Velo Client (Minecraft) is running with its AI API at http://127.0.0.1:" + net.veloclient.launcher.launch.GameLauncher.AI_PORT
-					+ " - send 'Authorization: Bearer " + net.veloclient.launcher.launch.GameLauncher.aiToken() + "' with every request."
-					+ " GET / returns the full description of every endpoint (replays, video export, recording, worlds, chat, input,"
-					+ " inventory, modules, resource packs, shaders, mods). Start with GET /player and GET /status.";
+			String url = "http://127.0.0.1:" + net.veloclient.launcher.launch.GameLauncher.AI_PORT;
+			String prompt = "You can control Velo Client (a Minecraft client) through its local AI API.\n"
+					+ "URL: " + url + "  -  send 'Authorization: Bearer " + net.veloclient.launcher.launch.GameLauncher.aiToken()
+					+ "' with every request (JSON bodies).\n"
+					+ "1. First read the full guide: GET " + url + "/ (markdown, every endpoint with examples, recipes, errors).\n"
+					+ "2. The game must be running: start a profile with the Velo launcher (also from a terminal:"
+					+ " \"Velo Client Launcher\" --launch <profile name or id>), then wait until GET /status answers.\n"
+					+ "3. Start every session with GET /status and GET /player.\n"
+					+ "4. Replays (Velo Rewind): GET /recordings, POST /open {\"file\": \"<name>\", \"leave\": true}, poll GET /status until replay.ready.\n"
+					+ "5. Look before and after every change: GET /sheet?count=12&width=480. Edits save themselves; POST /undo reverts.\n"
+					+ "6. Videos: POST /export {\"format\": \"TikTok\", \"size\": 1, \"fps\": 60, \"audio\": \"voice\"} (frame by frame, exact),"
+					+ " poll GET /export until DONE - output is the MP4.\n"
+					+ "Rules: 20 ticks = 1 second; the recording player is the target \"self\"; hide all names with POST /clip {\"hideNames\": true};"
+					+ " moving, chat and building only work in singleplayer or as an operator.";
 			javafx.scene.input.ClipboardContent clip = new javafx.scene.input.ClipboardContent();
 			clip.putString(prompt);
 			javafx.scene.input.Clipboard.getSystemClipboard().setContent(clip);
@@ -3960,6 +3983,36 @@ public final class LauncherApp extends Application {
 		} catch (NumberFormatException e) {
 			return 25565;
 		}
+	}
+
+	// --launch: the profile by id, else by name (case-insensitive); waits up to a minute for the sign-in to be ready.
+	private void launchFromCommandLine(String key) {
+		Thread.ofVirtual().name("velo-cli-launch").start(() -> {
+			for (int i = 0; i < 120 && session == null; i++) {
+				try {
+					Thread.sleep(500);
+				} catch (InterruptedException e) {
+					return;
+				}
+			}
+			Instance found = null;
+			for (Instance inst : InstanceStore.loadAll()) {
+				if (inst.id().equalsIgnoreCase(key)) {
+					found = inst;
+					break;
+				}
+				if (found == null && inst.name() != null && inst.name().equalsIgnoreCase(key)) {
+					found = inst;
+				}
+			}
+			Instance target = found;
+			if (target == null || session == null) {
+				LauncherLog.warn("--launch " + key + ": " + (target == null ? "no profile with that id or name" : "not signed in"), null);
+				return;
+			}
+			LauncherLog.info("--launch: starting " + target.name());
+			Platform.runLater(() -> launchWithProgress(target, null, launchBar.playButton(), launchBar.progress(), launchBar.statusLabel()));
+		});
 	}
 
 	private void launchInstance(Instance instance, Button playButton, ProgressBar progressBar, Label statusLabel) {

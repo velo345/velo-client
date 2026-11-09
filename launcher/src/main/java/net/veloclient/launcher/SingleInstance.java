@@ -24,6 +24,9 @@ public final class SingleInstance {
 	private static FileLock lock;
 	private static ServerSocket server;
 	private static volatile Runnable onActivate = () -> { };
+	private static volatile java.util.function.Consumer<String> onLaunch = id -> { };
+	/** What the second launcher passes on: "show", or "launch <profile id or name>". */
+	public static volatile String message = "show";
 
 	private SingleInstance() {
 	}
@@ -40,7 +43,7 @@ public final class SingleInstance {
 				try {
 					int port = Integer.parseInt(Files.readString(portFile, StandardCharsets.UTF_8).strip());
 					try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), port)) {
-						socket.getOutputStream().write("show\n".getBytes(StandardCharsets.UTF_8));
+						socket.getOutputStream().write((message + "\n").getBytes(StandardCharsets.UTF_8));
 					}
 				} catch (Exception ignored) {
 					// Couldn't reach it - it'll still be running; just don't start a second one.
@@ -62,8 +65,14 @@ public final class SingleInstance {
 	private static void listen() {
 		while (server != null && !server.isClosed()) {
 			try (Socket socket = server.accept()) {
-				socket.getInputStream().read(new byte[16]);
-				onActivate.run();
+				byte[] buf = new byte[512];
+				int n = socket.getInputStream().read(buf);
+				String line = n > 0 ? new String(buf, 0, n, StandardCharsets.UTF_8).strip() : "show";
+				if (line.startsWith("launch ")) {
+					onLaunch.accept(line.substring(7).strip());
+				} else {
+					onActivate.run();
+				}
 			} catch (IOException e) {
 				return;
 			}
@@ -72,5 +81,9 @@ public final class SingleInstance {
 
 	public static void onActivate(Runnable action) {
 		onActivate = action;
+	}
+
+	public static void onLaunch(java.util.function.Consumer<String> action) {
+		onLaunch = action;
 	}
 }

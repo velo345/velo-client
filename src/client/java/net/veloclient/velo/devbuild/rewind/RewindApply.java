@@ -52,6 +52,10 @@ public final class RewindApply {
 	public static boolean showName(Object e) {
 		return true;
 	}
+
+	public static boolean nameHidden(Object e) {
+		return false;
+	}
 }
 //?} else {
 /*import net.minecraft.client.Minecraft;
@@ -196,6 +200,13 @@ public final class RewindApply {
 				}
 				want = at.add(Math.sin(yaw) * followDistance, followHeight, -Math.cos(yaw) * followDistance);
 			}
+		}
+		// never inside a wall or a tree: stop in front of whatever is between it and the camera
+		var hit = mc.level.clip(new net.minecraft.world.level.ClipContext(at, want, net.minecraft.world.level.ClipContext.Block.VISUAL,
+				net.minecraft.world.level.ClipContext.Fluid.NONE, mc.player));
+		if (hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+			var back = at.subtract(hit.getLocation());
+			want = hit.getLocation().add(back.lengthSqr() > 1e-6 ? back.normalize().scale(0.35) : back);
 		}
 		double[] cam = followCam;
 		if (cam == null) {
@@ -378,9 +389,13 @@ public final class RewindApply {
 		return p != null && p.edits.clip().hidden.contains(e.getUUID().toString());
 	}
 
-	// Hidden entities: drawn (outlined red) while editing, left out of the exported video.
+	// Hidden entities: drawn (outlined red) while editing, left out of the exported video. Name holograms of players
+	// whose names are hidden: never drawn.
 	public static boolean renderEntity(Entity e) {
-		return !(RewindPlayer.active() && hiddenInClip(e) && !editorShown());
+		if (!RewindPlayer.active()) {
+			return true;
+		}
+		return !(HOLOGRAMS_HIDDEN.contains(e.getId()) || hiddenInClip(e) && !editorShown());
 	}
 
 	// null = as the game decides.
@@ -409,7 +424,68 @@ public final class RewindApply {
 	}
 
 	public static boolean showName(Entity e) {
-		return !(RewindPlayer.active() && net.veloclient.velo.client.cosmetics.CosmeticHide.hidden(e.getUUID(), "nametag"));
+		return !(RewindPlayer.active() && NAME_HIDDEN.contains(e.getId()));
+	}
+
+	// ---- names: entities whose name tag / score line is hidden, and name holograms left out (recomputed every tick) ----
+
+	private static final it.unimi.dsi.fastutil.ints.IntOpenHashSet NAME_HIDDEN = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
+	private static final it.unimi.dsi.fastutil.ints.IntOpenHashSet HOLOGRAMS_HIDDEN = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
+
+	static {
+		net.veloclient.velo.client.pvp.NameTagLines.hidden = id -> RewindPlayer.active() && NAME_HIDDEN.contains(id);
+	}
+
+	public static boolean nameHidden(Entity e) {
+		return RewindPlayer.active() && NAME_HIDDEN.contains(e.getId());
+	}
+
+	private static boolean playerNameHidden(RewindEdits.Clip c, Entity e) {
+		if (c.hideNames) {
+			return true;
+		}
+		var parts = c.hideParts == null ? null : c.hideParts.get(e.getUUID().toString());
+		return parts != null && parts.contains("nametag");
+	}
+
+	// A server's name / rank / money hologram: a text display, or an invisible armour stand showing a name.
+	private static boolean hologram(Entity e) {
+		return e instanceof net.minecraft.world.entity.Display.TextDisplay
+				|| e instanceof net.minecraft.world.entity.decoration.ArmorStand stand && stand.isInvisible() && stand.isCustomNameVisible();
+	}
+
+	private static void updateNames(Minecraft mc, RewindEdits.Clip c) {
+		NAME_HIDDEN.clear();
+		HOLOGRAMS_HIDDEN.clear();
+		java.util.List<Entity> heads = new java.util.ArrayList<>();
+		for (Entity e : mc.level.entitiesForRendering()) {
+			if (e instanceof net.minecraft.world.entity.player.Player && e != mc.player && playerNameHidden(c, e)) {
+				NAME_HIDDEN.add(e.getId());
+				heads.add(e);
+			} else if (c.hideNames && e != mc.player) {
+				NAME_HIDDEN.add(e.getId());
+			}
+		}
+		for (Entity e : mc.level.entitiesForRendering()) {
+			if (!hologram(e)) {
+				continue;
+			}
+			boolean hide = c.hideNames;
+			for (Entity v = e.getVehicle(); !hide && v != null; v = v.getVehicle()) {
+				hide = NAME_HIDDEN.contains(v.getId()) && v instanceof net.minecraft.world.entity.player.Player;
+			}
+			for (int i = 0; !hide && i < heads.size(); i++) {
+				// floating just above a hidden player's head (plugins that teleport it there every tick)
+				Entity h = heads.get(i);
+				double dx = e.getX() - h.getX();
+				double dz = e.getZ() - h.getZ();
+				double dy = e.getY() - h.getEyeY();
+				hide = dx * dx + dz * dz < 0.8 * 0.8 && dy > -0.6 && dy < 2.8;
+			}
+			if (hide) {
+				HOLOGRAMS_HIDDEN.add(e.getId());
+			}
+		}
 	}
 
 	// ---- every game tick ----
@@ -453,6 +529,7 @@ public final class RewindApply {
 			mc.player.setPos(cam[0], cam[1] - mc.player.getEyeHeight(), cam[2]);
 		}
 		// hidden entities stay in the world (RewindLookMixins skip drawing them outside the editor, outline them inside)
+		updateNames(mc, c);
 		applySkins(mc, c);
 	}
 

@@ -87,6 +87,8 @@ public final class RewindModule extends AbstractModule implements net.veloclient
 	private boolean recordVoice = true;
 	private boolean recordMic = false;
 	private boolean recordSystem = false;
+	private String systemDevice = "Automatic";
+	private String micDevice = "Default"; 
 
 	@Override
 	public java.util.List<net.veloclient.velo.module.ConfigField> configFields() {
@@ -103,14 +105,46 @@ public final class RewindModule extends AbstractModule implements net.veloclient
 					recordSystem = v;
 					RewindAudio.recordSystem = v;
 				}),
+				new net.veloclient.velo.module.ConfigField.ChoiceField("System Audio Device", withFirst("Automatic", RewindAudio.systemDevices()),
+						() -> systemDevice, v -> {
+							systemDevice = v;
+							RewindAudio.systemDevice = v.equals("Automatic") ? "" : v;
+						}),
+				new net.veloclient.velo.module.ConfigField.ChoiceField("Microphone", withFirst("Default", RewindAudio.micDevices()), () -> micDevice, v -> {
+					micDevice = v;
+					RewindAudio.micDevice = v.equals("Default") ? "" : v;
+				}),
 				new net.veloclient.velo.module.ConfigField.ToggleField("AI Access (local API)", () -> aiAccess, v -> {
 					aiAccess = v;
 					RewindApi.setEnabled(v && isEnabled());
 				}));
 	}
 
+	private static java.util.List<String> withFirst(String first, java.util.List<String> rest) {
+		java.util.List<String> out = new java.util.ArrayList<>();
+		out.add(first);
+		out.addAll(rest);
+		return out;
+	}
+
+	// The AI API changed the audio settings: keep them (saved with the profile like the settings screen does).
+	public static void audioChanged() {
+		RewindModule m = instance;
+		if (m == null) {
+			return;
+		}
+		m.recordVoice = RewindAudio.recordVoice;
+		m.recordMic = RewindAudio.recordMic;
+		m.recordSystem = RewindAudio.recordSystem;
+		m.systemDevice = RewindAudio.systemDevice.isBlank() ? "Automatic" : RewindAudio.systemDevice;
+		m.micDevice = RewindAudio.micDevice.isBlank() ? "Default" : RewindAudio.micDevice;
+		net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
+	}
+
 	@Override
 	public void onEnable() {
+		RewindAudio.systemDevice = "Automatic".equals(systemDevice) ? "" : systemDevice;
+		RewindAudio.micDevice = "Default".equals(micDevice) ? "" : micDevice;
 		RewindAudio.recordVoice = recordVoice;
 		RewindAudio.recordMic = recordMic;
 		RewindAudio.recordSystem = recordSystem;

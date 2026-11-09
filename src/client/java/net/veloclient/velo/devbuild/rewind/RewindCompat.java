@@ -13,6 +13,10 @@ final class RewindCompat {
 	private RewindCompat() {
 	}
 
+	static it.unimi.dsi.fastutil.ints.IntList removedIds(net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket p) {
+		return p.getEntityIds();
+	}
+
 	static int chunkX(net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket c) {
 		return c.getX();
 	}
@@ -50,6 +54,10 @@ final class RewindCompat {
 		return new net.minecraft.network.protocol.game.CommonPlayerSpawnInfo(i.dimensionType(), i.dimension(), i.seed(),
 				net.minecraft.world.level.GameType.SPECTATOR, java.util.Optional.of(net.minecraft.world.level.GameType.SPECTATOR), i.isDebug(), i.isFlat(),
 				i.lastDeathLocation(), i.portalCooldown(), i.seaLevel());
+	}
+
+	static it.unimi.dsi.fastutil.ints.IntList removedIds(net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket p) {
+		return p.entityIds();
 	}
 
 	static int chunkX(net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket c) {

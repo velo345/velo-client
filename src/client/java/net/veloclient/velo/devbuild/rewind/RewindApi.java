@@ -25,6 +25,10 @@ public final class RewindApi {
 	public static int port() {
 		return -1;
 	}
+
+	public static boolean windowHidden() {
+		return false;
+	}
 }
 //?} else {
 /*import com.google.gson.Gson;
@@ -85,7 +89,16 @@ public final class RewindApi {
 	private RewindApi() {
 	}
 
+	private static volatile Path pendingOpen;
+
 	public static void init() {
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {
+			Path open = pendingOpen;
+			if (open != null && client.level == null && !RewindPlayer.active() && client.gui.screen() instanceof TitleScreen) {
+				pendingOpen = null;
+				RewindPlayer.open(open, client.gui.screen());
+			}
+		});
 		if (FORCED != null) {
 			setEnabled(true);
 		}
@@ -96,6 +109,7 @@ public final class RewindApi {
 					windowHidden = true;
 					client.options.pauseOnLostFocus = false;
 					hideWindow(client.getWindow().handle());
+					client.mouseHandler.releaseMouse();
 				}
 			});
 		}
@@ -110,6 +124,13 @@ public final class RewindApi {
 	}
 
 	private static boolean windowHidden;
+
+	// The game started hidden for an AI (it must not grab the mouse - HiddenWindowMouseMixin).
+	public static boolean windowHidden() {
+		return HIDDEN;
+	}
+
+	private static final boolean HIDDEN = Boolean.getBoolean("velo.hiddenWindow");
 
 	// GLFW up to 26.2, SDL3 from 26.3 - whichever this game has.
 	private static void hideWindow(long handle) {
@@ -167,9 +188,13 @@ public final class RewindApi {
 	// What to paste into an AI chat (Claude Code, Codex, ...) so it knows how to use this.
 	static String prompt() {
 		Path dir = folder();
-		return "Velo Rewind (Minecraft replay editor) is running with its AI API on. Read " + dir.resolve("AI.md")
-				+ " for the endpoints, and " + dir.resolve("api.json") + " for the URL and the token (send it as 'Authorization: Bearer <token>'). "
-				+ "Use GET /sheet to look at the replay, edit the timeline with /keys, /global and /clip, check again, then POST /export.";
+		return "You can control Velo Client (a Minecraft client) through its local AI API.\n"
+				+ "1. Read the full guide first: " + dir.resolve("AI.md") + " (also GET / on the API). It lists every endpoint with examples.\n"
+				+ "2. URL and token are in " + dir.resolve("api.json") + ". Send 'Authorization: Bearer <token>' with every request, JSON bodies.\n"
+				+ "3. Start with GET /status and GET /player. Replays: GET /recordings, POST /open {\"file\", \"leave\": true}, poll /status until replay.ready.\n"
+				+ "4. Always look before and after changes with GET /sheet?count=12&width=480. Edits save themselves; POST /undo reverts.\n"
+				+ "5. Export with {\"audio\": \"voice\"} for exact frame-by-frame videos; poll GET /export until DONE.\n"
+				+ "Rules: 20 ticks = 1 s; the recording player is target \"self\"; moving/chat/building only in singleplayer or as operator.";
 	}
 
 	private static Path folder() {
@@ -254,15 +279,24 @@ public final class RewindApi {
 				if (!Files.exists(file)) {
 					throw new ApiError(404, "no such recording: " + file.getFileName());
 				}
+				boolean leave = b.has("leave") && b.get("leave").getAsBoolean();
 				send(ex, 200, game(() -> {
 					Minecraft mc = Minecraft.getInstance();
+					if ((RewindPlayer.active() || mc.level != null) && !leave) {
+						throw new ApiError(409, "the game is in a world or a replay - add \"leave\": true to leave it first");
+					}
 					if (RewindPlayer.active()) {
-						throw new ApiError(409, "a replay is open already - POST /exit first");
+						RewindPlayer.exit();
+					} else if (mc.level != null) {
+						mc.level.disconnect(net.minecraft.network.chat.Component.literal("Opening a replay (AI API)"));
+						mc.disconnectWithSavingScreen();
+						mc.setScreen(new TitleScreen());
 					}
-					if (mc.level != null) {
-						throw new ApiError(409, "the game is in a world - leave it first");
+					if (mc.level == null && !RewindPlayer.active()) {
+						RewindPlayer.open(file, mc.gui.screen());
+					} else {
+						pendingOpen = file; // once the world is gone
 					}
-					RewindPlayer.open(file, mc.gui.screen());
 					return ok("opening - poll GET /status until replay.ready is true");
 				}));
 			}
@@ -290,6 +324,9 @@ public final class RewindApi {
 				RewindEdits.Clip c = p.edits.clip();
 				if (b.has("name")) {
 					c.name = b.get("name").getAsString();
+				}
+				if (b.has("hideNames")) {
+					c.hideNames = b.get("hideNames").getAsBoolean();
 				}
 				if (b.has("background")) {
 					String bg = b.get("background").getAsString();
@@ -604,7 +641,57 @@ public final class RewindApi {
 				RewindApply.follow(target.getUUID(), mode);
 				return followState();
 			}));
-			case "GET /entities" -> send(ex, 200, game(RewindApi::entities));
+			case "GET /entities" -> send(ex, 200, game(() -> entities(q.get("type"), integer(q, "limit", 200))));
+			case "GET /players" -> send(ex, 200, game(() -> {
+				RewindPlayer p = player();
+				List<Object[]> rows = p.players();
+				JsonObject o = new JsonObject();
+				o.addProperty("ready", rows != null);
+				JsonArray a = new JsonArray();
+				if (rows != null) {
+					for (Object[] r : rows) {
+						JsonObject po = new JsonObject();
+						po.addProperty("uuid", r[0].toString());
+						po.addProperty("name", (String) r[1]);
+						po.addProperty("firstTick", (int) r[2]);
+						po.addProperty("lastTick", (int) r[3]);
+						po.addProperty("self", (boolean) r[4]);
+						a.add(po);
+					}
+				}
+				o.add("players", a);
+				o.addProperty("note", "ticks are absolute in the recording (clip ticks = tick - clip start, see GET /status)");
+				return o;
+			}));
+			case "GET /audio" -> send(ex, 200, audioState());
+			case "POST /audio" -> {
+				// {"systemDevice"?, "micDevice"? ("" = automatic), "recordVoice"?, "recordMic"?, "recordSystem"?, "exportSound"?: everything|voice|none}
+				if (b.has("systemDevice")) {
+					RewindAudio.systemDevice = b.get("systemDevice").getAsString();
+				}
+				if (b.has("micDevice")) {
+					RewindAudio.micDevice = b.get("micDevice").getAsString();
+				}
+				if (b.has("recordVoice")) {
+					RewindAudio.recordVoice = b.get("recordVoice").getAsBoolean();
+				}
+				if (b.has("recordMic")) {
+					RewindAudio.recordMic = b.get("recordMic").getAsBoolean();
+				}
+				if (b.has("recordSystem")) {
+					RewindAudio.recordSystem = b.get("recordSystem").getAsBoolean();
+				}
+				if (b.has("exportSound")) {
+					String a = b.get("exportSound").getAsString().toLowerCase(java.util.Locale.ROOT);
+					RewindExport.audioMode = a.startsWith("every") || a.startsWith("game") ? RewindExport.AUDIO_MODES.get(0)
+							: a.startsWith("voice") ? RewindExport.AUDIO_MODES.get(1) : RewindExport.AUDIO_MODES.get(2);
+				}
+				game(() -> {
+					RewindModule.audioChanged();
+					return null;
+				});
+				send(ex, 200, audioState());
+			}
 			case "GET /block" -> send(ex, 200, game(() -> blockAt(integer(q, "x", 0), integer(q, "y", 0), integer(q, "z", 0))));
 			case "POST /block/break" -> send(ex, 200, game(() -> breakBlock(b)));
 			case "POST /block/place" -> send(ex, 200, game(() -> placeBlock(b)));
@@ -910,11 +997,14 @@ public final class RewindApi {
 			if (e == mc.player) {
 				continue;
 			}
+			RewindPlayer rp = RewindPlayer.current();
 			boolean match = switch (key.toLowerCase(java.util.Locale.ROOT)) {
+				case "self", "me", "recorder" -> rp != null && (e.getUUID().equals(rp.replaySelfUuid()) || e.getId() == rp.selfEntityId());
 				case "nearest-item" -> e instanceof net.minecraft.world.entity.item.ItemEntity;
 				case "nearest-player" -> e instanceof net.minecraft.world.entity.player.Player;
 				case "nearest" -> true;
 				default -> e.getUUID().toString().equalsIgnoreCase(key) || String.valueOf(e.getId()).equals(key)
+						|| rp != null && rp.replaySelfUuid() != null && e.getUUID().equals(rp.replaySelfUuid()) && key.equalsIgnoreCase(rp.recordedSelfUuid())
 						|| e instanceof net.minecraft.world.entity.player.Player pl && pl.getGameProfile().name().equalsIgnoreCase(key);
 			};
 			if (match) {
@@ -931,7 +1021,7 @@ public final class RewindApi {
 		return best;
 	}
 
-	private static JsonArray entities() {
+	private static JsonArray entities(String type, int limit) {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.level == null) {
 			throw new ApiError(409, "not in a world");
@@ -939,13 +1029,21 @@ public final class RewindApi {
 		var cam = mc.gameRenderer.mainCamera().position();
 		List<net.minecraft.world.entity.Entity> list = new ArrayList<>();
 		for (net.minecraft.world.entity.Entity e : mc.level.entitiesForRendering()) {
-			if (e != mc.player) {
-				list.add(e);
+			if (e == mc.player) {
+				continue;
 			}
+			if (type != null && !type.isBlank()) {
+				String t = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).toString();
+				if (!(t.equals(type) || t.equals("minecraft:" + type))) {
+					continue;
+				}
+			}
+			list.add(e);
 		}
 		list.sort(java.util.Comparator.comparingDouble(e -> e.position().distanceToSqr(cam)));
 		JsonArray a = new JsonArray();
-		for (net.minecraft.world.entity.Entity e : list.subList(0, Math.min(200, list.size()))) {
+		RewindPlayer rp = RewindPlayer.current();
+		for (net.minecraft.world.entity.Entity e : list.subList(0, Math.min(Math.max(1, limit), list.size()))) {
 			JsonObject o = new JsonObject();
 			o.addProperty("uuid", e.getUUID().toString());
 			o.addProperty("id", e.getId());
@@ -958,9 +1056,27 @@ public final class RewindApi {
 			o.addProperty("y", e.getY());
 			o.addProperty("z", e.getZ());
 			o.addProperty("distance", Math.sqrt(e.position().distanceToSqr(cam)));
+			if (rp != null && (e.getUUID().equals(rp.replaySelfUuid()) || e.getId() == rp.selfEntityId())) {
+				o.addProperty("self", true);
+			}
 			a.add(o);
 		}
 		return a;
+	}
+
+	private static JsonObject audioState() {
+		JsonObject o = new JsonObject();
+		o.addProperty("systemDevice", RewindAudio.systemDevice);
+		o.addProperty("micDevice", RewindAudio.micDevice);
+		o.add("systemDevices", GSON.toJsonTree(RewindAudio.systemDevices()));
+		o.add("micDevices", GSON.toJsonTree(RewindAudio.micDevices()));
+		o.addProperty("systemAudioAvailable", RewindAudio.loopbackAvailable());
+		o.addProperty("recordVoice", RewindAudio.recordVoice);
+		o.addProperty("recordMic", RewindAudio.recordMic);
+		o.addProperty("recordSystem", RewindAudio.recordSystem);
+		o.addProperty("exportSound", RewindExport.audioMode);
+		o.addProperty("voicechatInstalled", net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("voicechat"));
+		return o;
 	}
 
 	private static JsonObject followState() {
@@ -1407,6 +1523,8 @@ public final class RewindApi {
 			r.addProperty("file", p.file().getFileName().toString());
 			r.addProperty("ready", mc.level != null && mc.player != null);
 			r.addProperty("ticksPerSecond", 20);
+			r.addProperty("selfUuid", p.replaySelfUuid() == null ? null : p.replaySelfUuid().toString());
+			r.addProperty("selfEntityId", p.selfEntityId());
 			r.addProperty("selectedClip", p.edits.selected);
 			JsonArray clips = new JsonArray();
 			for (RewindEdits.Clip c : p.edits.clips) {
@@ -1865,112 +1983,154 @@ public final class RewindApi {
 	// ---- AI.md: what an agent reads first ----
 
 	private static final String DOCS = """
-			# Velo Client - AI access
+			# Velo Client - AI access: the complete guide
 
-			A local HTTP API (127.0.0.1 only) to drive the game without clicking: Velo Rewind replays and videos,
-			recording, joining worlds and servers, chat and commands, movement, inventory, Velo modules, resource
-			packs, shaders and mods.
-			Base URL: http://127.0.0.1:{PORT}  -  every request needs `Authorization: Bearer <token>`
-			(token and URL: `velo-rewind/api.json` in the game folder). JSON in, JSON out.
+			Read this once, top to bottom. Everything you need is here; nothing else has to be guessed.
 
-			Time is in game ticks (20 per second). Keyframe ticks and seek positions are relative to the
-			selected clip's start (0 .. clip length). Edits save themselves (and make backups in
-			`velo-rewind/backups/<recording>/`), so there is no "save" call.
+			## 0. Connection
+			- Base URL: http://127.0.0.1:{PORT} (only this PC can connect).
+			- Every request needs the header `Authorization: Bearer <token>`. The token and URL are in
+			  `velo-rewind/api.json` in the game folder (the Velo launcher's Settings > AI Access > Copy prompt shows them too).
+			- Send and receive JSON (`Content-Type: application/json`). Images come back as PNG/JPEG bytes.
+			- Errors always look like `{"ok": false, "error": "<what is wrong and what to do>"}` with an HTTP status:
+			  400 = your request is wrong, 401 = token missing/wrong, 403 = not allowed here, 404 = not found,
+			  409 = wrong state right now (no replay open, not in a world, busy) - the message says what to do first.
+			- Requests run on the game thread one after another; one request at a time is best.
 
-			## Typical session
-			1. `GET /recordings` - pick a file.  `POST /open {"file": "<name>"}`, then poll `GET /status`
-			   until `replay.ready` is true (a few seconds).
-			2. Look: `GET /sheet?count=12&width=480` - a contact sheet of the clip (JPEG, ticks labelled).
-			   `GET /frame?tick=120&width=1280` - one PNG. `camera=free` shows the free camera instead of the
-			   camera path; `format_frame=TikTok` crops to 9:16. Much faster than exporting.
-			3. Edit: `POST /keys {"keys": [{"track": "cam_x", "tick": 0, "value": 10.5}, ...]}`,
-			   `POST /global {"track": "time", "value": 13000}`, or fetch `GET /edits`, change it, `PUT /edits`.
-			   `GET /status` shows where the camera is now (replay.camera) - handy for the first keyframe.
-			4. Check again with `/sheet`, `POST /undo` if it got worse.
-			5. `POST /export {"format": "TikTok 9:16", "size": 1, "fps": 60}`, poll `GET /export` until
-			   `state` is DONE; `output` is the MP4.
+			## 1. Quick start (do this every session)
+			1. `GET /status` - is a replay open (`replay` not null)? is it loaded (`replay.ready`)? export state?
+			2. `GET /player` - in a world? which server? `controlAllowed` (may you move / chat / build here?).
+			3. No replay open and you need one: `GET /recordings`, then `POST /open {"file": "<name>", "leave": true}`
+			   and poll `GET /status` every second until `replay.ready` is true (usually 2-10 s).
+			4. Look before you change anything: `GET /sheet?count=12&width=480` (one JPEG with 12 labelled frames).
+			5. Change, look again, export. Edits save themselves - there is no "save" call.
 
-			## Endpoints
-			- `GET /status` - recording, replay (clips, position, paused, speed, camera), export, open screen
-			- `GET /properties` - every track (id, range, default), interpolations, export formats + sizes
-			- `GET /recordings` - recordings with their meta (length in ticks, server, segments)
-			- `POST /open {"file"}` / `POST /exit`
-			- `GET /edits` / `PUT /edits <whole edits JSON>` - clips with tracks: {"global": value|null,
-			  "keys": {"<tick>": {"value", "interp", "label"}}}, hidden entity UUIDs, skins (UUID -> name/PNG)
-			- `POST /clip {"index"?, "add"?: true, "name"?, "start"?, "length"?, "background"?}` - select / add / trim a
-			  clip; background: World, No terrain, Green screen, Blue screen, Black (players and entities on a
-			  flat colour, for keying)
-			- `POST /key {"track", "tick", "value", "interp"?, "label"?}`, `POST /key/delete {"track", "tick"}`
-			- `POST /keys {"keys": [...], "replace"?: true}` - many keys at once (replace clears the clip's keys first)
-			- `POST /global {"track", "value"|null}` - a value for the whole clip (keys win where there are any)
-			- `POST /seek {"tick"}`, `POST /play`, `POST /pause`, `POST /speed {"speed"}`
-			- `POST /undo`, `POST /redo`
-			- `GET /frame?tick&width&format=png|jpg&camera=path|free&format_frame`
-			- `GET /sheet?from&to&count&columns&width&format=jpg|png&camera&format_frame`
-			- `POST /export {"format": name or index, "size": index, "fps", "audio": "everything"|"voice"|"none"}`,
-			  `GET /export`, `POST /export/cancel` - "everything" records what the speakers play while it renders
-			  (game sounds + voices); "voice" only the recorded voice chat / mic / system tracks
-			- `POST /quit` - closes the game (saves everything first)
+			## 2. Rules that never change
+			- Time is in game ticks: 20 ticks = 1 second. Inside a clip, ticks count from the clip's start (0 .. clip length).
+			  `GET /players` ticks are absolute (whole recording); clip tick = absolute tick - clip start.
+			- Positions are Minecraft world coordinates (x, y, z; y = up). Yaw: 0 = looking south (+Z), 90 = west (-X),
+			  180 / -180 = north, -90 = east. Pitch: -90 = straight up, 0 = level, 90 = straight down.
+			- The recording player (the account that recorded) has a DIFFERENT uuid inside the replay: use
+			  `replay.selfUuid` / `replay.selfEntityId` from `GET /status`, or simply the target `"self"`.
+			- A replay is made of clips (each its own timeline). Most endpoints work on the selected clip
+			  (`replay.selectedClip`); switch with `POST /clip {"index": n}`.
+			- Every track has a clip value (`global`, for the whole clip) and/or keyframes; keyframes win where they exist.
+			- Undo with `POST /undo` if a change made it worse.
+			- Playing (moving, chat/commands, inventory, building) only works in singleplayer, on servers where this account is
+			  an operator, or in a replay - otherwise 403. Watching, recording, screenshots, frames and settings work everywhere.
 
-			## The game itself (beyond replays)
-			At your own risk. Moving, chatting / commands, inventory and dropping only work in singleplayer (or your
-			own LAN world), on servers where this account is an operator, or in a replay (403 otherwise; see
-			`controlAllowed` in GET /player): running a bot on other people's servers breaks most of their rules.
-			Watching, recording, screenshots and client settings work everywhere.
+			## 3. Replays: open, look, edit
+			| Call | Body / query | Returns |
+			|---|---|---|
+			| `GET /recordings` | | `[{"file", "bytes", "meta": {"ticks", "server", "segments"...}}]` |
+			| `POST /open` | `{"file": "name or full path", "leave"?: true}` | starts loading - poll `/status` |
+			| `POST /exit` | | back to the title screen |
+			| `GET /status` | | `replay`: file, ready, clips[{name, segment, start, length, background}], position, paused, speed, camera{x,y,z,yaw,pitch}, voices, selfUuid, selfEntityId |
+			| `GET /players` | | every player in the whole recording: uuid, name, firstTick, lastTick, self (first call starts a scan - poll until `ready`) |
+			| `GET /entities` | `?type=player&limit=200` | nearest entities: uuid, id, type, name, item, x/y/z, distance, self |
+			| `GET /frame` | `?tick=120&width=1280&format=png&camera=path|free&format_frame=TikTok` | one image (1-2 s) |
+			| `GET /sheet` | `?from=0&to=200&count=12&columns=4&width=480` | one JPEG grid of frames, each labelled with its tick |
+			| `POST /seek` | `{"tick": 40}` | jumps inside the clip |
+			| `POST /play` / `POST /pause` / `POST /speed` | `{"speed": 0.5}` | playback |
+			| `GET /edits` / `PUT /edits` | whole edits JSON | everything at once (clips, tracks, hidden, skins, hideParts) |
+			| `POST /clip` | `{"index"?, "add"?: true, "name"?, "start"?, "length"?, "background"?, "hideNames"?}` | select / add / trim a clip, set background, hide all names |
+			| `POST /key` | `{"track", "tick", "value", "interp"?, "label"?}` | one keyframe |
+			| `POST /keys` | `{"keys": [{"track","tick","value"}, ...], "replace"?: true}` | many keyframes (replace clears the clip's keys first) |
+			| `POST /key/delete` | `{"track", "tick"}` | |
+			| `POST /global` | `{"track", "value"}` (`null` clears) | a value for the whole clip |
+			| `POST /follow` | `{"target": "self" or player name or uuid or entity id or "nearest-player" or "nearest-item", "mode"?: "behind"|"orbit"|"fixed", "distance"?: 4.5, "height"?: 1.2, "speed"?: 20}` | camera keeps the target in view and moves with it (`{"target": null}` stops) |
+			| `POST /undo` / `POST /redo` | | |
 
-			- `GET /player` - in a world?, server, position, rotation, health, food, game mode, dimension, held item, screen
-			- `GET /worlds`, `POST /join {"world": "<folder>"}` or `{"server": "host:port"}`, `POST /leave`
-			- `POST /record {"action": "start"|"pause"|"resume"|"stop", "name"?}` - Velo Rewind recording (stop + name
-			  saves without asking); the Velo Rewind module must be on
-			- `POST /chat {"message"}` (a leading / runs a command), `GET /chat?lines=30`
-			- `POST /input {"hold": ["forward", "jump", ...], "ms": 800, "tap": ["attack"], "release": [...], "slot": 0-8}`
-			  keys: forward back left right jump sneak sprint attack use drop inventory swap
-			- `POST /look {"yaw", "pitch"}` or `{"dyaw", "dpitch"}`, `POST /fly {"on": true}` (creative / spectator)
-			- `GET /inventory` - the open menu's slots (your inventory when nothing is open), carried stack
-			- `POST /inventory/click {"slot", "button", "action": pickup|quick_move|swap|throw|pickup_all|clone}`
-			- `POST /drop {"all"?: true, "slot"?: 0-8}` - drop the held item (or the whole stack)
-			- `GET /screen`, `POST /screen/close`; open the inventory with `POST /input {"tap": ["inventory"]}`
-			- `GET /modules`, `POST /module {"id", "enabled"?, "settings"?: {"<setting label>": value}}` - Velo Client
-			  modules and their settings (saved to the profile)
-			- `GET /resourcepacks`, `POST /resourcepacks {"enabled": ["vanilla", "file/<pack>.zip", ...]}`
-			- `GET /shaders`, `POST /shaders {"pack"?: "<Iris shader pack>", "enabled"?: bool}` (Iris); Velo's own
-			  shaders are a module
-			- `GET /mods`, `POST /mods {"file": "<jar>", "enabled": bool}` - takes effect after a restart
-			- `GET /frame` / `GET /sheet` work in normal worlds too (the current view, no HUD)
-			- `POST /screenshot {"hud"?: true}` - the game's own screenshot into screenshots/
-			- `POST /video {"seconds": 10, "hud"?: false, "format"?: "Window"|"TikTok"|..., "size"?, "fps"?: 30,
-			  "audio"?: "everything"|"none"}` - a first-person MP4 of what happens now (velo-rewind/clips); poll GET /export
+			Tracks (ids for /key, /keys, /global):
+			- Camera: `cam_x`, `cam_y`, `cam_z`, `cam_yaw`, `cam_pitch`, `cam_roll`, `fov`
+			- World: `time` (0-24000; 6000 = noon, 13000 = night), `rain`, `thunder` (0-1), `fog` (multiplier)
+			- Playback: `speed` (0.1-8)
+			- Audio multipliers (1 = as recorded, up to 2): `volume`, `vol_players`, `vol_hostile`, `vol_neutral`, `vol_blocks`,
+			  `vol_weather`, `vol_ambient`, `vol_records`, `vol_music`, `vol_voice`, `vol_mic`, `vol_system`, `voice:<uuid>`
+			Interpolation (`interp`): `Smooth` (default, curved path), `Linear`, `Ease in`, `Ease out`, `Hold`.
+			A camera keyframe needs all five: cam_x, cam_y, cam_z, cam_yaw, cam_pitch (same tick). Tip: fly or `/follow`,
+			read `replay.camera` from `/status`, and key exactly those numbers.
 
-			## Following something (replays)
-			- `GET /entities` - the 200 nearest entities (uuid, type, name, item, position, distance)
-			- `POST /follow {"target": "<uuid | player name | entity id | nearest-player | nearest-item>", "mode"?:
-			  "behind"|"orbit"|"fixed", "distance"?: 4.5, "height"?: 1.2, "speed"?: 20}` - the camera keeps it in view and
-			  moves with it (smoothly), also while exporting; `{"target": null}` stops; `GET /follow` shows the state
+			Hiding things (in `PUT /edits`, per clip):
+			- `hideNames: true` - every name tag, the score line under names and name holograms (ranks, money). Use this for videos.
+			- `hidden: ["<uuid>", ...]` - entities left out of the video (still shown, outlined red, while editing).
+			- `hideParts: {"<uuid>": ["nametag", "cape", "cosmetics", "pets", "glow"]}` - parts of one player.
+			- `skins: {"<uuid>": "<player name or PNG path>"}` - swap a skin.
+			- `background`: `World`, `No terrain`, `Green screen`, `Blue screen`, `Black`.
 
-			## Building (singleplayer / operator only)
-			- `GET /block?x&y&z` - the block there
-			- `POST /block/break {"x","y","z"}` - like the player (instant in creative, digs in survival; within 6 blocks)
-			- `POST /block/place {"x","y","z", "slot"?: 0-8}` - places the held block against a neighbour (within 6 blocks)
-			- `POST /build {"x","y","z", "blocks"?: [{"x","y","z","block"}], "fill"?: [{"from":[x,y,z],"to":[x,y,z],"block",
-			  "mode"?}], "schematic"?: "<file>", "includeAir"?: false}` - any size, through /setblock and /fill (needs command
-			  rights: cheats on in singleplayer, or operator); positions in blocks / fill / schematic are relative to x y z
-			  (default: where you stand). Schematics: vanilla .nbt structures, Sponge .schem, Litematica .litematic -
-			  relative paths are in the game's schematics folder. Blocks take states: "minecraft:oak_stairs[facing=east]".
-			- `GET /build` - commands still queued (800 a second are sent)
+			## 4. Export
+			| Call | Body | Returns |
+			|---|---|---|
+			| `POST /export` | `{"format": "TikTok" or "YouTube" or "Square" or "Window", "size": 0|1|2, "fps": 30|60, "audio": "voice"|"everything"|"none"}` | starts; poll `GET /export` |
+			| `GET /export` | | `{"state": IDLE|PREPARING|RENDERING|FINISHING|DONE|FAILED, "progress": 0-1, "message", "output": "<mp4 path>"}` |
+			| `POST /export/cancel` | | stops (keeps what's rendered) |
+			Sizes: TikTok 0 = 720x1280, 1 = 1080x1920; YouTube 0 = 1280x720, 1 = 1920x1080, 2 = 2560x1440; Square 0 = 720, 1 = 1080.
+			- `"audio": "voice"` or `"none"` renders FRAME BY FRAME: exact timing, never a lost frame, sound in sync, however
+			  long it takes. Use this for every video.
+			- `"audio": "everything"` records what the speakers play and therefore runs in real time (can drop frames on a
+			  slow PC). Only when you really need game sounds and a loopback device works (see `GET /audio`).
+			- The video never shows HUD, chat, menus or outlines - only the world.
+			- Poll `GET /export` every 2 s. DONE -> `output` is the MP4. FAILED -> `message` says why.
 
-			## Tracks
-			Camera: cam_x, cam_y, cam_z (world coordinates), cam_yaw, cam_pitch, cam_roll (degrees), fov.
-			Audio (multipliers, 1 = as recorded, up to 2): volume (everything), vol_players, vol_hostile, vol_neutral,
-			vol_blocks, vol_weather, vol_ambient, vol_records, vol_music, vol_voice, vol_mic, vol_system, and
-			voice:<player uuid> for one player's voice (GET /status lists replay.voices).
-			Playback: speed. World: time (0-24000), rain, thunder (0-1), fog (multiplier).
-			Interpolations: Smooth (curved path through the keys), Linear, Ease in, Ease out, Hold.
-			Yaw: Minecraft's - 0 looks south (+Z), 90 west (-X), 180 north, -90 east. Pitch: 90 straight down.
+			## 5. Sound settings
+			- `GET /audio`: recordVoice / recordMic / recordSystem, chosen devices, every device found, export sound mode.
+			- `POST /audio {"systemDevice"?, "micDevice"? ("" = automatic), "recordVoice"?, "recordMic"?, "recordSystem"?, "exportSound"?}`.
+			  Windows: system audio needs "Stereo Mix" or a virtual cable - choose it from `systemDevices`.
 
-			## Running without a visible window
-			Start the game with `-Dvelo.rewindApi=<port>` (turns this on without the setting) and
-			`-Dvelo.rewindOpen=<file>` (opens that recording at the title screen), e.g. inside a virtual
-			display (`kwin_wayland --virtual`, `Xvfb`). Only one export or frame grab runs at a time.
+			## 6. The game itself
+			| Call | Body | Notes |
+			|---|---|---|
+			| `GET /player` | | inWorld, server, controlAllowed, position, rotation, health, food, gameMode, dimension, holding, screen |
+			| `GET /worlds` / `POST /join` | `{"world": "<folder>"}` or `{"server": "host:port"}` | poll `/player` until `inWorld` |
+			| `POST /leave` | | leaves the world / replay |
+			| `POST /record` | `{"action": "start"|"pause"|"resume"|"stop", "name"?}` | Velo Rewind recording (module must be on: `POST /module {"id": "velo-rewind", "enabled": true}`) |
+			| `POST /chat` | `{"message": "hi" or "/command"}` | controlAllowed only |
+			| `GET /chat` | `?lines=30` | last chat lines |
+			| `POST /input` | `{"hold": ["forward","sprint"], "ms": 800, "tap": ["jump"], "release": [...], "slot": 0-8}` | keys: forward back left right jump sneak sprint attack use drop inventory swap |
+			| `POST /look` | `{"yaw", "pitch"}` or `{"dyaw", "dpitch"}` | |
+			| `POST /fly` | `{"on": true}` | creative / spectator |
+			| `GET /inventory` / `POST /inventory/click` / `POST /drop` | `{"slot", "button", "action": pickup|quick_move|swap|throw|pickup_all|clone}` / `{"all"?, "slot"?}` | |
+			| `GET /block` / `POST /block/break` / `POST /block/place` | `?x&y&z` / `{"x","y","z"}` / `{"x","y","z","slot"?}` | within 6 blocks |
+			| `POST /build` | `{"x","y","z", "blocks"?: [{"x","y","z","block"}], "fill"?: [{"from":[..],"to":[..],"block","mode"?}], "schematic"?: "file.nbt|.schem|.litematic", "includeAir"?}` | needs command rights; `GET /build` = queue |
+			| `POST /screenshot` | `{"hud"?: true}` | into screenshots/ |
+			| `POST /video` | `{"seconds": 10, "format"?: "TikTok", "fps"?: 30, "hud"?: false, "audio"?: "none"}` | first-person MP4 of what happens now; poll `GET /export` |
+			| `GET /modules` / `POST /module` | `{"id", "enabled"?, "settings"?: {"<label>": value}}` | Velo modules |
+			| `GET /resourcepacks` / `POST /resourcepacks` | `{"enabled": ["vanilla", "file/<pack>.zip"]}` | |
+			| `GET /shaders` / `POST /shaders` | `{"pack"?, "enabled"?}` | Iris |
+			| `GET /mods` / `POST /mods` | `{"file": "<jar>", "enabled": bool}` | after a restart |
+			| `GET /screen` / `POST /screen/close` | | |
+			| `POST /quit` | | closes the game, saving everything |
+
+			## 7. Recipes
+			**A TikTok of a fight from a recording**
+			1. `POST /open {"file": "fight", "leave": true}`; poll `/status` until ready.
+			2. `GET /players` (poll until ready) - pick the fighter; note the clip start from `/status`.
+			3. `PUT /edits` with the current edits plus `"hideNames": true` on the clip (or `POST /clip {"hideNames": true}`).
+			4. Trim: `POST /clip {"start": <tick>, "length": <ticks>}`.
+			5. Camera: `POST /follow {"target": "<name>", "mode": "behind", "distance": 4}` - or keyframes with `/keys`.
+			6. Check: `GET /sheet?count=12&width=360&format_frame=TikTok`. Fix, check again.
+			7. `POST /export {"format": "TikTok", "size": 1, "fps": 60, "audio": "voice"}`; poll `/export` until DONE.
+
+			**A smooth camera move without follow**: `GET /status` -> `replay.camera` at the start; `POST /keys` with the five
+			cam_* tracks at tick 0 and the end tick (and a few in between); `GET /sheet` to check; keyframes are Smooth by default.
+
+			**Record something yourself**: `POST /module {"id": "velo-rewind", "enabled": true}`, `POST /join`, `POST /record
+			{"action": "start"}`, ..., `POST /record {"action": "stop", "name": "my-take"}` - it's then in `GET /recordings`.
+
+			## 8. Running without a window
+			- The Velo launcher can start a profile hidden (Settings > AI Access > Start the game hidden) and from the command line:
+			  `"Velo Client Launcher" --launch <profile id or name>` (a running launcher takes it over).
+			- Or start Java with `-Dvelo.aiApi=<port> -Dvelo.hiddenWindow=true` and optionally `-Dvelo.rewindOpen=<file>`.
+			- A hidden game never grabs the mouse. `POST /quit` closes it cleanly.
+
+			## 9. When something goes wrong
+			- 409 "no replay open" -> `POST /open`. 409 "not loaded yet" -> wait and poll `/status`.
+			- 409 "busy (exporting or grabbing frames)" -> poll `GET /export` until it's not RENDERING.
+			- 404 "nothing matching" for /follow -> `GET /entities?type=player` (only what's near the camera) or seek first.
+			- 403 -> you're on someone else's server without operator rights: only watch / record there.
+			- A frame looks wrong -> `GET /frame?camera=free` shows the free camera instead of the keyed path.
+			- Export FAILED -> read `message`; try `"audio": "voice"`.
 			""";
+
 }
 *///?}

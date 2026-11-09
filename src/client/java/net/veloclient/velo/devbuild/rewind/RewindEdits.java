@@ -150,6 +150,8 @@ public final class RewindEdits {
 		public Map<String, String> skins = new LinkedHashMap<>();
 		/** Per player (UUID): parts of their look hidden in this clip - cape, cosmetics, pets, nametag, glow. */
 		public Map<String, List<String>> hideParts = new LinkedHashMap<>();
+		/** No name tags, score lines or name holograms on anyone in this clip. */
+		public boolean hideNames;
 		/** One of {@link #BACKGROUNDS} (null = World). */
 		public String background;
 

@@ -80,6 +80,9 @@ public final class RewindSound {
 	private static volatile float master = 1f;
 	private static volatile float voiceVolume = 1f;
 
+	// An exact export renders slower than real time: the speakers stay quiet, the export mixes its own sound (mixExport).
+	static volatile boolean exporting;
+
 	// Export ("voice tracks" mode): the mix is copied here as raw 48 kHz stereo s16le while set.
 	static volatile OutputStream capture;
 
@@ -302,9 +305,9 @@ public final class RewindSound {
 					}
 				}
 				java.util.Arrays.fill(mix, 0f);
-				if (on) {
+				if (on && !exporting) {
 					for (Track t : tracks.values()) {
-						mixTrack(t, clock, mix);
+						mixTrack(t, clock, mix, CHUNK);
 					}
 				}
 				ByteBuffer bb = ByteBuffer.wrap(out).order(ByteOrder.LITTLE_ENDIAN);
@@ -338,7 +341,25 @@ public final class RewindSound {
 		return tickAt * PER_TICK + into;
 	}
 
-	private static void mixTrack(Track t, long clock, float[] mix) {
+	// The sound of `frames` samples from `fromSample` (the replay's sample clock), as raw 48 kHz stereo s16le - the exact
+	// export calls it once per video frame, so picture and sound stay together.
+	static void mixExport(long fromSample, int frames, OutputStream out) {
+		float[] mix = new float[frames * 2];
+		for (Track t : tracks.values()) {
+			mixTrack(t, fromSample, mix, frames);
+		}
+		byte[] bytes = new byte[frames * 4];
+		ByteBuffer bb = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+		for (float v : mix) {
+			bb.putShort((short) Math.max(-32768, Math.min(32767, Math.round(v))));
+		}
+		try {
+			out.write(bytes);
+		} catch (java.io.IOException ignored) {
+		}
+	}
+
+	private static void mixTrack(Track t, long clock, float[] mix, int len) {
 		List<Block> blocks = t.blocks;
 		// first block that may still sound at clock (blocks are in time order)
 		int i = t.cursor;
@@ -367,7 +388,7 @@ public final class RewindSound {
 		}
 		for (int k = i; k < blocks.size(); k++) {
 			Block b = blocks.get(k);
-			if (b.start() >= clock + CHUNK) {
+			if (b.start() >= clock + len) {
 				break;
 			}
 			float[] lr = pan(t, b);
@@ -377,7 +398,7 @@ public final class RewindSound {
 				continue;
 			}
 			int from = (int) Math.max(0, clock - b.start());
-			int to = (int) Math.min(b.frames(), clock + CHUNK - b.start());
+			int to = (int) Math.min(b.frames(), clock + len - b.start());
 			for (int f = from; f < to; f++) {
 				int o = (int) (b.start() + f - clock) * 2;
 				if (b.channels() == 2) {

@@ -946,6 +946,16 @@ public final class RewindEditorScreen extends Screen {
 						p.saveEdits();
 					});
 				}
+				cy += 6;
+				cy = section(g, font, x, cy, "Name tags & name holograms");
+				cy = choice(g, font, x, cy, "Show", !clip.hideNames, mouseX, mouseY, () -> {
+					clip.hideNames = false;
+					p.saveEdits();
+				});
+				cy = choice(g, font, x, cy, "Hide on everyone", clip.hideNames, mouseX, mouseY, () -> {
+					clip.hideNames = true;
+					p.saveEdits();
+				});
 			}
 			case 1 -> {
 				cy = section(g, font, x, cy, "Camera path");
@@ -1642,7 +1652,13 @@ public final class RewindEditorScreen extends Screen {
 					exportOpen = false;
 				});
 			} else if (st == RewindExport.State.RENDERING) {
-				exportButton(g, font, x + 16, by, w - 32, "Stop here (keeps what's rendered)", false, mouseX, mouseY, RewindExport::cancel);
+				exportButton(g, font, x + 16, by, (w - 40) / 2, "Cancel", false, mouseX, mouseY, RewindExport::abort);
+				exportButton(g, font, x + 24 + (w - 40) / 2, by, (w - 40) / 2, "Stop & keep", true, mouseX, mouseY, RewindExport::cancel);
+			} else if (st == RewindExport.State.PREPARING || st == RewindExport.State.FINISHING) {
+				exportButton(g, font, x + 16, by, w - 32, "Cancel", false, mouseX, mouseY, () -> {
+					RewindExport.abort();
+					exportOpen = false;
+				});
 			}
 		}
 		// the window takes every click
@@ -2216,6 +2232,10 @@ public final class RewindEditorScreen extends Screen {
 		if (exportOpen && k == Keys.ESCAPE && !RewindExport.busy()) {
 			exportOpen = false;
 			RewindExport.reset();
+			return true;
+		}
+		if (k == Keys.ESCAPE && RewindExport.busy()) {
+			RewindExport.abort(); // Esc while exporting: cancel it
 			return true;
 		}
 		if (context != null && k == Keys.ESCAPE) {
