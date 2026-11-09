@@ -13,7 +13,7 @@ REPO=velo345/velo-client; ROOT=/var/www/velo-client.com/dl; LOCAL="${MIRROR_CACH
 mkdir -p "$LOCAL/v$VERSION"
 gh release download "v$VERSION" --repo "$REPO" -D "$LOCAL/v$VERSION" --skip-existing
 # the 1.8.9 mod stays on its own version (site.config release.legacyMod): carry it into every mirrored version folder
-LEGACY=$(node -e 'process.stdout.write(require(process.argv[1]).release.legacyMod||"")' "$(dirname "$0")/../../velo-site/site.config.json")
+LEGACY=$(node -e 'process.stdout.write(require(process.argv[1]).release.legacyMod||"")' "$(realpath "$(dirname "$0")/../../velo-site/site.config.json")")
 if [[ -n "$LEGACY" && ! -e "$LOCAL/v$VERSION/$LEGACY" ]]; then
   TAG=$(gh release list --repo "$REPO" --limit 30 --json tagName -q '.[].tagName' | while read -r t; do
     gh release view "$t" --repo "$REPO" --json assets -q '.assets[].name' | grep -qxF "$LEGACY" && { echo "$t"; break; }; done)
