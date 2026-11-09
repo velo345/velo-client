@@ -20,9 +20,22 @@ mod-rules:
   # Your own. match: id (fabric mod id) | modrinth (project slug or id) | name (part of the mod name / file)
   forbid:
     # - { match: id, value: "freecam", label: "Freecam" }
+  # Ready-made recommendations (players see only the ones they DON'T have yet, and can add them with one click
+  # in Velo - the game restarts and rejoins): performance, voice-chat, emotes, shaders
+  recommend-presets: []
   recommend:
     # - { match: modrinth, value: "simple-voice-chat", label: "Simple Voice Chat" }
   message: "Using these can get you banned here."
+
+# Chat lines for staff (permission velobridge.notify). Everything is quiet by default.
+notify:
+  # a line for every player who joins with Velo
+  on-join: false
+  # a line when someone joins with modules you switched off below
+  on-disabled-modules: false
+  # one console line per Velo join
+  log-joins: false
+
 
 # Velo Client modules switched OFF while playing here. Unlike mod hints this IS
 # enforced (you decided it, there are no false positives). Players see which
@@ -59,6 +72,18 @@ notes:
   # Areas where nobody can place notes.
   blocked-areas:
     # - { name: "Spawn", world: "world", x1: -100, z1: -100, x2: 100, z2: 100 }
+  # Server-wide notes: every Velo player can pin notes everyone here sees (Velo's notes are otherwise only shared
+  # with friends). Stored in plugins/VeloBridge/server-notes.json - remove them in /velobridge panel or with
+  # /velobridge notes. Staff with velobridge.notes.manage can change and remove any of them in Velo.
+  server-wide:
+    enabled: false
+    # Only in these areas (none = everywhere outside blocked-areas).
+    areas:
+      # - { name: "Market", world: "world", x1: 100, z1: 100, x2: 200, z2: 200 }
+    max-per-player: 5
+    # Who may place them ("" = everyone).
+    permission: ""
+    whiteboards: true
 
 # Tell new Velo players about Velo-only features of your server (once per player).
 welcome-toast:
@@ -69,3 +94,103 @@ welcome-toast:
 # Anonymous numbers for the Velo team (Velo players online, Velo versions).
 # Lets us list your server as a Velo partner. No player names or UUIDs.
 stats: true
+
+# ─── Owner panel ────────────────────────────────────────────────────────────
+# /velobridge panel gives you a link to dev.velo-client.com/panel: live numbers (Velo players, versions,
+# modules, join times) and every setting of this file. Player names of joins are sent for the
+# dashboard; nothing else leaves your server. false: no panel, nothing is sent.
+panel:
+  enabled: true
+
+# ─── Server menus ───────────────────────────────────────────────────────────
+# Velo players get a real Velo window, everyone else a chest menu. Open one with /velomenu <id>,
+# its own command, the action "menu:<id>" or the API.
+# Actions: command:/spawn | console:/give %player% diamond | menu:<id> | close | message:<text> |
+#          server:<bungee server> | transfer:<transfer target> | cutscene:<id> | sound:<id> | music:<id> | music-stop
+# Several: "command:/spawn ; close". Input fields: {field-id}. Placeholders: %player% %health% %level% %x% ...
+# (+ PlaceholderAPI).
+menus:
+  # console: actions run as the console - only switch this on if you trust everyone who can edit menus.
+  # (The owner panel can never change this one.)
+  allow-console-actions: false
+  list:
+    warps:
+      title: "Warps"
+      subtitle: "Where to?"
+      command: warps
+      items:
+        - { type: entry, id: spawn, label: "Spawn", detail: "Back to the start", icon: compass, action: "command:/spawn ; close" }
+        - { type: divider }
+        - { type: input, id: home, label: "Home name", placeholder: "base" }
+        - { type: button, id: sethome, label: "Set home", style: primary, action: "command:/sethome {home} ; close" }
+
+# ─── HUD elements ───────────────────────────────────────────────────────────
+# Shown in Velo's "Server HUD" (players move it in the HUD editor). type: text | bar | timer | image
+hud:
+  # coins:
+  #   type: text
+  #   title: "Coins"
+  #   text: "%vault_eco_balance%"
+  #   icon: gold_nugget
+  #   color: "#f4b82e"
+  # health:
+  #   type: bar
+  #   title: "Health"
+  #   value: "%health%"
+  #   max: "%max_health%"
+  #   color: "#ff5555"
+  # event:
+  #   type: timer
+  #   title: "Event starts in"
+  #   ends: "2026-12-24T18:00:00Z"
+  # logo:
+  #   type: image
+  #   url: "https://example.com/logo.png"
+  #   width: 64
+  #   height: 32
+  #   worlds: [world]      # any element: only in these worlds; permission: only for these players
+
+# ─── Cutscenes ──────────────────────────────────────────────────────────────
+# Camera flights. Record in game: /vb cutscene record <id>, /vb cutscene point at each spot, /vb cutscene save.
+cutscenes:
+  # intro:
+  #   duration: 12
+  #   letterbox: true
+  #   lock: true
+  #   title: "&bWelcome"
+  #   subtitle: "to %server%"
+  #   end-action: ""
+  #   world: world
+  #   points:
+  #     - [0.5, 80, 0.5, 45, 10]
+  #     - [20, 85, 30, 120, 20]
+# Played for Velo players joining for the first time ("" = none).
+on-first-join-cutscene: ""
+
+# ─── Music & sound zones ────────────────────────────────────────────────────
+# Fades in when a Velo player walks in, out when they leave. Sound event ids (vanilla or your resource pack).
+# Quick setup in game: /vb zone pos1, /vb zone pos2, /vb zone create <id> <sound> [volume]
+sound-zones:
+  # spawn:
+  #   world: world
+  #   from: [-50, 0, -50]
+  #   to: [50, 320, 50]
+  #   sound: "minecraft:music_disc.cat"
+  #   volume: 0.8
+  #   loop: true
+  #   priority: 0
+# Music for a whole world when no zone applies.
+world-music:
+  # world_nether: "minecraft:music.nether.basalt_deltas"
+
+# ─── NPC cosmetics ──────────────────────────────────────────────────────────
+# Velo cloaks, wings, auras and bodywear on your NPCs (FancyNpcs, Citizens - by NPC name - or any player
+# entity by UUID). Velo players see them. Easiest: design them in /velobridge panel → NPCs (like Velo's Locker).
+npc-cosmetics:
+  # shopkeeper:
+  #   cape: cape_velo_neon
+  #   wings: wings_angelic
+  #   aura: "aura_stars"
+  #   wear: "hat_tophat:1d1d1d,scarf_knit"
+  #   pet: fox
+  #   (a custom cloak uploaded in the panel shows as cape: "custom:<hash>")

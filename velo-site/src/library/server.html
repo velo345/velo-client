@@ -1,0 +1,21 @@
+<!--page {
+ "title": "Server status · Velo Library",
+ "description": "Check any Minecraft Java server: online players, version, MOTD, server icon, latency and a 24-hour player graph.",
+ "path": "/library/server",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="server">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Server status</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">Server list ping · players · MOTD · icon</span>
+    <h1>Server status</h1>
+    <p class="lib-lead">The same status ping the game sends - players, version, MOTD and icon. Servers people look at get a player graph for the last 24 hours.</p>
+  </header>
+  <form id="lookup" class="lib-search" role="search" style="max-width:640px;margin-bottom:32px"><input id="q" type="text" placeholder="play.example.net" aria-label="Server address" autocomplete="off"><button class="lib-btn red" type="submit">Ping</button></form>
+  <div id="result" style="display:flex;flex-direction:column;gap:18px"><div class="lib-empty">Enter a server address above.</div></div>
+
+</main>

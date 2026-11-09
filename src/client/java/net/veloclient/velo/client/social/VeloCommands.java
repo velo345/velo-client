@@ -123,6 +123,14 @@ public final class VeloCommands {
 					help();
 					return 1;
 				}))
+				.then(ClientCmd.literal("import").then(ClientCmd.argument("code", StringArgumentType.word()).executes(context -> {
+					DesignImport.run(StringArgumentType.getString(context, "code"));
+					return 1;
+				})))
+				.then(ClientCmd.literal("schem").then(ClientCmd.argument("code", StringArgumentType.word()).executes(context -> {
+					DesignImport.runSchematic(StringArgumentType.getString(context, "code"));
+					return 1;
+				})))
 				.then(ClientCmd.literal("plus")
 						.executes(context -> {
 							plusStatus();
@@ -313,6 +321,7 @@ public final class VeloCommands {
 	private static void help() {
 		VeloChat.info("/velo plus - your Velo+ time left   /velo coins - your coins   /velo store | map | waypoints | friends | party");
 		VeloChat.info("/velo waypoint <name> - post a waypoint in chat   /velo phantom [on|off]   /velo flyspeed <amount|off>");
+		VeloChat.info("/velo import <code> - a crosshair or HUD icon from velo-client.com/library/hud   /velo schem <code> - a community schematic");
 		if (StoreClient.isOwner()) {
 			VeloChat.info("Owner: /velo owner | lookup <player> | coins give|take <player> <n> | plus give <player> <days> | plus end <player>"
 					+ " | cosmetic give|take <player> <id>");

@@ -1,0 +1,56 @@
+<!--page {
+ "title": "Server banners · Velo Library",
+ "description": "Minecraft server banner generator: live player count, server icon and MOTD, block textures, gradients, patterns, MiniMessage titles and animated GIF banners for websites, server lists and Discord.",
+ "path": "/library/server-banner",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="banner">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Server banners</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">Live players · textures · gradients · animation</span>
+    <h1>Server banners</h1>
+    <p class="lib-lead">Banners for websites, server lists and Discord that update themselves: live player count, ping, icon and MOTD - styled with block textures, gradients, patterns and MiniMessage titles.</p>
+  </header>
+  <div class="lib-box lib-checker" style="padding:28px;display:flex;justify-content:center;margin-bottom:12px;overflow:auto"><img id="preview" alt="Banner preview" style="max-width:100%"></div>
+  <div id="err" class="lib-error" style="margin-bottom:12px"></div>
+  <div class="lib-row">
+    <div class="lib-main">
+      <div class="lib-field"><label for="address">Server address (empty = design only)</label><input id="address" type="text" placeholder="play.example.net"></div>
+      <div class="lib-field"><span>Size</span><div class="lib-pills" id="sizes"></div></div>
+      <div class="lib-field"><span>Theme</span><div class="lib-pills" id="themes"></div></div>
+      <div class="lib-row" style="gap:12px">
+        <label class="lib-field" style="flex:0 0 auto">Colour 1<input id="c1" type="color" value="#000000"></label>
+        <label class="lib-field" style="flex:0 0 auto">Colour 2<input id="c2" type="color" value="#000000"></label>
+        <label class="lib-field" style="flex:0 0 auto">Accent<input id="accent" type="color" value="#000000"></label>
+        <div class="lib-field" style="flex:1 1 180px"><label for="angle">Gradient angle <b id="anglev"></b></label><input id="angle" type="range" min="-180" max="180" step="5" value="0"></div>
+      </div>
+      <div class="lib-field"><label for="texture">Block texture behind (block id)</label><input id="texture" type="text" placeholder="deepslate_tiles">
+        <div class="lib-pills"><button type="button" class="lib-pill" data-tex="deepslate_tiles">Deepslate</button><button type="button" class="lib-pill" data-tex="oak_planks">Planks</button><button type="button" class="lib-pill" data-tex="grass_block">Grass</button><button type="button" class="lib-pill" data-tex="netherrack">Nether</button><button type="button" class="lib-pill" data-tex="end_stone_bricks">End</button><button type="button" class="lib-pill" data-tex="">None</button></div></div>
+      <div class="lib-field"><span>Pattern</span><div class="lib-pills" id="patterns"></div></div>
+      <div class="lib-field"><label for="title">Title (MiniMessage - gradients work)</label><input id="title" type="text" placeholder="<gradient:#ff55ff:#55ffff><bold>MY NETWORK"></div>
+      <div class="lib-field"><label for="lines">Lines (MiniMessage, &lt;newline&gt; for a second line; empty = live MOTD)</label><input id="lines" type="text" placeholder="<white>minigames · skyblock<newline><gray>play.example.net"></div>
+    </div>
+    <aside class="lib-side">
+      <div class="lib-field"><label for="icon">Icon: server / none / item id</label><input id="icon" type="text" value="server"></div>
+      <div class="lib-field"><span>Title font</span><div class="lib-pills" id="fonts"></div></div>
+      <div class="lib-field"><span>Layout</span><div class="lib-pills" id="layouts"></div></div>
+      <div class="lib-field"><label for="radius">Corners <b id="radiusv"></b></label><input id="radius" type="range" min="0" max="48" step="2" value="12"></div>
+      <div>
+        <label class="lib-check"><input id="players" type="checkbox"> Live player count</label>
+        <label class="lib-check"><input id="ping" type="checkbox"> Ping bars</label>
+        <label class="lib-check"><input id="showaddr" type="checkbox"> Address line</label>
+        <label class="lib-check"><input id="version" type="checkbox"> Version</label>
+        <label class="lib-check"><input id="glow" type="checkbox"> Glow</label>
+        <label class="lib-check"><input id="animate" type="checkbox"> Animated (GIF)</label>
+      </div>
+      <button id="copy" class="lib-btn red" type="button">Copy banner URL</button>
+      <pre class="lib-code" id="codes"></pre>
+    </aside>
+  </div>
+
+  <section class="lib-presets" data-presets aria-label="Community presets"></section>
+</main>

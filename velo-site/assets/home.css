@@ -94,8 +94,8 @@
 
 /* Stage: panes stacked, the new one wipes in from the right */
 .h-stage { position: relative; background: #0c0c0e; overflow: hidden; }
-.h-stage-launcher { aspect-ratio: 1600 / 898; }
-.h-stage-locker { aspect-ratio: 1600 / 934; }
+.h-stage-launcher { aspect-ratio: 1600 / 870; }
+.h-stage-locker { aspect-ratio: 1600 / 906; }
 .h-frame { aspect-ratio: 16 / 9; border: 1px solid #232327; border-radius: 6px; }
 .h-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; clip-path: inset(0 0 0 100%); z-index: 1; transition: clip-path .8s cubic-bezier(.77, 0, .18, 1); }
 .h-stage img.on { clip-path: inset(0 0 0 0); z-index: 2; }

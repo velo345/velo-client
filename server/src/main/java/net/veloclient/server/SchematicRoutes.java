@@ -87,7 +87,8 @@ final class SchematicRoutes {
 					}
 				});
 				case "file" -> VeloServerApp.handle(ex, "GET", e -> {
-					Object[] file = schematics.download(id);
+					String q = e.getRequestURI().getRawQuery();
+					Object[] file = schematics.download(id, q == null || !q.contains("view=1"));
 					if (file == null) {
 						JsonHttp.writeError(e, 404, "No such schematic");
 						return;

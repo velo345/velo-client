@@ -48,6 +48,15 @@ public final class Tasks {
 		}
 	}
 
+	/** On the player's thread after a delay. */
+	public static void forPlayerLater(Player player, Runnable task, long delayTicks) {
+		if (REGIONS) {
+			player.getScheduler().runDelayed(plugin, t -> task.run(), null, Math.max(1, delayTicks));
+		} else {
+			Bukkit.getScheduler().runTaskLater(plugin, task, delayTicks);
+		}
+	}
+
 	public static void global(Runnable task) {
 		if (REGIONS) {
 			Bukkit.getGlobalRegionScheduler().run(plugin, t -> task.run());

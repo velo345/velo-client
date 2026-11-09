@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Velo Bridge Panel</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0b0b0c">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="/favicon.png">
+<link rel="preload" href="/fonts/archivo-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter-regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/panel.css?v=1">
+<script src="/panel.js?v=1" defer></script>
+<script type="module" src="/skin3d.js?v=1"></script>
+</head>
+<body>
+<div class="gate" id="gate">
+	<div class="gate-card">
+		<a class="brand" href="/"><img src="/logo.png" alt="" width="28" height="28"><span>VELO</span><em>BRIDGE</em></a>
+		<h1 id="gate-title">Owner panel</h1>
+		<p id="gate-text">Open the link from <code>/velobridge panel</code> on your server. Each link works once, for 15 minutes.</p>
+	</div>
+</div>
+
+<div class="app" id="app" hidden>
+	<aside class="side" id="side">
+		<a class="brand" href="/"><img src="/logo.png" alt="" width="26" height="26"><span>VELO</span><em>PANEL</em></a>
+		<div class="srv">
+			<span class="srv-dot" id="srv-dot"></span>
+			<div><strong id="srv-name">Server</strong><span id="srv-sync">-</span></div>
+		</div>
+		<nav class="tabs" id="tabs" aria-label="Panel">
+			<span class="tab-group">Insights</span>
+			<button data-tab="overview" class="on">Overview</button>
+			<button data-tab="players">Players &amp; mods</button>
+			<span class="tab-group">Server features</span>
+			<button data-tab="menus">Menus</button>
+			<button data-tab="hud">HUD elements</button>
+			<button data-tab="cutscenes">Cutscenes</button>
+			<button data-tab="sound">Music &amp; zones</button>
+			<button data-tab="npcs">NPC cosmetics</button>
+			<button data-tab="notes">Server notes</button>
+			<span class="tab-group">Config</span>
+			<button data-tab="settings">Settings</button>
+			<button data-tab="rules">Mod rules</button>
+		</nav>
+		<p class="side-foot">Changes go to your server within ~5 seconds while this page is open. <a href="/#setup">Docs</a></p>
+	</aside>
+	<button class="side-toggle" id="side-toggle" type="button" aria-label="Menu" aria-expanded="false"><span></span><span></span></button>
+
+	<main class="main" id="main">
+		<section data-page="overview" class="page on"></section>
+		<section data-page="players" class="page"></section>
+		<section data-page="menus" class="page"></section>
+		<section data-page="hud" class="page"></section>
+		<section data-page="cutscenes" class="page"></section>
+		<section data-page="sound" class="page"></section>
+		<section data-page="npcs" class="page"></section>
+		<section data-page="notes" class="page"></section>
+		<section data-page="settings" class="page"></section>
+		<section data-page="rules" class="page"></section>
+	</main>
+
+	<div class="savebar" id="savebar" hidden>
+		<span id="save-text">Unsaved changes</span>
+		<button class="btn btn-sm" id="discard" type="button">Discard</button>
+		<button class="btn btn-sm btn-red" id="save" type="button">Save to server</button>
+	</div>
+	<div class="tip" id="tip" role="tooltip" hidden></div>
+	<div class="toast" id="toast" role="status" hidden></div>
+</div>
+</body>
+</html>

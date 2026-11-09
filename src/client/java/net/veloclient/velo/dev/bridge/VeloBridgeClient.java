@@ -101,6 +101,9 @@ public final class VeloBridgeClient {
 			hello.addProperty("mc", ClientCompat.minecraftVersion());
 			reportedModules = activeModules();
 			hello.add("modules", array(reportedModules));
+			if (ServerHudModule.shareMods()) {
+				hello.add("mods", modList());
+			}
 			BridgeNet.send(hello.toString());
 		}
 		if (++ticks % 40 == 0 && connectedToBridge) {
@@ -112,6 +115,9 @@ public final class VeloBridgeClient {
 				BridgeNet.send(m.toString());
 			}
 		}
+		BridgeCutscene.tick();
+		BridgeServerUi.tick(net.minecraft.client.MinecraftClient.getInstance());
+		BridgeNpcs.tick(net.minecraft.client.MinecraftClient.getInstance());
 		long t = System.currentTimeMillis();
 		TOASTS.removeIf(x -> x.until() < t - 400);
 		WAYPOINTS.values().removeIf(w -> w.until() > 0 && w.until() < t);
@@ -144,6 +150,7 @@ public final class VeloBridgeClient {
 				connectedToBridge = true;
 				serverName = str(m, "name", "This server");
 				serverColor = color(str(m, "color", "#5aa9ff"));
+				modListNotice();
 			}
 			case "mod_rules" -> BridgeModRules.check(server(), m);
 			case "lock_modules" -> {
@@ -200,6 +207,10 @@ public final class VeloBridgeClient {
 			case "precache" -> BridgeNetTools.precache(arr(m, "packs"));
 			case "preconnect" -> BridgeNetTools.preconnect(arr(m, "hosts"));
 			case "notes" -> notesPolicy = m;
+			case "npc_cosmetics" -> BridgeNpcs.set(m);
+			case "hud_set", "hud_remove", "hud_clear", "menu", "menu_close", "cutscene", "cutscene_stop", "music", "music_stop" -> BridgeServerUi.handle(type, m);
+			case "server_notes", "server_note", "server_note_remove", "note_result" ->
+					net.minecraft.client.MinecraftClient.getInstance().execute(() -> net.veloclient.velo.dev.notes.NoteStore.onBridge(type, m));
 			default -> {
 				// A newer plugin: ignore what this client doesn't know yet.
 			}
@@ -222,6 +233,9 @@ public final class VeloBridgeClient {
 		notesPolicy = null;
 		helloSent = false;
 		ModuleLocks.unlockAll();
+		BridgeServerUi.reset();
+		BridgeNpcs.reset();
+		net.minecraft.client.MinecraftClient.getInstance().execute(() -> net.veloclient.velo.dev.notes.NoteStore.onBridge("server_notes_reset", new JsonObject()));
 	}
 
 	// ---- For the HUD, mixins, Discord and Notes ----
@@ -251,6 +265,11 @@ public final class VeloBridgeClient {
 
 	static int serverColor() {
 		return serverColor;
+	}
+
+	/** Sends one raw protocol message (World Notes' server-wide notes). */
+	public static void sendRaw(String json) {
+		BridgeNet.send(json);
 	}
 
 	public static boolean onBridgeServer() {
@@ -347,6 +366,53 @@ public final class VeloBridgeClient {
 		} catch (RuntimeException e) {
 			return 0xFF5AA9FF;
 		}
+	}
+
+	/** The mods the player installed themselves (no bundled libraries), for the server's mod log and hints. */
+	private static JsonArray modList() {
+		JsonArray a = new JsonArray();
+		for (ModContainer mod : FabricLoader.getInstance().getAllMods()) {
+			if (mod.getContainingMod().isPresent() || a.size() >= 300) {
+				continue;
+			}
+			JsonObject o = new JsonObject();
+			o.addProperty("id", cut(mod.getMetadata().getId(), 48));
+			o.addProperty("name", cut(mod.getMetadata().getName(), 40));
+			o.addProperty("version", cut(mod.getMetadata().getVersion().getFriendlyString(), 24));
+			a.add(o);
+		}
+		// one plugin message from the client is at most 32 KB: drop names, then trim the list, until it fits
+		if (a.toString().length() > 24_000) {
+			a.forEach(e -> e.getAsJsonObject().remove("name"));
+		}
+		while (a.toString().length() > 24_000 && !a.isEmpty()) {
+			a.remove(a.size() - 1);
+		}
+		return a;
+	}
+
+	private static String cut(String s, int max) {
+		return s == null ? "" : s.length() > max ? s.substring(0, max) : s;
+	}
+
+	/** Once ever: tell the player Velo Bridge servers see their mod list, and where to switch that off. */
+	private static void modListNotice() {
+		if (!ServerHudModule.shareMods()) {
+			return;
+		}
+		java.nio.file.Path flag = net.veloclient.velo.config.VeloPaths.config().resolve("velo-bridge-modlist-notice");
+		if (java.nio.file.Files.exists(flag)) {
+			return;
+		}
+		try {
+			java.nio.file.Files.createDirectories(flag.getParent());
+			java.nio.file.Files.writeString(flag, "shown");
+		} catch (java.io.IOException ignored) {
+			// shows again next time
+		}
+		net.minecraft.client.MinecraftClient.getInstance().execute(() -> net.veloclient.velo.client.social.NotificationOverlay.show(
+				new net.veloclient.velo.client.social.NotificationOverlay.Toast(null, null, "This server sees your mod list",
+						"Velo Bridge servers get it for their mod rules. Switch it off: Server HUD settings.", 9000, null, null, null)));
 	}
 
 	/** The player's own mods as {id, name, file name} (lowercase), for the mod hints. */

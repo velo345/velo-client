@@ -17,7 +17,8 @@ rsync -rlptz --delete --chmod=D2775,F664 dev-site/ "$TARGET:/var/www/dev.velo-cl
 # The staff panel's static app (staff.velo-client.com) - before nginx, whose config serves it.
 ssh "$TARGET" 'install -d -m 2775 -g velo /var/www/staff.velo-client.com'
 rsync -rlptz --delete --chmod=D2775,F664 --exclude staff.part.js staff-site/ "$TARGET:/var/www/staff.velo-client.com/"
-scp -q server/build/libs/velo-server.jar tools/server/nginx/velo.conf tools/server/host/firewall.nft velo-site/assets/clip.js "$TARGET:/tmp/"
+scp -q server/build/libs/velo-server.jar tools/server/nginx/velo.conf tools/server/host/firewall.nft velo-site/assets/clip.js \
+	tools/server/nginx/snippets/velo-library.conf tools/server/nginx/snippets/velo-library-proxy.conf "$TARGET:/tmp/"
 ssh "$TARGET" 'bash -s' <<'REMOTE'
 set -euo pipefail
 stamp=$(date +%F-%H%M%S)
@@ -28,6 +29,9 @@ cp /etc/velo/firewall.nft "/opt/velo/backups/firewall.nft.$stamp" 2>/dev/null ||
 
 install -m 640 -o root -g velo /tmp/velo-server.jar /opt/velo/server/velo-server.jar
 install -m 644 /tmp/velo.conf /etc/nginx/conf.d/velo.conf
+# the Library's snippets (velo.conf includes them; see deploy-library.sh)
+install -d -m 700 -o www-data -g root /var/cache/nginx/velo-library
+install -m 644 /tmp/velo-library.conf /tmp/velo-library-proxy.conf /etc/nginx/snippets/
 if nginx -t 2>/dev/null; then
 	systemctl reload nginx
 else
@@ -52,6 +56,6 @@ echo "partners: $(curl -fsS http://127.0.0.1:8787/v1/partners)"
 echo "worlds:   $(curl -fsS http://127.0.0.1:8787/v1/worlds/public)"
 ss -ltn | grep -q ':25600 ' && echo "relay:    listening on 25600" || echo "relay:    NOT listening"
 tail -n 5 /var/log/nginx/error.log 2>/dev/null || true
-rm -f /tmp/velo-server.jar /tmp/velo.conf /tmp/firewall.nft /tmp/clip.js
+rm -f /tmp/velo-server.jar /tmp/velo.conf /tmp/firewall.nft /tmp/clip.js /tmp/velo-library.conf /tmp/velo-library-proxy.conf
 REMOTE
 echo "Deployed. Backups are in /opt/velo/backups on $TARGET."

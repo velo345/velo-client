@@ -25,4 +25,14 @@ public final class Presets {
 			"radar", List.of(
 					new String[] {"id", "xaerominimap", "Xaero's Minimap (radar)"}, new String[] {"id", "journeymap", "JourneyMap"},
 					new String[] {"id", "voxelmap", "VoxelMap"}));
+
+	/** Recommendation lists (Modrinth slugs, so players can add them with one click in Velo). */
+	public static final Map<String, List<String[]>> RECOMMEND = Map.of(
+			"performance", List.of(
+					new String[] {"modrinth", "sodium", "Sodium"}, new String[] {"modrinth", "lithium", "Lithium"},
+					new String[] {"modrinth", "ferrite-core", "FerriteCore"}, new String[] {"modrinth", "entityculling", "Entity Culling"},
+					new String[] {"modrinth", "immediatelyfast", "ImmediatelyFast"}),
+			"voice-chat", List.<String[]>of(new String[] {"modrinth", "simple-voice-chat", "Simple Voice Chat"}),
+			"emotes", List.<String[]>of(new String[] {"modrinth", "emotecraft", "Emotecraft"}),
+			"shaders", List.of(new String[] {"modrinth", "iris", "Iris Shaders"}, new String[] {"modrinth", "sodium", "Sodium"}));
 }

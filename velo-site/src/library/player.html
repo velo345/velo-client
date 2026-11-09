@@ -1,0 +1,28 @@
+<!--page {
+ "title": "Skin & name lookup · Velo Library",
+ "description": "Minecraft skin and name lookup: skin, cape, slim or classic model, 3D viewer, name history, skin history, UUID and whether a name is available.",
+ "path": "/library/player",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="player">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Skin & name lookup</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">Players · skins · names</span>
+    <h1>Skin &amp; name lookup</h1>
+    <p class="lib-lead">Any Java player's skin in 3D (with 3D skin layers), their cape and model, every name and skin the Library has seen, and whether a name is free.</p>
+  </header>
+  <form id="lookup" class="lib-search" role="search" style="max-width:640px;margin-bottom:32px"><label for="q" class="visually-hidden" style="position:absolute;left:-9999px">Name or UUID</label>
+    <input id="q" type="text" placeholder="Name or UUID" autocomplete="off"><button class="lib-btn red" type="submit">Look up</button></form>
+  <div id="result"><div class="lib-empty">Type a name or UUID above.</div></div>
+  <section class="lib-box lib-pad" style="margin-top:40px;display:flex;flex-direction:column;gap:12px" aria-labelledby="avail-h">
+    <h3 id="avail-h">Is a name available?</h3>
+    <form id="avail" class="lib-search" style="max-width:520px"><input id="name" type="text" placeholder="Name to check" maxlength="16" aria-label="Name to check"><button class="lib-btn" type="submit">Check</button></form>
+    <div id="avail-result" class="lib-muted"></div>
+  </section>
+
+</main>
+<script type="module" src="{{asset.skin3d}}"></script>

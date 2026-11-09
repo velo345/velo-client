@@ -153,11 +153,21 @@ public final class LauncherApp extends Application {
 			System.setProperty("javafx.animation.pulse", "30");
 		}
 		// --launch <profile id or name>: start that profile right away (scripts, AI agents) - also through a running launcher
-		for (int i = 0; i + 1 < args.length; i++) {
-			if (args[i].equals("--launch")) {
+		// AI agents add --ai (local API, hidden by the AI Access setting), --hidden / --visible and --ai-port <n>: only that
+		// launch gets the AI flags, so a normal copy of the same profile keeps working next to it.
+		StringBuilder cliFlags = new StringBuilder();
+		for (int i = 0; i < args.length; i++) {
+			if (args[i].equals("--launch") && i + 1 < args.length) {
 				cliLaunch = args[i + 1];
-				SingleInstance.message = "launch " + cliLaunch;
+			} else if (args[i].equals("--ai") || args[i].equals("--hidden") || args[i].equals("--visible")) {
+				cliFlags.append(' ').append(args[i]);
+			} else if (args[i].equals("--ai-port") && i + 1 < args.length) {
+				cliFlags.append(" --ai-port ").append(args[i + 1]);
 			}
+		}
+		if (cliLaunch != null) {
+			cliLaunch = cliLaunch + "\t" + cliFlags.toString().strip();
+			SingleInstance.message = "launch " + cliLaunch;
 		}
 		if (!SingleInstance.acquire()) {
 			LauncherLog.info("Launcher already running - brought it to the front instead of starting a second one");
@@ -309,6 +319,9 @@ public final class LauncherApp extends Application {
 		artLater.play();
 		// World Hosting: "Relaunch with matching mods" from the game.
 		net.veloclient.launcher.party.WorldRelaunch.start(instance -> launchWithProgress(instance, null, new Button(), new ProgressBar(), new Label()),
+				(title, text) -> showPlaceholderAlert(title, text));
+		// Velo Bridge mod hints: "Remove/Add & relaunch" from the game.
+		net.veloclient.launcher.party.ModFixRelaunch.start((instance, server) -> launchWithProgress(instance, server, new Button(), new ProgressBar(), new Label()),
 				(title, text) -> showPlaceholderAlert(title, text));
 		net.veloclient.launcher.SingleInstance.onLaunch(id -> launchFromCommandLine(id));
 		if (cliLaunch != null) {
@@ -856,6 +869,17 @@ public final class LauncherApp extends Application {
 		net.veloclient.launcher.social.StoreApi.onWalletChanged(() -> Platform.runLater(this::refreshCoins));
 		refreshCoins();
 		checkForUpdates(null);
+		// launchers left open for days still get updates: a quiet check every 3 hours (background download if on)
+		if (!periodicUpdateCheck) {
+			periodicUpdateCheck = true;
+			javafx.animation.Timeline every3h = new javafx.animation.Timeline(new javafx.animation.KeyFrame(javafx.util.Duration.hours(3), e -> {
+				if (!launcherUpdateReady) {
+					checkForUpdates(null);
+				}
+			}));
+			every3h.setCycleCount(javafx.animation.Animation.INDEFINITE);
+			every3h.play();
+		}
 		refreshAccountBadge();
 		refreshFriendsBadge();
 		return topBar;
@@ -1261,7 +1285,18 @@ public final class LauncherApp extends Application {
 		Label header = new Label("NOTIFICATIONS");
 		header.getStyleClass().add("popover-section");
 		list.getChildren().add(header);
-		if (availableUpdate != null) {
+		if (backgroundUpdating) {
+			list.getChildren().add(downloadNotification());
+		} else if (readyRelease != null) {
+			var ready = readyRelease;
+			list.getChildren().add(notificationRow("download", "#3DDC97", "Launcher " + ready.version() + " is ready",
+					"Downloaded - click to restart and update", () -> {
+						popup[0].hide();
+						if (updateCard == null) {
+							showUpdateReady(ready);
+						}
+					}));
+		} else if (availableUpdate != null) {
 			list.getChildren().add(notificationRow("download", "#3DDC97", "Update ready",
 					"Velo Client " + availableUpdate.version() + " - install now", () -> {
 						popup[0].hide();
@@ -1326,7 +1361,7 @@ public final class LauncherApp extends Application {
 		boolean social = state != null && ((state.incoming != null && !state.incoming.isEmpty())
 				|| (state.friends != null && state.friends.stream().anyMatch(f -> f.unread > 0)));
 		int unread = newsFeed == null ? 0 : net.veloclient.launcher.ui.NewsView.unread(newsFeed);
-		topBar.setNotificationDot(availableUpdate != null || social || unread > 0);
+		topBar.setNotificationDot(availableUpdate != null || backgroundUpdating || readyRelease != null || social || unread > 0);
 	}
 
 	/** The account pill: profile, invites, skins, theme, account switching and sign out. */
@@ -3607,8 +3642,10 @@ public final class LauncherApp extends Application {
 			d.aiAccess = on.isSelected();
 			net.veloclient.launcher.data.LauncherSettings.save(d);
 		});
-		net.veloclient.launcher.ui.SettingsUi.row(card, "AI access (at your own risk)", "Let AI agents drive the game through a local API",
-				"The game opens an API on 127.0.0.1:" + net.veloclient.launcher.launch.GameLauncher.AI_PORT + " (only this PC, token required):"
+		net.veloclient.launcher.ui.SettingsUi.row(card, "Allow AI launches (at your own risk)", "AI agents may start their own copy of the game with a local API",
+				"Only games an AI starts itself (\"Velo Client Launcher\" --launch <profile> --ai) open the API - your own Play clicks never do,"
+						+ " so you can play normally while an AI runs its own copy. That copy opens an API on 127.0.0.1:"
+						+ net.veloclient.launcher.launch.GameLauncher.AI_PORT + " or the next free port (only this PC, token required):"
 						+ " Velo Rewind replays and video exports, recording, joining worlds and servers, screenshots, Velo modules, resource packs,"
 						+ " shaders and mods. Moving, chatting and inventory only work in singleplayer or on servers where you're an operator."
 						+ " Takes effect on the next launch.", on);
@@ -3621,19 +3658,20 @@ public final class LauncherApp extends Application {
 			d.aiHidden = hidden.isSelected();
 			net.veloclient.launcher.data.LauncherSettings.save(d);
 		});
-		net.veloclient.launcher.ui.SettingsUi.row(card, "Start the game hidden", "No game window - the AI plays and records in the background",
-				"With AI access on, the game runs without a window (Linux: in an invisible display; Windows / macOS: the game hides its"
+		net.veloclient.launcher.ui.SettingsUi.row(card, "AI launches start hidden", "No window for the AI's copy - it plays and records in the background",
+				"Only for launches with --ai (an AI can also pass --hidden or --visible itself). The AI's copy runs without a window (Linux: in an invisible display; Windows / macOS: the game hides its"
 						+ " window once it has started) - nothing on your screen, your mouse and keyboard stay yours. Close it through the"
 						+ " API (POST /quit) or the launcher's Stop button.", hidden);
 		Button copy = new Button("Copy prompt");
 		copy.setOnAction(e -> {
-			String url = "http://127.0.0.1:" + net.veloclient.launcher.launch.GameLauncher.AI_PORT;
+			String url = "<url from ai-launch.json, usually http://127.0.0.1:" + net.veloclient.launcher.launch.GameLauncher.AI_PORT + ">";
 			String prompt = "You can control Velo Client (a Minecraft client) through its local AI API.\n"
 					+ "URL: " + url + "  -  send 'Authorization: Bearer " + net.veloclient.launcher.launch.GameLauncher.aiToken()
 					+ "' with every request (JSON bodies).\n"
 					+ "1. First read the full guide: GET " + url + "/ (markdown, every endpoint with examples, recipes, errors).\n"
-					+ "2. The game must be running: start a profile with the Velo launcher (also from a terminal:"
-					+ " \"Velo Client Launcher\" --launch <profile name or id>), then wait until GET /status answers.\n"
+					+ "2. Start your own copy of the game from a terminal: \"Velo Client Launcher\" --launch <profile name or id> --ai"
+					+ " (add --hidden for no window, --visible for a window). Never use the user's own running game. Then read ~/.velo-client/ai-launch.json"
+					+ " (\"url\" - the port can differ from " + net.veloclient.launcher.launch.GameLauncher.AI_PORT + " when another AI copy runs) and wait until GET /status answers.\n"
 					+ "3. Start every session with GET /status and GET /player.\n"
 					+ "4. Replays (Velo Rewind): GET /recordings, POST /open {\"file\": \"<name>\", \"leave\": true}, poll GET /status until replay.ready.\n"
 					+ "5. Look before and after every change: GET /sheet?count=12&width=480. Edits save themselves; POST /undo reverts.\n"
@@ -3986,7 +4024,30 @@ public final class LauncherApp extends Application {
 	}
 
 	// --launch: the profile by id, else by name (case-insensitive); waits up to a minute for the sign-in to be ready.
-	private void launchFromCommandLine(String key) {
+	private void launchFromCommandLine(String request) {
+		int tab = request.indexOf('\t');
+		String key = (tab < 0 ? request : request.substring(0, tab)).strip();
+		List<String> flags = tab < 0 ? List.of() : List.of(request.substring(tab + 1).strip().split("\\s+"));
+		boolean ai = flags.contains("--ai") || flags.contains("--hidden");
+		int aiPort = 0;
+		int portAt = flags.indexOf("--ai-port");
+		if (portAt >= 0 && portAt + 1 < flags.size()) {
+			try {
+				aiPort = Integer.parseInt(flags.get(portAt + 1));
+				ai = true;
+			} catch (NumberFormatException ignored) {
+				// keep 0 = first free
+			}
+		}
+		boolean hidden = flags.contains("--hidden") || (!flags.contains("--visible") && net.veloclient.launcher.data.LauncherSettings.get().aiHidden);
+		if (ai && !net.veloclient.launcher.data.LauncherSettings.get().aiAccess) {
+			LauncherLog.warn("--launch " + key + " --ai: AI launches are off (launcher Settings > AI Access)", null);
+			Platform.runLater(() -> net.veloclient.launcher.ui.Toasts.show(content, "info", "#f7c04a",
+					"An AI tried to start " + key + " - turn on Settings > AI Access to allow it"));
+			return;
+		}
+		boolean aiLaunch = ai;
+		int port = aiPort;
 		Thread.ofVirtual().name("velo-cli-launch").start(() -> {
 			for (int i = 0; i < 120 && session == null; i++) {
 				try {
@@ -4010,7 +4071,10 @@ public final class LauncherApp extends Application {
 				LauncherLog.warn("--launch " + key + ": " + (target == null ? "no profile with that id or name" : "not signed in"), null);
 				return;
 			}
-			LauncherLog.info("--launch: starting " + target.name());
+			LauncherLog.info("--launch: starting " + target.name() + (aiLaunch ? " for an AI" + (hidden ? " (hidden)" : "") : ""));
+			if (aiLaunch) {
+				GameLauncher.queueAiLaunch(target.id(), new GameLauncher.AiLaunch(hidden, port));
+			}
 			Platform.runLater(() -> launchWithProgress(target, null, launchBar.playButton(), launchBar.progress(), launchBar.statusLabel()));
 		});
 	}
@@ -4511,6 +4575,32 @@ public final class LauncherApp extends Application {
 			StackPane.setAlignment(badge, Pos.TOP_LEFT);
 			StackPane.setMargin(badge, new Insets(10));
 			art.getChildren().add(badge);
+			// Kill: ends every running copy of this profile at once (no saving) - frozen games, hidden AI instances.
+			Button kill = new Button(running > 1 ? "Kill all (" + running + ")" : "Kill");
+			kill.setGraphic(net.veloclient.launcher.ui.Icons.icon("close", 11, Color.WHITE));
+			kill.setStyle("-fx-background-color: rgba(214,48,49,0.88); -fx-text-fill: white; -fx-background-radius: 8; -fx-padding: 4 10 4 8;");
+			kill.setTooltip(new javafx.scene.control.Tooltip("End the game right away - unsaved progress is lost. Stop (in the launch bar) closes it normally."));
+			kill.setOnAction(e -> {
+				e.consume();
+				for (RunningInstanceManager.RunningInstance ri : List.copyOf(RunningInstanceManager.running())) {
+					if (ri.instance().id().equals(instance.id())) {
+						ri.kill();
+					}
+				}
+				net.veloclient.launcher.ui.Toasts.show(content, "info", "#ff5c5c", instance.name() + " killed");
+				Runnable page = currentPage;
+				javafx.animation.PauseTransition later = new javafx.animation.PauseTransition(javafx.util.Duration.millis(700));
+				later.setOnFinished(ev -> {
+					if (page != null && currentPage == page) {
+						page.run();
+					}
+				});
+				later.play();
+			});
+			kill.setOnMouseClicked(javafx.scene.input.MouseEvent::consume);
+			StackPane.setAlignment(kill, Pos.TOP_RIGHT);
+			StackPane.setMargin(kill, new Insets(10));
+			art.getChildren().add(kill);
 		}
 		StackPane play = new StackPane(net.veloclient.launcher.ui.Icons.icon("play", 15, Color.WHITE));
 		play.getStyleClass().add("tile-play");
@@ -4657,6 +4747,10 @@ public final class LauncherApp extends Application {
 			try {
 				var release = net.veloclient.launcher.launch.UpdateService.check();
 				var policy = net.veloclient.launcher.launch.UpdateService.policy();
+				if (status == null && release.anything() && net.veloclient.launcher.data.LauncherSettings.get().autoUpdate
+						&& net.veloclient.launcher.launch.UpdateService.packaged() && !policy.required()) {
+					backgroundUpdate(release);
+				}
 				javafx.application.Platform.runLater(() -> {
 					availableUpdate = release.anything() ? release : null;
 					requiredUpdate = policy.required() && availableUpdate != null ? policy : null;
@@ -4682,6 +4776,174 @@ public final class LauncherApp extends Application {
 		}, "velo-update-check");
 		thread.setDaemon(true);
 		thread.start();
+	}
+
+	/** Background updates (Settings > Automatic updates): set once the new launcher's installer is downloaded and checked. */
+	private volatile boolean launcherUpdateReady;
+	/** Background download shown live in the notifications: fraction (-1 = unknown) and a "12 / 250 MB · 8 MB/s" line. */
+	private final javafx.beans.property.DoubleProperty bgProgress = new javafx.beans.property.SimpleDoubleProperty(-1);
+	private final javafx.beans.property.StringProperty bgStatus = new javafx.beans.property.SimpleStringProperty("");
+	private volatile String bgVersion;
+	private net.veloclient.launcher.launch.UpdateService.Release readyRelease;
+	private boolean periodicUpdateCheck;
+	private volatile boolean backgroundUpdating;
+	private javafx.scene.Node updateCard;
+
+	/**
+	 * Automatic updates: new mod builds install right away (they apply on each profile's next launch), the new launcher's
+	 * installer downloads in the background, then a small card offers "Restart to update" - no dialog, no waiting.
+	 */
+	private void backgroundUpdate(net.veloclient.launcher.launch.UpdateService.Release release) {
+		if (backgroundUpdating) {
+			return;
+		}
+		backgroundUpdating = true;
+		bgVersion = release.version();
+		java.util.function.Consumer<net.veloclient.launcher.launch.UpdateService.Transfer> track = t -> javafx.application.Platform.runLater(() -> {
+			bgProgress.set(t.fraction());
+			bgStatus.set(net.veloclient.launcher.ui.UpdateDialog.describe(t));
+		});
+		javafx.application.Platform.runLater(() -> {
+			bgProgress.set(-1);
+			bgStatus.set("Starting the download...");
+			refreshNotificationDot();
+		});
+		try {
+			// only the Minecraft versions this player's profiles use (each jar is ~55 MB); the rest come when needed
+			java.util.Set<String> used = new java.util.HashSet<>();
+			for (var instance : net.veloclient.launcher.instance.InstanceStore.loadAll()) {
+				used.add(instance.mcVersion());
+			}
+			java.util.Map<String, net.veloclient.launcher.launch.UpdateService.Asset> mods = new java.util.LinkedHashMap<>();
+			release.modAssets().forEach((k, v) -> {
+				if (used.contains(k.replace("-addons", ""))) {
+					mods.put(k, v);
+				}
+			});
+			if (!mods.isEmpty()) {
+				net.veloclient.launcher.launch.UpdateService.installModUpdatesTracked(new net.veloclient.launcher.launch.UpdateService.Release(
+						release.version(), release.notes(), release.pageUrl(), release.launcherNewer(), release.installer(), mods), text -> { }, track);
+				LauncherLog.info("Background update: mod build " + release.version() + " for " + mods.keySet());
+			}
+			if (release.launcherNewer() && net.veloclient.launcher.launch.UpdateService.prepareInstaller(release, track)) {
+				launcherUpdateReady = true;
+				javafx.application.Platform.runLater(() -> {
+					readyRelease = release;
+					refreshNotificationDot();
+					showUpdateReady(release);
+				});
+			} else if (!mods.isEmpty()) {
+				javafx.application.Platform.runLater(() -> {
+					availableUpdate = null;
+					refreshNotificationDot();
+					net.veloclient.launcher.ui.Toasts.show(stage.getScene().getRoot(), "download", "#3DDC97",
+							"Velo " + release.version() + " is ready - your next game start uses it");
+				});
+			}
+		} catch (Exception e) {
+			// the bell still offers the update by hand
+			LauncherLog.info("Background update didn't finish: " + e);
+		} finally {
+			backgroundUpdating = false;
+			javafx.application.Platform.runLater(this::refreshNotificationDot);
+		}
+	}
+
+	/** The notification row while an update downloads in the background: title, live progress bar and speed. */
+	private Node downloadNotification() {
+		StackPane badge = new StackPane(net.veloclient.launcher.ui.Icons.icon("download", 16, Color.web("#3DDC97")));
+		badge.setMinSize(32, 32);
+		badge.setMaxSize(32, 32);
+		badge.setStyle("-fx-background-color: #3DDC9722; -fx-background-radius: 9;");
+		Label title = new Label("Downloading Velo " + (bgVersion == null ? "" : bgVersion));
+		title.getStyleClass().add("t-strong");
+		javafx.scene.control.ProgressBar bar = new javafx.scene.control.ProgressBar();
+		bar.progressProperty().bind(javafx.beans.binding.Bindings.when(bgProgress.lessThan(0))
+				.then(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS).otherwise(bgProgress));
+		bar.setMaxWidth(Double.MAX_VALUE);
+		bar.setPrefHeight(6);
+		Label detail = new Label();
+		detail.textProperty().bind(bgStatus);
+		detail.getStyleClass().add("t-muted");
+		VBox text = new VBox(5, title, bar, detail);
+		HBox.setHgrow(text, javafx.scene.layout.Priority.ALWAYS);
+		HBox row = new HBox(12, badge, text);
+		row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+		row.setPadding(new Insets(8, 10, 8, 10));
+		return row;
+	}
+
+	/** The small "Restart to update" card in the corner (stays until used or dismissed). */
+	private void showUpdateReady(net.veloclient.launcher.launch.UpdateService.Release release) {
+		if (!(stage.getScene().getRoot() instanceof javafx.scene.layout.StackPane layers) || updateCard != null) {
+			return;
+		}
+		Label title = new Label("Launcher " + release.version() + " is ready");
+		title.getStyleClass().add("t-strong");
+		Label text = new Label("Downloaded in the background. Restart to update - takes a few seconds.");
+		text.setWrapText(true);
+		text.getStyleClass().add("settings-row-hint");
+		text.setMaxWidth(280);
+		Button restart = new Button("Restart to update");
+		restart.getStyleClass().add("primary-button");
+		Button later = new Button("Later");
+		later.getStyleClass().add("ghost-button");
+		javafx.scene.layout.HBox buttons = new javafx.scene.layout.HBox(8, restart, later);
+		javafx.scene.layout.VBox card = new javafx.scene.layout.VBox(8, title, text, buttons);
+		card.getStyleClass().add("toast");
+		card.setStyle("-fx-padding: 16; -fx-background-radius: 12;");
+		card.setMaxSize(javafx.scene.layout.Region.USE_PREF_SIZE, javafx.scene.layout.Region.USE_PREF_SIZE);
+		javafx.scene.layout.StackPane.setAlignment(card, javafx.geometry.Pos.BOTTOM_RIGHT);
+		javafx.scene.layout.StackPane.setMargin(card, new javafx.geometry.Insets(0, 24, 96, 0));
+		layers.getChildren().add(card);
+		updateCard = card;
+		card.setOpacity(0);
+		card.setTranslateY(14);
+		javafx.animation.FadeTransition in = new javafx.animation.FadeTransition(javafx.util.Duration.millis(240), card);
+		in.setToValue(1);
+		javafx.animation.TranslateTransition up = new javafx.animation.TranslateTransition(javafx.util.Duration.millis(280), card);
+		up.setToY(0);
+		new javafx.animation.ParallelTransition(in, up).play();
+		Runnable close = () -> {
+			layers.getChildren().remove(card);
+			updateCard = null;
+		};
+		later.setOnAction(e -> close.run());
+		restart.setOnAction(e -> {
+			if (!RunningInstanceManager.running().isEmpty()) {
+				text.setText("Close your game first - the launcher restarts to update.");
+				return;
+			}
+			restart.setDisable(true);
+			later.setDisable(true);
+			text.setText("Updating - Velo Client closes and starts again by itself.");
+			Thread t = new Thread(() -> {
+				try {
+					boolean started = net.veloclient.launcher.launch.UpdateService.runInstallerTracked(release,
+							s -> javafx.application.Platform.runLater(() -> text.setText(s)), x -> { });
+					if (started) {
+						String os = System.getProperty("os.name", "").toLowerCase();
+						if (!os.contains("win") && !os.contains("mac")) {
+							net.veloclient.launcher.launch.UpdateService.relaunch();
+						}
+						Thread.sleep(600);
+						javafx.application.Platform.runLater(() -> {
+							javafx.application.Platform.exit();
+							System.exit(0);
+						});
+					}
+				} catch (Exception ex) {
+					LauncherLog.warn("Update from the card failed", ex);
+					javafx.application.Platform.runLater(() -> {
+						text.setText("That didn't work: " + ex.getMessage() + " - try the bell.");
+						restart.setDisable(false);
+						later.setDisable(false);
+					});
+				}
+			}, "velo-update-restart");
+			t.setDaemon(true);
+			t.start();
+		});
 	}
 
 	private void showSettings() {
@@ -4724,6 +4986,16 @@ public final class LauncherApp extends Application {
 		net.veloclient.launcher.ui.SettingsUi.row(updates, "Repair Velo Client", "Something broken? Reinstalls the current mod and launcher",
 				"Puts the current Velo mod back into every profile, clears Fabric's cache and downloads the current build again -"
 						+ " optionally reinstalls the launcher too. Worlds, settings and other mods stay as they are.", repairButton);
+		javafx.scene.control.CheckBox autoUpdate = new javafx.scene.control.CheckBox();
+		autoUpdate.setSelected(net.veloclient.launcher.data.LauncherSettings.get().autoUpdate);
+		autoUpdate.setOnAction(e -> {
+			net.veloclient.launcher.data.LauncherSettings.Data data = net.veloclient.launcher.data.LauncherSettings.get();
+			data.autoUpdate = autoUpdate.isSelected();
+			net.veloclient.launcher.data.LauncherSettings.save(data);
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(updates, "Automatic updates", "Downloads updates in the background - you just restart",
+				"New Velo mod builds install right away and apply on each profile's next launch. A new launcher version downloads"
+						+ " in the background; then a small card offers Restart to update. Off: updates wait for the bell.", autoUpdate);
 		javafx.scene.control.CheckBox minimize = new javafx.scene.control.CheckBox();
 		minimize.setSelected(net.veloclient.launcher.data.LauncherSettings.get().minimizeOnLaunch);
 		minimize.setOnAction(e -> {

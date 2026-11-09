@@ -141,8 +141,13 @@ public final class HudManager {
 		// every other vanilla HUD element (health/food/XP/chat/etc) and all
 		// our own modules below still haven't - applying the blur pass here
 		// blurs the world without smearing anything drawn on top of it.
+		// 26.2+: the post effects run from TurboHudWholeMixin every frame instead - this hook only runs when the HUD is
+		// rebuilt (Velo's HUD cache / Gnetum: at most 360 times a second), so at high FPS they were only in some frames
+		// and the picture flickered between graded and plain (black with vignette / Black & White).
+		//? if <26.2 {
 		net.veloclient.velo.client.modules.rendering.ColorGradingModule.applyIfActive();
 		net.veloclient.velo.client.modules.performance.PolyBlurModule.applyIfActive();
+		//?}
 		float tickDelta = tickCounter.getTickProgress(true);
 		int screenWidth = client.getWindow().getScaledWidth();
 		int screenHeight = client.getWindow().getScaledHeight();

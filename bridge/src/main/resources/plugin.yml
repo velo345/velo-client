@@ -12,10 +12,16 @@ commands:
     aliases: [vb]
     usage: /velobridge help
     permission: velobridge.admin
+  velomenu:
+    description: Open a Velo Bridge menu from config.yml
+    usage: /velomenu <id>
 permissions:
   velobridge.admin:
     description: Use /velobridge
     default: op
   velobridge.notify:
-    description: Get told when a Velo player joins with modules your server disabled or warned about
+    description: Get the Velo join lines switched on under "notify" in config.yml
+    default: op
+  velobridge.notes.manage:
+    description: Change and remove anyone's server-wide World Notes (in Velo)
     default: op

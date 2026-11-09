@@ -90,6 +90,20 @@ public final class RunningInstanceManager {
 		}
 
 		/**
+		 * Kill button: ends the game right away, no saving - for a frozen game or a hidden AI instance. Takes the whole
+		 * process tree (the hidden start runs the game inside kwin_wayland / xvfb-run, which would otherwise outlive it).
+		 */
+		public void kill() {
+			stopRequested.set(true);
+			try {
+				process.descendants().forEach(ProcessHandle::destroyForcibly);
+			} catch (RuntimeException ignored) {
+				// not allowed to see the children here - the main process below still goes
+			}
+			process.destroyForcibly();
+		}
+
+		/**
 		 * Asks the running game to quit on its own - the Velo mod checks {@code velo/close-request} in the profile every
 		 * second and shuts down the normal way. False when the request couldn't be written.
 		 */

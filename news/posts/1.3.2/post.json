@@ -1,0 +1,89 @@
+{
+ "title": "Velo Client 1.3.2: the server owner update",
+ "summary": "An owner panel for Velo Bridge servers, real Velo menus, HUD elements, cutscenes, music zones and NPC cosmetics - plus updates that install themselves.",
+ "tag": "Update",
+ "version": "1.3.2",
+ "accent": "#e0262e",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "text",
+   "text": "**Velo Client 1.3.2** gives servers with **Velo Bridge 1.2** a lot more to show you - and the launcher now updates itself in the background."
+  },
+  {
+   "type": "heading",
+   "text": "Servers in Velo's own style"
+  },
+  {
+   "type": "image",
+   "image": "file:images/menus.jpg",
+   "caption": "Server menus open as real Velo windows."
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Server menus** open as Velo windows: buttons, lists with item icons, input fields, toggles and sliders",
+    "**Server HUD**: quest progress, boss bars, event timers and pictures - move it like any HUD element",
+    "**Cutscenes**: smooth camera flights with letterbox and titles for intros and events",
+    "**Music zones**: music that fades in and out as you walk around a server",
+    "**Server notes**: on servers that allow it, pin World Notes everyone there can see",
+    "**NPCs in Velo cosmetics**: servers can dress their NPCs in cloaks, wings, auras, bodywear and pets"
+   ]
+  },
+  {
+   "type": "callout",
+   "text": "Don't want any of it? Settings of the **Server HUD** module: switch server music or cutscenes off any time."
+  },
+  {
+   "type": "heading",
+   "text": "For server owners"
+  },
+  {
+   "type": "image",
+   "image": "file:images/panel.jpg",
+   "caption": "The owner panel: live numbers and every setting in one page."
+  },
+  {
+   "type": "list",
+   "items": [
+    "Run **/velobridge panel** and open the link: players online, Velo versions, modules and join times",
+    "Change every setting with live previews - saved to your server within seconds",
+    "Design NPCs like in the Locker, with a 3D preview and your own cloaks",
+    "Everything at **dev.velo-client.com**"
+   ]
+  },
+  {
+   "type": "image",
+   "image": "file:images/npcs.jpg",
+   "caption": "Dressing an NPC in the panel."
+  },
+  {
+   "type": "heading",
+   "text": "Updates that install themselves"
+  },
+  {
+   "type": "list",
+   "items": [
+    "New versions **download in the background**; a small card offers **Restart to update**",
+    "Download progress right in your notifications",
+    "Downloads come from **Velo's own servers first** - about twice as fast, GitHub only as a backup",
+    "Windows: the update no longer stalls with a console window - it asks for permission once and installs quietly",
+    "Switch it off in Settings: **Automatic updates**"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Fixes"
+  },
+  {
+   "type": "list",
+   "items": [
+    "The Velo menu no longer opens and closes over and over when its key is held",
+    "Fixed a crash on 26.3 with some shader mods when a 3D player preview with cosmetics was shown",
+    "Fixed a rare crash on 1.21.10 / 1.21.11 with the GPU Utilization HUD",
+    "Velo Library: custom poses on the render page, steadier animated renders, better crouch and dab"
+   ]
+  }
+ ]
+}

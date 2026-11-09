@@ -104,6 +104,9 @@ final class BridgeHud {
 		lastFrame = nanos;
 		int w = context.getScaledWindowWidth();
 		int h = context.getScaledWindowHeight();
+		if (letterbox(context, w, h)) {
+			return; // a cutscene: only the bars and its title
+		}
 		markers(context, w, h);
 		progressBars(context, w, dt);
 		countdown(context, w, h);
@@ -197,6 +200,47 @@ final class BridgeHud {
 		int ly = cy + radius + 14;
 		VeloDraw.fillRounded(context, cx - lw / 2 - 9, ly - 5, lw + 18, MenuKit.H_UI + 10, 6, 0xC80F1014);
 		text(context, label, cx - lw / 2, ly, 0xFFEDEEF2);
+	}
+
+	/** Cutscene letterbox bars (slide in and out) and the title, fading in and out. True while a cutscene runs. */
+	private static boolean letterbox(DrawContext context, int w, int h) {
+		BridgeCutscene.Scene s = BridgeCutscene.scene;
+		long now = System.currentTimeMillis();
+		float in;
+		BridgeCutscene.Scene shown = s;
+		if (s != null) {
+			in = Math.min(1f, (now - s.start()) / 600f);
+		} else {
+			shown = BridgeCutscene.last;
+			if (shown == null || now - BridgeCutscene.endedAt > 600) {
+				return false;
+			}
+			in = 1f - (now - BridgeCutscene.endedAt) / 600f;
+		}
+		float e = ease(in);
+		if (shown.letterbox()) {
+			int bar = Math.round(h * 0.11f * e);
+			context.fill(0, 0, w, bar, 0xFF000000);
+			context.fill(0, h - bar, w, h, 0xFF000000);
+		}
+		if (s != null && !(s.title().isEmpty() && s.subtitle().isEmpty())) {
+			float p = BridgeCutscene.progress();
+			float a = Math.min(1f, Math.min(p / 0.12f, (1f - p) / 0.12f));
+			if (a > 0.02f) {
+				String title = s.title().replaceAll("[&§][0-9a-fk-orA-FK-OR]", "");
+				String sub = s.subtitle().replaceAll("[&§][0-9a-fk-orA-FK-OR]", "");
+				int cy = h - Math.round(h * 0.11f) - 34;
+				if (!title.isEmpty()) {
+					centered(context, MenuKit.hero(title), w / 2, cy, 0.7f, MenuKit.H_HERO, withAlpha(0xFFFFFFFF, a));
+				}
+				if (!sub.isEmpty()) {
+					var t = MenuKit.ui(sub);
+					int tw = MinecraftClient.getInstance().textRenderer.getWidth(t);
+					text(context, t, w / 2 - tw / 2, cy + 16, withAlpha(0xFFD0D3DA, a));
+				}
+			}
+		}
+		return s != null;
 	}
 
 	/** Text centred on (cx, cy) at {@code scale}; {@code lineHeight} is the font's height (MenuKit.H_*). */

@@ -614,7 +614,15 @@ public final class NoteEditScreen extends VeloWindow {
 		}
 		label(context, "Who sees it", x, y);
 		boolean can = NoteStore.canShareHere() || !draft.local;
-		int pw = (w - 8) / 3;
+		boolean serverWide = NoteStore.serverNotesHere() || "server".equals(draft.share) && !draft.local;
+		int pw = serverWide ? (w - 12) / 4 : (w - 8) / 3;
+		if (serverWide) {
+			hits.add(VeloUi.pill(context, x + (pw + 4) * 3, y + 12, pw, 18, "Everyone here", !draft.local && "server".equals(draft.share) ? 1 : 0, mouseX, mouseY,
+					() -> {
+						draft.local = false;
+						draft.share = "server";
+					}));
+		}
 		hits.add(VeloUi.pill(context, x, y + 12, pw, 18, "Only me", draft.local ? 1 : 0, mouseX, mouseY, () -> draft.local = true));
 		VeloUi.Hit friends = VeloUi.pill(context, x + pw + 4, y + 12, pw, 18, "All my friends", !draft.local && "friends".equals(draft.share) ? 1 : 0, mouseX, mouseY,
 				() -> {
@@ -642,6 +650,17 @@ public final class NoteEditScreen extends VeloWindow {
 		}
 		if (draft.local) {
 			deleteButton(context, x, contentBottom() - 40, mouseX, mouseY);
+			return;
+		}
+		if ("server".equals(draft.share)) {
+			for (String line : VeloUi.wrap("Everyone on " + net.veloclient.velo.dev.bridge.VeloBridgeClient.server()
+					+ " who uses Velo sees this note. It's stored on the server - its staff can remove it. No pictures.", w)) {
+				context.drawTextWithShadow(this.textRenderer, line, x, ly, VeloUi.muted());
+				ly += 11;
+			}
+			if (!isNew) {
+				deleteButton(context, x, contentBottom() - 40, mouseX, mouseY);
+			}
 			return;
 		}
 		label(context, draft.isBoard() ? "Who may draw along (live)" : "Others may", x, ly + 2);
@@ -753,7 +772,7 @@ public final class NoteEditScreen extends VeloWindow {
 	/** Someone else's note: who shared it, hide / leave, report. */
 	private void drawSharedWithMe(DrawContext context, int x, int y, int w, int mouseX, int mouseY, Theme theme) {
 		label(context, "From", x, y);
-		context.drawTextWithShadow(this.textRenderer, draft.ownerName + ("friends".equals(draft.share) ? " - shared with all their friends"
+		context.drawTextWithShadow(this.textRenderer, draft.ownerName + ("server".equals(draft.share) ? " - for everyone on this server" : "friends".equals(draft.share) ? " - shared with all their friends"
 				: " - shared with " + draft.people.size() + " people"), x, y + 12, theme.text());
 		boolean hidden = NoteStore.hidden(original);
 		hits.add(VeloUi.pill(context, x, y + 30, 150, 16, hidden ? "Show it in my world" : "Hide it in my world", 0, mouseX, mouseY,

@@ -248,10 +248,14 @@ public final class GameLauncher {
 		jvmArgs.add("-Dfabric.noGui=true");
 		// Which account's cosmetics the game wears (config/accounts/<uuid>/) - the same files the launcher's Locker edits.
 		jvmArgs.add("-Dvelo.account=" + session.uuid().replace("-", ""));
-		var aiSettings = net.veloclient.launcher.data.LauncherSettings.get();
-		if (aiSettings.aiAccess) {
-			// the game's local AI API (see the launcher's Settings > AI Access)
-			jvmArgs.add("-Dvelo.aiApi=" + AI_PORT);
+		// AI flags only for a launch an AI asked for (--launch <profile> --ai): a normal Play click never gets them, so a
+		// hidden AI copy and a normal copy can run side by side (the global toggle used to hide every game and stop it
+		// taking the mouse).
+		AiLaunch ai = PENDING_AI.remove(instance.id());
+		int aiPort = 0;
+		if (ai != null) {
+			aiPort = freePort(ai.port() > 0 ? ai.port() : AI_PORT);
+			jvmArgs.add("-Dvelo.aiApi=" + aiPort);
 			jvmArgs.add("-Dvelo.aiToken=" + aiToken());
 		}
 		if (net.veloclient.launcher.AppVersion.DEV) {   // the dev game shares the dev launcher's folder (pets, loadouts, Locker)
@@ -327,7 +331,10 @@ public final class GameLauncher {
 		command.add(mainClass);
 		command.addAll(gameArgs);
 
-		if (aiSettings.aiAccess && aiSettings.aiHidden) {
+		if (ai != null) {
+			writeAiLaunch(instance, aiPort, ai.hidden());
+		}
+		if (ai != null && ai.hidden()) {
 			if (MemoryPlanner.isLinux() && (onPath("kwin_wayland") || onPath("xvfb-run"))) {
 				command = hiddenDisplay(command, InstancePaths.logsDir(instance.id()).resolve("hidden-start.sh"));
 			} else {
@@ -404,6 +411,48 @@ public final class GameLauncher {
 	}
 
 	public static final int AI_PORT = 25620;
+
+	/** An AI start: open the local API (on {@code port}, 0 = the first free one from 25620) and maybe hide the window. */
+	public record AiLaunch(boolean hidden, int port) {
+	}
+
+	private static final java.util.Map<String, AiLaunch> PENDING_AI = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** The next launch of this profile is an AI launch (taken by {@link #launch} once). */
+	public static void queueAiLaunch(String instanceId, AiLaunch ai) {
+		PENDING_AI.put(instanceId, ai);
+	}
+
+	// A second AI copy can't share the first one's port.
+	private static int freePort(int from) {
+		for (int port = from; port < from + 40; port++) {
+			try (java.net.ServerSocket probe = new java.net.ServerSocket(port, 1, java.net.InetAddress.getLoopbackAddress())) {
+				return port;
+			} catch (IOException busy) {
+				// next
+			}
+		}
+		return from;
+	}
+
+	// ~/.velo-client/ai-launch.json: where the AI finds the API of the copy it just started (port can differ from 25620).
+	private static void writeAiLaunch(Instance instance, int port, boolean hidden) {
+		try {
+			JsonObject o = new JsonObject();
+			o.addProperty("profile", instance.name());
+			o.addProperty("profileId", instance.id());
+			o.addProperty("url", "http://127.0.0.1:" + port);
+			o.addProperty("port", port);
+			o.addProperty("hidden", hidden);
+			o.addProperty("startedAt", System.currentTimeMillis());
+			Path file = net.veloclient.launcher.data.VeloPaths.root().resolve("ai-launch.json");
+			Path tmp = file.resolveSibling("ai-launch.json.tmp");
+			Files.writeString(tmp, o.toString());
+			Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+		} catch (IOException | RuntimeException e) {
+			net.veloclient.launcher.LauncherLog.warn("Couldn't write ai-launch.json", e);
+		}
+	}
 
 	/** The AI API token (made once, kept in the launcher's settings). */
 	public static synchronized String aiToken() {

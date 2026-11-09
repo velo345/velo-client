@@ -1,0 +1,50 @@
+[Unit]
+Description=Velo Library (velo-client.com/library tools + public API under /v2) - isolated from velo-server
+After=network-online.target velo-server.service
+Wants=network-online.target
+
+[Service]
+User=velo-library
+Group=velo
+WorkingDirectory=/opt/velo/library
+EnvironmentFile=-/etc/velo/library.env
+Environment=LIBRARY_DATA_DIR=/opt/velo/library/data
+Environment=LIBRARY_BIND=127.0.0.1
+Environment=LIBRARY_PORT=8791
+Environment=LIBRARY_VELO_SERVER=http://127.0.0.1:8787
+Environment=LIBRARY_PUBLIC=https://velo-client.com
+Environment=XDG_CACHE_HOME=/opt/velo/library/data/.cache
+# One core's worth of JIT/GC threads, small heap: the Library must never compete with velo-server.
+ExecStart=/usr/bin/java -Xms64m -Xmx640m -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:+ExitOnOutOfMemoryError -Djava.awt.headless=true -jar /opt/velo/library/velo-library.jar
+Restart=always
+RestartSec=10
+UMask=0027
+LimitNOFILE=16384
+
+# Priority: velo-server first, always. Hard caps on CPU, memory, tasks and disk I/O.
+CPUQuota=100%
+CPUWeight=20
+Nice=10
+IOWeight=20
+MemoryHigh=850M
+MemoryMax=1G
+TasksMax=512
+
+# Hardening, like velo-server: read-only system, may only write its data folder.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/velo/library/data
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictNamespaces=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

@@ -184,6 +184,113 @@ public final class VeloBridge {
 		Protocol.send(player, m);
 	}
 
+	// ---- Menus, HUD elements, cutscenes, music ----
+
+	/** Shows a menu: a Velo window for Velo players, a chest menu for everyone else. */
+	public static void openMenu(Player player, VeloMenu menu) {
+		net.veloclient.bridge.internal.Menus.open(player, menu);
+	}
+
+	public static void closeMenu(Player player) {
+		net.veloclient.bridge.internal.Menus.close(player);
+	}
+
+	/**
+	 * A text line in the player's Server HUD (players move it in Velo's HUD editor). Same id again = update.
+	 * {@code color}: hex or null.
+	 */
+	public static void hudText(Player player, String id, String title, String text, String color) {
+		JsonObject m = hud(id, "text", title, color);
+		m.addProperty("text", text);
+		Protocol.send(player, m);
+	}
+
+	/** A bar (boss health, quest progress). {@code value}: 0-1. */
+	public static void hudBar(Player player, String id, String title, double value, String text, String color) {
+		JsonObject m = hud(id, "bar", title, color);
+		m.addProperty("value", Math.max(0, Math.min(1, value)));
+		m.addProperty("text", text == null ? "" : text);
+		Protocol.send(player, m);
+	}
+
+	/** A countdown to {@code endsAtMillis} (epoch ms), ticking on the client. */
+	public static void hudTimer(Player player, String id, String title, long endsAtMillis, String color) {
+		JsonObject m = hud(id, "timer", title, color);
+		m.addProperty("endsAt", endsAtMillis);
+		Protocol.send(player, m);
+	}
+
+	/** A picture from a URL (PNG, up to 256x256), shown {@code width}x{@code height} HUD pixels. */
+	public static void hudImage(Player player, String id, String url, int width, int height) {
+		JsonObject m = hud(id, "image", "", null);
+		m.addProperty("url", url);
+		m.addProperty("w", clamp(width, 4, 256));
+		m.addProperty("h", clamp(height, 4, 256));
+		Protocol.send(player, m);
+	}
+
+	public static void hudRemove(Player player, String id) {
+		JsonObject m = Protocol.message("hud_remove");
+		m.addProperty("id", "api-" + id);
+		Protocol.send(player, m);
+	}
+
+	private static JsonObject hud(String id, String type, String title, String color) {
+		JsonObject m = Protocol.message("hud_set");
+		m.addProperty("id", "api-" + id);
+		m.addProperty("type", type);
+		m.addProperty("title", title == null ? "" : title);
+		if (color != null) {
+			m.addProperty("color", color);
+		}
+		return m;
+	}
+
+	/**
+	 * A camera flight through {@code points} (at least 2) over {@code seconds}. Players without Velo get the title.
+	 * The player's real position never changes.
+	 */
+	public static void cutscene(Player player, String id, List<Location> points, double seconds, boolean letterbox, String title, String subtitle) {
+		if (!isVelo(player)) {
+			if (title != null && !title.isEmpty()) {
+				player.sendTitle(title, subtitle == null ? "" : subtitle, 10, 60, 20);
+			}
+			return;
+		}
+		JsonObject m = Protocol.message("cutscene");
+		m.addProperty("id", id);
+		JsonArray pts = new JsonArray();
+		for (Location l : points) {
+			JsonArray p = new JsonArray();
+			p.add(l.getX());
+			p.add(l.getY());
+			p.add(l.getZ());
+			p.add(l.getYaw());
+			p.add(l.getPitch());
+			pts.add(p);
+		}
+		m.add("points", pts);
+		m.addProperty("duration", Math.max(1, seconds) * 1000);
+		m.addProperty("letterbox", letterbox);
+		m.addProperty("lock", true);
+		m.addProperty("title", title == null ? "" : title);
+		m.addProperty("subtitle", subtitle == null ? "" : subtitle);
+		Protocol.send(player, m);
+	}
+
+	public static void stopCutscene(Player player) {
+		Protocol.send(player, Protocol.message("cutscene_stop"));
+	}
+
+	/** Music that fades in (sound event id, also from your resource pack). Sound zones pause until {@link #stopMusic}. */
+	public static void music(Player player, String sound, double volume, boolean loop) {
+		net.veloclient.bridge.internal.SoundZones.manual(player, sound + "|" + volume + "|" + loop);
+	}
+
+	public static void stopMusic(Player player) {
+		net.veloclient.bridge.internal.SoundZones.manual(player, "");
+	}
+
 	// ---- Transfers ----
 
 	/** Moves the player to another server with the 1.20.5+ transfer packet - no proxy needed. */

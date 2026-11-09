@@ -299,6 +299,21 @@ public final class GpuCosmetics {
 	private static volatile boolean failed = Boolean.getBoolean("velo.cpuCosmetics");
 	private static com.mojang.renderpearl.api.pipeline.RenderPipeline pipeline;
 
+	// Reported 2026-11-09 (26.3, big modpack): a mod/pack that replaces minecraft:core/entity's fragment shader made our
+	// pipeline fail to compile - inside vanilla's open pass, after it had pushed a debug group, so the game crashed on
+	// "Render pass had debug groups left open". The pipeline is now checked before anything is recorded (no pass open,
+	// once per frame, so a resource reload is noticed too); if it can't compile, the CPU path draws the cosmetics.
+	private static boolean pipelineReady() {
+		try {
+			if (com.mojang.blaze3d.systems.RenderSystem.getCompiledPipelineNullable(pipeline()) == null) {
+				fail(new IllegalStateException("Velo cosmetic pipeline doesn't compile (another mod or pack changed core/entity?)"));
+			}
+		} catch (Throwable t) {
+			fail(t);
+		}
+		return !failed;
+	}
+
 	private record GpuMesh(com.mojang.renderpearl.api.buffers.GpuBuffer vertices, int quadCount) {
 	}
 
@@ -336,6 +351,9 @@ public final class GpuCosmetics {
 		if (failed || !enabled || quads.length == 0 || quads.length % 4 != 0 || type.hasBlending()) {
 			return false;
 		}
+		if (PENDING.isEmpty() && !pipelineReady()) {
+			return false;
+		}
 		try {
 			MeshKey key = new MeshKey(meshIdentity, squeeze);
 			GpuMesh mesh = MESHES.get(key);
@@ -363,6 +381,9 @@ public final class GpuCosmetics {
 			float[] uv, int uvStride, int uvOff, int[] colors, int argb, net.minecraft.client.renderer.rendertype.RenderType type,
 			org.joml.Matrix4f pose, int light, int overlay) {
 		if (failed || !enabled || quads.length == 0 || quads.length % 4 != 0 || type.hasBlending()) {
+			return false;
+		}
+		if (PENDING.isEmpty() && !pipelineReady()) {
 			return false;
 		}
 		try {

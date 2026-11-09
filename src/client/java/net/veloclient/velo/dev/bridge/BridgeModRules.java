@@ -36,6 +36,14 @@ final class BridgeModRules {
 		ClientTickEvents.END_CLIENT_TICK.register(client -> showWhenReady());
 	}
 
+	/** A forbidden mod that is installed (with the jar files to move away) or a recommended one that's missing. */
+	record Hit(String label, String modrinth, List<java.nio.file.Path> files) {
+	}
+
+	private static volatile List<Hit> pendingBad = List.of();
+	private static volatile List<Hit> pendingMissing = List.of();
+	private static volatile String pendingMessage = "";
+
 	static void check(String serverName, JsonObject rules) {
 		String address = ClientCompat.currentServerAddress();
 		String key = address == null ? serverName : address.toLowerCase(Locale.ROOT);
@@ -43,56 +51,75 @@ final class BridgeModRules {
 			return;
 		}
 		List<String[]> mods = VeloBridgeClient.installedMods();
-		Set<String> bad = new LinkedHashSet<>();
+		List<Hit> bad = new ArrayList<>();
 		for (JsonElement e : VeloBridgeClient.arr(rules, "forbid")) {
 			JsonObject r = e.getAsJsonObject();
 			if (installed(mods, r)) {
-				bad.add(VeloBridgeClient.str(r, "label", VeloBridgeClient.str(r, "value", "?")));
+				bad.add(new Hit(VeloBridgeClient.str(r, "label", VeloBridgeClient.str(r, "value", "?")), null, files(r)));
 			}
 		}
-		List<String> missing = new ArrayList<>();
+		List<Hit> missing = new ArrayList<>();
 		for (JsonElement e : VeloBridgeClient.arr(rules, "recommend")) {
 			JsonObject r = e.getAsJsonObject();
+			// only what the player doesn't have yet - nobody needs to be told about mods they already use
 			if (!installed(mods, r)) {
-				missing.add(VeloBridgeClient.str(r, "label", VeloBridgeClient.str(r, "value", "?")));
+				String match = VeloBridgeClient.str(r, "match", "name");
+				String slug = match.equals("modrinth") || match.equals("id") ? VeloBridgeClient.str(r, "value", null) : null;
+				missing.add(new Hit(VeloBridgeClient.str(r, "label", VeloBridgeClient.str(r, "value", "?")), slug, List.of()));
 			}
 		}
 		if (bad.isEmpty() && missing.isEmpty()) {
 			return;
 		}
-		StringBuilder body = new StringBuilder();
-		if (!bad.isEmpty()) {
-			body.append("Not allowed here: ").append(String.join(", ", bad)).append(".");
-			String message = VeloBridgeClient.str(rules, "message", "");
-			if (!message.isBlank()) {
-				body.append(' ').append(message);
-			}
-		}
-		if (!missing.isEmpty()) {
-			body.append(body.isEmpty() ? "" : "\n\n").append("Recommended here: ").append(String.join(", ", missing)).append(".");
-		}
-		body.append("\n\nThis comes from the server, not from Velo Client - nothing was changed or blocked.");
+		pendingBad = bad;
+		pendingMissing = missing;
+		pendingMessage = VeloBridgeClient.str(rules, "message", "");
 		pendingTitle = "From " + serverName + ": mods";
-		pendingBody = body.toString();
+		pendingBody = "";
 		pendingServer = key;
 	}
 
+	/** The jar files (in the mods folder) of every installed mod a rule matches. */
+	private static List<java.nio.file.Path> files(JsonObject rule) {
+		List<java.nio.file.Path> out = new ArrayList<>();
+		java.nio.file.Path modsDir = net.fabricmc.loader.api.FabricLoader.getInstance().getGameDir().resolve("mods").toAbsolutePath().normalize();
+		for (net.fabricmc.loader.api.ModContainer mod : net.fabricmc.loader.api.FabricLoader.getInstance().getAllMods()) {
+			var origin = mod.getOrigin();
+			if (origin.getKind() != net.fabricmc.loader.api.metadata.ModOrigin.Kind.PATH || origin.getPaths().isEmpty()) {
+				continue;
+			}
+			java.nio.file.Path jar = origin.getPaths().get(0).toAbsolutePath().normalize();
+			String[] info = {mod.getMetadata().getId().toLowerCase(Locale.ROOT), mod.getMetadata().getName(), jar.getFileName().toString().toLowerCase(Locale.ROOT)};
+			if (jar.startsWith(modsDir) && matches(info, rule) && !out.contains(jar)) {
+				out.add(jar);
+			}
+		}
+		return out;
+	}
+
 	private static boolean installed(List<String[]> mods, JsonObject rule) {
+		for (String[] mod : mods) {
+			if (matches(mod, rule)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** mod = {id, name, jar file name}; Modrinth slugs and mod ids often differ only in - vs _ or spaces. */
+	private static boolean matches(String[] mod, JsonObject rule) {
 		String match = VeloBridgeClient.str(rule, "match", "name");
 		String v = VeloBridgeClient.str(rule, "value", "").toLowerCase(Locale.ROOT);
 		if (v.isEmpty()) {
 			return false;
 		}
-		for (String[] mod : mods) {
-			boolean hit = switch (match) {
-				case "id", "modrinth" -> mod[0].equals(v) || mod[0].equals(v.replace('-', '_'));
-				default -> mod[0].contains(v) || mod[1] != null && mod[1].toLowerCase(Locale.ROOT).contains(v) || mod[2].contains(v);
-			};
-			if (hit) {
-				return true;
-			}
-		}
-		return false;
+		String flat = v.replaceAll("[^a-z0-9]", "");
+		String name = mod[1] == null ? "" : mod[1].toLowerCase(Locale.ROOT);
+		return switch (match) {
+			case "id", "modrinth" -> mod[0].equals(v) || mod[0].equals(v.replace('-', '_')) || mod[0].replaceAll("[^a-z0-9]", "").equals(flat)
+					|| name.replaceAll("[^a-z0-9]", "").equals(flat);
+			default -> mod[0].contains(v) || name.contains(v) || mod[2].contains(v);
+		};
 	}
 
 	private static void showWhenReady() {
@@ -100,12 +127,9 @@ final class BridgeModRules {
 		if (title == null || !BridgeMc.inWorld() || ClientCompat.currentScreen() != null) {
 			return;
 		}
-		String body = pendingBody;
 		String server = pendingServer;
 		pendingTitle = null;
-		int lines = body.split("\n").length + body.length() / 52;
-		MinecraftClient.getInstance().setScreen(new net.veloclient.velo.client.gui.VeloConfirmScreen(null, title, body, "Got it", "Don't show again",
-				() -> hide(server), 340, Math.min(300, 96 + lines * 11)));
+		MinecraftClient.getInstance().setScreen(new BridgeModsScreen(title, pendingBad, pendingMissing, pendingMessage, () -> hide(server)));
 	}
 
 	private static Path file() {

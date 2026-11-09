@@ -1,0 +1,32 @@
+<!--page {
+ "title": "Enchant planner · Velo Library",
+ "description": "Minecraft anvil and enchanting order calculator: the cheapest way to combine your enchanted books, with the level cost of every step and no Too Expensive.",
+ "path": "/library/enchant",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="enchant">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Enchant planner</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">Anvil order · XP cost · never “Too Expensive!”</span>
+    <h1>Enchant planner</h1>
+    <p class="lib-lead">Pick the item and the books you have. The planner tries every order and shows the cheapest one - which item goes left, which book right, and what each step costs.</p>
+  </header>
+  <div class="lib-row">
+    <div class="lib-side" style="flex:1 1 420px">
+      <div class="lib-field"><span>Item</span><div id="items" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px"></div></div>
+      <div class="lib-field"><span>Enchantments</span><div class="lib-box" id="enchants" style="margin-top:-1px"></div></div>
+      <label class="lib-check"><input id="survival" type="checkbox" checked> Survival limit (no step of 40+ levels)</label>
+    </div>
+    <div class="lib-main">
+      <div class="lib-grid lib-stats"><div class="lib-stat"><span class="lib-label">Total levels</span><b id="total" style="color:#55ff55"></b></div><div class="lib-stat"><span class="lib-label">Total XP</span><b id="xp"></b></div><div class="lib-stat"><span class="lib-label">Most expensive step</span><b id="max"></b></div></div>
+      <div id="steps" style="display:flex;flex-direction:column;gap:10px"></div>
+      <p class="lib-muted" style="margin:0">Left slot = the item you keep, right slot = what gets used up. Cost = the right side's enchantments × their weight + the prior-work penalty of both sides (doubles with every anvil use).</p>
+    </div>
+  </div>
+
+  <section class="lib-presets" data-presets aria-label="Community presets"></section>
+</main>

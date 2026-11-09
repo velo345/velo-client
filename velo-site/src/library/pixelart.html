@@ -1,0 +1,60 @@
+<!--page {
+ "title": "Pixel art & text · Velo Library",
+ "description": "Turn a picture or text into Minecraft pixel art with real block colours: wall or floor, any size, wool, concrete, terracotta, wood, stone or bright blocks, material list and a .litematic that loads straight into Velo Client.",
+ "path": "/library/pixelart",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="pixelart">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Pixel art & text</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">Picture or text → blocks · wall or floor · .litematic</span>
+    <h1>Pixel art &amp; text</h1>
+    <p class="lib-lead">Colours come from the real block textures, so it looks right in the world - not just on a map. Signs, logos and lettering in one click.</p>
+  </header>
+  <div class="lib-row" style="gap:24px">
+    <div class="lib-main">
+      <div class="lib-field"><span>From</span><div class="lib-pills" id="sources"></div></div>
+      <div id="src-image" style="display:flex;flex-direction:column;gap:14px">
+        <div class="lib-field"><span>Picture</span><input id="file" type="file" accept="image/*" aria-label="Picture"></div>
+        <div class="lib-field"><label for="width">Width <b id="widthv"></b></label><input id="width" type="range" min="8" max="256" step="1" value="64"></div>
+        <div class="lib-field"><span>Dithering</span><div class="lib-pills" id="dithers"></div></div>
+        <div class="lib-field"><span>Block sets</span><div class="lib-pills" id="sets"></div></div>
+      </div>
+      <div id="src-text" hidden style="display:flex;flex-direction:column;gap:14px">
+        <div class="lib-field"><label for="text">Text (new line = new row)</label><textarea id="text" rows="2">VELO</textarea></div>
+        <div class="lib-field"><label for="font">Font</label><select id="font"><option value="800 64px Archivo">Archivo Bold</option><option value="700 64px Inter">Inter Bold</option><option value="500 64px JetBrains Mono">Mono</option><option value="700 64px Georgia">Serif</option></select></div>
+        <div class="lib-row" style="gap:12px">
+          <div class="lib-field" style="flex:1 1 160px"><label for="tblock">Letters</label><select id="tblock"></select></div>
+          <div class="lib-field" style="flex:1 1 160px"><label for="oblock">Outline</label><select id="oblock"></select></div>
+          <div class="lib-field" style="flex:1 1 160px"><label for="bblock">Background</label><select id="bblock"></select></div>
+        </div>
+      </div>
+      <div class="lib-field"><span>Orientation</span><div class="lib-pills" id="orients"></div></div>
+      <div class="lib-field"><label for="name">Name</label><input id="name" type="text" maxlength="40"></div>
+    </div>
+    <aside class="lib-side"><span class="lib-label">Original</span><img id="orig" alt="" style="width:100%;border-radius:12px;background:var(--surface);min-height:120px;object-fit:contain"></aside>
+  </div>
+  <div id="output" hidden style="margin-top:28px;display:flex;flex-direction:column;gap:16px">
+    <div class="lib-row" style="gap:20px">
+      <div class="lib-main" style="gap:10px">
+        <p class="lib-muted" id="info" style="margin:0"></p>
+        <div class="lib-box lib-checker" style="padding:16px;display:flex;justify-content:center;overflow:auto"><canvas id="result" class="lib-px" style="max-width:100%;image-rendering:pixelated" role="img" aria-label="Result"></canvas></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button id="load" class="lib-btn red" type="button">Load in Velo Client</button>
+          <button id="dl" class="lib-btn" type="button">Download .litematic</button>
+          <button id="show3d" class="lib-btn" type="button">3D view</button>
+          <button id="share" class="lib-btn" type="button">Share with the community</button>
+        </div>
+        <div id="cmdbox" class="lib-box lib-pad" hidden><span class="lib-muted">Type in the game chat - it's saved and loaded as a placement:</span> <code id="cmd" style="font:600 15px var(--mono)"></code></div>
+        <div id="view3d" class="lib-box" hidden style="height:480px;background:radial-gradient(120% 90% at 50% 100%, #1e1e26, #0b0b0e)"></div>
+      </div>
+      <aside class="lib-side" id="mats" style="gap:10px"></aside>
+    </div>
+  </div>
+</main>
+<script src="/assets/library-art.js" defer></script>
+<script type="module" src="{{asset.schem3d}}"></script>

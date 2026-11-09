@@ -1,0 +1,66 @@
+<!--page {
+ "title": "Server mappings · Velo Library",
+ "description": "Add your Minecraft server to Velo Client's server mappings: your name, logo and banner show in every Velo player's Discord Rich Presence. Free, verified through your MOTD, stored openly on GitHub.",
+ "path": "/library/servers",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "daily"
+}-->
+<main class="lib" id="main" data-tool="servers">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Server mappings</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">Discord presence · logo · banner · open on GitHub</span>
+    <h1>Server mappings</h1>
+    <p class="lib-lead">Velo players on a mapped server show its name and logo in their Discord status. The data lives openly on <a href="https://github.com/velo345/server-mappings" rel="noopener">GitHub</a> - sign up here in two minutes, we open the pull request for you.</p>
+  </header>
+
+  <section class="lib-box lib-pad" id="add-box" style="display:flex;flex-direction:column;gap:16px;margin-bottom:48px" aria-labelledby="add-h">
+    <h2 id="add-h">Add your server</h2>
+    <div id="need-signin" class="lib-empty" hidden>Sign in first - so we know who submitted it. </div>
+    <div id="add">
+      <form id="s1" data-step="1" class="lib-field" hidden>
+        <label for="addr">1 · The address players join with</label>
+        <div class="lib-search" style="max-width:560px"><input id="addr" type="text" placeholder="play.example.net" autocomplete="off" required><button class="lib-btn red" type="submit">Next</button></div>
+      </form>
+      <div data-step="2" hidden style="display:flex;flex-direction:column;gap:12px">
+        <span class="lib-label">2 · Prove it's your server</span>
+        <p style="margin:0">Put this code anywhere in the MOTD of <b id="addr2"></b> (server.properties, your MOTD plugin or proxy), save, then check. You can remove it again afterwards.</p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><code id="code" style="font:700 26px var(--mono);letter-spacing:.06em;padding:8px 16px;border:1px dashed var(--line-2);border-radius:10px"></code>
+          <button id="copycode" class="lib-btn" type="button">Copy</button><button id="check" class="lib-btn red" type="button">Check my MOTD</button></div>
+        <p id="s2err" class="lib-muted" style="margin:0"></p>
+      </div>
+      <form id="s3" data-step="3" hidden style="display:flex;flex-direction:column;gap:16px">
+        <span class="lib-label">3 · Your server</span>
+        <div class="lib-row" style="gap:16px">
+          <div class="lib-main" style="gap:14px">
+            <div class="lib-row" style="gap:12px"><div class="lib-field" style="flex:1 1 200px"><label for="f-name">Name</label><input id="f-name" type="text" maxlength="40" required></div>
+              <div class="lib-field" style="flex:1 1 160px"><label for="f-id">Id (lower case)</label><input id="f-id" type="text" maxlength="41" pattern="[a-z0-9][a-z0-9-]{1,40}" required></div></div>
+            <div class="lib-field"><label for="f-desc">Short description</label><input id="f-desc" type="text" maxlength="160"></div>
+            <div class="lib-field"><label for="f-addresses">More addresses (comma separated, *.example.net covers subdomains)</label><input id="f-addresses" type="text" placeholder="example.net, *.example.net"></div>
+            <div class="lib-row" style="gap:12px"><div class="lib-field" style="flex:1 1 200px"><label for="f-website">Website</label><input id="f-website" type="text" placeholder="https://"></div>
+              <div class="lib-field" style="flex:1 1 200px"><label for="f-discord">Discord invite</label><input id="f-discord" type="text" placeholder="https://discord.gg/..."></div>
+              <div class="lib-field" style="flex:1 1 200px"><label for="f-store">Store</label><input id="f-store" type="text" placeholder="https://"></div></div>
+            <div class="lib-row" style="gap:12px;align-items:flex-end"><label class="lib-field" style="flex:0 0 auto">Colour<input id="f-color" type="color" value="#5aa9ff"></label>
+              <div class="lib-field" style="flex:0 1 160px"><label for="f-version">Recommended version</label><input id="f-version" type="text" placeholder="1.21"></div></div>
+            <div class="lib-field"><span>Game types</span><div id="f-types"><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="smp"> smp</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="pvp"> pvp</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="minigames"> minigames</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="skyblock"> skyblock</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="survival"> survival</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="factions"> factions</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="prison"> prison</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="creative"> creative</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="lifesteal"> lifesteal</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="practice"> practice</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="bedwars"> bedwars</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="anarchy"> anarchy</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="modded"> modded</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="events"> events</label></div></div>
+            <div class="lib-field"><span>Regions</span><div id="f-regions"><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="NA"> NA</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="EU"> EU</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="SA"> SA</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="AS"> AS</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="OC"> OC</label><label class="lib-check" style="display:inline-flex;margin-right:12px"><input type="checkbox" value="AF"> AF</label></div></div>
+          </div>
+          <aside class="lib-side" style="gap:14px">
+            <div class="lib-field"><span>Logo - square PNG, 128-1024 px (required)</span><input id="f-logo" type="file" accept="image/png" aria-label="Logo"><span id="logo-info" class="lib-muted"></span><img id="logo-preview" alt="" style="width:96px;height:96px;border-radius:14px;object-fit:cover;background:var(--surface)"></div>
+            <div class="lib-field"><span>Banner - wide PNG, 16:9 to 5:1 (required)</span><input id="f-banner" type="file" accept="image/png" aria-label="Banner"><span id="banner-info" class="lib-muted"></span><img id="banner-preview" alt="" style="width:100%;aspect-ratio:16/6;object-fit:cover;border-radius:10px;background:var(--surface)"></div>
+            <div class="lib-field"><span>Discord status (optional, %name% = your server)</span><input id="f-pdetails" type="text" maxlength="100" placeholder="Playing on %name%" aria-label="Discord details line"><input id="f-pstate" type="text" maxlength="100" placeholder="Second line, e.g. Season 4" aria-label="Discord state line"></div>
+            <div class="lib-box" style="padding:12px;display:flex;gap:12px;align-items:center;background:#232428"><img id="pv-logo" alt="" style="width:64px;height:64px;border-radius:8px;background:#313338">
+              <div style="font-size:13px;line-height:1.4"><b style="color:#fff">Minecraft</b><div id="pv-details" style="color:#dbdee1"></div><div id="pv-state" style="color:#b5bac1"></div><div style="color:#b5bac1" id="pv-name"></div></div></div>
+          </aside>
+        </div>
+        <div><button id="send" class="lib-btn red" type="submit">Send</button> <span class="lib-muted">Opens a pull request on GitHub with your files.</span></div>
+      </form>
+      <div data-step="4" hidden style="display:flex;flex-direction:column;gap:10px"><h3>Thanks!</h3><p id="done-msg" style="margin:0"></p><a id="done-pr" class="lib-btn" hidden target="_blank" rel="noopener">See the pull request</a></div>
+    </div>
+  </section>
+
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px"><h2>Mapped servers</h2><span class="lib-muted" id="count"></span></div>
+  <div id="list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:14px"></div>
+</main>

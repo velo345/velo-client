@@ -1,0 +1,70 @@
+<!--page {
+ "title": "Community schematics · Velo Library",
+ "description": "Community Minecraft schematics: browse, upvote and download builds and redstone machines as .veloschem or .litematic, or share your own with an automatic isometric preview.",
+ "path": "/library/schematics",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "daily"
+}-->
+<main class="lib" id="main" data-tool="schematics">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Community schematics</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">.veloschem · .litematic · builds · redstone</span>
+    <h1>Community schematics</h1>
+    <p class="lib-lead">Builds and redstone machines from Velo players - the same library as in the game (Redstone Mode and Schematics). Download them here or share your own; the preview draws itself from the file.</p>
+  </header>
+  <section class="lib-box lib-pad" style="margin-bottom:40px;display:flex;flex-direction:column;gap:14px" aria-labelledby="up-h">
+    <h2 id="up-h">Share a schematic</h2>
+    <div id="up-signin" class="lib-empty" hidden>Sign in to share - downloading works without. </div>
+    <form id="upload" class="lib-row" style="gap:20px">
+      <div class="lib-main" style="gap:12px">
+        <div class="lib-field"><span>File (.veloschem or .litematic, up to 3 MB)</span><input id="file" type="file" accept=".veloschem,.litematic" aria-label="Schematic file"></div>
+        <div class="lib-field"><label for="title">Title</label><input id="title" type="text" maxlength="48" required></div>
+        <div class="lib-field"><label for="desc">Description</label><textarea id="desc" rows="3" maxlength="400" placeholder="What it is, how to use it"></textarea></div>
+        <div class="lib-field"><label for="tags">Tags (comma separated, up to 6)</label><input id="tags" type="text" placeholder="redstone, farm, door"></div>
+        <div><button id="send" class="lib-btn red" type="submit">Share</button></div>
+      </div>
+      <aside class="lib-side" style="gap:8px">
+        <span class="lib-label">Preview</span>
+        <canvas id="pv" width="640" height="480" class="lib-checker" style="width:100%;aspect-ratio:4/3;border-radius:12px;border:1px solid var(--line)" role="img" aria-label="Schematic preview"></canvas>
+        <span id="pinfo" class="lib-muted"></span>
+        <div class="lib-field"><span>Or your own picture</span><input id="ownpv" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Preview picture"></div>
+      </aside>
+    </form>
+    <div id="up-extra" class="lib-row" hidden style="gap:20px">
+      <div class="lib-main" style="gap:8px"><div class="lib-box" id="up-3d" style="height:420px;background:radial-gradient(120% 90% at 50% 100%, #1e1e26, #0b0b0e)"></div>
+        <div class="lib-field"><label for="up-layer">Layers</label><input id="up-layer" type="range" min="0" max="0" value="0"></div></div>
+      <aside class="lib-side" id="up-mats" style="gap:10px"></aside>
+    </div>
+  </section>
+  <div class="lib-row" style="align-items:center;margin-bottom:16px;gap:12px">
+    <div class="lib-pills" id="sorts"></div>
+    <div class="lib-search" style="flex:1 1 260px"><input id="search" type="search" placeholder="Search schematics" aria-label="Search schematics"></div>
+    <button id="tag" class="lib-pill" type="button" hidden></button>
+    <span class="lib-muted" id="total"></span>
+  </div>
+  <div id="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:14px"></div>
+  <div style="text-align:center;margin-top:20px"><button id="more" class="lib-btn" type="button" hidden>Load more</button></div>
+  <dialog id="detail" class="lib-dialog" aria-labelledby="d-title">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px">
+      <div><h2 id="d-title" style="margin:0"></h2><div class="lib-muted" id="d-meta"></div><p id="d-desc" class="lib-muted" style="margin:6px 0 0"></p></div>
+      <button id="d-close" class="lib-btn sm" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="lib-row" style="gap:20px">
+      <div class="lib-main" style="gap:8px">
+        <div class="lib-box" id="d-3d" style="height:min(60vh,520px);background:radial-gradient(120% 90% at 50% 100%, #1e1e26, #0b0b0e)"></div>
+        <div class="lib-field"><label for="d-layer">Layers</label><input id="d-layer" type="range" min="0" max="0" value="0"></div>
+        <span class="lib-muted">Drag to turn · right-drag or shift-drag to move · scroll to zoom · <span id="d-size"></span></span>
+      </div>
+      <aside class="lib-side" style="gap:12px">
+        <button id="d-load" class="lib-btn red" type="button">Load in Velo Client</button>
+        <code id="d-cmd" class="lib-muted" style="font:500 12px var(--mono)"></code>
+        <a id="d-download" class="lib-btn" href="#" download>Download file</a>
+        <div id="d-mats" style="display:flex;flex-direction:column;gap:10px"></div>
+      </aside>
+    </div>
+  </dialog>
+</main>
+<script type="module" src="{{asset.schem3d}}"></script>

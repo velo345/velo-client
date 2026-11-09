@@ -231,6 +231,9 @@ public final class NoteCard {
 	}
 
 	private static String sharedLabel(Note note) {
+		if ("server".equals(note.share)) {
+			return "Everyone here";
+		}
 		if ("friends".equals(note.share)) {
 			return "Shared with friends";
 		}

@@ -204,7 +204,7 @@ public final class NotesListScreen extends VeloWindow {
 		String title = note.displayTitle() + (note.unread ? "  @you" : "");
 		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(title, width - (tx - x) - actions - 8), tx, y + 6, note.unread ? 0xFFFF8A9A : theme.text());
 		StringBuilder detail = new StringBuilder();
-		detail.append(note.local ? "Private" : note.mine ? ("friends".equals(note.share) ? "Shared with friends" : "Shared with " + note.people.size())
+		detail.append(note.local ? "Private" : "server".equals(note.share) && !note.local ? (note.mine ? "Everyone here" : "Everyone here - by " + note.ownerName) : note.mine ? ("friends".equals(note.share) ? "Shared with friends" : "Shared with " + note.people.size())
 				: "From " + note.ownerName);
 		if (!note.checks.isEmpty()) {
 			detail.append("  -  ").append(note.done()).append("/").append(note.checks.size()).append(" done");

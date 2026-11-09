@@ -47,6 +47,11 @@ public final class NoteStore {
 
 	private static Local local;
 	private static final Map<String, Note> SHARED = new LinkedHashMap<>();
+	/** Server-wide notes from a Velo Bridge server (they live on that server; it sends the ones in your world). */
+	private static final Map<String, Note> SERVER = new LinkedHashMap<>();
+	private static JsonObject serverPolicy;
+	private static final Map<String, Consumer<JsonObject>> BRIDGE_WAITING = new java.util.HashMap<>();
+	private static int bridgeRef;
 	/** Dev-only (screenshot tour): notes "shared by someone" without a server. */
 	private static final List<Note> TOUR = new ArrayList<>();
 	private static final List<Mention> INBOX = new ArrayList<>();
@@ -144,6 +149,7 @@ public final class NoteStore {
 		if (server.equals(sharedFor)) {
 			out.addAll(SHARED.values());
 		}
+		out.addAll(SERVER.values());
 		for (Note note : TOUR) {
 			if (server.equals(note.server)) {
 				out.add(note);
@@ -158,7 +164,8 @@ public final class NoteStore {
 		String dim = StorageStore.here();
 		List<Note> out = new ArrayList<>();
 		for (Note note : onServer()) {
-			if (world != null && world.equals(note.world) && dim != null && dim.equals(note.dim) && !hidden(note)) {
+			boolean bridge = SERVER.containsKey(note.id); // the server only sends the notes of the world you're in
+			if ((bridge || world != null && world.equals(note.world) && dim != null && dim.equals(note.dim)) && !hidden(note)) {
 				out.add(note);
 			}
 		}
@@ -186,7 +193,118 @@ public final class NoteStore {
 				return note;
 			}
 		}
-		return SHARED.get(id);
+		Note shared = SHARED.get(id);
+		return shared != null ? shared : SERVER.get(id);
+	}
+
+	// ---- Server-wide notes (Velo Bridge) ----
+
+	/** The server you're on lets you pin notes for everyone here. */
+	public static boolean serverNotesHere() {
+		JsonObject p = serverPolicy;
+		return p != null && p.has("enabled") && p.get("enabled").getAsBoolean() && p.has("canPlace") && p.get("canPlace").getAsBoolean();
+	}
+
+	public static boolean isServerNote(Note note) {
+		return note != null && "server".equals(note.share) && !note.local;
+	}
+
+	/** Messages from the Velo Bridge plugin (game thread). */
+	public static void onBridge(String type, JsonObject m) {
+		switch (type) {
+			case "server_notes" -> {
+				serverPolicy = m;
+				SERVER.clear();
+				if (m.has("notes") && m.get("notes").isJsonArray()) {
+					m.getAsJsonArray("notes").forEach(e -> {
+						Note n = fromBridge(e.getAsJsonObject());
+						SERVER.put(n.id, n);
+					});
+				}
+				version++;
+			}
+			case "server_note" -> {
+				Note n = fromBridge(m.getAsJsonObject("note"));
+				SERVER.put(n.id, n);
+				version++;
+			}
+			case "server_note_remove" -> {
+				SERVER.remove(m.get("id").getAsString());
+				version++;
+			}
+			case "note_result" -> {
+				Consumer<JsonObject> waiting = BRIDGE_WAITING.remove(m.has("ref") ? m.get("ref").getAsString() : "");
+				if (waiting != null) {
+					waiting.accept(m);
+				}
+			}
+			case "server_notes_reset" -> {
+				serverPolicy = null;
+				SERVER.clear();
+				BRIDGE_WAITING.clear();
+				version++;
+			}
+			default -> {
+			}
+		}
+	}
+
+	private static Note fromBridge(JsonObject o) {
+		Note note = GSON.fromJson(o, Note.class);
+		note.local = false;
+		note.share = "server";
+		note.mine = o.has("mine") && o.get("mine").getAsBoolean();
+		note.canEdit = o.has("canEdit") && o.get("canEdit").getAsBoolean();
+		note.server = serverKey();
+		note.world = worldKey();
+		note.dim = StorageStore.here();
+		note.checks = note.checks == null ? new ArrayList<>() : note.checks;
+		note.board = note.board == null ? new ArrayList<>() : note.board;
+		note.people = new ArrayList<>();
+		note.names = new LinkedHashMap<>();
+		note.editors = new ArrayList<>();
+		note.kind = "note";
+		if (note.style == null || !Note.STYLES.contains(note.style)) {
+			note.style = "paper";
+		}
+		return note;
+	}
+
+	private static void bridgePut(Note draft, boolean creating, Consumer<Note> done, Consumer<String> error) {
+		if (!net.veloclient.velo.dev.bridge.VeloBridgeClient.onBridgeServer()) {
+			error.accept("This server doesn't have server notes");
+			return;
+		}
+		JsonObject input = input(draft, creating);
+		input.add("board", GSON.toJsonTree(draft.board));
+		String ref = String.valueOf(++bridgeRef);
+		JsonObject msg = new JsonObject();
+		msg.addProperty("t", "note_put");
+		msg.addProperty("ref", ref);
+		msg.add("note", input);
+		if (msg.toString().length() > 30_000) {
+			error.accept("Too big for a server note - draw a bit less");
+			return;
+		}
+		BRIDGE_WAITING.put(ref, r -> {
+			if (r.has("ok") && r.get("ok").getAsBoolean() && r.has("note")) {
+				Note saved = fromBridge(r.getAsJsonObject("note"));
+				SERVER.put(saved.id, saved);
+				version++;
+				done.accept(saved);
+			} else {
+				error.accept(r.has("error") ? r.get("error").getAsString() : "The server said no");
+			}
+		});
+		net.veloclient.velo.dev.bridge.VeloBridgeClient.sendRaw(msg.toString());
+	}
+
+	private static void bridgeSimple(String type, Note note, java.util.function.Consumer<JsonObject> extra) {
+		JsonObject msg = new JsonObject();
+		msg.addProperty("t", type);
+		msg.addProperty("id", note.id);
+		extra.accept(msg);
+		net.veloclient.velo.dev.bridge.VeloBridgeClient.sendRaw(msg.toString());
 	}
 
 	public static boolean hidden(Note note) {
@@ -233,6 +351,34 @@ public final class NoteStore {
 
 	/** Saves a note: private ones locally, shared ones on the server (sharing / un-sharing moves it). */
 	public static void save(Note draft, Consumer<Note> done, Consumer<String> error) {
+		Note before = draft.id == null ? null : byId(draft.id);
+		boolean wasServer = before != null && isServerNote(before);
+		if (!draft.local && "server".equals(draft.share)) {
+			boolean creating = !wasServer;
+			bridgePut(draft, creating, saved -> {
+				if (before != null && !wasServer) {
+					// moved here from a private / friends note: drop the old one
+					if (before.local) {
+						local().notes.removeIf(n -> n.id.equals(before.id));
+						saveLocal();
+					} else {
+						post("/v1/notes/delete", idBody(before.id), json -> SHARED.remove(before.id), e -> { });
+					}
+				}
+				done.accept(saved);
+			}, error);
+			return;
+		}
+		if (wasServer) {
+			// server note -> private / friends: take it off the server, then save it the other way as a new note
+			bridgeSimple("note_delete", before, m -> { });
+			SERVER.remove(before.id);
+			version++;
+			draft.id = draft.local ? "local-" + UUID.randomUUID().toString().substring(0, 8) : null;
+			if (!draft.local && draft.share.equals("server")) {
+				draft.share = "friends";
+			}
+		}
 		if (draft.local) {
 			Note existing = byId(draft.id);
 			if (existing != null && !existing.local) {
@@ -339,6 +485,13 @@ public final class NoteStore {
 			saveLocal();
 			return;
 		}
+		if (isServerNote(note)) {
+			bridgeSimple("note_check", note, m -> {
+				m.addProperty("check", check.id);
+				m.addProperty("done", done);
+			});
+			return;
+		}
 		JsonObject body = idBody(note.id);
 		body.addProperty("check", check.id);
 		body.addProperty("done", done);
@@ -361,6 +514,15 @@ public final class NoteStore {
 			done.accept(note);
 			return;
 		}
+		if (isServerNote(note)) {
+			Note copy = note.copy();
+			if (clear) {
+				copy.board.clear();
+			}
+			copy.board.addAll(strokes);
+			bridgePut(copy, false, done, error);
+			return;
+		}
 		JsonObject body = idBody(note.id);
 		body.add("strokes", GSON.toJsonTree(strokes));
 		body.addProperty("clear", clear);
@@ -374,7 +536,7 @@ public final class NoteStore {
 
 	/** A stroke while it's being drawn, for the others watching the board (fire and forget, never stored). */
 	public static void live(Note note, String sid, Note.Stroke stroke) {
-		if (note.local || note.id == null || note.id.startsWith("local-")) {
+		if (note.local || note.id == null || note.id.startsWith("local-") || isServerNote(note)) {
 			return;
 		}
 		JsonObject body = idBody(note.id);
@@ -395,6 +557,10 @@ public final class NoteStore {
 			done.accept(note);
 			return;
 		}
+		if (isServerNote(note)) {
+			error.accept("Pictures don't work on server notes");
+			return;
+		}
 		JsonObject body = idBody(note.id);
 		if (png != null) {
 			body.addProperty("png", Base64.getEncoder().encodeToString(png));
@@ -413,6 +579,13 @@ public final class NoteStore {
 			done.run();
 			return;
 		}
+		if (isServerNote(note)) {
+			bridgeSimple("note_delete", note, m -> { });
+			SERVER.remove(note.id);
+			version++;
+			done.run();
+			return;
+		}
 		post(note.mine ? "/v1/notes/delete" : "/v1/notes/leave", idBody(note.id), json -> {
 			SHARED.remove(note.id);
 			version++;
@@ -421,6 +594,10 @@ public final class NoteStore {
 	}
 
 	public static void report(Note note, String category, String reason, Runnable done, Consumer<String> error) {
+		if (isServerNote(note)) {
+			error.accept("Server notes belong to this server - tell its staff, they can remove it");
+			return;
+		}
 		JsonObject body = idBody(note.id);
 		body.addProperty("category", category);
 		body.addProperty("reason", reason);
@@ -429,7 +606,7 @@ public final class NoteStore {
 
 	/** You opened it: the mention badge goes away. */
 	public static void seen(Note note) {
-		if (note.local || !note.unread) {
+		if (note.local || !note.unread || isServerNote(note)) {
 			return;
 		}
 		note.unread = false;

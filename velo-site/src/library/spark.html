@@ -1,0 +1,21 @@
+<!--page {
+ "title": "Spark analyzer · Velo Library",
+ "description": "Analyze a spark profiler report: which plugins use how much of the server thread, the hottest methods, TPS, MSPT, memory, GC and plain-language advice from your server configs and flags.",
+ "path": "/library/spark",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="spark">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Spark analyzer</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">spark.lucko.me · plugins · advice</span>
+    <h1>Spark analyzer</h1>
+    <p class="lib-lead">Run /spark profiler on your server, stop it after a few minutes, paste the link. You get which plugins cost the most, the hottest methods and what to change.</p>
+  </header>
+  <form id="lookup" class="lib-search" style="max-width:720px;margin-bottom:32px"><input id="q" type="text" placeholder="https://spark.lucko.me/AbCdEf1234" aria-label="Spark link" autocomplete="off"><button class="lib-btn red" type="submit">Analyze</button></form>
+  <div id="result" style="display:flex;flex-direction:column;gap:18px"><div class="lib-empty">Paste a spark profiler link above. Heap summaries and health reports aren't supported - use /spark profiler.</div></div>
+
+</main>

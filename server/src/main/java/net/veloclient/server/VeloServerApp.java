@@ -214,6 +214,7 @@ public final class VeloServerApp {
 		new ProfileShareService(dataDir).register(server, registry);
 		new ServerProfileService(dataDir).register(server, adminToken);
 		new BridgeService(dataDir).register(server, adminToken);
+		new BridgePanelService(dataDir, capes).register(server);
 		SchematicShareService schematics = new SchematicShareService(dataDir);
 		SchematicRoutes.register(server, registry, schematics, store);
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));

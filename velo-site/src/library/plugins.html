@@ -1,0 +1,22 @@
+<!--page {
+ "title": "Plugin updates · Velo Library",
+ "description": "Check your Minecraft server plugins for updates on Modrinth, Hangar and SpigotMC - newest versions, Folia support and abandoned plugins.",
+ "path": "/library/plugins",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="plugins">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Plugin updates</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">Modrinth · Hangar · SpigotMC · Folia</span>
+    <h1>Plugin updates</h1>
+    <p class="lib-lead">Paste the output of /plugins, a list of jar names, or one plugin per line (with your version if you know it).</p>
+  </header>
+  <div class="lib-field" style="margin-bottom:12px"><label for="list">Your plugins</label><textarea id="list" rows="6" spellcheck="false" placeholder="Plugins (4): LuckPerms, EssentialsX, WorldEdit, ViaVersion&#10;or&#10;LuckPerms-Bukkit-5.4.141.jar&#10;Chunky 1.4.10"></textarea></div>
+  <div style="margin-bottom:28px"><button id="check" class="lib-btn red" type="button">Check for updates</button> <span class="lib-muted">Up to 40 at once.</span></div>
+  <div id="result"></div>
+
+</main>

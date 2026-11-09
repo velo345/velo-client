@@ -1,0 +1,39 @@
+plugins {
+	id 'application'
+	id 'com.gradleup.shadow' version '8.3.5'
+}
+
+repositories {
+	mavenCentral()
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}
+
+application {
+	mainClass = 'net.veloclient.library.LibraryApp'
+}
+
+dependencies {
+	implementation 'com.google.code.gson:gson:2.11.0'
+	testImplementation platform('org.junit:junit-bom:5.10.2')
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+	useJUnitPlatform()
+}
+
+// One runnable jar (Gson inside): copy it, run `java -jar velo-library.jar`.
+tasks.named('shadowJar') {
+	archiveBaseName.set('velo-library')
+	archiveClassifier.set('')
+	archiveVersion.set('')
+}
+
+tasks.named('build') {
+	dependsOn tasks.named('shadowJar')
+}

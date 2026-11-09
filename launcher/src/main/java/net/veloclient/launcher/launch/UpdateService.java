@@ -333,6 +333,28 @@ public final class UpdateService {
 	}
 
 	/**
+	 * Background updates: downloads (and verifies) the new launcher's installer now, so "Restart to update" later starts
+	 * at once. True when it's on disk and checked; false when this system has no installer in the release.
+	 */
+	public static boolean prepareInstaller(Release release, Consumer<Transfer> progress) throws IOException, InterruptedException {
+		Asset installer = release.installer();
+		if (installer == null) {
+			return false;
+		}
+		Files.createDirectories(updatesDir());
+		Path file = updatesDir().resolve(installer.name());
+		boolean complete = Files.exists(file) && Files.size(file) == installer.size()
+				&& (installer.sha256() == null || installer.sha256().equalsIgnoreCase(sha256Of(file)));
+		if (!complete) {
+			log("Background download of launcher " + release.version() + " (" + installer.name() + ")");
+			Path tmp = updatesDir().resolve(installer.name() + ".part");
+			download(installer, tmp, progress);
+			Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+		}
+		return true;
+	}
+
+	/**
 	 * Downloads this OS's installer and starts it. Returns true when the installer is running and the
 	 * launcher should now close; false if this OS has no installer (open the release page instead).
 	 */
@@ -413,28 +435,81 @@ public final class UpdateService {
 	}
 
 	/**
-	 * Windows: no clicking through the installer any more. A hidden script (no console window) waits until this launcher has
-	 * closed (so no file is in use), runs jpackage's installer quietly in the background - falling back to the passive mode
-	 * with the permission prompt when a machine-wide install needs admin rights - into the folder the launcher is installed in,
-	 * with a verbose Windows Installer log next to update.log - and starts the new launcher when it's done. jpackage's .exe
-	 * hands its arguments to msiexec; should an installer ever ignore them, it simply shows its normal wizard as before.
-	 * The script logs the installer's exit code, which the next start reads (see {@link #afterRestart()}).
+	 * Windows, silent update. Reported 2026-11-09: "a console window opens and then nothing happens; only the second try
+	 * (the wizard) works". The old flow asked for admin rights from a hidden script <em>after</em> the launcher had closed:
+	 * a permission prompt from a background process isn't shown in front (only a blinking taskbar icon), and PowerShell
+	 * could flash a console. Now:
+	 * <ol>
+	 * <li>A per-user install (folder writable) needs no admin rights: the script runs without any prompt.</li>
+	 * <li>A machine-wide install asks for the rights right here, while this launcher is still in front, so the
+	 * permission prompt shows at once. PowerShell (no console) starts the script elevated with a hidden window.</li>
+	 * <li>This launcher only closes once the script reports it's running (a marker file); if the prompt was declined,
+	 * the installer's normal wizard opens instead.</li>
+	 * </ol>
+	 * The script waits for this launcher's process to end, installs quietly into the current folder (verbose log next to
+	 * update.log), records the exit code for {@link #afterRestart()}, and starts the new launcher through explorer - so
+	 * it runs with normal rights even when the script had admin rights.
 	 */
 	private static void startWindowsInstall(Path installer) throws IOException {
 		String app = System.getProperty("jpackage.app-path");
 		Path appExe = app == null ? null : Path.of(app);
 		Path installDir = appExe == null ? null : appExe.getParent();
+		boolean elevate = installDir != null && !writable(installDir);
 		Path msiLog = updatesDir().resolve("installer.log");
 		Path script = updatesDir().resolve("run-update.cmd");
+		Path started = updatesDir().resolve("update-started.txt");
 		Path log = logFile();
-		StringBuilder cmd = new StringBuilder();
-		cmd.append("@echo off\r\n");
-		cmd.append("chcp 65001 >nul\r\n");
-		cmd.append("echo [%date% %time%] script: waiting for the launcher to close>>\"").append(log).append("\"\r\n");
-		// no console here (and stdin is a pipe), so "timeout" would quit at once: ping waits the 3 s instead
-		cmd.append("ping -n 4 127.0.0.1 >nul\r\n");
+		long pid = ProcessHandle.current().pid();
+		String[] texts = windowsUpdateScripts(installer, installDir, appExe, elevate, pid, script, started, log, msiLog,
+				updatesDir().resolve("installer-exit.txt"), repairMode);
+		Files.writeString(script, texts[0], StandardCharsets.UTF_8);
+		Files.deleteIfExists(updatesDir().resolve("installer-exit.txt"));
+		Files.deleteIfExists(started);
+		log("Starting " + script + " (install dir " + installDir + ", admin rights " + (elevate ? "asked" : "not needed") + ")");
+		Process starter;
+		try {
+			if (elevate) {
+				String encoded = java.util.Base64.getEncoder().encodeToString(texts[1].getBytes(StandardCharsets.UTF_16LE));
+				starter = new ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encoded)
+						.redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+			} else {
+				// Java starts children of a window-only app without a console window (CREATE_NO_WINDOW); the script outlives us
+				starter = new ProcessBuilder("cmd.exe", "/d", "/c", script.toString())
+						.redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+			}
+			starter.getOutputStream().close();
+		} catch (IOException e) {
+			log("Couldn't start the update script (" + e.getMessage() + ") - opening the installer");
+			new ProcessBuilder(installer.toString()).start();
+			return;
+		}
+		// Close only once the script runs: the player has up to 2 minutes to answer the permission prompt.
+		long until = System.currentTimeMillis() + (elevate ? 120_000 : 20_000);
+		while (System.currentTimeMillis() < until && !Files.exists(started)) {
+			if (elevate && !starter.isAlive() && starter.exitValue() != 0) {
+				break;   // the permission prompt was declined
+			}
+			try {
+				Thread.sleep(250);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				break;
+			}
+		}
+		if (!Files.exists(started)) {
+			// declined (or blocked): the installer's own wizard, which asks for the rights itself
+			log("The update script didn't start (permission prompt declined?) - opening the installer");
+			new ProcessBuilder(installer.toString()).start();
+			return;
+		}
+		log("Update script is running");
+	}
+
+	/** The update script (cmd) and the PowerShell command that starts it elevated - pure text, checkable without Windows. */
+	static String[] windowsUpdateScripts(Path installer, Path installDir, Path appExe, boolean elevate, long pid, Path script, Path started,
+			Path log, Path msiLog, Path exitFile, boolean repair) {
 		StringBuilder props = new StringBuilder(" /norestart /l*v \"").append(msiLog).append("\"");
-		if (repairMode) {
+		if (repair) {
 			// the same version over itself: reinstall every file instead of "already installed"
 			props.append(" REINSTALL=ALL REINSTALLMODE=amus");
 		}
@@ -442,41 +517,55 @@ public final class UpdateService {
 			// the folder the launcher runs from now, so a player's own install location survives the update
 			props.append(" INSTALLDIR=\"").append(installDir).append("\"");
 		}
-		// first fully in the background (no window at all); an install that needs admin rights can't ask for them quietly,
-		// so then once more with the permission prompt and a small progress bar
-		cmd.append("echo [%date% %time%] script: starting the installer quietly>>\"").append(log).append("\"\r\n");
+		StringBuilder cmd = new StringBuilder();
+		cmd.append("@echo off\r\n");
+		cmd.append("chcp 65001 >nul\r\n");
+		cmd.append("echo running>\"").append(started).append("\"\r\n");
+		cmd.append("echo [%date% %time%] script: started").append(elevate ? " with admin rights" : "").append(", waiting for the launcher (pid ")
+				.append(pid).append(") to close>>\"").append(log).append("\"\r\n");
+		// wait for this launcher to end (files in use), at most ~60 s; ping because "timeout" needs a console
+		cmd.append("set n=0\r\n");
+		cmd.append(":wait\r\n");
+		cmd.append("tasklist /FI \"PID eq ").append(pid).append("\" 2>nul | find \"").append(pid).append("\" >nul || goto closed\r\n");
+		cmd.append("set /a n+=1\r\n");
+		cmd.append("if %n% GEQ 60 goto closed\r\n");
+		cmd.append("ping -n 2 127.0.0.1 >nul\r\n");
+		cmd.append("goto wait\r\n");
+		cmd.append(":closed\r\n");
+		cmd.append("ping -n 2 127.0.0.1 >nul\r\n");
+		cmd.append("echo [%date% %time%] script: installing quietly>>\"").append(log).append("\"\r\n");
 		cmd.append("\"").append(installer).append("\" /quiet").append(props).append("\r\n");
 		cmd.append("set code=%errorlevel%\r\n");
 		cmd.append("if \"%code%\"==\"0\" goto done\r\n");
 		cmd.append("if \"%code%\"==\"3010\" goto done\r\n");
-		// A machine-wide install needs admin rights. Started without them, the installer raises its rights halfway and its
-		// final step can't use the temp folder - Windows Installer error 2503 (reported 2026-11-08). So: started elevated
-		// from the beginning (one permission prompt) and still quiet; the visible installer only if that was refused too.
-		cmd.append("echo [%date% %time%] script: quiet install exit %code% - again with admin rights>>\"").append(log).append("\"\r\n");
-		String psArgs = ("/quiet" + props).replace("'", "''");
-		cmd.append("powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command \"try { $p = Start-Process -FilePath '")
-				.append(installer.toString().replace("'", "''")).append("' -ArgumentList '").append(psArgs.replace("\"", "\\\""))
-				.append("' -Verb RunAs -Wait -PassThru; exit $p.ExitCode } catch { exit 1223 }\"\r\n");
-		cmd.append("set code=%errorlevel%\r\n");
-		cmd.append("if \"%code%\"==\"0\" goto done\r\n");
-		cmd.append("if \"%code%\"==\"3010\" goto done\r\n");
-		cmd.append("echo [%date% %time%] script: elevated install exit %code% - showing the installer>>\"").append(log).append("\"\r\n");
+		// quiet didn't work (e.g. rights): the installer with its own small progress window and prompts
+		cmd.append("echo [%date% %time%] script: quiet install exit %code% - showing the installer>>\"").append(log).append("\"\r\n");
 		cmd.append("\"").append(installer).append("\" /passive").append(props).append("\r\n");
 		cmd.append("set code=%errorlevel%\r\n");
 		cmd.append(":done\r\n");
-		cmd.append("echo [%date% %time%] script: installer exit code %code%>>\"").append(log).append("\"\r\n");
-		cmd.append("echo %code%>\"").append(updatesDir().resolve("installer-exit.txt")).append("\"\r\n");
+		cmd.append(">>\"").append(log).append("\" echo [%date% %time%] script: installer exit code %code%\r\n");
+		// redirect first: "echo 0>file" would read "0>" as a redirect of handle 0 and never write the code
+		cmd.append(">\"").append(exitFile).append("\" echo %code%\r\n");
 		if (appExe != null) {
-			cmd.append("start \"\" \"").append(appExe).append("\"\r\n");
+			// explorer starts it with the signed-in user's normal rights, also from an elevated script
+			cmd.append("start \"\" explorer.exe \"").append(appExe).append("\"\r\n");
 		}
-		Files.writeString(script, cmd.toString(), StandardCharsets.UTF_8);
-		Files.deleteIfExists(updatesDir().resolve("installer-exit.txt"));
-		log("Starting " + script + " (install dir " + installDir + ")");
-		// Started directly, not through "start": Java creates child processes with CREATE_NO_WINDOW, so no console pops up,
-		// and the script outlives this launcher (Windows doesn't end child processes with their parent).
-		Process p = new ProcessBuilder("cmd.exe", "/d", "/c", script.toString())
-				.redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
-		p.getOutputStream().close();
+		// Admin rights: PowerShell (started without a console by the launcher, which is still in front - so the permission
+		// prompt shows at once) starts the script elevated with a hidden window. Passed as -EncodedCommand: no quoting games.
+		String ps = "try { Start-Process -FilePath 'cmd.exe' -ArgumentList '/d /c \"\"" + script.toString().replace("'", "''")
+				+ "\"\"' -Verb RunAs -WindowStyle Hidden; exit 0 } catch { exit 1223 }";
+		return new String[] {cmd.toString(), ps};
+	}
+
+	/** Whether this user may write into {@code dir} (a per-user install) - then the update needs no admin rights. */
+	private static boolean writable(Path dir) {
+		try {
+			Path probe = Files.createTempFile(dir, ".velo-write-test", ".tmp");
+			Files.deleteIfExists(probe);
+			return true;
+		} catch (IOException | SecurityException e) {
+			return false;
+		}
 	}
 
 	/**
@@ -777,15 +866,27 @@ public final class UpdateService {
 	private static void download(Asset asset, Path target, Consumer<Transfer> progress) throws IOException, InterruptedException {
 		IOException last = null;
 		boolean restartedAfterBadHash = false;
-		String mirror = mirrorUrl(asset.url());
+		// The Velo server first (measured 2026-11-09: ~2x GitHub's speed from a datacenter, and GitHub's release downloads
+		// crawl for many players), GitHub as the fallback: two tries at ours, then GitHub. Same bytes on both, so a
+		// partial file resumes on the other one. A busy/missing answer from ours (404/429/503) switches at once.
+		String ours = asset.url() != null && asset.url().startsWith(MIRROR) ? asset.url() : mirrorUrl(asset.url());
+		String github = asset.url() != null && asset.url().startsWith(MIRROR) ? GITHUB_DOWNLOADS + asset.url().substring(MIRROR.length()) : asset.url();
+		boolean oursDown = ours == null;
 		for (int attempt = 1; attempt <= ATTEMPTS; attempt++) {
 			try {
-				// Two tries at GitHub, then the Velo server's copy (same bytes, so a partial file resumes there)
-				Asset from = mirror != null && attempt > 2 ? new Asset(asset.name(), mirror, asset.size(), asset.sha256(), asset.updatedAt(), asset.id()) : asset;
-				if (from != asset && attempt == 3) {
-					log("GitHub download of " + asset.name() + " keeps failing - switching to the Velo server");
+				boolean useOurs = !oursDown && attempt <= 2;
+				Asset from = new Asset(asset.name(), useOurs ? ours : github, asset.size(), asset.sha256(), asset.updatedAt(), asset.id());
+				if (!useOurs && ours != null && (attempt == 3 || oursDown)) {
+					log("Velo server download of " + asset.name() + " didn't work - switching to GitHub");
 				}
-				downloadOnce(from, target, progress, attempt);
+				try {
+					downloadOnce(from, target, progress, attempt);
+				} catch (BusyException busy) {
+					oursDown = true;
+					log("Velo server answered " + busy.code + " for " + asset.name() + " - GitHub instead");
+					attempt--;   // not a real failed attempt
+					continue;
+				}
 				if (asset.sha256() != null) {
 					String actual = sha256Of(target);
 					if (!asset.sha256().equalsIgnoreCase(actual)) {
@@ -831,6 +932,9 @@ public final class UpdateService {
 		boolean append = code == 206 && have > 0;
 		if (code != 200 && code != 206) {
 			response.body().close();
+			if (asset.url().startsWith(MIRROR) && (code == 404 || code == 429 || code == 503)) {
+				throw new BusyException(code);
+			}
 			throw new IOException("server answered " + code);
 		}
 		if (!append) {
@@ -882,6 +986,16 @@ public final class UpdateService {
 		}
 		if (total > 0 && done < total) {
 			throw new IOException("connection ended at " + done + " of " + total + " bytes");
+		}
+	}
+
+	/** The Velo server doesn't have the file or is busy (spam protection): go to GitHub without waiting. */
+	private static final class BusyException extends IOException {
+		final int code;
+
+		BusyException(int code) {
+			super("Velo server answered " + code);
+			this.code = code;
 		}
 	}
 

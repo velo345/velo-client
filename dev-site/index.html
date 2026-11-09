@@ -24,6 +24,7 @@
 		<nav class="nav-links" id="nav-links" aria-label="Sections">
 			<a href="#features">Features</a>
 			<a href="#setup">Setup</a>
+			<a href="#panel">Panel</a>
 			<a href="#api">API</a>
 			<a href="#protocol">Protocol</a>
 			<a href="#modules">Modules</a>
@@ -31,7 +32,7 @@
 			<a href="https://velo-client.com" class="nav-out">velo-client.com ↗</a>
 		</nav>
 		<div class="nav-act">
-			<a class="btn btn-red btn-sm" href="/downloads/VeloBridge-1.0.0.jar" download>Download</a>
+			<a class="btn btn-red btn-sm" href="/downloads/VeloBridge-1.2.0.jar" download>Download</a>
 			<button class="nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links"><span></span><span></span></button>
 		</div>
 	</div>
@@ -43,9 +44,9 @@
 	<div class="hero-copy">
 		<span class="kicker in" style="--d:0">FREE · PAPER · PURPUR · FOLIA · 1.20.5+</span>
 		<h1><span class="line"><span style="--d:1">Talk to Velo</span></span><span class="line"><span style="--d:2">players from</span></span><span class="line"><span style="--d:3">your server.</span></span></h1>
-		<p class="lead in" style="--d:4">One jar. Teammate outlines through walls, waypoints, native toasts and countdowns, camera effects, Discord presence, mod hints and proxy-free transfers. Players without Velo never notice it's there.</p>
+		<p class="lead in" style="--d:4">One jar - now with an owner panel, server menus, HUD elements, cutscenes, music zones and NPC cosmetics. Teammate outlines through walls, waypoints, native toasts and countdowns, camera effects, Discord presence, mod hints and proxy-free transfers. Players without Velo never notice it's there.</p>
 		<div class="cta in" style="--d:5">
-			<a class="btn btn-red" href="/downloads/VeloBridge-1.0.0.jar" download><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>VeloBridge 1.0.0</a>
+			<a class="btn btn-red" href="/downloads/VeloBridge-1.2.0.jar" download><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>VeloBridge 1.2.0</a>
 			<a class="btn" href="#setup">Set it up in a minute</a>
 		</div>
 		<ul class="points in" style="--d:6">
@@ -84,7 +85,7 @@
 <!-- Features: pick one, switch between API / command / config -->
 <section class="sec wrap" id="features">
 	<header class="head reveal">
-		<div><span class="num">01 / FEATURES</span><h2>Fourteen features,<br>one plugin.</h2></div>
+		<div><span class="num">01 / FEATURES</span><h2>Twenty-one features,<br>one plugin.</h2></div>
 		<p>No resource-pack hacks. Everything you send is drawn by Velo itself in its own fonts, crisp at every GUI scale. Toasts and bars carry your server's name.</p>
 	</header>
 	<div class="explorer reveal" data-explorer>
@@ -115,7 +116,7 @@
 		</div>
 	</header>
 	<ol class="steps reveal">
-		<li><b>1</b><h3>Drop in the jar</h3><p>Put <code>VeloBridge-1.0.0.jar</code> into <code>plugins/</code> and restart <span data-pname>Paper</span>. On a network, install it on every backend server.</p><p class="pnote" data-pnote>Region and entity schedulers, so it's ready for Folia too.</p></li>
+		<li><b>1</b><h3>Drop in the jar</h3><p>Put <code>VeloBridge-1.2.0.jar</code> into <code>plugins/</code> and restart <span data-pname>Paper</span>. On a network, install it on every backend server.</p><p class="pnote" data-pnote>Region and entity schedulers, so it's ready for Folia too.</p></li>
 		<li><b>2</b><h3>Name your server</h3><p>In <code>plugins/VeloBridge/config.yml</code> set the name and colour players see on everything you send.</p>
 <pre class="code mini"><span class="k">server</span>:
   <span class="k">name</span>: <span class="s">"SkyWars.gg"</span>
@@ -130,10 +131,31 @@
 	</div>
 </section>
 
+<!-- Owner panel -->
+<section class="sec wrap" id="panel">
+	<header class="head reveal">
+		<div><span class="num">03 / OWNER PANEL</span><h2>Your server,<br>one page.</h2></div>
+		<p>Live numbers and every setting of config.yml in your browser - menus, HUD elements, cutscenes, music zones, server notes and NPC cosmetics with live previews. No account, no port to open: the link is the login.</p>
+	</header>
+	<ol class="steps reveal">
+		<li><b>1</b><h3>Get your link</h3><p>In game (as op) or in the console run <code>/velobridge panel</code>. You get a link to <code>dev.velo-client.com/panel</code> - it works once, for 15 minutes. In game just click it.</p>
+<pre class="code mini"><span class="p">&gt;</span> velobridge panel
+<span class="o">Owner panel (15 minutes, once): https://dev.velo-client.com/panel#…</span></pre></li>
+		<li><b>2</b><h3>Look and change</h3><p><b>Overview</b> shows players online over 24 hours or 30 days, how many use Velo, versions, modules and when people join. The other pages edit everything: settings, mod hints, menus, HUD, cutscenes, music, server notes, NPCs.</p></li>
+		<li><b>3</b><h3>Save</h3><p>Press <b>Save to server</b>. While the panel is open your server checks every 5 seconds, writes the change into config.yml (comments stay) and applies it - the bar turns to <i>Live on your server ✓</i>. A session lasts 12 hours; after that run the command again.</p></li>
+	</ol>
+	<div class="faq reveal">
+		<details><summary>What can't the panel change?</summary><p>Console actions in menus (<code>menus.allow-console-actions</code>) - only the file on your server can switch those on, so a leaked link can never run console commands. Everything else in config.yml is editable.</p></details>
+		<details><summary>Is the panel safe?</summary><p>Your server proves who it is with a secret it made itself (<code>plugins/VeloBridge/panel-secret.txt</code> - keep it private). Links are single-use and expire after 15 minutes, sessions after 12 hours. Don't share a fresh link.</p></details>
+		<details><summary>How do I dress up my NPCs?</summary><p>Open <b>NPC cosmetics</b>: your FancyNpcs and Citizens NPCs are listed by name (or add any player NPC by UUID). Pick cloaks, wings, auras, bodywear and pets like in Velo's Locker with a 3D preview, or upload your own cloak PNG. Save, and Velo players see them on your server.</p></details>
+		<details><summary>Can I turn it off?</summary><p>Yes: <code>panel.enabled: false</code> in config.yml. Then nothing is synced and <code>/velobridge panel</code> says it's off.</p></details>
+	</div>
+</section>
+
 <!-- API -->
 <section class="sec wrap" id="api">
 	<header class="head reveal">
-		<div><span class="num">03 / JAVA API</span><h2>Five lines to a feature<br>players talk about.</h2></div>
+		<div><span class="num">04 / JAVA API</span><h2>Five lines to a feature<br>players talk about.</h2></div>
 		<p>Add <code>softdepend: [VeloBridge]</code> to your plugin.yml and compile against the jar. Every call is safe for players without Velo and from any thread, Folia included.</p>
 	</header>
 	<div class="api reveal" data-tabs="api">
@@ -185,7 +207,7 @@ VeloBridge.<span class="f">pings</span>(player, lobbies).<span class="f">thenAcc
 }</pre>
 <pre class="code" data-pane="4" hidden><span class="c">// build.gradle(.kts) - put the jar into libs/</span>
 dependencies {
-    <span class="f">compileOnly</span>(<span class="f">files</span>(<span class="s">"libs/VeloBridge-1.0.0.jar"</span>))
+    <span class="f">compileOnly</span>(<span class="f">files</span>(<span class="s">"libs/VeloBridge-1.2.0.jar"</span>))
 }
 
 <span class="c"># plugin.yml</span>
@@ -207,7 +229,7 @@ dependencies {
 <!-- Protocol -->
 <section class="sec wrap" id="protocol">
 	<header class="head reveal">
-		<div><span class="num">04 / PROTOCOL</span><h2>velo:bridge</h2></div>
+		<div><span class="num">05 / PROTOCOL</span><h2>velo:bridge</h2></div>
 		<p>Minestom, Velocity, your own server: one plugin channel, one UTF-8 JSON object per message, the type in <code>"t"</code>. Unknown types and fields are ignored on both sides.</p>
 	</header>
 	<div class="proto reveal">
@@ -229,7 +251,7 @@ dependencies {
 <!-- Modules -->
 <section class="sec wrap" id="modules">
 	<header class="head reveal">
-		<div><span class="num">05 / MODULE IDS</span><h2>Every Velo module<br>you can switch off.</h2></div>
+		<div><span class="num">06 / MODULE IDS</span><h2>Every Velo module<br>you can switch off.</h2></div>
 		<p>Use these ids in <code>disabled-modules</code> and <code>disableModules(...)</code>. Click one to copy it.</p>
 	</header>
 	<div class="modules reveal">
@@ -243,10 +265,11 @@ dependencies {
 
 <!-- FAQ -->
 <section class="sec wrap faq-wrap" id="faq">
-	<header class="head reveal"><div><span class="num">06 / FAQ</span><h2>Questions server<br>owners ask.</h2></div></header>
+	<header class="head reveal"><div><span class="num">07 / FAQ</span><h2>Questions server<br>owners ask.</h2></div></header>
 	<div class="faq">
 		<details><summary>Does it change anything for players without Velo?</summary><p>No. The plugin only ever talks to players who said hello on the Velo channel. Everyone else gets no packets, no messages, nothing.</p></details>
-		<details><summary>Can it kick or ban players for their mods?</summary><p>No, on purpose. Mod hints are checked on the player's own PC and shown as a heads-up; nothing is reported back or enforced, so a wrong match can never cost anyone their account. The only enforced thing is switching off Velo's own modules you listed.</p></details>
+		<details><summary>Can it kick or ban players for their mods?</summary><p>No, on purpose. Mod hints are shown as a heads-up on the player's PC and nothing is enforced, so a wrong match can never cost anyone their account. The only enforced thing is switching off Velo's own modules you listed.</p></details>
+		<details><summary>What does the owner panel send to Velo?</summary><p>While <code>panel.enabled</code> is on: your config, live numbers (players online, Velo versions and modules) and the names of players who joined, so the dashboard can show them. Only someone with a fresh link from <code>/velobridge panel</code> can open it. Set <code>panel.enabled: false</code> and nothing is sent.</p></details>
 		<details><summary>How do players know it's my server and not Velo?</summary><p>Toasts and progress bars carry your server's name in your colour, and your mod hints say "From &lt;your server&gt;". Velo's own UI never looks like that. Players can also hide your mod hints for good.</p></details>
 		<details><summary>What do you collect with <code>stats: true</code>?</summary><p>Your server name, software, Minecraft version, players online, how many use Velo and which Velo versions. No player names, UUIDs or IPs. Set <code>stats: false</code> and nothing is sent.</p></details>
 		<details><summary>Does it work on Folia and networks?</summary><p>Yes. It uses Folia's region and entity schedulers (which Paper and Purpur have too) and falls back to Bukkit's on Spigot. On a network, install it on every backend; transfers work between any servers, with or without a proxy.</p></details>
@@ -256,7 +279,7 @@ dependencies {
 
 <section class="wrap partner reveal">
 	<div><h2>Become a Velo partner server.</h2><p>Install Bridge, keep stats on and get in touch. Partner servers get featured in the Velo launcher.</p></div>
-	<div class="cta"><a class="btn btn-red" href="/downloads/VeloBridge-1.0.0.jar" download>Download VeloBridge</a><a class="btn" href="https://velo-client.com">About Velo Client</a></div>
+	<div class="cta"><a class="btn btn-red" href="/downloads/VeloBridge-1.2.0.jar" download>Download VeloBridge</a><a class="btn" href="https://velo-client.com">About Velo Client</a></div>
 </section>
 </main>
 

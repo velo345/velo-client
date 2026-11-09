@@ -1,0 +1,25 @@
+<!--page {
+ "title": "Item icons · Velo Library",
+ "description": "Every Minecraft item and block icon by name or old numeric id, from the newest game version, at any size - with a free API.",
+ "path": "/library/items",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="items">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Item icons</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">Items · blocks · numeric ids</span>
+    <h1>Item icons</h1>
+    <p class="lib-lead">Every item and block icon from the newest game version. Click one to copy its URL; numeric ids from 1.8 work too (276 = diamond sword).</p>
+  </header>
+  <div class="lib-row" style="align-items:center;margin-bottom:20px">
+    <div class="lib-search" style="flex:1 1 320px"><input id="q" type="search" placeholder="Search items" aria-label="Search items"></div>
+    <div class="lib-field" style="flex:0 1 auto"><span>Copied size</span><div class="lib-pills" id="sizes"></div></div>
+  </div>
+  <p class="lib-muted" id="count"></p>
+  <div id="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px"></div>
+
+</main>

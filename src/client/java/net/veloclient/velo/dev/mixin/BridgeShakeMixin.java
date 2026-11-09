@@ -18,6 +18,9 @@ public abstract class BridgeShakeMixin {
 	protected abstract void setRotation(float yaw, float pitch);
 
 	@Shadow
+	protected abstract void setPos(double x, double y, double z);
+
+	@Shadow
 	public abstract float getYaw();
 
 	@Shadow
@@ -29,6 +32,11 @@ public abstract class BridgeShakeMixin {
 		if (offset != null) {
 			setRotation(getYaw() + offset[0], getPitch() + offset[1]);
 		}
+		double[] cam = net.veloclient.velo.dev.bridge.BridgeCutscene.camera();
+		if (cam != null) {
+			setPos(cam[0], cam[1], cam[2]);
+			setRotation((float) cam[3], (float) cam[4]);
+		}
 	}
 }
 //?} else {
@@ -37,6 +45,9 @@ public abstract class BridgeShakeMixin {
 
 	@Shadow
 	protected abstract void setRotation(float yaw, float pitch);
+
+	@Shadow
+	protected abstract void setPosition(double x, double y, double z);
 
 	@Shadow
 	public abstract float yRot();
@@ -49,6 +60,11 @@ public abstract class BridgeShakeMixin {
 		float[] offset = net.veloclient.velo.dev.bridge.BridgeShake.offset();
 		if (offset != null) {
 			setRotation(yRot() + offset[0], xRot() + offset[1]);
+		}
+		double[] cam = net.veloclient.velo.dev.bridge.BridgeCutscene.camera();
+		if (cam != null) {
+			setPosition(cam[0], cam[1], cam[2]);
+			setRotation((float) cam[3], (float) cam[4]);
 		}
 	}
 }

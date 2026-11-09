@@ -378,12 +378,19 @@ final class SchematicShareService {
 
 	/** The file and the name to save it under ("<title>.<format>"); counts a download. */
 	synchronized Object[] download(String id) throws IOException {
+		return download(id, true);
+	}
+
+	/** {@code count = false}: the website's 3D preview and material list read the file without counting a download. */
+	synchronized Object[] download(String id, boolean count) throws IOException {
 		Entry e = entries.get(id);
 		if (e == null) {
 			return null;
 		}
-		e.downloads++;
-		save();
+		if (count) {
+			e.downloads++;
+			save();
+		}
 		String name = e.title.replaceAll("[^A-Za-z0-9 _.-]", "_").strip();
 		return new Object[] {Files.readAllBytes(root.resolve("files").resolve(id + ".bin")), (name.isEmpty() ? "schematic" : name) + "." + e.format};
 	}

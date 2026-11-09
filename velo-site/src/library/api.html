@@ -1,0 +1,153 @@
+<!--page {
+ "title": "API & keys · Velo Library",
+ "description": "The Velo Library API: player lookups, 3D renders, item icons, server status, banners, MOTDs, spark analysis, plugin updates and more as plain HTTPS endpoints, with free API keys and fair rate limits.",
+ "path": "/library/api",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="api">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>API & keys</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">velo-client.com/v2 · JSON & images · CORS open for GET</span>
+    <h1>Velo Library API</h1>
+    <p class="lib-lead">Plain HTTPS. Images answer with the image itself, so an endpoint drops straight into an &lt;img&gt;, a Discord embed or a plugin.</p>
+  </header>
+  <div class="lib-row">
+    <div class="lib-main">
+      <h2>Rate limits</h2>
+      <div class="lib-scroll lib-box"><table class="lib-table"><thead><tr><th>Tier</th><th>Requests</th><th>Item icons</th><th>Renders</th><th>Server pings</th><th>Heavy (spark, plugins)</th><th>Seed map</th></tr></thead><tbody>
+        <tr><td><b>No key</b> (per IP)</td><td>30 / min</td><td>300 / min</td><td>15 / min</td><td>5 / min</td><td>2 / min</td><td>60 / min</td></tr>
+        <tr><td><b>Free key</b></td><td>300 / min</td><td>1500 / min</td><td>100 / min</td><td>30 / min</td><td>10 / min</td><td>300 / min</td></tr>
+        <tr><td><b>Velo+</b></td><td>1500 / min</td><td>5000 / min</td><td>500 / min</td><td>150 / min</td><td>30 / min</td><td>1000 / min</td></tr>
+      </tbody></table></div>
+      <p class="lib-muted" style="margin:0">Cached answers don't count. Answers carry <code>X-RateLimit-Remaining</code> and <code>X-RateLimit-Tier</code>; over the limit you get <code>429</code> with <code>Retry-After</code>. Send a key as <code>Authorization: Bearer velo_…</code> or <code>?key=velo_…</code>. When the Library is paused or busy it answers <code>503</code> - try again later.</p>
+      <h2 style="margin-top:24px">Endpoints</h2>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/player/:name</code></div>
+        <span class="lib-muted" style="font-size:14px">UUID, name history, skins, cape, model</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/player/Notch">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/name/:name</code></div>
+        <span class="lib-muted" style="font-size:14px">available / taken</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/name/Notch">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/skin/:name.png</code></div>
+        <span class="lib-muted" style="font-size:14px">the raw skin texture</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/skin/Notch.png">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/head/:name.png</code></div>
+        <span class="lib-muted" style="font-size:14px">?size=8-1024 &overlay=false &style=3d</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/head/jeb_.png?style=3d&size=128">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/render/:name.png|.gif</code></div>
+        <span class="lib-muted" style="font-size:14px">?pose= &yaw= &pitch= &size= &bg= &layers3d= &slim= &cape= - head/rarm/larm/rleg/lleg=x,y,z for custom poses</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/render/Technoblade.png?pose=fight&size=256">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag warn">POST</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/render/custom.png</code></div>
+        <span class="lib-muted" style="font-size:14px">your own skin PNG as the body, same options</span>
+        
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/poses</code></div>
+        <span class="lib-muted" style="font-size:14px">pose names</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/poses">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/item/:id.png</code></div>
+        <span class="lib-muted" style="font-size:14px">item or block icon by name or 1.8 numeric id, ?size=16-512</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/item/276.png?size=64">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/items?q=</code></div>
+        <span class="lib-muted" style="font-size:14px">search names and ids</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/items?q=sword&limit=10">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/server/:address</code></div>
+        <span class="lib-muted" style="font-size:14px">status: players, version, MOTD (plain, MiniMessage, legacy, HTML), icon, 24 h history</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/server/hypixel.net">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/server/:address/icon.png</code></div>
+        <span class="lib-muted" style="font-size:14px">the server icon</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/server/hypixel.net/icon.png">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/banner/:address.png|.gif</code></div>
+        <span class="lib-muted" style="font-size:14px">size, theme, c1, c2, accent, angle, texture, pattern, title, lines, icon, font, layout, players, ping, address, version, glow, radius, animate</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/banner/hypixel.net.png?theme=velo&pattern=pixels">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/motd/render.png?mm=</code></div>
+        <span class="lib-muted" style="font-size:14px">a server list entry as PNG (mm = MiniMessage, or legacy=)</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/motd/render.png?mm=%3Cgold%3EHello%3Cnewline%3E%3Caqua%3EWorld&name=My%20Server">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/motd/convert?mm=</code></div>
+        <span class="lib-muted" style="font-size:14px">MiniMessage -> plain, legacy, HTML</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/motd/convert?mm=%3Cgradient:%23ff0000:%230000ff%3EHi">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/gradient?text= &colors=</code></div>
+        <span class="lib-muted" style="font-size:14px">gradient / animation frames (mode=wave|shift|pulse|static, format=tab|minimessage|legacy)</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/gradient?text=Velo&colors=ff6b73,f4b82e&frames=4">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/color/:hex</code></div>
+        <span class="lib-muted" style="font-size:14px">every colour format + nearest vanilla colour</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/color/e0262e">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/flags?ram= &software= &gc= &os=</code></div>
+        <span class="lib-muted" style="font-size:14px">JVM flags and start script</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/flags?ram=16&software=folia">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/spark/:id</code></div>
+        <span class="lib-muted" style="font-size:14px">spark profile analysis</span>
+        
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag warn">POST</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/plugins/check</code></div>
+        <span class="lib-muted" style="font-size:14px">{"text": "/plugins output"} or {"plugins": [{name, version}]}</span>
+        
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/seed/:seed/slime?cx= &cz= &r=</code></div>
+        <span class="lib-muted" style="font-size:14px">slime chunks around a chunk</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/seed/12345/slime?r=4">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/seed/:seed/tile.png</code></div>
+        <span class="lib-muted" style="font-size:14px">biome tile (scale 1/4/16/64/256, x, z, w, h)</span>
+        
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/seed/:seed/structures</code></div>
+        <span class="lib-muted" style="font-size:14px">x0, z0, x1, z1, types</span>
+        
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/presets?tool=</code></div>
+        <span class="lib-muted" style="font-size:14px">community presets (motd, tab, banner, pose, enchant, flags, seed)</span>
+        <button type="button" class="lib-btn sm" style="align-self:flex-start" data-try-url="/v2/presets?tool=motd">Try it</button><pre class="lib-code" data-result hidden></pre>
+      </div>
+      <div class="lib-box lib-pad" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap"><span class="lib-tag good">GET</span><code style="font:500 13px var(--mono);word-break:break-all">/v2/packs/:sha1</code></div>
+        <span class="lib-muted" style="font-size:14px">a hosted pack's info and server.properties lines</span>
+        
+      </div>
+    </div>
+    <aside class="lib-side"><h3>Your API keys</h3><div id="keys" style="display:flex;flex-direction:column;gap:10px"></div>
+      <p class="lib-muted" style="margin:0">Keys belong to your Minecraft account. Up to 5 keys. Keep them out of public code - anyone with a key uses your limit.</p></aside>
+  </div>
+
+</main>

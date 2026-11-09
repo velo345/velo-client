@@ -1,0 +1,40 @@
+<!--page {
+ "title": "MOTD designer · Velo Library",
+ "description": "Minecraft MOTD designer with MiniMessage, live server-list preview, item and player-head icons (1.21.9+), and exports for server.properties, Paper, Velocity and JSON.",
+ "path": "/library/motd",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="motd">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>MOTD designer</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">MiniMessage · items · heads · every format</span>
+    <h1>MOTD designer</h1>
+    <p class="lib-lead">Write MiniMessage and watch the server list update. Item icons and player heads use the sprite and head text objects from 1.21.9 on - older clients see the fallback text.</p>
+  </header>
+  <div class="mc-dirt lib-box" style="margin-bottom:24px"><div><div class="mc-list"><img id="sicon" class="icon lib-px" alt="Server icon">
+    <div style="flex-grow:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:12px"><span id="sname" style="color:#fff"></span><span style="color:#aaa">123/500</span></div><div id="lines"></div></div></div></div></div>
+  <div class="lib-row">
+    <div class="lib-main">
+      <div class="lib-field"><label for="l1">Line 1</label><textarea id="l1" rows="2" spellcheck="false"></textarea></div>
+      <div class="lib-field"><label for="l2">Line 2</label><textarea id="l2" rows="2" spellcheck="false"></textarea></div>
+      <div class="lib-field"><span>Insert</span><div class="lib-pills" id="chips"></div></div>
+      <div class="lib-row" style="gap:12px">
+        <div class="lib-field" style="flex:1 1 200px"><label for="name">Server name</label><input id="name" type="text"></div>
+        <div class="lib-field" style="flex:1 1 200px"><label for="icon">Icon (item id)</label><input id="icon" type="text" value="grass_block"></div>
+      </div>
+      <form id="import" class="lib-field"><label for="addr">Import a live MOTD</label><div class="lib-search"><input id="addr" type="text" placeholder="play.example.net"><button class="lib-btn" type="submit">Import</button></div></form>
+    </div>
+    <aside class="lib-side">
+      <div class="lib-pills" id="tabs"></div>
+      <pre class="lib-code" id="out" style="min-height:220px"></pre>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="copy" class="lib-btn red" type="button">Copy</button><button id="png" class="lib-btn" type="button">Open as PNG</button></div>
+      <p class="lib-muted" style="margin:0">Paper, Purpur and Velocity read MiniMessage directly. Spigot and vanilla get the § version; sprites become their fallback text.</p>
+    </aside>
+  </div>
+
+  <section class="lib-presets" data-presets aria-label="Community presets"></section>
+</main>

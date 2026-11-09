@@ -1,0 +1,29 @@
+<!--page {
+ "title": "Resource pack hosting · Velo Library",
+ "description": "Free Minecraft resource pack hosting for servers: upload a pack, get a direct download link, its SHA-1 and ready server.properties lines.",
+ "path": "/library/packs",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="packs">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Resource pack hosting</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">Direct link · SHA-1 · server.properties</span>
+    <h1>Pack hosting</h1>
+    <p class="lib-lead">Upload a resource pack for your server and get everything server.properties needs. Up to 50 MB per pack, 10 packs per account.</p>
+  </header>
+  <div class="lib-row">
+    <form id="upload" class="lib-side lib-box lib-pad" style="gap:14px">
+      <h3>Upload a pack</h3>
+      <div class="lib-field"><span>Zip file</span><input id="file" type="file" accept=".zip,application/zip" aria-label="Pack zip"></div>
+      <div class="lib-field"><label for="pname">Name</label><input id="pname" type="text" maxlength="60" placeholder="My server pack"></div>
+      <button id="up-btn" class="lib-btn red" type="submit">Upload</button>
+      <p class="lib-muted" style="margin:0">pack.mcmeta must be at the top of the zip. Uploading needs your velo-client.com sign-in.</p>
+    </form>
+    <div class="lib-main"><div id="result"></div><h3>Your packs</h3><div id="mine" style="display:flex;flex-direction:column;gap:12px"></div></div>
+  </div>
+
+</main>

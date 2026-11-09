@@ -162,6 +162,7 @@ function main() {
 	tokens["asset.js"] = `/assets/site.js?v=${hashOf(path.join(ROOT, "assets", "site.js"))}`;
 	tokens["asset.store"] = `/assets/store.js?v=${hashOf(path.join(ROOT, "assets", "store.js"))}`;
 	tokens["asset.skin3d"] = `/assets/skin3d.js?v=${hashOf(path.join(ROOT, "assets", "skin3d.js"))}`;
+	tokens["asset.schem3d"] = `/assets/schem3d.js?v=${hashOf(path.join(ROOT, "assets", "schem3d.js"))}`;
 	const rel = config.release;
 	// downloadMirror: our own copy of the release files (velo-client.com/dl/v<version>/, uploaded next to the site and kept
 	// by deploy.sh) - GitHub's release downloads time out for signed-out users now and then. Empty = straight from GitHub.
@@ -201,7 +202,7 @@ function main() {
 		};
 		const pageTokens = { ...tokens };
 		for (const [k, v] of Object.entries(page)) pageTokens[`page.${k}`] = v;
-		for (const id of ["home", "features", "plus", "store", "news", "download", "partners"]) pageTokens[`nav.${id}`] = page.active === id ? "aria-current=\"page\"" : "";
+		for (const id of ["home", "features", "plus", "store", "news", "download", "partners", "library"]) pageTokens[`nav.${id}`] = page.active === id ? "aria-current=\"page\"" : "";
 		const html = render(layout.replace("{{page.body}}", body), pageTokens, file);
 		const out = path.join(DIST, relPath);
 		fs.mkdirSync(path.dirname(out), { recursive: true });
@@ -216,6 +217,14 @@ function main() {
 		const [meta, body] = frontMatter(fs.readFileSync(path.join(SRC, file), "utf8"), file);
 		if (meta.lastmod === "latest-post" && posts[0]) meta.lastmod = posts[0].date;
 		writePage(file, meta, body, file);
+	}
+	// Sub-pages in folders (src/library/player.html -> /library/player).
+	for (const dir of fs.readdirSync(SRC, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== "partials")) {
+		for (const file of fs.readdirSync(path.join(SRC, dir.name)).filter((f) => f.endsWith(".html") && !f.startsWith("_"))) {
+			const rel = `${dir.name}/${file}`;
+			const [meta, body] = frontMatter(fs.readFileSync(path.join(SRC, rel), "utf8"), rel);
+			writePage(rel, meta, body, rel);
+		}
 	}
 
 	// One page per news post, with its images next to it.

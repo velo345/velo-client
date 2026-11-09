@@ -1,0 +1,49 @@
+<!--page {
+ "title": "Animated TAB & colours · Velo Library",
+ "description": "Animated gradient text generator for the TAB plugin, scoreboards and holograms: wave, colour shift and pulse animations with MiniMessage, legacy and hex exports, plus a Minecraft colour picker.",
+ "path": "/library/tab",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="tab">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Animated TAB & colours</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">Gradients · animations · TAB / MiniMessage / §x</span>
+    <h1>Animated TAB</h1>
+    <p class="lib-lead">Gradient and animated text for TAB, scoreboards, holograms and chat. Every colour format, ready to paste.</p>
+  </header>
+  <div class="lib-box" style="padding:48px 24px;display:flex;flex-direction:column;align-items:center;gap:16px;margin-bottom:24px"><div class="tab-stage" id="stage" aria-live="off"></div><span class="lib-muted" id="frame"></span></div>
+  <div class="lib-row">
+    <div class="lib-main">
+      <div class="lib-field"><label for="text">Text</label><input id="text" type="text" maxlength="64"></div>
+      <div class="lib-field"><span>Colours</span><div id="stops" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"></div></div>
+      <div class="lib-field"><span>Animation</span><div class="lib-pills" id="modes"></div></div>
+      <div class="lib-row" style="gap:20px">
+        <div class="lib-field" style="flex:1 1 200px"><label for="speed">Speed <b id="intv"></b></label><input id="speed" type="range" min="50" max="500" step="10" value="120"></div>
+        <div class="lib-field" style="flex:1 1 200px"><label for="nframes">Frames <b id="frv"></b></label><input id="nframes" type="range" min="6" max="40" step="1" value="20"></div>
+      </div>
+      <label class="lib-check"><input id="bold" type="checkbox" checked> Bold</label>
+      <div class="lib-field"><span>Export</span><div class="lib-pills" id="fmts"></div></div>
+      <pre class="lib-code" id="out"></pre>
+      <div><button id="copy" class="lib-btn red" type="button">Copy</button></div>
+    </div>
+    <aside class="lib-side" id="pick-box">
+      <h3>Colour picker</h3>
+      <div class="lib-box"><div id="pick-swatch" style="height:96px"></div>
+        <div class="lib-grid" style="grid-template-columns:1fr 1fr;border:0;border-radius:0">
+          <button type="button" data-copy="pick-hex" class="lib-stat" style="text-align:left;border:0;color:var(--text);cursor:pointer"><span class="lib-label">Hex</span><b id="pick-hex" style="font:500 14px var(--mono)"></b></button>
+          <button type="button" data-copy="pick-rgb" class="lib-stat" style="text-align:left;border:0;color:var(--text);cursor:pointer"><span class="lib-label">RGB</span><b id="pick-rgb" style="font:500 14px var(--mono)"></b></button>
+          <button type="button" data-copy="pick-mm" class="lib-stat" style="text-align:left;border:0;color:var(--text);cursor:pointer"><span class="lib-label">MiniMessage</span><b id="pick-mm" style="font:500 14px var(--mono)"></b></button>
+          <button type="button" data-copy="pick-legacy" class="lib-stat" style="text-align:left;border:0;color:var(--text);cursor:pointer"><span class="lib-label">Legacy</span><b id="pick-legacy" style="font:500 12px var(--mono);word-break:break-all"></b></button>
+        </div></div>
+      <label class="lib-check"><input id="picker" type="color"> Pick any colour</label>
+      <span class="lib-label">Vanilla colours</span>
+      <div class="lib-swatches" id="vanilla"></div>
+    </aside>
+  </div>
+
+  <section class="lib-presets" data-presets aria-label="Community presets"></section>
+</main>

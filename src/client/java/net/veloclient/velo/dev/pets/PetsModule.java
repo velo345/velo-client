@@ -59,6 +59,21 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 	private boolean showOthers = true;
 	/** Other players' pets: uuid -> pet id (online list) and uuid -> its brain (only for players drawn this frame). */
 	private static volatile Map<String, String> remotePets = Map.of();
+	/** NPCs a Velo Bridge server gave a pet (dashless uuid -> pet id). */
+	private static volatile Map<String, String> npcPets = Map.of();
+
+	public static void setNpcPets(Map<String, String> pets) {
+		Map<String, String> m = new HashMap<>();
+		if (pets != null) {
+			pets.forEach((uuid, id) -> {
+				String pet = id == null ? "" : id.replaceFirst("^pet_", "");
+				if (PETS.containsKey(pet)) {
+					m.put(uuid.replace("-", "").toLowerCase(java.util.Locale.ROOT), pet);
+				}
+			});
+		}
+		npcPets = Map.copyOf(m);
+	}
 	private static final Map<String, PetBrain> REMOTE_BRAINS = new HashMap<>();
 	private static final Map<String, Long> REMOTE_LAST = new HashMap<>();
 	/** Performance: other players' pets only this close, and at most this many at once (the nearest). */
@@ -150,7 +165,7 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 			out.add(own);
 		}
 		PetsModule m = instance;
-		if (m != null && m.isEnabled() && m.showOthers && !remotePets.isEmpty()) {
+		if (m != null && m.isEnabled() && m.showOthers && (!remotePets.isEmpty() || !npcPets.isEmpty())) {
 			others(m, out);
 		} else if (!REMOTE_BRAINS.isEmpty()) {
 			REMOTE_BRAINS.clear();
@@ -168,6 +183,9 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 		List<Object[]> near = new java.util.ArrayList<>();
 		for (LivingEntity other : PvpCompat.otherPlayers()) {
 			String id = remotePets.get(uuidOf(other));
+			if (id == null) {
+				id = npcPets.get(uuidOf(other));
+			}
 			if (id == null || net.veloclient.velo.client.cosmetics.CosmeticHide.hidden(String.valueOf(uuidOf(other)), "pets")) {
 				continue;
 			}

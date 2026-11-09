@@ -372,7 +372,7 @@ public final class AccountSwitcher {
 		}));
 		net.veloclient.velo.config.VeloPaths.setAccount(acc.uuid());
 		SKINS.remove(acc.uuid());
-		markActive(acc.uuid());
+		// (the launcher's own account choice stays as it is: switching in the game is for this session only)
 		LOG.info("Now playing as {}", acc.name());
 		clickSound();
 	}

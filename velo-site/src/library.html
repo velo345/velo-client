@@ -1,0 +1,47 @@
+<!--page {
+ "title": "Minecraft tools & API · Velo Library",
+ "description": "Free Minecraft tools and API by Velo Client: skin and name lookup, 3D pose renders, item icons, MOTD designer, animated TAB, server banners, server status, spark analyzer, JVM flags, plugin updates, pack hosting, enchant planner and seed map.",
+ "path": "/library",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.8",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="hub">
+  
+  <section class="lib-hero">
+    <div class="lib-head" style="margin:0">
+      <span class="lib-label">Library · 14 tools · open API</span>
+      <h1>The Minecraft<br>toolbox.</h1>
+      <p class="lib-lead">Look up players, render skins in any pose, design MOTDs and TAB animations, check servers and read spark profiles. Every tool is also an API - free, fast, fairly rate limited.</p>
+    </div>
+    <form id="lookup" class="lib-field" role="search">
+      <label for="q">Look up anything</label>
+      <div class="lib-search"><input id="q" type="text" placeholder="Player name, UUID, server address or item" autocomplete="off"><button class="lib-btn red" type="submit">Search</button></div>
+      <div class="lib-muted" style="display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono)">try: <a href="#" data-try="Dinnerbone">Dinnerbone</a><a href="#" data-try="hypixel.net">hypixel.net</a><a href="#" data-try="mace">mace</a></div>
+    </form>
+  </section>
+  <div class="lib-filter"><div class="lib-pills" id="filters"></div><span class="lib-muted" id="count"></span></div>
+  <div class="lib-grid lib-tools" id="tools"></div>
+  <section class="lib-row" style="margin-top:96px;align-items:center">
+    <div class="lib-main" style="flex:1 1 420px">
+      <span class="lib-label">For developers</span>
+      <h2>One API.<br>Everything above.</h2>
+      <p class="lib-lead">Every tool is a plain HTTPS endpoint under velo-client.com/v2. No key for light use; a free key from your Velo account raises the limits, Velo+ raises them again. Repeated requests are served from cache and cost nothing.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><a class="lib-btn red" href="/library/api">API docs &amp; keys</a></div>
+    </div>
+    <div class="lib-side" style="flex:1 1 460px">
+      <pre class="lib-code"># a player in a walking pose, 512 px, with 3D skin layers
+curl "https://velo-client.com/v2/render/Notch.png?pose=walk&amp;size=512" -o render.png
+
+# server status, MOTD as MiniMessage, legacy and HTML
+curl "https://velo-client.com/v2/server/hypixel.net"
+
+# any item icon by name or old numeric id
+curl "https://velo-client.com/v2/item/276.png?size=64" -o sword.png</pre>
+      <div class="lib-grid lib-stats"><div class="lib-stat"><span class="lib-label">No key</span><b>60/min</b></div><div class="lib-stat"><span class="lib-label">Free key</span><b>600/min</b></div><div class="lib-stat"><span class="lib-label">Velo+</span><b>3000/min</b></div></div>
+    </div>
+  </section>
+
+</main>

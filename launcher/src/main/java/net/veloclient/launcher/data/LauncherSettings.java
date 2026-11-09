@@ -45,6 +45,8 @@ public final class LauncherSettings {
 		 * extra effects (moving arms, glow, shine, particles) and previews without auras.
 		 */
 		public boolean performanceMode;
+		/** Launcher updates download (and mod updates install) in the background; a small card offers "Restart to update". */
+		public boolean autoUpdate = true;
 		/** Minimize the launcher once a game has started (it then frees its memory - see idle mode). */
 		public boolean minimizeOnLaunch = true;
 		/** AI Access: the game opens its local AI API (127.0.0.1) so AI agents can drive it - see the game's velo-rewind/AI.md. */

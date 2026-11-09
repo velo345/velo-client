@@ -1,0 +1,45 @@
+<!--page {
+ "title": "Pose renders · Velo Library",
+ "description": "Render any Minecraft player or your own skin file in any pose and camera angle, with 3D skin layers, slim or classic arms, as PNG or animated GIF - with a free API.",
+ "path": "/library/render",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="render">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>Pose renders</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">Render API · PNG / GIF · up to 2048 px</span>
+    <h1>Any player. Any pose.</h1>
+    <p class="lib-lead">Pick a pose, turn the camera, copy the URL - or drop your own skin file in. 3D skin layers, slim and classic arms, capes, and Dinnerbone stands on his head like in the game.</p>
+  </header>
+  <div class="lib-row">
+    <div class="lib-main">
+      <div class="lib-box lib-checker" style="height:560px;display:flex;align-items:center;justify-content:center"><img id="preview" alt="Render preview" style="max-height:540px;max-width:100%"></div>
+      <div class="lib-box lib-pad" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><code id="url" style="flex:1 1 300px;min-width:0;font:500 13px var(--mono);color:var(--text-2);word-break:break-all"></code>
+        <button id="copy" class="lib-btn red" type="button">Copy URL</button><button id="download" class="lib-btn" type="button">Download</button></div>
+      <div id="err" class="lib-error"></div>
+    </div>
+    <aside class="lib-side">
+      <div class="lib-field"><label for="name">Player</label><input id="name" type="text" autocomplete="off"></div>
+      <div class="lib-field"><span>Or your own skin</span><input id="file" type="file" accept="image/png" aria-label="Skin PNG"></div>
+      <div class="lib-field"><span>Model</span><div class="lib-pills" id="model"></div></div>
+      <div class="lib-field"><span>Pose</span><div class="lib-pills" id="poses"></div></div>
+      <div class="lib-field" id="joints" hidden></div>
+      <div class="lib-field"><label for="yaw">Camera yaw <b id="yawv"></b></label><input id="yaw" type="range" min="-180" max="180" step="5" value="-25"></div>
+      <div class="lib-field"><label for="pitch">Camera pitch <b id="pitchv"></b></label><input id="pitch" type="range" min="-45" max="45" step="5" value="10"></div>
+      <div class="lib-field"><span>Size</span><div class="lib-pills" id="sizes"></div></div>
+      <div class="lib-field"><span>Background</span><div class="lib-pills" id="bgs"></div></div>
+      <div style="border-top:1px solid var(--line);padding-top:14px">
+        <label class="lib-check"><input id="layers3d" type="checkbox" checked> 3D skin layers</label>
+        <label class="lib-check"><input id="overlay" type="checkbox" checked> Overlay (hat, jacket, sleeves)</label>
+        <label class="lib-check"><input id="cape" type="checkbox" checked> Cape</label>
+        <label class="lib-check"><input id="gif" type="checkbox"> Animated GIF (walk, wave, spin…)</label>
+      </div>
+    </aside>
+  </div>
+
+  <section class="lib-presets" data-presets aria-label="Community presets"></section>
+</main>

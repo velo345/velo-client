@@ -174,6 +174,8 @@ async function player3d(container, options) {
 	const root = new THREE.Group();
 	scene.add(root);
 	let player = null, limbs = {}, worn = null, wornTick = null, emote = null;
+	/** Extra pieces worn at once (setItems - the owner panel's NPC designer, like the Locker). */
+	let extras = [];
 
 	async function buildPlayer(skinUrl, slim) {
 		const img = await loadImage(skinUrl);
@@ -409,6 +411,7 @@ async function player3d(container, options) {
 		const next = await buildPlayer(url, slim);
 		if (player) {
 			if (worn) { player.remove(worn); next.add(worn); }
+			extras.forEach((x) => { player.remove(x.object); next.add(x.object); });
 			root.remove(player);
 		}
 		player = next;
@@ -452,6 +455,7 @@ async function player3d(container, options) {
 			limbs.head.rotation.x = Math.sin(t / 3100) * 0.08;
 		}
 		if (wornTick) wornTick(reduceMotion ? 0 : t);
+		for (const x of extras) if (x.tick) x.tick(reduceMotion ? 0 : t);
 		renderer.render(scene, camera);
 		requestAnimationFrame(frame);
 	};
@@ -537,7 +541,27 @@ async function player3d(container, options) {
 	function restartEmote() {
 		if (emote) { emote.start = performance.now(); emote.fired = -1; }
 	}
-	return { setItem, setSkin, restartEmote, dispose };
+	/** Several pieces at once: a cloak, wings, any bodywear and an aura (no emotes). */
+	async function setItems(items) {
+		const token = (setItems.token = (setItems.token || 0) + 1);
+		await setItem(null);
+		extras.forEach((x) => player && player.remove(x.object));
+		extras = [];
+		for (const item of items || []) {
+			if (!item) continue;
+			if (item.type === "aura") { await setItem(item); continue; }
+			try {
+				const built = item.type === "cape" && item.files && item.files.gif ? await buildCape(item)
+					: item.type === "wings" && item.files && item.files.mesh ? await buildWings(item)
+					: item.type === "wear" && item.files && item.files.mesh ? await buildWear(item) : null;
+				if (token !== setItems.token) return; // a newer call replaced this one
+				if (built) { extras.push(built); player.add(built.object); }
+			} catch (e) {
+				console.warn("try-on", e);
+			}
+		}
+	}
+	return { setItem, setItems, setSkin, restartEmote, dispose };
 }
 
 window.velo = window.velo || {};

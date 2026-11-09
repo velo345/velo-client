@@ -1,0 +1,45 @@
+<!--page {
+ "title": "HUD designer · Velo Library",
+ "description": "Design your own Minecraft crosshair, hearts, hunger and armor icons in the browser, start from vanilla, share them with the community and add them to Velo Client with one command.",
+ "path": "/library/hud",
+ "active": "library",
+ "css": "library.css",
+ "js": "library.js",
+ "priority": "0.7",
+ "changefreq": "weekly"
+}-->
+<main class="lib" id="main" data-tool="hud">
+  <nav class="lib-crumb" aria-label="Breadcrumb"><a href="/library">Library</a><span>/</span><span>HUD designer</span></nav>
+  <header class="lib-head">
+    <span class="lib-label">Crosshair · hearts · hunger · armor · /velo import</span>
+    <h1>HUD designer</h1>
+    <p class="lib-lead">Pixel by pixel, like the editor in the game - start from vanilla or a template, then send it to Velo Client with one chat command.</p>
+  </header>
+  <div class="lib-pills" id="kinds" style="margin-bottom:20px"></div>
+  <div class="lib-row">
+    <div class="lib-main" style="flex:1 1 480px;max-width:520px">
+      <div class="lib-pills" id="states"></div>
+      <canvas id="editor" class="lib-px" style="width:100%;max-width:480px;aspect-ratio:1;border-radius:12px;border:1px solid var(--line);touch-action:none;cursor:crosshair" aria-label="Pixel editor - left click draws, right click erases"></canvas>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="undo" class="lib-btn sm" type="button">Undo</button><button id="clear" class="lib-btn sm" type="button">Clear</button><button id="vanilla" class="lib-btn sm" type="button">Start from vanilla</button><button id="png" class="lib-btn sm" type="button">Download PNG</button>
+        <label class="lib-check" style="min-height:34px"><input id="gridt" type="checkbox" checked> Grid</label></div>
+      <p class="lib-muted" id="hint" style="margin:0"></p>
+    </div>
+    <aside class="lib-side">
+      <div class="lib-field"><span>Size</span><div class="lib-pills" id="sizes"></div></div>
+      <div class="lib-field"><span>Tool</span><div class="lib-pills" id="tools"></div></div>
+      <div class="lib-field"><span>Symmetry</span><div class="lib-pills" id="mirrors"></div></div>
+      <div class="lib-field"><span>Colour</span><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="color" type="color" aria-label="Colour"><div id="palette" style="display:flex;gap:5px;flex-wrap:wrap"></div></div></div>
+      <div class="lib-field"><label for="alpha">Opacity <b id="alphav"></b></label><input id="alpha" type="range" min="20" max="255" step="1" value="255"></div>
+      <div class="lib-field" id="tpls"><span>Templates</span><div class="lib-pills"><button type="button" class="lib-pill" data-tpl="gap">Gap cross</button><button type="button" class="lib-pill" data-tpl="plus">Plus</button><button type="button" class="lib-pill" data-tpl="dot">Dot</button><button type="button" class="lib-pill" data-tpl="circle">Circle</button><button type="button" class="lib-pill" data-tpl="x">X</button></div></div>
+      <div class="lib-field"><span>In game</span><canvas id="preview" class="lib-px" style="width:100%;height:180px;border-radius:12px;border:1px solid var(--line);background:url(/assets/shots/g-chat-800.webp) center/cover"></canvas></div>
+      <div class="lib-field"><label for="name">Name</label><input id="name" type="text" maxlength="32"></div>
+      <button id="add" class="lib-btn red" type="button">Add to Velo Client</button>
+      <div id="cmd-box" class="lib-box lib-pad" hidden style="display:flex;flex-direction:column;gap:8px">
+        <span class="lib-muted">Type this in the game chat:</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><code id="cmd" style="font:600 16px var(--mono)"></code><button id="copycmd" class="lib-btn sm" type="button">Copy</button></div>
+        <span class="lib-muted">It's saved, equipped and switched on right away.</span>
+      </div>
+    </aside>
+  </div>
+  <section class="lib-presets" data-presets aria-label="Community designs"></section>
+</main>

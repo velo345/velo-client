@@ -46,6 +46,23 @@ public final class VeloUserRegistry {
 	private VeloUserRegistry() {
 	}
 
+	// NPCs a Velo Bridge server dressed up (its owner picked their cloak, wings, aura, bodywear): checked first.
+	private static volatile Map<String, Entry> npcs = Map.of();
+
+	/** Replaces the server's NPC looks, keyed by entity UUID ({@code null} / empty: none). */
+	public static void putNpcs(Map<UUID, Entry> looks) {
+		Map<String, Entry> m = new java.util.HashMap<>();
+		if (looks != null) {
+			looks.forEach((u, e) -> m.put(dashless(u), e));
+		}
+		npcs = Map.copyOf(m);
+	}
+
+	private static Entry npc(UUID uuid) {
+		Map<String, Entry> m = npcs;
+		return uuid == null || m.isEmpty() ? null : m.get(dashless(uuid));
+	}
+
 	/** Someone else's last look while they aren't online with Velo; asks the server for it (batched) when not known yet. */
 	private static Entry offline(UUID uuid) {
 		if (uuid == null) {
@@ -151,6 +168,10 @@ public final class VeloUserRegistry {
 
 	/** The Store cape catalog id this player has equipped, if any and if they're online. */
 	public static String capeIdFor(UUID uuid) {
+		Entry npc = npc(uuid);
+		if (npc != null) {
+			return npc.capeId();
+		}
 		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
 		if (entry == null) {
 			entry = offline(uuid);
@@ -174,6 +195,10 @@ public final class VeloUserRegistry {
 	public static String wingsIdFor(UUID uuid, String username) {
 		if (net.veloclient.velo.client.cosmetics.CosmeticHide.hidden(uuid, "cosmetics")) {
 			return null;
+		}
+		Entry npcLook = npc(uuid);
+		if (npcLook != null) {
+			return npcLook.wingsId();
 		}
 		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
 		if (entry == null) {
@@ -220,6 +245,10 @@ public final class VeloUserRegistry {
 		if (net.veloclient.velo.client.cosmetics.CosmeticHide.hidden(uuid, "cosmetics")) {
 			return null;
 		}
+		Entry npcLook = npc(uuid);
+		if (npcLook != null) {
+			return npcLook.wear();
+		}
 		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
 		if (entry == null) {
 			entry = entryForName(username);
@@ -234,6 +263,10 @@ public final class VeloUserRegistry {
 	public static String auraIdFor(UUID uuid, String username) {
 		if (net.veloclient.velo.client.cosmetics.CosmeticHide.hidden(uuid, "cosmetics")) {
 			return null;
+		}
+		Entry npcLook = npc(uuid);
+		if (npcLook != null) {
+			return npcLook.auraId();
 		}
 		Entry entry = uuid == null || BY_UUID.isEmpty() ? null : BY_UUID.get(dashless(uuid));
 		if (entry == null) {

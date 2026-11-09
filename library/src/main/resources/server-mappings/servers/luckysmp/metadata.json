@@ -1,0 +1,15 @@
+{
+  "id": "luckysmp",
+  "name": "LuckySMP",
+  "description": "Lucky blocks, PvP and a friendly SMP community.",
+  "addresses": ["luckysmp.net", "*.luckysmp.net"],
+  "primaryAddress": "luckysmp.net",
+  "website": "https://luckysmp.net",
+  "discord": "https://discord.gg/luckysmp",
+  "primaryColor": "#3ddc84",
+  "gameTypes": ["smp", "pvp"],
+  "minecraftVersions": { "recommended": "1.21" },
+  "presence": {
+    "largeImageText": "LuckySMP"
+  }
+}

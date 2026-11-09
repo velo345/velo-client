@@ -106,6 +106,11 @@ public final class DiscordPresenceModule extends AbstractModule implements Confi
 		}
 		String server = ClientCompat.currentServerAddress();
 		if (server != null && !server.isBlank()) {
+			ServerMappingsClient.Mapping mapped = showServer ? ServerMappingsClient.get(server) : null;
+			if (mapped != null) {
+				String details = mapped.details().replace("%name%", mapped.name());
+				return new String[] {details, mapped.state() != null ? mapped.state().replace("%name%", mapped.name()) : "Multiplayer"};
+			}
 			String name = ClientCompat.currentServerName();
 			return new String[] {showServer ? "Playing on " + (name != null && !name.isBlank() ? name : server) : "Playing multiplayer", "Multiplayer"};
 		}
@@ -126,10 +131,32 @@ public final class DiscordPresenceModule extends AbstractModule implements Confi
 		timestamps.addProperty("start", since);
 		a.add("timestamps", timestamps);
 		JsonObject assets = new JsonObject();
-		assets.addProperty("large_image", "https://velo-client.com/assets/icon-512.png");
-		assets.addProperty("large_text", "Velo Client · Minecraft " + ClientCompat.minecraftVersion());
+		String server = ClientCompat.currentServerAddress();
+		ServerMappingsClient.Mapping mapped = showServer && server != null ? ServerMappingsClient.get(server) : null;
+		if (mapped != null && mapped.logo() != null) {
+			// a mapped server (github.com/velo345/server-mappings): its logo big, Velo small
+			assets.addProperty("large_image", mapped.logo());
+			assets.addProperty("large_text", clip(mapped.largeText()));
+			assets.addProperty("small_image", "https://velo-client.com/assets/icon-512.png");
+			assets.addProperty("small_text", "Velo Client · Minecraft " + ClientCompat.minecraftVersion());
+		} else {
+			assets.addProperty("large_image", "https://velo-client.com/assets/icon-512.png");
+			assets.addProperty("large_text", "Velo Client · Minecraft " + ClientCompat.minecraftVersion());
+		}
 		a.add("assets", assets);
-		if (showButton) {
+		if (mapped != null && mapped.buttons() != null && mapped.buttons().isJsonArray() && !mapped.buttons().getAsJsonArray().isEmpty()) {
+			JsonArray buttons = new JsonArray();
+			for (var b : mapped.buttons().getAsJsonArray()) {
+				if (buttons.size() < 2 && b.isJsonObject() && b.getAsJsonObject().has("label") && b.getAsJsonObject().has("url")
+						&& b.getAsJsonObject().get("url").getAsString().startsWith("https://")) {
+					JsonObject o = new JsonObject();
+					o.addProperty("label", clip(b.getAsJsonObject().get("label").getAsString()));
+					o.addProperty("url", b.getAsJsonObject().get("url").getAsString());
+					buttons.add(o);
+				}
+			}
+			a.add("buttons", buttons);
+		} else if (showButton) {
 			JsonArray buttons = new JsonArray();
 			JsonObject get = new JsonObject();
 			get.addProperty("label", "Get Velo Client");

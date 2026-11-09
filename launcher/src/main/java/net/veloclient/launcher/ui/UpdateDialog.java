@@ -166,7 +166,7 @@ public final class UpdateDialog {
 	}
 
 	/** "12.3 / 98.0 MB  ·  4.2 MB/s  ·  about 20 s left" (+ the attempt when it's a retry). */
-	static String describe(UpdateService.Transfer t) {
+	public static String describe(UpdateService.Transfer t) {
 		StringBuilder sb = new StringBuilder();
 		sb.append(String.format(java.util.Locale.ROOT, "%.1f", t.done() / 1048576.0));
 		if (t.total() > 0) {

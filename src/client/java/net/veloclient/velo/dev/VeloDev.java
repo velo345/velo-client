@@ -25,6 +25,7 @@ public final class VeloDev implements VeloAddon {
 		ModuleRegistry.register(new net.veloclient.velo.dev.storage.StorageMemoryModule());
 		ModuleRegistry.register(new net.veloclient.velo.dev.notes.NotesModule());
 		net.veloclient.velo.dev.bridge.VeloBridgeClient.init();
+		ModuleRegistry.register(new net.veloclient.velo.dev.bridge.ServerHudModule());
 		ModuleRegistry.register(new net.veloclient.velo.dev.discord.DiscordPresenceModule());
 		//? if >=26.2 {
 		/*ModuleRegistry.register(new net.veloclient.velo.dev.tweaks.ChunkAnimatorModule());

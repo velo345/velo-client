@@ -39,8 +39,43 @@ public final class VeloKeybinds {
 		ClientTickEvents.END_CLIENT_TICK.register(VeloKeybinds::onClientTick);
 	}
 
+	/**
+	 * Reported 2026-11-09 (Windows): with the menu on Tab or another key, the menu opened and closed again at once, "like
+	 * spam clicking". Holding a key makes the OS send repeats, and every repeat counted as a new press - so the menu
+	 * toggled open/closed/open while the key was down. Now it toggles only once per physical press: after a toggle the
+	 * key has to be let go first (checked on the real key state, not the binding's, which a screen may not update).
+	 */
+	private static boolean waitForRelease;
+	private static long lastToggle;
+
+	private static int menuKeyCode() {
+		//? if <26.1 {
+		return net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper.getBoundKeyOf(OPEN_MOD_MENU).getCode();
+		//?} else {
+		/*return net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper.getBoundKeyOf(OPEN_MOD_MENU).getValue();
+		*///?}
+	}
+
+	private static boolean menuKeyDown() {
+		int code = menuKeyCode();
+		// mouse buttons and unbound keys have no keyboard state: fall back to the time gate alone
+		return code >= 32 && net.veloclient.velo.client.util.Keys.isKeyDown(code);
+	}
+
 	private static void onClientTick(MinecraftClient client) {
+		if (waitForRelease && !menuKeyDown()) {
+			waitForRelease = false;
+		}
+		boolean pressed = false;
 		while (OPEN_MOD_MENU.wasPressed()) {
+			pressed = true;
+		}
+		if (!pressed || waitForRelease || System.currentTimeMillis() - lastToggle < 150) {
+			return;
+		}
+		lastToggle = System.currentTimeMillis();
+		waitForRelease = menuKeyCode() >= 32;
+		{
 			//? if <26.1 {
 			Screen current = client.currentScreen;
 			//?} else if <26.2 {
