@@ -47,7 +47,7 @@ public final class BossBarModule extends AbstractModule implements HudModule, Co
 	}
 
 	private static boolean editing() {
-		return net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen;
+		return net.veloclient.velo.client.hud.HudSample.active();
 	}
 
 	private List<Bar> bars() {

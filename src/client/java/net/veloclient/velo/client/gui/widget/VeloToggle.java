@@ -70,22 +70,18 @@ public final class VeloToggle extends ClickableWidget {
 	 * the accent gradient as it turns on, and a white knob gliding with sub-pixel precision.
 	 */
 	public static void drawSwitch(DrawContext context, float x, float y, float width, float height, float progress, float hover) {
+		// 2026-11 launcher look: a rounded-square track (#2A2324 off, accent on) and a small square knob - no glow.
 		Theme theme = ThemeManager.active();
-		float radius = height / 2f;
-		int off = VeloAnim.lerpArgb(VeloStyle.sunken(), VeloUi.withAlpha(theme.text(), 0x40), hover * 0.4f);
-		VeloDraw.fillRounded(context, x, y, width, height, radius, off);
-		VeloDraw.strokeRounded(context, x, y, width, height, radius, 1f, VeloUi.withAlpha(theme.text(), Math.round(0x22 * (1f - progress))));
-		if (progress > 0.01f) {
-			VeloDraw.fillRounded(context, x, y, width, height, radius, VeloUi.withAlpha(theme.accentStart(), Math.round(255 * progress)));
-		}
-		float inset = Math.max(1.5f, height * 0.16f);
+		float radius = Math.max(2f, height * 0.3f);
+		int off = VeloAnim.lerpArgb(0xFF2A2324, 0xFF3A3233, hover * 0.6f);
+		VeloDraw.fillRounded(context, x, y, width, height, radius, VeloAnim.lerpArgb(off, theme.accentStart() | 0xFF000000, progress));
+		float inset = Math.max(2f, height * 0.2f);
 		float knob = height - inset * 2;
 		float knobX = x + inset + (width - knob - inset * 2) * progress;
-		VeloDraw.fillRounded(context, knobX, y + inset + 0.6f, knob, knob, knob / 2f, 0x40000000);
 		// on a light accent track (Monochrome, Nord) a white knob vanishes - go dark there instead
 		int onKnob = theme.onAccent() == 0xFFFFFFFF ? 0xFFFFFFFF : 0xFF22252B;
-		int knobColor = VeloAnim.lerpArgb(VeloAnim.lerpArgb(0xFFD8D8DE, 0xFFFFFFFF, hover), onKnob, progress);
-		VeloDraw.fillRounded(context, knobX, y + inset, knob, knob, knob / 2f, knobColor);
+		int knobColor = VeloAnim.lerpArgb(VeloAnim.lerpArgb(0xFF8E8384, 0xFFB3A8A9, hover), onKnob, progress);
+		VeloDraw.fillRounded(context, knobX, y + inset, knob, knob, Math.max(1f, knob * 0.25f), knobColor);
 	}
 
 	@Override

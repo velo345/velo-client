@@ -148,7 +148,7 @@ tasks.register("bundleJavaRuntimeFallback") {
 // hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
 // below reuses the same value for the native installer's version.
 // -PlauncherVersion=1.2.4 (CI input) builds a test installer under another version, e.g. an update-test target.
-def launcherAppVersion = (project.findProperty("launcherVersion") ?: "1.3.2").toString()
+def launcherAppVersion = (project.findProperty("launcherVersion") ?: "1.4.0").toString()
 // A fixed identity for the Windows installer across every version - WiX
 // needs this (--win-upgrade-uuid below) to recognize a new installer as an
 // upgrade of whatever's already installed rather than an unrelated product,

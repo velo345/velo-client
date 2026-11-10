@@ -84,6 +84,16 @@ final class NewsRoutes {
 			JsonHttp.writeJson(e, 200, Map.of("id", id));
 		}));
 
+		// The signed-in player's own bug reports and their status (launcher: Report a problem > Your reports).
+		server.createContext("/v1/reports/mine", ex -> VeloServerApp.handle(ex, "GET", e -> {
+			SessionRegistry.Session session = registry.session(JsonHttp.bearerToken(e));
+			if (session == null) {
+				JsonHttp.writeError(e, 401, "Sign in to see your reports");
+				return;
+			}
+			JsonHttp.writeJson(e, 200, Map.of("reports", reports.mine(session.uuid())));
+		}));
+
 		admin(server, registry, store, adminToken, "/v1/admin/news/post", "POST", (e, author) ->
 				JsonHttp.writeJson(e, 200, news.savePost(JsonHttp.readBody(e, NewsService.Post.class, 1024 * 1024), author)));
 		admin(server, registry, store, adminToken, "/v1/admin/news/post/delete", "POST", (e, author) -> {

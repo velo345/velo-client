@@ -8,7 +8,6 @@ import net.veloclient.velo.module.ModuleCategory;
 import net.veloclient.velo.module.SafetyTag;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -108,6 +107,10 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 	private int breaksThisTick;
 	private final Map<String, Integer> soundsThisTick = new HashMap<>();
 	private final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<long[]> sections = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+	/** Sections currently held back (state[2] == 1), so the per-tick flush walks only these instead of every section ever
+	 * seen (that full walk was 6% of the render thread while flying around with farm mode on). May hold stale entries whose
+	 * state[2] went back to 0; they are dropped on the next flush. */
+	private final java.util.ArrayList<long[]> pending = new java.util.ArrayList<>();
 	private Object lastWorld;
 
 	public AntiFarmLagModule() {
@@ -157,6 +160,7 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 		if (world != lastWorld) {
 			lastWorld = world;
 			sections.clear();
+			pending.clear();
 			hotThisSecond.clear();
 			deferredLight.clear();
 			lightFlusher = null;
@@ -171,6 +175,7 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 		if (tick % 20 == 0) {
 			lastHot = hotThisSecond.size();
 			hotThisSecond.clear();
+			boolean travelled = travelledThisSecond();
 			boolean hot;
 			if (mode.equals("Always On")) {
 				hot = true;
@@ -181,7 +186,10 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 					default -> 5;
 				};
 				// Ignore the join/teleport burst: chunks and their light arriving dirty sections several times.
-				hot = tick - worldSince > 200 && lastHot >= needed;
+				// Also ignore seconds spent travelling (flying, elytra, minecart): new chunks arriving re-mesh their
+				// neighbours several times, which looked exactly like a redstone clock - farm mode switched on mid-flight
+				// with no farm anywhere, held real rebuilds back and walked ~20k tracked sections every tick.
+				hot = tick - worldSince > 200 && lastHot >= needed && !travelled;
 			}
 			hotSeconds = hot ? hotSeconds + 1 : 0;
 			coldSeconds = hot ? 0 : coldSeconds + 1;
@@ -194,6 +202,20 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 		if (tick % 200 == 0) {
 			sections.values().removeIf(state -> tick - state[0] > 600 && state[2] == 0);
 		}
+	}
+
+	private double[] lastSecondPos;
+
+	/** More than ~12 blocks horizontally since the last once-a-second check. */
+	private boolean travelledThisSecond() {
+		double[] pos = AntiFarmLagCompat.playerPos();
+		double[] last = lastSecondPos;
+		lastSecondPos = pos;
+		if (pos == null || last == null) {
+			return false;
+		}
+		double dx = pos[0] - last[0], dz = pos[2] - last[2];
+		return dx * dx + dz * dz > 12 * 12;
 	}
 
 	/**
@@ -239,7 +261,10 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 			releaseLight(Integer.MAX_VALUE);
 			flushDue(true);
 			sections.clear();
+			pending.clear();
 		}
+		net.veloclient.velo.VeloClient.LOGGER.info("[AntiFarmLag] farm mode {} ({} busy sections near you, {} tracked)",
+				value ? "on" : "off", lastHot, sections.size());
 		if (notify && mode.equals("Auto") && isEnabled()) {
 			NotificationOverlay.show(new NotificationOverlay.Toast(null, null, value ? "Farm mode on" : "Farm mode off",
 					value ? "Lots of redstone nearby - rendering it lighter. Farms keep running." : "Back to normal rendering.",
@@ -299,25 +324,35 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 			state[2] = 0;
 			return important ? ALLOW_ASYNC : ALLOW;
 		}
-		state[2] = 1;
+		if (state[2] == 0) {
+			state[2] = 1;
+			m.pending.add(state);
+		}
 		return DEFER;
 	}
 
 	private void flushDue(boolean all) {
 		// Sections are only ever deferred (pending) while farm mode is active, and switching it off
 		// flushes everything - so outside farm mode there's nothing to walk the whole map for.
-		if (flusher == null || sections.isEmpty() || (!active && !all)) {
+		if (flusher == null || pending.isEmpty() || (!active && !all)) {
 			return;
 		}
 		flushing = true;
 		try {
-			Iterator<long[]> it = sections.values().iterator();
-			while (it.hasNext()) {
-				long[] state = it.next();
-				if (state[2] == 1 && (all || tick - state[0] >= (long) rebuildInterval)) {
+			// swap-remove: order doesn't matter, every due section is flushed this tick
+			for (int i = pending.size() - 1; i >= 0; i--) {
+				long[] state = pending.get(i);
+				boolean drop = state[2] == 0;
+				if (!drop && (all || tick - state[0] >= (long) rebuildInterval)) {
 					state[0] = tick;
 					state[2] = 0;
+					drop = true;
 					flusher.dirty((int) state[3], (int) state[4], (int) state[5]);
+				}
+				if (drop) {
+					int last = pending.size() - 1;
+					pending.set(i, pending.get(last));
+					pending.remove(last);
 				}
 			}
 		} finally {

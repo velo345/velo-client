@@ -162,6 +162,11 @@ final class LearnedRules {
 			case "loader" -> {
 				return str(a, "value") == null ? null : new Action.SetLoader(str(a, "value"));
 			}
+			case "option" -> {
+				String v = str(a, "value");
+				int eq = v == null ? -1 : v.indexOf('=');
+				return eq <= 0 || !v.substring(0, eq).matches("[A-Za-z0-9_.]+") ? null : new Action.SetOption(v.substring(0, eq), v.substring(eq + 1));
+			}
 			case "render-distance" -> {
 				try {
 					return new Action.LowerRenderDistance(Math.max(2, Integer.parseInt(str(a, "value"))));

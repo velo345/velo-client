@@ -107,7 +107,8 @@ public final class VeloCapeTile extends ClickableWidget {
 			VeloDraw.fillRounded(context, x + (w - pw) / 2, y + 3 + (area - ph) / 2, pw, ph, 4,
 					VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x0A + 0x10 * pulse)));
 		} else {
-			VeloCapeRender.draw(context, texture, TEMPLATE_WIDTH, TEMPLATE_HEIGHT, x + w / 2f, y + 3 + area - 8,
+			int[] size = net.veloclient.velo.client.cosmetics.CapeManager.textureSize(texture);
+			VeloCapeRender.draw(context, texture, size == null ? TEMPLATE_WIDTH : size[0], size == null ? TEMPLATE_HEIGHT : size[1], x + w / 2f, y + 3 + area - 8,
 					area - 18, VeloCapeRender.idleYaw(phase, hover));
 		}
 

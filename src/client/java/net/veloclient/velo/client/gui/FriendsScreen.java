@@ -50,7 +50,10 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 	private static FriendsScreen openInstance;
 
 	/** Party first while you're in one (or have an invite), otherwise your friends' chats. */
-	private View view = SocialClient.party() != null || !SocialClient.partyInvites().isEmpty() ? View.PARTY : View.CHAT;
+	private View view = View.CHAT;
+	/** 0 = the list fills the window, 1 = a side panel (chat, party, requests...) is open next to it - eased. */
+	private float panelOpen = -1;
+	private long panelNanos;
 	private String partyMember;
 	private String selected;
 	private TextFieldWidget addField;
@@ -140,11 +143,19 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 
 	@Override
 	protected String[] headerTabs() {
-		int incoming = SocialClient.isReady() ? SocialClient.snapshot().incoming.size() : 0;
-		var party = SocialClient.party();
-		int partyInvites = SocialClient.partyInvites().size();
-		return new String[] {"Chat", party != null ? "Party (" + party.getAsJsonArray("members").size() + ")" : partyInvites > 0 ? "Party (" + partyInvites + " invite)" : "Party",
-				incoming > 0 ? "Requests (" + incoming + ")" : "Requests", "Blocked", "Popups"};
+		// 2026-11, like the launcher: one window - the list is the page, chat/party/requests open beside it
+		return new String[0];
+	}
+
+	/** A panel is wanted beside the list: a chat with someone, or party / requests / blocked / popups. */
+	private boolean panelWanted() {
+		return view != View.CHAT || SocialClient.friend(selected) != null;
+	}
+
+	private void closePanel() {
+		view = View.CHAT;
+		selected = null;
+		layoutContent();
 	}
 
 	@Override
@@ -205,18 +216,40 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 
 		int rightX = rightX();
 		int rightWidth = rightWidth();
-		chatField = new TextFieldWidget(this.textRenderer, rightX + 12, contentBottom() - 19, rightWidth - 64, 14, Text.literal("Message"));
+		chatField = new TextFieldWidget(this.textRenderer, rightX + 12, contentBottom() - 19, Math.max(10, rightWidth - 64), 14, Text.literal("Message"));
 		chatField.setDrawsBackground(false);
 		chatField.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder(VeloUi.trim(view == View.PARTY ? "Message your party..." : "Write a message...", chatField.getWidth() - 8)));
 		chatField.setMaxLength(500);
 		chatField.setText(chatFieldValue);
-		chatField.visible = view == View.CHAT && SocialClient.friend(selected) != null || view == View.PARTY && SocialClient.party() != null;
+		chatField.visible = (view == View.CHAT && SocialClient.friend(selected) != null || view == View.PARTY && SocialClient.party() != null) && rightWidth > 120;
 		addDrawableChild(chatField);
 	}
 
 	/** The friends column shrinks on small GUI sizes (Auto GUI scale on 1080p is only 480x270). */
 	private int leftWidth() {
-		return Math.max(150, Math.min(MAX_LEFT_WIDTH + 2 * CARD_PAD, (int) (contentWidth() * 0.36f)));
+		int narrow = Math.max(150, Math.min(MAX_LEFT_WIDTH + 2 * CARD_PAD, (int) (contentWidth() * 0.36f)));
+		float open = panelOpen < 0 ? (panelWanted() ? 1f : 0f) : panelOpen;
+		float eased = 1f - (1f - open) * (1f - open) * (1f - open);
+		return Math.round(contentWidth() + (narrow - contentWidth()) * eased);
+	}
+
+	/** Eases {@link #panelOpen} toward what's wanted (the list narrows smoothly when a chat opens, and back). */
+	private void stepPanel() {
+		long now = System.nanoTime();
+		float dt = panelNanos == 0 ? 0.016f : Math.min(0.05f, (now - panelNanos) / 1e9f);
+		panelNanos = now;
+		float target = panelWanted() ? 1f : 0f;
+		if (panelOpen < 0) {
+			panelOpen = target;
+		}
+		float before = panelOpen;
+		panelOpen += (target - panelOpen) * Math.min(1f, dt * 12f);
+		if (Math.abs(target - panelOpen) < 0.003f) {
+			panelOpen = target;
+		}
+		if (Math.round(before * 200) != Math.round(panelOpen * 200)) {
+			layoutContent();
+		}
 	}
 
 	private int rightX() {
@@ -232,9 +265,10 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 	@Override
 	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
 		hits.clear();
+		stepPanel();
 		if (chatField != null) {
 			chatField.visible = (view == View.CHAT && SocialClient.friend(selected) != null || view == View.PARTY && SocialClient.party() != null)
-					&& SocialClient.isReady();
+					&& SocialClient.isReady() && rightWidth() > 120;
 		}
 		if (addField != null) {
 			addField.visible = SocialClient.isReady();
@@ -244,7 +278,15 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 			return;
 		}
 		renderLeft(context, mouseX, mouseY);
-		renderRight(context, mouseX, mouseY);
+		if (rightWidth() > 60) {
+			renderRight(context, mouseX, mouseY);
+			// the panel's close cross (top right): the list takes the whole window again
+			int cx = rightX() + rightWidth() - 18;
+			int cy = contentY() + 6;
+			boolean over = VeloUi.inside(mouseX, mouseY, cx, cy, 12, 12);
+			VeloDraw.cross(context, cx + 6f, cy + 6f, 3.5f, 1.2f, over ? 0xFFFFFFFF : 0xFF8E8384);
+			hits.add(new VeloUi.Hit(cx - 2, cy - 2, 16, 16, this::closePanel));
+		}
 	}
 
 	private void renderNotConnected(DrawContext context, int mouseX, int mouseY) {
@@ -320,9 +362,47 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 			listTop += 20;
 		}
 
+		// Party: a row of its own (members or open invites), opening the party beside the list.
+		var partyNow = SocialClient.party();
+		int partyInvites = SocialClient.partyInvites().size();
+		{
+			String label = partyNow != null ? "Your party  ·  " + partyNow.getAsJsonArray("members").size()
+					: partyInvites > 0 ? partyInvites + (partyInvites == 1 ? " party invite" : " party invites") : "Start a party";
+			boolean hovered = VeloUi.inside(mouseX, mouseY, x, listTop, lw, 16);
+			boolean active = view == View.PARTY;
+			VeloDraw.fillRounded(context, x, listTop, lw, 16, 5, active ? 0xFF1C1617 : hovered ? 0x14FFFFFF : 0x0AFFFFFF);
+			VeloDraw.strokeRounded(context, x, listTop, lw, 16, 5, active ? VeloUi.withAlpha(theme.accentStart(), 0xB0) : 0x14FFFFFF);
+			net.veloclient.velo.client.gui.title.MenuKit.icon(context, "party", x + 5, listTop + 3, 10, partyInvites > 0 ? theme.accentStart() | 0xFF000000 : 0xFFB3A8A9);
+			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(label, lw - 24), x + 19, listTop + 4, 0xFFEDE6E6);
+			hits.add(new VeloUi.Hit(x, listTop, lw, 16, () -> {
+				view = View.PARTY;
+				rightScroll = 0;
+				layoutContent();
+			}));
+			listTop += 20;
+		}
+
 		// Friends list: online first, then offline, each under its own small heading.
 		listTop += 2;
-		int listBottom = contentBottom() - CARD_PAD;
+		int listBottom = contentBottom() - CARD_PAD - 16;
+		// Footer: Blocked and the popup settings open beside the list.
+		{
+			int fy = contentBottom() - CARD_PAD - 11;
+			int fx = x + 2;
+			for (Object[] link : new Object[][] {{"Blocked (" + state.blocked.size() + ")", View.BLOCKED}, {"Popups", View.NOTIFICATIONS}}) {
+				String label = (String) link[0];
+				int w = this.textRenderer.getWidth(label);
+				boolean over = VeloUi.inside(mouseX, mouseY, fx, fy - 2, w, 12);
+				context.drawTextWithShadow(this.textRenderer, label, fx, fy, view == link[1] ? 0xFFFFFFFF : over ? 0xFFEDE6E6 : 0xFF8E8384);
+				View target = (View) link[1];
+				hits.add(new VeloUi.Hit(fx, fy - 2, w, 12, () -> {
+					view = target;
+					rightScroll = 0;
+					layoutContent();
+				}));
+				fx += w + 14;
+			}
+		}
 		if (listBottom - listTop < 12) {
 			return;
 		}

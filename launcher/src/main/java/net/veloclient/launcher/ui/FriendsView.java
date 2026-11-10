@@ -54,6 +54,12 @@ public final class FriendsView {
 
 	private enum Mode { CHAT, REQUESTS, BLOCKED }
 
+	/** The chat drawer is open (a friend's message button or row was clicked). */
+	private boolean chatOpen;
+	private static boolean blockedOpen;
+	private boolean drawerAnimated;
+	private static final double CHAT_W = 400;
+
 	private final Host host;
 	private final StackPane root = new StackPane();
 	private Mode mode = Mode.CHAT;
@@ -113,37 +119,219 @@ public final class FriendsView {
 		Label sub = new Label(onlineCount + " online  ·  " + state.friends.size() + (state.friends.size() == 1 ? " friend" : " friends")
 				+ (state.incoming.isEmpty() ? "" : "  ·  " + state.incoming.size() + (state.incoming.size() == 1 ? " request" : " requests")));
 		sub.getStyleClass().add("t-muted");
-		HBox titleRow = new HBox(14, heading, sub);
-		titleRow.setAlignment(Pos.BASELINE_LEFT);
+		Region titleSpacer = new Region();
+		HBox.setHgrow(titleSpacer, Priority.ALWAYS);
+		heading.setMinWidth(Region.USE_PREF_SIZE);
+		sub.setMinWidth(0);
+		titleSpacer.setMinWidth(8);
+		HBox titleRow = new HBox(14, heading, titleSpacer, meAndAdd(state));
+		titleRow.setAlignment(Pos.CENTER_LEFT);
 
-		HBox body = new HBox(16, buildLeft(state), buildRight(state));
-		VBox.setVgrow(body, Priority.ALWAYS);
-		VBox wrapper = new VBox(16, titleRow, body);
-		root.getChildren().setAll(wrapper);
+		// 2026-11: the list is the page; a chat slides in over its right side when you open one (no fixed middle card).
+		Node list = buildLeft(state);
+		VBox.setVgrow(list, Priority.ALWAYS);
+		VBox wrapper = new VBox(16, titleRow, list);
+		wrapper.setMinWidth(0);
+		if (chatOpen && selected != null && LauncherSocial.friend(selected) != null) {
+			// 2026-11: the list gets narrower (animated) and the chat sits next to it - everything stays clickable,
+			// nothing slides over the rows any more.
+			HBox split = new HBox(16, wrapper, chatDrawer(state));
+			HBox.setHgrow(wrapper, Priority.ALWAYS);
+			split.setFillHeight(true);
+			root.getChildren().setAll(split);
+		} else {
+			root.getChildren().setAll(wrapper);
+		}
 	}
 
 	// ---- Left: me, add, list ----
 
 	private Node buildLeft(LauncherSocial.State state) {
 		LauncherTheme theme = host.theme();
+		// 2026-11: the list is the main column (grouped panels); the chat sits beside it.
 		VBox left = new VBox(12);
-		left.setPrefWidth(310);
-		left.setMinWidth(290);
-		left.getStyleClass().add("card");
-		left.setPadding(new Insets(16));
+		left.setMaxWidth(Double.MAX_VALUE);
 
-		// Me.
+		if (!state.incoming.isEmpty() || !state.outgoing.isEmpty()) {
+			left.getChildren().add(requestsPanel(state));
+		}
+
+		if (!feedback.isEmpty()) {
+			Label info = new Label(feedback);
+			info.setWrapText(true);
+			info.setTextFill(feedbackError ? Color.web("#ff7070") : Color.web("#6fe39a"));
+			info.setFont(Font.font(12));
+			left.getChildren().add(info);
+		}
+
+		VBox list = new VBox(2);
+		if (state.friends.isEmpty()) {
+			Label empty = new Label("No friends yet. Add one above - they get the request in the launcher or in game.");
+			empty.setWrapText(true);
+			empty.getStyleClass().add("t-muted");
+			list.getChildren().add(empty);
+		}
+		// Online first, then offline - each under its own small header.
+		List<LauncherSocial.Friend> onlineFriends = state.friends.stream().filter(f -> f.online).toList();
+		List<LauncherSocial.Friend> offlineFriends = state.friends.stream().filter(f -> !f.online).toList();
+		for (Object[] group : new Object[][] {{"ONLINE", onlineFriends}, {"OFFLINE", offlineFriends}}) {
+			@SuppressWarnings("unchecked")
+			List<LauncherSocial.Friend> friends = (List<LauncherSocial.Friend>) group[1];
+			if (friends.isEmpty()) {
+				continue;
+			}
+			// 2026-11: each group is its own panel - a header strip, then rows split by hairlines.
+			Region square = new Region();
+			square.getStyleClass().add("status-square");
+			if (group[0].equals("OFFLINE")) {
+				square.getStyleClass().add("status-square-off");
+			}
+			Label groupTitle = new Label((String) group[0]);
+			groupTitle.getStyleClass().add("friend-group-title");
+			Label groupCount = new Label(String.valueOf(friends.size()));
+			groupCount.getStyleClass().add("friend-group-count");
+			HBox groupHeader = new HBox(9, square, groupTitle, groupCount);
+			groupHeader.setAlignment(Pos.CENTER_LEFT);
+			groupHeader.getStyleClass().add("friend-group-header");
+			VBox groupBox = new VBox(groupHeader);
+			groupBox.getStyleClass().add("friend-group");
+			for (int i = 0; i < friends.size(); i++) {
+				Node row = friendRow(friends.get(i));
+				if (i < friends.size() - 1) {
+					row.getStyleClass().add("friend-row-split");
+				}
+				groupBox.getChildren().add(row);
+			}
+			VBox.setMargin(groupBox, new Insets(list.getChildren().isEmpty() ? 0 : 12, 0, 0, 0));
+			list.getChildren().add(groupBox);
+		}
+		list.getChildren().add(blockedGroup(state, !list.getChildren().isEmpty()));
+		ScrollPane scroll = new ScrollPane(list);
+		scroll.setFitToWidth(true);
+		scroll.getStyleClass().add("scroll-pane");
+		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		VBox.setVgrow(scroll, Priority.ALWAYS);
+		left.getChildren().add(scroll);
+		return left;
+	}
+
+	/** "Blocked" as a group you can fold open at the end of the list (it used to be a tab next to the chat). */
+	private Node blockedGroup(LauncherSocial.State state, boolean spaced) {
+		Region square = new Region();
+		square.getStyleClass().addAll("status-square", "status-square-off");
+		Label title = new Label("BLOCKED");
+		title.getStyleClass().add("friend-group-title");
+		Label count = new Label(String.valueOf(state.blocked.size()));
+		count.getStyleClass().add("friend-group-count");
+		Region push = new Region();
+		HBox.setHgrow(push, Priority.ALWAYS);
+		Node chevron = Icons.icon(blockedOpen ? "chevron-up" : "chevron-down", 14, Color.web("#8A8486"), 2.2);
+		HBox header = new HBox(9, square, title, count, push, chevron);
+		header.setAlignment(Pos.CENTER_LEFT);
+		header.getStyleClass().add("friend-group-header");
+		header.setStyle(blockedOpen ? "" : "-fx-background-radius: 12; -fx-border-width: 0;");
+		header.setCursor(javafx.scene.Cursor.HAND);
+		header.setOnMouseClicked(e -> {
+			blockedOpen = !blockedOpen;
+			rebuild();
+		});
+		VBox group = new VBox(header);
+		group.getStyleClass().add("friend-group");
+		if (blockedOpen) {
+			if (state.blocked.isEmpty()) {
+				Label none = new Label("You haven't blocked anyone. Blocked players can't message you or send requests - they're never told.");
+				none.getStyleClass().add("t-muted");
+				none.setWrapText(true);
+				none.setPadding(new Insets(12, 14, 12, 14));
+				group.getChildren().add(none);
+			}
+			for (int i = 0; i < state.blocked.size(); i++) {
+				LauncherSocial.PlayerRef ref = state.blocked.get(i);
+				Label name = new Label(ref.username);
+				name.getStyleClass().add("t-strong");
+				name.setOpacity(0.75);
+				HBox.setHgrow(name, Priority.ALWAYS);
+				name.setMaxWidth(Double.MAX_VALUE);
+				Button unblock = new Button("Unblock");
+				unblock.getStyleClass().addAll("ghost-button", "button-sm");
+				unblock.setMinWidth(Region.USE_PREF_SIZE);
+				unblock.setOnAction(e -> act(LauncherSocial.unblock(ref.uuid), "Unblocked " + ref.username));
+				HBox row = new HBox(12, head(ref.uuid, ref.username, 30), name, unblock);
+				row.setAlignment(Pos.CENTER_LEFT);
+				row.getStyleClass().add("friend-row");
+				if (i < state.blocked.size() - 1) {
+					row.getStyleClass().add("friend-row-split");
+				}
+				group.getChildren().add(row);
+			}
+		}
+		if (spaced) {
+			VBox.setMargin(group, new Insets(12, 0, 0, 0));
+		}
+		return group;
+	}
+
+	/** The chat with the selected friend as a panel that slides in over the right side; Esc or x closes it. */
+	private Node chatDrawer(LauncherSocial.State state) {
+		Button close = new Button();
+		close.setGraphic(Icons.icon("close", 14, Color.web("#F4EFEE"), 2.2));
+		close.getStyleClass().addAll("icon-button", "icon-button-flat");
+		close.setTooltip(new Tooltip("Close the chat"));
+		Node chat = buildChat(state);
+		VBox.setVgrow(chat, Priority.ALWAYS);
+		HBox top = new HBox(close);
+		top.setAlignment(Pos.CENTER_RIGHT);
+		VBox drawer = new VBox(4, top, chat);
+		drawer.getStyleClass().add("chat-drawer");
+		drawer.setMinWidth(0);
+		drawer.setMaxWidth(CHAT_W);
+		drawer.setPrefWidth(CHAT_W);
+		javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
+		clip.widthProperty().bind(drawer.widthProperty());
+		clip.heightProperty().bind(drawer.heightProperty());
+		drawer.setClip(clip);
+		Runnable closeChat = () -> {
+			// the chat folds away and the list grows back, then the page rebuilds without it
+			javafx.animation.Timeline out = new javafx.animation.Timeline(
+					new javafx.animation.KeyFrame(javafx.util.Duration.millis(240),
+							new javafx.animation.KeyValue(drawer.prefWidthProperty(), 0.0, UiMotion.EASE_OUT),
+							new javafx.animation.KeyValue(drawer.opacityProperty(), 0.0)));
+			out.setOnFinished(ev -> {
+				chatOpen = false;
+				rebuild();
+			});
+			out.play();
+		};
+		close.setOnAction(e -> closeChat.run());
+		drawer.setOnKeyPressed(e -> {
+			if (e.getCode() == javafx.scene.input.KeyCode.ESCAPE) {
+				closeChat.run();
+			}
+		});
+		if (!drawerAnimated) {
+			drawerAnimated = true;
+			drawer.setPrefWidth(0);
+			drawer.setOpacity(0);
+			new javafx.animation.Timeline(new javafx.animation.KeyFrame(javafx.util.Duration.millis(300),
+					new javafx.animation.KeyValue(drawer.prefWidthProperty(), CHAT_W, UiMotion.EASE_OUT),
+					new javafx.animation.KeyValue(drawer.opacityProperty(), 1.0))).play();
+		}
+		return drawer;
+	}
+
+	/** Top right of the page: you (online / hidden, with the switch) and "add a friend by name". */
+	private Node meAndAdd(LauncherSocial.State state) {
 		boolean invisible = state.me != null && state.me.invisible;
-		HBox me = new HBox(10);
-		me.setAlignment(Pos.CENTER_LEFT);
-		Node myHead = head(state.me != null ? state.me.uuid : null, state.me != null ? state.me.username : "?", 34);
-		Label myName = new Label(state.me != null ? state.me.username : "You");
-		myName.getStyleClass().add("t-strong");
-		Label myStatus = new Label(invisible ? "Appearing offline" : "Online");
+		Label myStatus = new Label(invisible ? "You appear offline" : "You're online");
 		myStatus.getStyleClass().add("t-muted");
-		myStatus.setGraphic(dot(invisible ? Color.web("#7a7a80") : Color.web("#43d17a")));
-		VBox meText = new VBox(2, myName, myStatus);
-		HBox.setHgrow(meText, Priority.ALWAYS);
+		myStatus.setMinWidth(Region.USE_PREF_SIZE);
+		Region myDot = new Region();
+		myDot.getStyleClass().add("status-square");
+		if (invisible) {
+			myDot.getStyleClass().add("status-square-off");
+		}
+		myStatus.setGraphic(myDot);
+		myStatus.setGraphicTextGap(8);
 		Button visibility = new Button(invisible ? "Go online" : "Hide me", Icons.icon(invisible ? "eye" : "lock", 13, Color.web("#E4E4E8")));
 		visibility.getStyleClass().addAll("ghost-button", "button-sm");
 		visibility.setMinWidth(Region.USE_PREF_SIZE);
@@ -151,8 +339,6 @@ public final class FriendsView {
 				: "Appear offline to all friends - stays that way until you switch back, also in game"));
 		visibility.setOnAction(e -> act(LauncherSocial.setInvisible(!invisible),
 				invisible ? "Friends can see you again" : "You now appear offline"));
-		me.getChildren().addAll(myHead, meText, visibility);
-
 		// Add friend.
 		TextField add = new TextField(addDraft);
 		add.setId("add-friend");
@@ -185,49 +371,76 @@ public final class FriendsView {
 		addButton.setOnAction(e -> submit.run());
 		add.setOnAction(e -> submit.run());
 		HBox addRow = new HBox(8, add, addButton);
-		Region meLine = new Region();
-		meLine.getStyleClass().add("hairline-h");
-		left.getChildren().addAll(me, meLine, addRow);
+		add.setPrefWidth(220);
+		add.setMinWidth(140);
+		HBox.setHgrow(add, Priority.NEVER);
+		HBox mine = new HBox(8, myStatus, visibility);
+		mine.setAlignment(Pos.CENTER_LEFT);
+		HBox box = new HBox(14, mine, addRow);
+		box.setAlignment(Pos.CENTER_LEFT);
+		return box;
+	}
 
-		if (!feedback.isEmpty()) {
-			Label info = new Label(feedback);
-			info.setWrapText(true);
-			info.setTextFill(feedbackError ? Color.web("#ff7070") : Color.web("#6fe39a"));
-			info.setFont(Font.font(12));
-			left.getChildren().add(info);
-		}
-
-		VBox list = new VBox(2);
-		if (state.friends.isEmpty()) {
-			Label empty = new Label("No friends yet. Add one above - they get the request in the launcher or in game.");
-			empty.setWrapText(true);
-			empty.getStyleClass().add("t-muted");
-			list.getChildren().add(empty);
-		}
-		// Online first, then offline - each under its own small header.
-		List<LauncherSocial.Friend> onlineFriends = state.friends.stream().filter(f -> f.online).toList();
-		List<LauncherSocial.Friend> offlineFriends = state.friends.stream().filter(f -> !f.online).toList();
-		for (Object[] group : new Object[][] {{"ONLINE", onlineFriends}, {"OFFLINE", offlineFriends}}) {
-			@SuppressWarnings("unchecked")
-			List<LauncherSocial.Friend> friends = (List<LauncherSocial.Friend>) group[1];
-			if (friends.isEmpty()) {
-				continue;
+	/** Friend requests as their own panel on top of the list (Accept / Decline right there). */
+	private Node requestsPanel(LauncherSocial.State state) {
+		Region square = new Region();
+		square.getStyleClass().addAll("status-square", "status-square-request");
+		Label title = new Label("REQUESTS");
+		title.getStyleClass().add("friend-group-title");
+		Label count = new Label(state.incoming.size() + (state.outgoing.isEmpty() ? "" : "  ·  " + state.outgoing.size() + " sent"));
+		count.getStyleClass().add("friend-group-count");
+		HBox header = new HBox(9, square, title, count);
+		header.setAlignment(Pos.CENTER_LEFT);
+		header.getStyleClass().add("friend-group-header");
+		VBox panel = new VBox(header);
+		panel.getStyleClass().add("friend-group");
+		for (int i = 0; i < state.incoming.size(); i++) {
+			LauncherSocial.Request request = state.incoming.get(i);
+			Label name = new Label(request.username);
+			name.getStyleClass().add("t-strong");
+			Label when = new Label("Wants to be friends  ·  " + ago(request.time));
+			when.getStyleClass().add("t-muted");
+			when.setStyle("-fx-font-size: 12px;");
+			VBox text = new VBox(2, name, when);
+			HBox.setHgrow(text, Priority.ALWAYS);
+			Button deny = new Button("Decline");
+			deny.getStyleClass().addAll("ghost-button", "button-sm");
+			deny.setMinWidth(Region.USE_PREF_SIZE);
+			deny.setOnAction(e -> act(LauncherSocial.respond(request.uuid, false), "Declined " + request.username));
+			Button accept = new Button("Accept");
+			accept.getStyleClass().addAll("primary-button", "button-sm");
+			accept.setMinWidth(Region.USE_PREF_SIZE);
+			accept.setOnAction(e -> act(LauncherSocial.respond(request.uuid, true), "You're now friends with " + request.username));
+			HBox row = new HBox(12, head(request.uuid, request.username, 34), text, deny, accept);
+			row.setAlignment(Pos.CENTER_LEFT);
+			row.getStyleClass().add("friend-row");
+			if (i < state.incoming.size() - 1 || !state.outgoing.isEmpty()) {
+				row.getStyleClass().add("friend-row-split");
 			}
-			Label groupHeader = new Label(group[0] + "  " + friends.size());
-			groupHeader.getStyleClass().add("field-label");
-			groupHeader.setPadding(new Insets(list.getChildren().isEmpty() ? 4 : 14, 0, 6, 4));
-			list.getChildren().add(groupHeader);
-			for (LauncherSocial.Friend friend : friends) {
-				list.getChildren().add(friendRow(friend));
-			}
+			panel.getChildren().add(row);
 		}
-		ScrollPane scroll = new ScrollPane(list);
-		scroll.setFitToWidth(true);
-		scroll.getStyleClass().add("scroll-pane");
-		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-		VBox.setVgrow(scroll, Priority.ALWAYS);
-		left.getChildren().add(scroll);
-		return left;
+		for (int i = 0; i < state.outgoing.size(); i++) {
+			LauncherSocial.Request request = state.outgoing.get(i);
+			Label name = new Label(request.username);
+			name.getStyleClass().add("t-strong");
+			Label when = new Label("Waiting for them  ·  sent " + ago(request.time));
+			when.getStyleClass().add("t-muted");
+			when.setStyle("-fx-font-size: 12px;");
+			VBox text = new VBox(2, name, when);
+			HBox.setHgrow(text, Priority.ALWAYS);
+			Button cancel = new Button("Cancel");
+			cancel.getStyleClass().addAll("ghost-button", "button-sm");
+			cancel.setMinWidth(Region.USE_PREF_SIZE);
+			cancel.setOnAction(e -> act(LauncherSocial.cancelRequest(request.uuid), "Cancelled request to " + request.username));
+			HBox row = new HBox(12, head(request.uuid, request.username, 34), text, cancel);
+			row.setAlignment(Pos.CENTER_LEFT);
+			row.getStyleClass().add("friend-row");
+			if (i < state.outgoing.size() - 1) {
+				row.getStyleClass().add("friend-row-split");
+			}
+			panel.getChildren().add(row);
+		}
+		return panel;
 	}
 
 	private Node friendRow(LauncherSocial.Friend friend) {
@@ -239,8 +452,10 @@ public final class FriendsView {
 		}
 		row.setAlignment(Pos.CENTER_LEFT);
 		StackPane headWithDot = new StackPane(head(friend.uuid, friend.username, 34));
-		Circle dot = new Circle(4.5, statusColor(friend));
-		dot.setStyle("-fx-stroke: -velo-surface;");
+		javafx.scene.shape.Rectangle dot = new javafx.scene.shape.Rectangle(10, 10, statusColor(friend));
+		dot.setArcWidth(4);
+		dot.setArcHeight(4);
+		dot.setStyle("-fx-stroke: #121010;");
 		dot.setStrokeWidth(2);
 		StackPane.setAlignment(dot, Pos.BOTTOM_RIGHT);
 		headWithDot.getChildren().add(dot);
@@ -271,6 +486,33 @@ public final class FriendsView {
 			});
 			row.getChildren().add(invite);
 		}
+		String joinable = friend.online && friend.activity != null && "server".equals(friend.activity.kind)
+				&& friend.activity.detail != null && !friend.activity.detail.isBlank() ? friend.activity.detail : null;
+		if (joinable != null) {
+			Button join = new Button("Join");
+			join.getStyleClass().addAll("ghost-button", "button-sm");
+			join.setMinWidth(Region.USE_PREF_SIZE);
+			join.setTooltip(new Tooltip("Launch your last profile straight into " + joinable));
+			ProgressBar joinProgress = new ProgressBar(0);
+			Label joinStatus = new Label();
+			join.setOnAction(e -> {
+				e.consume();
+				host.joinServer(joinable, join, joinProgress, joinStatus);
+			});
+			row.getChildren().add(join);
+		}
+		Button message = new Button();
+		message.setGraphic(Icons.icon("message", 15, Color.web("#C9C2C3")));
+		message.getStyleClass().addAll("icon-button", "icon-button-flat");
+		message.setTooltip(new Tooltip("Message " + friend.username));
+		message.setOnAction(e -> {
+			e.consume();
+			mode = Mode.CHAT;
+			chatOpen = true;
+			drawerAnimated = false;
+			select(friend.uuid);
+		});
+		row.getChildren().add(message);
 		if (friend.unread > 0) {
 			Label badge = new Label(friend.unread > 99 ? "99+" : String.valueOf(friend.unread));
 			badge.getStyleClass().add("unread-badge");
@@ -278,6 +520,8 @@ public final class FriendsView {
 		}
 		row.setOnMouseClicked(e -> {
 			mode = Mode.CHAT;
+			chatOpen = true;
+			drawerAnimated = false;
 			select(friend.uuid);
 		});
 		return row;
@@ -363,7 +607,7 @@ public final class FriendsView {
 		HBox header = new HBox(10);
 		header.setAlignment(Pos.CENTER_LEFT);
 		Label name = new Label(friend.username);
-		name.setFont(Font.font("Inter", FontWeight.BOLD, 16));
+		name.setFont(Font.font("Geist", FontWeight.BOLD, 16));
 		name.setTextFill(text(theme));
 		Label where = new Label(describe(friend));
 		where.getStyleClass().add("friend-status");
@@ -397,8 +641,21 @@ public final class FriendsView {
 		Button reportButton = new Button("Report");
 		reportButton.getStyleClass().addAll("danger-ghost-button", "button-compact");
 		reportButton.setOnAction(e -> ReportDialog.show(reportButton.getScene().getWindow(), friend.uuid, friend.username, "dm"));
-		header.getChildren().addAll(unfriend, block, reportButton);
-		chat.getChildren().addAll(header, progress, launchStatus);
+		// The actions get their own row under the name, at full size (in the header they were squeezed to "Joi...").
+		javafx.scene.layout.FlowPane actions = new javafx.scene.layout.FlowPane(8, 8);
+		for (Node n : List.copyOf(header.getChildren())) {
+			if (n instanceof Button b) {
+				header.getChildren().remove(b);
+				b.setMinWidth(Region.USE_PREF_SIZE);
+				actions.getChildren().add(b);
+			}
+		}
+		for (Button b : new Button[] {unfriend, block, reportButton}) {
+			b.setMinWidth(Region.USE_PREF_SIZE);
+			actions.getChildren().add(b);
+		}
+		who.setMinWidth(0);
+		chat.getChildren().addAll(header, actions, progress, launchStatus);
 
 		// Messages.
 		VBox messages = new VBox(6);
@@ -480,7 +737,7 @@ public final class FriendsView {
 		LauncherTheme theme = host.theme();
 		var waypoint = message.waypoint;
 		Label title = new Label(String.valueOf(waypoint.get("name")));
-		title.setFont(Font.font("Inter", FontWeight.BOLD, 13));
+		title.setFont(Font.font("Geist", FontWeight.BOLD, 13));
 		Object color = waypoint.get("color");
 		title.setTextFill(color instanceof Number n ? Color.rgb((n.intValue() >> 16) & 0xFF, (n.intValue() >> 8) & 0xFF, n.intValue() & 0xFF) : text(theme));
 		Label coords = new Label(String.format(Locale.ROOT, "%d, %d, %d  -  %s", num(waypoint.get("x")), num(waypoint.get("y")),
@@ -610,7 +867,7 @@ public final class FriendsView {
 		holder.setMaxSize(size, size);
 		Label initial = new Label(name == null || name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT));
 		initial.setTextFill(Color.WHITE);
-		initial.setFont(Font.font("Inter", FontWeight.BOLD, size * 0.45));
+		initial.setFont(Font.font("Geist", FontWeight.BOLD, size * 0.45));
 		holder.setStyle("-fx-background-color: rgba(255,255,255,0.12); -fx-background-radius: " + (size / 5) + ";");
 		holder.getChildren().add(initial);
 		if (uuid != null) {

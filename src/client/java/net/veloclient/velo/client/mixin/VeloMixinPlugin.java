@@ -21,7 +21,8 @@ import java.util.Set;
 public final class VeloMixinPlugin implements IMixinConfigPlugin {
 
 	private static final Set<String> ONLY_26_2 = Set.of("VulkanBarrierProbeMixin", "VulkanPassBarrierMixin", "VulkanSurfaceProfileMixin",
-			"VulkanThreadedSubmitMixin", "VulkanThreadedQueueMixin", "VulkanThreadedSubmissionMixin", "VulkanThreadedSurfaceMixin", "VulkanThreadedFrameMixin", "VulkanOutlineSkipMixin", "VulkanGuiDrawProfileMixin", "TurboSkyDeferMixin", "TurboSkyPipelineMixin");
+			"VulkanThreadedSubmitMixin", "VulkanThreadedQueueMixin", "VulkanThreadedSubmissionMixin", "VulkanThreadedSurfaceMixin", "VulkanThreadedFrameMixin", "VulkanOutlineSkipMixin", "VulkanGuiDrawProfileMixin", "TurboSkyDeferMixin", "TurboSkyPipelineMixin",
+			"TurboGlyphBulkMixin", "TurboGlyphFormatAccessor", "TurboGlyphInfoAccessor");
 	/** Patch vanilla's own terrain path, which Sodium replaces wholesale. */
 	private static final Set<String> VANILLA_TERRAIN = Set.of("ChunkSlicePrepMixin", "SectionMeshSlotsMixin", "UberBufferSlotsMixin");
 

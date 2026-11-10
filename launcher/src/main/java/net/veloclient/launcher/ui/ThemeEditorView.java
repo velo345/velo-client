@@ -114,7 +114,7 @@ public final class ThemeEditorView {
 		HBox palette = new HBox(bg, accent);
 		Label name = new Label(t.name());
 		name.getStyleClass().add("t-strong");
-		name.setStyle("-fx-font-family: '" + (active ? "Inter SemiBold" : "Inter Medium") + "';");
+		name.setStyle("-fx-font-family: '" + (active ? "Geist SemiBold" : "Geist Medium") + "';");
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		HBox row = new HBox(8, palette, name, spacer);
@@ -356,7 +356,7 @@ public final class ThemeEditorView {
 		Label over = new Label("CONTINUE PLAYING");
 		over.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 9px; -fx-font-weight: bold;");
 		Label name = new Label("AsteriaSMP");
-		name.setStyle("-fx-text-fill: " + text + "; -fx-font-family: 'Sora'; -fx-font-weight: bold; -fx-font-size: 22px;");
+		name.setStyle("-fx-text-fill: " + text + "; -fx-font-family: 'Archivo SemiExpanded'; -fx-font-weight: bold; -fx-font-size: 22px;");
 		VBox heroText = new VBox(4, over, name);
 		heroText.setAlignment(Pos.BOTTOM_LEFT);
 		heroText.setPadding(new Insets(14));
@@ -380,7 +380,7 @@ public final class ThemeEditorView {
 		VBox.setVgrow(main, Priority.ALWAYS);
 		Label play = new Label("PLAY");
 		play.setStyle("-fx-background-color: " + accent + "; -fx-text-fill: " + onAccent + "; -fx-background-radius: " + radius
-				+ "; -fx-padding: 9 28 9 28; -fx-font-family: 'Sora'; -fx-font-weight: bold; -fx-font-size: 12px;");
+				+ "; -fx-padding: 9 28 9 28; -fx-font-family: 'Archivo SemiExpanded'; -fx-font-weight: bold; -fx-font-size: 12px;");
 		Label profile = new Label("AsteriaSMP");
 		profile.setStyle("-fx-text-fill: " + text + "; -fx-font-size: 12px; -fx-font-weight: bold;");
 		Region spacer = new Region();

@@ -63,7 +63,7 @@ final class ReportService {
 	 * short readable name for it.
 	 */
 	record Summary(String id, long createdAt, String kind, String source, String username, String title, String message, String status,
-			String version, String minecraft, String group, String groupLabel, boolean auto) {
+			String version, String minecraft, String group, String groupLabel, boolean auto, String uuid) {
 	}
 
 	private final Path dir;
@@ -129,6 +129,17 @@ final class ReportService {
 		return json == null || json.toString().length() > 200_000 ? null : json;
 	}
 
+	/** A player's own reports, newest first (title, status, when) - for "Your reports" in the launcher. */
+	List<Map<String, Object>> mine(String uuid) {
+		String key = uuid == null ? "" : uuid.replace("-", "").toLowerCase(java.util.Locale.ROOT);
+		return index.values().stream()
+				.filter(s -> !s.auto() && s.uuid() != null && s.uuid().replace("-", "").toLowerCase(java.util.Locale.ROOT).equals(key))
+				.sorted(Comparator.comparingLong(s -> -s.createdAt())).limit(20)
+				.map(s -> Map.<String, Object>of("id", s.id(), "createdAt", s.createdAt(), "kind", s.kind() == null ? "bug" : s.kind(),
+						"title", s.title() == null ? "" : s.title(), "status", s.status() == null ? "new" : s.status()))
+				.toList();
+	}
+
 	List<Summary> list() {
 		return index.values().stream().sorted(Comparator.comparingLong(s -> -s.createdAt())).toList();
 	}
@@ -186,7 +197,7 @@ final class ReportService {
 		String message = r.message == null ? "" : r.message.length() > 160 ? r.message.substring(0, 160) + "..." : r.message;
 		String[] signature = signature(r);
 		return new Summary(r.id, r.createdAt, r.kind, r.source, r.username, r.title, message, r.status, version, minecraft,
-				signature[0], signature[1], r.auto);
+				signature[0], signature[1], r.auto, r.uuid);
 	}
 
 	private static final java.util.regex.Pattern EXCEPTION = java.util.regex.Pattern.compile(

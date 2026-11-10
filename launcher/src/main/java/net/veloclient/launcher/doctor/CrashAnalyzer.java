@@ -101,6 +101,7 @@ final class CrashAnalyzer {
 		nativeCrash(s, text, issues);
 		gameFiles(s, text, issues);
 		looseLibraries(s, text, issues);
+		windowsAndOptions(s, text, issues);
 
 		if (text.contains("Could not reserve enough space for") || text.contains("Invalid maximum heap size")
 				|| text.contains("Invalid initial heap size") || text.contains("The specified size exceeds the maximum representable size")) {
@@ -421,7 +422,17 @@ final class CrashAnalyzer {
 			ModScanner.ModInfo a = s.enabledById(aId);
 			ModScanner.ModInfo b = s.enabledById(bId);
 			List<Fix> fixes = new ArrayList<>();
-			// First offer to turn off the one fewer other mods need (Sodium next to VulkanMod + its add-ons, say).
+			// A's newest build added the "breaks" (Sodium 0.9.3-beta.4 vs Iris 1.11.7 on 26.3, four reports 2026-11-09)
+			// and there's nothing newer of B: step A back one version and keep both. Tried again after a crash, it steps
+			// further back, since the Doctor remembers which fix didn't help.
+			if (a != null && a.version() != null && !isVelo(a) && text.contains("Replace mod '" + clash.group(1) + "' (" + aId + ")")) {
+				fixes.add(new Fix("Use the previous " + a.displayName(), "Goes back from " + a.version() + " to the version before it, which works with "
+						+ clash.group(4), List.of(new Action.Update(a.file(), a.displayName(), aId, false, "<" + a.version()))));
+			}
+			if (b != null && !isVelo(b)) {
+				fixes.add(update(b, false));
+			}
+			// Then offer to turn off the one fewer other mods need (Sodium next to VulkanMod + its add-ons, say).
 			boolean aFirst = a != null && b != null && dependents(s, aId) < dependents(s, bId);
 			if (aFirst) {
 				fixes.add(off(a));
@@ -436,6 +447,41 @@ final class CrashAnalyzer {
 			}
 			issues.add(new Issue("breaks:" + aId + ":" + bId, Severity.CRASH, clash.group(1) + " doesn't work with " + clash.group(4),
 					"Fabric won't start with both installed. Keep one.", fixes, List.of()));
+		}
+	}
+
+	/**
+	 * Crashes that come from Windows or a game option rather than a mod (all from player reports, 2026-11-10):
+	 * the Windows narrator dying inside its speech call, Smart App Control refusing Minecraft's sound library, and a
+	 * resource pack whose core shaders no longer build on Vulkan.
+	 */
+	private static void windowsAndOptions(Snapshot s, String text, List<Issue> issues) {
+		// Narrator on + a broken Windows speech voice: JNA "Invalid memory access" from NarratorWindows.say. Off stops it.
+		if (text.contains("NarratorWindows") && text.contains("Invalid memory access")) {
+			issues.add(new Issue("narrator-crash", Severity.CRASH, "The Windows narrator crashed the game",
+					"Minecraft's narrator was reading something aloud and the Windows speech voice crashed. Turning the narrator off stops it"
+							+ " (Ctrl+B turns it back on in game).",
+					List.of(new Fix("Turn the narrator off", "Sets Narrator to Off in this profile's options", List.of(new Action.SetOption("narrator", "0")))),
+					List.of()));
+		}
+		// error code 4551 = ERROR_SYSTEM_INTEGRITY_POLICY: Smart App Control / App Control for Business blocked the DLL.
+		if (text.contains("error code = 4551") || text.contains("error code 4551")) {
+			Matcher dll = Pattern.compile("Failed to load library: .*?([\\w\\-.]+\\.dll)").matcher(text);
+			String name = dll.find() ? dll.group(1) : "a game library";
+			issues.add(new Issue("app-control-blocked", Severity.CRASH, "Windows blocked " + name,
+					"Windows Smart App Control (or your organisation's App Control policy) stopped Minecraft from loading " + name
+							+ ". Open Windows Security > App & browser control > Smart App Control and turn it off, or ask your admin"
+							+ " to allow the VeloClient folder. Then start again.",
+					List.of(), List.of()));
+		}
+		// Vulkan won't take a pipeline whose shaders don't build - nearly always a resource pack with old core shaders.
+		if (text.contains("Pipeline is not valid (may contain invalid shaders?)") || text.contains("Couldn't compile pipeline")) {
+			List<Fix> fixes = new ArrayList<>();
+			fixes.add(new Fix("Use OpenGL", "Older packs' shaders still build on OpenGL", List.of(new Action.SetGraphicsApi(GraphicsApi.OPENGL))));
+			issues.add(new Issue("invalid-pipeline", Severity.CRASH, "A shader didn't build on Vulkan",
+					"Usually a resource pack that brings its own core shaders made for an older Minecraft. Turn packs off one by one"
+							+ " (start with ones that change the look of the world, glass or the sky), or switch to OpenGL.",
+					fixes, List.of()));
 		}
 	}
 

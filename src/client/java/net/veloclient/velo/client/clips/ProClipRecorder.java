@@ -69,6 +69,16 @@ public final class ProClipRecorder {
 	private static long framesWritten;
 	private static long nextGrabNanos;
 	private static volatile boolean starting;
+	/**
+	 * Encoder failures in a row and when the next try may start. A player's PC (2026-11-10) ended up with 10-15 ffmpeg
+	 * processes, 100 % CPU and RAM: when the encoder died (an NVENC session limit, a crash dialog...) or no encoder
+	 * worked, the writer started a new one - and probed every hardware encoder again - with the very next frame, 60
+	 * times a second. Now each failure waits longer (1, 2, 4 ... 60 s), a failing hardware encoder falls back to the
+	 * CPU one, and after 6 failures Clips Pro stops for this session and says why.
+	 */
+	private static int failures;
+	private static long retryAt;
+	private static long encoderStartedAt;
 
 	private ProClipRecorder() {
 	}
@@ -102,6 +112,9 @@ public final class ProClipRecorder {
 		}
 		if (!active) {
 			active = true;
+			failures = 0;
+			retryAt = 0;
+			FfmpegTool.resetProbe();
 			FfmpegTool.ensure(problem -> status = problem == null ? "" : problem);
 		}
 	}
@@ -170,7 +183,18 @@ public final class ProClipRecorder {
 				}
 				try {
 					if (process == null || !process.isAlive() || frame.width() != encoderWidth || frame.height() != encoderHeight) {
+						if (process != null && !process.isAlive()) {
+							encoderFailed("the encoder quit (exit " + process.exitValue() + ")");
+						}
+						if (System.nanoTime() < retryAt || !active) {
+							continue; // waiting before the next try: this frame is dropped (finally releases it)
+						}
 						startEncoder(frame.width(), frame.height(), frame.nanos());
+						if (process == null) {
+							continue;
+						}
+					} else if (failures > 0 && System.nanoTime() - encoderStartedAt > 30_000_000_000L) {
+						failures = 0; // ran fine for half a minute
 					}
 					long due = (frame.nanos() - startNanos) * fps / 1_000_000_000L + 1;
 					int copies = (int) Math.min(8, Math.max(0, due - framesWritten));
@@ -183,9 +207,8 @@ public final class ProClipRecorder {
 						framesWritten++;
 					}
 				} catch (IOException e) {
-					status = "The encoder stopped - restarting it";
 					VeloClient.LOGGER.debug("Clips Pro encoder pipe failed", e);
-					stopEncoder();
+					encoderFailed(e.getMessage());
 				} finally {
 					FrameGrabber.release(frame.rgba());
 				}
@@ -200,13 +223,40 @@ public final class ProClipRecorder {
 		}
 	}
 
+	private static void encoderFailed(String why) {
+		stopEncoder();
+		failures++;
+		VeloClient.LOGGER.warn("Clips Pro: encoder failure {} ({})", failures, why);
+		if (failures >= 2 && FfmpegTool.demoteHardwareEncoder()) {
+			status = "The hardware encoder failed - using the CPU encoder";
+		}
+		if (failures >= 6) {
+			active = false;
+			status = "Clips Pro stopped: FFmpeg keeps failing on this PC (see clips/.buffer/encoder.log). Turn it off and on to try again.";
+			VeloClient.LOGGER.warn("Clips Pro: stopped after {} encoder failures in a row", failures);
+			return;
+		}
+		long waitMs = Math.min(60_000L, 1000L << Math.min(6, failures - 1));
+		retryAt = System.nanoTime() + waitMs * 1_000_000L;
+		if (status.isEmpty()) {
+			status = "The encoder stopped - trying again in " + (waitMs / 1000) + " s";
+		}
+	}
+
 	private static synchronized void startEncoder(int width, int height, long nanos) throws IOException {
 		stopEncoder();
 		Path ffmpeg = FfmpegTool.binary();
 		FfmpegTool.Encoder encoder = FfmpegTool.encoder(bitrateKbps);
 		if (ffmpeg == null || encoder == null) {
-			throw new IOException("FFmpeg isn't ready");
+			// not a crash: wait for the download / don't probe again every frame
+			retryAt = System.nanoTime() + 5_000_000_000L;
+			if (encoder == null && FfmpegTool.problem() != null) {
+				status = FfmpegTool.problem();
+			}
+			return;
 		}
+		encoderStartedAt = System.nanoTime();
+		FfmpegTool.quietCrashDialogs();
 		Path dir = bufferDir();
 		Files.createDirectories(dir);
 		clearBuffer();

@@ -89,7 +89,7 @@ public final class StoreTiles {
 	/** Price with coin, optionally with the full price struck through next to it (a deal). */
 	public static HBox price(int coins, Integer fullPrice, double size) {
 		Label amount = new Label(format(coins));
-		amount.setStyle("-fx-text-fill: -velo-gold; -fx-font-family: 'Inter'; -fx-font-weight: bold; -fx-font-size: " + size + "px;");
+		amount.setStyle("-fx-text-fill: -velo-gold; -fx-font-family: 'Geist'; -fx-font-weight: bold; -fx-font-size: " + size + "px;");
 		HBox box = new HBox(6, coin(size + 3), amount);
 		box.setAlignment(Pos.CENTER_LEFT);
 		if (fullPrice != null && fullPrice > coins) {
@@ -128,18 +128,26 @@ public final class StoreTiles {
 			StackPane.setMargin(deal, new Insets(10));
 			stage.getChildren().add(deal);
 		}
-		Label hint = new Label("Try on");
-		hint.setStyle("-fx-background-color: rgba(11,11,14,0.82); -fx-background-radius: 8; -fx-border-color: rgba(255,255,255,0.14);"
-				+ " -fx-border-radius: 8; -fx-padding: 6 11 6 11; -fx-text-fill: white; -fx-font-family: 'Inter SemiBold'; -fx-font-size: 12px;");
-		hint.setGraphic(Icons.icon("eye", 13, Color.WHITE));
-		hint.setOpacity(0);
-		hint.setMouseTransparent(true);
-		StackPane.setAlignment(hint, Pos.TOP_RIGHT);
-		StackPane.setMargin(hint, new Insets(10));
-		stage.getChildren().add(hint);
+		// The "Try on" hint is made on the first hover (most tiles are never hovered; fewer nodes = faster page switch).
+		Label[] hintHolder = new Label[1];
+		java.util.function.Supplier<Label> hint = () -> {
+			if (hintHolder[0] == null) {
+				Label h = new Label("Try on");
+				h.setStyle("-fx-background-color: rgba(11,11,14,0.82); -fx-background-radius: 8; -fx-border-color: rgba(255,255,255,0.14);"
+						+ " -fx-border-radius: 8; -fx-padding: 6 11 6 11; -fx-text-fill: white; -fx-font-family: 'Geist SemiBold'; -fx-font-size: 12px;");
+				h.setGraphic(Icons.icon("eye", 13, Color.WHITE));
+				h.setOpacity(0);
+				h.setMouseTransparent(true);
+				StackPane.setAlignment(h, Pos.TOP_RIGHT);
+				StackPane.setMargin(h, new Insets(10));
+				stage.getChildren().add(h);
+				hintHolder[0] = h;
+			}
+			return hintHolder[0];
+		};
 
 		Label over = new Label(rarity.label + "  ·  " + kind.toUpperCase(Locale.ROOT));
-		over.setStyle("-fx-text-fill: " + rarity.color + "; -fx-font-family: 'Inter'; -fx-font-weight: bold; -fx-font-size: 10px;");
+		over.setStyle("-fx-text-fill: " + rarity.color + "; -fx-font-family: 'Geist'; -fx-font-weight: bold; -fx-font-size: 10px;");
 		Label title = new Label(name);
 		title.getStyleClass().add("t-strong");
 		title.setStyle("-fx-font-size: 15px;");
@@ -159,8 +167,12 @@ public final class StoreTiles {
 		tileClip.widthProperty().bind(tile.widthProperty());
 		tileClip.heightProperty().bind(tile.heightProperty());
 		tile.setClip(tileClip);
-		tile.setOnMouseEntered(e -> fade(hint, 1));
-		tile.setOnMouseExited(e -> fade(hint, 0));
+		tile.setOnMouseEntered(e -> fade(hint.get(), 1));
+		tile.setOnMouseExited(e -> {
+			if (hintHolder[0] != null) {
+				fade(hintHolder[0], 0);
+			}
+		});
 		tile.setOnMouseClicked(e -> onClick.run());
 		return tile;
 	}
@@ -205,19 +217,9 @@ public final class StoreTiles {
 	public static Node capeArt(StoreItem item, Node[] hoverTargetHolder, double size) {
 		StackPane holder = new StackPane(CosmeticUi.spinner(24));
 		holder.setMinSize(size, size);
-		CosmeticUi.framesAsync(item, frames -> {
-			if (frames.isEmpty()) {
-				holder.getChildren().clear();
-				return;
-			}
-			String key = "store:" + item.id();
-			ImageView view = new ImageView(CosmeticUi.thumbnail(key, frames, size, size));
-			view.setFitHeight(size - 8);
-			view.setPreserveRatio(true);
-			holder.getChildren().setAll(view);
-			Node hover = hoverTargetHolder != null && hoverTargetHolder[0] != null ? hoverTargetHolder[0] : holder;
-			CosmeticUi.animate(hover, view, key, frames, size, size, false);
-		});
+		Node hover = hoverTargetHolder != null && hoverTargetHolder[0] != null ? hoverTargetHolder[0] : holder;
+		CosmeticUi.cardPicture(holder, hover, "store:" + item.id(), String.valueOf(net.veloclient.launcher.data.StoreCatalog.cardSha(item.id())), size, size, size - 8,
+				done -> CosmeticUi.framesAsync(item, done), true);
 		return holder;
 	}
 

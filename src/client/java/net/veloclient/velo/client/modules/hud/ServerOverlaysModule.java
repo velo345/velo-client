@@ -197,7 +197,7 @@ public final class ServerOverlaysModule extends AbstractModule implements HudMod
 
 	@Override
 	public void render(DrawContext context, int x, int y, float tickDelta) {
-		boolean editing = net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen;
+		boolean editing = net.veloclient.velo.client.hud.HudSample.active();
 		List<Row> rows = rows(editing);
 		lastRows = Math.max(1, rows.size());
 		if (rows.isEmpty()) {

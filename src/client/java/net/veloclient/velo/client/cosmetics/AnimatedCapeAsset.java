@@ -108,6 +108,7 @@ public final class AnimatedCapeAsset {
 		NativeImageBackedTexture texture = decoded.width() >= 512 ? new SmoothTexture(() -> "animated cloak " + id, decoded.width(), decoded.height())
 				: new NativeImageBackedTexture(() -> "animated cloak " + id, decoded.width(), decoded.height(), false);
 		MinecraftClient.getInstance().getTextureManager().registerTexture(textureId, texture);
+		CapeManager.noteTextureSize(textureId, decoded.width(), decoded.height());
 		// Frames only cover the used part of the layout (see GifDecoder#capeRegion): the rest stays transparent.
 		texture.getImage().fillRect(0, 0, decoded.width(), decoded.height(), 0);
 		AnimatedCapeAsset animated = new AnimatedCapeAsset(textureId, texture, decoded.frames(), decoded.width(), decoded.height());

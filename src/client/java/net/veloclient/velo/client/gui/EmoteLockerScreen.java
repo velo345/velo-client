@@ -54,7 +54,8 @@ public final class EmoteLockerScreen extends VeloWindow implements net.veloclien
 
 	@Override
 	protected String[] headerTabs() {
-		return CapeEquipScreen.LOCKER_TABS;
+		// kinds are the cards above the catalog (launcher layout)
+		return new String[0];
 	}
 
 	@Override
@@ -71,7 +72,8 @@ public final class EmoteLockerScreen extends VeloWindow implements net.veloclien
 	}
 
 	private int stageX() {
-		return contentX() + CapeEquipScreen.SLOTS_W + 12;
+		CapeEquipScreen.frame(contentX(), contentY(), contentWidth(), contentBottom());
+		return CapeEquipScreen.stageX();
 	}
 
 	private int panelX() {
@@ -80,8 +82,9 @@ public final class EmoteLockerScreen extends VeloWindow implements net.veloclien
 
 	@Override
 	protected void layoutContent() {
+		CapeEquipScreen.frame(contentX(), contentY(), contentWidth(), contentBottom());
 		this.clearChildren();
-		addDrawableChild(new EntityPreviewWidget(stageX(), contentY(), CapeEquipScreen.SHOWCASE_WIDTH, contentBottom() - contentY()).spin(0f, 20f));
+		addDrawableChild(new EntityPreviewWidget(stageX(), contentY(), CapeEquipScreen.SHOWCASE_WIDTH, CapeEquipScreen.stageBottom() - contentY()).spin(0f, 20f));
 	}
 
 	private void preview(String id) {
@@ -92,12 +95,14 @@ public final class EmoteLockerScreen extends VeloWindow implements net.veloclien
 	@Override
 	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
 		hits.clear();
+		CapeEquipScreen.frame(contentX(), contentY(), contentWidth(), contentBottom());
 		CapeEquipScreen.drawSlots(context, this.textRenderer, contentX(), contentY(), CapeEquipScreen.EMOTES_TAB, mouseX, mouseY);
 		CapeEquipScreen.drawLoadouts(context, this.textRenderer, contentX(), contentY(), contentBottom(), mouseX, mouseY);
+		CapeEquipScreen.drawArmorToggle(context, this.textRenderer, mouseX, mouseY);
 
 		int px = panelX();
 		int pw = contentX() + contentWidth() - px;
-		int y = contentY();
+		int y = CapeEquipScreen.rightTop();
 		MenuKit.text(context, this.textRenderer, MenuKit.small("YOUR EMOTE WHEEL"), px, y, MenuKit.TEXT_3);
 		MenuKit.text(context, this.textRenderer, MenuKit.ui("Hold B in game · pick a slot, then an emote"), px, y + 11, MenuKit.TEXT_2);
 		drawWheel(context, px + 70, y + 98, mouseX, mouseY);
@@ -170,7 +175,7 @@ public final class EmoteLockerScreen extends VeloWindow implements net.veloclien
 			hover = (int) (deg / sweep);
 		}
 		for (int i = 0; i < EmoteCatalog.SLOTS; i++) {
-			int fill = i == selectedSlot ? VeloUi.withAlpha(accent, 0xD0) : i == hover ? 0xFF2A2A34 : 0xFF1A1A21;
+			int fill = i == selectedSlot ? VeloUi.withAlpha(accent, 0xD0) : i == hover ? 0xFF2A2A34 : 0xFF1A1516;
 			VeloDraw.strokeArc(context, cx, cy, (inner + outer) / 2f, outer - inner, i * sweep - sweep / 2f + 1.5f, sweep - 3f, fill);
 			double a = Math.toRadians(i * sweep - 90);
 			int lx = Math.round(cx + (float) Math.cos(a) * (inner + outer) / 2f);

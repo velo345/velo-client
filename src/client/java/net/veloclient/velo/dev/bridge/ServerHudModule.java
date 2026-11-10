@@ -31,6 +31,7 @@ public final class ServerHudModule extends AbstractModule implements HudModule, 
 	private boolean cutscenes = true;
 	private boolean shareMods = true;
 	private int lastHeight = 40;
+	private int sampleHeight = 64;
 
 	public ServerHudModule() {
 		super("server-hud", "Server HUD", "Shows what Velo Bridge servers put on your HUD (quests, timers, boss bars). Also: server music, cutscenes, mod list sharing.",
@@ -68,13 +69,14 @@ public final class ServerHudModule extends AbstractModule implements HudModule, 
 	}
 
 	private static boolean editing() {
-		return net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen;
+		return net.veloclient.velo.client.hud.HudSample.active();
 	}
 
 	@Override
 	public void render(DrawContext context, int x, int y, float tickDelta) {
 		List<BridgeServerUi.HudItem> items = BridgeServerUi.hudItems();
-		if (items.isEmpty() && editing()) {
+		boolean sample = items.isEmpty() && editing();
+		if (sample) {
 			items = List.of(new BridgeServerUi.HudItem("demo", "bar", "Boss", "1200 / 2000", 0.6, 0, 0xFFFF5555, null, null, 0, 0, 0, 0),
 					new BridgeServerUi.HudItem("demo2", "text", "Coins", "4,210", 0, 0, 0xFFF4B82E, "gold_nugget", null, 0, 0, 1, 0));
 		}
@@ -143,7 +145,13 @@ public final class ServerHudModule extends AbstractModule implements HudModule, 
 				}
 			}
 		}
-		lastHeight = Math.max(18, cy - y - 4);
+		// The live HUD (empty) and a preview (sample) draw in the same frame: separate heights, or the preview's layout
+		// flipped between the two every frame.
+		if (sample) {
+			sampleHeight = Math.max(18, cy - y - 4);
+		} else {
+			lastHeight = Math.max(18, cy - y - 4);
+		}
 	}
 
 	private static void card(DrawContext context, int x, int y, int h, int accent) {
@@ -158,6 +166,6 @@ public final class ServerHudModule extends AbstractModule implements HudModule, 
 
 	@Override
 	public int height() {
-		return lastHeight;
+		return BridgeServerUi.hudItems().isEmpty() && editing() ? sampleHeight : lastHeight;
 	}
 }

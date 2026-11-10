@@ -179,6 +179,11 @@ public final class CrashReportDialog {
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		HBox actions = new HBox(8, copy, folder, repair, spacer, send);
 		actions.setAlignment(Pos.CENTER_LEFT);
+		// Never "Copy d..." / "Fix &...": every button keeps its label; the dialog grows to fit them (2026-11).
+		for (Button b : new Button[] {copy, folder, repair, send}) {
+			b.setMinWidth(Region.USE_PREF_SIZE);
+		}
+		actions.setMinWidth(Region.USE_PREF_SIZE);
 
 		String crashText = crash;
 		String logText = log;
@@ -248,6 +253,7 @@ public final class CrashReportDialog {
 			root.setPrefWidth(640);
 			// The fix goes bottom right, before Send report: the natural last click, and the one that actually helps.
 			Button fixAll = doctorPanel[0].takeFixAllButton();
+			fixAll.setMinWidth(Region.USE_PREF_SIZE);
 			actions.getChildren().add(actions.getChildren().indexOf(send), fixAll);
 			if (fixAll.isVisible()) {
 				send.getStyleClass().remove("primary-button");

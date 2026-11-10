@@ -155,7 +155,7 @@ public final class OnboardingView {
 				dot.setStyle("-fx-background-color: -velo-accent; -fx-background-radius: 11;");
 			} else {
 				Label number = new Label(String.valueOf(i + 1));
-				number.setStyle("-fx-font-size: 11px; -fx-font-family: 'Inter'; -fx-font-weight: bold; -fx-text-fill: "
+				number.setStyle("-fx-font-size: 11px; -fx-font-family: 'Geist'; -fx-font-weight: bold; -fx-text-fill: "
 						+ (current ? "-velo-text" : "-velo-text-3") + ";");
 				dot.getChildren().add(number);
 				dot.setStyle("-fx-background-radius: 11; -fx-border-radius: 11; -fx-border-color: "
@@ -263,7 +263,7 @@ public final class OnboardingView {
 		TextField field = new TextField();
 		field.setPromptText("Code or friend's name");
 		field.setPrefWidth(260);
-		field.setStyle("-fx-font-family: 'JetBrains Mono Medium'; -fx-font-size: 15px;");
+		field.setStyle("-fx-font-family: 'Geist Mono Medium'; -fx-font-size: 15px;");
 		Label result = new Label(codeNote == null ? "" : codeNote);
 		result.getStyleClass().add("t-muted");
 		result.setWrapText(true);

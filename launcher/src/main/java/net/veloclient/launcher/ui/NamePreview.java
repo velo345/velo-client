@@ -71,7 +71,7 @@ final class NamePreview extends Canvas {
 		String[] files = {null, "Sora-Bold", "SpaceGrotesk-Bold", "Poppins-Regular", "IBMPlexSans-SemiBold", "JetBrainsMono-Bold",
 				"Audiowide-Regular", "Inter-SemiBold", null};
 		for (int i = 0; i < FAMILIES.length; i++) {
-			String family = "JetBrains Mono";
+			String family = "Geist Mono";
 			if (i < files.length && files[i] != null) {
 				Font loaded = Font.loadFont(NamePreview.class.getResourceAsStream("/net/veloclient/launcher/fonts/" + files[i] + ".ttf"), 12);
 				if (loaded != null) {

@@ -85,6 +85,8 @@ final class VersionMigration {
 		card.setMaxWidth(620);
 		card.setPrefWidth(620);
 		card.setMaxHeight(640);
+		// never taller than the window (minus a margin), so the buttons stay reachable
+		card.maxHeightProperty().bind(javafx.beans.binding.Bindings.min(640, overlayHost.heightProperty().subtract(60)));
 		StackPane backdrop = new StackPane(card);
 		backdrop.getStyleClass().add("modal-backdrop");
 		Runnable close = () -> {
@@ -146,7 +148,14 @@ final class VersionMigration {
 		}
 		Button cancel = new Button("Cancel");
 		cancel.setOnAction(e -> close.run());
-		card.getChildren().setAll(title, sub, targets, buttons(cancel));
+		// The version tiles scroll when they don't fit (they were cut off with no way down).
+		ScrollPane scroll = new ScrollPane(targets);
+		scroll.setFitToWidth(true);
+		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		scroll.getStyleClass().add("migrate-scroll");
+		scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+		VBox.setVgrow(scroll, javafx.scene.layout.Priority.ALWAYS);
+		card.getChildren().setAll(title, sub, scroll, buttons(cancel));
 		UiMotion.stagger(targets, 8);
 	}
 

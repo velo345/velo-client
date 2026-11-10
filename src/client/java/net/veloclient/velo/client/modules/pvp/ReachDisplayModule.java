@@ -152,12 +152,12 @@ public final class ReachDisplayModule extends AbstractModule implements HudModul
 
 	@Override
 	public void render(DrawContext context, int x, int y, float tickDelta) {
-		if (!showText) {
+		if (!showText && !net.veloclient.velo.client.hud.HudSample.active()) {
 			return;
 		}
 		MinecraftClient client = MinecraftClient.getInstance();
 		double reach = CombatTracker.lastReach();
-		boolean editing = net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen;
+		boolean editing = net.veloclient.velo.client.hud.HudSample.active();
 		if ((reach < 0 || CombatTracker.ticksSinceHit() > 100) && !editing) {
 			return;
 		}
@@ -174,7 +174,7 @@ public final class ReachDisplayModule extends AbstractModule implements HudModul
 
 	@Override
 	public int height() {
-		return showText ? 20 : 0;
+		return showText || net.veloclient.velo.client.hud.HudSample.active() ? 20 : 0;
 	}
 
 	@Override

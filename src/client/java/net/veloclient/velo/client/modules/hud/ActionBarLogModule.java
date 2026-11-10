@@ -68,7 +68,12 @@ public final class ActionBarLogModule extends AbstractModule implements HudModul
 		// contract (x is the box's left edge, per HudPosition#resolveX) -
 		// this used to center each line on x instead, which routinely drew
 		// half the text outside the box the HUD editor shows/drags.
-		for (Text line : history) {
+		java.util.Collection<Text> lines = history;
+		if (lines.isEmpty() && net.veloclient.velo.client.hud.HudSample.active()) {
+			// preview / HUD editor: what a few action bar messages look like here
+			lines = java.util.List.of(Text.literal("+25 Coins"), Text.literal("Combo x3!"), Text.literal("Daily reward ready"));
+		}
+		for (Text line : lines) {
 			net.veloclient.velo.client.hud.HudLook.draw(context, line, x, rowY, 0xFFFFFFFF);
 			rowY += lineHeight;
 		}

@@ -162,7 +162,8 @@ public final class VeloBridgeClient {
 						names.add(mod.displayName());
 					});
 				}
-				if (!names.isEmpty()) {
+				// once per server (and again only when its list changes) - it popped up on every join
+				if (!names.isEmpty() && firstLockNotice(server() + "|" + String.join(",", new java.util.TreeSet<>(names)))) {
 					toast("Modules switched off here", String.join(", ", names) + " - back on when you leave.", 7);
 				}
 			}
@@ -236,6 +237,31 @@ public final class VeloBridgeClient {
 		BridgeServerUi.reset();
 		BridgeNpcs.reset();
 		net.minecraft.client.MinecraftClient.getInstance().execute(() -> net.veloclient.velo.dev.notes.NoteStore.onBridge("server_notes_reset", new JsonObject()));
+	}
+
+	/** True the first time this server + module list is seen (remembered in config/bridge-lock-notices.json). */
+	private static boolean firstLockNotice(String key) {
+		java.nio.file.Path file = net.veloclient.velo.config.VeloPaths.config().resolve("bridge-lock-notices.json");
+		java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+		try {
+			if (java.nio.file.Files.exists(file)) {
+				com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(file)).getAsJsonArray().forEach(e -> seen.add(e.getAsString()));
+			}
+		} catch (Exception ignored) {
+			// unreadable: show it
+		}
+		if (!seen.add(key)) {
+			return false;
+		}
+		JsonArray list = new JsonArray();
+		seen.forEach(list::add);
+		try {
+			java.nio.file.Files.createDirectories(file.getParent());
+			java.nio.file.Files.writeString(file, list.toString());
+		} catch (Exception ignored) {
+			// shown again next time
+		}
+		return true;
 	}
 
 	// ---- For the HUD, mixins, Discord and Notes ----

@@ -140,6 +140,17 @@ public record Diagnosis(List<Issue> issues, String crashSignature, String crashS
 			}
 		}
 
+		/** Sets one line of options.txt ({@code narrator:0}, say), adding it when the file doesn't have it yet. */
+		record SetOption(String option, String value) implements Action {
+			public String key() {
+				return "option:" + option + "=" + value;
+			}
+
+			public String target() {
+				return "option:" + option;
+			}
+		}
+
 		/** Launches the profile with this Fabric Loader build from now on ({@code null} = Velo's tested one). */
 		record SetLoader(String version) implements Action {
 			public String key() {

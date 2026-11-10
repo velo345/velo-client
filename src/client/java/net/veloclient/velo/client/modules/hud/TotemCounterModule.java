@@ -48,6 +48,9 @@ public final class TotemCounterModule extends AbstractModule implements HudModul
 			return;
 		}
 		int count = ClientCompat.countInInventory(Items.TOTEM_OF_UNDYING);
+		if (count == 0 && net.veloclient.velo.client.hud.HudSample.active()) {
+			count = 2; // preview / HUD editor
+		}
 		if (count == 0 && hideWhenNone) {
 			return;
 		}

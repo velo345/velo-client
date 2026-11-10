@@ -36,7 +36,7 @@ public final class ComboCounterModule extends AbstractModule implements HudModul
 	public void render(DrawContext context, int x, int y, float tickDelta) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		int combo = CombatTracker.combo();
-		boolean editing = net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen;
+		boolean editing = net.veloclient.velo.client.hud.HudSample.active();
 		if (combo == 0 && hideWhenZero && !editing) {
 			return;
 		}

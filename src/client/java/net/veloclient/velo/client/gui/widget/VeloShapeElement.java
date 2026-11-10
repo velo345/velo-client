@@ -104,7 +104,25 @@ record VeloShapeElement(Matrix3x2fc pose, float[] xy, int[] colors, int quadCoun
 
 	@Override
 	public void buildVertices(VertexConsumer vertices) {
-		for (int v = 0; v < quadCount * 4; v++) {
+		int count = quadCount * 4;
+		// Velo Turbo: all vertices in one reservation, transformed inline (was a begin/validate/Vector2f per vertex).
+		if (vertices instanceof net.veloclient.velo.client.util.BulkVertexSink sink) {
+			long p = sink.velo$reservePositionColorVertices(count);
+			if (p != -1L) {
+				float m00 = pose.m00(), m01 = pose.m01(), m10 = pose.m10(), m11 = pose.m11(), m20 = pose.m20(), m21 = pose.m21();
+				for (int v = 0; v < count; v++, p += 16) {
+					float x = xy[v * 2];
+					float y = xy[v * 2 + 1];
+					org.lwjgl.system.MemoryUtil.memPutFloat(p, m00 * x + m10 * y + m20);
+					org.lwjgl.system.MemoryUtil.memPutFloat(p + 4, m01 * x + m11 * y + m21);
+					org.lwjgl.system.MemoryUtil.memPutFloat(p + 8, 0f);
+					int argb = colors[v];
+					org.lwjgl.system.MemoryUtil.memPutInt(p + 12, argb & 0xFF00FF00 | (argb >>> 16) & 0xFF | (argb & 0xFF) << 16);
+				}
+				return;
+			}
+		}
+		for (int v = 0; v < count; v++) {
 			vertices.addVertexWith2DPose(pose, xy[v * 2], xy[v * 2 + 1]).setColor(colors[v]);
 		}
 	}

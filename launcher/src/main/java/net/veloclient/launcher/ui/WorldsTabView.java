@@ -175,7 +175,7 @@ public final class WorldsTabView {
 		iconHolder.getStyleClass().add("instance-icon-custom");
 
 		Label name = new Label(world.levelName());
-		name.setFont(javafx.scene.text.Font.font("Inter", javafx.scene.text.FontWeight.BOLD, 13));
+		name.setFont(javafx.scene.text.Font.font("Geist", javafx.scene.text.FontWeight.BOLD, 13));
 		name.setTextFill(InstanceDetailView.text(theme));
 		name.setWrapText(true);
 		name.setMaxWidth(170);

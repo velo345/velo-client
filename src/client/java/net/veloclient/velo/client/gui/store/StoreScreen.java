@@ -453,6 +453,23 @@ public final class StoreScreen extends VeloWindow {
 			y += 46 + 14;
 		}
 
+		// Browse: the categories as the launcher's row of cards (icon, name, how many, chevron)
+		{
+			Object[][] kinds = {
+					{"wings", "Wings", WingsManager.forSale().size(), Page.WINGS},
+					{"capes", "Cloaks", (int) StoreCatalog.byCategory(StoreCategory.CAPES).stream().filter(net.veloclient.velo.client.store.StoreItem::inStore).count(), Page.CAPES},
+					{"bolt", "Auras", net.veloclient.velo.client.cosmetics.aura.AuraManager.forSale().size(), Page.AURAS},
+					{"emotes", "Emotes", net.veloclient.velo.client.emotes.EmoteCatalog.forSale().size(), Page.EMOTES}};
+			headings.add(new Heading(y, "Browse", null));
+			y += headH;
+			int bw = (usable - 3 * GAP) / 4;
+			for (int i = 0; i < kinds.length; i++) {
+				Object[] k = kinds[i];
+				addRegionRow(browseCard((String) k[0], (String) k[1], (Integer) k[2], (Page) k[3], bw, 34), spots, cx + i * (bw + GAP), y);
+			}
+			y += 34 + 18;
+		}
+
 		// Daily picks
 		List<String> picks = StoreItems.dailyPicks();
 		if (!picks.isEmpty()) {
@@ -562,6 +579,28 @@ public final class StoreScreen extends VeloWindow {
 		Text text = MenuKit.uiBold(label + "  ›");
 		return new DrawnCard(linkWidth(label), 12, label, (context, x, y, w, h, hover) ->
 				MenuKit.text(context, this.textRenderer, text, x, y + 2, VeloAnim.lerpArgb(MenuKit.accentText(), 0xFFFFFFFF, hover)), () -> {
+			page = target;
+			restartPageIn();
+			layoutContent();
+		});
+	}
+
+	/** A Browse card: icon tile, the category, "N items" and a chevron - opens that tab. */
+	private DrawnCard browseCard(String icon, String label, int count, Page target, int width, int height) {
+		return new DrawnCard(width, height, label, (context, x, y, w, h, hover) -> {
+			VeloDraw.fillRounded(context, x, y, w, h, 6, VeloAnim.lerpArgb(0xFF141011, 0xFF1A1516, hover));
+			VeloDraw.strokeRounded(context, x, y, w, h, 6, VeloAnim.lerpArgb(0x10FFFFFF, 0x26FFFFFF, hover));
+			VeloDraw.fillRounded(context, x + 7, y + (h - 22) / 2, 22, 22, 5, 0xFF1E1819);
+			MenuKit.icon(context, icon, x + 12, y + (h - 12) / 2, 12, 0xFFB3A8A9);
+			MenuKit.text(context, this.textRenderer, MenuKit.uiBold(label), x + 36, y + 8, MenuKit.TEXT);
+			MenuKit.text(context, this.textRenderer, MenuKit.small(count + " ITEMS"), x + 36, y + 20, 0xFF8E8384);
+			int cy = y + h / 2;
+			int chev = VeloAnim.lerpArgb(0xFF8E8384, 0xFFEDE6E6, hover);
+			for (int d = 0; d < 3; d++) {
+				context.fill(x + w - 13 + d, cy - 3 + d, x + w - 12 + d, cy - 2 + d, chev);
+				context.fill(x + w - 13 + d, cy + 3 - d, x + w - 12 + d, cy + 4 - d, chev);
+			}
+		}, () -> {
 			page = target;
 			restartPageIn();
 			layoutContent();

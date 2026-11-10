@@ -73,7 +73,7 @@ public final class PlayerLevelsModule extends AbstractModule implements HudModul
 
 	@Override
 	public void render(DrawContext context, int x, int y, float tickDelta) {
-		boolean editing = net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen;
+		boolean editing = net.veloclient.velo.client.hud.HudSample.active();
 		GameSession s = GameSession.get();
 		if (!editing && (!s.online() || onlyInGames && s.mode() == ServerPacks.Mode.LOBBY)) {
 			return;

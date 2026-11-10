@@ -125,6 +125,11 @@ public final class RewindRecorder {
 	private static String fileName;
 	private static long startedAt;
 	private static int selfId = -1;
+	// Who and where, remembered while in the world: a recording stopped by leaving the server is finished when there's
+	// no player any more - its meta came out with an empty selfUuid, and the replay couldn't find you (2026-11-10).
+	private static String knownSelfName = "";
+	private static String knownSelfUuid = "";
+	private static String knownServer;
 	private static boolean selfSpawn;
 	private static final Map<Integer, Object> lastData = new java.util.HashMap<>();
 	private static final ItemStack[] lastEquip = new ItemStack[EquipmentSlot.values().length];
@@ -169,6 +174,12 @@ public final class RewindRecorder {
 		if (info.id() == ConnectionProtocol.CONFIGURATION) {
 			configProtocol = info;
 			newConfigPhase = true;
+			if (state != State.IDLE) {
+				// A proxy moving you to another server (lobby -> arena): the world is cleared right now, but the first
+				// config packet can come ticks later - tick() saw no player and no switch yet and stopped the recording.
+				switching = true;
+				switchingSince = System.currentTimeMillis();
+			}
 		} else if (info.id() == ConnectionProtocol.PLAY) {
 			playProtocol = info;
 		}
@@ -177,6 +188,11 @@ public final class RewindRecorder {
 	// A packet about to be handled on the game thread.
 	public static void onHandle(PacketListener listener, Packet<?> packet) {
 		String type = packet.getClass().getSimpleName();
+		if (state != State.IDLE && ("ClientboundTransferPacket".equals(type) || "ClientboundStartConfigurationPacket".equals(type))) {
+			// moving to another server: no world for a moment, keep recording
+			switching = true;
+			switchingSince = System.currentTimeMillis();
+		}
 		if (SKIP.contains(type)) {
 			return;
 		}
@@ -270,6 +286,8 @@ public final class RewindRecorder {
 			writer.config(c[0], c[1]);
 		}
 		startedAt = System.currentTimeMillis();
+		knownServer = null;
+		remember(mc);
 		writer.beginSegment();
 		snapshot();
 		writer.head(metaFields(mc)); // after the snapshot: it knows the recorder's own entity id
@@ -289,12 +307,21 @@ public final class RewindRecorder {
 
 	// The meta fields about where / who recorded (also written when recording starts, for crash recovery).
 	private static String metaFields(Minecraft mc) {
-		String server = mc.getCurrentServer() != null ? mc.getCurrentServer().ip : "singleplayer";
-		String selfName = mc.player != null ? mc.player.getGameProfile().name() : "";
-		String selfUuid = mc.player != null ? mc.player.getUUID().toString() : "";
+		remember(mc);
+		String server = knownServer != null ? knownServer : "singleplayer";
+		String selfName = knownSelfName;
+		String selfUuid = knownSelfUuid;
 		return "\"minecraft\": \"" + net.minecraft.SharedConstants.getCurrentVersion().name() + "\", \"protocol\": "
 				+ net.minecraft.SharedConstants.getProtocolVersion() + ", \"server\": " + json(server) + ", \"startedAt\": " + startedAt
 				+ ", \"selfId\": " + selfId + ", \"selfUuid\": " + json(selfUuid) + ", \"selfName\": " + json(selfName);
+	}
+
+	private static void remember(Minecraft mc) {
+		if (mc.player != null) {
+			knownSelfName = mc.player.getGameProfile().name();
+			knownSelfUuid = mc.player.getUUID().toString();
+			knownServer = mc.getCurrentServer() != null ? mc.getCurrentServer().ip : mc.hasSingleplayerServer() ? "singleplayer" : knownServer;
+		}
 	}
 
 	// The game is closing: finish the recording right now (it keeps its date name; no name prompt).
@@ -367,6 +394,9 @@ public final class RewindRecorder {
 				stop();
 			}
 			return;
+		}
+		if (mc.level.getGameTime() % 20 == 0) {
+			remember(mc);
 		}
 		if (state != State.RECORDING) {
 			return;
@@ -772,7 +802,8 @@ public final class RewindRecorder {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.level != null) {
 			for (var pl : mc.level.players()) {
-				if (pl != mc.player && conn.getPlayerInfo(pl.getUUID()) == null) {
+				// also yourself: servers that hide you from your own tab list left the replay without an entry for you
+				if (conn.getPlayerInfo(pl.getUUID()) == null) {
 					entries.add(new ClientboundPlayerInfoUpdatePacket.Entry(pl.getUUID(), pl.getGameProfile(), false, 0,
 							net.minecraft.world.level.GameType.SURVIVAL, null, true, 0, null));
 				}

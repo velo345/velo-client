@@ -52,18 +52,76 @@ public final class HudLook {
 		return id != null ? MenuKit.inNamedFont(s, id) : fontName.equals("Inter") ? MenuKit.uiBold(s) : Text.literal(s);
 	}
 
+	// ---- Prepared text (2026-11) ----
+	// HUD values ("247", "FPS", coordinates) mostly repeat between HUD passes, but every pass built a new Text, visited it
+	// character by character, ran the bidi reorder and measured it again (~3 % of the render thread, all in the HUD pass
+	// frames that set the 1 % lows). value()/label() now hand out the same Text per string and font, and text()/width()
+	// reuse its visual order and width.
+
+	//? if <26.1 {
+	private record Prepared(net.minecraft.text.OrderedText ordered, int width) {
+	}
+	//?} else {
+	/*private record Prepared(net.minecraft.util.FormattedCharSequence ordered, int width) {
+	}
+	*///?}
+
+	private static final java.util.Map<String, Text> TEXTS = new java.util.HashMap<>();
+	private static final java.util.Map<Text, Prepared> PREPARED = new java.util.IdentityHashMap<>();
+	private static String preparedFont = "";
+
+	private static final boolean NO_TEXT_CACHE = Boolean.getBoolean("velo.noHudTextCache");
+
+	private static Text shared(char kind, String s, java.util.function.Supplier<Text> make) {
+		if (NO_TEXT_CACHE) {
+			return make.get();
+		}
+		String f = font();
+		if (!f.equals(preparedFont) || TEXTS.size() > 2048) {
+			// a new HUD font, or a lot of one-off strings (timers, coordinates): start over
+			TEXTS.clear();
+			PREPARED.clear();
+			preparedFont = f;
+		}
+		Text text = TEXTS.get(kind + s);
+		if (text == null) {
+			text = make.get();
+			TEXTS.put(kind + s, text);
+			PREPARED.put(text, null);
+		}
+		return text;
+	}
+
+	/** The visual order + width of a shared Text, worked out on first use (null for any other Text). */
+	private static Prepared prepared(Text text) {
+		if (!PREPARED.containsKey(text)) {
+			return null;
+		}
+		Prepared p = PREPARED.get(text);
+		if (p == null) {
+			//? if <26.1 {
+			var ordered = text.asOrderedText();
+			//?} else {
+			/*var ordered = text.getVisualOrderText();
+			*///?}
+			p = new Prepared(ordered, MinecraftClient.getInstance().textRenderer.getWidth(ordered));
+			PREPARED.put(text, p);
+		}
+		return p;
+	}
+
 	/** A value in the HUD font, bold. */
 	public static Text value(String s) {
-		return preview(font(), s);
+		return shared('v', s, () -> preview(font(), s));
 	}
 
 	/** Secondary text (units, names) in the HUD font (Inter next to Sora, as before). */
 	public static Text label(String s) {
-		return switch (font()) {
+		return shared('l', s, () -> switch (font()) {
 			case "Inter", "Sora" -> MenuKit.ui(s);
 			case "Minecraft" -> Text.literal(s);
 			default -> preview(font(), s);
-		};
+		});
 	}
 
 	private static Text inHudFont(Text t) {
@@ -111,7 +169,8 @@ public final class HudLook {
 	}
 
 	public static int width(Text text) {
-		return MinecraftClient.getInstance().textRenderer.getWidth(text);
+		Prepared p = prepared(text);
+		return p != null ? p.width() : MinecraftClient.getInstance().textRenderer.getWidth(text);
 	}
 
 	/** {@link #width} without rounding up - TTF glyphs have fractional widths, and centring on the rounded one leans left. */
@@ -143,10 +202,20 @@ public final class HudLook {
 
 	public static void text(DrawContext context, Text text, int x, int y, int color) {
 		HudStyleModule style = style();
+		net.minecraft.client.font.TextRenderer textRenderer = MinecraftClient.getInstance().textRenderer;
+		Prepared p = prepared(text);
+		if (p != null) {
+			if (style == null || style.shadow()) {
+				context.drawTextWithShadow(textRenderer, p.ordered(), x, y, color);
+			} else {
+				MenuKit.textOrdered(context, textRenderer, p.ordered(), x, y, color);
+			}
+			return;
+		}
 		if (style == null || style.shadow()) {
-			context.drawTextWithShadow(MinecraftClient.getInstance().textRenderer, text, x, y, color);
+			context.drawTextWithShadow(textRenderer, text, x, y, color);
 		} else {
-			MenuKit.text(context, MinecraftClient.getInstance().textRenderer, text, x, y, color);
+			MenuKit.text(context, textRenderer, text, x, y, color);
 		}
 	}
 

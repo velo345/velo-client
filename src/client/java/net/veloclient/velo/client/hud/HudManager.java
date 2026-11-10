@@ -154,7 +154,7 @@ public final class HudManager {
 
 		if (net.veloclient.velo.client.redstone.RedstoneMode.active()) {
 			// Redstone Mode replaces the whole Velo HUD with its own overlay (Edit HUD Layout draws it itself).
-			if (!(net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen)) {
+			if (!(net.veloclient.velo.client.hud.HudSample.active())) {
 				net.veloclient.velo.client.redstone.RmHud.render(context, screenWidth, screenHeight, tickDelta);
 			}
 			return;

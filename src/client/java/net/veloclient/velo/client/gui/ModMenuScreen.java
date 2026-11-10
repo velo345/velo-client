@@ -35,20 +35,19 @@ import java.util.function.BooleanSupplier;
  * <li>an icon rail on the left: Modules, Addons (only when installed), then everything else Velo has (Locker, Skins, Friends, Clips,
  * Fight Recap, World Map, Waypoints, Background Queue, Schematics) and Settings, Redstone Mode and Profiles at the
  * bottom - names show on hover;</li>
- * <li>on top: the profile you're on (click to switch), search, and the glowing Edit HUD in the header;</li>
- * <li>category chips (Addons: their groups) and a grid of module cards - a big icon that lights up when the module is
- * on, its switch, the name and what it's good for;</li>
- * <li>a side panel for the picked module: what it does, its styles as one-click choices, quick switches, Favourite,
- * "All settings" and, for HUD modules, "Place on screen".</li>
+ * <li>on top: the profile you're on (click to switch), search, and Edit HUD as the page's one big button;</li>
+ * <li>category tabs (Addons: their groups) and four columns of slim module rows - icon, name, tag, switch. One click
+ * opens the module's settings page with its live preview (2026-11 redesign: the side panel nobody used is gone).</li>
  * </ul>
  * Opens with a spring and cascades its cards in (see {@link VeloWindow#springAnimation()}).
  */
 public final class ModMenuScreen extends VeloWindow implements ModuleConfigScreen.Reopenable, net.veloclient.velo.client.gui.window.MenuPage {
 
 	private static final int RAIL = 30;
-	private static final int DRAWER = 180;
 	private static final int GAP = 8;
-	private static final int MIN_CARD = 124;
+	/** 2026-11 redesign: slim row cards, four columns on the default window (no side panel any more). */
+	private static final int MIN_CARD = 205; // 2026-11 owner: the default cards were far too small
+	private static final int EDIT_H = 26;
 
 	private enum View { MODULES, ADDONS }
 
@@ -57,8 +56,10 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 
 	private static View view = View.MODULES;
 	/** Selected chip: 0 = All, then a category (or, in Addons, a group). */
-	private static int chip = 1;
+	private static int chip = 0; // "All" first (owner 2026-11-10; was HUD)
 	private static boolean onlyOn;
+	/** Card layout: {@link VeloModuleCard#GRID} (default), COMPACT or LIST - switched next to "On only". */
+	private static int cardStyle = VeloModuleCard.GRID;
 	private static String selectedId;
 
 	private TextFieldWidget search;
@@ -92,7 +93,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		View next = addons && hasAddons() ? View.ADDONS : View.MODULES;
 		if (view != next) {
 			view = next;
-			chip = next == View.ADDONS ? 0 : 1;
+			chip = 0;
 			selectedId = null;
 		}
 		return new ModMenuScreen();
@@ -135,20 +136,16 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		return contentX() + (shell() ? 0 : RAIL + 12);
 	}
 
-	private int drawerX() {
-		return contentX() + contentWidth() - DRAWER;
-	}
-
 	private int mainW() {
-		return drawerX() - 12 - mainX();
+		return contentX() + contentWidth() - mainX();
 	}
 
 	private int chipsY() {
-		return contentY() + 30;
+		return contentY() + 34;
 	}
 
 	private int gridTop() {
-		return chipsY() + 24;
+		return chipsY() + 26;
 	}
 
 	@Override
@@ -163,9 +160,11 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		String query = search == null ? "" : search.getText();
 		this.clearChildren();
 		buildRail();
-		searchW = Math.min(160, mainW() / 4);
-		searchX = mainX() + mainW() - searchW;
-		search = new TextFieldWidget(this.textRenderer, searchX + 20, contentY() + 7, searchW - 26, 12, Text.literal("Search"));
+		editW = editWidth();
+		editX = mainX() + mainW() - editW;
+		searchW = Math.min(150, mainW() / 4);
+		searchX = editX - 8 - searchW;
+		search = new TextFieldWidget(this.textRenderer, searchX + 20, contentY() + 6, searchW - 26, 12, Text.literal("Search"));
 		search.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder(view == View.ADDONS ? "Search addons" : "Search modules"));
 		search.setDrawsBackground(false);
 		search.setText(query);
@@ -207,7 +206,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		if (view != next) {
 			net.veloclient.velo.client.sound.VeloUiSounds.tab();
 			view = next;
-			chip = next == View.ADDONS ? 0 : 1;
+			chip = 0;
 			selectedId = null;
 			if (search != null) {
 				search.setText("");
@@ -275,8 +274,10 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		int top = gridTop();
 		region = new VeloScrollRegion(mainX(), top, mainW(), contentBottom() - top);
 		int usable = region.viewportWidth();
-		int columns = Math.max(2, (usable + GAP) / (MIN_CARD + GAP));
+		int minCard = cardStyle == VeloModuleCard.COMPACT ? 140 : MIN_CARD;
+		int columns = cardStyle == VeloModuleCard.LIST ? 1 : Math.max(2, (usable + GAP) / (minCard + GAP));
 		int cardW = (usable - (columns - 1) * GAP) / columns;
+		int cardH = VeloModuleCard.heightFor(cardStyle);
 		List<int[]> placed = new ArrayList<>();
 		int y = 2;
 		int order = 0;
@@ -286,8 +287,8 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 				continue;
 			}
 			if (section.title() != null) {
-				headings.add(new Heading(y, section.title(), section.note() != null ? section.note() : section.modules().size() + " modules", section.color()));
-				y += 18;
+				headings.add(new Heading(y, section.title(), section.note() != null ? section.note() : String.valueOf(section.modules().size()), section.color()));
+				y += 15;
 			}
 			for (int i = 0; i < section.modules().size(); i++) {
 				Module module = section.modules().get(i);
@@ -296,12 +297,12 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 				}
 				int color = view == View.ADDONS ? ModuleTags.addonGroup(module.id()).color() : MenuKit.accent();
 				VeloModuleCard card = new VeloModuleCard(cardW, module, color, order++, () -> module.id().equals(selectedId),
-						() -> selectedId = module.id(), () -> openSettings(module));
+						() -> selectedId = module.id(), () -> openSettings(module)).style(cardStyle);
 				addSelectableChild(card);
 				region.addRow(card);
-				placed.add(new int[] {mainX() + i % columns * (cardW + GAP), y + i / columns * (VeloModuleCard.HEIGHT + GAP)});
+				placed.add(new int[] {mainX() + i % columns * (cardW + GAP), y + i / columns * (cardH + GAP)});
 			}
-			y += (section.modules().size() + columns - 1) / columns * (VeloModuleCard.HEIGHT + GAP) + 10;
+			y += (section.modules().size() + columns - 1) / columns * (cardH + GAP) + 12;
 		}
 		// Keep the picked module while it's on this page; otherwise pick the first one shown.
 		boolean shown = false;
@@ -324,27 +325,27 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 
 	@Override
 	protected void renderHeaderExtras(DrawContext context, int mouseX, int mouseY) {
-		Text label = MenuKit.uiBold("Edit HUD");
-		editW = this.textRenderer.getWidth(label) + 34;
-		editX = headerRight() - editW;
-		int h = 20;
-		int y = windowY + (HEADER_HEIGHT - h) / 2;
-		boolean hover = MenuKit.inside(mouseX, mouseY, editX, y, editW, h);
-		int accent = MenuKit.accent();
-		VeloDraw.shadow(context, editX, y, editW, h, 7, hover ? 14 : 10, 3, VeloUi.withAlpha(accent, hover ? 0x90 : 0x60));
-		VeloDraw.fillRoundedGradient(context, editX, y, editW, h, 7, VeloAnim.lerpArgb(accent, 0xFFFFFFFF, hover ? 0.2f : 0.1f), accent);
-		MenuKit.icon(context, "hud_layout", editX + 9, y + 5, 10, MenuKit.onAccent());
-		MenuKit.text(context, this.textRenderer, label, editX + 24, y + (h - 8) / 2, MenuKit.onAccent());
+		// Edit HUD moved into the top row as the page's one big button (with what it does under its name).
 	}
 
-	@Override
-	protected boolean headerClick(int mouseX, int mouseY) {
-		int y = windowY + (HEADER_HEIGHT - 20) / 2;
-		if (MenuKit.inside(mouseX, mouseY, editX, y, editW, 20)) {
-			this.client.setScreen(new HudEditScreen(this));
-			return true;
-		}
-		return false;
+	private int editWidth() {
+		return Math.max(this.textRenderer.getWidth(MenuKit.uiBold("Edit HUD")), this.textRenderer.getWidth(MenuKit.small("Move & resize what's on screen")))
+				+ 36;
+	}
+
+	/** The one big red button: Edit HUD, with a second line saying what it is for (players didn't know). */
+	private void drawEditHud(DrawContext context, int mouseX, int mouseY) {
+		int y = contentY() - 1;
+		boolean hover = MenuKit.inside(mouseX, mouseY, editX, y, editW, EDIT_H);
+		int accent = MenuKit.accent();
+		// Calmer than a solid red block (owner: red + white text was too loud): a dark red-tinted card with an accent
+		// edge and icon - still the strongest thing in the row, just not shouting.
+		VeloDraw.fillRounded(context, editX, y, editW, EDIT_H, 6, VeloAnim.lerpArgb(0xFF1A1314, accent, hover ? 0.30f : 0.20f));
+		VeloDraw.strokeRounded(context, editX, y, editW, EDIT_H, 6, VeloUi.withAlpha(accent, hover ? 0xE0 : 0x90));
+		MenuKit.icon(context, "hud_layout", editX + 9, y + (EDIT_H - 13) / 2, 13, MenuKit.accentText());
+		MenuKit.text(context, this.textRenderer, MenuKit.uiBold("Edit HUD"), editX + 28, y + 5, 0xFFF2E9E9);
+		MenuKit.text(context, this.textRenderer, MenuKit.small("Move & resize what's on screen"), editX + 28, y + 15, 0xFFB3A8A9);
+		hits.add(new VeloUi.Hit(editX, y, editW, EDIT_H, () -> this.client.setScreen(new HudEditScreen(this))));
 	}
 
 	// ---- Drawing ----
@@ -356,6 +357,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			drawRail(context, mouseX, mouseY);
 		}
 		drawTopRow(context, mouseX, mouseY);
+		drawEditHud(context, mouseX, mouseY);
 		drawChips(context, mouseX, mouseY);
 	}
 
@@ -382,7 +384,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			int ty = box[1] + (box[2] - 18) / 2;
 			int alpha = Math.round(255 * eased);
 			VeloDraw.shadow(context, tx, ty, w, 18, 6, 10, 3, VeloUi.withAlpha(0xFF000000, Math.round(0x80 * eased)));
-			VeloDraw.fillRounded(context, tx, ty, w, 18, 6, VeloUi.withAlpha(0xFF1C1C23, alpha));
+			VeloDraw.fillRounded(context, tx, ty, w, 18, 6, VeloUi.withAlpha(0xFF141011, alpha));
 			VeloDraw.strokeRounded(context, tx, ty, w, 18, 6, VeloUi.withAlpha(MenuKit.accent(), Math.round(0x70 * eased)));
 			context.enableScissor(tx, ty, tx + w, ty + 18);
 			MenuKit.text(context, this.textRenderer, label, tx + 8, ty + 5, VeloUi.withAlpha(MenuKit.TEXT, alpha));
@@ -398,12 +400,11 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			region.renderScissorStart(context);
 			int top = region.pageTop();
 			for (Heading heading : headings) {
-				int hy = top + heading.y() + 2;
-				VeloDraw.fillCircle(context, mainX() + 3f, hy + 4f, 2.5f, heading.color());
-				Text title = MenuKit.display(heading.title());
-				MenuKit.text(context, this.textRenderer, title, mainX() + 10, hy, MenuKit.TEXT);
-				MenuKit.text(context, this.textRenderer, MenuKit.ui(heading.note()), mainX() + 16 + this.textRenderer.getWidth(title), hy + 1,
-						MenuKit.TEXT_3);
+				int hy = top + heading.y() + 3;
+				Text title = MenuKit.small(heading.title().toUpperCase(Locale.ROOT));
+				MenuKit.text(context, this.textRenderer, title, mainX() + 1, hy, 0xFFB3A8A9);
+				MenuKit.text(context, this.textRenderer, MenuKit.small(heading.note().toUpperCase(Locale.ROOT)),
+						mainX() + 9 + this.textRenderer.getWidth(title), hy, 0xFF7D7273);
 			}
 			region.renderScissorEnd(context);
 			region.renderScrollbarPage(context);
@@ -412,7 +413,6 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 				MenuKit.text(context, this.textRenderer, MenuKit.ui(empty), mainX(), gridTop() + 6, MenuKit.TEXT_3);
 			}
 		}
-		drawDrawer(context, mouseX, mouseY);
 	}
 
 	private void drawRail(DrawContext context, int mouseX, int mouseY) {
@@ -420,7 +420,7 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		int x = contentX();
 		int top = contentY();
 		int bottom = contentBottom();
-		VeloDraw.fillRounded(context, x, top, RAIL, bottom - top, 9, 0x08FFFFFF);
+		VeloDraw.fillRounded(context, x, top, RAIL, bottom - top, 9, 0xE0070505);
 		long upper = rail.stream().filter(r -> !r.bottom()).count();
 		long lower = rail.size() - upper;
 		int size = Math.max(18, Math.min(24, (bottom - top - 16 - (int) (rail.size() + 1) * 3) / rail.size()));
@@ -448,13 +448,11 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 			boolean hover = MenuKit.inside(mouseX, mouseY, ix, iy, size, size);
 			boolean redstone = item.icon().equals("redstone");
 			if (active) {
-				VeloDraw.shadow(context, ix, iy, size, size, 7, 8, 2, VeloUi.withAlpha(MenuKit.accent(), 0x50));
-				VeloDraw.fillRounded(context, ix, iy, size, size, 7, VeloUi.withAlpha(MenuKit.accent(), 0x30));
-				VeloDraw.strokeRounded(context, ix, iy, size, size, 7, VeloUi.withAlpha(MenuKit.accent(), 0x90));
+				VeloDraw.fillRounded(context, ix, iy, size, size, 6, 0xFF1E1718);
 			} else if (hover) {
 				VeloDraw.fillRounded(context, ix, iy, size, size, 7, 0x14FFFFFF);
 			}
-			int tint = active ? 0xFFFFFFFF : redstone ? 0xFFFF6B73 : hover ? 0xFFE4E4E8 : 0xFF9A9AA6;
+			int tint = active ? MenuKit.accentText() : redstone ? 0xFFFF6B73 : hover ? 0xFFE4E4E8 : 0xFF8E8384;
 			int icon = Math.round(size * 0.55f);
 			MenuKit.icon(context, item.icon(), ix + (size - icon) / 2, iy + (size - icon) / 2, icon, tint);
 			if (item.icon().equals("friends")) {
@@ -473,30 +471,30 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		int y = contentY();
 		// The view's title on the left, where the eye starts.
 		Text title = MenuKit.displayLg(view == View.ADDONS ? "Addons" : "Modules");
-		MenuKit.text(context, this.textRenderer, title, x, y + 5, MenuKit.TEXT);
+		MenuKit.text(context, this.textRenderer, title, x, y + 7, MenuKit.TEXT);
 
 		// Search on the far right, the profile switcher right before it.
 		boolean focused = search != null && search.isFocused();
-		boolean searchHover = MenuKit.inside(mouseX, mouseY, searchX, y, searchW, 24);
-		VeloStyle.drawInputField(context, searchX, y + 1, searchW, 22, focused, searchHover);
+		// Profile, search and Edit HUD: one row, all EDIT_H tall on the same line (y - 1).
+		boolean searchHover = MenuKit.inside(mouseX, mouseY, searchX, y - 1, searchW, EDIT_H);
+		VeloStyle.drawInputField(context, searchX, y - 1, searchW, EDIT_H, focused, searchHover);
 		VeloDraw.searchGlyph(context, searchX + 11f, y + 12f, 9f, focused ? MenuKit.accentText() : VeloStyle.textMuted());
 
 		String name = net.veloclient.velo.profile.VeloProfileManager.activeName();
 		Text label = MenuKit.fit(this.textRenderer, MenuKit.uiBold(name == null ? "Default" : name), 90);
 		int w = this.textRenderer.getWidth(label) + 40;
 		int px = searchX - 8 - w;
-		boolean hover = MenuKit.inside(mouseX, mouseY, px, y + 1, w, 22);
-		VeloDraw.fillRounded(context, px, y + 1, w, 22, 7, hover ? 0x16FFFFFF : 0x0BFFFFFF);
-		VeloDraw.strokeRounded(context, px, y + 1, w, 22, 7, hover ? 0x30FFFFFF : 0x18FFFFFF);
-		VeloDraw.fillRounded(context, px + 5, y + 5, 14, 14, 4, VeloUi.withAlpha(MenuKit.accent(), 0x38));
-		MenuKit.icon(context, "profiles", px + 8, y + 8, 8, MenuKit.accentText());
+		boolean hover = MenuKit.inside(mouseX, mouseY, px, y - 1, w, EDIT_H);
+		VeloDraw.fillRounded(context, px, y - 1, w, EDIT_H, 6, hover ? 0x16FFFFFF : 0x0BFFFFFF);
+		VeloDraw.strokeRounded(context, px, y - 1, w, EDIT_H, 6, hover ? 0x30FFFFFF : 0x14FFFFFF);
+		MenuKit.icon(context, "profiles", px + 8, y + 7, 9, 0xFF9A8E8F);
 		MenuKit.text(context, this.textRenderer, label, px + 24, y + 8, MenuKit.TEXT);
 		// A small down chevron.
 		for (int i = 0; i < 3; i++) {
 			context.fill(px + w - 12 + i, y + 10 + i, px + w - 11 + i, y + 11 + i, 0xFF8A8A95);
 			context.fill(px + w - 8 - i, y + 10 + i, px + w - 7 - i, y + 11 + i, 0xFF8A8A95);
 		}
-		hits.add(new VeloUi.Hit(px, y + 1, w, 22, () -> this.client.setScreen(new ProfileScreen(this))));
+		hits.add(new VeloUi.Hit(px, y - 1, w, EDIT_H, () -> this.client.setScreen(new ProfileScreen(this))));
 		// What's playing, in the gap between the title and the profile switcher.
 		int titleRight = x + this.textRenderer.getWidth(title) + 14;
 		media.renderPill(context, this.textRenderer, px - 8, y + 1, px - 8 - titleRight, mouseX, mouseY);
@@ -520,19 +518,17 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 		for (int i = 0; i < labels.size(); i++) {
 			Text label = MenuKit.uiBold(labels.get(i));
 			int w = this.textRenderer.getWidth(label) + 14;
-			if (x + w > right - onW - 8) {
+			if (x + w > right - onW - 8 - 3 * 18 - 6) {
 				break;
 			}
 			boolean on = i == chip;
 			boolean hover = MenuKit.inside(mouseX, mouseY, x, y, w, 16);
 			int color = view == View.ADDONS && i > 0 ? ModuleTags.addonGroups().get(i - 1).color() : MenuKit.accent();
+			// Launcher-style tabs: plain text, the picked one white with an accent line under it.
 			if (on) {
-				VeloDraw.fillRounded(context, x, y, w, 16, 8, VeloUi.withAlpha(color, 0x30));
-				VeloDraw.strokeRounded(context, x, y, w, 16, 8, VeloUi.withAlpha(color, 0xB0));
-			} else if (hover) {
-				VeloDraw.fillRounded(context, x, y, w, 16, 8, 0x12FFFFFF);
+				context.fill(x + 7, y + 16, x + w - 7, y + 18, color);
 			}
-			MenuKit.text(context, this.textRenderer, label, x + 7, y + 4, on ? 0xFFFFFFFF : hover ? 0xFFE4E4E8 : 0xFF9A9AA6);
+			MenuKit.text(context, this.textRenderer, label, x + 7, y + 4, on ? 0xFFFFFFFF : hover ? 0xFFE4E4E8 : 0xFF9A8E8F);
 			int index = i;
 			hits.add(new VeloUi.Hit(x, y, w, 16, () -> {
 				if (chip != index) {
@@ -545,204 +541,50 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 				restartPageIn();
 				rebuildPage();
 			}));
-			x += w + 4;
+			x += w + 2;
+		}
+		context.fill(mainX(), y + 18, right, y + 19, 0x10FFFFFF);
+		// Layout switch (grid / small / list), left of "On only".
+		for (int k = 0; k < 3; k++) {
+			int bx = right - onW - 8 - (3 - k) * 18;
+			boolean picked = cardStyle == k;
+			boolean over = MenuKit.inside(mouseX, mouseY, bx, y, 16, 16);
+			VeloDraw.fillRounded(context, bx, y, 16, 16, 4, picked ? 0xFF2A2324 : over ? 0x12FFFFFF : 0x00FFFFFF);
+			int g = picked ? 0xFFEDE6E6 : over ? 0xFFD4CCCC : 0xFF8E8384;
+			if (k == 0) {
+				context.fill(bx + 4, y + 4, bx + 7, y + 7, g);
+				context.fill(bx + 9, y + 4, bx + 12, y + 7, g);
+				context.fill(bx + 4, y + 9, bx + 7, y + 12, g);
+				context.fill(bx + 9, y + 9, bx + 12, y + 12, g);
+			} else if (k == 1) {
+				for (int gx = 0; gx < 3; gx++) {
+					for (int gy = 0; gy < 3; gy++) {
+						context.fill(bx + 4 + gx * 3, y + 4 + gy * 3, bx + 6 + gx * 3, y + 6 + gy * 3, g);
+					}
+				}
+			} else {
+				for (int gy = 0; gy < 3; gy++) {
+					context.fill(bx + 4, y + 4 + gy * 3, bx + 12, y + 5 + gy * 3, g);
+				}
+			}
+			int pick = k;
+			hits.add(new VeloUi.Hit(bx, y, 16, 16, () -> {
+				if (cardStyle != pick) {
+					cardStyle = pick;
+					restartPageIn();
+					rebuildPage();
+				}
+			}));
 		}
 		int ox = right - onW;
 		boolean hover = MenuKit.inside(mouseX, mouseY, ox, y, onW, 16);
-		VeloDraw.fillRounded(context, ox, y, onW, 16, 8, onlyOn ? VeloUi.withAlpha(MenuKit.GREEN, 0x30) : hover ? 0x12FFFFFF : 0x08FFFFFF);
-		VeloDraw.strokeRounded(context, ox, y, onW, 16, 8, onlyOn ? VeloUi.withAlpha(MenuKit.GREEN, 0xA0) : 0x18FFFFFF);
-		MenuKit.text(context, this.textRenderer, onLabel, ox + 7, y + 4, onlyOn ? MenuKit.GREEN : 0xFF9A9AA6);
+		VeloDraw.fillRounded(context, ox, y, onW, 16, 5, onlyOn ? VeloUi.withAlpha(MenuKit.accent(), 0x26) : hover ? 0x12FFFFFF : 0x00FFFFFF);
+		VeloDraw.strokeRounded(context, ox, y, onW, 16, 5, onlyOn ? VeloUi.withAlpha(MenuKit.accent(), 0x90) : 0x16FFFFFF);
+		MenuKit.text(context, this.textRenderer, onLabel, ox + 7, y + 4, onlyOn ? MenuKit.accentText() : 0xFF9A8E8F);
 		hits.add(new VeloUi.Hit(ox, y, onW, 16, () -> {
 			onlyOn = !onlyOn;
 			rebuildPage();
 		}));
-	}
-
-	/** The side panel for the picked module. */
-	private void drawDrawer(DrawContext context, int mouseX, int mouseY) {
-		int x = drawerX();
-		int y = contentY();
-		int w = DRAWER;
-		int h = contentBottom() - y;
-		Module module = selectedId == null ? null : ModuleRegistry.get(selectedId).orElse(null);
-		int color = module != null && module.category() == ModuleCategory.ADDONS ? ModuleTags.addonGroup(module.id()).color() : MenuKit.accent();
-		VeloDraw.fillRounded(context, x, y, w, h, 10, 0x0AFFFFFF);
-		VeloDraw.fillRoundedGradient(context, x, y, w, Math.min(90, h), 10, VeloUi.withAlpha(color, 0x1C), 0x00000000);
-		VeloDraw.strokeRounded(context, x, y, w, h, 10, 0x16FFFFFF);
-		if (module == null) {
-			MenuKit.text(context, this.textRenderer, MenuKit.ui("Pick a module."), x + 12, y + 14, MenuKit.TEXT_3);
-			return;
-		}
-		int px = x + 12;
-		int pw = w - 24;
-		// Icon, name, switch.
-		boolean enabled = module.isEnabled();
-		int tile = 32;
-		if (enabled) {
-			VeloDraw.shadow(context, px, y + 12, tile, tile, 9, 12, 3, VeloUi.withAlpha(color, 0x70));
-		}
-		VeloDraw.fillRoundedGradient(context, px, y + 12, tile, tile, 9, enabled ? VeloAnim.lerpArgb(color, 0xFFFFFFFF, 0.08f) : 0xFF26262D,
-				enabled ? VeloAnim.lerpArgb(color, 0xFF000000, 0.35f) : 0xFF1A1A20);
-		context.drawTexture(RenderPipelines.GUI_TEXTURED, ModuleIcons.textureFor(module.id()), px + 7, y + 19, 0f, 0f, 18, 18, 18, 18, 18, 18,
-				enabled ? 0xFFFFFFFF : 0xFFC9C9D1);
-		Text beta = MenuKit.small("BETA");
-		int betaW = module.beta() ? this.textRenderer.getWidth(beta) + 10 : 0;
-		Text name = MenuKit.fit(this.textRenderer, MenuKit.display(module.displayName()), pw - tile - 8 - (betaW > 0 ? betaW + 6 : 0));
-		MenuKit.text(context, this.textRenderer, name, px + tile + 8, y + 15, MenuKit.TEXT);
-		int badgeX = px + tile + 8 + MenuKit.width(this.textRenderer, name) + 6;
-		if (betaW > 0) {
-			VeloDraw.fillRounded(context, badgeX, y + 15, betaW, 11, 4, 0xFFE0A030);
-			MenuKit.text(context, this.textRenderer, beta, badgeX + 5, y + 17, 0xFF1A1206);
-			badgeX += betaW + 4;
-		}
-		if (module.isNew()) {
-			Text fresh = MenuKit.small("NEW");
-			int newW = this.textRenderer.getWidth(fresh) + 10;
-			if (badgeX + newW <= px + pw) {
-				VeloDraw.fillRounded(context, badgeX, y + 15, newW, 11, 4, (MenuKit.accent() & 0xFFFFFF) | 0x30000000);
-				MenuKit.text(context, this.textRenderer, fresh, badgeX + 5, y + 17, VeloAnim.lerpArgb(MenuKit.accent(), 0xFFFFFFFF, 0.35f));
-			}
-		}
-		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui("Good for " + ModuleTags.tag(module)), pw - tile - 8),
-				px + tile + 8, y + 30, MenuKit.TEXT_3);
-		int sy = y + 54;
-		Text state = MenuKit.uiBold(enabled ? "On" : "Off");
-		MenuKit.text(context, this.textRenderer, state, px, sy + 2, enabled ? VeloAnim.lerpArgb(color, 0xFFFFFFFF, 0.3f) : MenuKit.TEXT_2);
-		drawSwitch(context, px + pw - 22, sy, 22, 12, enabled, color);
-		hits.add(new VeloUi.Hit(px, sy - 2, pw, 16, () -> {
-			module.setEnabled(!module.isEnabled());
-			net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
-			QuickToggles.touch(module.id());
-		}));
-		int cy = sy + 22;
-		// What it does.
-		List<Text> lines = MenuKit.wrap(this.textRenderer, module.description(), MenuKit::ui, pw);
-		for (int i = 0; i < Math.min(4, lines.size()); i++) {
-			Text line = lines.get(i);
-			if (i == 3 && lines.size() > 4) {
-				line = MenuKit.fit(this.textRenderer, MenuKit.ui(line.getString() + " " + lines.get(4).getString()), pw);
-			}
-			MenuKit.text(context, this.textRenderer, line, px, cy, MenuKit.TEXT_2);
-			cy += 11;
-		}
-		cy += 8;
-		// Its styles, one click each.
-		List<ConfigField> fields = module instanceof Configurable configurable ? configurable.configFields() : List.of();
-		ConfigField.ChoiceField style = null;
-		List<ConfigField.ToggleField> toggles = new ArrayList<>();
-		for (ConfigField field : fields) {
-			if (field instanceof ConfigField.ChoiceField choice && style == null && choice.label().equalsIgnoreCase("Style")) {
-				style = choice;
-			} else if (field instanceof ConfigField.ToggleField toggle && toggles.size() < 4) {
-				toggles.add(toggle);
-			}
-		}
-		int buttonsTop = contentBottom() - 12 - 20 - (module instanceof HudModule ? 24 : 0);
-		int shownFields = 0;
-		if (style != null && cy + 30 < buttonsTop) {
-			shownFields++;
-			MenuKit.text(context, this.textRenderer, MenuKit.small("STYLE"), px, cy, MenuKit.TEXT_3);
-			cy += 11;
-			int bx = px;
-			String current = style.get().get();
-			for (String option : style.options()) {
-				Text label = MenuKit.uiBold(option);
-				int bw = Math.min(pw, this.textRenderer.getWidth(label) + 14);
-				if (bx + bw > px + pw) {
-					bx = px;
-					cy += 20;
-				}
-				if (cy + 16 > buttonsTop - 8) {
-					break;
-				}
-				boolean on = option.equals(current);
-				boolean hover = MenuKit.inside(mouseX, mouseY, bx, cy, bw, 16);
-				VeloDraw.fillRounded(context, bx, cy, bw, 16, 6, on ? VeloUi.withAlpha(color, 0x34) : hover ? 0x16FFFFFF : 0x0AFFFFFF);
-				VeloDraw.strokeRounded(context, bx, cy, bw, 16, 6, on ? VeloUi.withAlpha(color, 0xC0) : 0x18FFFFFF);
-				MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, label, bw - 12), bx + 7, cy + 4, on ? 0xFFFFFFFF : 0xFFB4B4BE);
-				ConfigField.ChoiceField field = style;
-				hits.add(new VeloUi.Hit(bx, cy, bw, 16, () -> {
-					field.set().accept(option);
-					net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
-				}));
-				bx += bw + 4;
-			}
-			cy += 26;
-		}
-		// A few of its switches.
-		if (!toggles.isEmpty() && cy + 30 < buttonsTop) {
-			MenuKit.text(context, this.textRenderer, MenuKit.small("QUICK SETTINGS"), px, cy, MenuKit.TEXT_3);
-			cy += 12;
-			for (ConfigField.ToggleField toggle : toggles) {
-				if (cy + 14 > buttonsTop - 6) {
-					break;
-				}
-				boolean on = toggle.get().getAsBoolean();
-				MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(toggle.label()), pw - 30), px, cy + 2, MenuKit.TEXT);
-				drawSwitch(context, px + pw - 18, cy + 1, 18, 10, on, color);
-				hits.add(new VeloUi.Hit(px, cy - 1, pw, 14, () -> {
-					toggle.set().accept(!toggle.get().getAsBoolean());
-					net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
-				}));
-				shownFields++;
-				cy += 16;
-			}
-			cy += 6;
-		}
-		// The drawer only shows a few: say so, and lead to the rest.
-		int moreFields = (int) fields.stream().filter(f -> !(f instanceof ConfigField.HeaderField)).count() - shownFields;
-		if (moreFields > 0 && cy + 14 < buttonsTop) {
-			boolean hover = MenuKit.inside(mouseX, mouseY, px, cy - 1, pw, 14);
-			for (int d = 0; d < 3; d++) {
-				VeloDraw.fillCircle(context, px + 2.5f + d * 4f, cy + 6f, 1.3f, hover ? color : MenuKit.TEXT_3);
-			}
-			MenuKit.text(context, this.textRenderer, MenuKit.ui(moreFields + " more setting" + (moreFields == 1 ? "" : "s") + " in All settings"),
-					px + 16, cy + 2, hover ? MenuKit.TEXT : MenuKit.TEXT_3);
-			hits.add(new VeloUi.Hit(px, cy - 1, pw, 14, () -> openSettings(module)));
-			cy += 20;
-		}
-		// Favourite (shows in the pause menu's quick toggles).
-		boolean favorite = QuickToggles.isFavorite(module.id());
-		if (cy + 14 < buttonsTop) {
-			boolean hover = MenuKit.inside(mouseX, mouseY, px, cy, pw, 14);
-			VeloDraw.fillCircle(context, px + 4f, cy + 6f, 4f, favorite ? MenuKit.GOLD : 0x30FFFFFF);
-			if (!favorite) {
-				VeloDraw.fillCircle(context, px + 4f, cy + 6f, 2.6f, 0xFF16161B);
-			}
-			MenuKit.text(context, this.textRenderer, MenuKit.uiBold(favorite ? "In your pause menu" : "Add to pause menu"), px + 13, cy + 2,
-					favorite ? MenuKit.GOLD : hover ? MenuKit.TEXT : MenuKit.TEXT_2);
-			hits.add(new VeloUi.Hit(px, cy, pw, 14, () -> QuickToggles.setFavorite(module.id(), !favorite)));
-		}
-		// Buttons.
-		int by = buttonsTop;
-		if (module instanceof HudModule) {
-			button(context, px, by, pw, "Place on screen", false, color, mouseX, mouseY, () -> this.client.setScreen(new HudEditScreen(this)));
-			by += 24;
-		}
-		button(context, px, by, pw, moreFields > 0 ? "All settings (+" + moreFields + ")" : "All settings", true, color, mouseX, mouseY, () -> openSettings(module));
-	}
-
-	private void button(DrawContext context, int x, int y, int w, String text, boolean primary, int color, int mouseX, int mouseY, Runnable action) {
-		boolean hover = MenuKit.inside(mouseX, mouseY, x, y, w, 20);
-		if (primary) {
-			VeloDraw.shadow(context, x, y, w, 20, 7, hover ? 12 : 8, 3, VeloUi.withAlpha(color, hover ? 0x80 : 0x50));
-			VeloDraw.fillRoundedGradient(context, x, y, w, 20, 7, VeloAnim.lerpArgb(color, 0xFFFFFFFF, hover ? 0.18f : 0.08f), color);
-		} else {
-			VeloDraw.fillRounded(context, x, y, w, 20, 7, hover ? 0x1AFFFFFF : 0x0DFFFFFF);
-			VeloDraw.strokeRounded(context, x, y, w, 20, 7, 0x24FFFFFF);
-		}
-		Text label = MenuKit.uiBold(text);
-		MenuKit.text(context, this.textRenderer, label, x + (w - this.textRenderer.getWidth(label)) / 2, y + 6, primary ? MenuKit.onAccent() : MenuKit.TEXT);
-		hits.add(new VeloUi.Hit(x, y, w, 20, action));
-	}
-
-	private static void drawSwitch(DrawContext context, int x, int y, int w, int h, boolean on, int color) {
-		if (on) {
-			VeloDraw.shadow(context, x, y, w, h, h / 2, 6, 1, VeloUi.withAlpha(color, 0x60));
-		}
-		VeloDraw.fillRounded(context, x, y, w, h, h / 2, on ? color : 0xFF3A3A42);
-		float knob = h - 4;
-		VeloDraw.fillCircle(context, x + 2 + knob / 2 + (on ? w - 4 - knob : 0), y + h / 2f, knob / 2, on ? 0xFFFFFFFF : 0xFFC9C9D1);
 	}
 
 	private static int friendsBadge() {

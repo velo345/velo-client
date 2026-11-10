@@ -176,6 +176,11 @@ public final class NewsApi {
 
 	// ---- Bug reports (anyone) ----
 
+	/** Your own reports (newest first): id, createdAt, kind, title, status (new / seen / fixed / wontfix). */
+	public static JsonArray myReports() throws NewsError {
+		return send(request("/v1/reports/mine").GET().build()).getAsJsonArray("reports");
+	}
+
 	public static String sendReport(JsonObject report) throws NewsError {
 		return send(request("/v1/reports").header("Content-Type", "application/json").timeout(Duration.ofSeconds(60))
 				.POST(HttpRequest.BodyPublishers.ofString(report.toString())).build()).get("id").getAsString();

@@ -18,8 +18,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The launcher's interface sounds (same set as the game's, made by tools/sounds/make_ui_sounds.py): a soft swell when it
- * opens, a deep bloom when you press Play, clicks and switch ticks. Dev build only for now, and off with Settings >
- * Interface sounds. Clips are decoded once, off the FX thread; a sound that isn't ready yet is simply skipped.
+ * opens, a deep bloom when you press Play, clicks and switch ticks. On by default, off with Settings >
+ * Interface sounds. Every press sounds: buttons, switches, tiles, rows and links. Clips are decoded once, off the FX thread; a sound that isn't ready yet is simply skipped.
  */
 public final class UiSounds {
 
@@ -105,10 +105,35 @@ public final class UiSounds {
 				play(box.isSelected() ? "toggle_on" : "toggle_off");
 			} else if (target instanceof ToggleButton toggle) {
 				play(toggle.isSelected() ? "toggle_on" : "toggle_off");
-			} else if (target instanceof ButtonBase button && button.getStyleClass().contains("topnav-tab")) {
-				play("tab"); // switching pages in the top bar
+			} else if (target instanceof ButtonBase button && (button.getStyleClass().contains("topnav-tab")
+					|| button.getStyleClass().contains("sidebar-nav"))) {
+				play("tab"); // switching pages
 			} else if (target instanceof ButtonBase) {
 				play("click");
+			}
+		});
+		// Everything else you can press clicks too (2026-11): tiles, cards, rows, links and dropdowns - anything with its
+		// own click handler that isn't a button (those already sounded above).
+		scene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
+			if (e.getButton() != javafx.scene.input.MouseButton.PRIMARY) {
+				return;
+			}
+			for (Object n = e.getTarget(); n instanceof javafx.scene.Node node; n = node.getParent()) {
+				if (node instanceof ButtonBase && !(node instanceof javafx.scene.control.MenuButton)) {
+					return;
+				}
+				if (node.isDisabled()) {
+					return;
+				}
+				if (node instanceof javafx.scene.control.ComboBoxBase<?> || node instanceof javafx.scene.control.MenuButton
+						|| node.getOnMouseClicked() != null) {
+					long now = System.nanoTime();
+					if (now - lastClick >= 40_000_000L) {
+						lastClick = now;
+						play("click");
+					}
+					return;
+				}
 			}
 		});
 	}

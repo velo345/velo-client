@@ -91,7 +91,10 @@ public final class CapeThumbnails {
 
 	/** The first frame's cloak corner at {@link #TEXELS} per cloak pixel, on a transparent 64 x 32 layout. */
 	private static BufferedImage layout(BufferedImage frame) {
-		int scale = Math.max(1, frame.getWidth() / 64);
+		// Full 64x32 layout (2:1) or a frame already cropped to the cloak corner (22x17 cloak px, HD art since 0.9.9):
+		// width/64 on a cropped frame gave a third of the scale, so only the left part of the art ended up in the card.
+		double aspect = frame.getWidth() / (double) Math.max(1, frame.getHeight());
+		int scale = Math.max(1, Math.abs(aspect - 2.0) < 0.25 ? frame.getWidth() / 64 : frame.getWidth() / REGION_W);
 		int rw = Math.min(frame.getWidth(), REGION_W * scale);
 		int rh = Math.min(frame.getHeight(), REGION_H * scale);
 		int outScale = Math.min(TEXELS, scale);
@@ -155,6 +158,7 @@ public final class CapeThumbnails {
 	}
 
 	private static Path cacheDir() {
-		return VeloPaths.root().resolve("cache").resolve("cloak-thumbs");
+		// v2: the first thumbnails of cropped HD cloaks were cut (wrong scale) - a new folder makes them again
+		return VeloPaths.root().resolve("cache").resolve("cloak-thumbs-v2");
 	}
 }

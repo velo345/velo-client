@@ -312,14 +312,79 @@ public final class VeloScrollRegion {
 		}
 	}
 
+	// ---- dragging the scrollbar (it was wheel-only) ----
+	private int barContent;
+	private long barDrawnAt;
+	private static VeloScrollRegion dragging;
+	private static double dragGrab;
+
+	private float thumbHeight(int contentHeight) {
+		return Math.max(18f, (float) height * height / contentHeight);
+	}
+
+	private float thumbY(int contentHeight) {
+		int maxScroll = contentHeight - height;
+		return y + (maxScroll > 0 ? (float) (shownOffset / maxScroll * (height - thumbHeight(contentHeight))) : 0f);
+	}
+
+	/** A press on a visible scrollbar of {@code screen} (track or thumb, a few pixels wide): starts dragging it. */
+	public static boolean pressScrollbar(Object screen, double mouseX, double mouseY) {
+		long now = System.nanoTime();
+		synchronized (LIVE) {
+			for (VeloScrollRegion r : LIVE.keySet()) {
+				if (r.screen != screen || r.barContent <= r.height || now - r.barDrawnAt > 250_000_000L) {
+					continue;
+				}
+				if (mouseX >= r.x + r.viewportWidth() + 1 && mouseX <= r.x + r.width + 2 && mouseY >= r.y && mouseY <= r.y + r.height) {
+					float thumbY = r.thumbY(r.barContent);
+					float thumbH = r.thumbHeight(r.barContent);
+					dragGrab = mouseY >= thumbY && mouseY <= thumbY + thumbH ? mouseY - thumbY : thumbH / 2f;
+					dragging = r;
+					r.dragTo(mouseY);
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	public static boolean dragScrollbar(double mouseY) {
+		if (dragging == null) {
+			return false;
+		}
+		dragging.dragTo(mouseY);
+		return true;
+	}
+
+	public static boolean releaseScrollbar() {
+		boolean was = dragging != null;
+		dragging = null;
+		return was;
+	}
+
+	private void dragTo(double mouseY) {
+		float thumbH = thumbHeight(barContent);
+		int maxScroll = barContent - height;
+		double t = (mouseY - dragGrab - y) / Math.max(1, height - thumbH);
+		scrollOffset = Math.max(0, Math.min(1, t)) * maxScroll;
+		lastScrollNanos = System.nanoTime();
+		remember();
+		if (lastNanos == 0) {
+			shownOffset = scrollOffset;
+		}
+	}
+
 	private void drawScrollbar(DrawContext context, int contentHeight) {
+		barContent = contentHeight;
+		barDrawnAt = System.nanoTime();
 		Theme theme = ThemeManager.active();
 		float trackX = x + width - SCROLLBAR_WIDTH;
 		float thumbHeight = Math.max(18f, (float) height * height / contentHeight);
 		int maxScroll = contentHeight - height;
 		float thumbY = y + (maxScroll > 0 ? (float) (shownOffset / maxScroll * (height - thumbHeight)) : 0f);
 		VeloDraw.fillRounded(context, trackX, y, SCROLLBAR_WIDTH, height, SCROLLBAR_WIDTH / 2f, VeloUi.withAlpha(theme.text(), 0x0C));
-		VeloDraw.fillRounded(context, trackX, thumbY, SCROLLBAR_WIDTH, thumbHeight, SCROLLBAR_WIDTH / 2f, VeloUi.withAlpha(theme.text(), 0x48));
+		VeloDraw.fillRounded(context, trackX, thumbY, SCROLLBAR_WIDTH, thumbHeight, SCROLLBAR_WIDTH / 2f,
+				VeloUi.withAlpha(theme.text(), dragging == this ? 0x90 : 0x48));
 	}
 
 	private boolean contains(double mouseX, double mouseY) {

@@ -324,6 +324,30 @@ public final class ScreenshotTour {
 			case "rshift" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.ModMenuScreen())},
 					new Object[] {30, (Runnable) () -> shot(client, "rshift")});
+			// Every module that has a live preview, one shot each (to spot empty previews).
+			case "allpreviews" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				for (var module : ModuleRegistry.all()) {
+					if (net.veloclient.velo.client.gui.window.ModulePreview.kind(module) == net.veloclient.velo.client.gui.window.ModulePreview.Kind.NONE
+							|| module instanceof net.veloclient.velo.client.gui.window.ModuleDashboard) {
+						continue;
+					}
+					steps.add(new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.window.ModuleConfigScreen(module,
+							new net.veloclient.velo.client.gui.ModMenuScreen()))});
+					steps.add(new Object[] {18, (Runnable) () -> shot(client, "pv-" + module.id())});
+				}
+				yield steps;
+			}
+			// 2026-11 redesign: module pages with their live previews (HUD element, crosshair, world view, player).
+			case "modpages" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				for (String id : System.getProperty("velo.screenshotTour.modules", "fps-counter,custom-crosshair,block-outline,cosmetics-quality,zoom").split(",")) {
+					steps.add(new Object[] {2, (Runnable) () -> ModuleRegistry.get(id).ifPresent(m ->
+							client.setScreen(new net.veloclient.velo.client.gui.window.ModuleConfigScreen(m, new net.veloclient.velo.client.gui.ModMenuScreen())))});
+					steps.add(new Object[] {35, (Runnable) () -> shot(client, "module-" + id)});
+				}
+				yield steps;
+			}
 			case "rshift-menu" -> List.of(
 					new Object[] {0, (Runnable) () -> {
 						var menu = new net.veloclient.velo.client.gui.ModMenuScreen();

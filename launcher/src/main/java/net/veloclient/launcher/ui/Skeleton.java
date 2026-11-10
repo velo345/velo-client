@@ -92,20 +92,51 @@ public final class Skeleton {
 		return r;
 	}
 
+	/**
+	 * 2026-11: a soft breathing plus a light sheen that sweeps across, so loading reads as "on its way" instead of frozen.
+	 * Both only run while the placeholder is in a window.
+	 */
 	private static Node pulse(Region root) {
 		root.setMouseTransparent(true);
-		FadeTransition fade = RenderGate.gate(new FadeTransition(Duration.millis(900), root));
+		FadeTransition fade = RenderGate.gate(new FadeTransition(Duration.millis(1100), root));
 		fade.setFromValue(1.0);
-		fade.setToValue(0.45);
+		fade.setToValue(0.7);
 		fade.setAutoReverse(true);
 		fade.setCycleCount(Animation.INDEFINITE);
-		root.sceneProperty().addListener((o, was, scene) -> {
+		Region sheen = new Region();
+		sheen.getStyleClass().add("skeleton-sheen");
+		sheen.setManaged(false);
+		sheen.setMouseTransparent(true);
+		javafx.scene.layout.StackPane holder = new javafx.scene.layout.StackPane(root, sheen);
+		holder.setMouseTransparent(true);
+		holder.setAlignment(Pos.TOP_LEFT);
+		javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
+		clip.widthProperty().bind(holder.widthProperty());
+		clip.heightProperty().bind(holder.heightProperty());
+		holder.setClip(clip);
+		javafx.animation.TranslateTransition sweep = RenderGate.gate(new javafx.animation.TranslateTransition(Duration.millis(1500), sheen));
+		sweep.setInterpolator(javafx.animation.Interpolator.EASE_BOTH);
+		sweep.setCycleCount(Animation.INDEFINITE);
+		Runnable size = () -> {
+			double w = Math.max(160, holder.getWidth() * 0.35);
+			sheen.resize(w, holder.getHeight());
+			sweep.setFromX(-w);
+			sweep.setToX(holder.getWidth() + w);
+		};
+		holder.widthProperty().addListener((o, a, b) -> {
+			size.run();
+			sweep.playFromStart();
+		});
+		holder.heightProperty().addListener((o, a, b) -> size.run());
+		holder.sceneProperty().addListener((o, was, scene) -> {
 			if (scene != null) {
 				fade.play();
+				sweep.play();
 			} else {
 				fade.stop();
+				sweep.stop();
 			}
 		});
-		return root;
+		return holder;
 	}
 }

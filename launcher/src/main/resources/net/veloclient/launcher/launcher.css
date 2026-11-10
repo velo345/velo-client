@@ -8,26 +8,26 @@
 	 * scene graph and never see that inline override, so they fall back to
 	 * these defaults instead of failing CSS color lookups.
 	 */
-	-velo-background: #0b0b0e;
-	-velo-surface: #131317;
-	-velo-surface-2: #1b1b21;
-	-velo-surface-3: #23232a;
+	-velo-background: #0c0a0a;
+	-velo-surface: #141011;
+	-velo-surface-2: #1b1617;
+	-velo-surface-3: #231c1d;
 	-velo-glass: rgba(11, 11, 14, 0.86);
-	-velo-accent-start: #e0262e;
+	-velo-accent-start: #d7262d;
 	-velo-accent-end: #c81f27;
-	-velo-accent: #e0262e;
+	-velo-accent: #d7262d;
 	-velo-accent-hover: #e43c43;
 	-velo-accent-pressed: #c12128;
 	-velo-accent-soft: rgba(224, 38, 46, 0.12);
 	-velo-accent-line: rgba(224, 38, 46, 0.38);
 	-velo-accent-glow: rgba(224, 38, 46, 0.35);
-	-velo-accent-text: #ff5a5f;
+	-velo-accent-text: #ff6b6f;
 	/* text drawn on a solid accent fill - dark for light accents (Nord, Monochrome); set from the theme */
 	-velo-on-accent: white;
-	-velo-text: #f4f4f6;
+	-velo-text: #f4efee;
 	-velo-text-2: rgba(244, 244, 246, 0.68);
 	-velo-text-3: rgba(244, 244, 246, 0.5);
-	-velo-hover: #1f1f25;
+	-velo-hover: #1f1819;
 	-velo-hairline: rgba(255, 255, 255, 0.07);
 	-velo-hairline-2: rgba(255, 255, 255, 0.12);
 	/* fixed meaning colors - the same in every theme */
@@ -37,7 +37,7 @@
 	-velo-blue: #5aa9ff;
 	-velo-violet: #bca6ff;
 	-velo-danger: #ff7a7e;
-	-fx-font-family: "Inter", "Segoe UI", "Helvetica Neue", sans-serif;
+	-fx-font-family: "Geist", "Segoe UI", "Helvetica Neue", sans-serif;
 	-fx-font-smoothing-type: gray;
 	-fx-background-color: -velo-background;
 }
@@ -1134,7 +1134,7 @@
 
 .signin-code {
 	-fx-text-fill: -velo-text;
-	-fx-font-family: "JetBrains Mono", "Consolas", "DejaVu Sans Mono", monospace;
+	-fx-font-family: "Geist Mono", "Consolas", "DejaVu Sans Mono", monospace;
 	-fx-font-size: 32px;
 	-fx-font-weight: bold;
 }
@@ -1535,7 +1535,7 @@
 
 .profile-uuid {
 	-fx-text-fill: derive(-velo-text, -45%);
-	-fx-font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace;
+	-fx-font-family: "Geist Mono", "DejaVu Sans Mono", monospace;
 	-fx-font-size: 11px;
 }
 
@@ -2117,7 +2117,7 @@
 }
 
 .news-run-code {
-	-fx-font-family: "JetBrains Mono", "Consolas", monospace;
+	-fx-font-family: "Geist Mono", "Consolas", monospace;
 	-fx-fill: #ffd9a0;
 }
 
@@ -2329,7 +2329,7 @@
 }
 
 .mono-area, .mono-area .content {
-	-fx-font-family: "JetBrains Mono", "Consolas", "DejaVu Sans Mono", monospace;
+	-fx-font-family: "Geist Mono", "Consolas", "DejaVu Sans Mono", monospace;
 	-fx-font-size: 11.5px;
 }
 
@@ -2347,7 +2347,7 @@
 
 .crash-cause {
 	-fx-text-fill: derive(-velo-text, -30%);
-	-fx-font-family: "JetBrains Mono", "Consolas", monospace;
+	-fx-font-family: "Geist Mono", "Consolas", monospace;
 	-fx-font-size: 12px;
 }
 
@@ -2425,27 +2425,27 @@
  * ====================================================================== */
 
 .root {
-	-fx-font-family: "Inter", "Segoe UI", sans-serif;
+	-fx-font-family: "Geist", "Segoe UI", sans-serif;
 	-fx-font-size: 13px;
 }
 
 /* ---- Typography ---- */
 
-.t-display { -fx-font-family: "Sora"; -fx-font-weight: bold; -fx-font-size: 44px; -fx-text-fill: -velo-text; }
-.t-title { -fx-font-family: "Sora"; -fx-font-weight: bold; -fx-font-size: 28px; -fx-text-fill: -velo-text; }
-.t-title-sm { -fx-font-family: "Sora"; -fx-font-weight: bold; -fx-font-size: 20px; -fx-text-fill: -velo-text; }
-.t-heading { -fx-font-family: "Sora SemiBold"; -fx-font-size: 17px; -fx-text-fill: -velo-text; }
-.t-strong { -fx-font-weight: 600; -fx-font-family: "Inter SemiBold"; -fx-text-fill: -velo-text; }
+.t-display { -fx-font-family: "Archivo SemiExpanded"; -fx-font-weight: bold; -fx-font-size: 44px; -fx-text-fill: -velo-text; }
+.t-title { -fx-font-family: "Archivo SemiExpanded"; -fx-font-weight: bold; -fx-font-size: 28px; -fx-text-fill: -velo-text; }
+.t-title-sm { -fx-font-family: "Archivo SemiExpanded"; -fx-font-weight: bold; -fx-font-size: 20px; -fx-text-fill: -velo-text; }
+.t-heading { -fx-font-family: "Archivo SemiExpanded"; -fx-font-size: 17px; -fx-text-fill: -velo-text; }
+.t-strong { -fx-font-weight: 600; -fx-font-family: "Geist SemiBold"; -fx-text-fill: -velo-text; }
 .t-body { -fx-font-size: 14px; -fx-text-fill: -velo-text-2; }
 .t-muted { -fx-font-size: 12px; -fx-text-fill: -velo-text-3; }
-.t-overline { -fx-font-family: "Inter"; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: -velo-accent-text; }
-.t-mono { -fx-font-family: "JetBrains Mono Medium"; -fx-font-size: 12px; -fx-text-fill: -velo-text-2; }
-.t-link { -fx-font-family: "Inter SemiBold"; -fx-text-fill: -velo-accent-text; -fx-cursor: hand; }
+.t-overline { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: -velo-accent-text; }
+.t-mono { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 12px; -fx-text-fill: -velo-text-2; }
+.t-link { -fx-font-family: "Geist SemiBold"; -fx-text-fill: -velo-accent-text; -fx-cursor: hand; }
 .t-link:hover { -fx-underline: true; }
 .t-gold { -fx-text-fill: -velo-gold; }
 .t-green { -fx-text-fill: -velo-green; }
 
-.page-title { -fx-font-family: "Sora"; -fx-font-weight: bold; -fx-font-size: 28px; -fx-text-fill: -velo-text; }
+.page-title { -fx-font-family: "Archivo SemiExpanded"; -fx-font-weight: bold; -fx-font-size: 28px; -fx-text-fill: -velo-text; }
 .page-subtitle { -fx-text-fill: -velo-text-3; -fx-font-size: 13px; }
 
 /* ---- Buttons ---- */
@@ -2457,7 +2457,7 @@
 	-fx-border-radius: 10;
 	-fx-border-width: 1;
 	-fx-text-fill: -velo-text;
-	-fx-font-family: "Inter SemiBold";
+	-fx-font-family: "Geist SemiBold";
 	-fx-font-size: 13px;
 	-fx-padding: 9 16 9 16;
 	-fx-cursor: hand;
@@ -2477,7 +2477,7 @@
 	-fx-background-color: -velo-accent;
 	-fx-border-color: transparent;
 	-fx-text-fill: -velo-on-accent;
-	-fx-font-family: "Inter SemiBold";
+	-fx-font-family: "Geist SemiBold";
 	-fx-effect: null;
 }
 
@@ -2530,7 +2530,7 @@
 	-fx-background-color: -velo-gold;
 	-fx-border-color: transparent;
 	-fx-text-fill: -velo-gold-ink;
-	-fx-font-family: "Inter";
+	-fx-font-family: "Geist";
 	-fx-font-weight: bold;
 }
 
@@ -2623,7 +2623,7 @@
 
 .tooltip {
 	-fx-background-color: -velo-surface-3;
-	-fx-font-family: "Inter Medium";
+	-fx-font-family: "Geist Medium";
 	-fx-background-radius: 8;
 	-fx-border-radius: 8;
 }
@@ -2639,7 +2639,7 @@
 
 .context-menu .menu-item { -fx-background-radius: 8; -fx-padding: 8 12 8 12; }
 .context-menu .menu-item:focused { -fx-background-color: rgba(255, 255, 255, 0.07); }
-.context-menu .menu-item .label { -fx-text-fill: -velo-text; -fx-font-family: "Inter Medium"; }
+.context-menu .menu-item .label { -fx-text-fill: -velo-text; -fx-font-family: "Geist Medium"; }
 
 /* Tabs: text with an accent underline, never filled pills */
 .tab-pane .tab-header-area .headers-region .tab {
@@ -2654,8 +2654,8 @@
 
 .tab-pane .tab-header-area .headers-region .tab:hover { -fx-background-color: transparent; }
 .tab-pane .tab-header-area .headers-region .tab:selected { -fx-background-color: transparent; -fx-border-color: transparent transparent -velo-accent-text transparent; }
-.tab-pane .tab-label { -fx-text-fill: -velo-text-3; -fx-font-family: "Inter Medium"; -fx-font-size: 14px; }
-.tab-pane .tab:selected .tab-label { -fx-text-fill: -velo-text; -fx-font-family: "Inter SemiBold"; -fx-font-weight: normal; }
+.tab-pane .tab-label { -fx-text-fill: -velo-text-3; -fx-font-family: "Geist Medium"; -fx-font-size: 14px; }
+.tab-pane .tab:selected .tab-label { -fx-text-fill: -velo-text; -fx-font-family: "Geist SemiBold"; -fx-font-weight: normal; }
 .tab-pane .tab-header-area { -fx-border-color: transparent transparent -velo-hairline transparent; -fx-border-width: 0 0 1 0; -fx-padding: 0 0 0 0; }
 
 /* Segmented control */
@@ -2665,7 +2665,7 @@
 	-fx-text-fill: -velo-text-3;
 	-fx-background-radius: 8;
 	-fx-padding: 7 14 7 14;
-	-fx-font-family: "Inter Medium";
+	-fx-font-family: "Geist Medium";
 }
 
 .segmented-button:hover { -fx-background-color: rgba(255, 255, 255, 0.05); -fx-text-fill: -velo-text; }
@@ -2673,7 +2673,7 @@
 .segmented-button-active, .segmented-button-active:hover {
 	-fx-background-color: -velo-surface-3;
 	-fx-text-fill: -velo-text;
-	-fx-font-family: "Inter SemiBold";
+	-fx-font-family: "Geist SemiBold";
 	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 4, 0, 0, 1);
 }
 
@@ -2695,12 +2695,12 @@
 	-fx-background-radius: 0;
 	-fx-padding: 10 0 10 0;
 	-fx-text-fill: -velo-text-3;
-	-fx-font-family: "Inter Medium";
+	-fx-font-family: "Geist Medium";
 	-fx-font-size: 14px;
 }
 
 .utab:hover { -fx-background-color: transparent; -fx-border-color: transparent; -fx-text-fill: -velo-text; }
-.utab-active, .utab-active:hover { -fx-border-color: transparent transparent -velo-accent-text transparent; -fx-text-fill: -velo-text; -fx-font-family: "Inter SemiBold"; }
+.utab-active, .utab-active:hover { -fx-border-color: transparent transparent -velo-accent-text transparent; -fx-text-fill: -velo-text; -fx-font-family: "Geist SemiBold"; }
 .utab-row { -fx-border-color: transparent transparent -velo-hairline transparent; -fx-border-width: 0 0 1 0; -fx-spacing: 24; }
 
 /* Filter chips */
@@ -2711,11 +2711,11 @@
 	-fx-border-radius: 999;
 	-fx-padding: 6 14 6 14;
 	-fx-text-fill: -velo-text-2;
-	-fx-font-family: "Inter Medium";
+	-fx-font-family: "Geist Medium";
 }
 
 .fchip:hover { -fx-background-color: rgba(255, 255, 255, 0.05); -fx-border-color: rgba(255, 255, 255, 0.2); -fx-text-fill: -velo-text; }
-.fchip-active, .fchip-active:hover { -fx-background-color: -velo-text; -fx-border-color: -velo-text; -fx-text-fill: -velo-background; -fx-font-family: "Inter SemiBold"; }
+.fchip-active, .fchip-active:hover { -fx-background-color: -velo-text; -fx-border-color: -velo-text; -fx-text-fill: -velo-background; -fx-font-family: "Geist SemiBold"; }
 
 /* ---- Cards & surfaces ---- */
 
@@ -2739,7 +2739,7 @@
 .badge {
 	-fx-background-radius: 5;
 	-fx-padding: 2 7 2 7;
-	-fx-font-family: "Inter";
+	-fx-font-family: "Geist";
 	-fx-font-weight: bold;
 	-fx-font-size: 10px;
 }
@@ -2751,12 +2751,12 @@
 .badge-blue { -fx-background-color: rgba(90, 169, 255, 0.16); -fx-text-fill: #7dbbff; }
 .badge-green { -fx-background-color: rgba(61, 220, 151, 0.14); -fx-text-fill: -velo-green; }
 .badge-grey { -fx-background-color: rgba(255, 255, 255, 0.08); -fx-text-fill: -velo-text-2; }
-.badge-mono { -fx-font-family: "JetBrains Mono Medium"; -fx-font-weight: normal; -fx-font-size: 11px; }
+.badge-mono { -fx-font-family: "Geist Mono Medium"; -fx-font-weight: normal; -fx-font-size: 11px; }
 
 .pill {
 	-fx-background-radius: 999;
 	-fx-padding: 5 11 5 11;
-	-fx-font-family: "Inter SemiBold";
+	-fx-font-family: "Geist SemiBold";
 	-fx-font-size: 12px;
 }
 
@@ -2769,7 +2769,7 @@
 	-fx-background-color: -velo-accent;
 	-fx-background-radius: 999;
 	-fx-text-fill: white;
-	-fx-font-family: "Inter";
+	-fx-font-family: "Geist";
 	-fx-font-weight: bold;
 	-fx-font-size: 10px;
 	-fx-padding: 1 5 1 5;
@@ -2791,7 +2791,7 @@
 	-fx-max-height: 60;
 }
 
-.topbar-brand { -fx-font-family: "Sora"; -fx-font-weight: bold; -fx-font-size: 15px; -fx-text-fill: -velo-text; }
+.topbar-brand { -fx-font-family: "Archivo SemiExpanded"; -fx-font-weight: bold; -fx-font-size: 15px; -fx-text-fill: -velo-text; }
 
 .topnav-tab {
 	-fx-background-color: transparent;
@@ -2801,7 +2801,7 @@
 	-fx-border-radius: 0;
 	-fx-padding: 0 12 0 12;
 	-fx-text-fill: -velo-text-3;
-	-fx-font-family: "Inter Medium";
+	-fx-font-family: "Geist Medium";
 	-fx-font-size: 14px;
 	-fx-min-height: 59;
 	-fx-pref-height: 59;
@@ -2811,7 +2811,7 @@
 
 .topnav-tab-active, .topnav-tab-active:hover {
 	-fx-text-fill: -velo-text;
-	-fx-font-family: "Inter SemiBold";
+	-fx-font-family: "Geist SemiBold";
 	-fx-border-color: transparent transparent -velo-accent-text transparent;
 }
 
@@ -2827,7 +2827,7 @@
 }
 
 .topbar-search:hover { -fx-border-color: -velo-hairline-2; }
-.kbd { -fx-font-family: "JetBrains Mono Medium"; -fx-font-size: 10px; -fx-text-fill: -velo-text-3; -fx-border-color: -velo-hairline-2; -fx-border-radius: 4; -fx-padding: 1 5 1 5; }
+.kbd { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 10px; -fx-text-fill: -velo-text-3; -fx-border-color: -velo-hairline-2; -fx-border-radius: 4; -fx-padding: 1 5 1 5; }
 
 .coin-pill {
 	-fx-background-color: rgba(247, 192, 74, 0.08);
@@ -2838,7 +2838,7 @@
 	-fx-min-height: 34;
 	-fx-pref-height: 34;
 	-fx-text-fill: -velo-gold;
-	-fx-font-family: "Inter";
+	-fx-font-family: "Geist";
 	-fx-font-weight: bold;
 	-fx-font-size: 13px;
 }
@@ -2849,7 +2849,7 @@
 	-fx-background-color: -velo-gold;
 	-fx-background-radius: 999;
 	-fx-text-fill: -velo-gold-ink;
-	-fx-font-family: "Sora";
+	-fx-font-family: "Archivo SemiExpanded";
 	-fx-font-weight: bold;
 	-fx-alignment: center;
 }
@@ -2861,7 +2861,7 @@
 	-fx-border-radius: 999;
 	-fx-padding: 3 10 3 3;
 	-fx-text-fill: -velo-text;
-	-fx-font-family: "Inter SemiBold";
+	-fx-font-family: "Geist SemiBold";
 }
 
 .account-pill:hover { -fx-background-color: rgba(255, 255, 255, 0.05); -fx-border-color: rgba(255, 255, 255, 0.2); }
@@ -2888,13 +2888,13 @@
 }
 
 .profile-switcher:hover { -fx-background-color: rgba(255, 255, 255, 0.05); -fx-border-color: -velo-hairline; }
-.profile-switcher-name { -fx-font-family: "Inter SemiBold"; -fx-font-size: 15px; -fx-text-fill: -velo-text; }
+.profile-switcher-name { -fx-font-family: "Geist SemiBold"; -fx-font-size: 15px; -fx-text-fill: -velo-text; }
 .profile-switcher-meta { -fx-font-size: 12px; -fx-text-fill: -velo-text-3; }
 
 .play-button {
 	-fx-background-radius: 12 0 0 12;
 	-fx-border-radius: 12 0 0 12;
-	-fx-font-family: "Sora";
+	-fx-font-family: "Archivo SemiExpanded";
 	-fx-font-weight: bold;
 	-fx-font-size: 16px;
 	-fx-padding: 0 30 0 26;
@@ -2922,8 +2922,8 @@
 
 .play-progress-track { -fx-background-color: derive(-velo-accent, -70%); -fx-background-radius: 12; -fx-border-color: -velo-accent-line; -fx-border-radius: 12; }
 .play-progress-fill { -fx-background-color: -velo-accent; -fx-background-radius: 12; }
-.play-progress-label { -fx-font-family: "Sora"; -fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: white; }
-.play-progress-sub { -fx-font-family: "JetBrains Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(255, 255, 255, 0.8); }
+.play-progress-label { -fx-font-family: "Archivo SemiExpanded"; -fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: white; }
+.play-progress-sub { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(255, 255, 255, 0.8); }
 
 .running-box {
 	-fx-background-color: -velo-surface-2;
@@ -2957,7 +2957,7 @@
 
 .popover-row:hover { -fx-background-color: rgba(255, 255, 255, 0.06); }
 .popover-row-active { -fx-background-color: -velo-accent-soft; }
-.popover-section { -fx-font-family: "Inter"; -fx-font-weight: bold; -fx-font-size: 10px; -fx-text-fill: -velo-text-3; -fx-padding: 8 10 4 10; }
+.popover-section { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 10px; -fx-text-fill: -velo-text-3; -fx-padding: 8 10 4 10; }
 
 /* ---- Page scaffolding ---- */
 
@@ -3039,14 +3039,14 @@
 	-fx-padding: 9 12 9 12;
 	-fx-background-radius: 9;
 	-fx-text-fill: -velo-text-2;
-	-fx-font-family: "Inter Medium";
+	-fx-font-family: "Geist Medium";
 	-fx-font-size: 14px;
 	-fx-graphic-text-gap: 10;
 }
 
 .snav:hover { -fx-background-color: rgba(255, 255, 255, 0.05); -fx-border-color: transparent; -fx-text-fill: -velo-text; }
-.snav-active, .snav-active:hover { -fx-background-color: -velo-accent-soft; -fx-text-fill: -velo-text; -fx-font-family: "Inter SemiBold"; }
-.snav-count { -fx-text-fill: -velo-text-3; -fx-font-family: "JetBrains Mono Medium"; -fx-font-size: 11px; }
+.snav-active, .snav-active:hover { -fx-background-color: -velo-accent-soft; -fx-text-fill: -velo-text; -fx-font-family: "Geist SemiBold"; }
+.snav-count { -fx-text-fill: -velo-text-3; -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; }
 .snav-active .snav-count { -fx-text-fill: -velo-accent-text; }
 
 .mod-table {
@@ -3097,8 +3097,8 @@
 }
 
 .server-card:hover { -fx-border-color: rgba(255, 255, 255, 0.16); -fx-background-color: -velo-surface-2; }
-.server-name { -fx-font-family: "Inter SemiBold"; -fx-font-size: 16px; -fx-text-fill: -velo-text; }
-.server-address { -fx-font-family: "JetBrains Mono Medium"; -fx-font-size: 12px; -fx-text-fill: -velo-text-3; }
+.server-name { -fx-font-family: "Geist SemiBold"; -fx-font-size: 16px; -fx-text-fill: -velo-text; }
+.server-address { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 12px; -fx-text-fill: -velo-text-3; }
 .server-icon { -fx-background-color: -velo-surface-2; -fx-background-radius: 12; -fx-border-width: 0; }
 .server-chip {
 	-fx-background-color: rgba(255, 255, 255, 0.06);
@@ -3150,8 +3150,8 @@
 	-fx-padding: 0 0 26 0;
 }
 
-.settings-card-title { -fx-font-family: "Sora SemiBold"; -fx-font-size: 19px; -fx-text-fill: -velo-text; -fx-padding: 0 0 6 0; }
-.settings-subheading { -fx-font-family: "Inter"; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: -velo-text-3; -fx-padding: 14 0 2 0; }
+.settings-card-title { -fx-font-family: "Archivo SemiExpanded"; -fx-font-size: 19px; -fx-text-fill: -velo-text; -fx-padding: 0 0 6 0; }
+.settings-subheading { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 11px; -fx-text-fill: -velo-text-3; -fx-padding: 14 0 2 0; }
 
 .settings-row {
 	-fx-background-color: transparent;
@@ -3162,9 +3162,9 @@
 }
 
 .settings-row:hover { -fx-background-color: transparent; }
-.settings-row-label { -fx-font-family: "Inter SemiBold"; -fx-font-size: 14px; -fx-text-fill: -velo-text; }
+.settings-row-label { -fx-font-family: "Geist SemiBold"; -fx-font-size: 14px; -fx-text-fill: -velo-text; }
 .settings-row-hint { -fx-font-size: 13px; -fx-text-fill: -velo-text-3; }
-.settings-value { -fx-font-family: "JetBrains Mono Medium"; -fx-text-fill: -velo-text-2; }
+.settings-value { -fx-font-family: "Geist Mono Medium"; -fx-text-fill: -velo-text-2; }
 
 .theme-tile {
 	-fx-background-color: -velo-surface;
@@ -3194,7 +3194,7 @@
 	-fx-border-radius: 18;
 	-fx-border-width: 1;
 	-fx-padding: 6 6 4 6;
-	-fx-font-family: "Inter";
+	-fx-font-family: "Geist";
 }
 
 .dialog-pane.velo-dialog > .header-panel {
@@ -3204,7 +3204,7 @@
 }
 
 .dialog-pane.velo-dialog > .header-panel .label {
-	-fx-font-family: "Sora";
+	-fx-font-family: "Archivo SemiExpanded";
 	-fx-font-weight: bold;
 	-fx-font-size: 19px;
 	-fx-text-fill: -velo-text;
@@ -3234,7 +3234,7 @@
 .dialog-pane.velo-dialog .button-bar .button:default {
 	-fx-background-color: -velo-accent;
 	-fx-text-fill: -velo-on-accent;
-	-fx-font-family: "Inter SemiBold";
+	-fx-font-family: "Geist SemiBold";
 }
 
 .dialog-pane.velo-dialog .button-bar .button:default:hover { -fx-background-color: -velo-accent-hover; }
@@ -3246,7 +3246,7 @@
 .modal-scrim { -fx-background-color: rgba(0, 0, 0, 0.55); }
 
 .field-label {
-	-fx-font-family: "Inter";
+	-fx-font-family: "Geist";
 	-fx-font-weight: bold;
 	-fx-font-size: 11px;
 	-fx-text-fill: -velo-text-3;
@@ -3312,7 +3312,7 @@
 	-fx-border-radius: 999;
 	-fx-padding: 5 11 5 9;
 	-fx-text-fill: #a6a6b0;
-	-fx-font-family: "Inter Medium";
+	-fx-font-family: "Geist Medium";
 	-fx-font-size: 12px;
 	-fx-cursor: hand;
 }
@@ -3326,7 +3326,7 @@
 	-fx-background-color: linear-gradient(to right, -velo-accent-start, -velo-accent-end);
 	-fx-border-color: transparent;
 	-fx-text-fill: -velo-on-accent;
-	-fx-font-family: "Inter SemiBold";
+	-fx-font-family: "Geist SemiBold";
 }
 
 /* Colour pickers: readable on the dark theme (Modena draws the code in black) */
@@ -3344,7 +3344,7 @@
 
 .color-picker .color-picker-label {
 	-fx-text-fill: -velo-text;
-	-fx-font-family: "Inter Medium";
+	-fx-font-family: "Geist Medium";
 	-fx-font-size: 12px;
 }
 
@@ -3447,7 +3447,7 @@
 	-fx-background-radius: 999;
 	-fx-border-radius: 999;
 	-fx-padding: 2 9 2 10;
-	-fx-font-family: "JetBrains Mono";
+	-fx-font-family: "Geist Mono";
 	-fx-font-size: 11px;
 	-fx-text-fill: -velo-text-2;
 	-fx-graphic-text-gap: 5;
@@ -3538,7 +3538,7 @@
 	-fx-background-color: rgba(90, 169, 255, 0.10);
 	-fx-border-color: rgba(90, 169, 255, 0.40);
 }
-.migrate-target-version { -fx-text-fill: -velo-text; -fx-font-family: "JetBrains Mono"; -fx-font-size: 20px; -fx-font-weight: bold; }
+.migrate-target-version { -fx-text-fill: -velo-text; -fx-font-family: "Geist Mono"; -fx-font-size: 20px; -fx-font-weight: bold; }
 .migrate-target-kind { -fx-font-size: 11px; -fx-font-weight: bold; }
 .migrate-up { -fx-text-fill: #7dd3a0; }
 .migrate-down { -fx-text-fill: #f7c04a; }
@@ -3552,7 +3552,7 @@
 .migrate-row { -fx-padding: 3 2 3 2; }
 .migrate-row-name { -fx-text-fill: -velo-text-2; -fx-font-size: 12px; }
 .migrate-row-kind { -fx-text-fill: -velo-text-3; -fx-font-size: 10px; -fx-min-width: 42; }
-.migrate-row-note { -fx-text-fill: -velo-text-3; -fx-font-family: "JetBrains Mono"; -fx-font-size: 11px; }
+.migrate-row-note { -fx-text-fill: -velo-text-3; -fx-font-family: "Geist Mono"; -fx-font-size: 11px; }
 .migrate-options { -fx-background-color: rgba(255, 255, 255, 0.03); -fx-background-radius: 12; -fx-padding: 12; }
 .migrate-done-badge {
 	-fx-background-color: rgba(125, 211, 160, 0.14);
@@ -3699,13 +3699,13 @@
 	-fx-padding: 12 14 12 14;
 }
 .changelog-heading { -fx-text-fill: -velo-text; -fx-font-weight: bold; -fx-font-size: 13px; }
-.changelog-version { -fx-text-fill: #8cc4ff; -fx-font-family: "JetBrains Mono"; -fx-font-size: 11.5px; -fx-padding: 6 0 0 0; }
+.changelog-version { -fx-text-fill: #8cc4ff; -fx-font-family: "Geist Mono"; -fx-font-size: 11.5px; -fx-padding: 6 0 0 0; }
 .changelog-subheading { -fx-text-fill: -velo-text; -fx-font-weight: bold; -fx-font-size: 12px; }
 .changelog-line { -fx-text-fill: -velo-text-2; -fx-font-size: 12px; }
 
 /* ---- Profile codes ---- */
 .share-code {
-	-fx-font-family: "JetBrains Mono";
+	-fx-font-family: "Geist Mono";
 	-fx-font-size: 30px;
 	-fx-font-weight: bold;
 	-fx-text-fill: white;
@@ -3713,7 +3713,7 @@
 	-fx-background-radius: 14;
 	-fx-padding: 10 18 10 18;
 }
-.share-code-field { -fx-font-family: "JetBrains Mono"; -fx-font-size: 16px; }
+.share-code-field { -fx-font-family: "Geist Mono"; -fx-font-size: 16px; }
 .share-preview { -fx-background-color: rgba(255, 255, 255, 0.04); -fx-background-radius: 12; -fx-padding: 12; }
 .share-preview-name { -fx-text-fill: -velo-text; -fx-font-weight: bold; -fx-font-size: 15px; }
 
@@ -3729,3 +3729,524 @@
 	-fx-font-weight: bold;
 	-fx-padding: 1 8 1 8;
 }
+
+/* ===================================================================================================
+ * 2026-11 redesign shell: left sidebar, slim top strip, rounded-square status, Archivo/Geist type.
+ * =================================================================================================== */
+
+.topbar {
+	-fx-padding: 0 12 0 28;
+	-fx-min-height: 64;
+	-fx-pref-height: 64;
+	-fx-max-height: 64;
+	-fx-border-color: transparent transparent rgba(255, 236, 236, 0.05) transparent;
+}
+
+.topbar-friends {
+	-fx-font-family: "Geist";
+	-fx-font-size: 13px;
+	-fx-text-fill: rgba(244, 239, 238, 0.72);
+	-fx-padding: 0 10 0 10;
+	-fx-cursor: hand;
+}
+.topbar-friends:hover { -fx-text-fill: -velo-text; }
+
+.bell-dot { -fx-background-color: -velo-accent; -fx-background-radius: 2; -fx-border-color: -velo-background; -fx-border-width: 1.5; -fx-border-radius: 2; }
+
+/* Status: a small rounded square, steady (no pulse, no glow). */
+.status-square {
+	-fx-background-color: -velo-green;
+	-fx-background-radius: 2;
+	-fx-min-width: 8; -fx-min-height: 8; -fx-max-width: 8; -fx-max-height: 8;
+}
+.status-square-away { -fx-background-color: #f2b64c; }
+.status-square-off { -fx-background-color: transparent; -fx-border-color: rgba(244, 239, 238, 0.35); -fx-border-width: 1.5; -fx-border-radius: 2; }
+.status-dot { -fx-background-radius: 2; }
+
+.sidebar-rail {
+	-fx-background-color: #090707;
+	-fx-border-color: transparent rgba(255, 236, 236, 0.06) transparent transparent;
+	-fx-border-width: 0 1 0 0;
+	-fx-padding: 20 12 14 12;
+}
+
+.sidebar-brand { -fx-font-family: "Archivo SemiExpanded"; -fx-font-weight: 800; -fx-font-size: 19px; -fx-text-fill: -velo-text; }
+
+.sidebar-nav {
+	-fx-background-color: transparent;
+	-fx-background-radius: 8;
+	-fx-border-color: transparent;
+	-fx-border-width: 0 0 0 3;
+	-fx-padding: 0 12 0 9;
+	-fx-min-height: 40; -fx-pref-height: 40; -fx-max-height: 40;
+	-fx-font-family: "Geist Medium";
+	-fx-font-size: 14px;
+	-fx-text-fill: rgba(244, 239, 238, 0.62);
+	-fx-cursor: hand;
+}
+.sidebar-nav .sidebar-nav-text { -fx-font-family: "Geist Medium"; -fx-font-size: 14px; -fx-text-fill: rgba(244, 239, 238, 0.62); }
+.sidebar-nav:hover { -fx-background-color: #171213; -fx-text-fill: -velo-text; }
+.sidebar-nav:hover .sidebar-nav-text { -fx-text-fill: -velo-text; }
+.sidebar-nav-active, .sidebar-nav-active:hover {
+	-fx-background-color: #171213;
+	-fx-border-color: transparent transparent transparent -velo-accent;
+	-fx-text-fill: -velo-text;
+}
+.sidebar-nav-active .sidebar-nav-text { -fx-text-fill: -velo-text; }
+/* No focus bar: a clicked row keeps focus, and a second red bar read as a second active page. */
+.sidebar-nav:focused { -fx-border-color: transparent; }
+.sidebar-nav-active:focused { -fx-border-color: transparent transparent transparent -velo-accent; }
+
+.sidebar-count {
+	-fx-background-color: -velo-accent;
+	-fx-background-radius: 5;
+	-fx-text-fill: white;
+	-fx-font-family: "Geist Mono SemiBold";
+	-fx-font-size: 10.5px;
+	-fx-padding: 1 5 1 5;
+	-fx-min-width: 18;
+	-fx-alignment: center;
+}
+
+.sidebar-divider { -fx-background-color: rgba(255, 236, 236, 0.06); -fx-min-height: 1; -fx-max-height: 1; }
+
+.sidebar-strip {
+	-fx-border-color: rgba(255, 236, 236, 0.07);
+	-fx-border-radius: 10;
+	-fx-background-radius: 10;
+}
+.sidebar-strip-cell { -fx-padding: 10 12 10 12; -fx-cursor: hand; }
+.sidebar-strip-cell:hover { -fx-background-color: rgba(255, 236, 236, 0.03); }
+.sidebar-strip-line { -fx-background-color: rgba(255, 236, 236, 0.07); -fx-min-width: 1; -fx-max-width: 1; }
+.sidebar-strip .t-overline { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 10px; -fx-text-fill: rgba(244, 239, 238, 0.55); }
+.sidebar-strip .sidebar-plus-label { -fx-text-fill: -velo-accent-text; }
+.sidebar-strip-value { -fx-font-family: "Geist"; -fx-font-size: 12px; -fx-text-fill: rgba(244, 239, 238, 0.75); }
+.sidebar-strip-muted { -fx-text-fill: rgba(244, 239, 238, 0.5); }
+.sidebar-coins { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 12.5px; -fx-text-fill: -velo-gold; }
+
+.sidebar-account {
+	-fx-background-color: transparent;
+	-fx-background-radius: 10;
+	-fx-border-color: rgba(255, 236, 236, 0.07);
+	-fx-border-radius: 10;
+	-fx-padding: 8;
+	-fx-cursor: hand;
+}
+.sidebar-account:hover { -fx-background-color: #171213; }
+
+/* Type: Archivo for display and headings, Geist Mono for overlines and numbers. */
+.t-display { -fx-font-family: "Archivo SemiExpanded ExtraBold"; -fx-font-weight: 800; }
+.t-overline { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 11px; }
+
+/* Home hero (2026-11): title, quiet sub line, stat line with hairlines, party line. */
+.hero { -fx-background-color: #0c0909; -fx-background-radius: 14; -fx-border-color: rgba(255, 236, 236, 0.06); -fx-border-radius: 14; }
+.hero-title { -fx-font-size: 52px; }
+.hero-sub { -fx-font-family: "Geist"; -fx-font-size: 14px; -fx-text-fill: rgba(244, 239, 238, 0.66); }
+.hero-stats { -fx-border-color: rgba(255, 236, 236, 0.10) transparent transparent transparent; -fx-border-width: 1 0 0 0; -fx-padding: 14 0 0 0; }
+.hero-stat-first { -fx-padding: 0 16 0 0; }
+.hero-stat { -fx-padding: 0 16 0 16; -fx-border-color: transparent transparent transparent rgba(255, 236, 236, 0.10); -fx-border-width: 0 0 0 1; }
+.hero-stat-label { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 10px; -fx-text-fill: rgba(244, 239, 238, 0.5); }
+.hero-stat-value { -fx-font-family: "Archivo SemiExpanded"; -fx-font-weight: bold; -fx-font-size: 20px; -fx-text-fill: -velo-text; }
+.hero-party-head { -fx-border-color: #0c0909; -fx-border-width: 2; -fx-border-radius: 5; -fx-background-radius: 5; }
+
+/* Launch bar (2026-11): darker strip, compact PLAY (148 x 52), "Mods & packs" with icon tile + count. */
+.launchbar {
+	-fx-background-color: #0a0808;
+	-fx-border-color: rgba(255, 236, 236, 0.06) transparent transparent transparent;
+	-fx-padding: 0 28 0 20;
+	-fx-min-height: 80; -fx-pref-height: 80; -fx-max-height: 80;
+}
+.play-button {
+	-fx-background-radius: 10 0 0 10;
+	-fx-border-radius: 10 0 0 10;
+	-fx-font-family: "Archivo SemiExpanded ExtraBold";
+	-fx-font-weight: 800;
+	-fx-font-size: 17px;
+	-fx-padding: 0 24 0 22;
+	-fx-min-height: 52; -fx-pref-height: 52;
+}
+.play-button:hover { -fx-effect: null; }
+.play-button-solo { -fx-background-radius: 10; -fx-border-radius: 10; }
+.play-chevron {
+	-fx-background-radius: 0 10 10 0;
+	-fx-border-radius: 0 10 10 0;
+	-fx-min-width: 44; -fx-pref-width: 44;
+	-fx-min-height: 52; -fx-pref-height: 52;
+}
+.play-progress-track, .play-progress-fill { -fx-background-radius: 10; -fx-border-radius: 10; }
+
+.launch-mods {
+	-fx-background-color: #141011;
+	-fx-background-radius: 10;
+	-fx-border-color: rgba(255, 236, 236, 0.08);
+	-fx-border-radius: 10;
+	-fx-padding: 0 12 0 8;
+	-fx-min-height: 52; -fx-pref-height: 52;
+	-fx-cursor: hand;
+}
+.launch-mods:hover { -fx-background-color: #1e1617; -fx-border-color: rgba(255, 236, 236, 0.18); }
+.launch-mods-icon { -fx-background-color: #1f1819; -fx-background-radius: 7; -fx-min-width: 36; -fx-min-height: 36; -fx-max-width: 36; -fx-max-height: 36; }
+.launch-mods-title { -fx-font-family: "Geist SemiBold"; -fx-font-size: 13.5px; -fx-text-fill: -velo-text; }
+.launch-mods-line { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(244, 239, 238, 0.55); }
+
+/* Servers (2026-11): calm rows, MOTD drawn like Minecraft, PLAYERS / PING as two labelled boxes. */
+.server-card {
+	-fx-background-color: #141011;
+	-fx-background-radius: 12;
+	-fx-border-color: rgba(255, 236, 236, 0.06);
+	-fx-border-radius: 12;
+	-fx-padding: 14 16 14 16;
+}
+.server-card:hover { -fx-background-color: #171213; -fx-border-color: rgba(255, 236, 236, 0.12); }
+.server-icon { -fx-background-color: #0f0c0c; -fx-background-radius: 6; }
+.server-name { -fx-font-family: "Geist SemiBold"; -fx-font-size: 15px; -fx-text-fill: -velo-text; }
+.server-version { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(244, 239, 238, 0.45); }
+.server-via {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-padding: 2 6 2 6;
+	-fx-background-radius: 6;
+	-fx-font-family: "Geist";
+	-fx-font-size: 12px;
+	-fx-cursor: hand;
+}
+.server-via .label { -fx-text-fill: rgba(244, 239, 238, 0.5); }
+.server-via:hover { -fx-background-color: rgba(255, 236, 236, 0.05); }
+.server-via .arrow { -fx-background-color: rgba(244, 239, 238, 0.45); }
+.server-stat {
+	-fx-background-color: #171213;
+	-fx-background-radius: 8;
+	-fx-border-color: rgba(255, 236, 236, 0.06);
+	-fx-border-radius: 8;
+	-fx-padding: 8 10 8 10;
+}
+.server-stat-label { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 9.5px; -fx-text-fill: rgba(244, 239, 238, 0.45); }
+.server-stat-value { -fx-font-family: "Geist SemiBold"; -fx-font-size: 14px; -fx-text-fill: -velo-text; }
+.server-stat-max { -fx-font-family: "Geist"; -fx-font-size: 12px; -fx-text-fill: rgba(244, 239, 238, 0.4); }
+.server-stat-value.server-ping-good { -fx-text-fill: #7febbe; }
+.server-stat-value.server-ping-ok { -fx-text-fill: #f2b64c; }
+.server-stat-value.server-ping-bad { -fx-text-fill: #ff6b6f; }
+.server-stat-value.server-dim { -fx-text-fill: rgba(244, 239, 238, 0.45); }
+.ping-bar { -fx-background-radius: 0.5; -fx-background-color: rgba(244, 239, 238, 0.2); }
+.server-join {
+	-fx-background-color: #1e1617;
+	-fx-background-radius: 8;
+	-fx-border-color: rgba(255, 236, 236, 0.14);
+	-fx-border-radius: 8;
+	-fx-text-fill: -velo-text;
+	-fx-font-family: "Geist SemiBold";
+	-fx-font-size: 13px;
+	-fx-padding: 0 16 0 16;
+	-fx-min-height: 34; -fx-pref-height: 34;
+}
+.server-join:hover { -fx-background-color: -velo-accent; -fx-border-color: -velo-accent; -fx-text-fill: white; }
+
+/* Partner / world cards (2026-11): one calm surface, no gradient or accent edge. */
+.partner-card {
+	-fx-background-color: #141011;
+	-fx-background-radius: 12;
+	-fx-border-color: rgba(255, 236, 236, 0.07);
+	-fx-border-radius: 12;
+}
+.partner-card:hover { -fx-border-color: rgba(255, 236, 236, 0.18); }
+.partner-tag {
+	-fx-background-color: rgba(215, 38, 45, 0.14);
+	-fx-background-radius: 4;
+	-fx-text-fill: #ff8a8d;
+	-fx-font-family: "Geist Mono SemiBold";
+	-fx-font-size: 9.5px;
+	-fx-padding: 2 6 2 6;
+}
+
+/* Sidebar selection that glides (2026-11): the rows themselves stay transparent; one highlight moves between them. */
+.sidebar-selection {
+	-fx-background-color: #191314;
+	-fx-background-radius: 8;
+	-fx-border-color: transparent transparent transparent -velo-accent;
+	-fx-border-width: 0 0 0 3;
+	-fx-border-radius: 8 0 0 8;
+}
+.sidebar-nav-active, .sidebar-nav-active:hover {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-text-fill: -velo-text;
+}
+.sidebar-nav-active:focused { -fx-border-color: transparent; }
+.sidebar-nav { -fx-background-radius: 8; }
+.sidebar-nav:hover { -fx-background-color: rgba(255, 236, 236, 0.035); }
+.sidebar-nav-active:hover { -fx-background-color: transparent; }
+
+/* Update pop-up (2026-11): the version's news post as a window over the launcher. */
+.update-scrim { -fx-background-color: rgba(6, 4, 4, 0.62); }
+.update-card {
+	-fx-background-color: #141011;
+	-fx-background-radius: 16;
+	-fx-border-color: rgba(255, 236, 236, 0.10);
+	-fx-border-radius: 16;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 60, 0.1, 0, 24);
+}
+.update-cover-fade { -fx-background-color: linear-gradient(to bottom, transparent 55%, #141011 100%); }
+.update-close { -fx-background-color: rgba(9, 7, 7, 0.6); -fx-background-radius: 8; }
+.update-overline { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 11px; -fx-text-fill: #ff6b6f; }
+.update-versions { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(244, 239, 238, 0.45); }
+.update-title { -fx-font-family: "Archivo SemiExpanded ExtraBold"; -fx-font-weight: 800; -fx-font-size: 30px; -fx-text-fill: -velo-text; }
+.update-summary { -fx-font-family: "Geist"; -fx-font-size: 14px; -fx-text-fill: rgba(244, 239, 238, 0.68); -fx-line-spacing: 2; }
+.update-point {
+	-fx-background-color: #1a1415;
+	-fx-background-radius: 10;
+	-fx-border-color: rgba(255, 236, 236, 0.06);
+	-fx-border-radius: 10;
+	-fx-padding: 12 14 12 14;
+}
+.update-point-icon { -fx-background-color: #251a1b; -fx-background-radius: 7; -fx-min-width: 30; -fx-min-height: 30; -fx-max-width: 30; -fx-max-height: 30; }
+.update-point-text { -fx-font-family: "Geist SemiBold"; -fx-font-size: 13.5px; -fx-text-fill: -velo-text; }
+.update-footer { -fx-border-color: rgba(255, 236, 236, 0.07) transparent transparent transparent; -fx-border-width: 1 0 0 0; -fx-padding: 16 0 0 0; }
+.update-status { -fx-font-family: "Geist"; -fx-font-size: 12.5px; -fx-text-fill: rgba(244, 239, 238, 0.6); }
+
+/* Locker slot cards (2026-11). */
+.locker-slot, .locker-slot-active { -fx-background-radius: 10; -fx-border-radius: 10; -fx-cursor: hand; }
+.locker-slot { -fx-background-color: transparent; -fx-border-color: rgba(255, 236, 236, 0.06); }
+.locker-slot:hover { -fx-background-color: rgba(255, 236, 236, 0.035); }
+.locker-slot-active { -fx-background-color: #1d1617; -fx-border-color: rgba(215, 38, 45, 0.5); }
+.locker-slot-kind { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 9.5px; -fx-text-fill: rgba(244, 239, 238, 0.5); }
+
+/* Friends (2026-11): one panel per group, rows split by hairlines. */
+.friend-group {
+	-fx-background-color: #121010;
+	-fx-background-radius: 12;
+	-fx-border-color: rgba(255, 236, 236, 0.07);
+	-fx-border-radius: 12;
+}
+.friend-group-header {
+	-fx-background-color: #151112;
+	-fx-background-radius: 12 12 0 0;
+	-fx-border-color: transparent transparent rgba(255, 236, 236, 0.06) transparent;
+	-fx-border-width: 0 0 1 0;
+	-fx-padding: 9 14 9 14;
+}
+.friend-group-title { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 10.5px; -fx-text-fill: rgba(244, 239, 238, 0.7); }
+.friend-group-count { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 10.5px; -fx-text-fill: rgba(244, 239, 238, 0.4); }
+.friend-row { -fx-background-color: transparent; -fx-background-radius: 0; -fx-padding: 10 14 10 14; -fx-cursor: hand; }
+.friend-row:hover { -fx-background-color: rgba(255, 236, 236, 0.035); }
+.friend-row-split { -fx-border-color: transparent transparent rgba(255, 236, 236, 0.05) transparent; -fx-border-width: 0 0 1 0; }
+.friend-row-selected, .friend-row-selected:hover { -fx-background-color: #1d1617; }
+
+/* Store browse cards (2026-11). */
+.store-cat {
+	-fx-background-color: #141011;
+	-fx-background-radius: 12;
+	-fx-border-color: rgba(255, 236, 236, 0.07);
+	-fx-border-radius: 12;
+	-fx-padding: 0 14 0 10;
+	-fx-min-height: 62; -fx-pref-height: 62;
+	-fx-cursor: hand;
+}
+.store-cat:hover { -fx-border-color: rgba(255, 236, 236, 0.18); }
+.store-cat-icon { -fx-background-color: #1f1819; -fx-background-radius: 9; -fx-min-width: 42; -fx-min-height: 42; -fx-max-width: 42; -fx-max-height: 42; }
+.store-cat-name { -fx-font-family: "Geist SemiBold"; -fx-font-size: 14px; -fx-text-fill: -velo-text; }
+.store-cat-meta { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(244, 239, 238, 0.45); }
+
+/* "BUILT IN" chip on mods Velo already covers (2026-11). */
+.builtin-badge {
+	-fx-background-color: rgba(215, 38, 45, 0.12);
+	-fx-background-radius: 5;
+	-fx-border-color: rgba(215, 38, 45, 0.3);
+	-fx-border-radius: 5;
+	-fx-padding: 2 6 2 4;
+	-fx-font-family: "Geist Mono SemiBold";
+	-fx-font-size: 9.5px;
+	-fx-text-fill: #ff8a8d;
+	-fx-cursor: hand;
+}
+
+/* Every dialog (2026-11): the update pop-up's look - warm dark card, Archivo title, quiet footer line. */
+.dialog-pane.velo-dialog {
+	-fx-background-color: #141011;
+	-fx-background-radius: 16;
+	-fx-border-color: rgba(255, 236, 236, 0.10);
+	-fx-border-radius: 16;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 50, 0.1, 0, 20);
+}
+.dialog-pane.velo-dialog > .header-panel { -fx-background-color: transparent; -fx-padding: 22 26 4 26; }
+.dialog-pane.velo-dialog > .header-panel .label {
+	-fx-font-family: "Archivo SemiExpanded ExtraBold";
+	-fx-font-weight: 800;
+	-fx-font-size: 21px;
+	-fx-text-fill: -velo-text;
+}
+.dialog-pane.velo-dialog > .content { -fx-padding: 14 26 14 26; }
+.dialog-pane.velo-dialog > .content.label { -fx-font-family: "Geist"; -fx-font-size: 14px; -fx-text-fill: rgba(244, 239, 238, 0.7); }
+.dialog-pane.velo-dialog > .button-bar {
+	-fx-padding: 14 26 20 26;
+	-fx-border-color: rgba(255, 236, 236, 0.07) transparent transparent transparent;
+	-fx-border-width: 1 0 0 0;
+}
+.dialog-pane.velo-dialog > .button-bar .button { -fx-background-radius: 8; -fx-border-radius: 8; -fx-min-height: 36; }
+.status-square-request { -fx-background-color: -velo-accent; }
+.sidebar-rail:compact { -fx-padding: 20 10 14 10; }
+/* (row alignment is set in code: a CSS alignment here stuck after unfolding) */
+.sidebar-rail:compact .sidebar-account { -fx-padding: 6; -fx-alignment: center; }
+.locker-tab-name { -fx-font-family: "Geist Medium"; -fx-font-size: 13px; -fx-text-fill: rgba(244, 239, 238, 0.75); }
+.locker-slot-active .locker-tab-name { -fx-text-fill: -velo-text; }
+.chat-drawer {
+	-fx-background-color: #141011;
+	-fx-background-radius: 14;
+	-fx-border-color: rgba(255, 236, 236, 0.10);
+	-fx-border-radius: 14;
+	-fx-padding: 10 18 18 18;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.55), 40, 0.1, -8, 10);
+}
+
+/* Profile page (2026-11): banner on the version art, sections as one tab row, Profile menu at its end. */
+.profile-banner { -fx-background-color: #110e0f; -fx-background-radius: 14; -fx-border-color: rgba(255, 236, 236, 0.06); -fx-border-radius: 14; }
+.profile-banner-shade { -fx-background-color: linear-gradient(to right, rgba(12, 9, 9, 0.85) 0%, rgba(12, 9, 9, 0.55) 60%, rgba(12, 9, 9, 0.3) 100%); }
+.profile-tabs { -fx-border-color: transparent transparent rgba(255, 236, 236, 0.06) transparent; -fx-border-width: 0 0 1 0; -fx-padding: 0 0 10 0; }
+.profile-tabs .snav {
+	-fx-background-color: transparent;
+	-fx-background-radius: 7;
+	-fx-border-width: 0;
+	-fx-padding: 0 12 0 12;
+	-fx-min-height: 32; -fx-pref-height: 32;
+	-fx-font-family: "Geist Medium";
+	-fx-font-size: 13px;
+	-fx-text-fill: rgba(244, 239, 238, 0.66);
+}
+.profile-tabs .snav:hover { -fx-background-color: #1a1415; -fx-text-fill: -velo-text; }
+.profile-tabs .snav-active, .profile-tabs .snav-active:hover { -fx-background-color: #f4efee; -fx-text-fill: #0c0a0a; }
+.profile-tabs .snav-active .snav-count { -fx-text-fill: rgba(12, 10, 10, 0.6); }
+.profile-menu {
+	-fx-background-color: #141011;
+	-fx-background-radius: 8;
+	-fx-border-color: rgba(255, 236, 236, 0.12);
+	-fx-border-radius: 8;
+	-fx-font-family: "Geist Medium";
+	-fx-font-size: 13px;
+}
+.profile-menu .label { -fx-text-fill: -velo-text; }
+.profile-menu .arrow { -fx-background-color: rgba(244, 239, 238, 0.55); }
+
+/* Mod rows (2026-11): one calm panel with hairlines, a soft hover. */
+.mod-table {
+	-fx-background-color: #121010;
+	-fx-background-radius: 12;
+	-fx-border-color: rgba(255, 236, 236, 0.07);
+	-fx-border-radius: 12;
+}
+.pack-toolbar .text-field { -fx-background-radius: 9; -fx-border-radius: 9; -fx-min-height: 40; }
+.pack-toolbar .text-field:focused { -fx-border-color: rgba(215, 38, 45, 0.6); }
+
+/* Doctor (2026-11): brand red for the fix, outlined cards instead of a coloured left edge, no glows. */
+.doctor-fix-all { -fx-background-color: -velo-accent; -fx-effect: null; -fx-text-fill: white; -fx-background-radius: 8; }
+.doctor-fix-all:hover { -fx-background-color: -velo-accent-hover; }
+.doctor-card { -fx-border-width: 1; -fx-border-radius: 10; -fx-background-radius: 10; -fx-border-color: rgba(255, 236, 236, 0.08); }
+.doctor-crash { -fx-border-color: rgba(255, 107, 111, 0.45); }
+.doctor-problem { -fx-border-color: rgba(242, 182, 76, 0.4); }
+.doctor-tip { -fx-border-color: rgba(255, 236, 236, 0.10); }
+.doctor-ring-ok, .doctor-ring-bad { -fx-effect: null; }
+.skeleton-sheen { -fx-background-color: linear-gradient(to right, transparent 0%, rgba(255, 236, 236, 0.06) 50%, transparent 100%); }
+.skeleton-block { -fx-background-color: #1d1718; }
+.skeleton-card { -fx-background-color: #141011; -fx-background-radius: 12; -fx-border-color: rgba(255, 236, 236, 0.05); -fx-border-radius: 12; }
+.partner-perks { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(244, 239, 238, 0.5); }
+.sidebar-shadow { -fx-background-color: #090707; -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.65), 38, 0.15, 10, 0); }
+
+/* Locker catalog cells (2026-11): hover previews, click wears, right click = menu. */
+.locker-cell, .locker-cell-worn { -fx-background-color: #141011; -fx-background-radius: 12; -fx-border-radius: 12; -fx-border-width: 1.5; -fx-cursor: hand; }
+.locker-cell { -fx-border-color: rgba(255, 236, 236, 0.07); }
+.locker-cell:hover { -fx-border-color: rgba(255, 236, 236, 0.28); }
+.locker-cell-worn { -fx-border-color: rgba(215, 38, 45, 0.75); }
+.locker-worn { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 9.5px; -fx-text-fill: #ff8a8d; }
+.aside-card { -fx-background-color: #141011; -fx-background-radius: 12; -fx-border-color: rgba(255, 236, 236, 0.07); -fx-border-radius: 12; -fx-padding: 16; }
+.aside-title { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 10.5px; -fx-text-fill: rgba(244, 239, 238, 0.55); }
+.report-row { -fx-padding: 11 2 11 2; -fx-border-color: transparent transparent rgba(255, 236, 236, 0.07) transparent; -fx-border-width: 0 0 1 0; }
+.report-row:hover { -fx-background-color: rgba(255, 236, 236, 0.03); -fx-background-radius: 6; }
+.aside-status { -fx-font-family: "Geist SemiBold"; -fx-font-size: 14px; -fx-text-fill: -velo-text; }
+.aside-text { -fx-font-family: "Geist"; -fx-font-size: 12.5px; -fx-text-fill: rgba(244, 239, 238, 0.62); }
+.aside-chip, .aside-chip-on { -fx-background-radius: 7; -fx-border-radius: 7; -fx-font-family: "Geist Mono Medium"; -fx-font-size: 12px; -fx-padding: 5 10 5 10; }
+.aside-chip { -fx-background-color: transparent; -fx-border-color: rgba(255, 236, 236, 0.12); -fx-text-fill: rgba(244, 239, 238, 0.75); }
+.aside-chip:hover { -fx-background-color: #1a1415; }
+.aside-chip-on { -fx-background-color: #f4efee; -fx-border-color: #f4efee; -fx-text-fill: #0c0a0a; }
+
+/* Report a problem (2026-11): form left, "Your reports" right. */
+.report-label { -fx-font-family: "Geist Medium"; -fx-font-size: 12.5px; -fx-text-fill: rgba(244, 239, 238, 0.7); }
+.report-attached { -fx-background-color: #0e0b0b; -fx-background-radius: 10; -fx-border-color: rgba(255, 236, 236, 0.08); -fx-border-radius: 10; -fx-padding: 10 12 10 12; -fx-spacing: 7; }
+.report-attached-line { -fx-font-family: "Geist"; -fx-font-size: 12.5px; -fx-text-fill: rgba(244, 239, 238, 0.78); }
+.report-aside { -fx-background-color: #110e0f; -fx-background-radius: 12; -fx-border-color: rgba(255, 236, 236, 0.07); -fx-border-radius: 12; -fx-padding: 16; }
+.report-row { -fx-padding: 10 0 10 0; -fx-border-color: rgba(255, 236, 236, 0.05) transparent transparent transparent; -fx-border-width: 1 0 0 0; }
+.report-badge { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 9.5px; -fx-padding: 2 6 2 6; -fx-background-radius: 4; }
+.report-badge-new { -fx-background-color: rgba(244, 239, 238, 0.08); -fx-text-fill: rgba(244, 239, 238, 0.7); }
+.report-badge-seen { -fx-background-color: rgba(247, 192, 74, 0.14); -fx-text-fill: #f7c04a; }
+.report-badge-fixed { -fx-background-color: rgba(61, 220, 151, 0.14); -fx-text-fill: #7febbe; }
+.report-badge-wontfix { -fx-background-color: rgba(244, 239, 238, 0.06); -fx-text-fill: rgba(244, 239, 238, 0.5); }
+.coins-code { -fx-padding: 14 0 0 0; -fx-border-color: rgba(247, 192, 74, 0.18) transparent transparent transparent; -fx-border-width: 1 0 0 0; }
+
+/* ---- Home arcade (2026-11): pause menu, inventory, crafting ---- */
+.arcade-scrim { -fx-background-color: rgba(6, 4, 5, 0.62); }
+.arcade-menu {
+	-fx-background-color: #141011;
+	-fx-background-radius: 16;
+	-fx-border-color: rgba(255, 236, 236, 0.10);
+	-fx-border-radius: 16;
+	-fx-padding: 22 24 22 24;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 50, 0.1, 0, 18);
+}
+.arcade-title { -fx-text-fill: #F4EFEE; }
+.arcade-sub { -fx-text-fill: #9C8C89; -fx-font-size: 12px; }
+.arcade-volume { -fx-background-color: rgba(255, 236, 236, 0.04); -fx-background-radius: 0; -fx-border-color: rgba(255, 236, 236, 0.10); -fx-padding: 6 10 6 10; }
+.arcade-slider .track { -fx-background-color: #2a2324; -fx-background-radius: 0; -fx-pref-height: 4; -fx-padding: 0; }
+.arcade-slider .thumb { -fx-background-color: #D7262D; -fx-background-radius: 0; -fx-padding: 6 4 6 4; }
+.arcade-slider:hover .thumb { -fx-background-color: #ff4b52; }
+.arcade-hud-button {
+	-fx-background-color: rgba(10, 7, 8, 0.62);
+	-fx-background-radius: 9;
+	-fx-border-color: rgba(255, 236, 236, 0.10);
+	-fx-border-radius: 9;
+	-fx-min-width: 34; -fx-min-height: 34; -fx-max-width: 34; -fx-max-height: 34;
+	-fx-cursor: hand;
+}
+.arcade-hud-button:hover { -fx-background-color: rgba(215, 38, 45, 0.55); }
+.arcade-button {
+	-fx-background-color: #1d1718;
+	-fx-background-radius: 9;
+	-fx-border-color: rgba(255, 236, 236, 0.08);
+	-fx-border-radius: 9;
+	-fx-text-fill: #E9E1DF;
+	-fx-padding: 9 14 9 14;
+	-fx-cursor: hand;
+}
+.arcade-button:hover { -fx-background-color: #2a2122; -fx-border-color: rgba(255, 236, 236, 0.16); }
+.arcade-danger { -fx-text-fill: #FF6B6F; -fx-border-color: rgba(215, 38, 45, 0.6); }
+.arcade-game-tile {
+	-fx-background-color: #1a1415;
+	-fx-background-radius: 12;
+	-fx-border-color: rgba(255, 236, 236, 0.08);
+	-fx-border-radius: 12;
+	-fx-border-width: 1.5;
+	-fx-padding: 8 8 10 8;
+	-fx-cursor: hand;
+}
+.arcade-game-tile:hover { -fx-background-color: #221a1b; -fx-border-color: rgba(255, 107, 111, 0.5); -fx-translate-y: -2; }
+.arcade-game-tile-on { -fx-border-color: #D7262D; -fx-background-color: #23161a; }
+.arcade-tile-name { -fx-text-fill: #F4EFEE; }
+.arcade-tile-text { -fx-text-fill: #9C8C89; -fx-font-size: 11px; }
+.arcade-slot {
+	-fx-background-color: #1d1718;
+	-fx-background-radius: 8;
+	-fx-border-color: rgba(255, 236, 236, 0.06);
+	-fx-border-radius: 8;
+	-fx-cursor: hand;
+}
+.arcade-slot:hover { -fx-background-color: #2a2122; }
+.arcade-slot-hotbar { -fx-background-color: #221a1b; }
+.arcade-slot-selected { -fx-border-color: #D7262D; -fx-border-width: 1.5; }
+.arcade-count { -fx-text-fill: #F4EFEE; -fx-effect: dropshadow(one-pass-box, rgba(0,0,0,0.9), 0, 0, 1, 1); }
+.arcade-recipe {
+	-fx-background-color: #1d1718;
+	-fx-background-radius: 10;
+	-fx-padding: 6 10 6 8;
+	-fx-cursor: hand;
+}
+.arcade-recipe:hover { -fx-background-color: #2a1d1f; }
+.arcade-recipe-off { -fx-opacity: 0.5; }
+.arcade-recipe-name { -fx-text-fill: #F4EFEE; -fx-font-size: 12.5px; -fx-font-weight: 600; }
+.arcade-need-ok { -fx-text-fill: #C9B9B6; }
+.arcade-need-missing { -fx-text-fill: #FF6B6F; }

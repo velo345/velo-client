@@ -157,6 +157,7 @@ public final class VeloServerApp {
 			System.out.println("[relay] Couldn't start the world hosting relay: " + e.getMessage());
 		}
 		worlds.setPartyLookup(parties::partyMates);
+		worlds.setArcade(new ArcadeRelay(registry, parties, social));
 		PlusFeatureRoutes.registerWorlds(server, registry, store, worlds);
 		PartnerServers partners = new PartnerServers(dataDir);
 		PlusFeatureRoutes.registerPartners(server, registry, store, partners);

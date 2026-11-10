@@ -43,7 +43,41 @@ public final class UiImages {
 		} catch (Exception e) {
 			modified = 0;
 		}
-		return cached("file:" + file + "#" + modified + "@" + width + "x" + height, () -> new Image(file.toUri().toString(), width, height, true, true));
+		String key = "file:" + file + "#" + modified + "@" + width + "x" + height;
+		// Big pictures (profile icons are often 500 KB+ originals) are decoded and scaled once, then kept as a small PNG:
+		// later launcher starts load that instead of decoding the full picture for a 44 px tile.
+		long bytes;
+		try {
+			bytes = Files.size(file);
+		} catch (Exception e) {
+			bytes = 0;
+		}
+		if (bytes < 48 * 1024) {
+			return cached(key, () -> new Image(file.toUri().toString(), width, height, true, true));
+		}
+		java.nio.file.Path small = net.veloclient.launcher.data.VeloPaths.root().resolve("cache").resolve("scaled")
+				.resolve(Integer.toHexString(key.hashCode()) + "-" + (int) width + ".png");
+		if (Files.isRegularFile(small)) {
+			Image fromCache = cached(key, () -> new Image(small.toUri().toString()));
+			if (fromCache != null && !fromCache.isError()) {
+				return fromCache;
+			}
+		}
+		Image image = cached(key, () -> new Image(file.toUri().toString(), width, height, true, true));
+		if (image != null && !image.isError() && javafx.application.Platform.isFxApplicationThread()) {
+			java.awt.image.BufferedImage copy = javafx.embed.swing.SwingFXUtils.fromFXImage(image, null);
+			Thread.ofVirtual().start(() -> {
+				try {
+					Files.createDirectories(small.getParent());
+					java.nio.file.Path tmp = small.resolveSibling(small.getFileName() + ".tmp");
+					javax.imageio.ImageIO.write(copy, "png", tmp.toFile());
+					Files.move(tmp, small, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+				} catch (Exception ignored) {
+					// scaled again next time
+				}
+			});
+		}
+		return image;
 	}
 
 	/** A pair of wings' preview picture (full size; ImageViews scale it). */

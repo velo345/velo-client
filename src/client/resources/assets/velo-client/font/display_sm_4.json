@@ -2,7 +2,7 @@
 	"providers": [
 		{
 			"type": "ttf",
-			"file": "velo-client:sora_semibold.ttf",
+			"file": "velo-client:archivo_semiexp_bold.ttf",
 			"size": 9,
 			"oversample": 4,
 			"shift": [

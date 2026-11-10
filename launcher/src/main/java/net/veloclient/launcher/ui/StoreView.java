@@ -147,7 +147,7 @@ public final class StoreView {
 		Label heading = new Label("Store");
 		heading.getStyleClass().add("page-title");
 		heading.setPadding(new Insets(0, 14, 10, 0));
-		HBox tabs = new HBox(24);
+		HBox tabs = new HBox(18);
 		tabs.setAlignment(Pos.BOTTOM_LEFT);
 		String[] labels = {"Featured", "Wings", "Cloaks", "Auras", "Emotes", "Kill FX", "Bodywear", "Pets", "Bundles", "Velo+"};
 		for (Page p : Page.values()) {
@@ -156,6 +156,7 @@ public final class StoreView {
 			}
 			Button tab = new Button(labels[p.ordinal()]);
 			tab.getStyleClass().setAll("button", "utab", "no-motion");
+			tab.setMinWidth(Region.USE_PREF_SIZE);
 			if (p == page) {
 				tab.getStyleClass().add("utab-active");
 			}
@@ -183,12 +184,29 @@ public final class StoreView {
 		locker.setGraphic(Icons.icon("locker", 15, Color.web("#C9C9D1")));
 		locker.getStyleClass().addAll("ghost-button", "button-sm");
 		locker.setOnAction(e -> host.openCosmetics());
-		HBox header = new HBox(heading, tabs, spacer);
+		heading.setMinWidth(Region.USE_PREF_SIZE);
+		wishlistAndLockerMin(locker);
+		// The narrower page next to the sidebar (2026-11): the tabs scroll sideways instead of shrinking to "Featu...".
+		ScrollPane tabStrip = new ScrollPane(tabs);
+		tabStrip.setFitToHeight(true);
+		tabStrip.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		tabStrip.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		tabStrip.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0;");
+		tabStrip.setPannable(true);
+		HBox.setHgrow(tabStrip, Priority.ALWAYS);
+		tabStrip.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> {
+			if (e.getDeltaY() != 0 && tabs.getWidth() > tabStrip.getViewportBounds().getWidth()) {
+				tabStrip.setHvalue(tabStrip.getHvalue() - e.getDeltaY() / Math.max(1, tabs.getWidth()));
+				e.consume();
+			}
+		});
+		HBox header = new HBox(heading, tabStrip);
 		header.setAlignment(Pos.BOTTOM_LEFT);
 		header.getStyleClass().add("utab-row");
 		if (StoreApi.isOwner()) {
 			Button owner = new Button("Owner panel");
 			owner.getStyleClass().addAll("ghost-button", "button-sm");
+			owner.setMinWidth(Region.USE_PREF_SIZE);
 			owner.setOnAction(e -> host.openOwner());
 			HBox.setMargin(owner, new Insets(0, 0, 8, 0));
 			header.getChildren().add(owner);
@@ -198,6 +216,7 @@ public final class StoreView {
 		Button wishlist = new Button(wished > 0 ? "Wishlist  " + wished : "Wishlist");
 		wishlist.setGraphic(Icons.icon("heart", 14, Color.web(page == Page.WISHLIST ? "#FF6B7A" : "#C9C9D1")));
 		wishlist.getStyleClass().addAll("ghost-button", "button-sm");
+		wishlist.setMinWidth(Region.USE_PREF_SIZE);
 		if (page == Page.WISHLIST) {
 			wishlist.setStyle("-fx-border-color: rgba(255,107,122,0.6);");
 		}
@@ -278,19 +297,45 @@ public final class StoreView {
 		if (collectionWings.isEmpty()) {
 			collectionWings = forSale;
 		}
-		if (StoreApi.welcomeGift()) {
-			body.getChildren().add(welcomeGiftBanner(host));
-		}
-		body.getChildren().add(discordBanner());
+		// 2026-11 order: the newest collection on top, then the categories to browse, then everything else.
 		if (!collectionWings.isEmpty()) {
 			body.getChildren().add(featuredHero(host, collection, collectionWings));
 		}
+		body.getChildren().add(browseCategories(host));
+		if (StoreApi.welcomeGift()) {
+			body.getChildren().add(welcomeGiftBanner(host));
+		}
 		body.getChildren().add(dailyPicks(host));
+		// Everything below the first screen is built one frame later: the page shows ~half the nodes at once (CSS and
+		// layout of ~950 nodes was ~50 ms per visit); ScrollKeeper follows the growing page when coming back.
+		afterFirstFrame(body, () -> buildFeaturedRest(host, body));
+	}
+
+	/** Runs {@code later} on the second pulse after now (the first one shows what is already there). */
+	private static void afterFirstFrame(Node anchor, Runnable later) {
+		new javafx.animation.AnimationTimer() {
+			private int frames;
+
+			@Override
+			public void handle(long now) {
+				if (++frames < 2) {
+					return;
+				}
+				stop();
+				if (anchor.getScene() != null) {
+					later.run();
+				}
+			}
+		}.start();
+	}
+
+	private static void buildFeaturedRest(Host host, VBox body) {
 		Node bundles = featuredBundles(host);
 		if (bundles != null) {
 			body.getChildren().add(bundles);
 		}
 		body.getChildren().add(plusAndCoinsRow(host));
+		body.getChildren().add(discordBanner());
 		List<AuraCatalog.AuraType> auras = AuraCatalog.all().stream().filter(AuraCatalog.AuraType::inStore).limit(6).toList();
 		if (!auras.isEmpty()) {
 			body.getChildren().add(section("Auras", "Animated effects around you · your colour, size and speed", "All auras", () -> {
@@ -312,6 +357,57 @@ public final class StoreView {
 				host.rebuild();
 			}, capeGrid(host, capes, 180)));
 		}
+	}
+
+	private static void wishlistAndLockerMin(Button locker) {
+		locker.setMinWidth(Region.USE_PREF_SIZE);
+	}
+
+	/** "Browse": one horizontal card per kind (icon, name, how many) that opens its tab. */
+	private static Node browseCategories(Host host) {
+		Object[][] kinds = {
+				{Page.WINGS, "Wings", "wings", WingsCatalog.forSale().size()},
+				{Page.CAPES, "Cloaks", "cape", (int) StoreCatalog.all().stream().filter(StoreItem::inStore).count()},
+				{Page.AURAS, "Auras", "aura", AuraCatalog.forSale().size()},
+				{Page.EMOTES, "Emotes", "sparkles", net.veloclient.launcher.data.EmoteCatalog.forSale().size()},
+				{Page.KILLFX, "Kill effects", "skull", net.veloclient.launcher.data.KillFxCatalog.forSale().size()},
+				{Page.WEAR, "Bodywear", "hat", net.veloclient.launcher.data.WearCatalog.all().size()},
+				{Page.PETS, "Pets", "heart", -1},
+				{Page.BUNDLES, "Bundles", "gift", bundles().size()}};
+		javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+		grid.setHgap(10);
+		grid.setVgap(10);
+		for (int c = 0; c < 4; c++) {
+			javafx.scene.layout.ColumnConstraints column = new javafx.scene.layout.ColumnConstraints();
+			column.setPercentWidth(25);
+			grid.getColumnConstraints().add(column);
+		}
+		for (int i = 0; i < kinds.length; i++) {
+			Object[] kind = kinds[i];
+			StackPane icon = new StackPane(Icons.icon((String) kind[2], 18, Color.web("#F4EFEE")));
+			icon.getStyleClass().add("store-cat-icon");
+			Label name = new Label((String) kind[1]);
+			name.getStyleClass().add("store-cat-name");
+			int count = (int) kind[3];
+			Label meta = new Label(count < 0 ? "See all" : count == 1 ? "1 item" : count + " items");
+			meta.getStyleClass().add("store-cat-meta");
+			VBox text = new VBox(3, name, meta);
+			// the card is taller than the two lines: centre them (they sat at the top)
+			text.setAlignment(Pos.CENTER_LEFT);
+			text.setFillWidth(true);
+			HBox.setHgrow(text, Priority.ALWAYS);
+			HBox card = new HBox(12, icon, text, Icons.icon("chevron-right", 14, Color.web("#8A8486"), 2.2));
+			card.setAlignment(Pos.CENTER_LEFT);
+			card.getStyleClass().addAll("store-cat", "motion-card");
+			card.setMaxWidth(Double.MAX_VALUE);
+			card.setOnMouseClicked(e -> {
+				page = (Page) kind[0];
+				openBundle = null;
+				host.rebuild();
+			});
+			grid.add(card, i % 4, i / 4);
+		}
+		return section("Browse", null, null, null, grid);
 	}
 
 	private static Node section(String title, String subtitle, String linkText, Runnable onLink, Node content) {
@@ -645,7 +741,7 @@ public final class StoreView {
 			JsonObject pack = element.getAsJsonObject();
 			int total = pack.get("coins").getAsInt() + pack.get("bonus").getAsInt();
 			Label amount = new Label(StoreTiles.format(total));
-			amount.setStyle("-fx-text-fill: -velo-gold; -fx-font-family: 'Inter'; -fx-font-weight: bold; -fx-font-size: 15px;");
+			amount.setStyle("-fx-text-fill: -velo-gold; -fx-font-family: 'Geist'; -fx-font-weight: bold; -fx-font-size: 15px;");
 			Label price = new Label(String.format(Locale.ROOT, "%.2f %s", pack.get("price").getAsDouble(), symbol));
 			price.getStyleClass().add("t-muted");
 			VBox content = new VBox(3, amount, price);
@@ -660,7 +756,7 @@ public final class StoreView {
 			if (highlight) {
 				Label bonus = new Label("+" + StoreTiles.format(pack.get("bonus").getAsInt()) + " BONUS");
 				bonus.setStyle("-fx-background-color: -velo-gold; -fx-text-fill: -velo-gold-ink; -fx-background-radius: 4; -fx-padding: 1 6 1 6;"
-						+ " -fx-font-family: 'Inter'; -fx-font-weight: bold; -fx-font-size: 9px;");
+						+ " -fx-font-family: 'Geist'; -fx-font-weight: bold; -fx-font-size: 9px;");
 				StackPane.setAlignment(bonus, Pos.TOP_CENTER);
 				StackPane.setMargin(bonus, new Insets(-8, 0, 0, 0));
 				card.getChildren().add(bonus);
@@ -1159,7 +1255,7 @@ public final class StoreView {
 		HBox priceRow = new HBox(10, price, per);
 		priceRow.setAlignment(Pos.BASELINE_LEFT);
 		Label status = new Label();
-		status.setStyle("-fx-text-fill: -velo-green; -fx-font-family: 'Inter SemiBold';");
+		status.setStyle("-fx-text-fill: -velo-green; -fx-font-family: 'Geist SemiBold';");
 		Button subscribe = new Button("Subscribe to Velo+");
 		subscribe.getStyleClass().addAll("primary-button", "button-lg");
 		subscribe.setDisable(true);
@@ -1421,6 +1517,9 @@ public final class StoreView {
 
 	private static final String PUBLIC_DISCORD = "https://discord.gg/tGwn8RsMpv";
 
+	/** Known once the server answered: a linked Discord hides the banner right away on the next build. */
+	private static Boolean discordLinked;
+
 	private static Node discordBanner() {
 		StackPane icon = new StackPane(Icons.icon("link", 20, Color.web("#8EA1FF")));
 		icon.setMinSize(46, 46);
@@ -1449,6 +1548,11 @@ public final class StoreView {
 		box.setStyle("-fx-border-color: rgba(88,101,242,0.55); -fx-border-width: 1.5; -fx-border-radius: 14;"
 				+ " -fx-background-color: linear-gradient(to right, rgba(88,101,242,0.20), rgba(88,101,242,0.04));");
 		join.setOnAction(e -> CoinsView.openUrl(invite[0]));
+		// 2026-11: only for people who haven't linked their Discord yet.
+		if (Boolean.TRUE.equals(discordLinked)) {
+			box.setVisible(false);
+			box.setManaged(false);
+		}
 		CompletableFuture.supplyAsync(() -> {
 			try {
 				return StoreApi.discordStatus();
@@ -1463,7 +1567,10 @@ public final class StoreView {
 			if (result.has("inviteUrl") && !result.get("inviteUrl").isJsonNull() && !result.get("inviteUrl").getAsString().isBlank()) {
 				invite[0] = result.get("inviteUrl").getAsString();
 			}
-			if (result.has("linked") && result.get("linked").getAsBoolean()) {
+			discordLinked = result.has("linked") && result.get("linked").getAsBoolean();
+			if (discordLinked) {
+				box.setVisible(false);
+				box.setManaged(false);
 				status.setText("Linked as " + result.get("discordName").getAsString() + " - the cloak is in your Locker.");
 				status.setStyle("-fx-text-fill: -velo-green;");
 				getCode.setDisable(true);

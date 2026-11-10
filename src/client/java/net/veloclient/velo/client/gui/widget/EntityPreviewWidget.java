@@ -116,6 +116,18 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		return this;
 	}
 
+	/** Locker "Armor" switch: previews show the player without the armour they wear (just skin + cosmetics). */
+	public static boolean hideArmor;
+
+	/** Flashes the hurt tint now and then (the Hit Color module's preview shows its colour on you). */
+	private boolean hurtPulse;
+	private static boolean hurtNow;
+
+	public EntityPreviewWidget hurtPulse() {
+		this.hurtPulse = true;
+		return this;
+	}
+
 	public EntityPreviewWidget noStage() {
 		this.stage = false;
 		return this;
@@ -166,7 +178,9 @@ public final class EntityPreviewWidget extends ClickableWidget {
 			// No world yet (title screen): your skin and cosmetics on a bare render state.
 			drawMenuAvatar(context, x1, y1, x2, y2, size, yawDegrees, wings == null ? null : wings.get(), wings != null);
 		} else {
+			hurtNow = hurtPulse && System.currentTimeMillis() % 1400 < 350;
 			drawRotatableEntity(context, x1, y1, x2, y2, size, yawDegrees, player, wings == null ? null : wings.get(), wings != null);
+			hurtNow = false;
 		}
 
 	}
@@ -207,7 +221,14 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		if (tagged) {
 			net.veloclient.velo.client.cosmetics.wings.WingsPreview.tag(state, wingsTag);
 		}
+		if (hideArmor && state instanceof net.minecraft.client.render.entity.state.BipedEntityRenderState biped) {
+			biped.equippedHeadStack = net.minecraft.item.ItemStack.EMPTY;
+			biped.equippedChestStack = net.minecraft.item.ItemStack.EMPTY;
+			biped.equippedLegsStack = net.minecraft.item.ItemStack.EMPTY;
+			biped.equippedFeetStack = net.minecraft.item.ItemStack.EMPTY;
+		}
 		if (state instanceof LivingEntityRenderState living) {
+			living.hurt = hurtNow;
 			living.bodyYaw = 180f + yawDegrees;
 			living.relativeHeadYaw = 0f;
 			living.pitch = living.pose == EntityPose.GLIDING ? 0f : living.pitch;
@@ -255,7 +276,14 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		if (tagged) {
 			net.veloclient.velo.client.cosmetics.wings.WingsPreview.tag(state, wingsTag);
 		}
+		if (hideArmor && state instanceof net.minecraft.client.renderer.entity.state.HumanoidRenderState humanoid) {
+			humanoid.headEquipment = net.minecraft.world.item.ItemStack.EMPTY;
+			humanoid.chestEquipment = net.minecraft.world.item.ItemStack.EMPTY;
+			humanoid.legsEquipment = net.minecraft.world.item.ItemStack.EMPTY;
+			humanoid.feetEquipment = net.minecraft.world.item.ItemStack.EMPTY;
+		}
 		if (state instanceof LivingEntityRenderState living) {
+			living.hasRedOverlay = hurtNow;
 			living.bodyRot = 180f + yawDegrees;
 			living.yRot = 0f;
 			living.xRot = living.pose == Pose.FALL_FLYING ? 0f : living.xRot;

@@ -430,8 +430,28 @@ public final class CoordScrambler {
 		return out.toString();
 	}
 
+	/** Plans per text (the fakes only depend on the text and this session's offset), cleared with the hit cache. */
+	private static final Map<String, Map<Integer, Object[]>> PLANS = new java.util.concurrent.ConcurrentHashMap<>();
+	private static volatile long plansAt;
+
 	/** Where each hit starts / what replaces it, by plain-text index (for the styled versions below). */
 	private static Map<Integer, Object[]> plan(String plainText, List<Hit> hits) {
+		// HUD text is prepared again every frame: building the plan (with String.format) each time cost ~1.5 % of a frame
+		if (PLANS.size() > 4096 || plansAt != cachedAt) {
+			PLANS.clear();
+			plansAt = cachedAt;
+		}
+		String key = coordScreen() ? '\u0001' + plainText : plainText; // the same split as the hit cache
+		Map<Integer, Object[]> known = PLANS.get(key);
+		if (known != null) {
+			return known;
+		}
+		Map<Integer, Object[]> made = buildPlan(plainText, hits);
+		PLANS.put(key, made);
+		return made;
+	}
+
+	private static Map<Integer, Object[]> buildPlan(String plainText, List<Hit> hits) {
 		Map<Integer, Object[]> plan = new java.util.HashMap<>();
 		for (Hit hit : hits) {
 			plan.put(hit.start(), new Object[] {hit.end(), fakeFor(plainText.substring(hit.start(), hit.end()), hit)});

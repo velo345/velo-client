@@ -64,6 +64,11 @@ public final class AttackIndicatorModule extends AbstractModule implements Confi
 		float progress = client.player.getAttackStrengthScale(0.0F);
 		boolean slowWeapon = client.player.getCurrentItemAttackStrengthDelay() > 5.0F;
 		*///?}
+		if (net.veloclient.velo.client.hud.HudSample.active()) {
+			// module preview / HUD editor: a charge filling up over and over
+			progress = (float) ((System.currentTimeMillis() % 1600) / 1600.0) * 0.98f;
+			crosshairMode = true;
+		}
 		if (followVanillaSetting && !crosshairMode) {
 			return;
 		}

@@ -90,7 +90,7 @@ public final class ReferralView {
 		sub.setWrapText(true);
 
 		Label codeLabel = new Label(code);
-		codeLabel.setStyle("-fx-font-family: 'JetBrains Mono Bold'; -fx-font-size: 30px; -fx-text-fill: -velo-text;");
+		codeLabel.setStyle("-fx-font-family: 'Geist Mono SemiBold'; -fx-font-size: 30px; -fx-text-fill: -velo-text;");
 		StackPane codeBox = new StackPane(codeLabel);
 		codeBox.setPadding(new Insets(10, 22, 10, 22));
 		codeBox.setStyle("-fx-background-color: rgba(255,255,255,0.04); -fx-background-radius: 12; -fx-border-color: -velo-hairline-2;"
@@ -289,7 +289,7 @@ public final class ReferralView {
 			int coins = invite.get("coins").getAsInt();
 			Label plus = new Label(coins > 0 ? "+" + StoreTiles.format(coins) : "Over the limit");
 			plus.getStyleClass().add(coins > 0 ? "t-gold" : "t-muted");
-			plus.setStyle("-fx-font-family: 'JetBrains Mono Bold'; -fx-font-size: 14px;");
+			plus.setStyle("-fx-font-family: 'Geist Mono SemiBold'; -fx-font-size: 14px;");
 			right = plus;
 		} else {
 			// Real progress: play time towards the payout.
@@ -318,7 +318,7 @@ public final class ReferralView {
 
 	private static Node avatar(String name) {
 		Label letter = new Label(name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(java.util.Locale.ROOT));
-		letter.setStyle("-fx-font-family: 'Sora'; -fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: -velo-text;");
+		letter.setStyle("-fx-font-family: 'Archivo SemiExpanded'; -fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: -velo-text;");
 		StackPane avatar = new StackPane(letter);
 		avatar.setMinSize(36, 36);
 		avatar.setMaxSize(36, 36);

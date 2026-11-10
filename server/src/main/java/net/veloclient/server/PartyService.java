@@ -156,6 +156,17 @@ final class PartyService {
 		return out;
 	}
 
+	/** Velo World co-op (ArcadeRelay): the party id of {@code uuid}, or null. */
+	synchronized String partyIdOf(String uuid) {
+		Party party = party(uuid);
+		return party == null ? null : party.id;
+	}
+
+	synchronized boolean isLeader(String uuid) {
+		Party party = party(uuid);
+		return party != null && uuid.equals(party.leader);
+	}
+
 	private Party party(String uuid) {
 		String id = partyOf.get(uuid);
 		return id == null ? null : parties.get(id);

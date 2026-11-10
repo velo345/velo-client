@@ -61,7 +61,7 @@ public final class WebCodeDialog {
 		Label title = new Label(heading);
 		title.getStyleClass().add("error-dialog-title");
 		Label pretty = new Label(code.substring(0, 3) + " " + code.substring(3));
-		pretty.setStyle("-fx-font-family: 'JetBrains Mono'; -fx-font-size: 44px; -fx-font-weight: bold; -fx-text-fill: -velo-text; -fx-letter-spacing: 6px;");
+		pretty.setStyle("-fx-font-family: 'Geist Mono'; -fx-font-size: 44px; -fx-font-weight: bold; -fx-text-fill: -velo-text; -fx-letter-spacing: 6px;");
 		Label hint = new Label(text);
 		hint.getStyleClass().add("error-dialog-message");
 		hint.setWrapText(true);

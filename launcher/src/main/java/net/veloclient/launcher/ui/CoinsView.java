@@ -94,7 +94,18 @@ public final class CoinsView {
 		status.managedProperty().bind(status.textProperty().isNotEmpty());
 		status.visibleProperty().bind(status.managedProperty());
 
-		VBox left = new VBox(28, hero(), section("Buy coins", "One-time packs, no subscription", packs(catalog, status, reload)), waysToEarn());
+		lastCodeRow = null;
+		Node packsSection = section("Buy coins", "One-time packs, no subscription", packs(catalog, status, reload));
+		Node heroCard = hero();
+		if (lastCodeRow != null && heroCard instanceof VBox heroBox) {
+			Label codeTitle = new Label("CREATOR OR PARTNER CODE");
+			codeTitle.getStyleClass().add("aside-title");
+			VBox codeBox = new VBox(8, codeTitle, lastCodeRow);
+			codeBox.getStyleClass().add("coins-code");
+			heroBox.getChildren().add(codeBox);
+			lastCodeRow = null;
+		}
+		VBox left = new VBox(28, heroCard, packsSection, waysToEarn());
 		HBox.setHgrow(left, Priority.ALWAYS);
 		VBox right = new VBox(12, section("Free every day", null, rewards == null ? note("Sign in to earn free coins.") : freeCoins(rewards, status, reload)));
 		right.setMinWidth(340);
@@ -262,8 +273,13 @@ public final class CoinsView {
 			partnerCode = null;
 			return new VBox(12, grid, secure);
 		}
-		return new VBox(12, codeRow(repricers), grid, secure);
+		// 2026-11: the code field moves up into the coins card at the top of the page (built here, placed by build()).
+		lastCodeRow = codeRow(repricers);
+		return new VBox(12, grid, secure);
 	}
+
+	/** The code row made by the last packs() call, waiting to be put into the top card. */
+	private static Node lastCodeRow;
 
 	private static String applied() {
 		return partnerName + "'s code  ·  " + (partnerPercent > 0 ? partnerPercent + "% off" : "supports them");
@@ -273,7 +289,7 @@ public final class CoinsView {
 	private static Node codeRow(java.util.List<Runnable> repricers) {
 		String hint = "Got a code from a partner server or creator? Enter it here.";
 		TextField field = new TextField(partnerCode == null ? "" : partnerCode);
-		field.setPromptText("Partner code");
+		field.setPromptText("Creator or partner code");
 		field.setPrefWidth(180);
 		field.setTextFormatter(new javafx.scene.control.TextFormatter<String>(change -> {
 			change.setText(change.getText().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9_-]", ""));
@@ -393,7 +409,7 @@ public final class CoinsView {
 		for (int d = 0; d < 7; d++) {
 			boolean lit = d < litInWeek;
 			Label day = new Label(d == 6 ? "★" : String.valueOf(d + 1));
-			day.setStyle("-fx-font-family: 'JetBrains Mono Medium'; -fx-font-size: 10px; -fx-text-fill: "
+			day.setStyle("-fx-font-family: 'Geist Mono Medium'; -fx-font-size: 10px; -fx-text-fill: "
 					+ (lit ? "#1a1406" : d == 6 ? "-velo-gold" : "-velo-text-3") + ";");
 			StackPane cell = new StackPane(day);
 			cell.setMinSize(24, 24);

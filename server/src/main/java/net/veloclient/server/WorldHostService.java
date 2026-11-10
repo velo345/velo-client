@@ -100,6 +100,12 @@ final class WorldHostService {
 		this.publicHost = publicHost;
 	}
 
+	private volatile ArcadeRelay arcade;
+
+	void setArcade(ArcadeRelay arcade) {
+		this.arcade = arcade;
+	}
+
 	void setPartyLookup(java.util.function.Function<String, List<String>> lookup) {
 		this.partyMates = lookup;
 	}
@@ -376,6 +382,13 @@ final class WorldHostService {
 				case "HOST" -> host(socket, in, parts.length > 1 ? parts[1] : "");
 				case "DATA" -> data(socket, in, parts.length > 2 ? parts[1] : "", parts.length > 2 ? parts[2] : "");
 				case "JOIN" -> join(socket, in, parts.length > 1 ? parts[1] : "");
+				case "ARCADE" -> {
+					if (arcade != null) {
+						arcade.handle(socket, in, parts);
+					} else {
+						closeQuietly(socket);
+					}
+				}
 				default -> closeQuietly(socket);
 			}
 		} catch (Exception e) {

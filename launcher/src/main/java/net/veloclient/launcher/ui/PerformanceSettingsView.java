@@ -73,6 +73,8 @@ public final class PerformanceSettingsView {
 
 		VBox preview = new VBox(0);
 		Runnable[] refresh = new Runnable[1];
+		boolean[] built = {false};
+		long[] planTicket = {0};
 		HBox[] fixedRow = new HBox[1];
 		refresh[0] = () -> {
 			boolean auto = mode.getSelectionModel().getSelectedIndex() == 0;
@@ -87,21 +89,39 @@ public final class PerformanceSettingsView {
 			updated.fixedMemoryMb = fixedMb;
 			updated.gc = LauncherSettings.GcMode.values()[Math.max(0, gc.getSelectionModel().getSelectedIndex())];
 			updated.driverShaderCache = driverCache.isSelected();
-			LauncherSettings.save(updated);
-			preview.getChildren().clear();
-			List<Instance> instances = InstanceStore.loadAll();
-			for (Instance instance : instances.subList(0, Math.min(6, instances.size()))) {
-				MemoryPlanner.Plan plan = MemoryPlanner.plan(instance);
-				Label value = new Label(plan.summary());
-				value.getStyleClass().add("settings-value");
-				if (plan.warning() != null) {
-					value.getStyleClass().add("settings-value-warn");
-				}
-				String why = String.join("\n", plan.reasons()) + (plan.warning() != null ? "\n\n" + plan.warning() : "");
-				VBox holder = new VBox();
-				SettingsUi.row(holder, instance.name(), null, why, value);
-				preview.getChildren().addAll(holder.getChildren());
+			// Opening the page used to save the settings and plan six profiles right here (walking every mods folder
+			// file by file) on the UI thread: ~100 ms per visit. Now: saved only when something changed, planned in the background.
+			if (built[0]) {
+				LauncherSettings.save(updated);
 			}
+			built[0] = true;
+			long ticket = ++planTicket[0];
+			java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+				List<Instance> instances = InstanceStore.loadAll();
+				List<Object[]> rows = new java.util.ArrayList<>();
+				for (Instance instance : instances.subList(0, Math.min(6, instances.size()))) {
+					rows.add(new Object[] {instance, MemoryPlanner.plan(instance)});
+				}
+				return rows;
+			}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()).thenAccept(rows -> javafx.application.Platform.runLater(() -> {
+				if (ticket != planTicket[0]) {
+					return;
+				}
+				preview.getChildren().clear();
+				for (Object[] row : rows) {
+					Instance instance = (Instance) row[0];
+					MemoryPlanner.Plan plan = (MemoryPlanner.Plan) row[1];
+					Label value = new Label(plan.summary());
+					value.getStyleClass().add("settings-value");
+					if (plan.warning() != null) {
+						value.getStyleClass().add("settings-value-warn");
+					}
+					String why = String.join("\n", plan.reasons()) + (plan.warning() != null ? "\n\n" + plan.warning() : "");
+					VBox holder = new VBox();
+					SettingsUi.row(holder, instance.name(), null, why, value);
+					preview.getChildren().addAll(holder.getChildren());
+				}
+			}));
 		};
 		mode.setOnAction(e -> refresh[0].run());
 		gc.setOnAction(e -> refresh[0].run());
@@ -274,7 +294,7 @@ public final class PerformanceSettingsView {
 		VBox card = new VBox(10);
 		card.getStyleClass().add("glass-panel");
 		Label headingLabel = new Label(heading);
-		headingLabel.setFont(Font.font("Inter", FontWeight.BOLD, 15));
+		headingLabel.setFont(Font.font("Geist", FontWeight.BOLD, 15));
 		headingLabel.setTextFill(color(theme.accentStart()));
 		Label sub = muted(theme, subtitle);
 		card.getChildren().addAll(headingLabel, sub);

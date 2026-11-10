@@ -143,6 +143,8 @@ final class Planner {
 					}
 					case Action.ClearFabricCache ignored -> {
 					}
+					case Action.SetOption ignored -> {
+					}
 					case Action.SetLoader l -> loader = l.version() == null ? loader : l.version();
 				}
 			}

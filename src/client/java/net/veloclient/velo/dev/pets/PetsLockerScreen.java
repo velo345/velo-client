@@ -68,7 +68,8 @@ public final class PetsLockerScreen extends VeloWindow implements net.veloclient
 
 	@Override
 	protected String[] headerTabs() {
-		return CapeEquipScreen.LOCKER_TABS;
+		// the kinds are the cards above the catalog (launcher layout)
+		return new String[0];
 	}
 
 	@Override
@@ -84,7 +85,8 @@ public final class PetsLockerScreen extends VeloWindow implements net.veloclient
 	}
 
 	private int stageX() {
-		return contentX() + CapeEquipScreen.SLOTS_W + 12;
+		CapeEquipScreen.frame(contentX(), contentY(), contentWidth(), contentBottom());
+		return CapeEquipScreen.stageX();
 	}
 
 	private int panelX() {
@@ -109,45 +111,48 @@ public final class PetsLockerScreen extends VeloWindow implements net.veloclient
 		hits.clear();
 		CapeEquipScreen.drawSlots(context, this.textRenderer, contentX(), contentY(), tabIndex, mouseX, mouseY);
 		CapeEquipScreen.drawLoadouts(context, this.textRenderer, contentX(), contentY(), contentBottom(), mouseX, mouseY);
-		renderStage(context);
+		renderStage(context, hoveredId != null ? hoveredId : selected);
+		hoveredId = null;
 
+		// Launcher layout: the heading and the pets right under the kind cards. One click wears a pet (or puts it away
+		// when it's the one you have out), a pet you don't own opens its Store page - no buttons.
 		int px = panelX();
 		int pw = contentX() + contentWidth() - px;
-		int y = contentY();
-		String equipped = PetsModule.pet();
-		boolean isEquipped = selected.equals(equipped);
-		boolean owned = selected.isEmpty() || PetsModule.owns(selected);
-		MenuKit.text(context, this.textRenderer, MenuKit.small("PET"), px, y, MenuKit.TEXT_3);
-		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.uiBold(name(selected)), pw), px, y + 11, MenuKit.TEXT);
-		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(selected.isEmpty() ? "No pet follows you" : owned ? "Follows you around" : "In the Store"), pw),
-				px, y + 23, MenuKit.TEXT_2);
-		String action = isEquipped ? (selected.isEmpty() ? "No pet" : "Put it away") : selected.isEmpty() ? "No pet" : owned ? "Take this one" : "See it in the Store";
-		button(context, px, y + 40, 112, action, mouseX, mouseY, () -> {
-			if (!owned) {
-				PetStore.item(selected).ifPresent(item -> MinecraftClient.getInstance().setScreen(new PetDetailScreen(this, item)));
-				return;
-			}
-			if (isEquipped) {
-				PetsModule.setPet("");
-				status = "Pet put away";
-			} else {
-				PetsModule.setPet(selected);
-				status = selected.isEmpty() ? "Pet put away" : name(selected) + " follows you now";
-			}
-		});
-		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui("Size, tricks and hit reactions: the Pets module."), pw),
-				px, y + 66, MenuKit.TEXT_3);
-		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(status), pw), px, y + 80, MenuKit.TEXT_2);
-		renderGrid(context, px, pw, y + 100, mouseX, mouseY);
+		int y = CapeEquipScreen.rightTop();
+		long owned = PetsModule.PETS.keySet().stream().filter(PetsModule::owns).count();
+		Text heading = MenuKit.display("Pets");
+		MenuKit.text(context, this.textRenderer, heading, px, y + 1, MenuKit.TEXT);
+		MenuKit.text(context, this.textRenderer, MenuKit.small(owned + " OWNED"), px + this.textRenderer.getWidth(heading) + 8, y + 4, MenuKit.TEXT_3);
+		String hint = status.isEmpty() ? "Size, tricks and hit reactions: the Pets module" : status;
+		Text hintText = MenuKit.ui(hint);
+		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, hintText, pw / 2), px + pw - Math.min(pw / 2, this.textRenderer.getWidth(hintText)),
+				y + 2, MenuKit.TEXT_3);
+		renderGrid(context, px, pw, y + 20, mouseX, mouseY);
 	}
 
-	private void renderStage(DrawContext context) {
+	/** One click: wear it (or put it away if it's out), or its Store page when you don't have it yet. */
+	private void pick(String id) {
+		selected = id;
+		if (!id.isEmpty() && !PetsModule.owns(id)) {
+			PetStore.item(id).ifPresent(item -> MinecraftClient.getInstance().setScreen(new PetDetailScreen(this, item)));
+			return;
+		}
+		if (id.equals(PetsModule.pet()) && !id.isEmpty()) {
+			PetsModule.setPet("");
+			status = name(id) + " put away";
+		} else {
+			PetsModule.setPet(id);
+			status = id.isEmpty() ? "Pet put away" : name(id) + " follows you now";
+		}
+	}
+
+	private void renderStage(DrawContext context, String selected) {
 		int x = stageX();
 		int y = contentY();
 		int w = CapeEquipScreen.SHOWCASE_WIDTH;
-		int h = contentBottom() - y;
-		VeloDraw.fillRounded(context, x, y, w, h, 10, 0xFF0E0E14);
-		VeloDraw.strokeRounded(context, x, y, w, h, 10, 0x17FFFFFF);
+		int h = CapeEquipScreen.stageBottom() - y;
+		VeloDraw.fillRounded(context, x, y, w, h, 8, 0xFF100D0D);
+		VeloDraw.strokeRounded(context, x, y, w, h, 8, 0x10FFFFFF);
 		if (selected.isEmpty()) {
 			String line = "No pet";
 			String hint = "Pick one on the right";
@@ -164,6 +169,9 @@ public final class PetsLockerScreen extends VeloWindow implements net.veloclient
 		String label = name(selected);
 		MenuKit.text(context, this.textRenderer, MenuKit.uiBold(label), x + (w - this.textRenderer.getWidth(MenuKit.uiBold(label))) / 2, y + h - 22, MenuKit.TEXT);
 	}
+
+	/** The pet under the mouse: shown on the stage while hovered (launcher behaviour). */
+	private String hoveredId;
 
 	private void renderGrid(DrawContext context, int px, int pw, int gy, int mouseX, int mouseY) {
 		List<String> ids = new ArrayList<>();
@@ -187,6 +195,9 @@ public final class PetsLockerScreen extends VeloWindow implements net.veloclient
 
 	private void drawTile(DrawContext context, String id, int x, int y, int mouseX, int mouseY, int clipTop) {
 		boolean hovered = mouseX >= x && mouseX < x + TILE && mouseY >= y && mouseY < y + TILE + 14 && mouseY >= clipTop;
+		if (hovered) {
+			hoveredId = id;
+		}
 		boolean active = id.equals(selected);
 		boolean worn = id.equals(PetsModule.pet());
 		int accent = MenuKit.accent();
@@ -212,7 +223,7 @@ public final class PetsLockerScreen extends VeloWindow implements net.veloclient
 		String label = MenuKit.fit(this.textRenderer, MenuKit.ui(name(id)), TILE).getString();
 		context.drawTextWithShadow(this.textRenderer, label, x + (TILE - this.textRenderer.getWidth(label)) / 2, y + TILE + 3, 0xFFE8E8F0);
 		int top = Math.max(y, clipTop);
-		hits.add(new Hit(x, top, TILE, Math.max(0, y + TILE + 14 - top), () -> selected = id));
+		hits.add(new Hit(x, top, TILE, Math.max(0, y + TILE + 14 - top), () -> pick(id)));
 	}
 
 	private void button(DrawContext context, int x, int y, int w, String label, int mouseX, int mouseY, Runnable action) {

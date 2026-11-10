@@ -143,7 +143,38 @@ public final class InstanceDetailView {
 			more.setOnAction(e -> menu.show(more, javafx.geometry.Side.BOTTOM, 0, 6));
 			banner.getChildren().add(more);
 		}
-		banner.setPadding(new Insets(0, 0, 18, 0));
+		banner.setPadding(new Insets(20, 22, 20, 18));
+		// 2026-11: the banner sits on its version's art, graded dark (like the redesign).
+		javafx.scene.image.ImageView art = new javafx.scene.image.ImageView();
+		art.setPreserveRatio(false);
+		art.setOpacity(0.18);
+		// Unmanaged: the picture follows the banner's size but never feeds back into it. Managed, its fit size became the
+		// StackPane's preferred size, which grew the banner, which grew the picture... until the banner filled the page.
+		art.setManaged(false);
+		art.fitWidthProperty().bind(banner.widthProperty());
+		art.fitHeightProperty().bind(banner.heightProperty());
+		art.setMouseTransparent(true);
+		VersionArt.load(instance.mcVersion(), image -> {
+			art.setImage(image);
+			// crop to the banner's shape so the picture isn't squashed
+			art.setViewport(null);
+			double ratio = Math.max(1, banner.getWidth()) / Math.max(1, banner.getHeight());
+			double h = image.getWidth() / ratio;
+			if (h < image.getHeight()) {
+				art.setViewport(new javafx.geometry.Rectangle2D(0, (image.getHeight() - h) / 2, image.getWidth(), h));
+			}
+		});
+		Region artShade = new Region();
+		artShade.getStyleClass().add("profile-banner-shade");
+		artShade.setMouseTransparent(true);
+		StackPane bannerBox = new StackPane(art, artShade, banner);
+		bannerBox.getStyleClass().add("profile-banner");
+		javafx.scene.shape.Rectangle bannerClip = new javafx.scene.shape.Rectangle();
+		bannerClip.widthProperty().bind(bannerBox.widthProperty());
+		bannerClip.heightProperty().bind(bannerBox.heightProperty());
+		bannerClip.setArcWidth(28);
+		bannerClip.setArcHeight(28);
+		bannerBox.setClip(bannerClip);
 
 		// ---- Sections ----
 		StackPane sectionHost = new StackPane();
@@ -190,9 +221,9 @@ public final class InstanceDetailView {
 		counts.put("Shaders", userFileCount(InstancePaths.shaderPacksDir(instance.id())));
 		counts.put("Worlds", folderCount(InstancePaths.savesDir(instance.id())));
 
-		VBox nav = new VBox(2);
-		nav.setMinWidth(210);
-		nav.setPrefWidth(220);
+		// 2026-11: the sections as one row of tabs; the profile's own actions sit in a menu at its end.
+		HBox nav = new HBox(4);
+		nav.setAlignment(Pos.CENTER_LEFT);
 		java.util.Map<String, Button> navButtons = new java.util.LinkedHashMap<>();
 		java.util.function.Consumer<String> open = new java.util.function.Consumer<>() {
 			@Override
@@ -219,6 +250,8 @@ public final class InstanceDetailView {
 		};
 		for (String name : sections.keySet()) {
 			Button button = navButton(name, counts.get(name));
+			button.setMaxWidth(Region.USE_PREF_SIZE);
+			button.setMinWidth(Region.USE_PREF_SIZE);
 			button.setOnAction(e -> open.accept(name));
 			navButtons.put(name, button);
 			nav.getChildren().add(button);
@@ -236,22 +269,21 @@ public final class InstanceDetailView {
 			CompletableFuture.supplyAsync(() -> net.veloclient.launcher.doctor.Doctor.check(instance), Executors.newVirtualThreadPerTaskExecutor())
 					.thenAccept(d -> Platform.runLater(() -> doctorBadge[0].accept(d)));
 		}
-		Region divider = new Region();
-		divider.getStyleClass().add("hairline-h");
-		VBox.setMargin(divider, new Insets(10, 4, 10, 4));
-		nav.getChildren().add(divider);
+		javafx.scene.control.MenuButton profileMenu = new javafx.scene.control.MenuButton("Profile");
+		profileMenu.setGraphic(Icons.icon("sliders", 15, javafx.scene.paint.Color.web("#E4E4E8")));
+		profileMenu.getStyleClass().add("profile-menu");
+		profileMenu.setMinWidth(Region.USE_PREF_SIZE);
 		{
-			Button migrate = navButton("Change version", null);
+			javafx.scene.control.MenuItem migrate = new javafx.scene.control.MenuItem("Change version");
 			migrate.setOnAction(e -> VersionMigration.show(overlayHost, instance, onBack));
-			nav.getChildren().add(migrate);
+			profileMenu.getItems().add(migrate);
 		}
 		if (header != null && header.javaSettings() != null) {
-			Button java = navButton("Java & memory", null);
-			java.setGraphic(null);
+			javafx.scene.control.MenuItem java = new javafx.scene.control.MenuItem("Java & memory");
 			java.setOnAction(e -> header.javaSettings().run());
-			nav.getChildren().add(java);
+			profileMenu.getItems().add(java);
 		}
-		Button logs = navButton("Logs & crashes", null);
+		javafx.scene.control.MenuItem logs = new javafx.scene.control.MenuItem("Logs & crashes");
 		logs.setOnAction(e -> {
 			try {
 				Files.createDirectories(InstancePaths.logsDir(instance.id()));
@@ -260,7 +292,7 @@ public final class InstanceDetailView {
 				error(owner, "Couldn't open logs", ex.getMessage());
 			}
 		});
-		Button folder = navButton("Open profile folder", null);
+		javafx.scene.control.MenuItem folder = new javafx.scene.control.MenuItem("Open profile folder");
 		folder.setOnAction(e -> {
 			try {
 				Files.createDirectories(InstancePaths.gameDir(instance.id()));
@@ -269,13 +301,96 @@ public final class InstanceDetailView {
 				error(owner, "Couldn't open folder", ex.getMessage());
 			}
 		});
-		nav.getChildren().addAll(logs, folder);
+		profileMenu.getItems().addAll(logs, folder);
+		Region navPush = new Region();
+		HBox.setHgrow(navPush, Priority.ALWAYS);
+		// many tabs on a narrow window: the row scrolls sideways instead of cutting labels
+		ScrollPane navStrip = new ScrollPane(nav);
+		navStrip.setFitToHeight(true);
+		navStrip.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		navStrip.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		navStrip.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0;");
+		navStrip.setPannable(true);
+		HBox.setHgrow(navStrip, Priority.ALWAYS);
+		HBox navRow = new HBox(10, navStrip, profileMenu);
+		navRow.setAlignment(Pos.CENTER_LEFT);
+		navRow.getStyleClass().add("profile-tabs");
 
-		HBox body = new HBox(28, nav, sectionHost);
+		// Right of every section (2026-11, like the redesign): the profile check and switching versions, always at hand.
+		VBox aside = profileAside(instance, overlayHost, onBack, open);
+		HBox.setHgrow(sectionHost, Priority.ALWAYS);
+		HBox body = new HBox(20, sectionHost, aside);
 		VBox.setVgrow(body, Priority.ALWAYS);
-		VBox root = new VBox(banner, body);
+		body.widthProperty().addListener((o, was, w) -> {
+			boolean wide = w.doubleValue() > 960;
+			aside.setVisible(wide);
+			aside.setManaged(wide);
+		});
+		VBox root = new VBox(14, bannerBox, navRow, body);
 		open.accept(LAST_SECTION.getOrDefault(instance.id(), "Mods"));
 		return new StackPane(root, overlayHost);
+	}
+
+	private static VBox profileAside(Instance instance, StackPane overlayHost, Runnable onBack, java.util.function.Consumer<String> open) {
+		Label checkTitle = new Label("PROFILE CHECK");
+		checkTitle.getStyleClass().add("aside-title");
+		Region square = new Region();
+		square.getStyleClass().addAll("status-square", "status-square-off");
+		Label status = new Label("Checking...");
+		status.getStyleClass().add("aside-status");
+		status.setGraphic(square);
+		status.setGraphicTextGap(9);
+		Label detail = new Label("Mods, Java, memory and graphics are checked against " + instance.mcVersion() + ".");
+		detail.getStyleClass().add("aside-text");
+		detail.setWrapText(true);
+		Button doctor = new Button("Open the Doctor");
+		doctor.getStyleClass().addAll("glass-button", "button-sm");
+		doctor.setMaxWidth(Double.MAX_VALUE);
+		doctor.setOnAction(e -> open.accept("Doctor"));
+		VBox check = new VBox(10, checkTitle, status, detail, doctor);
+		check.getStyleClass().add("aside-card");
+		CompletableFuture.supplyAsync(() -> net.veloclient.launcher.doctor.Doctor.check(instance), Executors.newVirtualThreadPerTaskExecutor())
+				.thenAccept(d -> Platform.runLater(() -> {
+					long serious = d.issues().stream().filter(i -> i.severity() != net.veloclient.launcher.doctor.Diagnosis.Severity.TIP).count();
+					square.getStyleClass().remove("status-square-off");
+					if (serious > 0) {
+						square.getStyleClass().add("status-square-request");
+					}
+					status.setText(serious == 0 ? "Ready to play" : serious == 1 ? "1 thing to fix" : serious + " things to fix");
+					detail.setText(serious == 0 ? "Everything in this profile fits Minecraft " + instance.mcVersion() + "."
+							: "The Doctor found what's wrong and can fix it in one click.");
+				}));
+
+		Label switchTitle = new Label("SWITCH VERSION");
+		switchTitle.getStyleClass().add("aside-title");
+		Label switchText = new Label("Velo checks every mod first and shows what changes before anything moves.");
+		switchText.getStyleClass().add("aside-text");
+		switchText.setWrapText(true);
+		javafx.scene.layout.FlowPane chips = new javafx.scene.layout.FlowPane(6, 6);
+		int shown = 0;
+		List<net.veloclient.launcher.launch.GameVersion> newestFirst = new java.util.ArrayList<>(List.of(net.veloclient.launcher.launch.GameVersion.values()));
+		java.util.Collections.reverse(newestFirst);
+		for (net.veloclient.launcher.launch.GameVersion version : newestFirst) {
+			shown++;
+			Button chip = new Button(version.id());
+			chip.getStyleClass().add(version.id().equals(instance.mcVersion()) ? "aside-chip-on" : "aside-chip");
+			chip.setMinWidth(Region.USE_PREF_SIZE);
+			chip.setOnAction(e -> {
+				if (!version.id().equals(instance.mcVersion())) {
+					VersionMigration.show(overlayHost, instance, onBack);
+				}
+			});
+			chips.getChildren().add(chip);
+		}
+		// every version right there (2026-11) - no extra "All versions" step
+		VBox versions = new VBox(10, switchTitle, switchText, chips);
+		versions.getStyleClass().add("aside-card");
+
+		VBox aside = new VBox(12, check, versions);
+		aside.setMinWidth(260);
+		aside.setPrefWidth(280);
+		aside.setMaxWidth(300);
+		return aside;
 	}
 
 	private static Button navButton(String name, Long count) {
@@ -550,8 +665,17 @@ public final class InstanceDetailView {
 
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
+		// Next to the sidebar the page is narrower (2026-11): buttons keep their full label, the search field gives way.
+		for (javafx.scene.control.Control control : new javafx.scene.control.Control[] {count, updateAll, openFolderButton, importButton, addButton}) {
+			control.setMinWidth(Region.USE_PREF_SIZE);
+		}
+		filter.setMinWidth(130);
+		HBox.setHgrow(filter, Priority.ALWAYS);
+		filter.setMaxWidth(320);
+		spacer.setMinWidth(0);
 		HBox toolbar = new HBox(8, count, filter, spacer, bulkProgress, updateAll, openFolderButton, importButton, addButton);
 		if (selection != null) {
+			selection.modeButton.setMinWidth(Region.USE_PREF_SIZE);
 			toolbar.getChildren().add(4, selection.modeButton);
 		}
 		toolbar.setAlignment(Pos.CENTER_LEFT);
@@ -561,7 +685,20 @@ public final class InstanceDetailView {
 		if (kind == InstalledAssetStore.Kind.MOD) {
 			root.getChildren().add(PlusAddonsCard.build(instance, () -> listRefresh[0].run()));
 		}
+		// Searching for something you don't have: no empty installed list taking the space above the Modrinth rows.
+		installedList.getChildren().addListener((javafx.collections.ListChangeListener<Node>) change -> {
+			boolean empty = installedList.getChildren().isEmpty();
+			scroll.setVisible(!empty);
+			scroll.setManaged(!empty);
+		});
 		root.getChildren().add(scroll);
+		root.getChildren().add(modrinthMatches(owner, overlayHost, instance, theme, kind, folder, filter, openDetail));
+		filter.setPromptText("Search your " + noun + " and Modrinth...");
+		// Dev (screenshot tour): -Dvelo.tourModSearch=map starts the Mods tab with that search typed in.
+		String tourSearch = System.getProperty("velo.tourModSearch");
+		if (tourSearch != null && System.getProperty("velo.launcherTour") != null && kind == InstalledAssetStore.Kind.MOD) {
+			Platform.runLater(() -> filter.setText(tourSearch));
+		}
 		if (selection == null) {
 			listRefresh[0].run();
 			return new InstalledView(root, listRefresh[0]);
@@ -573,6 +710,88 @@ public final class InstanceDetailView {
 		StackPane.setMargin(selection.bar(), new Insets(0, 0, 14, 0));
 		selection.installKeys(layered);
 		return new InstalledView(layered, listRefresh[0]);
+	}
+
+	/** The small "BUILT IN" chip with the Velo logo; hovering says what Velo has instead. Null when nothing is built in. */
+	static Label builtInBadge(String feature) {
+		if (feature == null) {
+			return null;
+		}
+		javafx.scene.image.ImageView logo = new javafx.scene.image.ImageView(UiImages.resource("/net/veloclient/launcher/images/logo.png", 12, 12));
+		Label badge = new Label("BUILT IN", logo);
+		badge.setGraphicTextGap(5);
+		badge.getStyleClass().add("builtin-badge");
+		Tooltip tip = new Tooltip("Velo already has " + feature + " - turn it on in game with Right Shift, no extra mod needed.");
+		tip.setShowDelay(javafx.util.Duration.millis(150));
+		tip.setWrapText(true);
+		tip.setMaxWidth(260);
+		Tooltip.install(badge, tip);
+		return badge;
+	}
+
+	/**
+	 * Under the installed list while you type in its filter: the best Modrinth matches you don't have yet, ready to add
+	 * - so one search box finds both (2026-11).
+	 */
+	private static Node modrinthMatches(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
+			Path folder, TextField filter, java.util.function.Consumer<String> openDetail) {
+		Label heading = new Label("ADD FROM MODRINTH");
+		heading.getStyleClass().add("friend-group-title");
+		Label hint = new Label("");
+		hint.getStyleClass().add("friend-group-count");
+		HBox header = new HBox(10, heading, hint);
+		header.setAlignment(Pos.CENTER_LEFT);
+		header.getStyleClass().add("friend-group-header");
+		VBox cards = new VBox();
+		VBox box = new VBox(header, cards);
+		box.getStyleClass().add("friend-group");
+		box.setVisible(false);
+		box.setManaged(false);
+		javafx.animation.PauseTransition debounce = new javafx.animation.PauseTransition(javafx.util.Duration.millis(380));
+		long[] generation = {0};
+		debounce.setOnFinished(e -> {
+			String text = filter.getText() == null ? "" : filter.getText().strip();
+			long mine = ++generation[0];
+			if (text.length() < 3) {
+				box.setVisible(false);
+				box.setManaged(false);
+				return;
+			}
+			hint.setText("searching for \"" + text + "\"...");
+			box.setVisible(true);
+			box.setManaged(true);
+			java.util.Set<String> have = InstalledAssetStore.loadAll(instance.id(), kind).stream()
+					.map(InstalledAsset::projectId).filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+			java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+				try {
+					return ModrinthClient.search(text, kind.modrinthProjectType(), instance.mcVersion(), "relevance", 0, 10);
+				} catch (Exception ex) {
+					return null;
+				}
+			}, java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
+				if (mine != generation[0]) {
+					return;
+				}
+				cards.getChildren().clear();
+				if (result == null) {
+					hint.setText("Modrinth didn't answer - try again in a moment");
+					return;
+				}
+				for (ModrinthClient.SearchHit hit : result.hits()) {
+					if (!have.contains(hit.projectId()) && cards.getChildren().size() < 4) {
+						Node row = buildSearchResultRow(owner, overlayHost, instance, theme, kind, folder, hit, openDetail);
+						if (!cards.getChildren().isEmpty()) {
+							cards.getChildren().getLast().getStyleClass().add("friend-row-split");
+						}
+						cards.getChildren().add(row);
+					}
+				}
+				hint.setText(cards.getChildren().isEmpty() ? "nothing new for \"" + text + "\" on " + instance.mcVersion()
+						: "for Minecraft " + instance.mcVersion());
+			}));
+		});
+		filter.textProperty().addListener((o, a, b) -> debounce.playFromStart());
+		return box;
 	}
 
 	/** Re-applies a pixel scroll offset once the rebuilt rows have been laid out. */
@@ -851,7 +1070,7 @@ public final class InstanceDetailView {
 
 		VBox info = new VBox(2);
 		Label title = new Label(asset.title() + (disabled ? "  (disabled)" : ""));
-		title.setFont(Font.font("Inter", FontWeight.BOLD, 13));
+		title.setFont(Font.font("Geist", FontWeight.BOLD, 13));
 		title.setTextFill(text(theme));
 		Node meta;
 		{
@@ -1057,7 +1276,7 @@ public final class InstanceDetailView {
 		Button back = BackButton.create("installed (" + userFileCount(folder) + ")", null);
 		back.setOnAction(e -> onBack.run());
 		Label heading = new Label("Browse Modrinth " + kind.modrinthProjectType() + "s for Minecraft " + instance.mcVersion());
-		heading.setFont(Font.font("Inter", FontWeight.BOLD, 15));
+		heading.setFont(Font.font("Geist", FontWeight.BOLD, 15));
 		heading.setTextFill(text(theme));
 		topRow.getChildren().addAll(back, heading);
 		root.getChildren().add(topRow);
@@ -1165,16 +1384,88 @@ public final class InstanceDetailView {
 	}
 
 	/** "Built into Velo: World Map" for mods whose feature Velo already has. */
+	/** The small "BUILT IN" chip next to a mod Velo already covers (2026-11: a quiet badge, the details on hover). */
 	private static Label builtinHint(String slug, String title) {
-		String feature = net.veloclient.launcher.data.VeloBuiltins.featureFor(slug, title);
-		if (feature == null) {
-			return null;
+		return builtInBadge(net.veloclient.launcher.data.VeloBuiltins.featureFor(slug, title));
+	}
+
+	/** Install button behaviour for a Modrinth hit: load versions, pick one (with dependencies), install, then flip the label. */
+	private static void wireInstall(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
+			Path folder, ModrinthClient.SearchHit hit, Button install, ProgressBar progress, String doneText) {
+		install.setOnAction(e -> {
+			install.setDisable(true);
+			CompletableFuture.supplyAsync(() -> {
+				try {
+					return ModrinthClient.versions(hit.projectId(), instance.mcVersion(), kind.modrinthProjectType());
+				} catch (IOException ex) {
+					return ex;
+				}
+			}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
+				if (result instanceof Exception ex) {
+					install.setDisable(false);
+					error(owner, "Couldn't load versions", ex.getMessage());
+					return;
+				}
+				@SuppressWarnings("unchecked")
+				List<ModrinthClient.ProjectVersion> versions = (List<ModrinthClient.ProjectVersion>) result;
+				if (versions.isEmpty()) {
+					install.setDisable(false);
+					error(owner, "No compatible version", hit.title() + " has no version published"
+							+ ("mod".equals(kind.modrinthProjectType()) ? " for Minecraft " + instance.mcVersion() + " on Fabric." : " at all."));
+					return;
+				}
+				// Stay on the search results after installing (so browsing
+				// and installing several things in a row doesn't keep
+				// kicking you back to the installed list) - just flip this
+				// card's own button once it's done, instead of navigating.
+				showVersionPicker(overlayHost, theme, instance, hit.title(), versions, plan ->
+						installWithDependencies(owner, instance, kind, folder, plan, null, progress, () -> {
+							install.setText(doneText);
+							install.setDisable(true);
+						}));
+			}));
+		});
+	}
+
+	/** A Modrinth hit as a list row (2026-11), matching the installed rows: icon, name + BUILT IN, one-line description, Add. */
+	private static Node buildSearchResultRow(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
+			Path folder, ModrinthClient.SearchHit hit, java.util.function.Consumer<String> openDetail) {
+		Node icon = iconView(hit.iconUrl(), 38);
+		icon.setCursor(javafx.scene.Cursor.HAND);
+		icon.setOnMouseClicked(e -> openDetail.accept(hit.projectId()));
+		Label title = new Label(hit.title());
+		title.getStyleClass().add("t-strong");
+		title.setOnMouseClicked(e -> openDetail.accept(hit.projectId()));
+		title.setCursor(javafx.scene.Cursor.HAND);
+		HBox titleRow = new HBox(8, title);
+		titleRow.setAlignment(Pos.CENTER_LEFT);
+		Label builtin = builtinHint(hit.slug(), hit.title());
+		if (builtin != null) {
+			titleRow.getChildren().add(builtin);
 		}
-		Label hint = new Label("★ Built into Velo: " + feature);
-		hint.getStyleClass().add("velo-builtin-hint");
-		hint.setTooltip(new javafx.scene.control.Tooltip("Velo Client already has this built in (" + feature
-				+ ") - you probably don't need this mod. Find it in game with Right Shift."));
-		return hint;
+		Label description = new Label(hit.description());
+		description.getStyleClass().add("t-muted");
+		description.setStyle("-fx-font-size: 12px;");
+		description.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+		description.setMinWidth(0);
+		VBox text = new VBox(4, titleRow, description);
+		text.setMinWidth(0);
+		HBox.setHgrow(text, Priority.ALWAYS);
+		Label downloads = new Label(formatCount(hit.downloads()));
+		downloads.getStyleClass().add("server-version");
+		downloads.setMinWidth(Region.USE_PREF_SIZE);
+		ProgressBar progress = new ProgressBar(0);
+		progress.setPrefWidth(80);
+		progress.setVisible(false);
+		progress.setManaged(false);
+		Button add = new Button("Add");
+		add.getStyleClass().addAll("primary-button", "button-sm");
+		add.setMinWidth(76);
+		wireInstall(owner, overlayHost, instance, theme, kind, folder, hit, add, progress, "Added");
+		HBox row = new HBox(14, icon, text, downloads, progress, add);
+		row.setAlignment(Pos.CENTER_LEFT);
+		row.getStyleClass().add("friend-row");
+		return row;
 	}
 
 	private static Node buildSearchResultCard(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
@@ -1192,7 +1483,7 @@ public final class InstanceDetailView {
 		card.getChildren().add(icon);
 
 		Label title = new Label(hit.title());
-		title.setFont(Font.font("Inter", FontWeight.BOLD, 13));
+		title.setFont(Font.font("Geist", FontWeight.BOLD, 13));
 		title.setTextFill(text(theme));
 		title.setWrapText(true);
 		title.setAlignment(Pos.CENTER);
@@ -1226,48 +1517,13 @@ public final class InstanceDetailView {
 		install.setMaxWidth(Double.MAX_VALUE);
 		install.setDisable(alreadyInstalled);
 		if (!alreadyInstalled) {
-			install.setOnAction(e -> {
-				install.setDisable(true);
-				CompletableFuture.supplyAsync(() -> {
-					try {
-						return ModrinthClient.versions(hit.projectId(), instance.mcVersion(), kind.modrinthProjectType());
-					} catch (IOException ex) {
-						return ex;
-					}
-				}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
-					if (result instanceof Exception ex) {
-						install.setDisable(false);
-						error(owner, "Couldn't load versions", ex.getMessage());
-						return;
-					}
-					@SuppressWarnings("unchecked")
-					List<ModrinthClient.ProjectVersion> versions = (List<ModrinthClient.ProjectVersion>) result;
-					if (versions.isEmpty()) {
-						install.setDisable(false);
-						error(owner, "No compatible version", hit.title() + " has no version published"
-								+ ("mod".equals(kind.modrinthProjectType()) ? " for Minecraft " + instance.mcVersion() + " on Fabric." : " at all."));
-						return;
-					}
-					// Stay on the search results after installing (so browsing
-					// and installing several things in a row doesn't keep
-					// kicking you back to the installed list) - just flip this
-					// card's own button once it's done, instead of navigating.
-					showVersionPicker(overlayHost, theme, instance, hit.title(), versions, plan ->
-							installWithDependencies(owner, instance, kind, folder, plan, null, progress, () -> {
-								install.setText("Installed");
-								install.setDisable(true);
-							}));
-				}));
-			});
+			wireInstall(owner, overlayHost, instance, theme, kind, folder, hit, install, progress, "Installed");
 		}
 
 		card.getChildren().addAll(title, description, downloads);
 		Label builtin = builtinHint(hit.slug(), hit.title());
 		if (builtin != null) {
-			card.getChildren().add(builtin);
-			description.setMinHeight(18);
-			description.setMaxHeight(18);
-			description.setText(truncate(hit.description(), 40));
+			card.getChildren().add(1, builtin);
 		}
 		card.getChildren().addAll(spacer, progress, install);
 		return card;
@@ -1307,7 +1563,7 @@ public final class InstanceDetailView {
 		card.setMaxHeight(560);
 
 		Label heading = new Label("Install " + projectTitle);
-		heading.setFont(Font.font("Inter", FontWeight.BOLD, 16));
+		heading.setFont(Font.font("Geist", FontWeight.BOLD, 16));
 		heading.setTextFill(text(theme));
 		heading.setWrapText(true);
 		Label subheading = new Label("Choose which version to install");
@@ -1508,7 +1764,7 @@ public final class InstanceDetailView {
 							return;
 						}
 						Label header = new Label("Dependencies");
-						header.setFont(Font.font("Inter", FontWeight.BOLD, 12));
+						header.setFont(Font.font("Geist", FontWeight.BOLD, 12));
 						node.getChildren().add(header);
 						for (Row row : rows) {
 							if (row.alreadyInstalled()) {

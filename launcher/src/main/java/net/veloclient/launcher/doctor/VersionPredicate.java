@@ -117,7 +117,35 @@ final class VersionPredicate {
 		}
 		boolean preA = core(a).length() < a.replaceAll("\\+.*$", "").length();
 		boolean preB = core(b).length() < b.replaceAll("\\+.*$", "").length();
-		return preA == preB ? 0 : preA ? -1 : 1;
+		if (preA != preB) {
+			return preA ? -1 : 1;
+		}
+		return preA ? comparePre(a, b) : 0;
+	}
+
+	/** "beta.3" < "beta.4", "alpha.9" < "beta.1": the pre-release parts, numbers as numbers (Sodium's betas, 2026-11-10). */
+	private static int comparePre(String a, String b) {
+		String[] x = pre(a).split("\\.");
+		String[] y = pre(b).split("\\.");
+		for (int i = 0; i < Math.min(x.length, y.length); i++) {
+			int c;
+			if (x[i].matches("\\d{1,12}") && y[i].matches("\\d{1,12}")) {
+				c = Long.compare(Long.parseLong(x[i]), Long.parseLong(y[i]));
+			} else {
+				c = x[i].compareToIgnoreCase(y[i]);
+			}
+			if (c != 0) {
+				return c;
+			}
+		}
+		return Integer.compare(x.length, y.length);
+	}
+
+	/** "1.2.3-beta.4+mc1.21" -> "beta.4" */
+	private static String pre(String version) {
+		String v = version.strip().replaceAll("\\+.*$", "");
+		int dash = v.indexOf('-');
+		return dash < 0 ? "" : v.substring(dash + 1);
 	}
 
 	/** "1.2.3-beta.4+mc1.21" -> "1.2.3" */

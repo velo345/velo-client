@@ -96,7 +96,7 @@ public final class MenuShell {
 		state.boxes.clear();
 		List<Entry> rail = state.entries;
 		int a = Math.round(255 * alpha);
-		VeloDraw.fillRounded(context, x, top, RAIL, bottom - top, 9, VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x08 * alpha)));
+		VeloDraw.fillRounded(context, x, top, RAIL, bottom - top, 9, VeloUi.withAlpha(0xFF070505, Math.round(0xE0 * alpha)));
 		long lower = rail.stream().filter(Entry::bottom).count();
 		int size = Math.max(18, Math.min(24, (bottom - top - 16 - (rail.size() + 1) * 3) / rail.size()));
 		int ty = top + 5;
@@ -131,9 +131,8 @@ public final class MenuShell {
 			}
 			int py = Math.round(pillY);
 			int s = activeBox[2];
-			VeloDraw.shadow(context, activeBox[0], py, s, s, 7, 8, 2, VeloUi.withAlpha(MenuKit.accent(), Math.round(0x50 * alpha)));
-			VeloDraw.fillRounded(context, activeBox[0], py, s, s, 7, VeloUi.withAlpha(MenuKit.accent(), Math.round(0x30 * alpha)));
-			VeloDraw.strokeRounded(context, activeBox[0], py, s, s, 7, VeloUi.withAlpha(MenuKit.accent(), Math.round(0x90 * alpha)));
+			// launcher rail: the page you're on = a quiet lighter square, its icon in the accent (no glow, no ring)
+			VeloDraw.fillRounded(context, activeBox[0], py, s, s, 6, VeloUi.withAlpha(0xFF1E1718, Math.round(0xFF * alpha)));
 		}
 		for (int[] box : state.boxes) {
 			Entry item = rail.get(box[3]);
@@ -145,7 +144,7 @@ public final class MenuShell {
 				VeloDraw.fillRounded(context, ix, iy, size, size, 7, VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x14 * alpha)));
 			}
 			boolean redstone = item.icon().equals("redstone");
-			int tint = active ? 0xFFFFFFFF : redstone ? 0xFFFF6B73 : hover ? 0xFFE4E4E8 : 0xFF9A9AA6;
+			int tint = active ? MenuKit.accentText() : redstone ? 0xFFFF6B73 : hover ? 0xFFE4E4E8 : 0xFF8E8384;
 			int icon = Math.round(size * 0.55f);
 			MenuKit.icon(context, item.icon(), ix + (size - icon) / 2, iy + (size - icon) / 2, icon, VeloUi.withAlpha(tint, a));
 			if (item.id().equals("friends") && friendsBadge() > 0) {
@@ -179,7 +178,7 @@ public final class MenuShell {
 			int ty = box[1] + (box[2] - 18) / 2;
 			int alpha = Math.round(255 * eased);
 			VeloDraw.shadow(context, tx, ty, w, 18, 6, 10, 3, VeloUi.withAlpha(0xFF000000, Math.round(0x80 * eased)));
-			VeloDraw.fillRounded(context, tx, ty, w, 18, 6, VeloUi.withAlpha(0xFF1C1C23, alpha));
+			VeloDraw.fillRounded(context, tx, ty, w, 18, 6, VeloUi.withAlpha(0xFF141011, alpha));
 			VeloDraw.strokeRounded(context, tx, ty, w, 18, 6, VeloUi.withAlpha(MenuKit.accent(), Math.round(0x70 * eased)));
 			context.enableScissor(tx, ty, tx + w, ty + 18);
 			MenuKit.text(context, renderer, label, tx + 8, ty + 5, VeloUi.withAlpha(MenuKit.TEXT, alpha));

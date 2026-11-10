@@ -7,7 +7,7 @@ import java.util.Map;
 public final class LauncherThemePresets {
 
 	public static final LauncherTheme VELO_DARK = new LauncherTheme(
-			"Velo Dark", 0xFF0B0B0E, 0xFF131317, 0xFFE0262E, 0xFFC81F27, 0xFFF4F4F6, 10, 0.6f, 1.0f, 0.92f);
+			"Velo Dark", 0xFF0C0A0A, 0xFF141011, 0xFFD7262D, 0xFFC21F26, 0xFFF4EFEE, 10, 0.6f, 1.0f, 0.92f);
 	public static final LauncherTheme MIDNIGHT = new LauncherTheme(
 			"Midnight", 0xFF090D18, 0xFF111726, 0xFF4F7DFF, 0xFF3B5BDB, 0xFFEEF1FF, 10, 0.5f, 1.0f, 0.92f);
 	public static final LauncherTheme NORD = new LauncherTheme(

@@ -120,7 +120,7 @@ public final class LauncherApp extends Application {
 	private MinecraftSession session;
 	/** Which profile the home screen's carousel is showing - an index into {@link #orderedProfilesForHome()}, clamped back to range whenever the profile list changes (e.g. after a delete). */
 	private int homeProfileIndex = 0;
-	private net.veloclient.launcher.ui.VoxelSceneryView homeScenery;
+	private net.veloclient.launcher.ui.RidgelineView homeScenery;
 	private StackPane homePlayerHolder;
 	/** The launch target Play currently starts (see {@link #currentTarget()}). */
 	private HomeLaunchTarget homeCurrentTarget;
@@ -169,7 +169,8 @@ public final class LauncherApp extends Application {
 			cliLaunch = cliLaunch + "\t" + cliFlags.toString().strip();
 			SingleInstance.message = "launch " + cliLaunch;
 		}
-		if (!SingleInstance.acquire()) {
+		// a screenshot tour runs beside the owner's open launcher (it never saves anything) - never bring that one forward
+		if (System.getProperty("velo.launcherTour") == null && !SingleInstance.acquire()) {
 			LauncherLog.info("Launcher already running - brought it to the front instead of starting a second one");
 			System.exit(0);
 		}
@@ -204,14 +205,16 @@ public final class LauncherApp extends Application {
 		// (a Font at one specific size) isn't otherwise used, the family just
 		// needs loading once. Same font as the in-game title screen.
 		Font.loadFont(getClass().getResourceAsStream("/net/veloclient/launcher/fonts/Audiowide-Regular.ttf"), 12);
-		// Inter is the UI font everywhere (same as the in-game menus) - bundled so it looks the same
-		// on every OS instead of falling back to whatever sans-serif the system has.
-		for (String weight : new String[] {"Regular", "Medium", "SemiBold", "Bold", "ExtraBold"}) {
-			Font.loadFont(getClass().getResourceAsStream("/net/veloclient/launcher/fonts/Inter-" + weight + ".ttf"), 12);
-		}
-		// Sora for display headings, JetBrains Mono for versions, prices and keys (0.9.7 redesign).
-		for (String file : new String[] {"Sora-SemiBold", "Sora-Bold", "JetBrainsMono-Medium", "JetBrainsMono-Bold"}) {
-			Font.loadFont(getClass().getResourceAsStream("/net/veloclient/launcher/fonts/" + file + ".ttf"), 12);
+		// 2026-11 redesign: Geist for everything you read and click, Archivo SemiExpanded (bold/extra bold) for headings
+		// and Play, Geist Mono for labels and numbers. Static cuts - JavaFX can't pick axes from a variable font. All OFL.
+		for (String file : new String[] {"Geist-Regular", "Geist-Medium", "Geist-SemiBold", "Geist-Bold", "GeistMono-Medium",
+				"GeistMono-SemiBold", "ArchivoSemiExpanded-Bold", "ArchivoSemiExpanded-ExtraBold", "Monocraft-Regular", "Monocraft-Bold"}) {
+			Font loaded = Font.loadFont(getClass().getResourceAsStream("/net/veloclient/launcher/fonts/" + file + ".ttf"), 12);
+			if (loaded == null) {
+				LauncherLog.warn("Font " + file + " didn't load", null);
+			} else if (Boolean.getBoolean("velo.fontDebug")) {
+				LauncherLog.info("Font " + file + " -> family '" + loaded.getFamily() + "', name '" + loaded.getName() + "'");
+			}
 		}
 
 		root = new BorderPane();
@@ -227,10 +230,20 @@ public final class LauncherApp extends Application {
 		// ...and its minimum height used to grow the whole window layout past the window, so `layers` centred it and
 		// pushed the top bar above the screen (Locker, unmaximized). The page area takes what's left, never more.
 		content.setMinSize(0, 0);
+		// A page bigger than the space (small window, the sidebar beside it) overflows to the right/bottom and gets clipped
+		// there - centred, it lost its title and left edge instead (2026-11).
+		content.setAlignment(Pos.TOP_LEFT);
 
-		root.setTop(new javafx.scene.layout.VBox(buildTopBar(), net.veloclient.launcher.ui.OfflineBanner.build(this::retryOnline)));
-		root.setCenter(content);
-		root.setBottom(buildLaunchBar());
+		// 2026-11 shell: the sidebar runs the full height on the left; the slim top strip, the page and the launch bar
+		// share the column next to it.
+		BorderPane column = new BorderPane();
+		column.setTop(new javafx.scene.layout.VBox(buildTopBar(), net.veloclient.launcher.ui.OfflineBanner.build(this::retryOnline)));
+		column.setCenter(content);
+		column.setBottom(buildLaunchBar());
+		column.setMinSize(0, 0);
+		// The sidebar rests as icons and unfolds over the page on hover (TopBar.rail).
+		root.setLeft(topBar.rail());
+		root.setCenter(column);
 		// Home itself is built once the window is up, behind the splash (finishStartup).
 
 		layers = new StackPane(root);
@@ -255,6 +268,8 @@ public final class LauncherApp extends Application {
 				shiftHeld = false;
 			}
 		});
+		// Home arcade: WASD / arrows on Home (outside text fields) turn the card into a little game.
+		scene.addEventFilter(javafx.scene.input.KeyEvent.ANY, this::arcadeKey);
 		scene.getAccelerators().put(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.K, javafx.scene.input.KeyCombination.SHORTCUT_DOWN),
 				() -> topBar.searchField().requestFocus());
 
@@ -487,6 +502,14 @@ public final class LauncherApp extends Application {
 			net.veloclient.launcher.ui.CosmeticsView.showWingsTab();
 			showCosmetics();
 		}});
+		steps.add(new Object[] {"04e-cosmetics-wear", (Runnable) () -> {
+			net.veloclient.launcher.ui.CosmeticsView.showWearTab();
+			showCosmetics();
+		}});
+		steps.add(new Object[] {"04f-cosmetics-emotes", (Runnable) () -> {
+			net.veloclient.launcher.ui.CosmeticsView.showEmotesTab();
+			showCosmetics();
+		}});
 		steps.add(new Object[] {"04d-cosmetics-skins", (Runnable) () -> {
 			net.veloclient.launcher.ui.CosmeticsView.showSkinsTab();
 			showCosmetics();
@@ -636,7 +659,8 @@ public final class LauncherApp extends Application {
 					stage.getScene().getRoot().applyCss();
 					stage.getScene().getRoot().layout();
 					long t2 = System.nanoTime();
-					System.out.printf("[navtiming] round %d %-9s build %5.1f ms  css+layout %5.1f ms%n", round, p, (t1 - t0) / 1e6, (t2 - t1) / 1e6);
+					System.out.printf("[navtiming] round %d %-9s build %5.1f ms  css+layout %5.1f ms  nodes %d%n", round, p, (t1 - t0) / 1e6, (t2 - t1) / 1e6,
+							countNodes(stage.getScene().getRoot()));
 				}
 			}
 		}});
@@ -676,6 +700,69 @@ public final class LauncherApp extends Application {
 		}
 		if (extra.contains("signin")) {
 			steps.add(new Object[] {"07-signin", (Runnable) () -> net.veloclient.launcher.ui.SignInDialog.demo(stage, theme)});
+		}
+		if (extra.contains("bugreport")) {
+			steps.add(new Object[] {"10d-bugreport", (Runnable) () -> net.veloclient.launcher.ui.BugReportDialog.show(stage)});
+		}
+		if (extra.contains("update")) {
+			// -Dvelo.launcherTourExtra=update[:<version>]: the update pop-up over Home, using that version's news post.
+			String tourVersion = extra.contains("update:") ? extra.substring(extra.indexOf("update:") + 7).split(",")[0] : AppVersion.VERSION;
+			steps.add(new Object[] {"23-update-popup", (Runnable) () -> {
+				showHome();
+				updateCard = null;
+				showUpdateReady(new net.veloclient.launcher.launch.UpdateService.Release(tourVersion, "", "", true, null, java.util.Map.of()));
+			}});
+			steps.add(new Object[] {"23b-update-available", (Runnable) () -> {
+				if (stage.getScene().getRoot() instanceof javafx.scene.layout.StackPane layers) {
+					layers.getChildren().removeIf(n -> n.getStyleClass().contains("update-overlay"));
+					var release = new net.veloclient.launcher.launch.UpdateService.Release(tourVersion, "", "", true, null, java.util.Map.of());
+					net.veloclient.launcher.ui.UpdatePopup.show(layers, net.veloclient.launcher.ui.UpdatePopup.postFor(newsFeed, tourVersion),
+							"UPDATE AVAILABLE", AppVersion.VERSION + "  →  " + tourVersion, "Velo Client " + tourVersion, "",
+							"Takes about a minute. Your profiles and settings stay as they are.", updateActions(release, false));
+				}
+			}});
+		}
+		if (extra.contains("arcade")) {
+			// -Dvelo.launcherTourExtra=arcade: the Home arcade in each of its states.
+			for (String scene : new String[] {"transition", "world", "rest", "cave", "ash", "frost", "village", "outpost", "inventory", "trade", "menu", "dungeon",
+					"foundry", "spire", "riddle0", "riddle1", "riddle2", "boss", "boss1", "boss2", "switch", "snake", "blocks", "fullscreen"}) {
+				steps.add(new Object[] {"30-arcade-" + scene, (Runnable) () -> {
+					if ("transition".equals(scene)) {
+						// the real path: a key press on Home, through the scene's filter
+						disposeHomeArcade();
+						showHome();
+						stage.getScene().getRoot().requestFocus();
+						stage.getScene().getRoot().applyCss();
+						stage.getScene().getRoot().layout();
+						javafx.event.Event.fireEvent(stage.getScene().getRoot(), new javafx.scene.input.KeyEvent(
+								javafx.scene.input.KeyEvent.KEY_PRESSED, "", "", javafx.scene.input.KeyCode.D, false, false, false, false));
+						if (homeArcade == null) {
+							LauncherLog.info("TOUR: arcade did not start from a key press; focus=" + stage.getScene().getFocusOwner()
+									+ " page=" + activePage + " hero=" + (homeHero != null && homeHero.getScene() != null) + " layers="
+									+ layers.getChildren().stream().map(n -> n.getClass().getSimpleName() + "/" + n.getStyleClass() + "/v" + n.isVisible() + "/mt" + n.isMouseTransparent()).toList());
+							return;
+						}
+					} else if (!"rest".equals(scene)) {
+						disposeHomeArcade();
+						showHome();
+						startHomeArcade();
+					}
+					// -Dvelo.tourSkin=Velo2k: wear a skin from the skin library in the shots
+					String tourSkin = System.getProperty("velo.tourSkin");
+					if (tourSkin != null) {
+						for (var skin : net.veloclient.launcher.data.SkinLibrary.all()) {
+							if (skin.name().equalsIgnoreCase(tourSkin)) {
+								try {
+									homeArcade.setSkin(java.nio.file.Files.readAllBytes(net.veloclient.launcher.data.SkinLibrary.png(skin)), skin.slim());
+								} catch (java.io.IOException ignored) {
+									// keep the account skin
+								}
+							}
+						}
+					}
+					homeArcade.tour(scene);
+				}});
+			}
 		}
 		if (System.getProperty("velo.launcherFps") != null) {
 			startFpsLog();
@@ -801,6 +888,9 @@ public final class LauncherApp extends Application {
 
 	@Override
 	public void stop() {
+		if (homeArcade != null) {
+			homeArcade.save();
+		}
 		net.veloclient.launcher.ui.WindowPlacement.save(stage, windowChrome);
 		// Tell the Velo server right away that the launcher went away (friends see it immediately).
 		net.veloclient.launcher.social.LauncherSocial.shutdown();
@@ -832,6 +922,17 @@ public final class LauncherApp extends Application {
 
 	private net.veloclient.launcher.ui.TopBar topBar;
 	private net.veloclient.launcher.ui.LaunchBar launchBar;
+	/** Dev (navtiming): nodes under {@code node}. */
+	private static int countNodes(javafx.scene.Node node) {
+		int n = 1;
+		if (node instanceof javafx.scene.Parent parent) {
+			for (javafx.scene.Node child : parent.getChildrenUnmodifiable()) {
+				n += countNodes(child);
+			}
+		}
+		return n;
+	}
+
 	/** The top-bar page the window is on ("home", "store", ...; "" for a sub page like a profile). */
 	private String activePage = "home";
 	/** The server each profile was last started for (empty = no server) - a Doctor relaunch goes to the same place. */
@@ -885,7 +986,7 @@ public final class LauncherApp extends Application {
 		return topBar;
 	}
 
-	private static final List<String> TAB_ORDER = List.of("home", "library", "servers", "store", "locker", "news", "clips", "settings");
+	private static final List<String> TAB_ORDER = List.of("home", "library", "servers", "locker", "store", "friends", "clips", "news", "settings");
 	/** Set by a top-bar tab click: which side the next page slides in from. */
 	private int navDirection;
 
@@ -921,6 +1022,7 @@ public final class LauncherApp extends Application {
 		if (topBar != null) {
 			boolean known = session != null && net.veloclient.launcher.social.StoreApi.connected() && net.veloclient.launcher.social.StoreApi.balance() >= 0;
 			topBar.setCoins(known ? net.veloclient.launcher.social.StoreApi.balance() : -1);
+			topBar.setPlus(net.veloclient.launcher.social.StoreApi.isPlusCached());
 		}
 	}
 
@@ -1075,6 +1177,7 @@ public final class LauncherApp extends Application {
 			launchBar.setTarget(new net.veloclient.launcher.ui.LaunchBar.Target(logo, "No profiles yet", "Create one to start playing", "CREATE PROFILE", false));
 			launchBar.setRunning(null, null);
 			launchBar.setStatus("");
+			launchBar.setModsLine("");
 			refreshLaunchBarSocial();
 			return;
 		}
@@ -1085,39 +1188,23 @@ public final class LauncherApp extends Application {
 				serverName != null ? serverName : instance.name(), homeDetailsLine(instance, serverName), label, session != null));
 		RunningInstanceManager.RunningInstance running = RunningInstanceManager.running().stream()
 				.filter(r -> r.instance().id().equals(instance.id())).findFirst().orElse(null);
-		launchBar.setRunning(running == null ? null : running.startedAtEpochMillis(), running == null ? null : running::stop);
-		launchBar.setStatus(running != null ? "" : session == null ? "Signed out" : "Ready · Fabric " + instance.mcVersion());
+		launchBar.setRunning(running == null ? null : running.startedAtEpochMillis(), running == null ? null : running::stop,
+				running == null ? null : () -> {
+					running.kill();
+					net.veloclient.launcher.ui.Toasts.show(content, "info", "#ff5c5c", instance.name() + " killed");
+				}, running != null && running.wasStopped());
+		launchBar.setStatus(running != null ? "" : session == null ? "Signed out" : "Ready");
+		long modsInProfile = modCount(instance);
+		launchBar.setModsLine(modsInProfile == 1 ? "1 mod" : modsInProfile + " mods");
 		refreshLaunchBarSocial();
 	}
 
 	/** "Nova and Kirito are on AsteriaSMP" / "3 friends online" next to the profile switcher. */
 	private void refreshLaunchBarSocial() {
-		if (launchBar == null) {
-			return;
-		}
-		var state = net.veloclient.launcher.social.LauncherSocial.snapshot();
-		if (state == null || state.friends == null || session == null) {
+		// 2026-11: friends online live in the top strip (text, no heads); the launch bar stays uncluttered.
+		if (launchBar != null) {
 			launchBar.setSocialLine("");
-			return;
 		}
-		HomeLaunchTarget target = homeCurrentTarget;
-		String host = target != null && target.isServer() ? parseHost(target.serverAddress()).toLowerCase(java.util.Locale.ROOT) : null;
-		List<net.veloclient.launcher.social.LauncherSocial.Friend> online = state.friends.stream().filter(f -> f.online).toList();
-		List<net.veloclient.launcher.social.LauncherSocial.Friend> there = host == null ? List.of() : online.stream()
-				.filter(f -> f.activity != null && f.activity.detail != null && f.activity.detail.toLowerCase(java.util.Locale.ROOT).contains(host)).toList();
-		List<net.veloclient.launcher.social.LauncherSocial.Friend> shown = there.isEmpty() ? online : there;
-		if (shown.isEmpty()) {
-			launchBar.setSocialLine("");
-			return;
-		}
-		Node[] heads = shown.stream().limit(3).map(f -> net.veloclient.launcher.ui.Heads.head(f.uuid, f.username, 24)).toArray(Node[]::new);
-		String text;
-		if (!there.isEmpty()) {
-			text = there.size() == 1 ? there.get(0).username + " is playing here" : there.size() + " friends are playing here";
-		} else {
-			text = online.size() == 1 ? online.get(0).username + " is online" : online.size() + " friends online";
-		}
-		launchBar.setSocialLine(text, heads);
 	}
 
 	/**
@@ -1437,13 +1524,13 @@ public final class LauncherApp extends Application {
 			((Label) signOutRow.getChildren().get(1)).setStyle("-fx-text-fill: -velo-danger;");
 			list.getChildren().add(signOutRow);
 		}
-		popup[0] = net.veloclient.launcher.ui.Popover.show(anchor, list, net.veloclient.launcher.ui.Popover.Side.BELOW_RIGHT, 290);
+		popup[0] = net.veloclient.launcher.ui.Popover.show(anchor, list, net.veloclient.launcher.ui.Popover.Side.ABOVE_LEFT, 290);
 	}
 
 	private HBox menuRow(String icon, String text, Runnable action) {
 		Label label = new Label(text);
 		label.getStyleClass().add("t-strong");
-		label.setStyle("-fx-font-family: 'Inter Medium';");
+		label.setStyle("-fx-font-family: 'Geist Medium';");
 		HBox row = new HBox(12, net.veloclient.launcher.ui.Icons.icon(icon, 17, Color.web("#A9A9B3")), label);
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.getStyleClass().add("popover-row");
@@ -1523,9 +1610,10 @@ public final class LauncherApp extends Application {
 				return;
 			}
 			long unused = Runtime.getRuntime().freeMemory(); // committed but not in use
-			if (trimWanted || unused > 96L * 1024 * 1024) {
+			if (trimWanted || unused > 48L * 1024 * 1024) {
 				trimWanted = false;
 				System.gc();
+				Thread.ofVirtual().start(NativeMemory::trim);
 			}
 		}));
 		check.setCycleCount(javafx.animation.Animation.INDEFINITE);
@@ -1541,6 +1629,7 @@ public final class LauncherApp extends Application {
 		net.veloclient.launcher.ui.LauncherCaches.trimAll();
 		// A full collection shrinks the heap right away (G1 + MaxHeapFreeRatio, see launcher/build.gradle).
 		System.gc();
+		Thread.ofVirtual().start(NativeMemory::trim);
 		LauncherLog.info("Launcher idle - page released, caches cleared");
 	}
 
@@ -1556,6 +1645,9 @@ public final class LauncherApp extends Application {
 			return;
 		}
 		// The same page built again (equip, select, edit, a reload finishing): keep where it was scrolled to, no page animation.
+		if (homeArcade != null && !"home".equals(activePage)) {
+			homeArcade.suspend();
+		}
 		boolean rebuilt = net.veloclient.launcher.ui.ScrollKeeper.samePage(previous, node);
 		List<?> scroll = rebuilt ? net.veloclient.launcher.ui.ScrollKeeper.captureAll(previous) : List.of();
 		content.getChildren().setAll(node);
@@ -1564,6 +1656,7 @@ public final class LauncherApp extends Application {
 			net.veloclient.launcher.ui.ScrollKeeper.restoreAll(node, scroll);
 		} else {
 			net.veloclient.launcher.ui.UiMotion.enterFrom(node, navDirection);
+			net.veloclient.launcher.ui.UiMotion.stagger(node);
 		}
 		navDirection = 0;
 	}
@@ -1734,7 +1827,7 @@ public final class LauncherApp extends Application {
 		refreshLaunchBar();
 	}
 
-	/** Settings > Appearance: the Velo+ Home background (a picture or GIF instead of the island). */
+	/** Settings > Appearance: the Velo+ Home background (a picture or GIF instead of the Ridgeline). */
 	private Node homeBackgroundRow() {
 		boolean plus = net.veloclient.launcher.social.StoreApi.isPlusCached();
 		java.nio.file.Path current = net.veloclient.launcher.data.HomeBackground.file();
@@ -1772,7 +1865,7 @@ public final class LauncherApp extends Application {
 				net.veloclient.launcher.ui.Toasts.show(pick, ex.getMessage());
 			}
 		});
-		Button reset = new Button("Use the island");
+		Button reset = new Button("Use Ridgeline");
 		reset.getStyleClass().add("ghost-button");
 		reset.setVisible(current != null);
 		reset.setManaged(current != null);
@@ -1787,7 +1880,7 @@ public final class LauncherApp extends Application {
 		net.veloclient.launcher.ui.SettingsUi.row(holder, "Home background" + (plus ? "" : " · Velo+"),
 				plus ? "Your own picture or animated GIF behind the Home card" : "Velo+ members can put their own picture or GIF on Home",
 				"It's scaled to always cover the whole card (cropped evenly, never stretched). PNG, JPG or GIF up to "
-						+ net.veloclient.launcher.data.HomeBackground.MAX_BYTES / 1024 / 1024 + " MB. Without Velo+ the island is shown.",
+						+ net.veloclient.launcher.data.HomeBackground.MAX_BYTES / 1024 / 1024 + " MB. Without Velo+ the Ridgeline is shown.",
 				preview, reset, pick);
 		return holder.getChildren().isEmpty() ? new Region() : holder.getChildren().getFirst();
 	}
@@ -1798,13 +1891,13 @@ public final class LauncherApp extends Application {
 		hero.getStyleClass().add("hero");
 		hero.setMinSize(0, 300);
 		Rectangle clip = new Rectangle();
-		clip.setArcWidth(36);
-		clip.setArcHeight(36);
+		clip.setArcWidth(28);
+		clip.setArcHeight(28);
 		clip.widthProperty().bind(hero.widthProperty());
 		clip.heightProperty().bind(hero.heightProperty());
 		hero.setClip(clip);
 
-		// Velo+: your own picture or GIF fills the whole card instead of the island (and the player standing on it).
+		// Velo+: your own picture or GIF fills the whole card instead of the Ridgeline (and the player standing on it).
 		java.nio.file.Path customBackground = tourHomeBackground != null ? tourHomeBackground
 				: net.veloclient.launcher.social.StoreApi.isPlusCached() ? net.veloclient.launcher.data.HomeBackground.file() : null;
 		if (customBackground != null) {
@@ -1815,48 +1908,25 @@ public final class LauncherApp extends Application {
 			cover.prefHeightProperty().bind(hero.heightProperty());
 			hero.getChildren().add(cover);
 		} else {
-		// The 3D island only where JavaFX can draw 3D (some Linux setups can't - the card keeps its colours there).
-		if (homeScenery == null && net.veloclient.launcher.ui.PlayerSkin3DView.supports3d()) {
-			homeScenery = new net.veloclient.launcher.ui.VoxelSceneryView();
+		// 2026-11: the blocky Ridgeline at dusk (2D, animated) with your skin standing flat on the front ridge.
+		if (homeScenery == null) {
+			homeScenery = new net.veloclient.launcher.ui.RidgelineView();
 		}
-		if (homeScenery != null) {
-			homeScenery.setTheme(accentColor(), Color.web(cssColor(theme.background())));
-			homeScenery.setTranslateX(0);
-			StackPane art = new StackPane(homeScenery);
-			art.setMinSize(0, 0);
-			art.setMouseTransparent(true);
-			// The island sits right of center, so the text on the left stays readable.
-			art.translateXProperty().bind(hero.widthProperty().multiply(0.18));
-			hero.getChildren().add(art);
-		}
-
-		javafx.scene.shape.Ellipse playerShadow = new javafx.scene.shape.Ellipse(58, 13);
-		playerShadow.setMouseTransparent(true);
-		playerShadow.setFill(new RadialGradient(0, 0, 0.5, 0.5, 0.5, true, CycleMethod.NO_CYCLE,
-				new Stop(0, Color.rgb(0, 0, 0, 0.55)), new Stop(1, Color.rgb(0, 0, 0, 0))));
-		playerShadow.translateXProperty().bind(hero.widthProperty().multiply(0.18));
-		StackPane.setMargin(playerShadow, new Insets(178, 0, 0, 0));
-		hero.getChildren().add(playerShadow);
-		homePlayerHolder = new StackPane();
-		homePlayerHolder.setPrefSize(480, 310);
-		homePlayerHolder.setMaxSize(480, 310);
-		homePlayerHolder.setMouseTransparent(true);
-		homePlayerHolder.translateXProperty().bind(hero.widthProperty().multiply(0.18));
-		StackPane.setMargin(homePlayerHolder, new Insets(0, 0, 120, 0));
-		hero.getChildren().add(homePlayerHolder);
+		homeScenery.setTheme(accentColor(), Color.web(cssColor(theme.background())));
+		homeScenery.setAnimated(net.veloclient.launcher.data.LauncherSettings.get().animateHomeBackground);
+		hero.getChildren().add(homeScenery);
 		loadHomePlayerModel();
 		}
 
 		Region fade = new Region();
 		fade.setMouseTransparent(true);
-		fade.setStyle("-fx-background-color: linear-gradient(to right, -velo-surface 22%, rgba(19,19,23,0.82) 42%, transparent 72%),"
-				+ " linear-gradient(to top, rgba(11,11,14,0.85), transparent 45%);");
+		fade.setStyle("-fx-background-color: linear-gradient(to right, rgba(12,9,9,0.94) 0%, rgba(12,9,9,0.72) 36%, transparent 64%);");
 		hero.getChildren().add(fade);
 
-		VBox text = new VBox(16);
+		VBox text = new VBox(18);
 		text.setAlignment(Pos.BOTTOM_LEFT);
-		text.setPadding(new Insets(32, 36, 32, 36));
-		text.setMaxWidth(560);
+		text.setPadding(new Insets(32, 36, 34, 36));
+		text.setMaxWidth(540);
 		text.setPickOnBounds(false);
 		StackPane.setAlignment(text, Pos.BOTTOM_LEFT);
 		if (target == null) {
@@ -1883,55 +1953,140 @@ public final class LauncherApp extends Application {
 			boolean running = RunningInstanceManager.running().stream().anyMatch(r -> r.instance().id().equals(instance.id()));
 			Label over = new Label(running ? "RUNNING NOW" : QuickLaunchStore.loadAll().isEmpty() ? "READY TO PLAY" : "CONTINUE PLAYING");
 			over.getStyleClass().add("t-overline");
-			Node icon = buildSidebarIcon(instance, target.serverAddress(), 68);
-			StackPane iconBox = new StackPane(icon);
-			iconBox.setStyle("-fx-background-radius: 16; -fx-border-color: rgba(255,255,255,0.1); -fx-border-radius: 16;");
+			Node smallIcon = buildSidebarIcon(instance, target.serverAddress(), 22);
+			HBox overRow = new HBox(10, smallIcon, over);
+			overRow.setAlignment(Pos.CENTER_LEFT);
 			Label name = new Label(serverName != null ? serverName : instance.name());
-			name.getStyleClass().add("t-display");
-			name.setStyle("-fx-font-size: 40px;");
+			name.getStyleClass().addAll("t-display", "hero-title");
 			name.setMinWidth(0);
-			Label meta = new Label(homeDetailsLine(instance, serverName) + playedLine(instance));
-			meta.getStyleClass().add("t-body");
-			VBox nameBox = new VBox(4, name, meta);
-			nameBox.setMinWidth(0);
-			HBox titleRow = new HBox(16, iconBox, nameBox);
-			titleRow.setAlignment(Pos.CENTER_LEFT);
+			Label meta = new Label(serverName != null ? "through your " + instance.name() + " profile" : homeDetailsLine(instance, null));
+			meta.getStyleClass().add("hero-sub");
+			VBox head = new VBox(12, overRow, name, meta);
 
-			HBox pills = new HBox(8);
-			pills.setAlignment(Pos.CENTER_LEFT);
+			// A quiet stat line instead of chips: label over value, hairline between the columns.
+			HBox stats = new HBox();
+			stats.getStyleClass().add("hero-stats");
 			if (target.isServer()) {
-				Label online = new Label(target.serverAddress());
-				online.getStyleClass().addAll("pill", "pill-grey");
-				Region dot = new Region();
-				dot.getStyleClass().add("status-dot");
-				dot.setStyle("-fx-background-color: -velo-text-3;");
-				online.setGraphic(dot);
-				pills.getChildren().add(online);
-				pingHomePill(target.serverAddress(), online, dot);
+				Label players = heroStat(stats, "PLAYERS", "…", true);
+				Label ping = heroStat(stats, "PING", "…", false);
+				pingHomeStats(target.serverAddress(), players, ping);
+			} else {
+				heroStat(stats, "MODS", String.valueOf(modCount(instance)), false);
 			}
-			Label version = new Label("Minecraft " + instance.mcVersion());
-			version.getStyleClass().addAll("pill", "pill-grey");
-			pills.getChildren().add(version);
-			Node party = homePartyPill();
+			Long millis = net.veloclient.launcher.data.PlayTimeStore.get().millisByProfile.get(instance.id());
+			heroStat(stats, "PLAYED", millis == null || millis < 60_000 ? "–" : millis >= 3_600_000 ? millis / 3_600_000 + " h" : millis / 60_000 + " min", false);
+			heroStat(stats, "VERSION", instance.mcVersion(), false);
+			text.getChildren().addAll(head, stats);
+			Node party = homePartyLine();
 			if (party != null) {
-				pills.getChildren().add(party);
+				text.getChildren().add(party);
 			}
-
-			Button mods = new Button("Mods & packs");
-			mods.setGraphic(net.veloclient.launcher.ui.Icons.icon("box", 16, Color.web("#E4E4E8")));
-			mods.getStyleClass().add("glass-button");
-			mods.setOnAction(e -> showInstanceDetail(instance));
-			Button folder = new Button("Open folder");
-			folder.setGraphic(net.veloclient.launcher.ui.Icons.icon("folder", 16, Color.web("#E4E4E8")));
-			folder.getStyleClass().add("glass-button");
-			folder.setOnAction(e -> openFolder(InstancePaths.gameDir(instance.id())));
-			Button more = profileMenu(instance);
-			HBox actions = new HBox(10, mods, folder, more);
-			actions.setAlignment(Pos.CENTER_LEFT);
-			text.getChildren().addAll(over, titleRow, pills, actions);
 		}
 		hero.getChildren().add(text);
+		homeHero = hero;
+		homeHeroText = text;
+		homeHeroFade = fade;
+		if (homeArcade != null && homeArcade.playing() && !homeArcade.fullscreen()) {
+			hero.getChildren().add(hero.getChildren().indexOf(fade), homeArcade);
+			if (homeScenery != null) {
+				homeScenery.setSuspended(true);
+			}
+			if (homeArcade.playing()) {
+				text.setOpacity(0);
+				text.setMouseTransparent(true);
+				fade.setOpacity(0);
+			}
+		}
 		return hero;
+	}
+
+	/** One column of Home's stat line; returns the value label (for values that arrive later, like the ping). */
+	private Label heroStat(HBox stats, String label, String value, boolean live) {
+		Label caption = new Label(label);
+		caption.getStyleClass().add("hero-stat-label");
+		Label shown = new Label(value);
+		shown.getStyleClass().add("hero-stat-value");
+		if (live) {
+			Region square = new Region();
+			square.getStyleClass().addAll("status-square", "status-square-off");
+			shown.setGraphic(square);
+			shown.setGraphicTextGap(8);
+		}
+		VBox cell = new VBox(8, caption, shown);
+		cell.getStyleClass().add(stats.getChildren().isEmpty() ? "hero-stat-first" : "hero-stat");
+		HBox.setHgrow(cell, Priority.ALWAYS);
+		cell.setMaxWidth(Double.MAX_VALUE);
+		stats.getChildren().add(cell);
+		return shown;
+	}
+
+	private static long modCount(Instance instance) {
+		try (var stream = java.nio.file.Files.list(net.veloclient.launcher.instance.InstancePaths.modsDir(instance.id()))) {
+			return stream.map(p -> p.getFileName().toString())
+					.filter(n -> n.endsWith(".jar") && !n.startsWith("velo-client-") && !n.startsWith("fabric-api-")).count();
+		} catch (java.io.IOException e) {
+			return 0;
+		}
+	}
+
+	/** Fills Home's PLAYERS and PING columns from a background ping. */
+	private void pingHomeStats(String address, Label players, Label ping) {
+		String host = parseHost(address);
+		int port = parsePort(address);
+		CompletableFuture.supplyAsync(() -> {
+			try {
+				return net.veloclient.launcher.net.ServerPinger.ping(host, port);
+			} catch (Exception e) {
+				return null;
+			}
+		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
+			if (result == null) {
+				players.setText("Offline");
+				ping.setText("–");
+				return;
+			}
+			players.setText(java.text.NumberFormat.getIntegerInstance(java.util.Locale.US).format(result.onlinePlayers()));
+			((Region) players.getGraphic()).getStyleClass().remove("status-square-off");
+			ping.setText(result.latencyMillis() + " ms");
+			if (result.latencyMillis() >= 120) {
+				ping.setStyle("-fx-text-fill: #FF6B6F;");
+			} else if (result.latencyMillis() >= 60) {
+				ping.setStyle("-fx-text-fill: #F2B64C;");
+			}
+		}));
+	}
+
+	/** "In a party with Velo2k" with the members' heads, or null when you're not in one. */
+	private Node homePartyLine() {
+		com.google.gson.JsonObject party = net.veloclient.launcher.social.LauncherSocial.party();
+		if (party == null || !party.has("members")) {
+			return null;
+		}
+		HBox heads = new HBox(-5);
+		List<String> others = new java.util.ArrayList<>();
+		for (var element : party.getAsJsonArray("members")) {
+			com.google.gson.JsonObject member = element.getAsJsonObject();
+			String uuid = member.has("uuid") ? member.get("uuid").getAsString() : "";
+			String memberName = member.has("name") ? member.get("name").getAsString() : "";
+			if (heads.getChildren().size() < 4) {
+				Node face = net.veloclient.launcher.ui.Heads.head(uuid, memberName, 22);
+				StackPane ring = new StackPane(face);
+				ring.getStyleClass().add("hero-party-head");
+				heads.getChildren().add(ring);
+			}
+			if (session == null || !uuid.replace("-", "").equalsIgnoreCase(session.uuid().replace("-", ""))) {
+				others.add(memberName);
+			}
+		}
+		Label line = new Label(others.isEmpty() ? "Your party is ready" : others.size() == 1 ? "In a party with " + others.get(0)
+				: "In a party with " + others.get(0) + " and " + (others.size() - 1) + " more");
+		line.getStyleClass().add("hero-sub");
+		Label open = new Label("Open party");
+		open.getStyleClass().add("t-link");
+		open.setOnMouseClicked(e -> showParty());
+		HBox row = new HBox(10, heads, line, open);
+		row.setAlignment(Pos.CENTER_LEFT);
+		return row;
 	}
 
 	private String playedLine(Instance instance) {
@@ -2057,7 +2212,11 @@ public final class LauncherApp extends Application {
 		add.getChildren().addAll(plus, addTitle, addSub);
 		add.setOnMouseClicked(e -> createNewProfile());
 		grid.add(add, shown, 0);
-		return new VBox(12, header, grid);
+		// room for the hover lift (tiles scale up a little): without it the grown border was cut off at the edges
+		grid.setPadding(new Insets(4, 4, 6, 4));
+		header.setPadding(new Insets(0, 4, 0, 4));
+		VBox box = new VBox(8, header, grid);
+		return box;
 	}
 
 	private StackPane homeTargetTile(HomeLaunchTarget target, int index) {
@@ -2143,34 +2302,246 @@ public final class LauncherApp extends Application {
 		}
 	}
 
-	/** The signed-in account's 3D skin with cosmetics, loaded off the UI thread into {@link #homePlayerHolder}. */
-	private void loadHomePlayerModel() {
-		if (session == null) {
+	// ---- Home arcade (2026-11 gimmick): the Home card turns into a little side-scroller / Snake / Blockfall ----
+
+	private net.veloclient.launcher.sandbox.Arcade homeArcade;
+	private StackPane homeHero;
+	private Node homeHeroText;
+	private Node homeHeroFade;
+	private volatile SkinFetcher.SkinData homeSkin;
+
+	private void arcadeKey(javafx.scene.input.KeyEvent event) {
+		javafx.scene.Node focus = stage.getScene().getFocusOwner();
+		boolean typing = focus instanceof javafx.scene.control.TextInputControl;
+		if (homeArcade != null && homeArcade.playing()) {
+			if (typing) {
+				return;
+			}
+			if (homeArcade.handleKey(event)) {
+				event.consume();
+			}
 			return;
 		}
-		if (homePlayerHolder != null && homePlayerHolder.getChildren().isEmpty()) {
-			homePlayerHolder.getChildren().setAll(net.veloclient.launcher.ui.CosmeticUi.spinner(30));
+		if (event.getEventType() != javafx.scene.input.KeyEvent.KEY_PRESSED || typing || !"home".equals(activePage)
+				|| homeHero == null || homeHero.getScene() == null || event.isShortcutDown() || event.isAltDown()
+				|| event.isControlDown() || event.isMetaDown() || !net.veloclient.launcher.sandbox.Arcade.isStartKey(event.getCode())) {
+			return;
 		}
-		StackPane holder = homePlayerHolder;
-		CompletableFuture.supplyAsync(() -> SkinFetcher.fetch(session), Executors.newVirtualThreadPerTaskExecutor())
-				.exceptionally(e -> null)
-				.thenAccept(skin -> Platform.runLater(() -> {
-					if (skin == null) {
-						holder.getChildren().clear();
-						return;
-					}
-					net.veloclient.launcher.ui.DressedPlayer.build(skin, false, 20, viewer -> {
-						if (viewer == null) {
-							holder.getChildren().clear();
-							return;
+		// not while something sits over the page (update pop-up, dialogs drawn in the window, the splash)
+		for (Node layer : layers.getChildren()) {
+			if (layer != layers.getChildren().getFirst() && layer != homeArcade && layer.isVisible() && !layer.isMouseTransparent()) {
+				return;
+			}
+		}
+		startHomeArcade();
+		homeArcade.handleKey(event);
+		event.consume();
+	}
+
+	private boolean arcadeWatchesWindow;
+
+	private void startHomeArcade() {
+		if (!arcadeWatchesWindow) {
+			arcadeWatchesWindow = true;
+			stage.iconifiedProperty().addListener((o, was, minimized) -> {
+				if (minimized && homeArcade != null) {
+					homeArcade.suspend();
+				}
+			});
+		}
+		if (homeArcade == null) {
+			homeArcade = new net.veloclient.launcher.sandbox.Arcade(accentColor(), Color.web(cssColor(theme.background())),
+					new net.veloclient.launcher.sandbox.Arcade.Host() {
+						@Override
+						public void playingChanged(boolean playing) {
+							arcadePlayingChanged(playing);
 						}
-						viewer.setOpacity(0);
-						holder.getChildren().setAll(viewer);
-						javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(Duration.millis(260), viewer);
-						fade.setToValue(1);
-						fade.play();
+
+						@Override
+						public void fullscreenChanged(boolean fullscreen) {
+							arcadeFullscreen(fullscreen);
+						}
+
+						@Override
+						public void openSettings() {
+							showSettings();
+						}
 					});
-				}));
+			SkinFetcher.SkinData skin = homeSkin;
+			if (skin != null) {
+				homeArcade.setSkin(skin.pngBytes(), skin.slim());
+			}
+		}
+		if (homeArcade.getParent() != homeHero && homeHero != null && !homeArcade.fullscreen()) {
+			if (homeArcade.getParent() instanceof javafx.scene.layout.Pane old) {
+				old.getChildren().remove(homeArcade);
+			}
+			int at = homeHeroFade != null ? homeHero.getChildren().indexOf(homeHeroFade) : -1;
+			homeHero.getChildren().add(at < 0 ? homeHero.getChildren().size() : at, homeArcade);
+		}
+		homeArcade.start();
+	}
+
+	/** The card's text slides away while you play and comes back when you stop. */
+	private void arcadePlayingChanged(boolean playing) {
+		if (homeScenery != null) {
+			homeScenery.setSuspended(playing);
+		}
+		Node text = homeHeroText;
+		Node fade = homeHeroFade;
+		if (text == null || fade == null) {
+			return;
+		}
+		javafx.animation.TranslateTransition slide = new javafx.animation.TranslateTransition(Duration.millis(playing ? 280 : 460), text);
+		javafx.animation.FadeTransition textFade = new javafx.animation.FadeTransition(Duration.millis(playing ? 220 : 420), text);
+		javafx.animation.FadeTransition shade = new javafx.animation.FadeTransition(Duration.millis(playing ? 260 : 520), fade);
+		if (playing) {
+			slide.setToX(-46);
+			slide.setInterpolator(javafx.animation.Interpolator.EASE_IN);
+			textFade.setToValue(0);
+			shade.setToValue(0);
+			text.setMouseTransparent(true);
+		} else {
+			text.setTranslateX(-30);
+			slide.setToX(0);
+			slide.setInterpolator(javafx.animation.Interpolator.SPLINE(0.2, 0.8, 0.25, 1));
+			textFade.setToValue(1);
+			shade.setToValue(1);
+			slide.setDelay(Duration.millis(380));
+			textFade.setDelay(Duration.millis(380));
+			shade.setDelay(Duration.millis(300));
+			text.setMouseTransparent(false);
+		}
+		new javafx.animation.ParallelTransition(slide, textFade, shade).play();
+	}
+
+	/** Fullscreen: the arcade leaves the card and covers the whole window. */
+	private void arcadeFullscreen(boolean fullscreen) {
+		net.veloclient.launcher.sandbox.Arcade arcade = homeArcade;
+		if (arcade == null) {
+			return;
+		}
+		if (arcade.getParent() instanceof javafx.scene.layout.Pane parent) {
+			parent.getChildren().remove(arcade);
+		}
+		if (fullscreen) {
+			layers.getChildren().add(arcade);
+		} else if (homeHero != null) {
+			int at = homeHeroFade != null ? homeHero.getChildren().indexOf(homeHeroFade) : -1;
+			homeHero.getChildren().add(at < 0 ? homeHero.getChildren().size() : at, arcade);
+		}
+		arcade.setOpacity(0.4);
+		arcade.setScaleX(0.97);
+		arcade.setScaleY(0.97);
+		javafx.animation.FadeTransition in = new javafx.animation.FadeTransition(Duration.millis(220), arcade);
+		in.setToValue(1);
+		javafx.animation.ScaleTransition grow = new javafx.animation.ScaleTransition(Duration.millis(300), arcade);
+		grow.setToX(1);
+		grow.setToY(1);
+		grow.setInterpolator(net.veloclient.launcher.ui.UiMotion.BACK_OUT_SOFT);
+		new javafx.animation.ParallelTransition(in, grow).play();
+	}
+
+	/**
+	 * Minimize on launch, but only once Minecraft's window is really there (2026-11): the launcher stays up through
+	 * the whole start (the arcade is right there), and goes down when the game's log says the window/renderer started.
+	 */
+	private void minimizeWhenGameWindowOpens(GameLauncher.LaunchResult result) {
+		Thread watcher = new Thread(() -> {
+			long deadline = System.currentTimeMillis() + 150_000;
+			long read = 0;
+			String[] markers = {"Backend library:", "LWJGL Version:", "Created: ", "Sound engine started", "OpenAL initialized",
+					"Reloading ResourceManager"};
+			try {
+				while (System.currentTimeMillis() < deadline && result.process().isAlive()) {
+					java.nio.file.Path log = result.logFile();
+					if (log != null && Files.exists(log)) {
+						long size = Files.size(log);
+						if (size > read) {
+							try (java.io.RandomAccessFile file = new java.io.RandomAccessFile(log.toFile(), "r")) {
+								file.seek(Math.max(0, read - 64));
+								byte[] chunk = new byte[(int) Math.min(size - Math.max(0, read - 64), 4 * 1024 * 1024)];
+								file.readFully(chunk);
+								String text = new String(chunk, java.nio.charset.StandardCharsets.UTF_8);
+								read = size;
+								for (String marker : markers) {
+									if (text.contains(marker)) {
+										Thread.sleep(700); // the window maps a moment after the line
+										Platform.runLater(() -> {
+											if (result.process().isAlive()) {
+												stage.setIconified(true);
+											}
+										});
+										return;
+									}
+								}
+							}
+						}
+					}
+					Thread.sleep(400);
+				}
+				if (result.process().isAlive()) {
+					Platform.runLater(() -> stage.setIconified(true));
+				}
+			} catch (Exception e) {
+				Platform.runLater(() -> stage.setIconified(true));
+			}
+		}, "velo-minimize-when-shown");
+		watcher.setDaemon(true);
+		watcher.start();
+	}
+
+	/** A game launches: save the arcade and drop it entirely (loop, audio line, textures, world) - it reloads from disk later. */
+	private void disposeHomeArcade() {
+		net.veloclient.launcher.sandbox.Arcade arcade = homeArcade;
+		if (arcade == null) {
+			return;
+		}
+		boolean wasPlaying = arcade.playing();
+		arcade.dispose();
+		homeArcade = null;
+		if (arcade.getParent() instanceof javafx.scene.layout.Pane parent) {
+			parent.getChildren().remove(arcade);
+		}
+		if (homeScenery != null) {
+			homeScenery.setSuspended(false);
+		}
+		if (wasPlaying) {
+			arcadePlayingChanged(false);
+		}
+		trimWanted = true;
+	}
+
+	/** The signed-in account's skin, drawn flat onto Home's Ridgeline (loaded off the UI thread). */
+	private void loadHomePlayerModel() {
+		net.veloclient.launcher.ui.RidgelineView scenery = homeScenery;
+		if (session == null || scenery == null) {
+			return;
+		}
+		CompletableFuture.supplyAsync(() -> {
+			SkinFetcher.SkinData skin = SkinFetcher.fetch(session);
+			homeSkin = skin;
+			if (skin != null) {
+				Platform.runLater(() -> {
+					if (homeArcade != null) {
+						homeArcade.setSkin(skin.pngBytes(), skin.slim());
+					}
+				});
+			}
+			return skin == null ? null : net.veloclient.launcher.ui.FlatSkin.render(skin.pngBytes(), skin.slim(), false, 5);
+		}, Executors.newVirtualThreadPerTaskExecutor()).exceptionally(e -> null).thenAccept(image -> Platform.runLater(() -> {
+			if (image == null) {
+				scenery.setPlayer(null);
+				return;
+			}
+			javafx.scene.image.ImageView flat = new javafx.scene.image.ImageView(image);
+			flat.setSmooth(false);
+			// Dusk grade: a touch darker, with a thin warm rim on the sky side (the red horizon behind).
+			javafx.scene.effect.DropShadow rim = new javafx.scene.effect.DropShadow(javafx.scene.effect.BlurType.ONE_PASS_BOX, Color.rgb(255, 110, 96, 0.28), 0, 0, 1, 0);
+			rim.setInput(new javafx.scene.effect.ColorAdjust(0, -0.05, -0.08, 0));
+			flat.setEffect(rim);
+			scenery.setPlayer(flat);
+		}));
 	}
 
 	/** A rasterized image of {@code instance}'s icon - a custom icon loads directly, a built-in (vector-drawn) one is snapshotted. */
@@ -2389,7 +2760,11 @@ public final class LauncherApp extends Application {
 			empty.setOnMouseClicked(e -> addButton.fire());
 			list.getChildren().add(empty);
 		}
-		// Discover first: partner servers and worlds hosted with Velo.
+		// 2026-11: the page starts with Discover (its own title), then "Servers" with search / refresh / add as a section head.
+		title.getStyleClass().setAll("label", "t-title-sm");
+		header.setAlignment(Pos.CENTER_LEFT);
+		header.setPadding(new Insets(18, 0, 4, 0));
+		list.getChildren().add(0, header);
 		list.getChildren().add(0, net.veloclient.launcher.ui.DiscoverView.build(discoverJoiner()));
 		for (SavedServer server : servers) {
 			Node row = buildServerRow(server, refreshers);
@@ -2418,7 +2793,7 @@ public final class LauncherApp extends Application {
 			aside.setManaged(wide);
 		});
 		VBox.setVgrow(body, Priority.ALWAYS);
-		VBox page = new VBox(22, header, body);
+		VBox page = new VBox(22, body);
 		page.getStyleClass().add("page");
 		setContent(page);
 	}
@@ -2473,60 +2848,67 @@ public final class LauncherApp extends Application {
 	}
 
 	private Node buildServerRow(SavedServer server, List<Runnable> refreshers) {
-		StackPane serverIconHolder = new StackPane();
-		serverIconHolder.setPrefSize(52, 52);
-		serverIconHolder.setMinSize(52, 52);
-		serverIconHolder.getStyleClass().add("server-icon");
+		// 2026-11 row: crisp pixel favicon | name, version, "via <profile>" and the MOTD as Minecraft draws it |
+		// PLAYERS and PING side by side | edit, more, Join.
 		ImageView serverIconView = new ImageView(fallbackServerIcon());
-		serverIconView.setFitWidth(44);
-		serverIconView.setFitHeight(44);
-		serverIconView.setPreserveRatio(true);
-		serverIconHolder.getChildren().add(serverIconView);
+		serverIconView.setFitWidth(56);
+		serverIconView.setFitHeight(56);
+		serverIconView.setSmooth(false);
+		StackPane serverIconHolder = new StackPane(serverIconView);
+		serverIconHolder.getStyleClass().add("server-icon");
+		serverIconHolder.setMinSize(56, 56);
+		serverIconHolder.setMaxSize(56, 56);
+		javafx.scene.shape.Rectangle iconClip = new javafx.scene.shape.Rectangle(56, 56);
+		iconClip.setArcWidth(12);
+		iconClip.setArcHeight(12);
+		serverIconHolder.setClip(iconClip);
 
 		Label name = new Label(server.name());
 		name.getStyleClass().add("server-name");
-		Label address = new Label(server.address());
-		address.getStyleClass().add("server-address");
-		HBox titleRow = new HBox(8, name, address);
-		titleRow.setAlignment(Pos.BASELINE_LEFT);
+		name.setMinWidth(Region.USE_PREF_SIZE);
+		Label version = new Label("");
+		version.getStyleClass().add("server-version");
+		version.setMinWidth(0);
+		List<Instance> instances = InstanceStore.loadAll();
+		Instance[] chosen = {instances.stream().filter(i -> i.id().equals(server.instanceId())).findFirst().orElse(null)};
+		MenuButton via = new MenuButton();
+		via.getStyleClass().add("server-via");
+		Runnable[] refreshConnect = new Runnable[1];
+		Runnable showVia = () -> via.setText(chosen[0] == null ? "Choose a profile" : "via " + chosen[0].name());
+		for (Instance instance : instances) {
+			MenuItem item = new MenuItem(instance.name() + "  ·  " + instance.mcVersion());
+			item.setOnAction(e -> {
+				chosen[0] = instance;
+				SavedServerStore.update(new SavedServer(server.id(), server.name(), server.host(), server.port(), instance.id()));
+				showVia.run();
+				refreshConnect[0].run();
+			});
+			via.getItems().add(item);
+		}
+		showVia.run();
+		HBox titleRow = new HBox(10, name, version, via);
+		titleRow.setAlignment(Pos.CENTER_LEFT);
 		javafx.scene.text.TextFlow motd = new javafx.scene.text.TextFlow(pingingText());
-		motd.setMaxHeight(36);
-		VBox info = new VBox(4, titleRow, motd);
+		motd.getStyleClass().add("server-motd");
+		motd.setMaxHeight(40);
+		motd.setLineSpacing(1);
+		VBox info = new VBox(7, titleRow, motd);
 		HBox.setHgrow(info, Priority.ALWAYS);
 		info.setMinWidth(160);
 
-		// Status chips: online + players, ping, version.
-		Label players = new Label("...");
-		players.getStyleClass().addAll("server-chip");
-		Label ping = new Label("");
-		ping.getStyleClass().add("server-chip");
-		Label version = new Label("");
-		version.getStyleClass().add("server-chip");
-		HBox chips = new HBox(6, players, ping, version);
-		chips.setAlignment(Pos.CENTER_LEFT);
-		info.getChildren().add(chips);
-
-		List<Instance> instances = InstanceStore.loadAll();
-		ComboBox<Instance> profilePicker = new ComboBox<>();
-		profilePicker.getItems().add(null);
-		profilePicker.getItems().addAll(instances);
-		profilePicker.setPrefWidth(170);
-		profilePicker.setConverter(new javafx.util.StringConverter<>() {
-			@Override
-			public String toString(Instance instance) {
-				return instance == null ? "Choose a profile" : instance.name();
-			}
-
-			@Override
-			public Instance fromString(String string) {
-				return null;
-			}
-		});
-		instances.stream().filter(i -> i.id().equals(server.instanceId())).findFirst()
-				.ifPresentOrElse(profilePicker::setValue, () -> profilePicker.setValue(null));
-		Label launchWith = new Label("Launches with");
-		launchWith.getStyleClass().add("settings-row-hint");
-		VBox profileBox = new VBox(3, launchWith, profilePicker);
+		Label players = new Label("…");
+		Label ping = new Label("…");
+		HBox pingBars = new HBox(2);
+		pingBars.setAlignment(Pos.BOTTOM_LEFT);
+		for (int h : new int[] {3, 5, 8, 11}) {
+			Region bar = new Region();
+			bar.getStyleClass().add("ping-bar");
+			bar.setMinSize(2, h);
+			bar.setMaxSize(2, h);
+			pingBars.getChildren().add(bar);
+		}
+		HBox stats = new HBox(6, serverStat("PLAYERS", net.veloclient.launcher.ui.Icons.icon("user", 11, Color.web("#8A8486"), 2.2), players, 104),
+				serverStat("PING", pingBars, ping, 84));
 
 		ProgressBar progressBar = new ProgressBar(0);
 		progressBar.setMaxWidth(Double.MAX_VALUE);
@@ -2539,14 +2921,13 @@ public final class LauncherApp extends Application {
 		launchStatus.setManaged(false);
 		launchStatus.setWrapText(true);
 
-		Button connect = new Button("Connect");
+		Button connect = new Button("Join");
 		connect.getStyleClass().add("server-join");
-		connect.setPrefWidth(110);
-		Runnable refreshConnectButton = () -> {
-			Instance selected = profilePicker.getValue();
-			if (selected == null) {
+		connect.setMinWidth(Region.USE_PREF_SIZE);
+		refreshConnect[0] = () -> {
+			if (chosen[0] == null) {
 				connect.setDisable(true);
-				connect.setText("Connect");
+				connect.setText("Join");
 				connect.setTooltip(new Tooltip("Choose which profile to launch with first."));
 			} else if (session == null) {
 				connect.setDisable(false);
@@ -2554,19 +2935,15 @@ public final class LauncherApp extends Application {
 				connect.setTooltip(new Tooltip("Sign in with your Microsoft account first."));
 			} else {
 				connect.setDisable(false);
-				connect.setText("Connect");
-				connect.setTooltip(new Tooltip("Launch " + selected.name() + " straight into " + server.name()));
+				connect.setText("Join");
+				connect.setTooltip(new Tooltip("Launch " + chosen[0].name() + " straight into " + server.name()));
 			}
 		};
-		refreshConnectButton.run();
-		profilePicker.valueProperty().addListener((obs, oldVal, newVal) -> {
-			SavedServerStore.update(new SavedServer(server.id(), server.name(), server.host(), server.port(),
-					newVal != null ? newVal.id() : null));
-			refreshConnectButton.run();
-		});
+		refreshConnect[0].run();
 		connect.setOnAction(e -> {
-			Instance instance = profilePicker.getValue();
+			Instance instance = chosen[0];
 			if (instance == null) {
+				via.show();
 				return;
 			}
 			if (session == null) {
@@ -2579,21 +2956,26 @@ public final class LauncherApp extends Application {
 
 		Runnable refresh = () -> {
 			motd.getChildren().setAll(pingingText());
-			pingInto(server, motd, players, ping, version, serverIconView);
+			pingInto(server, motd, players, ping, pingBars, version, serverIconView);
 		};
 		refreshers.add(refresh);
 
-		Button more = new Button();
-		more.setGraphic(net.veloclient.launcher.ui.Icons.icon("more", 18, Color.web("#C9C9D1"), 3));
-		more.getStyleClass().addAll("icon-button", "icon-button-flat");
-		ContextMenu menu = new ContextMenu();
-		MenuItem editItem = new MenuItem("Edit server...");
-		editItem.setOnAction(e -> ServerEditDialog.show(stage, "Edit Server", server.name(), server.host(), server.port(),
+		Runnable edit = () -> ServerEditDialog.show(stage, "Edit Server", server.name(), server.host(), server.port(),
 				InstanceStore.loadAll(), server.instanceId())
 				.ifPresent(result -> {
 					SavedServerStore.update(new SavedServer(server.id(), result.name(), result.host(), result.port(), result.instanceId()));
 					showServers();
-				}));
+				});
+		Button editButton = new Button();
+		editButton.setGraphic(net.veloclient.launcher.ui.Icons.icon("edit", 16, Color.web("#C9C2C3")));
+		editButton.getStyleClass().addAll("icon-button", "icon-button-flat");
+		editButton.setTooltip(new Tooltip("Edit server"));
+		editButton.setOnAction(e -> edit.run());
+		Button more = new Button();
+		more.setGraphic(net.veloclient.launcher.ui.Icons.icon("more", 18, Color.web("#C9C2C3"), 3));
+		more.getStyleClass().addAll("icon-button", "icon-button-flat");
+		more.setTooltip(new Tooltip("More"));
+		ContextMenu menu = new ContextMenu();
 		MenuItem copyItem = new MenuItem("Copy address");
 		copyItem.setOnAction(e -> {
 			javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
@@ -2615,26 +2997,48 @@ public final class LauncherApp extends Application {
 				showServers();
 			}
 		});
-		menu.getItems().addAll(editItem, copyItem, refreshItem, new javafx.scene.control.SeparatorMenuItem(), removeItem);
+		menu.getItems().addAll(copyItem, refreshItem, new javafx.scene.control.SeparatorMenuItem(), removeItem);
 		more.setOnAction(e -> menu.show(more, javafx.geometry.Side.BOTTOM, 0, 4));
 
-		HBox actions = new HBox(10, profileBox, connect, more);
+		HBox actions = new HBox(4, editButton, more, connect);
 		actions.setAlignment(Pos.CENTER_RIGHT);
-		HBox row = new HBox(14, serverIconHolder, info, actions);
+		HBox.setMargin(connect, new Insets(0, 0, 0, 6));
+		HBox row = new HBox(16, serverIconHolder, info, stats, actions);
 		row.setAlignment(Pos.CENTER_LEFT);
 		VBox card = new VBox(8, row, progressBar, launchStatus);
 		card.getStyleClass().addAll("server-card", "motion-card");
+		card.setOnMouseClicked(e -> {
+			if (e.getClickCount() == 2) {
+				connect.fire();
+			}
+		});
 		refresh.run();
 		return card;
 	}
 
-	private void pingInto(SavedServer server, javafx.scene.text.TextFlow motd, Label players, Label ping, Label version, ImageView iconView) {
-		players.setText("Checking...");
-		players.getStyleClass().removeAll("server-online", "server-offline");
-		ping.setVisible(false);
-		ping.setManaged(false);
-		version.setVisible(false);
-		version.setManaged(false);
+	/** One labelled box of a server row: small icon + caption over the value. */
+	private static VBox serverStat(String caption, Node icon, Label value, double width) {
+		Label label = new Label(caption);
+		label.getStyleClass().add("server-stat-label");
+		label.setGraphic(icon);
+		label.setGraphicTextGap(6);
+		value.getStyleClass().add("server-stat-value");
+		VBox box = new VBox(6, label, value);
+		box.getStyleClass().add("server-stat");
+		// At least this wide, wider when the value needs it ("2,104 / 15,000").
+		box.setMinWidth(Region.USE_PREF_SIZE);
+		box.prefWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+				() -> Math.max(width, value.prefWidth(-1) + 22), value.textProperty(), value.graphicProperty()));
+		box.setMaxHeight(Region.USE_PREF_SIZE);
+		return box;
+	}
+
+	private void pingInto(SavedServer server, javafx.scene.text.TextFlow motd, Label players, Label ping, HBox pingBars, Label version, ImageView iconView) {
+		players.setText("…");
+		ping.setText("…");
+		ping.getStyleClass().removeAll("server-ping-good", "server-ping-ok", "server-ping-bad", "server-dim");
+		players.getStyleClass().remove("server-dim");
+		paintPingBars(pingBars, 0, null);
 		CompletableFuture
 				.supplyAsync(() -> {
 					try {
@@ -2649,25 +3053,38 @@ public final class LauncherApp extends Application {
 						motd.getChildren().setAll(hasMotd ? motdTexts(p.motd()) : List.of());
 						motd.setVisible(hasMotd);
 						motd.setManaged(hasMotd);
-						players.setText("●  " + String.format(java.util.Locale.ROOT, "%,d / %,d online", p.onlinePlayers(), p.maxPlayers()));
-						players.getStyleClass().add("server-online");
+						players.setText(String.format(java.util.Locale.ROOT, "%,d", p.onlinePlayers()));
+						Label max = new Label(String.format(java.util.Locale.ROOT, " / %,d", p.maxPlayers()));
+						max.getStyleClass().add("server-stat-max");
+						players.setGraphic(max);
+						players.setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
+						players.setGraphicTextGap(0);
 						long ms = p.latencyMillis();
 						ping.setText(ms + " ms");
-						ping.getStyleClass().removeAll("server-ping-good", "server-ping-ok", "server-ping-bad");
-						ping.getStyleClass().add(ms < 80 ? "server-ping-good" : ms < 160 ? "server-ping-ok" : "server-ping-bad");
-						ping.setVisible(true);
-						ping.setManaged(true);
+						String quality = ms < 60 ? "server-ping-good" : ms < 120 ? "server-ping-ok" : "server-ping-bad";
+						ping.getStyleClass().add(quality);
+						paintPingBars(pingBars, ms < 60 ? 4 : ms < 120 ? 3 : 2, ms < 60 ? "#7FEBBE" : ms < 120 ? "#F2B64C" : "#FF6B6F");
 						version.setText(p.versionName());
-						version.setVisible(true);
-						version.setManaged(true);
 						applyServerFavicon(iconView, p.faviconPngBase64());
 					} else {
-						motd.getChildren().setAll(new javafx.scene.text.Text("Can't reach this server right now"));
-						((javafx.scene.text.Text) motd.getChildren().get(0)).setFill(textColor());
-						players.setText("●  Offline");
-						players.getStyleClass().add("server-offline");
+						javafx.scene.text.Text offline = new javafx.scene.text.Text("Can't connect to server");
+						offline.setFill(Color.web("#AA0000"));
+						offline.setStyle("-fx-font-family: 'Monocraft'; -fx-font-size: 13px;");
+						motd.getChildren().setAll(offline);
+						players.setText("Offline");
+						players.setGraphic(null);
+						players.getStyleClass().add("server-dim");
+						ping.setText("–");
+						ping.getStyleClass().add("server-dim");
+						iconView.setOpacity(0.45);
 					}
 				}));
+	}
+
+	private static void paintPingBars(HBox bars, int lit, String color) {
+		for (int i = 0; i < bars.getChildren().size(); i++) {
+			bars.getChildren().get(i).setStyle("-fx-background-color: " + (i < lit ? color : "rgba(244,239,238,0.2)") + ";");
+		}
 	}
 
 	/** The server list's per-row icon before a real favicon has (or ever) arrives - the app's own logo, same fallback style as installed-mod rows elsewhere in the launcher. */
@@ -2682,7 +3099,8 @@ public final class LauncherApp extends Application {
 		}
 		try {
 			byte[] bytes = java.util.Base64.getDecoder().decode(faviconPngBase64);
-			Image image = new Image(new java.io.ByteArrayInputStream(bytes), 36, 36, true, true);
+			// Favicons are 64 px pixel art: decode at full size, the view scales it without smoothing (crisp pixels).
+			Image image = new Image(new java.io.ByteArrayInputStream(bytes));
 			if (!image.isError()) {
 				iconView.setImage(image);
 			}
@@ -2703,9 +3121,13 @@ public final class LauncherApp extends Application {
 		for (net.veloclient.launcher.net.MotdText.Segment segment : segments) {
 			javafx.scene.text.Text text = new javafx.scene.text.Text(segment.text());
 			text.setFill(Color.rgb((segment.argbColor() >> 16) & 0xFF, (segment.argbColor() >> 8) & 0xFF, segment.argbColor() & 0xFF));
-			javafx.scene.text.FontWeight weight = segment.bold() ? FontWeight.BOLD : FontWeight.NORMAL;
-			javafx.scene.text.FontPosture posture = segment.italic() ? javafx.scene.text.FontPosture.ITALIC : javafx.scene.text.FontPosture.REGULAR;
-			text.setFont(Font.font("Inter", weight, posture, 13));
+			// Inline style, not setFont: the root's -fx-font-family is inherited through CSS and beats fonts set in code.
+			text.setStyle("-fx-font-family: 'Monocraft'; -fx-font-size: 13px; -fx-font-weight: " + (segment.bold() ? "bold" : "normal")
+					+ "; -fx-font-style: " + (segment.italic() ? "italic" : "normal") + ";");
+			// Minecraft draws every glyph with a shadow in the same colour at a quarter of the brightness.
+			int rgb = segment.argbColor();
+			text.setEffect(new javafx.scene.effect.DropShadow(javafx.scene.effect.BlurType.ONE_PASS_BOX,
+					Color.rgb(((rgb >> 16) & 0xFF) >> 2, ((rgb >> 8) & 0xFF) >> 2, (rgb & 0xFF) >> 2), 0, 0, 1.5, 1.5));
 			text.setUnderline(segment.underlined());
 			text.setStrikethrough(segment.strikethrough());
 			texts.add(text);
@@ -3185,6 +3607,9 @@ public final class LauncherApp extends Application {
 			return;
 		}
 		topBar.setFriendsCount(net.veloclient.launcher.social.LauncherSocial.badgeCount());
+		var socialState = net.veloclient.launcher.social.LauncherSocial.snapshot();
+		topBar.setFriendsOnline(socialState == null || socialState.friends == null || session == null ? 0
+				: (int) socialState.friends.stream().filter(f -> f.online).count());
 		refreshNotificationDot();
 		refreshLaunchBarSocial();
 	}
@@ -4103,6 +4528,7 @@ public final class LauncherApp extends Application {
 			return;
 		}
 		startingSince.put(instance.id(), System.currentTimeMillis());
+		disposeHomeArcade();
 		net.veloclient.launcher.ui.Toasts.show(content, "info", "#3ddc97", "Starting " + instance.name() + "...");
 		net.veloclient.launcher.ui.UiSounds.launch();
 		if (requiredUpdate != null && availableUpdate != null) {
@@ -4272,7 +4698,7 @@ public final class LauncherApp extends Application {
 						statusLabel.setManaged(false);
 						refreshLaunchBar();
 						if (net.veloclient.launcher.data.LauncherSettings.get().minimizeOnLaunch) {
-							stage.setIconified(true);
+							minimizeWhenGameWindowOpens(result);
 						}
 					});
 					int exitCode = result.process().waitFor();
@@ -4417,6 +4843,7 @@ public final class LauncherApp extends Application {
 	private int librarySort = 0;
 	/** Library filter: null = all, else a Minecraft version. */
 	private String libraryFilter;
+	private String librarySearch = "";
 
 	private void showLibrary() {
 		currentPage = this::showLibrary;
@@ -4455,50 +4882,37 @@ public final class LauncherApp extends Application {
 		create.setGraphic(net.veloclient.launcher.ui.Icons.icon("plus", 16, Color.WHITE, 2.2));
 		create.getStyleClass().add("primary-button");
 		create.setOnAction(e -> createNewProfile());
-		HBox header = new HBox(10, heading, spacer, importButton, create);
-		header.setAlignment(Pos.BOTTOM_LEFT);
-
-		HBox filters = new HBox(8);
-		filters.setAlignment(Pos.CENTER_LEFT);
-		java.util.List<String> versions = all.stream().map(Instance::mcVersion).distinct().sorted(Comparator.reverseOrder()).toList();
-		filters.getChildren().add(filterChip("All", libraryFilter == null, () -> {
-			libraryFilter = null;
-			showLibrary();
-		}));
-		for (String version : versions) {
-			filters.getChildren().add(filterChip(version, version.equals(libraryFilter), () -> {
-				libraryFilter = version;
-				showLibrary();
-			}));
-		}
-		Region filterSpacer = new Region();
-		HBox.setHgrow(filterSpacer, Priority.ALWAYS);
-		Label sortLabel = new Label("Sort");
-		sortLabel.getStyleClass().add("t-muted");
-		HBox sort = new HBox(2);
-		sort.getStyleClass().add("segment-bar");
+		// One header row (2026-11): search, sort and the two actions - no second filter row.
+		TextField search = new TextField(librarySearch);
+		search.setPromptText("Search profiles");
+		search.getStyleClass().add("topbar-search-field");
+		search.setPrefWidth(240);
+		Node searchIcon = net.veloclient.launcher.ui.Icons.icon("search", 15, Color.web("#8A8486"));
+		StackPane searchBox = new StackPane(search, searchIcon);
+		StackPane.setAlignment(searchIcon, Pos.CENTER_LEFT);
+		StackPane.setMargin(searchIcon, new Insets(0, 0, 0, 11));
+		searchIcon.setMouseTransparent(true);
 		String[] sorts = {"Recent", "Name", "Newest"};
+		MenuButton sort = new MenuButton(sorts[librarySort]);
+		sort.setGraphic(net.veloclient.launcher.ui.Icons.icon("sliders", 15, Color.web("#E4E4E8")));
 		for (int i = 0; i < sorts.length; i++) {
 			int index = i;
-			Button b = new Button(sorts[i]);
-			b.getStyleClass().setAll("button", "segmented-button");
-			if (i == librarySort) {
-				b.getStyleClass().add("segmented-button-active");
-			}
-			b.setOnAction(e -> {
+			MenuItem item = new MenuItem(sorts[i]);
+			item.setOnAction(e -> {
 				librarySort = index;
 				showLibrary();
 			});
-			sort.getChildren().add(b);
+			sort.getItems().add(item);
 		}
-		filters.getChildren().addAll(filterSpacer, sortLabel, sort);
+		HBox header = new HBox(10, heading, spacer, searchBox, sort, importButton, create);
+		header.setAlignment(Pos.CENTER_LEFT);
+		header.getStyleClass().add("page-header-row");
 
 		javafx.scene.layout.FlowPane grid = new javafx.scene.layout.FlowPane(16, 16);
 		for (Instance instance : all) {
-			if (libraryFilter != null && !libraryFilter.equals(instance.mcVersion())) {
-				continue;
-			}
-			grid.getChildren().add(libraryTile(instance, lastPlayed.get(instance.id())));
+			Node tile = libraryTile(instance, lastPlayed.get(instance.id()));
+			tile.setUserData(instance.name().toLowerCase(java.util.Locale.ROOT) + " " + instance.mcVersion());
+			grid.getChildren().add(tile);
 		}
 		VBox add = new VBox(8);
 		add.getStyleClass().add("dashed-tile");
@@ -4530,7 +4944,19 @@ public final class LauncherApp extends Application {
 		scroll.setFitToWidth(true);
 		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 		VBox.setVgrow(scroll, Priority.ALWAYS);
-		VBox page = new VBox(20, header, filters, scroll);
+		// Live filter: hides tiles whose name/version doesn't contain the text (the "New profile" tile always stays).
+		Runnable applySearch = () -> {
+			librarySearch = search.getText();
+			String query = librarySearch.toLowerCase(java.util.Locale.ROOT).strip();
+			for (Node tile : grid.getChildren()) {
+				boolean show = query.isEmpty() || !(tile.getUserData() instanceof String key) || key.contains(query);
+				tile.setVisible(show);
+				tile.setManaged(show);
+			}
+		};
+		search.textProperty().addListener((o, x, t) -> applySearch.run());
+		applySearch.run();
+		VBox page = new VBox(20, header, scroll);
 		page.getStyleClass().add("page");
 		setContent(page);
 	}
@@ -4545,9 +4971,24 @@ public final class LauncherApp extends Application {
 		return chip;
 	}
 
+	/** The colour an icon tints its tile with - a snapshot of the icon, so it's remembered per icon (and its file's date). */
+	private final java.util.Map<String, Color> iconTints = new java.util.HashMap<>();
+
+	private Color iconTint(Instance instance) {
+		String key = instance.icon().kind() + ":" + instance.icon().value() + ":" + accentColor();
+		if (instance.icon().kind() == InstanceIcon.Kind.CUSTOM) {
+			try {
+				key += ":" + instance.id() + ":" + Files.getLastModifiedTime(InstancePaths.iconFile(instance.id())).toMillis();
+			} catch (java.io.IOException ignored) {
+				// no file: the built-in fallback icon is shown
+			}
+		}
+		return iconTints.computeIfAbsent(key, k -> net.veloclient.launcher.ui.IconColorExtractor.fromNode(renderInstanceIcon(instance, 44), accentColor()));
+	}
+
 	private Node libraryTile(Instance instance, Long lastPlayedMillis) {
 		Node icon = renderInstanceIcon(instance, 44);
-		Color tint = net.veloclient.launcher.ui.IconColorExtractor.fromNode(icon, accentColor());
+		Color tint = iconTint(instance);
 		StackPane art = new StackPane();
 		art.setMinHeight(116);
 		art.setPrefHeight(116);
@@ -4758,6 +5199,16 @@ public final class LauncherApp extends Application {
 					if (status == null && requiredUpdate != null) {
 						// A hotfix everyone needs: don't wait for the bell.
 						net.veloclient.launcher.ui.UpdateDialog.show(stage, availableUpdate, java.util.Objects.requireNonNullElse(requiredUpdate.message(), ""));
+					} else if (status == null && availableUpdate != null && !backgroundUpdating && !launcherUpdateReady
+							&& !(net.veloclient.launcher.data.LauncherSettings.get().autoUpdate && net.veloclient.launcher.launch.UpdateService.packaged())
+							&& !availableUpdate.version().equals(updatePopupShownFor)
+							&& stage.getScene().getRoot() instanceof javafx.scene.layout.StackPane layers && updateCard == null) {
+						// Every new version pops up once per start (2026-11) - not only a dot on the bell.
+						updatePopupShownFor = availableUpdate.version();
+						updateCard = layers;
+						net.veloclient.launcher.ui.UpdatePopup.show(layers, net.veloclient.launcher.ui.UpdatePopup.postFor(newsFeed, availableUpdate.version()),
+								"UPDATE AVAILABLE", AppVersion.VERSION + "  →  " + availableUpdate.version(), "Velo Client " + availableUpdate.version(),
+								availableUpdate.notes(), "Takes about a minute. Your profiles and settings stay as they are.", updateActions(availableUpdate, false));
 					}
 					if (status != null) {
 						status.setText(availableUpdate == null ? "You're up to date (v" + AppVersion.VERSION + ")"
@@ -4788,6 +5239,7 @@ public final class LauncherApp extends Application {
 	private boolean periodicUpdateCheck;
 	private volatile boolean backgroundUpdating;
 	private javafx.scene.Node updateCard;
+	private String updatePopupShownFor;
 
 	/**
 	 * Automatic updates: new mod builds install right away (they apply on each profile's next launch), the new launcher's
@@ -4836,8 +5288,16 @@ public final class LauncherApp extends Application {
 				javafx.application.Platform.runLater(() -> {
 					availableUpdate = null;
 					refreshNotificationDot();
-					net.veloclient.launcher.ui.Toasts.show(stage.getScene().getRoot(), "download", "#3DDC97",
-							"Velo " + release.version() + " is ready - your next game start uses it");
+					if (stage.getScene().getRoot() instanceof javafx.scene.layout.StackPane layers && updateCard == null) {
+						updateCard = layers;
+						net.veloclient.launcher.ui.UpdatePopup.show(layers, net.veloclient.launcher.ui.UpdatePopup.postFor(newsFeed, release.version()),
+								"INSTALLED", "Velo " + release.version(), "Velo Client " + release.version(), release.notes(),
+								"Already installed - your next game start uses it.", List.of(
+										new net.veloclient.launcher.ui.UpdatePopup.Action("Got it", true, h -> {
+											updateCard = null;
+											h.close();
+										})));
+					}
 				});
 			}
 		} catch (Exception e) {
@@ -4873,54 +5333,70 @@ public final class LauncherApp extends Application {
 		return row;
 	}
 
-	/** The small "Restart to update" card in the corner (stays until used or dismissed). */
+	/** The update pop-up (2026-11, replaces the corner card): the version's news post with "Restart to update". */
 	private void showUpdateReady(net.veloclient.launcher.launch.UpdateService.Release release) {
 		if (!(stage.getScene().getRoot() instanceof javafx.scene.layout.StackPane layers) || updateCard != null) {
 			return;
 		}
-		Label title = new Label("Launcher " + release.version() + " is ready");
-		title.getStyleClass().add("t-strong");
-		Label text = new Label("Downloaded in the background. Restart to update - takes a few seconds.");
-		text.setWrapText(true);
-		text.getStyleClass().add("settings-row-hint");
-		text.setMaxWidth(280);
-		Button restart = new Button("Restart to update");
-		restart.getStyleClass().add("primary-button");
-		Button later = new Button("Later");
-		later.getStyleClass().add("ghost-button");
-		javafx.scene.layout.HBox buttons = new javafx.scene.layout.HBox(8, restart, later);
-		javafx.scene.layout.VBox card = new javafx.scene.layout.VBox(8, title, text, buttons);
-		card.getStyleClass().add("toast");
-		card.setStyle("-fx-padding: 16; -fx-background-radius: 12;");
-		card.setMaxSize(javafx.scene.layout.Region.USE_PREF_SIZE, javafx.scene.layout.Region.USE_PREF_SIZE);
-		javafx.scene.layout.StackPane.setAlignment(card, javafx.geometry.Pos.BOTTOM_RIGHT);
-		javafx.scene.layout.StackPane.setMargin(card, new javafx.geometry.Insets(0, 24, 96, 0));
-		layers.getChildren().add(card);
-		updateCard = card;
-		card.setOpacity(0);
-		card.setTranslateY(14);
-		javafx.animation.FadeTransition in = new javafx.animation.FadeTransition(javafx.util.Duration.millis(240), card);
-		in.setToValue(1);
-		javafx.animation.TranslateTransition up = new javafx.animation.TranslateTransition(javafx.util.Duration.millis(280), card);
-		up.setToY(0);
-		new javafx.animation.ParallelTransition(in, up).play();
-		Runnable close = () -> {
-			layers.getChildren().remove(card);
+		updateCard = layers;
+		net.veloclient.launcher.ui.UpdatePopup.show(layers, net.veloclient.launcher.ui.UpdatePopup.postFor(newsFeed, release.version()),
+				"UPDATE READY", AppVersion.VERSION + "  →  " + release.version(), "Velo Client " + release.version(), release.notes(),
+				"Downloaded in the background. Restarting takes a few seconds.", updateActions(release, true));
+	}
+
+	/** Buttons for the update pop-up: Later, the full post (if there is one), and the update itself. */
+	private List<net.veloclient.launcher.ui.UpdatePopup.Action> updateActions(net.veloclient.launcher.launch.UpdateService.Release release, boolean ready) {
+		List<net.veloclient.launcher.ui.UpdatePopup.Action> actions = new ArrayList<>();
+		actions.add(new net.veloclient.launcher.ui.UpdatePopup.Action("Maybe later", false, h -> {
 			updateCard = null;
-		};
-		later.setOnAction(e -> close.run());
-		restart.setOnAction(e -> {
+			h.close();
+		}));
+		com.google.gson.JsonObject post = net.veloclient.launcher.ui.UpdatePopup.postFor(newsFeed, release.version());
+		if (!ready) {
+			// 2026-11: Later / Install in background / Install now - the post itself is already the pop-up
+			if (net.veloclient.launcher.launch.UpdateService.packaged() || !release.launcherNewer() || System.getProperty("velo.launcherTour") != null) {
+				actions.add(new net.veloclient.launcher.ui.UpdatePopup.Action("Install in background", false, h -> {
+					updateCard = null;
+					h.close();
+					Thread t = new Thread(() -> backgroundUpdate(release), "velo-update-background");
+					t.setDaemon(true);
+					t.start();
+					net.veloclient.launcher.ui.Toasts.show(content, "info", "#3ddc97", "Downloading Velo " + release.version() + " in the background - the bell shows the progress");
+				}));
+			}
+			actions.add(new net.veloclient.launcher.ui.UpdatePopup.Action("Install now", true, h -> {
+				updateCard = null;
+				h.close();
+				net.veloclient.launcher.ui.UpdateDialog.show(stage, release);
+			}));
+			return actions;
+		}
+		if (post != null) {
+			actions.add(new net.veloclient.launcher.ui.UpdatePopup.Action("Full post", false, h -> {
+				updateCard = null;
+				h.close();
+				showNewsPost(post);
+			}));
+		}
+		if (!ready) {
+			actions.add(new net.veloclient.launcher.ui.UpdatePopup.Action("Update now", true, h -> {
+				updateCard = null;
+				h.close();
+				net.veloclient.launcher.ui.UpdateDialog.show(stage, release);
+			}));
+			return actions;
+		}
+		actions.add(new net.veloclient.launcher.ui.UpdatePopup.Action("Restart to update", true, h -> {
 			if (!RunningInstanceManager.running().isEmpty()) {
-				text.setText("Close your game first - the launcher restarts to update.");
+				h.status("Close your game first - the launcher restarts to update.");
 				return;
 			}
-			restart.setDisable(true);
-			later.setDisable(true);
-			text.setText("Updating - Velo Client closes and starts again by itself.");
+			h.busy(true);
+			h.status("Updating - Velo Client closes and starts again by itself.");
 			Thread t = new Thread(() -> {
 				try {
 					boolean started = net.veloclient.launcher.launch.UpdateService.runInstallerTracked(release,
-							s -> javafx.application.Platform.runLater(() -> text.setText(s)), x -> { });
+							text -> javafx.application.Platform.runLater(() -> h.status(text)), x -> { });
 					if (started) {
 						String os = System.getProperty("os.name", "").toLowerCase();
 						if (!os.contains("win") && !os.contains("mac")) {
@@ -4933,18 +5409,20 @@ public final class LauncherApp extends Application {
 						});
 					}
 				} catch (Exception ex) {
-					LauncherLog.warn("Update from the card failed", ex);
+					LauncherLog.warn("Update from the pop-up failed", ex);
 					javafx.application.Platform.runLater(() -> {
-						text.setText("That didn't work: " + ex.getMessage() + " - try the bell.");
-						restart.setDisable(false);
-						later.setDisable(false);
+						h.status("That didn't work: " + ex.getMessage() + " - try the bell.");
+						h.busy(false);
 					});
 				}
 			}, "velo-update-restart");
 			t.setDaemon(true);
 			t.start();
-		});
+		}));
+		return actions;
 	}
+
+
 
 	private void showSettings() {
 		currentPage = this::showSettings;
@@ -5045,6 +5523,18 @@ public final class LauncherApp extends Application {
 		net.veloclient.launcher.ui.SettingsUi.row(appearance, "Your own theme", "Accent, background, corners - with a live preview",
 				"Make your own colors and share them as a code.", themeButton);
 		appearance.getChildren().add(homeBackgroundRow());
+		javafx.scene.control.CheckBox animateHome = new javafx.scene.control.CheckBox();
+		animateHome.setSelected(net.veloclient.launcher.data.LauncherSettings.get().animateHomeBackground);
+		animateHome.setOnAction(e -> {
+			net.veloclient.launcher.data.LauncherSettings.Data data = net.veloclient.launcher.data.LauncherSettings.get();
+			data.animateHomeBackground = animateHome.isSelected();
+			net.veloclient.launcher.data.LauncherSettings.save(data);
+			if (homeScenery != null) {
+				homeScenery.setAnimated(data.animateHomeBackground);
+			}
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(appearance, "Animate the Home background", "Drifting hills, twinkling stars, the moon moving",
+				"Off shows a still picture and saves a little CPU. It always pauses while the launcher is minimized.", animateHome);
 		content.getChildren().add(1, appearance);
 		content.getChildren().add(2, soundAndGuidesCard());
 
@@ -5056,7 +5546,7 @@ public final class LauncherApp extends Application {
 			net.veloclient.launcher.ui.SettingsUi.row(account, session.username(), "Microsoft account", "UUID " + session.uuid(), signOutButton);
 			// velo-client.com: a short code to type on the website signs you in to the web Store.
 			Label webCode = new Label("");
-			webCode.setStyle("-fx-font-family: 'JetBrains Mono'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -velo-text;");
+			webCode.setStyle("-fx-font-family: 'Geist Mono'; -fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: -velo-text;");
 			Button codeButton = new Button("Get a code");
 			codeButton.setOnAction(e -> {
 				codeButton.setDisable(true);
@@ -5262,7 +5752,7 @@ public final class LauncherApp extends Application {
 		VBox card = new VBox(8);
 		card.getStyleClass().add("glass-panel");
 		Label headingLabel = new Label(heading);
-		headingLabel.setFont(Font.font("Inter", FontWeight.BOLD, 15));
+		headingLabel.setFont(Font.font("Geist", FontWeight.BOLD, 15));
 		headingLabel.setTextFill(accentColor());
 		card.getChildren().add(headingLabel);
 		if (subtitle != null) {

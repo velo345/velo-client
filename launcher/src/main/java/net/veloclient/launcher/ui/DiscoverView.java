@@ -71,9 +71,8 @@ public final class DiscoverView {
 		} else {
 			box.getChildren().add(cards);
 		}
-		Label loading = new Label("Loading...");
-		loading.getStyleClass().add("t-muted");
-		cards.getChildren().add(loading);
+		// Animated placeholders in the cards' shape while partners and worlds load (2026-11).
+		cards.getChildren().add(Skeleton.grid(row ? 3 : 2, 340, 132));
 		CompletableFuture.supplyAsync(() -> {
 			List<Node> out = new ArrayList<>();
 			JsonObject partners = quietly(StoreApi::partners);
@@ -204,20 +203,19 @@ public final class DiscoverView {
 		boolean online = p.has("online") && p.get("online").getAsBoolean();
 
 		javafx.scene.layout.StackPane iconBox = new javafx.scene.layout.StackPane();
-		iconBox.setMinSize(56, 56);
-		iconBox.setMaxSize(56, 56);
-		iconBox.setStyle("-fx-background-color: " + accent + "26; -fx-background-radius: 14; -fx-border-color: " + accent + "55;"
-				+ " -fx-border-radius: 14; -fx-border-width: 1;");
+		iconBox.setMinSize(48, 48);
+		iconBox.setMaxSize(48, 48);
+		iconBox.setStyle("-fx-background-color: #0f0c0c; -fx-background-radius: 10;");
 		String base = net.veloclient.launcher.social.LauncherSocial.baseUrl();
 		if (base != null && p.has("icon") && !p.get("icon").isJsonNull()) {
 			javafx.scene.image.ImageView icon = new javafx.scene.image.ImageView(new javafx.scene.image.Image(
 					base + "/v1/partners/icon/" + p.get("id").getAsString() + "?s=128&v=" + p.get("icon").getAsString(), 112, 112, true, true, true));
-			icon.setFitWidth(56);
-			icon.setFitHeight(56);
+			icon.setFitWidth(48);
+			icon.setFitHeight(48);
 			icon.setSmooth(true);
-			javafx.scene.shape.Rectangle round = new javafx.scene.shape.Rectangle(56, 56);
-			round.setArcWidth(28);
-			round.setArcHeight(28);
+			javafx.scene.shape.Rectangle round = new javafx.scene.shape.Rectangle(48, 48);
+			round.setArcWidth(20);
+			round.setArcHeight(20);
 			icon.setClip(round);
 			iconBox.getChildren().add(icon);
 		} else {
@@ -227,15 +225,18 @@ public final class DiscoverView {
 		}
 
 		Label tag = new Label("PARTNER");
-		tag.setStyle("-fx-background-color: " + accent + "; -fx-text-fill: white; -fx-background-radius: 5; -fx-padding: 2 7 2 7;"
-				+ " -fx-font-size: 9.5px; -fx-font-weight: 900;");
+		tag.getStyleClass().add("partner-tag");
 		Label name = new Label(p.get("name").getAsString());
 		name.getStyleClass().add("t-strong");
-		name.setStyle("-fx-font-size: 17px;");
-		javafx.scene.shape.Circle dot = new javafx.scene.shape.Circle(3.5, javafx.scene.paint.Color.web(online ? "#3ddc97" : "#6b6b75"));
-		Label players = new Label(online ? String.format(java.util.Locale.ROOT, "%,d online", p.get("players").getAsInt()) : "Offline");
-		players.setStyle("-fx-text-fill: " + (online ? "#3ddc97" : "-velo-text-3") + "; -fx-font-size: 11.5px; -fx-font-weight: 700;");
-		HBox live = new HBox(6, dot, players);
+		name.setStyle("-fx-font-size: 15px;");
+		Region dot = new Region();
+		dot.getStyleClass().add("status-square");
+		if (!online) {
+			dot.getStyleClass().add("status-square-off");
+		}
+		Label players = new Label(online ? String.format(java.util.Locale.ROOT, "%,d playing", p.get("players").getAsInt()) : "Offline");
+		players.setStyle("-fx-text-fill: " + (online ? "-velo-text" : "-velo-text-3") + "; -fx-font-size: 12px;");
+		HBox live = new HBox(7, dot, players);
 		live.setAlignment(Pos.CENTER_LEFT);
 		String versions = text(p, "versions", "");
 		if (!versions.isEmpty()) {
@@ -249,8 +250,9 @@ public final class DiscoverView {
 
 		Label description = new Label(text(p, "description", ""));
 		description.getStyleClass().add("t-muted");
-		description.setWrapText(true);
-		description.setMaxHeight(38);
+		description.setWrapText(false);
+		description.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+		description.setMaxWidth(Double.MAX_VALUE);
 
 		Button copy = new Button(address);
 		copy.setGraphic(Icons.icon("copy", 12, javafx.scene.paint.Color.web("#A9A9B3")));
@@ -268,27 +270,33 @@ public final class DiscoverView {
 		HBox bottom = new HBox(8, copy, spacer, join);
 		bottom.setAlignment(Pos.CENTER_LEFT);
 
-		Region grow = new Region();
-		VBox.setVgrow(grow, Priority.ALWAYS);
-		VBox card = new VBox(10, top, description);
+		VBox card = new VBox(9, top, description);
+		// 2026-11: perks as one quiet line (code + "free reward") instead of a ticket chip and a cosmetics box.
+		List<String> perks = new ArrayList<>();
 		if (p.has("codes") && p.get("codes").isJsonArray() && !p.getAsJsonArray("codes").isEmpty()) {
 			JsonObject first = p.getAsJsonArray("codes").get(0).getAsJsonObject();
 			int off = first.has("percent") ? first.get("percent").getAsInt() : 0;
-			Label code = new Label("Code " + first.get("code").getAsString() + (off > 0 ? "  ·  " + off + "% off Velo Coins" : ""));
-			code.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 11px; -fx-font-weight: 800; -fx-border-color: " + accent + "88;"
-					+ " -fx-border-style: segments(4, 3); -fx-border-radius: 6; -fx-padding: 3 8 3 8;");
-			card.getChildren().add(code);
+			perks.add("Code " + first.get("code").getAsString() + (off > 0 ? " · " + off + "% off coins" : ""));
 		}
 		if (p.has("reward") && p.get("reward").isJsonObject()) {
-			card.getChildren().add(rewardRow(p.getAsJsonObject("reward"), accent, joiner));
+			JsonObject reward = p.getAsJsonObject("reward");
+			int minutes = reward.has("minutes") ? reward.get("minutes").getAsInt() : 0;
+			perks.add(minutes > 0 ? "Free cosmetic after " + minutes + " min" : "Free cosmetic");
 		}
-		card.getChildren().addAll(grow, bottom);
-		card.getStyleClass().add("card");
-		card.setPadding(new Insets(16));
-		card.setPrefSize(340, 170);
+		if (!perks.isEmpty()) {
+			Label perkLine = new Label(String.join("   ·   ", perks));
+			perkLine.getStyleClass().add("partner-perks");
+			card.getChildren().add(perkLine);
+		}
+		// No stretching spacer: the card is only as tall as what it shows (2026-11: it stood too tall on Home).
+		card.getChildren().add(bottom);
+		card.setMaxHeight(Region.USE_PREF_SIZE);
+		// Compact and calm (2026-11): same footprint for every partner, so many of them sit side by side.
+		card.getStyleClass().add("partner-card");
+		card.setPadding(new Insets(14));
+		card.setPrefWidth(360);
 		card.setMinWidth(300);
-		card.setStyle("-fx-background-color: linear-gradient(to bottom right, " + accent + "2e 0%, " + accent + "0a 45%, transparent 100%), -velo-surface;"
-				+ " -fx-border-color: " + accent + "40; -fx-border-width: 1; -fx-border-radius: 14; -fx-background-radius: 14;");
+		card.setMaxWidth(420);
 		card.setOnMouseEntered(e -> card.setTranslateY(-2));
 		card.setOnMouseExited(e -> card.setTranslateY(0));
 		return card;
@@ -399,11 +407,10 @@ public final class DiscoverView {
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		bottom.getChildren().addAll(spacer, action);
 		VBox card = new VBox(8, tag, title, description, grow, bottom);
-		card.getStyleClass().add("card");
+		card.getStyleClass().add("partner-card");
 		card.setPadding(new Insets(14));
 		card.setPrefSize(300, 150);
 		card.setMinWidth(280);
-		card.setStyle("-fx-border-color: transparent transparent transparent " + accent + "; -fx-border-width: 0 0 0 3;");
 		return card;
 	}
 }

@@ -46,6 +46,9 @@ public final class HeldItemModule extends AbstractModule implements HudModule, C
 			return;
 		}
 		ItemStack stack = client.player.getMainHandStack();
+		if (stack.isEmpty() && net.veloclient.velo.client.hud.HudSample.active()) {
+			stack = net.veloclient.velo.client.pvp.PvpCompat.itemStack("minecraft:diamond_sword");
+		}
 		if (stack.isEmpty()) {
 			lastWidth = 24;
 			return;

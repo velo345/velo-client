@@ -99,14 +99,14 @@ public final class LauncherSplash extends StackPane {
 			word.getChildren().add(letter);
 		}
 		Text client = new Text("CLIENT");
-		client.setFont(Font.font("Sora", FontWeight.BOLD, 13));
+		client.setFont(Font.font("Archivo SemiExpanded", FontWeight.BOLD, 13));
 		client.setFill(accent.deriveColor(0, 1, 1.15, 1));
 		HBox.setMargin(client, new javafx.geometry.Insets(17, 0, 0, 8));
 		word.getChildren().add(client);
 		word.setAlignment(javafx.geometry.Pos.CENTER);
 
 		version = new Text(versionText);
-		version.setFont(Font.font("JetBrains Mono", 11));
+		version.setFont(Font.font("Geist Mono", 11));
 		version.setFill(Color.rgb(255, 255, 255, 0.38));
 
 		VBox column = new VBox(10, mark, word, version);

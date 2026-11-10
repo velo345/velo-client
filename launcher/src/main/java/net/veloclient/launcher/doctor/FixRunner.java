@@ -94,6 +94,7 @@ final class FixRunner {
 			case Action.DisableShaders ignored -> disableShaders(instance);
 			case Action.ClearFabricCache ignored -> clearFabricCache(instance);
 			case Action.LowerRenderDistance r -> lowerRenderDistance(instance, r.max());
+			case Action.SetOption o -> setOption(instance, o.option(), o.value());
 			case Action.SetLoader l -> {
 				net.veloclient.launcher.launch.GameVersion version = net.veloclient.launcher.launch.GameVersion.byId(instance.mcVersion());
 				if (version == null) {
@@ -279,6 +280,22 @@ final class FixRunner {
 			Files.move(replaces, backups.resolve(replaces.getFileName()), StandardCopyOption.REPLACE_EXISTING);
 			InstalledAssetStore.forget(instance.id(), InstalledAssetStore.Kind.MOD, replaces.getFileName().toString().replace(".disabled", ""));
 		}
+	}
+
+	private static void setOption(Instance instance, String option, String value) throws IOException {
+		Path options = InstancePaths.gameDir(instance.id()).resolve("options.txt");
+		List<String> lines = Files.exists(options) ? new ArrayList<>(Files.readAllLines(options, StandardCharsets.UTF_8)) : new ArrayList<>();
+		boolean found = false;
+		for (int i = 0; i < lines.size(); i++) {
+			if (lines.get(i).startsWith(option + ":")) {
+				lines.set(i, option + ":" + value);
+				found = true;
+			}
+		}
+		if (!found) {
+			lines.add(option + ":" + value);
+		}
+		Files.write(options, lines, StandardCharsets.UTF_8);
 	}
 
 	private static void lowerRenderDistance(Instance instance, int max) throws IOException {

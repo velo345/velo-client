@@ -70,7 +70,7 @@ public final class TargetHudModule extends AbstractModule implements HudModule, 
 			return;
 		}
 		LivingEntity target = target();
-		boolean editing = net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen;
+		boolean editing = net.veloclient.velo.client.hud.HudSample.active();
 		if (target == null && !editing) {
 			shownId = Integer.MIN_VALUE;
 			return;

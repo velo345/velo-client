@@ -48,6 +48,7 @@ public final class LaunchBar extends HBox {
 	private final Label name = new Label();
 	private final Label meta = new Label();
 	private final Label social = new Label();
+	private final Label modsLine = new Label();
 	private final HBox socialBox = new HBox(10);
 	private final Label statusText = new Label();
 	private final Button play = new Button();
@@ -108,8 +109,9 @@ public final class LaunchBar extends HBox {
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 
 		Region dot = new Region();
-		dot.getStyleClass().add("status-dot");
+		dot.getStyleClass().add("status-square");
 		statusText.getStyleClass().add("t-muted");
+		statusText.setMinWidth(Region.USE_PREF_SIZE);
 		statusBox = new HBox(8, dot, statusText);
 		statusBox.setAlignment(Pos.CENTER_LEFT);
 		// No dot without a status (while the game runs, the Running box has its own).
@@ -117,13 +119,20 @@ public final class LaunchBar extends HBox {
 		statusBox.managedProperty().bind(statusBox.visibleProperty());
 
 		Region runDot = new Region();
-		runDot.getStyleClass().add("status-dot");
-		runDot.setStyle("-fx-effect: dropshadow(gaussian, #3ddc97, 8, 0.3, 0, 0);");
+		runDot.getStyleClass().add("status-square");
 		runningText.getStyleClass().add("t-strong");
 		stopButton.getStyleClass().setAll("button", "button-sm", "danger-button");
 		stopButton.setOnAction(e -> {
+			if (killMode) {
+				if (killAction != null) {
+					killAction.run();
+				}
+				return;
+			}
 			if (stopAction != null) {
 				stopAction.run();
+				// Stopped but the game may hang on: the same button now ends it for good.
+				showKill();
 			}
 		});
 		runningBox.getStyleClass().add("running-box");
@@ -139,20 +148,29 @@ public final class LaunchBar extends HBox {
 		runningBox.setVisible(false);
 		runningBox.setManaged(false);
 
-		Button options = new Button("Mods & settings");
-		options.setGraphic(Icons.icon("box", 17, Color.web("#C9C9D1")));
-		options.setGraphicTextGap(9);
-		options.getStyleClass().setAll("button", "ghost-button");
-		options.setMinHeight(50);
+		// "Mods & packs": an icon tile, the title and a count line, then a chevron (2026-11).
+		StackPane optionsIcon = new StackPane(Icons.icon("box", 17, Color.web("#F4EFEE")));
+		optionsIcon.getStyleClass().add("launch-mods-icon");
+		Label optionsTitle = new Label("Mods & packs");
+		optionsTitle.getStyleClass().add("launch-mods-title");
+		modsLine.getStyleClass().add("launch-mods-line");
+		VBox optionsText = new VBox(4, optionsTitle, modsLine);
+		optionsText.setAlignment(Pos.CENTER_LEFT);
+		HBox optionsContent = new HBox(12, optionsIcon, optionsText, Icons.icon("chevron-right", 14, Color.web("#8A8486"), 2.2));
+		optionsContent.setAlignment(Pos.CENTER_LEFT);
+		Button options = new Button();
+		options.setGraphic(optionsContent);
+		options.getStyleClass().setAll("button", "launch-mods");
 		options.setMinWidth(Region.USE_PREF_SIZE);
-		options.setStyle("-fx-background-radius: 12; -fx-border-radius: 12; -fx-padding: 0 16 0 14;");
 		options.setTooltip(new Tooltip("This profile's mods, resource packs, worlds and settings"));
 		options.setOnAction(e -> host.openProfileOptions());
 
 		play.getStyleClass().setAll("button", "play-button");
 		play.setGraphic(Icons.icon("play", 16, Color.WHITE));
 		play.setGraphicTextGap(12);
-		play.setMinWidth(Region.USE_PREF_SIZE);
+		// Never narrower than its label (CONNECT, RELAUNCH...), never below the 148 px the design asks for.
+		play.minWidthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(() -> Math.max(148, play.prefWidth(-1)), play.textProperty(),
+				play.fontProperty()));
 		play.setOnAction(e -> host.play(play, progress, status));
 		chevron.getStyleClass().setAll("button", "play-chevron");
 		chevron.setGraphic(Icons.icon("chevron-up", 15, Color.WHITE, 2.4));
@@ -160,7 +178,7 @@ public final class LaunchBar extends HBox {
 		chevron.setOnAction(e -> host.openPlayMenu(chevron));
 		playSplit = new HBox(play, chevron);
 		playSplit.setAlignment(Pos.CENTER);
-		playSplit.setStyle("-fx-effect: dropshadow(gaussian, -velo-accent-glow, 22, 0.05, 0, 6);");
+
 
 		// Launch progress: the same footprint as the Play button, filling from left to right.
 		Region track = new Region();
@@ -190,8 +208,13 @@ public final class LaunchBar extends HBox {
 			playSplit.setVisible(!visible);
 		});
 		playArea = new StackPane(playSplit, progressView);
-		playArea.setMinWidth(260);
+		playArea.setMinWidth(192);
 
+		// The divider and social line only take room when there's something to say.
+		divider.visibleProperty().bind(social.textProperty().isNotEmpty());
+		divider.managedProperty().bind(divider.visibleProperty());
+		socialBox.visibleProperty().bind(social.textProperty().isNotEmpty());
+		socialBox.managedProperty().bind(socialBox.visibleProperty());
 		getChildren().addAll(switcher, divider, socialBox, spacer, statusBox, runningBox, options, playArea);
 	}
 
@@ -228,6 +251,13 @@ public final class LaunchBar extends HBox {
 		socialBox.getChildren().add(social);
 	}
 
+	/** The count line under "Mods & packs" ("74 mods · 3 packs"). */
+	public void setModsLine(String text) {
+		modsLine.setText(text == null ? "" : text);
+		modsLine.setVisible(text != null && !text.isEmpty());
+		modsLine.setManaged(modsLine.isVisible());
+	}
+
 	public void setStatus(String text) {
 		statusText.setText(text);
 	}
@@ -240,8 +270,31 @@ public final class LaunchBar extends HBox {
 		relaunchButton.setText(busy ? "Closing..." : "Relaunch");
 	}
 
+	private Runnable killAction;
+	private boolean killMode;
+
+	private void showKill() {
+		killMode = killAction != null;
+		if (killMode) {
+			stopButton.setText("Kill");
+			stopButton.setTooltip(new Tooltip("Still running after Stop? End the game process right away (unsaved progress is lost)."));
+		}
+	}
+
 	public void setRunning(Long since, Runnable stop) {
+		setRunning(since, stop, null, false);
+	}
+
+	/** {@code stopped}: Stop was already pressed - the button is Kill then (ends the whole process tree). */
+	public void setRunning(Long since, Runnable stop, Runnable kill, boolean stopped) {
 		this.stopAction = stop;
+		this.killAction = kill;
+		killMode = false;
+		stopButton.setText("Stop");
+		stopButton.setTooltip(null);
+		if (stopped) {
+			showKill();
+		}
 		setRelaunching(false);
 		boolean running = since != null;
 		runningBox.setVisible(running);

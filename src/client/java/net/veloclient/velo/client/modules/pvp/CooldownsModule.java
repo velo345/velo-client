@@ -59,7 +59,7 @@ public final class CooldownsModule extends AbstractModule implements HudModule, 
 			return;
 		}
 		List<PvpCompat.CooldownView> cooldowns = new ArrayList<>(PvpCompat.cooldowns());
-		boolean preview = cooldowns.isEmpty() && net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen;
+		boolean preview = cooldowns.isEmpty() && net.veloclient.velo.client.hud.HudSample.active();
 		if (preview) {
 			cooldowns.add(new PvpCompat.CooldownView("minecraft:ender_pearl", PvpCompat.itemStack("minecraft:ender_pearl"), 14, 20));
 			cooldowns.add(new PvpCompat.CooldownView("minecraft:wind_charge", PvpCompat.itemStack("minecraft:wind_charge"), 4, 10));

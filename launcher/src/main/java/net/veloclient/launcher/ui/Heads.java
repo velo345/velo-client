@@ -24,7 +24,7 @@ public final class Heads {
 		holder.setMaxSize(size, size);
 		Label initial = new Label(name == null || name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT));
 		initial.setTextFill(Color.WHITE);
-		initial.setFont(Font.font("Inter", FontWeight.BOLD, size * 0.45));
+		initial.setFont(Font.font("Geist", FontWeight.BOLD, size * 0.45));
 		holder.setStyle("-fx-background-color: rgba(255,255,255,0.12); -fx-background-radius: " + (size / 5) + ";");
 		holder.getChildren().add(initial);
 		if (uuid != null) {

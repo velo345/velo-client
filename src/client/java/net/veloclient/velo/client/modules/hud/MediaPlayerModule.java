@@ -126,7 +126,7 @@ public final class MediaPlayerModule extends AbstractModule implements HudModule
 		lastFrame = now;
 		NowPlaying.syncCover();
 		MediaState state = NowPlaying.state();
-		boolean editing = net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen;
+		boolean editing = net.veloclient.velo.client.hud.HudSample.active();
 
 		if (NowPlaying.trackSerial() != seenTrack) {
 			seenTrack = NowPlaying.trackSerial();

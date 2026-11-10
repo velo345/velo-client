@@ -59,6 +59,8 @@ public final class LauncherSettings {
 		public boolean partyLaunchTogether = true;
 		/** Party member: launch when the leader does (asks with a short countdown). */
 		public boolean partyFollowLaunches = true;
+		/** Home's Ridgeline backdrop moves (drifting hills, stars, moon). Off = a still picture, a little less CPU. */
+		public boolean animateHomeBackground = true;
 		/** System check kinds (finding titles) that no longer interrupt a launch. */
 		public java.util.List<String> silencedChecks = new java.util.ArrayList<>();
 	}

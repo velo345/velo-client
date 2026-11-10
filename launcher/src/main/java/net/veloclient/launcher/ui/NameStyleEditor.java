@@ -134,7 +134,7 @@ final class NameStyleEditor {
 			line.getChildren().add(mcLabel(before, "#FFFFFF"));
 		}
 		if (name != null) {
-			line.getChildren().add(new NamePreview(name, () -> style, 15, NamePreview.width(name, javafx.scene.text.Font.font("JetBrains Mono",
+			line.getChildren().add(new NamePreview(name, () -> style, 15, NamePreview.width(name, javafx.scene.text.Font.font("Geist Mono",
 					javafx.scene.text.FontWeight.BOLD, 15)) * 1.5 + 30));
 		}
 		if (after != null && !after.isEmpty()) {
@@ -145,7 +145,7 @@ final class NameStyleEditor {
 
 	private static Label mcLabel(String text, String color) {
 		Label label = new Label(text);
-		label.setStyle("-fx-text-fill: " + color + "; -fx-font-family: 'JetBrains Mono'; -fx-font-size: 13px;");
+		label.setStyle("-fx-text-fill: " + color + "; -fx-font-family: 'Geist Mono'; -fx-font-size: 13px;");
 		return label;
 	}
 
@@ -335,7 +335,7 @@ final class NameStyleEditor {
 		HBox.setHgrow(grow, Priority.ALWAYS);
 		javafx.scene.control.TextField hex = new javafx.scene.control.TextField(String.format(Locale.ROOT, "#%06X", colors[selectedColor]));
 		hex.setPrefColumnCount(7);
-		hex.setStyle("-fx-font-family: 'JetBrains Mono';");
+		hex.setStyle("-fx-font-family: 'Geist Mono';");
 		row.getChildren().addAll(grow, hex);
 
 		// The square: saturation left-right, brightness top-bottom, in the selected colour's hue.
@@ -558,7 +558,7 @@ final class NameStyleEditor {
 
 	private static Label small(String text) {
 		Label label = new Label(text);
-		label.setStyle("-fx-text-fill: -velo-text-3; -fx-font-family: 'Inter'; -fx-font-weight: bold; -fx-font-size: 10px;");
+		label.setStyle("-fx-text-fill: -velo-text-3; -fx-font-family: 'Geist'; -fx-font-weight: bold; -fx-font-size: 10px;");
 		return label;
 	}
 }

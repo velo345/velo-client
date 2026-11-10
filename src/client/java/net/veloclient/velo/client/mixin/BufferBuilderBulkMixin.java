@@ -41,6 +41,9 @@ public abstract class BufferBuilderBulkMixin implements BulkVertexSink {
 	private int elementsToFill;
 	@Shadow
 	private boolean building;
+	@Shadow
+	@Final
+	private int initialElementsToFill;
 
 	@Override
 	public long velo$reserveEntityVertices(int count) {
@@ -48,6 +51,33 @@ public abstract class BufferBuilderBulkMixin implements BulkVertexSink {
 		if (count <= 0 || !entityFormat || !building || elementsToFill != 0 || ByteOrder.nativeOrder() != ByteOrder.LITTLE_ENDIAN
 				|| vertexSize != ENTITY_VERTEX_SIZE || primitiveTopology == PrimitiveTopology.LINES
 				|| vertices + count > 16777215) {
+			return -1L;
+		}
+		long pointer = buffer.reserve(vertexSize * count);
+		vertices += count;
+		vertexPointer = pointer + (long) vertexSize * (count - 1);
+		return pointer;
+	}
+
+	@Override
+	public long velo$reserveRawVertices(int count) {
+		if (count <= 0 || !building || elementsToFill != 0 || ByteOrder.nativeOrder() != ByteOrder.LITTLE_ENDIAN
+				|| primitiveTopology == PrimitiveTopology.LINES || vertices + count > 16777215) {
+			return -1L;
+		}
+		long pointer = buffer.reserve(vertexSize * count);
+		vertices += count;
+		vertexPointer = pointer + (long) vertexSize * (count - 1);
+		return pointer;
+	}
+
+	@Override
+	public long velo$reservePositionColorVertices(int count) {
+		// Exactly POSITION_COLOR (GUI shapes): position at 0, colour at 12, nothing else to fill.
+		if (count <= 0 || !building || elementsToFill != 0 || ByteOrder.nativeOrder() != ByteOrder.LITTLE_ENDIAN
+				|| vertexSize != POSITION_COLOR_VERTEX_SIZE || primitiveTopology == PrimitiveTopology.LINES
+				|| initialElementsToFill != 2 || vertices + count > 16777215) {
+			// 16 bytes with only position (3 floats) + colour = POSITION_COLOR (elements[] moved package on 26.3)
 			return -1L;
 		}
 		long pointer = buffer.reserve(vertexSize * count);

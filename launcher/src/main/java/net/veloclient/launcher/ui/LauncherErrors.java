@@ -124,7 +124,7 @@ public final class LauncherErrors {
 		TextArea details = new TextArea(stackTrace(error));
 		details.setEditable(false);
 		details.setPrefRowCount(6);
-		details.setStyle("-fx-font-family: 'JetBrains Mono Medium'; -fx-font-size: 11px;");
+		details.setStyle("-fx-font-family: 'Geist Mono Medium'; -fx-font-size: 11px;");
 		Label status = new Label();
 		status.getStyleClass().add("t-muted");
 		status.setWrapText(true);

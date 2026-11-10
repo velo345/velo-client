@@ -26,6 +26,15 @@ public final class BetterTabListModule extends AbstractModule implements Configu
 	private boolean showMs = true;
 	private boolean alwaysHeads = true;
 	private double rows = 20;
+	private boolean openAnimation = true;
+	// open/close animation: how far the list is rolled down (0 = shut, 1 = open), whether Tab is held, and when we last
+	// heard that from the Hud hook (no word from it = the hook didn't apply: then only the opening animates)
+	private static float open;
+	private static boolean held;
+	private static long heldSeen;
+	private static long lastFrame;
+	private static boolean pushed;
+	private static float alpha = 1f;
 
 	public BetterTabListModule() {
 		super("better-tab-list", "Better Tab List", "Ping as a colored number, player heads on every server and more rows in the tab list.",
@@ -52,6 +61,80 @@ public final class BetterTabListModule extends AbstractModule implements Configu
 	public static int rows(int vanilla) {
 		BetterTabListModule m = on();
 		return m == null ? vanilla : (int) m.rows;
+	}
+
+	/**
+	 * The Hud asks "is Tab held?" before drawing the list: while the list is still rolling up after you let go, the
+	 * answer stays yes so it can finish closing.
+	 */
+	public static boolean holdOpen(boolean down) {
+		held = down;
+		heldSeen = System.nanoTime();
+		BetterTabListModule m = on();
+		if (m == null || !m.openAnimation) {
+			return down;
+		}
+		return down || open > 0.001f;
+	}
+
+	/**
+	 * Before the tab list draws: it rolls down from the top like a shutter (vertical scale, pivot at its top edge) and
+	 * fades in; let go of Tab and it rolls back up and fades out. ~0.18 s each way.
+	 */
+	public static void beginOpen(DrawContext context, int screenWidth) {
+		BetterTabListModule m = on();
+		long now = System.nanoTime();
+		boolean down = now - heldSeen > 100_000_000L || held;
+		if (now - lastFrame > 150_000_000L) {
+			open = 0f; // wasn't drawn for a while: start shut
+		}
+		float dt = Math.min(0.05f, (now - lastFrame) / 1e9f);
+		lastFrame = now;
+		pushed = false;
+		alpha = 1f;
+		if (m == null || !m.openAnimation) {
+			open = down ? 1f : 0f;
+			return;
+		}
+		open = down ? Math.min(1f, open + dt / 0.18f) : Math.max(0f, open - dt / 0.15f);
+		if (open >= 1f) {
+			return;
+		}
+		float e = 1f - (1f - open) * (1f - open) * (1f - open);
+		alpha = Math.min(1f, e * 1.3f);
+		float pivotY = 10f;
+		net.veloclient.velo.client.gui.window.ModuleScenes.push(context);
+		net.veloclient.velo.client.gui.window.ModuleScenes.move(context, 0f, pivotY);
+		net.veloclient.velo.client.gui.window.ModuleScenes.scale(context, 1f, Math.max(0.001f, e));
+		net.veloclient.velo.client.gui.window.ModuleScenes.move(context, 0f, -pivotY);
+		pushed = true;
+	}
+
+	public static void endOpen(DrawContext context) {
+		alpha = 1f;
+		if (pushed) {
+			pushed = false;
+			net.veloclient.velo.client.gui.window.ModuleScenes.pop(context);
+		}
+	}
+
+	/** A fill colour of the list, faded with the animation. */
+	public static int fade(int argb) {
+		if (alpha >= 1f) {
+			return argb;
+		}
+		int a = Math.round((argb >>> 24) * alpha);
+		return (argb & 0x00FFFFFF) | a << 24;
+	}
+
+	/** A text colour of the list, faded (old versions treat alpha 0 as opaque; nearly clear text would pop opaque). */
+	public static int fadeText(int argb) {
+		if (alpha >= 1f) {
+			return argb;
+		}
+		int a0 = argb >>> 24;
+		int a = Math.max(5, Math.round((a0 == 0 ? 255 : a0) * alpha));
+		return (argb & 0x00FFFFFF) | a << 24;
 	}
 
 	public static boolean heads(boolean vanilla) {
@@ -129,6 +212,7 @@ public final class BetterTabListModule extends AbstractModule implements Configu
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
+				new ConfigField.ToggleField("Open Animation (slides down from the top)", () -> openAnimation, v -> openAnimation = v),
 				new ConfigField.ChoiceField("Ping", PING_STYLES, () -> pingStyle, v -> pingStyle = v),
 				new ConfigField.ToggleField("Color The Ping (green = good, red = bad)", () -> coloredPing, v -> coloredPing = v),
 				new ConfigField.ToggleField("Show \"ms\"", () -> showMs, v -> showMs = v),

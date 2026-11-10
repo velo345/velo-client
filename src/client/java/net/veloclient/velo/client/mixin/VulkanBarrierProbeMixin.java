@@ -19,13 +19,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /*@Mixin(VulkanCommandEncoder.class)
 public abstract class VulkanBarrierProbeMixin {
 
+	private static final boolean PROFILE_OPS = Boolean.getBoolean("velo.profileOps");
 	private static final boolean VELO_SKIP = Boolean.getBoolean("velo.experimentNoBarrier");
 
 	@Inject(method = "memoryBarrier(Lorg/lwjgl/system/MemoryStack;)V", at = @At("HEAD"), cancellable = true)
 	private void velo$probe(MemoryStack stack, CallbackInfo ci) {
 		if (RenderProfiler.ENABLED) {
 			RenderProfiler.barriers++;
-			RenderProfiler.barrierFrom(StackWalker.getInstance().walk(f -> f.skip(1)
+			if (PROFILE_OPS) RenderProfiler.barrierFrom(StackWalker.getInstance().walk(f -> f.skip(1)
 					.filter(fr -> !fr.getMethodName().contains("memoryBarrier") && !fr.getMethodName().contains("velo$"))
 					.findFirst().map(fr -> fr.getMethodName()).orElse("?")));
 			if (VELO_SKIP) {

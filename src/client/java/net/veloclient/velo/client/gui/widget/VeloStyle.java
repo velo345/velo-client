@@ -26,7 +26,8 @@ public final class VeloStyle {
 	/** Opaque version of the theme surface - the base everything else is mixed from. */
 	public static int base() {
 		// 0.9.7: graphite with a touch of the theme's surface (same as the window frame), not the full tint.
-		return VeloAnim.lerpArgb(0xFF0E0E12, theme().surface() | 0xFF000000, 0.14f);
+		// 2026-11: the launcher's warm black, with only a touch of the theme (same as the window frame).
+		return VeloAnim.lerpArgb(0xFF0C0A0A, theme().surface() | 0xFF000000, 0.06f);
 	}
 
 	/** Window body: the themed surface at its configured opacity. */
@@ -104,7 +105,8 @@ public final class VeloStyle {
 	/** The shared text-input look: recessed rounded box, brighter border on hover, accent ring when focused. */
 	public static void drawInputField(DrawContext context, int x, int y, int width, int height, boolean focused, boolean hovered) {
 		int radius = Math.min(RADIUS_CONTROL, height / 2);
-		VeloDraw.fillRounded(context, x, y, width, height, radius, sunken());
+		// launcher input: the card surface (#141011) with a hairline, not a dark recess
+		VeloDraw.fillRounded(context, x, y, width, height, radius, card());
 		int border = focused ? accent() : hovered ? borderStrong() : border();
 		VeloDraw.strokeRounded(context, x, y, width, height, radius, border);
 		if (focused) {

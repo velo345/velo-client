@@ -42,6 +42,7 @@ public abstract class PlayerListHudMixin {
 	*///?} else {
 	private void velo$drawNameWithBadge(DrawContext context, TextRenderer textRenderer, Text text, int x, int y, int color) {
 	//?}
+		color = net.veloclient.velo.dev.tweaks.BetterTabListModule.fadeText(color); // Better Tab List open/close fade
 		Object[] row = net.veloclient.velo.client.gui.TabNames.rowFor(text);
 		int room = net.veloclient.velo.client.gui.TabNames.room(x);
 		if (row == null) {

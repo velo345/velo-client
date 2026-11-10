@@ -1,5 +1,7 @@
 package net.veloclient.launcher.ui;
 
+import java.util.List;
+
 import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
 import javafx.animation.ParallelTransition;
@@ -115,21 +117,95 @@ public final class UiMotion {
 		transition.play();
 	}
 
+	/** Panel-like pieces of a page that get the staggered entrance (cards, groups, rows of tiles...). */
+	private static final java.util.Set<String> STAGGERED = java.util.Set.of("card", "card-2", "server-card", "friend-group", "partner-card",
+			"aside-card", "store-cat", "tile", "locker-cell", "locker-cell-worn", "mod-table", "settings-card", "search-card", "news-card",
+			"update-point", "skeleton-card", "locker-slot", "locker-slot-active", "profile-banner", "dashed-tile");
+
+	/**
+	 * 2026-11: after a page switch its panels slide up a little and fade in one after another (35 ms apart, at most 24),
+	 * so the page builds itself instead of popping. Pieces holding a 3D view are skipped (opacity can blank a SubScene).
+	 */
+	public static void stagger(Node page) {
+		javafx.application.Platform.runLater(() -> {
+			List<Node> found = new java.util.ArrayList<>();
+			collect(page, found);
+			int i = 0;
+			for (Node node : found) {
+				if (i >= 24) {
+					break;
+				}
+				node.setOpacity(0);
+				node.setTranslateY(14);
+				FadeTransition fade = new FadeTransition(Duration.millis(240), node);
+				fade.setToValue(1);
+				TranslateTransition rise = new TranslateTransition(Duration.millis(320), node);
+				rise.setToY(0);
+				rise.setInterpolator(EASE_OUT);
+				ParallelTransition both = new ParallelTransition(fade, rise);
+				both.setDelay(Duration.millis(40 + i * 35L));
+				both.play();
+				i++;
+			}
+		});
+	}
+
+	private static void collect(Node node, List<Node> out) {
+		if (out.size() >= 24 || node instanceof javafx.scene.SubScene) {
+			return;
+		}
+		boolean match = node.getStyleClass().stream().anyMatch(STAGGERED::contains);
+		if (match && !holds3d(node, 0) && node.isVisible() && node.getOpacity() > 0.99) {
+			out.add(node);
+			return;
+		}
+		if (node instanceof javafx.scene.Parent parent) {
+			for (Node child : parent.getChildrenUnmodifiable()) {
+				collect(child, out);
+			}
+		}
+	}
+
+	private static boolean holds3d(Node node, int depth) {
+		if (node instanceof javafx.scene.SubScene) {
+			return true;
+		}
+		if (depth > 12 || !(node instanceof javafx.scene.Parent parent)) {
+			return false;
+		}
+		for (Node child : parent.getChildrenUnmodifiable()) {
+			if (holds3d(child, depth + 1)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** Fades a freshly shown page in while it rises a few pixels - used for every page switch. */
-	/** Enters from the side: {@code direction} 1 = from the right (a tab to the right was picked), -1 = from the left. */
+	/**
+	 * Page change (2026-11, sidebar): the new page comes from the direction of the row you picked - {@code direction}
+	 * 1 = a row further down (rises from below), -1 = further up (drops from above) - with a short fade and a barely
+	 * visible scale, so the switch feels physical without slowing you down.
+	 */
 	public static void enterFrom(Node node, int direction) {
 		if (direction == 0) {
 			enter(node);
 			return;
 		}
 		node.setOpacity(0);
-		node.setTranslateX(36 * direction);
-		FadeTransition fade = new FadeTransition(Duration.millis(220), node);
+		node.setTranslateY(22 * direction);
+		node.setScaleX(0.992);
+		node.setScaleY(0.992);
+		FadeTransition fade = new FadeTransition(Duration.millis(200), node);
 		fade.setToValue(1);
-		TranslateTransition slide = new TranslateTransition(Duration.millis(320), node);
-		slide.setToX(0);
+		TranslateTransition slide = new TranslateTransition(Duration.millis(300), node);
+		slide.setToY(0);
 		slide.setInterpolator(EASE_OUT);
-		new ParallelTransition(fade, slide).play();
+		ScaleTransition settle = new ScaleTransition(Duration.millis(300), node);
+		settle.setToX(1);
+		settle.setToY(1);
+		settle.setInterpolator(EASE_OUT);
+		new ParallelTransition(fade, slide, settle).play();
 	}
 
 	public static void enter(Node node) {

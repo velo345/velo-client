@@ -226,9 +226,75 @@ public final class FfmpegTool {
 		return encoderList.contains(" " + name + " ");
 	}
 
+	/** Hardware encoders that failed while recording this session (the next probe skips them). */
+	private static final java.util.Set<String> FAILED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+	/** All probes failed: don't probe again (each probe is up to four ffmpeg runs) until Clips Pro is switched on again. */
+	private static volatile boolean noneWorks;
+
+	/** The hardware encoder keeps failing while recording: drop it so the next start uses the next one (or the CPU). */
+	public static boolean demoteHardwareEncoder() {
+		Encoder known = encoder;
+		if (known == null || known.name().equals("libx264")) {
+			return false;
+		}
+		FAILED.add(known.name());
+		encoder = null;
+		return true;
+	}
+
+	/** Called when Clips Pro is switched on: try every encoder again. */
+	public static void resetProbe() {
+		noneWorks = false;
+		FAILED.clear();
+	}
+
+	/**
+	 * Windows: a crashing ffmpeg.exe (a broken GPU driver encoder, a missing DLL) shows an error dialog and stays alive
+	 * until someone clicks it away - several of those piled up on a player's PC. Child processes inherit the error
+	 * mode, so setting it once here keeps every ffmpeg quiet (it just exits, and we retry with a delay).
+	 */
+	public static void quietCrashDialogs() {
+		if (quieted || !System.getProperty("os.name", "").toLowerCase().contains("win")) {
+			return;
+		}
+		quieted = true;
+		try {
+			// via reflection: Minecraft 1.21.x compiles against Java 21, where this API is still a preview
+			Class<?> linkerC = Class.forName("java.lang.foreign.Linker");
+			Class<?> arenaC = Class.forName("java.lang.foreign.Arena");
+			Class<?> lookupC = Class.forName("java.lang.foreign.SymbolLookup");
+			Class<?> layoutC = Class.forName("java.lang.foreign.MemoryLayout");
+			Class<?> descC = Class.forName("java.lang.foreign.FunctionDescriptor");
+			Class<?> segmentC = Class.forName("java.lang.foreign.MemorySegment");
+			Class<?> optionC = Class.forName("java.lang.foreign.Linker$Option");
+			Object linker = linkerC.getMethod("nativeLinker").invoke(null);
+			Object kernel32 = lookupC.getMethod("libraryLookup", String.class, arenaC).invoke(null, "kernel32", arenaC.getMethod("global").invoke(null));
+			java.util.Optional<?> symbol = (java.util.Optional<?>) lookupC.getMethod("find", String.class).invoke(kernel32, "SetErrorMode");
+			if (symbol.isEmpty()) {
+				return;
+			}
+			Object javaInt = Class.forName("java.lang.foreign.ValueLayout").getField("JAVA_INT").get(null);
+			Object args = java.lang.reflect.Array.newInstance(layoutC, 1);
+			java.lang.reflect.Array.set(args, 0, javaInt);
+			Object descriptor = descC.getMethod("of", layoutC, args.getClass()).invoke(null, javaInt, args);
+			java.lang.invoke.MethodHandle setErrorMode = (java.lang.invoke.MethodHandle) linkerC
+					.getMethod("downcallHandle", segmentC, descC, java.lang.reflect.Array.newInstance(optionC, 0).getClass())
+					.invoke(linker, symbol.get(), descriptor, java.lang.reflect.Array.newInstance(optionC, 0));
+			// SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX
+			setErrorMode.invoke(0x0001 | 0x0002 | 0x8000);
+		} catch (Throwable ignored) {
+			// older Java / FFM unavailable: keep the default error mode
+		}
+	}
+
+	private static volatile boolean quieted;
+
 	/** The best H.264 encoder that actually encodes here (tested once with a short clip of nothing). */
 	public static Encoder encoder(int bitrateKbps) {
 		Encoder known = encoder;
+		if (known == null && noneWorks) {
+			return null;
+		}
 		if (known == null) {
 			Path ffmpeg = binary();
 			if (ffmpeg == null) {
@@ -244,6 +310,9 @@ public final class FfmpegTool {
 			}
 			candidates.add(new String[] {"libx264", "x264 (CPU)"});
 			for (String[] candidate : candidates) {
+				if (FAILED.contains(candidate[0])) {
+					continue;
+				}
 				if (encodes(ffmpeg, candidate[0])) {
 					known = new Encoder(candidate[0], candidate[1], List.of());
 					break;
@@ -251,6 +320,7 @@ public final class FfmpegTool {
 			}
 			if (known == null) {
 				problem = "None of FFmpeg's H.264 encoders works on this PC";
+				noneWorks = true;
 				return null;
 			}
 			encoder = known;
@@ -263,19 +333,30 @@ public final class FfmpegTool {
 			case "h264_amf" -> args.addAll(List.of("-quality", "speed", "-rc", "cbr", "-b:v", rate));
 			case "h264_qsv" -> args.addAll(List.of("-preset", "veryfast", "-b:v", rate));
 			case "h264_videotoolbox" -> args.addAll(List.of("-realtime", "1", "-b:v", rate));
-			default -> args.addAll(List.of("-preset", "ultrafast", "-tune", "zerolatency", "-b:v", rate, "-maxrate", rate, "-bufsize", bitrateKbps * 2 + "k"));
+			// the CPU fallback: at most half the cores, so the game (and the PC) stay usable
+			default -> args.addAll(List.of("-preset", "ultrafast", "-tune", "zerolatency", "-b:v", rate, "-maxrate", rate, "-bufsize", bitrateKbps * 2 + "k",
+					"-threads", String.valueOf(Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2)))));
 		}
 		return new Encoder(known.name(), known.label(), args);
 	}
 
 	private static boolean encodes(Path ffmpeg, String name) {
+		quietCrashDialogs();
+		Process process = null;
 		try {
-			Process process = new ProcessBuilder(ffmpeg.toString(), "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+			// output discarded (reading it blocked forever on an ffmpeg stuck behind a crash dialog), hard timeout, then killed
+			process = new ProcessBuilder(ffmpeg.toString(), "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
 					"color=c=black:s=1280x720:r=60", "-frames:v", "12", "-pix_fmt", "yuv420p", "-c:v", name, "-f", "null", "-")
-					.redirectErrorStream(true).start();
-			process.getInputStream().readAllBytes();
-			return process.waitFor(20, TimeUnit.SECONDS) && process.exitValue() == 0;
+					.redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+			if (!process.waitFor(15, TimeUnit.SECONDS)) {
+				process.destroyForcibly();
+				return false;
+			}
+			return process.exitValue() == 0;
 		} catch (Exception e) {
+			if (process != null) {
+				process.destroyForcibly();
+			}
 			return false;
 		}
 	}

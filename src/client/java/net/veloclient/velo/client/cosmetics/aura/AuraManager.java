@@ -194,7 +194,7 @@ public final class AuraManager {
 
 	/** What the local player shows right now. */
 	public static Worn wornByLocalPlayer() {
-		String id = previewActive ? previewId : equippedId();
+		String id = previewActive ? previewId : net.veloclient.velo.client.cosmetics.CapeManager.moduleOn("aura-cosmetics") ? equippedId() : null;
 		if (id == null || !previewActive && !owns(id)) {
 			return null;
 		}

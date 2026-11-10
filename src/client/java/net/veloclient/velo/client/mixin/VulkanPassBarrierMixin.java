@@ -172,11 +172,14 @@ public abstract class VulkanPassBarrierMixin {
 		}
 	}
 
+	private static final boolean PROFILE_OPS = Boolean.getBoolean("velo.profileOps");
+
 	@Redirect(method = {"clearColorTexture", "clearColorAndDepthTextures", "clearDepthTexture", "writeToBuffer", "copyToBuffer",
 			"writeToTexture", "copyBufferToTexture", "copyTextureToBuffer", "copyTextureToTexture"}, at = @At(value = "INVOKE",
 			target = "Lcom/mojang/blaze3d/vulkan/VulkanCommandEncoder;memoryBarrier(Lorg/lwjgl/system/MemoryStack;)V"), require = 0)
 	private void velo$transferBarrier(VulkanCommandEncoder self, MemoryStack stack) {
-		if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED) {
+		// Stack-walk labels cost ~6% of the render thread, which skewed every profile run: only with -Dvelo.profileOps.
+		if (net.veloclient.velo.client.devtools.RenderProfiler.ENABLED && PROFILE_OPS) {
 			net.veloclient.velo.client.devtools.RenderProfiler.op("xfer:" + StackWalker.getInstance().walk(f -> f.skip(1).findFirst().map(StackWalker.StackFrame::getMethodName).orElse("?"))
 					+ "<-" + StackWalker.getInstance().walk(f -> f.skip(2).filter(fr -> !fr.getClassName().contains("VulkanCommandEncoder") && !fr.getClassName().contains("CommandEncoder"))
 					.findFirst().map(fr -> fr.getClassName().substring(fr.getClassName().lastIndexOf('.') + 1) + "." + fr.getMethodName()).orElse("?")));

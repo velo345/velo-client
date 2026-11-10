@@ -42,7 +42,8 @@ public final class CosmeticUi {
 	 * Decoded cape frames for cards and thumbnails: cape-region crops at {@link #CARD_SCALE} px per cape pixel (about 4 MB
 	 * for a 40-frame cape), so a few dozen fit.
 	 */
-	private static final Map<String, List<GifFrames.Frame>> FRAMES = LauncherCaches.lru(12);
+	// Cards come from the disk cache now; frames are only needed while a card is hovered (and to render a card once).
+	private static final Map<String, List<GifFrames.Frame>> FRAMES = LauncherCaches.lru(4);
 	/** Full-resolution frames for the big 3D viewers - only the few on screen (about 15 MB each for a 1024 px cape). */
 	private static final Map<String, List<GifFrames.Frame>> HD_FRAMES = LauncherCaches.lru(2);
 	private static final int CARD_SCALE = 8;
@@ -215,6 +216,107 @@ public final class CosmeticUi {
 		}
 		return THUMBNAILS.computeIfAbsent(key + "@" + (int) width + "x" + (int) height,
 				k -> PlayerSkin3DView.capeThumbnail(frames.get(0).image(), width, height));
+	}
+
+	// ---- Card pictures kept on disk ----
+	// A cape card used to decode the whole GIF (every frame) and render a 3D snapshot on every launcher start. The first
+	// frame's snapshot is now saved as a small PNG; next time the card shows it straight away and the frames are only
+	// decoded when the card is hovered (to animate).
+
+	private static final int DISK_THUMB_VERSION = 1;
+
+	private static java.nio.file.Path diskThumb(String memKey) {
+		String name = Integer.toHexString((memKey + "#" + DISK_THUMB_VERSION).hashCode()) + "-" + memKey.replaceAll("[^A-Za-z0-9_.-]", "_");
+		return net.veloclient.launcher.data.VeloPaths.root().resolve("cache").resolve("card-thumbs").resolve(name + ".png");
+	}
+
+	private static void saveDiskThumb(String memKey, Image image) {
+		if (image == null) {
+			return;
+		}
+		java.awt.image.BufferedImage copy = javafx.embed.swing.SwingFXUtils.fromFXImage(image, null);
+		DECODER.execute(() -> {
+			try {
+				java.nio.file.Path file = diskThumb(memKey);
+				java.nio.file.Files.createDirectories(file.getParent());
+				java.nio.file.Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+				ImageIO.write(copy, "png", tmp.toFile());
+				java.nio.file.Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+			} catch (Exception ignored) {
+				// rendered again next time
+			}
+		});
+	}
+
+	/**
+	 * Shows a cape card picture in {@code holder}: from memory or the disk cache at once, else decoded and rendered (then
+	 * saved). Animated capes start decoding their frames on the first hover only. {@code version} changes when the
+	 * cape's picture can change (a library file's size/date).
+	 */
+	static void cardPicture(StackPane holder, Node hoverTarget, String key, String version, double width, double height, double fit,
+			java.util.function.Consumer<Consumer<List<GifFrames.Frame>>> frames, boolean animated) {
+		String memKey = key + "@" + (int) width + "x" + (int) height;
+		Image ready = THUMBNAILS.get(memKey);
+		java.nio.file.Path disk = diskThumb(memKey + "~" + version);
+		if (ready == null && java.nio.file.Files.isRegularFile(disk)) {
+			Image loading = new Image(disk.toUri().toString(), true);
+			loading.progressProperty().addListener((o, a, done) -> {
+				if (done.doubleValue() >= 1 && !loading.isError()) {
+					THUMBNAILS.put(memKey, loading);
+				}
+			});
+			ready = loading;
+		}
+		if (ready != null) {
+			ImageView view = new ImageView(ready);
+			view.setFitHeight(fit);
+			view.setPreserveRatio(true);
+			holder.getChildren().setAll(view);
+			if (animated) {
+				boolean[] asked = {false};
+				hoverTarget.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
+					if (asked[0]) {
+						return;
+					}
+					asked[0] = true;
+					frames.accept(list -> {
+						if (!list.isEmpty()) {
+							THUMBNAILS.putIfAbsent(memKey, view.getImage());
+							animate(hoverTarget, view, key, list, width, height, false);
+							if (hoverTarget.isHover()) {
+								javafx.event.Event.fireEvent(hoverTarget, new javafx.scene.input.MouseEvent(javafx.scene.input.MouseEvent.MOUSE_ENTERED,
+										0, 0, 0, 0, javafx.scene.input.MouseButton.NONE, 0, false, false, false, false, false, false, false, false,
+										false, false, null));
+							}
+						}
+					});
+				});
+			}
+			return;
+		}
+		frames.accept(list -> {
+			if (list.isEmpty()) {
+				holder.getChildren().clear();
+				return;
+			}
+			Image thumb = thumbnail(key, list, width, height);
+			saveDiskThumb(memKey + "~" + version, thumb);
+			ImageView view = new ImageView(thumb);
+			view.setFitHeight(fit);
+			view.setPreserveRatio(true);
+			holder.getChildren().setAll(view);
+			if (animated) {
+				animate(hoverTarget, view, key, list, width, height, false);
+			}
+		});
+	}
+
+	static String version(CapeEntry cape) {
+		try {
+			return java.nio.file.Files.size(cape.bundleFile()) + "-" + java.nio.file.Files.getLastModifiedTime(cape.bundleFile()).toMillis();
+		} catch (java.io.IOException e) {
+			return "0";
+		}
 	}
 
 	/** One frame of an animated cape as a 3D thumbnail, rendered on first use and cached. FX thread. */

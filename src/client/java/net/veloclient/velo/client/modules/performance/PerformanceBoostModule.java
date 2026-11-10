@@ -215,7 +215,41 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	 * a row (below 90% of the target) step quality down one level; eight fast ones (above 160%)
 	 * step it back up. At least 20 seconds between steps so it never flickers between looks.
 	 */
+	// ---- In-game FPS: the dashboard shows what you get while playing, not the capped menu rate ----
+	private static final int[] PLAY_FPS = new int[600]; // last 30 s of play, one sample per tick
+	private static int playFpsCount;
+	private static int playFpsNext;
+
+	private static void samplePlayFps(MinecraftClient client) {
+		//? if <26.1 {
+		boolean playing = client.world != null && client.player != null && client.currentScreen == null && client.isWindowFocused();
+		//?} else if <26.2 {
+		/*boolean playing = client.level != null && client.player != null && client.screen == null && client.isWindowActive();
+		*///?} else {
+		/*boolean playing = client.level != null && client.player != null && client.gui.screen() == null && client.isWindowActive();
+		*///?}
+		if (!playing) {
+			return;
+		}
+		PLAY_FPS[playFpsNext] = VideoOptions.currentFps();
+		playFpsNext = (playFpsNext + 1) % PLAY_FPS.length;
+		playFpsCount = Math.min(PLAY_FPS.length, playFpsCount + 1);
+	}
+
+	/** Average FPS over the last 30 s of actual play (no menu open), or -1 before any. */
+	public static int averagePlayFps() {
+		if (playFpsCount == 0) {
+			return -1;
+		}
+		long sum = 0;
+		for (int i = 0; i < playFpsCount; i++) {
+			sum += PLAY_FPS[i];
+		}
+		return (int) (sum / playFpsCount);
+	}
+
 	private void tickAuto(MinecraftClient client) {
+		samplePlayFps(client);
 		autoTicks++;
 		//? if <26.1 {
 		boolean inMenu = client.currentScreen != null || !client.isWindowFocused();
@@ -259,8 +293,15 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 			autoLow = 0;
 			autoHigh = 0;
 			autoCooldownUntil = autoTicks + 400;
-			applyPreset("Auto");
-			refreshRendering();
+			// While playing, Auto only steps the settings that don't rebuild terrain (particles, shadows, clouds, entity
+			// distance, weather). Graphics mode, smooth lighting, leaves, biome blend and mipmaps each rebuilt every loaded
+			// chunk (mipmaps even reloaded the texture atlas) - the "chunks reload by themselves" players saw every 20 s.
+			autoCheapOnly = true;
+			try {
+				applyPreset("Auto");
+			} finally {
+				autoCheapOnly = false;
+			}
 			if (autoNotify) {
 				net.veloclient.velo.client.social.NotificationOverlay.show(new net.veloclient.velo.client.social.NotificationOverlay.Toast(
 						null, null, "Auto graphics: " + AUTO_LEVELS.get(autoLevel), String.format(java.util.Locale.ROOT,
@@ -304,7 +345,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 			// preset here overwrote every tweak made after picking it (view distance, clouds, VSync...) on each start.
 			restoredFromProfileNanos = 0;
 		} else {
-			applyPreset(preset);
+			applyPresetAndRefresh(preset);
 		}
 		// (Not while profiling: the profiled window has no focus or input, and AFK capping would hold it at 30 FPS.)
 		if (dynamicFps && !net.veloclient.velo.client.devtools.RenderProfiler.ENABLED && !Boolean.getBoolean("velo.benchNoAfk")) {
@@ -312,6 +353,12 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 			/*// 1.21.1 keeps its own background FPS
 			*///?} else {
 			options.getInactivityFpsLimit().setValue(InactivityFpsLimit.AFK);
+			//?}
+		} else if (!dynamicFps) {
+			// Off means off: vanilla's own default is AFK (30 FPS after a minute without input, 10 after ten), so leaving the
+			// option alone kept the limit on even with Dynamic FPS turned off.
+			//? if >=1.21.2 {
+			options.getInactivityFpsLimit().setValue(InactivityFpsLimit.MINIMIZED);
 			//?}
 		}
 		// applyPreset() above writes straight to the GameOptions values, same as every
@@ -350,8 +397,41 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		refreshRendering();
 	}
 
+	/** Auto's in-game steps: only settings that don't rebuild chunks (see tickAuto). */
+	private boolean autoCheapOnly;
+
+	/** Every option that changes block meshes or the block atlas: when one of them changes, the loaded chunks are rebuilt. */
+	private static String meshKey() {
+		GameOptions options = MinecraftClient.getInstance().options;
+		return options.getPreset().getValue() + "|" + options.getBiomeBlendRadius().getValue() + "|" + options.getMipmapLevels().getValue() + "|"
+				+ VideoOptions.smoothLighting() + "|" + VideoOptions.fancyLeaves() + "|" + VideoOptions.improvedTransparency();
+	}
+
+	/** {@link #applyPreset} plus a chunk rebuild only when a mesh setting actually changed. */
+	private void applyPresetAndRefresh(String name) {
+		String before = meshKey();
+		applyPreset(name);
+		if (!before.equals(meshKey())) {
+			reloadRendering();
+		} else {
+			refreshRendering();
+		}
+	}
+
 	private void applyPreset(String name) {
 		GameOptions options = MinecraftClient.getInstance().options;
+		if (autoCheapOnly && !name.equals("Auto")) {
+			options.getParticles().setValue(name.equals("High Quality") ? ParticlesMode.ALL : name.equals("Medium Quality") ? ParticlesMode.DECREASED
+					: ParticlesMode.MINIMAL);
+			options.getEntityShadows().setValue(name.equals("High Quality"));
+			options.getCloudRenderMode().setValue(name.equals("High Quality") ? CloudRenderMode.FANCY : name.equals("Medium Quality")
+					? CloudRenderMode.FAST : CloudRenderMode.OFF);
+			options.getEntityDistanceScaling().setValue(name.equals("High Quality") ? 1.5 : name.equals("Medium Quality") ? 1.0 : 0.5);
+			if (name.equals("Max FPS")) {
+				VideoOptions.setWeatherRadius(3);
+			}
+			return;
+		}
 		if (name.equals("Auto")) {
 			keepDistance = true;
 			try {
@@ -457,8 +537,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 						autoLevel = 0;
 					}
 					if (isEnabled()) {
-						applyPreset(preset);
-						refreshRendering();
+						applyPresetAndRefresh(preset);
 					}
 				}),
 				new ConfigField.SliderField("Auto: Target FPS", 30, 240, () -> autoTargetFps, v -> autoTargetFps = (int) Math.round(v / 5) * 5,
@@ -517,14 +596,14 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				new ConfigField.ToggleField("Clouds", () -> options.getCloudRenderMode().getValue() != CloudRenderMode.OFF,
 						v -> { options.getCloudRenderMode().setValue(v ? CloudRenderMode.FAST : CloudRenderMode.OFF); refreshRendering(); }),
 				new ConfigField.ToggleField("Smooth Lighting", VideoOptions::smoothLighting,
-						v -> { VideoOptions.setSmoothLighting(v); refreshRendering(); }),
+						v -> { VideoOptions.setSmoothLighting(v); reloadRendering(); }),
 				new ConfigField.ToggleField("Fancy Leaves", VideoOptions::fancyLeaves,
-						v -> { VideoOptions.setFancyLeaves(v); refreshRendering(); }),
+						v -> { VideoOptions.setFancyLeaves(v); reloadRendering(); }),
 				new ConfigField.ToggleField("Improved Transparency", VideoOptions::improvedTransparency,
 						v -> { VideoOptions.setImprovedTransparency(v); reloadRendering(); }),
 				new ConfigField.SliderField("Biome Blend", 0, 7,
 						() -> options.getBiomeBlendRadius().getValue(),
-						v -> { options.getBiomeBlendRadius().setValue((int) v); refreshRendering(); }, v -> String.valueOf((int) v)),
+						v -> { options.getBiomeBlendRadius().setValue((int) v); reloadRendering(); }, v -> String.valueOf((int) v)),
 				new ConfigField.SliderField("Mipmap Levels", 0, 4,
 						() -> options.getMipmapLevels().getValue(),
 						v -> { options.getMipmapLevels().setValue((int) v); reloadRendering(); }, v -> String.valueOf((int) v)),
@@ -575,7 +654,9 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	public List<Stat> dashboardStats() {
 		MinecraftClient client = MinecraftClient.getInstance();
 		GameOptions options = client.options;
-		int fps = net.veloclient.velo.client.gui.title.MenuInfo.fps();
+		// In-game average (menus are capped, so the live number here said nothing about play).
+		int avg = averagePlayFps();
+		int fps = avg >= 0 ? avg : net.veloclient.velo.client.gui.title.MenuInfo.fps();
 		int target = preset.equals("Auto") ? autoTargetFps : adaptiveDistance ? targetFps : 60;
 		int fpsColor = fps >= target ? 0xFF4ADE80 : fps >= target * 0.6 ? 0xFFF5B942 : 0xFFF87171;
 		int cap = options.getMaxFps().getValue();
@@ -587,7 +668,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		String api = describe == null ? "" : describe.contains("Vulkan") ? "Vulkan" : "OpenGL";
 		String presetValue = !isEnabled() ? "Off" : preset.replace(" Quality", "");
 		return List.of(
-				new Stat("FPS", String.valueOf(fps), cap >= 260 ? "uncapped" : "cap " + cap, fpsColor, -1f, true),
+				new Stat("In-game FPS", avg >= 0 ? String.valueOf(fps) : "-", avg >= 0 ? "avg 30 s" : "play a bit", fpsColor, -1f, true),
 				new Stat("Frame", frame, "", 0xFFF4F4F6),
 				new Stat("GPU", gpuText, api, gpuColor, (float) Math.min(1, gpu / 100), false),
 				new Stat("View", String.valueOf(options.getViewDistance().getValue()), adaptiveDistance ? "adaptive" : "chunks", 0xFFF4F4F6,
@@ -662,7 +743,9 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 			return "Performance Boost is off - the switch at the top right turns it on.";
 		}
 		GameOptions options = MinecraftClient.getInstance().options;
-		int fps = net.veloclient.velo.client.gui.title.MenuInfo.fps();
+		// In-game average (menus are capped, so the live number here said nothing about play).
+		int avg = averagePlayFps();
+		int fps = avg >= 0 ? avg : net.veloclient.velo.client.gui.title.MenuInfo.fps();
 		int target = preset.equals("Auto") ? autoTargetFps : adaptiveDistance ? targetFps : 60;
 		int distance = options.getViewDistance().getValue();
 		if (fps > 0 && fps < target) {
@@ -726,6 +809,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 			fields.add(byLabel.get("Max FPS"));
 			fields.add(byLabel.get("View Distance"));
 			fields.add(byLabel.get("VSync Mode"));
+			fields.add(byLabel.get("Dynamic FPS (throttle when unfocused/AFK)"));
 			fields.removeIf(java.util.Objects::isNull);
 			return fields;
 		}
@@ -777,9 +861,9 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 			client.levelRenderer.needsUpdate();
 		}
 		*///?} else {
-		/*if (client.levelExtractor != null) {
-			client.levelExtractor.allChanged();
-		}
+		/*// 26.2: allChanged() is the FULL rebuild of every loaded chunk (the old lightweight terrain re-queue is gone). Nothing
+		// that comes here needs one: a new view distance is picked up by the renderer itself (it compares the distance each
+		// frame); particles, shadows, clouds and entity distance don't touch chunk meshes. Mesh settings use reloadRendering().
 		*///?}
 	}
 

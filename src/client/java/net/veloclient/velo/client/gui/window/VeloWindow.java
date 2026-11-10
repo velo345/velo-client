@@ -192,7 +192,17 @@ public abstract class VeloWindow extends Screen {
 			return;
 		}
 
-		context.fill(0, 0, this.width, this.height, (int) (0x70 * openProgress) << 24);
+		int[] hole = openProgress > 0.97f && !closing ? windowHole() : null;
+		if (hole == null) {
+			context.fill(0, 0, this.width, this.height, (int) (0x70 * openProgress) << 24);
+		} else {
+			// dim everything but the hole (the world shows through it untouched)
+			int dim = (int) (0x70 * openProgress) << 24;
+			context.fill(0, 0, this.width, hole[1], dim);
+			context.fill(0, hole[1] + hole[3], this.width, this.height, dim);
+			context.fill(0, hole[1], hole[0], hole[1] + hole[3], dim);
+			context.fill(hole[0] + hole[2], hole[1], this.width, hole[1] + hole[3], dim);
+		}
 
 		// Opens with a gentle scale-up + rise, closes with the reverse.
 		boolean spring = springAnimation() || shell();
@@ -211,10 +221,26 @@ public abstract class VeloWindow extends Screen {
 		VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 18, 6,
 				VeloUi.withAlpha(0xFF000000, Math.round(0x8C * openProgress)));
 
-		// 0.9.7: graphite glass (a touch of the theme's own surface), hairline edge, Sora title - no coloured header band.
-		int glass = VeloAnim.lerpArgb(0xFF0E0E12, theme.surface() | 0xFF000000, 0.14f);
-		int surface = (glass & 0x00FFFFFF) | (Math.round(0xEB * openProgress) << 24);
-		VeloDraw.fillRounded(context, windowX, windowY, windowWidth, windowHeight, radius, surface);
+		// 2026-11: the launcher's ground (#0C0A0A, warm black, a touch of the theme), almost opaque - same look as the launcher.
+		int glass = VeloAnim.lerpArgb(0xFF0C0A0A, theme.surface() | 0xFF000000, 0.06f);
+		int surface = (glass & 0x00FFFFFF) | (Math.round(0xF7 * openProgress) << 24);
+		if (hole == null) {
+			VeloDraw.fillRounded(context, windowX, windowY, windowWidth, windowHeight, radius, surface);
+		} else {
+			// The window around a see-through preview: the same rounded body drawn in four clipped bands.
+			int[][] bands = {
+					{windowX, windowY, windowX + windowWidth, hole[1]},
+					{windowX, hole[1] + hole[3], windowX + windowWidth, windowY + windowHeight},
+					{windowX, hole[1], hole[0], hole[1] + hole[3]},
+					{hole[0] + hole[2], hole[1], windowX + windowWidth, hole[1] + hole[3]}};
+			for (int[] band : bands) {
+				if (band[2] > band[0] && band[3] > band[1]) {
+					context.enableScissor(band[0], band[1], band[2], band[3]);
+					VeloDraw.fillRounded(context, windowX, windowY, windowWidth, windowHeight, radius, surface);
+					context.disableScissor();
+				}
+			}
+		}
 		context.fill(windowX + 1, windowY + HEADER_HEIGHT, windowX + windowWidth - 1, windowY + HEADER_HEIGHT + 1,
 				VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x10 * openProgress)));
 		VeloDraw.strokeRounded(context, windowX, windowY, windowWidth, windowHeight, radius,
@@ -301,6 +327,7 @@ public abstract class VeloWindow extends Screen {
 		}
 
 		context.getMatrices().popMatrix();
+		net.veloclient.velo.client.gui.widget.VeloContextMenu.render(this, context, mouseX, mouseY);
 		lastTabs = headerTabs();
 		lastTab = headerTab();
 	}
@@ -393,7 +420,12 @@ public abstract class VeloWindow extends Screen {
 	}
 
 	/** Draws a subclass's header extras (coins, actions) right-aligned before {@link #headerRight()}. */
-	protected void renderHeaderExtras(DrawContext context, int mouseX, int mouseY) {
+	/** A rect {x, y, w, h} left out of the window body (and the dim), so the game shows through it - or null. */
+	protected int[] windowHole() {
+		return null;
+	}
+
+		protected void renderHeaderExtras(DrawContext context, int mouseX, int mouseY) {
 	}
 
 	/** Clicks on header extras a subclass draws (coins, actions); true when handled. */
@@ -566,6 +598,12 @@ public abstract class VeloWindow extends Screen {
 	public boolean mouseClicked(Click click, boolean doubled) {
 		int mouseX = (int) click.x();
 		int mouseY = (int) click.y();
+		if (net.veloclient.velo.client.gui.widget.VeloContextMenu.click(this, click.x(), click.y())) {
+			return true;
+		}
+		if (click.button() == 0 && net.veloclient.velo.client.gui.widget.VeloScrollRegion.pressScrollbar(this, click.x(), click.y())) {
+			return true;
+		}
 		if (shell() && MenuShell.click(this, shellState, ((MenuPage) this).railId(), click.x(), click.y())) {
 			return true;
 		}
@@ -614,6 +652,9 @@ public abstract class VeloWindow extends Screen {
 
 	@Override
 	public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+		if (net.veloclient.velo.client.gui.widget.VeloScrollRegion.dragScrollbar(click.y())) {
+			return true;
+		}
 		if (draggingHeader) {
 			windowX = (int) (click.x() - dragOffsetX);
 			windowY = (int) (click.y() - dragOffsetY);
@@ -633,6 +674,9 @@ public abstract class VeloWindow extends Screen {
 
 	@Override
 	public boolean mouseReleased(Click click) {
+		if (net.veloclient.velo.client.gui.widget.VeloScrollRegion.releaseScrollbar()) {
+			return true;
+		}
 		if (draggingHeader) {
 			draggingHeader = false;
 			return true;

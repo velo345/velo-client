@@ -60,6 +60,7 @@ final class PackSelection {
 	private int decorated;
 
 	private final HBox bar;
+	private boolean barShown;
 	private final Label count = new Label();
 	private final Button toggleAll = new Button("Select all");
 	private final Button enable = new Button("Enable");
@@ -108,6 +109,10 @@ final class PackSelection {
 		bar.setMaxHeight(Region.USE_PREF_SIZE);
 		bar.setVisible(false);
 		bar.setManaged(false);
+		// 2026-11: check boxes are always there; the action bar slides in once something is ticked.
+		active = true;
+		modeButton.setVisible(false);
+		modeButton.setManaged(false);
 	}
 
 	void setRefresh(Runnable refresh) {
@@ -129,7 +134,7 @@ final class PackSelection {
 			if (!active) {
 				return;
 			}
-			if (e.getCode() == KeyCode.ESCAPE) {
+			if (e.getCode() == KeyCode.ESCAPE && !selected.isEmpty()) {
 				setActive(false);
 				e.consume();
 			} else if (e.getCode() == KeyCode.A && e.isShortcutDown()) {
@@ -144,6 +149,12 @@ final class PackSelection {
 	}
 
 	void setActive(boolean on) {
+		if (!on) {
+			// "leave selection mode" now just clears the ticks (the boxes stay)
+			selected.clear();
+			syncRows();
+			return;
+		}
 		if (active == on) {
 			return;
 		}
@@ -270,6 +281,10 @@ final class PackSelection {
 			bump.play();
 		}
 		toggleAll.setText(n > 0 && n == rows.size() ? "Select none" : "Select all");
+		if ((n > 0) != barShown) {
+			barShown = n > 0;
+			showBar(barShown);
+		}
 		enable.setDisable(n == 0);
 		disable.setDisable(n == 0);
 		delete.setDisable(n == 0);
@@ -290,7 +305,7 @@ final class PackSelection {
 		ParallelTransition move = new ParallelTransition(fade, slide);
 		if (!show) {
 			move.setOnFinished(e -> {
-				if (!active) {
+				if (!barShown) {
 					bar.setVisible(false);
 					bar.setManaged(false);
 				}

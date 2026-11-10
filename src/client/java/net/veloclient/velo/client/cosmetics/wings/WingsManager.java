@@ -454,7 +454,7 @@ public final class WingsManager {
 
 	/** What the local player shows right now (the preview while one is set). */
 	public static String renderIdForLocalPlayer() {
-		return previewActive ? previewId : equippedId();
+		return previewActive ? previewId : net.veloclient.velo.client.cosmetics.CapeManager.moduleOn("wings-cosmetics") ? equippedId() : null;
 	}
 
 	/**

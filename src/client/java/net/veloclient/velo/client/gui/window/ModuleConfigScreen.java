@@ -54,6 +54,61 @@ public final class ModuleConfigScreen extends VeloWindow {
 	private VeloValueRow dropdownRow;
 	private static final int OPTION_H = 16;
 
+	// ---- 2026-11 page layout: back link, title row, settings on the left, live preview on the right ----
+	private static final int PREVIEW_W = 214;
+	private final ModulePreview.Kind previewKind;
+
+	private boolean hasPreview() {
+		return previewKind != ModulePreview.Kind.NONE;
+	}
+
+	/** Width of the settings column (the whole content without a preview). */
+	private int listWidth() {
+		return hasPreview() ? contentWidth() - PREVIEW_W - 16 : contentWidth();
+	}
+
+	private int previewX() {
+		return contentX() + contentWidth() - PREVIEW_W;
+	}
+
+	/** The preview box {x, y, w, h}. */
+	private int[] previewBox() {
+		int top = contentY() + 14;
+		int h = Math.max(90, Math.min(170, contentBottom() - top - 70));
+		return new int[] {previewX(), top, PREVIEW_W, h};
+	}
+
+	@Override
+	protected int[] windowHole() {
+		if (previewKind != ModulePreview.Kind.WORLD) {
+			return null;
+		}
+		int[] box = previewBox();
+		return box;
+	}
+
+	// The world shows through the preview: no vanilla blur or darkening behind a world-preview page.
+	//? if <26.1 {
+	@Override
+	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+		if (previewKind != ModulePreview.Kind.WORLD) {
+			super.renderBackground(context, mouseX, mouseY, delta);
+		}
+	}
+	//?} else {
+	/*@Override
+	public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+		if (previewKind != ModulePreview.Kind.WORLD) {
+			super.extractBackground(context, mouseX, mouseY, delta);
+		}
+	}
+	*///?}
+
+	private void goBack() {
+		requestClose();
+		parent.reopen();
+	}
+
 	public interface Reopenable {
 		void reopen();
 	}
@@ -86,9 +141,10 @@ public final class ModuleConfigScreen extends VeloWindow {
 	private float navSelY = -1;
 
 	public ModuleConfigScreen(Module module, Reopenable parent) {
-		super(Text.literal(module.displayName()), module instanceof ModuleDashboard ? 660 : 380,
+		super(Text.literal(module.displayName()), module instanceof ModuleDashboard ? 660 : ModulePreview.kind(module) != ModulePreview.Kind.NONE ? 640 : 440,
 				module instanceof ModuleDashboard ? 420 : WINDOW_HEIGHT);
 		this.module = module;
+		this.previewKind = module instanceof ModuleDashboard && module instanceof Configurable ? ModulePreview.Kind.NONE : ModulePreview.kind(module);
 		this.parent = parent;
 		this.dash = module instanceof ModuleDashboard d && module instanceof Configurable ? d : null;
 		if (dash != null) {
@@ -118,15 +174,28 @@ public final class ModuleConfigScreen extends VeloWindow {
 		listX = contentX();
 
 		this.clearChildren();
-		// Header card: icon chip, description, safety pill, and the master switch on the right.
+		// Page head: "< Modules", icon + name + category, the description, and the master switch on the right.
 		descriptionLines = wrap(module.description(), headerTextWidth());
 		int headerHeight = headerHeight();
-		addDrawableChild(new VeloToggle(contentX() + contentWidth() - SWITCH_WIDTH - 10, contentY() + 10, SWITCH_WIDTH,
+		addDrawableChild(new VeloToggle(contentX() + listWidth() - SWITCH_WIDTH - 2, contentY() + 23, SWITCH_WIDTH,
 				Text.empty(), module::isEnabled, module::setEnabled));
+		if (previewKind == ModulePreview.Kind.PLAYER || previewKind == ModulePreview.Kind.SCENE && ModuleScenes.wantsFigure(module)) {
+			int[] box = previewBox();
+			var figure = new net.veloclient.velo.client.gui.widget.EntityPreviewWidget(box[0] + 4, box[1] + 4, box[2] - 8, box[3] - 8).noStage().spin(0f, 20f);
+			if (ModuleScenes.hurtPulse(module)) {
+				figure.hurtPulse();
+			}
+			addDrawableChild(figure);
+		}
+		if (module instanceof net.veloclient.velo.client.hud.HudModule) {
+			int[] box = previewBox();
+			addDrawableChild(new VeloButton(previewX(), contentBottom() - 20, PREVIEW_W, 20, Text.literal("Place on screen"),
+					b -> this.client.setScreen(new net.veloclient.velo.client.gui.HudEditScreen(this))).primary());
+		}
 
-		int y = contentY() + headerHeight + 12;
-		int listBottom = contentBottom() - 30;
-		scrollRegion = new VeloScrollRegion(contentX(), y, contentWidth(), Math.max(ROW_HEIGHT, listBottom - y));
+		int y = contentY() + headerHeight + 8;
+		int listBottom = contentBottom() - (module instanceof ModuleShortcut ? 26 : 0);
+		scrollRegion = new VeloScrollRegion(contentX(), y, listWidth(), Math.max(ROW_HEIGHT, listBottom - y));
 		scrollRegion.setScrollOffset(previousScrollOffset);
 
 		if (module instanceof Configurable configurable) {
@@ -141,15 +210,10 @@ public final class ModuleConfigScreen extends VeloWindow {
 		}
 
 		if (module instanceof ModuleShortcut shortcut) {
-			int w = Math.min(contentWidth() - 96, this.textRenderer.getWidth(shortcut.shortcutLabel()) + 40);
+			int w = Math.min(listWidth(), this.textRenderer.getWidth(shortcut.shortcutLabel()) + 40);
 			addDrawableChild(new VeloButton(contentX(), contentBottom() - 20, w, 20, Text.literal(shortcut.shortcutLabel() + "  >"),
 					b -> shortcut.openShortcut(this)).primary());
 		}
-		addDrawableChild(new VeloButton(contentX() + contentWidth() - 84, contentBottom() - 20, 84, 20, Text.literal("Done"),
-				b -> {
-					requestClose();
-					parent.reopen();
-				}).primary());
 	}
 
 	private void layoutDashboard(double previousScrollOffset) {
@@ -469,11 +533,11 @@ public final class ModuleConfigScreen extends VeloWindow {
 	}
 
 	private int headerTextWidth() {
-		return contentWidth() - CHIP - 30 - SWITCH_WIDTH - 12;
+		return listWidth() - 4;
 	}
 
 	private int headerHeight() {
-		return Math.max(CHIP + 20, 10 + descriptionLines.size() * DESC_LINE_HEIGHT + 22);
+		return 60 + Math.min(3, descriptionLines.size()) * DESC_LINE_HEIGHT + 8;
 	}
 
 	private ClickableWidget buildFieldWidget(ConfigField field, int y) {
@@ -656,6 +720,11 @@ public final class ModuleConfigScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+		if (dropdown == null && backClicked(click.x(), click.y())) {
+			net.veloclient.velo.client.sound.VeloUiSounds.click(1.0f);
+			goBack();
+			return true;
+		}
 		if (dropdown != null) {
 			int[] box = dropdownBox();
 			double mx = click.x();
@@ -696,6 +765,10 @@ public final class ModuleConfigScreen extends VeloWindow {
 		return super.mouseClicked(click, doubled);
 	}
 
+	private boolean backClicked(double mouseX, double mouseY) {
+		return dash == null && mouseX >= contentX() && mouseX < contentX() + 52 && mouseY >= contentY() - 2 && mouseY < contentY() + 10;
+	}
+
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
 		dropdown = null;
@@ -716,26 +789,76 @@ public final class ModuleConfigScreen extends VeloWindow {
 		Theme theme = ThemeManager.active();
 		int x = contentX();
 		int y = contentY();
-		int headerHeight = headerHeight();
-		VeloDraw.fillRounded(context, x, y, contentWidth(), headerHeight, VeloStyle.RADIUS_CARD, VeloStyle.card());
-		VeloDraw.strokeRounded(context, x, y, contentWidth(), headerHeight, VeloStyle.RADIUS_CARD, VeloStyle.border());
-
-		int chipX = x + 10;
-		int chipY = y + 10;
+		var kit = net.veloclient.velo.client.gui.title.MenuKit.class;
+		// "< Modules"
+		boolean backHover = mouseX >= x && mouseX < x + 52 && mouseY >= y - 2 && mouseY < y + 10;
+		int backColor = backHover ? 0xFFEDE6E6 : 0xFF9A8E8F;
+		for (int i = 0; i < 3; i++) {
+			context.fill(x + 3 - i, y + 3 + i, x + 4 - i, y + 4 + i, backColor);
+			context.fill(x + 1 + i, y + 5 + i, x + 2 + i, y + 6 + i, backColor);
+		}
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.ui("Modules"), x + 8, y + 1,
+				backColor);
+		// icon tile + name + category
+		int ty = y + 17;
 		boolean on = module.isEnabled();
-		VeloDraw.fillRounded(context, chipX, chipY, CHIP, CHIP, 9,
-				on ? VeloUi.withAlpha(theme.accentStart(), 0x30) : VeloUi.withAlpha(theme.text(), 0x0E));
+		VeloDraw.fillRounded(context, x, ty, 30, 30, 7, 0xFF1E1819);
 		context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, ModuleIcons.textureFor(module.id()),
-				chipX + 6, chipY + 6, 0f, 0f, CHIP - 12, CHIP - 12, 1024, 1024, 1024, 1024,
-				on ? (theme.accentStart() | 0xFF000000) : VeloStyle.textMuted());
-
-		int textX = chipX + CHIP + 10;
-		int lineY = y + 10;
-		for (String line : descriptionLines) {
-			context.drawTextWithShadow(this.textRenderer, line, textX, lineY, VeloStyle.textMuted());
+				x + 7, ty + 7, 0f, 0f, 16, 16, 1024, 1024, 1024, 1024,
+				on ? net.veloclient.velo.client.gui.title.MenuKit.accentText() : 0xFF8E8384);
+		Text name = net.veloclient.velo.client.gui.title.MenuKit.fit(this.textRenderer,
+				net.veloclient.velo.client.gui.title.MenuKit.displayLg(module.displayName()), listWidth() - 40 - SWITCH_WIDTH - 10);
+		// name on top, the category as a quiet label under it - a clear gap between them (they touched before)
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, name, x + 40, ty + 1, 0xFFEDE6E6);
+		String tag = module.category().displayName().toUpperCase(java.util.Locale.ROOT);
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.small(tag), x + 40,
+				ty + 23, 0xFF8E8384);
+		int lineY = y + 60;
+		for (int i = 0; i < Math.min(3, descriptionLines.size()); i++) {
+			context.drawTextWithShadow(this.textRenderer, descriptionLines.get(i), x, lineY, 0xFFB3A8A9);
 			lineY += DESC_LINE_HEIGHT;
 		}
-		drawSafetyPill(context, textX, lineY + 3);
+		if (hasPreview()) {
+			renderPreviewPanel(context, mouseX, mouseY);
+		}
+	}
+
+	private void renderPreviewPanel(DrawContext context, int mouseX, int mouseY) {
+		int px = previewX();
+		int y = contentY();
+		context.fill(px - 9, y, px - 8, contentBottom(), 0x10FFFFFF);
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.small("PREVIEW"), px, y + 1,
+				0xFF8E8384);
+		int[] box = previewBox();
+		switch (previewKind) {
+			case HUD -> {
+				ModulePreview.backdrop(context, box[0], box[1], box[2], box[3]);
+				ModulePreview.drawHud(context, (net.veloclient.velo.client.hud.HudModule) module, box[0], box[1], box[2], box[3],
+						1f);
+			}
+			case CROSSHAIR -> {
+				ModulePreview.backdrop(context, box[0], box[1], box[2], box[3]);
+				ModulePreview.drawCrosshair(context, box[0], box[1], box[2], box[3]);
+			}
+			case PLAYER -> VeloDraw.fillRounded(context, box[0], box[1], box[2], box[3], 8, 0xFF141011);
+			case SCENE -> ModuleScenes.drawUnder(context, module, box[0], box[1], box[2], box[3]);
+			default -> {
+				// WORLD: the window has a hole here - the real game shows through; just frame it
+			}
+		}
+		VeloDraw.strokeRounded(context, box[0], box[1], box[2], box[3], 8, 0x1CFFFFFF);
+		String note = switch (previewKind) {
+			case WORLD -> "This is the game itself - change a setting and watch it here.";
+			case PLAYER -> "Drag to turn. Changes show right away.";
+			case HUD -> "Changes show right away. Place on screen moves it.";
+			case SCENE -> "A sample of what it does - with your settings.";
+			default -> "Changes show right away.";
+		};
+		int ny = box[1] + box[3] + 8;
+		for (String line : wrap(note, PREVIEW_W)) {
+			context.drawTextWithShadow(this.textRenderer, line, px, ny, 0xFF8E8384);
+			ny += DESC_LINE_HEIGHT;
+		}
 	}
 
 	private void drawSafetyPill(DrawContext context, int x, int y) {
@@ -755,6 +878,10 @@ public final class ModuleConfigScreen extends VeloWindow {
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
+		if (previewKind == ModulePreview.Kind.SCENE && dropdown == null) {
+			int[] box = previewBox();
+			ModuleScenes.drawOver(context, module, box[0], box[1], box[2], box[3]);
+		}
 		boolean overDropdown = false;
 		if (dropdown != null) {
 			int[] box = dropdownBox();

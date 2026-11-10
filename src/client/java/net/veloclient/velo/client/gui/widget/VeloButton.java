@@ -74,9 +74,7 @@ public class VeloButton extends ClickableWidget {
 			if (!this.active) {
 				fill = VeloAnim.lerpArgb(fill, 0xFF000000, 0.5f);
 			}
-			if (hoverProgress > 0.01f) {
-				VeloDraw.shadow(context, x, y, w, h, radius, 6, 1, VeloStyle.accentGlow(Math.round(0x40 * hoverProgress)));
-			}
+			// launcher look: flat, no glow on hover
 			VeloDraw.fillRounded(context, x, y, w, h, radius, fill);
 		} else if (selected) {
 			VeloDraw.fillRounded(context, x, y, w, h, radius, VeloUi.withAlpha(theme.accentStart(), 0x33 + Math.round(0x14 * hoverProgress)));

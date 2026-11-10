@@ -21,10 +21,10 @@ import java.util.WeakHashMap;
  */
 public final class MenuKit {
 
-	public static final int TEXT = 0xFFF4F4F6;
-	public static final int TEXT_2 = 0xFFA9A9B3;
-	public static final int TEXT_3 = 0xFF6E6E78;
-	public static final int PANEL = 0xC40E0E12;
+	public static final int TEXT = 0xFFEDE6E6;
+	public static final int TEXT_2 = 0xFFB3A8A9;
+	public static final int TEXT_3 = 0xFF8E8384;
+	public static final int PANEL = 0xC40C0A0A;
 	public static final int SURFACE_2 = 0x0FFFFFFF;
 	public static final int HAIRLINE = 0x17FFFFFF;
 	public static final int GREEN = 0xFF3DDC97;
@@ -159,6 +159,15 @@ public final class MenuKit {
 
 	/** Text without the vanilla drop shadow. */
 	public static void text(DrawContext context, TextRenderer renderer, Text text, int x, int y, int color) {
+		context.drawText(renderer, text, x, y, color, false);
+	}
+
+	/** Already reordered text (cached by the HUD) without the drop shadow. */
+	//? if <26.1 {
+	public static void textOrdered(DrawContext context, TextRenderer renderer, net.minecraft.text.OrderedText text, int x, int y, int color) {
+	//?} else {
+	/*public static void textOrdered(DrawContext context, TextRenderer renderer, net.minecraft.util.FormattedCharSequence text, int x, int y, int color) {
+	*///?}
 		context.drawText(renderer, text, x, y, color, false);
 	}
 

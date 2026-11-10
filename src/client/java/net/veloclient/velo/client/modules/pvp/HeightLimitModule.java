@@ -51,7 +51,7 @@ public final class HeightLimitModule extends AbstractModule implements HudModule
 		int voidY = customVoid != 0 ? (int) customVoid : world[0];
 		int up = limit - feet;
 		int down = feet - voidY;
-		boolean editing = net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen;
+		boolean editing = net.veloclient.velo.client.hud.HudSample.active();
 		if (onlyWhenClose && up > closeBlocks && !editing) {
 			return;
 		}

@@ -23,7 +23,10 @@ public final class VeloCapeRender {
 	 */
 	public static void draw(DrawContext context, Identifier texture, int textureWidth, int textureHeight,
 			float centerX, float bottomY, float height, float yawDegrees) {
-		float unit = textureWidth / 64f;
+		// Full 64x32 cape layout (2:1), or the HD pipeline's crop to just the cape region (22x17 cape pixels, since 0.9.9).
+		// Treating a cropped texture as 64 wide picked a shifted, zoomed-in part of the art (cut-off logos on the cards).
+		float aspect = textureHeight <= 0 ? 2f : textureWidth / (float) textureHeight;
+		float unit = Math.abs(aspect - 2f) < 0.25f ? textureWidth / 64f : textureWidth / 22f;
 		double yaw = Math.toRadians(yawDegrees);
 		float cos = (float) Math.abs(Math.cos(yaw));
 		float sin = (float) Math.sin(yaw);

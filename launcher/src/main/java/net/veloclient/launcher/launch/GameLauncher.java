@@ -203,6 +203,10 @@ public final class GameLauncher {
 		// periodic writes to it are a known source of random multi-ms stalls, and nothing in a
 		// game session reads those stats.
 		jvmArgs.add("-XX:+PerfDisableSharedMem");
+		// Keeps the stack on exceptions that repeat: HotSpot otherwise drops it from a hot NullPointerException,
+		// and the crash report says only "NullPointerException: Render Frame" with no line of who did it
+		// (report 89a43338a6fb, 2026-11-10) - nothing for the Doctor or us to go on.
+		jvmArgs.add("-XX:-OmitStackTraceInFastThrow");
 		// Compact object headers (JDK 25+, JEP 519): every Java object gets 4 bytes smaller, which
 		// for Minecraft's millions of small objects means noticeably less heap churn and GC work.
 		// Only where the game's runtime actually understands the flag - an unknown -XX flag would
@@ -263,6 +267,12 @@ public final class GameLauncher {
 		}
 		if (instance.extraJvmArgs() != null && !instance.extraJvmArgs().isBlank()) {
 			for (String arg : instance.extraJvmArgs().trim().split("\\s+")) {
+				if (removedFromJava(arg)) {
+					// Java 8 flags copied from old guides: a modern JVM refuses to start at all ("Unrecognized option:
+					// -d64", exit code 1 and no log - report cde171fd6be7, 2026-11-10). Leaving them out changes nothing.
+					net.veloclient.launcher.LauncherLog.info("Left out JVM argument " + arg + " - this Java no longer has it");
+					continue;
+				}
 				jvmArgs.add(arg);
 			}
 		}
@@ -504,5 +514,13 @@ public final class GameLauncher {
 			}
 		}
 		return false;
+	}
+
+	/** JVM flags Java 9+ removed: passing one stops the game's JVM before it even starts. */
+	static boolean removedFromJava(String arg) {
+		return arg.equals("-d64") || arg.equals("-d32") || arg.equals("-Xincgc") || arg.equals("-XX:+AggressiveOpts")
+				|| arg.equals("-XX:+UseConcMarkSweepGC") || arg.equals("-XX:+CMSIncrementalMode") || arg.equals("-XX:+UseParNewGC")
+				|| arg.equals("-XX:+CMSClassUnloadingEnabled") || arg.startsWith("-XX:PermSize=") || arg.startsWith("-XX:MaxPermSize=")
+				|| arg.startsWith("-XX:CMSInitiatingOccupancyFraction=") || arg.equals("-XX:+UseCMSInitiatingOccupancyOnly");
 	}
 }

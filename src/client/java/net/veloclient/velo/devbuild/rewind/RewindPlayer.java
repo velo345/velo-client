@@ -126,11 +126,23 @@ final class RewindPlayer {
 		selfId = id.find() ? Integer.parseInt(id.group(1)) : -1;
 		Matcher uuid = Pattern.compile("\"selfUuid\":\\s*\"([0-9a-f-]+)\"").matcher(meta);
 		boolean hasSelf = uuid.find();
-		recordedSelf = hasSelf ? uuid.group(1) : null;
-		selfUuid = hasSelf ? uuidBytes(UUID.fromString(uuid.group(1))) : null;
+		String selfText = hasSelf ? uuid.group(1) : null;
+		if (selfText == null) {
+			// Recordings stopped by leaving a server (before 2026-11-11) have an empty selfUuid. They're recorded on this
+			// PC, nearly always with this account: without the swap the recorded player shares the camera's UUID and the
+			// game throws it away - you were missing from your own replay and its players list.
+			try {
+				var profile = Minecraft.getInstance().getGameProfile();
+				selfText = profile != null && profile.id() != null ? profile.id().toString() : null;
+			} catch (RuntimeException ignored) {
+				selfText = null;
+			}
+		}
+		recordedSelf = selfText;
+		selfUuid = selfText != null ? uuidBytes(UUID.fromString(selfText)) : null;
 		if (selfUuid != null) {
 			// stable per recording, so hidden entities / skin swaps saved for the recorder's own player still match
-			fakeUuid = uuidBytes(UUID.nameUUIDFromBytes(("velo-rewind:" + uuid.group(1)).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+			fakeUuid = uuidBytes(UUID.nameUUIDFromBytes(("velo-rewind:" + selfText).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
 		}
 		int[] ticks = new int[segments.size()];
 		for (int i = 0; i < ticks.length; i++) {

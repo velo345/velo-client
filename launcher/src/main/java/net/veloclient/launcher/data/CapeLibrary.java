@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 /**
@@ -195,11 +194,11 @@ public final class CapeLibrary {
 	}
 
 	private static byte[] bundleEntryBytes(CapeEntry entry, String entryName) throws IOException {
-		try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(entry.bundleFile()))) {
-			ZipEntry zipEntry;
-			while ((zipEntry = zip.getNextEntry()) != null) {
-				if (zipEntry.getName().equals(entryName)) {
-					return zip.readAllBytes();
+		try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(entry.bundleFile().toFile())) {
+			ZipEntry zipEntry = zip.getEntry(entryName);
+			if (zipEntry != null) {
+				try (var in = zip.getInputStream(zipEntry)) {
+					return in.readAllBytes();
 				}
 			}
 		}
@@ -274,17 +273,25 @@ public final class CapeLibrary {
 		Meta meta = null;
 		CapePhysicsPresetData preset = CapePhysicsPresetData.defaults();
 		boolean animated = false;
-		try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(bundleFile))) {
-			ZipEntry entry;
-			while ((entry = zip.getNextEntry()) != null) {
-				if (entry.getName().equals("meta.json")) {
-					meta = GSON.fromJson(new InputStreamReader(zip, StandardCharsets.UTF_8), Meta.class);
-				} else if (entry.getName().equals("physics.json")) {
-					preset = GSON.fromJson(new InputStreamReader(zip, StandardCharsets.UTF_8), CapePhysicsPresetData.class);
-				} else if (entry.getName().equals("frames.gif")) {
-					animated = true;
+		// ZipFile reads the central directory at the end and then only the two small entries. ZipInputStream streamed
+		// through the whole bundle (textures, GIF frames) to find them: 320 MB for 53 cloaks = the Locker's 1.6 s first open.
+		try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(bundleFile.toFile())) {
+			ZipEntry metaEntry = zip.getEntry("meta.json");
+			if (metaEntry != null) {
+				try (var in = new InputStreamReader(zip.getInputStream(metaEntry), StandardCharsets.UTF_8)) {
+					meta = GSON.fromJson(in, Meta.class);
 				}
 			}
+			ZipEntry physicsEntry = zip.getEntry("physics.json");
+			if (physicsEntry != null) {
+				try (var in = new InputStreamReader(zip.getInputStream(physicsEntry), StandardCharsets.UTF_8)) {
+					CapePhysicsPresetData read = GSON.fromJson(in, CapePhysicsPresetData.class);
+					if (read != null) {
+						preset = read;
+					}
+				}
+			}
+			animated = zip.getEntry("frames.gif") != null;
 		} catch (IOException e) {
 			return Optional.empty();
 		}

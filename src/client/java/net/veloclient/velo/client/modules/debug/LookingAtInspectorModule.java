@@ -42,11 +42,18 @@ public final class LookingAtInspectorModule extends AbstractModule implements Hu
 		MinecraftClient client = MinecraftClient.getInstance();
 		ClientWorld world = client.world;
 		HitResult target = client.crosshairTarget;
+		int lineHeight = client.textRenderer.fontHeight + 1;
+		int rowY = y;
+		if ((world == null || target == null || target.getType() == HitResult.Type.MISS) && net.veloclient.velo.client.hud.HudSample.active()) {
+			// preview / HUD editor: a sample of what it shows for a block
+			rowY = drawLine(context, x, rowY, lineHeight, "Block: minecraft:chest");
+			rowY = drawLine(context, x, rowY, lineHeight, "Pos: 12, 64, -30");
+			drawLine(context, x, rowY, lineHeight, "NBT: {Items:[{id:\"minecraft:diamond\",count:3}]}");
+			return;
+		}
 		if (world == null || target == null) {
 			return;
 		}
-		int lineHeight = client.textRenderer.fontHeight + 1;
-		int rowY = y;
 
 		if (target.getType() == HitResult.Type.BLOCK && target instanceof BlockHitResult blockHit) {
 			BlockState state = world.getBlockState(blockHit.getBlockPos());

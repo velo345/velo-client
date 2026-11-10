@@ -58,6 +58,9 @@ public final class PotCounterModule extends AbstractModule implements HudModule,
 				}
 			}
 		}
+		if (count == 0 && net.veloclient.velo.client.hud.HudSample.active()) {
+			count = 8; // the HUD editor / module preview: a believable example
+		}
 		if (count == 0 && hideWhenNone) {
 			return;
 		}

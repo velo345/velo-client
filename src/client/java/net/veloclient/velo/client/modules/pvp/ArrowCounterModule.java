@@ -39,7 +39,7 @@ public final class ArrowCounterModule extends AbstractModule implements HudModul
 		if (player == null) {
 			return;
 		}
-		boolean editing = ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen;
+		boolean editing = net.veloclient.velo.client.hud.HudSample.active();
 		if (onlyWithBow && !editing && !PvpCompat.isBow(PvpCompat.mainHand(player)) && !PvpCompat.isBow(PvpCompat.offHand(player))) {
 			return;
 		}

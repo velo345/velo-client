@@ -156,7 +156,13 @@ public final class CapeManager {
 	 * state.
 	 */
 	public static Optional<CapeDefinition> renderCape() {
-		return previewOverride != null ? Optional.of(previewOverride) : equipped();
+		// the Cosmetic Cloaks module is the master switch: off = no cloak on you (and in every preview), a Store try-on still shows
+		return previewOverride != null ? Optional.of(previewOverride) : moduleOn("cape-cosmetics") ? equipped() : Optional.empty();
+	}
+
+	/** A cosmetics module's switch (on when the module isn't there at all). */
+	public static boolean moduleOn(String id) {
+		return net.veloclient.velo.module.ModuleRegistry.get(id).map(net.veloclient.velo.module.Module::isEnabled).orElse(true);
 	}
 
 	public static void equip(String capeId) {
@@ -618,9 +624,22 @@ public final class CapeManager {
 		return registerPreloadedTexture(definitionId, image, label, false);
 	}
 
+	private static final java.util.Map<Identifier, int[]> TEXTURE_SIZES = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** Remembers a cape texture's real size - cropped HD art (22x17 cape px) and the full 64x32 layout map differently. */
+	public static void noteTextureSize(Identifier id, int width, int height) {
+		TEXTURE_SIZES.put(id, new int[] {width, height});
+	}
+
+	/** {width, height} of a registered cape texture, or null when unknown (then it's the plain 64x32 layout). */
+	public static int[] textureSize(Identifier id) {
+		return id == null ? null : TEXTURE_SIZES.get(id);
+	}
+
 	/** {@code smooth}: sampled bilinearly (painted art, not pixel art). */
 	public static Identifier registerPreloadedTexture(String definitionId, NativeImage image, String label, boolean smooth) {
 		Identifier identifier = Identifier.of("velo-client", "cape_" + definitionId.replace('-', '_'));
+		noteTextureSize(identifier, image.getWidth(), image.getHeight());
 		MinecraftClient.getInstance().getTextureManager()
 				.registerTexture(identifier, smooth ? new AnimatedCapeAsset.SmoothTexture(() -> label, image) : new NativeImageBackedTexture(() -> label, image));
 		TEXTURE_CACHE.put(definitionId, identifier);
@@ -714,6 +733,7 @@ public final class CapeManager {
 			while ((entry = zip.getNextEntry()) != null) {
 				if (entry.getName().equals(entryName)) {
 					NativeImage image = NativeImage.read(zip);
+					noteTextureSize(identifier, image.getWidth(), image.getHeight());
 					MinecraftClient.getInstance().getTextureManager()
 							.registerTexture(identifier, new NativeImageBackedTexture(() -> definition.name(), image));
 					return Optional.of(identifier);

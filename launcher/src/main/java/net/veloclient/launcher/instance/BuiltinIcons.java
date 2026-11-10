@@ -31,6 +31,8 @@ public final class BuiltinIcons {
 	}
 
 	/** Renders a builtin icon into a rounded tile sized {@code size}x{@code size}. */
+	private static final java.util.Map<String, Image> ICONS = new java.util.concurrent.ConcurrentHashMap<>();
+
 	public static StackPane render(String id, double size, Color accentStart, Color accentEnd) {
 		StackPane tile = new StackPane();
 		tile.setPrefSize(size, size);
@@ -41,9 +43,10 @@ public final class BuiltinIcons {
 				+ toRgba(accentStart) + ", " + toRgba(accentEnd) + ");");
 
 		String resolvedId = IDS.contains(id) ? id : DEFAULT;
-		ImageView view = new ImageView(new Image(
+		// decoded + smooth-scaled once per icon and size (every Library visit used to decode every profile's PNG again)
+		ImageView view = new ImageView(ICONS.computeIfAbsent(resolvedId + "@" + Math.round(size), k -> new Image(
 				BuiltinIcons.class.getResourceAsStream("/net/veloclient/launcher/images/icons/" + resolvedId + ".png"),
-				size * 0.68, size * 0.68, true, true));
+				size * 0.68, size * 0.68, true, true)));
 		StackPane.setAlignment(view, Pos.CENTER);
 		tile.getChildren().add(view);
 		return tile;

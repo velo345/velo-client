@@ -65,7 +65,8 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 
 	@Override
 	protected String[] headerTabs() {
-		return CapeEquipScreen.LOCKER_TABS;
+		// kinds are the cards above the catalog (launcher layout)
+		return new String[0];
 	}
 
 	@Override
@@ -111,7 +112,8 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 	}
 
 	private int stageX() {
-		return contentX() + CapeEquipScreen.SLOTS_W + 12;
+		CapeEquipScreen.frame(contentX(), contentY(), contentWidth(), contentBottom());
+		return CapeEquipScreen.stageX();
 	}
 
 	private int editorX() {
@@ -141,8 +143,8 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 		int x = stageX();
 		int y = contentY();
 		int w = CapeEquipScreen.SHOWCASE_WIDTH;
-		int h = contentBottom() - y;
-		VeloDraw.fillRounded(context, x, y, w, h, 10, 0xFF111116);
+		int h = CapeEquipScreen.stageBottom() - y;
+		VeloDraw.fillRounded(context, x, y, w, h, 10, 0xFF100D0D);
 		VeloDraw.fillRoundedGradient(context, x, y, w, h, 10, VeloUi.withAlpha(MenuKit.accent(), 0x14), 0x00111116);
 		VeloDraw.strokeRounded(context, x, y, w, h, 10, 0x17FFFFFF);
 		String name = playerName();
@@ -195,7 +197,7 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 				: enabled ? "On. Every Velo player sees your name like this, wherever you picked."
 				: "Off. Switch it on at the top right to show it.";
 		for (Text line : MenuKit.wrap(this.textRenderer, note, MenuKit::ui, w - 24)) {
-			if (noteY + 10 > contentBottom() - 8) {
+			if (noteY + 10 > CapeEquipScreen.stageBottom() - 8) {
 				break;
 			}
 			MenuKit.text(context, this.textRenderer, line, x + 12, noteY, MenuKit.TEXT_2);
@@ -206,7 +208,7 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 	private void renderEditor(DrawContext context, int mouseX, int mouseY) {
 		int x = editorX();
 		int w = editorWidth();
-		editorTop = contentY();
+		editorTop = CapeEquipScreen.rightTop();
 		editorBottom = contentBottom();
 		int maxScroll = Math.max(0, contentHeight - (editorBottom - editorTop));
 		scroll = Math.max(0, Math.min(maxScroll, scroll));
@@ -251,7 +253,7 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 	}
 
 	private int header(DrawContext context, int x, int y, int w, int mouseX, int mouseY) {
-		VeloDraw.fillRounded(context, x, y, w, 40, 8, 0xFF131318);
+		VeloDraw.fillRounded(context, x, y, w, 40, 8, 0xFF141011);
 		VeloDraw.strokeRounded(context, x, y, w, 40, 8, plus() ? 0x17FFFFFF : VeloUi.withAlpha(0xFFFF2D3C, 0x70));
 		MenuKit.text(context, this.textRenderer, MenuKit.uiBold("Name Style"), x + 12, y + 9, MenuKit.TEXT);
 		String sub = plus() ? style.effect().label + " · " + style.colors().length + (style.colors().length == 1 ? " colour" : " colours")
@@ -343,7 +345,7 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 			boolean selected = i == selectedColor;
 			if (selected) {
 				VeloDraw.fillCircle(context, cx, cy, size / 2 + 3, 0xFFFFFFFF);
-				VeloDraw.fillCircle(context, cx, cy, size / 2 + 1.5f, 0xFF131318);
+				VeloDraw.fillCircle(context, cx, cy, size / 2 + 1.5f, 0xFF141011);
 			} else if (hovered) {
 				VeloDraw.fillCircle(context, cx, cy, size / 2 + 2, 0x50FFFFFF);
 			}
@@ -588,7 +590,7 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 
 	private void tile(DrawContext context, int x, int y, int w, int h, boolean selected, int mouseX, int mouseY) {
 		boolean hovered = MenuKit.inside(mouseX, mouseY, x, y, w, h) && mouseY >= editorTop && mouseY < editorBottom;
-		VeloDraw.fillRounded(context, x, y, w, h, 7, selected ? VeloUi.withAlpha(MenuKit.accent(), 0x1F) : hovered ? 0xFF1A1A21 : 0xFF131318);
+		VeloDraw.fillRounded(context, x, y, w, h, 7, selected ? VeloUi.withAlpha(MenuKit.accent(), 0x1F) : hovered ? 0xFF1A1516 : 0xFF141011);
 		VeloDraw.strokeRounded(context, x, y, w, h, 7, selected ? VeloUi.withAlpha(MenuKit.accent(), 0xB0) : hovered ? 0x30FFFFFF : 0x17FFFFFF);
 	}
 

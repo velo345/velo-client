@@ -63,7 +63,8 @@ public final class KillFxLockerScreen extends VeloWindow implements net.veloclie
 
 	@Override
 	protected String[] headerTabs() {
-		return CapeEquipScreen.LOCKER_TABS;
+		// kinds are the cards above the catalog (launcher layout)
+		return new String[0];
 	}
 
 	@Override
@@ -80,7 +81,8 @@ public final class KillFxLockerScreen extends VeloWindow implements net.veloclie
 	}
 
 	private int stageX() {
-		return contentX() + CapeEquipScreen.SLOTS_W + 12;
+		CapeEquipScreen.frame(contentX(), contentY(), contentWidth(), contentBottom());
+		return CapeEquipScreen.stageX();
 	}
 
 	private int panelX() {
@@ -89,10 +91,11 @@ public final class KillFxLockerScreen extends VeloWindow implements net.veloclie
 
 	@Override
 	protected void layoutContent() {
+		CapeEquipScreen.frame(contentX(), contentY(), contentWidth(), contentBottom());
 		this.clearChildren();
 		int px = panelX();
 		int pw = contentX() + contentWidth() - px;
-		addDrawableChild(new VeloSlider(px, contentY() + 76, Math.min(240, pw), 18, "Volume", 0, 1.5, KillFxManager::volume,
+		addDrawableChild(new VeloSlider(px, CapeEquipScreen.rightTop() + 76, Math.min(240, pw), 18, "Volume", 0, 1.5, KillFxManager::volume,
 				v -> KillFxManager.setVolume((float) v), v -> Math.round(v * 20) / 20.0, v -> Math.round(v * 100) + "%"));
 	}
 
@@ -118,13 +121,14 @@ public final class KillFxLockerScreen extends VeloWindow implements net.veloclie
 	@Override
 	protected void renderContentLayer(DrawContext context, int mouseX, int mouseY, float delta) {
 		hits.clear();
+		CapeEquipScreen.frame(contentX(), contentY(), contentWidth(), contentBottom());
 		CapeEquipScreen.drawSlots(context, this.textRenderer, contentX(), contentY(), CapeEquipScreen.KILLFX_TAB, mouseX, mouseY);
 		CapeEquipScreen.drawLoadouts(context, this.textRenderer, contentX(), contentY(), contentBottom(), mouseX, mouseY);
 		renderStage(context);
 
 		int px = panelX();
 		int pw = contentX() + contentWidth() - px;
-		int y = contentY();
+		int y = CapeEquipScreen.rightTop();
 		String equipped = KillFxManager.equippedId();
 		boolean isEquipped = selected.isEmpty() ? equipped == null : selected.equals(equipped);
 		boolean owned = selected.isEmpty() || KillFxManager.owns(selected);
@@ -200,7 +204,7 @@ public final class KillFxLockerScreen extends VeloWindow implements net.veloclie
 		int x = stageX();
 		int y = contentY();
 		int w = CapeEquipScreen.SHOWCASE_WIDTH;
-		int h = contentBottom() - y;
+		int h = CapeEquipScreen.stageBottom() - y;
 		VeloDraw.fillRounded(context, x, y, w, h, 10, 0xFF0E0E14);
 		VeloDraw.strokeRounded(context, x, y, w, h, 10, 0x17FFFFFF);
 		if (KillFxManager.IDS.contains(selected)) {

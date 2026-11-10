@@ -65,7 +65,8 @@ public final class VeloSkinsScreen extends VeloWindow implements net.veloclient.
 
 	@Override
 	protected String[] headerTabs() {
-		return CapeEquipScreen.LOCKER_TABS;
+		// kinds are the cards above the catalog (launcher layout)
+		return new String[0];
 	}
 
 	@Override
@@ -82,7 +83,8 @@ public final class VeloSkinsScreen extends VeloWindow implements net.veloclient.
 	}
 
 	private int showcaseX() {
-		return contentX() + CapeEquipScreen.SLOTS_W + 12;
+		CapeEquipScreen.frame(contentX(), contentY(), contentWidth(), contentBottom());
+		return CapeEquipScreen.stageX();
 	}
 
 	private int gridX() {
@@ -95,7 +97,8 @@ public final class VeloSkinsScreen extends VeloWindow implements net.veloclient.
 
 	/** The toolbar under the heading: username box, Add, then arms + Import PNG on the right. */
 	private int toolbarY() {
-		return contentY() + 22;
+		CapeEquipScreen.frame(contentX(), contentY(), contentWidth(), contentBottom());
+		return CapeEquipScreen.rightTop() + 22;
 	}
 
 	private int fieldWidth() {
@@ -114,7 +117,7 @@ public final class VeloSkinsScreen extends VeloWindow implements net.veloclient.
 		int x = showcaseX() + 6;
 		int y = contentY() + 6;
 		int w = CapeEquipScreen.SHOWCASE_WIDTH - 12;
-		int h = contentBottom() - contentY() - 76;
+		int h = CapeEquipScreen.stageBottom() - contentY() - 76;
 		// Your player wearing the skin, with your cape, wings and aura (on the title screen too).
 		preview = new net.veloclient.velo.client.gui.widget.EntityPreviewWidget(x, y, w, h).noStage().zoom(1.35f).spin(0f, 20f);
 		addDrawableChild(preview);
@@ -243,6 +246,7 @@ public final class VeloSkinsScreen extends VeloWindow implements net.veloclient.
 			net.veloclient.velo.client.skins.SkinTryOn.set(texture(shown), shown.slim());
 		}
 		renderShowcase(context, mouseX, mouseY);
+		CapeEquipScreen.drawArmorToggle(context, this.textRenderer, mouseX, mouseY);
 	}
 
 	/** Heading, toolbar and the skin cards. */
@@ -251,13 +255,13 @@ public final class VeloSkinsScreen extends VeloWindow implements net.veloclient.
 		int width = gridW();
 		List<SkinLibrary.Skin> library = SkinLibrary.all();
 		Text heading = MenuKit.display("Skins");
-		MenuKit.text(context, this.textRenderer, heading, x, contentY() + 1, MenuKit.TEXT);
+		MenuKit.text(context, this.textRenderer, heading, x, CapeEquipScreen.rightTop() + 1, MenuKit.TEXT);
 		Text count = MenuKit.small(library.size() + " SAVED");
 		int hx = x + this.textRenderer.getWidth(heading) + 8;
-		MenuKit.text(context, this.textRenderer, count, hx, contentY() + 4, MenuKit.TEXT_3);
+		MenuKit.text(context, this.textRenderer, count, hx, CapeEquipScreen.rightTop() + 4, MenuKit.TEXT_3);
 		Text hint = MenuKit.ui("hover or click one to try it on");
 		if (hx + this.textRenderer.getWidth(count) + 16 + this.textRenderer.getWidth(hint) <= x + width) {
-			MenuKit.text(context, this.textRenderer, hint, x + width - this.textRenderer.getWidth(hint), contentY() + 2, MenuKit.TEXT_3);
+			MenuKit.text(context, this.textRenderer, hint, x + width - this.textRenderer.getWidth(hint), CapeEquipScreen.rightTop() + 2, MenuKit.TEXT_3);
 		}
 
 		// Toolbar: [search icon | username box] [Add]   ...   [Classic | Slim] [Import PNG]
@@ -273,7 +277,7 @@ public final class VeloSkinsScreen extends VeloWindow implements net.veloclient.
 		// Arms for imported PNGs: a two-way segmented switch.
 		int segW = 46;
 		int sx = ix - 8 - segW * 2;
-		VeloDraw.fillRounded(context, sx, ty, segW * 2, 24, 7, 0xFF131318);
+		VeloDraw.fillRounded(context, sx, ty, segW * 2, 24, 7, 0xFF141011);
 		VeloDraw.strokeRounded(context, sx, ty, segW * 2, 24, 7, 0x17FFFFFF);
 		VeloDraw.fillRounded(context, sx + 2 + (slimImport ? segW : 0), ty + 2, segW - 4, 20, 5, VeloUi.withAlpha(MenuKit.accent(), 0x40));
 		for (int i = 0; i < 2; i++) {
@@ -316,7 +320,7 @@ public final class VeloSkinsScreen extends VeloWindow implements net.veloclient.
 			}
 			float t = MenuKit.hover(skin == null ? "skin:current" : "skin:" + skin.id(), hovered);
 			int edge = selected ? MenuKit.accent() : VeloAnim.lerpArgb(0x17FFFFFF, 0x38FFFFFF, t);
-			VeloDraw.fillRounded(context, cx, cy, cardW, CARD_H, 9, VeloAnim.lerpArgb(0xFF131318, 0xFF1A1A21, t));
+			VeloDraw.fillRounded(context, cx, cy, cardW, CARD_H, 9, VeloAnim.lerpArgb(0xFF141011, 0xFF1A1516, t));
 			if (selected) {
 				VeloDraw.fillRoundedGradient(context, cx, cy, cardW, CARD_H, 9, VeloUi.withAlpha(MenuKit.accent(), 0x1C), 0x00131318);
 			}
@@ -400,14 +404,14 @@ public final class VeloSkinsScreen extends VeloWindow implements net.veloclient.
 		int x = showcaseX();
 		int y = contentY();
 		int w = CapeEquipScreen.SHOWCASE_WIDTH;
-		int h = contentBottom() - y;
-		VeloDraw.fillRounded(context, x, y, w, h, 10, 0xFF111116);
+		int h = CapeEquipScreen.stageBottom() - y;
+		VeloDraw.fillRounded(context, x, y, w, h, 10, 0xFF100D0D);
 		VeloDraw.fillRoundedGradient(context, x, y, w, h, 10, VeloUi.withAlpha(MenuKit.accent(), 0x14), 0x00111116);
 		VeloDraw.strokeRounded(context, x, y, w, h, 10, 0x17FFFFFF);
 		SkinLibrary.Skin skin = previewSkin();
 		boolean slim = skin == null ? net.veloclient.velo.client.gui.widget.SkinModelPreview.currentSlim() : skin.slim();
 		String name = skin == null ? "Your account's skin" : skin.name();
-		int by = contentBottom() - 30;
+		int by = CapeEquipScreen.stageBottom() - 30;
 		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.displaySm(name), w - 16), x + 10, by - 34, MenuKit.TEXT);
 		MenuKit.text(context, this.textRenderer, MenuKit.ui((slim ? "Slim" : "Classic") + " arms  ·  drag to turn"), x + 10, by - 19, MenuKit.TEXT_3);
 		if (skin == null) {

@@ -147,7 +147,7 @@ public final class AuraFx {
 
 	/** One cached still picture using the supplied per-aura settings. */
 	public static javafx.scene.image.Image snapshot(AuraEffects.Kind kind, AuraEffects.Settings settings, double width, double height) {
-		return SNAPSHOTS.computeIfAbsent(kind + "@" + settings.encode() + "@" + (int) width + "x" + (int) height, k -> {
+		return SNAPSHOTS.computeIfAbsent(kind + "@" + settings.encode() + "@" + (int) width + "x" + (int) height, k -> onDisk(k, () -> {
 			AuraEffects.Emitter emitter = new AuraEffects.Emitter(kind);
 			for (int i = 0; i < 90; i++) {
 				emitter.update(1 / 30f, settings, 0, 0, 0);
@@ -163,7 +163,66 @@ public final class AuraFx {
 			javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
 			params.setFill(Color.TRANSPARENT);
 			return canvas.snapshot(params, null);
-		});
+		}));
+	}
+
+	// ---- Card stills kept on disk ----
+	// Opening the Store drew every aura/kill effect card from scratch: the HD particle atlas decoded and scaled (~80 ms),
+	// 90 simulation steps and a canvas snapshot per card. The stills are now saved as small PNGs; the key carries the
+	// launcher build (jar/class dates) so a changed effect is redrawn.
+
+	private static String diskStamp;
+
+	private static String diskStamp() {
+		if (diskStamp == null) {
+			long stamp = 0;
+			for (Class<?> c : new Class<?>[] {AuraFx.class, AuraEffects.class, net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.class}) {
+				try {
+					var url = c.getResource(c.getSimpleName() + ".class");
+					var conn = url == null ? null : url.openConnection();
+					if (conn != null) {
+						stamp = stamp * 31 + conn.getLastModified();
+						conn.getInputStream().close();
+					}
+				} catch (Exception ignored) {
+					// no date: the version alone
+				}
+			}
+			diskStamp = net.veloclient.launcher.AppVersion.VERSION + "-" + Long.toHexString(stamp);
+		}
+		return diskStamp;
+	}
+
+	private static java.nio.file.Path diskFile(String key) {
+		String full = key + "#" + diskStamp();
+		String name = Integer.toHexString(full.hashCode()) + Integer.toHexString(new StringBuilder(full).reverse().toString().hashCode());
+		return net.veloclient.launcher.data.VeloPaths.root().resolve("cache").resolve("fx-stills").resolve(name + ".png");
+	}
+
+	/** {@code render} once per key and launcher build: later the PNG from disk (FX thread). */
+	private static javafx.scene.image.Image onDisk(String key, Supplier<javafx.scene.image.Image> render) {
+		java.nio.file.Path file = diskFile(key);
+		if (java.nio.file.Files.isRegularFile(file)) {
+			javafx.scene.image.Image image = new javafx.scene.image.Image(file.toUri().toString());
+			if (!image.isError() && image.getWidth() > 0) {
+				return image;
+			}
+		}
+		javafx.scene.image.Image image = render.get();
+		if (image != null) {
+			java.awt.image.BufferedImage copy = javafx.embed.swing.SwingFXUtils.fromFXImage(image, null);
+			Thread.ofVirtual().start(() -> {
+				try {
+					java.nio.file.Files.createDirectories(file.getParent());
+					java.nio.file.Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+					javax.imageio.ImageIO.write(copy, "png", tmp.toFile());
+					java.nio.file.Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+				} catch (Exception ignored) {
+					// drawn again next time
+				}
+			});
+		}
+		return image;
 	}
 
 	/**
@@ -366,7 +425,7 @@ public final class AuraFx {
 	/** A still of a kill effect at its most striking moment (cards in long lists). FX thread; cached. */
 	public static javafx.scene.image.Image killFxSnapshot(net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.Kind kind, AuraEffects.Settings settings,
 			double width, double height) {
-		return SNAPSHOTS.computeIfAbsent("killfx:" + kind + "@" + settings.encode() + "@" + (int) width + "x" + (int) height, key -> {
+		return SNAPSHOTS.computeIfAbsent("killfx:" + kind + "@" + settings.encode() + "@" + (int) width + "x" + (int) height, key -> onDisk(key, () -> {
 			var burst = killBurst(kind, 0.45);
 			for (int i = 0; i < Math.round(net.veloclient.velo.client.cosmetics.killfx.KillFxEffects.highlight(kind) * 30); i++) {
 				burst.update(1 / 30f, settings);
@@ -379,7 +438,7 @@ public final class AuraFx {
 			javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
 			params.setFill(Color.TRANSPARENT);
 			return canvas.snapshot(params, null);
-		});
+		}));
 	}
 
 	/** Every frame of one play of a kill effect (exported as the website's previews by AuraPreviewExport). FX thread. */
@@ -562,7 +621,7 @@ public final class AuraFx {
 		}
 		int size = 48;
 		javafx.scene.image.WritableImage image = new javafx.scene.image.WritableImage(size, size);
-		javafx.scene.image.PixelWriter writer = image.getPixelWriter();
+		int[] px = new int[size * size];
 		int r = ((key >> 8) & 15) * 17;
 		int gr = ((key >> 4) & 15) * 17;
 		int b = (key & 15) * 17;
@@ -572,9 +631,10 @@ public final class AuraFx {
 				double dy = (y + 0.5) / size * 2 - 1;
 				double d = Math.hypot(dx, dy);
 				double a = d >= 1 ? 0 : (Math.exp(-d * d * 9) * 0.85 + Math.exp(-d * d * 2.5) * 0.35) * Math.sqrt(1 - d);
-				writer.setArgb(x, y, ((int) Math.round(Math.min(1, a) * 255) << 24) | (r << 16) | (gr << 8) | b);
+				px[y * size + x] = ((int) Math.round(Math.min(1, a) * 255) << 24) | (r << 16) | (gr << 8) | b;
 			}
 		}
+		image.getPixelWriter().setPixels(0, 0, size, size, javafx.scene.image.PixelFormat.getIntArgbInstance(), px, 0, size);
 		GLOWS.put(key, image);
 		return image;
 	}
@@ -594,24 +654,31 @@ public final class AuraFx {
 			CELLS.clear();
 		}
 		if (atlas == null) {
-			try (var in = AuraFx.class.getResourceAsStream("/net/veloclient/launcher/aura/atlas.png")) {
-				atlas = in == null ? new javafx.scene.image.WritableImage(CELL_PX * AuraEffects.ATLAS_COLUMNS, CELL_PX * AuraEffects.ATLAS_ROWS)
-						: new javafx.scene.image.Image(in, CELL_PX * AuraEffects.ATLAS_COLUMNS, CELL_PX * AuraEffects.ATLAS_ROWS, false, true);
-			} catch (java.io.IOException e) {
+			// The HD atlas (8x8 cells of 256 px) scaled to 64 px cells took ~70 ms to decode: the scaled copy is kept on disk.
+			atlas = onDisk("atlas@" + CELL_PX, () -> {
+				try (var in = AuraFx.class.getResourceAsStream("/net/veloclient/launcher/aura/atlas.png")) {
+					if (in != null) {
+						return new javafx.scene.image.Image(in, CELL_PX * AuraEffects.ATLAS_COLUMNS, CELL_PX * AuraEffects.ATLAS_ROWS, false, true);
+					}
+				} catch (java.io.IOException ignored) {
+					// empty atlas below
+				}
+				return null;
+			});
+			if (atlas == null) {
 				atlas = new javafx.scene.image.WritableImage(CELL_PX * AuraEffects.ATLAS_COLUMNS, CELL_PX * AuraEffects.ATLAS_ROWS);
 			}
 		}
-		javafx.scene.image.PixelReader reader = atlas.getPixelReader();
 		javafx.scene.image.WritableImage image = new javafx.scene.image.WritableImage(CELL_PX, CELL_PX);
-		javafx.scene.image.PixelWriter writer = image.getPixelWriter();
 		int ox = (cell % AuraEffects.ATLAS_COLUMNS) * CELL_PX;
 		int oy = (cell / AuraEffects.ATLAS_COLUMNS) * CELL_PX;
 		int tint = rgb & 0xF0F0F0 | 0x080808;
-		for (int y = 0; y < CELL_PX; y++) {
-			for (int x = 0; x < CELL_PX; x++) {
-				writer.setArgb(x, y, (reader.getArgb(ox + x, oy + y) & 0xFF000000) | tint);
-			}
+		int[] px = new int[CELL_PX * CELL_PX];
+		atlas.getPixelReader().getPixels(ox, oy, CELL_PX, CELL_PX, javafx.scene.image.PixelFormat.getIntArgbInstance(), px, 0, CELL_PX);
+		for (int i = 0; i < px.length; i++) {
+			px[i] = (px[i] & 0xFF000000) | tint;
 		}
+		image.getPixelWriter().setPixels(0, 0, CELL_PX, CELL_PX, javafx.scene.image.PixelFormat.getIntArgbInstance(), px, 0, CELL_PX);
 		CELLS.put(key, image);
 		return image;
 	}

@@ -107,6 +107,43 @@ public final class SkinLibrary {
 	}
 
 	/** Copies a player's current skin (by username or UUID) from Mojang. */
+	/** A saved skin with exactly these pixels (the file's encoding doesn't matter), or null. */
+	public static Skin findSame(byte[] png) {
+		int[] wanted = pixels(png);
+		if (wanted == null) {
+			return null;
+		}
+		for (Skin skin : all()) {
+			try {
+				int[] have = pixels(java.nio.file.Files.readAllBytes(png(skin)));
+				if (have != null && java.util.Arrays.equals(have, wanted)) {
+					return skin;
+				}
+			} catch (IOException ignored) {
+				// unreadable file: not a match
+			}
+		}
+		return null;
+	}
+
+	private static int[] pixels(byte[] png) {
+		try {
+			java.awt.image.BufferedImage image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
+			if (image == null) {
+				return null;
+			}
+			int w = image.getWidth(), h = image.getHeight();
+			int[] out = image.getRGB(0, 0, w, h, null, 0, w);
+			int[] withSize = new int[out.length + 2];
+			withSize[0] = w;
+			withSize[1] = h;
+			System.arraycopy(out, 0, withSize, 2, out.length);
+			return withSize;
+		} catch (IOException e) {
+			return null;
+		}
+	}
+
 	public static Skin addFromPlayer(String nameOrUuid) throws IOException, InterruptedException {
 		String query = nameOrUuid.trim();
 		String uuid = query.replace("-", "");

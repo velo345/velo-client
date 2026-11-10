@@ -99,7 +99,7 @@ public final class TotemPopsModule extends AbstractModule implements HudModule, 
 
 	@Override
 	public void render(DrawContext context, int x, int y, float tickDelta) {
-		boolean editing = net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.HudEditScreen;
+		boolean editing = net.veloclient.velo.client.hud.HudSample.active();
 		if (totem == null) {
 			totem = new ItemStack(Items.TOTEM_OF_UNDYING);
 		}
