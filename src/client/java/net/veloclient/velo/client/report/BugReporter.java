@@ -163,6 +163,12 @@ public final class BugReporter {
 	 */
 	public static void send(String kind, String title, String message, Map<String, String> system, boolean includeLogs, Path crashFile,
 			Consumer<String> onSent, Consumer<String> onError) {
+		send(kind, title, message, system, includeLogs, crashFile, null, onSent, onError);
+	}
+
+	/** {@code spikes} non-null: a lag spike analysis ({@link SpikeRecorder}), added at the end of the log. */
+	public static void send(String kind, String title, String message, Map<String, String> system, boolean includeLogs, Path crashFile,
+			String spikes, Consumer<String> onSent, Consumer<String> onError) {
 		List<String> mods = mods();
 		List<String> modules = enabledModules();
 		//? if <26.1 {
@@ -191,6 +197,12 @@ public final class BugReporter {
 					if (crashFile != null) {
 						report.addProperty("crash", Files.readString(crashFile, StandardCharsets.UTF_8));
 					}
+				}
+				if (spikes != null) {
+					// at the end: the server trims an oversized log from the front
+					String log = report.has("log") ? report.get("log").getAsString() + "\n\n" : "";
+					report.addProperty("log", log + spikes);
+					sys.addProperty("Lag spike report", "attached (end of the log)");
 				}
 				String base = VeloServerClient.serverBaseUrl();
 				if (base == null) {

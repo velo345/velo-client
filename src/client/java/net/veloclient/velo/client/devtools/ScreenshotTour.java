@@ -579,6 +579,165 @@ public final class ScreenshotTour {
 						client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null));
 					}},
 					new Object[] {60, (Runnable) () -> shot(client, "store-capes")});
+			// 2026-11-15 fixes in one run: primed TNT with Turbo's block model memo, Color Grading, Motion Blur while turning.
+			case "postfx" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				steps.add(new Object[] {0, (Runnable) () -> {
+					client.setScreen(null);
+					net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo = true;
+					postfxCommand(client, "execute as @p at @p run summon tnt ^ ^1 ^4 {fuse:1200}");
+					postfxCommand(client, "execute as @p at @p run summon falling_block ^2 ^3 ^5 {BlockState:{Name:\"minecraft:gold_block\"},NoGravity:1b,Time:-2000}");
+				}});
+				steps.add(new Object[] {40, (Runnable) () -> shot(client, "postfx-tnt")});
+				steps.add(new Object[] {0, (Runnable) () -> ModuleRegistry.get("color-grading").ifPresent(m -> m.setEnabled(true))});
+				steps.add(new Object[] {25, (Runnable) () -> shot(client, "postfx-grade")});
+				steps.add(new Object[] {0, (Runnable) () -> {
+					ModuleRegistry.get("color-grading").ifPresent(m -> m.setEnabled(false));
+					ModuleRegistry.get("motion-blur").ifPresent(m -> m.setEnabled(true));
+				}});
+				for (int i = 0; i < 24; i++) {
+					steps.add(new Object[] {1, (Runnable) () -> postfxTurn(client, 9f)});
+				}
+				steps.add(new Object[] {0, (Runnable) () -> shot(client, "postfx-motion")});
+				steps.add(new Object[] {20, (Runnable) () -> shot(client, "postfx-motion-still")});
+				steps.add(new Object[] {0, (Runnable) () -> ModuleRegistry.get("motion-blur").ifPresent(m -> m.setEnabled(false))});
+				yield steps;
+			}
+			// Spike hunt (2026-11-15: "frame drops for a split second when looking at chests"): a ring of containers, then
+			// look away and back at them every 20 ticks while JFR records blocking events on the render thread.
+			case "chestlook" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				steps.add(new Object[] {0, (Runnable) () -> {
+					client.setScreen(null);
+					postfxCommand(client, "execute as @p at @p run fill ^-3 ^ ^3 ^3 ^ ^3 chest");
+					postfxCommand(client, "execute as @p at @p run fill ^-3 ^1 ^3 ^3 ^1 ^3 barrel");
+					postfxCommand(client, "execute as @p at @p run setblock ^ ^ ^2 ender_chest");
+					postfxCommand(client, "execute as @p at @p run setblock ^1 ^ ^2 trapped_chest");
+					postfxCommand(client, "execute as @p at @p run setblock ^-1 ^ ^2 shulker_box");
+				}});
+				for (int round = 0; round < 12; round++) {
+					steps.add(new Object[] {20, (Runnable) () -> postfxTurn(client, 180f)});
+					steps.add(new Object[] {20, (Runnable) () -> postfxTurn(client, 180f)});
+					for (int k = 0; k < 6; k++) {
+						steps.add(new Object[] {2, (Runnable) () -> postfxTurn(client, 4f)});
+					}
+					for (int k = 0; k < 6; k++) {
+						steps.add(new Object[] {2, (Runnable) () -> postfxTurn(client, -4f)});
+					}
+				}
+				steps.add(new Object[] {0, (Runnable) () -> shot(client, "chestlook")});
+				yield steps;
+			}
+			case "youtube" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				steps.add(new Object[] {0, (Runnable) () -> {
+					net.veloclient.velo.client.youtube.YouTubeOverlay.devSource(0);
+					client.setScreen(new net.veloclient.velo.client.youtube.YouTubeScreen());
+				}});
+				steps.add(new Object[] {5, (Runnable) () -> net.veloclient.velo.client.youtube.YouTubeOverlay.search("minecraft pvp montage")});
+				steps.add(new Object[] {160, (Runnable) () -> shot(client, "youtube-search")});
+				steps.add(new Object[] {0, (Runnable) () -> net.veloclient.velo.client.youtube.YouTubeOverlay.play("j3LsnE155C4", null, null)});
+				steps.add(new Object[] {260, (Runnable) () -> shot(client, "youtube-window")});
+				steps.add(new Object[] {0, (Runnable) net.veloclient.velo.client.youtube.YouTubeOverlay::togglePause});
+				steps.add(new Object[] {12, (Runnable) () -> shot(client, "youtube-paused")});
+				steps.add(new Object[] {0, (Runnable) () -> {
+					net.veloclient.velo.client.youtube.YouTubeOverlay.togglePause();
+					net.veloclient.velo.client.youtube.YouTubeOverlay.search("velo client");
+				}});
+				steps.add(new Object[] {120, (Runnable) () -> shot(client, "youtube-panel")});
+				steps.add(new Object[] {0, (Runnable) () -> client.setScreen(null)});
+				steps.add(new Object[] {40, (Runnable) () -> shot(client, "youtube-pip")});
+				steps.add(new Object[] {0, (Runnable) () -> {
+					client.setScreen(new net.veloclient.velo.client.youtube.YouTubeScreen());
+					net.veloclient.velo.client.youtube.YouTubeOverlay.devSource(3);
+					net.veloclient.velo.client.youtube.YouTubeOverlay.stop();
+				}});
+				steps.add(new Object[] {20, (Runnable) () -> shot(client, "youtube-files")});
+				steps.add(new Object[] {0, (Runnable) net.veloclient.velo.client.youtube.YouTubeOverlay::devShorts});
+				steps.add(new Object[] {320, (Runnable) () -> shot(client, "youtube-shorts")});
+				yield steps;
+			}
+			case "lyrics" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				steps.add(new Object[] {0, (Runnable) () -> {
+					net.veloclient.velo.client.lyrics.LyricsModule.applyPreset("Concert Sky");
+					net.veloclient.velo.client.lyrics.LyricsModule.openStudio();
+				}});
+				int n = 0;
+				for (String preset : List.of("Concert Sky", "Starfield", "Aurora", "Golden Hour", "Neon Night", "Hologram", "Karaoke", "Comic", "Fire", "Frost", "Rainbow Party", "Vaporwave", "Terminal", "Ghost", "Retro", "Word Pop", "Cinematic", "Spotlight")) {
+					String shotName = "lyrics-" + preset.toLowerCase(java.util.Locale.ROOT).replace(' ', '-');
+					steps.add(new Object[] {n == 0 ? 60 : 0, (Runnable) () -> net.veloclient.velo.client.lyrics.LyricsModule.applyPreset(preset)});
+					steps.add(new Object[] {38, (Runnable) () -> shot(client, shotName + "-a")});
+					steps.add(new Object[] {9, (Runnable) () -> shot(client, shotName + "-b")});
+					n++;
+				}
+				yield steps;
+			}
+			case "post141" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				steps.add(new Object[] {0, (Runnable) () -> {
+					net.veloclient.velo.client.lyrics.LyricsModule.applyPreset("Concert Sky");
+					net.veloclient.velo.client.lyrics.LyricsModule.openStudio();
+				}});
+				int idx = 0;
+				for (String preset : List.of("Concert Sky", "Neon Night", "Comic", "Aurora", "Spotlight")) {
+					String file = "post-lyrics-" + preset.toLowerCase(java.util.Locale.ROOT).replace(' ', '-');
+					steps.add(new Object[] {idx == 0 ? 60 : 0, (Runnable) () -> net.veloclient.velo.client.lyrics.LyricsModule.applyPreset(preset)});
+					steps.add(new Object[] {44, (Runnable) () -> shot(client, file)});
+					idx++;
+				}
+				steps.add(new Object[] {0, (Runnable) () -> {
+					client.setScreen(null);
+					for (String id : List.of("mini-player", "inventory-hud", "module-list", "server-display", "custom-text", "fps-counter", "keystrokes")) {
+						ModuleRegistry.get(id).ifPresent(m -> m.setEnabled(true));
+					}
+				}});
+				steps.add(new Object[] {50, (Runnable) () -> shot(client, "post-hud")});
+				yield steps;
+			}
+			case "shorts" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				steps.add(new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.youtube.YouTubeScreen())});
+				steps.add(new Object[] {5, (Runnable) net.veloclient.velo.client.youtube.YouTubeOverlay::devShorts});
+				steps.add(new Object[] {320, (Runnable) () -> shot(client, "shorts-1")});
+				steps.add(new Object[] {0, (Runnable) () -> net.veloclient.velo.client.youtube.YouTubeOverlay.flick(1)});
+				steps.add(new Object[] {240, (Runnable) () -> shot(client, "shorts-2")});
+				steps.add(new Object[] {0, (Runnable) () -> client.setScreen(null)});
+				steps.add(new Object[] {40, (Runnable) () -> shot(client, "shorts-pip")});
+				yield steps;
+			}
+			case "lyricsglow" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				steps.add(new Object[] {0, (Runnable) () -> {
+					net.veloclient.velo.client.lyrics.LyricsModule.applyPreset("Neon Night");
+					net.veloclient.velo.client.lyrics.LyricsModule.openStudio();
+				}});
+				steps.add(new Object[] {60, (Runnable) () -> net.veloclient.velo.client.lyrics.LyricsModule.editForTour(s -> {
+					s.glowSize = 3;
+					s.glowStrength = 2.5;
+				})});
+				steps.add(new Object[] {30, (Runnable) () -> shot(client, "glow-neon-max")});
+				steps.add(new Object[] {0, (Runnable) () -> {
+					net.veloclient.velo.client.lyrics.LyricsModule.applyPreset("Concert Sky");
+					net.veloclient.velo.client.lyrics.LyricsModule.editForTour(s -> {
+						s.glowSize = 3;
+						s.glowStrength = 2.5;
+						s.showPrevious = true;
+					});
+				}});
+				steps.add(new Object[] {30, (Runnable) () -> shot(client, "glow-sky-max")});
+				steps.add(new Object[] {0, (Runnable) () -> {
+					net.veloclient.velo.client.lyrics.LyricsModule.applyPreset("Spotlight");
+					net.veloclient.velo.client.lyrics.LyricsModule.editForTour(s -> {
+						s.glowSize = 3;
+						s.glowStrength = 2.5;
+						s.showNext = true;
+						s.showPrevious = true;
+					});
+				}});
+				steps.add(new Object[] {30, (Runnable) () -> shot(client, "glow-2d-max")});
+				yield steps;
+			}
 			case "title1" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.TitleScreen())},
 					new Object[] {45, (Runnable) () -> shot(client, "title")});
@@ -2197,6 +2356,23 @@ public final class ScreenshotTour {
 					return;
 				}
 			}
+		}
+		*///?}
+	}
+
+	private static void postfxCommand(MinecraftClient client, String command) {
+		//? if >=26.2 {
+		/*var server = client.getSingleplayerServer();
+		if (server != null) {
+			server.execute(() -> server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), command));
+		}
+		*///?}
+	}
+
+	private static void postfxTurn(MinecraftClient client, float degrees) {
+		//? if >=26.2 {
+		/*if (client.player != null) {
+			client.player.setYRot(client.player.getYRot() + degrees);
 		}
 		*///?}
 	}

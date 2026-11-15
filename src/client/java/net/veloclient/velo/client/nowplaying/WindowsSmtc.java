@@ -27,13 +27,25 @@ final class WindowsSmtc implements MediaBackend {
 	private volatile MediaState latest;
 	private volatile long lineAt;
 	private long startedAt;
+	/** The helper said this Windows has no media session API: controls fall back to the keyboard's media keys. */
+	private volatile boolean unsupported;
+	/** The helper printed "ready" (the media session API works); until then commands use the media keys. */
+	private volatile boolean ready;
+	/** When the first helper of this session was started (System.nanoTime), 0 before. */
+	private long firstStart;
 
 	@Override
 	public MediaState poll() throws Exception {
 		ensureRunning();
 		// No line for a while: the helper hung (or the session manager did) - start over.
-		if (process != null && lineAt > 0 && System.nanoTime() - lineAt > 8_000_000_000L) {
+		if (process != null && !unsupported && lineAt > 0 && System.nanoTime() - lineAt > 8_000_000_000L) {
 			close();
+		}
+		boolean silent = !ready && firstStart != 0 && System.nanoTime() - firstStart > 6_000_000_000L;
+		if (unsupported || silent) {
+			// No session to read (API missing, or the helper never got going: blocked PowerShell, AV, crash loop) - still offer play/pause and skip, sent as media key presses.
+			return new MediaState("windows", "Media keys", "Play, pause and skip whatever is playing", null, null, 0, 0, System.nanoTime(), true, -1,
+					true, true, false);
 		}
 		return latest;
 	}
@@ -47,6 +59,9 @@ final class WindowsSmtc implements MediaBackend {
 			return;
 		}
 		startedAt = now;
+		if (firstStart == 0) {
+			firstStart = now;
+		}
 		Path script = Files.createTempFile("velo-nowplaying", ".ps1");
 		script.toFile().deleteOnExit();
 		try (InputStream in = WindowsSmtc.class.getResourceAsStream("/assets/velo-client/nowplaying/smtc.ps1")) {
@@ -88,7 +103,13 @@ final class WindowsSmtc implements MediaBackend {
 			while ((line = in.readLine()) != null) {
 				lineAt = System.nanoTime();
 				line = line.replace("\uFEFF", "").trim();
-				if (line.equals("none")) {
+				if (line.equals("unsupported")) {
+					unsupported = true;
+					latest = null;
+				} else if (line.equals("ready")) {
+					unsupported = false;
+					ready = true;
+				} else if (line.equals("none")) {
 					latest = null;
 				} else if (line.startsWith("{")) {
 					latest = parse(JsonParser.parseString(line).getAsJsonObject());
@@ -128,27 +149,39 @@ final class WindowsSmtc implements MediaBackend {
 		return e != null && !e.isJsonNull() && e.getAsBoolean();
 	}
 
-	private synchronized void send(String command) throws IOException {
+	private synchronized boolean send(String command) throws IOException {
 		ensureRunning();
-		if (commands != null) {
-			commands.write(command + "\n");
-			commands.flush();
+		if (commands != null && process != null && process.isAlive() && ready && !unsupported) {
+			try {
+				commands.write(command + "\n");
+				commands.flush();
+				return true;
+			} catch (IOException e) {
+				// helper died between the check and the write: fall through to the media keys
+			}
 		}
+		return false;
 	}
 
 	@Override
 	public void playPause(MediaState on) throws Exception {
-		send("toggle");
+		if (!send("toggle")) {
+			MediaKeys.press(MediaKeys.PLAY_PAUSE);
+		}
 	}
 
 	@Override
 	public void next(MediaState on) throws Exception {
-		send("next");
+		if (!send("next")) {
+			MediaKeys.press(MediaKeys.NEXT);
+		}
 	}
 
 	@Override
 	public void previous(MediaState on) throws Exception {
-		send("prev");
+		if (!send("prev")) {
+			MediaKeys.press(MediaKeys.PREVIOUS);
+		}
 	}
 
 	@Override
@@ -174,6 +207,7 @@ final class WindowsSmtc implements MediaBackend {
 			process = null;
 			commands = null;
 			startedAt = 0;
+			unsupported = false;
 		}
 		latest = null;
 	}

@@ -39,6 +39,21 @@ public final class NowPlaying {
 	private NowPlaying() {
 	}
 
+	private static final java.util.Set<String> USERS = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+	/** A module that needs the media session (Media Player, Lyrics): runs while at least one of them wants it. */
+	public static synchronized void acquire(String who) {
+		USERS.add(who);
+		start();
+	}
+
+	public static synchronized void release(String who) {
+		USERS.remove(who);
+		if (USERS.isEmpty()) {
+			stop();
+		}
+	}
+
 	public static synchronized void start() {
 		if (running) {
 			return;
@@ -154,8 +169,12 @@ public final class NowPlaying {
 				merged = merged.withPosition(mine.positionNow());
 			}
 			// Players report position coarsely: keep our smooth clock unless it's really off (a seek elsewhere).
-			if (merged == polled && mine.playing() == polled.playing() && Math.abs(mine.positionNow() - polled.positionNow()) < 1200) {
-				merged = merged.withPosition(mine.positionNow());
+			// ...but pull it a quarter of the way towards the player each poll, so a small offset doesn't stay forever
+			// (synced lyrics noticed: an early lag of a few hundred ms never went away)
+			long ours = mine.positionNow();
+			long theirs = polled.positionNow();
+			if (merged == polled && mine.playing() == polled.playing() && Math.abs(ours - theirs) < 1200) {
+				merged = merged.withPosition(ours + (theirs - ours) / 4);
 			}
 		} else {
 			playingHeldUntil = volumeHeldUntil = positionHeldUntil = 0;

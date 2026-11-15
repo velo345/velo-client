@@ -26,9 +26,16 @@ public abstract class TurboEntityVisibilityMixin {
 	@org.spongepowered.asm.mixin.Unique
 	private static long velo$frameNanos;
 
+	@org.spongepowered.asm.mixin.Unique
+	private static boolean velo$itemAnswer(net.minecraft.world.entity.Entity entity, boolean shown) {
+		if (entity instanceof EntityVisCache cache) {
+			cache.velo$visStore(-AntiFarmLagModule.itemPassId(), 0, 0, 0, 0f, 0f, 0f, 0, 0, 0, shown);
+		}
+		return shown;
+	}
+
 	@org.spongepowered.asm.mixin.injection.Inject(method = "extractVisibleEntities", at = @At("HEAD"))
 	private void velo$newItemFrame(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
-		AntiFarmLagModule.beginItemFrame();
 		net.minecraft.client.Camera camera = net.minecraft.client.Minecraft.getInstance().gameRenderer.mainCamera();
 		net.minecraft.world.phys.Vec3 pos = camera.position();
 		velo$camMoved = pos.x != velo$lastX || pos.y != velo$lastY || pos.z != velo$lastZ
@@ -39,6 +46,7 @@ public abstract class TurboEntityVisibilityMixin {
 		velo$lastXRot = camera.xRot();
 		velo$lastYRot = camera.yRot();
 		velo$frameNanos = System.nanoTime();
+		AntiFarmLagModule.beginItemFrame(velo$camMoved);
 	}
 
 	@WrapOperation(method = "isEntityVisible", at = @At(value = "INVOKE",
@@ -47,23 +55,28 @@ public abstract class TurboEntityVisibilityMixin {
 			net.minecraft.client.renderer.culling.Frustum frustum, double camX, double camY, double camZ, float partialTick, Operation<Boolean> original) {
 		if ((entity instanceof net.minecraft.world.entity.item.ItemEntity || entity instanceof net.minecraft.world.entity.ExperienceOrb)
 				&& AntiFarmLagModule.itemFarm()) {
+			if (AntiFarmLagModule.itemPassReused() && entity instanceof EntityVisCache reuse) {
+				// the frame reuses the last full item pass: this item's answer from then (an item that wasn't there yet
+				// waits for the next pass, at most 25 ms)
+				return reuse.velo$visTime() == -AntiFarmLagModule.itemPassId() && reuse.velo$visResult();
+			}
 			double dist = entity.distanceToSqr(camX, camY, camZ);
 			if (dist > 16) {
 				// Anti Farm Lag item farms: beyond 40 blocks an item is a pixel or two - skipped; closer ones are grouped, one
 				// drawn per group with a count label (AntiFarmLagModule.itemCluster).
 				if (dist > 40 * 40) {
-					return false;
+					return velo$itemAnswer(entity, false);
 				}
 				int stack = entity instanceof net.minecraft.world.entity.item.ItemEntity item ? item.getItem().getCount() : 1;
 				boolean[] first = {false};
 				AntiFarmLagModule.ItemCluster cluster = AntiFarmLagModule.itemCluster(entity.getX(), entity.getY(), entity.getZ(), dist, stack, first);
 				if (!first[0] || !AntiFarmLagModule.takeItemBudget(dist)) {
-					return false;
+					return velo$itemAnswer(entity, false);
 				}
 				// the drawn one gets the full check (frustum, EntityCulling's occlusion), so no label shows through walls
 				boolean shown = original.call(dispatcher, entity, frustum, camX, camY, camZ, partialTick);
 				cluster.visible = shown;
-				return shown;
+				return velo$itemAnswer(entity, shown);
 			}
 		}
 		if (!PerformanceBoostModule.turbo || velo$camMoved || !(entity instanceof EntityVisCache cache)) {
@@ -101,9 +114,16 @@ public abstract class TurboEntityVisibilityMixin {
 	@org.spongepowered.asm.mixin.Unique
 	private static long velo$frameNanos;
 
+	@org.spongepowered.asm.mixin.Unique
+	private static boolean velo$itemAnswer(net.minecraft.world.entity.Entity entity, boolean shown) {
+		if (entity instanceof EntityVisCache cache) {
+			cache.velo$visStore(-AntiFarmLagModule.itemPassId(), 0, 0, 0, 0f, 0f, 0f, 0, 0, 0, shown);
+		}
+		return shown;
+	}
+
 	@org.spongepowered.asm.mixin.injection.Inject(method = "extractVisibleEntities", at = @At("HEAD"))
 	private void velo$newItemFrame(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
-		AntiFarmLagModule.beginItemFrame();
 		net.minecraft.client.Camera camera = net.minecraft.client.Minecraft.getInstance().gameRenderer.mainCamera();
 		net.minecraft.world.phys.Vec3 pos = camera.position();
 		velo$camMoved = pos.x != velo$lastX || pos.y != velo$lastY || pos.z != velo$lastZ
@@ -114,6 +134,7 @@ public abstract class TurboEntityVisibilityMixin {
 		velo$lastXRot = camera.xRot();
 		velo$lastYRot = camera.yRot();
 		velo$frameNanos = System.nanoTime();
+		AntiFarmLagModule.beginItemFrame(velo$camMoved);
 	}
 
 	@WrapOperation(method = "isEntityVisible", at = @At(value = "INVOKE",
@@ -122,23 +143,28 @@ public abstract class TurboEntityVisibilityMixin {
 			net.minecraft.client.renderer.culling.Frustum frustum, double camX, double camY, double camZ, Operation<Boolean> original) {
 		if ((entity instanceof net.minecraft.world.entity.item.ItemEntity || entity instanceof net.minecraft.world.entity.ExperienceOrb)
 				&& AntiFarmLagModule.itemFarm()) {
+			if (AntiFarmLagModule.itemPassReused() && entity instanceof EntityVisCache reuse) {
+				// the frame reuses the last full item pass: this item's answer from then (an item that wasn't there yet
+				// waits for the next pass, at most 25 ms)
+				return reuse.velo$visTime() == -AntiFarmLagModule.itemPassId() && reuse.velo$visResult();
+			}
 			double dist = entity.distanceToSqr(camX, camY, camZ);
 			if (dist > 16) {
 				// Anti Farm Lag item farms: beyond 40 blocks an item is a pixel or two - skipped; closer ones are grouped, one
 				// drawn per group with a count label (AntiFarmLagModule.itemCluster).
 				if (dist > 40 * 40) {
-					return false;
+					return velo$itemAnswer(entity, false);
 				}
 				int stack = entity instanceof net.minecraft.world.entity.item.ItemEntity item ? item.getItem().getCount() : 1;
 				boolean[] first = {false};
 				AntiFarmLagModule.ItemCluster cluster = AntiFarmLagModule.itemCluster(entity.getX(), entity.getY(), entity.getZ(), dist, stack, first);
 				if (!first[0] || !AntiFarmLagModule.takeItemBudget(dist)) {
-					return false;
+					return velo$itemAnswer(entity, false);
 				}
 				// the drawn one gets the full check (frustum, EntityCulling's occlusion), so no label shows through walls
 				boolean shown = original.call(dispatcher, entity, frustum, camX, camY, camZ);
 				cluster.visible = shown;
-				return shown;
+				return velo$itemAnswer(entity, shown);
 			}
 		}
 		if (!PerformanceBoostModule.turbo || velo$camMoved || !(entity instanceof EntityVisCache cache)) {

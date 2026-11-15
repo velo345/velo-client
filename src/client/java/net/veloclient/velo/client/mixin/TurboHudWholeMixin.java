@@ -18,12 +18,7 @@ public abstract class TurboHudWholeMixin {
 
 	@WrapMethod(method = "extractRenderState")
 	private void velo$wholeHud(net.minecraft.client.gui.GuiGraphicsExtractor graphics, net.minecraft.client.DeltaTracker delta, Operation<Void> original) {
-		// Post effects on the world picture: every frame, before any HUD cache (ours or Gnetum's) can skip the HUD -
-		// in HudManager they only ran in the frames the HUD was rebuilt and flickered.
-		if (!(net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.minecraft.client.gui.screens.TitleScreen)) {
-			net.veloclient.velo.client.modules.rendering.ColorGradingModule.applyIfActive();
-			net.veloclient.velo.client.modules.performance.PolyBlurModule.applyIfActive();
-		}
+		// (Post effects moved to PostEffectsFrameMixin: here they ran in the extract phase and turned the screen black.)
 		if (!HudFrameCache.wholeHud()) {
 			original.call(graphics, delta);
 			return;

@@ -1,0 +1,112 @@
+{
+ "title": "Velo Client 1.4.1: Lyrics in the sky & the Video Player",
+ "summary": "Synced lyrics floating in your world, a brand-new Video Player with YouTube, Shorts, Twitch and your own files, six new HUD modules, real Motion Blur, a much better 1.8.9 and lots of fixes.",
+ "tag": "Update",
+ "version": "1.4.1",
+ "accent": "#b040ff",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "text",
+   "text": "**Velo Client 1.4.1** brings your music into the game: the lyrics of whatever you're listening to, right in the sky. Plus a completely new **Video Player**, new HUD modules, real **Motion Blur** and a big update for **1.8.9**."
+  },
+  {
+   "type": "heading",
+   "text": "Lyrics"
+  },
+  {
+   "type": "image",
+   "image": "file:images/lyrics-studio.jpg",
+   "caption": "The Lyrics Studio: every setting on the left, the live preview in your world on the right."
+  },
+  {
+   "type": "list",
+   "items": [
+    "The lyrics of the song playing on **Spotify** (or any player your PC's media controls know), **synced line by line**",
+    "**In the sky** - behind mountains and clouds like it's really up there - **floating in front of you**, or flat on screen",
+    "Lines can stay in one spot or appear **all around you**",
+    "**19 presets**: Concert Sky, Starfield, Aurora, Neon Night, Hologram, Karaoke, Comic, Fire, Frost, Vaporwave, Terminal, Ghost and more",
+    "Crazy customizing: 8 fonts, gradients, rainbow, karaoke fill, **glow**, outline, shadow, 15 ways to come in, 11 ways to go out, letter spacing, tilt, chaos",
+    "Lyrics early or late? One slider fixes the sync"
+   ]
+  },
+  {
+   "type": "image",
+   "image": "file:images/lyrics-comic.jpg",
+   "caption": "The Comic preset: words bounce in all around you."
+  },
+  {
+   "type": "heading",
+   "text": "Video Player"
+  },
+  {
+   "type": "image",
+   "image": "file:images/player-search.jpg",
+   "caption": "Search, Shorts, Twitch and your own files in one window."
+  },
+  {
+   "type": "list",
+   "items": [
+    "**YouTube**: search or paste any link - videos, shorts, live streams",
+    "**Shorts**: an endless feed in a tall window - scroll, arrow keys or your own **Next / Previous Short** keys, even while it plays as picture-in-picture",
+    "**Twitch**: paste a channel and its live stream starts; videos and clips work too",
+    "**Files**: play videos from your PC (MP4, MKV, WEBM, MOV...) - and links from many other sites",
+    "A new look with Velo fonts: controls only appear when you hover, drag to move, resize from any edge, fullscreen and picture-in-picture",
+    "Open it with **U** (changeable) - press it again to close"
+   ]
+  },
+  {
+   "type": "image",
+   "image": "file:images/player-shorts.jpg",
+   "caption": "Shorts in a tall window - the next one is already loaded."
+  },
+  {
+   "type": "heading",
+   "text": "New modules"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Mini Player**: a small live 3D you on the HUD with your skin, armour and cosmetics",
+    "**Inventory HUD**: see your inventory mid-fight",
+    "**Module List**: what you have turned on, right on screen",
+    "**Server Display**: the server's logo and IP - great for videos",
+    "**Custom Text** with live placeholders like {fps}, {ping}, {server}, and **Custom Image** for your own logo or banner",
+    "**Motion Blur**: real camera motion blur with strong settings (off by default)",
+    "**TNT Optimizer**: for TNT farms and cannons (off by default)"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "1.8.9"
+  },
+  {
+   "type": "list",
+   "items": [
+    "A real **Right Shift menu** with a HUD editor",
+    "The **Locker**: pick your Velo cloak right in 1.8.9",
+    "**Freelook**, **Hit Color**, **1.7 Animations** (block-hitting, red armour), Zoom, Toggle Sprint, Fullbright",
+    "FPS, CPS, Keystrokes, Coordinates, Ping, Armor and Potion Status, Clock, Reach Display, Dynamic FPS and an FPS Boost"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Fixes & more"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Color Grading** no longer turns the screen black",
+    "**Primed TNT** is visible again",
+    "**Anti Farm Lag** is now off for everyone - turn it on only if you want it",
+    "**Windows media controls** work now (play, pause, skip)",
+    "**Report a bug** can record 60 seconds of lag spikes and send what caused them",
+    "The launcher's Home shows **how many players are on Velo today**",
+    "Fixed crashes when changing worlds and when closing the game, and a launcher crash with long clips",
+    "Sodium and Iris always get matching versions",
+    "New on the website: a **Creators** page and **every module** listed on the features page"
+   ]
+  }
+ ]
+}

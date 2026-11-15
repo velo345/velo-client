@@ -56,6 +56,56 @@ public final class LocalCape {
 		return id == null ? null : library().get(id);
 	}
 
+	/** Every cloak in the library (the Locker filters out store cloaks this account doesn't own). */
+	public static java.util.Collection<Bundle> all() {
+		return library().values();
+	}
+
+	/** Equips {@code id} (null = no cloak) for this account - the launcher and the modern game see it too. */
+	public static void equip(String uuid, String id) {
+		try {
+			Path file = VeloPaths.config().resolve("accounts").resolve(uuid).resolve("cosmetics-cape.json");
+			JsonObject o = Files.exists(file) ? Json.read(file) : null;
+			if (o == null) {
+				o = new JsonObject();
+			}
+			if (id == null) {
+				o.remove("equippedCapeId");
+			} else {
+				o.addProperty("equippedCapeId", id);
+			}
+			Files.createDirectories(file.getParent());
+			Files.write(file, new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(o).getBytes(StandardCharsets.UTF_8));
+			equippedId = id;
+			lastEquipRead = System.currentTimeMillis();
+		} catch (IOException e) {
+			VeloLegacy.LOGGER.warn("Velo: couldn't save the cloak choice", e);
+		}
+	}
+
+	/** The equipped cloak id right now (null = none). */
+	public static String equippedId(String uuid) {
+		Bundle b = equipped(uuid);
+		return b == null ? null : b.id();
+	}
+
+	private static final Map<String, String> NAMES = new ConcurrentHashMap<>();
+
+	/** Display name from the bundle's meta.json (read once per bundle file). */
+	public static String name(Bundle bundle) {
+		return NAMES.computeIfAbsent(bundle.file() + "@" + bundle.file().toFile().lastModified(), k -> readName(bundle));
+	}
+
+	private static String readName(Bundle bundle) {
+		try {
+			byte[] meta = entry(bundle.file(), "meta.json");
+			String n = meta == null ? null : Json.string(Json.parse(new String(meta, StandardCharsets.UTF_8)), "name");
+			return n != null ? n : bundle.id();
+		} catch (Exception e) {
+			return bundle.id();
+		}
+	}
+
 	/** Bundle by the store item it was bought as (so a remote player's store cloak needs no download when you own it too). */
 	public static Bundle bySourceItem(String itemId) {
 		for (Bundle bundle : library().values()) {

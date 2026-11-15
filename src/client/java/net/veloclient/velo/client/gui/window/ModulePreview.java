@@ -28,7 +28,7 @@ public final class ModulePreview {
 			"attack-indicator", "hit-color", "hit-particles", "low-fire", "item-position", "old-animations", "fov", "free-look", "zoom",
 			"damage-numbers", "health-indicator", "low-health-warning", "height-limit", "own-name-tag", "nick-hider", "small-caps",
 			"chunk-border-overlay", "hitbox-visualizer", "light-level-overlay", "world-border-visualizer", "spawn-radius",
-			"particle-debug-overlay", "polyblur", "particle-limiter", "enemy-effects", "enemy-hunger", "phantom");
+			"particle-debug-overlay", "motion-blur", "particle-limiter", "enemy-effects", "enemy-hunger", "phantom");
 
 	private ModulePreview() {
 	}

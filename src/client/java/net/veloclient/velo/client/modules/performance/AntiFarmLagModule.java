@@ -447,6 +447,41 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 	private static it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<ItemCluster> shownClusters = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
 	private static final java.util.ArrayDeque<ItemCluster> POOL = new java.util.ArrayDeque<>();
 
+	/** Item passes are reused for this long while the camera stands still (items only move per 50 ms game tick). */
+	private static final long ITEM_PASS_NANOS = 25_000_000L;
+	private static final boolean ITEM_PASS_REUSE = !"false".equals(System.getProperty("velo.itemPassReuse"));
+	private static long itemPassId = 1;
+	private static long itemPassStart;
+	private static boolean itemPassReused;
+
+	/** This frame reuses the last full item pass: every item takes the answer it stored then (see {@link #itemPassId()}). */
+	public static boolean itemPassReused() {
+		return itemPassReused;
+	}
+
+	/** The current full item pass; items store their answer stamped with {@code -itemPassId()} in their EntityVisCache. */
+	public static long itemPassId() {
+		return itemPassId;
+	}
+
+	/**
+	 * A new frame of entity extraction. Profiled 2026-11-11 in a real farm world (~2000 dropped items): grouping, budgeting
+	 * and checking every item again on every frame was ~40% of the render thread at 2000+ FPS. While the camera stands
+	 * still and the last full pass is under 25 ms old, the frame reuses that pass (each item its stored answer, the groups
+	 * and labels as they were) - items only move once per 50 ms tick anyway.
+	 */
+	public static void beginItemFrame(boolean cameraMoved) {
+		long now = System.nanoTime();
+		if (ITEM_PASS_REUSE && !cameraMoved && itemFarm() && now - itemPassStart < ITEM_PASS_NANOS) {
+			itemPassReused = true;
+			return;
+		}
+		itemPassReused = false;
+		itemPassId++;
+		itemPassStart = now;
+		beginItemFrame();
+	}
+
 	/** A new frame of entity extraction: last frame's groups go to the labels, a fresh set starts. */
 	public static void beginItemFrame() {
 		itemFrames++;

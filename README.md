@@ -116,7 +116,7 @@ Privacy Policy required for a project with an identifiable operator.
   utilization, particle limiter, **Performance Boost** (presets plus
   individually-tunable view distance/entities/particles/VSync mode —
   Off/On/Adaptive — mipmaps and HUD update rate, all applied live),
-  **PolyBlur** (motion-triggered blur using vanilla's own tested post-effect
+  **Motion Blur** (motion-triggered blur using vanilla's own tested post-effect
   shader, not custom GLSL), a Sodium/Lithium/Iris/Starlight detector,
   independent FOV sliders (movement/nausea/damage tilt), and Full Bright.
 - **Server Tools**: entity count overlay, chunk boundary + hitbox overlays

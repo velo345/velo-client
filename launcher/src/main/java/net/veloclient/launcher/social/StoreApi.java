@@ -459,6 +459,11 @@ public final class StoreApi {
 		return post("/v1/admin/store/addons", body);
 	}
 
+	/** Public live numbers: {@code online} (in game on Velo right now) and {@code today} (distinct players today, UTC). */
+	public static JsonObject liveStats() throws StoreError {
+		return get("/v1/stats/live");
+	}
+
 	/** Whether your Discord is linked ({@code linked}, {@code discordName}) and the invite link ({@code inviteUrl}). */
 	public static JsonObject discordStatus() throws StoreError {
 		return get("/v1/discord/status");

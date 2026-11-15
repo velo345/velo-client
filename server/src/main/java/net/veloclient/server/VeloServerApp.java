@@ -90,6 +90,8 @@ public final class VeloServerApp {
 		server.createContext("/v1/session/end-game", exchange -> handle(exchange, "POST", ex -> handleEndGame(ex, registry)));
 		server.createContext("/v1/heartbeat", exchange -> handle(exchange, "POST", ex -> handleHeartbeat(ex, registry, capes)));
 		server.createContext("/v1/online", exchange -> handle(exchange, "GET", ex -> handleOnline(ex, registry)));
+		// Public live numbers for the launcher's Home ("123 playing now · 1,234 today"): two counts, cached 30 s.
+		server.createContext("/v1/stats/live", exchange -> handle(exchange, "GET", ex -> handleLiveStats(ex, registry)));
 		lastLooks = new LastCosmetics(dataDir);
 		server.createContext("/v1/cosmetics/of", exchange -> handle(exchange, "POST", ex -> handleCosmeticsOf(ex, registry, capes)));
 		server.createContext("/v1/cape/upload", exchange -> handle(exchange, "POST", ex -> handleCapeUpload(ex, registry, capes)));
@@ -221,6 +223,20 @@ public final class VeloServerApp {
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));
 		PanelRoutes.register(server, registry, stats, store, adminToken);
 		PanelRoutes.registerStoreActions(server, store, announcer, adminToken);
+		// Creators page: the list is the owner's, channel numbers/pictures/latest videos refresh themselves every 3 hours.
+		CreatorService creators = new CreatorService(dataDir, envOr("VELO_YTDLP", "yt-dlp"));
+		PlusFeatureRoutes.registerCreators(server, registry, store, creators);
+		Executors.newSingleThreadScheduledExecutor(r -> {
+			Thread t = new Thread(r, "velo-creators");
+			t.setDaemon(true);
+			return t;
+		}).scheduleWithFixedDelay(() -> {
+			try {
+				creators.refreshAll();
+			} catch (RuntimeException e) {
+				System.err.println("[velo] creators refresh: " + e);
+			}
+		}, 20, 3 * 3600, TimeUnit.SECONDS);
 		SocialStatsService socials = new SocialStatsService(dataDir, envOr("VELO_YTDLP", "yt-dlp"), envOr("VELO_YOUTUBE_API_KEY", null));
 		socials.instagramApp(envOr("VELO_INSTAGRAM_APP_ID", null), envOr("VELO_INSTAGRAM_REDIRECT", null),
 				envOr("VELO_INSTAGRAM_APP_SECRET", null), envOr("VELO_INSTAGRAM_APP_SECRET2", null));
@@ -616,6 +632,28 @@ public final class VeloServerApp {
 	}
 
 	private record OnlineResponse(List<SessionRegistry.OnlineUser> users, long serverTimeMillis) {
+	}
+
+	private record LiveStats(int online, long today, long at) {
+	}
+
+	private static volatile LiveStats liveStats;
+
+	private static void handleLiveStats(HttpExchange exchange, SessionRegistry registry) throws IOException {
+		LiveStats cached = liveStats;
+		long now = System.currentTimeMillis();
+		if (cached == null || now - cached.at() > 30_000) {
+			long today = cached == null ? 0 : cached.today();
+			try {
+				today = stats == null ? 0 : stats.activeToday();
+			} catch (java.sql.SQLException e) {
+				// keep the last number
+			}
+			cached = new LiveStats(registry.onlineCount(), today, now);
+			liveStats = cached;
+		}
+		exchange.getResponseHeaders().set("Cache-Control", "public, max-age=30");
+		JsonHttp.writeJson(exchange, 200, cached);
 	}
 
 	private static void handleOnline(HttpExchange exchange, SessionRegistry registry) throws IOException {

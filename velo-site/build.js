@@ -157,6 +157,23 @@ function main() {
 	tokens["news.latest"] = posts.slice(0, 3).map(postCard).join("\n");
 	tokens["news.list"] = posts.map(postCard).join("\n");
 	tokens["news.count"] = String(posts.length);
+	// Every client module (dev-site/modules.json, made by tools/devsite/build.sh) - the full list on /features and the counts.
+	const modulesFile = path.join(ROOT, "..", "dev-site", "modules.json");
+	if (fs.existsSync(modulesFile)) {
+		const mods = JSON.parse(fs.readFileSync(modulesFile, "utf8"));
+		const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+		const groups = [["hud", "HUD"], ["pvp", "PvP"], ["qol", "Quality of life"], ["performance", "Performance"], ["rendering", "Visual"],
+			["cosmetics", "Cosmetics"], ["server_tools", "Server tools"], ["debug", "Debug"]];
+		tokens["counts.modules"] = String(mods.length);
+		tokens["modules.list"] = groups.map(([id, label]) => {
+			const list = mods.filter((m) => m.category === id).sort((a, b) => a.name.localeCompare(b.name));
+			tokens[`counts.cat.${id}`] = String(list.length);
+			if (!list.length) return "";
+			return `<div class="mods-group" data-mods-group><h3>${label} <span>${list.length}</span></h3><ul>`
+				+ list.map((m) => `<li data-mod><b>${esc(m.name)}</b><span>${esc(m.description)}</span></li>`).join("")
+				+ "</ul></div>";
+		}).join("\n");
+	}
 	tokens["build.year"] = String(new Date().getFullYear());
 	tokens["asset.css"] = `/assets/site.css?v=${hashOf(path.join(ROOT, "assets", "site.css"))}`;
 	tokens["asset.js"] = `/assets/site.js?v=${hashOf(path.join(ROOT, "assets", "site.js"))}`;
@@ -202,7 +219,7 @@ function main() {
 		};
 		const pageTokens = { ...tokens };
 		for (const [k, v] of Object.entries(page)) pageTokens[`page.${k}`] = v;
-		for (const id of ["home", "features", "plus", "store", "news", "download", "partners", "library"]) pageTokens[`nav.${id}`] = page.active === id ? "aria-current=\"page\"" : "";
+		for (const id of ["home", "features", "plus", "store", "news", "download", "partners", "creators", "library"]) pageTokens[`nav.${id}`] = page.active === id ? "aria-current=\"page\"" : "";
 		const html = render(layout.replace("{{page.body}}", body), pageTokens, file);
 		const out = path.join(DIST, relPath);
 		fs.mkdirSync(path.dirname(out), { recursive: true });

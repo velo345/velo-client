@@ -113,6 +113,7 @@ public final class ClipRecorder {
 
 	/** Called at the end of every rendered frame (GameRenderer#render). */
 	public static void onFrameRendered() {
+		net.veloclient.velo.client.report.SpikeRecorder.frame();
 		Runnable hook = frameHook;
 		if (hook != null) {
 			hook.run();

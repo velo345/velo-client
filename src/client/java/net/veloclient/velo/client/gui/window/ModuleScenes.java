@@ -31,7 +31,7 @@ public final class ModuleScenes {
 	private static final Set<String> PLAIN = Set.of("hearts", "hunger", "armor-bar", "xp-bar", "hotbar", "hud-style", "small-caps",
 			"block-outline", "tnt-timer", "anti-deepslate", "hide-foliage", "full-bright", "no-break-particles", "container-animations",
 			"waypoints", "better-tab-list", "chat-heads", "block-break-progress", "glint-colorizer", "item-physics", "chunk-animator", "phantom",
-			"polyblur", "input-sampler", "color-grading", "chunk-border-overlay", "world-border-visualizer", "light-level-overlay",
+			"motion-blur", "input-sampler", "color-grading", "chunk-border-overlay", "world-border-visualizer", "light-level-overlay",
 			"old-animations", "low-fire", "potion-timers", "scoreboard-hud");
 
 	private ModuleScenes() {
@@ -511,7 +511,7 @@ public final class ModuleScenes {
 					Text note = Text.literal(on ? "walk through · plates stay quiet" : "walls block you · plates click");
 					MenuKit.text(context, tr, note, cx - MenuKit.width(tr, note) / 2, y + h - 14, 0xFFEDE6E6);
 				}
-				case "polyblur" -> {
+				case "motion-blur" -> {
 					int s = 34;
 					double px = cx + Math.sin(t * 2.2) * (w / 2.8);
 					double vel = Math.cos(t * 2.2);
@@ -664,6 +664,7 @@ public final class ModuleScenes {
 		context.enableScissor(x, y, x + w, y + h);
 		try {
 			switch (module.id()) {
+				case "lyrics" -> net.veloclient.velo.client.lyrics.LyricsModule.drawCard(context, x, y, w, h);
 				case "damage-numbers" -> {
 					int c = color(module, 0xFFFF5555);
 					String[] hits = {"-2.5", "-4.0", "-1.5"};

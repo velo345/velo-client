@@ -52,6 +52,10 @@ public final class VideoPlayer {
 
 	private final Path ffmpeg;
 	private final String source;
+	/** Where the sound comes from: the same file/link, or a separate audio stream (YouTube serves them apart). */
+	private String audioSource;
+	/** Sent with every request to a link source (null = FFmpeg's own). */
+	private String userAgent;
 	private final ClipTools.Info info;
 	private final Pixels pixels;
 	private final int outWidth;
@@ -87,6 +91,41 @@ public final class VideoPlayer {
 		this.fps = info.fps() > 1 ? Math.min(60, info.fps()) : 30;
 		this.rangeTo = length();
 		start(0, false);
+	}
+
+	/** Like the constructor, with the sound from {@code audioSource} (a separate stream) and an HTTP user agent. */
+	public static VideoPlayer openStreams(Path ffmpeg, String video, String audio, String userAgent, ClipTools.Info info, int maxWidth, Pixels pixels) {
+		return new VideoPlayer(ffmpeg, video, audio, userAgent, info, maxWidth, pixels);
+	}
+
+	private VideoPlayer(Path ffmpeg, String video, String audio, String userAgent, ClipTools.Info info, int maxWidth, Pixels pixels) {
+		this.ffmpeg = ffmpeg;
+		this.source = video;
+		this.audioSource = audio;
+		this.userAgent = userAgent;
+		this.info = info;
+		this.pixels = pixels;
+		int w = Math.max(2, Math.min(maxWidth, info.width())) & ~1;
+		this.outWidth = w;
+		this.outHeight = Math.max(2, (int) Math.round(info.height() * (double) w / Math.max(1, info.width()))) & ~1;
+		this.fps = info.fps() > 1 ? Math.min(60, info.fps()) : 30;
+		this.rangeTo = length();
+		start(0, false);
+	}
+
+	/** FFmpeg's input arguments for {@code src} starting at {@code at}: links reconnect on hiccups instead of ending. */
+	private List<String> input(String src, double at) {
+		List<String> args = new ArrayList<>();
+		if (src.startsWith("http://") || src.startsWith("https://")) {
+			// ... but give up after 15 s without data, so a dead link ends with an error instead of loading forever
+			args.addAll(List.of("-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "4", "-rw_timeout", "15000000"));
+			if (userAgent != null) {
+				args.add("-user_agent");
+				args.add(userAgent);
+			}
+		}
+		args.addAll(List.of("-ss", ClipTools.fmt(at), "-i", src));
+		return args;
 	}
 
 	public ClipTools.Info info() {
@@ -319,7 +358,7 @@ public final class VideoPlayer {
 		}
 
 		void begin(boolean play) {
-			useAudio = info.audio();
+			useAudio = info.audio() || audioSource != null;
 			Thread.ofPlatform().daemon().name("velo-video-decode").start(this::decodeVideo);
 			if (useAudio) {
 				Thread.ofPlatform().daemon().name("velo-video-audio").start(() -> playAudio(play));
@@ -375,9 +414,10 @@ public final class VideoPlayer {
 		}
 
 		void decodeVideo() {
-			List<String> command = List.of(ffmpeg.toString(), "-hide_banner", "-loglevel", "error", "-nostdin", "-ss", ClipTools.fmt(start),
-					"-i", source, "-an", "-sn", "-vf", "scale=" + outWidth + ":" + outHeight + ":flags=bilinear,fps=" + ClipTools.fmt(fps),
-					"-pix_fmt", pixels == Pixels.RGBA ? "rgba" : "bgra", "-f", "rawvideo", "-");
+			List<String> command = new ArrayList<>(List.of(ffmpeg.toString(), "-hide_banner", "-loglevel", "error", "-nostdin"));
+			command.addAll(input(source, start));
+			command.addAll(List.of("-an", "-sn", "-vf", "scale=" + outWidth + ":" + outHeight + ":flags=bilinear,fps=" + ClipTools.fmt(fps),
+					"-pix_fmt", pixels == Pixels.RGBA ? "rgba" : "bgra", "-f", "rawvideo", "-"));
 			try {
 				Process p = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();
 				synchronized (processes) {
@@ -414,8 +454,9 @@ public final class VideoPlayer {
 		}
 
 		void playAudio(boolean play) {
-			List<String> command = List.of(ffmpeg.toString(), "-hide_banner", "-loglevel", "error", "-nostdin", "-ss", ClipTools.fmt(start),
-					"-i", source, "-vn", "-sn", "-ac", "2", "-ar", String.valueOf(RATE), "-f", "s16le", "-");
+			List<String> command = new ArrayList<>(List.of(ffmpeg.toString(), "-hide_banner", "-loglevel", "error", "-nostdin"));
+			command.addAll(input(audioSource != null ? audioSource : source, start));
+			command.addAll(List.of("-vn", "-sn", "-ac", "2", "-ar", String.valueOf(RATE), "-f", "s16le", "-"));
 			try {
 				Process p = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();
 				synchronized (processes) {
@@ -440,6 +481,7 @@ public final class VideoPlayer {
 					}
 				}
 				byte[] buffer = new byte[RATE / 50 * 4];
+				long written = 0;
 				try (InputStream in = p.getInputStream()) {
 					int read;
 					while (!stopped && (read = in.readNBytes(buffer, 0, buffer.length)) > 0) {
@@ -448,10 +490,24 @@ public final class VideoPlayer {
 							Thread.sleep(10);
 						}
 						l.write(buffer, 0, read - read % 4);
+						written += read;
 					}
 				}
 				if (!stopped) {
 					l.drain();
+				}
+				double heard = start + written / 4.0 / RATE;
+				if (!stopped && heard < Math.min(rangeTo, info.seconds()) - 1.5) {
+					// The sound stopped early (a stream that broke off, or never delivered): the clock was the sound
+					// line, so the picture would freeze there - it goes on by the wall clock from where it is now.
+					synchronized (this) {
+						double now = useAudio && line != null ? start + line.getLongFramePosition() / (double) RATE : heard;
+						useAudio = false;
+						wallBase = Math.max(start, now);
+						wallStart = System.nanoTime();
+						wallRunning = playing;
+					}
+					return;
 				}
 				audioDone = true;
 			} catch (Exception e) {

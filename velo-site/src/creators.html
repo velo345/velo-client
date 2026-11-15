@@ -1,0 +1,63 @@
+<!--page {
+	"title": "Creators – YouTubers & Streamers playing Velo Client",
+	"description": "The creators who play and record with Velo Client: NurHyper and more. Watch their latest videos or become a Velo creator yourself.",
+	"path": "/creators",
+	"active": "creators",
+	"priority": "0.6",
+	"changefreq": "weekly",
+	"css": "creators.css",
+	"js": "creators.js",
+	"bodyClass": "cr",
+	"ogImage": "/assets/creators/nurhyper/banner.webp",
+	"images": ["/assets/creators/nurhyper/banner.webp", "/assets/creators/nurhyper/avatar.webp"],
+	"schema": {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://velo-client.com/"}, {"@type": "ListItem", "position": 2, "name": "Creators", "item": "https://velo-client.com/creators"}]}
+}-->
+<section class="cr-hero" aria-labelledby="cr-h">
+  <div class="cr-wrap">
+    <span class="cr-label fade-up">Velo creators</span>
+    <h1 id="cr-h" class="fade-up" style="--d:.08s">Made with<br>Velo.</h1>
+    <p class="cr-lead fade-up" style="--d:.16s">YouTubers and streamers who play, record and stream with Velo Client. Go watch them - they're the reason a lot of you found us.</p>
+  </div>
+</section>
+
+<section class="cr-sec" aria-labelledby="cr-list-h">
+  <div class="cr-wrap">
+    <div class="cr-head">
+      <h2 id="cr-list-h">All creators</h2>
+      <span class="cr-rule" aria-hidden="true"></span>
+      <span class="cr-note" data-creators-count>1 creator</span>
+    </div>
+
+    <div class="creators" data-creators>
+    <article class="creator" id="nurhyper" style="--c:#2f7bff">
+      <a class="creator-banner" href="https://www.youtube.com/@hypermc26" rel="noopener" target="_blank" aria-label="NurHyper on YouTube">
+        <img src="/assets/creators/nurhyper/banner.webp" alt="NurHyper channel banner" width="1600" height="900">
+      </a>
+      <div class="creator-body">
+        <div class="creator-id">
+          <img class="creator-avatar" src="/assets/creators/nurhyper/avatar.webp" alt="NurHyper" width="320" height="320">
+          <div>
+            <h3>NurHyper</h3>
+          </div>
+        </div>
+        <div class="creator-cta">
+          <a class="cr-btn cr-btn-red" href="https://www.youtube.com/@hypermc26?sub_confirmation=1" rel="noopener" target="_blank">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23 7.2a3 3 0 0 0-2.1-2.1C19 4.6 12 4.6 12 4.6s-7 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .5 12a31 31 0 0 0 .5 4.8 3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.8 31 31 0 0 0-.5-4.8zM9.7 15.1V8.9l5.8 3.1z"/></svg>
+            Subscribe
+          </a>
+        </div>
+      </div>
+    </article>
+    </div>
+  </div>
+</section>
+
+<section class="cr-sec cr-last" aria-labelledby="cr-join-h">
+  <div class="cr-wrap cr-join">
+    <div>
+      <h2 id="cr-join-h">You make videos or stream?</h2>
+      <p>Record with Velo - Clips, Velo Rewind and the YouTube-ready Server Display - and get listed here with your channel. Write to us on Discord.</p>
+    </div>
+    <a class="cr-btn cr-btn-red" href="{{links.discord}}" rel="noopener" target="_blank">Become a creator</a>
+  </div>
+</section>

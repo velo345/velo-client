@@ -318,6 +318,15 @@ public final class PerformanceModsInstaller {
 				.filter(v -> v.gameVersions() != null && v.gameVersions().contains(version.id()))
 				.filter(v -> v.loaders() != null && v.loaders().contains(version.modrinthLoader()))
 				.toList();
+		// Releases first: the newest build was sometimes a beta that breaks mods players already have (Sodium
+		// 0.8.15-beta.1 declares Iris 1.10.7 incompatible - "Some of your mods are incompatible", report f0fd0b05bc32).
+		// A beta/alpha is only taken when there is no release for this game version at all.
+		List<ModrinthClient.ProjectVersion> releases = fitting.stream()
+				.filter(v -> v.versionType() == null || "release".equals(v.versionType()))
+				.toList();
+		if (!releases.isEmpty()) {
+			fitting = releases;
+		}
 		Optional<ModrinthClient.ProjectVersion> chosen = fitting.stream().findFirst();
 		if (chosen.isPresent() && net.veloclient.launcher.doctor.ModRequirements.constrains(modsDir, modId)) {
 			// Another mod wants a certain version of it: the newest build every mod accepts (read from the jar itself -

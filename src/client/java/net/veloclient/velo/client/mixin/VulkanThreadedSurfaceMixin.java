@@ -93,8 +93,10 @@ public abstract class VulkanThreadedSurfaceMixin {
 	}
 
 	@Inject(method = "configure", at = @At("HEAD"))
-	private void velo$drainBeforeConfigure(CallbackInfo ci) {
+	private void velo$drainBeforeConfigure(com.mojang.blaze3d.systems.GpuSurface.Configuration configuration, CallbackInfo ci) {
 		velo$drainAndApply();
+		// Only a real IMMEDIATE swapchain lets the present leave the render thread (see ThreadedPresent.eligible).
+		ThreadedPresent.immediate = configuration.presentMode() == com.mojang.blaze3d.systems.GpuSurface.PresentMode.IMMEDIATE;
 	}
 
 	@Inject(method = "close", at = @At("HEAD"))

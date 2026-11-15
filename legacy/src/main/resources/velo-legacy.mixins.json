@@ -7,7 +7,14 @@
 		"ClientPlayerEntityMixin",
 		"PlayerTabOverlayMixin",
 		"EntityRendererMixin",
-		"TourGameGuiMixin"
+		"TourGameGuiMixin",
+		"GameGuiHudMixin",
+		"GameRendererFovMixin",
+		"LivingEntityRendererHitColorMixin",
+		"ArmorLayerTintMixin",
+		"ItemInHandBlockHitMixin",
+		"FreelookMixins",
+		"GameRendererFreelookMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

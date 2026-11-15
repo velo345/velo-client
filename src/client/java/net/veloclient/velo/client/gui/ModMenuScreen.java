@@ -318,6 +318,11 @@ public final class ModMenuScreen extends VeloWindow implements ModuleConfigScree
 	}
 
 	private void openSettings(Module module) {
+		if (module.id().equals("lyrics")) {
+			// Lyrics has its own live editor instead of a settings list
+			this.client.setScreen(new net.veloclient.velo.client.lyrics.LyricsStudioScreen(this));
+			return;
+		}
 		this.client.setScreen(module.id().equals("command-keybinds") ? new CommandKeybindsScreen(this) : new ModuleConfigScreen(module, this));
 	}
 

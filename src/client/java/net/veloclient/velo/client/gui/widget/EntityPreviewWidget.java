@@ -119,6 +119,35 @@ public final class EntityPreviewWidget extends ClickableWidget {
 	/** Locker "Armor" switch: previews show the player without the armour they wear (just skin + cosmetics). */
 	public static boolean hideArmor;
 
+	/**
+	 * The local player as a small doll inside (x1, y1)-(x2, y2) in GUI coordinates (HUD Mini Player): the same pipeline as
+	 * this preview, so skin, armour and every Velo cosmetic show exactly as in-world. The box is mapped through the current
+	 * pose by hand, since the entity is a picture-in-picture element that ignores it (scaled HUD elements).
+	 */
+	public static void drawDoll(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees) {
+		var player = MinecraftClient.getInstance().player;
+		if (player == null) {
+			return;
+		}
+		//? if >=1.21.2 {
+		var pose = context.getMatrices();
+		org.joml.Vector2f a = pose.transformPosition(x1, y1, new org.joml.Vector2f());
+		org.joml.Vector2f b = pose.transformPosition(x2, y2, new org.joml.Vector2f());
+		size = Math.max(1, Math.round(size * pose.m00()));
+		x1 = Math.round(a.x);
+		y1 = Math.round(a.y);
+		x2 = Math.round(b.x);
+		y2 = Math.round(b.y);
+		//?}
+		boolean armor = hideArmor;
+		hideArmor = false;
+		try {
+			drawRotatableEntity(context, x1, y1, x2, y2, size, yawDegrees, player, null, false);
+		} finally {
+			hideArmor = armor;
+		}
+	}
+
 	/** Flashes the hurt tint now and then (the Hit Color module's preview shows its colour on you). */
 	private boolean hurtPulse;
 	private static boolean hurtNow;

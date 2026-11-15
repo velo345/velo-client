@@ -146,7 +146,7 @@ public final class HudManager {
 		// and the picture flickered between graded and plain (black with vignette / Black & White).
 		//? if <26.2 {
 		net.veloclient.velo.client.modules.rendering.ColorGradingModule.applyIfActive();
-		net.veloclient.velo.client.modules.performance.PolyBlurModule.applyIfActive();
+		net.veloclient.velo.client.modules.rendering.MotionBlurModule.applyIfActive();
 		//?}
 		float tickDelta = tickCounter.getTickProgress(true);
 		int screenWidth = client.getWindow().getScaledWidth();
@@ -168,7 +168,9 @@ public final class HudManager {
 		// mode the recording already wraps the entire HUD (TurboHudWholeMixin) - the modules just draw into it.
 		boolean whole = HudFrameCache.wholeHud();
 		if (!whole && HudFrameCache.replay(context, screenWidth, screenHeight)) {
-			net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
+			net.veloclient.velo.client.youtube.YouTubeModule.renderHud(context, screenWidth, screenHeight);
+		net.veloclient.velo.client.report.SpikeRecorder.renderHud(context, screenWidth);
+		net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
 			return;
 		}
 		if (!whole) {
@@ -194,6 +196,8 @@ public final class HudManager {
 				HudFrameCache.endRecord(context, completed);
 			}
 		}
+		net.veloclient.velo.client.youtube.YouTubeModule.renderHud(context, screenWidth, screenHeight);
+		net.veloclient.velo.client.report.SpikeRecorder.renderHud(context, screenWidth);
 		net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
 	}
 

@@ -5,6 +5,8 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"ActionBarOverlayMixin",
+		"PostEffectsFrameMixin",
+		"CameraLevelGuardMixin",
 		"AtmosphericFogMixin",
 		"OwnNameTagMixin",
 		"OwnPingMixin",

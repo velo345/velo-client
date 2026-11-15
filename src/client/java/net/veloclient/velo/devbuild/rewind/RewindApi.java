@@ -102,6 +102,9 @@ public final class RewindApi {
 		if (FORCED != null) {
 			setEnabled(true);
 		}
+		// The JDK HttpServer's dispatcher is a non-daemon thread: left running it kept the JVM alive after the game closed
+		// and Minecraft's shutdown watchdog wrote "Watchdog (Client shutdown from post-main)" crash reports (2026-11-15).
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> setEnabled(false));
 		if (Boolean.getBoolean("velo.hiddenWindow")) {
 			// AI runs (launcher: Settings > AI Access > Start the game hidden): no window on screen; it still renders
 			net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {

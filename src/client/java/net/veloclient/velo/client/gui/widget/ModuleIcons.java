@@ -23,7 +23,7 @@ public final class ModuleIcons {
 			"fps-counter", "ping-display", "coordinates", "clock", "armor-durability",
 			"potion-timers", "held-item", "keystrokes", "actionbar-log", "session-stats", "waypoints",
 			"toggle-sprint", "toggle-sneak", "zoom", "cape-cosmetics", "frame-time-graph", "memory-monitor",
-			"gpu-utilization", "particle-limiter", "performance-boost", "polyblur",
+			"gpu-utilization", "particle-limiter", "performance-boost", "motion-blur",
 			"full-bright", "fov", "mouse-buttons", "copy-coordinates", "entity-count-overlay", "chunk-border-overlay",
 			"hitbox-visualizer", "world-border-visualizer", "light-level-overlay", "tps-tick-graph",
 			"packet-traffic-monitor", "particle-debug-overlay", "sound-debug-overlay", "client-log-viewer",
@@ -40,7 +40,7 @@ public final class ModuleIcons {
 			"attack-indicator", "auto-reconnect", "chunk-load-profiler", "entity-detail", "fly-speed", "free-look",
 			"module-profiler", "nick-hider", "phantom", "render-culling", "velo-network", "screen-stretch",
 			"hide-foliage", "container-animations", "emoji-chat", "anti-coords-leak", "anti-deepslate", "velo-shaders",
-			"no-break-particles", "totem-pops", "emotes", "media-player");
+			"no-break-particles", "totem-pops", "emotes", "media-player", "lyrics");
 
 	private ModuleIcons() {
 	}

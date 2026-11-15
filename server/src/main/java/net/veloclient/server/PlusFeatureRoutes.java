@@ -331,6 +331,48 @@ final class PlusFeatureRoutes {
 		}));
 	}
 
+	record CreatorList(List<CreatorService.Creator> creators) {
+	}
+
+	/** GET /v1/creators (website), GET /v1/creators/art/<id>/<avatar|banner|v-videoId>, owner: GET/POST /v1/admin/creators. */
+	static void registerCreators(HttpServer server, SessionRegistry registry, StoreService store, CreatorService creators) {
+		server.createContext("/v1/creators", exchange -> VeloServerApp.handle(exchange, "GET", ex -> {
+			String path = ex.getRequestURI().getPath();
+			if (path.startsWith("/v1/creators/art/")) {
+				String[] parts = path.substring("/v1/creators/art/".length()).split("/");
+				byte[] jpg = parts.length == 2 ? creators.art(parts[0], parts[1]) : null;
+				if (jpg == null) {
+					JsonHttp.writeError(ex, 404, "No picture");
+					return;
+				}
+				ex.getResponseHeaders().set("Content-Type", "image/jpeg");
+				ex.getResponseHeaders().set("Cache-Control", "public, max-age=86400");
+				ex.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+				ex.sendResponseHeaders(200, jpg.length);
+				try (OutputStream out = ex.getResponseBody()) {
+					out.write(jpg);
+				}
+				return;
+			}
+			ex.getResponseHeaders().set("Cache-Control", "public, max-age=300");
+			JsonHttp.writeJson(ex, 200, Map.of("creators", creators.views()));
+		}));
+		server.createContext("/v1/admin/creators", exchange -> VeloServerApp.handle(exchange, exchange.getRequestMethod(), ex -> {
+			SessionRegistry.Session session = registry.session(JsonHttp.bearerToken(ex));
+			if (session == null) {
+				session = StoreRoutes.panelSession(ex);
+			}
+			if (session == null || !store.isOwner(session.uuid(), session.username())) {
+				JsonHttp.writeError(ex, 403, "Only the server owner can do that");
+				return;
+			}
+			if ("POST".equals(ex.getRequestMethod())) {
+				creators.setCreators(JsonHttp.readBody(ex, CreatorList.class).creators());
+			}
+			JsonHttp.writeJson(ex, 200, Map.of("creators", creators.creators(), "live", creators.views()));
+		}));
+	}
+
 	private static WorldHostService.World mine(WorldHostService worlds, SessionRegistry.Session s) throws ApiError {
 		WorldHostService.World world = worlds.worldOf(s.uuid());
 		if (world == null) {

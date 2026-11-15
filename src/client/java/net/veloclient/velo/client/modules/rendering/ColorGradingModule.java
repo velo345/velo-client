@@ -19,7 +19,7 @@ import java.util.List;
  * Color Grading: post effects on the game picture (not the HUD) - saturation, vibrance, contrast, brightness, gamma,
  * warmth, vignette and sharpening, all in one full-screen pass ({@code velo-client:post/velo_grade}). The slider values
  * reach the shader through an 8x1 texture ({@code velo-client:grade_params}) rewritten only when a value changes, so
- * there's no reload and almost no cost. Applied from HudManager right before the HUD draws, like PolyBlur.
+ * there's no reload and almost no cost. Applied after the world and before the HUD (PostEffectsFrameMixin on 26.2+, HudManager before), like Motion Blur.
  */
 public final class ColorGradingModule extends AbstractModule implements Configurable {
 

@@ -6,11 +6,14 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 python3 - <<'PY'
 import json, re, pathlib
 mods = {}
-for f in pathlib.Path("src/client/java/net/veloclient/velo/client/modules").rglob("*.java"):
+root = pathlib.Path("src/client/java/net/veloclient/velo")
+for f in root.rglob("*Module.java"):
+    if "preview" in f.parts:  # dev-build-only modules stay unlisted
+        continue
     text = f.read_text(encoding="utf-8")
-    for m in re.finditer(r'super\("([a-z0-9-]+)",\s*"([^"]+)",\s*"((?:[^"\\]|\\.)*)"', text):
+    for m in re.finditer(r'super\(\s*"([a-z0-9-]+)",\s*"([^"]+)",\s*((?:"(?:[^"\\]|\\.)*"\s*\+?\s*)+)', text):
         cat = re.search(r'ModuleCategory\.([A-Z_]+)', text[m.end():m.end() + 400])
-        mods.setdefault(m.group(1), {"id": m.group(1), "name": m.group(2), "description": m.group(3).replace('\\"', '"'),
+        mods.setdefault(m.group(1), {"id": m.group(1), "name": m.group(2).encode().decode("unicode_escape"), "description": "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(3))).replace('\\"', '"'),
                                     "category": cat.group(1).lower() if cat else "other"})
 out = sorted(mods.values(), key=lambda x: x["name"].lower())
 pathlib.Path("dev-site/modules.json").write_text(json.dumps(out, indent=1), encoding="utf-8")

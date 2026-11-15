@@ -83,12 +83,12 @@ public final class MediaPlayerModule extends AbstractModule implements HudModule
 
 	@Override
 	public void onEnable() {
-		NowPlaying.start();
+		NowPlaying.acquire("media-player");
 	}
 
 	@Override
 	public void onDisable() {
-		NowPlaying.stop();
+		NowPlaying.release("media-player");
 		MinecraftClient.getInstance().execute(NowPlaying::releaseCover);
 	}
 

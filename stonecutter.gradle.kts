@@ -783,7 +783,7 @@ stonecutter parameters {
 			replace("blockEntity.createNbt(", "blockEntity.saveWithFullMetadata(")
 			replace("BuiltInRegistries.BLOCK.getId(", "BuiltInRegistries.BLOCK.getKey(")
 			replace("BuiltInRegistries.ENTITY_TYPE.getId(", "BuiltInRegistries.ENTITY_TYPE.getKey(")
-			// PolyBlur's post-processing shader pipeline (verified against
+			// Motion Blur's post-processing shader pipeline (verified against
 			// real vanilla GameRenderer.java, which loads this exact same
 			// blur effect for the pause menu background).
 			replace("net.minecraft.client.gl.PostEffectProcessor", "net.minecraft.client.renderer.PostChain")
@@ -796,7 +796,7 @@ stonecutter parameters {
 			// form per version (Minecraft loses #getMainRenderTarget() in
 			// 26.2, but GameRenderer keeps its own #mainRenderTarget() -
 			// verified via javap) - handled with a manual //? if block in
-			// PolyBlurModule.java instead (see the long comment near the
+			// MotionBlurModule.java instead (see the long comment near the
 			// end of this file explaining why).
 			// appendClickableNarrations(NarrationMessageBuilder) -> the
 			// abstract hook AbstractWidget actually declares is
@@ -1186,7 +1186,7 @@ stonecutter parameters {
 		// source file instead (same proven-safe mechanism already used for
 		// CapeFeatureRenderer.java/GameRendererFovMixin.java's structural
 		// splits) - see HudManager.java, PerformanceBoostModule.java,
-		// PotionTimersModule.java, PolyBlurModule.java, and the six
+		// PotionTimersModule.java, MotionBlurModule.java, and the six
 		// Minecraft#screen (Yarn: currentScreen) read sites.
 
 		// --- 26.2-only deltas from 26.1, each verified via javap against the

@@ -1,8 +1,9 @@
 <!--page {
-	"title": "Features – 119 Free Minecraft Client Modules & Velo+ · Velo Client",
-	"description": "Every Velo Client feature: 119 free modules for HUD, PvP, performance, quality of life and servers, plus Velo+ with World Hosting, Cloud Sync, Clips Pro at 1080p60, picture and whiteboard notes, animated Name Styles, a custom Home background, monthly coins and the + badge.",
+	"title": "Features – 150+ Free Minecraft Client Modules & Velo+ · Velo Client",
+	"description": "Every Velo Client feature: 150+ free modules for HUD, PvP, performance, quality of life and servers, plus Velo+ with World Hosting, Cloud Sync, Clips Pro at 1080p60, picture and whiteboard notes, animated Name Styles, a custom Home background, monthly coins and the + badge.",
 	"path": "/features",
 	"active": "features",
+	"js": "features.js",
 	"priority": "0.9",
 	"images": ["/assets/gui/settings.webp", "/assets/gui/ingame-pause.webp"],
 	"schema": {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://velo-client.com/"}, {"@type": "ListItem", "position": 2, "name": "Features", "item": "https://velo-client.com/features"}]}
@@ -15,15 +16,65 @@
       <p class="fade-up" style="--d:.5s">Turn on what you need, style it, place it. Everything below comes with Velo Client at no cost, for Minecraft {{minecraft.version}}.</p>
     </div>
     <div class="cats">
-      <article class="card cat spot reveal" style="--i:0"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v4h-7zM14 10h7v11h-7zM3 13h7v8H3z"/></svg></span><b data-count="22">22</b></div><h2 style="font-size:19px">HUD</h2><p>Keystrokes, Mouse &amp; CPS, Armor, Potion Timers, Minimap, Coordinates, Waypoints, Scoreboard, FPS and ping, each in its own style.</p></article>
-      <article class="card cat spot reveal" style="--i:1"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4H20v5.5L10 19.5l-5.5-5.5zM7 17l-3 3"/></svg></span><b data-count="25">25</b></div><h2 style="font-size:19px">PvP</h2><p>Target HUD, Cooldowns, Hit Color, Old Animations (1.7/1.8), Reach Display, Fight Recap, Custom Crosshair, combo and pot counters.</p></article>
-      <article class="card cat spot reveal" style="--i:2"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.3 4.9 5.2.6-3.9 3.6 1.1 5.2L12 14.7 7.3 17.3l1.1-5.2-3.9-3.6 5.2-.6z"/></svg></span><b data-count="22">22</b></div><h2 style="font-size:19px">Quality of life</h2><p>Emoji Chat, Zoom, Free Look, Toggle Sprint, Shulker Preview, chat tweaks, Clips, World Map, Friends, Auto Reconnect and Session Fixer.</p></article>
-      <article class="card cat spot reveal" style="--i:3"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l5-5 4 4 7-8M15 8h5v5"/></svg></span><b data-count="11">11</b></div><h2 style="font-size:19px">Performance</h2><p>Performance Boost with Turbo Entities and Turbo Block Entities, Render Culling, Shader Cache, Anti Farm Lag, Particle Limiter, plus Sodium, Lithium and friends.</p></article>
-      <article class="card cat spot reveal" style="--i:0"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z"/></svg></span><b data-count="14">14</b></div><h2 style="font-size:19px">Server tools</h2><p>Background Queue, Game Mode Presets, Light Level, Spawn Radius, Chunk Borders, TPS graph and Redstone Mode.</p></article>
-      <article class="card cat spot reveal" style="--i:1"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></span><b data-count="6">6</b></div><h2 style="font-size:19px">Visual</h2><p>Hide Foliage, Container Animations, Block Outline, Full Bright, TNT Timer, Time, Weather &amp; Fog.</p></article>
-      <article class="card cat spot reveal" style="--i:2"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg></span><b data-count="5">5</b></div><h2 style="font-size:19px">Debug</h2><p>Better F3, Block and Entity Inspector, Module Profiler, keybind conflicts.</p></article>
-      <article class="card cat spot reveal" style="--i:3"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6a2 2 0 1 1 2 2c-1 .3-2 1-2 2M12 10 3 16.5a1 1 0 0 0 .6 1.8h16.8a1 1 0 0 0 .6-1.8z"/></svg></span><b data-count="3">3</b></div><h2 style="font-size:19px">Cosmetics</h2><p>Cloaks with cloth physics, kill effects and the Velo Network badge, next to the wings and auras from the Store.</p></article>
+      <article class="card cat spot reveal" style="--i:0"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v4h-7zM14 10h7v11h-7zM3 13h7v8H3z"/></svg></span><b data-count="{{counts.cat.hud}}">{{counts.cat.hud}}</b></div><h2 style="font-size:19px">HUD</h2><p>Keystrokes, Mouse &amp; CPS, Armor, Potion Timers, Minimap, Coordinates, Waypoints, Scoreboard, FPS and ping, each in its own style.</p></article>
+      <article class="card cat spot reveal" style="--i:1"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4H20v5.5L10 19.5l-5.5-5.5zM7 17l-3 3"/></svg></span><b data-count="{{counts.cat.pvp}}">{{counts.cat.pvp}}</b></div><h2 style="font-size:19px">PvP</h2><p>Target HUD, Cooldowns, Hit Color, Old Animations (1.7/1.8), Reach Display, Fight Recap, Custom Crosshair, combo and pot counters.</p></article>
+      <article class="card cat spot reveal" style="--i:2"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.3 4.9 5.2.6-3.9 3.6 1.1 5.2L12 14.7 7.3 17.3l1.1-5.2-3.9-3.6 5.2-.6z"/></svg></span><b data-count="{{counts.cat.qol}}">{{counts.cat.qol}}</b></div><h2 style="font-size:19px">Quality of life</h2><p>Emoji Chat, Zoom, Free Look, Toggle Sprint, Shulker Preview, chat tweaks, Clips, World Map, Friends, Auto Reconnect and Session Fixer.</p></article>
+      <article class="card cat spot reveal" style="--i:3"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l5-5 4 4 7-8M15 8h5v5"/></svg></span><b data-count="{{counts.cat.performance}}">{{counts.cat.performance}}</b></div><h2 style="font-size:19px">Performance</h2><p>Performance Boost with Turbo Entities and Turbo Block Entities, Render Culling, Shader Cache, Anti Farm Lag, Particle Limiter, plus Sodium, Lithium and friends.</p></article>
+      <article class="card cat spot reveal" style="--i:0"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z"/></svg></span><b data-count="{{counts.cat.server_tools}}">{{counts.cat.server_tools}}</b></div><h2 style="font-size:19px">Server tools</h2><p>Background Queue, Game Mode Presets, Light Level, Spawn Radius, Chunk Borders, TPS graph and Redstone Mode.</p></article>
+      <article class="card cat spot reveal" style="--i:1"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg></span><b data-count="{{counts.cat.rendering}}">{{counts.cat.rendering}}</b></div><h2 style="font-size:19px">Visual</h2><p>Hide Foliage, Container Animations, Block Outline, Full Bright, TNT Timer, Time, Weather &amp; Fog.</p></article>
+      <article class="card cat spot reveal" style="--i:2"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg></span><b data-count="{{counts.cat.debug}}">{{counts.cat.debug}}</b></div><h2 style="font-size:19px">Debug</h2><p>Better F3, Block and Entity Inspector, Module Profiler, keybind conflicts.</p></article>
+      <article class="card cat spot reveal" style="--i:3"><div class="cat-top"><span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6a2 2 0 1 1 2 2c-1 .3-2 1-2 2M12 10 3 16.5a1 1 0 0 0 .6 1.8h16.8a1 1 0 0 0 .6-1.8z"/></svg></span><b data-count="{{counts.cat.cosmetics}}">{{counts.cat.cosmetics}}</b></div><h2 style="font-size:19px">Cosmetics</h2><p>Cloaks with cloth physics, kill effects and the Velo Network badge, next to the wings and auras from the Store.</p></article>
     </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top:20px" id="modules" aria-labelledby="mods-h">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Every module</span>
+      <h2 id="mods-h">All {{counts.modules}}, one by one.</h2>
+      <p>The complete list - every module in Velo Client, free for everyone. Type to find one.</p>
+    </div>
+    <div class="mods-search reveal">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" placeholder="Search {{counts.modules}} modules - e.g. zoom, crosshair, FPS" aria-label="Search modules" data-mods-search>
+      <span data-mods-count></span>
+    </div>
+    <div class="mods">
+{{modules.list}}
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top:40px" aria-labelledby="more-h">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Free, beyond the modules</span>
+      <h2 id="more-h">Everything else you get free.</h2>
+    </div>
+    <ul class="more-free reveal">
+      <li><b>Velo Launcher</b><span>Windows, macOS and Linux. Fabric, Java and memory set up for you, one clean instance per profile.</span></li>
+      <li><b>Minecraft 1.21.1 to 26.3 and 1.8.9</b><span>Every version with the Velo mod - 1.8.9 with its own R-Shift menu, HUD editor, Locker, Freelook, Hit Color, 1.7 animations and 17 modules.</span></li>
+      <li><b>More FPS out of the box</b><span>Sodium, Lithium and the right performance mods installed and kept matching your version.</span></li>
+      <li><b>Import from other launchers</b><span>Lunar Client, Modrinth and CurseForge mods, settings and servers in a minute.</span></li>
+      <li><b>Launcher Doctor</b><span>Finds why the game crashed or won't start and fixes it with one click.</span></li>
+      <li><b>Mods, resource packs &amp; shaders</b><span>Modrinth search built in; the Pack editor lets you change textures yourself.</span></li>
+      <li><b>R-Shift menu &amp; HUD editor</b><span>Every module with a live preview, drag your HUD anywhere, HUD Style for one look everywhere.</span></li>
+      <li><b>Profiles &amp; presets</b><span>Save setups, switch per game mode, share them.</span></li>
+      <li><b>Friends, chat &amp; parties</b><span>See where friends play, message them, party pings and shared waypoints.</span></li>
+      <li><b>Discover</b><span>Partner servers and public Velo worlds, joined in one click.</span></li>
+      <li><b>Velo World</b><span>A side-scroller on the launcher's Home: biomes, dungeons, bosses, crafting, co-op with your party.</span></li>
+      <li><b>Clips &amp; Velo Rewind</b><span>Save the last 30 s with F8, record 3D replays and export them as video.</span></li>
+      <li><b>Video Player</b><span>YouTube, Shorts (scroll with a key), Twitch live streams, any video link and your own video files - in a window over the game or as picture-in-picture.</span></li>
+      <li><b>Lyrics</b><span>The song playing on Spotify with its synced lyrics - huge in the sky, floating in front of you or on screen, with 19 presets and a live editor.</span></li>
+      <li><b>Velo Library</b><span>Custom poses, map art, pixel art, schematics and HUD designs from the community.</span></li>
+      <li><b>World Notes &amp; Storage Memory</b><span>Floating notes in the world, and a search for everything in your chests.</span></li>
+      <li><b>Redstone Mode</b><span>Building tools for redstone in singleplayer creative.</span></li>
+      <li><b>Store, Locker &amp; Pets</b><span>Wings, cloaks, auras, emotes and pets - free ones from daily rewards, quests and invites, the rest with coins.</span></li>
+      <li><b>Daily rewards, quests &amp; invites</b><span>Earn Velo Coins by playing and by bringing friends.</span></li>
+      <li><b>Custom cloaks</b><span>Turn any picture into your own cloak that every Velo player sees.</span></li>
+      <li><b>Bug reports</b><span>Report from the pause menu - with a 60-second lag spike recording when the game stutters.</span></li>
+    </ul>
   </div>
 </section>
 
@@ -65,7 +116,7 @@
       <div class="plus-top">
         <div>
           <span class="plus-badge">VELO+</span>
-          <h2 id="plus-h">More for the players who want it.</h2>
+          <h2 id="plus-h">Everything in Velo+.</h2>
           <p>Velo+ pays for the servers and the work behind Velo Client. You get World Hosting for your friends, cloud backups of your setup, pro clips, a name that moves, coins every month and a badge everyone sees.</p>
         </div>
         <div style="display:grid;gap:10px;justify-items:start">

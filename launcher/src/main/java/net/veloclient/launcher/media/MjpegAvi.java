@@ -72,16 +72,44 @@ public final class MjpegAvi {
 	}
 
 
+	/**
+	 * Reads a clip without loading it into the heap: the file is memory-mapped and each frame is copied out only when it's
+	 * shown. Reading the whole file and then copying every frame needed twice the clip size on the heap - a long clip ran
+	 * the launcher out of memory (OutOfMemoryError in scan, report 80c1a073bff5, 2026-11-14).
+	 */
 	public static Clip read(Path file) throws IOException {
-		ByteBuffer data = ByteBuffer.wrap(Files.readAllBytes(file)).order(ByteOrder.LITTLE_ENDIAN);
-		List<byte[]> frames = new ArrayList<>();
+		ByteBuffer data;
+		try (java.nio.channels.FileChannel channel = java.nio.channels.FileChannel.open(file, java.nio.file.StandardOpenOption.READ)) {
+			long size = channel.size();
+			if (size > Integer.MAX_VALUE) {
+				throw new IOException("Clip too large (" + size / (1024 * 1024) + " MB)");
+			}
+			data = channel.map(java.nio.channels.FileChannel.MapMode.READ_ONLY, 0, size).order(ByteOrder.LITTLE_ENDIAN);
+		}
+		List<int[]> offsets = new ArrayList<>();
 		int[] header = {66666, 0, 0};
-		scan(data, 12, data.capacity(), frames, header);
+		scan(data, 12, data.capacity(), offsets, header);
 		double fps = header[0] > 0 ? 1_000_000.0 / header[0] : 15;
+		ByteBuffer mapped = data;
+		int[][] at = offsets.toArray(new int[0][]);
+		List<byte[]> frames = new java.util.AbstractList<>() {
+			@Override
+			public byte[] get(int index) {
+				byte[] frame = new byte[at[index][1]];
+				mapped.get(at[index][0], frame);
+				return frame;
+			}
+
+			@Override
+			public int size() {
+				return at.length;
+			}
+		};
 		return new Clip(frames, fps, header[1], header[2]);
 	}
 
-	private static void scan(ByteBuffer data, int from, int to, List<byte[]> frames, int[] header) {
+	/** Collects (offset, size) of every frame chunk. */
+	private static void scan(ByteBuffer data, int from, int to, List<int[]> offsets, int[] header) {
 		int pos = from;
 		while (pos + 8 <= to) {
 			String id = new String(new byte[] {data.get(pos), data.get(pos + 1), data.get(pos + 2), data.get(pos + 3)}, StandardCharsets.US_ASCII);
@@ -90,15 +118,13 @@ public final class MjpegAvi {
 				break;
 			}
 			if (id.equals("LIST")) {
-				scan(data, pos + 12, pos + 8 + size, frames, header);
+				scan(data, pos + 12, pos + 8 + size, offsets, header);
 			} else if (id.equals("avih") && size >= 40) {
 				header[0] = data.getInt(pos + 8);
 				header[1] = data.getInt(pos + 8 + 32);
 				header[2] = data.getInt(pos + 8 + 36);
 			} else if (id.endsWith("dc")) {
-				byte[] frame = new byte[size];
-				data.get(pos + 8, frame);
-				frames.add(frame);
+				offsets.add(new int[] {pos + 8, size});
 			}
 			pos += 8 + size + (size & 1);
 		}

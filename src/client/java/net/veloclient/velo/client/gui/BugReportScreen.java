@@ -12,6 +12,7 @@ import net.veloclient.velo.client.gui.widget.VeloUi;
 import net.veloclient.velo.client.gui.window.VeloWindow;
 import net.veloclient.velo.client.report.BugReporter;
 import net.veloclient.velo.client.report.CrashCheck;
+import net.veloclient.velo.client.report.SpikeRecorder;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -39,6 +40,10 @@ public final class BugReportScreen extends VeloWindow {
 	private boolean sending;
 	private String sentId;
 	private String status = "";
+	private boolean attachSpikes = true;
+	// what was typed before "Record lag spikes" closed the window, so it's back afterwards
+	private static String draftTitle = "";
+	private static String draftMessage = "";
 
 	public BugReportScreen(Screen parent) {
 		this(parent, null);
@@ -63,8 +68,8 @@ public final class BugReportScreen extends VeloWindow {
 		if (sentId != null) {
 			return;
 		}
-		String previousTitle = titleBox != null ? titleBox.getText() : "";
-		String previousMessage = messageText.get();
+		String previousTitle = titleBox != null ? titleBox.getText() : draftTitle;
+		String previousMessage = titleBox != null ? messageText.get() : draftMessage;
 		int x = contentX();
 		int y = contentY() + introHeight();
 		int w = contentWidth();
@@ -128,6 +133,26 @@ public final class BugReportScreen extends VeloWindow {
 				includeLogs ? 1 : 0, mouseX, mouseY, () -> includeLogs = !includeLogs));
 		hits.add(VeloUi.pill(context, x + 156, rowY, 110, 16, showDetails ? "Hide details" : "What gets sent", 0, mouseX, mouseY,
 				() -> showDetails = !showDetails));
+		if (crashFile == null) {
+			SpikeRecorder.Result spikes = SpikeRecorder.last();
+			String spikeLabel = SpikeRecorder.busy() ? (SpikeRecorder.secondsLeft() >= 0 ? "Recording... " + SpikeRecorder.secondsLeft() + " s" : "Analysing...")
+					: spikes != null ? (attachSpikes ? "Lag spikes: attached (" + spikes.spikes() + ")" : "Lag spikes: not attached")
+					: "Record lag spikes (60 s)";
+			hits.add(VeloUi.pill(context, x + 272, rowY, Math.min(w - 272, 160), 16, spikeLabel, spikes != null && attachSpikes ? 1 : 0, mouseX, mouseY, () -> {
+				if (SpikeRecorder.busy()) {
+					return;
+				}
+				if (spikes != null) {
+					attachSpikes = !attachSpikes;
+					return;
+				}
+				// keep what was typed, close the window and record while they play
+				draftTitle = titleBox.getText();
+				draftMessage = messageText.get();
+				SpikeRecorder.start(60);
+				this.client.setScreen(null);
+			}));
+		}
 		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(status, w), x, rowY + 22, status.startsWith("Couldn't") || status.startsWith("Too")
 				? 0xFFFF8A8D : VeloStyle.textMuted());
 
@@ -147,6 +172,11 @@ public final class BugReportScreen extends VeloWindow {
 		lines.add("Mods: " + BugReporter.mods().size() + ", Velo modules on: " + BugReporter.enabledModules().size());
 		if (includeLogs) {
 			lines.add("The end of your game log" + (crashFile != null ? " + the crash report" : ""));
+		}
+		if (crashFile == null && SpikeRecorder.last() != null && attachSpikes) {
+			lines.add("The lag spike analysis (frame times, what the game did in slow frames - the recording stays on your PC)");
+		} else if (crashFile == null) {
+			lines.add("Laggy? \"Record lag spikes\" measures 60 s while you play and adds what caused each spike");
 		}
 		lines.add("Your Minecraft name (to reply to you)");
 		int w = contentWidth();
@@ -178,16 +208,25 @@ public final class BugReportScreen extends VeloWindow {
 		}
 		String message = messageText.get().trim();
 		String title = titleBox.getText().trim();
-		if (crashFile == null && message.isEmpty() && title.isEmpty()) {
+		if (crashFile == null && message.isEmpty() && title.isEmpty() && !(attachSpikes && SpikeRecorder.last() != null)) {
 			status = "Describe the bug first - even one sentence helps.";
 			return;
 		}
 		sending = true;
 		status = "Sending...";
+		SpikeRecorder.Result spikes = crashFile == null && attachSpikes ? SpikeRecorder.last() : null;
+		if (title.isEmpty() && message.isEmpty() && spikes != null) {
+			title = "Lag spikes (" + spikes.spikes() + " in 60 s)";
+		}
 		BugReporter.send(crashFile != null ? "crash" : "bug", title.isEmpty() && crashCause != null ? crashCause : title, message, system,
-				includeLogs, crashFile, id -> {
+				includeLogs, crashFile, spikes == null ? null : spikes.summary(), id -> {
 					sending = false;
 					sentId = id;
+					draftTitle = "";
+					draftMessage = "";
+					if (spikes != null) {
+						SpikeRecorder.clear();
+					}
 					layoutContent();
 				}, error -> {
 					sending = false;

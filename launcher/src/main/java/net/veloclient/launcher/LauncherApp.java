@@ -1976,6 +1976,8 @@ public final class LauncherApp extends Application {
 			Long millis = net.veloclient.launcher.data.PlayTimeStore.get().millisByProfile.get(instance.id());
 			heroStat(stats, "PLAYED", millis == null || millis < 60_000 ? "–" : millis >= 3_600_000 ? millis / 3_600_000 + " h" : millis / 60_000 + " min", false);
 			heroStat(stats, "VERSION", instance.mcVersion(), false);
+			Label onVelo = heroStat(stats, "ON VELO · TODAY", "…", true);
+			fillVeloLiveStats(onVelo);
 			text.getChildren().addAll(head, stats);
 			Node party = homePartyLine();
 			if (party != null) {
@@ -2026,6 +2028,44 @@ public final class LauncherApp extends Application {
 					.filter(n -> n.endsWith(".jar") && !n.startsWith("velo-client-") && !n.startsWith("fabric-api-")).count();
 		} catch (java.io.IOException e) {
 			return 0;
+		}
+	}
+
+	private static volatile long[] veloLive;   // {online, today, fetchedAt}
+
+	/** Home's "ON VELO · TODAY" column: players in game on Velo right now and today's players (server, cached 30 s). */
+	private void fillVeloLiveStats(Label shown) {
+		long[] cached = veloLive;
+		if (cached != null) {
+			showVeloLive(shown, cached);
+			if (System.currentTimeMillis() - cached[2] < 30_000) {
+				return;
+			}
+		}
+		CompletableFuture.supplyAsync(() -> {
+			try {
+				com.google.gson.JsonObject o = net.veloclient.launcher.social.StoreApi.liveStats();
+				return new long[] {o.get("online").getAsLong(), o.get("today").getAsLong(), System.currentTimeMillis()};
+			} catch (Exception e) {
+				return null;
+			}
+		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(result -> Platform.runLater(() -> {
+			if (result == null) {
+				if (veloLive == null && shown.getParent() instanceof Region cell && cell.getParent() instanceof HBox row) {
+					row.getChildren().remove(cell);   // server not reachable (offline / older server): drop the column
+				}
+				return;
+			}
+			veloLive = result;
+			showVeloLive(shown, result);
+		}));
+	}
+
+	private static void showVeloLive(Label shown, long[] live) {
+		java.text.NumberFormat f = java.text.NumberFormat.getIntegerInstance(java.util.Locale.US);
+		shown.setText(f.format(live[0]) + " · " + f.format(Math.max(live[0], live[1])));
+		if (shown.getGraphic() instanceof Region square) {
+			square.getStyleClass().remove("status-square-off");
 		}
 	}
 

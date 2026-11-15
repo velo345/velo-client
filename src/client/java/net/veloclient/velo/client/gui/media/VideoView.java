@@ -52,6 +52,39 @@ public final class VideoView {
 		}
 	}
 
+	/**
+	 * Opens whatever {@code opener} builds (called on a worker thread once FFmpeg is there, with its path) - e.g. a
+	 * YouTube video's separate video and audio streams. {@code loading} is shown until then.
+	 */
+	public VideoView(java.util.function.Function<java.nio.file.Path, VideoPlayer> opener, boolean autoplay, String loading) {
+		this.autoplay = autoplay;
+		this.status = loading;
+		FfmpegTool.ensure(problem -> {
+			if (problem != null) {
+				error = problem;
+				return;
+			}
+			MediaTextures.decoder().execute(() -> {
+				try {
+					VideoPlayer opened = opener.apply(FfmpegTool.binary());
+					if (released) {
+						opened.release();
+						return;
+					}
+					player = opened;
+					if (autoplay) {
+						opened.play();
+					}
+				} catch (Exception e) {
+					error = e.getMessage() == null ? "Couldn't play this video" : e.getMessage();
+				}
+			});
+		});
+		if (FfmpegTool.binary() == null) {
+			status = "Getting FFmpeg for the player (once)...";
+		}
+	}
+
 	/** Null until the clip is open. */
 	public VideoPlayer player() {
 		return player;

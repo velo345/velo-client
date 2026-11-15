@@ -28,15 +28,19 @@ public abstract class VulkanThreadedFrameMixin {
 			original.call(encoder);
 		} finally {
 			ThreadedPresent.frameSubmit = false;
+			ThreadedPresent.frameSubmitted();
 		}
 	}
 
 	@WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/GpuSurface;acquireNextTexture()V"))
 	private void velo$acquireLateWhilePresenting(GpuSurface surface, Operation<Void> original) {
+		ThreadedPresent.beginFrame();
 		if (ThreadedPresent.enabled() && ThreadedPresent.busy()) {
 			return;
 		}
+		long start = System.nanoTime();
 		original.call(surface);
+		ThreadedPresent.recordAcquire(System.nanoTime() - start);
 	}
 }
 *///?} else {

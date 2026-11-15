@@ -25,6 +25,8 @@ public final class ModuleStateStore {
 	private static final String KEY_FORMAT = "Key format";
 	/** Set once a profile has the 0.9.8 HUD look (elements without their own dark boxes). */
 	private static final String HUD_LOOK = "HUD look";
+	/** Set once the 1.5 opt-in reset ran (Anti Farm Lag off for everyone, then the player's own choice). */
+	private static final String OPT_IN_RESET = "Opt-in 1.5";
 
 	/**
 	 * Key codes changed meaning in 26.3 (GLFW key codes -> SDL scancodes). The client sets the
@@ -72,7 +74,7 @@ public final class ModuleStateStore {
 			}
 			result.put(module.id(), new ModuleSnapshot(module.isEnabled(), fields));
 		}
-		result.put(META_ID, new ModuleSnapshot(false, Map.of(KEY_FORMAT, currentKeyFormat, HUD_LOOK, "0.9.8")));
+		result.put(META_ID, new ModuleSnapshot(false, Map.of(KEY_FORMAT, currentKeyFormat, HUD_LOOK, "0.9.8", OPT_IN_RESET, true)));
 		return result;
 	}
 
@@ -83,6 +85,7 @@ public final class ModuleStateStore {
 	 */
 	static Map<String, ModuleSnapshot> migrate(Map<String, ModuleSnapshot> snapshot) {
 		snapshot = migrateHudLook(snapshot);
+		snapshot = migrateOptIn(snapshot);
 		ModuleSnapshot cps = snapshot.get("cps-counter");
 		ModuleSnapshot mouse = snapshot.get("mouse-buttons");
 		if (cps == null || !cps.enabled() || (mouse != null && mouse.enabled())) {
@@ -117,6 +120,24 @@ public final class ModuleStateStore {
 				result.put(entry.getKey(), new ModuleSnapshot(entry.getValue().enabled(), copy));
 			}
 		}
+		return result;
+	}
+
+	/**
+	 * 1.5: Anti Farm Lag became fully opt-in. Profiles saved before that are switched off once; whatever the player picks
+	 * afterwards is kept (the marker is written with the next save).
+	 */
+	static Map<String, ModuleSnapshot> migrateOptIn(Map<String, ModuleSnapshot> snapshot) {
+		ModuleSnapshot meta = snapshot.get(META_ID);
+		if (meta != null && meta.fields().get(OPT_IN_RESET) != null) {
+			return snapshot;
+		}
+		ModuleSnapshot farm = snapshot.get("anti-farm-lag");
+		if (farm == null || !farm.enabled()) {
+			return snapshot;
+		}
+		Map<String, ModuleSnapshot> result = new LinkedHashMap<>(snapshot);
+		result.put("anti-farm-lag", new ModuleSnapshot(false, farm.fields()));
 		return result;
 	}
 

@@ -6,11 +6,18 @@
 $ErrorActionPreference = 'Stop'
 # UTF-8 without a byte order mark (a BOM would end up in front of the first line).
 $utf8 = New-Object System.Text.UTF8Encoding $false
-[Console]::OutputEncoding = $utf8
+# Started from javaw there is no console: setting the console encoding then throws "The handle is invalid" and, with
+# ErrorActionPreference Stop, ended the helper before its first line - "media controls do nothing" on Windows. Our own
+# StreamWriter below sets the encoding anyway, so this is only a nicety.
+try { [Console]::OutputEncoding = $utf8 } catch { }
 $stdout = New-Object System.IO.StreamWriter ([Console]::OpenStandardOutput()), $utf8
 $stdout.AutoFlush = $true
 
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
+# Per-app volume needs a little C# (Add-Type runs csc.exe). Antivirus/AppLocker sometimes blocks that - then everything
+# else still works and only the volume slider is missing.
+$script:hasAppVolume = $true
+try {
 Add-Type -Language CSharp -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -103,6 +110,10 @@ namespace VeloMedia {
 	}
 }
 '@
+} catch {
+	$script:hasAppVolume = $false
+	[Console]::Error.WriteLine("app volume unavailable: " + $_)
+}
 
 $asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
 	$_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1'
@@ -113,10 +124,24 @@ function Await($op, [Type] $type) {
 	$task.Result
 }
 
-[void] [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
-[void] [Windows.Storage.Streams.DataReader, Windows.Storage.Streams, ContentType = WindowsRuntime]
-$manager = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) `
-	([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
+try {
+	[void] [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
+	[void] [Windows.Storage.Streams.DataReader, Windows.Storage.Streams, ContentType = WindowsRuntime]
+	$manager = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) `
+		([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
+} catch {
+	[Console]::Error.WriteLine("media session manager unavailable: " + $_)
+	$manager = $null
+}
+if (-not $manager) {
+	# No media session API (old Windows / stripped install): say so once and keep stdin open so the game doesn't
+	# restart us every 10 s. Play/pause/skip still work through the game's media-key fallback.
+	$stdout.WriteLine('unsupported')
+	$stdin0 = New-Object System.IO.StreamReader ([Console]::OpenStandardInput()), $utf8
+	while ($null -ne $stdin0.ReadLine()) { }
+	exit 0
+}
+$stdout.WriteLine('ready')
 
 $lastKey = $null
 $lastProps = $null
@@ -177,7 +202,7 @@ function Emit {
 		$position += ([DateTimeOffset]::Now - $timeline.LastUpdatedTime).TotalMilliseconds
 	}
 	if (((Get-Date) - $script:volumeAt).TotalMilliseconds -gt 900) {
-		$script:volume = [VeloMedia.AppVolume]::Get($app)
+		$script:volume = if ($script:hasAppVolume) { [VeloMedia.AppVolume]::Get($app) } else { -1 }
 		$script:volumeAt = Get-Date
 	}
 	$out = [ordered] @{
@@ -208,7 +233,7 @@ function Run-Command([string] $line) {
 		'seek' { [void] (Await ($session.TryChangePlaybackPositionAsync([long] $parts[1] * 10000)) ([bool])) }
 		'vol' {
 			$level = [float]::Parse($parts[1], [Globalization.CultureInfo]::InvariantCulture)
-			[VeloMedia.AppVolume]::Set($session.SourceAppUserModelId, $level)
+			if ($script:hasAppVolume) { [VeloMedia.AppVolume]::Set($session.SourceAppUserModelId, $level) }
 			$script:volume = $level
 			$script:volumeAt = Get-Date
 		}

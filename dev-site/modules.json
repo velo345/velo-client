@@ -8,19 +8,19 @@
  {
   "id": "alternate-current",
   "name": "Alternate Current (Singleplayer only)",
-  "description": "Singleplayer only: faster redstone dust in your own worlds, no effect on servers. Machines that rely on vanilla's ",
+  "description": "Singleplayer only: faster redstone dust in your own worlds, no effect on servers. Machines that rely on vanilla's dust update order can behave differently. Applies on your next start from the Velo launcher.",
   "category": "performance"
  },
  {
   "id": "anti-coords-leak",
   "name": "Anti Coords Leak",
-  "description": "Hides every coordinate on screen (chat, F3, HUD, waypoints, Litematica, any mod) while you share your screen or record ",
+  "description": "Hides every coordinate on screen (chat, F3, HUD, waypoints, Litematica, any mod) while you share your screen or record (Discord, OBS, browsers, any app) - automatically, or always on.",
   "category": "qol"
  },
  {
   "id": "anti-deepslate",
   "name": "Anti Deepslate",
-  "description": "Draws deepslate, stone types, gravel, ores and bedrock as one plain block (netherite by default) so their rotation and patterns can't reveal ",
+  "description": "Draws deepslate, stone types, gravel, ores and bedrock as one plain block (netherite by default) so their rotation and patterns can't reveal where your base is.",
   "category": "rendering"
  },
  {
@@ -68,20 +68,32 @@
  {
   "id": "auto-reconnect",
   "name": "Auto Reconnect",
-  "description": "Automatically reconnects after an unexpected disconnect, waiting progressively longer between ",
+  "description": "Automatically reconnects after an unexpected disconnect, waiting progressively longer between attempts (3s, 5s, 10s, 30s, then every 60s). Adds a Cancel button to the disconnect screen.",
   "category": "qol"
  },
  {
   "id": "background-queue",
   "name": "Background Queue Session",
-  "description": "Keep a server connected in the background so you hold your spot (e.g. in a queue) while you play ",
+  "description": "Keep a server connected in the background so you hold your spot (e.g. in a queue) while you play elsewhere. Its chat and scoreboard stay live, and switching back is instant - no rejoin. Press J for the menu.",
   "category": "server_tools"
  },
  {
   "id": "better-f3",
   "name": "Better F3",
-  "description": "A cleaner F3 screen: compact see-through panels, Nether/Overworld coordinates for portals, ",
+  "description": "A cleaner F3 screen: compact see-through panels, Nether/Overworld coordinates for portals, and you choose which rows to show.",
   "category": "debug"
+ },
+ {
+  "id": "better-tab-list",
+  "name": "Better Tab List",
+  "description": "Ping as a colored number, player heads on every server and more rows in the tab list.",
+  "category": "hud"
+ },
+ {
+  "id": "block-break-progress",
+  "name": "Block Break Progress",
+  "description": "Shows how far you've mined a block - at the crosshair and on the block itself.",
+  "category": "hud"
  },
  {
   "id": "block-outline",
@@ -120,15 +132,27 @@
   "category": "qol"
  },
  {
+  "id": "chat-heads",
+  "name": "Chat Heads",
+  "description": "Shows the player's head in front of their chat messages.",
+  "category": "hud"
+ },
+ {
+  "id": "chunk-animator",
+  "name": "Chunk Animator",
+  "description": "New chunks glide into place instead of popping in. Needs Sodium (comes with the launcher).",
+  "category": "rendering"
+ },
+ {
   "id": "chunk-border-overlay",
   "name": "Chunk Boundary Overlay",
-  "description": "Renders chunk and chunk-section borders around you, for build/world-gen testing, with ",
+  "description": "Renders chunk and chunk-section borders around you, for build/world-gen testing, with customizable line colors.",
   "category": "server_tools"
  },
  {
   "id": "chunk-load-profiler",
   "name": "Chunk Load Profiler",
-  "description": "Highlights how long each chunk took to load relative to others (green = normal, red = ",
+  "description": "Highlights how long each chunk took to load relative to others (green = normal, red = slow), flags chunks you've genuinely never loaded before in purple, and factors in entity/block-entity counts (pistons, hoppers, ...) as an extra lag signal, with a ping when a slow chunk shows up.",
   "category": "server_tools"
  },
  {
@@ -148,6 +172,12 @@
   "name": "Clock",
   "description": "Displays the current real-world time.",
   "category": "hud"
+ },
+ {
+  "id": "color-codes",
+  "name": "Color Codes",
+  "description": "Pick a colour and copy it for chat, signs and plugins: hex, &#hex, MiniMessage, gradients. F4 opens it.",
+  "category": "qol"
  },
  {
   "id": "color-grading",
@@ -210,6 +240,18 @@
   "category": "pvp"
  },
  {
+  "id": "custom-image",
+  "name": "Custom Image",
+  "description": "Put any picture on your HUD - a logo, banner or overlay. Import PNG, JPG or GIF.",
+  "category": "hud"
+ },
+ {
+  "id": "custom-text",
+  "name": "Custom Text",
+  "description": "Your own text on the HUD with live placeholders like {fps}, {ping}, {server} and {x} {y} {z}.",
+  "category": "hud"
+ },
+ {
   "id": "damage-numbers",
   "name": "Damage Numbers",
   "description": "Shows the damage players take (and heal) above their heads for a moment after each hit.",
@@ -220,6 +262,12 @@
   "name": "Direction",
   "description": "A compass strip showing which way you're facing.",
   "category": "pvp"
+ },
+ {
+  "id": "discord-presence",
+  "name": "Discord Rich Presence",
+  "description": "Shows \"Playing Velo Client\" on Discord with where you are - the menus, a world or the server.",
+  "category": "qol"
  },
  {
   "id": "emoji-chat",
@@ -296,7 +344,7 @@
  {
   "id": "free-look",
   "name": "Free Look",
-  "description": "Hold the free look key to orbit the camera freely around your player in third person, without ",
+  "description": "Hold the free look key to orbit the camera freely around your player in third person, without turning your player or moving.",
   "category": "qol"
  },
  {
@@ -316,6 +364,12 @@
   "name": "Game Mode Presets",
   "description": "Loads a different Velo profile per game mode (Bed Wars, duels, SkyWars...) and switches back after.",
   "category": "server_tools"
+ },
+ {
+  "id": "glint-colorizer",
+  "name": "Glint Colorizer",
+  "description": "Gives the enchantment glint on your items and armor any color you like - or a rainbow.",
+  "category": "rendering"
  },
  {
   "id": "gpu-utilization",
@@ -398,7 +452,7 @@
  {
   "id": "hud-style",
   "name": "HUD Style",
-  "description": "One font, background and accent colour for every HUD element - Inter, Sora, Space Grotesk, Poppins and more, ",
+  "description": "One font, background and accent colour for every HUD element - Inter, Sora, Space Grotesk, Poppins and more, on glass, solid or nothing.",
   "category": "hud"
  },
  {
@@ -412,6 +466,18 @@
   "name": "Input Latency Sub-Tick Sampling",
   "description": "Timestamps mouse clicks off the main thread so latency doesn't depend on frame rate, and (optionally) polls input again at the start of every tick to notice clicks sooner during FPS stalls.",
   "category": "performance"
+ },
+ {
+  "id": "inventory-hud",
+  "name": "Inventory HUD",
+  "description": "Shows your inventory on screen so you see what you still have mid-fight.",
+  "category": "pvp"
+ },
+ {
+  "id": "item-physics",
+  "name": "Item Physics",
+  "description": "Dropped items lie flat on the ground and tumble through the air instead of floating and spinning.",
+  "category": "rendering"
  },
  {
   "id": "item-position",
@@ -434,7 +500,7 @@
  {
   "id": "kill-effects",
   "name": "Kill Effects",
-  "description": "Plays a purely client-side visual effect (with optional sound) when a nearby entity dies - ",
+  "description": "Plays a purely client-side visual effect (with optional sound) when a nearby entity dies - pick when it triggers and which animation/sound plays. A kill effect from the Store, once equipped, plays instead.",
   "category": "cosmetics"
  },
  {
@@ -456,10 +522,22 @@
   "category": "pvp"
  },
  {
+  "id": "lyrics",
+  "name": "Lyrics",
+  "description": "The lyrics of the song playing on Spotify, synced to the music - huge in the sky, floating in front of you or on screen, with animations, fonts, colours and presets. The Lyrics Studio has a live preview.",
+  "category": "rendering"
+ },
+ {
   "id": "memory-monitor",
   "name": "Memory & GC Monitor",
   "description": "Shows JVM heap usage and allocation rate.",
   "category": "performance"
+ },
+ {
+  "id": "mini-player",
+  "name": "Mini Player",
+  "description": "A small live 3D you on the HUD with your skin, armour and cosmetics - like Bedrock's paper doll.",
+  "category": "hud"
  },
  {
   "id": "minimap",
@@ -468,10 +546,22 @@
   "category": "hud"
  },
  {
+  "id": "module-list",
+  "name": "Module List",
+  "description": "Lists the modules you have turned on, right on the HUD.",
+  "category": "hud"
+ },
+ {
   "id": "module-profiler",
   "name": "Module Profiler",
   "description": "Shows live processing time (avg/peak ms) per module, broken down by tick/world-render/HUD-render, to track down performance regressions.",
   "category": "debug"
+ },
+ {
+  "id": "motion-blur",
+  "name": "Motion Blur",
+  "description": "Real camera motion blur: streaks when you turn, zoom streaks when you go fast, and a trail - scales with your speed.",
+  "category": "rendering"
  },
  {
   "id": "mouse-buttons",
@@ -490,6 +580,12 @@
   "name": "No Break Particles",
   "description": "Removes the particles when a block breaks and while you mine it - cleaner view, sounds stay.",
   "category": "rendering"
+ },
+ {
+  "id": "numbered-inventories",
+  "name": "Numbered Inventories",
+  "description": "Numbers every slot of chests, menus and your inventory - from 0 like plugin configs (DeluxeMenus, shops) count them, or from 1.",
+  "category": "qol"
  },
  {
   "id": "old-animations",
@@ -540,6 +636,12 @@
   "category": "performance"
  },
  {
+  "id": "pets",
+  "name": "Pets",
+  "description": "A companion that follows you, does tricks, rides your shoulder and celebrates your kills. Get pets in the Store.",
+  "category": "cosmetics"
+ },
+ {
   "id": "phantom",
   "name": "Phantom",
   "description": "Singleplayer: don't trigger pressure plates, tripwires or sculk, and fly through walls in creative.",
@@ -556,12 +658,6 @@
   "name": "Player Levels",
   "description": "Ranks the players in your game by the stars / level / ELO shown in the tab list.",
   "category": "hud"
- },
- {
-  "id": "polyblur",
-  "name": "PolyBlur",
-  "description": "Motion blur that responds to how fast you're turning or moving - not a constant filter.",
-  "category": "performance"
  },
  {
   "id": "pot-counter",
@@ -602,7 +698,7 @@
  {
   "id": "screen-stretch",
   "name": "Screen Stretch",
-  "description": "Stretched resolution: draw the world as 4:3, 5:4, 16:10 or your own shape and stretch it across your monitor - ",
+  "description": "Stretched resolution: draw the world as 4:3, 5:4, 16:10 or your own shape and stretch it across your monitor - the HUD stays sharp.",
   "category": "rendering"
  },
  {
@@ -610,6 +706,18 @@
   "name": "Seamless Resource Reload",
   "description": "Reloading resource packs no longer shows the red Mojang screen - you keep playing while it loads.",
   "category": "performance"
+ },
+ {
+  "id": "server-display",
+  "name": "Server Display",
+  "description": "Shows the server's logo and IP on the HUD - great for videos and screenshots.",
+  "category": "hud"
+ },
+ {
+  "id": "server-hud",
+  "name": "Server HUD",
+  "description": "Shows what Velo Bridge servers put on your HUD (quests, timers, boss bars). Also: server music, cutscenes, mod list sharing.",
+  "category": "hud"
  },
  {
   "id": "server-overlays",
@@ -620,7 +728,7 @@
  {
   "id": "session-auto-fixer",
   "name": "Session Auto-Fixer",
-  "description": "When a server kicks you for an invalid/expired session, refreshes your saved Velo account ",
+  "description": "When a server kicks you for an invalid/expired session, refreshes your saved Velo account and reconnects automatically - no game or launcher restart.",
   "category": "qol"
  },
  {
@@ -636,33 +744,45 @@
   "category": "performance"
  },
  {
+  "id": "shield-indicator",
+  "name": "Shield Indicator",
+  "description": "Green shield while it blocks, red while an axe disabled it - fades back and flashes when it works again.",
+  "category": "pvp"
+ },
+ {
   "id": "shulker-preview",
   "name": "Shulker Preview",
-  "description": "Hold Shift over a shulker box or bundle to see what's inside. Ctrl+Shift opens it next to your inventory so you can ",
+  "description": "Hold Shift over a shulker box or bundle to see what's inside. Ctrl+Shift opens it next to your inventory so you can move items in and out (singleplayer and the Creative inventory).",
   "category": "qol"
  },
  {
   "id": "simulation-distance",
   "name": "Simulation Distance",
-  "description": "Shows the chunks the server simulates around you (crops, redstone, mob spawning) ",
+  "description": "Shows the chunks the server simulates around you (crops, redstone, mob spawning) as a fence, plus the server's distance in a small legend.",
   "category": "server_tools"
  },
  {
   "id": "small-caps",
   "name": "Small Caps",
-  "description": "Renders chat, action bar and Velo's own HUD text in small capitals instead of normal case, ",
+  "description": "Renders chat, action bar and Velo's own HUD text in small capitals instead of normal case, each toggleable separately.",
   "category": "qol"
  },
  {
   "id": "spawn-radius",
   "name": "Spawn Radius",
-  "description": "Spheres around you showing where mobs can spawn and despawn (24 / 32 / 128 blocks), ",
+  "description": "Spheres around you showing where mobs can spawn and despawn (24 / 32 / 128 blocks), with your server's simulation distance in the legend.",
   "category": "server_tools"
  },
  {
   "id": "speed-hud",
   "name": "Speed",
   "description": "Shows how fast you're moving in blocks per second.",
+  "category": "qol"
+ },
+ {
+  "id": "storage-memory",
+  "name": "Storage Memory",
+  "description": "Remembers what's in your chests, shulker boxes and ender chest per server, plus villager trades and work stations. Y opens the search.",
   "category": "qol"
  },
  {
@@ -674,8 +794,14 @@
  {
   "id": "time-weather-fog",
   "name": "Time, Weather & Fog",
-  "description": "Locks the local time-of-day and weather to a fixed state, and lets you customize or fully ",
+  "description": "Locks the local time-of-day and weather to a fixed state, and lets you customize or fully disable fog - purely visual, never sent to the server.",
   "category": "rendering"
+ },
+ {
+  "id": "tnt-optimizer",
+  "name": "TNT Optimizer",
+  "description": "For TNT farms and cannons: merges stacked explosion effects and reuses TNT block models. Off by default.",
+  "category": "performance"
  },
  {
   "id": "tnt-timer",
@@ -726,10 +852,22 @@
   "category": "cosmetics"
  },
  {
+  "id": "velo-rewind",
+  "name": "Velo Rewind",
+  "description": "Record 3D replays of what happens around you - F6 to start / stop, pause from the pause menu. AI Access lets AI agents edit and export replays through a local API.",
+  "category": "qol"
+ },
+ {
   "id": "velo-shaders",
   "name": "Velo Shaders",
   "description": "Beta: custom Vulkan shaders, still in development. Shaders that run on Vulkan, fully customizable: presets, waving water with reflections, warm light, nicer fog, a custom sky with sun, moon, stars and aurora, bloom and colour grading - at a fraction of the usual shader cost.",
   "category": "rendering"
+ },
+ {
+  "id": "youtube",
+  "name": "Video Player",
+  "description": "Watch YouTube, Shorts, Twitch, any video link or your own video files in a window over the game - movable, resizable, fullscreen, picture-in-picture.",
+  "category": "qol"
  },
  {
   "id": "waypoints",
@@ -748,6 +886,18 @@
   "name": "World Border Visualizer",
   "description": "Highlights the world border boundary in 3D, using the server-enforced bounds.",
   "category": "server_tools"
+ },
+ {
+  "id": "world-map",
+  "name": "World Map",
+  "description": "Maps everywhere you explore - open it with M. Turn off coordinates for streaming.",
+  "category": "qol"
+ },
+ {
+  "id": "world-notes",
+  "name": "World Notes",
+  "description": "Notes floating in the world with checklists, a whiteboard and pictures - private or shared with friends and your party. O opens them.",
+  "category": "qol"
  },
  {
   "id": "xp-bar",

@@ -67,6 +67,8 @@ public final class Keys {
 	public static final int M = InputConstants.KEY_M;
 	public static final int N = InputConstants.KEY_N;
 	public static final int O = InputConstants.KEY_O;
+	public static final int U = InputConstants.KEY_U;
+	public static final int F = InputConstants.KEY_F;
 	public static final int P = InputConstants.KEY_P;
 	public static final int R = InputConstants.KEY_R;
 	public static final int Y = InputConstants.KEY_Y;
@@ -121,6 +123,8 @@ public final class Keys {
 	public static final int M = GLFW.GLFW_KEY_M;
 	public static final int N = GLFW.GLFW_KEY_N;
 	public static final int O = GLFW.GLFW_KEY_O;
+	public static final int U = GLFW.GLFW_KEY_U;
+	public static final int F = GLFW.GLFW_KEY_F;
 	public static final int P = GLFW.GLFW_KEY_P;
 	public static final int R = GLFW.GLFW_KEY_R;
 	public static final int Y = GLFW.GLFW_KEY_Y;

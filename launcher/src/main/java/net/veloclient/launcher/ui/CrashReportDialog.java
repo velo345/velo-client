@@ -143,7 +143,8 @@ public final class CrashReportDialog {
 		StringBuilder sent = new StringBuilder();
 		system.forEach((k, v) -> sent.append(k).append(": ").append(v).append('\n'));
 		sent.append("Mods: ").append(mods.size()).append(" files\n");
-		sent.append(crash != null ? "Crash report: " + crashFile.getFileName() + "\n" : "No crash report file was written.\n");
+		sent.append(crashFile != null ? "Crash report: " + crashFile.getFileName() + "\n"
+				: crash != null ? "Crash details from the game log\n" : "No crash report file was written.\n");
 		sent.append(log != null ? "Game log: last " + log.lines().count() + " lines\n" : "");
 		TextArea sentArea = new TextArea(sent.toString());
 		sentArea.setEditable(false);

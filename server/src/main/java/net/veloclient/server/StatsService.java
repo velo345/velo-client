@@ -150,6 +150,11 @@ final class StatsService {
 		}
 	}
 
+	/** Distinct players active today (UTC) in any Velo app - the public "today" number on the launcher's Home. */
+	synchronized long activeToday() throws SQLException {
+		return scalar("SELECT COUNT(DISTINCT uuid) FROM active_days WHERE day = '" + LocalDate.now(ZoneOffset.UTC) + "'");
+	}
+
 	/**
 	 * Everything the panel's overview shows: totals, per-day series for the last {@code days} days and the online
 	 * samples of the last {@code sampleHours} hours.

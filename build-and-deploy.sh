@@ -78,11 +78,16 @@ if [[ -d "$GAMEJARS" ]]; then
 		VJAR="${VDIR}build/libs/velo-client-${VERSION}+${V}.jar"
 		[[ -f "$VJAR" ]] && cp "$VJAR" "$GAMEJARS/$V.jar"
 	done
+	# 1.8.9 is its own Ornithe build (legacy/) - into the cache as gamejars/1.8.9.jar like the launcher bundles it
+	(cd legacy && ./gradlew build -q)
+	LEGACY_JAR=$(ls -t legacy/build/libs/velo-client-*+mc1.8.9.jar 2>/dev/null | grep -v sources | head -1 || true)
+	[[ -n "$LEGACY_JAR" ]] && cp "$LEGACY_JAR" "$GAMEJARS/1.8.9.jar"
 	for INST in "$HOME"/.velo-client/instances/*/; do
 		[[ -f "$INST/instance.json" && -d "$INST/mods" ]] || continue
 		V=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('mcVersion',''))" "$INST/instance.json" 2>/dev/null)
 		VJAR="versions/$V/build/libs/velo-client-${VERSION}+${V}.jar"
 		[[ -f "$VJAR" ]] || VJAR=""
+		[[ "$V" == "1.8.9" && -n "${LEGACY_JAR:-}" ]] && VJAR="$LEGACY_JAR"
 		OLD=$(ls "$INST/mods" | grep -E '^velo-client.*\.jar$' | head -1)
 		[[ -n "$VJAR" && -n "$OLD" ]] && cp "$VJAR" "$INST/mods/$OLD"
 	done

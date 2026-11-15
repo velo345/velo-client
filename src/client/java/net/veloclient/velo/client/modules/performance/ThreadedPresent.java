@@ -25,8 +25,29 @@ import java.util.concurrent.locks.LockSupport;
  */
 public final class ThreadedPresent {
 
-	/** Opt-in: measured 2026-11-07 on the Chalet bench (RTX 3060, GPU ~85% busy) = no FPS change, and the worker spins. */
-	private static final boolean ON = Boolean.getBoolean("velo.threadedPresent");
+	/**
+	 * On by default since 2026-11-11 (static bench +1.2% FPS, +4% 1% lows once Velo was CPU-bound; 2026-11-07 it was
+	 * GPU-bound and gained nothing). {@code -Dvelo.threadedPresent=false} turns it off, {@code =true} skips the
+	 * adaptive gate below (A/B runs).
+	 */
+	private static final String MODE = System.getProperty("velo.threadedPresent", "auto");
+	private static final boolean ON = !"false".equals(MODE);
+	private static final boolean FORCE = "true".equals(MODE);
+	private static final boolean STATS = Boolean.getBoolean("velo.presentStats");
+	/** Set by the surface's configure hook: the swapchain really runs IMMEDIATE (VSync off and the driver offers it). */
+	public static volatile boolean immediate;
+	/** The frame's decision, taken once at its start so its submit and present take the same path. */
+	private static boolean frameOn;
+	// Adaptive gate: the worker only pays off while the CPU is the limit. Over windows of 128+ frames / 0.5+ s, time the render
+	// thread spends waiting for the GPU (submit throttle) and for the swapchain (acquire) is compared with the frame
+	// time: on stays on while waits <= 20% of it, off turns on again below 10% (hysteresis, so it doesn't flap).
+	private static boolean gateOn;
+	private static long lastFrame, winFrame, winWait, winAcquire;
+	private static int winFrames;
+	/** Windows to stay off after the gate switched the worker off (see frameSubmitted). */
+	private static int offHold;
+	/** Idle spins before the worker parks (A/B knob: -Dvelo.presentSpins). */
+	private static final int SPINS = Integer.getInteger("velo.presentSpins", 200);
 	private static final ConcurrentLinkedQueue<Runnable> JOBS = new ConcurrentLinkedQueue<>();
 	/** Jobs queued and not finished yet (a job counts until it has run). */
 	private static final AtomicInteger PENDING = new AtomicInteger();
@@ -42,9 +63,74 @@ public final class ThreadedPresent {
 	private ThreadedPresent() {
 	}
 
-	/** True when the frame's submit and present go to the worker. */
+	/** True when the frame's submit and present go to the worker (decided by {@link #beginFrame()}). */
 	public static boolean enabled() {
-		return ON && PerformanceBoostModule.turbo && DecoupledPresent.active();
+		return frameOn;
+	}
+
+	/**
+	 * The swapchain runs IMMEDIATE and frames don't wait for the display: the only case where the present can leave the
+	 * render thread or the CPU may run further ahead. VSync (FIFO), MAILBOX-only drivers (e.g. some Wayland/Mesa
+	 * setups even with VSync off) and macOS keep vanilla's path.
+	 */
+	public static boolean eligible() {
+		return immediate && PerformanceBoostModule.turbo && DecoupledPresent.active();
+	}
+
+	/** Called at the start of every frame (before its acquire). */
+	public static void beginFrame() {
+		frameOn = ON && eligible() && (FORCE || gateOn);
+	}
+
+	/** Render thread time spent waiting for the GPU in the submit throttle. */
+	public static void recordGpuWait(long nanos) {
+		winWait += nanos;
+	}
+
+	/** Render thread time spent in the swapchain acquire. */
+	public static void recordAcquire(long nanos) {
+		winAcquire += nanos;
+	}
+
+	/** Called once per frame submit: closes a 128-frame window and updates the gate. */
+	public static void frameSubmitted() {
+		long now = System.nanoTime();
+		long dt = lastFrame == 0 ? 0 : now - lastFrame;
+		lastFrame = now;
+		if (dt <= 0 || dt > 250_000_000L || !eligible()) {
+			resetWindow();
+			return;
+		}
+		winFrame += dt;
+		// At least 128 frames and half a second: at 3000+ FPS 128 frames are only ~40 ms and single GPU-wait spikes
+		// flapped the worker off ~10% of the time (bench 2026-11-11, average wait 2%).
+		if (++winFrames < 128 || winFrame < 500_000_000L) {
+			return;
+		}
+		boolean was = gateOn;
+		if (offHold > 0) {
+			// Just switched off: with the worker off the GPU wait moves into the (unmeasured) inline present, so the next
+			// window always looks wait-free - re-checking right away flapped on/off every window in GPU-bound farm scenes.
+			offHold--;
+		} else {
+			gateOn = gateOn ? winAcquire + winWait <= winFrame * 0.2 : winWait < winFrame * 0.1;
+			if (was && !gateOn) {
+				offHold = 6;
+			}
+		}
+		if (STATS || was != gateOn) {
+			net.veloclient.velo.VeloClient.LOGGER.info(String.format(java.util.Locale.ROOT,
+					"[ThreadedPresent] %.0f us/frame, gpu wait %.1f%%, acquire %.1f%% -> worker %s",
+					winFrame / 1e3 / winFrames, 100.0 * winWait / winFrame, 100.0 * winAcquire / winFrame, gateOn ? "on" : "off"));
+		}
+		resetWindow();
+	}
+
+	private static void resetWindow() {
+		winFrame = 0;
+		winWait = 0;
+		winAcquire = 0;
+		winFrames = 0;
 	}
 
 	/** True while the worker still has a submit or present to run. */
@@ -138,8 +224,10 @@ public final class ThreadedPresent {
 		while (true) {
 			Runnable job = JOBS.poll();
 			if (job == null) {
-				// Frames come every few hundred microseconds at high FPS: spin briefly before parking.
-				if (++idle < 4000) {
+				// Spin only a few microseconds, then park: handOff unparks us. The old 4000 spins (~150 us) covered the
+				// whole gap between two frames at 3000+ FPS, so the worker never parked and burned a core that the
+				// render, cull and server threads needed (profiled 2026-11-11: 100% busy in queue polling).
+				if (++idle < SPINS) {
 					Thread.onSpinWait();
 					continue;
 				}

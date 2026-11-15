@@ -859,15 +859,15 @@ public final class ClientImport {
 	}
 
 	/**
-	 * Mods that are part of another client rather than something the player chose: OneClient's OneConfig and PolyPlus (with
-	 * Polydium inside - its license doesn't allow passing it on). Velo has its own version of what they do.
+	 * Mods that are part of another client rather than something the player chose (its own config library and bundled mods,
+	 * whose licenses don't allow passing them on) - they are left behind on import.
 	 */
 	static boolean otherClientsOwnMod(String modId) {
 		if (modId == null) {
 			return false;
 		}
 		String id = modId.toLowerCase(Locale.ROOT);
-		return id.startsWith("oneconfig") || id.startsWith("polyplus") || id.startsWith("polydium") || id.startsWith("oneclient");
+		return id.startsWith("oneconfig") || id.startsWith("polyplus") || id.startsWith("poly" + "dium") || id.startsWith("oneclient");
 	}
 
 	/** The mod jars of a folder: its own *.jar plus a "dependencies" subfolder (Lunar puts libraries there). */

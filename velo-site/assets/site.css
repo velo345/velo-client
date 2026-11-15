@@ -681,3 +681,19 @@ dialog::backdrop { background: rgba(4, 4, 6, .72); backdrop-filter: blur(8px); }
 .dl-ver b { font: 700 15px var(--display); }
 .dl-ver span { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; }
 .dl-ver-legacy { grid-column: 1 / -1; }
+
+/* /features: the complete module list (generated from dev-site/modules.json) and the other free features */
+.mods-search { display: flex; align-items: center; gap: 10px; max-width: 560px; margin: 0 0 26px; padding: 0 16px; min-height: 48px; border: 1px solid var(--border, #26262b); border-radius: 14px; background: rgba(255, 255, 255, .03); color: var(--text-2); }
+.mods-search input { flex: 1; min-width: 0; height: 46px; border: 0; outline: 0; background: transparent; color: var(--text, #fff); font: inherit; font-size: 15px; }
+.mods-search span { font: 500 12px var(--mono); white-space: nowrap; }
+.mods { columns: 3 320px; column-gap: 28px; }
+.mods-group { break-inside: avoid; margin: 0 0 28px; }
+.mods-group h3 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; font-size: 18px; }
+.mods-group h3 span { font: 600 12px var(--mono); color: var(--text-2); }
+.mods-group ul, .more-free { list-style: none; margin: 0; padding: 0; }
+.mods-group li { padding: 9px 0; border-top: 1px solid var(--border, #1f1f23); }
+.mods-group li b, .more-free b { display: block; font-size: 14.5px; color: var(--text, #fff); }
+.mods-group li span, .more-free span { display: block; margin-top: 2px; font-size: 13.5px; line-height: 1.5; color: var(--text-2); }
+.mods-group[hidden], .mods-group li[hidden] { display: none; }
+.more-free { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0 28px; }
+.more-free li { padding: 12px 0; border-top: 1px solid var(--border, #1f1f23); }

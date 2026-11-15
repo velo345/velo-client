@@ -63,13 +63,17 @@ final class LinuxMpris implements MediaBackend {
 	}
 
 	private MediaState read(String name) throws Exception {
+		long asked = System.nanoTime();
 		String out = gdbus("--dest", name, "--object-path", PATH, "--method", "org.freedesktop.DBus.Properties.GetAll", "org.mpris.MediaPlayer2.Player");
+		long answered = System.nanoTime();
 		String status = string(out, "PlaybackStatus");
 		String title = string(out, "xesam:title");
 		if (title == null || title.isBlank() || "Stopped".equals(status)) {
 			return null;
 		}
-		long sampled = System.nanoTime();
+		// the player read its position somewhere during the call (starting gdbus takes 50-200 ms): the middle, not the end -
+		// stamping it with the end made the position (and synced lyrics) lag behind by the whole call
+		long sampled = asked + (answered - asked) / 2;
 		double volume = number(out, "Volume", -1);
 		return new MediaState(name.substring(PREFIX.length()), title, string(out, "xesam:artist"), string(out, "xesam:album"),
 				artPath(string(out, "mpris:artUrl")), (long) number(out, "mpris:length", 0) / 1000L, (long) number(out, "Position", 0) / 1000L,
