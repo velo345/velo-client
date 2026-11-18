@@ -14,7 +14,7 @@ public final class LyricsStyle {
 	public static final List<String> PLACEMENTS = List.of("Sky", "In Front");
 	public static final List<String> DEPTHS = List.of("Behind Blocks", "Always In Front");
 	public static final List<String> SPREADS = List.of("One Spot", "Around You", "Everywhere");
-	public static final List<String> FONTS = List.of("Archivo", "Inter", "Sora", "Space Grotesk", "Poppins", "Audiowide", "JetBrains Mono", "Minecraft");
+	public static final List<String> FONTS = List.of("Archivo", "Inter", "Sora", "Space Grotesk", "Poppins", "Audiowide", "JetBrains Mono", "MinecraftClient");
 	public static final List<String> COLOR_MODES = List.of("Solid", "Gradient", "Flowing Gradient", "Rainbow", "Per Word");
 	public static final List<String> CASES = List.of("As Written", "UPPERCASE", "lowercase");
 	public static final List<String> ENTERS = List.of("Fade", "Rise", "Drop", "Slide", "Zoom", "Pop", "Bounce", "Wave", "Spin", "Flip", "Fly In",
@@ -46,6 +46,14 @@ public final class LyricsStyle {
 	public int color2 = 0xFF9EC5FF;
 	public boolean karaoke = false;
 	public int highlight = 0xFFFFD84A;
+	// solid letters: real depth (3D text, not a flat picture hanging in the world); only in the 3D World display
+	public boolean text3d = false;
+	/** How thick the letters are, in font units (a line is 9). */
+	public double thickness = 2.4;
+	/** Rounded edge, in font units. */
+	public double bevel = 0.22;
+	/** Colour of the sides; 0 = a darker shade of the letter's colour. */
+	public int sideColor = 0;
 	public boolean shadow = false;
 	public int shadowColor = 0xFF000000;
 	public boolean outline = false;
@@ -77,6 +85,11 @@ public final class LyricsStyle {
 
 	public boolean sky() {
 		return "Sky".equals(placement);
+	}
+
+	/** Solid letters are drawn: only in the world, never in the 2D HUD. */
+	public boolean solid() {
+		return text3d && world3d();
 	}
 
 	public boolean seeThrough() {
@@ -113,6 +126,8 @@ public final class LyricsStyle {
 		if (!IDLES.contains(idle)) idle = d.idle;
 		if (!SCREEN_SPOTS.contains(screenSpot)) screenSpot = d.screenSpot;
 		if (lineGap < 1.2 || lineGap > 5) lineGap = d.lineGap;
+		thickness = Math.max(0.4, Math.min(8, thickness));
+		bevel = Math.max(0, Math.min(1.2, bevel));
 		return this;
 	}
 
@@ -155,102 +170,122 @@ public final class LyricsStyle {
 		s.screenSize = size;
 	}
 
+	/** Solid letters with a given depth and rounded edge (the 3D look: real thickness, not a flat picture). */
+	private static void solid(LyricsStyle s, double thickness, double bevel) {
+		s.text3d = true;
+		s.thickness = thickness;
+		s.bevel = bevel;
+	}
+
+	// The presets are deliberately calm: white and one soft accent, no outlines or cartoon colours, gentle motion.
 	static {
 		preset("Concert Sky", s -> {
-			sky(s, 110, 22, 1.0);
-			s.font = "Archivo"; s.colorMode = "Gradient"; s.color = 0xFFFFFFFF; s.color2 = 0xFF9EC5FF;
-			s.glow = true; s.glowColor = 0xFF5B8CFF; s.glowSize = 1.2; s.glowStrength = 1.0;
+			sky(s, 110, 22, 1.0); solid(s, 2.6, 0.28);
+			s.font = "Archivo"; s.colorMode = "Gradient"; s.color = 0xFFFFFFFF; s.color2 = 0xFFCFE0FF;
+			s.glow = true; s.glowColor = 0xFF7FA8FF; s.glowSize = 1.1; s.glowStrength = 0.7;
 			s.enter = "Rise"; s.exit = "Fade"; s.perLetter = true; s.idle = "Float"; s.showNext = true;
+		});
+		preset("Block Letters", s -> {
+			front(s, 7, 0.6, 1.2, false); solid(s, 4.5, 0.18);
+			s.font = "Archivo"; s.textCase = "UPPERCASE"; s.spacing = 0.6; s.colorMode = "Solid"; s.color = 0xFFF4F4F6; s.sideColor = 0xFF8E94A3;
+			s.glow = false;
+			s.enter = "Zoom"; s.exit = "Zoom"; s.perLetter = false; s.idle = "Breathe"; s.showNext = false;
+		});
+		preset("Chrome", s -> {
+			front(s, 7, 0.8, 1.1, false); solid(s, 3.2, 0.5);
+			s.font = "Archivo"; s.textCase = "UPPERCASE"; s.spacing = 0.9; s.colorMode = "Gradient"; s.color = 0xFFFFFFFF; s.color2 = 0xFFB4BCCB; s.sideColor = 0xFF5D6575;
+			s.glow = false;
+			s.enter = "Slide"; s.exit = "Fade"; s.perLetter = true; s.idle = "Sway"; s.speed = 0.9; s.showNext = false;
+		});
+		preset("Obsidian", s -> {
+			front(s, 7, 0.6, 1.1, false); solid(s, 3.0, 0.3);
+			s.font = "Sora"; s.spacing = 0.7; s.colorMode = "Solid"; s.color = 0xFF16181F; s.sideColor = 0xFF2B2F3B;
+			s.glow = true; s.glowColor = 0xFFFFFFFF; s.glowSize = 0.9; s.glowStrength = 0.55;
+			s.enter = "Fade"; s.exit = "Fade"; s.perLetter = false; s.idle = "Float"; s.showNext = false; s.speed = 0.8;
+		});
+		preset("Crimson", s -> {
+			front(s, 7, 0.7, 1.2, false); solid(s, 3.4, 0.25);
+			s.font = "Archivo"; s.textCase = "UPPERCASE"; s.spacing = 0.8; s.colorMode = "Solid"; s.color = 0xFFF0F0F2; s.sideColor = 0xFFD3243A;
+			s.glow = true; s.glowColor = 0xFFD3243A; s.glowSize = 1.2; s.glowStrength = 0.6;
+			s.enter = "Zoom"; s.exit = "Fade"; s.perLetter = false; s.idle = "None"; s.showNext = false;
+		});
+		preset("Midnight", s -> {
+			sky(s, 120, 24, 1.1); solid(s, 2.4, 0.3);
+			s.font = "Sora"; s.spacing = 0.6; s.colorMode = "Gradient"; s.color = 0xFFEAF0FF; s.color2 = 0xFF8FA6E8;
+			s.glow = true; s.glowColor = 0xFF3F5FD0; s.glowSize = 1.4; s.glowStrength = 0.7;
+			s.enter = "Blur In"; s.exit = "Fade"; s.perLetter = true; s.idle = "Float"; s.speed = 0.8; s.showNext = true;
 		});
 		preset("Starfield", s -> {
 			sky(s, 140, 34, 0.8); s.spread = "Everywhere"; s.followView = false;
 			s.font = "Sora"; s.textCase = "lowercase"; s.spacing = 1.4; s.colorMode = "Solid"; s.color = 0xFFF4F7FF;
-			s.glow = true; s.glowColor = 0xFFFFFFFF; s.glowSize = 1.6; s.glowStrength = 0.7;
+			s.glow = true; s.glowColor = 0xFFFFFFFF; s.glowSize = 1.6; s.glowStrength = 0.6;
 			s.enter = "Fly In"; s.exit = "Scatter"; s.perLetter = true; s.idle = "Breathe"; s.showNext = false; s.speed = 0.8;
 		});
 		preset("Aurora", s -> {
-			sky(s, 160, 30, 1.2);
-			s.font = "Sora"; s.colorMode = "Flowing Gradient"; s.color = 0xFF7CFFCB; s.color2 = 0xFF7A8CFF;
-			s.glow = true; s.glowColor = 0xFF3FD8B0; s.glowSize = 1.8; s.glowStrength = 0.9;
-			s.enter = "Wave"; s.exit = "Fly Away"; s.perLetter = true; s.idle = "Wave"; s.showNext = true;
+			sky(s, 160, 30, 1.2); solid(s, 2.2, 0.3);
+			s.font = "Sora"; s.colorMode = "Flowing Gradient"; s.color = 0xFFD8FFF0; s.color2 = 0xFF9FB4FF;
+			s.glow = true; s.glowColor = 0xFF5CCFB0; s.glowSize = 1.6; s.glowStrength = 0.6;
+			s.enter = "Wave"; s.exit = "Fade"; s.perLetter = true; s.idle = "Wave"; s.speed = 0.8; s.showNext = true;
 		});
 		preset("Golden Hour", s -> {
-			sky(s, 100, 14, 1.1);
-			s.font = "Archivo"; s.textCase = "UPPERCASE"; s.spacing = 1.0; s.colorMode = "Gradient"; s.color = 0xFFFFE7A3; s.color2 = 0xFFFF9A3D;
-			s.glow = true; s.glowColor = 0xFFFF7A1A; s.glowSize = 1.3; s.glowStrength = 0.8; s.shadow = true;
+			sky(s, 100, 14, 1.1); solid(s, 2.4, 0.3);
+			s.font = "Archivo"; s.textCase = "UPPERCASE"; s.spacing = 1.0; s.colorMode = "Gradient"; s.color = 0xFFFFF0CF; s.color2 = 0xFFFFC27A;
+			s.glow = true; s.glowColor = 0xFFFF9A3D; s.glowSize = 1.3; s.glowStrength = 0.6;
 			s.enter = "Blur In"; s.exit = "Fade"; s.perLetter = false; s.idle = "None"; s.speed = 0.7; s.showNext = false;
 		});
-		preset("Neon Night", s -> {
+		preset("Dusk", s -> {
+			sky(s, 120, 20, 1.2); solid(s, 2.4, 0.3);
+			s.font = "Inter"; s.spacing = 1.2; s.colorMode = "Gradient"; s.color = 0xFFF6E9FF; s.color2 = 0xFFFFC9B8;
+			s.glow = true; s.glowColor = 0xFFB58AF0; s.glowSize = 1.4; s.glowStrength = 0.55;
+			s.enter = "Slide"; s.exit = "Fade"; s.perLetter = true; s.idle = "Sway"; s.tilt = -4; s.showNext = false; s.speed = 0.8;
+		});
+		preset("Ember", s -> {
+			front(s, 7, 0.9, 1.1, false); solid(s, 3.0, 0.25);
+			s.font = "Archivo"; s.textCase = "UPPERCASE"; s.spacing = 0.7; s.colorMode = "Gradient"; s.color = 0xFFFFF1D6; s.color2 = 0xFFFF9A52; s.sideColor = 0xFF9E3B14;
+			s.glow = true; s.glowColor = 0xFFFF6A1F; s.glowSize = 1.3; s.glowStrength = 0.7;
+			s.enter = "Rise"; s.exit = "Fade"; s.perLetter = true; s.idle = "Breathe"; s.showNext = false;
+		});
+		preset("Frost", s -> {
+			sky(s, 90, 18, 1.0); s.spread = "Around You"; s.followView = false; solid(s, 2.2, 0.35);
+			s.font = "Sora"; s.colorMode = "Gradient"; s.color = 0xFFFFFFFF; s.color2 = 0xFFBFE8FF;
+			s.glow = true; s.glowColor = 0xFF8FD8FF; s.glowSize = 1.2; s.glowStrength = 0.6;
+			s.enter = "Drop"; s.exit = "Fade"; s.perLetter = true; s.idle = "Sway"; s.speed = 0.8; s.showNext = true;
+		});
+		preset("Night Drive", s -> {
 			front(s, 6, 0.6, 1.0, true);
-			s.font = "Audiowide"; s.colorMode = "Gradient"; s.color = 0xFFFF3DDB; s.color2 = 0xFF39E7FF;
-			s.glow = true; s.glowColor = 0xFFB040FF; s.glowSize = 1.4; s.glowStrength = 1.3;
-			s.enter = "Glitch"; s.exit = "Glitch"; s.perLetter = true; s.idle = "Pulse"; s.karaoke = true; s.highlight = 0xFFFFFFFF; s.showNext = false;
+			s.font = "Audiowide"; s.colorMode = "Solid"; s.color = 0xFFFFFFFF;
+			s.glow = true; s.glowColor = 0xFF4F8CFF; s.glowSize = 1.3; s.glowStrength = 1.0;
+			s.enter = "Fade"; s.exit = "Fade"; s.perLetter = true; s.idle = "Pulse"; s.karaoke = true; s.highlight = 0xFF8FB8FF; s.showNext = false;
 		});
 		preset("Hologram", s -> {
 			front(s, 5, 0.9, 0.9, true); s.spread = "Around You"; s.followView = false;
-			s.font = "JetBrains Mono"; s.textCase = "UPPERCASE"; s.spacing = 0.8; s.colorMode = "Solid"; s.color = 0xFF7FF6FF;
-			s.glow = true; s.glowColor = 0xFF00C8FF; s.glowSize = 1.0; s.glowStrength = 1.1; s.opacity = 0.85;
-			s.enter = "Flip"; s.exit = "Dissolve"; s.perLetter = true; s.idle = "Shake"; s.showNext = true; s.chaos = 0.1;
-		});
-		preset("Karaoke", s -> {
-			front(s, 5, -0.4, 0.9, true);
-			s.font = "Poppins"; s.colorMode = "Solid"; s.color = 0xFFB8B8C8; s.karaoke = true; s.highlight = 0xFFFFD84A;
-			s.outline = true; s.outlineColor = 0xFF101014; s.glow = false;
-			s.enter = "Pop"; s.exit = "Rise"; s.perLetter = false; s.idle = "None"; s.showNext = true;
-		});
-		preset("Comic", s -> {
-			front(s, 6, 0.8, 1.2, false); s.spread = "Around You"; s.followView = false;
-			s.font = "Poppins"; s.textCase = "UPPERCASE"; s.colorMode = "Per Word"; s.color = 0xFFFFE14D; s.color2 = 0xFFFF5A5A;
-			s.outline = true; s.outlineColor = 0xFF140A00; s.outlineSize = 1.8; s.glow = false; s.shadow = true;
-			s.enter = "Bounce"; s.exit = "Explode"; s.perLetter = true; s.idle = "Jelly"; s.chaos = 0.35; s.showNext = false;
-		});
-		preset("Fire", s -> {
-			front(s, 7, 1.0, 1.1, false);
-			s.font = "Archivo"; s.textCase = "UPPERCASE"; s.colorMode = "Flowing Gradient"; s.color = 0xFFFFE066; s.color2 = 0xFFFF3D1F;
-			s.glow = true; s.glowColor = 0xFFFF4A00; s.glowSize = 1.6; s.glowStrength = 1.2;
-			s.enter = "Rise"; s.exit = "Fly Away"; s.perLetter = true; s.idle = "Shake"; s.chaos = 0.05; s.showNext = false;
-		});
-		preset("Frost", s -> {
-			sky(s, 90, 18, 1.0); s.spread = "Around You"; s.followView = false;
-			s.font = "Sora"; s.colorMode = "Gradient"; s.color = 0xFFFFFFFF; s.color2 = 0xFFA8E6FF;
-			s.glow = true; s.glowColor = 0xFF8FD8FF; s.glowSize = 1.2; s.glowStrength = 0.8; s.outline = false;
-			s.enter = "Drop"; s.exit = "Shrink"; s.perLetter = true; s.idle = "Sway"; s.speed = 0.8; s.showNext = true;
-		});
-		preset("Rainbow Party", s -> {
-			front(s, 7, 1.2, 1.3, true); s.spread = "Everywhere"; s.followView = false;
-			s.font = "Poppins"; s.textCase = "UPPERCASE"; s.colorMode = "Rainbow";
-			s.outline = true; s.outlineColor = 0xFF101014; s.glow = true; s.glowColor = 0xFFFFFFFF; s.glowSize = 0.8; s.glowStrength = 0.5;
-			s.enter = "Spin"; s.exit = "Explode"; s.perLetter = true; s.idle = "Jelly"; s.chaos = 0.25; s.showNext = false;
-		});
-		preset("Vaporwave", s -> {
-			sky(s, 120, 20, 1.2); s.spread = "Around You";
-			s.font = "Audiowide"; s.spacing = 1.6; s.colorMode = "Flowing Gradient"; s.color = 0xFFFF71CE; s.color2 = 0xFF01CDFE;
-			s.glow = true; s.glowColor = 0xFFB967FF; s.glowSize = 1.5; s.glowStrength = 1.0; s.shadow = true; s.shadowColor = 0xFF05FFA1;
-			s.enter = "Slide"; s.exit = "Slide"; s.perLetter = true; s.idle = "Sway"; s.tilt = -6; s.showNext = false;
+			s.font = "JetBrains Mono"; s.textCase = "UPPERCASE"; s.spacing = 0.8; s.colorMode = "Solid"; s.color = 0xFFC9F4FF;
+			s.glow = true; s.glowColor = 0xFF4FC8FF; s.glowSize = 1.0; s.glowStrength = 0.9; s.opacity = 0.85;
+			s.enter = "Flip"; s.exit = "Dissolve"; s.perLetter = true; s.idle = "None"; s.showNext = true;
 		});
 		preset("Terminal", s -> {
 			front(s, 5, 0.2, 0.8, true);
-			s.font = "JetBrains Mono"; s.colorMode = "Solid"; s.color = 0xFF39FF6A; s.textCase = "lowercase";
-			s.glow = true; s.glowColor = 0xFF00FF44; s.glowSize = 0.8; s.glowStrength = 0.9;
-			s.enter = "Typewriter"; s.exit = "Glitch"; s.perLetter = true; s.idle = "None"; s.showNext = false; s.showPrevious = true;
+			s.font = "JetBrains Mono"; s.colorMode = "Solid"; s.color = 0xFFA6F0B8; s.textCase = "lowercase";
+			s.glow = true; s.glowColor = 0xFF5CD27E; s.glowSize = 0.8; s.glowStrength = 0.6;
+			s.enter = "Typewriter"; s.exit = "Fade"; s.perLetter = true; s.idle = "None"; s.showNext = false; s.showPrevious = true;
 		});
 		preset("Ghost", s -> {
 			front(s, 8, 0.4, 1.1, false); s.spread = "Around You"; s.followView = false;
-			s.font = "Inter"; s.textCase = "lowercase"; s.colorMode = "Solid"; s.color = 0xFFE8ECFF; s.opacity = 0.55;
-			s.glow = true; s.glowColor = 0xFFFFFFFF; s.glowSize = 2.0; s.glowStrength = 0.6;
+			s.font = "Inter"; s.textCase = "lowercase"; s.colorMode = "Solid"; s.color = 0xFFE8ECFF; s.opacity = 0.6;
+			s.glow = true; s.glowColor = 0xFFFFFFFF; s.glowSize = 2.0; s.glowStrength = 0.5;
 			s.enter = "Blur In"; s.exit = "Dissolve"; s.perLetter = true; s.idle = "Breathe"; s.speed = 0.6; s.showNext = false;
 		});
-		preset("Retro", s -> {
-			front(s, 7, 1.2, 1.2, false);
-			s.font = "Minecraft"; s.colorMode = "Gradient"; s.color = 0xFFFFE066; s.color2 = 0xFFFF6B6B;
-			s.outline = true; s.outlineColor = 0xFF2A1430; s.glow = false; s.shadow = true;
-			s.enter = "Drop"; s.exit = "Fall"; s.perLetter = true; s.idle = "Float"; s.showNext = false;
+		preset("Karaoke", s -> {
+			front(s, 5, -0.4, 0.9, true);
+			s.font = "Poppins"; s.colorMode = "Solid"; s.color = 0xFFB9BDC9; s.karaoke = true; s.highlight = 0xFFFFFFFF;
+			s.outline = true; s.outlineColor = 0xFF101014; s.glow = false;
+			s.enter = "Fade"; s.exit = "Rise"; s.perLetter = false; s.idle = "None"; s.showNext = true;
 		});
 		preset("Word Pop", s -> {
 			front(s, 6, 0.3, 1.1, true);
-			s.font = "Archivo"; s.textCase = "UPPERCASE"; s.colorMode = "Per Word"; s.color = 0xFFFFFFFF; s.color2 = 0xFF6EE7FF;
-			s.glow = true; s.glowColor = 0xFF2B6BFF; s.glowSize = 0.9; s.glowStrength = 0.8; s.karaoke = true; s.highlight = 0xFFFFD84A;
-			s.enter = "Word by Word"; s.exit = "Zoom"; s.idle = "Pulse"; s.showNext = false;
+			s.font = "Archivo"; s.textCase = "UPPERCASE"; s.colorMode = "Solid"; s.color = 0xFFFFFFFF;
+			s.glow = true; s.glowColor = 0xFF4F7BFF; s.glowSize = 0.9; s.glowStrength = 0.7; s.karaoke = true; s.highlight = 0xFFBFD3FF;
+			s.enter = "Word by Word"; s.exit = "Zoom"; s.idle = "None"; s.showNext = false;
 		});
 		preset("Cinematic", s -> {
 			screen(s, "Bottom", 1.2);
@@ -260,13 +295,13 @@ public final class LyricsStyle {
 		preset("Minimal", s -> {
 			screen(s, "Bottom", 0.9);
 			s.font = "Inter"; s.colorMode = "Solid"; s.color = 0xFFFFFFFF; s.shadow = true; s.glow = false;
-			s.enter = "Fade"; s.exit = "Fade"; s.perLetter = false; s.idle = "None"; s.karaoke = true; s.highlight = 0xFF8FB3FF; s.showNext = true;
+			s.enter = "Fade"; s.exit = "Fade"; s.perLetter = false; s.idle = "None"; s.karaoke = true; s.highlight = 0xFF9DB8FF; s.showNext = true;
 		});
 		preset("Spotlight", s -> {
 			screen(s, "Center", 1.6);
-			s.font = "Archivo"; s.textCase = "UPPERCASE"; s.spacing = 0.8; s.colorMode = "Gradient"; s.color = 0xFFFFFFFF; s.color2 = 0xFFFF3B47;
-			s.glow = true; s.glowColor = 0xFFFF3B47; s.glowSize = 1.2; s.glowStrength = 0.9;
-			s.enter = "Word by Word"; s.exit = "Explode"; s.idle = "Pulse"; s.showNext = false;
+			s.font = "Archivo"; s.textCase = "UPPERCASE"; s.spacing = 0.8; s.colorMode = "Solid"; s.color = 0xFFFFFFFF;
+			s.glow = true; s.glowColor = 0xFFFFFFFF; s.glowSize = 1.1; s.glowStrength = 0.5;
+			s.enter = "Word by Word"; s.exit = "Fade"; s.idle = "None"; s.showNext = false;
 		});
 	}
 

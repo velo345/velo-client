@@ -717,10 +717,10 @@ final class LyricsRenderer {
 				}
 			}
 		}
-		if (st.shadow) {
+		if (st.shadow && !st.solid()) {   // solid letters carry their own shading: no flat shadow or outline copies
 			out.draw(0.9f, 0.9f, 1f, st.shadowColor, alpha * 0.75f);
 		}
-		if (st.outline) {
+		if (st.outline && !st.solid()) {
 			float r = 0.55f * (float) st.outlineSize;
 			int steps = st.outlineSize > 1.4 ? 16 : 8;
 			for (int i = 0; i < steps; i++) {

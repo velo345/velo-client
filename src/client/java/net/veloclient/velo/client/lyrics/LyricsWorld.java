@@ -17,7 +17,10 @@ final class LyricsWorld {
 	private static long lastNanos;
 
 	/** One letter layer, gathered first and then submitted with the version's queue. */
-	private record Piece(Matrix4f pose, Text glyph, float x, float y, int color) {
+	private record Piece(Matrix4f pose, Text glyph, float x, float y, int color, Text3dMesh.Mesh solid, float offsetX, int sideColor) {
+		Piece(Matrix4f pose, Text glyph, float x, float y, int color) {
+			this(pose, glyph, x, y, color, null, 0f, 0);
+		}
 	}
 
 	private LyricsWorld() {
@@ -67,9 +70,11 @@ final class LyricsWorld {
 			// every shading layer gets its own depth, back to front, so they never fight over the same depth (that
 			// showed as grain in big glows); the letter itself stays in front of all of them
 			int[] left = {LyricsRenderer.effectLayers(style)};
+			boolean solid = st.solid();
+			float behind = solid ? (float) st.thickness / 2f + 0.02f : 0f;   // glow sits behind the solid letter's back face
 			float half = LyricsRenderer.EM / 2f;
 			LyricsRenderer.effects(style, alpha, (ox, oy, sc, c, al) -> {
-				float z = gap * left[0]--;
+				float z = gap * left[0]-- + behind;
 				int la = Math.round(LyricsRenderer.clamp(al) * ((c >>> 24) & 0xFF));
 				if (la >= 5) {
 					Matrix4f pose = sc == 1f ? new Matrix4f(m).translate(0f, 0f, z)
@@ -77,7 +82,18 @@ final class LyricsWorld {
 					pieces.add(new Piece(pose, glyph, sc == 1f ? ox : 0f, sc == 1f ? oy : 0f, (la << 24) | (c & 0xFFFFFF)));
 				}
 			});
-			pieces.add(new Piece(m, glyph, 0f, 0f, (baseA << 24) | (color & 0xFFFFFF)));
+			int face = (baseA << 24) | (color & 0xFFFFFF);
+			if (solid) {
+				String text = glyph.getString();
+				int cp = text.isEmpty() ? 32 : text.codePointAt(0);
+				Text3dMesh.Mesh mesh = Text3dMesh.glyph(st.font, cp, (float) st.thickness, (float) st.bevel);
+				if (mesh.vertices() > 0) {
+					int side = st.sideColor != 0 ? (baseA << 24) | (st.sideColor & 0xFFFFFF) : Text3dDraw.shade(face, 0.62f);
+					pieces.add(new Piece(m, glyph, 0f, 0f, face, mesh, (w - mesh.advance()) / 2f, side));
+				}
+				return;
+			}
+			pieces.add(new Piece(m, glyph, 0f, 0f, face));
 		}, st, LyricsModule.studioOpen, new double[] {cam[0], cam[1], cam[2], rot[0]}, 0, 0, dt, true);
 		return pieces;
 	}
@@ -106,7 +122,16 @@ final class LyricsWorld {
 		for (Piece p : pieces) {
 			matrices.push();
 			matrices.multiplyPositionMatrix(p.pose());
-			queue.submitText(matrices, p.x(), p.y(), p.glyph().asOrderedText(), false, mode, FULL_BRIGHT, p.color(), 0, 0);
+			if (p.solid() != null) {
+				var white = net.minecraft.util.Identifier.of("velo-client", Text3dDraw.WHITE_TEXTURE);
+				var layer = (p.color() >>> 24) < 250 ? net.minecraft.client.render.RenderLayers.entityTranslucent(white)
+						: net.minecraft.client.render.RenderLayers.entityCutoutNoCull(white);
+				queue.submitCustom(matrices, layer, (entry, consumer) -> Text3dDraw.emit(p.solid(), p.offsetX(), p.color(), p.sideColor(), p.pose(),
+						entry.getPositionMatrix(), entry.getNormalMatrix(), (x, y, z, c, u, v, nx, ny, nz) -> consumer.vertex(x, y, z, c, u, v,
+								net.minecraft.client.render.OverlayTexture.DEFAULT_UV, FULL_BRIGHT, nx, ny, nz)));
+			} else {
+				queue.submitText(matrices, p.x(), p.y(), p.glyph().asOrderedText(), false, mode, FULL_BRIGHT, p.color(), 0, 0);
+			}
 			matrices.pop();
 		}
 	}
@@ -134,7 +159,16 @@ final class LyricsWorld {
 		for (Piece p : pieces) {
 			matrices.pushPose();
 			matrices.mulPose(p.pose());
-			queue.submitText(matrices, p.x(), p.y(), p.glyph().getVisualOrderText(), false, mode, FULL_BRIGHT, p.color(), 0, 0);
+			if (p.solid() != null) {
+				var white = net.minecraft.resources.Identifier.fromNamespaceAndPath("velo-client", Text3dDraw.WHITE_TEXTURE);
+				var layer = (p.color() >>> 24) < 250 ? net.minecraft.client.renderer.rendertype.RenderTypes.entityTranslucent(white)
+						: net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(white);
+				queue.submitCustomGeometry(matrices, layer, (entry, consumer) -> Text3dDraw.emit(p.solid(), p.offsetX(), p.color(), p.sideColor(), p.pose(),
+						entry.pose(), entry.normal(), (x, y, z, c, u, v, nx, ny, nz) -> consumer.addVertex(x, y, z, c, u, v,
+								net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, FULL_BRIGHT, nx, ny, nz)));
+			} else {
+				queue.submitText(matrices, p.x(), p.y(), p.glyph().getVisualOrderText(), false, mode, FULL_BRIGHT, p.color(), 0, 0);
+			}
 			matrices.popPose();
 		}
 	}

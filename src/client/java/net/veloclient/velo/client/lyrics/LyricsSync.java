@@ -100,6 +100,9 @@ final class LyricsSync {
 
 	/** The lines to show: the song's, the demo ones (preview), or null. */
 	static List<LyricsFetcher.Line> lines(boolean demo) {
+		if (LyricsDev.on()) {
+			return LyricsDev.lines();
+		}
 		LyricsFetcher.Lyrics l = lyrics;
 		if (l != null && l.found()) {
 			return l.lines();
@@ -108,12 +111,18 @@ final class LyricsSync {
 	}
 
 	static boolean showingDemo(boolean demo) {
+		if (LyricsDev.on()) {
+			return true;
+		}
 		LyricsFetcher.Lyrics l = lyrics;
 		return demo && (l == null || !l.found());
 	}
 
 	/** The song position in ms (with the sync offset), or the demo clock. */
 	static long now(boolean demo, int offsetMs) {
+		if (LyricsDev.on()) {
+			return LyricsDev.now() + offsetMs;
+		}
 		if (showingDemo(demo)) {
 			return (System.currentTimeMillis() - DEMO_START) % DEMO_LENGTH;
 		}
@@ -123,6 +132,9 @@ final class LyricsSync {
 
 	/** End of the demo loop / the song (so the last line knows when to leave). */
 	static long length(boolean demo) {
+		if (LyricsDev.on()) {
+			return LyricsDev.length();
+		}
 		if (showingDemo(demo)) {
 			return DEMO_LENGTH - 400;
 		}
