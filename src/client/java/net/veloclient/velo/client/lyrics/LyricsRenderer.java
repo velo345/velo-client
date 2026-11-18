@@ -597,6 +597,9 @@ final class LyricsRenderer {
 		String sub = null;
 		long since = LyricsSync.sinceSongStart();
 		LyricsSync.Status status = LyricsSync.status();
+		if (LyricsDev.on()) {
+			return;   // video mode: just the chosen words, no cards
+		}
 		if (LyricsSync.showingDemo(demo)) {
 			top = "♪ Lyrics preview";
 			sub = status == LyricsSync.Status.NOT_FOUND ? "No synced lyrics for " + LyricsSync.title() : "Play a song to see its lyrics";
