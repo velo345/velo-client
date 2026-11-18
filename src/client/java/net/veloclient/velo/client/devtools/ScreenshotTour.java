@@ -664,7 +664,7 @@ public final class ScreenshotTour {
 					net.veloclient.velo.client.lyrics.LyricsModule.openStudio();
 				}});
 				int n = 0;
-				for (String preset : List.of("Concert Sky", "Starfield", "Aurora", "Golden Hour", "Neon Night", "Hologram", "Karaoke", "Comic", "Fire", "Frost", "Rainbow Party", "Vaporwave", "Terminal", "Ghost", "Retro", "Word Pop", "Cinematic", "Spotlight")) {
+				for (String preset : List.of("Concert Sky", "Block Letters", "Chrome", "Obsidian", "Crimson", "Midnight", "Starfield", "Aurora", "Golden Hour", "Dusk", "Ember", "Frost", "Night Drive", "Hologram", "Terminal", "Ghost", "Karaoke", "Word Pop", "Cinematic", "Spotlight")) {
 					String shotName = "lyrics-" + preset.toLowerCase(java.util.Locale.ROOT).replace(' ', '-');
 					steps.add(new Object[] {n == 0 ? 60 : 0, (Runnable) () -> net.veloclient.velo.client.lyrics.LyricsModule.applyPreset(preset)});
 					steps.add(new Object[] {38, (Runnable) () -> shot(client, shotName + "-a")});
@@ -680,7 +680,7 @@ public final class ScreenshotTour {
 					net.veloclient.velo.client.lyrics.LyricsModule.openStudio();
 				}});
 				int idx = 0;
-				for (String preset : List.of("Concert Sky", "Neon Night", "Comic", "Aurora", "Spotlight")) {
+				for (String preset : List.of("Concert Sky", "Night Drive", "Chrome", "Aurora", "Spotlight")) {
 					String file = "post-lyrics-" + preset.toLowerCase(java.util.Locale.ROOT).replace(' ', '-');
 					steps.add(new Object[] {idx == 0 ? 60 : 0, (Runnable) () -> net.veloclient.velo.client.lyrics.LyricsModule.applyPreset(preset)});
 					steps.add(new Object[] {44, (Runnable) () -> shot(client, file)});
@@ -709,7 +709,7 @@ public final class ScreenshotTour {
 			case "lyricsglow" -> {
 				List<Object[]> steps = new java.util.ArrayList<>();
 				steps.add(new Object[] {0, (Runnable) () -> {
-					net.veloclient.velo.client.lyrics.LyricsModule.applyPreset("Neon Night");
+					net.veloclient.velo.client.lyrics.LyricsModule.applyPreset("Night Drive");
 					net.veloclient.velo.client.lyrics.LyricsModule.openStudio();
 				}});
 				steps.add(new Object[] {60, (Runnable) () -> net.veloclient.velo.client.lyrics.LyricsModule.editForTour(s -> {

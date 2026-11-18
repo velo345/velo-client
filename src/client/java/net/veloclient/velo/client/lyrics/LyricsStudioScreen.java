@@ -178,6 +178,13 @@ public final class LyricsStudioScreen extends Screen {
 		// look
 		y = header(context, textRenderer, "Look", x, y + 4);
 		y = choice(context, textRenderer, "Font", LyricsStyle.FONTS, () -> st.font, v -> st.font = v, x, y, w, mouseX, mouseY, top, bottom);
+		if (st.world3d()) {
+			y = toggle(context, textRenderer, "Solid 3D letters", () -> st.text3d, v -> st.text3d = v, x, y, w, mouseX, mouseY, top, bottom);
+			if (st.text3d) {
+				y = slider(context, textRenderer, "Letter depth", 0.5, 8, () -> st.thickness, v -> st.thickness = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1f", v), x, y, w, mouseX, mouseY, top, bottom);
+				y = slider(context, textRenderer, "Rounded edge", 0, 1, () -> st.bevel, v -> st.bevel = Math.round(v * 20) / 20.0, v -> Math.round(v * 100) + "%", x, y, w, mouseX, mouseY, top, bottom);
+			}
+		}
 		y = choice(context, textRenderer, "Letters", LyricsStyle.CASES, () -> st.textCase, v -> st.textCase = v, x, y, w, mouseX, mouseY, top, bottom);
 		y = slider(context, textRenderer, "Letter spacing", 0, 4, () -> st.spacing, v -> st.spacing = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1f", v), x, y, w, mouseX, mouseY, top, bottom);
 		y = choice(context, textRenderer, "Colours", LyricsStyle.COLOR_MODES, () -> st.colorMode, v -> st.colorMode = v, x, y, w, mouseX, mouseY, top, bottom);
@@ -201,6 +208,7 @@ public final class LyricsStudioScreen extends Screen {
 			y = slider(context, textRenderer, "Glow size", 0.3, 3, () -> st.glowSize, v -> st.glowSize = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1f", v), x, y, w, mouseX, mouseY, top, bottom);
 			y = slider(context, textRenderer, "Glow strength", 0.1, 2.5, () -> st.glowStrength, v -> st.glowStrength = Math.round(v * 10) / 10.0, v -> Math.round(v * 100) + "%", x, y, w, mouseX, mouseY, top, bottom);
 		}
+		if (!st.solid()) {
 		y = toggle(context, textRenderer, "Outline", () -> st.outline, v -> st.outline = v, x, y, w, mouseX, mouseY, top, bottom);
 		if (st.outline) {
 			y = colors(context, textRenderer, "Outline colour", () -> st.outlineColor, v -> st.outlineColor = v, x, y, w, mouseX, mouseY, top, bottom);
@@ -209,6 +217,7 @@ public final class LyricsStudioScreen extends Screen {
 		y = toggle(context, textRenderer, "Drop shadow", () -> st.shadow, v -> st.shadow = v, x, y, w, mouseX, mouseY, top, bottom);
 		if (st.shadow) {
 			y = colors(context, textRenderer, "Shadow colour", () -> st.shadowColor, v -> st.shadowColor = v, x, y, w, mouseX, mouseY, top, bottom);
+		}
 		}
 
 		// motion

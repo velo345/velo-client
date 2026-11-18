@@ -32,6 +32,7 @@ public final class LyricsModule extends AbstractModule implements Configurable {
 		HudElementRegistry.attachElementBefore(VanillaHudElements.CROSSHAIR, Identifier.of("velo-client", "lyrics"),
 				(context, tickCounter) -> draw(context));
 		LyricsWorld.register();
+		LyricsTour.initIfRequested();
 	}
 
 	static LyricsModule get() {
@@ -44,6 +45,10 @@ public final class LyricsModule extends AbstractModule implements Configurable {
 	/** Whether lyrics should show at all right now (on, or the Studio's preview; and something is playing). */
 	private static boolean active() {
 		LyricsModule m = instance;
+		LyricsDev.poll();
+		if (LyricsDev.on() && m != null) {
+			return true;
+		}
 		if (m == null || !m.isEnabled() && !studioOpen) {
 			return false;
 		}

@@ -597,6 +597,9 @@ final class LyricsRenderer {
 		String sub = null;
 		long since = LyricsSync.sinceSongStart();
 		LyricsSync.Status status = LyricsSync.status();
+		if (LyricsDev.on()) {
+			return;   // video mode: just the chosen words, no cards
+		}
 		if (LyricsSync.showingDemo(demo)) {
 			top = "♪ Lyrics preview";
 			sub = status == LyricsSync.Status.NOT_FOUND ? "No synced lyrics for " + LyricsSync.title() : "Play a song to see its lyrics";
@@ -717,10 +720,10 @@ final class LyricsRenderer {
 				}
 			}
 		}
-		if (st.shadow) {
+		if (st.shadow && !st.solid()) {   // solid letters carry their own shading: no flat shadow or outline copies
 			out.draw(0.9f, 0.9f, 1f, st.shadowColor, alpha * 0.75f);
 		}
-		if (st.outline) {
+		if (st.outline && !st.solid()) {
 			float r = 0.55f * (float) st.outlineSize;
 			int steps = st.outlineSize > 1.4 ? 16 : 8;
 			for (int i = 0; i < steps; i++) {

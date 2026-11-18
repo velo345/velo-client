@@ -18,6 +18,10 @@ final class RewindPlayer {
 		return false;
 	}
 
+	static long clipMillis() {
+		return -1;
+	}
+
 	static void tick() {
 	}
 
@@ -343,6 +347,16 @@ final class RewindPlayer {
 
 	static boolean active() {
 		return current != null;
+	}
+
+	// Milliseconds into the selected clip (ticks and the frame's fraction), or -1 when no replay is open. Lyrics' video mode locks to this.
+	static long clipMillis() {
+		RewindPlayer p = current;
+		if (p == null) {
+			return -1;
+		}
+		float partial = net.minecraft.client.MinecraftClient.getInstance().getRenderTickCounter().getGameTimeDeltaPartialTick(false);
+		return (long) (((p.tick - p.clipStart(p.edits.clip())) + (p.paused ? 0f : partial)) * 50f);
 	}
 
 	static RewindPlayer current() {
