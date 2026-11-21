@@ -30,6 +30,13 @@ final class Rules {
 	}
 
 	/** Mods known to break each other that don't declare it (or declare it too loosely). */
+	/** Mod id, what it does: mods that replace every player's cape with their own. */
+	private static final String[][] CAPE_OVERRIDERS = {
+			{"cosmetica", "puts its own cloaks on every player"},
+			{"capes", "replaces cloaks with ones from other cloak services"},
+			{"minecraftcapes", "replaces cloaks with MinecraftCapes ones"},
+			{"cloaksplus", "replaces cloaks with Cloaks+ ones"}};
+
 	private static final String[][] KNOWN_CLASHES = {
 			{"optifabric", "sodium", "OptiFine (OptiFabric) and Sodium both replace the renderer - they can't run together."},
 			{"optifabric", "iris", "OptiFine (OptiFabric) and Iris both handle shaders - they can't run together."},
@@ -180,6 +187,16 @@ final class Rules {
 			}
 		}
 
+		// Mods that draw their own capes over everyone's: the player's Velo cloak (store, Discord reward, imported) never
+		// shows (bug report 2026-11-20: Cosmetica hid an imported cloak and Velo Neon).
+		for (String[] capes : CAPE_OVERRIDERS) {
+			ModScanner.ModInfo mod = s.enabledById(capes[0]);
+			if (mod != null) {
+				issues.add(issue("cape-override:" + capes[0], Severity.PROBLEM, mod.displayName() + " hides your Velo cloak",
+						mod.displayName() + " " + capes[1] + " - your Velo cloak (and everyone else's) doesn't show while it's on.", off(mod)));
+			}
+		}
+
 		for (String[] clash : KNOWN_CLASHES) {
 			ModScanner.ModInfo a = s.enabledById(clash[0]);
 			ModScanner.ModInfo b = s.enabledById(clash[1]);
@@ -242,10 +259,38 @@ final class Rules {
 		boolean offOther = dependents.getOrDefault(otherId, 0) < dependents.getOrDefault(mod.id(), 0);
 		Fix first = offOther ? off(other) : off(mod);
 		Fix second = offOther ? off(mod) : off(other);
-		issues.add(issue((severity == Severity.CRASH ? "breaks:" : "conflicts:") + mod.id() + ":" + otherId, severity,
-				mod.displayName() + " doesn't work with " + other.displayName() + (severity == Severity.CRASH ? "" : " " + have),
-				severity == Severity.CRASH ? "Its author says the game breaks with both installed. Keep one." : "Its author says they clash - expect bugs with both.",
-				first, second));
+		// Only OLD versions of the other mod clash ("breaks voicechat <2.6.23"): updating it keeps both - offered first
+		// (bug report 2026-11-20: Flashback + Simple Voice Chat 2.6.22 only got "turn one off").
+		String newer = newerThan(requirementText(requirement));
+		String id = (severity == Severity.CRASH ? "breaks:" : "conflicts:") + mod.id() + ":" + otherId;
+		String title = mod.displayName() + " doesn't work with " + other.displayName() + (severity == Severity.CRASH ? "" : " " + have);
+		String detail = severity == Severity.CRASH ? "Its author says the game breaks with both installed. Keep one." : "Its author says they clash - expect bugs with both.";
+		if (newer != null) {
+			Fix update = fix("Update " + other.displayName(), "To " + describe(new com.google.gson.JsonPrimitive(newer)) + " - then both work",
+					new Action.Update(other.file(), other.displayName(), otherId, false, newer));
+			issues.add(issue(id, severity, title, mod.displayName() + " needs " + other.displayName() + " " + describe(new com.google.gson.JsonPrimitive(newer))
+					+ " - you have " + have + ".", update, first, second));
+			return;
+		}
+		issues.add(issue(id, severity, title, detail, first, second));
+	}
+
+	/** {@code "<2.6.23"} -> {@code ">=2.6.23"} (the versions that don't clash); null when the clash isn't "old versions only". */
+	static String newerThan(String range) {
+		if (range == null) {
+			return null;
+		}
+		String r = range.trim();
+		if (r.contains(" ") || r.contains("||")) {
+			return null;
+		}
+		if (r.startsWith("<=")) {
+			return ">" + r.substring(2).trim();
+		}
+		if (r.startsWith("<")) {
+			return ">=" + r.substring(1).trim();
+		}
+		return null;
 	}
 
 	private static Fix off(ModScanner.ModInfo mod) {

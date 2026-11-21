@@ -26,6 +26,10 @@ mkdir -p /opt/velo/backups
 cp /opt/velo/server/velo-server.jar "/opt/velo/backups/velo-server.jar.$stamp"
 cp /etc/nginx/conf.d/velo.conf "/opt/velo/backups/velo.conf.$stamp"
 cp /etc/velo/firewall.nft "/opt/velo/backups/firewall.nft.$stamp" 2>/dev/null || true
+# keep only the 5 newest copies of each file kind (every deploy adds a ~280 MB jar - they filled the disk in 2026-11)
+for kind in velo-server.jar velo-library.jar velo-panel.jar velo-bot.jar velo.conf velo-library.conf velo-library-proxy.conf firewall.nft; do
+	ls -1t /opt/velo/backups/"$kind".* 2>/dev/null | tail -n +6 | xargs -r rm -f --
+done
 
 install -m 640 -o root -g velo /tmp/velo-server.jar /opt/velo/server/velo-server.jar
 install -m 644 /tmp/velo.conf /etc/nginx/conf.d/velo.conf

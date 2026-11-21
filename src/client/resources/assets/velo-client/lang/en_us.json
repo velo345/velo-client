@@ -7,6 +7,8 @@
 	"key.velo-client.storage_memory": "Open Storage Memory",
 	"key.velo-client.world_notes": "World Notes",
 	"key.velo-client.youtube": "Video Player",
+	"key.velo-client.browser": "Browser",
+	"key.velo-client.browser_hide": "Browser: Hide / Show",
 	"key.velo-client.next_short": "Next Short",
 	"key.velo-client.previous_short": "Previous Short",
 	"key.velo-client.new_waypoint": "New Waypoint Here",

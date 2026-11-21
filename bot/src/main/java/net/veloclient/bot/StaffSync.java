@@ -77,6 +77,7 @@ final class StaffSync {
 
 	private void run() throws Exception {
 		if (config.staffRoles.isEmpty() && !hadStaff) {
+			syncPlusRoles();
 			return;
 		}
 		Map<String, String> levels = new LinkedHashMap<>();
@@ -98,6 +99,24 @@ final class StaffSync {
 		hadStaff = !levels.isEmpty();
 		if (answer.has("added") && (answer.get("added").getAsInt() > 0 || answer.get("removed").getAsInt() > 0)) {
 			System.out.println("Staff sync: " + answer);
+		}
+		syncPlusRoles();
+	}
+
+	/** Partners and creators (their Discord roles) get Velo+ for as long as they have the role. */
+	private void syncPlusRoles() throws Exception {
+		Map<String, String> roles = new LinkedHashMap<>();
+		for (Guild guild : jda.getGuilds()) {
+			Map<String, java.util.Set<String>> holders = RoleHolders.of(jda, guild.getId(), config.plusRoles.keySet());
+			for (Map.Entry<String, java.util.Set<String>> member : holders.entrySet()) {
+				for (String roleId : member.getValue()) {
+					roles.putIfAbsent(member.getKey(), config.plusRoles.get(roleId));
+				}
+			}
+		}
+		var answer = server.syncPlusRoles(roles);
+		if (answer.has("added") && (answer.get("added").getAsInt() > 0 || answer.get("removed").getAsInt() > 0)) {
+			System.out.println("Velo+ roles sync: " + answer);
 		}
 	}
 }

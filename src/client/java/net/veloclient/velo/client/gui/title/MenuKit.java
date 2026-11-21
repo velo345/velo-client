@@ -55,8 +55,11 @@ public final class MenuKit {
 
 	// ---- Colours ----
 
+	/** Velo+ Customize: an accent for the screen being drawn (0xRRGGBB), -1 for the theme's. Set and cleared around one render. */
+	public static int accentOverride = -1;
+
 	public static int accent() {
-		return ThemeManager.active().accentStart() | 0xFF000000;
+		return accentOverride >= 0 ? accentOverride | 0xFF000000 : ThemeManager.active().accentStart() | 0xFF000000;
 	}
 
 	/** The accent lifted for text on dark glass (readable even for dark accents). */

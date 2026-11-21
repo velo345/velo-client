@@ -144,10 +144,11 @@ public final class HudManager {
 		// 26.2+: the post effects run from TurboHudWholeMixin every frame instead - this hook only runs when the HUD is
 		// rebuilt (Velo's HUD cache / Gnetum: at most 360 times a second), so at high FPS they were only in some frames
 		// and the picture flickered between graded and plain (black with vignette / Black & White).
-		//? if <26.2 {
-		net.veloclient.velo.client.modules.rendering.ColorGradingModule.applyIfActive();
+		// 1.21.x and 26.2+ run them from PostEffectsFrameMixin (outside the HUD pass, so HUD caches like Gnetum can't swallow them)
+		//? if >=26.1 && <26.2 {
+		/*net.veloclient.velo.client.modules.rendering.ColorGradingModule.applyIfActive();
 		net.veloclient.velo.client.modules.rendering.MotionBlurModule.applyIfActive();
-		//?}
+		*///?}
 		float tickDelta = tickCounter.getTickProgress(true);
 		int screenWidth = client.getWindow().getScaledWidth();
 		int screenHeight = client.getWindow().getScaledHeight();
@@ -168,7 +169,7 @@ public final class HudManager {
 		// mode the recording already wraps the entire HUD (TurboHudWholeMixin) - the modules just draw into it.
 		boolean whole = HudFrameCache.wholeHud();
 		if (!whole && HudFrameCache.replay(context, screenWidth, screenHeight)) {
-			net.veloclient.velo.client.youtube.YouTubeModule.renderHud(context, screenWidth, screenHeight);
+			net.veloclient.velo.client.browser.BrowserModule.renderHud(context, screenWidth, screenHeight);
 		net.veloclient.velo.client.report.SpikeRecorder.renderHud(context, screenWidth);
 		net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
 			return;
@@ -196,7 +197,7 @@ public final class HudManager {
 				HudFrameCache.endRecord(context, completed);
 			}
 		}
-		net.veloclient.velo.client.youtube.YouTubeModule.renderHud(context, screenWidth, screenHeight);
+		net.veloclient.velo.client.browser.BrowserModule.renderHud(context, screenWidth, screenHeight);
 		net.veloclient.velo.client.report.SpikeRecorder.renderHud(context, screenWidth);
 		net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
 	}

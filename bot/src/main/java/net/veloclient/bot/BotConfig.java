@@ -115,6 +115,11 @@ final class BotConfig {
 	List<String> seededTypes = new ArrayList<>();
 	/** Discord roles that make someone Velo staff: role id to "helper", "mod" or "admin" (synced to the Velo server). */
 	Map<String, String> staffRoles = new LinkedHashMap<>();
+	/**
+	 * Discord roles that come with free Velo+ for as long as someone has them: role id to a name ("partner", "creator").
+	 * Synced with the staff roles; losing the role ends it at the next sync (a few seconds).
+	 */
+	Map<String, String> plusRoles = new LinkedHashMap<>(Map.of("1564223334760185947", "partner", "1567601592562229268", "creator"));
 	/** Where the welcome card for new members is posted (null: no welcome messages). */
 	String welcomeChannelId;
 	/** A channel the welcome points new members to (e.g. the rules), optional. */
@@ -173,6 +178,9 @@ final class BotConfig {
 		if (config.staffRoles == null) {
 			config.staffRoles = new LinkedHashMap<>();
 		}
+		if (config.plusRoles == null || config.plusRoles.isEmpty()) {
+			config.plusRoles = new LinkedHashMap<>(Map.of("1564223334760185947", "partner", "1567601592562229268", "creator"));
+		}
 		if (config.giveaways == null) {
 			config.giveaways = new LinkedHashMap<>();
 		}
@@ -219,6 +227,7 @@ final class BotConfig {
 		this.rolesPanelTitle = fresh.rolesPanelTitle;
 		this.rolesPanelText = fresh.rolesPanelText;
 		this.staffRoles = fresh.staffRoles;
+		this.plusRoles = fresh.plusRoles;
 		this.boostChannelId = fresh.boostChannelId;
 		this.welcomeChannelId = fresh.welcomeChannelId;
 		this.welcomeRulesChannelId = fresh.welcomeRulesChannelId;

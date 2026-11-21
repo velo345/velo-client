@@ -159,8 +159,10 @@ public final class VulkanPipelineCache {
 		if (pendingSave != null) {
 			pendingSave.cancel(false);
 		}
-		// Saved on the render thread (where pipelines are created), a moment after the last one.
-		pendingSave = SAVER.schedule(() -> Minecraft.getInstance().execute(VulkanPipelineCache::saveNow), SAVE_DELAY_SECONDS, TimeUnit.SECONDS);
+		// Saved on our own thread, a moment after the last new pipeline. It used to hop to the render thread: reading out,
+		// checksumming and writing ~25 MB there was a 50+ ms frame (spike recorder, 2026-11-21 - it hit right as the death
+		// screen opened). The cache is internally synchronized and the read lock in saveNow keeps it alive meanwhile.
+		pendingSave = SAVER.schedule(VulkanPipelineCache::saveNow, SAVE_DELAY_SECONDS, TimeUnit.SECONDS);
 	}
 
 	public static void saveNow() {

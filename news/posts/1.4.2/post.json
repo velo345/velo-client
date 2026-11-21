@@ -1,0 +1,118 @@
+{
+ "title": "Velo Client 1.4.2: Make it yours",
+ "summary": "Customize every Velo screen with new R-Shift menu styles and the theme editor, a real Velo Browser with TikTok, YouTube and Spotify, any colour for auras and kill effects, fewer lag spikes and lots of fixes.",
+ "tag": "Update",
+ "version": "1.4.2",
+ "accent": "#ff3b44",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "text",
+   "text": "**Velo Client 1.4.2** is all about making Velo yours: restyle the menus you see every day, browse the web without leaving the game, pick any colour for your effects - and enjoy smoother frames while you do it."
+  },
+  {
+   "type": "heading",
+   "text": "Customize (Velo+)"
+  },
+  {
+   "type": "image",
+   "image": "file:images/customize-menu.jpg",
+   "caption": "The new R-Shift menu tab: pick a style and watch the live preview open and close."
+  },
+  {
+   "type": "list",
+   "items": [
+    "A new **Customize** page in the launcher for your **title screen, R-Shift menu, pause menu, loading screen, theme** and **launcher**",
+    "**Six R-Shift menu styles**: Velo, **Glass** (see-through with a sheen), **Minimal**, **Glow** (a soft halo in your accent), **Neon** and **Solid**",
+    "Pick how the menu **opens, closes and switches pages** - slide, fade, zoom, bounce and more - plus speed, see-through, corner roundness and how dark the game gets behind it",
+    "The **theme editor** now lives right in Customize, with a live preview",
+    "The game picks up every change **right away** - no restart"
+   ]
+  },
+  {
+   "type": "image",
+   "image": "file:images/customize-theme.jpg",
+   "caption": "Themes: start from a built-in one, change anything, see it live."
+  },
+  {
+   "type": "heading",
+   "text": "Velo Browser"
+  },
+  {
+   "type": "image",
+   "image": "file:images/browser-start.jpg",
+   "caption": "The start page: search, or jump straight to your favourite sites."
+  },
+  {
+   "type": "list",
+   "items": [
+    "A **real browser** over your game: **YouTube, TikTok, Twitch, Instagram, Spotify** and any other site (replaces the Video Player)",
+    "Press **U** to open it - move it, resize it, go fullscreen, search from the start page or type any address",
+    "Click away or press Esc and it **keeps playing** in a small window in the corner - or hide it completely and just listen",
+    "**Private by design**: no history, no cookies, no logins, no cache are saved - close the game and it's all gone",
+    "Downloads once the first time you open it (~120 MB) and uses barely anything while it's closed"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Cosmetics"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Any colour** for your auras and kill effects - a colour picker next to the swatches, and other Velo players see your colour too",
+    "Colour changes show in the game **instantly**",
+    "Cosmetics load in the background, so joining a busy server no longer stutters once per player"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "New modules"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Clear Water & Lava**: see further under water and in lava - each on its own",
+    "**No Totem Pop**: hide the totem animation, its particles and its sound - each on its own",
+    "**Hearts** and **Hunger** now step aside when a server shows its own (MCC Island and others)",
+    "**Mini Player** got a **head tilt** setting"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Smoother"
+  },
+  {
+   "type": "list",
+   "items": [
+    "The first R-Shift menu of a session no longer hitches - fonts and icons are ready before you open it",
+    "Changing a setting or moving the HUD no longer causes a short freeze (that was up to 40 ms every time)",
+    "Fewer spikes on Vulkan: the shader cache saves in the background",
+    "Velo's HUD costs noticeably less per frame"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Fixes"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**\"Authentication failed\"** when joining a server straight from the launcher",
+    "**Windows**: left click no longer keeps spamming after holding it or moving the window",
+    "**Windows**: the game only grabs your mouse when its window is really in front",
+    "**Windows**: launcher updates no longer need the installer",
+    "**Linux**: when the password prompt can't open (Linux Mint and others), the update opens in your package installer instead of failing",
+    "Clips on **macOS with VulkanMod** were upside down with wrong colours",
+    "26.2 closing when minimized (\"out of date swapchain\")",
+    "26.3 crash with the newest Sodium beta; Color Grading and Motion Blur on 26.3",
+    "Color Grading / Motion Blur turning the screen black on 1.21.x",
+    "The Launcher Doctor now spots mods that hide your Velo cloak (Cosmetica and others) and offers updating a mod before turning one off",
+    "Bigger modpacks get a bit more memory",
+    "If the game ever freezes, Velo now notes where - so we can fix it faster",
+    "Chain Wings were removed"
+   ]
+  }
+ ]
+}

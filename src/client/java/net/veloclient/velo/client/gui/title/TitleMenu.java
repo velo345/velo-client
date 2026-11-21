@@ -198,6 +198,7 @@ public final class TitleMenu {
 			return;
 		}
 		missingFrames = 0;
+		MenuKit.accentOverride = ScreenLook.title().accent;
 		try {
 			renderMenu(context, width, height, mouseX, mouseY, env);
 		} catch (RuntimeException | LinkageError e) {
@@ -206,6 +207,8 @@ public final class TitleMenu {
 				widget.visible = true;
 			}
 			org.slf4j.LoggerFactory.getLogger("velo-client").error("Velo title menu failed - showing the plain menu for this session", e);
+		} finally {
+			MenuKit.accentOverride = -1;
 		}
 	}
 
@@ -337,17 +340,35 @@ public final class TitleMenu {
 		rows.addAll(quitIndex, modRows);
 
 		// ---- Layout ----
-		int y = top;
+		// Velo+ Customize: alignment, free offsets per part, word size/font/colours and button style (ScreenLook).
+		ScreenLook.Title look = ScreenLook.title();
+		String align = look.align;
+		// Essential's side menu sits at the right edge: a right-aligned menu leaves it room.
+		int rightEdge = width - margin - (essential && align.equals("right") ? 44 : 0);
+		Align at = new Align(align, margin, rightEdge, width, height);
+		float sizeK = look.scale;
+		String fontId = ScreenLook.fontId(look.font);
+		int y = top + at.dy(look, "brand");
 		int step = 0;
-		slideIn(context, open, step++);
-		int brandH = drawBrand(context, renderer, margin, y, large);
-		context.getMatrices().popMatrix();
-		y += brandH + (compact ? 10 : large ? 22 : 16);
+		int contentLeft = Integer.MAX_VALUE;
+		int contentRight = 0;
+		Text brandTitle = large ? MenuKit.display("VELO CLIENT") : MenuKit.displaySm("VELO CLIENT");
+		int brandW = MenuKit.width(renderer, brandTitle) + (large ? 37 : 31);
+		int brandH = large ? 28 : 22;
+		if (look.brand) {
+			int bx = at.x(brandW, look, "brand");
+			slideIn(context, open, step++, align);
+			drawBrand(context, renderer, bx, y, large);
+			context.getMatrices().popMatrix();
+			contentLeft = Math.min(contentLeft, bx);
+			contentRight = Math.max(contentRight, bx + brandW);
+			y += brandH + (compact ? 10 : large ? 22 : 16);
+		}
+		y -= at.dy(look, "brand");
 
 		LastServer.Entry last = LastServer.get();
 		// With Essential the free space right of the menu is where its character goes: keep the card narrow.
 		int cardW = Math.min(essential ? 190 : large ? 250 : 220, width - margin * 2);
-		int contentRight = margin + MenuKit.width(renderer, large ? MenuKit.display("VELO CLIENT") : MenuKit.displaySm("VELO CLIENT")) + (large ? 37 : 31);
 		int cardH = large ? 36 : 30;
 		int cardBlock = cardH + (compact ? 8 : large ? 16 : 12);
 
@@ -355,14 +376,16 @@ public final class TitleMenu {
 		// "Jump back in" card goes only when even tight rows don't fit - most players are at 1080p (GUI 480x270).
 		int iconSize = large ? 22 : 18;
 		int footerY = height - clamp(Math.round(height * 0.07f), 10, 56) - iconSize;
-		int rowH = compact ? 15 : large ? 25 : 19;
-		int secondaryH = compact ? 12 : large ? 16 : 14;
+		int rowH = Math.round((compact ? 15 : large ? 25 : 19) * sizeK);
+		int secondaryH = Math.round((compact ? 12 : large ? 16 : 14) * Math.min(1.25f, sizeK));
+		int minRowH = Math.round((large ? 20 : 15) * Math.min(1f, sizeK));
 		// Only servers that answer: no card pointing at one that's down or gone.
-		boolean showCard = last != null && height >= 230 && LastServer.reachable(last);
+		boolean showCard = look.jump && last != null && height >= 230 && LastServer.reachable(last);
 		int mains = (int) rows.stream().filter(Row::main).count();
 		int seconds = rows.size() - mains;
-		int room = footerY - 8 - y - (showCard ? cardBlock : 0);
-		while (mains * (rowH + 2) + seconds * secondaryH > room && rowH > (large ? 20 : 15)) {
+		int menuTop = y + (showCard ? cardBlock : 0);
+		int room = footerY - 8 - menuTop;
+		while (mains * (rowH + 2) + seconds * secondaryH > room && rowH > minRowH) {
 			rowH--;
 			secondaryH = Math.max(12, secondaryH - 1);
 		}
@@ -374,29 +397,56 @@ public final class TitleMenu {
 		int needed = mains * (rowH + 2) + seconds * secondaryH;
 		float columnScale = needed > room && room > 0 ? Math.max(0.55f, room / (float) needed) : 1f;
 		// No entry wider than the left part of the screen (long mod labels) - those scale down on their own.
-		int columnMaxW = Math.max(120, Math.min(width - margin * 2, width / 2 - margin));
+		int columnMaxW = Math.max(120, Math.min(width - margin * 2, align.equals("center") ? width - margin * 2 - (essential ? 90 : 0) : width / 2 - margin));
 		if (showCard) {
-			jumpCard.place(margin, y, cardW, cardH, true);
-			slideIn(context, open, step++);
-			drawJumpCard(context, renderer, margin, y, cardW, cardH, last, MenuKit.hover(jumpCard, hovered(mouseX, mouseY, jumpCard)));
+			int cx = at.x(cardW, look, "card");
+			int cy = y + at.dy(look, "card");
+			jumpCard.place(cx, cy, cardW, cardH, true);
+			slideIn(context, open, step++, align);
+			drawJumpCard(context, renderer, cx, cy, cardW, cardH, last, MenuKit.hover(jumpCard, hovered(mouseX, mouseY, jumpCard)));
 			context.getMatrices().popMatrix();
-			contentRight = Math.max(contentRight, margin + cardW);
+			contentLeft = Math.min(contentLeft, cx);
+			contentRight = Math.max(contentRight, cx + cardW);
 			y += cardH + (compact ? 8 : large ? 16 : 12);
 		} else {
 			jumpCard.place(0, 0, 0, 0, false);
 		}
 
+		// The words of each row and their natural widths (boxed styles use one width for all).
+		boolean boxed = !look.buttons.equals("words") && !look.buttons.equals("underline");
+		List<Text> labels = new ArrayList<>();
+		List<Float> labelScales = new ArrayList<>();
+		int widest = 0;
 		for (Row row : rows) {
+			String words = row.label().getString();
+			Text label;
+			float labelScale;
+			if (fontId != null) {
+				label = MenuKit.inNamedFont(words, fontId);
+				labelScale = (!row.main() ? 1.0f : large ? 1.9f : 1.35f) * (row.main() ? sizeK : Math.min(1.25f, sizeK));
+			} else {
+				label = !row.main() ? MenuKit.uiBold(words) : large ? MenuKit.displayLg(words) : MenuKit.display(words);
+				labelScale = row.main() ? sizeK : Math.min(1.25f, sizeK);
+			}
+			labels.add(label);
+			labelScales.add(labelScale);
+			int w = Math.round(MenuKit.width(renderer, label) * labelScale) + (boxed ? 28 : 30) + (row.badge() != null ? 34 : 0);
+			widest = Math.max(widest, w);
+		}
+		y += at.dy(look, "menu");
+		for (int i = 0; i < rows.size(); i++) {
+			Row row = rows.get(i);
 			ClickableWidget widget = row.widget();
 			int h = row.main() ? rowH : secondaryH;
-			Text label = !row.main() ? MenuKit.uiBold(row.label().getString())
-					: large ? MenuKit.displayLg(row.label().getString()) : MenuKit.display(row.label().getString());
-			int w = MenuKit.width(renderer, label) + 30 + (row.badge() != null ? 34 : 0);
+			Text label = labels.get(i);
+			int natural = Math.round(MenuKit.width(renderer, label) * labelScales.get(i)) + (boxed ? 28 : 30) + (row.badge() != null ? 34 : 0);
+			int w = boxed ? widest : natural;
 			float scale = Math.min(columnScale, columnMaxW / (float) w);
 			int sw = Math.round(w * scale);
 			int sh = Math.round(h * scale);
+			int rx = at.x(sw, look, "menu");
 			if (widget instanceof HotspotButton hotspot) {
-				hotspot.place(margin, y, sw, sh, true);
+				hotspot.place(rx, y, sw, sh, true);
 				if (hotspot != storeRow && hotspot != discoverRow) {
 					ClickableWidget target = byKey.values().stream().filter(v -> PROXIES.get(env.keyOf(v)) == hotspot).findFirst().orElse(null);
 					if (target != null) {
@@ -404,42 +454,51 @@ public final class TitleMenu {
 					}
 				}
 			} else {
-				widget.setX(margin);
+				widget.setX(rx);
 				widget.setY(y);
 				widget.setWidth(sw);
 				widget.setHeight(sh);
 				RESTYLED.add(widget);
 			}
-			slideIn(context, open, step++);
-			context.getMatrices().translate(margin, y);
+			slideIn(context, open, step++, align);
+			context.getMatrices().translate(rx, y);
 			context.getMatrices().scale(scale, scale);
-			drawRow(context, renderer, row, label, 0, 0, w, h, large, MenuKit.hover(widget, widget.active && hovered(mouseX, mouseY, widget)));
+			drawRow(context, renderer, row, label, labelScales.get(i), fontId != null, 0, 0, w, h, large, look,
+					MenuKit.hover(widget, widget.active && hovered(mouseX, mouseY, widget)));
 			context.getMatrices().popMatrix();
-			contentRight = Math.max(contentRight, margin + sw);
+			contentLeft = Math.min(contentLeft, rx);
+			contentRight = Math.max(contentRight, rx + sw);
 			y += Math.round((h + (row.main() ? 2 : 0)) * columnScale);
 		}
 
 		// ---- Footer: you, friends online, small icon buttons - one row, centred on the icons ----
-		boolean showFooter = footerY > y + 8;
-		int x = margin;
+		int footerDy = at.dy(look, "footer");
+		boolean showFooter = look.footer && footerY > y + 8 - at.dy(look, "menu");
+		footerY += footerDy;
 		String name = MenuInfo.username();
 		String uuid = MenuInfo.uuid();
-		slideIn(context, open, step++);
-		if (showFooter && name != null && !name.isEmpty()) {
+		boolean showName = showFooter && name != null && !name.isEmpty();
+		int online = onlineFriends();
+		Text nameText = MenuKit.uiBold(name == null ? "" : name);
+		Text friendsLine = MenuKit.ui(online < 0 ? "Velo Network offline" : online == 0 ? "No friends online"
+				: online + (online == 1 ? " friend online" : " friends online"));
+		boolean ownFriends = icons.stream().noneMatch(icon -> icon.key().equals("friends"));
+		// measured first, so the whole row can sit left, centred or right
+		int footerW = (showName ? iconSize + 8 + Math.max(MenuKit.width(renderer, nameText), MenuKit.width(renderer, friendsLine)) + 16 : 0)
+				+ (ownFriends ? iconSize + 5 : 0) + icons.size() * (iconSize + 5) - 5;
+		int x = at.x(Math.max(0, footerW), look, "footer");
+		int footerLeft = x;
+		slideIn(context, open, step++, align);
+		if (showName) {
 			int head = iconSize;
 			PlayerHeads.draw(context, uuid, name, x, footerY, head);
 			VeloDraw.strokeRounded(context, x - 1, footerY - 1, head + 2, head + 2, 4, MenuKit.accent());
-			int online = onlineFriends();
-			Text nameText = MenuKit.uiBold(name);
-			Text friendsLine = MenuKit.ui(online < 0 ? "Velo Network offline" : online == 0 ? "No friends online"
-					: online + (online == 1 ? " friend online" : " friends online"));
 			int blockH = MenuKit.H_UI * 2 + 3;
 			int ty = footerY + (iconSize - blockH) / 2;
 			MenuKit.text(context, renderer, nameText, x + head + 8, ty, MenuKit.TEXT);
 			MenuKit.text(context, renderer, friendsLine, x + head + 8, ty + MenuKit.H_UI + 3, online > 0 ? MenuKit.GREEN : MenuKit.TEXT_3);
 			x += head + 8 + Math.max(MenuKit.width(renderer, nameText), MenuKit.width(renderer, friendsLine)) + 16;
 		}
-		boolean ownFriends = icons.stream().noneMatch(icon -> icon.key().equals("friends"));
 		friends.place(x, footerY, iconSize, iconSize, showFooter && ownFriends);
 		if (showFooter && ownFriends) {
 			drawIconButton(context, x, footerY, iconSize, "friends", MenuKit.hover(friends, hovered(mouseX, mouseY, friends)), true);
@@ -462,23 +521,78 @@ public final class TitleMenu {
 		}
 		context.getMatrices().popMatrix();
 		if (showFooter) {
+			contentLeft = Math.min(contentLeft, footerLeft);
 			contentRight = Math.max(contentRight, x);
 		}
+		if (contentLeft == Integer.MAX_VALUE) {
+			contentLeft = margin;
+		}
+		contentRight = Math.max(contentRight, contentLeft + 2);
 		if (essential) {
-			anchorForEssential(byKey, width, contentRight);
+			if (align.equals("left")) {
+				anchorForEssential(byKey, width, contentRight);
+			} else {
+				anchorAroundForEssential(byKey, width, contentLeft, contentRight);
+			}
 		}
 
-		// ---- Store card, bottom right (unless a mod owns the right side) ----
+		// ---- Store card, bottom right (bottom left when the menu is on the right; unless a mod owns that side) ----
 		int scW = large ? 180 : 150;
 		int scH = large ? 40 : 34;
-		boolean showStoreCard = !essential && width >= 420 && width - margin - scW > margin + cardW + 20;
-		int scX = width - margin - scW;
-		int scY = footerY + iconSize - scH;
+		boolean storeLeft = align.equals("right");
+		int scX = (storeLeft ? margin : width - margin - scW) + at.dx(look, "store");
+		int scY = footerY - footerDy + iconSize - scH + at.dy(look, "store");
+		boolean clear = storeLeft ? scX + scW + 20 < contentLeft : scX > contentRight + 20;
+		boolean showStoreCard = look.store && !essential && width >= 420 && (clear || !look.moved.isEmpty() && look.moved.containsKey("store"));
 		storeCard.place(scX, scY, scW, scH, showStoreCard);
 		if (showStoreCard) {
-			slideIn(context, open, step + 2);
+			slideIn(context, open, step + 2, align);
 			drawStoreCard(context, renderer, scX, scY, scW, scH, MenuKit.hover(storeCard, hovered(mouseX, mouseY, storeCard)));
 			context.getMatrices().popMatrix();
+		}
+	}
+
+	/** Where a part of the menu goes for the chosen alignment, plus its free offset (fractions of the screen). */
+	private record Align(String mode, int left, int right, int width, int height) {
+		int x(int w, ScreenLook.Title look, String part) {
+			int base = switch (mode) {
+				case "center" -> (width - w) / 2;
+				case "right" -> right - w;
+				default -> left;
+			};
+			return base + dx(look, part);
+		}
+
+		int dx(ScreenLook.Title look, String part) {
+			return Math.round(look.dx(part) * width);
+		}
+
+		int dy(ScreenLook.Title look, String part) {
+			return Math.round(look.dy(part) * height);
+		}
+	}
+
+	/**
+	 * Essential with the menu centred or on the right: the anchors span our whole menu, so Essential puts its character
+	 * in the free space LEFT of it (its natural layout) and its side menu right of it. When the character doesn't fit
+	 * there (or would cross the middle of the screen, where it stops taking clicks) the singleplayer anchor goes far
+	 * left, which takes the character off-screen while the side menu stays.
+	 */
+	private static void anchorAroundForEssential(Map<String, ClickableWidget> byKey, int width, int left, int right) {
+		ClickableWidget top = byKey.get("menu.singleplayer");
+		EssentialAnchors.Plan plan = EssentialAnchors.around(width, left, right, top != null && byKey.get("menu.multiplayer") != null);
+		for (Map.Entry<String, ClickableWidget> entry : byKey.entrySet()) {
+			ClickableWidget widget = entry.getValue();
+			RESTYLED.remove(widget);
+			int[] first = FIRST_SEEN.get(widget);
+			boolean offLeft = plan == null || widget == top && !plan.playerShown();
+			widget.setX(offLeft ? EssentialAnchors.OFF_LEFT : plan.topX());
+			widget.setWidth(offLeft ? EssentialAnchors.ANCHOR_W : plan.menuX() - plan.topX());
+			if (first != null) {
+				widget.setY(first[1]);
+				widget.setHeight(first[3]);
+			}
+			widget.visible = false;
 		}
 	}
 
@@ -518,11 +632,16 @@ public final class TitleMenu {
 	}
 
 	/** Pushes a slide-in transform for element {@code index}: each one comes in from the left a little after the last. */
-	private static void slideIn(DrawContext context, float open, int index) {
+	private static void slideIn(DrawContext context, float open, int index, String align) {
 		float local = Math.max(0f, Math.min(1f, (open * 900f - index * 45f) / 380f));
 		float eased = 1f - (float) Math.pow(1f - local, 3);
 		context.getMatrices().pushMatrix();
-		context.getMatrices().translate(-28f * (1f - eased), 0f);
+		// from the side the menu sits on; a centred menu rises up
+		switch (align) {
+			case "right" -> context.getMatrices().translate(28f * (1f - eased), 0f);
+			case "center" -> context.getMatrices().translate(0f, 16f * (1f - eased));
+			default -> context.getMatrices().translate(-28f * (1f - eased), 0f);
+		}
 	}
 
 	private static int onlineFriends() {
@@ -578,32 +697,109 @@ public final class TitleMenu {
 		MenuKit.icon(context, "play", cx - 5, cy - 5, 10, MenuKit.onAccent());
 	}
 
-	private static void drawRow(DrawContext context, TextRenderer renderer, Row row, Text label, int x, int y, int w, int h, boolean large, float hover) {
-		int base = row.primary() ? MenuKit.TEXT : row.quit() ? MenuKit.TEXT_3 : MenuKit.TEXT_2;
+	private static void drawRow(DrawContext context, TextRenderer renderer, Row row, Text label, float labelScale, boolean customFont, int x, int y,
+			int w, int h, boolean large, ScreenLook.Title look, float hover) {
+		int own = look.color;
+		int base = own >= 0 ? (row.primary() ? 0xFF000000 : row.quit() ? 0x99000000 : 0xCC000000) | own
+				: row.primary() ? MenuKit.TEXT : row.quit() ? MenuKit.TEXT_3 : MenuKit.TEXT_2;
 		if (!row.widget().active) {
 			base = 0xFF4A4A52;
 		}
-		int color = VeloAnim.lerpArgb(base, 0xFFFFFFFF, hover);
-		int slide = Math.round(hover * 8);
-		// Where the capitals actually sit for each font (TTF glyphs don't start at the draw y).
-		int fontH = !row.main() ? MenuKit.H_UI : large ? 16 : MenuKit.H_DISPLAY;
-		int ty = y + (h - fontH) / 2;
-		if (hover > 0.02f) {
-			int arrowAlpha = Math.round(hover * 255);
-			Text arrow = !row.main() ? MenuKit.uiBold("›") : large ? MenuKit.displayLg("›") : MenuKit.display("›");
-			MenuKit.text(context, renderer, arrow, x - 10 + slide, ty, (arrowAlpha << 24) | (MenuKit.accentText() & 0xFFFFFF));
+		int color = VeloAnim.lerpArgb(base, look.hoverColor >= 0 ? 0xFF000000 | look.hoverColor : 0xFFFFFFFF, hover);
+		int accent = MenuKit.accent();
+		String style = look.buttons;
+		String align = look.align;
+		boolean boxed = !style.equals("words") && !style.equals("underline");
+		int labelW = Math.round(MenuKit.width(renderer, label) * labelScale);
+		int badgeW = row.badge() != null ? 34 : 0;
+		// Where the capitals sit for each font (TTF glyphs don't start at the draw y).
+		float fontH = customFont ? 8f * labelScale : (!row.main() ? MenuKit.H_UI : large ? 16 : MenuKit.H_DISPLAY) * labelScale;
+		int ty = Math.round(y + (h - fontH) / 2f);
+
+		// ---- the button behind the words ----
+		int r = Math.min(h / 2, 8);
+		switch (style) {
+			case "pills" -> VeloDraw.fillRounded(context, x, y, w, h, h / 2, VeloAnim.lerpArgb(0x1CFFFFFF, (accent & 0xFFFFFF) | 0x66000000, hover));
+			case "glass" -> {
+				VeloDraw.fillRounded(context, x, y, w, h, r, VeloAnim.lerpArgb(0xB80C0A0E, 0xD8141218, hover));
+				VeloDraw.strokeRounded(context, x, y, w, h, r, VeloAnim.lerpArgb(MenuKit.HAIRLINE, accent, hover));
+			}
+			case "outline" -> {
+				if (hover > 0.01f) {
+					VeloDraw.fillRounded(context, x, y, w, h, r, (Math.round(hover * 0x22) << 24) | (accent & 0xFFFFFF));
+				}
+				VeloDraw.strokeRounded(context, x, y, w, h, r, VeloAnim.lerpArgb(0x40FFFFFF, accent, hover));
+			}
+			default -> {
+			}
 		}
-		MenuKit.text(context, renderer, label, x + slide, ty, color);
+
+		// ---- the words ----
+		int pad = boxed ? 14 : 0;
+		int inner = w - pad * 2 - badgeW;
+		int slide = boxed || align.equals("center") ? 0 : Math.round(hover * 8) * (align.equals("right") ? -1 : 1);
+		int tx = switch (align) {
+			case "center" -> x + pad + (inner - labelW) / 2;
+			case "right" -> boxed ? x + w - pad - badgeW - labelW : x + w - 12 - labelW;
+			default -> x + pad;
+		} + slide;
+		if (!boxed && !align.equals("center") && hover > 0.02f) {
+			int arrowAlpha = Math.round(hover * 255);
+			boolean right = align.equals("right");
+			Text arrow = MenuKit.uiBold(right ? "‹" : "›");
+			int ax = right ? tx + labelW + 4 : tx - 10;
+			MenuKit.text(context, renderer, arrow, ax, ty + Math.round((fontH - MenuKit.H_UI) / 2f), (arrowAlpha << 24) | (MenuKit.accentText() & 0xFFFFFF));
+		}
+		int glowColor = look.accent >= 0 ? look.accent : accent & 0xFFFFFF;
+		float glow = look.glow / 100f * (0.55f + 0.45f * hover);
+		drawLabel(context, renderer, label, tx, ty, labelScale, color, look.shadow, glow, glowColor);
+		if (style.equals("underline")) {
+			int lw = Math.round(labelW * (0.25f + 0.75f * hover));
+			int lx = align.equals("center") ? tx + (labelW - lw) / 2 : align.equals("right") ? tx + labelW - lw : tx;
+			context.fill(lx, Math.round(ty + fontH + 2), lx + lw, Math.round(ty + fontH + 3), VeloAnim.lerpArgb((accent & 0xFFFFFF) | 0x66000000, accent, hover));
+		}
 		if (row.badge() != null) {
 			Text badge = MenuKit.mono(row.badge());
 			int bh = large ? 12 : 10;
-			int bx = x + slide + MenuKit.width(renderer, label) + 8;
+			int bx = tx + labelW + 8;
+			if (align.equals("right") && !boxed) {
+				bx = tx - 8 - (MenuKit.width(renderer, badge) + 8);
+			}
 			int bw = MenuKit.width(renderer, badge) + 8;
-			// Centred on the word's capitals, not on the row box.
-			int by = ty + (fontH - bh) / 2 - (large ? -1 : 3);
-			VeloDraw.fillRounded(context, bx, by, bw, bh, 3, MenuKit.accent());
+			int by = Math.round(ty + (fontH - bh) / 2f);
+			VeloDraw.fillRounded(context, bx, by, bw, bh, 3, accent);
 			MenuKit.text(context, renderer, badge, bx + 4, by + (bh - MenuKit.H_MONO) / 2, MenuKit.onAccent());
 		}
+	}
+
+	/** A label at {@code labelScale}, with an optional drop shadow and a soft glow (halo copies around it). */
+	private static void drawLabel(DrawContext context, TextRenderer renderer, Text label, int x, int y, float labelScale, int color,
+			boolean shadow, float glow, int glowRgb) {
+		context.getMatrices().pushMatrix();
+		context.getMatrices().translate(x, y);
+		context.getMatrices().scale(labelScale, labelScale);
+		if (glow > 0.01f) {
+			int alpha = (int) (glow * 0x30) * ((color >>> 24) & 0xFF) / 255;
+			if (alpha > 0) {
+				for (int i = 0; i < 8; i++) {
+					double a = i * Math.PI / 4;
+					for (float rad : new float[] {1.2f, 2.4f}) {
+						context.getMatrices().pushMatrix();
+						context.getMatrices().translate((float) Math.cos(a) * rad / labelScale, (float) Math.sin(a) * rad / labelScale);
+						MenuKit.text(context, renderer, label, 0, 0, (alpha << 24) | glowRgb);
+						context.getMatrices().popMatrix();
+					}
+				}
+			}
+		}
+		if (shadow) {
+			context.getMatrices().pushMatrix();
+			context.getMatrices().translate(1f / labelScale * 1.2f, 1f / labelScale * 1.2f);
+			MenuKit.text(context, renderer, label, 0, 0, (((color >>> 24) & 0xFF) * 0x90 / 255 << 24));
+			context.getMatrices().popMatrix();
+		}
+		MenuKit.text(context, renderer, label, 0, 0, color);
+		context.getMatrices().popMatrix();
 	}
 
 	private static void drawIconButton(DrawContext context, int x, int y, int size, String icon, float hover, boolean active) {

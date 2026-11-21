@@ -35,6 +35,9 @@ public abstract class VeloWindow extends Screen {
 	private boolean draggingHeader;
 	private double dragOffsetX;
 	private double dragOffsetY;
+	/** Set while {@link net.veloclient.velo.client.util.MenuWarmup} draws a window invisibly once (no sound, instantly open). */
+	public static boolean warming;
+
 	private float openProgress;
 	private boolean closing;
 	/** Spring animation ({@link #springAnimation()}): when the window started opening / closing. */
@@ -150,6 +153,12 @@ public abstract class VeloWindow extends Screen {
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		float deltaSeconds = MinecraftClient.getInstance().getRenderTickCounter().getDynamicDeltaTicks() / 20f;
 		long frameNanos = System.nanoTime();
+		if (warming) {
+			// MenuWarmup's invisible first draw: fully open at once, no sound, no hand-off trace for the real open later
+			openDecided = true;
+			handedOff = true;
+			openProgress = 1f;
+		}
 		if (!openDecided) {
 			// Opened straight from another Velo window (a rail tab, a sub-page): no second open animation - the
 			// window just stays put and the new page fades in, instead of the whole menu bouncing on every switch.
@@ -163,7 +172,11 @@ public abstract class VeloWindow extends Screen {
 				net.veloclient.velo.client.sound.VeloUiSounds.menuOpen();
 			}
 		}
-		lastWindowFrameNanos = frameNanos;
+		if (!warming) {
+			lastWindowFrameNanos = frameNanos;
+		}
+		// Velo+ Customize: the menu's look and motion (ScreenLook.Menu); the defaults are Velo's own
+		net.veloclient.velo.client.gui.title.ScreenLook.Menu look = net.veloclient.velo.client.gui.title.ScreenLook.menu();
 		if (closing && returnScreen instanceof VeloWindow) {
 			// Back to the window underneath: switch right away too.
 			openProgress = 0f;
@@ -171,6 +184,8 @@ public abstract class VeloWindow extends Screen {
 			openProgress = 1f;
 			springScale = 1f;
 			springRise = 0f;
+		} else if (customMotion(look)) {
+			customStep(look);
 		} else if (springAnimation() || shell()) {
 			springStep();
 		} else {
@@ -193,11 +208,12 @@ public abstract class VeloWindow extends Screen {
 		}
 
 		int[] hole = openProgress > 0.97f && !closing ? windowHole() : null;
+		int dimMax = Math.round(look.dim * 2.55f);
 		if (hole == null) {
-			context.fill(0, 0, this.width, this.height, (int) (0x70 * openProgress) << 24);
+			context.fill(0, 0, this.width, this.height, (int) (dimMax * openProgress) << 24);
 		} else {
 			// dim everything but the hole (the world shows through it untouched)
-			int dim = (int) (0x70 * openProgress) << 24;
+			int dim = (int) (dimMax * openProgress) << 24;
 			context.fill(0, 0, this.width, hole[1], dim);
 			context.fill(0, hole[1] + hole[3], this.width, this.height, dim);
 			context.fill(0, hole[1], hole[0], hole[1] + hole[3], dim);
@@ -205,25 +221,61 @@ public abstract class VeloWindow extends Screen {
 		}
 
 		// Opens with a gentle scale-up + rise, closes with the reverse.
-		boolean spring = springAnimation() || shell();
+		boolean spring = springAnimation() || shell() || customMotion(look);
 		float scale = spring ? springScale : 0.955f + 0.045f * openProgress;
 		float rise = spring ? springRise : (1f - openProgress) * 10f;
+		float shiftX = customMotion(look) ? motionX : 0f;
+		float scaleX = customMotion(look) ? scale * motionSX : scale;
+		float scaleY = customMotion(look) ? scale * motionSY : scale;
 		context.getMatrices().pushMatrix();
 		float centerX = windowX + windowWidth / 2f;
 		float centerY = windowY + windowHeight / 2f;
-		context.getMatrices().translate(centerX, centerY + rise);
-		context.getMatrices().scale(scale, scale);
+		context.getMatrices().translate(centerX + shiftX, centerY + rise);
+		context.getMatrices().scale(scaleX, scaleY);
 		context.getMatrices().translate(-centerX, -centerY);
 
 		Theme theme = ThemeManager.active();
 		int alpha = (int) (255 * openProgress);
-		int radius = VeloStyle.RADIUS_WINDOW;
-		VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 18, 6,
-				VeloUi.withAlpha(0xFF000000, Math.round(0x8C * openProgress)));
+		int radius = look.radius >= 0 ? look.radius : look.style.equals("minimal") ? 6 : VeloStyle.RADIUS_WINDOW;
+		int accentRgb = net.veloclient.velo.client.gui.title.MenuKit.accent() & 0xFFFFFF;
+		String style = look.style;
+		switch (style) {
+			case "minimal" -> {
+				// flat: no shadow at all
+			}
+			case "glow" -> {
+				VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 26, 0,
+						(Math.round(0x70 * openProgress) << 24) | accentRgb);
+				VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 12, 4,
+						VeloUi.withAlpha(0xFF000000, Math.round(0x80 * openProgress)));
+			}
+			case "neon" -> {
+				VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 34, 0,
+						(Math.round(0x90 * openProgress) << 24) | accentRgb);
+				VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 10, 0,
+						(Math.round(0xA0 * openProgress) << 24) | accentRgb);
+			}
+			case "solid" -> VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 24, 10,
+					VeloUi.withAlpha(0xFF000000, Math.round(0xB0 * openProgress)));
+			default -> VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 18, 6,
+					VeloUi.withAlpha(0xFF000000, Math.round(0x8C * openProgress)));
+		}
 
 		// 2026-11: the launcher's ground (#0C0A0A, warm black, a touch of the theme), almost opaque - same look as the launcher.
-		int glass = VeloAnim.lerpArgb(0xFF0C0A0A, theme.surface() | 0xFF000000, 0.06f);
-		int surface = (glass & 0x00FFFFFF) | (Math.round(0xF7 * openProgress) << 24);
+		int glass = switch (style) {
+			case "glass" -> VeloAnim.lerpArgb(0xFF181620, theme.surface() | 0xFF000000, 0.25f);
+			case "solid" -> theme.surface() | 0xFF000000;
+			case "neon" -> 0xFF07060A;
+			case "glow" -> VeloAnim.lerpArgb(0xFF0C0A0A, 0xFF000000 | accentRgb, 0.05f);
+			default -> VeloAnim.lerpArgb(0xFF0C0A0A, theme.surface() | 0xFF000000, 0.06f);
+		};
+		int baseAlpha = switch (style) {
+			case "glass" -> 0xA8;
+			case "solid" -> 0xFF;
+			default -> 0xF7;
+		};
+		baseAlpha = Math.round(baseAlpha * (1f - look.clear / 100f * 0.75f));
+		int surface = (glass & 0x00FFFFFF) | (Math.round(baseAlpha * openProgress) << 24);
 		if (hole == null) {
 			VeloDraw.fillRounded(context, windowX, windowY, windowWidth, windowHeight, radius, surface);
 		} else {
@@ -241,10 +293,32 @@ public abstract class VeloWindow extends Screen {
 				}
 			}
 		}
-		context.fill(windowX + 1, windowY + HEADER_HEIGHT, windowX + windowWidth - 1, windowY + HEADER_HEIGHT + 1,
-				VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x10 * openProgress)));
-		VeloDraw.strokeRounded(context, windowX, windowY, windowWidth, windowHeight, radius,
-				VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x18 * openProgress)));
+		if (style.equals("glass")) {
+			// a soft sheen across the top, like frosted glass catching light
+			context.fillGradient(windowX + 1, windowY + 1, windowX + windowWidth - 1, windowY + Math.min(windowHeight, 90),
+					VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x14 * openProgress)), 0x00FFFFFF);
+		} else if (style.equals("glow") || style.equals("neon")) {
+			// the accent rises from the header line
+			context.fillGradient(windowX + 1, windowY + 1, windowX + windowWidth - 1, windowY + HEADER_HEIGHT,
+					(Math.round((style.equals("neon") ? 0x30 : 0x1C) * openProgress) << 24) | accentRgb, accentRgb);
+		}
+		if (!style.equals("minimal")) {
+			context.fill(windowX + 1, windowY + HEADER_HEIGHT, windowX + windowWidth - 1, windowY + HEADER_HEIGHT + 1,
+					style.equals("neon") ? (Math.round(0x80 * openProgress) << 24) | accentRgb
+							: VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x10 * openProgress)));
+		}
+		int edge = switch (style) {
+			case "glass" -> VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x38 * openProgress));
+			case "minimal" -> VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x0C * openProgress));
+			case "glow" -> (Math.round(0x90 * openProgress) << 24) | accentRgb;
+			case "neon" -> (Math.round(0xFF * openProgress) << 24) | VeloAnim.lerpArgb(accentRgb | 0xFF000000, 0xFFFFFFFF, 0.25f) & 0xFFFFFF;
+			default -> VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x18 * openProgress));
+		};
+		VeloDraw.strokeRounded(context, windowX, windowY, windowWidth, windowHeight, radius, edge);
+		if (style.equals("neon")) {
+			VeloDraw.strokeRounded(context, windowX + 1, windowY + 1, windowWidth - 2, windowHeight - 2, Math.max(0, radius - 1),
+					(Math.round(0x50 * openProgress) << 24) | accentRgb);
+		}
 
 		renderHeader(context, mouseX, mouseY, alpha);
 		if (openProgress > 0.4f) {
@@ -272,14 +346,14 @@ public abstract class VeloWindow extends Screen {
 		}
 		if (openProgress > 0.4f) {
 			// a page switched to from the rail slides in from the direction you moved; the frame and rail stay put
-			float slide = railId != null ? MenuShell.slideIn(railId) : 0f;
+			float slide = railId != null && look.pages.equals("slide") ? MenuShell.slideIn(railId) : 0f;
 			if (slide != 0f) {
 				context.getMatrices().pushMatrix();
 				context.getMatrices().translate(0f, slide);
 			}
 			// After a tab switch the new page glides in from the side it came from (down/up for the Locker's slot
 			// column, right/left for header tabs), clipped to the page so nothing spills over the frame.
-			float glide = 1f - pageIn();
+			float glide = look.pages.equals("slide") ? 1f - pageIn() : 0f;
 			int[] glideArea = glide > 0f && (slideX != 0 || slideY != 0) ? pageArea() : null;
 			fixedStripRight = Integer.MIN_VALUE;
 			pageOffsetX = glideArea == null ? 0f : glide * SLIDE_PX * slideX;
@@ -539,7 +613,11 @@ public abstract class VeloWindow extends Screen {
 
 	/** 0..1 eased progress of the current page's entrance (after a tab switch). */
 	protected float pageIn() {
-		float t = Math.min(1f, (System.nanoTime() - contentShownAt) / 260_000_000f);
+		var look = net.veloclient.velo.client.gui.title.ScreenLook.menu();
+		if (look.pages.equals("none")) {
+			return 1f;
+		}
+		float t = Math.min(1f, (System.nanoTime() - contentShownAt) / (260_000_000f / look.speed));
 		return 1f - (float) Math.pow(1f - t, 3);
 	}
 
@@ -704,6 +782,97 @@ public abstract class VeloWindow extends Screen {
 	 */
 	protected boolean springAnimation() {
 		return false;
+	}
+
+	/** Customize motion: offsets and per-axis scale of the open/close animation (beside springScale / springRise). */
+	private float motionX;
+	private float motionSX = 1f;
+	private float motionSY = 1f;
+
+	private boolean customMotion(net.veloclient.velo.client.gui.title.ScreenLook.Menu look) {
+		return !(look.open.equals("spring") && look.close.equals("spring") && look.speed == 1f);
+	}
+
+	/** The chosen open / close animation, time-based (same at any frame rate), at the chosen speed. */
+	private void customStep(net.veloclient.velo.client.gui.title.ScreenLook.Menu look) {
+		long now = System.nanoTime();
+		if (openedAtNanos < 0) {
+			openedAtNanos = now;
+		}
+		String kind = closing ? look.close : look.open;
+		if (kind.equals("spring")) {
+			// Velo's own, just at another speed
+			long shift = (long) ((now - (closing ? closingAtNanos : openedAtNanos)) * (look.speed - 1f));
+			long realOpen = openedAtNanos;
+			long realClose = closingAtNanos;
+			if (closing) {
+				closingAtNanos -= shift;
+			} else {
+				openedAtNanos -= shift;
+			}
+			springStep();
+			openedAtNanos = realOpen;
+			closingAtNanos = realClose;
+			motionX = 0f;
+			motionSX = 1f;
+			motionSY = 1f;
+			return;
+		}
+		float ms = closing ? (kind.equals("fold") ? 260f : 200f) : kind.equals("drop") ? 620f : kind.equals("pop") ? 460f : 360f;
+		float t = kind.equals("none") ? 1f : Math.min(1f, (now - (closing ? closingAtNanos : openedAtNanos)) / (ms * 1_000_000f / look.speed));
+		// k: how "there" the window is (1 = fully open)
+		float k = closing ? 1f - t * t * t : 1f - (float) Math.pow(1f - t, 3);
+		openProgress = Math.min(1f, kind.equals("drop") || kind.startsWith("slide") ? Math.min(1f, k * 1.6f) : k);
+		springScale = 1f;
+		springRise = 0f;
+		motionX = 0f;
+		motionSX = 1f;
+		motionSY = 1f;
+		float away = 1f - k;
+		switch (kind) {
+			case "zoom" -> springScale = 0.82f + 0.18f * k;
+			case "pop" -> {
+				float c1 = 1.70158f * 1.4f;
+				float c3 = c1 + 1f;
+				float back = 1f + c3 * (float) Math.pow(t - 1f, 3) + c1 * (float) Math.pow(t - 1f, 2);
+				springScale = 0.6f + 0.4f * back;
+			}
+			case "slide-up" -> springRise = away * 60f * (closing ? -1f : 1f);
+			case "slide-down" -> springRise = away * -60f * (closing ? -1f : 1f);
+			case "slide-left" -> motionX = away * 90f * (closing ? -1f : 1f);
+			case "slide-right" -> motionX = away * -90f * (closing ? -1f : 1f);
+			case "drop" -> {
+				// falls in from above and settles with a small bounce
+				springRise = -(1f - bounce(t)) * (this.height * 0.7f);
+			}
+			case "unfold" -> {
+				motionSY = Math.max(0.02f, k);
+				springScale = 1f;
+			}
+			case "fold" -> motionSY = Math.max(0.02f, k);
+			default -> {
+				// fade: just the opacity
+			}
+		}
+		if (closing && t >= 1f) {
+			openProgress = 0f;
+		}
+	}
+
+	private static float bounce(float t) {
+		float n1 = 7.5625f;
+		float d1 = 2.75f;
+		if (t < 1 / d1) {
+			return n1 * t * t;
+		} else if (t < 2 / d1) {
+			t -= 1.5f / d1;
+			return n1 * t * t + 0.75f;
+		} else if (t < 2.5 / d1) {
+			t -= 2.25f / d1;
+			return n1 * t * t + 0.9375f;
+		}
+		t -= 2.625f / d1;
+		return n1 * t * t + 0.984375f;
 	}
 
 	private void springStep() {

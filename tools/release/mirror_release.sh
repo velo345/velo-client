@@ -21,6 +21,8 @@ if [[ -n "$LEGACY" && ! -e "$LOCAL/v$VERSION/$LEGACY" ]]; then
 fi
 ssh "$TARGET" "mkdir -p '$ROOT/v$VERSION'"
 rsync -rlptz --partial --chmod=D2775,F664 "$LOCAL/v$VERSION/" "$TARGET:$ROOT/v$VERSION/"
+# Only the newest 3 releases stay mirrored (each is ~2.6 GB; the launcher only ever downloads the latest)
+ssh "$TARGET" "cd '$ROOT' && ls -1d v*/ 2>/dev/null | sed 's#/##' | sort -V | head -n -3 | xargs -r rm -rf --"
 # releases.json: every version folder on the server, newest first
 MIRRORED=$(ssh "$TARGET" "ls -1 '$ROOT'" | sed -n 's/^v//p')
 gh api "repos/$REPO/releases?per_page=30" > "$LOCAL/github-releases.json"

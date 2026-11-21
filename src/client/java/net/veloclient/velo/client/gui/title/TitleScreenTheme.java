@@ -409,11 +409,27 @@ public final class TitleScreenTheme {
 	 * Draws Velo's background; false (and vanilla's panorama for the rest of the session) when that failed - a driver or
 	 * a mod breaking it must leave a working title screen, not a broken or black one.
 	 */
+	/** Velo+ Customize: your own title background (picture or GIF). */
+	private static final LookPicture TITLE_PICTURE = new LookPicture("title");
+
 	public static boolean tryDrawPanorama(DrawContext context, int screenWidth, int screenHeight) {
 		if (panoramaFailed) {
 			return false;
 		}
+		ScreenLook.Title look = ScreenLook.title();
+		if (look.background.equals("vanilla")) {
+			return false;
+		}
 		try {
+			if (look.background.equals("image")) {
+				context.fill(0, 0, screenWidth, screenHeight, 0xFF0B0B10);
+				if (TITLE_PICTURE.draw(context, screenWidth, screenHeight, look.blur, 255)) {
+					drawShade(context, screenWidth, screenHeight, look);
+					return true;
+				}
+			} else {
+				TITLE_PICTURE.release();
+			}
 			drawPanorama(context, screenWidth, screenHeight);
 			return true;
 		} catch (RuntimeException | LinkageError e) {
@@ -469,13 +485,50 @@ public final class TitleScreenTheme {
 		// A light grade toward the theme background, edge fades, and a soft scrim behind the
 		// logo + button column so the wordmark never sits on bright sky unprotected.
 		context.fill(0, 0, screenWidth, screenHeight, (theme.background() & 0x00FFFFFF) | 0x1E000000);
+		drawShade(context, screenWidth, screenHeight, ScreenLook.title());
+	}
+
+	/**
+	 * Edge fades, the Customize dim, and the dark fade behind the menu - on the side the menu is (Customize), as strong
+	 * as chosen (100 = Velo's default).
+	 */
+	private static void drawShade(DrawContext context, int screenWidth, int screenHeight, ScreenLook.Title look) {
+		Theme theme = ThemeManager.active();
 		context.fillGradient(0, 0, screenWidth, 48, 0x55000000, 0x00000000);
 		context.fillGradient(0, screenHeight - 120, screenWidth, screenHeight, 0x00000000, 0xAA000000);
-		// The menu column lives on the left (TitleMenu): the scene fades to the theme's dark there.
+		if (look.dim > 0) {
+			context.fill(0, 0, screenWidth, screenHeight, Math.round(look.dim * 2.4f) << 24);
+		}
 		int dark = theme.background() & 0x00FFFFFF;
-		int solid = Math.round(screenWidth * 0.22f);
-		context.fill(0, 0, solid, screenHeight, dark | 0xD8000000);
-		MenuKit.hGradient(context, solid, 0, Math.round(screenWidth * 0.36f), screenHeight, dark | 0xD8000000, dark);
+		int a = Math.round(0xD8 * look.scrim / 100f);
+		if (a <= 0) {
+			return;
+		}
+		int solidA = dark | (a << 24);
+		switch (look.align) {
+			case "right" -> {
+				int solid = Math.round(screenWidth * 0.22f);
+				context.fill(screenWidth - solid, 0, screenWidth, screenHeight, solidA);
+				int fade = Math.round(screenWidth * 0.36f);
+				MenuKit.hGradient(context, screenWidth - solid - fade, 0, fade, screenHeight, dark, solidA);
+			}
+			case "center" -> {
+				// a soft band down the middle
+				int band = Math.round(screenWidth * 0.18f);
+				int fade = Math.round(screenWidth * 0.16f);
+				int cx = screenWidth / 2;
+				int mid = dark | (Math.round(a * 0.8f) << 24);
+				context.fill(cx - band, 0, cx + band, screenHeight, mid);
+				MenuKit.hGradient(context, cx - band - fade, 0, fade, screenHeight, dark, mid);
+				MenuKit.hGradient(context, cx + band, 0, fade, screenHeight, mid, dark);
+			}
+			default -> {
+				// The menu column lives on the left (TitleMenu): the scene fades to the theme's dark there.
+				int solid = Math.round(screenWidth * 0.22f);
+				context.fill(0, 0, solid, screenHeight, solidA);
+				MenuKit.hGradient(context, solid, 0, Math.round(screenWidth * 0.36f), screenHeight, solidA, dark);
+			}
+		}
 	}
 
 	private static void drawDuelFrame(DrawContext context, com.mojang.blaze3d.pipeline.RenderPipeline pipeline, Identifier texture,

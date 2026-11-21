@@ -461,6 +461,31 @@ public final class WingsManager {
 	 * The model for a catalog id, loaded on first use. Null if it can't be - or, for a server-only pair,
 	 * until its mesh has downloaded (asked again next frame).
 	 */
+	/** Mesh + rig of pair {@code id} (worker thread); null while its texture (needed for the glow) is still downloading. */
+	private static WingModel buildModel(String id, WingType type) throws Exception {
+		WingModel model;
+		if (type.bundled()) {
+			model = WingModel.load(id, type.scale());
+		} else {
+			java.nio.file.Path file = net.veloclient.velo.client.cosmetics.CosmeticsCatalog.file(type.mesh());
+			if (file == null) {
+				return null;
+			}
+			try (InputStream in = java.nio.file.Files.newInputStream(file)) {
+				model = WingModel.read(in, id, type.scale());
+			}
+		}
+		WingRigs.Effect effect = WingRigs.effect(id);
+		WingRigs.Sampler texture = null;
+		if (effect != null && effect.glow() != null) {
+			texture = sampler(id, type);
+			if (texture == null && !type.bundled()) {
+				return null; // its glow is picked out of the texture, still downloading
+			}
+		}
+		return model.withRig(id, type.scale(), type.style() == Style.TENTACLE, texture);
+	}
+
 	public static synchronized WingModel model(String id) {
 		WingModel model = MODELS.get(id);
 		if (model != null || failedRecently(id)) {
@@ -471,27 +496,11 @@ public final class WingsManager {
 			return null;
 		}
 		try {
-			if (type.bundled()) {
-				model = WingModel.load(id, type.scale());
-			} else {
-				java.nio.file.Path file = net.veloclient.velo.client.cosmetics.CosmeticsCatalog.file(type.mesh());
-				if (file == null) {
-					return null;
-				}
-				try (InputStream in = java.nio.file.Files.newInputStream(file)) {
-					model = WingModel.read(in, id, type.scale());
-				}
+			// read and rigged on a worker (AsyncLoad): a new pair used to cost its mesh parse in the frame it first showed
+			model = net.veloclient.velo.client.cosmetics.AsyncLoad.poll("wingmodel:" + id, () -> buildModel(id, type));
+			if (model != null) {
+				MODELS.put(id, model);
 			}
-			WingRigs.Effect effect = WingRigs.effect(id);
-			WingRigs.Sampler texture = null;
-			if (effect != null && effect.glow() != null) {
-				texture = sampler(id, type);
-				if (texture == null && !type.bundled()) {
-					return null; // its glow is picked out of the texture, still downloading
-				}
-			}
-			model = model.withRig(id, type.scale(), type.style() == Style.TENTACLE, texture);
-			MODELS.put(id, model);
 		} catch (Exception e) {
 			FAILED.put(id, System.currentTimeMillis());
 			VeloClient.LOGGER.warn("Couldn't load wings {}", id, e);
@@ -539,7 +548,7 @@ public final class WingsManager {
 		if (type.bundled()) {
 			return Identifier.of("velo-client", "textures/cosmetics/wings/" + id + ".png");
 		}
-		return downloaded(type.texture(), "wings " + id, ChainWings.is(id));
+		return downloaded(type.texture(), "wings " + id, false);
 	}
 
 	/** The pair's still picture for cards (null until downloaded). Render thread only. */
@@ -566,8 +575,16 @@ public final class WingsManager {
 		if (file == null) {
 			return null;
 		}
-		try (InputStream in = java.nio.file.Files.newInputStream(file)) {
-			net.minecraft.client.texture.NativeImage image = net.minecraft.client.texture.NativeImage.read(in);
+		try {
+			// decoded on a worker; registered here (render thread) once it's ready
+			net.minecraft.client.texture.NativeImage image = net.veloclient.velo.client.cosmetics.AsyncLoad.poll("wingtex:" + sha, () -> {
+				try (InputStream in = java.nio.file.Files.newInputStream(file)) {
+					return net.minecraft.client.texture.NativeImage.read(in);
+				}
+			});
+			if (image == null) {
+				return null;
+			}
 			Identifier id = net.veloclient.velo.client.cosmetics.CapeManager.registerPreloadedTexture("wingtex_" + sha.substring(0, 24), image, label, smooth);
 			TEXTURES.put(sha, id);
 			return id;

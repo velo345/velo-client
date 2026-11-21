@@ -165,10 +165,39 @@ public final class PauseMenu {
 		}
 		float open = Math.min(1f, (System.nanoTime() - openedAt) / 320_000_000f);
 		float eased = 1f - (float) Math.pow(1f - open, 3);
-		int dimA = Math.round(0xD0 * eased);
-		int dimB = Math.round(0x59 * eased);
-		MenuKit.hGradient(context, 0, 0, Math.round(width * 0.55f), height, (dimA << 24) | 0x08080B, (dimB << 24) | 0x08080B);
-		context.fill(Math.round(width * 0.55f), 0, width, height, (dimB << 24) | 0x08080B);
+		// Customize: how dark (100 = Velo's default, up to twice as dark), the tint, and the side the menu is on
+		ScreenLook.Pause look = ScreenLook.pause();
+		float k = look.dim / 100f;
+		int dimA = Math.min(255, Math.round(0xD0 * eased * k));
+		int dimB = Math.min(255, Math.round(0x59 * eased * k * (k > 1f ? k : 1f)));
+		int tint = look.tint & 0xFFFFFF;
+		int split = Math.round(width * 0.55f);
+		boolean rightSide = look.align.equals("right") && !FabricLoader.getInstance().isModLoaded("essential");
+		if (rightSide) {
+			MenuKit.hGradient(context, width - split, 0, split, height, (dimB << 24) | tint, (dimA << 24) | tint);
+			context.fill(0, 0, width - split, height, (dimB << 24) | tint);
+		} else {
+			MenuKit.hGradient(context, 0, 0, split, height, (dimA << 24) | tint, (dimB << 24) | tint);
+			context.fill(split, 0, width, height, (dimB << 24) | tint);
+		}
+	}
+
+	/** Word colour of the menu rows (Customize), set per frame. */
+	private static int navColor = 0xFFE4E4E8;
+
+	/** The menu's panel in the chosen style. */
+	private static void panel(DrawContext context, int x, int y, int w, int h, String style) {
+		switch (style) {
+			case "solid" -> {
+				VeloDraw.shadow(context, x, y, w, h, 9, 14, 4, 0x55000000);
+				VeloDraw.fillRounded(context, x, y, w, h, 9, 0xF40E0C10);
+				VeloDraw.strokeRounded(context, x, y, w, h, 9, MenuKit.HAIRLINE);
+			}
+			case "clear" -> {
+				// just the words over the game
+			}
+			default -> MenuKit.panel(context, x, y, w, h, 9);
+		}
 	}
 
 	private static boolean hovered(int mouseX, int mouseY, ClickableWidget w) {
@@ -191,6 +220,15 @@ public final class PauseMenu {
 	}
 
 	public static void render(DrawContext context, int width, int height, int mouseX, int mouseY, Env env) {
+		MenuKit.accentOverride = ScreenLook.pause().accent;
+		try {
+			renderMenu(context, width, height, mouseX, mouseY, env);
+		} finally {
+			MenuKit.accentOverride = -1;
+		}
+	}
+
+	private static void renderMenu(DrawContext context, int width, int height, int mouseX, int mouseY, Env env) {
 		TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
 		for (ClickableWidget widget : RESTYLED) {
 			widget.visible = true;
@@ -303,26 +341,30 @@ public final class PauseMenu {
 			}
 		}
 
-		// ---- Left column ----
+		// ---- Left column (Customize: or on the right - never with Essential, its character needs the left half) ----
+		ScreenLook.Pause look = ScreenLook.pause();
+		boolean rightSide = look.align.equals("right") && !essentialMode;
+		int colX = rightSide ? width - margin - colW : margin;
+		navColor = look.color >= 0 ? 0xFF000000 | look.color : 0xFFE4E4E8;
 		context.getMatrices().pushMatrix();
-		context.getMatrices().translate(-30f * (1f - eased), 0f);
+		context.getMatrices().translate((rightSide ? 30f : -30f) * (1f - eased), 0f);
 		int y = top;
 		// The logo centred on the word's capitals (Sora at this size draws its caps 2..16 below y).
-		MenuKit.logo(context, margin, y, 18);
-		MenuKit.text(context, renderer, MenuKit.displayLg("Paused"), margin + 24, y, MenuKit.TEXT);
+		MenuKit.logo(context, colX, y, 18);
+		MenuKit.text(context, renderer, MenuKit.displayLg("Paused"), colX + 24, y, MenuKit.TEXT);
 		y += 24;
 
 		ClickableWidget back = byKey.get("menu.returnToGame");
 		int backH = compact ? 20 : 24;
 		if (back != null) {
-			place(back, margin, y, colW, backH);
+			place(back, colX, y, colW, backH);
 			float hover = MenuKit.hover(back, hovered(mouseX, mouseY, back));
 			int accent = MenuKit.accent();
-			VeloDraw.shadow(context, margin, y, colW, backH, 7, 10, 3, (accent & 0xFFFFFF) | 0x50000000);
-			VeloDraw.fillRounded(context, margin, y, colW, backH, 7, VeloAnim.lerpArgb(accent, VeloAnim.lerpArgb(accent, 0xFFFFFFFF, 0.12f), hover));
-			MenuKit.icon(context, "play", margin + 9, y + (backH - 10) / 2, 10, MenuKit.onAccent());
-			MenuKit.text(context, renderer, MenuKit.uiBold(label(back)), margin + 25, y + (backH - MenuKit.H_UI) / 2, MenuKit.onAccent());
-			MenuKit.keyHint(context, renderer, "ESC", margin + colW - 9, y + (backH - MenuKit.H_MONO) / 2, (MenuKit.onAccent() & 0xFFFFFF) | 0xB0000000);
+			VeloDraw.shadow(context, colX, y, colW, backH, 7, 10, 3, (accent & 0xFFFFFF) | 0x50000000);
+			VeloDraw.fillRounded(context, colX, y, colW, backH, 7, VeloAnim.lerpArgb(accent, VeloAnim.lerpArgb(accent, 0xFFFFFFFF, 0.12f), hover));
+			MenuKit.icon(context, "play", colX + 9, y + (backH - 10) / 2, 10, MenuKit.onAccent());
+			MenuKit.text(context, renderer, MenuKit.uiBold(label(back)), colX + 25, y + (backH - MenuKit.H_UI) / 2, MenuKit.onAccent());
+			MenuKit.keyHint(context, renderer, "ESC", colX + colW - 9, y + (backH - MenuKit.H_MONO) / 2, (MenuKit.onAccent() & 0xFFFFFF) | 0xB0000000);
 			y += backH + 8;
 		}
 
@@ -358,25 +400,25 @@ public final class PauseMenu {
 			rowH = Math.max(11, (panelBottomLimit - y - 8 - iconRowH - 14) / Math.max(1, rows.size() + serverRows.size() + modRows.size()));
 			needed = 8 + (rows.size() + serverRows.size() + modRows.size()) * rowH + (serverRows.isEmpty() ? 0 : 7) + (modRows.isEmpty() ? 0 : 7) + iconRowH;
 		}
-		MenuKit.panel(context, margin, y, colW, needed, 9);
+		panel(context, colX, y, colW, needed, look.panel);
 		int ry = y + 4;
 		for (Row row : rows) {
-			drawNavRow(context, renderer, row, margin + 4, ry, colW - 8, rowH, mouseX, mouseY);
+			drawNavRow(context, renderer, row, colX + 4, ry, colW - 8, rowH, mouseX, mouseY);
 			ry += rowH;
 		}
 		for (List<Row> group : List.of(serverRows, modRows)) {
 			if (group.isEmpty()) {
 				continue;
 			}
-			MenuKit.hairline(context, margin + 10, ry + 3, colW - 20);
+			MenuKit.hairline(context, colX + 10, ry + 3, colW - 20);
 			ry += 7;
 			for (Row row : group) {
-				drawNavRow(context, renderer, row, margin + 4, ry, colW - 8, rowH, mouseX, mouseY);
+				drawNavRow(context, renderer, row, colX + 4, ry, colW - 8, rowH, mouseX, mouseY);
 				ry += rowH;
 			}
 		}
 		if (!iconWidgets.isEmpty()) {
-			int ix = margin + 8;
+			int ix = colX + 8;
 			for (int i = 0; i < iconWidgets.size(); i++) {
 				ClickableWidget widget = iconWidgets.get(i);
 				if (widget instanceof HotspotButton hotspot) {
@@ -397,12 +439,12 @@ public final class PauseMenu {
 
 		if (leave != null) {
 			int ly = height - top - leaveH;
-			place(leave, margin, ly, colW, leaveH);
+			place(leave, colX, ly, colW, leaveH);
 			float hover = MenuKit.hover(leave, hovered(mouseX, mouseY, leave));
-			VeloDraw.fillRounded(context, margin, ly, colW, leaveH, 7, VeloAnim.lerpArgb(0x00000000, 0x24FF5A5F, hover));
-			VeloDraw.strokeRounded(context, margin, ly, colW, leaveH, 7, VeloAnim.lerpArgb(0x59FF5A5F, 0xFFFF5A5F, hover));
+			VeloDraw.fillRounded(context, colX, ly, colW, leaveH, 7, VeloAnim.lerpArgb(0x00000000, 0x24FF5A5F, hover));
+			VeloDraw.strokeRounded(context, colX, ly, colW, leaveH, 7, VeloAnim.lerpArgb(0x59FF5A5F, 0xFFFF5A5F, hover));
 			Text label = MenuKit.uiBold(label(leave));
-			MenuKit.text(context, renderer, label, margin + (colW - MenuKit.width(renderer, label)) / 2, ly + (leaveH - MenuKit.H_UI) / 2, MenuKit.RED_TEXT);
+			MenuKit.text(context, renderer, label, colX + (colW - MenuKit.width(renderer, label)) / 2, ly + (leaveH - MenuKit.H_UI) / 2, MenuKit.RED_TEXT);
 		}
 		// Vanilla's other leftovers (the other leave button when both exist) go under Disconnect's spot.
 		for (String key : List.of("menu.returnToMenu", "menu.disconnect")) {
@@ -416,8 +458,8 @@ public final class PauseMenu {
 
 		// ---- Right column: cards ----
 		int cardW = clamp(Math.round(width * 0.26f), 160, 210);
-		int cardX = essentialMode ? margin + colW + 16 : width - margin - cardW;
-		boolean room = cardX > margin + colW + 16 || essentialMode;
+		int cardX = essentialMode ? margin + colW + 16 : rightSide ? margin : width - margin - cardW;
+		boolean room = essentialMode || (rightSide ? cardX + cardW + 16 < colX : cardX > margin + colW + 16);
 		if (essentialMode) {
 			// Essential's character goes right next to the menu - it has to stay in the left half of the screen (see
 			// EssentialAnchors) - and the cards after it, when they fit before Essential's side menu; else they give way.
@@ -435,12 +477,12 @@ public final class PauseMenu {
 			}
 			anchorForEssential(anchors, plan);
 		}
-		if (!room) {
+		if (!room || !look.cards) {
 			hideCards();
 			return;
 		}
 		context.getMatrices().pushMatrix();
-		context.getMatrices().translate(30f * (1f - eased), 0f);
+		context.getMatrices().translate((rightSide ? -30f : 30f) * (1f - eased), 0f);
 		int cy = top;
 		cy = serverCard(context, renderer, cardX, cy, cardW);
 		cy += 8;
@@ -533,7 +575,7 @@ public final class PauseMenu {
 		int box = Math.min(12, h - 3);
 		VeloDraw.fillRounded(context, x + 4 + slide, y + (h - box) / 2, box, box, 3, 0x10FFFFFF);
 		MenuKit.icon(context, row.icon(), x + 4 + slide + (box - 8) / 2, y + (h - 8) / 2, 8, widget.active ? 0xFFC9C9D1 : 0xFF55555C);
-		int color = widget.active ? VeloAnim.lerpArgb(0xFFE4E4E8, 0xFFFFFFFF, hover) : 0xFF6E6E78;
+		int color = widget.active ? VeloAnim.lerpArgb(navColor, 0xFFFFFFFF, hover) : 0xFF6E6E78;
 		int maxLabel = w - box - 14 - (row.key() == null ? 4 : MenuKit.width(renderer, MenuKit.mono(row.key())) + 10);
 		MenuKit.text(context, renderer, MenuKit.fit(renderer, MenuKit.uiBold(row.label()), maxLabel), x + 4 + slide + box + 6, y + (h - MenuKit.H_UI) / 2, color);
 		MenuKit.keyHint(context, renderer, row.key(), x + w - 5, y + (h - MenuKit.H_MONO) / 2, MenuKit.TEXT_3);

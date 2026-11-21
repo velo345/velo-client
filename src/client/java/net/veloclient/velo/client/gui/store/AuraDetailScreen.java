@@ -142,10 +142,18 @@ public final class AuraDetailScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
-		for (int i = 0; i <= AuraEffects.RAINBOW; i++) {
+		for (int i = 0; i <= AuraEffects.RAINBOW + 1; i++) {
 			int sx = swatchX + i * (SWATCH + 5);
 			if (click.x() >= sx && click.x() < sx + SWATCH && click.y() >= swatchY && click.y() < swatchY + SWATCH) {
-				setColor(i);
+				if (i == AuraEffects.RAINBOW + 1) {
+					// any colour: Velo's colour picker
+					int current = AuraManager.settings(type.id()).color();
+					int start = AuraEffects.isCustom(current) ? current & 0xFFFFFF : 0x7A5CFF;
+					this.client.setScreen(new net.veloclient.velo.client.gui.VeloColorPickerScreen(this, "Aura colour", 0xFF000000 | start, false,
+							argb -> setColor(AuraEffects.custom(argb))));
+				} else {
+					setColor(i);
+				}
 				return true;
 			}
 		}
@@ -188,6 +196,15 @@ public final class AuraDetailScreen extends VeloWindow {
 			if (i == current) {
 				VeloDraw.strokeRounded(context, sx - 2, swatchY - 2, SWATCH + 4, SWATCH + 4, 5, 0xFFFFFFFF);
 			}
+		}
+		// the free choice after the rainbow: shows the picked colour, or a "+"
+		int cx = swatchX + (AuraEffects.RAINBOW + 1) * (SWATCH + 5);
+		boolean custom = AuraEffects.isCustom(current);
+		VeloDraw.fillRounded(context, cx, swatchY, SWATCH, SWATCH, 4, custom ? 0xFF000000 | (current & 0xFFFFFF) : 0xFF2A2A33);
+		if (!custom) {
+			context.drawTextWithShadow(this.textRenderer, "+", cx + (SWATCH - this.textRenderer.getWidth("+")) / 2 + 1, swatchY + (SWATCH - 8) / 2 + 1, 0xFFFFFFFF);
+		} else {
+			VeloDraw.strokeRounded(context, cx - 2, swatchY - 2, SWATCH + 4, SWATCH + 4, 5, 0xFFFFFFFF);
 		}
 		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(status, iw), ix, contentBottom() - 12, VeloStyle.text());
 	}

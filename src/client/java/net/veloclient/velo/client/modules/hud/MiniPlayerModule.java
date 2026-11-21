@@ -20,8 +20,8 @@ import java.util.List;
  * Bedrock Edition. It copies your pose (sneaking, swimming, gliding, swinging) because it is drawn from your own player.
  * "When Moving" shows it only while you move or turn and fades it out after a moment, the way Bedrock does.
  *
- * <p>Only drawn while no screen is open: two 3D player previews in one frame run 26.2's Vulkan device out of memory
- * (Locker, Store and R-Shift have their own), so screens get a flat placeholder instead.
+ * <p>Two 3D player previews in one frame run 26.2's Vulkan device out of memory, so on 26.2+ it only draws over screens
+ * that show no 3D player of their own (pause menu, chat, chests...) and steps aside in the others.
  */
 public final class MiniPlayerModule extends AbstractModule implements HudModule, Configurable {
 
@@ -30,6 +30,8 @@ public final class MiniPlayerModule extends AbstractModule implements HudModule,
 	private final HudPosition position = new HudPosition(0.015f, 0.14f);
 	private String show = "Always";
 	private double turn = 25;
+	/** How much the head follows you looking up / down, 0..100 %. */
+	private double headTilt = 100;
 	private double size = 1.0;
 	private boolean showBackground = false;
 
@@ -54,11 +56,17 @@ public final class MiniPlayerModule extends AbstractModule implements HudModule,
 		MinecraftClient client = MinecraftClient.getInstance();
 		int w = width();
 		int h = height();
-		boolean screenOpen = net.veloclient.velo.client.util.ClientCompat.currentScreen() != null;
-		if (client.player == null || screenOpen || net.veloclient.velo.client.hud.HudSample.active()) {
-			if (screenOpen || net.veloclient.velo.client.hud.HudSample.active()) {
-				placeholder(context, x, y, w, h);
-			}
+		var screen = net.veloclient.velo.client.util.ClientCompat.currentScreen();
+		if (net.veloclient.velo.client.hud.HudSample.active()) {
+			placeholder(context, x, y, w, h); // the HUD editor's sample
+			return;
+		}
+		if (client.player == null) {
+			return;
+		}
+		if (screen != null && !dollAllowedOver(screen)) {
+			// a screen that draws its own 3D player (inventory, Velo windows): a second one runs 26.2's Vulkan out of
+			// memory - the Mini Player just steps out of the way there (it used to show a stand-in sketch, which looked broken)
 			return;
 		}
 		float alpha = 1f;
@@ -88,7 +96,19 @@ public final class MiniPlayerModule extends AbstractModule implements HudModule,
 			VeloDraw.fillRounded(context, x, y, w, h, 6, net.veloclient.velo.client.gui.widget.VeloUi.withAlpha(0x90101014, Math.round(0x90 * alpha)));
 		}
 		int box = (int) Math.round(30 * size);
-		EntityPreviewWidget.drawDoll(context, x, y, x + w, y + h, box, (float) -turn);
+		EntityPreviewWidget.drawDoll(context, x, y, x + w, y + h, box, (float) -turn, (float) (headTilt / 100.0));
+	}
+
+	/** Screens over which the real 3D Mini Player can draw: ones that never show a 3D player themselves (on 26.2+). */
+	private static boolean dollAllowedOver(Object screen) {
+		//? if <26.2 {
+		return true;
+		//?} else {
+		/*return screen instanceof net.minecraft.client.gui.screens.PauseScreen || screen instanceof net.minecraft.client.gui.screens.ChatScreen
+				|| screen instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>
+				&& !(screen instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen)
+				&& !(screen instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen);
+		*///?}
 	}
 
 	private void placeholder(DrawContext context, int x, int y, int w, int h) {
@@ -118,6 +138,7 @@ public final class MiniPlayerModule extends AbstractModule implements HudModule,
 		return List.of(
 				new ConfigField.ChoiceField("Show", SHOW, () -> show, v -> show = v),
 				new ConfigField.SliderField("Turn", -180, 180, () -> turn, v -> turn = Math.round(v), v -> Math.round(v) + "°"),
+				new ConfigField.SliderField("Head Tilt", 0, 100, () -> headTilt, v -> headTilt = Math.round(v), v -> Math.round(v) + "%"),
 				new ConfigField.SliderField("Size", 0.6, 2.0, () -> size, v -> size = Math.round(v * 20) / 20.0, v -> Math.round(v * 100) + "%"),
 				new ConfigField.ToggleField("Show Background", () -> showBackground, v -> showBackground = v));
 	}

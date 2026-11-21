@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Nightly backup of everything Velo keeps: server data (SQLite copied safely while running), bot data, the website.
-# Keeps 14 days in /opt/velo/backups (the owner panel can download them). Secrets (/etc/velo) are NOT included.
+# Keeps 7 days in /opt/velo/backups (the owner panel can download them). Secrets (/etc/velo) are NOT included.
+# The download mirror (/var/www/velo-client.com/dl, ~2.6 GB of installers per release) is NOT backed up: it is a copy
+# of the GitHub releases and tools/release/mirror_release.sh rebuilds it. Backing it up made each backup 15 GB and
+# filled the disk (2026-11).
 set -euo pipefail
 umask 027
 DEST=/opt/velo/backups
@@ -14,8 +17,10 @@ for db in /opt/velo/server/data/*.db; do
 	python3 -I -c 'import sqlite3,sys; s=sqlite3.connect("file:"+sys.argv[1]+"?mode=ro", uri=True); d=sqlite3.connect(sys.argv[2]); s.backup(d); d.close(); s.close()' "$db" "$WORK/server-data/$(basename "$db")"
 done
 tar -C /opt/velo/server/data --exclude='*.db' --exclude='*.db-wal' --exclude='*.db-shm' -cf - . | tar -C "$WORK/server-data" -xf -
-tar -C "$WORK" -czf "$DEST/velo-$STAMP.tar.gz" server-data -C /opt/velo/bot bot-data -C /var/www velo-client.com
+tar -C "$WORK" -czf "$DEST/velo-$STAMP.tar.gz" server-data -C /opt/velo/bot bot-data -C /var/www --exclude='velo-client.com/dl' velo-client.com
 chgrp velo "$DEST/velo-$STAMP.tar.gz"
 chmod 640 "$DEST/velo-$STAMP.tar.gz"
-find "$DEST" -name 'velo-*.tar.gz' -mtime +14 -delete
+find "$DEST" -name 'velo-*.tar.gz' -mtime +6 -delete
+# empty / broken archives from a failed run (a full disk) never count as a backup
+find "$DEST" -name 'velo-*.tar.gz' -size -1k -mmin +60 -delete
 echo "backup $DEST/velo-$STAMP.tar.gz $(du -h "$DEST/velo-$STAMP.tar.gz" | cut -f1)"

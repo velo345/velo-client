@@ -38,10 +38,34 @@ public final class GuiCellMaskList<E> extends ArrayList<E> {
 		return (mask & cells(left, top, right, bottom)) != 0;
 	}
 
+	// The last rectangle's cells: one new element is tested against many lists in a row (render thread only).
+	private static int lastLeft, lastTop, lastRight, lastBottom, lastCellWidth, lastCellHeight;
+	private static long lastCells;
+
 	private long cells(int left, int top, int right, int bottom) {
 		if (right <= left || bottom <= top) {
 			return 0L;
 		}
+		if (left == lastLeft && top == lastTop && right == lastRight && bottom == lastBottom && cellWidth == lastCellWidth
+				&& cellHeight == lastCellHeight && Thread.currentThread() == RENDER) {
+			return lastCells;
+		}
+		long result = computeCells(left, top, right, bottom);
+		if (Thread.currentThread() == RENDER) {
+			lastLeft = left;
+			lastTop = top;
+			lastRight = right;
+			lastBottom = bottom;
+			lastCellWidth = cellWidth;
+			lastCellHeight = cellHeight;
+			lastCells = result;
+		}
+		return result;
+	}
+
+	private static final Thread RENDER = Thread.currentThread();
+
+	private long computeCells(int left, int top, int right, int bottom) {
 		int col0 = clamp(Math.floorDiv(left, cellWidth));
 		int col1 = clamp(Math.floorDiv(right - 1, cellWidth));
 		int row0 = clamp(Math.floorDiv(top, cellHeight));

@@ -131,14 +131,49 @@ public final class RewindAudio {
 
 	// ---- devices (the settings and the AI API list them) ----
 
-	private static List<String> systemCache;
-	private static long systemCacheAt;
+	private static volatile List<String> systemCache;
+	private static volatile List<String> micCache;
+	private static volatile long devicesAt;
+	private static final java.util.concurrent.atomic.AtomicBoolean listing = new java.util.concurrent.atomic.AtomicBoolean();
+
+	/**
+	 * The device lists for the settings, never waited for: listing them starts a program (pactl / FFmpeg) and asks every
+	 * Java Sound mixer - 40 ms to several hundred on the calling thread, and the profile save calls this (through the
+	 * settings) on the render thread every time something changes (spike recorder, 2026-11-21). The last lists come back
+	 * at once; a stale or missing one is refreshed in the background.
+	 */
+	public static void refreshDevicesSoon() {
+		if (System.currentTimeMillis() - devicesAt < 60_000 && systemCache != null && micCache != null) {
+			return;
+		}
+		if (listing.compareAndSet(false, true)) {
+			Thread.ofPlatform().daemon().name("velo-rewind-devices").start(() -> {
+				try {
+					systemCache = listSystemDevices();
+					micCache = listMicDevices();
+					devicesAt = System.currentTimeMillis();
+				} finally {
+					listing.set(false);
+				}
+			});
+		}
+	}
 
 	/** Sources "everything you hear" can be recorded from: PulseAudio / PipeWire sources (monitors first), DirectShow audio devices. */
-	public static synchronized List<String> systemDevices() {
-		if (systemCache != null && System.currentTimeMillis() - systemCacheAt < 60_000) {
-			return systemCache;
-		}
+	public static List<String> systemDevices() {
+		refreshDevicesSoon();
+		List<String> list = systemCache;
+		return list == null ? List.of() : list;
+	}
+
+	/** Microphones Java can record from. */
+	public static List<String> micDevices() {
+		refreshDevicesSoon();
+		List<String> list = micCache;
+		return list == null ? List.of() : list;
+	}
+
+	private static List<String> listSystemDevices() {
 		List<String> out = new ArrayList<>();
 		String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
 		try {
@@ -167,13 +202,10 @@ public final class RewindAudio {
 			}
 		} catch (Exception ignored) {
 		}
-		systemCache = out;
-		systemCacheAt = System.currentTimeMillis();
 		return out;
 	}
 
-	/** Microphones Java can record from. */
-	public static List<String> micDevices() {
+	private static List<String> listMicDevices() {
 		List<String> out = new ArrayList<>();
 		javax.sound.sampled.AudioFormat format = new javax.sound.sampled.AudioFormat(RATE, 16, 1, true, false);
 		for (var info : javax.sound.sampled.AudioSystem.getMixerInfo()) {

@@ -126,7 +126,7 @@ public final class AnimatedCapeAsset {
 			smooth();
 		}
 
-		/** A finished picture, sampled smoothly (Chain Wings' painted atlas). */
+		/** A finished picture, sampled smoothly (painted art rather than pixel art). */
 		public SmoothTexture(java.util.function.Supplier<String> name, NativeImage image) {
 			//? if <1.21.2 {
 			/*super(image);

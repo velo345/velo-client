@@ -136,6 +136,10 @@ public final class LauncherApp extends Application {
 	private static volatile String cliLaunch;
 
 	public static void main(String[] args) {
+		// A newer launcher unpacked by the installer-free update: start that one instead (before any window).
+		if (net.veloclient.launcher.launch.AppUpdate.hop(args)) {
+			return; // the newer version ran (and has ended)
+		}
 		mainAt = System.nanoTime();
 		LauncherLog.install();
 		// Linux: AWT (clipboard, browser fallback) must load the same GTK 3 as JavaFX - mixing in GTK 2 aborts the whole process.
@@ -297,6 +301,7 @@ public final class LauncherApp extends Application {
 		net.veloclient.launcher.ui.WindowPlacement.fitMinimumToScreen(stage, MIN_WIDTH, MIN_HEIGHT);
 		boolean firstStart = ensureDefaultProfile();
 		stage.show();
+		net.veloclient.launcher.launch.AppUpdate.started();
 		shownAt = System.nanoTime();
 		splash.intro(() -> {
 			try {
@@ -497,6 +502,12 @@ public final class LauncherApp extends Application {
 			steps.add(new Object[] {"02-profile", (Runnable) () -> showInstanceDetail(instances.get(0))});
 		}
 		steps.add(new Object[] {"03-settings", (Runnable) this::showSettings});
+		for (String customizeTab : List.of("title", "menu", "pause", "loading", "theme", "launcher")) {
+			steps.add(new Object[] {"03c-customize-" + customizeTab, (Runnable) () -> {
+				net.veloclient.launcher.ui.CustomizeView.tourTab(customizeTab);
+				showCustomize();
+			}});
+		}
 		steps.add(new Object[] {"04-cosmetics", (Runnable) this::showCosmetics});
 		steps.add(new Object[] {"04b-cosmetics-wings", (Runnable) () -> {
 			net.veloclient.launcher.ui.CosmeticsView.showWingsTab();
@@ -986,7 +997,7 @@ public final class LauncherApp extends Application {
 		return topBar;
 	}
 
-	private static final List<String> TAB_ORDER = List.of("home", "library", "servers", "locker", "store", "friends", "clips", "news", "settings");
+	private static final List<String> TAB_ORDER = List.of("home", "library", "servers", "locker", "store", "friends", "clips", "news", "customize", "settings");
 	/** Set by a top-bar tab click: which side the next page slides in from. */
 	private int navDirection;
 
@@ -1006,6 +1017,7 @@ public final class LauncherApp extends Application {
 			case "news" -> showNews();
 			case "clips" -> showMedia();
 			case "settings" -> showSettings();
+			case "customize" -> showCustomize();
 			case "friends" -> showFriends();
 			default -> showHome();
 		}
@@ -1043,6 +1055,8 @@ public final class LauncherApp extends Application {
 				{"Friends", "Page · friends & party", "chat party social", (Runnable) this::showFriends, "friends"},
 				{"Invite friends", "Earn Velo Coins", "referral code invite", (Runnable) this::showReferrals, "gift"},
 				{"Settings", "Page", "options preferences memory ram", (Runnable) this::showSettings, "settings"},
+				{"Customize", "Page · Velo+", "title screen pause menu escape loading screen background buttons font layout customize",
+						(Runnable) this::showCustomize, "palette"},
 				{"Report a bug", "Send the Velo team a bug report", "bug report problem broken issue feedback",
 						(Runnable) () -> net.veloclient.launcher.ui.BugReportDialog.show(stage), "bug"},
 				{"Themes", "Settings · colors", "theme colors appearance custom", (Runnable) this::showThemeEditor, "palette"},
@@ -1827,6 +1841,56 @@ public final class LauncherApp extends Application {
 		refreshLaunchBar();
 	}
 
+	/** Velo+ Customize: title screen, pause menu, loading screen and the Home background. */
+	private void showCustomize() {
+		currentPage = this::showCustomize;
+		setActivePage("customize");
+		setContent(net.veloclient.launcher.ui.CustomizeView.build(new net.veloclient.launcher.ui.CustomizeView.Host() {
+			@Override
+			public boolean plus() {
+				return net.veloclient.launcher.social.StoreApi.isPlusCached();
+			}
+
+			@Override
+			public void openPlus() {
+				showPlus();
+			}
+
+			@Override
+			public Node themeEditor() {
+				return ThemeEditorView.build(new ThemeEditorView.Host() {
+					@Override
+					public LauncherTheme activeTheme() {
+						return theme;
+					}
+
+					@Override
+					public void setActiveTheme(LauncherTheme newTheme) {
+						theme = newTheme;
+						ThemeStore.save(theme);
+						applyTheme();
+					}
+
+					@Override
+					public void rebuild() {
+						showCustomize();
+					}
+				});
+			}
+
+			@Override
+			public Color accent() {
+				return accentColor();
+			}
+
+			@Override
+			public javafx.stage.Window window() {
+				return stage;
+			}
+
+		}));
+	}
+
 	/** Settings > Appearance: the Velo+ Home background (a picture or GIF instead of the Ridgeline). */
 	private Node homeBackgroundRow() {
 		boolean plus = net.veloclient.launcher.social.StoreApi.isPlusCached();
@@ -1860,7 +1924,7 @@ public final class LauncherApp extends Application {
 			try {
 				net.veloclient.launcher.data.HomeBackground.set(file.toPath());
 				net.veloclient.launcher.ui.Toasts.show(pick, "Home background set");
-				showSettings();
+				currentPage.run(); // Settings or Customize - whichever shows this row
 			} catch (Exception ex) {
 				net.veloclient.launcher.ui.Toasts.show(pick, ex.getMessage());
 			}
@@ -1875,7 +1939,7 @@ public final class LauncherApp extends Application {
 			} catch (Exception ignored) {
 				// Nothing to remove.
 			}
-			showSettings();
+			currentPage.run(); // Settings or Customize - whichever shows this row
 		});
 		net.veloclient.launcher.ui.SettingsUi.row(holder, "Home background" + (plus ? "" : " · Velo+"),
 				plus ? "Your own picture or animated GIF behind the Home card" : "Velo+ members can put their own picture or GIF on Home",
@@ -4793,7 +4857,8 @@ public final class LauncherApp extends Application {
 
 	/** Runs {@code action} with a signed-in, non-expired session - signing in (or refreshing) first if needed. */
 	private void requireSignedIn(Consumer<MinecraftSession> action) {
-		if (session != null && !session.isAccessTokenExpired()) {
+		// hours of validity, not seconds: the game uses this token for every server join of the session
+		if (session != null && !session.tooShortForGame()) {
 			action.accept(session);
 			return;
 		}
@@ -5447,6 +5512,9 @@ public final class LauncherApp extends Application {
 							javafx.application.Platform.exit();
 							System.exit(0);
 						});
+					} else {
+						// handed to the system's package installer (Linux) - the status line says what to do
+						javafx.application.Platform.runLater(() -> h.busy(false));
 					}
 				} catch (Exception ex) {
 					LauncherLog.warn("Update from the pop-up failed", ex);

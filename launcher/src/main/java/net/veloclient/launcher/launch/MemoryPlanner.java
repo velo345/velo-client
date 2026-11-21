@@ -173,7 +173,7 @@ public final class MemoryPlanner {
 		if (instance != null) {
 			int mods = countJars(InstancePaths.modsDir(instance.id()));
 			if (mods > BUNDLED_MODS) {
-				need += (mods - BUNDLED_MODS) * 35;
+				need += (mods - BUNDLED_MODS) * 45; // 2026-11-16: big modpacks (100-160 mods) ran short at 35
 				reasons.add(mods + " mods installed");
 			}
 			int renderDistance = readRenderDistance(InstancePaths.gameDir(instance.id()));

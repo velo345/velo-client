@@ -67,6 +67,7 @@ public final class VeloProfileManager {
 	}
 
 	public static Optional<VeloProfile> loadByName(String name) {
+		flushPending(); // a save still on its way must land before the file is read
 		return load(fileFor(name));
 	}
 
@@ -84,11 +85,61 @@ public final class VeloProfileManager {
 
 	public static void save(VeloProfile profile) {
 		VeloPaths.ensureDirectories();
-		try (Writer writer = Files.newBufferedWriter(fileFor(profile.name()), StandardCharsets.UTF_8)) {
-			GSON.toJson(profile, writer);
+		Path target = fileFor(profile.name());
+		// written next to it and moved over: a crash or a full disk mid-write used to leave a cut-off profile
+		Path tmp = target.resolveSibling(target.getFileName() + ".tmp");
+		try {
+			try (Writer writer = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
+				GSON.toJson(profile, writer);
+			}
+			try {
+				Files.move(tmp, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+			} catch (java.nio.file.AtomicMoveNotSupportedException e) {
+				Files.move(tmp, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+			}
 		} catch (IOException e) {
 			throw new RuntimeException("Failed to save profile " + profile.name(), e);
 		}
+	}
+
+	private static final java.util.concurrent.atomic.AtomicReference<VeloProfile> PENDING = new java.util.concurrent.atomic.AtomicReference<>();
+	private static final java.util.concurrent.ExecutorService WRITER = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+		Thread t = new Thread(r, "velo-profile-save");
+		t.setDaemon(true);
+		return t;
+	});
+
+	/**
+	 * {@link #save} on a background thread: the caller (the render thread - module toggles, HUD moves, settings) only
+	 * hands over the captured profile. Several saves in a row write once, the newest. Serialising and writing every
+	 * module's settings there was a hitch on slow disks / with antivirus scanning each write.
+	 */
+	public static void saveLater(VeloProfile profile) {
+		if (PENDING.getAndSet(profile) == null) {
+			WRITER.execute(VeloProfileManager::writePending);
+		}
+	}
+
+	static {
+		// the writer is a daemon thread: whatever is still waiting when the JVM ends is written first
+		Runtime.getRuntime().addShutdownHook(new Thread(VeloProfileManager::flushPending, "velo-profile-flush"));
+	}
+
+	private static synchronized void writePending() {
+		VeloProfile profile = PENDING.getAndSet(null);
+		if (profile == null) {
+			return;
+		}
+		try {
+			save(profile);
+		} catch (RuntimeException e) {
+			org.slf4j.LoggerFactory.getLogger("velo-client").warn("Couldn't save the Velo profile", e);
+		}
+	}
+
+	/** Game closing: whatever is still waiting is written now (on this thread). */
+	public static void flushPending() {
+		writePending();
 	}
 
 	public static void delete(String name) {

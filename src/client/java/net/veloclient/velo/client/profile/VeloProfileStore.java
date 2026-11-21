@@ -70,7 +70,8 @@ public final class VeloProfileStore {
 			return; // the dev screenshot tour shares ~/.velo-client with the real game - never persist its demo state
 		}
 		String name = VeloProfileManager.activeName();
-		VeloProfileManager.save(captureCurrent(name));
+		// captured here (the live modules), written on a background thread
+		VeloProfileManager.saveLater(captureCurrent(name));
 	}
 
 	/**

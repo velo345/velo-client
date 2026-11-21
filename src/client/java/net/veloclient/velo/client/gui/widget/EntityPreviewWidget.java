@@ -124,6 +124,18 @@ public final class EntityPreviewWidget extends ClickableWidget {
 	 * this preview, so skin, armour and every Velo cosmetic show exactly as in-world. The box is mapped through the current
 	 * pose by hand, since the entity is a picture-in-picture element that ignores it (scaled HUD elements).
 	 */
+	/** How much of the player's real head tilt (looking up / down) the doll copies, 0..1 - Mini Player's "Head Tilt". */
+	private static float dollPitch = 1f;
+
+	public static void drawDoll(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees, float headTilt) {
+		dollPitch = Math.max(0f, Math.min(1f, headTilt));
+		try {
+			drawDoll(context, x1, y1, x2, y2, size, yawDegrees);
+		} finally {
+			dollPitch = 1f;
+		}
+	}
+
 	public static void drawDoll(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees) {
 		var player = MinecraftClient.getInstance().player;
 		if (player == null) {
@@ -260,7 +272,7 @@ public final class EntityPreviewWidget extends ClickableWidget {
 			living.hurt = hurtNow;
 			living.bodyYaw = 180f + yawDegrees;
 			living.relativeHeadYaw = 0f;
-			living.pitch = living.pose == EntityPose.GLIDING ? 0f : living.pitch;
+			living.pitch = living.pose == EntityPose.GLIDING ? 0f : living.pitch * dollPitch;
 		}
 		// entity.getHeight() rather than the render state's own dimension
 		// field - a normal player is never custom-scaled, so there's
@@ -315,7 +327,7 @@ public final class EntityPreviewWidget extends ClickableWidget {
 			living.hasRedOverlay = hurtNow;
 			living.bodyRot = 180f + yawDegrees;
 			living.yRot = 0f;
-			living.xRot = living.pose == Pose.FALL_FLYING ? 0f : living.xRot;
+			living.xRot = living.pose == Pose.FALL_FLYING ? 0f : living.xRot * dollPitch;
 		}
 		Vector3f position = new Vector3f(0, entity.getBbHeight() / 2f, 0);
 		context.entity(state, (float) size, position, worldRotation, tilt, x1, y1, x2, y2);

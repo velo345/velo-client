@@ -226,6 +226,8 @@ public final class CloudSync {
 		Runnable flush = () -> {
 			try {
 				net.veloclient.velo.client.profile.VeloProfileStore.saveActive();
+				// saving is asynchronous now: the backup reads the file right after, so write it out here
+				net.veloclient.velo.profile.VeloProfileManager.flushPending();
 				writeOptions();
 			} catch (Throwable t) {
 				VeloClient.LOGGER.debug("Couldn't flush settings before a backup", t);

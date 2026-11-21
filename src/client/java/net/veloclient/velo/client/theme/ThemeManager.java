@@ -29,8 +29,40 @@ public final class ThemeManager {
 	public static synchronized Theme active() {
 		if (active == null) {
 			load();
+			stamp = stamp();
+		} else {
+			// the launcher's theme editor (Customize / Settings) writes the same files: pick changes up live, once a second
+			long now = System.nanoTime();
+			if (now - checkedAt > 1_000_000_000L) {
+				checkedAt = now;
+				long current = stamp();
+				if (current != stamp) {
+					stamp = current;
+					customThemes = null;
+					load();
+				}
+			}
 		}
 		return active;
+	}
+
+	private static long stamp;
+	private static long checkedAt;
+
+	/** Last-modified of theme.json and the custom themes file together. */
+	private static long stamp() {
+		long sum = 0;
+		for (String name : new String[] {"theme.json", "custom-themes.json"}) {
+			try {
+				java.nio.file.Path p = net.veloclient.velo.config.VeloPaths.config().resolve(name);
+				if (java.nio.file.Files.exists(p)) {
+					sum = sum * 31 + java.nio.file.Files.getLastModifiedTime(p).toMillis();
+				}
+			} catch (Exception ignored) {
+				// unreadable: no change
+			}
+		}
+		return sum;
 	}
 
 	public static synchronized void setActive(Theme theme) {
@@ -138,6 +170,7 @@ public final class ThemeManager {
 
 	private static void save() {
 		ConfigManager.save(CONFIG_ID, new Persisted(active.name(), moduleColorOverrides));
+		stamp = stamp(); // our own write isn't a change to reload
 	}
 
 	private record Persisted(String themeName, Map<String, Integer> moduleColorOverrides) {

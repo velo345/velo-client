@@ -187,7 +187,28 @@ public final class KillFxLockerScreen extends VeloWindow implements net.veloclie
 						select(selected);
 					}
 				}));
+			}	// the free choice after the swatches: Velo's colour picker
+			int cx = px + (free ? last : last + 1) * (SWATCH + 4);
+			int customNow = free ? KillFxManager.freeColor() & 0xFFFFFF : AuraEffects.isCustom(current) ? current & 0xFFFFFF : -1;
+			boolean customChosen = free ? java.util.Arrays.stream(AuraEffects.PALETTE).noneMatch(p -> p == (KillFxManager.freeColor() & 0xFFFFFF))
+					: AuraEffects.isCustom(current);
+			VeloDraw.fillRounded(context, cx, sy, SWATCH, SWATCH, 4, customChosen && customNow >= 0 ? 0xFF000000 | customNow : 0xFF2A2A33);
+			if (customChosen) {
+				VeloDraw.strokeRounded(context, cx - 2, sy - 2, SWATCH + 4, SWATCH + 4, 5, 0xFFFFFFFF);
+			} else {
+				MenuKit.text(context, this.textRenderer, MenuKit.uiBold("+"), cx + (SWATCH - 5) / 2, sy + (SWATCH - 8) / 2, 0xFFFFFFFF);
 			}
+			String target = selected;
+			hits.add(new Hit(cx, sy, SWATCH, SWATCH, () -> {
+				int start = customNow >= 0 ? customNow : 0xFF4D6D;
+				this.client.setScreen(new VeloColorPickerScreen(this, "Kill effect colour", 0xFF000000 | start, false, argb -> {
+					if (free) {
+						KillFxManager.setFreeColor(0xFF000000 | (argb & 0xFFFFFF));
+					} else {
+						KillFxManager.setColor(target, AuraEffects.custom(argb));
+					}
+				}));
+			}));
 		}
 		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(status), pw), px, y + 134, MenuKit.TEXT_2);
 		renderGrid(context, px, pw, y + 156, mouseX, mouseY);

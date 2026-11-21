@@ -2795,24 +2795,6 @@
 				"preview": "pets/reindeer_preview.jpg"
 			},
 			"rev": 1
-		},
-		{
-			"id": "wings_chainwings",
-			"type": "wings",
-			"name": "Chain Wings",
-			"description": "Neon crimson blade wings with a chrome ornament - plasma flows from the root out into the tips, chains with sickle blades swing as you move. Recolour them in the Locker.",
-			"price": 4200,
-			"status": "hidden",
-			"collection": "relics",
-			"accent": "#c3122b",
-			"style": "feathered",
-			"scale": 1.25,
-			"glow": true,
-			"files": {
-				"mesh": "wings/chainwings.vmesh",
-				"texture": "wings/chainwings.png",
-				"preview": "wings/chainwings_preview.png"
-			}
 		}
 	]
 }

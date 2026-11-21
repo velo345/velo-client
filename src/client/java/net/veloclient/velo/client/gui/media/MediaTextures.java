@@ -64,7 +64,7 @@ public final class MediaTextures {
 		return null;
 	}
 
-	static Tex register(NativeImage image, String name) {
+	public static Tex register(NativeImage image, String name) {
 		Identifier id = Identifier.of("velo-client", "media/" + (counter++));
 		MinecraftClient.getInstance().getTextureManager().registerTexture(id, new NativeImageBackedTexture(() -> name, image));
 		return new Tex(id, image.getWidth(), image.getHeight());

@@ -150,8 +150,29 @@ public final class AuraDetailView {
 			cells[i] = cell;
 			swatches.getChildren().add(cell);
 		}
+		// any colour: the picker after the swatches (stored as AuraEffects.custom(rgb) - other Velo players see it too)
+		javafx.scene.control.ColorPicker picker = new javafx.scene.control.ColorPicker();
+		picker.getStyleClass().add("button");
+		picker.setPrefWidth(110);
+		picker.setTooltip(new javafx.scene.control.Tooltip("Any colour"));
+		int startColour = current[0].color();
+		if (AuraEffects.isCustom(startColour)) {
+			int rgb = startColour & 0xFFFFFF;
+			picker.setValue(javafx.scene.paint.Color.rgb((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255));
+		}
+		picker.setOnAction(e -> {
+			javafx.scene.paint.Color c = picker.getValue();
+			int rgb = ((int) Math.round(c.getRed() * 255) << 16) | ((int) Math.round(c.getGreen() * 255) << 8) | (int) Math.round(c.getBlue() * 255);
+			AuraEffects.Settings s = current[0];
+			current[0] = new AuraEffects.Settings(s.size(), s.speed(), s.density(), AuraEffects.custom(rgb));
+			live.accept(current[0]);
+			AuraCatalog.setSettings(id, current[0]);
+			mark.run();
+		});
+		swatches.getChildren().add(picker);
+		swatches.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 		mark.run();
-		Label note = new Label("Saved for the game - it picks them up the next time it starts.");
+		Label note = new Label("Changes show in the game right away - other Velo players see your colour too.");
 		note.getStyleClass().add("stage-hint");
 		note.setWrapText(true);
 		box.getChildren().addAll(colourLabel, swatches, note);

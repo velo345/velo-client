@@ -913,7 +913,7 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		}
 		if (net.veloclient.velo.client.cosmetics.wings.WingRigs.recolorable(selectedWings)) {
 			// Colour: the hues round the wheel, then white, then a cycling rainbow.
-			// Pairs with their own colour (grey art, e.g. Chain Wings) start the slider at "Own".
+			// Pairs with their own colour (grey art) start the slider at "Own".
 			boolean own = net.veloclient.velo.client.cosmetics.wings.WingRigs.ownTint(selectedWings) >= 0;
 			addDrawableChild(new net.veloclient.velo.client.gui.widget.VeloSlider(gridX, y + 3 * 24, listWidth, 20, "Colour", own ? 0 : 1,
 					net.veloclient.velo.client.cosmetics.wings.WingRigs.TINT_RAINBOW, () -> {

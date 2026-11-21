@@ -28,7 +28,10 @@ import java.util.List;
  */
 public final class MotionBlurModule extends AbstractModule implements Configurable {
 
-	//? if >=26.1 {
+	//? if >=26.3 {
+	/*// 26.3 compiles shaders to SPIR-V: its own copies with layout locations (the plain ones failed -> black screen)
+	private static final Identifier EFFECT = Identifier.of("velo-client", "motion_blur_spirv");
+	*///?} else if >=26.1 {
 	/*private static final Identifier EFFECT = Identifier.of("velo-client", "motion_blur");
 	*///?} else {
 	private static final Identifier EFFECT = Identifier.of("velo-client", "motion_blur_notrail");

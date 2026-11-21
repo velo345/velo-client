@@ -28,16 +28,16 @@ jobs:
         include:
           - os: ubuntu-latest
             # .deb for Debian/Ubuntu, .tar.gz (app folder + runtime) for Arch (packaging/aur) and other distros
-            asset-glob: launcher/build/jpackage-dist/*.deb launcher/build/jpackage-dist/*.tar.gz
+            asset-glob: launcher/build/jpackage-dist/*.deb launcher/build/jpackage-dist/*.tar.gz launcher/build/jpackage-dist/*-app-*.zip
           - os: windows-latest
-            asset-glob: launcher/build/jpackage-dist/*.exe
+            asset-glob: launcher/build/jpackage-dist/*.exe launcher/build/jpackage-dist/*-app-*.zip
           # macOS: one runner per CPU, since jpackage bundles the JDK that runs it -
           # macos-latest is Apple Silicon (arm64), macos-15-intel is Intel (x64).
           # launcher/build.gradle names the results ...-macos-arm64.dmg / ...-macos-x64.dmg.
           - os: macos-latest
-            asset-glob: launcher/build/jpackage-dist/*.dmg
+            asset-glob: launcher/build/jpackage-dist/*.dmg launcher/build/jpackage-dist/*-app-*.zip
           - os: macos-15-intel
-            asset-glob: launcher/build/jpackage-dist/*.dmg
+            asset-glob: launcher/build/jpackage-dist/*.dmg launcher/build/jpackage-dist/*-app-*.zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

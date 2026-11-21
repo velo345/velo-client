@@ -153,6 +153,27 @@ public final class AuraEffects {
 	public static final int[] PALETTE = {0xFF4D4D, 0xFF8A1F, 0xFFD84D, 0x5CFF7A, 0x3FF0FF, 0x4D7CFF, 0xA65CFF, 0xFF4FD8, 0xF4F6FF};
 	public static final String[] PALETTE_NAMES = {"Red", "Orange", "Gold", "Green", "Cyan", "Blue", "Purple", "Pink", "White"};
 	public static final int RAINBOW = PALETTE.length + 1;
+	/**
+	 * A colour picked freely (2026-11-16): the RGB value with this bit set. Older clients clamp anything above
+	 * {@link #RAINBOW} to 0, so they simply show the effect's own colours instead of breaking.
+	 */
+	public static final int CUSTOM = 0x1000000;
+
+	public static int custom(int rgb) {
+		return CUSTOM | (rgb & 0xFFFFFF);
+	}
+
+	public static boolean isCustom(int color) {
+		return (color & CUSTOM) != 0;
+	}
+
+	/** The RGB a colour setting shows as (for swatches): the palette entry, the custom colour, or -1 for own/rainbow. */
+	public static int rgbOf(int color) {
+		if (isCustom(color)) {
+			return color & 0xFFFFFF;
+		}
+		return color >= 1 && color <= PALETTE.length ? PALETTE[color - 1] : -1;
+	}
 
 	/**
 	 * How an aura is worn: {@code size} (0.5-1.6), {@code speed} (0.25-2.5), {@code density} (0.25-2),
@@ -165,7 +186,7 @@ public final class AuraEffects {
 			size = clamp(size, 0.5f, 1.6f, 1f);
 			speed = clamp(speed, 0.25f, 2.5f, 1f);
 			density = clamp(density, 0.25f, 2f, 1f);
-			color = color < 0 || color > RAINBOW ? 0 : color;
+			color = isCustom(color) ? custom(color) : color < 0 || color > RAINBOW ? 0 : color;
 		}
 
 		private static float clamp(float v, float min, float max, float fallback) {
@@ -398,6 +419,10 @@ public final class AuraEffects {
 	public static int color(int[] defaults, Settings s, float f, float hueSeed, float time) {
 		if (s.color() == RAINBOW) {
 			return hsv((hueSeed * 0.37f + time * 0.08f) % 1f, 0.75f, 1f);
+		}
+		if (isCustom(s.color())) {
+			int base = s.color() & 0xFFFFFF;
+			return mix(base, mix(base, 0xFFFFFF, 0.45f), 1 - f);
 		}
 		if (s.color() > 0) {
 			int base = PALETTE[s.color() - 1];

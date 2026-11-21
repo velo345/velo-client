@@ -34,6 +34,8 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 
 	private String style = VANILLA;
 	/** Per frame, set by {@link #render}: the vanilla sprites are being recoloured (and whether the world is hardcore). */
+	/** Step aside when the server's resource pack restyles or hides this bar (MCC Island and others). */
+	private boolean serverWins = true;
 	private boolean vanillaLook;
 	private boolean hardcore;
 	private int heartColor = 0xFFE3262B;
@@ -62,6 +64,9 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 		HeartsModule module = active();
 		if (module == null) {
 			return false;
+		}
+		if (module.serverWins && net.veloclient.velo.client.hud.ServerHudPack.overridesHearts()) {
+			return false; // the server's pack styles or hides this bar itself
 		}
 		if (module.vanillaForEffects && hasSpecialHearts(player)) {
 			return false;
@@ -186,6 +191,7 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
+				new ConfigField.ToggleField("Use the Server's Hearts When Its Pack Has Its Own", () -> serverWins, v -> serverWins = v),
 				new ConfigField.ChoiceField("Style", STYLES, () -> style, v -> style = "Recolored".equals(v) ? VANILLA : v),
 				new ConfigField.ColorField("Heart Color", () -> heartColor, v -> heartColor = v, false),
 				new ConfigField.ColorField("Absorption Color", () -> absorptionColor, v -> absorptionColor = v, false),

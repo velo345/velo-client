@@ -365,6 +365,37 @@ final class StaffRoutes {
 		return out;
 	}
 
+	private record RoleMember(String discordId, String role) {
+	}
+
+	private record RoleSyncRequest(List<RoleMember> members) {
+	}
+
+	/** The bot's list of partner / creator role holders (Discord ids): linked ones get Velo+ while they have the role. */
+	static void registerRolePlus(HttpServer server, DiscordLinks links, RolePlus rolePlus, String adminToken) {
+		admin(server, adminToken, "/v1/admin/roles/plus", ex -> {
+			RoleSyncRequest r = JsonHttp.readBody(ex, RoleSyncRequest.class);
+			Map<String, String> fresh = new LinkedHashMap<>();
+			if (r.members() != null) {
+				for (RoleMember m : r.members()) {
+					DiscordLinks.Link link = links.byDiscordId(m.discordId());
+					if (link != null && m.role() != null) {
+						fresh.putIfAbsent(link.uuid(), m.role());
+					}
+				}
+			}
+			int[] changes = rolePlus.replace(fresh);
+			if (changes[0] > 0 || changes[1] > 0) {
+				System.out.println("[role-plus] Velo+ by role: " + fresh.size() + " (+" + changes[0] + " / -" + changes[1] + ")");
+			}
+			Map<String, Object> out = new LinkedHashMap<>();
+			out.put("members", fresh.size());
+			out.put("added", changes[0]);
+			out.put("removed", changes[1]);
+			JsonHttp.writeJson(ex, 200, out);
+		});
+	}
+
 	private static void admin(HttpServer server, String adminToken, String path, Admin handler) {
 		server.createContext(path, exchange -> VeloServerApp.handle(exchange, "POST", ex -> {
 			String header = ex.getRequestHeaders().getFirst("X-Velo-Admin-Token");

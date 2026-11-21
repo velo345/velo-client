@@ -228,7 +228,13 @@ final class Passkeys {
 		}
 		p.signCount = count;
 		p.lastUsed = System.currentTimeMillis();
-		save(list);
+		try {
+			save(list);
+		} catch (IOException e) {
+			// The signature checked out: a full disk (2026-11-18) must not lock the owner out - only "last used" and the
+			// counter weren't stored, which costs nothing (synced passkeys keep the counter at 0 anyway).
+			System.out.println("[panel] passkey sign-in: couldn't store last use (" + e.getMessage() + ") - signed in anyway");
+		}
 		return p.username;
 	}
 

@@ -91,7 +91,10 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				client -> net.veloclient.velo.client.cosmetics.LockerFileSync.tick());
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(
-				client -> net.veloclient.velo.client.cloud.CloudSync.onStop());
+				client -> {
+					net.veloclient.velo.client.cloud.CloudSync.onStop();
+					net.veloclient.velo.profile.VeloProfileManager.flushPending();
+				});
 		// The launcher's Stop / Relaunch asks the game to close instead of killing it (saves the world).
 		net.veloclient.velo.client.util.CloseRequest.register();
 		// Your real ping (tab list row, Ping HUD) - servers often send fake per-player pings.
@@ -111,6 +114,9 @@ public final class VeloClientMod implements ClientModInitializer {
 		VeloKeybinds.register();
 		net.veloclient.velo.client.keybind.MenuKeySync.register();
 		net.veloclient.velo.client.util.ClassWarmup.register();
+		net.veloclient.velo.client.util.FontWarmup.register();
+		net.veloclient.velo.client.util.StuckButtons.register();
+		net.veloclient.velo.client.report.FreezeWatchdog.register();
 		net.veloclient.velo.client.util.MemoryStatsRecorder.start();
 		CapeFeatureRenderer.register();
 		net.veloclient.velo.client.cosmetics.render.WingsFeatureRenderer.register();
@@ -269,6 +275,9 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
 			net.fabricmc.fabric.api.client.screen.v1.ScreenEvents.afterRender(screen).register((s, context, mouseX, mouseY, tickDelta) -> {
 				net.veloclient.velo.client.modules.qol.ShulkerPreview.render(s, context, mouseX, mouseY);
+				if (net.veloclient.velo.client.util.MenuWarmup.isLoadingScreen(s)) {
+					net.veloclient.velo.client.util.MenuWarmup.afterLoadingFrame(s, context);
+				}
 				net.veloclient.velo.client.social.NotificationOverlay.renderOverScreen(s, context, mouseX, mouseY);
 			});
 			//? if <1.21.2 {
@@ -346,9 +355,11 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.ServerDisplayModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.CustomLinesModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.hud.CustomImageModule());
-		ModuleRegistry.register(new net.veloclient.velo.client.youtube.YouTubeModule());
+		// the Video Player became the Velo Browser (same module id: it keeps its on/off state)
+		ModuleRegistry.register(new net.veloclient.velo.client.browser.BrowserModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.lyrics.LyricsModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.TotemPopsModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.NoTotemPopModule());
 		ModuleRegistry.register(new KeystrokesModule());
 		ModuleRegistry.register(new MouseButtonsModule());
 		net.veloclient.velo.client.worldmap.WorldMap.register();
@@ -401,6 +412,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new TntTimerModule());
 		ModuleRegistry.register(new BlockOutlineModule());
 		ModuleRegistry.register(new TimeWeatherFogModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.ClearLiquidsModule());
 
 		// Cosmetics (section 6.5)
 		ModuleRegistry.register(new CapeCosmeticsModule());

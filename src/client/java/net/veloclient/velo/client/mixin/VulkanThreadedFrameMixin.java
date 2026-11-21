@@ -32,6 +32,9 @@ public abstract class VulkanThreadedFrameMixin {
 		}
 	}
 
+	@org.spongepowered.asm.mixin.Shadow
+	private boolean windowSurfaceNeedsReconfiguring;
+
 	@WrapOperation(method = "renderFrame", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/GpuSurface;acquireNextTexture()V"))
 	private void velo$acquireLateWhilePresenting(GpuSurface surface, Operation<Void> original) {
 		ThreadedPresent.beginFrame();
@@ -39,7 +42,19 @@ public abstract class VulkanThreadedFrameMixin {
 			return;
 		}
 		long start = System.nanoTime();
-		original.call(surface);
+		try {
+			original.call(surface);
+		} catch (IllegalStateException e) {
+			// The last frame's present (on the present thread) found the swapchain out of date - minimizing or resizing -
+			// after this frame's "reconfigure?" check already ran. Vanilla presents on this thread and never sees that race.
+			// Skip this frame (nothing acquired = no blit, no present) and reconfigure on the next one, exactly like a resize.
+			// Bug reports 2026-11-20: "Attempt to use out of date swapchain" crash, game closing on minimize.
+			if (e.getMessage() == null || !e.getMessage().toLowerCase(java.util.Locale.ROOT).contains("out of date")) {
+				throw e;
+			}
+			windowSurfaceNeedsReconfiguring = true;
+			return;
+		}
 		ThreadedPresent.recordAcquire(System.nanoTime() - start);
 	}
 }

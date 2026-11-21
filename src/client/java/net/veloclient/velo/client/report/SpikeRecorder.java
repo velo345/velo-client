@@ -110,7 +110,12 @@ public final class SpikeRecorder {
 	}
 
 	/** Every rendered frame (end of GameRenderer#render). */
+	/** Dev: -Dvelo.frameLog=true logs every frame over 30 ms while recording (with the open screen). */
+	private static final boolean FRAME_LOG = Boolean.getBoolean("velo.frameLog");
+	private static final float FRAME_LOG_MS = Float.parseFloat(System.getProperty("velo.frameLogMs", "30"));
+
 	public static void frame() {
+		FreezeWatchdog.beat();
 		if (!recording) {
 			return;
 		}
@@ -121,6 +126,11 @@ public final class SpikeRecorder {
 				frameEnd = Arrays.copyOf(frameEnd, frameMs.length);
 			}
 			frameMs[frames] = (now - lastFrameNano) / 1_000_000f;
+			if (FRAME_LOG && frameMs[frames] > FRAME_LOG_MS) {
+				VeloClient.LOGGER.info("spike-probe frame {} ms at {} s, screen {}", frameMs[frames], (now - baseNano) / 1e9,
+						net.veloclient.velo.client.util.ClientCompat.currentScreen() == null ? "none"
+								: net.veloclient.velo.client.util.ClientCompat.currentScreen().getClass().getSimpleName());
+			}
 			frameEnd[frames] = baseEpochNanos + (now - baseNano);
 			frames++;
 		}

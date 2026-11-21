@@ -759,21 +759,21 @@ public final class VeloBot extends ListenerAdapter {
 	/** Leaving the server or losing a staff role ends staff perks right away instead of at the next 5-minute sync. */
 	@Override
 	public void onGuildMemberRemove(GuildMemberRemoveEvent event) {
-		if (staff != null && !config.staffRoles.isEmpty()) {
+		if (staff != null) {
 			staff.soon();
 		}
 	}
 
 	@Override
 	public void onGuildMemberRoleRemove(GuildMemberRoleRemoveEvent event) {
-		if (staff != null && event.getRoles().stream().anyMatch(r -> config.staffRoles.containsKey(r.getId()))) {
+		if (staff != null && event.getRoles().stream().anyMatch(r -> config.staffRoles.containsKey(r.getId()) || config.plusRoles.containsKey(r.getId()))) {
 			staff.soon();
 		}
 	}
 
 	@Override
 	public void onGuildMemberRoleAdd(GuildMemberRoleAddEvent event) {
-		if (staff != null && event.getRoles().stream().anyMatch(r -> config.staffRoles.containsKey(r.getId()))) {
+		if (staff != null && event.getRoles().stream().anyMatch(r -> config.staffRoles.containsKey(r.getId()) || config.plusRoles.containsKey(r.getId()))) {
 			staff.soon();
 		}
 	}

@@ -126,7 +126,9 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	// "Default" out of the box: it only turns VSync off and leaves the player's own video settings
 	// alone. "High Quality" as the default raised the view distance to 16 (and clouds, shadows,
 	// mipmaps...) on every launch, so a fresh install ran heavier than the settings the player chose.
-	private String preset = "Default";
+	// New installs start on Auto (2026-11-16): it adapts to the PC - lowers quality only while the FPS drop, never touches
+	// the view distance. Saved profiles keep whatever they had ("Default" stays "Default").
+	private String preset = "Auto";
 	/** Set while the saved profile is applied (fields first, then enable): onEnable must not re-apply the preset then. */
 	private long restoredFromProfileNanos;
 	private int autoTargetFps = 60;
@@ -418,6 +420,11 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 		}
 	}
 
+	/** Auto's target in sensible steps: 5 FPS up to 300, then 50. */
+	private static int roundTarget(double v) {
+		return v < 300 ? (int) Math.round(v / 5) * 5 : (int) Math.round(v / 50) * 50;
+	}
+
 	private void applyPreset(String name) {
 		GameOptions options = MinecraftClient.getInstance().options;
 		if (autoCheapOnly && !name.equals("Auto")) {
@@ -540,8 +547,9 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 						applyPresetAndRefresh(preset);
 					}
 				}),
-				new ConfigField.SliderField("Auto: Target FPS", 30, 240, () -> autoTargetFps, v -> autoTargetFps = (int) Math.round(v / 5) * 5,
-						v -> (int) Math.round(v / 5) * 5 + " FPS"),
+				// up to 3000 (the top = Unlimited: Auto then always goes for the most frames)
+				new ConfigField.SliderField("Auto: Target FPS", 30, 3000, () -> autoTargetFps, v -> autoTargetFps = roundTarget(v),
+						v -> roundTarget(v) >= 3000 ? "Unlimited" : roundTarget(v) + " FPS"),
 				new ConfigField.ToggleField("Auto: Notify On Quality Change", () -> autoNotify, v -> autoNotify = v),
 				new ConfigField.HeaderField("Frame Rate"),
 				new ConfigField.SliderField("Max FPS", 10, 260,

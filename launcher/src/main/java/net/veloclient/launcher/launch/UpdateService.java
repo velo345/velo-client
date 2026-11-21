@@ -68,10 +68,14 @@ public final class UpdateService {
 	 * that differ from what this launcher would install today.
 	 */
 	public record Release(String version, String notes, String pageUrl, boolean launcherNewer, Asset installer,
-			Map<String, Asset> modAssets) {
+			Map<String, Asset> modAssets, Asset appZip) {
+
+		public Release(String version, String notes, String pageUrl, boolean launcherNewer, Asset installer, Map<String, Asset> modAssets) {
+			this(version, notes, pageUrl, launcherNewer, installer, modAssets, null);
+		}
 
 		public boolean anything() {
-			return launcherNewer && installer != null || !modAssets.isEmpty();
+			return launcherNewer && (installer != null || appZip != null) || !modAssets.isEmpty();
 		}
 	}
 
@@ -211,7 +215,9 @@ public final class UpdateService {
 		if (testChannel) {
 			log("Test channel: " + version + " (" + (installer == null ? "no installer for this OS" : installer.name()) + ")");
 		}
-		return new Release(version, notes, page, launcherNewer, installer, mods);
+		// the installer-free update (AppUpdate) when this release has it for this platform
+		Asset appZip = AppUpdate.supported() ? AppUpdate.pick(assets, version) : null;
+		return new Release(version, notes, page, launcherNewer, installer, mods, appZip);
 	}
 
 	/** The mod jars of {@code version} that differ from what this launcher would install today. */
@@ -379,6 +385,19 @@ public final class UpdateService {
 	 */
 	public static boolean runInstallerTracked(Release release, Consumer<String> status, Consumer<Transfer> progress)
 			throws IOException, InterruptedException {
+		// First choice everywhere: no installer at all - the new launcher files go into the player's own folder and the
+		// launcher starts again from them (AppUpdate). The installer is only the fallback (other Java runtime, no zip).
+		if (release.launcherNewer() && AppUpdate.usable(release)) {
+			try {
+				log("Launcher update " + AppVersion.VERSION + " -> " + release.version() + " without installer (" + release.appZip().name() + ")");
+				AppUpdate.install(release.appZip(), release.version(), status, progress);
+				status.accept("Updated - Velo Client starts again");
+				relaunch();
+				return true;
+			} catch (IOException e) {
+				log("Installer-free update didn't work (" + e.getMessage() + ") - using the installer");
+			}
+		}
 		Asset installer = release.installer();
 		if (installer == null) {
 			return false;
@@ -423,15 +442,53 @@ public final class UpdateService {
 					: List.of("pkexec", "dpkg", "-i", file.toString());
 			Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
 			String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-			log("Package install exited with " + process.waitFor() + ": " + output.strip().lines().reduce((a, b) -> b).orElse(""));
-			if (process.exitValue() != 0) {
-				clearPending();
-				throw new IOException("The update couldn't be installed (was the password prompt cancelled?)");
+			int code = process.waitFor();
+			log("Package install exited with " + code + ": " + output.strip().lines().reduce((a, b) -> b).orElse(""));
+			if (code == 0) {
+				return true;
 			}
-			return true;
+			// 126 = the password window was closed. Anything else (127 "no authentication agent" on XFCE and other light
+			// desktops, apt busy, a broken package list...) isn't the player's doing: hand the package to the system's own
+			// installer instead (GDebi / Software Manager on Mint) - bug report 2026-11-16, Linux Mint XFCE.
+			if (code == 126) {
+				clearPending();
+				throw new IOException("The password prompt was closed - click Restart to update to try again");
+			}
+			if (openWithPackageApp(file)) {
+				clearPending();
+				status.accept("Opened the update in your package installer - install it there, then start Velo again");
+				return false;
+			}
+			clearPending();
+			throw new IOException("The update couldn't be installed. Install it by hand: " + file);
 		}
-		new ProcessBuilder("xdg-open", file.toString()).start();
-		return true;
+		if (openWithPackageApp(file)) {
+			status.accept("Opened the update in your package installer - install it there, then start Velo again");
+			return false;
+		}
+		throw new IOException("No package installer found. Install the update by hand: " + file);
+	}
+
+	/** Set when the last update was handed to the system's package installer (Linux) instead of installed here. */
+	public static volatile boolean handedToPackageApp;
+
+	/** Opens a .deb in the desktop's package installer (GDebi, Software Manager, GNOME Software...); false if none answered. */
+	private static boolean openWithPackageApp(Path file) {
+		for (List<String> command : List.of(List.of("gdebi-gtk", file.toString()), List.of("mintinstall", file.toString()),
+				List.of("xdg-open", file.toString()))) {
+			if (!onPath(command.get(0))) {
+				continue;
+			}
+			try {
+				new ProcessBuilder(command).start();
+				log("Opened the update with " + command.get(0));
+				handedToPackageApp = true;
+				return true;
+			} catch (IOException e) {
+				log("Couldn't open the update with " + command.get(0) + ": " + e.getMessage());
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -826,14 +883,26 @@ public final class UpdateService {
 	 * started right away it found this launcher still holding the single-instance lock, asked it to come to the front and quit -
 	 * and then this one closed too, so nothing was left running. A detached shell waits a moment, then starts it.
 	 */
+	private static volatile boolean relaunched;
+
 	public static void relaunch() {
+		if (relaunched) {
+			return; // already queued (the installer-free update restarts by itself, callers may ask again)
+		}
 		try {
 			String app = System.getProperty("jpackage.app-path");
-			if (app == null || !Files.isExecutable(Path.of(app))) {
+			if (app == null || !Files.exists(Path.of(app))) {
 				LauncherLog.warn("No installed launcher to restart (jpackage.app-path " + app + ")", null);
 				return;
 			}
+			relaunched = true;
 			List<String> command = new ArrayList<>();
+			if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
+				// a short wait (this launcher closes meanwhile - else the single-instance check hands over to it), then start
+				command.addAll(List.of("cmd.exe", "/d", "/c", "ping -n 3 127.0.0.1 >nul & start \"\" \"" + app + "\""));
+				new ProcessBuilder(command).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+				return;
+			}
 			if (onPath("setsid")) {
 				command.add("setsid");
 			}
@@ -863,6 +932,16 @@ public final class UpdateService {
 	 * whole file is checked against the release's SHA-256 at the end; a mismatch starts over once from zero. Every attempt
 	 * is written to update.log.
 	 */
+	/** {@link #download} for {@link AppUpdate}: resumable, checked, moved into place once complete. */
+	static void downloadAsset(Asset asset, Path target, Consumer<Transfer> progress) throws IOException, InterruptedException {
+		if (Files.exists(target) && Files.size(target) == asset.size() && (asset.sha256() == null || asset.sha256().equalsIgnoreCase(sha256Of(target)))) {
+			return;
+		}
+		Path part = target.resolveSibling(target.getFileName() + ".part");
+		download(asset, part, progress);
+		Files.move(part, target, StandardCopyOption.REPLACE_EXISTING);
+	}
+
 	private static void download(Asset asset, Path target, Consumer<Transfer> progress) throws IOException, InterruptedException {
 		IOException last = null;
 		boolean restartedAfterBadHash = false;

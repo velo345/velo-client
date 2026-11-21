@@ -51,15 +51,15 @@ public final class WingRigs {
 
 	/** Whether pair {@code id} takes a colour (its art is white, tinted to the wearer's pick). */
 	public static boolean recolorable(String id) {
-		return "neon".equals(id) || "chainwings".equals(id);
+		return "neon".equals(id);
 	}
 
 	/**
 	 * The colour (RGB) a recolourable pair has when the wearer kept its own (code 0), for pairs whose art is grey and
-	 * always tinted - Chain Wings are dark crimson. -1: its art already has its own colours (Neon: white).
+	 * always tinted. -1: its art already has its own colours (Neon: white).
 	 */
 	public static int ownTint(String id) {
-		return "chainwings".equals(id) ? 0xFFFFFF : -1; // its art is already coloured: "Own" = as painted
+		return -1;
 	}
 
 	/** {@link #tint(int, float)} for pair {@code id}: its own colour ({@link #ownTint}) for code 0. */

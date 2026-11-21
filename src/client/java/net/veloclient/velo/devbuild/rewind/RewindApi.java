@@ -977,7 +977,9 @@ public final class RewindApi {
 		for (var e : List.copyOf(HELD.entrySet())) {
 			boolean down = e.getValue() > now;
 			try {
-				key(e.getKey()).setDown(down);
+				var mapping = key(e.getKey());
+				mapping.setDown(down);
+				net.veloclient.velo.client.util.StuckButtons.external(mapping, down);
 			} catch (ApiError ignored) {
 			}
 			if (!down) {

@@ -11,8 +11,10 @@ public abstract class RewindRenderMixin {
 /*@Mixin(net.minecraft.client.renderer.entity.EntityRenderDispatcher.class)
 public abstract class RewindRenderMixin {
 
-	@org.spongepowered.asm.mixin.injection.Inject(method = "shouldRender", at = @org.spongepowered.asm.mixin.injection.At("HEAD"), cancellable = true)
+	@org.spongepowered.asm.mixin.injection.Inject(method = "shouldRender", at = @org.spongepowered.asm.mixin.injection.At("HEAD"), cancellable = true, require = 0)
 	private void velo$rewindHidden(net.minecraft.world.entity.Entity entity, net.minecraft.client.renderer.culling.Frustum frustum, double x, double y, double z,
+			//? if >=26.3
+			/^float partialTick,^/
 			org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Boolean> cir) {
 		if (!net.veloclient.velo.devbuild.rewind.RewindApply.renderEntity(entity)) {
 			cir.setReturnValue(false);

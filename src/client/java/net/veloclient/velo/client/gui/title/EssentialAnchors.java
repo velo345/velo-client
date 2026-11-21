@@ -81,4 +81,22 @@ public final class EssentialAnchors {
 	static int playerLeft(int topLeft) {
 		return Math.min(topLeft / 2 - PLAYER_W / 2, topLeft - 17 - PLAYER_W);
 	}
+
+	/**
+	 * Velo's menu centred or on the right (Customize): the anchors span the whole menu ({@code left..right}), so the
+	 * character goes into the free space left of it - Essential's own layout - and the side menu right of it.
+	 * {@link Plan#playerShown()} is false when the character doesn't fit there whole, or would end past the middle of
+	 * the screen (dead to clicks); the caller then parks the singleplayer anchor off-screen to the left, which takes
+	 * the character with it.
+	 *
+	 * @return a plan whose {@code topX..menuX} is the span for the anchors
+	 */
+	public static Plan around(int width, int left, int right, boolean canSplit) {
+		int px = playerLeft(left);
+		boolean fits = px >= 2 && px + PLAYER_W <= width / 2 && px + PLAYER_W <= left - GAP;
+		if (!fits && !canSplit) {
+			return null;
+		}
+		return new Plan(left, Math.max(left + ANCHOR_W, right), fits);
+	}
 }

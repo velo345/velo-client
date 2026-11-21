@@ -148,7 +148,7 @@ tasks.register("bundleJavaRuntimeFallback") {
 // hardcoded strings scattered across LauncherApp/GameLauncher. jpackageDist
 // below reuses the same value for the native installer's version.
 // -PlauncherVersion=1.2.4 (CI input) builds a test installer under another version, e.g. an update-test target.
-def launcherAppVersion = (project.findProperty("launcherVersion") ?: "1.4.1").toString()
+def launcherAppVersion = (project.findProperty("launcherVersion") ?: "1.4.2").toString()
 // A fixed identity for the Windows installer across every version - WiX
 // needs this (--win-upgrade-uuid below) to recognize a new installer as an
 // upgrade of whatever's already installed rather than an unrelated product,
@@ -414,6 +414,33 @@ tasks.register("jpackageDist") {
 				"--java-options", "-XX:+UseCompactObjectHeaders",
 				"--java-options", "-Dprism.maxvram=512m"
 		]
+		// The installer-free update (launch/AppUpdate.java): the app folder's files + a small manifest, as
+		// velo-client-launcher-<version>-app-<platform>.zip. Launchers that already run this version's runtime just
+		// unpack it into their user folder and start from there - no installer, no admin rights, no password prompt.
+		String cpu = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT)
+		String platform = isWindows ? "windows-x64" : isMac ? "macos-" + (cpu.contains("aarch64") || cpu.contains("arm") ? "arm64" : "x64") : "linux-x64"
+		// this version's own JVM options ($APPDIR = the folder it's unpacked to), read back by AppUpdate.hop
+		List<String> javaOptions = []
+		for (int i = 0; i < command.size() - 1; i++) {
+			if (command[i] == "--java-options") {
+				javaOptions << command[i + 1]
+			}
+		}
+		File appZip = new File(dist, "velo-client-launcher-${launcherAppVersion}-app-${platform}.zip")
+		new java.util.zip.ZipOutputStream(new FileOutputStream(appZip)).withCloseable { zip ->
+			zip.setLevel(1)
+			String manifest = groovy.json.JsonOutput.toJson([version: launcherAppVersion, platform: platform,
+					javaFeature: Runtime.version().feature(), files: staging.listFiles().collect { it.name }.sort(),
+					javaOptions: javaOptions])
+			zip.putNextEntry(new java.util.zip.ZipEntry("velo-launcher-app.json"))
+			zip.write(manifest.getBytes("UTF-8"))
+			zip.closeEntry()
+			staging.listFiles().sort { it.name }.each { File f ->
+				zip.putNextEntry(new java.util.zip.ZipEntry(f.name))
+				f.withInputStream { zip << it }
+				zip.closeEntry()
+			}
+		}
 		if (isWindows) {
 			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser", "--win-upgrade-uuid", launcherWindowsUpgradeUuid]
 		}

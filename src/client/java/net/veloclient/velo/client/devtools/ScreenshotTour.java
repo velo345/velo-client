@@ -738,6 +738,11 @@ public final class ScreenshotTour {
 				steps.add(new Object[] {30, (Runnable) () -> shot(client, "glow-2d-max")});
 				yield steps;
 			}
+			case "loading" -> List.of(
+					// the startup loading screen's drawing (Customize: background, logo, caption, bar) in a normal frame -
+					// the real startup overlay isn't in the target the tour captures
+					new Object[] {0, (Runnable) () -> client.setScreen(new LoadingPreviewScreen())},
+					new Object[] {20, (Runnable) () -> shot(client, "loading")});
 			case "title1" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.TitleScreen())},
 					new Object[] {45, (Runnable) () -> shot(client, "title")});
@@ -977,6 +982,8 @@ public final class ScreenshotTour {
 			case "vibe-packs-code" -> vibePacksCode(client);
 			case "rs-layout" -> rsLayout(client);
 			case "shadercine" -> shaderCinematics(client);
+			case "shadercosm" -> shaderCosmetics(client);
+			case "spikes" -> spikeRun(client);
 			default -> {
 				// "theme:Velo_Dark" switches the menu theme for the scenes after it (saves theme.json - use -Duser.home=<temp>).
 				if (name.startsWith("theme:")) {
@@ -1282,6 +1289,122 @@ public final class ScreenshotTour {
 	}
 
 	/** Orbits the camera around you wearing cosmetics: capes, wings, then one aura in every colour. */
+	/** A dead test player (the saved world can keep one) respawns first. */
+	private static void respawnIfDead(MinecraftClient client) {
+		if (client.player != null && !client.player.isAlive()) {
+			//? if <26.1 {
+			client.player.requestRespawn();
+			//?} else {
+			/*client.player.respawn();
+			*///?}
+			client.setScreen(null);
+		}
+	}
+
+	/**
+	 * Lag spike analysis of everyday play: 60 s of the spike recorder while flying fast through new chunks, turning,
+	 * opening the inventory and the Velo menu; the report goes to spikes.txt in the tour folder.
+	 */
+	private static List<Object[]> spikeRun(MinecraftClient client) {
+		List<Object[]> steps = new ArrayList<>();
+		steps.add(new Object[] {0, (Runnable) () -> {
+			respawnIfDead(client);
+			serverCommands(client, "gamemode creative @a", "time set 1000", "weather clear");
+		}});
+		steps.add(new Object[] {100, (Runnable) () -> {
+			// what a profile save costs the render thread now (capture only - the tour never writes the real profile)
+			for (int i = 0; i < 3; i++) {
+				long a = System.nanoTime();
+				var p = net.veloclient.velo.client.profile.VeloProfileStore.captureCurrent("probe");
+				long b = System.nanoTime();
+				String json = new com.google.gson.Gson().toJson(p);
+				VeloClient.LOGGER.info("spike-probe profile capture {} ms, serialise {} ms, {} KB", (b - a) / 1e6, (System.nanoTime() - b) / 1e6,
+						json.length() / 1024);
+			}
+			// which modules make the capture slow
+			java.util.List<String> slow = new java.util.ArrayList<>();
+			for (var module : net.veloclient.velo.module.ModuleRegistry.all()) {
+				if (module instanceof net.veloclient.velo.module.Configurable c) {
+					long a = System.nanoTime();
+					c.configFields();
+					long b = System.nanoTime();
+					c.extraState();
+					long e = System.nanoTime();
+					if ((e - a) > 300_000L) {
+						slow.add(String.format("%s fields %.2f extra %.2f", module.id(), (b - a) / 1e6, (e - b) / 1e6));
+					}
+				}
+			}
+			VeloClient.LOGGER.info("spike-probe slow modules: {}", slow);
+			net.veloclient.velo.client.report.SpikeRecorder.start(60);
+		}});
+		for (int t = 0; t < 1200; t += 2) {
+			int tick = t;
+			steps.add(new Object[] {2, (Runnable) () -> {
+				if (client.player == null) {
+					return;
+				}
+				// ~40 blocks/s along x: new chunks the whole time, plus a slow turn (server-side teleport: same on every version)
+				serverCommands(client, "tp @a " + (tick * 2) + " 120 0 " + ((tick * 1.5f) % 360f) + " 10");
+				if (tick % 300 == 260) {
+					long a = System.nanoTime();
+					client.setScreen(null);
+					VeloClient.LOGGER.info("spike-probe close setScreen {} ms", (System.nanoTime() - a) / 1e6);
+				} else if (tick % 300 == 200) {
+					long a = System.nanoTime();
+					var menu = net.veloclient.velo.client.gui.ModMenuScreen.forView(false);
+					long b = System.nanoTime();
+					client.setScreen(menu);
+					VeloClient.LOGGER.info("spike-probe open: build {} ms, setScreen {} ms", (b - a) / 1e6, (System.nanoTime() - b) / 1e6);
+				}
+			}});
+		}
+		steps.add(new Object[] {200, (Runnable) () -> {
+			var result = net.veloclient.velo.client.report.SpikeRecorder.last();
+			try {
+				Files.createDirectories(folder);
+				Files.writeString(folder.resolve("spikes.txt"), result == null ? "no result" : result.summary());
+				VeloClient.LOGGER.info("Velo screenshot tour: spike report saved");
+			} catch (Exception e) {
+				VeloClient.LOGGER.error("spike report", e);
+			}
+		}});
+		return steps;
+	}
+
+	/** Cosmetics (wings + aura + cloak) from two sides, without and with Velo Shaders - "cosmetics look cursed with shaders". */
+	private static List<Object[]> shaderCosmetics(MinecraftClient client) {
+		List<Object[]> steps = new ArrayList<>();
+		steps.add(new Object[] {0, (Runnable) () -> {
+			respawnIfDead(client);
+			net.veloclient.velo.client.cosmetics.CosmeticsCatalog.refresh(true);
+			net.veloclient.velo.client.cosmetics.CapeManager.loadLibrary();
+			serverCommands(client, "gamemode creative @a", "time set 6000", "weather clear", "effect clear @a");
+			ModuleRegistry.get("velo-shaders").ifPresent(m -> m.setEnabled(false));
+			ModuleRegistry.get("free-look").ifPresent(m -> m.setEnabled(true));
+			setHudHidden(client, true);
+		}});
+		steps.add(new Object[] {300, (Runnable) () -> {
+			var wings = net.veloclient.velo.client.cosmetics.wings.WingsManager.catalog();
+			String wing = System.getProperty("velo.tourWing", wings.isEmpty() ? null : wings.get(0).id());
+			net.veloclient.velo.client.cosmetics.wings.WingsManager.setPreview(wing);
+			net.veloclient.velo.client.cosmetics.aura.AuraManager.setPreview(System.getProperty("velo.tourAura", "crystal"));
+			net.veloclient.velo.client.cosmetics.CapeManager.library().values().stream().findFirst()
+					.ifPresent(net.veloclient.velo.client.cosmetics.CapeManager::setPreviewOverride);
+			VeloClient.LOGGER.info("shadercosm: wing {} of {}", wing, wings.size());
+		}});
+		steps.add(new Object[] {200, (Runnable) () -> { }});
+		for (boolean shaders : new boolean[] {false, true}) {
+			String tag = shaders ? "shader" : "plain";
+			steps.add(new Object[] {2, (Runnable) () -> ModuleRegistry.get("velo-shaders").ifPresent(m -> m.setEnabled(shaders))});
+			steps.add(new Object[] {shaders ? 160 : 20, (Runnable) () -> net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(true, 160f, 3.4)});
+			steps.add(new Object[] {20, (Runnable) () -> shot(client, "cosm-" + tag + "-back")});
+			steps.add(new Object[] {2, (Runnable) () -> net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(true, 20f, 3.4)});
+			steps.add(new Object[] {20, (Runnable) () -> shot(client, "cosm-" + tag + "-front")});
+		}
+		return steps;
+	}
+
 	private static List<Object[]> vibeOrbit(MinecraftClient client) {
 		List<Object[]> steps = new ArrayList<>();
 		String[] capes = System.getProperty("velo.tourCapes", "").split(",");
@@ -1344,13 +1467,17 @@ public final class ScreenshotTour {
 				net.veloclient.velo.client.cosmetics.aura.AuraManager.setPreview(aura);
 			});
 		}
-		int colours = noAuras ? 0 : net.veloclient.velo.client.cosmetics.aura.AuraEffects.RAINBOW + 1;
+		// every palette colour, rainbow, then one picked freely (custom)
+		int colours = noAuras ? 0 : net.veloclient.velo.client.cosmetics.aura.AuraEffects.RAINBOW + 2;
 		if (!noAuras) {
 			steps.add(new Object[] {20, (Runnable) () -> net.veloclient.velo.client.cosmetics.aura.AuraManager.setPreview(auras[0])});
 		}
 		sequence(steps, client, "orbit-colours", colours * 8, f -> {
 			if (f % 8 == 0) {
-				net.veloclient.velo.client.cosmetics.aura.AuraManager.setSettings(auras[0], new net.veloclient.velo.client.cosmetics.aura.AuraEffects.Settings(1.2f, 1f, 1.3f, f / 8));
+				int idx = f / 8;
+				int colour = idx == net.veloclient.velo.client.cosmetics.aura.AuraEffects.RAINBOW + 1
+						? net.veloclient.velo.client.cosmetics.aura.AuraEffects.custom(0x22FFAA) : idx;
+				net.veloclient.velo.client.cosmetics.aura.AuraManager.setSettings(auras[0], new net.veloclient.velo.client.cosmetics.aura.AuraEffects.Settings(1.2f, 1f, 1.3f, colour));
 			}
 			net.veloclient.velo.client.modules.qol.FreeLookModule.forceForTour(true, 150f + f * 0.9f, 3.4);
 		});
@@ -2529,9 +2656,30 @@ public final class ScreenshotTour {
 		} catch (Exception e) {
 			VeloClient.LOGGER.error("Velo screenshot tour: {} failed", name, e);
 		}
-		*///?} else {
-		VeloClient.LOGGER.warn("Velo screenshot tour only captures on 26.2 ({} skipped)", name);
-		//?}
+		*///?} else if <26.1 {
+		try {
+			Files.createDirectories(folder);
+			Path file = folder.resolve(name + ".png");
+			//? if >=1.21.10 {
+			net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(client.getFramebuffer(), image -> {
+				try (image) {
+					image.writeTo(file);
+					VeloClient.LOGGER.info("Velo screenshot tour saved {}", file);
+				} catch (Exception e) {
+					VeloClient.LOGGER.error("Velo screenshot tour: saving {} failed", file, e);
+				}
+			});
+			//?} else {
+			/*try (net.minecraft.client.texture.NativeImage image = net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(client.getFramebuffer())) {
+				image.writeTo(file);
+			}
+			*///?}
+		} catch (Exception e) {
+			VeloClient.LOGGER.error("Velo screenshot tour: {} failed", name, e);
+		}
+		//?} else {
+		/*VeloClient.LOGGER.warn("Velo screenshot tour only captures on 26.2 ({} skipped)", name);
+		*///?}
 	}
 
 	private static final java.util.concurrent.ExecutorService RAW_WRITER = java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
@@ -2580,5 +2728,26 @@ public final class ScreenshotTour {
 		*///?} else {
 		client.scheduleStop();
 		//?}
+	}
+
+	/** Draws the Velo loading screen at 62 % (dev tour only). */
+	private static final class LoadingPreviewScreen extends net.minecraft.client.gui.screen.Screen {
+		LoadingPreviewScreen() {
+			super(net.minecraft.text.Text.literal("Loading preview"));
+		}
+
+		//? if <26.1 {
+		@Override
+		public void render(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {
+			net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.render(context, 0.62f, -1f, offset -> {
+			});
+		}
+		//?} else {
+		/*@Override
+		public void extractRenderState(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+			net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.render(context, 0.62f, -1f, offset -> {
+			});
+		}
+		*///?}
 	}
 }

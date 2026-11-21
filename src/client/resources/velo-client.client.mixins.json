@@ -5,6 +5,7 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"ActionBarOverlayMixin",
+		"WindowFrontGrabMixin",
 		"PostEffectsFrameMixin",
 		"CameraLevelGuardMixin",
 		"AtmosphericFogMixin",
@@ -38,6 +39,10 @@
 		"SmallCapsChatMixin",
 		"TitleLogoMixin",
 		"TitlePanoramaMixin",
+		"PauseBlurMixin",
+		"ClearLiquidsFogMixin",
+		"NoTotemPopAnimationMixin",
+		"NoTotemPopParticlesMixin",
 		"TitleScreenMixin",
 		"TitleSplashMixin",
 		"VanillaHudGateMixin"

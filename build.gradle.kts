@@ -116,6 +116,9 @@ dependencies {
 	}
 	modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
 	modImplementation("net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
+	// Velo Browser: the Java side of CinemaMod's java-cef build (BSD, libs/jcef-cinemamod-<commit>.jar - must match the
+	// native bundle browser/CefRuntime downloads). Packed into the mod jar below; the natives come at first use.
+	"clientImplementation"(files(rootProject.file("libs/jcef-cinemamod-eaeb3d4.jar")))
 	// Velo Rewind records Simple Voice Chat through its client API (a plugin it calls when installed; nothing happens otherwise).
 	"clientCompileOnly"("de.maxhenkel.voicechat:voicechat-api:2.6.27")
 	// Velo Shaders' shadow pass draws Sodium's chunk meshes a second time from the sun, so it compiles
@@ -228,5 +231,12 @@ tasks.named<Jar>("jar") {
 	val licenseFile = rootProject.file("LICENSE")
 	from(licenseFile) {
 		rename { "${it}_${archivesName}" }
+	}
+}
+
+// The java-cef classes travel inside the Velo jar (org.cef.* - the natives bind to these names, so no relocation).
+tasks.named<Jar>("jar") {
+	from(zipTree(rootProject.file("libs/jcef-cinemamod-eaeb3d4.jar"))) {
+		exclude("META-INF/MANIFEST.MF")
 	}
 }

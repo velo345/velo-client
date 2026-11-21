@@ -131,9 +131,12 @@ public final class VeloServerApp {
 		// Velo+: memberships in memory, monthly coins hourly, signed tokens + addon jars for members.
 		store.loadPlus();
 		store.loadAddonAccess();
-		store.setStaffLookup(staff::isStaff);
+		RolePlus rolePlus = new RolePlus(dataDir);
+		// staff and partner/creator role holders count as Velo+ while they have the role
+		store.setStaffLookup(uuid -> staff.isStaff(uuid) || rolePlus.has(uuid));
 		registry.setPlusLookup(store::isPlus);
 		StaffRoutes.register(server, registry, staff, social, parties, capes, store, cosmetics, discordLinks, announcer, adminToken);
+		StaffRoutes.registerRolePlus(server, discordLinks, rolePlus, adminToken);
 		PlusTokens plusTokens = new PlusTokens(envOr("VELO_PLUS_SIGNING_KEY", null));
 		AddonStore addonStore = new AddonStore(dataDir);
 		AddonSync addonSync = new AddonSync(addonStore, envOr("VELO_PLUS_GITHUB_REPO", "velo345/velo-client-plus"), envOr("VELO_PLUS_GITHUB_TOKEN", null));

@@ -156,6 +156,12 @@
   "category": "server_tools"
  },
  {
+  "id": "clear-liquids",
+  "name": "Clear Water & Lava",
+  "description": "No fog under water, in lava or in powder snow - see as far as on land. Separate from the normal fog setting.",
+  "category": "rendering"
+ },
+ {
   "id": "client-log-viewer",
   "name": "Client Log Viewer",
   "description": "In-game log viewer with a text filter and one-click session export.",
@@ -580,6 +586,12 @@
   "name": "No Break Particles",
   "description": "Removes the particles when a block breaks and while you mine it - cleaner view, sounds stay.",
   "category": "rendering"
+ },
+ {
+  "id": "no-totem-pop",
+  "name": "No Totem Pop",
+  "description": "No totem flying into your face when one pops - you still hear it. Turn off the particles and the sound too if you like.",
+  "category": "pvp"
  },
  {
   "id": "numbered-inventories",

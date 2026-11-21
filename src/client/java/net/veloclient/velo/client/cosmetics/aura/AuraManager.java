@@ -87,6 +87,8 @@ public final class AuraManager {
 		loaded = false;
 		SETTINGS.clear();
 		load();
+		// changed in the launcher's Locker while playing: other Velo players get the new colour right away too
+		net.veloclient.velo.client.network.VeloServerClient.syncSoon();
 	}
 
 	private static synchronized void load() {

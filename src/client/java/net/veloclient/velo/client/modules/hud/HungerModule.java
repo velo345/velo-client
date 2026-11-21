@@ -33,6 +33,8 @@ public final class HungerModule extends AbstractModule implements Configurable {
 	private static final List<String> STYLES = List.of("Vanilla", VANILLA_RECOLORED, VELO, "Custom Drawing");
 
 	private String style = VANILLA_RECOLORED;
+	/** Step aside when the server's resource pack restyles or hides this bar (MCC Island and others). */
+	private boolean serverWins = true;
 	private boolean showSaturation = true;
 	private int saturationColor = 0xFFFFC83A;
 	private int foodColor = 0xFFC27A3E;
@@ -57,6 +59,9 @@ public final class HungerModule extends AbstractModule implements Configurable {
 		HungerModule module = active();
 		if (module == null) {
 			return false;
+		}
+		if (module.serverWins && net.veloclient.velo.client.hud.ServerHudPack.overridesFood()) {
+			return false; // the server's pack styles or hides this bar itself
 		}
 		//? if <26.1 {
 		int food = player.getHungerManager().getFoodLevel();
@@ -139,6 +144,9 @@ public final class HungerModule extends AbstractModule implements Configurable {
 	 */
 	public static boolean ownsFoodOverlay() {
 		HungerModule module = active();
+		if (module != null && module.serverWins && net.veloclient.velo.client.hud.ServerHudPack.overridesFood()) {
+			return false;
+		}
 		return module != null && (module.style.equals(VELO) || module.style.equals("Custom Drawing") && StatusBarIcons.hasDrawing(KIND));
 	}
 
@@ -230,6 +238,7 @@ public final class HungerModule extends AbstractModule implements Configurable {
 	@Override
 	public List<ConfigField> configFields() {
 		return List.of(
+				new ConfigField.ToggleField("Use the Server's Food Bar When Its Pack Has Its Own", () -> serverWins, v -> serverWins = v),
 				new ConfigField.ToggleField("Show Saturation Outline", () -> showSaturation, v -> showSaturation = v),
 				new ConfigField.ColorField("Saturation Color", () -> saturationColor, v -> saturationColor = v, true),
 				new ConfigField.ChoiceField("Food Icon Style", STYLES, () -> style, v -> style = "Recolored".equals(v) ? VANILLA_RECOLORED : v),

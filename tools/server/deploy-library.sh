@@ -24,6 +24,10 @@ install -d -m 2751 -o velo-library -g velo /opt/velo/library/data
 install -d -m 755 -o velo-library -g velo /opt/velo/library/data/packs
 install -d -m 700 -o www-data -g root /var/cache/nginx/velo-library
 [ -f /opt/velo/library/velo-library.jar ] && cp /opt/velo/library/velo-library.jar "/opt/velo/backups/velo-library.jar.$stamp"
+# keep only the 5 newest copies of each file kind (every deploy adds a ~280 MB jar - they filled the disk in 2026-11)
+for kind in velo-server.jar velo-library.jar velo-panel.jar velo-bot.jar velo.conf velo-library.conf velo-library-proxy.conf firewall.nft; do
+	ls -1t /opt/velo/backups/"$kind".* 2>/dev/null | tail -n +6 | xargs -r rm -f --
+done
 install -m 640 -o root -g velo /tmp/velo-library.jar /opt/velo/library/velo-library.jar
 install -d -m 750 -o velo-library -g velo /opt/velo/library/data/bin
 install -m 750 -o root -g velo /tmp/seedmap-linux-x64 /opt/velo/library/data/bin/seedmap

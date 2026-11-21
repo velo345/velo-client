@@ -6,7 +6,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.caffeinemc.mods.sodium.api.util.ColorARGB;
-import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
 import net.caffeinemc.mods.sodium.api.vertex.format.common.ParticleVertex;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -43,7 +42,7 @@ public abstract class TurboSodiumParticleWriteMixin {
 	private static MemoryStack velo$stack;
 	// While a layer is being built: its writer and how many quads wait in the scratch.
 	@Unique
-	private static VertexBufferWriter velo$batchWriter;
+	private static Object velo$batchWriter;
 	@Unique
 	private static VertexConsumer velo$batchConsumer;
 	@Unique
@@ -71,8 +70,9 @@ public abstract class TurboSodiumParticleWriteMixin {
 	@WrapMethod(method = "renderRotatedQuad", require = 0)
 	private void velo$directWrite(VertexConsumer consumer, float x, float y, float z, float qx, float qy, float qz, float qw, float size,
 			float u0, float u1, float v0, float v1, int color, int light, Operation<Void> original) {
-		VertexBufferWriter writer = ON && net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo
-				&& com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread() ? VertexBufferWriter.tryOf(consumer) : null;
+		// by name: Sodium 0.9.3-beta.5 renamed tryOf/push (sodium$...) and calling the old one crashed every 26.3 player
+		Object writer = ON && net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo
+				&& com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread() ? net.veloclient.velo.client.util.SodiumWriter.tryOf(consumer) : null;
 		if (writer == null) {
 			velo$flush();
 			original.call(consumer, x, y, z, qx, qy, qz, qw, size, u0, u1, v0, v1, color, light);
@@ -104,7 +104,7 @@ public abstract class TurboSodiumParticleWriteMixin {
 	@Unique
 	private static void velo$flush() {
 		if (velo$batched > 0 && velo$batchWriter != null) {
-			velo$batchWriter.push(velo$stack, velo$scratch, velo$batched * 4, ParticleVertex.FORMAT);
+			net.veloclient.velo.client.util.SodiumWriter.push(velo$batchWriter, velo$stack, velo$scratch, velo$batched * 4, ParticleVertex.FORMAT);
 		}
 		velo$batched = 0;
 	}

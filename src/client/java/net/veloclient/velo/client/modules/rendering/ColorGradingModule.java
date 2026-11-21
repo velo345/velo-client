@@ -23,7 +23,12 @@ import java.util.List;
  */
 public final class ColorGradingModule extends AbstractModule implements Configurable {
 
+	//? if >=26.3 {
+	/*// 26.3 compiles shaders to SPIR-V: its own copy with layout locations (the plain one failed to compile there)
+	private static final Identifier EFFECT = Identifier.of("velo-client", "color_grade_spirv");
+	*///?} else {
 	private static final Identifier EFFECT = Identifier.of("velo-client", "color_grade");
+	//?}
 	private static final Identifier PARAMS_ID = Identifier.of("velo-client", "textures/effect/grade_params.png");
 	private static final List<String> PRESETS = List.of("Custom", "Vivid", "Cinematic", "Warm", "Cold", "Black & White", "Crisp PvP");
 

@@ -1408,7 +1408,7 @@ public final class CosmeticsView {
 			// Colour: the hues round the wheel, then white, then a cycling rainbow.
 			int white = net.veloclient.velo.client.cosmetics.wings.WingRigs.TINT_WHITE;
 			int rainbow = net.veloclient.velo.client.cosmetics.wings.WingRigs.TINT_RAINBOW;
-			// Pairs with their own colour (grey art, e.g. Chain Wings) start the slider at "Own".
+			// Pairs with their own colour (grey art) start the slider at "Own".
 			boolean own = net.veloclient.velo.client.cosmetics.wings.WingRigs.ownTint(type.id()) >= 0;
 			Slider colour = new Slider(own ? 0 : 1, rainbow, current[0].color() <= 0 ? own ? 0 : white : current[0].color());
 			colour.setBlockIncrement(1);

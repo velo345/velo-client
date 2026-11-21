@@ -184,6 +184,9 @@ public final class TopBar extends HBox {
 		divider.getStyleClass().add("sidebar-divider");
 		VBox.setMargin(divider, new Insets(8, 10, 8, 10));
 		sidebar.getChildren().add(divider);
+		Button customize = navRow("Customize", "palette", () -> host.navigate("customize"));
+		tabs.put("customize", customize);
+		sidebar.getChildren().add(customize);
 		Button settings = navRow("Settings", "settings", () -> host.navigate("settings"));
 		tabs.put("settings", settings);
 		sidebar.getChildren().add(settings);

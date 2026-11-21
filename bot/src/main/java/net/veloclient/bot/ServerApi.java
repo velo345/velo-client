@@ -125,6 +125,20 @@ final class ServerApi {
 		return post("/v1/admin/staff/sync", body);
 	}
 
+	/** Sends everyone with a Velo+ role (Discord id to "partner"/"creator"); the server gives or ends their free Velo+. */
+	JsonObject syncPlusRoles(java.util.Map<String, String> roles) throws ApiException {
+		com.google.gson.JsonArray members = new com.google.gson.JsonArray();
+		roles.forEach((id, role) -> {
+			JsonObject m = new JsonObject();
+			m.addProperty("discordId", id);
+			m.addProperty("role", role);
+			members.add(m);
+		});
+		JsonObject body = new JsonObject();
+		body.add("members", members);
+		return post("/v1/admin/roles/plus", body);
+	}
+
 	private volatile java.util.Map<String, String> items = java.util.Map.of();
 	private volatile long itemsAt;
 

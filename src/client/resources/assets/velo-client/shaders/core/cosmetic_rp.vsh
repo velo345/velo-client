@@ -48,6 +48,15 @@ layout(location = 5) out vec4 overlayColor;
 
 layout(location = 6) out vec2 texCoord0;
 
+// Velo Shaders' entity fragment shader also reads these (its own light model); vanilla's ignores them. Without them the
+// pipeline didn't compile with Velo Shaders on and every cosmetic fell back to the CPU path (wings faded, clouds showed
+// through - report 2026-11-21).
+layout(location = 8) out vec4 veloColor;
+layout(location = 9) out vec3 veloNormal;
+layout(location = 10) out vec2 veloLight;
+layout(location = 11) out vec3 veloPos;
+layout(location = 12) flat out float veloWorld;
+
 void main() {
     gl_Position = ProjMat * ModelViewMat * vec4(Position, 1.0);
 
@@ -75,4 +84,11 @@ void main() {
 #endif
 
     texCoord0 = UV0;
+
+    // Velo Shaders inputs, like its own entity.vsh (camera-relative world space = what the CPU-posed vertices carried)
+    veloColor = Color;
+    veloNormal = normalize(mat3(TextureMat) * Normal);
+    veloLight = clamp(vec2(ModelOffset.x, ModelOffset.y) / 240.0, 0.0, 1.0);
+    veloPos = world;
+    veloWorld = abs(ProjMat[2][3]) > 0.5 ? 1.0 : 0.0;
 }

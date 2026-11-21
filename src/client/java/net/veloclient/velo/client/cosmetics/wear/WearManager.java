@@ -401,14 +401,24 @@ public final class WearManager {
 		if (texFile == null || c > 0 && maskFile == null) {
 			return null;
 		}
-		try (InputStream in = java.nio.file.Files.newInputStream(texFile)) {
-			net.minecraft.client.texture.NativeImage image = net.minecraft.client.texture.NativeImage.read(in);
-			if (c > 0) {
-				try (InputStream maskIn = java.nio.file.Files.newInputStream(maskFile)) {
-					net.minecraft.client.texture.NativeImage mask = net.minecraft.client.texture.NativeImage.read(maskIn);
-					tint(image, mask, WearTint.rgb(c));
-					mask.close();
+		try {
+			// read, decoded and tinted on a worker (AsyncLoad); registered here once ready
+			int tintCode = c;
+			net.minecraft.client.texture.NativeImage image = net.veloclient.velo.client.cosmetics.AsyncLoad.poll("wear:" + key, () -> {
+				try (InputStream in = java.nio.file.Files.newInputStream(texFile)) {
+					net.minecraft.client.texture.NativeImage decoded = net.minecraft.client.texture.NativeImage.read(in);
+					if (tintCode > 0) {
+						try (InputStream maskIn = java.nio.file.Files.newInputStream(maskFile)) {
+							net.minecraft.client.texture.NativeImage mask = net.minecraft.client.texture.NativeImage.read(maskIn);
+							tint(decoded, mask, WearTint.rgb(tintCode));
+							mask.close();
+						}
+					}
+					return decoded;
 				}
+			});
+			if (image == null) {
+				return null;
 			}
 			Identifier identifier = net.veloclient.velo.client.cosmetics.CapeManager.registerPreloadedTexture("wear_" + id + "_" + c, image, "bodywear " + id);
 			TEXTURES.put(key, identifier);
@@ -464,8 +474,15 @@ public final class WearManager {
 		if (file == null) {
 			return null;
 		}
-		try (InputStream in = java.nio.file.Files.newInputStream(file)) {
-			net.minecraft.client.texture.NativeImage image = net.minecraft.client.texture.NativeImage.read(in);
+		try {
+			net.minecraft.client.texture.NativeImage image = net.veloclient.velo.client.cosmetics.AsyncLoad.poll("wear:" + key, () -> {
+				try (InputStream in = java.nio.file.Files.newInputStream(file)) {
+					return net.minecraft.client.texture.NativeImage.read(in);
+				}
+			});
+			if (image == null) {
+				return null;
+			}
 			Identifier identifier = net.veloclient.velo.client.cosmetics.CapeManager.registerPreloadedTexture("wearpreview_" + id, image, "bodywear preview " + id);
 			TEXTURES.put(key, identifier);
 			return identifier;

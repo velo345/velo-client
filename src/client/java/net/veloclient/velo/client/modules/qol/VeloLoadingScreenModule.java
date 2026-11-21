@@ -34,6 +34,15 @@ public final class VeloLoadingScreenModule extends AbstractModule {
 
 	private static VeloLoadingScreenModule instance;
 
+	private static final Identifier CAPTION = Identifier.of("velo-client", "loading_caption");
+	/** Customize (Velo+): the look this screen was prepared for, and the caption picture (drawn with AWT - see prepareCaption). */
+	private static volatile ScreenLookSnapshot look = ScreenLookSnapshot.read();
+	private static volatile int preparedGeneration = -1;
+	private static volatile boolean preparing;
+	private static volatile NativeImage preparedCaption;
+	private static int captionW;
+	private static int captionH;
+	private static boolean captionReady;
 	private static volatile NativeImage preparedBackground;
 	private static volatile NativeImage preparedLogo;
 	private static int backgroundW;
@@ -46,10 +55,33 @@ public final class VeloLoadingScreenModule extends AbstractModule {
 		super("velo-loading-screen", "Velo Loading Screen", "A clean Velo loading screen at startup instead of the red Mojang one.",
 				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, true);
 		instance = this;
-		Thread prepare = new Thread(VeloLoadingScreenModule::prepare, "Velo loading screen");
+		startPrepare();
+	}
+
+	private static void startPrepare() {
+		preparing = true;
+		Thread prepare = new Thread(() -> {
+			try {
+				prepare();
+			} finally {
+				preparing = false;
+			}
+		}, "Velo loading screen");
 		prepare.setDaemon(true);
 		prepare.setPriority(Thread.MIN_PRIORITY);
 		prepare.start();
+	}
+
+	/** The Customize settings the loading screen uses, read once per prepare (it may run before the game is up). */
+	private record ScreenLookSnapshot(net.veloclient.velo.client.gui.title.ScreenLook.Loading look, int generation) {
+		static ScreenLookSnapshot read() {
+			try {
+				var l = net.veloclient.velo.client.gui.title.ScreenLook.loading();
+				return new ScreenLookSnapshot(l, net.veloclient.velo.client.gui.title.ScreenLook.generation());
+			} catch (Throwable t) {
+				return new ScreenLookSnapshot(new net.veloclient.velo.client.gui.title.ScreenLook.Loading(), -1);
+			}
+		}
 	}
 
 	/** Set when drawing failed once: vanilla's loading screen takes over for the rest of this start. */
@@ -85,12 +117,28 @@ public final class VeloLoadingScreenModule extends AbstractModule {
 	// ---------------------------------------------------------------- background thread
 
 	private static void prepare() {
-		try (InputStream in = VeloLoadingScreenModule.class.getResourceAsStream("/assets/velo-client/textures/icon/logo.png")) {
-			if (in != null) {
-				preparedLogo = NativeImage.read(in);
+		ScreenLookSnapshot snapshot = ScreenLookSnapshot.read();
+		look = snapshot;
+		preparedGeneration = snapshot.generation();
+		var custom = snapshot.look();
+		if (!logoReady && preparedLogo == null) {
+			try (InputStream in = VeloLoadingScreenModule.class.getResourceAsStream("/assets/velo-client/textures/icon/logo.png")) {
+				if (in != null) {
+					preparedLogo = NativeImage.read(in);
+				}
+			} catch (Exception | LinkageError ignored) {
+				// no logo then
 			}
-		} catch (Exception | LinkageError ignored) {
-			// no logo then
+		}
+		prepareCaption(custom);
+		if (custom.background.equals("color")) {
+			return;
+		}
+		if (custom.background.equals("image") && prepareCustomBackground(custom)) {
+			return;
+		}
+		if (backgroundReady && !customBackground) {
+			return; // the panorama is already up
 		}
 		try (InputStream in = VeloLoadingScreenModule.class.getResourceAsStream("/assets/velo-client/textures/gui/title/pano_base.png")) {
 			if (in == null) {
@@ -135,9 +183,114 @@ public final class VeloLoadingScreenModule extends AbstractModule {
 			}
 			backgroundW = w;
 			backgroundH = h;
+			customBackground = false;
 			preparedBackground = out;
 		} catch (Exception | LinkageError ignored) {
 			// plain dark background then
+		}
+	}
+
+	private static volatile boolean customBackground;
+
+	/** Your own picture (Customize, Velo+): shrunk, blurred as chosen; a GIF shows its first frame. */
+	private static boolean prepareCustomBackground(net.veloclient.velo.client.gui.title.ScreenLook.Loading custom) {
+		java.nio.file.Path file = net.veloclient.velo.client.gui.title.ScreenLook.picture("loading");
+		if (file == null) {
+			return false;
+		}
+		try {
+			java.awt.image.BufferedImage src = javax.imageio.ImageIO.read(file.toFile());
+			if (src == null) {
+				return false;
+			}
+			double k = Math.min(1.0, (custom.blur > 0 ? 480.0 : 1920.0) / src.getWidth());
+			int w = Math.max(16, (int) Math.round(src.getWidth() * k));
+			int h = Math.max(9, (int) Math.round(src.getHeight() * k));
+			java.awt.image.BufferedImage scaled = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
+			var g = scaled.createGraphics();
+			g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+			g.drawImage(src, 0, 0, w, h, null);
+			g.dispose();
+			int[] px = scaled.getRGB(0, 0, w, h, null, 0, w);
+			int[] rgb = new int[w * h * 3];
+			for (int i = 0; i < px.length; i++) {
+				rgb[i * 3] = (px[i] >> 16) & 0xFF;
+				rgb[i * 3 + 1] = (px[i] >> 8) & 0xFF;
+				rgb[i * 3 + 2] = px[i] & 0xFF;
+			}
+			int radius = Math.round(custom.blur / 100f * w / 40f);
+			if (radius > 0) {
+				for (int pass = 0; pass < 3; pass++) {
+					rgb = blur(rgb, w, h, radius);
+				}
+			}
+			NativeImage out = new NativeImage(w, h, false);
+			for (int y = 0; y < h; y++) {
+				for (int x = 0; x < w; x++) {
+					int i = (y * w + x) * 3;
+					out.setColorArgb(x, y, 0xFF000000 | (rgb[i] << 16) | (rgb[i + 1] << 8) | rgb[i + 2]);
+				}
+			}
+			backgroundW = w;
+			backgroundH = h;
+			customBackground = true;
+			preparedBackground = out;
+			return true;
+		} catch (Exception | LinkageError e) {
+			return false;
+		}
+	}
+
+	/**
+	 * The caption under the logo, drawn with Java's own text renderer from Velo's font files: the game's fonts load as
+	 * part of what this screen waits for, so they can't draw it. Rendered large and drawn scaled down - sharp at any GUI
+	 * scale.
+	 */
+	private static void prepareCaption(net.veloclient.velo.client.gui.title.ScreenLook.Loading custom) {
+		String caption = custom.caption == null ? "" : custom.caption.strip();
+		if (caption.isEmpty()) {
+			preparedCaption = null;
+			captionW = 0;
+			return;
+		}
+		String file = switch (custom.captionFont) {
+			case "Sora" -> "sora_bold.ttf";
+			case "Archivo" -> "archivo_semiexp_extrabold.ttf";
+			case "Poppins" -> "poppins_regular.ttf";
+			case "Space Grotesk" -> "space_grotesk_bold.ttf";
+			case "Mono" -> "jetbrains_mono_medium.ttf";
+			case "Audiowide" -> "audiowide.ttf";
+			default -> "inter_semibold.ttf";
+		};
+		try (InputStream in = VeloLoadingScreenModule.class.getResourceAsStream("/assets/velo-client/font/" + file)) {
+			java.awt.Font font = in != null ? java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, in).deriveFont(64f)
+					: new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.BOLD, 64);
+			java.awt.image.BufferedImage probe = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+			var pg = probe.createGraphics();
+			pg.setFont(font);
+			var metrics = pg.getFontMetrics();
+			int w = Math.min(4096, metrics.stringWidth(caption) + 16);
+			int h = metrics.getAscent() + metrics.getDescent() + 8;
+			pg.dispose();
+			java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+			var g = img.createGraphics();
+			g.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+			g.setRenderingHint(java.awt.RenderingHints.KEY_FRACTIONALMETRICS, java.awt.RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+			g.setFont(font);
+			g.setColor(java.awt.Color.WHITE);
+			g.drawString(caption, 8, 4 + metrics.getAscent());
+			g.dispose();
+			NativeImage out = new NativeImage(w, h, false);
+			for (int y = 0; y < h; y++) {
+				for (int x = 0; x < w; x++) {
+					out.setColorArgb(x, y, img.getRGB(x, y));
+				}
+			}
+			captionW = w;
+			captionH = h;
+			preparedCaption = out;
+		} catch (Exception | LinkageError e) {
+			preparedCaption = null;
 		}
 	}
 
@@ -176,9 +329,19 @@ public final class VeloLoadingScreenModule extends AbstractModule {
 
 	private static void upload() {
 		var textures = MinecraftClient.getInstance().getTextureManager();
-		if (!backgroundReady && preparedBackground != null) {
-			textures.registerTexture(BACKGROUND, new NativeImageBackedTexture(() -> "velo loading background", preparedBackground));
+		NativeImage background = preparedBackground;
+		if (background != null) {
+			preparedBackground = null;
+			textures.registerTexture(BACKGROUND, new NativeImageBackedTexture(() -> "velo loading background", background));
 			backgroundReady = true;
+		}
+		NativeImage caption = preparedCaption;
+		if (caption != null) {
+			preparedCaption = null;
+			textures.registerTexture(CAPTION, new NativeImageBackedTexture(() -> "velo loading caption", caption));
+			captionReady = true;
+		} else if (captionW == 0) {
+			captionReady = false;
 		}
 		if (!logoReady && preparedLogo != null) {
 			textures.registerTexture(LOGO, new NativeImageBackedTexture(() -> "velo loading logo", preparedLogo));
@@ -212,9 +375,16 @@ public final class VeloLoadingScreenModule extends AbstractModule {
 			// the title screen slides up into place under the fading loading screen
 			screen.accept(Math.round((1f - outro) * 28f));
 		}
+		// Customize changed since this screen was prepared (next resource reload): prepare again in the background
+		if (!preparing && net.veloclient.velo.client.gui.title.ScreenLook.generation() != preparedGeneration) {
+			startPrepare();
+		}
+		var custom = look.look();
 		int coverAlpha = Math.round((1f - outro) * 255);
 		if (coverAlpha > 0) {
-			if (backgroundReady) {
+			if (custom.background.equals("color")) {
+				context.fill(0, 0, width, height, (coverAlpha << 24) | (custom.color & 0xFFFFFF));
+			} else if (backgroundReady) {
 				// cover the screen, keeping the panorama's aspect
 				float scale = Math.max(width / (float) backgroundW, height / (float) backgroundH);
 				int drawW = Math.round(backgroundW * scale);
@@ -223,6 +393,12 @@ public final class VeloLoadingScreenModule extends AbstractModule {
 						backgroundW, backgroundH, backgroundW, backgroundH, (coverAlpha << 24) | 0xFFFFFF);
 			} else {
 				context.fill(0, 0, width, height, (coverAlpha << 24) | (DARK & 0xFFFFFF));
+			}
+			// the default look has its darkening baked into the panorama; the Customize dim goes on top
+			int dim = custom.dim - 25;
+			if (customBackground || custom.background.equals("color") ? custom.dim > 0 : dim > 0) {
+				int d = customBackground || custom.background.equals("color") ? custom.dim : dim;
+				context.fill(0, 0, width, height, (Math.round(d * 2.4f * coverAlpha / 255f) << 24));
 			}
 		}
 		shownProgress += (Math.max(shownProgress, progress) - shownProgress) * 0.12f;
@@ -234,9 +410,13 @@ public final class VeloLoadingScreenModule extends AbstractModule {
 		int alpha = Math.round((1f - out) * 255);
 		if (alpha > 2) {
 			int drift = Math.round(out * 10f);
-			int size = Math.max(40, Math.min(110, height / 5));
+			int size = Math.round(Math.max(40, Math.min(110, height / 5)) * custom.logoSize);
 			int cy = height / 2 - size / 3 + drift;
-			if (logoReady) {
+			if (!custom.logo) {
+				size = 0;
+				cy = height / 2 + drift;
+			}
+			if (logoReady && custom.logo) {
 				float pulse = doneFor < 0 ? 0.94f + 0.06f * (float) Math.sin(System.nanoTime() / 4e8) : 1f;
 				int s = Math.round(size * pulse);
 				context.drawTexture(RenderPipelines.GUI_TEXTURED, LOGO, width / 2 - s / 2, cy - s / 2, 0f, 0f, s, s, 500, 500, 500, 500,
@@ -245,11 +425,27 @@ public final class VeloLoadingScreenModule extends AbstractModule {
 			int barW = Math.max(120, Math.min(220, width / 4));
 			int barX = width / 2 - barW / 2;
 			int barY = cy + size / 2 + 18;
-			context.fill(barX, barY, barX + barW, barY + 2, (alpha * 0x30 / 255 << 24) | 0xFFFFFF);
-			int filled = Math.round(barW * Math.max(0f, Math.min(1f, shownProgress)));
-			if (filled > 0) {
-				context.fill(barX, barY - 1, barX + filled, barY + 3, (alpha * 0x28 / 255 << 24) | 0xFFFFFF); // soft glow
-				context.fill(barX, barY, barX + filled, barY + 2, (alpha << 24) | 0xFFFFFF);
+			int captionBottom = barY - 6;
+			if (captionReady && captionW > 0) {
+				// the caption sits between the logo and the bar
+				float k = 12f * custom.captionSize / captionH * 1.4f;
+				int dw = Math.round(captionW * k);
+				int dh = Math.round(captionH * k);
+				int capY = cy + size / 2 + 8;
+				context.drawTexture(RenderPipelines.GUI_TEXTURED, CAPTION, width / 2 - dw / 2, capY, 0f, 0f, dw, dh, captionW, captionH,
+						captionW, captionH, (alpha << 24) | (custom.captionColor & 0xFFFFFF));
+				captionBottom = capY + dh;
+				barY = Math.max(barY, captionBottom + 8);
+			}
+			int barRgb = custom.barColor & 0xFFFFFF;
+			int thick = custom.bar.equals("thick") ? 4 : 2;
+			if (!custom.bar.equals("hidden")) {
+				context.fill(barX, barY, barX + barW, barY + thick, (alpha * 0x30 / 255 << 24) | barRgb);
+				int filled = Math.round(barW * Math.max(0f, Math.min(1f, shownProgress)));
+				if (filled > 0) {
+					context.fill(barX, barY - 1, barX + filled, barY + thick + 1, (alpha * 0x28 / 255 << 24) | barRgb); // soft glow
+					context.fill(barX, barY, barX + filled, barY + thick, (alpha << 24) | barRgb);
+				}
 			}
 		}
 		return doneFor >= OUTRO_SECONDS;

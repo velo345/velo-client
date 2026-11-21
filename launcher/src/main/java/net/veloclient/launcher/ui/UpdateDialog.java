@@ -138,7 +138,9 @@ public final class UpdateDialog {
 					Platform.runLater(() -> {
 						progress.setVisible(false);
 						progress.setManaged(false);
-						status.setText(launcher ? "Mod updated. This system has no launcher installer - get it from " + release.pageUrl()
+						status.setText(launcher && UpdateService.handedToPackageApp
+								? "Opened the update in your package installer - install it there, then start Velo again."
+								: launcher ? "Mod updated. This system has no launcher installer - get it from " + release.pageUrl()
 								: !UpdateService.packaged() ? "Mods updated. This launcher runs from the source folder - update it with git pull."
 								: "Done - your next game launch uses the new build.");
 						later.setText("Close");

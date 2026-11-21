@@ -31,6 +31,29 @@ final class FrameGrabber {
 		void accept(ByteBuffer rgba, int width, int height);
 	}
 
+	/**
+	 * VulkanMod reads frames back top row first and as BGRA (vanilla: bottom row first, RGBA) - clips came out upside
+	 * down with red and blue swapped (bug report 2026-11-20, macOS + VulkanMod). Turned into vanilla's layout here, so
+	 * every consumer (Clips, Clips Pro, Rewind export) stays the same.
+	 */
+	private static final boolean VULKANMOD = net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("vulkanmod");
+
+	private static void normalizeVulkanMod(ByteBuffer src, ByteBuffer dest, int w, int h, int bytes) {
+		int stride = w * 4;
+		int rows = Math.min(h, Math.min(bytes, src.remaining()) / stride);
+		java.nio.IntBuffer in = src.duplicate().order(java.nio.ByteOrder.LITTLE_ENDIAN).asIntBuffer();
+		java.nio.IntBuffer out = dest.duplicate().order(java.nio.ByteOrder.LITTLE_ENDIAN).asIntBuffer();
+		int[] row = new int[w];
+		for (int y = 0; y < rows; y++) {
+			in.get(y * w, row, 0, w);
+			for (int x = 0; x < w; x++) {
+				int v = row[x];
+				row[x] = v & 0xFF00FF00 | (v >>> 16) & 0xFF | (v & 0xFF) << 16;
+			}
+			out.put((h - 1 - y) * w, row, 0, w);
+		}
+	}
+
 	private static final int POOL = 4;
 	private static final ArrayDeque<ByteBuffer> FREE = new ArrayDeque<>();
 	private static int allocated;
@@ -247,7 +270,11 @@ final class FrameGrabber {
 					boolean handed = false;
 					try {
 						dest.clear();
-						dest.put(0, src, 0, Math.min(bytes, src.remaining()));
+						if (VULKANMOD) {
+							normalizeVulkanMod(src, dest, w, h, bytes);
+						} else {
+							dest.put(0, src, 0, Math.min(bytes, src.remaining()));
+						}
 						handed = true;
 						sink.accept(dest, w, h);
 					} catch (Throwable t) {

@@ -143,6 +143,7 @@ public final class RewindModule extends AbstractModule implements net.veloclient
 
 	@Override
 	public void onEnable() {
+		RewindAudio.refreshDevicesSoon(); // the settings' device lists, ready before anyone opens them
 		RewindAudio.systemDevice = "Automatic".equals(systemDevice) ? "" : systemDevice;
 		RewindAudio.micDevice = "Default".equals(micDevice) ? "" : micDevice;
 		RewindAudio.recordVoice = recordVoice;

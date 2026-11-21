@@ -49,6 +49,34 @@ public abstract class VeloShadowSodiumMixin implements net.veloclient.velo.clien
 	@org.spongepowered.asm.mixin.Unique
 	private static boolean velo$failed;
 
+	@org.spongepowered.asm.mixin.Unique
+	private static java.lang.reflect.Method velo$updateMethod;
+
+	// Sodium 0.9.3-beta.5 added the camera to update(matrices, fog[, camera]) - call whichever this Sodium has.
+	@org.spongepowered.asm.mixin.Unique
+	private static void velo$update(Object manager, Object matrices, Object fog, Object camera) throws Exception {
+		java.lang.reflect.Method m = velo$updateMethod;
+		if (m == null) {
+			for (java.lang.reflect.Method c : manager.getClass().getMethods()) {
+				if (c.getName().equals("update") && (c.getParameterCount() == 2 || c.getParameterCount() == 3)) {
+					m = c;
+					if (c.getParameterCount() == 3) {
+						break;
+					}
+				}
+			}
+			if (m == null) {
+				throw new NoSuchMethodException("UniformBufferManager.update");
+			}
+			velo$updateMethod = m;
+		}
+		if (m.getParameterCount() == 3) {
+			m.invoke(manager, matrices, fog, camera);
+		} else {
+			m.invoke(manager, matrices, fog);
+		}
+	}
+
 	// 26.3: called before the frame graph runs (Sodium has prepared the camera's batches; the terrain pass isn't open yet).
 	@Override
 	public void velo$shadowPass(double x, double y, double z) {
@@ -71,8 +99,8 @@ public abstract class VeloShadowSodiumMixin implements net.veloclient.velo.clien
 			var shadow = new net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices(
 					net.veloclient.velo.client.modules.rendering.VeloShadowMap.PROJECTION, net.veloclient.velo.client.modules.rendering.VeloShadowMap.VIEW);
 			((VeloSodiumUniformsAccessor) uniformBufferManager).velo$setUpdatedThisFrame(false);
-			uniformBufferManager.update(shadow, lastFogParameters);
 			var camera = new net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform(x, y, z);
+			velo$update(uniformBufferManager, shadow, lastFogParameters, camera);
 			// Its own sections: everything around the player, not just what the camera sees.
 			net.veloclient.velo.client.modules.rendering.VeloShadowLists.INSTANCE.rebuild(renderSectionManager.regions, x, y, z,
 					net.veloclient.velo.client.modules.rendering.VeloShadowMap.RADIUS + 8f);

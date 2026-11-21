@@ -170,6 +170,19 @@ public final class Keys {
 		return i >= 0 ? LEGACY_SDL[i] : UNKNOWN;
 	}
 
+	/** This version's key code as a GLFW code (26.3: SDL scancode looked up; before: unchanged) - -1 when it has none. */
+	public static int toGlfw(int code) {
+		if (!SDL) {
+			return code;
+		}
+		for (int i = 0; i < LEGACY_SDL.length; i++) {
+			if (LEGACY_SDL[i] == code) {
+				return LEGACY_GLFW[i];
+			}
+		}
+		return -1;
+	}
+
 	/** "glfw" or "sdl" - the kind of key code this version uses (stored next to saved bindings). */
 	public static String format() {
 		return SDL ? "sdl" : "glfw";
