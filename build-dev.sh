@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds the DEV client jars: they include the unreleased features from src/dev and are versioned "<version>-dev".
 # Production builds (build-and-deploy.sh, releases) never contain src/dev. The Velo Client Tester launcher (CI tag tester-<v>)
-# bundles these jars, keeps its own data folder (~/.velo-client-dev) and never updates itself.
+# bundles these jars, keeps its own data folder (~/.velo-client-dev) and updates itself from the Velo server.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 ./gradlew :1.21.11:build :26.1:build :26.2:build :26.3:build -PveloDev=true -q --console=plain
