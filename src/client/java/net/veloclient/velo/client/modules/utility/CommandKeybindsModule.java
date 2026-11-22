@@ -29,7 +29,7 @@ public final class CommandKeybindsModule extends AbstractModule {
 
 	public CommandKeybindsModule() {
 		super("command-keybinds", "Command Keybinds", "Bind a key to instantly run a chat command, like /spawn.",
-				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.QOL, SafetyTag.CHECK_SERVER_RULES, false);
 		ClientTickEvents.END_CLIENT_TICK.register(client ->
 				ModuleProfiler.time("command-keybinds", ModuleProfiler.Phase.TICK, () -> onTick(client)));
 	}

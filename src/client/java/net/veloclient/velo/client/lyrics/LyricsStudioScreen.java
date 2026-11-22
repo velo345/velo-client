@@ -29,11 +29,9 @@ public final class LyricsStudioScreen extends Screen {
 
 	private static final int PANEL_W = 236;
 	private static final int ROW = 20;
-	private static final int[] PALETTE = {0xFFFFFFFF, 0xFFB8B8C8, 0xFF101014, 0xFFFF3B47, 0xFFFF8A3D, 0xFFFFD84A, 0xFF3DDC97,
-			0xFF7CFFCB, 0xFF39E7FF, 0xFF9EC5FF, 0xFF5B8CFF, 0xFF7A8CFF, 0xFFB040FF, 0xFFFF3DDB,
-			0xFFFFE7A3, 0xFFFF9A3D, 0xFFFF3D1F, 0xFF05FFA1, 0xFF01CDFE, 0xFFFF71CE, 0xFF7FF6FF};
-
 	private final Screen parent;
+	/** Look / Beat / Motion / Place - remembered while the game runs. */
+	private static int tab = Integer.getInteger("velo.lyricsTab", 0);
 	private final List<VeloUi.Hit> hits = new ArrayList<>();
 	private int scroll;
 	private int contentH;
@@ -108,7 +106,22 @@ public final class LyricsStudioScreen extends Screen {
 		MenuKit.text(context, textRenderer, MenuKit.uiBold("Lyrics Studio"), px + 12, py + 11, 0xFFFFFFFF);
 		MenuKit.text(context, textRenderer, MenuKit.ui(statusLine()), px + 12, py + 24, statusColor());
 		hits.add(button(context, textRenderer, px + PANEL_W - 52, py + 9, 42, "Done", mouseX, mouseY, this::leave));
-		int top = py + 40;
+		String[] tabs = {"Look", "Beat", "Motion", "Place"};
+		int tabW = (PANEL_W - 24 - 3 * 4) / 4;
+		for (int t = 0; t < tabs.length; t++) {
+			int tx = px + 12 + t * (tabW + 4);
+			boolean on = t == tab;
+			boolean hov = VeloUi.inside(mouseX, mouseY, tx, py + 38, tabW, 18);
+			VeloDraw.fillRounded(context, tx, py + 38, tabW, 18, 9, on ? MenuKit.accent() : hov ? 0xFF2A2A33 : 0xFF1C1C23);
+			Text label = MenuKit.ui(tabs[t]);
+			MenuKit.text(context, textRenderer, label, tx + (tabW - MenuKit.width(textRenderer, label)) / 2, py + 43, on ? 0xFF0C0C10 : 0xFFE6E6EC);
+			int index = t;
+			hits.add(new VeloUi.Hit(tx, py + 38, tabW, 18, () -> {
+				tab = index;
+				scroll = 0;
+			}));
+		}
+		int top = py + 64;
 		int bottom = py + ph - 8;
 		int maxScroll = Math.max(0, contentH - (bottom - top));
 		scroll = Math.max(0, Math.min(scroll, maxScroll));
@@ -118,6 +131,8 @@ public final class LyricsStudioScreen extends Screen {
 		int y = top - scroll;
 		int startY = y;
 
+		switch (tab) {
+			case 0 -> {
 		// presets
 		y = header(context, textRenderer, "Presets", x, y);
 		int i = 0;
@@ -152,6 +167,90 @@ public final class LyricsStudioScreen extends Screen {
 		}
 		y += ((i + 1) / 2) * 36 + 6;
 
+		// look
+		y = header(context, textRenderer, "Look", x, y + 4);
+		y = choice(context, textRenderer, "Font", LyricsStyle.FONTS, () -> st.font, v -> st.font = v, x, y, w, mouseX, mouseY, top, bottom);
+		y = choice(context, textRenderer, "Letters", LyricsStyle.CASES, () -> st.textCase, v -> st.textCase = v, x, y, w, mouseX, mouseY, top, bottom);
+		y = slider(context, textRenderer, "Letter spacing", 0, 4, () -> st.spacing, v -> st.spacing = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1f", v), x, y, w, mouseX, mouseY, top, bottom);
+		y = choice(context, textRenderer, "Colours", LyricsStyle.SIMPLE_COLOR_MODES, () -> st.colorMode, v -> st.colorMode = v, x, y, w, mouseX, mouseY, top, bottom);
+		if (!"Rainbow".equals(st.colorMode)) {
+			y = colorButton(context, textRenderer, "Colour", () -> st.color, v -> st.color = v, x, y, w, mouseX, mouseY, top, bottom);
+		}
+		if (!"Solid".equals(st.colorMode) && !"Rainbow".equals(st.colorMode)) {
+			y = colorButton(context, textRenderer, "Second colour", () -> st.color2, v -> st.color2 = v, x, y, w, mouseX, mouseY, top, bottom);
+		}
+		y = toggle(context, textRenderer, "Karaoke fill (in time)", () -> st.karaoke, v -> st.karaoke = v, x, y, w, mouseX, mouseY, top, bottom);
+		if (st.karaoke) {
+			y = colorButton(context, textRenderer, "Fill colour", () -> st.highlight, v -> st.highlight = v, x, y, w, mouseX, mouseY, top, bottom);
+		}
+		y = slider(context, textRenderer, "Opacity", 0.1, 1, () -> st.opacity, v -> st.opacity = Math.round(v * 20) / 20.0, v -> Math.round(v * 100) + "%", x, y, w, mouseX, mouseY, top, bottom);
+
+		// effects
+		y = header(context, textRenderer, "Effects", x, y + 4);
+		y = toggle(context, textRenderer, "Glow", () -> st.glow, v -> st.glow = v, x, y, w, mouseX, mouseY, top, bottom);
+		if (st.glow) {
+			y = colorButton(context, textRenderer, "Glow colour", () -> st.glowColor, v -> st.glowColor = v, x, y, w, mouseX, mouseY, top, bottom);
+			y = slider(context, textRenderer, "Glow size", 0.3, 3, () -> st.glowSize, v -> st.glowSize = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1f", v), x, y, w, mouseX, mouseY, top, bottom);
+		}
+		y = toggle(context, textRenderer, "Outline", () -> st.outline, v -> st.outline = v, x, y, w, mouseX, mouseY, top, bottom);
+		if (st.outline) {
+			y = colorButton(context, textRenderer, "Outline colour", () -> st.outlineColor, v -> st.outlineColor = v, x, y, w, mouseX, mouseY, top, bottom);
+			y = slider(context, textRenderer, "Outline thickness", 0.4, 3, () -> st.outlineSize, v -> st.outlineSize = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1f", v), x, y, w, mouseX, mouseY, top, bottom);
+		}
+		y = choice(context, textRenderer, "3D depth", LyricsStyle.DEPTHS_3D, () -> st.depth3d, v -> st.depth3d = v, x, y, w, mouseX, mouseY, top, bottom);
+		if (!"Off".equals(st.depth3d)) {
+			y = colorButton(context, textRenderer, "Depth colour", () -> st.depthColor != 0 ? st.depthColor : LyricsRenderer.shade(st.color, 0.5f),
+					v -> st.depthColor = v, x, y, w, mouseX, mouseY, top, bottom);
+		}
+		y = toggle(context, textRenderer, "Drop shadow", () -> st.shadow, v -> st.shadow = v, x, y, w, mouseX, mouseY, top, bottom);
+		if (st.shadow) {
+			y = colorButton(context, textRenderer, "Shadow colour", () -> st.shadowColor, v -> st.shadowColor = v, x, y, w, mouseX, mouseY, top, bottom);
+		}
+
+			}
+			case 1 -> {
+		// beat
+		y = header(context, textRenderer, "Beat effects", x, y);
+		y = toggle(context, textRenderer, "Effects on the beat", () -> st.beatSync, v -> st.beatSync = v, x, y, w, mouseX, mouseY, top, bottom);
+		y = beatStatus(context, textRenderer, st, x, y, w);
+		if (st.beatSync) {
+			y = choice(context, textRenderer, "When", LyricsStyle.TRIGGERS, () -> st.beatTrigger, v -> st.beatTrigger = v, x, y, w, mouseX, mouseY, top, bottom);
+			y = slider(context, textRenderer, "Strength", 0.2, 2.5, () -> st.beatStrength, v -> st.beatStrength = Math.round(v * 10) / 10.0, v -> Math.round(v * 100) + "%", x, y, w, mouseX, mouseY, top, bottom);
+			y = header(context, textRenderer, "What happens", x, y + 4);
+			y = toggle(context, textRenderer, "Colour split", () -> st.fxSplit, v -> st.fxSplit = v, x, y, w, mouseX, mouseY, top, bottom);
+			y = toggle(context, textRenderer, "Flash", () -> st.fxFlash, v -> st.fxFlash = v, x, y, w, mouseX, mouseY, top, bottom);
+			y = toggle(context, textRenderer, "Shake", () -> st.fxShake, v -> st.fxShake = v, x, y, w, mouseX, mouseY, top, bottom);
+			y = toggle(context, textRenderer, "Glitch", () -> st.fxGlitch, v -> st.fxGlitch = v, x, y, w, mouseX, mouseY, top, bottom);
+			y = toggle(context, textRenderer, "Zoom kick", () -> st.fxZoom, v -> st.fxZoom = v, x, y, w, mouseX, mouseY, top, bottom);
+			y = toggle(context, textRenderer, "Letters bounce on every beat", () -> st.beatBounce, v -> st.beatBounce = v, x, y, w, mouseX, mouseY, top, bottom);
+		}
+		for (String line : VeloUi.wrap("Velo listens to what your PC plays to find the beat. Nothing is recorded or sent anywhere.", w)) {
+			MenuKit.text(context, textRenderer, MenuKit.ui(line), x, y + 4, 0xFF6E6E78);
+			y += 11;
+		}
+		y += 8;
+			}
+			case 2 -> {
+		// motion
+		y = header(context, textRenderer, "Animation", x, y + 4);
+		y = choice(context, textRenderer, "Coming in", LyricsStyle.ENTERS, () -> st.enter, v -> st.enter = v, x, y, w, mouseX, mouseY, top, bottom);
+		y = choice(context, textRenderer, "Going out", LyricsStyle.EXITS, () -> st.exit, v -> st.exit = v, x, y, w, mouseX, mouseY, top, bottom);
+		y = toggle(context, textRenderer, "Letter by letter", () -> st.perLetter, v -> st.perLetter = v, x, y, w, mouseX, mouseY, top, bottom);
+		y = slider(context, textRenderer, "Speed", 0.3, 3, () -> st.speed, v -> st.speed = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1fx", v), x, y, w, mouseX, mouseY, top, bottom);
+		y = choice(context, textRenderer, "While showing", LyricsStyle.IDLES, () -> st.idle, v -> st.idle = v, x, y, w, mouseX, mouseY, top, bottom);
+		y = slider(context, textRenderer, "Chaos", 0, 1, () -> st.chaos, v -> st.chaos = Math.round(v * 20) / 20.0, v -> Math.round(v * 100) + "%", x, y, w, mouseX, mouseY, top, bottom);
+
+		// lines
+		y = header(context, textRenderer, "Lines", x, y + 4);
+		y = toggle(context, textRenderer, "Show the next line", () -> st.showNext, v -> st.showNext = v, x, y, w, mouseX, mouseY, top, bottom);
+		y = toggle(context, textRenderer, "Show the previous line", () -> st.showPrevious, v -> st.showPrevious = v, x, y, w, mouseX, mouseY, top, bottom);
+		if (st.showNext || st.showPrevious) {
+			y = slider(context, textRenderer, "Space to other lines", 1.2, 5, () -> st.lineGap, v -> st.lineGap = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1f", v), x, y, w, mouseX, mouseY, top, bottom);
+		}
+		y = toggle(context, textRenderer, "Song title when a song starts", () -> st.songCard, v -> st.songCard = v, x, y, w, mouseX, mouseY, top, bottom);
+
+			}
+			default -> {
 		// where
 		y = header(context, textRenderer, "Where", x, y);
 		y = choice(context, textRenderer, "Style", LyricsStyle.DISPLAYS, () -> st.display, v -> st.display = v, x, y, w, mouseX, mouseY, top, bottom);
@@ -175,60 +274,6 @@ public final class LyricsStudioScreen extends Screen {
 			y = slider(context, textRenderer, "Size", 0.4, 3, () -> st.screenSize, v -> st.screenSize = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1fx", v), x, y, w, mouseX, mouseY, top, bottom);
 		}
 
-		// look
-		y = header(context, textRenderer, "Look", x, y + 4);
-		y = choice(context, textRenderer, "Font", LyricsStyle.FONTS, () -> st.font, v -> st.font = v, x, y, w, mouseX, mouseY, top, bottom);
-		y = choice(context, textRenderer, "Letters", LyricsStyle.CASES, () -> st.textCase, v -> st.textCase = v, x, y, w, mouseX, mouseY, top, bottom);
-		y = slider(context, textRenderer, "Letter spacing", 0, 4, () -> st.spacing, v -> st.spacing = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1f", v), x, y, w, mouseX, mouseY, top, bottom);
-		y = choice(context, textRenderer, "Colours", LyricsStyle.COLOR_MODES, () -> st.colorMode, v -> st.colorMode = v, x, y, w, mouseX, mouseY, top, bottom);
-		if (!"Rainbow".equals(st.colorMode)) {
-			y = colors(context, textRenderer, "Colour", () -> st.color, v -> st.color = v, x, y, w, mouseX, mouseY, top, bottom);
-		}
-		if (!"Solid".equals(st.colorMode) && !"Rainbow".equals(st.colorMode)) {
-			y = colors(context, textRenderer, "Second colour", () -> st.color2, v -> st.color2 = v, x, y, w, mouseX, mouseY, top, bottom);
-		}
-		y = toggle(context, textRenderer, "Karaoke fill (in time)", () -> st.karaoke, v -> st.karaoke = v, x, y, w, mouseX, mouseY, top, bottom);
-		if (st.karaoke) {
-			y = colors(context, textRenderer, "Fill colour", () -> st.highlight, v -> st.highlight = v, x, y, w, mouseX, mouseY, top, bottom);
-		}
-		y = slider(context, textRenderer, "Opacity", 0.1, 1, () -> st.opacity, v -> st.opacity = Math.round(v * 20) / 20.0, v -> Math.round(v * 100) + "%", x, y, w, mouseX, mouseY, top, bottom);
-
-		// effects
-		y = header(context, textRenderer, "Effects", x, y + 4);
-		y = toggle(context, textRenderer, "Glow", () -> st.glow, v -> st.glow = v, x, y, w, mouseX, mouseY, top, bottom);
-		if (st.glow) {
-			y = colors(context, textRenderer, "Glow colour", () -> st.glowColor, v -> st.glowColor = v, x, y, w, mouseX, mouseY, top, bottom);
-			y = slider(context, textRenderer, "Glow size", 0.3, 3, () -> st.glowSize, v -> st.glowSize = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1f", v), x, y, w, mouseX, mouseY, top, bottom);
-			y = slider(context, textRenderer, "Glow strength", 0.1, 2.5, () -> st.glowStrength, v -> st.glowStrength = Math.round(v * 10) / 10.0, v -> Math.round(v * 100) + "%", x, y, w, mouseX, mouseY, top, bottom);
-		}
-		y = toggle(context, textRenderer, "Outline", () -> st.outline, v -> st.outline = v, x, y, w, mouseX, mouseY, top, bottom);
-		if (st.outline) {
-			y = colors(context, textRenderer, "Outline colour", () -> st.outlineColor, v -> st.outlineColor = v, x, y, w, mouseX, mouseY, top, bottom);
-			y = slider(context, textRenderer, "Outline thickness", 0.4, 3, () -> st.outlineSize, v -> st.outlineSize = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1f", v), x, y, w, mouseX, mouseY, top, bottom);
-		}
-		y = toggle(context, textRenderer, "Drop shadow", () -> st.shadow, v -> st.shadow = v, x, y, w, mouseX, mouseY, top, bottom);
-		if (st.shadow) {
-			y = colors(context, textRenderer, "Shadow colour", () -> st.shadowColor, v -> st.shadowColor = v, x, y, w, mouseX, mouseY, top, bottom);
-		}
-
-		// motion
-		y = header(context, textRenderer, "Animation", x, y + 4);
-		y = choice(context, textRenderer, "Coming in", LyricsStyle.ENTERS, () -> st.enter, v -> st.enter = v, x, y, w, mouseX, mouseY, top, bottom);
-		y = choice(context, textRenderer, "Going out", LyricsStyle.EXITS, () -> st.exit, v -> st.exit = v, x, y, w, mouseX, mouseY, top, bottom);
-		y = toggle(context, textRenderer, "Letter by letter", () -> st.perLetter, v -> st.perLetter = v, x, y, w, mouseX, mouseY, top, bottom);
-		y = slider(context, textRenderer, "Speed", 0.3, 3, () -> st.speed, v -> st.speed = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1fx", v), x, y, w, mouseX, mouseY, top, bottom);
-		y = choice(context, textRenderer, "While showing", LyricsStyle.IDLES, () -> st.idle, v -> st.idle = v, x, y, w, mouseX, mouseY, top, bottom);
-		y = slider(context, textRenderer, "Chaos", 0, 1, () -> st.chaos, v -> st.chaos = Math.round(v * 20) / 20.0, v -> Math.round(v * 100) + "%", x, y, w, mouseX, mouseY, top, bottom);
-
-		// lines
-		y = header(context, textRenderer, "Lines", x, y + 4);
-		y = toggle(context, textRenderer, "Show the next line", () -> st.showNext, v -> st.showNext = v, x, y, w, mouseX, mouseY, top, bottom);
-		y = toggle(context, textRenderer, "Show the previous line", () -> st.showPrevious, v -> st.showPrevious = v, x, y, w, mouseX, mouseY, top, bottom);
-		if (st.showNext || st.showPrevious) {
-			y = slider(context, textRenderer, "Space to other lines", 1.2, 5, () -> st.lineGap, v -> st.lineGap = Math.round(v * 10) / 10.0, v -> String.format(Locale.ROOT, "%.1f", v), x, y, w, mouseX, mouseY, top, bottom);
-		}
-		y = toggle(context, textRenderer, "Song title when a song starts", () -> st.songCard, v -> st.songCard = v, x, y, w, mouseX, mouseY, top, bottom);
-
 		// sync
 		y = header(context, textRenderer, "Sync", x, y + 4);
 		y = slider(context, textRenderer, "Offset", -2000, 2000, () -> st.offsetMs, v -> st.offsetMs = (int) Math.round(v / 50.0) * 50,
@@ -237,6 +282,8 @@ public final class LyricsStudioScreen extends Screen {
 		y += 16;
 		MenuKit.text(context, textRenderer, MenuKit.ui("Synced lyrics from LRCLIB (lrclib.net)."), x, y + 2, 0xFF6E6E78);
 		y += 16;
+			}
+		}
 		contentH = y - startY + 8;
 		context.disableScissor();
 		if (maxScroll > 0) {
@@ -342,26 +389,51 @@ public final class LyricsStudioScreen extends Screen {
 		return y + 24;
 	}
 
-	private int colors(DrawContext context, TextRenderer textRenderer, String label, IntSupplier get, IntConsumer set,
+	/** Label, a swatch and the hex code; a click opens the colour picker (changes show live). */
+	private int colorButton(DrawContext context, TextRenderer textRenderer, String label, IntSupplier get, IntConsumer set,
 			int x, int y, int w, int mouseX, int mouseY, int top, int bottom) {
-		MenuKit.text(context, textRenderer, MenuKit.ui(label), x, y + 2, 0xFFE6E6EC);
+		MenuKit.text(context, textRenderer, MenuKit.ui(label), x, y + 6, 0xFFE6E6EC);
 		int current = get.getAsInt() | 0xFF000000;
-		int sw = 13;
-		int gap = (w - 7 * sw) / 6;
-		for (int i = 0; i < PALETTE.length; i++) {
-			int cx = x + (i % 7) * (sw + gap);
-			int cy = y + 14 + (i / 7) * (sw + 4);
-			boolean on = (PALETTE[i] | 0xFF000000) == current;
-			if (on) {
-				VeloDraw.fillRounded(context, cx - 2, cy - 2, sw + 4, sw + 4, 4, 0xFFFFFFFF);
-			}
-			VeloDraw.fillRounded(context, cx, cy, sw, sw, 3, PALETTE[i]);
-			if (visible(cy, sw, top, bottom)) {
-				int color = PALETTE[i];
-				hits.add(new VeloUi.Hit(cx, cy, sw, sw, () -> apply(() -> set.accept(color))));
-			}
+		int bw = 112;
+		int bx = x + w - bw;
+		boolean hov = VeloUi.inside(mouseX, mouseY, bx, y + 1, bw, 16) && mouseY >= top && mouseY < bottom;
+		VeloDraw.fillRounded(context, bx, y + 1, bw, 16, 8, hov ? 0xFF2A2A33 : 0xFF1C1C23);
+		VeloDraw.fillRounded(context, bx + 3, y + 4, 20, 10, 5, current);
+		MenuKit.text(context, textRenderer, MenuKit.ui(String.format(Locale.ROOT, "#%06X", current & 0xFFFFFF)), bx + 30, y + 5, 0xFFFFFFFF);
+		if (visible(y, 18, top, bottom)) {
+			hits.add(new VeloUi.Hit(bx, y + 1, bw, 16, () -> MinecraftClient.getInstance().setScreen(
+					new net.veloclient.velo.client.gui.VeloColorPickerScreen(this, label, current, false, argb -> apply(() -> set.accept(argb | 0xFF000000))))));
 		}
-		return y + 14 + ((PALETTE.length + 6) / 7) * (sw + 4) + 4;
+		return y + ROW;
+	}
+
+	/** "Listening - 124 BPM" with a level bar that jumps on each beat, or why it can't hear anything. */
+	private int beatStatus(DrawContext context, TextRenderer textRenderer, LyricsStyle st, int x, int y, int w) {
+		if (!st.beatSync) {
+			return y;
+		}
+		String text;
+		int color = 0xFF8A8A95;
+		if (BeatTracker.unavailable()) {
+			text = "Can't hear the PC's sound here - new lines give the hits instead";
+		} else if (!BeatTracker.listening()) {
+			text = "Starting to listen...";
+		} else if (BeatTracker.quiet()) {
+			text = "Listening - play some music";
+		} else if (BeatTracker.bpm() > 0) {
+			text = "Listening - " + Math.round(BeatTracker.bpm()) + " BPM";
+			color = 0xFF7CFFB2;
+		} else {
+			text = "Listening - finding the beat...";
+		}
+		MenuKit.text(context, textRenderer, MenuKit.ui(VeloUi.trim(text, w)), x, y + 2, color);
+		float since = (System.nanoTime() - BeatTracker.lastBeatNanos()) / 1e9f;
+		float flash = Math.max(0f, 1f - since / 0.25f);
+		int barW = Math.round((w - 20) * Math.max(BeatTracker.level(), flash));
+		VeloDraw.fillRounded(context, x, y + 14, w - 20, 4, 2, 0xFF1C1C23);
+		VeloDraw.fillRounded(context, x, y + 14, Math.max(2, barW), 4, 2, BeatTracker.big() && flash > 0 ? 0xFFFF5D73 : MenuKit.accent());
+		VeloDraw.fillCircle(context, x + w - 8, y + 16, 4, flash > 0 ? (BeatTracker.big() ? 0xFFFF5D73 : 0xFFFFFFFF) : 0xFF33333C);
+		return y + 26;
 	}
 
 	private void apply(Runnable change) {

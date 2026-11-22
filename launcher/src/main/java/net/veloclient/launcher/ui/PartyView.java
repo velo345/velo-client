@@ -93,8 +93,39 @@ public final class PartyView {
 		} else if (party == null) {
 			content.getChildren().add(emptyState());
 		} else {
-			HBox columns = new HBox(16, membersColumn(party), chatColumn(party));
-			HBox.setHgrow(columns.getChildren().get(1), Priority.ALWAYS);
+			// Side by side when there's room; in a narrow panel (the Friends side panel) the chat goes under the members
+			// with the full width - next to them it was cut off.
+			ScrollPane members = (ScrollPane) membersColumn(party);
+			Node chat = chatColumn(party);
+			javafx.scene.layout.StackPane columns = new javafx.scene.layout.StackPane();
+			boolean[] narrowNow = {false};
+			Runnable arrange = () -> {
+				double width = root.getWidth();
+				boolean narrow = width > 0 && width < 760;
+				if (narrow == narrowNow[0] && !columns.getChildren().isEmpty()) {
+					return;
+				}
+				narrowNow[0] = narrow;
+				if (narrow) {
+					members.setMinWidth(0);
+					members.setPrefWidth(Region.USE_COMPUTED_SIZE);
+					members.setMaxHeight(300);
+					VBox stack = new VBox(12, members, chat);
+					VBox.setVgrow(chat, Priority.ALWAYS);
+					columns.getChildren().setAll(stack);
+				} else {
+					members.setMinWidth(320);
+					members.setPrefWidth(360);
+					members.setMaxHeight(Double.MAX_VALUE);
+					HBox row = new HBox(16, members, chat);
+					HBox.setHgrow(chat, Priority.ALWAYS);
+					columns.getChildren().setAll(row);
+				}
+			};
+			arrange.run();
+			javafx.beans.value.ChangeListener<Number> onWidth = (o, a, b) -> arrange.run();
+			root.widthProperty().addListener(new javafx.beans.value.WeakChangeListener<>(onWidth));
+			columns.getProperties().put("velo-width-listener", onWidth); // keeps the weak listener alive with the view
 			VBox.setVgrow(columns, Priority.ALWAYS);
 			content.getChildren().add(columns);
 			VBox.setVgrow(content, Priority.ALWAYS);
@@ -436,6 +467,8 @@ public final class PartyView {
 		Label time = new Label(when);
 		time.getStyleClass().add("settings-row-hint");
 		VBox textBox = new VBox(1, new HBox(6, who, time), body);
+		textBox.setMinWidth(0);
+		HBox.setHgrow(textBox, Priority.ALWAYS);
 		HBox row = new HBox(8, Heads.head(str(line, "from"), name, 22), textBox);
 		row.setAlignment(Pos.TOP_LEFT);
 		return row;

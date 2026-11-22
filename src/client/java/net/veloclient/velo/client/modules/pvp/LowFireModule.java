@@ -23,7 +23,7 @@ public final class LowFireModule extends AbstractModule implements Configurable 
 
 	public LowFireModule() {
 		super("low-fire", "Low Fire", "Lowers the fire overlay while you burn and shrinks the flames on burning players and mobs - or hides it with Fire Resistance.",
-				ModuleCategory.PVP, SafetyTag.COSMETIC_ONLY, false);
+				ModuleCategory.PVP, SafetyTag.CHECK_SERVER_RULES, false);
 		instance = this;
 	}
 

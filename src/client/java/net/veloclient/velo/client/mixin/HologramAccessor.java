@@ -17,5 +17,9 @@ public interface HologramAccessor {
 
 	@Invoker("getText")
 	net.minecraft.network.chat.Component velo$text();
+
+	// The lines as last laid out for drawing (null until drawn once) - DisplayCulling sizes the hologram from it.
+	@org.spongepowered.asm.mixin.gen.Accessor("clientDisplayCache")
+	net.minecraft.world.entity.Display.TextDisplay.CachedInfo velo$layout();
 }
 *///?}

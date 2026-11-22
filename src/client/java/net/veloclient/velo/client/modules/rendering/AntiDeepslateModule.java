@@ -54,7 +54,7 @@ public final class AntiDeepslateModule extends AbstractModule implements Configu
 		super("anti-deepslate", "Anti Deepslate",
 				"Draws deepslate, stone types, gravel, ores and bedrock as one plain block (netherite by default) so their rotation and patterns can't reveal "
 						+ "where your base is.",
-				ModuleCategory.RENDERING, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.RENDERING, SafetyTag.CHECK_SERVER_RULES, false);
 		instance = this;
 	}
 

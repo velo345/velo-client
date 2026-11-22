@@ -139,10 +139,10 @@ function postBody(post) {
 	return out.join("\n");
 }
 
-function postCard(post, i) {
+function postCard(post, i, eager = false) {
 	const tag = esc(post.tag || "News");
 	return `<a class="news-card reveal tilt" style="--i:${i % 6}" href="/news/${post.slug}">`
-		+ (post.cover ? `<span class="news-card-img"><img src="${esc(post.image(post.cover))}" alt="" loading="lazy" decoding="async" width="800" height="488"></span>` : "")
+		+ (post.cover ? `<span class="news-card-img"><img src="${esc(post.image(post.cover))}" alt="" ${eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" width="800" height="488" sizes="(max-width: 760px) 100vw, 400px"></span>` : "")
 		+ `<span class="news-card-body"><span class="news-meta"><span class="tag tag-${tag.toLowerCase()}">${tag}</span>`
 		+ `<time datetime="${post.date}">${prettyDate(post.date)}</time></span>`
 		+ `<span class="news-title">${esc(post.title)}</span><span class="news-summary">${esc(post.summary || "")}</span></span></a>`;
@@ -150,12 +150,22 @@ function postCard(post, i) {
 
 // ---- Build ----
 
+/** A small script minified for inlining (its sha256 goes into the site's CSP, see the check at the end of main()). */
+function inlineScript(file) {
+	const src = fs.readFileSync(file, "utf8");
+	try {
+		return require("esbuild").transformSync(src, { loader: "js", minify: true, target: "es2018" }).code.trim();
+	} catch (e) {
+		throw new Error(`can't inline ${file}: ${e.message}`);
+	}
+}
+
 function main() {
 	const tokens = flatten(config, "", {});
 	const siteUrl = tokens["site.url"].replace(/\/$/, "");
 	const posts = readPosts();
-	tokens["news.latest"] = posts.slice(0, 3).map(postCard).join("\n");
-	tokens["news.list"] = posts.map(postCard).join("\n");
+	tokens["news.latest"] = posts.slice(0, 3).map((p, i) => postCard(p, i)).join("\n"); // below the fold: lazy
+	tokens["news.list"] = posts.map((p, i) => postCard(p, i, i < 2)).join("\n");
 	tokens["news.count"] = String(posts.length);
 	// Every client module (dev-site/modules.json, made by tools/devsite/build.sh) - the full list on /features and the counts.
 	const modulesFile = path.join(ROOT, "..", "dev-site", "modules.json");
@@ -175,8 +185,11 @@ function main() {
 		}).join("\n");
 	}
 	tokens["build.year"] = String(new Date().getFullYear());
+	// The sale bar/cards are in the HTML while the sale isn't over at build time (the pages hide it themselves after "until").
+	tokens["sale.on"] = config.sale && truthy(String(config.sale.enabled)) && Date.now() < Number(config.sale.until) ? "true" : "";
 	tokens["asset.css"] = `/assets/site.css?v=${hashOf(path.join(ROOT, "assets", "site.css"))}`;
 	tokens["asset.js"] = `/assets/site.js?v=${hashOf(path.join(ROOT, "assets", "site.js"))}`;
+	tokens["asset.sale"] = `/assets/sale.js?v=${hashOf(path.join(ROOT, "assets", "sale.js"))}`;
 	tokens["asset.store"] = `/assets/store.js?v=${hashOf(path.join(ROOT, "assets", "store.js"))}`;
 	tokens["asset.skin3d"] = `/assets/skin3d.js?v=${hashOf(path.join(ROOT, "assets", "skin3d.js"))}`;
 	tokens["asset.schem3d"] = `/assets/schem3d.js?v=${hashOf(path.join(ROOT, "assets", "schem3d.js"))}`;
@@ -212,9 +225,13 @@ function main() {
 			extraHead: [
 				meta.css ? `<link rel="stylesheet" href="/assets/${meta.css}?v=${hashOf(path.join(ROOT, "assets", meta.css))}">` : "",
 				meta.js ? `<script src="/assets/${meta.js}?v=${hashOf(path.join(ROOT, "assets", meta.js))}" defer></script>` : "",
-				meta.preload ? `<link rel="preload" as="image" href="${meta.preload}" fetchpriority="high">` : "",
+				// "preload": "/x.webp" or [{"href", "media", "srcset"}] - one per <picture> source, so a phone never fetches the desktop picture.
+				...(meta.preload ? (Array.isArray(meta.preload) ? meta.preload : [{ href: meta.preload }]).map((p) =>
+					`<link rel="preload" as="image" href="${p.href}"${p.srcset ? ` imagesrcset="${p.srcset}" imagesizes="100vw"` : ""}${p.media ? ` media="${p.media}"` : ""} fetchpriority="high">`) : []),
 				// Runs before the first paint (the CSP allows no inline scripts), e.g. to cover the page until an intro starts.
-				meta.headScript ? `<script src="/assets/${meta.headScript}?v=${hashOf(path.join(ROOT, "assets", meta.headScript))}"></script>` : "",
+				// Inline, so it costs no request before the first paint - nginx's CSP allows it by its sha256 (keep the file stable,
+				// or update the hash in tools/server/nginx/snippets/velo-site-csp.conf: build.js prints it).
+				meta.headScript ? `<script>${inlineScript(path.join(ROOT, "assets", meta.headScript))}</script>` : "",
 			].join(""),
 		};
 		const pageTokens = { ...tokens };
@@ -318,6 +335,24 @@ function main() {
 	].join("\n"));
 	if (config.seo && config.seo.indexNowKey) fs.writeFileSync(path.join(DIST, `${config.seo.indexNowKey}.txt`), config.seo.indexNowKey);
 	fs.writeFileSync(path.join(DIST, "urls.txt"), sitemap.map((u) => u.loc).join("\n") + "\n");
+
+	// Responsive WebP variants of news and partner photos (Python + Pillow; skipped where that isn't installed).
+	try {
+		execSync(`python3 "${path.join(ROOT, "images.py")}" "${DIST}"`, { stdio: "inherit" });
+	} catch (e) {
+		console.warn("  ! images.py failed - pages keep the single pictures");
+	}
+	require("./optimize").optimize(DIST);
+	// Every inline <script> must be allowed by its hash in the site's CSP (tools/server/nginx/snippets/velo-site-csp.conf).
+	const inlineHashes = new Set();
+	for (const f of fs.readdirSync(DIST).filter((n) => n.endsWith(".html"))) {
+		for (const m of fs.readFileSync(path.join(DIST, f), "utf8").matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+			inlineHashes.add(`'sha256-${crypto.createHash("sha256").update(m[1]).digest("base64")}'`);
+		}
+	}
+	const csp = fs.readFileSync(path.join(ROOT, "..", "tools", "server", "nginx", "snippets", "velo-site-csp.conf"), "utf8");
+	const missing = [...inlineHashes].filter((h) => !csp.includes(h));
+	if (missing.length) console.warn(`\n  ! inline scripts not in the CSP yet - add to script-src: ${missing.join(" ")}\n`);
 
 	const placeholders = Object.entries(tokens).filter(([k, v]) => k.startsWith("legal.") && /YOUR |\[|example\.com|^$/.test(v));
 	console.log(`Built ${sitemap.length} indexed pages (${posts.length} news posts) -> dist/`);

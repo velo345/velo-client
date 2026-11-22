@@ -30,7 +30,7 @@
 		a.style.setProperty("--c", c.color);
 		const banner = link(safeUrl(c.channel), "creator-banner");
 		banner.setAttribute("aria-label", `${c.name} on YouTube`);
-		if (c.banner) banner.append(img(c.banner, `${c.name} channel banner`, 1600, 900));
+		if (c.banner) { const b = img(c.banner, `${c.name} channel banner`, 1600, 900); b.fetchPriority = "high"; banner.append(b); }
 		const body = el("div", "creator-body");
 		const id = el("div", "creator-id");
 		if (c.avatar) { const av = img(c.avatar, c.name, 320, 320); av.className = "creator-avatar"; id.append(av); }
@@ -69,6 +69,16 @@
 		.then((data) => {
 			const creators = (data && data.creators) || [];
 			if (!creators.length) return;
+			// Creators already in the HTML keep its pictures (small WebPs, already on screen) instead of loading the
+			// server's JPEGs again - the swap made the page fetch every picture twice and moved its main image late.
+			for (const c of creators) {
+				const known = document.getElementById(c.id);
+				if (!known) continue;
+				const b = known.querySelector(".creator-banner img");
+				const av = known.querySelector(".creator-avatar");
+				if (b) c.banner = b.getAttribute("src");
+				if (av) c.avatar = av.getAttribute("src");
+			}
 			list.replaceChildren(...creators.map(card));
 			if (note) note.textContent = creators.length === 1 ? "1 creator" : `${creators.length} creators`;
 		})

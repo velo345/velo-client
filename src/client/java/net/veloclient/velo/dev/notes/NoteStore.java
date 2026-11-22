@@ -241,7 +241,7 @@ public final class NoteStore {
 			case "server_notes_reset" -> {
 				serverPolicy = null;
 				SERVER.clear();
-				BRIDGE_WAITING.clear();
+				failWaiting("Lost the connection to the server - try again");
 				version++;
 			}
 			default -> {
@@ -297,6 +297,28 @@ public final class NoteStore {
 			}
 		});
 		net.veloclient.velo.dev.bridge.VeloBridgeClient.sendRaw(msg.toString());
+		// No answer (server busy, plugin reloaded, you switched servers): don't leave "Saving..." up forever.
+		java.util.concurrent.CompletableFuture.delayedExecutor(10, java.util.concurrent.TimeUnit.SECONDS).execute(() ->
+				MinecraftClient.getInstance().execute(() -> {
+					Consumer<JsonObject> late = BRIDGE_WAITING.remove(ref);
+					if (late != null) {
+						late.accept(failure("The server didn't answer - try again"));
+					}
+				}));
+	}
+
+	private static JsonObject failure(String message) {
+		JsonObject r = new JsonObject();
+		r.addProperty("ok", false);
+		r.addProperty("error", message);
+		return r;
+	}
+
+	/** Everyone still waiting for a bridge answer gets an error instead of waiting forever. */
+	private static void failWaiting(String message) {
+		List<Consumer<JsonObject>> waiting = new ArrayList<>(BRIDGE_WAITING.values());
+		BRIDGE_WAITING.clear();
+		waiting.forEach(w -> w.accept(failure(message)));
 	}
 
 	private static void bridgeSimple(String type, Note note, java.util.function.Consumer<JsonObject> extra) {

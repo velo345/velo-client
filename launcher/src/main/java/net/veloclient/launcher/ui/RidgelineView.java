@@ -105,6 +105,21 @@ public final class RidgelineView extends Region {
 		requestLayout();
 	}
 
+	private boolean winter;
+
+	/** Christmas: the snowy pixel-art village ({@link ChristmasScene}) instead of the ridgeline at dusk. */
+	public void setWinter(boolean winter) {
+		if (this.winter != winter) {
+			this.winter = winter;
+			builtW = 0;
+			requestLayout();
+		}
+	}
+
+	public boolean winter() {
+		return winter;
+	}
+
 	/** Who stands on the front ridge (the flat player); null for nobody. */
 	public void setPlayer(Node player) {
 		this.player = player;
@@ -134,8 +149,17 @@ public final class RidgelineView extends Region {
 		syncRunning();
 	}
 
+	// Pauses with the rest of the decorative animation (unfocused, minimized, 30 s without input). Before, the bobbing
+	// player and the twinkling stars kept Home rendering at 60 FPS forever - in front of the game too - and every frame
+	// presented leaks native memory in the NVIDIA GL driver (see RenderGate). Weak: a rebuilt Home doesn't stay reachable.
+	private final javafx.beans.value.ChangeListener<Boolean> gateListener = (o, was, now) -> syncRunning();
+
+	{
+		RenderGate.activeProperty().addListener(new javafx.beans.value.WeakChangeListener<>(gateListener));
+	}
+
 	private boolean shouldRun() {
-		if (suspended || !animatedSetting || getScene() == null || getScene().getWindow() == null || !getScene().getWindow().isShowing()) {
+		if (suspended || !animatedSetting || !RenderGate.active() || getScene() == null || getScene().getWindow() == null || !getScene().getWindow().isShowing()) {
 			return false;
 		}
 		return !(getScene().getWindow() instanceof javafx.stage.Stage s && s.isIconified());
@@ -165,6 +189,82 @@ public final class RidgelineView extends Region {
 
 	// ------------------------------------------------------------------ building
 
+	private void buildWinter(double w, double h) {
+		ChristmasScene scene = new ChristmasScene(w, h);
+		stage.getChildren().add(scene);
+		animations.add(scene.animation());
+		if (player != null) {
+			double pw = player.prefWidth(-1);
+			double ph = player.prefHeight(-1);
+			javafx.scene.image.ImageView hat = santaHat(pw);
+			Group standing = new Group(player, hat);
+			player.relocate(0, 0);
+			player.setLayoutX(0);
+			player.setLayoutY(0);
+			standing.relocate(Math.round(w * ChristmasScene.PLAYER_X - pw / 2), scene.playerGroundY() - ph);
+			// Group.relocate counts the hat sticking out above the head - put the feet back on the snow.
+			standing.setLayoutX(Math.round(w * ChristmasScene.PLAYER_X - pw / 2));
+			standing.setLayoutY(Math.round(scene.playerGroundY() - ph));
+			stage.getChildren().add(standing);
+			TranslateTransition bob = new TranslateTransition(Duration.seconds(1.7), standing);
+			bob.setFromY(0);
+			bob.setToY(-1.5);
+			bob.setAutoReverse(true);
+			bob.setCycleCount(Animation.INDEFINITE);
+			bob.setInterpolator(Interpolator.EASE_BOTH);
+			animations.add(bob);
+		}
+		if (shouldRun()) {
+			running = true;
+			for (Animation animation : animations) {
+				animation.play();
+			}
+		} else {
+			running = false;
+		}
+	}
+
+	/** A pixel Santa hat sized to the flat skin's head (the skin is 16 skin pixels wide). */
+	private static javafx.scene.image.ImageView santaHat(double playerWidth) {
+		String[] art = {
+				"..........WW",
+				"........RRWW",
+				"......RRRR..",
+				".....RRRRr..",
+				"....RRRRRr..",
+				"...RRRRRRRr.",
+				"..RRRRRRRRr.",
+				".WWWWWWWWWW.",
+				".wWWWwWWWwW."};
+		int unit = (int) Math.max(1, Math.round(playerWidth / 16));
+		int cols = art[0].length();
+		WritableImage img = new WritableImage(cols * unit, art.length * unit);
+		javafx.scene.image.PixelWriter pw = img.getPixelWriter();
+		for (int y = 0; y < art.length; y++) {
+			for (int x = 0; x < cols; x++) {
+				char ch = art[y].charAt(x);
+				int argb = switch (ch) {
+					case 'R' -> 0xFFC8202E;
+					case 'r' -> 0xFF8E1622;
+					case 'W' -> 0xFFF4F6FF;
+					case 'w' -> 0xFFC9D2EA;
+					default -> 0;
+				};
+				for (int dy = 0; dy < unit; dy++) {
+					for (int dx = 0; dx < unit; dx++) {
+						pw.setArgb(x * unit + dx, y * unit + dy, argb);
+					}
+				}
+			}
+		}
+		javafx.scene.image.ImageView view = new javafx.scene.image.ImageView(img);
+		view.setSmooth(false);
+		// Brim over the top two rows of the head (head = skin columns 4-11, rows 0-7).
+		view.setLayoutX(2 * unit);
+		view.setLayoutY(-(art.length - 2) * unit);
+		return view;
+	}
+
 	private void rebuild() {
 		double w = getWidth();
 		double h = getHeight();
@@ -177,6 +277,10 @@ public final class RidgelineView extends Region {
 		animations.clear();
 		stage.getChildren().clear();
 		stage.resize(w, h);
+		if (winter) {
+			buildWinter(w, h);
+			return;
+		}
 
 		Rectangle sky = new Rectangle(w, h);
 		sky.setFill(new LinearGradient(0, 0, 0, 1, true, CycleMethod.NO_CYCLE,

@@ -307,6 +307,10 @@ public final class FfmpegTool {
 				candidates.add(new String[] {"h264_nvenc", "NVIDIA NVENC"});
 				candidates.add(new String[] {"h264_amf", "AMD AMF"});
 				candidates.add(new String[] {"h264_qsv", "Intel Quick Sync"});
+				if (linux()) {
+					// Linux: Intel / AMD graphics encode through VA-API (what OBS uses there)
+					candidates.add(new String[] {"h264_vaapi", "VA-API"});
+				}
 			}
 			candidates.add(new String[] {"libx264", "x264 (CPU)"});
 			for (String[] candidate : candidates) {
@@ -333,6 +337,7 @@ public final class FfmpegTool {
 			case "h264_amf" -> args.addAll(List.of("-quality", "speed", "-rc", "cbr", "-b:v", rate));
 			case "h264_qsv" -> args.addAll(List.of("-preset", "veryfast", "-b:v", rate));
 			case "h264_videotoolbox" -> args.addAll(List.of("-realtime", "1", "-b:v", rate));
+			case "h264_vaapi" -> args.addAll(List.of("-b:v", rate));
 			// the CPU fallback: at most half the cores, so the game (and the PC) stay usable
 			default -> args.addAll(List.of("-preset", "ultrafast", "-tune", "zerolatency", "-b:v", rate, "-maxrate", rate, "-bufsize", bitrateKbps * 2 + "k",
 					"-threads", String.valueOf(Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2)))));
@@ -340,14 +345,35 @@ public final class FfmpegTool {
 		return new Encoder(known.name(), known.label(), args);
 	}
 
+	/** The render node VA-API encodes on (the first one there is). */
+	public static String vaapiDevice() {
+		for (int i = 128; i < 136; i++) {
+			Path node = Path.of("/dev/dri/renderD" + i);
+			if (Files.exists(node)) {
+				return node.toString();
+			}
+		}
+		return "/dev/dri/renderD128";
+	}
+
+	private static boolean linux() {
+		return System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("linux");
+	}
+
 	private static boolean encodes(Path ffmpeg, String name) {
 		quietCrashDialogs();
 		Process process = null;
 		try {
 			// output discarded (reading it blocked forever on an ffmpeg stuck behind a crash dialog), hard timeout, then killed
-			process = new ProcessBuilder(ffmpeg.toString(), "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
-					"color=c=black:s=1280x720:r=60", "-frames:v", "12", "-pix_fmt", "yuv420p", "-c:v", name, "-f", "null", "-")
-					.redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+			List<String> command = new ArrayList<>(List.of(ffmpeg.toString(), "-hide_banner", "-loglevel", "error"));
+			if ("h264_vaapi".equals(name)) {
+				command.addAll(List.of("-vaapi_device", vaapiDevice(), "-f", "lavfi", "-i", "color=c=black:s=1280x720:r=60", "-frames:v", "12",
+						"-vf", "format=nv12,hwupload", "-c:v", name, "-f", "null", "-"));
+			} else {
+				command.addAll(List.of("-f", "lavfi", "-i", "color=c=black:s=1280x720:r=60", "-frames:v", "12", "-pix_fmt", "yuv420p",
+						"-c:v", name, "-f", "null", "-"));
+			}
+			process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
 			if (!process.waitFor(15, TimeUnit.SECONDS)) {
 				process.destroyForcibly();
 				return false;

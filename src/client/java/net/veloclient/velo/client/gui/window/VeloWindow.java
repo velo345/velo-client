@@ -218,6 +218,7 @@ public abstract class VeloWindow extends Screen {
 			context.fill(0, hole[1] + hole[3], this.width, this.height, dim);
 			context.fill(0, hole[1], hole[0], hole[1] + hole[3], dim);
 			context.fill(hole[0] + hole[2], hole[1], this.width, hole[1] + hole[3], dim);
+			holeCorners(context, hole, dim);
 		}
 
 		// Opens with a gentle scale-up + rise, closes with the reverse.
@@ -292,6 +293,7 @@ public abstract class VeloWindow extends Screen {
 					context.disableScissor();
 				}
 			}
+			holeCorners(context, hole, surface);
 		}
 		if (style.equals("glass")) {
 			// a soft sheen across the top, like frosted glass catching light
@@ -498,6 +500,29 @@ public abstract class VeloWindow extends Screen {
 	protected int[] windowHole() {
 		return null;
 	}
+
+	/** The hole's frame is rounded (radius {@link #HOLE_RADIUS}): fill its four corners outside that curve with {@code color}. */
+	private static void holeCorners(DrawContext context, int[] hole, int color) {
+		int r = HOLE_RADIUS;
+		int x0 = hole[0];
+		int y0 = hole[1];
+		int x1 = hole[0] + hole[2];
+		int y1 = hole[1] + hole[3];
+		for (int row = 0; row < r; row++) {
+			double dy = r - row - 0.5;
+			int inset = (int) Math.round(r - Math.sqrt(Math.max(0, r * r - dy * dy)));
+			if (inset <= 0) {
+				continue;
+			}
+			context.fill(x0, y0 + row, x0 + inset, y0 + row + 1, color);
+			context.fill(x1 - inset, y0 + row, x1, y0 + row + 1, color);
+			context.fill(x0, y1 - row - 1, x0 + inset, y1 - row, color);
+			context.fill(x1 - inset, y1 - row - 1, x1, y1 - row, color);
+		}
+	}
+
+	/** Corner radius of a see-through preview's frame (ModuleConfigScreen strokes it with the same radius). */
+	protected static final int HOLE_RADIUS = 8;
 
 		protected void renderHeaderExtras(DrawContext context, int mouseX, int mouseY) {
 	}

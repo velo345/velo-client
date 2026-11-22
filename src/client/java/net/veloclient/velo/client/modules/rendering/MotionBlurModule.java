@@ -172,9 +172,11 @@ public final class MotionBlurModule extends AbstractModule implements Configurab
 		try {
 			uploadParams(client, dirX / 0.25, dirY / 0.25, zoom, trailNow / 0.95, samples);
 			//? if >=1.21.2 {
-			if (processor == null) {
-				processor = load(client, EFFECT);
+			// Fetched every frame (vanilla caches it): a resource reload - e.g. a server resource pack - closes the old one.
+			if (net.veloclient.velo.client.util.ClientCompat.reloadingResources()) {
+				return; // never mid-reload (see ClientCompat.reloadingResources)
 			}
+			processor = load(client, EFFECT);
 			//?}
 			if (processor == null) {
 				return;

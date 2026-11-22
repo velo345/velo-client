@@ -27,6 +27,20 @@ public final class ClientCompat {
 	}
 
 	/** The integer GUI scale (screen pixels per GUI unit). */
+	/**
+	 * A resource reload is running (the loading overlay is up - Velo's seamless reload still keeps it). Post chains must not
+	 * be loaded then: a load attempt mid-reload counts as a broken resource pack, Minecraft drops every pack and reloads
+	 * again (long black screen, "resource pack loading failed").
+	 */
+	public static boolean reloadingResources() {
+		var client = net.minecraft.client.MinecraftClient.getInstance();
+		//? if <26.2 {
+		return client.getOverlay() != null;
+		//?} else {
+		/*return client.gui.overlay() != null;
+		*///?}
+	}
+
 	public static int guiScale() {
 		//? if <26.1 {
 		return MinecraftClient.getInstance().getWindow().getScaleFactor();

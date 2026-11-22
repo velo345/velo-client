@@ -103,6 +103,19 @@ public final class CosmeticUi {
 		}
 	}
 
+	/** Drops everything decoded for a library cloak (its art was just replaced). */
+	public static void forgetLibraryCape(String id) {
+		String key = "lib:" + id;
+		FRAMES.remove(key);
+		HD_FRAMES.remove(key);
+		synchronized (THUMBNAILS) {
+			THUMBNAILS.keySet().removeIf(k -> k.startsWith(key + "@"));
+		}
+		synchronized (FRAME_THUMBNAILS) {
+			FRAME_THUMBNAILS.keySet().removeIf(k -> k.startsWith(key + "@"));
+		}
+	}
+
 	/** The frames if they're already decoded (instant), else null. */
 	static List<GifFrames.Frame> cachedFrames(String key) {
 		return FRAMES.get(key);

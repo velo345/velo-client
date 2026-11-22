@@ -148,6 +148,7 @@ public final class HudManager {
 		//? if >=26.1 && <26.2 {
 		/*net.veloclient.velo.client.modules.rendering.ColorGradingModule.applyIfActive();
 		net.veloclient.velo.client.modules.rendering.MotionBlurModule.applyIfActive();
+		net.veloclient.velo.client.lyrics.LyricsPulse.applyIfActive();
 		*///?}
 		float tickDelta = tickCounter.getTickProgress(true);
 		int screenWidth = client.getWindow().getScaledWidth();

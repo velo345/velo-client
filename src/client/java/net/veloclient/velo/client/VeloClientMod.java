@@ -90,6 +90,8 @@ public final class VeloClientMod implements ClientModInitializer {
 				net.veloclient.velo.client.devtools.StartupTimer::tick);
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				client -> net.veloclient.velo.client.cosmetics.LockerFileSync.tick());
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
+				client -> net.veloclient.velo.client.report.BugReporter.snapshotTick());
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(
 				client -> {
 					net.veloclient.velo.client.cloud.CloudSync.onStop();
@@ -180,6 +182,8 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.devtools.ScreenshotTour.initIfRequested();
 		net.veloclient.velo.client.devtools.CosmeticsBench.register();
 		net.veloclient.velo.client.devtools.CrowdBench.register();
+		net.veloclient.velo.client.devtools.SpawnBench.register();
+		net.veloclient.velo.client.devtools.ServerBench.register();
 		net.veloclient.velo.client.devtools.MoveBench.register();
 		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
 				net.veloclient.velo.client.modules.performance.HudCacheTuner::tick);
@@ -427,11 +431,17 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new ParticleLimiterModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.AntiFarmLagModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.TntOptimizerModule());
+		if (net.veloclient.velo.client.modules.performance.GpuHeldMeshes.supported()) {
+			ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.GpuMeshesModule());
+		}
 		ModuleRegistry.register(new PerformanceBoostModule());
 		ModuleRegistry.register(new RenderCullingModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.ShaderCacheModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.EntityDetailModule());
 		ModuleRegistry.register(new MotionBlurModule());
+		if (net.veloclient.velo.client.modules.rendering.SkyboxModule.supported()) {
+			ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.SkyboxModule());
+		}
 		ModuleRegistry.register(new FullBrightModule());
 		ModuleRegistry.register(new FovModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.ScreenStretchModule());

@@ -167,7 +167,7 @@ final class AudioCapture {
 		return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("linux");
 	}
 
-	private static Source desktopSource() {
+	static Source desktopSource() {
 		if (windows()) {
 			Source wasapi = WasapiLoopback.open();
 			if (wasapi != null) {

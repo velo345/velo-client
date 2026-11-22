@@ -1,0 +1,47 @@
+{
+ "title": "Black Friday: 50% off Velo Coins & Velo+",
+ "summary": "From Monday, November 23 until the end of Cyber Monday: every Velo Coin pack and your first month of Velo+ cost half. Biggest deal of the year.",
+ "tag": "Event",
+ "accent": "#e0262e",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "text",
+   "text": "**Black Friday is here.** From **Monday, November 23** until **Cyber Monday (November 30) is over**, everything you buy with real money in Velo costs **half**."
+  },
+  {
+   "type": "heading",
+   "text": "What's 50% off"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Every Velo Coin pack** - 15,000 coins for **25.00 €** instead of 49.99 €",
+    "**Velo+**: your **first month for 5.00 €** instead of 9.99 € (the yearly plan is half price too)",
+    "Works in the **launcher**, **in game** and on **velo-client.com/store** - the lower price is already in the checkout, no code needed"
+   ]
+  },
+  {
+   "type": "image",
+   "image": "file:images/coins.jpg",
+   "caption": "Launcher > Velo Coins: the sale price is right on every pack."
+  },
+  {
+   "type": "heading",
+   "text": "Good to know"
+  },
+  {
+   "type": "list",
+   "items": [
+    "Partner codes don't stack with the sale - the sale is the better deal anyway",
+    "Coins never expire, so stock up for the **Christmas collection** coming in December",
+    "Already have Velo+? Grab coins at half price - your monthly coins keep coming on top"
+   ]
+  },
+  {
+   "type": "text",
+   "text": "Ends **Monday, November 30 at midnight (CET)**. See you in the Store!"
+  }
+ ]
+}

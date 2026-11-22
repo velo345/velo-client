@@ -59,7 +59,7 @@ public final class TntTimerModule extends AbstractModule implements Configurable
 	public TntTimerModule() {
 		super("tnt-timer", "TNT Timer",
 				"Shows a live countdown above primed TNT, with a customizable color and text size.",
-				ModuleCategory.RENDERING, SafetyTag.COSMETIC_ONLY, false);
+				ModuleCategory.RENDERING, SafetyTag.CHECK_SERVER_RULES, false);
 		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context ->
 				ModuleProfiler.time(id(), ModuleProfiler.Phase.WORLD_RENDER, () -> onRender(context)));
 	}

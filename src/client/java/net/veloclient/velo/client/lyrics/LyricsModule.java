@@ -40,6 +40,7 @@ public final class LyricsModule extends AbstractModule implements Configurable {
 
 	/** True while the Lyrics Studio is open: demo lines show when nothing plays. */
 	static boolean studioOpen;
+	private static final boolean DEV_DEMO = Boolean.getBoolean("velo.lyricsDemo");
 
 	/** Whether lyrics should show at all right now (on, or the Studio's preview; and something is playing). */
 	private static boolean active() {
@@ -47,9 +48,17 @@ public final class LyricsModule extends AbstractModule implements Configurable {
 		if (m == null || !m.isEnabled() && !studioOpen) {
 			return false;
 		}
+		if (DEV_DEMO) {
+			studioOpen = true; // dev (-Dvelo.lyricsDemo): demo lines without music, for headless checks
+		}
 		LyricsSync.update();
 		return studioOpen || LyricsSync.status() != LyricsSync.Status.NOTHING_PLAYING
 				&& (LyricsSync.playing() || LyricsSync.status() == LyricsSync.Status.FOUND);
+	}
+
+	/** Lyrics are showing right now (any style) - the Beat Pulse only runs then. */
+	static boolean visibleNow() {
+		return active();
 	}
 
 	/** The world pass asks: 3D lyrics this frame? */

@@ -109,6 +109,7 @@ public final class ProfileShare {
 	/** Builds the shared profile as a new profile on this PC, downloading everything from Modrinth. */
 	public static Instance install(JsonObject shared, String name, BiConsumer<String, Double> progress) throws IOException {
 		Instance instance = InstanceStore.createNew(name, shared.get("minecraft").getAsString(), InstanceIcon.builtin(BuiltinIcons.DEFAULT));
+		InstanceStore.skipGuide(instance.id());
 		Object[][] kinds = {{"mods", InstalledAssetStore.Kind.MOD, InstancePaths.modsDir(instance.id())},
 				{"resourcepacks", InstalledAssetStore.Kind.RESOURCE_PACK, InstancePaths.resourcePacksDir(instance.id())},
 				{"shaders", InstalledAssetStore.Kind.SHADER_PACK, InstancePaths.shaderPacksDir(instance.id())}};

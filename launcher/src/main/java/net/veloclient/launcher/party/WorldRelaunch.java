@@ -178,6 +178,7 @@ public final class WorldRelaunch {
 			}
 		}
 		Instance created = InstanceStore.createNew(name, version, InstanceIcon.builtin(net.veloclient.launcher.instance.BuiltinIcons.DEFAULT));
+		InstanceStore.skipGuide(created.id());
 		try {
 			Files.writeString(net.veloclient.launcher.instance.InstancePaths.dir(created.id()).resolve(MARKER), "Temporary profile for a hosted world");
 		} catch (java.io.IOException ignored) {

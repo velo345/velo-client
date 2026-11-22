@@ -81,7 +81,7 @@ final class StaffSync {
 			return;
 		}
 		Map<String, String> levels = new LinkedHashMap<>();
-		for (Guild guild : jda.getGuilds()) {
+		for (Guild guild : HomeGuild.guilds(jda)) {
 			// A failed lookup throws, so a Discord hiccup never wipes the staff list.
 			Map<String, java.util.Set<String>> holders = RoleHolders.of(jda, guild.getId(), config.staffRoles.keySet());
 			for (Map.Entry<String, java.util.Set<String>> member : holders.entrySet()) {
@@ -106,7 +106,7 @@ final class StaffSync {
 	/** Partners and creators (their Discord roles) get Velo+ for as long as they have the role. */
 	private void syncPlusRoles() throws Exception {
 		Map<String, String> roles = new LinkedHashMap<>();
-		for (Guild guild : jda.getGuilds()) {
+		for (Guild guild : HomeGuild.guilds(jda)) {
 			Map<String, java.util.Set<String>> holders = RoleHolders.of(jda, guild.getId(), config.plusRoles.keySet());
 			for (Map.Entry<String, java.util.Set<String>> member : holders.entrySet()) {
 				for (String roleId : member.getValue()) {

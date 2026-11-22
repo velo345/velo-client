@@ -79,9 +79,11 @@ public final class ColorGradingModule extends AbstractModule implements Configur
 			//? if <1.21.2 {
 			/*//
 			*///?} else {
-			if (processor == null) {
-				processor = load(client, EFFECT);
+			// Fetched every frame (vanilla caches it): a resource reload - e.g. a server resource pack - closes the old one.
+			if (net.veloclient.velo.client.util.ClientCompat.reloadingResources()) {
+				return; // never mid-reload (see ClientCompat.reloadingResources)
 			}
+			processor = load(client, EFFECT);
 			//?}
 			if (processor == null) {
 				return;

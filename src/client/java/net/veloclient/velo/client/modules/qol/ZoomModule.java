@@ -83,7 +83,7 @@ public final class ZoomModule extends AbstractModule implements Configurable {
 
 	public ZoomModule() {
 		super("zoom", "Zoom", "Hold the zoom key to smoothly narrow your FOV, spyglass-style. Scroll while held to adjust.",
-				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.QOL, SafetyTag.CHECK_SERVER_RULES, false);
 		ClientTickEvents.END_CLIENT_TICK.register(client ->
 				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
 	}

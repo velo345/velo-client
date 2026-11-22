@@ -222,9 +222,11 @@ public final class TopBar extends HBox {
 
 		avatar.setMinSize(32, 32);
 		avatar.setMaxSize(32, 32);
+		// The head fills the whole 32 px box so the rounded clip actually cuts its corners (it used to be 28 px inside the
+		// box - the rounding only touched the empty margin and the head looked square).
 		javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle(32, 32);
-		clip.setArcWidth(10);
-		clip.setArcHeight(10);
+		clip.setArcWidth(14);
+		clip.setArcHeight(14);
 		avatar.setClip(clip);
 		accountName.getStyleClass().add("t-strong");
 		accountName.setMaxWidth(118);

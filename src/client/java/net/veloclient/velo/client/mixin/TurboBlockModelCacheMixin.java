@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 *///?}
 
 /**
- * TNT Optimizer - block model memo (TntOptimizerModule, default off): block-shaped entities (primed TNT, falling blocks, block displays, minecart contents
+ * Block model memo (TNT Optimizer's switch, and always with Velo Turbo since 2026-11-21): block-shaped entities (primed TNT, falling blocks, block displays, minecart contents
  * ...) rebuild their block model every frame - the model set lookup plus the whole Fabric model pipeline (quads into a
  * mutable view and back). Profiled 2026-11-11 in a TNT farm: 60 primed TNT cost 7% of the render thread. The result
  * only depends on the block state and the display context (the model seed is a constant), so the first build is
@@ -48,7 +48,9 @@ public abstract class TurboBlockModelCacheMixin {
 	@Inject(method = "update", at = @At("HEAD"), cancellable = true)
 	private void velo$fromMemo(BlockModelRenderState state, BlockState block, BlockDisplayContext context, CallbackInfo ci) {
 		velo$recording = false;
-		if (!ON || !net.veloclient.velo.client.modules.performance.TntOptimizerModule.reuseModels()
+		// TNT Optimizer's switch, or Velo Turbo (block displays: server spawns are built from hundreds of them)
+		if (!ON || !(net.veloclient.velo.client.modules.performance.TntOptimizerModule.reuseModels()
+				|| net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo)
 				|| !com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
 			return;
 		}
@@ -75,6 +77,9 @@ public abstract class TurboBlockModelCacheMixin {
 		a.velo$setSpecialTransformation((org.joml.Matrix4fc) m[4]);
 		state.tintLayers().addAll((it.unimi.dsi.fastutil.ints.IntList) m[5]);
 		state.blockLightCoords = (Integer) m[6];
+		if (m[7] != null && !velo$setMesh(state, m[7])) {
+			return; // couldn't hand the geometry over: let vanilla build it (never an empty model)
+		}
 		ci.cancel();
 	}
 
@@ -84,17 +89,57 @@ public abstract class TurboBlockModelCacheMixin {
 			return;
 		}
 		velo$recording = false;
+		// Fabric API keeps emitted geometry in its own mesh field (a new mesh each update, nulled by clear()). A memo of only
+		// the vanilla fields replayed an EMPTY model (primed TNT went invisible, 2026-11-15), so the mesh is copied into the
+		// memo and handed back on every hit - one copy per block state, shared read-only (nothing writes a mesh after it
+		// was filled: update() clears the state first, which only nulls the field).
+		Object meshCopy = null;
 		if (velo$fabricMeshInUse(state)) {
-			// Fabric API keeps emitted geometry in its own mesh field, which clear() nulls - a memo of only the vanilla
-			// fields replays an EMPTY model (primed TNT went invisible, 2026-11-15). Those results are never memoized.
-			return;
+			meshCopy = velo$copyMesh(state);
+			if (meshCopy == null) {
+				return; // can't copy it: never memoized
+			}
 		}
 		TurboBlockModelStateAccessor a = (TurboBlockModelStateAccessor) state;
 		List<net.minecraft.client.renderer.block.dispatch.BlockStateModelPart> parts = a.velo$modelParts();
 		Object[] m = {parts == null ? null : List.copyOf(parts), a.velo$transformation(), a.velo$renderType(), a.velo$specialRenderer(),
-				a.velo$specialTransformation(), new it.unimi.dsi.fastutil.ints.IntArrayList(state.tintLayers()), state.blockLightCoords};
+				a.velo$specialTransformation(), new it.unimi.dsi.fastutil.ints.IntArrayList(state.tintLayers()), state.blockLightCoords, meshCopy};
 		velo$memo.computeIfAbsent(block, k -> new IdentityHashMap<>()).put(context, m);
 		velo$entries++;
+	}
+
+	// A filled copy of the state's Fabric mesh (null when there's nothing to copy or no way to).
+	@Unique
+	private static Object velo$copyMesh(BlockModelRenderState state) {
+		java.lang.reflect.Field f = velo$meshField;
+		if (f == null) {
+			return null;
+		}
+		try {
+			Object mesh = f.get(state);
+			if (!(mesh instanceof net.fabricmc.fabric.api.client.renderer.v1.mesh.MeshView view)) {
+				return null;
+			}
+			var copy = net.fabricmc.fabric.api.client.renderer.v1.Renderer.get().mutableMesh();
+			view.outputTo(copy.emitter());
+			return copy.size() == view.size() && f.getType().isInstance(copy) ? copy : null;
+		} catch (ReflectiveOperationException | RuntimeException e) {
+			return null;
+		}
+	}
+
+	@Unique
+	private static boolean velo$setMesh(BlockModelRenderState state, Object mesh) {
+		java.lang.reflect.Field f = velo$meshField;
+		if (f == null) {
+			return false;
+		}
+		try {
+			f.set(state, mesh);
+			return true;
+		} catch (ReflectiveOperationException | RuntimeException e) {
+			return false;
+		}
 	}
 
 	@Unique

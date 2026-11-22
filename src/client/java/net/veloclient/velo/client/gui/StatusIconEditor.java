@@ -28,6 +28,18 @@ public final class StatusIconEditor {
 	 * @param color    the module's current color for the starter art
 	 */
 	public static void open(Screen parent, String kind, String label, int color) {
+		open(parent, kind, label, color, null);
+	}
+
+	/**
+	 * A heart variant of your own (absorption, frozen, poison, wither): starts from the one made from your normal heart
+	 * (hue-shifted), saved separately; until you save one the made variant is used.
+	 */
+	public static void openVariant(Screen parent, String baseKind, StatusBarIcons.Variant variant, int color) {
+		open(parent, variant.kind(baseKind), variant.label + " Heart", color, new Object[] {baseKind, variant});
+	}
+
+	private static void open(Screen parent, String kind, String label, int color, Object[] variantOf) {
 		MinecraftClient.getInstance().setScreen(new PixelEditorScreen(parent, "Draw " + label, new PixelEditorScreen.Host() {
 			@Override
 			public List<PixelEditorScreen.StateSpec> states() {
@@ -52,6 +64,22 @@ public final class StatusIconEditor {
 
 			@Override
 			public NativeImage starter(String key, int size) {
+				if (variantOf != null) {
+					String base = (String) variantOf[0];
+					StatusBarIcons.Variant variant = (StatusBarIcons.Variant) variantOf[1];
+					Map<StatusBarIcons.State, NativeImage> saved = StatusBarIcons.loadForEditing(base);
+					NativeImage from = saved.remove(state(key));
+					saved.values().forEach(NativeImage::close);
+					if (from == null) {
+						from = builtIn(base, state(key), color);
+					}
+					if (from == null) {
+						return null;
+					}
+					NativeImage made = variant.applyTo(from);
+					from.close();
+					return made;
+				}
 				return builtIn(kind, state(key), color);
 			}
 
@@ -77,10 +105,11 @@ public final class StatusIconEditor {
 				NativeImage full = editor.image("full");
 				NativeImage half = editor.image("half");
 				NativeImage empty = editor.image("empty");
-				int slot = 18;
-				int step = 16;
+				boolean hearts = "heart".equals(kind);
+				int slot = hearts ? 14 : 18;    // hearts: a smaller row, so the effect variants fit under it
+				int step = hearts ? 13 : 16;
 				int rowX = x + Math.max(6, (width - (step * 5 + slot)) / 2);
-				int rowY = y + (height - slot) / 2;
+				int rowY = hearts ? y + 4 : y + (height - slot) / 2;
 				for (int i = 0; i < 6; i++) {
 					int sx = rowX + i * step;
 					if (i < 3) {
@@ -101,6 +130,40 @@ public final class StatusIconEditor {
 					} else {
 						PixelEditorScreen.drawImage(context, full, sx, rowY, slot, 0x59000000, 1f);
 					}
+				}
+				if (!"heart".equals(kind) || full == null) {
+					return;
+				}
+				// The variants made from this drawing (hue-shifted like a pen with modifiers) - what absorption, poison,
+				// wither and frozen look like unless you draw them yourself. Four groups side by side under the row.
+				var font = MinecraftClient.getInstance().textRenderer;
+				int small = 12;
+				int groupW = width / 4;
+				int vy = rowY + slot + 4;
+				if (vy + 10 + small > y + height) {
+					return;
+				}
+				int g = 0;
+				for (StatusBarIcons.Variant variant : StatusBarIcons.Variant.values()) {
+					if (variant == StatusBarIcons.Variant.NORMAL) {
+						continue;
+					}
+					int gx = x + g * groupW + 6;
+					boolean own = StatusBarIcons.hasDrawing(variant.kind(kind));
+					context.drawTextWithShadow(font, variant.label + (own ? " *" : ""), gx, vy, 0xFF9A9AA6);
+					NativeImage made = variant.applyTo(full);
+					NativeImage madeEmpty = variant == StatusBarIcons.Variant.WITHERED && empty != null ? variant.applyTo(empty) : null;
+					NativeImage back = madeEmpty != null ? madeEmpty : empty;
+					int iy = vy + 10;
+					PixelEditorScreen.drawImage(context, made, gx, iy, small, 0, 1f);
+					PixelEditorScreen.drawImage(context, back != null ? back : made, gx + small + 2, iy, small, back != null ? 0 : 0x59000000, 1f);
+					PixelEditorScreen.drawImage(context, made, gx + small + 2, iy, small, 0, 5 / 9f);
+					PixelEditorScreen.drawImage(context, back != null ? back : made, gx + 2 * (small + 2), iy, small, back != null ? 0 : 0x59000000, 1f);
+					made.close();
+					if (madeEmpty != null) {
+						madeEmpty.close();
+					}
+					g++;
 				}
 			}
 		}));

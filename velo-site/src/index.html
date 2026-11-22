@@ -11,7 +11,7 @@
 	"headScript": "intro-gate.js",
 	"bodyClass": "v2 home",
 	"ogImage": "/assets/hero/og.jpg",
-	"preload": "/assets/hero/hero-1600.webp",
+	"preload": [{"href": "/assets/hero/hero-mobile.webp", "media": "(max-width: 760px)"}, {"href": "/assets/hero/hero-1600.webp", "srcset": "/assets/hero/hero-1600.webp 1600w, /assets/hero/hero-2560.webp 2560w", "media": "(min-width: 761px)"}],
 	"images": ["/assets/hero/hero-2560.webp", "/assets/shots/l-home.webp", "/assets/shots/title-velo-dark.webp", "/assets/shots/l-locker.webp"],
 	"schema": [
 		{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Velo Client", "applicationCategory": "GameApplication", "applicationSubCategory": "Minecraft client", "operatingSystem": "Windows 10, Windows 11, Linux", "softwareVersion": "1.1.0", "datePublished": "2026-11-01", "url": "https://velo-client.com/", "downloadUrl": "https://velo-client.com/download", "screenshot": ["https://velo-client.com/assets/shots/l-home.webp", "https://velo-client.com/assets/shots/title-velo-dark.webp", "https://velo-client.com/assets/shots/l-locker.webp"], "image": "https://velo-client.com/assets/hero/og.jpg", "description": "A free Minecraft launcher and Fabric client with performance mods built in, 119 free modules, a customizable HUD, friends and parties, PvP tools and 3D cosmetics.", "featureList": ["Performance mods (Sodium, Lithium, FerriteCore) installed automatically", "119 free modules", "Drag-and-drop HUD editor", "Friends, parties and chat across servers", "World map and waypoints", "Clips: save the last 30 seconds", "Redstone Mode", "Emoji in chat like Discord", "Animated 3D wings, cloaks, auras, emotes, kill effects and bodywear"], "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR", "availability": "https://schema.org/InStock"}, "publisher": {"@id": "https://velo-client.com/#org"}},
@@ -31,7 +31,7 @@
 }-->
 <div class="intro" aria-hidden="true" data-intro>
   <div class="intro-grid" data-intro-grid></div>
-  <div class="intro-mark"><img src="/assets/logo.png" alt="" width="64" height="64"><span>VELO</span></div>
+  <div class="intro-mark"><img src="/assets/logo-112.webp" alt="" width="64" height="64"><span>VELO</span></div>
 </div>
 
 <section class="h-hero" data-hero>
@@ -62,6 +62,8 @@
   </div>
 </section>
 
+{{> sale-strip}}
+
 <div class="h-ticker" aria-hidden="true">
   <div class="h-ticker-track">
     <span>{{counts.modules}} free modules</span><i>/</i><span>Sodium, Lithium &amp; FerriteCore built in</span><i>/</i><span>Import from Lunar, Modrinth, CurseForge</span><i>/</i><span>Minecraft 1.21.11 – 26.3</span><i>/</i><span>Friends &amp; parties on every server</span><i>/</i><span>Clips of your last 30 seconds</span><i>/</i>
@@ -76,29 +78,30 @@
       <p>Every picture on this page is a real capture of Velo Client {{release.version}}. Switch pages like you would in the launcher, and tap the numbered points on Home.</p>
     </header>
     <div class="h-window reveal" data-tabs="launcher">
-      <div class="h-window-bar" role="tablist" aria-label="Launcher pages">
-        <span class="h-window-label">LAUNCHER</span>
-        <button role="tab" aria-selected="true" data-tab="0">Home</button>
-        <button role="tab" aria-selected="false" data-tab="1">Library</button>
-        <button role="tab" aria-selected="false" data-tab="2">Servers</button>
-        <button role="tab" aria-selected="false" data-tab="3">Store</button>
-        <button role="tab" aria-selected="false" data-tab="4">Locker</button>
-        <button role="tab" aria-selected="false" data-tab="5">Clips</button>
+      <div class="h-window-bar">        <span class="h-window-label" aria-hidden="true">LAUNCHER</span>
+        <div class="h-window-tabs" role="tablist" aria-label="Launcher pages">
+          <button role="tab" aria-selected="true" data-tab="0">Home</button>
+          <button role="tab" aria-selected="false" data-tab="1">Library</button>
+          <button role="tab" aria-selected="false" data-tab="2">Servers</button>
+          <button role="tab" aria-selected="false" data-tab="3">Store</button>
+          <button role="tab" aria-selected="false" data-tab="4">Locker</button>
+          <button role="tab" aria-selected="false" data-tab="5">Clips</button>
+        </div>
       </div>
       <div class="h-stage h-stage-launcher">
-        <img class="on" data-pane="0" src="/assets/shots/l-home.webp" srcset="/assets/shots/l-home-800.webp 800w, /assets/shots/l-home.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="870" alt="Velo launcher Home: continue playing LuckySMP, what's new, jump back in" loading="lazy">
-        <img data-pane="1" src="/assets/shots/l-library.webp" srcset="/assets/shots/l-library-800.webp 800w, /assets/shots/l-library.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="870" alt="Velo launcher Library with profiles for 26.2 and 1.21.11" loading="lazy">
-        <img data-pane="2" src="/assets/shots/l-servers.webp" srcset="/assets/shots/l-servers-800.webp 800w, /assets/shots/l-servers.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="870" alt="Velo launcher Servers with live ping and player counts" loading="lazy">
-        <img data-pane="3" src="/assets/shots/l-store.webp" srcset="/assets/shots/l-store-800.webp 800w, /assets/shots/l-store.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="870" alt="Velo launcher Store with a featured wings collection" loading="lazy">
-        <img data-pane="4" src="/assets/shots/l-locker.webp" srcset="/assets/shots/l-locker-800.webp 800w, /assets/shots/l-locker.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="906" alt="Velo launcher Locker with cloak, wings and aura on a 3D player" loading="lazy">
-        <img data-pane="5" src="/assets/shots/l-clips.webp" srcset="/assets/shots/l-clips-800.webp 800w, /assets/shots/l-clips.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="870" alt="Velo launcher Clips and screenshots" loading="lazy">
+        <img class="on" data-pane="0" src="/assets/shots/l-home.webp" srcset="/assets/shots/l-home-800.webp 800w, /assets/shots/l-home.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="950" alt="Velo launcher Home: continue playing LuckySMP, what's new, jump back in" loading="lazy">
+        <img data-pane="1" src="/assets/shots/l-library.webp" srcset="/assets/shots/l-library-800.webp 800w, /assets/shots/l-library.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="950" alt="Velo launcher Library with profiles for 26.2 and 1.21.11" loading="lazy">
+        <img data-pane="2" src="/assets/shots/l-servers.webp" srcset="/assets/shots/l-servers-800.webp 800w, /assets/shots/l-servers.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="950" alt="Velo launcher Servers with live ping and player counts" loading="lazy">
+        <img data-pane="3" src="/assets/shots/l-store.webp" srcset="/assets/shots/l-store-800.webp 800w, /assets/shots/l-store.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="950" alt="Velo launcher Store with a featured wings collection" loading="lazy">
+        <img data-pane="4" src="/assets/shots/l-locker.webp" srcset="/assets/shots/l-locker-800.webp 800w, /assets/shots/l-locker.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="950" alt="Velo launcher Locker with cloak, wings and aura on a 3D player" loading="lazy">
+        <img data-pane="5" src="/assets/shots/l-clips.webp" srcset="/assets/shots/l-clips-800.webp 800w, /assets/shots/l-clips.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="950" alt="Velo launcher Clips and screenshots" loading="lazy">
         <div class="h-spots" data-spots>
-          <button type="button" style="left:4.6%;top:36.1%" data-spot="0" aria-label="Continue playing">1</button>
-          <button type="button" style="left:46.4%;top:3.7%" data-spot="1" aria-label="Search everything">2</button>
-          <button type="button" style="left:63.6%;top:3.7%" data-spot="2" aria-label="Velo Coins">3</button>
-          <button type="button" style="left:73.4%;top:11.8%" data-spot="3" aria-label="What's new">4</button>
-          <button type="button" style="left:2.2%;top:67.5%" data-spot="4" aria-label="Jump back in">5</button>
-          <button type="button" style="left:83.6%;top:95.4%" data-spot="5" aria-label="Connect">6</button>
+          <button type="button" style="left:10%;top:29.4%" data-spot="0" aria-label="Continue playing">1</button>
+          <button type="button" style="left:37%;top:4.3%" data-spot="1" aria-label="Search everything">2</button>
+          <button type="button" style="left:10%;top:51%" data-spot="2" aria-label="Live stats">3</button>
+          <button type="button" style="left:68.7%;top:13.2%" data-spot="3" aria-label="What's new">4</button>
+          <button type="button" style="left:19.3%;top:62.8%" data-spot="4" aria-label="Jump back in">5</button>
+          <button type="button" style="left:80.9%;top:91.9%" data-spot="5" aria-label="Connect">6</button>
         </div>
       </div>
       <div class="h-caption" aria-live="polite">
@@ -143,7 +146,7 @@
         </div>
         <div class="h-stage h-frame">
           <img class="on" data-pane="0" src="/assets/shots/g-rshift.webp" srcset="/assets/shots/g-rshift-800.webp 800w, /assets/shots/g-rshift.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo Right Shift menu with module cards" loading="lazy">
-          <img data-pane="1" src="/assets/shots/g-locker.webp" srcset="/assets/shots/g-locker-800.webp 800w, /assets/shots/g-locker.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo Locker in game with cloaks" loading="lazy">
+          <img data-pane="1" src="/assets/shots/g-locker.webp" srcset="/assets/shots/g-locker-800.webp 800w, /assets/shots/g-locker.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo Locker in game: wings on a 3D player" loading="lazy">
           <img data-pane="2" src="/assets/shots/g-friends.webp" srcset="/assets/shots/g-friends-800.webp 800w, /assets/shots/g-friends.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Velo friends list in game" loading="lazy">
           <img data-pane="3" src="/assets/shots/g-emoji.webp" srcset="/assets/shots/g-emoji-800.webp 800w, /assets/shots/g-emoji.webp 1600w" sizes="(max-width: 980px) 100vw, 620px" width="1600" height="900" alt="Emoji suggestions in Minecraft chat" loading="lazy">
         </div>
@@ -159,19 +162,20 @@
       <p>Cloaks with cloth physics, wings, auras, emotes and bodywear. Equip them in the launcher or in game and every Velo player around you sees them.</p>
     </header>
     <div class="h-window reveal" data-tabs="locker">
-      <div class="h-window-bar" role="tablist" aria-label="Locker">
-        <span class="h-window-label">LOCKER</span>
-        <button role="tab" aria-selected="true" data-tab="0">Cloaks</button>
-        <button role="tab" aria-selected="false" data-tab="1">Wings</button>
-        <button role="tab" aria-selected="false" data-tab="2">Auras</button>
-        <button role="tab" aria-selected="false" data-tab="3">Skins</button>
+      <div class="h-window-bar">        <span class="h-window-label" aria-hidden="true">LOCKER</span>
+        <div class="h-window-tabs" role="tablist" aria-label="Locker">
+          <button role="tab" aria-selected="true" data-tab="0">Cloaks</button>
+          <button role="tab" aria-selected="false" data-tab="1">Wings</button>
+          <button role="tab" aria-selected="false" data-tab="2">Auras</button>
+          <button role="tab" aria-selected="false" data-tab="3">Skins</button>
+        </div>
         <a class="h-window-link" href="/store">Open the Store →</a>
       </div>
       <div class="h-stage h-stage-locker">
-        <img class="on" data-pane="0" src="/assets/shots/l-locker.webp" srcset="/assets/shots/l-locker-800.webp 800w, /assets/shots/l-locker.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="906" alt="Locker, Cloaks tab: Obsidian cloak equipped" loading="lazy">
-        <img data-pane="1" src="/assets/shots/l-locker-wings.webp" srcset="/assets/shots/l-locker-wings-800.webp 800w, /assets/shots/l-locker-wings.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="906" alt="Locker, Wings tab with size, height and flap settings" loading="lazy">
-        <img data-pane="2" src="/assets/shots/l-locker-auras.webp" srcset="/assets/shots/l-locker-auras-800.webp 800w, /assets/shots/l-locker-auras.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="906" alt="Locker, Auras tab with colour and density" loading="lazy">
-        <img data-pane="3" src="/assets/shots/l-locker-skins.webp" srcset="/assets/shots/l-locker-skins-800.webp 800w, /assets/shots/l-locker-skins.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="906" alt="Locker, Skins tab with your saved skins" loading="lazy">
+        <img class="on" data-pane="0" src="/assets/shots/l-locker.webp" srcset="/assets/shots/l-locker-800.webp 800w, /assets/shots/l-locker.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="950" alt="Locker, Cloaks tab: Obsidian cloak equipped" loading="lazy">
+        <img data-pane="1" src="/assets/shots/l-locker-wings.webp" srcset="/assets/shots/l-locker-wings-800.webp 800w, /assets/shots/l-locker-wings.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="950" alt="Locker, Wings tab with size, height and flap settings" loading="lazy">
+        <img data-pane="2" src="/assets/shots/l-locker-auras.webp" srcset="/assets/shots/l-locker-auras-800.webp 800w, /assets/shots/l-locker-auras.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="950" alt="Locker, Auras tab with colour and density" loading="lazy">
+        <img data-pane="3" src="/assets/shots/l-locker-skins.webp" srcset="/assets/shots/l-locker-skins-800.webp 800w, /assets/shots/l-locker-skins.webp 1600w" sizes="(max-width: 1280px) 100vw, 1240px" width="1600" height="950" alt="Locker, Skins tab with your saved skins" loading="lazy">
       </div>
       <div class="h-facts">
         <div><b>Cloth physics</b><span>Cloaks swing, fold and catch the wind.</span></div>
@@ -192,11 +196,11 @@
       <div class="h-plus-offer reveal">
         <div class="h-price"><span>{{plus.price}}</span><small>per month · or yearly</small></div>
         <ul class="h-plus-list" role="tablist" aria-label="Velo+ features" data-tabs-control="plus">
-          <li><button role="tab" aria-selected="true" data-tab="0"><strong>World Hosting</strong><small>Your world for friends, no port forwarding</small></button></li>
-          <li><button role="tab" aria-selected="false" data-tab="1"><strong>Name Styles</strong><small>Animated names in chat, tab list and above your head</small></button></li>
-          <li><button role="tab" aria-selected="false" data-tab="2"><strong>Cloud Sync</strong><small>Restore points for your setup on every PC</small></button></li>
-          <li><button role="tab" aria-selected="false" data-tab="3"><strong>Discover</strong><small>Join friends' worlds and public worlds</small></button></li>
-          <li><button role="tab" aria-selected="false" data-tab="4"><strong>Everything in Velo+</strong><small>{{plus.monthlyCoins}} coins a month, Clips Pro, the + badge</small></button></li>
+          <li role="presentation"><button role="tab" aria-selected="true" data-tab="0"><strong>World Hosting</strong><small>Your world for friends, no port forwarding</small></button></li>
+          <li role="presentation"><button role="tab" aria-selected="false" data-tab="1"><strong>Name Styles</strong><small>Animated names in chat, tab list and above your head</small></button></li>
+          <li role="presentation"><button role="tab" aria-selected="false" data-tab="2"><strong>Cloud Sync</strong><small>Restore points for your setup on every PC</small></button></li>
+          <li role="presentation"><button role="tab" aria-selected="false" data-tab="3"><strong>Discover</strong><small>Join friends' worlds and public worlds</small></button></li>
+          <li role="presentation"><button role="tab" aria-selected="false" data-tab="4"><strong>Everything in Velo+</strong><small>{{plus.monthlyCoins}} coins a month, Clips Pro, the + badge</small></button></li>
         </ul>
         <div class="h-cta">
           <a class="h-btn h-btn-red" href="/store#plus">Try {{plus.trialDays}} days free</a>
@@ -210,7 +214,7 @@
           <img data-pane="1" src="/assets/shots/g-namestyle.webp" srcset="/assets/shots/g-namestyle-800.webp 800w, /assets/shots/g-namestyle.webp 1600w" sizes="(max-width: 980px) 100vw, 720px" width="1600" height="900" alt="Name Styles with presets and live preview" loading="lazy">
           <img data-pane="2" src="/assets/shots/g-cloud.webp" srcset="/assets/shots/g-cloud-800.webp 800w, /assets/shots/g-cloud.webp 1600w" sizes="(max-width: 980px) 100vw, 720px" width="1600" height="900" alt="Cloud Sync with restore points" loading="lazy">
           <img data-pane="3" src="/assets/shots/g-discover.webp" srcset="/assets/shots/g-discover-800.webp 800w, /assets/shots/g-discover.webp 1600w" sizes="(max-width: 980px) 100vw, 720px" width="1600" height="900" alt="Discover worlds to join" loading="lazy">
-          <img data-pane="4" src="/assets/shots/l-plus.webp" srcset="/assets/shots/l-plus-800.webp 800w, /assets/shots/l-plus.webp 1600w" sizes="(max-width: 980px) 100vw, 720px" width="1600" height="870" alt="Velo+ in the launcher Store: what you get" loading="lazy">
+          <img data-pane="4" src="/assets/shots/l-plus.webp" srcset="/assets/shots/l-plus-800.webp 800w, /assets/shots/l-plus.webp 1600w" sizes="(max-width: 980px) 100vw, 720px" width="1600" height="950" alt="Velo+ in the launcher Store: what you get" loading="lazy">
         </div>
       </div>
     </div>

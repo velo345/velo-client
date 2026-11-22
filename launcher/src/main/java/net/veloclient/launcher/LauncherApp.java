@@ -184,6 +184,20 @@ public final class LauncherApp extends Application {
 
 	@Override
 	public void start(Stage stage) {
+		// A Store cloak's art changed on the server and the library copy was swapped: drop its decoded frames, redraw.
+		java.util.concurrent.atomic.AtomicBoolean redrawQueued = new java.util.concurrent.atomic.AtomicBoolean();
+		net.veloclient.launcher.data.StorePurchase.onArtReplaced = id -> {
+			javafx.application.Platform.runLater(() -> net.veloclient.launcher.ui.CosmeticUi.forgetLibraryCape(id));
+			if (redrawQueued.compareAndSet(false, true)) {
+				// one redraw for a batch of swapped cloaks
+				javafx.application.Platform.runLater(() -> javafx.application.Platform.runLater(() -> {
+					redrawQueued.set(false);
+					if (currentPage != null) {
+						currentPage.run();
+					}
+				}));
+			}
+		};
 		try {
 			startLauncher(stage);
 		} catch (Throwable error) {
@@ -427,6 +441,8 @@ public final class LauncherApp extends Application {
 			if ("connected".equals(event.type())) {
 				// Connected as this account (after start or a switch): its wallet decides what the Locker and Store unlock.
 				Platform.runLater(this::refreshOwned);
+				Platform.runLater(() -> maybeShowAdvent(0));
+				checkSale();
 				return;
 			}
 			refreshFriendsBadge();
@@ -732,6 +748,39 @@ public final class LauncherApp extends Application {
 							"Takes about a minute. Your profiles and settings stay as they are.", updateActions(release, false));
 				}
 			}});
+		}
+		if (extra.contains("sale")) {
+			// -Dvelo.launcherTourExtra=sale -Dvelo.tourSale=true: the sale strip on Home, the pop-up and the coin packs.
+			steps.add(new Object[] {"41-sale-home", (Runnable) () -> {
+				saleChecked = false;
+				checkSale();
+			}});
+			steps.add(new Object[] {"41b-sale-coins", (Runnable) () -> {
+				layers.getChildren().removeIf(n -> layers.getChildren().indexOf(n) > 0);
+				showCoins();
+			}});
+		}
+		if (extra.contains("advent")) {
+			// -Dvelo.launcherTourExtra=advent: the Christmas Home and the calendar (demo data - nothing is claimed).
+			steps.add(new Object[] {"40-advent-home", (Runnable) this::showHome});
+			steps.add(new Object[] {"40b-advent-calendar", (Runnable) () -> {
+				try {
+					net.veloclient.launcher.ui.AdventCalendar.show(layers, net.veloclient.launcher.social.StoreApi.advent(),
+							new net.veloclient.launcher.ui.AdventCalendar.Host() {
+								@Override
+								public void openLocker() {
+								}
+
+								@Override
+								public void rewardsChanged() {
+								}
+							}, null);
+				} catch (Exception ex) {
+					LauncherLog.warn("Tour advent", ex);
+				}
+			}});
+			steps.add(new Object[] {"40c-advent-present", (Runnable) net.veloclient.launcher.ui.AdventCalendar::tourOpenToday});
+			steps.add(new Object[] {"40d-advent-reward", (Runnable) net.veloclient.launcher.ui.AdventCalendar::tourClickGift});
 		}
 		if (extra.contains("arcade")) {
 			// -Dvelo.launcherTourExtra=arcade: the Home arcade in each of its states.
@@ -1799,6 +1848,120 @@ public final class LauncherApp extends Application {
 		}
 	}
 
+	private boolean saleChecked;
+
+	/** Once per start: loads the catalog for its sale - Home gets the strip, and a running sale its pop-up once. */
+	private void checkSale() {
+		if (saleChecked) {
+			return;
+		}
+		saleChecked = true;
+		CompletableFuture.supplyAsync(() -> {
+			try {
+				return net.veloclient.launcher.social.StoreApi.catalog();
+			} catch (Exception e) {
+				return null;
+			}
+		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(catalog -> Platform.runLater(() -> {
+			if (net.veloclient.launcher.ui.SaleUi.sale(catalog) == null) {
+				return;
+			}
+			if ("home".equals(activePage)) {
+				showHome();
+			}
+			net.veloclient.launcher.ui.SaleUi.maybePopup(layers, catalog, this::showCoins, this::showPlus);
+		}));
+	}
+
+	// ---- Christmas (dev launcher first): the snowy Home and the Advent calendar ----
+
+	/** The pixel-art Christmas Home. Dev builds only for now - promoting means a December check here. */
+	/** The winter Home and the advent calendar button: Dec 1-26 for everyone (the dev build always, for testing). */
+	private static boolean christmasHome() {
+		if (AppVersion.DEV) {
+			return true;
+		}
+		java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Europe/Berlin"));
+		return today.getMonth() == java.time.Month.DECEMBER && today.getDayOfMonth() <= 26;
+	}
+
+	private boolean adventOpen;
+	private String adventCheckedFor;
+
+	/** Home's corner button: opens the calendar any time (today's door or a look at the opened ones). */
+	private Node adventButton() {
+		Button button = new Button("Advent calendar");
+		button.setGraphic(net.veloclient.launcher.ui.Icons.icon("gift", 15, Color.web("#FFD27A")));
+		button.setStyle("-fx-font-family: 'Monocraft'; -fx-font-size: 12px; -fx-text-fill: #FFE6A0; -fx-background-color: rgba(8,12,32,0.72);"
+				+ "-fx-border-color: rgba(255,210,122,0.55); -fx-border-width: 1; -fx-background-radius: 8; -fx-border-radius: 8; -fx-padding: 7 12 7 10;");
+		button.setCursor(javafx.scene.Cursor.HAND);
+		StackPane.setAlignment(button, Pos.TOP_RIGHT);
+		StackPane.setMargin(button, new Insets(26, 26, 0, 0));
+		button.setOnAction(e -> showAdvent(true));
+		return button;
+	}
+
+	/**
+	 * After every sign-in / account switch: the calendar opens on its own when today's door is still closed - once per
+	 * account and launcher start, and only when nothing else (onboarding, the update pop-up, a dialog) is on top.
+	 */
+	private void maybeShowAdvent(int attempt) {
+		if (!christmasHome() || session == null || adventOpen || System.getProperty("velo.launcherTour") != null) {
+			return;
+		}
+		String account = session.uuid();
+		if (account == null || account.equals(adventCheckedFor)) {
+			return;
+		}
+		boolean covered = layers == null || layers.getChildren().size() > 1;
+		if (covered) {
+			if (attempt < 40) {
+				javafx.animation.PauseTransition later = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(3));
+				later.setOnFinished(e -> maybeShowAdvent(attempt + 1));
+				later.play();
+			}
+			return;
+		}
+		adventCheckedFor = account;
+		showAdvent(false);
+	}
+
+	private void showAdvent(boolean always) {
+		if (adventOpen) {
+			return;
+		}
+		adventOpen = true;
+		CompletableFuture.supplyAsync(() -> {
+			try {
+				return net.veloclient.launcher.social.StoreApi.advent();
+			} catch (Exception e) {
+				LauncherLog.warn("Advent calendar unavailable", e);
+				return null;
+			}
+		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(calendar -> Platform.runLater(() -> {
+			boolean show = calendar != null && (always ? calendar.has("running") && calendar.get("running").getAsBoolean()
+					: net.veloclient.launcher.ui.AdventCalendar.wantsAttention(calendar));
+			if (!show) {
+				adventOpen = false;
+				if (always && homeHero != null) {
+					net.veloclient.launcher.ui.Toasts.show(homeHero, "The Advent calendar opens on December 1");
+				}
+				return;
+			}
+			net.veloclient.launcher.ui.AdventCalendar.show(layers, calendar, new net.veloclient.launcher.ui.AdventCalendar.Host() {
+				@Override
+				public void openLocker() {
+					showCosmetics();
+				}
+
+				@Override
+				public void rewardsChanged() {
+					refreshOwned();
+				}
+			}, () -> adventOpen = false);
+		}));
+	}
+
 	private void showHome() {
 		currentPage = this::showHome;
 		setActivePage("home");
@@ -1826,6 +1989,12 @@ public final class LauncherApp extends Application {
 		// Hero + launch options fill the window exactly as before; partner servers and worlds to join (only shown when
 		// there are some) sit just below it - scroll down to reach them instead of squeezing the hero.
 		VBox fold = new VBox(22, top, recent);
+		// A real-money sale (Black Friday): a strip above the hero, from the teaser until it ends.
+		com.google.gson.JsonObject sale = net.veloclient.launcher.ui.SaleUi.sale(net.veloclient.launcher.social.StoreApi.cachedCatalog());
+		if (sale != null) {
+			fold.getChildren().add(0, net.veloclient.launcher.ui.SaleUi.banner(sale, this::showCoins));
+		}
+		checkSale();
 		Node discover = net.veloclient.launcher.ui.DiscoverView.build(discoverJoiner(), true);
 		page.getChildren().addAll(fold, discover);
 		ScrollPane scroll = new ScrollPane(page);
@@ -1977,6 +2146,7 @@ public final class LauncherApp extends Application {
 			homeScenery = new net.veloclient.launcher.ui.RidgelineView();
 		}
 		homeScenery.setTheme(accentColor(), Color.web(cssColor(theme.background())));
+		homeScenery.setWinter(christmasHome());
 		homeScenery.setAnimated(net.veloclient.launcher.data.LauncherSettings.get().animateHomeBackground);
 		hero.getChildren().add(homeScenery);
 		loadHomePlayerModel();
@@ -1984,8 +2154,13 @@ public final class LauncherApp extends Application {
 
 		Region fade = new Region();
 		fade.setMouseTransparent(true);
-		fade.setStyle("-fx-background-color: linear-gradient(to right, rgba(12,9,9,0.94) 0%, rgba(12,9,9,0.72) 36%, transparent 64%);");
+		fade.setStyle(christmasHome() && customBackground == null
+				? "-fx-background-color: linear-gradient(to right, rgba(5,8,22,0.9) 0%, rgba(5,8,22,0.62) 36%, transparent 62%);"
+				: "-fx-background-color: linear-gradient(to right, rgba(12,9,9,0.94) 0%, rgba(12,9,9,0.72) 36%, transparent 64%);");
 		hero.getChildren().add(fade);
+		if (christmasHome() && session != null) {
+			hero.getChildren().add(adventButton());
+		}
 
 		VBox text = new VBox(18);
 		text.setAlignment(Pos.BOTTOM_LEFT);
@@ -2723,7 +2898,7 @@ public final class LauncherApp extends Application {
 			topBar.setAccount("Sign in", icon);
 			return;
 		}
-		topBar.setAccount(shown.username(), net.veloclient.launcher.ui.Heads.head(shown.uuid(), shown.username(), 28));
+		topBar.setAccount(shown.username(), net.veloclient.launcher.ui.Heads.head(shown.uuid(), shown.username(), 32));
 		checkAccountSkin();
 	}
 
@@ -3251,7 +3426,15 @@ public final class LauncherApp extends Application {
 				"cosmetics-killfx.json", "cosmetics-emotes.json", "name-style.json", "loadout-active.txt"};
 		long[] last = {Long.MIN_VALUE, Long.MIN_VALUE};
 		String[] lastAccount = {null};
-		javafx.animation.Timeline watch = new javafx.animation.Timeline(new javafx.animation.KeyFrame(javafx.util.Duration.millis(700), e -> {
+		// The file checks run on their own thread: on the FX thread they kept a 700 ms Timeline going (pulses) and were
+		// the launcher's biggest allocator while idle. The FX thread only hears about real changes.
+		java.util.concurrent.ScheduledExecutorService watcher = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+			Thread t = new Thread(r, "velo-locker-watch");
+			t.setDaemon(true);
+			t.setPriority(Thread.MIN_PRIORITY);
+			return t;
+		});
+		watcher.scheduleWithFixedDelay(() -> {
 			long equip = 0;
 			for (String name : files) {
 				equip = equip * 31 + lockerStamp(net.veloclient.launcher.data.VeloPaths.accountConfig(name));
@@ -3267,16 +3450,19 @@ public final class LauncherApp extends Application {
 			String account = net.veloclient.launcher.data.VeloPaths.account();
 			boolean fresh = last[0] == Long.MIN_VALUE || !java.util.Objects.equals(account, lastAccount[0]);
 			boolean libraryChanged = !fresh && capes != last[1];
-			boolean equipChanged = !fresh && equip != last[0] && !stage.isFocused();
+			boolean equipTouched = !fresh && equip != last[0];
 			last[0] = equip;
 			last[1] = capes;
 			lastAccount[0] = account;
-			if ((libraryChanged || equipChanged) && currentPage != null && ("locker".equals(activePage) || "home".equals(activePage))) {
-				currentPage.run();
+			if (libraryChanged || equipTouched) {
+				Platform.runLater(() -> {
+					boolean equipChanged = equipTouched && !stage.isFocused();
+					if ((libraryChanged || equipChanged) && currentPage != null && ("locker".equals(activePage) || "home".equals(activePage))) {
+						currentPage.run();
+					}
+				});
 			}
-		}));
-		watch.setCycleCount(javafx.animation.Animation.INDEFINITE);
-		watch.play();
+		}, 0, 1000, java.util.concurrent.TimeUnit.MILLISECONDS);
 	}
 
 	private static long lockerStamp(java.nio.file.Path file) {

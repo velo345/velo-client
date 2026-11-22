@@ -39,6 +39,7 @@ public final class CefRuntime {
 
 	private static volatile State state;
 	private static volatile String error;
+	private static volatile String errorDetail;
 	private static volatile double progress;
 	private static volatile long downloadedBytes;
 	private static volatile long totalBytes;
@@ -61,6 +62,11 @@ public final class CefRuntime {
 
 	public static String error() {
 		return error;
+	}
+
+	/** The technical side of the last failure (step, exception, message) - shown small under the error. */
+	public static String errorDetail() {
+		return errorDetail;
 	}
 
 	/** 0..1 while downloading. */
@@ -119,23 +125,52 @@ public final class CefRuntime {
 		if (state == State.FAILED) {
 			state = null;
 			error = null;
+			errorDetail = null;
+			progress = 0;
+			downloadedBytes = 0;
+			totalBytes = 0;
 		}
 	}
 
 	// ------------------------------------------------------------------ download
 
+	/** A failure we already put into words for the player (the step it happened in goes into the detail line). */
+	private static final class SetupException extends IOException {
+		SetupException(String message) {
+			super(message);
+		}
+	}
+
 	private static void download() {
+		// a retry starts from zero (the old counters made the bar start full and run past the end)
+		downloadedBytes = 0;
+		totalBytes = 0;
+		progress = 0;
+		String step = "checksum";
+		Path archive = null;
 		try {
 			HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(15)).build();
 			String url = HOST + COMMIT + "/" + platform() + ".tar.gz";
-			String expected = http.send(HttpRequest.newBuilder(URI.create(url + ".sha256")).timeout(Duration.ofSeconds(20)).build(),
-					HttpResponse.BodyHandlers.ofString()).body().trim().split("\\s+")[0];
+			HttpResponse<String> shaResponse = http.send(HttpRequest.newBuilder(URI.create(url + ".sha256")).timeout(Duration.ofSeconds(20)).build(),
+					HttpResponse.BodyHandlers.ofString());
+			if (shaResponse.statusCode() != 200) {
+				throw new SetupException("The download server answered HTTP " + shaResponse.statusCode() + " - try again later");
+			}
+			// Linux/macOS publish "<hash>  <file>", Windows a PowerShell Get-FileHash table ("Algorithm Hash Path ...") -
+			// taking the first word made every Windows download "damaged". The hash is the only 64-hex-digit word.
+			var hex = java.util.regex.Pattern.compile("\\b[0-9a-fA-F]{64}\\b").matcher(shaResponse.body());
+			if (!hex.find()) {
+				throw new SetupException("The download server sent no checksum - try again later");
+			}
+			String expected = hex.group();
+
+			step = "download";
 			Files.createDirectories(baseDir());
-			Path archive = baseDir().resolve(platform() + ".tar.gz");
+			archive = baseDir().resolve(platform() + ".tar.gz");
 			HttpResponse<InputStream> response = http.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofMinutes(30)).build(),
 					HttpResponse.BodyHandlers.ofInputStream());
 			if (response.statusCode() != 200) {
-				throw new IOException("Download answered " + response.statusCode());
+				throw new SetupException("The download server answered HTTP " + response.statusCode() + " - try again later");
 			}
 			totalBytes = response.headers().firstValueAsLong("content-length").orElse(-1);
 			MessageDigest sha = MessageDigest.getInstance("SHA-256");
@@ -146,14 +181,18 @@ public final class CefRuntime {
 					out.write(buffer, 0, n);
 					sha.update(buffer, 0, n);
 					downloadedBytes += n;
-					progress = totalBytes > 0 ? downloadedBytes / (double) totalBytes : 0;
+					progress = totalBytes > 0 ? Math.min(1, downloadedBytes / (double) totalBytes) : 0;
 				}
+			}
+			if (totalBytes > 0 && downloadedBytes != totalBytes) {
+				throw new SetupException("The connection dropped after " + mb(downloadedBytes) + " of " + mb(totalBytes) + " MB - try again");
 			}
 			String actual = HexFormat.of().formatHex(sha.digest());
 			if (!actual.equalsIgnoreCase(expected)) {
-				Files.deleteIfExists(archive);
-				throw new IOException("The download was damaged (checksum) - try again");
+				throw new SetupException("The file arrived changed (checksum differs) - an antivirus, proxy or VPN may be altering downloads");
 			}
+
+			step = "unpack";
 			extract(archive, baseDir());
 			Files.deleteIfExists(archive);
 			makeExecutable();
@@ -162,8 +201,56 @@ public final class CefRuntime {
 				state = State.NOT_INSTALLED; // installed: the next ensure() starts it on the render thread
 			}
 		} catch (Exception e) {
-			fail("Couldn't download the browser: " + e.getMessage(), e);
+			if (archive != null) {
+				try {
+					Files.deleteIfExists(archive);
+				} catch (IOException ignored) {
+					// locked (antivirus scanning it) - the next try overwrites it
+				}
+			}
+			errorDetail = step + " step: " + e.getClass().getSimpleName() + (e.getMessage() == null ? "" : " - " + e.getMessage());
+			fail(explain(e, step), e);
 		}
+	}
+
+	private static long mb(long bytes) {
+		return bytes / 1_048_576;
+	}
+
+	/** What went wrong, in words a player can act on. */
+	private static String explain(Throwable e, String step) {
+		if (e instanceof SetupException) {
+			return e.getMessage();
+		}
+		for (Throwable t = e; t != null; t = t.getCause()) {
+			String msg = String.valueOf(t.getMessage()).toLowerCase(Locale.ROOT);
+			if (t instanceof java.net.UnknownHostException) {
+				return "No connection to the download server - check your internet, VPN or DNS";
+			}
+			if (t instanceof java.net.http.HttpConnectTimeoutException || t instanceof java.net.ConnectException) {
+				return "The download server can't be reached - a firewall, VPN or antivirus may be blocking it";
+			}
+			if (t instanceof java.net.http.HttpTimeoutException || t instanceof java.net.SocketTimeoutException) {
+				return "The download timed out - your connection may be too slow or unstable, try again";
+			}
+			if (t instanceof javax.net.ssl.SSLException) {
+				return "The secure connection failed - an antivirus or proxy is intercepting HTTPS";
+			}
+			if (t instanceof java.nio.file.AccessDeniedException || msg.contains("access is denied") || msg.contains("being used by another process")) {
+				return "Velo isn't allowed to write the browser files - an antivirus may be blocking them, or another game is using them";
+			}
+			if (msg.contains("not enough space") || msg.contains("no space left") || msg.contains("disk full")) {
+				return "Not enough disk space - the browser needs about 400 MB";
+			}
+			if (t instanceof java.util.zip.ZipException || t instanceof java.io.EOFException) {
+				return "The download arrived broken - try again";
+			}
+		}
+		return switch (step) {
+			case "unpack" -> "Couldn't unpack the browser - try again (antivirus?)";
+			case "checksum" -> "Couldn't reach the download server - try again";
+			default -> "The download failed - try again";
+		};
 	}
 
 	/** A plain tar reader (the archive is a gzipped ustar/GNU tar) - no library needed. */
@@ -410,6 +497,9 @@ public final class CefRuntime {
 	}
 
 	private static void fail(String message, Throwable t) {
+		if (errorDetail == null && t != null) {
+			errorDetail = t.getClass().getSimpleName() + (t.getMessage() == null ? "" : " - " + t.getMessage());
+		}
 		error = message;
 		state = State.FAILED;
 		net.veloclient.velo.VeloClient.LOGGER.warn("Velo Browser: {}", message, t);

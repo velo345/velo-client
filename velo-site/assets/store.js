@@ -8,9 +8,22 @@
 	const LAST = "velo.web.lastName";
 	const DEMO_SKIN = "Velo2k";
 	const store = { token: null, username: null, uuid: null, wallet: null, catalog: null, cosmetics: null, byId: {} };
-	// The WebGL try-on viewer (skin3d.js, a module) may load after this script.
-	window.velo.skin3dReady = window.velo.player3d ? Promise.resolve()
-		: new Promise((resolve) => addEventListener("velo:skin3d", resolve, { once: true }));
+	// The WebGL try-on viewer (skin3d.js + three.js, ~700 KB) isn't part of the page load: it's fetched the first time the
+	// visitor moves, taps or scrolls (so it's there by the time they open an item), or right away when something needs it.
+	let skin3dLoading = null;
+	window.velo.loadSkin3d = () => skin3dLoading || (skin3dLoading = window.velo.player3d ? Promise.resolve() : new Promise((resolve) => {
+		addEventListener("velo:skin3d", resolve, { once: true });
+		const host = document.getElementById("store");
+		const s = document.createElement("script");
+		s.type = "module";
+		s.src = (host && host.dataset.lazyScript) || "/assets/skin3d.js";
+		document.head.append(s);
+	}));
+	const warm = () => {
+		for (const ev of ["pointermove", "pointerdown", "keydown", "scroll", "touchstart"]) removeEventListener(ev, warm);
+		setTimeout(window.velo.loadSkin3d, 400);
+	};
+	for (const ev of ["pointermove", "pointerdown", "keydown", "scroll", "touchstart"]) addEventListener(ev, warm, { passive: true, once: true });
 	const remember = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } };
 	const recall = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 	const head = (who, size = 32) => el("img", { class: "head-img", src: window.velo.headUrl(who), alt: "", width: size, height: size, style: `width:${size}px;height:${size}px`,
@@ -248,7 +261,7 @@
 		if (item.accent && /^#[0-9a-f]{3,8}$/i.test(item.accent)) art.style.setProperty("--accent", item.accent + "55");
 		if (owns(item.id)) art.append(el("span", { class: "ribbon owned" }, "OWNED"));
 		else if (p && p.full) art.append(el("span", { class: "ribbon" }, "-" + Math.round((1 - p.price / p.full) * 100) + "%"));
-		const card = el("button", { class: "card item tilt", type: "button", "aria-label": item.name },
+		const card = el("button", { class: "card item tilt", type: "button" },
 			art,
 			el("span", { class: "body" },
 				el("b", {}, item.name),
@@ -273,7 +286,7 @@
 			const target = name || store.uuid || store.username || DEMO_SKIN;
 			stage.replaceChildren(el("span", { class: "hint", style: "position:static" }, "Loading your skin…"));
 			try {
-				await window.velo.skin3dReady;
+				await window.velo.loadSkin3d();
 				const meta = await window.velo.skinMeta(target);
 				if (!meta || !meta.hasSkin) throw new Error("no skin");
 				if (viewer) viewer.dispose();
@@ -460,10 +473,23 @@
 		return out;
 	}
 
-	function render() {
+	// Built in small steps (on-screen parts first, one section per task) so the page never freezes while ~2000 elements
+	// go in; a newer render() (search, sort) cancels an unfinished one.
+	let renderRun = 0;
+	const nextTask = () => new Promise((r) => setTimeout(r, 0));
+	async function render() {
 		if (!store.catalog) return;
+		const run = ++renderRun;
 		const shown = store.cosmetics.items.filter((i) => i.inStore || owns(i.id) || i.unlock === "discord");
+		// Daily picks
+		const daily = $('[data-grid="daily"]');
+		daily.replaceChildren(...store.catalog.daily.items.map((id) => store.byId[id]).filter(Boolean).map((i) => itemCard(i, 10)));
+		renderCodeBox();
+		renderPacks();
+		renderPlus();
 		for (const type of ["wings", "cape", "aura", "emote", "killfx", "wear", "pet"]) {
+			await nextTask();
+			if (run !== renderRun) return;
 			const grid = $(`[data-grid="${type}"]`);
 			const list = sorted(shown.filter((i) => i.type === type));
 			grid.replaceChildren(...(list.length ? list.map((i) => itemCard(i, type === "cape" ? 10 : 9)) : [el("p", { class: "kind" }, "Nothing matches.")]));
@@ -473,16 +499,13 @@
 		$("#pets").hidden = !anyPets;
 		const petTab = $('#store-tabs a[href="#pets"]');
 		if (petTab) petTab.hidden = !anyPets;
-		// Daily picks
-		const daily = $('[data-grid="daily"]');
-		daily.replaceChildren(...store.catalog.daily.items.map((id) => store.byId[id]).filter(Boolean).map((i) => itemCard(i, 10)));
+		await nextTask();
+		if (run !== renderRun) return;
 		// Bundles
 		const bundles = $('[data-grid="bundles"]');
 		bundles.replaceChildren(...(store.catalog.bundles.length ? store.catalog.bundles.map(bundleCard) : [el("p", { class: "kind" }, "No bundles right now - check back soon.")]));
 		$("#bundles").hidden = !store.catalog.bundles.length;
-		renderCodeBox();
-		renderPacks();
-		renderPlus();
+		store.rendered = true;
 	}
 
 	function bundleCard(b) {
@@ -528,7 +551,7 @@
 
 	function renderCodeBox() {
 		const box = $("[data-code-box]");
-		if (!box || store.catalog.partnerCodePercent == null || !store.catalog.checkoutEnabled) { if (box) box.hidden = true; store.code = null; return; }
+		if (!box || store.catalog.partnerCodePercent == null || !store.catalog.checkoutEnabled || (store.catalog.sale && store.catalog.sale.active && store.catalog.sale.coins)) { if (box) box.hidden = true; store.code = null; return; }
 		const off = (c) => c.percent > 0 ? c.percent + "% off every coin pack" : "your purchase supports them";
 		box.hidden = false;
 		const input = el("input", { type: "text", placeholder: "Partner code", maxlength: "24", autocomplete: "off", spellcheck: "false", "aria-label": "Partner code" });
@@ -575,7 +598,8 @@
 		const on = store.catalog.checkoutEnabled;
 		const cur = store.catalog.currency || "EUR";
 		const money = new Intl.NumberFormat(undefined, { style: "currency", currency: cur });
-		const percent = store.code ? store.code.percent || 0 : 0;
+		const sale = store.catalog.sale && store.catalog.sale.active && store.catalog.sale.coins ? store.catalog.sale : null;
+		const percent = !sale && store.code ? store.code.percent || 0 : 0; // a sale and a partner code don't stack
 		const priceOf = (pack) => percent ? Math.round(pack.price * (100 - percent)) / 100 : pack.price;
 		grid.replaceChildren(...store.catalog.coinPacks.map((pack, i) => {
 			const b = el("button", { class: "btn " + (i === 2 ? "btn-primary" : ""), type: "button", disabled: !on }, on ? money.format(priceOf(pack)) : "Opens soon");
@@ -593,7 +617,9 @@
 				el("i", { class: "coin-dot", style: "width:34px;height:34px" }),
 				el("span", { class: "big" }, coins(pack.coins + (pack.bonus || 0))),
 				pack.bonus ? el("span", { class: "bonus" }, "+" + coins(pack.bonus) + " bonus") : el("span", { class: "kind" }, "Velo Coins"),
-				el("span", { class: "kind" }, percent ? [el("s", {}, money.format(pack.price)), " ", el("span", { class: "code-price" }, money.format(priceOf(pack)))] : money.format(pack.price)), b);
+				sale && pack.fullPrice ? el("span", { class: "sale-ribbon" }, "-" + sale.percent + "%") : null,
+				el("span", { class: "kind" }, sale && pack.fullPrice ? [el("s", { class: "sale-was" }, money.format(pack.fullPrice)), el("span", { class: "sale-now" }, money.format(pack.price))]
+					: percent ? [el("s", {}, money.format(pack.price)), " ", el("span", { class: "code-price" }, money.format(priceOf(pack)))] : money.format(pack.price)), b);
 		}));
 		$("[data-checkout-note]").textContent = on
 			? "Secure checkout by Tebex (our reseller). Coins land on your account right after payment."
@@ -604,8 +630,11 @@
 		const plus = store.catalog.plus;
 		const cur = store.catalog.currency || "EUR";
 		if (plus) {
-			const price = new Intl.NumberFormat(undefined, { style: "currency", currency: cur }).format(plus.price);
-			$$("[data-plus-price]").forEach((n) => n.replaceChildren(price, el("small", {}, " / month")));
+			const fmt = new Intl.NumberFormat(undefined, { style: "currency", currency: cur });
+			const price = fmt.format(plus.price);
+			$$("[data-plus-price]").forEach((n) => n.replaceChildren(...(plus.fullPrice
+				? [el("s", { class: "sale-was" }, fmt.format(plus.fullPrice)), price, el("small", {}, " first month")]
+				: [price, el("small", {}, " / month")])));
 		}
 		const btn = $("[data-plus-buy]");
 		const state = $("[data-plus-state]");
@@ -616,7 +645,7 @@
 			yearly.hidden = !show;
 			if (show) {
 				const yp = new Intl.NumberFormat(undefined, { style: "currency", currency: cur }).format(plus.yearlyPrice);
-				const saved = Math.round(100 - plus.yearlyPrice / (plus.price * 12) * 100);
+				const saved = Math.round(100 - plus.yearlyPrice / ((plus.fullPrice || plus.price) * 12) * 100);
 				yearly.textContent = "Yearly · " + yp + (saved > 0 ? " (save " + saved + "%)" : "");
 			}
 		}
@@ -739,6 +768,60 @@
 			$("#featured").replaceChildren(el("div", { class: "error" }, "The Store couldn't load right now (" + e.message + "). Try again in a minute - or buy in the launcher."));
 		}
 	})();
+	// Section tabs: the grids are still being built (and sections off screen are only placeholders until drawn), so a
+	// plain #anchor jump lands where the section *was*. Jump, then keep correcting until it has stayed put for a moment.
+	let jumpRun = 0;
+	function jumpTo(id, smooth) {
+		const target = document.getElementById(id);
+		if (!target || target.hidden) return false;
+		const run = ++jumpRun;
+		// everything above the target gets its real height now (a skipped section only counts as a 720px placeholder and
+		// grows when the scroll passes it - on phones by thousands of pixels, so the target ran away)
+		for (let n = target.previousElementSibling; n; n = n.previousElementSibling) if (n.classList.contains("store-section")) n.classList.add("cv-off");
+		const pad = parseFloat(getComputedStyle(target).scrollMarginTop) || 140;
+		const want = () => Math.max(0, scrollY + target.getBoundingClientRect().top - pad);
+		scrollTo({ top: want(), behavior: smooth ? "smooth" : "auto" });
+		let still = 0, frames = 0, last = -1;
+		const settle = () => {
+			if (run !== jumpRun || ++frames > 240) return;
+			const off = target.getBoundingClientRect().top - pad;
+			const moving = Math.abs(scrollY - last) > 0.5;
+			last = scrollY;
+			if (!moving) {
+				if (Math.abs(off) > 2) { scrollTo({ top: want(), behavior: "auto" }); still = 0; }
+				else if (++still > 20) return;
+			}
+			requestAnimationFrame(settle);
+		};
+		requestAnimationFrame(settle);
+		return true;
+	}
+	// the person scrolling themselves ends any correction
+	const cancelJump = () => { jumpRun++; };
+	addEventListener("wheel", cancelJump, { passive: true });
+	addEventListener("touchstart", cancelJump, { passive: true });
+	// until the first full render the grids are empty: wait for it, then go (and stay) there
+	let waitTimer = 0;
+	function goWhenReady(id, smooth) {
+		clearInterval(waitTimer);
+		if (store.rendered) return jumpTo(id, smooth);
+		const started = Date.now();
+		waitTimer = setInterval(() => {
+			if (store.rendered) { clearInterval(waitTimer); jumpTo(id, false); }
+			else if (Date.now() - started > 15000) clearInterval(waitTimer);
+		}, 100);
+		return true;
+	}
+	$$("#store-tabs a").forEach((a) => a.addEventListener("click", (e) => {
+		const id = a.getAttribute("href").slice(1);
+		if (!goWhenReady(id, true)) return;
+		e.preventDefault();
+		history.replaceState(null, "", "#" + id);
+	}));
+	{
+		const id = location.hash.slice(1);
+		if (/^[a-z]+$/.test(id) && document.querySelector(`#store-tabs a[href="#${id}"]`)) goWhenReady(id, false);
+	}
 	$$("[data-signin]").forEach((b) => b.addEventListener("click", () => openSignIn()));
 	addEventListener("hashchange", () => {
 		if (location.hash === "#signin" && !store.token) openSignIn();

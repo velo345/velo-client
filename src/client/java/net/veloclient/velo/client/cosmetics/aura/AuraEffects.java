@@ -179,6 +179,12 @@ public final class AuraEffects {
 	 * How an aura is worn: {@code size} (0.5-1.6), {@code speed} (0.25-2.5), {@code density} (0.25-2),
 	 * {@code color} (0 = default, 1..9 = {@link #PALETTE}, {@link #RAINBOW}).
 	 */
+	/**
+	 * How many of the loose particles to emit (1 = all): Cosmetics Quality's Lite version and "fewer for others" lower it
+	 * for one draw. Unlike density it doesn't change an aura's shape (Celestial Orbit's stars per ring). Render thread.
+	 */
+	public static float particleScale = 1f;
+
 	public record Settings(float size, float speed, float density, int color) {
 		public static final Settings DEFAULT = new Settings(1f, 1f, 1f, 0);
 
@@ -633,7 +639,7 @@ public final class AuraEffects {
 
 		/** How many particles to spawn this step at {@code perSecond}. */
 		private int count(float t, float perSecond) {
-			emitDebt += t * perSecond;
+			emitDebt += t * perSecond * particleScale;
 			int n = (int) emitDebt;
 			emitDebt -= n;
 			return n;
@@ -1495,7 +1501,7 @@ public final class AuraEffects {
 
 		/** Like {@link #count(float, float)}, for a further stream with its own rate. */
 		private int count(float t, float perSecond, int slot) {
-			debts[slot] += t * perSecond;
+			debts[slot] += t * perSecond * particleScale;
 			int n = (int) debts[slot];
 			debts[slot] -= n;
 			return n;

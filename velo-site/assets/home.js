@@ -22,12 +22,14 @@
 	]);
 	if (intro && play && !reduce) {
 		const grid = $("[data-intro-grid]", intro);
-		const cell = innerWidth < 700 ? 46 : 72;
-		const cols = Math.ceil(innerWidth / cell), rows = Math.ceil(innerHeight / cell);
+		// Read the viewport once, before any style is written (a read after a write forces a layout).
+		const vw = innerWidth, vh = innerHeight;
+		const cell = vw < 700 ? 46 : 72;
+		const cols = Math.ceil(vw / cell), rows = Math.ceil(vh / cell);
 		grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
 		grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
 		// Where the cloak is in the hero picture.
-		const ox = (innerWidth < 760 ? 0.5 : 0.74) * cols, oy = (innerWidth < 760 ? 0.36 : 0.46) * rows;
+		const ox = (vw < 760 ? 0.5 : 0.74) * cols, oy = (vw < 760 ? 0.36 : 0.46) * rows;
 		const far = Math.hypot(Math.max(ox, cols - ox), Math.max(oy, rows - oy));
 		const frag = document.createDocumentFragment();
 		for (let y = 0; y < rows; y++) {
@@ -91,7 +93,7 @@
 		spots: [
 			["HOME · 1 / 6", "Continue playing", "The server you played last, with its profile, mods and playtime. Mods & packs opens the profile right there."],
 			["HOME · 2 / 6", "Search everything", "Ctrl K finds profiles, servers, settings and Store items from anywhere in the launcher."],
-			["HOME · 3 / 6", "Velo Coins", "Earned free from daily rewards and quests, or every month with Velo+. Spend them in the Store."],
+			["HOME · 3 / 6", "Live stats", "Players online and ping for the server, your hours on it, and how many people are on Velo today."],
 			["HOME · 4 / 6", "What's new", "Release notes and news from the Velo team, straight on Home."],
 			["HOME · 5 / 6", "Jump back in", "Your profiles, or import your setup from Lunar, Modrinth or CurseForge in a few clicks."],
 			["HOME · 6 / 6", "Connect", "Starts the selected profile straight onto its server. Velo checks the profile first and offers a fix if something would crash."],
@@ -104,9 +106,8 @@
 		$("[data-cap-k]", cap).textContent = k;
 		$("[data-cap-t]", cap).textContent = t;
 		$("[data-cap-p]", cap).textContent = p;
-		cap.classList.remove("swap");
-		void cap.offsetWidth;
-		cap.classList.add("swap");
+		// a short fade-in (Web Animations: no forced layout, unlike the old class-toggle + offsetWidth)
+		if (cap.animate) for (const n of cap.children) n.animate([{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "none" }], { duration: 450, easing: "cubic-bezier(.2,.8,.2,1)" });
 	};
 
 	$$("[data-tabs]").forEach((box) => {

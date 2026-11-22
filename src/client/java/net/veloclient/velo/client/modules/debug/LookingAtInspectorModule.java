@@ -29,7 +29,7 @@ public final class LookingAtInspectorModule extends AbstractModule implements Hu
 	public LookingAtInspectorModule() {
 		super("looking-at-inspector", "Block/Entity Inspector",
 				"Shows extended info (registry id, NBT, UUID) for the block or entity you're looking at.",
-				ModuleCategory.DEBUG, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.DEBUG, SafetyTag.CHECK_SERVER_RULES, false);
 	}
 
 	@Override

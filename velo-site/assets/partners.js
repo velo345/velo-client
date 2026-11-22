@@ -90,7 +90,10 @@
 					const aura = items.find((i) => i.startsWith("aura_"));
 					const auraImg = $("[data-reward-aura]", reward);
 					if (aura && auraImg) {
-						auraImg.src = "/assets/auras/" + aura.replace(/^aura_/, "") + ".webp";
+						// a still frame (~15 KB) - the animation (~0.9 MB) only while the reward is hovered
+						const name = aura.replace(/^aura_/, "");
+						auraImg.src = "/assets/auras/still/" + name + ".webp";
+						reward.addEventListener("pointerenter", () => { auraImg.src = "/assets/auras/" + name + ".webp"; }, { once: true });
 						auraImg.alt = "The aura you get";
 						auraImg.hidden = false;
 					}

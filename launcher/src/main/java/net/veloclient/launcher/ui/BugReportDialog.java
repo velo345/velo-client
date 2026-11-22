@@ -296,12 +296,35 @@ public final class BugReportDialog {
 				}
 				report.add("mods", list);
 			}
+			com.google.gson.JsonArray modules = activeModules(dir);
+			if (modules != null) {
+				report.add("modules", modules);
+			}
 		} catch (Exception e) {
 			log.append("\n(couldn't attach the game log: ").append(e).append(")");
 		}
 	}
 
 	/** The newest {@code count} files ending in {@code suffix} changed within {@code days}, newest first. */
+	/** The Velo modules that were on in this profile's last game (the game writes them every 10 s), or null. */
+	static com.google.gson.JsonArray activeModules(Path gameDir) {
+		try {
+			Path file = gameDir.resolve("config").resolve("velo-client").resolve("active-modules.txt");
+			if (!java.nio.file.Files.isRegularFile(file)) {
+				return null;
+			}
+			com.google.gson.JsonArray out = new com.google.gson.JsonArray();
+			for (String line : java.nio.file.Files.readAllLines(file, java.nio.charset.StandardCharsets.UTF_8)) {
+				if (!line.isBlank() && out.size() < 400) {
+					out.add(line.trim());
+				}
+			}
+			return out;
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
 	static List<Path> newest(Path dir, String suffix, int count, int days) {
 		if (!Files.isDirectory(dir)) {
 			return List.of();

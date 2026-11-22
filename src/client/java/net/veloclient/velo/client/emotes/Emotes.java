@@ -201,6 +201,17 @@ public final class Emotes {
 		return !PLAYING.isEmpty() || preview != null;
 	}
 
+	/** {@link #playing(UUID)} for a uuid as 32 hex chars (or dashed). */
+	public static boolean playing(String uuid) {
+		return playing(parseUuid(uuid));
+	}
+
+	/** True while this player's emote plays (not stopping). */
+	public static boolean playing(UUID uuid) {
+		Playing p = uuid == null ? null : PLAYING.get(uuid);
+		return p != null && p.stopNanos == 0;
+	}
+
 	/** Every emote playing in the world right now (for the effects). */
 	public static void forEachPlaying(BiConsumer<UUID, Playing> action) {
 		PLAYING.forEach(action);

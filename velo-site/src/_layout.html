@@ -1,11 +1,12 @@
 <!doctype html>
-<html lang="en" dir="ltr">
+<html lang="en" dir="ltr"{{#if sale.on}} data-sale-from="{{sale.from}}" data-sale-until="{{sale.until}}"{{/if}}>
 <head>
 {{> head}}
 </head>
 <body class="{{page.bodyClass}}">
 <div class="scroll-progress" aria-hidden="true"></div>
 <div class="bg-glow" aria-hidden="true"><span></span><span></span><span></span></div>
+{{> sale-bar}}
 {{> nav}}
 <main id="main">
 {{page.body}}

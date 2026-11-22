@@ -100,6 +100,8 @@ final class BotConfig {
 	String vipRoleId;
 	/** Also take the VIP role from anyone holding it without an active Velo+ (false: only from linked members whose Velo+ ended). */
 	boolean vipStrict = true;
+	/** The OG role: given to linked members who got Velo in its first two weeks (the OG badge); never taken away. */
+	String ogRoleId = "1574026944691830815";
 	int ticketCounter;
 	int maxOpenTicketsPerUser = 2;
 	String ticketPanelTitle = "Need help?";
@@ -221,6 +223,7 @@ final class BotConfig {
 		this.linkedRoleId = fresh.linkedRoleId;
 		this.vipRoleId = fresh.vipRoleId;
 		this.vipStrict = fresh.vipStrict;
+		this.ogRoleId = fresh.ogRoleId;
 		this.maxOpenTicketsPerUser = fresh.maxOpenTicketsPerUser;
 		this.ticketPanelTitle = fresh.ticketPanelTitle;
 		this.ticketPanelText = fresh.ticketPanelText;

@@ -44,7 +44,7 @@ public final class WaypointsModule extends AbstractModule implements Configurabl
 	public WaypointsModule() {
 		super("waypoints", "Waypoints",
 				"Per-world waypoints with beams, on-screen distance markers and minimap dots. P opens the menu, N adds one where you stand.",
-				ModuleCategory.HUD, SafetyTag.ALWAYS_SAFE, true);
+				ModuleCategory.HUD, SafetyTag.CHECK_SERVER_RULES, true);
 		ClientTickEvents.END_CLIENT_TICK.register(client ->
 				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));
 		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context ->

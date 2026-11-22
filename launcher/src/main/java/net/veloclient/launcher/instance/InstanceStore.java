@@ -60,23 +60,13 @@ public final class InstanceStore {
 	}
 
 	public static Instance createNew(String name, String mcVersion, InstanceIcon icon) {
-		// The first-start guide only makes sense once: the very first launch with Velo ever (its default profile) - not
-		// on profiles made later, and not again after deleting every profile (remembered in config/guide-offered).
-		Path offered = net.veloclient.launcher.data.VeloPaths.root().resolve("config").resolve("guide-offered");
-		boolean first = loadAll().isEmpty() && !Files.exists(offered);
+		// Every new profile shows Velo's setup guide once - on its first title screen, or a moment after joining when it
+		// launches straight onto a server (the game deletes the file when the guide is finished or skipped).
 		String id = UUID.randomUUID().toString();
 		Instance instance = new Instance(id, name, mcVersion, icon, System.currentTimeMillis());
 		InstancePaths.ensureDirectories(id);
 		save(instance);
-		if (first) {
-			markGuidePending(id);
-			try {
-				Files.createDirectories(offered.getParent());
-				Files.writeString(offered, java.time.Instant.now().toString(), StandardCharsets.UTF_8);
-			} catch (IOException ignored) {
-				// worst case the guide is offered on a later first profile too
-			}
-		}
+		markGuidePending(id);
 		giveOwnVeloProfile(id, name);
 		return instance;
 	}
@@ -108,10 +98,7 @@ public final class InstanceStore {
 		return profileName.toLowerCase().replaceAll("[^a-z0-9_-]+", "-");
 	}
 
-	/**
-	 * A brand-new profile shows Velo's first-start guide once, on its first title screen (the game deletes the file when
-	 * the guide is finished or skipped). Only the very first profile; later ones, duplicates and imports never get it.
-	 */
+	/** A new profile shows Velo's setup guide once (the game deletes the file when it's finished or skipped). */
 	private static void markGuidePending(String id) {
 		try {
 			Path marker = InstancePaths.gameDir(id).resolve("velo").resolve("guide-pending");
@@ -119,6 +106,15 @@ public final class InstanceStore {
 			Files.writeString(marker, java.time.Instant.now().toString(), StandardCharsets.UTF_8);
 		} catch (IOException ignored) {
 			// no guide for this profile - harmless
+		}
+	}
+
+	/** No setup guide for this profile (a temporary one, or one that comes with someone's finished setup). */
+	public static void skipGuide(String id) {
+		try {
+			Files.deleteIfExists(InstancePaths.gameDir(id).resolve("velo").resolve("guide-pending"));
+		} catch (IOException ignored) {
+			// it just shows the guide once
 		}
 	}
 

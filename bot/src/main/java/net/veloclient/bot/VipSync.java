@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
  * and takes it away from everyone who doesn't - linked members whose Velo+ ended, and (when
  * {@code vipStrict}, the default) anyone holding the role without an active membership. Also run for one
  * member right after {@code /link}, so someone who links after getting Velo+ gets the role at once.
+ * Also hands out the OG role ({@code ogRoleId}) to linked members with the OG badge - only given, never taken.
  */
 final class VipSync {
 
@@ -54,17 +55,23 @@ final class VipSync {
 	}
 
 	private void run() throws Exception {
-		if (config.vipRoleId == null) {
+		if (config.vipRoleId == null && config.ogRoleId == null) {
 			return;
 		}
 		List<ServerApi.LinkInfo> links = server.links();
+		if (config.ogRoleId != null) {
+			giveOg(links);
+		}
+		if (config.vipRoleId == null) {
+			return;
+		}
 		Set<String> plusIds = new HashSet<>();
 		for (ServerApi.LinkInfo link : links) {
 			if (link.plus()) {
 				plusIds.add(link.discordId());
 			}
 		}
-		for (Guild guild : jda.getGuilds()) {
+		for (Guild guild : HomeGuild.guilds(jda)) {
 			Role role = guild.getRoleById(config.vipRoleId);
 			if (role == null || !guild.getSelfMember().canInteract(role)) {
 				continue;
@@ -78,6 +85,22 @@ final class VipSync {
 						guild.removeRoleFromMember(net.dv8tion.jda.api.entities.UserSnowflake.fromId(holder), role).reason("Velo+ is not active")
 								.queue(null, e -> System.err.println("Couldn't remove the VIP role: " + e.getMessage()));
 					}
+				}
+			}
+		}
+	}
+
+	private void giveOg(List<ServerApi.LinkInfo> links) throws Exception {
+		for (Guild guild : HomeGuild.guilds(jda)) {
+			Role role = guild.getRoleById(config.ogRoleId);
+			if (role == null || !guild.getSelfMember().canInteract(role)) {
+				continue;
+			}
+			Set<String> holders = RoleHolders.of(jda, guild.getId(), Set.of(role.getId())).keySet();
+			for (ServerApi.LinkInfo link : links) {
+				if (link.og() && !holders.contains(link.discordId())) {
+					guild.addRoleToMember(net.dv8tion.jda.api.entities.UserSnowflake.fromId(link.discordId()), role).reason("Velo OG (first two weeks)")
+							.queue(null, e -> { });
 				}
 			}
 		}

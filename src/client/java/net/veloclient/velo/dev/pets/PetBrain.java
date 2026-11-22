@@ -65,6 +65,13 @@ final class PetBrain {
 	private float rideX;
 	private float rideLift;
 	private float rideZ;
+	// Sit & stay: the pet waits where it is (watching you), curls up after a while, and comes back when called.
+	private boolean staying;
+	private double stayX = Double.NaN;
+	private double stayY;
+	private double stayZ;
+	/** Its owner's emote is playing: the pet does its trick along (again and again while it lasts). */
+	private boolean emoting;
 
 	private final Matrix4f frame = new Matrix4f();
 	private final Matrix4f rel = new Matrix4f();
@@ -85,6 +92,45 @@ final class PetBrain {
 		rideX = x;
 		rideLift = lift;
 		rideZ = z;
+	}
+
+	/** Sit & stay on / off (off: wakes up and follows again). */
+	void stay(boolean on) {
+		if (on == staying) {
+			return;
+		}
+		staying = on;
+		stayX = Double.NaN;
+	}
+
+	boolean staying() {
+		return staying;
+	}
+
+	/** A trick on command ("trick" = its special move, "cheer" = its celebration). */
+	void act(String what) {
+		// the trick (and a cheer) is the kill celebration for now (owner 2026-11-22); pets without one do their idle trick
+		String clip = model.clips.containsKey("kill") ? "kill" : "special";
+		if (riding || staying || !model.clips.containsKey(clip)) {
+			return;
+		}
+		if ("sleep".equals(scene) || "perch".equals(scene)) {
+			return; // asleep or on your shoulder: it stays put
+		}
+		startScene(clip);
+		sinceSpecial = 0;
+	}
+
+	/** In first person with the pet shown: it walks ahead of you, to the side, where you can see it. */
+	private boolean front;
+
+	void front(boolean on) {
+		front = on;
+	}
+
+	/** Its owner is (or stops) playing an emote: the pet joins in with its kill celebration. */
+	void emoting(boolean on) {
+		emoting = on;
 	}
 
 	/** A small pet hops a little lower than a big one (blocks per model pixel -> about its height). */
@@ -141,7 +187,23 @@ final class PetBrain {
 		}
 
 		// ---- state changes ----
-		boolean moving = speed > 0.6;
+		boolean moving = speed > 0.6 && !staying;
+		if (staying) {
+			if (scene != null) {
+				// Scenes play relative to you (the clip carries the hop onto your shoulder etc.) - a waiting pet only idles.
+				startFollow(px, py, pz);
+			}
+			if (Double.isNaN(stayX) && !Double.isNaN(x)) {
+				stayX = x;
+				stayY = y;
+				stayZ = z;
+			}
+		}
+		// joining your emote: the kill celebration (livelier than the idle trick)
+		String emoteClip = model.clips.containsKey("kill") ? "kill" : "special";
+		if (emoting && scene == null && !staying && model.clips.containsKey(emoteClip)) {
+			startScene(emoteClip);
+		}
 		if (scene != null) {
 			sceneT += dt;
 			PetModel.Clip clip = model.clips.get(scene);
@@ -153,12 +215,14 @@ final class PetBrain {
 				startFollow(px, py, pz);
 			} else if ("perch".equals(scene) && afk > settings.sleepAfter()) {
 				startScene("sleep");
-			} else if ("sleep".equals(scene) && afk < 0.05f) {
+			} else if ("sleep".equals(scene) && afk < 0.05f && !staying) {
 				startScene("wake");
 			}
 		} else {
 			sinceSpecial += dt;
-			if (settings.tricks() && still > 5 && sinceSpecial > 25) {
+			if (staying) {
+				// waits in its idle loop, watching you
+			} else if (settings.tricks() && still > 5 && sinceSpecial > 25) {
 				startScene("special");
 				sinceSpecial = 0;
 			} else if (settings.tricks() && still > 14) {
@@ -172,15 +236,22 @@ final class PetBrain {
 		double gz = pz;
 		{
 			float fx = model.follow[0] * unit;
-			float fz = model.follow[2] * unit;
+			float fz = (front ? Math.abs(model.follow[2]) * 1.6f : model.follow[2]) * unit;
 			gx += fx * Math.cos(playerA) + fz * Math.sin(playerA);
 			gz += -fx * Math.sin(playerA) + fz * Math.cos(playerA);
 			// no ground found (you fly high above the ground): a walker stays on the ground it had instead of jumping up to you
 			gy = model.flies() ? py + model.follow[1] * unit : !Double.isNaN(ground) ? ground : !Double.isNaN(groundY) ? groundY : py;
+			if (staying && !Double.isNaN(stayX)) {
+				gx = stayX;
+				gz = stayZ;
+				if (model.flies()) {
+					gy = stayY;
+				}
+			}
 		}
 		// Too far behind: catch up in one go. Walkers only count the ground distance - flying high above one in creative
 		// must not make it blink after you.
-		boolean lost = model.flies() ? dist(x, y, z, gx, gy, gz) > 24 : dist(x, 0, z, gx, 0, gz) > 28 || Math.abs(gy - y) > 40;
+		boolean lost = !staying && (model.flies() ? dist(x, y, z, gx, gy, gz) > 24 : dist(x, 0, z, gx, 0, gz) > 28 || Math.abs(gy - y) > 40);
 		if (Double.isNaN(goalX) || Double.isNaN(x) || lost) {
 			x = gx;
 			y = gy;
@@ -237,7 +308,8 @@ final class PetBrain {
 		}
 		double sp = Math.sqrt(vx * vx + vz * vz + (model.flies() ? vy * vy : 0));
 		float spPx = (float) (sp / unit);
-		float face = spPx > (model.flies() ? 26 : 10) ? (float) Math.atan2(vx, vz) : playerA + 0.2f;
+		float face = spPx > (model.flies() ? 26 : 10) ? (float) Math.atan2(vx, vz)
+				: staying ? (float) Math.atan2(px - x, pz - z) : playerA + 0.2f; // waiting: it watches you
 		float dy = angDiff(yaw, face) * (1 - (float) Math.exp(-dt * (model.flies() ? 4.5 : 7)));
 		yaw += dy;
 		yawRate += (dy / dt - yawRate) * (1 - (float) Math.exp(-dt * 4));

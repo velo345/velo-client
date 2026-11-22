@@ -95,6 +95,36 @@ public final class BugReporter {
 		return list;
 	}
 
+	private static int snapshotTicks;
+	private static volatile String lastSnapshot;
+
+	/**
+	 * Every 10 s: the switched-on modules into {@code <game dir>/config/velo-client/active-modules.txt} (only when the
+	 * list changed), so a report sent from the launcher - after a ban, a kick, a crash - still says which modules were on.
+	 */
+	public static void snapshotTick() {
+		if (++snapshotTicks < 200) {
+			return;
+		}
+		snapshotTicks = 0;
+		String now = String.join("\n", enabledModules());
+		if (now.equals(lastSnapshot)) {
+			return;
+		}
+		lastSnapshot = now;
+		Thread.ofVirtual().start(() -> {
+			try {
+				Path dir = gameDir().resolve("config").resolve("velo-client");
+				java.nio.file.Files.createDirectories(dir);
+				Path tmp = dir.resolve("active-modules.txt.tmp");
+				java.nio.file.Files.writeString(tmp, now, java.nio.charset.StandardCharsets.UTF_8);
+				java.nio.file.Files.move(tmp, dir.resolve("active-modules.txt"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+			} catch (Exception ignored) {
+				lastSnapshot = null;
+			}
+		});
+	}
+
 	public static Path gameDir() {
 		return FabricLoader.getInstance().getGameDir();
 	}

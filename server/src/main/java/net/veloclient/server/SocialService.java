@@ -755,9 +755,12 @@ final class SocialService {
 			}
 			UserRecord record = data.users.get(uuid);
 			Activity activity = visibleActivity(uuid);
-			if (record != null && (activity != null || sessions.hasLiveSession(uuid, SessionRegistry.KIND_GAME)
-					|| sessions.hasLiveSession(uuid, SessionRegistry.KIND_LAUNCHER))) {
-				record.lastSeen = System.currentTimeMillis();
+			// Only while friends actually see them online: someone appearing offline (or whose session merely hasn't
+			// timed out yet) showed up as "Offline - last seen just now".
+			String announced = lastAnnouncedPresence.get(uuid);
+			boolean wasVisible = announced != null && !announced.equals("offline");
+			if (record != null && (activity != null || wasVisible)) {
+				record.lastSeen = System.currentTimeMillis(); // online now, or just went offline (that moment)
 			}
 			String fingerprint = activity == null ? "offline" : activity.kind() + "\u0000" + activity.detail();
 			if (fingerprint.equals(lastAnnouncedPresence.get(uuid))) {

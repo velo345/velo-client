@@ -80,19 +80,55 @@ public final class ClipsModule extends AbstractModule implements Configurable {
 						new net.veloclient.velo.client.gui.media.MediaScreen(null, file)), null, null)));
 	}
 
-	/** Clips Pro when it's on and you're Velo+, else the normal in-memory buffer. */
+	/**
+	 * Free clips on the graphics card's own video encoder when the PC has one (NVIDIA NVENC, AMD AMF, Intel Quick Sync,
+	 * VA-API on Linux) - the same engine as Clips Pro, at the free limits (720p, 30 FPS, the free buffer length). Almost no
+	 * CPU instead of compressing every frame as a JPEG on the CPU, so weak laptops record smoothly and in better quality,
+	 * with sound. 0 unknown, 1 checking, 2 yes, 3 no (CPU only, or FFmpeg not available): then the JPEG buffer as before.
+	 */
+	private static volatile int hardware;
+	private boolean graphicsEncoder = true;
+
+	private void checkHardware() {
+		hardware = 1;
+		net.veloclient.velo.client.clips.FfmpegTool.ensure(problem -> {
+			if (problem != null) {
+				hardware = 3;
+				return;
+			}
+			Thread.ofVirtual().name("velo-clips-encoder-probe").start(() -> {
+				var encoder = net.veloclient.velo.client.clips.FfmpegTool.encoder(6000);
+				hardware = encoder != null && !"libx264".equals(encoder.name()) ? 2 : 3;
+				net.veloclient.velo.VeloClient.LOGGER.info("Clips: {}", hardware == 2 ? "recording on the graphics card (" + encoder.label() + ")"
+						: "no graphics card encoder - the normal buffer");
+				net.minecraft.client.MinecraftClient.getInstance().execute(this::apply);
+			});
+		});
+	}
+
+	/** Clips Pro when it's on and you're Velo+; else the graphics card encoder when there is one; else the in-memory buffer. */
 	private void apply() {
 		boolean usePro = isEnabled() && pro && net.veloclient.velo.client.namestyle.NameStyles.plus();
+		if (isEnabled() && !usePro && graphicsEncoder && hardware == 0) {
+			checkHardware();
+		}
+		boolean useGpu = isEnabled() && !usePro && graphicsEncoder && hardware == 2;
 		int kbps = switch (proQuality) {
 			case "Balanced" -> 8000;
 			case "Max" -> 20000;
 			default -> 12000;
 		};
 		net.veloclient.velo.client.clips.ProClipRecorder.configureAudio(desktopSound, (float) (desktopVolume / 100), micSound, (float) (micVolume / 100));
-		net.veloclient.velo.client.clips.ProClipRecorder.configure(usePro, Integer.parseInt(proFps), Integer.parseInt(proResolution.replace("p", "")),
-				(int) Math.round(proMinutes * 60), kbps, compressSaved);
 		int height = Integer.parseInt(resolution.replace("p", ""));
-		ClipRecorder.configure(isEnabled() && !usePro, Integer.parseInt(fps), height, (int) Math.round(seconds), (float) (quality / 100.0));
+		if (useGpu) {
+			// the free limits on the Pro engine: 720p, 30 FPS, the free clip length
+			net.veloclient.velo.client.clips.ProClipRecorder.configure(true, Math.min(30, Integer.parseInt(fps)), Math.min(720, height),
+					(int) Math.round(seconds), 6000, compressSaved);
+		} else {
+			net.veloclient.velo.client.clips.ProClipRecorder.configure(usePro, Integer.parseInt(proFps), Integer.parseInt(proResolution.replace("p", "")),
+					(int) Math.round(proMinutes * 60), kbps, compressSaved);
+		}
+		ClipRecorder.configure(isEnabled() && !usePro && !useGpu, Integer.parseInt(fps), height, (int) Math.round(seconds), (float) (quality / 100.0));
 	}
 
 	@Override
@@ -150,6 +186,10 @@ public final class ClipsModule extends AbstractModule implements Configurable {
 					micVolume = Math.round(v / 5) * 5;
 					apply();
 				}, v -> (int) Math.round(v) + "%"),
+				new ConfigField.ToggleField("Record On The Graphics Card (smoother, with sound)", () -> graphicsEncoder, v -> {
+					graphicsEncoder = v;
+					apply();
+				}),
 				new ConfigField.ToggleField("Shrink Saved Clips", () -> compressSaved, v -> {
 					compressSaved = v;
 					apply();

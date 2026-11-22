@@ -1,0 +1,14 @@
+{{#if sale.on}}<div class="wrap sale-slot"><section class="sale-hero compact" aria-labelledby="sale-h">
+  <div class="sale-hero-body">
+    <div class="sale-hero-left">
+      <span class="sale-kicker"><span class="when-soon">{{sale.name}} · starts Monday</span><span class="when-live">{{sale.name}} · live now</span></span>
+      <h2 class="sale-big" id="sale-h"><span class="sale-num">{{sale.percent}}%</span> <span class="sale-off">OFF</span></h2>
+      <p class="sale-sub">Half price on Velo Coins &amp; Velo+ - one week only.</p>
+    </div>
+    <div class="sale-hero-right">
+      {{> sale-tiles}}
+      {{> sale-deals}}
+      <a class="btn btn-primary sale-cta" href="/store#sale"><span class="when-live">Grab the deal</span><span class="when-soon">See the deals</span></a>
+    </div>
+  </div>
+</section></div>{{/if}}

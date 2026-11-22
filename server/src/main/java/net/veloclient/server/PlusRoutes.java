@@ -34,7 +34,7 @@ final class PlusRoutes {
 	}
 
 	static void register(HttpServer server, SessionRegistry registry, StoreService store, PlusTokens tokens, AddonStore addons, AddonSync addonSync,
-			DiscordLinks links, String adminToken) {
+			DiscordLinks links, String adminToken, java.util.function.Predicate<String> ogEligible) {
 		route(server, registry, "/v1/plus/status", "GET", (ex, s) -> {
 			var plus = store.config().plus;
 			Map<String, Object> out = new java.util.LinkedHashMap<>(Map.of("plus", store.isPlus(s.uuid()), "until", store.plusUntil(s.uuid()),
@@ -42,6 +42,18 @@ final class PlusRoutes {
 					"checkoutEnabled", store.checkoutEnabled()));
 			out.put("trialDays", plus.trialDays);
 			out.put("yearlyPrice", plus.yearlyPrice);
+			// A sale (Black Friday): the first payment costs less; fullPrice is what it costs after.
+			var offer = store.plusOffer();
+			if (offer.fullPrice() != null) {
+				out.put("price", offer.price());
+				out.put("yearlyPrice", offer.yearlyPrice());
+				out.put("fullPrice", offer.fullPrice());
+				out.put("fullYearlyPrice", offer.fullYearlyPrice());
+			}
+			Map<String, Object> sale = store.saleView();
+			if (sale != null) {
+				out.put("sale", sale);
+			}
 			out.put("trialAvailable", store.trialAvailable(s.uuid()));
 			// Only the players who have them hear about the Addons at all.
 			if (store.hasAddons(s.uuid())) {
@@ -132,7 +144,8 @@ final class PlusRoutes {
 		admin(server, adminToken, "/v1/admin/discord/links", ex -> {
 			List<Map<String, Object>> out = new java.util.ArrayList<>();
 			for (DiscordLinks.Link l : links.all()) {
-				out.add(Map.of("discordId", l.discordId(), "uuid", l.uuid(), "username", l.username(), "plus", store.isPlus(l.uuid())));
+				out.add(Map.of("discordId", l.discordId(), "uuid", l.uuid(), "username", l.username(), "plus", store.isPlus(l.uuid()),
+						"og", ogEligible.test(l.uuid())));
 			}
 			JsonHttp.writeJson(ex, 200, Map.of("links", out));
 		});

@@ -33,9 +33,9 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 	private static final List<String> STYLES = List.of(VANILLA, VELO, "Custom Drawing");
 
 	private String style = VANILLA;
-	/** Per frame, set by {@link #render}: the vanilla sprites are being recoloured (and whether the world is hardcore). */
 	/** Step aside when the server's resource pack restyles or hides this bar (MCC Island and others). */
 	private boolean serverWins = true;
+	/** Per frame, set by {@link #render}: the vanilla sprites are being recoloured (and whether the world is hardcore). */
 	private boolean vanillaLook;
 	private boolean hardcore;
 	private int heartColor = 0xFFE3262B;
@@ -68,10 +68,13 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 		if (module.serverWins && net.veloclient.velo.client.hud.ServerHudPack.overridesHearts()) {
 			return false; // the server's pack styles or hides this bar itself
 		}
-		if (module.vanillaForEffects && hasSpecialHearts(player)) {
+		boolean custom = module.style.equals("Custom Drawing") && StatusBarIcons.hasDrawing(KIND);
+		// Your own drawing has its poison / wither / frozen hearts (made from it, or drawn) - only the other styles fall
+		// back to vanilla's when that's switched on.
+		if (!custom && module.vanillaForEffects && hasSpecialHearts(player)) {
 			return false;
 		}
-		boolean custom = module.style.equals("Custom Drawing") && StatusBarIcons.hasDrawing(KIND);
+		module.variant = custom ? effectVariant(player) : StatusBarIcons.Variant.NORMAL;
 		module.vanillaLook = !custom && !module.style.equals(VELO);
 		module.hardcore = module.vanillaLook && isHardcore();
 		// Vanilla's parameter names are misleading: "lastHealth" is the player's CURRENT health (what the hearts fill to) and
@@ -120,7 +123,8 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 			return;
 		}
 		if (custom) {
-			StatusBarIcons.draw(context, KIND, StatusBarIcons.State.EMPTY, x, y, 0xFFFFFFFF);
+			StatusBarIcons.drawVariant(context, KIND, variant == StatusBarIcons.Variant.WITHERED ? variant : StatusBarIcons.Variant.NORMAL,
+					StatusBarIcons.State.EMPTY, x, y, 0xFFFFFFFF);
 			return;
 		}
 		layer(context, FILL, x, y, false, emptyColor);
@@ -141,8 +145,16 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 			return;
 		}
 		if (custom) {
-			StatusBarIcons.draw(context, KIND, half ? StatusBarIcons.State.HALF : StatusBarIcons.State.FULL, x, y,
-					tintCustomIcon || absorbing ? color : 0xFFFFFFFF);
+			StatusBarIcons.State state = half ? StatusBarIcons.State.HALF : StatusBarIcons.State.FULL;
+			if (color == 0xFFFFFFFF && !absorbing) {
+				StatusBarIcons.draw(context, KIND, state, x, y, 0xFFFFFFFF); // the white damage flash
+			} else if (absorbing) {
+				StatusBarIcons.drawVariant(context, KIND, StatusBarIcons.Variant.ABSORBING, state, x, y, 0xFFFFFFFF);
+			} else if (variant != StatusBarIcons.Variant.NORMAL) {
+				StatusBarIcons.drawVariant(context, KIND, variant, state, x, y, 0xFFFFFFFF);
+			} else {
+				StatusBarIcons.draw(context, KIND, state, x, y, tintCustomIcon ? color : 0xFFFFFFFF);
+			}
 			return;
 		}
 		layer(context, FILL, x, y, half, color);
@@ -178,6 +190,29 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 		context.drawTexture(RenderPipelines.GUI_TEXTURED, texture, x, y, 0f, 0f, w, 9, w, 9, 9, 9, color);
 	}
 
+	/** This frame's heart variant for the custom drawing (vanilla's order: poison, then wither, then frozen). */
+	private StatusBarIcons.Variant variant = StatusBarIcons.Variant.NORMAL;
+
+	private static StatusBarIcons.Variant effectVariant(PlayerEntity player) {
+		//? if <26.1 {
+		if (player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.POISON)) {
+			return StatusBarIcons.Variant.POISONED;
+		}
+		if (player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.WITHER)) {
+			return StatusBarIcons.Variant.WITHERED;
+		}
+		return player.isFrozen() ? StatusBarIcons.Variant.FROZEN : StatusBarIcons.Variant.NORMAL;
+		//?} else {
+		/*if (player.hasEffect(net.minecraft.world.effect.MobEffects.POISON)) {
+			return StatusBarIcons.Variant.POISONED;
+		}
+		if (player.hasEffect(net.minecraft.world.effect.MobEffects.WITHER)) {
+			return StatusBarIcons.Variant.WITHERED;
+		}
+		return player.isFullyFrozen() ? StatusBarIcons.Variant.FROZEN : StatusBarIcons.Variant.NORMAL;
+		*///?}
+	}
+
 	private static boolean hasSpecialHearts(PlayerEntity player) {
 		//? if <26.1 {
 		return player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.POISON)
@@ -186,6 +221,18 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 		/*return player.hasEffect(net.minecraft.world.effect.MobEffects.POISON)
 				|| player.hasEffect(net.minecraft.world.effect.MobEffects.WITHER) || player.isFullyFrozen();
 		*///?}
+	}
+
+	private void openVariant(StatusBarIcons.Variant variant) {
+		style = "Custom Drawing";
+		//? if <26.1 {
+		net.minecraft.client.gui.screen.Screen parent = net.minecraft.client.MinecraftClient.getInstance().currentScreen;
+		//?} else if <26.2 {
+		/*net.minecraft.client.gui.screens.Screen parent = net.minecraft.client.Minecraft.getInstance().screen;
+		*///?} else {
+		/*net.minecraft.client.gui.screens.Screen parent = net.minecraft.client.Minecraft.getInstance().gui.screen();
+		*///?}
+		net.veloclient.velo.client.gui.StatusIconEditor.openVariant(parent, KIND, variant, heartColor);
 	}
 
 	@Override
@@ -197,12 +244,28 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 				new ConfigField.ColorField("Absorption Color", () -> absorptionColor, v -> absorptionColor = v, false),
 				new ConfigField.ColorField("Empty Heart Color (Velo Style)", () -> emptyColor, v -> emptyColor = v, true),
 				new ConfigField.ColorField("Outline Color (Velo Style)", () -> outlineColor, v -> outlineColor = v, true),
-				new ConfigField.ToggleField("Keep Vanilla Look When Poisoned/Withered/Frozen", () -> vanillaForEffects, v -> vanillaForEffects = v),
+				new ConfigField.ToggleField("Keep Vanilla Look When Poisoned/Withered/Frozen (Velo & Recolored)", () -> vanillaForEffects, v -> vanillaForEffects = v),
 				new ConfigField.ActionButtonField("Draw Custom Heart (or import a PNG)...", () -> {
 					style = "Custom Drawing";
 					net.veloclient.velo.client.gui.StatusIconEditor.openFromSettings(KIND, "Heart", heartColor);
 				}),
 				new ConfigField.ToggleField("Tint Custom Drawing With Heart Color", () -> tintCustomIcon, v -> tintCustomIcon = v),
+				new ConfigField.HeaderField("Effect Hearts (made from your drawing, or draw your own)"),
+				new ConfigField.ActionButtonField("Draw Absorption Heart...", () -> openVariant(StatusBarIcons.Variant.ABSORBING)),
+				new ConfigField.ActionButtonField("Draw Poison Heart...", () -> openVariant(StatusBarIcons.Variant.POISONED)),
+				new ConfigField.ActionButtonField("Draw Wither Heart...", () -> openVariant(StatusBarIcons.Variant.WITHERED)),
+				new ConfigField.ActionButtonField("Draw Frozen Heart...", () -> openVariant(StatusBarIcons.Variant.FROZEN)),
+				new ConfigField.ActionButtonField("Back To Automatic Effect Hearts", () -> {
+					for (StatusBarIcons.Variant variant : StatusBarIcons.Variant.values()) {
+						if (variant != StatusBarIcons.Variant.NORMAL) {
+							try {
+								StatusBarIcons.delete(variant.kind(KIND));
+							} catch (Exception ignored) {
+								// nothing to delete
+							}
+						}
+					}
+				}),
 				new ConfigField.ActionButtonField("Delete Custom Drawing", () -> {
 					try {
 						StatusBarIcons.delete(KIND);

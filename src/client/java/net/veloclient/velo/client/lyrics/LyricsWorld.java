@@ -16,8 +16,58 @@ final class LyricsWorld {
 	private static boolean failed;
 	private static long lastNanos;
 
-	/** One letter layer, gathered first and then submitted with the version's queue. */
-	private record Piece(Matrix4f pose, Text glyph, float x, float y, int color) {
+	/** One letter layer, gathered first and then submitted with the version's queue. Pooled: reused every frame. */
+	private static final class Piece {
+		final Matrix4f pose = new Matrix4f();
+		Text glyph;
+		float x;
+		float y;
+		int color;
+
+		Matrix4f pose() {
+			return pose;
+		}
+
+		Text glyph() {
+			return glyph;
+		}
+
+		float x() {
+			return x;
+		}
+
+		float y() {
+			return y;
+		}
+
+		int color() {
+			return color;
+		}
+	}
+
+	private static final List<Piece> POOL = new ArrayList<>();
+	// scratch matrices (render thread only): pieces copy them
+	private static final Matrix4f LETTER = new Matrix4f();
+	private static final Matrix4f LAYER = new Matrix4f();
+	/** The glyph's ordered text, made once per glyph (same object every frame, so the font memo hits). */
+	private static final java.util.IdentityHashMap<Text, Object> ORDERED = new java.util.IdentityHashMap<>();
+	private static Object lastGlyph;
+	private static Object lastOrdered;
+	private static final List<Piece> FRAME = new ArrayList<>();
+
+	private static Piece piece(Matrix4f pose, Text glyph, float x, float y, int color) {
+		Piece p = FRAME.size() < POOL.size() ? POOL.get(FRAME.size()) : null;
+		if (p == null) {
+			p = new Piece();
+			POOL.add(p);
+		}
+		p.pose.set(pose);
+		p.glyph = glyph;
+		p.x = x;
+		p.y = y;
+		p.color = color;
+		FRAME.add(p);
+		return p;
 	}
 
 	private LyricsWorld() {
@@ -25,7 +75,8 @@ final class LyricsWorld {
 
 	/** This frame's letters (empty when Lyrics shows nothing in 3D right now). */
 	private static List<Piece> collect() {
-		List<Piece> pieces = new ArrayList<>();
+		FRAME.clear();
+		List<Piece> pieces = FRAME;
 		if (!LyricsModule.showing3d()) {
 			return pieces;
 		}
@@ -59,7 +110,7 @@ final class LyricsWorld {
 			double px = a.ax + a.rx * cx * s - a.ux * cy * s + a.nx * dz * s;
 			double py = a.ay + a.ry * cx * s - a.uy * cy * s + a.ny * dz * s;
 			double pz = a.az + a.rz * cx * s - a.uz * cy * s + a.nz * dz * s;
-			Matrix4f m = new Matrix4f(xx, xy, xz, 0f, yx, yy, yz, 0f, zx, zy, zz, 0f, (float) px, (float) py, (float) pz, 1f)
+			Matrix4f m = LETTER.set(xx, xy, xz, 0f, yx, yy, yz, 0f, zx, zy, zz, 0f, (float) px, (float) py, (float) pz, 1f)
 					.translate(-w / 2f, -LyricsRenderer.EM / 2f, 0f);
 			// shading layers sit a hair behind the letter, so the depth buffer keeps them under it
 			double dist = Math.sqrt(px * px + py * py + pz * pz);
@@ -71,13 +122,13 @@ final class LyricsWorld {
 			LyricsRenderer.effects(style, alpha, (ox, oy, sc, c, al) -> {
 				float z = gap * left[0]--;
 				int la = Math.round(LyricsRenderer.clamp(al) * ((c >>> 24) & 0xFF));
-				if (la >= 5) {
-					Matrix4f pose = sc == 1f ? new Matrix4f(m).translate(0f, 0f, z)
-							: new Matrix4f(m).translate(w / 2f + ox, half + oy, z).scale(sc, sc, 1f).translate(-w / 2f, -half, 0f);
-					pieces.add(new Piece(pose, glyph, sc == 1f ? ox : 0f, sc == 1f ? oy : 0f, (la << 24) | (c & 0xFFFFFF)));
+				if (la >= 20) { // shading layers under ~8% opacity barely show - skipping them saves most of the text work on faded lines
+					Matrix4f pose = sc == 1f ? LAYER.set(m).translate(0f, 0f, z)
+							: LAYER.set(m).translate(w / 2f + ox, half + oy, z).scale(sc, sc, 1f).translate(-w / 2f, -half, 0f);
+					piece(pose, glyph, sc == 1f ? ox : 0f, sc == 1f ? oy : 0f, (la << 24) | (c & 0xFFFFFF));
 				}
 			});
-			pieces.add(new Piece(m, glyph, 0f, 0f, (baseA << 24) | (color & 0xFFFFFF)));
+			piece(m, glyph, 0f, 0f, (baseA << 24) | (color & 0xFFFFFF));
 		}, st, LyricsModule.studioOpen, new double[] {cam[0], cam[1], cam[2], rot[0]}, 0, 0, dt, true);
 		return pieces;
 	}
@@ -105,8 +156,9 @@ final class LyricsWorld {
 				: net.minecraft.client.font.TextRenderer.TextLayerType.NORMAL;
 		for (Piece p : pieces) {
 			matrices.push();
-			matrices.multiplyPositionMatrix(p.pose());
-			queue.submitText(matrices, p.x(), p.y(), p.glyph().asOrderedText(), false, mode, FULL_BRIGHT, p.color(), 0, 0);
+			// straight into the position matrix: text has no normals, so skip the normal-matrix inverse per layer
+			matrices.peek().getPositionMatrix().mul(p.pose());
+			queue.submitText(matrices, p.x(), p.y(), ordered(p.glyph()), false, mode, FULL_BRIGHT, p.color(), 0, 0);
 			matrices.pop();
 		}
 	}
@@ -133,10 +185,35 @@ final class LyricsWorld {
 				: net.minecraft.client.gui.Font.DisplayMode.NORMAL;
 		for (Piece p : pieces) {
 			matrices.pushPose();
-			matrices.mulPose(p.pose());
-			queue.submitText(matrices, p.x(), p.y(), p.glyph().getVisualOrderText(), false, mode, FULL_BRIGHT, p.color(), 0, 0);
+			// straight into the position matrix: text has no normals, so skip the normal-matrix inverse per layer
+			matrices.last().pose().mul(p.pose());
+			queue.submitText(matrices, p.x(), p.y(), ordered(p.glyph()), false, mode, FULL_BRIGHT, p.color(), 0, 0);
 			matrices.popPose();
 		}
+	}
+	*///?}
+
+	//? if <26.1 {
+	private static net.minecraft.text.OrderedText ordered(Text glyph) {
+		if (glyph != lastGlyph) {
+			if (ORDERED.size() > 4000) {
+				ORDERED.clear();
+			}
+			lastGlyph = glyph;
+			lastOrdered = ORDERED.computeIfAbsent(glyph, Text::asOrderedText);
+		}
+		return (net.minecraft.text.OrderedText) lastOrdered;
+	}
+	//?} else {
+	/*private static net.minecraft.util.FormattedCharSequence ordered(net.minecraft.network.chat.Component glyph) {
+		if (glyph != lastGlyph) {
+			if (ORDERED.size() > 4000) {
+				ORDERED.clear();
+			}
+			lastGlyph = glyph;
+			lastOrdered = ORDERED.computeIfAbsent(glyph, net.minecraft.network.chat.Component::getVisualOrderText);
+		}
+		return (net.minecraft.util.FormattedCharSequence) lastOrdered;
 	}
 	*///?}
 

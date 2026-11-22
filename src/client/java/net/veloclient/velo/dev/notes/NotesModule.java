@@ -25,7 +25,7 @@ import java.util.List;
 public final class NotesModule extends AbstractModule implements Configurable, net.veloclient.velo.client.gui.window.ModuleShortcut {
 
 	public static final KeyBinding OPEN_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.world_notes", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.O, VeloKeybinds.CATEGORY));
+			"key.velo-client." + "world_notes" /* split: the client.world -> client.level Stonecutter rule */, InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.O, VeloKeybinds.CATEGORY));
 
 	private static final List<String> STYLE_NAMES = List.of("Paper", "Sticky", "Glass", "Sign", "Neon");
 	private static NotesModule instance;

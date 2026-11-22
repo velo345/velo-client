@@ -298,9 +298,11 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 		if (!menu && !net.veloclient.velo.client.modules.cosmetics.AuraCosmeticsModule.shows(self)) {
 			return;
 		}
+		// Fewer / Lite only thin out the loose particles (AuraEffects.particleScale): scaling the density itself clamped every
+		// setting to the same minimum, so the Density slider did nothing in game (Celestial Orbit stayed at 1 star a ring).
+		float particles = 1f;
 		if (worn != null && !self && net.veloclient.velo.client.modules.cosmetics.AuraCosmeticsModule.fewerForOthers()) {
-			AuraEffects.Settings base = worn.settings();
-			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.5f, base.color()));
+			particles *= 0.5f;
 		}
 		// Cosmetics Quality: the Lite version (fewer particles) where it decides so.
 		if (net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.hideFar(self, self || player == null || client.player == null ? 0 : player.squaredDistanceTo(client.player))) {
@@ -308,13 +310,18 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 		}
 		if (worn != null && net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.lite(state.id, self,
 				self || player == null || client.player == null ? 0 : player.squaredDistanceTo(client.player))) {
-			AuraEffects.Settings base = worn.settings();
-			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * (net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.low() ? 0.2f : 0.4f), base.color()));
+			particles *= net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.low() ? 0.2f : 0.4f;
 		}
 		matrices.push();
 		toWorld(matrices, state.bodyYaw);
 		aim(matrices.peek().getPositionMatrix());
-		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z, self);
+		AuraEffects.particleScale = particles;
+		float[] geometry;
+		try {
+			geometry = geometry(state.id, worn, state.x, state.y, state.z, self);
+		} finally {
+			AuraEffects.particleScale = 1f;
+		}
 		if (geometry == null || geometry.length == 0) {
 			matrices.pop();
 			return;
@@ -367,9 +374,11 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 		if (!menu && !net.veloclient.velo.client.modules.cosmetics.AuraCosmeticsModule.shows(self)) {
 			return;
 		}
+		// Fewer / Lite only thin out the loose particles (AuraEffects.particleScale): scaling the density itself clamped every
+		// setting to the same minimum, so the Density slider did nothing in game (Celestial Orbit stayed at 1 star a ring).
+		float particles = 1f;
 		if (worn != null && !self && net.veloclient.velo.client.modules.cosmetics.AuraCosmeticsModule.fewerForOthers()) {
-			AuraEffects.Settings base = worn.settings();
-			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * 0.5f, base.color()));
+			particles *= 0.5f;
 		}
 		// Cosmetics Quality: the Lite version (fewer particles) where it decides so.
 		if (net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.hideFar(self, self || player == null || client.player == null ? 0 : player.distanceToSqr(client.player))) {
@@ -377,13 +386,18 @@ public final class AuraFeatureRenderer extends net.minecraft.client.render.entit
 		}
 		if (worn != null && net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.lite(state.id, self,
 				self || player == null || client.player == null ? 0 : player.distanceToSqr(client.player))) {
-			AuraEffects.Settings base = worn.settings();
-			worn = new AuraManager.Worn(worn.id(), new AuraEffects.Settings(base.size(), base.speed(), base.density() * (net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.low() ? 0.2f : 0.4f), base.color()));
+			particles *= net.veloclient.velo.client.modules.performance.CosmeticsQualityModule.low() ? 0.2f : 0.4f;
 		}
 		matrices.pushPose();
 		toWorld(matrices, state.bodyRot);
 		aim(matrices.last().pose());
-		float[] geometry = geometry(state.id, worn, state.x, state.y, state.z, self);
+		AuraEffects.particleScale = particles;
+		float[] geometry;
+		try {
+			geometry = geometry(state.id, worn, state.x, state.y, state.z, self);
+		} finally {
+			AuraEffects.particleScale = 1f;
+		}
 		if (geometry == null || geometry.length == 0) {
 			matrices.popPose();
 			return;

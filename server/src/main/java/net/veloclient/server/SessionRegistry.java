@@ -64,7 +64,7 @@ final class SessionRegistry {
 	/** {@code wear}: the bodywear shown, "id[:colour],..." (item ids without "wear_", colour codes 1-360 hue), or null. */
 	/** {@code og}: shows the OG badge (eligible and switched on, see {@link OgBadge}). */
 	record OnlineUser(String uuid, String username, String capeId, String wingsId, String auraId, boolean plus, String nameStyle, String emote,
-			String wear, String pet, boolean og) {
+			String wear, String pet, boolean og, String petAct) {
 	}
 
 	/** An emote someone plays, until it expires (the client keeps sending it while it plays). */
@@ -86,6 +86,17 @@ final class SessionRegistry {
 
 	/** The pet each in-game player has out ("pet_" item id without the prefix, already checked against what they own). */
 	private final Map<String, String> pets = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** The pet's command state per player ("stay;act;seq", checked by the caller), null to clear. */
+	private final Map<String, String> petActs = new java.util.concurrent.ConcurrentHashMap<>();
+
+	void setPetAct(String uuid, String value) {
+		if (value == null) {
+			petActs.remove(uuid);
+		} else {
+			petActs.put(uuid, value);
+		}
+	}
 
 	void setPet(String uuid, String value) {
 		if (value == null || !value.matches("[a-z0-9_]{1,40}")) {
@@ -344,7 +355,7 @@ final class SessionRegistry {
 		return sessionsByToken.values().stream()
 				.filter(s -> s.expiresAtMillis() >= now && s.kind().equals(KIND_GAME))
 				.map(s -> new OnlineUser(s.uuid(), s.username(), s.capeId(), s.wingsId(), s.auraId(), plusLookup.test(s.uuid()) && !plusHidden.contains(s.uuid()),
-						plusLookup.test(s.uuid()) ? s.nameStyle() : null, emoteOf(s.uuid(), now), wear.get(s.uuid()), pets.get(s.uuid()), ogShown.contains(s.uuid())))
+						plusLookup.test(s.uuid()) ? s.nameStyle() : null, emoteOf(s.uuid(), now), wear.get(s.uuid()), pets.get(s.uuid()), ogShown.contains(s.uuid()), petActs.get(s.uuid())))
 				.toList();
 	}
 

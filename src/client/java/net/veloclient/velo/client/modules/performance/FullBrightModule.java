@@ -24,7 +24,7 @@ public final class FullBrightModule extends AbstractModule implements net.velocl
 
 	public FullBrightModule() {
 		super("full-bright", "Full Bright", "Makes everything lit at all read as fully bright (vanilla Night Vision rendering, always on).",
-				ModuleCategory.RENDERING, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.RENDERING, SafetyTag.CHECK_SERVER_RULES, false);
 	}
 
 	public static boolean isActive() {

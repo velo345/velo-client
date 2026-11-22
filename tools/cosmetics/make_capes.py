@@ -1351,7 +1351,19 @@ def gift_wrap(phase):
 STAFF3 = None
 
 
-def velo_staff(phase):
+# Staff colour choices (the owner, 2026-11-22: "more staff would wear it"): only the accent line/glow changes.
+STAFF_COLOURS = {
+    "green": (0.16, 0.92, 0.36),
+    "yellow": (1.0, 0.84, 0.10),
+    "orange": (1.0, 0.48, 0.06),
+    "purple": (0.56, 0.22, 1.0),
+    "blue": (0.14, 0.46, 1.0),
+    "aqua": (0.08, 0.88, 0.94),
+    "pink": (1.0, 0.20, 0.60),
+}
+
+
+def velo_staff(phase, accent=(0.95, 0.16, 0.22), tint_logo=False):
     """Minimal and calm: matte black, the Velo logo in flat white, a thin red line and STAFF in spaced letters."""
     from PIL import ImageDraw, ImageFont
     global STAFF3
@@ -1376,7 +1388,7 @@ def velo_staff(phase):
         text_m = np.asarray(text.resize((HW, HH), Image.LANCZOS), dtype=float) / 255
         STAFF3 = (logo, text_m, hnoise(40, 461, 2))
     logo, text_m, grain = STAFF3
-    red = np.array([0.95, 0.16, 0.22])
+    red = np.array(accent)
     # Matte black with a soft top light and a fine grain.
     img = np.zeros((HH, HW, 3)) + np.array([0.045, 0.045, 0.05]) + (grain[..., None] - 0.5) * 0.025
     img += np.exp(-(((x - 0.5) * 1.6) ** 2 + ((y - 0.28) * 2.2) ** 2) * 3)[..., None] * np.array([0.05, 0.05, 0.06])
@@ -1395,7 +1407,14 @@ def velo_staff(phase):
     img = img * (1 - text_m[..., None]) + text_m[..., None] * (np.array([1.9, 1.9, 1.98]) + sweep[..., None] * 0.4)
     # A red seam along the bottom edge.
     img += np.exp(-((y - 0.985) * HH) ** 2 / 6)[..., None] * red * 0.8
-    return vignette(tonemap(img), 0.25)
+    out = tonemap(img)
+    if tint_logo:
+        # Colour versions: the logo in the cloak's colour, painted AFTER the tonemap so it stays fully saturated (through
+        # the roll-off bright colours fade toward white). The light sweep stays in that colour - a soft gloss, no white.
+        col = np.array(accent)
+        lit = np.clip(col * (0.86 + 0.3 * sweep[..., None]) + (1 - col) * 0.06 * sweep[..., None], 0, 1)
+        out = out * (1 - logo[..., None]) + logo[..., None] * lit
+    return vignette(out, 0.25)
 
 
 def booster(phase):
@@ -1481,6 +1500,8 @@ CAPES = {
     "jack_o_lantern": jack_o_lantern,
     "witching_hour": witching_hour,
 }
+for _name, _rgb in STAFF_COLOURS.items():
+    CAPES[f"velo_staff_{_name}"] = (lambda rgb: lambda phase: velo_staff(phase, rgb, True))(_rgb)
 
 
 # ---- cape layout ----
@@ -1490,6 +1511,7 @@ CAPES = {
 # Every cape is 1024 x 512 (OUT_SCALE 16); these differ in frame count / dithering.
 HIGH_RES = {
     "velo_staff": (OUT_SCALE, 24, False),   # flat colours: no dither speckle on the STAFF lettering
+    **{f"velo_staff_{n}": (OUT_SCALE, 24, False) for n in STAFF_COLOURS},
 }
 
 

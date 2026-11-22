@@ -25,7 +25,7 @@ public final class ClearLiquidsModule extends AbstractModule implements Configur
 
 	public ClearLiquidsModule() {
 		super("clear-liquids", "Clear Water & Lava", "No fog under water, in lava or in powder snow - see as far as on land. "
-				+ "Separate from the normal fog setting.", ModuleCategory.RENDERING, SafetyTag.COSMETIC_ONLY, false);
+				+ "Separate from the normal fog setting.", ModuleCategory.RENDERING, SafetyTag.CHECK_SERVER_RULES, false);
 		instance = this;
 	}
 

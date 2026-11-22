@@ -280,7 +280,7 @@
 			pills(filters, cats.map(([k, l]) => [k, l + " " + (k === "all" ? TOOLS.length : TOOLS.filter((t) => t[1] === k).length)]), cat, (k) => { cat = k; draw(); });
 			grid.replaceChildren(...shown.map(([name, c, desc, href, icon, ep]) => el("a", { class: "lib-tool", href },
 				el("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } },
-					el("div", { class: "ico" }, el("img", { src: icon, alt: "", class: "lib-px", loading: "lazy" })), el("span", { class: "lib-tag" }, c.toUpperCase())),
+					el("div", { class: "ico" }, el("img", { src: icon, alt: "", class: "lib-px", width: 44, height: 44, loading: "lazy" })), el("span", { class: "lib-tag" }, c.toUpperCase())),
 				el("h3", {}, name), el("p", {}, desc), el("div", { class: "foot" }, el("span", {}, ep), el("span", { class: "go" }, "Open →")))));
 		};
 		draw();

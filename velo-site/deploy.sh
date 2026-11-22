@@ -15,6 +15,30 @@ DRY=()
 REMOTE_DIR="${REMOTE_DIR:-/var/www/velo-client.com}"
 
 node build.js
+
+# Every inline <script> is allowed by its sha256 in the site CSP (tools/server/nginx/snippets/velo-site-csp.conf):
+# rewrite the list from what the build produced and push it to nginx when it changed (before the pages that need it).
+CSP=../tools/server/nginx/snippets/velo-site-csp.conf
+if python3 - "$CSP" <<'PY'
+import re, sys, glob, hashlib, base64
+path = sys.argv[1]
+hs = set()
+for f in glob.glob("dist/**/*.html", recursive=True):
+    for m in re.finditer(r"<script>([\s\S]*?)</script>", open(f, encoding="utf-8").read()):
+        hs.add("'sha256-" + base64.b64encode(hashlib.sha256(m.group(1).encode()).digest()).decode() + "'")
+old = open(path).read()
+new = re.sub(r"script-src 'self'[^;]*;", "script-src 'self'" + "".join(" " + h for h in sorted(hs)) + ";", old)
+if new == old:
+    sys.exit(1)
+open(path, "w").write(new)
+PY
+then
+	if [[ ${#DRY[@]} -eq 0 ]]; then
+		scp -q "$CSP" "$TARGET:/tmp/velo-site-csp.conf"
+		ssh "$TARGET" "cp /etc/nginx/snippets/velo-site-csp.conf /root/velo-site-csp.conf.bak && cp /tmp/velo-site-csp.conf /etc/nginx/snippets/velo-site-csp.conf && nginx -t -q && systemctl reload nginx || { cp /root/velo-site-csp.conf.bak /etc/nginx/snippets/velo-site-csp.conf; echo 'CSP update failed - restored'; exit 1; }"
+		echo "CSP: inline script hashes updated"
+	fi
+fi
 rsync -rlptz --delete --exclude=/dl/ --chmod=D2775,F664 "${DRY[@]}" dist/ "$TARGET:$REMOTE_DIR/"
 [[ ${#DRY[@]} -gt 0 ]] && exit 0
 ssh "$TARGET" "chgrp -R velo '$REMOTE_DIR' 2>/dev/null || true"

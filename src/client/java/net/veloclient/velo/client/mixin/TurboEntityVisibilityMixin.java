@@ -49,10 +49,13 @@ public abstract class TurboEntityVisibilityMixin {
 		AntiFarmLagModule.beginItemFrame(velo$camMoved);
 	}
 
-	@WrapOperation(method = "isEntityVisible", at = @At(value = "INVOKE",
+	// @Redirect, not @WrapOperation: Operation.call boxed 3 doubles + a float into an Object[] for every entity in every
+	// frame the camera moved (profiled 2026-11-21: ~3% of the render thread's garbage). require = 0: if another mod
+	// redirects the same call, theirs wins and this cache simply stays off.
+	@org.spongepowered.asm.mixin.injection.Redirect(method = "isEntityVisible", require = 0, at = @At(value = "INVOKE",
 			target = "Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;shouldRender(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/client/renderer/culling/Frustum;DDDF)Z"))
 	private boolean velo$reuseVisibility(net.minecraft.client.renderer.entity.EntityRenderDispatcher dispatcher, net.minecraft.world.entity.Entity entity,
-			net.minecraft.client.renderer.culling.Frustum frustum, double camX, double camY, double camZ, float partialTick, Operation<Boolean> original) {
+			net.minecraft.client.renderer.culling.Frustum frustum, double camX, double camY, double camZ, float partialTick) {
 		if ((entity instanceof net.minecraft.world.entity.item.ItemEntity || entity instanceof net.minecraft.world.entity.ExperienceOrb)
 				&& AntiFarmLagModule.itemFarm()) {
 			if (AntiFarmLagModule.itemPassReused() && entity instanceof EntityVisCache reuse) {
@@ -74,13 +77,13 @@ public abstract class TurboEntityVisibilityMixin {
 					return velo$itemAnswer(entity, false);
 				}
 				// the drawn one gets the full check (frustum, EntityCulling's occlusion), so no label shows through walls
-				boolean shown = original.call(dispatcher, entity, frustum, camX, camY, camZ, partialTick);
+				boolean shown = dispatcher.shouldRender(entity, frustum, camX, camY, camZ, partialTick);
 				cluster.visible = shown;
 				return velo$itemAnswer(entity, shown);
 			}
 		}
 		if (!PerformanceBoostModule.turbo || velo$camMoved || !(entity instanceof EntityVisCache cache)) {
-			return original.call(dispatcher, entity, frustum, camX, camY, camZ, partialTick);
+			return dispatcher.shouldRender(entity, frustum, camX, camY, camZ, partialTick);
 		}
 		net.minecraft.client.Camera camera = net.minecraft.client.Minecraft.getInstance().gameRenderer.mainCamera();
 		float xRot = camera.xRot();
@@ -94,7 +97,7 @@ public abstract class TurboEntityVisibilityMixin {
 		if (at != 0 && now - at < EntityVisCache.MAX_AGE_NANOS && cache.velo$visMatches(camX, camY, camZ, xRot, yRot, fov, x, y, z)) {
 			return cache.velo$visResult();
 		}
-		boolean visible = original.call(dispatcher, entity, frustum, camX, camY, camZ, partialTick);
+		boolean visible = dispatcher.shouldRender(entity, frustum, camX, camY, camZ, partialTick);
 		cache.velo$visStore(now, camX, camY, camZ, xRot, yRot, fov, x, y, z, visible);
 		return visible;
 	}
@@ -137,10 +140,13 @@ public abstract class TurboEntityVisibilityMixin {
 		AntiFarmLagModule.beginItemFrame(velo$camMoved);
 	}
 
-	@WrapOperation(method = "isEntityVisible", at = @At(value = "INVOKE",
+	// @Redirect, not @WrapOperation: Operation.call boxed 3 doubles + a float into an Object[] for every entity in every
+	// frame the camera moved (profiled 2026-11-21: ~3% of the render thread's garbage). require = 0: if another mod
+	// redirects the same call, theirs wins and this cache simply stays off.
+	@org.spongepowered.asm.mixin.injection.Redirect(method = "isEntityVisible", require = 0, at = @At(value = "INVOKE",
 			target = "Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;shouldRender(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/client/renderer/culling/Frustum;DDD)Z"))
 	private boolean velo$reuseVisibility(net.minecraft.client.renderer.entity.EntityRenderDispatcher dispatcher, net.minecraft.world.entity.Entity entity,
-			net.minecraft.client.renderer.culling.Frustum frustum, double camX, double camY, double camZ, Operation<Boolean> original) {
+			net.minecraft.client.renderer.culling.Frustum frustum, double camX, double camY, double camZ) {
 		if ((entity instanceof net.minecraft.world.entity.item.ItemEntity || entity instanceof net.minecraft.world.entity.ExperienceOrb)
 				&& AntiFarmLagModule.itemFarm()) {
 			if (AntiFarmLagModule.itemPassReused() && entity instanceof EntityVisCache reuse) {
@@ -162,13 +168,13 @@ public abstract class TurboEntityVisibilityMixin {
 					return velo$itemAnswer(entity, false);
 				}
 				// the drawn one gets the full check (frustum, EntityCulling's occlusion), so no label shows through walls
-				boolean shown = original.call(dispatcher, entity, frustum, camX, camY, camZ);
+				boolean shown = dispatcher.shouldRender(entity, frustum, camX, camY, camZ);
 				cluster.visible = shown;
 				return velo$itemAnswer(entity, shown);
 			}
 		}
 		if (!PerformanceBoostModule.turbo || velo$camMoved || !(entity instanceof EntityVisCache cache)) {
-			return original.call(dispatcher, entity, frustum, camX, camY, camZ);
+			return dispatcher.shouldRender(entity, frustum, camX, camY, camZ);
 		}
 		net.minecraft.client.Camera camera = net.minecraft.client.Minecraft.getInstance().gameRenderer.mainCamera();
 		float xRot = camera.xRot();
@@ -182,7 +188,7 @@ public abstract class TurboEntityVisibilityMixin {
 		if (at != 0 && now - at < EntityVisCache.MAX_AGE_NANOS && cache.velo$visMatches(camX, camY, camZ, xRot, yRot, fov, x, y, z)) {
 			return cache.velo$visResult();
 		}
-		boolean visible = original.call(dispatcher, entity, frustum, camX, camY, camZ);
+		boolean visible = dispatcher.shouldRender(entity, frustum, camX, camY, camZ);
 		cache.velo$visStore(now, camX, camY, camZ, xRot, yRot, fov, x, y, z, visible);
 		return visible;
 	}

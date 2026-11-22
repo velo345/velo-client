@@ -31,6 +31,8 @@ import java.util.Map;
 public final class VeloKeybindsScreen extends VeloWindow {
 
 	private static boolean openVanillaOnce;
+	/** When this window last closed: a vanilla Key Binds screen opening right after is a loop, not a new visit. */
+	private static long closedAtNanos;
 	private static Screen lastOther;
 
 	private final List<VeloUi.Hit> hits = new ArrayList<>();
@@ -57,6 +59,12 @@ public final class VeloKeybindsScreen extends VeloWindow {
 		returnTo(parent);
 	}
 
+	@Override
+	public void removed() {
+		closedAtNanos = System.nanoTime();
+		super.removed();
+	}
+
 	/** Remembers the last other screen (vanilla's Controls screen) and swaps vanilla's Key Binds screen for this one. */
 	public static void maybeReplace(MinecraftClient client, Screen screen) {
 		//? if <26.1 {
@@ -78,6 +86,16 @@ public final class VeloKeybindsScreen extends VeloWindow {
 		}
 		if (openVanillaOnce) {
 			openVanillaOnce = false;
+			return;
+		}
+		if (closedAtNanos != 0 && System.nanoTime() - closedAtNanos < 700_000_000L) {
+			// Some launchers/mods (LabyMod) put the vanilla Key Binds screen back after ours closes, and swapping it again
+			// trapped players in Controls (report fd005278baf7): send it on to its own parent instead.
+			//? if <26.1 {
+			client.execute(() -> screen.close());
+			//?} else {
+			/*client.execute(() -> screen.onClose());
+			*///?}
 			return;
 		}
 		if (!VeloScreens.controls()) {

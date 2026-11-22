@@ -42,7 +42,8 @@ final class ServerApi {
 	}
 
 	/** A linked Discord account: whether its Minecraft account has an active Velo+ right now. */
-	record LinkInfo(String discordId, String uuid, String username, boolean plus) {
+	/** {@code og}: got Velo in its first two weeks (the OG badge). */
+	record LinkInfo(String discordId, String uuid, String username, boolean plus, boolean og) {
 	}
 
 	java.util.List<LinkInfo> links() throws ApiException {
@@ -56,7 +57,8 @@ final class ServerApi {
 			java.util.List<LinkInfo> out = new java.util.ArrayList<>();
 			for (var element : JsonParser.parseString(response.body()).getAsJsonObject().getAsJsonArray("links")) {
 				JsonObject o = element.getAsJsonObject();
-				out.add(new LinkInfo(o.get("discordId").getAsString(), o.get("uuid").getAsString(), o.get("username").getAsString(), o.get("plus").getAsBoolean()));
+				out.add(new LinkInfo(o.get("discordId").getAsString(), o.get("uuid").getAsString(), o.get("username").getAsString(), o.get("plus").getAsBoolean(),
+						o.has("og") && o.get("og").getAsBoolean()));
 			}
 			return out;
 		} catch (ApiException e) {

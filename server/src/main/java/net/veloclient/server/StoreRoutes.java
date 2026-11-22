@@ -100,6 +100,11 @@ final class StoreRoutes {
 		route(server, registry, "/v1/store/wallet", "GET", (ex, s) -> JsonHttp.writeJson(ex, 200, store.wallet(s.uuid(), s.username())));
 		route(server, registry, "/v1/store/buy", "POST", (ex, s) ->
 				JsonHttp.writeJson(ex, 200, store.buy(s.uuid(), s.username(), JsonHttp.readBody(ex, BuyRequest.class).itemId())));
+		// The Advent calendar (December 1-24): GET the doors, POST open = today's door (the server picks the day).
+		net.veloclient.server.store.AdventCalendar advent = new net.veloclient.server.store.AdventCalendar(store);
+		route(server, registry, "/v1/advent", "GET", (ex, s) -> JsonHttp.writeJson(ex, 200, advent.view(s.uuid(), s.username(), testDay(ex))));
+		route(server, registry, "/v1/advent/open", "POST", (ex, s) -> JsonHttp.writeJson(ex, 200, advent.open(s.uuid(), s.username(), testDay(ex))));
+		route(server, registry, "/v1/advent/reset", "POST", (ex, s) -> JsonHttp.writeJson(ex, 200, advent.resetTest(s.uuid(), s.username(), testDay(ex))));
 		route(server, registry, "/v1/store/welcome-gift", "POST", (ex, s) ->
 				JsonHttp.writeJson(ex, 200, store.claimWelcomeGift(s.uuid(), s.username(), JsonHttp.readBody(ex, BuyRequest.class).itemId())));
 		route(server, registry, "/v1/store/checkout", "POST", (ex, s) -> {
@@ -232,6 +237,16 @@ final class StoreRoutes {
 			JsonHttp.writeBytes(e, 200, "text/plain; charset=utf-8", body, "max-age=3600");
 		}));
 		server.createContext("/rewards/ad", ex -> VeloServerApp.handle(ex, "GET", e -> adPage(e, store, query(e).get("t"))));
+	}
+
+	/** {@code ?day=} - only an owner's test calendar listens to it (outside December). */
+	private static Integer testDay(com.sun.net.httpserver.HttpExchange ex) {
+		try {
+			String day = query(ex).get("day");
+			return day == null ? null : Integer.parseInt(day);
+		} catch (NumberFormatException e) {
+			return null;
+		}
 	}
 
 	private static void route(HttpServer server, SessionRegistry registry, String path, String method, Authed handler) {

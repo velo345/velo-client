@@ -81,6 +81,7 @@ final class LyricsRenderer {
 	 * pixels (2D) - in 3D only used for the preview shift.
 	 */
 	static void frame(Sink sink, LyricsStyle st, boolean demo, double[] view, int sw, int sh, float dt, boolean cards) {
+		frameNo++;
 		List<LyricsFetcher.Line> lines = LyricsSync.lines(demo);
 		long now = LyricsSync.now(demo, st.offsetMs);
 		if (now < lastNow - 1500) {
@@ -375,7 +376,7 @@ final class LyricsRenderer {
 				partW += widths[k] + gap;
 			}
 			float fit = partW * lineScale > a.maxWidth ? (float) (a.maxWidth / (partW * lineScale)) : 1f;
-			float scale = lineScale * fit;
+			float scale = lineScale * fit * (dim ? 1f : LyricsPulse.bounceScale());
 			float partRow = parts == 1 ? row : row + (part == 0 ? -0.58f : 0.58f) * lineScale;
 			float x = -partW * scale / 2f;
 			for (int k = from; k < to; k++) {
@@ -668,6 +669,9 @@ final class LyricsRenderer {
 			float py = a.sy + cy * a.unit;
 			float[] m = {ax, ay, bx, by, px - ax * w / 2f - bx * EM / 2f, py - ay * w / 2f - by * EM / 2f};
 			effects(st, alpha, (ox, oy, sc, c, al) -> {
+				if (al * ((c >>> 24) & 0xFF) < 20) {
+					return; // a shading layer under ~8% opacity barely shows: skip it (most of a faded line's text work)
+				}
 				if (sc == 1f) {
 					layer(context, m, glyph, ox, oy, c, al);
 				} else {
@@ -694,7 +698,49 @@ final class LyricsRenderer {
 	 * The shading layers of one letter, drawn back to front: glow (soft halo copies growing around the letter plus fine
 	 * rings - more of them the bigger the glow, so big glows stay smooth instead of showing single copies), shadow, outline.
 	 */
+	// The shading layers depend only on the style: built once per frame (they used to be worked out again for every
+	// letter, and effectLayers ran the whole thing once more just to count - ~7% of the render thread with big glows).
+	private static LyricsStyle templateStyle;
+	private static long templateFrame = -1;
+	private static float[] template = new float[0];   // per layer: ox, oy, scale, colour (as float bits), alpha factor
+	private static int templateLayers;
+	private static long frameNo;
+
 	static void effects(LyricsStyle st, float alpha, Layer out) {
+		buildTemplate(st);
+		float[] t = template;
+		for (int i = 0, n = templateLayers * 5; i < n; i += 5) {
+			out.draw(t[i], t[i + 1], t[i + 2], Float.floatToRawIntBits(t[i + 3]), alpha * t[i + 4]);
+		}
+	}
+
+	/** How many layers {@link #effects} draws (the world pass spaces them in depth). */
+	static int effectLayers(LyricsStyle st) {
+		buildTemplate(st);
+		return templateLayers;
+	}
+
+	private static void buildTemplate(LyricsStyle st) {
+		if (st == templateStyle && templateFrame == frameNo) {
+			return;
+		}
+		templateStyle = st;
+		templateFrame = frameNo;
+		templateLayers = 0;
+		effectsSlow(st, 1f, (ox, oy, sc, c, al) -> {
+			if (template.length < (templateLayers + 1) * 5) {
+				template = java.util.Arrays.copyOf(template, Math.max(64, template.length * 2));
+			}
+			int i = templateLayers++ * 5;
+			template[i] = ox;
+			template[i + 1] = oy;
+			template[i + 2] = sc;
+			template[i + 3] = Float.intBitsToFloat(c);
+			template[i + 4] = al;
+		});
+	}
+
+	private static void effectsSlow(LyricsStyle st, float alpha, Layer out) {
 		if (st.glow) {
 			float size = (float) st.glowSize;
 			float strength = (float) st.glowStrength;
@@ -706,19 +752,30 @@ final class LyricsRenderer {
 				float al = alpha * strength * 0.5f * (1f - f * 0.75f) / halos * 2.2f;
 				out.draw(0f, 0f, grow, st.glowColor, al);
 			}
-			int rings = size > 1.3f ? 2 : 1;
+			int rings = 1; // a second ring doubled the glow's cost for little difference
 			for (int ring = rings; ring >= 1; ring--) {
 				float r = size * 0.9f * ring / rings;
 				float al = alpha * strength * 0.13f * (1.15f - ring / (float) rings * 0.6f);
 				double turn = ring * 0.6180339 * Math.PI;
-				for (int i = 0; i < 10; i++) {
-					double ang = i * Math.PI / 5 + turn;
+				for (int i = 0; i < 8; i++) {
+					double ang = i * Math.PI / 4 + turn;
 					out.draw((float) Math.cos(ang) * r, (float) Math.sin(ang) * r, 1f, st.glowColor, al);
 				}
 			}
 		}
 		if (st.shadow) {
 			out.draw(0.9f, 0.9f, 1f, st.shadowColor, alpha * 0.75f);
+		}
+		if (!"Off".equals(st.depth3d)) {
+			// extruded 3D letters: copies stepping back down-right, darker the deeper they sit
+			boolean deep = "Deep".equals(st.depth3d);
+			int layers = deep ? 7 : 4;
+			float step = deep ? 0.24f : 0.19f;
+			int front = st.depthColor != 0 ? st.depthColor : shade(st.color, 0.5f);
+			int back = shade(front, 0.45f);
+			for (int i = layers; i >= 1; i--) {
+				out.draw(i * step, i * step * 1.2f, 1f, lerpColor(front, back, i / (float) layers), alpha);
+			}
 		}
 		if (st.outline) {
 			float r = 0.55f * (float) st.outlineSize;
@@ -730,12 +787,14 @@ final class LyricsRenderer {
 		}
 	}
 
-	/** How many layers {@link #effects} draws (the world pass spaces them in depth). */
-	static int effectLayers(LyricsStyle st) {
-		int[] n = {0};
-		effects(st, 1f, (ox, oy, sc, c, al) -> n[0]++);
-		return n[0];
+	/** {@code argb} with its colour scaled by {@code k} (alpha kept). */
+	static int shade(int argb, float k) {
+		int r = Math.round(((argb >> 16) & 0xFF) * k);
+		int g = Math.round(((argb >> 8) & 0xFF) * k);
+		int b = Math.round((argb & 0xFF) * k);
+		return (argb & 0xFF000000) | r << 16 | g << 8 | b;
 	}
+
 
 	private static void layer(DrawContext context, float[] m, Text glyph, float ox, float oy, int color, float alpha) {
 		int a = Math.round(Math.max(0f, Math.min(1f, alpha)) * ((color >>> 24) & 0xFF));

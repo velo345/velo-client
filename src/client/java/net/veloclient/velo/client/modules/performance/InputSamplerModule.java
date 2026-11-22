@@ -65,7 +65,7 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 	public InputSamplerModule() {
 		super("input-sampler", "Input Latency Sub-Tick Sampling",
 				"Timestamps mouse clicks off the main thread so latency doesn't depend on frame rate, and (optionally) polls input again at the start of every tick to notice clicks sooner during FPS stalls.",
-				ModuleCategory.PERFORMANCE, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.PERFORMANCE, SafetyTag.CHECK_SERVER_RULES, false);
 		ClientTickEvents.START_CLIENT_TICK.register(client ->
 				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTickStart(client)));
 	}

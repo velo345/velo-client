@@ -80,28 +80,81 @@ public final class PassBarriers {
 		return any;
 	}
 
-	// What a render pass draws into: attachment textures and mip levels, and its render area.
-	private record Key(java.util.List<Object> color, Object depth, int depthMip, java.util.List<Integer> colorMips, int x, int y, int w, int h) {
+	// What a render pass draws into: attachment textures and mip levels, and its render area. One per command encoder,
+	// filled in place and compared field by field - the old record + two lists per pass were allocated twice for every
+	// render pass of the frame (profiled 2026-11-21: ~0.8% of all bytes the game allocated).
+	public static final class OpenKey {
+		private Object[] color = new Object[4];
+		private int[] colorMips = new int[4];
+		private int colorCount;
+		private Object depth;
+		private int depthMip;
+		private int x;
+		private int y;
+		private int w;
+		private int h;
+
+		void set(com.mojang.blaze3d.systems.RenderPassDescriptor descriptor) {
+			int n = 0;
+			for (var attachment : descriptor.colorAttachments()) {
+				if (n == color.length) {
+					color = java.util.Arrays.copyOf(color, n * 2);
+					colorMips = java.util.Arrays.copyOf(colorMips, n * 2);
+				}
+				boolean present = attachment != null && attachment.textureView() != null;
+				color[n] = present ? attachment.textureView().texture() : null;
+				colorMips[n] = present ? attachment.textureView().baseMipLevel() : -1;
+				n++;
+			}
+			java.util.Arrays.fill(color, n, color.length, null);
+			colorCount = n;
+			var d = descriptor.depthAttachment();
+			boolean hasDepth = d != null && d.textureView() != null;
+			depth = hasDepth ? d.textureView().texture() : null;
+			depthMip = hasDepth ? d.textureView().baseMipLevel() : -1;
+			var area = descriptor.renderArea;
+			x = area == null ? -1 : area.x();
+			y = area == null ? -1 : area.y();
+			w = area == null ? -1 : area.width();
+			h = area == null ? -1 : area.height();
+		}
+
+		boolean matches(com.mojang.blaze3d.systems.RenderPassDescriptor descriptor) {
+			int n = 0;
+			for (var attachment : descriptor.colorAttachments()) {
+				if (n >= colorCount) {
+					return false;
+				}
+				boolean present = attachment != null && attachment.textureView() != null;
+				if (color[n] != (present ? attachment.textureView().texture() : null)
+						|| colorMips[n] != (present ? attachment.textureView().baseMipLevel() : -1)) {
+					return false;
+				}
+				n++;
+			}
+			if (n != colorCount) {
+				return false;
+			}
+			var d = descriptor.depthAttachment();
+			boolean hasDepth = d != null && d.textureView() != null;
+			if (depth != (hasDepth ? d.textureView().texture() : null) || depthMip != (hasDepth ? d.textureView().baseMipLevel() : -1)) {
+				return false;
+			}
+			var area = descriptor.renderArea;
+			return x == (area == null ? -1 : area.x()) && y == (area == null ? -1 : area.y())
+					&& w == (area == null ? -1 : area.width()) && h == (area == null ? -1 : area.height());
+		}
 	}
 
-	public static Object key(com.mojang.blaze3d.systems.RenderPassDescriptor descriptor) {
-		java.util.List<Object> color = new java.util.ArrayList<>(2);
-		java.util.List<Integer> mips = new java.util.ArrayList<>(2);
-		for (var attachment : descriptor.colorAttachments()) {
-			boolean present = attachment != null && attachment.textureView() != null;
-			color.add(present ? attachment.textureView().texture() : null);
-			mips.add(present ? attachment.textureView().baseMipLevel() : -1);
-		}
-		var depth = descriptor.depthAttachment();
-		boolean hasDepth = depth != null && depth.textureView() != null;
-		var area = descriptor.renderArea;
-		return new Key(color, hasDepth ? depth.textureView().texture() : null, hasDepth ? depth.textureView().baseMipLevel() : -1, mips,
-				area == null ? -1 : area.x(), area == null ? -1 : area.y(), area == null ? -1 : area.width(), area == null ? -1 : area.height());
+	// Fills the encoder's key in place (no allocation) and returns it.
+	public static OpenKey key(com.mojang.blaze3d.systems.RenderPassDescriptor descriptor, OpenKey into) {
+		into.set(descriptor);
+		return into;
 	}
 
 	// The next pass can continue the open rendering instance: same attachments and area, and it doesn't clear any of them.
-	public static boolean canContinue(com.mojang.blaze3d.systems.RenderPassDescriptor descriptor, Object openKey) {
-		if (DISABLED || openKey == null || !openKey.equals(key(descriptor))) {
+	public static boolean canContinue(com.mojang.blaze3d.systems.RenderPassDescriptor descriptor, OpenKey openKey) {
+		if (DISABLED || openKey == null || !openKey.matches(descriptor)) {
 			return false;
 		}
 		for (var attachment : descriptor.colorAttachments()) {

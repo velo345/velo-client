@@ -13,7 +13,33 @@ import net.minecraft.client.gui.DrawContext;
  */
 public final class HudFrameCache {
 
-	private static final long INTERVAL_NS = 1_000_000_000L / 360;
+	/**
+	 * Recording rate: twice the monitor's refresh rate (so HUD animations stay smooth however the frames line up with the
+	 * screen), at most 360 Hz, at least 120 Hz. A fixed 360 Hz re-recorded the whole HUD 6x per shown frame on a 60 Hz
+	 * screen - the recording frames were ~7% of all frames and carried most of the HUD's cost (2026-11-21 profile).
+	 */
+	private static long intervalNs = 1_000_000_000L / 360;
+	private static long refreshCheckedAt;
+
+	private static long interval(long now) {
+		if (now - refreshCheckedAt > 2_000_000_000L) {
+			refreshCheckedAt = now;
+			int hz = 0;
+			try {
+				//? if >=26.3 {
+				/*var mode = net.minecraft.client.Minecraft.getInstance().getWindow().getActiveVideoMode();
+				hz = mode == null ? 0 : Math.round(mode.getRefreshRate());
+				*///?} else if >=26.2 {
+				/*hz = net.minecraft.client.Minecraft.getInstance().getWindow().getRefreshRate();
+				*///?}
+			} catch (RuntimeException | LinkageError e) {
+				hz = 0;
+			}
+			int rate = hz <= 0 ? 360 : Math.max(120, Math.min(360, hz * 2));
+			intervalNs = 1_000_000_000L / rate;
+		}
+		return intervalNs;
+	}
 
 	private static long recordedAt;
 	private static int recordedWidth;
@@ -65,7 +91,7 @@ public final class HudFrameCache {
 		}
 		int scale = net.veloclient.velo.client.util.ClientCompat.guiScale();
 		if (!valid || width != recordedWidth || height != recordedHeight || scale != recordedScale
-				|| System.nanoTime() - recordedAt >= INTERVAL_NS) {
+				|| System.nanoTime() - recordedAt >= interval(System.nanoTime())) {
 			return false;
 		}
 		var state = ((net.veloclient.velo.client.mixin.TurboHudStateAccessor) (Object) context).velo$state();

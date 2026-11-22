@@ -59,7 +59,7 @@ public final class ShieldIndicatorModule extends AbstractModule implements Confi
 	public ShieldIndicatorModule() {
 		super("shield-indicator", "Shield Indicator",
 				"Green shield while it blocks, red while an axe disabled it - fades back and flashes when it works again.",
-				ModuleCategory.PVP, SafetyTag.COSMETIC_ONLY, false);
+				ModuleCategory.PVP, SafetyTag.CHECK_SERVER_RULES, false);
 		instance = this;
 		ClientTickEvents.END_CLIENT_TICK.register(client -> tick());
 	}

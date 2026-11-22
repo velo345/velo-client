@@ -974,6 +974,104 @@
 			}
 		},
 		{
+			"id": "cape_velo_staff_green",
+			"rev": 1,
+			"type": "cape",
+			"name": "Velo Staff (Green)",
+			"description": "The Velo Client team's cloak with a green line - the Velo logo and STAFF in crisp white over matte black.",
+			"price": 0,
+			"status": "released",
+			"collection": "velo_originals",
+			"unlock": "staff",
+			"files": {
+				"gif": "capes/velo_staff_green.gif"
+			}
+		},
+		{
+			"id": "cape_velo_staff_yellow",
+			"rev": 1,
+			"type": "cape",
+			"name": "Velo Staff (Yellow)",
+			"description": "The Velo Client team's cloak with a yellow line - the Velo logo and STAFF in crisp white over matte black.",
+			"price": 0,
+			"status": "released",
+			"collection": "velo_originals",
+			"unlock": "staff",
+			"files": {
+				"gif": "capes/velo_staff_yellow.gif"
+			}
+		},
+		{
+			"id": "cape_velo_staff_orange",
+			"rev": 1,
+			"type": "cape",
+			"name": "Velo Staff (Orange)",
+			"description": "The Velo Client team's cloak with a orange line - the Velo logo and STAFF in crisp white over matte black.",
+			"price": 0,
+			"status": "released",
+			"collection": "velo_originals",
+			"unlock": "staff",
+			"files": {
+				"gif": "capes/velo_staff_orange.gif"
+			}
+		},
+		{
+			"id": "cape_velo_staff_purple",
+			"rev": 1,
+			"type": "cape",
+			"name": "Velo Staff (Purple)",
+			"description": "The Velo Client team's cloak with a purple line - the Velo logo and STAFF in crisp white over matte black.",
+			"price": 0,
+			"status": "released",
+			"collection": "velo_originals",
+			"unlock": "staff",
+			"files": {
+				"gif": "capes/velo_staff_purple.gif"
+			}
+		},
+		{
+			"id": "cape_velo_staff_blue",
+			"rev": 1,
+			"type": "cape",
+			"name": "Velo Staff (Blue)",
+			"description": "The Velo Client team's cloak with a blue line - the Velo logo and STAFF in crisp white over matte black.",
+			"price": 0,
+			"status": "released",
+			"collection": "velo_originals",
+			"unlock": "staff",
+			"files": {
+				"gif": "capes/velo_staff_blue.gif"
+			}
+		},
+		{
+			"id": "cape_velo_staff_aqua",
+			"rev": 1,
+			"type": "cape",
+			"name": "Velo Staff (Aqua)",
+			"description": "The Velo Client team's cloak with a aqua line - the Velo logo and STAFF in crisp white over matte black.",
+			"price": 0,
+			"status": "released",
+			"collection": "velo_originals",
+			"unlock": "staff",
+			"files": {
+				"gif": "capes/velo_staff_aqua.gif"
+			}
+		},
+		{
+			"id": "cape_velo_staff_pink",
+			"rev": 1,
+			"type": "cape",
+			"name": "Velo Staff (Pink)",
+			"description": "The Velo Client team's cloak with a pink line - the Velo logo and STAFF in crisp white over matte black.",
+			"price": 0,
+			"status": "released",
+			"collection": "velo_originals",
+			"unlock": "staff",
+			"files": {
+				"gif": "capes/velo_staff_pink.gif"
+			}
+		},
+		{
 			"id": "cape_booster",
 			"rev": 2,
 			"type": "cape",

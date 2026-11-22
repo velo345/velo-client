@@ -202,6 +202,10 @@ public final class CrashReportDialog {
 			JsonArray modList = new JsonArray();
 			mods.forEach(modList::add);
 			report.add("mods", modList);
+			JsonArray modules = BugReportDialog.activeModules(InstancePaths.gameDir(instance.id()));
+			if (modules != null) {
+				report.add("modules", modules);
+			}
 			if (includeLog.isSelected()) {
 				report.addProperty("crash", crashText);
 				report.addProperty("log", logText);
@@ -320,6 +324,19 @@ public final class CrashReportDialog {
 
 	/** The one line that says what broke: the crash report's description + first exception, or the last error in the log. */
 	static String cause(String crash, String log) {
+		if (crash != null && crash.contains("A fatal error has been detected by the Java Runtime Environment")) {
+			// A native crash (hs_err_pid*.log): it has no "Description:" - say where it died. Falling back to the log's
+			// last exception showed some harmless, already-handled error as the cause (a failed browser download, 2026-11-22).
+			java.util.regex.Matcher frame = java.util.regex.Pattern.compile("Problematic frame:\\s*\\R#\\s*\\S+\\s+\\[([^+\\]]+)").matcher(crash);
+			if (frame.find()) {
+				String lib = frame.group(1).trim();
+				String low = lib.toLowerCase(java.util.Locale.ROOT);
+				boolean gpu = low.matches(".*(nvoglv|nvwgf|nvd3d|atio6|atig6|amdvlk|amdxx|ig\\d+icd|igvk|vulkan-1|libvulkan|libnvidia|radeonsi|iris_dri|opengl32|libgl|mesa).*");
+				return gpu ? "The game crashed inside the graphics driver (" + lib + ")" : "The game crashed inside " + lib;
+			}
+			return crash.contains("insufficient memory") || crash.contains("malloc) failed") ? "The game ran out of memory"
+					: "The game process crashed (a native error)";
+		}
 		if (crash != null) {
 			String description = null;
 			String exception = null;

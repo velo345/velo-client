@@ -40,9 +40,42 @@ public final class HudCacheTuner {
 	private HudCacheTuner() {
 	}
 
+	/** null = not checked yet. */
+	private static Boolean blitUnsafe;
+
+	/**
+	 * Older Intel graphics on Windows (Intel HD / UHD Graphics - Sodium turns on its INTEL_FRAMEBUFFER_BLIT workaround
+	 * there): their drivers break framebuffer copies after the window loses focus, and Gnetum's HUD is exactly that - a
+	 * framebuffer copied over every frame. After an Alt+Tab the whole HUD flickered on and off (2026-11-22, Intel HD 4600).
+	 * There Gnetum's cache stays off and Velo's own HUD cache (it replays draw calls, no framebuffer) does the job.
+	 */
+	private static boolean blitUnsafe() {
+		if (blitUnsafe == null) {
+			String gpu = net.veloclient.velo.client.util.GpuInfo.describe();
+			if (gpu == null) {
+				return false; // not known yet: ask again next tick
+			}
+			String g = gpu.toLowerCase(java.util.Locale.ROOT);
+			boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+			blitUnsafe = windows && g.contains("intel") && (g.contains("hd graphics") || g.contains("uhd graphics"));
+			if (blitUnsafe) {
+				org.slf4j.LoggerFactory.getLogger("velo-client").info("HUD cache: {} - Gnetum's framebuffer cache stays off, Velo's own HUD cache instead", gpu);
+			}
+		}
+		return blitUnsafe;
+	}
+
 	/** Called every client tick. */
 	public static void tick(MinecraftClient client) {
 		if (DISABLED || !PerformanceBoostModule.turbo || !gnetum()) {
+			return;
+		}
+		if (blitUnsafe()) {
+			if (!decidedOff || phase >= 0) {
+				decidedOff = true;
+				phase = -1;
+				set(false);
+			}
 			return;
 		}
 		boolean playing = client.player != null && net.veloclient.velo.client.util.ClientCompat.currentScreen() == null;

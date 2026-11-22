@@ -210,6 +210,21 @@ public final class VeloShadersModule extends AbstractModule implements Configura
 				|| Math.abs(m.saturation - 1) > 0.01 || m.vignette > 0.01 || m.tintAmount > 0.01);
 	}
 
+	/** The sun's height (cos of vanilla's sun angle: 1 at noon, -1 at midnight), captured on 26.2+ every frame. */
+	/** The sun's angle in radians (0 = noon), captured from the sky every frame. */
+	public static float sunAngle() {
+		return sunAngle;
+	}
+
+	/** Vanilla's moon phase, 0 (full) .. 7. */
+	public static int moonPhase() {
+		return moonPhase;
+	}
+
+	public static float sunHeight() {
+		return (float) Math.cos(sunAngle);
+	}
+
 	public static void captureSky(float angleRadians, int argb, int phase) {
 		sunAngle = angleRadians;
 		skyColor = argb;

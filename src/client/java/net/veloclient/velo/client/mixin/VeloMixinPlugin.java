@@ -78,6 +78,12 @@ public final class VeloMixinPlugin implements IMixinConfigPlugin {
 		if (simpleName.startsWith("TurboSky") && !hasVulkan) {
 			return false;
 		}
+		if (simpleName.startsWith("SkyboxFrame") && !hasVulkan) {
+			return false;
+		}
+		if (simpleName.startsWith("TurboFont") && !hasVulkan) {
+			return false;
+		}
 		if (simpleName.startsWith("TurboHud") && !hasVulkan) {
 			return false;
 		}

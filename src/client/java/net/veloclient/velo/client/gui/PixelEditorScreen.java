@@ -331,17 +331,24 @@ public final class PixelEditorScreen extends VeloWindow {
 		VeloDraw.strokeRect(context, canvasX + px * cell, canvasY + py * cell, cell, cell, 0xC0FFFFFF);
 	}
 
+	// Inline colour picker (HSV): kept as its own values so the hue doesn't jump while you drag through greys and black.
+	private float pickHue;
+	private float pickSat;
+	private float pickVal = 1f;
+	private int pickAlpha = 255;
+	private int pickedFor = 0;     // the colour the HSV values belong to (re-derived when it changes elsewhere)
+	private int pickDrag;          // 0 none, 1 square, 2 hue, 3 alpha
+	private int svX, svY, svW, svH, hueX, hueY, hueW, alphaY;
+
 	private void drawColorPanel(DrawContext context, int x, int y, int width, int mouseX, int mouseY) {
 		context.drawTextWithShadow(this.textRenderer, "Color", x, y, VeloStyle.textMuted());
 		int swatchY = y + 12;
 		drawSwatch(context, x, swatchY, 26, color);
 		String hex = String.format(Locale.ROOT, "#%08X", color);
 		context.drawTextWithShadow(this.textRenderer, hex, x + 32, swatchY + 2, VeloStyle.text());
-		hits.add(VeloUi.pill(context, x + 32, swatchY + 13, 64, 13, "Pick...", 0, mouseX, mouseY, () ->
+		hits.add(VeloUi.pill(context, x + 32, swatchY + 13, 64, 13, "Type hex...", 0, mouseX, mouseY, () ->
 				this.client.setScreen(new VeloColorPickerScreen(this, "Draw Color", color, true, c -> setColor(c)))));
-		hits.add(new VeloUi.Hit(x, swatchY, 26, 26, () ->
-				this.client.setScreen(new VeloColorPickerScreen(this, "Draw Color", color, true, c -> setColor(c)))));
-		int sw = Math.max(10, Math.min(16, (width - 7 * 3) / 8));
+		int sw = Math.max(10, Math.min(16, (Math.min(width, 150) - 7 * 3) / 8));
 		int py = swatchY + 32;
 		for (int i = 0; i < PALETTE.length; i++) {
 			int sx = x + (i % 8) * (sw + 3);
@@ -358,6 +365,95 @@ public final class PixelEditorScreen extends VeloWindow {
 			hits.add(new VeloUi.Hit(sx, ry, sw, sw, () -> setColor(c)));
 			i++;
 		}
+
+		// The picker sits right of the palette when there's room (keeps the previews below where they were).
+		int paletteW = 8 * (sw + 3);
+		int px = x + paletteW + 14;
+		int pw = Math.min(170, x + width - px);
+		if (pw < 90) {
+			return;
+		}
+		syncPicker();
+		svX = px;
+		svY = y + 12;
+		svW = pw;
+		svH = 58;
+		int pure = 0xFF000000 | java.awt.Color.HSBtoRGB(pickHue, 1f, 1f);
+		net.veloclient.velo.client.gui.title.MenuKit.hGradient(context, svX, svY, svW, svH, 0xFFFFFFFF, pure);
+		VeloDraw.fillGradient(context, svX, svY, svW, svH, 0x00000000, 0xFF000000);
+		VeloDraw.strokeRect(context, svX, svY, svW, svH, 0x40FFFFFF);
+		float kx = svX + pickSat * svW;
+		float ky = svY + (1 - pickVal) * svH;
+		VeloDraw.fillCircle(context, kx, ky, 4.5f, 0xFFFFFFFF);
+		VeloDraw.fillCircle(context, kx, ky, 3f, 0xFF000000 | (color & 0xFFFFFF));
+		hueX = px;
+		hueW = pw;
+		hueY = svY + svH + 6;
+		int[] stops = {0xFFFF0000, 0xFFFFFF00, 0xFF00FF00, 0xFF00FFFF, 0xFF0000FF, 0xFFFF00FF, 0xFFFF0000};
+		for (int k = 0; k < 6; k++) {
+			int x0 = hueX + hueW * k / 6;
+			int x1 = hueX + hueW * (k + 1) / 6;
+			net.veloclient.velo.client.gui.title.MenuKit.hGradient(context, x0, hueY, x1 - x0, 7, stops[k], stops[k + 1]);
+		}
+		VeloDraw.fillRounded(context, Math.round(hueX + pickHue * hueW) - 2, hueY - 2, 4, 11, 2, 0xFFFFFFFF);
+		// alpha over a checkerboard
+		alphaY = hueY + 13;
+		for (int cx = 0; cx < hueW; cx += 4) {
+			context.fill(hueX + cx, alphaY, hueX + Math.min(hueW, cx + 4), alphaY + 7, ((cx / 4) % 2 == 0) ? CHECKER_A : CHECKER_B);
+		}
+		net.veloclient.velo.client.gui.title.MenuKit.hGradient(context, hueX, alphaY, hueW, 7, color & 0xFFFFFF, 0xFF000000 | (color & 0xFFFFFF));
+		VeloDraw.fillRounded(context, Math.round(hueX + pickAlpha / 255f * hueW) - 2, alphaY - 2, 4, 11, 2, 0xFFFFFFFF);
+	}
+
+	/** Takes over a colour picked elsewhere (palette, pipette, hex) into the HSV values. */
+	private void syncPicker() {
+		if (color == pickedFor) {
+			return;
+		}
+		float[] hsb = java.awt.Color.RGBtoHSB((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, null);
+		if (hsb[1] > 0.02f && hsb[2] > 0.02f) {
+			pickHue = hsb[0];   // greys and black keep the hue you had
+		}
+		pickSat = hsb[1];
+		pickVal = hsb[2];
+		pickAlpha = (color >>> 24) & 0xFF;
+		pickedFor = color;
+	}
+
+	/** True when the click starts a drag on the inline picker. */
+	private boolean pickerPress(double mx, double my) {
+		if (svW <= 0) {
+			return false;
+		}
+		if (mx >= svX && mx <= svX + svW && my >= svY && my <= svY + svH) {
+			pickDrag = 1;
+		} else if (mx >= hueX && mx <= hueX + hueW && my >= hueY - 3 && my <= hueY + 10) {
+			pickDrag = 2;
+		} else if (mx >= hueX && mx <= hueX + hueW && my >= alphaY - 3 && my <= alphaY + 10) {
+			pickDrag = 3;
+		} else {
+			return false;
+		}
+		pickerDrag(mx, my);
+		return true;
+	}
+
+	private void pickerDrag(double mx, double my) {
+		float fx = (float) Math.max(0, Math.min(1, (mx - (pickDrag == 1 ? svX : hueX)) / Math.max(1, pickDrag == 1 ? svW : hueW)));
+		switch (pickDrag) {
+			case 1 -> {
+				pickSat = fx;
+				pickVal = 1f - (float) Math.max(0, Math.min(1, (my - svY) / Math.max(1, svH)));
+			}
+			case 2 -> pickHue = Math.min(0.999f, fx);
+			case 3 -> pickAlpha = Math.round(fx * 255);
+			default -> {
+				return;
+			}
+		}
+		int rgb = java.awt.Color.HSBtoRGB(pickHue, pickSat, pickVal) & 0xFFFFFF;
+		color = (pickAlpha << 24) | rgb;
+		pickedFor = color;
 	}
 
 	private void drawSwatch(DrawContext context, int x, int y, int s, int c) {
@@ -615,6 +711,9 @@ public final class PixelEditorScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseClicked(Click click, boolean doubled) {
+		if (click.button() == net.veloclient.velo.client.util.Keys.MOUSE_LEFT && pickerPress(click.x(), click.y())) {
+			return true;
+		}
 		for (VeloUi.Hit hit : List.copyOf(hits)) {
 			if (hit.contains(click.x(), click.y())) {
 				hit.action().run();
@@ -646,6 +745,10 @@ public final class PixelEditorScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+		if (pickDrag != 0) {
+			pickerDrag(click.x(), click.y());
+			return true;
+		}
 		if (painting) {
 			int px = (int) Math.floor((click.x() - canvasX) / Math.max(1, cell));
 			int py = (int) Math.floor((click.y() - canvasY) / Math.max(1, cell));
@@ -657,6 +760,10 @@ public final class PixelEditorScreen extends VeloWindow {
 
 	@Override
 	public boolean mouseReleased(Click click) {
+		if (pickDrag != 0) {
+			pickDrag = 0;
+			setColor(color);   // into the recent colours
+		}
 		painting = false;
 		return super.mouseReleased(click);
 	}

@@ -305,7 +305,7 @@ public final class BrowserWindow {
 		if (s == CefRuntime.State.DOWNLOADING) {
 			int bw = Math.min(220, c[2] - 60);
 			VeloDraw.fillRounded(context, cx - bw / 2, cy + 12, bw, 4, 2, (alpha * 0x22 / 255 << 24) | 0xFFFFFF);
-			VeloDraw.fillRounded(context, cx - bw / 2, cy + 12, Math.max(4, (int) (bw * CefRuntime.progress())), 4, 2,
+			VeloDraw.fillRounded(context, cx - bw / 2, cy + 12, Math.max(4, (int) (bw * Math.min(1, Math.max(0, CefRuntime.progress())))), 4, 2,
 					(alpha << 24) | (MenuKit.accent() & 0xFFFFFF));
 		} else if (s == CefRuntime.State.FAILED) {
 			retryRect = new int[] {cx - 34, cy + 10, 68, 16};
@@ -313,6 +313,12 @@ public final class BrowserWindow {
 			VeloDraw.fillRounded(context, cx - 34, cy + 10, 68, 16, 8, hover ? MenuKit.accent() : (alpha << 24) | (MenuKit.accent() & 0xFFFFFF));
 			Text retry = MenuKit.uiBold("Try again");
 			MenuKit.text(context, tr, retry, cx - MenuKit.width(tr, retry) / 2, cy + 14, 0xFFFFFFFF);
+			// the technical reason (step + exception), small and dim - what to send us when it keeps failing
+			String detail = CefRuntime.errorDetail();
+			if (detail != null && !detail.isEmpty()) {
+				Text d = MenuKit.fit(tr, MenuKit.ui(detail), c[2] - 30);
+				MenuKit.text(context, tr, d, cx - MenuKit.width(tr, d) / 2, cy + 34, (alpha << 24) | 0x5E5658);
+			}
 		}
 	}
 

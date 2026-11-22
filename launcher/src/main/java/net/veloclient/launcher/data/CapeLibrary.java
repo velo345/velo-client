@@ -176,6 +176,67 @@ public final class CapeLibrary {
 		return new CapeEntry(id, name, bundleFile, preset, true);
 	}
 
+	/** SHA-256 of an animated bundle's frames.gif, remembered per file + modification time (hashed once). */
+	private static final java.util.Map<String, String> GIF_SHA = new java.util.concurrent.ConcurrentHashMap<>();
+
+	public static String gifSha(CapeEntry entry) throws IOException {
+		Path file = entry.bundleFile();
+		String key = file + "@" + Files.getLastModifiedTime(file).toMillis();
+		String known = GIF_SHA.get(key);
+		if (known != null) {
+			return known;
+		}
+		try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(file.toFile())) {
+			ZipEntry gif = zip.getEntry("frames.gif");
+			if (gif == null) {
+				return null;
+			}
+			java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+			try (var in = zip.getInputStream(gif)) {
+				byte[] buffer = new byte[1 << 16];
+				for (int n; (n = in.read(buffer)) > 0; ) {
+					digest.update(buffer, 0, n);
+				}
+			}
+			String sha = java.util.HexFormat.of().formatHex(digest.digest());
+			GIF_SHA.put(key, sha);
+			return sha;
+		} catch (java.security.NoSuchAlgorithmException e) {
+			throw new IOException(e);
+		}
+	}
+
+	/**
+	 * Swaps a Store cloak's art in place (the server changed it): same bundle, id, physics and meta - only frames.gif is
+	 * new, so equips and settings stay.
+	 */
+	public static void replaceGif(CapeEntry entry, InputStream gifBytes) throws IOException {
+		Path file = entry.bundleFile();
+		Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+		try (java.util.zip.ZipFile old = new java.util.zip.ZipFile(file.toFile());
+				ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(tmp))) {
+			zip.putNextEntry(new ZipEntry("frames.gif"));
+			gifBytes.transferTo(zip);
+			zip.closeEntry();
+			var entries = old.entries();
+			while (entries.hasMoreElements()) {
+				ZipEntry e = entries.nextElement();
+				if (e.getName().equals("frames.gif")) {
+					continue;
+				}
+				zip.putNextEntry(new ZipEntry(e.getName()));
+				try (var in = old.getInputStream(e)) {
+					in.transferTo(zip);
+				}
+				zip.closeEntry();
+			}
+		} catch (IOException e) {
+			Files.deleteIfExists(tmp);
+			throw e;
+		}
+		Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+	}
+
 	public static void exportBundle(CapeEntry entry, Path destination) throws IOException {
 		if (entry.animated()) {
 			throw new IOException("Animated cloaks are Velo Store items and can't be exported");

@@ -195,15 +195,17 @@ final class StaffRoutes {
 			// Every sync makes ownership match the team exactly (not only on changes): a revoke that failed once, or a grant
 			// from before a lost staff.json, can't leave someone with the staff cape after they left - or without it while on the team.
 			int revoked = 0;
-			for (String uuid : store.database().ownersOf(StaffService.STAFF_CAPE, "grant:staff")) {
-				if (!fresh.containsKey(uuid) && store.database().revokeItem(uuid, StaffService.STAFF_CAPE, "staff ended")) {
-					revoked++;
+			for (String cape : StaffService.STAFF_CAPES) {
+				for (String uuid : store.database().ownersOf(cape, "grant:staff")) {
+					if (!fresh.containsKey(uuid) && store.database().revokeItem(uuid, cape, "staff ended")) {
+						revoked++;
+					}
 				}
-			}
-			for (String uuid : fresh.keySet()) {
-				if (!store.database().owns(uuid, StaffService.STAFF_CAPE)) {
-					store.database().touchWallet(uuid, fresh.get(uuid).name);
-					store.database().grantItem(uuid, StaffService.STAFF_CAPE, "staff");
+				for (String uuid : fresh.keySet()) {
+					if (!store.database().owns(uuid, cape)) {
+						store.database().touchWallet(uuid, fresh.get(uuid).name);
+						store.database().grantItem(uuid, cape, "staff");
+					}
 				}
 			}
 			if (revoked > 0 || !changes.get(1).isEmpty()) {

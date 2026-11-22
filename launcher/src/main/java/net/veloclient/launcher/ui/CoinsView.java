@@ -214,7 +214,9 @@ public final class CoinsView {
 
 	private static Node packs(JsonObject catalog, Label status, Runnable reload) {
 		FlowPane grid = StoreTiles.grid(190, 14);
-		boolean codes = catalog.has("partnerCodePercent") && !catalog.get("partnerCodePercent").isJsonNull();
+		JsonObject sale = SaleUi.liveCoins(catalog);
+		// A sale and a partner code don't stack (the server ignores the code while a sale runs).
+		boolean codes = sale == null && catalog.has("partnerCodePercent") && !catalog.get("partnerCodePercent").isJsonNull();
 		java.util.List<Runnable> repricers = new java.util.ArrayList<>();
 		JsonArray packs = catalog.getAsJsonArray("coinPacks");
 		String currency = catalog.get("currency").getAsString();
@@ -225,6 +227,7 @@ public final class CoinsView {
 			int coins = pack.get("coins").getAsInt();
 			int bonus = pack.get("bonus").getAsInt();
 			double price = pack.get("price").getAsDouble();
+			Double fullPrice = sale != null && pack.has("fullPrice") && !pack.get("fullPrice").isJsonNull() ? pack.get("fullPrice").getAsDouble() : null;
 
 			StackPane art = new StackPane(coinPile(2 + i * 2));
 			art.setPrefHeight(104);
@@ -252,6 +255,19 @@ public final class CoinsView {
 				repricers.get(repricers.size() - 1).run();
 			}
 			VBox body = new VBox(10, art, amountRow, extra, buy);
+			if (fullPrice != null) {
+				Node was = SaleUi.struck(formatPrice(fullPrice, currency), 13);
+				Label off = new Label("-" + sale.get("percent").getAsInt() + "%");
+				off.setStyle("-fx-background-color: white; -fx-text-fill: black; -fx-font-family: 'Archivo SemiExpanded ExtraBold'; -fx-font-size: 12px;"
+						+ "-fx-padding: 4 7 4 7; -fx-background-radius: 5;");
+				StackPane.setAlignment(off, Pos.TOP_LEFT);
+				StackPane.setMargin(off, new javafx.geometry.Insets(8));
+				art.getChildren().add(off);
+				HBox priceLine = new HBox(8, was, new Label(sale.get("name").getAsString().toUpperCase(Locale.ROOT)));
+				priceLine.getChildren().get(1).setStyle("-fx-text-fill: #FF6B6F; -fx-font-family: 'Geist Mono'; -fx-font-size: 11px;");
+				priceLine.setAlignment(Pos.CENTER_LEFT);
+				body.getChildren().add(3, priceLine);
+			}
 			body.getStyleClass().add("card");
 			body.setPadding(new javafx.geometry.Insets(12, 12, 14, 12));
 			if (i == best) {

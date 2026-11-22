@@ -41,6 +41,9 @@ final class StaffService {
 	static final Set<String> SERVICES = Set.of("friends", "capes", "parties", "network");
 	static final Set<String> CATEGORIES = Set.of("spam", "scam", "insult", "harassment", "inappropriate", "other");
 	static final String STAFF_CAPE = "cape_velo_staff";
+	/** The staff cloak and its colour versions (owner 2026-11-22) - every staff member owns all of them. */
+	static final List<String> STAFF_CAPES = List.of(STAFF_CAPE, "cape_velo_staff_green", "cape_velo_staff_yellow", "cape_velo_staff_orange",
+			"cape_velo_staff_purple", "cape_velo_staff_blue", "cape_velo_staff_aqua", "cape_velo_staff_pink");
 	private static final int MAX_REPORTS = 1000;
 
 	static final class Member {

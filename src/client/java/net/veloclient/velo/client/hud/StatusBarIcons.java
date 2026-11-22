@@ -39,6 +39,106 @@ public final class StatusBarIcons {
 		}
 	}
 
+	/**
+	 * Heart variants (absorption, frozen, poison, wither): by default made from your own drawing like a pen with modifiers -
+	 * every pixel's hue turned by {@code hueDegrees} (from the default red), its saturation and brightness scaled - so shading
+	 * and highlights carry over. A variant you draw yourself ({@code <kind>_<suffix>}) wins over the made one.
+	 */
+	public enum Variant {
+		NORMAL("", "Normal", 0f, 1f, 1f),
+		ABSORBING("absorbing", "Absorption", 45f, 0.95f, 1.05f),
+		FROZEN("frozen", "Frozen", 190f, 0.7f, 1.1f),
+		POISONED("poisoned", "Poison", 70f, 0.9f, 0.85f),
+		WITHERED("withered", "Wither", 0f, 0.08f, 0.4f);
+
+		public final String suffix;
+		public final String label;
+		public final float hueDegrees;
+		public final float saturation;
+		public final float brightness;
+
+		Variant(String suffix, String label, float hueDegrees, float saturation, float brightness) {
+			this.suffix = suffix;
+			this.label = label;
+			this.hueDegrees = hueDegrees;
+			this.saturation = saturation;
+			this.brightness = brightness;
+		}
+
+		/** The kind a drawing of this variant is saved under ("heart" -> "heart_frozen"). */
+		public String kind(String base) {
+			return suffix.isEmpty() ? base : base + "_" + suffix;
+		}
+
+		/** One ARGB colour through this variant's modifiers. */
+		public int apply(int argb) {
+			if (this == NORMAL) {
+				return argb;
+			}
+			int a = argb >>> 24;
+			float[] hsb = java.awt.Color.RGBtoHSB((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF, null);
+			float h = (hsb[0] + hueDegrees / 360f) % 1f;
+			float sat = Math.max(0f, Math.min(1f, hsb[1] * saturation));
+			float bri = Math.max(0f, Math.min(1f, hsb[2] * brightness));
+			return (a << 24) | (java.awt.Color.HSBtoRGB(h, sat, bri) & 0xFFFFFF);
+		}
+
+		/** A copy of {@code source} with every pixel through {@link #apply} (the caller closes both). */
+		public NativeImage applyTo(NativeImage source) {
+			NativeImage out = new NativeImage(source.getWidth(), source.getHeight(), true);
+			for (int y = 0; y < source.getHeight(); y++) {
+				for (int x = 0; x < source.getWidth(); x++) {
+					out.setColorArgb(x, y, apply(source.getColorArgb(x, y)));
+				}
+			}
+			return out;
+		}
+	}
+
+	/**
+	 * Draws one state of a heart variant: your own drawing of that variant if there is one, else the variant made from
+	 * the normal drawing. Returns false if there's no drawing at all.
+	 */
+	public static boolean drawVariant(DrawContext context, String kind, Variant variant, State state, int x, int y, int color) {
+		if (variant == Variant.NORMAL) {
+			return draw(context, kind, state, x, y, color);
+		}
+		if (hasDrawing(variant.kind(kind))) {
+			return draw(context, variant.kind(kind), state, x, y, color);
+		}
+		if (!hasDrawing(kind)) {
+			return false;
+		}
+		// made from the normal drawing: its own state if drawn, else the same fallbacks as draw()
+		boolean own = state == State.FULL || Files.isRegularFile(file(kind, state));
+		State from = own ? state : State.FULL;
+		String key = kind + "/" + from.file + "@" + variant.suffix;
+		Identifier made = cached(key, () -> {
+			Path path = file(kind, from);
+			if (!Files.isRegularFile(path)) {
+				return null;
+			}
+			try (InputStream in = Files.newInputStream(path)) {
+				NativeImage source = NativeImage.read(in);
+				NativeImage out = variant.applyTo(source);
+				source.close();
+				return out;
+			}
+		});
+		if (made == null) {
+			return false;
+		}
+		int size = SIZES.getOrDefault(key, 9);
+		if (own) {
+			drawSquare(context, made, size, x, y, false, color);
+		} else if (state == State.HALF) {
+			drawSquare(context, made, size, x, y, true, color);
+		} else {
+			drawSquare(context, made, size, x, y, false, 0x59000000);
+		}
+		return true;
+	}
+
 	/** Size imported PNGs are fitted to when there's no drawing yet (2x the 9px slot). */
 	public static final int SIZE = 18;
 

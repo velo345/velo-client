@@ -416,46 +416,99 @@ public final class VeloServerClient {
 		return response.get("capeId").isJsonNull() ? null : response.get("capeId").getAsString();
 	}
 
-	private static void poll(String base) {
+	// The online list as last merged (uuid -> entry) and its feed version; a newer server answers ?since= with only
+	// what changed, so a quiet poll is ~100 bytes instead of the whole list. Older servers just send the full list.
+	private static final Map<String, JsonObject> ONLINE = new java.util.LinkedHashMap<>();
+	private static long onlineVersion = -1;
+	private static String onlineBase;
+
+	private static synchronized void poll(String base) {
 		try {
-			HttpRequest request = HttpRequest.newBuilder(URI.create(base + "/v1/online"))
+			if (!base.equals(onlineBase)) {
+				onlineBase = base;
+				onlineVersion = -1;
+				ONLINE.clear();
+			}
+			String url = base + "/v1/online" + (onlineVersion >= 0 ? "?since=" + onlineVersion : "");
+			HttpRequest request = HttpRequest.newBuilder(URI.create(url))
 					.timeout(Duration.ofSeconds(10))
+					.header("Accept-Encoding", "gzip")
 					.GET()
 					.build();
-			HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+			HttpResponse<byte[]> response = HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray());
 			if (response.statusCode() / 100 != 2) {
 				return;
 			}
-			JsonObject json = JsonParser.parseString(response.body()).getAsJsonObject();
+			byte[] body = response.body();
+			if (response.headers().firstValue("Content-Encoding").map(v -> v.equalsIgnoreCase("gzip")).orElse(false)) {
+				try (var in = new java.util.zip.GZIPInputStream(new java.io.ByteArrayInputStream(body))) {
+					body = in.readAllBytes();
+				}
+			}
+			JsonObject json = JsonParser.parseString(new String(body, java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+			boolean delta = json.has("delta") && json.get("delta").isJsonPrimitive() && json.get("delta").getAsBoolean();
+			boolean changed = false;
+			if (!delta) {
+				Map<String, JsonObject> full = new java.util.LinkedHashMap<>();
+				for (var element : json.getAsJsonArray("users")) {
+					JsonObject user = element.getAsJsonObject();
+					String uuid = normalizeUuid(user.has("uuid") ? user.get("uuid").getAsString() : null);
+					if (uuid != null) {
+						full.put(uuid, user);
+					}
+				}
+				changed = !full.equals(ONLINE);
+				ONLINE.clear();
+				ONLINE.putAll(full);
+			} else {
+				for (var element : json.getAsJsonArray("users")) {
+					JsonObject user = element.getAsJsonObject();
+					String uuid = normalizeUuid(user.has("uuid") ? user.get("uuid").getAsString() : null);
+					if (uuid != null) {
+						changed |= !user.equals(ONLINE.put(uuid, user));
+					}
+				}
+				if (json.has("removed")) {
+					for (var element : json.getAsJsonArray("removed")) {
+						changed |= ONLINE.remove(normalizeUuid(element.getAsString())) != null;
+					}
+				}
+			}
+			onlineVersion = json.has("version") && json.get("version").isJsonPrimitive() ? json.get("version").getAsLong() : -1;
+			if (!changed && onlineSeen) {
+				return; // nothing new: the registry, emotes and pets are already up to date
+			}
+			onlineSeen = true;
 			Map<String, VeloUserRegistry.Entry> entries = new HashMap<>();
 			Map<String, String> emotes = new HashMap<>();
-			for (var element : json.getAsJsonArray("users")) {
-				JsonObject user = element.getAsJsonObject();
-				String uuid = normalizeUuid(user.has("uuid") ? user.get("uuid").getAsString() : null);
-				String username = user.has("username") ? user.get("username").getAsString() : null;
-				String capeId = user.has("capeId") && !user.get("capeId").isJsonNull() ? user.get("capeId").getAsString() : null;
-				String wingsId = user.has("wingsId") && !user.get("wingsId").isJsonNull() ? user.get("wingsId").getAsString() : null;
-				String auraId = user.has("auraId") && !user.get("auraId").isJsonNull() ? user.get("auraId").getAsString() : null;
-				String nameStyle = user.has("nameStyle") && !user.get("nameStyle").isJsonNull() ? user.get("nameStyle").getAsString() : null;
-				String wear = user.has("wear") && !user.get("wear").isJsonNull() ? user.get("wear").getAsString() : null;
-				if (uuid != null && user.has("emote") && !user.get("emote").isJsonNull()) {
+			com.google.gson.JsonArray users = new com.google.gson.JsonArray();
+			for (Map.Entry<String, JsonObject> e : ONLINE.entrySet()) {
+				String uuid = e.getKey();
+				JsonObject user = e.getValue();
+				users.add(user);
+				String username = user.has("username") && !user.get("username").isJsonNull() ? user.get("username").getAsString() : null;
+				if (user.has("emote") && !user.get("emote").isJsonNull()) {
 					emotes.put(uuid, user.get("emote").getAsString());
 				}
-				if (uuid != null && username != null) {
+				if (username != null) {
 					boolean plus = user.has("plus") && !user.get("plus").isJsonNull() && user.get("plus").getAsBoolean();
 					boolean og = user.has("og") && !user.get("og").isJsonNull() && user.get("og").getAsBoolean();
-					entries.put(uuid, new VeloUserRegistry.Entry(username, capeId, wingsId, auraId, plus, nameStyle, wear, og));
+					entries.put(uuid, new VeloUserRegistry.Entry(username, str(user, "capeId"), str(user, "wingsId"), str(user, "auraId"), plus,
+							str(user, "nameStyle"), str(user, "wear"), og));
 				}
 			}
 			VeloUserRegistry.replaceAll(entries);
 			net.veloclient.velo.client.emotes.Emotes.onOnline(emotes);
 			for (var listener : ONLINE_LISTENERS) {
-				listener.accept(json.getAsJsonArray("users"));
+				listener.accept(users);
 			}
 		} catch (Exception e) {
+			onlineVersion = -1; // start over with the full list next time
 			VeloClient.LOGGER.debug("Velo Network online-list poll failed", e);
 		}
 	}
+
+	private static boolean onlineSeen;
 
 	private static void endSessionQuietly(String token) {
 		try {

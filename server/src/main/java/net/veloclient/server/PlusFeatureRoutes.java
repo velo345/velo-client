@@ -346,7 +346,10 @@ final class PlusFeatureRoutes {
 					return;
 				}
 				ex.getResponseHeaders().set("Content-Type", "image/jpeg");
-				ex.getResponseHeaders().set("Cache-Control", "public, max-age=86400");
+				// Avatar/banner links carry ?v=<when it was fetched> (a new picture = a new link); video thumbnails never change.
+				String query = ex.getRequestURI().getRawQuery();
+				ex.getResponseHeaders().set("Cache-Control", query != null && query.startsWith("v=") || parts[1].startsWith("v-")
+						? "public, max-age=31536000, immutable" : "public, max-age=86400");
 				ex.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
 				ex.sendResponseHeaders(200, jpg.length);
 				try (OutputStream out = ex.getResponseBody()) {

@@ -159,7 +159,7 @@ final class StaffBridge {
 			return hit.ids;
 		}
 		java.util.Set<String> ids = new java.util.HashSet<>();
-		for (Guild g : jda.getGuilds()) {
+		for (Guild g : HomeGuild.guilds(jda)) {
 			Member m = g.getMemberById(discordId);
 			if (m == null) {
 				try {
@@ -364,7 +364,7 @@ final class StaffBridge {
 		}
 		Guild guild = null;
 		Member member = null;
-		for (Guild g : jda.getGuilds()) {
+		for (Guild g : HomeGuild.guilds(jda)) {
 			try {
 				member = g.retrieveMemberById(discordId).submit().get(10, TimeUnit.SECONDS);
 				guild = g;

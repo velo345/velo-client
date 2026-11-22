@@ -22,7 +22,7 @@ public final class NoTotemPopModule extends AbstractModule implements Configurab
 
 	public NoTotemPopModule() {
 		super("no-totem-pop", "No Totem Pop", "No totem flying into your face when one pops - you still hear it. "
-				+ "Turn off the particles and the sound too if you like.", ModuleCategory.PVP, SafetyTag.COSMETIC_ONLY, false);
+				+ "Turn off the particles and the sound too if you like.", ModuleCategory.PVP, SafetyTag.CHECK_SERVER_RULES, false);
 		instance = this;
 	}
 

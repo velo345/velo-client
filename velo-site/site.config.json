@@ -14,15 +14,15 @@
   },
   "release": {
     "_comment": "Bump version on every release - the download buttons link straight to these GitHub release assets.",
-    "version": "1.4.1",
+    "version": "1.4.2",
     "channel": "Release",
-    "launcherExe": "Velo.Client.Launcher-1.4.1.exe",
-    "launcherDeb": "velo-client-launcher_1.4.1_amd64.deb",
-    "launcherTar": "velo-client-launcher-1.4.1-linux-x64.tar.gz",
-    "date": "2026-11-15",
-    "datePretty": "Nov 15, 2026",
-    "launcherDmgArm": "velo-client-launcher-1.4.1-macos-arm64.dmg",
-    "launcherDmgX64": "velo-client-launcher-1.4.1-macos-x64.dmg",
+    "launcherExe": "Velo.Client.Launcher-1.4.2.exe",
+    "launcherDeb": "velo-client-launcher_1.4.2_amd64.deb",
+    "launcherTar": "velo-client-launcher-1.4.2-linux-x64.tar.gz",
+    "date": "2026-11-21",
+    "datePretty": "Nov 21, 2026",
+    "launcherDmgArm": "velo-client-launcher-1.4.2-macos-arm64.dmg",
+    "launcherDmgX64": "velo-client-launcher-1.4.2-macos-x64.dmg",
     "legacyMod": "velo-client-1.2.0+mc1.8.9.jar",
     "newsPath": "/news"
   },
@@ -83,5 +83,19 @@
   "seo": {
     "_comment": "IndexNow tells Bing, Yandex, Seznam and others about new pages right after a deploy (deploy.sh pings it).",
     "indexNowKey": "a75aae4b980def6cd4e3c3da0e0887cc"
+  },
+  "sale": {
+    "_comment": "Black Friday: the bar on every page + the sale card on Home and the Store are built into the HTML (no layout shift). The server's catalog still decides whether prices are live; past 'until' the pages hide it by themselves.",
+    "enabled": "true",
+    "name": "Black Friday",
+    "upper": "BLACK FRIDAY",
+    "percent": "50",
+    "from": 1795388400000,
+    "until": 1796079600000,
+    "coins": "15,000",
+    "coinsFull": "49,99 €",
+    "coinsNow": "25,00 €",
+    "plusFull": "9,99 €",
+    "plusNow": "5,00 €"
   }
 }

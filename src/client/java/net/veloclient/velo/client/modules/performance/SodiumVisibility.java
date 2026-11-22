@@ -39,6 +39,23 @@ public final class SodiumVisibility {
 		return visible;
 	}
 
+	/** False only when Sodium found every chunk section this box touches hidden this frame. Render thread, Sodium loaded. */
+	public static boolean boxVisible(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+		//? if >=26.2 {
+		/*var renderer = net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.instanceNullable();
+		if (renderer == null) {
+			return true;
+		}
+		try {
+			return renderer.isBoxVisible(minX, minY, minZ, maxX, maxY, maxZ);
+		} catch (RuntimeException e) {
+			return true;
+		}
+		*///?} else {
+		return true;
+		//?}
+	}
+
 	private static boolean sectionVisible(int sx, int sy, int sz) {
 		//? if >=26.2 {
 		/*var renderer = net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.instanceNullable();

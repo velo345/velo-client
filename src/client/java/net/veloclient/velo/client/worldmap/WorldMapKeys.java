@@ -11,7 +11,7 @@ import net.veloclient.velo.client.keybind.VeloKeybinds;
 public final class WorldMapKeys {
 
 	public static final KeyBinding OPEN_MAP = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.world_map", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.M, VeloKeybinds.CATEGORY));
+			"key.velo-client." + "world_map" /* split: the client.world -> client.level Stonecutter rule */, InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.M, VeloKeybinds.CATEGORY));
 
 	private WorldMapKeys() {
 	}

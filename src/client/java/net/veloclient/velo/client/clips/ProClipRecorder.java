@@ -265,9 +265,17 @@ public final class ProClipRecorder {
 		// stream out) - the CPU conversion it replaces was most of ffmpeg's ~1 core at 1080p60. Only
 		// when the frame already has the recorded, even size (26.2 scales it on the GPU first).
 		boolean gpuConvert = "h264_nvenc".equals(encoder.name()) && outH == height && (width & 1) == 0;
-		List<String> command = new ArrayList<>(List.of(ffmpeg.toString(), "-hide_banner", "-loglevel", "error", "-y",
-				"-f", "rawvideo", "-pix_fmt", "rgba", "-video_size", width + "x" + height, "-framerate", String.valueOf(fps), "-i", "pipe:0"));
-		if (gpuConvert) {
+		boolean vaapi = "h264_vaapi".equals(encoder.name());
+		List<String> command = new ArrayList<>(List.of(ffmpeg.toString(), "-hide_banner", "-loglevel", "error", "-y"));
+		if (vaapi) {
+			command.addAll(List.of("-vaapi_device", FfmpegTool.vaapiDevice()));
+		}
+		command.addAll(List.of("-f", "rawvideo", "-pix_fmt", "rgba", "-video_size", width + "x" + height, "-framerate", String.valueOf(fps), "-i", "pipe:0"));
+		if (vaapi) {
+			// VA-API: flip and scale on the CPU side as usual, then hand NV12 frames up to the graphics card
+			command.addAll(List.of("-vf", "vflip" + (outH < height ? ",scale=-2:" + outH + ":flags=bilinear" : ",scale=trunc(iw/2)*2:trunc(ih/2)*2")
+					+ ",format=nv12,hwupload"));
+		} else if (gpuConvert) {
 			// GPU rows come bottom-up.
 			command.addAll(List.of("-vf", "vflip"));
 		} else {

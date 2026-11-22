@@ -43,6 +43,7 @@ public final class VeloServerApp {
 	public static void main(String[] args) throws IOException {
 		int port = resolvePort();
 		SessionRegistry registry = new SessionRegistry();
+		OnlineFeed onlineFeed = new OnlineFeed(registry);
 		Path dataDir = Path.of(envOr("VELO_DATA_DIR", "data")).toAbsolutePath();
 		CapeStore capes = new CapeStore(dataDir);
 		social = new SocialService(dataDir, registry);
@@ -89,7 +90,7 @@ public final class VeloServerApp {
 		server.createContext("/v1/session/end", exchange -> handle(exchange, "POST", ex -> handleEnd(ex, registry)));
 		server.createContext("/v1/session/end-game", exchange -> handle(exchange, "POST", ex -> handleEndGame(ex, registry)));
 		server.createContext("/v1/heartbeat", exchange -> handle(exchange, "POST", ex -> handleHeartbeat(ex, registry, capes)));
-		server.createContext("/v1/online", exchange -> handle(exchange, "GET", ex -> handleOnline(ex, registry)));
+		server.createContext("/v1/online", exchange -> handle(exchange, "GET", ex -> handleOnline(ex, onlineFeed)));
 		// Public live numbers for the launcher's Home ("123 playing now · 1,234 today"): two counts, cached 30 s.
 		server.createContext("/v1/stats/live", exchange -> handle(exchange, "GET", ex -> handleLiveStats(ex, registry)));
 		lastLooks = new LastCosmetics(dataDir);
@@ -140,7 +141,7 @@ public final class VeloServerApp {
 		PlusTokens plusTokens = new PlusTokens(envOr("VELO_PLUS_SIGNING_KEY", null));
 		AddonStore addonStore = new AddonStore(dataDir);
 		AddonSync addonSync = new AddonSync(addonStore, envOr("VELO_PLUS_GITHUB_REPO", "velo345/velo-client-plus"), envOr("VELO_PLUS_GITHUB_TOKEN", null));
-		PlusRoutes.register(server, registry, store, plusTokens, addonStore, addonSync, discordLinks, adminToken);
+		PlusRoutes.register(server, registry, store, plusTokens, addonStore, addonSync, discordLinks, adminToken, uuid -> og != null && og.eligible(uuid));
 		// Velo+ features: Cloud Sync restore points and Clips Pro share links (velo-client.com/c/<id>).
 		CloudBackupService cloud = new CloudBackupService(dataDir);
 		ClipShareService clipShares = new ClipShareService(dataDir, Long.parseLong(envOr("VELO_CLIPS_MAX_GB", "40")) * 1024 * 1024 * 1024,
@@ -457,7 +458,7 @@ public final class VeloServerApp {
 
 	/** {@code wear}: equipped bodywear, "id,id,..." (item ids without "wear_"). */
 	private record HeartbeatRequest(String sessionToken, String capeId, String wingsId, String auraId, Boolean idle, Boolean hidePlus, String nameStyle,
-			String emote, String wear, String pet, Boolean og) {
+			String emote, String wear, String pet, Boolean og, String petAct) {
 	}
 
 	/** {@code ogEligible}: this account may switch to the OG badge (see {@link OgBadge}). */
@@ -595,6 +596,9 @@ public final class VeloServerApp {
 				pet = null;
 			}
 			registry.setPet(refreshed.uuid(), pet);
+			// What the pet is told to do: "<stay 0|1>;<trick|cheer|none>;<number>" - only with a pet out.
+			String petAct = request.petAct();
+			registry.setPetAct(refreshed.uuid(), pet != null && petAct != null && petAct.matches("[01];(trick|cheer|none);[0-9]{1,5}") ? petAct : null);
 			if (lastLooks != null) {
 				lastLooks.record(refreshed.uuid(), refreshed.capeId(), refreshed.wingsId(), refreshed.auraId(), wear, pet);
 			}
@@ -634,8 +638,6 @@ public final class VeloServerApp {
 		JsonHttp.writeJson(exchange, 200, new HeartbeatResponse(true, registry.onlineCount(), null, false));
 	}
 
-	private record OnlineResponse(List<SessionRegistry.OnlineUser> users, long serverTimeMillis) {
-	}
 
 	private record LiveStats(int online, long today, long at) {
 	}
@@ -659,8 +661,23 @@ public final class VeloServerApp {
 		JsonHttp.writeJson(exchange, 200, cached);
 	}
 
-	private static void handleOnline(HttpExchange exchange, SessionRegistry registry) throws IOException {
-		JsonHttp.writeJson(exchange, 200, new OnlineResponse(registry.onlineUsers(), System.currentTimeMillis()));
+	/** The full list, or with {@code ?since=<version>} only what changed (see OnlineFeed). */
+	private static void handleOnline(HttpExchange exchange, OnlineFeed feed) throws IOException {
+		long since = -1;
+		String query = exchange.getRequestURI().getRawQuery();
+		if (query != null) {
+			for (String part : query.split("&")) {
+				if (part.startsWith("since=")) {
+					try {
+						since = Long.parseLong(part.substring(6));
+					} catch (NumberFormatException ignored) {
+						// full list
+					}
+				}
+			}
+		}
+		exchange.getResponseHeaders().set("Cache-Control", "no-store");
+		JsonHttp.writeJson(exchange, 200, feed.answer(since));
 	}
 
 	private record CapeUploadResponse(String capeId) {

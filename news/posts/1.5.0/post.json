@@ -1,0 +1,128 @@
+{
+ "title": "Velo Client 1.5: A whole new sky",
+ "summary": "Custom Skybox with eight hand-made skies, lyrics that hit on the beat, pets that sit, do tricks and join your emotes, drawable heart variants, smooth clips on any PC - plus faster starts and lots of fixes.",
+ "tag": "Update",
+ "version": "1.5.0",
+ "accent": "#ff3b44",
+ "pinned": true,
+ "cover": "file:images/cover.jpg",
+ "blocks": [
+  {
+   "type": "text",
+   "text": "**Velo Client 1.5** changes what you look at every second you play: the sky. On top of that, your lyrics now move with the music, your pet listens to you, and clips record smoothly even on older PCs."
+  },
+  {
+   "type": "heading",
+   "text": "Custom Skybox"
+  },
+  {
+   "type": "image",
+   "image": "file:images/skybox-presets.png",
+   "caption": "Eight new skies, each with a preview in the new picker."
+  },
+  {
+   "type": "list",
+   "items": [
+    "Replace the sky with **8 built-in skies**: Starry Night, Deep Space, Velo Nebula, Aurora, Crimson Dusk, Sunset Glow, Cotton Candy and Pastel Day",
+    "**Choose Skybox...** opens a picker with a **preview of every sky** - or **import your own picture** (a 2:1 panorama or a cube-map cross)",
+    "**Sharp stars at any screen size** with a gentle twinkle, and a **Stars** slider",
+    "The game's own **sun and moon** rise and set on top of your sky - the moon even shows its **phase**",
+    "Terrain, water, clouds, players **and your lyrics stay in front** of the sky",
+    "Rotation, slow spin, opacity, brightness and darker at night"
+   ]
+  },
+  {
+   "type": "image",
+   "image": "file:images/skybox-aurora.jpg",
+   "caption": "Aurora - one of the new skies."
+  },
+  {
+   "type": "heading",
+   "text": "Lyrics that hit on the beat"
+  },
+  {
+   "type": "list",
+   "items": [
+    "Velo now **listens to the beat** of what you play (Spotify and anything else) instead of guessing from the words",
+    "Pick what happens on the **big moments** - hard hits and drops: **zoom, chromatic split, flash, shake or glitch** - or on every beat",
+    "Letters can **bounce** a little on every beat",
+    "**3D extruded text** (flat, subtle or deep) with its own colour",
+    "**27 new presets** with cleaner colours, and a simpler **Lyrics Studio** with tabs and a colour picker",
+    "Faster: lyrics cost far less, even with effects on"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Pets"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Sit & stay** and **do a trick** on a key (pick them in the controls) - other players see it too",
+    "Your pet **joins in when you emote** with its kill celebration",
+    "Pets now **show in first person** at their normal spot beside you",
+    "**Hide All Pets While Fighting**: every pet steps aside for a few seconds when you hit or get hit"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Hearts, clips and more"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**Draw every heart variant** - poison, wither, frozen, absorption and more - with a pen that keeps the right hue for each, and a **colour picker** in the pixel editor",
+    "**Free clips on your graphics card** (NVIDIA, AMD, Intel, and VA-API on Linux) at 720p with sound - no more laggy recordings, and the fallback lowers its resolution by itself when your PC can't keep up",
+    "The **setup guide** now shows for **every new profile** (also when you launch straight onto a server), and you can open it any time in R-Shift > Settings",
+    "Every module that some servers don't allow is now marked **Check Server Rules** (Fullbright, Zoom, Free Look, World Map, Waypoints...) - Safe Mode turns them all off"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Staff and community"
+  },
+  {
+   "type": "image",
+   "image": "file:images/staff-cloaks.png",
+   "caption": "The Velo Staff cloak now comes in eight colours."
+  },
+  {
+   "type": "list",
+   "items": [
+    "The **Velo Staff cloak** comes in **green, yellow, orange, purple, blue, aqua and pink** too",
+    "Got Velo in its first two weeks? Link your Discord and you get the **OG role** automatically",
+    "Store cloaks in the launcher update themselves when their art changes"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Faster and smoother"
+  },
+  {
+   "type": "list",
+   "items": [
+    "**GPU item meshes**, display culling and cheaper name tags: busy spawns with item displays and holograms run much faster",
+    "Online players sync with tiny updates instead of the full list every time",
+    "The launcher uses less memory in the background"
+   ]
+  },
+  {
+   "type": "heading",
+   "text": "Fixes"
+  },
+  {
+   "type": "list",
+   "items": [
+    "Long black screen and **\"resource pack loading failed\"** when starting with music playing (Lyrics) - your packs no longer get switched off",
+    "Motion Blur, Color Grading and Lyrics effects stopping after a server resource pack (MCC Island and others)",
+    "The Controls screen reopening right after closing it (LabyMod)",
+    "Sodium crash in the culling pass, the World Map key showing up in another language",
+    "World Notes: sharing stuck forever, the \"lead me\" text never going away, notes you couldn't delete",
+    "Aura density only applying in the launcher, flickering HUD on older Intel graphics after Alt+Tab",
+    "Party chat cut off in the Friends panel, friends showing \"last seen just now\" while offline",
+    "The crash dialog now names graphics driver crashes instead of an unrelated earlier error",
+    "Rounded corners on the module previews, the launcher avatar, and many small things"
+   ]
+  }
+ ]
+}

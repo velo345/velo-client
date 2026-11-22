@@ -181,12 +181,128 @@ public final class StoreService {
 	public record BundleView(String id, String name, String description, List<String> items, int price) {
 	}
 
-	public record CatalogView(String currency, List<StoreConfig.CoinPack> coinPacks, List<CatalogItem> items,
-			boolean checkoutEnabled, boolean adsEnabled, DailyView daily, List<BundleView> bundles, PlusOffer plus, Map<String, Object> launchBonus, Integer partnerCodePercent) {
+	public record CatalogView(String currency, List<PackView> coinPacks, List<CatalogItem> items,
+			boolean checkoutEnabled, boolean adsEnabled, DailyView daily, List<BundleView> bundles, PlusOffer plus, Map<String, Object> launchBonus,
+			Integer partnerCodePercent, Map<String, Object> sale) {
+	}
+
+	/** A coin pack as sold right now: {@code fullPrice} is set while a sale takes money off it. */
+	public record PackView(String id, int coins, int bonus, double price, Double fullPrice) {
 	}
 
 	/** Velo+ as offered (for visitors who aren't signed in - the website shows the live price). */
-	public record PlusOffer(double price, int monthlyCoins, int periodDays, int trialDays, double yearlyPrice) {
+	public record PlusOffer(double price, int monthlyCoins, int periodDays, int trialDays, double yearlyPrice, Double fullPrice, Double fullYearlyPrice) {
+	}
+
+	/** The coin packs at today's prices (a live sale halves them, say). */
+	public List<PackView> packViews() {
+		int off = saleCoinsPercent();
+		List<PackView> out = new ArrayList<>();
+		for (StoreConfig.CoinPack pack : config.coinPacks) {
+			out.add(new PackView(pack.id(), pack.coins(), pack.bonus(), off > 0 ? codePrice(pack.price(), off) : pack.price(), off > 0 ? pack.price() : null));
+		}
+		return out;
+	}
+
+	public PlusOffer plusOffer() {
+		int off = salePlusPercent();
+		StoreConfig.Plus plus = config.plus;
+		return new PlusOffer(off > 0 ? codePrice(plus.price, off) : plus.price, plus.monthlyCoins, plus.periodDays, plus.trialDays,
+				off > 0 && plus.yearlyPrice > 0 ? codePrice(plus.yearlyPrice, off) : plus.yearlyPrice, off > 0 ? plus.price : null,
+				off > 0 && plus.yearlyPrice > 0 ? plus.yearlyPrice : null);
+	}
+
+	// ---- Sales (Black Friday) ----
+
+	private volatile boolean saleCoinsOk;
+	private volatile boolean salePlusOk;
+	private volatile long saleCheckedAt;
+	private final java.util.concurrent.atomic.AtomicBoolean saleChecking = new java.util.concurrent.atomic.AtomicBoolean();
+
+	private boolean saleRunning() {
+		StoreConfig.Sale sale = config.sale;
+		long now = System.currentTimeMillis();
+		return sale != null && sale.percent > 0 && now >= sale.from && now < sale.until;
+	}
+
+	/**
+	 * Tries the sale coupon on throwaway baskets (a coin pack, the monthly Velo+) every few minutes while the sale runs:
+	 * only what Tebex really discounts by the promised percent is shown and charged cheaper.
+	 */
+	public void refreshSale() {
+		StoreConfig.Sale sale = config.sale;
+		if (!saleRunning() || !tebex.canCheckout() || sale.tebexCoupon == null || sale.tebexCoupon.isBlank() || !saleChecking.compareAndSet(false, true)) {
+			return;
+		}
+		try {
+			boolean coins = false;
+			boolean plus = false;
+			if (sale.coins && !config.coinPacks.isEmpty()) {
+				long packageId = config.tebexPackage(config.coinPacks.getFirst().id());
+				TebexCheckout.CodeCheck check = packageId == 0 ? null : tebex.check(packageId, sale.tebexCoupon, false);
+				coins = check != null && check.ok() && check.percent() >= sale.percent - 1;
+			}
+			if (sale.plus) {
+				long packageId = config.tebexPackage("plus_month");
+				TebexCheckout.CodeCheck check = packageId == 0 ? null : tebex.check(packageId, sale.tebexCoupon, false);
+				plus = check != null && check.ok() && check.percent() >= sale.percent - 1;
+			}
+			if (coins != saleCoinsOk || plus != salePlusOk) {
+				System.out.println("[store] Sale " + sale.id + ": coin packs " + (coins ? "LIVE" : "off") + ", Velo+ " + (plus ? "LIVE" : "off")
+						+ " (coupon " + sale.tebexCoupon + ")");
+			}
+			saleCoinsOk = coins;
+			salePlusOk = plus;
+			saleCheckedAt = System.currentTimeMillis();
+		} finally {
+			saleChecking.set(false);
+		}
+	}
+
+	private void refreshSaleSoon() {
+		if (saleRunning() && System.currentTimeMillis() - saleCheckedAt > 5 * 60_000L) {
+			java.util.concurrent.CompletableFuture.runAsync(this::refreshSale);
+		}
+	}
+
+	/** Percent off the coin packs right now (0 = full price). */
+	public int saleCoinsPercent() {
+		refreshSaleSoon();
+		return saleRunning() && config.sale.coins && saleCoinsOk ? config.sale.percent : 0;
+	}
+
+	/** Percent off the first Velo+ payment right now (0 = full price). */
+	public int salePlusPercent() {
+		refreshSaleSoon();
+		return saleRunning() && config.sale.plus && salePlusOk ? config.sale.percent : 0;
+	}
+
+	/**
+	 * The sale for the clients: {@code id, name, percent, from, until, active} (started), {@code coins} / {@code plus}
+	 * (discounted right now). Shown from the teaser on, so the launcher and website can count down to it; null outside.
+	 */
+	public Map<String, Object> saleView() {
+		StoreConfig.Sale sale = config.sale;
+		long now = System.currentTimeMillis();
+		if (sale == null || sale.percent <= 0 || now < Math.min(sale.teaserFrom, sale.from) || now >= sale.until) {
+			return null;
+		}
+		boolean active = now >= sale.from;
+		int coins = saleCoinsPercent();
+		int plus = salePlusPercent();
+		if (active && coins == 0 && plus == 0) {
+			return null; // started, but Tebex doesn't take the coupon (yet): promise nothing
+		}
+		Map<String, Object> out = new java.util.LinkedHashMap<>();
+		out.put("id", sale.id);
+		out.put("name", sale.name);
+		out.put("percent", sale.percent);
+		out.put("from", sale.from);
+		out.put("until", sale.until);
+		out.put("active", active);
+		out.put("coins", active ? coins > 0 : sale.coins);
+		out.put("plus", active ? plus > 0 : sale.plus);
+		return out;
 	}
 
 	public CatalogView catalog() {
@@ -196,11 +312,10 @@ public final class StoreService {
 			Integer deal = deals.prices().get(item.id());
 			items.add(new CatalogItem(item.id(), item.name(), deal != null ? deal : item.price(), deal != null ? item.price() : null));
 		}
-		return new CatalogView(config.currency, config.coinPacks, items, checkoutEnabled(), adsEnabled(),
+		return new CatalogView(config.currency, packViews(), items, checkoutEnabled(), adsEnabled(),
 				// a pick taken off sale since this morning (made a Discord reward, hidden...) drops out right away
 				new DailyView(deals.items().stream().filter(id -> items.stream().anyMatch(i -> i.id().equals(id))).toList(), LocalDate.now(ZoneOffset.UTC).plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()),
-				bundles(), new PlusOffer(config.plus.price, config.plus.monthlyCoins, config.plus.periodDays, config.plus.trialDays, config.plus.yearlyPrice), launchOffer(),
-				partnerCodesLive() ? 0 : null);
+				bundles(), plusOffer(), launchOffer(), partnerCodesLive() ? 0 : null, saleView());
 	}
 
 	// ---- Daily picks & bundles ----
@@ -768,6 +883,17 @@ public final class StoreService {
 		if (packageId == 0) {
 			throw new StoreException(503, "Velo+ isn't set up in the Tebex webstore yet");
 		}
+		if (salePlusPercent() > 0) {
+			try {
+				return new PlusCheckoutView(tebex.createSubscriptionCheckout(uuid, username, packageId,
+						publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?plus=1", yearly, config.sale.tebexCoupon).checkoutUrl());
+			} catch (Exception e) {
+				salePlusOk = false;
+				saleCheckedAt = System.currentTimeMillis();
+				System.out.println("[store] Velo+ sale checkout failed: " + e.getMessage());
+				throw new StoreException(503, "The " + config.sale.name + " price couldn't be applied right now - try again in a minute");
+			}
+		}
 		TebexCheckout.Basket basket = tebex.createSubscriptionCheckout(uuid, username, packageId,
 				publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?plus=1", yearly);
 		return new PlusCheckoutView(basket.checkoutUrl());
@@ -905,7 +1031,22 @@ public final class StoreService {
 		}
 		String orderId = "vo_" + randomHex(12);
 		TebexCheckout.Basket basket;
-		if (code != null) {
+		int saleOff = saleCoinsPercent();
+		if (saleOff > 0) {
+			// The sale beats a partner code (they don't stack); the webhook checks against the sale price.
+			StoreConfig.Sale sale = config.sale;
+			db.createOrder(orderId, uuid, pack, config.currency, "SALE:" + sale.id, codePrice(pack.price(), saleOff));
+			try {
+				basket = tebex.createCheckout(orderId, uuid, username, packageId,
+						publicUrl + "/store/done?cancelled=1", publicUrl + "/store/done?order=" + orderId, sale.tebexCoupon, false, "SALE:" + sale.id);
+			} catch (Exception e) {
+				db.flagOrder(orderId, "failed", null);
+				saleCoinsOk = false;
+				saleCheckedAt = System.currentTimeMillis();
+				System.out.println("[store] Sale checkout failed: " + e.getMessage());
+				throw new StoreException(503, "The " + sale.name + " price couldn't be applied right now - try again in a minute");
+			}
+		} else if (code != null) {
 			// The webhook's "paid at least the price" check then runs against the discounted price.
 			db.createOrder(orderId, uuid, pack, config.currency, code.code(), codePrice(pack.price(), code.percent()));
 			try {

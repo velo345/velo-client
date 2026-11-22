@@ -45,7 +45,7 @@ public final class HideFoliageModule extends AbstractModule implements Configura
 	public HideFoliageModule() {
 		super("hide-foliage", "Hide Foliage",
 				"Hides grass, ferns, dry grass, bushes, seagrass, nether sprouts and roots, leaf litter and more - clearer views and fewer polygons.",
-				ModuleCategory.RENDERING, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.RENDERING, SafetyTag.CHECK_SERVER_RULES, false);
 		instance = this;
 	}
 

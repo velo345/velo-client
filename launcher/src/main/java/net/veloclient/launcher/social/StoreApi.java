@@ -103,6 +103,22 @@ public final class StoreApi {
 
 	public static JsonObject catalog() throws StoreError {
 		JsonObject catalog = get("/v1/store/catalog");
+		if (DEMO && Boolean.getBoolean("velo.tourSale")) {
+			// Tour-only: a running 50% sale on the demo packs and Velo+ (the sale strip, pop-up and crossed-out prices).
+			catalog = catalog.deepCopy();
+			long now = System.currentTimeMillis();
+			JsonObject sale = com.google.gson.JsonParser.parseString("{\"id\":\"tour_sale\",\"name\":\"Black Friday\",\"percent\":50,\"active\":true,"
+					+ "\"coins\":true,\"plus\":true,\"from\":" + (now - 3_600_000L) + ",\"until\":" + (now + 4L * 86_400_000L) + "}").getAsJsonObject();
+			catalog.add("sale", sale);
+			for (var e : catalog.getAsJsonArray("coinPacks")) {
+				JsonObject pack = e.getAsJsonObject();
+				double full = pack.get("price").getAsDouble();
+				pack.addProperty("fullPrice", full);
+				pack.addProperty("price", Math.round(full * 50) / 100.0);
+			}
+			catalog.add("plus", com.google.gson.JsonParser.parseString("{\"price\":5.0,\"fullPrice\":9.99,\"yearlyPrice\":50.0,\"fullYearlyPrice\":99.99,"
+					+ "\"monthlyCoins\":2000,\"periodDays\":30,\"trialDays\":7}"));
+		}
 		if (catalog.has("items") && catalog.get("items").isJsonArray()) {
 			java.util.Map<String, Integer> map = new java.util.HashMap<>();
 			java.util.Map<String, Integer> full = new java.util.HashMap<>();
@@ -200,6 +216,70 @@ public final class StoreApi {
 		balance = order.get("balance").getAsInt();
 		fireWallet();
 		return order;
+	}
+
+	// ---- Advent calendar (December 1-24, dev launcher first) ----
+
+	/** {@code -Dvelo.adventDay=N}: an owner's test calendar opens door N (the server ignores it for everyone else). */
+	private static String adventQuery() {
+		String day = System.getProperty("velo.adventDay");
+		return day == null || day.isBlank() ? "" : "?day=" + URLEncoder.encode(day.trim(), StandardCharsets.UTF_8);
+	}
+
+	/** The calendar: {@code running, preview, today, openedToday, days[{day, state, reward?}]}. */
+	public static JsonObject advent() throws StoreError {
+		if (DEMO) {
+			return adventDemo(false);
+		}
+		return get("/v1/advent" + adventQuery());
+	}
+
+	/** Opens today's door; the answer carries {@code reward} (and the balance) on top of the calendar. */
+	public static JsonObject openAdvent() throws StoreError {
+		if (DEMO) {
+			return adventDemo(true); // a tour never claims a real reward
+		}
+		JsonObject result = trackBalance(post("/v1/advent/open" + adventQuery(), new JsonObject()));
+		if (result.has("reward") && result.getAsJsonObject("reward").has("type")
+				&& "plus".equals(result.getAsJsonObject("reward").get("type").getAsString())) {
+			refreshPlusInBackground();
+		}
+		return result;
+	}
+
+	/** Owners: closes the test calendar's doors again. */
+	public static JsonObject resetAdvent() throws StoreError {
+		return post("/v1/advent/reset" + adventQuery(), new JsonObject());
+	}
+
+	private static JsonObject adventDemo(boolean open) {
+		int today = Integer.getInteger("velo.adventDay", 21);
+		String[] rewards = {"{\"type\":\"coins\",\"amount\":150,\"name\":\"150 Coins\"}",
+				"{\"type\":\"item\",\"id\":\"wear_santa_hat\",\"itemType\":\"wear\",\"name\":\"Santa Hat\",\"amount\":1}",
+				"{\"type\":\"plus\",\"amount\":3,\"name\":\"3 days of Velo+\"}"};
+		JsonObject out = new JsonObject();
+		out.addProperty("running", true);
+		out.addProperty("preview", true);
+		out.addProperty("today", today);
+		out.addProperty("openedToday", open);
+		com.google.gson.JsonArray days = new com.google.gson.JsonArray();
+		for (int day = 1; day <= 24; day++) {
+			JsonObject d = new JsonObject();
+			d.addProperty("day", day);
+			boolean opened = day < today && day % 5 != 3 || day == today && open;
+			d.addProperty("state", opened ? "opened" : day == today ? "today" : day < today ? "missed" : "locked");
+			if (opened) {
+				d.add("reward", com.google.gson.JsonParser.parseString(day == today
+						? "{\"day\":21,\"type\":\"item\",\"id\":\"cape_silent_night\",\"itemType\":\"cape\",\"name\":\"Silent Night\",\"amount\":1,\"worth\":1900}"
+						: rewards[day % rewards.length]));
+			}
+			days.add(d);
+		}
+		out.add("days", days);
+		if (open) {
+			out.add("reward", days.get(today - 1).getAsJsonObject().get("reward"));
+		}
+		return out;
 	}
 
 	public static JsonObject rewards() throws StoreError {
@@ -649,7 +729,8 @@ public final class StoreApi {
 
 	private static JsonObject applyWallet(JsonObject wallet) {
 		balance = wallet.get("balance").getAsInt();
-		owner = wallet.has("owner") && wallet.get("owner").getAsBoolean();
+		// -Dvelo.tourNotOwner: website shots without the owner-only tabs
+		owner = wallet.has("owner") && wallet.get("owner").getAsBoolean() && !Boolean.getBoolean("velo.tourNotOwner");
 		welcomeGift = wallet.has("welcomeGift") && wallet.get("welcomeGift").getAsBoolean();
 		welcomeGiftUntil = wallet.has("welcomeGiftUntil") ? wallet.get("welcomeGiftUntil").getAsLong() : 0;
 		Set<String> items = new HashSet<>();

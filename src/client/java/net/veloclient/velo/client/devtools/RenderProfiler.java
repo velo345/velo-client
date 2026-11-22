@@ -103,6 +103,7 @@ public final class RenderProfiler {
 	public static void frameEnd() {
 		GpuPassTimer.endFrame();
 		MoveBench.frame(System.nanoTime());
+		QuadProbe.frame();
 		if (frameStart == 0) {
 			return;
 		}

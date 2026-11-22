@@ -10,17 +10,26 @@
 set -euo pipefail
 VERSION="${1:?version, e.g. 1.2.6}"; TARGET="${2:-velo-brand}"
 REPO=velo345/velo-client; ROOT=/var/www/velo-client.com/dl; LOCAL="${MIRROR_CACHE:-$HOME/.cache/velo-dl}"
-mkdir -p "$LOCAL/v$VERSION"
-gh release download "v$VERSION" --repo "$REPO" -D "$LOCAL/v$VERSION" --skip-existing
+mkdir -p "$LOCAL"
+# The server pulls every asset from GitHub itself (~16 MB/s there vs. hours of upload from a home line - the old
+# local download + rsync broke off silently more than once and the website buttons 404'd). Name + size from gh; each
+# file lands as .<name>.part and is only renamed once its size matches, so nginx never serves half a file.
+gh release view "v$VERSION" --repo "$REPO" --json assets -q '.assets[] | "v'"$VERSION"' \(.name) \(.size)"' > "$LOCAL/assets-$VERSION.txt"
 # the 1.8.9 mod stays on its own version (site.config release.legacyMod): carry it into every mirrored version folder
 LEGACY=$(node -e 'process.stdout.write(require(process.argv[1]).release.legacyMod||"")' "$(realpath "$(dirname "$0")/../../velo-site/site.config.json")")
-if [[ -n "$LEGACY" && ! -e "$LOCAL/v$VERSION/$LEGACY" ]]; then
-  TAG=$(gh release list --repo "$REPO" --limit 30 --json tagName -q '.[].tagName' | while read -r t; do
-    gh release view "$t" --repo "$REPO" --json assets -q '.assets[].name' | grep -qxF "$LEGACY" && { echo "$t"; break; }; done)
-  [[ -n "$TAG" ]] && gh release download "$TAG" --repo "$REPO" -p "$LEGACY" -D "$LOCAL/v$VERSION"
+if [[ -n "$LEGACY" ]] && ! grep -q " $LEGACY " "$LOCAL/assets-$VERSION.txt"; then
+  gh release list --repo "$REPO" --limit 30 --json tagName -q '.[].tagName' | while read -r t; do
+    line=$(gh release view "$t" --repo "$REPO" --json assets -q '.assets[] | "'"$t"' \(.name) \(.size)"' | grep -F " $LEGACY " || true)
+    [[ -n "$line" ]] && { echo "$line" >> "$LOCAL/assets-$VERSION.txt"; break; }; done
 fi
-ssh "$TARGET" "mkdir -p '$ROOT/v$VERSION'"
-rsync -rlptz --partial --chmod=D2775,F664 "$LOCAL/v$VERSION/" "$TARGET:$ROOT/v$VERSION/"
+scp -q "$LOCAL/assets-$VERSION.txt" "$TARGET:/tmp/velo-mirror-assets.txt"
+ssh "$TARGET" "mkdir -p '$ROOT/v$VERSION' && cd '$ROOT/v$VERSION' && fail=0 && while read -r tag n s; do
+  [ -f \"\$n\" ] && [ \"\$(stat -c%s \"\$n\")\" = \"\$s\" ] && continue
+  url=\"https://github.com/$REPO/releases/download/\$tag/\$(printf %s \"\$n\" | sed 's/+/%2B/g')\"
+  if curl -sfL --retry 3 -o \".\$n.part\" \"\$url\" && [ \"\$(stat -c%s \".\$n.part\")\" = \"\$s\" ]; then
+    chmod 664 \".\$n.part\" && mv \".\$n.part\" \"\$n\" && echo \"  mirrored \$n\"
+  else rm -f \".\$n.part\"; echo \"  FAILED \$n\"; fail=1; fi
+done < /tmp/velo-mirror-assets.txt; chgrp -R velo . 2>/dev/null; exit \$fail"
 # Only the newest 3 releases stay mirrored (each is ~2.6 GB; the launcher only ever downloads the latest)
 ssh "$TARGET" "cd '$ROOT' && ls -1d v*/ 2>/dev/null | sed 's#/##' | sort -V | head -n -3 | xargs -r rm -rf --"
 # releases.json: every version folder on the server, newest first

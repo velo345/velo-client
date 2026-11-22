@@ -65,6 +65,41 @@ public final class ClipRecorder {
 	private static volatile boolean active;
 	private static volatile int fps = 24;
 	private static volatile int maxHeight = 480;
+	/**
+	 * Steps the recording height down while the encoders can't keep up (a weak CPU / laptop): frames dropped at a full
+	 * queue made clips choppy (2026-11-22, an Intel HD 4600 laptop). Never below 360p; reset when the settings change.
+	 */
+	private static volatile int adaptiveHeight = Integer.MAX_VALUE;
+	private static int wanted;
+	private static int dropped;
+	private static long windowStart;
+
+	private static int height() {
+		return Math.min(maxHeight, adaptiveHeight);
+	}
+
+	/** Counts a frame that was due: {@code ok} = captured, else dropped at a full queue. Every 3 s, steps down if needed. */
+	private static void track(boolean ok, long now) {
+		wanted++;
+		if (!ok) {
+			dropped++;
+		}
+		if (windowStart == 0) {
+			windowStart = now;
+		}
+		if (now - windowStart < 3_000_000_000L) {
+			return;
+		}
+		int current = height();
+		if (wanted >= 10 && dropped * 4 > wanted && current > 360) {
+			int next = current > 540 ? 540 : current > 480 ? 480 : 360;
+			adaptiveHeight = next;
+			VeloClient.LOGGER.info("Clips: the encoders can't keep up ({} of {} frames dropped) - recording at {}p instead", dropped, wanted, next);
+		}
+		wanted = 0;
+		dropped = 0;
+		windowStart = now;
+	}
 	private static volatile int seconds = 30;
 	private static volatile float quality = 0.75f;
 	private static long nextCaptureNanos;
@@ -78,6 +113,7 @@ public final class ClipRecorder {
 	public static void configure(boolean enabled, int framesPerSecond, int height, int lengthSeconds, float jpegQuality) {
 		fps = Math.max(5, Math.min(60, framesPerSecond));
 		maxHeight = Math.max(240, height);
+		adaptiveHeight = Integer.MAX_VALUE;
 		seconds = Math.max(5, Math.min(120, lengthSeconds));
 		quality = Math.max(0.3f, Math.min(0.95f, jpegQuality));
 		if (active && !enabled) {
@@ -129,9 +165,16 @@ public final class ClipRecorder {
 			return;
 		}
 		long now = System.nanoTime();
-		if (now < nextCaptureNanos || QUEUED.get() >= 4) {
+		if (now < nextCaptureNanos) {
 			return;
 		}
+		if (QUEUED.get() >= 4) {
+			long skip = 1_000_000_000L / fps;
+			nextCaptureNanos = Math.max(nextCaptureNanos + skip, now - skip);   // one count per due frame, not per rendered one
+			track(false, now);
+			return;
+		}
+		track(true, now);
 		long interval = 1_000_000_000L / fps;
 		nextCaptureNanos = Math.max(nextCaptureNanos + interval, now - interval);
 		try {
@@ -150,7 +193,7 @@ public final class ClipRecorder {
 						QUEUED.decrementAndGet();
 					}
 				});
-			}, maxHeight);
+			}, height());
 		} catch (Throwable t) {
 			// A GPU hiccup must never take the frame down with it; stop instead of failing every frame.
 			VeloClient.LOGGER.warn("Clip recording stopped: frame capture failed", t);
@@ -159,7 +202,7 @@ public final class ClipRecorder {
 	}
 
 	private static void encode(ByteBuffer rgba, int width, int height, long stamp) throws IOException {
-		int outH = Math.min(height, maxHeight);
+		int outH = Math.min(height, height());
 		int outW = Math.max(2, Math.round(width * (outH / (float) height)) & ~1);
 		outH &= ~1;
 		int bytes = width * height * 4;

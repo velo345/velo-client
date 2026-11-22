@@ -168,6 +168,15 @@ public final class StoreDatabase implements AutoCloseable {
 						uuid TEXT PRIMARY KEY,
 						granted_by TEXT,
 						granted_at INTEGER NOT NULL)""");
+			// The Advent calendar: one row per opened door (the primary key stops a second claim of the same day).
+			st.execute("""
+					CREATE TABLE IF NOT EXISTS advent_claims (
+						uuid TEXT NOT NULL,
+						year INTEGER NOT NULL,
+						day INTEGER NOT NULL,
+						reward TEXT NOT NULL,
+						claimed_at INTEGER NOT NULL,
+						PRIMARY KEY (uuid, year, day))""");
 			st.execute("""
 					CREATE TABLE IF NOT EXISTS wishlist (
 						uuid TEXT NOT NULL,
@@ -516,6 +525,49 @@ public final class StoreDatabase implements AutoCloseable {
 			adjustInTx(uuid, 0, reason, itemId, null);
 			return "ok";
 		});
+	}
+
+	// ---- Advent calendar ----
+
+	/** The doors {@code uuid} opened in {@code year}: day -> reward JSON. */
+	public synchronized java.util.Map<Integer, String> adventClaims(String uuid, int year) throws SQLException {
+		java.util.Map<Integer, String> claims = new java.util.TreeMap<>();
+		try (PreparedStatement ps = connection.prepareStatement("SELECT day, reward FROM advent_claims WHERE uuid = ? AND year = ?")) {
+			ps.setString(1, uuid);
+			ps.setInt(2, year);
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					claims.put(rs.getInt(1), rs.getString(2));
+				}
+			}
+		}
+		return claims;
+	}
+
+	/** Marks a door as opened; false when it already was (a double click, a second device). */
+	public synchronized boolean claimAdvent(String uuid, int year, int day, String reward) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement(
+				"INSERT OR IGNORE INTO advent_claims(uuid, year, day, reward, claimed_at) VALUES(?, ?, ?, ?, ?)")) {
+			ps.setString(1, uuid);
+			ps.setInt(2, year);
+			ps.setInt(3, day);
+			ps.setString(4, reward);
+			ps.setLong(5, System.currentTimeMillis());
+			return ps.executeUpdate() == 1;
+		}
+	}
+
+	/** Takes an opened door back (its reward failed to arrive, or the owner resets their test calendar). */
+	public synchronized void unclaimAdvent(String uuid, int year, Integer day) throws SQLException {
+		try (PreparedStatement ps = connection.prepareStatement(day == null
+				? "DELETE FROM advent_claims WHERE uuid = ? AND year = ?" : "DELETE FROM advent_claims WHERE uuid = ? AND year = ? AND day = ?")) {
+			ps.setString(1, uuid);
+			ps.setInt(2, year);
+			if (day != null) {
+				ps.setInt(3, day);
+			}
+			ps.executeUpdate();
+		}
 	}
 
 	public synchronized boolean grantItem(String uuid, String itemId, String actor) throws SQLException {

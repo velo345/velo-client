@@ -1367,6 +1367,14 @@ public final class StoreView {
 			String symbol = currency.equals("EUR") ? "€" : currency.equals("USD") ? "$" : currency;
 			int coins = result.get("monthlyCoins").getAsInt();
 			price.setText(String.format(Locale.ROOT, "%.2f %s", amount, symbol));
+			if (result.has("fullPrice") && !result.get("fullPrice").isJsonNull()) {
+				// A sale (Black Friday): the first payment is cheaper - show what it costs after, crossed out next to it.
+				double full = result.get("fullPrice").getAsDouble();
+				Node was = SaleUi.struck(String.format(Locale.ROOT, "%.2f %s", full, symbol), 20);
+				priceRow.getChildren().add(0, was);
+				per.setText("first month · then " + String.format(Locale.ROOT, "%.2f %s", full, symbol) + " · cancel any time");
+				price.setStyle(price.getStyle() + "-fx-text-fill: #FF6B6F;");
+			}
 			if (coinsLabel != null) {
 				coinsLabel.setText(StoreTiles.format(coins) + " Velo Coins every month");
 			}

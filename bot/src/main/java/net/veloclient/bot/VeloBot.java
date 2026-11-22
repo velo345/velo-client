@@ -91,6 +91,9 @@ public final class VeloBot extends ListenerAdapter {
 		new StaffBridge(jda, config, bot.tickets, bot.staff, adminToken).start(env("BOT_BRIDGE_BIND", "127.0.0.1"),
 				Integer.parseInt(env("BOT_BRIDGE_PORT", "8792")));
 		System.out.println("Velo bot online as " + jda.getSelfUser().getName());
+		// Partner servers add the bot with no permissions at all - it's only there to be seen (HomeGuild keeps it idle there).
+		System.out.println("Partner invite (no permissions): https://discord.com/oauth2/authorize?client_id="
+				+ jda.getSelfUser().getApplicationId() + "&scope=bot&permissions=0");
 	}
 
 	private static String env(String name, String fallback) {
@@ -135,6 +138,7 @@ public final class VeloBot extends ListenerAdapter {
 				new SubcommandData("support-role", "The role that handles every ticket").addOptions(new OptionData(OptionType.ROLE, "role", "The role", true)),
 				new SubcommandData("linked-role", "A role for members who linked their Minecraft account").addOptions(new OptionData(OptionType.ROLE, "role", "The role", true)),
 				new SubcommandData("vip-role", "The VIP role of Velo+ members (given and taken away automatically)").addOptions(new OptionData(OptionType.ROLE, "role", "The role", true)),
+				new SubcommandData("og-role", "The OG role for players who got Velo in its first two weeks (given automatically)").addOptions(new OptionData(OptionType.ROLE, "role", "The role", true)),
 				new SubcommandData("webhooks", "Create the server's webhooks (the URLs go in the Velo server's settings)").addOptions(
 						new OptionData(OptionType.CHANNEL, "donations", "Channel for purchase announcements", false),
 						new OptionData(OptionType.CHANNEL, "reports", "Channel for bug / crash reports", false),
@@ -211,6 +215,10 @@ public final class VeloBot extends ListenerAdapter {
 
 	@Override
 	public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
+		if (!HomeGuild.is(event.getGuild())) {
+			event.reply("Velo's commands work on the Velo Client Discord - discord.gg/tGwn8RsMpv").setEphemeral(true).queue();
+			return;
+		}
 		try {
 			String sub = event.getSubcommandName();
 			switch (event.getName()) {
@@ -236,6 +244,9 @@ public final class VeloBot extends ListenerAdapter {
 
 	@Override
 	public void onMessageReceived(MessageReceivedEvent event) {
+		if (!HomeGuild.is(event.getGuild())) {
+			return; // partner servers: the bot is just there (boosting them must never pay out Velo+)
+		}
 		if (honeypot.onMessage(event) || boosters.onMessage(event)) {
 			return;
 		}
@@ -586,6 +597,15 @@ public final class VeloBot extends ListenerAdapter {
 					vip.runNow();
 				}
 			}
+			case "og-role" -> {
+				config.ogRoleId = event.getOption("role").getAsRole().getId();
+				config.save();
+				event.reply("<@&" + config.ogRoleId + "> is the OG role now: everyone who got Velo in its first two weeks and linked their Discord gets it. "
+						+ "Checked every minute. Move my role above it in the server settings.").setEphemeral(true).queue();
+				if (vip != null) {
+					vip.runNow();
+				}
+			}
 			case "staff-role" -> {
 				Role role = event.getOption("role").getAsRole();
 				String level = event.getOption("level").getAsString();
@@ -678,6 +698,7 @@ public final class VeloBot extends ListenerAdapter {
 					.addField("Support role", config.supportRoleId == null ? "not set" : "<@&" + config.supportRoleId + ">", true)
 					.addField("Linked role", config.linkedRoleId == null ? "not set" : "<@&" + config.linkedRoleId + ">", true)
 					.addField("VIP role (Velo+)", config.vipRoleId == null ? "not set" : "<@&" + config.vipRoleId + ">", true)
+					.addField("OG role", config.ogRoleId == null ? "not set" : "<@&" + config.ogRoleId + ">", true)
 					.addField("Ticket types", String.valueOf(config.ticketTypes.size()), true).addField("Ping roles", String.valueOf(config.roles.size()), true)
 					.addField("Open tickets", String.valueOf(config.tickets.size()), true)
 					.addField("Staff roles", config.staffRoles.isEmpty() ? "not set" : String.join("\n", config.staffRoles.entrySet().stream()
@@ -717,6 +738,9 @@ public final class VeloBot extends ListenerAdapter {
 
 	@Override
 	public void onCommandAutoCompleteInteraction(CommandAutoCompleteInteractionEvent event) {
+		if (!HomeGuild.is(event.getGuild())) {
+			return;
+		}
 		if (event.getName().equals("giveaway") && event.getFocusedOption().getName().equals("prize") && giveaways != null) {
 			giveaways.autocomplete(event);
 		}
@@ -726,6 +750,9 @@ public final class VeloBot extends ListenerAdapter {
 
 	@Override
 	public void onButtonInteraction(ButtonInteractionEvent event) {
+		if (!HomeGuild.is(event.getGuild())) {
+			return;
+		}
 		String id = event.getComponentId();
 		if (id.startsWith(RolePanel.PREFIX)) {
 			RolePanel.toggle(event);
@@ -744,6 +771,9 @@ public final class VeloBot extends ListenerAdapter {
 
 	@Override
 	public void onModalInteraction(ModalInteractionEvent event) {
+		if (!HomeGuild.is(event.getGuild())) {
+			return;
+		}
 		if (event.getModalId().startsWith(Tickets.MODAL)) {
 			tickets.open(event);
 		} else if (event.getModalId().equals(Tickets.CLOSE_MODAL)) {
@@ -753,33 +783,42 @@ public final class VeloBot extends ListenerAdapter {
 
 	@Override
 	public void onGuildMemberJoin(GuildMemberJoinEvent event) {
+		if (!HomeGuild.is(event.getGuild())) {
+			return;
+		}
 		welcomer.onJoin(event.getGuild(), event.getMember());
 	}
 
 	/** Leaving the server or losing a staff role ends staff perks right away instead of at the next 5-minute sync. */
 	@Override
 	public void onGuildMemberRemove(GuildMemberRemoveEvent event) {
-		if (staff != null) {
+		if (staff != null && HomeGuild.is(event.getGuild())) {
 			staff.soon();
 		}
 	}
 
 	@Override
 	public void onGuildMemberRoleRemove(GuildMemberRoleRemoveEvent event) {
-		if (staff != null && event.getRoles().stream().anyMatch(r -> config.staffRoles.containsKey(r.getId()) || config.plusRoles.containsKey(r.getId()))) {
+		if (staff != null && HomeGuild.is(event.getGuild()) && event.getRoles().stream().anyMatch(r -> config.staffRoles.containsKey(r.getId()) || config.plusRoles.containsKey(r.getId()))) {
 			staff.soon();
 		}
 	}
 
 	@Override
 	public void onGuildMemberRoleAdd(GuildMemberRoleAddEvent event) {
-		if (staff != null && event.getRoles().stream().anyMatch(r -> config.staffRoles.containsKey(r.getId()) || config.plusRoles.containsKey(r.getId()))) {
+		if (staff != null && HomeGuild.is(event.getGuild()) && event.getRoles().stream().anyMatch(r -> config.staffRoles.containsKey(r.getId()) || config.plusRoles.containsKey(r.getId()))) {
 			staff.soon();
 		}
 	}
 
 	@Override
 	public void onReady(ReadyEvent event) {
-		System.out.println("Connected - " + event.getGuildAvailableCount() + " server(s)");
+		System.out.println("Connected - " + event.getGuildAvailableCount() + " server(s), home " + HomeGuild.ID);
+	}
+
+	@Override
+	public void onGuildJoin(net.dv8tion.jda.api.events.guild.GuildJoinEvent event) {
+		System.out.println("Added to " + event.getGuild().getName() + " (" + event.getGuild().getId() + ", "
+				+ event.getGuild().getMemberCount() + " members)" + (HomeGuild.is(event.getGuild()) ? " - home" : " - partner, idle"));
 	}
 }

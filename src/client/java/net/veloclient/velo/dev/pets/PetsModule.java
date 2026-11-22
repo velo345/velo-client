@@ -1,6 +1,11 @@
 package net.veloclient.velo.dev.pets;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.util.InputUtil;
+import net.veloclient.velo.client.keybind.KeybindConfig;
+import net.veloclient.velo.client.keybind.VeloKeybinds;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.veloclient.velo.client.pvp.PvpCompat;
@@ -46,15 +51,34 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 
 	private static PetsModule instance;
 
+	/** Sit & stay / come back, and a trick on command (both unbound until you pick a key). */
+	public static final KeyBinding STAY_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.velo-client.pet_stay",
+			InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
+	public static final KeyBinding TRICK_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.velo-client.pet_trick",
+			InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
+
+	/** Sit & stay (this session only), and the last trick asked for: "trick" / "cheer" with a running number. */
+	private boolean staying;
+	private String lastAct = "";
+	private int actSeq;
+	private boolean emoteAlong = true;
+	/** Other players' pet commands (dashless uuid -> "stay;act;seq"), and the last seq each remote pet acted on. */
+	private static volatile Map<String, String> remoteActs = Map.of();
+	private static final Map<String, Integer> REMOTE_SEEN = new HashMap<>();
+
 	/** The pet you picked ("" = none) - kept per account in config/accounts/<uuid>/pets.json, shared with the launcher's Locker. */
 	private static String pet = readPet();
 	private static long petStamp;
 	private double size = 1.0;
 	private String hitReaction = "Not In PvP Fights";
 	private boolean celebrateKills = true;
+	/** Hide every pet (yours and others') while you're fighting: a hit dealt or taken in the last 6 seconds. */
+	private boolean hideWhileFighting = true;
+	private static volatile long fightNanos;
 	private boolean tricks = true;
 	private double sleepAfter = 45;
-	private boolean hideFirstPerson = true;
+	/** Shown in first person too, at its normal spot (renamed from hideFirstPerson so everyone gets the new default). */
+	private boolean showInFirstPerson = true;
 	/** Other Velo players' pets around you (from the online list). */
 	private boolean showOthers = true;
 	/** Other players' pets: uuid -> pet id (online list) and uuid -> its brain (only for players drawn this frame). */
@@ -134,7 +158,7 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 		setPet(id);
 		m.setEnabled(id != null);
 		m.ride = ride;
-		m.hideFirstPerson = false;
+		m.showInFirstPerson = true;
 		m.shape = null;
 		m.brain = null;
 	}
@@ -160,11 +184,14 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 	/** Everything to draw this frame: your pet, then other Velo players' pets near you. Render thread. */
 	static List<Frame> frames() {
 		List<Frame> out = new java.util.ArrayList<>();
-		Frame own = frame();
+		Frame own = frame();   // still updated while hidden, so it's in the right place when it comes back
+		PetsModule m = instance;
+		if (m != null && m.hideWhileFighting && fightNanos != 0 && System.nanoTime() - fightNanos < 6_000_000_000L) {
+			return out;
+		}
 		if (own != null) {
 			out.add(own);
 		}
-		PetsModule m = instance;
 		if (m != null && m.isEnabled() && m.showOthers && (!remotePets.isEmpty() || !npcPets.isEmpty())) {
 			others(m, out);
 		} else if (!REMOTE_BRAINS.isEmpty()) {
@@ -219,12 +246,30 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 			REMOTE_LAST.put(key, now);
 			double ground = groundFor(brain, pos);
 			brain.ride(0, 0, 0);
+			String act = remoteActs.get(key);
+			if (act != null) {
+				String[] parts = act.split(";");
+				brain.stay(parts.length > 0 && "1".equals(parts[0]));
+				if (parts.length > 2) {
+					try {
+						int seq = Integer.parseInt(parts[2]);
+						Integer seen = REMOTE_SEEN.put(key, seq);
+						if (seen != null && seen != seq && !"none".equals(parts[1])) {
+							brain.act(parts[1]);   // only new commands - not the one they did before you came by
+						}
+					} catch (NumberFormatException ignored) {
+						// malformed: ignore
+					}
+				}
+			}
+			brain.emoting(net.veloclient.velo.client.emotes.Emotes.playing(key));
 			brain.update(dt, pos[0], pos[1], pos[2], bodyYaw(other), other.getYaw(), (float) m.size, ground, m, 0f);
 			out.add(new Frame(brain, pos[0], pos[1], pos[2], (float) (pos[0] - cam[0]), (float) (pos[1] - cam[1]), (float) (pos[2] - cam[2]),
 					id.equals("mini") ? skinTexture(other) : null));
 		}
 		REMOTE_BRAINS.keySet().retainAll(drawn);
 		REMOTE_LAST.keySet().retainAll(drawn);
+		REMOTE_SEEN.keySet().retainAll(drawn);
 	}
 
 	/**
@@ -308,20 +353,27 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 		net.veloclient.velo.client.network.VeloServerClient.HEARTBEAT_EXTRAS.add(body -> {
 			if (isEnabled() && !pet.isEmpty() && owns(pet)) {
 				body.addProperty("pet", pet);
+				body.addProperty("petAct", (staying ? "1" : "0") + ";" + (lastAct.isEmpty() ? "none" : lastAct) + ";" + actSeq);
 			}
 		});
 		net.veloclient.velo.client.network.VeloServerClient.ONLINE_LISTENERS.add(users -> {
 			Map<String, String> next = new HashMap<>();
+			Map<String, String> acts = new HashMap<>();
 			for (var element : users) {
 				var user = element.getAsJsonObject();
+				if (user.has("petAct") && !user.get("petAct").isJsonNull() && user.has("uuid")) {
+					acts.put(user.get("uuid").getAsString().replace("-", "").toLowerCase(java.util.Locale.ROOT), user.get("petAct").getAsString());
+				}
 				if (user.has("pet") && !user.get("pet").isJsonNull() && user.has("uuid") && PETS.containsKey(user.get("pet").getAsString())) {
 					next.put(user.get("uuid").getAsString().replace("-", "").toLowerCase(java.util.Locale.ROOT), user.get("pet").getAsString());
 				}
 			}
 			remotePets = next;
+			remoteActs = acts;
 		});
 		PvpCompat.onLocalAttack(id -> {
 			attacked.put(id, tick);
+			fightNanos = System.nanoTime();
 			if (PvpCompat.isPlayer(PvpCompat.entityById(id))) {
 				lastPlayerHitTick = tick;
 			}
@@ -341,6 +393,12 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 	/** Kill and hit reactions, read from plain client state each tick. */
 	private void onTick() {
 		tick++;
+		while (STAY_KEY.wasPressed()) {
+			toggleStay();
+		}
+		while (TRICK_KEY.wasPressed()) {
+			doTrick("trick");
+		}
 		if (tick % 20 == 0) {   // picked in the dev launcher's Locker meanwhile?
 			try {
 				long stamp = java.nio.file.Files.exists(petFile()) ? java.nio.file.Files.getLastModifiedTime(petFile()).toMillis() : 0;
@@ -373,6 +431,9 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 		});
 		// a hit: the hurt animation starting
 		int hurt = PvpCompat.hurtTime(self);
+		if (hurt > lastHurt && lastHurt == 0) {
+			fightNanos = System.nanoTime();
+		}
 		if (hurt > lastHurt && lastHurt == 0 && !brain.busyWith("kill") && reactsToHit()) {
 			brain.play("hit");
 		}
@@ -435,7 +496,7 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 		long now = System.nanoTime();
 		// Hidden in first person (not riding): nobody sees the pose, it only has to keep following - 60 Hz is plenty
 		// (it used to run its whole animation every frame, ~2% of the render thread at high FPS).
-		if (net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo && m.hideFirstPerson && !m.ride && firstPerson() && m.lastNanos != 0 && now - m.lastNanos < 16_000_000L) {
+		if (net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo && !m.showInFirstPerson && !m.ride && firstPerson() && m.lastNanos != 0 && now - m.lastNanos < 16_000_000L) {
 			return null;
 		}
 		float dt = m.lastNanos == 0 ? 0.016f : (now - m.lastNanos) / 1e9f;
@@ -469,14 +530,24 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 			PetRenderer.rideShape = null;
 		}
 		m.brain.ride(rideOffX, rideLift, rideOffZ);
+		m.brain.stay(m.staying && !riding);
+		m.brain.front(false); // its normal spot beside/behind you, also in first person - ahead of you it got in the way
+		m.brain.emoting(m.emoteAlong && net.veloclient.velo.client.emotes.Emotes.localEmote() != null);
 		m.brain.update(dt, pos[0], pos[1], pos[2], bodyYaw(self), self.getYaw(), (float) m.size, ground, m, riding ? m.rideScale : 0f);
 		double[] cam = PvpCompat.cameraPos();
-		if (m.hideFirstPerson && firstPerson()) {
+		if (!m.showInFirstPerson && firstPerson()) {
 			// you'd only see it clip through the camera when you turn - F5 shows it. Riding still needs its shape once.
 			if (riding && m.shape == null) {
 				PetRenderer.build(m.brain, (float) (pos[0] - cam[0]), (float) (pos[1] - cam[1]), (float) (pos[2] - cam[2]));
 			}
 			return null;
+		}
+		if (!riding && firstPerson()) {
+			// shown in first person: skip the frames where it's right at the camera (turning around would clip through it)
+			double[] at = m.brain.position();
+			if (at != null && Math.hypot(at[0] - cam[0], at[2] - cam[2]) < 0.8 && Math.abs(at[1] - cam[1]) < 1.4) {
+				return null;
+			}
 		}
 		return new Frame(m.brain, pos[0], pos[1], pos[2], (float) (pos[0] - cam[0]), (float) (pos[1] - cam[1]), (float) (pos[2] - cam[2]),
 				id.startsWith("mini") ? skinTexture(self) : null);
@@ -547,12 +618,32 @@ public final class PetsModule extends AbstractModule implements Configurable, Pe
 		*///?}
 	}
 
+	/** Sit & stay where it is / come back. Others see it too (heartbeat). */
+	public void toggleStay() {
+		staying = !staying;
+		net.veloclient.velo.client.network.VeloServerClient.syncSoon();
+	}
+
+	/** "trick" (its special move) or "cheer" (its celebration) - shown to others too. */
+	public void doTrick(String what) {
+		if (brain != null) {
+			brain.act(what);
+		}
+		lastAct = what;
+		actSeq = (actSeq + 1) % 100000;
+		net.veloclient.velo.client.network.VeloServerClient.syncSoon();
+	}
+
 	@Override
 	public List<ConfigField> configFields() {
 		// which pet: the Locker's Pets tab (in game and in the dev launcher)
 		return List.of(
 				new ConfigField.ToggleField("Ride Your Pet (Beta)", () -> ride, v -> ride = v),
-				new ConfigField.ToggleField("Hide It In First Person (F5 shows it)", () -> hideFirstPerson, v -> hideFirstPerson = v),
+				new ConfigField.ToggleField("Show It In First Person", () -> showInFirstPerson, v -> showInFirstPerson = v),
+				new ConfigField.ToggleField("Hide All Pets While Fighting", () -> hideWhileFighting, v -> hideWhileFighting = v),
+				new ConfigField.ToggleField("Joins In When You Emote", () -> emoteAlong, v -> emoteAlong = v),
+				KeybindConfig.field("Sit & Stay / Come Back Key", STAY_KEY),
+				KeybindConfig.field("Trick Key", TRICK_KEY),
 				new ConfigField.ToggleField("Show Other Players' Pets", () -> showOthers, v -> showOthers = v),
 				new ConfigField.SliderField("Size", 0.5, 1.5, () -> size, v -> size = Math.round(v * 20) / 20.0, v -> Math.round(v * 100) + "%"),
 				new ConfigField.ChoiceField("React When You're Hit", HIT_OPTIONS, () -> hitReaction, v -> hitReaction = v),

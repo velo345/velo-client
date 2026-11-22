@@ -14,6 +14,18 @@ public interface GpuCosmeticsPipelinesAccessor {
 	static com.mojang.blaze3d.pipeline.RenderPipeline.Snippet velo$globals() {
 		throw new AssertionError();
 	}
+
+	// vanilla's item pipelines' base (bind groups, ENTITY vertices, depth) - GpuHeldMeshes builds its pipelines on it
+	@Accessor("ITEM_SNIPPET")
+	static com.mojang.blaze3d.pipeline.RenderPipeline.Snippet velo$heldBase() {
+		throw new AssertionError();
+	}
+
+	// vanilla's entity pipelines' base - GpuModelMeshes builds its entity_translucent twin on it
+	@Accessor("ENTITY_SNIPPET")
+	static com.mojang.blaze3d.pipeline.RenderPipeline.Snippet velo$entityBase() {
+		throw new AssertionError();
+	}
 }
 *///?} else if >=26.3 {
 /*@Mixin(net.minecraft.client.renderer.RenderPipelines.class)

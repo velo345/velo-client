@@ -285,8 +285,8 @@ public final class NoteEditScreen extends VeloWindow {
 			hits.add(VeloUi.pill(context, px, by, bw, 18, busy ? "Saving..." : isNew ? "Save note" : "Save changes", 1, mouseX, mouseY, this::save));
 		}
 		hits.add(VeloUi.pill(context, px, by + 22, bw, 16, "Show me where it is", 0, mouseX, mouseY, () -> {
-			StorageHighlight.block(NoteStore.worldKey() == null ? null : draft.world, draft.dim, (int) Math.floor(draft.x), (int) Math.floor(draft.y),
-					(int) Math.floor(draft.z), null, draft.displayTitle(), null);
+			StorageHighlight.point(NoteStore.worldKey() == null ? null : draft.world, draft.dim, draft.x, draft.y, draft.z, draft.displayTitle(),
+					draft.id);
 			if (draft.world != null && draft.world.equals(NoteStore.worldKey())) {
 				closeToGame();
 			} else {
@@ -294,6 +294,11 @@ public final class NoteEditScreen extends VeloWindow {
 			}
 		}));
 		hits.add(VeloUi.pill(context, px, by + 42, bw, 16, "All notes", 0, mouseX, mouseY, () -> this.client.setScreen(new NotesListScreen(null))));
+		// Delete sits here for every note you own (it used to be only on the Share tab, and missing for notes shared with
+		// friends or picked people).
+		if (draft.mine && !isNew) {
+			deleteButton(context, px, by + 62, bw, mouseX, mouseY);
+		}
 	}
 
 	/** Height of the "Note / Picture / Whiteboard" row on top of the Note tab (only the owner picks the kind). */
@@ -649,7 +654,6 @@ public final class NoteEditScreen extends VeloWindow {
 			}
 		}
 		if (draft.local) {
-			deleteButton(context, x, contentBottom() - 40, mouseX, mouseY);
 			return;
 		}
 		if ("server".equals(draft.share)) {
@@ -657,9 +661,6 @@ public final class NoteEditScreen extends VeloWindow {
 					+ " who uses Velo sees this note. It's stored on the server - its staff can remove it. No pictures.", w)) {
 				context.drawTextWithShadow(this.textRenderer, line, x, ly, VeloUi.muted());
 				ly += 11;
-			}
-			if (!isNew) {
-				deleteButton(context, x, contentBottom() - 40, mouseX, mouseY);
 			}
 			return;
 		}
@@ -735,7 +736,6 @@ public final class NoteEditScreen extends VeloWindow {
 				context.drawTextWithShadow(this.textRenderer, "Add friends in Velo (or join a party) to share with them.", x, ly + 4, VeloUi.muted());
 			}
 		}
-		deleteButton(context, x, contentBottom() - 40, mouseX, mouseY);
 	}
 
 	private void addParty() {
@@ -759,11 +759,14 @@ public final class NoteEditScreen extends VeloWindow {
 		flash(added == 0 ? "Your party is already on it." : "Added " + added + " party member" + (added == 1 ? "" : "s") + " - save to share.");
 	}
 
-	private void deleteButton(DrawContext context, int x, int y, int mouseX, int mouseY) {
+	private void deleteButton(DrawContext context, int x, int y, int w, int mouseX, int mouseY) {
 		if (isNew) {
 			return;
 		}
-		hits.add(confirmPill(context, x, y, 120, "Delete note", "delete", mouseX, mouseY, () -> NoteStore.delete(original, () -> {
+		hits.add(confirmPill(context, x, y, w, "Delete note", "delete", mouseX, mouseY, () -> NoteStore.delete(original, () -> {
+			if (original.id != null && original.id.equals(StorageHighlight.leading())) {
+				StorageHighlight.clear();
+			}
 			flash("Deleted");
 			this.client.setScreen(returnScreen());
 		}, this::flash)));

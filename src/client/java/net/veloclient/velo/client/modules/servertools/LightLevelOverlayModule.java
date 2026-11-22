@@ -50,7 +50,7 @@ public final class LightLevelOverlayModule extends AbstractModule implements Con
 	public LightLevelOverlayModule() {
 		super("light-level-overlay", "Light Level Overlay",
 				"Shows block light levels on nearby surface blocks, highlighting where hostile mobs can spawn.",
-				ModuleCategory.SERVER_TOOLS, SafetyTag.ALWAYS_SAFE, false);
+				ModuleCategory.SERVER_TOOLS, SafetyTag.CHECK_SERVER_RULES, false);
 		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context ->
 				ModuleProfiler.time(id(), ModuleProfiler.Phase.WORLD_RENDER, () -> onRender(context)));
 	}

@@ -69,7 +69,7 @@ public final class TimeWeatherFogModule extends AbstractModule implements Config
 		super("time-weather-fog", "Time, Weather & Fog",
 				"Locks the local time-of-day and weather to a fixed state, and lets you customize or fully "
 						+ "disable fog - purely visual, never sent to the server.",
-				ModuleCategory.RENDERING, SafetyTag.COSMETIC_ONLY, false);
+				ModuleCategory.RENDERING, SafetyTag.CHECK_SERVER_RULES, false);
 		instance = this;
 		ClientTickEvents.END_CLIENT_TICK.register(client ->
 				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTick(client)));

@@ -252,6 +252,12 @@
   "category": "hud"
  },
  {
+  "id": "custom-skybox",
+  "name": "Custom Skybox",
+  "description": "Replace the sky with a panorama: built-in presets or any picture you import. Terrain, clouds and water stay in front.",
+  "category": "rendering"
+ },
+ {
   "id": "custom-text",
   "name": "Custom Text",
   "description": "Your own text on the HUD with live placeholders like {fps}, {ping}, {server} and {x} {y} {z}.",
@@ -376,6 +382,12 @@
   "name": "Glint Colorizer",
   "description": "Gives the enchantment glint on your items and armor any color you like - or a rainbow.",
   "category": "rendering"
+ },
+ {
+  "id": "gpu-item-meshes",
+  "name": "GPU Item Meshes",
+  "description": "Keeps big item models (custom 3D items from server packs - in hands, on the ground, on display) on the graphics card instead of rebuilding them every frame. Much higher FPS on busy server spawns; looks the same.",
+  "category": "performance"
  },
  {
   "id": "gpu-utilization",

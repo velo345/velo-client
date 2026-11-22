@@ -152,6 +152,16 @@ public final class TebexCheckout {
 		return basket(custom, packageId, returnUrl, completeUrl);
 	}
 
+	/** The Velo+ checkout with a sale coupon on it; fails when Tebex doesn't take the coupon. */
+	public Basket createSubscriptionCheckout(String uuid, String username, long packageId, String returnUrl, String completeUrl, boolean yearly,
+			String coupon) throws Exception {
+		Basket basket = createSubscriptionCheckout(uuid, username, packageId, returnUrl, completeUrl, yearly);
+		if (!hasCoupon(apply(basket.ident(), coupon, false))) {
+			throw new IllegalStateException("Tebex didn't apply the coupon " + coupon);
+		}
+		return basket;
+	}
+
 	private Basket basket(JsonObject custom, long packageId, String returnUrl, String completeUrl)
 			throws Exception {
 		JsonObject create = new JsonObject();

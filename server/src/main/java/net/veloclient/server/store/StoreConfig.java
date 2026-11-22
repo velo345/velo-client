@@ -166,6 +166,77 @@ public final class StoreConfig {
 
 	public WelcomeGift welcomeGift = new WelcomeGift();
 
+	/**
+	 * One door of the Advent calendar. {@code type}: "coins" ({@code amount}), "mystery" (a random amount between
+	 * {@code amount} and {@code max}), "item" ({@code id}; already owned = {@code amount} coins instead) or "plus"
+	 * ({@code amount} days of Velo+).
+	 */
+	public record AdventDay(int day, String type, String id, int amount, int max) {
+	}
+
+	/** The Advent calendar: December 1 to 24 of {@code year}, one door a day, only today's door can be opened. */
+	public static final class Advent {
+		public int year = 2026;
+		/** When a door's day starts (players are mostly in Germany). */
+		public String zone = "Europe/Berlin";
+		/** Opened every single door: this item (or {@code perfectCoins}) on top of the last door. */
+		public String perfectItem = "pet_reindeer";
+		public int perfectCoins = 1500;
+		public List<AdventDay> days = DEFAULT_ADVENT;
+	}
+
+	public static final List<AdventDay> DEFAULT_ADVENT = List.of(
+			new AdventDay(1, "coins", null, 150, 0),
+			new AdventDay(2, "item", "wear_santa_hat", 500, 0),
+			new AdventDay(3, "coins", null, 200, 0),
+			new AdventDay(4, "item", "cape_gift_wrap", 700, 0),
+			new AdventDay(5, "mystery", null, 100, 800),
+			new AdventDay(6, "item", "wings_candycane", 1100, 0),
+			new AdventDay(7, "coins", null, 250, 0),
+			new AdventDay(8, "plus", null, 3, 0),
+			new AdventDay(9, "coins", null, 250, 0),
+			new AdventDay(10, "item", "cape_festive_lights", 700, 0),
+			new AdventDay(11, "coins", null, 300, 0),
+			new AdventDay(12, "item", "aura_frost", 800, 0),
+			new AdventDay(13, "mystery", null, 150, 1000),
+			new AdventDay(14, "item", "killfx_frostbite", 900, 0),
+			new AdventDay(15, "coins", null, 350, 0),
+			new AdventDay(16, "item", "wings_snowdrift", 1100, 0),
+			new AdventDay(17, "plus", null, 7, 0),
+			new AdventDay(18, "coins", null, 400, 0),
+			new AdventDay(19, "item", "wings_ice_star", 1000, 0),
+			new AdventDay(20, "mystery", null, 200, 1200),
+			new AdventDay(21, "item", "cape_silent_night", 800, 0),
+			new AdventDay(22, "item", "aura_festive", 1000, 0),
+			new AdventDay(23, "coins", null, 750, 0),
+			new AdventDay(24, "plus", null, 30, 0));
+
+	public Advent advent = new Advent();
+
+	/**
+	 * A real-money sale (Black Friday): {@code percent} off the coin packs and the first Velo+ payment from {@code from}
+	 * until {@code until}, through the Tebex coupon {@code tebexCoupon} (made by the owner in the Tebex panel - percentage,
+	 * all packages, single + subscription baskets). The server tries the coupon on a throwaway basket and only shows and
+	 * charges the lower price once Tebex really takes it. From {@code teaserFrom} the clients announce it ahead.
+	 * {@code percent} 0 = off.
+	 */
+	public static final class Sale {
+		public String id = "black_friday_2026";
+		public String name = "Black Friday";
+		public int percent = 50;
+		/** 2026-11-21 00:00 CET: the "starts Monday" teaser. */
+		public long teaserFrom = 1_795_215_600_000L;
+		/** Monday 2026-11-23 00:00 CET. */
+		public long from = 1_795_388_400_000L;
+		/** Through Cyber Monday: 2026-12-01 00:00 CET. */
+		public long until = 1_796_079_600_000L;
+		public String tebexCoupon = "BLACKFRIDAY";
+		public boolean coins = true;
+		public boolean plus = true;
+	}
+
+	public Sale sale = new Sale();
+
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	public static StoreConfig load(Path dataDir) throws IOException {

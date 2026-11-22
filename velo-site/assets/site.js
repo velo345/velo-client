@@ -24,14 +24,22 @@ window.velo = { el, $, $$ };
 
 // ---- Navigation ----
 const nav = $("#nav");
+// The page height comes from a ResizeObserver (called after layout, so reading it there is free) - reading scrollHeight
+// in the scroll handler or a rAF forced a layout of its own (PageSpeed "forced reflow").
+let maxScroll = 0;
 const onScroll = () => {
 	const y = scrollY;
 	nav && nav.classList.toggle("scrolled", y > 8);
-	const max = document.documentElement.scrollHeight - innerHeight;
-	document.documentElement.style.setProperty("--p", max > 0 ? Math.min(1, y / max) : 0);
+	document.documentElement.style.setProperty("--p", maxScroll > 0 ? Math.min(1, y / maxScroll) : 0);
 };
 addEventListener("scroll", onScroll, { passive: true });
-onScroll();
+if ("ResizeObserver" in window) {
+	new ResizeObserver((entries) => {
+		const box = entries[0].borderBoxSize && entries[0].borderBoxSize[0];
+		maxScroll = (box ? box.blockSize : entries[0].contentRect.height) - innerHeight;
+		onScroll();
+	}).observe(document.body);
+}
 const toggle = $(".nav-toggle");
 if (toggle) {
 	toggle.addEventListener("click", () => {
@@ -486,15 +494,47 @@ function petArt(item, always) {
 	return n;
 }
 
+/**
+ * Auras and kill effects: a still frame (~15 KB) in the grids, the animation (0.3-1 MB) only while it's hovered - or, on
+ * touch screens, while the card is on screen. The detail view (always) plays right away.
+ */
+function liveArt(dir, name, alt, always) {
+	const anim = `/assets/${dir}/${name}.webp`;
+	const still = `/assets/${dir}/still/${name}.webp`;
+	const img = el("img", { class: "aura-img", src: always || reduceMotion ? (always ? anim : still) : still, alt, width: 300, height: 300, loading: "lazy", decoding: "async" });
+	if (always || reduceMotion) return img;
+	let wanted = false;
+	const play = () => {
+		wanted = true;
+		const pre = new Image();
+		pre.decoding = "async";
+		pre.src = anim;
+		(pre.decode ? pre.decode() : Promise.resolve()).then(() => { if (wanted) img.src = anim; }, () => {});
+	};
+	const stop = () => {
+		wanted = false;
+		if (img.src.endsWith(anim)) img.src = still;
+	};
+	const whileVisible = () => new IntersectionObserver(([e]) => (e.isIntersecting ? play() : stop()), { threshold: 0.6 }).observe(img);
+	requestAnimationFrame(() => {
+		// Touch screens, and the home page's showcase cards, play while on screen; Store grids on hover.
+		if (!matchMedia("(pointer: fine)").matches || img.closest(".cos-card")) return whileVisible();
+		const host = img.closest(".item, button, .card") || img;
+		host.addEventListener("pointerenter", play);
+		host.addEventListener("pointerleave", stop);
+	});
+	return img;
+}
+
 function cosmeticArt(item, k = 12, draggable = false) {
 	if (item.type === "emote") return emoteFigure(item);
 	if (item.type === "pet") return petArt(item, draggable);
 	// Cards get the small "card" art (768 px, ~1 MB) when there is one - the full 2048 px GIF (~8 MB, 40 frames) per card made
 	// the cloak pages crawl; the detail view (draggable) still shows the full art.
 	if (item.type === "cape" && item.files && item.files.gif) return cape3d(fileUrl(!draggable && item.files.card ? item.files.card : item.files.gif), k, draggable);
-	if (item.type === "aura") return el("img", { class: "aura-img", src: `/assets/auras/${item.id.replace(/^aura_/, "")}.webp`, alt: item.name + " aura", loading: "lazy", decoding: "async" });
-	if (item.type === "killfx") return el("img", { class: "aura-img", src: `/assets/killfx/${item.id.replace(/^killfx_/, "")}.webp`, alt: item.name + " kill effect", loading: "lazy", decoding: "async" });
-	if (item.files && item.files.preview) return el("img", { src: fileUrl(item.files.preview), alt: item.name, loading: "lazy", decoding: "async" });
+	if (item.type === "aura") return liveArt("auras", item.id.replace(/^aura_/, ""), item.name + " aura", draggable);
+	if (item.type === "killfx") return liveArt("killfx", item.id.replace(/^killfx_/, ""), item.name + " kill effect", draggable);
+	if (item.files && item.files.preview) return el("img", { src: fileUrl(item.files.preview), alt: item.name, width: 384, height: 288, loading: "lazy", decoding: "async" });
 	return el("span", {}, item.name);
 }
 window.velo.cosmeticArt = cosmeticArt;

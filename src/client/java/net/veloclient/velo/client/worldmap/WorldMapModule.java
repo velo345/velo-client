@@ -24,7 +24,7 @@ public final class WorldMapModule extends AbstractModule implements Configurable
 
 	public WorldMapModule() {
 		super("world-map", "World Map", "Maps everywhere you explore - open it with M. Turn off coordinates for streaming.",
-				ModuleCategory.QOL, SafetyTag.ALWAYS_SAFE, true);
+				ModuleCategory.QOL, SafetyTag.CHECK_SERVER_RULES, true);
 	}
 
 	private static WorldMapModule instance() {

@@ -227,7 +227,9 @@ public final class NotesListScreen extends VeloWindow {
 		bx -= 58;
 		hits.add(VeloUi.pill(context, bx, y + 9, 54, 16, "Open", 1, mouseX, mouseY, () -> this.client.setScreen(new NoteEditScreen(this, note, false))));
 		bx -= 68;
-		hits.add(VeloUi.pill(context, bx, y + 9, 64, 16, "Lead me", 0, mouseX, mouseY, () -> lead(note)));
+		boolean leading = note.id.equals(StorageHighlight.leading());
+		hits.add(VeloUi.pill(context, bx, y + 9, 64, 16, leading ? "Stop" : "Lead me", leading ? 1 : 0, mouseX, mouseY,
+				() -> { if (leading) StorageHighlight.clear(); else lead(note); }));
 		if (!note.mine) {
 			bx -= 58;
 			boolean hidden = NoteStore.hidden(note);
@@ -237,7 +239,7 @@ public final class NotesListScreen extends VeloWindow {
 	}
 
 	private void lead(Note note) {
-		StorageHighlight.block(note.world, note.dim, (int) Math.floor(note.x), (int) Math.floor(note.y), (int) Math.floor(note.z), null, note.displayTitle(), null);
+		StorageHighlight.point(note.world, note.dim, note.x, note.y, note.z, note.displayTitle(), note.id);
 		if (note.world != null && note.world.equals(NoteStore.worldKey()) && note.dim != null && note.dim.equals(StorageStore.here())) {
 			closeToGame();
 		} else {

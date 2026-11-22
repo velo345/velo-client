@@ -98,7 +98,7 @@ final class CrashAnalyzer {
 		String trace = errorsOnly(text);
 
 		fabricResolution(s, text, issues);
-		nativeCrash(s, text, issues);
+		nativeCrash(s, text, log, issues);
 		gameFiles(s, text, issues);
 		looseLibraries(s, text, issues);
 		windowsAndOptions(s, text, issues);
@@ -542,7 +542,7 @@ final class CrashAnalyzer {
 	 * The JVM itself died (hs_err_pid*.log, "A fatal error has been detected"): usually the graphics driver or memory.
 	 * Says which, from the problematic frame / the out-of-memory note.
 	 */
-	private static void nativeCrash(Snapshot s, String text, List<Issue> issues) {
+	private static void nativeCrash(Snapshot s, String text, String log, List<Issue> issues) {
 		if (!text.contains("A fatal error has been detected by the Java Runtime Environment") && !text.contains("There is insufficient memory for the Java Runtime")) {
 			return;
 		}
@@ -557,8 +557,11 @@ final class CrashAnalyzer {
 		boolean gpu = lib.matches(".*(nvoglv|nvwgf|nvd3d|atio6|atig6|amdvlk|amdxx|ig\\d+icd|igvk|vulkan-1|libvulkan|libnvidia|radeonsi|iris_dri|opengl32|libgl|mesa).*");
 		if (gpu) {
 			List<Fix> fixes = new ArrayList<>();
-			if (GraphicsApi.supported(s.instance().mcVersion())) {
-				String other = GraphicsApi.OPENGL.equals(s.graphicsApi()) ? GraphicsApi.VULKAN : GraphicsApi.OPENGL;
+			// No Vulkan on this PC (old Intel HD graphics etc.): "Switch to Vulkan" can't help - the game falls back to OpenGL.
+			boolean noVulkan = log != null && (log.contains("Failed to locate library: vulkan-1.dll") || log.contains("libvulkan.so.1: cannot open"));
+			String current = GraphicsApi.OPENGL.equals(s.graphicsApi()) ? GraphicsApi.OPENGL : GraphicsApi.VULKAN;
+			String other = GraphicsApi.OPENGL.equals(current) ? GraphicsApi.VULKAN : GraphicsApi.OPENGL;
+			if (GraphicsApi.supported(s.instance().mcVersion()) && !(noVulkan && GraphicsApi.VULKAN.equals(other))) {
 				fixes.add(new Fix("Switch to " + (other.equals(GraphicsApi.OPENGL) ? "OpenGL" : "Vulkan"), "The other graphics API often avoids the driver bug",
 						List.of(new Action.SetGraphicsApi(other))));
 			}

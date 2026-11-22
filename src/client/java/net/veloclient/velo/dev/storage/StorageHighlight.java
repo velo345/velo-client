@@ -39,6 +39,9 @@ public final class StorageHighlight {
 	private static long itemsUntil;
 	private static String finished;
 	private static long finishedUntil;
+	/** A plain spot (a World Note), not a container: the lead ends once you're there. */
+	private static boolean arriveOnReach;
+	private static String leadId;
 
 	private StorageHighlight() {
 	}
@@ -73,6 +76,24 @@ public final class StorageHighlight {
 		items = frame;
 		itemsUntil = until;
 		finished = null;
+		arriveOnReach = false;
+		leadId = null;
+	}
+
+	/**
+	 * Leads to a spot that isn't a container (a World Note): it ends by itself when you're within 3 blocks. Before,
+	 * notes used {@link #block}, which only moves on when the container is opened - the "Note - 2m ahead" line stayed
+	 * for 10 minutes.
+	 */
+	public static void point(String worldKey, String dimension, double x, double y, double z, String what, String id) {
+		start(List.of(new Target(worldKey, dimension, x - 0.5, y - 0.5, z - 0.5, 1, 1, 1, what, null)), Set.of());
+		arriveOnReach = true;
+		leadId = id;
+	}
+
+	/** The id given to {@link #point} while that lead is still running, else null. */
+	public static String leading() {
+		return current() != null ? leadId : null;
 	}
 
 	public static void block(String worldKey, String dimension, int bx, int by, int bz, int[] other, String what, String itemId) {
@@ -106,6 +127,7 @@ public final class StorageHighlight {
 		TARGETS.clear();
 		until = 0;
 		itemsUntil = 0;
+		leadId = null;
 	}
 
 	private static Target current() {
@@ -198,7 +220,13 @@ public final class StorageHighlight {
 		double dz = cz - me[2];
 		double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 		String line;
-		if (distance < 3) {
+		if (distance < 3 && arriveOnReach) {
+			finished = target.label() + " - you're there";
+			finishedUntil = System.currentTimeMillis() + 2500;
+			clear();
+			drawLine(context, finished, sw, sh / 2 + 18, 0xFF8FF0A8);
+			return;
+		} else if (distance < 3) {
 			line = prefix + target.label() + " - right here";
 		} else {
 			// Angle to the target relative to where you look (Minecraft yaw: 0 = +Z, 90 = -X).

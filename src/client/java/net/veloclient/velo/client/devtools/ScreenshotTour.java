@@ -657,6 +657,29 @@ public final class ScreenshotTour {
 				steps.add(new Object[] {320, (Runnable) () -> shot(client, "youtube-shorts")});
 				yield steps;
 			}
+			case "lyricsworld" -> {
+				// every Lyrics preset in the world, no HUD and no Studio (clean comparison shots)
+				List<Object[]> steps = new java.util.ArrayList<>();
+				steps.add(new Object[] {0, (Runnable) () -> {
+					//? if <26.1 {
+					client.options.hudHidden = true;
+					//?} else if <26.2 {
+					/*client.options.hideGui = true;
+					*///?} else {
+					/*if (!client.gui.hud.isHidden()) {
+						client.gui.hud.toggle();
+					}
+					*///?}
+				}});
+				int n = 0;
+				for (String preset : List.copyOf(net.veloclient.velo.client.lyrics.LyricsStyle.PRESETS.keySet())) {
+					String shotName = "lw-" + preset.toLowerCase(java.util.Locale.ROOT).replace(' ', '-');
+					steps.add(new Object[] {n == 0 ? 60 : 0, (Runnable) () -> net.veloclient.velo.client.lyrics.LyricsModule.applyPreset(preset)});
+					steps.add(new Object[] {50, (Runnable) () -> shot(client, shotName)});
+					n++;
+				}
+				yield steps;
+			}
 			case "lyrics" -> {
 				List<Object[]> steps = new java.util.ArrayList<>();
 				steps.add(new Object[] {0, (Runnable) () -> {
@@ -664,7 +687,7 @@ public final class ScreenshotTour {
 					net.veloclient.velo.client.lyrics.LyricsModule.openStudio();
 				}});
 				int n = 0;
-				for (String preset : List.of("Concert Sky", "Starfield", "Aurora", "Golden Hour", "Neon Night", "Hologram", "Karaoke", "Comic", "Fire", "Frost", "Rainbow Party", "Vaporwave", "Terminal", "Ghost", "Retro", "Word Pop", "Cinematic", "Spotlight")) {
+				for (String preset : List.copyOf(net.veloclient.velo.client.lyrics.LyricsStyle.PRESETS.keySet())) {
 					String shotName = "lyrics-" + preset.toLowerCase(java.util.Locale.ROOT).replace(' ', '-');
 					steps.add(new Object[] {n == 0 ? 60 : 0, (Runnable) () -> net.veloclient.velo.client.lyrics.LyricsModule.applyPreset(preset)});
 					steps.add(new Object[] {38, (Runnable) () -> shot(client, shotName + "-a")});

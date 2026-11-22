@@ -84,6 +84,7 @@
 .h-window { border: 1px solid #232327; border-radius: 6px; overflow: hidden; background: #111113; }
 .h-window-bar { display: flex; align-items: center; gap: 2px; padding: 0 10px; border-bottom: 1px solid #232327; overflow-x: auto; scrollbar-width: none; }
 .h-window-bar::-webkit-scrollbar { display: none; }
+.h-window-tabs { display: contents; }
 .h-window-label { font: 500 11px var(--mono); color: var(--h-dim); padding: 0 12px 0 6px; letter-spacing: .08em; }
 .h-window-bar button, .h-list button, .h-chips button, .h-plus-list button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 .h-window-bar button { flex: none; min-height: 48px; padding: 0 13px; font-weight: 500; font-size: 14px; color: var(--h-mute); border-bottom: 2px solid transparent; transition: color .2s, border-color .2s; }
@@ -94,8 +95,8 @@
 
 /* Stage: panes stacked, the new one wipes in from the right */
 .h-stage { position: relative; background: #0c0c0e; overflow: hidden; }
-.h-stage-launcher { aspect-ratio: 1600 / 870; }
-.h-stage-locker { aspect-ratio: 1600 / 906; }
+.h-stage-launcher { aspect-ratio: 1600 / 950; }
+.h-stage-locker { aspect-ratio: 1600 / 950; }
 .h-frame { aspect-ratio: 16 / 9; border: 1px solid #232327; border-radius: 6px; }
 .h-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; clip-path: inset(0 0 0 100%); z-index: 1; transition: clip-path .8s cubic-bezier(.77, 0, .18, 1); }
 .h-stage img.on { clip-path: inset(0 0 0 0); z-index: 2; }
@@ -116,8 +117,6 @@
 .h-caption-k { font: 500 11px var(--mono); color: var(--red); letter-spacing: .08em; }
 .h-caption strong { font: 700 22px Archivo, sans-serif; font-stretch: 112%; }
 .h-caption p { margin: 0; padding: 22px 24px; color: var(--h-soft); line-height: 1.6; }
-.h-caption .swap { animation: h-swap .45s cubic-bezier(.2, .8, .2, 1); }
-@keyframes h-swap { from { opacity: 0; transform: translateY(6px); } }
 @media (max-width: 720px) { .h-caption { grid-template-columns: 1fr; } .h-caption > div { border-right: 0; border-bottom: 1px solid #232327; } }
 
 .h-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid #232327; }

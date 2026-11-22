@@ -94,7 +94,16 @@ public final class SettingsTabScreen extends VeloWindow implements net.veloclien
 		addDrawableChild(screenRow(right, y, half, "Advancements", VeloScreens::advancements, VeloScreens::setAdvancements));
 		y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
 
-		y = section("Files", y, 1);
+		y = section("Setup & files", y, 2);
+		addDrawableChild(new VeloValueRow(x, y, width, ROW_HEIGHT, Text.literal("Setup guide (pick modules, HUD and look again)"), VeloValueRow.Kind.LINK,
+				() -> "Start", null, b -> {
+					try {
+						net.veloclient.velo.preview.guide.GuideTrigger.open();
+					} catch (LinkageError missing) {
+						status = Text.literal("The setup guide isn't in this build.");
+					}
+				}));
+		y += ROW_HEIGHT;
 		addDrawableChild(new VeloValueRow(x, y, width, ROW_HEIGHT, Text.literal("Mods folder"), VeloValueRow.Kind.LINK,
 				() -> "Open", null,
 				b -> FileManagerOpener.open(FabricLoader.getInstance().getGameDir().resolve("mods").toFile(),

@@ -957,6 +957,8 @@ stonecutter parameters {
 			// Anti Coords Leak's Font#prepareText hooks (AntiCoordsFontMixin) - real Mojmap names.
 			replace("prepareText(", "prepareText(")
 			replace("Font\$PreparedText;", "Font\$PreparedText;")
+			// FontPrepareMemo / TurboFontPrepareMixin (Velo Turbo prepared-text memo) - real Mojmap type.
+			replace("net.minecraft.client.gui.Font.PreparedText", "net.minecraft.client.gui.Font.PreparedText")
 			replace("\"setTitleText\"", "\"setTitleText\"")
 			replace("\"setSubtitleText\"", "\"setSubtitleText\"")
 			// Real Mojmap method (LivingEntityRenderer) that the bare "RenderLayers" rule would mangle.

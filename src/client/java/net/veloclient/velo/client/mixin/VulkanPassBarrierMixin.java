@@ -46,7 +46,9 @@ public abstract class VulkanPassBarrierMixin {
 	@Unique
 	private boolean velo$open;
 	@Unique
-	private Object velo$openKey;
+	private PassBarriers.OpenKey velo$openKey;
+	@Unique
+	private PassBarriers.OpenKey velo$keyStore;
 	@Unique
 	private boolean velo$mergeNext;
 	// Inside createRenderPass / submitRenderPass, whose own commandBuffer() calls must not close it.
@@ -109,7 +111,10 @@ public abstract class VulkanPassBarrierMixin {
 	private void velo$beginPassDone(RenderPassDescriptor descriptor, CallbackInfoReturnable<?> cir) {
 		velo$inPassOp = false;
 		if (velo$mainTargetPass) {
-			velo$openKey = PassBarriers.key(descriptor);
+			if (velo$keyStore == null) {
+				velo$keyStore = new PassBarriers.OpenKey();
+			}
+			velo$openKey = PassBarriers.key(descriptor, velo$keyStore);
 		}
 	}
 
