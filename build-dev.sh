@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the DEV client jars: they include the unreleased features from src/dev and are versioned "<version>-dev".
-# Production builds (build-and-deploy.sh, releases) never contain src/dev. The dev launcher (./launch-launcher-dev.sh)
+# Production builds (build-and-deploy.sh, releases) never contain src/dev. The Velo Client Tester launcher (CI tag tester-<v>)
 # bundles these jars, keeps its own data folder (~/.velo-client-dev) and never updates itself.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"

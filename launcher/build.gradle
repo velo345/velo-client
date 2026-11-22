@@ -276,7 +276,7 @@ tasks.named("run") {
 	notCompatibleWithConfigurationCache("org.openjfx.javafxplugin wires the module path via Task.extensions at execution time")
 }
 
-// launch-launcher-dev.sh: writes the java command line for the built launcher (a java @argfile) so the dev launcher
+// (formerly used by the removed dev launcher script) writes the java command line for the built launcher (a java @argfile) so the dev launcher
 // runs as its own process - started through "gradlew :launcher:run" it lived inside the Gradle daemon, which kept
 // ~2.5 GB (-Xmx2G build JVM) next to the launcher for as long as it was open.
 tasks.register("devRunArgs") {
