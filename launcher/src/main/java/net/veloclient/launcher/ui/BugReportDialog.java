@@ -142,7 +142,7 @@ public final class BugReportDialog {
 				// "The game doesn't start" reports used to carry only the launcher log: add the game side of the profile
 				// that ran last - its log, its newest crash report and its mods.
 				lastGame(report, sys, log);
-				report.addProperty("log", log.toString());
+				report.addProperty("log", redactSecrets(log.toString()));
 			}
 			if (context != null) {
 				report.add("context", context);
@@ -306,6 +306,18 @@ public final class BugReportDialog {
 	}
 
 	/** The newest {@code count} files ending in {@code suffix} changed within {@code days}, newest first. */
+	private static final java.util.regex.Pattern SECRETS = java.util.regex.Pattern.compile(
+			"(--accessToken\\s+)\\S+|eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}");
+
+	/** Never send a Minecraft access token: native crash dumps (hs_err) contain the whole launch command line. */
+	static String redactSecrets(String text) {
+		if (text == null || text.isEmpty()) {
+			return text;
+		}
+		return SECRETS.matcher(text).replaceAll(m -> m.group(1) != null
+				? java.util.regex.Matcher.quoteReplacement(m.group(1) + "<redacted>") : "<redacted>");
+	}
+
 	/** The Velo modules that were on in this profile's last game (the game writes them every 10 s), or null. */
 	static com.google.gson.JsonArray activeModules(Path gameDir) {
 		try {

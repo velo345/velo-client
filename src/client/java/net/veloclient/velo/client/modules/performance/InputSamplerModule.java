@@ -72,9 +72,15 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 
 	@Override
 	public void onEnable() {
-		thread = new InputSamplerThread();
-		thread.setSampleHz(sampleHz);
-		thread.start();
+		// Reading GLFW off the main thread is unsupported; on Windows, and wherever Ixeris moves GLFW onto its own thread,
+		// it crashed the game natively (EXCEPTION_ACCESS_VIOLATION in this thread, Velo 1.5.0). The tick-start re-poll
+		// below still works without it.
+		boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+		if (!windows && !net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("ixeris")) {
+			thread = new InputSamplerThread();
+			thread.setSampleHz(sampleHz);
+			thread.start();
+		}
 		resetStats();
 	}
 

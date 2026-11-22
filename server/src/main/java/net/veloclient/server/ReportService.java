@@ -76,6 +76,9 @@ final class ReportService {
 			for (Path path : files.filter(p -> p.toString().endsWith(".json.gz")).toList()) {
 				try {
 					Report report = read(path);
+					if (scrub(report)) {
+						write(report); // reports stored before the redaction existed
+					}
 					index.put(report.id, summary(report));
 				} catch (IOException | RuntimeException ignored) {
 					// Skip a broken file.
@@ -177,7 +180,33 @@ final class ReportService {
 		return id != null && id.matches("[0-9a-f]{12}") ? dir.resolve(id + ".json.gz") : null;
 	}
 
+	/** Minecraft access tokens (JWTs) and the launch argument carrying them - native crash dumps include the command line. */
+	private static final java.util.regex.Pattern SECRET = java.util.regex.Pattern.compile(
+			"(--accessToken\\s+)\\S+|eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}");
+
+	static String redact(String text) {
+		if (text == null || text.isEmpty()) {
+			return text;
+		}
+		return SECRET.matcher(text).replaceAll(m -> m.group(1) != null
+				? java.util.regex.Matcher.quoteReplacement(m.group(1) + "<redacted>") : "<redacted>");
+	}
+
+	/** True when the report held a secret (now removed). */
+	private static boolean scrub(Report report) {
+		String crash = redact(report.crash);
+		String log = redact(report.log);
+		String message = redact(report.message);
+		boolean changed = !java.util.Objects.equals(crash, report.crash) || !java.util.Objects.equals(log, report.log)
+				|| !java.util.Objects.equals(message, report.message);
+		report.crash = crash;
+		report.log = log;
+		report.message = message;
+		return changed;
+	}
+
 	private void write(Report report) throws IOException {
+		scrub(report);
 		Path tmp = dir.resolve(report.id + ".tmp");
 		try (OutputStream out = new GZIPOutputStream(Files.newOutputStream(tmp))) {
 			out.write(GSON.toJson(report).getBytes(StandardCharsets.UTF_8));

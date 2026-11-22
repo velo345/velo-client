@@ -161,6 +161,9 @@ tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") 
 tasks.named<ProcessResources>("processClientResources") {
 	if (sc.current.parsed < "26.2") {
 		exclude("assets/velo-client/shaders/core/cosmetic*.vsh")
+		// GPU item/model meshes (26.2+) import the same 26.2-only includes: Velo 1.5.0 was black / text-less on 1.21.x
+		exclude("assets/velo-client/shaders/core/held_mesh*.vsh")
+		exclude("assets/velo-client/shaders/core/model_mesh*.vsh")
 	}
 }
 

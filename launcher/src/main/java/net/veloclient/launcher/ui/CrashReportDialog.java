@@ -207,8 +207,8 @@ public final class CrashReportDialog {
 				report.add("modules", modules);
 			}
 			if (includeLog.isSelected()) {
-				report.addProperty("crash", crashText);
-				report.addProperty("log", logText);
+				report.addProperty("crash", BugReportDialog.redactSecrets(crashText));
+				report.addProperty("log", BugReportDialog.redactSecrets(logText));
 			}
 			if (doctorPanel[0] != null) {
 				report.add("doctor", net.veloclient.launcher.doctor.Doctor.reportData(instance, doctorPanel[0].diagnosis()));

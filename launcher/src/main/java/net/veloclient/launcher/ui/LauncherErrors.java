@@ -193,7 +193,7 @@ public final class LauncherErrors {
 		report.add("system", system);
 		report.addProperty("crash", stackTrace(error));
 		if (includeLog) {
-			report.addProperty("log", logTail(400));
+			report.addProperty("log", BugReportDialog.redactSecrets(logTail(400)));
 		}
 		return report;
 	}
