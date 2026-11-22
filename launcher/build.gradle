@@ -90,6 +90,9 @@ tasks.register("bundleGameJars") {
 	doLast {
 		def outDir = gameJarsOutputDir.get().asFile
 		outDir.mkdirs()
+		// never ship leftovers: an older build step put the private Velo+ Addons here (*-addons.jar) - they come from the
+		// server only, and a tester launcher goes out to many people
+		outDir.listFiles()?.each { if (it.name.endsWith("-addons.jar")) it.delete() }
 		gameVersions.each { v ->
 			def libsDir = libsDirs[v]
 			def matches = libsDir.listFiles({ f -> f.name.startsWith("velo-client-") && f.name.endsWith(".jar") && !f.name.contains("-sources")
@@ -333,7 +336,14 @@ tasks.register("jpackageDist") {
 		boolean isWindows = osName.contains("win")
 		boolean isMac = osName.contains("mac")
 		String installerType = isWindows ? "exe" : (isMac ? "dmg" : "deb")
-		File iconFile = isWindows ? new File(rootDir, "Logo.ico") : (isMac ? new File(rootDir, "Logo.icns") : new File(rootDir, "Logo.png"))
+		// The tester flavour (-PveloDev=true): "Velo Client Tester" - its own app name, so it installs next to the normal
+		// launcher (own folder, start menu entry, Windows product id), its own icon and file names.
+		String logo = veloDev ? "Logo-dev" : "Logo"
+		File iconFile = isWindows ? new File(rootDir, logo + ".ico") : (isMac ? new File(rootDir, logo + ".icns") : new File(rootDir, logo + ".png"))
+		String appName = veloDev ? "Velo Client Tester" : "Velo Client Launcher"
+		String filePrefix = veloDev ? "velo-client-tester" : "velo-client-launcher"
+		// installers take at most three numbers; tester builds are 1.5.1.4 - the full one lives in version.properties
+		String packageVersion = launcherAppVersion.tokenize('.').take(3).join('.')
 		// jpackage bundles whatever JDK is running it - use that same JDK's own
 		// jpackage binary explicitly rather than "jpackage" off PATH, since a
 		// machine can have several JDKs installed with PATH pointing elsewhere
@@ -355,8 +365,8 @@ tasks.register("jpackageDist") {
 				"--type", installerType,
 				"--input", staging.absolutePath,
 				"--dest", dist.absolutePath,
-				"--name", "Velo Client Launcher",
-				"--app-version", launcherAppVersion,
+				"--name", appName,
+				"--app-version", packageVersion,
 				"--vendor", "Velo Client",
 				"--description", "Launch Minecraft with your Velo Client mod profiles",
 				"--main-jar", jarFile.get().asFile.name,
@@ -426,7 +436,7 @@ tasks.register("jpackageDist") {
 				javaOptions << command[i + 1]
 			}
 		}
-		File appZip = new File(dist, "velo-client-launcher-${launcherAppVersion}-app-${platform}.zip")
+		File appZip = new File(dist, "${filePrefix}-${launcherAppVersion}-app-${platform}.zip")
 		new java.util.zip.ZipOutputStream(new FileOutputStream(appZip)).withCloseable { zip ->
 			zip.setLevel(1)
 			String manifest = groovy.json.JsonOutput.toJson([version: launcherAppVersion, platform: platform,
@@ -445,14 +455,14 @@ tasks.register("jpackageDist") {
 			command += ["--win-shortcut", "--win-menu", "--win-dir-chooser", "--win-upgrade-uuid", launcherWindowsUpgradeUuid]
 		}
 		if (isMac) {
-			command += ["--mac-package-identifier", "net.veloclient.launcher", "--mac-package-name", "Velo Client"]
+			command += ["--mac-package-identifier", veloDev ? "net.veloclient.tester" : "net.veloclient.launcher", "--mac-package-name", veloDev ? "Velo Tester" : "Velo Client"]
 		}
 		List<String> appImage = new ArrayList<>(command)
 		if (!isWindows && !isMac) {
 			command += ["--linux-shortcut"]
 		}
 		if (isMac) {
-			buildMacDmg(appImage, dist, launcherAppVersion)
+			buildMacDmg(appImage, dist, launcherAppVersion, packageVersion, appName, filePrefix, veloDev)
 			return
 		}
 		runJpackage(command)
@@ -464,13 +474,13 @@ tasks.register("jpackageDist") {
 			appImage.set(type + 1, "app-image")
 			appImage.set(appImage.indexOf("--dest") + 1, imageDir.absolutePath)
 			runJpackage(appImage)
-			File app = new File(imageDir, "Velo Client Launcher")
-			File renamed = new File(imageDir, "velo-client-launcher")
+			File app = new File(imageDir, appName)
+			File renamed = new File(imageDir, filePrefix)
 			if (!app.renameTo(renamed)) {
 				throw new GradleException("jpackage app-image not found at " + app)
 			}
-			String tarName = "velo-client-launcher-${launcherAppVersion}-linux-x64.tar.gz"
-			Process tar = new ProcessBuilder("tar", "-czf", new File(dist, tarName).absolutePath, "-C", imageDir.absolutePath, "velo-client-launcher")
+			String tarName = "${filePrefix}-${launcherAppVersion}-linux-x64.tar.gz"
+			Process tar = new ProcessBuilder("tar", "-czf", new File(dist, tarName).absolutePath, "-C", imageDir.absolutePath, filePrefix)
 					.redirectErrorStream(true).start()
 			String tarOut = tar.inputStream.getText("UTF-8")
 			if (tar.waitFor() != 0) {
@@ -489,7 +499,7 @@ tasks.register("jpackageDist") {
 // "unidentified developer" prompt (right-click > Open, or Open Anyway in Privacy & Security) instead
 // of "is damaged and can't be opened". Then the dmg is packed from that signed image and named
 // velo-client-launcher-<version>-macos-<arm64|x64>.dmg - UpdateService picks the asset by that suffix.
-void buildMacDmg(List<String> appImageCommand, File dist, String version) {
+void buildMacDmg(List<String> appImageCommand, File dist, String version, String packageVersion, String appName, String filePrefix, boolean tester) {
 	String arch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT)
 	String archSuffix = arch.contains("aarch64") || arch.contains("arm") ? "arm64" : "x64"
 	File imageDir = new File(dist, "app-image")
@@ -497,7 +507,7 @@ void buildMacDmg(List<String> appImageCommand, File dist, String version) {
 	image.set(image.indexOf("--type") + 1, "app-image")
 	image.set(image.indexOf("--dest") + 1, imageDir.absolutePath)
 	runJpackage(image)
-	File app = new File(imageDir, "Velo Client Launcher.app")
+	File app = new File(imageDir, appName + ".app")
 	if (!app.isDirectory()) {
 		throw new GradleException("jpackage app-image not found at " + app)
 	}
@@ -506,13 +516,13 @@ void buildMacDmg(List<String> appImageCommand, File dist, String version) {
 	runTool(["codesign", "--verify", "--deep", "--strict", app.absolutePath])
 	String jpackageBin = new File(new File(System.getProperty("java.home"), "bin"), "jpackage").absolutePath
 	runJpackage([jpackageBin, "--type", "dmg", "--app-image", app.absolutePath, "--dest", dist.absolutePath,
-			"--name", "Velo Client Launcher", "--app-version", version, "--vendor", "Velo Client",
-			"--mac-package-identifier", "net.veloclient.launcher"])
+			"--name", appName, "--app-version", packageVersion, "--vendor", "Velo Client",
+			"--mac-package-identifier", tester ? "net.veloclient.tester" : "net.veloclient.launcher"])
 	File dmg = dist.listFiles().find { it.name.endsWith(".dmg") }
 	if (dmg == null) {
 		throw new GradleException("jpackage produced no .dmg in " + dist)
 	}
-	File renamed = new File(dist, "velo-client-launcher-${version}-macos-${archSuffix}.dmg")
+	File renamed = new File(dist, "${filePrefix}-${version}-macos-${archSuffix}.dmg")
 	if (!dmg.renameTo(renamed)) {
 		throw new GradleException("Couldn't rename " + dmg + " to " + renamed)
 	}

@@ -261,6 +261,22 @@ final class ServerApi {
 		return o.has(key) && !o.get(key).isJsonNull() && o.get(key).getAsBoolean();
 	}
 
+	/** Personal 24 h download links for the newest tester build (404 "not-tester" when they aren't a linked tester). */
+	JsonObject testerLinks(String discordId) throws ApiException {
+		JsonObject body = new JsonObject();
+		body.addProperty("discordId", discordId);
+		return post("/v1/admin/tester/link", body);
+	}
+
+	/** The Discord ids holding the tester role - linked accounts become testers on the server (TesterService). */
+	JsonObject syncTesters(java.util.Collection<String> discordIds) throws ApiException {
+		JsonObject body = new JsonObject();
+		com.google.gson.JsonArray ids = new com.google.gson.JsonArray();
+		discordIds.forEach(ids::add);
+		body.add("discordIds", ids);
+		return post("/v1/admin/tester/sync", body);
+	}
+
 	private JsonObject post(String path, JsonObject body) throws ApiException {
 		try {
 			HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + path)).timeout(Duration.ofSeconds(15))

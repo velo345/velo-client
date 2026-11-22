@@ -1,0 +1,19 @@
+{
+  "title": "Welcome to Velo Client Tester",
+  "summary": "The first tester build: everything from 1.5.1 plus this Testing page. Try the new stuff below and tell us what works and what breaks - every answer goes straight to the team.",
+  "changes": [
+    "New: the Testing page - see what changed in every tester build and report each item as works / broken",
+    "The Tester launcher updates itself when a new tester build is out",
+    "Custom Skybox: 8 skies with previews, sharp stars, real sun and moon",
+    "Lyrics react to the beat of your music, with 3D text and big-moment effects",
+    "Pets: sit & stay, tricks, first person, hidden while fighting"
+  ],
+  "test": [
+    {"id": "testing-page", "title": "This Testing page", "how": "Answer each item here. Does it save when you come back later?"},
+    {"id": "skybox", "title": "Custom Skybox", "how": "R-Shift > Custom Skybox > Choose Skybox... Try several skies at day and night. Are the stars sharp, are sun and moon right, are lyrics and water in front?", "modules": ["custom-skybox"]},
+    {"id": "lyrics-beat", "title": "Lyrics on the beat", "how": "Play music (Spotify etc.), turn on Lyrics and beat sync in the Lyrics Studio. Do the effects hit on the beat?", "modules": ["lyrics"]},
+    {"id": "pets", "title": "Pets", "how": "Equip a pet, bind Stay and Trick in the controls, emote, fight something. Does it hide while fighting and come back?", "modules": ["pets"]},
+    {"id": "hearts", "title": "Heart variants", "how": "Hearts module > draw a poison or wither heart variant with the colour picker.", "modules": ["hearts"]},
+    {"id": "start", "title": "Game start", "how": "Start each Minecraft version you play. Anything black, missing text or crashing?"}
+  ]
+}

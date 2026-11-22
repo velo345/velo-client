@@ -142,6 +142,8 @@ public final class VeloServerApp {
 		AddonStore addonStore = new AddonStore(dataDir);
 		AddonSync addonSync = new AddonSync(addonStore, envOr("VELO_PLUS_GITHUB_REPO", "velo345/velo-client-plus"), envOr("VELO_PLUS_GITHUB_TOKEN", null));
 		PlusRoutes.register(server, registry, store, plusTokens, addonStore, addonSync, discordLinks, adminToken, uuid -> og != null && og.eligible(uuid));
+		// The tester programme: private tester launcher builds, tester role from the bot, what each tester really did.
+		TesterRoutes.register(server, registry, new TesterService(dataDir, discordLinks), store, adminToken, envOr("VELO_TESTER_UPLOAD_TOKEN", null));
 		// Velo+ features: Cloud Sync restore points and Clips Pro share links (velo-client.com/c/<id>).
 		CloudBackupService cloud = new CloudBackupService(dataDir);
 		ClipShareService clipShares = new ClipShareService(dataDir, Long.parseLong(envOr("VELO_CLIPS_MAX_GB", "40")) * 1024 * 1024 * 1024,

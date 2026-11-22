@@ -180,6 +180,13 @@ public final class TopBar extends HBox {
 			tabs.put(page[0], row);
 			sidebar.getChildren().add(row);
 		}
+		if (net.veloclient.launcher.AppVersion.DEV) {
+			// the Velo Client Tester launcher: builds, what to test, feedback
+			Button testing = navRow("Testing", "bug", () -> host.navigate("testing"));
+			testing.getStyleClass().add("sidebar-testing");
+			tabs.put("testing", testing);
+			sidebar.getChildren().add(testing);
+		}
 		Region divider = new Region();
 		divider.getStyleClass().add("sidebar-divider");
 		VBox.setMargin(divider, new Insets(8, 10, 8, 10));

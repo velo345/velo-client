@@ -292,7 +292,7 @@ public final class LauncherApp extends Application {
 				() -> topBar.searchField().requestFocus());
 
 		stage.getIcons().add(new Image(getClass().getResourceAsStream(AppVersion.DEV ? "/net/veloclient/launcher/images/logo-dev.png" : "/net/veloclient/launcher/images/logo.png")));
-		stage.setTitle(AppVersion.DEV ? "Velo Client Launcher (DEV)" : "Velo Client Launcher");
+		stage.setTitle(AppVersion.DEV ? "Velo Client Tester" : "Velo Client Launcher");
 		// Our own window frame: the top bar is the title bar, with minimize / maximize / close on its right.
 		windowChrome = net.veloclient.launcher.ui.WindowChrome.install(stage);
 		windowChrome.dragWith(topBar);
@@ -443,6 +443,9 @@ public final class LauncherApp extends Application {
 				Platform.runLater(this::refreshOwned);
 				Platform.runLater(() -> maybeShowAdvent(0));
 				checkSale();
+				if (AppVersion.DEV) {
+					testerStartup();
+				}
 				return;
 			}
 			refreshFriendsBadge();
@@ -1046,7 +1049,7 @@ public final class LauncherApp extends Application {
 		return topBar;
 	}
 
-	private static final List<String> TAB_ORDER = List.of("home", "library", "servers", "locker", "store", "friends", "clips", "news", "customize", "settings");
+	private static final List<String> TAB_ORDER = List.of("home", "library", "servers", "locker", "store", "friends", "clips", "news", "testing", "customize", "settings");
 	/** Set by a top-bar tab click: which side the next page slides in from. */
 	private int navDirection;
 
@@ -1068,8 +1071,42 @@ public final class LauncherApp extends Application {
 			case "settings" -> showSettings();
 			case "customize" -> showCustomize();
 			case "friends" -> showFriends();
+			case "testing" -> showTesting();
 			default -> showHome();
 		}
+	}
+
+	/** The Velo Client Tester page: builds, what to test, feedback, and (owners) who tests. */
+	private void showTesting() {
+		currentPage = this::showTesting;
+		setActivePage("testing");
+		setContent(net.veloclient.launcher.ui.TestingView.build());
+		refreshLaunchBar();
+	}
+
+	private volatile boolean testerChecked;
+
+	/** Tester build, once connected: what's new in this build (once), then a newer build downloaded in the background. */
+	private void testerStartup() {
+		Platform.runLater(() -> {
+			if (layers != null) {
+				net.veloclient.launcher.ui.TestingView.maybeShowWhatsNew(layers, this::showTesting);
+			}
+		});
+		if (testerChecked) {
+			return;
+		}
+		testerChecked = true;
+		java.util.concurrent.CompletableFuture.runAsync(() -> {
+			var result = net.veloclient.launcher.launch.TesterUpdate.check(text -> { }, p -> { });
+			if (result.ready()) {
+				Platform.runLater(() -> {
+					if (layers != null) {
+						net.veloclient.launcher.ui.TestingView.showUpdateReady(layers, net.veloclient.launcher.launch.TesterUpdate.readyVersion(), result.newest());
+					}
+				});
+			}
+		});
 	}
 
 	private void setActivePage(String page) {
@@ -4991,7 +5028,24 @@ public final class LauncherApp extends Application {
 							minimizeWhenGameWindowOpens(result);
 						}
 					});
+					if (AppVersion.DEV) {
+						// tester build: count the launch for the owner's tester overview
+						com.google.gson.JsonObject launchEvent = net.veloclient.launcher.social.TesterApi.eventOf("launch", AppVersion.VERSION);
+						launchEvent.addProperty("mc", instance.mcVersion());
+						net.veloclient.launcher.social.TesterApi.event(launchEvent);
+					}
 					int exitCode = result.process().waitFor();
+					if (AppVersion.DEV) {
+						// ...and how long they played, with the Velo modules that were on (matched to the "what to test" items)
+						com.google.gson.JsonObject session = net.veloclient.launcher.social.TesterApi.eventOf("session", AppVersion.VERSION);
+						session.addProperty("minutes", (System.currentTimeMillis() - startedAt) / 60000.0);
+						com.google.gson.JsonArray modules = net.veloclient.launcher.ui.BugReportDialog.activeModules(
+								net.veloclient.launcher.instance.InstancePaths.gameDir(instance.id()));
+						if (modules != null) {
+							session.add("modules", modules);
+						}
+						net.veloclient.launcher.social.TesterApi.event(session);
+					}
 					Platform.runLater(this::checkAccountSkin);
 					// The game closed: bring the launcher back (it was minimized on launch) - unless another game still runs.
 					Platform.runLater(() -> {
@@ -5459,7 +5513,7 @@ public final class LauncherApp extends Application {
 		}
 		if (AppVersion.DEV) {   // a dev build never replaces itself or its client jars with a release
 			if (status != null) {
-				status.setText("Dev build - updates are off");
+				status.setText("Tester build " + AppVersion.VERSION + " - updates come through the Testing page");
 			}
 			return;
 		}

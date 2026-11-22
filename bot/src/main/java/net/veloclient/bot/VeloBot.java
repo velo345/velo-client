@@ -109,6 +109,7 @@ public final class VeloBot extends ListenerAdapter {
 		commands.add(Commands.slash("link", "Link your Minecraft account with the code from Velo Client (only you see the answer)")
 				.addOption(OptionType.STRING, "code", "The code Velo Client shows you", true));
 		commands.add(Commands.slash("unlink", "Unlink your Minecraft account (the Velo Neon cloak is removed)"));
+		commands.add(Commands.slash("tester", "Testers: get the Velo Client Tester launcher (only you see the links)"));
 		commands.add(Commands.slash("roles", "Ping roles members can pick").setDefaultPermissions(admin).addSubcommands(
 				new SubcommandData("add", "Put a role on the panel").addOptions(new OptionData(OptionType.ROLE, "role", "The role to give", true),
 						new OptionData(OptionType.STRING, "label", "Button text, e.g. News", true),
@@ -213,6 +214,47 @@ public final class VeloBot extends ListenerAdapter {
 		return option;
 	}
 
+	/** Testers get personal download links for the newest Velo Client Tester build (24 h, only for them). */
+	private void testerCommand(SlashCommandInteractionEvent event) {
+		boolean hasRole = event.getMember() != null && config.testerRoleId != null
+				&& event.getMember().getRoles().stream().anyMatch(r -> r.getId().equals(config.testerRoleId));
+		if (!hasRole) {
+			event.reply("The Velo Client Tester launcher is for members with the Tester role.").setEphemeral(true).queue();
+			return;
+		}
+		event.deferReply(true).queue();
+		if (vip != null) {
+			vip.runNow(); // a brand-new tester: sync the role to the server first
+		}
+		new Thread(() -> {
+			try {
+				Thread.sleep(2500);
+				com.google.gson.JsonObject res = server.testerLinks(event.getUser().getId());
+				com.google.gson.JsonObject links = res.getAsJsonObject("links");
+				if (links.isEmpty()) {
+					event.getHook().sendMessage("There's no tester build yet - you'll get one soon.").queue();
+					return;
+				}
+				StringBuilder text = new StringBuilder("**Velo Client Tester " + res.get("version").getAsString() + "** - your personal links (valid 24 h, don't share them):\n");
+				String[][] names = {{"windows", "Windows"}, {"mac-arm", "macOS (Apple Silicon)"}, {"mac-intel", "macOS (Intel)"},
+						{"linux-deb", "Linux (.deb)"}, {"linux-tar", "Linux (other distros, .tar.gz)"}};
+				for (String[] n : names) {
+					if (links.has(n[0])) {
+						text.append("\n• [").append(n[1]).append("](").append(links.get(n[0]).getAsString()).append(")");
+					}
+				}
+				text.append("\n\nInstall it, sign in, and open **Testing** in the sidebar - it shows what to test and updates itself from then on.");
+				event.getHook().sendMessage(text.toString()).queue();
+			} catch (ServerApi.ApiException e) {
+				event.getHook().sendMessage("not-tester".equals(e.getMessage())
+						? "Link your Minecraft account first with **/link** (code from Velo Client > Settings), then try /tester again in a few minutes."
+						: "Couldn't get your links: " + e.getMessage()).queue();
+			} catch (InterruptedException ignored) {
+				// shutting down
+			}
+		}, "velo-tester-links").start();
+	}
+
 	@Override
 	public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
 		if (!HomeGuild.is(event.getGuild())) {
@@ -224,6 +266,7 @@ public final class VeloBot extends ListenerAdapter {
 			switch (event.getName()) {
 				case "link" -> linkCommand(event);
 				case "unlink" -> unlink(event);
+				case "tester" -> testerCommand(event);
 				case "roles" -> roles(event, sub);
 				case "ticket" -> ticket(event, sub);
 				case "setup" -> setup(event, sub);

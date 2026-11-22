@@ -102,6 +102,8 @@ final class BotConfig {
 	boolean vipStrict = true;
 	/** The OG role: given to linked members who got Velo in its first two weeks (the OG badge); never taken away. */
 	String ogRoleId = "1574026944691830815";
+	/** Testers: holders get the Velo Client Tester launcher builds (server TesterService). */
+	String testerRoleId = "1574119499832234084";
 	int ticketCounter;
 	int maxOpenTicketsPerUser = 2;
 	String ticketPanelTitle = "Need help?";
@@ -224,6 +226,7 @@ final class BotConfig {
 		this.vipRoleId = fresh.vipRoleId;
 		this.vipStrict = fresh.vipStrict;
 		this.ogRoleId = fresh.ogRoleId;
+		this.testerRoleId = fresh.testerRoleId;
 		this.maxOpenTicketsPerUser = fresh.maxOpenTicketsPerUser;
 		this.ticketPanelTitle = fresh.ticketPanelTitle;
 		this.ticketPanelText = fresh.ticketPanelText;

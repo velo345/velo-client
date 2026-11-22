@@ -18,7 +18,8 @@ import java.util.concurrent.TimeUnit;
  * and takes it away from everyone who doesn't - linked members whose Velo+ ended, and (when
  * {@code vipStrict}, the default) anyone holding the role without an active membership. Also run for one
  * member right after {@code /link}, so someone who links after getting Velo+ gets the role at once.
- * Also hands out the OG role ({@code ogRoleId}) to linked members with the OG badge - only given, never taken.
+ * Also hands out the OG role ({@code ogRoleId}) to linked members with the OG badge - only given, never taken - and
+ * every 5 minutes sends the tester role's holders ({@code testerRoleId}) to the server's tester programme.
  */
 final class VipSync {
 
@@ -54,7 +55,21 @@ final class VipSync {
 		}
 	}
 
+	private int testerTicks;
+
 	private void run() throws Exception {
+		// testers: every 5 minutes (and right after a change), the role holders go to the server
+		if (config.testerRoleId != null && testerTicks++ % 5 == 0) {
+			java.util.Set<String> holders = new java.util.HashSet<>();
+			for (Guild guild : HomeGuild.guilds(jda)) {
+				holders.addAll(RoleHolders.of(jda, guild.getId(), Set.of(config.testerRoleId)).keySet());
+			}
+			try {
+				server.syncTesters(holders);
+			} catch (ServerApi.ApiException e) {
+				System.err.println("Tester sync failed: " + e.getMessage());
+			}
+		}
 		if (config.vipRoleId == null && config.ogRoleId == null) {
 			return;
 		}

@@ -4250,3 +4250,95 @@
 .arcade-recipe-name { -fx-text-fill: #F4EFEE; -fx-font-size: 12.5px; -fx-font-weight: 600; }
 .arcade-need-ok { -fx-text-fill: #C9B9B6; }
 .arcade-need-missing { -fx-text-fill: #FF6B6F; }
+
+/* ---- Velo Client Tester: the Testing page ---- */
+.tester-badge {
+	-fx-background-color: linear-gradient(to right, #ff3b44, #ff7a3d);
+	-fx-text-fill: white;
+	-fx-font-family: "Geist Mono";
+	-fx-font-weight: bold;
+	-fx-font-size: 11px;
+	-fx-padding: 3 9 3 9;
+	-fx-background-radius: 6;
+}
+.tester-hero {
+	-fx-background-color: linear-gradient(to right, rgba(255, 59, 68, 0.16), rgba(255, 122, 61, 0.05) 60%, transparent);
+	-fx-border-color: rgba(255, 90, 80, 0.35);
+	-fx-border-radius: 14;
+	-fx-background-radius: 14;
+	-fx-padding: 20 22 20 22;
+}
+.tester-build-number {
+	-fx-font-family: "Geist Mono";
+	-fx-font-weight: bold;
+	-fx-font-size: 34px;
+	-fx-text-fill: -velo-text;
+}
+.tester-build { -fx-padding: 18 20 18 20; }
+.tester-version {
+	-fx-font-family: "Geist Mono";
+	-fx-font-weight: bold;
+	-fx-font-size: 18px;
+	-fx-text-fill: -velo-text;
+}
+.tester-build-title {
+	-fx-font-family: "Archivo SemiExpanded";
+	-fx-font-weight: bold;
+	-fx-font-size: 17px;
+	-fx-text-fill: -velo-text;
+}
+.tester-dot { -fx-text-fill: #ff5a50; -fx-font-weight: bold; }
+.tester-change { -fx-text-fill: -velo-text; -fx-font-size: 13px; }
+.tester-item {
+	-fx-background-color: rgba(255, 255, 255, 0.035);
+	-fx-background-radius: 10;
+	-fx-border-color: rgba(255, 255, 255, 0.06);
+	-fx-border-radius: 10;
+	-fx-padding: 12 14 12 14;
+}
+.tester-item-title { -fx-text-fill: -velo-text; -fx-font-weight: bold; -fx-font-size: 14px; }
+.tester-pill {
+	-fx-font-size: 11px;
+	-fx-font-weight: bold;
+	-fx-padding: 3 9 3 9;
+	-fx-background-radius: 6;
+}
+.tester-pill-current { -fx-background-color: rgba(255, 255, 255, 0.10); -fx-text-fill: -velo-text; }
+.tester-pill-new { -fx-background-color: #ff3b44; -fx-text-fill: white; }
+.tester-pill-used { -fx-background-color: rgba(90, 170, 255, 0.16); -fx-text-fill: #8fc2ff; }
+.tester-pill-works { -fx-background-color: rgba(60, 200, 120, 0.16); -fx-text-fill: #63dd99; }
+.tester-pill-broken { -fx-background-color: rgba(255, 70, 70, 0.16); -fx-text-fill: #ff7b7b; }
+.tester-pill-skip { -fx-background-color: rgba(255, 255, 255, 0.07); -fx-text-fill: rgba(255, 255, 255, 0.55); }
+.tester-works:hover { -fx-border-color: #63dd99; -fx-text-fill: #63dd99; }
+.tester-broken:hover { -fx-border-color: #ff7b7b; -fx-text-fill: #ff7b7b; }
+.tester-owner { -fx-border-color: rgba(247, 192, 74, 0.30); -fx-border-radius: 14; }
+.tester-owner-row {
+	-fx-padding: 10 0 10 0;
+	-fx-border-color: rgba(255, 255, 255, 0.06) transparent transparent transparent;
+}
+.tester-chip {
+	-fx-padding: 5 10 5 10;
+	-fx-background-radius: 8;
+	-fx-font-size: 12px;
+}
+.tester-chip .label { -fx-text-fill: -velo-text; }
+.tester-chip-none { -fx-background-color: rgba(255, 70, 70, 0.10); }
+.tester-chip-none .label { -fx-text-fill: #ff9a9a; }
+.tester-chip-some { -fx-background-color: rgba(247, 192, 74, 0.10); }
+.tester-chip-good { -fx-background-color: rgba(60, 200, 120, 0.12); }
+.tester-dim { -fx-background-color: rgba(0, 0, 0, 0.55); }
+.tester-popup {
+	-fx-background-color: -velo-surface;
+	-fx-background-radius: 16;
+	-fx-border-color: rgba(255, 90, 80, 0.40);
+	-fx-border-radius: 16;
+	-fx-padding: 24;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.5), 30, 0.2, 0, 8);
+}
+.tester-popup-title {
+	-fx-font-family: "Archivo SemiExpanded";
+	-fx-font-weight: bold;
+	-fx-font-size: 20px;
+	-fx-text-fill: -velo-text;
+}
+.sidebar-testing .label { -fx-text-fill: #ff7a5a; }

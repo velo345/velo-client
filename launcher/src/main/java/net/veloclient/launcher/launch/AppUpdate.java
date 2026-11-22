@@ -87,6 +87,15 @@ public final class AppUpdate {
 		Path zip = UpdateService.updatesDir().resolve(asset.name());
 		status.accept("Downloading Velo Client " + version + "...");
 		UpdateService.downloadAsset(asset, zip, progress);
+		installZip(zip, version, status);
+	}
+
+	/**
+	 * Unpacks an app zip that is already on disk (the tester launcher downloads its builds from the Velo server) and
+	 * points current.txt at it; deletes the zip afterwards.
+	 */
+	public static void installZip(Path zip, String version, Consumer<String> status) throws IOException {
+		Files.createDirectories(root());
 		status.accept("Unpacking the update...");
 		Path target = root().resolve(version);
 		Path temp = root().resolve(version + ".unpacking");
