@@ -173,8 +173,44 @@ public final class LauncherApp extends Application {
 			cliLaunch = cliLaunch + "\t" + cliFlags.toString().strip();
 			SingleInstance.message = "launch " + cliLaunch;
 		}
-		// a screenshot tour runs beside the owner's open launcher (it never saves anything) - never bring that one forward
-		if (System.getProperty("velo.launcherTour") == null && !SingleInstance.acquire()) {
+		// Started by an update (UpdateService.relaunch): wait until the old launcher process has really ended, then take
+		// the single-instance lock - retried for a while, so a slow-closing old launcher can't make this one quit.
+		long afterUpdate = -1;
+		for (int i = 0; i < args.length - 1; i++) {
+			if (args[i].equals("--after-update")) {
+				try {
+					afterUpdate = Long.parseLong(args[i + 1].strip());
+				} catch (NumberFormatException ignored) {
+					// not a pid
+				}
+			}
+		}
+		if (afterUpdate > 0) {
+			net.veloclient.launcher.launch.UpdateService.log("[start] " + AppVersion.VERSION + " started after an update (hop "
+					+ System.getProperty("velo.appHop") + "), waiting for the old launcher (pid " + afterUpdate + ")");
+			long waitStart = System.currentTimeMillis();
+			var old = ProcessHandle.of(afterUpdate);
+			if (old.isPresent()) {
+				try {
+					old.get().onExit().get(30, java.util.concurrent.TimeUnit.SECONDS);
+				} catch (Exception e) {
+					net.veloclient.launcher.launch.UpdateService.log("[start] old launcher still running after 30 s (" + e + ")");
+				}
+			}
+			net.veloclient.launcher.launch.UpdateService.log("[start] old launcher gone after " + (System.currentTimeMillis() - waitStart) + " ms");
+			boolean got = false;
+			for (int attempt = 0; attempt < 40 && !got; attempt++) {
+				got = SingleInstance.acquire();
+				if (!got) {
+					try {
+						Thread.sleep(250);
+					} catch (InterruptedException e) {
+						Thread.currentThread().interrupt();
+					}
+				}
+			}
+			net.veloclient.launcher.launch.UpdateService.log("[start] single-instance lock " + (got ? "taken" : "still held - starting anyway"));
+		} else if (System.getProperty("velo.launcherTour") == null && !SingleInstance.acquire()) {
 			LauncherLog.info("Launcher already running - brought it to the front instead of starting a second one");
 			System.exit(0);
 		}
@@ -5624,7 +5660,7 @@ public final class LauncherApp extends Application {
 						release.version(), release.notes(), release.pageUrl(), release.launcherNewer(), release.installer(), mods), text -> { }, track);
 				LauncherLog.info("Background update: mod build " + release.version() + " for " + mods.keySet());
 			}
-			if (release.launcherNewer() && net.veloclient.launcher.launch.UpdateService.prepareInstaller(release, track)) {
+			if (release.launcherNewer() && net.veloclient.launcher.launch.UpdateService.prepareLauncher(release, track)) {
 				launcherUpdateReady = true;
 				javafx.application.Platform.runLater(() -> {
 					readyRelease = release;
@@ -5650,6 +5686,7 @@ public final class LauncherApp extends Application {
 		} catch (Exception e) {
 			// the bell still offers the update by hand
 			LauncherLog.info("Background update didn't finish: " + e);
+			net.veloclient.launcher.launch.UpdateService.log("[prepare] background update didn't finish: " + e);
 		} finally {
 			backgroundUpdating = false;
 			javafx.application.Platform.runLater(this::refreshNotificationDot);
@@ -5733,7 +5770,8 @@ public final class LauncherApp extends Application {
 			}));
 			return actions;
 		}
-		actions.add(new net.veloclient.launcher.ui.UpdatePopup.Action("Restart to update", true, h -> {
+		actions.add(new net.veloclient.launcher.ui.UpdatePopup.Action("Install & Restart", true, h -> {
+			net.veloclient.launcher.launch.UpdateService.log("[ui] Install & Restart clicked for " + release.version());
 			if (!RunningInstanceManager.running().isEmpty()) {
 				h.status("Close your game first - the launcher restarts to update.");
 				return;

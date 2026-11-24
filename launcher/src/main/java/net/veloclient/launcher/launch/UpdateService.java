@@ -342,6 +342,40 @@ public final class UpdateService {
 	 * Background updates: downloads (and verifies) the new launcher's installer now, so "Restart to update" later starts
 	 * at once. True when it's on disk and checked; false when this system has no installer in the release.
 	 */
+	/**
+	 * Background launcher update: the installer-free update is downloaded, unpacked, checked and made next in line right
+	 * away (current.txt), so "Install & Restart" only restarts - and a launcher closed normally starts updated too. Only
+	 * when that can't work here (other Java, no app zip, it failed) the installer is downloaded instead. True when the
+	 * update is ready.
+	 */
+	public static boolean prepareLauncher(Release release, Consumer<Transfer> progress) throws IOException, InterruptedException {
+		log("==== background launcher update " + AppVersion.VERSION + " -> " + release.version() + " (" + osLine() + ")");
+		if (AppUpdate.isStaged(release.version())) {
+			log("[prepare] " + release.version() + " is already unpacked and next in line");
+			return true;
+		}
+		if (AppUpdate.usable(release)) {
+			try {
+				AppUpdate.install(release.appZip(), release.version(), s -> log("[prepare] " + s), progress);
+				log("[prepare] ready - a restart starts " + release.version());
+				return true;
+			} catch (IOException e) {
+				log("[prepare] installer-free update failed: " + AppUpdate.describe(e));
+				UpdateReports.send("Installer-free update failed (background)", release.version(), e);
+			}
+		} else {
+			log("[prepare] installer-free update not usable here (packaged " + packaged() + ", app zip "
+					+ (release.appZip() == null ? "missing" : release.appZip().name()) + ")");
+		}
+		log("[prepare] falling back to the installer");
+		return prepareInstaller(release, progress);
+	}
+
+	private static String osLine() {
+		return System.getProperty("os.name") + " " + System.getProperty("os.version") + " " + System.getProperty("os.arch") + ", Java "
+				+ Runtime.version() + ", app " + System.getProperty("jpackage.app-path") + ", hop " + System.getProperty("velo.appHop");
+	}
+
 	public static boolean prepareInstaller(Release release, Consumer<Transfer> progress) throws IOException, InterruptedException {
 		Asset installer = release.installer();
 		if (installer == null) {
@@ -387,16 +421,28 @@ public final class UpdateService {
 			throws IOException, InterruptedException {
 		// First choice everywhere: no installer at all - the new launcher files go into the player's own folder and the
 		// launcher starts again from them (AppUpdate). The installer is only the fallback (other Java runtime, no zip).
+		log("==== update requested " + AppVersion.VERSION + " -> " + release.version() + " (" + osLine() + ")");
+		if (release.launcherNewer() && AppUpdate.isStaged(release.version())) {
+			log("[restart] " + release.version() + " was prepared in the background - restarting into it");
+			status.accept("Updated - Velo Client starts again");
+			markPending(release.version());
+			relaunch();
+			return true;
+		}
 		if (release.launcherNewer() && AppUpdate.usable(release)) {
 			try {
 				log("Launcher update " + AppVersion.VERSION + " -> " + release.version() + " without installer (" + release.appZip().name() + ")");
 				AppUpdate.install(release.appZip(), release.version(), status, progress);
 				status.accept("Updated - Velo Client starts again");
+				markPending(release.version());
 				relaunch();
 				return true;
 			} catch (IOException e) {
-				log("Installer-free update didn't work (" + e.getMessage() + ") - using the installer");
+				log("Installer-free update didn't work - using the installer: " + AppUpdate.describe(e));
+				UpdateReports.send("Installer-free update failed", release.version(), e);
 			}
+		} else if (release.launcherNewer()) {
+			log("Installer-free update not usable (packaged " + packaged() + ", app zip " + (release.appZip() == null ? "missing" : "present") + ")");
 		}
 		Asset installer = release.installer();
 		if (installer == null) {
@@ -870,6 +916,7 @@ public final class UpdateService {
 		}
 		long age = System.currentTimeMillis() - Long.parseLong(props.getProperty("startedAt", "0"));
 		log("Still on " + AppVersion.VERSION + " after trying to update to " + to + " (installer exit " + exit + ", " + age / 1000 + " s ago)");
+		UpdateReports.send("Update didn't arrive (still " + AppVersion.VERSION + ", installer exit " + exit + ")", to, null);
 		String why = exit == null ? "the installer didn't finish"
 				: exit.equals("1602") ? "the installation was cancelled (or Windows' permission prompt was declined)"
 				: exit.equals("1618") ? "another installation was running at the same time"
@@ -892,23 +939,29 @@ public final class UpdateService {
 		try {
 			String app = System.getProperty("jpackage.app-path");
 			if (app == null || !Files.exists(Path.of(app))) {
+				log("[restart] no installed launcher to restart (jpackage.app-path " + app + ")");
 				LauncherLog.warn("No installed launcher to restart (jpackage.app-path " + app + ")", null);
 				return;
 			}
 			relaunched = true;
+			// The new launcher gets this one's pid: it waits until this process is really gone before it takes the
+			// single-instance lock. Before, it started blindly after ~2 s - when this one took longer to close it found the
+			// lock still held, handed over to the closing launcher and quit, and nothing was left running.
+			long pid = ProcessHandle.current().pid();
 			List<String> command = new ArrayList<>();
 			if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
-				// a short wait (this launcher closes meanwhile - else the single-instance check hands over to it), then start
-				command.addAll(List.of("cmd.exe", "/d", "/c", "ping -n 3 127.0.0.1 >nul & start \"\" \"" + app + "\""));
-				new ProcessBuilder(command).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
-				return;
+				command.addAll(List.of("cmd.exe", "/d", "/c", "ping -n 2 127.0.0.1 >nul & start \"\" \"" + app + "\" --after-update " + pid));
+			} else {
+				if (onPath("setsid")) {
+					command.add("setsid");
+				}
+				command.addAll(List.of("sh", "-c", "sleep 1; exec \"$0\" --after-update \"$1\" >/dev/null 2>&1", app, String.valueOf(pid)));
 			}
-			if (onPath("setsid")) {
-				command.add("setsid");
-			}
-			command.addAll(List.of("sh", "-c", "sleep 2; exec \"$0\" >/dev/null 2>&1", app));
+			log("[restart] " + String.join(" ", command));
 			new ProcessBuilder(command).redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+			log("[restart] started the new launcher process - this one (pid " + pid + ") closes now");
 		} catch (Exception e) {
+			log("[restart] couldn't start the launcher again: " + AppUpdate.describe(e));
 			LauncherLog.warn("Couldn't restart the launcher after updating", e);
 		}
 	}
@@ -1097,7 +1150,7 @@ public final class UpdateService {
 		return updatesDir().resolve("update.log");
 	}
 
-	static synchronized void log(String message) {
+	public static synchronized void log(String message) {
 		LauncherLog.info("Updater: " + message);
 		try {
 			Files.createDirectories(updatesDir());

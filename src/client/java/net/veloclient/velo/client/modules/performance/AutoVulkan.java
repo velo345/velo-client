@@ -104,6 +104,7 @@ public final class AutoVulkan {
 			var info = device.getDeviceInfo();
 			boolean onVulkan = "vulkan".equalsIgnoreCase(info.backendName());
 			var options = net.minecraft.client.Minecraft.getInstance().options;
+			irisHint(onVulkan);
 			String s = state();
 			if (s.equals("trying")) {
 				if (onVulkan) {
@@ -138,6 +139,44 @@ public final class AutoVulkan {
 		}
 		*///?}
 	}
+
+	//? if >=26.2 {
+	/*private static boolean irisHintShown;
+
+	// Vulkan picked by hand with Iris (or another OpenGL-only mod) in the profile: shader packs need OpenGL. Asked once per
+	// game folder, on the first title screen - "Switch to OpenGL" sets it for the next start.
+	private static void irisHint(boolean onVulkan) {
+		if (!onVulkan || !glOnlyModPresent()) {
+			return;
+		}
+		Path marker = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("velo-client").resolve("iris-opengl-hint.txt");
+		if (Files.exists(marker)) {
+			return;
+		}
+		try {
+			Files.createDirectories(marker.getParent());
+			Files.writeString(marker, "shown", StandardCharsets.UTF_8);
+		} catch (IOException ignored) {
+			// worst case it's asked again
+		}
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {
+			if (irisHintShown || !(client.gui.screen() instanceof net.minecraft.client.gui.screens.TitleScreen title)) {
+				return;
+			}
+			irisHintShown = true;
+			client.gui.setScreen(new net.veloclient.velo.client.gui.VeloConfirmScreen(title, "Shaders need OpenGL",
+					"You're running Minecraft on Vulkan, but Iris shader packs only work with OpenGL. Switch to OpenGL so your shaders "
+							+ "work? (Applies from the next start - you can change it any time in Video Settings.)",
+					"Keep Vulkan", "Switch to OpenGL", () -> {
+						client.options.preferredGraphicsBackend().set(net.minecraft.client.PreferredGraphicsApi.OPENGL);
+						client.options.save();
+						org.slf4j.LoggerFactory.getLogger("velo-client").info("Iris hint: switched to OpenGL for the next start");
+						net.veloclient.velo.client.social.NotificationOverlay.show(new net.veloclient.velo.client.social.NotificationOverlay.Toast(null, null,
+								"OpenGL from the next start", "Restart Minecraft and your Iris shaders work.", 8000, null, null, null));
+					}, 320, 170));
+		});
+	}
+	*///?}
 
 	/** Rewrites the backend line in options.txt directly (the game hasn't loaded it yet). */
 	private static void writeOptionsBackend(String value) {

@@ -83,48 +83,179 @@ public final class AppUpdate {
 	 */
 	static void install(UpdateService.Asset asset, String version, Consumer<String> status, Consumer<UpdateService.Transfer> progress)
 			throws IOException, InterruptedException {
+		long t0 = System.currentTimeMillis();
 		Files.createDirectories(root());
 		Path zip = UpdateService.updatesDir().resolve(asset.name());
+		UpdateService.log("[app] download " + asset.name() + " (" + asset.size() + " bytes, sha256 " + asset.sha256() + ") -> " + zip);
 		status.accept("Downloading Velo Client " + version + "...");
 		UpdateService.downloadAsset(asset, zip, progress);
+		UpdateService.log("[app] downloaded in " + (System.currentTimeMillis() - t0) + " ms, " + Files.size(zip) + " bytes on disk");
 		installZip(zip, version, status);
+	}
+
+	/** The update for {@code version} is unpacked, checked and next in line (current.txt) - a restart is all that's left. */
+	public static boolean isStaged(String version) {
+		try {
+			Path pointer = root().resolve("current.txt");
+			return Files.isRegularFile(pointer) && Files.readString(pointer, StandardCharsets.UTF_8).strip().equals(version)
+					&& Files.isRegularFile(root().resolve(version).resolve("launcher.jar"))
+					&& !Files.exists(root().resolve("failed-" + version));
+		} catch (IOException e) {
+			return false;
+		}
 	}
 
 	/**
 	 * Unpacks an app zip that is already on disk (the tester launcher downloads its builds from the Velo server) and
 	 * points current.txt at it; deletes the zip afterwards.
+	 *
+	 * <p>Unpacked straight into {@code launcher-app/<version>} - no folder rename at the end: on Windows the virus scanner
+	 * opens every freshly written jar, and renaming a folder while any file in it is open fails ("used by another
+	 * process"). That rename was where the installer-free update broke on Windows and everyone ended up in the installer.
+	 * Every file step retries for a few seconds for the same reason; everything is written to update.log.
 	 */
 	public static void installZip(Path zip, String version, Consumer<String> status) throws IOException {
+		long t0 = System.currentTimeMillis();
 		Files.createDirectories(root());
 		status.accept("Unpacking the update...");
 		Path target = root().resolve(version);
-		Path temp = root().resolve(version + ".unpacking");
-		deleteTree(temp);
-		Files.createDirectories(temp);
+		UpdateService.log("[app] unpack " + zip + " (" + (Files.exists(zip) ? Files.size(zip) : -1) + " bytes) -> " + target);
+		// leftovers of the old two-step unpack
+		try {
+			deleteTreeRetry(root().resolve(version + ".unpacking"));
+		} catch (IOException e) {
+			UpdateService.log("[app] old .unpacking folder stays: " + e);
+		}
+		if (Files.exists(target)) {
+			try {
+				deleteTreeRetry(target);
+				UpdateService.log("[app] removed an older copy of " + version);
+			} catch (IOException e) {
+				UpdateService.log("[app] couldn't remove the older copy (" + e + ") - overwriting its files instead");
+			}
+		}
+		Files.createDirectories(target);
 		JsonObject manifest = null;
+		int files = 0;
+		long bytes = 0;
 		try (ZipInputStream in = new ZipInputStream(Files.newInputStream(zip))) {
 			ZipEntry entry;
 			while ((entry = in.getNextEntry()) != null) {
 				String name = entry.getName();
 				// flat folder only: no paths, nothing that could land outside the target
 				if (entry.isDirectory() || name.contains("/") || name.contains("\\") || name.contains("..")) {
+					UpdateService.log("[app] skipped zip entry " + name);
 					continue;
 				}
-				Path out = temp.resolve(name);
-				Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING);
+				Path out = target.resolve(name);
+				long written = writeRetry(out, in);
+				files++;
+				bytes += written;
 				if (name.equals(MANIFEST)) {
 					manifest = JsonParser.parseString(Files.readString(out, StandardCharsets.UTF_8)).getAsJsonObject();
+					UpdateService.log("[app] manifest: " + manifest);
 				}
 			}
+		} catch (IOException | RuntimeException e) {
+			UpdateService.log("[app] unpack failed after " + files + " files: " + describe(e));
+			throw e instanceof IOException io ? io : new IOException(e);
 		}
-		check(temp, manifest, version);
-		deleteTree(target);
-		Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE);
-		Files.deleteIfExists(root().resolve("failed-" + version));
-		Files.deleteIfExists(root().resolve("booting-" + version));
+		UpdateService.log("[app] unpacked " + files + " files, " + bytes + " bytes in " + (System.currentTimeMillis() - t0) + " ms");
+		try {
+			check(target, manifest, version);
+		} catch (IOException e) {
+			UpdateService.log("[app] check failed: " + e.getMessage() + " - this update needs the installer");
+			try {
+				deleteTreeRetry(target);
+			} catch (IOException ignored) {
+				// harmless: current.txt doesn't point at it
+			}
+			throw e;
+		}
+		UpdateService.log("[app] check passed (java " + Runtime.version().feature() + ", platform " + platform() + ")");
+		deleteRetry(root().resolve("failed-" + version));
+		deleteRetry(root().resolve("booting-" + version));
 		writeCurrent(version);
-		Files.deleteIfExists(zip);
-		UpdateService.log("App update " + version + " unpacked to " + target + " - starts with the next launch");
+		UpdateService.log("[app] current.txt -> " + version + " - the next launcher start runs it (" + (System.currentTimeMillis() - t0) + " ms total)");
+		try {
+			Files.deleteIfExists(zip);
+		} catch (IOException e) {
+			// not a failed update - the zip is just still being scanned; cleaned up on a later start
+			UpdateService.log("[app] zip stays for now (" + e + ")");
+		}
+	}
+
+	/**
+	 * Streams one zip entry to {@code out} (384 MB launcher.jar - never in memory): written as {@code .part}, then moved into
+	 * place. Windows: a file the virus scanner just opened can't be replaced for a moment - the move is retried for ~6 s.
+	 */
+	private static long writeRetry(Path out, ZipInputStream in) throws IOException {
+		Path part = out.resolveSibling(out.getFileName() + ".part");
+		long written;
+		try (var stream = Files.newOutputStream(part)) {
+			written = in.transferTo(stream);
+		}
+		IOException last = null;
+		for (int attempt = 0; attempt < 25; attempt++) {
+			try {
+				Files.move(part, out, StandardCopyOption.REPLACE_EXISTING);
+				if (attempt > 0) {
+					UpdateService.log("[app] placed " + out.getFileName() + " on attempt " + (attempt + 1));
+				}
+				return written;
+			} catch (IOException e) {
+				last = e;
+				pause(250);
+			}
+		}
+		UpdateService.log("[app] couldn't place " + out + ": " + describe(last));
+		throw last;
+	}
+
+	private static void deleteRetry(Path file) throws IOException {
+		IOException last = null;
+		for (int attempt = 0; attempt < 25; attempt++) {
+			try {
+				Files.deleteIfExists(file);
+				return;
+			} catch (IOException e) {
+				last = e;
+				pause(250);
+			}
+		}
+		throw last;
+	}
+
+	private static void deleteTreeRetry(Path dir) throws IOException {
+		IOException last = null;
+		for (int attempt = 0; attempt < 25; attempt++) {
+			try {
+				deleteTree(dir);
+				return;
+			} catch (IOException e) {
+				last = e;
+				pause(250);
+			}
+		}
+		throw last;
+	}
+
+	private static void pause(long ms) {
+		try {
+			Thread.sleep(ms);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	static String describe(Throwable t) {
+		if (t == null) {
+			return "?";
+		}
+		java.io.StringWriter out = new java.io.StringWriter();
+		t.printStackTrace(new java.io.PrintWriter(out));
+		String text = out.toString();
+		return text.length() > 3000 ? text.substring(0, 3000) + "..." : text;
 	}
 
 	/** The unpacked folder must be complete and made for the Java runtime this install bundles. */
@@ -200,8 +331,23 @@ public final class AppUpdate {
 
 	private static void writeCurrent(String version) throws IOException {
 		Path tmp = root().resolve("current.txt.tmp");
-		Files.writeString(tmp, version, StandardCharsets.UTF_8);
-		Files.move(tmp, root().resolve("current.txt"), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+		IOException last = null;
+		for (int attempt = 0; attempt < 25; attempt++) {
+			try {
+				Files.writeString(tmp, version, StandardCharsets.UTF_8);
+				try {
+					Files.move(tmp, root().resolve("current.txt"), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+				} catch (java.nio.file.AtomicMoveNotSupportedException e) {
+					Files.move(tmp, root().resolve("current.txt"), StandardCopyOption.REPLACE_EXISTING);
+				}
+				return;
+			} catch (IOException e) {
+				last = e;
+				pause(250);
+			}
+		}
+		UpdateService.log("[app] couldn't write current.txt: " + describe(last));
+		throw last;
 	}
 
 	// ------------------------------------------------------------------ start
@@ -223,13 +369,17 @@ public final class AppUpdate {
 				return false;
 			}
 			String version = Files.readString(pointer, StandardCharsets.UTF_8).strip();
+			UpdateService.log("[hop] installed " + AppVersion.VERSION + ", current.txt " + version + ", args " + java.util.Arrays.toString(args));
 			if (UpdateService.compare(version, AppVersion.VERSION) <= 0) {
+				UpdateService.log("[hop] installed version is as new - removing unpacked versions");
 				// a fresh installer brought this or a newer version: the unpacked ones are old now
 				cleanUp(null);
 				return false;
 			}
 			Path dir = root().resolve(version);
 			if (!Files.isRegularFile(dir.resolve("launcher.jar")) || Files.exists(root().resolve("failed-" + version))) {
+				UpdateService.log("[hop] not starting " + version + ": launcher.jar " + Files.isRegularFile(dir.resolve("launcher.jar"))
+						+ ", failed marker " + Files.exists(root().resolve("failed-" + version)));
 				return false;
 			}
 			// The last start of this version never showed a window: give it one more try, then fall back for good.
@@ -318,6 +468,7 @@ public final class AppUpdate {
 		try {
 			String hopped = System.getProperty("velo.appHop");
 			if (hopped != null) {
+				UpdateService.log("[hop] " + hopped + " is up (window shown)");
 				Files.deleteIfExists(root().resolve("booting-" + hopped));
 				cleanUp(hopped);
 			}

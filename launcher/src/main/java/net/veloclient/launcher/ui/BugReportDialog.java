@@ -310,7 +310,7 @@ public final class BugReportDialog {
 			"(--accessToken\\s+)\\S+|eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}");
 
 	/** Never send a Minecraft access token: native crash dumps (hs_err) contain the whole launch command line. */
-	static String redactSecrets(String text) {
+	public static String redactSecrets(String text) {
 		if (text == null || text.isEmpty()) {
 			return text;
 		}
