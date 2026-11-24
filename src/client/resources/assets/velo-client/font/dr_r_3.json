@@ -1,0 +1,18 @@
+{
+	"providers": [
+		{
+			"type": "ttf",
+			"file": "velo-client:geist_medium.ttf",
+			"size": 9,
+			"oversample": 1.5,
+			"shift": [
+				0,
+				0
+			]
+		},
+		{
+			"type": "reference",
+			"id": "minecraft:default"
+		}
+	]
+}

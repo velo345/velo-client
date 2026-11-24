@@ -99,6 +99,11 @@ public final class MenuKit {
 		return font(s, MONO);
 	}
 
+	/** {@code s} in any Velo font by its id path (e.g. {@code dr_r_5}). */
+	public static Text inFont(String s, String fontPath) {
+		return font(s, Identifier.of("velo-client", fontPath));
+	}
+
 	public static Text ui(String s) {
 		return font(s, UI);
 	}

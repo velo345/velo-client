@@ -47,15 +47,18 @@ public final class DrawerTour {
 				case 270 -> shot(client, "drawer-7-full.png");
 				case 275 -> screen.testCategory("PvP");
 				case 300 -> shot(client, "drawer-8-full-pvp.png");
-				case 305 -> screen.testModule("performance-boost");
-				case 335 -> shot(client, "drawer-9-full-module.png");
-				case 340 -> {
+				case 302 -> screen.testFeatures();
+				case 325 -> shot(client, "drawer-9-full-features.png");
+				case 330 -> screen.testModule("performance-boost");
+				case 355 -> shot(client, "drawer-10-full-module.png");
+				case 360 -> {
 					screen.testExpanded(false);
 					screen.testHome();
-					screen.testOpen(false);
 				}
-				case 370 -> shot(client, "drawer-10-collapsed.png");
-				case 390 -> client.scheduleStop();
+				case 375 -> shot(client, "drawer-11-panel-after.png");
+				case 380 -> screen.testOpen(false);
+				case 405 -> shot(client, "drawer-12-collapsed.png");
+				case 425 -> client.scheduleStop();
 				default -> {
 				}
 			}

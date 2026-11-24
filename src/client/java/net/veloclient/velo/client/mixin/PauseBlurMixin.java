@@ -23,6 +23,10 @@ public abstract class PauseBlurMixin {
 
 	@Inject(method = "getMenuBackgroundBlurrinessValue()I", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$pauseBlur(CallbackInfoReturnable<Integer> cir) {
+		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.drawer.VeloDrawerScreen drawer) {
+			cir.setReturnValue(drawer.blurRadius());   // the full R-Shift menu: strong glass blur, faded in and out
+			return;
+		}
 		int blur = ScreenLook.pause().blur;
 		if (blur >= 0 && net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof GameMenuScreen) {
 			cir.setReturnValue(blur);
@@ -35,6 +39,10 @@ public abstract class PauseBlurMixin {
 
 	@Inject(method = "getMenuBackgroundBlurriness()I", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$pauseBlur(CallbackInfoReturnable<Integer> cir) {
+		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.drawer.VeloDrawerScreen drawer) {
+			cir.setReturnValue(drawer.blurRadius());   // the full R-Shift menu: strong glass blur, faded in and out
+			return;
+		}
 		int blur = ScreenLook.pause().blur;
 		if (blur >= 0 && net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof PauseScreen) {
 			cir.setReturnValue(blur);
