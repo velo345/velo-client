@@ -49,7 +49,7 @@ public final class DrawerTour {
 				case 300 -> shot(client, "drawer-8-full-pvp.png");
 				case 302 -> screen.testFeatures();
 				case 325 -> shot(client, "drawer-9-full-features.png");
-				case 330 -> screen.testModule("performance-boost");
+				case 330 -> screen.testModule("keystrokes");
 				case 355 -> shot(client, "drawer-10-full-module.png");
 				case 360 -> {
 					screen.testExpanded(false);

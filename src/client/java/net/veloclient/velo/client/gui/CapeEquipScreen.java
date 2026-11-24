@@ -410,7 +410,8 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 	/** The stage's top-left switch: "Armor" on/off for the preview (launcher's Full look / Cloak only spot). */
 	private static int[] armorBox(net.minecraft.client.font.TextRenderer font) {
 		int w = MenuKit.width(font, MenuKit.uiBold("Armor")) + 30;
-		return new int[] {stageX() + 8, stageBottom() - 26, w, 18};   // bottom-left: the name tag above the head covered it at the top
+		// right of the item's name at the bottom of the stage (top-left sat under the name tag, bottom-left on the buttons)
+		return new int[] {stageX() + SHOWCASE_WIDTH - 8 - w, stageBottom() - 67, w, 18};
 	}
 
 	private static boolean armorShown;
@@ -510,7 +511,10 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		VeloDraw.fillRounded(context, x, y, SHOWCASE_WIDTH, h, 8, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF100D0D, 0x12FFFFFF));
 		VeloDraw.strokeRounded(context, x, y, SHOWCASE_WIDTH, h, 8, 0x10FFFFFF);
 		int fy = y + h - 46;
-		VeloDraw.fillRoundedGradient(context, x + SHOWCASE_WIDTH / 6, fy, SHOWCASE_WIDTH * 2 / 3, 18, 9, 0x00000000, VeloUi.withAlpha(MenuKit.accent(), 0x18));
+		if (!net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
+			// (glass: no floor glow - with the white accent it was a stray white line)
+			VeloDraw.fillRoundedGradient(context, x + SHOWCASE_WIDTH / 6, fy, SHOWCASE_WIDTH * 2 / 3, 18, 9, 0x00000000, VeloUi.withAlpha(MenuKit.accent(), 0x18));
+		}
 	}
 
 	@Override
@@ -570,8 +574,7 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		boolean isEquipped = selectedWear.isEmpty() ? equipped == null : selectedWear.equals(equipped);
 		boolean owned = selectedWear.isEmpty() || net.veloclient.velo.client.cosmetics.wear.WearManager.owns(selectedWear);
 		var selectedType = net.veloclient.velo.client.cosmetics.wear.WearManager.type(selectedWear);
-		int armorW = armorBox(this.textRenderer)[2] + 6;
-		VeloButton equip = new VeloButton(showcaseX + 8 + armorW, stageBottom() - 28, SHOWCASE_WIDTH - 16 - armorW, 20,
+		VeloButton equip = new VeloButton(showcaseX + 8, stageBottom() - 28, SHOWCASE_WIDTH - 16, 20,
 				Text.literal(selectedWear.isEmpty() ? (equipped == null ? "Nothing here" : "Take it off") : isEquipped ? "Take it off"
 						: owned ? "Wear it" : "Get in the Store"), b -> {
 					if (!owned) {

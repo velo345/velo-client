@@ -56,8 +56,8 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	private static final float EXPAND_TIME = 0.42f;
 	private static final float HANDLE_TIME = 0.26f;
 
-	private static final int GLASS = 0x99141417;        // the panel, over the blurred world
-	private static final int GLASS_FULL = 0x8A141418;   // the full menu: over the strongly blurred world
+	private static final int GLASS = 0xA8141417;        // the panel, over the softly blurred world
+	private static final int GLASS_FULL = 0xA6141418;   // the full menu
 	private static final Identifier LOGO = Identifier.of("velo-client", "textures/icon/logo.png");
 	private static final int TEXT_1 = 0xEBFFFFFF;
 	private static final int GLASS_EDGE = 0x26FFFFFF;
@@ -299,7 +299,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	public int blurRadius() {
 		// the panel gets a lighter blur (the HUD stays crisp on top); it lifts when the panel slides away to place things
 		float e = easeInOut(expandAnim);
-		return Math.round((8f + 7f * e) * ease(openAnim));
+		return Math.round((4f + 3f * e) * ease(openAnim));   // the game behind: softly blurred, the glass itself is frostier
 	}
 
 	// ---------------------------------------------------------------- geometry
@@ -567,6 +567,12 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		handleAnim = approach(handleAnim, (!open || autoHidden()) && !expanded && !closing ? 1f : 0f, dt / HANDLE_TIME);
 		expandAnim = approach(expandAnim, expanded ? 1f : 0f, dt / EXPAND_TIME);
 		trans = Math.min(1f, trans + dt / PAGE_TIME);
+		float glide = 1f - (float) Math.exp(-dt * 14f);
+		for (Map.Entry<Page, Float> e : scrollTarget.entrySet()) {
+			float cur = scroll.getOrDefault(e.getKey(), 0f);
+			float target = clampScroll(e.getKey(), e.getValue());
+			scroll.put(e.getKey(), Math.abs(target - cur) < 0.05f ? target : cur + (target - cur) * glide);
+		}
 		//? if <1.21.2 {
 		/*if (blurOn()) {
 			this.applyBlur(delta);
@@ -579,6 +585,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 		hits.clear();
 		overlayHits.clear();
+		scrollbars.clear();
 		float[] heldTrack = sliding != null ? sliderTrack.get(sliding) : null;
 		sliderTrack.clear();   // rebuilt every frame (only the slider being dragged stays)
 		if (heldTrack != null) {
@@ -742,8 +749,9 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		}
 		float rad = 18f + 6f * e;
 		glass(c, x, y, w, h, rad, VeloAnim.lerpArgb(GLASS, GLASS_FULL, e), a);
-		hits.add(new Hit(x, y, w, h, () -> {
-		}));   // eats clicks on the glass itself
+		glassHit = new Hit(x, y, w, h, () -> {
+		});
+		hits.add(glassHit);   // eats clicks on the glass itself
 
 		float pa = a * clamp01(1f - e * 2.2f);
 		float fa = a * clamp01((e - 0.45f) * 2.2f);
@@ -830,11 +838,61 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		if (!full) {
 			renderPage(c, p, x, pw, top, height, a, live);
 		} else if (p.kind() == Kind.MODULE) {
-			float cw = Math.min(560f, pw - 48f);
-			renderPage(c, p, x + (pw - cw) / 2f, cw, top, height, a, live);
+			net.veloclient.velo.client.gui.window.ModulePreview.Kind kind = net.veloclient.velo.client.gui.window.ModulePreview.kind(p.module());
+			boolean preview = kind == net.veloclient.velo.client.gui.window.ModulePreview.Kind.HUD
+					|| kind == net.veloclient.velo.client.gui.window.ModulePreview.Kind.CROSSHAIR
+					|| kind == net.veloclient.velo.client.gui.window.ModulePreview.Kind.SCENE;
+			if (preview && pw >= 600f) {
+				// settings on the left, a live preview of what you're changing on the right
+				float gap = 24f;
+				float pvW = Math.min(360f, pw * 0.4f);
+				float cw = Math.min(500f, pw - 48f - pvW - gap);
+				float cx = x + (pw - (cw + gap + pvW)) / 2f;
+				renderPage(c, p, cx, cw, top, height, a, live);
+				drawPreview(c, p.module(), kind, cx + cw + gap, top + 8f, pvW, Math.min(height - 16f, pvW * 0.72f + 14f), a);
+			} else {
+				float cw = Math.min(560f, pw - 48f);
+				renderPage(c, p, x + (pw - cw) / 2f, cw, top, height, a, live);
+			}
 		} else {
 			renderGrid(c, p, x, pw, top, height, a, live);
 		}
+	}
+
+	/** The module's live preview (the same scenes the old settings window had), drawn in gui pixels. */
+	private void drawPreview(DrawContext c, Module m, net.veloclient.velo.client.gui.window.ModulePreview.Kind kind, float x, float y, float w, float h, float a) {
+		if (a < 0.4f) {
+			return;
+		}
+		text(c, Mo("PREVIEW"), x + 2f, y, TEXT_3, a);
+		y += 14f;
+		h -= 14f;
+		ModuleScenes.pop(c);
+		int bx = Math.round(x * k);
+		int by = Math.round(y * k);
+		int bw = Math.round(w * k);
+		int bh = Math.round(h * k);
+		try {
+			switch (kind) {
+				case HUD -> {
+					net.veloclient.velo.client.gui.window.ModulePreview.backdrop(c, bx, by, bw, bh);
+					net.veloclient.velo.client.gui.window.ModulePreview.drawHud(c, (HudModule) m, bx, by, bw, bh, lastDelta);
+				}
+				case CROSSHAIR -> {
+					net.veloclient.velo.client.gui.window.ModulePreview.backdrop(c, bx, by, bw, bh);
+					net.veloclient.velo.client.gui.window.ModulePreview.drawCrosshair(c, bx, by, bw, bh);
+				}
+				default -> {
+					ModuleScenes.drawUnder(c, m, bx, by, bw, bh);
+					ModuleScenes.drawOver(c, m, bx, by, bw, bh);
+				}
+			}
+		} catch (RuntimeException ignored) {
+			// a preview never breaks the menu
+		}
+		VeloDraw.strokeRounded(c, bx, by, bw, bh, 8, 0x24FFFFFF);
+		ModuleScenes.push(c);
+		ModuleScenes.scale(c, k, k);
 	}
 
 	private void roundButton(DrawContext c, String iconKey, float x, float y, float size, float a, Runnable click) {
@@ -1025,12 +1083,12 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		trans = 0f;
 		transDir = tab >= from ? 1 : -1;
 		dropdown = null;
-		scroll.put(page(), 0f);
+		setScroll(page(), 0f);
 	}
 
 	/** Module cards: icon tile, switch, name, a line about it. Searching shows the results; All shows every category. */
 	private void renderGrid(DrawContext c, Page p, float x, float pw, float top, float height, float a, boolean live) {
-		float s = scroll.getOrDefault(p, 0f);
+		float s = Math.min(scroll.getOrDefault(p, 0f), scrollMax.getOrDefault(p, Float.MAX_VALUE));
 		float gx = x + 22f;
 		float gw = pw - 44f;
 		int cols = gw >= 700f ? 4 : 3;
@@ -1253,7 +1311,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	// ---- pages
 
 	private void renderPage(DrawContext c, Page p, float x, float pw, float top, float height, float a, boolean live) {
-		float s = scroll.getOrDefault(p, 0f);
+		float s = Math.min(scroll.getOrDefault(p, 0f), scrollMax.getOrDefault(p, Float.MAX_VALUE));
 		float y = top + 4f - s;
 		float content = switch (p.kind()) {
 			case HOME -> renderHome(c, x + PAD, y, pw - 2 * PAD, top, height, a, live);
@@ -1272,13 +1330,18 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	private void scrollBar(DrawContext c, Page p, float x, float s, float content, float top, float height, float a, boolean live) {
 		float max = Math.max(0f, content - height + 12f);
+		scrollMax.put(p, max);
 		if (s > max) {
-			scroll.put(p, max);
+			setScroll(p, max);
 		}
 		if (max > 0f && live) {
 			float bar = Math.max(24f, height * height / (content + 12f));
 			float by = top + (height - bar) * (Math.min(s, max) / max);
-			rect(c, x, by, 2.5f, bar, 1.25f, 0x40FFFFFF, a);
+			boolean active = draggingBar != null && draggingBar.page() == p;
+			boolean over = active || mouseU >= x - 6f && mouseU < x + 8f && mouseV >= top && mouseV < top + height;
+			float bw = over ? 4f : 2.5f;
+			rect(c, x + 2.5f - bw, by, bw, bar, bw / 2f, over ? 0x80FFFFFF : 0x40FFFFFF, a);
+			scrollbars.add(new Bar(p, x - 6f, top, 14f, height, bar, max));
 		}
 	}
 
@@ -1753,6 +1816,41 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	}
 
 	private final Map<Hit, float[]> sliderTrack = new HashMap<>();
+
+	/** A page's scroll bar this frame: drag (or click) it to scroll. */
+	private record Bar(Page page, float x, float y, float w, float h, float bar, float max) {
+		boolean contains(double u, double v) {
+			return u >= x && u < x + w && v >= y && v < y + h;
+		}
+
+		float scrollAt(double v) {
+			return Math.max(0f, Math.min(max, (float) ((v - y - bar / 2f) / Math.max(1f, h - bar)) * max));
+		}
+	}
+
+	private final List<Bar> scrollbars = new ArrayList<>();
+	/** Smooth scrolling: where each page is heading (the wheel and flings set it; the view eases there). */
+	private final Map<Page, Float> scrollTarget = new HashMap<>();
+	private Hit glassHit;
+	// touch-style scrolling: press on an empty spot of the page and drag
+	private Page touchPage;
+	private double touchStartV;
+	private float touchStartScroll;
+	private double touchLastV;
+	private long touchLastNanos;
+	private float touchVelocity;
+
+	private void setScroll(Page p, float value) {
+		scroll.put(p, value);
+		scrollTarget.put(p, value);
+	}
+
+	private float clampScroll(Page p, float value) {
+		return Math.max(0f, Math.min(scrollMax.getOrDefault(p, Float.MAX_VALUE), value));
+	}
+	/** How far each page can scroll (from the last frame). */
+	private final Map<Page, Float> scrollMax = new HashMap<>();
+	private Bar draggingBar;
 	private static final int[] SWATCHES = {0xFFFFFFFF, 0xFFE5373E, 0xFFFF9F0A, 0xFFFFD60A, 0xFF32D74B, 0xFF64D2FF, 0xFF5E5CE6, 0xFFBF5AF2, 0xFF141416};
 
 	private void keycap(DrawContext c, Text label, String key, boolean on, float x, float y, float w, float top, float height, float a, boolean live,
@@ -1899,6 +1997,13 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			moreMenu = false;
 			return true;
 		}
+		for (Bar bar : scrollbars) {
+			if (bar.contains(u, v)) {
+				draggingBar = bar;
+				setScroll(bar.page(), bar.scrollAt(v));
+				return true;
+			}
+		}
 		for (int i = hits.size() - 1; i >= 0; i--) {
 			Hit h = hits.get(i);
 			if (!h.contains(u, v)) {
@@ -1912,6 +2017,15 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			if (h.grip != null) {
 				ghost = h.grip;
 				ghostMoved = false;
+				return true;
+			}
+			if (h == glassHit && v >= bodyTop && v < bodyBottom) {
+				touchPage = page();
+				touchStartV = v;
+				touchLastV = v;
+				touchLastNanos = System.nanoTime();
+				touchVelocity = 0f;
+				touchStartScroll = scroll.getOrDefault(touchPage, 0f);
 				return true;
 			}
 			if (h.click != null) {
@@ -1969,6 +2083,19 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			slideTo(u);
 			return true;
 		}
+		if (draggingBar != null) {
+			setScroll(draggingBar.page(), draggingBar.scrollAt(v));
+			return true;
+		}
+		if (touchPage != null) {
+			long now = System.nanoTime();
+			float secs = Math.max(0.001f, (now - touchLastNanos) / 1e9f);
+			touchVelocity = touchVelocity * 0.6f + (float) ((v - touchLastV) / secs) * 0.4f;
+			touchLastV = v;
+			touchLastNanos = now;
+			setScroll(touchPage, clampScroll(touchPage, touchStartScroll - (float) (v - touchStartV)));
+			return true;
+		}
 		if (ghost != null) {
 			ghostMoved = true;
 			return true;
@@ -1999,6 +2126,18 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	@Override
 	public boolean mouseReleased(net.minecraft.client.gui.Click click) {
+		if (draggingBar != null) {
+			draggingBar = null;
+			return true;
+		}
+		if (touchPage != null) {
+			// a flick keeps going a little, then glides to a stop
+			boolean recent = System.nanoTime() - touchLastNanos < 80_000_000L;
+			float fling = recent ? -touchVelocity * 0.18f : 0f;
+			scrollTarget.put(touchPage, clampScroll(touchPage, scroll.getOrDefault(touchPage, 0f) + fling));
+			touchPage = null;
+			return true;
+		}
 		if (sliding != null) {
 			sliding = null;
 			VeloProfileStore.saveActive();
@@ -2051,7 +2190,10 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
 		if (overDrawer(mouseX / k, mouseY / k)) {
 			Page p = page();
-			scroll.put(p, Math.max(0f, scroll.getOrDefault(p, 0f) - (float) verticalAmount * 24f));
+			// clamped right here to the page's length (last frame): scrolling past the end used to draw one frame too far and jump back
+			float max = scrollMax.getOrDefault(p, Float.MAX_VALUE);
+			float from = scrollTarget.getOrDefault(p, scroll.getOrDefault(p, 0f));
+			scrollTarget.put(p, Math.max(0f, Math.min(max, from - (float) verticalAmount * 40f)));
 			return true;
 		}
 		return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
@@ -2117,10 +2259,15 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			return true;
 		}
 		if (key == Keys.ESCAPE) {
+			// Esc steps back through the menu (module -> category -> home), and closes only from the start;
+			// the menu key (R-Shift) closes right away from anywhere
 			if (overlayOpen()) {
 				dropdown = null;
 				profileMenu = false;
 				moreMenu = false;
+			} else if (stack.size() > 1) {
+				search.setLength(0);
+				back();
 			} else {
 				closeToGame();
 			}
@@ -2173,7 +2320,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			transDir = -1;
 		}
 		open = true;
-		scroll.put(page(), 0f);
+		setScroll(page(), 0f);
 		return true;
 	}
 

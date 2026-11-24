@@ -306,11 +306,11 @@ public abstract class VeloWindow extends Screen {
 		int baseAlpha = switch (style) {
 			case "glass" -> 0xA8;
 			case "solid" -> 0xFF;
-			default -> 0x8C;   // glass over the blurred game
+			default -> 0xA4;   // frosted glass over the softly blurred game
 		};
 		if (glassLook()) {
 			glass = 0xFF141418;
-			baseAlpha = 0x8C;
+			baseAlpha = 0xA4;
 		}
 		baseAlpha = Math.round(baseAlpha * (1f - look.clear / 100f * 0.75f));
 		int surface = (glass & 0x00FFFFFF) | (Math.round(baseAlpha * openProgress) << 24);
@@ -380,7 +380,7 @@ public abstract class VeloWindow extends Screen {
 						VeloUi.withAlpha(0xFFE5484D, Math.round(0xD0 * openProgress)), closeHover));
 		int glyph = VeloAnim.lerpArgb(VeloUi.withAlpha(theme.text(), Math.round(0xB0 * openProgress)),
 				VeloUi.withAlpha(0xFFFFFFFF, alpha), closeHover);
-		VeloDraw.cross(context, closeX + CLOSE_SIZE / 2f, closeY + CLOSE_SIZE / 2f, 6.5f, 1.3f, glyph);
+		VeloDraw.cross(context, closeX + CLOSE_SIZE / 2f, closeY + CLOSE_SIZE / 2f, 7.5f, 1.6f, glyph);
 
 		String railId = shell() ? ((MenuPage) this).railId() : null;
 		if (railId != null) {
@@ -787,7 +787,7 @@ public abstract class VeloWindow extends Screen {
 		}
 	}
 
-	private static final int CLOSE_SIZE = 18;
+	private static final int CLOSE_SIZE = 22;   // big enough to hit, and clear of header buttons
 	private float closeHover;
 	private long lastFrameNanos;
 

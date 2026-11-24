@@ -101,72 +101,84 @@ public final class StatusIconEditor {
 
 			@Override
 			public void drawContextPreview(DrawContext context, PixelEditorScreen editor, int x, int y, int width, int height) {
-				// A row the way it looks in game: full, full, full, half, empty, empty (2x size).
+				// A row the way it looks in game: full, full, full, half, empty, empty.
 				NativeImage full = editor.image("full");
 				NativeImage half = editor.image("half");
 				NativeImage empty = editor.image("empty");
-				boolean hearts = "heart".equals(kind);
-				int slot = hearts ? 14 : 18;    // hearts: a smaller row, so the effect variants fit under it
-				int step = hearts ? 13 : 16;
-				int rowX = x + Math.max(6, (width - (step * 5 + slot)) / 2);
-				int rowY = hearts ? y + 4 : y + (height - slot) / 2;
-				for (int i = 0; i < 6; i++) {
-					int sx = rowX + i * step;
-					if (i < 3) {
-						PixelEditorScreen.drawImage(context, full, sx, rowY, slot, 0, 1f);
-					} else if (i == 3) {
-						if (empty != null) {
-							PixelEditorScreen.drawImage(context, empty, sx, rowY, slot, 0, 1f);
-						} else {
-							PixelEditorScreen.drawImage(context, full, sx, rowY, slot, 0x59000000, 1f);
-						}
-						if (half != null) {
-							PixelEditorScreen.drawImage(context, half, sx, rowY, slot, 0, 1f);
-						} else {
-							PixelEditorScreen.drawImage(context, full, sx, rowY, slot, 0, 5 / 9f);
-						}
-					} else if (empty != null) {
-						PixelEditorScreen.drawImage(context, empty, sx, rowY, slot, 0, 1f);
-					} else {
-						PixelEditorScreen.drawImage(context, full, sx, rowY, slot, 0x59000000, 1f);
-					}
-				}
 				if (!"heart".equals(kind) || full == null) {
+					int slot = 18;
+					drawRow(context, full, half, empty, x + Math.max(6, (width - (16 * 5 + slot)) / 2), y + (height - slot) / 2, slot, 16);
 					return;
 				}
-				// The variants made from this drawing (hue-shifted like a pen with modifiers) - what absorption, poison,
-				// wither and frozen look like unless you draw them yourself. Four groups side by side under the row.
+				// Hearts: every kind as its own full row, one under the other - click one to draw that kind.
 				var font = MinecraftClient.getInstance().textRenderer;
-				int small = 12;
-				int groupW = width / 4;
-				int vy = rowY + slot + 4;
-				if (vy + 10 + small > y + height) {
-					return;
-				}
-				int g = 0;
-				for (StatusBarIcons.Variant variant : StatusBarIcons.Variant.values()) {
-					if (variant == StatusBarIcons.Variant.NORMAL) {
-						continue;
+				StatusBarIcons.Variant[] variants = StatusBarIcons.Variant.values();
+				int rowH = Math.max(16, Math.min(30, (height - 8) / variants.length));
+				int slot = Math.min(16, rowH - 8);
+				int step = slot + 2;
+				int labelW = 74;
+				int ry = y + Math.max(4, (height - rowH * variants.length) / 2);
+				int[] mouse = editor.mouse();
+				for (StatusBarIcons.Variant variant : variants) {
+					boolean normal = variant == StatusBarIcons.Variant.NORMAL;
+					boolean hover = !normal && mouse[0] >= x + 4 && mouse[0] < x + width - 4 && mouse[1] >= ry && mouse[1] < ry + rowH;
+					if (normal || hover) {
+						net.veloclient.velo.client.gui.widget.VeloDraw.fillRounded(context, x + 4, ry + 1, width - 8, rowH - 2, 6, normal ? 0x14FFFFFF : 0x22FFFFFF);
 					}
-					int gx = x + g * groupW + 6;
-					boolean own = StatusBarIcons.hasDrawing(variant.kind(kind));
-					context.drawTextWithShadow(font, variant.label + (own ? " *" : ""), gx, vy, 0xFF9A9AA6);
-					NativeImage made = variant.applyTo(full);
-					NativeImage madeEmpty = variant == StatusBarIcons.Variant.WITHERED && empty != null ? variant.applyTo(empty) : null;
-					NativeImage back = madeEmpty != null ? madeEmpty : empty;
-					int iy = vy + 10;
-					PixelEditorScreen.drawImage(context, made, gx, iy, small, 0, 1f);
-					PixelEditorScreen.drawImage(context, back != null ? back : made, gx + small + 2, iy, small, back != null ? 0 : 0x59000000, 1f);
-					PixelEditorScreen.drawImage(context, made, gx + small + 2, iy, small, 0, 5 / 9f);
-					PixelEditorScreen.drawImage(context, back != null ? back : made, gx + 2 * (small + 2), iy, small, back != null ? 0 : 0x59000000, 1f);
-					made.close();
-					if (madeEmpty != null) {
-						madeEmpty.close();
+					boolean own = !normal && StatusBarIcons.hasDrawing(variant.kind(kind));
+					String label = normal ? "Normal" : variant.label;
+					int ty = ry + (rowH - 8) / 2;
+					net.veloclient.velo.client.gui.title.MenuKit.text(context, font, net.veloclient.velo.client.gui.title.MenuKit.uiBold(label), x + 12, ty,
+							normal ? 0xFFFFFFFF : 0xFFD4D4DA);
+					int hx = x + 12 + labelW;
+					int hy = ry + (rowH - slot) / 2;
+					if (normal) {
+						drawRow(context, full, half, empty, hx, hy, slot, step);
+					} else {
+						NativeImage made = variant.applyTo(full);
+						NativeImage madeEmpty = variant == StatusBarIcons.Variant.WITHERED && empty != null ? variant.applyTo(empty) : null;
+						drawRow(context, made, null, madeEmpty != null ? madeEmpty : empty, hx, hy, slot, step);
+						made.close();
+						if (madeEmpty != null) {
+							madeEmpty.close();
+						}
+						String tag = hover ? "Edit  >" : own ? "Your drawing" : "";
+						if (!tag.isEmpty()) {
+							net.minecraft.text.Text t = net.veloclient.velo.client.gui.title.MenuKit.ui(tag);
+							net.veloclient.velo.client.gui.title.MenuKit.text(context, font, t, x + width - 12 - net.veloclient.velo.client.gui.title.MenuKit.width(font, t), ty, hover ? 0xFFFFFFFF : 0xFF9A9AA6);
+						}
+						editor.addPreviewHit(x + 4, ry, width - 8, rowH, () -> openVariant(editor, kind, variant, color));
 					}
-					g++;
+					ry += rowH;
 				}
 			}
 		}));
+	}
+
+	/** Six icons like the game shows them: full, full, full, half, empty, empty (missing states made from Full). */
+	private static void drawRow(DrawContext context, NativeImage full, NativeImage half, NativeImage empty, int rowX, int rowY, int slot, int step) {
+		if (full == null) {
+			return;
+		}
+		for (int i = 0; i < 6; i++) {
+			int sx = rowX + i * step;
+			if (i < 3) {
+				PixelEditorScreen.drawImage(context, full, sx, rowY, slot, 0, 1f);
+				continue;
+			}
+			if (empty != null) {
+				PixelEditorScreen.drawImage(context, empty, sx, rowY, slot, 0, 1f);
+			} else {
+				PixelEditorScreen.drawImage(context, full, sx, rowY, slot, 0x59000000, 1f);
+			}
+			if (i == 3) {
+				if (half != null) {
+					PixelEditorScreen.drawImage(context, half, sx, rowY, slot, 0, 1f);
+				} else {
+					PixelEditorScreen.drawImage(context, full, sx, rowY, slot, 0, 5 / 9f);
+				}
+			}
+		}
 	}
 
 	/** Opens the editor on top of whatever screen is showing (the module's settings). */

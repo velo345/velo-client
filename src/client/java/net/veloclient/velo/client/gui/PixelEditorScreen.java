@@ -189,6 +189,8 @@ public final class PixelEditorScreen extends VeloWindow {
 			return;
 		}
 		hits.clear();
+		lastMouseX = mouseX;
+		lastMouseY = mouseY;
 		int x = contentX();
 		int y = contentY();
 		int right = x + contentWidth();
@@ -463,6 +465,19 @@ public final class PixelEditorScreen extends VeloWindow {
 		context.fill(x, y, x + s, y + s, c);
 		VeloDraw.strokeRect(context, x, y, s, s, c == color ? 0xFFFFFFFF : 0x50FFFFFF);
 	}
+
+	/** For a host's context preview: something clickable this frame (e.g. a heart row that opens that heart). */
+	public void addPreviewHit(int x, int y, int w, int h, Runnable action) {
+		hits.add(new VeloUi.Hit(x, y, w, h, action));
+	}
+
+	/** The mouse position this frame (for hover in a host's context preview). */
+	public int[] mouse() {
+		return new int[] {lastMouseX, lastMouseY};
+	}
+
+	private int lastMouseX;
+	private int lastMouseY;
 
 	private void drawPreviews(DrawContext context, int x, int y, int width, int height, int mouseX, int mouseY) {
 		context.drawTextWithShadow(this.textRenderer, "Preview", x, y, VeloStyle.textMuted());
@@ -867,7 +882,10 @@ public final class PixelEditorScreen extends VeloWindow {
 		int n = source.getWidth();
 		for (int y = 0; y < size; y++) {
 			for (int x = 0; x < size; x++) {
-				out.setColorArgb(x, y, source.getColorArgb(Math.min(n - 1, x * n / size), Math.min(source.getHeight() - 1, y * source.getHeight() / size)));
+				// sample at pixel centres: corner sampling drifted the drawing right/down a little on every size switch
+				int sx = Math.min(n - 1, (int) ((x + 0.5f) * n / size));
+				int sy = Math.min(source.getHeight() - 1, (int) ((y + 0.5f) * source.getHeight() / size));
+				out.setColorArgb(x, y, source.getColorArgb(sx, sy));
 			}
 		}
 		source.close();
