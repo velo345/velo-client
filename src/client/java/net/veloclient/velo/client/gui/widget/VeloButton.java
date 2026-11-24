@@ -63,7 +63,8 @@ public class VeloButton extends ClickableWidget {
 		int y = getY();
 		int w = getWidth();
 		int h = getHeight();
-		int radius = Math.min(VeloStyle.RADIUS_CONTROL, h / 2);
+		boolean glass = VeloStyle.glass();
+		float radius = glass ? h / 2f : Math.min(VeloStyle.RADIUS_CONTROL, h / 2);   // glass: pills
 		VeloStyle.pushScale(context, x + w / 2f, y + h / 2f, VeloStyle.pressScale(pressedAt));
 
 		// 0.9.7 (launcher look): primary = flat accent; selected (a sidebar entry) = soft accent tint with white text;
@@ -76,25 +77,36 @@ public class VeloButton extends ClickableWidget {
 			}
 			// launcher look: flat, no glow on hover
 			VeloDraw.fillRounded(context, x, y, w, h, radius, fill);
+		} else if (selected && glass) {
+			// glass: the selected one is a white pill with dark text (like the R-Shift tabs)
+			tinted = true;
+			VeloDraw.fillRounded(context, x, y, w, h, radius, VeloAnim.lerpArgb(0xFFFFFFFF, 0xFFE9E9EC, hoverProgress));
 		} else if (selected) {
 			VeloDraw.fillRounded(context, x, y, w, h, radius, VeloUi.withAlpha(theme.accentStart(), 0x33 + Math.round(0x14 * hoverProgress)));
 		} else {
-			int bg = VeloAnim.lerpArgb(0x0DFFFFFF, 0x1AFFFFFF, hoverProgress);
+			int bg = glass ? VeloAnim.lerpArgb(0x16FFFFFF, 0x26FFFFFF, hoverProgress) : VeloAnim.lerpArgb(0x0DFFFFFF, 0x1AFFFFFF, hoverProgress);
 			if (!this.active) {
 				bg = 0x08FFFFFF;
 			}
 			VeloDraw.fillRounded(context, x, y, w, h, radius, bg);
-			VeloDraw.strokeRounded(context, x, y, w, h, radius, VeloAnim.lerpArgb(0x17FFFFFF, 0x38FFFFFF, hoverProgress));
+			if (!glass) {
+				VeloDraw.strokeRounded(context, x, y, w, h, (int) radius, VeloAnim.lerpArgb(0x17FFFFFF, 0x38FFFFFF, hoverProgress));
+			}
 		}
 
-		int textColor = tinted ? VeloStyle.onAccent() : selected ? 0xFFFFFFFF : VeloStyle.text();
+		int textColor = tinted ? (glass ? 0xFF141416 : VeloStyle.onAccent()) : selected ? 0xFFFFFFFF : VeloStyle.text();
 		if (!this.active) {
 			textColor = VeloStyle.textFaint();
 		}
 		// Long labels are cut with "..." instead of spilling past the button (and the window).
-		context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer,
-				VeloUi.trimStyled(getMessage(), w - 8, TitleScreenTheme::bodyFont),
-				x + w / 2, y + (h - 8) / 2, textColor);
+		net.minecraft.text.Text label = VeloUi.trimStyled(getMessage(), w - 8, TitleScreenTheme::bodyFont);
+		if (glass) {
+			// no shadow on glass (dark text on a white pill would get a smear)
+			var tr = MinecraftClient.getInstance().textRenderer;
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, tr, label, x + (w - net.veloclient.velo.client.gui.title.MenuKit.width(tr, label)) / 2, y + (h - 8) / 2, textColor);
+		} else {
+			context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer, label, x + w / 2, y + (h - 8) / 2, textColor);
+		}
 		VeloStyle.popScale(context);
 	}
 

@@ -153,6 +153,201 @@
 			"name": "Lyrics",
 			"group": "Core",
 			"path": "M3 6h12 M3 11h9 M3 16h6 M16 21a2.5 2.5 0 1 0 0-5a2.5 2.5 0 1 0 0 5 M18.5 18.5V5l3-1"
+		},
+		"alternate-current": {
+			"name": "Alternate Current",
+			"group": "Core",
+			"path": "M13 2 3 14h9l-1 8 10-12h-9l1-8z"
+		},
+		"better-tab-list": {
+			"name": "Better Tab List",
+			"group": "Core",
+			"path": "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"
+		},
+		"block-break-progress": {
+			"name": "Block Break Progress",
+			"group": "Core",
+			"path": "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2zM12 3l-2 5 4 3-3 4 1 6"
+		},
+		"c2me": {
+			"name": "C2ME",
+			"group": "Core",
+			"path": "M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2zM10 9h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1zM15 2v2M15 20v2M9 2v2M9 20v2M2 15h2M2 9h2M20 15h2M20 9h2"
+		},
+		"centered-inventory": {
+			"name": "Centered Inventory",
+			"group": "Core",
+			"path": "M21 6H3M17 12H7M19 18H5"
+		},
+		"chat-heads": {
+			"name": "Chat Heads",
+			"group": "Core",
+			"path": "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2zM9.5 10a2.5 2.5 0 1 0 5.0 0a2.5 2.5 0 1 0 -5.0 0"
+		},
+		"chunk-animator": {
+			"name": "Chunk Animator",
+			"group": "Core",
+			"path": "M12 15V3M7 8l5-5 5 5M5 17h14a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1v-2a1 1 0 0 1 1 -1z"
+		},
+		"clear-liquids": {
+			"name": "Clear Water & Lava",
+			"group": "Core",
+			"path": "M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"
+		},
+		"color-codes": {
+			"name": "Color Codes",
+			"group": "Core",
+			"path": "M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"
+		},
+		"color-grading": {
+			"name": "Color Grading",
+			"group": "Core",
+			"path": "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M12 3v18M12 7h5M12 11h7M12 15h7"
+		},
+		"cosmetics-quality": {
+			"name": "Cosmetics Quality",
+			"group": "Core",
+			"path": "M6 3h12l4 6-10 13L2 9z M11 3 8 9l4 13 4-13-3-6 M2 9h20"
+		},
+		"custom-image": {
+			"name": "Custom Image",
+			"group": "Core",
+			"path": "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2zM7 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M21 15l-3.1-3.1a2 2 0 0 0-2.8 0L6 21"
+		},
+		"custom-skybox": {
+			"name": "Custom Skybox",
+			"group": "Core",
+			"path": "M12 2v2M4.9 4.9l1.4 1.4M20 12h2M19.1 4.9l-1.4 1.4M15.9 13A4 4 0 0 0 8.1 11M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6z"
+		},
+		"custom-text": {
+			"name": "Custom Text",
+			"group": "Core",
+			"path": "M4 7V4h16v3M9 20h6M12 4v16"
+		},
+		"discord-presence": {
+			"name": "Discord Rich Presence",
+			"group": "Core",
+			"path": "M6 6h12a4 4 0 0 1 4 4v4a4 4 0 0 1 -4 4h-12a4 4 0 0 1 -4 -4v-4a4 4 0 0 1 4 -4zM6 12h4M8 10v4M15 13h.01M18 11h.01"
+		},
+		"glint-colorizer": {
+			"name": "Glint Colorizer",
+			"group": "Core",
+			"path": "M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8 19 13M15 9h.01M17.8 6.2 19 5M3 21l9-9M12.2 6.2 11 5"
+		},
+		"gpu-item-meshes": {
+			"name": "GPU Item Meshes",
+			"group": "Core",
+			"path": "M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM3.3 7 12 12l8.7-5M12 22V12"
+		},
+		"hold-up-items": {
+			"name": "Hold Up Items",
+			"group": "Core",
+			"path": "M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"
+		},
+		"inventory-hud": {
+			"name": "Inventory HUD",
+			"group": "Core",
+			"path": "M4 10a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM8 10h8M8 18h8M8 22v-6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v6M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"
+		},
+		"item-physics": {
+			"name": "Item Physics",
+			"group": "Core",
+			"path": "M11 9h7a2 2 0 0 1 2 2v7a2 2 0 0 1 -2 2h-7a2 2 0 0 1 -2 -2v-7a2 2 0 0 1 2 -2zM3 3l3 3M3 9h3M9 3v3"
+		},
+		"mini-player": {
+			"name": "Mini Player",
+			"group": "Core",
+			"path": "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2zM13 12h5a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-5a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1z"
+		},
+		"module-list": {
+			"name": "Module List",
+			"group": "Core",
+			"path": "M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"
+		},
+		"no-totem-pop": {
+			"name": "No Totem Pop",
+			"group": "Core",
+			"path": "M2 2l20 20M5 5a1 1 0 0 0-1 1v7c0 5 3.5 7.5 7.7 8.9a1 1 0 0 0 .6 0 13 13 0 0 0 3.9-2M9.3 3.4l2-1.2a1 1 0 0 1 1.3 0C14.6 3.6 17 5 19 5a1 1 0 0 1 1 1v7a9 9 0 0 1-.3 2.3"
+		},
+		"numbered-inventories": {
+			"name": "Numbered Inventories",
+			"group": "Core",
+			"path": "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2zM10 8l2-1v10M10 17h4"
+		},
+		"own-name-tag": {
+			"name": "Own Name Tag",
+			"group": "Core",
+			"path": "M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4zM6.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"
+		},
+		"particle-size": {
+			"name": "Particle Size",
+			"group": "Core",
+			"path": "M4 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M12 8a4 4 0 1 0 8 0a4 4 0 1 0 -8 0M6 17a3 3 0 1 0 6 0a3 3 0 1 0 -6 0"
+		},
+		"pets": {
+			"name": "Pets",
+			"group": "Core",
+			"path": "M9 4a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M16 8a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M18 16a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.8 1.2 1.7 1.7 0 0 0-1.2-1.2A3.5 3.5 0 0 1 7 11.7 5 5 0 0 1 9 10z"
+		},
+		"rideable-opacity": {
+			"name": "Rideable Opacity",
+			"group": "Core",
+			"path": "M5 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2zM11 9h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2z"
+		},
+		"rm-toolbar": {
+			"name": "Redstone: Tools",
+			"group": "Core",
+			"path": "M15 12l-8.4 8.4a2.1 2.1 0 1 1-3-3L12 9M17.6 15 22 10.6M20.9 11.7l-1.3-1.3a2 2 0 0 1-.6-1.4V7.9l-2.6-2.6a6 6 0 0 0-4.2-1.8H9l.9.8a6.3 6.3 0 0 1 2.1 4.6v1.6l2 2h1.2a2 2 0 0 1 1.4.6l1.2 1.2"
+		},
+		"seamless-reload": {
+			"name": "Seamless Resource Reload",
+			"group": "Core",
+			"path": "M21 12a9 9 0 0 0-9-9 9.8 9.8 0 0 0-6.7 2.7L3 8M3 3v5h5M3 12a9 9 0 0 0 9 9 9.8 9.8 0 0 0 6.7-2.7L21 16M16 16h5v5"
+		},
+		"server-display": {
+			"name": "Server Display",
+			"group": "Core",
+			"path": "M4 2h16a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2v-4a2 2 0 0 1 2 -2zM4 14h16a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2v-4a2 2 0 0 1 2 -2zM6 6h.01M6 18h.01"
+		},
+		"server-hud": {
+			"name": "Server HUD",
+			"group": "Core",
+			"path": "M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2zM8 21h8M12 17v4"
+		},
+		"shield-indicator": {
+			"name": "Shield Indicator",
+			"group": "Core",
+			"path": "M20 13c0 5-3.5 7.5-7.7 8.9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.5 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1zM9 12l2 2 4-4"
+		},
+		"storage-memory": {
+			"name": "Storage Memory",
+			"group": "Core",
+			"path": "M3 3h18a1 1 0 0 1 1 1v3a1 1 0 0 1 -1 1h-18a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1zM4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"
+		},
+		"tnt-optimizer": {
+			"name": "TNT Optimizer",
+			"group": "Core",
+			"path": "M3 13a8 8 0 1 0 16 0a8 8 0 1 0 -16 0M14.4 4.4l1.2-1.2a1 1 0 0 1 1.4 0l2.8 2.8a1 1 0 0 1 0 1.4l-1.2 1.2M22 2l-1.5 1.5"
+		},
+		"velo-loading-screen": {
+			"name": "Velo Loading Screen",
+			"group": "Core",
+			"path": "M12 2v4M16.2 7.8l2.9-2.9M18 12h4M16.2 16.2l2.9 2.9M12 18v4M4.9 19.1l2.9-2.9M2 12h4M4.9 4.9l2.9 2.9"
+		},
+		"velo-rewind": {
+			"name": "Velo Rewind",
+			"group": "Core",
+			"path": "M11 19 2 12l9-7zM22 19l-9-7 9-7z"
+		},
+		"world-notes": {
+			"name": "World Notes",
+			"group": "Core",
+			"path": "M15.5 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.5zM15 3v6h6"
+		},
+		"youtube": {
+			"name": "Browser",
+			"group": "Core",
+			"path": "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0M2 12h20M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"
 		}
 	}
 }

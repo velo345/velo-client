@@ -170,7 +170,7 @@ public final class MediaScreen extends VeloWindow implements net.veloclient.velo
 		int h = 66 + Math.max(1, friends.size()) * 22;
 		int x = right - w;
 		VeloDraw.shadow(context, x, top, w, h, 8, 14, 4, 0x66000000);
-		VeloDraw.fillRounded(context, x, top, w, h, 8, 0xF7131318);
+		VeloDraw.fillRounded(context, x, top, w, h, 8, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xF7131318, 0x14FFFFFF));
 		VeloDraw.strokeRounded(context, x, top, w, h, 8, 0x30FFFFFF);
 		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(url, w - 16), x + 8, top + 8, VeloUi.muted());
 		hits.add(iconPill(context, x + 8, top + 22, w - 16, "copy", "Copy link", 1, mouseX, mouseY, () -> {
@@ -341,7 +341,7 @@ public final class MediaScreen extends VeloWindow implements net.veloclient.velo
 			if (tex != null) {
 				MediaTextures.drawCover(context, tex, tx + 3, ty + 3, tileW - 6, tileH - 6);
 			} else {
-				VeloDraw.fillRounded(context, tx + 3, ty + 3, tileW - 6, tileH - 6, 4, 0xFF1A1A22);
+				VeloDraw.fillRounded(context, tx + 3, ty + 3, tileW - 6, tileH - 6, 4, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF1A1A22, 0x1FFFFFFF));
 			}
 			if (item.clip()) {
 				String length = item.meta() != null && item.meta().has("seconds") ? Math.round(item.meta().get("seconds").getAsDouble()) + "s" : "clip";

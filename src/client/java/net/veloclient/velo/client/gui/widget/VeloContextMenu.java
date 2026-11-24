@@ -64,7 +64,7 @@ public final class VeloContextMenu {
 		var tr = MinecraftClient.getInstance().textRenderer;
 		int h = entries.size() * ROW + PAD * 2;
 		VeloDraw.shadow(context, x, y, width, h, 6, 10, 3, 0x90000000);
-		VeloDraw.fillRounded(context, x, y, width, h, 6, 0xFA141011);
+		VeloDraw.fillRounded(context, x, y, width, h, 6, VeloStyle.glassOr(0xFA141011, 0xF2202024));
 		VeloDraw.strokeRounded(context, x, y, width, h, 6, 0x22FFFFFF);
 		for (int i = 0; i < entries.size(); i++) {
 			Entry e = entries.get(i);

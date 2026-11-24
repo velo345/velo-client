@@ -356,7 +356,7 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 			int[] r = kindBox(i);
 			boolean active = activeTab == i;
 			boolean hovered = MenuKit.inside(mouseX, mouseY, r[0], r[1], r[2], r[3]);
-			VeloDraw.fillRounded(context, r[0], r[1], r[2], r[3], 5, active ? 0xFF1C1617 : hovered ? 0xFF1A1516 : 0xFF141011);
+			VeloDraw.fillRounded(context, r[0], r[1], r[2], r[3], 5, active ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF1C1617, 0x30FFFFFF) : hovered ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF1A1516, 0x20FFFFFF) : net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF141011, 0x12FFFFFF));
 			VeloDraw.strokeRounded(context, r[0], r[1], r[2], r[3], 5, active ? VeloUi.withAlpha(MenuKit.accent(), 0xB0) : hovered ? 0x22FFFFFF : 0x10FFFFFF);
 			boolean none = rows[i][1].equals("None");
 			MenuKit.icon(context, rows[i][2], r[0] + 7, r[1] + 5, 12, active ? MenuKit.accentText() : none ? MenuKit.TEXT_3 : 0xFFB3A8A9);
@@ -372,7 +372,7 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 			int tw = MenuKit.width(font, t) + 12;
 			int tx = Math.min(mouseX + 8, rightX() + rightW() - tw);
 			int ty = mouseY + 12;
-			VeloDraw.fillRounded(context, tx, ty, tw, 16, 4, 0xF0141011);
+			VeloDraw.fillRounded(context, tx, ty, tw, 16, 4, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xF0141011, 0xF0141418));
 			VeloDraw.strokeRounded(context, tx, ty, tw, 16, 4, 0x22FFFFFF);
 			MenuKit.text(context, font, t, tx + 6, ty + 4, MenuKit.TEXT);
 		}
@@ -421,7 +421,7 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		int[] r = armorBox(font);
 		boolean on = !net.veloclient.velo.client.gui.widget.EntityPreviewWidget.hideArmor;
 		boolean hovered = MenuKit.inside(mouseX, mouseY, r[0], r[1], r[2], r[3]);
-		VeloDraw.fillRounded(context, r[0], r[1], r[2], r[3], 5, hovered ? 0xFF241D1E : 0xFF1A1516);
+		VeloDraw.fillRounded(context, r[0], r[1], r[2], r[3], 5, hovered ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF241D1E, 0x24FFFFFF) : net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF1A1516, 0x14FFFFFF));
 		VeloDraw.strokeRounded(context, r[0], r[1], r[2], r[3], 5, 0x18FFFFFF);
 		MenuKit.text(context, font, MenuKit.uiBold("Armor"), r[0] + 7, r[1] + 4, on ? MenuKit.TEXT : 0xFF8E8384);
 		net.veloclient.velo.client.gui.widget.VeloToggle.drawSwitch(context, r[0] + r[2] - 19, r[1] + 4, 14, 8, on ? 1f : 0f, hovered ? 1f : 0f);
@@ -444,14 +444,14 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		var looks = net.veloclient.velo.client.cosmetics.Loadouts.all();
 		int px = stageX();
 		int py = stageBottom() + 8;
-		VeloDraw.fillRounded(context, px, py, SHOWCASE_WIDTH, frameBottom - py, 8, 0xFF100D0D);
+		VeloDraw.fillRounded(context, px, py, SHOWCASE_WIDTH, frameBottom - py, 8, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF100D0D, 0x12FFFFFF));
 		VeloDraw.strokeRounded(context, px, py, SHOWCASE_WIDTH, frameBottom - py, 8, 0x10FFFFFF);
 		MenuKit.text(context, font, MenuKit.uiBold("Loadouts"), px + 10, py + 9, MenuKit.TEXT);
 		for (int[] c : loadoutChips(font)) {
 			boolean hovered = MenuKit.inside(mouseX, mouseY, c[0], c[1], c[2], c[3]);
 			boolean worn = c[4] >= 0 && looks.get(c[4]).isWorn();
 			String label = c[4] >= 0 ? looks.get(c[4]).name() : "+ Save current";
-			VeloDraw.fillRounded(context, c[0], c[1], c[2], c[3], 8, worn ? 0xFF2A2324 : hovered ? 0xFF1E1819 : 0x00000000);
+			VeloDraw.fillRounded(context, c[0], c[1], c[2], c[3], 8, worn ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF2A2324, 0x30FFFFFF) : hovered ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF1E1819, 0x1CFFFFFF) : 0x00000000);
 			VeloDraw.strokeRounded(context, c[0], c[1], c[2], c[3], 8, worn ? VeloUi.withAlpha(MenuKit.accent(), 0x90) : hovered ? 0x30FFFFFF : 0x1CFFFFFF);
 			MenuKit.text(context, font, MenuKit.fit(font, MenuKit.uiBold(label), c[2] - 12), c[0] + 7, c[1] + 4, worn || hovered ? MenuKit.TEXT : 0xFFB3A8A9);
 		}
@@ -508,7 +508,7 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		int y = contentY();
 		int h = stageBottom() - y;
 		// launcher stage: the same dark panel with a soft light on the floor under the player
-		VeloDraw.fillRounded(context, x, y, SHOWCASE_WIDTH, h, 8, 0xFF100D0D);
+		VeloDraw.fillRounded(context, x, y, SHOWCASE_WIDTH, h, 8, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF100D0D, 0x12FFFFFF));
 		VeloDraw.strokeRounded(context, x, y, SHOWCASE_WIDTH, h, 8, 0x10FFFFFF);
 		int fy = y + h - 46;
 		VeloDraw.fillRoundedGradient(context, x + SHOWCASE_WIDTH / 6, fy, SHOWCASE_WIDTH * 2 / 3, 18, 9, 0x00000000, VeloUi.withAlpha(MenuKit.accent(), 0x18));

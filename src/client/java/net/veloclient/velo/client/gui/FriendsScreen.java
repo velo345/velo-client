@@ -370,7 +370,7 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 					: partyInvites > 0 ? partyInvites + (partyInvites == 1 ? " party invite" : " party invites") : "Start a party";
 			boolean hovered = VeloUi.inside(mouseX, mouseY, x, listTop, lw, 16);
 			boolean active = view == View.PARTY;
-			VeloDraw.fillRounded(context, x, listTop, lw, 16, 5, active ? 0xFF1C1617 : hovered ? 0x14FFFFFF : 0x0AFFFFFF);
+			VeloDraw.fillRounded(context, x, listTop, lw, 16, 5, active ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF1C1617, 0x30FFFFFF) : hovered ? 0x14FFFFFF : 0x0AFFFFFF);
 			VeloDraw.strokeRounded(context, x, listTop, lw, 16, 5, active ? VeloUi.withAlpha(theme.accentStart(), 0xB0) : 0x14FFFFFF);
 			net.veloclient.velo.client.gui.title.MenuKit.icon(context, "party", x + 5, listTop + 3, 10, partyInvites > 0 ? theme.accentStart() | 0xFF000000 : 0xFFB3A8A9);
 			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(label, lw - 24), x + 19, listTop + 4, 0xFFEDE6E6);
@@ -448,7 +448,7 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 		boolean isSelected = view == View.CHAT && friend.uuid.equals(selected);
 		boolean hovered = mouseY >= clipTop && mouseY < clipBottom && VeloUi.inside(mouseX, mouseY, x, y, rowW, ROW_HEIGHT);
 		if (isSelected || hovered) {
-			int bg = isSelected ? VeloAnim.lerpArgb(theme.accentStart(), 0xFF000000, 0.55f) : VeloUi.withAlpha(0xFFFFFFFF, 0x12);
+			int bg = isSelected ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(VeloAnim.lerpArgb(theme.accentStart(), 0xFF000000, 0.55f), 0x2EFFFFFF) : VeloUi.withAlpha(0xFFFFFFFF, 0x12);
 			VeloDraw.fillRounded(context, x, y, rowW - 4, ROW_HEIGHT, 5, bg);
 		}
 		if (isSelected) {
@@ -857,7 +857,7 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 			}
 			int bubbleHeight = item.height() - (item.showTime() ? 11 : 3);
 			int bubbleX = item.mine() ? x + width - item.bubbleWidth() - 2 : x + 2;
-			int bubbleColor = item.mine() ? VeloAnim.lerpArgb(theme.accentStart(), 0xFF000000, 0.25f) : VeloUi.withAlpha(0xFFFFFFFF, 0x1C);
+			int bubbleColor = item.mine() ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(VeloAnim.lerpArgb(theme.accentStart(), 0xFF000000, 0.25f), 0x3DFFFFFF) : VeloUi.withAlpha(0xFFFFFFFF, 0x1C);
 			VeloDraw.fillRounded(context, bubbleX, cursor, item.bubbleWidth(), bubbleHeight, 6, bubbleColor);
 			if (item.message().isWaypoint()) {
 				drawWaypointCard(context, item.message(), item.mine(), friend, bubbleX, cursor, item.bubbleWidth(), mouseX, mouseY, top, top + height);
@@ -1065,7 +1065,7 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 
 	/** The launcher's card: a slightly lifted graphite fill with a hairline edge. */
 	private static void cardPanel(DrawContext context, int x, int y, int w, int h) {
-		VeloDraw.fillRounded(context, x, y, w, h, 8, 0xFF131318);
+		VeloDraw.fillRounded(context, x, y, w, h, 8, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF131318, 0x12FFFFFF));
 		VeloDraw.strokeRounded(context, x, y, w, h, 8, 0x17FFFFFF);
 	}
 

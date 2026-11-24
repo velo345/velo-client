@@ -59,6 +59,9 @@ public final class MenuKit {
 	public static int accentOverride = -1;
 
 	public static int accent() {
+		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
+			return 0xFFFFFFFF;   // glass: white highlights, no colour
+		}
 		return accentOverride >= 0 ? accentOverride | 0xFF000000 : ThemeManager.active().accentStart() | 0xFF000000;
 	}
 
@@ -97,6 +100,11 @@ public final class MenuKit {
 
 	public static Text mono(String s) {
 		return font(s, MONO);
+	}
+
+	/** Window titles: Geist SemiBold, a size up (crisp per GUI scale). */
+	public static Text title13(String s) {
+		return font(s, Identifier.of("velo-client", "menu_title"));
 	}
 
 	/** {@code s} in any Velo font by its id path (e.g. {@code dr_r_5}). */

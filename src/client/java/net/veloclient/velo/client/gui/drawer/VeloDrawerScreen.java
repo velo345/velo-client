@@ -48,7 +48,6 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	private static final float DW = 300f;   // drawer width
 	private static final float M = 10f;     // gap to the screen edge
 	private static final float HEADER = 44f;
-	private static final float DOCK = 48f;
 	private static final float PAD = 12f;
 	private static final float ROW = 26f;
 	// animation times (seconds), linear progress + easing curves: calm, not snappy
@@ -57,7 +56,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	private static final float EXPAND_TIME = 0.42f;
 	private static final float HANDLE_TIME = 0.26f;
 
-	private static final int GLASS = 0xC8121215;        // the panel: the world stays sharp behind it
+	private static final int GLASS = 0x99141417;        // the panel, over the blurred world
 	private static final int GLASS_FULL = 0x8A141418;   // the full menu: over the strongly blurred world
 	private static final Identifier LOGO = Identifier.of("velo-client", "textures/icon/logo.png");
 	private static final int TEXT_1 = 0xEBFFFFFF;
@@ -296,9 +295,11 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		return blurRadius() > 0;
 	}
 
-	/** The menu blur while this is open: strong behind the full menu, faded in and out with it; none behind the panel. */
+	/** The menu blur while this is open: strong behind the full menu, lighter behind the panel, faded in and out. */
 	public int blurRadius() {
-		return Math.round(10f * easeInOut(expandAnim) * ease(openAnim));
+		// the panel gets a lighter blur (the HUD stays crisp on top); it lifts when the panel slides away to place things
+		float e = easeInOut(expandAnim);
+		return Math.round((5f + 5f * e) * ease(openAnim));
 	}
 
 	// ---------------------------------------------------------------- geometry
@@ -572,7 +573,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		}
 		*///?}
 
-		if (!blurOn()) {
+		if (expandAnim < 0.5f) {
 			renderHud(context, mouseX, mouseY, delta);   // the full menu covers the HUD; Edit HUD brings it back
 		}
 
@@ -644,7 +645,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			HudManager.renderScaled(context, hud, this.width, this.height, delta);
 			boolean active = hud == dragging || hud == resizing || hud == selected;
 			boolean hover = !overDrawer(mouseX / k, mouseY / k) && mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
-			float t = animTo(hud, active ? 1f : hover ? 0.6f : 0f, 9f);
+			float t = animTo("hud:" + hud.id(), active ? 1f : hover ? 0.6f : 0f, 9f);   // own key: a HUD module's toggle animates too
 			if (t > 0.02f) {
 				VeloDraw.strokeRounded(context, x - 3, y - 3, w + 6, h + 6, 4, VeloUi.withAlpha(WHITE, Math.round(255 * t)));
 			}
@@ -802,7 +803,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 		// pages
 		float cy = y + HEADER;
-		float ch = h - HEADER - DOCK;
+		float ch = h - HEADER - 8f;   // no dock in the panel: the features are on Home
 		if (live) {
 			bodyTop = cy;
 			bodyBottom = cy + ch;
@@ -811,7 +812,6 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		pages(c, x, DW, cy, ch, a, live, false);
 		unclip(c);
 
-		renderDock(c, x, y + h - DOCK, a, live);
 	}
 
 	/** The current page sliding in over the one before (a short slide and a crossfade). */
@@ -1400,7 +1400,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		if (pinned || hover) {
 			icon(c, pinned ? "d_pin_on" : "d_pin", px + 3f, y + 6f, 13f, pinned ? (pinHover ? TEXT_2 : WHITE) : pinHover ? WHITE : TEXT_3, a);
 		}
-		toggle(c, m, sx, y + 5.5f, m.isEnabled(), a, false);
+		toggle(c, "row:" + m.id(), sx, y + 5.5f, m.isEnabled(), a, false);
 		hit(live, top, height, x + 14f, y, px - x - 14f, ROW, () -> go(new Page(Kind.MODULE, catOf(m), m)));
 		hit(live, top, height, px, y, 22f, ROW, () -> QuickToggles.setFavorite(m.id(), !pinned));
 		hit(live, top, height, sx - 2f, y, 30f, ROW, () -> QuickToggles.toggle(m));
@@ -1600,7 +1600,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		if (f instanceof ConfigField.ToggleField t) {
 			boolean on = t.get().getAsBoolean();
 			text(c, label, x, y + 6f, TEXT_1, a);
-			toggle(c, t, x + w - 26f, y + 2.5f, on, a, false);
+			toggle(c, "f:" + m.id() + ":" + f.label(), x + w - 26f, y + 2.5f, on, a, false);
 			hit(live, top, height, x, y, w, 20f, () -> {
 				t.set().accept(!on);
 				VeloProfileStore.saveActive();
@@ -1638,7 +1638,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 				rect(c, x, sy, w, 22f, 11f, 0x33000000, a);
 				float each = w / choice.options().size();
 				int idx = Math.max(0, choice.options().indexOf(cur));
-				float pos = animTo(choice, idx, 12f);
+				float pos = animTo("seg:" + m.id() + ":" + f.label(), idx, 12f);
 				rect(c, x + 2f + pos * each, sy + 2f, each - 4f, 18f, 9f, WHITE, a);
 				for (int i = 0; i < choice.options().size(); i++) {
 					String o = choice.options().get(i);
@@ -1807,37 +1807,15 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	private static final String[][] DOCK_ITEMS = {{"skins", "d_shirt", "Locker"}, {"friends", "d_users", "Friends"}, {"clips", "d_video", "Clips"},
 			{"map", "d_map", "World Map"}, {"settings", "d_sliders", "Settings"}};
 
-	private void renderDock(DrawContext c, float x, float y, float a, boolean live) {
-		c.fill(Math.round(x + PAD), Math.round(y), Math.round(x + DW - PAD), Math.round(y) + 1, alpha(0x1AFFFFFF, a));
-		int n = DOCK_ITEMS.length;
-		float gap = 6f;
-		float bw = (DW - 2 * PAD - gap * (n - 1)) / n;
-		float by = y + 9f;
-		String hoverLabel = null;
-		for (int i = 0; i < n; i++) {
-			float bx = x + PAD + i * (bw + gap);
-			boolean hover = inside(bx, by, bw, 30f);
-			rect(c, bx, by, bw, 30f, 10f, hover ? 0x26FFFFFF : 0x12FFFFFF, a);
-			icon(c, DOCK_ITEMS[i][1], bx + (bw - 15f) / 2f, by + 7.5f, 15f, WHITE, a);
-			if (hover) {
-				hoverLabel = DOCK_ITEMS[i][2];
-			}
-			String id = DOCK_ITEMS[i][0];
-			hits.add(new Hit(bx, by, bw, 30f, () -> openEntry(id)));
-		}
-		if (hoverLabel != null) {
-			Text t = B(hoverLabel);
-			float tw = tw(t) + 14f;
-			float tx = (float) Math.max(x + 6f, Math.min(x + DW - tw - 6f, mouseU - tw / 2f));
-			rect(c, tx, by - 22f, tw, 16f, 8f, WHITE, a);
-			text(c, t, tx + 7f, by - 18f, 0xFF141416, a);
-		}
-	}
+
 
 	private void openEntry(String id) {
 		for (MenuShell.Entry e : MenuShell.entries()) {
 			if (e.id().equals(id)) {
 				Screen next = e.open().apply(this);
+				if (next instanceof net.veloclient.velo.client.gui.window.VeloWindow window) {
+					window.returnTo(this);   // Esc / close lands back in the R-Shift menu
+				}
 				if (next != null) {
 					this.client.setScreen(next);
 				}

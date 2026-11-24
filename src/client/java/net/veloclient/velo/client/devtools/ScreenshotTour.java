@@ -554,6 +554,9 @@ public final class ScreenshotTour {
 						*///?}
 					}},
 					new Object[] {25, (Runnable) () -> shot(client, "emoji-chat")});
+			case "clips" -> List.of(
+					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.media.MediaScreen(null))},
+					new Object[] {40, (Runnable) () -> shot(client, "clips")});
 			case "friends" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.FriendsScreen())},
 					new Object[] {30, (Runnable) () -> shot(client, "friends")});

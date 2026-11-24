@@ -73,7 +73,7 @@ public final class VeloToggle extends ClickableWidget {
 		// 2026-11 launcher look: a rounded-square track (#2A2324 off, accent on) and a small square knob - no glow.
 		Theme theme = ThemeManager.active();
 		float radius = Math.max(2f, height * 0.3f);
-		int off = VeloAnim.lerpArgb(0xFF2A2324, 0xFF3A3233, hover * 0.6f);
+		int off = VeloStyle.glassOr(VeloAnim.lerpArgb(0xFF2A2324, 0xFF3A3233, hover * 0.6f), VeloAnim.lerpArgb(0x33FFFFFF, 0x47FFFFFF, hover * 0.6f));
 		VeloDraw.fillRounded(context, x, y, width, height, radius, VeloAnim.lerpArgb(off, theme.accentStart() | 0xFF000000, progress));
 		float inset = Math.max(2f, height * 0.2f);
 		float knob = height - inset * 2;

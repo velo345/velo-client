@@ -19,6 +19,16 @@ public final class VeloStyle {
 	private VeloStyle() {
 	}
 
+	/** Every menu look but Solid is glass (2026-11-24): translucent white surfaces over the blurred game. */
+	public static boolean glass() {
+		return !"solid".equals(net.veloclient.velo.client.gui.title.ScreenLook.menu().style);
+	}
+
+	/** {@code opaque} in the solid look, {@code glass} in the glass look. */
+	public static int glassOr(int opaque, int glass) {
+		return glass() ? glass : opaque;
+	}
+
 	public static Theme theme() {
 		return ThemeManager.active();
 	}
@@ -37,24 +47,39 @@ public final class VeloStyle {
 
 	/** A card sitting on the window (tiles, rows, inputs). */
 	public static int card() {
+		if (glass()) {
+			return 0x14FFFFFF;
+		}
 		return over(VeloAnim.lerpArgb(base(), 0xFFFFFFFF, 0.045f));
 	}
 
 	public static int cardHover() {
+		if (glass()) {
+			return 0x24FFFFFF;
+		}
 		return over(VeloAnim.lerpArgb(base(), 0xFFFFFFFF, 0.085f));
 	}
 
 	/** Recessed areas: input fields, toggle tracks, slider tracks. */
 	public static int sunken() {
+		if (glass()) {
+			return 0x38000000;
+		}
 		return over(VeloAnim.lerpArgb(base(), 0xFF000000, 0.35f));
 	}
 
 	/** Hairline border on cards/inputs. */
 	public static int border() {
+		if (glass()) {
+			return 0x1CFFFFFF;
+		}
 		return VeloUi.withAlpha(theme().text(), 0x1C);
 	}
 
 	public static int borderStrong() {
+		if (glass()) {
+			return 0x38FFFFFF;
+		}
 		return VeloUi.withAlpha(theme().text(), 0x30);
 	}
 

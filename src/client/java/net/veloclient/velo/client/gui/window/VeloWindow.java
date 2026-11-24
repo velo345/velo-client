@@ -5,6 +5,7 @@ import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import net.veloclient.velo.client.gui.widget.VeloAnim;
 import net.veloclient.velo.client.gui.widget.VeloDraw;
 import net.veloclient.velo.client.gui.widget.VeloStyle;
@@ -67,6 +68,32 @@ public abstract class VeloWindow extends Screen {
 		return false;
 	}
 
+	// 2026-11-24 glass: in a world, the game's own blur behind the window - not vanilla's dark gradient on top of it
+	//? if >=1.21.2 && <26.1 {
+	@Override
+	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+		if (MinecraftClient.getInstance().world != null) {
+			this.applyBlur(context);
+		} else {
+			super.renderBackground(context, mouseX, mouseY, delta);
+		}
+	}
+	//?} else if >=26.1 {
+	/*@Override
+	public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+		if (net.minecraft.client.Minecraft.getInstance().level != null) {
+			this.extractBlurredBackground(context);
+		} else {
+			super.extractBackground(context, mouseX, mouseY, delta);
+		}
+	}
+	*///?}
+
+	/** Glass is the base of every look (blurred game, translucent body, white pills); glow/neon only add their edge. Solid stays opaque. */
+	protected static boolean glassLook() {
+		return VeloStyle.glass();
+	}
+
 	public void onClosed(Runnable callback) {
 		this.onClosed = callback;
 	}
@@ -120,7 +147,8 @@ public abstract class VeloWindow extends Screen {
 
 	/** True for the pages of the one-window Velo menu (dev build): shared frame and rail, see {@link MenuShell}. */
 	protected final boolean shell() {
-		return net.veloclient.velo.client.Preview.ON && this instanceof MenuPage;
+		// 2026-11-24: no rail any more - the R-Shift menu is the navigation; every page is its own glass window
+		return false;
 	}
 
 	/** Room the rail takes on the left of a menu page, plus centring for pages with a max content width. */
@@ -208,7 +236,7 @@ public abstract class VeloWindow extends Screen {
 		}
 
 		int[] hole = openProgress > 0.97f && !closing ? windowHole() : null;
-		int dimMax = Math.round(look.dim * 2.55f);
+		int dimMax = Math.round(look.dim * 2.55f * (glassLook() ? 0.35f : 1f));   // glass: a light veil, the blur does the rest
 		if (hole == null) {
 			context.fill(0, 0, this.width, this.height, (int) (dimMax * openProgress) << 24);
 		} else {
@@ -237,9 +265,9 @@ public abstract class VeloWindow extends Screen {
 
 		Theme theme = ThemeManager.active();
 		int alpha = (int) (255 * openProgress);
-		int radius = look.radius >= 0 ? look.radius : look.style.equals("minimal") ? 6 : VeloStyle.RADIUS_WINDOW;
+		int radius = look.radius >= 0 ? look.radius : look.style.equals("minimal") ? 6 : glassLook() ? 14 : VeloStyle.RADIUS_WINDOW;
 		int accentRgb = net.veloclient.velo.client.gui.title.MenuKit.accent() & 0xFFFFFF;
-		String style = look.style;
+		String style = glassLook() ? "velo" : look.style;   // glass: one clean edge, no coloured glow
 		switch (style) {
 			case "minimal" -> {
 				// flat: no shadow at all
@@ -268,13 +296,17 @@ public abstract class VeloWindow extends Screen {
 			case "solid" -> theme.surface() | 0xFF000000;
 			case "neon" -> 0xFF07060A;
 			case "glow" -> VeloAnim.lerpArgb(0xFF0C0A0A, 0xFF000000 | accentRgb, 0.05f);
-			default -> VeloAnim.lerpArgb(0xFF0C0A0A, theme.surface() | 0xFF000000, 0.06f);
+			default -> 0xFF141418;
 		};
 		int baseAlpha = switch (style) {
 			case "glass" -> 0xA8;
 			case "solid" -> 0xFF;
-			default -> 0xF7;
+			default -> 0x8C;   // glass over the blurred game
 		};
+		if (glassLook()) {
+			glass = 0xFF141418;
+			baseAlpha = 0x8C;
+		}
 		baseAlpha = Math.round(baseAlpha * (1f - look.clear / 100f * 0.75f));
 		int surface = (glass & 0x00FFFFFF) | (Math.round(baseAlpha * openProgress) << 24);
 		if (hole == null) {
@@ -304,7 +336,7 @@ public abstract class VeloWindow extends Screen {
 			context.fillGradient(windowX + 1, windowY + 1, windowX + windowWidth - 1, windowY + HEADER_HEIGHT,
 					(Math.round((style.equals("neon") ? 0x30 : 0x1C) * openProgress) << 24) | accentRgb, accentRgb);
 		}
-		if (!style.equals("minimal")) {
+		if (!style.equals("minimal") && !glassLook()) {
 			context.fill(windowX + 1, windowY + HEADER_HEIGHT, windowX + windowWidth - 1, windowY + HEADER_HEIGHT + 1,
 					style.equals("neon") ? (Math.round(0x80 * openProgress) << 24) | accentRgb
 							: VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x10 * openProgress)));
@@ -314,9 +346,13 @@ public abstract class VeloWindow extends Screen {
 			case "minimal" -> VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x0C * openProgress));
 			case "glow" -> (Math.round(0x90 * openProgress) << 24) | accentRgb;
 			case "neon" -> (Math.round(0xFF * openProgress) << 24) | VeloAnim.lerpArgb(accentRgb | 0xFF000000, 0xFFFFFFFF, 0.25f) & 0xFFFFFF;
-			default -> VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x18 * openProgress));
+			default -> VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x26 * openProgress));
 		};
 		VeloDraw.strokeRounded(context, windowX, windowY, windowWidth, windowHeight, radius, edge);
+		if (glassLook()) {
+			// light catching the top edge
+			context.fill(windowX + radius, windowY, windowX + windowWidth - radius, windowY + 1, VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x34 * openProgress)));
+		}
 		if (style.equals("neon")) {
 			VeloDraw.strokeRounded(context, windowX + 1, windowY + 1, windowWidth - 2, windowHeight - 2, Math.max(0, radius - 1),
 					(Math.round(0x50 * openProgress) << 24) | accentRgb);
@@ -334,8 +370,8 @@ public abstract class VeloWindow extends Screen {
 		closeHover = VeloAnim.step(closeHover, closeHovered ? 1f : 0f, dt);
 		int closeX = closeButtonX();
 		int closeY = closeButtonY();
-		VeloDraw.fillRounded(context, closeX, closeY, CLOSE_SIZE, CLOSE_SIZE, 5,
-				VeloAnim.lerpArgb(VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x0D * openProgress)),
+		VeloDraw.fillRounded(context, closeX, closeY, CLOSE_SIZE, CLOSE_SIZE, glassLook() ? CLOSE_SIZE / 2f : 5,
+				VeloAnim.lerpArgb(VeloUi.withAlpha(0xFFFFFFFF, Math.round((glassLook() ? 0x1A : 0x0D) * openProgress)),
 						VeloUi.withAlpha(0xFFE5484D, Math.round(0xD0 * openProgress)), closeHover));
 		int glyph = VeloAnim.lerpArgb(VeloUi.withAlpha(theme.text(), Math.round(0xB0 * openProgress)),
 				VeloUi.withAlpha(0xFFFFFFFF, alpha), closeHover);
@@ -570,6 +606,10 @@ public abstract class VeloWindow extends Screen {
 
 	private void renderHeader(DrawContext context, int mouseX, int mouseY, int alpha) {
 		String[] tabs = headerTabs();
+		if (glassLook()) {
+			renderGlassHeader(context, mouseX, mouseY, alpha, tabs);
+			return;
+		}
 		Text title = net.veloclient.velo.client.gui.title.MenuKit.display(this.title.getString());
 		// Sora's capitals sit low in its line box: this centres them on the header (measured on screen).
 		int titleY = windowY + (HEADER_HEIGHT - net.veloclient.velo.client.gui.title.MenuKit.H_DISPLAY) / 2 + 5;
@@ -616,6 +656,79 @@ public abstract class VeloWindow extends Screen {
 			underlineW += (tabW[active] - underlineW) * 0.25f;
 			VeloDraw.fillRounded(context, Math.round(underlineX), windowY + HEADER_HEIGHT - 2, Math.round(underlineW), 2, 1,
 					VeloUi.withAlpha(net.veloclient.velo.client.gui.title.MenuKit.accent(), alpha));
+		}
+	}
+
+	private static final Identifier LOGO = Identifier.of("velo-client", "textures/icon/logo.png");
+	private float pillX = -1;
+	private float pillW;
+
+	/** Glass header: the Velo icon, the title in Geist, and the tabs as pills (the active one white, gliding over). */
+	private void renderGlassHeader(DrawContext context, int mouseX, int mouseY, int alpha, String[] tabs) {
+		int logo = 14;
+		int ly = windowY + (HEADER_HEIGHT - logo) / 2 + 1;
+		int gs = net.veloclient.velo.client.util.ClientCompat.guiScale();
+		Identifier tex = net.veloclient.velo.client.gui.drawer.CrispIcons.get(LOGO, logo * gs);
+		if (tex != null) {
+			context.getMatrices().pushMatrix();
+			context.getMatrices().translate(windowX + PADDING, ly);
+			context.getMatrices().scale(1f / gs, 1f / gs);
+			context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, tex, 0, 0, 0f, 0f, logo * gs, logo * gs, logo * gs, logo * gs,
+					logo * gs, logo * gs, VeloUi.withAlpha(0xFFFFFFFF, alpha));
+			context.getMatrices().popMatrix();
+		}
+		Text title = net.veloclient.velo.client.gui.title.MenuKit.title13(this.title.getString());
+		int tx = windowX + PADDING + logo + 7;
+		int titleY = windowY + (HEADER_HEIGHT - 10) / 2 + 1;
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer,
+				net.veloclient.velo.client.gui.title.MenuKit.fit(this.textRenderer, title, windowWidth - PADDING * 2 - 60), tx, titleY,
+				VeloUi.withAlpha(0xFFFFFFFF, alpha));
+		if (tabs == null || tabs.length == 0) {
+			tabX = new int[0];
+			return;
+		}
+		int pad = 9;
+		int h = 18;
+		int y = windowY + (HEADER_HEIGHT - h) / 2;
+		int x = tx + this.textRenderer.getWidth(title) + 14;
+		tabX = new int[tabs.length];
+		tabW = new int[tabs.length];
+		int total = 4;
+		Text[] labels = new Text[tabs.length];
+		for (int i = 0; i < tabs.length; i++) {
+			labels[i] = net.veloclient.velo.client.gui.title.MenuKit.uiBold(tabs[i]);
+			String badge = headerTabBadge(i);
+			int badgeW = badge == null ? 0 : this.textRenderer.getWidth(net.veloclient.velo.client.gui.title.MenuKit.small(badge)) + 10;
+			tabW[i] = this.textRenderer.getWidth(labels[i]) + pad * 2 + badgeW;
+			tabX[i] = x + total - 2;
+			total += tabW[i];
+		}
+		VeloDraw.fillRounded(context, x, y, total, h, h / 2f, VeloUi.withAlpha(0xFF000000, Math.round(0x48 * alpha / 255f)));
+		int active = headerTab();
+		if (active >= 0 && active < tabs.length) {
+			if (pillX < 0) {
+				pillX = tabX[active];
+				pillW = tabW[active];
+			}
+			pillX += (tabX[active] - pillX) * 0.25f;
+			pillW += (tabW[active] - pillW) * 0.25f;
+			VeloDraw.fillRounded(context, pillX, y + 2, pillW, h - 4, (h - 4) / 2f, VeloUi.withAlpha(0xFFFFFFFF, alpha));
+		}
+		int textY = y + (h - 8) / 2 + 1;
+		for (int i = 0; i < tabs.length; i++) {
+			boolean on = i == active;
+			boolean hovered = !on && mouseX >= tabX[i] && mouseX < tabX[i] + tabW[i] && mouseY >= y && mouseY < y + h;
+			int color = on ? 0xFF141416 : hovered ? 0xFFFFFFFF : 0xB8FFFFFF;
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, labels[i], tabX[i] + pad, textY,
+					VeloUi.withAlpha(color, Math.round(((color >>> 24) & 0xFF) * alpha / 255f)));
+			String badge = headerTabBadge(i);
+			if (badge != null) {
+				int bx = tabX[i] + pad + this.textRenderer.getWidth(labels[i]) + 4;
+				int bw = this.textRenderer.getWidth(net.veloclient.velo.client.gui.title.MenuKit.small(badge)) + 6;
+				VeloDraw.fillRounded(context, bx, textY - 1, bw, 10, 5, VeloUi.withAlpha(net.veloclient.velo.client.gui.title.MenuKit.accent(), alpha));
+				net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.small(badge),
+						bx + 3, textY + 1, VeloUi.withAlpha(0xFFFFFFFF, alpha));
+			}
 		}
 	}
 

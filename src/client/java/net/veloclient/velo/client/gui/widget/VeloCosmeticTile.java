@@ -65,8 +65,8 @@ public final class VeloCosmeticTile extends ClickableWidget {
 		// The launcher's Locker tile: graphite card, picture on a slightly lighter well, name bottom-left; equipped =
 		// green edge + tick, the one on the preview = white edge.
 		int nameH = 16;
-		VeloDraw.fillRounded(context, x, y, w, h, 7, VeloAnim.lerpArgb(0xFF16161C, 0xFF1C1C23, hover));
-		VeloDraw.fillRounded(context, x + 3, y + 3, w - 6, h - nameH - 4, 5, VeloAnim.lerpArgb(0xFF1C1C23, 0xFF22222A, hover));
+		VeloDraw.fillRounded(context, x, y, w, h, 7, VeloStyle.glassOr(VeloAnim.lerpArgb(0xFF16161C, 0xFF1C1C23, hover), VeloAnim.lerpArgb(0x14FFFFFF, 0x24FFFFFF, hover)));
+		VeloDraw.fillRounded(context, x + 3, y + 3, w - 6, h - nameH - 4, 5, VeloStyle.glassOr(VeloAnim.lerpArgb(0xFF1C1C23, 0xFF22222A, hover), VeloAnim.lerpArgb(0x22000000, 0x14000000, hover)));
 		int edge = equipped ? 0xFF3DDC97 : selected ? 0xD0FFFFFF : VeloAnim.lerpArgb(0x14FFFFFF, 0x40FFFFFF, hover);
 		VeloDraw.strokeRounded(context, x, y, w, h, 7, edge);
 		int area = h - nameH - 4;

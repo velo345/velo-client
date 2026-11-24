@@ -47,6 +47,7 @@ public final class ModuleIcons {
 
 	/** Icons other jars (an add-on) bring for their own modules. */
 	private static final java.util.Map<String, Identifier> EXTRA = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final java.util.Map<String, Identifier> RESOLVED = new java.util.concurrent.ConcurrentHashMap<>();
 
 	public static void register(String moduleId, Identifier texture) {
 		EXTRA.put(moduleId, texture);
@@ -60,7 +61,22 @@ public final class ModuleIcons {
 		if (moduleId.equals("low-latency")) {
 			return texture("input-sampler"); // same subject: input lag
 		}
-		return KNOWN_IDS.contains(moduleId) ? texture(moduleId) : DEFAULT;
+		// by what really exists (core first, then the add-on jar): a stale id list once showed the missing-texture pattern
+		return RESOLVED.computeIfAbsent(moduleId, id -> {
+			try {
+				var rm = net.minecraft.client.MinecraftClient.getInstance().getResourceManager();
+				if (rm.getResource(texture(id)).isPresent()) {
+					return texture(id);
+				}
+				Identifier addon = Identifier.of("velo-addons", "textures/icon/module/" + id + ".png");
+				if (rm.getResource(addon).isPresent()) {
+					return addon;
+				}
+				return DEFAULT;
+			} catch (RuntimeException e) {
+				return KNOWN_IDS.contains(id) ? texture(id) : DEFAULT;
+			}
+		});
 	}
 
 	private static Identifier texture(String id) {

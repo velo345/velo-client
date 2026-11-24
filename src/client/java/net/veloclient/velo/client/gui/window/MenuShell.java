@@ -97,7 +97,7 @@ public final class MenuShell {
 		state.boxes.clear();
 		List<Entry> rail = state.entries;
 		int a = Math.round(255 * alpha);
-		VeloDraw.fillRounded(context, x, top, RAIL, bottom - top, 9, VeloUi.withAlpha(0xFF070505, Math.round(0xE0 * alpha)));
+		VeloDraw.fillRounded(context, x, top, RAIL, bottom - top, 9, VeloUi.withAlpha(net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF070505, 0xFFFFFFFF), Math.round(net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xE0, 0x12) * alpha)));
 		long lower = rail.stream().filter(Entry::bottom).count();
 		int size = Math.max(18, Math.min(24, (bottom - top - 16 - (rail.size() + 1) * 3) / rail.size()));
 		int ty = top + 5;
@@ -133,7 +133,7 @@ public final class MenuShell {
 			int py = Math.round(pillY);
 			int s = activeBox[2];
 			// launcher rail: the page you're on = a quiet lighter square, its icon in the accent (no glow, no ring)
-			VeloDraw.fillRounded(context, activeBox[0], py, s, s, 6, VeloUi.withAlpha(0xFF1E1718, Math.round(0xFF * alpha)));
+			VeloDraw.fillRounded(context, activeBox[0], py, s, s, 6, VeloUi.withAlpha(net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF1E1718, 0xFFFFFFFF), Math.round(net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF, 0x2E) * alpha)));
 		}
 		for (int[] box : state.boxes) {
 			Entry item = rail.get(box[3]);
@@ -179,7 +179,7 @@ public final class MenuShell {
 			int ty = box[1] + (box[2] - 18) / 2;
 			int alpha = Math.round(255 * eased);
 			VeloDraw.shadow(context, tx, ty, w, 18, 6, 10, 3, VeloUi.withAlpha(0xFF000000, Math.round(0x80 * eased)));
-			VeloDraw.fillRounded(context, tx, ty, w, 18, 6, VeloUi.withAlpha(0xFF141011, alpha));
+			VeloDraw.fillRounded(context, tx, ty, w, 18, 6, VeloUi.withAlpha(net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF141011, 0xFF141418), alpha));
 			VeloDraw.strokeRounded(context, tx, ty, w, 18, 6, VeloUi.withAlpha(MenuKit.accent(), Math.round(0x70 * eased)));
 			context.enableScissor(tx, ty, tx + w, ty + 18);
 			MenuKit.text(context, renderer, label, tx + 8, ty + 5, VeloUi.withAlpha(MenuKit.TEXT, alpha));

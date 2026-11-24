@@ -127,7 +127,7 @@ public final class VeloModuleCard extends ClickableWidget {
 		int tile = style == COMPACT ? 16 : style == GRID ? 30 : 20;
 		int tx = x + (style == GRID ? 9 : 7);
 		int ty = y + (h - tile) / 2;
-		VeloDraw.fillRounded(context, tx, ty, tile, tile, 5, VeloUi.withAlpha(0xFF1E1819, fade));
+		VeloDraw.fillRounded(context, tx, ty, tile, tile, 5, VeloStyle.glass() ? VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x1F * fade / 255f)) : VeloUi.withAlpha(0xFF1E1819, fade));
 		int iconSize = style == COMPACT ? 10 : style == GRID ? 17 : 12;
 		int tint = VeloAnim.lerpArgb(0xFF8E8384, VeloAnim.lerpArgb(color, 0xFFFFFFFF, 0.3f), on);
 		context.drawTexture(RenderPipelines.GUI_TEXTURED, icon, tx + (tile - iconSize) / 2, ty + (tile - iconSize) / 2, 0f, 0f, iconSize, iconSize,
@@ -169,7 +169,7 @@ public final class VeloModuleCard extends ClickableWidget {
 		float sy = y + (h - SWITCH_H) / 2f;
 		boolean overSwitch = isHovered() && overSwitch(mouseX, mouseY);
 		VeloDraw.fillRounded(context, sx, sy, SWITCH_W, SWITCH_H, 3f,
-				VeloUi.withAlpha(VeloAnim.lerpArgb(overSwitch ? 0xFF3A3233 : 0xFF2A2324, color, on), fade));
+				VeloStyle.glass() && on < 0.5f ? VeloUi.withAlpha(0xFFFFFFFF, Math.round((overSwitch ? 0x47 : 0x33) * fade / 255f)) : VeloUi.withAlpha(VeloAnim.lerpArgb(overSwitch ? 0xFF3A3233 : 0xFF2A2324, color, on), fade));
 		float knob = SWITCH_H - 4;
 		VeloDraw.fillRounded(context, sx + 2 + (SWITCH_W - 4 - knob) * on, sy + 2, knob, knob, 1.5f,
 				VeloUi.withAlpha(VeloAnim.lerpArgb(0xFF8E8384, 0xFFFFFFFF, on), fade));

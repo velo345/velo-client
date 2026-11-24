@@ -28,7 +28,7 @@ public final class StoreCard {
 		if (hover > 0.01f) {
 			VeloDraw.shadow(context, x, y, w, h, RADIUS, 12, 5, VeloUi.withAlpha(0xFF000000, Math.round(0x90 * hover)));
 		}
-		VeloDraw.fillRounded(context, x, y, w, h, RADIUS, 0xFF15151B);
+		VeloDraw.fillRounded(context, x, y, w, h, RADIUS, VeloStyle.glassOr(0xFF15151B, 0x14FFFFFF));
 		VeloDraw.fillRoundedGradient(context, x, y, w, h - INFO_H, RADIUS, VeloUi.withAlpha(accent, 0x1C + Math.round(0x14 * hover)), 0x00191920);
 		context.fill(x, y + h - INFO_H - 1, x + w, y + h - INFO_H + 1, VeloUi.withAlpha(accent, 0xB0));
 		VeloDraw.strokeRounded(context, x, y, w, h, RADIUS, VeloAnim.lerpArgb(0x17FFFFFF, 0x40FFFFFF, hover));

@@ -43,7 +43,20 @@ public final class ThemeManager {
 				}
 			}
 		}
-		return active;
+		return net.veloclient.velo.client.gui.widget.VeloStyle.glass() ? glass(active) : active;
+	}
+
+	private static Theme glassBase;
+	private static Theme glassTheme;
+
+	/** The glass look (2026-11-24): neutral surfaces and a white accent - no coloured (red) highlights in the menus. */
+	private static Theme glass(Theme t) {
+		if (t != glassBase) {
+			glassBase = t;
+			glassTheme = new Theme(t.name(), t.background(), 0xFF141418, 0xFFFFFFFF, 0xFFE4E4E8, 0xFFFFFFFF, t.cornerRadius(), t.blurIntensity(),
+					t.animationSpeed(), t.panelOpacity());
+		}
+		return glassTheme;
 	}
 
 	private static long stamp;
