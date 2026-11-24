@@ -61,8 +61,8 @@ public final class BrowserView {
 
 	/** Chromium's off-screen browser, drawing into this view. */
 	private final class Page extends CefBrowserOsr {
-		Page(org.cef.CefClient client, String url) {
-			super(client, url, false, null);
+		Page(org.cef.CefClient client, String url, org.cef.browser.CefRequestContext context) {
+			super(client, url, false, context);
 		}
 
 		void resize(int w, int h) {
@@ -86,7 +86,7 @@ public final class BrowserView {
 
 		@Override
 		public void onPaint(CefBrowser browser, boolean isPopup, Rectangle[] dirtyRects, ByteBuffer buffer, int w, int h) {
-			paint(isPopup, buffer, w, h);
+			paint(isPopup, buffer, w, h, dirtyRects);
 		}
 
 		void mouse(CefMouseEvent e) {
@@ -106,7 +106,24 @@ public final class BrowserView {
 		}
 	}
 
-	private BrowserView(String startUrl, int w, int h) {
+	/** Incognito pages share one in-memory context; a new one once the last incognito page closed (its data is gone). */
+	private static org.cef.browser.CefRequestContext incognitoContext;
+	private final boolean incognito;
+
+	private static org.cef.browser.CefRequestContext incognitoContext() {
+		boolean anyOpen = ALL.stream().anyMatch(v -> v.incognito);
+		if (incognitoContext == null || !anyOpen) {
+			incognitoContext = org.cef.browser.CefRequestContext.createContext(null);
+		}
+		return incognitoContext;
+	}
+
+	public boolean incognito() {
+		return incognito;
+	}
+
+	private BrowserView(String startUrl, int w, int h, boolean incognito) {
+		this.incognito = incognito;
 		this.width = Math.max(64, w);
 		this.height = Math.max(64, h);
 		this.url = startUrl;
@@ -152,7 +169,7 @@ public final class BrowserView {
 				return true;
 			}
 		});
-		page = new Page(client, startUrl);
+		page = new Page(client, startUrl, incognito ? incognitoContext() : null);
 		page.resize(width, height);
 		page.createImmediately();
 		page.setFocus(true);
@@ -160,17 +177,22 @@ public final class BrowserView {
 
 	/** A new page at {@code url}, {@code w x h} real pixels; null while Chromium isn't ready yet. */
 	public static BrowserView open(String url, int w, int h) {
+		return open(url, w, h, false);
+	}
+
+	/** {@code incognito}: nothing of this page is kept (its own in-memory cookies, storage and cache). */
+	public static BrowserView open(String url, int w, int h, boolean incognito) {
 		if (!CefRuntime.ensure()) {
 			return null;
 		}
-		BrowserView view = new BrowserView(url, w, h);
+		BrowserView view = new BrowserView(url, w, h, incognito);
 		ALL.add(view);
 		return view;
 	}
 
 	// ------------------------------------------------------------------ pixels
 
-	private void paint(boolean isPopup, ByteBuffer bgra, int w, int h) {
+	private void paint(boolean isPopup, ByteBuffer bgra, int w, int h, Rectangle[] dirtyRects) {
 		if (closed) {
 			return;
 		}
@@ -179,12 +201,26 @@ public final class BrowserView {
 			return;
 		}
 		if (!isPopup) {
-			if (pixels == null || pixelsW != w || pixelsH != h) {
+			boolean fresh = pixels == null || pixelsW != w || pixelsH != h;
+			if (fresh) {
 				pixels = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.LITTLE_ENDIAN);
 				pixelsW = w;
 				pixelsH = h;
 			}
-			convert(bgra, w, h, pixels, 0, 0, w);
+			if (fresh || dirtyRects == null || dirtyRects.length == 0 || popupShown) {
+				convert(bgra, w, h, pixels, 0, 0, w);
+			} else {
+				// only what changed (a blinking caret, a ticking clock): a still page costs next to nothing per paint
+				for (Rectangle d : dirtyRects) {
+					int x0 = Math.max(0, d.x);
+					int y0 = Math.max(0, d.y);
+					int x1 = Math.min(w, d.x + d.width);
+					int y1 = Math.min(h, d.y + d.height);
+					if (x1 > x0 && y1 > y0) {
+						convertRegion(bgra, w, pixels, x0, y0, x1 - x0, y1 - y0);
+					}
+				}
+			}
 		} else if (popup != null && pixels != null && popupShown) {
 			// a dropdown (<select>) is its own little buffer: drawn over the page at its place
 			int px = Math.max(0, popup.x);
@@ -213,6 +249,17 @@ public final class BrowserView {
 			src.get(y * w, row, 0, w);
 			swap(row, w);
 			dst.put((oy + y) * outW + ox, row, 0, w);
+		}
+	}
+
+	private static void convertRegion(ByteBuffer bgra, int w, ByteBuffer out, int x, int y, int rw, int rh) {
+		IntBuffer src = bgra.order(ByteOrder.LITTLE_ENDIAN).asIntBuffer();
+		IntBuffer dst = out.asIntBuffer();
+		int[] row = new int[rw];
+		for (int yy = y; yy < y + rh; yy++) {
+			src.get(yy * w + x, row, 0, rw);
+			swap(row, rw);
+			dst.put(yy * w + x, row, 0, rw);
 		}
 	}
 

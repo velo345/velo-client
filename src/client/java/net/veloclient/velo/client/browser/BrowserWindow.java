@@ -164,7 +164,7 @@ public final class BrowserWindow {
 		} else {
 			if (view == null || view.closed()) {
 				int scale = ClientCompat.guiScale();
-				view = BrowserView.open(home(), c[2] * scale, c[3] * scale);
+				view = BrowserView.open(home(), c[2] * scale, c[3] * scale, incognito);
 			}
 			if (view != null) {
 				int scale = ClientCompat.guiScale();
@@ -194,10 +194,16 @@ public final class BrowserWindow {
 	}
 
 	private static final String[] BUTTONS = {"arrow_left", "arrow_right", "reload", "home"};
-	private static final String[] RIGHT = {"eye_off", "expand", "close"};
+	private static final String[] RIGHT = {"incognito", "eye_off", "expand", "close"};
+	/** Incognito (Chrome-like): the page reopens in its own in-memory context; nothing of it is kept. */
+	private static boolean incognito;
 
 	private static void drawBar(DrawContext context, TextRenderer tr, int[] r, int mouseX, int mouseY, int alpha) {
 		int y = r[1];
+		if (incognito) {
+			// Chrome-like: a purple-grey bar so it's always clear nothing is being kept
+			context.fill(r[0] + 1, y + 1, r[0] + r[2] - 1, y + BAR - 1, (alpha * 0x60 / 255 << 24) | 0x3A2E5C);
+		}
 		int accent = MenuKit.accent();
 		context.fill(r[0] + 1, y + BAR - 1, r[0] + r[2] - 1, y + BAR, (alpha * 0x16 / 255 << 24) | 0xFFFFFF);
 		int x = r[0] + 6;
@@ -213,6 +219,9 @@ public final class BrowserWindow {
 		int right = r[0] + r[2] - 6;
 		int rx = right - RIGHT.length * 18 + 2;
 		for (int i = 0; i < RIGHT.length; i++) {
+			if (i == 0 && incognito) {
+				VeloDraw.fillRounded(context, rx, y + 3, 16, 16, 5, (alpha * 0x80 / 255 << 24) | 0x7A5CFF);
+			}
 			drawButton(context, rx + i * 18, y + 3, RIGHT[i], true, i == RIGHT.length - 1, mouseX, mouseY, alpha);
 		}
 		// the address field
@@ -233,7 +242,7 @@ public final class BrowserWindow {
 			shown = view == null || StartPage.isStartPage(view.url()) ? "Search Google or type an address" : pretty(view.url());
 			color = 0x6E6E78;
 		} else if (view == null || StartPage.isStartPage(view.url())) {
-			shown = "Search Google or type an address";
+			shown = incognito ? "Incognito - search Google or type an address" : "Search Google or type an address";
 			color = 0x8E8384;
 		} else {
 			shown = pretty(view.url());
@@ -551,12 +560,22 @@ public final class BrowserWindow {
 	private static void rightButton(int i) {
 		switch (i) {
 			case 0 -> {
+				// incognito on/off: a fresh page in the other mode
+				incognito = !incognito;
+				if (view != null) {
+					view.dispose();
+					view = null;
+				}
+				BrowserModule.toast(incognito ? "Incognito: nothing you do here is saved - closing it forgets everything."
+						: "Back to normal browsing - sign-ins and history are kept on this PC only.");
+			}
+			case 1 -> {
 				// hide: the page keeps playing, only the sound remains
 				hidden = true;
 				animateClose(() -> MinecraftClient.getInstance().setScreen(null));
 				BrowserModule.toast("Browser hidden - it keeps playing. " + BrowserModule.keyName() + " shows it again.");
 			}
-			case 1 -> {
+			case 2 -> {
 				fullscreen = !fullscreen;
 				BrowserModule.saveSoon();
 			}

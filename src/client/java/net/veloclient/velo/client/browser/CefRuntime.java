@@ -376,9 +376,16 @@ public final class CefRuntime {
 			}
 			org.cef.CefSettings settings = new org.cef.CefSettings();
 			settings.windowless_rendering_enabled = true;
-			// no cache_path: everything (cookies, history, storage, cache) stays in memory - incognito by design
-			settings.cache_path = null;
-			settings.persist_session_cookies = false;
+			// Normal browsing keeps its data like Chrome - cookies, sign-ins, history, cache - only on this PC
+			// (<velo root>/browser/profile, nothing is ever sent anywhere). Incognito windows use their own in-memory
+			// context instead (BrowserView). A second game running at the same time can't open the same profile:
+			// it browses in memory only.
+			Path profile = profileDir();
+			boolean persistent = lockProfile(profile);
+			settings.cache_path = persistent ? profile.toString() : null;
+			settings.persist_session_cookies = persistent;
+			net.veloclient.velo.VeloClient.LOGGER.info("Velo Browser: {}", persistent ? "saving data locally in " + profile
+					: "browsing in memory only (the profile is in use by another game)");
 			settings.background_color = settings.new ColorType(255, 18, 16, 20);
 			settings.log_severity = org.cef.CefSettings.LogSeverity.LOGSEVERITY_DISABLE;
 			app = org.cef.CefApp.getInstance(switches, settings);
@@ -386,6 +393,43 @@ public final class CefRuntime {
 			net.veloclient.velo.VeloClient.LOGGER.info("Velo Browser: Chromium {} started ({})", COMMIT.substring(0, 7), platform());
 		} catch (Throwable t) {
 			fail("The browser couldn't start: " + t.getMessage(), t);
+		}
+	}
+
+	/** Where normal (not incognito) browsing keeps its data. */
+	static Path profileDir() {
+		return net.veloclient.velo.config.VeloPaths.root().resolve("browser").resolve("profile");
+	}
+
+	private static java.nio.channels.FileChannel profileLockChannel;
+
+	/** One game at a time per profile; also wipes it first when "Clear browsing data" asked for that. */
+	private static boolean lockProfile(Path profile) {
+		try {
+			Files.createDirectories(profile);
+			Path clear = profile.resolveSibling("clear-profile");
+			if (Files.exists(clear)) {
+				try (var walk = Files.walk(profile)) {
+					walk.sorted(java.util.Comparator.reverseOrder()).filter(p -> !p.equals(profile)).forEach(p -> p.toFile().delete());
+				}
+				Files.deleteIfExists(clear);
+				net.veloclient.velo.VeloClient.LOGGER.info("Velo Browser: browsing data cleared");
+			}
+			profileLockChannel = java.nio.channels.FileChannel.open(profile.resolveSibling("profile.lock"),
+					java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE);
+			return profileLockChannel.tryLock() != null;
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	/** Settings: clears cookies, sign-ins, history and cache the next time the browser starts (Chromium holds the files now). */
+	public static void clearDataOnNextStart() {
+		try {
+			Files.createDirectories(profileDir());
+			Files.writeString(profileDir().resolveSibling("clear-profile"), "1");
+		} catch (Exception ignored) {
+			// nothing to clear
 		}
 	}
 

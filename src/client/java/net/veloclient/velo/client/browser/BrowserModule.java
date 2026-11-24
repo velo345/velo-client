@@ -133,6 +133,11 @@ public final class BrowserModule extends AbstractModule implements Configurable,
 					default -> AWAY.get(0);
 				}, v -> BrowserWindow.away = v.equals(AWAY.get(1)) ? BrowserWindow.Away.HIDDEN : v.equals(AWAY.get(2)) ? BrowserWindow.Away.CLOSE
 						: BrowserWindow.Away.PIP),
+				// normal browsing keeps sign-ins and history on this PC only (incognito: the hat button in the bar keeps nothing)
+				new ConfigField.ActionButtonField("Clear Browsing Data (sign-ins, history, cache)", () -> {
+					CefRuntime.clearDataOnNextStart();
+					toast("Browsing data is cleared the next time the game starts.");
+				}),
 				new ConfigField.SliderField("Small Window Opacity", 0.3, 1.0, () -> BrowserWindow.pipOpacity,
 						v -> BrowserWindow.pipOpacity = (float) (Math.round(v * 100) / 100.0), v -> Math.round(v * 100) + "%"),
 				new ConfigField.ChoiceField("Start Page Background", StartPage.BACKGROUNDS, () -> BrowserWindow.background, v -> {
