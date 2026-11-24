@@ -28,7 +28,6 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.User;
-import net.minecraft.world.entity.player.PlayerSkin;
 import net.veloclient.velo.client.gui.title.MenuKit;
 import net.veloclient.velo.client.gui.widget.VeloAnim;
 import net.veloclient.velo.client.gui.widget.VeloDraw;
@@ -66,7 +65,6 @@ public final class AccountSwitcher {
 	}
 
 	private static final List<Hit> HITS = new ArrayList<>();
-	private static final Map<String, java.util.function.Supplier<PlayerSkin>> SKINS = new HashMap<>();
 	private static List<Account> accounts = List.of();
 	private static long readAt;
 	private static boolean open;
@@ -171,17 +169,6 @@ public final class AccountSwitcher {
 		return u.substring(0, 8) + "-" + u.substring(8, 12) + "-" + u.substring(12, 16) + "-" + u.substring(16, 20) + "-" + u.substring(20);
 	}
 
-	private static PlayerSkin skin(String uuid, String name) {
-		var lookup = SKINS.computeIfAbsent(uuid, k -> {
-			try {
-				return Minecraft.getInstance().getSkinManager().createLookup(new com.mojang.authlib.GameProfile(UUID.fromString(uuid), name), false);
-			} catch (Exception e) {
-				return () -> net.minecraft.client.resources.DefaultPlayerSkin.get(UUID.fromString(uuid));
-			}
-		});
-		return lookup.get();
-	}
-
 	// ---- drawing ----
 
 	private static void draw(GuiGraphicsExtractor g, int mouseX, int mouseY) {
@@ -199,7 +186,9 @@ public final class AccountSwitcher {
 		float hv = MenuKit.hover("acc-chip", MenuKit.inside(mouseX, mouseY, x, y, w, h));
 		VeloDraw.fillRounded(g, x, y, w, h, 8, VeloAnim.lerpArgb(0xB0101015, 0xD01A1A20, Math.max(hv, open ? 1 : 0)));
 		VeloDraw.strokeRounded(g, x, y, w, h, 8, 0x26FFFFFF);
-		net.minecraft.client.gui.components.PlayerFaceExtractor.extractRenderState(g, skin(current, user.getName()), x + 5, y + 5, 12);
+		// the real face from Mojang via Velo's head cache (the same one as the title footer) - a bare GameProfile has no
+		// textures, so vanilla's skin lookup handed back a default skin: someone else's face next to your name (1.5.1)
+		net.veloclient.velo.client.gui.PlayerHeads.draw(g, current, user.getName(), x + 5, y + 5, 12);
 		MenuKit.text(g, font, name, x + 23, y + (h - MenuKit.H_UI) / 2, MenuKit.TEXT);
 		// chevron
 		float cx = x + w - 11;
@@ -251,7 +240,7 @@ public final class AccountSwitcher {
 			if (on || rh > 0.01f) {
 				VeloDraw.fillRounded(g, x + 4, ry, lw - 8, rowH, 6, on ? 0x1EFFFFFF : (Math.round(0x14 * rh) << 24) | 0xFFFFFF);
 			}
-			net.minecraft.client.gui.components.PlayerFaceExtractor.extractRenderState(g, skin(acc.uuid(), acc.name()), x + 10, ry + 4, 12);
+			net.veloclient.velo.client.gui.PlayerHeads.draw(g, acc.uuid(), acc.name(), x + 10, ry + 4, 12);
 			MenuKit.text(g, font, MenuKit.ui(acc.name()), x + 28, ry + (rowH - MenuKit.H_UI) / 2, on ? MenuKit.TEXT : MenuKit.TEXT_2);
 			if (on) {
 				VeloDraw.line(g, x + lw - 20, ry + 10, x + lw - 17, ry + 13, 1.4f, (a << 24) | (MenuKit.accent() & 0xFFFFFF));
@@ -371,7 +360,6 @@ public final class AccountSwitcher {
 			}
 		}));
 		net.veloclient.velo.config.VeloPaths.setAccount(acc.uuid());
-		SKINS.remove(acc.uuid());
 		// (the launcher's own account choice stays as it is: switching in the game is for this session only)
 		LOG.info("Now playing as {}", acc.name());
 		clickSound();
