@@ -21,6 +21,7 @@ VersionInfoVersion=@NUMERIC_VERSION@
 DefaultDirName={localappdata}\Programs\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
+DisableWelcomePage=no
 DisableDirPage=auto
 DisableReadyPage=yes
 PrivilegesRequired=lowest
