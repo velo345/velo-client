@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Style B - Settings app</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;width:1600px;height:900px;overflow:hidden;font-family:Inter,sans-serif;color:#ECECEF;background:#000}
+.bg{position:absolute;inset:0;background:url(bg.jpg) center/cover;filter:brightness(.45) blur(3px);transform:scale(1.03)}
+.win{position:absolute;left:190px;top:90px;width:1220px;height:720px;border-radius:18px;background:#1C1C1F;border:1px solid #2C2C31;box-shadow:0 30px 90px rgba(0,0,0,.6);display:flex;overflow:hidden}
+.side{width:300px;background:#161618;border-right:1px solid #26262A;padding:22px 14px;display:flex;flex-direction:column;gap:3px}
+.dots{display:flex;gap:8px;margin:0 8px 20px}.dots i{width:12px;height:12px;border-radius:6px;display:block;background:#3A3A40}.dots i:first-child{background:#E5373E}
+.acct{display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:#202024;margin-bottom:16px}
+.av{width:40px;height:40px;border-radius:10px;background:linear-gradient(#4A3528 0 38%,#C89A78 38% 100%)}
+.acct b{display:block;font-size:15px}.acct small{color:#8D8D96;font-size:13px}
+.sbs{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:9px;background:#202024;color:#7D7D86;font-size:14px;margin-bottom:14px}
+.it{display:flex;align-items:center;gap:12px;height:40px;padding:0 10px;border-radius:9px;font-size:15px;color:#D6D6DC}
+.it.on{background:#2B6BEA;color:#fff}
+.sq{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff}
+.it span.n{flex:1}.it small{font-family:'Geist Mono';font-size:12px;color:#8D8D96}.it.on small{color:#DCE6FF}
+.gap{height:14px}
+.main{flex:1;display:flex;flex-direction:column;padding:26px 36px;overflow:hidden}
+h1{margin:0 0 4px;font-size:28px;font-weight:700}.sub{color:#8D8D96;font-size:15px;margin-bottom:22px}
+.group{background:#232327;border:1px solid #2C2C31;border-radius:14px;margin-bottom:18px;overflow:hidden}
+.gt{font-size:12.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#8D8D96;margin:0 0 8px 6px}
+.row{display:flex;align-items:center;gap:14px;height:62px;padding:0 18px;border-bottom:1px solid #2C2C31}.row:last-child{border-bottom:0}
+.row .sq{width:34px;height:34px;border-radius:9px}
+.row .t{flex:1}.row b{display:block;font-size:16px;font-weight:600}.row small{color:#8D8D96;font-size:13.5px}
+.tg{width:50px;height:30px;border-radius:15px;background:#3A3A40;padding:3px}.tg i{display:block;width:24px;height:24px;border-radius:12px;background:#fff}
+.tg.on{background:#34C759}.tg.on i{transform:translateX(20px)}
+.chev{color:#6E6E78}
+.tag{position:absolute;left:40px;top:28px;font-family:'Geist Mono';font-size:15px;padding:8px 14px;border-radius:10px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.2);color:#fff}
+.btn{margin-left:auto;height:40px;padding:0 18px;border-radius:10px;background:#2B6BEA;color:#fff;font-weight:600;font-size:14.5px;display:flex;align-items:center;gap:8px}
+.hd{display:flex;align-items:flex-start}
+</style></head><body>
+<div class="bg"></div>
+<div class="tag">STYLE B · SETTINGS APP</div>
+<div class="win">
+ <div class="side">
+  <div class="dots"><i></i><i></i><i></i></div>
+  <div class="acct"><div class="av"></div><div><b>Velo2k</b><small>PvP profile</small></div></div>
+  <div class="sbs"><span data-i="search" data-s="16"></span>Search</div>
+  <div id="cats"></div>
+  <div class="gap"></div>
+  <div id="more"></div>
+ </div>
+ <div class="main">
+  <div class="hd"><div><h1>PvP</h1><div class="sub">29 modules for fights and duels</div></div><div class="btn"><span data-i="layout" data-s="17"></span>Edit HUD</div></div>
+  <div class="gt">On screen</div>
+  <div class="group" id="g1"></div>
+  <div class="gt">Feel</div>
+  <div class="group" id="g2"></div>
+ </div>
+</div>
+<script>
+const cats=[['layout','HUD','#FF9F0A',33,0],['swords','PvP','#FF453A',29,1],['sparkles','Visuals','#BF5AF2',28,0],['wrench','Utility','#30B0C7',35,0],['zap','Performance','#FFD60A',17,0],['cpu','Advanced','#8E8E93',19,0]];
+document.getElementById('cats').innerHTML=cats.map(c=>`<div class="it ${c[4]?'on':''}"><div class="sq" style="background:${c[2]}" data-i="${c[0]}" data-s="16" data-w="2"></div><span class="n">${c[1]}</span><small>${c[3]}</small></div>`).join('');
+const more=[['shirt','Locker','#5E5CE6'],['users','Friends','#32D74B'],['video','Clips & Rewind','#FF375F'],['map','World Map','#64D2FF'],['sliders','Settings','#8E8E93']];
+document.getElementById('more').innerHTML=more.map(c=>`<div class="it"><div class="sq" style="background:${c[2]}" data-i="${c[0]}" data-s="16" data-w="2"></div><span class="n">${c[1]}</span></div>`).join('');
+const row=(i,c,n,h,on)=>`<div class="row"><div class="sq" style="background:${c}" data-i="${i}" data-s="19" data-w="2"></div><div class="t"><b>${n}</b><small>${h}</small></div><div class="tg ${on?'on':''}"><i></i></div><span class="chev" data-i="chev" data-s="18"></span></div>`;
+document.getElementById('g1').innerHTML=row('crosshair','#FF453A','Custom Crosshair','Aim with your own shape',1)+row('trend','#FF9F0A','Combo Counter','Count your combos',1)+row('shield','#30B0C7','Target HUD','Enemy health and armor',0);
+document.getElementById('g2').innerHTML=row('swords','#FF375F','Hit Color','See every hit land',1)+row('activity','#5E5CE6','Old Animations','1.7 style blocking and swing',0)+row('eye','#32D74B','Reach Display','Distance of your hits',0);
+</script>
+<script src="icons.js"></script>
+</body></html>
