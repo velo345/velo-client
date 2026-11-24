@@ -29,6 +29,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import author_emotes  # noqa: E402
 import emote_specs  # noqa: E402
+
+# 2026-11-24 (owner): the unreleased emotes are gone for good - only what the Store sells is built
+RELEASED = {"wave", "cheer", "bow", "shrug", "heart", "facepalm", "backflip"}
+emote_specs.EMOTES = [e for e in emote_specs.EMOTES if e["id"] in RELEASED]
 import import_emotes as ie  # noqa: E402
 import make_sounds  # noqa: E402
 import music_sync as ms  # noqa: E402
