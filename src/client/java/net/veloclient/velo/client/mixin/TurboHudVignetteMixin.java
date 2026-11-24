@@ -1,7 +1,15 @@
 package net.veloclient.velo.client.mixin;
 
 import org.spongepowered.asm.mixin.Mixin;
-//? if >=26.3 {
+//? if >=1.21.11 && <26.1 {
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.util.Identifier;
+import net.veloclient.velo.client.modules.performance.PerformanceBoostModule;
+import org.spongepowered.asm.mixin.injection.At;
+//?} else if >=26.3 {
 /*import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 *///?} else if >=26.2 {
 /*import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -22,7 +30,21 @@ import org.spongepowered.asm.mixin.injection.At;
  * the sky). With a pure black color (and no world-border warning, which tints it) the draw is skipped: the picture is
  * identical, at night and underground it is drawn as always.
  */
-//? if >=26.3 {
+//? if >=1.21.11 && <26.1 {
+@Mixin(net.minecraft.client.gui.hud.InGameHud.class)
+public abstract class TurboHudVignetteMixin {
+
+	@WrapOperation(method = "renderVignetteOverlay", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/client/gui/DrawContext;drawTexture(Lcom/mojang/blaze3d/pipeline/RenderPipeline;Lnet/minecraft/util/Identifier;IIFFIIIII)V"))
+	private void velo$skipInvisibleVignette(DrawContext graphics, RenderPipeline pipeline, Identifier texture, int x, int y,
+			float u, float v, int width, int height, int texWidth, int texHeight, int color, Operation<Void> original) {
+		if (PerformanceBoostModule.turbo && (color & 0xFFFFFF) == 0) {
+			return;
+		}
+		original.call(graphics, pipeline, texture, x, y, u, v, width, height, texWidth, texHeight, color);
+	}
+}
+//?} else if >=26.3 {
 /*@Mixin(net.minecraft.client.gui.Hud.class)
 public abstract class TurboHudVignetteMixin {
 
@@ -51,8 +73,8 @@ public abstract class TurboHudVignetteMixin {
 	}
 }
 *///?} else {
-@Mixin(targets = "net.minecraft.client.MinecraftClient")
+/*@Mixin(targets = "net.minecraft.client.MinecraftClient")
 public abstract class TurboHudVignetteMixin {
 	// Vulkan-era versions only (VeloMixinPlugin skips TurboHud* elsewhere).
 }
-//?}
+*///?}

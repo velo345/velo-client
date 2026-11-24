@@ -26,9 +26,18 @@ public final class VeloMixinPlugin implements IMixinConfigPlugin {
 	/** Patch vanilla's own terrain path, which Sodium replaces wholesale. */
 	private static final Set<String> VANILLA_TERRAIN = Set.of("ChunkSlicePrepMixin", "SectionMeshSlotsMixin", "UberBufferSlotsMixin");
 
+	/** Velo Turbo mixins with a 1.21.11 branch (2026-11-24): allowed there like on the Vulkan-era versions. */
+	private static final Set<String> PORTED_1_21_11 = Set.of("TurboSodiumCacheCleanupMixin",
+			"TurboSodiumRegionUpdateMixin", "TurboSodiumSpriteMarksMixin", "TurboSodiumFlatMovingMixin", "TurboFarmItemTickMixin",
+			"TurboFarmLightMixin", "TurboFarmMovingMixin", "TurboPacketHandleInvoker", "TurboPacketPacingMixin", "TurboPacketLightPacingMixin",
+			"TurboFontPrepareMixin", "TurboFontReloadMixin", "TurboEntityNameMemoMixin", "TurboEntityNameTagMixin",
+			"TurboHudStateAccessor", "TurboHudWholeMixin", "TurboHudVignetteMixin", "TurboSodiumParticleCullMixin",
+			"TurboSodiumParticleWriteMixin", "TurboEntityDisplayCullMixin", "TurboEntityVisFieldsMixin", "TurboEntityVisibilityMixin");
+
 	private boolean hasVulkan;
 	private boolean renderPearl;
 	private boolean sodium;
+	private boolean mc1211;
 
 	@Override
 	public void onLoad(String mixinPackage) {
@@ -36,11 +45,15 @@ public final class VeloMixinPlugin implements IMixinConfigPlugin {
 		renderPearl = loader.getResource("com/mojang/renderpearl/backend/vulkan/VulkanDevice.class") != null;
 		hasVulkan = renderPearl || loader.getResource("com/mojang/blaze3d/vulkan/VulkanDevice.class") != null;
 		sodium = net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("sodium");
+		mc1211 = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("minecraft")
+				.map(m -> m.getMetadata().getVersion().getFriendlyString().equals("1.21.11")).orElse(false);
 	}
 
 	@Override
 	public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
 		String simpleName = mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1);
+		// the Turbo rules below read "Vulkan era" - a mixin ported to 1.21.11 counts as that there
+		boolean hasVulkan = this.hasVulkan || mc1211 && PORTED_1_21_11.contains(simpleName);
 		if (sodium && VANILLA_TERRAIN.contains(simpleName)) {
 			return false;
 		}

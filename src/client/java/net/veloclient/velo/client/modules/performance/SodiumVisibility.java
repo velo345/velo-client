@@ -41,7 +41,17 @@ public final class SodiumVisibility {
 
 	/** False only when Sodium found every chunk section this box touches hidden this frame. Render thread, Sodium loaded. */
 	public static boolean boxVisible(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
-		//? if >=26.2 {
+		//? if >=1.21.11 && <26.1 {
+		var renderer = net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.instanceNullable();
+		if (renderer == null) {
+			return true;
+		}
+		try {
+			return renderer.isBoxVisible(minX, minY, minZ, maxX, maxY, maxZ);
+		} catch (RuntimeException e) {
+			return true;
+		}
+		//?} else if >=26.2 {
 		/*var renderer = net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.instanceNullable();
 		if (renderer == null) {
 			return true;
@@ -52,12 +62,26 @@ public final class SodiumVisibility {
 			return true;
 		}
 		*///?} else {
-		return true;
-		//?}
+		/*return true;
+		*///?}
 	}
 
 	private static boolean sectionVisible(int sx, int sy, int sz) {
-		//? if >=26.2 {
+		//? if >=1.21.11 && <26.1 {
+		var renderer = net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.instanceNullable();
+		if (renderer == null) {
+			return true;
+		}
+		try {
+			// a hair inside the section, so neighbours sharing the face don't count
+			double x0 = sx * 16.0;
+			double y0 = sy * 16.0;
+			double z0 = sz * 16.0;
+			return renderer.isBoxVisible(x0 + 0.01, y0 + 0.01, z0 + 0.01, x0 + 15.99, y0 + 15.99, z0 + 15.99);
+		} catch (RuntimeException e) {
+			return true;
+		}
+		//?} else if >=26.2 {
 		/*var renderer = net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.instanceNullable();
 		if (renderer == null) {
 			return true;
@@ -72,7 +96,7 @@ public final class SodiumVisibility {
 			return true;
 		}
 		*///?} else {
-		return true;
-		//?}
+		/*return true;
+		*///?}
 	}
 }

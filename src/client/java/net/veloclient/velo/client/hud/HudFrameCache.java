@@ -51,7 +51,13 @@ public final class HudFrameCache {
 	public static int replays;
 	public static int records;
 
-	//? if >=26.2 {
+	//? if >=1.21.11 && <26.1 {
+	private static final Recorder RECORDER = new Recorder();
+	private static final java.util.ArrayList<Object> ARGS = new java.util.ArrayList<>();
+	private static byte[] ops = new byte[256];
+	private static int opCount;
+	private static net.minecraft.client.gui.render.state.GuiRenderState swappedOut;
+	//?} else if >=26.2 {
 	/*private static final Recorder RECORDER = new Recorder();
 	private static final java.util.ArrayList<Object> ARGS = new java.util.ArrayList<>();
 	private static byte[] ops = new byte[256];
@@ -84,7 +90,36 @@ public final class HudFrameCache {
 
 	/** Replays the last recorded HUD if it is still fresh; true = done, skip drawing the modules. */
 	public static boolean replay(DrawContext context, int width, int height) {
-		//? if >=26.2 {
+		//? if >=1.21.11 && <26.1 {
+		if (!allowed()) {
+			valid = false;
+			return false;
+		}
+		int scale = net.veloclient.velo.client.util.ClientCompat.guiScale();
+		if (!valid || width != recordedWidth || height != recordedHeight || scale != recordedScale
+				|| System.nanoTime() - recordedAt >= interval(System.nanoTime())) {
+			return false;
+		}
+		var state = ((net.veloclient.velo.client.mixin.TurboHudStateAccessor) (Object) context).velo$state();
+		for (int i = 0; i < opCount; i++) {
+			Object arg = ARGS.get(i);
+			switch (ops[i]) {
+				case 0 -> state.createNewRootLayer();
+				case 1 -> state.applyBlur();
+				case 2 -> state.goUpLayer();
+				case 3 -> state.addItem((net.minecraft.client.gui.render.state.ItemGuiElementRenderState) arg);
+				case 4 -> state.addText((net.minecraft.client.gui.render.state.TextGuiElementRenderState) arg);
+				case 5 -> state.addSpecialElement((net.minecraft.client.gui.render.state.special.SpecialGuiElementRenderState) arg);
+				case 6 -> state.addSimpleElement((net.minecraft.client.gui.render.state.SimpleGuiElementRenderState) arg);
+				case 7 -> state.addSimpleElementToCurrentLayer((net.minecraft.client.gui.render.state.TexturedQuadGuiElementRenderState) arg);
+				case 8 -> state.addPreparedTextElement((net.minecraft.client.gui.render.state.SimpleGuiElementRenderState) arg);
+				default -> {
+				}
+			}
+		}
+		replays++;
+		return true;
+		//?} else if >=26.2 {
 		/*if (!allowed()) {
 			valid = false;
 			return false;
@@ -114,13 +149,28 @@ public final class HudFrameCache {
 		replays++;
 		return true;
 		*///?} else {
-		return false;
-		//?}
+		/*return false;
+		*///?}
 	}
 
 	/** Starts recording what the HUD modules draw into {@code context} (when caching is allowed). */
 	public static void beginRecord(DrawContext context, int width, int height) {
-		//? if >=26.2 {
+		//? if >=1.21.11 && <26.1 {
+		if (!allowed() || recording) {
+			return;
+		}
+		var accessor = (net.veloclient.velo.client.mixin.TurboHudStateAccessor) (Object) context;
+		swappedOut = accessor.velo$state();
+		RECORDER.real = swappedOut;
+		opCount = 0;
+		ARGS.clear();
+		accessor.velo$setState(RECORDER);
+		recording = true;
+		records++;
+		recordedWidth = width;
+		recordedHeight = height;
+		recordedScale = net.veloclient.velo.client.util.ClientCompat.guiScale();
+		//?} else if >=26.2 {
 		/*if (!allowed() || recording) {
 			return;
 		}
@@ -140,7 +190,17 @@ public final class HudFrameCache {
 
 	/** Ends a recording (always restores the real render state, also after an exception). */
 	public static void endRecord(DrawContext context, boolean completed) {
-		//? if >=26.2 {
+		//? if >=1.21.11 && <26.1 {
+		if (!recording) {
+			return;
+		}
+		((net.veloclient.velo.client.mixin.TurboHudStateAccessor) (Object) context).velo$setState(swappedOut);
+		RECORDER.real = null;
+		swappedOut = null;
+		recording = false;
+		valid = completed;
+		recordedAt = System.nanoTime();
+		//?} else if >=26.2 {
 		/*if (!recording) {
 			return;
 		}
@@ -153,7 +213,173 @@ public final class HudFrameCache {
 		*///?}
 	}
 
-	//? if >=26.2 {
+	//? if >=1.21.11 && <26.1 {
+	private static void record(int op, Object arg) {
+		if (opCount == ops.length) {
+			ops = java.util.Arrays.copyOf(ops, ops.length * 2);
+		}
+		ops[opCount++] = (byte) op;
+		ARGS.add(arg);
+	}
+
+	// Forwards everything to the frame's real state and remembers the additions.
+	static final class Recorder extends net.minecraft.client.gui.render.state.GuiRenderState {
+		net.minecraft.client.gui.render.state.GuiRenderState real;
+
+		@Override
+		public void createNewRootLayer() {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.createNewRootLayer();
+				return;
+			}
+			real.createNewRootLayer();
+			record(0, null);
+		}
+
+		@Override
+		public void applyBlur() {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.applyBlur();
+				return;
+			}
+			real.applyBlur();
+			record(1, null);
+		}
+
+		@Override
+		public void goUpLayer() {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.goUpLayer();
+				return;
+			}
+			real.goUpLayer();
+			record(2, null);
+		}
+
+		@Override
+		public void addItem(net.minecraft.client.gui.render.state.ItemGuiElementRenderState state) {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.addItem(state);
+				return;
+			}
+			real.addItem(state);
+			record(3, state);
+		}
+
+		@Override
+		public void addText(net.minecraft.client.gui.render.state.TextGuiElementRenderState state) {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.addText(state);
+				return;
+			}
+			real.addText(state);
+			record(4, state);
+		}
+
+		@Override
+		public void addSpecialElement(net.minecraft.client.gui.render.state.special.SpecialGuiElementRenderState state) {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.addSpecialElement(state);
+				return;
+			}
+			real.addSpecialElement(state);
+			record(5, state);
+		}
+
+		@Override
+		public void addSimpleElement(net.minecraft.client.gui.render.state.SimpleGuiElementRenderState state) {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.addSimpleElement(state);
+				return;
+			}
+			real.addSimpleElement(state);
+			record(6, state);
+		}
+
+		@Override
+		public void addSimpleElementToCurrentLayer(net.minecraft.client.gui.render.state.TexturedQuadGuiElementRenderState state) {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.addSimpleElementToCurrentLayer(state);
+				return;
+			}
+			real.addSimpleElementToCurrentLayer(state);
+			record(7, state);
+		}
+
+		@Override
+		public void addPreparedTextElement(net.minecraft.client.gui.render.state.SimpleGuiElementRenderState state) {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.addPreparedTextElement(state);
+				return;
+			}
+			real.addPreparedTextElement(state);
+			record(8, state);
+		}
+
+		@Override
+		public java.util.Set<Object> getItemModelKeys() {
+			if (real == null) {
+				return super.getItemModelKeys();
+			}
+			return real.getItemModelKeys();
+		}
+
+		@Override
+		public void forEachSimpleElement(java.util.function.Consumer<net.minecraft.client.gui.render.state.SimpleGuiElementRenderState> consumer,
+				net.minecraft.client.gui.render.state.GuiRenderState.LayerFilter range) {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.forEachSimpleElement(consumer, range);
+				return;
+			}
+			real.forEachSimpleElement(consumer, range);
+		}
+
+		@Override
+		public void forEachItemElement(java.util.function.Consumer<net.minecraft.client.gui.render.state.ItemGuiElementRenderState> consumer) {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.forEachItemElement(consumer);
+				return;
+			}
+			real.forEachItemElement(consumer);
+		}
+
+		@Override
+		public void forEachTextElement(java.util.function.Consumer<net.minecraft.client.gui.render.state.TextGuiElementRenderState> consumer) {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.forEachTextElement(consumer);
+				return;
+			}
+			real.forEachTextElement(consumer);
+		}
+
+		@Override
+		public void forEachSpecialElement(java.util.function.Consumer<net.minecraft.client.gui.render.state.special.SpecialGuiElementRenderState> consumer) {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.forEachSpecialElement(consumer);
+				return;
+			}
+			real.forEachSpecialElement(consumer);
+		}
+
+		@Override
+		public void sortSimpleElements(java.util.Comparator<net.minecraft.client.gui.render.state.SimpleGuiElementRenderState> comparator) {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.sortSimpleElements(comparator);
+				return;
+			}
+			real.sortSimpleElements(comparator);
+		}
+
+		@Override
+		public void clear() {
+			if (real == null) { // GuiRenderState's own constructor calls in before real is set
+				super.clear();
+				return;
+			}
+			real.clear();
+		}
+	}
+	//?} else if >=26.2 {
 	/*private static void record(int op, Object arg) {
 		if (opCount == ops.length) {
 			ops = java.util.Arrays.copyOf(ops, ops.length * 2);

@@ -1,7 +1,11 @@
 package net.veloclient.velo.client.mixin;
 
 import org.spongepowered.asm.mixin.Mixin;
-//? if >=26.2 {
+//? if >=1.21.11 && <26.1 {
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import net.veloclient.velo.client.hud.HudFrameCache;
+//?} else if >=26.2 {
 /*import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.veloclient.velo.client.hud.HudFrameCache;
@@ -12,7 +16,33 @@ import net.veloclient.velo.client.hud.HudFrameCache;
  * built at most 360 times a second and replayed in between, whenever Gnetum isn't caching it. With Gnetum caching, this
  * passes straight through.
  */
-//? if >=26.2 {
+//? if >=1.21.11 && <26.1 {
+@Mixin(net.minecraft.client.gui.hud.InGameHud.class)
+public abstract class TurboHudWholeMixin {
+
+	@WrapMethod(method = "render")
+	private void velo$wholeHud(net.minecraft.client.gui.DrawContext graphics, net.minecraft.client.render.RenderTickCounter delta, Operation<Void> original) {
+		// (Post effects moved to PostEffectsFrameMixin: here they ran in the extract phase and turned the screen black.)
+		if (!HudFrameCache.wholeHud()) {
+			original.call(graphics, delta);
+			return;
+		}
+		int width = graphics.getScaledWindowWidth();
+		int height = graphics.getScaledWindowHeight();
+		if (HudFrameCache.replay(graphics, width, height)) {
+			return;
+		}
+		HudFrameCache.beginRecord(graphics, width, height);
+		boolean completed = false;
+		try {
+			original.call(graphics, delta);
+			completed = true;
+		} finally {
+			HudFrameCache.endRecord(graphics, completed);
+		}
+	}
+}
+//?} else if >=26.2 {
 /*@Mixin(net.minecraft.client.gui.Hud.class)
 public abstract class TurboHudWholeMixin {
 
@@ -39,8 +69,8 @@ public abstract class TurboHudWholeMixin {
 	}
 }
 *///?} else {
-@Mixin(targets = "net.minecraft.client.MinecraftClient")
+/*@Mixin(targets = "net.minecraft.client.MinecraftClient")
 public abstract class TurboHudWholeMixin {
 	// GuiRenderState era only (VeloMixinPlugin skips TurboHud* before 26.2).
 }
-//?}
+*///?}

@@ -10,6 +10,10 @@ public interface HologramAccessor {
 
 	@Invoker("getText")
 	net.minecraft.text.Text velo$text();
+
+	// The lines as last laid out for drawing (null until drawn once) - DisplayCulling sizes the hologram from it.
+	@org.spongepowered.asm.mixin.gen.Accessor("textLines")
+	net.minecraft.entity.decoration.DisplayEntity.TextDisplayEntity.TextLines velo$layout();
 }
 //?} else {
 /*@Mixin(net.minecraft.world.entity.Display.TextDisplay.class)

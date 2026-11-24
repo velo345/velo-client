@@ -123,6 +123,10 @@ dependencies {
 	"clientCompileOnly"("de.maxhenkel.voicechat:voicechat-api:2.6.27")
 	// Velo Shaders' shadow pass draws Sodium's chunk meshes a second time from the sun, so it compiles
 	// against Sodium's renderer (compile-only: Sodium itself comes with the launcher's profiles).
+	if (sc.current.version == "1.21.11") {
+		// Velo Turbo's Sodium tweaks on 1.21.11 (the build the launcher installs there)
+		modCompileOnly("maven.modrinth:sodium:mc1.21.11-0.8.15-beta.1-fabric")
+	}
 	if (sc.current.version == "26.2") {
 		modCompileOnly("maven.modrinth:sodium:mc26.2-0.9.2-fabric")
 	}

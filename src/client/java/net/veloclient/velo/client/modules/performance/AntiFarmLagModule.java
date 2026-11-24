@@ -399,7 +399,21 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 	}
 
 	private static int countItemsNearby(double radius) {
-		//? if >=26.2 {
+		//? if >=1.21.11 && <26.1 {
+		var client = net.minecraft.client.MinecraftClient.getInstance();
+		if (client.world == null || client.player == null) {
+			return 0;
+		}
+		double r2 = radius * radius;
+		int n = 0;
+		for (net.minecraft.entity.Entity e : client.world.getEntities()) {
+			if ((e instanceof net.minecraft.entity.ItemEntity || e instanceof net.minecraft.entity.ExperienceOrbEntity)
+					&& e.squaredDistanceTo(client.player) < r2) {
+				n++;
+			}
+		}
+		return n;
+		//?} else if >=26.2 {
 		/*var client = net.minecraft.client.Minecraft.getInstance();
 		if (client.level == null || client.player == null) {
 			return 0;
@@ -414,8 +428,8 @@ public final class AntiFarmLagModule extends AbstractModule implements Configura
 		}
 		return n;
 		*///?} else {
-		return 0;
-		//?}
+		/*return 0;
+		*///?}
 	}
 
 	/** True while item farm mode is on (see {@link #updateItemFarm()}). */

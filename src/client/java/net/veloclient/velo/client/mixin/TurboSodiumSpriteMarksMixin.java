@@ -1,7 +1,12 @@
 package net.veloclient.velo.client.mixin;
 
 import org.spongepowered.asm.mixin.Mixin;
-//? if >=26.2 {
+//? if >=1.21.11 && <26.1 {
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+//?} else if >=26.2 {
 /*import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -16,7 +21,31 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * walk now runs at most every 25 ms - still at least twice per 50 ms tick, so every animation that's in view is marked
  * before the tick that uploads it, exactly as before. Only with Sodium (VeloMixinPlugin), off with -Dvelo.spriteMarkThrottle=false.
  */
-//? if >=26.2 {
+//? if >=1.21.11 && <26.1 {
+@Mixin(targets = "net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager", remap = false)
+public abstract class TurboSodiumSpriteMarksMixin {
+
+	@Unique
+	private static final boolean ON = !"false".equals(System.getProperty("velo.spriteMarkThrottle"));
+	@Unique
+	private static final long INTERVAL_NANOS = 25_000_000L;
+	@Unique
+	private long velo$lastMarks;
+
+	@Inject(method = "tickVisibleRenders", at = @At("HEAD"), cancellable = true, require = 0)
+	private void velo$throttleMarks(CallbackInfo ci) {
+		if (!ON || !net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo) {
+			return;
+		}
+		long now = System.nanoTime();
+		if (now - velo$lastMarks < INTERVAL_NANOS) {
+			ci.cancel();
+			return;
+		}
+		velo$lastMarks = now;
+	}
+}
+//?} else if >=26.2 {
 /*@Mixin(targets = "net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager", remap = false)
 public abstract class TurboSodiumSpriteMarksMixin {
 
@@ -41,8 +70,8 @@ public abstract class TurboSodiumSpriteMarksMixin {
 	}
 }
 *///?} else {
-@Mixin(targets = "net.minecraft.client.MinecraftClient")
+/*@Mixin(targets = "net.minecraft.client.MinecraftClient")
 public abstract class TurboSodiumSpriteMarksMixin {
 	// 26.2+ with Sodium only (VeloMixinPlugin skips it elsewhere).
 }
-//?}
+*///?}

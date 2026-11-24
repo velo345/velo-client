@@ -83,7 +83,9 @@ public final class ChunkAnimatorModule extends AbstractModule implements Configu
 		built = settings;
 		shaderLoaded = true;
 		m.wanted = settings;
-		if (settings.isEmpty() || !source.contains(ANCHOR) || !source.contains("u_SectionTimeInfo") || !source.contains("u_CurrentTime")) {
+		// Sodium 0.9 (26.x) keeps each section's first-shown time in u_SectionTimeInfo, Sodium 0.8 (1.21.11) in u_chunkFades
+		boolean sodium08 = source.contains("u_chunkFades");
+		if (settings.isEmpty() || !source.contains(ANCHOR) || !(sodium08 || source.contains("u_SectionTimeInfo")) || !source.contains("u_CurrentTime")) {
 			return source;
 		}
 		float duration = switch (m.speed) {
@@ -96,13 +98,14 @@ public final class ChunkAnimatorModule extends AbstractModule implements Configu
 
 				    // Velo Chunk Animator: sections Sodium fades in glide into place
 				    {
-				        int veloBuilt = texelFetch(u_SectionTimeInfo, int((u_RegionID * 256u) + uint(_draw_id))).r;
+				        %s
 				        if (veloBuilt >= 0) {
 				            float veloT = clamp(float(u_CurrentTime - veloBuilt) / %.1f, 0.0, 1.0);
 				            position.y += pow(1.0 - veloT, 3.0) * %.2f;
 				        }
 				    }
-				""", duration, offset);
+				""", sodium08 ? "int veloBuilt = u_chunkFades[int(_draw_id) >> 2][int(_draw_id) & 3];"
+						: "int veloBuilt = texelFetch(u_SectionTimeInfo, int((u_RegionID * 256u) + uint(_draw_id))).r;", duration, offset);
 		return source.replace(ANCHOR, ANCHOR + code);
 	}
 
