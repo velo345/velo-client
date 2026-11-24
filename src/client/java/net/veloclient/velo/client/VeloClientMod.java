@@ -116,6 +116,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		VeloKeybinds.register();
 		net.veloclient.velo.client.keybind.MenuKeySync.register();
 		net.veloclient.velo.client.util.ClassWarmup.register();
+		net.veloclient.velo.client.util.MemoryTrim.register();
 		net.veloclient.velo.client.util.FontWarmup.register();
 		net.veloclient.velo.client.util.StuckButtons.register();
 		net.veloclient.velo.client.report.FreezeWatchdog.register();
