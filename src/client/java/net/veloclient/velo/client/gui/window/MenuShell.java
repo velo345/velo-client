@@ -40,7 +40,7 @@ public final class MenuShell {
 	/** The highlight's current y, carried across pages so it glides from the old entry to the new one. */
 	private static float pillY = Float.NaN;
 
-	private record Entry(String id, String icon, String label, boolean bottom, Function<Screen, Screen> open) {
+	public record Entry(String id, String icon, String label, boolean bottom, Function<Screen, Screen> open) {
 	}
 
 	/** Per-window drawing state: where the icons are, hover progress of their name tags. */
@@ -54,7 +54,8 @@ public final class MenuShell {
 	private MenuShell() {
 	}
 
-	private static List<Entry> entries() {
+	/** Every place the Velo menu can go (the drawer's dock and More menu use these too). */
+	public static List<Entry> entries() {
 		List<Entry> out = new ArrayList<>();
 		out.add(new Entry("modules", "grid", "Modules", false, p -> net.veloclient.velo.client.gui.ModMenuScreen.forView(false)));
 		if (net.veloclient.velo.client.gui.ModMenuScreen.addonsAvailable()) {

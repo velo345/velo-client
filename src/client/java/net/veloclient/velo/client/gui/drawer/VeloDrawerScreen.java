@@ -1,0 +1,1575 @@
+package net.veloclient.velo.client.gui.drawer;
+
+import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import net.veloclient.velo.client.gui.title.MenuKit;
+import net.veloclient.velo.client.gui.title.QuickToggles;
+import net.veloclient.velo.client.gui.widget.ModuleIcons;
+import net.veloclient.velo.client.gui.widget.VeloAnim;
+import net.veloclient.velo.client.gui.widget.VeloDraw;
+import net.veloclient.velo.client.gui.widget.VeloNavIcons;
+import net.veloclient.velo.client.gui.widget.VeloUi;
+import net.veloclient.velo.client.gui.window.MenuShell;
+import net.veloclient.velo.client.gui.window.ModuleScenes;
+import net.veloclient.velo.client.hud.HudManager;
+import net.veloclient.velo.client.hud.HudModule;
+import net.veloclient.velo.client.util.Keys;
+import net.veloclient.velo.module.ConfigField;
+import net.veloclient.velo.module.Configurable;
+import net.veloclient.velo.module.Module;
+import net.veloclient.velo.module.ModuleCategory;
+import net.veloclient.velo.module.ModuleRegistry;
+import net.veloclient.velo.profile.VeloProfileManager;
+import net.veloclient.velo.client.profile.VeloProfileStore;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * R-Shift (2026-11-24 redesign, design/rshift-drawer/): the game stays visible and the HUD is editable right away -
+ * drag an element, pull its corner to scale it, click it for its settings - while a glass drawer on the right holds
+ * everything else: search, pinned modules, the categories, each module's settings, profiles, and a dock for Locker,
+ * Friends, Clips, World Map and Settings.
+ *
+ * <p>The drawer can slide away for room (and slides away by itself while you move something near it), HUD modules can be
+ * dragged out of it onto the screen, and it keeps its own size: everything in it is laid out on a 540-unit-high canvas
+ * scaled to the window, so Minecraft's GUI scale never makes it huge or tiny.
+ */
+public final class VeloDrawerScreen extends Screen implements net.veloclient.velo.client.gui.window.ModuleConfigScreen.Reopenable {
+
+	// ---- the drawer's own coordinate system: the screen is always REF_H units high ----
+	private static final float REF_H = 540f;
+	private static final float DW = 300f;   // drawer width
+	private static final float M = 10f;     // gap to the screen edge
+	private static final float HEADER = 44f;
+	private static final float DOCK = 48f;
+	private static final float PAD = 12f;
+	private static final float ROW = 26f;
+	private static final float EASE_SPEED = 7f;
+
+	private static final int GLASS = 0xE0141417;
+	private static final int GLASS_EDGE = 0x26FFFFFF;
+	private static final int WHITE = 0xFFFFFFFF;
+	private static final int TEXT_2 = 0xB8FFFFFF;
+	private static final int TEXT_3 = 0x80FFFFFF;
+	private static final int HOVER = 0x14FFFFFF;
+	private static final int CARD = 0x10FFFFFF;
+	private static final int RED = 0xFFE5373E;
+
+	/** A category of the drawer: some of the module categories under one friendlier name. */
+	private record Cat(String name, String icon, List<ModuleCategory> categories) {
+		List<Module> modules() {
+			List<Module> out = new ArrayList<>();
+			for (ModuleCategory c : categories) {
+				out.addAll(ModuleRegistry.byCategory(c));
+			}
+			return out;
+		}
+	}
+
+	private enum Kind { HOME, CATEGORY, MODULE }
+
+	private record Page(Kind kind, Cat cat, Module module) {
+	}
+
+	/** Something clickable this frame, in drawer units. */
+	private static final class Hit {
+		final float x, y, w, h;
+		final Runnable click;
+		java.util.function.DoubleConsumer slide;   // sliders: called with 0..1 while pressed
+		Module grip;                                 // HUD rows: drag out onto the screen
+
+		Hit(float x, float y, float w, float h, Runnable click) {
+			this.x = x;
+			this.y = y;
+			this.w = w;
+			this.h = h;
+			this.click = click;
+		}
+
+		boolean contains(double mx, double my) {
+			return mx >= x && mx < x + w && my >= y && my < y + h;
+		}
+	}
+
+	private final List<Cat> cats = new ArrayList<>();
+	private final List<Page> stack = new ArrayList<>();
+	private Page fromPage;
+	private float trans = 1f;
+	private int transDir = 1;
+	private final Map<Page, Float> scroll = new HashMap<>();
+	private final Map<Object, Float> anim = new HashMap<>();
+	private final List<Hit> hits = new ArrayList<>();
+	private final List<Hit> overlayHits = new ArrayList<>();
+
+	private boolean open = true;
+	private float openAnim = 0f;
+	private long lastNanos = -1;
+	private float dt;
+	private float k = 1f;   // gui px per drawer unit
+
+	private final StringBuilder search = new StringBuilder();
+	private boolean profileMenu;
+	private boolean moreMenu;
+	private ConfigField.ChoiceField dropdown;
+	private float[] dropdownAt;
+	private ConfigField.KeybindField listening;
+	private ConfigField.ChordKeybindField listeningChord;
+	private final java.util.LinkedHashSet<Integer> chordHeld = new java.util.LinkedHashSet<>();
+	private final java.util.LinkedHashSet<Integer> chordMax = new java.util.LinkedHashSet<>();
+	private ConfigField.TextField editing;
+	private final StringBuilder editBuffer = new StringBuilder();
+	private long swallowCharsUntil;
+
+	// HUD editing (gui coordinates)
+	private HudModule dragging;
+	private HudModule resizing;
+	private HudModule selected;
+	private int dragOffsetX;
+	private int dragOffsetY;
+	private boolean dragMoved;
+	private float resizeGrabX;
+	private float resizeGrabY;
+	// a module dragged out of the drawer
+	private Module ghost;
+	private boolean ghostMoved;
+	// slider being dragged
+	private Hit sliding;
+	private double mouseU;
+	private double mouseV;
+
+	public VeloDrawerScreen() {
+		super(Text.literal("Velo"));
+		cats.add(new Cat("HUD", "d_layout", List.of(ModuleCategory.HUD)));
+		cats.add(new Cat("PvP", "d_swords", List.of(ModuleCategory.PVP)));
+		cats.add(new Cat("Visuals", "d_sparkles", List.of(ModuleCategory.RENDERING, ModuleCategory.COSMETICS)));
+		cats.add(new Cat("Utility", "d_wrench", List.of(ModuleCategory.QOL)));
+		cats.add(new Cat("Performance", "d_zap", List.of(ModuleCategory.PERFORMANCE)));
+		cats.add(new Cat("Advanced", "d_cpu", List.of(ModuleCategory.SERVER_TOOLS, ModuleCategory.DEBUG)));
+		if (net.veloclient.velo.client.gui.ModMenuScreen.addonsAvailable()) {
+			cats.add(new Cat("Addons", "d_puzzle", List.of(ModuleCategory.ADDONS)));
+		}
+		stack.add(new Page(Kind.HOME, null, null));
+	}
+
+	/** Opens straight on a module's settings (clicking a HUD element, or from elsewhere). */
+	public VeloDrawerScreen openModule(Module module) {
+		Cat cat = catOf(module);
+		stack.clear();
+		stack.add(new Page(Kind.HOME, null, null));
+		if (cat != null) {
+			stack.add(new Page(Kind.CATEGORY, cat, null));
+		}
+		stack.add(new Page(Kind.MODULE, cat, module));
+		return this;
+	}
+
+	@Override
+	public void reopen() {
+	}
+
+	// ---- dev tour hooks (devtools/DrawerTour) ----
+	public void testCategory(String name) {
+		for (Cat cat : cats) {
+			if (cat.name().equals(name)) {
+				go(new Page(Kind.CATEGORY, cat, null));
+			}
+		}
+	}
+
+	public void testModule(String id) {
+		ModuleRegistry.get(id).ifPresent(m -> go(new Page(Kind.MODULE, catOf(m), m)));
+	}
+
+	public void testProfileMenu(boolean show) {
+		profileMenu = show;
+	}
+
+	public void testOpen(boolean show) {
+		open = show;
+	}
+
+	public void testHome() {
+		stack.subList(1, stack.size()).clear();
+		trans = 1f;
+	}
+
+	@Override
+	public boolean shouldPause() {
+		return false;
+	}
+
+	// The world stays visible: no blur or dimming from vanilla.
+	//? if <26.1 {
+	@Override
+	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+	}
+	//?} else {
+	/*@Override
+	public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+	}
+	*///?}
+
+	// ---------------------------------------------------------------- geometry
+
+	private float W() {
+		return this.width / k;
+	}
+
+	private float H() {
+		return this.height / k;
+	}
+
+	/** The drawer's left edge in units (slides right when hidden). */
+	private float drawerX() {
+		return W() - M - DW + (1f - ease(openAnim)) * (DW + M + 24f);
+	}
+
+	private boolean autoHidden() {
+		return open && (dragging != null || resizing != null) && dragMoved && mouseU > W() - M - DW - 40f;
+	}
+
+	private static float ease(float t) {
+		t = Math.max(0f, Math.min(1f, t));
+		return 1f - (float) Math.pow(1f - t, 3);
+	}
+
+	private Page page() {
+		return stack.get(stack.size() - 1);
+	}
+
+	private void go(Page next) {
+		fromPage = page();
+		stack.add(next);
+		trans = 0f;
+		transDir = 1;
+		dropdown = null;
+		listening = null;
+		listeningChord = null;
+		editing = null;
+	}
+
+	private void back() {
+		if (stack.size() <= 1) {
+			return;
+		}
+		fromPage = stack.remove(stack.size() - 1);
+		trans = 0f;
+		transDir = -1;
+		dropdown = null;
+		listening = null;
+		listeningChord = null;
+		editing = null;
+	}
+
+	private Cat catOf(Module module) {
+		for (Cat cat : cats) {
+			if (cat.categories().contains(module.category())) {
+				return cat;
+			}
+		}
+		return null;
+	}
+
+	private float animTo(Object key, float target, float speed) {
+		float v = VeloAnim.step(anim.getOrDefault(key, target), target, dt * speed);
+		anim.put(key, v);
+		return v;
+	}
+
+	// ---------------------------------------------------------------- drawing helpers (units)
+
+	/** Text is drawn a quarter bigger than the units around it (closer to the mockup), centred where 8-unit text would sit. */
+	private static final float TS = 1.25f;
+
+	private void text(DrawContext c, Text t, float x, float y, int color, float a) {
+		ModuleScenes.push(c);
+		ModuleScenes.move(c, x, y - (TS - 1f) * 4f);
+		ModuleScenes.scale(c, TS, TS);
+		MenuKit.text(c, this.textRenderer, t, 0, 0, VeloUi.withAlpha(color, Math.round(((color >>> 24) & 0xFF) * a)));
+		ModuleScenes.pop(c);
+	}
+
+	private int tw(Text t) {
+		return Math.round(MenuKit.width(this.textRenderer, t) * TS);
+	}
+
+	private Text fit(String s, boolean bold, float maxW) {
+		Text t = bold ? MenuKit.uiBold(s) : MenuKit.ui(s);
+		if (tw(t) <= maxW) {
+			return t;
+		}
+		String cut = s;
+		while (cut.length() > 1 && tw(bold ? MenuKit.uiBold(cut + "…") : MenuKit.ui(cut + "…")) > maxW) {
+			cut = cut.substring(0, cut.length() - 1);
+		}
+		return bold ? MenuKit.uiBold(cut + "…") : MenuKit.ui(cut + "…");
+	}
+
+	private static int alpha(int color, float a) {
+		return VeloUi.withAlpha(color, Math.round(((color >>> 24) & 0xFF) * Math.max(0f, Math.min(1f, a))));
+	}
+
+	private void rect(DrawContext c, float x, float y, float w, float h, float r, int color, float a) {
+		VeloDraw.fillRounded(c, x, y, w, h, r, alpha(color, a));
+	}
+
+	private void icon(DrawContext c, String key, float x, float y, float size, int color, float a) {
+		ModuleScenes.push(c);
+		ModuleScenes.move(c, x, y);
+		ModuleScenes.scale(c, size / 16f, size / 16f);
+		c.drawTexture(RenderPipelines.GUI_TEXTURED, VeloNavIcons.of(key), 0, 0, 0f, 0f, 16, 16, 16, 16, 16, 16, alpha(color, a));
+		ModuleScenes.pop(c);
+	}
+
+	private void moduleIcon(DrawContext c, Module m, float x, float y, float size, int color, float a) {
+		Identifier tex = ModuleIcons.textureFor(m.id());
+		ModuleScenes.push(c);
+		ModuleScenes.move(c, x, y);
+		ModuleScenes.scale(c, size / 16f, size / 16f);
+		c.drawTexture(RenderPipelines.GUI_TEXTURED, tex, 0, 0, 0f, 0f, 16, 16, 16, 16, 16, 16, alpha(color, a));
+		ModuleScenes.pop(c);
+	}
+
+	/** A toggle switch: white track + dark knob when on, glass track + white knob when off; the knob slides. */
+	private void toggle(DrawContext c, Object key, float x, float y, boolean on, float a, boolean big) {
+		float t = animTo(key, on ? 1f : 0f, 9f);
+		float w = big ? 30f : 26f;
+		float h = big ? 17f : 15f;
+		int track = VeloAnim.lerpArgb(0x33FFFFFF, WHITE, t);
+		rect(c, x, y, w, h, h / 2f, track, a);
+		float kn = h - 4f;
+		float kx = x + 2f + (w - h) * t;
+		VeloDraw.fillCircle(c, kx + kn / 2f, y + 2f + kn / 2f + 0.5f, kn / 2f, alpha(0x40000000, a));
+		VeloDraw.fillCircle(c, kx + kn / 2f, y + 2f + kn / 2f, kn / 2f, alpha(VeloAnim.lerpArgb(WHITE, 0xFF141416, t), a));
+	}
+
+	/** Pushes the scissor for a units rect (version-safe: set with an identity pose, in gui pixels). */
+	private void clip(DrawContext c, float x, float y, float w, float h) {
+		ModuleScenes.pop(c);
+		c.enableScissor(Math.round(x * k), Math.round(y * k), Math.round((x + w) * k), Math.round((y + h) * k));
+		ModuleScenes.push(c);
+		ModuleScenes.scale(c, k, k);
+	}
+
+	private void unclip(DrawContext c) {
+		ModuleScenes.pop(c);
+		c.disableScissor();
+		ModuleScenes.push(c);
+		ModuleScenes.scale(c, k, k);
+	}
+
+	// ---------------------------------------------------------------- render
+
+	@Override
+	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+		long now = System.nanoTime();
+		dt = lastNanos < 0 ? 0f : Math.min(0.1f, (now - lastNanos) / 1_000_000_000f);
+		lastNanos = now;
+		k = Math.max(0.2f, this.height / REF_H);
+		mouseU = mouseX / k;
+		mouseV = mouseY / k;
+		openAnim = VeloAnim.step(openAnim, open && !autoHidden() ? 1f : 0f, dt * EASE_SPEED);
+		trans = Math.min(1f, trans + dt * 4.2f);
+
+		renderHud(context, mouseX, mouseY, delta);
+
+		hits.clear();
+		overlayHits.clear();
+		ModuleScenes.push(context);
+		ModuleScenes.scale(context, k, k);
+		renderHandle(context);
+		if (openAnim > 0.01f) {
+			renderDrawer(context);
+		}
+		renderGhost(context);
+		ModuleScenes.pop(context);
+		super.render(context, mouseX, mouseY, delta);
+	}
+
+	// ---- HUD elements, editable (gui pixels)
+
+	private List<HudModule> hudModules() {
+		List<HudModule> out = new ArrayList<>();
+		for (Module module : ModuleRegistry.all()) {
+			if (module instanceof HudModule hud && hud.isEnabled() && hud.width() > 0 && hud.height() > 0) {
+				out.add(hud);
+			}
+		}
+		return out;
+	}
+
+	private static int sw(HudModule hud) {
+		return Math.round(hud.width() * hud.position().scale());
+	}
+
+	private static int sh(HudModule hud) {
+		return Math.round(hud.height() * hud.position().scale());
+	}
+
+	private void renderHud(DrawContext context, int mouseX, int mouseY, float delta) {
+		net.veloclient.velo.client.hud.HudAutoLayout.update(this.width, this.height);
+		if (dragging != null && dragMoved) {
+			context.fill(this.width / 2, 0, this.width / 2 + 1, this.height, 0x50FFFFFF);
+			context.fill(0, this.height / 2, this.width, this.height / 2 + 1, 0x50FFFFFF);
+		}
+		HudModule labelled = null;
+		int[] box = null;
+		for (HudModule hud : hudModules()) {
+			int w = sw(hud);
+			int h = sh(hud);
+			int x = hud.position().resolveX(this.width, w);
+			int y = hud.position().resolveY(this.height, h);
+			HudManager.renderScaled(context, hud, this.width, this.height, delta);
+			boolean active = hud == dragging || hud == resizing || hud == selected;
+			boolean hover = !overDrawer(mouseX / k, mouseY / k) && mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+			float t = animTo(hud, active ? 1f : hover ? 0.6f : 0f, 9f);
+			if (t > 0.02f) {
+				VeloDraw.strokeRounded(context, x - 3, y - 3, w + 6, h + 6, 4, VeloUi.withAlpha(WHITE, Math.round(255 * t)));
+			}
+			if (active || hover) {
+				labelled = hud;
+				box = new int[] {x, y, w, h};
+			}
+			if (hud == selected || hud == resizing) {
+				VeloDraw.fillRounded(context, x + w - 1, y + h - 1, 6, 6, 1.5f, WHITE);
+			}
+		}
+		if (labelled != null) {
+			Text name = MenuKit.uiBold(labelled.displayName());
+			Text size = MenuKit.mono(Math.round(labelled.position().scale() * 100) + "%");
+			int cw = tw(name) + tw(size) + 20;
+			int cx = Math.max(2, Math.min(this.width - cw - 2, box[0] - 3));
+			int cy = box[1] - 18 < 4 ? box[1] + box[3] + 6 : box[1] - 18;
+			VeloDraw.fillRounded(context, cx, cy, cw, 13, 6.5f, WHITE);
+			MenuKit.text(context, this.textRenderer, name, cx + 6, cy + 3, 0xFF141416);
+			MenuKit.text(context, this.textRenderer, size, cx + 12 + tw(name), cy + 4, 0xA0141416);
+		}
+	}
+
+	private boolean overDrawer(double u, double v) {
+		return openAnim > 0.5f && u >= drawerX() && u <= drawerX() + DW && v >= M && v <= H() - M;
+	}
+
+	// ---- the glass drawer (units)
+
+	private void renderHandle(DrawContext c) {
+		float a = 1f - ease(openAnim);
+		if (a < 0.02f) {
+			return;
+		}
+		// a glass tab on the right edge: red Velo dot over a chevron
+		float w = 26f;
+		float h = 84f;
+		float x = W() - w + (1f - a) * 30f;
+		float y = (H() - h) / 2f;
+		boolean hover = mouseU >= x && mouseV >= y && mouseV <= y + h;
+		VeloDraw.shadow(c, Math.round(x), Math.round(y), Math.round(w + 14), Math.round(h), 12, 12, 3, alpha(0x60000000, a));
+		rect(c, x, y, w + 14f, h, 12f, hover ? 0xF0262629 : GLASS, a);
+		VeloDraw.strokeRounded(c, x, y, w + 14f, h, 12f, 1f, alpha(GLASS_EDGE, a));
+		rect(c, x + w / 2f - 3f, y + 22f, 6f, 6f, 1.5f, RED, a);
+		icon(c, "d_chev_l", x + w / 2f - 7f, y + h / 2f - 2f, 14f, WHITE, a);
+		hits.add(new Hit(x, y, w, h, () -> open = true));
+	}
+
+	private void renderDrawer(DrawContext c) {
+		float a = Math.min(1f, openAnim * 1.6f);
+		float x = drawerX();
+		float y = M;
+		float h = H() - 2 * M;
+		VeloDraw.shadow(c, Math.round(x), Math.round(y), Math.round(DW), Math.round(h), 18, 22, 6, alpha(0x66000000, a));
+		rect(c, x, y, DW, h, 18f, GLASS, a);
+		VeloDraw.strokeRounded(c, x, y, DW, h, 18f, 1f, alpha(GLASS_EDGE, a));
+		hits.add(new Hit(x, y, DW, h, () -> {
+		}));   // eats clicks on the glass itself
+
+		// header: red dot, Velo, profile dropdown, slide-away
+		float hy = y + 14f;
+		rect(c, x + PAD + 2f, hy + 3f, 6f, 6f, 1.5f, RED, a);
+		text(c, MenuKit.uiBold("Velo"), x + PAD + 14f, hy + 2f, WHITE, a);
+		float bx = x + DW - PAD - 22f;
+		boolean hb = inside(bx, hy - 5f, 22f, 22f);
+		rect(c, bx, hy - 5f, 22f, 22f, 11f, hb ? 0x2EFFFFFF : 0x1AFFFFFF, a);
+		icon(c, "d_collapse", bx + 5f, hy + 1f, 12f, WHITE, a);
+		hits.add(new Hit(bx, hy - 5f, 22f, 22f, () -> {
+			open = false;
+			profileMenu = false;
+			moreMenu = false;
+		}));
+		renderProfileButton(c, bx - 6f, hy - 5f, a);
+
+		// pages
+		float cy = y + HEADER;
+		float ch = h - HEADER - DOCK;
+		clip(c, x + 1f, cy, DW - 2f, ch);
+		float e = ease(trans);
+		if (trans < 1f && fromPage != null) {
+			float off = transDir > 0 ? -e * DW : e * DW;
+			renderPage(c, fromPage, x + off, cy, ch, a * (1f - e), false);
+			float inOff = transDir > 0 ? (1f - e) * DW : -(1f - e) * DW;
+			renderPage(c, page(), x + inOff, cy, ch, a, true);
+		} else {
+			renderPage(c, page(), x, cy, ch, a, true);
+		}
+		unclip(c);
+
+		renderDock(c, x, y + h - DOCK, a);
+		if (dropdown != null) {
+			renderDropdown(c, a);
+		}
+		if (profileMenu) {
+			renderProfileMenu(c, a);
+		}
+		if (moreMenu) {
+			renderMoreMenu(c, x, y + h - DOCK, a);
+		}
+	}
+
+	private boolean inside(float x, float y, float w, float h) {
+		return mouseU >= x && mouseU < x + w && mouseV >= y && mouseV < y + h;
+	}
+
+	// ---- header: profile dropdown
+
+	private void renderProfileButton(DrawContext c, float right, float y, float a) {
+		String name = VeloProfileManager.activeName();
+		Text t = fit(name == null ? "Default" : name, true, 80f);
+		float w = tw(t) + 44f;
+		float x = right - w;
+		boolean hover = inside(x, y, w, 22f);
+		rect(c, x, y, w, 22f, 11f, profileMenu ? 0x26FFFFFF : hover ? 0x1EFFFFFF : 0x10FFFFFF, a);
+		VeloDraw.strokeRounded(c, x, y, w, 22f, 11f, 1f, alpha(profileMenu ? 0x66FFFFFF : 0x2EFFFFFF, a));
+		icon(c, "d_user", x + 8f, y + 5f, 12f, TEXT_2, a);
+		text(c, t, x + 23f, y + 7f, WHITE, a);
+		float rot = animTo("profChevron", profileMenu ? 1f : 0f, 10f);
+		icon(c, rot > 0.5f ? "d_chev_u" : "d_chev_d", x + w - 17f, y + 5f, 11f, TEXT_2, a);
+		hits.add(new Hit(x, y, w, 22f, () -> {
+			profileMenu = !profileMenu;
+			moreMenu = false;
+			dropdown = null;
+		}));
+		profileAnchor = new float[] {x + w, y + 26f};
+	}
+
+	private float[] profileAnchor = {0, 0};
+
+	private void renderProfileMenu(DrawContext c, float a) {
+		List<String> names = new ArrayList<>(VeloProfileManager.listProfileNames());
+		String active = VeloProfileManager.activeName();
+		float w = 190f;
+		float rowH = 24f;
+		float h = 22f + names.size() * rowH + 12f + 2 * 22f + 8f;
+		float x = profileAnchor[0] - w;
+		float y = profileAnchor[1];
+		float t = animTo("profMenu", 1f, 12f);
+		float ma = a * t;
+		VeloDraw.shadow(c, Math.round(x), Math.round(y), Math.round(w), Math.round(h), 12, 16, 4, alpha(0x70000000, ma));
+		rect(c, x, y, w, h, 12f, 0xF0202024, ma);
+		VeloDraw.strokeRounded(c, x, y, w, h, 12f, 1f, alpha(0x26FFFFFF, ma));
+		overlayHits.add(new Hit(x, y, w, h, () -> {
+		}));
+		text(c, MenuKit.mono("PROFILES"), x + 10f, y + 9f, TEXT_3, ma);
+		float ry = y + 22f;
+		for (String n : names) {
+			boolean on = n.equals(active);
+			boolean hover = inside(x + 4f, ry, w - 8f, rowH);
+			if (hover) {
+				rect(c, x + 4f, ry, w - 8f, rowH, 8f, HOVER, ma);
+			}
+			text(c, fit(n, true, w - 40f), x + 12f, ry + 8f, WHITE, ma);
+			if (on) {
+				icon(c, "d_check", x + w - 24f, ry + 6f, 12f, WHITE, ma);
+			}
+			String target = n;
+			overlayHits.add(new Hit(x + 4f, ry, w - 8f, rowH, () -> switchProfile(target)));
+			ry += rowH;
+		}
+		ry += 4f;
+		c.fill(Math.round(x + 8f), Math.round(ry), Math.round(x + w - 8f), Math.round(ry) + 1, alpha(0x1AFFFFFF, ma));
+		ry += 6f;
+		String[][] actions = {{"d_plus", "New profile"}, {"d_sliders", "Manage profiles"}};
+		for (String[] act : actions) {
+			boolean hover = inside(x + 4f, ry, w - 8f, 22f);
+			if (hover) {
+				rect(c, x + 4f, ry, w - 8f, 22f, 8f, HOVER, ma);
+			}
+			icon(c, act[0], x + 12f, ry + 5f, 12f, TEXT_2, ma);
+			text(c, MenuKit.ui(act[1]), x + 30f, ry + 7f, WHITE, ma);
+			overlayHits.add(new Hit(x + 4f, ry, w - 8f, 22f, () -> {
+				profileMenu = false;
+				this.client.setScreen(new net.veloclient.velo.client.gui.ProfileScreen(this));
+			}));
+			ry += 22f;
+		}
+	}
+
+	private void switchProfile(String name) {
+		profileMenu = false;
+		if (name.equals(VeloProfileManager.activeName())) {
+			return;
+		}
+		VeloProfileStore.saveActive();
+		VeloProfileManager.loadByName(name).ifPresent(profile -> {
+			VeloProfileStore.applyToLive(profile);
+			VeloProfileManager.setActiveName(name);
+		});
+	}
+
+	// ---- pages
+
+	private void renderPage(DrawContext c, Page p, float x, float top, float height, float a, boolean live) {
+		float s = scroll.getOrDefault(p, 0f);
+		float y = top + 4f - s;
+		float content = switch (p.kind()) {
+			case HOME -> renderHome(c, x + PAD, y, DW - 2 * PAD, top, height, a, live);
+			case CATEGORY -> renderCategory(c, p, x + PAD, y, DW - 2 * PAD, top, height, a, live);
+			case MODULE -> renderModule(c, p, x + PAD, y, DW - 2 * PAD, top, height, a, live);
+		};
+		float max = Math.max(0f, content - height + 12f);
+		if (s > max) {
+			scroll.put(p, max);
+		}
+		if (max > 0f && live) {
+			// a thin scroll bar on the right
+			float bar = Math.max(24f, height * height / (content + 12f));
+			float by = top + (height - bar) * (s / max);
+			rect(c, x + DW - 6f, by, 2.5f, bar, 1.25f, 0x40FFFFFF, a);
+		}
+	}
+
+	/** Adds a hit only for live pages and only when it's inside the visible content area. */
+	private Hit hit(boolean live, float top, float height, float x, float y, float w, float h, Runnable click) {
+		Hit hit = new Hit(x, y, w, h, click);
+		if (live && y + h > top && y < top + height) {
+			hits.add(hit);
+		}
+		return hit;
+	}
+
+	private float renderHome(DrawContext c, float x, float y, float w, float top, float height, float a, boolean live) {
+		float y0 = y;
+		// search
+		rect(c, x, y, w, 26f, 13f, 0x1AFFFFFF, a);
+		icon(c, "d_search", x + 10f, y + 7f, 12f, TEXT_2, a);
+		String q = search.toString();
+		if (q.isEmpty()) {
+			text(c, MenuKit.ui("Search modules"), x + 28f, y + 9f, TEXT_3, a);
+		} else {
+			Text qt = MenuKit.ui(q);
+			text(c, qt, x + 28f, y + 9f, WHITE, a);
+			boolean blink = (System.currentTimeMillis() / 530) % 2 == 0;
+			if (blink) {
+				rect(c, x + 29f + tw(qt), y + 7f, 1f, 12f, 0f, WHITE, a);
+			}
+			hit(live, top, height, x + w - 24f, y + 3f, 20f, 20f, () -> search.setLength(0));
+			icon(c, "d_x", x + w - 19f, y + 8f, 10f, TEXT_2, a);
+		}
+		y += 34f;
+		if (!q.isEmpty()) {
+			String lower = q.toLowerCase(Locale.ROOT);
+			List<Module> found = new ArrayList<>();
+			for (Module m : ModuleRegistry.all()) {
+				if (m.displayName().toLowerCase(Locale.ROOT).contains(lower)
+						|| net.veloclient.velo.client.gui.widget.ModuleTags.tag(m).toLowerCase(Locale.ROOT).contains(lower)) {
+					found.add(m);
+				}
+			}
+			text(c, MenuKit.ui(found.isEmpty() ? "Nothing found" : "Results"), x + 4f, y, TEXT_3, a);
+			y += 14f;
+			for (Module m : found) {
+				y = moduleRow(c, m, x, y, w, top, height, a, live, false);
+			}
+			return y - y0;
+		}
+		// pinned
+		List<Module> pins = QuickToggles.favorites();
+		text(c, MenuKit.ui("Pinned"), x + 4f, y, TEXT_3, a);
+		y += 14f;
+		if (pins.isEmpty()) {
+			text(c, MenuKit.ui("Nothing pinned yet - pin modules from any category."), x + 4f, y + 4f, TEXT_3, a);
+			y += 22f;
+		}
+		for (Module m : pins) {
+			y = moduleRow(c, m, x, y, w, top, height, a, live, true);
+		}
+		y += 6f;
+		c.fill(Math.round(x + 4f), Math.round(y), Math.round(x + w - 4f), Math.round(y) + 1, alpha(0x1AFFFFFF, a));
+		y += 8f;
+		for (Cat cat : cats) {
+			boolean hover = live && inside(x, y, w, ROW) && mouseV >= top && mouseV < top + height;
+			if (hover) {
+				rect(c, x, y, w, ROW, 9f, HOVER, a);
+			}
+			icon(c, cat.icon(), x + 8f, y + 6f, 14f, TEXT_2, a);
+			text(c, MenuKit.ui(cat.name()), x + 30f, y + 9f, WHITE, a);
+			Text count = MenuKit.mono(String.valueOf(cat.modules().size()));
+			text(c, count, x + w - 26f - tw(count), y + 10f, TEXT_3, a);
+			icon(c, "d_chev_r", x + w - 20f, y + 7f, 12f, TEXT_3, a);
+			Cat target = cat;
+			hit(live, top, height, x, y, w, ROW, () -> go(new Page(Kind.CATEGORY, target, null)));
+			y += ROW;
+		}
+		return y - y0;
+	}
+
+	private float renderCategory(DrawContext c, Page p, float x, float y, float w, float top, float height, float a, boolean live) {
+		float y0 = y;
+		y = backButton(c, "Home", x, y, top, height, a, live);
+		text(c, MenuKit.displaySm(p.cat().name()), x + 4f, y, WHITE, a);
+		y += 20f;
+		for (Module m : p.cat().modules()) {
+			y = moduleRow(c, m, x, y, w, top, height, a, live, false);
+		}
+		return y - y0;
+	}
+
+	private float backButton(DrawContext c, String label, float x, float y, float top, float height, float a, boolean live) {
+		Text t = MenuKit.ui(label);
+		float bw = tw(t) + 24f;
+		boolean hover = live && inside(x, y, bw, 20f);
+		if (hover) {
+			rect(c, x, y, bw, 20f, 10f, HOVER, a);
+		}
+		icon(c, "d_chev_l", x + 4f, y + 4f, 12f, TEXT_2, a);
+		text(c, t, x + 18f, y + 6f, TEXT_2, a);
+		hit(live, top, height, x, y, bw, 20f, this::back);
+		return y + 26f;
+	}
+
+	/** A module row: (grip for HUD modules) icon, name, pin, switch. Clicking the name opens its settings. */
+	private float moduleRow(DrawContext c, Module m, float x, float y, float w, float top, float height, float a, boolean live, boolean pinnedList) {
+		boolean visible = y + ROW > top && y < top + height;
+		if (!visible) {
+			return y + ROW;
+		}
+		boolean hover = live && inside(x, y, w, ROW) && mouseV >= top && mouseV < top + height;
+		if (hover) {
+			rect(c, x, y, w, ROW, 9f, HOVER, a);
+		}
+		float ix = x + 6f;
+		if (m instanceof HudModule && !pinnedList) {
+			icon(c, "d_grip", x + 1f, y + 7f, 12f, hover ? TEXT_2 : TEXT_3, a);
+			Hit grip = hit(live, top, height, x, y, 14f, ROW, null);
+			grip.grip = m;
+			ix = x + 15f;
+		}
+		moduleIcon(c, m, ix, y + 6f, 14f, m.isEnabled() ? WHITE : TEXT_2, a);
+		float nameX = ix + 22f;
+		float right = x + w - 6f;
+		float sx = right - 26f;
+		float px = sx - 24f;
+		text(c, fit(m.displayName(), false, px - nameX - 4f), nameX, y + 9f, WHITE, a);
+		boolean pinned = QuickToggles.isFavorite(m.id());
+		boolean pinHover = live && inside(px, y + 4f, 20f, 18f);
+		if (pinned || hover) {
+			icon(c, pinned ? "d_pin_on" : "d_pin", px + 3f, y + 6f, 13f, pinned ? (pinHover ? TEXT_2 : WHITE) : pinHover ? WHITE : TEXT_3, a);
+		}
+		toggle(c, m, sx, y + 5.5f, m.isEnabled(), a, false);
+		hit(live, top, height, x + 14f, y, px - x - 14f, ROW, () -> go(new Page(Kind.MODULE, catOf(m), m)));
+		hit(live, top, height, px, y, 22f, ROW, () -> QuickToggles.setFavorite(m.id(), !pinned));
+		hit(live, top, height, sx - 2f, y, 30f, ROW, () -> QuickToggles.toggle(m));
+		return y + ROW;
+	}
+
+	// ---- module page
+
+	private float renderModule(DrawContext c, Page p, float x, float y, float w, float top, float height, float a, boolean live) {
+		Module m = p.module();
+		float y0 = y;
+		y = backButton(c, p.cat() == null ? "Home" : p.cat().name(), x, y, top, height, a, live);
+		// header: icon tile, name, description, big switch
+		rect(c, x, y, 30f, 30f, 9f, 0x1AFFFFFF, a);
+		moduleIcon(c, m, x + 7f, y + 7f, 16f, WHITE, a);
+		text(c, fit(m.displayName(), true, w - 80f), x + 40f, y + 5f, WHITE, a);
+		text(c, fit(m.description(), false, w - 80f), x + 40f, y + 18f, TEXT_3, a);
+		toggle(c, "mod:" + m.id(), x + w - 32f, y + 7f, m.isEnabled(), a, true);
+		hit(live, top, height, x + w - 34f, y + 3f, 34f, 24f, () -> QuickToggles.toggle(m));
+		y += 42f;
+
+		List<ConfigField> fields = m instanceof Configurable cfg ? cfg.configFields() : List.of();
+		if (fields.isEmpty()) {
+			text(c, MenuKit.ui("No settings - just switch it on or off."), x + 4f, y + 4f, TEXT_3, a);
+			y += 22f;
+		}
+		// one glass card per header group
+		List<List<ConfigField>> groups = new ArrayList<>();
+		List<String> titles = new ArrayList<>();
+		for (ConfigField f : fields) {
+			if (f instanceof ConfigField.HeaderField hf || groups.isEmpty()) {
+				groups.add(new ArrayList<>());
+				titles.add(f instanceof ConfigField.HeaderField hf2 ? hf2.label() : "Settings");
+				if (f instanceof ConfigField.HeaderField) {
+					continue;
+				}
+			}
+			groups.get(groups.size() - 1).add(f);
+		}
+		for (int g = 0; g < groups.size(); g++) {
+			if (groups.get(g).isEmpty()) {
+				continue;
+			}
+			float cardTop = y;
+			float inner = w - 20f;
+			// measure first
+			float ch = 22f;
+			for (ConfigField f : groups.get(g)) {
+				ch += fieldHeight(f, inner) + 6f;
+			}
+			ch += 4f;
+			rect(c, x, cardTop, w, ch, 12f, CARD, a);
+			VeloDraw.strokeRounded(c, x, cardTop, w, ch, 12f, 1f, alpha(0x0FFFFFFF, a));
+			text(c, MenuKit.mono(titles.get(g).toUpperCase(Locale.ROOT)), x + 10f, cardTop + 9f, TEXT_3, a);
+			float fy = cardTop + 22f;
+			for (ConfigField f : groups.get(g)) {
+				renderField(c, m, f, x + 10f, fy, inner, top, height, a, live);
+				fy += fieldHeight(f, inner) + 6f;
+			}
+			y = cardTop + ch + 8f;
+		}
+		if (m instanceof net.veloclient.velo.client.gui.window.ModuleShortcut shortcut) {
+			y = wideButton(c, "d_external", shortcut.shortcutLabel(), x, y, w, top, height, a, live, () -> shortcut.openShortcut(this));
+		}
+		if (m instanceof HudModule && !m.id().equals("hud-style")) {
+			Module style = ModuleRegistry.get("hud-style").orElse(null);
+			if (style != null) {
+				y = wideButton(c, "d_sliders", "HUD style (fonts, background, all elements)", x, y, w, top, height, a, live,
+						() -> go(new Page(Kind.MODULE, catOf(style), style)));
+			}
+		}
+		if (m instanceof HudModule hud) {
+			y = wideButton(c, "d_reset", "Reset position", x, y, w, top, height, a, live, () -> {
+				hud.position().resetToDefault();
+				VeloProfileStore.saveActive();
+			});
+		}
+		y = wideButton(c, "d_external", "All settings and preview", x, y, w, top, height, a, live,
+				() -> this.client.setScreen(new net.veloclient.velo.client.gui.window.ModuleConfigScreen(m, this)));
+		return y - y0;
+	}
+
+	private float wideButton(DrawContext c, String iconKey, String label, float x, float y, float w, float top, float height, float a, boolean live,
+			Runnable action) {
+		boolean hover = live && inside(x, y, w, 26f);
+		rect(c, x, y, w, 26f, 13f, hover ? 0x22FFFFFF : 0x12FFFFFF, a);
+		Text t = MenuKit.ui(label);
+		float tx = x + (w - tw(t) - 18f) / 2f;
+		icon(c, iconKey, tx, y + 7f, 12f, TEXT_2, a);
+		text(c, t, tx + 18f, y + 9f, WHITE, a);
+		hit(live, top, height, x, y, w, 26f, action);
+		return y + 32f;
+	}
+
+	private boolean segmented(ConfigField.ChoiceField f, float w) {
+		if (f.options().size() > 4 || f.options().isEmpty()) {
+			return false;
+		}
+		float each = w / f.options().size();
+		for (String o : f.options()) {
+			if (tw(MenuKit.ui(o)) > each - 10f) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private float fieldHeight(ConfigField f, float w) {
+		if (f instanceof ConfigField.SliderField) {
+			return 30f;
+		}
+		if (f instanceof ConfigField.ChoiceField choice) {
+			return segmented(choice, w) ? 36f : 20f;
+		}
+		if (f instanceof ConfigField.TextField) {
+			return 36f;
+		}
+		if (f instanceof ConfigField.ActionButtonField) {
+			return 22f;
+		}
+		return 20f;
+	}
+
+	private void renderField(DrawContext c, Module m, ConfigField f, float x, float y, float w, float top, float height, float a, boolean live) {
+		if (y + fieldHeight(f, w) < top || y > top + height) {
+			return;
+		}
+		Text label = fit(f.label(), false, w * 0.6f);
+		if (f instanceof ConfigField.ToggleField t) {
+			boolean on = t.get().getAsBoolean();
+			text(c, label, x, y + 6f, TEXT_2, a);
+			toggle(c, t, x + w - 26f, y + 2.5f, on, a, false);
+			hit(live, top, height, x, y, w, 20f, () -> {
+				t.set().accept(!on);
+				VeloProfileStore.saveActive();
+			});
+		} else if (f instanceof ConfigField.SliderField s) {
+			double v = s.get().getAsDouble();
+			double frac = s.max() > s.min() ? (v - s.min()) / (s.max() - s.min()) : 0;
+			text(c, label, x, y + 2f, TEXT_2, a);
+			Text val = MenuKit.mono(s.format() != null ? s.format().apply(v) : String.format(Locale.ROOT, "%.1f", v));
+			text(c, val, x + w - tw(val), y + 3f, TEXT_2, a);
+			float ty = y + 19f;
+			rect(c, x, ty, w, 4f, 2f, 0x24FFFFFF, a);
+			rect(c, x, ty, (float) (w * frac), 4f, 2f, WHITE, a);
+			float knobX = x + (float) (w * frac);
+			VeloDraw.fillCircle(c, knobX, ty + 2.5f, 6f, alpha(0x55000000, a));
+			VeloDraw.fillCircle(c, knobX, ty + 2f, 5.5f, alpha(WHITE, a));
+			Hit hit = hit(live, top, height, x - 4f, ty - 8f, w + 8f, 20f, null);
+			hit.slide = t -> {
+				double nv = s.min() + Math.max(0, Math.min(1, t)) * (s.max() - s.min());
+				s.set().accept(nv);
+			};
+			sliderTrack.put(hit, new float[] {x, w});
+		} else if (f instanceof ConfigField.ChoiceField choice) {
+			String cur = choice.get().get();
+			if (segmented(choice, w)) {
+				text(c, label, x, y + 2f, TEXT_2, a);
+				float sy = y + 13f;
+				rect(c, x, sy, w, 22f, 11f, 0x33000000, a);
+				float each = w / choice.options().size();
+				int idx = Math.max(0, choice.options().indexOf(cur));
+				float pos = animTo(choice, idx, 12f);
+				rect(c, x + 2f + pos * each, sy + 2f, each - 4f, 18f, 9f, WHITE, a);
+				for (int i = 0; i < choice.options().size(); i++) {
+					String o = choice.options().get(i);
+					Text ot = MenuKit.uiBold(o);
+					boolean sel = i == idx;
+					text(c, ot, x + i * each + (each - tw(ot)) / 2f, sy + 7f, sel ? 0xFF141416 : TEXT_2, a);
+					hit(live, top, height, x + i * each, sy, each, 22f, () -> {
+						choice.set().accept(o);
+						VeloProfileStore.saveActive();
+					});
+				}
+			} else {
+				text(c, label, x, y + 6f, TEXT_2, a);
+				Text vt = fit(cur, true, w * 0.4f);
+				float bw = tw(vt) + 26f;
+				float bx = x + w - bw;
+				boolean hover = live && inside(bx, y, bw, 20f);
+				rect(c, bx, y, bw, 20f, 10f, dropdown == choice ? 0x30FFFFFF : hover ? 0x24FFFFFF : 0x14FFFFFF, a);
+				text(c, vt, bx + 9f, y + 6f, WHITE, a);
+				icon(c, "d_chev_d", bx + bw - 15f, y + 5f, 10f, TEXT_2, a);
+				hit(live, top, height, bx, y, bw, 20f, () -> {
+					dropdown = dropdown == choice ? null : choice;
+					dropdownAt = new float[] {bx + bw, y + 22f};
+					profileMenu = false;
+				});
+			}
+		} else if (f instanceof ConfigField.ColorField col) {
+			int argb = col.get().getAsInt();
+			text(c, label, x, y + 6f, TEXT_2, a);
+			Text hex = MenuKit.mono(String.format("#%06X", argb & 0xFFFFFF));
+			text(c, hex, x + w - 26f - tw(hex), y + 7f, TEXT_3, a);
+			VeloDraw.fillCircle(c, x + w - 9f, y + 10f, 9f, alpha(0x40FFFFFF, a));
+			VeloDraw.fillCircle(c, x + w - 9f, y + 10f, 7.5f, alpha(argb | 0xFF000000, a));
+			hit(live, top, height, x + w - 80f, y, 80f, 20f, () -> this.client.setScreen(new net.veloclient.velo.client.gui.VeloColorPickerScreen(
+					this, col.label(), col.get().getAsInt(), col.includeAlpha(), v -> {
+						col.set().accept(v);
+						VeloProfileStore.saveActive();
+					})));
+		} else if (f instanceof ConfigField.KeybindField kb) {
+			boolean on = listening == kb;
+			keycap(c, label, on ? "Press a key…" : kb.displayText().get(), on, x, y, w, top, height, a, live, () -> {
+				listening = on ? null : kb;
+				listeningChord = null;
+			});
+		} else if (f instanceof ConfigField.ChordKeybindField chord) {
+			boolean on = listeningChord == chord;
+			String shown = !on ? net.veloclient.velo.client.keybind.ChordKeybinds.displayText(chord.get().get())
+					: chordMax.isEmpty() ? "Hold keys…" : net.veloclient.velo.client.keybind.ChordKeybinds.displayText(List.copyOf(chordMax)) + "…";
+			keycap(c, label, shown, on, x, y, w, top, height, a, live, () -> {
+				listeningChord = on ? null : chord;
+				listening = null;
+				chordHeld.clear();
+				chordMax.clear();
+			});
+		} else if (f instanceof ConfigField.TextField tf) {
+			text(c, label, x, y + 2f, TEXT_2, a);
+			boolean on = editing == tf;
+			rect(c, x, y + 13f, w, 22f, 11f, on ? 0x26FFFFFF : 0x33000000, a);
+			if (on) {
+				VeloDraw.strokeRounded(c, x, y + 13f, w, 22f, 11f, 1f, alpha(0x80FFFFFF, a));
+			}
+			String shown = on ? editBuffer.toString() : tf.get().get();
+			Text st = shown.isEmpty() && !on ? MenuKit.ui(tf.placeholder() == null ? "" : tf.placeholder()) : fit(shown, false, w - 20f);
+			text(c, st, x + 10f, y + 20f, shown.isEmpty() && !on ? TEXT_3 : WHITE, a);
+			if (on && (System.currentTimeMillis() / 530) % 2 == 0) {
+				rect(c, x + 11f + tw(st), y + 18f, 1f, 12f, 0f, WHITE, a);
+			}
+			hit(live, top, height, x, y + 13f, w, 22f, () -> {
+				commitEdit();
+				editing = tf;
+				editBuffer.setLength(0);
+				editBuffer.append(tf.get().get());
+			});
+		} else if (f instanceof ConfigField.ActionButtonField act) {
+			boolean hover = live && inside(x, y, w, 22f);
+			rect(c, x, y, w, 22f, 11f, hover ? 0x26FFFFFF : 0x14FFFFFF, a);
+			Text t = MenuKit.ui(act.label());
+			text(c, t, x + (w - tw(t)) / 2f, y + 7f, WHITE, a);
+			hit(live, top, height, x, y, w, 22f, () -> act.action().run());
+		}
+	}
+
+	private final Map<Hit, float[]> sliderTrack = new HashMap<>();
+
+	private void keycap(DrawContext c, Text label, String key, boolean on, float x, float y, float w, float top, float height, float a, boolean live,
+			Runnable click) {
+		text(c, label, x, y + 6f, TEXT_2, a);
+		Text kt = MenuKit.mono(key);
+		float bw = Math.max(46f, tw(kt) + 18f);
+		float bx = x + w - bw;
+		rect(c, bx, y, bw, 20f, 7f, on ? 0x2EFFFFFF : 0x40000000, a);
+		VeloDraw.strokeRounded(c, bx, y, bw, 20f, 7f, 1f, alpha(on ? WHITE : 0x2AFFFFFF, a));
+		text(c, kt, bx + (bw - tw(kt)) / 2f, y + 7f, WHITE, a);
+		hit(live, top, height, bx, y, bw, 20f, click);
+	}
+
+	private void renderDropdown(DrawContext c, float a) {
+		ConfigField.ChoiceField f = dropdown;
+		float w = 150f;
+		for (String o : f.options()) {
+			w = Math.max(w, tw(MenuKit.ui(o)) + 40f);
+		}
+		float rowH = 20f;
+		float h = f.options().size() * rowH + 8f;
+		float x = dropdownAt[0] - w;
+		float y = dropdownAt[1];
+		float bottom = H() - M - DOCK;
+		if (y + h > bottom) {
+			y = Math.max(M + HEADER, bottom - h);
+		}
+		VeloDraw.shadow(c, Math.round(x), Math.round(y), Math.round(w), Math.round(h), 10, 14, 4, alpha(0x70000000, a));
+		rect(c, x, y, w, h, 10f, 0xF2202024, a);
+		VeloDraw.strokeRounded(c, x, y, w, h, 10f, 1f, alpha(0x26FFFFFF, a));
+		overlayHits.add(new Hit(x, y, w, h, () -> {
+		}));
+		String cur = f.get().get();
+		float ry = y + 4f;
+		for (String o : f.options()) {
+			boolean hover = inside(x + 4f, ry, w - 8f, rowH);
+			if (hover) {
+				rect(c, x + 4f, ry, w - 8f, rowH, 7f, HOVER, a);
+			}
+			text(c, MenuKit.ui(o), x + 12f, ry + 6f, WHITE, a);
+			if (o.equals(cur)) {
+				icon(c, "d_check", x + w - 22f, ry + 4f, 12f, WHITE, a);
+			}
+			overlayHits.add(new Hit(x + 4f, ry, w - 8f, rowH, () -> {
+				f.set().accept(o);
+				dropdown = null;
+				VeloProfileStore.saveActive();
+			}));
+			ry += rowH;
+		}
+	}
+
+	// ---- dock + More
+
+	private static final String[][] DOCK_ITEMS = {{"skins", "d_shirt", "Locker"}, {"friends", "d_users", "Friends"}, {"clips", "d_video", "Clips"},
+			{"map", "d_map", "World Map"}, {"settings", "d_sliders", "Settings"}};
+
+	private void renderDock(DrawContext c, float x, float y, float a) {
+		c.fill(Math.round(x + PAD), Math.round(y), Math.round(x + DW - PAD), Math.round(y) + 1, alpha(0x1AFFFFFF, a));
+		int n = DOCK_ITEMS.length + 1;
+		float gap = 6f;
+		float bw = (DW - 2 * PAD - gap * (n - 1)) / n;
+		float by = y + 9f;
+		String hoverLabel = null;
+		for (int i = 0; i < n; i++) {
+			float bx = x + PAD + i * (bw + gap);
+			boolean hover = inside(bx, by, bw, 30f);
+			boolean more = i == DOCK_ITEMS.length;
+			rect(c, bx, by, bw, 30f, 10f, hover || (more && moreMenu) ? 0x26FFFFFF : 0x12FFFFFF, a);
+			icon(c, more ? "d_more" : DOCK_ITEMS[i][1], bx + (bw - 15f) / 2f, by + 7.5f, 15f, WHITE, a);
+			if (hover) {
+				hoverLabel = more ? "More" : DOCK_ITEMS[i][2];
+			}
+			if (more) {
+				hits.add(new Hit(bx, by, bw, 30f, () -> {
+					moreMenu = !moreMenu;
+					profileMenu = false;
+				}));
+			} else {
+				String id = DOCK_ITEMS[i][0];
+				hits.add(new Hit(bx, by, bw, 30f, () -> openEntry(id)));
+			}
+		}
+		if (hoverLabel != null && !moreMenu) {
+			Text t = MenuKit.uiBold(hoverLabel);
+			float tw = tw(t) + 14f;
+			float tx = (float) Math.max(x + 6f, Math.min(x + DW - tw - 6f, mouseU - tw / 2f));
+			rect(c, tx, by - 22f, tw, 16f, 8f, WHITE, a);
+			text(c, t, tx + 7f, by - 18f, 0xFF141416, a);
+		}
+	}
+
+	private void openEntry(String id) {
+		for (MenuShell.Entry e : MenuShell.entries()) {
+			if (e.id().equals(id)) {
+				Screen next = e.open().apply(this);
+				if (next != null) {
+					this.client.setScreen(next);
+				}
+				return;
+			}
+		}
+	}
+
+	private void renderMoreMenu(DrawContext c, float drawerX, float dockY, float a) {
+		List<MenuShell.Entry> rest = new ArrayList<>();
+		java.util.Set<String> inDock = new java.util.HashSet<>();
+		for (String[] d : DOCK_ITEMS) {
+			inDock.add(d[0]);
+		}
+		for (MenuShell.Entry e : MenuShell.entries()) {
+			if (!inDock.contains(e.id())) {
+				rest.add(e);
+			}
+		}
+		float w = DW - 2 * PAD;
+		float rowH = 22f;
+		float h = rest.size() * rowH + 30f;
+		float x = drawerX + PAD;
+		float y = dockY - h - 4f;
+		VeloDraw.shadow(c, Math.round(x), Math.round(y), Math.round(w), Math.round(h), 12, 16, 4, alpha(0x70000000, a));
+		rect(c, x, y, w, h, 12f, 0xF2202024, a);
+		VeloDraw.strokeRounded(c, x, y, w, h, 12f, 1f, alpha(0x26FFFFFF, a));
+		overlayHits.add(new Hit(x, y, w, h, () -> {
+		}));
+		float ry = y + 4f;
+		for (MenuShell.Entry e : rest) {
+			boolean hover = inside(x + 4f, ry, w - 8f, rowH);
+			if (hover) {
+				rect(c, x + 4f, ry, w - 8f, rowH, 7f, HOVER, a);
+			}
+			MenuKit.icon(c, e.icon(), Math.round(x + 12f), Math.round(ry + 6f), 10, alpha(TEXT_2, a));
+			text(c, MenuKit.ui(e.label()), x + 30f, ry + 7f, WHITE, a);
+			String id = e.id();
+			overlayHits.add(new Hit(x + 4f, ry, w - 8f, rowH, () -> {
+				moreMenu = false;
+				openEntry(id);
+			}));
+			ry += rowH;
+		}
+		boolean hover = inside(x + 4f, ry, w - 8f, rowH);
+		if (hover) {
+			rect(c, x + 4f, ry, w - 8f, rowH, 7f, HOVER, a);
+		}
+		icon(c, "d_layout", x + 11f, ry + 5f, 12f, TEXT_2, a);
+		text(c, MenuKit.ui("Classic module grid"), x + 30f, ry + 7f, WHITE, a);
+		overlayHits.add(new Hit(x + 4f, ry, w - 8f, rowH, () -> {
+			moreMenu = false;
+			this.client.setScreen(new net.veloclient.velo.client.gui.ModMenuScreen());
+		}));
+	}
+
+	// ---- dragging a module out of the drawer
+
+	private void renderGhost(DrawContext c) {
+		if (ghost == null || !ghostMoved) {
+			return;
+		}
+		Text t = MenuKit.uiBold(ghost.displayName());
+		float w = tw(t) + 34f;
+		float x = (float) mouseU - 12f;
+		float y = (float) mouseV - 11f;
+		boolean drop = !overDrawer(mouseU, mouseV);
+		VeloDraw.shadow(c, Math.round(x), Math.round(y), Math.round(w), 22, 11, 12, 3, 0x60000000);
+		rect(c, x, y, w, 22f, 11f, WHITE, drop ? 1f : 0.6f);
+		icon(c, "d_plus", x + 8f, y + 5f, 12f, 0xFF141416, 1f);
+		text(c, t, x + 24f, y + 7f, 0xFF141416, 1f);
+	}
+
+	// ---------------------------------------------------------------- input
+
+	private boolean overlayOpen() {
+		return dropdown != null || profileMenu || moreMenu;
+	}
+
+	@Override
+	public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+		double u = click.x() / k;
+		double v = click.y() / k;
+		mouseU = u;
+		mouseV = v;
+		commitEditIfOutside();
+		if (overlayOpen()) {
+			for (int i = overlayHits.size() - 1; i >= 0; i--) {
+				Hit h = overlayHits.get(i);
+				if (h.contains(u, v)) {
+					h.click.run();
+					return true;
+				}
+			}
+			dropdown = null;
+			profileMenu = false;
+			moreMenu = false;
+			return true;
+		}
+		for (int i = hits.size() - 1; i >= 0; i--) {
+			Hit h = hits.get(i);
+			if (!h.contains(u, v)) {
+				continue;
+			}
+			if (h.slide != null) {
+				sliding = h;
+				slideTo(u);
+				return true;
+			}
+			if (h.grip != null) {
+				ghost = h.grip;
+				ghostMoved = false;
+				return true;
+			}
+			if (h.click != null) {
+				h.click.run();
+			}
+			return true;
+		}
+		// the HUD (gui pixels)
+		int mx = (int) click.x();
+		int my = (int) click.y();
+		List<HudModule> huds = hudModules();
+		for (int i = huds.size() - 1; i >= 0; i--) {
+			HudModule hud = huds.get(i);
+			int w = sw(hud);
+			int h = sh(hud);
+			int x = hud.position().resolveX(this.width, w);
+			int y = hud.position().resolveY(this.height, h);
+			if ((hud == selected || hud == resizing) && Math.abs(mx - (x + w)) <= 7 && Math.abs(my - (y + h)) <= 7) {
+				resizing = hud;
+				resizeGrabX = x + w - mx;
+				resizeGrabY = y + h - my;
+				dragMoved = false;
+				return true;
+			}
+			if (mx >= x && mx <= x + w && my >= y && my <= y + h) {
+				dragging = hud;
+				dragOffsetX = mx - x;
+				dragOffsetY = my - y;
+				dragMoved = false;
+				selected = hud;
+				return true;
+			}
+		}
+		selected = null;
+		return velo$superMouseClicked(click, doubled);
+	}
+
+	private void slideTo(double u) {
+		float[] track = sliderTrack.get(sliding);
+		if (track != null && sliding.slide != null) {
+			sliding.slide.accept((u - track[0]) / track[1]);
+		}
+	}
+
+	@Override
+	public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
+		double u = click.x() / k;
+		double v = click.y() / k;
+		mouseU = u;
+		mouseV = v;
+		if (sliding != null) {
+			slideTo(u);
+			return true;
+		}
+		if (ghost != null) {
+			ghostMoved = true;
+			return true;
+		}
+		if (resizing != null) {
+			int w = sw(resizing);
+			int h = sh(resizing);
+			int x = resizing.position().resolveX(this.width, w);
+			int y = resizing.position().resolveY(this.height, h);
+			float fromW = resizing.width() > 0 ? ((float) click.x() + resizeGrabX - x) / resizing.width() : 1f;
+			float fromH = resizing.height() > 0 ? ((float) click.y() + resizeGrabY - y) / resizing.height() : 1f;
+			resizing.position().setScale(Math.max(0.3f, Math.min(4f, Math.max(fromW, fromH))));
+			dragMoved = true;
+			return true;
+		}
+		if (dragging != null) {
+			int w = sw(dragging);
+			int h = sh(dragging);
+			int nx = (int) click.x() - dragOffsetX;
+			int ny = (int) click.y() - dragOffsetY;
+			dragging.position().set(this.width > w ? nx / (float) (this.width - w) : 0f, this.height > h ? ny / (float) (this.height - h) : 0f);
+			dragging.position().setPlaced(true);
+			dragMoved = true;
+			return true;
+		}
+		return velo$superMouseDragged(click, offsetX, offsetY);
+	}
+
+	@Override
+	public boolean mouseReleased(net.minecraft.client.gui.Click click) {
+		if (sliding != null) {
+			sliding = null;
+			VeloProfileStore.saveActive();
+			return true;
+		}
+		if (ghost != null) {
+			Module m = ghost;
+			boolean moved = ghostMoved;
+			ghost = null;
+			ghostMoved = false;
+			if (moved && !overDrawer(click.x() / k, click.y() / k) && m instanceof HudModule hud) {
+				if (!hud.isEnabled()) {
+					QuickToggles.toggle(hud);
+				}
+				int w = Math.max(20, sw(hud));
+				int h = Math.max(8, sh(hud));
+				int nx = (int) click.x() - w / 2;
+				int ny = (int) click.y() - h / 2;
+				hud.position().set(this.width > w ? Math.max(0, nx) / (float) (this.width - w) : 0f, this.height > h ? Math.max(0, ny) / (float) (this.height - h) : 0f);
+				hud.position().setPlaced(true);
+				selected = hud;
+				VeloProfileStore.saveActive();
+			} else if (!moved) {
+				go(new Page(Kind.MODULE, catOf(m), m));
+			}
+			return true;
+		}
+		if (dragging != null || resizing != null) {
+			HudModule hud = dragging != null ? dragging : resizing;
+			boolean moved = dragMoved;
+			dragging = null;
+			resizing = null;
+			dragMoved = false;
+			if (!moved) {
+				// a click, not a drag: its settings in the drawer
+				open = true;
+				Page top = page();
+				if (top.kind() != Kind.MODULE || top.module() != hud) {
+					go(new Page(Kind.MODULE, catOf(hud), hud));
+				}
+			} else {
+				VeloProfileStore.saveActive();
+			}
+			return true;
+		}
+		return velo$superMouseReleased(click);
+	}
+
+	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+		if (overDrawer(mouseX / k, mouseY / k)) {
+			Page p = page();
+			scroll.put(p, Math.max(0f, scroll.getOrDefault(p, 0f) - (float) verticalAmount * 24f));
+			return true;
+		}
+		return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+	}
+
+	private void commitEditIfOutside() {
+		// clicks elsewhere end text editing (the field's own click re-opens it)
+		commitEdit();
+	}
+
+	private void commitEdit() {
+		if (editing != null) {
+			editing.set().accept(editBuffer.toString());
+			editing = null;
+			VeloProfileStore.saveActive();
+		}
+	}
+
+	@Override
+	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
+		int key = input.key();
+		if (listening != null) {
+			ConfigField.KeybindField f = listening;
+			listening = null;
+			swallowCharsUntil = System.nanoTime() + 250_000_000L;
+			f.onKeyCodeChosen().accept(key == Keys.ESCAPE ? Keys.UNKNOWN : key);
+			VeloProfileStore.saveActive();
+			return true;
+		}
+		if (listeningChord != null) {
+			if (key == Keys.ESCAPE) {
+				listeningChord.set().accept(List.of());
+				listeningChord = null;
+				chordHeld.clear();
+				chordMax.clear();
+				return true;
+			}
+			chordHeld.add(key);
+			chordMax.add(key);
+			return true;
+		}
+		if (editing != null) {
+			if (key == Keys.ESCAPE) {
+				editing = null;
+			} else if (key == Keys.ENTER || key == Keys.KP_ENTER) {
+				commitEdit();
+			} else if (key == Keys.BACKSPACE && editBuffer.length() > 0) {
+				editBuffer.setLength(editBuffer.length() - 1);
+			}
+			return true;
+		}
+		if (key == Keys.ESCAPE) {
+			if (overlayOpen()) {
+				dropdown = null;
+				profileMenu = false;
+				moreMenu = false;
+			} else if (!search.isEmpty()) {
+				search.setLength(0);
+			} else if (stack.size() > 1) {
+				back();
+			} else {
+				closeToGame();
+			}
+			return true;
+		}
+		if (key == Keys.BACKSPACE && !search.isEmpty()) {
+			search.setLength(search.length() - 1);
+			return true;
+		}
+		return velo$superKeyPressed(input);
+	}
+
+	@Override
+	public boolean keyReleased(net.minecraft.client.input.KeyInput input) {
+		if (listeningChord != null) {
+			swallowCharsUntil = System.nanoTime() + 250_000_000L;
+			chordHeld.remove(input.key());
+			if (chordHeld.isEmpty() && !chordMax.isEmpty()) {
+				listeningChord.set().accept(List.copyOf(chordMax));
+				listeningChord = null;
+				chordMax.clear();
+				VeloProfileStore.saveActive();
+			}
+			return true;
+		}
+		return velo$superKeyReleased(input);
+	}
+
+	/** Typing goes into the open text field, otherwise into the search (and jumps to it). */
+	private boolean typed(int codepoint) {
+		if (listening != null || listeningChord != null || System.nanoTime() < swallowCharsUntil || codepoint < 32 || codepoint == 127) {
+			return listening != null || listeningChord != null;
+		}
+		String s = new String(Character.toChars(codepoint));
+		if (editing != null) {
+			editBuffer.append(s);
+			return true;
+		}
+		if (search.isEmpty() && s.isBlank()) {
+			return true;
+		}
+		search.append(s);
+		if (page().kind() != Kind.HOME) {
+			fromPage = page();
+			stack.subList(1, stack.size()).clear();
+			trans = 0f;
+			transDir = -1;
+		}
+		open = true;
+		scroll.put(page(), 0f);
+		return true;
+	}
+
+	// (1.21.1 types through charTyped(char, int) at the bottom)
+	//? if >=1.21.2 && <26.1 {
+	@Override
+	public boolean charTyped(net.minecraft.client.input.CharInput input) {
+		return typed(input.codepoint()) || super.charTyped(input);
+	}
+	//?} else if >=26.1 {
+	/*@Override
+	public boolean charTyped(net.minecraft.client.input.CharacterEvent input) {
+		return typed(input.codepoint()) || super.charTyped(input);
+	}
+	*///?}
+
+	@Override
+	public void close() {
+		closeToGame();
+	}
+
+	/** Saves everything and goes back to the game (also what R-Shift does while this is open). */
+	public void closeToGame() {
+		commitEdit();
+		VeloProfileStore.saveActive();
+		this.client.setScreen(null);
+	}
+
+	// ---- 1.21.1: vanilla input still comes as numbers; the screen uses 1.21.9's event objects ----
+	private boolean velo$superKeyPressed(net.minecraft.client.input.KeyInput c) {
+		//? if <1.21.2 {
+		/*return super.keyPressed(c.key(), c.scancode(), c.modifiers());
+		*///?} else {
+		return super.keyPressed(c);
+		//?}
+	}
+
+	private boolean velo$superKeyReleased(net.minecraft.client.input.KeyInput c) {
+		//? if <1.21.2 {
+		/*return super.keyReleased(c.key(), c.scancode(), c.modifiers());
+		*///?} else {
+		return super.keyReleased(c);
+		//?}
+	}
+
+	private boolean velo$superMouseClicked(net.minecraft.client.gui.Click c, boolean d) {
+		//? if <1.21.2 {
+		/*return super.mouseClicked(c.x(), c.y(), c.button());
+		*///?} else {
+		return super.mouseClicked(c, d);
+		//?}
+	}
+
+	private boolean velo$superMouseDragged(net.minecraft.client.gui.Click c, double dx, double dy) {
+		//? if <1.21.2 {
+		/*return super.mouseDragged(c.x(), c.y(), c.button(), dx, dy);
+		*///?} else {
+		return super.mouseDragged(c, dx, dy);
+		//?}
+	}
+
+	private boolean velo$superMouseReleased(net.minecraft.client.gui.Click c) {
+		//? if <1.21.2 {
+		/*return super.mouseReleased(c.x(), c.y(), c.button());
+		*///?} else {
+		return super.mouseReleased(c);
+		//?}
+	}
+
+	//? if <1.21.2 {
+	/*@Override
+	public boolean mouseClicked(double x, double y, int button) {
+		return mouseClicked(new net.veloclient.velo.client.compat.Click(x, y, button), net.veloclient.velo.client.compat.Click.doubled(x, y, button));
+	}
+
+	@Override
+	public boolean mouseReleased(double x, double y, int button) {
+		return mouseReleased(new net.veloclient.velo.client.compat.Click(x, y, button));
+	}
+
+	@Override
+	public boolean mouseDragged(double x, double y, int button, double dx, double dy) {
+		return mouseDragged(new net.veloclient.velo.client.compat.Click(x, y, button), dx, dy);
+	}
+
+	@Override
+	public boolean keyPressed(int key, int scancode, int modifiers) {
+		return keyPressed(new net.veloclient.velo.client.compat.KeyInput(key, scancode, modifiers));
+	}
+
+	@Override
+	public boolean keyReleased(int key, int scancode, int modifiers) {
+		return keyReleased(new net.veloclient.velo.client.compat.KeyInput(key, scancode, modifiers));
+	}
+
+	@Override
+	public boolean charTyped(char chr, int modifiers) {
+		return typed(chr) || super.charTyped(chr, modifiers);
+	}
+	*///?}
+}

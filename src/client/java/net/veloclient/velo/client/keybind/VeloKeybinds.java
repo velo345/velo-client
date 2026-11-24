@@ -84,7 +84,10 @@ public final class VeloKeybinds {
 			/*Screen current = client.gui.screen();
 			*///?}
 			if (current == null) {
-				client.setScreen(new ModMenuScreen());
+				// 2026-11-24 redesign: the glass drawer with the HUD editable right away (design/rshift-drawer)
+				client.setScreen(new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen());
+			} else if (current instanceof net.veloclient.velo.client.gui.drawer.VeloDrawerScreen drawer) {
+				drawer.closeToGame();
 			} else if (current instanceof VeloWindow window) {
 				// Toggle closed: this key opens AND closes the panel, rather
 				// than only opening it and requiring Escape to get back out.

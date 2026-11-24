@@ -114,7 +114,7 @@ public final class PauseMenu {
 	public static List<ClickableWidget> createHotspots(Screen screen) {
 		openedAt = System.nanoTime();
 		MinecraftClient client = MinecraftClient.getInstance();
-		veloMenu = new HotspotButton(Text.literal("Velo menu"), () -> client.setScreen(new ModMenuScreen()));
+		veloMenu = new HotspotButton(Text.literal("Velo menu"), () -> client.setScreen(new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen()));
 		store = new HotspotButton(Text.literal("Store"), () -> client.setScreen(new StoreScreen(screen)));
 		friends = new HotspotButton(Text.literal("Friends"), () -> client.setScreen(new FriendsScreen(screen)));
 		bug = new HotspotButton(Text.literal("Report a bug"), () -> client.setScreen(new BugReportScreen(screen)));
