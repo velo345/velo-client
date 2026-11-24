@@ -53,18 +53,18 @@ public final class StoreConfig {
 	 * shown before the catalog loads).
 	 */
 	public static final List<Item> DEFAULT_ITEMS = List.of(
-			new Item("cape_black_pattern", "Digitized", 900),
-			new Item("cape_red_code", "Codebreaker", 1000),
-			new Item("cape_red_lightning", "Storm Strike", 1200),
-			new Item("cape_symbols", "Rune Weave", 950),
-			new Item("wings_angelic", "Angelic Wings", 3000),
-			new Item("wings_frost", "Frost Wings", 2800),
-			new Item("wings_phoenix", "Phoenix Wings", 3200),
-			new Item("wings_raven", "Raven Wings", 2400),
-			new Item("wings_shadowfang", "Shadowfang Wings", 2800),
-			new Item("wings_cobweb", "Cobweb Wings", 2600),
-			new Item("wings_bonedragon", "Bone Dragon Wings", 3000),
-			new Item("wings_wraith", "Wraith Wings", 2800));
+			new Item("cape_black_pattern", "Digitized", 650),
+			new Item("cape_red_code", "Codebreaker", 700),
+			new Item("cape_red_lightning", "Storm Strike", 850),
+			new Item("cape_symbols", "Rune Weave", 650),
+			new Item("wings_angelic", "Angelic Wings", 2100),
+			new Item("wings_frost", "Frost Wings", 1950),
+			new Item("wings_phoenix", "Phoenix Wings", 2250),
+			new Item("wings_raven", "Raven Wings", 1700),
+			new Item("wings_shadowfang", "Shadowfang Wings", 1950),
+			new Item("wings_cobweb", "Cobweb Wings", 1800),
+			new Item("wings_bonedragon", "Bone Dragon Wings", 2100),
+			new Item("wings_wraith", "Wraith Wings", 1950));
 
 	/**
 	 * A daily quest. {@code stat}: {@code online_minutes} (measured by the server from game
@@ -76,31 +76,43 @@ public final class StoreConfig {
 	}
 
 	/**
-	 * Free coins. Deliberately slow: with everything maxed every single day (login streak, all
-	 * quests, all ads) a player earns roughly 30-35 coins/day, so a ~1000-coin cape is about a month
-	 * of daily grinding - possible for free, but buying stays the sensible option.
+	 * Free coins. With everything maxed every day (login streak, all quests, all ads) a player earns roughly 50 coins/day
+	 * (2026-11-24: login, streak, weekly bonus and quests 1.5x, cosmetics 30% cheaper - a cloak is ~3 weeks of playing).
+	 * Three quests a day per player, picked from the pool below (a different mix every day).
 	 */
 	public static final class Rewards {
-		public int dailyLoginCoins = 6;
-		public int streakBonusPerDay = 2;
-		public int streakBonusMax = 8;
+		public int dailyLoginCoins = 9;
+		public int streakBonusPerDay = 3;
+		public int streakBonusMax = 12;
 		/** Extra coins on every 7th login day in a row (a full week of playing). */
-		public int weeklyStreakBonus = 40;
+		public int weeklyStreakBonus = 60;
 		public int loginMinOnlineMinutes = 5;
 		public int questsPerDay = 3;
 		public int adCoins = 6;
 		public int adsPerDay = 3;
-		public List<Quest> quests = List.of(
-				new Quest("play_60", "Play for 1 hour", "online_minutes", 60, 8, 0),
-				new Quest("play_180", "Play for 3 hours", "online_minutes", 180, 16, 0),
-				new Quest("kill_100", "Defeat 100 mobs", "mob_kills", 100, 10, 30),
-				new Quest("kill_300", "Defeat 300 mobs", "mob_kills", 300, 18, 75),
-				new Quest("mine_1000", "Mine 1,000 blocks", "blocks_mined", 1000, 12, 45),
-				new Quest("mine_3000", "Mine 3,000 blocks", "blocks_mined", 3000, 20, 120),
-				new Quest("place_500", "Place 500 blocks", "blocks_placed", 500, 10, 30),
-				new Quest("walk_5k", "Travel 5 km", "distance_m", 5000, 8, 30),
-				new Quest("walk_15k", "Travel 15 km", "distance_m", 15000, 16, 75));
+		public List<Quest> quests = DEFAULT_QUESTS;
 	}
+
+	public static final List<Quest> DEFAULT_QUESTS = List.of(
+			new Quest("play_30", "Play for 30 minutes", "online_minutes", 30, 6, 0),
+			new Quest("play_60", "Play for 1 hour", "online_minutes", 60, 12, 0),
+			new Quest("play_120", "Play for 2 hours", "online_minutes", 120, 18, 0),
+			new Quest("play_180", "Play for 3 hours", "online_minutes", 180, 24, 0),
+			new Quest("kill_50", "Defeat 50 mobs", "mob_kills", 50, 9, 20),
+			new Quest("kill_100", "Defeat 100 mobs", "mob_kills", 100, 15, 30),
+			new Quest("kill_200", "Defeat 200 mobs", "mob_kills", 200, 21, 50),
+			new Quest("kill_300", "Defeat 300 mobs", "mob_kills", 300, 27, 75),
+			new Quest("mine_500", "Mine 500 blocks", "blocks_mined", 500, 9, 25),
+			new Quest("mine_1000", "Mine 1,000 blocks", "blocks_mined", 1000, 18, 45),
+			new Quest("mine_2000", "Mine 2,000 blocks", "blocks_mined", 2000, 24, 90),
+			new Quest("mine_3000", "Mine 3,000 blocks", "blocks_mined", 3000, 30, 120),
+			new Quest("place_200", "Place 200 blocks", "blocks_placed", 200, 8, 15),
+			new Quest("place_500", "Place 500 blocks", "blocks_placed", 500, 15, 30),
+			new Quest("place_1500", "Place 1,500 blocks", "blocks_placed", 1500, 21, 60),
+			new Quest("walk_2k", "Travel 2 km", "distance_m", 2000, 6, 15),
+			new Quest("walk_5k", "Travel 5 km", "distance_m", 5000, 12, 30),
+			new Quest("walk_15k", "Travel 15 km", "distance_m", 15000, 24, 75),
+			new Quest("walk_30k", "Travel 30 km", "distance_m", 30000, 33, 120));
 
 	public Rewards rewards = new Rewards();
 
