@@ -38,6 +38,36 @@ public final class VeloBuiltins {
 		title("Better F3", "betterf3", "better f3");
 		title("Zoom", "zoomify", "ok zoomer");
 		title("Free Look", "freelook", "free look");
+		// 2026-11-24: every popular mod Velo already covers
+		slug("Velo Rewind (replays)", "replaymod", "flashback");
+		title("Velo Rewind (replays)", "replay mod", "flashback");
+		slug("Chat Heads", "chat-heads");
+		title("Chat Heads", "chat heads");
+		slug("Dynamic FPS (Performance Boost)", "dynamic-fps");
+		title("Dynamic FPS (Performance Boost)", "dynamic fps");
+		slug("Ping Display", "better-ping-display");
+		title("Ping Display", "better ping display", "ping display");
+		slug("Old Animations", "animatium");
+		title("Old Animations", "animatium", "old animations", "1.7 animations");
+		title("Item Physics", "item physic", "itemphysic");
+		title("Motion Blur", "motion blur", "motionblur");
+		title("Low Fire", "low fire", "lower fire", "lowfire");
+		title("Hit Color", "hit color", "hitcolor");
+		title("Damage Numbers & Health Indicator", "damage indicator", "damage number", "health indicator", "healthindicator");
+		title("Totem Pop Counter", "totem counter", "totem pop");
+		title("TNT Timer", "tnt timer", "tnttimer");
+		title("Chunk Animator", "chunk animator");
+		title("Keystrokes & CPS", "keystrokes", "cps display");
+		title("FPS Counter", "fps display", "fps counter", "fps hud");
+		title("Coordinates", "coordinates display", "coords hud", "coordinates hud");
+		title("Time, Weather & Fog", "no fog", "nofog", "time changer");
+		title("Light Level Overlay", "light overlay", "lightoverlay", "light level overlay");
+		title("Auto GG", "autogg", "auto gg");
+		title("Better Tab List", "better tab", "better tablist");
+		title("Armor Durability", "durability viewer", "armor hud", "armorhud");
+		title("Potion Effect Timers", "status effect timer", "effect timer", "potion timer");
+		title("Toggle Sprint", "toggle sprint", "togglesprint");
+		title("Shulker Preview", "shulker preview");
 	}
 
 	private static void slug(String feature, String... slugs) {

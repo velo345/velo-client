@@ -1091,6 +1091,8 @@ public final class InstanceDetailView {
 		info.getChildren().addAll(title, meta);
 		Label builtin = builtinHint(null, asset.title());
 		if (builtin != null) {
+			builtin.setMinWidth(Region.USE_PREF_SIZE);
+			builtin.setMaxWidth(Region.USE_PREF_SIZE);
 			info.getChildren().add(builtin);
 		}
 		if (kind == InstalledAssetStore.Kind.MOD) {
@@ -1437,10 +1439,14 @@ public final class InstanceDetailView {
 		title.getStyleClass().add("t-strong");
 		title.setOnMouseClicked(e -> openDetail.accept(hit.projectId()));
 		title.setCursor(javafx.scene.Cursor.HAND);
+		title.setMinWidth(0);
+		title.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
 		HBox titleRow = new HBox(8, title);
 		titleRow.setAlignment(Pos.CENTER_LEFT);
+		titleRow.setMinWidth(0);
 		Label builtin = builtinHint(hit.slug(), hit.title());
 		if (builtin != null) {
+			builtin.setMinWidth(Region.USE_PREF_SIZE);
 			titleRow.getChildren().add(builtin);
 		}
 		Label description = new Label(hit.description());
@@ -1523,7 +1529,14 @@ public final class InstanceDetailView {
 		card.getChildren().addAll(title, description, downloads);
 		Label builtin = builtinHint(hit.slug(), hit.title());
 		if (builtin != null) {
-			card.getChildren().add(1, builtin);
+			// on the icon's lower edge: a line of its own made the fixed-size card overflow
+			builtin.setMinWidth(Region.USE_PREF_SIZE);
+			builtin.setTranslateY(9);
+			StackPane iconWithBadge = new StackPane(icon, builtin);
+			StackPane.setAlignment(builtin, Pos.BOTTOM_CENTER);
+			iconWithBadge.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+			VBox.setMargin(iconWithBadge, new Insets(0, 0, 8, 0));
+			card.getChildren().set(card.getChildren().indexOf(icon), iconWithBadge);
 		}
 		card.getChildren().addAll(spacer, progress, install);
 		return card;
