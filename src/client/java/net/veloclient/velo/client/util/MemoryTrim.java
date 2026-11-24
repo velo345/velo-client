@@ -18,6 +18,8 @@ public final class MemoryTrim {
 	private static boolean wasInWorld = true; // the start counts as "just left a world"
 	private static long idleSince;
 	private static volatile boolean running;
+	/** Heap in use right after the last trim, MB (0 = none yet) - reported by PerfTelemetry. */
+	public static volatile long trimmedUsedMb;
 
 	private MemoryTrim() {
 	}
@@ -61,6 +63,7 @@ public final class MemoryTrim {
 			long before = rt.totalMemory();
 			long start = System.nanoTime();
 			System.gc(); // concurrent (see the class comment) - this thread waits, the game doesn't
+			trimmedUsedMb = (rt.totalMemory() - rt.freeMemory()) >> 20;
 			net.veloclient.velo.VeloClient.LOGGER.info("[Velo] memory trim: heap {} MB -> {} MB committed ({} MB used) in {} ms",
 					before >> 20, rt.totalMemory() >> 20, (rt.totalMemory() - rt.freeMemory()) >> 20, (System.nanoTime() - start) / 1_000_000);
 		} catch (Throwable t) {

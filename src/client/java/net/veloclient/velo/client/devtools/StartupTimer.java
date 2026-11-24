@@ -15,6 +15,8 @@ public final class StartupTimer {
 
 	private static final int EXIT_AFTER = Integer.getInteger("velo.profileExitAfter", 0);
 	private static long readyAt;
+	/** JVM start -> loading screen gone, ms (0 until then) - also reported by PerfTelemetry. */
+	public static volatile long readyMs;
 	private static boolean stopping;
 
 	private StartupTimer() {
@@ -34,6 +36,7 @@ public final class StartupTimer {
 			//?}
 			readyAt = System.currentTimeMillis();
 			long start = java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime();
+			readyMs = readyAt - start;
 			VeloClient.LOGGER.info("Velo startup: game ready {} ms after JVM start", readyAt - start);
 			return;
 		}

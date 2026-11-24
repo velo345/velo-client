@@ -228,6 +228,11 @@ public final class VeloServerApp {
 		SchematicRoutes.register(server, registry, schematics, store);
 		server.createContext("/v1/admin/cape/remove", exchange -> handle(exchange, "POST", ex -> handleAdminCapeRemove(ex, capes, adminToken)));
 		PanelRoutes.register(server, registry, stats, store, adminToken);
+		try {
+			new PerfService(dataDir).register(server, adminToken);
+		} catch (java.sql.SQLException e) {
+			System.out.println("[perf] performance reports off: " + e.getMessage());
+		}
 		PanelRoutes.registerStoreActions(server, store, announcer, adminToken);
 		// Creators page: the list is the owner's, channel numbers/pictures/latest videos refresh themselves every 3 hours.
 		CreatorService creators = new CreatorService(dataDir, envOr("VELO_YTDLP", "yt-dlp"));

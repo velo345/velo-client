@@ -40,6 +40,7 @@ function s(tag, attrs, ...children) {
 const ICONS = {
 	notes: "M6 3h9l4 4v14H6z M15 3v4h4 M9 11h7 M9 15h7 M9 19h4",
 	overview: "M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z",
+	perf: "M3 17l5-5 4 4 8-8 M15 8h5v5",
 	players: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M2 21c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5 M16 3.5a4 4 0 0 1 0 7.5 M18.5 14.5c2 .8 3.5 3 3.5 6.5",
 	store: "M3 7h18l-1.5 12.5a2 2 0 0 1-2 1.5h-11a2 2 0 0 1-2-1.5z M8 7V5a4 4 0 0 1 8 0v2",
 	cosmetics: "M12 3l2.4 5.1 5.6.7-4.1 3.9 1 5.5L12 15.6l-4.9 2.6 1-5.5L4 8.8l5.6-.7z",
@@ -590,7 +591,7 @@ function deviceName() {
 // ---- Shell & routing ----
 
 const PAGES = [
-	["Velo", [["overview", "Overview"], ["players", "Players"], ["store", "Store"], ["socials", "Socials"]]],
+	["Velo", [["overview", "Overview"], ["perf", "Performance"], ["players", "Players"], ["store", "Store"], ["socials", "Socials"]]],
 	["Moderation", [["monitor", "Monitoring"], ["clips", "Clips"], ["worlds", "Public worlds"], ["notes", "World notes"], ["capes", "Custom capes"], ["stafflog", "Staff log"]]],
 	["Owner tools", [["cosmetics", "Cosmetics"], ["news", "News"], ["reports", "Reports"], ["doctor", "Launcher Doctor"], ["serverrules", "Server mod rules"], ["bridge", "Velo Bridge servers"], ["partners", "Partner servers"], ["codes", "Partner codes"], ["updates", "Required update"], ["addons", "Addons"]]],
 	["Machine", [["server", "Server"], ["files", "Files"], ["activity", "Activity log"]]],
@@ -2495,6 +2496,55 @@ RENDER.stafflog = async (root) => {
 // ---- Socials: TikTok / YouTube Shorts / Instagram Reels views ----
 
 const PLATFORM_NAMES = { tiktok: "TikTok", youtube: "YouTube", instagram: "Instagram" };
+
+// ---- Performance (per update) ----
+
+/** Anonymous reports from the game's first three sessions after each update: did a version start slower, run worse, eat more RAM? */
+RENDER.perf = async (root) => {
+	let days = 90, mc = "", os = "", backend = "";
+	const body = h("div");
+	const filters = h("div", { class: "row", style: "gap:10px;flex-wrap:wrap;margin-bottom:14px" });
+	root.append(card("Performance by version", "Median of every report from the first three game sessions after an update - green is better than the version before, red is worse", null, filters, body));
+	const select = (label, options, value, onChange) => {
+		const el = h("select", { "aria-label": label }, h("option", { value: "" }, "All " + label), options.map((o) => h("option", { value: o, selected: o === value ? "" : null }, o)));
+		el.addEventListener("change", () => onChange(el.value));
+		return el;
+	};
+	const delta = (now, before, higherIsBetter, unit) => {
+		if (now < 0 || before == null || before < 0) return null;
+		const diff = now - before;
+		const pct = before ? Math.round((diff / before) * 100) : 0;
+		if (Math.abs(pct) < 3) return h("span", { class: "muted small" }, " ±0%");
+		const good = higherIsBetter ? diff > 0 : diff < 0;
+		return h("span", { class: "small", style: "margin-left:6px;color:" + (good ? "var(--good,#3ddc97)" : "var(--bad,#ff6b73)") }, (diff > 0 ? "+" : "") + pct + "%");
+	};
+	const cell = (v, fmtv) => (v < 0 ? "–" : fmtv(v));
+	async function draw() {
+		const q = `admin/panel/perf?days=${days}&mc=${encodeURIComponent(mc)}&os=${encodeURIComponent(os)}&backend=${encodeURIComponent(backend)}`;
+		const r = await velo(q);
+		if (!root.isConnected) return;
+		filters.replaceChildren(
+			seg([["30", "30 days"], ["90", "90 days"], ["365", "1 year"]], String(days), (v) => { days = +v; draw(); }),
+			select("Minecraft versions", r.mcVersions, mc, (v) => { mc = v; draw(); }),
+			select("systems", r.oses, os, (v) => { os = v; draw(); }),
+			select("backends", r.backends, backend, (v) => { backend = v; draw(); }));
+		const v = r.versions;
+		subtitle(v.reduce((a, x) => a + x.reports, 0) + " reports");
+		body.replaceChildren(table(["Velo", "num:Reports", "num:Installs", "num:Start-up", "num:FPS", "num:Slowest 5% FPS", "num:Heap in menu", "First report"], v.map((x, i) => {
+			const prev = v[i + 1];
+			return [
+				h("b", {}, x.velo),
+				fmt(x.reports), fmt(x.installs),
+				h("span", {}, cell(x.launchMs, (n) => (n / 1000).toFixed(1) + " s"), prev ? delta(x.launchMs, prev.launchMs, false) : null),
+				h("span", {}, cell(x.fpsAvg, fmt), prev ? delta(x.fpsAvg, prev.fpsAvg, true) : null),
+				h("span", {}, cell(x.fpsLow, fmt), prev ? delta(x.fpsLow, prev.fpsLow, true) : null),
+				h("span", {}, cell(x.heapMb, (n) => fmt(n) + " MB"), prev ? delta(x.heapMb, prev.heapMb, false) : null),
+				when(x.since),
+			];
+		})));
+	}
+	await draw();
+};
 
 RENDER.socials = async (root) => {
 	const input = h("input", { type: "url", placeholder: "TikTok profile, YouTube channel, Instagram profile or a single video / Reel link", class: "grow" });
