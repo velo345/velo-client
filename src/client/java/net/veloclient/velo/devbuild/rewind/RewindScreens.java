@@ -5,8 +5,60 @@ package net.veloclient.velo.devbuild.rewind;
  * pause menu. Plain buttons in the centre column - Velo's menus pick them up as their own styled rows (the recording ones
  * with record / pause / stop icons, see TitleScreenTheme).
  */
-//? if <26.2 {
+//? if >=1.21.11 && <26.1 {
+import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.Screens;
+import net.minecraft.text.Text;
+
 public final class RewindScreens {
+
+	private RewindScreens() {
+	}
+
+	public static void register() {
+		net.veloclient.velo.client.gui.title.PauseMenu.recordingStatus = () -> RewindRecorder.active() ? RewindRecorder.status() : null;
+		RewindEditorScreen.registerHud();
+		RewindApply.registerGizmo();
+		net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.START_CLIENT_TICK.register(client -> RewindEditorScreen.viewportSelect());
+		ScreenEvents.AFTER_INIT.register((client, screen, w, h) -> {
+			if (screen instanceof net.minecraft.client.gui.screen.TitleScreen && RewindModule.recovered > 0) {
+				int n = RewindModule.recovered;
+				RewindModule.recovered = 0;
+				net.minecraft.client.toast.SystemToast.add(client.getToastManager(),
+						net.minecraft.client.toast.SystemToast.Type.PERIODIC_NOTIFICATION, Text.literal("Velo Rewind"),
+						Text.literal(n == 1 ? "Recovered a recording the last crash interrupted" : "Recovered " + n + " recordings a crash interrupted"));
+			}
+			if (!RewindModule.available()) {
+				return;
+			}
+			int x = w / 2 - 100;
+			if (screen instanceof net.minecraft.client.gui.screen.TitleScreen) {
+				Screens.getButtons(screen).add(net.minecraft.client.gui.widget.ButtonWidget.builder(Text.literal("Velo Rewind - Open Replays"),
+						b -> client.setScreen(new RewindLibraryScreen(screen))).dimensions(x, h / 4 + 48 + 24 * 5, 200, 20).build());
+			} else if (screen instanceof net.minecraft.client.gui.screen.GameMenuScreen pause && pause.shouldShowMenu()) {
+				int y = h / 4 + 8 + 24 * 6;
+				if (!RewindRecorder.active()) {
+					Screens.getButtons(screen).add(net.minecraft.client.gui.widget.ButtonWidget.builder(Text.literal("Start Recording"), b -> {
+						client.setScreen(null);
+						RewindRecorder.toggle();
+					}).dimensions(x, y, 200, 20).build());
+				} else {
+					String label = RewindRecorder.paused() ? "Resume Recording" : "Pause Recording";
+					Screens.getButtons(screen).add(net.minecraft.client.gui.widget.ButtonWidget.builder(Text.literal(label), b -> {
+						RewindRecorder.togglePause();
+						client.setScreen(null);
+					}).dimensions(x, y, 200, 20).build());
+					Screens.getButtons(screen).add(net.minecraft.client.gui.widget.ButtonWidget.builder(Text.literal("Stop Recording"), b -> {
+						client.setScreen(null);
+						RewindRecorder.toggle();
+					}).dimensions(x, y + 24, 200, 20).build());
+				}
+			}
+		});
+	}
+}
+//?} else if <26.2 {
+/*public final class RewindScreens {
 
 	private RewindScreens() {
 	}
@@ -14,7 +66,7 @@ public final class RewindScreens {
 	public static void register() {
 	}
 }
-//?} else {
+*///?} else {
 /*import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.minecraft.client.Minecraft;

@@ -7,8 +7,834 @@ package net.veloclient.velo.devbuild.rewind;
  * recorder's own player - which the server never echoes back - is written as packets every tick (position, head, entity
  * data, equipment, swings). Recording is client-only: it works on every server and in singleplayer.
  */
-//? if <26.2 {
+//? if >=1.21.11 && <26.1 {
+import com.mojang.datafixers.util.Pair;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import net.minecraft.block.Block;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientConfigurationNetworkHandler;
+import net.minecraft.client.network.ClientPlayNetworkHandler;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.network.PlayerListEntry;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.FallingBlockEntity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.decoration.AbstractDecorationEntity;
+import net.minecraft.entity.projectile.ProjectileEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.NetworkPhase;
+import net.minecraft.network.NetworkSide;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.PacketListener;
+import net.minecraft.network.packet.BundlePacket;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
+import net.minecraft.network.packet.s2c.play.ChunkRenderDistanceCenterS2CPacket;
+import net.minecraft.network.packet.s2c.play.EntityAnimationS2CPacket;
+import net.minecraft.network.packet.s2c.play.EntityEquipmentUpdateS2CPacket;
+import net.minecraft.network.packet.s2c.play.EntityPassengersSetS2CPacket;
+import net.minecraft.network.packet.s2c.play.EntityPositionSyncS2CPacket;
+import net.minecraft.network.packet.s2c.play.EntitySetHeadYawS2CPacket;
+import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
+import net.minecraft.network.packet.s2c.play.EntityTrackerUpdateS2CPacket;
+import net.minecraft.network.packet.s2c.play.GameJoinS2CPacket;
+import net.minecraft.network.packet.s2c.play.GameStateChangeS2CPacket;
+import net.minecraft.network.packet.s2c.play.PlayerListS2CPacket;
+import net.minecraft.network.packet.s2c.play.PlayerRespawnS2CPacket;
+import net.minecraft.network.packet.s2c.play.WorldBorderInitializeS2CPacket;
+import net.minecraft.network.state.NetworkState;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.chunk.ChunkStatus;
+import net.minecraft.world.chunk.WorldChunk;
+
 public final class RewindRecorder {
+
+	private enum State { IDLE, RECORDING, PAUSED }
+
+	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("Velo Rewind");
+
+	private static volatile State state = State.IDLE;
+	// The clientbound protocols the connection uses right now (the play one is bound to the server's registries).
+	private static volatile NetworkState<?> configProtocol;
+	private static volatile NetworkState<?> playProtocol;
+	private static volatile boolean newConfigPhase;
+
+	// Kept from joining on (main thread): what a fresh client needs before the snapshot.
+	private static final List<Object[]> CONFIG = new ArrayList<>();
+	private static Packet<?> login;
+	private static Packet<?> respawn;
+	private static final Map<Class<?>, Packet<?>> STICKY = new LinkedHashMap<>();
+	private static final Set<String> STICKY_TYPES = Set.of("ClientboundUpdateTagsPacket", "ClientboundServerDataPacket",
+			"ClientboundChangeDifficultyPacket", "ClientboundSetDefaultSpawnPositionPacket", "ClientboundTabListPacket",
+			"ClientboundSetSimulationDistancePacket", "ClientboundSetChunkCacheRadiusPacket", "ClientboundSetTimePacket",
+			"ClientboundPlayerAbilitiesPacket", "ClientboundUpdateMobEffectPacket");
+	// Network housekeeping that means nothing in a replay.
+	private static final Set<String> SKIP = Set.of("ClientboundKeepAlivePacket", "ClientboundPingPacket", "ClientboundDisconnectPacket",
+			"ClientboundTransferPacket", "ClientboundCookieRequestPacket", "ClientboundStoreCookiePacket", "ClientboundPongResponsePacket",
+			"ClientboundCustomQueryPacket");
+
+	private static RewindWriter writer;
+	private static String fileName;
+	private static long startedAt;
+	private static int selfId = -1;
+	// Who and where, remembered while in the world: a recording stopped by leaving the server is finished when there's
+	// no player any more - its meta came out with an empty selfUuid, and the replay couldn't find you (2026-11-10).
+	private static String knownSelfName = "";
+	private static String knownSelfUuid = "";
+	private static String knownServer;
+	private static boolean selfSpawn;
+	private static final Map<Integer, Object> lastData = new java.util.HashMap<>();
+	private static final ItemStack[] lastEquip = new ItemStack[EquipmentSlot.values().length];
+	private static boolean lastSwinging;
+	// Following the player to another server: config packets go into a new configuration, then a fresh snapshot.
+	private static boolean switching;
+	private static long switchingSince;
+	private static boolean resnapshot;
+	private static int resnapshotWait;
+	// The AI API's stop: save under this name without asking.
+	static volatile String apiName;
+
+	static Path lastFile() {
+		return lastFile;
+	}
+	private static int thumbIn = -1;
+	private static boolean thumbHudWas;
+
+	private RewindRecorder() {
+	}
+
+	public static boolean active() {
+		return state != State.IDLE;
+	}
+
+	public static boolean paused() {
+		return state == State.PAUSED;
+	}
+
+	// The play protocol the connection uses now (Velo Rewind's playback decodes with it).
+	public static NetworkState<?> playProtocol() {
+		return playProtocol;
+	}
+
+	// ---- hooks (mixins) ----
+
+	// Connection.setupInboundProtocol: which protocol the following packets use.
+	public static void onInbound(NetworkState<?> info) {
+		if (info.side() != NetworkSide.CLIENTBOUND) {
+			return;
+		}
+		if (info.id() == NetworkPhase.CONFIGURATION) {
+			configProtocol = info;
+			newConfigPhase = true;
+			if (state != State.IDLE) {
+				// A proxy moving you to another server (lobby -> arena): the world is cleared right now, but the first
+				// config packet can come ticks later - tick() saw no player and no switch yet and stopped the recording.
+				switching = true;
+				switchingSince = System.currentTimeMillis();
+			}
+		} else if (info.id() == NetworkPhase.PLAY) {
+			playProtocol = info;
+		}
+	}
+
+	// A packet about to be handled on the game thread.
+	public static void onHandle(PacketListener listener, Packet<?> packet) {
+		String type = packet.getClass().getSimpleName();
+		if (state != State.IDLE && ("ClientboundTransferPacket".equals(type) || "ClientboundStartConfigurationPacket".equals(type))) {
+			// moving to another server: no world for a moment, keep recording
+			switching = true;
+			switchingSince = System.currentTimeMillis();
+		}
+		if (SKIP.contains(type)) {
+			return;
+		}
+		if (listener instanceof ClientConfigurationNetworkHandler) {
+			if (newConfigPhase) {
+				newConfigPhase = false;
+				CONFIG.clear();
+				if (state != State.IDLE) {
+					switching = true;
+					switchingSince = System.currentTimeMillis();
+					writer.newConfig();
+				}
+			}
+			CONFIG.add(new Object[] {packet, configProtocol});
+			if (state != State.IDLE) {
+				writer.config(packet, configProtocol);
+			}
+			return;
+		}
+		if (!(listener instanceof ClientPlayNetworkHandler)) {
+			return;
+		}
+		if (packet instanceof GameJoinS2CPacket) {
+			login = packet;
+			respawn = null;
+			STICKY.clear();
+			selfSpawn = true;
+			if (switching) {
+				switching = false;
+				resnapshot = true; // once the new world is set up (next tick)
+			}
+		} else if (packet instanceof PlayerRespawnS2CPacket) {
+			respawn = packet;
+			selfSpawn = true;
+		} else if (STICKY_TYPES.contains(type)) {
+			STICKY.put(packet.getClass(), packet);
+		}
+		if (state == State.RECORDING && !"ClientboundPlayerPositionPacket".equals(type)) {
+			writer.packet(packet, playProtocol);
+		}
+	}
+
+	// ---- controls ----
+
+	public static void toggle() {
+		if (state == State.IDLE) {
+			start();
+		} else {
+			stop();
+		}
+	}
+
+	public static void togglePause() {
+		if (state == State.RECORDING) {
+			writer.endSegment();
+			state = State.PAUSED;
+			say("Velo Rewind paused");
+		} else if (state == State.PAUSED && !switching) {
+			resnapshot = false;
+			writer.beginSegment();
+			snapshot();
+			state = State.RECORDING;
+			say("Velo Rewind recording");
+		}
+	}
+
+	private static void start() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (RewindPlayer.active()) {
+			return; // watching a recording
+		}
+		if (mc.player == null || mc.world == null || mc.getNetworkHandler() == null) {
+			return;
+		}
+		if (login == null || playProtocol == null) {
+			say("Velo Rewind: rejoin the world once to record it");
+			return;
+		}
+		try {
+			Path dir = mc.runDirectory.toPath().resolve("velo-rewind");
+			Files.createDirectories(dir);
+			fileName = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+			writer = new RewindWriter(dir.resolve(fileName + ".vrewind"), RewindRecorder::encode);
+		} catch (Exception e) {
+			LOG.warn("Couldn't start a Velo Rewind recording", e);
+			say("Velo Rewind couldn't start: " + e.getMessage());
+			return;
+		}
+		writer.start();
+		for (Object[] c : CONFIG) {
+			writer.config(c[0], c[1]);
+		}
+		startedAt = System.currentTimeMillis();
+		knownServer = null;
+		remember(mc);
+		writer.beginSegment();
+		snapshot();
+		writer.head(metaFields(mc)); // after the snapshot: it knows the recorder's own entity id
+		state = State.RECORDING;
+		switching = false;
+		resnapshot = false;
+		thumbIn = 30;
+		RewindWriter audioTo = writer;
+		RewindAudio.sink = (track, pcm, channels, rate, x, y, z) -> {
+			if (writer == audioTo && state == State.RECORDING) {
+				audioTo.audio(track, pcm, channels, rate, x, y, z);
+			}
+		};
+		RewindAudio.started();
+		say("Velo Rewind recording");
+	}
+
+	// The meta fields about where / who recorded (also written when recording starts, for crash recovery).
+	private static String metaFields(MinecraftClient mc) {
+		remember(mc);
+		String server = knownServer != null ? knownServer : "singleplayer";
+		String selfName = knownSelfName;
+		String selfUuid = knownSelfUuid;
+		return "\"minecraft\": \"" + net.minecraft.SharedConstants.getGameVersion().name() + "\", \"protocol\": "
+				+ net.minecraft.SharedConstants.getProtocolVersion() + ", \"server\": " + json(server) + ", \"startedAt\": " + startedAt
+				+ ", \"selfId\": " + selfId + ", \"selfUuid\": " + json(selfUuid) + ", \"selfName\": " + json(selfName);
+	}
+
+	private static void remember(MinecraftClient mc) {
+		if (mc.player != null) {
+			knownSelfName = mc.player.getGameProfile().name();
+			knownSelfUuid = mc.player.getUuid().toString();
+			knownServer = mc.getCurrentServerEntry() != null ? mc.getCurrentServerEntry().address : mc.isIntegratedServerRunning() ? "singleplayer" : knownServer;
+		}
+	}
+
+	// The game is closing: finish the recording right now (it keeps its date name; no name prompt).
+	public static void shutdown() {
+		RewindWriter w = writer;
+		if (w == null) {
+			return;
+		}
+		RewindAudio.sink = null;
+		RewindAudio.stopped();
+		writer = null;
+		state = State.IDLE;
+		w.endSegment();
+		Path file = w.finishBlocking(metaFields(MinecraftClient.getInstance()), 15_000);
+		LOG.info("Velo Rewind: saved {} as the game closed", file);
+	}
+
+	private static void stop() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		RewindAudio.sink = null;
+		RewindAudio.stopped();
+		RewindWriter w = writer;
+		writer = null;
+		state = State.IDLE;
+		if (w == null) {
+			return;
+		}
+		w.endSegment();
+		String meta = metaFields(mc);
+		switching = false;
+		resnapshot = false;
+		say("Velo Rewind saving...");
+		w.finish(meta, file -> mc.execute(() -> {
+			if (file == null) {
+				say("Velo Rewind couldn't save: " + w.error());
+				return;
+			}
+			// Saved already under its date; now ask for a name (in game, or on the title / server list after leaving).
+			lastFile = file;
+			String named = apiName;
+			apiName = null;
+			if (named != null) {
+				// stopped through the AI API: saved under that name right away, no name prompt
+				try {
+					Path to = file.resolveSibling(named.replaceAll("[\\\\/:*?\"<>|]", "_") + ".vrewind");
+					if (!java.nio.file.Files.exists(to)) {
+						java.nio.file.Files.move(file, to);
+						lastFile = to;
+					}
+				} catch (Exception e) {
+					LOG.warn("Velo Rewind: couldn't name the recording {}", named, e);
+				}
+				say("Velo Rewind saved");
+				return;
+			}
+			RewindSaveScreen.open(file);
+		}));
+	}
+
+	// ---- per tick: the recorder's own player ----
+
+	public static void tick() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (state == State.IDLE) {
+			return;
+		}
+		if (mc.player == null || mc.world == null) {
+			// Between two servers the client has no world for a moment - keep going; anything else is leaving.
+			if (!switching || System.currentTimeMillis() - switchingSince > 60_000) {
+				stop();
+			}
+			return;
+		}
+		if (mc.world.getTime() % 20 == 0) {
+			remember(mc);
+		}
+		if (state != State.RECORDING) {
+			return;
+		}
+		if (resnapshot) {
+			// wait until the new server has sent the chunks around the player (up to 5 s), so the new segment's snapshot
+			// has a world to show instead of starting empty
+			boolean chunkHere = mc.world.isChunkLoaded(mc.player.getBlockPos().getX() >> 4, mc.player.getBlockPos().getZ() >> 4);
+			if (resnapshotWait++ < 100 && (!chunkHere || resnapshotWait < 20)) {
+				return;
+			}
+			resnapshotWait = 0;
+			resnapshot = false;
+			writer.beginSegment();
+			snapshot();
+			say("Velo Rewind: following you to this server");
+		}
+		if (thumbIn >= 0) {
+			// The library's picture: the world without the HUD - hidden for the frame the screenshot reads.
+			if (thumbIn == 1) {
+				thumbHudWas = mc.options.hudHidden;
+				hideHud(mc, true);
+			} else if (thumbIn == 0) {
+				thumbnail(mc);
+				hideHud(mc, thumbHudWas);
+			}
+			thumbIn--;
+		}
+		ClientPlayerEntity p = mc.player;
+		if (selfSpawn || p.getId() != selfId) {
+			spawnSelf(p);
+		}
+		writer.packet(EntityPositionSyncS2CPacket.create(p), playProtocol);
+		writer.packet(new EntitySetHeadYawS2CPacket(p, (byte) Math.floor(p.getHeadYaw() * 256f / 360f)), playProtocol);
+		List<DataTracker.SerializedEntry<?>> changed = dataChanges(p, false);
+		if (!changed.isEmpty()) {
+			writer.packet(new EntityTrackerUpdateS2CPacket(p.getId(), changed), playProtocol);
+		}
+		List<Pair<EquipmentSlot, ItemStack>> equip = new ArrayList<>();
+		for (EquipmentSlot slot : EquipmentSlot.values()) {
+			ItemStack now = p.getEquippedStack(slot);
+			ItemStack was = lastEquip[slot.ordinal()];
+			if (was == null || !ItemStack.areEqual(was, now)) {
+				lastEquip[slot.ordinal()] = now.copy();
+				if (was != null || !now.isEmpty()) {
+					equip.add(Pair.of(slot, now.copy()));
+				}
+			}
+		}
+		if (!equip.isEmpty()) {
+			writer.packet(new EntityEquipmentUpdateS2CPacket(p.getId(), equip), playProtocol);
+		}
+		int swing = RewindCompat.swing(p);
+		if (swing >= 0 && !lastSwinging) {
+			writer.packet(new EntityAnimationS2CPacket(p, swing), playProtocol);
+		}
+		lastSwinging = swing >= 0;
+		writer.tick();
+	}
+
+	// F1's state (26.2 keeps it private in Hud).
+	private static void hideHud(MinecraftClient mc, boolean hidden) {
+		try {
+			mc.options.hudHidden = hidden;
+			if (false) throw new ReflectiveOperationException();
+		} catch (ReflectiveOperationException ignored) {
+		}
+	}
+
+	// The library's picture: the screen a moment after the recording started, 480 wide.
+	private static void thumbnail(MinecraftClient mc) {
+		RewindWriter w = writer;
+		net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(mc.getFramebuffer(), image -> {
+			try (image) {
+				int width = 480;
+				int height = Math.max(1, image.getHeight() * width / Math.max(1, image.getWidth()));
+				try (net.minecraft.client.texture.NativeImage small = new net.minecraft.client.texture.NativeImage(width, height, false)) {
+					image.resizeSubRectTo(0, 0, image.getWidth(), image.getHeight(), small);
+					Path tmp = Files.createTempFile("velo-rewind", ".png");
+					small.writeTo(tmp);
+					w.thumbnail(Files.readAllBytes(tmp), "thumb.png");
+					Files.deleteIfExists(tmp);
+				}
+			} catch (Exception e) {
+				LOG.warn("Velo Rewind: no thumbnail", e);
+			}
+		});
+	}
+
+	// ---- self test (-Dvelo.rewindTest): record with a pause, read it back, decode every packet, quit ----
+
+	private static final boolean TEST = Boolean.getBoolean("velo.rewindTest");
+	private static int testTicks;
+	private static int saveShown;
+	private static Path lastFile;
+
+	public static void testTick() {
+		if (!TEST) {
+			return;
+		}
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (mc.player == null || mc.world == null) {
+			return;
+		}
+		testTicks++;
+		if (mc.currentScreen instanceof RewindSaveScreen) {
+			if (++saveShown == 25) {
+				shot(mc, "rewind-save.png");
+			} else if (saveShown > 30) {
+				mc.setScreen(null);
+			}
+		}
+		switch (testTicks) {
+			case 100 -> toggle();
+			case 150 -> mc.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true));
+			case 170 -> shot(mc, "rewind-pause-recording.png");
+			case 180 -> mc.setScreen(null);
+			case 200 -> togglePause();
+			case 240 -> togglePause();
+			case 400 -> toggle();
+			default -> {
+			}
+		}
+		if (testTicks > 400 && lastFile != null) {
+			Path f = lastFile;
+			lastFile = null;
+			verify(f);
+			testTicks = 1000;
+		}
+		if (testTicks == 1050) {
+			mc.setScreen(new RewindLibraryScreen(null));
+		}
+		if (testTicks == 1100) {
+			shot(mc, "rewind-library.png");
+		}
+		if (testTicks == 1110) {
+			mc.scheduleStop();
+		}
+	}
+
+	private static void shot(MinecraftClient mc, String name) {
+		net.minecraft.client.util.ScreenshotRecorder.saveScreenshot(mc.runDirectory, name, mc.getFramebuffer(), 1, msg -> LOG.info("Velo Rewind test shot {}", name));
+	}
+
+	public static void verify(Path file) {
+		Map<String, Integer> counts = new java.util.TreeMap<>();
+		int frames = 0;
+		int ticks = 0;
+		int bad = 0;
+		try (RewindReader reader = new RewindReader(file)) {
+			LOG.info("Velo Rewind verify {}: meta {}", file.getFileName(), reader.meta());
+			for (int k = 0; ; k++) {
+				try (RewindReader.Frames f = reader.open("config-" + k + ".bin")) {
+					if (f == null) {
+						break;
+					}
+					for (RewindReader.Frame fr; (fr = f.next()) != null; ) {
+						frames++;
+						bad += decode(configProtocol, fr.body(), counts, "config ") ? 0 : 1;
+					}
+				}
+			}
+			for (int s = 0; s < reader.segments(); s++) {
+				try (RewindReader.Frames f = reader.open("seg-" + s + ".bin")) {
+					for (RewindReader.Frame fr; (fr = f.next()) != null; ) {
+						frames++;
+						if (fr.type() == RewindWriter.F_TICK) {
+							ticks++;
+						} else if (fr.type() == RewindWriter.F_PACKET) {
+							bad += decode(playProtocol, fr.body(), counts, "") ? 0 : 1;
+						}
+					}
+				}
+			}
+		} catch (Exception e) {
+			LOG.warn("Velo Rewind verify failed", e);
+		}
+		LOG.info("Velo Rewind verify: {} frames, {} ticks, {} undecodable, packets {}", frames, ticks, bad, counts);
+	}
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static boolean decode(NetworkState<?> info, byte[] body, Map<String, Integer> counts, String prefix) {
+		ByteBuf buf = Unpooled.wrappedBuffer(body);
+		try {
+			Object packet = ((PacketCodec<ByteBuf, Packet>) (PacketCodec) info.codec()).decode(buf);
+			counts.merge(prefix + packet.getClass().getSimpleName(), 1, Integer::sum);
+			return buf.readableBytes() == 0;
+		} catch (Throwable t) {
+			counts.merge(prefix + "ERROR " + t.getClass().getSimpleName(), 1, Integer::sum);
+			return false;
+		}
+	}
+
+	public static String status() {
+		RewindWriter w = writer;
+		if (w == null) {
+			return "";
+		}
+		int s = w.ticks() / 20;
+		return (state == State.PAUSED ? "Paused " : "REC ") + String.format("%d:%02d", s / 60, s % 60);
+	}
+
+	private static void spawnSelf(ClientPlayerEntity p) {
+		selfId = p.getId();
+		selfSpawn = false;
+		lastData.clear();
+		java.util.Arrays.fill(lastEquip, null);
+		writer.packet(addEntity(p), playProtocol);
+		List<DataTracker.SerializedEntry<?>> all = dataChanges(p, true);
+		if (!all.isEmpty()) {
+			writer.packet(new EntityTrackerUpdateS2CPacket(p.getId(), all), playProtocol);
+		}
+	}
+
+	// The player's entity data that changed since last tick (all of it when {@code all}); read straight from its items,
+	// since the client never marks its own changes dirty.
+	private static List<DataTracker.SerializedEntry<?>> dataChanges(ClientPlayerEntity p, boolean all) {
+		List<DataTracker.SerializedEntry<?>> out = new ArrayList<>();
+		for (DataTracker.Entry<?> item : items(p.getDataTracker())) {
+			if (item == null) {
+				continue;
+			}
+			DataTracker.SerializedEntry<?> v = item.toSerialized();
+			Object now = v.value();
+			Object was = lastData.get(v.id());
+			if (all || !lastData.containsKey(v.id()) || !same(was, now)) {
+				lastData.put(v.id(), now instanceof ItemStack s ? s.copy() : now);
+				out.add(v);
+			}
+		}
+		return out;
+	}
+
+	private static boolean same(Object a, Object b) {
+		if (a instanceof ItemStack x && b instanceof ItemStack y) {
+			return ItemStack.areEqual(x, y);
+		}
+		return java.util.Objects.equals(a, b);
+	}
+
+	private static java.lang.reflect.Field itemsField;
+
+	private static DataTracker.Entry<?>[] items(DataTracker data) {
+		try {
+			if (itemsField == null) {
+				itemsField = RewindCompat.field(DataTracker.class, "entries", "field_13331");
+				itemsField.setAccessible(true);
+			}
+			return (DataTracker.Entry<?>[]) itemsField.get(data);
+		} catch (ReflectiveOperationException e) {
+			return new DataTracker.Entry<?>[0];
+		}
+	}
+
+	// ---- the snapshot: the world as the client has it, as packets ----
+
+	private static void snapshot() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		ClientWorld level = mc.world;
+		ClientPlayNetworkHandler conn = mc.getNetworkHandler();
+		ClientPlayerEntity self = mc.player;
+		if (level == null || conn == null || self == null) {
+			writer.snapshotEnd();
+			return;
+		}
+		long t0 = System.nanoTime();
+		writer.packet(login, playProtocol);
+		if (respawn != null) {
+			writer.packet(respawn, playProtocol);
+		}
+		for (Packet<?> p : STICKY.values()) {
+			writer.packet(p, playProtocol);
+		}
+		writer.packet(playerInfo(conn), playProtocol);
+		writer.packet(new WorldBorderInitializeS2CPacket(level.getWorldBorder()), playProtocol);
+		ChunkPos center = self.getChunkPos();
+		writer.packet(new ChunkRenderDistanceCenterS2CPacket(center.x, center.z), playProtocol);
+		int radius = Math.min(34, mc.options.getClampedViewDistance() + 2);
+		int chunks = 0;
+		for (int dx = -radius; dx <= radius; dx++) {
+			for (int dz = -radius; dz <= radius; dz++) {
+				WorldChunk chunk = level.getChunkManager().getChunk(center.x + dx, center.z + dz, ChunkStatus.FULL, false);
+				if (chunk != null && !chunk.isEmpty()) {
+					writer.packet(new ChunkDataS2CPacket(chunk, level.getLightingProvider(), null, null), playProtocol);
+					chunks++;
+				}
+			}
+		}
+		int entities = 0;
+		List<Entity> riders = new ArrayList<>();
+		for (Entity e : level.getEntities()) {
+			if (e == self) {
+				continue;
+			}
+			writer.packet(addEntity(e), playProtocol);
+			List<DataTracker.SerializedEntry<?>> data = e.getDataTracker().getChangedEntries();
+			if (data != null && !data.isEmpty()) {
+				writer.packet(new EntityTrackerUpdateS2CPacket(e.getId(), data), playProtocol);
+			}
+			if (e instanceof LivingEntity living) {
+				List<Pair<EquipmentSlot, ItemStack>> equip = new ArrayList<>();
+				for (EquipmentSlot slot : EquipmentSlot.values()) {
+					ItemStack stack = living.getEquippedStack(slot);
+					if (!stack.isEmpty()) {
+						equip.add(Pair.of(slot, stack.copy()));
+					}
+				}
+				if (!equip.isEmpty()) {
+					writer.packet(new EntityEquipmentUpdateS2CPacket(e.getId(), equip), playProtocol);
+				}
+			}
+			if (!e.getPassengerList().isEmpty()) {
+				riders.add(e);
+			}
+			entities++;
+		}
+		for (Entity vehicle : riders) {
+			writer.packet(new EntityPassengersSetS2CPacket(vehicle), playProtocol);
+		}
+		spawnSelf(self);
+		// boss bars and the scoreboard (sidebar, tab list, teams) as they are now - later updates refer to them
+		try {
+			for (Object event : bossEvents(mc)) {
+				writer.packet(net.minecraft.network.packet.s2c.play.BossBarS2CPacket.add((net.minecraft.entity.boss.BossBar) event), playProtocol);
+			}
+			var board = level.getScoreboard();
+			for (var objective : board.getObjectives()) {
+				writer.packet(new net.minecraft.network.packet.s2c.play.ScoreboardObjectiveUpdateS2CPacket(objective, 0), playProtocol);
+				for (var entry : board.getScoreboardEntries(objective)) {
+					writer.packet(new net.minecraft.network.packet.s2c.play.ScoreboardScoreUpdateS2CPacket(entry.owner(), objective.getName(), entry.value(),
+							java.util.Optional.ofNullable(entry.display()), java.util.Optional.ofNullable(entry.numberFormatOverride())), playProtocol);
+				}
+			}
+			for (var slot : net.minecraft.scoreboard.ScoreboardDisplaySlot.values()) {
+				var shown = board.getObjectiveForSlot(slot);
+				if (shown != null) {
+					writer.packet(new net.minecraft.network.packet.s2c.play.ScoreboardDisplayS2CPacket(slot, shown), playProtocol);
+				}
+			}
+			for (var team : board.getTeams()) {
+				writer.packet(net.minecraft.network.packet.s2c.play.TeamS2CPacket.updateTeam(team, true), playProtocol);
+			}
+		} catch (RuntimeException e) {
+			LOG.warn("Velo Rewind: no boss bars / scoreboard in the snapshot", e);
+		}
+		if (level.isRaining()) {
+			writer.packet(new GameStateChangeS2CPacket(GameStateChangeS2CPacket.RAIN_STARTED, 0f), playProtocol);
+			writer.packet(new GameStateChangeS2CPacket(GameStateChangeS2CPacket.RAIN_GRADIENT_CHANGED, level.getRainGradient(1f)), playProtocol);
+			writer.packet(new GameStateChangeS2CPacket(GameStateChangeS2CPacket.THUNDER_GRADIENT_CHANGED, level.getThunderGradient(1f)), playProtocol);
+		}
+		writer.snapshotEnd();
+		LOG.info("Velo Rewind snapshot: {} chunks, {} entities in {} ms", chunks, entities, (System.nanoTime() - t0) / 1_000_000);
+	}
+
+	private static java.lang.reflect.Field bossEventsField;
+
+	private static java.util.Collection<?> bossEvents(MinecraftClient mc) {
+		try {
+			Object overlay = mc.inGameHud.getBossBarHud();
+			if (bossEventsField == null) {
+				for (java.lang.reflect.Field f : overlay.getClass().getDeclaredFields()) {
+					if (java.util.Map.class.isAssignableFrom(f.getType())) {
+						f.setAccessible(true);
+						bossEventsField = f;
+						break;
+					}
+				}
+			}
+			return ((java.util.Map<?, ?>) bossEventsField.get(overlay)).values();
+		} catch (ReflectiveOperationException | RuntimeException e) {
+			return java.util.List.of();
+		}
+	}
+
+	private static EntitySpawnS2CPacket addEntity(Entity e) {
+		int data = 0;
+		if (e instanceof FallingBlockEntity falling) {
+			data = Block.getRawIdFromState(falling.getBlockState());
+		} else if (e instanceof AbstractDecorationEntity hanging) {
+			data = hanging.getHorizontalFacing().getIndex();
+		} else if (e instanceof ProjectileEntity projectile && projectile.getOwner() != null) {
+			data = projectile.getOwner().getId();
+		}
+		EntityType<?> type = e.getType();
+		return new EntitySpawnS2CPacket(e.getId(), e.getUuid(), e.getX(), e.getY(), e.getZ(), e.getPitch(), e.getYaw(), type, data,
+				e.getVelocity(), e.getHeadYaw());
+	}
+
+	private static java.lang.reflect.Field entriesField;
+
+	// Everyone in the tab list (and the hidden ones the server told us about) - the packet has no public way to build it
+	// from client-side entries, so they go in after construction.
+	private static PlayerListS2CPacket playerInfo(ClientPlayNetworkHandler conn) {
+		EnumSet<PlayerListS2CPacket.Action> actions = EnumSet.of(PlayerListS2CPacket.Action.ADD_PLAYER,
+				PlayerListS2CPacket.Action.UPDATE_GAME_MODE, PlayerListS2CPacket.Action.UPDATE_LISTED,
+				PlayerListS2CPacket.Action.UPDATE_LATENCY, PlayerListS2CPacket.Action.UPDATE_DISPLAY_NAME,
+				PlayerListS2CPacket.Action.UPDATE_HAT, PlayerListS2CPacket.Action.UPDATE_LIST_ORDER);
+		PlayerListS2CPacket packet = new PlayerListS2CPacket(actions, List.of());
+		List<PlayerListS2CPacket.Entry> entries = new ArrayList<>();
+		java.util.Collection<PlayerListEntry> listed = conn.getListedPlayerListEntries();
+		for (PlayerListEntry info : conn.getPlayerList()) {
+			entries.add(new PlayerListS2CPacket.Entry(info.getProfile().id(), info.getProfile(), listed.contains(info),
+					info.getLatency(), info.getGameMode(), info.getDisplayName(), info.shouldShowHat(), info.getListOrder(), null));
+		}
+		// NPCs (FancyNPCs, Citizens, ...): fake players whose list entry the server removed right after spawning them - the
+		// client keeps drawing them, but a replay can't spawn a player without an entry, so they get an unlisted one
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (mc.world != null) {
+			for (var pl : mc.world.getPlayers()) {
+				// also yourself: servers that hide you from your own tab list left the replay without an entry for you
+				if (conn.getPlayerListEntry(pl.getUuid()) == null) {
+					entries.add(new PlayerListS2CPacket.Entry(pl.getUuid(), pl.getGameProfile(), false, 0,
+							net.minecraft.world.GameMode.SURVIVAL, null, true, 0, null));
+				}
+			}
+		}
+		try {
+			if (entriesField == null) {
+				entriesField = RewindCompat.field(PlayerListS2CPacket.class, "entries", "field_12369");
+				entriesField.setAccessible(true);
+			}
+			entriesField.set(packet, entries);
+		} catch (ReflectiveOperationException e) {
+			LOG.warn("Velo Rewind: couldn't write the player list", e);
+		}
+		return packet;
+	}
+
+	// ---- encoding (writer thread) ----
+
+	private static final Set<String> FAILED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static void encode(Object packet, Object protocol, java.util.function.Consumer<byte[]> out) {
+		if (packet instanceof BundlePacket<?> bundle) {
+			for (Packet<?> sub : bundle.getPackets()) {
+				encode(sub, protocol, out);
+			}
+			return;
+		}
+		NetworkState<?> info = (NetworkState<?>) protocol;
+		if (info == null) {
+			return;
+		}
+		ByteBuf buf = Unpooled.buffer(256);
+		try {
+			((PacketCodec<ByteBuf, Packet>) (PacketCodec) info.codec()).encode(buf, (Packet) packet);
+			byte[] bytes = new byte[buf.readableBytes()];
+			buf.readBytes(bytes);
+			out.accept(bytes);
+		} catch (Throwable t) {
+			if (FAILED.add(packet.getClass().getName())) {
+				LOG.warn("Velo Rewind can't record {}: {}", packet.getClass().getSimpleName(), t.toString());
+			}
+		} finally {
+			buf.release();
+		}
+	}
+
+	private static void say(String text) {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (mc.player != null) {
+			mc.player.sendMessage(Text.literal(text), true);
+		}
+	}
+
+	private static String json(String s) {
+		return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+	}
+}
+//?} else if <26.2 {
+/*public final class RewindRecorder {
 
 	private RewindRecorder() {
 	}
@@ -40,7 +866,7 @@ public final class RewindRecorder {
 	public static void testTick() {
 	}
 }
-//?} else {
+*///?} else {
 /*import com.mojang.datafixers.util.Pair;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;

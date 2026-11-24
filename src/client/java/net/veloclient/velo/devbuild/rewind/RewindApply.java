@@ -5,8 +5,584 @@ package net.veloclient.velo.devbuild.rewind;
  * roll and FOV (RewindCameraMixin asks), playback speed, time of day, rain, thunder, fog, hidden entities and swapped skins.
  * The value comes from the playhead, or from where the timeline is being dragged (live preview).
  */
-//? if <26.2 {
+//? if >=1.21.11 && <26.1 {
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.Entity;
+
 public final class RewindApply {
+
+	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("Velo Rewind");
+
+	// Set by the editor while the playhead is dragged (clip ticks), else -1.
+	static volatile double previewTick = -1;
+	// Camera keyframes drive the view while playing / dragging; paused you fly freely (to set up the next keyframe) unless this is on.
+	static volatile boolean previewCamera;
+
+	private RewindApply() {
+	}
+
+	private static double tickNow(RewindPlayer p, float partial) {
+		if (previewTick >= 0) {
+			return previewTick;
+		}
+		return p.clipPosition() + (p.paused() ? 0 : partial);
+	}
+
+	private static boolean cameraDriven(RewindPlayer p) {
+		RewindEdits.Clip c = p.edits.clip();
+		boolean hasPath = has(c, "cam_x") || has(c, "cam_y") || has(c, "cam_z") || has(c, "cam_yaw") || has(c, "cam_pitch");
+		return hasPath && (!p.paused() || previewTick >= 0 || previewCamera);
+	}
+
+	private static boolean has(RewindEdits.Clip c, String id) {
+		RewindEdits.Track t = c.tracks.get(id);
+		return t != null && t.active();
+	}
+
+	// ---- asked by RewindCameraMixin every frame ----
+
+	public static double[] camera(float partial) {
+		RewindPlayer p = RewindPlayer.current();
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (p != null && mc.player != null && followTarget != null) {
+			double[] f = followPose(mc, partial);
+			if (f != null) {
+				syncViewer(mc, f);
+				return f;
+			}
+		}
+		if (p == null || mc.player == null || !cameraDriven(p)) {
+			return null;
+		}
+		RewindEdits.Clip c = p.edits.clip();
+		double t = tickNow(p, partial);
+		var eye = mc.player.getCameraPosVec(partial);
+		double[] out = {
+				or(c.value("cam_x", t), eye.x), or(c.value("cam_y", t), eye.y), or(c.value("cam_z", t), eye.z),
+				or(c.value("cam_yaw", t), mc.player.getYaw(partial)), or(c.value("cam_pitch", t), mc.player.getPitch(partial))};
+		syncViewer(mc, out);
+		return out;
+	}
+
+	// The (invisible) viewer looks where the camera looks: culling and everything else that goes by the player's view
+	// (entity culling, visibility caches) then matches what's on screen instead of what's behind it.
+	private static void syncViewer(MinecraftClient mc, double[] out) {
+		mc.player.setYaw((float) out[3]);
+		mc.player.setPitch((float) out[4]);
+		mc.player.lastYaw = (float) out[3];
+		mc.player.lastPitch = (float) out[4];
+		mc.player.setHeadYaw((float) out[3]);
+	}
+
+	// ---- follow: the camera keeps an entity (player, item, mob) in view and moves with it ----
+
+	public static volatile java.util.UUID followTarget;
+	// "behind" (over its shoulder, turning with it), "orbit" (circling it), "fixed" (same offset as when it started)
+	public static volatile String followMode = "behind";
+	public static volatile double followDistance = 4.5;
+	public static volatile double followHeight = 1.2;
+	public static volatile double followSpeed = 20; // orbit: degrees per second
+	private static double[] followCam;
+	private static net.minecraft.util.math.Vec3d followOffset;
+	private static long followLast;
+	private static double followAngle;
+
+	public static void follow(java.util.UUID target, String mode) {
+		followTarget = target;
+		if (mode != null) {
+			followMode = mode;
+		}
+		followCam = null;
+		followOffset = null;
+		followLast = 0;
+	}
+
+	static Entity followed() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		java.util.UUID id = followTarget;
+		if (id == null || mc.world == null) {
+			return null;
+		}
+		for (Entity e : mc.world.getEntities()) {
+			if (id.equals(e.getUuid())) {
+				return e;
+			}
+		}
+		return null;
+	}
+
+	private static double[] followPose(MinecraftClient mc, float partial) {
+		Entity e = followed();
+		if (e == null) {
+			return null; // out of the recording's range for now: the camera stays as it was
+		}
+		var at = e.getLerpedPos(partial).add(0, Math.min(1.6, e.getHeight() * 0.7), 0);
+		long now = System.nanoTime();
+		double dt = followLast == 0 ? 0 : Math.min(0.1, (now - followLast) / 1e9);
+		followLast = now;
+		net.minecraft.util.math.Vec3d want;
+		switch (followMode) {
+			case "orbit" -> {
+				followAngle += Math.toRadians(followSpeed) * dt;
+				want = at.add(Math.sin(followAngle) * followDistance, followHeight, Math.cos(followAngle) * followDistance);
+			}
+			case "fixed" -> {
+				if (followOffset == null) {
+					var cam = mc.gameRenderer.getCamera().getCameraPos();
+					followOffset = cam.subtract(at);
+				}
+				want = at.add(followOffset);
+			}
+			default -> {
+				// over the shoulder: behind where it looks (an item has no look - behind where it's going, else as before)
+				double yaw;
+				if (e instanceof net.minecraft.entity.LivingEntity living) {
+					yaw = Math.toRadians(living.getYaw(partial));
+				} else {
+					var v = e.getVelocity();
+					yaw = v.horizontalLengthSquared() > 1e-4 ? Math.atan2(-v.x, v.z) : Math.toRadians(followCam != null ? followCam[3] : 0);
+				}
+				want = at.add(Math.sin(yaw) * followDistance, followHeight, -Math.cos(yaw) * followDistance);
+			}
+		}
+		// never inside a wall or a tree: stop in front of whatever is between it and the camera
+		var hit = mc.world.raycast(new net.minecraft.world.RaycastContext(at, want, net.minecraft.world.RaycastContext.ShapeType.VISUAL,
+				net.minecraft.world.RaycastContext.FluidHandling.NONE, mc.player));
+		if (hit.getType() == net.minecraft.util.hit.HitResult.Type.BLOCK) {
+			var back = at.subtract(hit.getPos());
+			want = hit.getPos().add(back.lengthSquared() > 1e-6 ? back.normalize().multiply(0.35) : back);
+		}
+		double[] cam = followCam;
+		if (cam == null) {
+			cam = new double[] {want.x, want.y, want.z, 0, 0};
+		} else {
+			double k = 1 - Math.exp(-dt * 6); // smooth, not glued
+			cam[0] += (want.x - cam[0]) * k;
+			cam[1] += (want.y - cam[1]) * k;
+			cam[2] += (want.z - cam[2]) * k;
+		}
+		double dx = at.x - cam[0];
+		double dy = at.y - cam[1];
+		double dz = at.z - cam[2];
+		cam[3] = Math.toDegrees(Math.atan2(-dx, dz));
+		cam[4] = -Math.toDegrees(Math.atan2(dy, Math.hypot(dx, dz)));
+		followCam = cam;
+		return cam.clone();
+	}
+
+	public static float rollRadians() {
+		RewindPlayer p = RewindPlayer.current();
+		if (p == null) {
+			return 0f;
+		}
+		Double roll = p.edits.clip().value("cam_roll", tickNow(p, MinecraftClient.getInstance().getRenderTickCounter().getTickProgress(false)));
+		return roll == null ? 0f : (float) Math.toRadians(-roll);
+	}
+
+	public static Float fov() {
+		RewindPlayer p = RewindPlayer.current();
+		if (p == null) {
+			return null;
+		}
+		Double fov = p.edits.clip().value("fov", tickNow(p, MinecraftClient.getInstance().getRenderTickCounter().getTickProgress(false)));
+		return fov == null ? null : fov.floatValue();
+	}
+
+	private static double or(Double v, double fallback) {
+		return v == null ? fallback : v;
+	}
+
+	// ---- the camera, drawn in the world (Blender-like) while you fly freely ----
+
+	static void registerGizmo() {
+		net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context -> drawCamera());
+	}
+
+	private static void drawCamera() {
+		RewindPlayer p = RewindPlayer.current();
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (p == null || mc.player == null || cameraDriven(p) || RewindExport.busy()) {
+			return;
+		}
+		RewindEdits.Clip c = p.edits.clip();
+		if (!(has(c, "cam_x") || has(c, "cam_y") || has(c, "cam_z"))) {
+			return;
+		}
+		double t = previewTick >= 0 ? previewTick : p.clipPosition();
+		// the path: sampled along the clip, keyframes marked
+		net.minecraft.util.math.Vec3d prev = null;
+		for (int k = 0; k <= c.length; k += 2) {
+			net.minecraft.util.math.Vec3d at = pos(c, k);
+			if (at == null) {
+				break;
+			}
+			if (prev != null) {
+				net.minecraft.world.debug.gizmo.GizmoDrawing.line(prev, at, 0xB0F7C04A, 1.5f);
+			}
+			prev = at;
+		}
+		java.util.Set<Integer> keys = new java.util.TreeSet<>();
+		for (String id : new String[] {"cam_x", "cam_y", "cam_z"}) {
+			RewindEdits.Track tr = c.tracks.get(id);
+			if (tr != null) {
+				keys.addAll(tr.keys.keySet());
+			}
+		}
+		for (int k : keys) {
+			net.minecraft.util.math.Vec3d at = pos(c, k);
+			if (at != null) {
+				double r = 0.12;
+				net.minecraft.world.debug.gizmo.GizmoDrawing.line(at.add(-r, 0, 0), at.add(r, 0, 0), 0xFFF7C04A, 3f);
+				net.minecraft.world.debug.gizmo.GizmoDrawing.line(at.add(0, -r, 0), at.add(0, r, 0), 0xFFF7C04A, 3f);
+				net.minecraft.world.debug.gizmo.GizmoDrawing.line(at.add(0, 0, -r), at.add(0, 0, r), 0xFFF7C04A, 3f);
+			}
+		}
+		// the camera at the playhead: a pyramid towards what it sees, the frame in the export's shape, a triangle on top
+		net.minecraft.util.math.Vec3d eye = pos(c, t);
+		if (eye == null) {
+			return;
+		}
+		double yaw = Math.toRadians(or(c.value("cam_yaw", t), 0));
+		double pitch = Math.toRadians(or(c.value("cam_pitch", t), 0));
+		double roll = Math.toRadians(or(c.value("cam_roll", t), 0));
+		net.minecraft.util.math.Vec3d fwd = new net.minecraft.util.math.Vec3d(-Math.sin(yaw) * Math.cos(pitch), -Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+		net.minecraft.util.math.Vec3d right = new net.minecraft.util.math.Vec3d(-Math.cos(yaw), 0, -Math.sin(yaw));
+		net.minecraft.util.math.Vec3d up = right.crossProduct(fwd).normalize();
+		// roll turns right/up around the view direction
+		net.minecraft.util.math.Vec3d r2 = right.multiply(Math.cos(roll)).add(up.multiply(Math.sin(roll)));
+		net.minecraft.util.math.Vec3d u2 = up.multiply(Math.cos(roll)).subtract(right.multiply(Math.sin(roll)));
+		double aspect = RewindEditorScreen.frameAspect();
+		double fovV = Math.toRadians(or(c.value("fov", t), mc.options.getFov().getValue()));
+		double d = 1.4;
+		double hh = Math.tan(fovV / 2) * d * 0.6;
+		double hw = hh * aspect;
+		net.minecraft.util.math.Vec3d centre = eye.add(fwd.multiply(d));
+		net.minecraft.util.math.Vec3d[] corner = {
+				centre.add(r2.multiply(-hw)).add(u2.multiply(hh)), centre.add(r2.multiply(hw)).add(u2.multiply(hh)),
+				centre.add(r2.multiply(hw)).add(u2.multiply(-hh)), centre.add(r2.multiply(-hw)).add(u2.multiply(-hh))};
+		int col = 0xFFFFFFFF;
+		for (int i = 0; i < 4; i++) {
+			net.minecraft.world.debug.gizmo.GizmoDrawing.line(eye, corner[i], col, 2f);
+			net.minecraft.world.debug.gizmo.GizmoDrawing.line(corner[i], corner[(i + 1) % 4], col, 2.5f);
+		}
+		net.minecraft.util.math.Vec3d topMid = centre.add(u2.multiply(hh));
+		net.minecraft.util.math.Vec3d tip = topMid.add(u2.multiply(hh * 0.55));
+		net.minecraft.world.debug.gizmo.GizmoDrawing.line(topMid.add(r2.multiply(-hw * 0.35)), tip, 0xFFFF5A5F, 2.5f);
+		net.minecraft.world.debug.gizmo.GizmoDrawing.line(tip, topMid.add(r2.multiply(hw * 0.35)), 0xFFFF5A5F, 2.5f);
+		net.minecraft.world.debug.gizmo.GizmoDrawing.line(topMid.add(r2.multiply(hw * 0.35)), topMid.add(r2.multiply(-hw * 0.35)), 0xFFFF5A5F, 2.5f);
+		// a ray to where it looks
+		net.minecraft.world.debug.gizmo.GizmoDrawing.line(centre, eye.add(fwd.multiply(6)), 0x60FFFFFF, 1f);
+	}
+
+	private static net.minecraft.util.math.Vec3d pos(RewindEdits.Clip c, double t) {
+		Double x = c.value("cam_x", t);
+		Double y = c.value("cam_y", t);
+		Double z = c.value("cam_z", t);
+		if (x == null || y == null || z == null) {
+			return null;
+		}
+		return new net.minecraft.util.math.Vec3d(x, y, z);
+	}
+
+	// ---- backgrounds (RewindBackgroundMixin / RewindChunkMixin / RewindSodiumChunkMixin, every frame) ----
+
+	private static String background() {
+		RewindPlayer p = RewindPlayer.current();
+		if (p == null) {
+			return "World";
+		}
+		String b = p.edits.clip().background;
+		return b == null ? "World" : b;
+	}
+
+	public static boolean hideTerrain() {
+		return !"World".equals(background());
+	}
+
+	// The flat colour behind everything (RGB), or -1 for the world's own sky.
+	public static int backgroundColor() {
+		return switch (background()) {
+			case "Green screen" -> 0x00B140;
+			case "Blue screen" -> 0x0047BB;
+			case "Black" -> 0x000000;
+			default -> -1;
+		};
+	}
+
+	// ---- how entities look (RewindRenderMixin, RewindGlowMixin, RewindTeamColorMixin, RewindNameMixin) ----
+
+	static {
+		net.veloclient.velo.client.cosmetics.CosmeticHide.test = (uuid, part) -> {
+			RewindPlayer p = RewindPlayer.current();
+			if (p == null) {
+				return false;
+			}
+			var all = p.edits.clip().hideParts;
+			var parts = all == null ? null : all.get(uuid);
+			return parts != null && parts.contains(part);
+		};
+	}
+
+	// Editing (editor open or flying around the viewport) - not the final render: no outlines there, hidden ones gone.
+	private static boolean editorShown() {
+		return !RewindExport.busy();
+	}
+
+	private static boolean hiddenInClip(Entity e) {
+		RewindPlayer p = RewindPlayer.current();
+		return p != null && p.edits.clip().hidden.contains(e.getUuid().toString());
+	}
+
+	// Hidden entities: drawn (outlined red) while editing, left out of the exported video. Name holograms of players
+	// whose names are hidden: never drawn.
+	public static boolean renderEntity(Entity e) {
+		if (!RewindPlayer.active()) {
+			return true;
+		}
+		return !(HOLOGRAMS_HIDDEN.contains(e.getId()) || hiddenInClip(e) && !editorShown());
+	}
+
+	// null = as the game decides.
+	public static Boolean glowing(Entity e) {
+		if (!RewindPlayer.active()) {
+			return null;
+		}
+		if (editorShown() && (e == RewindEditorScreen.selectedEntity() || hiddenInClip(e))) {
+			return true;
+		}
+		if (net.veloclient.velo.client.cosmetics.CosmeticHide.hidden(e.getUuid(), "glow")) {
+			return false;
+		}
+		return null;
+	}
+
+	// Outline colour: white for the selection, red for hidden ones; -1 = the entity's own.
+	public static int outlineColor(Entity e) {
+		if (!RewindPlayer.active() || !editorShown()) {
+			return -1;
+		}
+		if (hiddenInClip(e)) {
+			return 0xFF4D57;
+		}
+		return e == RewindEditorScreen.selectedEntity() ? 0xFFFFFF : -1;
+	}
+
+	public static boolean showName(Entity e) {
+		return !(RewindPlayer.active() && NAME_HIDDEN.contains(e.getId()));
+	}
+
+	// ---- names: entities whose name tag / score line is hidden, and name holograms left out (recomputed every tick) ----
+
+	private static final it.unimi.dsi.fastutil.ints.IntOpenHashSet NAME_HIDDEN = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
+	private static final it.unimi.dsi.fastutil.ints.IntOpenHashSet HOLOGRAMS_HIDDEN = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
+
+	static {
+		net.veloclient.velo.client.pvp.NameTagLines.hidden = id -> RewindPlayer.active() && NAME_HIDDEN.contains(id);
+	}
+
+	public static boolean nameHidden(Entity e) {
+		return RewindPlayer.active() && NAME_HIDDEN.contains(e.getId());
+	}
+
+	private static boolean playerNameHidden(RewindEdits.Clip c, Entity e) {
+		if (c.hideNames) {
+			return true;
+		}
+		var parts = c.hideParts == null ? null : c.hideParts.get(e.getUuid().toString());
+		return parts != null && parts.contains("nametag");
+	}
+
+	// A server's name / rank / money hologram: a text display, or an invisible armour stand showing a name.
+	private static boolean hologram(Entity e) {
+		return e instanceof net.minecraft.entity.decoration.DisplayEntity.TextDisplayEntity
+				|| e instanceof net.minecraft.entity.decoration.ArmorStandEntity stand && stand.isInvisible() && stand.isCustomNameVisible();
+	}
+
+	private static void updateNames(MinecraftClient mc, RewindEdits.Clip c) {
+		NAME_HIDDEN.clear();
+		HOLOGRAMS_HIDDEN.clear();
+		java.util.List<Entity> heads = new java.util.ArrayList<>();
+		for (Entity e : mc.world.getEntities()) {
+			if (e instanceof net.minecraft.entity.player.PlayerEntity && e != mc.player && playerNameHidden(c, e)) {
+				NAME_HIDDEN.add(e.getId());
+				heads.add(e);
+			} else if (c.hideNames && e != mc.player) {
+				NAME_HIDDEN.add(e.getId());
+			}
+		}
+		for (Entity e : mc.world.getEntities()) {
+			if (!hologram(e)) {
+				continue;
+			}
+			boolean hide = c.hideNames;
+			for (Entity v = e.getVehicle(); !hide && v != null; v = v.getVehicle()) {
+				hide = NAME_HIDDEN.contains(v.getId()) && v instanceof net.minecraft.entity.player.PlayerEntity;
+			}
+			for (int i = 0; !hide && i < heads.size(); i++) {
+				// floating just above a hidden player's head (plugins that teleport it there every tick)
+				Entity h = heads.get(i);
+				double dx = e.getX() - h.getX();
+				double dz = e.getZ() - h.getZ();
+				double dy = e.getY() - h.getEyeY();
+				hide = dx * dx + dz * dz < 0.8 * 0.8 && dy > -0.6 && dy < 2.8;
+			}
+			if (hide) {
+				HOLOGRAMS_HIDDEN.add(e.getId());
+			}
+		}
+	}
+
+	// ---- every game tick ----
+
+	private static float lastSpeed = -1;
+
+	static void tick() {
+		RewindPlayer p = RewindPlayer.current();
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (p == null || mc.world == null || mc.player == null) {
+			net.veloclient.velo.client.modules.rendering.TimeWeatherFogModule.externalFogThickness = null;
+			lastSpeed = -1;
+			return;
+		}
+		RewindEdits.Clip c = p.edits.clip();
+		double t = tickNow(p, 0);
+		Double speed = c.value("speed", t);
+		if (speed != null && Math.abs(speed - lastSpeed) > 0.01 && previewTick < 0) {
+			lastSpeed = speed.floatValue();
+			p.setSpeed(lastSpeed);
+		}
+		Double time = c.value("time", t);
+		if (time != null) {
+			setTime(mc, Math.round(time));
+		}
+		Double rain = c.value("rain", t);
+		if (backgroundColor() >= 0) {
+			rain = 0.0; // a flat background: no rain splashing on ground that isn't drawn
+		}
+		if (rain != null) {
+			mc.world.setRainGradient(rain.floatValue());
+		}
+		Double thunder = c.value("thunder", t);
+		if (thunder != null) {
+			mc.world.setThunderGradient(thunder.floatValue());
+		}
+		net.veloclient.velo.client.modules.rendering.TimeWeatherFogModule.externalFogThickness = c.value("fog", t);
+		// the camera path also carries the (invisible) viewer along, so chunks load where the camera is
+		double[] cam = camera(0);
+		if (cam != null) {
+			mc.player.setPosition(cam[0], cam[1] - mc.player.getStandingEyeHeight(), cam[2]);
+		}
+		// hidden entities stay in the world (RewindLookMixins skip drawing them outside the editor, outline them inside)
+		updateNames(mc, c);
+		applySkins(mc, c);
+	}
+
+	private static void setTime(MinecraftClient mc, long ticks) {
+		long day = mc.world.getTimeOfDay();
+		long target = Math.floorDiv(day, 24000L) * 24000L + Math.floorMod(ticks, 24000L);
+		mc.world.setTime(mc.world.getTime(), target, false);
+	}
+
+	// ---- skins: a player name or a PNG per entity ----
+
+	private static final Map<String, Object> SKINS = new ConcurrentHashMap<>();   // source -> PlayerSkin (or a String error / "loading")
+	private static java.lang.reflect.Field skinLookup;
+
+	@SuppressWarnings("unchecked")
+	private static void applySkins(MinecraftClient mc, RewindEdits.Clip c) {
+		if (c.skins.isEmpty() || mc.getNetworkHandler() == null) {
+			return;
+		}
+		for (var e : c.skins.entrySet()) {
+			Object skin = SKINS.computeIfAbsent(e.getValue(), RewindApply::load);
+			if (!(skin instanceof net.minecraft.entity.player.SkinTextures playerSkin)) {
+				continue;
+			}
+			var info = mc.getNetworkHandler().getPlayerListEntry(UUID.fromString(e.getKey()));
+			if (info == null) {
+				continue;
+			}
+			try {
+				if (skinLookup == null) {
+					skinLookup = RewindCompat.field(net.minecraft.client.network.PlayerListEntry.class, "texturesSupplier", "field_45607");
+					skinLookup.setAccessible(true);
+				}
+				var current = (java.util.function.Supplier<net.minecraft.entity.player.SkinTextures>) skinLookup.get(info);
+				if (current == null || current.get() != playerSkin) {
+					skinLookup.set(info, (java.util.function.Supplier<net.minecraft.entity.player.SkinTextures>) () -> playerSkin);
+				}
+			} catch (ReflectiveOperationException ex) {
+				LOG.warn("Velo Rewind: can't swap a skin", ex);
+				return;
+			}
+		}
+	}
+
+	// Status of a skin source for the panel: null = ready, else a short text.
+	static String skinStatus(String source) {
+		Object s = SKINS.get(source);
+		return s instanceof String text ? text : null;
+	}
+
+	static void forgetSkin(String source) {
+		SKINS.remove(source);
+	}
+
+	private static Object load(String source) {
+		Thread.ofVirtual().start(() -> {
+			try {
+				byte[] png;
+				boolean slim = false;
+				if (source.toLowerCase().endsWith(".png")) {
+					png = java.nio.file.Files.readAllBytes(java.nio.file.Path.of(source));
+				} else {
+					var http = java.net.http.HttpClient.newHttpClient();
+					var r1 = http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create("https://api.mojang.com/users/profiles/minecraft/" + source)).build(),
+							java.net.http.HttpResponse.BodyHandlers.ofString());
+					if (r1.statusCode() != 200) {
+						SKINS.put(source, "No player called " + source);
+						return;
+					}
+					String id = com.google.gson.JsonParser.parseString(r1.body()).getAsJsonObject().get("id").getAsString();
+					var r2 = http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create("https://sessionserver.mojang.com/session/minecraft/profile/" + id)).build(),
+							java.net.http.HttpResponse.BodyHandlers.ofString());
+					String textures = null;
+					for (var prop : com.google.gson.JsonParser.parseString(r2.body()).getAsJsonObject().getAsJsonArray("properties")) {
+						if (prop.getAsJsonObject().get("name").getAsString().equals("textures")) {
+							textures = new String(java.util.Base64.getDecoder().decode(prop.getAsJsonObject().get("value").getAsString()), java.nio.charset.StandardCharsets.UTF_8);
+						}
+					}
+					var skinJson = com.google.gson.JsonParser.parseString(textures).getAsJsonObject().getAsJsonObject("textures").getAsJsonObject("SKIN");
+					slim = skinJson.has("metadata") && "slim".equals(skinJson.getAsJsonObject("metadata").get("model").getAsString());
+					png = http.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(skinJson.get("url").getAsString())).build(),
+							java.net.http.HttpResponse.BodyHandlers.ofByteArray()).body();
+				}
+				boolean slimArms = slim;
+				byte[] bytes = png;
+				MinecraftClient.getInstance().execute(() -> {
+					try {
+						var image = net.minecraft.client.texture.NativeImage.read(bytes);
+						var id = net.minecraft.util.Identifier.of("velo-client", "rewind/skin_" + Integer.toHexString(source.hashCode()));
+						MinecraftClient.getInstance().getTextureManager().registerTexture(id, new net.minecraft.client.texture.NativeImageBackedTexture(() -> "rewind skin", image));
+						var texture = new net.minecraft.util.AssetInfo.TextureAssetInfo(id, id);
+						SKINS.put(source, net.minecraft.entity.player.SkinTextures.create(texture, null, null,
+								slimArms ? net.minecraft.entity.player.PlayerSkinType.SLIM : net.minecraft.entity.player.PlayerSkinType.WIDE));
+					} catch (Exception ex) {
+						SKINS.put(source, "Not a skin picture");
+					}
+				});
+			} catch (Exception ex) {
+				SKINS.put(source, "Couldn't load the skin");
+			}
+		});
+		return "loading";
+	}
+}
+//?} else if <26.2 {
+/*public final class RewindApply {
 
 	private RewindApply() {
 	}
@@ -57,7 +633,7 @@ public final class RewindApply {
 		return false;
 	}
 }
-//?} else {
+*///?} else {
 /*import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 

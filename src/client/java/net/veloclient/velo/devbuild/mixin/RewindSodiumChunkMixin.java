@@ -4,11 +4,28 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 
 // Velo Rewind backgrounds: no terrain when Sodium draws it.
-//? if <26.2 {
-@Mixin(net.minecraft.client.MinecraftClient.class)
+//? if >=1.21.11 && <26.1 {
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
+
+// Velo Rewind backgrounds: no terrain when Sodium draws it.
+@Pseudo
+@Mixin(targets = "net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer", remap = false)
+public abstract class RewindSodiumChunkMixin {
+
+	@org.spongepowered.asm.mixin.injection.Inject(method = "drawChunkLayer", at = @org.spongepowered.asm.mixin.injection.At("HEAD"), cancellable = true,
+			remap = false, require = 0)
+	private void velo$rewindNoTerrain(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+		if (net.veloclient.velo.devbuild.rewind.RewindApply.hideTerrain()) {
+			ci.cancel();
+		}
+	}
+}
+//?} else if <26.2 {
+/*@Mixin(net.minecraft.client.MinecraftClient.class)
 public abstract class RewindSodiumChunkMixin {
 }
-//?} else {
+*///?} else {
 /*@Pseudo
 @Mixin(targets = "net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer", remap = false)
 public abstract class RewindSodiumChunkMixin {

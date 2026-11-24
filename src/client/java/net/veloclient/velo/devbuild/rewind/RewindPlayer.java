@@ -8,8 +8,935 @@ package net.veloclient.velo.devbuild.rewind;
  * from the camera's). Pause / speed go through the game's own tick freezing; jumping back restarts the segment from its
  * snapshot and fast-forwards.
  */
-//? if <26.2 {
+//? if >=1.21.11 && <26.1 {
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.embedded.EmbeddedChannel;
+import java.nio.ByteBuffer;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.TitleScreen;
+import net.minecraft.client.network.ClientLoginNetworkHandler;
+import net.minecraft.client.network.CookieStorage;
+import net.minecraft.client.world.ClientChunkLoadProgress;
+import net.minecraft.entity.EntityPosition;
+import net.minecraft.network.ClientConnection;
+import net.minecraft.network.NetworkSide;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.s2c.login.LoginSuccessS2CPacket;
+import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
+import net.minecraft.network.packet.s2c.play.CommonPlayerSpawnInfo;
+import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
+import net.minecraft.network.packet.s2c.play.GameJoinS2CPacket;
+import net.minecraft.network.packet.s2c.play.GameStateChangeS2CPacket;
+import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
+import net.minecraft.network.packet.s2c.play.PlayerRespawnS2CPacket;
+import net.minecraft.network.packet.s2c.play.UpdateTickRateS2CPacket;
+import net.minecraft.network.state.ConfigurationStates;
+import net.minecraft.network.state.NetworkState;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.GameMode;
+
 final class RewindPlayer {
+
+	private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("Velo Rewind");
+	// The camera's entity id - far from anything a server hands out.
+	private static final int CAMERA_ID = 2_000_000_007;
+	// What a replay must not do to the viewer: move / kill / inventory the camera, change its mode, open screens.
+	private static final Set<String> DROP = Set.of("ClientboundPlayerPositionPacket", "ClientboundSetHealthPacket", "ClientboundSetExperiencePacket",
+			"ClientboundContainerSetContentPacket", "ClientboundContainerSetSlotPacket", "ClientboundSetCursorItemPacket",
+			"ClientboundSetPlayerInventoryPacket", "ClientboundSetHeldSlotPacket", "ClientboundPlayerAbilitiesPacket", "ClientboundPlayerCombatKillPacket",
+			"ClientboundSetCameraPacket", "ClientboundOpenScreenPacket", "ClientboundOpenBookPacket", "ClientboundMountScreenOpenPacket",
+			"ClientboundContainerClosePacket", "ClientboundResourcePackPushPacket", "ClientboundResourcePackPopPacket",
+			"ClientboundShowDialogPacket", "ClientboundClearDialogPacket", "ClientboundCommandsPacket", "ClientboundRecipeBookAddPacket",
+			"ClientboundUpdateAdvancementsPacket", "ClientboundCooldownPacket", "ClientboundPlayerLookAtPacket", "ClientboundStartConfigurationPacket");
+
+	private static RewindPlayer current;
+	private static final Set<String> FAILED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+	private final Path file;
+	private final RewindReader reader;
+	private final List<int[]> segments = new ArrayList<>(); // {config, ticks}
+	private final int totalTicks;
+	private final int selfId;
+	private final byte[] selfUuid;
+	private byte[] fakeUuid = uuidBytes(UUID.randomUUID());
+	private EmbeddedChannel channel;
+	private ClientConnection connection;
+	private RewindReader.Frames frames;
+	private int segment;
+	private int segmentStart;   // absolute tick at the segment's start
+	private int tick;           // absolute tick played
+	private boolean paused;
+	private float speed = 1f;
+	private boolean ended;
+	private int loadWait;
+	private int spectatorTries;
+	private Vec3d cameraAt;
+	// Chunks a packet changed since the segment's snapshot: jumping back re-sends only these (the rest is still right),
+	// so the world doesn't reload. A dimension change in between means a real rejoin.
+	private final java.util.Set<Long> dirty = new java.util.HashSet<>();
+	private boolean inSnapshot;
+	private boolean softSnapshot;
+	private java.util.Set<Long> redoChunks;
+	private boolean dimensionChanged;
+	RewindEdits edits;
+
+	private RewindPlayer(Path file) throws Exception {
+		this.file = file;
+		this.reader = new RewindReader(file);
+		String meta = reader.meta();
+		Matcher seg = Pattern.compile("\"config\":\\s*(\\d+),\\s*\"ticks\":\\s*(\\d+)").matcher(meta);
+		int total = 0;
+		while (seg.find()) {
+			int t = Integer.parseInt(seg.group(2));
+			segments.add(new int[] {Integer.parseInt(seg.group(1)), t});
+			total += t;
+		}
+		totalTicks = total;
+		Matcher id = Pattern.compile("\"selfId\":\\s*(-?\\d+)").matcher(meta);
+		selfId = id.find() ? Integer.parseInt(id.group(1)) : -1;
+		Matcher uuid = Pattern.compile("\"selfUuid\":\\s*\"([0-9a-f-]+)\"").matcher(meta);
+		boolean hasSelf = uuid.find();
+		String selfText = hasSelf ? uuid.group(1) : null;
+		if (selfText == null) {
+			// Recordings stopped by leaving a server (before 2026-11-11) have an empty selfUuid. They're recorded on this
+			// PC, nearly always with this account: without the swap the recorded player shares the camera's UUID and the
+			// game throws it away - you were missing from your own replay and its players list.
+			try {
+				var profile = MinecraftClient.getInstance().getGameProfile();
+				selfText = profile != null && profile.id() != null ? profile.id().toString() : null;
+			} catch (RuntimeException ignored) {
+				selfText = null;
+			}
+		}
+		recordedSelf = selfText;
+		selfUuid = selfText != null ? uuidBytes(UUID.fromString(selfText)) : null;
+		if (selfUuid != null) {
+			// stable per recording, so hidden entities / skin swaps saved for the recorder's own player still match
+			fakeUuid = uuidBytes(UUID.nameUUIDFromBytes(("velo-rewind:" + selfText).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+		}
+		int[] ticks = new int[segments.size()];
+		for (int i = 0; i < ticks.length; i++) {
+			ticks[i] = segments.get(i)[1];
+		}
+		edits = RewindEdits.load(file, ticks);
+		autosave = new RewindAutosave(file, edits);
+	}
+
+	final RewindAutosave autosave;
+
+	Path file() {
+		return file;
+	}
+
+	// After every edit: saved once the changes settle (see RewindAutosave), and an undo step.
+	// The recording player's UUID inside the replay (it's swapped so the viewer's own account never clashes with it).
+	UUID replaySelfUuid() {
+		ByteBuffer b = ByteBuffer.wrap(fakeUuid);
+		return new UUID(b.getLong(), b.getLong());
+	}
+
+	private final String recordedSelf;
+
+	// The recording player's real UUID (meta.json selfUuid) - asking for it finds them under their replay UUID.
+	String recordedSelfUuid() {
+		return recordedSelf == null ? "" : recordedSelf;
+	}
+
+	int selfEntityId() {
+		return selfId;
+	}
+
+	// ---- every player in the whole recording (the AI API's GET /players), scanned once in the background ----
+
+	private volatile List<Object[]> playersScan; // {uuid, name, firstTick, lastTick, self}
+	private volatile boolean scanning;
+
+	List<Object[]> players() {
+		if (playersScan == null && !scanning) {
+			scanning = true;
+			Thread.ofPlatform().daemon().name("velo-rewind-players").start(this::scanPlayers);
+		}
+		return playersScan;
+	}
+
+	private void scanPlayers() {
+		java.util.Map<UUID, Object[]> out = new java.util.LinkedHashMap<>();
+		java.util.Map<UUID, String> names = new java.util.HashMap<>();
+		java.util.Map<Integer, UUID> byId = new java.util.HashMap<>();
+		NetworkState<?> info = RewindRecorder.playProtocol();
+		UUID self = selfUuid == null ? null : replaySelfUuid();
+		try (RewindReader r = new RewindReader(file)) {
+			for (int seg = 0; seg < segments.size(); seg++) {
+				int tick = segmentStart(seg);
+				int end = tick + segments.get(seg)[1];
+				java.util.Set<UUID> present = new java.util.HashSet<>();
+				try (RewindReader.Frames frames = r.open("seg-" + seg + ".bin")) {
+					for (RewindReader.Frame f; (f = frames.next()) != null; ) {
+						if (f.type() == RewindWriter.F_TICK) {
+							tick++;
+							continue;
+						}
+						if (f.type() != RewindWriter.F_PACKET) {
+							continue;
+						}
+						byte[] body = f.body().clone();
+						if (selfUuid != null) {
+							replace(body, selfUuid, fakeUuid);
+						}
+						Packet<?> p = decode(info, body);
+						if (p instanceof net.minecraft.network.packet.s2c.play.PlayerListS2CPacket pi) {
+							for (var e : pi.getEntries()) {
+								if (e.profile() != null) {
+									names.put(e.profileId(), e.profile().name());
+								}
+							}
+						} else if (p instanceof net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket add
+								&& net.minecraft.registry.Registries.ENTITY_TYPE.getId(add.getEntityType()).getPath().equals("player")) {
+							byId.put(add.getEntityId(), add.getUuid());
+							present.add(add.getUuid());
+							int t = tick;
+							out.computeIfAbsent(add.getUuid(), k -> new Object[] {k, null, t, t, k.equals(self)});
+						} else if (p instanceof net.minecraft.network.packet.s2c.play.EntitiesDestroyS2CPacket rm) {
+							for (int id : RewindCompat.removedIds(rm)) {
+								UUID u = byId.get(id);
+								if (u != null && out.containsKey(u)) {
+									out.get(u)[3] = tick;
+									present.remove(u);
+								}
+							}
+						}
+					}
+				} catch (Exception ignored) {
+					// a cut-off segment: everything before counts
+				}
+				for (UUID u : present) {
+					out.get(u)[3] = end; // still there when the segment ended
+				}
+			}
+		} catch (Exception e) {
+			LOG.warn("Velo Rewind: couldn't scan the players of {}", file.getFileName(), e);
+		}
+		for (Object[] row : out.values()) {
+			row[1] = names.getOrDefault((UUID) row[0], ((UUID) row[0]).equals(self) ? "(you)" : null);
+		}
+		playersScan = new ArrayList<>(out.values());
+		scanning = false;
+	}
+
+	void saveEdits() {
+		autosave.changed();
+	}
+
+	boolean undo() {
+		return restoreEdits(autosave.undo(edits));
+	}
+
+	boolean redo() {
+		return restoreEdits(autosave.redo());
+	}
+
+	// Replaces the edits (the AI API's PUT /edits): one undo step.
+	boolean replaceEdits(RewindEdits e) {
+		if (!restoreEdits(e)) {
+			return false;
+		}
+		saveEdits();
+		return true;
+	}
+
+	private boolean restoreEdits(RewindEdits e) {
+		if (e == null || e.clips == null || e.clips.isEmpty()) {
+			return false;
+		}
+		int before = edits.selected;
+		e.selected = Math.max(0, Math.min(e.clips.size() - 1, e.selected));
+		edits = e;
+		if (e.selected != before) {
+			seek(clipStart(edits.clip()));
+		}
+		return true;
+	}
+
+	int segmentStart(int index) {
+		int s = 0;
+		for (int i = 0; i < index && i < segments.size(); i++) {
+			s += segments.get(i)[1];
+		}
+		return s;
+	}
+
+	// Absolute tick where clip {@code c} starts / ends.
+	int clipStart(RewindEdits.Clip c) {
+		return segmentStart(c.segment) + c.start;
+	}
+
+	int clipEnd(RewindEdits.Clip c) {
+		return clipStart(c) + c.length;
+	}
+
+	// The playhead inside the selected clip (ticks from its start).
+	int clipPosition() {
+		return Math.max(0, Math.min(edits.clip().length, tick - clipStart(edits.clip())));
+	}
+
+	void selectClip(int index) {
+		edits.selected = Math.max(0, Math.min(edits.clips.size() - 1, index));
+		seek(clipStart(edits.clip()));
+		saveEdits();
+	}
+
+	// A new clip: a copy of the selected one's range with an empty timeline.
+	void addClip() {
+		RewindEdits.Clip from = edits.clip();
+		RewindEdits.Clip c = new RewindEdits.Clip();
+		c.segment = from.segment;
+		c.start = from.start;
+		c.length = from.length;
+		c.name = "Clip " + (edits.clips.size() + 1);
+		edits.clips.add(c);
+		selectClip(edits.clips.size() - 1);
+	}
+
+	// Seeks inside the selected clip.
+	void seekClip(int clipTick) {
+		RewindEdits.Clip c = edits.clip();
+		seek(clipStart(c) + Math.max(0, Math.min(c.length, clipTick)));
+	}
+
+	int segmentLength(int index) {
+		return index >= 0 && index < segments.size() ? segments.get(index)[1] : 0;
+	}
+
+	int segmentCount() {
+		return segments.size();
+	}
+
+	static boolean active() {
+		return current != null;
+	}
+
+	static RewindPlayer current() {
+		return current;
+	}
+
+	// ---- open / close ----
+
+	static void open(Path file, Screen from) {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (current != null || mc.world != null) {
+			return;
+		}
+		try {
+			RewindPlayer p = new RewindPlayer(file);
+			if (p.segments.isEmpty()) {
+				throw new IllegalStateException("empty recording");
+			}
+			current = p;
+			p.connect(0);
+			RewindSound.open(file);
+		} catch (Exception e) {
+			LOG.warn("Velo Rewind couldn't open {}", file, e);
+			current = null;
+			net.minecraft.client.toast.SystemToast.add(mc.getToastManager(),
+					net.minecraft.client.toast.SystemToast.Type.PERIODIC_NOTIFICATION,
+					net.minecraft.text.Text.literal("Velo Rewind"), net.minecraft.text.Text.literal("Couldn't open: " + e.getMessage()));
+		}
+	}
+
+	// Joins the recording at the start of segment {@code index}: handshake, its configuration, its snapshot.
+	private void connect(int index) throws Exception {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		segment = index;
+		segmentStart = 0;
+		for (int i = 0; i < index; i++) {
+			segmentStart += segments.get(i)[1];
+		}
+		tick = segmentStart;
+		// Unregistered first: the Connection must be in the pipeline before the channel goes active (it takes its channel there).
+		channel = new EmbeddedChannel(false, false);
+		ClientConnection.addLocalValidator(channel.pipeline(), NetworkSide.CLIENTBOUND);
+		connection = new ClientConnection(NetworkSide.CLIENTBOUND);
+		channel.pipeline().addLast("packet_handler", connection);
+		channel.register();
+		ClientLoginNetworkHandler login = new ClientLoginNetworkHandler(connection, mc, null, new TitleScreen(), false, null,
+				status -> { }, new ClientChunkLoadProgress(0L) {
+					// Vanilla waits for the player's chunk section to be compiled, a signal Sodium never sends (so every join
+					// took the 30 s timeout): a replay is ready once its world and camera exist.
+					@Override
+					public boolean isDone() {
+						MinecraftClient m = MinecraftClient.getInstance();
+						return m.world != null && m.player != null || super.isDone();
+					}
+				}, new CookieStorage(java.util.Map.of(), java.util.Map.of(), false));
+		connection.connect("velo-rewind", 0, login);
+		setPending(mc, connection);
+		deliver(new LoginSuccessS2CPacket(mc.getGameProfile()));
+		try (RewindReader.Frames config = reader.open("config-" + segments.get(index)[0] + ".bin")) {
+			for (RewindReader.Frame f; (f = config.next()) != null; ) {
+				if (f.type() == RewindWriter.F_PACKET) {
+					Packet<?> p = decode(ConfigurationStates.S2C, f.body());
+					if (p != null) {
+						deliver(p);
+					}
+				}
+			}
+		}
+		frames = reader.open("seg-" + index + ".bin");
+		dirty.clear();
+		dimensionChanged = false;
+		inSnapshot = true;
+		// the snapshot, all at once
+		for (RewindReader.Frame f; (f = frames.next()) != null; ) {
+			if (f.type() == RewindWriter.F_SNAPSHOT_END) {
+				break;
+			}
+			if (f.type() == RewindWriter.F_PACKET) {
+				play(f.body());
+			}
+		}
+		inSnapshot = false;
+		deliver(new GameStateChangeS2CPacket(GameStateChangeS2CPacket.INITIAL_CHUNKS_COMING, 0f));
+		if (cameraAt != null) {
+			deliver(new PlayerPositionLookS2CPacket(CAMERA_ID, new EntityPosition(cameraAt.add(0, 1.5, 2.5), Vec3d.ZERO, 180f, 20f), Set.of()));
+		}
+		applyRate();
+		LOG.info("Velo Rewind: playing {} from tick {} of {}", file.getFileName(), tick, totalTicks);
+	}
+
+	private static java.lang.reflect.Field pendingField;
+
+	// The game ticks its pending connection while it logs in (as for a server it connects to).
+	private static void setPending(MinecraftClient mc, ClientConnection c) {
+		try {
+			if (pendingField == null) {
+				pendingField = RewindCompat.field(MinecraftClient.class, "integratedServerConnection", "field_1746");
+				pendingField.setAccessible(true);
+			}
+			pendingField.set(mc, c);
+		} catch (ReflectiveOperationException e) {
+			LOG.warn("Velo Rewind: no pending connection", e);
+		}
+	}
+
+	// The game is closing: the edits on disk now.
+	// The viewer needs its own player-list entry in spectator mode: without one the game doesn't count the camera as a
+	// spectator, and it bumps into blocks instead of flying through them (Phantom).
+	void viewerSpectator(MinecraftClient mc) {
+		try {
+			var packet = new net.minecraft.network.packet.s2c.play.PlayerListS2CPacket(java.util.EnumSet.of(
+					net.minecraft.network.packet.s2c.play.PlayerListS2CPacket.Action.ADD_PLAYER,
+					net.minecraft.network.packet.s2c.play.PlayerListS2CPacket.Action.UPDATE_GAME_MODE), java.util.List.of());
+			var profile = mc.getGameProfile();
+			var f = RewindCompat.field(net.minecraft.network.packet.s2c.play.PlayerListS2CPacket.class, "entries", "field_12369");
+			f.setAccessible(true);
+			f.set(packet, java.util.List.of(new net.minecraft.network.packet.s2c.play.PlayerListS2CPacket.Entry(profile.id(), profile, false, 0,
+					GameMode.SPECTATOR, null, true, 0, null)));
+			deliver(packet);
+			if (mc.interactionManager != null) {
+				mc.interactionManager.setGameMode(GameMode.SPECTATOR);
+			}
+		} catch (Exception e) {
+			LOG.warn("Velo Rewind: couldn't make the camera a spectator", e);
+		}
+	}
+
+	static void flushEdits() {
+		RewindPlayer p = current;
+		if (p != null) {
+			p.autosave.flush(p.edits);
+		}
+	}
+
+	static void close() {
+		RewindPlayer p = current;
+		current = null;
+		if (p == null) {
+			return;
+		}
+		p.autosave.flush(p.edits);
+		RewindSound.close();
+		try {
+			if (p.frames != null) {
+				p.frames.close();
+			}
+			p.reader.close();
+		} catch (Exception ignored) {
+		}
+		if (p.channel != null) {
+			p.channel.finishAndReleaseAll();
+		}
+	}
+
+	// Leaves the replay (back to the library).
+	static void exit() {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		close();
+		mc.disconnect(new RewindLibraryScreen(new TitleScreen()), false);
+	}
+
+	// ---- self test: -Dvelo.rewindPlayTest=<file>: open it from the title screen, watch, jump around, screenshot, quit ----
+
+	private static final String PLAY_TEST = System.getProperty("velo.rewindPlayTest");
+	private static int testTicks;
+	private static RewindEditorScreen testEditor;
+
+	static void testTick() {
+		if (PLAY_TEST == null) {
+			return;
+		}
+		MinecraftClient mc = MinecraftClient.getInstance();
+		testTicks++;
+		if (testTicks == 60 && mc.world == null) {
+			mc.options.pauseOnLostFocus = false; // the hidden test window never has focus
+			open(Path.of(PLAY_TEST), mc.currentScreen);
+		}
+		RewindPlayer p = current;
+		if (p == null || mc.player == null) {
+			return;
+		}
+		if (testTicks == 150) {
+			// a camera move, a whole-clip time of day and some rain
+			var cam = mc.gameRenderer.getCamera();
+			RewindEdits.Clip c = p.edits.clip();
+			c.tracks.clear();
+			put(c, "cam_x", 0, cam.getCameraPos().x);
+			put(c, "cam_x", 80, cam.getCameraPos().x + 6);
+			put(c, "cam_y", 0, cam.getCameraPos().y + 2);
+			put(c, "cam_z", 0, cam.getCameraPos().z);
+			put(c, "cam_yaw", 0, cam.getYaw());
+			put(c, "cam_yaw", 80, cam.getYaw() + 40);
+			put(c, "cam_pitch", 0, 20);
+			put(c, "cam_roll", 40, 8);
+			c.track("time").global = 13000.0;
+			put(c, "rain", 0, 0);
+			put(c, "rain", 60, 1);
+			c.track("cam_x").keys.get(80).label = "pan";
+		}
+		if (testTicks == 200) {
+			shot(mc, "rewind-play-1.png");
+			LOG.info("Velo Rewind test: tick {} / {}, entities {}", p.position(), p.totalTicks(), mc.world.getRegularEntityCount());
+		}
+		if (testTicks == 205) {
+			shot(mc, "rewind-play-viewport.png"); // opens in the viewport: bar + keys
+			mc.setScreen(new RewindEditorScreen());
+		}
+		if (testTicks == 210) {
+			p.seekClip(20);
+		}
+		if (testTicks == 240) {
+			shot(mc, "rewind-play-seek.png");
+			LOG.info("Velo Rewind test after soft seek: clip tick {}, level still {}", p.clipPosition(), mc.world != null);
+		}
+		if (testTicks == 250) {
+			mc.setScreen(null);
+		}
+		if (testTicks == 290) {
+			shot(mc, "rewind-play-bar.png");
+		}
+		if (testTicks == 300 && !Boolean.getBoolean("velo.rewindBarDebug")) {
+			// the test never records the speakers
+			RewindExport.audioMode = RewindExport.AUDIO_MODES.get("voice".equals(System.getProperty("velo.rewindTestAudio")) ? 1 : 2);
+			LOG.info("Velo Rewind test: viewer spectator {}, audio {}", mc.player.isSpectator(), RewindSound.status());
+			// like a player: open the editor, its export window, press Start
+			testEditor = new RewindEditorScreen();
+			mc.setScreen(testEditor);
+			testEditor.testOpenExport();
+		}
+		if (testTicks == 304 && testEditor != null) {
+			LOG.info("Velo Rewind test: Start pressed {}", testEditor.testPress("Start"));
+		}
+		if (testTicks == 320) {
+			shot(mc, "rewind-export-progress.png");
+		}
+		if (testTicks > 300 && (RewindExport.state == RewindExport.State.DONE || RewindExport.state == RewindExport.State.FAILED) && exportShot == 0) {
+			exportShot = testTicks;
+			LOG.info("Velo Rewind test export: {} {} -> {}", RewindExport.state, RewindExport.message, RewindExport.output);
+		}
+		if (exportShot > 0 && testTicks == exportShot + 20) {
+			shot(mc, "rewind-play-export.png");
+		}
+		if (exportShot > 0 && testTicks == exportShot + 30 || testTicks > 2400 || testTicks == 320 && Boolean.getBoolean("velo.rewindBarDebug")) {
+			mc.scheduleStop();
+		}
+	}
+
+	private static int exportShot;
+
+	private static void put(RewindEdits.Clip c, String id, int tick, double value) {
+		RewindEdits.Key k = new RewindEdits.Key();
+		k.value = value;
+		c.track(id).keys.put(tick, k);
+	}
+
+	private static void shot(MinecraftClient mc, String name) {
+		net.minecraft.client.util.ScreenshotRecorder.saveScreenshot(mc.runDirectory, name, mc.getFramebuffer(), 1, msg -> LOG.info("Velo Rewind test shot {}", name));
+	}
+
+	// ---- per game tick ----
+
+	static void tick() {
+		RewindPlayer p = current;
+		if (p == null) {
+			return;
+		}
+		p.autosave.tick(p.edits);
+		MinecraftClient mc = MinecraftClient.getInstance();
+		if (p.connection != null && !p.connection.isOpen()) {
+			close(); // left the replay
+			return;
+		}
+		if (mc.world == null && p.loadWait++ > 1200) {
+			// never got into its world: back to the library with a message instead of a black screen
+			LOG.warn("Velo Rewind: {} didn't load in 60 s", p.file.getFileName());
+			exit();
+			net.minecraft.client.toast.SystemToast.add(mc.getToastManager(),
+					net.minecraft.client.toast.SystemToast.Type.PERIODIC_NOTIFICATION,
+					net.minecraft.text.Text.literal("Velo Rewind"), net.minecraft.text.Text.literal("The replay didn't load"));
+			return;
+		}
+		if (mc.player != null && mc.world != null) {
+			RewindSound.tick(p);
+		}
+		if (mc.player != null && !mc.player.isSpectator() && p.spectatorTries++ < 40 && mc.world.getTime() % 10 == 0) {
+			p.viewerSpectator(mc);
+		}
+		p.channel.releaseOutbound(); // what the game "sends to the server" goes nowhere
+		if (mc.world == null || mc.player == null || p.paused || p.ended) {
+			return;
+		}
+		p.loadWait = 0;
+		if (p.tick >= p.clipEnd(p.edits.clip())) {
+			p.paused = true; // the selected clip ends here
+			p.applyRate();
+			return;
+		}
+		p.advance(1);
+	}
+
+	// Plays {@code n} recorded ticks (stops at a segment end; the next segment needs a fresh join).
+	private void advance(int n) {
+		try {
+			while (n > 0) {
+				RewindReader.Frame f = frames.next();
+				if (f == null) {
+					if (segment + 1 < segments.size()) {
+						int next = segment + 1;
+						frames.close();
+						if (canSoft(next)) {
+							softReset(next);
+						} else {
+							reconnect(next, -1);
+						}
+					} else {
+						ended = true;
+						paused = true;
+						applyRate();
+					}
+					return;
+				}
+				if (f.type() == RewindWriter.F_TICK) {
+					tick++;
+					n--;
+				} else if (f.type() == RewindWriter.F_PACKET) {
+					play(f.body());
+				}
+			}
+		} catch (Exception e) {
+			LOG.warn("Velo Rewind playback failed", e);
+			ended = true;
+		}
+	}
+
+	// ---- controls (the viewer's) ----
+
+	// Each clip's length in ticks (a clip = start / resume to pause / stop of the recording).
+	int[] clipTicks() {
+		int[] out = new int[segments.size()];
+		for (int i = 0; i < out.length; i++) {
+			out[i] = segments.get(i)[1];
+		}
+		return out;
+	}
+
+	// Keyframes (ticks) per timeline track - camera paths, speed and FOV build on them.
+	final java.util.Map<String, java.util.TreeSet<Integer>> tracks = new java.util.LinkedHashMap<>(java.util.Map.of());
+	{
+		for (String t : new String[] {"Camera", "Speed", "FOV"}) {
+			tracks.put(t, new java.util.TreeSet<>());
+		}
+	}
+	final java.util.TreeSet<Integer> keyframes = tracks.get("Camera");
+	boolean editorOpened;
+
+	int position() {
+		return tick;
+	}
+
+	int totalTicks() {
+		return totalTicks;
+	}
+
+	boolean paused() {
+		return paused;
+	}
+
+	float speed() {
+		return speed;
+	}
+
+	String name() {
+		return file.getFileName().toString().replaceFirst("\\.vrewind$", "");
+	}
+
+	void togglePause() {
+		if (paused && (ended || tick >= clipEnd(edits.clip()))) {
+			ended = false;
+			seek(clipStart(edits.clip())); // from the clip's start again
+		}
+		paused = !paused;
+		applyRate();
+	}
+
+	void setSpeed(float s) {
+		speed = Math.max(0.1f, Math.min(8f, s));
+		applyRate();
+	}
+
+	// Jumps to {@code target}: forward = fast-forward from here, back = rejoin the segment and fast-forward from its start.
+	void seek(int target) {
+		target = Math.max(0, Math.min(totalTicks, target));
+		int segIndex = 0;
+		int start = 0;
+		while (segIndex + 1 < segments.size() && target >= start + segments.get(segIndex)[1]) {
+			start += segments.get(segIndex)[1];
+			segIndex++;
+		}
+		ended = false;
+		if (segIndex == segment && target >= tick) {
+			advance(target - tick);
+			return;
+		}
+		try {
+			frames.close();
+			if (canSoft(segIndex)) {
+				softReset(segIndex);
+				if (target > tick) {
+					advance(target - tick);
+				}
+			} else {
+				reconnect(segIndex, target);
+			}
+		} catch (Exception e) {
+			LOG.warn("Velo Rewind seek failed", e);
+		}
+	}
+
+	private void reconnect(int index, int target) throws Exception {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		Vec3d eye = mc.player != null ? mc.player.getEntityPos() : null;
+		float yRot = mc.player != null ? mc.player.getYaw() : 0;
+		float xRot = mc.player != null ? mc.player.getPitch() : 0;
+		Screen screen = mc.currentScreen;
+		// leave the old world properly (a short "Velo Rewind" screen in between), then join the segment again
+		EmbeddedChannel oldChannel = channel;
+		connection = null;
+		mc.disconnect(new net.minecraft.client.gui.screen.MessageScreen(net.minecraft.text.Text.literal("Velo Rewind")), false);
+		oldChannel.finishAndReleaseAll();
+		connect(index);
+		if (target > tick) {
+			advance(target - tick);
+		}
+		if (eye != null) {
+			deliver(new PlayerPositionLookS2CPacket(CAMERA_ID, new EntityPosition(eye, Vec3d.ZERO, yRot, xRot), Set.of()));
+		}
+		if (screen != null && mc.world != null) {
+			mc.setScreen(screen);
+		}
+	}
+
+	private boolean canSoft(int index) {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		return mc.world != null && mc.player != null && !dimensionChanged && segments.get(index)[0] == segments.get(segment)[0];
+	}
+
+	// Back to the start of segment {@code index} without leaving the world: every recorded entity goes, the snapshot is
+	// played again - its chunks only where something changed since (same segment) - and playback goes on from there.
+	private void softReset(int index) throws Exception {
+		MinecraftClient mc = MinecraftClient.getInstance();
+		it.unimi.dsi.fastutil.ints.IntArrayList ids = new it.unimi.dsi.fastutil.ints.IntArrayList();
+		for (net.minecraft.entity.Entity e : mc.world.getEntities()) {
+			if (e != mc.player) {
+				ids.add(e.getId());
+			}
+		}
+		if (!ids.isEmpty()) {
+			deliver(new net.minecraft.network.packet.s2c.play.EntitiesDestroyS2CPacket(ids));
+		}
+		redoChunks = index == segment ? new java.util.HashSet<>(dirty) : null;
+		segment = index;
+		segmentStart = segmentStart(index);
+		tick = segmentStart;
+		frames = reader.open("seg-" + index + ".bin");
+		softSnapshot = true;
+		inSnapshot = true;
+		try {
+			for (RewindReader.Frame f; (f = frames.next()) != null; ) {
+				if (f.type() == RewindWriter.F_SNAPSHOT_END) {
+					break;
+				}
+				if (f.type() == RewindWriter.F_PACKET) {
+					play(f.body());
+				}
+			}
+		} finally {
+			softSnapshot = false;
+			inSnapshot = false;
+			redoChunks = null;
+		}
+		dirty.clear();
+		applyRate();
+	}
+
+	private static java.lang.reflect.Field sectionPosField;
+
+	private static long chunkKey(int x, int z) {
+		return (long) x << 32 | (z & 0xFFFFFFFFL);
+	}
+
+	private void markDirty(Packet<?> p) {
+		if (p instanceof net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket b) {
+			dirty.add(chunkKey(b.getPos().getX() >> 4, b.getPos().getZ() >> 4));
+		} else if (p instanceof ChunkDataS2CPacket c) {
+			dirty.add(chunkKey(RewindCompat.chunkX(c), RewindCompat.chunkZ(c)));
+		} else if (p instanceof net.minecraft.network.packet.s2c.play.UnloadChunkS2CPacket f) {
+			dirty.add(chunkKey(f.pos().x, f.pos().z));
+		} else if (p instanceof net.minecraft.network.packet.s2c.play.ChunkDeltaUpdateS2CPacket u) {
+			try {
+				if (sectionPosField == null) {
+					sectionPosField = RewindCompat.field(net.minecraft.network.packet.s2c.play.ChunkDeltaUpdateS2CPacket.class, "sectionPos", "field_26345");
+					sectionPosField.setAccessible(true);
+				}
+				var sp = (net.minecraft.util.math.ChunkSectionPos) sectionPosField.get(u);
+				dirty.add(chunkKey(sp.getSectionX(), sp.getSectionZ()));
+			} catch (ReflectiveOperationException e) {
+				dimensionChanged = true; // can't tell: rejoin to be safe
+			}
+		} else if (p instanceof GameJoinS2CPacket || p instanceof PlayerRespawnS2CPacket) {
+			dimensionChanged = true;
+		}
+	}
+
+	private void applyRate() {
+		deliver(new UpdateTickRateS2CPacket(20f * speed, paused));
+	}
+
+	// ---- packets ----
+
+	// One recorded play packet: self UUID kept apart from the camera's, the login / respawns made the camera's, the rest
+	// dropped or handed over.
+	private void play(byte[] body) {
+		if (selfUuid != null) {
+			replace(body, selfUuid, fakeUuid);
+		}
+		NetworkState<?> info = RewindRecorder.playProtocol();
+		Packet<?> p = decode(info, body);
+		if (p == null) {
+			return;
+		}
+		String type = p.getClass().getSimpleName();
+		if (DROP.contains(type)) {
+			return;
+		}
+		if (softSnapshot) {
+			if (p instanceof GameJoinS2CPacket || p instanceof PlayerRespawnS2CPacket) {
+				return;
+			}
+			if (p instanceof ChunkDataS2CPacket c && redoChunks != null && !redoChunks.contains(chunkKey(RewindCompat.chunkX(c), RewindCompat.chunkZ(c)))
+					&& MinecraftClient.getInstance().world.getChunkManager().getChunk(RewindCompat.chunkX(c), RewindCompat.chunkZ(c), net.minecraft.world.chunk.ChunkStatus.FULL, false) != null) {
+				return; // unchanged since the snapshot: keep it, no rebuild
+			}
+		} else if (!inSnapshot) {
+			markDirty(p);
+		}
+		if (p instanceof GameJoinS2CPacket login) {
+			p = new GameJoinS2CPacket(CAMERA_ID, login.hardcore(), login.dimensionIds(), login.maxPlayers(), login.viewDistance(), login.simulationDistance(),
+					login.reducedDebugInfo(), false, login.doLimitedCrafting(), spectator(login.commonPlayerSpawnInfo()), false);
+		} else if (p instanceof PlayerRespawnS2CPacket respawn) {
+			p = new PlayerRespawnS2CPacket(spectator(respawn.commonPlayerSpawnInfo()), respawn.flag());
+		} else if (p instanceof EntitySpawnS2CPacket add && add.getEntityId() == selfId && cameraAt == null) {
+			cameraAt = new Vec3d(add.getX(), add.getY(), add.getZ());
+		} else if (p instanceof GameStateChangeS2CPacket event && event.getReason() == GameStateChangeS2CPacket.GAME_MODE_CHANGED) {
+			return;
+		}
+		deliver(p);
+	}
+
+	private static CommonPlayerSpawnInfo spectator(CommonPlayerSpawnInfo i) {
+		return RewindCompat.spectator(i);
+	}
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private void deliver(Packet<?> packet) {
+		try {
+			// In the world: handled right here, one by one - a packet about something the recording didn't capture (an
+			// older boss bar, a team) used to throw inside the connection and end the whole replay ("Network Exception").
+			var listener = MinecraftClient.getInstance().getNetworkHandler();
+			if (listener != null && connection != null && listener.getConnection() == connection
+					&& packet.getPacketType().side() == NetworkSide.CLIENTBOUND && !(packet instanceof GameJoinS2CPacket)) {
+				((Packet) packet).apply(listener);
+				return;
+			}
+			channel.writeInbound(packet);
+			channel.runPendingTasks();
+		} catch (Throwable t) {
+			if (FAILED.add(packet.getClass().getSimpleName())) {
+				LOG.warn("Velo Rewind: {} failed", packet.getClass().getSimpleName(), t);
+			}
+		}
+	}
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static Packet<?> decode(NetworkState<?> info, byte[] body) {
+		if (info == null) {
+			return null;
+		}
+		ByteBuf buf = Unpooled.wrappedBuffer(body);
+		try {
+			return (Packet<?>) ((PacketCodec<ByteBuf, Packet>) (PacketCodec) info.codec()).decode(buf);
+		} catch (Throwable t) {
+			return null;
+		}
+	}
+
+	private static byte[] uuidBytes(UUID u) {
+		return ByteBuffer.allocate(16).putLong(u.getMostSignificantBits()).putLong(u.getLeastSignificantBits()).array();
+	}
+
+	private static void replace(byte[] data, byte[] from, byte[] to) {
+		outer:
+		for (int i = 0; i + 16 <= data.length; i++) {
+			for (int k = 0; k < 16; k++) {
+				if (data[i + k] != from[k]) {
+					continue outer;
+				}
+			}
+			System.arraycopy(to, 0, data, i, 16);
+			i += 15;
+		}
+	}
+}
+//?} else if <26.2 {
+/*final class RewindPlayer {
 
 	private RewindPlayer() {
 	}
@@ -27,7 +954,7 @@ final class RewindPlayer {
 	static void testTick() {
 	}
 }
-//?} else {
+*///?} else {
 /*import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;

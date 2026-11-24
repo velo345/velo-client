@@ -1,13 +1,58 @@
 package net.veloclient.velo.devbuild.rewind;
 
 /** Velo Rewind: the few calls that differ between 26.2 and 26.3. */
-//? if <26.2 {
+//? if >=1.21.11 && <26.1 {
 final class RewindCompat {
 
 	private RewindCompat() {
 	}
+
+	// a private field by its yarn name (dev runs) or its intermediary name (the real game), made accessible
+	static java.lang.reflect.Field field(Class<?> owner, String yarn, String intermediary) throws NoSuchFieldException {
+		java.lang.reflect.Field f;
+		try {
+			f = owner.getDeclaredField(intermediary);
+		} catch (NoSuchFieldException e) {
+			f = owner.getDeclaredField(yarn);
+		}
+		f.setAccessible(true);
+		return f;
+	}
+
+	static it.unimi.dsi.fastutil.ints.IntList removedIds(net.minecraft.network.packet.s2c.play.EntitiesDestroyS2CPacket p) {
+		return p.getEntityIds();
+	}
+
+	static int chunkX(net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket c) {
+		return c.getChunkX();
+	}
+
+	static int chunkZ(net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket c) {
+		return c.getChunkZ();
+	}
+
+	static String openPng() {
+		return org.lwjgl.util.tinyfd.TinyFileDialogs.tinyfd_openFileDialog("Skin picture", "", null, "PNG", false);
+	}
+
+	// -1 = not swinging, 0 = main hand, 3 = off hand (the animate packet's ids)
+	static net.minecraft.network.packet.s2c.play.CommonPlayerSpawnInfo spectator(net.minecraft.network.packet.s2c.play.CommonPlayerSpawnInfo i) {
+		return new net.minecraft.network.packet.s2c.play.CommonPlayerSpawnInfo(i.dimensionType(), i.dimension(), i.seed(),
+				net.minecraft.world.GameMode.SPECTATOR, net.minecraft.world.GameMode.SPECTATOR, i.isDebug(), i.isFlat(),
+				i.lastDeathLocation(), i.portalCooldown(), i.seaLevel());
+	}
+
+	static int swing(net.minecraft.entity.LivingEntity e) {
+		return !e.handSwinging ? -1 : e.preferredHand == net.minecraft.util.Hand.MAIN_HAND ? 0 : 3;
+	}
 }
-//?} else if <26.3 {
+//?} else if <26.2 {
+/*final class RewindCompat {
+
+	private RewindCompat() {
+	}
+}
+*///?} else if <26.3 {
 /*final class RewindCompat {
 
 	private RewindCompat() {

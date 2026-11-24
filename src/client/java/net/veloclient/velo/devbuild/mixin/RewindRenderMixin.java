@@ -3,11 +3,26 @@ package net.veloclient.velo.devbuild.mixin;
 import org.spongepowered.asm.mixin.Mixin;
 
 // Velo Rewind: entities hidden in the clip aren't drawn while watching / exporting.
-//? if <26.2 {
-@Mixin(net.minecraft.client.MinecraftClient.class)
+//? if >=1.21.11 && <26.1 {
+import org.spongepowered.asm.mixin.Mixin;
+
+// Velo Rewind: entities hidden in the clip aren't drawn while watching / exporting.
+@Mixin(net.minecraft.client.render.entity.EntityRenderManager.class)
+public abstract class RewindRenderMixin {
+
+	@org.spongepowered.asm.mixin.injection.Inject(method = "shouldRender", at = @org.spongepowered.asm.mixin.injection.At("HEAD"), cancellable = true, require = 0)
+	private void velo$rewindHidden(net.minecraft.entity.Entity entity, net.minecraft.client.render.Frustum frustum, double x, double y, double z,
+			org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Boolean> cir) {
+		if (!net.veloclient.velo.devbuild.rewind.RewindApply.renderEntity(entity)) {
+			cir.setReturnValue(false);
+		}
+	}
+}
+//?} else if <26.2 {
+/*@Mixin(net.minecraft.client.MinecraftClient.class)
 public abstract class RewindRenderMixin {
 }
-//?} else {
+*///?} else {
 /*@Mixin(net.minecraft.client.renderer.entity.EntityRenderDispatcher.class)
 public abstract class RewindRenderMixin {
 

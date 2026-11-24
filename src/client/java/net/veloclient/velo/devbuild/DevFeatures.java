@@ -11,7 +11,9 @@ public final class DevFeatures implements VeloAddon {
 		ModuleRegistry.register(new ShieldIndicatorModule());
 		ModuleRegistry.register(new net.veloclient.velo.devbuild.slots.NumberedInventoryModule());
 		ModuleRegistry.register(new net.veloclient.velo.devbuild.colors.ColorCodesModule());
-		//? if >=26.2 {
+		//? if >=1.21.11 && <26.1 {
+		ModuleRegistry.register(new net.veloclient.velo.devbuild.rewind.RewindModule());
+		//?} else if >=26.2 {
 		/*ModuleRegistry.register(new net.veloclient.velo.devbuild.rewind.RewindModule());
 		net.veloclient.velo.devbuild.accounts.AccountSwitcher.register();
 		*///?}

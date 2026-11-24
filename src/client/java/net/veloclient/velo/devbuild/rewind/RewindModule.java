@@ -116,7 +116,8 @@ public final class RewindModule extends AbstractModule implements net.veloclient
 				}),
 				new net.veloclient.velo.module.ConfigField.ToggleField("AI Access (local API)", () -> aiAccess, v -> {
 					aiAccess = v;
-					RewindApi.setEnabled(v && isEnabled());
+					// a launch with --ai forces the API on: loading the profile (this setter) must not switch it off
+					RewindApi.setEnabled(v && isEnabled() || System.getProperty("velo.aiApi", System.getProperty("velo.rewindApi")) != null);
 				}));
 	}
 
