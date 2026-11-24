@@ -62,49 +62,55 @@ def tooltip(im,x,y,lines):
     for j in range(1,h-1):
         t=j/(h-1); c=(int(80-40*t),0,int(255-128*t),255); im.putpixel((x+1,y+j),c); im.putpixel((x+w-2,y+j),c)
     for i,(s,col) in enumerate(lines): text(im,s,x+4,y+4+i*10+(1 if i else 0),col)
-# ---- scene ----
+
+# ---- scene: the normal Velo menu, just with Minecraft's font, buttons, tabs and list background ----
+def nine(im,spr,x,y,w,h,b=2):
+    sw,sh=spr.size
+    for (sx0,sx1,dx0,dx1) in [(0,b,x,x+b),(b,sw-b,x+b,x+w-b),(sw-b,sw,x+w-b,x+w)]:
+        for (sy0,sy1,dy0,dy1) in [(0,b,y,y+b),(b,sh-b,y+b,y+h-b),(sh-b,sh,y+h-b,y+h)]:
+            if dx1>dx0 and dy1>dy0:
+                im.alpha_composite(spr.crop((sx0,sy0,sx1,sy1)).resize((dx1-dx0,dy1-dy0),Image.NEAREST),(dx0,dy0))
 bg=Image.open('/home/daviseib/Dokumente/VSCode/Velo Client/design/poll/bg.jpg').convert('RGBA').resize((W,H))
-im=ImageEnhance.Brightness(bg).enhance(0.85)
-shade=Image.new('RGBA',(W,H),(16,16,16,175)); im.alpha_composite(shade)
-# header (vanilla screen title + subtitle)
-centered(im,'Velo Modules',W//2,16)
-centered(im,'Profile: PvP   |   Search: Ctrl+F',W//2,28,(170,170,170))
-# creative-style panel with tabs
-PX,PY=52,78
-tabs=[('clock_00','HUD'),('diamond_sword','PvP'),('ender_eye','Visuals'),('compass_00','Utility'),('feather','Performance'),('repeater','Advanced'),('elytra','Cosmetics')]
-SEL=1
-for i,(ic,_) in enumerate(tabs):
-    if i==SEL: continue
-    t=img(f'gui/sprites/container/creative_inventory/tab_top_unselected_{i+1}.png'); im.alpha_composite(t,(PX+i*27,PY-28))
-    draw_item(im,ic,PX+i*27+5,PY-28+9)
-panel=img('gui/container/creative_inventory/tab_items.png').crop((0,0,195,136)); im.alpha_composite(panel,(PX,PY))
-t=img(f'gui/sprites/container/creative_inventory/tab_top_selected_{SEL+1}.png'); im.alpha_composite(t,(PX+SEL*27,PY-28))
-draw_item(im,tabs[SEL][0],PX+SEL*27+5,PY-28+9)
-text(im,'PvP  -  29 modules',PX+8,PY+6,(64,64,64),False)
-im.alpha_composite(img('gui/sprites/container/creative_inventory/scroller.png'),(PX+175,PY+18))
-mods=[('book','Enemy Effects',0),('blaze_rod','Combo Counter',1),('redstone','Hit Color',1),('name_tag','Target HUD',0),('iron_sword','Old Animations',1),
-('stick','Reach Display',0),('totem_of_undying','Totem Counter',1),('golden_apple','Cooldowns',1),('ender_pearl','Pearl Timer',0),
-('dragon_breath','Pot Counter',0),('iron_chestplate','Armor Status',1),('fire_charge','Low Fire',1),('experience_bottle','Damage Numbers',0),('slime_ball','Hit Particles',0),
-('goat_horn','Hit Sounds',1),('paper','Auto GG',0),('spectral_arrow','Arrow Counter',1),('clock_00','Fight Recap',0),('bow','Item Position',0),('amethyst_shard','Health Indicator',1),
-('compass_00','Direction',0),('feather','Speed',0),('arrow','Custom Crosshair',1),('sugar','FOV',1),('comparator','Attack Indicator',0),('nether_star','Shield Indicator',0),
-('writable_book','Height Limit',0),('bundle','Inventory HUD',0),('spyglass','Low Health Warning',1)]
-for i,(ic,name,on) in enumerate(mods):
-    cx,cy=PX+9+(i%9)*18,PY+18+(i//9)*18
-    draw_item(im,ic,cx,cy,glint=bool(on))
-# hovered slot highlight + tooltip (Custom Crosshair)
-hx,hy=PX+9+4*18,PY+18+2*18
-hl=Image.new('RGBA',(16,16),(255,255,255,128)); im.alpha_composite(hl,(hx,hy))
-tooltip(im,hx-30,hy+20,[('Custom Crosshair',(255,255,255)),('Aim with your own shape',(170,170,170)),('Enabled',(85,255,85)),('Click: toggle   Right-click: settings',(85,85,85+90))])
-# bottom buttons under the panel
-button(im,PX,PY+142,95,'Edit HUD',hover=True); button(im,PX+100,PY+142,95,'Locker')
-button(im,PX,PY+166,95,'Friends'); button(im,PX+100,PY+166,95,'Done')
-# settings column (vanilla options look)
-SX=290; centered(im,'Custom Crosshair',SX+95,PY-22)
-button(im,SX,PY-6,190,'Enabled: ON'); button(im,SX,PY+18,190,'Shape: Plus')
-slider(im,SX,PY+42,190,'Size: 11',0.4); slider(im,SX,PY+66,190,'Gap: 2',0.33)
-button(im,SX,PY+90,190,'Colour: White'); button(im,SX,PY+114,93,'Outline: ON'); button(im,SX+97,PY+114,93,'3rd Person: OFF')
-button(im,SX,PY+142,190,'Open Crosshair Editor...')
-# style tag
-tg=Image.new('RGBA',(text_w('STYLE C - MINECRAFT')+10,14),(0,0,0,170)); im.alpha_composite(tg,(8,8)); text(im,'STYLE C - MINECRAFT',13,11)
+im=ImageEnhance.Brightness(bg).enhance(0.9)
+im.alpha_composite(Image.new('RGBA',(W,H),(16,16,16,120)))
+# tabs (like Create World), header separator
+TAB=img('gui/sprites/widget/tab.png'); TABS=img('gui/sprites/widget/tab_selected.png')
+cats=['HUD','PvP','Visuals','Utility','Performance','Advanced']
+tw=78; tx0=(W-tw*len(cats))//2
+for i,c in enumerate(cats):
+    nine(im,TABS if i==1 else TAB,tx0+i*tw,0,tw,24)
+    centered(im,c,tx0+i*tw+tw//2,9 if i==1 else 9,(255,255,255) if i==1 else (160,160,160))
+LIST=img('gui/inworld_menu_list_background.png')
+top,bottom=26,H-33
+for yy in range(top,bottom,16):
+    for xx in range(0,W,16):
+        im.alpha_composite(LIST.crop((0,0,min(16,W-xx),min(16,bottom-yy))),(xx,yy))
+HS=img('gui/inworld_header_separator.png'); FS=img('gui/inworld_footer_separator.png')
+for xx in range(0,W,32):
+    im.alpha_composite(HS.crop((0,0,min(32,W-xx),2)),(xx,24)); im.alpha_composite(FS.crop((0,0,min(32,W-xx),2)),(xx,H-33))
+# profile + search row
+button(im,W//2-160,34,100,'Profile: PvP')
+TF=img('gui/sprites/widget/text_field.png'); nine(im,TF,W//2-52,34,212,20,1)
+text(im,'Search modules...',W//2-46,40,(112,112,112),False)
+# module options in two columns, like vanilla Options
+def option(x,y,name,on):
+    w=126
+    button(im,x,y,w,'')
+    label=name+': '; v='ON' if on else 'OFF'
+    tot=text_w(label+v); sx=x+w//2-tot//2
+    sx=text(im,label,sx,y+6); text(im,v,sx+1,y+6,(85,255,85) if on else (255,85,85))
+    button(im,x+w+2,y,22,'...')
+mods=[('Custom Crosshair',1),('Combo Counter',1),('Hit Color',1),('Target HUD',0),('Old Animations',1),('Reach Display',0),('Totem Counter',1),
+('Cooldowns',1),('Pot Counter',0),('Armor Status',1),('Low Fire',1),('Damage Numbers',0),('Hit Sounds',1),('Arrow Counter',1)]
+cx0=W//2-155
+for i,(n,on) in enumerate(mods):
+    col=i%2; row=i//2
+    option(cx0+col*160,62+row*24,n,on)
+# footer buttons
+labels=['Edit HUD','Locker','Friends','Done']
+bw=98; fx=(W-(bw*4+4*3))//2
+for i,l in enumerate(labels):
+    button(im,fx+i*(bw+4),H-26,bw,l,hover=(i==0))
+tg=Image.new('RGBA',(text_w('STYLE C - MINECRAFT')+10,14),(0,0,0,170)); im.alpha_composite(tg,(4,H-48)); text(im,'STYLE C - MINECRAFT',9,H-45)
 im=im.resize((W*3,H*3),Image.NEAREST).crop((0,0,1600,900))
 im.convert('RGB').save(OUT); print('saved')
