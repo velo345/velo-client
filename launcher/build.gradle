@@ -553,7 +553,9 @@ void buildInnoSetup(List<String> appImageCommand, File dist, String version, Str
 		}
 		println("Inno Setup failed with WizardStyle=" + style + ": " + out)
 	}
-	throw new GradleException("Inno Setup couldn't build the installer")
+	// never fails the build: the jpackage installer and the app zips (what updates use) are what a release needs
+	println("WARNING: Inno Setup couldn't build Velo-Client-Setup - releasing without it")
+	imageDir.deleteDir()
 }
 
 // macOS: one .dmg per CPU, built on that CPU's runner (jpackage bundles the JDK that runs it, so an
