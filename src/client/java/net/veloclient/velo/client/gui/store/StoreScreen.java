@@ -242,10 +242,25 @@ public final class StoreScreen extends VeloWindow {
 		StoreCard.coin(context, coinsX + 11f, y + h / 2f, 5f);
 		MenuKit.text(context, this.textRenderer, amount, coinsX + 22, y + (h - 8) / 2, 0xFFFFD56A);
 		MenuKit.text(context, this.textRenderer, plus, coinsX + coinsW - 8 - this.textRenderer.getWidth(plus), y + (h - 8) / 2, MenuKit.accentText());
+		// Free coins: daily reward + quests, gold when something is ready to claim (owner 2026-11-24: nobody found them)
+		int ready = readyRewards();
+		Text free = MenuKit.uiBold(ready > 0 ? "\u2605 " + ready + " ready" : "\u2605 Free coins");
+		freeW = 8 + this.textRenderer.getWidth(free) + 8;
+		freeX = coinsX - 8 - freeW;
+		boolean freeHover = MenuKit.inside(mouseX, mouseY, freeX, y, freeW, h);
+		if (ready > 0) {
+			float pulse = (float) (0.5 + 0.5 * Math.sin(System.nanoTime() / 2.5e8));
+			VeloDraw.fillRounded(context, freeX, y, freeW, h, 6, freeHover ? 0xFFFFD56A : lerpArgb(0xFFF7C04A, 0xFFFFD56A, pulse));
+			MenuKit.text(context, this.textRenderer, free, freeX + 8, y + (h - 8) / 2, 0xFF1A1406);
+		} else {
+			VeloDraw.fillRounded(context, freeX, y, freeW, h, 6, freeHover ? 0x33F7C04A : 0x1AF7C04A);
+			VeloDraw.strokeRounded(context, freeX, y, freeW, h, 6, 0x59F7C04A);
+			MenuKit.text(context, this.textRenderer, free, freeX + 8, y + (h - 8) / 2, 0xFFFFD56A);
+		}
 		// My Locker: where you equip what you own.
 		Text locker = MenuKit.ui("My Locker");
 		lockerW = 8 + 10 + 4 + this.textRenderer.getWidth(locker) + 8;
-		lockerX = coinsX - 8 - lockerW;
+		lockerX = freeX - 8 - lockerW;
 		boolean lockerHover = MenuKit.inside(mouseX, mouseY, lockerX, y, lockerW, h);
 		VeloDraw.fillRounded(context, lockerX, y, lockerW, h, 6, lockerHover ? 0x1AFFFFFF : 0x0DFFFFFF);
 		VeloDraw.strokeRounded(context, lockerX, y, lockerW, h, 6, lockerHover ? 0x38FFFFFF : 0x17FFFFFF);
@@ -282,7 +297,7 @@ public final class StoreScreen extends VeloWindow {
 	protected boolean headerClick(int mouseX, int mouseY) {
 		int h = 18;
 		int y = windowY + (HEADER_HEIGHT - h) / 2;
-		if (MenuKit.inside(mouseX, mouseY, coinsX, y, coinsW, h)) {
+		if (MenuKit.inside(mouseX, mouseY, coinsX, y, coinsW, h) || MenuKit.inside(mouseX, mouseY, freeX, y, freeW, h)) {
 			this.client.setScreen(new BuyCoinsScreen(this));
 			return true;
 		}
@@ -1053,6 +1068,28 @@ public final class StoreScreen extends VeloWindow {
 		if (!discordError.isEmpty()) {
 			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(discordError), cw - 36), tx, bottom, MenuKit.RED_TEXT);
 		}
+	}
+
+	private int freeX;
+	private int freeW;
+
+	/** Daily reward + quests that can be claimed right now. */
+	private static int readyRewards() {
+		StoreClient.Rewards r = StoreClient.rewards();
+		if (r == null) {
+			return 0;
+		}
+		int n = r.loginClaimable() ? 1 : 0;
+		for (StoreClient.Quest q : r.quests()) {
+			if (q.claimable()) {
+				n++;
+			}
+		}
+		return n;
+	}
+
+	private static int lerpArgb(int a, int b, float t) {
+		return net.veloclient.velo.client.gui.widget.VeloAnim.lerpArgb(a, b, t);
 	}
 
 	private static String balanceText() {

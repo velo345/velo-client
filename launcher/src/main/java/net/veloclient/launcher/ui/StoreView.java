@@ -260,7 +260,8 @@ public final class StoreView {
 		scroll.setFitToWidth(true);
 		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 		VBox.setVgrow(scroll, Priority.ALWAYS);
-		VBox page = new VBox(18, header, scroll);
+		// free coins right where people shop (daily reward + today's quests with Claim buttons)
+		VBox page = new VBox(18, header, RewardsStrip.build(host::openCoins), scroll);
 		page.getStyleClass().add("page");
 		return page;
 	}

@@ -140,23 +140,40 @@ final class SessionRegistry {
 		return KIND_LAUNCHER.equals(kind) ? KIND_LAUNCHER : KIND_GAME;
 	}
 
+	/**
+	 * A new challenge. Keyed by its own random serverId, several may be open per account: with one slot per uuid anybody
+	 * could keep asking challenges for somebody else's uuid and overwrite theirs, so that player's sign-in always failed.
+	 * At most {@value #MAX_CHALLENGES_PER_UUID} open per account (the oldest goes), expired ones are dropped as new ones come.
+	 */
 	String createChallenge(String uuid, String username, String kind) {
+		long now = System.currentTimeMillis();
+		if (challengesByUuid.size() > 50_000) {
+			challengesByUuid.entrySet().removeIf(e -> e.getValue().expiresAtMillis() < now);
+		}
+		String normalizedKind = normalizeKind(kind);
+		java.util.List<Challenge> mine = challengesByUuid.values().stream().filter(c -> c.uuid().equals(uuid))
+				.sorted(java.util.Comparator.comparingLong(Challenge::expiresAtMillis)).toList();
+		for (int i = 0; i <= mine.size() - MAX_CHALLENGES_PER_UUID; i++) {
+			challengesByUuid.remove(mine.get(i).serverId());
+		}
 		String serverId = randomHex(16);
-		// Keyed per uuid+kind, so the launcher and the game authenticating at the same moment
-		// don't overwrite each other's pending challenge.
-		challengesByUuid.put(uuid + "/" + normalizeKind(kind), new Challenge(uuid, username, normalizeKind(kind), serverId,
-				System.currentTimeMillis() + CHALLENGE_TTL_MILLIS));
+		challengesByUuid.put(serverId, new Challenge(uuid, username, normalizedKind, serverId, now + CHALLENGE_TTL_MILLIS));
 		return serverId;
 	}
 
-	/** Consumes the pending challenge for {@code uuid} if {@code serverId} matches and it hasn't expired; null otherwise. */
+	private static final int MAX_CHALLENGES_PER_UUID = 6;
+
+	/** Consumes the pending challenge {@code serverId} if it is {@code uuid}'s, of that kind and not expired; null otherwise. */
 	Challenge takeChallenge(String uuid, String kind, String serverId) {
-		String key = uuid + "/" + normalizeKind(kind);
-		Challenge challenge = challengesByUuid.get(key);
-		if (challenge == null || challenge.expiresAtMillis() < System.currentTimeMillis() || !challenge.serverId().equals(serverId)) {
+		if (serverId == null) {
 			return null;
 		}
-		challengesByUuid.remove(key);
+		Challenge challenge = challengesByUuid.get(serverId);
+		if (challenge == null || challenge.expiresAtMillis() < System.currentTimeMillis() || !challenge.uuid().equals(uuid)
+				|| !challenge.kind().equals(normalizeKind(kind))) {
+			return null;
+		}
+		challengesByUuid.remove(serverId);
 		return challenge;
 	}
 

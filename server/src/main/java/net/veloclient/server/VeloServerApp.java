@@ -412,7 +412,23 @@ public final class VeloServerApp {
 	private record ChallengeResponse(String serverId) {
 	}
 
+	/** Sign-in attempts per address: a sign-in needs 1 challenge + 1 verify, a busy household a few more. */
+	private static final RateLimiter AUTH_LIMIT = new RateLimiter();
+
+	private static boolean authLimited(HttpExchange exchange, String action) throws IOException {
+		long wait = AUTH_LIMIT.tryAcquire(WebRoutes.clientIp(exchange), action,
+				new RateLimiter.Window(40, 60_000L), new RateLimiter.Window(600, 3_600_000L));
+		if (wait > 0) {
+			JsonHttp.writeError(exchange, 429, "Too many sign-in attempts - try again in " + Math.max(1, wait / 1000) + " s");
+			return true;
+		}
+		return false;
+	}
+
 	private static void handleChallenge(HttpExchange exchange, SessionRegistry registry) throws IOException {
+		if (authLimited(exchange, "challenge")) {
+			return;
+		}
 		ChallengeRequest request = JsonHttp.readBody(exchange, ChallengeRequest.class);
 		String uuid = normalizeUuid(request.uuid());
 		String username = validUsername(request.username());
@@ -431,6 +447,9 @@ public final class VeloServerApp {
 	}
 
 	private static void handleVerify(HttpExchange exchange, SessionRegistry registry) throws IOException {
+		if (authLimited(exchange, "verify")) {
+			return;
+		}
 		VerifyRequest request = JsonHttp.readBody(exchange, VerifyRequest.class);
 		String uuid = normalizeUuid(request.uuid());
 		if (uuid == null || request.serverId() == null || request.serverId().isBlank()) {

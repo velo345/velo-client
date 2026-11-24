@@ -146,7 +146,7 @@ public final class StoreConfig {
 	public static final class Plus {
 		public double price = 9.99;
 		public int periodDays = 30;
-		public int monthlyCoins = 2000;
+		public int monthlyCoins = 3000;
 		/** Free Velo+ once per account that never had it (0 = no trial). No monthly coins during the trial. */
 		public int trialDays = 7;
 		/** Velo+ for a year, paid at once (0 = only monthly). Members get the monthly coins all year. */
@@ -278,6 +278,11 @@ public final class StoreConfig {
 		if (config.plus.price == 8.99 && config.plus.monthlyCoins == 2500) {
 			config.plus.price = 9.99;
 			config.plus.monthlyCoins = 2000;
+			added = true;
+		}
+		// 2026-11-24 (owner): Velo+ comes with 3,000 coins a month
+		if (config.plus.monthlyCoins == 2000) {
+			config.plus.monthlyCoins = 3000;
 			added = true;
 		}
 		List<Item> merged = new java.util.ArrayList<>(config.items);
