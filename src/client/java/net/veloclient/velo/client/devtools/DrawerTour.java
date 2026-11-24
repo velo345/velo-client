@@ -25,6 +25,7 @@ public final class DrawerTour {
 				case 80 -> {
 					screen = new VeloDrawerScreen();
 					client.setScreen(screen);
+					screen.testExpanded(false);
 				}
 				case 110 -> shot(client, "drawer-1-home.png");
 				case 115 -> screen.testCategory("HUD");
@@ -40,10 +41,21 @@ public final class DrawerTour {
 				case 230 -> shot(client, "drawer-5-profiles.png");
 				case 235 -> {
 					screen.testProfileMenu(false);
+					screen.testExpanded(true);
+				}
+				case 239 -> shot(client, "drawer-6-morph.png");
+				case 270 -> shot(client, "drawer-7-full.png");
+				case 275 -> screen.testCategory("PvP");
+				case 300 -> shot(client, "drawer-8-full-pvp.png");
+				case 305 -> screen.testModule("performance-boost");
+				case 335 -> shot(client, "drawer-9-full-module.png");
+				case 340 -> {
+					screen.testExpanded(false);
+					screen.testHome();
 					screen.testOpen(false);
 				}
-				case 260 -> shot(client, "drawer-6-collapsed.png");
-				case 280 -> client.scheduleStop();
+				case 370 -> shot(client, "drawer-10-collapsed.png");
+				case 390 -> client.scheduleStop();
 				default -> {
 				}
 			}
