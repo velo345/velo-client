@@ -154,6 +154,9 @@ final class TesterRoutes {
 					links.put(os, base + os);
 				}
 			}
+			for (String mc : tester.newestJarVersions()) {
+				links.put("jar-" + mc, base + "jar-" + mc);
+			}
 			List<Map<String, Object>> builds = tester.builds();
 			JsonHttp.writeJson(ex, 200, Map.of("name", t.name, "links", links, "version", builds.isEmpty() ? "" : builds.get(0).get("version")));
 		});

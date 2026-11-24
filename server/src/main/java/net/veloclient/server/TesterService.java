@@ -310,6 +310,26 @@ final class TesterService {
 	}
 
 	/** The newest build's installer for a system: windows / mac-arm / mac-intel / linux-deb / linux-tar. */
+	/** The Minecraft versions the newest build has a tester mod jar for, oldest first. */
+	List<String> newestJarVersions() {
+		for (Map<String, Object> b : builds()) {
+			@SuppressWarnings("unchecked")
+			List<Map<String, Object>> files = (List<Map<String, Object>>) b.get("files");
+			List<String> out = new ArrayList<>();
+			for (Map<String, Object> f : files) {
+				String name = (String) f.get("name");
+				if (name.startsWith("velo-client-tester-") && name.endsWith(".jar") && name.contains("+")) {
+					out.add(name.substring(name.lastIndexOf('+') + 1, name.length() - 4));
+				}
+			}
+			if (!out.isEmpty()) {
+				out.sort(Comparator.naturalOrder());
+				return out;
+			}
+		}
+		return List.of();
+	}
+
 	Path newestInstaller(String os) {
 		for (Map<String, Object> b : builds()) {
 			@SuppressWarnings("unchecked")
@@ -322,7 +342,9 @@ final class TesterService {
 					case "mac-intel" -> name.endsWith("-macos-x64.dmg");
 					case "linux-deb" -> name.endsWith(".deb");
 					case "linux-tar" -> name.endsWith("-linux-x64.tar.gz");
-					default -> false;
+					// "jar-26.2": the tester mod jar for that Minecraft version (players on another launcher)
+					default -> os != null && os.startsWith("jar-") && os.length() < 20 && name.startsWith("velo-client-tester-")
+							&& name.endsWith("+" + os.substring(4) + ".jar");
 				};
 				if (match) {
 					return buildsDir.resolve((String) b.get("version")).resolve(name);

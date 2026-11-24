@@ -155,6 +155,8 @@ public final class SkyboxModule extends AbstractModule implements Configurable {
 	private static double sunAngle() {
 		//? if >=26.2 {
 		/*return VeloShadersModule.sunAngle();
+		*///?} else if >=26.1 {
+		/*return 0; // no Custom Skybox on 26.1
 		*///?} else {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client.world == null) {
@@ -170,6 +172,8 @@ public final class SkyboxModule extends AbstractModule implements Configurable {
 	private static int moonPhase() {
 		//? if >=26.2 {
 		/*return VeloShadersModule.moonPhase();
+		*///?} else if >=26.1 {
+		/*return 0;
 		*///?} else {
 		MinecraftClient client = MinecraftClient.getInstance();
 		return client.world == null ? 0 : (int) Math.floorMod(client.world.getTimeOfDay() / 24000L, 8L);

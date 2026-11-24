@@ -1,0 +1,24 @@
+{
+  "title": "Faster start, less RAM, the new Tester window",
+  "summary": "This build starts faster, gives about 1 GB of RAM back once the game is loaded, fixes the updater on Windows and brings the Custom Skybox to 1.21.10 / 1.21.11. Go through the list below one by one - if something is broken, the report window takes a screenshot or a short video and always sends your logs with it.",
+  "changes": [
+    "New Tester window: test plan, reports with screenshots / videos, live logs",
+    "Faster game start (block shapes on all CPU cores, cloak library read faster) and ~1 GB less RAM in the menu",
+    "Updater: downloads and unpacks in the background, Install & Restart restarts straight into the new version",
+    "Custom Skybox is drawn behind clouds and everything else, cheaper - and now on 1.21.10 / 1.21.11 too",
+    "Low Latency Mode (new, off by default) and a throttle for a hidden game window",
+    "Fixes: time changer kept by servers, keybind typing into the search box, doubled cloaks, Minecraft cape under Velo cloaks, crosshairs off-centre, player heads"
+  ],
+  "test": [
+    {"id": "tester-window", "title": "This Tester window", "how": "Send one test report from the Report page with a screenshot (Paste screenshot works too). Check the Logs page shows your launcher and game logs live."},
+    {"id": "start-time", "title": "Game start", "how": "Start the game a few times. Does it feel faster than before? Anything black, missing or crashing?"},
+    {"id": "ram", "title": "RAM in the menu", "how": "Wait 10 seconds on the title screen, then look at Task Manager (Windows) / System Monitor. Roughly how much does Minecraft use now?"},
+    {"id": "skybox", "title": "Custom Skybox", "how": "R-Shift > Custom Skybox. Are clouds, water and lyrics in front of the sky? On 1.21.10 / 1.21.11: does it show at all?", "modules": ["custom-skybox"]},
+    {"id": "time-changer", "title": "Time changer on servers", "how": "Time, Weather & Fog > set a fixed time, join a server and wait a minute. Does the time stay?", "modules": ["time-weather-fog"]},
+    {"id": "keybinds", "title": "Changing keybinds", "how": "Controls / Velo keybinds: type something in the search, click a keybind and press a letter. Does the letter end up in the search box?"},
+    {"id": "cloaks", "title": "Cloaks", "how": "Wear a Velo cloak. Is your Minecraft cape gone under it? Is any cloak listed twice in the Locker?"},
+    {"id": "crosshair", "title": "Custom crosshair", "how": "Equip a custom crosshair. Is it exactly in the middle?"},
+    {"id": "low-latency", "title": "Low Latency Mode", "how": "Turn it on (R-Shift > Low Latency Mode), play a bit. Does aiming feel more direct? FPS drop is expected.", "modules": ["low-latency"]},
+    {"id": "hidden-window", "title": "Hidden window", "how": "Windows / Mac: put a browser fullscreen over the game for a minute. Does the PC get quieter? Does the game come back instantly?"}
+  ]
+}

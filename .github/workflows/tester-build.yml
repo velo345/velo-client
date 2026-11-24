@@ -63,6 +63,25 @@ jobs:
             echo
           done
 
+      # Players who use only the mod (another launcher): the tester mod jar for every Minecraft version. Never the add-ons.
+      - name: Upload the tester mod jars
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.VELO_TESTER_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          for jar in versions/*/build/libs/velo-client-*-dev+*.jar; do
+            case "$jar" in *-sources.jar) continue;; esac
+            mc="${jar##*+}"; mc="${mc%.jar}"
+            name="velo-client-tester-$TESTER_VERSION+$mc.jar"
+            echo "Uploading $name"
+            curl -fsS --retry 3 --retry-all-errors -X POST -H "X-Velo-Tester-Token: $TOKEN" \
+              -H "Content-Type: application/octet-stream" --data-binary @"$jar" \
+              "$VELO_SERVER/v1/admin/tester/file?version=$TESTER_VERSION&name=$name"
+            echo
+          done
+
       - name: Upload the build notes
         if: runner.os == 'Linux'
         shell: bash

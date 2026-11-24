@@ -190,6 +190,11 @@ public final class VeloCommands {
 					openLater(() -> new StoreScreen(null));
 					return 1;
 				}))
+				// testers who only use the mod jar: the test plan and reports (TesterScreen; tells everyone else how to become one)
+				.then(ClientCmd.literal("tester").executes(context -> {
+					openLater(() -> new net.veloclient.velo.client.tester.TesterScreen(null));
+					return 1;
+				}))
 				.then(ClientCmd.literal("map").executes(context -> {
 					openLater(() -> new WorldMapScreen(null));
 					return 1;

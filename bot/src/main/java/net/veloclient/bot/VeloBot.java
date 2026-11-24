@@ -238,13 +238,25 @@ public final class VeloBot extends ListenerAdapter {
 				StringBuilder text = new StringBuilder("**Velo Client Tester " + res.get("version").getAsString() + "** - your personal links (valid 24 h, don't share them):\n");
 				String[][] names = {{"windows", "Windows"}, {"mac-arm", "macOS (Apple Silicon)"}, {"mac-intel", "macOS (Intel)"},
 						{"linux-deb", "Linux (.deb)"}, {"linux-tar", "Linux (other distros, .tar.gz)"}};
+				text.append("\n**Tester launcher** (recommended):");
 				for (String[] n : names) {
 					if (links.has(n[0])) {
 						text.append("\n• [").append(n[1]).append("](").append(links.get(n[0]).getAsString()).append(")");
 					}
 				}
-				text.append("\n\nInstall it, sign in, and open **Testing** in the sidebar - it shows what to test and updates itself from then on.");
+				StringBuilder jars = new StringBuilder();
+				for (var e : links.entrySet()) {
+					if (e.getKey().startsWith("jar-")) {
+						jars.append("\n• [Minecraft ").append(e.getKey().substring(4)).append("](").append(e.getValue().getAsString()).append(")");
+					}
+				}
+				text.append("\n\nLauncher: sign in, the Tester window opens with it.");
 				event.getHook().sendMessage(text.toString()).queue();
+				if (!jars.isEmpty()) {
+					// own message: Discord stops at 2000 characters and every signed link is ~190
+					event.getHook().sendMessage("**Only the mod** (your own launcher - into your mods folder, needs Fabric API; type **/velo tester** in game "
+							+ "for the test plan and reports):" + jars).queue();
+				}
 			} catch (ServerApi.ApiException e) {
 				event.getHook().sendMessage("not-tester".equals(e.getMessage())
 						? "Link your Minecraft account first with **/link** (code from Velo Client > Settings), then try /tester again in a few minutes."
