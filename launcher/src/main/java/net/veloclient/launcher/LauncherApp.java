@@ -352,6 +352,9 @@ public final class LauncherApp extends Application {
 		boolean firstStart = ensureDefaultProfile();
 		stage.show();
 		net.veloclient.launcher.launch.AppUpdate.started();
+		if (AppVersion.DEV) {
+			net.veloclient.launcher.ui.TesterLogging.install();
+		}
 		shownAt = System.nanoTime();
 		splash.intro(() -> {
 			try {
@@ -1115,11 +1118,10 @@ public final class LauncherApp extends Application {
 	}
 
 	/** The Velo Client Tester page: builds, what to test, feedback, and (owners) who tests. */
+	/** The Testing nav row: the Tester window (2026-11-24 - replaced the in-launcher Testing page). */
 	private void showTesting() {
-		currentPage = this::showTesting;
-		setActivePage("testing");
-		setContent(net.veloclient.launcher.ui.TestingView.build());
-		refreshLaunchBar();
+		net.veloclient.launcher.ui.TesterWindow.open(stage, themeStyle());
+		net.veloclient.launcher.ui.TesterWindow.toFront();
 	}
 
 	private volatile boolean testerChecked;
@@ -1127,6 +1129,10 @@ public final class LauncherApp extends Application {
 	/** Tester build, once connected: what's new in this build (once), then a newer build downloaded in the background. */
 	private void testerStartup() {
 		Platform.runLater(() -> {
+			// the Tester window comes up with the launcher, behind it
+			if (stage != null && stage.isShowing()) {
+				net.veloclient.launcher.ui.TesterWindow.open(stage, themeStyle());
+			}
 			if (layers != null) {
 				net.veloclient.launcher.ui.TestingView.maybeShowWhatsNew(layers, this::showTesting);
 			}

@@ -68,6 +68,55 @@ final class TesterRoutes {
 			JsonHttp.writeJson(ex, 200, tester.overview());
 		});
 
+		// The Tester window: reports (a broken test item, a bug, a suggestion) with logs, then their screenshots / videos.
+		authed(server, registry, tester, store, "/v1/tester/report", "POST", true, (ex, s, owner) -> {
+			JsonObject body = JsonParser.parseString(new String(JsonHttp.readRawBody(ex, 12 * 1024 * 1024), StandardCharsets.UTF_8)).getAsJsonObject();
+			try {
+				TesterService.Report r = tester.addReport(s.uuid(), s.username(), body);
+				JsonHttp.writeJson(ex, 200, Map.of("id", r.id));
+			} catch (IllegalArgumentException e) {
+				JsonHttp.writeError(ex, 400, e.getMessage());
+			}
+		});
+		authed(server, registry, tester, store, "/v1/tester/attachment", "POST", true, (ex, s, owner) -> {
+			Map<String, String> q = StoreRoutes.query(ex);
+			try {
+				long size = tester.putAttachment(s.uuid(), owner, q.get("report"), q.get("name"), ex.getRequestBody());
+				JsonHttp.writeJson(ex, 200, Map.of("stored", q.get("name"), "size", size));
+			} catch (IllegalArgumentException e) {
+				JsonHttp.writeError(ex, 400, e.getMessage());
+			}
+		});
+		authed(server, registry, tester, store, "/v1/tester/reports", "GET", true, (ex, s, owner) -> {
+			if (!owner) {
+				JsonHttp.writeError(ex, 403, "Owners only");
+				return;
+			}
+			JsonHttp.writeJson(ex, 200, Map.of("reports", tester.reports()));
+		});
+		authed(server, registry, tester, store, "/v1/tester/report/status", "POST", true, (ex, s, owner) -> {
+			Map<String, String> q = StoreRoutes.query(ex);
+			if (!owner) {
+				JsonHttp.writeError(ex, 403, "Owners only");
+				return;
+			}
+			JsonHttp.writeJson(ex, tester.setReportStatus(q.get("id"), q.get("status")) ? 200 : 404, Map.of("ok", true));
+		});
+		authed(server, registry, tester, store, "/v1/tester/report/file", "GET", true, (ex, s, owner) -> {
+			Map<String, String> q = StoreRoutes.query(ex);
+			if (!owner) {
+				JsonHttp.writeError(ex, 403, "Owners only");
+				return;
+			}
+			var path = tester.reportFile(q.get("id"), q.get("name"));
+			if (path == null || !java.nio.file.Files.isRegularFile(path)) {
+				JsonHttp.writeError(ex, 404, "No such file");
+				return;
+			}
+			ex.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"" + path.getFileName() + "\"");
+			JsonHttp.writeFile(ex, path, java.nio.file.Files.size(path), "application/octet-stream", null, "no-store");
+		});
+
 		upload(server, adminToken, uploadToken, "/v1/admin/tester/file", ex -> {
 			Map<String, String> q = StoreRoutes.query(ex);
 			try {

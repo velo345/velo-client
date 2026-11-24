@@ -128,6 +128,56 @@ public final class TesterApi {
 		});
 	}
 
+	/** A report from the Tester window (text + logs); returns its id for {@link #attach}. */
+	public static String report(JsonObject report) throws TesterError {
+		JsonObject json = send(request("/v1/tester/report", Duration.ofSeconds(60)).header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(report.toString())).build());
+		return json.get("id").getAsString();
+	}
+
+	/** Uploads one screenshot / video for a report. */
+	public static void attach(String reportId, Path file) throws TesterError {
+		try {
+			String name = file.getFileName().toString();
+			send(request("/v1/tester/attachment?report=" + enc(reportId) + "&name=" + enc(name), Duration.ofMinutes(15))
+					.header("Content-Type", "application/octet-stream").POST(HttpRequest.BodyPublishers.ofFile(file)).build());
+		} catch (java.io.FileNotFoundException e) {
+			throw new TesterError(0, "File not found: " + file);
+		}
+	}
+
+	/** Owners: every report, newest first. */
+	public static JsonArray reports() throws TesterError {
+		JsonObject json = send(request("/v1/tester/reports", Duration.ofSeconds(20)).GET().build());
+		return json.has("reports") ? json.getAsJsonArray("reports") : new JsonArray();
+	}
+
+	/** Owners: open / fixed / wontfix. */
+	public static void reportStatus(String id, String status) throws TesterError {
+		send(request("/v1/tester/report/status?id=" + enc(id) + "&status=" + enc(status), Duration.ofSeconds(15))
+				.POST(HttpRequest.BodyPublishers.noBody()).build());
+	}
+
+	/** Owners: downloads one file of a report. */
+	public static void reportFile(String id, String name, Path target) throws TesterError, IOException {
+		HttpResponse<InputStream> response;
+		try {
+			response = HTTP.send(request("/v1/tester/report/file?id=" + enc(id) + "&name=" + enc(name), Duration.ofMinutes(10)).GET().build(),
+					HttpResponse.BodyHandlers.ofInputStream());
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new TesterError(0, "Interrupted");
+		}
+		if (response.statusCode() != 200) {
+			response.body().close();
+			throw new TesterError(response.statusCode(), "Download failed (" + response.statusCode() + ")");
+		}
+		Files.createDirectories(target.getParent());
+		try (InputStream in = response.body()) {
+			Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+		}
+	}
+
 	public static JsonObject eventOf(String kind, String version) {
 		JsonObject e = new JsonObject();
 		e.addProperty("kind", kind);

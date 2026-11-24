@@ -48,6 +48,29 @@ final class TesterService {
 		String state;      // "works" / "broken" / "skip"
 		String comment;
 		long at;
+		/** The full report (text, logs, screenshots/videos) behind a "broken", see {@link Report}. */
+		String reportId;
+	}
+
+	/**
+	 * A tester's report from the Tester window: a "broken" test item, or a free bug report / suggestion. Text in
+	 * tester.json; logs and attachments as files in tester/reports/&lt;id&gt;/.
+	 */
+	static final class Report {
+		String id;
+		String uuid;
+		String name;
+		String version;
+		/** The test item, or null for a free report. */
+		String item;
+		/** "broken" (test item) / "bug" / "suggestion" */
+		String type;
+		String title;
+		String text;
+		long at;
+		List<String> files = new ArrayList<>();
+		/** Owner's status: "open" / "fixed" / "wontfix" */
+		String status = "open";
 	}
 
 	static final class Stat {
@@ -65,6 +88,7 @@ final class TesterService {
 		Map<String, Tester> testers = new LinkedHashMap<>();
 		/** uuid -> version -> stat */
 		Map<String, Map<String, Stat>> stats = new LinkedHashMap<>();
+		List<Report> reports = new ArrayList<>();
 	}
 
 	private final Path dir;
@@ -89,6 +113,9 @@ final class TesterService {
 					}
 					if (data.stats == null) {
 						data.stats = new LinkedHashMap<>();
+					}
+					if (data.reports == null) {
+						data.reports = new ArrayList<>();
 					}
 				}
 			} catch (RuntimeException e) {
@@ -367,6 +394,141 @@ final class TesterService {
 			default -> throw new IllegalArgumentException("Unknown event");
 		}
 		save();
+	}
+
+	private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
+	private static final long MAX_ATTACHMENT = 200L * 1024 * 1024;
+	private static final int MAX_FILES = 12;
+	private static final java.util.regex.Pattern ATTACHMENT = java.util.regex.Pattern.compile(
+			"[A-Za-z0-9._ ()-]{1,100}\\.(png|jpe?g|gif|webp|bmp|mp4|webm|mov|mkv|txt|log|zip)", java.util.regex.Pattern.CASE_INSENSITIVE);
+
+	private Path reportDir(String id) {
+		return dir.resolve("reports").resolve(id);
+	}
+
+	/**
+	 * A report from the Tester window (logs inline, attachments follow with {@link #putAttachment}). A "broken" test item
+	 * also becomes that item's feedback.
+	 */
+	synchronized Report addReport(String uuid, String name, JsonObject body) throws IOException {
+		String version = body.has("version") ? body.get("version").getAsString() : null;
+		if (!safeVersion(version)) {
+			throw new IllegalArgumentException("Bad version");
+		}
+		String type = body.has("type") ? body.get("type").getAsString() : "bug";
+		if (!List.of("broken", "bug", "suggestion").contains(type)) {
+			throw new IllegalArgumentException("Bad type");
+		}
+		Report r = new Report();
+		byte[] idBytes = new byte[6];
+		RANDOM.nextBytes(idBytes);
+		r.id = java.util.HexFormat.of().formatHex(idBytes);
+		r.uuid = key(uuid);
+		r.name = name;
+		r.version = version;
+		r.item = body.has("item") && !body.get("item").isJsonNull() ? clip(body.get("item").getAsString(), 80) : null;
+		r.type = type;
+		r.title = clip(body.has("title") ? body.get("title").getAsString() : "", 160);
+		r.text = clip(body.has("text") ? body.get("text").getAsString() : "", 8000);
+		r.at = System.currentTimeMillis();
+		Path rd = reportDir(r.id);
+		Files.createDirectories(rd);
+		for (String log : List.of("launcherLog", "gameLog", "updateLog")) {
+			if (body.has(log) && !body.get(log).isJsonNull()) {
+				String name2 = log.equals("launcherLog") ? "launcher.log" : log.equals("gameLog") ? "game.log" : "update.log";
+				Files.writeString(rd.resolve(name2), clip(body.get(log).getAsString(), 3 * 1024 * 1024), StandardCharsets.UTF_8);
+				r.files.add(name2);
+			}
+		}
+		data.reports.add(0, r);
+		if (r.item != null) {
+			Stat st = stat(uuid, version);
+			Feedback f = new Feedback();
+			f.state = "broken";
+			f.comment = clip(r.text, 1500);
+			f.at = r.at;
+			f.reportId = r.id;
+			st.feedback.put(r.item, f);
+			st.lastSeen = r.at;
+		}
+		save();
+		System.out.println("[tester] report " + r.id + " from " + name + " (" + type + (r.item != null ? " " + r.item : "") + "): " + r.title);
+		return r;
+	}
+
+	/** A screenshot / video / file for one of the tester's own reports, streamed to disk. */
+	long putAttachment(String uuid, boolean owner, String reportId, String fileName, InputStream body) throws IOException {
+		Report r;
+		synchronized (this) {
+			r = data.reports.stream().filter(x -> x.id.equals(reportId)).findFirst().orElse(null);
+			if (r == null || !(owner || r.uuid.equals(key(uuid)))) {
+				throw new IllegalArgumentException("No such report");
+			}
+			if (fileName == null || !ATTACHMENT.matcher(fileName).matches() || fileName.contains("..")) {
+				throw new IllegalArgumentException("Pictures, videos, logs or zips only");
+			}
+			if (r.files.size() >= MAX_FILES) {
+				throw new IllegalArgumentException("Too many files on this report");
+			}
+		}
+		String safe = fileName.replace(' ', '_');
+		Path target = reportDir(reportId).resolve(safe);
+		Path tmp = target.resolveSibling(safe + ".part");
+		long total = 0;
+		try (InputStream in = body; var out = Files.newOutputStream(tmp)) {
+			byte[] buffer = new byte[1 << 16];
+			for (int n; (n = in.read(buffer)) > 0; ) {
+				total += n;
+				if (total > MAX_ATTACHMENT) {
+					throw new IllegalArgumentException("Files up to 200 MB");
+				}
+				out.write(buffer, 0, n);
+			}
+		} catch (IOException | RuntimeException e) {
+			Files.deleteIfExists(tmp);
+			throw e;
+		}
+		Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+		synchronized (this) {
+			if (!r.files.contains(safe)) {
+				r.files.add(safe);
+			}
+			save();
+		}
+		return total;
+	}
+
+	/** Owner: every report, newest first. */
+	synchronized List<Report> reports() {
+		return List.copyOf(data.reports);
+	}
+
+	/** Owner: mark a report open / fixed / wontfix. */
+	synchronized boolean setReportStatus(String id, String status) {
+		if (!List.of("open", "fixed", "wontfix").contains(status)) {
+			return false;
+		}
+		for (Report r : data.reports) {
+			if (r.id.equals(id)) {
+				r.status = status;
+				save();
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** One stored file of a report, or null. */
+	synchronized Path reportFile(String id, String name) {
+		if (id == null || !id.matches("[0-9a-f]{12}") || name == null) {
+			return null;
+		}
+		for (Report r : data.reports) {
+			if (r.id.equals(id) && r.files.contains(name)) {
+				return reportDir(id).resolve(name);
+			}
+		}
+		return null;
 	}
 
 	private static String clip(String s, int max) {
