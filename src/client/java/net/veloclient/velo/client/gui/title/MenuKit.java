@@ -256,10 +256,13 @@ public final class MenuKit {
 	public static void toggle(DrawContext context, int x, int y, float progress) {
 		int w = 16;
 		int h = 9;
-		int track = VeloAnim.lerpArgb(0xFF3A3A42, accent(), progress);
+		boolean glass = net.veloclient.velo.client.gui.widget.VeloStyle.glass();
+		int track = VeloAnim.lerpArgb(glass ? 0x40FFFFFF : 0xFF3A3A42, accent(), progress);
 		VeloDraw.fillRounded(context, x, y, w, h, h / 2, track);
 		float knobX = x + 1 + (w - h) * progress;
-		VeloDraw.fillCircle(context, knobX + (h - 2) / 2f, y + h / 2f, (h - 2) / 2f, 0xFFFFFFFF);
+		// glass: the track turns white when on, so the knob turns dark (white on white vanished)
+		int knob = glass ? VeloAnim.lerpArgb(0xFFFFFFFF, 0xFF141416, progress) : 0xFFFFFFFF;
+		VeloDraw.fillCircle(context, knobX + (h - 2) / 2f, y + h / 2f, (h - 2) / 2f, knob);
 	}
 
 	/** A keyboard key hint ("ESC", "R-SHIFT") in mono, right-aligned at {@code right}. */

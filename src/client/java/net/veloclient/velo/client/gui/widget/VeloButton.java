@@ -64,7 +64,7 @@ public class VeloButton extends ClickableWidget {
 		int w = getWidth();
 		int h = getHeight();
 		boolean glass = VeloStyle.glass();
-		float radius = glass ? h / 2f : Math.min(VeloStyle.RADIUS_CONTROL, h / 2);   // glass: pills
+		float radius = glass ? Math.min(h / 2f, 10f) : Math.min(VeloStyle.RADIUS_CONTROL, h / 2);   // glass: pills (tall buttons get corners, not a stadium)
 		VeloStyle.pushScale(context, x + w / 2f, y + h / 2f, VeloStyle.pressScale(pressedAt));
 
 		// 0.9.7 (launcher look): primary = flat accent; selected (a sidebar entry) = soft accent tint with white text;

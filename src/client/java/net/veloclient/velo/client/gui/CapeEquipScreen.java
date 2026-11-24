@@ -410,7 +410,7 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 	/** The stage's top-left switch: "Armor" on/off for the preview (launcher's Full look / Cloak only spot). */
 	private static int[] armorBox(net.minecraft.client.font.TextRenderer font) {
 		int w = MenuKit.width(font, MenuKit.uiBold("Armor")) + 30;
-		return new int[] {stageX() + 8, frameY + 8, w, 16};
+		return new int[] {stageX() + 8, stageBottom() - 26, w, 18};   // bottom-left: the name tag above the head covered it at the top
 	}
 
 	private static boolean armorShown;
@@ -421,10 +421,9 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		int[] r = armorBox(font);
 		boolean on = !net.veloclient.velo.client.gui.widget.EntityPreviewWidget.hideArmor;
 		boolean hovered = MenuKit.inside(mouseX, mouseY, r[0], r[1], r[2], r[3]);
-		VeloDraw.fillRounded(context, r[0], r[1], r[2], r[3], 5, hovered ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF241D1E, 0x24FFFFFF) : net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF1A1516, 0x14FFFFFF));
-		VeloDraw.strokeRounded(context, r[0], r[1], r[2], r[3], 5, 0x18FFFFFF);
-		MenuKit.text(context, font, MenuKit.uiBold("Armor"), r[0] + 7, r[1] + 4, on ? MenuKit.TEXT : 0xFF8E8384);
-		net.veloclient.velo.client.gui.widget.VeloToggle.drawSwitch(context, r[0] + r[2] - 19, r[1] + 4, 14, 8, on ? 1f : 0f, hovered ? 1f : 0f);
+		VeloDraw.fillRounded(context, r[0], r[1], r[2], r[3], 9, hovered ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF241D1E, 0x24FFFFFF) : net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF1A1516, 0x14FFFFFF));
+		MenuKit.text(context, font, MenuKit.uiBold("Armor"), r[0] + 8, r[1] + 5, on ? MenuKit.TEXT : 0xFF8E8384);
+		net.veloclient.velo.client.gui.widget.VeloToggle.drawSwitch(context, r[0] + r[2] - 20, r[1] + 5, 14, 8, on ? 1f : 0f, hovered ? 1f : 0f);
 	}
 
 	private static boolean armorToggleClick(double mouseX, double mouseY) {
@@ -571,7 +570,8 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		boolean isEquipped = selectedWear.isEmpty() ? equipped == null : selectedWear.equals(equipped);
 		boolean owned = selectedWear.isEmpty() || net.veloclient.velo.client.cosmetics.wear.WearManager.owns(selectedWear);
 		var selectedType = net.veloclient.velo.client.cosmetics.wear.WearManager.type(selectedWear);
-		VeloButton equip = new VeloButton(showcaseX + 8, stageBottom() - 28, SHOWCASE_WIDTH - 16, 20,
+		int armorW = armorBox(this.textRenderer)[2] + 6;
+		VeloButton equip = new VeloButton(showcaseX + 8 + armorW, stageBottom() - 28, SHOWCASE_WIDTH - 16 - armorW, 20,
 				Text.literal(selectedWear.isEmpty() ? (equipped == null ? "Nothing here" : "Take it off") : isEquipped ? "Take it off"
 						: owned ? "Wear it" : "Get in the Store"), b -> {
 					if (!owned) {

@@ -16,14 +16,14 @@
 # currently selected in the launcher.
 #
 # The "Velo Client Addons" jar (Velo+ modules; source in the private submodule src/addon) is
-# deployed alongside it too so it can be tested; pass --no-addons to deploy
-# velo-client alone (i.e. what a player without Velo+ gets). The addons are never attached to
+# deployed alongside it only with --addons (default: velo-client alone, what a player without Velo+ gets). The addons are never attached to
 # the public GitHub releases - see tools/release/publish_addons.py.
 set -euo pipefail
 
-DEPLOY_ADDONS=1
-if [[ "${1:-}" == "--no-addons" ]]; then
-	DEPLOY_ADDONS=0
+# 2026-11-24 owner: no Addons in his own profiles by default - pass --addons to deploy them for a test.
+DEPLOY_ADDONS=0
+if [[ "${1:-}" == "--addons" ]]; then
+	DEPLOY_ADDONS=1
 fi
 
 cd "$(dirname "${BASH_SOURCE[0]}")"

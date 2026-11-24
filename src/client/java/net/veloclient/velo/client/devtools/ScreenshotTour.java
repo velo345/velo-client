@@ -554,6 +554,17 @@ public final class ScreenshotTour {
 						*///?}
 					}},
 					new Object[] {25, (Runnable) () -> shot(client, "emoji-chat")});
+			case "worlds" -> {
+				var worlds = new net.veloclient.velo.client.gui.WorldHostScreen(null);
+				yield List.of(
+						new Object[] {0, (Runnable) () -> client.setScreen(worlds)},
+						new Object[] {50, (Runnable) () -> shot(client, "worlds-discover")},
+						new Object[] {2, (Runnable) () -> worlds.tourTab(1)},
+						new Object[] {30, (Runnable) () -> shot(client, "worlds-host")});
+			}
+			case "profiles" -> List.of(
+					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.ProfileScreen(null))},
+					new Object[] {30, (Runnable) () -> shot(client, "profiles")});
 			case "clips" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.media.MediaScreen(null))},
 					new Object[] {40, (Runnable) () -> shot(client, "clips")});

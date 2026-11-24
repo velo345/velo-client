@@ -72,7 +72,8 @@ public final class VeloToggle extends ClickableWidget {
 	public static void drawSwitch(DrawContext context, float x, float y, float width, float height, float progress, float hover) {
 		// 2026-11 launcher look: a rounded-square track (#2A2324 off, accent on) and a small square knob - no glow.
 		Theme theme = ThemeManager.active();
-		float radius = Math.max(2f, height * 0.3f);
+		boolean glass = VeloStyle.glass();
+		float radius = glass ? height / 2f : Math.max(2f, height * 0.3f);
 		int off = VeloStyle.glassOr(VeloAnim.lerpArgb(0xFF2A2324, 0xFF3A3233, hover * 0.6f), VeloAnim.lerpArgb(0x33FFFFFF, 0x47FFFFFF, hover * 0.6f));
 		VeloDraw.fillRounded(context, x, y, width, height, radius, VeloAnim.lerpArgb(off, theme.accentStart() | 0xFF000000, progress));
 		float inset = Math.max(2f, height * 0.2f);
@@ -81,6 +82,14 @@ public final class VeloToggle extends ClickableWidget {
 		// on a light accent track (Monochrome, Nord) a white knob vanishes - go dark there instead
 		int onKnob = theme.onAccent() == 0xFFFFFFFF ? 0xFFFFFFFF : 0xFF22252B;
 		int knobColor = VeloAnim.lerpArgb(VeloAnim.lerpArgb(0xFF8E8384, 0xFFB3A8A9, hover), onKnob, progress);
+		if (glass) {
+			// glass: a round knob, white when off, dark on the white "on" track (like the R-Shift menu)
+			float g = Math.max(1.5f, height * 0.15f);
+			float d = height - g * 2;
+			float kx = x + g + (width - d - g * 2) * progress;
+			VeloDraw.fillCircle(context, kx + d / 2f, y + height / 2f, d / 2f, VeloAnim.lerpArgb(0xFFFFFFFF, 0xFF141416, progress));
+			return;
+		}
 		VeloDraw.fillRounded(context, knobX, y + inset, knob, knob, Math.max(1f, knob * 0.25f), knobColor);
 	}
 

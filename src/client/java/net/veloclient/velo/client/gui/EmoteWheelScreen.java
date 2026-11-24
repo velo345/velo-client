@@ -7,6 +7,7 @@ import net.minecraft.text.Text;
 import net.veloclient.velo.client.emotes.EmoteCatalog;
 import net.veloclient.velo.client.gui.widget.VeloDraw;
 import net.veloclient.velo.client.gui.widget.VeloUi;
+import net.veloclient.velo.client.gui.widget.VeloAnim;
 import net.veloclient.velo.client.modules.cosmetics.EmotesModule;
 import net.veloclient.velo.client.theme.ThemeManager;
 import net.veloclient.velo.client.util.Keys;
@@ -105,10 +106,14 @@ public final class EmoteWheelScreen extends Screen {
 			int ly = Math.round(cy + (float) Math.sin(angle) * r);
 			String id = module.slot(i);
 			int alpha = Math.round(255 * ease);
-			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(String.valueOf(i + 1)), lx, ly - 10,
-					VeloUi.withAlpha(i == hovered ? 0xFFFFFFFF : 0xFF9A9AA6, alpha));
-			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(id == null ? "-" : EmoteCatalog.name(id)), lx, ly + 1,
-					VeloUi.withAlpha(id == null ? 0xFF5E5E68 : 0xFFFFFFFF, alpha));
+			// the hovered slot fills with the (white, glass) accent: its text turns dark so it stays readable
+			float dark = (accent & 0xFFFFFF) == 0xFFFFFF ? hoverAnim[i] : 0f;
+			Text num = Text.literal(String.valueOf(i + 1));
+			Text name = Text.literal(id == null ? "-" : EmoteCatalog.name(id));
+			int numColor = VeloAnim.lerpArgb(i == hovered ? 0xFFFFFFFF : 0xFF9A9AA6, 0xFF3A3A40, dark);
+			int nameColor = VeloAnim.lerpArgb(id == null ? 0xFF5E5E68 : 0xFFFFFFFF, 0xFF141416, dark);
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, num, lx - this.textRenderer.getWidth(num) / 2, ly - 10, VeloUi.withAlpha(numColor, alpha));
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, name, lx - this.textRenderer.getWidth(name) / 2, ly + 1, VeloUi.withAlpha(nameColor, alpha));
 		}
 		// centre: the hovered emote, playing small - or the hint
 		VeloDraw.fillCircle(context, cx, cy, inner - 6f, VeloUi.withAlpha(0xFF101014, Math.round(0xD0 * ease)));

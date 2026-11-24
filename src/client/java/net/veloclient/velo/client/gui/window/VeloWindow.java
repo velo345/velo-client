@@ -286,8 +286,13 @@ public abstract class VeloWindow extends Screen {
 			}
 			case "solid" -> VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 24, 10,
 					VeloUi.withAlpha(0xFF000000, Math.round(0xB0 * openProgress)));
-			default -> VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 18, 6,
-					VeloUi.withAlpha(0xFF000000, Math.round(0x8C * openProgress)));
+			default -> {
+				// glass: no drop shadow (it shows through the translucent body as a dark band)
+				if (!glassLook()) {
+					VeloDraw.shadow(context, windowX, windowY, windowWidth, windowHeight, radius, 18, 6,
+							VeloUi.withAlpha(0xFF000000, Math.round(0x8C * openProgress)));
+				}
+			}
 		}
 
 		// 2026-11: the launcher's ground (#0C0A0A, warm black, a touch of the theme), almost opaque - same look as the launcher.

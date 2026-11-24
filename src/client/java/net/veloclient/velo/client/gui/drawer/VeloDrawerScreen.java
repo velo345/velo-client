@@ -299,7 +299,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	public int blurRadius() {
 		// the panel gets a lighter blur (the HUD stays crisp on top); it lifts when the panel slides away to place things
 		float e = easeInOut(expandAnim);
-		return Math.round((5f + 5f * e) * ease(openAnim));
+		return Math.round((8f + 7f * e) * ease(openAnim));
 	}
 
 	// ---------------------------------------------------------------- geometry
@@ -722,7 +722,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	/** Glass: tint and a light edge (brighter along the top, like light catching it). */
 	private void glass(DrawContext c, float x, float y, float w, float h, float r, int tint, float a) {
-		VeloDraw.shadow(c, Math.round(x), Math.round(y), Math.round(w), Math.round(h), Math.round(r), 22, 6, alpha(0x55000000, a));
+		// no drop shadow: under translucent glass it showed through as a dark band
 		rect(c, x, y, w, h, r, tint, a);
 		VeloDraw.strokeRounded(c, x, y, w, h, r, 1f, alpha(0x24FFFFFF, a));
 		c.fill(Math.round(x + r), Math.round(y), Math.round(x + w - r), Math.round(y) + 1, alpha(0x30FFFFFF, a));
@@ -1284,8 +1284,11 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	/** Adds a hit only for live pages and only when it's inside the visible content area. */
 	private Hit hit(boolean live, float top, float height, float x, float y, float w, float h, Runnable click) {
-		Hit hit = new Hit(x, y, w, h, click);
-		if (live && y + h > top && y < top + height) {
+		// only the visible part is clickable: a card scrolled under the header mustn't catch clicks meant for the header
+		float y0 = Math.max(y, top);
+		float y1 = Math.min(y + h, top + height);
+		Hit hit = new Hit(x, y0, w, Math.max(0f, y1 - y0), click);
+		if (live && y1 > y0) {
 			hits.add(hit);
 		}
 		return hit;

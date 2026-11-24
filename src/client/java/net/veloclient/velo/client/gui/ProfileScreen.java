@@ -102,8 +102,8 @@ public final class ProfileScreen extends VeloWindow implements net.veloclient.ve
 			boolean isActive = name.equals(active);
 			boolean hovered = MenuKit.inside(mouseX, mouseY, x, cy, w, CARD_H) && mouseY >= top && mouseY < bottom;
 			float t = MenuKit.hover("profile:" + name, hovered);
-			VeloDraw.fillRounded(context, x, cy, w, CARD_H, 9, VeloAnim.lerpArgb(0xFF131318, 0xFF1A1A21, t));
-			if (isActive) {
+			VeloDraw.fillRounded(context, x, cy, w, CARD_H, 9, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(VeloAnim.lerpArgb(0xFF131318, 0xFF1A1A21, t), VeloAnim.lerpArgb(isActive ? 0x24FFFFFF : 0x12FFFFFF, 0x24FFFFFF, t)));
+			if (isActive && !net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
 				VeloDraw.fillRoundedGradient(context, x, cy, w, CARD_H, 9, VeloUi.withAlpha(MenuKit.accent(), 0x22), 0x00131318);
 			}
 			VeloDraw.strokeRounded(context, x, cy, w, CARD_H, 9, isActive ? VeloUi.withAlpha(MenuKit.accent(), 0x90)

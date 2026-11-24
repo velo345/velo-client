@@ -100,6 +100,11 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 		WorldHosting.partners(list -> partners = list);
 	}
 
+	/** Dev tour: switch tabs like a click. */
+	public void tourTab(int index) {
+		selectHeaderTab(index);
+	}
+
 	@Override
 	protected String[] headerTabs() {
 		return new String[] {"Discover", "Host a world"};
@@ -268,8 +273,8 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 		boolean hot = visible(mouseX, mouseY, x, y, w, h);
 		float hv = ease(key, hot, dt);
 		int accent = partner.accent() != 0 ? partner.accent() : MenuKit.accent();
-		VeloDraw.shadow(context, x, y, w, h, 10, 8 + Math.round(hv * 8), 3, VeloAnim.lerpArgb(0x30000000, (accent & 0xFFFFFF) | 0x50000000, hv));
-		VeloDraw.fillRounded(context, x, y, w, h, 10, VeloAnim.lerpArgb(0xFF131318, 0xFF19191F, hv));
+		if (!net.veloclient.velo.client.gui.widget.VeloStyle.glass()) VeloDraw.shadow(context, x, y, w, h, 10, 8 + Math.round(hv * 8), 3, VeloAnim.lerpArgb(0x30000000, (accent & 0xFFFFFF) | 0x50000000, hv));
+		VeloDraw.fillRounded(context, x, y, w, h, 10, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(VeloAnim.lerpArgb(0xFF131318, 0xFF19191F, hv), VeloAnim.lerpArgb(0x12FFFFFF, 0x22FFFFFF, hv)));
 		VeloDraw.strokeRounded(context, x, y, w, h, 10, VeloAnim.lerpArgb(0x17FFFFFF, accent, hv));
 		// A soft band of the partner's colour along the top edge.
 		VeloDraw.fillRoundedGradient(context, x + 1, y + 1, w - 2, 18, 9, (accent & 0xFFFFFF) | 0x26000000, accent & 0xFFFFFF);
@@ -320,7 +325,7 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 		int cy = y + Math.round((1 - rise) * 12);
 		boolean hot = visible(mouseX, mouseY, x, cy, w, h);
 		float hv = ease(key, hot, dt);
-		VeloDraw.fillRounded(context, x, cy, w, h, 10, VeloAnim.lerpArgb(0xFF131318, 0xFF18181E, hv));
+		VeloDraw.fillRounded(context, x, cy, w, h, 10, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(VeloAnim.lerpArgb(0xFF131318, 0xFF18181E, hv), VeloAnim.lerpArgb(0x12FFFFFF, 0x22FFFFFF, hv)));
 		VeloDraw.strokeRounded(context, x, cy, w, h, 10, VeloAnim.lerpArgb(0x17FFFFFF, (MenuKit.accent() & 0xFFFFFF) | 0x80000000, hv));
 		PlayerHeads.draw(context, hostUuid, hostName, x + 10, cy + 10, 30);
 		VeloDraw.strokeRounded(context, x + 9, cy + 9, 32, 32, 5, 0x30FFFFFF);
@@ -494,7 +499,7 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 			int cy = sy + Math.round((1 - entrance(cardIndex++)) * 10);
 			boolean hot = visible(mouseX, mouseY, x, cy, w, h);
 			float hv = ease("pl:" + player, hot, dt);
-			VeloDraw.fillRounded(context, x, cy, w, h, 9, VeloAnim.lerpArgb(0xFF131318, 0xFF18181E, hv));
+			VeloDraw.fillRounded(context, x, cy, w, h, 9, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(VeloAnim.lerpArgb(0xFF131318, 0xFF18181E, hv), VeloAnim.lerpArgb(0x12FFFFFF, 0x22FFFFFF, hv)));
 			VeloDraw.strokeRounded(context, x, cy, w, h, 9, 0x17FFFFFF);
 			PlayerHeads.draw(context, null, player, x + 8, cy + 7, 20);
 			MenuKit.text(context, this.textRenderer, MenuKit.uiBold(player), x + 36, cy + 13, MenuKit.TEXT);
@@ -554,7 +559,7 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 		if (hosted != null && !hosted.allowed().isEmpty()) {
 			sy = section(context, "ALLOWED", x, sy, null);
 			for (String[] member : hosted.allowed()) {
-				VeloDraw.fillRounded(context, x, sy, w, 28, 8, 0xFF131318);
+				VeloDraw.fillRounded(context, x, sy, w, 28, 8, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF131318, 0x12FFFFFF));
 				PlayerHeads.draw(context, member[0], member[1], x + 7, sy + 6, 16);
 				MenuKit.text(context, this.textRenderer, MenuKit.ui(member[1]), x + 30, sy + 10, MenuKit.TEXT);
 				pill(context, x + w - 140, sy + 4, 66, 20, "Remove", false, mouseX, mouseY, dt,
@@ -577,7 +582,7 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 			int tx = x + (i % 2) * (colW + 8);
 			int ty = sy + (i / 2) * 32;
 			float knob = ease("rule:" + t[0], on, dt);
-			VeloDraw.fillRounded(context, tx, ty, colW, 26, 8, 0xFF131318);
+			VeloDraw.fillRounded(context, tx, ty, colW, 26, 8, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF131318, 0x12FFFFFF));
 			MenuKit.text(context, this.textRenderer, MenuKit.ui(t[1]), tx + 10, ty + 9, MenuKit.TEXT);
 			MenuKit.toggle(context, tx + colW - 26, ty + 8, knob);
 			hit(tx, ty, colW, 26, () -> {
@@ -623,8 +628,8 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 	}
 
 	private void heroCard(DrawContext context, int x, int y, int w, int h, int accent) {
-		VeloDraw.shadow(context, x, y, w, h, 12, 14, 4, 0x45000000);
-		VeloDraw.fillRoundedGradient(context, x, y, w, h, 12, (accent & 0xFFFFFF) | 0x2A000000, 0xF2121217);
+		if (!net.veloclient.velo.client.gui.widget.VeloStyle.glass()) VeloDraw.shadow(context, x, y, w, h, 12, 14, 4, 0x45000000);
+		VeloDraw.fillRoundedGradient(context, x, y, w, h, 12, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr((accent & 0xFFFFFF) | 0x2A000000, 0x1FFFFFFF), net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xF2121217, 0x10FFFFFF));
 		VeloDraw.strokeRounded(context, x, y, w, h, 12, (accent & 0xFFFFFF) | 0x55000000);
 	}
 
@@ -669,7 +674,7 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 		for (String[] o : options) {
 			total += this.textRenderer.getWidth(o[1]) + 22;
 		}
-		VeloDraw.fillRounded(context, sx, y, total + 4, 24, 12, 0xFF101014);
+		VeloDraw.fillRounded(context, sx, y, total + 4, 24, 12, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF101014, 0x47000000));
 		VeloDraw.strokeRounded(context, sx, y, total + 4, 24, 12, 0x17FFFFFF);
 		int ox = sx + 2;
 		// The selected option's background slides between options.
@@ -709,7 +714,7 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 		boolean hot = visible(mouseX, mouseY, x, y, w, 36);
 		float hv = ease("toggle:" + title, hot, dt);
 		float knob = ease("knob:" + title, on, dt);
-		VeloDraw.fillRounded(context, x, y, w, 36, 10, VeloAnim.lerpArgb(0xFF131318, 0xFF18181E, hv));
+		VeloDraw.fillRounded(context, x, y, w, 36, 10, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(VeloAnim.lerpArgb(0xFF131318, 0xFF18181E, hv), VeloAnim.lerpArgb(0x12FFFFFF, 0x22FFFFFF, hv)));
 		VeloDraw.strokeRounded(context, x, y, w, 36, 10, 0x17FFFFFF);
 		MenuKit.text(context, this.textRenderer, MenuKit.uiBold(title), x + 12, y + 8, MenuKit.TEXT);
 		MenuKit.text(context, this.textRenderer, MenuKit.small(sub), x + 12, y + 21, MenuKit.TEXT_3);
