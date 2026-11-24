@@ -21,8 +21,15 @@ public abstract class ParallelBlockStatesMixin {
 	}
 }
 *///?} else {
-@Mixin(targets = "net.minecraft.client.MinecraftClient")
+@Mixin(net.minecraft.block.Blocks.class)
 public abstract class ParallelBlockStatesMixin {
-	// 26.x only for now
+
+	@com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation(method = "<clinit>", at = @org.spongepowered.asm.mixin.injection.At(value = "INVOKE",
+			target = "Lnet/minecraft/block/BlockState;initShapeCache()V"), require = 0)
+	private static void velo$defer(net.minecraft.block.BlockState state, com.llamalad7.mixinextras.injector.wrapoperation.Operation<Void> original) {
+		if (!net.veloclient.velo.client.modules.performance.ParallelBlockStates.defer(state)) {
+			original.call(state);
+		}
+	}
 }
 //?}

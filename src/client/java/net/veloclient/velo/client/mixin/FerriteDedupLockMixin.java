@@ -34,6 +34,21 @@ public abstract class FerriteDedupLockMixin {
 @Pseudo
 @Mixin(targets = "malte0811.ferritecore.impl.BlockStateCacheImpl", remap = false)
 public abstract class FerriteDedupLockMixin {
-	// 26.x only for now
+
+	@com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod(method = "deduplicateCachePre", remap = false, require = 0)
+	private static void velo$lockPre(net.minecraft.block.AbstractBlock.AbstractBlockState state,
+			com.llamalad7.mixinextras.injector.wrapoperation.Operation<Void> original) {
+		synchronized (net.veloclient.velo.client.modules.performance.ParallelBlockStates.FERRITE_LOCK) {
+			original.call(state);
+		}
+	}
+
+	@com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod(method = "deduplicateCachePost", remap = false, require = 0)
+	private static void velo$lockPost(net.minecraft.block.AbstractBlock.AbstractBlockState state,
+			com.llamalad7.mixinextras.injector.wrapoperation.Operation<Void> original) {
+		synchronized (net.veloclient.velo.client.modules.performance.ParallelBlockStates.FERRITE_LOCK) {
+			original.call(state);
+		}
+	}
 }
 //?}

@@ -24,8 +24,19 @@ public abstract class ParallelBlockStatesBootstrapMixin {
 	}
 }
 *///?} else {
-@Mixin(targets = "net.minecraft.client.MinecraftClient")
+@Mixin(net.minecraft.Bootstrap.class)
 public abstract class ParallelBlockStatesBootstrapMixin {
-	// 26.x only for now
+
+	@org.spongepowered.asm.mixin.injection.Inject(method = "initialize", at = @org.spongepowered.asm.mixin.injection.At(value = "INVOKE",
+			target = "Lnet/minecraft/block/FireBlock;registerDefaultFlammables()V"), require = 0)
+	private static void velo$arm(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+		net.veloclient.velo.client.modules.performance.ParallelBlockStates.arm();
+	}
+
+	@org.spongepowered.asm.mixin.injection.Inject(method = "initialize", at = @org.spongepowered.asm.mixin.injection.At(value = "INVOKE",
+			target = "Lnet/minecraft/block/FireBlock;registerDefaultFlammables()V", shift = org.spongepowered.asm.mixin.injection.At.Shift.AFTER), require = 0)
+	private static void velo$flush(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+		net.veloclient.velo.client.modules.performance.ParallelBlockStates.flush();
+	}
 }
 //?}

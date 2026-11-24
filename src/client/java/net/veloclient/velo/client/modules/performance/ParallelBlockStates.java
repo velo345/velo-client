@@ -23,7 +23,10 @@ public final class ParallelBlockStates {
 	/** FerriteCore's de-duplication maps (see FerriteDedupLockMixin). */
 	public static final Object FERRITE_LOCK = new Object();
 	private static final boolean OFF = Boolean.getBoolean("velo.noParallelBlockStates");
-	private static final List<String> SAFE_MIXIN_PREFIXES = List.of("malte0811.ferritecore.", "net.veloclient.", "net.fabricmc.fabric.");
+	private static final List<String> SAFE_MIXIN_PREFIXES = List.of("malte0811.ferritecore.", "net.veloclient.", "net.fabricmc.fabric.",
+			// Lithium (installed with Velo on 1.21.x), read 2026-11-24: block tracking flags (lazy, AtomicBoolean + static
+			// arrays) and path node types (its own view per state, vanilla's static node checks)
+			"net.caffeinemc.mods.lithium.mixin.util.block_tracking.", "net.caffeinemc.mods.lithium.mixin.ai.pathing.");
 
 	private static volatile boolean armed;
 	private static List<Object> deferred;
@@ -92,8 +95,16 @@ public final class ParallelBlockStates {
 	/** The first mixin on the block state classes that isn't known to be thread-safe, or null when all are. */
 	private static String unsafeMixin() {
 		try {
-			for (String cls : List.of("net/minecraft/world/level/block/state/BlockBehaviour$BlockStateBase",
-					"net/minecraft/world/level/block/state/BlockBehaviour$BlockStateBase$Cache", "net/minecraft/world/level/block/state/BlockState")) {
+			//? if >=26.1 {
+			/*List<String> classes = List.of("net/minecraft/world/level/block/state/BlockBehaviour$BlockStateBase",
+					"net/minecraft/world/level/block/state/BlockBehaviour$BlockStateBase$Cache", "net/minecraft/world/level/block/state/BlockState");
+			*///?} else {
+			// 1.21.x: the runtime names (intermediary in a real install, named in a dev run)
+			var resolver = net.fabricmc.loader.api.FabricLoader.getInstance().getMappingResolver();
+			List<String> classes = java.util.stream.Stream.of("net.minecraft.class_4970$class_4971", "net.minecraft.class_4970$class_4971$class_3752",
+					"net.minecraft.class_2680").map(c -> resolver.mapClassName("intermediary", c).replace('.', '/')).toList();
+			//?}
+			for (String cls : classes) {
 				var info = org.spongepowered.asm.mixin.transformer.ClassInfo.forName(cls);
 				if (info == null) {
 					continue;

@@ -37,7 +37,7 @@ public final class SkyboxSmoke {
 			}
 			if (ticks == 160) {
 				shot = true;
-				//? if <26.1 {
+				//? if >=1.21.10 && <26.1 {
 				net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(client.getFramebuffer(), image -> {
 					try {
 						image.writeTo(java.nio.file.Path.of(target));
