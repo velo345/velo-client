@@ -4891,13 +4891,17 @@ public final class LauncherApp extends Application {
 	private void launchWithProgress(Instance instance, String quickPlayTarget, Button triggerButton, ProgressBar progressBar, Label statusLabel) {
 		// a start that never finished (sign-in closed, a dialog dismissed oddly) mustn't block Play for good
 		Long since = startingSince.get(instance.id());
-		if (since != null && System.currentTimeMillis() - since > 120_000) {
+		if (since != null && System.currentTimeMillis() - since > 60_000) {
+			LauncherLog.info("[play] " + instance.name() + ": an old start never finished (" + (System.currentTimeMillis() - since) / 1000 + " s) - starting again");
 			starting.remove(instance.id());
 		}
 		if (!starting.add(instance.id())) {
+			LauncherLog.info("[play] " + instance.name() + ": already starting - click ignored");
 			net.veloclient.launcher.ui.Toasts.show(content, "info", "#5aa9ff", instance.name() + " is already starting...");
 			return;
 		}
+		LauncherLog.info("[play] " + instance.name() + " (" + instance.mcVersion() + ")" + (quickPlayTarget != null ? " -> " + quickPlayTarget : "")
+				+ ", " + RunningInstanceManager.running().size() + " game(s) running");
 		startingSince.put(instance.id(), System.currentTimeMillis());
 		disposeHomeArcade();
 		net.veloclient.launcher.ui.Toasts.show(content, "info", "#3ddc97", "Starting " + instance.name() + "...");
@@ -4955,11 +4959,13 @@ public final class LauncherApp extends Application {
 				statusLabel.setVisible(false);
 				statusLabel.setManaged(false);
 				if (!finalWarnings.isEmpty() && !net.veloclient.launcher.ui.SystemCheckDialog.confirmLaunch(stage, finalWarnings)) {
+					LauncherLog.info("[play] " + instance.name() + ": system check dialog cancelled");
 					starting.remove(instance.id());
 					return;
 				}
 				if (finalDiagnosis != null && finalDiagnosis.issues().stream().anyMatch(i -> i.severity() == net.veloclient.launcher.doctor.Diagnosis.Severity.CRASH)
 						&& !net.veloclient.launcher.ui.DoctorDialog.confirmLaunch(stage, instance, finalDiagnosis)) {
+					LauncherLog.info("[play] " + instance.name() + ": Doctor dialog cancelled");
 					starting.remove(instance.id());
 					return;
 				}
@@ -4981,7 +4987,16 @@ public final class LauncherApp extends Application {
 				}
 			}
 		}
+		// Waiting for a sign-in isn't "starting": a sign-in window closed without signing in never called back, and
+		// Play then only said "already starting..." for minutes (owner 2026-11-24: "Play sometimes doesn't start again").
+		starting.remove(instance.id());
+		LauncherLog.info("[play] " + instance.name() + ": checks done, " + (session == null ? "asking to sign in" : "signed in"));
 		requireSignedIn(activeSession -> {
+			if (!starting.add(instance.id())) {
+				LauncherLog.info("[play] " + instance.name() + ": another start of this profile is already running");
+				return;
+			}
+			startingSince.put(instance.id(), System.currentTimeMillis());
 			triggerButton.setDisable(true);
 			progressBar.setProgress(0);
 			progressBar.setVisible(true);
@@ -5078,7 +5093,10 @@ public final class LauncherApp extends Application {
 						launchEvent.addProperty("mc", instance.mcVersion());
 						net.veloclient.launcher.social.TesterApi.event(launchEvent);
 					}
+					LauncherLog.info("[play] " + instance.name() + ": game process " + result.process().pid() + " started");
 					int exitCode = result.process().waitFor();
+					LauncherLog.info("[play] " + instance.name() + ": game exited with " + exitCode + " after "
+							+ (System.currentTimeMillis() - startedAt) / 1000 + " s");
 					if (AppVersion.DEV) {
 						// ...and how long they played, with the Velo modules that were on (matched to the "what to test" items)
 						com.google.gson.JsonObject session = net.veloclient.launcher.social.TesterApi.eventOf("session", AppVersion.VERSION);
