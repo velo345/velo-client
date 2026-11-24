@@ -52,7 +52,32 @@ public final class GameLauncher {
 	}
 
 	/** @param quickPlayServerAddress nullable "host:port" - when present, launches straight into that server via Mojang's Quick Play Multiplayer feature instead of to the title screen. */
-	public static LaunchResult launch(Instance instance, MinecraftSession session, LaunchProgressListener listener, String quickPlayServerAddress) throws IOException {
+	public static LaunchResult launch(Instance instance, MinecraftSession session, LaunchProgressListener progressListener, String quickPlayServerAddress) throws IOException {
+		// Every phase of a launch with its time in launcher.log - to see where a slow start goes before the game even runs.
+		long launchStart = System.nanoTime();
+		long[] phaseStart = {launchStart};
+		String[] phaseName = {"start"};
+		LaunchProgressListener listener = new LaunchProgressListener() {
+			@Override
+			public void onPhase(String phase) {
+				long now = System.nanoTime();
+				net.veloclient.launcher.LauncherLog.info("[launch] " + phaseName[0] + " took " + (now - phaseStart[0]) / 1_000_000 + " ms");
+				phaseStart[0] = now;
+				phaseName[0] = phase;
+				progressListener.onPhase(phase);
+			}
+
+			@Override
+			public void onProgress(double fraction) {
+				progressListener.onProgress(fraction);
+			}
+
+			@Override
+			public void onBytes(long done, long total) {
+				progressListener.onBytes(done, total);
+			}
+		};
+		net.veloclient.launcher.LauncherLog.info("[launch] " + instance.name() + " (" + instance.mcVersion() + ") - preparing");
 		String runId = UUID.randomUUID().toString();
 		GameVersion version = GameVersion.byId(instance.mcVersion());
 		GameDataPaths.ensureDirectories(version.id());
@@ -126,7 +151,10 @@ public final class GameLauncher {
 		JavaRuntimeProvider.JavaRuntime runtime = JavaRuntimeProvider.forVersion(vanilla, listener, exact);
 
 		listener.onPhase("Starting Minecraft...");
-		return startProcess(instance, version, vanilla, fabric, libraries, clientJar, nativesDir, session, quickPlayServerAddress, runId, runtime);
+		LaunchResult result = startProcess(instance, version, vanilla, fabric, libraries, clientJar, nativesDir, session, quickPlayServerAddress, runId, runtime);
+		net.veloclient.launcher.LauncherLog.info("[launch] game process started " + (System.nanoTime() - launchStart) / 1_000_000
+				+ " ms after Play (last phase " + (System.nanoTime() - phaseStart[0]) / 1_000_000 + " ms)");
+		return result;
 	}
 
 	private static void downloadLibraries(List<LibraryResolver.ResolvedLibrary> libraries, LaunchProgressListener listener) throws IOException {

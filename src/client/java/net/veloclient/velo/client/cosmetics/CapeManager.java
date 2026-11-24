@@ -783,20 +783,28 @@ public final class CapeManager {
 		CapePhysicsPreset preset = CapePhysicsPreset.defaults();
 		boolean hasElytra = false;
 		boolean animated = false;
-		try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(bundleFile))) {
-			ZipEntry entry;
-			while ((entry = zip.getNextEntry()) != null) {
-				if (entry.getName().equals("meta.json")) {
-					meta = GSON.fromJson(new java.io.InputStreamReader(zip, StandardCharsets.UTF_8), Meta.class);
-				} else if (entry.getName().equals("physics.json")) {
-					preset = GSON.fromJson(new java.io.InputStreamReader(zip, StandardCharsets.UTF_8), CapePhysicsPreset.class);
-				} else if (entry.getName().equals("elytra.png")) {
-					hasElytra = true;
-				} else if (entry.getName().equals("frames.gif")) {
-					animated = true;
+		// The zip's directory, not a stream: frames.gif comes first in Store bundles (up to 9 MB), and streaming inflated
+		// every whole GIF just to reach meta.json - 54 cloaks = 228 MB unpacked on the render thread at every start
+		// (profiled 2026-11-24). Only the two small JSON files are read now.
+		try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(bundleFile.toFile())) {
+			ZipEntry metaEntry = zip.getEntry("meta.json");
+			if (metaEntry != null) {
+				try (var in = new java.io.InputStreamReader(zip.getInputStream(metaEntry), StandardCharsets.UTF_8)) {
+					meta = GSON.fromJson(in, Meta.class);
 				}
 			}
-		} catch (IOException e) {
+			ZipEntry physicsEntry = zip.getEntry("physics.json");
+			if (physicsEntry != null) {
+				try (var in = new java.io.InputStreamReader(zip.getInputStream(physicsEntry), StandardCharsets.UTF_8)) {
+					CapePhysicsPreset read = GSON.fromJson(in, CapePhysicsPreset.class);
+					if (read != null) {
+						preset = read;
+					}
+				}
+			}
+			hasElytra = zip.getEntry("elytra.png") != null;
+			animated = zip.getEntry("frames.gif") != null;
+		} catch (IOException | RuntimeException e) {
 			return Optional.empty();
 		}
 		if (meta == null) {

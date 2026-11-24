@@ -259,6 +259,10 @@ public final class MemoryPlanner {
 		List<String> args = new ArrayList<>();
 		args.add("-Xmx" + plan.maxMb() + "m");
 		args.add("-Xms" + plan.minMb() + "m");
+		// Start-up: the metaspace high-water mark starts at ~21 MB and only grows by collecting - with 130+ mods that was
+		// three full-heap "Metadata GC Threshold" collections while the game loads (~0.4 s of stop-the-world, profiled
+		// 2026-11-24; the game ends start-up at ~75 MB). Only a threshold, nothing is reserved or touched up front.
+		args.add("-XX:MetaspaceSize=192m");
 		if (plan.gc() == Gc.ZGC && javaFeature >= 15) {
 			// Generational ZGC: pauses well under a millisecond regardless of heap size, and it
 			// returns unused memory (ZUncommit, on by default). SoftMaxHeapSize keeps it aiming lower
