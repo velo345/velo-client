@@ -1,0 +1,199 @@
+{
+ "providers": [
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/diamond_sword.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue300"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/diamond_axe.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue301"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/mace.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue302"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/end_crystal.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue303"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:mob_effect/instant_health.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue304"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/netherite_helmet.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue305"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/totem_of_undying.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue306"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/golden_apple.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue307"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/minecart.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue310"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/diamond_chestplate.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue311"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/apple.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue312"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "velo-client:font/tier_bed.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue313"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/bow.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue314"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:mob_effect/speed.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue315"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:mob_effect/poison.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue316"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/gunpowder.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue317"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/trident.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue318"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/compass_00.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue319"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/elytra.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue31a"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/diamond.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue31b"
+   ]
+  },
+  {
+   "type": "bitmap",
+   "file": "minecraft:item/nether_star.png",
+   "ascent": 7,
+   "height": 8,
+   "chars": [
+    "\ue31f"
+   ]
+  },
+  {
+   "type": "space",
+   "advances": {
+    " ": 3
+   }
+  }
+ ]
+}

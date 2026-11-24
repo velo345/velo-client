@@ -230,6 +230,7 @@ public final class VeloServerApp {
 		PanelRoutes.register(server, registry, stats, store, adminToken);
 		try {
 			new PerfService(dataDir).register(server, adminToken);
+			new TierService().register(server);
 		} catch (java.sql.SQLException e) {
 			System.out.println("[perf] performance reports off: " + e.getMessage());
 		}

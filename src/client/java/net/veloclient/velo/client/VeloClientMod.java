@@ -119,6 +119,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.util.MemoryTrim.register();
 		net.veloclient.velo.client.devtools.SkyboxSmoke.register();
 		net.veloclient.velo.client.devtools.DrawerTour.register();
+		net.veloclient.velo.client.devtools.TierTagTest.register();
 		net.veloclient.velo.client.util.PerfTelemetry.register();
 		net.veloclient.velo.client.util.FontWarmup.register();
 		net.veloclient.velo.client.util.StuckButtons.register();
@@ -309,6 +310,7 @@ public final class VeloClientMod implements ClientModInitializer {
 	private void registerModules() {
 		// PvP
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.OldAnimationsModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.TierTaggerModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.pvp.ItemPositionModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.HoldUpItemsModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.ParticleSizeModule());

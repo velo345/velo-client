@@ -74,6 +74,8 @@ public abstract class PlayerNameTagBadgeMixin {
 			int kind = self ? VeloBadge.ownKind() : VeloBadge.kindOf(player.getUuid(), name);
 			tag = VeloBadge.prefixWithBadge(tag, kind);
 		}
+		// Tier Tagger: PvPTiers / SubTiers tier next to the name
+		tag = net.veloclient.velo.client.tiers.TierTags.decorate(tag, player.getUuid(), false);
 		if (tag != original) {
 			cir.setReturnValue(tag);
 		}
@@ -101,6 +103,7 @@ public abstract class PlayerNameTagBadgeMixin {
 			int kind = self ? VeloBadge.ownKind() : VeloBadge.kindOf(player.getUUID(), name);
 			tag = VeloBadge.prefixWithBadge(tag, kind);
 		}
+		tag = net.veloclient.velo.client.tiers.TierTags.decorate(tag, player.getUUID(), false);
 		if (tag != original) {
 			cir.setReturnValue(tag);
 		}

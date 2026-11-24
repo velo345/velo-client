@@ -27,15 +27,15 @@ public abstract class NameStyleTabMixin {
 	@Inject(method = "getPlayerName", at = @At("HEAD"), cancellable = true)
 	private void velo$cached(PlayerListEntry entry, CallbackInfoReturnable<Text> cir) {
 		if (net.veloclient.velo.client.util.TabListCache.name(entry, entry.getDisplayName()) instanceof Text cached) {
-			cir.setReturnValue(cached);
+			cir.setReturnValue(net.veloclient.velo.client.tiers.TierTags.decorate(cached, entry.getProfile().id(), true));
 		}
 	}
 
 	@Inject(method = "getPlayerName", at = @At("RETURN"), cancellable = true)
 	private void velo$nameStyle(PlayerListEntry entry, CallbackInfoReturnable<Text> cir) {
 		Text tagged = NameStyles.tagName(cir.getReturnValue(), entry.getProfile().name(), NameStyles.TAB);
-		cir.setReturnValue(tagged);
 		net.veloclient.velo.client.util.TabListCache.storeName(entry, entry.getDisplayName(), tagged);
+		cir.setReturnValue(net.veloclient.velo.client.tiers.TierTags.decorate(tagged, entry.getProfile().id(), true));
 	}
 }
 //?} else {
@@ -45,15 +45,15 @@ public abstract class NameStyleTabMixin {
 	@Inject(method = "getNameForDisplay", at = @At("HEAD"), cancellable = true)
 	private void velo$cached(PlayerInfo entry, CallbackInfoReturnable<Component> cir) {
 		if (net.veloclient.velo.client.util.TabListCache.name(entry, entry.getTabListDisplayName()) instanceof Component cached) {
-			cir.setReturnValue(cached);
+			cir.setReturnValue(net.veloclient.velo.client.tiers.TierTags.decorate(cached, entry.getProfile().id(), true));
 		}
 	}
 
 	@Inject(method = "getNameForDisplay", at = @At("RETURN"), cancellable = true)
 	private void velo$nameStyle(PlayerInfo entry, CallbackInfoReturnable<Component> cir) {
 		Component tagged = NameStyles.tagName(cir.getReturnValue(), entry.getProfile().name(), NameStyles.TAB);
-		cir.setReturnValue(tagged);
 		net.veloclient.velo.client.util.TabListCache.storeName(entry, entry.getTabListDisplayName(), tagged);
+		cir.setReturnValue(net.veloclient.velo.client.tiers.TierTags.decorate(tagged, entry.getProfile().id(), true));
 	}
 }
 *///?}
