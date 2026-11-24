@@ -80,6 +80,24 @@ public final class CapeManager {
 		equippedCapeId = state.equippedCapeId();
 	}
 
+	/**
+	 * Picks up bundles another process (the launcher) wrote since the library was loaded; true when one of them is the
+	 * Store item {@code itemId}. Checked before a Store restore imports anything - the launcher and the game both
+	 * restored a freshly granted cloak and it showed up twice (1.5.1.1).
+	 */
+	public static synchronized boolean adoptFromDisk(String itemId) {
+		java.util.Set<Path> known = new java.util.HashSet<>();
+		LIBRARY.values().forEach(def -> known.add(def.bundleFile()));
+		try (var files = Files.list(VeloPaths.capes())) {
+			for (Path file : files.filter(p -> p.toString().endsWith(".velocape") && !known.contains(p)).toList()) {
+				readBundleMetadata(file).ifPresent(def -> LIBRARY.put(def.id(), def));
+			}
+		} catch (IOException ignored) {
+			// nothing new
+		}
+		return LIBRARY.values().stream().anyMatch(def -> java.util.Objects.equals(def.sourceItemId(), itemId));
+	}
+
 	public static synchronized void loadLibrary() {
 		if (loaded) {
 			return;
@@ -104,10 +122,25 @@ public final class CapeManager {
 	 */
 	public static Map<String, CapeDefinition> library() {
 		Map<String, CapeDefinition> usable = new LinkedHashMap<>();
+		// one per Store item (an older double import stays on disk - another account may wear it - but isn't listed);
+		// the worn copy wins
+		Map<String, String> itemToId = new java.util.HashMap<>();
 		LIBRARY.forEach((id, def) -> {
-			if (usable(def)) {
-				usable.put(id, def);
+			if (!usable(def)) {
+				return;
 			}
+			String item = def.sourceItemId();
+			if (item != null && !item.isBlank()) {
+				String kept = itemToId.get(item);
+				if (kept != null) {
+					if (!id.equals(equippedCapeId)) {
+						return;
+					}
+					usable.remove(kept);
+				}
+				itemToId.put(item, id);
+			}
+			usable.put(id, def);
 		});
 		return java.util.Collections.unmodifiableMap(usable);
 	}

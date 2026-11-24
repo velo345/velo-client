@@ -1,0 +1,26 @@
+{
+    "targets": {},
+    "passes": [
+        {
+            "vertex_shader": "minecraft:core/screenquad",
+            "fragment_shader": "velo-client:post/velo_skybox_direct_spirv",
+            "inputs": [
+                {
+                    "sampler_name": "Sky",
+                    "location": "velo-client:skybox",
+                    "width": 4096,
+                    "height": 2048,
+                    "bilinear": true
+                },
+                {
+                    "sampler_name": "Params",
+                    "location": "velo-client:skybox_params",
+                    "width": 12,
+                    "height": 1,
+                    "bilinear": false
+                }
+            ],
+            "output": "minecraft:main"
+        }
+    ]
+}

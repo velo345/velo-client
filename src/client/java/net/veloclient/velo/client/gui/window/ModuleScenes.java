@@ -210,13 +210,22 @@ public final class ModuleScenes {
 					}
 				}
 				case "potion-timers" -> {
-					String[][] fx = {{"speed", "Speed II", "1:24"}, {"strength", "Strength", "0:52"}, {"fire_resistance", "Fire Resistance", "6:30"}};
-					int ry = cy - 30;
+					String[][] fx = {{"speed", "Speed II", "1:24"}, {"strength", "Strength", "0:52"}, {"fire_resistance", "Fire Resistance", "6:30"}, {"regeneration", "Regeneration", "0:07"}};
+					// the two styles as the HUD draws them: List = icon, name and time; Compact = icon and time only
+					boolean compact = choice(module, "style", "List").equals("Compact");
+					int rowH = compact ? 20 : 24;
+					int ry = cy - fx.length * rowH / 2;
+					int left = compact ? cx - 24 : cx - 60;
 					for (String[] f : fx) {
-						tex(context, "mob_effect/" + f[0], cx - 60, ry, 18, 18, 18, 18, 0, 0xFFFFFFFF);
-						net.veloclient.velo.client.hud.HudLook.draw(context, f[1], cx - 38, ry + 1, 0xFFFFFFFF);
-						net.veloclient.velo.client.hud.HudLook.draw(context, f[2], cx - 38, ry + 10, 0xFFB3A8A9);
-						ry += 22;
+						boolean low = f[2].startsWith("0:0");
+						tex(context, "mob_effect/" + f[0], left, ry + (rowH - 18) / 2, 18, 18, 18, 18, 0, 0xFFFFFFFF);
+						if (compact) {
+							net.veloclient.velo.client.hud.HudLook.draw(context, f[2], left + 23, ry + (rowH - 9) / 2, low ? 0xFFFF6B73 : 0xFFFFFFFF);
+						} else {
+							net.veloclient.velo.client.hud.HudLook.draw(context, f[1], left + 23, ry + 2, 0xFFFFFFFF);
+							net.veloclient.velo.client.hud.HudLook.draw(context, f[2], left + 23, ry + 12, low ? 0xFFFF6B73 : 0xFFD4D4DA);
+						}
+						ry += rowH;
 					}
 				}
 				case "scoreboard-hud" -> {

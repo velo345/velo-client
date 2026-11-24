@@ -78,7 +78,9 @@ public abstract class LocalPlayerSkinCapeMixin {
 		}
 		CapeDefinition definition = equipped.get();
 		boolean overrideCape = net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.waveyActive();
-		boolean hideCape = WaveyCapesCompat.isLoaded() && !overrideCape;
+		// A Velo cloak is worn: the Minecraft (Mojang / Migrator) cape goes, else both were drawn on top of each other
+		// (owner 1.5.1). Only kept when the Velo cloak itself rides in that cape slot (Wavey Capes).
+		boolean hideCape = !overrideCape;
 		var elytraTexture = ((AbstractClientPlayerEntity) (Object) this).getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).getItem()
 				== net.minecraft.item.Items.ELYTRA ? CapeManager.elytraTextureIdentifier(definition) : java.util.Optional.<Identifier>empty();
 		if (!overrideCape && !hideCape && elytraTexture.isEmpty()) {
@@ -132,7 +134,9 @@ public abstract class LocalPlayerSkinCapeMixin {
 		CapeDefinition definition = equipped.get();
 		boolean overrideCape = net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.waveyActive();
 		// Wavey Capes installed but Velo picked to draw: report no cape, or Wavey would draw one on top of ours.
-		boolean hideCape = WaveyCapesCompat.isLoaded() && !overrideCape;
+		// A Velo cloak is worn: the Minecraft (Mojang / Migrator) cape goes, else both were drawn on top of each other
+		// (owner 1.5.1). Only kept when the Velo cloak itself rides in that cape slot (Wavey Capes).
+		boolean hideCape = !overrideCape;
 		// Only painted while an elytra is actually worn (it is re-made from the cape art every animation frame).
 		var elytraTexture = ((AbstractClientPlayerEntity) (Object) this).getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST).getItem()
 				== net.minecraft.item.Items.ELYTRA ? CapeManager.elytraTextureIdentifier(definition) : java.util.Optional.<Identifier>empty();
@@ -197,7 +201,9 @@ public abstract class LocalPlayerSkinCapeMixin {
 		CapeDefinition definition = equipped.get();
 		boolean overrideCape = net.veloclient.velo.client.modules.cosmetics.CapeCosmeticsModule.waveyActive();
 		// Wavey Capes installed but Velo picked to draw: report no cape, or Wavey would draw one on top of ours.
-		boolean hideCape = WaveyCapesCompat.isLoaded() && !overrideCape;
+		// A Velo cloak is worn: the Minecraft (Mojang / Migrator) cape goes, else both were drawn on top of each other
+		// (owner 1.5.1). Only kept when the Velo cloak itself rides in that cape slot (Wavey Capes).
+		boolean hideCape = !overrideCape;
 		var elytraTexture = ((AbstractClientPlayer) (Object) this).getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).getItem()
 				== net.minecraft.world.item.Items.ELYTRA ? CapeManager.elytraTextureIdentifier(definition) : java.util.Optional.<Identifier>empty();
 		if (!overrideCape && !hideCape && elytraTexture.isEmpty()) {

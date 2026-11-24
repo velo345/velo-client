@@ -163,7 +163,7 @@ final class NewsEditorView {
 		version.setPrefWidth(130);
 
 		String accent = NewsUi.str(post, "accent");
-		ColorPicker color = new ColorPicker(NewsUi.validColor(accent) ? Color.web(accent) : Color.web("#ff4444"));
+		ColorPicker color = new VeloColorPicker(NewsUi.validColor(accent) ? Color.web(accent) : Color.web("#ff4444"));
 		color.getStyleClass().add("button");
 		CheckBox themed = new CheckBox("Theme color");
 		themed.setSelected(!NewsUi.validColor(accent));

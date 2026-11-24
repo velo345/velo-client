@@ -51,7 +51,7 @@ public final class CapeLibrary {
 	 */
 	public static List<CapeEntry> listAll() {
 		String equipped = equippedCapeId().orElse(null);
-		return listAllBundles().stream().filter(entry -> {
+		return dedupeStoreItems(listAllBundles(), equipped).stream().filter(entry -> {
 			String item = SOURCE_ITEMS.get(entry.bundleFile());
 			if (item == null || item.isEmpty()) {
 				return true;
@@ -61,6 +61,35 @@ public final class CapeLibrary {
 			}
 			return net.veloclient.launcher.social.StoreApi.owns(item) || net.veloclient.launcher.social.StoreApi.isOwner();
 		}).toList();
+	}
+
+	/** The Store item a bundle was imported for, or null for the player's own pictures. */
+	public static String sourceItemId(CapeEntry entry) {
+		String item = SOURCE_ITEMS.get(entry.bundleFile());
+		return item == null || item.isEmpty() ? null : item;
+	}
+
+	/**
+	 * One cloak per Store item: two refreshes racing (or a renamed catalog entry) once imported the same cloak twice, and
+	 * the Locker listed it twice (1.5.1.1, LuckySMP cloak). The worn copy wins; the spare files stay on disk (another
+	 * account may wear that one) but aren't listed.
+	 */
+	private static List<CapeEntry> dedupeStoreItems(List<CapeEntry> all, String equipped) {
+		java.util.Map<String, CapeEntry> byItem = new java.util.LinkedHashMap<>();
+		List<CapeEntry> out = new ArrayList<>();
+		for (CapeEntry entry : all) {
+			String item = sourceItemId(entry);
+			if (item == null) {
+				out.add(entry);
+				continue;
+			}
+			CapeEntry kept = byItem.get(item);
+			if (kept == null || entry.id().equals(equipped)) {
+				byItem.put(item, entry);
+			}
+		}
+		out.addAll(byItem.values());
+		return out;
 	}
 
 	/** Every bundle on disk, whoever bought it - for restoring purchases. */

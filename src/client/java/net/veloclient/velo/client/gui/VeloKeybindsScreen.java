@@ -217,6 +217,7 @@ public final class VeloKeybindsScreen extends VeloWindow {
 				@Override
 				public void listen(KeyBinding binding) {
 					listening = binding;
+					stopTyping();
 					status = "";
 				}
 
@@ -397,6 +398,7 @@ public final class VeloKeybindsScreen extends VeloWindow {
 		boolean visible = y + 22 > top && y < bottom;
 		VeloUi.Hit keyHit = VeloUi.pill(context, keyX, y + 2, keyW, 18, key, isListening ? 1 : conflict ? 3 : 0, mouseX, mouseY, () -> {
 			listening = binding;
+			stopTyping();
 			status = "";
 		});
 		if (visible) {
@@ -427,11 +429,44 @@ public final class VeloKeybindsScreen extends VeloWindow {
 
 	// ---- Input ----
 
+	/** Until when the character events of the key just bound are swallowed (see {@link #charTyped}). */
+	private long swallowCharsUntil;
+
+	/** A binding starts listening: the search box lets go, so the pressed key can't also type into it. */
+	private void stopTyping() {
+		if (search != null) {
+			search.setFocused(false);
+		}
+		setFocused(null);
+	}
+
+	/**
+	 * The key that was just bound also sends a character event of its own, after keyPressed; it used to land in the
+	 * still-focused search box and change the results ("the character gets input into the search box and the keybind
+	 * box", 1.5.1.1). Swallowed while listening and right after a key was taken.
+	 */
+	private boolean swallowChar() {
+		return listening != null || System.nanoTime() < swallowCharsUntil;
+	}
+
+	//? if <26.1 {
+	@Override
+	public boolean charTyped(net.minecraft.client.input.CharInput input) {
+		return swallowChar() || super.charTyped(input);
+	}
+	//?} else {
+	/*@Override
+	public boolean charTyped(net.minecraft.client.input.CharacterEvent input) {
+		return swallowChar() || super.charTyped(input);
+	}
+	*///?}
+
 	@Override
 	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
 		if (listening != null) {
 			KeyBinding binding = listening;
 			listening = null;
+			swallowCharsUntil = System.nanoTime() + 250_000_000L;
 			if (input.key() == net.veloclient.velo.client.util.Keys.ESCAPE) {
 				status = "Cancelled";
 			} else if (input.key() == net.veloclient.velo.client.util.Keys.BACKSPACE || input.key() == net.veloclient.velo.client.util.Keys.DELETE) {

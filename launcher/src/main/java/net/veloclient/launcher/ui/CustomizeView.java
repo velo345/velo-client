@@ -852,7 +852,7 @@ public final class CustomizeView {
 
 	private Node colorPicker(JsonObject o, String key, String fallback) {
 		String current = str(o, key, "");
-		ColorPicker picker = new ColorPicker(Color.web(current.isEmpty() ? fallback : current));
+		ColorPicker picker = new VeloColorPicker(Color.web(current.isEmpty() ? fallback : current));
 		picker.getStyleClass().add("button");
 		picker.setPrefWidth(120);
 		Button reset = new Button("Default");

@@ -127,6 +127,22 @@ public final class CrosshairManager {
 
 	/** Persists the definition's metadata and pixel data. {@code hitImage} is only written when {@code hitMode == SEPARATE_IMAGE}; pass {@code null} otherwise. */
 	public static void save(CrosshairDefinition definition, NativeImage idleImage, NativeImage hitImage) {
+		// odd canvases only: an even one has no centre pixel and sat half a pixel off the screen's centre
+		if (idleImage.getWidth() % 2 == 0) {
+			NativeImage oddIdle = oddCanvas(idleImage);
+			NativeImage oddHit = hitImage != null && hitImage.getWidth() % 2 == 0 ? oddCanvas(hitImage) : hitImage;
+			CrosshairDefinition odd = new CrosshairDefinition(definition.id(), definition.name(), oddIdle.getWidth(), definition.hitMode(),
+					definition.colorSwap());
+			try {
+				save(odd, oddIdle, oddHit);
+			} finally {
+				oddIdle.close();
+				if (oddHit != null && oddHit != hitImage) {
+					oddHit.close();
+				}
+			}
+			return;
+		}
 		VeloPaths.ensureDirectories();
 		Path dir = dirFor(definition.id());
 		try {
@@ -145,6 +161,24 @@ public final class CrosshairManager {
 		}
 		LIBRARY.put(definition.id(), definition);
 		invalidateTexture(definition.id());
+	}
+
+	/**
+	 * An even-sized drawing as an odd one: the middle row and column (index n/2) go, so a drawing symmetric around the
+	 * even canvas' centre (a 2-px line at 7/8 of 16) stays symmetric around the new centre pixel (a 1-px line at 7 of
+	 * 15). A new image; the source stays open.
+	 */
+	public static NativeImage oddCanvas(NativeImage source) {
+		int n = source.getWidth();
+		int m = n - 1;
+		int skip = n / 2;
+		NativeImage out = new NativeImage(m, m, false);
+		for (int y = 0; y < m; y++) {
+			for (int x = 0; x < m; x++) {
+				out.setColorArgb(x, y, source.getColorArgb(x < skip ? x : x + 1, y < skip ? y : y + 1));
+			}
+		}
+		return out;
 	}
 
 	public static void delete(String id) {
@@ -211,6 +245,9 @@ public final class CrosshairManager {
 		Identifier idle = TEXTURE_CACHE.remove(id + ":idle");
 		Identifier hit = TEXTURE_CACHE.remove(id + ":hit");
 		Identifier swap = TEXTURE_CACHE.remove(id + ":swap");
+		if (idle == null && hit == null && swap == null) {
+			return; // nothing registered yet (also: the library loads before the texture manager exists)
+		}
 		var textureManager = MinecraftClient.getInstance().getTextureManager();
 		if (idle != null) {
 			textureManager.destroyTexture(idle);
@@ -233,16 +270,44 @@ public final class CrosshairManager {
 			if (meta == null) {
 				return Optional.empty();
 			}
-			return Optional.of(new CrosshairDefinition(meta.id(), meta.name(), meta.canvasSize(),
-					CrosshairDefinition.HitMode.valueOf(meta.hitMode()), meta.colorSwap() != null ? meta.colorSwap() : Map.of()));
+			CrosshairDefinition definition = new CrosshairDefinition(meta.id(), meta.name(), meta.canvasSize(),
+					CrosshairDefinition.HitMode.valueOf(meta.hitMode()), meta.colorSwap() != null ? meta.colorSwap() : Map.of());
+			return Optional.of(migrateToOdd(dir, definition));
 		} catch (IOException | RuntimeException e) {
 			return Optional.empty();
 		}
 	}
 
+	/** Older crosshairs were drawn on 16x16 (no centre pixel): converted once to 15x15 (see {@link #oddCanvas}). */
+	private static CrosshairDefinition migrateToOdd(Path dir, CrosshairDefinition definition) {
+		Path idleFile = dir.resolve("idle.png");
+		if (!Files.exists(idleFile)) {
+			return definition;
+		}
+		try (NativeImage idle = readImage(idleFile)) {
+			if (idle.getWidth() % 2 != 0 || idle.getWidth() != idle.getHeight()) {
+				return definition;
+			}
+			Path hitFile = dir.resolve("hit.png");
+			NativeImage hit = definition.hitMode() == CrosshairDefinition.HitMode.SEPARATE_IMAGE && Files.exists(hitFile) ? readImage(hitFile) : null;
+			try {
+				save(definition, idle, hit); // save() makes both odd and records the new size
+			} finally {
+				if (hit != null) {
+					hit.close();
+				}
+			}
+			net.veloclient.velo.VeloClient.LOGGER.info("Crosshair \"{}\" moved to an odd canvas ({}x{} -> {}x{})", definition.name(),
+					idle.getWidth(), idle.getWidth(), idle.getWidth() - 1, idle.getWidth() - 1);
+			return LIBRARY.getOrDefault(definition.id(), definition);
+		} catch (RuntimeException e) {
+			return definition;
+		}
+	}
+
 	/** Ships a couple of ready-to-use crosshairs on first run so the library isn't empty; these are ordinary (editable/deletable) entries, not protected presets. */
 	private static void seedDefaults() {
-		int size = 16;
+		int size = 16; // drawn on 16 and saved as 15 (save() drops the middle row and column)
 		NativeImage cross = new NativeImage(size, size, false);
 		cross.fillRect(0, 0, size, size, 0);
 		int white = 0xFFFFFFFF;

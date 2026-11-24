@@ -65,7 +65,7 @@ public final class MenuShell {
 		out.add(new Entry("friends", "friends", "Friends", false, p -> new net.veloclient.velo.client.gui.FriendsScreen(p)));
 		out.add(new Entry("clips", "clips", "Clips & Screenshots", false, p -> new net.veloclient.velo.client.gui.media.MediaScreen(p)));
 		out.add(new Entry("fight_recap", "fight_recap", "Fight Recap (K)", false, p -> new net.veloclient.velo.client.gui.media.FightRecapScreen(p)));
-		out.add(new Entry("map", "map", "World Map (M)", false, p -> new net.veloclient.velo.client.worldmap.WorldMapScreen(p)));
+		out.add(new Entry("map", "map", "World Map", false, p -> new net.veloclient.velo.client.worldmap.WorldMapScreen(p)));
 		out.add(new Entry("waypoints", "waypoints", "Waypoints", false, p -> new net.veloclient.velo.client.gui.WaypointsScreen(p)));
 		out.add(new Entry("queue", "queue", "Background Queue", false, p -> new net.veloclient.velo.client.gui.BackgroundQueueSessionsScreen(p, null)));
 		out.add(new Entry("schematics", "schematics", "Schematics", false, p -> new net.veloclient.velo.client.gui.SchematicsScreen(p)));

@@ -42,6 +42,9 @@ public final class FramesInFlight {
 			}
 		}
 		lastSubmit = now;
+		if (LowLatencyModule.queueReduction()) {
+			return 1; // Low Latency Mode: wait for the frame just submitted (nothing queued ahead of the GPU)
+		}
 		return switch (MODE) {
 			case "3" -> 3;
 			case "auto" -> ThreadedPresent.eligible() && avgNanos < FAST_NANOS ? 3 : 2;

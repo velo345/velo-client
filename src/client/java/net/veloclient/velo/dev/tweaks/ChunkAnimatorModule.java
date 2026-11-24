@@ -33,6 +33,8 @@ public final class ChunkAnimatorModule extends AbstractModule implements Configu
 	private static String built = "";
 	private String wanted = "";
 	private int reloadIn = -1;
+	/** Sodium has built its terrain shader at least once (it only does in a world). */
+	private static boolean shaderLoaded;
 
 	public ChunkAnimatorModule() {
 		super("chunk-animator", "Chunk Animator", "New chunks glide into place instead of popping in. Needs Sodium (comes with the launcher).",
@@ -45,18 +47,29 @@ public final class ChunkAnimatorModule extends AbstractModule implements Configu
 		return isEnabled() ? style + "|" + speed + "|" + (int) distance : "";
 	}
 
-	/** Reloads resources (a moment after the last change) when the shader no longer matches the settings. */
+	/**
+	 * Reloads resources (a moment after the last change) when the shader no longer matches the settings - only while a
+	 * world's terrain shader is actually loaded. Sodium builds that shader when a world is joined, already patched with
+	 * the current settings: a reload scheduled before that (game start, menu) used to run anyway on every join, a whole
+	 * extra resource reload each time (1.5.x "launching / joining takes forever").
+	 */
 	private void tick(MinecraftClient client) {
 		String now = settings();
+		if (client.world == null || !shaderLoaded) {
+			wanted = now;
+			reloadIn = -1;
+			return;
+		}
 		if (!now.equals(wanted)) {
 			wanted = now;
 			reloadIn = built.equals(now) ? -1 : 30;
 		}
-		if (reloadIn > 0 && --reloadIn == 0 && client.world != null) {
+		if (built.equals(now)) {
+			reloadIn = -1; // the shader was rebuilt with these settings meanwhile
+		}
+		if (reloadIn > 0 && --reloadIn == 0) {
 			reloadIn = -1;
 			client.reloadResources();
-		} else if (reloadIn == 0) {
-			reloadIn = 1; // not in a world: wait until there is one
 		}
 	}
 
@@ -68,6 +81,7 @@ public final class ChunkAnimatorModule extends AbstractModule implements Configu
 		}
 		String settings = m.settings();
 		built = settings;
+		shaderLoaded = true;
 		m.wanted = settings;
 		if (settings.isEmpty() || !source.contains(ANCHOR) || !source.contains("u_SectionTimeInfo") || !source.contains("u_CurrentTime")) {
 			return source;

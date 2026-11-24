@@ -79,7 +79,8 @@ public final class ThreadedPresent {
 
 	/** Called at the start of every frame (before its acquire). */
 	public static void beginFrame() {
-		frameOn = ON && eligible() && (FORCE || gateOn);
+		// Low Latency Mode's queue reduction waits in the submit: on the worker it would only block the worker
+		frameOn = ON && eligible() && (FORCE || gateOn) && !LowLatencyModule.queueReduction();
 	}
 
 	/** Render thread time spent waiting for the GPU in the submit throttle. */

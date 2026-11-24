@@ -446,6 +446,7 @@ public final class VeloClientMod implements ClientModInitializer {
 		ModuleRegistry.register(new FovModule());
 		ModuleRegistry.register(new net.veloclient.velo.client.modules.rendering.ScreenStretchModule());
 		ModuleRegistry.register(new InputSamplerModule());
+		ModuleRegistry.register(new net.veloclient.velo.client.modules.performance.LowLatencyModule());
 
 		// Utility
 		ModuleRegistry.register(new CopyCoordinatesModule());

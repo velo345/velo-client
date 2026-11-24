@@ -81,7 +81,7 @@ public final class WearDetailView {
 		Label name = new Label();
 		name.getStyleClass().add("stage-hint");
 		javafx.scene.layout.FlowPane swatches = new javafx.scene.layout.FlowPane(6, 6);
-		javafx.scene.control.ColorPicker picker = new javafx.scene.control.ColorPicker();
+		javafx.scene.control.ColorPicker picker = new VeloColorPicker();
 		picker.setPrefWidth(120);
 		java.util.List<Region> cells = new java.util.ArrayList<>();
 		Runnable[] mark = new Runnable[1];

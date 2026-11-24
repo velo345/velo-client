@@ -316,7 +316,7 @@ public final class CapeImportDialog {
 			int auto = CapeArt.autoBackground(first);
 			CheckBox autoBg = new CheckBox("Auto");
 			autoBg.setSelected(true);
-			ColorPicker color = new ColorPicker(Color.rgb((auto >> 16) & 0xFF, (auto >> 8) & 0xFF, auto & 0xFF));
+			ColorPicker color = new VeloColorPicker(Color.rgb((auto >> 16) & 0xFF, (auto >> 8) & 0xFF, auto & 0xFF));
 			color.getStyleClass().add("button-sm");
 			color.setDisable(true);
 			Runnable applyBg = () -> {

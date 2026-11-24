@@ -123,7 +123,7 @@ public final class KillFxDetailView {
 			swatches.getChildren().add(cell);
 		}
 		// any colour: the picker after the swatches (stored as AuraEffects.custom(rgb) - other Velo players see it too)
-		javafx.scene.control.ColorPicker picker = new javafx.scene.control.ColorPicker();
+		javafx.scene.control.ColorPicker picker = new VeloColorPicker();
 		picker.getStyleClass().add("button");
 		picker.setPrefWidth(110);
 		picker.setTooltip(new javafx.scene.control.Tooltip("Any colour"));

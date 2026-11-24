@@ -57,6 +57,9 @@ public final class ModuleIcons {
 		if (extra != null) {
 			return extra;
 		}
+		if (moduleId.equals("low-latency")) {
+			return texture("input-sampler"); // same subject: input lag
+		}
 		return KNOWN_IDS.contains(moduleId) ? texture(moduleId) : DEFAULT;
 	}
 

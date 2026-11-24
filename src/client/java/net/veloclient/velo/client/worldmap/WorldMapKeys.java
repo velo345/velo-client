@@ -7,11 +7,11 @@ import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.veloclient.velo.client.keybind.VeloKeybinds;
 
-/** The world map's own key (M by default, rebindable in Controls). */
+/** The world map's own key (unbound by default since 1.5.2 - players who had M keep it: options.txt stores every key). */
 public final class WorldMapKeys {
 
 	public static final KeyBinding OPEN_MAP = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client." + "world_map" /* split: the client.world -> client.level Stonecutter rule */, InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.M, VeloKeybinds.CATEGORY));
+			"key.velo-client." + "world_map" /* split: the client.world -> client.level Stonecutter rule */, InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN, VeloKeybinds.CATEGORY));
 
 	private WorldMapKeys() {
 	}

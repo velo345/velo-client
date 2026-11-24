@@ -18,8 +18,10 @@ public final class ServerHudPack {
 	private static long checkedAt;
 	private static int heartsVotes;
 	private static int foodVotes;
+	private static int armorVotes;
 	private static boolean hearts;
 	private static boolean food;
+	private static boolean armor;
 
 	private ServerHudPack() {
 	}
@@ -32,6 +34,12 @@ public final class ServerHudPack {
 	public static boolean overridesFood() {
 		refresh();
 		return food;
+	}
+
+	/** The pack restyles or hides the armor row (same treatment as hearts, owner 1.5.1). */
+	public static boolean overridesArmor() {
+		refresh();
+		return armor;
 	}
 
 	/**
@@ -68,9 +76,11 @@ public final class ServerHudPack {
 		checkedAt = now;
 		boolean h;
 		boolean f;
+		boolean a;
 		try {
 			h = fromServer("hud/heart/full") || fromServer("hud/heart/container");
 			f = fromServer("hud/food_full") || fromServer("hud/food_empty");
+			a = fromServer("hud/armor_full") || fromServer("hud/armor_empty");
 		} catch (RuntimeException | LinkageError e) {
 			return; // keep the last answer, try again in a second
 		}
@@ -81,10 +91,15 @@ public final class ServerHudPack {
 			checked = true;
 			reloadPending = false;
 			checkedWorld = new java.lang.ref.WeakReference<>(world);
+			if (a != armor) {
+				net.veloclient.velo.VeloClient.LOGGER.info("Velo server HUD: armor {} by the server pack", a ? "taken over" : "not touched");
+			}
 			hearts = h;
 			food = f;
+			armor = a;
 			heartsVotes = 0;
 			foodVotes = 0;
+			armorVotes = 0;
 			return;
 		}
 		// mid-game: switch only on the second reading in a row that disagrees
@@ -93,6 +108,12 @@ public final class ServerHudPack {
 			log("mid-game (hearts)", h, food);
 			hearts = h;
 			heartsVotes = 0;
+		}
+		armorVotes = a != armor ? armorVotes + 1 : 0;
+		if (armorVotes >= 2) {
+			net.veloclient.velo.VeloClient.LOGGER.info("Velo server HUD: armor {} by the server pack (mid-game)", a ? "taken over" : "not touched");
+			armor = a;
+			armorVotes = 0;
 		}
 		foodVotes = f != food ? foodVotes + 1 : 0;
 		if (foodVotes >= 2) {

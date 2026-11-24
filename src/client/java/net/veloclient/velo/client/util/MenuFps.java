@@ -40,7 +40,7 @@ public final class MenuFps {
 		*///?}
 	}
 
-	private static int refreshRate() {
+	public static int refreshRate() {
 		//? if <26.1 {
 		return net.minecraft.client.MinecraftClient.getInstance().getWindow().getRefreshRate();
 		//?} else if <26.3 {

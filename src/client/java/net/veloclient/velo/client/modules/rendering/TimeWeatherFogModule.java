@@ -135,15 +135,9 @@ public final class TimeWeatherFogModule extends AbstractModule implements Config
 	}
 	//?} else {
 	/*private void applyTime(MinecraftClient client) {
-		Long fixed = FIXED_TIMES.get(timeMode);
-		if (fixed == null) {
-			lastAppliedTimeMode = null;
-			return;
-		}
-		if (!timeMode.equals(lastAppliedTimeMode)) {
-			client.world.setTimeFromServer(fixed);
-			lastAppliedTimeMode = timeMode;
-		}
+		// 26.x: the time of day lives in the world clocks - TimeFixMixin answers the clock reads with the fixed time.
+		// (setTimeFromServer only sets the game time; the old call here broke animations until the server's next
+		// time packet, which is when the sky "reverted".)
 	}
 
 	private void applyWeather(MinecraftClient client) {
@@ -155,6 +149,36 @@ public final class TimeWeatherFogModule extends AbstractModule implements Config
 		client.world.setThunderLevel(gradient[1]);
 	}
 	*///?}
+
+	/** The locked time of day (0-23999) while the module locks the time, else -1. Read by TimeFixMixin. */
+	public static long fixedTimeOfDay() {
+		TimeWeatherFogModule module = instance;
+		if (module == null || !module.isEnabled()) {
+			return -1;
+		}
+		Long fixed = FIXED_TIMES.get(module.timeMode);
+		return fixed == null ? -1 : Math.floorMod(fixed, 24000L);
+	}
+
+	/** A clock read with the time locked: same day (moon phase keeps moving with the real days), fixed time of day. */
+	public static long lockClock(long realTicks) {
+		long fixed = fixedTimeOfDay();
+		return fixed < 0 ? realTicks : Math.floorDiv(realTicks, 24000L) * 24000L + fixed;
+	}
+
+	/** 1.21.x: the server's time packet just overwrote the world time - put the locked time back (same tick, no flash). */
+	public static void afterServerTime() {
+		TimeWeatherFogModule module = instance;
+		if (module != null) {
+			module.lastAppliedTimeMode = null;
+			//? if <26.1 {
+			MinecraftClient client = MinecraftClient.getInstance();
+			if (module.isEnabled() && client.world != null) {
+				module.applyTime(client);
+			}
+			//?}
+		}
+	}
 
 	/** Read from {@code AtmosphericFogMixin} - whether to override the atmospheric fog color this frame. */
 	public static boolean isFogColorOverrideActive() {

@@ -26,7 +26,7 @@ import java.util.List;
 public final class StorageMemoryModule extends AbstractModule implements Configurable, net.veloclient.velo.client.gui.window.ModuleShortcut {
 
 	public static final KeyBinding OPEN_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-			"key.velo-client.storage_memory", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.Y, VeloKeybinds.CATEGORY));
+			"key.velo-client.storage_memory", InputUtil.Type.KEYSYM, net.veloclient.velo.client.util.Keys.UNKNOWN /* unbound by default since 1.5.2; options.txt keeps existing players Y */, VeloKeybinds.CATEGORY));
 
 	private static StorageMemoryModule instance;
 	private static boolean partySync;

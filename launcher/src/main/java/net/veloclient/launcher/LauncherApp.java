@@ -970,6 +970,8 @@ public final class LauncherApp extends Application {
 		if (layers != null) {
 			layers.setStyle(themeStyle());
 		}
+		// Corners: sizes can't be CSS lookups, so they come as a scaled extra stylesheet
+		net.veloclient.launcher.theme.ThemeRadii.apply(theme.cornerRadius());
 	}
 
 	private String themeStyle() {

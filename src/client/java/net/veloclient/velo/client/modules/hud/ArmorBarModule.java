@@ -34,6 +34,7 @@ public final class ArmorBarModule extends AbstractModule implements Configurable
 	private int emptyColor = 0xFF2B2B30;
 	private int outlineColor = 0xFF000000;
 	private boolean tintCustom = false;
+	private boolean serverWins = true;
 
 	public ArmorBarModule() {
 		super("armor-bar", "Armor Bar", "Recolor the armor points above your hearts or draw your own armor icon.",
@@ -45,6 +46,9 @@ public final class ArmorBarModule extends AbstractModule implements Configurable
 		var module = ModuleRegistry.get("armor-bar").orElse(null);
 		if (!(module instanceof ArmorBarModule armor) || !module.isEnabled()) {
 			return false;
+		}
+		if (armor.serverWins && net.veloclient.velo.client.hud.ServerHudPack.overridesArmor()) {
+			return false; // the server's pack styles or hides this row itself
 		}
 		//? if <26.1 {
 		int points = player.getArmor();
@@ -111,6 +115,7 @@ public final class ArmorBarModule extends AbstractModule implements Configurable
 					net.veloclient.velo.client.gui.StatusIconEditor.openFromSettings(KIND, "Armor Icon", armorColor);
 				}),
 				new ConfigField.ToggleField("Tint Custom Drawing With Armor Color", () -> tintCustom, v -> tintCustom = v),
+				new ConfigField.ToggleField("Use the Server's Armor Bar When Its Pack Has Its Own", () -> serverWins, v -> serverWins = v),
 				new ConfigField.ActionButtonField("Delete Custom Drawing", () -> {
 					try {
 						StatusBarIcons.delete(KIND);

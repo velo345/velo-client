@@ -33,13 +33,16 @@ public final class StoreRestore {
 		}
 	}
 
-	public static void restoreMissing() {
+	public static synchronized void restoreMissing() {
 		for (String itemId : StoreClient.owned()) {
 			boolean present = CapeManager.allBundles().values().stream()
 					.map(CapeDefinition::sourceItemId).anyMatch(id -> Objects.equals(id, itemId));
 			if (present) {
 				refreshArtIfChanged(itemId);
 				continue;
+			}
+			if (CapeManager.adoptFromDisk(itemId)) {
+				continue; // the launcher already restored it
 			}
 			StoreCatalog.byId(itemId).filter(StoreAssets::ready).ifPresent(item -> {
 				try (InputStream in = StoreAssets.openGif(item)) {

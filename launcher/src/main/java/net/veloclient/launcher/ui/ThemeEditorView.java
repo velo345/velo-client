@@ -306,7 +306,7 @@ public final class ThemeEditorView {
 	}
 
 	private static Node picker(int argb, java.util.function.IntFunction<UnaryOperator<LauncherTheme>> change, Host host) {
-		ColorPicker picker = new ColorPicker(Color.web(LauncherTheme.toCssHex(argb)));
+		ColorPicker picker = new VeloColorPicker(Color.web(LauncherTheme.toCssHex(argb)));
 		picker.getStyleClass().addAll("button", "swatch-picker");
 		picker.setStyle("-fx-color-label-visible: false;");
 		picker.setTooltip(new Tooltip("Any colour"));

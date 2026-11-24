@@ -626,6 +626,7 @@ public final class ModuleConfigScreen extends VeloWindow {
 		if (awaitingRebind != null) {
 			ConfigField.KeybindField field = awaitingRebind;
 			awaitingRebind = null;
+			swallowCharsUntil = System.nanoTime() + 250_000_000L;
 			// Escape unbinds the key entirely rather than just cancelling
 			// back to whatever was bound before - it's also not captured as
 			// the new key itself, and doesn't fall through to close this
@@ -658,9 +659,25 @@ public final class ModuleConfigScreen extends VeloWindow {
 		return super.keyPressed(input);
 	}
 
+	/** The bound key's own character event (after keyPressed) must not type into a text field (1.5.1.1). */
+	private long swallowCharsUntil;
+
+	//? if <26.1 {
+	@Override
+	public boolean charTyped(net.minecraft.client.input.CharInput input) {
+		return awaitingRebind != null || awaitingChordRebind != null || System.nanoTime() < swallowCharsUntil || super.charTyped(input);
+	}
+	//?} else {
+	/*@Override
+	public boolean charTyped(net.minecraft.client.input.CharacterEvent input) {
+		return awaitingRebind != null || awaitingChordRebind != null || System.nanoTime() < swallowCharsUntil || super.charTyped(input);
+	}
+	*///?}
+
 	@Override
 	public boolean keyReleased(net.minecraft.client.input.KeyInput input) {
 		if (awaitingChordRebind != null) {
+			swallowCharsUntil = System.nanoTime() + 250_000_000L;
 			chordHeldKeys.remove(input.key());
 			if (chordHeldKeys.isEmpty() && !chordMaxKeys.isEmpty()) {
 				ConfigField.ChordKeybindField field = awaitingChordRebind;

@@ -34,10 +34,15 @@ public final class StorePurchase {
 	 * Imports every owned store cape the local library doesn't have yet (bought elsewhere / granted), and swaps the art of
 	 * ones whose art the server changed since they were imported (the library keeps its own copy).
 	 */
-	public static void restoreMissing() {
+	public static synchronized void restoreMissing() {
+		// synchronized: the startup refresh and a Store refresh running at once both saw the cloak missing and both
+		// imported it (a doubled LuckySMP cloak, 1.5.1.1)
+		java.util.List<CapeEntry> bundles = CapeLibrary.listAllBundles();
 		for (String itemId : StoreApi.owned()) {
 			StoreCatalog.byId(itemId).ifPresent(item -> {
-				CapeEntry present = CapeLibrary.listAllBundles().stream().filter(c -> c.animated() && c.name().equals(item.name())).findFirst().orElse(null);
+				// by Store id first (names change), the old name match for bundles from before ids were stored
+				CapeEntry present = bundles.stream().filter(c -> item.id().equals(CapeLibrary.sourceItemId(c))).findFirst()
+						.or(() -> bundles.stream().filter(c -> c.animated() && c.name().equals(item.name())).findFirst()).orElse(null);
 				if (present != null) {
 					refreshArt(present, item);
 					return;

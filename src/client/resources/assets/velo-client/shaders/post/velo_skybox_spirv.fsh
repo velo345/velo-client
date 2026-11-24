@@ -90,7 +90,7 @@ float stars(vec3 dir, float cells, float density, float pxAngle, float time) {
             continue;
         }
         vec3 sp = normalize(c + 0.15 + 0.7 * hash3(c + 17.0));
-        float ang = acos(clamp(dot(dir, sp), -1.0, 1.0));
+        float ang = length(dir - sp); // chord = angle for tiny angles, no acos per cell
         float size = pxAngle * (0.45 + 0.55 * h.y * h.y);
         float b = 0.22 + 0.78 * h.z * h.z * h.z;
         b *= 0.8 + 0.2 * sin(time * (1.5 + 3.0 * h.x) + h.y * 40.0);

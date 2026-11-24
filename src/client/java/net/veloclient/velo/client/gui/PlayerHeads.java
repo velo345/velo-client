@@ -107,11 +107,12 @@ public final class PlayerHeads {
 			// Legacy 64x32 skins have no real alpha in the hat layer - vanilla ignores a fully opaque
 			// one (otherwise e.g. Notch's head renders as a black square), so do the same.
 			boolean useHat = true;
-			if (full.getHeight() == 32) {
+			if (full.getHeight() * 2 == full.getWidth()) {
 				boolean anyTransparent = false;
 				for (int py = 0; py < 8 && !anyTransparent; py++) {
 					for (int px = 0; px < 8; px++) {
-						if ((full.getColorArgb(40 + px, 8 + py) >>> 24) < 0x80) {
+						int k0 = Math.max(1, full.getWidth() / 64);
+						if ((full.getColorArgb((40 + px) * k0, (8 + py) * k0) >>> 24) < 0x80) {
 							anyTransparent = true;
 							break;
 						}
@@ -119,11 +120,13 @@ public final class PlayerHeads {
 				}
 				useHat = anyTransparent;
 			}
+			// HD skins (128, 256... wide) keep the same layout scaled up: sample the face at that scale
+			int k = Math.max(1, full.getWidth() / 64);
 			NativeImage head = new NativeImage(8, 8, false);
 			for (int py = 0; py < 8; py++) {
 				for (int px = 0; px < 8; px++) {
-					int base = full.getColorArgb(8 + px, 8 + py) | 0xFF000000;
-					int hat = useHat ? full.getColorArgb(40 + px, 8 + py) : 0;
+					int base = full.getColorArgb((8 + px) * k + k / 2, (8 + py) * k + k / 2) | 0xFF000000;
+					int hat = useHat ? full.getColorArgb((40 + px) * k + k / 2, (8 + py) * k + k / 2) : 0;
 					head.setColorArgb(px, py, (hat >>> 24) > 0x80 ? (hat | 0xFF000000) : base);
 				}
 			}

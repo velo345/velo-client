@@ -35,8 +35,10 @@ public final class SkyboxModule extends AbstractModule implements Configurable {
 
 	//? if >=26.3 {
 	/*private static final Identifier EFFECT = Identifier.of("velo-client", "skybox_spirv");
+	private static final Identifier DIRECT = Identifier.of("velo-client", "skybox_direct_spirv");
 	*///?} else {
 	private static final Identifier EFFECT = Identifier.of("velo-client", "skybox");
+	private static final Identifier DIRECT = Identifier.of("velo-client", "skybox_direct");
 	//?}
 	private static final Identifier SKY_ID = Identifier.of("velo-client", "textures/effect/skybox.png");
 	private static final Identifier PARAMS_ID = Identifier.of("velo-client", "textures/effect/skybox_params.png");
@@ -100,16 +102,21 @@ public final class SkyboxModule extends AbstractModule implements Configurable {
 				ModuleCategory.RENDERING, SafetyTag.ALWAYS_SAFE, false);
 		instance = this;
 		//? if >=26.2 {
-		/*// Preferred spot: right after the solid terrain, before entities, text (Lyrics), water, clouds and particles - so all
-		// of those land in front of the sky. Lyrics write no depth, so the old after-the-world pass painted over them.
-		net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.AFTER_OPAQUE_TERRAIN.register(context -> {
+		/*// Drawn before the world: right after vanilla's sky, at the start of the main pass. Terrain, clouds, water, entities,
+		// text (Lyrics) and particles are all drawn over it afterwards - no depth test needed, so nothing can end up behind
+		// the sky (clouds did with Fabulous, where they never reach the main depth buffer), and at full opacity it's one
+		// pass straight into the frame instead of a full-screen copy there and back.
+		net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.START_MAIN.register(context -> {
 			earlyRan = true;
-			applyIfActive();
+			SkyboxModule m = instance;
+			if (m != null && m.isEnabled() && !broken) {
+				m.apply(m.opacity >= 0.999);
+			}
 		});
 		*///?}
 	}
 
-	/** The early pass (after the opaque terrain) ran this frame - the after-the-world fallback then skips. */
+	/** The early pass (start of the main pass) ran this frame - the after-the-world fallback then skips. */
 	private static boolean earlyRan;
 
 	/**
@@ -139,10 +146,11 @@ public final class SkyboxModule extends AbstractModule implements Configurable {
 		if (m == null || !m.isEnabled() || broken) {
 			return;
 		}
-		m.apply();
+		m.apply(false);
 	}
 
-	private void apply() {
+	/** {@code direct}: before the world, straight into the frame (full opacity); else the depth-tested blend pass. */
+	private void apply(boolean direct) {
 		MinecraftClient client = MinecraftClient.getInstance();
 		if (client.player == null || client.world == null) {
 			return;
@@ -184,7 +192,7 @@ public final class SkyboxModule extends AbstractModule implements Configurable {
 			if (net.veloclient.velo.client.util.ClientCompat.reloadingResources()) {
 				return; // never mid-reload (see ClientCompat.reloadingResources)
 			}
-			processor = load(client, EFFECT);
+			processor = load(client, direct ? DIRECT : EFFECT);
 			if (processor == null) {
 				return;
 			}
@@ -238,7 +246,8 @@ public final class SkyboxModule extends AbstractModule implements Configurable {
 				(System.nanoTime() / 1e9 % 60.0) / 30.0 - 1,   // star twinkle clock
 				starAmount() * 2 - 1, stars * 2 - 1,
 				-Math.sin(VeloShadersModule.sunAngle()), Math.cos(VeloShadersModule.sunAngle()), // sun direction (x, y)
-				VeloShadersModule.moonPhase() / 8.0 * 2 - 1, -1, -1};
+				VeloShadersModule.moonPhase() / 8.0 * 2 - 1,
+				client.getWindow().getHeight() / 2048.0 - 1, -1}; // frame height (the direct pass can't ask its input)
 		if (paramsTexture == null) {
 			paramsTexture = new NativeImageBackedTexture(() -> "velo-skybox-params", new NativeImage(12, 1, false));
 			client.getTextureManager().registerTexture(PARAMS_ID, paramsTexture);

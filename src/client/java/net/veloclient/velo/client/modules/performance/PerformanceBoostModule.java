@@ -567,6 +567,8 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 						//?}
 					}
 				}),
+				new ConfigField.ToggleField("Throttle Hidden Window (covered / other desktop)",
+						() -> net.veloclient.velo.client.util.WindowOcclusion.enabled, v -> net.veloclient.velo.client.util.WindowOcclusion.enabled = v),
 				new ConfigField.HeaderField("View Distance"),
 				new ConfigField.SliderField("View Distance", 2, 32,
 						// while Adaptive Render Distance has lowered it, the profile keeps the player's own value
@@ -818,6 +820,7 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 			fields.add(byLabel.get("View Distance"));
 			fields.add(byLabel.get("VSync Mode"));
 			fields.add(byLabel.get("Dynamic FPS (throttle when unfocused/AFK)"));
+			fields.add(byLabel.get("Throttle Hidden Window (covered / other desktop)"));
 			fields.removeIf(java.util.Objects::isNull);
 			return fields;
 		}
