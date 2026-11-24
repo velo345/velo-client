@@ -466,6 +466,9 @@ tasks.register("jpackageDist") {
 			return
 		}
 		runJpackage(command)
+		if (isWindows && !veloDev) {
+			buildInnoSetup(appImage, dist, launcherAppVersion, packageVersion, appName, rootDir)
+		}
 		// Linux without dpkg (Arch, Fedora, ...): the same app as a plain folder with its runtime, packed as
 		// velo-client-launcher-<version>-linux-x64.tar.gz - what packaging/aur/PKGBUILD installs to /opt.
 		if (!isWindows && !isMac) {
@@ -489,6 +492,68 @@ tasks.register("jpackageDist") {
 			imageDir.deleteDir()
 		}
 	}
+}
+
+// Windows: "Velo-Client-Setup-<version>.exe" - the branded installer for new players (packaging/windows/velo-setup.iss,
+// Inno Setup 6.6+ for its dark wizard; built with the plain modern one on an older Inno). Per-user, no admin prompt.
+// Built from jpackage's app image of the same files. Skipped (with a note) where Inno Setup isn't installed - the
+// jpackage .exe is built either way, the updater's fallback keeps using that one for its installs.
+void buildInnoSetup(List<String> appImageCommand, File dist, String version, String packageVersion, String appName, File rootDir) {
+	File iscc = [System.getenv("INNO_ISCC"), "C:/Program Files (x86)/Inno Setup 6/ISCC.exe", "C:/Program Files/Inno Setup 6/ISCC.exe"]
+			.findAll { it != null }.collect { new File(it) }.find { it.isFile() }
+	if (iscc == null) {
+		println("Inno Setup not found - skipping Velo-Client-Setup.exe")
+		return
+	}
+	File imageDir = new File(dist, "inno-image")
+	List<String> image = new ArrayList<>()
+	// app-image takes none of the installer options
+	for (int i = 0; i < appImageCommand.size(); i++) {
+		String a = appImageCommand[i]
+		if (a == "--win-upgrade-uuid") {
+			i++
+			continue
+		}
+		if (a.startsWith("--win-")) {
+			continue
+		}
+		image << a
+	}
+	image.set(image.indexOf("--type") + 1, "app-image")
+	image.set(image.indexOf("--dest") + 1, imageDir.absolutePath)
+	runJpackage(image)
+	File app = new File(imageDir, appName)
+	if (!app.isDirectory()) {
+		throw new GradleException("jpackage app-image not found at " + app)
+	}
+	String template = new File(rootDir, "packaging/windows/velo-setup.iss").getText("UTF-8")
+	String numeric = (packageVersion.tokenize(".") + ["0", "0", "0"]).take(4).join(".")
+	for (String style : ["modern dark", "modern"]) {
+		String iss = template
+				.replace("@APP_NAME@", "Velo Client")
+				.replace("@VERSION@", version)
+				.replace("@NUMERIC_VERSION@", numeric)
+				.replace("@EXE_NAME@", appName + ".exe")
+				.replace("@APP_ID@", "6C1E9B4A-2D7F-4F3B-9A61-7E0C5B8D4A21}")
+				.replace("@OUTPUT_DIR@", dist.absolutePath)
+				.replace("@OUTPUT_NAME@", "Velo-Client-Setup-" + version)
+				.replace("@ICON@", new File(rootDir, "Logo.ico").absolutePath)
+				.replace("@IMAGES@", new File(rootDir, "packaging/windows").absolutePath)
+				.replace("@SOURCE_DIR@", app.absolutePath)
+				.replace("@STYLE@", style)
+		File script = new File(dist, "velo-setup.generated.iss")
+		script.setText(iss, "UTF-8")
+		Process p = new ProcessBuilder(iscc.absolutePath, "/Q", script.absolutePath).redirectErrorStream(true).start()
+		String out = p.inputStream.getText("UTF-8")
+		if (p.waitFor() == 0) {
+			println("Built Velo-Client-Setup-" + version + ".exe (" + style + ")")
+			script.delete()
+			imageDir.deleteDir()
+			return
+		}
+		println("Inno Setup failed with WizardStyle=" + style + ": " + out)
+	}
+	throw new GradleException("Inno Setup couldn't build the installer")
 }
 
 // macOS: one .dmg per CPU, built on that CPU's runner (jpackage bundles the JDK that runs it, so an

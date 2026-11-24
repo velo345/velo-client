@@ -53,6 +53,11 @@ jobs:
         if: runner.os == 'Windows'
         run: choco install wixtoolset -y
 
+      # Velo-Client-Setup-<version>.exe, the branded installer for new players (packaging/windows/velo-setup.iss)
+      - name: Install Inno Setup
+        if: runner.os == 'Windows'
+        run: choco install innosetup -y
+
       - name: Build mod jars (all 3 supported Minecraft versions)
         shell: bash
         run: ./gradlew :1.21.1:build :1.21.10:build :1.21.11:build :26.1:build :26.2:build :26.3:build -q

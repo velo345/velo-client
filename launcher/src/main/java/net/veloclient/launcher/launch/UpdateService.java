@@ -204,7 +204,7 @@ public final class UpdateService {
 		// macOS: one disk image per CPU (...-macos-arm64.dmg for Apple Silicon, ...-macos-x64.dmg for Intel).
 		String macDmg = os.contains("mac") ? "-macos-" + macArch() + ".dmg" : null;
 		for (Asset asset : assets) {
-			if (os.contains("win") && asset.name().endsWith(".exe")
+			if (os.contains("win") && windowsInstallerFits(asset.name())
 					|| debian && asset.name().endsWith(".deb")
 					|| macDmg != null && asset.name().endsWith(macDmg)) {
 				installer = asset;
@@ -608,15 +608,39 @@ public final class UpdateService {
 		log("Update script is running");
 	}
 
+	/** Installed by Velo-Client-Setup (Inno Setup): its uninstaller sits next to the launcher. */
+	static boolean innoInstall() {
+		String app = System.getProperty("jpackage.app-path");
+		return app != null && Files.exists(Path.of(app).resolveSibling("unins000.exe"));
+	}
+
+	/**
+	 * Releases carry two Windows installers: jpackage's (the update fallback since 1.0) and Velo-Client-Setup (Inno, for
+	 * new players). Each install is updated by the one that made it - the other would install a second copy elsewhere.
+	 */
+	static boolean windowsInstallerFits(String name) {
+		if (!name.endsWith(".exe")) {
+			return false;
+		}
+		return name.startsWith("Velo-Client-Setup") == innoInstall();
+	}
+
 	/** The update script (cmd) and the PowerShell command that starts it elevated - pure text, checkable without Windows. */
 	static String[] windowsUpdateScripts(Path installer, Path installDir, Path appExe, boolean elevate, long pid, Path script, Path started,
 			Path log, Path msiLog, Path exitFile, boolean repair) {
+		boolean inno = installer.getFileName().toString().startsWith("Velo-Client-Setup");
 		StringBuilder props = new StringBuilder(" /norestart /l*v \"").append(msiLog).append("\"");
-		if (repair) {
+		if (inno) {
+			// Inno Setup's own switches: no wizard, no message boxes, into the current folder, its log next to update.log
+			props = new StringBuilder(" /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /LOG=\"").append(msiLog).append("\"");
+			if (installDir != null) {
+				props.append(" /DIR=\"").append(installDir).append("\"");
+			}
+		} else if (repair) {
 			// the same version over itself: reinstall every file instead of "already installed"
 			props.append(" REINSTALL=ALL REINSTALLMODE=amus");
 		}
-		if (installDir != null) {
+		if (installDir != null && !inno) {
 			// the folder the launcher runs from now, so a player's own install location survives the update
 			props.append(" INSTALLDIR=\"").append(installDir).append("\"");
 		}
@@ -637,13 +661,13 @@ public final class UpdateService {
 		cmd.append(":closed\r\n");
 		cmd.append("ping -n 2 127.0.0.1 >nul\r\n");
 		cmd.append("echo [%date% %time%] script: installing quietly>>\"").append(log).append("\"\r\n");
-		cmd.append("\"").append(installer).append("\" /quiet").append(props).append("\r\n");
+		cmd.append("\"").append(installer).append(inno ? "\" /VERYSILENT" : "\" /quiet").append(props).append("\r\n");
 		cmd.append("set code=%errorlevel%\r\n");
 		cmd.append("if \"%code%\"==\"0\" goto done\r\n");
 		cmd.append("if \"%code%\"==\"3010\" goto done\r\n");
 		// quiet didn't work (e.g. rights): the installer with its own small progress window and prompts
 		cmd.append("echo [%date% %time%] script: quiet install exit %code% - showing the installer>>\"").append(log).append("\"\r\n");
-		cmd.append("\"").append(installer).append("\" /passive").append(props).append("\r\n");
+		cmd.append("\"").append(installer).append(inno ? "\" /SILENT" : "\" /passive").append(props).append("\r\n");
 		cmd.append("set code=%errorlevel%\r\n");
 		cmd.append(":done\r\n");
 		cmd.append(">>\"").append(log).append("\" echo [%date% %time%] script: installer exit code %code%\r\n");
@@ -824,7 +848,7 @@ public final class UpdateService {
 		for (JsonElement element : release.getAsJsonArray("assets")) {
 			JsonObject a = element.getAsJsonObject();
 			String name = a.get("name").getAsString();
-			if (os.contains("win") && name.endsWith(".exe") || debian && name.endsWith(".deb") || macDmg != null && name.endsWith(macDmg)) {
+			if (os.contains("win") && windowsInstallerFits(name) || debian && name.endsWith(".deb") || macDmg != null && name.endsWith(macDmg)) {
 				String digest = a.has("digest") && !a.get("digest").isJsonNull() ? a.get("digest").getAsString() : null;
 				return new Asset(name, a.get("browser_download_url").getAsString(), a.get("size").getAsLong(),
 						digest != null && digest.startsWith("sha256:") ? digest.substring(7) : null, 0, a.get("id").getAsLong());
