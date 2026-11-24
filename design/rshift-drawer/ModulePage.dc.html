@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Module page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,600;112,700&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0C0A0A}
+a{color:#FF6B6F}a:hover{color:#ff8a8d}
+</style>
+</helmet>
+<div style="width:1280px;height:720px;position:relative;overflow:hidden;font-family:Inter,system-ui,sans-serif;color:#F2ECEB">
+<img src="/_blob/2c13934c10ac325461171bc36aad2ab0" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(6px) brightness(.55);transform:scale(1.04)">
+<div style="position:absolute;left:190px;top:80px;width:900px;height:560px;display:flex;flex-direction:column;background:#110E0F;border:1px solid rgba(255,255,255,.07);border-radius:14px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.55)">
+
+<div style="display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid rgba(255,255,255,.05)">
+<a href="#" style="display:flex;align-items:center;gap:4px;color:#A39A9B;text-decoration:none;font-size:13px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>PvP</a>
+<div style="width:1px;height:20px;background:rgba(255,255,255,.08)"></div>
+<div style="width:34px;height:34px;border-radius:9px;background:rgba(215,38,45,.16);color:#FF6B6F;display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3v6M12 15v6M3 12h6M15 12h6"></path></svg></div>
+<div><h1 style="margin:0;font-family:Archivo,sans-serif;font-stretch:112%;font-weight:700;font-size:19px">Custom Crosshair</h1><div style="font-size:12px;color:#8E8586">Aim with your own shape</div></div>
+<div style="flex:1"></div>
+<button style="height:32px;padding:0 12px;background:transparent;border:1px solid rgba(255,255,255,.08);border-radius:8px;color:#A39A9B;font:inherit;font-size:12px;cursor:pointer">Reset</button>
+<button aria-label="Custom Crosshair on" style="width:44px;height:24px;border:0;border-radius:12px;padding:3px;background:#D7262D;cursor:pointer;display:flex;justify-content:flex-end"><span style="width:18px;height:18px;border-radius:9px;background:#fff;display:block"></span></button>
+</div>
+
+<div style="flex:1;min-height:0;display:flex;gap:22px;padding:20px 22px">
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+<div style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:1.2px;color:#6F6768;margin:0 0 8px">LOOK</div>
+
+<div style="display:flex;align-items:center;min-height:48px;gap:12px">
+<span style="flex:1;font-size:14px">Style</span>
+<div role="radiogroup" aria-label="Style" style="display:flex;padding:3px;border-radius:9px;background:#1A1617;border:1px solid rgba(255,255,255,.05)">
+<button role="radio" aria-checked="true" style="height:28px;padding:0 12px;border:0;border-radius:7px;background:#2C2425;color:#F2ECEB;font:inherit;font-size:12px;font-weight:500">Plus</button>
+<button role="radio" aria-checked="false" style="height:28px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:#A39A9B;font:inherit;font-size:12px">Dot</button>
+<button role="radio" aria-checked="false" style="height:28px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:#A39A9B;font:inherit;font-size:12px">Circle</button>
+<button role="radio" aria-checked="false" style="height:28px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:#A39A9B;font:inherit;font-size:12px">Custom</button>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;min-height:48px;gap:12px">
+<label for="size" style="flex:1;font-size:14px">Size</label>
+<input id="size" type="range" min="5" max="21" step="2" value="9" style="width:180px;accent-color:#D7262D">
+<span style="width:28px;text-align:right;font-family:'Geist Mono',monospace;font-size:12px;color:#A39A9B">9</span>
+</div>
+
+<div style="display:flex;align-items:center;min-height:48px;gap:12px">
+<label for="gap" style="flex:1;font-size:14px">Gap</label>
+<input id="gap" type="range" min="0" max="6" value="2" style="width:180px;accent-color:#D7262D">
+<span style="width:28px;text-align:right;font-family:'Geist Mono',monospace;font-size:12px;color:#A39A9B">2</span>
+</div>
+
+<div style="display:flex;align-items:center;min-height:48px;gap:12px">
+<span style="flex:1;font-size:14px">Color</span>
+<div role="radiogroup" aria-label="Color" style="display:flex;gap:8px">
+<button role="radio" aria-checked="true" aria-label="White" style="width:24px;height:24px;border-radius:7px;background:#FFFFFF;border:2px solid #D7262D;cursor:pointer"></button>
+<button role="radio" aria-checked="false" aria-label="Red" style="width:24px;height:24px;border-radius:7px;background:#E5484D;border:2px solid transparent;cursor:pointer"></button>
+<button role="radio" aria-checked="false" aria-label="Green" style="width:24px;height:24px;border-radius:7px;background:#46C46E;border:2px solid transparent;cursor:pointer"></button>
+<button role="radio" aria-checked="false" aria-label="Cyan" style="width:24px;height:24px;border-radius:7px;background:#3DC6E0;border:2px solid transparent;cursor:pointer"></button>
+<button aria-label="Pick a color" style="width:24px;height:24px;border-radius:7px;background:#1A1617;border:1px dashed rgba(255,255,255,.2);color:#A39A9B;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;min-height:48px;gap:12px">
+<span style="flex:1;font-size:14px">Outline</span>
+<button aria-label="Outline on" style="width:34px;height:20px;border:0;border-radius:10px;padding:2px;background:#D7262D;cursor:pointer;display:flex;justify-content:flex-end"><span style="width:16px;height:16px;border-radius:8px;background:#fff;display:block"></span></button>
+</div>
+
+<button style="margin-top:8px;height:40px;display:flex;align-items:center;gap:8px;padding:0;border:0;border-top:1px solid rgba(255,255,255,.05);background:transparent;color:#A39A9B;font:inherit;font-size:13px;cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>Advanced<span style="color:#6F6768">· 6 more settings</span></button>
+</div>
+
+<div style="width:330px;flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="flex:1;position:relative;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.06)">
+<img src="/_blob/2c13934c10ac325461171bc36aad2ab0" alt="Preview of the crosshair in game" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:62% 50%;filter:brightness(.8)">
+<svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)"><path d="M20 9v8M20 23v8M9 20h8M23 20h8" stroke="#000" stroke-width="4"></path><path d="M20 9v8M20 23v8M9 20h8M23 20h8" stroke="#fff" stroke-width="2"></path></svg>
+</div>
+<div style="font-size:12px;color:#8E8586;text-align:center">Live preview, updates while you change settings</div>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

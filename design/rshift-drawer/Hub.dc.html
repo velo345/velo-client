@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R-Shift concept C</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,600;112,700&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0C0A0A}
+a{color:#FF6B6F}a:hover{color:#ff8a8d}
+</style>
+</helmet>
+<div style="width:1280px;height:720px;position:relative;overflow:hidden;font-family:Inter,system-ui,sans-serif;color:#F2ECEB">
+<img src="/_blob/2c13934c10ac325461171bc36aad2ab0" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(6px) brightness(.55);transform:scale(1.04)">
+<div style="position:absolute;left:260px;top:110px;width:760px;height:500px;box-sizing:border-box;padding:22px;display:flex;flex-direction:column;gap:18px;background:#110E0F;border:1px solid rgba(255,255,255,.07);border-radius:16px;box-shadow:0 30px 80px rgba(0,0,0,.55)">
+
+<div style="display:flex;align-items:center;gap:10px">
+<svg width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="Velo"><path d="M3 5l5 0 4 9 4-9 5 0-7 15h-4z" fill="#D7262D"></path></svg>
+<label style="flex:1;display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;box-sizing:border-box;background:#1A1617;border:1px solid rgba(255,255,255,.07);border-radius:11px;color:#8E8586">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"></path></svg>
+<input placeholder="Search modules, settings, friends…" aria-label="Search everything" style="flex:1;min-width:0;background:transparent;border:0;outline:0;color:#F2ECEB;font:inherit;font-size:14px">
+<span style="font-family:'Geist Mono',monospace;font-size:11px;padding:3px 6px;border-radius:5px;background:#231D1E;color:#8E8586">Ctrl F</span>
+</label>
+<button style="height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;background:#2A1416;border:1px solid rgba(215,38,45,.45);border-radius:11px;color:#FF6B6F;font:inherit;font-size:14px;font-weight:600;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h18v14H3zM3 9h18M8 9v10"></path></svg>Edit HUD</button>
+</div>
+
+<section aria-label="Pinned modules">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+<h2 style="margin:0;font-family:'Geist Mono',monospace;font-weight:500;font-size:10px;letter-spacing:1.2px;color:#6F6768">PINNED</h2>
+<a href="#" style="font-size:12px;text-decoration:none">Edit pins</a>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+<sc-for list="{{pins}}" as="p" hint-placeholder-count="8">
+<button aria-pressed="{{p.pressed}}" style="height:44px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:10px;border:1px solid {{p.border}};background:{{p.bg}};color:{{p.fg}};font:inherit;font-size:13px;font-weight:500;cursor:pointer;text-align:left"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{p.icon}}"></path></svg><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.name}}</span></button>
+</sc-for>
+</div>
+</section>
+
+<section aria-label="Go to" style="flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:10px">
+<sc-for list="{{tiles}}" as="t" hint-placeholder-count="6">
+<button style="display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,.05);background:#171314;color:#F2ECEB;font:inherit;cursor:pointer;text-align:left">
+<div style="width:36px;height:36px;border-radius:9px;background:#221C1D;color:#E9E2E1;display:flex;align-items:center;justify-content:center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{t.icon}}"></path></svg></div>
+<div><div style="font-family:Archivo,sans-serif;font-stretch:112%;font-weight:600;font-size:15px">{{t.label}}</div><div style="font-size:12px;color:#8E8586;margin-top:2px">{{t.detail}}</div></div>
+</button>
+</sc-for>
+</section>
+
+<div style="display:flex;align-items:center;gap:10px;padding-top:12px;border-top:1px solid rgba(255,255,255,.05);font-size:12px;color:#8E8586">
+<div aria-hidden="true" style="width:22px;height:22px;border-radius:5px;background:linear-gradient(#3B2A22 0 38%,#C89A78 38% 100%)"></div>
+<span style="color:#F2ECEB;font-weight:500">Velo2k</span><span>·</span><span>PvP profile</span>
+<div style="flex:1"></div>
+<span style="font-family:'Geist Mono',monospace">Esc to close</span>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const pin = (name, icon, on) => ({ name, icon, pressed: on ? 'true' : 'false',
+      bg: on ? 'rgba(215,38,45,.13)' : '#171314', border: on ? 'rgba(215,38,45,.35)' : 'rgba(255,255,255,.05)', fg: on ? '#FF8A8D' : '#A39A9B' });
+    return {
+      pins: [
+        pin('Toggle Sprint', 'M5 12h10M11 6l6 6-6 6', true), pin('Full Bright', 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M2 12h2M20 12h2', true),
+        pin('Zoom', 'M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-6-6', true), pin('Keystrokes', 'M3 7h18v10H3zM7 11h2M11 11h2M15 11h2M8 14h8', false),
+        pin('Free Look', 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', false), pin('Nick Hider', 'M4 20c0-4 4-6 8-6s8 2 8 6M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', false),
+        pin('Motion Blur', 'M3 8h10M3 12h14M3 16h8', false), pin('Clips', 'M4 5h16v14H4zM10 9l5 3-5 3z', true)
+      ],
+      tiles: [
+        { label: 'Modules', detail: 'All 182, by category', icon: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z' },
+        { label: 'Locker', detail: 'Cloaks, wings, emotes', icon: 'M8 4l4 2 4-2 4 3-2 4h-2v9H8v-9H6L4 7z' },
+        { label: 'Friends', detail: 'Party and messages', icon: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20c0-3 3-5 6-5s6 2 6 5M16 11a3 3 0 1 0 0-6M21 20c0-2-1.5-3.5-3.5-4.3' },
+        { label: 'Clips & Rewind', detail: 'Clips, replays, screenshots', icon: 'M11 7l-6 5 6 5zM19 7l-6 5 6 5z' },
+        { label: 'World Map', detail: 'Map and waypoints', icon: 'M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14' },
+        { label: 'Settings', detail: 'Profiles, keybinds, look', icon: 'M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

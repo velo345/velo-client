@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R-Shift concept B</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,600;112,700&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0C0A0A}
+a{color:#FF6B6F}a:hover{color:#ff8a8d}
+.velo-side:hover{background:#1A1617;color:#F2ECEB}
+.velo-row:hover{background:#1A1617}
+</style>
+</helmet>
+<div style="width:1280px;height:720px;position:relative;overflow:hidden;font-family:Inter,system-ui,sans-serif;color:#F2ECEB">
+<img src="/_blob/2c13934c10ac325461171bc36aad2ab0" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(6px) brightness(.55);transform:scale(1.04)">
+<div style="position:absolute;left:190px;top:80px;width:900px;height:560px;display:flex;background:#110E0F;border:1px solid rgba(255,255,255,.07);border-radius:14px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.55)">
+
+<nav aria-label="Menu" style="width:216px;flex:none;background:#0D0B0B;border-right:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;padding:16px 12px;box-sizing:border-box">
+<button style="display:flex;align-items:center;gap:10px;padding:8px;border:1px solid rgba(255,255,255,.06);border-radius:10px;background:#151112;color:#F2ECEB;font:inherit;cursor:pointer;text-align:left">
+<div aria-hidden="true" style="width:30px;height:30px;border-radius:7px;background:linear-gradient(#3B2A22 0 38%,#C89A78 38% 100%)"></div>
+<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">Velo2k</div><div style="font-size:11px;color:#A39A9B">PvP profile</div></div>
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8586" stroke-width="2" aria-hidden="true"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"></path></svg>
+</button>
+
+<div style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:1.2px;color:#6F6768;margin:18px 8px 6px">MODULES</div>
+<sc-for list="{{cats}}" as="c" hint-placeholder-count="7">
+<button class="velo-side" onClick="{{c.pick}}" style="{{c.style}}"><span style="flex:1;text-align:left">{{c.label}}</span><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6F6768">{{c.count}}</span></button>
+</sc-for>
+
+<div style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:1.2px;color:#6F6768;margin:16px 8px 6px">MORE</div>
+<sc-for list="{{more}}" as="o" hint-placeholder-count="5">
+<button class="velo-side" style="height:32px;display:flex;align-items:center;gap:10px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:#A39A9B;font:inherit;font-size:13px;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{o.icon}}"></path></svg>{{o.label}}</button>
+</sc-for>
+</nav>
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<div style="display:flex;align-items:center;gap:12px;padding:18px 22px 14px;border-bottom:1px solid rgba(255,255,255,.05)">
+<h1 style="margin:0;font-family:Archivo,sans-serif;font-stretch:112%;font-weight:700;font-size:20px">{{title}}</h1>
+<div style="flex:1"></div>
+<label style="display:flex;align-items:center;gap:8px;width:220px;height:34px;padding:0 12px;box-sizing:border-box;background:#1A1617;border:1px solid rgba(255,255,255,.06);border-radius:9px;color:#8E8586">
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"></path></svg>
+<input placeholder="Search" aria-label="Search modules" style="flex:1;min-width:0;background:transparent;border:0;outline:0;color:#F2ECEB;font:inherit;font-size:13px">
+</label>
+<button style="height:34px;padding:0 14px;display:flex;align-items:center;gap:8px;background:#2A1416;border:1px solid rgba(215,38,45,.45);border-radius:9px;color:#FF6B6F;font:inherit;font-size:13px;font-weight:600;cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h18v14H3zM3 9h18M8 9v10"></path></svg>Edit HUD</button>
+</div>
+
+<div style="flex:1;min-height:0;overflow:hidden;padding:8px 12px">
+<sc-for list="{{rows}}" as="m" hint-placeholder-count="9">
+<div class="velo-row" style="height:52px;display:flex;align-items:center;gap:12px;padding:0 10px;border-radius:10px;cursor:pointer">
+<div style="width:32px;height:32px;flex:none;border-radius:8px;background:{{m.iconBg}};color:{{m.iconFg}};display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg></div>
+<div style="flex:1;min-width:0;display:flex;align-items:baseline;gap:10px">
+<span style="font-size:14px;font-weight:500;white-space:nowrap">{{m.name}}</span>
+<span style="font-size:12px;color:#7D7475;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{m.hint}}</span>
+</div>
+<button aria-label="{{m.toggleLabel}}" onClick="{{m.toggle}}" style="width:34px;height:20px;flex:none;border:0;border-radius:10px;padding:2px;background:{{m.track}};cursor:pointer;display:flex;justify-content:{{m.knobSide}}"><span style="width:16px;height:16px;border-radius:8px;background:#fff;display:block"></span></button>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6F6768" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = { cat: 'PvP', on: { crosshair: true, combo: true, hitcolor: true, cooldowns: true, oldanim: true, keys: true, fps: true } };
+  }
+  renderVals() {
+    const I = {
+      fps: 'M4 18h16M6 14l4-4 3 3 5-6', keys: 'M3 7h18v10H3zM7 11h2M11 11h2M15 11h2M8 14h8', coords: 'M12 21s7-6 7-11a7 7 0 0 0-14 0c0 5 7 11 7 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+      zoom: 'M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-6-6M7 10h6M10 7v6', crosshair: 'M12 3v6M12 15v6M3 12h6M15 12h6', sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v2M12 20v2M2 12h2M20 12h2',
+      sprint: 'M5 12h10M11 6l6 6-6 6', armor: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z', potion: 'M9 3h6M10 3v5l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3',
+      combo: 'M4 14l4-8 4 8 4-8 4 8', sword: 'M14 4h6v6l-9 9-3-3zM5 16l3 3M4 20l2-2', target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+      clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2', heart: 'M12 20s-8-5-8-11a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 6-8 11-8 11z', totem: 'M9 3h6v4H9zM7 7h10v6H7zM9 13h6v8H9z',
+      bolt: 'M13 2L4 14h7l-1 8 9-12h-7z', moon: 'M20 14a8 8 0 1 1-10-10 7 7 0 0 0 10 10z', eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'
+    };
+    const mods = {
+      'HUD': [['fps', 'FPS Counter', 'see your frame rate', I.fps], ['keys', 'Keystrokes', 'show WASD and clicks', I.keys], ['coords', 'Coordinates', 'XYZ and facing', I.coords], ['armor', 'Armor & Durability', 'know when gear breaks', I.armor], ['potion', 'Potion Effect Timers', 'effects and time left', I.potion], ['clock', 'Clock', 'real time on screen', I.clock]],
+      'PvP': [['crosshair', 'Custom Crosshair', 'aim with your own shape', I.crosshair], ['combo', 'Combo Counter', 'count your combos', I.combo], ['hitcolor', 'Hit Color', 'see every hit land', I.sword], ['cooldowns', 'Cooldowns', 'pearls, gapples, totems', I.clock], ['target', 'Target HUD', 'enemy health and armor', I.target], ['totem', 'Totem Pop Counter', 'who popped how often', I.totem], ['health', 'Health Indicator', 'hearts above players', I.heart], ['oldanim', 'Old Animations', '1.7 style blocking and swing', I.sword], ['reach', 'Reach Display', 'distance of your hits', I.target]],
+      'Visuals': [['bright', 'Full Bright', 'see in the dark', I.sun], ['time', 'Time, Weather & Fog', 'your own sky', I.moon], ['freelook', 'Free Look', 'look around while running', I.eye]],
+      'Utility': [['zoom', 'Zoom', 'scroll to zoom in', I.zoom], ['sprint', 'Toggle Sprint', 'never hold ctrl again', I.sprint]],
+      'Performance': [['boost', 'Performance Boost', 'more FPS, same look', I.bolt]]
+    };
+    const all = [].concat(mods['HUD'], mods['PvP'], mods['Visuals'], mods['Utility'], mods['Performance']);
+    const counts = { 'All': 182, 'HUD': 33, 'PvP': 29, 'Visuals': 28, 'Utility': 35, 'Performance': 17, 'Advanced': 19 };
+    const cat = this.state.cat;
+    const list = cat === 'All' ? all : (mods[cat] || []);
+    const on = this.state.on;
+    const rows = list.slice(0, 9).map(m => {
+      const active = !!on[m[0]];
+      return {
+        name: m[1], hint: m[2], icon: m[3],
+        iconBg: active ? 'rgba(215,38,45,.16)' : '#1E191A', iconFg: active ? '#FF6B6F' : '#A39A9B',
+        track: active ? '#D7262D' : '#3A3233', knobSide: active ? 'flex-end' : 'flex-start',
+        toggleLabel: m[1] + (active ? ' off' : ' on'),
+        toggle: () => this.setState({ on: { ...on, [m[0]]: !active } })
+      };
+    });
+    const more = [['Locker', 'M8 4l4 2 4-2 4 3-2 4h-2v9H8v-9H6L4 7z'], ['Friends', 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20c0-3 3-5 6-5s6 2 6 5'], ['Clips & Rewind', 'M4 5h16v14H4zM10 9l5 3-5 3z'], ['World Map', 'M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14'], ['Settings', 'M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4']];
+    return {
+      title: cat, rows,
+      more: more.map(o => ({ label: o[0], icon: o[1] })),
+      cats: Object.keys(counts).map(c => ({
+        label: c, count: counts[c], pick: () => this.setState({ cat: c }),
+        style: 'height:32px;display:flex;align-items:center;gap:8px;padding:0 10px;border:0;border-radius:8px;font:inherit;font-size:13px;cursor:pointer;'
+          + (cat === c ? 'background:rgba(215,38,45,.13);color:#F2ECEB;font-weight:500' : 'background:transparent;color:#A39A9B')
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

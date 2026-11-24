@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GUI scale rule</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,600;112,700&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0C0A0A}
+a{color:#FF6B6F}a:hover{color:#ff8a8d}
+</style>
+</helmet>
+<div style="width:2640px;height:720px;box-sizing:border-box;padding:56px 40px;background:#0C0A0A;font-family:Inter,system-ui,sans-serif;color:#F2ECEB;display:flex;flex-direction:column;gap:36px">
+<div style="display:flex;align-items:baseline;gap:24px">
+<h1 style="margin:0;font-family:Archivo,sans-serif;font-stretch:112%;font-weight:700;font-size:34px">One size rule for every screen</h1>
+<p style="margin:0;font-size:17px;color:#A39A9B">The menu ignores Minecraft's GUI scale. It always takes about 75% of the screen height and picks its own text size, so it never overflows and never looks tiny.</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:80px">
+<sc-for list="{{frames}}" as="f" hint-placeholder-count="4">
+<figure style="margin:0;display:flex;flex-direction:column;gap:16px">
+<div style="height:315px;position:relative;border-radius:10px;overflow:hidden;border:1px solid {{f.edge}}">
+<img src="/_blob/2c13934c10ac325461171bc36aad2ab0" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(4px) brightness(.5)">
+<div style="position:absolute;left:{{f.x}};top:{{f.y}};width:{{f.w}};height:{{f.h}};background:#110E0F;border:1px solid rgba(255,255,255,.1);border-radius:8px;display:flex;overflow:hidden">
+<div style="width:9%;background:#0D0B0B;border-right:1px solid rgba(255,255,255,.05)"></div>
+<div style="flex:1;padding:4%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:{{f.tile}};gap:4%">
+<sc-for list="{{tiles}}" as="t" hint-placeholder-count="12"><div style="border-radius:4px;background:{{t.bg}}"></div></sc-for>
+</div>
+</div>
+</div>
+<figcaption style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:center;gap:10px"><span style="font-family:'Geist Mono',monospace;font-size:12px;padding:4px 8px;border-radius:6px;background:{{f.tagBg}};color:{{f.tagFg}}">{{f.tag}}</span><span style="font-size:18px;font-weight:600">{{f.screen}}</span></div>
+<div style="font-size:15px;color:#A39A9B">{{f.note}}</div>
+</figcaption>
+</figure>
+</sc-for>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2640,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const newFrame = (screen, note) => ({ screen, note, tag: 'NEW', tagBg: 'rgba(215,38,45,.15)', tagFg: '#FF8A8D', edge: 'rgba(255,255,255,.08)',
+      x: '15%', y: '12.5%', w: '70%', h: '75%', tile: '18%' });
+    return {
+      frames: [
+        { screen: '1366 × 768 · GUI scale 4', note: 'Today: the window is drawn in GUI pixels, so a big scale pushes it past the screen.', tag: 'TODAY', tagBg: '#231D1E', tagFg: '#A39A9B', edge: 'rgba(229,72,77,.6)',
+          x: '-6%', y: '-10%', w: '112%', h: '122%', tile: '20%' },
+        newFrame('1366 × 768 · any GUI scale', 'Same proportions on a small laptop. Text 13 px on screen.'),
+        newFrame('1920 × 1080 · any GUI scale', 'The normal case. Text 14 px, 4 columns of modules.'),
+        newFrame('2560 × 1440 · any GUI scale', 'Bigger screen, slightly bigger text (16 px), never a wall of empty space.')
+      ],
+      tiles: Array.from({ length: 12 }, (_, i) => ({ bg: i % 3 === 0 ? 'rgba(215,38,45,.35)' : '#221C1D' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

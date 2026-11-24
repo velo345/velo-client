@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R-Shift concept E</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#000}
+a{color:#fff}a:hover{color:#ddd}
+.wheel-seg{cursor:pointer}
+.glass-row:hover{background:rgba(255,255,255,.07)}
+</style>
+</helmet>
+<div style="width:1280px;height:720px;position:relative;overflow:hidden;font-family:Geist,system-ui,sans-serif;color:#fff">
+<img src="/_blob/2c13934c10ac325461171bc36aad2ab0" alt="The game world behind the wheel" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.45) blur(2px)">
+
+<svg width="440" height="440" viewBox="0 0 440 440" role="img" aria-label="Section wheel" style="position:absolute;left:420px;top:140px">
+<sc-for list="{{segs}}" as="s" hint-placeholder-count="6">
+<path class="wheel-seg" d="{{s.d}}" fill="{{s.fill}}" stroke="rgba(255,255,255,.18)" stroke-width="1" onClick="{{s.pick}}"></path>
+</sc-for>
+<circle cx="220" cy="220" r="62" fill="rgba(18,18,20,.6)" stroke="rgba(255,255,255,.14)"></circle>
+</svg>
+<sc-for list="{{segs}}" as="s" hint-placeholder-count="6">
+<div style="position:absolute;left:{{s.lx}};top:{{s.ly}};width:110px;margin-left:-55px;margin-top:-22px;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;color:{{s.fg}}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{s.icon}}"></path></svg>
+<span style="font-size:13px;font-weight:600">{{s.label}}</span>
+</div>
+</sc-for>
+<div style="position:absolute;left:640px;top:360px;transform:translate(-50%,-50%);text-align:center;pointer-events:none">
+<div style="font-weight:700;font-size:16px">Velo</div>
+<div style="font-family:'Geist Mono',monospace;font-size:10px;color:rgba(255,255,255,.6);margin-top:2px">type to search</div>
+</div>
+
+<section aria-label="{{cardTitle}} modules" style="position:absolute;left:900px;top:170px;width:320px;box-sizing:border-box;padding:16px;background:rgba(18,18,20,.55);backdrop-filter:blur(28px) saturate(1.4);-webkit-backdrop-filter:blur(28px) saturate(1.4);border:1px solid rgba(255,255,255,.14);border-radius:22px;display:flex;flex-direction:column;gap:2px">
+<div style="display:flex;align-items:baseline;justify-content:space-between;margin:0 6px 8px"><h2 style="margin:0;font-size:17px;font-weight:700">{{cardTitle}}</h2><a href="#" style="font-size:12px;color:rgba(255,255,255,.7);text-decoration:none">All 29 ›</a></div>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="7">
+<div class="glass-row" style="height:42px;display:flex;align-items:center;gap:10px;padding:0 6px 0 8px;border-radius:12px">
+<span style="flex:1;font-size:14px;font-weight:500">{{r.name}}</span>
+<button aria-pressed="{{r.pressed}}" onClick="{{r.toggle}}" style="{{r.pill}}">{{r.state}}</button>
+</div>
+</sc-for>
+</section>
+
+<div style="position:absolute;left:0;right:0;bottom:28px;display:flex;justify-content:center;gap:18px;font-size:12px;color:rgba(255,255,255,.7)">
+<span><kbd style="font-family:'Geist Mono',monospace;padding:2px 6px;border-radius:5px;background:rgba(255,255,255,.12)">R-Shift</kbd> hold and point, release to open</span>
+<span><kbd style="font-family:'Geist Mono',monospace;padding:2px 6px;border-radius:5px;background:rgba(255,255,255,.12)">Tab</kbd> Locker, Friends, Clips, Settings</span>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = { sel: 1, on: { crosshair: true, combo: true, hitcolor: true, oldanim: true } };
+  }
+  renderVals() {
+    const secs = [
+      ['HUD', 'M3 5h18v14H3zM3 9h18M8 9v10'], ['PvP', 'M14 4h6v6l-9 9-3-3zM5 16l3 3M4 20l2-2'], ['Visuals', 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'],
+      ['Utility', 'M14 6l4 4-8 8H6v-4zM12 8l4 4'], ['Performance', 'M13 2L4 14h7l-1 8 9-12h-7z'], ['Locker', 'M8 4l4 2 4-2 4 3-2 4h-2v9H8v-9H6L4 7z']
+    ];
+    const cx = 220, cy = 220, r0 = 72, r1 = 210, gap = 1.5;
+    const pt = (r, a) => { const t = (a - 90) * Math.PI / 180; return [(cx + r * Math.cos(t)).toFixed(1), (cy + r * Math.sin(t)).toFixed(1)]; };
+    const segs = secs.map((s, i) => {
+      const a0 = i * 60 + gap - 30, a1 = (i + 1) * 60 - gap - 30;
+      const p0 = pt(r1, a0), p1 = pt(r1, a1), p2 = pt(r0, a1), p3 = pt(r0, a0);
+      const d = `M${p0[0]} ${p0[1]} A${r1} ${r1} 0 0 1 ${p1[0]} ${p1[1]} L${p2[0]} ${p2[1]} A${r0} ${r0} 0 0 0 ${p3[0]} ${p3[1]} Z`;
+      const mid = i * 60, lp = pt(142, mid);
+      const sel = this.state.sel === i;
+      return { d, label: s[0], icon: s[1], fill: sel ? 'rgba(255,255,255,.92)' : 'rgba(18,18,20,.55)', fg: sel ? '#111' : '#fff',
+        lx: (420 + +lp[0]) + 'px', ly: (140 + +lp[1]) + 'px', pick: () => this.setState({ sel: i }) };
+    });
+    const on = this.state.on;
+    const row = (id, name) => { const a = !!on[id]; return { name, state: a ? 'On' : 'Off', pressed: a ? 'true' : 'false',
+      toggle: () => this.setState({ on: { ...on, [id]: !a } }),
+      pill: 'width:52px;height:28px;border-radius:14px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;'
+        + (a ? 'border:0;background:#fff;color:#111' : 'border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.8)') }; };
+    return {
+      segs, cardTitle: secs[this.state.sel][0],
+      rows: [row('crosshair', 'Custom Crosshair'), row('combo', 'Combo Counter'), row('hitcolor', 'Hit Color'), row('cooldowns', 'Cooldowns'), row('target', 'Target HUD'), row('oldanim', 'Old Animations'), row('reach', 'Reach Display')]
+    };
+  }
+}
+</script>
+</body>
+</html>

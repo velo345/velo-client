@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R-Shift drawer with HUD editing</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#000}
+a{color:#fff}a:hover{color:#ddd}
+.g-row:hover{background:rgba(255,255,255,.07)}
+.g-btn:hover{background:rgba(255,255,255,.16)}
+.g-icon:hover{color:#fff;background:rgba(255,255,255,.12)}
+.g-range{position:absolute;inset:-6px 0;width:100%;margin:0;opacity:0;cursor:pointer}
+</style>
+</helmet>
+<div ref="{{setRoot}}" onPointerMove="{{onMove}}" onPointerUp="{{onUp}}" onPointerLeave="{{onUp}}" style="width:1280px;height:720px;position:relative;overflow:hidden;font-family:Geist,system-ui,sans-serif;color:#fff;user-select:none;touch-action:none">
+<img src="/_blob/2c13934c10ac325461171bc36aad2ab0" alt="The game world" draggable="false" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.82)">
+
+<sc-if value="{{dragging}}" hint-placeholder-val="{{ false }}">
+<div aria-hidden="true" style="position:absolute;left:640px;top:0;bottom:0;width:1px;background:rgba(255,255,255,.35)"></div>
+<div aria-hidden="true" style="position:absolute;top:360px;left:0;right:0;height:1px;background:rgba(255,255,255,.35)"></div>
+</sc-if>
+
+<sc-for list="{{huds}}" as="h" hint-placeholder-count="4">
+<div onPointerDown="{{h.down}}" style="{{h.style}}">
+<div style="{{h.frame}}"></div>
+<div style="{{h.chip}}">{{h.label}}</div>
+<sc-if value="{{h.isFps}}" hint-placeholder-val="{{ false }}"><div style="{{h.body}}">{{h.fpsText}}</div></sc-if>
+<sc-if value="{{h.isCoords}}" hint-placeholder-val="{{ false }}"><div style="{{h.body}}">{{h.coordsText}}</div></sc-if>
+<sc-if value="{{h.isArmor}}" hint-placeholder-val="{{ false }}"><div style="{{h.body}}">Helmet 98%  ·  Chest 91%</div></sc-if>
+<sc-if value="{{h.isPotion}}" hint-placeholder-val="{{ false }}"><div style="{{h.body}}">Speed II  1:24<br>Strength  0:48</div></sc-if>
+<sc-if value="{{h.isClock}}" hint-placeholder-val="{{ false }}"><div style="{{h.body}}">{{h.clockText}}</div></sc-if>
+<sc-if value="{{h.isKeys}}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:repeat(3,34px);gap:4px;padding:2px">
+<span></span><span style="{{h.key}}">W</span><span></span>
+<span style="{{h.key}}">A</span><span style="{{h.keyDown}}">S</span><span style="{{h.key}}">D</span>
+</div>
+</sc-if>
+<sc-if value="{{h.selected}}" hint-placeholder-val="{{ false }}"><div role="button" aria-label="Drag to scale" onPointerDown="{{h.scaleDown}}" style="position:absolute;right:-11px;bottom:-11px;width:12px;height:12px;border-radius:3px;background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.35);cursor:nwse-resize"></div></sc-if>
+</div>
+</sc-for>
+<sc-if value="{{crosshairOn}}" hint-placeholder-val="{{ true }}">
+<svg aria-hidden="true" width="40" height="40" viewBox="-20 -20 40 40" style="position:absolute;left:620px;top:340px;pointer-events:none"><path d="{{crossPath}}" stroke="rgba(0,0,0,.8)" stroke-width="{{crossOutline}}" fill="none" stroke-linecap="square"></path><path d="{{crossPath}}" stroke="{{crossColor}}" stroke-width="2" fill="none" stroke-linecap="square"></path></svg>
+</sc-if>
+
+<sc-if value="{{ghostOn}}" hint-placeholder-val="{{ false }}">
+<div style="{{ghostStyle}}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>{{ghostLabel}}</div>
+</sc-if>
+<div style="{{hintStyle}}">{{hintText}}</div>
+
+<button aria-label="Open the Velo panel" onClick="{{toggleOpen}}" style="{{handleStyle}}">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+<span style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:12px;font-weight:600;letter-spacing:.5px">Velo</span>
+</button>
+
+<aside aria-label="Velo menu" style="{{drawerStyle}}">
+<div style="display:flex;align-items:center;gap:8px;padding:16px 16px 12px">
+<span aria-hidden="true" style="width:8px;height:8px;border-radius:2px;background:#E5373E"></span>
+<span style="font-weight:700;font-size:17px;letter-spacing:-.2px">Velo</span>
+<div style="flex:1"></div>
+<div style="position:relative">
+<button class="g-btn" onClick="{{toggleProfiles}}" aria-haspopup="menu" aria-expanded="{{profOpenAttr}}" aria-label="Profile: {{profile}}" style="{{profBtnStyle}}">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="opacity:.8"><path d="{{icons.user}}"></path></svg>
+<span style="max-width:84px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{profile}}</span>
+<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="{{profChevron}}"><path d="m6 9 6 6 6-6"></path></svg>
+</button>
+<div role="menu" aria-label="Profiles" style="{{profMenuStyle}}">
+<div style="font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:rgba(255,255,255,.5);padding:6px 10px 4px">Profiles</div>
+<sc-for list="{{profiles}}" as="pr" hint-placeholder-count="4">
+<button role="menuitemradio" aria-checked="{{pr.checked}}" class="g-row" onClick="{{pr.pick}}" style="height:38px;display:flex;align-items:center;gap:10px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:#fff;font:inherit;font-size:13px;cursor:pointer;text-align:left">
+<span style="flex:1;min-width:0"><span style="display:block;font-weight:600">{{pr.name}}</span><span style="display:block;font-size:11px;color:rgba(255,255,255,.55)">{{pr.sub}}</span></span>
+<sc-if value="{{pr.active}}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+</button>
+</sc-for>
+<div style="height:1px;background:rgba(255,255,255,.1);margin:6px 4px"></div>
+<button role="menuitem" class="g-row" onClick="{{toggleProfiles}}" style="height:34px;display:flex;align-items:center;gap:10px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:rgba(255,255,255,.85);font:inherit;font-size:13px;cursor:pointer;text-align:left"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>New profile</button>
+<button role="menuitem" class="g-row" onClick="{{toggleProfiles}}" style="height:34px;display:flex;align-items:center;gap:10px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:rgba(255,255,255,.85);font:inherit;font-size:13px;cursor:pointer;text-align:left"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.sliders}}"></path></svg>Manage profiles</button>
+</div>
+</div>
+<button class="g-btn" aria-label="Slide the panel away" title="Slide away for more room" onClick="{{toggleOpen}}" style="width:30px;height:30px;border-radius:15px;border:0;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.collapse}}"></path></svg></button>
+</div>
+
+<div style="flex:1;min-height:0;overflow:hidden;position:relative">
+<div style="{{stripStyle}}">
+
+<section aria-label="Home" style="width:340px;flex:none;box-sizing:border-box;padding:0 16px 16px;display:flex;flex-direction:column;gap:2px">
+<label style="display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;margin-bottom:10px;border-radius:20px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7)">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.search}}"></path></svg>
+<input placeholder="Search 182 modules" aria-label="Search modules" style="flex:1;min-width:0;background:transparent;border:0;outline:0;color:#fff;font:inherit;font-size:14px">
+</label>
+<div style="display:flex;align-items:center;justify-content:space-between;margin:2px 6px 4px"><span style="font-size:12px;color:rgba(255,255,255,.6)">Pinned</span><span style="font-size:11px;color:rgba(255,255,255,.45)">{{pinCount}}</span></div>
+<sc-for list="{{pinned}}" as="p" hint-placeholder-count="4">
+<div class="g-row" style="height:42px;display:flex;align-items:center;gap:10px;padding:0 6px 0 10px;border-radius:12px">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;opacity:.9"><path d="{{p.icon}}"></path></svg>
+<button onClick="{{p.open}}" style="flex:1;min-width:0;text-align:left;border:0;background:transparent;color:#fff;font:inherit;font-size:14px;font-weight:500;cursor:pointer;padding:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.name}}</button>
+<button class="g-icon" aria-label="{{p.unpinLabel}}" title="Unpin" onClick="{{p.unpin}}" style="width:28px;height:28px;flex:none;border-radius:14px;border:0;background:transparent;color:rgba(255,255,255,.7);cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.pin}}"></path></svg></button>
+<button aria-pressed="{{p.pressed}}" aria-label="{{p.name}}" onClick="{{p.toggle}}" style="{{p.pill}}"><span style="{{p.knob}}"></span></button>
+</div>
+</sc-for>
+<sc-if value="{{noPins}}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:rgba(255,255,255,.5);padding:8px 10px">Nothing pinned. Pin modules from any category.</div></sc-if>
+<div style="height:1px;background:rgba(255,255,255,.1);margin:8px 6px"></div>
+<sc-for list="{{cats}}" as="c" hint-placeholder-count="6">
+<button class="g-row" onClick="{{c.open}}" style="height:40px;display:flex;align-items:center;gap:12px;padding:0 10px;border:0;border-radius:12px;background:transparent;color:#fff;font:inherit;cursor:pointer;text-align:left">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="opacity:.75"><path d="{{c.icon}}"></path></svg>
+<span style="flex:1;font-size:14px">{{c.name}}</span>
+<span style="font-family:'Geist Mono',monospace;font-size:12px;color:rgba(255,255,255,.5)">{{c.count}}</span>
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+</button>
+</sc-for>
+</section>
+
+<section aria-label="{{catName}}" style="width:340px;flex:none;box-sizing:border-box;padding:0 16px 16px;display:flex;flex-direction:column;gap:2px">
+<button class="g-btn" onClick="{{goHome}}" style="align-self:flex-start;height:30px;display:flex;align-items:center;gap:4px;padding:0 10px 0 6px;margin-bottom:6px;border:0;border-radius:15px;background:transparent;color:rgba(255,255,255,.75);font:inherit;font-size:13px;cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>Home</button>
+<h2 style="margin:0 6px 8px;font-size:20px;font-weight:700">{{catName}}</h2>
+<sc-for list="{{catMods}}" as="m" hint-placeholder-count="5">
+<div class="g-row" style="height:44px;display:flex;align-items:center;gap:8px;padding:0 6px 0 4px;border-radius:12px">
+<span role="button" aria-label="{{m.gripLabel}}" title="{{m.gripLabel}}" onPointerDown="{{m.grab}}" style="{{m.gripStyle}}"><svg width="14" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="{{icons.grip}}"></path></svg></span>
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;opacity:.85"><path d="{{m.icon}}"></path></svg>
+<button onClick="{{m.open}}" style="flex:1;min-width:0;text-align:left;border:0;background:transparent;color:#fff;font:inherit;font-size:14px;font-weight:500;cursor:pointer;padding:0 0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{m.name}}</button>
+<button class="g-icon" aria-label="{{m.pinLabel}}" title="{{m.pinLabel}}" onClick="{{m.pin}}" style="{{m.pinStyle}}"><svg width="15" height="15" viewBox="0 0 24 24" fill="{{m.pinFill}}" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.pin}}"></path></svg></button>
+<button aria-pressed="{{m.pressed}}" aria-label="{{m.name}}" onClick="{{m.toggle}}" style="{{m.pill}}"><span style="{{m.knob}}"></span></button>
+</div>
+</sc-for>
+</section>
+
+<section aria-label="{{modName}} settings" style="width:340px;flex:none;box-sizing:border-box;padding:0 16px 16px;display:flex;flex-direction:column;overflow:hidden">
+<button class="g-btn" onClick="{{goCat}}" style="align-self:flex-start;height:30px;display:flex;align-items:center;gap:4px;padding:0 10px 0 6px;margin-bottom:6px;border:0;border-radius:15px;background:transparent;color:rgba(255,255,255,.75);font:inherit;font-size:13px;cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>{{modCat}}</button>
+<div style="display:flex;align-items:center;gap:12px;margin:0 4px 14px">
+<div style="width:38px;height:38px;flex:none;border-radius:12px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{modIcon}}"></path></svg></div>
+<div style="flex:1;min-width:0"><h2 style="margin:0;font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{modName}}</h2><div style="font-size:12px;color:rgba(255,255,255,.6)">{{modDesc}}</div></div>
+<button aria-pressed="{{modPressed}}" aria-label="{{modName}}" onClick="{{modToggle}}" style="{{modPill}}"><span style="{{modKnob}}"></span></button>
+</div>
+
+<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-bottom:4px">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="2">
+<div style="display:flex;flex-direction:column;gap:14px;padding:14px;border-radius:18px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.06)">
+<div style="font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:rgba(255,255,255,.5)">{{g.title}}</div>
+<sc-for list="{{g.items}}" as="s" hint-placeholder-count="3">
+<div>
+<sc-if value="{{s.isSeg}}" hint-placeholder-val="{{ true }}">
+<div style="font-size:13px;color:rgba(255,255,255,.85);margin-bottom:8px">{{s.label}}</div>
+<div role="radiogroup" aria-label="{{s.label}}" style="display:flex;padding:3px;border-radius:14px;background:rgba(0,0,0,.25)">
+<sc-for list="{{s.options}}" as="o" hint-placeholder-count="3">
+<button role="radio" aria-checked="{{o.checked}}" onClick="{{o.pick}}" style="{{o.style}}">{{o.label}}</button>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{s.isSlider}}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;justify-content:space-between;font-size:13px;color:rgba(255,255,255,.85);margin-bottom:10px"><span>{{s.label}}</span><span style="font-family:'Geist Mono',monospace;font-size:12px;color:rgba(255,255,255,.7)">{{s.valueText}}</span></div>
+<div style="position:relative;height:6px;border-radius:3px;background:rgba(255,255,255,.14)">
+<div style="{{s.fill}}"></div>
+<div style="{{s.thumb}}"></div>
+<input class="g-range" type="range" aria-label="{{s.label}}" min="{{s.min}}" max="{{s.max}}" step="{{s.step}}" value="{{s.value}}" onInput="{{s.set}}" onChange="{{s.set}}">
+</div>
+</sc-if>
+<sc-if value="{{s.isToggle}}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span style="font-size:13px;color:rgba(255,255,255,.85)">{{s.label}}</span><button aria-pressed="{{s.pressed}}" aria-label="{{s.label}}" onClick="{{s.set}}" style="{{s.pill}}"><span style="{{s.knob}}"></span></button></div>
+</sc-if>
+<sc-if value="{{s.isColor}}" hint-placeholder-val="{{ false }}">
+<div style="font-size:13px;color:rgba(255,255,255,.85);margin-bottom:10px">{{s.label}}</div>
+<div role="radiogroup" aria-label="{{s.label}}" style="display:flex;gap:10px;align-items:center">
+<sc-for list="{{s.swatches}}" as="w" hint-placeholder-count="5">
+<button role="radio" aria-checked="{{w.checked}}" aria-label="{{w.name}}" onClick="{{w.pick}}" style="{{w.style}}"></button>
+</sc-for>
+<button aria-label="Custom colour" style="width:26px;height:26px;border-radius:13px;border:1px dashed rgba(255,255,255,.35);background:transparent;color:rgba(255,255,255,.8);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+</div>
+</sc-if>
+<sc-if value="{{s.isKey}}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span style="font-size:13px;color:rgba(255,255,255,.85)">{{s.label}}</span><button onClick="{{s.set}}" aria-label="{{s.keyLabel}}" style="{{s.keyStyle}}">{{s.keyText}}</button></div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</sc-for>
+<button class="g-btn" onClick="{{toggleAdvanced}}" aria-expanded="{{advOpen}}" style="height:40px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:20px;border:1px solid rgba(255,255,255,.14);background:transparent;color:rgba(255,255,255,.8);font:inherit;font-size:13px;cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{advIcon}}"></path></svg>{{advText}}</button>
+<sc-if value="{{isHud}}" hint-placeholder-val="{{ false }}">
+<button class="g-btn" onClick="{{resetPos}}" style="height:40px;border-radius:20px;border:0;background:rgba(255,255,255,.08);color:#fff;font:inherit;font-size:13px;font-weight:500;cursor:pointer">Reset position</button>
+</sc-if>
+</div>
+</section>
+
+</div>
+</div>
+
+<nav aria-label="More" style="display:flex;justify-content:space-between;padding:12px 16px 16px;border-top:1px solid rgba(255,255,255,.1)">
+<sc-for list="{{dock}}" as="d" hint-placeholder-count="5">
+<button class="g-btn" aria-label="{{d.label}}" title="{{d.label}}" style="width:52px;height:42px;border:0;border-radius:14px;background:rgba(255,255,255,.08);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{d.icon}}"></path></svg></button>
+</sc-for>
+</nav>
+</aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.root = null;
+    this.state = {
+      open: true, profOpen: false, profile: 'PvP', level: 0, cat: 'HUD', mod: 'fps', drag: null, selected: null, px: 0, py: 0, adv: false, listening: null,
+      pins: ['fps', 'sprint', 'zoom', 'bright'],
+      on: { fps: true, keys: true, coords: true, armor: true, sprint: true, zoom: true, crosshair: true, boost: true },
+      pos: { fps: { x: 16, y: 14 }, keys: { x: 22, y: 560 }, coords: { x: 16, y: 54 }, armor: { x: 470, y: 600 }, potion: { x: 16, y: 300 }, clock: { x: 600, y: 14 } },
+      vals: {}
+    };
+  }
+  pt(e) {
+    const r = this.root ? this.root.getBoundingClientRect() : { left: 0, top: 0, width: 1280 };
+    const k = r.width / 1280 || 1;
+    return { x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k };
+  }
+  renderVals() {
+    const S = this.state;
+    // ---- one clean icon set: 24 grid, 1.75 stroke, round caps (circles / rects written as paths)
+    const C = (x, y, r) => `M${x - r} ${y}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
+    const R = (x, y, w, h, r) => `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a${r} ${r} 0 0 1 ${r} ${-r}z`;
+    const icons = {
+      search: C(11, 11, 7) + 'M20 20l-3.6-3.6',
+      collapse: 'm6 17 5-5-5-5M13 17l5-5-5-5',
+      pin: 'M12 17v5M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.8a2 2 0 0 0-1.1-1.8l-1.8-.9a2 2 0 0 1-1.1-1.7V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z',
+      grip: C(9, 5, 1.4) + C(9, 12, 1.4) + C(9, 19, 1.4) + C(15, 5, 1.4) + C(15, 12, 1.4) + C(15, 19, 1.4),
+      gauge: 'm12 14 4-4M3.34 19a10 10 0 1 1 17.32 0',
+      keyboard: R(2, 5, 20, 14, 2.5) + 'M6 9h.01M10 9h.01M14 9h.01M18 9h.01M7 15h10',
+      mappin: 'M20 10c0 5-5.5 10.2-7.4 11.8a1 1 0 0 1-1.2 0C9.5 20.2 4 15 4 10a8 8 0 0 1 16 0' + C(12, 10, 3),
+      shield: 'M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z',
+      flask: 'M14 2v6a2 2 0 0 0 .2 1l5.5 10a2 2 0 0 1-1.7 3H6a2 2 0 0 1-1.7-3l5.5-10a2 2 0 0 0 .2-1V2M6.5 15h11M8.5 2h7',
+      clock: C(12, 12, 10) + 'M12 6v6l4 2',
+      crosshair: C(12, 12, 10) + 'M22 12h-4M6 12H2M12 6V2M12 22v-4',
+      trend: 'M22 7l-8.5 8.5-5-5L2 17M16 7h6v6',
+      swords: 'M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M14.5 6.5 18 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2',
+      sun: C(12, 12, 4) + 'M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4',
+      moon: 'M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z',
+      eye: 'M2.1 12.3a1 1 0 0 1 0-.7 10.8 10.8 0 0 1 19.8 0 1 1 0 0 1 0 .7 10.8 10.8 0 0 1-19.8 0' + C(12, 12, 3),
+      zoom: C(11, 11, 8) + 'M21 21l-4.3-4.3M11 8v6M8 11h6',
+      run: 'm6 17 5-5-5-5M13 17l5-5-5-5',
+      zap: 'M4 14a1 1 0 0 1-.8-1.6l9.9-10.2a.5.5 0 0 1 .9.5l-1.9 6A1 1 0 0 0 13 10h7a1 1 0 0 1 .8 1.6l-9.9 10.2a.5.5 0 0 1-.9-.5l1.9-6A1 1 0 0 0 11 14z',
+      activity: 'M22 12h-2.5a2 2 0 0 0-1.9 1.5l-2.4 8.3a.3.3 0 0 1-.5 0L9.2 2.2a.3.3 0 0 0-.5 0l-2.3 8.3A2 2 0 0 1 4.5 12H2',
+      layout: R(3, 3, 7, 9, 1.5) + R(14, 3, 7, 5, 1.5) + R(14, 12, 7, 9, 1.5) + R(3, 16, 7, 5, 1.5),
+      sparkles: 'M9.9 15.5A2 2 0 0 0 8.5 14l-6.1-1.6a.5.5 0 0 1 0-1L8.5 10A2 2 0 0 0 10 8.5l1.6-6.1a.5.5 0 0 1 1 0L14 8.5a2 2 0 0 0 1.5 1.4l6.1 1.6a.5.5 0 0 1 0 1L15.5 14a2 2 0 0 0-1.4 1.4l-1.6 6.1a.5.5 0 0 1-1 0zM20 3v4M22 5h-4',
+      wrench: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z',
+      cpu: R(5, 5, 14, 14, 2) + R(9, 9, 6, 6, 1) + 'M15 2v3M15 19v3M9 2v3M9 19v3M2 15h3M2 9h3M19 15h3M19 9h3',
+      // wide tee: shoulders reach the edges of the 24 grid, boxy body
+      shirt: 'M9 3.5 4.3 5.3a2 2 0 0 0-1.1 1L1.5 10l3.7 1.8L6 10.6V20a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9.4l.8 1.2 3.7-1.8-1.7-3.7a2 2 0 0 0-1.1-1L15 3.5a3 3 0 0 1-6 0z',
+      users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' + C(9, 7, 4) + 'M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+      video: 'm16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 10.5' + R(2, 6, 14, 12, 2),
+      map: 'M14.1 5.6a2 2 0 0 0 1.8 0l3.7-1.8a1 1 0 0 1 1.4.9v12.7a1 1 0 0 1-.6.9l-4.5 2.3a2 2 0 0 1-1.8 0l-4.2-2.1a2 2 0 0 0-1.8 0l-3.7 1.8A1 1 0 0 1 3 19.4V6.6a1 1 0 0 1 .6-.9l4.5-2.3a2 2 0 0 1 1.8 0zM15 5.8v15M9 3.2v15',
+      sliders: 'M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4',
+      bars: 'M3 3v18h18M18 17V9M13 17V5M8 17v-3',
+      user: 'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2' + C(12, 7, 4)
+    };
+    // ---- modules: name, category, icon, short description, settings groups
+    const LOOK = (extra) => [{ title: 'Look', items: [{ k: 'style', t: 'seg', label: 'Style', opts: ['Plain', 'Box', 'Glass'], d: 'Plain' }, { k: 'size', t: 'slider', label: 'Size', min: 60, max: 180, step: 5, d: 100, unit: '%' },
+      { k: 'color', t: 'color', label: 'Text colour', d: '#FFFFFF' }, { k: 'shadow', t: 'toggle', label: 'Text shadow', d: true }] }].concat(extra || []);
+    const MODS = {
+      fps: ['FPS Counter', 'HUD', icons.gauge, 'Your frame rate', LOOK([{ title: 'Show', items: [{ k: 'low', t: 'toggle', label: '1% low next to it', d: false }, { k: 'label', t: 'seg', label: 'Label', opts: ['FPS', 'None'], d: 'FPS' }] }])],
+      keys: ['Keystrokes', 'HUD', icons.keyboard, 'WASD and clicks', LOOK([{ title: 'Show', items: [{ k: 'cps', t: 'toggle', label: 'Clicks per second', d: true }, { k: 'space', t: 'toggle', label: 'Space bar', d: false }, { k: 'pressed', t: 'color', label: 'Pressed colour', d: '#FFFFFF' }] }])],
+      coords: ['Coordinates', 'HUD', icons.mappin, 'XYZ and facing', LOOK([{ title: 'Show', items: [{ k: 'dec', t: 'seg', label: 'Decimals', opts: ['0', '1', '2'], d: '0' }, { k: 'facing', t: 'toggle', label: 'Facing', d: true }, { k: 'biome', t: 'toggle', label: 'Biome', d: false }] }])],
+      armor: ['Armor & Durability', 'HUD', icons.shield, 'When gear breaks', LOOK([{ title: 'Show', items: [{ k: 'layout', t: 'seg', label: 'Layout', opts: ['Row', 'Column'], d: 'Row' }, { k: 'dur', t: 'seg', label: 'Durability', opts: ['%', 'Bar', 'Left'], d: '%' }] }])],
+      potion: ['Potion Effect Timers', 'HUD', icons.flask, 'Effects and time left', LOOK([{ title: 'Show', items: [{ k: 'layout', t: 'seg', label: 'Layout', opts: ['Compact', 'List'], d: 'Compact' }, { k: 'icons', t: 'toggle', label: 'Effect icons', d: true }] }])],
+      clock: ['Clock', 'HUD', icons.clock, 'Real time on screen', LOOK([{ title: 'Show', items: [{ k: 'fmt', t: 'seg', label: 'Format', opts: ['24h', '12h'], d: '24h' }, { k: 'sec', t: 'toggle', label: 'Seconds', d: false }] }])],
+      crosshair: ['Custom Crosshair', 'PvP', icons.crosshair, 'Aim with your own shape', [{ title: 'Shape', items: [{ k: 'shape', t: 'seg', label: 'Style', opts: ['Plus', 'Dot', 'Circle', 'T'], d: 'Plus' }, { k: 'size', t: 'slider', label: 'Size', min: 5, max: 21, step: 2, d: 11, unit: '' }, { k: 'gap', t: 'slider', label: 'Gap', min: 0, max: 6, step: 1, d: 2, unit: '' }] },
+        { title: 'Colour', items: [{ k: 'color', t: 'color', label: 'Colour', d: '#FFFFFF' }, { k: 'outline', t: 'toggle', label: 'Outline', d: true }] }]],
+      combo: ['Combo Counter', 'PvP', icons.trend, 'Count your combos', LOOK([{ title: 'Behaviour', items: [{ k: 'reset', t: 'slider', label: 'Reset after', min: 1, max: 5, step: 0.5, d: 2, unit: ' s' }] }])],
+      hitcolor: ['Hit Color', 'PvP', icons.swords, 'See every hit land', [{ title: 'Look', items: [{ k: 'color', t: 'color', label: 'Hit colour', d: '#E5484D' }, { k: 'alpha', t: 'slider', label: 'Strength', min: 10, max: 100, step: 5, d: 45, unit: '%' }] }]],
+      bright: ['Full Bright', 'Visuals', icons.sun, 'See in the dark', [{ title: 'Light', items: [{ k: 'mode', t: 'seg', label: 'Mode', opts: ['Gamma', 'Night vision'], d: 'Gamma' }, { k: 'level', t: 'slider', label: 'Brightness', min: 100, max: 1500, step: 50, d: 1000, unit: '%' }] },
+        { title: 'Control', items: [{ k: 'key', t: 'key', label: 'Toggle key', d: 'B' }] }]],
+      time: ['Time, Weather & Fog', 'Visuals', icons.moon, 'Your own sky', [{ title: 'Sky', items: [{ k: 'time', t: 'slider', label: 'Time of day', min: 0, max: 24, step: 0.5, d: 19, unit: ':00' }, { k: 'weather', t: 'seg', label: 'Weather', opts: ['Clear', 'Rain', 'Thunder'], d: 'Clear' }, { k: 'fog', t: 'slider', label: 'Fog', min: 0, max: 100, step: 5, d: 40, unit: '%' }] }]],
+      freelook: ['Free Look', 'Visuals', icons.eye, 'Look around while running', [{ title: 'Control', items: [{ k: 'key', t: 'key', label: 'Key', d: 'Left Alt' }, { k: 'mode', t: 'seg', label: 'Mode', opts: ['Hold', 'Toggle'], d: 'Hold' }, { k: 'invert', t: 'toggle', label: 'Invert up / down', d: false }] }]],
+      zoom: ['Zoom', 'Utility', icons.zoom, 'Scroll to zoom in', [{ title: 'Zoom', items: [{ k: 'key', t: 'key', label: 'Key', d: 'C' }, { k: 'amount', t: 'slider', label: 'Zoom', min: 2, max: 10, step: 0.5, d: 4, unit: 'x' }, { k: 'smooth', t: 'toggle', label: 'Smooth zoom', d: true }, { k: 'scroll', t: 'toggle', label: 'Scroll to adjust', d: true }] }]],
+      sprint: ['Toggle Sprint', 'Utility', icons.run, 'Never hold Ctrl again', [{ title: 'Keys', items: [{ k: 'kSprint', t: 'key', label: 'Sprint', d: 'Left Ctrl' }, { k: 'kSneak', t: 'key', label: 'Sneak', d: 'Left Shift' }] },
+        { title: 'Show', items: [{ k: 'hud', t: 'toggle', label: 'State on screen', d: true }] }]],
+      boost: ['Performance Boost', 'Performance', icons.zap, 'More FPS, same look', [{ title: 'Preset', items: [{ k: 'preset', t: 'seg', label: 'Preset', opts: ['Balanced', 'Max FPS', 'Quality'], d: 'Balanced' }] },
+        { title: 'Hidden window', items: [{ k: 'throttle', t: 'toggle', label: 'Throttle when hidden', d: true }, { k: 'hidFps', t: 'slider', label: 'FPS when hidden', min: 5, max: 60, step: 5, d: 15, unit: '' }] }]],
+      graph: ['Frame Time Graph', 'Performance', icons.activity, 'Spikes and 1% lows', LOOK([{ title: 'Show', items: [{ k: 'low', t: 'toggle', label: '1% low', d: true }] }])],
+      tps: ['TPS & Tick Graph', 'Advanced', icons.bars, 'Server tick rate', [{ title: 'Show', items: [{ k: 'graph', t: 'toggle', label: 'Graph', d: true }] }]],
+      hitbox: ['Hitbox Visualizer', 'Advanced', icons.cpu, 'Entity hitboxes', [{ title: 'Look', items: [{ k: 'color', t: 'color', label: 'Colour', d: '#FFFFFF' }, { k: 'key', t: 'key', label: 'Toggle key', d: 'F3 + B' }] }]]
+    };
+    const CATS = [['HUD', 33, icons.layout], ['PvP', 29, icons.swords], ['Visuals', 28, icons.sparkles], ['Utility', 35, icons.wrench], ['Performance', 17, icons.zap], ['Advanced', 19, icons.cpu]];
+    const SW = [['White', '#FFFFFF'], ['Red', '#E5484D'], ['Amber', '#F5B544'], ['Green', '#46C46E'], ['Cyan', '#3DC6E0']];
+    const set = (patch) => this.setState(patch);
+    const val = (id, k) => { const v = (S.vals[id] || {})[k]; if (v !== undefined) return v; for (const g of MODS[id][4]) for (const it of g.items) if (it.k === k) return it.d; return undefined; };
+    const put = (id, k, v) => set({ vals: { ...S.vals, [id]: { ...(S.vals[id] || {}), [k]: v } } });
+    // toggle switch: white track + dark knob when on, glass track + white knob when off; the knob slides
+    const pill = (a, big) => 'width:' + (big ? 46 : 40) + 'px;height:' + (big ? 27 : 24) + 'px;flex:none;padding:2px;box-sizing:border-box;border:0;border-radius:14px;cursor:pointer;display:block;transition:background .25s cubic-bezier(.2,.8,.2,1);'
+      + (a ? 'background:#fff' : 'background:rgba(255,255,255,.2)');
+    const knob = (a, big) => 'display:block;width:' + (big ? 23 : 20) + 'px;height:' + (big ? 23 : 20) + 'px;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .25s cubic-bezier(.2,.8,.2,1),background .25s;'
+      + (a ? 'background:#141416;transform:translateX(' + (big ? 19 : 16) + 'px)' : 'background:#fff;transform:translateX(0)');
+    const toggleOn = (id) => set({ on: { ...S.on, [id]: !S.on[id] } });
+    const openMod = (id) => set({ mod: id, cat: MODS[id][1], level: 2, open: true, adv: false, listening: null, selected: S.pos[id] ? id : S.selected });
+    const isPinned = (id) => S.pins.indexOf(id) >= 0;
+    const togglePin = (id) => set({ pins: isPinned(id) ? S.pins.filter(x => x !== id) : S.pins.concat([id]) });
+    const ease = 'cubic-bezier(.2,.8,.2,1)';
+
+    // ---- HUD elements on screen (their look comes straight from the settings)
+    const hudIds = ['fps', 'coords', 'keys', 'armor', 'potion', 'clock'];
+    const huds = hudIds.filter(id => S.on[id]).map(id => {
+      const p = S.pos[id], sel = S.selected === id, drag = S.drag && S.drag.id === id;
+      const style = val(id, 'style'), scale = val(id, 'size'), shadow = val(id, 'shadow'), color = val(id, 'color');
+      const base = style === 'Box' ? 'background:rgba(0,0,0,.45);padding:6px 10px;border-radius:6px;'
+        : style === 'Glass' ? 'background:rgba(255,255,255,.14);backdrop-filter:blur(10px);padding:6px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.18);' : 'padding:2px;';
+      const keyBg = style === 'Glass' ? 'background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18);' : 'background:rgba(0,0,0,.45);';
+      const dec = +val('coords', 'dec');
+      const n = (x) => x.toFixed(dec);
+      return {
+        label: MODS[id][0], isFps: id === 'fps', isCoords: id === 'coords', isArmor: id === 'armor', isKeys: id === 'keys', isPotion: id === 'potion', isClock: id === 'clock',
+        selected: sel && !S.drag,
+        fpsText: (val('fps', 'label') === 'FPS' ? '512 FPS' : '512') + (val('fps', 'low') ? '  ·  1% 344' : ''),
+        coordsText: 'XYZ  ' + n(-21.37) + '  ' + n(114) + '  ' + n(-20.62) + (val('coords', 'facing') ? '  ·  N' : '') + (val('coords', 'biome') ? '  ·  Dark Forest' : ''),
+        clockText: val('clock', 'fmt') === '24h' ? (val('clock', 'sec') ? '18:42:07' : '18:42') : (val('clock', 'sec') ? '6:42:07 PM' : '6:42 PM'),
+        style: 'position:absolute;left:' + p.x + 'px;top:' + p.y + 'px;transform-origin:top left;transform:scale(' + (scale / 100) + ');cursor:' + (drag ? 'grabbing' : 'grab') + ';z-index:' + (sel ? 3 : 2),
+        frame: 'position:absolute;inset:-6px;border-radius:8px;pointer-events:none;border:1.5px ' + (sel ? 'solid #fff' : 'dashed rgba(255,255,255,.55)') + ';opacity:' + (sel || drag ? 1 : .55),
+        chip: 'position:absolute;left:-6px;top:-30px;white-space:nowrap;font-size:11px;font-weight:600;padding:3px 8px;border-radius:10px;background:#fff;color:#111;pointer-events:none;opacity:' + (sel || drag ? 1 : 0),
+        body: base + 'font-family:\'Geist Mono\',monospace;font-size:14px;font-weight:600;white-space:nowrap;color:' + color + ';' + (shadow ? 'text-shadow:0 1px 2px rgba(0,0,0,.9);' : ''),
+        key: 'width:34px;height:30px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:6px;' + keyBg + 'font-family:\'Geist Mono\',monospace;font-size:12px;font-weight:600;color:' + color,
+        keyDown: 'width:34px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:' + val('keys', 'pressed') + ';color:#111;font-family:\'Geist Mono\',monospace;font-size:12px;font-weight:600',
+        scaleDown: (e) => { e.preventDefault(); e.stopPropagation(); const q = this.pt(e); set({ drag: { id, mode: 'scale', sx: q.x, s0: scale, moved: false }, selected: id, px: q.x, py: q.y }); },
+        down: (e) => { e.preventDefault(); const q = this.pt(e); set({ drag: { id, mode: 'move', dx: q.x - p.x, dy: q.y - p.y, moved: false }, selected: id, px: q.x, py: q.y }); }
+      };
+    });
+    // crosshair from its settings
+    const cs = val('crosshair', 'size'), cg = val('crosshair', 'gap'), shape = val('crosshair', 'shape'), h = (cs - 1) / 2;
+    const crossPath = shape === 'Dot' ? 'M-1 0h2' : shape === 'Circle' ? C(0, 0, h) : shape === 'T'
+      ? `M${-h} 0h${h - cg}M${cg} 0h${h - cg}M0 ${cg}v${h - cg}` : `M0 ${-h}v${h - cg}M0 ${cg}v${h - cg}M${-h} 0h${h - cg}M${cg} 0h${h - cg}`;
+
+    // smart minimize: moving / scaling near the panel slides it away until you let go
+    const autoHidden = !!(S.open && S.drag && S.drag.mode !== 'new' && S.drag.moved && S.px > 800);
+    const open = S.open && !autoHidden;
+
+    // ---- settings controls for the open module
+    const m = MODS[S.mod];
+    const control = (it) => {
+      const v = val(S.mod, it.k);
+      const base = { label: it.label, isSeg: it.t === 'seg', isSlider: it.t === 'slider', isToggle: it.t === 'toggle', isColor: it.t === 'color', isKey: it.t === 'key' };
+      if (it.t === 'seg') return { ...base, options: it.opts.map(o => ({ label: o, checked: v === o ? 'true' : 'false', pick: () => put(S.mod, it.k, o),
+        style: 'flex:1;height:30px;border:0;border-radius:11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:background .2s ' + ease + ',color .2s;'
+          + (v === o ? 'background:#fff;color:#111;box-shadow:0 1px 4px rgba(0,0,0,.25)' : 'background:transparent;color:rgba(255,255,255,.75)') })) };
+      if (it.t === 'slider') {
+        const f = (v - it.min) / (it.max - it.min) * 100;
+        return { ...base, min: it.min, max: it.max, step: it.step, value: v, valueText: v + (it.unit || ''), set: (e) => put(S.mod, it.k, +e.target.value),
+          fill: 'position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#fff;width:' + f + '%',
+          thumb: 'position:absolute;top:50%;left:' + f + '%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:8px;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.4);pointer-events:none' };
+      }
+      if (it.t === 'toggle') return { ...base, state: v ? 'On' : 'Off', pressed: v ? 'true' : 'false', pill: pill(v), knob: knob(v), set: () => put(S.mod, it.k, !v) };
+      if (it.t === 'color') return { ...base, swatches: SW.map(w => ({ name: w[0], checked: v === w[1] ? 'true' : 'false', pick: () => put(S.mod, it.k, w[1]),
+        style: 'width:26px;height:26px;border-radius:13px;cursor:pointer;padding:0;background:' + w[1] + ';border:0;'
+          + (v === w[1] ? 'box-shadow:0 0 0 2px rgba(18,18,20,.9),0 0 0 4px #fff' : 'box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)') })) };
+      if (it.t === 'key') {
+        const listening = S.listening === S.mod + '.' + it.k;
+        return { ...base, keyText: listening ? 'Press a key…' : v, keyLabel: it.label + ' key: ' + v,
+          set: () => set({ listening: listening ? null : S.mod + '.' + it.k }),
+          keyStyle: 'min-width:64px;height:30px;padding:0 12px;border-radius:10px;font-family:\'Geist Mono\',monospace;font-size:12px;font-weight:600;cursor:pointer;'
+            + (listening ? 'border:1px solid #fff;background:rgba(255,255,255,.16);color:#fff' : 'border:1px solid rgba(255,255,255,.16);background:rgba(0,0,0,.25);color:#fff') };
+      }
+      return base;
+    };
+    const groups = m[4].map(g => ({ title: g.title, items: g.items.map(control) }));
+
+    return {
+      icons, setRoot: (el) => { this.root = el; },
+      profile: S.profile, profOpenAttr: S.profOpen ? 'true' : 'false',
+      toggleProfiles: () => set({ profOpen: !S.profOpen }),
+      profBtnStyle: 'height:32px;display:flex;align-items:center;gap:6px;padding:0 8px 0 10px;border-radius:16px;border:1px solid rgba(255,255,255,' + (S.profOpen ? '.4' : '.18') + ');background:' + (S.profOpen ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.06)') + ';color:#fff;font:inherit;font-size:13px;font-weight:600;cursor:pointer',
+      profChevron: 'opacity:.7;transition:transform .25s cubic-bezier(.2,.8,.2,1);transform:rotate(' + (S.profOpen ? 180 : 0) + 'deg)',
+      profMenuStyle: 'position:absolute;right:0;top:40px;width:220px;padding:6px;box-sizing:border-box;display:flex;flex-direction:column;background:rgba(28,28,32,.82);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.14);border-radius:16px;box-shadow:0 18px 40px rgba(0,0,0,.45);z-index:30;transform-origin:top right;transition:opacity .18s,transform .22s cubic-bezier(.2,.8,.2,1);'
+        + (S.profOpen ? 'opacity:1;transform:scale(1) translateY(0)' : 'opacity:0;transform:scale(.96) translateY(-6px);pointer-events:none'),
+      profiles: [['PvP', '38 modules on'], ['Survival', '24 modules on'], ['Building', '17 modules on'], ['Recording', 'Clean HUD for videos']].map(p => ({
+        name: p[0], sub: p[1], active: S.profile === p[0], checked: S.profile === p[0] ? 'true' : 'false', pick: () => set({ profile: p[0], profOpen: false }) })),
+      onMove: (e) => {
+        const d = S.drag; if (!d) return;
+        const q = this.pt(e);
+        if (d.mode === 'new') { set({ px: q.x, py: q.y, drag: { ...d, moved: true } }); return; }
+        if (d.mode === 'scale') { const sc = Math.max(60, Math.min(180, Math.round((d.s0 + (q.x - d.sx) * 0.6) / 5) * 5)); put(d.id, 'size', sc); set({ px: q.x, py: q.y, drag: { ...d, moved: true } }); return; }
+        let x = Math.round(q.x - d.dx), y = Math.round(q.y - d.dy);
+        x = Math.max(4, Math.min(1180, x)); y = Math.max(4, Math.min(690, y));
+        set({ px: q.x, py: q.y, pos: { ...S.pos, [d.id]: { x, y } }, drag: { ...d, moved: true } });
+      },
+      onUp: () => {
+        const d = S.drag; if (!d) return;
+        if (d.mode === 'new') {
+          if (d.moved && (S.px < 884 || !S.open)) set({ drag: null, on: { ...S.on, [d.id]: true }, pos: { ...S.pos, [d.id]: { x: Math.round(S.px - 40), y: Math.round(S.py - 14) } }, selected: d.id });
+          else set({ drag: null });
+          return;
+        }
+        if (!d.moved && d.mode === 'move') { openMod(d.id); set({ drag: null }); } else set({ drag: null });
+      },
+      dragging: !!(S.drag && S.drag.moved),
+      huds, crosshairOn: !!S.on.crosshair, crossPath, crossColor: val('crosshair', 'color'), crossOutline: val('crosshair', 'outline') ? 4 : 0,
+      toggleOpen: () => set({ open: !S.open }),
+      ghostOn: !!(S.drag && S.drag.mode === 'new' && S.drag.moved),
+      ghostLabel: S.drag && S.drag.mode === 'new' ? MODS[S.drag.id][0] : '',
+      ghostStyle: 'position:absolute;left:' + (S.px - 40) + 'px;top:' + (S.py - 16) + 'px;display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:14px;background:#fff;color:#111;font-size:13px;font-weight:600;pointer-events:none;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:' + (S.px < 884 ? 1 : .6),
+      hintText: S.drag && S.drag.mode === 'new' ? 'Drop it anywhere on your screen' : S.drag && S.drag.mode === 'scale' ? 'Size ' + val(S.drag.id, 'size') + '%' : 'Drag anything to move it  ·  drag modules out of the panel  ·  corner to scale',
+      drawerStyle: 'position:absolute;right:16px;top:16px;bottom:16px;width:340px;display:flex;flex-direction:column;background:rgba(18,18,20,.55);backdrop-filter:blur(28px) saturate(1.4);-webkit-backdrop-filter:blur(28px) saturate(1.4);border:1px solid rgba(255,255,255,.14);border-radius:24px;box-shadow:0 20px 60px rgba(0,0,0,.35);z-index:10;transition:transform .45s ' + ease + ',opacity .3s;'
+        + (open ? 'transform:translateX(0);opacity:1' : 'transform:translateX(390px);opacity:.4;pointer-events:none'),
+      handleStyle: 'position:absolute;right:0;top:50%;margin-top:-56px;width:34px;height:112px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:1px solid rgba(255,255,255,.14);border-right:0;border-radius:14px 0 0 14px;background:rgba(18,18,20,.55);backdrop-filter:blur(20px);color:#fff;cursor:pointer;z-index:9;transition:transform .45s ' + ease + ';'
+        + (open || autoHidden ? 'transform:translateX(40px)' : 'transform:translateX(0)'),
+      hintStyle: 'position:absolute;left:' + (open ? 250 : 420) + 'px;bottom:22px;padding:8px 14px;border-radius:16px;background:rgba(18,18,20,.55);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.12);font-size:12px;color:rgba(255,255,255,.85);white-space:nowrap;transition:left .45s ' + ease,
+      stripStyle: 'display:flex;width:1020px;height:100%;transition:transform .38s ' + ease + ';transform:translateX(-' + (S.level * 340) + 'px)',
+      pinCount: S.pins.length ? S.pins.length + ' pinned' : '',
+      noPins: S.pins.length === 0,
+      pinned: S.pins.map(id => ({ name: MODS[id][0], icon: MODS[id][2], open: () => openMod(id), unpin: () => togglePin(id), unpinLabel: 'Unpin ' + MODS[id][0],
+        state: S.on[id] ? 'On' : 'Off', pressed: S.on[id] ? 'true' : 'false', toggle: () => toggleOn(id), pill: pill(S.on[id]), knob: knob(S.on[id]) })),
+      cats: CATS.map(c => ({ name: c[0], count: c[1], icon: c[2], open: () => set({ cat: c[0], level: 1 }) })),
+      goHome: () => set({ level: 0 }), goCat: () => set({ level: 1 }), catName: S.cat,
+      catMods: Object.keys(MODS).filter(id => MODS[id][1] === S.cat).map(id => {
+        const pinned = isPinned(id), canDrag = !!S.pos[id];
+        return { name: MODS[id][0], icon: MODS[id][2], open: () => openMod(id), pin: () => togglePin(id), pinLabel: pinned ? 'Unpin' : 'Pin', pinFill: pinned ? 'currentColor' : 'none',
+          pinStyle: 'width:28px;height:28px;flex:none;border-radius:14px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:' + (pinned ? '#fff' : 'rgba(255,255,255,.4)'),
+          gripLabel: canDrag ? 'Drag ' + MODS[id][0] + ' onto your screen' : 'Not a HUD element',
+          gripStyle: 'width:18px;height:28px;flex:none;display:flex;align-items:center;justify-content:center;cursor:' + (canDrag ? 'grab' : 'default') + ';color:rgba(255,255,255,' + (canDrag ? '.55' : '0') + ')',
+          grab: (e) => { if (!canDrag) return; e.preventDefault(); const q = this.pt(e); set({ drag: { id, mode: 'new', moved: false }, px: q.x, py: q.y }); },
+          state: S.on[id] ? 'On' : 'Off', pressed: S.on[id] ? 'true' : 'false', toggle: () => toggleOn(id), pill: pill(S.on[id]), knob: knob(S.on[id]) };
+      }),
+      modName: m[0], modCat: m[1], modIcon: m[2], modDesc: m[3],
+      modState: S.on[S.mod] ? 'On' : 'Off', modPressed: S.on[S.mod] ? 'true' : 'false', modToggle: () => toggleOn(S.mod), modPill: pill(S.on[S.mod], true), modKnob: knob(S.on[S.mod], true),
+      groups, isHud: !!S.pos[S.mod],
+      advOpen: S.adv ? 'true' : 'false', toggleAdvanced: () => set({ adv: !S.adv }),
+      advText: S.adv ? 'Fewer settings' : 'Advanced', advIcon: S.adv ? 'm18 15-6-6-6 6' : 'm6 9 6 6 6-6',
+      resetPos: () => {
+        const home = { fps: { x: 16, y: 14 }, keys: { x: 22, y: 560 }, coords: { x: 16, y: 54 }, armor: { x: 470, y: 600 }, potion: { x: 16, y: 300 }, clock: { x: 600, y: 14 } };
+        if (home[S.mod]) set({ pos: { ...S.pos, [S.mod]: home[S.mod] } });
+      },
+      dock: [{ label: 'Locker', icon: icons.shirt }, { label: 'Friends', icon: icons.users }, { label: 'Clips & Rewind', icon: icons.video }, { label: 'World Map', icon: icons.map }, { label: 'Settings', icon: icons.sliders }]
+    };
+  }
+}
+</script>
+</body>
+</html>

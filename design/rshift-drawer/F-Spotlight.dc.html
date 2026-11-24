@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R-Shift concept F</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#000}
+a{color:#fff}a:hover{color:#ddd}
+.glass-row:hover{background:rgba(255,255,255,.07)}
+.glass-chip:hover{background:rgba(255,255,255,.16)}
+</style>
+</helmet>
+<div style="width:1280px;height:720px;position:relative;overflow:hidden;font-family:Geist,system-ui,sans-serif;color:#fff">
+<img src="/_blob/2c13934c10ac325461171bc36aad2ab0" alt="The game world behind the search" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.55)">
+
+<div style="position:absolute;left:320px;top:110px;width:640px;box-sizing:border-box;background:rgba(18,18,20,.6);backdrop-filter:blur(30px) saturate(1.4);-webkit-backdrop-filter:blur(30px) saturate(1.4);border:1px solid rgba(255,255,255,.14);border-radius:24px;box-shadow:0 24px 70px rgba(0,0,0,.4);overflow:hidden">
+<label style="display:flex;align-items:center;gap:14px;height:64px;padding:0 22px;border-bottom:1px solid rgba(255,255,255,.1)">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"></path></svg>
+<input value="{{query}}" onInput="{{onQuery}}" aria-label="Search Velo" placeholder="Search modules, settings, friends…" style="flex:1;min-width:0;background:transparent;border:0;outline:0;color:#fff;font:inherit;font-size:20px;font-weight:500">
+<span style="font-family:'Geist Mono',monospace;font-size:11px;padding:3px 7px;border-radius:6px;background:rgba(255,255,255,.12);color:rgba(255,255,255,.75)">Esc</span>
+</label>
+
+<div style="padding:10px">
+<div style="font-size:12px;color:rgba(255,255,255,.55);margin:4px 12px 6px">{{resultTitle}}</div>
+<sc-for list="{{results}}" as="r" hint-placeholder-count="5">
+<div class="glass-row" style="{{r.rowStyle}}">
+<div style="width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;flex:none"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{r.icon}}"></path></svg></div>
+<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:600">{{r.name}}</div><div style="font-size:12px;color:rgba(255,255,255,.6)">{{r.sub}}</div></div>
+<sc-if value="{{r.isToggle}}" hint-placeholder-val="{{ true }}">
+<button aria-pressed="{{r.pressed}}" onClick="{{r.toggle}}" style="{{r.pill}}">{{r.state}}</button>
+</sc-if>
+<sc-if value="{{r.isLink}}" hint-placeholder-val="{{ false }}">
+<span style="font-size:12px;color:rgba(255,255,255,.6)">Open ›</span>
+</sc-if>
+</div>
+</sc-for>
+</div>
+
+<div style="display:flex;align-items:center;gap:8px;padding:12px 22px;border-top:1px solid rgba(255,255,255,.1)">
+<sc-for list="{{jumps}}" as="j" hint-placeholder-count="5">
+<button class="glass-chip" style="height:32px;padding:0 12px;border-radius:16px;border:0;background:rgba(255,255,255,.08);color:#fff;font:inherit;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{j.icon}}"></path></svg>{{j.label}}</button>
+</sc-for>
+<div style="flex:1"></div>
+<button style="height:32px;padding:0 14px;border-radius:16px;border:0;background:#fff;color:#111;font:inherit;font-size:13px;font-weight:600;cursor:pointer">Edit HUD</button>
+</div>
+</div>
+
+<div style="position:absolute;left:320px;width:640px;top:600px;display:flex;justify-content:center;gap:18px;font-size:12px;color:rgba(255,255,255,.75)">
+<span><kbd style="font-family:'Geist Mono',monospace;padding:2px 6px;border-radius:5px;background:rgba(255,255,255,.14)">↑ ↓</kbd> choose</span>
+<span><kbd style="font-family:'Geist Mono',monospace;padding:2px 6px;border-radius:5px;background:rgba(255,255,255,.14)">Enter</kbd> toggle</span>
+<span><kbd style="font-family:'Geist Mono',monospace;padding:2px 6px;border-radius:5px;background:rgba(255,255,255,.14)">→</kbd> settings</span>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = { query: 'fps', on: { fps: true, boost: true } };
+  }
+  renderVals() {
+    const on = this.state.on;
+    const all = [
+      { id: 'fps', name: 'FPS Counter', sub: 'HUD · shows your frame rate', icon: 'M4 18h16M6 14l4-4 3 3 5-6', kind: 'toggle', keys: 'fps frame counter hud' },
+      { id: 'graph', name: 'Frame Time Graph', sub: 'Performance · spikes and 1% lows', icon: 'M3 17l4-6 4 3 4-8 6 9', kind: 'toggle', keys: 'fps frame time graph performance' },
+      { id: 'boost', name: 'Performance Boost', sub: 'Performance · more FPS, same look', icon: 'M13 2L4 14h7l-1 8 9-12h-7z', kind: 'toggle', keys: 'fps boost performance' },
+      { id: 'cap', name: 'FPS limit when hidden', sub: 'Setting in Performance Boost', icon: 'M4 7h10M18 7h2M4 17h4M12 17h8', kind: 'link', keys: 'fps limit hidden setting' },
+      { id: 'zoom', name: 'Zoom', sub: 'Utility · scroll to zoom in', icon: 'M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-6-6', kind: 'toggle', keys: 'zoom utility' },
+      { id: 'sprint', name: 'Toggle Sprint', sub: 'Utility · never hold ctrl again', icon: 'M5 12h10M11 6l6 6-6 6', kind: 'toggle', keys: 'sprint utility' }
+    ];
+    const q = (this.state.query || '').toLowerCase().trim();
+    const list = (q ? all.filter(r => r.keys.includes(q)) : all.slice(4)).slice(0, 5);
+    return {
+      query: this.state.query,
+      onQuery: (e) => this.setState({ query: e.target.value }),
+      resultTitle: q ? 'Best matches' : 'Recent',
+      results: list.map((r, i) => {
+        const a = !!on[r.id];
+        return { ...r, isToggle: r.kind === 'toggle', isLink: r.kind === 'link', state: a ? 'On' : 'Off', pressed: a ? 'true' : 'false',
+          toggle: () => this.setState({ on: { ...on, [r.id]: !a } }),
+          rowStyle: 'height:56px;display:flex;align-items:center;gap:14px;padding:0 12px;border-radius:14px;' + (i === 0 ? 'background:rgba(255,255,255,.1)' : ''),
+          pill: 'width:56px;height:30px;border-radius:15px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;'
+            + (a ? 'border:0;background:#fff;color:#111' : 'border:1px solid rgba(255,255,255,.25);background:transparent;color:rgba(255,255,255,.8)') };
+      }),
+      jumps: [{ label: 'All modules', icon: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z' }, { label: 'Locker', icon: 'M8 4l4 2 4-2 4 3-2 4h-2v9H8v-9H6L4 7z' },
+        { label: 'Friends', icon: 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20c0-3 3-5 6-5s6 2 6 5' }, { label: 'Clips', icon: 'M4 5h16v14H4zM10 9l5 3-5 3z' }]
+    };
+  }
+}
+</script>
+</body>
+</html>

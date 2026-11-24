@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R-Shift concept A2</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,600;112,700&amp;family=Inter:wght@400;500;600&amp;family=Geist+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0C0A0A}
+a{color:#FF6B6F}a:hover{color:#ff8a8d}
+.velo-tile:hover{background:#1E191A}
+.velo-menu-item:hover{background:#221C1D;color:#F2ECEB}
+</style>
+</helmet>
+<div style="width:1280px;height:720px;position:relative;overflow:hidden;font-family:Inter,system-ui,sans-serif;color:#F2ECEB">
+<img src="/_blob/2c13934c10ac325461171bc36aad2ab0" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(6px) brightness(.55);transform:scale(1.04)">
+<div style="position:absolute;left:230px;top:90px;width:820px;height:540px;display:flex;flex-direction:column;background:#110E0F;border:1px solid rgba(255,255,255,.07);border-radius:14px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.55)">
+
+<div style="display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.05);position:relative">
+<button onClick="{{toggleMenu}}" aria-expanded="{{menuOpen}}" aria-label="Switch section" style="height:36px;display:flex;align-items:center;gap:8px;padding:0 10px 0 8px;border:0;border-radius:9px;background:transparent;color:#F2ECEB;font:inherit;cursor:pointer">
+<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5l5 0 4 9 4-9 5 0-7 15h-4z" fill="#D7262D"></path></svg>
+<span style="font-family:Archivo,sans-serif;font-stretch:112%;font-weight:700;font-size:19px">Modules</span>
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8586" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+</button>
+<div style="flex:1"></div>
+<label style="display:flex;align-items:center;gap:8px;width:240px;height:36px;padding:0 12px;box-sizing:border-box;background:#1A1617;border:1px solid rgba(255,255,255,.06);border-radius:9px;color:#8E8586">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4"></path></svg>
+<input placeholder="Search modules" aria-label="Search modules" style="flex:1;min-width:0;background:transparent;border:0;outline:0;color:#F2ECEB;font:inherit;font-size:13px">
+</label>
+<button style="height:36px;padding:0 14px;display:flex;align-items:center;gap:8px;background:#2A1416;border:1px solid rgba(215,38,45,.45);border-radius:9px;color:#FF6B6F;font:inherit;font-size:13px;font-weight:600;cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h18v14H3zM3 9h18M8 9v10"></path></svg>Edit HUD</button>
+<button aria-label="Profile: PvP" title="Profile: PvP" style="width:36px;height:36px;padding:0;border:1px solid rgba(255,255,255,.06);border-radius:9px;background:#1A1617;cursor:pointer;display:flex;align-items:center;justify-content:center"><span aria-hidden="true" style="width:22px;height:22px;border-radius:5px;background:linear-gradient(#3B2A22 0 38%,#C89A78 38% 100%);display:block"></span></button>
+
+<sc-if value="{{menuOpen}}" hint-placeholder-val="{{ false }}">
+<div role="menu" style="position:absolute;left:16px;top:58px;width:220px;padding:6px;background:#191516;border:1px solid rgba(255,255,255,.08);border-radius:12px;box-shadow:0 18px 40px rgba(0,0,0,.5);z-index:5;display:flex;flex-direction:column">
+<sc-for list="{{menu}}" as="i" hint-placeholder-count="7">
+<button role="menuitem" class="velo-menu-item" onClick="{{toggleMenu}}" style="{{i.style}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{i.icon}}"></path></svg>{{i.label}}</button>
+</sc-for>
+</div>
+</sc-if>
+</div>
+
+<div style="flex:1;min-height:0;overflow:hidden;padding:4px 20px 0">
+<sc-for list="{{sections}}" as="s" hint-placeholder-count="2">
+<div style="display:flex;align-items:baseline;gap:8px;margin:14px 2px 10px"><h2 style="margin:0;font-size:13px;font-weight:600;color:#F2ECEB">{{s.name}}</h2><span style="font-family:'Geist Mono',monospace;font-size:11px;color:#6F6768">{{s.count}}</span><div style="flex:1"></div><a href="#" style="font-size:12px;text-decoration:none;color:#8E8586">Show all</a></div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+<sc-for list="{{s.mods}}" as="m" hint-placeholder-count="4">
+<div class="velo-tile" style="height:84px;box-sizing:border-box;padding:12px;border-radius:11px;background:#171314;border:1px solid {{m.border}};display:flex;flex-direction:column;justify-content:space-between;cursor:pointer">
+<div style="display:flex;align-items:flex-start;justify-content:space-between">
+<div style="width:32px;height:32px;border-radius:9px;background:{{m.iconBg}};color:{{m.iconFg}};display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{m.icon}}"></path></svg></div>
+<button aria-label="{{m.toggleLabel}}" onClick="{{m.toggle}}" style="width:32px;height:18px;border:0;border-radius:9px;padding:2px;background:{{m.track}};cursor:pointer;display:flex;justify-content:{{m.knobSide}}"><span style="width:14px;height:14px;border-radius:7px;background:#fff;display:block"></span></button>
+</div>
+<div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{m.name}}</div>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = { menuOpen: true, on: { fps: true, keys: true, coords: true, armor: true, crosshair: true, combo: true, hitcolor: true } };
+  }
+  renderVals() {
+    const I = {
+      fps: 'M4 18h16M6 14l4-4 3 3 5-6', keys: 'M3 7h18v10H3zM7 11h2M11 11h2M15 11h2M8 14h8', coords: 'M12 21s7-6 7-11a7 7 0 0 0-14 0c0 5 7 11 7 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+      armor: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z', potion: 'M9 3h6M10 3v5l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3', ping: 'M5 19v-3M10 19v-7M15 19v-10M20 19V5',
+      clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2', mouse: 'M12 3a6 6 0 0 1 6 6v6a6 6 0 0 1-12 0V9a6 6 0 0 1 6-6zM12 7v4',
+      crosshair: 'M12 3v6M12 15v6M3 12h6M15 12h6', combo: 'M4 14l4-8 4 8 4-8 4 8', sword: 'M14 4h6v6l-9 9-3-3zM5 16l3 3M4 20l2-2', target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'
+    };
+    const on = this.state.on;
+    const tile = (id, name, icon) => {
+      const active = !!on[id];
+      return { name, icon, iconBg: active ? 'rgba(215,38,45,.16)' : '#221C1D', iconFg: active ? '#FF6B6F' : '#A39A9B',
+        border: active ? 'rgba(215,38,45,.28)' : 'rgba(255,255,255,.05)', track: active ? '#D7262D' : '#3A3233', knobSide: active ? 'flex-end' : 'flex-start',
+        toggleLabel: name + (active ? ' off' : ' on'), toggle: () => this.setState({ on: { ...on, [id]: !active } }) };
+    };
+    const menuItems = [['Modules', 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z'], ['Locker', 'M8 4l4 2 4-2 4 3-2 4h-2v9H8v-9H6L4 7z'],
+      ['Friends', 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20c0-3 3-5 6-5s6 2 6 5'], ['Clips & Rewind', 'M11 7l-6 5 6 5zM19 7l-6 5 6 5z'],
+      ['World Map', 'M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14'], ['Store', 'M5 8h14l-1 12H6zM9 8V6a3 3 0 0 1 6 0v2'], ['Settings', 'M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4']];
+    return {
+      menuOpen: this.state.menuOpen,
+      toggleMenu: () => this.setState({ menuOpen: !this.state.menuOpen }),
+      menu: menuItems.map((m, i) => ({ label: m[0], icon: m[1],
+        style: 'height:34px;display:flex;align-items:center;gap:10px;padding:0 10px;border:0;border-radius:8px;font:inherit;font-size:13px;cursor:pointer;text-align:left;'
+          + (i === 0 ? 'background:rgba(215,38,45,.13);color:#F2ECEB' : 'background:transparent;color:#A39A9B') })),
+      sections: [
+        { name: 'HUD', count: 33, mods: [tile('fps', 'FPS Counter', I.fps), tile('keys', 'Keystrokes', I.keys), tile('coords', 'Coordinates', I.coords), tile('armor', 'Armor & Durability', I.armor),
+          tile('potion', 'Potion Effect Timers', I.potion), tile('ping', 'Ping Display', I.ping), tile('clock', 'Clock', I.clock), tile('cps', 'Mouse Buttons', I.mouse)] },
+        { name: 'PvP', count: 29, mods: [tile('crosshair', 'Custom Crosshair', I.crosshair), tile('combo', 'Combo Counter', I.combo), tile('hitcolor', 'Hit Color', I.sword), tile('target', 'Target HUD', I.target)] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
