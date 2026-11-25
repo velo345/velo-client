@@ -146,6 +146,16 @@ public final class RmHud {
 		BG_HOVER = on && style.background().equals("Glass") ? 0xC02A2A36 : 0xFF2A2A36;
 	}
 
+	/** A panel's background: the menus' glass (real blur behind it, see HudManager) - or the solid look. */
+	static void panelBg(DrawContext context, int x, int y, int w, int h, int radius) {
+		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
+			net.veloclient.velo.client.hud.HudLook.glassPanel(context, x, y, w, h, radius);
+			context.fill(x + radius, y, x + w - radius, y + 1, 0x30FFFFFF);
+			return;
+		}
+		VeloDraw.fillRounded(context, x, y, w, h, radius, BG);
+	}
+
 	public static void render(DrawContext context, int screenWidth, int screenHeight, float tickDelta) {
 		// Vanilla font calls stay vanilla even when Edit HUD Layout (a Velo menu, which swaps in Inter) draws this.
 		net.veloclient.velo.client.gui.VeloFonts.beginHud();
@@ -351,7 +361,7 @@ public final class RmHud {
 		int x = Math.round(menuX);
 		int y = Math.round(menuY);
 		int h = menu.size() * 14 + 6;
-		VeloDraw.fillRounded(context, x, y, width, h, 5, 0xF4141419);
+		panelBg(context, x, y, width, h, 5);
 		VeloDraw.strokeRounded(context, x, y, width, h, 5, 0x40FFFFFF);
 		int ry = y + 3;
 		for (MenuItem item : menu) {
@@ -528,7 +538,7 @@ public final class RmHud {
 			int vw = RmHud.width(shown) + 10;
 			int vx = x + w - vw;
 			boolean hover = hovered(vx, y, vw, 14);
-			VeloDraw.fillRounded(context, vx, y, vw, 14, 4, hover ? 0xFF3A3A48 : 0xFF26262F);
+			VeloDraw.fillRounded(context, vx, y, vw, 14, 4, hover ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF3A3A48, 0x33FFFFFF) : net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF26262F, 0x1AFFFFFF));
 			RmHud.text(context, shown, vx + 5, y + 3, TEXT);
 			hit(vx, y, vw, 14, action, null);
 		}
@@ -610,7 +620,7 @@ public final class RmHud {
 			draw.add(() -> iconButton(context, ex, by, size, "exit", false, "Leave Redstone Mode" + RmKeys.toggleHint(), RedstoneMode::exit));
 			bx[0] += size + 2;
 			width = bx[0] - x + 2;
-			VeloDraw.fillRounded(context, x, y, width, height, 7, BG);
+			panelBg(context, x, y, width, height, 7);
 			for (Runnable r : draw) {
 				r.run();
 			}
@@ -628,7 +638,7 @@ public final class RmHud {
 			int w = 6 + 12 + 4 + RmHud.width(label) + 8;
 			draw.add(() -> {
 				boolean hover = hovered(bx, by, w, size);
-				VeloDraw.fillRounded(context, bx, by, w, size, 4, hover ? 0xFF3A3A48 : 0xFF26262F);
+				VeloDraw.fillRounded(context, bx, by, w, size, 4, hover ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF3A3A48, 0x33FFFFFF) : net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF26262F, 0x1AFFFFFF));
 				drawIcon(context, icon, bx + 6, by + (size - 12) / 2, 12, hover ? 0xFFFFFFFF : 0xFFC8C8D4);
 				RmHud.text(context, label, bx + 22, by + (size - 8) / 2, TEXT);
 				hit(bx, by, w, size, action, tooltip);
@@ -683,7 +693,7 @@ public final class RmHud {
 			}
 			cy = RmToolSettings.layout(this, context, x + 8, cy, inner, draw);
 			height = cy - y + 6;
-			VeloDraw.fillRounded(context, x, y, width, height, 7, BG);
+			panelBg(context, x, y, width, height, 7);
 			for (Runnable r : draw) {
 				r.run();
 			}
@@ -868,7 +878,7 @@ public final class RmHud {
 				cy += 32;
 			}
 			height = cy - y + 4;
-			VeloDraw.fillRounded(context, x, y, width, height, 8, BG);
+			panelBg(context, x, y, width, height, 8);
 			for (Runnable r : draw) {
 				r.run();
 			}
@@ -889,7 +899,7 @@ public final class RmHud {
 		private void labelButton(DrawContext context, int x, int y, int w, String icon, String label, String tooltip, Runnable action) {
 			var textRenderer = MinecraftClient.getInstance().textRenderer;
 			boolean hover = hovered(x, y, w, 26);
-			VeloDraw.fillRounded(context, x, y, w, 26, 6, hover ? 0xFF3A3A48 : 0xFF2A2A34);
+			VeloDraw.fillRounded(context, x, y, w, 26, 6, hover ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF3A3A48, 0x33FFFFFF) : net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF2A2A34, 0x1AFFFFFF));
 			drawIcon(context, icon, x + (w - 10) / 2, y + 3, 10, hover ? 0xFFFFFFFF : 0xFFC8C8D4);
 			String t = VeloUi.trim(label, w - 4);
 			RmHud.text(context, t, x + (w - RmHud.width(t)) / 2, y + 15, hover ? TEXT : 0xFFD8D8E0);
@@ -899,7 +909,7 @@ public final class RmHud {
 		/** Options side by side, the chosen one filled. */
 		private void segmented(DrawContext context, int x, int y, int w, String[] options, int active, java.util.function.IntConsumer pick) {
 			var textRenderer = MinecraftClient.getInstance().textRenderer;
-			VeloDraw.fillRounded(context, x, y, w, 15, 5, 0xFF16161C);
+			VeloDraw.fillRounded(context, x, y, w, 15, 5, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF16161C, 0x33000000));
 			int segment = w / options.length;
 			for (int i = 0; i < options.length; i++) {
 				int sx = x + i * segment;
@@ -907,7 +917,7 @@ public final class RmHud {
 				boolean on = i == active;
 				boolean hover = !on && hovered(sx, y, sw, 15);
 				if (on || hover) {
-					VeloDraw.fillRounded(context, sx + 1, y + 1, sw - 2, 13, 4, on ? 0xFFB83030 : 0xFF2C2C36);
+					VeloDraw.fillRounded(context, sx + 1, y + 1, sw - 2, 13, 4, on ? 0xFFB83030 : net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF2C2C36, 0x1AFFFFFF));
 				}
 				String t = VeloUi.trim(options[i], sw - 4);
 				RmHud.text(context, t, sx + (sw - RmHud.width(t)) / 2, y + 4, on ? TEXT : MUTED);
@@ -948,7 +958,7 @@ public final class RmHud {
 			var textRenderer = MinecraftClient.getInstance().textRenderer;
 			width = 380;
 			height = 34;
-			VeloDraw.fillRounded(context, x, y, width, height, 8, BG);
+			panelBg(context, x, y, width, height, 8);
 			if (Timeline.phase() == Timeline.Phase.RECORDING) {
 				VeloDraw.fillCircle(context, x + 14, y + 17, 4, (System.currentTimeMillis() / 500) % 2 == 0 ? ACCENT : 0xFF802020);
 				RmHud.text(context, "Recording  " + Timeline.recordingFrames() + " ticks", x + 24, y + 13, TEXT);
@@ -1032,7 +1042,7 @@ public final class RmHud {
 			w += RmHud.width(hint) + 10;
 			width = w;
 			height = 16;
-			VeloDraw.fillRounded(context, x, y, width, height, 5, BG);
+			panelBg(context, x, y, width, height, 5);
 			drawIcon(context, "redstone", x + 4, y + 2, 12, ACCENT);
 			int tx = x + 20;
 			RmHud.text(context, title, tx, y + 4, TEXT);

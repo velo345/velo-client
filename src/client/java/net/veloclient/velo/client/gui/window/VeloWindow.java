@@ -115,9 +115,21 @@ public abstract class VeloWindow extends Screen {
 
 	/** Where this window will sit on a screen of that size {x, y, w, h} (as init() places it). */
 	public int[] plannedRect(int screenW, int screenH) {
-		int w = Math.min(requestedWidth, Math.max(160, screenW - 24));
-		int h = Math.min(requestedHeight, Math.max(120, screenH - 24));
-		return new int[] {Math.max(0, (screenW - w) / 2), Math.max(0, (screenH - h) / 2), w, h};
+		// in the window's own (dense) units, as init() lays it out - then back to normal GUI pixels
+		float f = DenseGui.appliesTo(this) ? DenseGui.factor() : 1f;
+		int dw = (int) Math.floor(screenW * f);
+		int dh = (int) Math.floor(screenH * f);
+		int w = Math.min(requestedWidth, Math.max(160, dw - 24));
+		int h = Math.min(requestedHeight, Math.max(120, dh - 24));
+		int x = Math.max(0, (dw - w) / 2);
+		int y = Math.max(0, (dh - h) / 2);
+		return new int[] {Math.round(x / f), Math.round(y / f), Math.round(w / f), Math.round(h / f)};
+	}
+
+	/** This window's rect in normal GUI pixels (dense windows are laid out in finer units). */
+	public int[] guiRect() {
+		float f = DenseGui.appliesTo(this) ? DenseGui.factor() : 1f;
+		return new int[] {Math.round(windowX / f), Math.round(windowY / f), Math.round(windowWidth / f), Math.round(windowHeight / f)};
 	}
 
 	/** Dev-only (screenshot tour): close like pressing Esc. */
@@ -242,7 +254,7 @@ public abstract class VeloWindow extends Screen {
 				onClosed.run();
 			}
 			if (returnScreen instanceof net.veloclient.velo.client.gui.drawer.VeloDrawerScreen drawer) {
-				drawer.morphFrom(new int[] {windowX, windowY, windowWidth, windowHeight});
+				drawer.morphFrom(guiRect());
 			}
 			//? if <26.1 {
 			if (this.client.currentScreen == this) {
@@ -260,7 +272,8 @@ public abstract class VeloWindow extends Screen {
 			blurredNow = false;
 			if (glassLook() && net.veloclient.velo.client.gui.glass.SharpFrame.prepare()) {
 				// frosted only behind the window, the game around it stays sharp
-				net.veloclient.velo.client.gui.glass.SharpFrame.drawOutside(context, this.width, this.height, windowX, windowY, windowWidth, windowHeight);
+				net.veloclient.velo.client.gui.glass.SharpFrame.drawOutside(context, this.width, this.height, windowX, windowY, windowWidth, windowHeight,
+						Math.round(net.veloclient.velo.client.gui.glass.GlassPrefs.radius(14f)));
 			}
 		}
 		int[] hole = openProgress > 0.97f && !closing ? windowHole() : null;

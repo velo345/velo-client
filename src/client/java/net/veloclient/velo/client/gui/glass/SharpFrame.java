@@ -174,9 +174,15 @@ public final class SharpFrame {
 	 * the blurred game. Call right after the background, before anything else of the menu.
 	 */
 	public static void drawOutside(DrawContext context, int screenW, int screenH, int x, int y, int w, int h) {
+		drawOutside(context, screenW, screenH, x, y, w, h, 0);
+	}
+
+	/** Like {@link #drawOutside(DrawContext, int, int, int, int, int, int)} for a rounded menu: the corners outside its curve stay sharp too. */
+	public static void drawOutside(DrawContext context, int screenW, int screenH, int x, int y, int w, int h, int radius) {
 		if (texW == 0 || screenW <= 0 || screenH <= 0) {
 			return;
 		}
+		corners(context, ID, screenW, screenH, x, y, w, h, radius);
 		x = Math.max(0, Math.min(screenW, x));
 		y = Math.max(0, Math.min(screenH, y));
 		int x2 = Math.max(x, Math.min(screenW, x + w));
@@ -189,10 +195,23 @@ public final class SharpFrame {
 
 	/** Runs the menu blur at this point of the GUI (everything drawn before gets blurred). */
 	public static void blurHere(DrawContext context) {
+		newLayer(context);
 		//? if >=1.21.2 && <26.1 {
 		context.applyBlur();
 		//?} else if >=26.1 {
 		/*context.blurBeforeThisStratum();
+		*///?}
+	}
+
+	/**
+	 * Starts a new GUI layer: the blur only takes what's in the layers before the current one, so whatever must be
+	 * blurred (and be in the sharp copy) has to be drawn before this.
+	 */
+	public static void newLayer(DrawContext context) {
+		//? if >=1.21.2 && <26.1 {
+		context.createNewRootLayer();
+		//?} else if >=26.1 {
+		/*context.nextStratum();
 		*///?}
 	}
 
@@ -211,6 +230,25 @@ public final class SharpFrame {
 			int x2 = Math.min(screenW, r[0] + r[2]);
 			int y2 = Math.min(screenH, r[1] + r[3]);
 			strip(context, BLURRED_ID, screenW, screenH, x, y, x2 - x, y2 - y);
+			if (r.length > 4) {
+				corners(context, ID, screenW, screenH, r[0], r[1], r[2], r[3], r[4]);   // rounded: sharp again outside the curve
+			}
+		}
+	}
+
+	/** The four corner areas outside a rounded rect's curve, row by row, from texture {@code id}. */
+	private static void corners(DrawContext context, Identifier id, int screenW, int screenH, int x, int y, int w, int h, int radius) {
+		int r = Math.min(radius, Math.min(w, h) / 2);
+		for (int i = 0; i < r; i++) {
+			double dy = r - i - 0.5;
+			int inset = (int) Math.round(r - Math.sqrt(Math.max(0, (double) r * r - dy * dy)));
+			if (inset <= 0) {
+				continue;
+			}
+			strip(context, id, screenW, screenH, x, y + i, inset, 1);
+			strip(context, id, screenW, screenH, x + w - inset, y + i, inset, 1);
+			strip(context, id, screenW, screenH, x, y + h - 1 - i, inset, 1);
+			strip(context, id, screenW, screenH, x + w - inset, y + h - 1 - i, inset, 1);
 		}
 	}
 

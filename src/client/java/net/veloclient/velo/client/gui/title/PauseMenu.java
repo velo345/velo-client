@@ -370,7 +370,7 @@ public final class PauseMenu {
 		int backH = compact ? 20 : 24;
 		if (back != null) {
 			place(back, colX, y, colW, backH);
-			GLASS_RECTS.add(new int[] {colX, y, colW, backH});
+			GLASS_RECTS.add(new int[] {colX, y, colW, backH, backH / 2});
 			float hover = MenuKit.hover(back, hovered(mouseX, mouseY, back));
 			int accent = MenuKit.accent();
 			boolean glass = net.veloclient.velo.client.gui.widget.VeloStyle.glass();
@@ -457,7 +457,7 @@ public final class PauseMenu {
 		if (leave != null) {
 			int ly = height - top - leaveH;
 			place(leave, colX, ly, colW, leaveH);
-			GLASS_RECTS.add(new int[] {colX, ly, colW, leaveH});
+			GLASS_RECTS.add(new int[] {colX, ly, colW, leaveH, leaveH / 2});
 			float hover = MenuKit.hover(leave, hovered(mouseX, mouseY, leave));
 			if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
 				// glass pill; it only warms up red when you point at it

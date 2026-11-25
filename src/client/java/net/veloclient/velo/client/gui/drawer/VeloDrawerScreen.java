@@ -302,6 +302,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
 		if (blurOn()) {
 			hudBehind = hudUnderBlur(context, delta);
+			net.veloclient.velo.client.gui.glass.SharpFrame.newLayer(context);   // so the blur (and the sharp copy) includes the HUD
 			this.applyBlur(context);
 		}
 	}
@@ -310,6 +311,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 		if (blurOn()) {
 			hudBehind = hudUnderBlur(context, delta);
+			net.veloclient.velo.client.gui.glass.SharpFrame.newLayer(context);   // so the blur (and the sharp copy) includes the HUD
 			this.extractBlurredBackground(context);
 		}
 	}
@@ -594,6 +596,12 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		return net.veloclient.velo.client.gui.glass.GlassPrefs.accent();
 	}
 
+	/** Icons in the accent (a coloured accent shows on every icon; with white they stay white). */
+	private static int accIcon() {
+		int c = acc();
+		return VeloAnim.lerpArgb(c, WHITE, 0.15f);
+	}
+
 	private static int onAcc() {
 		return net.veloclient.velo.client.gui.glass.GlassPrefs.onAccent();
 	}
@@ -709,8 +717,9 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		if (blurOn() && net.veloclient.velo.client.gui.glass.SharpFrame.prepare()) {
 			// blur only behind the glass: the game around it stays sharp
 			float[] gr = rectNow();
+			float gRad = net.veloclient.velo.client.gui.glass.GlassPrefs.radius(18f + 6f * easeInOut(expandAnim));
 			net.veloclient.velo.client.gui.glass.SharpFrame.drawOutside(context, this.width, this.height, Math.round(gr[0] * k), Math.round(gr[1] * k),
-					Math.round(gr[2] * k), Math.round(gr[3] * k));
+					Math.round(gr[2] * k), Math.round(gr[3] * k), Math.round(gRad * k));
 		}
 		if (expandAnim < 0.5f) {
 			renderHud(context, mouseX, mouseY, delta);   // the full menu covers the HUD; Edit HUD brings it back
@@ -772,7 +781,9 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	private void renderHud(DrawContext context, int mouseX, int mouseY, float delta) {
 		boolean elementsDrawn = hudBehind;
 		hudBehind = false;
-		net.veloclient.velo.client.hud.HudAutoLayout.update(this.width, this.height);
+		if (!elementsDrawn) {
+			net.veloclient.velo.client.hud.HudAutoLayout.update(this.width, this.height);   // (already done under the blur otherwise)
+		}
 		if (dragging != null && dragMoved) {
 			context.fill(this.width / 2, 0, this.width / 2 + 1, this.height, 0x50FFFFFF);
 			context.fill(0, this.height / 2, this.width, this.height / 2 + 1, 0x50FFFFFF);
@@ -909,8 +920,14 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 				layout(c, false, x, y, w, h, pa);
 			}
 		}
+		// dropdowns slide and fade in, and out again (the last one is kept for its fade-out)
 		if (dropdown != null) {
-			renderDropdown(c, a);
+			lastDropdown = dropdown;
+			lastDropdownAt = dropdownAt;
+		}
+		float dd = animTo("dropdownAnim", dropdown != null ? 1f : 0f, 16f);
+		if (dd > 0.02f && lastDropdown != null && lastDropdownAt != null) {
+			renderDropdown(c, a * dd, dd);
 		}
 		if (profileMenu) {
 			renderProfileMenu(c, a);
@@ -1044,6 +1061,9 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	/** The search field. It's always the focused field (typing anywhere goes here), so it always shows the caret. */
 	private void renderSearch(DrawContext c, float x, float y, float w, float h, float a, boolean live, float top, float height) {
 		boolean focused = editing == null && listening == null && listeningChord == null;
+		if (inside(x, y, w, h)) {
+			net.veloclient.velo.client.util.IBeamCursor.ibeam(c);
+		}
 		rect(c, x, y, w, h, h / 2f, focused ? 0x22FFFFFF : 0x16FFFFFF, a);
 		if (focused) {
 			VeloDraw.strokeRounded(c, x, y, w, h, h / 2f, 1f, alpha(0x52FFFFFF, a));
@@ -1304,7 +1324,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		rect(c, x, y, w, h, 18f, VeloAnim.lerpArgb(0x12FFFFFF, 0x1FFFFFFF, ht), a);
 		VeloDraw.strokeRounded(c, x, y, w, h, 18f, 1f, alpha(0x17FFFFFF, a));
 		rect(c, x + 14f, y + 14f, 32f, 32f, 11f, 0x1FFFFFFF, a);
-		icon(c, f.icon(), x + 22f, y + 22f, 16f, WHITE, a);
+		icon(c, f.icon(), x + 22f, y + 22f, 16f, accIcon(), a);
 		icon(c, "d_chev_r", x + w - 28f, y + 22f, 14f, hover ? WHITE : TEXT_3, a);
 		text(c, fit(f.name(), true, w - 28f), x + 14f, y + h - 32f, WHITE, a);
 		text(c, fit(f.blurb(), false, w - 28f), x + 14f, y + h - 18f, TEXT_3, a);
@@ -1327,7 +1347,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			}
 			boolean hover = live && inside(tx, ty, tw, th) && mouseV >= top && mouseV < top + height;
 			rect(c, tx, ty, tw, th, 12f, hover ? 0x22FFFFFF : 0x10FFFFFF, a);
-			icon(c, f.icon(), tx + (tw - 16f) / 2f, ty + 9f, 16f, WHITE, a);
+			icon(c, f.icon(), tx + (tw - 16f) / 2f, ty + 9f, 16f, accIcon(), a);
 			Text name = fit(f.name(), false, tw - 6f);
 			text(c, name, tx + (tw - tw(name)) / 2f, ty + 33f, TEXT_2, a);
 			hit(live, top, height, tx, ty, tw, th, () -> openEntry(f.id()));
@@ -1343,7 +1363,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		rect(c, x, y, w, h, 18f, bg, a);
 		VeloDraw.strokeRounded(c, x, y, w, h, 18f, 1f, alpha(on ? 0x33FFFFFF : 0x17FFFFFF, a));
 		rect(c, x + 14f, y + 14f, 32f, 32f, 11f, on ? acc() : 0x1FFFFFFF, a);
-		moduleIcon(c, m, x + 22f, y + 22f, 16f, on ? onAcc() : WHITE, a);
+		moduleIcon(c, m, x + 22f, y + 22f, 16f, on ? onAcc() : accIcon(), a);
 		float sx = x + w - 14f - 30f;
 		toggle(c, "cardsw:" + m.id(), sx, y + 14f, on, a, true);
 		boolean pinned = QuickToggles.isFavorite(m.id());
@@ -1537,7 +1557,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			if (hover) {
 				rect(c, x, y, w, ROW, 9f, HOVER, a);
 			}
-			icon(c, cat.icon(), x + 8f, y + 6f, 14f, TEXT_2, a);
+			icon(c, cat.icon(), x + 8f, y + 6f, 14f, accIcon(), a);
 			text(c, R(cat.name()), x + 30f, y + 9f, WHITE, a);
 			Text count = Mo(String.valueOf(cat.modules().size()));
 			text(c, count, x + w - 26f - tw(count), y + 10f, TEXT_3, a);
@@ -1594,7 +1614,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			grip.grip = m;
 			ix = x + 15f;
 		}
-		moduleIcon(c, m, ix, y + 6f, 14f, m.isEnabled() ? WHITE : TEXT_2, a);
+		moduleIcon(c, m, ix, y + 6f, 14f, m.isEnabled() ? accIcon() : TEXT_2, a);
 		float nameX = ix + 22f;
 		float right = x + w - 6f;
 		float sx = right - 26f;
@@ -1621,7 +1641,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		// header: icon tile, name, description (wrapped), big switch
 		boolean modOn = m.isEnabled();
 		rect(c, x, y, 34f, 34f, 11f, modOn ? acc() : 0x1FFFFFFF, a);
-		moduleIcon(c, m, x + 8f, y + 8f, 18f, modOn ? onAcc() : WHITE, a);
+		moduleIcon(c, m, x + 8f, y + 8f, 18f, modOn ? onAcc() : accIcon(), a);
 		text(c, fit(m.displayName(), true, w - 90f), x + 44f, y + 4f, WHITE, a);
 		List<Text> desc = wrap(m.description(), w - 90f, 2);
 		for (int i = 0; i < desc.size(); i++) {
@@ -1936,6 +1956,9 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		} else if (f instanceof ConfigField.TextField tf) {
 			text(c, label, x, y + 2f, TEXT_1, a);
 			boolean on = editing == tf;
+			if (live && inside(x, y + 13f, w, 22f)) {
+				net.veloclient.velo.client.util.IBeamCursor.ibeam(c);
+			}
 			rect(c, x, y + 13f, w, 22f, 11f, on ? 0x26FFFFFF : 0x33000000, a);
 			if (on) {
 				VeloDraw.strokeRounded(c, x, y + 13f, w, 22f, 11f, 1f, alpha(0x80FFFFFF, a));
@@ -2002,18 +2025,37 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	private void keycap(DrawContext c, Text label, String key, boolean on, float x, float y, float w, float top, float height, float a, boolean live,
 			Runnable click) {
-		text(c, label, x, y + 6f, TEXT_1, a);
-		Text kt = Mo(key);
+		if (on) {
+			// listening: the whole row lights up and the key pulses in the accent - clearly "press a key now"
+			float pulse = 0.55f + 0.45f * (float) Math.sin(System.nanoTime() / 1.6e8);
+			rect(c, x - 6f, y - 3f, w + 12f, 26f, 9f, 0x1CFFFFFF, a);
+			text(c, label, x, y + 6f, WHITE, a);
+		} else {
+			text(c, label, x, y + 6f, TEXT_1, a);
+		}
+		Text kt = on ? B(key) : Mo(key);
 		float bw = Math.max(46f, tw(kt) + 18f);
 		float bx = x + w - bw;
-		rect(c, bx, y, bw, 20f, 7f, on ? 0x2EFFFFFF : 0x40000000, a);
-		VeloDraw.strokeRounded(c, bx, y, bw, 20f, 7f, 1f, alpha(on ? WHITE : 0x2AFFFFFF, a));
-		text(c, kt, bx + (bw - tw(kt)) / 2f, y + 7f, WHITE, a);
+		if (on) {
+			float pulse = 0.55f + 0.45f * (float) Math.sin(System.nanoTime() / 1.6e8);
+			rect(c, bx, y, bw, 20f, 10f, acc(), a);
+			VeloDraw.strokeRounded(c, bx - 2f, y - 2f, bw + 4f, 24f, 12f, 1.5f, alpha(VeloUi.withAlpha(acc(), Math.round(255 * pulse)), a));
+			text(c, kt, bx + (bw - tw(kt)) / 2f, y + 7f, onAcc(), a);
+		} else {
+			rect(c, bx, y, bw, 20f, 10f, 0x40000000, a);
+			VeloDraw.strokeRounded(c, bx, y, bw, 20f, 10f, 1f, alpha(0x2AFFFFFF, a));
+			text(c, kt, bx + (bw - tw(kt)) / 2f, y + 7f, WHITE, a);
+		}
 		hit(live, top, height, bx, y, bw, 20f, click);
 	}
 
-	private void renderDropdown(DrawContext c, float a) {
-		ConfigField.ChoiceField f = dropdown;
+	private ConfigField.ChoiceField lastDropdown;
+	private float[] lastDropdownAt;
+
+	private void renderDropdown(DrawContext c, float a, float shown) {
+		ConfigField.ChoiceField f = lastDropdown;
+		boolean live = dropdown != null;
+		float[] dropdownAt = lastDropdownAt;
 		float w = 150f;
 		for (String o : f.options()) {
 			w = Math.max(w, tw(R(o)) + 40f);
@@ -2025,11 +2067,14 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		if (y + h > bodyBottom) {
 			y = Math.max(bodyTop, bodyBottom - h);
 		}
+		y -= (1f - ease(shown)) * 8f;   // slides down into place (and back up while it fades out)
 		VeloDraw.shadow(c, Math.round(x), Math.round(y), Math.round(w), Math.round(h), 10, 14, 4, alpha(0x70000000, a));
-		rect(c, x, y, w, h, 10f, 0xF2202024, a);
-		VeloDraw.strokeRounded(c, x, y, w, h, 10f, 1f, alpha(0x26FFFFFF, a));
-		overlayHits.add(new Hit(x, y, w, h, () -> {
-		}));
+		rect(c, x, y, w, h, 12f, 0xF2202024, a);
+		VeloDraw.strokeRounded(c, x, y, w, h, 12f, 1f, alpha(0x26FFFFFF, a));
+		if (live) {
+			overlayHits.add(new Hit(x, y, w, h, () -> {
+			}));
+		}
 		String cur = f.get().get();
 		float ry = y + 4f;
 		for (String o : f.options()) {
@@ -2041,11 +2086,13 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			if (o.equals(cur)) {
 				icon(c, "d_check", x + w - 22f, ry + 4f, 12f, WHITE, a);
 			}
-			overlayHits.add(new Hit(x + 4f, ry, w - 8f, rowH, () -> {
-				f.set().accept(o);
-				dropdown = null;
-				VeloProfileStore.saveActive();
-			}));
+			if (live) {
+				overlayHits.add(new Hit(x + 4f, ry, w - 8f, rowH, () -> {
+					f.set().accept(o);
+					dropdown = null;
+					VeloProfileStore.saveActive();
+				}));
+			}
 			ry += rowH;
 		}
 	}

@@ -206,7 +206,7 @@ public final class StoreScreen extends VeloWindow {
 		if (index >= TABS.length) {
 			return EXTRA_PAGES.get(index - TABS.length).badge();
 		}
-		return index == Page.WEAR.ordinal() ? "NEW" : null;
+		return null;   // no NEW tags: they crowded the header
 	}
 
 	/** The Store's own tab on show, or null while an added one is open. */

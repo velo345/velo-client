@@ -98,7 +98,7 @@ public final class HudManager {
 		// twice in two different positions/styles at once.
 		// Boss bars: drawn (or hidden) by the Boss Bar module while it's on.
 		HudElementRegistry.replaceElement(VanillaHudElements.BOSS_BAR, vanilla -> (context, tickCounter) -> {
-			boolean handled = ModuleRegistry.get("boss-bar").map(Module::isEnabled).orElse(false);
+			boolean handled = hidesVanillaBossBar();   // Boss Bar module, or Redstone Mode (its overlay owns the top)
 			if (!handled) {
 				vanilla.render(context, tickCounter);
 			}
@@ -158,7 +158,18 @@ public final class HudManager {
 		if (net.veloclient.velo.client.redstone.RedstoneMode.active()) {
 			// Redstone Mode replaces the whole Velo HUD with its own overlay (Edit HUD Layout draws it itself).
 			if (!(net.veloclient.velo.client.hud.HudSample.active())) {
-				net.veloclient.velo.client.redstone.RmHud.render(context, screenWidth, screenHeight, tickDelta);
+				// glass: real blur behind its panels (where they were last frame), the world around stays sharp
+				if (net.veloclient.velo.client.util.ClientCompat.currentScreen() == null && net.veloclient.velo.client.gui.widget.VeloStyle.glass()
+						&& !HudLook.rects().isEmpty() && net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
+					net.veloclient.velo.client.gui.glass.SharpFrame.blurHere(context);
+					net.veloclient.velo.client.gui.glass.SharpFrame.drawSharpExcept(context, screenWidth, screenHeight, HudLook.rects());
+				}
+				HudLook.beginRects();
+				try {
+					net.veloclient.velo.client.redstone.RmHud.render(context, screenWidth, screenHeight, tickDelta);
+				} finally {
+					HudLook.endRects();
+				}
 			}
 			return;
 		}

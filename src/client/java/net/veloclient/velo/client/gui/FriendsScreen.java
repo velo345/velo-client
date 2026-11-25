@@ -216,7 +216,7 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 
 		int rightX = rightX();
 		int rightWidth = rightWidth();
-		chatField = new TextFieldWidget(this.textRenderer, rightX + 12, contentBottom() - 19, Math.max(10, rightWidth - 64), 14, Text.literal("Message"));
+		chatField = new TextFieldWidget(this.textRenderer, rightX + 16, contentBottom() - 19, Math.max(10, rightWidth - 84), 14, Text.literal("Message"));
 		chatField.setDrawsBackground(false);
 		chatField.setPlaceholder(net.veloclient.velo.client.gui.widget.VeloUi.placeholder(VeloUi.trim(view == View.PARTY ? "Message your party..." : "Write a message...", chatField.getWidth() - 8)));
 		chatField.setMaxLength(500);
@@ -281,11 +281,13 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 		if (rightWidth() > 60) {
 			renderRight(context, mouseX, mouseY);
 			// the panel's close cross (top right): the list takes the whole window again
-			int cx = rightX() + rightWidth() - 18;
-			int cy = contentY() + 6;
-			boolean over = VeloUi.inside(mouseX, mouseY, cx, cy, 12, 12);
-			VeloDraw.cross(context, cx + 6f, cy + 6f, 3.5f, 1.2f, over ? 0xFFFFFFFF : 0xFF8E8384);
-			hits.add(new VeloUi.Hit(cx - 2, cy - 2, 16, 16, this::closePanel));
+			// a real round button, with the action buttons kept clear of it
+			int cx = rightX() + rightWidth() - 26;
+			int cy = contentY() + 2;
+			boolean over = VeloUi.inside(mouseX, mouseY, cx, cy, 22, 22);
+			VeloDraw.fillRounded(context, cx, cy, 22, 22, 11, over ? 0x2EFFFFFF : 0x16FFFFFF);
+			VeloDraw.cross(context, cx + 11f, cy + 11f, 4.5f, 1.5f, 0xFFFFFFFF);
+			hits.add(new VeloUi.Hit(cx, cy, 22, 22, this::closePanel));
 		}
 	}
 
@@ -741,7 +743,7 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 
 		// Header: who, where, actions (actions drop to their own row when the panel is narrow).
 		String joinableHere = joinableAddress(friend);
-		int buttonsWidth = 46 + 58 + 52 + 52 + (joinableHere != null ? 52 : 0) + 8;
+		int buttonsWidth = 46 + 58 + 52 + 52 + (joinableHere != null ? 52 : 0) + 8 + 30;   // + the panel's close button
 		boolean stacked = width - buttonsWidth < 150;
 		int textWidth = stacked ? width - 50 : width - buttonsWidth - 52;
 		PlayerHeads.draw(context, friend.uuid, friend.username, x + 8, top, 24);
@@ -749,7 +751,7 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 		VeloDraw.fillCircle(context, x + 41, top + 17, 2, FriendStatus.dotColor(friend));
 		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(FriendStatus.describe(friend), textWidth - 9), x + 47, top + 13, VeloUi.muted());
 		int buttonRow = stacked ? top + 28 : top + 3;
-		int buttonX = x + width - 8;
+		int buttonX = x + width - 8 - (stacked ? 0 : 30);   // clear of the close button
 		boolean muted = SocialSettings.isMuted(friend.uuid);
 		// Shrink the buttons evenly when even a row of their own is too narrow for them.
 		int buttonCount = joinableHere != null ? 5 : 4;
@@ -787,17 +789,20 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 
 		int chatTop = top + (stacked ? 50 : 30);
 		context.fill(x + 6, chatTop - 3, x + width - 6, chatTop - 2, VeloUi.withAlpha(theme.text(), 0x20));
-		int chatBottom = contentBottom() - 28;
+		int chatBottom = contentBottom() - 34;
 		if (chatBottom - chatTop < 12) {
 			return;
 		}
 		drawMessages(context, friend, x + 6, chatTop, width - 12, chatBottom - chatTop, mouseX, mouseY);
 
 		// Input bar.
-		int inputY = contentBottom() - 24;
-		VeloDraw.fillRounded(context, x + 8, inputY, width - 68, 18, 5, fieldColor(chatField != null && chatField.isFocused()));
-		VeloDraw.strokeRounded(context, x + 8, inputY, width - 68, 18, 5, chatField != null && chatField.isFocused() ? 0x40FFFFFF : 0x17FFFFFF);
-		hits.add(VeloUi.pill(context, x + width - 56, inputY, 48, 18, "Send", 1, mouseX, mouseY, this::submitMessage));
+		int inputY = contentBottom() - 26;
+		boolean focused = chatField != null && chatField.isFocused();
+		VeloDraw.fillRounded(context, x + 8, inputY, width - 72, 22, 11, focused ? 0x26FFFFFF : 0x16FFFFFF);
+		if (focused) {
+			VeloDraw.strokeRounded(context, x + 8, inputY, width - 72, 22, 11, 0x52FFFFFF);
+		}
+		hits.add(VeloUi.pill(context, x + width - 58, inputY, 50, 22, "Send", 1, mouseX, mouseY, this::submitMessage));
 	}
 
 	private void drawMessages(DrawContext context, SocialClient.Friend friend, int x, int top, int width, int height, int mouseX, int mouseY) {
@@ -824,20 +829,20 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 				bubbleWidth = Math.min(maxBubble, 190);
 				bubbleHeight = mine ? 34 : 52;
 			} else {
-				lines = VeloUi.wrap(message.text, maxBubble - 12);
+				lines = VeloUi.wrap(message.text, maxBubble - 20);
 				int widest = 0;
 				for (String line : lines) {
 					widest = Math.max(widest, this.textRenderer.getWidth(line));
 				}
-				bubbleWidth = widest + 12;
-				bubbleHeight = lines.size() * 10 + 8;
+				bubbleWidth = widest + 20;
+				bubbleHeight = lines.size() * 12 + 12;   // roomier bubbles, easier to read
 				// A shared clip link gets a Watch button: it plays right here in the game.
 				if (net.veloclient.velo.client.clips.core.ClipTools.shareId(message.text) != null) {
 					bubbleWidth = Math.max(bubbleWidth, 120);
 					bubbleHeight += 24;
 				}
 			}
-			int h = bubbleHeight + (showTime ? 11 : 3);
+			int h = bubbleHeight + (showTime ? 13 : 4);
 			laid.add(new Laid(message, mine, lines, bubbleWidth, h, showTime));
 			total += h;
 		}
@@ -855,17 +860,21 @@ public final class FriendsScreen extends VeloWindow implements net.veloclient.ve
 			if (cursor > top + height || cursor + item.height() < top) {
 				continue;
 			}
-			int bubbleHeight = item.height() - (item.showTime() ? 11 : 3);
+			int bubbleHeight = item.height() - (item.showTime() ? 13 : 4);
 			int bubbleX = item.mine() ? x + width - item.bubbleWidth() - 2 : x + 2;
-			int bubbleColor = item.mine() ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(VeloAnim.lerpArgb(theme.accentStart(), 0xFF000000, 0.25f), 0x3DFFFFFF) : VeloUi.withAlpha(0xFFFFFFFF, 0x1C);
-			VeloDraw.fillRounded(context, bubbleX, cursor, item.bubbleWidth(), bubbleHeight, 6, bubbleColor);
+			boolean glass = net.veloclient.velo.client.gui.widget.VeloStyle.glass();
+			// yours in the accent (like a phone), theirs in glass
+			int bubbleColor = item.mine() ? (glass ? net.veloclient.velo.client.gui.title.MenuKit.accent() : VeloAnim.lerpArgb(theme.accentStart(), 0xFF000000, 0.25f))
+					: VeloUi.withAlpha(0xFFFFFFFF, 0x24);
+			int textColor = item.mine() && glass ? net.veloclient.velo.client.gui.title.MenuKit.onAccent() : 0xFFFFFFFF;
+			VeloDraw.fillRounded(context, bubbleX, cursor, item.bubbleWidth(), bubbleHeight, Math.min(11, bubbleHeight / 2f), bubbleColor);
 			if (item.message().isWaypoint()) {
 				drawWaypointCard(context, item.message(), item.mine(), friend, bubbleX, cursor, item.bubbleWidth(), mouseX, mouseY, top, top + height);
 			} else {
-				int lineY = cursor + 4;
+				int lineY = cursor + 7;
 				for (String line : item.lines()) {
-					context.drawTextWithShadow(this.textRenderer, line, bubbleX + 6, lineY, 0xFFFFFFFF);
-					lineY += 10;
+					net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, Text.literal(line), bubbleX + 10, lineY, textColor);
+					lineY += 12;
 				}
 				String clipId = net.veloclient.velo.client.clips.core.ClipTools.shareId(item.message().text);
 				if (clipId != null && lineY + 20 > top && lineY < top + height) {

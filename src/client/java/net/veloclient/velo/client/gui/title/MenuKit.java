@@ -245,7 +245,8 @@ public final class MenuKit {
 
 	public static void panel(DrawContext context, int x, int y, int w, int h, int radius) {
 		if (panelSink != null) {
-			panelSink.add(new int[] {x, y, w, h});
+			boolean g = net.veloclient.velo.client.gui.widget.VeloStyle.glass();
+			panelSink.add(new int[] {x, y, w, h, g ? Math.round(net.veloclient.velo.client.gui.glass.GlassPrefs.radius(radius)) : radius});
 		}
 		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
 			// the glass of the menus: no drop shadow (it showed through), light edge, light along the top

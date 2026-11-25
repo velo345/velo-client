@@ -53,17 +53,37 @@ public final class VeloProfileManager {
 		return VeloPaths.config().resolve("active-profile.json");
 	}
 
+	/** file -> {last modified, name}: menus list the profiles every frame - a whole profile was parsed for each name. */
+	private static final java.util.Map<Path, Object[]> NAME_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+	private static List<String> namesCached;
+	private static long namesAt;
+
 	public static List<String> listProfileNames() {
+		long now = System.currentTimeMillis();
+		if (namesCached != null && now - namesAt < 500) {
+			return namesCached;
+		}
 		VeloPaths.ensureDirectories();
 		List<String> names = new ArrayList<>();
 		try (var files = Files.list(VeloPaths.savedProfiles())) {
 			for (Path file : files.filter(p -> p.toString().endsWith(".json")).sorted().toList()) {
-				load(file).ifPresent(p -> names.add(p.name()));
+				long modified = Files.getLastModifiedTime(file).toMillis();
+				Object[] cached = NAME_CACHE.get(file);
+				if (cached == null || (long) cached[0] != modified) {
+					String name = load(file).map(VeloProfile::name).orElse(null);
+					cached = new Object[] {modified, name};
+					NAME_CACHE.put(file, cached);
+				}
+				if (cached[1] != null) {
+					names.add((String) cached[1]);
+				}
 			}
 		} catch (IOException ignored) {
 			// No saved-profiles directory content yet.
 		}
-		return names;
+		namesCached = java.util.List.copyOf(names);
+		namesAt = now;
+		return namesCached;
 	}
 
 	public static Optional<VeloProfile> loadByName(String name) {
@@ -84,6 +104,7 @@ public final class VeloProfileManager {
 	}
 
 	public static void save(VeloProfile profile) {
+		namesAt = 0;
 		VeloPaths.ensureDirectories();
 		Path target = fileFor(profile.name());
 		// written next to it and moved over: a crash or a full disk mid-write used to leave a cut-off profile
@@ -143,6 +164,7 @@ public final class VeloProfileManager {
 	}
 
 	public static void delete(String name) {
+		namesAt = 0;
 		try {
 			Files.deleteIfExists(fileFor(name));
 		} catch (IOException ignored) {
@@ -160,7 +182,21 @@ public final class VeloProfileManager {
 		});
 	}
 
+	private static String activeCached;
+	private static long activeAt;
+
 	public static String activeName() {
+		// asked every frame by the menus: read the marker at most every 250 ms (setActiveName updates it at once)
+		long now = System.currentTimeMillis();
+		if (activeCached != null && now - activeAt < 250) {
+			return activeCached;
+		}
+		activeCached = readActiveName();
+		activeAt = now;
+		return activeCached;
+	}
+
+	private static String readActiveName() {
 		VeloPaths.ensureDirectories();
 		Path file = activeMarkerFile();
 		if (!Files.exists(file)) {
@@ -175,6 +211,8 @@ public final class VeloProfileManager {
 	}
 
 	public static void setActiveName(String name) {
+		activeCached = name;
+		activeAt = System.currentTimeMillis();
 		VeloPaths.ensureDirectories();
 		try (Writer writer = Files.newBufferedWriter(activeMarkerFile(), StandardCharsets.UTF_8)) {
 			GSON.toJson(new ActiveMarker(name), writer);

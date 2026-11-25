@@ -221,7 +221,7 @@ public final class HudLook {
 
 	/** The menus' glass, for the HUD: a light tint over real blur (the blur goes behind every glass panel - see HudManager). */
 	public static void glassPanel(DrawContext context, int x, int y, int w, int h, int radius) {
-		record(context, x, y, w, h);
+		record(context, x, y, w, h, radius);
 		VeloDraw.fillRounded(context, x, y, w, h, radius, 0x5C141418);
 	}
 
@@ -250,7 +250,7 @@ public final class HudLook {
 		return style != null && style.background().equals("Glass");
 	}
 
-	private static void record(DrawContext context, int x, int y, int w, int h) {
+	private static void record(DrawContext context, int x, int y, int w, int h, int radius) {
 		if (rectSink == null) {
 			return;
 		}
@@ -258,7 +258,9 @@ public final class HudLook {
 		var m = context.getMatrices();
 		org.joml.Vector2f a = m.transformPosition(x, y, new org.joml.Vector2f());
 		org.joml.Vector2f b = m.transformPosition(x + w, y + h, new org.joml.Vector2f());
-		rectSink.add(new int[] {Math.round(Math.min(a.x, b.x)), Math.round(Math.min(a.y, b.y)), Math.round(Math.abs(b.x - a.x)), Math.round(Math.abs(b.y - a.y))});
+		float scale = Math.abs(b.x - a.x) / Math.max(1, w);
+		rectSink.add(new int[] {Math.round(Math.min(a.x, b.x)), Math.round(Math.min(a.y, b.y)), Math.round(Math.abs(b.x - a.x)), Math.round(Math.abs(b.y - a.y)),
+				Math.round(radius * scale)});
 		//?}
 	}
 

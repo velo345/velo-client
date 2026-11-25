@@ -175,7 +175,7 @@ public final class GuideScreen extends Screen {
 		sliders.clear();
 
 		// dim the title screen, a warm accent glow behind the card
-		context.fill(0, 0, this.width, this.height, VeloUi.withAlpha(0xFF07070A, Math.round(0xC8 * open)));
+		context.fill(0, 0, this.width, this.height, VeloUi.withAlpha(0xFF07070A, Math.round(0x50 * open)));   // glass: a light veil over the blur
 		int glowR = Math.max(this.width, this.height);
 		for (int i = 0; i < 6; i++) {
 			float f = i / 6f;
@@ -203,9 +203,12 @@ public final class GuideScreen extends Screen {
 		int ch = DH;
 		int cx = 0;
 		int cy = Math.round((1f - open) * 18f);
-		VeloDraw.shadow(context, cx, cy, cw, ch, 14, 24, 8, VeloUi.withAlpha(0xFF000000, Math.round(0xA0 * open)));
-		VeloDraw.fillRounded(context, cx, cy, cw, ch, 14, VeloUi.withAlpha(0xFF101015, Math.round(0xF4 * open)));
-		VeloDraw.strokeRounded(context, cx, cy, cw, ch, 14, VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x1C * open)));
+		// the glass card of the menus: tint, light edge, light along the top
+		float cardR = net.veloclient.velo.client.gui.glass.GlassPrefs.radius(18f);
+		int tint = net.veloclient.velo.client.gui.glass.GlassPrefs.tint(0xB4141418);
+		VeloDraw.fillRounded(context, cx, cy, cw, ch, cardR, VeloUi.withAlpha(tint, Math.round(((tint >>> 24) & 0xFF) * open)));
+		VeloDraw.strokeRounded(context, cx, cy, cw, ch, cardR, 1f, VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x26 * open)));
+		context.fill(Math.round(cx + cardR), cy, Math.round(cx + cw - cardR), cy + 1, VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x38 * open)));
 
 		// header: progress + Skip
 		int a = Math.round(255 * open);
@@ -219,8 +222,7 @@ public final class GuideScreen extends Screen {
 			int sx = cx + cw - sw - 14;
 			int sy = cy + 12;
 			float h = hover("skip", mouseX, mouseY, sx, sy, sw, 20, dt);
-			VeloDraw.fillRounded(context, sx, sy, sw, 20, 7, VeloUi.withAlpha(0xFFFFFFFF, Math.round((0x0C + 0x14 * h) * open)));
-			VeloDraw.strokeRounded(context, sx, sy, sw, 20, 7, VeloUi.withAlpha(0xFFFFFFFF, Math.round((0x22 + 0x30 * h) * open)));
+			VeloDraw.fillRounded(context, sx, sy, sw, 20, 10, VeloUi.withAlpha(0xFFFFFFFF, Math.round((0x16 + 0x18 * h) * open)));
 			MenuKit.text(context, this.textRenderer, skip, sx + 11, sy + 6, VeloUi.withAlpha(VeloAnim.lerpArgb(MenuKit.TEXT_2, 0xFFFFFFFF, h), a));
 			hits.add(new Hit("skip", sx, sy, sw, 20, this::finish));
 		}
@@ -253,7 +255,7 @@ public final class GuideScreen extends Screen {
 			boolean on = i == step;
 			float w = anim.merge("dot" + i, 0f, (o, n) -> VeloAnim.step(o, on ? 1f : 0f, dt * 6f));
 			int dw = 6 + Math.round(14 * w);
-			int col = i <= step ? MenuKit.accent() : 0xFF3A3A44;
+			int col = i <= step ? MenuKit.accent() : 0x40FFFFFF;
 			VeloDraw.fillRounded(context, dx, fy + 10, dw, 6, 3, VeloUi.withAlpha(col, a));
 			dx += dw + 5;
 		}
@@ -1593,16 +1595,15 @@ public final class GuideScreen extends Screen {
 			float alpha, Runnable action) {
 		float hv = hover("bt_" + id, mouseX, mouseY, x, y, w, h, dt);
 		int a = Math.round(255 * alpha);
+		// glass pills: the main one in the accent with readable text (white on white before), the other one glass
 		if (primary) {
-			VeloDraw.shadow(context, x, y, w, h, 8, 10, 3, VeloUi.withAlpha(MenuKit.accent(), Math.round((0x40 + 0x40 * hv) * alpha)));
-			VeloDraw.fillRounded(context, x, y - Math.round(hv), w, h, 8, VeloUi.withAlpha(VeloAnim.lerpArgb(MenuKit.accent(), 0xFFFF5A63, hv), a));
+			VeloDraw.fillRounded(context, x, y, w, h, h / 2f, VeloUi.withAlpha(VeloAnim.lerpArgb(MenuKit.accent(), 0xFF000000, 0.08f * hv), a));
 		} else {
-			VeloDraw.fillRounded(context, x, y, w, h, 8, VeloUi.withAlpha(0xFFFFFFFF, Math.round((0x0E + 0x12 * hv) * alpha)));
-			VeloDraw.strokeRounded(context, x, y, w, h, 8, VeloUi.withAlpha(0xFFFFFFFF, Math.round((0x22 + 0x30 * hv) * alpha)));
+			VeloDraw.fillRounded(context, x, y, w, h, h / 2f, VeloUi.withAlpha(0xFFFFFFFF, Math.round((0x16 + 0x18 * hv) * alpha)));
 		}
 		Text t = MenuKit.uiBold(text);
-		MenuKit.text(context, this.textRenderer, t, x + (w - this.textRenderer.getWidth(t)) / 2, y + (h - 8) / 2 + 1 - (primary ? Math.round(hv) : 0),
-				VeloUi.withAlpha(0xFFFFFFFF, a));
+		MenuKit.text(context, this.textRenderer, t, x + (w - this.textRenderer.getWidth(t)) / 2, y + (h - 8) / 2 + 1,
+				VeloUi.withAlpha(primary ? MenuKit.onAccent() : 0xFFFFFFFF, a));
 		hits.add(new Hit("bt_" + id, x, y, w, h, action));
 	}
 

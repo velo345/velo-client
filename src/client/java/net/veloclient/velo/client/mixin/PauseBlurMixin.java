@@ -23,7 +23,8 @@ public abstract class PauseBlurMixin {
 
 	@Inject(method = "getMenuBackgroundBlurrinessValue()I", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$pauseBlur(CallbackInfoReturnable<Integer> cir) {
-		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() == null && net.veloclient.velo.client.hud.HudLook.glassBlur()) {
+		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() == null && (net.veloclient.velo.client.hud.HudLook.glassBlur()
+				|| net.veloclient.velo.client.redstone.RedstoneMode.active() && net.veloclient.velo.client.gui.widget.VeloStyle.glass())) {
 			cir.setReturnValue(net.veloclient.velo.client.gui.glass.GlassPrefs.blurRadius(9));   // HUD Style Glass: blur behind the HUD panels
 			return;
 		}
@@ -52,7 +53,8 @@ public abstract class PauseBlurMixin {
 
 	@Inject(method = "getMenuBackgroundBlurriness()I", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$pauseBlur(CallbackInfoReturnable<Integer> cir) {
-		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() == null && net.veloclient.velo.client.hud.HudLook.glassBlur()) {
+		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() == null && (net.veloclient.velo.client.hud.HudLook.glassBlur()
+				|| net.veloclient.velo.client.redstone.RedstoneMode.active() && net.veloclient.velo.client.gui.widget.VeloStyle.glass())) {
 			cir.setReturnValue(net.veloclient.velo.client.gui.glass.GlassPrefs.blurRadius(9));   // HUD Style Glass: blur behind the HUD panels
 			return;
 		}
