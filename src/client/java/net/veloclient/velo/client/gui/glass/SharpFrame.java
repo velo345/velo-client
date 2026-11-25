@@ -187,6 +187,15 @@ public final class SharpFrame {
 		strip(context, screenW, screenH, x2, y, screenW - x2, y2 - y);
 	}
 
+	/** Runs the menu blur at this point of the GUI (everything drawn before gets blurred). */
+	public static void blurHere(DrawContext context) {
+		//? if >=1.21.2 && <26.1 {
+		context.applyBlur();
+		//?} else if >=26.1 {
+		/*context.blurBeforeThisStratum();
+		*///?}
+	}
+
 	/**
 	 * Several glass panels (the pause menu): the sharp frame everywhere, then the blurred one back behind each rect
 	 * {x, y, w, h} (gui pixels). Needs {@link #prepareBoth} this frame.

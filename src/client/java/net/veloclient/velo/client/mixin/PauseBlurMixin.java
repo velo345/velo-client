@@ -23,6 +23,10 @@ public abstract class PauseBlurMixin {
 
 	@Inject(method = "getMenuBackgroundBlurrinessValue()I", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$pauseBlur(CallbackInfoReturnable<Integer> cir) {
+		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() == null && net.veloclient.velo.client.hud.HudLook.glassBlur()) {
+			cir.setReturnValue(net.veloclient.velo.client.gui.glass.GlassPrefs.blurRadius(9));   // HUD Style Glass: blur behind the HUD panels
+			return;
+		}
 		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.drawer.VeloDrawerScreen drawer) {
 			cir.setReturnValue(drawer.blurRadius());   // the full R-Shift menu: strong glass blur, faded in and out
 			return;
@@ -48,6 +52,10 @@ public abstract class PauseBlurMixin {
 
 	@Inject(method = "getMenuBackgroundBlurriness()I", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$pauseBlur(CallbackInfoReturnable<Integer> cir) {
+		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() == null && net.veloclient.velo.client.hud.HudLook.glassBlur()) {
+			cir.setReturnValue(net.veloclient.velo.client.gui.glass.GlassPrefs.blurRadius(9));   // HUD Style Glass: blur behind the HUD panels
+			return;
+		}
 		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.drawer.VeloDrawerScreen drawer) {
 			cir.setReturnValue(drawer.blurRadius());   // the full R-Shift menu: strong glass blur, faded in and out
 			return;

@@ -108,6 +108,18 @@ public abstract class VeloWindow extends Screen {
 		this.returnScreen = screen;
 	}
 
+	/** The R-Shift menu hands over to this window (its glass grew into our rect): open in place, no spring. */
+	public static void markHandoff() {
+		lastWindowFrameNanos = System.nanoTime();
+	}
+
+	/** Where this window will sit on a screen of that size {x, y, w, h} (as init() places it). */
+	public int[] plannedRect(int screenW, int screenH) {
+		int w = Math.min(requestedWidth, Math.max(160, screenW - 24));
+		int h = Math.min(requestedHeight, Math.max(120, screenH - 24));
+		return new int[] {Math.max(0, (screenW - w) / 2), Math.max(0, (screenH - h) / 2), w, h};
+	}
+
 	/** Dev-only (screenshot tour): close like pressing Esc. */
 	public void closeForTour() {
 		requestClose();
@@ -210,7 +222,8 @@ public abstract class VeloWindow extends Screen {
 		}
 		// Velo+ Customize: the menu's look and motion (ScreenLook.Menu); the defaults are Velo's own
 		net.veloclient.velo.client.gui.title.ScreenLook.Menu look = net.veloclient.velo.client.gui.title.ScreenLook.menu();
-		if (closing && returnScreen instanceof VeloWindow) {
+		if (closing && (returnScreen instanceof VeloWindow || returnScreen instanceof net.veloclient.velo.client.gui.drawer.VeloDrawerScreen)) {
+			// back to the window / menu underneath: switch right away (the R-Shift menu's glass morphs back from here)
 			// Back to the window underneath: switch right away too.
 			openProgress = 0f;
 		} else if (handedOff && !closing) {
@@ -227,6 +240,9 @@ public abstract class VeloWindow extends Screen {
 		if (closing && openProgress < 0.02f) {
 			if (onClosed != null) {
 				onClosed.run();
+			}
+			if (returnScreen instanceof net.veloclient.velo.client.gui.drawer.VeloDrawerScreen drawer) {
+				drawer.morphFrom(new int[] {windowX, windowY, windowWidth, windowHeight});
 			}
 			//? if <26.1 {
 			if (this.client.currentScreen == this) {
@@ -606,6 +622,11 @@ public abstract class VeloWindow extends Screen {
 	}
 
 	/** Where header extras (coins, actions) may start from the right: subclasses draw them left of this x. */
+	/** The left edge of the buttons a window draws in its header (the tabs end before it). */
+	protected int headerExtrasLeft() {
+		return headerRight();
+	}
+
 	protected int headerRight() {
 		return closeButtonX() - 8;
 	}
@@ -659,7 +680,7 @@ public abstract class VeloWindow extends Screen {
 				int bx = x + w + 4;
 				VeloDraw.fillRounded(context, bx, textY - 1, badgeW, 10, 3, VeloUi.withAlpha(net.veloclient.velo.client.gui.title.MenuKit.accent(), alpha));
 				net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.small(badge),
-						bx + 4, textY + 1, VeloUi.withAlpha(0xFFFFFFFF, alpha));
+						bx + 4, textY + 1, VeloUi.withAlpha(net.veloclient.velo.client.gui.title.MenuKit.onAccent(), alpha));
 			}
 			x += tabW[i] + 16;
 		}
@@ -704,19 +725,29 @@ public abstract class VeloWindow extends Screen {
 			tabX = new int[0];
 			return;
 		}
-		int pad = 9;
 		int h = 18;
 		int y = windowY + (HEADER_HEIGHT - h) / 2;
 		int x = tx + this.textRenderer.getWidth(title) + 14;
 		tabX = new int[tabs.length];
 		tabW = new int[tabs.length];
-		int total = 4;
 		Text[] labels = new Text[tabs.length];
+		int[] textW = new int[tabs.length];
+		int content = 0;
 		for (int i = 0; i < tabs.length; i++) {
 			labels[i] = net.veloclient.velo.client.gui.title.MenuKit.uiBold(tabs[i]);
 			String badge = headerTabBadge(i);
-			int badgeW = badge == null ? 0 : this.textRenderer.getWidth(net.veloclient.velo.client.gui.title.MenuKit.small(badge)) + 10;
-			tabW[i] = this.textRenderer.getWidth(labels[i]) + pad * 2 + badgeW;
+			textW[i] = this.textRenderer.getWidth(labels[i]) + (badge == null ? 0 : this.textRenderer.getWidth(net.veloclient.velo.client.gui.title.MenuKit.small(badge)) + 10);
+			content += textW[i];
+		}
+		// the tabs get tighter until they end before the header's buttons (the Store's coins, Locker...)
+		int limit = headerExtrasLeft() - 10;
+		int pad = 9;
+		while (pad > 4 && x + 4 + content + pad * 2 * tabs.length > limit) {
+			pad--;
+		}
+		int total = 4;
+		for (int i = 0; i < tabs.length; i++) {
+			tabW[i] = textW[i] + pad * 2;
 			tabX[i] = x + total - 2;
 			total += tabW[i];
 		}
@@ -744,7 +775,7 @@ public abstract class VeloWindow extends Screen {
 				int bw = this.textRenderer.getWidth(net.veloclient.velo.client.gui.title.MenuKit.small(badge)) + 6;
 				VeloDraw.fillRounded(context, bx, textY - 1, bw, 10, 5, VeloUi.withAlpha(net.veloclient.velo.client.gui.title.MenuKit.accent(), alpha));
 				net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.small(badge),
-						bx + 3, textY + 1, VeloUi.withAlpha(0xFFFFFFFF, alpha));
+						bx + 3, textY + 1, VeloUi.withAlpha(net.veloclient.velo.client.gui.title.MenuKit.onAccent(), alpha));
 			}
 		}
 	}

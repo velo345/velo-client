@@ -102,6 +102,9 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			new Feature("settings", "d_sliders", "Settings", "Velo's own settings")};
 
 	private List<Feature> features() {
+		if (featureCache != null) {
+			return featureCache;
+		}
 		java.util.Set<String> ids = new java.util.HashSet<>();
 		for (MenuShell.Entry e : MenuShell.entries()) {
 			ids.add(e.id());
@@ -112,7 +115,23 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 				out.add(f);
 			}
 		}
+		featureCache = out;
 		return out;
+	}
+
+	// ---- per-frame work kept cheap (the profile name was a disk read every frame, fit() measured letter by letter)
+	private List<Feature> featureCache;
+	private String profileName;
+	private long profileAt;
+	private final Map<String, Text> fitCache = new HashMap<>();
+
+	private String activeProfile() {
+		long now = System.currentTimeMillis();
+		if (profileName == null || now - profileAt > 1000) {
+			profileName = VeloProfileManager.activeName();
+			profileAt = now;
+		}
+		return profileName;
 	}
 
 	private record Page(Kind kind, Cat cat, Module module) {
@@ -353,6 +372,47 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	/** The glass right now: the panel morphing into the full menu and back. */
 	private float[] rectNow() {
+		float[] base = baseRect();
+		if (pending != null) {
+			return lerpRect(handoffFrom, handoffTo, easeInOut(handoffT));   // growing into the window being opened
+		}
+		if (morphFrom != null && morphT < 1f) {
+			return lerpRect(morphFrom, base, easeInOut(morphT));   // coming back from a window
+		}
+		return base;
+	}
+
+	private static float[] lerpRect(float[] a, float[] b, float t) {
+		return new float[] {a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t};
+	}
+
+	// ---- moving between the menu and a feature window (Locker, Friends...): the glass morphs, like panel <-> full menu
+	private Screen pending;
+	private boolean handoffDone;
+	private float[] handoffFrom;
+	private float[] handoffTo;
+	private float handoffT;
+	private float[] morphFromGui;
+	private float[] morphFrom;
+	private float morphT = 1f;
+
+	/** A window closing back into this menu: the glass grows from the window's rect {x, y, w, h} (gui pixels). */
+	public void morphFrom(int[] guiRect) {
+		morphFromGui = new float[] {guiRect[0], guiRect[1], guiRect[2], guiRect[3]};
+		morphT = 0f;
+		pending = null;
+		handoffDone = false;
+	}
+
+	/** How much of the menu's content shows while the glass morphs to / from a window. */
+	private float contentShown() {
+		if (pending != null) {
+			return clamp01(1f - handoffT * 2.2f);
+		}
+		return morphFrom != null && morphT < 1f ? clamp01((morphT - 0.35f) / 0.65f) : 1f;
+	}
+
+	private float[] baseRect() {
 		float e = easeInOut(expandAnim);
 		float[] p = panelRect();
 		float[] f = fullRect();
@@ -473,15 +533,33 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	}
 
 	private Text fit(String s, boolean bold, float maxW) {
+		String key = s + '\u0001' + bold + '\u0001' + Math.round(maxW) + '\u0001' + fontN;
+		Text cached = fitCache.get(key);
+		if (cached != null) {
+			return cached;
+		}
 		Text t = bold ? B(s) : R(s);
-		if (tw(t) <= maxW) {
-			return t;
+		if (tw(t) > maxW) {
+			// binary search for the longest piece that fits with the ellipsis
+			int lo = 1;
+			int hi = s.length();
+			while (lo < hi) {
+				int mid = (lo + hi + 1) / 2;
+				String cut = s.substring(0, mid) + "\u2026";
+				if (tw(bold ? B(cut) : R(cut)) <= maxW) {
+					lo = mid;
+				} else {
+					hi = mid - 1;
+				}
+			}
+			String cut = s.substring(0, Math.max(1, lo)) + "\u2026";
+			t = bold ? B(cut) : R(cut);
 		}
-		String cut = s;
-		while (cut.length() > 1 && tw(bold ? B(cut + "…") : R(cut + "…")) > maxW) {
-			cut = cut.substring(0, cut.length() - 1);
+		if (fitCache.size() > 4000) {
+			fitCache.clear();
 		}
-		return bold ? B(cut + "…") : R(cut + "…");
+		fitCache.put(key, t);
+		return t;
 	}
 
 	/** Word-wraps {@code s} into at most {@code maxLines} lines (the last one cut with an ellipsis). */
@@ -600,6 +678,22 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		handleAnim = approach(handleAnim, (!open || autoHidden()) && !expanded && !closing ? 1f : 0f, dt / HANDLE_TIME);
 		expandAnim = approach(expandAnim, expanded ? 1f : 0f, dt / EXPAND_TIME);
 		trans = Math.min(1f, trans + dt / PAGE_TIME);
+		if (morphFromGui != null) {
+			morphFrom = new float[] {morphFromGui[0] / k, morphFromGui[1] / k, morphFromGui[2] / k, morphFromGui[3] / k};
+			morphFromGui = null;
+		}
+		morphT = approach(morphT, 1f, dt / 0.32f);
+		if (pending != null) {
+			handoffT = approach(handoffT, 1f, dt / 0.26f);
+			if (handoffT >= 1f && !handoffDone) {
+				handoffDone = true;
+				Screen next = pending;
+				this.client.execute(() -> {
+					net.veloclient.velo.client.gui.window.VeloWindow.markHandoff();
+					this.client.setScreen(next);
+				});
+			}
+		}
 		float glide = 1f - (float) Math.exp(-dt * 14f);
 		for (Map.Entry<Page, Float> e : scrollTarget.entrySet()) {
 			float cur = scroll.getOrDefault(e.getKey(), 0f);
@@ -796,8 +890,9 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		});
 		hits.add(glassHit);   // eats clicks on the glass itself
 
-		float pa = a * clamp01(1f - e * 2.2f);
-		float fa = a * clamp01((e - 0.45f) * 2.2f);
+		float shown = contentShown();
+		float pa = a * shown * clamp01(1f - e * 2.2f);
+		float fa = a * shown * clamp01((e - 0.45f) * 2.2f);
 		// the live layout is drawn last, so its overlay anchors win; the other one adds no hits
 		if (expanded) {
 			if (pa > 0.01f) {
@@ -1267,7 +1362,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	// ---- header: profile dropdown
 
 	private float renderProfileButton(DrawContext c, float right, float y, float a) {
-		String name = VeloProfileManager.activeName();
+		String name = activeProfile();
 		Text t = fit(name == null ? "Default" : name, true, 80f);
 		float w = tw(t) + 44f;
 		float x = right - w;
@@ -1291,7 +1386,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	private void renderProfileMenu(DrawContext c, float a) {
 		List<String> names = new ArrayList<>(VeloProfileManager.listProfileNames());
-		String active = VeloProfileManager.activeName();
+		String active = activeProfile();
 		float w = 190f;
 		float rowH = 24f;
 		float h = 22f + names.size() * rowH + 12f + 2 * 22f + 8f;
@@ -1341,7 +1436,8 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	private void switchProfile(String name) {
 		profileMenu = false;
-		if (name.equals(VeloProfileManager.activeName())) {
+		profileAt = 0;
+		if (name.equals(activeProfile())) {
 			return;
 		}
 		VeloProfileStore.saveActive();
@@ -1967,6 +2063,16 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 				Screen next = e.open().apply(this);
 				if (next instanceof net.veloclient.velo.client.gui.window.VeloWindow window) {
 					window.returnTo(this);   // Esc / close lands back in the R-Shift menu
+					// the glass grows into the window first, then the window takes over in place
+					int[] r = window.plannedRect(this.width, this.height);
+					handoffFrom = rectNow();
+					handoffTo = new float[] {r[0] / k, r[1] / k, r[2] / k, r[3] / k};
+					handoffT = 0f;
+					handoffDone = false;
+					pending = next;
+					dropdown = null;
+					profileMenu = false;
+					return;
 				}
 				if (next != null) {
 					this.client.setScreen(next);
@@ -2027,7 +2133,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	@Override
 	public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
-		if (closing) {
+		if (closing || pending != null) {
 			return true;
 		}
 		double u = click.x() / k;

@@ -261,6 +261,12 @@ public final class StoreScreen extends VeloWindow {
 		Text locker = MenuKit.ui("My Locker");
 		lockerW = 8 + 10 + 4 + this.textRenderer.getWidth(locker) + 8;
 		lockerX = freeX - 8 - lockerW;
+		if (lockerX < headerTabsEnd() + 10) {
+			// the tabs need the room: just the icon
+			locker = Text.empty();
+			lockerW = 26;
+			lockerX = freeX - 8 - lockerW;
+		}
 		boolean lockerHover = MenuKit.inside(mouseX, mouseY, lockerX, y, lockerW, h);
 		VeloDraw.fillRounded(context, lockerX, y, lockerW, h, 6, lockerHover ? 0x1AFFFFFF : 0x0DFFFFFF);
 		VeloDraw.strokeRounded(context, lockerX, y, lockerW, h, 6, lockerHover ? 0x38FFFFFF : 0x17FFFFFF);
@@ -279,18 +285,28 @@ public final class StoreScreen extends VeloWindow {
 			MenuKit.icon(context, "link", discordX + 8, y + 4, 10, 0xFFFFFFFF);
 			MenuKit.text(context, this.textRenderer, discord, discordX + 22, y + (h - 8) / 2, 0xFFFFFFFF);
 		}
-		// Owner panel, for owners (the server checks every call anyway).
+		// Owner panel, for owners (the server checks every call anyway) - just its icon when the tabs need the room.
 		ownerW = 0;
 		if (StoreClient.isOwner()) {
 			Text owner = MenuKit.ui("Owner panel");
 			ownerW = 8 + 10 + 4 + this.textRenderer.getWidth(owner) + 8;
 			ownerX = discordX - 8 - ownerW;
+			if (ownerX < headerTabsEnd() + 10) {
+				owner = Text.empty();
+				ownerW = 26;
+				ownerX = discordX - 8 - ownerW;
+			}
 			boolean ownerHover = MenuKit.inside(mouseX, mouseY, ownerX, y, ownerW, h);
 			VeloDraw.fillRounded(context, ownerX, y, ownerW, h, 6, ownerHover ? 0x1AFFFFFF : 0x0DFFFFFF);
 			VeloDraw.strokeRounded(context, ownerX, y, ownerW, h, 6, ownerHover ? 0x38FFFFFF : 0x17FFFFFF);
 			MenuKit.icon(context, "settings", ownerX + 8, y + 4, 10, ownerHover ? MenuKit.TEXT : MenuKit.TEXT_2);
 			MenuKit.text(context, this.textRenderer, owner, ownerX + 22, y + (h - 8) / 2, ownerHover ? MenuKit.TEXT : MenuKit.TEXT_2);
 		}
+	}
+
+	@Override
+	protected int headerExtrasLeft() {
+		return lockerX > 0 ? lockerX : headerRight() - 320;
 	}
 
 	@Override

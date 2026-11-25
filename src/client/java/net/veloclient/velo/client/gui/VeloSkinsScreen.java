@@ -277,13 +277,15 @@ public final class VeloSkinsScreen extends VeloWindow implements net.veloclient.
 		// Arms for imported PNGs: a two-way segmented switch.
 		int segW = 46;
 		int sx = ix - 8 - segW * 2;
-		VeloDraw.fillRounded(context, sx, ty, segW * 2, 24, 7, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF141011, 0x47000000));
-		VeloDraw.strokeRounded(context, sx, ty, segW * 2, 24, 7, 0x17FFFFFF);
-		VeloDraw.fillRounded(context, sx + 2 + (slimImport ? segW : 0), ty + 2, segW - 4, 20, 5, VeloUi.withAlpha(MenuKit.accent(), 0x40));
+		VeloDraw.fillRounded(context, sx, ty, segW * 2, 24, 12, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF141011, 0x47000000));
+		// the pill glides between Classic and Slim (it jumped before)
+		float slimT = MenuKit.hover("skins:slimImport", slimImport);
+		VeloDraw.fillRounded(context, sx + 2 + segW * slimT, ty + 2, segW - 4, 20, 10, MenuKit.accent());
 		for (int i = 0; i < 2; i++) {
-			Text label = MenuKit.ui(i == 0 ? "Classic" : "Slim");
-			boolean on = (i == 1) == slimImport;
-			MenuKit.text(context, this.textRenderer, label, sx + i * segW + (segW - this.textRenderer.getWidth(label)) / 2, ty + 8, on ? MenuKit.TEXT : MenuKit.TEXT_3);
+			Text label = MenuKit.uiBold(i == 0 ? "Classic" : "Slim");
+			float on = i == 1 ? slimT : 1f - slimT;
+			MenuKit.text(context, this.textRenderer, label, sx + i * segW + (segW - this.textRenderer.getWidth(label)) / 2, ty + 8,
+					net.veloclient.velo.client.gui.widget.VeloAnim.lerpArgb(MenuKit.TEXT_3, MenuKit.onAccent(), on));
 			boolean slim = i == 1;
 			hits.add(new VeloUi.Hit(sx + i * segW, ty, segW, 24, () -> slimImport = slim));
 		}

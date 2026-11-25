@@ -31,7 +31,7 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 	private static final int GAP = 3;
 	private final HudPosition position = new HudPosition(0.02f, 0.53f);
 
-	private static final List<String> STYLES = List.of("Boxes", "Glass", "Outline", "Minecraft", "HUD Style");
+	private static final List<String> STYLES = List.of("Boxes", "Glass", "Outline", "Minecraft");
 
 	private String style = "Glass";
 	private boolean showLabels = true;
@@ -127,7 +127,13 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 
 	private void drawKeyShape(DrawContext context, int x, int y, int kw, int kh, boolean pressed) {
 		int r6 = Math.min(6, kh / 2), r5 = Math.min(5, kh / 2), r3 = Math.min(3, kh / 2);
-		switch (style) {
+		// with a HUD Style background, the keys take its look (glass with real blur, or solid)
+		if (!pressed && (style.equals("Glass") || style.equals("Boxes") || style.equals("HUD Style")) && net.veloclient.velo.client.hud.HudLook.hasBackground()
+				&& idleColor == DEFAULT_IDLE) {
+			net.veloclient.velo.client.hud.HudLook.stylePanel(context, x, y, kw, kh, style.equals("Boxes") ? r3 : r6);
+			return;
+		}
+		switch (style.equals("HUD Style") ? "Glass" : style) {
 			case "Glass" -> {
 				// Frosted keys; a pressed key fills with the HUD accent and glows - unless this module's own colours were changed.
 				int accent = net.veloclient.velo.client.hud.HudLook.own(pressedColor, DEFAULT_PRESSED, net.veloclient.velo.client.hud.HudLook.accent());
@@ -138,14 +144,6 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 					// Light frosted key: enough to read the letter, little of the world hidden behind it.
 					VeloDraw.fillRounded(context, x, y, kw, kh, r6, idleColor != DEFAULT_IDLE ? idleColor : 0x38101016);
 					VeloDraw.strokeRounded(context, x, y, kw, kh, r6, 0x40FFFFFF);
-				}
-			}
-			case "HUD Style" -> {
-				// the HUD Style's panel (glass by default); a held key turns white
-				if (pressed) {
-					VeloDraw.fillRounded(context, x, y, kw, kh, Math.min(6, kh / 2), 0xEEFFFFFF);
-				} else {
-					net.veloclient.velo.client.hud.HudLook.stylePanel(context, x, y, kw, kh);
 				}
 			}
 			case "Outline" -> {
@@ -173,7 +171,7 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 		int kw = keyW[i], kh = keyH[i];
 		MinecraftClient client = MinecraftClient.getInstance();
 		boolean pressed = binding.isPressed();
-		int textColor = style.equals("Minecraft") && pressed ? 0xFF3F3F3F : style.equals("HUD Style") && pressed ? 0xFF141416 : 0xFFFFFFFF;
+		int textColor = style.equals("Minecraft") && pressed ? 0xFF3F3F3F : 0xFFFFFFFF;
 		boolean hudFont = net.veloclient.velo.client.hud.HudLook.on() && !style.equals("Minecraft");
 		String font = hudFont ? net.veloclient.velo.client.hud.HudLook.font() : "";
 		String bound = binding.getBoundKeyTranslationKey();

@@ -461,7 +461,9 @@ public final class PauseMenu {
 			float hover = MenuKit.hover(leave, hovered(mouseX, mouseY, leave));
 			if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
 				// glass pill; it only warms up red when you point at it
-				VeloDraw.fillRounded(context, colX, ly, colW, leaveH, leaveH / 2f, VeloAnim.lerpArgb(0x16FFFFFF, 0x30FF5A5F, hover));
+				// clearly a button, even over the blur: a red-tinted pill with a soft edge, warmer on hover
+				VeloDraw.fillRounded(context, colX, ly, colW, leaveH, leaveH / 2f, VeloAnim.lerpArgb(0xCC2A1618, 0xE0442024, hover));
+				VeloDraw.strokeRounded(context, colX, ly, colW, leaveH, leaveH / 2f, 1f, VeloAnim.lerpArgb(0x55FF5A5F, 0xAAFF5A5F, hover));
 			} else {
 				VeloDraw.fillRounded(context, colX, ly, colW, leaveH, 7, VeloAnim.lerpArgb(0x00000000, 0x24FF5A5F, hover));
 				VeloDraw.strokeRounded(context, colX, ly, colW, leaveH, 7, VeloAnim.lerpArgb(0x59FF5A5F, 0xFFFF5A5F, hover));
@@ -653,10 +655,16 @@ public final class PauseMenu {
 		Text rec = MenuKit.uiBold("Recent");
 		int favW = MenuKit.width(renderer, fav) + 14;
 		int recW = MenuKit.width(renderer, rec) + 14;
-		VeloDraw.fillRounded(context, tx, ty, favW + recW + 4, 16, 5, 0x0DFFFFFF);
-		VeloDraw.fillRounded(context, showRecent ? tx + 2 + favW : tx + 2, ty + 2, showRecent ? recW : favW, 12, 4, 0xFF2A2A32);
-		MenuKit.text(context, renderer, fav, tx + 2 + 7, ty + 4, showRecent ? 0xFF9D9DA8 : MenuKit.TEXT);
-		MenuKit.text(context, renderer, rec, tx + 2 + favW + 7, ty + 4, showRecent ? MenuKit.TEXT : 0xFF9D9DA8);
+		boolean glass = net.veloclient.velo.client.gui.widget.VeloStyle.glass();
+		VeloDraw.fillRounded(context, tx, ty, favW + recW + 4, 16, glass ? 8 : 5, glass ? 0x47000000 : 0x0DFFFFFF);
+		// the pill glides to the picked tab (it jumped before)
+		float t = MenuKit.hover("pause:recentTab", showRecent);
+		float pillX = tx + 2 + favW * t;
+		float pillW = favW + (recW - favW) * t;
+		VeloDraw.fillRounded(context, pillX, ty + 2, pillW, 12, glass ? 6 : 4, glass ? MenuKit.accent() : 0xFF2A2A32);
+		int on = glass ? MenuKit.onAccent() : MenuKit.TEXT;
+		MenuKit.text(context, renderer, fav, tx + 2 + 7, ty + 4, net.veloclient.velo.client.gui.widget.VeloAnim.lerpArgb(on, 0xFF9D9DA8, t));
+		MenuKit.text(context, renderer, rec, tx + 2 + favW + 7, ty + 4, net.veloclient.velo.client.gui.widget.VeloAnim.lerpArgb(0xFF9D9DA8, on, t));
 		tabFavorites.place(tx + 2, ty, favW, 16, true);
 		tabRecent.place(tx + 2 + favW, ty, recW, 16, true);
 		recordButtons(context, renderer, tx + favW + recW + 10, x + w - 8, ty, mouseX, mouseY);

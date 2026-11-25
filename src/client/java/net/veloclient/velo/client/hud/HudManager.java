@@ -169,6 +169,17 @@ public final class HudManager {
 		net.veloclient.velo.client.redstone.RmAnalysis.renderOutside(context, screenWidth, screenHeight);
 		// Velo Turbo: the modules redraw at most 360 times a second; frames in between reuse what they drew. In whole-HUD
 		// mode the recording already wraps the entire HUD (TurboHudWholeMixin) - the modules just draw into it.
+		var screen = net.veloclient.velo.client.util.ClientCompat.currentScreen();
+		if (screen == null && HudLook.glassBlur() && !HudLook.rects().isEmpty() && net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
+			// HUD Style Glass: real blur behind the glass panels, the game around them stays sharp
+			net.veloclient.velo.client.gui.glass.SharpFrame.blurHere(context);
+			net.veloclient.velo.client.gui.glass.SharpFrame.drawSharpExcept(context, screenWidth, screenHeight, HudLook.rects());
+		}
+		if (screen instanceof net.veloclient.velo.client.gui.drawer.VeloDrawerScreen || screen instanceof net.veloclient.velo.client.gui.HudEditScreen) {
+			// the editors draw the HUD themselves, live: the (cached) copy under them lagged behind while dragging
+			net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
+			return;
+		}
 		boolean whole = HudFrameCache.wholeHud();
 		if (!whole && HudFrameCache.replay(context, screenWidth, screenHeight)) {
 			net.veloclient.velo.client.browser.BrowserModule.renderHud(context, screenWidth, screenHeight);
@@ -180,6 +191,7 @@ public final class HudManager {
 			HudFrameCache.beginRecord(context, screenWidth, screenHeight);
 		}
 		boolean completed = false;
+		HudLook.beginRects();
 		try {
 			for (Module module : ModuleRegistry.all()) {
 				if (!(module instanceof HudModule hud) || !hud.isEnabled()) {
@@ -195,6 +207,7 @@ public final class HudManager {
 			}
 			completed = true;
 		} finally {
+			HudLook.endRects();
 			if (!whole) {
 				HudFrameCache.endRecord(context, completed);
 			}

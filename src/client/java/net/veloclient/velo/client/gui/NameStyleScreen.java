@@ -144,8 +144,7 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 		int y = contentY();
 		int w = CapeEquipScreen.SHOWCASE_WIDTH;
 		int h = CapeEquipScreen.stageBottom() - y;
-		VeloDraw.fillRounded(context, x, y, w, h, 10, 0xFF100D0D);
-		VeloDraw.fillRoundedGradient(context, x, y, w, h, 10, VeloUi.withAlpha(MenuKit.accent(), 0x14), 0x00111116);
+		VeloDraw.fillRounded(context, x, y, w, h, 12, 0x12FFFFFF);   // glass preview panel
 		VeloDraw.strokeRounded(context, x, y, w, h, 10, 0x17FFFFFF);
 		String name = playerName();
 		MenuKit.text(context, this.textRenderer, MenuKit.small("LIVE PREVIEW"), x + 12, y + 12, MenuKit.TEXT_3);
@@ -169,7 +168,7 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 		// In chat.
 		int chatY = tagY + boxH + 24;
 		int lineH = 11;
-		VeloDraw.fillRounded(context, x + 10, chatY, w - 20, lineH * 4 + 8, 4, 0x80000000);
+		VeloDraw.fillRounded(context, x + 10, chatY, w - 20, lineH * 4 + 8, 8, 0x59000000);
 		Text[] lines = {
 				Text.empty().append(mc("<")).append(NameStyles.preview(name, style, Style.EMPTY, CHAT_SLOT)).append(mc("> gg, that was close")),
 				Text.empty().append(mc("<Steve> clean")),
@@ -183,7 +182,7 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 
 		// In the tab list.
 		int tabY = chatY + lineH * 4 + 32;
-		VeloDraw.fillRounded(context, x + 10, tabY, w - 20, 14, 2, 0x55000000);
+		VeloDraw.fillRounded(context, x + 10, tabY, w - 20, 14, 6, 0x47000000);
 		context.fill(x + 13, tabY + 3, x + 21, tabY + 11, 0xFF6B4A35);
 		context.drawTextWithShadow(this.textRenderer, NameStyles.preview(name, style, Style.EMPTY, TAB_SLOT), x + 25, tabY + 3, 0xFFFFFFFF);
 		for (int b = 0; b < 4; b++) {
@@ -253,8 +252,7 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 	}
 
 	private int header(DrawContext context, int x, int y, int w, int mouseX, int mouseY) {
-		VeloDraw.fillRounded(context, x, y, w, 40, 8, 0xFF141011);
-		VeloDraw.strokeRounded(context, x, y, w, 40, 8, plus() ? 0x17FFFFFF : VeloUi.withAlpha(0xFFFF2D3C, 0x70));
+		VeloDraw.fillRounded(context, x, y, w, 40, 12, 0x14FFFFFF);
 		MenuKit.text(context, this.textRenderer, MenuKit.uiBold("Name Style"), x + 12, y + 9, MenuKit.TEXT);
 		String sub = plus() ? style.effect().label + " · " + style.colors().length + (style.colors().length == 1 ? " colour" : " colours")
 				: "Part of Velo+";
@@ -345,7 +343,7 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 			boolean selected = i == selectedColor;
 			if (selected) {
 				VeloDraw.fillCircle(context, cx, cy, size / 2 + 3, 0xFFFFFFFF);
-				VeloDraw.fillCircle(context, cx, cy, size / 2 + 1.5f, 0xFF141011);
+				VeloDraw.fillCircle(context, cx, cy, size / 2 + 1.5f, 0xFF1A1A1E);
 			} else if (hovered) {
 				VeloDraw.fillCircle(context, cx, cy, size / 2 + 2, 0x50FFFFFF);
 			}
@@ -590,17 +588,17 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 
 	private void tile(DrawContext context, int x, int y, int w, int h, boolean selected, int mouseX, int mouseY) {
 		boolean hovered = MenuKit.inside(mouseX, mouseY, x, y, w, h) && mouseY >= editorTop && mouseY < editorBottom;
-		VeloDraw.fillRounded(context, x, y, w, h, 7, selected ? VeloUi.withAlpha(MenuKit.accent(), 0x1F) : hovered ? 0xFF1A1516 : 0xFF141011);
-		VeloDraw.strokeRounded(context, x, y, w, h, 7, selected ? VeloUi.withAlpha(MenuKit.accent(), 0xB0) : hovered ? 0x30FFFFFF : 0x17FFFFFF);
+		// glass tiles; the picked one gets the accent edge
+		VeloDraw.fillRounded(context, x, y, w, h, 10, selected ? 0x26FFFFFF : hovered ? 0x1FFFFFFF : 0x10FFFFFF);
+		if (selected) {
+			VeloDraw.strokeRounded(context, x, y, w, h, 10, MenuKit.accent());
+		}
 	}
 
 	private void button(DrawContext context, int x, int y, int w, int h, String label, boolean primary, int mouseX, int mouseY, Runnable action) {
 		boolean hovered = MenuKit.inside(mouseX, mouseY, x, y, w, h);
-		VeloDraw.fillRounded(context, x, y, w, h, 7, primary ? (hovered ? VeloUi.withAlpha(MenuKit.accent(), 0xFF) : MenuKit.accent())
-				: hovered ? 0x1AFFFFFF : 0x0AFFFFFF);
-		if (!primary) {
-			VeloDraw.strokeRounded(context, x, y, w, h, 7, hovered ? 0x38FFFFFF : 0x17FFFFFF);
-		}
+		VeloDraw.fillRounded(context, x, y, w, h, h / 2f, primary ? (hovered ? net.veloclient.velo.client.gui.widget.VeloAnim.lerpArgb(MenuKit.accent(), 0xFF000000, 0.08f) : MenuKit.accent())
+				: hovered ? 0x2EFFFFFF : 0x16FFFFFF);
 		Text text = MenuKit.uiBold(label);
 		MenuKit.text(context, this.textRenderer, text, x + (w - this.textRenderer.getWidth(text)) / 2, y + (h - 8) / 2,
 				primary ? MenuKit.onAccent() : MenuKit.TEXT);

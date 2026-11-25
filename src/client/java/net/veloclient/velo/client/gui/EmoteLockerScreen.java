@@ -175,7 +175,8 @@ public final class EmoteLockerScreen extends VeloWindow implements net.veloclien
 			hover = (int) (deg / sweep);
 		}
 		for (int i = 0; i < EmoteCatalog.SLOTS; i++) {
-			int fill = i == selectedSlot ? VeloUi.withAlpha(accent, 0xD0) : i == hover ? 0xFF2A2A34 : 0xFF1A1516;
+			// glass segments; the picked slot in the accent (its text turns dark/light to stay readable)
+			int fill = i == selectedSlot ? accent : i == hover ? 0x38FFFFFF : 0x1CFFFFFF;
 			VeloDraw.strokeArc(context, cx, cy, (inner + outer) / 2f, outer - inner, i * sweep - sweep / 2f + 1.5f, sweep - 3f, fill);
 			double a = Math.toRadians(i * sweep - 90);
 			int lx = Math.round(cx + (float) Math.cos(a) * (inner + outer) / 2f);
@@ -183,10 +184,12 @@ public final class EmoteLockerScreen extends VeloWindow implements net.veloclien
 			String id = EmoteCatalog.slot(i);
 			String label = id == null ? String.valueOf(i + 1) : shortName(EmoteCatalog.name(id));
 			int w = this.textRenderer.getWidth(label);
-			context.drawTextWithShadow(this.textRenderer, label, lx - w / 2, ly - 4, id == null ? 0xFF6A6A76 : 0xFFFFFFFF);
+			int labelColor = i == selectedSlot ? MenuKit.onAccent() : id == null ? 0x80FFFFFF : 0xFFFFFFFF;
+			MenuKit.text(context, this.textRenderer, MenuKit.uiBold(label), lx - MenuKit.width(this.textRenderer, MenuKit.uiBold(label)) / 2, ly - 4, labelColor);
 		}
-		VeloDraw.fillCircle(context, (float) cx, cy, inner - 3f, 0xFF101014);
-		context.drawTextWithShadow(this.textRenderer, "B", cx - this.textRenderer.getWidth("B") / 2, cy - 4, accent);
+		VeloDraw.fillCircle(context, (float) cx, cy, inner - 3f, 0x33000000);
+		net.minecraft.text.Text key = MenuKit.uiBold("B");
+		MenuKit.text(context, this.textRenderer, key, cx - MenuKit.width(this.textRenderer, key) / 2, cy - 4, 0xFFFFFFFF);
 		for (int i = 0; i < EmoteCatalog.SLOTS; i++) {
 			int slot = i;
 			double a = Math.toRadians(i * sweep - 90);
@@ -211,12 +214,15 @@ public final class EmoteLockerScreen extends VeloWindow implements net.veloclien
 		boolean hovered = mouseX >= x && mouseX < x + TILE && mouseY >= y && mouseY < y + TILE + 14 && mouseY >= clipTop;
 		boolean active = t.id().equals(previewing);
 		int slot = EmoteCatalog.slotOf(t.id());
-		VeloDraw.fillRounded(context, x, y, TILE, TILE, 8, active ? VeloUi.withAlpha(t.accent(), 0x40) : hovered ? 0xFF1E1E26 : 0xFF15151B);
-		VeloDraw.strokeRounded(context, x, y, TILE, TILE, 8, active ? VeloUi.withAlpha(t.accent(), 0xC0) : 0x17FFFFFF);
+		VeloDraw.fillRounded(context, x, y, TILE, TILE, 10, active ? 0x2EFFFFFF : hovered ? 0x22FFFFFF : 0x12FFFFFF);
+		if (active) {
+			VeloDraw.strokeRounded(context, x, y, TILE, TILE, 10, MenuKit.accent());
+		}
 		EmoteFigure.draw(context, t, t.id(), x + TILE / 2f, y + TILE - 5, (TILE - 12) / 34f, owned ? t.accent() : 0xFF55555F);
 		if (slot >= 0 && owned) {
-			VeloDraw.fillRounded(context, x + 3, y + 3, 12, 12, 4, VeloUi.withAlpha(MenuKit.accent(), 0xE0));
-			context.drawTextWithShadow(this.textRenderer, String.valueOf(slot + 1), x + 6, y + 5, 0xFFFFFFFF);
+			VeloDraw.fillRounded(context, x + 4, y + 4, 13, 13, 6.5f, MenuKit.accent());
+			net.minecraft.text.Text n = MenuKit.uiBold(String.valueOf(slot + 1));
+			MenuKit.text(context, this.textRenderer, n, x + 4 + (13 - MenuKit.width(this.textRenderer, n)) / 2, y + 7, MenuKit.onAccent());
 		}
 		if (!owned) {
 			VeloDraw.fillRounded(context, x, y, TILE, TILE, 8, 0x66000000);
@@ -240,8 +246,7 @@ public final class EmoteLockerScreen extends VeloWindow implements net.veloclien
 
 	private void button(DrawContext context, int x, int y, int w, String label, int mouseX, int mouseY, Runnable action) {
 		boolean hovered = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 18;
-		VeloDraw.fillRounded(context, x, y, w, 18, 6, hovered ? 0x1AFFFFFF : 0x0DFFFFFF);
-		VeloDraw.strokeRounded(context, x, y, w, 18, 6, hovered ? 0x38FFFFFF : 0x17FFFFFF);
+		VeloDraw.fillRounded(context, x, y, w, 18, 9, hovered ? 0x2EFFFFFF : 0x16FFFFFF);
 		MenuKit.text(context, this.textRenderer, MenuKit.ui(label), x + (w - this.textRenderer.getWidth(MenuKit.ui(label))) / 2, y + 5,
 				hovered ? MenuKit.TEXT : MenuKit.TEXT_2);
 		hits.add(new Hit(x, y, w, 18, action));

@@ -219,13 +219,58 @@ public final class HudLook {
 		}
 	}
 
-	/** The menus' glass, for the HUD: dark translucent body, a light edge and light catching the top. */
+	/** The menus' glass, for the HUD: a light tint over real blur (the blur goes behind every glass panel - see HudManager). */
 	public static void glassPanel(DrawContext context, int x, int y, int w, int h, int radius) {
-		VeloDraw.fillRounded(context, x, y, w, h, radius, 0x8C141418);
-		VeloDraw.strokeRounded(context, x, y, w, h, radius, 0x26FFFFFF);
-		if (w > radius * 2) {
-			context.fill(x + radius, y, x + w - radius, y + 1, 0x33FFFFFF);
+		record(context, x, y, w, h);
+		VeloDraw.fillRounded(context, x, y, w, h, radius, 0x5C141418);
+	}
+
+	// ---- where the glass panels are (screen pixels), collected while the HUD draws; the blur goes behind them next frame
+	private static java.util.List<int[]> rectSink;
+	private static java.util.List<int[]> lastRects = java.util.List.of();
+
+	public static void beginRects() {
+		rectSink = new java.util.ArrayList<>();
+	}
+
+	public static void endRects() {
+		if (rectSink != null) {
+			lastRects = rectSink;
 		}
+		rectSink = null;
+	}
+
+	public static java.util.List<int[]> rects() {
+		return lastRects;
+	}
+
+	/** HUD Style "Glass": real blur behind the panels. */
+	public static boolean glassBlur() {
+		HudStyleModule style = style();
+		return style != null && style.background().equals("Glass");
+	}
+
+	private static void record(DrawContext context, int x, int y, int w, int h) {
+		if (rectSink == null) {
+			return;
+		}
+		//? if >=1.21.2 {
+		var m = context.getMatrices();
+		org.joml.Vector2f a = m.transformPosition(x, y, new org.joml.Vector2f());
+		org.joml.Vector2f b = m.transformPosition(x + w, y + h, new org.joml.Vector2f());
+		rectSink.add(new int[] {Math.round(Math.min(a.x, b.x)), Math.round(Math.min(a.y, b.y)), Math.round(Math.abs(b.x - a.x)), Math.round(Math.abs(b.y - a.y))});
+		//?}
+	}
+
+	/** A glass panel with its own corner radius (the Mouse style's body). */
+	public static void stylePanel(DrawContext context, int x, int y, int w, int h, int radius) {
+		HudStyleModule style = style();
+		if (style != null && style.background().equals("Solid")) {
+			VeloDraw.fillRounded(context, x, y, w, h, radius, SOLID);
+			VeloDraw.strokeRounded(context, x, y, w, h, radius, 0x1CFFFFFF);
+			return;
+		}
+		glassPanel(context, x, y, w, h, radius);
 	}
 
 	/** The element's panel in the HUD Style's look - glass when the HUD Style has no background of its own. */
