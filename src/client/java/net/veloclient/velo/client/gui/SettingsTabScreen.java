@@ -53,8 +53,10 @@ public final class SettingsTabScreen extends VeloWindow implements net.veloclien
 
 		y = section("Appearance", y, 1);
 		addDrawableChild(new VeloValueRow(x, y, width, ROW_HEIGHT, Text.literal("Theme"), VeloValueRow.Kind.LINK,
-				() -> net.veloclient.velo.client.theme.ThemeManager.active().name(), null,
-				b -> this.client.setScreen(new ThemeEditorScreen(this))));
+				() -> net.veloclient.velo.client.gui.widget.VeloStyle.glass() ? net.veloclient.velo.client.gui.glass.GlassPrefs.accentName()
+						: net.veloclient.velo.client.theme.ThemeManager.active().name(), null,
+				b -> this.client.setScreen(net.veloclient.velo.client.gui.widget.VeloStyle.glass()
+						? new net.veloclient.velo.client.gui.glass.ThemeScreen(this) : new ThemeEditorScreen(this))));
 		y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
 
 

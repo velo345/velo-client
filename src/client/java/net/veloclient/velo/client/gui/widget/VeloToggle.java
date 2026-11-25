@@ -87,7 +87,7 @@ public final class VeloToggle extends ClickableWidget {
 			float g = Math.max(1.5f, height * 0.15f);
 			float d = height - g * 2;
 			float kx = x + g + (width - d - g * 2) * progress;
-			VeloDraw.fillCircle(context, kx + d / 2f, y + height / 2f, d / 2f, VeloAnim.lerpArgb(0xFFFFFFFF, 0xFF141416, progress));
+			VeloDraw.fillCircle(context, kx + d / 2f, y + height / 2f, d / 2f, VeloAnim.lerpArgb(0xFFFFFFFF, net.veloclient.velo.client.gui.glass.GlassPrefs.onAccent(), progress));
 			return;
 		}
 		VeloDraw.fillRounded(context, knobX, y + inset, knob, knob, Math.max(1f, knob * 0.25f), knobColor);

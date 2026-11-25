@@ -49,11 +49,13 @@ public final class ThemeManager {
 	private static Theme glassBase;
 	private static Theme glassTheme;
 
-	/** The glass look (2026-11-24): neutral surfaces and a white accent - no coloured (red) highlights in the menus. */
+	/** The glass look (2026-11-24): neutral surfaces and the accent from Settings > Theme (white by default). */
 	private static Theme glass(Theme t) {
-		if (t != glassBase) {
+		int accent = net.veloclient.velo.client.gui.glass.GlassPrefs.accent();
+		if (t != glassBase || glassTheme == null || glassTheme.accentStart() != accent) {
 			glassBase = t;
-			glassTheme = new Theme(t.name(), t.background(), 0xFF141418, 0xFFFFFFFF, 0xFFE4E4E8, 0xFFFFFFFF, t.cornerRadius(), t.blurIntensity(),
+			int end = net.veloclient.velo.client.gui.widget.VeloAnim.lerpArgb(accent, 0xFFFFFFFF, 0.2f);
+			glassTheme = new Theme(t.name(), t.background(), 0xFF141418, accent, end, 0xFFFFFFFF, t.cornerRadius(), t.blurIntensity(),
 					t.animationSpeed(), t.panelOpacity());
 		}
 		return glassTheme;

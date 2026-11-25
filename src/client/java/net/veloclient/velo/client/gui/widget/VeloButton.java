@@ -80,7 +80,7 @@ public class VeloButton extends ClickableWidget {
 		} else if (selected && glass) {
 			// glass: the selected one is a white pill with dark text (like the R-Shift tabs)
 			tinted = true;
-			VeloDraw.fillRounded(context, x, y, w, h, radius, VeloAnim.lerpArgb(0xFFFFFFFF, 0xFFE9E9EC, hoverProgress));
+			VeloDraw.fillRounded(context, x, y, w, h, radius, VeloAnim.lerpArgb(VeloStyle.accent(), 0xFF000000, 0.08f * hoverProgress));
 		} else if (selected) {
 			VeloDraw.fillRounded(context, x, y, w, h, radius, VeloUi.withAlpha(theme.accentStart(), 0x33 + Math.round(0x14 * hoverProgress)));
 		} else {
@@ -94,7 +94,7 @@ public class VeloButton extends ClickableWidget {
 			}
 		}
 
-		int textColor = tinted ? (glass ? 0xFF141416 : VeloStyle.onAccent()) : selected ? 0xFFFFFFFF : VeloStyle.text();
+		int textColor = tinted ? (glass ? net.veloclient.velo.client.gui.glass.GlassPrefs.onAccent() : VeloStyle.onAccent()) : selected ? 0xFFFFFFFF : VeloStyle.text();
 		if (!this.active) {
 			textColor = VeloStyle.textFaint();
 		}

@@ -565,6 +565,12 @@ public final class ScreenshotTour {
 			case "profiles" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.ProfileScreen(null))},
 					new Object[] {30, (Runnable) () -> shot(client, "profiles")});
+			case "theme" -> List.of(
+					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.glass.ThemeScreen(null))},
+					new Object[] {30, (Runnable) () -> shot(client, "theme")});
+			case "cloud" -> List.of(
+					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.CloudSyncScreen(null))},
+					new Object[] {60, (Runnable) () -> shot(client, "cloud")});
 			case "clips" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.media.MediaScreen(null))},
 					new Object[] {40, (Runnable) () -> shot(client, "clips")});

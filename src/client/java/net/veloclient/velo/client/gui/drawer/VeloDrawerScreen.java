@@ -323,7 +323,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	public int blurRadius() {
 		// the panel gets a lighter blur (the HUD stays crisp on top); it lifts when the panel slides away to place things
 		float e = easeInOut(expandAnim);
-		return Math.round((10f + 2f * e) * ease(openAnim));   // strong: it only shows behind the glass (SharpFrame keeps the rest sharp)
+		return Math.round(net.veloclient.velo.client.gui.glass.GlassPrefs.blurRadius(Math.round(10f + 2f * e)) * ease(openAnim));   // Settings > Theme: Blur (only behind the glass)
 	}
 
 	// ---------------------------------------------------------------- geometry
@@ -511,6 +511,15 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		return out;
 	}
 
+	/** The accent from Settings > Theme (white by default) and the text colour that reads on it. */
+	private static int acc() {
+		return net.veloclient.velo.client.gui.glass.GlassPrefs.accent();
+	}
+
+	private static int onAcc() {
+		return net.veloclient.velo.client.gui.glass.GlassPrefs.onAccent();
+	}
+
 	private static int alpha(int color, float a) {
 		return VeloUi.withAlpha(color, Math.round(((color >>> 24) & 0xFF) * Math.max(0f, Math.min(1f, a))));
 	}
@@ -550,12 +559,12 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		float t = animTo(key, on ? 1f : 0f, 9f);
 		float w = big ? 30f : 26f;
 		float h = big ? 17f : 15f;
-		int track = VeloAnim.lerpArgb(0x33FFFFFF, WHITE, t);
+		int track = VeloAnim.lerpArgb(0x33FFFFFF, acc(), t);
 		rect(c, x, y, w, h, h / 2f, track, a);
 		float kn = h - 4f;
 		float kx = x + 2f + (w - h) * t;
 		VeloDraw.fillCircle(c, kx + kn / 2f, y + 2f + kn / 2f + 0.5f, kn / 2f, alpha(0x40000000, a));
-		VeloDraw.fillCircle(c, kx + kn / 2f, y + 2f + kn / 2f, kn / 2f, alpha(VeloAnim.lerpArgb(WHITE, 0xFF141416, t), a));
+		VeloDraw.fillCircle(c, kx + kn / 2f, y + 2f + kn / 2f, kn / 2f, alpha(VeloAnim.lerpArgb(WHITE, onAcc(), t), a));
 	}
 
 	/** Pushes the scissor for a units rect (version-safe: set with an identity pose, in gui pixels). */
@@ -781,8 +790,8 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			// a light veil over the blurred game - not a black overlay
 			c.fill(0, 0, (int) Math.ceil(W()) + 1, (int) Math.ceil(H()) + 1, alpha(0x1C000000, e * a));
 		}
-		float rad = 18f + 6f * e;
-		glass(c, x, y, w, h, rad, VeloAnim.lerpArgb(GLASS, GLASS_FULL, e), a);
+		float rad = net.veloclient.velo.client.gui.glass.GlassPrefs.radius(18f + 6f * e);
+		glass(c, x, y, w, h, rad, net.veloclient.velo.client.gui.glass.GlassPrefs.tint(VeloAnim.lerpArgb(GLASS, GLASS_FULL, e)), a);
 		glassHit = new Hit(x, y, w, h, () -> {
 		});
 		hits.add(glassHit);   // eats clicks on the glass itself
@@ -1015,9 +1024,9 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		Text eh = B("Edit HUD");
 		float ew = tw(eh) + 46f;
 		boolean eHover = inside(x + 22f, fy, ew, 32f);
-		rect(c, x + 22f, fy, ew, 32f, 16f, eHover ? 0xFFE9E9EC : WHITE, a);
-		icon(c, "d_layout", x + 36f, fy + 9f, 14f, 0xFF141416, a);
-		text(c, eh, x + 56f, fy + 12f, 0xFF141416, a);
+		rect(c, x + 22f, fy, ew, 32f, 16f, eHover ? VeloAnim.lerpArgb(acc(), 0xFF000000, 0.08f) : acc(), a);
+		icon(c, "d_layout", x + 36f, fy + 9f, 14f, onAcc(), a);
+		text(c, eh, x + 56f, fy + 12f, onAcc(), a);
 		hits.add(new Hit(x + 22f, fy, ew, 32f, () -> setExpanded(false)));
 
 		int n = DOCK_ITEMS.length;
@@ -1089,12 +1098,12 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		rect(c, x, y, total, 26f, 13f, 0x47000000, a);
 		float ax = animTo("pillX", xs[active], 14f);
 		float aw = animTo("pillW", ws[active], 14f);
-		rect(c, ax, y + 3f, aw, 20f, 10f, WHITE, a);
+		rect(c, ax, y + 3f, aw, 20f, 10f, acc(), a);
 		for (int i = 0; i < labels.size(); i++) {
 			Text t = B(labels.get(i));
 			boolean on = i == active;
 			boolean hover = !on && inside(xs[i], y, ws[i], 26f);
-			text(c, t, xs[i] + pad / 2f, y + 9f, on ? 0xFF141416 : hover ? WHITE : TEXT_2, a);
+			text(c, t, xs[i] + pad / 2f, y + 9f, on ? onAcc() : hover ? WHITE : TEXT_2, a);
 			int tab = i;
 			hits.add(new Hit(xs[i], y, ws[i], 26f, () -> showTab(tab)));
 		}
@@ -1238,8 +1247,8 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		int bg = VeloAnim.lerpArgb(on ? 0x1FFFFFFF : 0x12FFFFFF, on ? 0x2BFFFFFF : 0x1FFFFFFF, ht);
 		rect(c, x, y, w, h, 18f, bg, a);
 		VeloDraw.strokeRounded(c, x, y, w, h, 18f, 1f, alpha(on ? 0x33FFFFFF : 0x17FFFFFF, a));
-		rect(c, x + 14f, y + 14f, 32f, 32f, 11f, on ? WHITE : 0x1FFFFFFF, a);
-		moduleIcon(c, m, x + 22f, y + 22f, 16f, on ? 0xFF141416 : WHITE, a);
+		rect(c, x + 14f, y + 14f, 32f, 32f, 11f, on ? acc() : 0x1FFFFFFF, a);
+		moduleIcon(c, m, x + 22f, y + 22f, 16f, on ? onAcc() : WHITE, a);
 		float sx = x + w - 14f - 30f;
 		toggle(c, "cardsw:" + m.id(), sx, y + 14f, on, a, true);
 		boolean pinned = QuickToggles.isFavorite(m.id());
@@ -1515,8 +1524,8 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		y = backButton(c, p.cat() == null ? "Home" : p.cat().name(), x, y, top, height, a, live);
 		// header: icon tile, name, description (wrapped), big switch
 		boolean modOn = m.isEnabled();
-		rect(c, x, y, 34f, 34f, 11f, modOn ? WHITE : 0x1FFFFFFF, a);
-		moduleIcon(c, m, x + 8f, y + 8f, 18f, modOn ? 0xFF141416 : WHITE, a);
+		rect(c, x, y, 34f, 34f, 11f, modOn ? acc() : 0x1FFFFFFF, a);
+		moduleIcon(c, m, x + 8f, y + 8f, 18f, modOn ? onAcc() : WHITE, a);
 		text(c, fit(m.displayName(), true, w - 90f), x + 44f, y + 4f, WHITE, a);
 		List<Text> desc = wrap(m.description(), w - 90f, 2);
 		for (int i = 0; i < desc.size(); i++) {
@@ -1725,7 +1734,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			float kw = w - 12f;
 			float kx0 = x + 6f;
 			rect(c, kx0, ty, kw, 4f, 2f, 0x24FFFFFF, a);
-			rect(c, kx0, ty, (float) Math.max(4f, kw * frac), 4f, 2f, WHITE, a);
+			rect(c, kx0, ty, (float) Math.max(4f, kw * frac), 4f, 2f, acc(), a);
 			float knobX = kx0 + (float) (kw * frac);
 			boolean held = sliding != null && sliderTrack.containsKey(sliding) && sliderTrack.get(sliding)[0] == kx0 && sliderTrack.get(sliding)[2] == ty;
 			boolean over = live && inside(x - 4f, ty - 8f, w + 8f, 20f);
@@ -1747,12 +1756,12 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 				float each = w / choice.options().size();
 				int idx = Math.max(0, choice.options().indexOf(cur));
 				float pos = animTo("seg:" + m.id() + ":" + f.label(), idx, 12f);
-				rect(c, x + 2f + pos * each, sy + 2f, each - 4f, 18f, 9f, WHITE, a);
+				rect(c, x + 2f + pos * each, sy + 2f, each - 4f, 18f, 9f, acc(), a);
 				for (int i = 0; i < choice.options().size(); i++) {
 					String o = choice.options().get(i);
 					Text ot = B(o);
 					boolean sel = i == idx;
-					text(c, ot, x + i * each + (each - tw(ot)) / 2f, sy + 7f, sel ? 0xFF141416 : TEXT_2, a);
+					text(c, ot, x + i * each + (each - tw(ot)) / 2f, sy + 7f, sel ? onAcc() : TEXT_2, a);
 					hit(live, top, height, x + i * each, sy, each, 22f, () -> {
 						choice.set().accept(o);
 						VeloProfileStore.saveActive();

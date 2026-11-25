@@ -60,7 +60,7 @@ public final class MenuKit {
 
 	public static int accent() {
 		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
-			return 0xFFFFFFFF;   // glass: white highlights, no colour
+			return net.veloclient.velo.client.gui.glass.GlassPrefs.accent();   // glass: the accent from Settings > Theme (white by default)
 		}
 		return accentOverride >= 0 ? accentOverride | 0xFF000000 : ThemeManager.active().accentStart() | 0xFF000000;
 	}
@@ -71,6 +71,9 @@ public final class MenuKit {
 	}
 
 	public static int onAccent() {
+		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
+			return net.veloclient.velo.client.gui.glass.GlassPrefs.onAccent();
+		}
 		return ThemeManager.active().onAccent();
 	}
 
@@ -238,6 +241,17 @@ public final class MenuKit {
 
 	/** A glass card: soft shadow, dark translucent fill, hairline edge. */
 	public static void panel(DrawContext context, int x, int y, int w, int h, int radius) {
+		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
+			// the glass of the menus: no drop shadow (it showed through), light edge, light along the top
+			float r = net.veloclient.velo.client.gui.glass.GlassPrefs.radius(radius);
+			VeloDraw.fillRounded(context, x, y, w, h, r, net.veloclient.velo.client.gui.glass.GlassPrefs.tint(0xA6141418));
+			VeloDraw.strokeRounded(context, x, y, w, h, r, 1f, 0x26FFFFFF);
+			int ri = Math.round(r);
+			if (w > ri * 2) {
+				context.fill(x + ri, y, x + w - ri, y + 1, 0x33FFFFFF);
+			}
+			return;
+		}
 		VeloDraw.shadow(context, x, y, w, h, radius, 14, 4, 0x55000000);
 		VeloDraw.fillRounded(context, x, y, w, h, radius, PANEL);
 		VeloDraw.strokeRounded(context, x, y, w, h, radius, HAIRLINE);
@@ -245,7 +259,7 @@ public final class MenuKit {
 
 	/** An inner tile on a panel. */
 	public static void tile(DrawContext context, int x, int y, int w, int h, int radius) {
-		VeloDraw.fillRounded(context, x, y, w, h, radius, SURFACE_2);
+		VeloDraw.fillRounded(context, x, y, w, h, radius, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(SURFACE_2, 0x14FFFFFF));
 	}
 
 	public static void hairline(DrawContext context, int x, int y, int w) {
@@ -261,7 +275,7 @@ public final class MenuKit {
 		VeloDraw.fillRounded(context, x, y, w, h, h / 2, track);
 		float knobX = x + 1 + (w - h) * progress;
 		// glass: the track turns white when on, so the knob turns dark (white on white vanished)
-		int knob = glass ? VeloAnim.lerpArgb(0xFFFFFFFF, 0xFF141416, progress) : 0xFFFFFFFF;
+		int knob = glass ? VeloAnim.lerpArgb(0xFFFFFFFF, net.veloclient.velo.client.gui.glass.GlassPrefs.onAccent(), progress) : 0xFFFFFFFF;
 		VeloDraw.fillCircle(context, knobX + (h - 2) / 2f, y + h / 2f, (h - 2) / 2f, knob);
 	}
 

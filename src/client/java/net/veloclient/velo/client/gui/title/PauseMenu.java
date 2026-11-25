@@ -167,7 +167,7 @@ public final class PauseMenu {
 		float eased = 1f - (float) Math.pow(1f - open, 3);
 		// Customize: how dark (100 = Velo's default, up to twice as dark), the tint, and the side the menu is on
 		ScreenLook.Pause look = ScreenLook.pause();
-		float k = look.dim / 100f;
+		float k = look.dim / 100f * (net.veloclient.velo.client.gui.widget.VeloStyle.glass() ? 0.45f : 1f);   // glass: the game stays visible
 		int dimA = Math.min(255, Math.round(0xD0 * eased * k));
 		int dimB = Math.min(255, Math.round(0x59 * eased * k * (k > 1f ? k : 1f)));
 		int tint = look.tint & 0xFFFFFF;
@@ -360,8 +360,12 @@ public final class PauseMenu {
 			place(back, colX, y, colW, backH);
 			float hover = MenuKit.hover(back, hovered(mouseX, mouseY, back));
 			int accent = MenuKit.accent();
-			VeloDraw.shadow(context, colX, y, colW, backH, 7, 10, 3, (accent & 0xFFFFFF) | 0x50000000);
-			VeloDraw.fillRounded(context, colX, y, colW, backH, 7, VeloAnim.lerpArgb(accent, VeloAnim.lerpArgb(accent, 0xFFFFFFFF, 0.12f), hover));
+			boolean glass = net.veloclient.velo.client.gui.widget.VeloStyle.glass();
+			if (!glass) {
+				VeloDraw.shadow(context, colX, y, colW, backH, 7, 10, 3, (accent & 0xFFFFFF) | 0x50000000);
+			}
+			VeloDraw.fillRounded(context, colX, y, colW, backH, glass ? backH / 2f : 7, glass ? VeloAnim.lerpArgb(accent, 0xFF000000, 0.08f * hover)
+					: VeloAnim.lerpArgb(accent, VeloAnim.lerpArgb(accent, 0xFFFFFFFF, 0.12f), hover));
 			MenuKit.icon(context, "play", colX + 9, y + (backH - 10) / 2, 10, MenuKit.onAccent());
 			MenuKit.text(context, renderer, MenuKit.uiBold(label(back)), colX + 25, y + (backH - MenuKit.H_UI) / 2, MenuKit.onAccent());
 			MenuKit.keyHint(context, renderer, "ESC", colX + colW - 9, y + (backH - MenuKit.H_MONO) / 2, (MenuKit.onAccent() & 0xFFFFFF) | 0xB0000000);
@@ -441,8 +445,13 @@ public final class PauseMenu {
 			int ly = height - top - leaveH;
 			place(leave, colX, ly, colW, leaveH);
 			float hover = MenuKit.hover(leave, hovered(mouseX, mouseY, leave));
-			VeloDraw.fillRounded(context, colX, ly, colW, leaveH, 7, VeloAnim.lerpArgb(0x00000000, 0x24FF5A5F, hover));
-			VeloDraw.strokeRounded(context, colX, ly, colW, leaveH, 7, VeloAnim.lerpArgb(0x59FF5A5F, 0xFFFF5A5F, hover));
+			if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
+				// glass pill; it only warms up red when you point at it
+				VeloDraw.fillRounded(context, colX, ly, colW, leaveH, leaveH / 2f, VeloAnim.lerpArgb(0x16FFFFFF, 0x30FF5A5F, hover));
+			} else {
+				VeloDraw.fillRounded(context, colX, ly, colW, leaveH, 7, VeloAnim.lerpArgb(0x00000000, 0x24FF5A5F, hover));
+				VeloDraw.strokeRounded(context, colX, ly, colW, leaveH, 7, VeloAnim.lerpArgb(0x59FF5A5F, 0xFFFF5A5F, hover));
+			}
 			Text label = MenuKit.uiBold(label(leave));
 			MenuKit.text(context, renderer, label, colX + (colW - MenuKit.width(renderer, label)) / 2, ly + (leaveH - MenuKit.H_UI) / 2, MenuKit.RED_TEXT);
 		}

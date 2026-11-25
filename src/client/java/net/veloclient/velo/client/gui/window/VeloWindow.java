@@ -277,7 +277,7 @@ public abstract class VeloWindow extends Screen {
 
 		Theme theme = ThemeManager.active();
 		int alpha = (int) (255 * openProgress);
-		int radius = look.radius >= 0 ? look.radius : look.style.equals("minimal") ? 6 : glassLook() ? 14 : VeloStyle.RADIUS_WINDOW;
+		int radius = look.radius >= 0 ? look.radius : look.style.equals("minimal") ? 6 : glassLook() ? Math.round(net.veloclient.velo.client.gui.glass.GlassPrefs.radius(14f)) : VeloStyle.RADIUS_WINDOW;
 		int accentRgb = net.veloclient.velo.client.gui.title.MenuKit.accent() & 0xFFFFFF;
 		String style = glassLook() ? "velo" : look.style;   // glass: one clean edge, no coloured glow
 		switch (style) {
@@ -322,7 +322,7 @@ public abstract class VeloWindow extends Screen {
 		};
 		if (glassLook()) {
 			glass = 0xFF141418;
-			baseAlpha = 0xA4;
+			baseAlpha = net.veloclient.velo.client.gui.glass.GlassPrefs.tint(0xA4000000) >>> 24;   // Settings > Theme: Glass
 		}
 		baseAlpha = Math.round(baseAlpha * (1f - look.clear / 100f * 0.75f));
 		int surface = (glass & 0x00FFFFFF) | (Math.round(baseAlpha * openProgress) << 24);
@@ -729,13 +729,13 @@ public abstract class VeloWindow extends Screen {
 			}
 			pillX += (tabX[active] - pillX) * 0.25f;
 			pillW += (tabW[active] - pillW) * 0.25f;
-			VeloDraw.fillRounded(context, pillX, y + 2, pillW, h - 4, (h - 4) / 2f, VeloUi.withAlpha(0xFFFFFFFF, alpha));
+			VeloDraw.fillRounded(context, pillX, y + 2, pillW, h - 4, (h - 4) / 2f, VeloUi.withAlpha(net.veloclient.velo.client.gui.title.MenuKit.accent(), alpha));
 		}
 		int textY = y + (h - 8) / 2 + 1;
 		for (int i = 0; i < tabs.length; i++) {
 			boolean on = i == active;
 			boolean hovered = !on && mouseX >= tabX[i] && mouseX < tabX[i] + tabW[i] && mouseY >= y && mouseY < y + h;
-			int color = on ? 0xFF141416 : hovered ? 0xFFFFFFFF : 0xB8FFFFFF;
+			int color = on ? net.veloclient.velo.client.gui.title.MenuKit.onAccent() : hovered ? 0xFFFFFFFF : 0xB8FFFFFF;
 			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, labels[i], tabX[i] + pad, textY,
 					VeloUi.withAlpha(color, Math.round(((color >>> 24) & 0xFF) * alpha / 255f)));
 			String badge = headerTabBadge(i);
