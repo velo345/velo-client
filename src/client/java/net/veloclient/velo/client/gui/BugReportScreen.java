@@ -79,7 +79,7 @@ public final class BugReportScreen extends VeloWindow {
 		titleBox.setText(previousTitle);
 		addDrawableChild(titleBox);
 		int boxY = y + 24;
-		int boxH = Math.max(40, contentBottom() - 64 - boxY);
+		int boxH = Math.max(40, contentBottom() - 78 - boxY);   // room for the box's own character counter above the buttons
 		//? if <26.1 {
 		//? if <1.21.2 {
 		/*net.minecraft.client.gui.widget.EditBoxWidget box = new net.minecraft.client.gui.widget.EditBoxWidget(this.textRenderer, x + 2, boxY + 2, w - 4, boxH - 4, Text.literal("What happened"), Text.empty());
@@ -160,7 +160,12 @@ public final class BugReportScreen extends VeloWindow {
 		hits.add(VeloUi.pill(context, x, buttonY, 90, 18, crashFile != null ? "Not now" : "Cancel", 0, mouseX, mouseY, this::requestClose));
 		hits.add(VeloUi.pill(context, x + w - 120, buttonY, 120, 18, sending ? "Sending..." : "Send report", 1, mouseX, mouseY, this::send));
 
-		if (showDetails) {
+	}
+
+	@Override
+	protected void renderOverlayLayer(DrawContext context, int mouseX, int mouseY, float delta) {
+		// over the text boxes (it was drawn under them, so they showed through)
+		if (showDetails && sentId == null) {
 			renderDetails(context);
 		}
 	}
@@ -182,11 +187,16 @@ public final class BugReportScreen extends VeloWindow {
 		int w = contentWidth();
 		int h = lines.size() * 11 + 12;
 		int x = contentX();
-		int y = contentBottom() - 64 - h;
-		VeloDraw.fillRounded(context, x, y, w, h, 8, VeloStyle.window() | 0xFF000000);
-		VeloDraw.strokeRounded(context, x, y, w, h, 8, VeloStyle.borderStrong());
+		int bottom = contentBottom() - 64;
+		int y = Math.max(contentY(), bottom - h);
+		h = bottom - y;
+		VeloDraw.fillRounded(context, x, y, w, h, 10, 0xF51A1A1E);
+		VeloDraw.strokeRounded(context, x, y, w, h, 10, VeloStyle.borderStrong());
 		int ly = y + 6;
 		for (String line : lines) {
+			if (ly + 9 > y + h) {
+				break;
+			}
 			context.drawTextWithShadow(this.textRenderer, VeloUi.trim(line, w - 14), x + 7, ly, VeloStyle.textMuted());
 			ly += 11;
 		}

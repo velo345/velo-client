@@ -57,7 +57,7 @@ public final class MenuShell {
 	/** Every place the Velo menu can go (the drawer's dock and More menu use these too). */
 	public static List<Entry> entries() {
 		List<Entry> out = new ArrayList<>();
-		out.add(new Entry("modules", "grid", "Modules", false, p -> net.veloclient.velo.client.gui.ModMenuScreen.forView(false)));
+		out.add(new Entry("modules", "grid", "Modules", false, p -> new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen().full()));
 		if (net.veloclient.velo.client.gui.ModMenuScreen.addonsAvailable()) {
 			out.add(new Entry("addons", "extensions", "Addons", false, p -> net.veloclient.velo.client.gui.ModMenuScreen.forView(true)));
 		}

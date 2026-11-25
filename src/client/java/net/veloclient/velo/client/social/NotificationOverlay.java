@@ -192,15 +192,11 @@ public final class NotificationOverlay {
 				toast.expiresAt = Math.max(toast.expiresAt, now + 1500);
 			}
 
-			int surface = theme.surface() | 0xFF000000;
-			int bg = VeloAnim.lerpArgb(surface, 0xFF000000, 0.25f);
-			if (hovered) {
-				bg = VeloAnim.lerpArgb(bg, 0xFFFFFFFF, 0.05f);
-			}
-			VeloDraw.fillRounded(context, x + 2, y + 3, WIDTH, height, 7, VeloUi.withAlpha(0xFF000000, alpha / 3));
-			VeloDraw.fillRounded(context, x, y, WIDTH, height, 7, VeloUi.withAlpha(bg, Math.min(alpha, 0xF2)));
-			VeloDraw.strokeRounded(context, x, y, WIDTH, height, 7, VeloUi.withAlpha(theme.accentStart(), Math.min(alpha, 0x70)));
-			VeloDraw.fillRounded(context, x + 1, y + 6, 3, BASE_HEIGHT - 12, 1, VeloUi.withAlpha(theme.accentStart(), alpha));
+			// 2026-11-25 glass card: dark glass, a light edge catching the top, no coloured side bar
+			int bg = hovered ? 0xFF202024 : 0xFF18181C;
+			VeloDraw.fillRounded(context, x, y, WIDTH, height, 11, VeloUi.withAlpha(bg, Math.min(alpha, 0xEE)));
+			VeloDraw.strokeRounded(context, x, y, WIDTH, height, 11, VeloUi.withAlpha(0xFFFFFFFF, Math.min(alpha, 0x26)));
+			context.fill(x + 11, y, x + WIDTH - 11, y + 1, VeloUi.withAlpha(0xFFFFFFFF, Math.min(alpha, 0x30)));
 
 			int headSize = 22;
 			int headX = x + 10;
@@ -208,17 +204,18 @@ public final class NotificationOverlay {
 			if (toast.uuid != null) {
 				PlayerHeads.draw(context, toast.uuid, toast.name, headX, headY, headSize);
 			} else {
-				VeloDraw.fillRounded(context, headX, headY, headSize, headSize, 4, VeloUi.withAlpha(theme.accentStart(), alpha));
-				context.drawTextWithShadow(textRenderer, "!", headX + (headSize - textRenderer.getWidth("!")) / 2,
-						headY + (headSize - 8) / 2, 0xFFFFFFFF);
+				VeloDraw.fillRounded(context, headX, headY, headSize, headSize, headSize / 2f, VeloUi.withAlpha(0xFFFFFFFF, Math.min(alpha, 0x22)));
+				net.minecraft.text.Text bang = net.veloclient.velo.client.gui.title.MenuKit.uiBold("!");
+				net.veloclient.velo.client.gui.title.MenuKit.text(context, textRenderer, bang, headX + (headSize - net.veloclient.velo.client.gui.title.MenuKit.width(textRenderer, bang)) / 2, headY + (headSize - 8) / 2 + 1,
+						VeloUi.withAlpha(0xFFFFFFFF, alpha));
 			}
 
 			int textX = headX + headSize + 8;
 			int textWidth = WIDTH - (textX - x) - 8;
-			context.drawTextWithShadow(textRenderer, VeloUi.trim(toast.title, textWidth), textX, y + 8,
-					VeloUi.withAlpha(theme.accentStart() | 0xFF000000, alpha));
-			context.drawTextWithShadow(textRenderer, VeloUi.trim(toast.body, textWidth), textX, y + 21,
-					VeloUi.withAlpha(theme.text(), Math.min(alpha, 0xDD)));
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, textRenderer, net.veloclient.velo.client.gui.title.MenuKit.fit(textRenderer, net.veloclient.velo.client.gui.title.MenuKit.uiBold(toast.title), textWidth - 10), textX, y + 9,
+					VeloUi.withAlpha(0xFFFFFFFF, alpha));
+			net.veloclient.velo.client.gui.title.MenuKit.text(context, textRenderer, net.veloclient.velo.client.gui.title.MenuKit.fit(textRenderer, net.veloclient.velo.client.gui.title.MenuKit.ui(toast.body), textWidth), textX, y + 21,
+					VeloUi.withAlpha(0xFFB8B8C0, Math.min(alpha, 0xE6)));
 
 			if (toast.hasActions()) {
 				int buttonY = y + BASE_HEIGHT - 4;
@@ -246,7 +243,7 @@ public final class NotificationOverlay {
 			int closeX = x + WIDTH - 12;
 			if (!playing) {
 				boolean closeHovered = VeloUi.inside(mouseX, mouseY, closeX - 3, y + 3, 12, 12);
-				context.drawTextWithShadow(textRenderer, close, closeX, y + 5, closeHovered ? theme.accentStart() : VeloUi.muted());
+				VeloDraw.cross(context, closeX + 2.5f, y + 9f, 3f, 1.2f, VeloUi.withAlpha(closeHovered ? 0xFFFFFFFF : 0xFF8E8E96, alpha));
 				HITS.add(new VeloUi.Hit(closeX - 3, y + 3, 12, 12, () -> dismiss(toast)));
 				if (toast.onOpen != null) {
 					HITS.add(new VeloUi.Hit(x, y, WIDTH, BASE_HEIGHT, () -> open(toast)));

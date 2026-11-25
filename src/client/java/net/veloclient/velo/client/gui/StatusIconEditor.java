@@ -41,6 +41,10 @@ public final class StatusIconEditor {
 
 	private static void open(Screen parent, String kind, String label, int color, Object[] variantOf) {
 		MinecraftClient.getInstance().setScreen(new PixelEditorScreen(parent, "Draw " + label, new PixelEditorScreen.Host() {
+			private NativeImage baseFull;
+			private NativeImage baseHalf;
+			private NativeImage baseEmpty;
+
 			@Override
 			public List<PixelEditorScreen.StateSpec> states() {
 				return List.of(
@@ -105,12 +109,31 @@ public final class StatusIconEditor {
 				NativeImage full = editor.image("full");
 				NativeImage half = editor.image("half");
 				NativeImage empty = editor.image("empty");
-				if (!"heart".equals(kind) || full == null) {
+				String baseKind = variantOf == null ? kind : (String) variantOf[0];
+				StatusBarIcons.Variant current = variantOf == null ? StatusBarIcons.Variant.NORMAL : (StatusBarIcons.Variant) variantOf[1];
+				if (!"heart".equals(baseKind) || full == null) {
 					int slot = 18;
 					drawRow(context, full, half, empty, x + Math.max(6, (width - (16 * 5 + slot)) / 2), y + (height - slot) / 2, slot, 16);
 					return;
 				}
-				// Hearts: every kind as its own full row, one under the other - click one to draw that kind.
+				// Hearts: every kind as its own full row, one under the other - click one to draw that kind. In a variant's
+				// editor the others stay here too (made from your normal heart), so you can jump between them.
+				if (current != StatusBarIcons.Variant.NORMAL && baseFull == null) {
+					Map<StatusBarIcons.State, NativeImage> saved = StatusBarIcons.loadForEditing(baseKind);
+					baseFull = saved.remove(StatusBarIcons.State.FULL);
+					baseHalf = saved.remove(StatusBarIcons.State.HALF);
+					baseEmpty = saved.remove(StatusBarIcons.State.EMPTY);
+					saved.values().forEach(NativeImage::close);
+					if (baseFull == null) {
+						baseFull = builtIn(baseKind, StatusBarIcons.State.FULL, color);
+					}
+				}
+				NativeImage nFull = current == StatusBarIcons.Variant.NORMAL ? full : baseFull;
+				NativeImage nHalf = current == StatusBarIcons.Variant.NORMAL ? half : baseHalf;
+				NativeImage nEmpty = current == StatusBarIcons.Variant.NORMAL ? empty : baseEmpty;
+				if (nFull == null) {
+					return;
+				}
 				var font = MinecraftClient.getInstance().textRenderer;
 				StatusBarIcons.Variant[] variants = StatusBarIcons.Variant.values();
 				int rowH = Math.max(16, Math.min(30, (height - 8) / variants.length));
@@ -121,33 +144,41 @@ public final class StatusIconEditor {
 				int[] mouse = editor.mouse();
 				for (StatusBarIcons.Variant variant : variants) {
 					boolean normal = variant == StatusBarIcons.Variant.NORMAL;
-					boolean hover = !normal && mouse[0] >= x + 4 && mouse[0] < x + width - 4 && mouse[1] >= ry && mouse[1] < ry + rowH;
-					if (normal || hover) {
-						net.veloclient.velo.client.gui.widget.VeloDraw.fillRounded(context, x + 4, ry + 1, width - 8, rowH - 2, 6, normal ? 0x14FFFFFF : 0x22FFFFFF);
+					boolean editing = variant == current;
+					boolean hover = !editing && mouse[0] >= x + 4 && mouse[0] < x + width - 4 && mouse[1] >= ry && mouse[1] < ry + rowH;
+					if (editing || hover) {
+						net.veloclient.velo.client.gui.widget.VeloDraw.fillRounded(context, x + 4, ry + 1, width - 8, rowH - 2, 6, editing ? 0x1CFFFFFF : 0x22FFFFFF);
 					}
-					boolean own = !normal && StatusBarIcons.hasDrawing(variant.kind(kind));
+					boolean own = !normal && StatusBarIcons.hasDrawing(variant.kind(baseKind));
 					String label = normal ? "Normal" : variant.label;
 					int ty = ry + (rowH - 8) / 2;
 					net.veloclient.velo.client.gui.title.MenuKit.text(context, font, net.veloclient.velo.client.gui.title.MenuKit.uiBold(label), x + 12, ty,
-							normal ? 0xFFFFFFFF : 0xFFD4D4DA);
+							editing ? 0xFFFFFFFF : 0xFFD4D4DA);
 					int hx = x + 12 + labelW;
 					int hy = ry + (rowH - slot) / 2;
-					if (normal) {
-						drawRow(context, full, half, empty, hx, hy, slot, step);
+					if (editing) {
+						drawRow(context, full, half, empty, hx, hy, slot, step);   // what you're drawing right now
+					} else if (normal) {
+						drawRow(context, nFull, nHalf, nEmpty, hx, hy, slot, step);
 					} else {
-						NativeImage made = variant.applyTo(full);
-						NativeImage madeEmpty = variant == StatusBarIcons.Variant.WITHERED && empty != null ? variant.applyTo(empty) : null;
-						drawRow(context, made, null, madeEmpty != null ? madeEmpty : empty, hx, hy, slot, step);
+						NativeImage made = variant.applyTo(nFull);
+						NativeImage madeEmpty = variant == StatusBarIcons.Variant.WITHERED && nEmpty != null ? variant.applyTo(nEmpty) : null;
+						drawRow(context, made, null, madeEmpty != null ? madeEmpty : nEmpty, hx, hy, slot, step);
 						made.close();
 						if (madeEmpty != null) {
 							madeEmpty.close();
 						}
-						String tag = hover ? "Edit  >" : own ? "Your drawing" : "";
-						if (!tag.isEmpty()) {
-							net.minecraft.text.Text t = net.veloclient.velo.client.gui.title.MenuKit.ui(tag);
-							net.veloclient.velo.client.gui.title.MenuKit.text(context, font, t, x + width - 12 - net.veloclient.velo.client.gui.title.MenuKit.width(font, t), ty, hover ? 0xFFFFFFFF : 0xFF9A9AA6);
-						}
-						editor.addPreviewHit(x + 4, ry, width - 8, rowH, () -> openVariant(editor, kind, variant, color));
+					}
+					String tag = editing ? "Editing" : hover ? "Edit  >" : own ? "Your drawing" : "";
+					if (!tag.isEmpty()) {
+						net.minecraft.text.Text t = net.veloclient.velo.client.gui.title.MenuKit.ui(tag);
+						net.veloclient.velo.client.gui.title.MenuKit.text(context, font, t, x + width - 12 - net.veloclient.velo.client.gui.title.MenuKit.width(font, t), ty,
+								hover || editing ? 0xFFFFFFFF : 0xFF9A9AA6);
+					}
+					if (!editing) {
+						// switch to that kind (back still goes to where you came from)
+						Runnable go = normal ? () -> open(parent, baseKind, "Heart", color, null) : () -> openVariant(parent, baseKind, variant, color);
+						editor.addPreviewHit(x + 4, ry, width - 8, rowH, go);
 					}
 					ry += rowH;
 				}

@@ -56,6 +56,16 @@ public final class EnemyHungerModule extends AbstractModule implements Configura
 		if (m.onlyWhenNotFull && hunger >= 20f && saturation > 0f) {
 			return null;
 		}
+		return build(m, hunger, saturation);
+	}
+
+	/** The settings preview: the line exactly as the module builds it, for a sample player. */
+	public static Object preview(float hunger, float saturation) {
+		EnemyHungerModule m = instance;
+		return m == null ? null : build(m, hunger, saturation);
+	}
+
+	private static Object build(EnemyHungerModule m, float hunger, float saturation) {
 		var text = PvpCompat.literal("≈ ", 0xB8B8B8);
 		if (m.style.equals("Numbers")) {
 			text.append(PvpCompat.sprite("hud/food_full"));

@@ -130,6 +130,15 @@ public final class VeloFonts {
 				|| screen instanceof GameMenuScreen && VeloScreens.pause();
 	}
 
+	/**
+	 * Title and pause menu: other mods (Essential...) put their own buttons there, sized for the vanilla font - their
+	 * text keeps Inter's metrics (Geist is a bit taller and got cut off). Velo's own windows use Geist.
+	 */
+	private static boolean modsShareScreen() {
+		Screen screen = ClientCompat.currentScreen();
+		return screen instanceof TitleScreen || screen instanceof GameMenuScreen;
+	}
+
 	/** Sets the pose scale of the HUD element about to draw; returns the previous one to restore. */
 	public static float setHudPoseScale(float scale) {
 		float previous = hudPoseScale;
@@ -172,7 +181,7 @@ public final class VeloFonts {
 
 	public static StyleSpriteSource remap(StyleSpriteSource source) {
 		if (source == StyleSpriteSource.DEFAULT || StyleSpriteSource.DEFAULT.equals(source)) {
-			return menuScope() ? MENU[scaleIndex()] : source;
+			return menuScope() ? (modsShareScreen() ? UI[scaleIndex()] : MENU[scaleIndex()]) : source;
 		}
 		if (source instanceof StyleSpriteSource.Font font) {
 			if (fontsBroken() && "velo-client".equals(font.id().getNamespace())) {
@@ -203,7 +212,7 @@ public final class VeloFonts {
 
 	public static FontDescription remap(FontDescription source) {
 		if (source == FontDescription.DEFAULT || FontDescription.DEFAULT.equals(source)) {
-			return menuScope() ? MENU[scaleIndex()] : source;
+			return menuScope() ? (modsShareScreen() ? UI[scaleIndex()] : MENU[scaleIndex()]) : source;
 		}
 		if (source instanceof FontDescription.Resource font) {
 			if (fontsBroken() && "velo-client".equals(font.id().getNamespace())) {

@@ -120,7 +120,7 @@ public final class PauseMenu {
 		bug = new HotspotButton(Text.literal("Report a bug"), () -> client.setScreen(new BugReportScreen(screen)));
 		tabFavorites = new HotspotButton(Text.literal("Favorites"), () -> showRecent = false);
 		tabRecent = new HotspotButton(Text.literal("Recent"), () -> showRecent = true);
-		allModules = new HotspotButton(Text.literal("All modules"), () -> client.setScreen(new ModMenuScreen()));
+		allModules = new HotspotButton(Text.literal("All modules"), () -> client.setScreen(new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen().full()));
 		clip = new HotspotButton(Text.literal("Save clip"), PauseMenu::saveClip);
 		toggles.clear();
 		for (int i = 0; i < 6; i++) {

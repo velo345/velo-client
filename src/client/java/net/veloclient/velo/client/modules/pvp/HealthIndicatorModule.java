@@ -54,6 +54,16 @@ public final class HealthIndicatorModule extends AbstractModule implements Confi
 		if (m.onlyWhenDamaged && health >= max && absorption <= 0f) {
 			return null;
 		}
+		return build(m, health, max, absorption);
+	}
+
+	/** The settings preview: the line exactly as the module builds it, for a sample player. */
+	public static Object preview(float health, float max, float absorption) {
+		HealthIndicatorModule m = instance;
+		return m == null ? null : build(m, health, max, m.showAbsorption ? absorption : 0f);
+	}
+
+	private static Object build(HealthIndicatorModule m, float health, float max, float absorption) {
 		var text = PvpCompat.empty();
 		if (!m.style.equals("Number")) {
 			// Ten heart slots for the whole health bar, whatever the max health is.

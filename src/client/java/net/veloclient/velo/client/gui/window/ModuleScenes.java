@@ -689,11 +689,9 @@ public final class ModuleScenes {
 					}
 				}
 				case "health-indicator" -> {
-					for (int i = 0; i < 10; i++) {
-						sprite(context, "hud/heart/container", cx - 40 + i * 8, head - 12, 9, 9);
-						if (i < 7) {
-							sprite(context, "hud/heart/full", cx - 40 + i * 8, head - 12, 9, 9);
-						}
+					// the module's own line for a hurt player with absorption - every setting shows here
+					if (net.veloclient.velo.client.modules.pvp.HealthIndicatorModule.preview(14f, 20f, 4f) instanceof Text line) {
+						MenuKit.text(context, tr, line, cx - MenuKit.width(tr, line) / 2, head - 12, 0xFFFFFFFF);
 					}
 				}
 				case "enemy-effects" -> {
@@ -724,11 +722,8 @@ public final class ModuleScenes {
 					}
 				}
 				case "enemy-hunger" -> {
-					for (int i = 0; i < 10; i++) {
-						sprite(context, "hud/food_empty", cx + 31 - i * 8, head - 12, 9, 9);
-						if (i < 6) {
-							sprite(context, "hud/food_full", cx + 31 - i * 8, head - 12, 9, 9);
-						}
+					if (net.veloclient.velo.client.modules.pvp.EnemyHungerModule.preview(13f, 2.4f) instanceof Text line) {
+						MenuKit.text(context, tr, line, cx - MenuKit.width(tr, line) / 2, head - 12, 0xFFFFFFFF);
 					}
 				}
 				case "own-name-tag", "nick-hider" -> {

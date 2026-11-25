@@ -30,7 +30,8 @@ public final class HudManager {
 	}
 
 	public static boolean hidesVanillaBossBar() {
-		return ModuleRegistry.get("boss-bar").map(Module::isEnabled).orElse(false);
+		// Redstone Mode: its overlay owns the top of the screen (the boss bar sat over it)
+		return net.veloclient.velo.client.redstone.RedstoneMode.active() || ModuleRegistry.get("boss-bar").map(Module::isEnabled).orElse(false);
 	}
 
 	public static boolean hidesVanillaScoreboard() {

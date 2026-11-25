@@ -733,6 +733,13 @@ public final class RmHud {
 			width = 204;
 			int inner = width - 16;
 			List<Placements.Placement> list = Placements.all();
+			if (list.isEmpty()) {
+				// nothing loaded (the HUD editor draws every panel): a hint instead of a crash
+				height = 22;
+				context.fill(x, y, x + width, y + height, 0xA0101014);
+				context.drawTextWithShadow(textRenderer, "Schematics - load one with Load", x + 8, y + 7, 0xFFB4B4BE);
+				return;
+			}
 			Placements.Placement selected = Placements.selected();
 			if (selected == null || !list.contains(selected)) {
 				selected = list.get(list.size() - 1);

@@ -31,7 +31,7 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 	private static final int GAP = 3;
 	private final HudPosition position = new HudPosition(0.02f, 0.53f);
 
-	private static final List<String> STYLES = List.of("Boxes", "Glass", "Outline", "Minecraft");
+	private static final List<String> STYLES = List.of("Boxes", "Glass", "Outline", "Minecraft", "HUD Style");
 
 	private String style = "Glass";
 	private boolean showLabels = true;
@@ -140,6 +140,14 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 					VeloDraw.strokeRounded(context, x, y, kw, kh, r6, 0x40FFFFFF);
 				}
 			}
+			case "HUD Style" -> {
+				// the HUD Style's panel (glass by default); a held key turns white
+				if (pressed) {
+					VeloDraw.fillRounded(context, x, y, kw, kh, Math.min(6, kh / 2), 0xEEFFFFFF);
+				} else {
+					net.veloclient.velo.client.hud.HudLook.stylePanel(context, x, y, kw, kh);
+				}
+			}
 			case "Outline" -> {
 				boolean ownPressed = pressedColor != DEFAULT_PRESSED;
 				boolean ownIdle = idleColor != DEFAULT_IDLE;
@@ -165,7 +173,7 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 		int kw = keyW[i], kh = keyH[i];
 		MinecraftClient client = MinecraftClient.getInstance();
 		boolean pressed = binding.isPressed();
-		int textColor = style.equals("Minecraft") && pressed ? 0xFF3F3F3F : 0xFFFFFFFF;
+		int textColor = style.equals("Minecraft") && pressed ? 0xFF3F3F3F : style.equals("HUD Style") && pressed ? 0xFF141416 : 0xFFFFFFFF;
 		boolean hudFont = net.veloclient.velo.client.hud.HudLook.on() && !style.equals("Minecraft");
 		String font = hudFont ? net.veloclient.velo.client.hud.HudLook.font() : "";
 		String bound = binding.getBoundKeyTranslationKey();
@@ -186,7 +194,9 @@ public final class KeystrokesModule extends AbstractModule implements HudModule,
 			}
 		}
 		if (hudFont && styledLabels[i] != null) {
-			float w = labelWidths[i];
+			// measured now, inside the HUD's font scope (the cached width came from wherever the label was first made -
+			// another font's metrics put the W off centre)
+			float w = net.veloclient.velo.client.hud.HudLook.exactWidth((net.minecraft.text.Text) styledLabels[i]);
 			float s = Math.min(w > kw - 4 ? (kw - 4) / (float) w : 1f, kh < 14 ? (kh - 2) / 9f : 1f);
 			context.getMatrices().pushMatrix();
 			// TTF advances have no trailing gap (unlike Minecraft's font): centre the full width, not snapped to pixels.

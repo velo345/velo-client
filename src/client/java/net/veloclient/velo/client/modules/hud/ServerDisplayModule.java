@@ -88,7 +88,7 @@ public final class ServerDisplayModule extends AbstractModule implements HudModu
 		}
 		int h = height();
 		if (showBackground) {
-			VeloDraw.fillRounded(context, x, y, width(), h, 6, 0x90101014);
+			HudLook.stylePanel(context, x, y, width(), h);   // the HUD Style's panel (glass by default)
 		}
 		int tx = x + 5;
 		if (showIcon) {

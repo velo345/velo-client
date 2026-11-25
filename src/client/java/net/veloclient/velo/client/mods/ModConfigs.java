@@ -97,7 +97,7 @@ public final class ModConfigs {
 	/** The mod's settings screen opener, or null when it has none. */
 	public static Function<Screen, Screen> configFor(String modId) {
 		if (modId.equals("velo-client")) {
-			return parent -> new net.veloclient.velo.client.gui.ModMenuScreen();
+			return parent -> new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen().full();
 		}
 		return factories().get(modId);
 	}

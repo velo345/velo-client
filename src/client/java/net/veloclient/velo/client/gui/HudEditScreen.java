@@ -340,7 +340,8 @@ public final class HudEditScreen extends Screen implements net.veloclient.velo.c
 			boolean hover = isInside(mouseX, mouseY, bx, y + 3, bw, h - 6);
 			int fill = primary ? (hover ? VeloAnim.lerpArgb(accent, 0xFFFFFFFF, 0.15f) : accent) : hover ? 0x22FFFFFF : 0x10FFFFFF;
 			VeloDraw.fillRounded(context, bx, y + 3, bw, h - 6, 6, VeloUi.withAlpha(fill, Math.round(((fill >>> 24) & 0xFF) * bannerOpacity)));
-			MenuKit.text(context, this.textRenderer, t, bx + 9, y + 8, VeloUi.withAlpha(0xFFFFFFFF, alpha));
+			// on the (white, glass) accent the label turns dark - white on white was unreadable
+			MenuKit.text(context, this.textRenderer, t, bx + 9, y + 8, VeloUi.withAlpha(primary ? MenuKit.onAccent() : 0xFFFFFFFF, alpha));
 			Runnable action = switch (label) {
 				case "Done" -> this::leave;
 				case "Reset" -> this::resetLayout;

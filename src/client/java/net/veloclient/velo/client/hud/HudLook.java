@@ -219,6 +219,27 @@ public final class HudLook {
 		}
 	}
 
+	/** The menus' glass, for the HUD: dark translucent body, a light edge and light catching the top. */
+	public static void glassPanel(DrawContext context, int x, int y, int w, int h, int radius) {
+		VeloDraw.fillRounded(context, x, y, w, h, radius, 0x8C141418);
+		VeloDraw.strokeRounded(context, x, y, w, h, radius, 0x26FFFFFF);
+		if (w > radius * 2) {
+			context.fill(x + radius, y, x + w - radius, y + 1, 0x33FFFFFF);
+		}
+	}
+
+	/** The element's panel in the HUD Style's look - glass when the HUD Style has no background of its own. */
+	public static void stylePanel(DrawContext context, int x, int y, int w, int h) {
+		HudStyleModule style = style();
+		int radius = style == null || style.rounded() ? Math.min(h / 2, 6) : 2;
+		if (style != null && style.background().equals("Solid")) {
+			VeloDraw.fillRounded(context, x, y, w, h, radius, SOLID);
+			VeloDraw.strokeRounded(context, x, y, w, h, radius, 0x1CFFFFFF);
+			return;
+		}
+		glassPanel(context, x, y, w, h, radius);
+	}
+
 	/** The panel behind an element, per the style (nothing without a background). */
 	public static void panel(DrawContext context, int x, int y, int w, int h) {
 		HudStyleModule style = style();
@@ -226,7 +247,11 @@ public final class HudLook {
 			return;
 		}
 		int radius = style.rounded() ? Math.min(h / 2, 7) : 2;
-		VeloDraw.fillRounded(context, x, y, w, h, radius, style.background().equals("Solid") ? SOLID : GLASS);
+		if (!style.background().equals("Solid")) {
+			glassPanel(context, x, y, w, h, radius);   // 2026-11-25: the same glass as the menus
+			return;
+		}
+		VeloDraw.fillRounded(context, x, y, w, h, radius, SOLID);
 		VeloDraw.strokeRounded(context, x, y, w, h, radius, 0x1CFFFFFF);
 	}
 

@@ -251,6 +251,13 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		open = show;
 	}
 
+	/** Opens straight as the full menu (the pause menu's "All modules", Mod Menu's config button). */
+	public VeloDrawerScreen full() {
+		expanded = true;
+		expandAnim = 1f;
+		return this;
+	}
+
 	public void testFeatures() {
 		showTab(cats.size() + 1);
 	}
@@ -1602,6 +1609,10 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	private Module statsOf;
 	private long statsAt;
 
+	private static List<ConfigField> fields(Module m) {
+		return m instanceof Configurable cfg ? cfg.configFields() : List.of();
+	}
+
 	private float renderStats(DrawContext c, Module m, net.veloclient.velo.client.gui.window.ModuleDashboard dash, float x, float y, float w, float a) {
 		long now = System.currentTimeMillis();
 		if (statsOf != m || now - statsAt > 300) {
@@ -1612,6 +1623,10 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			}
 			statsOf = m;
 			statsAt = now;
+		}
+		if (stats != null && fields(m).stream().anyMatch(f -> f instanceof ConfigField.ChoiceField cf && cf.label().equalsIgnoreCase("Preset"))) {
+			// the Preset setting is right below - no second "Preset" tile
+			stats = stats.stream().filter(st -> !st.label().equalsIgnoreCase("Preset")).toList();
 		}
 		if (stats == null || stats.isEmpty()) {
 			return y;
