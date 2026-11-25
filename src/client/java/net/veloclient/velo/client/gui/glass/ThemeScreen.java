@@ -98,8 +98,6 @@ public final class ThemeScreen extends VeloWindow {
 		VeloDraw.fillRounded(context, x, ry, rw, 22, 11, hover ? 0x2EFFFFFF : 0x16FFFFFF);
 		MenuKit.text(context, this.textRenderer, reset, x + 14, ry + 8, 0xFFFFFFFF);
 		hits.add(new Hit(x, ry, rw, 22, GlassPrefs::reset));
-		Text note = MenuKit.ui("Changes show right away in every Velo menu.");
-		MenuKit.text(context, this.textRenderer, note, x + w - MenuKit.width(this.textRenderer, note), ry + 8, MenuKit.TEXT_3);
 	}
 
 	private void section(DrawContext context, String title, String value, int x, int y) {
