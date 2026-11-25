@@ -29,7 +29,7 @@ public abstract class PauseBlurMixin {
 		}
 		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()
 				&& net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.window.VeloWindow) {
-			cir.setReturnValue(6);   // glass windows: the game softly blurred (the glass body is frostier)
+			cir.setReturnValue(12);   // glass windows: strong - only behind the window (SharpFrame keeps the rest sharp)
 			return;
 		}
 		int blur = ScreenLook.pause().blur;
@@ -50,7 +50,7 @@ public abstract class PauseBlurMixin {
 		}
 		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()
 				&& net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.window.VeloWindow) {
-			cir.setReturnValue(6);   // glass windows: the game softly blurred (the glass body is frostier)
+			cir.setReturnValue(12);   // glass windows: strong - only behind the window (SharpFrame keeps the rest sharp)
 			return;
 		}
 		int blur = ScreenLook.pause().blur;

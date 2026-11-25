@@ -56,8 +56,8 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	private static final float EXPAND_TIME = 0.42f;
 	private static final float HANDLE_TIME = 0.26f;
 
-	private static final int GLASS = 0xA8141417;        // the panel, over the softly blurred world
-	private static final int GLASS_FULL = 0xA6141418;   // the full menu
+	private static final int GLASS = 0x8C141417;        // the panel, over the frosted (blurred) game behind it
+	private static final int GLASS_FULL = 0x8C141418;   // the full menu
 	private static final Identifier LOGO = Identifier.of("velo-client", "textures/icon/logo.png");
 	private static final int TEXT_1 = 0xEBFFFFFF;
 	private static final int GLASS_EDGE = 0x26FFFFFF;
@@ -275,6 +275,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	@Override
 	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
 		if (blurOn()) {
+			hudBehind = hudUnderBlur(context, delta);
 			this.applyBlur(context);
 		}
 	}
@@ -282,6 +283,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	/*@Override
 	public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 		if (blurOn()) {
+			hudBehind = hudUnderBlur(context, delta);
 			this.extractBlurredBackground(context);
 		}
 	}
@@ -291,6 +293,21 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	}
 	*///?}
 
+	/** True when this frame's HUD elements were drawn under the blur (frosted behind the glass, sharp around it). */
+	private boolean hudBehind;
+
+	/** The HUD elements, drawn before the blur so the glass frosts them too (the edit outlines go on top later). */
+	private boolean hudUnderBlur(DrawContext context, float delta) {
+		if (expandAnim >= 0.5f) {
+			return false;
+		}
+		net.veloclient.velo.client.hud.HudAutoLayout.update(this.width, this.height);
+		for (HudModule hud : hudModules()) {
+			HudManager.renderScaled(context, hud, this.width, this.height, delta);
+		}
+		return true;
+	}
+
 	private boolean blurOn() {
 		return blurRadius() > 0;
 	}
@@ -299,7 +316,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	public int blurRadius() {
 		// the panel gets a lighter blur (the HUD stays crisp on top); it lifts when the panel slides away to place things
 		float e = easeInOut(expandAnim);
-		return Math.round((4f + 3f * e) * ease(openAnim));   // the game behind: softly blurred, the glass itself is frostier
+		return Math.round((10f + 2f * e) * ease(openAnim));   // strong: it only shows behind the glass (SharpFrame keeps the rest sharp)
 	}
 
 	// ---------------------------------------------------------------- geometry
@@ -579,6 +596,12 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		}
 		*///?}
 
+		if (blurOn() && net.veloclient.velo.client.gui.glass.SharpFrame.prepare()) {
+			// blur only behind the glass: the game around it stays sharp
+			float[] gr = rectNow();
+			net.veloclient.velo.client.gui.glass.SharpFrame.drawOutside(context, this.width, this.height, Math.round(gr[0] * k), Math.round(gr[1] * k),
+					Math.round(gr[2] * k), Math.round(gr[3] * k));
+		}
 		if (expandAnim < 0.5f) {
 			renderHud(context, mouseX, mouseY, delta);   // the full menu covers the HUD; Edit HUD brings it back
 		}
@@ -637,6 +660,8 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	}
 
 	private void renderHud(DrawContext context, int mouseX, int mouseY, float delta) {
+		boolean elementsDrawn = hudBehind;
+		hudBehind = false;
 		net.veloclient.velo.client.hud.HudAutoLayout.update(this.width, this.height);
 		if (dragging != null && dragMoved) {
 			context.fill(this.width / 2, 0, this.width / 2 + 1, this.height, 0x50FFFFFF);
@@ -649,7 +674,9 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			int h = sh(hud);
 			int x = hud.position().resolveX(this.width, w);
 			int y = hud.position().resolveY(this.height, h);
-			HudManager.renderScaled(context, hud, this.width, this.height, delta);
+			if (!elementsDrawn) {
+				HudManager.renderScaled(context, hud, this.width, this.height, delta);
+			}
 			boolean active = hud == dragging || hud == resizing || hud == selected;
 			boolean hover = !overDrawer(mouseX / k, mouseY / k) && mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
 			float t = animTo("hud:" + hud.id(), active ? 1f : hover ? 0.6f : 0f, 9f);   // own key: a HUD module's toggle animates too
@@ -745,7 +772,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		float h = r[3];
 		if (e > 0.01f) {
 			// a light veil over the blurred game - not a black overlay
-			c.fill(0, 0, (int) Math.ceil(W()) + 1, (int) Math.ceil(H()) + 1, alpha(0x30000000, e * a));
+			c.fill(0, 0, (int) Math.ceil(W()) + 1, (int) Math.ceil(H()) + 1, alpha(0x1C000000, e * a));
 		}
 		float rad = 18f + 6f * e;
 		glass(c, x, y, w, h, rad, VeloAnim.lerpArgb(GLASS, GLASS_FULL, e), a);

@@ -74,6 +74,7 @@ public abstract class VeloWindow extends Screen {
 	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
 		if (MinecraftClient.getInstance().world != null) {
 			this.applyBlur(context);
+			blurredNow = true;
 		} else {
 			super.renderBackground(context, mouseX, mouseY, delta);
 		}
@@ -83,11 +84,15 @@ public abstract class VeloWindow extends Screen {
 	public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
 		if (net.minecraft.client.Minecraft.getInstance().level != null) {
 			this.extractBlurredBackground(context);
+			blurredNow = true;
 		} else {
 			super.extractBackground(context, mouseX, mouseY, delta);
 		}
 	}
 	*///?}
+
+	/** Set when this frame's background blurred the game (then only the window keeps it - see SharpFrame). */
+	private boolean blurredNow;
 
 	/** Glass is the base of every look (blurred game, translucent body, white pills); glow/neon only add their edge. Solid stays opaque. */
 	protected static boolean glassLook() {
@@ -235,8 +240,15 @@ public abstract class VeloWindow extends Screen {
 			return;
 		}
 
+		if (blurredNow) {
+			blurredNow = false;
+			if (glassLook() && net.veloclient.velo.client.gui.glass.SharpFrame.prepare()) {
+				// frosted only behind the window, the game around it stays sharp
+				net.veloclient.velo.client.gui.glass.SharpFrame.drawOutside(context, this.width, this.height, windowX, windowY, windowWidth, windowHeight);
+			}
+		}
 		int[] hole = openProgress > 0.97f && !closing ? windowHole() : null;
-		int dimMax = Math.round(look.dim * 2.55f * (glassLook() ? 0.35f : 1f));   // glass: a light veil, the blur does the rest
+		int dimMax = Math.round(look.dim * 2.55f * (glassLook() ? 0.15f : 1f));   // glass: barely a veil - the game around the window stays clear
 		if (hole == null) {
 			context.fill(0, 0, this.width, this.height, (int) (dimMax * openProgress) << 24);
 		} else {
