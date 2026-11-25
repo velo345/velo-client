@@ -32,6 +32,10 @@ public abstract class PauseBlurMixin {
 			cir.setReturnValue(net.veloclient.velo.client.gui.glass.GlassPrefs.blurRadius(12));   // glass windows: strong - only behind the window (SharpFrame keeps the rest sharp)
 			return;
 		}
+		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass() && net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof GameMenuScreen) {
+			cir.setReturnValue(net.veloclient.velo.client.gui.glass.GlassPrefs.blurRadius(12));   // glass: strong, only behind the panels
+			return;
+		}
 		int blur = ScreenLook.pause().blur;
 		if (blur >= 0 && net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof GameMenuScreen) {
 			cir.setReturnValue(blur);
@@ -51,6 +55,10 @@ public abstract class PauseBlurMixin {
 		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()
 				&& net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof net.veloclient.velo.client.gui.window.VeloWindow) {
 			cir.setReturnValue(net.veloclient.velo.client.gui.glass.GlassPrefs.blurRadius(12));   // glass windows: strong - only behind the window (SharpFrame keeps the rest sharp)
+			return;
+		}
+		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass() && net.veloclient.velo.client.util.ClientCompat.currentScreen() instanceof PauseScreen) {
+			cir.setReturnValue(net.veloclient.velo.client.gui.glass.GlassPrefs.blurRadius(12));   // glass: strong, only behind the panels
 			return;
 		}
 		int blur = ScreenLook.pause().blur;

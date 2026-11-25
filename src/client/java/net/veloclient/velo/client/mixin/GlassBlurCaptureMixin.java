@@ -18,4 +18,13 @@ public abstract class GlassBlurCaptureMixin {
 	private void velo$keepSharpFrame(CallbackInfo ci) {
 		net.veloclient.velo.client.gui.glass.SharpFrame.capture();
 	}
+
+	//? if <26.1 {
+	@Inject(method = "renderBlur", at = @At("TAIL"), require = 0)
+	//?} else {
+	/*@Inject(method = "processBlurEffect", at = @At("TAIL"), require = 0)
+	*///?}
+	private void velo$keepBlurredFrame(CallbackInfo ci) {
+		net.veloclient.velo.client.gui.glass.SharpFrame.captureBlurred();
+	}
 }

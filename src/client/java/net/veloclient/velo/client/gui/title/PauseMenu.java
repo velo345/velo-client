@@ -160,8 +160,16 @@ public final class PauseMenu {
 		for (ClickableWidget widget : RESTYLED) {
 			widget.visible = false;
 		}
+		MenuKit.panelSink = null;
+		List<int[]> glassRects = new ArrayList<>(GLASS_RECTS);
+		GLASS_RECTS.clear();
 		if (!menuWasShown) {
 			return;
+		}
+		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass() && !glassRects.isEmpty()
+				&& net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
+			// the game stays sharp; only behind the panels and buttons it's frosted (rects from the last frame)
+			net.veloclient.velo.client.gui.glass.SharpFrame.drawSharpExcept(context, width, height, glassRects);
 		}
 		float open = Math.min(1f, (System.nanoTime() - openedAt) / 320_000_000f);
 		float eased = 1f - (float) Math.pow(1f - open, 3);
@@ -181,6 +189,9 @@ public final class PauseMenu {
 			context.fill(split, 0, width, height, (dimB << 24) | tint);
 		}
 	}
+
+	/** The glass panels and buttons drawn this frame - next frame the blur goes behind them. */
+	private static final List<int[]> GLASS_RECTS = new ArrayList<>();
 
 	/** Word colour of the menu rows (Customize), set per frame. */
 	private static int navColor = 0xFFE4E4E8;
@@ -240,6 +251,7 @@ public final class PauseMenu {
 			}
 		}
 		menuWasShown = menuShown;
+		MenuKit.panelSink = GLASS_RECTS;
 		if (!menuShown) {
 			// F3+Esc pauses without a menu: nothing of ours either.
 			hideCards();
@@ -358,6 +370,7 @@ public final class PauseMenu {
 		int backH = compact ? 20 : 24;
 		if (back != null) {
 			place(back, colX, y, colW, backH);
+			GLASS_RECTS.add(new int[] {colX, y, colW, backH});
 			float hover = MenuKit.hover(back, hovered(mouseX, mouseY, back));
 			int accent = MenuKit.accent();
 			boolean glass = net.veloclient.velo.client.gui.widget.VeloStyle.glass();
@@ -444,6 +457,7 @@ public final class PauseMenu {
 		if (leave != null) {
 			int ly = height - top - leaveH;
 			place(leave, colX, ly, colW, leaveH);
+			GLASS_RECTS.add(new int[] {colX, ly, colW, leaveH});
 			float hover = MenuKit.hover(leave, hovered(mouseX, mouseY, leave));
 			if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
 				// glass pill; it only warms up red when you point at it

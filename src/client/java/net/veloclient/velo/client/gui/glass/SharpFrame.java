@@ -22,6 +22,8 @@ public final class SharpFrame {
 
 	private static final Identifier ID = Identifier.of("velo-client", "glass/sharp_frame");
 	private static boolean wanted;
+	private static boolean wantedBlurred;
+	private static final Identifier BLURRED_ID = Identifier.of("velo-client", "glass/blurred_frame");
 	private static int texW;
 	private static int texH;
 
@@ -29,6 +31,7 @@ public final class SharpFrame {
 	}
 
 	private static Object tex;
+	private static Object blurredTex;
 
 	//? if >=1.21.11 && <26.1 {
 	private static final class Tex extends net.minecraft.client.texture.AbstractTexture {
@@ -90,6 +93,13 @@ public final class SharpFrame {
 
 	public static void capture() {
 	}
+
+	public static void captureBlurred() {
+	}
+
+	public static boolean prepareBoth() {
+		return false;
+	}
 	*///?} else {
 	/** Called while a menu records its frame: makes sure the copy target matches the screen. False when not possible. */
 	public static boolean prepare() {
@@ -107,6 +117,12 @@ public final class SharpFrame {
 				Tex made = new Tex(gpu);
 				MinecraftClient.getInstance().getTextureManager().registerTexture(ID, made);
 				tex = made;
+				var gpu2 = com.mojang.blaze3d.systems.RenderSystem.getDevice().createTexture(() -> "Velo glass blurred frame",
+						GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING,
+						main.getFormat(), w, h, 1, 1);
+				Tex made2 = new Tex(gpu2);
+				MinecraftClient.getInstance().getTextureManager().registerTexture(BLURRED_ID, made2);
+				blurredTex = made2;
 				texW = w;
 				texH = h;
 			}
@@ -115,6 +131,28 @@ public final class SharpFrame {
 		} catch (RuntimeException e) {
 			return false;
 		}
+	}
+
+	/** Like {@link #prepare}, and also keeps the blurred frame (for menus with several glass panels: {@link #drawSharpExcept}). */
+	public static boolean prepareBoth() {
+		if (!prepare()) {
+			return false;
+		}
+		wantedBlurred = true;
+		return true;
+	}
+
+	/** GameRenderer, right after the menu blur: copy the blurred frame. */
+	public static void captureBlurred() {
+		if (!wantedBlurred || blurredTex == null) {
+			return;
+		}
+		wantedBlurred = false;
+		var main = main();
+		if (main == null || main.getWidth(0) != texW || main.getHeight(0) != texH) {
+			return;
+		}
+		com.mojang.blaze3d.systems.RenderSystem.getDevice().createCommandEncoder().copyTextureToTexture(main, ((Tex) blurredTex).gpu(), 0, 0, 0, 0, 0, texW, texH);
 	}
 
 	/** GameRenderer, right before the menu blur: copy the frame as it is (sharp). */
@@ -149,7 +187,29 @@ public final class SharpFrame {
 		strip(context, screenW, screenH, x2, y, screenW - x2, y2 - y);
 	}
 
+	/**
+	 * Several glass panels (the pause menu): the sharp frame everywhere, then the blurred one back behind each rect
+	 * {x, y, w, h} (gui pixels). Needs {@link #prepareBoth} this frame.
+	 */
+	public static void drawSharpExcept(DrawContext context, int screenW, int screenH, java.util.List<int[]> rects) {
+		if (texW == 0 || screenW <= 0 || screenH <= 0) {
+			return;
+		}
+		strip(context, ID, screenW, screenH, 0, 0, screenW, screenH);
+		for (int[] r : rects) {
+			int x = Math.max(0, r[0]);
+			int y = Math.max(0, r[1]);
+			int x2 = Math.min(screenW, r[0] + r[2]);
+			int y2 = Math.min(screenH, r[1] + r[3]);
+			strip(context, BLURRED_ID, screenW, screenH, x, y, x2 - x, y2 - y);
+		}
+	}
+
 	private static void strip(DrawContext context, int screenW, int screenH, int gx, int gy, int gw, int gh) {
+		strip(context, ID, screenW, screenH, gx, gy, gw, gh);
+	}
+
+	private static void strip(DrawContext context, Identifier id, int screenW, int screenH, int gx, int gy, int gw, int gh) {
 		if (gw <= 0 || gh <= 0) {
 			return;
 		}
@@ -158,6 +218,6 @@ public final class SharpFrame {
 		int rw = Math.round(gw * sx);
 		int rh = Math.round(gh * sy);
 		// the copied render target is stored bottom-up: sample it flipped
-		context.drawTexture(RenderPipelines.GUI_TEXTURED, ID, gx, gy, gx * sx, texH - gy * sy, gw, gh, rw, -rh, texW, texH, 0xFFFFFFFF);
+		context.drawTexture(RenderPipelines.GUI_TEXTURED, id, gx, gy, gx * sx, texH - gy * sy, gw, gh, rw, -rh, texW, texH, 0xFFFFFFFF);
 	}
 }
