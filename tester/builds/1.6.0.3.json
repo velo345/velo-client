@@ -1,5 +1,5 @@
 {
- "title": "Velo 1.6.0.2: your reports, fixed",
+ "title": "Velo 1.6.0.3: your reports, fixed",
  "summary": "Fixes for what you reported in 1.6.0.1, plus a few improvements. The new points are at the top; what you already answered stays answered. Something still broken or ugly? Press \"Broken - report it\" and attach screenshots or clips. Please keep it private until the release.",
  "changes": [
   "Glass HUD: frosted panels again, also with Gnetum, at little cost",
@@ -10,89 +10,117 @@
   "Input Latency is now Fast Crystal under PvP, and also works on Windows",
   "Crash fixed: waypoint icons outside a world on 26.3",
   "Launcher: dropdowns without black corners, party chat and friends corners, no friends flicker, Store tabs not cut off, Black Friday bar, calendar alignment",
-  "Launcher: a new profile is selected right away, copied profiles update, the party wave fits its slot"
+  "Launcher: a new profile is selected right away, copied profiles update, the party wave fits its slot",
+  "Aura: no more hard glow line across the feet in the launcher",
+  "Tier Tagger: a tier site outage no longer sticks as \"no tier\"",
+  "Locker: the last 3D previews stay loaded when you switch tabs",
+  "Coloured icons: help us find which mod causes it"
  ],
  "test": [
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
+   "id": "v3-aura-feet",
+   "title": "Aura at your feet",
+   "how": "On Home, with your aura on: is there still a hard glowing line across the feet?"
+  },
+  {
+   "group": "New in 1.6.0.3",
+   "id": "v3-tiers",
+   "title": "Tier Tagger again",
+   "how": "Play on a server with ranked PvP players (check the tab list too). Do tiers show? The tier site was down for a while earlier."
+  },
+  {
+   "group": "New in 1.6.0.3",
+   "id": "v3-locker",
+   "title": "Locker previews",
+   "how": "In the Locker, switch between your full look, Cloaks and Wings, leave the page and come back. Does the 3D player stay instead of loading again?"
+  },
+  {
+   "group": "New in 1.6.0.3",
+   "id": "v3-icons",
+   "title": "Coloured (rainbow) icons",
+   "how": "If icons look cyan/yellow/pink in the R-Shift menu or title screen: in the launcher turn off ImmediatelyFast in your profile's mods, start again, and tell us whether that fixes it. If not, try Gnetum, then BadOptimizations."
+  },
+  {
+   "group": "New in 1.6.0.3",
    "id": "v2-new-profile",
    "title": "New profile from Home",
    "how": "On Home, open the profile switcher and press New profile. Is the new profile selected afterwards?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-copy-profile",
    "title": "Copied profile",
    "how": "Duplicate a profile, restart the launcher and look at its mods. Is the Velo version the same as your other profiles?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-party-wave",
    "title": "Party wave",
    "how": "Invite a friend to a party. When they wave on Home, is their whole hand visible?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-friends",
    "title": "Switching chats",
    "how": "On Friends, click quickly between friends. Does anything flicker?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-store-tabs",
    "title": "Store categories",
    "how": "Open the Store. Is the category bar complete, with nothing cut off at the bottom and nothing that moves when you drag or scroll on it?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-dropdowns",
    "title": "Dropdown menus",
    "how": "Open Import on Profiles and the three dots on Servers. Rounded corners, no black squares?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-corners",
    "title": "Friends and party chat",
    "how": "Check Friends, the party chat on Home and the Black Friday bar. Any odd corners or off-centre bits?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-sky",
    "title": "Sky behind menus",
    "how": "Open Esc and R-Shift while looking at the sky and the horizon, also with Custom Skybox. Does the sky stay sharp and unchanged?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-hud-glass",
    "title": "Glass HUD",
    "how": "HUD Style: Glass. Are the panels frosted, and does nothing cover other HUD parts while you move around?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-rshift-drag",
    "title": "Dragging HUD elements",
    "how": "In R-Shift, drag the Media Player (nothing playing) and others. Can you see what you drag?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-cloaks",
    "title": "Store cloaks",
    "how": "Open the Store's Cloaks in game. Do the cloaks look straight and complete?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-title",
    "title": "Title screen buttons",
    "how": "With any title font, are all button texts centred with their icons?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-fast-crystal",
    "title": "Fast Crystal",
    "how": "R-Shift > PvP > Fast Crystal. Turn it on and play a bit. Any crashes or input problems?"
   },
   {
-   "group": "New in 1.6.0.2",
+   "group": "New in 1.6.0.3",
    "id": "v2-hearts-mcci",
    "title": "Hearts on MCC Island",
    "how": "If you play on MCC Island: with Velo's Hearts module on, do hearts the server hides stay hidden? If not, report it and attach latest.log."

@@ -318,6 +318,12 @@
   "category": "performance"
  },
  {
+  "id": "input-sampler",
+  "name": "Fast Crystal",
+  "description": "Reads your input again right before each tick, so a crystal place or hit isn't left waiting behind a slow frame. The server's tick and hit registration stay as they are.",
+  "category": "pvp"
+ },
+ {
   "id": "fast-grow",
   "name": "Fast Grow",
   "description": "Singleplayer: crops, amethyst, saplings and other growing blocks grow up to 100x faster.",
@@ -368,7 +374,7 @@
  {
   "id": "full-bright",
   "name": "Full Bright",
-  "description": "Makes everything lit at all read as fully bright (vanilla Night Vision rendering, always on).",
+  "description": "Everything as bright as daylight - caves, nights, every corner - in its real colours.",
   "category": "rendering"
  },
  {
@@ -478,12 +484,6 @@
   "name": "Hunger & Saturation",
   "description": "Outlines your food icons by how much saturation you have left, and lets you recolor or replace the food icon.",
   "category": "hud"
- },
- {
-  "id": "input-sampler",
-  "name": "Input Latency Sub-Tick Sampling",
-  "description": "Timestamps mouse clicks off the main thread so latency doesn't depend on frame rate, and (optionally) polls input again at the start of every tick to notice clicks sooner during FPS stalls.",
-  "category": "performance"
  },
  {
   "id": "inventory-hud",

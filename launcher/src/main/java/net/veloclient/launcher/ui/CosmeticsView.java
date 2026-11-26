@@ -883,11 +883,20 @@ public final class CosmeticsView {
 	private record CachedViewer(String key, Node node, Object wings, Object aura) {
 	}
 
-	private static CachedViewer cachedViewer;
+	/**
+	 * The last few 3D previews: with only one, going between Cloaks, Wings and the full look (or leaving the Locker and
+	 * coming back on another tab) built the player again each time, with its loading placeholder (VELO-197).
+	 */
+	private static final java.util.LinkedHashMap<String, CachedViewer> VIEWERS = new java.util.LinkedHashMap<>(8, 0.75f, true) {
+		@Override
+		protected boolean removeEldestEntry(java.util.Map.Entry<String, CachedViewer> eldest) {
+			return size() > 4;
+		}
+	};
 
 	private static boolean reuseViewer(StackPane box, String key) {
-		CachedViewer c = cachedViewer;
-		if (c == null || !c.key().equals(key)) {
+		CachedViewer c = VIEWERS.get(key);
+		if (c == null) {
 			return false;
 		}
 		if (c.node().getParent() instanceof javafx.scene.layout.Pane old) {
@@ -910,7 +919,7 @@ public final class CosmeticsView {
 	}
 
 	private static void rememberViewer(String key, Node node) {
-		cachedViewer = new CachedViewer(key, node, wingsModel[0], auraLive[0]);
+		VIEWERS.put(key, new CachedViewer(key, node, wingsModel[0], auraLive[0]));
 	}
 
 	private static void outfitViewer(Host host, StackPane box, HBox bottom) {

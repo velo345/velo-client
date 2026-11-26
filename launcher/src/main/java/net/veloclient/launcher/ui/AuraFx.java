@@ -540,9 +540,10 @@ public final class AuraFx {
 					return;
 				}
 				double k = focal / d;
-				// a ground glow wider than its distance to the player's middle lies under the feet: split it
+				// a soft ground glow wider than its distance to the player's middle lies under the feet: all of it goes behind
+				// them. Splitting it (as plates are) cut the glow with a hard edge across the feet (VELO-191).
 				boolean ground = shape == AuraEffects.DISC && Math.abs(rz) < size * UNIT * 0.9;
-				out.add(new Sprite(cx + rx * k, cy + my * k, rz, size * UNIT * k, rgb, alpha, shape, 0, 0, null, ground ? FLAT : null));
+				out.add(new Sprite(cx + rx * k, cy + my * k, ground ? Math.max(Math.abs(rz), 0.001) : rz, size * UNIT * k, rgb, alpha, shape, 0, 0, null, null));
 			}
 
 			@Override

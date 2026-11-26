@@ -67,7 +67,9 @@ final class TierService {
 				}
 				Entry e = cache.get(id);
 				boolean fresh = e != null && now - e.fetchedAt() < (e.failed() ? ERROR_RETRY_MS : hasAny(e.data()) ? TTL_MS : MISS_TTL_MS);
-				if (e != null) {
+				// a lookup that failed with nothing to show isn't an answer ("no tier"): the client asks again and gets it once
+				// the tier site is back (VELO-193, pvptiers.com answered 500/502 for a while)
+				if (e != null && !(e.failed() && !hasAny(e.data()))) {
 					players.put(id, e.data());
 				}
 				if (!fresh && pending.add(id)) {
