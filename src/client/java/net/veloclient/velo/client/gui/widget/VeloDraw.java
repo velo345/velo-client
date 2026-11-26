@@ -179,7 +179,9 @@ public final class VeloDraw {
 
 	private static int segmentsFor(float radius) {
 		float px = radius * (capture != null ? capturePixelsPerUnit : Math.max(1, ClientCompat.guiScale()));
-		return Math.max(1, Math.min(MAX_SEGMENTS, (int) Math.ceil(px / 2.2f) + 1));
+		// 2026-11-25: one segment per ~4.5 px of arc (still under 0.2 px deviation) - half the vertices of before,
+		// rounded panels were the biggest part of the drawer's GUI geometry
+		return Math.max(1, Math.min(MAX_SEGMENTS, (int) Math.ceil(px / 4.5f) + 1));
 	}
 
 	/**

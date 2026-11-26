@@ -54,7 +54,8 @@ final class FrameGrabber {
 		}
 	}
 
-	private static final int POOL = 4;
+	/** Frames in flight (GPU copy, copier, encoder queue): 6 rides out a short encoder stall without dropping frames. */
+	private static final int POOL = 6;
 	private static final ArrayDeque<ByteBuffer> FREE = new ArrayDeque<>();
 	private static int allocated;
 	private static int poolBytes;

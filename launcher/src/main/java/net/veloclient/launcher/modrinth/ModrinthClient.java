@@ -112,7 +112,7 @@ public final class ModrinthClient {
 			int offset, int limit) throws IOException {
 		JsonArray facets = new JsonArray();
 		facets.add(singleFacet("project_type:" + projectType));
-		if (versionSensitive(projectType)) {
+		if (versionSensitive(projectType) && gameVersion != null) {
 			// Resource packs/shaders aren't loader-specific and plenty of them
 			// never bother tagging every individual game version (especially
 			// this project's own less-common target versions), so a strict
@@ -159,7 +159,7 @@ public final class ModrinthClient {
 	public static List<ProjectVersion> versions(String projectId, String gameVersion, String projectType, String loader) throws IOException {
 		StringBuilder url = new StringBuilder(API_BASE).append("/project/").append(encode(projectId)).append("/version");
 		List<String> params = new ArrayList<>();
-		if (versionSensitive(projectType)) {
+		if (versionSensitive(projectType) && gameVersion != null) {
 			params.add("game_versions=" + encode("[\"" + gameVersion + "\"]"));
 		}
 		if (loaderSensitive(projectType)) {
@@ -262,6 +262,34 @@ public final class ModrinthClient {
 		JsonObject wrapper = new JsonObject();
 		wrapper.add("array", com.google.gson.JsonParser.parseString(rawJsonArray).getAsJsonArray());
 		return wrapper;
+	}
+
+	private static final java.util.Map<String, String> OWNERS = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** The project's owner (or first member) username, "" when unknown - cached per project. */
+	public static String owner(String projectId) {
+		if (projectId == null || projectId.isBlank()) {
+			return "";
+		}
+		return OWNERS.computeIfAbsent(projectId, id -> {
+			try {
+				com.google.gson.JsonArray members = com.google.gson.JsonParser.parseString(getRaw(API_BASE + "/project/" + encode(id) + "/members")).getAsJsonArray();
+				String first = "";
+				for (var element : members) {
+					var member = element.getAsJsonObject();
+					String name = member.getAsJsonObject("user").get("username").getAsString();
+					if (first.isEmpty()) {
+						first = name;
+					}
+					if (member.has("role") && "Owner".equalsIgnoreCase(member.get("role").getAsString())) {
+						return name;
+					}
+				}
+				return first;
+			} catch (Exception e) {
+				return "";
+			}
+		});
 	}
 
 	private static JsonObject getJson(String url) throws IOException {

@@ -193,6 +193,50 @@ public final class SharpFrame {
 		strip(context, screenW, screenH, x2, y, screenW - x2, y2 - y);
 	}
 
+	/**
+	 * Paces a menu's real blur (2026-11-26): at most 60 times a second - behind frosted glass more doesn't show - and
+	 * every frame while {@code force} (opening, closing, moving). The frames in between draw the last blurred copy
+	 * behind the glass ({@link #drawBlurredInside}) and the live game everywhere else: no blur pass, no copy.
+	 */
+	public static final class Pacer {
+		private long last;
+
+		public boolean blurNow(boolean force) {
+			long now = System.nanoTime();
+			if (force || !hasBlurred() || now - last >= 1_000_000_000L / 60) {
+				last = now;
+				return true;
+			}
+			return false;
+		}
+	}
+
+	/** Whether a blurred copy from an earlier frame is there to reuse ({@link #drawBlurredInside}). */
+	public static boolean hasBlurred() {
+		return blurredTex != null && texW > 0;
+	}
+
+	/**
+	 * The blurred copy of an earlier frame inside a rounded rect (gui pixels) - for the frames between two real blurs:
+	 * the live game stays everywhere else, no blur pass and no copy this frame (2026-11-26, R-Shift cost ~0.5 ms/frame).
+	 */
+	public static void drawBlurredInside(DrawContext context, int screenW, int screenH, int x, int y, int w, int h, int radius) {
+		if (!hasBlurred() || screenW <= 0 || screenH <= 0 || w <= 0 || h <= 0) {
+			return;
+		}
+		int r = Math.min(radius, Math.min(w, h) / 2);
+		// the rounded ends row by row, the middle in one piece
+		// in 2-pixel steps (the glass edge sits over them): half the elements of row-by-row
+		for (int i = 0; i < r; i += 2) {
+			int rows = Math.min(2, r - i);
+			double dy = r - i - rows / 2.0;
+			int inset = (int) Math.round(r - Math.sqrt(Math.max(0, (double) r * r - dy * dy)));
+			strip(context, BLURRED_ID, screenW, screenH, x + inset, y + i, w - 2 * inset, rows);
+			strip(context, BLURRED_ID, screenW, screenH, x + inset, y + h - i - rows, w - 2 * inset, rows);
+		}
+		strip(context, BLURRED_ID, screenW, screenH, x, y + r, w, h - 2 * r);
+	}
+
 	/** Runs the menu blur at this point of the GUI (everything drawn before gets blurred). */
 	public static void blurHere(DrawContext context) {
 		newLayer(context);

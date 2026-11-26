@@ -78,7 +78,10 @@ public final class VeloBot extends ListenerAdapter {
 		VeloBot bot = new VeloBot(config, server);
 		// MESSAGE_CONTENT (a privileged intent - switch it on in the Discord developer portal) lets ticket transcripts include what was said.
 		JDA jda = JDABuilder.createLight(token, GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MEMBERS)
-				.setMemberCachePolicy(MemberCachePolicy.NONE).setActivity(Activity.playing("Velo Client")).addEventListeners(bot).build();
+				.setMemberCachePolicy(MemberCachePolicy.NONE)
+				// forum tags (Done / Declined / Launcher...) - the light builder leaves them out, the forum sync needs them
+				.enableCache(net.dv8tion.jda.api.utils.cache.CacheFlag.FORUM_TAGS)
+				.setActivity(Activity.playing("Velo Client")).addEventListeners(bot).build();
 		jda.awaitReady();
 		bot.registerCommands(jda, env("DISCORD_GUILD_ID", null));
 		bot.vip = new VipSync(jda, config, bot.server);
@@ -90,6 +93,14 @@ public final class VeloBot extends ListenerAdapter {
 		// The staff panel (staff.velo-client.com) reaches tickets and staff roles through the Velo server and this local API.
 		new StaffBridge(jda, config, bot.tickets, bot.staff, adminToken).start(env("BOT_BRIDGE_BIND", "127.0.0.1"),
 				Integer.parseInt(env("BOT_BRIDGE_PORT", "8792")));
+		// The feedback forums -> YouTrack (youtrack.velo-client.com, project VELO) and back
+		String youtrackToken = env("YOUTRACK_TOKEN", null);
+		if (youtrackToken != null) {
+			ForumSync forums = new ForumSync(jda, new YouTrackClient(env("YOUTRACK_URL", "http://127.0.0.1:8180"), youtrackToken,
+					env("YOUTRACK_PROJECT", "VELO"), env("YOUTRACK_ASSIGNEE", "admin")), env("DISCORD_GUILD_ID", ""), Path.of(env("BOT_DATA_DIR", "bot-data")));
+			jda.addEventListener(forums);
+			forums.start();
+		}
 		System.out.println("Velo bot online as " + jda.getSelfUser().getName());
 		// Partner servers add the bot with no permissions at all - it's only there to be seen (HomeGuild keeps it idle there).
 		System.out.println("Partner invite (no permissions): https://discord.com/oauth2/authorize?client_id="

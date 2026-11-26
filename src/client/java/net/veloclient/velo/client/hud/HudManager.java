@@ -181,10 +181,18 @@ public final class HudManager {
 		// Velo Turbo: the modules redraw at most 360 times a second; frames in between reuse what they drew. In whole-HUD
 		// mode the recording already wraps the entire HUD (TurboHudWholeMixin) - the modules just draw into it.
 		var screen = net.veloclient.velo.client.util.ClientCompat.currentScreen();
-		if (screen == null && HudLook.glassBlur() && !HudLook.rects().isEmpty() && net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
+		// Tier Tagger's all-tiers ring: laid out now so its glass chips get the blur too
+		java.util.List<int[]> ringRects = net.veloclient.velo.client.tiers.TierRing.prepare(screenWidth, screenHeight);
+		boolean hudGlass = HudLook.glassBlur() && !HudLook.rects().isEmpty();
+		if (screen == null && (hudGlass || !ringRects.isEmpty()) && net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
 			// HUD Style Glass: real blur behind the glass panels, the game around them stays sharp
+			java.util.List<int[]> rects = ringRects;
+			if (hudGlass) {
+				rects = new java.util.ArrayList<>(HudLook.rects());
+				rects.addAll(ringRects);
+			}
 			net.veloclient.velo.client.gui.glass.SharpFrame.blurHere(context);
-			net.veloclient.velo.client.gui.glass.SharpFrame.drawSharpExcept(context, screenWidth, screenHeight, HudLook.rects());
+			net.veloclient.velo.client.gui.glass.SharpFrame.drawSharpExcept(context, screenWidth, screenHeight, rects);
 		}
 		if (screen instanceof net.veloclient.velo.client.gui.drawer.VeloDrawerScreen || screen instanceof net.veloclient.velo.client.gui.HudEditScreen) {
 			// the editors draw the HUD themselves, live: the (cached) copy under them lagged behind while dragging
@@ -196,6 +204,7 @@ public final class HudManager {
 			net.veloclient.velo.client.browser.BrowserModule.renderHud(context, screenWidth, screenHeight);
 		net.veloclient.velo.client.report.SpikeRecorder.renderHud(context, screenWidth);
 		net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
+			net.veloclient.velo.client.tiers.TierRing.renderHud(context, screenWidth, screenHeight);
 			return;
 		}
 		if (!whole) {
@@ -226,6 +235,7 @@ public final class HudManager {
 		net.veloclient.velo.client.browser.BrowserModule.renderHud(context, screenWidth, screenHeight);
 		net.veloclient.velo.client.report.SpikeRecorder.renderHud(context, screenWidth);
 		net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);
+		net.veloclient.velo.client.tiers.TierRing.renderHud(context, screenWidth, screenHeight);
 	}
 
 	/** Renders one HUD element at its configured position, scaled outward from its own top-left corner. */

@@ -73,6 +73,10 @@ public abstract class VeloWindow extends Screen {
 	@Override
 	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
 		if (MinecraftClient.getInstance().world != null) {
+			if (reuseBlur()) {
+				reusingBlur = true;
+				return;
+			}
 			this.applyBlur(context);
 			blurredNow = true;
 		} else {
@@ -82,7 +86,15 @@ public abstract class VeloWindow extends Screen {
 	//?} else if >=26.1 {
 	/*@Override
 	public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+		if (System.getProperty("velo.promoMatte") != null) {
+			context.fill(0, 0, this.width, this.height, 0xFF000000);   // promo capture: the window alone, over black
+			return;
+		}
 		if (net.minecraft.client.Minecraft.getInstance().level != null) {
+			if (reuseBlur()) {
+				reusingBlur = true;
+				return;
+			}
 			this.extractBlurredBackground(context);
 			blurredNow = true;
 		} else {
@@ -93,6 +105,15 @@ public abstract class VeloWindow extends Screen {
 
 	/** Set when this frame's background blurred the game (then only the window keeps it - see SharpFrame). */
 	private boolean blurredNow;
+	/** This frame skips the blur and shows the last blurred copy behind the window (SharpFrame.Pacer). */
+	private boolean reusingBlur;
+	private final net.veloclient.velo.client.gui.glass.SharpFrame.Pacer blurPacer = new net.veloclient.velo.client.gui.glass.SharpFrame.Pacer();
+
+	/** Glass windows blur for real at most 60 times a second once they stand still (the blur was ~0.5 ms every frame). */
+	private boolean reuseBlur() {
+		boolean still = glassLook() && openProgress >= 0.999f && !closing && !handedOff;
+		return still && !blurPacer.blurNow(false);
+	}
 
 	/** Glass is the base of every look (blurred game, translucent body, white pills); glow/neon only add their edge. Solid stays opaque. */
 	protected static boolean glassLook() {
@@ -270,11 +291,15 @@ public abstract class VeloWindow extends Screen {
 
 		if (blurredNow) {
 			blurredNow = false;
-			if (glassLook() && net.veloclient.velo.client.gui.glass.SharpFrame.prepare()) {
-				// frosted only behind the window, the game around it stays sharp
+			if (glassLook() && net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
+				// frosted only behind the window, the game around it stays sharp (the blurred copy is kept for the next frames)
 				net.veloclient.velo.client.gui.glass.SharpFrame.drawOutside(context, this.width, this.height, windowX, windowY, windowWidth, windowHeight,
 						Math.round(net.veloclient.velo.client.gui.glass.GlassPrefs.radius(14f)));
 			}
+		} else if (reusingBlur) {
+			reusingBlur = false;
+			net.veloclient.velo.client.gui.glass.SharpFrame.drawBlurredInside(context, this.width, this.height, windowX, windowY, windowWidth, windowHeight,
+					Math.round(net.veloclient.velo.client.gui.glass.GlassPrefs.radius(14f)));
 		}
 		int[] hole = openProgress > 0.97f && !closing ? windowHole() : null;
 		int dimMax = Math.round(look.dim * 2.55f * (glassLook() ? 0.15f : 1f));   // glass: barely a veil - the game around the window stays clear

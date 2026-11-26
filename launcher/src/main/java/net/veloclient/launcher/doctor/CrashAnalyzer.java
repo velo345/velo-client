@@ -32,6 +32,12 @@ final class CrashAnalyzer {
 	private static final Pattern MIXIN_HANDLER = Pattern.compile("^(?:handler|modify|redirect|localvar|wrapOperation|wrapWithCondition|modifyExpressionValue|modifyReturnValue|modifyArg|modifyArgs|modifyVariable|modifyConstant)\\$[a-z0-9]+\\$([a-z0-9_\\-]+)\\$");
 	private static final Pattern MIXIN_MOD = Pattern.compile("(?i)(?:Mixin apply for mod|from mod|mod) ([a-z0-9_\\-]+)(?: failed|\\b)");
 	private static final Pattern MIXIN_CONFIG = Pattern.compile("([\\w\\-.]+\\.mixins?\\.json)");
+	/**
+	 * "Mixin [shine.mixins.json:sodium.X from mod shine] from phase [DEFAULT] ... FAILED during APPLY": a mod's mixin broke a
+	 * class loaded while joining a world. The game then disconnects and dies on vanilla code ("minecraft.player is null"),
+	 * so the crash report names nobody - only the log does (4 reports from one player, 2026-11-25).
+	 */
+	private static final Pattern MIXIN_APPLY_FAILED = Pattern.compile("Mixin \\[[\\w\\-.]+:[\\w.$]+ from mod ([a-z0-9_\\-]+)\\][^\\n]*FAILED during APPLY");
 	private static final Pattern MISSING_CLASS = Pattern.compile("(?:NoClassDefFoundError|ClassNotFoundException): ([\\w/$.]+)");
 	private static final Pattern CLASS_VERSION = Pattern.compile("([\\w/$.]+) has been compiled by a more recent version of the Java Runtime \\(class file version (\\d+)");
 	private static final Pattern VULKAN = Pattern.compile("(?i)(VK_ERROR_\\w+|vkCreate\\w+ failed|Vulkan (?:device|instance|initiali[sz]ation) (?:lost|failed)|VulkanException)");
@@ -240,6 +246,17 @@ final class CrashAnalyzer {
 		Matcher mixinMod = MIXIN_MOD.matcher(trace);
 		while (culprit == null && mixinMod.find()) {
 			culprit = s.enabledById(mixinMod.group(1));
+		}
+		if (culprit == null || isVelo(culprit) && crash != null && log != null) {
+			// the crash report may only show the aftermath: a mixin that failed to apply earlier is in the log
+			Matcher failed = MIXIN_APPLY_FAILED.matcher(crash != null && log != null ? crash + "\n" + log : text);
+			while (failed.find()) {
+				ModScanner.ModInfo mod = s.enabledById(failed.group(1));
+				if (mod != null && !isVelo(mod)) {
+					culprit = mod;
+					break;
+				}
+			}
 		}
 		if (culprit == null) {
 			culprit = stackCulprit(trace, byPackage, s::enabledById);

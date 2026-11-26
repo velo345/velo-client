@@ -295,10 +295,10 @@ begin
 
   Footer := MakeLabel(PANEL_X, 470, 300, 18, 'Version {#AppVersion}   |   velo-client.com', 8, CLR_TEXT3, False);
 
-  CloseHit := MakeLabel(WIN_W - 36, 8, 28, 28, '', 10, CLR_TEXT, False);
+  CloseHit := MakeLabel(WIN_W - 52, 20, 28, 28, '', 10, CLR_TEXT, False);
   CloseHit.Cursor := crHand;
   CloseHit.OnClick := @CloseClick;
-  MinHit := MakeLabel(WIN_W - 70, 8, 28, 28, '', 10, CLR_TEXT, False);
+  MinHit := MakeLabel(WIN_W - 84, 20, 28, 28, '', 10, CLR_TEXT, False);
   MinHit.Cursor := crHand;
   MinHit.OnClick := @MinClick;
 end;

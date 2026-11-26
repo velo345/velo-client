@@ -71,7 +71,7 @@ public final class ClientImportView {
 	private static final int CORE_BRANDS = 8;
 
 	/** The client's logo at {@code size} px, or its letter in a coloured circle. */
-	static Node brandLogo(String client, double size) {
+	public static Node brandLogo(String client, double size) {
 		Brand brand = BRANDS.stream().filter(b -> b.client().equals(client)).findFirst().orElse(null);
 		if (brand != null) {
 			var url = ClientImportView.class.getResource("/net/veloclient/launcher/clients/" + brand.logo() + ".png");

@@ -23,7 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Emotes: hold (or tap) the emote key for a wheel of eight emotes - point at one with the mouse and let go, click
+ * Emotes: hold the emote key for a wheel of eight emotes - point at one with the mouse and let go, click
  * it, or press 1-8. Your player plays it with its effects, props, sounds and music (the camera swings to third person meanwhile);
  * moving, jumping, sneaking, attacking or taking a hit ends it. Emotes are Velo Store items: the wheel holds the ones
  * you bought, arranged in the Locker's Emotes tab. Other Velo players see your emotes and you theirs (through the

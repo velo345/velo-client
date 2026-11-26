@@ -1477,4 +1477,6 @@ def main():
 	print("[pano] wrote", ARGS.out)
 
 
-main()
+# run directly (Blender --python); panorama_space.py imports the building blocks without rendering this scene
+if __name__ == "__main__":
+	main()

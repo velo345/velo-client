@@ -104,6 +104,7 @@ public final class NotificationOverlay {
 
 	/** Must be called on the render thread. */
 	public static void show(Toast toast) {
+		net.veloclient.velo.client.sound.VeloUiSounds.notifySoft();
 		TOASTS.add(toast);
 		while (TOASTS.size() > 12) {
 			TOASTS.remove(0);

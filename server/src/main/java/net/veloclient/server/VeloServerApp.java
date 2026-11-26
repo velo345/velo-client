@@ -33,6 +33,12 @@ public final class VeloServerApp {
 	/** Staff, online-service bans and player reports. */
 	static StaffService staff;
 	private static net.veloclient.server.store.StoreService store;
+
+	/** True when {@code uuid} may show emote {@code id} to others (emotes are bought store items). */
+	static boolean emoteAllowed(String uuid, String id) {
+		String item = "emote_" + id;
+		return store != null && store.knownItem(item) && store.mayDisplayCape(uuid, item);
+	}
 	/** Everyone's last in-game look, for players on another client (see LastCosmetics). */
 	private static LastCosmetics lastLooks;
 	/** Installs, daily actives and online samples for the owner panel. */
@@ -143,7 +149,9 @@ public final class VeloServerApp {
 		AddonSync addonSync = new AddonSync(addonStore, envOr("VELO_PLUS_GITHUB_REPO", "velo345/velo-client-plus"), envOr("VELO_PLUS_GITHUB_TOKEN", null));
 		PlusRoutes.register(server, registry, store, plusTokens, addonStore, addonSync, discordLinks, adminToken, uuid -> og != null && og.eligible(uuid));
 		// The tester programme: private tester launcher builds, tester role from the bot, what each tester really did.
-		TesterRoutes.register(server, registry, new TesterService(dataDir, discordLinks), store, adminToken, envOr("VELO_TESTER_UPLOAD_TOKEN", null));
+		TesterService testerService = new TesterService(dataDir, discordLinks);
+		TesterRoutes.register(server, registry, testerService, store, adminToken, envOr("VELO_TESTER_UPLOAD_TOKEN", null));
+		testerService.startYouTrack();
 		// Velo+ features: Cloud Sync restore points and Clips Pro share links (velo-client.com/c/<id>).
 		CloudBackupService cloud = new CloudBackupService(dataDir);
 		ClipShareService clipShares = new ClipShareService(dataDir, Long.parseLong(envOr("VELO_CLIPS_MAX_GB", "40")) * 1024 * 1024 * 1024,
@@ -210,7 +218,13 @@ public final class VeloServerApp {
 		if (!plusTokens.enabled()) {
 			System.out.println("VELO_PLUS_SIGNING_KEY not set - no Velo+ proofs for the game");
 		}
-		reportService.setListener(announcer::report);
+		// players' bug / crash reports also go to YouTrack (project VELO) - imported once, then each new one
+		PlayerReportsYouTrack playerReportsYouTrack = new PlayerReportsYouTrack(reportService, dataDir);
+		reportService.setListener((summary, report) -> {
+			announcer.report(summary, report);
+			playerReportsYouTrack.submitted(summary);
+		});
+		playerReportsYouTrack.start();
 		// World Notes (shared in-world notes): players' routes + staff list / read / remove.
 		NotesService notes = new NotesService(dataDir, social, parties, moderation, uuid -> store != null && store.isPlus(uuid));
 		ModerationRoutes.setNotes(notes);
@@ -492,7 +506,8 @@ public final class VeloServerApp {
 	private record HeartbeatResponse(boolean ok, int onlineCount, String capeId, boolean ogEligible) {
 	}
 
-	private record CosmeticsOfRequest(java.util.List<String> uuids) {
+	/** {@code includeOnline}: also online players' current look (the launcher's party lobby); the game takes those from the feed. */
+	private record CosmeticsOfRequest(java.util.List<String> uuids, Boolean includeOnline) {
 	}
 
 	private record LookView(String uuid, String capeId, String wingsId, String auraId, String wear, String pet) {
@@ -508,15 +523,24 @@ public final class VeloServerApp {
 	 */
 	private static void handleCosmeticsOf(HttpExchange exchange, SessionRegistry registry, CapeStore capes) throws IOException {
 		CosmeticsOfRequest request = JsonHttp.readBody(exchange, CosmeticsOfRequest.class);
-		java.util.Set<String> online = new java.util.HashSet<>();
+		java.util.Map<String, SessionRegistry.OnlineUser> online = new java.util.HashMap<>();
 		for (SessionRegistry.OnlineUser user : registry.onlineUsers()) {
-			online.add(user.uuid());
+			online.put(user.uuid(), user);
 		}
+		boolean includeOnline = request != null && Boolean.TRUE.equals(request.includeOnline());
 		java.util.List<LookView> out = new java.util.ArrayList<>();
 		java.util.List<String> uuids = request == null || request.uuids() == null ? java.util.List.of() : request.uuids();
 		for (String raw : uuids.subList(0, Math.min(200, uuids.size()))) {
 			String uuid = normalizeUuid(raw);
-			if (uuid == null || online.contains(uuid)) {
+			if (uuid == null) {
+				continue;
+			}
+			SessionRegistry.OnlineUser now = online.get(uuid);
+			if (now != null) {
+				// online: the heartbeat already checked ownership of what they wear
+				if (includeOnline && (now.capeId() != null || now.wingsId() != null || now.auraId() != null || now.wear() != null || now.pet() != null)) {
+					out.add(new LookView(uuid, now.capeId(), now.wingsId(), now.auraId(), now.wear(), now.pet()));
+				}
 				continue;
 			}
 			LastCosmetics.Look look = lastLooks == null ? null : lastLooks.get(uuid);

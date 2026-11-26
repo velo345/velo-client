@@ -61,6 +61,10 @@ public final class ScreenshotTour {
 			return;
 		}
 		bootTicks++;
+		// -Dvelo.screenshotTour.promoTitle: the title screen frame by frame (entrance + scene), for videos
+		if (System.getProperty("velo.screenshotTour.promoTitle") != null && bootTicks >= 2 && bootTicks < 182) {
+			rawShot(client, String.format(java.util.Locale.ROOT, "title-%03d", bootTicks - 2));
+		}
 		switch (bootTicks) {
 			case 4 -> shot(client, "boot-title-opening");
 			case 200 -> shot(client, "boot-title");
@@ -321,6 +325,78 @@ public final class ScreenshotTour {
 						new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.media.MediaScreen(null))},
 						new Object[] {30, (Runnable) () -> shot(client, "veloplus-clips")});
 			}
+			// 2026-11-26 checks: the R-Shift panel on consecutive frames (blur frame + reused blur), full menu, the Old
+			// Animations preview, the Pets Locker, the Bundles cards
+			// Promo video sequences (one raw frame per tick): the glass menus over the game. Never saves profiles
+			// (screenshot tour); the theme accent it cycles is put back at the end.
+			case "promo16" -> promo16(client);
+			case "promomenu" -> promoMenus(client);
+			case "nov26" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				var drawer = new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen[1];
+				steps.add(new Object[] {0, (Runnable) () -> {
+					drawer[0] = new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen();
+					client.setScreen(drawer[0]);
+					drawer[0].testExpanded(false);
+				}});
+				steps.add(new Object[] {40, (Runnable) () -> shot(client, "n26-panel-a")});
+				steps.add(new Object[] {1, (Runnable) () -> shot(client, "n26-panel-b")});
+				steps.add(new Object[] {1, (Runnable) () -> shot(client, "n26-panel-c")});
+				steps.add(new Object[] {2, (Runnable) () -> drawer[0].testModule("old-animations")});
+				steps.add(new Object[] {30, (Runnable) () -> shot(client, "n26-oldanim-1")});
+				steps.add(new Object[] {9, (Runnable) () -> shot(client, "n26-oldanim-2")});
+				steps.add(new Object[] {9, (Runnable) () -> shot(client, "n26-oldanim-3")});
+				steps.add(new Object[] {2, (Runnable) () -> {
+					drawer[0].testHome();
+					drawer[0].testExpanded(true);
+				}});
+				steps.add(new Object[] {40, (Runnable) () -> shot(client, "n26-full")});
+				steps.add(new Object[] {2, (Runnable) () -> client.setScreen(new net.veloclient.velo.dev.pets.PetsLockerScreen(null))});
+				steps.add(new Object[] {40, (Runnable) () -> shot(client, "n26-pets")});
+				steps.add(new Object[] {2, (Runnable) () -> {
+					net.veloclient.velo.client.gui.store.StoreScreen.showBundles();
+					client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null));
+				}});
+				steps.add(new Object[] {50, (Runnable) () -> shot(client, "n26-bundles")});
+				steps.add(new Object[] {2, (Runnable) () -> client.setScreen(null)});
+				yield steps;
+			}
+			// Full Bright check (2026-11-26): night outside and a closed stone box (light 0), off / on, frame sequences for flicker
+			case "fullbright" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				Runnable on = () -> ModuleRegistry.get("full-bright").ifPresent(m -> m.setEnabled(true));
+				Runnable off = () -> ModuleRegistry.get("full-bright").ifPresent(m -> m.setEnabled(false));
+				steps.add(new Object[] {0, (Runnable) () -> {
+					respawnIfDead(client);
+					off.run();
+				}});
+				steps.add(new Object[] {20, (Runnable) () -> {
+					clearChat(client);
+					serverCommands(client, "gamemode creative @a", "effect clear @a", "time set 18000", "weather clear",
+							"gamerule doDaylightCycle false", "gamerule advance_time false");
+				}});
+				steps.add(new Object[] {10, (Runnable) () -> clearChat(client)});
+				steps.add(new Object[] {60, (Runnable) () -> shot(client, "fb-night-off")});
+				steps.add(new Object[] {1, on});
+				steps.add(new Object[] {30, (Runnable) () -> shot(client, "fb-night-on")});
+				for (int i = 0; i < 8; i++) {
+					int n = i;
+					steps.add(new Object[] {1, (Runnable) () -> shot(client, "fb-night-seq" + n)});
+				}
+				steps.add(new Object[] {1, (Runnable) () -> serverCommands(client,
+						"execute as @s at @s run fill ~-5 ~-1 ~-5 ~5 ~5 ~5 minecraft:stone hollow")});
+				steps.add(new Object[] {60, (Runnable) () -> shot(client, "fb-box-on")});
+				for (int i = 0; i < 8; i++) {
+					int n = i;
+					steps.add(new Object[] {1, (Runnable) () -> shot(client, "fb-box-seq" + n)});
+				}
+				steps.add(new Object[] {1, off});
+				steps.add(new Object[] {30, (Runnable) () -> shot(client, "fb-box-off")});
+				steps.add(new Object[] {1, on});
+				steps.add(new Object[] {30, (Runnable) () -> shot(client, "fb-box-on2")});
+				steps.add(new Object[] {1, off});
+				yield steps;
+			}
 			case "rshift" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.ModMenuScreen())},
 					new Object[] {30, (Runnable) () -> shot(client, "rshift")});
@@ -565,6 +641,11 @@ public final class ScreenshotTour {
 			case "profiles" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.ProfileScreen(null))},
 					new Object[] {30, (Runnable) () -> shot(client, "profiles")});
+			case "emotewheel" -> List.of(
+					new Object[] {0, (Runnable) () -> net.veloclient.velo.module.ModuleRegistry.get("emotes").ifPresent(m -> client.setScreen(
+							new net.veloclient.velo.client.gui.EmoteWheelScreen((net.veloclient.velo.client.modules.cosmetics.EmotesModule) m,
+									net.veloclient.velo.client.util.Keys.B)))},
+					new Object[] {30, (Runnable) () -> shot(client, "emotewheel")});
 			case "theme" -> List.of(
 					new Object[] {0, (Runnable) () -> client.setScreen(new net.veloclient.velo.client.gui.glass.ThemeScreen(null))},
 					new Object[] {30, (Runnable) () -> shot(client, "theme")});
@@ -1065,6 +1146,167 @@ public final class ScreenshotTour {
 		};
 	}
 
+	/** Where the menu's glass is in this frame (framebuffer pixels), for cutting it out in the edit. */
+	private static void logPromoRect(MinecraftClient client, String prefix, int frame) {
+		var screen = net.veloclient.velo.client.util.ClientCompat.currentScreen();
+		double scale = net.veloclient.velo.client.util.ClientCompat.guiScale();
+		if (screen instanceof net.veloclient.velo.client.gui.drawer.VeloDrawerScreen drawer) {
+			float[] r = drawer.promoRect();
+			vibeLog(String.format(java.util.Locale.ROOT, "rect %s %d %.1f %.1f %.1f %.1f %.1f %.3f", prefix, frame,
+					r[0] * scale, r[1] * scale, r[2] * scale, r[3] * scale, r[4] * scale, r[5]));
+		} else if (screen instanceof net.veloclient.velo.client.gui.window.VeloWindow window) {
+			int[] r = window.guiRect();
+			vibeLog(String.format(java.util.Locale.ROOT, "rect %s %d %.1f %.1f %.1f %.1f %.1f 1", prefix, frame,
+					r[0] * scale, r[1] * scale, r[2] * scale, r[3] * scale, 14 * scale));
+		}
+	}
+
+	private static List<Object[]> promo16(MinecraftClient client) {
+		List<Object[]> steps = new java.util.ArrayList<>();
+		var drawer = new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen[1];
+		int[] accent = {net.veloclient.velo.client.gui.glass.GlassPrefs.accent()};
+		java.util.function.BiConsumer<String, Boolean> module = (id, on) -> ModuleRegistry.get(id).ifPresent(m -> m.setEnabled(on));
+		steps.add(new Object[] {0, (Runnable) () -> {
+			respawnIfDead(client);
+			// a clean screen: only the pretty HUD pieces (no coordinates, FPS, ping or server info in a video)
+			ModuleRegistry.byCategory(net.veloclient.velo.module.ModuleCategory.HUD).forEach(m -> {
+				if (!m.id().equals("keystrokes") && !m.id().equals("cps-counter") && !m.id().equals("armor-durability")) {
+					m.setEnabled(false);
+				}
+			});
+			module.accept("full-bright", false);
+			serverCommands(client, "gamemode creative @a", "effect clear @a", "time set 12300", "weather clear",
+					"gamerule doDaylightCycle false", "gamerule advance_time false");
+		}});
+		steps.add(new Object[] {60, (Runnable) () -> clearChat(client)});
+		sequence(steps, client, "idle", 40, f -> { });
+		sequence(steps, client, "dopen", 40, f -> {
+			if (f == 1) {
+				drawer[0] = new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen();
+				client.setScreen(drawer[0]);
+				drawer[0].testExpanded(false);
+			}
+		});
+		sequence(steps, client, "dgrow", 44, f -> {
+			if (f == 4) {
+				drawer[0].testExpanded(true);
+			}
+		});
+		sequence(steps, client, "dcat", 30, f -> {
+			if (f == 2) {
+				drawer[0].testCategory("PvP");
+			}
+		});
+		sequence(steps, client, "dmodule", 40, f -> {
+			if (f == 2) {
+				drawer[0].testModule("keystrokes");
+			}
+		});
+		sequence(steps, client, "dtheme", 66, f -> {
+			if (f == 1) {
+				drawer[0].testHome();
+			}
+			int[] colors = {0xFFFF375F, 0xFF8B5CF6, 0xFF2F9BFF, 0xFF30D158, 0xFFFF9F0A, 0xFFFFFFFF, 0xFFE5373E};
+			if (f >= 8 && (f - 8) % 8 == 0 && (f - 8) / 8 < colors.length) {
+				net.veloclient.velo.client.gui.glass.GlassPrefs.setAccent(colors[(f - 8) / 8]);
+			}
+		});
+		steps.add(new Object[] {1, (Runnable) () -> {
+			net.veloclient.velo.client.gui.glass.GlassPrefs.setAccent(accent[0]);
+			client.setScreen(null);
+		}});
+		sequence(steps, client, "locker", 50, f -> {
+			if (f == 1) {
+				client.setScreen(new net.veloclient.velo.client.gui.CapeEquipScreen(null));
+			}
+		});
+		sequence(steps, client, "store", 60, f -> {
+			if (f == 1) {
+				net.veloclient.velo.client.gui.store.StoreScreen.showBundles();
+				client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null));
+			}
+		});
+		sequence(steps, client, "pause", 36, f -> {
+			if (f == 1) {
+				client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true));
+			}
+		});
+		steps.add(new Object[] {1, (Runnable) () -> {
+			client.setScreen(null);
+			serverCommands(client, "time set 18000");
+		}});
+		steps.add(new Object[] {40, (Runnable) () -> clearChat(client)});
+		sequence(steps, client, "fb", 50, f -> {
+			if (f == 20) {
+				module.accept("full-bright", true);
+			}
+		});
+		steps.add(new Object[] {1, (Runnable) () -> {
+			module.accept("full-bright", false);
+			net.veloclient.velo.client.gui.glass.GlassPrefs.setAccent(accent[0]);
+		}});
+		return steps;
+	}
+
+	private static List<Object[]> promoMenus(MinecraftClient client) {
+		List<Object[]> steps = new java.util.ArrayList<>();
+		var drawer = new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen[1];
+		int accent = net.veloclient.velo.client.gui.glass.GlassPrefs.accent();
+		steps.add(new Object[] {0, (Runnable) () -> {
+			respawnIfDead(client);
+			ModuleRegistry.byCategory(net.veloclient.velo.module.ModuleCategory.HUD).forEach(m -> m.setEnabled(false));
+			setHudHidden(client, true);
+			serverCommands(client, "gamemode creative @a", "effect clear @a");
+		}});
+		steps.add(new Object[] {40, (Runnable) () -> clearChat(client)});
+		sequence(steps, client, "mopen", 36, f -> {
+			if (f == 1) {
+				drawer[0] = new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen();
+				client.setScreen(drawer[0]);
+				drawer[0].testExpanded(false);
+			}
+		});
+		sequence(steps, client, "mgrow", 40, f -> {
+			if (f == 2) {
+				drawer[0].testExpanded(true);
+			}
+		});
+		sequence(steps, client, "mcat", 28, f -> {
+			if (f == 2) {
+				drawer[0].testCategory("PvP");
+			}
+		});
+		sequence(steps, client, "mtheme", 66, f -> {
+			if (f == 1) {
+				drawer[0].testHome();
+			}
+			int[] colors = {0xFFFF375F, 0xFF8B5CF6, 0xFF2F9BFF, 0xFF30D158, 0xFFFF9F0A, 0xFFFFFFFF, 0xFFE5373E};
+			if (f >= 8 && (f - 8) % 8 == 0 && (f - 8) / 8 < colors.length) {
+				net.veloclient.velo.client.gui.glass.GlassPrefs.setAccent(colors[(f - 8) / 8]);
+			}
+		});
+		steps.add(new Object[] {1, (Runnable) () -> {
+			net.veloclient.velo.client.gui.glass.GlassPrefs.setAccent(accent);
+			client.setScreen(null);
+		}});
+		sequence(steps, client, "mlocker", 40, f -> {
+			if (f == 1) {
+				client.setScreen(new net.veloclient.velo.client.gui.CapeEquipScreen(null));
+			}
+		});
+		sequence(steps, client, "mstore", 44, f -> {
+			if (f == 1) {
+				net.veloclient.velo.client.gui.store.StoreScreen.showBundles();
+				client.setScreen(new net.veloclient.velo.client.gui.store.StoreScreen(null));
+			}
+		});
+		steps.add(new Object[] {1, (Runnable) () -> {
+			client.setScreen(null);
+			setHudHidden(client, false);
+		}});
+		return steps;
+	}
+
 	// ---- Frame sequences for promo edits: one shot per tick. A shot shows the state set one tick earlier,
 	// so step k saves frame k-1 and then sets frame k (vibe-log.txt says where the cursor is per frame). ----
 
@@ -1093,6 +1335,7 @@ public final class ScreenshotTour {
 			steps.add(new Object[] {1, (Runnable) () -> {
 				if (f > 0) {
 					rawShot(client, String.format(java.util.Locale.ROOT, "%s-%03d", prefix, f - 1));
+					logPromoRect(client, prefix, f - 1);
 					vibeLog(String.format(java.util.Locale.ROOT, "time %s %d %d", prefix, f - 1, System.nanoTime() / 1_000_000));
 				}
 				if (f < count) {

@@ -55,12 +55,14 @@ public final class TopBar extends HBox {
 	private final Label friendsOnline = new Label();
 	private final Region bellDot = new Region();
 	private final Label coinsText = new Label();
+	private final Label pillCoins = new Label();
 	private final Label plusText = new Label();
 	private final Button account = new Button();
 	private final StackPane avatar = new StackPane();
 	private final Label accountName = new Label();
 	private final Label accountState = new Label();
 	private final TextField search;
+	private StackPane searchBox;
 	private final VBox sidebar = new VBox(2);
 	/** One highlight behind the active row that glides to the next one (instead of each row lighting up on its own). */
 	private final Region selection = new Region();
@@ -105,6 +107,12 @@ public final class TopBar extends HBox {
 		search.focusedProperty().addListener((o, a, f) -> kbd.setVisible(!f && search.getText().isEmpty()));
 		search.textProperty().addListener((o, a, t) -> kbd.setVisible(!search.isFocused() && t.isEmpty()));
 		getChildren().add(searchBox);
+		// Home's sale strip lives up here, in the empty part of the bar (owner, 2026-11-25: "GANZ NACH OBEN")
+		promoSlot.setAlignment(Pos.CENTER_LEFT);
+		promoSlot.setMinWidth(0);
+		HBox.setHgrow(promoSlot, Priority.SOMETIMES);
+		promoSlot.setMaxWidth(760);
+		getChildren().add(promoSlot);
 
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -133,16 +141,35 @@ public final class TopBar extends HBox {
 		StackPane.setMargin(bellDot, new Insets(8, 9, 0, 0));
 		bellBox.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
 
+		// Coins as a glass pill (2026-11-25 design): the Velo coin, the balance, a + to buy more.
+		ImageView coin = new ImageView(UiImages.resource("/net/veloclient/launcher/images/velo-coin.png", 22, 22));
+		pillCoins.getStyleClass().add("coins-pill-text");
+		StackPane plusDot = new StackPane(Icons.icon("plus", 11, Color.WHITE, 2.6));
+		plusDot.getStyleClass().add("coins-pill-plus");
+		HBox pillContent = new HBox(8, coin, pillCoins, plusDot);
+		pillContent.setAlignment(Pos.CENTER_LEFT);
+		Button coinsPill = new Button();
+		coinsPill.setGraphic(pillContent);
+		coinsPill.getStyleClass().setAll("button", "coins-pill", "glass");
+		coinsPill.setOnAction(e -> host.openCoins());
+		coinsPill.setTooltip(new Tooltip("Velo coins"));
+		getChildren().add(coinsPill);
+
 		Button bug = iconButton("bug", "Report a problem (Ctrl+Shift+B)", null);
 		bug.setOnAction(e -> BugReportDialog.show(bug.getScene().getWindow()));
 		HBox icons = new HBox(2, bellBox, bug);
 		icons.setAlignment(Pos.CENTER);
 		getChildren().add(icons);
 
-		widthProperty().addListener((o, a, w) -> {
-			boolean roomy = w.doubleValue() > 760;
-			searchBox.setVisible(roomy);
-			searchBox.setManaged(roomy);
+		// 2026-11-25 design: no search field in the bar - Ctrl+K opens it, it folds away again when left empty
+		this.searchBox = searchBox;
+		searchBox.setVisible(false);
+		searchBox.setManaged(false);
+		search.focusedProperty().addListener((o, a, focused) -> {
+			if (!focused && search.getText().isBlank()) {
+				searchBox.setVisible(false);
+				searchBox.setManaged(false);
+			}
 		});
 	}
 
@@ -541,9 +568,9 @@ public final class TopBar extends HBox {
 
 	/** Friends online right now ({@code < 1} hides the line). */
 	public void setFriendsOnline(int count) {
-		friendsOnline.setText(count == 1 ? "1 friend online" : count + " friends online");
-		friendsOnline.setVisible(count > 0);
-		friendsOnline.setManaged(count > 0);
+		// (not shown any more: the owner found the count in the top bar pointless - Friends on Home lists who's online)
+		friendsOnline.setVisible(false);
+		friendsOnline.setManaged(false);
 	}
 
 	public void setNotificationDot(boolean show) {
@@ -553,6 +580,7 @@ public final class TopBar extends HBox {
 	/** {@code balance < 0}: not signed in / wallet unknown - the strip shows dashes. */
 	public void setCoins(int balance) {
 		coinsText.setText(balance >= 0 ? NumberFormat.getIntegerInstance(Locale.US).format(balance) : "–");
+		pillCoins.setText(coinsText.getText());
 	}
 
 	/** The Velo+ cell: "Active" for members, "Get it" otherwise. */
@@ -570,5 +598,28 @@ public final class TopBar extends HBox {
 		boolean signedIn = !"Sign in".equals(name);
 		accountState.setText(signedIn ? "Online" : "Not signed in");
 		accountState.getGraphic().setVisible(signedIn);
+	}
+
+	/** Ctrl+K: shows the search field and puts the cursor in it. */
+	private final HBox promoSlot = new HBox();
+
+	/** Shows {@code promo} in the top bar (null removes it). */
+	public void setPromo(Node promo) {
+		if (promo == null) {
+			promoSlot.getChildren().clear();
+			return;
+		}
+		HBox.setHgrow(promo, Priority.ALWAYS);
+		promoSlot.getChildren().setAll(promo);
+	}
+
+	public boolean hasPromo() {
+		return !promoSlot.getChildren().isEmpty();
+	}
+
+	public void openSearch() {
+		searchBox.setVisible(true);
+		searchBox.setManaged(true);
+		search.requestFocus();
 	}
 }

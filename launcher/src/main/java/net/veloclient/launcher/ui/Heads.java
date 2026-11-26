@@ -28,7 +28,19 @@ public final class Heads {
 		holder.setStyle("-fx-background-color: rgba(255,255,255,0.12); -fx-background-radius: " + (size / 5) + ";");
 		holder.getChildren().add(initial);
 		if (uuid != null) {
-			SkinHeads.skin(uuid).thenAccept(bytes -> {
+			var future = SkinHeads.skin(uuid);
+			// already loaded (every rebuild after the first): the face right away - the initial used to flash for a frame
+			// on every page rebuild (Friends, party, chat switches)
+			byte[] ready = future.isDone() && !future.isCompletedExceptionally() ? future.getNow(null) : null;
+			if (ready != null && Platform.isFxApplicationThread()) {
+				StackPane rendered = PlayerHeadView.build(ready, size);
+				if (rendered != null) {
+					holder.setStyle("");
+					holder.getChildren().setAll(rendered);
+					return holder;
+				}
+			}
+			future.thenAccept(bytes -> {
 				if (bytes != null) {
 					Platform.runLater(() -> {
 						StackPane rendered = PlayerHeadView.build(bytes, size);

@@ -145,6 +145,8 @@ public final class MediaView {
 
 	private void load() {
 		hint.setText("Loading...");
+		// the gallery's shape while the folders are read
+		grid.getChildren().setAll(Skeleton.grid(8, 232, 190));
 		LOADER.execute(() -> {
 			List<Item> found = new ArrayList<>();
 			for (Instance instance : InstanceStore.loadAll()) {
@@ -228,8 +230,9 @@ public final class MediaView {
 		if (Files.exists(item.thumbnail())) {
 			thumb.setImage(new Image(item.thumbnail().toUri().toString(), 464, 260, true, true, true));
 		}
-		StackPane frame = new StackPane(thumb);
-		frame.setStyle("-fx-background-color: #0b0b0f; -fx-background-radius: 8;");
+		// a shimmer until the thumbnail is in (decoded in the background)
+		StackPane frame = new StackPane(Skeleton.under(thumb, 232, 130, 8), thumb);
+		frame.setStyle("-fx-background-color: rgba(0,0,0,0.25); -fx-background-radius: 8;");
 		frame.setMinSize(232, 130);
 		frame.setMaxSize(232, 130);
 		javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle(232, 130);

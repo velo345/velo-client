@@ -522,7 +522,7 @@ final class PartyService {
 		}
 		for (String member : party.members) {
 			if (!member.equals(me)) {
-				social.pushEvent(member, "waypoint".equals(kind) ? "party_waypoint" : "party_ping", clean);
+				social.pushEvent(member, "waypoint".equals(kind) ? "party_waypoint" : "emote".equals(kind) ? "party_emote" : "party_ping", clean);
 			}
 		}
 		if ("waypoint".equals(kind)) {

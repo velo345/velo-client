@@ -9,6 +9,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
@@ -67,12 +68,18 @@ public final class DatapacksTabView {
 		Runnable[] activeBack = new Runnable[1];
 		Consumer<String>[] openDetail = new Consumer[1];
 
-		showWorldPicker[0] = () -> container.getChildren().setAll(buildWorldPicker(instance, theme, world -> {
-			selectedWorld[0] = world;
-			showManage[0].run();
-		}));
+		// 2026-11-25 design: installed datapacks on the left, Modrinth on the right (like mods and packs)
+		AddPanel add = new AddPanel(owner, instance, theme, () -> showManage[0].run());
+		showWorldPicker[0] = () -> {
+			add.setWorld(null);
+			container.getChildren().setAll(buildWorldPicker(instance, theme, world -> {
+				selectedWorld[0] = world;
+				showManage[0].run();
+			}));
+		};
 		showManage[0] = () -> {
 			activeBack[0] = showManage[0];
+			add.setWorld(selectedWorld[0]);
 			ScrollKeeper.setAll(container, buildManageView(owner, overlayHost, instance, theme, selectedWorld[0], showWorldPicker[0], showManage[0], showBrowse[0], openDetail[0]));
 		};
 		showBrowse[0] = () -> {
@@ -82,7 +89,151 @@ public final class DatapacksTabView {
 		openDetail[0] = projectId -> showDatapackDetail(owner, overlayHost, container, instance, theme, selectedWorld[0], projectId, () -> activeBack[0].run());
 
 		showWorldPicker[0].run();
-		return container;
+		VBox main = new VBox(container);
+		VBox.setVgrow(container, Priority.ALWAYS);
+		main.getStyleClass().add("profile-section-panel");
+		main.setPadding(new Insets(16));
+		net.veloclient.launcher.ui.glass.Glass.install(main, 24);
+		HBox.setHgrow(main, Priority.ALWAYS);
+		main.setMinWidth(0);
+		HBox both = new HBox(14, main, add.panel);
+		both.getProperties().put("velo.ownGlass", true);
+		return both;
+	}
+
+	/** The right panel: search Modrinth datapacks for this version and install them into the world picked on the left. */
+	private static final class AddPanel {
+		final VBox panel;
+		private final VBox results = new VBox(2);
+		private final TextField search = new TextField();
+		private final Label hint = new Label();
+		private final Stage owner;
+		private final Instance instance;
+		private final LauncherTheme theme;
+		private final Runnable installed;
+		private WorldInfo world;
+		private long generation;
+
+		AddPanel(Stage owner, Instance instance, LauncherTheme theme, Runnable installed) {
+			this.owner = owner;
+			this.instance = instance;
+			this.theme = theme;
+			this.installed = installed;
+			Label title = new Label("Add datapacks");
+			title.getStyleClass().add("panel-title");
+			Label source = new Label("MODRINTH · " + instance.mcVersion());
+			source.getStyleClass().add("home-card-note");
+			javafx.scene.layout.Region push = new javafx.scene.layout.Region();
+			HBox.setHgrow(push, Priority.ALWAYS);
+			HBox head = new HBox(title, push, source);
+			head.setAlignment(Pos.BASELINE_LEFT);
+			search.setPromptText("Search datapacks for " + instance.mcVersion());
+			search.getStyleClass().add("topbar-search-field");
+			hint.getStyleClass().add("t-muted");
+			hint.setWrapText(true);
+			ScrollPane scroll = new ScrollPane(results);
+			scroll.setFitToWidth(true);
+			scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+			scroll.getStyleClass().add("scroll-pane");
+			VBox.setVgrow(scroll, Priority.ALWAYS);
+			javafx.animation.PauseTransition debounce = new javafx.animation.PauseTransition(javafx.util.Duration.millis(380));
+			debounce.setOnFinished(e -> load());
+			search.textProperty().addListener((o, a, t) -> debounce.playFromStart());
+			panel = new VBox(12, head, search, hint, scroll);
+			panel.getStyleClass().addAll("profile-section-panel", "add-panel");
+			panel.setPadding(new Insets(18, 16, 16, 16));
+			panel.setMinWidth(340);
+			panel.setPrefWidth(364);
+			panel.setMaxWidth(364);
+			net.veloclient.launcher.ui.glass.Glass.install(panel, 24);
+			load();
+		}
+
+		void setWorld(WorldInfo world) {
+			this.world = world;
+			hint.setText(world == null ? "Pick a world on the left - datapacks are installed per world." : "Installs into " + world.levelName());
+			load();
+		}
+
+		private void load() {
+			long mine = ++generation;
+			results.getChildren().setAll(Skeleton.list(4));
+			String text = search.getText() == null ? "" : search.getText().strip();
+			CompletableFuture.supplyAsync(() -> {
+				try {
+					return ModrinthClient.search(text, "datapack", instance.mcVersion(), text.isBlank() ? "downloads" : "relevance", 0, 20).hits();
+				} catch (IOException e) {
+					return null;
+				}
+			}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(hits -> Platform.runLater(() -> {
+				if (mine != generation) {
+					return;
+				}
+				results.getChildren().clear();
+				if (hits == null) {
+					results.getChildren().add(InstanceDetailView.messageLabel("Modrinth can't be reached right now.", theme));
+					return;
+				}
+				for (ModrinthClient.SearchHit hit : hits) {
+					results.getChildren().add(row(hit));
+				}
+			}));
+		}
+
+		private Node row(ModrinthClient.SearchHit hit) {
+			Node icon = InstanceDetailView.iconView(hit.iconUrl(), 38);
+			Label name = new Label(hit.title());
+			name.getStyleClass().add("t-strong");
+			name.setMinWidth(0);
+			Label by = new Label((hit.author() == null || hit.author().isBlank() ? "" : "by " + hit.author() + "  ·  ")
+					+ InstanceDetailView.formatCount(hit.downloads()));
+			by.getStyleClass().add("mod-author");
+			by.setMinWidth(0);
+			VBox text = new VBox(3, name, by);
+			text.setMinWidth(0);
+			HBox.setHgrow(text, Priority.ALWAYS);
+			ProgressBar progress = new ProgressBar(0);
+			progress.setPrefWidth(70);
+			progress.setVisible(false);
+			progress.setManaged(false);
+			Button install = new Button("Add");
+			install.getStyleClass().addAll("primary-button", "button-sm");
+			install.setDisable(world == null);
+			Path datapacksDir = world == null ? null : WorldScanner.datapacksDir(InstancePaths.savesDir(instance.id()).resolve(world.folderName()));
+			if (datapacksDir != null && DatapackRegistry.loadAll(datapacksDir).stream().anyMatch(a -> a.projectId().equals(hit.projectId()))) {
+				install.setText("Added");
+				install.setDisable(true);
+			}
+			install.setOnAction(e -> {
+				install.setDisable(true);
+				CompletableFuture.supplyAsync(() -> {
+					try {
+						return ModrinthClient.versions(hit.projectId(), instance.mcVersion(), "datapack");
+					} catch (IOException ex) {
+						return null;
+					}
+				}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(versions -> Platform.runLater(() -> {
+					if (versions == null || versions.isEmpty()) {
+						install.setDisable(false);
+						InstanceDetailView.error(owner, "No compatible version", hit.title() + " has no version for Minecraft " + instance.mcVersion() + ".");
+						return;
+					}
+					progress.setVisible(true);
+					progress.setManaged(true);
+					pickAndInstall(owner, theme, instance, datapacksDir, hit.title(), versions, progress, () -> {
+						progress.setVisible(false);
+						progress.setManaged(false);
+						install.setText("Added");
+						installed.run();
+					});
+				}));
+			});
+			HBox row = new HBox(12, icon, text, progress, install);
+			row.setAlignment(Pos.CENTER_LEFT);
+			row.getStyleClass().add("friend-row");
+			Tooltip.install(row, new Tooltip(hit.description()));
+			return row;
+		}
 	}
 
 	// ---- World picker ----
@@ -193,10 +344,9 @@ public final class DatapacksTabView {
 				InstanceDetailView.error(owner, "Couldn't open folder", ex.getMessage());
 			}
 		});
-		Button browseButton = new Button("+ Browse Modrinth");
-		browseButton.getStyleClass().addAll("title-menu-button", "title-menu-button-primary", "button-compact");
-		browseButton.setOnAction(e -> openBrowse.run());
-		actions.getChildren().addAll(addButton, openFolderButton, browseButton);
+		addButton.getStyleClass().add("glass-button");
+		openFolderButton.getStyleClass().add("glass-button");
+		actions.getChildren().addAll(addButton, openFolderButton);
 		root.getChildren().add(actions);
 
 		VBox list = new VBox(8);
@@ -368,7 +518,8 @@ public final class DatapacksTabView {
 		title.setAlignment(Pos.CENTER);
 		title.setMaxWidth(170);
 
-		Label downloads = new Label(InstanceDetailView.formatCount(hit.downloads()) + " downloads");
+		Label downloads = new Label(InstanceDetailView.formatCount(hit.downloads()) + " downloads"
+				+ (hit.author() == null || hit.author().isBlank() ? "" : "  ·  by " + hit.author()));
 		downloads.getStyleClass().add("version-tag");
 		downloads.setTextFill(InstanceDetailView.text(theme));
 

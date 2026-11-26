@@ -265,6 +265,44 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 		clampScroll(ry - start);
 	}
 
+	/**
+	 * Our own status ping of a partner server: {players online} or {-1} when it doesn't answer, null while asking. The
+	 * Velo server's status isn't enough (owner 2026-11-26): some partners' firewalls block the API host, so it said
+	 * "offline" while you could join. Asked once a minute at most, in the background.
+	 */
+	private static final java.util.Map<String, int[]> LOCAL = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final java.util.Map<String, Long> LOCAL_AT = new java.util.concurrent.ConcurrentHashMap<>();
+
+	private static int[] localStatus(String address) {
+		if (address == null || address.isBlank()) {
+			return null;
+		}
+		long now = System.currentTimeMillis();
+		Long at = LOCAL_AT.get(address);
+		if (at == null || now - at > 60_000) {
+			LOCAL_AT.put(address, now);
+			Thread thread = new Thread(() -> {
+				String json = net.veloclient.velo.client.gui.title.LastServer.status(address);
+				int players = -1;
+				if (json != null) {
+					players = 0;
+					try {
+						var root = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
+						if (root.has("players")) {
+							players = root.getAsJsonObject("players").get("online").getAsInt();
+						}
+					} catch (RuntimeException ignored) {
+						// answered, just no count
+					}
+				}
+				LOCAL.put(address, new int[] {players});
+			}, "Velo partner ping");
+			thread.setDaemon(true);
+			thread.start();
+		}
+		return LOCAL.get(address);
+	}
+
 	private void partnerTile(DrawContext context, WorldHosting.Partner partner, int x, int y, int w, int h, int mouseX, int mouseY, float dt) {
 		int index = cardIndex++;
 		float rise = entrance(index);
@@ -295,9 +333,12 @@ public final class WorldHostScreen extends VeloWindow implements net.veloclient.
 		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.uiBold(partner.name()), tw), tx, y + 12, MenuKit.TEXT);
 		String line = partner.description().isEmpty() ? partner.address() : partner.description();
 		MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.ui(line), tw), tx, y + 25, MenuKit.TEXT_2);
-		if (partner.online()) {
+		int[] local = localStatus(partner.address());
+		boolean online = partner.online() || local != null && local[0] >= 0;
+		int playerCount = local != null && local[0] >= 0 ? local[0] : partner.players();
+		if (online) {
 			livePulse(context, tx + 3, y + 43);
-			String players = String.format(Locale.ROOT, "%,d online", partner.players()) + (partner.versions().isEmpty() ? "" : "  ·  " + partner.versions());
+			String players = String.format(Locale.ROOT, "%,d online", playerCount) + (partner.versions().isEmpty() ? "" : "  ·  " + partner.versions());
 			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.small(players.toUpperCase(Locale.ROOT)), tw - 60), tx + 10, y + 41,
 					MenuKit.GREEN);
 		} else {

@@ -38,11 +38,34 @@ public final class GlassPrefs {
 		return VeloPaths.config().resolve("glass.json");
 	}
 
+	private static long checkedAt;
+	private static long fileTime = -1;
+
 	private static void load() {
 		if (loaded) {
-			return;
+			// the launcher's Customize > In-game look writes the same file: follow it while the game runs
+			long now = System.currentTimeMillis();
+			if (now - checkedAt < 500) {
+				return;
+			}
+			checkedAt = now;
+			long time;
+			try {
+				time = Files.exists(file()) ? Files.getLastModifiedTime(file()).toMillis() : -1;
+			} catch (Exception e) {
+				return;
+			}
+			if (time == fileTime) {
+				return;
+			}
 		}
 		loaded = true;
+		checkedAt = System.currentTimeMillis();
+		try {
+			fileTime = Files.exists(file()) ? Files.getLastModifiedTime(file()).toMillis() : -1;
+		} catch (Exception e) {
+			fileTime = -1;
+		}
 		try {
 			if (Files.exists(file())) {
 				JsonObject o = new Gson().fromJson(Files.readString(file(), StandardCharsets.UTF_8), JsonObject.class);
@@ -71,6 +94,7 @@ public final class GlassPrefs {
 			o.addProperty("corners", corners);
 			Files.createDirectories(file().getParent());
 			Files.writeString(file(), o.toString(), StandardCharsets.UTF_8);
+			fileTime = Files.getLastModifiedTime(file()).toMillis();
 		} catch (Exception ignored) {
 			// not saved this time
 		}

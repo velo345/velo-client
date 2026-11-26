@@ -616,9 +616,10 @@ public final class RmHud {
 			int hx = bx[0];
 			draw.add(() -> iconButton(context, hx, by, size, "hidden", false, "Hide overlay (F9)", RedstoneMode::toggleOverlay));
 			bx[0] += size + 2;
+			// leaving is always one key away - written on the button so nobody thinks they're stuck (owner 2026-11-25)
 			int ex = bx[0];
-			draw.add(() -> iconButton(context, ex, by, size, "exit", false, "Leave Redstone Mode" + RmKeys.toggleHint(), RedstoneMode::exit));
-			bx[0] += size + 2;
+			bx[0] += labelButton(draw, context, ex, by, size, "exit", "Leave  Alt+R", "Leave Redstone Mode (Alt+R" + RmKeys.toggleHint().replace(" (", ", ").replace(")", "") + ")",
+					RedstoneMode::exit) + 2;
 			width = bx[0] - x + 2;
 			panelBg(context, x, y, width, height, 7);
 			for (Runnable r : draw) {

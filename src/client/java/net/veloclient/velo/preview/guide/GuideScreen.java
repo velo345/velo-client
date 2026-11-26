@@ -212,10 +212,7 @@ public final class GuideScreen extends Screen {
 
 		// header: progress + Skip
 		int a = Math.round(255 * open);
-		if (step > 0 && step < STEP_NAMES.length - 1) {
-			Text kicker = MenuKit.small(("Step " + step + " of " + (STEP_NAMES.length - 2) + " · " + STEP_NAMES[step]).toUpperCase());
-			MenuKit.text(context, this.textRenderer, kicker, cx + 22, cy + 18, VeloUi.withAlpha(MenuKit.accentText(), a));
-		}
+		// (no "Step x of y · name" line: the page title says it big, the dots at the bottom show the progress - owner 2026-11-26)
 		if (step < STEP_NAMES.length - 1) {
 			Text skip = MenuKit.uiBold("Skip setup");
 			int sw = this.textRenderer.getWidth(skip) + 22;
@@ -338,9 +335,12 @@ public final class GuideScreen extends Screen {
 		float pop = ease(Math.min(1f, t / 0.8f));
 		int lx = p.x + p.w / 2 - logo / 2;
 		int ly = p.y + 30 + Math.round((1f - pop) * 14f);
-		for (int i = 0; i < 4; i++) {
-			VeloDraw.fillCircle(p.c, lx + logo / 2f, ly + logo / 2f, logo * (0.9f + i * 0.35f) + (float) Math.sin(t * 1.6f) * 2f,
-					VeloUi.withAlpha(MenuKit.accent(), Math.round(0x0E * p.alpha * pop)));
+		// a soft, breathing glow in the logo's red (not hard rings in the accent - with a white accent those were grey discs,
+		// cut off at the top of the page)
+		float breathe = 1f + (float) Math.sin(t * 1.4f) * 0.04f;
+		for (int i = 0; i < 12; i++) {
+			float r = logo * (1.05f - i * 0.045f) * breathe;
+			VeloDraw.fillCircle(p.c, lx + logo / 2f, ly + logo / 2f, r, VeloUi.withAlpha(0xFFE0262E, Math.round(0x05 * p.alpha * pop)));
 		}
 		MenuKit.logo(p.c, lx, ly, logo);
 		Text title = MenuKit.hero("Welcome to Velo");
@@ -694,8 +694,13 @@ public final class GuideScreen extends Screen {
 				VeloDraw.fillRounded(p.c, -w / 2, -11, w, 22, 6, VeloUi.withAlpha(0xFF101014, Math.round(0x90 * am)));
 				int col = VeloUi.withAlpha(0xFFFFFFFF, Math.round(255 * am));
 				if (id.equals("pot-counter")) {
-					tex(p.c, "item/splash_potion", -w / 2 + 4, -8, 16, col);
-					tex(p.c, "item/potion_overlay", -w / 2 + 4, -8, 16, VeloUi.withAlpha(0xFFF82423, Math.round(255 * am)));
+					if (inWorld()) {
+						item(p.c, "minecraft:splash_potion", "item/splash_potion", -w / 2 + 4, -8, col);
+					} else {
+						// like vanilla: the tinted liquid first, the glass bottle over it
+						tex(p.c, "item/potion_overlay", -w / 2 + 4, -8, 16, VeloUi.withAlpha(0xFFF82423, Math.round(255 * am)));
+						tex(p.c, "item/splash_potion", -w / 2 + 4, -8, 16, col);
+					}
 				} else {
 					tex(p.c, id.equals("totem-counter") ? "item/totem_of_undying" : "item/arrow", -w / 2 + 4, -8, 16, col);
 				}
@@ -720,7 +725,7 @@ public final class GuideScreen extends Screen {
 				float ccx = 0f;
 				float ccy = -4f;
 				VeloDraw.fillCircle(p.c, ccx, ccy, cell / 2f, VeloUi.withAlpha(0xFF101014, Math.round(0x99 * am)));
-				tex(p.c, "item/ender_pearl", -8, Math.round(ccy) - 8, 16, VeloUi.withAlpha(0xFFFFFFFF, Math.round(255 * am)));
+				item(p.c, "minecraft:ender_pearl", "item/ender_pearl", -8, Math.round(ccy) - 8, VeloUi.withAlpha(0xFFFFFFFF, Math.round(255 * am)));
 				int r = (int) (0x6F + (0xFF - 0x6F) * progress);
 				int g = (int) (0xE3 + (0x55 - 0xE3) * progress);
 				int accent = 0xFF000000 | r << 16 | g << 8 | 0x55;
@@ -838,31 +843,43 @@ public final class GuideScreen extends Screen {
 	}
 
 	private void done(Page p) {
+		// 2026-11-26 (owner: "offset, nicht centered, weirder Kreis"): one centred block - a calm glowing badge with a check
+		// in the contrast colour, the title, two lines, the R-Shift key - placed in the middle of the page both ways.
 		long now = System.nanoTime();
 		float t = (now - stepChangedAt) / 1_000_000_000f;
-		float pop = ease(Math.min(1f, t / 0.7f));
+		float pop = ease(Math.min(1f, t / 0.6f));
 		int r = 26;
+		var tr = GuideScreen.this.textRenderer;
+		Text title = MenuKit.hero("You're all set");
+		String[] lines = {"Right Shift opens everything you just set up - and a lot more.", "Your Locker has cloaks, wings, pets and emotes to try on."};
+		int blockH = r * 2 + 26 + 22 + 12 + lines.length * 13 + 22 + 24;
+		int top = p.y + Math.max(10, (p.h - blockH) / 2 - 12);
 		int cx = p.x + p.w / 2;
-		int cy = p.y + 64;
-		for (int i = 0; i < 5; i++) {
-			float ring = (t * 0.6f + i * 0.2f) % 1f;
-			VeloDraw.strokeRounded(p.c, cx - r - ring * 40, cy - r - ring * 40, (r + ring * 40) * 2, (r + ring * 40) * 2, r + ring * 40, 1.5f,
-					VeloUi.withAlpha(MenuKit.accent(), Math.round(0x50 * (1f - ring) * p.alpha)));
-		}
-		VeloDraw.fillCircle(p.c, (float) cx, (float) cy, r * pop, p.a(MenuKit.accent()));
+		int cy = top + r;
+		int accent = MenuKit.accent();
+		// soft halo + one slow ring breathing out of the badge
+		VeloDraw.fillCircle(p.c, (float) cx, (float) cy, (r + 16) * pop, p.a(VeloUi.withAlpha(accent, 0x10)));
+		VeloDraw.fillCircle(p.c, (float) cx, (float) cy, (r + 8) * pop, p.a(VeloUi.withAlpha(accent, 0x1C)));
+		float ring = (t * 0.45f) % 1f;
+		float rr = r + 4 + ring * 30;
+		VeloDraw.strokeRounded(p.c, cx - rr, cy - rr, rr * 2, rr * 2, rr, 1.2f, VeloUi.withAlpha(accent, Math.round(0x40 * (1f - ring) * p.alpha * pop)));
+		VeloDraw.fillCircle(p.c, (float) cx, (float) cy, r * pop, p.a(accent));
 		p.c.getMatrices().pushMatrix();
 		p.c.getMatrices().translate(cx, cy);
 		p.c.getMatrices().scale(pop, pop);
-		drawCheck(p.c, 0, 0, 14, p.a(0xFFFFFFFF));
+		drawCheck(p.c, 0, 0, 16, p.a(MenuKit.onAccent()));
 		p.c.getMatrices().popMatrix();
-		Text title = MenuKit.hero("You're all set");
-		MenuKit.text(p.c, GuideScreen.this.textRenderer, title, p.x + (p.w - GuideScreen.this.textRenderer.getWidth(title)) / 2, cy + r + 20, p.a(MenuKit.TEXT));
-		String[] lines = {"Right Shift opens everything you just set up - and a lot more.", "Your Locker has cloaks, wings, pets and emotes to try on."};
-		for (int i = 0; i < lines.length; i++) {
-			Text line = MenuKit.ui(lines[i]);
-			MenuKit.text(p.c, GuideScreen.this.textRenderer, line, p.x + (p.w - GuideScreen.this.textRenderer.getWidth(line)) / 2, cy + r + 50 + i * 13, p.a(MenuKit.TEXT_2));
+		int y = cy + r + 26;
+		MenuKit.text(p.c, tr, title, cx - GuideScreen.this.textRenderer.getWidth(title) / 2, y, p.a(MenuKit.TEXT));
+		y += 22 + 12;
+		for (String l : lines) {
+			Text line = MenuKit.ui(l);
+			MenuKit.text(p.c, tr, line, cx - GuideScreen.this.textRenderer.getWidth(line) / 2, y, p.a(MenuKit.TEXT_2));
+			y += 13;
 		}
-		keycap(p, p.x + p.w / 2 - 44, cy + r + 84, "R-Shift", true);
+		Text key = MenuKit.uiBold("R-Shift");
+		int kw = Math.max(26, GuideScreen.this.textRenderer.getWidth(key) + 14);
+		keycap(p, cx - kw / 2, y + 22, "R-Shift", true);
 	}
 
 	// ---------------------------------------------------------------- previews
@@ -1524,7 +1541,7 @@ public final class GuideScreen extends Screen {
 		VeloDraw.fillRounded(p.c, x, y + 3, w, 22, 6, p.a(0xFF0A0A0D));
 		VeloDraw.fillRounded(p.c, x, y, w, 22, 6, p.a(lit ? VeloUi.withAlpha(MenuKit.accent(), 0xFF) : 0xFF26262E));
 		VeloDraw.strokeRounded(p.c, x, y, w, 22, 6, p.a(0x30FFFFFF));
-		MenuKit.text(p.c, GuideScreen.this.textRenderer, t, x + (w - GuideScreen.this.textRenderer.getWidth(t)) / 2, y + 7, p.a(0xFFFFFFFF));
+		MenuKit.text(p.c, GuideScreen.this.textRenderer, t, x + (w - GuideScreen.this.textRenderer.getWidth(t)) / 2, y + 7, p.a(lit ? MenuKit.onAccent() : 0xFFFFFFFF));
 	}
 
 	private void toggleRow(Page p, String id, int x, int y, int w, String text, boolean on, Consumer<Boolean> set) {
@@ -1533,7 +1550,8 @@ public final class GuideScreen extends Screen {
 		MenuKit.text(p.c, GuideScreen.this.textRenderer, MenuKit.fit(GuideScreen.this.textRenderer, MenuKit.ui(text), w - 40), x, y + 6, p.a(VeloAnim.lerpArgb(MenuKit.TEXT_2, MenuKit.TEXT, Math.max(v, h))));
 		int sx = x + w - 30;
 		VeloDraw.fillRounded(p.c, sx, y + 3, 30, 14, 7, p.a(VeloAnim.lerpArgb(0xFF2A2A33, MenuKit.accent(), v)));
-		VeloDraw.fillCircle(p.c, sx + 7f + 16f * v, y + 10f, 5f, p.a(0xFFFFFFFF));
+		// the knob on the accent takes the contrast colour (a white accent made a white blob - owner 2026-11-26)
+		VeloDraw.fillCircle(p.c, sx + 7f + 16f * v, y + 10f, 5f, p.a(VeloAnim.lerpArgb(0xFFFFFFFF, MenuKit.onAccent(), v)));
 		if (p.live) {
 			hits.add(new Hit("tg_" + id, x, y, w, 20, () -> {
 				set.accept(!on);
@@ -1556,7 +1574,7 @@ public final class GuideScreen extends Screen {
 			float s = anim.merge("ch_" + id + option, sel ? 1f : 0f, (o, n) -> VeloAnim.step(o, sel ? 1f : 0f, p.dt * 9f));
 			float h = p.live ? hover("ch_" + id + option, p.mx, p.my, cx, cy, cw, 18, p.dt) : 0f;
 			VeloDraw.fillRounded(p.c, cx, cy, cw, 18, 7, p.a(VeloAnim.lerpArgb(VeloAnim.lerpArgb(0x0EFFFFFF, 0x1CFFFFFF, h), VeloUi.withAlpha(MenuKit.accent(), 0xE0), s)));
-			MenuKit.text(p.c, GuideScreen.this.textRenderer, t, cx + 8, cy + 5, p.a(VeloAnim.lerpArgb(MenuKit.TEXT_2, 0xFFFFFFFF, Math.max(s, h))));
+			MenuKit.text(p.c, GuideScreen.this.textRenderer, t, cx + 8, cy + 5, p.a(VeloAnim.lerpArgb(VeloAnim.lerpArgb(MenuKit.TEXT_2, 0xFFFFFFFF, h), MenuKit.onAccent(), s)));
 			if (p.live) {
 				hits.add(new Hit("ch_" + id + option, cx, cy, cw, 18, () -> {
 					if (!option.equals(current)) {
@@ -1636,8 +1654,73 @@ public final class GuideScreen extends Screen {
 	 * on the title screen their data components aren't bound yet and creating one crashes the game (26.x).
 	 */
 	private static void tex(DrawContext context, String path, int x, int y, int size, int color) {
-		context.drawTexture(RenderPipelines.GUI_TEXTURED, Identifier.of("minecraft", "textures/" + path + ".png"), x, y, 0f, 0f, size, size, 16, 16, 16, 16,
+		// the file's real size (owner 2026-11-26: with a PvP pack the pearl and potion were striped - packs ship 32 px items
+		// or animated strips, and squeezing a whole strip into 16 px gave the stripes): the first square frame of it
+		int[] wh = TEX_SIZE.computeIfAbsent(path, GuideScreen::textureSize);
+		int w = wh[0];
+		int h = wh[1];
+		context.drawTexture(RenderPipelines.GUI_TEXTURED, Identifier.of("minecraft", "textures/" + path + ".png"), x, y, 0f, 0f, size, size, w, w, w, h,
 				color);
+	}
+
+	private static final java.util.Map<String, int[]> TEX_SIZE = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** Width and height of a texture file under the active packs ({16, 16} when it can't be read). */
+	private static int[] textureSize(String path) {
+		try {
+			var resource = MinecraftClient.getInstance().getResourceManager().getResource(Identifier.of("minecraft", "textures/" + path + ".png"));
+			if (resource.isEmpty()) {
+				return new int[] {16, 16};
+			}
+			//? if <26.1 {
+			try (java.io.InputStream in = resource.get().getInputStream()) {
+			//?} else {
+			/*try (java.io.InputStream in = resource.get().open()) {
+			*///?}
+				byte[] head = in.readNBytes(24);
+				// PNG: width and height are the big-endian ints at bytes 16 and 20 (IHDR)
+				int w = ((head[16] & 0xFF) << 24) | ((head[17] & 0xFF) << 16) | ((head[18] & 0xFF) << 8) | (head[19] & 0xFF);
+				int h = ((head[20] & 0xFF) << 24) | ((head[21] & 0xFF) << 16) | ((head[22] & 0xFF) << 8) | (head[23] & 0xFF);
+				return w > 0 && h > 0 && w <= 4096 && h <= 65536 ? new int[] {w, h} : new int[] {16, 16};
+			}
+		} catch (Exception e) {
+			return new int[] {16, 16};
+		}
+	}
+
+	/** A real item through Minecraft's item renderer when a world is loaded (packs, animations, the right tint) - else the texture. */
+	private static void item(DrawContext context, String id, String texPath, int x, int y, int color) {
+		if (inWorld()) {
+			try {
+				net.minecraft.item.ItemStack stack = null;
+				if (id.equals("minecraft:splash_potion")) {
+					// your own pot, like the Pot Counter shows (a red Healing one when you carry it)
+					for (var s : net.veloclient.velo.client.util.ClientCompat.inventoryStacks()) {
+						if (net.veloclient.velo.client.pvp.PvpCompat.isSplashPotion(s)) {
+							stack = s;
+							break;
+						}
+					}
+				}
+				if (stack == null) {
+					stack = net.veloclient.velo.client.pvp.PvpCompat.itemStack(id);
+				}
+				context.drawItemWithoutEntity(stack, x, y);
+				return;
+			} catch (RuntimeException ignored) {
+				// fall through to the texture
+			}
+		}
+		tex(context, texPath, x, y, 16, color);
+	}
+
+	private static boolean inWorld() {
+		MinecraftClient client = MinecraftClient.getInstance();
+		//? if <26.1 {
+		return client.world != null;
+		//?} else {
+		/*return client.level != null;
+		*///?}
 	}
 
 	private static float ease(float t) {

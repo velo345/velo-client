@@ -72,7 +72,7 @@ public final class SettingsTabScreen extends VeloWindow implements net.veloclien
 			y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
 		}
 
-		y = section("Controls", y, 2);
+		y = section("Controls", y, 3);
 		var menuKey = net.veloclient.velo.client.keybind.VeloKeybinds.OPEN_MOD_MENU;
 		addDrawableChild(new VeloValueRow(x, y, width, ROW_HEIGHT, Text.literal("Open Velo menu"), VeloValueRow.Kind.KEY,
 				() -> menuKey.getBoundKeyLocalizedText().getString(), null,
@@ -83,6 +83,10 @@ public final class SettingsTabScreen extends VeloWindow implements net.veloclien
 		y += ROW_HEIGHT;
 		addDrawableChild(new VeloValueRow(x, y, width, ROW_HEIGHT, Text.literal("The menu key opens"), VeloValueRow.Kind.CHOICE,
 				net.veloclient.velo.client.gui.drawer.DrawerPrefs::mode, null, b -> net.veloclient.velo.client.gui.drawer.DrawerPrefs.cycleMode()));
+		y += ROW_HEIGHT;
+		addDrawableChild(new VeloValueRow(x, y, width, ROW_HEIGHT, Text.literal("Menu tour"), VeloValueRow.Kind.CHOICE,
+				() -> net.veloclient.velo.client.gui.drawer.DrawerPrefs.toured() ? "Show again" : "Next time the menu opens", null,
+				b -> net.veloclient.velo.client.gui.drawer.DrawerPrefs.setToured(!net.veloclient.velo.client.gui.drawer.DrawerPrefs.toured())));
 		y += ROW_HEIGHT + CARD_PAD + SECTION_GAP;
 
 		// Two columns: six switches in three rows, so the page still fits without scrolling.

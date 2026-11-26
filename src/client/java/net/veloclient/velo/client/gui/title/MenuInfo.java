@@ -133,6 +133,32 @@ public final class MenuInfo {
 		return null;
 	}
 
+	/** The name your saved server list gives {@code address} (case-insensitive), or null. */
+	public static String savedServerName(String address) {
+		try {
+			//? if <26.1 {
+			var list = new net.minecraft.client.option.ServerList(net.minecraft.client.MinecraftClient.getInstance());
+			list.loadFile();
+			for (int i = 0; i < list.size(); i++) {
+				if (address.equalsIgnoreCase(list.get(i).address)) {
+					return list.get(i).name;
+				}
+			}
+			//?} else {
+			/*var list = new net.minecraft.client.multiplayer.ServerList(net.minecraft.client.Minecraft.getInstance());
+			list.load();
+			for (int i = 0; i < list.size(); i++) {
+				if (address.equalsIgnoreCase(list.get(i).ip)) {
+					return list.get(i).name;
+				}
+			}
+			*///?}
+		} catch (RuntimeException e) {
+			// no saved list
+		}
+		return null;
+	}
+
 	/** The first server in the multiplayer list as {name, address, icon bytes}, or null - "Jump back in" before you've joined one with Velo. */
 	public static Object[] firstSavedServer() {
 		try {

@@ -623,20 +623,27 @@ public final class ModuleScenes {
 					double cycle = t % (swing + 1.6);
 					boolean blocking = on && !blockMode.equals("Off") && (int) (t / (swing + 1.6)) % 2 == 1;
 					double swingP = cycle < swing ? cycle / swing : -1;
+					// held like in first person (owner 2026-11-26: it looked twisted): the grip sits bottom right, the blade points
+					// up-left at the crosshair, and everything turns around the grip - a hit swings the blade forward and down,
+					// 1.7 blocking tilts it across the screen
 					push(context);
-					float ix = x + w - 70;
-					float iy = y + h - 64;
+					float gx = x + w - 34;
+					float gy = y + h - 14;
+					double angle = -90;   // the sprite's blade points up-right; -90 turns it up-left
 					if (blocking) {
-						move(context, ix - 20, iy - 12);
-						rotate(context, (float) Math.toRadians(-60));
+						gx -= 26;
+						gy -= 14;
+						angle -= 38;
 					} else if (swingP >= 0) {
 						double a = Math.sin(swingP * Math.PI);
-						move(context, (float) (ix - a * 30), (float) (iy - a * 18));
-						rotate(context, (float) Math.toRadians(-a * 50));
-					} else {
-						move(context, ix, iy);
+						gx -= (float) (a * 22);
+						gy -= (float) (a * 10);
+						angle -= a * 48;
 					}
+					move(context, gx, gy);
+					rotate(context, (float) Math.toRadians(angle));
 					scale(context, 4f, 4f);
+					move(context, -2f, -14f);   // the grip (pixel 2,14 of the sprite) on the pivot
 					context.drawItemWithoutEntity(net.veloclient.velo.client.pvp.PvpCompat.itemStack("minecraft:diamond_sword"), 0, 0);
 					pop(context);
 					Text label = Text.literal(blocking ? "blocking" : swingP >= 0 ? "hit" : "");

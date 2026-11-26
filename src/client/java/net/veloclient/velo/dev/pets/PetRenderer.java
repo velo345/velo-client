@@ -52,6 +52,49 @@ public final class PetRenderer {
 		}
 	}
 
+	/**
+	 * One pet's buffers, reused every frame (2026-11-25): the pet used to allocate ~100 KB of batch/effect arrays and a
+	 * matrix per bone each frame - at 1000+ FPS that was a large share of the render thread's garbage. The submitted
+	 * geometry lambdas read these arrays later in the same frame, before the next build rewrites them.
+	 */
+	private static final class Scratch {
+		Batch[] batches = new Batch[0];
+		Matrix4f[] chain = new Matrix4f[0];
+		boolean[] shown = new boolean[0];
+		final Matrix4f root = new Matrix4f();
+		final Matrix4f world = new Matrix4f();
+		final org.joml.Quaternionf rootQ = new org.joml.Quaternionf();
+		final Vector3f[] corners = {new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f()};
+		final Vector3f n1 = new Vector3f();
+		final Vector3f n2 = new Vector3f();
+		Matrix4f[] skin = new Matrix4f[0];
+		float[] posed = new float[0];
+		final List<Batch> out = new ArrayList<>();
+		final FxBatch[] fx = new FxBatch[1 + SPRITES.length];
+		long frame = -1;
+
+		Scratch() {
+			for (int i = 0; i < fx.length; i++) {
+				fx[i] = new FxBatch();
+			}
+		}
+	}
+
+	/** Counts submit passes: a pet drawn twice in one pass gets fresh buffers for the second draw. */
+	private static long submitFrame;
+
+	private static Scratch scratch(PetBrain brain) {
+		Scratch s = brain.renderScratch instanceof Scratch existing ? existing : null;
+		if (s == null) {
+			s = new Scratch();
+			brain.renderScratch = s;
+		} else if (s.frame == submitFrame) {
+			return new Scratch();
+		}
+		s.frame = submitFrame;
+		return s;
+	}
+
 	/** The drawn pet's lowest and highest point last frame, in blocks above the player's feet (riding sizes and seats by it). */
 	static volatile float lastBottom;
 	static volatile float lastTop = 1f;
@@ -63,23 +106,46 @@ public final class PetRenderer {
 
 	/** This frame's batches for {@code brain}'s pose, offset by (ox, oy, oz) = player position - camera. */
 	static List<Batch> build(PetBrain brain, float ox, float oy, float oz) {
+		return build(brain, ox, oy, oz, scratch(brain));
+	}
+
+	private static List<Batch> build(PetBrain brain, float ox, float oy, float oz, Scratch sc) {
 		PetModel model = brain.model;
 		PetPose pose = brain.out;
 		int n = model.nodes.length;
-		Matrix4f root = new Matrix4f().translation(ox + pose.rootP[0], oy + pose.rootP[1], oz + pose.rootP[2])
-				.rotate(new org.joml.Quaternionf(pose.rootQ[0], pose.rootQ[1], pose.rootQ[2], pose.rootQ[3])).scale(pose.rootS[0], pose.rootS[1], pose.rootS[2]);
-		Matrix4f[] chain = new Matrix4f[n];   // each node relative to the root
-		boolean[] shown = new boolean[n];
+		Matrix4f root = sc.root.translation(ox + pose.rootP[0], oy + pose.rootP[1], oz + pose.rootP[2])
+				.rotate(sc.rootQ.set(pose.rootQ[0], pose.rootQ[1], pose.rootQ[2], pose.rootQ[3])).scale(pose.rootS[0], pose.rootS[1], pose.rootS[2]);
+		if (sc.chain.length < n) {
+			Matrix4f[] grown = java.util.Arrays.copyOf(sc.chain, n);
+			for (int i = sc.chain.length; i < n; i++) {
+				grown[i] = new Matrix4f();
+			}
+			sc.chain = grown;
+			sc.shown = new boolean[n];
+		}
+		Matrix4f[] chain = sc.chain;   // each node relative to the root
+		boolean[] shown = sc.shown;
 		for (int i = 0; i < n; i++) {
 			PetModel.Node node = model.nodes[i];
-			Matrix4f local = new Matrix4f().translationRotateScale(pose.p[i * 3], pose.p[i * 3 + 1], pose.p[i * 3 + 2],
+			Matrix4f local = chain[i].translationRotateScale(pose.p[i * 3], pose.p[i * 3 + 1], pose.p[i * 3 + 2],
 					pose.q[i * 4], pose.q[i * 4 + 1], pose.q[i * 4 + 2], pose.q[i * 4 + 3], pose.s[i * 3], pose.s[i * 3 + 1], pose.s[i * 3 + 2]);
-			chain[i] = node.parent < 0 ? local : new Matrix4f(chain[node.parent]).mul(local);
+			if (node.parent >= 0) {
+				// parent * local, written into this node's own matrix (parents always come first)
+				chain[node.parent].mul(local, local);
+			}
 			shown[i] = pose.v[i] > .5f && (node.parent < 0 || shown[node.parent]);
 		}
-		Batch[] batches = new Batch[model.materials.length];
-		Vector3f[] c = {new Vector3f(), new Vector3f(), new Vector3f(), new Vector3f()};
-		Matrix4f world = new Matrix4f();
+		if (sc.batches.length < model.materials.length) {
+			sc.batches = new Batch[model.materials.length];
+		}
+		Batch[] batches = sc.batches;
+		for (Batch batch : batches) {
+			if (batch != null) {
+				batch.size = 0;
+			}
+		}
+		Vector3f[] c = sc.corners;
+		Matrix4f world = sc.world;
 		for (int i = 0; i < n; i++) {
 			PetModel.Node node = model.nodes[i];
 			if (node.type == PetModel.BONE || !shown[i]) {
@@ -94,13 +160,14 @@ public final class PetRenderer {
 						int vi = order[k];
 						world.transformPosition(node.pos[vi * 3], node.pos[vi * 3 + 1], node.pos[vi * 3 + 2], c[k]);
 					}
-					emitQuad(batch, c, node.uv, order);
+					emitQuad(batch, c, node.uv, order, sc);
 				}
 			} else {
-				emitSkin(batch, node, root, chain, c);
+				emitSkin(batch, node, root, chain, c, sc);
 			}
 		}
-		List<Batch> out = new ArrayList<>();
+		List<Batch> out = sc.out;
+		out.clear();
 		float minY = Float.MAX_VALUE;
 		float maxY = -Float.MAX_VALUE;
 		for (Batch batch : batches) {
@@ -191,8 +258,8 @@ public final class PetRenderer {
 		rideShape = new float[] {minY, maxY, cx, cz, back};
 	}
 
-	private static void emitQuad(Batch batch, Vector3f[] c, float[] uv, int[] order) {
-		Vector3f normal = new Vector3f(c[1]).sub(c[0]).cross(new Vector3f(c[3]).sub(c[0]));
+	private static void emitQuad(Batch batch, Vector3f[] c, float[] uv, int[] order, Scratch sc) {
+		Vector3f normal = sc.n1.set(c[1]).sub(c[0]).cross(sc.n2.set(c[3]).sub(c[0]));
 		if (normal.lengthSquared() < 1e-12f) {
 			normal.set(0, 1, 0);
 		}
@@ -205,15 +272,29 @@ public final class PetRenderer {
 	}
 
 	/** A skinned membrane: each vertex is the weighted sum of its bones' (pose x inverse bind) transforms. */
-	private static void emitSkin(Batch batch, PetModel.Node node, Matrix4f root, Matrix4f[] chain, Vector3f[] c) {
+	private static void emitSkin(Batch batch, PetModel.Node node, Matrix4f root, Matrix4f[] chain, Vector3f[] c, Scratch sc) {
 		int bones = node.bones.length;
-		Matrix4f[] skin = new Matrix4f[bones];
+		if (sc.skin.length < bones) {
+			Matrix4f[] grown = java.util.Arrays.copyOf(sc.skin, bones);
+			for (int j = sc.skin.length; j < bones; j++) {
+				grown[j] = new Matrix4f();
+			}
+			sc.skin = grown;
+		}
+		Matrix4f[] skin = sc.skin;
 		for (int j = 0; j < bones; j++) {
-			skin[j] = new Matrix4f(root).mul(chain[node.bones[j]]).mul(new Matrix4f().set(node.boneInverses[j]));
+			Matrix4f m = skin[j];
+			m.set(node.boneInverses[j]);
+			// root * chain * inverse bind
+			chain[node.bones[j]].mul(m, m);
+			root.mul(m, m);
 		}
 		int count = node.pos.length / 3;
-		float[] posed = new float[count * 3];
-		Vector3f tmp = new Vector3f();
+		if (sc.posed.length < count * 3) {
+			sc.posed = new float[count * 3];
+		}
+		float[] posed = sc.posed;
+		Vector3f tmp = sc.n2;
 		for (int vi = 0; vi < count; vi++) {
 			float px = 0;
 			float py = 0;
@@ -232,13 +313,13 @@ public final class PetRenderer {
 			posed[vi * 3 + 1] = py;
 			posed[vi * 3 + 2] = pz;
 		}
-		int[] corner = new int[4];
+		int[] corner = SKIN_CORNER;
 		for (int t = 0; t + 2 < node.index.length; t += 3) {
 			for (int k = 0; k < 4; k++) {
 				corner[k] = node.index[t + Math.min(k, 2)];
 				c[k].set(posed[corner[k] * 3], posed[corner[k] * 3 + 1], posed[corner[k] * 3 + 2]);
 			}
-			Vector3f normal = new Vector3f(c[1]).sub(c[0]).cross(new Vector3f(c[2]).sub(c[0]));
+			Vector3f normal = sc.n1.set(c[1]).sub(c[0]).cross(sc.n2.set(c[2]).sub(c[0]));
 			if (normal.lengthSquared() < 1e-12f) {
 				normal.set(0, 1, 0);
 			}
@@ -248,6 +329,8 @@ public final class PetRenderer {
 			}
 		}
 	}
+
+	private static final int[] SKIN_CORNER = new int[4];
 
 	private static int argb(float a, float r, float g, float b) {
 		return Math.round(clamp01(a) * 255) << 24 | Math.round(clamp01(r) * 255) << 16 | Math.round(clamp01(g) * 255) << 8 | Math.round(clamp01(b) * 255);
@@ -304,10 +387,11 @@ public final class PetRenderer {
 	}
 
 	/** This frame's effects: [0] the glow dots, [1..] one batch per sprite picture. Camera-relative like {@link #build}. */
-	static FxBatch[] buildFx(PetBrain brain, float ox, float oy, float oz) {
-		FxBatch[] out = new FxBatch[1 + SPRITES.length];
-		for (int i = 0; i < out.length; i++) {
-			out[i] = new FxBatch();
+	private static FxBatch[] buildFx(PetBrain brain, float ox, float oy, float oz, Scratch sc) {
+		FxBatch[] out = sc.fx;
+		for (FxBatch batch : out) {
+			batch.size = 0;
+			batch.corners = 0;
 		}
 		// the camera's right and up axes, so every quad faces it
 		float[] rot = net.veloclient.velo.client.pvp.PvpCompat.cameraRotation();
@@ -377,6 +461,7 @@ public final class PetRenderer {
 	}
 
 	private static void submit(net.minecraft.client.util.math.MatrixStack matrices, net.minecraft.client.render.command.OrderedRenderCommandQueue queue) {
+		submitFrame++;
 		for (PetsModule.Frame frame : PetsModule.frames()) {
 			submitOne(matrices, queue, frame);
 		}
@@ -388,7 +473,8 @@ public final class PetRenderer {
 		PetPose pose = frame.brain().out;
 		int light = light(frame.x(), frame.y(), frame.z());
 		var overlay = net.minecraft.client.render.OverlayTexture.DEFAULT_UV;
-		for (Batch batch : build(frame.brain(), frame.ox(), frame.oy(), frame.oz())) {
+		Scratch sc = scratch(frame.brain());
+		for (Batch batch : build(frame.brain(), frame.ox(), frame.oy(), frame.oz(), sc)) {
 			PetModel.Material m = model.materials[batch.material];
 			float alpha = pose.opacity[batch.material];
 			float[] data = batch.data;
@@ -409,7 +495,7 @@ public final class PetRenderer {
 						emit(data, size, entry.getPositionMatrix(), (x, y, z, u, v, nx, ny, nz) -> consumer.vertex(x, y, z, color, u, v, overlay, 0xF000F0, nx, ny, nz)));
 			}
 		}
-		FxBatch[] fx = buildFx(frame.brain(), frame.ox(), frame.oy(), frame.oz());
+		FxBatch[] fx = buildFx(frame.brain(), frame.ox(), frame.oy(), frame.oz(), sc);
 		for (int i = 0; i < fx.length; i++) {
 			FxBatch batch = fx[i];
 			if (batch.size == 0) {
@@ -432,6 +518,7 @@ public final class PetRenderer {
 	}
 
 	private static void submit(com.mojang.blaze3d.vertex.PoseStack matrices, net.minecraft.client.renderer.SubmitNodeCollector queue) {
+		submitFrame++;
 		for (PetsModule.Frame frame : PetsModule.frames()) {
 			submitOne(matrices, queue, frame);
 		}
@@ -443,7 +530,8 @@ public final class PetRenderer {
 		PetPose pose = frame.brain().out;
 		int light = light(frame.x(), frame.y(), frame.z());
 		int overlay = net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY;
-		for (Batch batch : build(frame.brain(), frame.ox(), frame.oy(), frame.oz())) {
+		Scratch sc = scratch(frame.brain());
+		for (Batch batch : build(frame.brain(), frame.ox(), frame.oy(), frame.oz(), sc)) {
 			PetModel.Material m = model.materials[batch.material];
 			float alpha = pose.opacity[batch.material];
 			float[] data = batch.data;
@@ -454,10 +542,10 @@ public final class PetRenderer {
 						: net.minecraft.client.renderer.rendertype.RenderTypes.entityCutout(texture);
 				int color = argb(m.transparent ? alpha : 1, 1, 1, 1);
 				queue.submitCustomGeometry(matrices, layer, (pose2, consumer) -> {
-					Matrix4f pm = new Matrix4f(pose2.pose());
-					if (!net.veloclient.velo.client.cosmetics.render.CosmeticVertexWriter.writeSequential(consumer, size / 8, data, 8, 0, 5, 3,
-							pm, new org.joml.Matrix3f(pm), color, overlay, light)) {
-						emit(data, size, pm, (x, y, z, u, v, nx, ny, nz) -> consumer.addVertex(x, y, z, color, u, v, overlay, light, nx, ny, nz));
+					Matrix4f pm = pose2.pose();
+					if (!net.veloclient.velo.client.cosmetics.render.CosmeticVertexWriter.writeExpanded(consumer, size / 8, data, 8, 0, 5, 3,
+							pm, color, overlay, light)) {
+						emit(data, size, new Matrix4f(pm), (x, y, z, u, v, nx, ny, nz) -> consumer.addVertex(x, y, z, color, u, v, overlay, light, nx, ny, nz));
 					}
 				});
 			}
@@ -467,15 +555,15 @@ public final class PetRenderer {
 				int color = argb(glow, tint[batch.material * 3], tint[batch.material * 3 + 1], tint[batch.material * 3 + 2]);
 				queue.submitCustomGeometry(matrices, net.minecraft.client.renderer.rendertype.RenderTypes.eyes(id(model.textures[m.emissive])), (pose2, consumer) ->
 						{
-							Matrix4f pm = new Matrix4f(pose2.pose());
-							if (!net.veloclient.velo.client.cosmetics.render.CosmeticVertexWriter.writeSequential(consumer, size / 8, data, 8, 0, 5, 3,
-									pm, new org.joml.Matrix3f(pm), color, overlay, 0xF000F0)) {
-								emit(data, size, pm, (x, y, z, u, v, nx, ny, nz) -> consumer.addVertex(x, y, z, color, u, v, overlay, 0xF000F0, nx, ny, nz));
+							Matrix4f pm = pose2.pose();
+							if (!net.veloclient.velo.client.cosmetics.render.CosmeticVertexWriter.writeExpanded(consumer, size / 8, data, 8, 0, 5, 3,
+									pm, color, overlay, 0xF000F0)) {
+								emit(data, size, new Matrix4f(pm), (x, y, z, u, v, nx, ny, nz) -> consumer.addVertex(x, y, z, color, u, v, overlay, 0xF000F0, nx, ny, nz));
 							}
 						});
 			}
 		}
-		FxBatch[] fx = buildFx(frame.brain(), frame.ox(), frame.oy(), frame.oz());
+		FxBatch[] fx = buildFx(frame.brain(), frame.ox(), frame.oy(), frame.oz(), sc);
 		for (int i = 0; i < fx.length; i++) {
 			FxBatch batch = fx[i];
 			if (batch.size == 0) {

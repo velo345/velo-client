@@ -28,6 +28,14 @@ public final class Toasts {
 	}
 
 	public static void show(Node anyNode, String icon, String color, String message) {
+		String i = icon == null ? "" : icon.toLowerCase(java.util.Locale.ROOT);
+		if (i.contains("warn") || i.contains("alert") || i.contains("error") || i.equals("close") || i.equals("x")) {
+			UiSounds.error();
+		} else if (i.contains("check") || i.contains("done")) {
+			UiSounds.confirm();
+		} else {
+			UiSounds.notifySoft();
+		}
 		if (anyNode == null || anyNode.getScene() == null || !(anyNode.getScene().getRoot() instanceof StackPane layers)) {
 			return;
 		}

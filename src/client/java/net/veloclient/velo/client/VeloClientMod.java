@@ -119,6 +119,8 @@ public final class VeloClientMod implements ClientModInitializer {
 		net.veloclient.velo.client.util.MemoryTrim.register();
 		net.veloclient.velo.client.devtools.SkyboxSmoke.register();
 		net.veloclient.velo.client.devtools.DrawerTour.register();
+		net.veloclient.velo.client.devtools.DrawerBench.register();
+		net.veloclient.velo.client.devtools.FullBrightTest.register();
 		net.veloclient.velo.client.devtools.TierTagTest.register();
 		net.veloclient.velo.client.util.PerfTelemetry.register();
 		net.veloclient.velo.client.util.FontWarmup.register();

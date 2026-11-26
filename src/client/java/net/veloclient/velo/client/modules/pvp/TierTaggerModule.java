@@ -35,6 +35,12 @@ public final class TierTaggerModule extends AbstractModule implements Configurab
 	private boolean retired = true;
 	private boolean peak = false;
 	private String side = "After the name";
+	private boolean showOwn = true;
+
+	/** Hold to see every tier of the player you're looking at (2026-11-25 request). */
+	public static final net.minecraft.client.option.KeyBinding ALL_TIERS_KEY = net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper
+			.registerKeyBinding(new net.minecraft.client.option.KeyBinding("key.velo-client.all_tiers", net.minecraft.client.util.InputUtil.Type.KEYSYM,
+					net.veloclient.velo.client.util.Keys.G, net.veloclient.velo.client.keybind.VeloKeybinds.CATEGORY));
 
 	public TierTaggerModule() {
 		super("tier-tagger", "Tier Tagger", "Shows players' PvP tiers (PvPTiers, SubTiers) next to their name - above their head and in the tab list.",
@@ -87,6 +93,10 @@ public final class TierTaggerModule extends AbstractModule implements Configurab
 		return peak;
 	}
 
+	public boolean showOwn() {
+		return showOwn;
+	}
+
 	public boolean before() {
 		return side.equals("Before the name");
 	}
@@ -127,6 +137,10 @@ public final class TierTaggerModule extends AbstractModule implements Configurab
 					tabList = v;
 					settingsVersion++;
 				}),
+				new ConfigField.ToggleField("Show my own tier", () -> showOwn, v -> {
+					showOwn = v;
+					settingsVersion++;
+				}),
 				new ConfigField.ChoiceField("Position", List.of("After the name", "Before the name"), () -> side, v -> {
 					side = v;
 					settingsVersion++;
@@ -143,7 +157,9 @@ public final class TierTaggerModule extends AbstractModule implements Configurab
 				new ConfigField.ToggleField("Show peak when higher", () -> peak, v -> {
 					peak = v;
 					settingsVersion++;
-				}));
+				}),
+				new ConfigField.HeaderField("All tiers"),
+				net.veloclient.velo.client.keybind.KeybindConfig.field("Hold to see all tiers", ALL_TIERS_KEY));
 	}
 
 	@Override

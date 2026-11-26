@@ -1,318 +1,561 @@
 {
- "emote.boing": {
-  "sounds": [
-   {
-    "name": "velo-client:emote/boing"
-   }
-  ]
- },
- "emote.chime": {
-  "sounds": [
-   {
-    "name": "velo-client:emote/chime"
-   }
-  ]
- },
- "emote.dust": {
-  "sounds": [
-   {
-    "name": "velo-client:emote/dust"
-   }
-  ]
- },
- "emote.heart": {
-  "sounds": [
-   {
-    "name": "velo-client:emote/heart"
-   }
-  ]
- },
- "emote.magic": {
-  "sounds": [
-   {
-    "name": "velo-client:emote/magic"
-   }
-  ]
- },
- "emote.pop": {
-  "sounds": [
-   {
-    "name": "velo-client:emote/pop"
-   }
-  ]
- },
- "emote.popper": {
-  "sounds": [
-   {
-    "name": "velo-client:emote/popper"
-   }
-  ]
- },
- "emote.sad_trombone": {
-  "sounds": [
-   {
-    "name": "velo-client:emote/sad_trombone"
-   }
-  ]
- },
- "emote.slap": {
-  "sounds": [
-   {
-    "name": "velo-client:emote/slap"
-   }
-  ]
- },
- "emote.stomp": {
-  "sounds": [
-   {
-    "name": "velo-client:emote/stomp"
-   }
-  ]
- },
- "emote.tap": {
-  "sounds": [
-   {
-    "name": "velo-client:emote/tap"
-   }
-  ]
- },
- "emote.whoosh": {
-  "sounds": [
-   {
-    "name": "velo-client:emote/whoosh"
-   }
-  ]
- },
- "killfx.blackhole": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/blackhole"
-   }
-  ]
- },
- "killfx.frostbite": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/frostbite"
-   }
-  ]
- },
- "killfx.glitch": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/glitch"
-   }
-  ]
- },
- "killfx.grave": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/grave"
-   }
-  ]
- },
- "killfx.jackpot": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/jackpot"
-   }
-  ]
- },
- "killfx.katana": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/katana"
-   }
-  ]
- },
- "killfx.meteor": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/meteor"
-   }
-  ]
- },
- "killfx.orbital": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/orbital"
-   }
-  ]
- },
- "killfx.phoenix": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/phoenix"
-   }
-  ]
- },
- "killfx.reaper": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/reaper"
-   }
-  ]
- },
- "killfx.shadow": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/shadow"
-   }
-  ]
- },
- "killfx.shatter": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/shatter"
-   }
-  ]
- },
- "killfx.supernova": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/supernova"
-   }
-  ]
- },
- "killfx.thunder": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/thunder"
-   }
-  ]
- },
- "killfx.tornado": {
-  "sounds": [
-   {
-    "name": "velo-client:killfx/tornado"
-   }
-  ]
- },
- "music.title_ambient": {
-  "sounds": [
-   {
-    "name": "velo-client:music/title_ambient",
-    "stream": true
-   }
-  ]
- },
- "ui.click": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/click"
-   }
-  ]
- },
- "ui.game_loaded": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/game_loaded"
-   }
-  ]
- },
- "ui.guide_back": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/guide_back"
-   }
-  ]
- },
- "ui.guide_done": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/guide_done"
-   }
-  ]
- },
- "ui.guide_next": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/guide_next"
-   }
-  ]
- },
- "ui.hover": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/hover"
-   }
-  ]
- },
- "ui.launch": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/launch"
-   }
-  ]
- },
- "ui.launcher_start": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/launcher_start"
-   }
-  ]
- },
- "ui.menu_close": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/menu_close"
-   }
-  ]
- },
- "ui.menu_open": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/menu_open"
-   }
-  ]
- },
- "ui.pause_close": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/pause_close"
-   }
-  ]
- },
- "ui.pause_open": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/pause_open"
-   }
-  ]
- },
- "ui.slider": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/slider"
-   }
-  ]
- },
- "ui.tab": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/tab"
-   }
-  ]
- },
- "ui.toggle_off": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/toggle_off"
-   }
-  ]
- },
- "ui.toggle_on": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/toggle_on"
-   }
-  ]
- },
- "ui.welcome": {
-  "sounds": [
-   {
-    "name": "velo-client:ui/welcome"
-   }
-  ]
- }
+  "emote.boing": {
+    "sounds": [
+      {
+        "name": "velo-client:emote/boing"
+      }
+    ]
+  },
+  "emote.chime": {
+    "sounds": [
+      {
+        "name": "velo-client:emote/chime"
+      }
+    ]
+  },
+  "emote.dust": {
+    "sounds": [
+      {
+        "name": "velo-client:emote/dust"
+      }
+    ]
+  },
+  "emote.heart": {
+    "sounds": [
+      {
+        "name": "velo-client:emote/heart"
+      }
+    ]
+  },
+  "emote.magic": {
+    "sounds": [
+      {
+        "name": "velo-client:emote/magic"
+      }
+    ]
+  },
+  "emote.pop": {
+    "sounds": [
+      {
+        "name": "velo-client:emote/pop"
+      }
+    ]
+  },
+  "emote.popper": {
+    "sounds": [
+      {
+        "name": "velo-client:emote/popper"
+      }
+    ]
+  },
+  "emote.sad_trombone": {
+    "sounds": [
+      {
+        "name": "velo-client:emote/sad_trombone"
+      }
+    ]
+  },
+  "emote.slap": {
+    "sounds": [
+      {
+        "name": "velo-client:emote/slap"
+      }
+    ]
+  },
+  "emote.stomp": {
+    "sounds": [
+      {
+        "name": "velo-client:emote/stomp"
+      }
+    ]
+  },
+  "emote.tap": {
+    "sounds": [
+      {
+        "name": "velo-client:emote/tap"
+      }
+    ]
+  },
+  "emote.whoosh": {
+    "sounds": [
+      {
+        "name": "velo-client:emote/whoosh"
+      }
+    ]
+  },
+  "killfx.blackhole": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/blackhole"
+      }
+    ]
+  },
+  "killfx.frostbite": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/frostbite"
+      }
+    ]
+  },
+  "killfx.glitch": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/glitch"
+      }
+    ]
+  },
+  "killfx.grave": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/grave"
+      }
+    ]
+  },
+  "killfx.jackpot": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/jackpot"
+      }
+    ]
+  },
+  "killfx.katana": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/katana"
+      }
+    ]
+  },
+  "killfx.meteor": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/meteor"
+      }
+    ]
+  },
+  "killfx.orbital": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/orbital"
+      }
+    ]
+  },
+  "killfx.phoenix": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/phoenix"
+      }
+    ]
+  },
+  "killfx.reaper": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/reaper"
+      }
+    ]
+  },
+  "killfx.shadow": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/shadow"
+      }
+    ]
+  },
+  "killfx.shatter": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/shatter"
+      }
+    ]
+  },
+  "killfx.supernova": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/supernova"
+      }
+    ]
+  },
+  "killfx.thunder": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/thunder"
+      }
+    ]
+  },
+  "killfx.tornado": {
+    "sounds": [
+      {
+        "name": "velo-client:killfx/tornado"
+      }
+    ]
+  },
+  "music.title_ambient": {
+    "sounds": [
+      {
+        "name": "velo-client:music/title_ambient",
+        "stream": true
+      }
+    ]
+  },
+  "ui.click": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/click"
+      },
+      {
+        "name": "velo-client:ui/click_1"
+      },
+      {
+        "name": "velo-client:ui/click_2"
+      },
+      {
+        "name": "velo-client:ui/click_3"
+      },
+      {
+        "name": "velo-client:ui/click_4"
+      }
+    ]
+  },
+  "ui.game_loaded": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/game_loaded"
+      }
+    ]
+  },
+  "ui.guide_back": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/guide_back"
+      },
+      {
+        "name": "velo-client:ui/guide_back_1"
+      },
+      {
+        "name": "velo-client:ui/guide_back_2"
+      },
+      {
+        "name": "velo-client:ui/guide_back_3"
+      },
+      {
+        "name": "velo-client:ui/guide_back_4"
+      }
+    ]
+  },
+  "ui.guide_done": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/guide_done"
+      }
+    ]
+  },
+  "ui.guide_next": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/guide_next"
+      },
+      {
+        "name": "velo-client:ui/guide_next_1"
+      },
+      {
+        "name": "velo-client:ui/guide_next_2"
+      },
+      {
+        "name": "velo-client:ui/guide_next_3"
+      },
+      {
+        "name": "velo-client:ui/guide_next_4"
+      }
+    ]
+  },
+  "ui.hover": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/hover"
+      },
+      {
+        "name": "velo-client:ui/hover_1"
+      },
+      {
+        "name": "velo-client:ui/hover_2"
+      },
+      {
+        "name": "velo-client:ui/hover_3"
+      },
+      {
+        "name": "velo-client:ui/hover_4"
+      }
+    ]
+  },
+  "ui.launch": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/launch"
+      }
+    ]
+  },
+  "ui.launcher_start": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/launcher_start"
+      }
+    ]
+  },
+  "ui.menu_close": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/menu_close"
+      }
+    ]
+  },
+  "ui.menu_open": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/menu_open"
+      }
+    ]
+  },
+  "ui.pause_close": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/pause_close"
+      }
+    ]
+  },
+  "ui.pause_open": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/pause_open"
+      }
+    ]
+  },
+  "ui.slider": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/slider"
+      },
+      {
+        "name": "velo-client:ui/slider_1"
+      },
+      {
+        "name": "velo-client:ui/slider_2"
+      },
+      {
+        "name": "velo-client:ui/slider_3"
+      },
+      {
+        "name": "velo-client:ui/slider_4"
+      }
+    ]
+  },
+  "ui.tab": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/tab"
+      },
+      {
+        "name": "velo-client:ui/tab_1"
+      },
+      {
+        "name": "velo-client:ui/tab_2"
+      },
+      {
+        "name": "velo-client:ui/tab_3"
+      },
+      {
+        "name": "velo-client:ui/tab_4"
+      }
+    ]
+  },
+  "ui.toggle_off": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/toggle_off"
+      },
+      {
+        "name": "velo-client:ui/toggle_off_1"
+      },
+      {
+        "name": "velo-client:ui/toggle_off_2"
+      },
+      {
+        "name": "velo-client:ui/toggle_off_3"
+      },
+      {
+        "name": "velo-client:ui/toggle_off_4"
+      }
+    ]
+  },
+  "ui.toggle_on": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/toggle_on"
+      },
+      {
+        "name": "velo-client:ui/toggle_on_1"
+      },
+      {
+        "name": "velo-client:ui/toggle_on_2"
+      },
+      {
+        "name": "velo-client:ui/toggle_on_3"
+      },
+      {
+        "name": "velo-client:ui/toggle_on_4"
+      }
+    ]
+  },
+  "ui.welcome": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/welcome"
+      }
+    ]
+  },
+  "ui.back": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/back"
+      },
+      {
+        "name": "velo-client:ui/back_1"
+      },
+      {
+        "name": "velo-client:ui/back_2"
+      },
+      {
+        "name": "velo-client:ui/back_3"
+      },
+      {
+        "name": "velo-client:ui/back_4"
+      }
+    ]
+  },
+  "ui.page": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/page"
+      },
+      {
+        "name": "velo-client:ui/page_1"
+      },
+      {
+        "name": "velo-client:ui/page_2"
+      },
+      {
+        "name": "velo-client:ui/page_3"
+      },
+      {
+        "name": "velo-client:ui/page_4"
+      }
+    ]
+  },
+  "ui.confirm": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/confirm"
+      },
+      {
+        "name": "velo-client:ui/confirm_1"
+      },
+      {
+        "name": "velo-client:ui/confirm_2"
+      },
+      {
+        "name": "velo-client:ui/confirm_3"
+      },
+      {
+        "name": "velo-client:ui/confirm_4"
+      }
+    ]
+  },
+  "ui.error": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/error"
+      }
+    ]
+  },
+  "ui.notify": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/notify"
+      }
+    ]
+  },
+  "ui.drag": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/drag"
+      },
+      {
+        "name": "velo-client:ui/drag_1"
+      },
+      {
+        "name": "velo-client:ui/drag_2"
+      },
+      {
+        "name": "velo-client:ui/drag_3"
+      },
+      {
+        "name": "velo-client:ui/drag_4"
+      }
+    ]
+  },
+  "ui.drop": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/drop"
+      },
+      {
+        "name": "velo-client:ui/drop_1"
+      },
+      {
+        "name": "velo-client:ui/drop_2"
+      },
+      {
+        "name": "velo-client:ui/drop_3"
+      },
+      {
+        "name": "velo-client:ui/drop_4"
+      }
+    ]
+  },
+  "ui.expand": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/expand"
+      },
+      {
+        "name": "velo-client:ui/expand_1"
+      },
+      {
+        "name": "velo-client:ui/expand_2"
+      },
+      {
+        "name": "velo-client:ui/expand_3"
+      },
+      {
+        "name": "velo-client:ui/expand_4"
+      }
+    ]
+  },
+  "ui.collapse": {
+    "sounds": [
+      {
+        "name": "velo-client:ui/collapse"
+      },
+      {
+        "name": "velo-client:ui/collapse_1"
+      },
+      {
+        "name": "velo-client:ui/collapse_2"
+      },
+      {
+        "name": "velo-client:ui/collapse_3"
+      },
+      {
+        "name": "velo-client:ui/collapse_4"
+      }
+    ]
+  }
 }

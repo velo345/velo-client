@@ -192,8 +192,9 @@ final class BridgeMenuScreen extends VeloWindow {
 
 	private DrawContext currentContext;
 
+	/** Server menus in Velo's UI font (the glass windows' look), not Minecraft's pixel font. */
 	private void drawText(String s, int x, int y, int color) {
-		currentContext.drawTextWithShadow(this.textRenderer, s, x, y, color);
+		MenuKit.text(currentContext, this.textRenderer, MenuKit.ui(s), x, y, color);
 	}
 
 	@Override

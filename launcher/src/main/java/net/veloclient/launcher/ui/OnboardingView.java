@@ -46,6 +46,10 @@ public final class OnboardingView {
 
 		/** Opens the "Switch from another client" page. */
 		void openImport();
+
+		/** Getting started is over (finished or skipped) - the launcher tour can start. */
+		default void finished() {
+		}
 	}
 
 	private enum Step { WELCOME, SIGN_IN, IMPORT, CODE, DONE }
@@ -130,7 +134,12 @@ public final class OnboardingView {
 	private void close() {
 		FadeTransition out = new FadeTransition(Duration.millis(200), scrim);
 		out.setToValue(0);
-		out.setOnFinished(e -> layers.getChildren().remove(scrim));
+		out.setOnFinished(e -> {
+			layers.getChildren().remove(scrim);
+			if (!importChosen) {
+				host.finished();
+			}
+		});
 		out.play();
 		if (importChosen) {
 			host.openImport();

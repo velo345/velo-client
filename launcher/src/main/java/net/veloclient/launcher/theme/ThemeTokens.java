@@ -42,6 +42,24 @@ public final class ThemeTokens {
 				"-fx-background-color: -velo-background;");
 	}
 
+	/**
+	 * The glass launcher (2026-11-25): surfaces become see-through tints of the backdrop's colour (the frosted picture
+	 * behind glass panels is drawn by ui/glass/Glass), hairlines a little brighter.
+	 */
+	public static String glass(int r, int g, int b, double darkness) {
+		int tint = (r << 16) | (g << 8) | b;
+		double a = Math.max(0.3, Math.min(0.9, darkness + 0.12));
+		return String.join(" ",
+				token("-velo-surface", rgba(tint, a)),
+				token("-velo-surface-2", "rgba(255,255,255,0.07)"),
+				token("-velo-surface-3", "rgba(255,255,255,0.11)"),
+				token("-velo-hover", "rgba(255,255,255,0.12)"),
+				token("-velo-glass", rgba(lift(tint, 6), 0.92)),
+				token("-velo-glass-tint", rgba(tint, a)),
+				token("-velo-hairline", "rgba(255,255,255,0.10)"),
+				token("-velo-hairline-2", "rgba(255,255,255,0.16)"));
+	}
+
 	private static String token(String name, String value) {
 		return name + ": " + value + ";";
 	}

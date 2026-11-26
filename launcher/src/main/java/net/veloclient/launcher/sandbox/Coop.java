@@ -225,6 +225,14 @@ final class Coop {
 		}
 	}
 
+	/** Host: lets go of a guest (closing its stream; its read loop then ends on its own). */
+	void drop(String peerId) {
+		Peer peer = peers.remove(peerId);
+		if (peer != null) {
+			closeQuietly(peer.socket);
+		}
+	}
+
 	List<JsonObject> drain() {
 		List<JsonObject> out = new ArrayList<>();
 		JsonObject msg;

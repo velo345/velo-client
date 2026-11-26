@@ -95,7 +95,50 @@ public final class FriendsView {
 			LauncherSocial.markRead(selected);
 		}
 		host.badgeChanged();
-		rebuild();
+		if (event.type().equals("message") && chatOpen && currentSplit != null) {
+			// a message only changes the chat: the list (and its glass) stays as it is
+			queueChatRefresh();
+			return;
+		}
+		queueRebuild();
+	}
+
+	/** The list + chat row while a chat is open (its chat half is swapped on new messages). */
+	private HBox currentSplit;
+	/** The title row + list column of the last rebuild (moved into a split in place when a chat opens). */
+	private VBox currentWrapper;
+	private boolean rebuildQueued;
+	private boolean chatRefreshQueued;
+
+	/** Many events in a row (read receipts, presence, the conversation arriving) = one rebuild. */
+	private void queueRebuild() {
+		if (rebuildQueued) {
+			return;
+		}
+		rebuildQueued = true;
+		Platform.runLater(() -> {
+			rebuildQueued = false;
+			rebuild();
+		});
+	}
+
+	private void queueChatRefresh() {
+		if (chatRefreshQueued) {
+			return;
+		}
+		chatRefreshQueued = true;
+		Platform.runLater(() -> {
+			chatRefreshQueued = false;
+			LauncherSocial.State state = LauncherSocial.snapshot();
+			if (rebuildQueued || currentSplit == null || state == null || !chatOpen || currentSplit.getScene() == null
+					|| currentSplit.getChildren().size() < 2) {
+				queueRebuild();
+				return;
+			}
+			Node drawer = chatDrawer(state);
+			currentSplit.getChildren().set(1, drawer);
+			net.veloclient.launcher.ui.glass.Glass.applyNow(drawer);
+		});
 	}
 
 	private void rebuild() {
@@ -132,6 +175,7 @@ public final class FriendsView {
 		VBox.setVgrow(list, Priority.ALWAYS);
 		VBox wrapper = new VBox(16, titleRow, list);
 		wrapper.setMinWidth(0);
+		currentWrapper = wrapper;
 		if (chatOpen && selected != null && LauncherSocial.friend(selected) != null) {
 			// 2026-11: the list gets narrower (animated) and the chat sits next to it - everything stays clickable,
 			// nothing slides over the rows any more.
@@ -139,9 +183,13 @@ public final class FriendsView {
 			HBox.setHgrow(wrapper, Priority.ALWAYS);
 			split.setFillHeight(true);
 			root.getChildren().setAll(split);
+			currentSplit = split;
 		} else {
 			root.getChildren().setAll(wrapper);
+			currentSplit = null;
 		}
+		// glass right away: the 350 ms glass walk left the new panels plain for a moment (the flicker on every click)
+		net.veloclient.launcher.ui.glass.Glass.applyNow(root);
 	}
 
 	// ---- Left: me, add, list ----
@@ -447,6 +495,7 @@ public final class FriendsView {
 		LauncherTheme theme = host.theme();
 		HBox row = new HBox(10);
 		row.getStyleClass().add("friend-row");
+		row.getProperties().put("velo.friend", friend.uuid);
 		if (mode == Mode.CHAT && friend.uuid.equals(selected)) {
 			row.getStyleClass().add("friend-row-selected");
 		}
@@ -507,9 +556,10 @@ public final class FriendsView {
 		message.setTooltip(new Tooltip("Message " + friend.username));
 		message.setOnAction(e -> {
 			e.consume();
+			// slide the chat in only when it wasn't open yet: switching friends used to fold it to 0 and open it again
+			drawerAnimated = drawerAnimated && chatOpen;
 			mode = Mode.CHAT;
 			chatOpen = true;
-			drawerAnimated = false;
 			select(friend.uuid);
 		});
 		row.getChildren().add(message);
@@ -519,9 +569,10 @@ public final class FriendsView {
 			row.getChildren().add(badge);
 		}
 		row.setOnMouseClicked(e -> {
+			// slide the chat in only when it wasn't open yet: switching friends used to fold it to 0 and open it again
+			drawerAnimated = drawerAnimated && chatOpen;
 			mode = Mode.CHAT;
 			chatOpen = true;
-			drawerAnimated = false;
 			select(friend.uuid);
 		});
 		return row;
@@ -544,10 +595,50 @@ public final class FriendsView {
 		selected = uuid;
 		draft = "";
 		if (loaded.add(uuid)) {
-			LauncherSocial.loadConversation(uuid).thenAccept(error -> Platform.runLater(this::rebuild));
+			LauncherSocial.loadConversation(uuid).thenAccept(error -> Platform.runLater(this::queueChatRefresh));
 		}
 		LauncherSocial.markRead(uuid).thenAccept(error -> Platform.runLater(host::badgeChanged));
-		rebuild();
+		if (!selectInPlace()) {
+			rebuild();
+		}
+	}
+
+	/**
+	 * Opening or switching a chat changes two things: which row is highlighted and the chat half. Doing just that (no
+	 * page rebuild) keeps every panel, avatar and its glass as it is - the rebuild re-made all of them, and for a frame
+	 * the avatars were letters and panels re-tinted (owner, 2026-11-25: "flickers like an LSD trip").
+	 */
+	private boolean selectInPlace() {
+		LauncherSocial.State state = LauncherSocial.snapshot();
+		if (state == null || !chatOpen || mode != Mode.CHAT || selected == null || LauncherSocial.friend(selected) == null
+				|| currentWrapper == null || currentWrapper.getScene() == null || rebuildQueued) {
+			return false;
+		}
+		for (Node row : root.lookupAll(".friend-row")) {
+			Object uuid = row.getProperties().get("velo.friend");
+			if (uuid == null) {
+				continue;
+			}
+			boolean on = uuid.equals(selected);
+			if (on && !row.getStyleClass().contains("friend-row-selected")) {
+				row.getStyleClass().add("friend-row-selected");
+			} else if (!on) {
+				row.getStyleClass().remove("friend-row-selected");
+			}
+		}
+		Node drawer = chatDrawer(state);
+		if (currentSplit != null && currentSplit.getChildren().size() >= 2 && currentSplit.getChildren().get(0) == currentWrapper) {
+			currentSplit.getChildren().set(1, drawer);
+		} else {
+			HBox split = new HBox(16);
+			HBox.setHgrow(currentWrapper, Priority.ALWAYS);
+			split.setFillHeight(true);
+			split.getChildren().addAll(currentWrapper, drawer);
+			root.getChildren().setAll(split);
+			currentSplit = split;
+		}
+		net.veloclient.launcher.ui.glass.Glass.applyNow(drawer);
+		return true;
 	}
 
 	// ---- Right: chat / requests / blocked ----
@@ -694,7 +785,21 @@ public final class FriendsView {
 		scroll.setFitToWidth(true);
 		scroll.getStyleClass().add("scroll-pane");
 		VBox.setVgrow(scroll, Priority.ALWAYS);
-		Platform.runLater(() -> scroll.setVvalue(1.0));
+		// at the newest message from the very first frame, and kept there while bubbles lay out / the drawer widens
+		// (a runLater jump showed the top of the chat first, then cut to the bottom - owner 2026-11-25)
+		scroll.setVvalue(1.0);
+		boolean[] pinned = {true};
+		scroll.vvalueProperty().addListener((o, a, b) -> pinned[0] = b.doubleValue() >= 0.98);
+		messages.heightProperty().addListener((o, a, b) -> {
+			if (pinned[0]) {
+				scroll.setVvalue(1.0);
+			}
+		});
+		scroll.viewportBoundsProperty().addListener((o, a, b) -> {
+			if (pinned[0]) {
+				scroll.setVvalue(1.0);
+			}
+		});
 
 		// Input.
 		TextField input = new TextField(draft);
@@ -861,29 +966,7 @@ public final class FriendsView {
 	// ---- Small builders ----
 
 	private Node head(String uuid, String name, double size) {
-		StackPane holder = new StackPane();
-		holder.setMinSize(size, size);
-		holder.setPrefSize(size, size);
-		holder.setMaxSize(size, size);
-		Label initial = new Label(name == null || name.isEmpty() ? "?" : name.substring(0, 1).toUpperCase(Locale.ROOT));
-		initial.setTextFill(Color.WHITE);
-		initial.setFont(Font.font("Geist", FontWeight.BOLD, size * 0.45));
-		holder.setStyle("-fx-background-color: rgba(255,255,255,0.12); -fx-background-radius: " + (size / 5) + ";");
-		holder.getChildren().add(initial);
-		if (uuid != null) {
-			SkinHeads.skin(uuid).thenAccept(bytes -> {
-				if (bytes != null) {
-					Platform.runLater(() -> {
-						StackPane rendered = PlayerHeadView.build(bytes, size);
-						if (rendered != null) {
-							holder.setStyle("");
-							holder.getChildren().setAll(rendered);
-						}
-					});
-				}
-			});
-		}
-		return holder;
+		return Heads.head(uuid, name, size);
 	}
 
 	private static Node dot(Color color) {
@@ -898,7 +981,7 @@ public final class FriendsView {
 		return kind.equals("server") || kind.equals("singleplayer") || kind.equals("realm") ? Color.web("#43d17a") : Color.web("#f2c14e");
 	}
 
-	private static String describe(LauncherSocial.Friend friend) {
+	public static String describe(LauncherSocial.Friend friend) {
 		if (!friend.online || friend.activity == null) {
 			return friend.lastSeen > 0 ? "Offline - last seen " + ago(friend.lastSeen) : "Offline";
 		}

@@ -64,6 +64,15 @@ public final class AccountSwitcher {
 	private static volatile boolean switching;
 	private static boolean broken;
 
+	/** Opens / closes the account list (the Play Deck's account pill); false when there's no switcher here. */
+	public static boolean toggle() {
+		if (broken) {
+			return false;
+		}
+		open = !open;
+		return true;
+	}
+
 	private AccountSwitcher() {
 	}
 
@@ -174,6 +183,12 @@ public final class AccountSwitcher {
 		int h = 22;
 		int x = g.getScaledWindowWidth() - 8 - w;
 		int y = 8;
+		// The Play Deck has its own account pill (bottom left) and Rewind in its bar: no corner chips, the list opens
+		// above the pill instead
+		int[] deck = net.veloclient.velo.client.gui.title.TitleMenu.deckAccountAnchor;
+		if (deck != null) {
+			y = -10000;
+		}
 		float hv = MenuKit.hover("acc-chip", MenuKit.inside(mouseX, mouseY, x, y, w, h));
 		VeloDraw.fillRounded(g, x, y, w, h, 8, VeloAnim.lerpArgb(0xB0101015, 0xD01A1A20, Math.max(hv, open ? 1 : 0)));
 		VeloDraw.strokeRounded(g, x, y, w, h, 8, 0x26FFFFFF);
@@ -200,7 +215,7 @@ public final class AccountSwitcher {
 			MenuKit.text(g, font, label, rx + 22, y + (h - MenuKit.H_UI) / 2, MenuKit.TEXT);
 			HITS.add(new Hit(rx, y, rw, h, AccountSwitcher::openRewind));
 		}
-		if (status != null) {
+		if (status != null && deck == null) {
 			var st = MenuKit.ui(status);
 			MenuKit.text(g, font, st, g.getScaledWindowWidth() - 10 - MenuKit.width(font, st), y + h + 4, switching ? MenuKit.TEXT_2 : MenuKit.RED_TEXT);
 		}
@@ -212,9 +227,12 @@ public final class AccountSwitcher {
 		List<Account> list = accounts();
 		int lw = Math.max(170, w);
 		x = g.getScaledWindowWidth() - 8 - lw; // the list hangs from the right edge
+		if (deck != null) {
+			x = deck[0];
+		}
 		int rowH = 20;
-		int ly = y + h + (status != null ? 16 : 4);
 		int lh = Math.max(1, list.size()) * rowH + 18 + 8;
+		int ly = deck != null ? deck[1] - lh - 6 : y + h + (status != null ? 16 : 4);
 		int a = Math.round(255 * openAnim);
 		int shown = Math.round(lh * openAnim);
 		g.enableScissor(x, ly, x + lw, ly + shown);
@@ -483,6 +501,10 @@ public final class AccountSwitcher {
 	private AccountSwitcher() {
 	}
 
+	public static boolean toggle() {
+		return false;
+	}
+
 	public static void register() {
 	}
 }
@@ -543,6 +565,15 @@ public final class AccountSwitcher {
 	private static volatile String status;
 	private static volatile boolean switching;
 	private static boolean broken;
+
+	/^* Opens / closes the account list (the Play Deck's account pill); false when there's no switcher here. *^/
+	public static boolean toggle() {
+		if (broken) {
+			return false;
+		}
+		open = !open;
+		return true;
+	}
 
 	private AccountSwitcher() {
 	}
@@ -654,6 +685,12 @@ public final class AccountSwitcher {
 		int h = 22;
 		int x = g.guiWidth() - 8 - w;
 		int y = 8;
+		// The Play Deck has its own account pill (bottom left) and Rewind in its bar: no corner chips, the list opens
+		// above the pill instead
+		int[] deck = net.veloclient.velo.client.gui.title.TitleMenu.deckAccountAnchor;
+		if (deck != null) {
+			y = -10000;
+		}
 		float hv = MenuKit.hover("acc-chip", MenuKit.inside(mouseX, mouseY, x, y, w, h));
 		VeloDraw.fillRounded(g, x, y, w, h, 8, VeloAnim.lerpArgb(0xB0101015, 0xD01A1A20, Math.max(hv, open ? 1 : 0)));
 		VeloDraw.strokeRounded(g, x, y, w, h, 8, 0x26FFFFFF);
@@ -680,7 +717,7 @@ public final class AccountSwitcher {
 			MenuKit.text(g, font, label, rx + 22, y + (h - MenuKit.H_UI) / 2, MenuKit.TEXT);
 			HITS.add(new Hit(rx, y, rw, h, AccountSwitcher::openRewind));
 		}
-		if (status != null) {
+		if (status != null && deck == null) {
 			var st = MenuKit.ui(status);
 			MenuKit.text(g, font, st, g.guiWidth() - 10 - MenuKit.width(font, st), y + h + 4, switching ? MenuKit.TEXT_2 : MenuKit.RED_TEXT);
 		}
@@ -692,9 +729,12 @@ public final class AccountSwitcher {
 		List<Account> list = accounts();
 		int lw = Math.max(170, w);
 		x = g.guiWidth() - 8 - lw; // the list hangs from the right edge
+		if (deck != null) {
+			x = deck[0];
+		}
 		int rowH = 20;
-		int ly = y + h + (status != null ? 16 : 4);
 		int lh = Math.max(1, list.size()) * rowH + 18 + 8;
+		int ly = deck != null ? deck[1] - lh - 6 : y + h + (status != null ? 16 : 4);
 		int a = Math.round(255 * openAnim);
 		int shown = Math.round(lh * openAnim);
 		g.enableScissor(x, ly, x + lw, ly + shown);

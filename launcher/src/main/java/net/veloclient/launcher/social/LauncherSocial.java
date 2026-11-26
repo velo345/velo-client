@@ -543,7 +543,7 @@ public final class LauncherSocial {
 				// A popup for the game (the leader joined a server); nothing to refresh in the launcher.
 				return false;
 			}
-			case "party", "party_invite", "party_chat", "party_launch", "party_ping", "party_waypoint" -> {
+			case "party", "party_invite", "party_chat", "party_launch", "party_ping", "party_waypoint", "party_emote" -> {
 				onPartyEvent(type, data == null || !data.isJsonObject() ? new JsonObject() : data.getAsJsonObject());
 				return false;
 			}
@@ -687,6 +687,15 @@ public final class LauncherSocial {
 		JsonObject body = new JsonObject();
 		body.addProperty("text", text);
 		return action("/v1/party/chat", body);
+	}
+
+	/** You emoted on Home: your party sees it on theirs (server checks you own it). */
+	public static CompletableFuture<String> partyEmote(String emoteId) {
+		JsonObject payload = new JsonObject();
+		payload.addProperty("name", emoteId);
+		JsonObject body = new JsonObject();
+		body.add("payload", payload);
+		return action("/v1/party/emote", body);
 	}
 
 	/** Leader: share (or with null, stop sharing) your mod profile. */

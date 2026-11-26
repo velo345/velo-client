@@ -45,6 +45,9 @@ public final class TierTags {
 		if (m == null || base == null || uuid == null || (tab ? !m.tabList() : !m.nameTags())) {
 			return base;
 		}
+		if (!m.showOwn() && uuid.equals(ownUuid())) {
+			return base;
+		}
 		Map<UUID, Cached> cache = tab ? TAB : NAME_TAGS;
 		int gen = TierData.generation();
 		int settings = TierTaggerModule.settingsVersion;
@@ -73,13 +76,10 @@ public final class TierTags {
 		}
 		MutableText tag = Text.empty();
 		if (m.icon()) {
-			tag.append(Text.literal(ICONS.getOrDefault(tier.mode(), FALLBACK_ICON)).setStyle(iconStyle()));
+			tag.append(icon(tier.mode()));
 			tag.append(Text.literal(" "));
 		}
-		int t = Math.max(1, Math.min(5, tier.tier()));
-		int color = tier.retired() ? RETIRED : COLORS[t - 1][tier.high() ? 0 : 1];
-		String label = (tier.retired() ? "R" : "") + (tier.high() ? "HT" : "LT") + t;
-		tag.append(Text.literal(label).setStyle(Style.EMPTY.withColor(color).withBold(true)));
+		tag.append(label(tier));
 		if (m.peak() && (tier.peak() < tier.tier() || tier.peak() == tier.tier() && tier.peakHigh() && !tier.high())) {
 			int pt = Math.max(1, Math.min(5, tier.peak()));
 			tag.append(Text.literal(" (" + (tier.peakHigh() ? "HT" : "LT") + pt + ")").setStyle(Style.EMPTY.withColor(COLORS[pt - 1][tier.peakHigh() ? 0 : 1])));
@@ -92,6 +92,30 @@ public final class TierTags {
 			out.append(base).append(separator).append(tag);
 		}
 		return out;
+	}
+
+	/** The game mode's icon (an item picture from font {@code velo-client:tiers}). */
+	public static Text icon(String mode) {
+		return Text.literal(ICONS.getOrDefault(mode, FALLBACK_ICON)).setStyle(iconStyle());
+	}
+
+	/** "HT1".."LT5" (retired: "RHT2") in the tier's colour, bold. */
+	public static Text label(TierData.Tier tier) {
+		int t = Math.max(1, Math.min(5, tier.tier()));
+		int color = color(tier);
+		String label = (tier.retired() ? "R" : "") + (tier.high() ? "HT" : "LT") + t;
+		return Text.literal(label).setStyle(Style.EMPTY.withColor(color).withBold(true));
+	}
+
+	/** The tier's colour (RGB): gold, silver, bronze, green, blue - HT brighter than LT; grey when retired. */
+	public static int color(TierData.Tier tier) {
+		int t = Math.max(1, Math.min(5, tier.tier()));
+		return tier.retired() ? RETIRED : COLORS[t - 1][tier.high() ? 0 : 1];
+	}
+
+	private static UUID ownUuid() {
+		var self = net.veloclient.velo.client.pvp.PvpCompat.localPlayer();
+		return self == null ? null : net.veloclient.velo.client.pvp.PvpCompat.uuid(self);
 	}
 
 	/** The chosen mode, or the best tier of all (active ones before retired ones). */

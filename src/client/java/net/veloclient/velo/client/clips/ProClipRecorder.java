@@ -37,7 +37,8 @@ import java.util.stream.Stream;
  */
 public final class ProClipRecorder {
 
-	private record Frame(ByteBuffer rgba, int width, int height, long nanos) {
+	/** {@code slot}: the frame's place on the recording's fixed 1/fps grid (see {@link #onFrameRendered}). */
+	private record Frame(ByteBuffer rgba, int width, int height, long nanos, long slot) {
 	}
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -62,12 +63,17 @@ public final class ProClipRecorder {
 	private static Process process;
 	private static WritableByteChannel pipe;
 	private static Thread writer;
-	private static final BlockingQueue<Frame> QUEUE = new ArrayBlockingQueue<>(3);
+	private static final BlockingQueue<Frame> QUEUE = new ArrayBlockingQueue<>(6);
 	private static int encoderWidth;
 	private static int encoderHeight;
 	private static long startNanos;
 	private static long framesWritten;
-	private static long nextGrabNanos;
+	/** The capture grid: slot n covers [origin + n/fps, origin + (n+1)/fps). 0 = not started yet. */
+	private static long gridOrigin;
+	private static int gridFps;
+	private static long lastSlot = -1;
+	/** The slot the running encoder started at (its frame 0). */
+	private static long baseSlot;
 	private static volatile boolean starting;
 	/**
 	 * Encoder failures in a row and when the next try may start. A player's PC (2026-11-10) ended up with 10-15 ffmpeg
@@ -112,6 +118,7 @@ public final class ProClipRecorder {
 		}
 		if (!active) {
 			active = true;
+			gridOrigin = 0;
 			failures = 0;
 			retryAt = 0;
 			FfmpegTool.resetProbe();
@@ -151,15 +158,25 @@ public final class ProClipRecorder {
 			return;
 		}
 		long now = System.nanoTime();
-		long interval = 1_000_000_000L / fps;
-		if (now < nextGrabNanos) {
+		// A fixed grid of 1/fps slots: the first rendered frame in each new slot is captured and carries its slot number,
+		// the writer fills slots by number. The old "next grab = last + interval" schedule drifted in phase after any
+		// stall, and the writer's time-to-slot rounding then dropped or doubled frames all over the clip (judder).
+		int rate = fps;
+		if (gridOrigin == 0 || gridFps != rate) {
+			gridOrigin = now;
+			gridFps = rate;
+			lastSlot = -1;
+		}
+		long slot = (now - gridOrigin) * rate / 1_000_000_000L;
+		if (slot <= lastSlot) {
 			return;
 		}
-		nextGrabNanos = Math.max(nextGrabNanos + interval, now - interval);
+		lastSlot = slot;
+		final long frameSlot = slot;
 		try {
 			final long shownAt = now;   // when the frame was shown, not when its GPU copy arrived (that jittered the timing)
 			FrameGrabber.grab((rgba, width, height) -> {
-				if (!QUEUE.offer(new Frame(rgba, width, height, shownAt))) {
+				if (!QUEUE.offer(new Frame(rgba, width, height, shownAt, frameSlot))) {
 					FrameGrabber.release(rgba); // encoder busy: the next frame is repeated to keep time
 				}
 			}, maxHeight);
@@ -190,13 +207,15 @@ public final class ProClipRecorder {
 							continue; // waiting before the next try: this frame is dropped (finally releases it)
 						}
 						startEncoder(frame.width(), frame.height(), frame.nanos());
+						baseSlot = frame.slot();
 						if (process == null) {
 							continue;
 						}
 					} else if (failures > 0 && System.nanoTime() - encoderStartedAt > 30_000_000_000L) {
 						failures = 0; // ran fine for half a minute
 					}
-					long due = (frame.nanos() - startNanos) * fps / 1_000_000_000L + 1;
+					// By slot number: a slot nobody rendered in (a stall) repeats the last picture, nothing is ever dropped
+					long due = frame.slot() - baseSlot + 1;
 					int copies = (int) Math.min(8, Math.max(0, due - framesWritten));
 					for (int i = 0; i < copies; i++) {
 						ByteBuffer view = frame.rgba().duplicate();
@@ -395,7 +414,19 @@ public final class ProClipRecorder {
 						}
 					}
 				}
-				return out;
+				// The ring reuses file names (segment_wrap) and FFmpeg's list is as long as the ring, so after the first lap
+				// the oldest entry names the file FFmpeg is overwriting right now: every save then failed with "Invalid data
+				// found" (owner 2026-11-25: clips stopped working after walking a while). Keep only the newest entry per
+				// file, and never the oldest two laps' worth near the write head.
+				java.util.Set<Path> seen = new java.util.HashSet<>();
+				List<Piece> fresh = new ArrayList<>();
+				for (int i = out.size() - 1; i >= 0; i--) {
+					if (seen.add(out.get(i).file())) {
+						fresh.add(0, out.get(i));
+					}
+				}
+				int keep = Math.max(2, seconds + 4 - 2);
+				return fresh.size() > keep ? new ArrayList<>(fresh.subList(fresh.size() - keep, fresh.size())) : fresh;
 			} catch (Exception e) {
 				try {
 					Thread.sleep(30);

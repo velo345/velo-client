@@ -99,7 +99,8 @@ public final class VeloCapeTile extends ClickableWidget {
 		VeloDraw.strokeRounded(context, x, y, w, h, 7, edge);
 		int area = h - NAME_H - 4;
 		// Loaded off-thread: a soft pulse until the cape is ready, so the Locker opens instantly.
-		Identifier texture = CapeManager.textureIfReady(definition);
+		// a still first frame for the grid; the full animation only while hovered, worn or picked (launcher logic)
+		Identifier texture = CapeManager.tileTexture(definition, hover > 0.05f || equipped || selected);
 		if (texture == null) {
 			float pulse = 0.5f + 0.5f * (float) Math.sin(System.nanoTime() / 2.5e8);
 			int pw = Math.max(8, (w - 6) / 3);

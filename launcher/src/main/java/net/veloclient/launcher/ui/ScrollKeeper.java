@@ -34,6 +34,8 @@ public final class ScrollKeeper {
 	public static void setAll(Pane parent, Node content) {
 		List<Offset> saved = capture(parent);
 		parent.getChildren().setAll(content);
+		// the rebuilt panels are glass at once (one frame without glass showed them in the plain tint - flicker)
+		net.veloclient.launcher.ui.glass.Glass.applyNow(content);
 		restore(content, saved);
 	}
 

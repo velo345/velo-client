@@ -284,7 +284,12 @@ public final class CosmeticUi {
 			ImageView view = new ImageView(ready);
 			view.setFitHeight(fit);
 			view.setPreserveRatio(true);
-			holder.getChildren().setAll(view);
+			if (ready.getProgress() < 1) {
+				// still decoding from disk: a shimmer in the tile's shape until it's in
+				holder.getChildren().setAll(Skeleton.under(view, Math.min(width, fit), fit, 10), view);
+			} else {
+				holder.getChildren().setAll(view);
+			}
 			if (animated) {
 				boolean[] asked = {false};
 				hoverTarget.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_ENTERED, e -> {
@@ -307,6 +312,8 @@ public final class CosmeticUi {
 			}
 			return;
 		}
+		// nothing cached yet: the tile's shape shimmers while the frames are read and rendered
+		holder.getChildren().setAll(Skeleton.shimmer(Math.min(width, fit), fit, 10));
 		frames.accept(list -> {
 			if (list.isEmpty()) {
 				holder.getChildren().clear();

@@ -65,6 +65,11 @@ public final class LaunchBar extends HBox {
 	private final Button stopButton = new Button("Stop");
 	private final Button relaunchButton = new Button("Relaunch");
 	private final HBox statusBox;
+	private Button switcherButton;
+	private Button optionsButton;
+	private final Label playTitle = new Label();
+	private final Label playSub = new Label();
+	private boolean homeMode;
 	private Timeline runningTimer;
 	private long runningSince;
 	private Runnable stopAction;
@@ -94,6 +99,7 @@ public final class LaunchBar extends HBox {
 		switcher.setTooltip(new Tooltip("Switch profile"));
 		switcher.setOnAction(e -> host.openProfileSwitcher(switcher));
 		switcher.setMinWidth(Region.USE_PREF_SIZE);
+		switcherButton = switcher;
 
 		Region divider = new Region();
 		divider.getStyleClass().add("hairline-v");
@@ -164,6 +170,7 @@ public final class LaunchBar extends HBox {
 		options.setMinWidth(Region.USE_PREF_SIZE);
 		options.setTooltip(new Tooltip("This profile's mods, resource packs, worlds and settings"));
 		options.setOnAction(e -> host.openProfileOptions());
+		optionsButton = options;
 
 		play.getStyleClass().setAll("button", "play-button");
 		play.setGraphic(Icons.icon("play", 16, Color.WHITE));
@@ -222,8 +229,14 @@ public final class LaunchBar extends HBox {
 		iconBox.getChildren().setAll(target.icon() == null ? new Region() : target.icon());
 		name.setText(target.name());
 		meta.setText(target.meta());
-		play.setText(target.playLabel());
-		boolean menu = target.canPlayMenu();
+		if (homeMode) {
+			String label = target.playLabel().toLowerCase(java.util.Locale.ROOT);
+			playTitle.setText(label.isEmpty() ? "" : Character.toUpperCase(label.charAt(0)) + label.substring(1));
+			play.setText(null);
+		} else {
+			play.setText(target.playLabel());
+		}
+		boolean menu = target.canPlayMenu() && !homeMode;
 		chevron.setVisible(menu);
 		chevron.setManaged(menu);
 		play.getStyleClass().remove("play-button-solo");
@@ -330,5 +343,83 @@ public final class LaunchBar extends HBox {
 
 	public void setPlayInsets(Insets insets) {
 		HBox.setMargin(playArea, insets);
+	}
+
+	/** The line under "Play" on Home's play card ("into LuckySMP", "to the title screen"). */
+	public void setPlaySub(String text) {
+		playSub.setText(text == null ? "" : text);
+		playSub.setVisible(text != null && !text.isEmpty());
+		playSub.setManaged(playSub.isVisible());
+	}
+
+	/**
+	 * Home's play card (2026-11-25 glass launcher): the bar's own parts moved into one glass card - the profile switcher
+	 * and a clear "Mods & packs" button in one row, the big Play (it fills up as the launch progress), then {@code below}
+	 * (the "launch into" chips). The bar itself is no longer shown; its Play, progress and status keep working as before.
+	 */
+	public javafx.scene.layout.VBox homeCard(Node below) {
+		if (homeMode) {
+			return rebuildHomeCard(below);
+		}
+		homeMode = true;
+		getChildren().removeAll(switcherButton, optionsButton, playArea);
+		switcherButton.getStyleClass().setAll("button", "home-switcher");
+		optionsButton.getStyleClass().setAll("button", "home-mods");
+		switcherButton.setMaxWidth(Double.MAX_VALUE);
+		// both halves of the row as tall as the row (the switcher used to be shorter than Mods & packs)
+		switcherButton.setMaxHeight(Double.MAX_VALUE);
+		optionsButton.setMaxHeight(Double.MAX_VALUE);
+		HBox.setHgrow(switcherButton, Priority.ALWAYS);
+		HBox profileRow = new HBox(switcherButton, optionsButton);
+		profileRow.getStyleClass().add("home-profile-row");
+		profileRow.setFillHeight(true);
+		// Play: just the icon and "Play", centred - where it goes is already picked right below ("launch into"), so the
+		// small line under it said the same thing twice (owner, 2026-11-25)
+		playTitle.getStyleClass().add("home-play-title");
+		HBox playContent = new HBox(12, Icons.icon("play", 24, Color.WHITE), playTitle);
+		playContent.setAlignment(Pos.CENTER);
+		play.setGraphic(playContent);
+		play.setText(null);
+		play.minWidthProperty().unbind();
+		play.setMinWidth(0);
+		play.setMaxWidth(Double.MAX_VALUE);
+		play.getStyleClass().setAll("button", "home-play");
+		playSplit.getChildren().setAll(play);
+		HBox.setHgrow(play, Priority.ALWAYS);
+		playSplit.setMaxWidth(Double.MAX_VALUE);
+		playArea.setMinWidth(0);
+		playArea.setMaxWidth(Double.MAX_VALUE);
+		progressView.setMinHeight(76);
+		return flow(profileRow, below);
+	}
+
+	/** The flowing glass card: the profile row as its top tab, Play and {@code below} in the body. */
+	private javafx.scene.layout.VBox flow(HBox profileRow, Node below) {
+		// profile row and Play full width on top; "launch into" flows out narrower underneath
+		net.veloclient.launcher.ui.glass.FlowCard card = new net.veloclient.launcher.ui.glass.FlowCard(below, profileRow, playArea);
+		javafx.scene.layout.VBox holder = new javafx.scene.layout.VBox(card);
+		holder.getStyleClass().add("home-play-card");
+		return holder;
+	}
+
+	/** Puts the card's parts back when Home is rebuilt (the card is made fresh each time). */
+	private javafx.scene.layout.VBox rebuildHomeCard(Node below) {
+		if (switcherButton.getParent() instanceof javafx.scene.layout.Pane old) {
+			old.getChildren().remove(switcherButton);
+		}
+		if (optionsButton.getParent() instanceof javafx.scene.layout.Pane old) {
+			old.getChildren().remove(optionsButton);
+		}
+		if (playArea.getParent() instanceof javafx.scene.layout.Pane old) {
+			old.getChildren().remove(playArea);
+		}
+		HBox profileRow = new HBox(switcherButton, optionsButton);
+		profileRow.getStyleClass().add("home-profile-row");
+		return flow(profileRow, below);
+	}
+
+	/** True while a launch prepares (the Play button shows its progress then). */
+	public javafx.beans.property.BooleanProperty preparingProperty() {
+		return progressView.visibleProperty();
 	}
 }

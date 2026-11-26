@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** Party members' skins for Velo World co-op, fetched once per player from Mojang's profile service. */
-final class RemoteSkins {
+public final class RemoteSkins {
 
 	private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8))
 			.followRedirects(HttpClient.Redirect.NORMAL).build();
@@ -24,7 +24,7 @@ final class RemoteSkins {
 	}
 
 	/** {png, {1 if slim}} or null (default skin / offline). */
-	static byte[][] fetch(String uuid) {
+	public static byte[][] fetch(String uuid) {
 		String id = uuid.replace("-", "");
 		byte[][] cached = CACHE.get(id);
 		if (cached != null) {

@@ -123,7 +123,10 @@ void main() {
     float lon = atan(dir.x, -dir.z) / (2.0 * PI) + 0.5 + turn;
     float lat = asin(clamp(dir.y, -1.0, 1.0));
     vec2 uv = vec2(fract(lon), 0.5 - lat / PI);
-    vec3 sky = texture(SkySampler, uv).rgb * bright;
+    // derivatives of the continuous longitude: fract() jumps 1 -> 0 at one meridian, and the hardware read that jump as a
+    // huge texel step there - a thin vertical line through the sky (owner, 2026-11-25)
+    vec2 smoothUv = vec2(lon, uv.y);
+    vec3 sky = textureGrad(SkySampler, uv, dFdx(smoothUv), dFdy(smoothUv)).rgb * bright;
     float starAmount = (val(17) + 1.0) * 0.5;
     if (starAmount > 0.0) {
         float time = (val(16) + 1.0) * 30.0;

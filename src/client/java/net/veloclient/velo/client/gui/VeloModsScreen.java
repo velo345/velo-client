@@ -254,6 +254,32 @@ public final class VeloModsScreen extends VeloWindow implements net.veloclient.v
 		}
 	}
 
+	/**
+	 * A mod's icon (or a letter tile) at {@code size} px - for other screens (the Bridge's mod hints). {@code label}
+	 * finds the installed mod by name / id, {@code jars} by its file.
+	 */
+	public static void drawIcon(DrawContext context, String label, java.util.List<java.nio.file.Path> jars, int x, int y, int size) {
+		ModConfigs.Mod found = null;
+		String want = label == null ? "" : label.toLowerCase(Locale.ROOT);
+		for (ModConfigs.Mod m : ModConfigs.mods()) {
+			boolean fileMatch = jars != null && m.jar() != null && jars.stream().anyMatch(j -> j.toAbsolutePath().normalize().equals(m.jar()));
+			if (fileMatch || m.name().toLowerCase(Locale.ROOT).equals(want) || m.id().equalsIgnoreCase(want)) {
+				found = m;
+				break;
+			}
+		}
+		Identifier icon = found == null ? null : icon(found);
+		net.veloclient.velo.client.gui.widget.VeloDraw.fillRounded(context, x, y, size, size, Math.max(3, size / 5), 0x22FFFFFF);
+		if (icon != null) {
+			int src = ICON_SIZES.getOrDefault(found.id(), 64);
+			context.drawTexture(RenderPipelines.GUI_TEXTURED, icon, x, y, 0f, 0f, size, size, src, src, src, src, 0xFFFFFFFF);
+			return;
+		}
+		String letter = want.isEmpty() ? "?" : label.substring(0, 1).toUpperCase(Locale.ROOT);
+		var tr = MinecraftClient.getInstance().textRenderer;
+		MenuKit.text(context, tr, MenuKit.uiBold(letter), x + (size - MenuKit.width(tr, MenuKit.uiBold(letter))) / 2, y + (size - 8) / 2 + 1, 0xFFE8E8EE);
+	}
+
 	/** The mod's own icon from its jar, as a texture (once per mod). */
 	private static Identifier icon(ModConfigs.Mod mod) {
 		if (mod.iconPath() == null) {

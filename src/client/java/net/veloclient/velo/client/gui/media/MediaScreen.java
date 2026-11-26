@@ -382,7 +382,7 @@ public final class MediaScreen extends VeloWindow implements net.veloclient.velo
 		int x = contentX();
 		int y = contentY();
 		int width = contentWidth();
-		hits.add(VeloUi.pill(context, x, y, 70, 20, "< Back", 0, mouseX, mouseY, this::backToGallery));
+		hits.add(iconPill(context, x, y, 70, "d_chev_l", "Back", 0, mouseX, mouseY, this::backToGallery));
 		context.drawTextWithShadow(this.textRenderer, VeloUi.trim(label(viewing), width - (proPlayer != null && proPlayer.trimmed() ? 540 : 420)), x + 80, y + 6, theme.text());
 		hits.add(iconPill(context, x + width - 214, y, 100, "mods_folder", "Folder", 0, mouseX, mouseY,
 				() -> openFolder(viewing.file().getParent())));
@@ -537,14 +537,45 @@ public final class MediaScreen extends VeloWindow implements net.veloclient.velo
 	}
 
 	/** A pill button with an icon in front of its label. */
+	/**
+	 * The viewer's header buttons: round pills, icon + label in the UI font. Share (tone 1) is the accent with the
+	 * accent's own text colour (a white accent showed white on white); Delete is a quiet red outline until hovered.
+	 */
 	private VeloUi.Hit iconPill(DrawContext context, int x, int y, int w, String icon, String label, int tone, int mouseX, int mouseY, Runnable action) {
-		VeloUi.Hit hit = VeloUi.pill(context, x, y, w, 20, "", tone, mouseX, mouseY, action);
-		int labelW = this.textRenderer.getWidth(label);
-		int total = 12 + 5 + labelW;
+		int h = 22;
+		boolean hover = VeloUi.inside(mouseX, mouseY, x, y, w, h);
+		int fill;
+		int fg;
+		int edge;
+		switch (tone) {
+			case 1 -> {
+				int acc = net.veloclient.velo.client.gui.widget.VeloStyle.accent() | 0xFF000000;
+				fill = hover ? net.veloclient.velo.client.gui.widget.VeloAnim.lerpArgb(acc, 0xFFFFFFFF, 0.12f) : acc;
+				fg = net.veloclient.velo.client.gui.widget.VeloStyle.onAccent();
+				edge = 0;
+			}
+			case 3 -> {
+				fill = hover ? 0xFFC24242 : 0x26C24242;
+				fg = hover ? 0xFFFFFFFF : 0xFFFF8A8A;
+				edge = hover ? 0 : 0x66C24242;
+			}
+			default -> {
+				fill = hover ? 0x24FFFFFF : 0x12FFFFFF;
+				fg = 0xFFF0F0F4;
+				edge = hover ? 0x40FFFFFF : 0x1FFFFFFF;
+			}
+		}
+		VeloDraw.fillRounded(context, x, y, w, h, h / 2, fill);
+		if (edge != 0) {
+			VeloDraw.strokeRounded(context, x, y, w, h, h / 2, edge);
+		}
+		net.minecraft.text.Text text = net.veloclient.velo.client.gui.title.MenuKit.uiBold(label);
+		int labelW = this.textRenderer.getWidth(text);
+		int total = 12 + 6 + labelW;
 		int ix = x + (w - total) / 2;
-		net.veloclient.velo.client.gui.title.MenuKit.icon(context, icon, ix, y + 4, 12, 0xFFFFFFFF);
-		context.drawTextWithShadow(this.textRenderer, label, ix + 17, y + 6, 0xFFFFFFFF);
-		return hit;
+		net.veloclient.velo.client.gui.title.MenuKit.icon(context, icon, ix, y + 5, 12, fg);
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, text, ix + 18, y + 7, fg);
+		return new VeloUi.Hit(x, y, w, h, action);
 	}
 
 	private void backToGallery() {

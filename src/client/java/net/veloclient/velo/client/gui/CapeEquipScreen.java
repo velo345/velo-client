@@ -255,6 +255,10 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 	static final int KIND_COLS = 5;
 	static final int KIND_H = 22;
 	static final int KIND_GAP = 5;
+	/** 2026-11-25 (launcher layout): the kinds as one vertical glass list between the stage and the catalog. */
+	static final int KINDS_W = 132;
+	static final int KIND_ROW = 24;
+	static final int CATALOG_PAD = 10;
 	static final int LOADOUT_PANEL_H = 66;
 
 	/** Every Locker screen calls this with its content box before laying out or drawing. */
@@ -274,13 +278,22 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		return frameBottom - LOADOUT_PANEL_H - 8;
 	}
 
-	/** The catalog column right of the stage. */
+	/** The kinds list right of the stage. */
+	public static int kindsX() {
+		return frameX + SHOWCASE_WIDTH + 10;
+	}
+
+	/** The catalog panel (glass) right of the kinds list; {@link #rightX} is its content inside the padding. */
+	public static int catalogX() {
+		return kindsX() + KINDS_W + 10;
+	}
+
 	public static int rightX() {
-		return frameX + SHOWCASE_WIDTH + 14;
+		return catalogX() + CATALOG_PAD;
 	}
 
 	public static int rightW() {
-		return frameX + frameW - rightX();
+		return frameX + frameW - CATALOG_PAD - rightX();
 	}
 
 	private static int kindCount() {
@@ -289,13 +302,11 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 
 	/** Where the catalog starts: under the kind cards. */
 	public static int rightTop() {
-		int rows = (kindCount() + KIND_COLS - 1) / KIND_COLS;
-		return frameY + rows * (KIND_H + KIND_GAP) + 8;
+		return frameY + CATALOG_PAD;
 	}
 
 	private static int[] kindBox(int i) {
-		int w = (rightW() - (KIND_COLS - 1) * KIND_GAP) / KIND_COLS;
-		return new int[] {rightX() + i % KIND_COLS * (w + KIND_GAP), frameY + i / KIND_COLS * (KIND_H + KIND_GAP), w, KIND_H};
+		return new int[] {kindsX() + 6, frameY + 6 + i * (KIND_ROW + 2), KINDS_W - 12, KIND_ROW};
 	}
 
 	/** The kinds (Skin, Cloak, Wings...) as the launcher's slim cards above the catalog. {@code x, y} are ignored (see {@link #frame}). */
@@ -333,8 +344,8 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 			}
 		}
 		String wear = wornCount == 0 ? "None" : wornCount + (wornCount == 1 ? " item" : " items");
-		String[][] rows = {{"Skin", skin == null || skin.isEmpty() ? "Your skin" : skin, "skins"}, {"Cloak", cape, "capes"},
-				{"Wings", wings, "wings"}, {"Aura", aura, "bolt"}, {"Name style", name, "theme_editor"}, {"Emotes", emotes, "emotes"},
+		String[][] rows = {{"Skin", skin == null || skin.isEmpty() ? "Your skin" : skin, "skins"}, {"Cloaks", cape, "capes"},
+				{"Wings", wings, "wings"}, {"Auras", aura, "bolt"}, {"Name style", name, "theme_editor"}, {"Emotes", emotes, "emotes"},
 				{"Kill effect", killFx, "skull"}, {"Bodywear", wear, "hat"}};
 		if (!EXTRA_TABS.isEmpty()) {
 			String[][] all = java.util.Arrays.copyOf(rows, rows.length + EXTRA_TABS.size());
@@ -352,16 +363,25 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 	private static void drawSlotsInPlace(DrawContext context, net.minecraft.client.font.TextRenderer font, int activeTab, int mouseX, int mouseY) {
 		String[][] rows = kindRows();
 		String tip = null;
+		// the kinds list and the catalog as two glass panels, like the launcher's Locker
+		int panelH = frameBottom - frameY;
+		VeloDraw.fillRounded(context, kindsX(), frameY, KINDS_W, panelH, 10, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF141011, 0x14FFFFFF));
+		VeloDraw.strokeRounded(context, kindsX(), frameY, KINDS_W, panelH, 10, 0x18FFFFFF);
+		VeloDraw.fillRounded(context, catalogX(), frameY, frameX + frameW - catalogX(), panelH, 10, net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF141011, 0x10FFFFFF));
+		VeloDraw.strokeRounded(context, catalogX(), frameY, frameX + frameW - catalogX(), panelH, 10, 0x18FFFFFF);
 		for (int i = 0; i < rows.length && i < kindCount(); i++) {
 			int[] r = kindBox(i);
 			boolean active = activeTab == i;
 			boolean hovered = MenuKit.inside(mouseX, mouseY, r[0], r[1], r[2], r[3]);
-			VeloDraw.fillRounded(context, r[0], r[1], r[2], r[3], 5, active ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF1C1617, 0x30FFFFFF) : hovered ? net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF1A1516, 0x20FFFFFF) : net.veloclient.velo.client.gui.widget.VeloStyle.glassOr(0xFF141011, 0x12FFFFFF));
-			VeloDraw.strokeRounded(context, r[0], r[1], r[2], r[3], 5, active ? VeloUi.withAlpha(MenuKit.accent(), 0xB0) : hovered ? 0x22FFFFFF : 0x10FFFFFF);
+			if (active) {
+				VeloDraw.fillRounded(context, r[0], r[1], r[2], r[3], 7, 0xF0FFFFFF);
+			} else if (hovered) {
+				VeloDraw.fillRounded(context, r[0], r[1], r[2], r[3], 7, 0x16FFFFFF);
+			}
 			boolean none = rows[i][1].equals("None");
-			MenuKit.icon(context, rows[i][2], r[0] + 7, r[1] + 5, 12, active ? MenuKit.accentText() : none ? MenuKit.TEXT_3 : 0xFFB3A8A9);
-			MenuKit.text(context, font, MenuKit.fit(font, MenuKit.uiBold(rows[i][0]), r[2] - 28), r[0] + 24, r[1] + 7,
-					active ? 0xFFFFFFFF : hovered ? MenuKit.TEXT : 0xFFB3A8A9);
+			int ink = active ? 0xFF1A0A10 : hovered ? MenuKit.TEXT : none ? MenuKit.TEXT_3 : 0xFFC8C2C3;
+			MenuKit.icon(context, rows[i][2], r[0] + 8, r[1] + 6, 12, ink);
+			MenuKit.text(context, font, MenuKit.fit(font, MenuKit.uiBold(rows[i][0]), r[2] - 30), r[0] + 26, r[1] + 8, ink);
 			if (hovered) {
 				tip = rows[i][1];
 			}
@@ -596,8 +616,8 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		}
 		// launcher-style: no Equip button - one click on a tile wears it, right click has the rest
 
-		int gridX = showcaseX + SHOWCASE_WIDTH + 14;
-		int listWidth = contentX() + contentWidth() - gridX;
+		int gridX = rightX();
+		int listWidth = rightW();
 		addTabs(gridX);
 		// The slots as chips across the top.
 		int chipX = gridX;
@@ -750,8 +770,8 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		}
 		// launcher-style: no Equip button - one click on a tile wears it, right click has the rest
 
-		int gridX = showcaseX + SHOWCASE_WIDTH + 14;
-		int listWidth = contentX() + contentWidth() - gridX;
+		int gridX = rightX();
+		int listWidth = rightW();
 		addTabs(gridX);
 		int y = rightTop() + 20;
 		int columns = Math.max(3, (listWidth + 8) / 128);
@@ -839,8 +859,8 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		}
 		// launcher-style: no Equip button - one click on a tile wears it, right click has the rest
 
-		int gridX = showcaseX + SHOWCASE_WIDTH + 14;
-		int listWidth = contentX() + contentWidth() - gridX;
+		int gridX = rightX();
+		int listWidth = rightW();
 		addTabs(gridX);
 		int y = rightTop() + 20;
 		int columns = Math.max(3, (listWidth + 8) / 128);
@@ -997,8 +1017,8 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		addDrawableChild(new EntityPreviewWidget(showcaseX + 6, contentY() + 6, SHOWCASE_WIDTH - 12, stageBottom() - contentY() - 12).noStage().zoom(1.35f));
 
 		// Right: the collection.
-		int gridX = showcaseX + SHOWCASE_WIDTH + 14;
-		int listWidth = contentX() + contentWidth() - gridX;
+		int gridX = rightX();
+		int listWidth = rightW();
 		int gridTop = rightTop() + 20;
 		int gridHeight = contentBottom() - gridTop - 14;
 		gridColumns = Math.max(3, (listWidth + TILE_GAP) / (104 + TILE_GAP));
@@ -1131,7 +1151,7 @@ public final class CapeEquipScreen extends VeloWindow implements net.veloclient.
 		}
 		String hint = aurasTab || wingsTab || wearTab ? "click to wear  ·  right-click for more" : "click to wear  ·  right-click: edit, delete";
 		Text hintText = MenuKit.ui(hint);
-		int right = contentX() + contentWidth();
+		int right = rightX() + rightW();
 		if (hx + this.textRenderer.getWidth(countText) + 16 + this.textRenderer.getWidth(hintText) <= right) {
 			MenuKit.text(context, this.textRenderer, hintText, right - this.textRenderer.getWidth(hintText), rightTop() + 2, MenuKit.TEXT_3);
 		}

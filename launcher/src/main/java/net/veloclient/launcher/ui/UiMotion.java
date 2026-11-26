@@ -127,34 +127,122 @@ public final class UiMotion {
 	 * so the page builds itself instead of popping. Pieces holding a 3D view are skipped (opacity can blank a SubScene).
 	 */
 	public static void stagger(Node page) {
-		javafx.application.Platform.runLater(() -> {
-			List<Node> found = new java.util.ArrayList<>();
-			collect(page, found);
-			int i = 0;
-			for (Node node : found) {
-				if (i >= 24) {
-					break;
+		// once the page's first frame is out: it has its real layout (positions decide the cascade order), and the
+		// cascade starts together with the page fade (see enterFrom)
+		afterFirstFrame(() -> cascade(page));
+	}
+
+	/**
+	 * Runs {@code action} at the start of the frame after the next one. A new page's first frame is the heavy one
+	 * (CSS, layout, glass, images) and can take a few hundred ms: animations started before it ran their whole course
+	 * inside that frame - the page popped in finished, then the cascade hid and rebuilt it (the "hard cut", 2026-11-26).
+	 */
+	public static void afterFirstFrame(Runnable action) {
+		new javafx.animation.AnimationTimer() {
+			private int frames;
+
+			@Override
+			public void handle(long now) {
+				if (++frames >= 2) {
+					stop();
+					action.run();
 				}
-				node.setOpacity(0);
-				node.setTranslateY(14);
-				FadeTransition fade = new FadeTransition(Duration.millis(240), node);
-				fade.setToValue(1);
-				TranslateTransition rise = new TranslateTransition(Duration.millis(320), node);
-				rise.setToY(0);
-				rise.setInterpolator(EASE_OUT);
-				ParallelTransition both = new ParallelTransition(fade, rise);
-				both.setDelay(Duration.millis(40 + i * 35L));
-				both.play();
-				i++;
 			}
-		});
+		}.start();
+	}
+
+	/** Panels and the pieces inside them that take part in the entrance cascade. */
+	private static final java.util.Set<String> PANELS = java.util.Set.of("glass-on", "home-card", "profile-card", "glass-panel",
+			"profile-section-panel", "home-play-card", "locker-kinds", "locker-catalog", "profile-rail", "rewards-strip", "badge-card",
+			"page-title", "panel-title", "home-greet-name", "home-greet-over", "stagger");
+
+	/**
+	 * 2026-11-25: every page builds itself piece by piece - first the panels, then the rows, cards and chips inside
+	 * them - top to bottom, each sliding up a few pixels with a soft fade and a hint of scale, 22 ms apart. Only what is
+	 * on screen takes part (things further down just are there when you scroll); 3D views are never touched.
+	 */
+	private static void cascade(Node page) {
+		if (page.getScene() == null) {
+			return;
+		}
+		List<Node> found = new java.util.ArrayList<>();
+		collect(page, found);
+		for (Node panel : List.copyOf(found)) {
+			if (panel instanceof Parent parent && !(panel instanceof javafx.scene.control.Control)) {
+				collectItems(parent, found, 0);
+			}
+		}
+		double bottom = page.getScene().getHeight();
+		List<Node> shown = new java.util.ArrayList<>();
+		java.util.Set<Node> seen = new java.util.HashSet<>();
+		for (Node node : found) {
+			if (!seen.add(node) || !node.isVisible() || holds3d(node, 0)) {
+				continue;
+			}
+			javafx.geometry.Bounds b = node.localToScene(node.getLayoutBounds());
+			if (b.getMinY() > bottom || b.getHeight() <= 0) {
+				continue;
+			}
+			node.getProperties().put("velo.cascadeY", b.getMinY() * 4 + b.getMinX() / 400);
+			shown.add(node);
+		}
+		shown.sort(java.util.Comparator.comparingDouble(n -> (double) n.getProperties().get("velo.cascadeY")));
+		int i = 0;
+		for (Node node : shown) {
+			if (i >= 80) {
+				break;
+			}
+			double fromY = node instanceof Parent && !(node instanceof javafx.scene.control.Control) ? 16 : 10;
+			node.setOpacity(0);
+			node.setTranslateY(fromY);
+			node.setScaleX(0.985);
+			node.setScaleY(0.985);
+			FadeTransition fade = new FadeTransition(Duration.millis(260), node);
+			fade.setToValue(1);
+			TranslateTransition rise = new TranslateTransition(Duration.millis(380), node);
+			rise.setToY(0);
+			rise.setInterpolator(EASE_OUT);
+			ScaleTransition settle = new ScaleTransition(Duration.millis(380), node);
+			settle.setToX(1);
+			settle.setToY(1);
+			settle.setInterpolator(EASE_OUT);
+			ParallelTransition all = new ParallelTransition(fade, rise, settle);
+			all.setDelay(Duration.millis(Math.min(900, 30 + i * 22L)));
+			all.play();
+			i++;
+		}
+	}
+
+	/** Inside a panel: the pieces of the first list-like container (rows, tiles, chips), else its own children. */
+	private static void collectItems(Parent parent, List<Node> out, int depth) {
+		if (depth > 4) {
+			return;
+		}
+		List<Node> children = new java.util.ArrayList<>();
+		for (Node child : parent.getChildrenUnmodifiable()) {
+			if (child.isManaged() && child.isVisible() && !(child instanceof javafx.scene.image.ImageView && depth == 0 && parent.getStyleClass().contains("glass-on"))) {
+				children.add(child);
+			}
+		}
+		if (children.size() >= 3 && depth > 0) {
+			out.addAll(children);
+			return;
+		}
+		for (Node child : children) {
+			if (depth == 0) {
+				out.add(child);
+			}
+			if (child instanceof Parent p && !(child instanceof javafx.scene.control.Control)) {
+				collectItems(p, out, depth + 1);
+			}
+		}
 	}
 
 	private static void collect(Node node, List<Node> out) {
-		if (out.size() >= 24 || node instanceof javafx.scene.SubScene) {
+		if (out.size() >= 60 || node instanceof javafx.scene.SubScene) {
 			return;
 		}
-		boolean match = node.getStyleClass().stream().anyMatch(STAGGERED::contains);
+		boolean match = node.getStyleClass().stream().anyMatch(c -> STAGGERED.contains(c) || PANELS.contains(c));
 		if (match && !holds3d(node, 0) && node.isVisible() && node.getOpacity() > 0.99) {
 			out.add(node);
 			return;
@@ -205,7 +293,8 @@ public final class UiMotion {
 		settle.setToX(1);
 		settle.setToY(1);
 		settle.setInterpolator(EASE_OUT);
-		new ParallelTransition(fade, slide, settle).play();
+		ParallelTransition all = new ParallelTransition(fade, slide, settle);
+		afterFirstFrame(all::play);
 	}
 
 	public static void enter(Node node) {
@@ -216,7 +305,8 @@ public final class UiMotion {
 		TranslateTransition rise = new TranslateTransition(Duration.millis(260), node);
 		rise.setToY(0);
 		rise.setInterpolator(EASE_OUT);
-		new ParallelTransition(fade, rise).play();
+		ParallelTransition all = new ParallelTransition(fade, rise);
+		afterFirstFrame(all::play);
 	}
 
 	/** Staggered entrance for the children of a list (cards, rows): each fades/rises slightly after the previous. */

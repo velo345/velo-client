@@ -540,6 +540,12 @@
   "category": "pvp"
  },
  {
+  "id": "low-latency",
+  "name": "Low Latency Mode",
+  "description": "Shows a fresher picture: frames wait for the GPU instead of queueing, and an optional precise frame cap stops drawing frames your screen never shows. Lowers the FPS number, lowers input lag.",
+  "category": "performance"
+ },
+ {
   "id": "lyrics",
   "name": "Lyrics",
   "description": "The lyrics of the song playing on Spotify, synced to the music - huge in the sky, floating in front of you or on screen, with animations, fonts, colours and presets. The Lyrics Studio has a live preview.",
@@ -813,6 +819,12 @@
   "id": "target-hud",
   "name": "Target HUD",
   "description": "Shows the player you're fighting: health, armor, distance and who's winning.",
+  "category": "pvp"
+ },
+ {
+  "id": "tier-tagger",
+  "name": "Tier Tagger",
+  "description": "Shows players' PvP tiers (PvPTiers, SubTiers) next to their name - above their head and in the tab list.",
   "category": "pvp"
  },
  {

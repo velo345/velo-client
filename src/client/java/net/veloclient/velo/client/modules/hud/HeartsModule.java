@@ -119,7 +119,8 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 
 	private void drawContainer(DrawContext context, boolean custom, int x, int y, boolean blinking) {
 		if (vanillaLook) {
-			vanillaSprite(context, "container" + (hardcore ? "_hardcore" : "") + (blinking ? "_blinking" : ""), x, y);
+			// (no "_blinking" container: its white outline flashed next to recoloured hearts)
+			vanillaSprite(context, "container" + (hardcore ? "_hardcore" : ""), x, y);
 			return;
 		}
 		if (custom) {
@@ -128,15 +129,16 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 			return;
 		}
 		layer(context, FILL, x, y, false, emptyColor);
-		layer(context, OUTLINE, x, y, false, blinking ? 0xFFFFFFFF : outlineColor);
+		layer(context, OUTLINE, x, y, false, blinking ? flashColor(heartColor) : outlineColor);
 	}
 
 	private void drawHeart(DrawContext context, boolean custom, int x, int y, boolean half, int color, boolean absorbing) {
 		if (vanillaLook) {
 			String shape = (half ? "half" : "full");
 			if (color == 0xFFFFFFFF && !absorbing) {
-				// The white flash after taking damage: vanilla's own blinking sprite.
-				vanillaSprite(context, (hardcore ? "hardcore_" : "") + shape + "_blinking", x, y);
+				// The flash after taking damage: a light version of YOUR heart colour (vanilla's white-red blinking sprite
+				// clashed with recoloured hearts - owner 2026-11-25)
+				recoloredSprite(context, "hud/heart/" + (hardcore ? "hardcore_" : "") + shape, flashColor(heartColor), x, y);
 			} else if (absorbing) {
 				recoloredSprite(context, "hud/heart/absorbing_" + (hardcore ? "hardcore_" : "") + shape, color, x, y);
 			} else {
@@ -147,7 +149,8 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 		if (custom) {
 			StatusBarIcons.State state = half ? StatusBarIcons.State.HALF : StatusBarIcons.State.FULL;
 			if (color == 0xFFFFFFFF && !absorbing) {
-				StatusBarIcons.draw(context, KIND, state, x, y, 0xFFFFFFFF); // the white damage flash
+				// the damage flash: the drawing, lightened toward white in your heart colour
+				StatusBarIcons.draw(context, KIND, state, x, y, tintCustomIcon ? flashColor(heartColor) : 0xFFFFFFFF);
 			} else if (absorbing) {
 				StatusBarIcons.drawVariant(context, KIND, StatusBarIcons.Variant.ABSORBING, state, x, y, 0xFFFFFFFF);
 			} else if (variant != StatusBarIcons.Variant.NORMAL) {
@@ -157,8 +160,17 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 			}
 			return;
 		}
-		layer(context, FILL, x, y, half, color);
+		layer(context, FILL, x, y, half, color == 0xFFFFFFFF && !absorbing ? flashColor(heartColor) : color);
 		layer(context, DETAIL, x, y, half, 0xFFFFFFFF);
+	}
+
+	/** The damage flash colour: the heart colour mixed most of the way to white (reads as "just lost", stays on-theme). */
+	private static int flashColor(int color) {
+		int r = (color >> 16) & 0xFF, g = (color >> 8) & 0xFF, b = color & 0xFF;
+		r = r + (255 - r) * 3 / 5;
+		g = g + (255 - g) * 3 / 5;
+		b = b + (255 - b) * 3 / 5;
+		return 0xFF000000 | (r << 16) | (g << 8) | b;
 	}
 
 	private static void vanillaSprite(DrawContext context, String name, int x, int y) {

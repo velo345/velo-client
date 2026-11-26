@@ -243,7 +243,8 @@ public final class ModpacksTabView {
 		title.setAlignment(Pos.CENTER);
 		title.setMaxWidth(170);
 
-		Label downloads = new Label(InstanceDetailView.formatCount(hit.downloads()) + " downloads");
+		Label downloads = new Label(InstanceDetailView.formatCount(hit.downloads()) + " downloads"
+				+ (hit.author() == null || hit.author().isBlank() ? "" : "  ·  by " + hit.author()));
 		downloads.getStyleClass().add("version-tag");
 		downloads.setTextFill(InstanceDetailView.text(theme));
 

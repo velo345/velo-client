@@ -103,8 +103,10 @@ public final class RewardsStrip {
 
 		VBox box = new VBox(10, head, row);
 		box.setPadding(new Insets(14, 16, 14, 16));
-		box.setStyle("-fx-background-color: linear-gradient(to right, rgba(247,192,74,0.12), rgba(247,192,74,0.03)); -fx-background-radius: 14;"
-				+ " -fx-border-color: rgba(247,192,74," + (claimable > 0 ? "0.55" : "0.22") + "); -fx-border-radius: 14;");
+		// glass like every panel (the gold wash read as brown); gold only on the edge while something waits
+		box.getStyleClass().add("rewards-strip");
+		box.setStyle("-fx-border-color: " + (claimable > 0 ? "rgba(247,192,74,0.5)" : "rgba(255,255,255,0.12)") + ";");
+		javafx.application.Platform.runLater(() -> net.veloclient.launcher.ui.glass.Glass.install(box, 22));
 		return box;
 	}
 

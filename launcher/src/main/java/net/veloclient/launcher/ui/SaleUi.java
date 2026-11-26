@@ -79,40 +79,126 @@ public final class SaleUi {
 		return (d > 0 ? d + "d " : "") + String.format(Locale.ROOT, "%02d:%02d:%02d", s / 3600 % 24, s / 60 % 60, s % 60);
 	}
 
-	/** Home's sale strip: black, the name in a box, the deal, a live countdown and the button. */
+	/**
+	 * Home's sale strip (2026-11-25 redesign): one slim glass bar across the top of Home - the sale's name in display
+	 * type with a slow light sweep over the bar, the deal, a tiled countdown (days / hours / minutes / seconds) and the
+	 * button. Accent colours from the theme.
+	 */
 	public static Node banner(JsonObject sale, Runnable open) {
+		return banner(sale, open, 52);
+	}
+
+	/** {@code height}: 52 on a page, 40 in the top bar. */
+	public static Node banner(JsonObject sale, Runnable open, double height) {
 		boolean live = active(sale);
-		Label tag = new Label(sale.get("name").getAsString().toUpperCase(Locale.ROOT));
-		tag.setStyle(DISPLAY + "-fx-font-size: 11px; -fx-padding: 5 8 5 8; -fx-border-color: white; -fx-border-width: 1.5;"
-				+ (live ? "-fx-background-color: white; -fx-text-fill: black;" : "-fx-text-fill: white;"));
+		boolean slim = height < 48;
 		int percent = sale.get("percent").getAsInt();
-		Label big = new Label(percent + "% OFF");
-		big.setStyle(DISPLAY + "-fx-font-size: 22px; -fx-text-fill: " + (live ? "#FF5A60" : "white") + ";");
-		Label text = new Label(live ? what(sale) + " - this week only" : "starts " + startsLabel(sale.get("from").getAsLong()) + " on " + what(sale));
-		text.setStyle("-fx-text-fill: #C9C9D1; -fx-font-size: 13px;");
-		Label countdown = new Label();
-		countdown.setStyle(MONO + "-fx-text-fill: white; -fx-font-size: 12px;");
-		Region push = new Region();
-		HBox.setHgrow(push, Priority.ALWAYS);
+		Label name = new Label(sale.get("name").getAsString().toUpperCase(Locale.ROOT));
+		name.setStyle(DISPLAY + "-fx-font-size: 15px; -fx-text-fill: white;");
+		name.setMinWidth(Region.USE_PREF_SIZE);
+		Label off = new Label(percent + "% OFF");
+		off.setStyle(DISPLAY + "-fx-font-size: 12px; -fx-text-fill: -velo-on-accent; -fx-background-color: -velo-accent;"
+				+ "-fx-background-radius: 999; -fx-padding: 4 10 4 10;");
+		off.setMinWidth(Region.USE_PREF_SIZE);
+		Label text = new Label(live ? "on " + what(sale) : "starts " + startsLabel(sale.get("from").getAsLong()) + " on " + what(sale));
+		text.setStyle("-fx-text-fill: rgba(255,255,255,0.72); -fx-font-size: 13px;");
+		text.setMinWidth(0);
+		HBox.setHgrow(text, Priority.ALWAYS);
+		text.setMaxWidth(Double.MAX_VALUE);
+
+		HBox clock = new HBox(4);
+		clock.setAlignment(Pos.CENTER);
+		clock.setMinWidth(Region.USE_PREF_SIZE);
+		Label[] parts = new Label[4];
+		String[] units = {"D", "H", "M", "S"};
+		for (int i = 0; i < 4; i++) {
+			Label value = new Label("00");
+			value.setStyle(MONO + "-fx-font-size: 13px; -fx-text-fill: white;");
+			Label unit = new Label(units[i]);
+			unit.setStyle(MONO + "-fx-font-size: 9px; -fx-text-fill: rgba(255,255,255,0.5);");
+			HBox tile = new HBox(2, value, unit);
+			tile.setAlignment(Pos.BASELINE_CENTER);
+			tile.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-background-radius: 8; -fx-padding: 4 7 4 7;");
+			parts[i] = value;
+			clock.getChildren().add(tile);
+		}
+		Runnable updateClock = () -> {
+			long now = System.currentTimeMillis();
+			long s = Math.max(0, (live ? sale.get("until").getAsLong() : sale.get("from").getAsLong()) - now) / 1000;
+			long[] v = {s / 86400, s / 3600 % 24, s / 60 % 60, s % 60};
+			for (int i = 0; i < 4; i++) {
+				parts[i].setText(String.format(Locale.ROOT, "%02d", v[i]));
+			}
+			// no days left: hide the day tile
+			clock.getChildren().getFirst().setVisible(v[0] > 0);
+			clock.getChildren().getFirst().setManaged(v[0] > 0);
+		};
+		updateClock.run();
+		Label endsIn = new Label(live ? "ENDS IN" : "STARTS IN");
+		endsIn.setStyle(MONO + "-fx-font-size: 10px; -fx-text-fill: rgba(255,255,255,0.5);");
+		endsIn.setMinWidth(Region.USE_PREF_SIZE);
+
 		Button go = new Button(live ? "Get the deal" : "See the deals");
 		go.getStyleClass().add("primary-button");
+		go.setMinWidth(Region.USE_PREF_SIZE);
 		go.setOnAction(e -> open.run());
-		HBox row = new HBox(14, tag, big, text, push, countdown, go);
+		HBox row = new HBox(12, name, off, text, endsIn, clock, go);
 		row.setAlignment(Pos.CENTER_LEFT);
-		row.setPadding(new Insets(10, 12, 10, 16));
-		row.setStyle("-fx-background-color: linear-gradient(to right, #000000 0%, #0A0607 55%, #2A0A0D 100%);"
-				+ "-fx-background-radius: 14; -fx-border-color: rgba(224,38,46,0.45); -fx-border-radius: 14; -fx-border-width: 1;");
-		Timeline tick = new Timeline(new KeyFrame(Duration.seconds(1), e -> countdown.setText(countdownText(sale))));
-		tick.setCycleCount(Animation.INDEFINITE);
-		countdown.setText(countdownText(sale));
-		row.sceneProperty().addListener((o, a, scene) -> {
+		row.setPadding(slim ? new Insets(4, 4, 4, 14) : new Insets(8, 8, 8, 18));
+		row.setMinHeight(height);
+		row.setMaxHeight(height);
+		if (slim) {
+			name.setStyle(DISPLAY + "-fx-font-size: 13px; -fx-text-fill: white;");
+			row.setSpacing(10);
+			go.getStyleClass().add("button-sm");
+		}
+		row.setMinWidth(0);
+		row.setStyle("-fx-background-color: linear-gradient(to right, rgba(0,0,0,0.55), rgba(0,0,0,0.25) 60%, transparent),"
+				+ " radial-gradient(center 100% 50%, radius 70%, -velo-accent-soft, transparent), -velo-glass-tint;"
+				+ "-fx-background-radius: 999; -fx-border-color: -velo-accent-line; -fx-border-radius: 999; -fx-border-width: 1;");
+		row.getStyleClass().add("sale-strip");
+
+		// a soft light sweep across the strip every few seconds
+		Region sweep = new Region();
+		sweep.setMouseTransparent(true);
+		sweep.setManaged(false);
+		sweep.setStyle("-fx-background-color: linear-gradient(to right, transparent, rgba(255,255,255,0.10), transparent);");
+		StackPane strip = new StackPane(row, sweep);
+		strip.setMinWidth(0);
+		strip.setMaxHeight(height);
+		Rectangle clip = new Rectangle();
+		clip.setArcWidth(height);
+		clip.setArcHeight(height);
+		clip.widthProperty().bind(strip.widthProperty());
+		clip.heightProperty().bind(strip.heightProperty());
+		strip.setClip(clip);
+		sweep.resize(140, height);
+		sweep.setTranslateX(-200);
+		TranslateTransition move = new TranslateTransition(Duration.seconds(1.6), sweep);
+		move.setFromX(-200);
+		move.toXProperty().bind(strip.widthProperty().add(60));
+		Timeline loop = new Timeline(new KeyFrame(Duration.seconds(1), e -> updateClock.run()));
+		loop.setCycleCount(Animation.INDEFINITE);
+		Timeline sweepLoop = new Timeline(new KeyFrame(Duration.seconds(6), e -> move.playFromStart()));
+		sweepLoop.setCycleCount(Animation.INDEFINITE);
+		net.veloclient.launcher.ui.RenderGate.gate(sweepLoop);
+		strip.sceneProperty().addListener((o, a, scene) -> {
 			if (scene == null) {
-				tick.stop();
+				loop.stop();
+				sweepLoop.stop();
+				move.stop();
 			} else {
-				tick.play();
+				loop.play();
+				sweepLoop.play();
 			}
 		});
-		return row;
+		strip.setCursor(javafx.scene.Cursor.HAND);
+		row.setOnMouseClicked(e -> {
+			if (e.getTarget() == row || e.getTarget() instanceof Label) {
+				open.run();
+			}
+		});
+		return strip;
 	}
 
 	private static String countdownText(JsonObject sale) {
@@ -172,11 +258,11 @@ public final class SaleUi {
 		int percent = sale.get("percent").getAsInt();
 
 		Label kicker = new Label(sale.get("name").getAsString().toUpperCase(Locale.ROOT) + "  ·  LIVE NOW");
-		kicker.setStyle(MONO + "-fx-font-size: 12px; -fx-text-fill: #FF6B6F; -fx-padding: 6 9 6 9; -fx-border-color: #E0262E; -fx-border-radius: 6;");
+		kicker.setStyle(MONO + "-fx-font-size: 12px; -fx-text-fill: -velo-accent-text; -fx-padding: 6 9 6 9; -fx-border-color: -velo-accent; -fx-border-radius: 6;");
 		Label num = new Label(percent + "%");
-		num.setStyle(DISPLAY + "-fx-font-size: 104px; -fx-text-fill: linear-gradient(to bottom, #FFFFFF 35%, #FF9AA0 80%, #E0262E 100%);");
+		num.setStyle(DISPLAY + "-fx-font-size: 104px; -fx-text-fill: linear-gradient(to bottom, #FFFFFF 35%, derive(-velo-accent-text, 30%) 80%, -velo-accent 100%);");
 		Label off = new Label("OFF");
-		off.setStyle(DISPLAY + "-fx-font-size: 44px; -fx-text-fill: #E0262E;");
+		off.setStyle(DISPLAY + "-fx-font-size: 44px; -fx-text-fill: -velo-accent;");
 		num.setMinWidth(Region.USE_PREF_SIZE);
 		off.setMinWidth(Region.USE_PREF_SIZE);
 		HBox big = new HBox(12, num, off);
@@ -232,7 +318,7 @@ public final class SaleUi {
 		body.setPadding(new Insets(34, 36, 32, 38));
 		StackPane card = new StackPane(body);
 		card.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
-		card.setStyle("-fx-background-color: radial-gradient(center 90% 0%, radius 80%, rgba(224,38,46,0.38), transparent), #050506;"
+		card.setStyle("-fx-background-color: radial-gradient(center 90% 0%, radius 80%, -velo-accent-line, transparent), -velo-glass-tint;"
 				+ "-fx-background-radius: 22; -fx-border-color: rgba(224,38,46,0.45); -fx-border-radius: 22; -fx-border-width: 1;");
 		Rectangle clip = new Rectangle();
 		clip.setArcWidth(44);

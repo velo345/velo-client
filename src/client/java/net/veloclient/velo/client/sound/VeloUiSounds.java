@@ -16,7 +16,7 @@ import net.veloclient.velo.client.emotes.EmoteSounds;
 public final class VeloUiSounds {
 
 	/** Playback volume of every UI sound - the files are levelled for it. */
-	private static final float VOLUME = 0.3f;
+	private static final float VOLUME = 0.18f;   // 2026-11-26: quieter by default (owner)
 
 	private static boolean loadedPlayed;
 	private static EmoteSounds.Handle music;
@@ -75,6 +75,68 @@ public final class VeloUiSounds {
 		}
 	}
 
+	/** Something under the mouse lit up (any hover in Velo's menus) - barely there, never twice within 70 ms. */
+	public static void hoverSoft() {
+		long now = System.nanoTime();
+		if (velo() && now - lastHover > 70_000_000L) {
+			lastHover = now;
+			play("hover", 1f);
+		}
+	}
+
+	private static long lastHover;
+
+	/** Going one page deeper in a menu / to another page. */
+	public static void page() {
+		if (velo()) {
+			play("page", 1f);
+		}
+	}
+
+	/** Going back a page (Esc / back arrow). */
+	public static void back() {
+		if (velo()) {
+			play("back", 1f);
+		}
+	}
+
+	/** Saved / done / bought. */
+	public static void confirm() {
+		if (velo()) {
+			play("confirm", 1f);
+		}
+	}
+
+	/** Something didn't work. */
+	public static void error() {
+		if (velo()) {
+			play("error", 1f);
+		}
+	}
+
+	/** A notification card slid in. */
+	public static void notifySoft() {
+		long now = System.nanoTime();
+		if (velo() && now - lastNotify > 400_000_000L) {
+			lastNotify = now;
+			play("notify", 1f);
+		}
+	}
+
+	private static long lastNotify;
+
+	public static void drag() {
+		if (velo()) {
+			play("drag", 1f);
+		}
+	}
+
+	public static void drop() {
+		if (velo()) {
+			play("drop", 1f);
+		}
+	}
+
 	/** The Velo menu opening from gameplay / closing back to it. */
 	public static void menuOpen() {
 		if (velo()) {
@@ -87,6 +149,27 @@ public final class VeloUiSounds {
 			play("menu_close", 1f);
 		}
 	}
+
+	/** The R-Shift panel growing into the full menu / coming back from the edge. */
+	public static void expand() {
+		if (velo()) {
+			play("expand", 1f);
+		}
+	}
+
+	/** The full menu shrinking to the panel / the panel sliding away. */
+	public static void collapse() {
+		if (velo()) {
+			play("collapse", 1f);
+		}
+	}
+
+	/** Whether a Velo sound started in the last {@code millis} ms (so a press that already sounded doesn't click twice). */
+	public static boolean playedWithin(long millis) {
+		return System.nanoTime() - lastPlayNanos < millis * 1_000_000L;
+	}
+
+	private static long lastPlayNanos;
 
 	public static void guideNext() {
 		if (velo()) {
@@ -150,7 +233,7 @@ public final class VeloUiSounds {
 			}
 			if (music == null || music.done() || silentTicks > 30) {
 				silentTicks = 0;
-				music = EmoteSounds.menuMusic("velo-client:music.title_ambient", 1f);
+				music = EmoteSounds.menuMusic("velo-client:music.title_ambient", 0.35f);   // quiet background, not a feature
 			}
 			// vanilla's menu music would start on top of it
 			//? if <26.1 {
@@ -254,14 +337,18 @@ public final class VeloUiSounds {
 	}
 
 	private static void play(String name, float pitch) {
+		lastPlayNanos = System.nanoTime();
+		// menus coming and going carry a little more weight than a click (they were inaudible at the click level)
+		float volume = name.startsWith("menu_") || name.startsWith("pause_") || name.equals("expand") || name.equals("collapse")
+				? Math.min(1f, VOLUME * 1.8f) : VOLUME;
 		try {
 			//? if <26.1 {
 			MinecraftClient.getInstance().getSoundManager().play(net.minecraft.client.sound.PositionedSoundInstance.ui(
-					net.minecraft.sound.SoundEvent.of(net.minecraft.util.Identifier.of("velo-client", "ui." + name)), pitch, VOLUME));
+					net.minecraft.sound.SoundEvent.of(net.minecraft.util.Identifier.of("velo-client", "ui." + name)), pitch, volume));
 			//?} else {
 			/*net.minecraft.client.Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
 					net.minecraft.sounds.SoundEvent.createVariableRangeEvent(net.minecraft.resources.Identifier.fromNamespaceAndPath("velo-client", "ui." + name)),
-					pitch, VOLUME));
+					pitch, volume));
 			*///?}
 		} catch (RuntimeException ignored) {
 			// no sound engine

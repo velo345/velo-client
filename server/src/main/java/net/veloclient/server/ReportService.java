@@ -155,7 +155,19 @@ final class ReportService {
 		return read(path);
 	}
 
+	/** Told when the owner changes a report's status (YouTrack follows). */
+	volatile java.util.function.BiConsumer<String, String> statusListener;
+
 	void setStatus(String id, String status, String note) throws IOException {
+		setStatusQuiet(id, status, note);
+		var notify = statusListener;
+		if (notify != null) {
+			notify.accept(id, status);
+		}
+	}
+
+	/** Like setStatus, without telling YouTrack (used when the change came from YouTrack). */
+	void setStatusQuiet(String id, String status, String note) throws IOException {
 		if (!List.of("new", "seen", "fixed", "wontfix").contains(status)) {
 			throw new NewsService.NewsException(400, "Unknown status");
 		}

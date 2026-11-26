@@ -441,6 +441,42 @@ public final class Wings3D {
 		return picked.stream().mapToInt(Integer::intValue).toArray();
 	}
 
+	/** The aura atlas, decoded once (it used to be decoded again for every new sprite - on the UI thread). */
+	private static int[] atlasPixels;
+	private static int atlasWidth;
+
+	private static synchronized int[] atlas() {
+		if (atlasPixels == null) {
+			try (InputStream in = Wings3D.class.getResourceAsStream("/net/veloclient/launcher/aura/atlas.png")) {
+				if (in != null) {
+					javafx.scene.image.Image atlas = new javafx.scene.image.Image(in);
+					atlasWidth = (int) atlas.getWidth();
+					int h = (int) atlas.getHeight();
+					atlasPixels = new int[atlasWidth * h];
+					atlas.getPixelReader().getPixels(0, 0, atlasWidth, h, javafx.scene.image.PixelFormat.getIntArgbInstance(), atlasPixels, 0, atlasWidth);
+				}
+			} catch (Exception e) {
+				atlasPixels = new int[0];
+			}
+		}
+		return atlasPixels;
+	}
+
+	/**
+	 * Warms everything a pair of wings needs (atlas, model) off the UI thread - Home's player built them in the middle
+	 * of a frame and the window went blank for a moment.
+	 */
+	public static void warm(String id) {
+		atlas();
+		if (id != null) {
+			try {
+				load(id);
+			} catch (RuntimeException ignored) {
+				// built (or skipped) when shown
+			}
+		}
+	}
+
 	/** An aura atlas cell tinted {@code color}, full bright (64 px). */
 	private static synchronized javafx.scene.image.Image sprite(int cell, int color) {
 		int key = cell << 24 ^ (color & 0xFFFFFF);
@@ -449,25 +485,22 @@ public final class Wings3D {
 			return cached;
 		}
 		javafx.scene.image.WritableImage out = new javafx.scene.image.WritableImage(64, 64);
-		try (InputStream in = Wings3D.class.getResourceAsStream("/net/veloclient/launcher/aura/atlas.png")) {
-			if (in != null) {
-				javafx.scene.image.Image atlas = new javafx.scene.image.Image(in);
-				javafx.scene.image.PixelReader reader = atlas.getPixelReader();
-				int cellSize = (int) atlas.getWidth() / 8;
-				int x0 = (cell % 8) * cellSize;
-				int y0 = (cell / 8) * cellSize;
-				for (int y = 0; y < 64; y++) {
-					for (int x = 0; x < 64; x++) {
-						int a = reader.getArgb(x0 + x * cellSize / 64, y0 + y * cellSize / 64) >>> 24;
-						int r = ((color >> 16) & 0xFF) * a / 255;
-						int g = ((color >> 8) & 0xFF) * a / 255;
-						int b = (color & 0xFF) * a / 255;
-						out.getPixelWriter().setArgb(x, y, a << 24 | r << 16 | g << 8 | b);
-					}
+		int[] src = atlas();
+		if (src.length > 0) {
+			int cellSize = atlasWidth / 8;
+			int x0 = (cell % 8) * cellSize;
+			int y0 = (cell / 8) * cellSize;
+			int[] px = new int[64 * 64];
+			for (int y = 0; y < 64; y++) {
+				for (int x = 0; x < 64; x++) {
+					int a = src[(y0 + y * cellSize / 64) * atlasWidth + x0 + x * cellSize / 64] >>> 24;
+					int r = ((color >> 16) & 0xFF) * a / 255;
+					int g = ((color >> 8) & 0xFF) * a / 255;
+					int b = (color & 0xFF) * a / 255;
+					px[y * 64 + x] = a << 24 | r << 16 | g << 8 | b;
 				}
 			}
-		} catch (Exception e) {
-			// No sprite: the particle stays invisible.
+			out.getPixelWriter().setPixels(0, 0, 64, 64, javafx.scene.image.PixelFormat.getIntArgbInstance(), px, 0, 64);
 		}
 		SPRITES.put(key, out);
 		return out;

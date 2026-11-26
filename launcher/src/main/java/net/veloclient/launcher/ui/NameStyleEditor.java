@@ -259,7 +259,7 @@ final class NameStyleEditor {
 		FlowPane grid = new FlowPane(8, 8);
 		for (NameStyle.Preset preset : NameStyle.PRESETS) {
 			NameStyle look = preset.style().withPlaces(style.chat(), style.tab(), style.nameTag());
-			grid.getChildren().add(tile(new NamePreview(name, preset::style, 15, 140), preset.name(), look.equals(style),
+			grid.getChildren().add(tile(new NamePreview(name, preset::style, 15, 140).hoverOnly(), preset.name(), look.equals(style),
 					() -> commit(look, redraw)));
 		}
 		return grid;
@@ -499,7 +499,7 @@ final class NameStyleEditor {
 		for (int i = 0; i < NameStyle.FONTS.length; i++) {
 			int font = i;
 			NameStyle look = style.withFont(i).withIcon(0);
-			grid.getChildren().add(tile(new NamePreview(name, () -> style.withFont(font).withIcon(0), 15, 140), NameStyle.FONTS[i][0],
+			grid.getChildren().add(tile(new NamePreview(name, () -> style.withFont(font).withIcon(0), 15, 140).hoverOnly(), NameStyle.FONTS[i][0],
 					style.font() == i, () -> commit(style.withFont(font), redraw)));
 		}
 		return grid;

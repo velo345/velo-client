@@ -43,6 +43,25 @@ import java.util.List;
 @Mixin(TitleScreen.class)
 public abstract class TitleScreenMixin {
 
+	/**
+	 * Vanilla's Realms notification icons (the newspaper with the gem) sit at the spot of vanilla's own Realms button -
+	 * Velo moves the buttons, so they floated on top of Multiplayer (owner 2026-11-25). Realms is its own entry here.
+	 */
+	@Inject(method = "isRealmsNotificationsGuiDisplayed", at = @At("HEAD"), cancellable = true, require = 0)
+	private void velo$noRealmsIcons(org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Boolean> cir) {
+		if (net.veloclient.velo.client.gui.VeloScreens.title()) {
+			cir.setReturnValue(false);
+		}
+	}
+
+	/** The Play Deck shows the versions itself (bottom right): vanilla's "Minecraft x (n Mods)" line goes. */
+	@org.spongepowered.asm.mixin.injection.ModifyArg(method = "render", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/client/gui/DrawContext;drawTextWithShadow"), index = 1, require = 0)
+	private String velo$hideVersionLine(String text) {
+		return net.veloclient.velo.client.gui.VeloScreens.title()
+				&& TitleMenu.deck(net.veloclient.velo.client.gui.title.ScreenLook.title()) ? "" : text;
+	}
+
 	@Inject(method = "init", at = @At("RETURN"))
 	private void velo$restyle(CallbackInfo ci) {
 		if (!net.veloclient.velo.client.gui.VeloScreens.title()) {
@@ -123,6 +142,22 @@ public abstract class TitleScreenMixin {
 //?} else {
 /*@Mixin(TitleScreen.class)
 public abstract class TitleScreenMixin {
+
+	/^* Vanilla's Realms notification icons sat on top of Multiplayer (Velo moves the buttons) - Realms is its own entry. *^/
+	@Inject(method = "realmsNotificationsEnabled", at = @At("HEAD"), cancellable = true, require = 0)
+	private void velo$noRealmsIcons(org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Boolean> cir) {
+		if (net.veloclient.velo.client.gui.VeloScreens.title()) {
+			cir.setReturnValue(false);
+		}
+	}
+
+	/^* The Play Deck shows the versions itself (bottom right): vanilla's "Minecraft x (n Mods)" line goes. *^/
+	@org.spongepowered.asm.mixin.injection.ModifyArg(method = "extractRenderState", at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;text(Lnet/minecraft/client/gui/Font;Ljava/lang/String;III)V"), index = 1, require = 0)
+	private String velo$hideVersionLine(String text) {
+		return net.veloclient.velo.client.gui.VeloScreens.title()
+				&& TitleMenu.deck(net.veloclient.velo.client.gui.title.ScreenLook.title()) ? "" : text;
+	}
 
 	@Inject(method = "init", at = @At("RETURN"))
 	private void velo$restyle(CallbackInfo ci) {

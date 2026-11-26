@@ -7,9 +7,7 @@ import net.minecraft.text.Text;
 import net.veloclient.velo.client.emotes.EmoteCatalog;
 import net.veloclient.velo.client.gui.widget.VeloDraw;
 import net.veloclient.velo.client.gui.widget.VeloUi;
-import net.veloclient.velo.client.gui.widget.VeloAnim;
 import net.veloclient.velo.client.modules.cosmetics.EmotesModule;
-import net.veloclient.velo.client.theme.ThemeManager;
 import net.veloclient.velo.client.util.Keys;
 
 /**
@@ -19,8 +17,6 @@ import net.veloclient.velo.client.util.Keys;
  */
 public final class EmoteWheelScreen extends Screen {
 
-	private static final float INNER = 34f;
-	private static final float OUTER = 98f;
 	/** Released sooner than this after opening = a tap: the wheel stays open. */
 	private static final long TAP_NANOS = 220_000_000L;
 
@@ -55,88 +51,121 @@ public final class EmoteWheelScreen extends Screen {
 	}
 	*///?}
 
+	/** The disc: segments run from INNER to OUTER (gui px from the centre); GAP_DEG keeps them apart. */
+	private static final float OUTER = 98f;
+	private static final float INNER = 40f;
+	private static final float GAP_DEG = 1.4f;
+	/** Dev (screenshot tour): -Dvelo.tourWheelHover=<slot> shows that slot hovered. */
+	private static final int TOUR_HOVER = Integer.getInteger("velo.tourWheelHover", -1);
+
 	private int slotAt(double mouseX, double mouseY) {
 		double dx = mouseX - this.width / 2.0;
 		double dy = mouseY - this.height / 2.0;
 		double dist = Math.sqrt(dx * dx + dy * dy);
-		if (dist < INNER * 0.6) {
+		// the direction is enough (owner 2026-11-26): a small nudge from the centre picks that segment - on the wheel or
+		// far outside it; only a tiny dead zone in the middle picks none
+		if (dist < 10) {
 			return -1;
 		}
-		// 0 degrees = straight up, clockwise - the same as VeloDraw's arcs; slot 0 is centred at the top
+		// 0 degrees = straight up, clockwise; slot 0 is at the top
 		double deg = Math.toDegrees(Math.atan2(dx, -dy));
 		deg = (deg + 360 + 180.0 / EmotesModule.SLOTS) % 360;
 		int slot = (int) (deg / (360.0 / EmotesModule.SLOTS));
 		return module.slot(slot) == null ? -1 : slot;
 	}
 
+	/**
+	 * Glass wheel (owner 2026-11-25: "no weird circles, no text spilling out"): one blurred glass disc cut into eight
+	 * segments, each showing its emote moving; the hovered segment fills with the accent and its name sits in the hub.
+	 * Accent / darkness: GlassPrefs.
+	 */
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		long now = System.nanoTime();
 		float dt = lastNanos < 0 ? 0f : Math.min(0.1f, (now - lastNanos) / 1e9f);
 		lastNanos = now;
-		hovered = slotAt(mouseX, mouseY);
-		float open = Math.min(1f, (now - openedAt) / 120_000_000f);
-		float ease = 1f - (1f - open) * (1f - open);
+		hovered = TOUR_HOVER >= 0 && module.slot(TOUR_HOVER) != null ? TOUR_HOVER : slotAt(mouseX, mouseY);
+		// a tap shorter than a tick: the release came before this screen did - the wheel is hold-only, so it closes
+		if (TOUR_HOVER < 0 && wheelKey > 0 && now - openedAt > TAP_NANOS && !Keys.isKeyDown(wheelKey) && this.client != null
+				&& net.veloclient.velo.client.util.ClientCompat.currentScreen() == this) {
+			this.close();
+		}
+		float open = Math.min(1f, (now - openedAt) / 160_000_000f);
+		float ease = 1f - (1f - open) * (1f - open) * (1f - open);
 		float cx = this.width / 2f;
 		float cy = this.height / 2f;
-		int accent = ThemeManager.active().accentStart() | 0xFF000000;
-
-		context.fill(0, 0, this.width, this.height, VeloUi.withAlpha(0xFF000000, Math.round(0x40 * ease)));
-		float scale = 0.85f + 0.15f * ease;
-		float inner = INNER * scale;
+		int accent = net.veloclient.velo.client.gui.glass.GlassPrefs.accent() | 0xFF000000;
+		int slots = EmotesModule.SLOTS;
+		float scale = 0.86f + 0.14f * ease;
 		float outer = OUTER * scale;
-		float sweep = 360f / EmotesModule.SLOTS;
-		// soft shadow ring, then the slots
-		VeloDraw.strokeArc(context, cx, cy, (inner + outer) / 2f, outer - inner + 10f, 0f, 360f, VeloUi.withAlpha(0xFF000000, Math.round(0x50 * ease)));
-		for (int i = 0; i < EmotesModule.SLOTS; i++) {
+		float inner = INNER * scale;
+		for (int i = 0; i < slots; i++) {
 			hoverAnim[i] += ((i == hovered ? 1f : 0f) - hoverAnim[i]) * Math.min(1f, dt * 14f);
-			boolean empty = module.slot(i) == null;
-			float grow = hoverAnim[i] * 6f;
-			int base = empty ? 0xA0141418 : 0xC81B1B22;
-			int fill = mix(base, VeloUi.withAlpha(accent, 0xE0), hoverAnim[i]);
-			float start = i * sweep - sweep / 2f + 1.2f;
-			VeloDraw.strokeArc(context, cx, cy, (inner + outer + grow) / 2f, outer - inner + grow, start, sweep - 2.4f,
-					VeloUi.withAlpha(fill, Math.round(((fill >>> 24) & 0xFF) * ease)));
 		}
-		// labels: the number and the emote's name in the middle of each slot
-		for (int i = 0; i < EmotesModule.SLOTS; i++) {
-			double angle = Math.toRadians(i * sweep - 90);
-			float r = (inner + outer) / 2f + hoverAnim[i] * 3f;
-			int lx = Math.round(cx + (float) Math.cos(angle) * r);
-			int ly = Math.round(cy + (float) Math.sin(angle) * r);
+
+		context.fill(0, 0, this.width, this.height, VeloUi.withAlpha(0xFF000000, Math.round(0x30 * ease)));
+		// real blur behind the disc only (the game around it stays sharp)
+		if (ease > 0.2f && net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
+			int r = Math.round(outer + 4);
+			java.util.List<int[]> rects = new java.util.ArrayList<>();
+			rects.add(new int[] {Math.round(cx) - r, Math.round(cy) - r, r * 2, r * 2, r});
+			net.veloclient.velo.client.gui.glass.SharpFrame.blurHere(context);
+			net.veloclient.velo.client.gui.glass.SharpFrame.drawSharpExcept(context, this.width, this.height, rects);
+		}
+		int alpha = Math.round(255 * ease);
+		int tint = net.veloclient.velo.client.gui.glass.GlassPrefs.tint(0xB0101014);
+		int tintA = (tint >>> 24) & 0xFF;
+		float sweep = 360f / slots;
+		float mid = (inner + outer) / 2f;
+		float thick = outer - inner;
+		for (int i = 0; i < slots; i++) {
 			String id = module.slot(i);
-			int alpha = Math.round(255 * ease);
-			// the hovered slot fills with the (white, glass) accent: its text turns dark so it stays readable
-			float dark = (accent & 0xFFFFFF) == 0xFFFFFF ? hoverAnim[i] : 0f;
-			Text num = Text.literal(String.valueOf(i + 1));
-			Text name = Text.literal(id == null ? "-" : EmoteCatalog.name(id));
-			int numColor = VeloAnim.lerpArgb(i == hovered ? 0xFFFFFFFF : 0xFF9A9AA6, 0xFF3A3A40, dark);
-			int nameColor = VeloAnim.lerpArgb(id == null ? 0xFF5E5E68 : 0xFFFFFFFF, 0xFF141416, dark);
-			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, num, lx - this.textRenderer.getWidth(num) / 2, ly - 10, VeloUi.withAlpha(numColor, alpha));
-			net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, name, lx - this.textRenderer.getWidth(name) / 2, ly + 1, VeloUi.withAlpha(nameColor, alpha));
+			float h = hoverAnim[i];
+			float start = i * sweep - sweep / 2f + GAP_DEG;
+			float arc = sweep - GAP_DEG * 2f;
+			float grow = h * 4f;
+			VeloDraw.strokeArc(context, cx, cy, mid + grow / 2f, thick + grow, start, arc,
+					VeloUi.withAlpha(tint, Math.round(tintA * ease * (id == null ? 0.7f : 1f))));
+			if (h > 0.01f) {
+				VeloDraw.strokeArc(context, cx, cy, mid + grow / 2f, thick + grow, start, arc, VeloUi.withAlpha(accent, Math.round(0x50 * h * ease)));
+				VeloDraw.strokeArc(context, cx, cy, outer + grow - 1f, 2f, start, arc, VeloUi.withAlpha(accent, Math.round(255 * h * ease)));
+			}
+			double angle = Math.toRadians(i * sweep - 90);
+			float fx = cx + (float) Math.cos(angle) * (mid + grow / 2f);
+			float fy = cy + (float) Math.sin(angle) * (mid + grow / 2f);
+			if (id != null) {
+				float figScale = (thick - 16f) / 34f * (1f + 0.08f * h);
+				net.veloclient.velo.client.gui.widget.EmoteFigure.draw(context, slotFigures[i], id, fx, fy + 34f * figScale / 2f, figScale,
+						EmoteCatalog.accent(id));
+			} else {
+				Text plus = Text.literal("+");
+				net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, plus, Math.round(fx - this.textRenderer.getWidth(plus) / 2f),
+						Math.round(fy - 4), VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x40 * ease)));
+			}
 		}
-		// centre: the hovered emote, playing small - or the hint
-		VeloDraw.fillCircle(context, cx, cy, inner - 6f, VeloUi.withAlpha(0xFF101014, Math.round(0xD0 * ease)));
-		if (hovered >= 0) {
-			String id = module.slot(hovered);
-			context.enableScissor(Math.round(cx - inner + 6), Math.round(cy - inner + 6), Math.round(cx + inner - 6), Math.round(cy + inner - 6));
-			net.veloclient.velo.client.gui.widget.EmoteFigure.draw(context, centreFigure, id, cx, cy + inner - 12f, (inner * 2 - 22f) / 34f,
-					EmoteCatalog.accent(id));
-			context.disableScissor();
-			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal(EmoteCatalog.name(id)), Math.round(cx), Math.round(cy + outer + 10),
-					VeloUi.withAlpha(accent, Math.round(255 * ease)));
-		} else {
-			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("Emotes"), Math.round(cx), Math.round(cy) - 4,
-					VeloUi.withAlpha(0xFFD8D8E0, Math.round(255 * ease)));
+		// the hub: the hovered emote's name, or "Emotes"
+		VeloDraw.fillCircle(context, cx, cy, inner - 3f, VeloUi.withAlpha(tint, Math.round(Math.min(255, tintA * 1.15f) * ease)));
+		VeloDraw.strokeArc(context, cx, cy, inner - 3.5f, 1f, 0f, 360f, VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x2E * ease)));
+		String label = hovered >= 0 ? EmoteCatalog.name(module.slot(hovered)) : "Emotes";
+		int maxW = Math.round((inner - 6f) * 2f);
+		String shown = label;
+		if (net.veloclient.velo.client.gui.title.MenuKit.width(this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.uiBold(shown)) > maxW) {
+			while (shown.length() > 1 && net.veloclient.velo.client.gui.title.MenuKit.width(this.textRenderer, net.veloclient.velo.client.gui.title.MenuKit.uiBold(shown + "…")) > maxW) {
+				shown = shown.substring(0, shown.length() - 1);
+			}
+			shown = shown.trim() + "…";
 		}
+		Text title = net.veloclient.velo.client.gui.title.MenuKit.uiBold(shown);
+		net.veloclient.velo.client.gui.title.MenuKit.text(context, this.textRenderer, title, Math.round(cx - net.veloclient.velo.client.gui.title.MenuKit.width(this.textRenderer, title) / 2f),
+				Math.round(cy) - 4, VeloUi.withAlpha(hovered >= 0 ? 0xFFFFFFFF : 0xFFEDEDF2, alpha));
 		if (empty()) {
 			context.drawCenteredTextWithShadow(this.textRenderer, Text.literal("No emotes yet - click here to get some in the Store"),
-					Math.round(cx), Math.round(cy + outer + 24), VeloUi.withAlpha(0xFFFFD24A, Math.round(255 * ease)));
+					Math.round(cx), Math.round(cy + outer + 12), VeloUi.withAlpha(0xFFFFD24A, alpha));
 		}
 		super.render(context, mouseX, mouseY, delta);
 	}
 
-	private final Object centreFigure = new Object();
+	private final Object[] slotFigures = new Object[] {new Object(), new Object(), new Object(), new Object(), new Object(), new Object(), new Object(), new Object()};
 
 	private boolean empty() {
 		for (int i = 0; i < EmotesModule.SLOTS; i++) {
@@ -145,16 +174,6 @@ public final class EmoteWheelScreen extends Screen {
 			}
 		}
 		return true;
-	}
-
-	private static int mix(int a, int b, float t) {
-		int out = 0;
-		for (int shift = 0; shift < 32; shift += 8) {
-			int ca = (a >>> shift) & 0xFF;
-			int cb = (b >>> shift) & 0xFF;
-			out |= Math.round(ca + (cb - ca) * t) << shift;
-		}
-		return out;
 	}
 
 	private void play(int slot) {
@@ -174,11 +193,7 @@ public final class EmoteWheelScreen extends Screen {
 			}
 		}
 		if (input.key() == wheelKey) {
-			// Holding the key sends repeat presses - only a new press after a release closes the wheel.
-			if (!wheelKeyDown && System.nanoTime() - openedAt > TAP_NANOS) {
-				this.close();
-			}
-			wheelKeyDown = true;
+			wheelKeyDown = true;   // held: the repeats keep it open
 			return true;
 		}
 		return velo$superKeyPressed(input);
@@ -187,16 +202,14 @@ public final class EmoteWheelScreen extends Screen {
 	@Override
 	public boolean keyReleased(net.minecraft.client.input.KeyInput input) {
 		if (input.key() == wheelKey) {
+			// hold to pick (owner 2026-11-26): letting go plays the emote you point at, or just closes the wheel
 			wheelKeyDown = false;
 			if (hovered >= 0) {
 				play(hovered);
-				return true;
-			}
-			if (System.nanoTime() - openedAt > TAP_NANOS) {
-				// held and let go over the centre: nothing chosen
+			} else {
 				this.close();
-				return true;
 			}
+			return true;
 		}
 		return velo$superKeyReleased(input);
 	}

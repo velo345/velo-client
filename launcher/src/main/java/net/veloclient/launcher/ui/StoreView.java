@@ -146,24 +146,28 @@ public final class StoreView {
 	public static Node build(Host host) {
 		Label heading = new Label("Store");
 		heading.getStyleClass().add("page-title");
-		heading.setPadding(new Insets(0, 14, 10, 0));
-		HBox tabs = new HBox(18);
-		tabs.setAlignment(Pos.BOTTOM_LEFT);
+		heading.setPadding(new Insets(0, 14, 0, 0));
+		// 2026-11-25 design: the tabs as pills inside one glass bar, the active one white
+		HBox tabs = new HBox(0);
+		tabs.setAlignment(Pos.CENTER_LEFT);
+		tabs.getStyleClass().add("store-tabs");
+		tabs.setPadding(new Insets(4));
 		String[] labels = {"Featured", "Wings", "Cloaks", "Auras", "Emotes", "Kill FX", "Bodywear", "Pets", "Bundles", "Velo+"};
 		for (Page p : Page.values()) {
 			if (p == Page.WISHLIST) {
 				continue;
 			}
 			Button tab = new Button(labels[p.ordinal()]);
-			tab.getStyleClass().setAll("button", "utab", "no-motion");
+			tab.getStyleClass().setAll("button", "store-tab", "no-motion");
 			tab.setMinWidth(Region.USE_PREF_SIZE);
 			if (p == page) {
-				tab.getStyleClass().add("utab-active");
+				tab.getStyleClass().add("store-tab-active");
 			}
-			if (p == Page.PLUS) {
+			if (p == Page.PLUS && p != page) {
+				// accent text only on the plain tab: the selected tab is a white pill (Monochrome's accent is white too)
 				tab.setStyle("-fx-text-fill: -velo-accent-text;");
 			}
-			if (p == Page.PETS) {
+			if (p == Page.PETS && false) {   // owner 2026-11-26: no NEW badge on Pets
 				Label badge = new Label("NEW");
 				badge.getStyleClass().addAll("badge", "badge-new");
 				badge.setStyle("-fx-font-size: 9px;");
@@ -200,22 +204,30 @@ public final class StoreView {
 				e.consume();
 			}
 		});
-		HBox header = new HBox(heading, tabStrip);
-		header.setAlignment(Pos.BOTTOM_LEFT);
+		HBox.setHgrow(tabStrip, Priority.NEVER);
+		tabStrip.setMaxWidth(Region.USE_PREF_SIZE);
+		Region headerPush = new Region();
+		HBox.setHgrow(headerPush, Priority.ALWAYS);
+		HBox header = new HBox(10, heading, tabStrip, headerPush);
+		header.setAlignment(Pos.CENTER_LEFT);
+		javafx.application.Platform.runLater(() -> net.veloclient.launcher.ui.glass.Glass.install(tabs, 20));
 		header.getStyleClass().add("utab-row");
 		if (StoreApi.isOwner()) {
-			Button owner = new Button("Owner panel");
-			owner.getStyleClass().addAll("ghost-button", "button-sm");
+			Button owner = new Button();
+			owner.setGraphic(Icons.icon("crown", 16, Color.web("#E4E4E8")));
+			owner.setTooltip(new javafx.scene.control.Tooltip("Owner panel"));
+			owner.getStyleClass().addAll("glass-button", "icon-only");
 			owner.setMinWidth(Region.USE_PREF_SIZE);
 			owner.setOnAction(e -> host.openOwner());
-			HBox.setMargin(owner, new Insets(0, 0, 8, 0));
+			HBox.setMargin(owner, new Insets(0));
 			header.getChildren().add(owner);
 		}
 		// The wishlist: everything you hearted on an item page, in one place (with what it costs together).
 		long wished = wishedItems().size();
-		Button wishlist = new Button(wished > 0 ? "Wishlist  " + wished : "Wishlist");
-		wishlist.setGraphic(Icons.icon("heart", 14, Color.web(page == Page.WISHLIST ? "#FF6B7A" : "#C9C9D1")));
-		wishlist.getStyleClass().addAll("ghost-button", "button-sm");
+		Button wishlist = new Button(wished > 0 ? String.valueOf(wished) : null);
+		wishlist.setGraphic(Icons.icon("heart", 16, Color.web(page == Page.WISHLIST ? "#FF6B7A" : "#E4E4E8")));
+		wishlist.setTooltip(new javafx.scene.control.Tooltip("Wishlist"));
+		wishlist.getStyleClass().addAll("glass-button", "icon-only");
 		wishlist.setMinWidth(Region.USE_PREF_SIZE);
 		if (page == Page.WISHLIST) {
 			wishlist.setStyle("-fx-border-color: rgba(255,107,122,0.6);");
@@ -225,9 +237,11 @@ public final class StoreView {
 			openBundle = null;
 			host.rebuild();
 		});
-		HBox.setMargin(wishlist, new Insets(0, 8, 8, 0));
 		header.getChildren().add(wishlist);
-		HBox.setMargin(locker, new Insets(0, 0, 8, 0));
+		locker.setText(null);
+		locker.setGraphic(Icons.icon("hanger", 16, Color.web("#E4E4E8")));
+		locker.setTooltip(new javafx.scene.control.Tooltip("My Locker"));
+		locker.getStyleClass().setAll("button", "glass-button", "icon-only");
 		header.getChildren().add(locker);
 
 		VBox body = new VBox(26);
@@ -256,12 +270,13 @@ public final class StoreView {
 		}
 		refreshWallet(host, body);
 
+		// free coins right where people shop - part of the scrolling page now, not pinned above it
+		body.getChildren().add(0, RewardsStrip.build(host::openCoins));
 		ScrollPane scroll = new ScrollPane(body);
 		scroll.setFitToWidth(true);
 		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 		VBox.setVgrow(scroll, Priority.ALWAYS);
-		// free coins right where people shop (daily reward + today's quests with Claim buttons)
-		VBox page = new VBox(18, header, RewardsStrip.build(host::openCoins), scroll);
+		VBox page = new VBox(18, header, scroll);
 		page.getStyleClass().add("page");
 		return page;
 	}
@@ -1243,7 +1258,12 @@ public final class StoreView {
 		ImageView badge = new ImageView(UiImages.resource("/net/veloclient/launcher/images/velo-plus-badge.png", 120, 72));
 		Label headline = new Label("Play more.\nUnlock everything.");
 		headline.getStyleClass().add("t-display");
-		headline.setStyle("-fx-font-size: 46px;");
+		headline.setStyle("-fx-font-size: 40px;");
+		// wraps instead of "Unlock everythi..." when the column is narrow
+		headline.setWrapText(true);
+		headline.setMinHeight(Region.USE_PREF_SIZE);
+		headline.setMinWidth(0);
+		headline.setTextOverrun(javafx.scene.control.OverrunStyle.CLIP);
 		Label pitch = new Label("Host your world for friends, your setup in the cloud, pro clips, a name that moves and a monthly coin drop.");
 		pitch.getStyleClass().add("t-body");
 		pitch.setStyle("-fx-font-size: 15px;");
@@ -1519,7 +1539,7 @@ public final class StoreView {
 		HBox box = new HBox(16, icon, words, browse);
 		box.setAlignment(Pos.CENTER_LEFT);
 		box.getStyleClass().add("card");
-		box.setStyle("-fx-border-color: rgba(247,192,74,0.55); -fx-background-color: linear-gradient(to right, rgba(247,192,74,0.16), rgba(247,192,74,0.02));");
+		box.setStyle("-fx-border-color: rgba(247,192,74,0.5); -fx-background-color: -velo-glass-tint;");
 		box.setPadding(new Insets(16, 18, 16, 16));
 		return box;
 	}

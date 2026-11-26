@@ -21,6 +21,26 @@ public final class DrawerTour {
 				return;
 			}
 			ticks++;
+			if (Boolean.getBoolean("velo.rshiftTour")) {
+				// the first-open R-Shift tour: a shot of every stop (and one mid-glide)
+				if (ticks == 80) {
+					screen = new VeloDrawerScreen();
+					client.setScreen(screen);
+					screen.testExpanded(false);
+				} else if (ticks >= 130 && ticks < 130 + 8 * 30) {
+					int t = ticks - 130;
+					if (t % 30 == 0) {
+						shot(client, "rshift-tour-" + (t / 30 + 1) + ".png");
+					} else if (t % 30 == 2) {
+						screen.testTourNext();
+					} else if (t == 32 + 3) {
+						shot(client, "rshift-tour-glide.png");
+					}
+				} else if (ticks == 130 + 8 * 30 + 20) {
+					client.scheduleStop();
+				}
+				return;
+			}
 			switch (ticks) {
 				case 80 -> {
 					screen = new VeloDrawerScreen();

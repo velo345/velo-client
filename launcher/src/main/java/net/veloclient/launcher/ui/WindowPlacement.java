@@ -43,6 +43,21 @@ public final class WindowPlacement {
 			Rectangle2D b = screenFor(saved).getVisualBounds();
 			double width = Math.min(saved.width(), b.getWidth());
 			double height = Math.min(saved.height(), b.getHeight());
+			// 2026-11-25: the layout grew - a window remembered smaller than the new comfortable size gets a little
+			// bigger once (it cut things off), centred on where it was; the player can shrink it again afterwards
+			java.nio.file.Path grown = net.veloclient.launcher.data.VeloPaths.config().resolve("launcher-window-grown-v2");
+			if (!java.nio.file.Files.exists(grown)) {
+				double wantW = Math.min(Math.max(width, Math.min(defaultWidth, b.getWidth() - 40)), b.getWidth());
+				double wantH = Math.min(Math.max(height, Math.min(defaultHeight, b.getHeight() - 30)), b.getHeight());
+				saved = new Saved(saved.x() - (wantW - width) / 2, saved.y() - (wantH - height) / 2, wantW, wantH, saved.maximized());
+				width = wantW;
+				height = wantH;
+				try {
+					java.nio.file.Files.writeString(grown, "1");
+				} catch (java.io.IOException ignored) {
+					// tried once anyway
+				}
+			}
 			stage.setWidth(width);
 			stage.setHeight(height);
 			stage.setX(Math.max(b.getMinX(), Math.min(saved.x(), b.getMaxX() - width)));

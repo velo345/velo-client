@@ -117,11 +117,12 @@ public final class NameStyleScreen extends VeloWindow implements net.veloclient.
 	}
 
 	private int editorX() {
-		return stageX() + CapeEquipScreen.SHOWCASE_WIDTH + 14;
+		return CapeEquipScreen.rightX();
 	}
 
 	private int editorWidth() {
-		return contentX() + contentWidth() - editorX();
+		editorX();
+		return CapeEquipScreen.rightW();
 	}
 
 	// ---- Rendering ----

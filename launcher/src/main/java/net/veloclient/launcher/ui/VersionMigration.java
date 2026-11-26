@@ -80,6 +80,11 @@ final class VersionMigration {
 	}
 
 	static void show(StackPane overlayHost, Instance instance, Runnable onDone) {
+		show(overlayHost, instance, onDone, null);
+	}
+
+	/** {@code target} picked already (the header's version popover): straight to checking the mods for it. */
+	static void show(StackPane overlayHost, Instance instance, Runnable onDone, String target) {
 		VBox card = new VBox(14);
 		card.getStyleClass().addAll("glass-panel", "modal-card", "migrate-card");
 		card.setMaxWidth(620);
@@ -112,7 +117,115 @@ final class VersionMigration {
 		pop.setToY(1);
 		pop.setInterpolator(Interpolator.SPLINE(0.16, 1, 0.3, 1));
 		pop.play();
-		pickStep(card, instance, close, onDone);
+		if (target != null) {
+			analyzeStep(card, instance, target, close, onDone);
+		} else {
+			pickStep(card, instance, close, onDone);
+		}
+	}
+
+	/**
+	 * The header's version switcher (2026-11-25 design): every version as a tile on its picture, the current one marked;
+	 * pick one and "Switch to ..." checks the mods and moves the profile (the same flow as before).
+	 */
+	static void popover(Node anchor, StackPane overlayHost, Instance instance, Runnable onDone) {
+		Label title = new Label("Switch version");
+		title.getStyleClass().add("panel-title");
+		Label note = new Label("MODS COME ALONG");
+		note.getStyleClass().add("home-card-note");
+		javafx.scene.layout.Region push = new javafx.scene.layout.Region();
+		javafx.scene.layout.HBox.setHgrow(push, javafx.scene.layout.Priority.ALWAYS);
+		javafx.scene.layout.HBox head = new javafx.scene.layout.HBox(title, push, note);
+		head.setAlignment(javafx.geometry.Pos.BASELINE_LEFT);
+		javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+		grid.setHgap(6);
+		grid.setVgap(6);
+		Label text = new Label("");
+		text.getStyleClass().add("t-muted");
+		text.setWrapText(true);
+		javafx.scene.layout.HBox.setHgrow(text, javafx.scene.layout.Priority.ALWAYS);
+		Button go = new Button("Switch");
+		go.getStyleClass().add("white-pill");
+		go.setDisable(true);
+		go.setMinWidth(Region.USE_PREF_SIZE);
+		String[] picked = {null};
+		java.util.List<StackPane> tiles = new java.util.ArrayList<>();
+		GameVersion[] all = GameVersion.values();
+		int n = 0;
+		for (int i = all.length - 1; i >= 0; i--) {
+			GameVersion version = all[i];
+			boolean current = version.id().equals(instance.mcVersion());
+			javafx.scene.image.ImageView art = new javafx.scene.image.ImageView();
+			art.setFitWidth(196);
+			art.setFitHeight(74);
+			art.setPreserveRatio(false);
+			VersionArt.load(version.id(), image -> {
+				art.setImage(image);
+				double h = image.getWidth() * 74 / 196;
+				if (h < image.getHeight()) {
+					art.setViewport(new javafx.geometry.Rectangle2D(0, (image.getHeight() - h) / 2, image.getWidth(), h));
+				}
+			});
+			javafx.scene.layout.Region shade = new javafx.scene.layout.Region();
+			shade.getStyleClass().add("version-tile-shade");
+			Label name = new Label(version.id());
+			name.getStyleClass().add("version-tile-name");
+			String tagText = current ? "CURRENT" : i == all.length - 1 ? "NEWEST" : version.id().startsWith("1.8") ? "PVP"
+					: version.id().startsWith("1.9") ? "LEGACY" : version.id().equals("1.21.1") ? "LTS" : null;
+			Label sub = new Label(current ? "You are here" : version.id().startsWith("1.8") || version.id().startsWith("1.9")
+					? "Velo legacy mod" : "Mods are checked first");
+			sub.getStyleClass().add("version-tile-sub");
+			VBox words = new VBox(1, name, sub);
+			words.setAlignment(javafx.geometry.Pos.BOTTOM_LEFT);
+			words.setPadding(new javafx.geometry.Insets(8, 10, 8, 10));
+			StackPane tile = new StackPane(art, shade, words);
+			if (tagText != null) {
+				Label tag = new Label(tagText);
+				tag.getStyleClass().addAll("version-tile-tag", tagText.equals("NEWEST") ? "version-tile-tag-new" : current ? "version-tile-tag-cur" : "version-tile-tag-red");
+				StackPane.setAlignment(tag, javafx.geometry.Pos.TOP_RIGHT);
+				StackPane.setMargin(tag, new javafx.geometry.Insets(7));
+				tile.getChildren().add(tag);
+			}
+			tile.getStyleClass().addAll("version-tile", "no-motion", current ? "version-tile-current" : "version-tile-pick");
+			javafx.scene.layout.Region ring = new javafx.scene.layout.Region();
+			ring.getStyleClass().add("version-tile-ring");
+			ring.setMouseTransparent(true);
+			ring.setVisible(false);
+			tile.getChildren().add(ring);
+			tile.getProperties().put("ring", ring);
+			tile.setMinSize(196, 74);
+			tile.setMaxSize(196, 74);
+			javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle(196, 74);
+			clip.setArcWidth(28);
+			clip.setArcHeight(28);
+			tile.setClip(clip);
+			if (!current) {
+				tile.setOnMouseClicked(e -> {
+					picked[0] = version.id();
+					tiles.forEach(t -> ((javafx.scene.Node) t.getProperties().get("ring")).setVisible(false));
+					ring.setVisible(true);
+					go.setDisable(false);
+					go.setText("Switch to " + version.id());
+					text.setText(version.id().startsWith("1.8") || version.id().startsWith("1.9")
+							? "A new " + version.id() + " profile on the Velo legacy mod" : "Your mods are checked first");
+				});
+			}
+			tiles.add(tile);
+			grid.add(tile, n % 2, n / 2);
+			n++;
+		}
+		// the button first, then what happens (owner 2026-11-25)
+		javafx.scene.layout.HBox foot = new javafx.scene.layout.HBox(10, go, text);
+		foot.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+		foot.getStyleClass().add("version-pop-foot");
+		VBox content = new VBox(12, head, grid, foot);
+		javafx.stage.Popup popup = Popover.show(anchor, content, Popover.Side.BELOW_LEFT, 430);
+		go.setOnAction(e -> {
+			if (picked[0] != null) {
+				popup.hide();
+				show(overlayHost, instance, onDone, picked[0]);
+			}
+		});
 	}
 
 	// ---- Step 1: where to ----

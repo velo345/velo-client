@@ -88,11 +88,13 @@ public final class VeloSkinsScreen extends VeloWindow implements net.veloclient.
 	}
 
 	private int gridX() {
-		return showcaseX() + CapeEquipScreen.SHOWCASE_WIDTH + 14;
+		showcaseX();
+		return CapeEquipScreen.rightX();
 	}
 
 	private int gridW() {
-		return contentX() + contentWidth() - gridX();
+		gridX();
+		return CapeEquipScreen.rightW();
 	}
 
 	/** The toolbar under the heading: username box, Add, then arms + Import PNG on the right. */

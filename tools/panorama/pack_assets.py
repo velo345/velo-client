@@ -18,8 +18,13 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageFilter
 
-DUEL_X, DUEL_Y, FW, FH = 2776, 372, 640, 432
-FRAMES, COLUMNS = 24, 6
+# "Drift" (panorama_space.py): the floating astronaut's crop. (The old knight duel was 2776, 372, 640 x 432.)
+# 2026-11-25: 48 frames of a slow 360 degree roll (crop 704 x 704); frames are stored at half resolution (the scene is
+# blurred by BLUR_RADIUS anyway), their glow at a quarter.
+DUEL_X, DUEL_Y, FW, FH = 2720, 173, 704, 704
+# 2026-11-26: 120 frames of a calm zero-g drift (12 s at 10 fps; the 48-frame roll looked laggy when slowed down)
+FRAMES, COLUMNS = 120, 8
+FRAME_DIV = 2
 FEATHER = 30
 NOISE_FLOOR = 4
 # A blur on the scene and its glow (identically on the duel frames, so they still match the static
@@ -28,6 +33,8 @@ BLUR_RADIUS = 4.5
 
 src, dst = Path(sys.argv[1]), Path(sys.argv[2])
 dst.mkdir(parents=True, exist_ok=True)
+# --frames-only: only the animated crop's atlases (the static panorama stays as it is - same crop, same feather)
+FRAMES_ONLY = "--frames-only" in sys.argv
 
 
 def rgb(path, blur=False):
@@ -64,24 +71,35 @@ def save(array, name):
 
 mask = feather_mask()
 
-base = rgb(src / "base.png", blur=True).astype(np.uint8)
-save(base, "pano_base.png")
+if not FRAMES_ONLY:
+	base = rgb(src / "base.png", blur=True).astype(np.uint8)
+	save(base, "pano_base.png")
 
-glow = rgb(src / "accent.png", blur=True)
-hole = np.ones(glow.shape[:2], np.float32)
-hole[DUEL_Y:DUEL_Y + FH, DUEL_X:DUEL_X + FW] = 1 - mask
-save(glow_rgba(glow, hole), "pano_glow.png")
+	glow = rgb(src / "accent.png", blur=True)
+	hole = np.ones(glow.shape[:2], np.float32)
+	hole[DUEL_Y:DUEL_Y + FH, DUEL_X:DUEL_X + FW] = 1 - mask
+	save(glow_rgba(glow, hole), "pano_glow.png")
 
 rows = FRAMES // COLUMNS
-duel = np.zeros((rows * FH, COLUMNS * FW, 4), np.uint8)
-duel_glow = np.zeros((rows * FH // 2, COLUMNS * FW // 2, 4), np.uint8)
+SW, SH = FW // FRAME_DIV, FH // FRAME_DIV
+duel = np.zeros((rows * SH, COLUMNS * SW, 4), np.uint8)
+duel_glow = np.zeros((rows * SH // 2, COLUMNS * SW // 2, 4), np.uint8)
 alpha = np.round(mask * 255).astype(np.uint8)
+
+
+def shrink(array):
+	return np.asarray(Image.fromarray(array).resize((array.shape[1] // FRAME_DIV, array.shape[0] // FRAME_DIV), Image.LANCZOS))
+
+
 for i in range(FRAMES):
-	x, y = (i % COLUMNS) * FW, (i // COLUMNS) * FH
+	x, y = (i % COLUMNS) * SW, (i // COLUMNS) * SH
 	frame = rgb(src / "frames" / f"base_{i}.png", blur=True).astype(np.uint8)
-	duel[y:y + FH, x:x + FW] = np.dstack([frame, alpha])
-	duel_glow[y // 2:(y + FH) // 2, x // 2:(x + FW) // 2] = glow_rgba(rgb(src / "frames" / f"glow_{i}.png", blur=True), mask)
-	if i == 0:
+	duel[y:y + SH, x:x + SW] = shrink(np.dstack([frame, alpha]))
+	glow_full = rgb(src / "frames" / f"glow_{i}.png", blur=True).astype(np.float32)
+	glow_half = np.asarray(Image.fromarray(np.clip(glow_full, 0, 255).astype(np.uint8)).resize((SW, SH), Image.LANCZOS)).astype(np.int16)
+	small_mask = np.asarray(Image.fromarray((mask * 255).astype(np.uint8)).resize((SW, SH), Image.LANCZOS)).astype(np.float32) / 255
+	duel_glow[y // 2:(y + SH) // 2, x // 2:(x + SW) // 2] = glow_rgba(glow_half, small_mask)
+	if i == 0 and not FRAMES_ONLY:
 		static = base[DUEL_Y:DUEL_Y + FH, DUEL_X:DUEL_X + FW].astype(np.int16)
 		diff = np.abs(static - frame.astype(np.int16))[FEATHER:-FEATHER, FEATHER:-FEATHER]
 		print("frame 0 vs static panorama: mean abs diff", round(float(diff.mean()), 2))

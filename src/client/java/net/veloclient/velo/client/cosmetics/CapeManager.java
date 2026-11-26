@@ -602,6 +602,89 @@ public final class CapeManager {
 		return null;
 	}
 
+	private static final java.util.Map<String, Identifier> STILLS = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final java.util.Set<String> STILL_LOADING = java.util.concurrent.ConcurrentHashMap.newKeySet();
+	private static final java.util.concurrent.ExecutorService STILL_LOADER = java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+		Thread thread = new Thread(r, "Velo cloak stills");
+		thread.setDaemon(true);
+		return thread;
+	});
+
+	/**
+	 * A still picture (first frame) of an animated cloak for the Locker's tiles (2026-11-25, like the launcher): decoding
+	 * only the first frame - and keeping it as a small PNG on disk - instead of every frame of every cloak, so the grid fills
+	 * in right away. The full animation is only decoded for the tile under the mouse and the worn/selected one. Static
+	 * cloaks just use their texture. Render thread; null until ready.
+	 */
+	public static Identifier stillIfReady(CapeDefinition definition) {
+		if (!definition.animated()) {
+			return textureIfReady(definition);
+		}
+		AnimatedCapeAsset full = AnimatedCapeAsset.existing(definition.id());
+		if (full != null) {
+			return full.identifier();
+		}
+		Identifier still = STILLS.get(definition.id());
+		if (still != null) {
+			return still;
+		}
+		if (STILL_LOADING.add(definition.id())) {
+			STILL_LOADER.submit(() -> {
+				try {
+					Path source = definition.bundleFile();
+					String key = source != null && Files.isRegularFile(source)
+							? Long.toHexString(Files.getLastModifiedTime(source).toMillis() ^ Files.size(source)) : "store";
+					Path cacheFile = net.veloclient.velo.config.VeloPaths.root().resolve("cache").resolve("game-cloak-stills")
+							.resolve(definition.id().replaceAll("[^a-zA-Z0-9_.-]", "_") + "-" + key + ".png");
+					byte[] png;
+					if (Files.isRegularFile(cacheFile)) {
+						png = Files.readAllBytes(cacheFile);
+					} else {
+						java.awt.image.BufferedImage first;
+						try (InputStream in = openAnimatedSource(definition)) {
+							first = GifDecoder.firstFrame(in);
+						}
+						java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+						javax.imageio.ImageIO.write(first, "png", out);
+						png = out.toByteArray();
+						Files.createDirectories(cacheFile.getParent());
+						Files.write(cacheFile, png);
+					}
+					NativeImage image = NativeImage.read(new java.io.ByteArrayInputStream(png));
+					MinecraftClient.getInstance().execute(() -> {
+						Identifier id = Identifier.of("velo-client", "cloak_still_" + definition.id().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_.-]", "_"));
+						noteTextureSize(id, image.getWidth(), image.getHeight());
+						MinecraftClient.getInstance().getTextureManager().registerTexture(id, new NativeImageBackedTexture(() -> definition.name(), image));
+						STILLS.put(definition.id(), id);
+					});
+				} catch (Throwable t) {
+					// no still: the tile falls back to the full animation
+					STILL_LOADING.remove(definition.id());
+					MinecraftClient.getInstance().execute(() -> STILLS.putIfAbsent(definition.id(), FALLBACK_TO_FULL));
+				}
+			});
+		}
+		return null;
+	}
+
+	/** Marker: no still could be made, use the animated texture. */
+	private static final Identifier FALLBACK_TO_FULL = Identifier.of("velo-client", "cloak_still_none");
+
+	/** For the Locker tiles: the still, or (hovered, worn, picked - or no still possible) the full animation. */
+	public static Identifier tileTexture(CapeDefinition definition, boolean animate) {
+		if (!definition.animated() || animate) {
+			Identifier full = textureIfReady(definition);
+			if (full != null || !definition.animated()) {
+				return full;
+			}
+		}
+		Identifier still = stillIfReady(definition);
+		if (still == FALLBACK_TO_FULL) {
+			return textureIfReady(definition);
+		}
+		return still;
+	}
+
 	private static NativeImage readBundleImage(CapeDefinition definition, String entryName) throws IOException {
 		try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(definition.bundleFile()))) {
 			ZipEntry entry;

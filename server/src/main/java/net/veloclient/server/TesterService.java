@@ -71,6 +71,19 @@ final class TesterService {
 		List<String> files = new ArrayList<>();
 		/** Owner's status: "open" / "fixed" / "wontfix" */
 		String status = "open";
+		/** What the tester said about where it happened (sent by the Tester window; any may be null). */
+		String os;
+		String minecraft;
+		String area;
+		/** The YouTrack issue ("VELO-12") once created, its state and public comments (synced), files already uploaded. */
+		String youtrack;
+		String ytState;
+		boolean ytResolved;
+		long ytUpdated;
+		List<YouTrack.Comment> ytComments = new ArrayList<>();
+		Set<String> ytFiles = new LinkedHashSet<>();
+		/** True when the tester hasn't seen the latest state / team comment yet. */
+		boolean unread;
 	}
 
 	static final class Stat {
@@ -117,11 +130,24 @@ final class TesterService {
 					if (data.reports == null) {
 						data.reports = new ArrayList<>();
 					}
+					for (Report r : data.reports) {
+						if (r.ytComments == null) {
+							r.ytComments = new ArrayList<>();
+						}
+						if (r.ytFiles == null) {
+							r.ytFiles = new LinkedHashSet<>();
+						}
+					}
 				}
 			} catch (RuntimeException e) {
 				System.out.println("[tester] couldn't read tester.json: " + e.getMessage());
 			}
 		}
+	}
+
+	/** Called once the server is up: imports reports that have no issue yet and starts the state sync. */
+	void startYouTrack() {
+		startSync();
 	}
 
 	private synchronized void save() {
@@ -422,7 +448,7 @@ final class TesterService {
 	private static final long MAX_ATTACHMENT = 200L * 1024 * 1024;
 	private static final int MAX_FILES = 12;
 	private static final java.util.regex.Pattern ATTACHMENT = java.util.regex.Pattern.compile(
-			"[A-Za-z0-9._ ()-]{1,100}\\.(png|jpe?g|gif|webp|bmp|mp4|webm|mov|mkv|txt|log|zip)", java.util.regex.Pattern.CASE_INSENSITIVE);
+			"[A-Za-z0-9._ ()-]{1,100}\\.(png|jpe?g|gif|webp|bmp|mp4|webm|mov|mkv|txt|log|zip|json|csv|md|toml|cfg|properties)", java.util.regex.Pattern.CASE_INSENSITIVE);
 
 	private Path reportDir(String id) {
 		return dir.resolve("reports").resolve(id);
@@ -453,6 +479,9 @@ final class TesterService {
 		r.title = clip(body.has("title") ? body.get("title").getAsString() : "", 160);
 		r.text = clip(body.has("text") ? body.get("text").getAsString() : "", 8000);
 		r.at = System.currentTimeMillis();
+		r.os = optional(body, "os", 40);
+		r.minecraft = optional(body, "minecraft", 20);
+		r.area = optional(body, "area", 40);
 		Path rd = reportDir(r.id);
 		Files.createDirectories(rd);
 		for (String log : List.of("launcherLog", "gameLog", "updateLog")) {
@@ -475,7 +504,226 @@ final class TesterService {
 		}
 		save();
 		System.out.println("[tester] report " + r.id + " from " + name + " (" + type + (r.item != null ? " " + r.item : "") + "): " + r.title);
+		toYouTrack(r);
 		return r;
+	}
+
+	private static String optional(JsonObject body, String key, int max) {
+		return body.has(key) && !body.get(key).isJsonNull() && !body.get(key).getAsString().isBlank() ? clip(body.get(key).getAsString().trim(), max) : null;
+	}
+
+	// ---- YouTrack (project VELO): issue per report, files attached, state + comments back ----
+
+	/** One queue for every YouTrack call: in order, never two uploads of one report at once. */
+	private final java.util.concurrent.ExecutorService youtrackQueue = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+		Thread t = new Thread(r, "velo-youtrack");
+		t.setDaemon(true);
+		return t;
+	});
+	private volatile boolean syncStarted;
+
+	private void toYouTrack(Report r) {
+		if (!YouTrack.enabled()) {
+			return;
+		}
+		startSync();
+		youtrackQueue.submit(() -> {
+			try {
+				if (r.youtrack == null) {
+					String type = switch (r.type) {
+						case "suggestion" -> "Suggestion";
+						default -> r.title.toLowerCase(java.util.Locale.ROOT).contains("crash") ? "Crash" : "Bug";
+					};
+					Map<String, String> enums = new LinkedHashMap<>();
+					enums.put("Type", type);
+					enums.put("Source", r.item != null ? "Test Plan" : "Tester Window");
+					enums.put("Platform", platform(r.os));
+					enums.put("Minecraft", r.minecraft);
+					enums.put("Subsystem", r.area);
+					Map<String, String> texts = new LinkedHashMap<>();
+					texts.put("Tester", r.name);
+					texts.put("Tester UUID", r.uuid);
+					texts.put("Test Item", r.item);
+					texts.put("Velo Build", r.version);
+					texts.put("Velo Report", r.id);
+					String summary = r.title == null || r.title.isBlank() ? (r.item != null ? "Broken: " + r.item : "Report from " + r.name) : r.title;
+					String id = YouTrack.create(summary, description(r), enums, texts, List.of("tester"));
+					synchronized (this) {
+						r.youtrack = id;
+						r.ytState = "New";
+						save();
+					}
+					System.out.println("[youtrack] " + r.id + " -> " + id);
+				}
+				uploadFiles(r);
+			} catch (Exception e) {
+				System.out.println("[youtrack] report " + r.id + " failed: " + e.getMessage());
+			}
+		});
+	}
+
+	private void uploadFiles(Report r) {
+		if (r.youtrack == null) {
+			return;
+		}
+		List<String> files;
+		synchronized (this) {
+			files = new ArrayList<>(r.files);
+			files.removeAll(r.ytFiles);
+		}
+		for (String name : files) {
+			Path file = reportDir(r.id).resolve(name);
+			if (!Files.isRegularFile(file)) {
+				continue;
+			}
+			try {
+				YouTrack.attach(r.youtrack, file);
+				String n = name.toLowerCase(java.util.Locale.ROOT);
+				if (n.matches(".*\\.(mp4|webm|mov|mkv)")) {
+					YouTrack.tag(r.youtrack, "has-video");
+				} else if (n.matches(".*\\.(png|jpe?g|gif|webp|bmp)")) {
+					YouTrack.tag(r.youtrack, "has-screenshot");
+				} else if (n.endsWith(".log")) {
+					YouTrack.tag(r.youtrack, "has-logs");
+					if (n.equals("game.log")) {
+						String log = Files.readString(file, StandardCharsets.UTF_8);
+						YouTrack.tag(r.youtrack, log.contains("Vulkan") ? "vulkan" : "opengl");
+						String low = log.toLowerCase(java.util.Locale.ROOT);
+						for (String mod : List.of("sodium", "iris", "essential")) {
+							if (low.contains(mod)) {
+								YouTrack.tag(r.youtrack, mod);
+							}
+						}
+					}
+				}
+				synchronized (this) {
+					r.ytFiles.add(name);
+					save();
+				}
+			} catch (IOException e) {
+				System.out.println("[youtrack] " + r.youtrack + " file " + name + ": " + e.getMessage());
+			}
+		}
+	}
+
+	private static String platform(String os) {
+		if (os == null) {
+			return null;
+		}
+		String o = os.toLowerCase(java.util.Locale.ROOT);
+		return o.contains("win") ? "Windows" : o.contains("mac") || o.contains("darwin") ? "macOS" : o.contains("linux") ? "Linux" : null;
+	}
+
+	private static String description(Report r) {
+		StringBuilder sb = new StringBuilder();
+		sb.append(r.text == null || r.text.isBlank() ? "_No description._" : r.text).append("\n\n---\n\n");
+		sb.append("| | |\n|---|---|\n");
+		sb.append("| **Tester** | ").append(r.name).append(" |\n");
+		sb.append("| **Build** | ").append(r.version).append(" |\n");
+		if (r.item != null) {
+			sb.append("| **Test item** | ").append(r.item).append(" |\n");
+		}
+		if (r.os != null) {
+			sb.append("| **System** | ").append(r.os).append(" |\n");
+		}
+		if (r.minecraft != null) {
+			sb.append("| **Minecraft** | ").append(r.minecraft).append(" |\n");
+		}
+		sb.append("| **Report** | `").append(r.id).append("` |\n\n");
+		sb.append("Screenshots, videos and the launcher / game / update logs are attached. Public comments are shown to the tester "
+				+ "in their Tester window - use a comment visible to a group for team-only notes.");
+		return sb.toString();
+	}
+
+	/** Every 2 minutes: state + public comments of the open reports' issues (and resolved ones for a week after). */
+	private void startSync() {
+		if (syncStarted || !YouTrack.enabled()) {
+			return;
+		}
+		syncStarted = true;
+		Thread.ofVirtual().name("velo-youtrack-sync").start(() -> {
+			boolean first = true;
+			while (true) {
+				try {
+					Thread.sleep(first ? 15_000 : 120_000);
+					first = false;
+					List<Report> open;
+					synchronized (this) {
+						long weekAgo = System.currentTimeMillis() - 7L * 24 * 3600_000;
+						open = data.reports.stream().filter(x -> x.youtrack != null && (!x.ytResolved || x.ytUpdated > weekAgo)).toList();
+						for (Report x : data.reports) {
+							if (x.youtrack == null || !x.files.stream().allMatch(x.ytFiles::contains)) {
+								toYouTrack(x);   // a report or file that didn't make it earlier (YouTrack down, restart)
+							}
+						}
+					}
+					for (Report x : open) {
+						youtrackQueue.submit(() -> refresh(x));
+					}
+				} catch (InterruptedException e) {
+					return;
+				} catch (RuntimeException e) {
+					System.out.println("[youtrack] sync: " + e.getMessage());
+				}
+			}
+		});
+	}
+
+	private void refresh(Report r) {
+		try {
+			YouTrack.Status st = YouTrack.status(r.youtrack);
+			synchronized (this) {
+				boolean changed = !st.state().equals(r.ytState) || st.comments().size() != r.ytComments.size();
+				if (changed) {
+					boolean newTeamWord = st.comments().stream().filter(c -> !c.tester()).count()
+							> r.ytComments.stream().filter(c -> !c.tester()).count();
+					r.unread = r.unread || newTeamWord || r.ytState != null && !st.state().equals(r.ytState);
+					r.ytState = st.state();
+					r.ytResolved = st.resolved();
+					r.ytUpdated = st.updated();
+					r.ytComments = new ArrayList<>(st.comments());
+					r.status = st.resolved() ? (st.state().equals("Won't Fix") || st.state().equals("Duplicate") || st.state().equals("Can't Reproduce")
+							? "wontfix" : "fixed") : "open";
+					save();
+				}
+			}
+		} catch (IOException e) {
+			System.out.println("[youtrack] refresh " + r.youtrack + ": " + e.getMessage());
+		}
+	}
+
+	/** The tester's own reports, newest first (with YouTrack state + public comments); marks them read. */
+	synchronized List<Report> myReports(String uuid, boolean markRead) {
+		String me = key(uuid);
+		List<Report> out = data.reports.stream().filter(x -> me.equals(x.uuid)).toList();
+		if (markRead && out.stream().anyMatch(x -> x.unread)) {
+			out.forEach(x -> x.unread = false);
+			save();
+		}
+		return out;
+	}
+
+	/** A tester's reply on their own report: a YouTrack comment (marked as theirs), shown right away. */
+	void reply(String uuid, String name, String reportId, String text) throws IOException {
+		Report r;
+		synchronized (this) {
+			r = data.reports.stream().filter(x -> x.id.equals(reportId) && x.uuid.equals(key(uuid))).findFirst().orElse(null);
+			if (r == null) {
+				throw new IllegalArgumentException("No such report");
+			}
+			if (r.youtrack == null) {
+				throw new IllegalArgumentException("Still sending this report - try again in a minute");
+			}
+		}
+		String clean = clip(text.strip(), 4000);
+		if (clean.isEmpty()) {
+			throw new IllegalArgumentException("Write something first");
+		}
+		YouTrack.comment(r.youtrack, YouTrack.TESTER_MARK + "**" + name + "** (tester) wrote:\n" + clean);
+		synchronized (this) {
+			r.ytComments.add(new YouTrack.Comment("local-" + System.nanoTime(), "You", clean, System.currentTimeMillis(), true));
+			save();
+		}
 	}
 
 	/** A screenshot / video / file for one of the tester's own reports, streamed to disk. */
@@ -487,7 +735,7 @@ final class TesterService {
 				throw new IllegalArgumentException("No such report");
 			}
 			if (fileName == null || !ATTACHMENT.matcher(fileName).matches() || fileName.contains("..")) {
-				throw new IllegalArgumentException("Pictures, videos, logs or zips only");
+				throw new IllegalArgumentException("Pictures, videos, logs, text files or zips only");
 			}
 			if (r.files.size() >= MAX_FILES) {
 				throw new IllegalArgumentException("Too many files on this report");
@@ -517,6 +765,9 @@ final class TesterService {
 			}
 			save();
 		}
+		if (YouTrack.enabled()) {
+			youtrackQueue.submit(() -> uploadFiles(r));
+		}
 		return total;
 	}
 
@@ -534,6 +785,21 @@ final class TesterService {
 			if (r.id.equals(id)) {
 				r.status = status;
 				save();
+				if (r.youtrack != null && YouTrack.enabled()) {
+					String state = switch (status) {
+						case "fixed" -> "Fixed";
+						case "wontfix" -> "Won't Fix";
+						default -> "Confirmed";
+					};
+					youtrackQueue.submit(() -> {
+						try {
+							YouTrack.setState(r.youtrack, state);
+							refresh(r);
+						} catch (IOException e) {
+							System.out.println("[youtrack] state " + r.youtrack + ": " + e.getMessage());
+						}
+					});
+				}
 				return true;
 			}
 		}

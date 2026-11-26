@@ -66,27 +66,31 @@ public final class HudLook {
 	}
 	*///?}
 
-	private static final java.util.Map<String, Text> TEXTS = new java.util.HashMap<>();
+	// one map per kind, keyed by the string itself (a "kind + s" key built a new String on every lookup)
+	private static final java.util.Map<String, Text> VALUE_TEXTS = new java.util.HashMap<>();
+	private static final java.util.Map<String, Text> LABEL_TEXTS = new java.util.HashMap<>();
 	private static final java.util.Map<Text, Prepared> PREPARED = new java.util.IdentityHashMap<>();
 	private static String preparedFont = "";
 
 	private static final boolean NO_TEXT_CACHE = Boolean.getBoolean("velo.noHudTextCache");
 
-	private static Text shared(char kind, String s, java.util.function.Supplier<Text> make) {
+	private static Text shared(boolean value, String s) {
 		if (NO_TEXT_CACHE) {
-			return make.get();
+			return value ? makeValue(s) : makeLabel(s);
 		}
 		String f = font();
-		if (!f.equals(preparedFont) || TEXTS.size() > 2048) {
+		if (!f.equals(preparedFont) || VALUE_TEXTS.size() + LABEL_TEXTS.size() > 2048) {
 			// a new HUD font, or a lot of one-off strings (timers, coordinates): start over
-			TEXTS.clear();
+			VALUE_TEXTS.clear();
+			LABEL_TEXTS.clear();
 			PREPARED.clear();
 			preparedFont = f;
 		}
-		Text text = TEXTS.get(kind + s);
+		java.util.Map<String, Text> texts = value ? VALUE_TEXTS : LABEL_TEXTS;
+		Text text = texts.get(s);
 		if (text == null) {
-			text = make.get();
-			TEXTS.put(kind + s, text);
+			text = value ? makeValue(s) : makeLabel(s);
+			texts.put(s, text);
 			PREPARED.put(text, null);
 		}
 		return text;
@@ -112,16 +116,24 @@ public final class HudLook {
 
 	/** A value in the HUD font, bold. */
 	public static Text value(String s) {
-		return shared('v', s, () -> preview(font(), s));
+		return shared(true, s);
+	}
+
+	private static Text makeValue(String s) {
+		return preview(font(), s);
 	}
 
 	/** Secondary text (units, names) in the HUD font (Inter next to Sora, as before). */
 	public static Text label(String s) {
-		return shared('l', s, () -> switch (font()) {
+		return shared(false, s);
+	}
+
+	private static Text makeLabel(String s) {
+		return switch (font()) {
 			case "Inter", "Sora" -> MenuKit.ui(s);
 			case "Minecraft" -> Text.literal(s);
 			default -> preview(font(), s);
-		});
+		};
 	}
 
 	private static Text inHudFont(Text t) {

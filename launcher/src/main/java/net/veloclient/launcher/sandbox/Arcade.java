@@ -893,6 +893,13 @@ public final class Arcade extends StackPane {
 		return button;
 	}
 
+	/** Takes the whole window (no-op when it already does). */
+	public void enterFullscreen() {
+		if (!fullscreen) {
+			toggleFullscreen();
+		}
+	}
+
 	private void toggleFullscreen() {
 		fullscreen = !fullscreen;
 		audio.play(fullscreen ? "open" : "close");

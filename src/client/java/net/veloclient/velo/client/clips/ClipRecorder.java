@@ -102,7 +102,10 @@ public final class ClipRecorder {
 	}
 	private static volatile int seconds = 30;
 	private static volatile float quality = 0.75f;
-	private static long nextCaptureNanos;
+	/** Fixed capture grid (as in Clips Pro): slot n starts at origin + n/fps; 0 = not started. */
+	private static long gridOrigin;
+	private static int gridFps;
+	private static long lastSlot = -1;
 	private static long bufferedBytes;
 	private static final ThreadLocal<byte[][]> SCRATCH = ThreadLocal.withInitial(() -> new byte[][] {new byte[0]});
 	private static final ThreadLocal<ImageWriter> JPEG_WRITER = ThreadLocal.withInitial(() -> ImageIO.getImageWritersByFormatName("jpeg").next());
@@ -165,22 +168,27 @@ public final class ClipRecorder {
 			return;
 		}
 		long now = System.nanoTime();
-		if (now < nextCaptureNanos) {
+		int rate = fps;
+		if (gridOrigin == 0 || gridFps != rate || now - gridOrigin < 0) {
+			gridOrigin = now;
+			gridFps = rate;
+			lastSlot = -1;
+		}
+		long slot = (now - gridOrigin) * rate / 1_000_000_000L;
+		if (slot <= lastSlot) {
 			return;
 		}
+		lastSlot = slot;   // one count per due frame, not per rendered one
 		if (QUEUED.get() >= 4) {
-			long skip = 1_000_000_000L / fps;
-			nextCaptureNanos = Math.max(nextCaptureNanos + skip, now - skip);   // one count per due frame, not per rendered one
 			track(false, now);
 			return;
 		}
 		track(true, now);
-		long interval = 1_000_000_000L / fps;
-		nextCaptureNanos = Math.max(nextCaptureNanos + interval, now - interval);
 		try {
 			// The frame's time is when it was shown (now), not when its GPU copy arrived a frame or two later - stamping it
 			// on arrival made the gaps between frames jitter, which the saved clip played back as stutter.
-			final long stamp = now;
+			// stamped with its slot's exact time: the save step maps slots 1:1 (a drifting phase made it skip and repeat)
+			final long stamp = gridOrigin + slot * 1_000_000_000L / rate;
 			FrameGrabber.grab((rgba, width, height) -> {
 				QUEUED.incrementAndGet();
 				ENCODER.execute(() -> {

@@ -558,7 +558,7 @@ public final class OwnerScreen extends VeloWindow {
 			}
 			VeloDraw.fillRounded(context, x + 6, ry + 4, 10, 10, 3, on ? MenuKit.accent() : 0x1FFFFFFF);
 			if (on) {
-				MenuKit.icon(context, "check", x + 7, ry + 5, 8, MenuKit.onAccent());
+				MenuKit.icon(context, "d_check", x + 7, ry + 5, 8, MenuKit.onAccent());
 			}
 			StoreItems.drawArt(context, id, x + 21, ry + 1, rowH - 2);
 			MenuKit.text(context, this.textRenderer, MenuKit.fit(this.textRenderer, MenuKit.uiBold(str(item, "name", id)), w - 130), x + 23 + rowH, ry + 5, MenuKit.TEXT);

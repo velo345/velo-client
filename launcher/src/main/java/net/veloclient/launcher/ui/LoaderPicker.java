@@ -35,10 +35,17 @@ final class LoaderPicker {
 
 	static Label chip(Instance instance, Runnable changed) {
 		GameVersion version = GameVersion.byId(instance.mcVersion());
-		Label chip = new Label("Fabric " + LoaderVersions.forInstance(instance.id(), version));
-		chip.getStyleClass().addAll("badge", "badge-grey", "badge-mono", "badge-clickable");
-		chip.setGraphic(Icons.icon("chevron-down", 11, Color.web("#A9A9B3"), 2.2));
-		chip.setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
+		// 2026-11-25 design chip: "FABRIC" small, the version, a chevron
+		Label kind = new Label("FABRIC");
+		kind.getStyleClass().add("chip-kind");
+		Label number = new Label(LoaderVersions.forInstance(instance.id(), version));
+		number.getStyleClass().add("chip-value");
+		HBox content = new HBox(6, kind, number, Icons.icon("chevron-down", 12, Color.WHITE, 2.4));
+		content.setAlignment(Pos.CENTER_LEFT);
+		Label chip = new Label();
+		chip.setGraphic(content);
+		chip.getStyleClass().add("header-chip");
+		chip.getProperties().put("velo.value", number);
 		Tooltip.install(chip, new Tooltip("Fabric Loader for this profile - click to pick another build"));
 		chip.setOnMouseClicked(e -> open(chip, instance, version, changed));
 		return chip;
@@ -56,8 +63,74 @@ final class LoaderPicker {
 		Label note = new Label("Applies on the next start. Velo is tested with " + version.fabricLoaderVersion() + ".");
 		note.getStyleClass().add("t-muted");
 		note.setWrapText(true);
-		VBox content = new VBox(6, header, scroll, note);
-		Popup popup = Popover.show(chip, content, Popover.Side.BELOW_RIGHT, 300);
+		// Fabric API below the loader: the version in this profile, newer and older builds to switch to
+		Label apiHeader = new Label("FABRIC API");
+		apiHeader.getStyleClass().add("version-menu-header");
+		VBox apiList = new VBox(2);
+		apiList.getChildren().add(Skeleton.list(2));
+		VBox content = new VBox(6, header, scroll, note, apiHeader, apiList);
+		Popup popup = Popover.show(chip, content, Popover.Side.BELOW_LEFT, 320);
+		java.nio.file.Path modsDir = net.veloclient.launcher.instance.InstancePaths.modsDir(instance.id());
+		String installedApi = installedFabricApi(modsDir);
+		CompletableFuture.supplyAsync(() -> {
+			try {
+				return net.veloclient.launcher.modrinth.ModrinthClient.versions("fabric-api", instance.mcVersion(), "mod");
+			} catch (Exception ex) {
+				return null;
+			}
+		}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(versions -> Platform.runLater(() -> {
+			apiList.getChildren().clear();
+			if (versions == null || versions.isEmpty()) {
+				Label none = new Label(versions == null ? "Couldn't reach Modrinth" : "No Fabric API for " + instance.mcVersion());
+				none.getStyleClass().add("t-muted");
+				apiList.getChildren().add(none);
+				return;
+			}
+			for (int i = 0; i < Math.min(5, versions.size()); i++) {
+				var v = versions.get(i);
+				String number = v.versionNumber();
+				boolean isCurrent = installedApi != null && number.startsWith(installedApi.split("\\+")[0]) && installedApi.startsWith(number.split("\\+")[0]);
+				Label label = new Label(number);
+				label.getStyleClass().add("version-menu-number");
+				HBox.setHgrow(label, Priority.ALWAYS);
+				label.setMaxWidth(Double.MAX_VALUE);
+				HBox row = new HBox(8, label);
+				row.setAlignment(Pos.CENTER_LEFT);
+				row.getStyleClass().add("version-menu-row");
+				if (i == 0) {
+					row.getChildren().add(tag("Newest", "version-tag-newest"));
+				}
+				if (isCurrent) {
+					row.getStyleClass().add("version-menu-row-current");
+					row.getChildren().add(Icons.icon("check", 16, Color.web("#7dd3a0"), 2.4));
+				}
+				row.setOnMouseClicked(e -> {
+					if (isCurrent) {
+						return;
+					}
+					popup.hide();
+					Toasts.show(chip, "Getting Fabric API " + number + "...");
+					Thread.ofVirtual().start(() -> {
+						try {
+							var file = v.primaryFile().orElseThrow();
+							java.nio.file.Path temp = modsDir.resolve(".velo-download-" + file.filename() + ".part");
+							java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder().followRedirects(java.net.http.HttpClient.Redirect.NORMAL).build();
+							client.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(file.url())).build(), java.net.http.HttpResponse.BodyHandlers.ofFile(temp));
+							try (var old = java.nio.file.Files.list(modsDir)) {
+								for (java.nio.file.Path p : old.filter(f -> f.getFileName().toString().startsWith("fabric-api-") && f.getFileName().toString().endsWith(".jar")).toList()) {
+									java.nio.file.Files.deleteIfExists(p);
+								}
+							}
+							java.nio.file.Files.move(temp, modsDir.resolve(file.filename()), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+							Platform.runLater(() -> Toasts.show(chip, "Fabric API " + number + " - used from the next start"));
+						} catch (Exception ex) {
+							Platform.runLater(() -> Toasts.show(chip, "Couldn't change Fabric API: " + ex.getMessage()));
+						}
+					});
+				});
+				apiList.getChildren().add(row);
+			}
+		}));
 		String current = LoaderVersions.forInstance(instance.id(), version);
 		CompletableFuture.supplyAsync(() -> {
 			try {
@@ -85,7 +158,9 @@ final class LoaderPicker {
 					}
 					try {
 						LoaderVersions.set(instance.id(), version, build.version());
-						chip.setText("Fabric " + build.version());
+						if (chip.getProperties().get("velo.value") instanceof Label value) {
+							value.setText(build.version());
+						}
 						Toasts.show(chip, "Fabric Loader " + build.version() + " - used from the next start");
 						if (changed != null) {
 							changed.run();
@@ -138,5 +213,15 @@ final class LoaderPicker {
 		Label tag = new Label(text);
 		tag.getStyleClass().addAll("version-tag-pill", style);
 		return tag;
+	}
+
+	/** The Fabric API version in a mods folder ("0.139.2+26.2"), from its file name; null when there is none. */
+	private static String installedFabricApi(java.nio.file.Path modsDir) {
+		try (var files = java.nio.file.Files.list(modsDir)) {
+			return files.map(p -> p.getFileName().toString()).filter(n -> n.startsWith("fabric-api-") && n.endsWith(".jar"))
+					.map(n -> n.substring("fabric-api-".length(), n.length() - 4)).findFirst().orElse(null);
+		} catch (java.io.IOException e) {
+			return null;
+		}
 	}
 }

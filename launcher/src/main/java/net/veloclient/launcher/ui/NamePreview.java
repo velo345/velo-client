@@ -33,6 +33,9 @@ final class NamePreview extends Canvas {
 				return;
 			}
 			for (NamePreview preview : java.util.List.copyOf(LIVE)) {
+				if (preview.hoverOnly && !preview.hovered()) {
+					continue;
+				}
 				preview.draw();
 			}
 		}
@@ -41,6 +44,8 @@ final class NamePreview extends Canvas {
 	private static final String[] FAMILIES = new String[NameStyle.FONTS.length];
 
 	private final Supplier<NameStyle> style;
+	/** Small tiles: drawn still, animated only while the mouse is over the tile. */
+	private boolean hoverOnly;
 	private final String name;
 	private final double size;
 
@@ -85,6 +90,22 @@ final class NamePreview extends Canvas {
 	static String family(int font) {
 		loadFonts();
 		return FAMILIES[Math.max(0, Math.min(FAMILIES.length - 1, font))];
+	}
+
+	NamePreview hoverOnly() {
+		hoverOnly = true;
+		return this;
+	}
+
+	private boolean hovered() {
+		// the preview itself or the tile right around it - never the whole grid
+		javafx.scene.Node node = this;
+		for (int i = 0; i < 2 && node != null; i++, node = node.getParent()) {
+			if (node.isHover()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private void draw() {

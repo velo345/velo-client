@@ -106,21 +106,25 @@ public final class ClipPlayerPanel {
 		} else if (!p.playing()) {
 			// Big play button over a paused picture.
 			float a = hover[0] = VeloAnim.step(hover[0], overVideo ? 1 : 0, dt * 8);
-			int r = 20 + Math.round(a * 2);
-			VeloDraw.fillCircle(context, areaX + areaW / 2, areaY + areaH / 2, r, VeloAnim.lerpArgb(0xB0000000, MenuKit.accent(), a));
-			MenuKit.icon(context, "play", areaX + areaW / 2 - 9, areaY + areaH / 2 - 10, 20, 0xFFFFFFFF);
+			// a dark glass disc with a light rim; hover fills it with the accent (icon in the accent's own text colour, so a
+			// white accent never hides it - owner 2026-11-25)
+			int r = 24 + Math.round(a * 2);
+			int pcx = areaX + areaW / 2, pcy = areaY + areaH / 2;
+			VeloDraw.fillCircle(context, pcx, pcy, r, VeloAnim.lerpArgb(0xA8101014, MenuKit.accent() | 0xFF000000, a));
+			VeloDraw.strokeArc(context, pcx, pcy, r - 0.5f, 1f, 0f, 360f, VeloUi.withAlpha(0xFFFFFFFF, Math.round(0x40 * (1 - a))));
+			MenuKit.icon(context, "play", pcx - 8, pcy - 10, 20, a > 0.5f ? net.veloclient.velo.client.gui.widget.VeloStyle.onAccent() : 0xFFFFFFFF);
 		}
 
 		// ---- Control row ----
 		barY = y + h - BAR_H;
-		VeloDraw.fillRounded(context, x, barY, w, BAR_H, 8, 0xE6141419);
-		VeloDraw.strokeRounded(context, x, barY, w, BAR_H, 8, 0x1FFFFFFF);
+		VeloDraw.fillRounded(context, x, barY, w, BAR_H, BAR_H / 2, 0xE6141419);
+		VeloDraw.strokeRounded(context, x, barY, w, BAR_H, BAR_H / 2, 0x1FFFFFFF);
 		int cy = barY + BAR_H / 2;
 		playX = x + 6;
 		boolean overPlay = VeloUi.inside(mouseX, mouseY, playX, barY + 4, 22, 22);
 		hover[1] = VeloAnim.step(hover[1], overPlay ? 1 : 0, dt * 10);
-		VeloDraw.fillCircle(context, playX + 11, cy, 11, VeloAnim.lerpArgb(MenuKit.accent() & 0xD0FFFFFF, MenuKit.accent(), hover[1]));
-		MenuKit.icon(context, p != null && p.playing() ? "pause" : "play", playX + 5, cy - 6, 12, 0xFFFFFFFF);
+		VeloDraw.fillCircle(context, playX + 11, cy, 11, VeloAnim.lerpArgb(MenuKit.accent() & 0xD0FFFFFF, MenuKit.accent() | 0xFF000000, hover[1]));
+		MenuKit.icon(context, p != null && p.playing() ? "pause" : "play", playX + 5, cy - 6, 12, net.veloclient.velo.client.gui.widget.VeloStyle.onAccent());
 
 		double duration = p == null ? 0 : p.duration();
 		double position = p == null ? 0 : p.position();

@@ -89,7 +89,9 @@ final class NewsCarousel extends StackPane {
 	}
 
 	private Button arrow(String glyph, int step) {
-		Button button = new Button(glyph);
+		// a glass circle with a clean chevron (the text glyph sat off-centre)
+		Button button = new Button();
+		button.setGraphic(Icons.icon(step < 0 ? "chevron-left" : "chevron-right", 18, javafx.scene.paint.Color.WHITE, 2.4));
 		button.getStyleClass().add("news-carousel-arrow");
 		button.setOnAction(e -> show(index + step, step));
 		return button;
@@ -159,12 +161,7 @@ final class NewsCarousel extends StackPane {
 		when.getStyleClass().add("news-slide-date");
 		HBox meta = new HBox(8, tag, when);
 		meta.setAlignment(Pos.CENTER_LEFT);
-		String version = NewsUi.str(post, "version");
-		if (version != null && !version.isBlank()) {
-			Label v = new Label("v" + version.replaceFirst("^v", ""));
-			v.getStyleClass().add("news-version");
-			meta.getChildren().add(1, v);
-		}
+		// no "v1.5.0" chip: an update post already names its version in the title (owner, 2026-11-25)
 
 		Label title = new Label(NewsUi.str(post, "title"));
 		title.getStyleClass().add(compact ? "news-slide-title-compact" : "news-slide-title");

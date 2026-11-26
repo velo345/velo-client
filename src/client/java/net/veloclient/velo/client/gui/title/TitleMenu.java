@@ -71,6 +71,9 @@ public final class TitleMenu {
 		return widget instanceof ClickableWidget w && RESTYLED.contains(w);
 	}
 
+	/** While the Play Deck shows: where its account pill is ({x, y}) - the account list opens above it. */
+	public static int[] deckAccountAnchor;
+	private static HotspotButton accountPill;
 	private static HotspotButton storeRow;
 	private static HotspotButton jumpCard;
 	private static HotspotButton storeCard;
@@ -120,9 +123,15 @@ public final class TitleMenu {
 			client.setScreen(new StoreScreen(screen));
 		});
 		friends = new HotspotButton(Text.literal("Friends"), () -> client.setScreen(new FriendsScreen(screen)));
+		accountPill = new HotspotButton(Text.literal("Account"), () -> {
+			if (net.veloclient.velo.devbuild.accounts.AccountSwitcher.toggle()) {
+				return;
+			}
+			client.setScreen(new FriendsScreen(screen));   // no account switcher on this version: your friends
+		});
 		discoverRow = new HotspotButton(Text.literal("Discover"),
 				() -> client.setScreen(net.veloclient.velo.client.gui.WorldHostScreen.discover(screen)));
-		List<ClickableWidget> out = new ArrayList<>(List.of(storeRow, jumpCard, storeCard, friends, discoverRow));
+		List<ClickableWidget> out = new ArrayList<>(List.of(storeRow, jumpCard, storeCard, friends, discoverRow, accountPill));
 		PROXIES.clear();
 		for (String key : MAIN_KEYS) {
 			if (!key.startsWith("$")) {
@@ -164,7 +173,7 @@ public final class TitleMenu {
 	private static int missingFrames;
 
 	private static boolean ready() {
-		return jumpCard != null && storeRow != null && storeCard != null && friends != null && discoverRow != null;
+		return jumpCard != null && storeRow != null && storeCard != null && friends != null && discoverRow != null && accountPill != null;
 	}
 
 	/**
@@ -220,6 +229,10 @@ public final class TitleMenu {
 
 	private static void renderMenu(DrawContext context, int width, int height, int mouseX, int mouseY, Env env) {
 		net.veloclient.velo.client.sound.VeloUiSounds.gameLoaded();
+		deckAccountAnchor = null;
+		if (accountPill != null) {
+			accountPill.place(0, 0, 0, 0, false);
+		}
 		TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
 		for (ClickableWidget widget : RESTYLED) {
 			widget.visible = true;
@@ -342,6 +355,10 @@ public final class TitleMenu {
 		// ---- Layout ----
 		// Velo+ Customize: alignment, free offsets per part, word size/font/colours and button style (ScreenLook).
 		ScreenLook.Title look = ScreenLook.title();
+		if (deck(look)) {
+			renderDeck(context, renderer, width, height, mouseX, mouseY, env, byKey, modsRow, modRows, icons, essential, open);
+			return;
+		}
 		String align = look.align;
 		// Essential's side menu sits at the right edge: a right-aligned menu leaves it room.
 		int rightEdge = width - margin - (essential && align.equals("right") ? 44 : 0);
@@ -550,6 +567,364 @@ public final class TitleMenu {
 			drawStoreCard(context, renderer, scX, scY, scW, scH, MenuKit.hover(storeCard, hovered(mouseX, mouseY, storeCard)));
 			context.getMatrices().popMatrix();
 		}
+	}
+
+	// ---- "Play Deck" (2026-11-25, owner-approved design E): the default title screen ----
+
+	/**
+	 * The deck is the title screen unless Customize changed the menu's layout (alignment, button style, size, font,
+	 * colours, moved parts) - then the classic column with those settings.
+	 */
+	public static boolean deck(ScreenLook.Title look) {
+		// 2026-11-25: the deck is THE title screen; Customize now only changes its background, colours and font (the old
+		// layout options - alignment, moved parts, button styles - are gone from the launcher)
+		return true;
+	}
+
+	/** Customize (Velo+): the deck's font (null = Velo's own) and text colour (-1 = white), set each frame. */
+	private static String deckFontId;
+	private static int deckTextColor = -1;
+
+	private static Text deckLabel(String s) {
+		return deckFontId != null ? MenuKit.inNamedFont(s, deckFontId) : MenuKit.uiBold(s);
+	}
+
+	private static int deckText(int fallback) {
+		return deckTextColor >= 0 ? 0xFF000000 | deckTextColor : fallback;
+	}
+
+	private record Segment(ClickableWidget widget, String label, String icon) {
+	}
+
+	/** A main menu button as the deck clicks it (with Essential: our proxy, the real one stays its anchor). */
+	private static ClickableWidget deckButton(Map<String, ClickableWidget> byKey, String key, boolean essential) {
+		ClickableWidget widget = byKey.get(key);
+		if (widget == null) {
+			return null;
+		}
+		HotspotButton proxy = PROXIES.get(key);
+		if (essential && proxy != null) {
+			RESTYLED.remove(widget);
+			return proxy.forwardTo(widget);
+		}
+		return widget;
+	}
+
+	/**
+	 * Where UI-font text goes so its capitals sit in the middle of a box {@code h} tall at {@code y}: the glyphs start a
+	 * little above the draw y and the capitals are ~5.3 GUI px (measured on a 3x screenshot, 2026-11-25) - the plain
+	 * (h - 8) / 2 put every label ~2 px above its icon.
+	 */
+	private static int deckTextY(int y, int h) {
+		return y + Math.round(h / 2f - 2.4f);
+	}
+
+	private static void deckPlace(ClickableWidget widget, int x, int y, int w, int h) {
+		if (widget == null) {
+			return;
+		}
+		if (widget instanceof HotspotButton hotspot) {
+			hotspot.place(x, y, w, h, true);
+			return;
+		}
+		widget.setX(x);
+		widget.setY(y);
+		widget.setWidth(w);
+		widget.setHeight(h);
+		RESTYLED.add(widget);
+	}
+
+	/**
+	 * Centred: the logo, a slim "Continue" strip for your last server (with Play), Singleplayer and Multiplayer as two
+	 * light glass buttons, every other place (Realms, Mods, mods' own buttons, Store, Discover) as one segment bar,
+	 * Options and Quit side by side, the small icon buttons under them, you + friends bottom-left, versions bottom-right.
+	 */
+	private static void renderDeck(DrawContext context, TextRenderer renderer, int width, int height, int mouseX, int mouseY, Env env,
+			Map<String, ClickableWidget> byKey, Row modsRow, List<Row> modRows, List<Icon> icons, boolean essential, float open) {
+		boolean large = height >= 320;
+		ScreenLook.Title customLook = ScreenLook.title();
+		deckFontId = ScreenLook.fontId(customLook.font);
+		deckTextColor = customLook.color;
+		int colW = Math.min(width - 24, clamp(Math.round(width * 0.56f), 236, large ? 420 : 372));
+		int x0 = (width - colW) / 2;
+		int gap = large ? 7 : 5;
+		int logo = large ? 30 : 22;
+		Text brandText = large ? MenuKit.displayLg("VELO") : MenuKit.display("VELO");
+		int brandH = logo + 6 + (large ? 16 : MenuKit.H_DISPLAY);
+		int contH = large ? 34 : 26;
+		int rowH = large ? 30 : 23;
+		int segH = large ? 26 : 20;
+		int optH = large ? 26 : 21;
+		int iconS = large ? 20 : 16;
+		int pillH = large ? 30 : 24;
+		int bottomReserve = pillH + 16;
+
+		LastServer.Entry last = LastServer.get();
+		boolean showCont = last != null && LastServer.reachable(last);
+		boolean showBrand = true;
+		boolean brandWords = true;
+		int[] parts = new int[1];
+		for (int attempt = 0; attempt < 4; attempt++) {
+			int t = (showBrand ? (brandWords ? brandH : logo) + (large ? 16 : 10) : 0) + (showCont ? contH + gap + 2 : 0)
+					+ rowH + gap + segH + gap + optH + gap + 2 + iconS;
+			parts[0] = t;
+			if (t <= height - bottomReserve - 12) {
+				break;
+			}
+			if (brandWords) {
+				brandWords = false;
+			} else if (showCont) {
+				showCont = false;
+			} else {
+				showBrand = false;
+			}
+		}
+		int blockH = parts[0];
+		int y = Math.max(8, Math.min(height - bottomReserve - 6 - blockH, Math.round((height - blockH) / 2f - height * 0.04f)));
+		int step = 0;
+		int accent = MenuKit.accent();
+
+		// ---- brand ----
+		if (showBrand) {
+			slideIn(context, open, step++, "center");
+			MenuKit.logo(context, (width - logo) / 2, y, logo);
+			if (brandWords) {
+				int bw = MenuKit.width(renderer, brandText);
+				MenuKit.text(context, renderer, brandText, (width - bw) / 2, y + logo + 6, deckText(MenuKit.TEXT));
+			}
+			context.getMatrices().popMatrix();
+			y += (brandWords ? brandH : logo) + (large ? 16 : 10);
+		}
+
+		// ---- Continue ----
+		if (showCont) {
+			jumpCard.place(x0, y, colW, contH, true);
+			float hover = MenuKit.hover(jumpCard, hovered(mouseX, mouseY, jumpCard));
+			slideIn(context, open, step++, "center");
+			int r = contH / 2 > 10 ? 10 : contH / 2;
+			VeloDraw.fillRounded(context, x0, y, colW, contH, r, VeloAnim.lerpArgb(0xC40C0B0F, 0xD8121117, hover));
+			VeloDraw.strokeRounded(context, x0, y, colW, contH, r, VeloAnim.lerpArgb(0x26FFFFFF, (accent & 0xFFFFFF) | 0x99000000, hover));
+			int pad = large ? 6 : 4;
+			int iconBox = contH - pad * 2;
+			Identifier icon = LastServer.icon();
+			if (icon != null) {
+				MenuKit.texture(context, icon, x0 + pad, y + pad, iconBox, 64);
+			} else {
+				VeloDraw.fillRounded(context, x0 + pad, y + pad, iconBox, iconBox, 6, (accent & 0xFFFFFF) | 0x40000000);
+				MenuKit.logo(context, x0 + pad + 3, y + pad + 3, iconBox - 6);
+			}
+			Text play = MenuKit.uiBold("Play");
+			int playW = MenuKit.width(renderer, play) + (large ? 34 : 28);
+			int playH = contH - pad * 2;
+			int px = x0 + colW - pad - playW;
+			VeloDraw.fillRounded(context, px, y + pad, playW, playH, Math.min(8, playH / 2), VeloAnim.lerpArgb(accent, VeloAnim.lerpArgb(accent, 0xFFFFFFFF, 0.14f), hover));
+			int iconSz = large ? 9 : 7;
+			int contentW = iconSz + 5 + MenuKit.width(renderer, play);
+			// the icon centred on the text line, not on the button (they sat a pixel or two apart - owner 2026-11-26)
+			int textY = deckTextY(y + pad, playH);
+			MenuKit.icon(context, "play", px + (playW - contentW) / 2, textY + (MenuKit.H_UI - 2 - iconSz) / 2, iconSz, MenuKit.onAccent());
+			MenuKit.text(context, renderer, play, px + (playW - contentW) / 2 + iconSz + 5, textY, MenuKit.onAccent());
+			int tx = x0 + pad + iconBox + (large ? 9 : 7);
+			int textBlock = MenuKit.H_MONO + 3 + MenuKit.H_UI;
+			int ty = y + (contH - textBlock) / 2;
+			MenuKit.text(context, renderer, MenuKit.mono("CONTINUE"), tx, ty, 0xFF9A96A0);
+			MenuKit.text(context, renderer, MenuKit.fit(renderer, MenuKit.uiBold(last.serverName()), px - tx - 8), tx, ty + MenuKit.H_MONO + 3, MenuKit.TEXT);
+			context.getMatrices().popMatrix();
+			y += contH + gap + 2;
+		} else {
+			jumpCard.place(0, 0, 0, 0, false);
+		}
+
+		// ---- Singleplayer | Multiplayer ----
+		int half = (colW - gap) / 2;
+		ClickableWidget sp = deckButton(byKey, "menu.singleplayer", essential);
+		ClickableWidget mp = deckButton(byKey, "menu.multiplayer", essential);
+		slideIn(context, open, step++, "center");
+		deckBig(context, renderer, sp, "Singleplayer", "d_user", x0, y, half, rowH, large, mouseX, mouseY);
+		deckBig(context, renderer, mp, "Multiplayer", "d_users", x0 + colW - half, y, half, rowH, large, mouseX, mouseY);
+		context.getMatrices().popMatrix();
+		y += rowH + gap;
+
+		// ---- the segment bar ----
+		List<Segment> segments = new ArrayList<>();
+		ClickableWidget realms = deckButton(byKey, "menu.online", essential);
+		if (realms != null) {
+			segments.add(new Segment(realms, "Realms", "home"));
+		}
+		if (modsRow != null) {
+			segments.add(new Segment(modsRow.widget(), "Mods", "mods"));
+		}
+		for (Row row : modRows) {
+			String label = row.label().getString();
+			String icon = label.equals("Velo Rewind") || label.equals("Replays") ? "replay_editor" : "extensions";
+			segments.add(new Segment(row.widget(), label.equals("Velo Rewind") ? "Rewind" : label, icon));
+		}
+		segments.add(new Segment(storeRow, "Store", "store"));
+		segments.add(new Segment(discoverRow, "Discover", "globe"));
+		slideIn(context, open, step++, "center");
+		int barR = Math.min(10, segH / 2);
+		VeloDraw.fillRounded(context, x0, y, colW, segH, barR, 0x1CFFFFFF);
+		VeloDraw.strokeRounded(context, x0, y, colW, segH, barR, 0x2BFFFFFF);
+		// every segment shows icon + label: widths follow the labels, extra room is shared out evenly, and when the bar
+		// is too narrow (many mods' buttons, small windows) the labels shrink a little instead of disappearing
+		int n = segments.size();
+		int segIcon = large ? 11 : 9;
+		int segPad = large ? 14 : 10;
+		int[] natural = new int[n];
+		int sum = 0;
+		for (int i = 0; i < n; i++) {
+			natural[i] = segIcon + 4 + MenuKit.width(renderer, deckLabel(segments.get(i).label())) + segPad;
+			sum += natural[i];
+		}
+		int room = colW - 4;
+		float textScale = sum <= room ? 1f : Math.max(0.7f, (room - n * (segIcon + 4 + segPad)) / (float) Math.max(1, sum - n * (segIcon + 4 + segPad)));
+		int extra = sum <= room ? (room - sum) / Math.max(1, n) : 0;
+		int sx = x0 + 2;
+		for (int i = 0; i < n; i++) {
+			Segment seg = segments.get(i);
+			Text label = deckLabel(seg.label());
+			int labelW = Math.round(MenuKit.width(renderer, label) * textScale);
+			int sw = i == n - 1 ? x0 + colW - 2 - sx : (sum <= room ? natural[i] + extra : segIcon + 4 + labelW + segPad);
+			deckPlace(seg.widget(), sx, y + 2, sw, segH - 4);
+			boolean on = seg.widget().active && hovered(mouseX, mouseY, seg.widget());
+			float hover = MenuKit.hover(seg.widget(), on);
+			if (hover > 0.01f) {
+				VeloDraw.fillRounded(context, sx, y + 2, sw, segH - 4, Math.max(2, barR - 2), (Math.round(hover * 0x26) << 24) | 0xFFFFFF);
+			}
+			int color = seg.widget().active ? VeloAnim.lerpArgb(deckText(0xFFE4E2E8), 0xFFFFFFFF, hover) : 0xFF5A5860;
+			int cw = segIcon + 4 + labelW;
+			int cx = sx + (sw - cw) / 2;
+			MenuKit.icon(context, seg.icon(), cx, y + (segH - segIcon) / 2, segIcon, color);
+			context.getMatrices().pushMatrix();
+			context.getMatrices().translate(cx + segIcon + 4, y + segH / 2f - 2.4f * textScale);
+			context.getMatrices().scale(textScale, textScale);
+			MenuKit.text(context, renderer, label, 0, 0, color);
+			context.getMatrices().popMatrix();
+			sx += sw;
+		}
+		context.getMatrices().popMatrix();
+		y += segH + gap;
+
+		// ---- Options | Quit ----
+		ClickableWidget options = deckButton(byKey, "menu.options", essential);
+		ClickableWidget quit = deckButton(byKey, "menu.quit", essential);
+		slideIn(context, open, step++, "center");
+		deckSmall(context, renderer, options, "Options", "sliders", x0, y, half, optH, false, mouseX, mouseY);
+		deckSmall(context, renderer, quit, "Quit", "logout", x0 + colW - half, y, half, optH, true, mouseX, mouseY);
+		context.getMatrices().popMatrix();
+		y += optH + gap + 2;
+
+		// ---- the small icon buttons ----
+		int iconGap = large ? 6 : 5;
+		int rowW = icons.size() * (iconS + iconGap) - iconGap;
+		int ix = (width - Math.max(0, rowW)) / 2;
+		slideIn(context, open, step++, "center");
+		for (Icon icon : icons) {
+			ClickableWidget widget = icon.widget();
+			env.undraw(widget);
+			if (widget instanceof HotspotButton hotspot) {
+				hotspot.place(ix, y, iconS, iconS, true);
+			}
+			widget.setX(ix);
+			widget.setY(y);
+			widget.setWidth(iconS);
+			widget.setHeight(iconS);
+			float hover = MenuKit.hover(widget, hovered(mouseX, mouseY, widget));
+			VeloDraw.fillCircle(context, ix + iconS / 2f, y + iconS / 2f, iconS / 2f, VeloAnim.lerpArgb(0x1CFFFFFF, 0x33FFFFFF, hover));
+			VeloDraw.strokeArc(context, ix + iconS / 2f, y + iconS / 2f, iconS / 2f - 0.5f, 1f, 0f, 360f, VeloAnim.lerpArgb(0x2BFFFFFF, accent, hover));
+			int inner = Math.round(iconS * 0.55f);
+			MenuKit.icon(context, icon.key(), ix + (iconS - inner) / 2, y + (iconS - inner) / 2, inner, widget.active ? 0xFFE4E2E8 : 0xFF5A5860);
+			ix += iconS + iconGap;
+		}
+		context.getMatrices().popMatrix();
+
+		// ---- you + friends, bottom-left (the account switcher will open from here) ----
+		String name = MenuInfo.username();
+		String uuid = MenuInfo.uuid();
+		int online = onlineFriends();
+		Text nameText = MenuKit.uiBold(name == null || name.isEmpty() ? "Player" : name);
+		Text friendsLine = MenuKit.ui(online < 0 ? "Velo Network offline" : online == 0 ? "No friends online"
+				: online + (online == 1 ? " friend online" : " friends online"));
+		int head = pillH - 10;
+		int inset = (pillH - head) / 2;
+		int textW = Math.max(MenuKit.width(renderer, nameText), MenuKit.width(renderer, friendsLine) + (online > 0 ? 6 : 0));
+		int pillW = inset + head + 8 + textW + 24;
+		int pxl = large ? 14 : 10;
+		int pyl = height - pillH - (large ? 12 : 8);
+		int pr = Math.min(9, pillH / 2 - 2);
+		accountPill.place(pxl, pyl, pillW, pillH, true);
+		friends.place(0, 0, 0, 0, false);
+		deckAccountAnchor = new int[] {pxl, pyl};
+		float fHover = MenuKit.hover(accountPill, hovered(mouseX, mouseY, accountPill));
+		slideIn(context, open, step++, "center");
+		VeloDraw.fillRounded(context, pxl, pyl, pillW, pillH, pr, VeloAnim.lerpArgb(0xB80C0B0F, 0xD0141318, fHover));
+		VeloDraw.strokeRounded(context, pxl, pyl, pillW, pillH, pr, VeloAnim.lerpArgb(0x26FFFFFF, (accent & 0xFFFFFF) | 0x99000000, fHover));
+		if (name != null && !name.isEmpty()) {
+			PlayerHeads.draw(context, uuid, name, pxl + inset, pyl + inset, head);
+		}
+		int tx = pxl + inset + head + 8;
+		int line = MenuKit.H_UI + 2;
+		int tyl = deckTextY(pyl, pillH) - line / 2;
+		MenuKit.text(context, renderer, nameText, tx, tyl, MenuKit.TEXT);
+		if (online > 0) {
+			VeloDraw.fillCircle(context, tx + 2, tyl + line + 2.6f, 2f, MenuKit.GREEN);
+		}
+		MenuKit.text(context, renderer, friendsLine, tx + (online > 0 ? 6 : 0), tyl + line, online > 0 ? 0xFFB8F0D2 : MenuKit.TEXT_3);
+		MenuKit.icon(context, "d_chev_u", pxl + pillW - 9 - inset - 2, pyl + (pillH - 9) / 2, 9, 0xFFB8B6BE);
+		context.getMatrices().popMatrix();
+
+		// ---- versions, bottom-right (above vanilla's copyright line) ----
+		String mc = FabricLoader.getInstance().getModContainer("minecraft").map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("");
+		String version = VERSION.contains("+") ? VERSION.substring(0, VERSION.indexOf('+')) : VERSION;
+		Text versions = MenuKit.mono("MINECRAFT " + mc + " · VELO " + version);
+		MenuKit.text(context, renderer, versions, width - MenuKit.width(renderer, versions) - 3, height - 21, 0x99FFFFFF);
+
+		storeCard.place(0, 0, 0, 0, false);
+		if (essential) {
+			anchorAroundForEssential(byKey, width, x0, x0 + colW);
+		}
+	}
+
+	/** Singleplayer / Multiplayer: light glass, icon, bold label, a chevron at the end. */
+	private static void deckBig(DrawContext context, TextRenderer renderer, ClickableWidget widget, String fallback, String icon, int x, int y, int w,
+			int h, boolean large, int mouseX, int mouseY) {
+		if (widget == null) {
+			return;
+		}
+		deckPlace(widget, x, y, w, h);
+		float hover = MenuKit.hover(widget, widget.active && hovered(mouseX, mouseY, widget));
+		int r = Math.min(10, h / 2);
+		VeloDraw.fillRounded(context, x, y, w, h, r, VeloAnim.lerpArgb(0x2EFFFFFF, 0x45FFFFFF, hover));
+		VeloDraw.strokeRounded(context, x, y, w, h, r, VeloAnim.lerpArgb(0x40FFFFFF, MenuKit.accent(), hover));
+		int is = large ? 12 : 10;
+		int color = widget.active ? deckText(0xFFFFFFFF) : 0xFF6A6870;
+		MenuKit.icon(context, icon, x + (large ? 12 : 9), y + (h - is) / 2, is, color);
+		String words = widget instanceof HotspotButton ? fallback : widget.getMessage().getString();
+		Text label = MenuKit.fit(renderer, deckLabel(words), w - (large ? 52 : 42));
+		MenuKit.text(context, renderer, label, x + (large ? 12 : 9) + is + (large ? 8 : 6), deckTextY(y, h), color);
+		int cs = large ? 9 : 8;
+		MenuKit.icon(context, "d_chev_r", x + w - cs - (large ? 10 : 8) + Math.round(hover * 2), y + (h - cs) / 2, cs, (Math.round(0x99 + 0x66 * hover) << 24) | 0xFFFFFF);
+	}
+
+	/** Options / Quit: quieter glass, white words; Quit warms to red on hover. */
+	private static void deckSmall(DrawContext context, TextRenderer renderer, ClickableWidget widget, String fallback, String icon, int x, int y, int w,
+			int h, boolean quit, int mouseX, int mouseY) {
+		if (widget == null) {
+			return;
+		}
+		deckPlace(widget, x, y, w, h);
+		float hover = MenuKit.hover(widget, widget.active && hovered(mouseX, mouseY, widget));
+		int r = Math.min(10, h / 2);
+		int hoverFill = quit ? 0x4DE0262E : 0x30FFFFFF;
+		VeloDraw.fillRounded(context, x, y, w, h, r, VeloAnim.lerpArgb(0x1CFFFFFF, hoverFill, hover));
+		VeloDraw.strokeRounded(context, x, y, w, h, r, VeloAnim.lerpArgb(0x2BFFFFFF, quit ? 0xCCE0262E : 0x66FFFFFF, hover));
+		String words = widget instanceof HotspotButton ? fallback : widget.getMessage().getString().replace("...", "").replace("…", "").strip();
+		Text label = MenuKit.fit(renderer, deckLabel(words), w - 30);
+		int is = 9;
+		int cw = is + 5 + MenuKit.width(renderer, label);
+		int cx = x + (w - cw) / 2;
+		MenuKit.icon(context, icon, cx, y + (h - is) / 2, is, deckText(0xFFFFFFFF));
+		MenuKit.text(context, renderer, label, cx + is + 5, deckTextY(y, h), deckText(0xFFFFFFFF));
 	}
 
 	/** Where a part of the menu goes for the chosen alignment, plus its free offset (fractions of the screen). */

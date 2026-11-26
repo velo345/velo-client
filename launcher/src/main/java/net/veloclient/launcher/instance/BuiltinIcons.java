@@ -52,6 +52,17 @@ public final class BuiltinIcons {
 		return tile;
 	}
 
+	/** Decodes the icons for {@code sizes} off the UI thread (pages with many profiles opened slowly the first time). */
+	public static void warm(double... sizes) {
+		for (double size : sizes) {
+			for (String id : IDS) {
+				ICONS.computeIfAbsent(id + "@" + Math.round(size), k -> new Image(
+						BuiltinIcons.class.getResourceAsStream("/net/veloclient/launcher/images/icons/" + id + ".png"),
+						size * 0.68, size * 0.68, true, true));
+			}
+		}
+	}
+
 	private static String toRgba(Color c) {
 		return String.format(java.util.Locale.ROOT, "rgba(%d,%d,%d,%.3f)",
 				(int) (c.getRed() * 255), (int) (c.getGreen() * 255), (int) (c.getBlue() * 255), c.getOpacity());

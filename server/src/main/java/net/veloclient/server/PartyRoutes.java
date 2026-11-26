@@ -131,6 +131,17 @@ final class PartyRoutes {
 			long now = System.currentTimeMillis();
 			JsonHttp.writeJson(ex, 200, new StorageResponse(now, parties.storage(me, since)));
 		});
+		// the launcher's party lobby: you emote on Home and your party sees it on theirs (owned emotes only)
+		SocialRoutes.route(server, registry, "/v1/party/emote", "POST", (ex, me) -> {
+			ShareRequest request = JsonHttp.readBody(ex, ShareRequest.class);
+			Object id = request == null || request.payload() == null ? null : request.payload().get("name");
+			if (!(id instanceof String emote) || !emote.matches("[a-z0-9_]{1,40}") || !VeloServerApp.emoteAllowed(me, emote)) {
+				JsonHttp.writeError(ex, 403, "You don't own that emote");
+				return;
+			}
+			parties.share(me, "emote", request.payload());
+			JsonHttp.writeJson(ex, 200, new Ok(true));
+		});
 		SocialRoutes.route(server, registry, "/v1/party/waypoint", "POST", (ex, me) -> {
 			parties.share(me, "waypoint", JsonHttp.readBody(ex, ShareRequest.class).payload());
 			JsonHttp.writeJson(ex, 200, new Ok(true));

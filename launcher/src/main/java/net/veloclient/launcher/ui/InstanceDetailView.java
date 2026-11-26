@@ -72,6 +72,9 @@ public final class InstanceDetailView {
 	public record Header(Node icon, String meta, Runnable edit, List<javafx.scene.control.MenuItem> menu, Runnable javaSettings) {
 	}
 
+	/** Play in the profile header (glass design): set by the launcher, starts this profile. */
+	public static java.util.function.Consumer<Instance> play;
+
 	public static Node build(Stage owner, Instance instance, LauncherTheme theme, Runnable onBack) {
 		return build(owner, instance, theme, onBack, null);
 	}
@@ -100,40 +103,38 @@ public final class InstanceDetailView {
 		iconBox.setStyle("-fx-border-color: rgba(255,255,255,0.1); -fx-border-radius: 16; -fx-background-radius: 16;");
 		Label title = new Label(instance.name());
 		title.getStyleClass().add("t-title");
-		Label mc = new Label("Minecraft " + instance.mcVersion());
-		mc.getStyleClass().addAll("badge", "badge-grey", "badge-mono");
-		{
-			// Click the version to move the whole profile up or down.
-			mc.setGraphic(Icons.icon("chevrons-updown", 11, javafx.scene.paint.Color.web("#A9A9B3"), 2.2));
-			mc.setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
-			mc.getStyleClass().add("badge-clickable");
-			Tooltip.install(mc, new Tooltip("Change Minecraft version"));
-			mc.setOnMouseClicked(e -> VersionMigration.show(overlayHost, instance, onBack));
-		}
+		// 2026-11-25 design chip: "MC" small, the version, a chevron - opens the version switcher popover
+		Label mcKind = new Label("MC");
+		mcKind.getStyleClass().add("chip-kind");
+		Label mcValue = new Label(instance.mcVersion());
+		mcValue.getStyleClass().add("chip-value");
+		HBox mcContent = new HBox(6, mcKind, mcValue, Icons.icon("chevron-down", 12, javafx.scene.paint.Color.WHITE, 2.4));
+		mcContent.setAlignment(Pos.CENTER_LEFT);
+		Label mc = new Label();
+		mc.setGraphic(mcContent);
+		mc.getStyleClass().add("header-chip");
+		Tooltip.install(mc, new Tooltip("Switch Minecraft version"));
+		mc.setOnMouseClicked(e -> VersionMigration.popover(mc, overlayHost, instance, onBack));
 		Label loader = LoaderPicker.chip(instance, null);
 		HBox chips = new HBox(8, mc, loader);
 		chips.setAlignment(Pos.CENTER_LEFT);
 		Node graphicsApi = GraphicsApiToggle.build(instance);
+		VBox graphicsBox = null;
 		if (graphicsApi != null) {
-			chips.getChildren().add(graphicsApi);
-		}
-		if (header != null && header.meta() != null && !header.meta().isBlank()) {
-			Label meta = new Label(header.meta());
-			meta.getStyleClass().add("t-muted");
-			meta.setStyle("-fx-font-size: 13px;");
-			chips.getChildren().add(meta);
+			Label graphicsLabel = new Label("GRAPHICS · THIS PROFILE");
+			graphicsLabel.getStyleClass().add("home-card-note");
+			graphicsBox = new VBox(4, graphicsLabel, graphicsApi);
+			graphicsBox.setAlignment(Pos.CENTER_RIGHT);
 		}
 		VBox titles = new VBox(8, title, chips);
 		Region headerSpacer = new Region();
 		HBox.setHgrow(headerSpacer, Priority.ALWAYS);
 		HBox banner = new HBox(16, back, iconBox, titles, headerSpacer);
-		banner.setAlignment(Pos.CENTER_LEFT);
-		if (header != null && header.edit() != null) {
-			Button edit = new Button("Edit profile");
-			edit.setGraphic(Icons.icon("edit", 15, javafx.scene.paint.Color.web("#E4E4E8")));
-			edit.setOnAction(e -> header.edit().run());
-			banner.getChildren().add(edit);
+		if (graphicsBox != null) {
+			banner.getChildren().add(graphicsBox);
 		}
+		banner.setAlignment(Pos.CENTER_LEFT);
+		// 2026-11-25 design: no separate Edit/Profile buttons - everything is in the ⋯ menu (rename & icon first)
 		if (header != null && header.menu() != null && !header.menu().isEmpty()) {
 			Button more = new Button();
 			more.setGraphic(Icons.icon("more", 18, javafx.scene.paint.Color.web("#E4E4E8"), 3));
@@ -141,13 +142,24 @@ public final class InstanceDetailView {
 			javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
 			menu.getItems().addAll(header.menu());
 			more.setOnAction(e -> menu.show(more, javafx.geometry.Side.BOTTOM, 0, 6));
+			more.getStyleClass().add("glass-button");
+			more.setTooltip(new Tooltip("Profile options"));
 			banner.getChildren().add(more);
+			banner.getProperties().put("velo.menu", menu);
+		}
+		if (play != null) {
+			Button playButton = new Button("Play");
+			playButton.setGraphic(Icons.icon("play", 15, javafx.scene.paint.Color.WHITE));
+			playButton.getStyleClass().add("header-play");
+			playButton.setMinWidth(Region.USE_PREF_SIZE);
+			playButton.setOnAction(e -> play.accept(instance));
+			banner.getChildren().add(playButton);
 		}
 		banner.setPadding(new Insets(20, 22, 20, 18));
 		// 2026-11: the banner sits on its version's art, graded dark (like the redesign).
 		javafx.scene.image.ImageView art = new javafx.scene.image.ImageView();
 		art.setPreserveRatio(false);
-		art.setOpacity(0.18);
+		art.setOpacity(0);
 		// Unmanaged: the picture follows the banner's size but never feeds back into it. Managed, its fit size became the
 		// StackPane's preferred size, which grew the banner, which grew the picture... until the banner filled the page.
 		art.setManaged(false);
@@ -221,21 +233,20 @@ public final class InstanceDetailView {
 		counts.put("Shaders", userFileCount(InstancePaths.shaderPacksDir(instance.id())));
 		counts.put("Worlds", folderCount(InstancePaths.savesDir(instance.id())));
 
-		// 2026-11: the sections as one row of tabs; the profile's own actions sit in a menu at its end.
-		HBox nav = new HBox(4);
-		nav.setAlignment(Pos.CENTER_LEFT);
+		// 2026-11-25 glass: the sections as a rail on the left (icon, name, count), the profile check under them.
+		VBox nav = new VBox(2);
 		java.util.Map<String, Button> navButtons = new java.util.LinkedHashMap<>();
 		java.util.function.Consumer<String> open = new java.util.function.Consumer<>() {
 			@Override
 			public void accept(String name) {
 				LAST_SECTION.put(instance.id(), name);
-				navButtons.forEach((n, b) -> b.getStyleClass().remove("snav-active"));
-				navButtons.get(name).getStyleClass().add("snav-active");
+				navButtons.forEach((n, b) -> b.getStyleClass().remove("rail-active"));
+				navButtons.get(name).getStyleClass().add("rail-active");
 				Node node = built.get(name);
 				if (node == null) {
 					sectionHost.getChildren().setAll(Skeleton.list(4));
 					Platform.runLater(() -> {
-						Node made = sections.get(name).get();
+						Node made = glassed(sections.get(name).get());
 						built.put(name, made);
 						if (name.equals(LAST_SECTION.get(instance.id()))) {
 							sectionHost.getChildren().setAll(made);
@@ -250,8 +261,6 @@ public final class InstanceDetailView {
 		};
 		for (String name : sections.keySet()) {
 			Button button = navButton(name, counts.get(name));
-			button.setMaxWidth(Region.USE_PREF_SIZE);
-			button.setMinWidth(Region.USE_PREF_SIZE);
 			button.setOnAction(e -> open.accept(name));
 			navButtons.put(name, button);
 			nav.getChildren().add(button);
@@ -261,10 +270,12 @@ public final class InstanceDetailView {
 			Button doctor = navButtons.get("Doctor");
 			doctorBadge[0] = d -> {
 				long serious = d.issues().stream().filter(i -> i.severity() != net.veloclient.launcher.doctor.Diagnosis.Severity.TIP).count();
-				Label badge = new Label(serious == 0 ? "✓" : String.valueOf(serious));
-				badge.getStyleClass().addAll("snav-count", serious == 0 ? "snav-count-ok" : "snav-count-bad");
-				doctor.setGraphic(badge);
-				doctor.setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
+				if (doctor.getProperties().get("count") instanceof Label badge) {
+					badge.setText(serious == 0 ? "✓" : String.valueOf(serious));
+					badge.getStyleClass().removeAll("rail-count-ok", "rail-count-bad");
+					badge.getStyleClass().add(serious == 0 ? "rail-count-ok" : "rail-count-bad");
+					badge.setVisible(true);
+				}
 			};
 			CompletableFuture.supplyAsync(() -> net.veloclient.launcher.doctor.Doctor.check(instance), Executors.newVirtualThreadPerTaskExecutor())
 					.thenAccept(d -> Platform.runLater(() -> doctorBadge[0].accept(d)));
@@ -302,31 +313,32 @@ public final class InstanceDetailView {
 			}
 		});
 		profileMenu.getItems().addAll(logs, folder);
-		Region navPush = new Region();
-		HBox.setHgrow(navPush, Priority.ALWAYS);
-		// many tabs on a narrow window: the row scrolls sideways instead of cutting labels
-		ScrollPane navStrip = new ScrollPane(nav);
-		navStrip.setFitToHeight(true);
-		navStrip.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-		navStrip.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-		navStrip.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0;");
-		navStrip.setPannable(true);
-		HBox.setHgrow(navStrip, Priority.ALWAYS);
-		HBox navRow = new HBox(10, navStrip, profileMenu);
-		navRow.setAlignment(Pos.CENTER_LEFT);
-		navRow.getStyleClass().add("profile-tabs");
+		// the profile's own actions (version, Java, logs, folder) join the ⋯ menu in the banner
+		if (banner.getProperties().get("velo.menu") instanceof javafx.scene.control.ContextMenu menu) {
+			menu.getItems().add(new javafx.scene.control.SeparatorMenuItem());
+			menu.getItems().addAll(List.copyOf(profileMenu.getItems()));
+		} else {
+			profileMenu.getStyleClass().add("glass-button");
+			banner.getChildren().add(banner.getChildren().indexOf(headerSpacer) + 1, profileMenu);
+		}
 
-		// Right of every section (2026-11, like the redesign): the profile check and switching versions, always at hand.
 		VBox aside = profileAside(instance, overlayHost, onBack, open);
-		HBox.setHgrow(sectionHost, Priority.ALWAYS);
-		HBox body = new HBox(20, sectionHost, aside);
+		Node check = aside.getChildren().getFirst();
+		Region railPush = new Region();
+		VBox.setVgrow(railPush, Priority.ALWAYS);
+		VBox rail = new VBox(2, nav, railPush, check);
+		rail.getStyleClass().add("profile-rail");
+		rail.setPadding(new Insets(10, 8, 10, 8));
+		rail.setMinWidth(208);
+		rail.setPrefWidth(208);
+		rail.setMaxWidth(208);
+		net.veloclient.launcher.ui.glass.Glass.install(rail, 24);
+		VBox sectionPanel = new VBox(sectionHost);
+		VBox.setVgrow(sectionHost, Priority.ALWAYS);
+		HBox.setHgrow(sectionPanel, Priority.ALWAYS);
+		HBox body = new HBox(14, rail, sectionPanel);
 		VBox.setVgrow(body, Priority.ALWAYS);
-		body.widthProperty().addListener((o, was, w) -> {
-			boolean wide = w.doubleValue() > 960;
-			aside.setVisible(wide);
-			aside.setManaged(wide);
-		});
-		VBox root = new VBox(14, bannerBox, navRow, body);
+		VBox root = new VBox(14, bannerBox, body);
 		open.accept(LAST_SECTION.getOrDefault(instance.id(), "Mods"));
 		return new StackPane(root, overlayHost);
 	}
@@ -393,16 +405,39 @@ public final class InstanceDetailView {
 		return aside;
 	}
 
-	private static Button navButton(String name, Long count) {
-		Button button = new Button(name);
-		button.getStyleClass().setAll("button", "snav", "no-motion");
-		button.setMaxWidth(Double.MAX_VALUE);
-		if (count != null) {
-			Label badge = new Label(String.valueOf(count));
-			badge.getStyleClass().add("snav-count");
-			button.setGraphic(badge);
-			button.setContentDisplay(javafx.scene.control.ContentDisplay.RIGHT);
+	/** A section that doesn't bring its own glass panels sits in one (pack sections have two: list + Add). */
+	private static Node glassed(Node section) {
+		if (section.getProperties().containsKey("velo.ownGlass")) {
+			return section;
 		}
+		VBox panel = new VBox(section);
+		VBox.setVgrow(section, Priority.ALWAYS);
+		panel.getStyleClass().add("profile-section-panel");
+		panel.setPadding(new Insets(16));
+		net.veloclient.launcher.ui.glass.Glass.install(panel, 24);
+		return panel;
+	}
+
+	private static final java.util.Map<String, String> RAIL_ICONS = java.util.Map.of("Mods", "box", "Resource packs", "image",
+			"Shaders", "sun", "Worlds", "globe", "Datapacks", "file-code", "Schematics", "cube", "Modpacks", "package", "Doctor", "pulse");
+
+	/** One row of the profile rail: icon, name, count on the right (the Doctor's fills in once its check is done). */
+	private static Button navButton(String name, Long count) {
+		Label text = new Label(name);
+		text.getStyleClass().add("rail-text");
+		Region push = new Region();
+		HBox.setHgrow(push, Priority.ALWAYS);
+		Label badge = new Label(count == null ? "" : String.valueOf(count));
+		badge.getStyleClass().add("rail-count");
+		badge.setVisible(count != null);
+		HBox content = new HBox(11, Icons.icon(RAIL_ICONS.getOrDefault(name, "box"), 17, javafx.scene.paint.Color.web("#F4EFEE")), text, push, badge);
+		content.setAlignment(Pos.CENTER_LEFT);
+		Button button = new Button();
+		button.setGraphic(content);
+		button.getStyleClass().setAll("button", "rail-item", "no-motion");
+		button.setMaxWidth(Double.MAX_VALUE);
+		content.prefWidthProperty().bind(button.widthProperty().subtract(22));
+		button.getProperties().put("count", badge);
 		return button;
 	}
 
@@ -473,12 +508,173 @@ public final class InstanceDetailView {
 
 		// Nothing installed yet (Velo's own jars don't count): open straight on Modrinth so the
 		// obvious next step - finding something to add - is already on screen.
-		if (userFileCount(folder) == 0) {
-			showSearch[0].run();
-		} else {
-			showInstalled[0].run();
+		// 2026-11-25 design: the installed list in one glass panel, "Add mods" (Modrinth search, categories, drop zone)
+		// in a second one on the right - the old full-page search is gone.
+		showInstalled[0].run();
+		VBox main = new VBox(container);
+		VBox.setVgrow(container, Priority.ALWAYS);
+		main.getStyleClass().add("profile-section-panel");
+		main.setPadding(new Insets(16));
+		net.veloclient.launcher.ui.glass.Glass.install(main, 24);
+		HBox.setHgrow(main, Priority.ALWAYS);
+		main.setMinWidth(0);
+		Node add = addPanel(owner, overlayHost, instance, theme, kind, folder, openDetail[0], () -> {
+			if (installedView[0] != null) {
+				installedView[0].refresh().run();
+			}
+		});
+		HBox both = new HBox(14, main, add);
+		both.getProperties().put("velo.ownGlass", true);
+		return both;
+	}
+
+	/** The right panel of a pack section (design): add from Modrinth with a search, category pills, Install, and a drop zone. */
+	private static Node addPanel(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,
+			Path folder, java.util.function.Consumer<String> openDetail, Runnable installed) {
+		String noun = switch (kind) {
+			case MOD -> "mods";
+			case RESOURCE_PACK -> "resource packs";
+			case SHADER_PACK -> "shaders";
+			default -> "files";
+		};
+		Label title = new Label("Add " + noun);
+		title.getStyleClass().add("panel-title");
+		Label source = new Label("MODRINTH · " + instance.mcVersion());
+		source.getStyleClass().add("home-card-note");
+		Region push = new Region();
+		HBox.setHgrow(push, Priority.ALWAYS);
+		HBox head = new HBox(title, push, source);
+		head.setAlignment(Pos.BASELINE_LEFT);
+		TextField search = new TextField();
+		search.setPromptText("Search " + noun + " for " + instance.mcVersion());
+		search.getStyleClass().add("topbar-search-field");
+		String[] categories = switch (kind) {
+			case MOD -> new String[] {"Popular", "Performance", "Utility", "Map", "Building"};
+			case RESOURCE_PACK -> new String[] {"Popular", "Vanilla-like", "PvP", "32x", "Dark"};
+			case SHADER_PACK -> new String[] {"Popular", "Light", "Realistic", "Fantasy"};
+			default -> new String[] {"Popular"};
+		};
+		javafx.scene.layout.FlowPane pills = new javafx.scene.layout.FlowPane(6, 6);
+		VBox results = new VBox(2);
+		ScrollPane scroll = new ScrollPane(results);
+		scroll.setFitToWidth(true);
+		scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		scroll.getStyleClass().add("scroll-pane");
+		VBox.setVgrow(scroll, Priority.ALWAYS);
+		long[] generation = {0};
+		java.util.function.Consumer<String> load = query -> {
+			long mine = ++generation[0];
+			results.getChildren().setAll(Skeleton.list(4));
+			CompletableFuture.supplyAsync(() -> {
+				try {
+					return ModrinthClient.search(query, kind.modrinthProjectType(), instance.mcVersion(), query.isBlank() ? "downloads" : "relevance", 0, 20).hits();
+				} catch (IOException e) {
+					return null;
+				}
+			}, Executors.newVirtualThreadPerTaskExecutor()).thenAccept(hits -> Platform.runLater(() -> {
+				if (mine != generation[0]) {
+					return;
+				}
+				results.getChildren().clear();
+				if (hits == null) {
+					results.getChildren().add(messageLabel("Modrinth can't be reached right now.", theme));
+					return;
+				}
+				for (ModrinthClient.SearchHit hit : hits) {
+					Node row = buildSearchResultRow(owner, overlayHost, instance, theme, kind, folder, hit, openDetail);
+					// an install that finished refreshes the installed list on the left
+					row.lookupAll(".button").forEach(n -> {
+						if (n instanceof Button b) {
+							b.textProperty().addListener((o, a, t) -> {
+								if (t != null && (t.startsWith("Added") || t.startsWith("Installed"))) {
+									installed.run();
+								}
+							});
+						}
+					});
+					results.getChildren().add(row);
+				}
+				if (hits.isEmpty()) {
+					results.getChildren().add(messageLabel("Nothing found.", theme));
+				}
+			}));
+		};
+		Button[] active = new Button[1];
+		for (String category : categories) {
+			Button pill = new Button(category);
+			pill.getStyleClass().setAll("button", "add-pill");
+			if (active[0] == null) {
+				active[0] = pill;
+				pill.getStyleClass().add("add-pill-on");
+			}
+			pill.setOnAction(e -> {
+				active[0].getStyleClass().remove("add-pill-on");
+				pill.getStyleClass().add("add-pill-on");
+				active[0] = pill;
+				search.clear();
+				load.accept(category.equals("Popular") ? "" : category.toLowerCase(java.util.Locale.ROOT));
+			});
+			pills.getChildren().add(pill);
 		}
-		return container;
+		javafx.animation.PauseTransition debounce = new javafx.animation.PauseTransition(javafx.util.Duration.millis(380));
+		debounce.setOnFinished(e -> load.accept(search.getText().strip()));
+		search.textProperty().addListener((o, a, t) -> debounce.playFromStart());
+		// drop zone: files dragged in land in this section's folder
+		Label dropText = new Label("Drop " + (kind == InstalledAssetStore.Kind.MOD ? ".jar files" : ".zip files") + " here");
+		dropText.getStyleClass().add("t-muted");
+		HBox drop = new HBox(10, Icons.icon("upload", 18, javafx.scene.paint.Color.web("#C9C2C3")), dropText);
+		drop.setAlignment(Pos.CENTER);
+		drop.getStyleClass().add("add-drop");
+		drop.setMinHeight(58);
+		drop.setOnDragOver(e -> {
+			if (e.getDragboard().hasFiles()) {
+				e.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
+				drop.getStyleClass().add("add-drop-hover");
+			}
+			e.consume();
+		});
+		drop.setOnDragExited(e -> drop.getStyleClass().remove("add-drop-hover"));
+		drop.setOnDragDropped(e -> {
+			boolean done = false;
+			for (File file : e.getDragboard().getFiles()) {
+				try {
+					Files.createDirectories(folder);
+					Files.copy(file.toPath(), folder.resolve(file.getName()), StandardCopyOption.REPLACE_EXISTING);
+					done = true;
+				} catch (IOException ex) {
+					error(owner, "Failed to add " + file.getName(), ex.getMessage());
+				}
+			}
+			e.setDropCompleted(done);
+			e.consume();
+			installed.run();
+		});
+		drop.setOnMouseClicked(e -> {
+			FileChooser chooser = new FileChooser();
+			chooser.setTitle("Choose files to add");
+			List<File> files = chooser.showOpenMultipleDialog(owner);
+			if (files == null) {
+				return;
+			}
+			for (File file : files) {
+				try {
+					Files.createDirectories(folder);
+					Files.copy(file.toPath(), folder.resolve(file.getName()), StandardCopyOption.REPLACE_EXISTING);
+				} catch (IOException ex) {
+					error(owner, "Failed to add " + file.getName(), ex.getMessage());
+				}
+			}
+			installed.run();
+		});
+		VBox panel = new VBox(12, head, search, pills, scroll, drop);
+		panel.getStyleClass().addAll("profile-section-panel", "add-panel");
+		panel.setPadding(new Insets(18, 16, 16, 16));
+		panel.setMinWidth(340);
+		panel.setPrefWidth(364);
+		panel.setMaxWidth(364);
+		net.veloclient.launcher.ui.glass.Glass.install(panel, 24);
+		load.accept("");
+		return panel;
 	}
 
 	/** Files in the folder a user added themselves (Velo Client and Fabric API are managed by the launcher). */
@@ -673,7 +869,12 @@ public final class InstanceDetailView {
 		HBox.setHgrow(filter, Priority.ALWAYS);
 		filter.setMaxWidth(320);
 		spacer.setMinWidth(0);
-		HBox toolbar = new HBox(8, count, filter, spacer, bulkProgress, updateAll, openFolderButton, importButton, addButton);
+		openFolderButton.setText(null);
+		openFolderButton.setGraphic(Icons.icon("folder", 16, javafx.scene.paint.Color.web("#E4E4E8")));
+		openFolderButton.getStyleClass().setAll("button", "glass-button", "icon-only");
+		openFolderButton.setTooltip(new Tooltip("Open folder"));
+		count.getStyleClass().add("panel-title");
+		HBox toolbar = new HBox(8, count, spacer, filter, openFolderButton);
 		if (selection != null) {
 			selection.modeButton.setMinWidth(Region.USE_PREF_SIZE);
 			toolbar.getChildren().add(4, selection.modeButton);
@@ -682,6 +883,27 @@ public final class InstanceDetailView {
 		toolbar.getStyleClass().add("pack-toolbar");
 
 		root.getChildren().add(toolbar);
+		// updates as one amber bar under the toolbar (design): what's new, and Update all
+		Label updatesText = new Label();
+		updatesText.getStyleClass().add("update-bar-text");
+		HBox.setHgrow(updatesText, Priority.ALWAYS);
+		updatesText.setMaxWidth(Double.MAX_VALUE);
+		updateAll.getStyleClass().setAll("button", "update-bar-button");
+		HBox updateBar = new HBox(12, Icons.icon("upload", 16, javafx.scene.paint.Color.web("#ffb347"), 2.2), updatesText, bulkProgress, updateAll);
+		updateBar.setAlignment(Pos.CENTER_LEFT);
+		updateBar.getStyleClass().add("update-bar");
+		updateBar.visibleProperty().bind(updateAll.visibleProperty());
+		updateBar.managedProperty().bind(updateAll.visibleProperty());
+		Runnable previous = updates.onChange;
+		updates.onChange = () -> {
+			previous.run();
+			int n = updates.pending.size();
+			String names = updates.pending.values().stream().limit(3).map(p -> p.asset().title() != null ? p.asset().title() : p.asset().filename())
+					.collect(java.util.stream.Collectors.joining(", "));
+			updatesText.setText((n == 1 ? "1 update" : n + " updates") + (names.isEmpty() ? "" : "  ·  " + names));
+			updateAll.setText("Update all");
+		};
+		root.getChildren().add(updateBar);
 		if (kind == InstalledAssetStore.Kind.MOD) {
 			root.getChildren().add(PlusAddonsCard.build(instance, () -> listRefresh[0].run()));
 		}
@@ -692,8 +914,7 @@ public final class InstanceDetailView {
 			scroll.setManaged(!empty);
 		});
 		root.getChildren().add(scroll);
-		root.getChildren().add(modrinthMatches(owner, overlayHost, instance, theme, kind, folder, filter, openDetail));
-		filter.setPromptText("Search your " + noun + " and Modrinth...");
+		filter.setPromptText("Filter");
 		// Dev (screenshot tour): -Dvelo.tourModSearch=map starts the Mods tab with that search typed in.
 		String tourSearch = System.getProperty("velo.tourModSearch");
 		if (tourSearch != null && System.getProperty("velo.launcherTour") != null && kind == InstalledAssetStore.Kind.MOD) {
@@ -1086,6 +1307,8 @@ public final class InstanceDetailView {
 				installPicked(owner, instance, kind, folder, version, asset.filename(), refresh);
 			}));
 			chipRow.setAlignment(Pos.CENTER_LEFT);
+			chipRow.setSpacing(8);
+			chipRow.getChildren().add(authorLabel(file, asset.projectId()));
 			meta = chipRow;
 		}
 		info.getChildren().addAll(title, meta);
@@ -1150,7 +1373,12 @@ public final class InstanceDetailView {
 		Label size = new Label(protectedFile ? sizeOf(file) : sizeOf(file) + "  ·  not on Modrinth");
 		size.getStyleClass().add("version-tag");
 		size.setTextFill(text(theme));
-		info.getChildren().addAll(name, size);
+		HBox sizeRow = new HBox(8, size);
+		sizeRow.setAlignment(Pos.CENTER_LEFT);
+		if (kind == InstalledAssetStore.Kind.MOD) {
+			sizeRow.getChildren().add(authorLabel(file, null));
+		}
+		info.getChildren().addAll(name, sizeRow);
 		HBox.setHgrow(info, Priority.ALWAYS);
 		row.getChildren().add(info);
 
@@ -1449,17 +1677,22 @@ public final class InstanceDetailView {
 			builtin.setMinWidth(Region.USE_PREF_SIZE);
 			titleRow.getChildren().add(builtin);
 		}
-		Label description = new Label(hit.description());
-		description.getStyleClass().add("t-muted");
-		description.setStyle("-fx-font-size: 12px;");
-		description.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
-		description.setMinWidth(0);
-		VBox text = new VBox(4, titleRow, description);
+		Label by = new Label(hit.author() == null || hit.author().isBlank() ? "" : "by " + hit.author());
+		by.getStyleClass().add("mod-author");
+		by.setMinWidth(0);
+		by.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+		Label downloads = new Label(formatCount(hit.downloads()));
+		downloads.getStyleClass().add("mod-downloads");
+		downloads.setMinWidth(Region.USE_PREF_SIZE);
+		Label dot = new Label("·");
+		dot.getStyleClass().add("mod-downloads");
+		HBox metaRow = new HBox(6, by, dot, downloads);
+		metaRow.setAlignment(Pos.CENTER_LEFT);
+		metaRow.setMinWidth(0);
+		Tooltip.install(text0(titleRow), new Tooltip(hit.description()));
+		VBox text = new VBox(3, titleRow, metaRow);
 		text.setMinWidth(0);
 		HBox.setHgrow(text, Priority.ALWAYS);
-		Label downloads = new Label(formatCount(hit.downloads()));
-		downloads.getStyleClass().add("server-version");
-		downloads.setMinWidth(Region.USE_PREF_SIZE);
 		ProgressBar progress = new ProgressBar(0);
 		progress.setPrefWidth(80);
 		progress.setVisible(false);
@@ -1468,10 +1701,67 @@ public final class InstanceDetailView {
 		add.getStyleClass().addAll("primary-button", "button-sm");
 		add.setMinWidth(76);
 		wireInstall(owner, overlayHost, instance, theme, kind, folder, hit, add, progress, "Added");
-		HBox row = new HBox(14, icon, text, downloads, progress, add);
+		HBox row = new HBox(12, icon, text, progress, add);
 		row.setAlignment(Pos.CENTER_LEFT);
 		row.getStyleClass().add("friend-row");
 		return row;
+	}
+
+	private static Node text0(Node node) {
+		return node;
+	}
+
+	private static final java.util.Map<String, String> AUTHORS = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** "by CaffeineMC" from the mod jar's fabric.mod.json (read once in the background, cached per file and date). */
+	private static Label authorLabel(Path file, String projectId) {
+		Label label = new Label();
+		label.getStyleClass().add("mod-author");
+		label.setMinWidth(0);
+		label.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
+		String key;
+		try {
+			key = file + "@" + Files.getLastModifiedTime(file).toMillis();
+		} catch (IOException e) {
+			return label;
+		}
+		String cached = AUTHORS.get(key);
+		if (cached != null) {
+			label.setText(cached.isEmpty() ? "" : "by " + cached);
+			return label;
+		}
+		Thread.ofVirtual().start(() -> {
+			String authors = "";
+			try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(file.toFile())) {
+				java.util.zip.ZipEntry entry = zip.getEntry("fabric.mod.json");
+				if (entry != null) {
+					try (var in = zip.getInputStream(entry)) {
+						var json = com.google.gson.JsonParser.parseString(new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+						if (json.has("authors") && json.get("authors").isJsonArray()) {
+							java.util.List<String> names = new java.util.ArrayList<>();
+							for (var element : json.getAsJsonArray("authors")) {
+								if (element.isJsonPrimitive()) {
+									names.add(element.getAsString());
+								} else if (element.isJsonObject() && element.getAsJsonObject().has("name")) {
+									names.add(element.getAsJsonObject().get("name").getAsString());
+								}
+							}
+							authors = names.size() <= 2 ? String.join(", ", names) : names.get(0) + ", " + names.get(1) + " +" + (names.size() - 2);
+						}
+					}
+				}
+			} catch (Exception ignored) {
+				// not a readable jar: no author line
+			}
+			if (authors.isEmpty() && projectId != null) {
+				// packs, shaders and mods without authors in their file: the Modrinth project's owner
+				authors = ModrinthClient.owner(projectId);
+			}
+			AUTHORS.put(key, authors);
+			String shown = authors;
+			Platform.runLater(() -> label.setText(shown.isEmpty() ? "" : "by " + shown));
+		});
+		return label;
 	}
 
 	private static Node buildSearchResultCard(Stage owner, StackPane overlayHost, Instance instance, LauncherTheme theme, InstalledAssetStore.Kind kind,

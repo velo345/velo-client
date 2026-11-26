@@ -121,18 +121,21 @@ public final class CustomizeView {
 		heading.getStyleClass().add("page-title");
 		Label chip = new Label("VELO+");
 		chip.getStyleClass().add("t-overline");
-		chip.setStyle("-fx-background-color: -velo-accent; -fx-text-fill: white; -fx-padding: 3 8 3 8; -fx-background-radius: 6;");
+		chip.setStyle("-fx-background-color: -velo-accent; -fx-text-fill: -velo-on-accent; -fx-padding: 3 8 3 8; -fx-background-radius: 6;");
 		HBox titleRow = new HBox(12, heading, chip);
 		titleRow.setAlignment(Pos.CENTER_LEFT);
-		Label sub = new Label("Your title screen, pause menu and loading screen. Saved on this PC only - the game shows changes right away.");
+		Label sub = new Label("Backgrounds, colours and fonts for your title screen, pause menu, loading screen and the glass menus. Saved on this PC - the game shows changes right away, even while it runs.");
 		sub.getStyleClass().add("t-muted");
 		sub.setWrapText(true);
 
 		HBox tabs = new HBox();
 		tabs.getStyleClass().add("segment-bar");
 		tabs.setMaxWidth(Region.USE_PREF_SIZE);
-		for (String[] t : new String[][] {{"title", "Title screen"}, {"menu", "R-Shift menu"}, {"pause", "Pause menu"}, {"loading", "Loading screen"}, {"theme", "Theme"},
-				{"launcher", "Launcher"}}) {
+		// 2026-11-25: only what the new menus really use - backgrounds, colours and fonts (owner: "simple things")
+		if (!List.of("title", "pause", "loading", "glass").contains(tab)) {
+			tab = "title";
+		}
+		for (String[] t : new String[][] {{"title", "Title screen"}, {"pause", "Pause menu"}, {"loading", "Loading screen"}, {"glass", "Menus"}}) {
 			Button b = new Button(t[1]);
 			b.getStyleClass().setAll("button", "segmented-button");
 			if (t[0].equals(tab)) {
@@ -196,11 +199,13 @@ public final class CustomizeView {
 		Label hint = new Label();
 		hint.getStyleClass().add("t-muted");
 		hint.setStyle("-fx-font-size: 12px;");
+		hint.setWrapText(true);
 		hint.textProperty().bind(javafx.beans.binding.Bindings.createStringBinding(() -> switch (tab) {
-			case "title" -> "Drag the logo, the menu, the card, the bar at the bottom or the Store card to move them. Double-click one to put it back.";
-			case "pause" -> "With Essential installed the menu always stays on the left - its character needs that side.";
+			case "title" -> "The title screen as it looks in the game. Other mods' buttons join the bar in the middle.";
+			case "pause" -> "Press Esc in a world to see it. The game around the menu stays sharp.";
 			case "loading" -> "Shown when the game starts and when resource packs reload.";
 			case "menu" -> "The Velo menu and every Velo window. Click the preview to play the animation again.";
+			case "glass" -> "Every glass menu in the game: R-Shift, Locker, Store, the emote wheel and the HUD's glass style. Applies while you play.";
 			default -> "";
 		}, previewHolder.widthProperty()));
 		VBox previewColumn = new VBox(10, previewHolder, hint);
@@ -237,6 +242,7 @@ public final class CustomizeView {
 		bodyHolder.getChildren().setAll(editorBody);
 		settings.getChildren().setAll(switch (tab) {
 			case "menu" -> menuSettings();
+			case "glass" -> glassSettings();
 			case "pause" -> pauseSettings();
 			case "loading" -> loadingSettings();
 			case "launcher" -> launcherSettings();
@@ -249,6 +255,7 @@ public final class CustomizeView {
 		canvas.getChildren().clear();
 		switch (tab) {
 			case "menu" -> drawMenu();
+			case "glass" -> drawGlass();
 			case "theme" -> {
 			}
 			case "pause" -> drawPause();
@@ -263,12 +270,181 @@ public final class CustomizeView {
 		saveLater.playFromStart();
 	}
 
+	// ------------------------------------------------------------------ in-game look (the game's glass.json)
+
+	/**
+	 * The glass menus' look in the game (2026-11-25): accent, how dark the glass is, how strong the blur behind it and how
+	 * round the corners - the same four values as the game's own Settings > Theme (GlassPrefs, {@code config/glass.json}),
+	 * which re-reads the file when it changes, so the game follows while it runs.
+	 */
+	private static final int[] GLASS_SWATCHES = {0xFFFFFFFF, 0xFFE5373E, 0xFFFF8A3D, 0xFFFFC93D, 0xFF4CD07D, 0xFF3DD6D0, 0xFF4C9AFF,
+			0xFF7C6BFF, 0xFFC266FF, 0xFFFF5FA8};
+	private static final String[] GLASS_NAMES = {"White", "Red", "Orange", "Yellow", "Green", "Teal", "Blue", "Indigo", "Purple", "Pink"};
+	private static JsonObject glassState;
+
+	private static Path glassFile() {
+		return VeloPaths.config().resolve("glass.json");
+	}
+
+	private static JsonObject glass() {
+		if (glassState == null) {
+			try {
+				glassState = Files.exists(glassFile()) ? JsonParser.parseString(Files.readString(glassFile(), StandardCharsets.UTF_8)).getAsJsonObject()
+						: new JsonObject();
+			} catch (Exception e) {
+				glassState = new JsonObject();
+			}
+		}
+		return glassState;
+	}
+
+	private static void saveGlass() {
+		if (glassState == null) {
+			return;
+		}
+		try {
+			Files.createDirectories(glassFile().getParent());
+			Path tmp = glassFile().resolveSibling("glass.json.tmp");
+			Files.writeString(tmp, glassState.toString(), StandardCharsets.UTF_8);
+			try {
+				Files.move(tmp, glassFile(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			} catch (IOException atomic) {
+				Files.move(tmp, glassFile(), StandardCopyOption.REPLACE_EXISTING);
+			}
+		} catch (IOException e) {
+			net.veloclient.launcher.LauncherLog.warn("Couldn't save the in-game look", e);
+		}
+	}
+
+	private static int glassNum(String key, int fallback) {
+		JsonObject g = glass();
+		try {
+			return g.has(key) ? g.get(key).getAsInt() : fallback;
+		} catch (RuntimeException e) {
+			return fallback;
+		}
+	}
+
+	private List<Node> glassSettings() {
+		JsonObject g = glass();
+		VBox colour = SettingsUi.card("Accent");
+		javafx.scene.layout.FlowPane swatches = new javafx.scene.layout.FlowPane(8, 8);
+		int current = glassNum("accent", 0xFFFFFFFF) | 0xFF000000;
+		for (int i = 0; i < GLASS_SWATCHES.length; i++) {
+			int argb = GLASS_SWATCHES[i];
+			javafx.scene.shape.Circle dot = new javafx.scene.shape.Circle(13, Color.rgb((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF));
+			dot.setStroke(argb == current ? Color.WHITE : Color.rgb(255, 255, 255, 0.18));
+			dot.setStrokeWidth(argb == current ? 2.5 : 1);
+			StackPane hit = new StackPane(dot);
+			hit.setCursor(Cursor.HAND);
+			javafx.scene.control.Tooltip.install(hit, new javafx.scene.control.Tooltip(GLASS_NAMES[i]));
+			hit.setOnMouseClicked(e -> {
+				g.addProperty("accent", argb);
+				saveGlass();
+				refresh();
+			});
+			swatches.getChildren().add(hit);
+		}
+		colour.getChildren().add(swatches);
+
+		VBox look = SettingsUi.card("Glass");
+		row(look, "Darkness", "How much of the game shows through", null, glassSlider(g, "glass", 55, "Clear", "Dark"));
+		row(look, "Blur", "Behind every glass panel", null, glassSlider(g, "blur", 70, "Sharp", "Soft"));
+		row(look, "Corners", null, null, glassSlider(g, "corners", 60, "Square", "Round"));
+		Button reset = new Button("Back to default");
+		reset.getStyleClass().add("ghost-button");
+		reset.setOnAction(e -> {
+			glassState = new JsonObject();
+			saveGlass();
+			refresh();
+		});
+		row(look, "Reset", null, null, reset);
+		return List.of(colour, look);
+	}
+
+	private Node glassSlider(JsonObject g, String key, int fallback, String low, String high) {
+		Slider slider = new Slider(0, 100, glassNum(key, fallback));
+		slider.setPrefWidth(120);
+		slider.valueProperty().addListener((o, a, v) -> {
+			g.addProperty(key, (int) Math.round(v.doubleValue()));
+			redraw();
+		});
+		slider.valueChangingProperty().addListener((o, was, now) -> {
+			if (!now) {
+				saveGlass();
+			}
+		});
+		slider.setOnMouseReleased(e -> saveGlass());
+		Label lo = new Label(low);
+		lo.getStyleClass().add("t-muted");
+		lo.setStyle("-fx-font-size: 11px;");
+		Label hi = new Label(high);
+		hi.getStyleClass().add("t-muted");
+		hi.setStyle("-fx-font-size: 11px;");
+		HBox box = new HBox(6, lo, slider, hi);
+		box.setAlignment(Pos.CENTER_LEFT);
+		return box;
+	}
+
+	/** The preview: the R-Shift glass drawer over the title panorama, in the chosen look. */
+	private void drawGlass() {
+		background(null, 0, "velo");
+		int accent = glassNum("accent", 0xFFFFFFFF) | 0xFF000000;
+		Color acc = Color.rgb((accent >> 16) & 0xFF, (accent >> 8) & 0xFF, accent & 0xFF);
+		double dark = glassNum("glass", 55) / 100.0;
+		double blur = glassNum("blur", 70) / 100.0;
+		double corner = 4 + glassNum("corners", 60) / 100.0 * 18;
+		double x = 40, y = 34, w = GW - 80, h = GH - 68;
+		// the blurred game behind the panel
+		javafx.scene.SnapshotParameters params = new javafx.scene.SnapshotParameters();
+		params.setFill(Color.BLACK);
+		// the backdrop node alone (the canvas itself carries the preview's scale)
+		Node backdropNode = canvas.getChildren().isEmpty() ? null : canvas.getChildren().getLast();
+		Image shot = backdropNode == null ? null : backdropNode.snapshot(params, null);
+		ImageView behind = new ImageView(shot);
+		behind.setFitWidth(GW);
+		behind.setFitHeight(GH);
+		behind.setEffect(new GaussianBlur(2 + blur * 30));
+		Rectangle shape = new Rectangle(x, y, w, h);
+		shape.setArcWidth(corner * 2);
+		shape.setArcHeight(corner * 2);
+		behind.setClip(shape);
+		canvas.getChildren().add(behind);
+		Rectangle tint = round(x, y, w, h, corner * 2, Color.rgb(12, 12, 16, 0.25 + dark * 0.65), Color.rgb(255, 255, 255, 0.14));
+		canvas.getChildren().add(tint);
+		// a sidebar of categories, the active one in the accent
+		String[] cats = {"All", "HUD", "PvP", "Visual", "Performance", "Cosmetics"};
+		for (int i = 0; i < cats.length; i++) {
+			boolean on = i == 1;
+			Rectangle pill = round(x + 10, y + 14 + i * 26, 92, 20, Math.min(20, corner * 1.4), on ? acc : Color.TRANSPARENT, null);
+			canvas.getChildren().add(pill);
+			Text label = new Text(x + 22, y + 28 + i * 26, cats[i]);
+			label.setFont(Font.font("Inter", javafx.scene.text.FontWeight.SEMI_BOLD, 10));
+			boolean light = acc.getBrightness() > 0.75 && acc.getSaturation() < 0.3;
+			label.setFill(on ? (light ? Color.web("#111") : Color.WHITE) : Color.rgb(255, 255, 255, 0.7));
+			canvas.getChildren().add(label);
+		}
+		// module cards
+		for (int r = 0; r < 3; r++) {
+			for (int c = 0; c < 3; c++) {
+				double cx = x + 116 + c * ((w - 128) / 3);
+				double cy = y + 14 + r * 58;
+				double cw = (w - 128) / 3 - 8;
+				canvas.getChildren().add(round(cx, cy, cw, 50, corner * 1.4, Color.rgb(255, 255, 255, 0.06 + (1 - dark) * 0.04), Color.rgb(255, 255, 255, 0.1)));
+				canvas.getChildren().add(round(cx + 8, cy + 8, 18, 18, Math.min(18, corner), Color.rgb(255, 255, 255, 0.12), null));
+				canvas.getChildren().add(round(cx + 8, cy + 32, cw * 0.55, 6, 6, Color.rgb(255, 255, 255, 0.35), null));
+				boolean enabled = (r + c) % 2 == 0;
+				canvas.getChildren().add(round(cx + cw - 30, cy + 9, 22, 12, 12, enabled ? acc : Color.rgb(255, 255, 255, 0.18), null));
+			}
+		}
+	}
+
 	// ------------------------------------------------------------------ settings: title
 
 	private List<Node> titleSettings() {
 		JsonObject t = section("title");
 		VBox bg = SettingsUi.card("Background");
-		row(bg, "Background", null, null, segmented(t, "background", new String[][] {{"velo", "Velo"}, {"image", "Your picture"},
+		row(bg, "Background", null, null, segmented(t, "background", new String[][] {{"velo", "Velo scene"}, {"image", "Your picture"},
 				{"vanilla", "Minecraft"}}, "velo"));
 		if (str(t, "background", "velo").equals("image")) {
 			row(bg, "Picture or GIF", "PNG, JPG or animated GIF", "Covers the whole screen - cropped evenly, never stretched. "
@@ -276,34 +452,72 @@ public final class CustomizeView {
 			row(bg, "Blur", null, null, slider(t, "blur", 0, 100, 0, "%"));
 		}
 		row(bg, "Darken", null, null, slider(t, "dim", 0, 100, 0, "%"));
-		row(bg, "Shade behind the menu", "The dark fade on the menu's side", null, slider(t, "scrim", 0, 100, 100, "%"));
 
-		VBox layout = SettingsUi.card("Layout");
-		row(layout, "Menu position", "Drag parts in the preview to fine-tune", null,
-				segmented(t, "align", new String[][] {{"left", "Left"}, {"center", "Center"}, {"right", "Right"}}, "left"));
-		Button resetMoves = new Button("Put everything back");
-		resetMoves.getStyleClass().add("ghost-button");
-		resetMoves.setOnAction(e -> {
-			t.remove("moved");
+		VBox colours = SettingsUi.card("Colours");
+		row(colours, "Accent", "Play button, highlights, hover edges", null, swatches(t, "accent", "#E0262E"));
+		row(colours, "Text", "Button words and the logo", null, swatches(t, "color", "#FFFFFF"));
+
+		VBox font = SettingsUi.card("Font");
+		row(font, "Button font", null, null, fontChips(t, "font", "Archivo"));
+		return List.of(bg, colours, font, resetCard("title"));
+	}
+
+	private static final String[] SWATCHES = {"#FFFFFF", "#E0262E", "#FF8A3D", "#FFC93D", "#4CD07D", "#3DD6D0", "#4C9AFF", "#7C6BFF", "#C266FF",
+			"#FF5FA8"};
+
+	/** Ten round swatches plus "Custom..." (a colour picker) - the chosen one ringed. */
+	private Node swatches(JsonObject o, String key, String fallback) {
+		String current = str(o, key, "");
+		javafx.scene.layout.FlowPane row = new javafx.scene.layout.FlowPane(7, 7);
+		for (String hexValue : SWATCHES) {
+			javafx.scene.shape.Circle dot = new javafx.scene.shape.Circle(11, Color.web(hexValue));
+			boolean on = current.isEmpty() ? hexValue.equalsIgnoreCase(fallback) : hexValue.equalsIgnoreCase(current);
+			dot.setStroke(on ? Color.WHITE : Color.rgb(255, 255, 255, 0.18));
+			dot.setStrokeWidth(on ? 2.5 : 1);
+			StackPane hit = new StackPane(dot);
+			hit.setCursor(Cursor.HAND);
+			hit.setOnMouseClicked(e -> {
+				if (hexValue.equalsIgnoreCase(fallback)) {
+					o.remove(key);
+				} else {
+					o.addProperty(key, hexValue);
+				}
+				saveLater.playFromStart();
+				refresh();
+			});
+			row.getChildren().add(hit);
+		}
+		ColorPicker picker = new VeloColorPicker(Color.web(current.isEmpty() ? fallback : current));
+		picker.getStyleClass().add("button");
+		picker.setPrefWidth(96);
+		picker.valueProperty().addListener((obs, a, c) -> {
+			o.addProperty(key, hex(c));
 			changed();
 		});
-		row(layout, "Moved parts", null, null, resetMoves);
-		row(layout, "Logo", null, null, toggle(t, "brand", true));
-		row(layout, "\"Jump back in\" card", "Your last server", null, toggle(t, "jump", true));
-		row(layout, "Bottom bar", "You, friends and the small buttons", null, toggle(t, "footer", true));
-		row(layout, "Store card", "Hidden when Essential is installed", null, toggle(t, "store", true));
+		row.getChildren().add(picker);
+		return row;
+	}
 
-		VBox words = SettingsUi.card("Menu words");
-		row(words, "Font", null, null, fontBox(t, "font"));
-		row(words, "Size", null, null, sliderF(t, "scale", 60, 160, 100));
-		row(words, "Buttons", null, null, segmented(t, "buttons", new String[][] {{"words", "Words"}, {"pills", "Pills"},
-				{"glass", "Glass"}, {"outline", "Outline"}, {"underline", "Line"}}, "words"));
-		row(words, "Colour", null, null, colorPicker(t, "color", "#EDE6E6"));
-		row(words, "Hover colour", null, null, colorPicker(t, "hoverColor", "#FFFFFF"));
-		row(words, "Accent", "Highlights, badges and button edges", null, colorPicker(t, "accent", "#E0262E"));
-		row(words, "Shadow", null, null, toggle(t, "shadow", false));
-		row(words, "Glow", null, null, slider(t, "glow", 0, 100, 0, "%"));
-		return List.of(bg, layout, words, resetCard("title"));
+	/** The fonts as chips, each written in itself. "Velo" = the menus' own font. */
+	private Node fontChips(JsonObject o, String key, String fallback) {
+		javafx.scene.layout.FlowPane row = new javafx.scene.layout.FlowPane(6, 6);
+		String current = str(o, key, fallback);
+		for (String f : FONTS) {
+			Button b = new Button(f.equals("Archivo") ? "Velo" : f);
+			b.getStyleClass().setAll("button", "segmented-button");
+			b.setFont(fontNamed(f.equals("Archivo") ? "Inter" : f, 12.5));
+			b.setStyle("-fx-padding: 6 11 6 11; -fx-background-radius: 9; -fx-border-color: -velo-hairline; -fx-border-radius: 9;");
+			if (f.equals(current)) {
+				b.getStyleClass().add("segmented-button-active");
+			}
+			b.setOnAction(e -> {
+				o.addProperty(key, f);
+				saveLater.playFromStart();
+				refresh();
+			});
+			row.getChildren().add(b);
+		}
+		return row;
 	}
 
 	// ------------------------------------------------------------------ settings: R-Shift menu
@@ -604,40 +818,31 @@ public final class CustomizeView {
 	private List<Node> pauseSettings() {
 		JsonObject p = section("pause");
 		VBox look = SettingsUi.card("Over the game");
-		row(look, "Darkness", "100 % is Velo's default", null, slider(p, "dim", 0, 200, 100, "%"));
-		row(look, "Tint", null, null, colorPicker(p, "tint", "#08080B"));
-		CheckBox own = new CheckBox();
-		own.setSelected(num(p, "blur", -1) >= 0);
-		Slider blur = new Slider(0, 10, Math.max(0, num(p, "blur", 5)));
+		row(look, "Darken", "100 % is Velo's default", null, slider(p, "dim", 0, 200, 100, "%"));
+		row(look, "Tint", "The colour the game fades to", null, swatches(p, "tint", "#08080B"));
+		// "blur" in the game: -1 = Velo's default, 0..10 your own strength - here 0 on the slider means "default"
+		Slider blur = new Slider(0, 10, Math.max(0, num(p, "blur", -1)));
 		blur.setMajorTickUnit(1);
 		blur.setSnapToTicks(true);
-		blur.setPrefWidth(120);
-		blur.setDisable(!own.isSelected());
-		Label blurValue = new Label(own.isSelected() ? String.valueOf(num(p, "blur", 5)) : "Game");
-		blurValue.setMinWidth(40);
-		own.selectedProperty().addListener((o, a, on) -> {
-			blur.setDisable(!on);
-			p.addProperty("blur", on ? (int) Math.round(blur.getValue()) : -1);
-			blurValue.setText(on ? String.valueOf((int) Math.round(blur.getValue())) : "Game");
+		blur.setPrefWidth(130);
+		Label blurValue = new Label(num(p, "blur", -1) <= 0 ? "Default" : String.valueOf(num(p, "blur", -1)));
+		blurValue.setMinWidth(54);
+		blur.valueProperty().addListener((o, a, v) -> {
+			int n = (int) Math.round(v.doubleValue());
+			if (n <= 0) {
+				p.remove("blur");
+			} else {
+				p.addProperty("blur", n);
+			}
+			blurValue.setText(n <= 0 ? "Default" : String.valueOf(n));
 			changed();
 		});
-		blur.valueProperty().addListener((o, a, v) -> {
-			if (own.isSelected()) {
-				p.addProperty("blur", (int) Math.round(v.doubleValue()));
-				blurValue.setText(String.valueOf((int) Math.round(v.doubleValue())));
-				changed();
-			}
-		});
-		row(look, "Own blur", "Only the pause menu - your Minecraft setting stays", null, own, blur, blurValue);
+		row(look, "Blur strength", "Behind the glass panels", null, new HBox(8, blur, blurValue));
 
-		VBox layout = SettingsUi.card("Menu");
-		row(layout, "Side", null, null, segmented(p, "align", new String[][] {{"left", "Left"}, {"right", "Right"}}, "left"));
-		row(layout, "Panel", null, null, segmented(p, "panel", new String[][] {{"glass", "Glass"}, {"solid", "Solid"}, {"clear", "Clear"}},
-				"glass"));
-		row(layout, "Cards", "Server, quick toggles, party", null, toggle(p, "cards", true));
-		row(layout, "Word colour", null, null, colorPicker(p, "color", "#E4E4E8"));
-		row(layout, "Accent", null, null, colorPicker(p, "accent", "#E0262E"));
-		return List.of(look, layout, resetCard("pause"));
+		VBox colours = SettingsUi.card("Colours");
+		row(colours, "Accent", "Back to Game and highlights", null, swatches(p, "accent", "#E0262E"));
+		row(colours, "Text", null, null, swatches(p, "color", "#E4E4E8"));
+		return List.of(look, colours, resetCard("pause"));
 	}
 
 	// ------------------------------------------------------------------ settings: loading
@@ -746,7 +951,7 @@ public final class CustomizeView {
 		boolean wide = false;
 		for (Node c : controls) {
 			if (c.getStyleClass().contains("segment-bar") || c instanceof HBox h && h.getChildren().stream().anyMatch(n -> n instanceof Slider)
-					|| c instanceof ComboBox || c instanceof TextField) {
+					|| c instanceof ComboBox || c instanceof TextField || c instanceof javafx.scene.layout.FlowPane) {
 				wide = true;
 			}
 		}
@@ -911,219 +1116,109 @@ public final class CustomizeView {
 
 	// ------------------------------------------------------------------ preview: title
 
+	/** The Play Deck (TitleMenu.renderDeck) at 1080p / GUI scale 4 - same sizes and places as in the game. */
 	private void drawTitle() {
 		JsonObject t = section("title");
-		String align = str(t, "align", "left");
 		String background = str(t, "background", "velo");
 		background(background.equals("image") ? picture("title") : null, background.equals("vanilla") ? 0 : num(t, "blur", 0), background);
 		if (num(t, "dim", 0) > 0) {
 			canvas.getChildren().add(rect(0, 0, GW, GH, Color.rgb(0, 0, 0, num(t, "dim", 0) * 2.4 / 255)));
 		}
-		shade(align, num(t, "scrim", 100) / 100.0, background.equals("vanilla"));
-
-		double margin = clamp(Math.round(GW * 0.065), 14, 72);
-		double top = clamp(Math.round(GH * 0.1), 10, 80);
-		double right = GW - margin;
-		double sizeK = fnum(t, "scale", 1f);
-		String font = str(t, "font", "Archivo");
+		shade("center", 1, background.equals("vanilla"));
 		Color accent = color(t, "accent", Color.web("#E0262E"));
-		double y = top;
-
-		if (bool(t, "brand", true)) {
-			Group brand = new Group();
-			ImageView logo = new ImageView(UiImages.resource("/net/veloclient/launcher/images/logo.png", 44, 44));
-			logo.setFitWidth(22);
-			logo.setFitHeight(22);
-			Text name = text("VELO CLIENT", fontNamed("Archivo", 9), Color.web("#EDE6E6"));
-			name.setX(31);
-			name.setY(10);
-			Text version = text("1.4 · Minecraft 1.21.11", fontNamed("Mono", 5.5), Color.web("#8A8A95"));
-			version.setX(31);
-			version.setY(19);
-			brand.getChildren().addAll(logo, name, version);
-			double w = 31 + name.getLayoutBounds().getWidth() + 6;
-			place(brand, "brand", alignX(align, w, margin, right), y, w, 22, t);
-			y += 22 + 16;
+		Color words = color(t, "color", Color.WHITE);
+		String fontName = str(t, "font", "Archivo");
+		String face = fontName.equals("Archivo") ? "Inter" : fontName;
+		boolean lightAccent = accent.getBrightness() > 0.85 && accent.getSaturation() < 0.2;
+		Color onAccent = lightAccent ? Color.web("#141416") : Color.WHITE;
+		double colW = 269;
+		double x0 = (GW - colW) / 2;
+		double half = (colW - 5) / 2;
+		double y = 35;
+		// logo + VELO
+		ImageView logo = new ImageView(UiImages.resource("/net/veloclient/launcher/images/logo.png", 44, 44));
+		logo.setFitWidth(22);
+		logo.setFitHeight(22);
+		logo.setX((GW - 22) / 2);
+		logo.setY(y);
+		Text brand = text("VELO", fontNamed("Archivo", 13), words);
+		brand.setX((GW - measure("VELO", brand.getFont())) / 2);
+		brand.setY(y + 22 + 6 + 10);
+		canvas.getChildren().addAll(logo, brand);
+		y += 38 + 10;
+		// Continue strip
+		canvas.getChildren().add(round(x0, y, colW, 26, 20, Color.web("#0C0B0F", 0.77), Color.rgb(255, 255, 255, 0.15)));
+		canvas.getChildren().add(round(x0 + 4, y + 4, 18, 18, 7, accent.deriveColor(0, 1, 1, 0.3), null));
+		Text cont = text("CONTINUE", fontNamed("Mono", 4.8), Color.web("#9A96A0"));
+		cont.setX(x0 + 29);
+		cont.setY(y + 10.5);
+		Text server = text("LuckySMP", fontNamed(face, 7.5), Color.web("#EDE6E6"));
+		server.setX(x0 + 29);
+		server.setY(y + 19.5);
+		double playW = 46;
+		canvas.getChildren().addAll(cont, server, round(x0 + colW - 4 - playW, y + 4, playW, 18, 12, accent, null));
+		Text play = text("▶  Play", fontNamed(face, 7.5), onAccent);
+		play.setX(x0 + colW - 4 - playW + (playW - measure("▶  Play", play.getFont())) / 2);
+		play.setY(y + 15.5);
+		canvas.getChildren().add(play);
+		y += 26 + 7;
+		// Singleplayer | Multiplayer
+		for (int i = 0; i < 2; i++) {
+			double bx = i == 0 ? x0 : x0 + colW - half;
+			canvas.getChildren().add(round(bx, y, half, 23, 18, Color.rgb(255, 255, 255, 0.18), Color.rgb(255, 255, 255, 0.25)));
+			Text label = text(i == 0 ? "Singleplayer" : "Multiplayer", fontNamed(face, 8), words);
+			label.setX(bx + 24);
+			label.setY(y + 14.8);
+			canvas.getChildren().add(round(bx + 9, y + 7.5, 9, 9, 9, Color.TRANSPARENT, words.deriveColor(0, 1, 1, 0.9)));
+			Text chev = text("›", fontNamed("Inter", 9), words.deriveColor(0, 1, 1, 0.6));
+			chev.setX(bx + half - 12);
+			chev.setY(y + 15);
+			canvas.getChildren().addAll(label, chev);
 		}
-		// the same fitting as the game: rows get tighter, then the card goes, then the whole column shrinks
-		double iconSizeF = 18;
-		double footerTop = GH - clamp(Math.round(GH * 0.07), 10, 56) - iconSizeF;
-		double rowHFit = Math.round(19 * fnum(t, "scale", 1f));
-		double minRowH = Math.round(15 * Math.min(1f, fnum(t, "scale", 1f)));
-		int mains = 8;
-		boolean showCard = bool(t, "jump", true);
-		double room = footerTop - 8 - y - (showCard ? 42 : 0);
-		while (mains * (rowHFit + 2) > room && rowHFit > minRowH) {
-			rowHFit--;
+		y += 23 + 5;
+		// the bar
+		canvas.getChildren().add(round(x0, y, colW, 20, 18, Color.rgb(255, 255, 255, 0.11), Color.rgb(255, 255, 255, 0.17)));
+		String[] segments = {"Realms", "Mods", "Rewind", "Store", "Discover"};
+		double segW = (colW - 4) / segments.length;
+		for (int i = 0; i < segments.length; i++) {
+			Text seg = text(segments[i], fontNamed(face, 6.8), words.deriveColor(0, 1, 0.92, 1));
+			double tw = measure(segments[i], seg.getFont()) + 12;
+			double sx = x0 + 2 + i * segW + (segW - tw) / 2;
+			canvas.getChildren().add(round(sx, y + 6, 7, 7, 3, Color.TRANSPARENT, words.deriveColor(0, 1, 1, 0.75)));
+			seg.setX(sx + 12);
+			seg.setY(y + 12.8);
+			canvas.getChildren().add(seg);
 		}
-		if (showCard && mains * (rowHFit + 2) > room) {
-			showCard = false;
-			room += 42;
+		y += 20 + 5;
+		// Options | Quit
+		for (int i = 0; i < 2; i++) {
+			double bx = i == 0 ? x0 : x0 + colW - half;
+			canvas.getChildren().add(round(bx, y, half, 21, 18, Color.rgb(255, 255, 255, 0.11), Color.rgb(255, 255, 255, 0.17)));
+			String w = i == 0 ? "Options" : "Quit Game";
+			Text label = text(w, fontNamed(face, 7.8), words);
+			label.setX(bx + (half - measure(w, label.getFont())) / 2 + 6);
+			label.setY(y + 13.6);
+			canvas.getChildren().add(label);
 		}
-		double neededH = mains * (rowHFit + 2);
-		double columnScale = neededH > room && room > 0 ? Math.max(0.55, room / neededH) : 1;
-		if (showCard) {
-			Group card = new Group();
-			Rectangle box = new Rectangle(220, 30);
-			box.setArcWidth(14);
-			box.setArcHeight(14);
-			box.setFill(accent.deriveColor(0, 1, 1, 0.14));
-			box.setStroke(accent.deriveColor(0, 1, 1, 0.4));
-			Text kicker = text("JUMP BACK IN", fontNamed("Mono", 5.5), accent.interpolate(Color.WHITE, 0.3));
-			kicker.setX(30);
-			kicker.setY(12);
-			Text server = text("Hypixel Network", fontNamed("Inter", 7.5), Color.web("#EDE6E6"));
-			server.setX(30);
-			server.setY(22);
-			ImageView logo = new ImageView(UiImages.resource("/net/veloclient/launcher/images/logo.png", 36, 36));
-			logo.setFitWidth(18);
-			logo.setFitHeight(18);
-			logo.setX(6);
-			logo.setY(6);
-			javafx.scene.shape.Circle play = new javafx.scene.shape.Circle(205, 15, 9, accent);
-			card.getChildren().addAll(box, logo, kicker, server, play);
-			place(card, "card", alignX(align, 220, margin, right), y, 220, 30, t);
-			y += 30 + 12;
+		y += 21 + 7;
+		// small icons
+		for (int i = 0; i < 3; i++) {
+			double cx = GW / 2 - 21 + i * 21;
+			canvas.getChildren().add(new javafx.scene.shape.Circle(cx, y + 8, 8, Color.rgb(255, 255, 255, 0.11)));
 		}
-
-		// the menu
-		String[][] rows = {{"Singleplayer", ""}, {"Multiplayer", ""}, {"Discover", "NEW"}, {"Minecraft Realms", ""}, {"Store", "NEW"},
-				{"Mods", ""}, {"Options...", ""}, {"Quit Game", ""}};
-		String style = str(t, "buttons", "words");
-		boolean boxed = !style.equals("words") && !style.equals("underline");
-		double fontSize = (font.equals("Archivo") ? 12 : 12.15) * sizeK;
-		Font rowFont = fontNamed(font, fontSize);
-		double rowH = rowHFit;
-		double widest = 0;
-		for (String[] row : rows) {
-			widest = Math.max(widest, measure(row[0], rowFont) + (boxed ? 28 : 30) + (row[1].isEmpty() ? 0 : 34));
-		}
-		Group menu = new Group();
-		double menuTop = y;
-		double minX = Double.MAX_VALUE;
-		double maxX = 0;
-		Color own = color(t, "color", null);
-		boolean shadow = bool(t, "shadow", false);
-		double glow = num(t, "glow", 0) / 100.0;
-		for (int i = 0; i < rows.length; i++) {
-			String[] row = rows[i];
-			double natural = measure(row[0], rowFont) + (boxed ? 28 : 30) + (row[1].isEmpty() ? 0 : 34);
-			double w = boxed ? widest : natural;
-			double cs = Math.min(columnScale, Math.min(GW - margin * 2, align.equals("center") ? GW - margin * 2 : GW / 2 - margin) / w);
-			// each row is drawn at 0,0 in its own group, scaled like the game's column
-			Group rowGroup = new Group();
-			rowGroup.getTransforms().add(new Scale(cs, cs, 0, 0));
-			rowGroup.setLayoutX(alignX(align, w * cs, margin, right) - margin);
-			rowGroup.setLayoutY(y - menuTop);
-			menu.getChildren().add(rowGroup);
-			Group rowsTarget = rowGroup;
-			double x = 0;
-			double ry = 0;
-			Color base = own != null ? own.deriveColor(0, 1, 1, i == 0 ? 1 : i == rows.length - 1 ? 0.6 : 0.8)
-					: i == 0 ? Color.web("#EDE6E6") : i == rows.length - 1 ? Color.web("#8E8384") : Color.web("#B3A8A9");
-			double r = Math.min(rowH / 2, 8);
-			switch (style) {
-				case "pills" -> rowsTarget.getChildren().add(round(x, ry, w, rowH, rowH, Color.rgb(255, 255, 255, 0.11), null));
-				case "glass" -> rowsTarget.getChildren().add(round(x, ry, w, rowH, r * 2, Color.web("#0C0A0E", 0.72), Color.rgb(255, 255, 255, 0.09)));
-				case "outline" -> rowsTarget.getChildren().add(round(x, ry, w, rowH, r * 2, Color.TRANSPARENT, Color.rgb(255, 255, 255, 0.25)));
-				default -> {
-				}
-			}
-			double labelW = measure(row[0], rowFont);
-			double pad = boxed ? 14 : 0;
-			double inner = w - pad * 2 - (row[1].isEmpty() ? 0 : 34);
-			double tx = switch (align) {
-				case "center" -> x + pad + (inner - labelW) / 2;
-				case "right" -> boxed ? x + w - pad - (row[1].isEmpty() ? 0 : 34) - labelW : x + w - 12 - labelW;
-				default -> x + pad;
-			};
-			double baseline = ry + rowH / 2 + fontSize * 0.36;
-			Text label = text(row[0], rowFont, base);
-			label.setX(tx);
-			label.setY(baseline);
-			if (glow > 0) {
-				Text halo = text(row[0], rowFont, accent.deriveColor(0, 1, 1, Math.min(1, glow * 0.9)));
-				halo.setX(tx);
-				halo.setY(baseline);
-				halo.setEffect(new GaussianBlur(2 + glow * 4));
-				rowsTarget.getChildren().add(halo);
-			}
-			if (shadow) {
-				Text drop = text(row[0], rowFont, Color.rgb(0, 0, 0, 0.55));
-				drop.setX(tx + 1.2);
-				drop.setY(baseline + 1.2);
-				rowsTarget.getChildren().add(drop);
-			}
-			rowsTarget.getChildren().add(label);
-			if (style.equals("underline")) {
-				double lw = labelW * 0.25;
-				double lx = align.equals("center") ? tx + (labelW - lw) / 2 : align.equals("right") ? tx + labelW - lw : tx;
-				rowsTarget.getChildren().add(rect(lx, baseline + 3, lw, 1, accent.deriveColor(0, 1, 1, 0.5)));
-			}
-			if (!row[1].isEmpty()) {
-				Text badge = text(row[1], fontNamed("Mono", 5.5), Color.WHITE);
-				double bw = measure(row[1], badge.getFont()) + 8;
-				double bx = align.equals("right") && !boxed ? tx - 8 - bw : tx + labelW + 8;
-				double by = ry + (rowH - 10) / 2;
-				rowsTarget.getChildren().add(round(bx, by, bw, 10, 6, accent, null));
-				badge.setX(bx + 4);
-				badge.setY(by + 7.5);
-				rowsTarget.getChildren().add(badge);
-			}
-			minX = Math.min(minX, rowGroup.getLayoutX());
-			maxX = Math.max(maxX, rowGroup.getLayoutX() + w * cs);
-			y += Math.round((rowH + 2) * columnScale);
-		}
-		// the group starts where its widest row starts (so the drag outline hugs the menu)
-		for (Node n : menu.getChildren()) {
-			n.setTranslateX(-minX);
-		}
-		place(menu, "menu", margin + minX, menuTop, maxX - minX, y - menuTop, t);
-
-		double footerRight = 0;
-		if (bool(t, "footer", true)) {
-			double iconSize = 18;
-			double footerY = GH - clamp(Math.round(GH * 0.07), 10, 56) - iconSize;
-			Group footer = new Group();
-			footer.getChildren().add(round(0, 0, iconSize, iconSize, 8, Color.web("#3A7BD5"), accent));
-			Text name = text("You", fontNamed("Inter", 7.5), Color.web("#EDE6E6"));
-			name.setX(26);
-			name.setY(8);
-			Text online = text("2 friends online", fontNamed("Inter", 6.5), Color.web("#3DDC97"));
-			online.setX(26);
-			online.setY(17);
-			footer.getChildren().addAll(name, online);
-			double fx = 26 + measure("2 friends online", online.getFont()) + 16;
-			for (int i = 0; i < 4; i++) {
-				footer.getChildren().add(round(fx, 0, iconSize, iconSize, 10, Color.rgb(255, 255, 255, 0.08), Color.rgb(255, 255, 255, 0.09)));
-				fx += iconSize + 5;
-			}
-			double fw = fx - 5;
-			place(footer, "footer", alignX(align, fw, margin, right), footerY, fw, iconSize, t);
-			footerRight = alignX(align, fw, margin, right) + fw;
-		}
-		if (bool(t, "store", true)) {
-			double scW = 150;
-			double scH = 34;
-			Group store = new Group();
-			store.getChildren().add(round(0, 0, scW, scH, 16, Color.web("#0C0A0A", 0.77), Color.rgb(255, 255, 255, 0.09)));
-			store.getChildren().add(round(6, 6, scH - 12, scH - 12, 10, accent.deriveColor(0, 1, 1, 0.18), null));
-			Text kicker = text("NEW IN STORE", fontNamed("Mono", 5.5), Color.web("#BCA6FF"));
-			kicker.setX(scH + 2);
-			kicker.setY(13);
-			Text what = text("Wings, cloaks and auras", fontNamed("Inter", 7.5), Color.web("#EDE6E6"));
-			what.setX(scH + 2);
-			what.setY(24);
-			store.getChildren().addAll(kicker, what);
-			double sx = align.equals("right") ? margin : GW - margin - scW;
-			double sy = GH - clamp(Math.round(GH * 0.07), 10, 56) - scH;
-			double menuLeft = margin + minX;
-			double menuRight = margin + maxX;
-			boolean clear = align.equals("right") ? sx + scW + 20 < menuLeft : sx > Math.max(menuRight, footerRight) + 20;
-			if (clear || moved(t, "store")[0] != 0 || moved(t, "store")[1] != 0) {
-				place(store, "store", sx, sy, scW, scH, t);
-			}
-		}
+		// account bottom-left, versions bottom-right
+		canvas.getChildren().add(round(10, GH - 24 - 16, 96, 24, 16, Color.web("#0C0B0F", 0.72), Color.rgb(255, 255, 255, 0.15)));
+		canvas.getChildren().add(round(15, GH - 24 - 11, 14, 14, 3, Color.web("#7A5A44"), null));
+		Text you = text("You", fontNamed(face, 6.5), words);
+		you.setX(34);
+		you.setY(GH - 24 - 16 + 10.5);
+		Text online = text("3 friends online", fontNamed("Inter", 5.4), Color.web("#B8F0D2"));
+		online.setX(34);
+		online.setY(GH - 24 - 16 + 18.5);
+		Text versions = text("MINECRAFT 1.21.11 · VELO 1.6.0", fontNamed("Mono", 4.6), Color.rgb(255, 255, 255, 0.6));
+		versions.setX(GW - 6 - measure("MINECRAFT 1.21.11 · VELO 1.6.0", versions.getFont()));
+		versions.setY(GH - 14);
+		canvas.getChildren().addAll(you, online, versions);
 	}
 
 	private static double alignX(String align, double w, double left, double right) {
@@ -1515,6 +1610,16 @@ public final class CustomizeView {
 			state = new JsonObject();
 		}
 		state.addProperty("version", 1);
+		// options the new menus don't have any more (layout, button styles, R-Shift animations): gone from the file
+		JsonObject title = section("title");
+		for (String k : List.of("align", "moved", "scale", "buttons", "hoverColor", "shadow", "glow", "brand", "jump", "footer", "store", "scrim")) {
+			title.remove(k);
+		}
+		JsonObject pause = section("pause");
+		for (String k : List.of("align", "panel", "cards")) {
+			pause.remove(k);
+		}
+		state.remove("menu");   // the R-Shift animation options (the new menus have their own motion)
 	}
 
 	/** Written to a temporary file and moved over (the game never reads half a file). */

@@ -60,6 +60,86 @@ public final class Skeleton {
 		return pulse(box);
 	}
 
+	/**
+	 * A shimmering block of {@code w} x {@code h} for one picture that loads in the background (a screenshot, a clip's
+	 * thumbnail, a cosmetic's art): put it under the {@link javafx.scene.image.ImageView} in the same StackPane. It
+	 * fades out once the picture has loaded (or failed), and stays when there's no picture to come.
+	 */
+	public static Region under(javafx.scene.image.ImageView view, double w, double h, double radius) {
+		Region block = block(w, h, radius);
+		block.getStyleClass().add("skeleton-under");
+		block.setMouseTransparent(true);
+		FadeTransition breathe = RenderGate.gate(new FadeTransition(Duration.millis(900), block));
+		breathe.setFromValue(1.0);
+		breathe.setToValue(0.55);
+		breathe.setAutoReverse(true);
+		breathe.setCycleCount(Animation.INDEFINITE);
+		Runnable done = () -> {
+			breathe.stop();
+			FadeTransition out = new FadeTransition(Duration.millis(220), block);
+			out.setToValue(0);
+			out.setOnFinished(e -> block.setVisible(false));
+			out.play();
+		};
+		java.util.function.Consumer<javafx.scene.image.Image> watch = image -> {
+			if (image == null) {
+				return;
+			}
+			if (image.getProgress() >= 1 || image.isError()) {
+				done.run();
+				return;
+			}
+			image.progressProperty().addListener((o, a2, p) -> {
+				if (p.doubleValue() >= 1) {
+					javafx.application.Platform.runLater(done);
+				}
+			});
+			image.errorProperty().addListener((o, a2, e) -> {
+				if (e) {
+					javafx.application.Platform.runLater(done);
+				}
+			});
+		};
+		watch.accept(view.getImage());
+		view.imageProperty().addListener((o, old, image) -> watch.accept(image));
+		block.sceneProperty().addListener((o, a2, scene) -> {
+			if (scene == null) {
+				breathe.stop();
+			} else if (block.isVisible() && block.getOpacity() > 0) {
+				breathe.play();
+			}
+		});
+		return block;
+	}
+
+	/** A player's outline (head over body) for a 3D preview that is still being built. */
+	public static Node player() {
+		VBox figure = new VBox(8, shimmer(64, 64, 14), shimmer(96, 150, 18));
+		figure.setAlignment(Pos.CENTER);
+		figure.setMouseTransparent(true);
+		return figure;
+	}
+
+	/** One breathing placeholder block (a tile's picture that is still being made). */
+	public static Region shimmer(double w, double h, double radius) {
+		Region block = block(w, h, radius);
+		block.getStyleClass().add("skeleton-under");
+		block.setMouseTransparent(true);
+		FadeTransition breathe = RenderGate.gate(new FadeTransition(Duration.millis(900), block));
+		breathe.setFromValue(1.0);
+		breathe.setToValue(0.55);
+		breathe.setAutoReverse(true);
+		breathe.setCycleCount(Animation.INDEFINITE);
+		block.sceneProperty().addListener((o, a2, scene) -> {
+			if (scene == null) {
+				breathe.stop();
+			} else {
+				breathe.play();
+			}
+		});
+		return block;
+	}
+
 	/** Text-line placeholders: a title and a shorter subtitle, widths varied per row so it doesn't look like a barcode. */
 	private static Node lines(int seed) {
 		double[] widths = {0.55, 0.42, 0.63, 0.48, 0.38, 0.58};

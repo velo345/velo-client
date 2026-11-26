@@ -61,6 +61,15 @@ public final class LauncherSettings {
 		public boolean partyFollowLaunches = true;
 		/** Home's Ridgeline backdrop moves (drifting hills, stars, moon). Off = a still picture, a little less CPU. */
 		public boolean animateHomeBackground = true;
+		/** The glass launcher's backdrop: a PixelScenes id, or "custom" (Velo+, the HomeBackground picture). */
+		public String backdrop = "sunset";
+		/** False until the player picks a background in Settings (the default can change until then). */
+		public boolean backdropPicked;
+		/** How dark the glass panels are (0.15 clear .. 0.85 almost solid). */
+		public double glassDarkness = 0.45;
+		/** Velo+ custom backdrop: blur and dim, 0..1. */
+		public double customBlur = 0.3;
+		public double customDim = 0.35;
 		/** System check kinds (finding titles) that no longer interrupt a launch. */
 		public java.util.List<String> silencedChecks = new java.util.ArrayList<>();
 	}

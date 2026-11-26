@@ -152,6 +152,33 @@ public final class TesterApi {
 		return json.has("reports") ? json.getAsJsonArray("reports") : new JsonArray();
 	}
 
+	/** The tester's own reports with their YouTrack state and the team's public comments ({@code read}: marks them seen). */
+	public static JsonArray myReports(boolean read) throws TesterError {
+		JsonObject json = send(request("/v1/tester/my-reports" + (read ? "?read=1" : ""), Duration.ofSeconds(20)).GET().build());
+		return json.has("reports") ? json.getAsJsonArray("reports") : new JsonArray();
+	}
+
+	/** Every open issue the team knows about (titles and fields only). */
+	public static JsonArray openIssues() throws TesterError {
+		JsonObject json = send(request("/v1/tester/issues", Duration.ofSeconds(20)).GET().build());
+		return json.has("issues") ? json.getAsJsonArray("issues") : new JsonArray();
+	}
+
+	/** "I have this too" on an open issue. */
+	public static void meToo(String issue, String version) throws TesterError {
+		send(request("/v1/tester/issue/metoo?id=" + enc(issue) + "&version=" + enc(version), Duration.ofSeconds(20))
+				.POST(HttpRequest.BodyPublishers.noBody()).build());
+	}
+
+	/** A reply on one of your reports (a comment on its YouTrack issue). */
+	public static void reply(String id, String text) throws TesterError {
+		JsonObject body = new JsonObject();
+		body.addProperty("id", id);
+		body.addProperty("text", text);
+		send(request("/v1/tester/report/reply", Duration.ofSeconds(30)).header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(body.toString())).build());
+	}
+
 	/** Owners: open / fixed / wontfix. */
 	public static void reportStatus(String id, String status) throws TesterError {
 		send(request("/v1/tester/report/status?id=" + enc(id) + "&status=" + enc(status), Duration.ofSeconds(15))

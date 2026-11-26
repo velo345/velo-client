@@ -42,16 +42,33 @@ public final class AuraFx {
 	/** Model units per block (the viewer's model is in Minecraft pixels), and where its feet are. */
 	private static final double UNIT = 16;
 	private static final double FEET_Y = 10;
+	/**
+	 * Where the feet really are on a 3D player from PlayerSkin3DView: its boxes hang down from their top edge (legs 4..16),
+	 * so 16 - FEET_Y (made for the cards' own 2D silhouette) put every ground plate 6 units up, around the shins.
+	 */
+	private static final double VIEWER_FEET_Y = 16;
 
 	/**
 	 * A glow, (shape {@link #LINE}) a beam from (x, y) to (x2, y2) {@code radius} wide, or (shape {@link #PANEL}) an
 	 * upright card {@code radius} wide and {@code x2} tall showing atlas cell {@code (int) y2}.
 	 */
-	private record Sprite(double x, double y, double depth, double radius, int rgb, double alpha, int shape, double x2, double y2, double[] corners) {
+	/**
+	 * {@code halves}: a ground piece that reaches both in front of and behind the player - drawn twice, the far half
+	 * (clipped) behind the body and the near half in front, instead of the whole plate behind the feet. {@link #FLAT}:
+	 * split at its own middle line (flat sprites, ground glows); otherwise {near polygon, far polygon} on screen (quads).
+	 */
+	private record Sprite(double x, double y, double depth, double radius, int rgb, double alpha, int shape, double x2, double y2, double[] corners,
+			double[][] halves) {
 		Sprite(double x, double y, double depth, double radius, int rgb, double alpha, int shape, double x2, double y2) {
-			this(x, y, depth, radius, rgb, alpha, shape, x2, y2, null);
+			this(x, y, depth, radius, rgb, alpha, shape, x2, y2, null, null);
+		}
+
+		Sprite(double x, double y, double depth, double radius, int rgb, double alpha, int shape, double x2, double y2, double[] corners) {
+			this(x, y, depth, radius, rgb, alpha, shape, x2, y2, corners, null);
 		}
 	}
+
+	private static final double[][] FLAT = new double[0][];
 
 	private static final int LINE = 99;
 	private static final int PANEL = 98;
@@ -117,7 +134,11 @@ public final class AuraFx {
 				double focal = (h / 2) / Math.tan(Math.toRadians(camera.getFieldOfView() / 2));
 				double distance = -camera.getTranslateZ();
 				double angle = Math.toRadians(yaw.getAngle());
-				List<Sprite> sprites = project(emitter[0], s.settings(), w / 2, h / 2, focal, distance, angle);
+				AuraEffects.Emitter e = emitter[0];
+				AuraEffects.Settings settings = s.settings();
+				// the real 3D player's feet (and the camera's own height offset)
+				List<Sprite> sprites = project(out -> e.draw(settings, 0, 0, 0, out), w / 2, h / 2, focal, distance, angle,
+						VIEWER_FEET_Y - camera.getTranslateY());
 				draw(back.getGraphicsContext2D(), sprites, distance, false, false);
 				draw(front.getGraphicsContext2D(), sprites, distance, true, false);
 			}
@@ -485,12 +506,17 @@ public final class AuraFx {
 	/** The aura's sprites on screen (model space: x right, y down, feet at FEET_Y; turned by {@code angle}). */
 	private static List<Sprite> project(AuraEffects.Emitter emitter, AuraEffects.Settings settings, double cx, double cy, double focal,
 			double distance, double angle) {
-		return project(out -> emitter.draw(settings, 0, 0, 0, out), cx, cy, focal, distance, angle);
+		return project(out -> emitter.draw(settings, 0, 0, 0, out), cx, cy, focal, distance, angle, FEET_Y);
+	}
+
+	private static List<Sprite> project(java.util.function.Consumer<AuraEffects.Out> drawer, double cx, double cy, double focal, double distance,
+			double angle) {
+		return project(drawer, cx, cy, focal, distance, angle, FEET_Y);
 	}
 
 	/** Whatever {@code drawer} draws, on screen (the same projection as an aura's). */
 	private static List<Sprite> project(java.util.function.Consumer<AuraEffects.Out> drawer, double cx, double cy, double focal, double distance,
-			double angle) {
+			double angle, double feetY) {
 		double cos = Math.cos(angle);
 		double sin = Math.sin(angle);
 		List<Sprite> out = new ArrayList<>();
@@ -505,7 +531,7 @@ public final class AuraFx {
 					return;
 				}
 				double mx = x * UNIT;
-				double my = FEET_Y - y * UNIT;
+				double my = feetY - y * UNIT;
 				double mz = z * UNIT;
 				double rx = mx * cos + mz * sin;
 				double rz = -mx * sin + mz * cos;
@@ -514,7 +540,9 @@ public final class AuraFx {
 					return;
 				}
 				double k = focal / d;
-				out.add(new Sprite(cx + rx * k, cy + my * k, rz, size * UNIT * k, rgb, alpha, shape, 0, 0));
+				// a ground glow wider than its distance to the player's middle lies under the feet: split it
+				boolean ground = shape == AuraEffects.DISC && Math.abs(rz) < size * UNIT * 0.9;
+				out.add(new Sprite(cx + rx * k, cy + my * k, rz, size * UNIT * k, rgb, alpha, shape, 0, 0, null, ground ? FLAT : null));
 			}
 
 			@Override
@@ -525,7 +553,9 @@ public final class AuraFx {
 				}
 				double[] c = alpha <= 0.02f ? null : point(x, y, z);
 				if (c != null) {
-					out.add(new Sprite(c[0], c[1], c[2], size * UNIT * focal / c[3], rgb, alpha, ATLAS_SHAPE + shape, rot, 0));
+					// a plate lying on the ground around the player: its near half goes in front of the feet
+					boolean ground = !AuraEffects.upright(shape & 0xFF) && Math.abs(c[2]) < size * UNIT * 0.9;
+					out.add(new Sprite(c[0], c[1], c[2], size * UNIT * focal / c[3], rgb, alpha, ATLAS_SHAPE + shape, rot, 0, null, ground ? FLAT : null));
 				}
 			}
 
@@ -535,6 +565,7 @@ public final class AuraFx {
 					return;
 				}
 				double[] screen = new double[8];
+				double[] rz = new double[4];
 				double depth = 0;
 				for (int i = 0; i < 4; i++) {
 					double[] c = point(q[i * 3], q[i * 3 + 1], q[i * 3 + 2]);
@@ -543,9 +574,10 @@ public final class AuraFx {
 					}
 					screen[i * 2] = c[0];
 					screen[i * 2 + 1] = c[1];
+					rz[i] = c[2];
 					depth += c[2] / 4;
 				}
-				out.add(new Sprite(screen[0], screen[1], depth, 0, rgb, alpha, QUAD, 0, cell, screen));
+				out.add(new Sprite(screen[0], screen[1], depth, 0, rgb, alpha, QUAD, 0, cell, screen, halves(screen, rz)));
 			}
 
 			@Override
@@ -578,7 +610,7 @@ public final class AuraFx {
 
 			private double[] point(float x, float y, float z) {
 				double mx = x * UNIT;
-				double my = FEET_Y - y * UNIT;
+				double my = feetY - y * UNIT;
 				double mz = z * UNIT;
 				double rx = mx * cos + mz * sin;
 				double rz = -mx * sin + mz * cos;
@@ -732,105 +764,177 @@ public final class AuraFx {
 		g.setGlobalBlendMode(additive ? BlendMode.ADD : BlendMode.SRC_OVER);
 		double boost = additive ? 1.0 : 1.3;
 		for (Sprite s : sprites) {
+			if (s.halves() != null) {
+				// a ground plate around the feet: only this canvas's half of it
+				g.save();
+				clipHalf(g, s, front);
+				drawOne(g, s, boost);
+				g.restore();
+				continue;
+			}
 			if (s.depth < 0 != front) {
 				continue;
 			}
-			Color c = Color.rgb((s.rgb >> 16) & 255, (s.rgb >> 8) & 255, s.rgb & 255, Math.min(1, s.alpha * boost));
-			if (s.shape == PANEL) {
-				int cell = (int) s.y2;
-				double w = Math.max(1, s.radius);
-				double h = Math.max(1, s.x2);
-				g.setGlobalAlpha(Math.min(1, s.alpha * boost));
-				if (cell >= AuraEffects.CELL_GLYPH) {
-					// A code glyph: the character itself (cached picture), mirrored like in the game.
-					double gw = w / 9.0 * 10;
-					double gh = h / 12.0 * 14;
-					g.drawImage(glyphImage(cell - AuraEffects.CELL_GLYPH, s.rgb), s.x - gw / 2, s.y - gh / 2, gw, gh);
-				} else {
-					// A light curtain: bright at the foot, fading upwards (cached gradient picture).
-					g.drawImage(curtainImage(s.rgb), s.x - w / 2, s.y - h / 2, w, h);
-				}
-				g.setGlobalAlpha(1);
-				continue;
-			}
-			if (s.shape == QUAD) {
-				// The cell stretched onto the quad (an affine fit through its first, second and last corner).
-				double[] q = s.corners;
-				g.save();
-				g.setGlobalAlpha(Math.min(1, s.alpha * boost));
-				g.transform(q[6] - q[0], q[7] - q[1], q[2] - q[0], q[3] - q[1], q[0], q[1]);
-				g.drawImage(cellImage((int) s.y2, s.rgb), 0, 0, 1, 1);
-				g.restore();
-				continue;
-			}
-			if (s.shape >= ATLAS_SHAPE) {
-				int shape = s.shape - ATLAS_SHAPE;
-				double r = Math.max(1, s.radius);
-				g.save();
-				g.setGlobalAlpha(Math.min(1, s.alpha * boost));
-				g.translate(s.x, s.y);
-				if (!AuraEffects.upright(shape)) {
-					// Lying flat: seen from about head height, squashed.
-					g.scale(1, 0.28);
-				}
-				g.rotate(Math.toDegrees(-s.x2));
-				g.drawImage(cellImage(AuraEffects.cell(shape), s.rgb), -r, -r, r * 2, r * 2);
-				g.restore();
-				continue;
-			}
-			if (s.shape == AuraEffects.HEART) {
-				double r = Math.max(1.5, s.radius);
-				g.setFill(c);
-				g.beginPath();
-				g.moveTo(s.x, s.y + r * 0.9);
-				g.bezierCurveTo(s.x - r * 1.4, s.y - r * 0.1, s.x - r * 0.6, s.y - r * 1.1, s.x, s.y - r * 0.35);
-				g.bezierCurveTo(s.x + r * 0.6, s.y - r * 1.1, s.x + r * 1.4, s.y - r * 0.1, s.x, s.y + r * 0.9);
-				g.closePath();
-				g.fill();
-				continue;
-			}
-			if (s.shape == AuraEffects.LEAF) {
-				double r = Math.max(1.5, s.radius);
-				g.save();
-				g.translate(s.x, s.y);
-				g.rotate((s.rgb * 37 + s.depth * 40) % 360);
-				g.setFill(c);
-				g.fillOval(-r * 0.4, -r, r * 0.8, r * 2);
-				g.restore();
-				continue;
-			}
-			if (s.shape == LINE) {
-				// A soft glow around a sharper line.
-				g.setLineCap(StrokeLineCap.ROUND);
-				g.setStroke(c.deriveColor(0, 1, 1, 0.35));
-				g.setLineWidth(Math.max(1.2, s.radius * 1.1));
-				g.strokeLine(s.x, s.y, s.x2, s.y2);
-				g.setStroke(c);
-				g.setLineWidth(Math.max(0.6, s.radius * 0.4));
-				g.strokeLine(s.x, s.y, s.x2, s.y2);
-				continue;
-			}
-			double r = Math.max(1, s.radius);
-			// Glows are a cached soft sprite per colour, stamped with the sprite's alpha: building a gradient
-			// object per particle per frame (the old way) made a page of aura cards crawl.
-			javafx.scene.image.Image glow = glowImage(s.rgb);
-			g.setGlobalAlpha(Math.min(1, s.alpha * boost));
-			if (s.shape == AuraEffects.DISC) {
-				g.drawImage(glow, s.x - r, s.y - r * 0.22, r * 2, r * 0.44);
-				g.setGlobalAlpha(1);
-				continue;
-			}
-			g.drawImage(glow, s.x - r, s.y - r, r * 2, r * 2);
-			g.setGlobalAlpha(1);
-			if (s.shape == AuraEffects.STAR) {
-				g.setStroke(c);
-				g.setLineCap(StrokeLineCap.ROUND);
-				g.setLineWidth(Math.max(0.6, r * 0.12));
-				g.strokeLine(s.x - r * 1.1, s.y, s.x + r * 1.1, s.y);
-				g.strokeLine(s.x, s.y - r * 1.1, s.x, s.y + r * 1.1);
-			}
+			drawOne(g, s, boost);
 		}
 		g.setGlobalBlendMode(BlendMode.SRC_OVER);
+	}
+
+	/** Clips to the near (front) or far half of a split ground piece. */
+	private static void clipHalf(GraphicsContext g, Sprite s, boolean front) {
+		g.beginPath();
+		if (s.halves() == FLAT) {
+			double r = Math.max(1, s.radius) * 2;
+			// seen from above the ground, the near half of a flat ring is the lower half on screen
+			g.rect(s.x - r, front ? s.y : s.y - r, r * 2, r);
+		} else {
+			double[] poly = s.halves()[front ? 0 : 1];
+			g.moveTo(poly[0], poly[1]);
+			for (int k = 2; k + 1 < poly.length; k += 2) {
+				g.lineTo(poly[k], poly[k + 1]);
+			}
+			g.closePath();
+		}
+		g.clip();
+	}
+
+	/**
+	 * A quad whose corners lie both in front of and behind the player (depth plane rz = 0): its {near, far} screen
+	 * polygons, cut where the edges cross that plane (screen-space interpolation - plenty for a ground plate). Null when
+	 * the whole quad is on one side.
+	 */
+	private static double[][] halves(double[] screen, double[] rz) {
+		boolean anyFront = false;
+		boolean anyBack = false;
+		for (double z : rz) {
+			anyFront |= z < 0;
+			anyBack |= z >= 0;
+		}
+		if (!anyFront || !anyBack) {
+			return null;
+		}
+		double[] near = new double[12];
+		double[] far = new double[12];
+		int n = 0;
+		int f = 0;
+		for (int i = 0; i < 4; i++) {
+			int j = (i + 1) % 4;
+			double xi = screen[i * 2], yi = screen[i * 2 + 1];
+			if (rz[i] < 0) {
+				near[n++] = xi;
+				near[n++] = yi;
+			} else {
+				far[f++] = xi;
+				far[f++] = yi;
+			}
+			if (rz[i] < 0 != rz[j] < 0) {
+				double t = rz[i] / (rz[i] - rz[j]);
+				double x = xi + (screen[j * 2] - xi) * t;
+				double y = yi + (screen[j * 2 + 1] - yi) * t;
+				near[n++] = x;
+				near[n++] = y;
+				far[f++] = x;
+				far[f++] = y;
+			}
+		}
+		return new double[][] {java.util.Arrays.copyOf(near, n), java.util.Arrays.copyOf(far, f)};
+	}
+
+	private static void drawOne(GraphicsContext g, Sprite s, double boost) {
+		Color c = Color.rgb((s.rgb >> 16) & 255, (s.rgb >> 8) & 255, s.rgb & 255, Math.min(1, s.alpha * boost));
+		if (s.shape == PANEL) {
+			int cell = (int) s.y2;
+			double w = Math.max(1, s.radius);
+			double h = Math.max(1, s.x2);
+			g.setGlobalAlpha(Math.min(1, s.alpha * boost));
+			if (cell >= AuraEffects.CELL_GLYPH) {
+				// A code glyph: the character itself (cached picture), mirrored like in the game.
+				double gw = w / 9.0 * 10;
+				double gh = h / 12.0 * 14;
+				g.drawImage(glyphImage(cell - AuraEffects.CELL_GLYPH, s.rgb), s.x - gw / 2, s.y - gh / 2, gw, gh);
+			} else {
+				// A light curtain: bright at the foot, fading upwards (cached gradient picture).
+				g.drawImage(curtainImage(s.rgb), s.x - w / 2, s.y - h / 2, w, h);
+			}
+			g.setGlobalAlpha(1);
+			return;
+		}
+		if (s.shape == QUAD) {
+			// The cell stretched onto the quad (an affine fit through its first, second and last corner).
+			double[] q = s.corners;
+			g.save();
+			g.setGlobalAlpha(Math.min(1, s.alpha * boost));
+			g.transform(q[6] - q[0], q[7] - q[1], q[2] - q[0], q[3] - q[1], q[0], q[1]);
+			g.drawImage(cellImage((int) s.y2, s.rgb), 0, 0, 1, 1);
+			g.restore();
+			return;
+		}
+		if (s.shape >= ATLAS_SHAPE) {
+			int shape = s.shape - ATLAS_SHAPE;
+			double r = Math.max(1, s.radius);
+			g.save();
+			g.setGlobalAlpha(Math.min(1, s.alpha * boost));
+			g.translate(s.x, s.y);
+			if (!AuraEffects.upright(shape)) {
+				// Lying flat: seen from about head height, squashed.
+				g.scale(1, 0.28);
+			}
+			g.rotate(Math.toDegrees(-s.x2));
+			g.drawImage(cellImage(AuraEffects.cell(shape), s.rgb), -r, -r, r * 2, r * 2);
+			g.restore();
+			return;
+		}
+		if (s.shape == AuraEffects.HEART) {
+			double r = Math.max(1.5, s.radius);
+			g.setFill(c);
+			g.beginPath();
+			g.moveTo(s.x, s.y + r * 0.9);
+			g.bezierCurveTo(s.x - r * 1.4, s.y - r * 0.1, s.x - r * 0.6, s.y - r * 1.1, s.x, s.y - r * 0.35);
+			g.bezierCurveTo(s.x + r * 0.6, s.y - r * 1.1, s.x + r * 1.4, s.y - r * 0.1, s.x, s.y + r * 0.9);
+			g.closePath();
+			g.fill();
+			return;
+		}
+		if (s.shape == AuraEffects.LEAF) {
+			double r = Math.max(1.5, s.radius);
+			g.save();
+			g.translate(s.x, s.y);
+			g.rotate((s.rgb * 37 + s.depth * 40) % 360);
+			g.setFill(c);
+			g.fillOval(-r * 0.4, -r, r * 0.8, r * 2);
+			g.restore();
+			return;
+		}
+		if (s.shape == LINE) {
+			// A soft glow around a sharper line.
+			g.setLineCap(StrokeLineCap.ROUND);
+			g.setStroke(c.deriveColor(0, 1, 1, 0.35));
+			g.setLineWidth(Math.max(1.2, s.radius * 1.1));
+			g.strokeLine(s.x, s.y, s.x2, s.y2);
+			g.setStroke(c);
+			g.setLineWidth(Math.max(0.6, s.radius * 0.4));
+			g.strokeLine(s.x, s.y, s.x2, s.y2);
+			return;
+		}
+		double r = Math.max(1, s.radius);
+		// Glows are a cached soft sprite per colour, stamped with the sprite's alpha: building a gradient
+		// object per particle per frame (the old way) made a page of aura cards crawl.
+		javafx.scene.image.Image glow = glowImage(s.rgb);
+		g.setGlobalAlpha(Math.min(1, s.alpha * boost));
+		if (s.shape == AuraEffects.DISC) {
+			g.drawImage(glow, s.x - r, s.y - r * 0.22, r * 2, r * 0.44);
+			g.setGlobalAlpha(1);
+			return;
+		}
+		g.drawImage(glow, s.x - r, s.y - r, r * 2, r * 2);
+		g.setGlobalAlpha(1);
+		if (s.shape == AuraEffects.STAR) {
+			g.setStroke(c);
+			g.setLineCap(StrokeLineCap.ROUND);
+			g.setLineWidth(Math.max(0.6, r * 0.12));
+			g.strokeLine(s.x - r * 1.1, s.y, s.x + r * 1.1, s.y);
+			g.strokeLine(s.x, s.y - r * 1.1, s.x, s.y + r * 1.1);
+		}
 	}
 
 	/** A dim player shape (cards), {@code k} pixels per model unit. */

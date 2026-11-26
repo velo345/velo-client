@@ -33,7 +33,7 @@ public final class SavedServerStore {
 	public static List<SavedServer> loadAll() {
 		Path file = VeloPaths.config().resolve(FILE_NAME);
 		if (!Files.exists(file)) {
-			return new ArrayList<>();
+			return seedForNewPlayer();
 		}
 		try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
 			List<SavedServer> servers = GSON.fromJson(reader, new TypeToken<List<SavedServer>>() {}.getType());
@@ -41,6 +41,25 @@ public final class SavedServerStore {
 		} catch (IOException | JsonParseException e) {
 			return new ArrayList<>();
 		}
+	}
+
+	/**
+	 * A brand-new player (no server list yet, never launched into a server) starts with our partner server LuckySMP
+	 * as an example - written once, so removing it keeps it gone. Anyone who already played servers starts empty.
+	 */
+	private static List<SavedServer> seedForNewPlayer() {
+		List<SavedServer> servers = new ArrayList<>();
+		boolean playedServers = QuickLaunchStore.loadAll().stream()
+				.anyMatch(e -> e.serverAddress() != null && !e.serverAddress().isBlank());
+		if (!playedServers) {
+			servers.add(new SavedServer(UUID.randomUUID().toString(), "LuckySMP", "luckysmp.net", 25565, null));
+		}
+		try {
+			saveAll(servers);
+		} catch (RuntimeException ignored) {
+			// read-only config: show it this time anyway
+		}
+		return servers;
 	}
 
 	public static void saveAll(List<SavedServer> servers) {

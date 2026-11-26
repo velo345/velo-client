@@ -19,6 +19,14 @@ import java.util.Map;
 public final class Icons {
 
 	private static final Map<String, String> PATHS = Map.ofEntries(
+			Map.entry("layers", "M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"),
+			Map.entry("terminal", "M3 6a2.5 2.5 0 0 1 2.5-2.5h13A2.5 2.5 0 0 1 21 6v12a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18zM7.5 10l2.5 2-2.5 2M12.5 15h4"),
+			Map.entry("pulse", "M3 12h4l2-5 4 10 2-5h6"),
+			Map.entry("sun", "M12 3v2M12 19v2M5 5l1.4 1.4M17.6 17.6 19 19M3 12h2M19 12h2M5 19l1.4-1.4M17.6 6.4 19 5M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"),
+			Map.entry("file-code", "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M10 13l-2 2 2 2M14 13l2 2-2 2"),
+			Map.entry("cube", "M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10"),
+			Map.entry("package", "M4 6h16M4 6v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6M4 6l2-3h12l2 3M9 11h6"),
+			Map.entry("hanger", "M10 7.5a2 2 0 1 1 2.6 1.9c-.4.1-.6.5-.6.9V11M2.5 18.5 12 12l9.5 6.5z"),
 			Map.entry("home", "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"),
 			Map.entry("library", "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"),
 			Map.entry("server", "M3 4h18v7H3zM3 13h18v7H3zM7 7.5h.01M7 16.5h.01"),

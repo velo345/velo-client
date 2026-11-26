@@ -153,7 +153,7 @@ public final class CoinsView {
 		VBox.setMargin(actions, new javafx.geometry.Insets(8, 0, 0, 0));
 		hero.getStyleClass().add("card");
 		hero.setPadding(new javafx.geometry.Insets(26, 30, 26, 30));
-		hero.setStyle("-fx-background-color: radial-gradient(center 85% 20%, radius 65%, rgba(247,192,74,0.16) 0%, transparent 100%), -velo-surface;"
+		hero.setStyle("-fx-background-color: radial-gradient(center 85% 20%, radius 65%, rgba(247,192,74,0.10) 0%, transparent 100%), -velo-glass-tint;"
 				+ " -fx-border-color: rgba(247,192,74,0.22);");
 		return hero;
 	}

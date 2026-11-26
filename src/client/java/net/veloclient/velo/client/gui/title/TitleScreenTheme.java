@@ -235,13 +235,16 @@ public final class TitleScreenTheme {
 	private static final int PANO_W = 6144;
 	private static final int PANO_H = 1152;
 	/** Where the duel's animated crop sits in the panorama, and its frame atlas layout. */
-	private static final int DUEL_X = 2776;
-	private static final int DUEL_Y = 372;
-	private static final int DUEL_FRAME_W = 640;
-	private static final int DUEL_FRAME_H = 432;
-	private static final int DUEL_COLUMNS = 6;
-	private static final int DUEL_FRAMES = 24;
-	private static final float DUEL_FPS = 12f;
+	// "Drift" (2026-11-25, tools/panorama/panorama_space.py): the animated crop is the floating astronaut
+	// 2026-11-25: 48 frames of a slow 360 degree roll, 704 x 704 crop, atlas at half resolution (glow at a quarter)
+	private static final int DUEL_X = 2720;
+	private static final int DUEL_Y = 173;
+	private static final int DUEL_FRAME_W = 704;
+	private static final int DUEL_FRAME_H = 704;
+	private static final int DUEL_COLUMNS = 8;
+	private static final int DUEL_FRAMES = 120;   // 2026-11-26: a calm 12 s zero-g drift (was a 48-frame roll)
+	private static final int DUEL_ATLAS_DIV = 2;
+	private static final float DUEL_FPS = 10f;   // 120 frames = one 12 s loop; neighbouring frames are cross-faded
 	/** Panorama pixels scrolled per second - one full turn takes about four minutes. */
 	private static final double PAN_PIXELS_PER_SECOND = 25.0;
 	private static final int EMBERS = 34;
@@ -505,7 +508,8 @@ public final class TitleScreenTheme {
 			return;
 		}
 		int solidA = dark | (a << 24);
-		switch (look.align) {
+		// the Play Deck is centred: a soft band down the middle instead of the left column's fade
+		switch (TitleMenu.deck(look) ? "center" : look.align) {
 			case "right" -> {
 				int solid = Math.round(screenWidth * 0.22f);
 				context.fill(screenWidth - solid, 0, screenWidth, screenHeight, solidA);
@@ -538,7 +542,7 @@ public final class TitleScreenTheme {
 		if (additive ? (color & 0xFFFFFF) == 0 : (color >>> 24) == 0) {
 			return;
 		}
-		int div = additive ? 2 : 1; // the glow atlas is half resolution
+		int div = additive ? DUEL_ATLAS_DIV * 2 : DUEL_ATLAS_DIV; // the atlas is half resolution, its glow a quarter
 		int frameW = DUEL_FRAME_W / div;
 		int frameH = DUEL_FRAME_H / div;
 		float u = (frame % DUEL_COLUMNS) * frameW;
@@ -555,18 +559,17 @@ public final class TitleScreenTheme {
 		return 0xFF000000 | (r << 16) | (g << 8) | b;
 	}
 
-	/** Theme-colored embers drifting up through the scene, a little faster than the pan (parallax). */
+	/** Theme-colored star dust drifting sideways through space, a little faster than the pan (parallax), twinkling. */
 	private static void drawEmbers(DrawContext context, int screenWidth, int screenHeight, double seconds, float scale, int accent) {
 		int span = screenWidth + 60;
 		int core = VeloAnim.lerpArgb(accent, 0xFFFFFFFF, 0.45f);
 		for (int i = 0; i < EMBERS; i++) {
 			double r1 = hash(i * 3 + 1), r2 = hash(i * 3 + 2), r3 = hash(i * 3 + 3);
-			double life = (seconds * (0.035 + 0.035 * r2) + r1) % 1.0;
 			double drift = seconds * PAN_PIXELS_PER_SECOND * scale * (1.25 + 0.5 * r3);
-			float x = (float) (((r3 * span - drift) % span + span) % span) - 30
-					+ (float) Math.sin(seconds * 0.7 + i) * 6f;
-			float y = (float) (screenHeight * (1.02 - life * 0.85));
-			float fade = (float) Math.sin(life * Math.PI);
+			float x = (float) (((r3 * span - drift) % span + span) % span) - 30;
+			// weightless: a slow sway up and down instead of rising like sparks
+			float y = (float) (screenHeight * (0.06 + 0.88 * r1)) + (float) Math.sin(seconds * (0.25 + 0.2 * r2) + i) * 8f;
+			float fade = (float) (0.35 + 0.65 * Math.pow(0.5 + 0.5 * Math.sin(seconds * (0.6 + r2) + i * 1.7), 2));
 			float size = 0.6f + (float) r2 * 0.9f;
 			VeloDraw.fillCircle(context, x, y, size * 3.2f, VeloUi.withAlpha(accent, Math.round(0x2A * fade)));
 			VeloDraw.fillCircle(context, x, y, size, VeloUi.withAlpha(core, Math.round(0xC8 * fade)));

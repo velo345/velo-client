@@ -25,6 +25,7 @@
 	"key.velo-client.rewind_pause": "Velo Rewind: Pause / Resume",
 	"key.velo-client.rewind_play": "Velo Rewind: Play / Pause Replay",
 	"key.velo-client.fight_recap": "Open Fight Recap",
+	"key.velo-client.all_tiers": "See all tiers (Tier Tagger)",
 	"key.velo-client.party_ping": "Party Ping",
 	"key.velo-client.fast_grow": "Toggle Fast Grow",
 	"key.category.velo-client.redstone": "Velo Redstone Mode",

@@ -80,14 +80,21 @@ def background(s: int) -> Image.Image:
     line = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     ImageDraw.Draw(line).line((PANEL_X * s, 128 * s, (W - 30) * s, 128 * s), fill=(255, 255, 255, 22), width=max(1, s))
     img.alpha_composite(line)
-    # title bar: minimize / close glyphs, top right (click areas are labels in the .iss)
-    gx = (W - 22) * s
-    gy = 22 * s
-    r = 5 * s
-    d.line((gx - r, gy - r, gx + r, gy + r), fill=TEXT_2, width=max(1, int(1.6 * s)))
-    d.line((gx - r, gy + r, gx + r, gy - r), fill=TEXT_2, width=max(1, int(1.6 * s)))
-    mx = gx - 34 * s
-    d.line((mx - r, gy, mx + r, gy), fill=TEXT_2, width=max(1, int(1.6 * s)))
+    # title bar: minimise / close as small glass circles, like the launcher's (click areas are labels in the .iss)
+    for cx, glyph in (((W - 38), "x"), ((W - 70), "-")):
+        cy = 34
+        circ = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        ImageDraw.Draw(circ).ellipse(((cx - 12) * s, (cy - 12) * s, (cx + 12) * s, (cy + 12) * s), fill=(255, 255, 255, 16),
+                                     outline=(255, 255, 255, 26), width=max(1, s))
+        img.alpha_composite(circ)
+        d = ImageDraw.Draw(img)
+        r = 4.5 * s
+        gx, gy = cx * s, cy * s
+        if glyph == "x":
+            d.line((gx - r, gy - r, gx + r, gy + r), fill=TEXT_2, width=max(1, int(1.5 * s)))
+            d.line((gx - r, gy + r, gx + r, gy - r), fill=TEXT_2, width=max(1, int(1.5 * s)))
+        else:
+            d.line((gx - r, gy, gx + r, gy), fill=TEXT_2, width=max(1, int(1.5 * s)))
     # accent line along the bottom of the hero
     d.rectangle((0, h - 3 * s, 300 * s, h), fill=ACCENT)
     return img.convert("RGB")

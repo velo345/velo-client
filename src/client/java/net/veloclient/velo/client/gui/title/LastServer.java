@@ -52,8 +52,14 @@ public final class LastServer {
 			checkedAddress = address;
 			checkedAt = now;
 			Thread thread = new Thread(() -> {
-				boolean up = probe(address);
-				reachableAddress = up ? address : null;
+				String json = status(address);
+				reachableAddress = json != null ? address : null;
+				// the icon the address itself answers with (on a network: the proxy's) replaces whatever was remembered
+				String fav = faviconFromStatus(json);
+				Entry current = cached;
+				if (fav != null && validPng(fav) && current != null && address.equals(current.address()) && !fav.equals(current.favicon())) {
+					save(new Entry(current.serverName(), current.address(), fav, current.joinedAt()));
+				}
 				checking = false;
 			}, "Velo last-server check");
 			thread.setDaemon(true);
@@ -67,7 +73,7 @@ public final class LastServer {
 	}
 
 	/** The server's status JSON (MOTD, players, favicon) from a real status ping, or null when it doesn't answer. */
-	private static String status(String address) {
+	public static String status(String address) {
 		try {
 			//? if <26.1 {
 			var resolved = net.minecraft.client.network.AllowedAddressResolver.DEFAULT.resolve(net.minecraft.client.network.ServerAddress.parse(address));
@@ -158,13 +164,18 @@ public final class LastServer {
 		if (address == null || address.isBlank() || ClientCompat.isRealm() || System.getProperty("velo.screenshotTour") != null) {
 			return;
 		}
-		String name = ClientCompat.currentServerName();
+		String name = cleanName(ClientCompat.currentServerName(), address);
 		// The joined ServerData only has an icon when you came from the server list and it had pinged that entry - a direct
 		// connect, a partner/"Jump back in" join or a list that hasn't loaded yet leave it empty. Fall back to the saved list,
 		// then to the icon remembered last time, then to our own status ping (what the list sends, so proxies answer it too).
-		byte[] bytes = faviconBytes();
+		// the saved list's icon first (what you see in the server list), then the joined connection's - on a network that
+		// one can come from the backend server and be empty or broken (the magenta square, owner 2026-11-26)
+		byte[] bytes = MenuInfo.savedServerIcon(address);
 		if (bytes == null) {
-			bytes = MenuInfo.savedServerIcon(address);
+			bytes = faviconBytes();
+		}
+		if (bytes != null && !validPng(Base64.getEncoder().encodeToString(bytes))) {
+			bytes = null;
 		}
 		String favicon = bytes == null ? null : Base64.getEncoder().encodeToString(bytes);
 		Entry previous = get();
@@ -172,16 +183,57 @@ public final class LastServer {
 			favicon = previous.favicon();
 		}
 		save(new Entry(name == null || name.isBlank() ? address : name, address, favicon, System.currentTimeMillis()));
-		if (favicon == null) {
+		{
+			// always ask the address itself too: its answer is the icon the server list shows
 			Thread thread = new Thread(() -> {
 				String icon = faviconFromStatus(status(address));
 				Entry current = cached;
-				if (icon != null && current != null && address.equals(current.address())) {
+				if (icon != null && validPng(icon) && current != null && address.equals(current.address())) {
 					save(new Entry(current.serverName(), current.address(), icon, current.joinedAt()));
 				}
 			}, "Velo server icon");
 			thread.setDaemon(true);
 			thread.start();
+		}
+	}
+
+	/** A real name: the server list's name for the address, else the address - never vanilla's "Minecraft Server" placeholder. */
+	private static String cleanName(String name, String address) {
+		String saved = MenuInfo.savedServerName(address);
+		if (saved != null && !saved.isBlank() && !isPlaceholder(saved)) {
+			return saved;
+		}
+		if (name == null || name.isBlank() || isPlaceholder(name)) {
+			return address;
+		}
+		return name;
+	}
+
+	private static boolean isPlaceholder(String name) {
+		String placeholder;
+		try {
+			//? if <26.1 {
+			placeholder = net.minecraft.client.resource.language.I18n.translate("selectServer.defaultName");
+			//?} else {
+			/*placeholder = net.minecraft.client.resources.language.I18n.get("selectServer.defaultName");
+			*///?}
+		} catch (RuntimeException e) {
+			placeholder = "Minecraft Server";
+		}
+		return name.equalsIgnoreCase("Minecraft Server") || name.equalsIgnoreCase(placeholder);
+	}
+
+	/** Whether the base64 data is a picture that decodes (anything else drew Minecraft's missing-texture square). */
+	private static boolean validPng(String base64) {
+		try {
+			byte[] png = Base64.getDecoder().decode(base64);
+			if (png.length < 8 || (png[0] & 0xFF) != 0x89 || png[1] != 'P' || png[2] != 'N' || png[3] != 'G') {
+				return false;
+			}
+			java.awt.image.BufferedImage image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
+			return image != null && image.getWidth() > 0 && image.getHeight() > 0;
+		} catch (Exception e) {
+			return false;
 		}
 	}
 
@@ -235,6 +287,13 @@ public final class LastServer {
 			try {
 				if (Files.exists(file())) {
 					cached = GSON.fromJson(Files.readString(file(), StandardCharsets.UTF_8), Entry.class);
+					if (cached != null && cached.address() != null) {
+						String name = cleanName(cached.serverName(), cached.address());
+						String fav = cached.favicon() != null && validPng(cached.favicon()) ? cached.favicon() : null;
+						if (!name.equals(cached.serverName()) || !java.util.Objects.equals(fav, cached.favicon())) {
+							cached = new Entry(name, cached.address(), fav, cached.joinedAt());
+						}
+					}
 				}
 			} catch (Exception ignored) {
 				cached = null;

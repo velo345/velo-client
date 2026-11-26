@@ -32,6 +32,14 @@ public final class RedstoneMode {
 			while (RmKeys.TOGGLE.wasPressed()) {
 				toggle();
 			}
+			// Alt+R always leaves Redstone Mode (shown on the overlay's Leave button), whatever the keybinds say
+			// (works in the Alt cursor screen too - holding Alt opens it)
+			boolean altR = active && net.veloclient.velo.client.util.Keys.isKeyDown(net.veloclient.velo.client.util.Keys.LEFT_ALT)
+					&& net.veloclient.velo.client.util.Keys.isKeyDown(net.veloclient.velo.client.util.Keys.letter('R'));
+			if (altR && !altRDown) {
+				exit();
+			}
+			altRDown = altR;
 			RmInput.tick();
 		});
 		WorldRenderEvents.BEFORE_DEBUG_RENDER.register(context -> RmRender.world());
@@ -47,6 +55,8 @@ public final class RedstoneMode {
 			toolSlot = false;
 		});
 	}
+
+	private static boolean altRDown;
 
 	public static boolean active() {
 		return active;

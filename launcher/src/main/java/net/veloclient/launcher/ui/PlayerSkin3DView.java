@@ -469,6 +469,306 @@ public final class PlayerSkin3DView {
 		return wrapper;
 	}
 
+	/**
+	 * Home's player (2026-11-25 glass launcher): every body part in its own group around its joint, posed every frame by a
+	 * calm idle - breathing, a slow arm swing, the head looking around - while the whole figure sways a little left and
+	 * right. Studio-style light (warm key, cool fill, a rim from behind) instead of the flat two-light setup. The cape hangs
+	 * from the body; {@code decorate} adds more (wings) in the model's space. Drag to turn, it eases back after a moment.
+	 */
+	public static Node createIdleViewer(byte[] skinPngBytes, boolean slim, List<GifFrames.Frame> capeFrames,
+			java.util.function.Consumer<Group> decorate) {
+		if (skinPngBytes == null) {
+			return null;
+		}
+		if (!supports3d()) {
+			return flat(skinPngBytes, slim);
+		}
+		Image raw;
+		try {
+			raw = new Image(new ByteArrayInputStream(skinPngBytes));
+		} catch (RuntimeException e) {
+			return null;
+		}
+		if (raw.isError() || raw.getWidth() < 64 || raw.getHeight() < 32) {
+			return null;
+		}
+		WritableImage skin = normalize(raw);
+		if (skin == null) {
+			return null;
+		}
+		int scale = (int) (skin.getWidth() / 64);
+		Image texture = upscale(skin, Math.max(1, UPSCALE_FACTOR / scale));
+		double armWidth = slim ? 3 : 4;
+		Part[] parts = {
+				new Part(0, 0, 8, 8, 8, 0, -16, 0, 32, 0),
+				new Part(16, 16, 8, 12, 4, 0, -8, 0, 16, 32),
+				new Part(40, 16, armWidth, 12, 4, -(4 + armWidth / 2), -8, 0, 40, 32),
+				new Part(32, 48, armWidth, 12, 4, 4 + armWidth / 2, -8, 0, 48, 48),
+				new Part(0, 16, 4, 12, 4, -2, 4, 0, 0, 32),
+				new Part(16, 48, 4, 12, 4, 2, 4, 0, 0, 48),
+		};
+		// joints in model space (a part's y is its top edge): neck, body from the neck, shoulders, hips
+		double[][] joints = {{0, -8, 0}, {0, -8, 0}, {-5, -6, 0}, {5, -6, 0}, {-1.9, 4, 0}, {1.9, 4, 0}};
+		Group model = new Group();
+		Rotate[][] rotations = new Rotate[6][];
+		javafx.scene.transform.Translate[] lifts = new javafx.scene.transform.Translate[6];
+		for (int i = 0; i < parts.length; i++) {
+			Part p = parts[i];
+			Group g = new Group();
+			Part local = new Part(p.u, p.v, p.w, p.h, p.d, p.cx - joints[i][0], p.cy - joints[i][1], p.cz - joints[i][2], p.ou, p.ov);
+			addPart(g, texture, 64, 64, local.u, local.v, local.w, local.h, local.d, local.cx, local.cy, local.cz);
+			MeshView layer = buildLayerVoxels(skin, 64, 64, new Part[] {local}, scale);
+			if (layer != null) {
+				g.getChildren().add(layer);
+			}
+			lifts[i] = new javafx.scene.transform.Translate(joints[i][0], joints[i][1], joints[i][2]);
+			rotations[i] = new Rotate[] {new Rotate(0, Rotate.Z_AXIS), new Rotate(0, Rotate.Y_AXIS), new Rotate(0, Rotate.X_AXIS)};
+			g.getTransforms().addAll(lifts[i], rotations[i][0], rotations[i][1], rotations[i][2]);
+			model.getChildren().add(g);
+		}
+		// The cloak and the wings ride on the body (owner 2026-11-26: during emotes they stayed put while the body bent
+		// and flipped): same joint transforms as the body part, then back into model space for their own placement.
+		Group onBody = new Group();
+		onBody.getTransforms().addAll(lifts[1], rotations[1][0], rotations[1][1], rotations[1][2],
+				new javafx.scene.transform.Translate(-joints[1][0], -joints[1][1], -joints[1][2]));
+		model.getChildren().add(onBody);
+		AnimationTimer capeTimer = addCape(onBody, capeFrames);
+		if (decorate != null) {
+			decorate.accept(onBody);
+		}
+		Group rig = new Group(model);
+		Rotate yaw = new Rotate(18, Rotate.Y_AXIS);
+		Rotate pitch = new Rotate(-4, Rotate.X_AXIS);
+		rig.getTransforms().addAll(pitch, yaw);
+		PerspectiveCamera camera = new PerspectiveCamera(true);
+		camera.setNearClip(0.1);
+		camera.setFarClip(1000);
+		// -93 (was -88): room above the head for the idle bounce and the wave (the head was cut off at the top)
+		camera.setTranslateZ(-93);
+		camera.setTranslateY(-0.5);
+		camera.setFieldOfView(22);
+		AmbientLight ambient = new AmbientLight(Color.rgb(118, 112, 116));
+		PointLight key = new PointLight(Color.rgb(255, 238, 226));
+		key.setTranslateX(-70);
+		key.setTranslateY(-90);
+		key.setTranslateZ(-110);
+		PointLight fill = new PointLight(Color.rgb(96, 108, 150));
+		fill.setTranslateX(110);
+		fill.setTranslateY(-10);
+		fill.setTranslateZ(-60);
+		PointLight rim = new PointLight(Color.rgb(255, 120, 110));
+		rim.setTranslateX(40);
+		rim.setTranslateY(-60);
+		rim.setTranslateZ(120);
+		Group sceneRoot = new Group(rig, camera, ambient, key, fill, rim);
+		StackPane wrapper = new StackPane();
+		sceneRoot.getProperties().put(RenderGate.VIEWER, wrapper);
+		SubScene subScene = new SubScene(sceneRoot, 10, 10, true, SceneAntialiasing.BALANCED);
+		subScene.setFill(Color.TRANSPARENT);
+		subScene.setCamera(camera);
+		subScene.widthProperty().bind(wrapper.widthProperty());
+		subScene.heightProperty().bind(wrapper.heightProperty());
+		wrapper.getChildren().add(subScene);
+		wrapper.getProperties().put("velo.yaw", yaw);
+		wrapper.getProperties().put("velo.camera", camera);
+		wrapper.getProperties().put("velo.subScene", subScene);
+		// the whole area turns the player (not just its pixels), with a hand cursor, at any time - also mid-animation
+		wrapper.setPickOnBounds(true);
+		subScene.setPickOnBounds(true);
+		wrapper.setCursor(javafx.scene.Cursor.OPEN_HAND);
+		double[] userYaw = {0};
+		double[] lastX = new double[1];
+		long[] touched = {0};
+		// a wave of the right hand on request (Home: when the launcher opens, party members arriving / leaving)
+		long[] waveStart = {0};
+		// an emote on request (Home: B, or a party member's), blended in from the idle and back out
+		net.veloclient.launcher.data.EmoteCatalog.Animation[] emote = {null};
+		long[] emoteStart = {0};
+		long[] emoteStop = {0};
+		float[] emotePose = EmoteFigureFx.REST.clone();
+		wrapper.setOnMousePressed(e -> {
+			lastX[0] = e.getSceneX();
+			touched[0] = System.nanoTime();
+			e.consume();
+		});
+		wrapper.setOnMouseDragged(e -> {
+			userYaw[0] += (e.getSceneX() - lastX[0]) * 0.6;
+			lastX[0] = e.getSceneX();
+			touched[0] = System.nanoTime();
+			wrapper.setCursor(javafx.scene.Cursor.CLOSED_HAND);
+			e.consume();
+		});
+		wrapper.setOnMouseReleased(e -> wrapper.setCursor(javafx.scene.Cursor.OPEN_HAND));
+		AnimationTimer timer = new AnimationTimer() {
+			private long start;
+			private long last;
+			// every player its own rhythm: a party on Home built at the same moment used to move in lockstep
+			private final double phase = java.util.concurrent.ThreadLocalRandom.current().nextDouble(0, 60);
+			private final double tempo = java.util.concurrent.ThreadLocalRandom.current().nextDouble(0.88, 1.12);
+
+			@Override
+			public void handle(long now) {
+				if (!RenderGate.visible(wrapper)) {
+					last = 0;
+					return;
+				}
+				if (start == 0) {
+					start = now;
+				}
+				double dt = last == 0 ? 0 : Math.min(0.05, (now - last) / 1e9);
+				last = now;
+				double t = (now - start) / 1e9 * tempo + phase;
+				// every frame starts from the rest pose (the idle below doesn't touch every angle; an emote might have)
+				for (int i = 0; i < 6; i++) {
+					rotations[i][0].setAngle(0);
+					rotations[i][1].setAngle(0);
+					rotations[i][2].setAngle(0);
+					lifts[i].setX(joints[i][0]);
+					lifts[i].setZ(joints[i][2]);
+				}
+				if (waveStart[0] == 0 && TOUR_WAVE) {
+					waveStart[0] = -1;   // dev: -Dvelo.tourWave=true waves on a loop (screenshots)
+				}
+				if (waveStart[0] == -1) {
+					waveStart[0] = now;
+				}
+				// 0..1..0 over 2.1 s: raise, wave three times, lower - eased at both ends
+				double waveT = waveStart[0] > 0 ? (now - waveStart[0]) / 1e9 : -1;
+				double wave = 0;
+				if (waveT >= 0 && waveT < 2.1) {
+					wave = waveT < 0.35 ? smooth(waveT / 0.35) : waveT > 1.65 ? smooth((2.1 - waveT) / 0.45) : 1;
+				} else if (waveT >= 2.1) {
+					waveStart[0] = 0;
+				}
+				// after a drag the player eases back to its idle sway
+				if (now - touched[0] > 4_000_000_000L) {
+					// ease back along the shortest way round
+					userYaw[0] = Math.IEEEremainder(userYaw[0], 360);
+					userYaw[0] -= userYaw[0] * Math.min(1, dt * 1.2);
+				}
+				// A livelier idle in layers (2026-11-25): breathing, weight shifting from leg to leg, arms swinging
+				// against each other, the head looking around, every ~9 s a glance where the body turns along, and
+				// every ~16 s a little bounce on the toes. All eased - nothing snaps.
+				double breath = Math.sin(t * 1.3);
+				double shift = Math.sin(t * 0.85);                   // -1 = weight on the right leg, 1 = on the left
+				double glancePhase = (t % 9.0) / 9.0;                 // 0..1 within each 9 s window
+				double glance = glancePhase < 0.28 ? Math.sin(glancePhase / 0.28 * Math.PI) : 0;
+				double glanceDir = ((int) (t / 9.0)) % 2 == 0 ? 1 : -1;
+				double bouncePhase = (t % 16.0) / 16.0;
+				double bounce = bouncePhase > 0.9 ? Math.sin((bouncePhase - 0.9) / 0.1 * Math.PI) : 0;
+				// waving turns them to face you
+				yaw.setAngle((18 + Math.sin(t * 0.31) * 20 + glance * glanceDir * 12) * (1 - wave * 0.85) + userYaw[0]);
+				// head: wanders, looks further during a glance, a small nod with the breath
+				rotations[0][1].setAngle(Math.sin(t * 0.53) * 16 + Math.sin(t * 0.21) * 8 + glance * glanceDir * 28);
+				rotations[0][2].setAngle(Math.sin(t * 0.37) * 5 - breath * 1.5 - bounce * 4);
+				rotations[0][0].setAngle(shift * 2.5);
+				// body: rolls a little towards the standing leg, turns a bit with the glance
+				rotations[1][0].setAngle(-shift * 2.2);
+				rotations[1][1].setAngle(glance * glanceDir * 9);
+				for (int i = 0; i < 4; i++) {
+					lifts[i].setY(joints[i][1] - breath * 0.14 - bounce * 0.9);
+				}
+				// arms: swing forward/back against each other, hang out a bit with the breath, follow the glance
+				double swing = Math.sin(t * 1.05);
+				rotations[2][2].setAngle((swing * 9 + glance * glanceDir * 6) * (1 - wave));
+				rotations[3][2].setAngle(-swing * 9 + glance * glanceDir * 6);
+				// right arm: up beside the head, the hand swinging side to side
+				double idleArm = 5 + breath * 1.6 + Math.max(0, shift) * 2.5 + bounce * 8;
+				double waveArm = 148 + Math.sin(waveT * 10.5) * 16;
+				rotations[2][0].setAngle(idleArm * (1 - wave) + waveArm * wave);
+				rotations[3][0].setAngle(-5 - breath * 1.6 - Math.max(0, -shift) * 2.5 - bounce * 8);
+				// legs: the free leg bends a little at the knee (shown as a small forward swing), feet settle
+				rotations[4][2].setAngle(Math.max(0, -shift) * -7 + bounce * -4);
+				rotations[5][2].setAngle(Math.max(0, shift) * -7 + bounce * -4);
+				rotations[4][0].setAngle(1.5 + shift * 1.2);
+				rotations[5][0].setAngle(-1.5 + shift * 1.2);
+				// the whole figure sways with the weight and rises on the bounce
+				rig.setTranslateX(shift * 0.35);
+				rig.setTranslateY(Math.sin(t * 1.3 + 0.6) * 0.3 - bounce * 1.2);
+				playEmote(now);
+			}
+
+			/** Blends the running emote over the idle pose: in over 0.22 s, out over 0.3 s (end, drag or 12 s for loops). */
+			private void playEmote(long now) {
+				var a = emote[0];
+				if (a == null) {
+					return;
+				}
+				if (emoteStart[0] == -1) {
+					emoteStart[0] = now;
+				}
+				double et = (now - emoteStart[0]) / 1e9;
+				if (a.loop() && emoteStop[0] == 0 && touched[0] > emoteStart[0]) {
+					emoteStop[0] = now;   // dragging the player ends a looping emote
+				}
+				double end = emoteStop[0] > 0 ? (emoteStop[0] - emoteStart[0]) / 1e9 : a.loop() ? 12 : a.duration();
+				if (et > end + 0.3) {
+					emote[0] = null;
+					return;
+				}
+				double w = smooth(et / 0.22) * (et > end ? 1 - smooth((et - end) / 0.3) : 1);
+				double local = a.loop() ? et % Math.max(0.05, a.duration()) : Math.min(et, a.duration());
+				System.arraycopy(EmoteFigureFx.REST, 0, emotePose, 0, emotePose.length);
+				a.pose(local * a.fps(), emotePose);
+				for (int i = 0; i < 6; i++) {
+					int o = i * 6;
+					lifts[i].setX(lerp(lifts[i].getX(), emotePose[o], w));
+					lifts[i].setY(lerp(lifts[i].getY(), emotePose[o + 1] - 8, w));
+					lifts[i].setZ(lerp(lifts[i].getZ(), emotePose[o + 2], w));
+					rotations[i][0].setAngle(blendAngle(rotations[i][0].getAngle(), Math.toDegrees(emotePose[o + 5]), w));
+					rotations[i][1].setAngle(blendAngle(rotations[i][1].getAngle(), Math.toDegrees(emotePose[o + 4]), w));
+					rotations[i][2].setAngle(blendAngle(rotations[i][2].getAngle(), Math.toDegrees(emotePose[o + 3]), w));
+				}
+				// emotes face you; the body stands still under them
+				yaw.setAngle(lerp(yaw.getAngle(), 10 + userYaw[0], w));
+				rig.setTranslateX(lerp(rig.getTranslateX(), 0, w));
+				rig.setTranslateY(lerp(rig.getTranslateY(), 0, w));
+			}
+		};
+		wrapper.getProperties().put("velo.emote", (java.util.function.Consumer<net.veloclient.launcher.data.EmoteCatalog.Animation>) a -> {
+			emote[0] = a;
+			emoteStart[0] = -1;
+			emoteStop[0] = 0;
+		});
+		// a click on the player ends a looping emote too
+		wrapper.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_PRESSED, e -> {
+			if (emote[0] != null && emoteStop[0] == 0 && emoteStart[0] > 0) {
+				emoteStop[0] = System.nanoTime();
+			}
+		});
+		wrapper.getProperties().put("velo.wave", (Runnable) () -> waveStart[0] = -1);
+		wrapper.sceneProperty().addListener((obs, o, n) -> {
+			if (n == null) {
+				timer.stop();
+				if (capeTimer != null) {
+					capeTimer.stop();
+				}
+			} else {
+				timer.start();
+			}
+		});
+		return wrapper;
+	}
+
+	private static final boolean TOUR_WAVE = Boolean.getBoolean("velo.tourWave");
+
+	private static double lerp(double a, double b, double w) {
+		return a + (b - a) * w;
+	}
+
+	/**
+	 * Blends an angle the short way round: a backflip ends at 360 degrees, and easing that back to the idle's 0 spun the
+	 * player a whole turn backwards in 0.3 s (owner 2026-11-26). 360 is the same pose as 0, so it just settles.
+	 */
+	private static double blendAngle(double from, double to, double w) {
+		return from + Math.IEEEremainder(to - from, 360) * w;
+	}
+
+	private static double smooth(double x) {
+		double c = Math.max(0, Math.min(1, x));
+		return c * c * (3 - 2 * c);
+	}
+
 	/** An emote particle as a glyph in the scene, at a model-space point turned with the viewer's yaw. */
 	private static void spawn(Group particles, net.veloclient.launcher.data.EmoteCatalog.Event e, double[] point, double yaw, java.util.Random random) {
 		int n = Math.min(6, Math.max(1, e.count() / 3));

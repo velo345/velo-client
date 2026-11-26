@@ -194,6 +194,8 @@ final class WorldGame implements MiniGame {
 		double hurt;
 		SkinRig rig;
 		boolean skinAsked;
+		/** When we last heard from them (System.nanoTime). */
+		long seenAt = System.nanoTime();
 	}
 
 	WorldGame(Arcade arcade) {
@@ -2216,10 +2218,41 @@ final class WorldGame implements MiniGame {
 				// a bad message: skip it
 			}
 		}
+		if (coop.isHost()) {
+			dropGoneMembers(party);
+		}
 		netTimer -= dt;
 		if (netTimer <= 0) {
 			netTimer = 1 / 12.0;
 			sendState();
+		}
+	}
+
+	/**
+	 * Host: someone who left the party (or went silent - the relay doesn't always close their stream) leaves the world
+	 * too. They used to stay standing there, invulnerable, for everyone (owner 2026-11-25).
+	 */
+	private void dropGoneMembers(JsonObject party) {
+		if (remotes.isEmpty()) {
+			return;
+		}
+		java.util.Set<String> members = new java.util.HashSet<>();
+		for (var el : party.getAsJsonArray("members")) {
+			JsonObject member = el.getAsJsonObject();
+			if (member.has("uuid")) {
+				members.add(member.get("uuid").getAsString().replace("-", "").toLowerCase(java.util.Locale.ROOT));
+			}
+		}
+		long now = System.nanoTime();
+		for (var it = remotes.entrySet().iterator(); it.hasNext();) {
+			var entry = it.next();
+			String id = entry.getKey().replace("-", "").toLowerCase(java.util.Locale.ROOT);
+			Remote r = entry.getValue();
+			if (!members.contains(id) || now - r.seenAt > 8_000_000_000L) {
+				it.remove();
+				coop.drop(entry.getKey());
+				say((r.name.isEmpty() ? "A player" : r.name) + " left");
+			}
 		}
 	}
 
@@ -2431,6 +2464,7 @@ final class WorldGame implements MiniGame {
 	}
 
 	private void readRemote(Remote r, JsonObject p) {
+		r.seenAt = System.nanoTime();
 		r.level = p.get("l").getAsString();
 		r.nx = p.get("x").getAsDouble();
 		r.ny = p.get("y").getAsDouble();

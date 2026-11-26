@@ -87,6 +87,78 @@ final class TesterRoutes {
 				JsonHttp.writeError(ex, 400, e.getMessage());
 			}
 		});
+		// The tester's own reports with their YouTrack state and the team's public comments; replying adds a comment.
+		authed(server, registry, tester, store, "/v1/tester/my-reports", "GET", true, (ex, s, owner) -> {
+			Map<String, String> q = StoreRoutes.query(ex);
+			var list = tester.myReports(s.uuid(), "1".equals(q.get("read")));
+			java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+			for (TesterService.Report r : list) {
+				Map<String, Object> row = new java.util.LinkedHashMap<>();
+				row.put("id", r.id);
+				row.put("title", r.title);
+				row.put("text", r.text);
+				row.put("type", r.type);
+				row.put("item", r.item);
+				row.put("version", r.version);
+				row.put("at", r.at);
+				row.put("files", r.files);
+				row.put("issue", r.youtrack);
+				row.put("state", r.ytState == null ? (r.youtrack == null ? "Sending" : "New") : r.ytState);
+				row.put("resolved", r.ytResolved);
+				row.put("updated", r.ytUpdated);
+				row.put("comments", r.ytComments);
+				row.put("unread", r.unread);
+				if (owner && r.youtrack != null) {
+					row.put("url", YouTrack.url(r.youtrack));
+				}
+				out.add(row);
+			}
+			JsonHttp.writeJson(ex, 200, Map.of("reports", out, "youtrack", YouTrack.enabled()));
+		});
+		// Known issues: every open issue (titles and fields only) so testers see what's already known; "me too" comments.
+		authed(server, registry, tester, store, "/v1/tester/issues", "GET", true, (ex, s, owner) -> {
+			if (!YouTrack.enabled()) {
+				JsonHttp.writeJson(ex, 200, Map.of("issues", java.util.List.of()));
+				return;
+			}
+			try {
+				JsonHttp.writeJson(ex, 200, Map.of("issues", YouTrack.openIssues()));
+			} catch (java.io.IOException e) {
+				JsonHttp.writeError(ex, 502, "The tracker didn't answer - try again in a moment");
+			}
+		});
+		authed(server, registry, tester, store, "/v1/tester/issue/metoo", "POST", true, (ex, s, owner) -> {
+			Map<String, String> q = StoreRoutes.query(ex);
+			String id = q.get("id");
+			if (id == null || !id.matches("[A-Z]+-\\d{1,6}")) {
+				JsonHttp.writeError(ex, 400, "Bad issue");
+				return;
+			}
+			try {
+				boolean known = YouTrack.openIssues().stream().anyMatch(i -> i.id().equals(id));
+				if (!known) {
+					JsonHttp.writeError(ex, 404, "No such open issue");
+					return;
+				}
+				YouTrack.comment(id, YouTrack.TESTER_MARK + "**" + s.username() + "** (tester) has this too (build "
+						+ (q.get("version") == null ? "?" : q.get("version").replaceAll("[^0-9.]", "")) + ")");
+				YouTrack.tag(id, "tester");
+				JsonHttp.writeJson(ex, 200, Map.of("ok", true));
+			} catch (java.io.IOException e) {
+				JsonHttp.writeError(ex, 502, "The tracker didn't answer - try again in a moment");
+			}
+		});
+		authed(server, registry, tester, store, "/v1/tester/report/reply", "POST", true, (ex, s, owner) -> {
+			JsonObject body = JsonParser.parseString(new String(JsonHttp.readRawBody(ex, 64 * 1024), StandardCharsets.UTF_8)).getAsJsonObject();
+			try {
+				tester.reply(s.uuid(), s.username(), body.get("id").getAsString(), body.get("text").getAsString());
+				JsonHttp.writeJson(ex, 200, Map.of("ok", true));
+			} catch (IllegalArgumentException e) {
+				JsonHttp.writeError(ex, 400, e.getMessage());
+			} catch (java.io.IOException e) {
+				JsonHttp.writeError(ex, 502, "YouTrack didn't answer - try again in a moment");
+			}
+		});
 		authed(server, registry, tester, store, "/v1/tester/reports", "GET", true, (ex, s, owner) -> {
 			if (!owner) {
 				JsonHttp.writeError(ex, 403, "Owners only");

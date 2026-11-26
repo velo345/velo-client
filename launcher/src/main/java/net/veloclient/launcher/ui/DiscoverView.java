@@ -197,6 +197,33 @@ public final class DiscoverView {
 	 * A partner server: its icon big on an accent-tinted card, live player count, the address (click to copy) and its
 	 * partner code, if it has one, as a ticket-style badge.
 	 */
+	/** A server list ping from this machine (null = really unreachable), answered on the FX thread. */
+	public static void pingLocally(String address, java.util.function.Consumer<net.veloclient.launcher.net.ServerPinger.PingResult> done) {
+		String host = address;
+		int port = 25565;
+		int colon = address.lastIndexOf(':');
+		if (colon > 0 && address.indexOf(':') == colon) {
+			host = address.substring(0, colon);
+			try {
+				port = Integer.parseInt(address.substring(colon + 1));
+			} catch (NumberFormatException ignored) {
+				// keep 25565
+			}
+		}
+		String h = host;
+		int pt = port;
+		Thread.ofVirtual().start(() -> {
+			net.veloclient.launcher.net.ServerPinger.PingResult result;
+			try {
+				result = net.veloclient.launcher.net.ServerPinger.ping(h, pt);
+			} catch (Exception e) {
+				result = null;
+			}
+			var r = result;
+			javafx.application.Platform.runLater(() -> done.accept(r));
+		});
+	}
+
 	private static Node partnerCard(JsonObject p, Button join, Joiner joiner) {
 		String accent = p.has("accent") && !p.get("accent").isJsonNull() ? p.get("accent").getAsString() : "#ff2d3c";
 		String address = p.get("address").getAsString();
@@ -238,6 +265,37 @@ public final class DiscoverView {
 		players.setStyle("-fx-text-fill: " + (online ? "-velo-text" : "-velo-text-3") + "; -fx-font-size: 12px;");
 		HBox live = new HBox(7, dot, players);
 		live.setAlignment(Pos.CENTER_LEFT);
+		if (!online) {
+			// The API server's own ping can be blocked by a partner's anti-bot firewall (LuckySMP drops it, 2026-11-25) -
+			// then it says "offline" to everyone. Players can reach it, so ask from here before believing that.
+			players.setText("Checking…");
+			boolean noIcon = iconBox.getChildren().isEmpty() || !(iconBox.getChildren().get(0) instanceof javafx.scene.image.ImageView);
+			pingLocally(address, result -> {
+				if (result == null) {
+					players.setText("Offline");
+					return;
+				}
+				dot.getStyleClass().remove("status-square-off");
+				players.setText(String.format(java.util.Locale.ROOT, "%,d playing", result.onlinePlayers()));
+				players.setStyle("-fx-text-fill: -velo-text; -fx-font-size: 12px;");
+				if (noIcon && result.faviconPngBase64() != null) {
+					try {
+						javafx.scene.image.ImageView icon = new javafx.scene.image.ImageView(new javafx.scene.image.Image(
+								new java.io.ByteArrayInputStream(java.util.Base64.getMimeDecoder().decode(result.faviconPngBase64()))));
+						icon.setFitWidth(48);
+						icon.setFitHeight(48);
+						icon.setSmooth(false);
+						javafx.scene.shape.Rectangle round = new javafx.scene.shape.Rectangle(48, 48);
+						round.setArcWidth(20);
+						round.setArcHeight(20);
+						icon.setClip(round);
+						iconBox.getChildren().setAll(icon);
+					} catch (RuntimeException ignored) {
+						// keep the letter
+					}
+				}
+			});
+		}
 		String versions = text(p, "versions", "");
 		if (!versions.isEmpty()) {
 			Label v = new Label("·  " + versions);

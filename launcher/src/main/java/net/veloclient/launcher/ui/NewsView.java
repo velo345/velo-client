@@ -133,8 +133,7 @@ public final class NewsView {
 		shade.setMouseTransparent(true);
 		shade.setStyle("-fx-background-color: linear-gradient(to top, rgba(11,11,14,0.96) 12%, rgba(11,11,14,0) 70%); -fx-background-radius: 14;");
 		Label tag = NewsUi.tag(NewsUi.str(post, "tag"), accent);
-		String version = NewsUi.str(post, "version");
-		Label when = new Label((version == null || version.isBlank() ? "" : "v" + version + "  ·  ") + NewsUi.date(NewsUi.num(post, "publishedAt")));
+		Label when = new Label(NewsUi.date(NewsUi.num(post, "publishedAt")));
 		when.getStyleClass().add("t-mono");
 		javafx.scene.layout.HBox meta = new javafx.scene.layout.HBox(8, tag, when);
 		meta.setAlignment(Pos.CENTER_LEFT);
@@ -373,12 +372,6 @@ public final class NewsView {
 		Label tag = NewsUi.tag(NewsUi.str(post, "tag"), accent);
 		HBox meta = new HBox(8, tag);
 		meta.setAlignment(Pos.CENTER_LEFT);
-		String version = NewsUi.str(post, "version");
-		if (version != null && !version.isBlank()) {
-			Label v = new Label("v" + version.replaceFirst("^v", ""));
-			v.getStyleClass().add("news-version");
-			meta.getChildren().add(v);
-		}
 		String author = NewsUi.str(post, "author");
 		Label when = new Label(NewsUi.date(NewsUi.bool(post, "published") ? NewsUi.num(post, "publishedAt") : 0)
 				+ (author != null && !author.isBlank() ? "  ·  by " + author : ""));

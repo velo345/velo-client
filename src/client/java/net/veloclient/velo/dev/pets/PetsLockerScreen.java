@@ -55,7 +55,7 @@ public final class PetsLockerScreen extends VeloWindow implements net.veloclient
 	/** Adds the Pets tab to the Locker. */
 	public static void register() {
 		// Pets in the Store: their own tab, every card a turntable preview.
-		net.veloclient.velo.client.gui.store.StoreScreen.registerPage("Pets", "NEW", (store, w, h) -> {
+		net.veloclient.velo.client.gui.store.StoreScreen.registerPage("Pets", null, (store, w, h) -> {
 			java.util.List<net.minecraft.client.gui.widget.ClickableWidget> cards = new ArrayList<>();
 			for (var item : PetStore.shown()) {
 				cards.add(new VeloPetCard(w, h, item, () -> MinecraftClient.getInstance().setScreen(new PetDetailScreen(store, item))));
@@ -90,7 +90,9 @@ public final class PetsLockerScreen extends VeloWindow implements net.veloclient
 	}
 
 	private int panelX() {
-		return stageX() + CapeEquipScreen.SHOWCASE_WIDTH + 14;
+		// right of the kinds column, like every other Locker tab (it sat under the kinds and overlapped them)
+		stageX();
+		return CapeEquipScreen.rightX();
 	}
 
 	@Override

@@ -109,20 +109,57 @@ public final class CosmeticVertexWriter {
 		return true;
 	}
 
-	private static int[] sequential = new int[0];
-
-	/** Vertices already expanded per corner ({@code count} of them, in quad order): 0, 1, 2, ... */
-	public static boolean writeSequential(Object consumer, int count, float[] data, int stride, int posOff, int nrmOff, int uvOff,
-			Matrix4f m, Matrix3f n, int argb, int overlay, int light) {
-		if (sequential.length < count) {
-			int[] seq = new int[Math.max(count, sequential.length * 2)];
-			for (int i = 0; i < seq.length; i++) {
-				seq[i] = i;
-			}
-			sequential = seq;
+	/**
+	 * Vertices already expanded per corner and rebuilt every frame (pets): written straight into the buffer, without the
+	 * per-mesh transform cache above (keyed by array identity, which a reused per-frame array would fool) and without
+	 * an index array. Normals in {@code data} must be unit length. An identity {@code m} (the usual world submit) skips
+	 * the transform entirely.
+	 */
+	public static boolean writeExpanded(Object consumer, int count, float[] data, int stride, int posOff, int nrmOff, int uvOff,
+			Matrix4f m, int argb, int overlay, int light) {
+		if (!(consumer instanceof BulkVertexSink sink) || count == 0) {
+			return count == 0;
 		}
-		int[] quads = sequential.length == count ? sequential : java.util.Arrays.copyOf(sequential, count);
-		return writeQuads(consumer, quads, count, data, stride, posOff, nrmOff, data, stride, uvOff, 1f, 0f, m, n, argb, null, overlay, light);
+		long pointer = sink.velo$reserveEntityVertices(count);
+		if (pointer == -1L) {
+			return false;
+		}
+		boolean identity = (m.properties() & Matrix4f.PROPERTY_IDENTITY) != 0;
+		boolean translationOnly = !identity && (m.properties() & Matrix4f.PROPERTY_TRANSLATION) != 0;
+		long colorBits = (long) abgr(argb) << 32;
+		long overlayLight = (overlay & 0xFFFFFFFFL) | (long) light << 32;
+		for (int v = 0, i = 0; v < count; v++, i += stride) {
+			float x = data[i + posOff], y = data[i + posOff + 1], z = data[i + posOff + 2];
+			float a = data[i + nrmOff], b = data[i + nrmOff + 1], c = data[i + nrmOff + 2];
+			if (translationOnly) {
+				x += m.m30();
+				y += m.m31();
+				z += m.m32();
+			} else if (!identity) {
+				float px = m.m00() * x + m.m10() * y + m.m20() * z + m.m30();
+				float py = m.m01() * x + m.m11() * y + m.m21() * z + m.m31();
+				float pz = m.m02() * x + m.m12() * y + m.m22() * z + m.m32();
+				x = px;
+				y = py;
+				z = pz;
+				float nx = m.m00() * a + m.m10() * b + m.m20() * c;
+				float ny = m.m01() * a + m.m11() * b + m.m21() * c;
+				float nz = m.m02() * a + m.m12() * b + m.m22() * c;
+				float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+				float inv = len > 1e-6f ? 1f / len : 0f;
+				a = nx * inv;
+				b = ny * inv;
+				c = nz * inv;
+			}
+			MemoryUtil.memPutLong(pointer, (Float.floatToRawIntBits(x) & 0xFFFFFFFFL) | (long) Float.floatToRawIntBits(y) << 32);
+			MemoryUtil.memPutLong(pointer + 8L, (Float.floatToRawIntBits(z) & 0xFFFFFFFFL) | colorBits);
+			MemoryUtil.memPutLong(pointer + 16L, (Float.floatToRawIntBits(data[i + uvOff]) & 0xFFFFFFFFL)
+					| (long) Float.floatToRawIntBits(data[i + uvOff + 1]) << 32);
+			MemoryUtil.memPutLong(pointer + 24L, overlayLight);
+			MemoryUtil.memPutInt(pointer + 32L, ((int) (a * 127f) & 0xFF) | ((int) (b * 127f) & 0xFF) << 8 | ((int) (c * 127f) & 0xFF) << 16);
+			pointer += BulkVertexSink.ENTITY_VERTEX_SIZE;
+		}
+		return true;
 	}
 
 	private static int abgr(int argb) {

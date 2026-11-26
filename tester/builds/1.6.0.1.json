@@ -1,0 +1,294 @@
+{
+ "title": "Velo 1.6: the glass update",
+ "summary": "This is Velo 1.6. The whole launcher and every in-game menu are glass now, with a new title screen in space, a new R-Shift menu, a new emote wheel, new sounds, Tier Tagger and much more. Go through the list: each item says where to look and what to try. Something broken or ugly? Press \"Broken - report it\", drag in screenshots, clips or logs and send. Answers show up under \"My reports\". Please keep it private until the release.",
+ "changes": [
+  "Launcher: glass look everywhere, calm page transitions, loading placeholders, party lobby with chat, arcade, launcher tour on your first Home visit",
+  "Title screen: new Play Deck layout, space scene with an astronaut, Continue shows your last server",
+  "R-Shift: glass drawer that is also the HUD editor and grows into the full menu, with a short tour the first time; Theme settings",
+  "Emote wheel (launcher and game): hold the key, point in a direction, let go. Cloak and wings now move with your body",
+  "New interface sounds in launcher and game",
+  "Full Bright is real full bright now (26.x and 1.21.11)",
+  "Tier Tagger (PvPTiers / SubTiers) with a hold-G ring, hearts damage flash in your colour",
+  "Store: new bundle cards. Log viewer for running games. Setup guide fixes. New Windows installer look",
+  "Velo Rewind and Velo Turbo on 1.21.11, account switcher, Velo Browser with incognito",
+  "Reports from the tester window go straight to the team's tracker"
+ ],
+ "test": [
+  {
+   "group": "Launcher",
+   "id": "home-look",
+   "title": "Home",
+   "how": "Open Home. No greeting text, the Play button only says Play, server chips under it are centred. If a sale is running, its strip sits at the very top. Does anything look cut off?"
+  },
+  {
+   "group": "Launcher",
+   "id": "glass-pages",
+   "title": "Switching pages",
+   "how": "Click through Home, Profiles, Locker, Store, Friends, Settings a few times. Do panels flicker grey/red or jump? Does the left sidebar change right away when you switch the theme in Settings?"
+  },
+  {
+   "group": "Launcher",
+   "id": "tour",
+   "title": "Setup guide + launcher tour",
+   "how": "On a fresh install, go through the setup guide: are all toggles and buttons readable? On your first Home visit after it, does the tour start? Nothing overlapping or off-centre?"
+  },
+  {
+   "group": "Launcher",
+   "id": "account-switch",
+   "title": "Switching accounts",
+   "how": "Switch the account in the launcher. Does only your player/name update instead of the whole window rebuilding or flickering?"
+  },
+  {
+   "group": "Launcher",
+   "id": "running-log",
+   "title": "Running game and its log",
+   "how": "Start a game and open it from Home > Running. Is the log readable, are warnings and errors coloured, does scrolling stay smooth?"
+  },
+  {
+   "group": "Launcher",
+   "id": "bundles",
+   "title": "Store bundles",
+   "how": "Store > Bundles. Do the new cards look right and show what's inside?"
+  },
+  {
+   "group": "Launcher",
+   "id": "skeletons",
+   "title": "Loading placeholders",
+   "how": "Open Locker, Media (screenshots) and Profiles right after starting the launcher. Do you see soft grey placeholders while things load instead of empty spots?"
+  },
+  {
+   "group": "Launcher",
+   "id": "home-player",
+   "title": "Your player on Home",
+   "how": "Start the launcher. Does your player wave once? Is the head or any cloak/aura cut off while it moves? Does the aura's ground ring sit at the feet?"
+  },
+  {
+   "group": "Launcher",
+   "id": "party-lobby",
+   "title": "Party lobby",
+   "how": "Invite a friend (the + button next to online friends on Home). Do they appear next to you in 3D with their cloak, wings and aura, wave when they join and wave + fade when they leave? Do you both move out of sync?"
+  },
+  {
+   "group": "Launcher",
+   "id": "party-chat",
+   "title": "Party chat + leaving",
+   "how": "In a party, write in the chat bottom right on Home. Does it arrive at your friend? Then press Leave in its header - are you out of the party?"
+  },
+  {
+   "group": "Launcher",
+   "id": "home-emotes",
+   "title": "Emotes on Home",
+   "how": "HOLD B on Home, move the mouse towards an emote (you don't need to be on it) and let go. Does it play? Do cloak and wings move with the body, also in a backflip?"
+  },
+  {
+   "group": "Launcher",
+   "id": "arcade",
+   "title": "Velo World / Snake / Blockfall",
+   "how": "On Home, click on an empty spot, then press W, A, S, D or an arrow key. Does the game take the whole window and the launcher fade away? Leave the game - does everything come back? In a party: leave the party while playing - is your player gone for the others?"
+  },
+  {
+   "group": "Launcher",
+   "id": "friends",
+   "title": "Friends and chat",
+   "how": "Friends page: open a chat, switch between friends quickly. Does anything flicker or show letters instead of faces? Does a chat open at the newest message without jumping?"
+  },
+  {
+   "group": "Launcher",
+   "id": "locker",
+   "title": "Locker",
+   "how": "Click through cloaks and outfits in the Locker. Does the 3D preview stay put instead of reloading on every click?"
+  },
+  {
+   "group": "Launcher",
+   "id": "store",
+   "title": "Store",
+   "how": "Store with the Monochrome theme: is the Velo+ tab readable? Does \"Unlock everything\" fit? Claim free coins in the rewards strip if there are any."
+  },
+  {
+   "group": "Launcher",
+   "id": "customize-look",
+   "title": "Customize > In-game look",
+   "how": "Velo+ Customize > In-game look: change accent, glass darkness, blur and corners. Start the game - do the in-game menus use your settings?"
+  },
+  {
+   "group": "Launcher",
+   "id": "discover",
+   "title": "Discover / partner servers",
+   "how": "Open Discover. Does LuckySMP show a real player count (not \"Offline\")?"
+  },
+  {
+   "group": "Launcher",
+   "id": "version-switch",
+   "title": "Changing Minecraft version",
+   "how": "On a profile, open the version picker and select another version. Is the Switch button first, the text after it?"
+  },
+  {
+   "group": "Launcher",
+   "id": "tester-window",
+   "title": "This Tester window",
+   "how": "Report a bug / idea: drag a screenshot, a clip and a .txt/.log file onto the page, send it. Open My reports - is it there with its number? Reply to it once."
+  },
+  {
+   "group": "Title screen & menus",
+   "id": "title-screen",
+   "title": "New title screen",
+   "how": "Start the game. Continue strip with your last server at the top, Singleplayer / Multiplayer, the bar (Realms, Mods, Rewind, Store, Discover), Options / Quit, small icons, your account bottom left. Is anything cut off, overlapping, or is a mod's button missing?"
+  },
+  {
+   "group": "Title screen & menus",
+   "id": "title-scene",
+   "title": "Space scene",
+   "how": "Watch the title screen for 30 seconds. Does the astronaut turn smoothly without a jump when the loop starts over? Any stutter?"
+  },
+  {
+   "group": "Title screen & menus",
+   "id": "title-account",
+   "title": "Account list",
+   "how": "Click your account bottom left on the title screen. Does the list open above it and can you switch accounts (if you have more than one in the launcher)?"
+  },
+  {
+   "group": "Title screen & menus",
+   "id": "rshift",
+   "title": "R-Shift menu",
+   "how": "In a world press R-Shift (the first time a short tour explains it). Grow the panel into the full menu and back, open a module's settings, drag a HUD module out. Smooth? FPS still fine while it's open?"
+  },
+  {
+   "group": "Title screen & menus",
+   "id": "edit-hud",
+   "title": "Edit HUD",
+   "how": "Full R-Shift menu > Edit HUD. Does the side panel slide away so you have the whole screen? Bring it back with the tab on the edge."
+  },
+  {
+   "group": "Title screen & menus",
+   "id": "theme",
+   "title": "Theme settings",
+   "how": "R-Shift > Settings > Theme: change accent colour, glass darkness, blur and roundness. Do all menus change right away?"
+  },
+  {
+   "group": "Title screen & menus",
+   "id": "pause",
+   "title": "Pause menu",
+   "how": "Press Esc in a world. Is only the area behind the glass panels blurred, the rest of the game clear?"
+  },
+  {
+   "group": "In game",
+   "id": "emote-wheel",
+   "title": "Emote wheel",
+   "how": "HOLD your emote key (default B), move the mouse towards an emote and let go. Does it play without clicking? Does text ever spill out? Does your cloak follow a backflip without snapping?",
+   "modules": [
+    "emotes"
+   ]
+  },
+  {
+   "group": "In game",
+   "id": "tier-tagger",
+   "title": "Tier Tagger",
+   "how": "Turn on Tier Tagger (it's off by default). On a PvP server, are tiers shown above heads and in the tab list? Look at a player and hold G - does the ring with all their tiers show up? Try \"Show my own tier\".",
+   "modules": [
+    "tier-tagger"
+   ]
+  },
+  {
+   "group": "In game",
+   "id": "hearts",
+   "title": "Hearts",
+   "how": "Hearts module with your own colour: take damage. Is the flash a lighter version of your colour (not Minecraft's white/red)?",
+   "modules": [
+    "hearts"
+   ]
+  },
+  {
+   "group": "In game",
+   "id": "clips",
+   "title": "Clips",
+   "how": "Play for at least 5 minutes, then save a clip (F8) a few times in a row. Do you get full-length clips every time? Open one: are Back / Folder / Share / Delete readable, does the player work?",
+   "modules": [
+    "clips"
+   ]
+  },
+  {
+   "group": "In game",
+   "id": "skybox",
+   "title": "Custom Skybox",
+   "how": "R-Shift > Custom Skybox. Turn around slowly - is there a line where the sky picture wraps around?",
+   "modules": [
+    "custom-skybox"
+   ]
+  },
+  {
+   "group": "In game",
+   "id": "fullbright",
+   "title": "Full Bright",
+   "how": "At night or in a cave toggle Full Bright. Is it really fully bright (not a night-vision tint)? Any flicker? Please try it on 1.21.11 and 26.2.",
+   "modules": [
+    "full-bright"
+   ]
+  },
+  {
+   "group": "In game",
+   "id": "sounds",
+   "title": "Interface sounds",
+   "how": "Click through menus, toggle modules, open/close R-Shift and the pause menu. Anything annoying, too loud, doubled or missing?"
+  },
+  {
+   "group": "In game",
+   "id": "title-continue",
+   "title": "Continue on the title screen",
+   "how": "Join a server, quit the game, start again. Does Continue show the right server name and icon, and does Play connect you there?"
+  },
+  {
+   "group": "In game",
+   "id": "hud-style",
+   "title": "HUD Style",
+   "how": "Set HUD Style to Glass. Do Keystrokes, Mouse Buttons and Server Display look right and centred?"
+  },
+  {
+   "group": "In game",
+   "id": "browser",
+   "title": "Velo Browser",
+   "how": "Open the Velo Browser, log in to a site, close and reopen the game - still logged in? Try the incognito toggle (purple bar)."
+  },
+  {
+   "group": "In game",
+   "id": "rewind-11",
+   "title": "Velo Rewind on 1.21.11",
+   "how": "Only on 1.21.11: record a few minutes with Velo Rewind, open the replay, scrub and export a short video.",
+   "modules": [
+    "rewind"
+   ]
+  },
+  {
+   "group": "In game",
+   "id": "cloaks",
+   "title": "Cloaks",
+   "how": "Wear a Velo cloak. Is your Minecraft cape gone under it? Is any cloak listed twice in the Locker?"
+  },
+  {
+   "group": "Performance & fixes",
+   "id": "start-time",
+   "title": "Game start",
+   "how": "Start the game a few times. Faster than before? Anything black, missing or crashing?"
+  },
+  {
+   "group": "Performance & fixes",
+   "id": "turbo-11",
+   "title": "Performance on 1.21.11",
+   "how": "Only on 1.21.11: play on a busy server or near farms. FPS compared to before?"
+  },
+  {
+   "group": "Performance & fixes",
+   "id": "low-latency",
+   "title": "Low Latency Mode",
+   "how": "R-Shift > Low Latency Mode on, play a bit. Does aiming feel more direct? A small FPS drop is expected.",
+   "modules": [
+    "low-latency"
+   ]
+  },
+  {
+   "group": "Performance & fixes",
+   "id": "keybinds",
+   "title": "Changing keybinds",
+   "how": "Velo keybinds: type in the search, click a keybind and press a letter. Does the letter end up in the search box?"
+  }
+ ]
+}

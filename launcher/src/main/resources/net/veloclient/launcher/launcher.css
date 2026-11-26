@@ -2316,7 +2316,7 @@
 	-fx-background-radius: 18;
 }
 
-.report-kind-crash { -fx-background-color: rgba(229, 72, 77, 0.22); -fx-text-fill: #ff8a8d; }
+.report-kind-crash { -fx-background-color: rgba(229, 72, 77, 0.22); -fx-text-fill: -velo-accent-text; }
 .report-kind-bug { -fx-background-color: rgba(255, 190, 60, 0.18); -fx-text-fill: #ffd27a; }
 .report-status-new { -fx-background-color: derive(-velo-accent-start, -45%); -fx-text-fill: white; }
 .report-status-seen { -fx-background-color: rgba(255, 255, 255, 0.1); -fx-text-fill: derive(-velo-text, -25%); }
@@ -3290,7 +3290,7 @@
 
 .window-button:hover { -fx-background-color: rgba(255, 255, 255, 0.07); }
 .window-button:pressed { -fx-background-color: rgba(255, 255, 255, 0.12); }
-.window-button-close:hover { -fx-background-color: #E0262E; }
+.window-button-close:hover { -fx-background-color: -velo-accent; }
 .window-button-close:pressed { -fx-background-color: #b51d24; }
 
 .window-glyph { -fx-stroke: -velo-text-2; -fx-stroke-width: 1.4; -fx-fill: transparent; }
@@ -3925,7 +3925,7 @@
 .server-stat-max { -fx-font-family: "Geist"; -fx-font-size: 12px; -fx-text-fill: rgba(244, 239, 238, 0.4); }
 .server-stat-value.server-ping-good { -fx-text-fill: #7febbe; }
 .server-stat-value.server-ping-ok { -fx-text-fill: #f2b64c; }
-.server-stat-value.server-ping-bad { -fx-text-fill: #ff6b6f; }
+.server-stat-value.server-ping-bad { -fx-text-fill: -velo-accent-text; }
 .server-stat-value.server-dim { -fx-text-fill: rgba(244, 239, 238, 0.45); }
 .ping-bar { -fx-background-radius: 0.5; -fx-background-color: rgba(244, 239, 238, 0.2); }
 .server-join {
@@ -3950,9 +3950,9 @@
 }
 .partner-card:hover { -fx-border-color: rgba(255, 236, 236, 0.18); }
 .partner-tag {
-	-fx-background-color: rgba(215, 38, 45, 0.14);
+	-fx-background-color: -velo-accent-soft;
 	-fx-background-radius: 4;
-	-fx-text-fill: #ff8a8d;
+	-fx-text-fill: -velo-accent-text;
 	-fx-font-family: "Geist Mono SemiBold";
 	-fx-font-size: 9.5px;
 	-fx-padding: 2 6 2 6;
@@ -3987,7 +3987,7 @@
 }
 .update-cover-fade { -fx-background-color: linear-gradient(to bottom, transparent 55%, #141011 100%); }
 .update-close { -fx-background-color: rgba(9, 7, 7, 0.6); -fx-background-radius: 8; }
-.update-overline { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 11px; -fx-text-fill: #ff6b6f; }
+.update-overline { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 11px; -fx-text-fill: -velo-accent-text; }
 .update-versions { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(244, 239, 238, 0.45); }
 .update-title { -fx-font-family: "Archivo SemiExpanded ExtraBold"; -fx-font-weight: 800; -fx-font-size: 30px; -fx-text-fill: -velo-text; }
 .update-summary { -fx-font-family: "Geist"; -fx-font-size: 14px; -fx-text-fill: rgba(244, 239, 238, 0.68); -fx-line-spacing: 2; }
@@ -4007,7 +4007,7 @@
 .locker-slot, .locker-slot-active { -fx-background-radius: 10; -fx-border-radius: 10; -fx-cursor: hand; }
 .locker-slot { -fx-background-color: transparent; -fx-border-color: rgba(255, 236, 236, 0.06); }
 .locker-slot:hover { -fx-background-color: rgba(255, 236, 236, 0.035); }
-.locker-slot-active { -fx-background-color: #1d1617; -fx-border-color: rgba(215, 38, 45, 0.5); }
+.locker-slot-active { -fx-background-color: #1d1617; -fx-border-color: -velo-accent-glow; }
 .locker-slot-kind { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 9.5px; -fx-text-fill: rgba(244, 239, 238, 0.5); }
 
 /* Friends (2026-11): one panel per group, rows split by hairlines. */
@@ -4048,14 +4048,14 @@
 
 /* "BUILT IN" chip on mods Velo already covers (2026-11). */
 .builtin-badge {
-	-fx-background-color: rgba(215, 38, 45, 0.12);
+	-fx-background-color: -velo-accent-soft;
 	-fx-background-radius: 5;
-	-fx-border-color: rgba(215, 38, 45, 0.3);
+	-fx-border-color: -velo-accent-line;
 	-fx-border-radius: 5;
 	-fx-padding: 2 6 2 4;
 	-fx-font-family: "Geist Mono SemiBold";
 	-fx-font-size: 9.5px;
-	-fx-text-fill: #ff8a8d;
+	-fx-text-fill: -velo-accent-text;
 	-fx-cursor: hand;
 }
 
@@ -4133,7 +4133,7 @@
 	-fx-border-radius: 12;
 }
 .pack-toolbar .text-field { -fx-background-radius: 9; -fx-border-radius: 9; -fx-min-height: 40; }
-.pack-toolbar .text-field:focused { -fx-border-color: rgba(215, 38, 45, 0.6); }
+.pack-toolbar .text-field:focused { -fx-border-color: -velo-accent-glow; }
 
 /* Doctor (2026-11): brand red for the fix, outlined cards instead of a coloured left edge, no glows. */
 .doctor-fix-all { -fx-background-color: -velo-accent; -fx-effect: null; -fx-text-fill: white; -fx-background-radius: 8; }
@@ -4153,8 +4153,8 @@
 .locker-cell, .locker-cell-worn { -fx-background-color: #141011; -fx-background-radius: 12; -fx-border-radius: 12; -fx-border-width: 1.5; -fx-cursor: hand; }
 .locker-cell { -fx-border-color: rgba(255, 236, 236, 0.07); }
 .locker-cell:hover { -fx-border-color: rgba(255, 236, 236, 0.28); }
-.locker-cell-worn { -fx-border-color: rgba(215, 38, 45, 0.75); }
-.locker-worn { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 9.5px; -fx-text-fill: #ff8a8d; }
+.locker-cell-worn { -fx-border-color: -velo-accent; }
+.locker-worn { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 9.5px; -fx-text-fill: -velo-accent-text; }
 .aside-card { -fx-background-color: #141011; -fx-background-radius: 12; -fx-border-color: rgba(255, 236, 236, 0.07); -fx-border-radius: 12; -fx-padding: 16; }
 .aside-title { -fx-font-family: "Geist Mono SemiBold"; -fx-font-size: 10.5px; -fx-text-fill: rgba(244, 239, 238, 0.55); }
 .report-row { -fx-padding: 11 2 11 2; -fx-border-color: transparent transparent rgba(255, 236, 236, 0.07) transparent; -fx-border-width: 0 0 1 0; }
@@ -4193,7 +4193,7 @@
 .arcade-sub { -fx-text-fill: #9C8C89; -fx-font-size: 12px; }
 .arcade-volume { -fx-background-color: rgba(255, 236, 236, 0.04); -fx-background-radius: 0; -fx-border-color: rgba(255, 236, 236, 0.10); -fx-padding: 6 10 6 10; }
 .arcade-slider .track { -fx-background-color: #2a2324; -fx-background-radius: 0; -fx-pref-height: 4; -fx-padding: 0; }
-.arcade-slider .thumb { -fx-background-color: #D7262D; -fx-background-radius: 0; -fx-padding: 6 4 6 4; }
+.arcade-slider .thumb { -fx-background-color: -velo-accent; -fx-background-radius: 0; -fx-padding: 6 4 6 4; }
 .arcade-slider:hover .thumb { -fx-background-color: #ff4b52; }
 .arcade-hud-button {
 	-fx-background-color: rgba(10, 7, 8, 0.62);
@@ -4203,7 +4203,7 @@
 	-fx-min-width: 34; -fx-min-height: 34; -fx-max-width: 34; -fx-max-height: 34;
 	-fx-cursor: hand;
 }
-.arcade-hud-button:hover { -fx-background-color: rgba(215, 38, 45, 0.55); }
+.arcade-hud-button:hover { -fx-background-color: -velo-accent-glow; }
 .arcade-button {
 	-fx-background-color: #1d1718;
 	-fx-background-radius: 9;
@@ -4214,7 +4214,7 @@
 	-fx-cursor: hand;
 }
 .arcade-button:hover { -fx-background-color: #2a2122; -fx-border-color: rgba(255, 236, 236, 0.16); }
-.arcade-danger { -fx-text-fill: #FF6B6F; -fx-border-color: rgba(215, 38, 45, 0.6); }
+.arcade-danger { -fx-text-fill: -velo-accent-text; -fx-border-color: -velo-accent-glow; }
 .arcade-game-tile {
 	-fx-background-color: #1a1415;
 	-fx-background-radius: 12;
@@ -4225,7 +4225,7 @@
 	-fx-cursor: hand;
 }
 .arcade-game-tile:hover { -fx-background-color: #221a1b; -fx-border-color: rgba(255, 107, 111, 0.5); -fx-translate-y: -2; }
-.arcade-game-tile-on { -fx-border-color: #D7262D; -fx-background-color: #23161a; }
+.arcade-game-tile-on { -fx-border-color: -velo-accent; -fx-background-color: #23161a; }
 .arcade-tile-name { -fx-text-fill: #F4EFEE; }
 .arcade-tile-text { -fx-text-fill: #9C8C89; -fx-font-size: 11px; }
 .arcade-slot {
@@ -4237,7 +4237,7 @@
 }
 .arcade-slot:hover { -fx-background-color: #2a2122; }
 .arcade-slot-hotbar { -fx-background-color: #221a1b; }
-.arcade-slot-selected { -fx-border-color: #D7262D; -fx-border-width: 1.5; }
+.arcade-slot-selected { -fx-border-color: -velo-accent; -fx-border-width: 1.5; }
 .arcade-count { -fx-text-fill: #F4EFEE; -fx-effect: dropshadow(one-pass-box, rgba(0,0,0,0.9), 0, 0, 1, 1); }
 .arcade-recipe {
 	-fx-background-color: #1d1718;
@@ -4249,7 +4249,7 @@
 .arcade-recipe-off { -fx-opacity: 0.5; }
 .arcade-recipe-name { -fx-text-fill: #F4EFEE; -fx-font-size: 12.5px; -fx-font-weight: 600; }
 .arcade-need-ok { -fx-text-fill: #C9B9B6; }
-.arcade-need-missing { -fx-text-fill: #FF6B6F; }
+.arcade-need-missing { -fx-text-fill: -velo-accent-text; }
 
 /* ---- Velo Client Tester: the Testing page ---- */
 .tester-badge {
@@ -4342,3 +4342,951 @@
 	-fx-text-fill: -velo-text;
 }
 .sidebar-testing .label { -fx-text-fill: #ff7a5a; }
+
+/* =====================================================================================================================
+ * GLASS LAUNCHER (2026-11-25, owner-approved canvas): pixel backdrop over the whole window, frosted panels
+ * (ui/glass/Glass draws the blurred picture; these rules give the tint fallback, edges and type).
+ * Kept at the end of the file so it wins over the older rules of the same weight.
+ * ================================================================================================================== */
+
+/* =====================================================================================================================
+ * GLASS CONSISTENCY (2026-11-25): one set of tokens for every page, like the design canvas -
+ * panels 22 px corners + light edge, inner rows 14-16, buttons 12, pills 18; titles Geist bold 28 / sections 17 / 14.
+ * ================================================================================================================== */
+
+/* panels */
+.card, .card-2, .server-card, .partner-card, .aside-card, .settings-card, .friend-group, .news-card, .search-card,
+.store-cat, .mod-table, .profile-banner, .locker-slot, .locker-slot-active {
+	-fx-background-color: -velo-glass-tint;
+	-fx-background-radius: 22;
+	-fx-border-color: rgba(255,255,255,0.12);
+	-fx-border-radius: 22;
+}
+.tile, .locker-cell, .locker-cell-worn { -fx-background-radius: 18; -fx-border-radius: 18; }
+.server-card { -fx-padding: 14 16 14 14; }
+.partner-card { -fx-padding: 16; }
+.settings-card { -fx-padding: 18 20 12 20; }
+.dashed-tile { -fx-background-color: rgba(255,255,255,0.04); -fx-background-radius: 22; -fx-border-radius: 22; -fx-border-color: rgba(255,255,255,0.22); }
+
+/* type */
+.t-title { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 26px; -fx-text-fill: #ffffff; }
+.t-title-sm, .settings-card-title, .t-heading { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 17px; -fx-text-fill: #ffffff; }
+.settings-card-title { -fx-padding: 0 0 8 0; }
+.t-muted, .settings-row-hint { -fx-text-fill: rgba(236,236,242,0.6); }
+.t-overline, .aside-title { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 10.5px; -fx-text-fill: rgba(236,236,242,0.55); }
+.settings-row { -fx-border-color: rgba(255,255,255,0.08) transparent transparent transparent; }
+.settings-row-label { -fx-font-family: "Geist SemiBold"; -fx-font-weight: normal; -fx-font-size: 13.5px; -fx-text-fill: #ffffff; }
+
+/* buttons */
+.button, .menu-button, .toggle-button {
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+}
+.primary-button, .server-join, .play-button {
+	-fx-background-color: -velo-accent;
+	-fx-border-color: transparent;
+	-fx-background-radius: 12;
+	-fx-text-fill: #ffffff;
+	-fx-font-family: "Geist";
+	-fx-font-weight: bold;
+}
+.primary-button:hover, .server-join:hover { -fx-background-color: -velo-accent-hover; }
+.ghost-button, .glass-button { -fx-background-radius: 12; -fx-border-radius: 12; }
+.icon-button { -fx-background-radius: 12; -fx-border-radius: 12; }
+
+/* fields */
+.text-field, .combo-box, .password-field {
+	-fx-background-color: rgba(255,255,255,0.07);
+	-fx-border-color: rgba(255,255,255,0.12);
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+	-fx-text-fill: #ffffff;
+	-fx-prompt-text-fill: rgba(255,255,255,0.45);
+}
+.text-field:focused { -fx-border-color: rgba(255,255,255,0.3); }
+.topbar-search-field { -fx-background-radius: 19; -fx-border-radius: 19; -fx-padding: 8 14 8 14; }
+
+/* small inner boxes (server stats, chips) */
+.server-icon { -fx-background-radius: 14; }
+.badge, .partner-tag { -fx-background-radius: 7; }
+
+/* settings menu items in the rail */
+.settings-rail-item { -fx-alignment: center-left; -fx-text-fill: rgba(255,255,255,0.78); -fx-font-family: "Geist SemiBold"; -fx-font-size: 13.5px; }
+.settings-rail-item:hover { -fx-text-fill: #ffffff; }
+
+/* popovers & menus in glass colours */
+.context-menu, .menu-button .context-menu {
+	-fx-background-color: rgba(30,12,20,0.96);
+	-fx-background-radius: 14;
+	-fx-border-color: rgba(255,255,255,0.14);
+	-fx-border-radius: 14;
+	-fx-padding: 6;
+}
+.menu-item { -fx-background-radius: 9; -fx-padding: 8 12 8 12; }
+.menu-item:focused { -fx-background-color: rgba(255,255,255,0.10); }
+
+.backdrop { -fx-background-color: #07020a; }
+
+.glass {
+	-fx-background-color: -velo-glass-tint;
+	-fx-background-radius: 22;
+	-fx-border-color: transparent;
+}
+
+.glass-on { -fx-background-color: -velo-glass-tint; }
+
+.glass-edge {
+	-fx-background-color: linear-gradient(to bottom, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0) 18%);
+	-fx-border-color: rgba(255,255,255,0.15) rgba(255,255,255,0.10) rgba(255,255,255,0.08) rgba(255,255,255,0.10);
+	-fx-border-width: 1;
+}
+
+/* ---- shell: transparent top strip, floating nav ---- */
+
+.topbar {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-padding: 14 18 0 22;
+	-fx-min-height: 64;
+	-fx-pref-height: 64;
+	-fx-max-height: 64;
+}
+
+.topbar-search-field {
+	-fx-background-color: -velo-glass-tint;
+	-fx-border-color: rgba(255,255,255,0.13);
+	-fx-background-radius: 19;
+	-fx-border-radius: 19;
+}
+
+.nav-bar { -fx-background-radius: 24; }
+
+.nav-item {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-background-radius: 16;
+	-fx-border-radius: 16;
+	-fx-min-width: 48; -fx-pref-width: 48; -fx-max-width: 48;
+	-fx-min-height: 48; -fx-pref-height: 48; -fx-max-height: 48;
+	-fx-padding: 0;
+	-fx-alignment: center;
+	-fx-cursor: hand;
+}
+
+.nav-item:hover { -fx-background-color: rgba(255,255,255,0.10); }
+.nav-item-active, .nav-item-active:hover { -fx-background-color: transparent; }
+
+.nav-selection {
+	-fx-background-color: rgba(255,255,255,0.94);
+	-fx-background-radius: 16;
+	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 12, 0, 0, 4);
+}
+
+.nav-dot {
+	-fx-background-color: -velo-accent;
+	-fx-background-radius: 99;
+	-fx-border-color: rgba(20,8,12,0.9);
+	-fx-border-radius: 99;
+	-fx-border-width: 1.5;
+}
+
+.nav-tip {
+	-fx-background-color: rgba(30,14,20,0.94);
+	-fx-background-radius: 10;
+	-fx-border-color: rgba(255,255,255,0.16);
+	-fx-border-radius: 10;
+	-fx-padding: 6 12 6 12;
+	-fx-text-fill: #ffffff;
+	-fx-font-size: 13px;
+	-fx-font-weight: bold;
+	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 16, 0, 0, 6);
+}
+
+.nav-account {
+	-fx-background-color: rgba(255,255,255,0.06);
+	-fx-border-color: rgba(255,255,255,0.18);
+	-fx-background-radius: 14;
+	-fx-border-radius: 14;
+	-fx-padding: 6;
+	-fx-cursor: hand;
+}
+
+.nav-account:hover { -fx-background-color: rgba(255,255,255,0.14); }
+
+.coins-pill {
+	-fx-background-color: -velo-glass-tint;
+	-fx-border-color: rgba(255,255,255,0.13);
+	-fx-background-radius: 17;
+	-fx-border-radius: 17;
+	-fx-padding: 5 6 5 5;
+	-fx-min-height: 34;
+}
+
+.coins-pill:hover { -fx-background-color: rgba(255,255,255,0.12); }
+.coins-pill-text { -fx-text-fill: #ffffff; -fx-font-size: 13px; -fx-font-weight: bold; }
+
+.coins-pill-plus {
+	-fx-background-color: rgba(255,255,255,0.14);
+	-fx-background-radius: 99;
+	-fx-min-width: 24; -fx-min-height: 24; -fx-max-width: 24; -fx-max-height: 24;
+}
+
+/* page backgrounds stay see-through so the backdrop shows */
+.page, .scroll-pane, .scroll-pane > .viewport { -fx-background-color: transparent; }
+
+.page-title { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 28px; }
+
+/* ---- glass Home ---- */
+
+.home-greet-over { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(236,236,242,0.72); }
+.home-greet-name { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 24px; -fx-text-fill: #ffffff; }
+.home-footer { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(236,236,242,0.5); }
+
+.name-tag {
+	-fx-background-color: rgba(10,2,6,0.42);
+	-fx-background-radius: 8;
+}
+.name-tag-plain { -fx-text-fill: #ffffff; -fx-font-family: "Geist SemiBold"; -fx-font-size: 17px; }
+
+.home-player-shadow {
+	-fx-background-color: radial-gradient(center 50% 50%, radius 50%, rgba(8,0,4,0.75), rgba(8,0,4,0));
+	-fx-background-radius: 50%;
+	-fx-min-height: 26;
+}
+
+.home-play-card { -fx-background-radius: 28; }
+
+.home-profile-row {
+	-fx-background-color: rgba(255,255,255,0.07);
+	-fx-background-radius: 18;
+	-fx-border-color: rgba(255,255,255,0.10);
+	-fx-border-radius: 18;
+	-fx-min-height: 56;
+}
+
+.home-switcher {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-background-radius: 18 0 0 18;
+	-fx-padding: 8 12 8 8;
+	-fx-alignment: center-left;
+}
+.home-switcher:hover { -fx-background-color: rgba(255,255,255,0.06); }
+
+.home-mods {
+	-fx-background-color: rgba(255,255,255,0.05);
+	-fx-border-color: transparent transparent transparent rgba(255,255,255,0.10);
+	-fx-border-width: 0 0 0 1;
+	-fx-background-radius: 0 18 18 0;
+	-fx-border-radius: 0 18 18 0;
+	-fx-padding: 8 14 8 12;
+}
+.home-mods:hover { -fx-background-color: rgba(255,255,255,0.12); }
+.home-mods .launch-mods-icon { -fx-background-color: transparent; }
+.home-mods .launch-mods-title { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: #ffffff; }
+.home-mods .launch-mods-line { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 10.5px; -fx-text-fill: rgba(236,236,242,0.6); }
+
+.home-play {
+	-fx-background-color: -velo-accent;
+	-fx-background-radius: 22;
+	-fx-border-color: transparent;
+	-fx-min-height: 76;
+	-fx-pref-height: 76;
+	-fx-effect: dropshadow(gaussian, -velo-accent-glow, 30, 0, 0, 12);
+	-fx-cursor: hand;
+}
+.home-play:hover { -fx-background-color: -velo-accent-hover; }
+.home-play:pressed { -fx-background-color: -velo-accent-pressed; -fx-scale-x: 0.99; -fx-scale-y: 0.99; }
+.home-play-title { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 30px; -fx-text-fill: #ffffff; }
+.home-play-sub { -fx-font-family: "Geist Medium"; -fx-font-size: 12px; -fx-text-fill: rgba(255,255,255,0.86); }
+
+.home-chips-label { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(236,236,242,0.55); -fx-padding: 0 0 0 4; }
+
+.home-chip {
+	-fx-background-color: rgba(255,255,255,0.08);
+	-fx-border-color: rgba(255,255,255,0.08);
+	-fx-background-radius: 18;
+	-fx-border-radius: 18;
+	-fx-padding: 5 14 5 6;
+	-fx-min-height: 36;
+	-fx-text-fill: #ffffff;
+	-fx-font-family: "Geist Medium";
+	-fx-font-size: 13px;
+}
+.home-chip:hover { -fx-background-color: rgba(255,255,255,0.15); }
+.home-chip-on, .home-chip-on:hover { -fx-background-color: rgba(255,255,255,0.92); -fx-border-color: rgba(255,255,255,0.92); -fx-text-fill: #1a0a10; }
+.home-chip-on .home-chip-icon { -fx-background-color: rgba(26,10,16,0.85); }
+.home-chip-add { -fx-padding: 5 11 5 11; }
+.home-chip-icon {
+	-fx-background-color: rgba(255,255,255,0.12);
+	-fx-background-radius: 99;
+	-fx-min-width: 24; -fx-min-height: 24; -fx-max-width: 24; -fx-max-height: 24;
+}
+
+.home-card { -fx-background-radius: 22; }
+.home-card-title { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: #ffffff; }
+.home-card-note { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(236,236,242,0.55); }
+.home-card-empty { -fx-font-size: 12.5px; -fx-text-fill: rgba(236,236,242,0.6); }
+.home-right, .home-right > .viewport { -fx-background-color: transparent; -fx-background: transparent; }
+
+.run-row {
+	-fx-background-color: rgba(255,255,255,0.06);
+	-fx-background-radius: 16;
+	-fx-padding: 10 10 10 12;
+	-fx-cursor: hand;
+}
+.run-row:hover { -fx-background-color: rgba(255,255,255,0.12); -fx-border-color: rgba(255,255,255,0.18); -fx-border-radius: 16; }
+.run-row-starting { -fx-cursor: default; }
+.run-dot { -fx-background-color: #4cd07d; -fx-background-radius: 4; -fx-min-width: 8; -fx-min-height: 8; -fx-max-width: 8; -fx-max-height: 8; }
+.run-dot-starting { -fx-background-color: #ffb347; }
+.run-name { -fx-font-family: "Geist SemiBold"; -fx-font-size: 13px; -fx-text-fill: #ffffff; }
+.run-sub { -fx-font-size: 11.5px; -fx-text-fill: rgba(236,236,242,0.6); }
+.run-icon {
+	-fx-background-radius: 9;
+	-fx-border-color: transparent;
+	-fx-padding: 0;
+	-fx-min-width: 26; -fx-min-height: 26; -fx-max-width: 26; -fx-max-height: 26;
+}
+.run-icon-plain { -fx-background-color: rgba(255,255,255,0.10); }
+.run-icon-plain:hover { -fx-background-color: rgba(255,255,255,0.22); }
+.run-icon-danger { -fx-background-color: -velo-accent-soft; }
+.run-icon-danger:hover { -fx-background-color: derive(-velo-accent, -10%); }
+.run-track { -fx-background-color: rgba(255,255,255,0.12); -fx-background-radius: 2; }
+.run-fill { -fx-background-color: #ffb347; -fx-background-radius: 2; }
+
+.friend-mini { -fx-padding: 4 2 4 4; }
+.mini-join {
+	-fx-background-color: rgba(255,255,255,0.12);
+	-fx-border-color: transparent;
+	-fx-background-radius: 13;
+	-fx-padding: 4 10 4 10;
+	-fx-font-size: 12px;
+	-fx-text-fill: #ffffff;
+}
+.mini-join:hover { -fx-background-color: rgba(255,255,255,0.22); }
+
+/* Home player entrance */
+.spawn-ring {
+	-fx-background-color: transparent;
+	-fx-border-color: -velo-accent-text;
+	-fx-border-width: 3;
+	-fx-border-radius: 50%;
+	-fx-background-radius: 50%;
+	-fx-effect: dropshadow(gaussian, -velo-accent-glow, 18, 0.4, 0, 0);
+}
+.spawn-glow { -fx-background-color: radial-gradient(center 50% 70%, radius 55%, -velo-accent-glow, transparent); }
+.spawn-spark { -fx-background-color: -velo-accent-text; }
+.spawn-spark-white { -fx-background-color: #ffffff; }
+
+/* ---- glass pages: shared buttons and panels ---- */
+
+.accent-pill {
+	-fx-background-color: -velo-accent;
+	-fx-border-color: transparent;
+	-fx-background-radius: 13;
+	-fx-padding: 9 16 9 14;
+	-fx-text-fill: #ffffff;
+	-fx-font-family: "Geist";
+	-fx-font-weight: bold;
+	-fx-font-size: 13px;
+	-fx-graphic-text-gap: 8;
+}
+.accent-pill:hover { -fx-background-color: -velo-accent-hover; }
+
+.glass-button, .menu-button.glass-button {
+	-fx-background-color: -velo-glass-tint;
+	-fx-border-color: rgba(255,255,255,0.14);
+	-fx-background-radius: 13;
+	-fx-border-radius: 13;
+	-fx-padding: 8 14 8 12;
+	-fx-text-fill: #ffffff;
+	-fx-font-family: "Geist SemiBold";
+	-fx-font-size: 13px;
+}
+.glass-button:hover { -fx-background-color: rgba(255,255,255,0.14); }
+.glass-button.icon-only { -fx-padding: 9; }
+
+.white-pill {
+	-fx-background-color: rgba(255,255,255,0.92);
+	-fx-border-color: transparent;
+	-fx-background-radius: 10;
+	-fx-padding: 6 13 6 13;
+	-fx-text-fill: #1a0a10;
+	-fx-font-family: "Geist";
+	-fx-font-weight: bold;
+	-fx-font-size: 12px;
+}
+.white-pill:hover { -fx-background-color: #ffffff; }
+
+.panel-title { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 17px; -fx-text-fill: #ffffff; }
+.glass-panel { -fx-background-radius: 24; }
+
+.profile-card { -fx-background-radius: 22; -fx-cursor: hand; }
+.profile-card:hover .glass-edge { -fx-border-color: rgba(255,255,255,0.28); }
+.profile-card-name { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 15px; -fx-text-fill: #ffffff; }
+.profile-card-meta { -fx-font-size: 12px; -fx-text-fill: rgba(236,236,242,0.62); }
+.profile-card-status { -fx-font-family: "Geist SemiBold"; -fx-font-size: 12px; -fx-text-fill: rgba(236,236,242,0.5); }
+.profile-card-status-run { -fx-text-fill: #6fe09a; }
+.profile-card-status-fix { -fx-text-fill: #ffc070; }
+.profile-card-dot { -fx-background-color: rgba(236,236,242,0.5); -fx-background-radius: 4; -fx-min-width: 7; -fx-min-height: 7; -fx-max-width: 7; -fx-max-height: 7; }
+.profile-card-dot-run { -fx-background-color: #6fe09a; }
+.profile-card-dot-fix { -fx-background-color: #ffc070; }
+.profile-card-play {
+	-fx-background-color: -velo-accent;
+	-fx-border-color: transparent;
+	-fx-background-radius: 10;
+	-fx-min-height: 34;
+	-fx-text-fill: #ffffff;
+	-fx-font-family: "Geist";
+	-fx-font-weight: bold;
+	-fx-font-size: 12px;
+	-fx-graphic-text-gap: 7;
+}
+.profile-card-play:hover { -fx-background-color: -velo-accent-hover; }
+.profile-card-manage {
+	-fx-background-color: rgba(255,255,255,0.10);
+	-fx-border-color: transparent;
+	-fx-background-radius: 10;
+	-fx-min-height: 34;
+	-fx-padding: 0 13 0 13;
+	-fx-text-fill: #ffffff;
+	-fx-font-family: "Geist";
+	-fx-font-weight: bold;
+	-fx-font-size: 12px;
+}
+.profile-card-manage:hover { -fx-background-color: rgba(255,255,255,0.2); }
+
+.pack-row, .import-row {
+	-fx-background-color: rgba(255,255,255,0.06);
+	-fx-background-radius: 16;
+	-fx-padding: 10;
+}
+.pack-row:hover, .import-row:hover { -fx-background-color: rgba(255,255,255,0.11); }
+.pack-icon { -fx-background-color: rgba(255,255,255,0.08); }
+.import-letter {
+	-fx-background-color: linear-gradient(to bottom right, -velo-accent, derive(-velo-accent, -45%));
+	-fx-background-radius: 10;
+	-fx-min-width: 38; -fx-min-height: 38; -fx-max-width: 38; -fx-max-height: 38;
+	-fx-alignment: center;
+	-fx-text-fill: #ffffff;
+	-fx-font-family: "Geist";
+	-fx-font-weight: bold;
+	-fx-font-size: 15px;
+}
+
+/* older page pieces: see-through tints until (or instead of) the frosted layer */
+.partner-card, .card, .card-2, .server-card, .friend-group, .aside-card, .settings-card, .news-card, .search-card, .tile, .store-cat {
+	-fx-background-color: -velo-glass-tint;
+	-fx-border-color: rgba(255,255,255,0.12);
+}
+.partner-card, .server-card { -fx-background-radius: 18; -fx-border-radius: 18; }
+
+/* ---- glass profile screen ---- */
+.profile-rail, .profile-section-panel { -fx-background-radius: 24; }
+.rail-item {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-background-radius: 13;
+	-fx-padding: 0 10 0 12;
+	-fx-min-height: 40;
+	-fx-alignment: center-left;
+}
+.rail-item:hover { -fx-background-color: rgba(255,255,255,0.08); }
+.rail-text { -fx-font-family: "Geist SemiBold"; -fx-font-size: 13.5px; -fx-text-fill: rgba(255,255,255,0.78); }
+.rail-count { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 10.5px; -fx-text-fill: rgba(255,255,255,0.45); }
+.rail-active, .rail-active:hover { -fx-background-color: rgba(255,255,255,0.94); }
+.rail-active .rail-text { -fx-text-fill: #1a0a10; }
+.rail-active .rail-count { -fx-text-fill: rgba(26,10,16,0.55); }
+.rail-active .svg-path, .rail-active SVGPath { -fx-stroke: #1a0a10; }
+.rail-count-bad { -fx-background-color: #ffb347; -fx-background-radius: 6; -fx-text-fill: #241304; -fx-padding: 1 5 1 5; }
+.rail-count-ok { -fx-text-fill: #6fe09a; }
+.profile-banner { -fx-background-color: -velo-glass-tint; -fx-background-radius: 24; }
+
+/* ---- Locker badges ---- */
+.badge-card { -fx-background-radius: 18; -fx-cursor: hand; }
+.badge-card-off { -fx-background-color: rgba(255,255,255,0.06); }
+.badge-card-off:hover { -fx-background-color: rgba(255,255,255,0.11); }
+.badge-card-on { -fx-background-color: rgba(255,255,255,0.16); -fx-border-color: #ffffff; -fx-border-width: 1.5; -fx-border-radius: 18; }
+.badge-art { -fx-background-radius: 14; -fx-background-color: radial-gradient(center 50% 50%, radius 60%, rgba(229,55,62,0.28), rgba(0,0,0,0.2)); }
+.badge-art-plus { -fx-background-color: radial-gradient(center 50% 50%, radius 60%, rgba(255,70,80,0.36), rgba(0,0,0,0.2)); }
+.badge-art-og { -fx-background-color: radial-gradient(center 50% 50%, radius 60%, rgba(255,200,80,0.3), rgba(0,0,0,0.2)); }
+.badge-lock { -fx-background-color: rgba(0,0,0,0.45); -fx-background-radius: 9; -fx-min-width: 26; -fx-min-height: 26; }
+.badge-on { -fx-background-color: #ffffff; -fx-background-radius: 7; -fx-padding: 3 7 3 7; -fx-text-fill: #121216; -fx-font-family: "Geist Mono Medium"; -fx-font-size: 10px; }
+.badge-preview { -fx-background-color: rgba(0,0,0,0.22); -fx-background-radius: 18; }
+.badge-preview-line { -fx-background-color: rgba(0,0,0,0.35); -fx-background-radius: 10; -fx-padding: 8 10 8 10; }
+.badge-preview-tag { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 11px; -fx-text-fill: rgba(255,255,255,0.45); }
+.badge-preview-name { -fx-font-family: "Monocraft"; -fx-font-size: 12px; -fx-text-fill: #ffffff; }
+
+/* Settings: background picker */
+.bg-tile { -fx-background-radius: 14; -fx-cursor: hand; }
+.bg-tile-off:hover { -fx-background-color: rgba(255,255,255,0.08); }
+.bg-tile-on { -fx-background-color: rgba(255,255,255,0.16); -fx-border-color: #ffffff; -fx-border-width: 1.5; -fx-border-radius: 14; }
+.bg-tile-name { -fx-font-family: "Geist SemiBold"; -fx-font-size: 12px; -fx-text-fill: #ffffff; -fx-padding: 0 2 2 2; }
+.bg-tile-custom { -fx-background-color: rgba(255,255,255,0.05); -fx-border-color: rgba(255,255,255,0.28); -fx-border-style: segments(6, 5); -fx-border-radius: 9; -fx-border-width: 1.5; }
+
+/* ---- Locker: kinds as a vertical glass list ---- */
+.locker-kinds, .locker-catalog { -fx-background-radius: 24; }
+.locker-kind, .locker-kind-active { -fx-background-radius: 13; -fx-cursor: hand; -fx-min-height: 40; -fx-pref-height: 40; -fx-max-height: 40; }
+.locker-kind:hover { -fx-background-color: rgba(255,255,255,0.08); }
+.locker-kind-active { -fx-background-color: rgba(255,255,255,0.94); }
+.locker-kind .locker-tab-name { -fx-text-fill: rgba(255,255,255,0.78); -fx-font-family: "Geist SemiBold"; -fx-font-size: 13.5px; }
+.locker-kind-active .locker-tab-name { -fx-text-fill: #1a0a10; -fx-font-family: "Geist SemiBold"; -fx-font-size: 13.5px; }
+.header-play {
+	-fx-background-color: -velo-accent;
+	-fx-border-color: transparent;
+	-fx-background-radius: 16;
+	-fx-min-height: 48;
+	-fx-padding: 0 24 0 20;
+	-fx-text-fill: #ffffff;
+	-fx-font-family: "Geist";
+	-fx-font-weight: bold;
+	-fx-font-size: 16px;
+	-fx-graphic-text-gap: 10;
+	-fx-effect: dropshadow(gaussian, -velo-accent-glow, 22, 0, 0, 8);
+}
+.header-play:hover { -fx-background-color: -velo-accent-hover; }
+
+/* ---- Store tabs: glass bar with pills ---- */
+.store-tabs { -fx-background-color: -velo-glass-tint; -fx-background-radius: 20; }
+.store-tab {
+	-fx-background-color: transparent;
+	-fx-border-color: transparent;
+	-fx-background-radius: 16;
+	-fx-padding: 0 14 0 14;
+	-fx-min-height: 32;
+	-fx-pref-height: 32;
+	-fx-text-fill: rgba(255,255,255,0.68);
+	-fx-font-family: "Geist SemiBold";
+	-fx-font-size: 13px;
+}
+.store-tab:hover { -fx-text-fill: #ffffff; }
+.store-tab-active, .store-tab-active:hover { -fx-background-color: rgba(255,255,255,0.94); -fx-text-fill: #121216; }
+.store-tabs { -fx-border-color: rgba(255,255,255,0.13); -fx-border-radius: 20; }
+/* flat icon buttons in the top bar and the window buttons stay without a box */
+.icon-button-flat, .window-button { -fx-background-color: transparent; -fx-border-color: transparent; }
+.icon-button-flat:hover, .window-button:hover { -fx-background-color: rgba(255,255,255,0.10); }
+.window-button-close:hover { -fx-background-color: -velo-accent; }
+/* Store tabs a touch tighter so every tab fits next to the icon buttons */
+.store-tab { -fx-padding: 0 10 0 10; -fx-font-size: 12.5px; }
+.store-tabs { -fx-spacing: 0; }
+
+/* wings motion pills (Locker): no dark bar behind, glass pills, the active one white */
+.segment-bar { -fx-background-color: transparent; -fx-padding: 0; -fx-spacing: 6; }
+.segmented-button {
+	-fx-background-color: -velo-glass-tint;
+	-fx-border-color: rgba(255,255,255,0.14);
+	-fx-border-width: 1;
+	-fx-background-radius: 14;
+	-fx-border-radius: 14;
+	-fx-text-fill: rgba(255,255,255,0.8);
+	-fx-font-family: "Geist SemiBold";
+}
+.segmented-button:hover { -fx-background-color: rgba(255,255,255,0.14); }
+.segmented-button-active, .segmented-button-active:hover { -fx-background-color: rgba(255,255,255,0.94); -fx-text-fill: #1a0a10; -fx-border-color: transparent; }
+.backdrop-plain { -fx-background-color: linear-gradient(to bottom, #1b191e 0%, #121115 100%); }
+.home-chip-icon-only { -fx-padding: 5; -fx-min-width: 36; -fx-min-height: 36; }
+
+/* ---- profile screen: design header, update bar, Add panel, version popover ---- */
+.profile-banner, .profile-banner:hover { -fx-background-color: transparent; -fx-border-color: transparent; }
+.profile-banner .glass-edge, .profile-banner .glass-frost { -fx-opacity: 0; }
+.profile-banner-shade { -fx-background-color: transparent; }
+.header-chip {
+	-fx-background-color: rgba(255,255,255,0.07);
+	-fx-border-color: rgba(255,255,255,0.14);
+	-fx-background-radius: 9;
+	-fx-border-radius: 9;
+	-fx-padding: 4 9 4 10;
+	-fx-cursor: hand;
+}
+.header-chip:hover { -fx-background-color: rgba(255,255,255,0.14); }
+.chip-kind { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 10px; -fx-text-fill: rgba(236,236,242,0.6); }
+.chip-value { -fx-font-family: "Geist SemiBold"; -fx-font-size: 12.5px; -fx-text-fill: #ffffff; }
+.update-bar {
+	-fx-background-color: rgba(255,179,71,0.12);
+	-fx-border-color: rgba(255,179,71,0.28);
+	-fx-background-radius: 14;
+	-fx-border-radius: 14;
+	-fx-padding: 6 7 6 14;
+	-fx-min-height: 44;
+}
+.update-bar-text { -fx-text-fill: #ffffff; -fx-font-size: 13px; }
+.update-bar-button {
+	-fx-background-color: #ffb347;
+	-fx-border-color: transparent;
+	-fx-background-radius: 10;
+	-fx-text-fill: #241304;
+	-fx-font-family: "Geist";
+	-fx-font-weight: bold;
+	-fx-font-size: 12.5px;
+	-fx-padding: 7 14 7 14;
+}
+.add-pill {
+	-fx-background-color: rgba(255,255,255,0.06);
+	-fx-border-color: rgba(255,255,255,0.12);
+	-fx-background-radius: 15;
+	-fx-border-radius: 15;
+	-fx-padding: 5 12 5 12;
+	-fx-text-fill: rgba(255,255,255,0.8);
+	-fx-font-family: "Geist SemiBold";
+	-fx-font-size: 12px;
+}
+.add-pill:hover { -fx-background-color: rgba(255,255,255,0.13); }
+.add-pill-on, .add-pill-on:hover { -fx-background-color: rgba(255,255,255,0.92); -fx-text-fill: #1a0a10; -fx-border-color: transparent; }
+.add-drop {
+	-fx-border-color: rgba(255,255,255,0.22);
+	-fx-border-style: segments(7, 5);
+	-fx-border-width: 1.5;
+	-fx-border-radius: 16;
+	-fx-background-radius: 16;
+	-fx-cursor: hand;
+}
+.add-drop:hover, .add-drop-hover { -fx-background-color: rgba(255,255,255,0.06); -fx-border-color: rgba(255,255,255,0.4); }
+.version-tile { -fx-cursor: hand; }
+.version-tile-shade { -fx-background-color: linear-gradient(to bottom, rgba(10,2,6,0.12), rgba(10,2,6,0.82)); }
+.version-tile-name { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 15px; -fx-text-fill: #ffffff; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.7), 4, 0, 0, 1); }
+.version-tile-sub { -fx-font-size: 11.5px; -fx-text-fill: rgba(236,236,242,0.75); }
+.version-tile-tag { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 9.5px; -fx-padding: 2 6 2 6; -fx-background-radius: 6; }
+.version-tile-tag-new { -fx-background-color: rgba(76,208,125,0.3); -fx-text-fill: #b5f2c9; }
+.version-tile-tag-cur { -fx-background-color: rgba(255,255,255,0.2); -fx-text-fill: #ffffff; }
+.version-tile-tag-red { -fx-background-color: -velo-accent-line; -fx-text-fill: #ffd0d2; }
+.version-tile-current { -fx-opacity: 0.6; -fx-cursor: default; }
+.version-tile-on { -fx-border-color: #ffffff; -fx-border-width: 2; -fx-border-radius: 14; }
+.version-pop-foot { -fx-background-color: rgba(0,0,0,0.25); -fx-background-radius: 14; -fx-padding: 10 12 10 12; }
+.add-panel .primary-button {
+	-fx-background-color: rgba(255,255,255,0.92);
+	-fx-text-fill: #1a0a10;
+	-fx-background-radius: 10;
+	-fx-padding: 6 13 6 13;
+	-fx-font-size: 12px;
+	-fx-effect: null;
+}
+.add-panel .primary-button:hover { -fx-background-color: #ffffff; }
+.mod-author { -fx-font-size: 11.5px; -fx-text-fill: rgba(236,236,242,0.6); }
+.mod-downloads { -fx-font-family: "Geist Mono Medium"; -fx-font-size: 10.5px; -fx-text-fill: rgba(236,236,242,0.45); }
+.import-logo { -fx-background-color: rgba(255,255,255,0.08); -fx-background-radius: 12; }
+
+/* tooltips: opaque, no big shadow (its transparent margin slid under the cursor and the tooltip vanished at once) */
+.tooltip {
+	-fx-background-color: #26222a;
+	-fx-text-fill: #ffffff;
+	-fx-border-color: rgba(255,255,255,0.14);
+	-fx-background-radius: 9;
+	-fx-border-radius: 9;
+	-fx-padding: 6 10 6 10;
+	-fx-font-family: "Geist Medium";
+	-fx-font-size: 12px;
+	-fx-effect: null;
+}
+
+/* graphics toggle: white knob, dark text on it (no blue) */
+.gapi-pill { -fx-background-color: rgba(0,0,0,0.32); -fx-border-color: rgba(255,255,255,0.12); }
+.gapi-knob { -fx-background-color: rgba(255,255,255,0.94); -fx-effect: null; }
+.gapi-segment.gapi-on { -fx-text-fill: #1a0a10; }
+
+/* version tiles: selection as an inner ring */
+.version-tile-ring { -fx-border-color: #ffffff; -fx-border-width: 2.5; -fx-border-radius: 14; -fx-background-radius: 14; }
+
+/* glass buttons everywhere (News, Clips, Store header...): light glass, not the dark tint */
+.glass-button, .menu-button.glass-button {
+	-fx-background-color: rgba(255,255,255,0.09);
+	-fx-border-color: rgba(255,255,255,0.16);
+}
+.glass-button:hover, .menu-button.glass-button:hover { -fx-background-color: rgba(255,255,255,0.17); }
+.danger-ghost-button {
+	-fx-background-color: rgba(255,90,90,0.10);
+	-fx-border-color: rgba(255,107,107,0.4);
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+	-fx-text-fill: #ff8a8a;
+	-fx-font-family: "Geist SemiBold";
+}
+.danger-ghost-button:hover { -fx-background-color: rgba(255,90,90,0.2); }
+.news-carousel-arrow {
+	-fx-background-color: rgba(255,255,255,0.10);
+	-fx-border-color: rgba(255,255,255,0.20);
+	-fx-background-radius: 99;
+	-fx-border-radius: 99;
+	-fx-min-width: 40; -fx-min-height: 40; -fx-max-width: 40; -fx-max-height: 40;
+	-fx-padding: 0;
+	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 10, 0, 0, 3);
+}
+.news-carousel-arrow:hover { -fx-background-color: rgba(255,255,255,0.22); }
+.back-icon-button {
+	-fx-background-color: rgba(255,255,255,0.09);
+	-fx-border-color: rgba(255,255,255,0.16);
+	-fx-background-radius: 99;
+	-fx-border-radius: 99;
+}
+.back-icon-button:hover { -fx-background-color: rgba(255,255,255,0.18); }
+
+
+/* ---- theme-aware details ---- */
+.utab-row { -fx-border-color: transparent; -fx-border-width: 0; }
+.rewards-strip { -fx-background-radius: 22; -fx-border-radius: 22; -fx-background-color: -velo-glass-tint; }
+
+/* text and icons on an accent fill use the theme's on-accent colour (dark on Monochrome's white accent) */
+.home-play, .accent-pill, .profile-card-play, .header-play, .primary-button, .server-join, .play-button { -fx-text-fill: -velo-on-accent; }
+.home-play .label, .home-play-title, .home-play-sub { -fx-text-fill: -velo-on-accent; }
+.home-play SVGPath, .accent-pill SVGPath, .profile-card-play SVGPath, .header-play SVGPath, .primary-button SVGPath { -fx-fill: -velo-on-accent; -fx-stroke: -velo-on-accent; }
+.run-dot-starting, .nav-dot { -fx-border-color: transparent; }
+
+/* sliders: accent track on a visible rail, a thumb that stands out on every accent */
+.slider .track { -fx-background-color: rgba(255,255,255,0.14); -fx-background-radius: 3; -fx-pref-height: 5; }
+.slider .thumb {
+	-fx-background-color: -velo-accent, -velo-on-accent;
+	-fx-background-insets: 0, 4;
+	-fx-background-radius: 99;
+	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 6, 0, 0, 1);
+}
+
+/* toggles: the knob in on-accent colour when on (no white knob on a white track) */
+.toggle-switch:selected .thumb, .check-box:selected .mark { -fx-background-color: -velo-on-accent; }
+.on-accent-icon SVGPath { -fx-stroke: -velo-on-accent; }
+
+/* 2026-11-25: loading skeletons on glass - soft white blocks (the old #1d1718 was the brown theme's) */
+.skeleton-block, .skeleton-under { -fx-background-color: rgba(255,255,255,0.075); }
+.skeleton-card { -fx-background-color: rgba(255,255,255,0.035); -fx-border-color: rgba(255,255,255,0.06); }
+.skeleton-sheen { -fx-background-color: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%); }
+
+/* 2026-11-25 Home party lobby: status under the other members' name tags, the invite rail on the right */
+.lobby-status { -fx-font-family: 'Geist Mono'; -fx-font-size: 10px; -fx-text-fill: rgba(255,255,255,0.6);
+	-fx-background-color: rgba(0,0,0,0.35); -fx-background-radius: 999; -fx-padding: 2 8 2 8; }
+.lobby-status-leader { -fx-text-fill: -velo-accent-text; }
+.lobby-rail-title { -fx-font-family: 'Geist Mono'; -fx-font-size: 10px; -fx-text-fill: rgba(255,255,255,0.55); }
+.lobby-plus {
+	-fx-min-width: 46; -fx-min-height: 46; -fx-pref-width: 46; -fx-pref-height: 46; -fx-max-width: 46; -fx-max-height: 46;
+	-fx-background-color: rgba(255,255,255,0.06); -fx-background-radius: 999;
+	-fx-border-color: rgba(255,255,255,0.28); -fx-border-style: segments(5, 4); -fx-border-width: 1.5; -fx-border-radius: 999;
+	-fx-cursor: hand; -fx-padding: 0;
+}
+.lobby-plus:hover { -fx-background-color: -velo-accent-soft; -fx-border-color: -velo-accent; -fx-border-style: solid; }
+.lobby-entry { -fx-background-color: rgba(0,0,0,0.28); -fx-background-radius: 999; -fx-padding: 4 12 4 4; }
+.lobby-picker { -fx-background-color: rgba(16,16,20,0.96); -fx-background-radius: 18; -fx-border-color: rgba(255,255,255,0.14);
+	-fx-border-radius: 18; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.4), 24, 0, 0, 8); }
+.mini-invite { -fx-background-color: rgba(255,255,255,0.08); -fx-background-radius: 999; -fx-min-width: 30; -fx-min-height: 30;
+	-fx-pref-width: 30; -fx-pref-height: 30; -fx-padding: 0; -fx-cursor: hand; }
+.mini-invite:hover { -fx-background-color: -velo-accent; }
+.mini-invite:hover SVGPath { -fx-stroke: -velo-on-accent; }
+
+/* 2026-11-25 Home party chat */
+.party-bubble { -fx-background-color: rgba(255,255,255,0.08); -fx-background-radius: 12; -fx-padding: 6 10 6 10; -fx-text-fill: #EDEDF0; -fx-font-size: 12.5px; }
+.party-bubble-mine { -fx-background-color: -velo-accent; -fx-background-radius: 12; -fx-padding: 6 10 6 10; -fx-text-fill: -velo-on-accent; -fx-font-size: 12.5px; }
+.party-chat-name { -fx-font-size: 11px; -fx-text-fill: rgba(255,255,255,0.55); -fx-font-family: 'Geist SemiBold'; }
+.party-chat-system { -fx-font-size: 11px; -fx-text-fill: rgba(255,255,255,0.45); -fx-font-style: italic; }
+.party-chat-input { -fx-background-color: rgba(255,255,255,0.07); -fx-background-radius: 999; -fx-border-color: rgba(255,255,255,0.12);
+	-fx-border-radius: 999; -fx-text-fill: white; -fx-prompt-text-fill: rgba(255,255,255,0.4); -fx-padding: 7 12 7 12; }
+.party-chat-send { -fx-background-color: -velo-accent; -fx-background-radius: 999; -fx-min-width: 32; -fx-min-height: 32;
+	-fx-pref-width: 32; -fx-pref-height: 32; -fx-padding: 0; -fx-cursor: hand; }
+.party-chat-send SVGPath { -fx-stroke: -velo-on-accent; }
+.party-chat-send { -fx-background-insets: 0; -fx-min-width: 34; -fx-min-height: 34; -fx-pref-width: 34; -fx-pref-height: 34;
+	-fx-max-width: 34; -fx-max-height: 34; -fx-alignment: center; -fx-translate-y: 0; -fx-effect: null; }
+.party-chat-input { -fx-background-insets: 0; -fx-padding: 0 12 0 12; }
+
+/* 2026-11-25 launcher emote wheel (B on Home): one frosted disc in 8 segments, name in the middle */
+.emote-wheel-scrim { -fx-background-color: rgba(0,0,0,0.38); }
+.emote-wheel-disc { -fx-background-color: -velo-glass-tint; -fx-background-radius: 999; }
+.emote-wheel-seg { -fx-fill: rgba(255,255,255,0.035); -fx-stroke: rgba(255,255,255,0.10); -fx-stroke-width: 1; -fx-cursor: hand; }
+.emote-wheel-seg-hover { -fx-fill: -velo-accent-soft; -fx-stroke: -velo-accent; -fx-stroke-width: 1.5; }
+.emote-wheel-hub { -fx-fill: rgba(0,0,0,0.28); -fx-stroke: rgba(255,255,255,0.10); -fx-stroke-width: 1; }
+.emote-wheel-center { -fx-font-family: 'Geist SemiBold'; -fx-font-size: 15px; -fx-text-fill: #F2F2F5; }
+.emote-wheel-sub { -fx-font-family: 'Geist'; -fx-font-size: 11px; -fx-text-fill: rgba(255,255,255,0.5); }
+.emote-wheel-empty { -fx-font-family: 'Geist'; -fx-font-size: 22px; -fx-text-fill: rgba(255,255,255,0.22); }
+
+/* 2026-11-25: Leave in the Home party chat header */
+.party-chat-leave { -fx-font-size: 11.5px; -fx-padding: 3 10 3 8; -fx-min-height: 24; -fx-pref-height: 24; -fx-background-radius: 12; -fx-border-radius: 12; -fx-graphic-text-gap: 5; }
+
+/* ---- Velo Tester window (2026-11-25 redesign) ---- */
+.tw-nav { -fx-background-color: -velo-surface; -fx-border-color: transparent -velo-hairline transparent transparent; -fx-padding: 22 12 18 12; }
+.tw-brand { -fx-text-fill: -velo-text; -fx-font-family: 'Geist SemiBold'; -fx-font-size: 18px; }
+.tw-build { -fx-text-fill: -velo-text-3; -fx-font-family: 'Geist Mono'; -fx-font-size: 10.5px; }
+.tw-nav-item { -fx-background-color: transparent; -fx-background-radius: 10; -fx-padding: 9 12 9 12; -fx-text-fill: -velo-text-2;
+	-fx-font-family: 'Geist Medium'; -fx-font-size: 13px; -fx-cursor: hand; -fx-border-width: 0; }
+.tw-nav-item:hover { -fx-background-color: rgba(255,255,255,0.05); -fx-text-fill: -velo-text; }
+.tw-nav-active, .tw-nav-active:hover { -fx-background-color: -velo-accent-soft; -fx-text-fill: -velo-text; -fx-border-color: transparent transparent transparent -velo-accent;
+	-fx-border-width: 0 0 0 3; -fx-border-radius: 10; }
+.tw-nav-hint { -fx-text-fill: -velo-text-3; -fx-font-size: 11px; -fx-padding: 0 10 0 10; }
+.tw-title { -fx-text-fill: -velo-text; -fx-font-family: 'Geist SemiBold'; -fx-font-size: 24px; }
+.tw-headline { -fx-text-fill: -velo-accent; -fx-font-family: 'Geist SemiBold'; -fx-font-size: 14px; }
+.tw-card { -fx-background-color: -velo-surface; -fx-background-radius: 14; -fx-border-color: -velo-hairline; -fx-border-radius: 14; -fx-padding: 14 18 14 18; }
+.tw-progress-card { -fx-spacing: 10; }
+.tw-progress-text { -fx-text-fill: -velo-text; -fx-font-family: 'Geist SemiBold'; -fx-font-size: 13px; }
+.tw-progress-counts { -fx-text-fill: -velo-text-3; -fx-font-size: 12px; }
+.tw-track { -fx-background-color: rgba(255,255,255,0.07); -fx-background-radius: 4; -fx-min-height: 7; -fx-pref-height: 7; -fx-max-height: 7; }
+.tw-track-fill { -fx-background-color: -velo-accent; -fx-background-radius: 4; -fx-min-height: 7; -fx-pref-height: 7; -fx-max-height: 7; }
+.tw-group { -fx-text-fill: -velo-text-2; -fx-font-family: 'Geist Mono Medium'; -fx-font-size: 11px; }
+.tw-group-count { -fx-text-fill: -velo-text-3; -fx-font-family: 'Geist Mono'; -fx-font-size: 11px; }
+.tw-test { -fx-spacing: 10; }
+.tw-test:hover { -fx-border-color: rgba(255,255,255,0.16); }
+.tw-test-current, .tw-test-current:hover { -fx-border-color: -velo-accent; -fx-border-width: 1.5; }
+.tw-test-done { -fx-padding: 10 18 10 18; -fx-opacity: 0.82; }
+.tw-number { -fx-min-width: 28; -fx-min-height: 28; -fx-max-width: 28; -fx-max-height: 28; -fx-alignment: center; -fx-background-radius: 14;
+	-fx-background-color: rgba(255,255,255,0.07); -fx-text-fill: -velo-text-2; -fx-font-family: 'Geist SemiBold'; -fx-font-size: 12px; }
+.tw-test-current .tw-number { -fx-background-color: -velo-accent; -fx-text-fill: -velo-on-accent; }
+.tw-number-works { -fx-background-color: rgba(61,220,151,0.16); -fx-text-fill: #3DDC97; }
+.tw-number-broken { -fx-background-color: rgba(255,107,115,0.16); -fx-text-fill: #FF6B73; }
+.tw-number-skip { -fx-background-color: rgba(255,255,255,0.06); -fx-text-fill: -velo-text-3; }
+.tw-test-title { -fx-text-fill: -velo-text; -fx-font-family: 'Geist SemiBold'; -fx-font-size: 14.5px; }
+.tw-how { -fx-text-fill: -velo-text-2; -fx-font-size: 13px; -fx-line-spacing: 2; }
+.tw-state { -fx-font-family: 'Geist Mono Medium'; -fx-font-size: 10px; -fx-padding: 3 9 3 9; -fx-background-radius: 7; }
+.tw-state-works { -fx-text-fill: #3DDC97; -fx-background-color: rgba(61,220,151,0.13); }
+.tw-state-broken { -fx-text-fill: #FF6B73; -fx-background-color: rgba(255,107,115,0.13); }
+.tw-state-skip { -fx-text-fill: -velo-text-3; -fx-background-color: rgba(255,255,255,0.06); }
+.tw-next { -fx-text-fill: -velo-on-accent; -fx-background-color: -velo-accent; -fx-font-family: 'Geist Mono Medium'; -fx-font-size: 10px;
+	-fx-padding: 3 9 3 9; -fx-background-radius: 7; }
+.tw-link { -fx-background-color: transparent; -fx-text-fill: -velo-text-3; -fx-font-size: 12px; -fx-padding: 2 4 2 4; -fx-cursor: hand; -fx-border-width: 0; }
+.tw-link:hover { -fx-text-fill: -velo-text; -fx-underline: true; }
+.tw-answer { -fx-background-radius: 10; -fx-border-radius: 10; -fx-padding: 7 14 7 14; -fx-font-family: 'Geist Medium'; -fx-font-size: 12.5px; -fx-cursor: hand; }
+.tw-answer-works { -fx-background-color: rgba(61,220,151,0.12); -fx-border-color: rgba(61,220,151,0.45); -fx-text-fill: #3DDC97; }
+.tw-answer-works:hover { -fx-background-color: #3DDC97; -fx-text-fill: #0B1A12; }
+.tw-answer-broken { -fx-background-color: rgba(255,107,115,0.10); -fx-border-color: rgba(255,107,115,0.42); -fx-text-fill: #FF8A90; }
+.tw-answer-broken:hover { -fx-background-color: #FF6B73; -fx-text-fill: #1A0B0C; }
+.tw-answer-skip { -fx-background-color: transparent; -fx-border-color: -velo-hairline; -fx-text-fill: -velo-text-3; }
+.tw-answer-skip:hover { -fx-background-color: rgba(255,255,255,0.06); -fx-text-fill: -velo-text; }
+.tw-drop { -fx-background-color: rgba(255,255,255,0.025); -fx-background-radius: 14; -fx-border-color: rgba(255,255,255,0.18);
+	-fx-border-style: segments(7, 6); -fx-border-radius: 14; -fx-border-width: 1.5; -fx-padding: 18 16 18 16; }
+.tw-drop-hover { -fx-background-color: -velo-accent-soft; -fx-border-color: -velo-accent; }
+.tw-drop-title { -fx-text-fill: -velo-text; -fx-font-family: 'Geist SemiBold'; -fx-font-size: 14px; }
+.tw-drop-sub { -fx-text-fill: -velo-text-3; -fx-font-size: 11.5px; }
+.tw-file-chip { -fx-background-color: rgba(255,255,255,0.07); -fx-background-radius: 9; -fx-text-fill: -velo-text; -fx-font-size: 12px;
+	-fx-padding: 5 10 5 10; -fx-cursor: hand; -fx-border-width: 0; }
+.tw-file-chip:hover { -fx-background-color: rgba(255,107,115,0.18); }
+.tw-search { -fx-background-color: rgba(255,255,255,0.05); -fx-background-radius: 10; -fx-border-color: -velo-hairline; -fx-border-radius: 10;
+	-fx-padding: 8 12 8 12; -fx-text-fill: -velo-text; -fx-prompt-text-fill: -velo-text-3; }
+.tw-filter { -fx-background-color: transparent; -fx-border-color: -velo-hairline; -fx-border-radius: 999; -fx-background-radius: 999;
+	-fx-padding: 5 12 5 12; -fx-text-fill: -velo-text-2; -fx-font-size: 12px; -fx-cursor: hand; }
+.tw-filter:hover { -fx-text-fill: -velo-text; -fx-background-color: rgba(255,255,255,0.05); }
+.tw-filter-on, .tw-filter-on:hover { -fx-background-color: -velo-accent-soft; -fx-border-color: -velo-accent; -fx-text-fill: -velo-text; }
+.tw-known { -fx-padding: 12 16 12 16; }
+.tw-known:hover { -fx-border-color: rgba(255,255,255,0.16); }
+.tw-known-id { -fx-text-fill: -velo-text-3; -fx-font-family: 'Geist Mono'; -fx-font-size: 11px; -fx-min-width: 64; }
+.tw-known-title { -fx-text-fill: -velo-text; -fx-font-family: 'Geist Medium'; -fx-font-size: 13.5px; }
+.tw-type { -fx-font-family: 'Geist Mono Medium'; -fx-font-size: 10px; -fx-padding: 3 8 3 8; -fx-background-radius: 7;
+	-fx-text-fill: #FF8A90; -fx-background-color: rgba(255,107,115,0.12); }
+.tw-type-crash { -fx-text-fill: #FF5A64; -fx-background-color: rgba(255,90,100,0.16); }
+.tw-type-suggestion, .tw-type-feature-request { -fx-text-fill: #7FB2FF; -fx-background-color: rgba(127,178,255,0.13); }
+.tw-type-performance { -fx-text-fill: #F2C14E; -fx-background-color: rgba(242,193,78,0.13); }
+.tw-area { -fx-text-fill: -velo-text-3; -fx-font-size: 11px; -fx-padding: 2 8 2 8; -fx-background-radius: 7; -fx-background-color: rgba(255,255,255,0.05); }
+
+/* ---- launcher tour (2026-11-26) ---- */
+.tour-ring { -fx-fill: transparent; -fx-stroke: -velo-accent; -fx-stroke-width: 2; -fx-effect: dropshadow(gaussian, -velo-accent, 18, 0.25, 0, 0); }
+.tour-card { -fx-background-radius: 18; -fx-border-radius: 18; -fx-border-color: rgba(255,255,255,0.16); -fx-spacing: 8;
+	-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 30, 0.1, 0, 10); }
+.tour-counter { -fx-text-fill: -velo-accent; -fx-font-family: 'Geist Mono Medium'; -fx-font-size: 11px; }
+.tour-title { -fx-text-fill: -velo-text; -fx-font-family: 'Geist SemiBold'; -fx-font-size: 18px; }
+.tour-text { -fx-text-fill: -velo-text-2; -fx-font-size: 13px; -fx-line-spacing: 2; }
+.tour-next { -fx-background-color: -velo-accent; -fx-text-fill: -velo-on-accent; -fx-background-radius: 10; -fx-padding: 7 16 7 16;
+	-fx-font-family: 'Geist SemiBold'; -fx-font-size: 12.5px; -fx-cursor: hand; }
+.tour-next:hover { -fx-opacity: 0.9; }
+.tour-back { -fx-background-color: rgba(255,255,255,0.07); -fx-text-fill: -velo-text; -fx-background-radius: 10; -fx-padding: 7 14 7 14;
+	-fx-font-size: 12.5px; -fx-cursor: hand; }
+.tour-back:hover { -fx-background-color: rgba(255,255,255,0.12); }
+.tour-skip { -fx-background-color: transparent; -fx-text-fill: -velo-text-3; -fx-font-size: 12px; -fx-padding: 7 4 7 4; -fx-cursor: hand; }
+.tour-skip:hover { -fx-text-fill: -velo-text; -fx-underline: true; }
+.tour-pulse { -fx-fill: transparent; -fx-stroke: -velo-accent; -fx-stroke-width: 1.5; }
+
+/* 2026-11-26: dropdown lists are their own little windows over the page - with the glass theme's 7 % white they were
+   see-through and unreadable (Customize > font). Solid dark glass with a shadow, like the context menus. */
+.combo-box-popup .list-view {
+	-fx-background-color: rgba(24, 22, 28, 0.985);
+	-fx-background-insets: 0;
+	-fx-border-color: rgba(255, 255, 255, 0.12);
+	-fx-border-width: 1;
+	-fx-background-radius: 12;
+	-fx-border-radius: 12;
+	-fx-padding: 6;
+	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.6), 24, 0.12, 0, 10);
+}
+.combo-box-popup .list-view .list-cell { -fx-text-fill: rgba(255, 255, 255, 0.86); }
+.combo-box-popup .list-view .list-cell:filled:hover { -fx-background-color: rgba(255, 255, 255, 0.08); -fx-text-fill: white; }
+.combo-box-popup .list-view .list-cell:filled:selected { -fx-background-color: -velo-accent-soft; -fx-text-fill: white; }
+
+/* ---- 2026-11-26 running game page: header card, stats, segmented tabs, a real log viewer ---- */
+.run-head { -fx-padding: 18 20 18 18; -fx-background-radius: 18; }
+.run-title { -fx-font-family: "Archivo SemiExpanded"; -fx-font-weight: bold; -fx-font-size: 22px; -fx-text-fill: -velo-text; }
+.run-dot { -fx-min-width: 8; -fx-min-height: 8; -fx-max-width: 8; -fx-max-height: 8; -fx-background-radius: 4;
+	-fx-background-color: #4cd97b; -fx-effect: dropshadow(gaussian, rgba(76, 217, 123, 0.7), 8, 0.3, 0, 0); }
+.run-dot-stopping { -fx-background-color: #ffb547; -fx-effect: dropshadow(gaussian, rgba(255, 181, 71, 0.6), 8, 0.3, 0, 0); }
+.run-dot-off { -fx-background-color: #6e686a; -fx-effect: null; }
+.run-state { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 12px; -fx-text-fill: -velo-text; }
+.run-sub { -fx-font-family: "Geist Mono"; -fx-font-size: 11.5px; -fx-text-fill: -velo-text-3; }
+.run-stop { -fx-background-color: rgba(255, 92, 92, 0.10); -fx-border-color: rgba(255, 92, 92, 0.35); -fx-border-radius: 12;
+	-fx-background-radius: 12; -fx-text-fill: #ff8a8a; -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 13px;
+	-fx-padding: 10 18 10 14; -fx-graphic-text-gap: 8; -fx-cursor: hand; }
+.run-stop:hover { -fx-background-color: rgba(255, 92, 92, 0.2); -fx-text-fill: #ffb0b0; }
+.run-stop:disabled { -fx-opacity: 0.55; }
+.run-stat { -fx-background-color: rgba(255, 255, 255, 0.04); -fx-background-radius: 12; -fx-padding: 10 14 10 12; -fx-min-width: 120; }
+.run-stat-label { -fx-font-family: "Geist Mono"; -fx-font-size: 10px; -fx-text-fill: -velo-text-3; }
+.run-stat-value { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 14px; -fx-text-fill: -velo-text; }
+.run-stat-warn .run-stat-value { -fx-text-fill: #ffc56b; }
+.run-stat-error .run-stat-value { -fx-text-fill: #ff7b7b; }
+.run-seg { -fx-background-color: rgba(255, 255, 255, 0.05); -fx-background-radius: 12; -fx-padding: 4; }
+.run-seg-button { -fx-padding: 7 18 7 18; -fx-font-size: 13px; }
+
+.log-card { -fx-padding: 12; -fx-background-radius: 18; }
+.log-search { -fx-background-color: rgba(255, 255, 255, 0.06); -fx-background-radius: 10; -fx-border-color: rgba(255, 255, 255, 0.08);
+	-fx-border-radius: 10; -fx-text-fill: -velo-text; -fx-prompt-text-fill: -velo-text-3; -fx-padding: 7 12 7 12; -fx-font-family: "Geist"; }
+.log-chip { -fx-background-color: transparent; -fx-border-color: rgba(255, 255, 255, 0.1); -fx-border-radius: 999; -fx-background-radius: 999;
+	-fx-text-fill: -velo-text-2; -fx-padding: 5 12 5 12; -fx-font-family: "Geist"; -fx-font-size: 12px; -fx-cursor: hand; }
+.log-chip:hover { -fx-background-color: rgba(255, 255, 255, 0.06); }
+.log-chip:selected { -fx-background-color: rgba(255, 255, 255, 0.92); -fx-text-fill: #141216; -fx-border-color: transparent; }
+.log-action { -fx-background-color: rgba(255, 255, 255, 0.06); -fx-background-radius: 10; -fx-text-fill: -velo-text;
+	-fx-padding: 6 12 6 10; -fx-graphic-text-gap: 7; -fx-font-family: "Geist"; -fx-font-size: 12px; -fx-cursor: hand; }
+.log-action:hover { -fx-background-color: rgba(255, 255, 255, 0.11); }
+.log-list, .log-list .virtual-flow, .log-list .clipped-container, .log-list .sheet {
+	-fx-background-color: transparent; -fx-control-inner-background: transparent; -fx-border-color: transparent; -fx-padding: 0; }
+.log-list .log-cell { -fx-background-color: transparent; -fx-padding: 1 8 1 8; -fx-background-radius: 6; }
+.log-list .log-cell:hover { -fx-background-color: rgba(255, 255, 255, 0.04); }
+.log-list .log-cell-warn { -fx-background-color: rgba(255, 181, 71, 0.06); }
+.log-list .log-cell-error { -fx-background-color: rgba(255, 92, 92, 0.09); }
+.log-list .log-cell:selected { -fx-background-color: rgba(255, 255, 255, 0.08); }
+.log-time, .log-thread, .log-msg, .log-level { -fx-font-family: "Geist Mono"; -fx-font-size: 11.5px; }
+.log-time { -fx-text-fill: rgba(255, 255, 255, 0.32); }
+.log-thread { -fx-text-fill: rgba(255, 255, 255, 0.40); }
+.log-msg-info { -fx-text-fill: rgba(255, 255, 255, 0.86); }
+.log-msg-warn { -fx-text-fill: #ffd48e; }
+.log-msg-error { -fx-text-fill: #ff9d9d; }
+.log-level { -fx-font-weight: bold; -fx-font-size: 10px; -fx-padding: 1 6 1 6; -fx-background-radius: 5; }
+.log-level-warn { -fx-text-fill: #ffb547; -fx-background-color: rgba(255, 181, 71, 0.14); }
+.log-level-error, .log-level-fatal { -fx-text-fill: #ff6b6b; -fx-background-color: rgba(255, 92, 92, 0.16); }
+.log-level-debug { -fx-text-fill: rgba(255, 255, 255, 0.5); -fx-background-color: rgba(255, 255, 255, 0.06); }
+.log-empty { -fx-font-family: "Geist"; -fx-font-size: 13px; -fx-text-fill: -velo-text-3; }
+.log-list .scroll-bar:vertical { -fx-pref-width: 8; -fx-background-color: transparent; }
+.log-list .scroll-bar:horizontal { -fx-pref-height: 0; -fx-opacity: 0; }
+
+.run-mods { -fx-background-color: transparent; }
+.run-mods > .viewport { -fx-background-color: transparent; }
+.run-mods-head { -fx-font-family: "Geist Mono"; -fx-font-size: 11px; -fx-text-fill: -velo-text-3; -fx-padding: 2 4 6 4; }
+.run-mod-row { -fx-background-color: rgba(255, 255, 255, 0.035); -fx-background-radius: 12; -fx-padding: 10 14 10 14; }
+.run-mod-row:hover { -fx-background-color: rgba(255, 255, 255, 0.06); }
+.run-mod-name { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 13px; -fx-text-fill: -velo-text; }
+.run-mod-desc { -fx-font-family: "Geist"; -fx-font-size: 11.5px; -fx-text-fill: -velo-text-3; }
+.run-mod-version { -fx-font-family: "Geist Mono"; -fx-font-size: 11px; -fx-text-fill: -velo-text-2; -fx-background-color: rgba(255, 255, 255, 0.06);
+	-fx-background-radius: 999; -fx-padding: 3 9 3 9; }
+
+/* ---- 2026-11-26 Tester window: the launcher's calm grey with glass cards (no picture, owner: "grau, simple") ---- */
+.tw-root { -fx-background-color: linear-gradient(to bottom, #1c1a1f 0%, #161519 55%, #121114 100%); }
+.tw-nav { -fx-background-color: rgba(255, 255, 255, 0.025); -fx-border-color: transparent rgba(255, 255, 255, 0.06) transparent transparent; }
+.tw-root .tw-nav-active, .tw-root .tw-nav-active:hover { -fx-background-color: rgba(255, 255, 255, 0.08); -fx-border-color: transparent;
+	-fx-border-width: 0; -fx-text-fill: white; }
+.tw-card { -fx-background-color: linear-gradient(to bottom, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.035));
+	-fx-background-radius: 16; -fx-border-color: rgba(255, 255, 255, 0.09) rgba(255, 255, 255, 0.06) rgba(255, 255, 255, 0.045) rgba(255, 255, 255, 0.06);
+	-fx-border-radius: 16; -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.28), 18, 0.0, 0, 6); }
+.tw-test:hover { -fx-border-color: rgba(255, 255, 255, 0.16); }
+.tw-test-current, .tw-test-current:hover { -fx-border-color: rgba(255, 255, 255, 0.28); -fx-border-width: 1.2;
+	-fx-background-color: linear-gradient(to bottom, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.05)); }
+.tw-test-current .tw-number { -fx-background-color: white; -fx-text-fill: #141216; }
+.tw-next { -fx-text-fill: #141216; -fx-background-color: white; }
+.tw-test-closed { -fx-padding: 10 18 10 18; -fx-cursor: hand; }
+.tw-test-closed:hover { -fx-background-color: linear-gradient(to bottom, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.05)); }
+.tw-headline { -fx-text-fill: -velo-text-2; }
+.tw-track-fill { -fx-background-color: white; }
+.tw-drop { -fx-background-color: rgba(255, 255, 255, 0.03); -fx-border-color: rgba(255, 255, 255, 0.14); }
+.tw-root .text-area, .tw-root .text-field { -fx-background-color: rgba(255, 255, 255, 0.05); -fx-control-inner-background: transparent; }
+.tw-root .text-area .content, .tw-root .text-area .viewport, .tw-root .text-area .scroll-pane { -fx-background-color: transparent; }
+.tw-root .text-area, .tw-root .text-field { -fx-border-color: rgba(255, 255, 255, 0.08); -fx-border-radius: 12; -fx-background-radius: 12; }
+
+.log-list .log-cell:empty, .log-list .log-cell:empty:hover, .log-list .log-cell:empty:selected { -fx-background-color: transparent; }
+.tw-root .log-card { -fx-background-color: linear-gradient(to bottom, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.03));
+	-fx-border-color: rgba(255, 255, 255, 0.08); -fx-border-radius: 18; -fx-background-radius: 18; }
+.tw-root .run-seg-button { -fx-text-fill: -velo-text-2; }
+.tw-root .segmented-button-active, .tw-root .segmented-button-active:hover { -fx-background-color: rgba(255, 255, 255, 0.94); -fx-text-fill: #141216; }

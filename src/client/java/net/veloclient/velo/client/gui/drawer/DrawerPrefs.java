@@ -20,6 +20,7 @@ public final class DrawerPrefs {
 
 	private static String mode;
 	private static boolean lastFull;
+	private static boolean toured;
 
 	private DrawerPrefs() {
 	}
@@ -41,6 +42,7 @@ public final class DrawerPrefs {
 					mode = m.equals(PANEL) || m.equals(FULL) ? m : LAST;
 				}
 				lastFull = o != null && o.has("lastFull") && o.get("lastFull").getAsBoolean();
+				toured = o != null && o.has("toured") && o.get("toured").getAsBoolean();
 			}
 		} catch (Exception ignored) {
 			// unreadable: defaults
@@ -52,6 +54,7 @@ public final class DrawerPrefs {
 			JsonObject o = new JsonObject();
 			o.addProperty("mode", mode);
 			o.addProperty("lastFull", lastFull);
+			o.addProperty("toured", toured);
 			Files.createDirectories(file().getParent());
 			Files.writeString(file(), o.toString(), StandardCharsets.UTF_8);
 		} catch (Exception ignored) {
@@ -75,6 +78,21 @@ public final class DrawerPrefs {
 	public static boolean startFull() {
 		load();
 		return mode.equals(FULL) || (mode.equals(LAST) && lastFull);
+	}
+
+	/** Whether the short R-Shift tour has been shown (or skipped). */
+	public static boolean toured() {
+		load();
+		return toured;
+	}
+
+	/** Settings > Controls "Menu tour": false shows it again the next time the menu opens. */
+	public static void setToured(boolean value) {
+		load();
+		if (toured != value) {
+			toured = value;
+			save();
+		}
 	}
 
 	/** The size the menu was left in (for "Last used"). */

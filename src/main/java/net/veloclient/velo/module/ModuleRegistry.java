@@ -26,6 +26,8 @@ public final class ModuleRegistry {
 	private static final Map<String, Module> MODULES = new LinkedHashMap<>();
 	/** Read-only snapshot for {@link #all()} - the HUD walks it every frame, so it's built once per register, not per call. */
 	private static volatile List<Module> snapshot = List.of();
+	/** Per-category lists, rebuilt on register - the drawer asked for them every frame (a stream + list each time). */
+	private static volatile Map<ModuleCategory, List<Module>> byCategory = Map.of();
 
 	private ModuleRegistry() {
 	}
@@ -36,6 +38,12 @@ public final class ModuleRegistry {
 		}
 		MODULES.put(module.id(), module);
 		snapshot = List.copyOf(MODULES.values());
+		Map<ModuleCategory, List<Module>> grouped = new java.util.EnumMap<>(ModuleCategory.class);
+		for (Module m : snapshot) {
+			grouped.computeIfAbsent(m.category(), c -> new ArrayList<>()).add(m);
+		}
+		grouped.replaceAll((c, list) -> List.copyOf(list));
+		byCategory = grouped;
 	}
 
 	public static Optional<Module> get(String id) {
@@ -47,9 +55,7 @@ public final class ModuleRegistry {
 	}
 
 	public static List<Module> byCategory(ModuleCategory category) {
-		return MODULES.values().stream()
-				.filter(m -> m.category() == category)
-				.toList();
+		return byCategory.getOrDefault(category, List.of());
 	}
 
 	/**

@@ -49,7 +49,7 @@ public abstract class FullBrightMixin {
 	}
 
 	private boolean velo$shouldSpoof(RegistryEntry<StatusEffect> effect) {
-		if (!FullBrightModule.isActive() || !effect.matches(StatusEffects.NIGHT_VISION)) {
+		if (!FullBrightModule.isActive() || !FullBrightModule.fakeNightVision() || !effect.matches(StatusEffects.NIGHT_VISION)) {
 			return false;
 		}
 		MinecraftClient client = MinecraftClient.getInstance();

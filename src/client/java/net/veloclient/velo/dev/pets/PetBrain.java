@@ -21,6 +21,8 @@ final class PetBrain {
 
 	final PetModel model;
 	final PetPose out;
+	/** PetRenderer's reused per-frame buffers for this pet (render thread only). */
+	Object renderScratch;
 	private final PetPose from;
 	private final PetPose a;
 	private final PetPose b;

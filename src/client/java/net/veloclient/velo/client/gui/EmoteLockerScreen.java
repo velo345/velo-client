@@ -77,7 +77,7 @@ public final class EmoteLockerScreen extends VeloWindow implements net.veloclien
 	}
 
 	private int panelX() {
-		return stageX() + CapeEquipScreen.SHOWCASE_WIDTH + 14;
+		return CapeEquipScreen.rightX();
 	}
 
 	@Override
@@ -101,7 +101,7 @@ public final class EmoteLockerScreen extends VeloWindow implements net.veloclien
 		CapeEquipScreen.drawArmorToggle(context, this.textRenderer, mouseX, mouseY);
 
 		int px = panelX();
-		int pw = contentX() + contentWidth() - px;
+		int pw = CapeEquipScreen.rightW();
 		int y = CapeEquipScreen.rightTop();
 		MenuKit.text(context, this.textRenderer, MenuKit.small("YOUR EMOTE WHEEL"), px, y, MenuKit.TEXT_3);
 		MenuKit.text(context, this.textRenderer, MenuKit.ui("Hold B in game · pick a slot, then an emote"), px, y + 11, MenuKit.TEXT_2);

@@ -303,7 +303,12 @@ public final class MenuKit {
 	public static float hover(Object key, boolean hovered) {
 		// [0] the fade, [1] the last frame in nanoseconds. A double on purpose: as milliseconds-since-boot in a float the
 		// time only moved in 16 ms steps after a couple of days of uptime, and every hover fade stuttered.
-		double[] state = HOVER.computeIfAbsent(key, k -> new double[] {0, 0});
+		double[] state = HOVER.computeIfAbsent(key, k -> new double[] {0, 0, 0});
+		// [2] was it hovered last frame - a new hover plays the soft hover sound (2026-11-25)
+		if (hovered && state[2] == 0) {
+			net.veloclient.velo.client.sound.VeloUiSounds.hoverSoft();
+		}
+		state[2] = hovered ? 1 : 0;
 		long now = System.nanoTime();
 		float dt = state[1] == 0 ? 0f : (float) Math.min(0.1, (now - state[1]) / 1e9);
 		state[1] = now;

@@ -77,7 +77,7 @@ public final class CosmeticsView {
 		}
 	}
 
-	public enum Slot { SKIN, CAPE, WINGS, AURA, NAME, EMOTES, KILLFX, WEAR, PETS }
+	public enum Slot { SKIN, CAPE, WINGS, AURA, NAME, EMOTES, KILLFX, WEAR, PETS, BADGE }
 
 	private static Slot slot = Slot.CAPE;
 	/** Set by a slot click: -1 / 1 = the next build slides its panel in from above / below (the slots are a column). */
@@ -197,6 +197,7 @@ public final class CosmeticsView {
 			case KILLFX -> killFxPanel(host, refresh);
 			case WEAR -> wearPanel(host, refresh);
 			case PETS -> petsPanel(refresh);
+			case BADGE -> badgePanel(host, refresh);
 		};
 		if (pendingSlide != 0) {
 			slideIn(panel, pendingSlide);
@@ -220,7 +221,13 @@ public final class CosmeticsView {
 		if (panel instanceof Region region) {
 			region.setMaxWidth(Double.MAX_VALUE);
 		}
-		VBox right = new VBox(14, slots, panel);
+		VBox catalog = new VBox(panel);
+		catalog.getStyleClass().add("locker-catalog");
+		catalog.setPadding(new Insets(20, 20, 20, 0));
+		VBox.setVgrow(panel, Priority.ALWAYS);
+		net.veloclient.launcher.ui.glass.Glass.install(catalog, 24);
+		HBox.setHgrow(catalog, Priority.ALWAYS);
+		HBox right = new HBox(14, slots, catalog);
 		right.setPadding(new Insets(50, 0, 0, 0));
 		HBox.setHgrow(right, Priority.ALWAYS);
 		HBox body = new HBox(22, left, right);
@@ -241,9 +248,9 @@ public final class CosmeticsView {
 		MinecraftSession session = host.session();
 		column.add(slotButton(Slot.SKIN, "SKIN", session == null ? "Sign in" : session.username(),
 				session == null ? Icons.icon("skin", 22, Color.web("#8A8A95")) : Heads.head(session.uuid(), session.username(), 38), refresh));
-		column.add(slotButton(Slot.CAPE, "CLOAK", cape == null ? "None" : cape.name(), capeThumb(cape, 38), refresh));
+		column.add(slotButton(Slot.CAPE, "CLOAKS", cape == null ? "None" : cape.name(), capeThumb(cape, 38), refresh));
 		column.add(slotButton(Slot.WINGS, "WINGS", wings == null ? "None" : wings.name(), wingsThumb(wings, 38), refresh));
-		column.add(slotButton(Slot.AURA, "AURA", aura == null ? "None" : aura.name(), auraThumb(aura, 38), refresh));
+		column.add(slotButton(Slot.AURA, "AURAS", aura == null ? "None" : aura.name(), auraThumb(aura, 38), refresh));
 		net.veloclient.velo.client.namestyle.NameStyle nameStyle = net.veloclient.launcher.data.NameStyleSetting.style();
 		boolean nameOn = net.veloclient.launcher.data.NameStyleSetting.enabled();
 		Node nameThumb = new NamePreview("Aa", () -> nameStyle, 13, 26); // fits the 26 px tab picture (46 wide was cut off)
@@ -275,24 +282,31 @@ public final class CosmeticsView {
 		column.add(slotButton(Slot.WEAR, "BODYWEAR", worn == 0 ? "None" : worn + (worn == 1 ? " item" : " items"),
 				Icons.icon("hat", 22, Color.web(worn == 0 ? "#5A5A63" : "#8A8A95")), refresh));
 		String pet = net.veloclient.launcher.data.PetsSetting.equipped();
-		column.add(slotButton(Slot.PETS, "PET", net.veloclient.launcher.data.PetsSetting.name(pet),
+		column.add(slotButton(Slot.PETS, "PETS", net.veloclient.launcher.data.PetsSetting.name(pet),
 				pet == null ? Icons.icon("sparkles", 22, Color.web("#5A5A63")) : petImage(pet, 38), refresh));
-		javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
-		grid.setHgap(8);
-		grid.setVgap(8);
-		for (int c = 0; c < 5; c++) {
-			javafx.scene.layout.ColumnConstraints fifth = new javafx.scene.layout.ColumnConstraints();
-			fifth.setPercentWidth(100.0 / 5);
-			grid.getColumnConstraints().add(fifth);
-		}
-		for (int i = 0; i < column.size(); i++) {
-			Node cell = column.get(i);
+		String badge = NameTag.badge(net.veloclient.launcher.social.StoreApi.isPlusCached());
+		column.add(slotButton(Slot.BADGE, "BADGES", switch (badge) {
+			case "og" -> "OG";
+			case "plus" -> "Velo+";
+			default -> "Velo";
+		}, NameTag.badgeImage(badge, 18), refresh));
+		// 2026-11-25 glass: the kinds as one vertical list in a glass column (Name Style last, like the design)
+		Node nameRow = column.remove(4);
+		column.add(nameRow);
+		VBox list = new VBox(2);
+		for (Node cell : column) {
 			if (cell instanceof Region region) {
 				region.setMaxWidth(Double.MAX_VALUE);
 			}
-			grid.add(cell, i % 5, i / 5);
+			list.getChildren().add(cell);
 		}
-		return grid;
+		list.getStyleClass().add("locker-kinds");
+		list.setPadding(new Insets(10, 8, 10, 8));
+		list.setMinWidth(186);
+		list.setPrefWidth(186);
+		list.setMaxWidth(186);
+		net.veloclient.launcher.ui.glass.Glass.install(list, 24);
+		return list;
 	}
 
 	private static Node slotButton(Slot target, String kind, String value, Node thumb, Runnable refresh) {
@@ -327,7 +341,7 @@ public final class CosmeticsView {
 		javafx.scene.control.Tooltip.install(row, new javafx.scene.control.Tooltip(name + ": " + value));
 		boolean active = slot == target;
 		// 2026-11: calm horizontal cards - the active one is lifted and outlined, no accent bar on the side.
-		row.getStyleClass().add(active ? "locker-slot-active" : "locker-slot");
+		row.getStyleClass().add(active ? "locker-kind-active" : "locker-kind");
 		row.getStyleClass().add("motion-card");
 		row.setOnMouseClicked(e -> {
 			if (slot == target) {
@@ -687,7 +701,7 @@ public final class CosmeticsView {
 		String glow = switch (slot) {
 			case WINGS -> WingsCatalog.byId(selectedWingsId()).map(WingsCatalog.WingType::accent).orElse("#5aa9ff");
 			case AURA -> AuraCatalog.byId(selectedAuraId()).map(AuraCatalog.AuraType::accent).orElse("#bca6ff");
-			case SKIN, NAME -> "#bca6ff";
+			case SKIN, NAME, BADGE -> "#bca6ff";
 			case CAPE -> "#5ac8ff";
 			case EMOTES -> net.veloclient.launcher.data.EmoteCatalog.byId(selectedEmoteId()).map(net.veloclient.launcher.data.EmoteCatalog.EmoteType::accent).orElse("#8b7cf6");
 			case KILLFX -> KillFxCatalog.byId(selectedKillFxId()).map(KillFxCatalog.KillFxType::accent).orElse("#ff5c5c");
@@ -696,8 +710,10 @@ public final class CosmeticsView {
 		};
 		StackPane stage = new StackPane();
 		stage.setMinWidth(300);
-		stage.setStyle("-fx-background-color: radial-gradient(center 50% 58%, radius 50%, " + glow + "30 0%, transparent 100%), derive(-velo-background, 3%);"
-				+ " -fx-border-color: transparent -velo-hairline transparent -velo-hairline; -fx-border-width: 0 1 0 1;");
+		// glass stage (2026-11-25): the frosted backdrop behind, a soft glow of the item's colour on top
+		stage.setStyle("-fx-background-color: radial-gradient(center 50% 58%, radius 50%, " + glow + "30 0%, transparent 100%);"
+				+ " -fx-background-radius: 24;");
+		net.veloclient.launcher.ui.glass.Glass.install(stage, 24);
 		StackPane viewerBox = new StackPane();
 		viewerBox.setMinSize(260, 360);
 		StackPane.setMargin(viewerBox, new Insets(40, 0, 70, 0));
@@ -709,6 +725,13 @@ public final class CosmeticsView {
 		StackPane.setAlignment(floor, Pos.BOTTOM_CENTER);
 		StackPane.setMargin(floor, new Insets(0, 0, 76, 0));
 		stage.getChildren().add(0, floor);
+		// your name tag over the player, like in game (badge + Name Style) - follows changes made in this Locker
+		if (host.session() != null) {
+			Node tag = NameTag.create(host.session().username(), net.veloclient.launcher.social.StoreApi.isPlusCached());
+			StackPane.setAlignment(tag, Pos.TOP_CENTER);
+			StackPane.setMargin(tag, new Insets(62, 0, 0, 0));
+			stage.getChildren().add(tag);
+		}
 
 		if (host.session() == null) {
 			Label signIn = new Label("Sign in to see everything on your own skin");
@@ -739,7 +762,7 @@ public final class CosmeticsView {
 			case CAPE -> "Cloak only";
 			case WINGS -> "Wings only";
 			case AURA -> "Aura only";
-			case SKIN, NAME -> "Skin only";
+			case SKIN, NAME, BADGE -> "Skin only";
 			case EMOTES -> "Emote";
 			case KILLFX -> "Kill effect";
 			case WEAR -> "Bodywear";
@@ -791,7 +814,7 @@ public final class CosmeticsView {
 		} else switch (slot) {
 			case WEAR -> {
 				if (host.session() != null) {
-					viewerBox.getChildren().setAll(CosmeticUi.spinner(30));
+					viewerBox.getChildren().setAll(Skeleton.player());
 					CosmeticUi.skin(host.session(), data -> {
 						double yaw = "back".equals(wearSlot) ? 160 : 25;
 						Node viewer = data == null ? null : PlayerSkin3DView.createViewer(data.pngBytes(), data.slim(), null, true, yaw, false);
@@ -824,7 +847,7 @@ public final class CosmeticsView {
 						viewerBox.getChildren().setAll(viewer);
 					}
 				} else if (host.session() != null) {
-					viewerBox.getChildren().setAll(CosmeticUi.spinner(30));
+					viewerBox.getChildren().setAll(Skeleton.player());
 					CosmeticUi.skin(host.session(), data -> {
 						Node viewer = data == null ? null : PlayerSkin3DView.createViewer(data.pngBytes(), data.slim(), null, true, 25, false);
 						if (viewer != null) {
@@ -852,6 +875,44 @@ public final class CosmeticsView {
 	 * The whole look on your skin: the equipped cape, wings and aura, with the item you're looking at in the open
 	 * tab in place of that slot's (and the picked library skin on the Skin tab).
 	 */
+	/**
+	 * The last 3D preview and what it showed: the Locker rebuilds its page on every click, and the preview used to drop
+	 * back to the skeleton and fade in again each time (a hard cut) even when it showed the very same thing. Now the
+	 * same preview (with its live wing / aura handles) is put back as it is.
+	 */
+	private record CachedViewer(String key, Node node, Object wings, Object aura) {
+	}
+
+	private static CachedViewer cachedViewer;
+
+	private static boolean reuseViewer(StackPane box, String key) {
+		CachedViewer c = cachedViewer;
+		if (c == null || !c.key().equals(key)) {
+			return false;
+		}
+		if (c.node().getParent() instanceof javafx.scene.layout.Pane old) {
+			old.getChildren().remove(c.node());
+		}
+		c.node().setOpacity(1);
+		box.getChildren().setAll(c.node());
+		restoreHandles(c);
+		return true;
+	}
+
+	@SuppressWarnings("unchecked")
+	private static void restoreHandles(CachedViewer c) {
+		if (c.wings() != null) {
+			((Object[]) (Object) wingsModel)[0] = c.wings();
+		}
+		if (c.aura() != null) {
+			((Object[]) (Object) auraLive)[0] = c.aura();
+		}
+	}
+
+	private static void rememberViewer(String key, Node node) {
+		cachedViewer = new CachedViewer(key, node, wingsModel[0], auraLive[0]);
+	}
+
 	private static void outfitViewer(Host host, StackPane box, HBox bottom) {
 		String capeId = slot == Slot.CAPE ? (previewCape != null ? (previewCape.isEmpty() ? null : previewCape) : CapeLibrary.equippedCapeId().orElse(null))
 				: CapeLibrary.equippedCapeId().orElse(null);
@@ -868,8 +929,13 @@ public final class CosmeticsView {
 		CapeEntry cape = capeId == null ? null : CapeLibrary.listAll().stream().filter(c -> c.id().equals(capeId)).findFirst().orElse(null);
 		SkinLibrary.Skin librarySkin = slot == Slot.SKIN && selectedSkin != null
 				? SkinLibrary.all().stream().filter(s -> s.id().equals(selectedSkin)).findFirst().orElse(null) : null;
+		String cacheKey = "outfit:" + capeId + ":" + wingsId + ":" + auraId + ":" + (librarySkin == null ? "" : librarySkin.id()) + ":"
+				+ (host.session() == null ? "" : host.session().uuid());
+		if (reuseViewer(box, cacheKey)) {
+			return;
+		}
 		wingsModel[0] = null;
-		box.getChildren().setAll(CosmeticUi.spinner(30));
+		box.getChildren().setAll(Skeleton.player());
 
 		List<GifFrames.Frame>[] frames = new List[1];
 		byte[][] png = new byte[1][];
@@ -902,6 +968,7 @@ public final class CosmeticsView {
 				auraLive[0] = s -> current[0] = s;
 				AuraFx.attach(viewer, () -> new AuraFx.Shown(aura, current[0]));
 			}
+			rememberViewer(cacheKey, viewer);
 			viewer.setOpacity(0);
 			box.getChildren().setAll(viewer);
 			javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(javafx.util.Duration.millis(200), viewer);
@@ -975,7 +1042,11 @@ public final class CosmeticsView {
 		if (host.session() == null) {
 			return;
 		}
-		box.getChildren().setAll(CosmeticUi.spinner(30));
+		String cacheKey = "cape:" + selectedCapeId() + ":" + host.session().uuid();
+		if (reuseViewer(box, cacheKey)) {
+			return;
+		}
+		box.getChildren().setAll(Skeleton.player());
 		List<GifFrames.Frame>[] frames = new List[1];
 		SkinFetcher.SkinData[] skinData = new SkinFetcher.SkinData[1];
 		boolean[] arrived = new boolean[2];
@@ -986,6 +1057,7 @@ public final class CosmeticsView {
 			List<GifFrames.Frame> f = frames[0] == null || frames[0].isEmpty() ? null : frames[0];
 			Node viewer = skinData[0] == null ? null : PlayerSkin3DView.createShowcase(skinData[0].pngBytes(), skinData[0].slim(), f);
 			if (viewer != null) {
+				rememberViewer(cacheKey, viewer);
 				viewer.setOpacity(0);
 				box.getChildren().setAll(viewer);
 				javafx.animation.FadeTransition fade = new javafx.animation.FadeTransition(javafx.util.Duration.millis(200), viewer);
@@ -1034,6 +1106,118 @@ public final class CosmeticsView {
 	}
 
 	// ---- Right: the slot's items ----
+
+	/**
+	 * Badges (2026-11-25): the Velo badges you can show next to your name - Velo for everyone, Velo+ for members, OG for
+	 * the first players. Others see the one picked here (same files the game reads), in the tab list, chat and name tag.
+	 */
+	public static void showBadgeTab() {
+		slot = Slot.BADGE;
+	}
+
+	private static Node badgePanel(Host host, Runnable refresh) {
+		boolean plus = net.veloclient.launcher.social.StoreApi.isPlusCached();
+		boolean og = net.veloclient.launcher.data.OgBadgeSetting.eligible();
+		String current = NameTag.badge(plus);
+		VBox panel = panelShell("Badges", 1 + (plus ? 1 : 0) + (og ? 1 : 0));
+		Label hint = new Label("Shown next to your name for other players: in the tab list, in chat and above your head.");
+		hint.getStyleClass().add("t-muted");
+		hint.setWrapText(true);
+		panel.getChildren().add(hint);
+		javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+		grid.setHgap(12);
+		grid.setVgap(12);
+		for (int c = 0; c < 2; c++) {
+			javafx.scene.layout.ColumnConstraints half = new javafx.scene.layout.ColumnConstraints();
+			half.setPercentWidth(50);
+			grid.getColumnConstraints().add(half);
+		}
+		String[][] badges = {{"velo", "Velo", "Everyone on Velo"}, {"plus", "Velo+", plus ? "From your Velo+ membership" : "With Velo+"},
+				{"og", "OG", og ? "Played in the first two weeks" : "Only for the first players"}};
+		int i = 0;
+		for (String[] b : badges) {
+			boolean locked = b[0].equals("plus") && !plus || b[0].equals("og") && !og;
+			boolean on = b[0].equals(current);
+			ImageView image = NameTag.badgeImage(b[0], b[0].equals("og") ? 46 : 54);
+			StackPane art = new StackPane(image);
+			art.getStyleClass().addAll("badge-art", "badge-art-" + b[0]);
+			art.setMinHeight(104);
+			if (locked) {
+				image.setOpacity(0.35);
+				StackPane lock = new StackPane(Icons.icon("lock", 13, Color.WHITE, 2.2));
+				lock.getStyleClass().add("badge-lock");
+				lock.setMaxSize(26, 26);
+				StackPane.setAlignment(lock, Pos.TOP_RIGHT);
+				StackPane.setMargin(lock, new Insets(10));
+				art.getChildren().add(lock);
+			}
+			Label name = new Label(b[1]);
+			name.getStyleClass().add("t-strong");
+			Label sub = new Label(b[2]);
+			sub.getStyleClass().add("t-muted");
+			VBox text = new VBox(2, name, sub);
+			HBox.setHgrow(text, Priority.ALWAYS);
+			HBox bottom = new HBox(8, text);
+			bottom.setAlignment(Pos.CENTER_LEFT);
+			if (on) {
+				Label onTag = new Label("ON");
+				onTag.getStyleClass().add("badge-on");
+				bottom.getChildren().add(onTag);
+			}
+			VBox card = new VBox(10, art, bottom);
+			card.getStyleClass().addAll("badge-card", on ? "badge-card-on" : "badge-card-off");
+			card.setPadding(new Insets(10));
+			if (!locked) {
+				card.setOnMouseClicked(e -> {
+					switch (b[0]) {
+						case "og" -> net.veloclient.launcher.data.OgBadgeSetting.setUse(true);
+						case "plus" -> {
+							net.veloclient.launcher.data.OgBadgeSetting.setUse(false);
+							net.veloclient.launcher.data.PlusBadgeSetting.set(true);
+						}
+						default -> {
+							net.veloclient.launcher.data.OgBadgeSetting.setUse(false);
+							net.veloclient.launcher.data.PlusBadgeSetting.set(false);
+						}
+					}
+					refresh.run();
+				});
+			} else if (b[0].equals("plus")) {
+				card.setOnMouseClicked(e -> host.openStore());
+			}
+			grid.add(card, i % 2, i / 2);
+			i++;
+		}
+		panel.getChildren().add(grid);
+		// how it looks for others
+		String name = host.session() == null ? "Player" : host.session().username();
+		Label how = new Label("HOW OTHERS SEE IT");
+		how.getStyleClass().add("home-chips-label");
+		HBox tab = new HBox(8, monoTag("TAB"), NameTag.badgeImage(current, 14), monoName(name));
+		HBox chat = new HBox(8, monoTag("CHAT"), NameTag.badgeImage(current, 14), monoName("<" + name + "> gg"));
+		for (HBox line : new HBox[] {tab, chat}) {
+			line.setAlignment(Pos.CENTER_LEFT);
+			line.getStyleClass().add("badge-preview-line");
+			HBox.setHgrow(line, Priority.ALWAYS);
+		}
+		VBox preview = new VBox(10, how, new HBox(10, tab, chat));
+		preview.getStyleClass().add("badge-preview");
+		preview.setPadding(new Insets(14, 16, 14, 16));
+		panel.getChildren().add(preview);
+		return panel;
+	}
+
+	private static Label monoTag(String text) {
+		Label label = new Label(text);
+		label.getStyleClass().add("badge-preview-tag");
+		return label;
+	}
+
+	private static Label monoName(String text) {
+		Label label = new Label(text);
+		label.getStyleClass().add("badge-preview-name");
+		return label;
+	}
 
 	private static VBox panelShell(String title, int count, Node... actions) {
 		Label heading = new Label(title);

@@ -151,6 +151,19 @@ public final class PauseMenu {
 	}
 
 	private static boolean menuWasShown;
+	private static boolean skippedBlur;
+	private static final net.veloclient.velo.client.gui.glass.SharpFrame.Pacer BLUR_PACER = new net.veloclient.velo.client.gui.glass.SharpFrame.Pacer();
+
+	/**
+	 * PauseBlurPaceMixin, before the background: true = skip vanilla's blur this frame (the glass look, the menu fully
+	 * open, panels known from the last frame) - the blur runs for real at most 60 times a second.
+	 */
+	public static boolean skipBlur() {
+		boolean steady = menuWasShown && net.veloclient.velo.client.gui.widget.VeloStyle.glass() && !GLASS_RECTS.isEmpty()
+				&& System.nanoTime() - openedAt > 400_000_000L;
+		skippedBlur = steady && !BLUR_PACER.blurNow(false);
+		return skippedBlur;
+	}
 
 	/**
 	 * Start of the frame: hides what we paint and lays the dim down first - under vanilla and under other mods'
@@ -166,7 +179,13 @@ public final class PauseMenu {
 		if (!menuWasShown) {
 			return;
 		}
-		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass() && !glassRects.isEmpty()
+		if (skippedBlur) {
+			// no blur this frame (SharpFrame.Pacer): the live game, and the last blurred copy behind each panel
+			skippedBlur = false;
+			for (int[] r : glassRects) {
+				net.veloclient.velo.client.gui.glass.SharpFrame.drawBlurredInside(context, width, height, r[0], r[1], r[2], r[3], r.length > 4 ? r[4] : 0);
+			}
+		} else if (net.veloclient.velo.client.gui.widget.VeloStyle.glass() && !glassRects.isEmpty()
 				&& net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
 			// the game stays sharp; only behind the panels and buttons it's frosted (rects from the last frame)
 			net.veloclient.velo.client.gui.glass.SharpFrame.drawSharpExcept(context, width, height, glassRects);

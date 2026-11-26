@@ -23,7 +23,7 @@ public final class FullBrightModule extends AbstractModule implements net.velocl
 	private double savedGamma = -1;
 
 	public FullBrightModule() {
-		super("full-bright", "Full Bright", "Makes everything lit at all read as fully bright (vanilla Night Vision rendering, always on).",
+		super("full-bright", "Full Bright", "Everything as bright as daylight - caves, nights, every corner - in its real colours.",
 				ModuleCategory.RENDERING, SafetyTag.CHECK_SERVER_RULES, false);
 	}
 
@@ -42,19 +42,31 @@ public final class FullBrightModule extends AbstractModule implements net.velocl
 				() -> hideLightningFlash, v -> hideLightningFlash = v));
 	}
 
+	/** How bright: far past vanilla's 1.0, so even light level 0 renders like daylight. */
+	private static final double FULL = 16.0;
+
 	@Override
 	public void onEnable() {
 		active = true;
 		var gamma = MinecraftClient.getInstance().options.getGamma();
-		savedGamma = gamma.getValue();
-		gamma.setValue(1.0);
+		double now = gamma.getValue();
+		if (now <= 1.0) {
+			savedGamma = now;
+		}
+		// the option's own setter refuses values above 1.0 - written straight into the field instead
+		((net.veloclient.velo.client.mixin.GammaOptionAccessor) (Object) gamma).velo$setRawValue(FULL);
+	}
+
+	/** Night Vision is no longer faked (it tinted the world) - Full Bright is the brightness itself now. */
+	public static boolean fakeNightVision() {
+		return false;
 	}
 
 	@Override
 	public void onDisable() {
 		active = false;
 		if (savedGamma >= 0) {
-			MinecraftClient.getInstance().options.getGamma().setValue(savedGamma);
+			((net.veloclient.velo.client.mixin.GammaOptionAccessor) (Object) MinecraftClient.getInstance().options.getGamma()).velo$setRawValue(savedGamma);
 			savedGamma = -1;
 		}
 	}

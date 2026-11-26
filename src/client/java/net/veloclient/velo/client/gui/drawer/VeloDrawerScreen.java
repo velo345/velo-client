@@ -71,13 +71,24 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	/** A category of the drawer: some of the module categories under one friendlier name. */
 	private record Cat(String name, String icon, List<ModuleCategory> categories) {
 		List<Module> modules() {
-			List<Module> out = new ArrayList<>();
-			for (ModuleCategory c : categories) {
-				out.addAll(ModuleRegistry.byCategory(c));
+			// asked for every frame: built once per category set (and again only if modules get registered later)
+			java.util.Collection<Module> all = ModuleRegistry.all();
+			if (all != catSnapshot) {
+				CAT_MODULES.clear();
+				catSnapshot = all;
 			}
-			return out;
+			return CAT_MODULES.computeIfAbsent(name, n -> {
+				List<Module> out = new ArrayList<>();
+				for (ModuleCategory c : categories) {
+					out.addAll(ModuleRegistry.byCategory(c));
+				}
+				return List.copyOf(out);
+			});
 		}
 	}
+
+	private static final java.util.Map<String, List<Module>> CAT_MODULES = new java.util.HashMap<>();
+	private static java.util.Collection<Module> catSnapshot;
 
 	private enum Kind { HOME, CATEGORY, MODULE, FEATURES }
 
@@ -231,10 +242,15 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			cats.add(new Cat("Addons", "d_puzzle", List.of(ModuleCategory.ADDONS)));
 		}
 		stack.add(new Page(Kind.HOME, null, null));
+		// opened over the game (not handed over from another Velo window): the menu's own opening sound
+		if (net.veloclient.velo.client.util.ClientCompat.currentScreen() == null) {
+			net.veloclient.velo.client.sound.VeloUiSounds.menuOpen();
+		}
 	}
 
 	/** Opens straight on a module's settings (clicking a HUD element, or from elsewhere). */
 	public VeloDrawerScreen openModule(Module module) {
+		explicitOpen = true;
 		Cat cat = catOf(module);
 		stack.clear();
 		stack.add(new Page(Kind.HOME, null, null));
@@ -272,6 +288,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	/** Opens straight as the full menu (the pause menu's "All modules", Mod Menu's config button). */
 	public VeloDrawerScreen full() {
+		explicitOpen = true;
 		expanded = true;
 		expandAnim = 1f;
 		return this;
@@ -283,6 +300,10 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	public void testExpanded(boolean full) {
 		setExpanded(full);
+	}
+
+	public void testTourNext() {
+		tourNext();
 	}
 
 	public void testHome() {
@@ -300,8 +321,13 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	//? if >=1.21.2 && <26.1 {
 	@Override
 	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+		blurFrame = decideBlurFrame();
 		if (blurOn()) {
+			// the HUD first, always: on a blur frame it gets frosted behind the glass; in between the reused blurred picture
+			// covers it inside the glass (drawn live on top it flickered sharp/frosted)
 			hudBehind = hudUnderBlur(context, delta);
+		}
+		if (blurFrame) {
 			net.veloclient.velo.client.gui.glass.SharpFrame.newLayer(context);   // so the blur (and the sharp copy) includes the HUD
 			this.applyBlur(context);
 		}
@@ -309,8 +335,16 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	//?} else if >=26.1 {
 	/*@Override
 	public void extractBackground(net.minecraft.client.gui.GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-		if (blurOn()) {
+		blurFrame = decideBlurFrame();
+		if (PROMO_MATTE) {
+			context.fill(0, 0, this.width, this.height, 0xFF000000);   // promo capture: the menu alone, over black
+			hudBehind = true;
+		} else if (blurOn()) {
+			// the HUD first, always: on a blur frame it gets frosted behind the glass; in between the reused blurred picture
+			// covers it inside the glass (drawn live on top it flickered sharp/frosted)
 			hudBehind = hudUnderBlur(context, delta);
+		}
+		if (blurFrame) {
 			net.veloclient.velo.client.gui.glass.SharpFrame.newLayer(context);   // so the blur (and the sharp copy) includes the HUD
 			this.extractBlurredBackground(context);
 		}
@@ -321,19 +355,82 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	}
 	*///?}
 
+	/** Dev, promo capture ({@code -Dvelo.promoMatte}): black behind the menu instead of the game, no HUD or hint. */
+	static final boolean PROMO_MATTE = System.getProperty("velo.promoMatte") != null;
+
+	/** Promo capture: the glass right now as {x, y, w, h, radius} in gui pixels. */
+	public float[] promoRect() {
+		float[] r = rectNow();
+		float rad = net.veloclient.velo.client.gui.glass.GlassPrefs.radius(18f + 6f * easeInOut(expandAnim));
+		return new float[] {r[0] * k, r[1] * k, r[2] * k, r[3] * k, rad * k, Math.min(1f, openAnim * 1.6f)};
+	}
+
 	/** True when this frame's HUD elements were drawn under the blur (frosted behind the glass, sharp around it). */
 	private boolean hudBehind;
+
+	/**
+	 * Whether this frame runs the real blur (2026-11-26, owner: "mit R-Shift droppen FPS um 1000" - the blur was ~0.5 ms
+	 * a frame): only at the monitor's refresh rate; the frames in between reuse the last blurred picture behind the glass.
+	 */
+	private boolean blurFrame;
+	private long lastBlurNanos;
+
+	private boolean decideBlurFrame() {
+		if (!blurOn()) {
+			return false;
+		}
+		long now = System.nanoTime();
+		boolean need = !net.veloclient.velo.client.gui.glass.SharpFrame.hasBlurred() || now - lastBlurNanos >= blurIntervalNanos()
+				|| openAnim < 0.999f || morphT < 0.999f || pending != null;
+		if (need) {
+			lastBlurNanos = now;
+		}
+		return need;
+	}
+
+	private static long blurIntervalNanos() {
+		int hz = 0;
+		try {
+			//? if >=26.3 {
+			/*var mode = net.minecraft.client.Minecraft.getInstance().getWindow().getActiveVideoMode();
+			hz = mode == null ? 0 : Math.round(mode.getRefreshRate());
+			*///?} else if >=26.2 {
+			/*hz = net.minecraft.client.Minecraft.getInstance().getWindow().getRefreshRate();
+			*///?}
+		} catch (RuntimeException | LinkageError e) {
+			hz = 0;
+		}
+		// behind frosted glass 60 updates a second look the same as more (a blur frame costs ~2 ms)
+		return 1_000_000_000L / Math.min(60, Math.max(30, hz <= 0 ? 60 : hz));
+	}
 
 	/** The HUD elements, drawn before the blur so the glass frosts them too (the edit outlines go on top later). */
 	private boolean hudUnderBlur(DrawContext context, float delta) {
 		if (expandAnim >= 0.5f) {
 			return false;
 		}
+		// the HUD under the glass is cached like the menu (it was rebuilt every frame here - ~0.2 ms)
+		if (dragging == null && resizing == null && hudCache.replay(context, this.width, this.height)) {
+			return true;
+		}
+		hudCache.begin(context, this.width, this.height);
+		boolean completed = false;
+		try {
+			drawHudUnderBlur(context, delta);
+			completed = true;
+		} finally {
+			hudCache.end(context, completed);
+		}
+		return true;
+	}
+
+	private final net.veloclient.velo.client.gui.glass.GuiFrameCache hudCache = new net.veloclient.velo.client.gui.glass.GuiFrameCache();
+
+	private void drawHudUnderBlur(DrawContext context, float delta) {
 		net.veloclient.velo.client.hud.HudAutoLayout.update(this.width, this.height);
 		for (HudModule hud : hudModules()) {
 			HudManager.renderScaled(context, hud, this.width, this.height, delta);
 		}
-		return true;
 	}
 
 	private boolean blurOn() {
@@ -341,7 +438,13 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	}
 
 	/** The menu blur while this is open: strong behind the full menu, lighter behind the panel, faded in and out. */
+	/** Dev benchmark (DrawerBench): the panel without its blur, to see what the blur costs. */
+	public static boolean benchNoBlur;
+
 	public int blurRadius() {
+		if (benchNoBlur) {
+			return 0;
+		}
 		// the panel gets a lighter blur (the HUD stays crisp on top); it lifts when the panel slides away to place things
 		float e = easeInOut(expandAnim);
 		return Math.round(net.veloclient.velo.client.gui.glass.GlassPrefs.blurRadius(Math.round(10f + 2f * e)) * ease(openAnim));   // Settings > Theme: Blur (only behind the glass)
@@ -428,6 +531,11 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		expanded = full;
 		open = true;
 		dropdown = null;
+		if (full) {
+			net.veloclient.velo.client.sound.VeloUiSounds.expand();
+		} else {
+			net.veloclient.velo.client.sound.VeloUiSounds.collapse();
+		}
 		profileMenu = false;
 		moreMenu = false;
 		DrawerPrefs.rememberFull(full);
@@ -461,6 +569,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	}
 
 	private void go(Page next) {
+		net.veloclient.velo.client.sound.VeloUiSounds.page();
 		fromPage = page();
 		stack.add(next);
 		trans = 0f;
@@ -475,6 +584,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		if (stack.size() <= 1) {
 			return;
 		}
+		net.veloclient.velo.client.sound.VeloUiSounds.back();
 		fromPage = stack.remove(stack.size() - 1);
 		trans = 0f;
 		transDir = -1;
@@ -672,6 +782,30 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+		// 2026-11-26 (owner: "mit R-Shift droppen FPS um 1000"): the menu is drawn at most twice the monitor's refresh rate
+		// and replayed in between (GuiFrameCache); any input redraws it right away
+		if (blurFrame) {
+			// a real blur frame draws the sharp copy around the glass - never replayed in the frames after it
+			frameCache.invalidate();
+			renderLive(context, mouseX, mouseY, delta);
+			return;
+		}
+		if (frameCache.replay(context, this.width, this.height)) {
+			return;
+		}
+		frameCache.begin(context, this.width, this.height);
+		boolean completed = false;
+		try {
+			renderLive(context, mouseX, mouseY, delta);
+			completed = true;
+		} finally {
+			frameCache.end(context, completed);
+		}
+	}
+
+	private final net.veloclient.velo.client.gui.glass.GuiFrameCache frameCache = new net.veloclient.velo.client.gui.glass.GuiFrameCache();
+
+	private void renderLive(DrawContext context, int mouseX, int mouseY, float delta) {
 		long now = System.nanoTime();
 		dt = lastNanos < 0 ? 0f : Math.min(1f / 30f, (now - lastNanos) / 1_000_000_000f);   // a hitch never jumps the animation
 		lastNanos = now;
@@ -714,12 +848,22 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		}
 		*///?}
 
-		if (blurOn() && net.veloclient.velo.client.gui.glass.SharpFrame.prepare()) {
-			// blur only behind the glass: the game around it stays sharp
+		if (blurOn()) {
 			float[] gr = rectNow();
 			float gRad = net.veloclient.velo.client.gui.glass.GlassPrefs.radius(18f + 6f * easeInOut(expandAnim));
-			net.veloclient.velo.client.gui.glass.SharpFrame.drawOutside(context, this.width, this.height, Math.round(gr[0] * k), Math.round(gr[1] * k),
-					Math.round(gr[2] * k), Math.round(gr[3] * k), Math.round(gRad * k));
+			int gx = Math.round(gr[0] * k);
+			int gy = Math.round(gr[1] * k);
+			int gw = Math.round(gr[2] * k);
+			int gh = Math.round(gr[3] * k);
+			if (blurFrame) {
+				// a real blur this frame: the sharp copy around the glass (the game stays clear), the blurred one kept for later
+				if (net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
+					net.veloclient.velo.client.gui.glass.SharpFrame.drawOutside(context, this.width, this.height, gx, gy, gw, gh, Math.round(gRad * k));
+				}
+			} else {
+				// in between: the live game everywhere, the last blurred picture only behind the glass
+				net.veloclient.velo.client.gui.glass.SharpFrame.drawBlurredInside(context, this.width, this.height, gx, gy, gw, gh, Math.round(gRad * k));
+			}
 		}
 		if (expandAnim < 0.5f) {
 			renderHud(context, mouseX, mouseY, delta);   // the full menu covers the HUD; Edit HUD brings it back
@@ -741,6 +885,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			renderDrawer(context);
 		}
 		renderGhost(context);
+		renderTour(context);
 		ModuleScenes.pop(context);
 		super.render(context, mouseX, mouseY, delta);
 		if (closing && !closeScheduled && (openAnim <= 0.001f || System.nanoTime() - closingSince > 900_000_000L)) {
@@ -853,12 +998,18 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		VeloDraw.strokeRounded(c, x, y, w + 14f, h, 12f, 1f, alpha(GLASS_EDGE, a));
 		img(c, LOGO, x + w / 2f - 8f, y + 14f, 16f, WHITE, a);
 		icon(c, "d_chev_l", x + w / 2f - 7f, y + h / 2f + 2f, 14f, WHITE, a);
-		hits.add(new Hit(x, y, w, h, () -> open = true));
+		hits.add(new Hit(x, y, w, h, () -> {
+			open = true;
+			net.veloclient.velo.client.sound.VeloUiSounds.expand();
+		}));
 	}
 
 	/** A small glass hint above the game while the panel is out: what you can do with the HUD right here. */
 	private void renderHint(DrawContext c) {
-		boolean show = open && !closing && !expanded && dragging == null && resizing == null && ghost == null && !overlayOpen();
+		if (PROMO_MATTE) {
+			return;
+		}
+		boolean show = open && !closing && !expanded && dragging == null && resizing == null && ghost == null && !overlayOpen() && tourStep < 0;
 		float a = animTo("hint", show && openAnim > 0.6f ? 1f : 0f, 6f) * (1f - easeInOut(expandAnim));
 		if (a < 0.02f) {
 			return;
@@ -957,12 +1108,19 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		float bx = x + DW - PAD - 22f;
 		roundButton(c, "d_collapse", bx, hy - 5f, 22f, a, () -> {
 			open = false;
+			net.veloclient.velo.client.sound.VeloUiSounds.collapse();
 			profileMenu = false;
 			moreMenu = false;
 		});
 		float ex = bx - 26f;
 		roundButton(c, "d_expand", ex, hy - 5f, 22f, a, () -> setExpanded(true));
-		renderProfileButton(c, ex - 6f, hy - 5f, a);
+		float px = renderProfileButton(c, ex - 6f, hy - 5f, a);
+		if (live) {
+			tourAnchor.put("collapse", new float[] {bx, hy - 5f, 22f, 22f});
+			tourAnchor.put("expand", new float[] {ex, hy - 5f, 22f, 22f});
+			tourAnchor.put("profile", new float[] {px, hy - 5f, ex - 6f - px, 22f});
+			tourAnchor.put("panel", new float[] {x, y, DW, h});
+		}
 
 		// pages
 		float cy = y + HEADER;
@@ -1142,7 +1300,14 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		rect(c, x + 22f, fy, ew, 32f, 16f, eHover ? VeloAnim.lerpArgb(acc(), 0xFF000000, 0.08f) : acc(), a);
 		icon(c, "d_layout", x + 36f, fy + 9f, 14f, onAcc(), a);
 		text(c, eh, x + 56f, fy + 12f, onAcc(), a);
-		hits.add(new Hit(x + 22f, fy, ew, 32f, () -> setExpanded(false)));
+		// Edit HUD from the full menu: the whole screen for moving things - the side panel slides away too (its tab on the
+		// edge brings it back; owner 2026-11-25)
+		hits.add(new Hit(x + 22f, fy, ew, 32f, () -> {
+			setExpanded(false);
+			open = false;
+			profileMenu = false;
+			moreMenu = false;
+		}));
 
 		int n = DOCK_ITEMS.length;
 		float size = 32f;
@@ -1520,6 +1685,9 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		float y0 = y;
 		// search (always focused)
 		renderSearch(c, x, y, w, 26f, a, live, top, height);
+		if (live) {
+			tourAnchor.put("search", new float[] {x, y, w, 26f});
+		}
 		String q = search.toString();
 		y += 34f;
 		if (!q.isEmpty()) {
@@ -1539,6 +1707,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			return y - y0;
 		}
 		// pinned
+		float modulesTop = y - 3f;
 		List<Module> pins = QuickToggles.favorites();
 		text(c, R("Pinned"), x + 4f, y, TEXT_3, a);
 		y += 14f;
@@ -1566,10 +1735,17 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			hit(live, top, height, x, y, w, ROW, () -> go(new Page(Kind.CATEGORY, target, null)));
 			y += ROW;
 		}
+		if (live) {
+			tourAnchor.put("modules", new float[] {x, modulesTop, w, y - modulesTop + 2f});
+		}
 		y += 10f;
+		float featuresTop = y - 3f;
 		text(c, R("Features"), x + 4f, y, TEXT_3, a);
 		y += 14f;
 		y = featureTiles(c, x, y, w, top, height, a, live);
+		if (live) {
+			tourAnchor.put("features", new float[] {x, featuresTop, w, y - featuresTop + 2f});
+		}
 		return y - y0;
 	}
 
@@ -2174,17 +2350,297 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	// ---------------------------------------------------------------- input
 
+	// ---- first-open tour (2026-11-26): a spotlight on each part of the panel and a glass card that glides along ----
+
+	private record TourStop(String anchor, String icon, String title, String body) {
+	}
+
+	private static final TourStop[] TOUR = {
+			new TourStop("panel", "d_sparkles", "Welcome to Velo",
+					"This panel is everything Velo can do. Right Shift opens it any time, Esc or Right Shift closes it again."),
+			new TourStop("search", "d_search", "Just start typing",
+					"The search is always active: type a module's name anywhere in the menu and it shows up right away."),
+			new TourStop("modules", "d_layout", "Modules",
+					"Pick a category, then flip a switch to turn a module on. Click a module's name for its settings and a live preview. Pin your favourites to the top."),
+			new TourStop("hud", "d_layout", "Your HUD",
+					"While this panel is open you can edit your HUD right in the game: drag elements around, pull a corner to resize, click one for its settings."),
+			new TourStop("features", "d_sparkles", "Features",
+					"Locker, Friends, Clips, Emotes and more - all one click away."),
+			new TourStop("profile", "d_user", "Profiles",
+					"Save different setups - one for PvP, one for building - and switch between them here."),
+			new TourStop("expand", "d_expand", "Full menu",
+					"Grows the panel into the big menu: every module with previews, plus all features in tabs."),
+			new TourStop("collapse", "d_collapse", "Slide it away",
+					"Tucks the panel to the side so you see the whole screen. The tab on the right edge brings it back. That's it - have fun!"),
+	};
+
+	private final Map<String, float[]> tourAnchor = new HashMap<>();
+	private final List<Hit> tourHits = new ArrayList<>();
+	/** Opened for something specific (a module, the full menu from the pause screen): no tour this time. */
+	private boolean explicitOpen;
+	private boolean tourChecked;
+	private int tourStep = -1;
+	private int tourShown;
+	private boolean tourEnding;
+	private float tourAlpha;
+	private float tourText = 1f;
+	private float[] tourSpot;
+	private float[] tourCard;
+	private long tourStartNanos;
+
+	private boolean touring() {
+		return tourStep >= 0 && !tourEnding;
+	}
+
+	private void maybeStartTour() {
+		if (tourChecked || closing || openAnim < 0.95f) {
+			return;
+		}
+		boolean forced = Boolean.getBoolean("velo.rshiftTour");
+		if (!forced && (DrawerPrefs.toured() || explicitOpen || stack.size() != 1 || System.getProperty("velo.drawerTour") != null
+				|| System.getProperty("velo.screenshotTour") != null || Boolean.getBoolean("velo.drawerBench"))) {
+			tourChecked = true;
+			return;
+		}
+		if (expanded) {
+			setExpanded(false);   // the tour walks through the panel; it grows into the full menu once it has settled
+			return;
+		}
+		if (expandAnim > 0.02f || !tourAnchor.containsKey("panel")) {
+			return;
+		}
+		tourChecked = true;
+		search.setLength(0);
+		open = true;
+		tourStep = 0;
+		tourShown = 0;
+		tourText = 1f;
+		tourStartNanos = System.nanoTime();
+		net.veloclient.velo.client.sound.VeloUiSounds.guideNext();
+	}
+
+	private void tourNext() {
+		if (tourStep >= TOUR.length - 1) {
+			endTour();
+			net.veloclient.velo.client.sound.VeloUiSounds.guideDone();
+			return;
+		}
+		tourStep++;
+		net.veloclient.velo.client.sound.VeloUiSounds.guideNext();
+	}
+
+	private void tourBack() {
+		if (tourStep > 0) {
+			tourStep--;
+			net.veloclient.velo.client.sound.VeloUiSounds.guideBack();
+		}
+	}
+
+	private void endTour() {
+		if (tourStep < 0) {
+			return;
+		}
+		tourEnding = true;
+		DrawerPrefs.setToured(true);
+		if (page().kind() == Kind.HOME) {
+			scrollTarget.put(page(), 0f);
+		}
+	}
+
+	/** The spotlit area of a stop, in drawer units. */
+	private float[] tourTarget(TourStop stop) {
+		if (stop.anchor().equals("hud")) {
+			float panelX = rectNow()[0];
+			return new float[] {M + 8f, M + 22f, Math.max(60f, panelX - 2f * M - 16f), H() - 2f * M - 92f};
+		}
+		float[] r = tourAnchor.get(stop.anchor());
+		if (r == null) {
+			return tourAnchor.getOrDefault("panel", new float[] {W() / 2f - 50f, H() / 2f - 50f, 100f, 100f});
+		}
+		float pad = stop.anchor().equals("panel") ? 0f : 4f;
+		float[] t = {r[0] - pad, r[1] - pad, r[2] + 2f * pad, r[3] + 2f * pad};
+		// a stop further down the list scrolls it into view (and back up for the others)
+		if (page().kind() == Kind.HOME && !stop.anchor().equals("panel")) {
+			float cur = scroll.getOrDefault(page(), 0f);
+			if (stop.anchor().equals("features") && t[1] + t[3] > bodyBottom - 6f) {
+				scrollTarget.put(page(), clampScroll(page(), cur + (t[1] + t[3]) - (bodyBottom - 6f)));
+			} else if (!stop.anchor().equals("features") && cur > 0f && !stop.anchor().equals("hud")) {
+				scrollTarget.put(page(), 0f);
+			}
+		}
+		if (!stop.anchor().equals("panel") && !stop.anchor().equals("collapse") && !stop.anchor().equals("expand") && !stop.anchor().equals("profile")) {
+			// list parts: keep the spotlight inside the panel's body
+			float top = Math.max(t[1], bodyTop - 2f);
+			float bottom = Math.min(t[1] + t[3], bodyBottom + 2f);
+			t[1] = top;
+			t[3] = Math.max(20f, bottom - top);
+		}
+		return t;
+	}
+
+	private void renderTour(DrawContext c) {
+		tourHits.clear();
+		maybeStartTour();
+		if (tourStep < 0) {
+			return;
+		}
+		tourAlpha = approach(tourAlpha, tourEnding ? 0f : 1f, dt / (tourEnding ? 0.22f : 0.3f));
+		if (tourEnding && tourAlpha <= 0.001f) {
+			tourStep = -1;
+			tourEnding = false;
+			tourSpot = null;
+			tourCard = null;
+			return;
+		}
+		float a = ease(tourAlpha);
+		float glide = 1f - (float) Math.exp(-dt * 11f);
+		float[] want = tourTarget(TOUR[tourStep]);
+		if (tourSpot == null) {
+			tourSpot = want.clone();
+		}
+		for (int i = 0; i < 4; i++) {
+			tourSpot[i] += (want[i] - tourSpot[i]) * glide;
+		}
+		float sx = tourSpot[0], sy = tourSpot[1], sw = tourSpot[2], sh = tourSpot[3];
+		boolean whole = TOUR[tourStep].anchor().equals("panel");
+
+		// dim everything but the spotlight
+		int dim = alpha(0xA0000000, a);
+		int W = (int) Math.ceil(W()) + 1, H = (int) Math.ceil(H()) + 1;
+		c.fill(0, 0, W, Math.round(sy), dim);
+		c.fill(0, Math.round(sy + sh), W, H, dim);
+		c.fill(0, Math.round(sy), Math.round(sx), Math.round(sy + sh), dim);
+		c.fill(Math.round(sx + sw), Math.round(sy), W, Math.round(sy + sh), dim);
+		// accent ring + a soft pulse growing out of it
+		float ringR = whole ? net.veloclient.velo.client.gui.glass.GlassPrefs.radius(18f) : 9f;
+		VeloDraw.strokeRounded(c, sx, sy, sw, sh, ringR, 1.5f, alpha(acc(), a * 0.95f));
+		float p = ((System.nanoTime() - tourStartNanos) / 1_500_000_000f) % 1f;
+		float grow = 2f + p * 9f;
+		VeloDraw.strokeRounded(c, sx - grow, sy - grow, sw + 2f * grow, sh + 2f * grow, ringR + grow, 1.2f, alpha(acc(), a * 0.55f * (1f - p)));
+
+		// text cross-fade between stops
+		if (tourShown != tourStep) {
+			tourText = approach(tourText, 0f, dt / 0.11f);
+			if (tourText <= 0f) {
+				tourShown = tourStep;
+			}
+		} else {
+			tourText = approach(tourText, 1f, dt / 0.16f);
+		}
+		TourStop stop = TOUR[tourShown];
+		float cw = 236f;
+		List<Text> lines = wrap(stop.body(), cw - 28f, 6);
+		float ch = 16f + 12f + 18f + lines.size() * 11f + 14f + 22f + 14f;
+		// the card sits beside the spotlight (left of it, else right, else inside at the bottom)
+		float cx = sx - cw - 18f;
+		float cy = sy + sh / 2f - ch / 2f;
+		if (TOUR[tourShown].anchor().equals("hud")) {
+			cx = sx + (sw - cw) / 2f;
+			cy = sy + sh - ch - 24f;
+		} else if (cx < 10f) {
+			cx = sx + sw + 18f;
+			if (cx + cw > W() - 10f) {
+				cx = sx + (sw - cw) / 2f;
+				cy = sy + sh - ch - 16f;
+			}
+		}
+		cy = Math.max(10f, Math.min(H() - ch - 10f, cy));
+		float[] cardWant = {cx, cy, cw, ch};
+		if (tourCard == null) {
+			tourCard = cardWant.clone();
+		}
+		for (int i = 0; i < 4; i++) {
+			tourCard[i] += (cardWant[i] - tourCard[i]) * glide;
+		}
+		float x = tourCard[0], y = tourCard[1], h = tourCard[3];
+		float rise = (1f - a) * 10f;
+		y += rise;
+		VeloDraw.shadow(c, Math.round(x), Math.round(y), Math.round(cw), Math.round(h), 14, 16, 4, alpha(0x70000000, a));
+		glass(c, x, y, cw, h, net.veloclient.velo.client.gui.glass.GlassPrefs.radius(14f), 0xF0161619, a);
+
+		float ta = a * tourText;
+		float ix = x + 14f;
+		float iy = y + 14f;
+		// step count + skip
+		text(c, R((tourShown + 1) + " of " + TOUR.length), ix, iy, TEXT_3, ta);
+		if (tourShown < TOUR.length - 1) {
+			Text skip = R("Skip tour");
+			float skw = tw(skip);
+			float skx = x + cw - 14f - skw;
+			boolean hover = inside(skx - 4f, iy - 4f, skw + 8f, 16f);
+			text(c, skip, skx, iy, hover ? WHITE : TEXT_2, a);
+			tourHits.add(new Hit(skx - 4f, iy - 4f, skw + 8f, 16f, () -> {
+				endTour();
+				net.veloclient.velo.client.sound.VeloUiSounds.back();
+			}));
+		}
+		iy += 16f;
+		// icon + title
+		rect(c, ix, iy - 2f, 18f, 18f, 9f, alpha(acc(), 0.22f), ta);
+		icon(c, stop.icon(), ix + 3f, iy + 1f, 12f, accIcon(), ta);
+		text(c, B(stop.title()), ix + 25f, iy + 3f, WHITE, ta);
+		iy += 26f;
+		for (Text line : lines) {
+			text(c, line, ix, iy, TEXT_2, ta);
+			iy += 11f;
+		}
+		// dots + buttons along the bottom
+		float by = y + h - 14f - 22f;
+		float dx = ix;
+		for (int i = 0; i < TOUR.length; i++) {
+			boolean on = i == tourStep;
+			float dw = animTo("tourDot" + i, on ? 12f : 5f, 14f);
+			rect(c, dx, by + 8.5f, dw, 5f, 2.5f, on ? acc() : 0x40FFFFFF, a);
+			dx += dw + 4f;
+		}
+		boolean last = tourStep == TOUR.length - 1;
+		Text nextLabel = B(last ? "Done" : "Next");
+		float nw = tw(nextLabel) + 26f;
+		float nx = x + cw - 14f - nw;
+		boolean nh = inside(nx, by, nw, 22f);
+		rect(c, nx, by, nw, 22f, 11f, nh ? VeloAnim.lerpArgb(acc(), 0xFFFFFFFF, 0.15f) : acc(), a);
+		text(c, nextLabel, nx + 13f, by + 7f, onAcc(), a);
+		tourHits.add(new Hit(nx, by, nw, 22f, this::tourNext));
+		if (tourStep > 0) {
+			Text backLabel = R("Back");
+			float bw = tw(backLabel) + 22f;
+			float bx = nx - 6f - bw;
+			boolean bh = inside(bx, by, bw, 22f);
+			rect(c, bx, by, bw, 22f, 11f, bh ? 0x2EFFFFFF : 0x16FFFFFF, a);
+			text(c, backLabel, bx + 11f, by + 7f, WHITE, a);
+			tourHits.add(new Hit(bx, by, bw, 22f, this::tourBack));
+		}
+	}
+
+	/** Every press in the menu sounds (2026-11-26): its own sound if it has one (toggle, page...), else a soft click. */
+	private static void runWithSound(Runnable click) {
+		click.run();
+		if (!net.veloclient.velo.client.sound.VeloUiSounds.playedWithin(60)) {
+			net.veloclient.velo.client.sound.VeloUiSounds.click(1f);
+		}
+	}
+
 	private boolean overlayOpen() {
 		return dropdown != null || profileMenu || moreMenu;
 	}
 
 	@Override
 	public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
+		frameCache.invalidate();
 		if (closing || pending != null) {
 			return true;
 		}
 		double u = click.x() / k;
 		double v = click.y() / k;
+		if (touring()) {
+			for (int i = tourHits.size() - 1; i >= 0; i--) {
+				if (tourHits.get(i).contains(u, v)) {
+					tourHits.get(i).click.run();
+					break;
+				}
+			}
+			return true;   // the menu under the tour isn't clickable meanwhile
+		}
 		mouseU = u;
 		mouseV = v;
 		commitEditIfOutside();
@@ -2192,7 +2648,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			for (int i = overlayHits.size() - 1; i >= 0; i--) {
 				Hit h = overlayHits.get(i);
 				if (h.contains(u, v)) {
-					h.click.run();
+					runWithSound(h.click);
 					return true;
 				}
 			}
@@ -2232,8 +2688,8 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 				touchStartScroll = scroll.getOrDefault(touchPage, 0f);
 				return true;
 			}
-			if (h.click != null) {
-				h.click.run();
+			if (h.click != null && h != glassHit) {
+				runWithSound(h.click);
 			}
 			return true;
 		}
@@ -2279,6 +2735,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	@Override
 	public boolean mouseDragged(net.minecraft.client.gui.Click click, double offsetX, double offsetY) {
+		frameCache.invalidate();
 		double u = click.x() / k;
 		double v = click.y() / k;
 		mouseU = u;
@@ -2330,6 +2787,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	@Override
 	public boolean mouseReleased(net.minecraft.client.gui.Click click) {
+		frameCache.invalidate();
 		if (draggingBar != null) {
 			draggingBar = null;
 			return true;
@@ -2392,6 +2850,10 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+		frameCache.invalidate();
+		if (touring()) {
+			return true;
+		}
 		if (overDrawer(mouseX / k, mouseY / k)) {
 			Page p = page();
 			// clamped right here to the page's length (last frame): scrolling past the end used to draw one frame too far and jump back
@@ -2418,8 +2880,19 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	@Override
 	public boolean keyPressed(net.minecraft.client.input.KeyInput input) {
+		frameCache.invalidate();
 		int key = input.key();
 		if (closing) {
+			return true;
+		}
+		if (touring() && key != net.veloclient.velo.client.keybind.VeloKeybinds.menuKeyCode()) {
+			if (key == Keys.ESCAPE) {
+				endTour();
+			} else if (key == Keys.ENTER || key == Keys.KP_ENTER || key == Keys.SPACE || key == Keys.RIGHT) {
+				tourNext();
+			} else if (key == Keys.LEFT) {
+				tourBack();
+			}
 			return true;
 		}
 		// the menu key (R-Shift) closes it again - screens never pass it to the key binding
@@ -2486,6 +2959,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	@Override
 	public boolean keyReleased(net.minecraft.client.input.KeyInput input) {
+		frameCache.invalidate();
 		if (listeningChord != null) {
 			swallowCharsUntil = System.nanoTime() + 250_000_000L;
 			chordHeld.remove(input.key());
@@ -2502,7 +2976,8 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	/** Typing goes into the open text field, otherwise into the search (and jumps to it). */
 	private boolean typed(int codepoint) {
-		if (closing) {
+		frameCache.invalidate();
+		if (closing || touring()) {
 			return true;
 		}
 		if (listening != null || listeningChord != null || System.nanoTime() < swallowCharsUntil || codepoint < 32 || codepoint == 127) {
@@ -2548,6 +3023,9 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	/** Saves everything and goes back to the game (also what R-Shift does while this is open). */
 	public void closeToGame() {
+		if (tourStep >= 0) {
+			DrawerPrefs.setToured(true);   // closed mid-tour: it has been seen
+		}
 		if (closing) {
 			return;
 		}
@@ -2555,6 +3033,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		VeloProfileStore.saveActive();
 		closing = true;
 		closingSince = System.nanoTime();
+		net.veloclient.velo.client.sound.VeloUiSounds.menuClose();
 		open = false;
 		dropdown = null;
 		profileMenu = false;
