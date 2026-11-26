@@ -1,5 +1,6 @@
 package net.veloclient.velo.client.gui.widget;
 
+import net.minecraft.util.Identifier;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.Text;
@@ -57,9 +58,22 @@ public final class StoreCard {
 		}
 	}
 
-	/** The Velo Coin: gold disc with a darker rim. */
+	private static final Identifier COIN = Identifier.of("velo-client", "textures/icon/velo_coin.png");
+
+	/** The Velo Coin: the same art as the launcher's (the Velo logo on gold), drawn at its exact screen size. */
 	public static void coin(DrawContext context, float cx, float cy, float r) {
-		VeloDraw.fillCircle(context, cx, cy, r, 0xFFC9861A);
-		VeloDraw.fillCircle(context, cx, cy, r - 0.9f, 0xFFFFD56A);
+		int px = Math.max(6, Math.round(2 * r * net.veloclient.velo.client.util.ClientCompat.guiScale()));
+		Identifier crisp = net.veloclient.velo.client.gui.drawer.CrispIcons.get(COIN, px);
+		if (crisp == null) {
+			VeloDraw.fillCircle(context, cx, cy, r, 0xFFC9861A);
+			VeloDraw.fillCircle(context, cx, cy, r - 0.9f, 0xFFFFD56A);
+			return;
+		}
+		int drawn = Math.min(px, 128);
+		context.getMatrices().pushMatrix();
+		context.getMatrices().translate(cx - r, cy - r);
+		context.getMatrices().scale(2 * r / drawn, 2 * r / drawn);
+		context.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, crisp, 0, 0, 0f, 0f, drawn, drawn, drawn, drawn);
+		context.getMatrices().popMatrix();
 	}
 }

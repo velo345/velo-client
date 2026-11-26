@@ -101,22 +101,27 @@ public final class CapeThumbnails {
 		BufferedImage out = new BufferedImage(64 * outScale, 32 * outScale, BufferedImage.TYPE_INT_ARGB);
 		int ow = REGION_W * outScale;
 		int oh = REGION_H * outScale;
-		int step = scale / outScale;
-		// Box filter: each output pixel averages its step x step source block (alpha-weighted).
+		// Box filter: each output pixel averages its source block (alpha-weighted). The block's edges are worked out per pixel:
+		// the ratio isn't whole for every art size (card art: 12 per cloak pixel to 8), and an integer step of 12 / 8 = 1 took
+		// only the top-left two thirds of the cloak - every grid tile showed it zoomed in and off-centre (2026-11-26).
 		for (int y = 0; y < oh; y++) {
+			int y0 = y * scale / outScale;
+			int stepY = Math.max(1, (y + 1) * scale / outScale - y0);
 			for (int x = 0; x < ow; x++) {
+				int x0 = x * scale / outScale;
+				int stepX = Math.max(1, (x + 1) * scale / outScale - x0);
 				long a = 0;
 				long r = 0;
 				long g = 0;
 				long b = 0;
 				int n = 0;
-				for (int j = 0; j < step; j++) {
-					int sy = y * step + j;
+				for (int j = 0; j < stepY; j++) {
+					int sy = y0 + j;
 					if (sy >= rh) {
 						break;
 					}
-					for (int i = 0; i < step; i++) {
-						int sx = x * step + i;
+					for (int i = 0; i < stepX; i++) {
+						int sx = x0 + i;
 						if (sx >= rw) {
 							break;
 						}
@@ -159,6 +164,6 @@ public final class CapeThumbnails {
 
 	private static Path cacheDir() {
 		// v2: the first thumbnails of cropped HD cloaks were cut (wrong scale) - a new folder makes them again
-		return VeloPaths.root().resolve("cache").resolve("cloak-thumbs-v2");
+		return VeloPaths.root().resolve("cache").resolve("cloak-thumbs-v3");
 	}
 }

@@ -118,7 +118,7 @@ public final class SaleUi {
 			unit.setStyle(MONO + "-fx-font-size: 9px; -fx-text-fill: rgba(255,255,255,0.5);");
 			HBox tile = new HBox(2, value, unit);
 			tile.setAlignment(Pos.BASELINE_CENTER);
-			tile.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-background-radius: 8; -fx-padding: 4 7 4 7;");
+			tile.setStyle("-fx-background-color: rgba(255,255,255,0.08); -fx-background-radius: 999; -fx-padding: 6 9 2 9;");
 			parts[i] = value;
 			clock.getChildren().add(tile);
 		}
@@ -144,13 +144,21 @@ public final class SaleUi {
 		go.setOnAction(e -> open.run());
 		HBox row = new HBox(12, name, off, text, endsIn, clock, go);
 		row.setAlignment(Pos.CENTER_LEFT);
-		row.setPadding(slim ? new Insets(4, 4, 4, 14) : new Insets(8, 8, 8, 18));
+		// the button is a pill inside the pill, with the same gap above, below and at the end (it sat off in the round end,
+		// 2026-11-26): the gap is half of what's left of the bar's height, minus the 1 px border
+		double buttonHeight = slim ? 30 : 36;
+		double gap = (height - buttonHeight) / 2 - 1;
+		go.setMinHeight(buttonHeight);
+		go.setPrefHeight(buttonHeight);
+		go.setMaxHeight(buttonHeight);
+		go.setStyle("-fx-background-radius: 999; -fx-border-radius: 999; -fx-background-insets: 0; -fx-padding: 0 15 0 15;"
+				+ (slim ? " -fx-font-size: 12px;" : ""));
+		row.setPadding(new Insets(gap, gap, gap, slim ? 14 : 18));
 		row.setMinHeight(height);
 		row.setMaxHeight(height);
 		if (slim) {
 			name.setStyle(DISPLAY + "-fx-font-size: 13px; -fx-text-fill: white;");
 			row.setSpacing(10);
-			go.getStyleClass().add("button-sm");
 		}
 		row.setMinWidth(0);
 		row.setStyle("-fx-background-color: linear-gradient(to right, rgba(0,0,0,0.55), rgba(0,0,0,0.25) 60%, transparent),"

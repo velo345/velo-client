@@ -217,6 +217,8 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	private HudModule dragging;
 	private HudModule resizing;
 	private HudModule selected;
+	/** The element under the cursor (last frame): it shows example content, so it isn't an empty box while idle. */
+	private HudModule sampled;
 	private int dragOffsetX;
 	private int dragOffsetY;
 	private boolean dragMoved;
@@ -429,7 +431,26 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	private void drawHudUnderBlur(DrawContext context, float delta) {
 		net.veloclient.velo.client.hud.HudAutoLayout.update(this.width, this.height);
 		for (HudModule hud : hudModules()) {
+			drawElement(context, hud, delta);
+		}
+	}
+
+	/**
+	 * One element as it is in game - except the one being hovered, dragged or resized: that one shows its example content
+	 * (an idle Media Player was an empty box being dragged around, 2026-11-26). Only that one, so opening the menu
+	 * mid-game never puts made-up values over the live HUD.
+	 */
+	private void drawElement(DrawContext context, HudModule hud, float delta) {
+		boolean sample = hud == sampled || hud == dragging || hud == resizing;
+		if (sample) {
+			net.veloclient.velo.client.hud.HudSample.begin();
+		}
+		try {
 			HudManager.renderScaled(context, hud, this.width, this.height, delta);
+		} finally {
+			if (sample) {
+				net.veloclient.velo.client.hud.HudSample.end();
+			}
 		}
 	}
 
@@ -941,7 +962,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			int x = hud.position().resolveX(this.width, w);
 			int y = hud.position().resolveY(this.height, h);
 			if (!elementsDrawn) {
-				HudManager.renderScaled(context, hud, this.width, this.height, delta);
+				drawElement(context, hud, delta);
 			}
 			boolean active = hud == dragging || hud == resizing || hud == selected;
 			boolean hover = !overDrawer(mouseX / k, mouseY / k) && mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
@@ -957,6 +978,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 				VeloDraw.fillRounded(context, x + w - 1, y + h - 1, 6, 6, 1.5f, WHITE);
 			}
 		}
+		sampled = labelled;
 		if (labelled != null) {
 			Text name = MenuKit.uiBold(labelled.displayName());
 			Text size = MenuKit.mono(Math.round(labelled.position().scale() * 100) + "%");
@@ -1712,7 +1734,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		text(c, R("Pinned"), x + 4f, y, TEXT_3, a);
 		y += 14f;
 		if (pins.isEmpty()) {
-			text(c, R("Nothing pinned yet - pin modules from any category."), x + 4f, y + 4f, TEXT_3, a);
+			text(c, fit("Pin modules from any category.", false, w - 8f), x + 4f, y + 4f, TEXT_3, a);
 			y += 22f;
 		}
 		for (Module m : pins) {
@@ -1881,7 +1903,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		if (m instanceof HudModule && !m.id().equals("hud-style")) {
 			Module style = ModuleRegistry.get("hud-style").orElse(null);
 			if (style != null) {
-				y = wideButton(c, "d_sliders", "HUD style (fonts, background, all elements)", x, y, w, top, height, a, live,
+				y = wideButton(c, "d_sliders", "HUD style", x, y, w, top, height, a, live,
 						() -> go(new Page(Kind.MODULE, catOf(style), style)));
 			}
 		}
@@ -1961,7 +1983,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			Runnable action) {
 		boolean hover = live && inside(x, y, w, 26f);
 		rect(c, x, y, w, 26f, 13f, hover ? 0x22FFFFFF : 0x12FFFFFF, a);
-		Text t = R(label);
+		Text t = fit(label, false, w - 34f);
 		float tx = x + (w - tw(t) - 18f) / 2f;
 		icon(c, iconKey, tx, y + 7f, 12f, TEXT_2, a);
 		text(c, t, tx + 18f, y + 9f, WHITE, a);
@@ -2155,7 +2177,7 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			boolean hover = live && inside(x, y, w, 24f);
 			rect(c, x, y, w, 24f, 12f, hover ? 0x26FFFFFF : 0x14FFFFFF, a);
 			VeloDraw.strokeRounded(c, x, y, w, 24f, 12f, 1f, alpha(hover ? 0x40FFFFFF : 0x1FFFFFFF, a));
-			Text t = B(act.label());
+			Text t = fit(act.label(), true, w - 20f);   // a long label ends in "…" instead of running past the button
 			text(c, t, x + (w - tw(t)) / 2f, y + 8f, WHITE, a);
 			hit(live, top, height, x, y, w, 24f, () -> act.action().run());
 		}
@@ -2325,7 +2347,12 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 			ModuleScenes.pop(c);
 			ModuleScenes.push(c);
 			ModuleScenes.move(c, gx - cx, gy - cy);
-			HudManager.renderScaled(c, hud, this.width, this.height, lastDelta);
+			net.veloclient.velo.client.hud.HudSample.begin();   // dragged out of the drawer: show what it looks like
+			try {
+				HudManager.renderScaled(c, hud, this.width, this.height, lastDelta);
+			} finally {
+				net.veloclient.velo.client.hud.HudSample.end();
+			}
 			ModuleScenes.pop(c);
 			VeloDraw.strokeRounded(c, gx - 3, gy - 3, w + 6, h + 6, 4, VeloUi.withAlpha(WHITE, drop ? 255 : 90));
 			if (!drop) {

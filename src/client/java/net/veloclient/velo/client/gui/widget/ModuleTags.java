@@ -33,7 +33,7 @@ public final class ModuleTags {
 	private static final Map<String, String> TAGS = Map.ofEntries(
 			Map.entry("keystrokes", "PvP"), Map.entry("mouse-buttons", "PvP"), Map.entry("armor-durability", "PvP"),
 			Map.entry("potion-timers", "PvP"), Map.entry("target-hud", "PvP"), Map.entry("cooldowns", "PvP"), Map.entry("combo-counter", "PvP"),
-			Map.entry("totem-counter", "Crystal PvP"), Map.entry("inventory-hud", "PvP"), Map.entry("mini-player", "Look"), Map.entry("module-list", "Everyday"), Map.entry("server-display", "Recording"), Map.entry("custom-text", "Everyday"), Map.entry("custom-image", "Look"), Map.entry("youtube", "Everyday"), Map.entry("lyrics", "Look"), Map.entry("totem-pops", "Crystal PvP"), Map.entry("emotes", "Style"), Map.entry("pot-counter", "Pot PvP"), Map.entry("arrow-counter", "Bow PvP"),
+			Map.entry("totem-counter", "Crystal PvP"), Map.entry("input-sampler", "Crystal PvP"), Map.entry("inventory-hud", "PvP"), Map.entry("mini-player", "Look"), Map.entry("module-list", "Everyday"), Map.entry("server-display", "Recording"), Map.entry("custom-text", "Everyday"), Map.entry("custom-image", "Look"), Map.entry("youtube", "Everyday"), Map.entry("lyrics", "Look"), Map.entry("totem-pops", "Crystal PvP"), Map.entry("emotes", "Style"), Map.entry("pot-counter", "Pot PvP"), Map.entry("arrow-counter", "Bow PvP"),
 			Map.entry("coordinates", "Survival"), Map.entry("minimap", "Survival"), Map.entry("waypoints", "Survival"),
 			Map.entry("world-map", "Survival"), Map.entry("shulker-preview", "Survival"), Map.entry("session-stats", "Everyday"),
 			Map.entry("fps-counter", "Everyday"), Map.entry("ping-display", "Servers"), Map.entry("clock", "Everyday"), Map.entry("media-player", "Music"),

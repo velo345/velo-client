@@ -300,9 +300,7 @@ public final class TesterWindow {
 		}
 		String version = build.get("version").getAsString();
 		JsonObject notes = build.getAsJsonObject("notes");
-		JsonObject mine = me.has("mine") && me.get("mine").isJsonObject() && me.getAsJsonObject("mine").has(version)
-				? me.getAsJsonObject("mine").getAsJsonObject(version) : new JsonObject();
-		JsonObject feedback = mine.has("feedback") && mine.get("feedback").isJsonObject() ? mine.getAsJsonObject("feedback") : new JsonObject();
+		JsonObject feedback = answers(me, version);
 		if (notes.has("title")) {
 			Label headline = new Label(notes.get("title").getAsString());
 			headline.getStyleClass().add("tw-headline");
@@ -389,6 +387,42 @@ public final class TesterWindow {
 			}
 		};
 		redraw[0].run();
+	}
+
+	/**
+	 * What this tester answered for {@code version}'s test plan, including answers from earlier builds of the same release
+	 * (1.6.0.1 -> 1.6.0.2): a new build adds points to the list, the ones already answered stay answered (owner 2026-11-26).
+	 */
+	private static JsonObject answers(JsonObject me, String version) {
+		JsonObject all = new JsonObject();
+		if (!me.has("mine") || !me.get("mine").isJsonObject()) {
+			return all;
+		}
+		int dot = version.lastIndexOf('.');
+		String release = dot > 0 ? version.substring(0, dot + 1) : version;
+		java.util.TreeMap<Integer, JsonObject> builds = new java.util.TreeMap<>();
+		for (var entry : me.getAsJsonObject("mine").entrySet()) {
+			String other = entry.getKey();
+			if (!other.startsWith(release) || !other.substring(release.length()).matches("\\d{1,4}")) {
+				continue;
+			}
+			int number = Integer.parseInt(other.substring(release.length()));
+			JsonObject stat = entry.getValue().getAsJsonObject();
+			if (other.compareTo(version) == 0 || dot > 0 && number < buildNumber(version, release)) {
+				if (stat.has("feedback") && stat.get("feedback").isJsonObject()) {
+					builds.put(number, stat.getAsJsonObject("feedback"));
+				}
+			}
+		}
+		for (JsonObject feedback : builds.values()) { // oldest first: a newer answer wins
+			feedback.entrySet().forEach(e -> all.add(e.getKey(), e.getValue()));
+		}
+		return all;
+	}
+
+	private static int buildNumber(String version, String release) {
+		String number = version.startsWith(release) ? version.substring(release.length()) : "";
+		return number.matches("\\d{1,4}") ? Integer.parseInt(number) : 0;
 	}
 
 	private static Node testCard(String version, JsonObject item, int index, List<String> states, boolean current,
@@ -822,7 +856,7 @@ public final class TesterWindow {
 					case "Bugs" -> !type.equals("Crash") && !type.equals("Suggestion") && !type.equals("Feature Request");
 					case "Crashes" -> type.equals("Crash");
 					case "Suggestions" -> type.equals("Suggestion") || type.equals("Feature Request");
-					case "In progress" -> state.equals("In Progress") || state.equals("Confirmed");
+					case "In progress" -> state.equals("In Progress") || state.equals("Confirmed") || state.equals("Testing");
 					default -> true;
 				};
 				if (!match || !q.isEmpty() && !(str(i, "summary") + " " + str(i, "id") + " " + str(i, "area")).toLowerCase(Locale.ROOT).contains(q)) {
@@ -944,6 +978,7 @@ public final class TesterWindow {
 			case "New", "Sending" -> "#9AA4B2";
 			case "Confirmed" -> "#7FB2FF";
 			case "In Progress" -> "#F2C14E";
+			case "Testing" -> "#B38CFF";
 			case "Needs Info" -> "#FF9F5A";
 			case "Fixed", "Verified" -> "#4CD07D";
 			default -> "#8A8A95";
@@ -957,7 +992,8 @@ public final class TesterWindow {
 			case "Confirmed" -> "The team can see it too - it's on the list.";
 			case "In Progress" -> "Someone is working on it right now.";
 			case "Needs Info" -> "The team needs more from you - see the comments and reply below.";
-			case "Fixed" -> "Fixed - check it again in the next tester build.";
+			case "Testing" -> "Done - please check it in the newest tester build and tell us if it works.";
+			case "Fixed" -> "Fixed.";
 			case "Verified" -> "Fixed and checked.";
 			case "Can't Reproduce" -> "The team couldn't make it happen - more details or a video help.";
 			case "Duplicate" -> "Someone reported the same thing already.";

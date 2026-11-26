@@ -40,7 +40,7 @@ public final class ShaderCacheModule extends AbstractModule implements Configura
 				new ConfigField.ActionButtonField("Show Cache Stats", () -> NotificationOverlay.show(new NotificationOverlay.Toast(null, null,
 						String.format(Locale.ROOT, "Shader cache: %.1f MB on disk", ShaderCache.diskBytes() / (1024.0 * 1024.0)),
 						ShaderCache.summary(), 9000, null, null, null))),
-				new ConfigField.ActionButtonField("Clear Shader Cache (rebuilds next start)", () -> {
+				new ConfigField.ActionButtonField("Clear Shader Cache", () -> {
 					ShaderCache.clear();
 					NotificationOverlay.show(new NotificationOverlay.Toast(null, null, "Shader cache cleared",
 							"Shaders are rebuilt and cached again on the next start", 5000, null, null, null));

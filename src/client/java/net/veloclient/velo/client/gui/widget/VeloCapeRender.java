@@ -37,9 +37,10 @@ public final class VeloCapeRender {
 		float frontWidth = capeWidth * cos;
 		float sideWidth = depth * Math.abs(sin);
 		float total = frontWidth + sideWidth;
-		// Edges going away from the viewer rise slightly - a cheap stand-in for perspective.
-		float frontSlope = -0.10f * sin;
-		float sideSlope = 0.32f * Math.signum(sin);
+		// The front stays level (its edges meet the floor shadow); only the side runs up and back. Front rising while the
+		// side fell looked like a bent, badly aligned slab (2026-11-26).
+		float frontSlope = 0f;
+		float sideSlope = -0.32f * Math.signum(sin);
 		float top = bottomY - capeHeight;
 
 		// Soft ground shadow.

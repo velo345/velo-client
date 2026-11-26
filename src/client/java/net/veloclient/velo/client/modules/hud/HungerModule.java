@@ -246,7 +246,7 @@ public final class HungerModule extends AbstractModule implements Configurable {
 				new ConfigField.ColorField("Food Color With Hunger Effect", () -> hungerEffectColor, v -> hungerEffectColor = v, false),
 				new ConfigField.ColorField("Empty Food Color (Velo Style)", () -> emptyColor, v -> emptyColor = v, true),
 				new ConfigField.ColorField("Outline Color (Velo Style)", () -> outlineColor, v -> outlineColor = v, true),
-				new ConfigField.ActionButtonField("Draw Custom Food Icon (or import a PNG)...", () -> {
+				new ConfigField.ActionButtonField("Draw Custom Food Icon...", () -> {
 					style = "Custom Drawing";
 					net.veloclient.velo.client.gui.StatusIconEditor.openFromSettings(KIND, "Food Icon", foodColor);
 				}),

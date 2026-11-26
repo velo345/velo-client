@@ -134,7 +134,7 @@ public final class BrowserModule extends AbstractModule implements Configurable,
 				}, v -> BrowserWindow.away = v.equals(AWAY.get(1)) ? BrowserWindow.Away.HIDDEN : v.equals(AWAY.get(2)) ? BrowserWindow.Away.CLOSE
 						: BrowserWindow.Away.PIP),
 				// normal browsing keeps sign-ins and history on this PC only (incognito: the hat button in the bar keeps nothing)
-				new ConfigField.ActionButtonField("Clear Browsing Data (sign-ins, history, cache)", () -> {
+				new ConfigField.ActionButtonField("Clear Browsing Data", () -> {
 					CefRuntime.clearDataOnNextStart();
 					toast("Browsing data is cleared the next time the game starts.");
 				}),
@@ -161,6 +161,6 @@ public final class BrowserModule extends AbstractModule implements Configurable,
 					}
 				}),
 				new ConfigField.ActionButtonField("Open Browser", () -> MinecraftClient.getInstance().setScreen(new BrowserScreen())),
-				new ConfigField.ActionButtonField("Close the Page (forget this session)", BrowserWindow::closePage));
+				new ConfigField.ActionButtonField("Close the Page", BrowserWindow::closePage));
 	}
 }

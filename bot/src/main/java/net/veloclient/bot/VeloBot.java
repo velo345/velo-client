@@ -234,6 +234,8 @@ public final class VeloBot extends ListenerAdapter {
 			return;
 		}
 		event.deferReply(true).queue();
+		// every follow-up too: only the first one inherits the private reply, the second (mod jar links) was posted for everyone
+		event.getHook().setEphemeral(true);
 		if (vip != null) {
 			vip.runNow(); // a brand-new tester: sync the role to the server first
 		}
@@ -631,6 +633,7 @@ public final class VeloBot extends ListenerAdapter {
 			}
 			case "webhooks" -> {
 				event.deferReply(true).queue();
+				event.getHook().setEphemeral(true);
 				StringBuilder out = new StringBuilder("Put these in the Velo server's settings (environment):\n");
 				List<Runnable> pending = new ArrayList<>();
 				int[] left = {0};

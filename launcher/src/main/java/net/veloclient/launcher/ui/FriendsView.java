@@ -245,9 +245,7 @@ public final class FriendsView {
 			groupBox.getStyleClass().add("friend-group");
 			for (int i = 0; i < friends.size(); i++) {
 				Node row = friendRow(friends.get(i));
-				if (i < friends.size() - 1) {
-					row.getStyleClass().add("friend-row-split");
-				}
+				row.getStyleClass().add(i < friends.size() - 1 ? "friend-row-split" : "friend-row-last");
 				groupBox.getChildren().add(row);
 			}
 			VBox.setMargin(groupBox, new Insets(list.getChildren().isEmpty() ? 0 : 12, 0, 0, 0));
@@ -277,7 +275,7 @@ public final class FriendsView {
 		HBox header = new HBox(9, square, title, count, push, chevron);
 		header.setAlignment(Pos.CENTER_LEFT);
 		header.getStyleClass().add("friend-group-header");
-		header.setStyle(blockedOpen ? "" : "-fx-background-radius: 12; -fx-border-width: 0;");
+		header.setStyle(blockedOpen ? "" : "-fx-background-radius: 22; -fx-border-width: 0;");
 		header.setCursor(javafx.scene.Cursor.HAND);
 		header.setOnMouseClicked(e -> {
 			blockedOpen = !blockedOpen;
@@ -307,9 +305,7 @@ public final class FriendsView {
 				HBox row = new HBox(12, head(ref.uuid, ref.username, 30), name, unblock);
 				row.setAlignment(Pos.CENTER_LEFT);
 				row.getStyleClass().add("friend-row");
-				if (i < state.blocked.size() - 1) {
-					row.getStyleClass().add("friend-row-split");
-				}
+				row.getStyleClass().add(i < state.blocked.size() - 1 ? "friend-row-split" : "friend-row-last");
 				group.getChildren().add(row);
 			}
 		}
@@ -337,6 +333,8 @@ public final class FriendsView {
 		javafx.scene.shape.Rectangle clip = new javafx.scene.shape.Rectangle();
 		clip.widthProperty().bind(drawer.widthProperty());
 		clip.heightProperty().bind(drawer.heightProperty());
+		clip.setArcWidth(44);   // the drawer's own 22 px corners: a square clip left sharp edges around them
+		clip.setArcHeight(44);
 		drawer.setClip(clip);
 		Runnable closeChat = () -> {
 			// the chat folds away and the list grows back, then the page rebuilds without it
@@ -597,7 +595,12 @@ public final class FriendsView {
 		if (loaded.add(uuid)) {
 			LauncherSocial.loadConversation(uuid).thenAccept(error -> Platform.runLater(this::queueChatRefresh));
 		}
-		LauncherSocial.markRead(uuid).thenAccept(error -> Platform.runLater(host::badgeChanged));
+		// only when there's something unread: marking an already read chat redrew the whole page on every click, so
+		// switching between friends quickly flickered (VELO-192)
+		LauncherSocial.Friend picked = LauncherSocial.friend(uuid);
+		if (picked == null || picked.unread > 0) {
+			LauncherSocial.markRead(uuid).thenAccept(error -> Platform.runLater(host::badgeChanged));
+		}
 		if (!selectInPlace()) {
 			rebuild();
 		}
@@ -611,7 +614,7 @@ public final class FriendsView {
 	private boolean selectInPlace() {
 		LauncherSocial.State state = LauncherSocial.snapshot();
 		if (state == null || !chatOpen || mode != Mode.CHAT || selected == null || LauncherSocial.friend(selected) == null
-				|| currentWrapper == null || currentWrapper.getScene() == null || rebuildQueued) {
+				|| currentWrapper == null || currentWrapper.getScene() == null) {
 			return false;
 		}
 		for (Node row : root.lookupAll(".friend-row")) {

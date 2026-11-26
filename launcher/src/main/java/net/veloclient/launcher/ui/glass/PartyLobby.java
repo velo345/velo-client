@@ -319,6 +319,10 @@ public final class PartyLobby {
 		if (viewer instanceof Region region) {
 			region.setMinSize(0, 0);
 		}
+		// the camera a step back: the slot is narrow, and a waving hand ran out of it (VELO-190)
+		if (viewer.getProperties().get("velo.camera") instanceof javafx.scene.PerspectiveCamera camera) {
+			camera.setTranslateZ(camera.getTranslateZ() * 1.2);
+		}
 		BUILT.put(member.uuid(), viewer);
 		model.getChildren().setAll(viewer);
 		viewer.setOpacity(0);

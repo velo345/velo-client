@@ -466,6 +466,9 @@ tasks.register("jpackageDist") {
 			return
 		}
 		runJpackage(command)
+		if (!isWindows && !isMac) {
+			relaxDebDependencies(dist)
+		}
 		if (isWindows && !veloDev) {
 			buildInnoSetup(appImage, dist, launcherAppVersion, packageVersion, appName, rootDir)
 		}
@@ -491,6 +494,31 @@ tasks.register("jpackageDist") {
 			}
 			imageDir.deleteDir()
 		}
+	}
+}
+
+// jpackage writes down the build machine's package names: built on Ubuntu 24.04 the .deb asks for libasound2t64, which
+// Mint 21, Ubuntu 22.04 and Debian 12 don't have (there it is libasound2), so it refused to install. Either one will do.
+void relaxDebDependencies(File dist) {
+	def run = { List<String> cmd ->
+		Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start()
+		String out = p.inputStream.getText("UTF-8")
+		if (p.waitFor() != 0) {
+			throw new GradleException(cmd.join(" ") + " failed: " + out)
+		}
+	}
+	(dist.listFiles() ?: []).findAll { it.name.endsWith(".deb") }.each { File deb ->
+		File tree = new File(dist, "deb-tree")
+		tree.deleteDir()
+		run(["dpkg-deb", "-R", deb.absolutePath, tree.absolutePath])
+		File control = new File(tree, "DEBIAN/control")
+		String text = control.getText("UTF-8")
+		String fixed = text.replaceAll(/libasound2t64(?!\s*\|)/, "libasound2t64 | libasound2")
+		if (fixed != text) {
+			control.setText(fixed, "UTF-8")
+			run(["dpkg-deb", "--root-owner-group", "-Zzstd", "-b", tree.absolutePath, deb.absolutePath])
+		}
+		tree.deleteDir()
 	}
 }
 

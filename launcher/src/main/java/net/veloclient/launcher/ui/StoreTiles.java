@@ -76,13 +76,12 @@ public final class StoreTiles {
 		return NumberFormat.getIntegerInstance(Locale.US).format(coins);
 	}
 
-	/** The small gold "V" coin. */
+	/** The Velo Coin (see {@link CosmeticUi#coin}). */
 	public static Label coin(double size) {
-		Label coin = new Label("V");
-		coin.getStyleClass().add("coin");
+		Label coin = new Label();
+		coin.setGraphic(CosmeticUi.coinImage(size));
 		coin.setMinSize(size, size);
 		coin.setMaxSize(size, size);
-		coin.setStyle("-fx-font-size: " + Math.round(size * 0.55) + "px;");
 		return coin;
 	}
 

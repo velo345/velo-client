@@ -280,6 +280,61 @@ public final class ScreenshotTour {
 	/** Each scene = steps of {delayTicks, Runnable}. Add a scene here instead of running the whole tour. */
 	private static List<Object[]> scene(MinecraftClient client, String name) {
 		return switch (name) {
+			// Sky checks (2026-11-26, owner: skybox over clouds / sky over the HUD / sky blurred behind menus): the same
+			// view with and without Custom Skybox - playing, pause menu, R-Shift, playing again.
+			case "sky" -> {
+				List<Object[]> steps = new java.util.ArrayList<>();
+				var drawer = new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen[1];
+				// -Dvelo.skyExtra=<ids>: more modules on, like the setup the report came from
+				steps.add(new Object[] {0, (Runnable) () -> {
+					for (String id : System.getProperty("velo.skyExtra", "").split(",")) {
+						ModuleRegistry.get(id).ifPresent(m -> m.setEnabled(true));
+					}
+				}});
+				// above the ground on a barrier, under the clouds, in daylight
+				steps.add(new Object[] {0, (Runnable) () -> serverCommands(client, "time set 6000", "weather clear",
+						"setblock ~ 149 ~ barrier", "tp @s ~ 150 ~")});
+				for (String pass : new String[] {"box", "vanilla"}) {
+					steps.add(new Object[] {0, (Runnable) () -> {
+						ModuleRegistry.get("custom-skybox").ifPresent(m -> m.setEnabled(pass.equals("box")));
+						//? if >=26.2 {
+						/*client.options.cloudStatus().set(net.minecraft.client.CloudStatus.FANCY);
+						client.options.cloudRange().set(128);
+						*///?}
+						//? if <26.1 {
+						client.player.setPitch(-18);
+						//?} else {
+						/*client.player.setXRot(-18);
+						*///?}
+					}});
+					steps.add(new Object[] {80, (Runnable) () -> shot(client, "sky-" + pass + "-1-game")});
+					steps.add(new Object[] {2, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))});
+					steps.add(new Object[] {40, (Runnable) () -> shot(client, "sky-" + pass + "-2-pause")});
+					steps.add(new Object[] {2, (Runnable) () -> client.setScreen(null)});
+					steps.add(new Object[] {10, (Runnable) () -> {
+						drawer[0] = new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen();
+						client.setScreen(drawer[0]);
+						drawer[0].testExpanded(false);
+					}});
+					steps.add(new Object[] {40, (Runnable) () -> shot(client, "sky-" + pass + "-3-rshift")});
+					steps.add(new Object[] {2, (Runnable) () -> client.setScreen(null)});
+					steps.add(new Object[] {20, (Runnable) () -> shot(client, "sky-" + pass + "-4-game-after")});
+				}
+				// the horizon: far terrain, water and clouds against the sky, playing and paused
+				steps.add(new Object[] {0, (Runnable) () -> {
+					ModuleRegistry.get("custom-skybox").ifPresent(m -> m.setEnabled(false));
+					serverCommands(client, "setblock ~ 99 ~ barrier", "tp @s ~ 100 ~");
+					//? if <26.1 {
+					client.player.setPitch(6);
+					//?} else {
+					/*client.player.setXRot(6);
+					*///?}
+				}});
+				steps.add(new Object[] {100, (Runnable) () -> shot(client, "sky-horizon-1-game")});
+				steps.add(new Object[] {2, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))});
+				steps.add(new Object[] {40, (Runnable) () -> shot(client, "sky-horizon-2-pause")});
+				yield steps;
+			}
 			case "perfboost" -> {
 				var dash = new net.veloclient.velo.client.gui.window.ModuleConfigScreen(ModuleRegistry.get("performance-boost").orElseThrow(), null);
 				List<Object[]> steps = new java.util.ArrayList<>();

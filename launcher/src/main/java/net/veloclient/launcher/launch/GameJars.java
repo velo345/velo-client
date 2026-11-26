@@ -62,6 +62,52 @@ public final class GameJars {
 		}
 	}
 
+	/**
+	 * Brings every profile that already has a Velo jar up to this launcher's one. Play does that for the profile it
+	 * starts; without this, a profile not started since an update (a fresh copy, say) kept showing the old version
+	 * (VELO-181, 2026-11-26). Running profiles are left alone. Background thread.
+	 */
+	public static void refreshProfiles() {
+		java.util.Map<String, byte[]> jars = new java.util.HashMap<>();
+		for (net.veloclient.launcher.instance.Instance instance : net.veloclient.launcher.instance.InstanceStore.loadAll()) {
+			try {
+				GameVersion version = GameVersion.byId(instance.mcVersion());
+				Path modsDir = net.veloclient.launcher.instance.InstancePaths.modsDir(instance.id());
+				if (!Files.isDirectory(modsDir) || net.veloclient.launcher.instance.RunningInstanceManager.countRunning(instance.id()) > 0) {
+					continue;
+				}
+				List<Path> installed;
+				try (Stream<Path> files = Files.list(modsDir)) {
+					installed = files.filter(GameJars::isVeloJar).toList();
+				}
+				if (installed.isEmpty()) {
+					continue; // no Velo in it (yet): Play decides
+				}
+				if (!jars.containsKey(version.id())) {
+					jars.put(version.id(), currentBytes(version.id()));
+				}
+				byte[] current = jars.get(version.id());
+				Path dest = modsDir.resolve("velo-client-" + version.id() + ".jar");
+				if (current == null || installed.equals(List.of(dest)) && Arrays.equals(current, Files.readAllBytes(dest))) {
+					continue;
+				}
+				// the new one first, complete, then the old ones go: never a profile without Velo or with half a jar
+				Path partial = modsDir.resolve(dest.getFileName() + ".part");
+				Files.write(partial, current);
+				Files.move(partial, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+				for (Path old : installed) {
+					if (!old.equals(dest)) {
+						Files.deleteIfExists(old);
+					}
+				}
+				PlusAddons.disableMismatched(modsDir); // as after Play: an Addons jar for the old build is off, not a crash
+				LauncherLog.info("Updated the Velo jar of profile " + instance.name());
+			} catch (IOException | RuntimeException e) {
+				LauncherLog.warn("Couldn't update the Velo jar of profile " + instance.name() + " - Play will", e);
+			}
+		}
+	}
+
 	private static void installClientJar(Path modsDir, GameVersion version) {
 		try {
 			Files.createDirectories(modsDir);

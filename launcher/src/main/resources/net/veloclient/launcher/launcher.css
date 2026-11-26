@@ -4090,9 +4090,9 @@
 .locker-slot-active .locker-tab-name { -fx-text-fill: -velo-text; }
 .chat-drawer {
 	-fx-background-color: #141011;
-	-fx-background-radius: 14;
+	-fx-background-radius: 22;
 	-fx-border-color: rgba(255, 236, 236, 0.10);
-	-fx-border-radius: 14;
+	-fx-border-radius: 22;
 	-fx-padding: 10 18 18 18;
 	-fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.55), 40, 0.1, -8, 10);
 }
@@ -4416,7 +4416,8 @@
 
 /* popovers & menus in glass colours */
 .context-menu, .menu-button .context-menu {
-	-fx-background-color: rgba(30,12,20,0.96);
+	/* the same neutral dark glass as the other dropdown lists (the red-brown one was the old design) */
+	-fx-background-color: rgba(24,22,28,0.985);
 	-fx-background-radius: 14;
 	-fx-border-color: rgba(255,255,255,0.14);
 	-fx-border-radius: 14;
@@ -4719,7 +4720,8 @@
 .white-pill:hover { -fx-background-color: #ffffff; }
 
 .panel-title { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 17px; -fx-text-fill: #ffffff; }
-.glass-panel { -fx-background-radius: 24; }
+/* both radii: a 12 px border inside the 24 px panel drew a second, squarer corner (party chat, 2026-11-26) */
+.glass-panel { -fx-background-radius: 24; -fx-border-radius: 24; }
 
 .profile-card { -fx-background-radius: 22; -fx-cursor: hand; }
 .profile-card:hover .glass-edge { -fx-border-color: rgba(255,255,255,0.28); }
@@ -5081,6 +5083,7 @@
 .party-chat-send { -fx-background-insets: 0; -fx-min-width: 34; -fx-min-height: 34; -fx-pref-width: 34; -fx-pref-height: 34;
 	-fx-max-width: 34; -fx-max-height: 34; -fx-alignment: center; -fx-translate-y: 0; -fx-effect: null; }
 .party-chat-input { -fx-background-insets: 0; -fx-padding: 0 12 0 12; }
+.party-chat-send { -fx-border-color: transparent; -fx-border-width: 0; -fx-border-radius: 999; }
 
 /* 2026-11-25 launcher emote wheel (B on Home): one frosted disc in 8 segments, name in the middle */
 .emote-wheel-scrim { -fx-background-color: rgba(0,0,0,0.38); }
@@ -5290,3 +5293,8 @@
 	-fx-border-color: rgba(255, 255, 255, 0.08); -fx-border-radius: 18; -fx-background-radius: 18; }
 .tw-root .run-seg-button { -fx-text-fill: -velo-text-2; }
 .tw-root .segmented-button-active, .tw-root .segmented-button-active:hover { -fx-background-color: rgba(255, 255, 255, 0.94); -fx-text-fill: #141216; }
+
+/* 2026-11-26 friend groups: the header is part of the panel (no own tint, same corners), and the last row follows the
+   panel's round corners when it's highlighted */
+.friend-group-header { -fx-background-color: transparent; -fx-background-radius: 22 22 0 0; }
+.friend-row-last { -fx-background-radius: 0 0 21 21; }

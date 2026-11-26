@@ -524,7 +524,7 @@ final class ForumSync extends ListenerAdapter {
 		return state == null ? null : switch (state) {
 			case "Fixed", "Verified" -> "done";
 			case "Won't Fix", "Duplicate", "Can't Reproduce" -> "declined";
-			case "In Progress" -> "progress";
+			case "In Progress", "Testing" -> "progress";
 			default -> null;
 		};
 	}
@@ -685,6 +685,7 @@ final class ForumSync extends ListenerAdapter {
 		return switch (state) {
 			case "Confirmed" -> "👀 **Status: Confirmed** - the team has it on the list.";
 			case "In Progress" -> "🛠️ **Status: In progress** - someone is working on this.";
+			case "Testing" -> "🧪 **Status: Testing** - it's done and our testers are checking it before it ships.";
 			case "Needs Info" -> "❓ **Status: Needs info** - the team needs a bit more from you, please reply here.";
 			case "Fixed" -> "✅ **Status: Done** - this is fixed / added and comes with the next update.";
 			case "Verified" -> "✅ **Status: Verified** - done and checked.";
@@ -703,7 +704,7 @@ final class ForumSync extends ListenerAdapter {
 		String want = switch (state) {
 			case "Fixed", "Verified" -> "done";
 			case "Won't Fix", "Duplicate", "Can't Reproduce" -> "declined";
-			case "In Progress" -> "in progress|in development";
+			case "In Progress", "Testing" -> "in progress|in development";
 			default -> null;
 		};
 		Set<String> status = Set.of("done", "declined", "in progress", "in development");

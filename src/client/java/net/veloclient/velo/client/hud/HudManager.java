@@ -159,7 +159,9 @@ public final class HudManager {
 			// Redstone Mode replaces the whole Velo HUD with its own overlay (Edit HUD Layout draws it itself).
 			if (!(net.veloclient.velo.client.hud.HudSample.active())) {
 				// glass: real blur behind its panels (where they were last frame), the world around stays sharp
-				if (net.veloclient.velo.client.util.ClientCompat.currentScreen() == null && net.veloclient.velo.client.gui.widget.VeloStyle.glass()
+				if (!net.veloclient.velo.client.gui.glass.HudFrost.supported()   // else HudFrost does it before the HUD
+						&& net.veloclient.velo.client.util.ClientCompat.currentScreen() == null && net.veloclient.velo.client.gui.widget.VeloStyle.glass()
+						&& !net.veloclient.velo.client.modules.performance.HudCacheTuner.gnetumCaching()
 						&& !HudLook.rects().isEmpty() && net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
 					net.veloclient.velo.client.gui.glass.SharpFrame.blurHere(context);
 					net.veloclient.velo.client.gui.glass.SharpFrame.drawSharpExcept(context, screenWidth, screenHeight, HudLook.rects());
@@ -184,7 +186,12 @@ public final class HudManager {
 		// Tier Tagger's all-tiers ring: laid out now so its glass chips get the blur too
 		java.util.List<int[]> ringRects = net.veloclient.velo.client.tiers.TierRing.prepare(screenWidth, screenHeight);
 		boolean hudGlass = HudLook.glassBlur() && !HudLook.rects().isEmpty();
-		if (screen == null && (hudGlass || !ringRects.isEmpty()) && net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
+		net.veloclient.velo.client.gui.glass.HudFrost.extra(ringRects);
+		// Where HudFrost can't run (1.21.1, 26.1): in this pass, but never while Gnetum caches the HUD: this pass is then drawn into Gnetum's own image, spread over several frames, and
+		// the full-screen sharp copy landed there on top of other HUD parts (sky over the HUD, reported 2026-11-26)
+		if (!net.veloclient.velo.client.gui.glass.HudFrost.supported() && screen == null && (hudGlass || !ringRects.isEmpty())
+				&& !net.veloclient.velo.client.modules.performance.HudCacheTuner.gnetumCaching()
+				&& net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
 			// HUD Style Glass: real blur behind the glass panels, the game around them stays sharp
 			java.util.List<int[]> rects = ringRects;
 			if (hudGlass) {

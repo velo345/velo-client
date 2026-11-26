@@ -43,6 +43,7 @@
 		"TitleLogoMixin",
 		"TitlePanoramaMixin",
 		"PauseBlurMixin",
+		"GameRendererBlurInvoker",
 		"GlassBlurCaptureMixin",
 		"ClearLiquidsFogMixin",
 		"NoTotemPopAnimationMixin",

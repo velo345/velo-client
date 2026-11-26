@@ -613,10 +613,11 @@ public final class TitleMenu {
 	/**
 	 * Where UI-font text goes so its capitals sit in the middle of a box {@code h} tall at {@code y}: the glyphs start a
 	 * little above the draw y and the capitals are ~5.3 GUI px (measured on a 3x screenshot, 2026-11-25) - the plain
-	 * (h - 8) / 2 put every label ~2 px above its icon.
+	 * (h - 8) / 2 put every label ~2 px above its icon. The picked title fonts (Customize) sit 1 px lower than Velo's own
+	 * (measured per font, 2026-11-26): with Velo's offset their words hung below the icons ("Quit Game" not centred).
 	 */
 	private static int deckTextY(int y, int h) {
-		return y + Math.round(h / 2f - 2.4f);
+		return y + Math.round(h / 2f - (deckFontId == null ? 2.4f : 3.6f));
 	}
 
 	private static void deckPlace(ClickableWidget widget, int x, int y, int w, int h) {
@@ -796,7 +797,7 @@ public final class TitleMenu {
 			int cx = sx + (sw - cw) / 2;
 			MenuKit.icon(context, seg.icon(), cx, y + (segH - segIcon) / 2, segIcon, color);
 			context.getMatrices().pushMatrix();
-			context.getMatrices().translate(cx + segIcon + 4, y + segH / 2f - 2.4f * textScale);
+			context.getMatrices().translate(cx + segIcon + 4, y + segH / 2f - (deckFontId == null ? 2.4f : 3.6f) * textScale);
 			context.getMatrices().scale(textScale, textScale);
 			MenuKit.text(context, renderer, label, 0, 0, color);
 			context.getMatrices().popMatrix();

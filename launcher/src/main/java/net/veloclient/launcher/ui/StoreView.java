@@ -192,17 +192,34 @@ public final class StoreView {
 		wishlistAndLockerMin(locker);
 		// The narrower page next to the sidebar (2026-11): the tabs scroll sideways instead of shrinking to "Featu...".
 		ScrollPane tabStrip = new ScrollPane(tabs);
-		tabStrip.setFitToHeight(true);
+		// the strip is as tall as its pill plus a hair: with Windows' scaling the rounding cut off its lower edge (VELO-196)
+		tabStrip.setFitToHeight(false);
+		tabStrip.minViewportHeightProperty().bind(tabs.heightProperty().add(2));
+		tabStrip.prefViewportHeightProperty().bind(tabs.heightProperty().add(2));
 		tabStrip.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 		tabStrip.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 		tabStrip.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0;");
-		tabStrip.setPannable(true);
-		HBox.setHgrow(tabStrip, Priority.ALWAYS);
-		tabStrip.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> {
-			if (e.getDeltaY() != 0 && tabs.getWidth() > tabStrip.getViewportBounds().getWidth()) {
-				tabStrip.setHvalue(tabStrip.getHvalue() - e.getDeltaY() / Math.max(1, tabs.getWidth()));
-				e.consume();
+		// Only a strip that's really too narrow moves, and only sideways: dragging or scrolling on the tabs could shift
+		// them a few pixels even when every tab fitted (2026-11-26).
+		var overflow = javafx.beans.binding.Bindings.createBooleanBinding(
+				() -> tabs.getWidth() - tabStrip.getViewportBounds().getWidth() > 2, tabs.widthProperty(), tabStrip.viewportBoundsProperty());
+		tabStrip.pannableProperty().bind(overflow);
+		tabStrip.vvalueProperty().addListener((o, was, now) -> {
+			if (now.doubleValue() != 0) {
+				tabStrip.setVvalue(0);
 			}
+		});
+		tabStrip.hvalueProperty().addListener((o, was, now) -> {
+			if (!overflow.get() && now.doubleValue() != 0) {
+				tabStrip.setHvalue(0);
+			}
+		});
+		tabStrip.addEventFilter(javafx.scene.input.ScrollEvent.SCROLL, e -> {
+			double move = e.getDeltaY() != 0 ? e.getDeltaY() : e.getDeltaX();
+			if (overflow.get()) {
+				tabStrip.setHvalue(tabStrip.getHvalue() - move / Math.max(1, tabs.getWidth()));
+			}
+			e.consume();
 		});
 		HBox.setHgrow(tabStrip, Priority.NEVER);
 		tabStrip.setMaxWidth(Region.USE_PREF_SIZE);

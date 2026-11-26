@@ -257,7 +257,7 @@ public final class HeartsModule extends AbstractModule implements Configurable {
 				new ConfigField.ColorField("Empty Heart Color (Velo Style)", () -> emptyColor, v -> emptyColor = v, true),
 				new ConfigField.ColorField("Outline Color (Velo Style)", () -> outlineColor, v -> outlineColor = v, true),
 				new ConfigField.ToggleField("Keep Vanilla Look When Poisoned/Withered/Frozen (Velo & Recolored)", () -> vanillaForEffects, v -> vanillaForEffects = v),
-				new ConfigField.ActionButtonField("Draw Custom Heart (or import a PNG)...", () -> {
+				new ConfigField.ActionButtonField("Draw Custom Heart...", () -> {
 					style = "Custom Drawing";
 					net.veloclient.velo.client.gui.StatusIconEditor.openFromSettings(KIND, "Heart", heartColor);
 				}),

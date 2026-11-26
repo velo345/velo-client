@@ -335,6 +335,7 @@ public final class LauncherApp extends Application {
 		applyTheme();
 		net.veloclient.launcher.ui.UiMotion.install(scene);
 		net.veloclient.launcher.ui.glass.Glass.watch(scene, () -> layers);
+		net.veloclient.launcher.ui.glass.Glass.clearPopupBackdrops();
 		net.veloclient.launcher.ui.UiSounds.install(scene);
 		net.veloclient.launcher.ui.UiSounds.preload();
 		scene.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, ev -> {
@@ -470,6 +471,9 @@ public final class LauncherApp extends Application {
 			Thread.ofVirtual().start(() -> {
 				try {
 					Thread.sleep(8000);
+					if (System.getProperty("velo.launcherTour") == null) {
+						net.veloclient.launcher.launch.GameJars.refreshProfiles();
+					}
 					for (Instance inst : InstanceStore.loadAll()) {
 						net.veloclient.launcher.doctor.Doctor.check(inst);
 					}
@@ -2270,6 +2274,8 @@ public final class LauncherApp extends Application {
 		button.setCursor(javafx.scene.Cursor.HAND);
 		StackPane.setAlignment(button, Pos.TOP_RIGHT);
 		StackPane.setMargin(button, new Insets(26, 26, 0, 0));
+		// level with the news card next to it (it sat 2 px higher, 2026-11-26)
+		HBox.setMargin(button, new Insets(2, 0, 0, 0));
 		button.setOnAction(e -> showAdvent(true));
 		return button;
 	}
@@ -5761,7 +5767,16 @@ public final class LauncherApp extends Application {
 							result.name().isBlank() ? "New Profile" : result.name(), result.mcVersion(), result.icon());
 					applyIconChoice(instance, result);
 					installModLoaderJars(instance);
+					// the new profile is the picked one: never-played profiles sit behind the played ones in the list (VELO-189)
+					List<HomeLaunchTarget> targets = orderedLaunchTargetsForHome();
 					homeProfileIndex = 0;
+					for (int i = 0; i < targets.size(); i++) {
+						if (targets.get(i).instance().id().equals(instance.id())) {
+							homeProfileIndex = i;
+							break;
+						}
+					}
+					homeLaunchOverride = null;
 					showHome();
 				});
 	}

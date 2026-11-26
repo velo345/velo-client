@@ -528,7 +528,7 @@ public final class SkyboxModule extends AbstractModule implements Configurable {
 		List<ConfigField> fields = new ArrayList<>(List.of(
 				new ConfigField.ActionButtonField("Choose Skybox... (" + sky + ")", () -> openPicker(options)),
 				new ConfigField.ChoiceField("Skybox", options, () -> sky, v -> sky = v),
-				new ConfigField.ActionButtonField(importStatus.isEmpty() ? "Import Picture... (2:1 panorama or 4:3 cube cross)" : importStatus, this::importPicture),
+				new ConfigField.ActionButtonField(importStatus.isEmpty() ? "Import Picture..." : importStatus, this::importPicture),
 				new ConfigField.SliderField("Opacity", 0.1, 1.0, () -> opacity, v -> opacity = Math.round(v * 100) / 100.0, pct),
 				new ConfigField.SliderField("Brightness", 0.2, 1.0, () -> brightness, v -> brightness = Math.round(v * 100) / 100.0, pct),
 				new ConfigField.SliderField("Rotation", 0, 359, () -> rotation, v -> rotation = Math.round(v), v -> Math.round(v) + "°"),

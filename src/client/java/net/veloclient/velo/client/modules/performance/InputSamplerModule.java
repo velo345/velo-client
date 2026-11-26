@@ -50,7 +50,7 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 	private InputSamplerThread thread;
 
 	private int sampleHz = 1000;
-	private boolean earlyDispatch = false;
+	private boolean earlyDispatch = true;
 	private boolean showHud = false;
 	private boolean trackGhostHits = true;
 	private int hudColor = 0xFF55FFAA;
@@ -63,9 +63,10 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 	private boolean resetKeyWasDown;
 
 	public InputSamplerModule() {
-		super("input-sampler", "Input Latency Sub-Tick Sampling",
-				"Timestamps mouse clicks off the main thread so latency doesn't depend on frame rate, and (optionally) polls input again at the start of every tick to notice clicks sooner during FPS stalls.",
-				ModuleCategory.PERFORMANCE, SafetyTag.CHECK_SERVER_RULES, false);
+		// shown as "Fast Crystal" under PvP since 2026-11-26 (the id stays, so saved settings carry over)
+		super("input-sampler", "Fast Crystal",
+				"Reads your input again right before each tick, so a crystal place or hit isn't left waiting behind a slow frame. The server's tick and hit registration stay as they are.",
+				ModuleCategory.PVP, SafetyTag.CHECK_SERVER_RULES, false);
 		ClientTickEvents.START_CLIENT_TICK.register(client ->
 				ModuleProfiler.time(id(), ModuleProfiler.Phase.TICK, () -> onTickStart(client)));
 	}
@@ -76,7 +77,7 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 		// it crashed the game natively (EXCEPTION_ACCESS_VIOLATION in this thread, Velo 1.5.0). The tick-start re-poll
 		// below still works without it.
 		boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
-		if (!windows && !net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("ixeris")) {
+		if (!windows && !ixeris()) {
 			thread = new InputSamplerThread();
 			thread.setSampleHz(sampleHz);
 			thread.start();
@@ -92,6 +93,10 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 		}
 	}
 
+	private static boolean ixeris() {
+		return net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("ixeris");
+	}
+
 	private void resetStats() {
 		java.util.Arrays.fill(rollingLatenciesMs, 0);
 		rollingIndex = 0;
@@ -101,7 +106,15 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 	}
 
 	private void onTickStart(MinecraftClient client) {
-		if (!isEnabled() || thread == null) {
+		if (!isEnabled()) {
+			return;
+		}
+		if (thread == null) {
+			// No click timer here (Windows): the re-read before the tick still runs. This used to return early, so the module
+			// did nothing at all on Windows (2026-11-26). With Ixeris input already comes in on its own thread.
+			if (earlyDispatch && !ixeris()) {
+				net.veloclient.velo.client.util.Keys.pollEvents();
+			}
 			return;
 		}
 		boolean resetPressed = RESET_STATS_KEY.isPressed();
@@ -162,7 +175,7 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 
 	@Override
 	public void render(DrawContext context, int x, int y, float tickDelta) {
-		if (!showHud) {
+		if (!showHud || thread == null) {
 			return;
 		}
 		TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
@@ -176,7 +189,7 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 
 	@Override
 	public int width() {
-		if (!showHud) {
+		if (!showHud || thread == null) {
 			return 0;
 		}
 		TextRenderer renderer = MinecraftClient.getInstance().textRenderer;
@@ -189,7 +202,7 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 
 	@Override
 	public int height() {
-		if (!showHud) {
+		if (!showHud || thread == null) {
 			return 0;
 		}
 		int lines = trackGhostHits ? 2 : 1;
@@ -205,7 +218,7 @@ public final class InputSamplerModule extends AbstractModule implements Configur
 						thread.setSampleHz(sampleHz);
 					}
 				}, v -> (int) v + "Hz"),
-				new ConfigField.ToggleField("Early Dispatch (experimental)", () -> earlyDispatch, v -> earlyDispatch = v),
+				new ConfigField.ToggleField("Read Clicks Before Each Tick", () -> earlyDispatch, v -> earlyDispatch = v),
 				new ConfigField.ToggleField("Show HUD", () -> showHud, v -> showHud = v),
 				new ConfigField.ColorField("HUD Color", () -> hudColor, v -> hudColor = v, true),
 				new ConfigField.ToggleField("Track Ghost Hits", () -> trackGhostHits, v -> trackGhostHits = v),

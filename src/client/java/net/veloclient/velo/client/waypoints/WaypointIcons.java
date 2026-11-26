@@ -62,6 +62,10 @@ public final class WaypointIcons {
 		if (key == null || !ICONS.containsKey(key)) {
 			return null;
 		}
-		return STACKS.computeIfAbsent(key, k -> new ItemStack(ICONS.get(k)));
+		try {
+			return STACKS.computeIfAbsent(key, k -> new ItemStack(ICONS.get(k)));
+		} catch (RuntimeException notBoundYet) {
+			return null;   // 26.3 outside a world: item data isn't there yet - a plain marker instead of a crash
+		}
 	}
 }

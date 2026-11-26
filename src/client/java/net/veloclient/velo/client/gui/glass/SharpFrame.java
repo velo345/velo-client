@@ -73,15 +73,15 @@ public final class SharpFrame {
 	*///?}
 
 	//? if >=1.21.2 && <26.1 {
-	private static GpuTexture main() {
+	static GpuTexture main() {
 		return MinecraftClient.getInstance().getFramebuffer().getColorAttachment();
 	}
 	//?} else if >=26.1 && <26.2 {
-	/*private static GpuTexture main() {
+	/*static GpuTexture main() {
 		return net.minecraft.client.Minecraft.getInstance().getMainRenderTarget().getColorTexture();
 	}
 	*///?} else if >=26.2 {
-	/*private static GpuTexture main() {
+	/*static GpuTexture main() {
 		return net.minecraft.client.Minecraft.getInstance().gameRenderer.mainRenderTarget().getColorTexture();
 	}
 	*///?}
@@ -100,6 +100,10 @@ public final class SharpFrame {
 	public static boolean prepareBoth() {
 		return false;
 	}
+
+	static boolean blurCopy(Runnable blur) {
+		return false;
+	}
 	*///?} else {
 	/** Called while a menu records its frame: makes sure the copy target matches the screen. False when not possible. */
 	public static boolean prepare() {
@@ -112,7 +116,7 @@ public final class SharpFrame {
 			int h = main.getHeight(0);
 			if (tex == null || w != texW || h != texH) {
 				var gpu = com.mojang.blaze3d.systems.RenderSystem.getDevice().createTexture(() -> "Velo glass sharp frame",
-						GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_TEXTURE_BINDING,
+						GpuTexture.USAGE_COPY_DST | GpuTexture.USAGE_COPY_SRC | GpuTexture.USAGE_TEXTURE_BINDING,
 						main.getFormat(), w, h, 1, 1);
 				Tex made = new Tex(gpu);
 				MinecraftClient.getInstance().getTextureManager().registerTexture(ID, made);
@@ -153,6 +157,28 @@ public final class SharpFrame {
 			return;
 		}
 		com.mojang.blaze3d.systems.RenderSystem.getDevice().createCommandEncoder().copyTextureToTexture(main, ((Tex) blurredTex).gpu(), 0, 0, 0, 0, 0, texW, texH);
+	}
+
+	/**
+	 * The HUD frost ({@link HudFrost}): blurs a copy of the frame and leaves the frame itself as it was. Three copies
+	 * and one blur; nothing else touches the screen. False when there's no copy target.
+	 */
+	static boolean blurCopy(Runnable blur) {
+		if (!prepare()) {
+			return false;
+		}
+		wanted = false;   // copied here, not by the blur hooks
+		var main = main();
+		if (main == null || main.getWidth(0) != texW || main.getHeight(0) != texH) {
+			return false;
+		}
+		var device = com.mojang.blaze3d.systems.RenderSystem.getDevice();
+		device.createCommandEncoder().copyTextureToTexture(main, ((Tex) tex).gpu(), 0, 0, 0, 0, 0, texW, texH);
+		blur.run();
+		var after = device.createCommandEncoder();
+		after.copyTextureToTexture(main, ((Tex) blurredTex).gpu(), 0, 0, 0, 0, 0, texW, texH);
+		after.copyTextureToTexture(((Tex) tex).gpu(), main, 0, 0, 0, 0, 0, texW, texH);
+		return true;
 	}
 
 	/** GameRenderer, right before the menu blur: copy the frame as it is (sharp). */
@@ -296,6 +322,58 @@ public final class SharpFrame {
 		}
 	}
 
+	//? if >=1.21.2 {
+	/** The GUI's textured pipeline that replaces what's there. */
+	private static com.mojang.blaze3d.pipeline.RenderPipeline opaque() {
+		//? if >=26.1 {
+		/*return RenderPipelines.GUI_OPAQUE_TEXTURED_BACKGROUND;
+		*///?} else {
+		return RenderPipelines.GUI_OPAQUE_TEX_BG;
+		//?}
+	}
+	//?}
+
+	/**
+	 * The blurred picture behind a HUD panel, drawn with the panel itself (inside its current transform, so it works
+	 * scaled and inside HUD caches): the part of the blurred frame that lies where the panel ends up on screen.
+	 */
+	public static void drawBlurredPanel(DrawContext context, int x, int y, int w, int h, int radius) {
+		//? if >=1.21.2 {
+		if (!hasBlurred() || w <= 0 || h <= 0) {
+			return;
+		}
+		var m = context.getMatrices();
+		org.joml.Vector2f a = m.transformPosition(x, y, new org.joml.Vector2f());
+		org.joml.Vector2f b = m.transformPosition(x + w, y + h, new org.joml.Vector2f());
+		float sx = texW / (float) Math.max(1, MinecraftClient.getInstance().getWindow().getScaledWidth());
+		float sy = texH / (float) Math.max(1, MinecraftClient.getInstance().getWindow().getScaledHeight());
+		float left = a.x * sx;
+		float top = a.y * sy;
+		float perW = (b.x - a.x) * sx / w;   // texture pixels per panel unit
+		float perH = (b.y - a.y) * sy / h;
+		int r = Math.min(radius, Math.min(w, h) / 2);
+		for (int i = 0; i < r; i += 2) {
+			int rows = Math.min(2, r - i);
+			double dy = r - i - rows / 2.0;
+			int inset = (int) Math.round(r - Math.sqrt(Math.max(0, (double) r * r - dy * dy)));
+			slice(context, x, y, inset, i, w - 2 * inset, rows, left, top, perW, perH);
+			slice(context, x, y, inset, h - i - rows, w - 2 * inset, rows, left, top, perW, perH);
+		}
+		slice(context, x, y, 0, r, w, h - 2 * r, left, top, perW, perH);
+		//?}
+	}
+
+	//? if >=1.21.2 {
+	private static void slice(DrawContext context, int x, int y, int dx, int dy, int w, int h, float left, float top, float perW, float perH) {
+		if (w <= 0 || h <= 0) {
+			return;
+		}
+		int rw = Math.max(1, Math.round(w * perW));
+		int rh = Math.max(1, Math.round(h * perH));
+		context.drawTexture(opaque(), BLURRED_ID, x + dx, y + dy, left + dx * perW, texH - (top + dy * perH), w, h, rw, -rh, texW, texH, 0xFFFFFFFF);
+	}
+	//?}
+
 	private static void strip(DrawContext context, int screenW, int screenH, int gx, int gy, int gw, int gh) {
 		strip(context, ID, screenW, screenH, gx, gy, gw, gh);
 	}
@@ -308,7 +386,13 @@ public final class SharpFrame {
 		float sy = texH / (float) screenH;
 		int rw = Math.round(gw * sx);
 		int rh = Math.round(gh * sy);
-		// the copied render target is stored bottom-up: sample it flipped
-		context.drawTexture(RenderPipelines.GUI_TEXTURED, id, gx, gy, gx * sx, texH - gy * sy, gw, gh, rw, -rh, texW, texH, 0xFFFFFFFF);
+		// the copied render target is stored bottom-up: sample it flipped. Drawn without blending: the frame's alpha isn't
+		// 1 everywhere (sky and fog, above all with server packs) and blending let the blurred frame show through there -
+		// the sky looked blurred and tinted behind Esc / R-Shift (reported 2026-11-26)
+		//? if >=1.21.2 {
+		context.drawTexture(opaque(), id, gx, gy, gx * sx, texH - gy * sy, gw, gh, rw, -rh, texW, texH, 0xFFFFFFFF);
+		//?} else {
+		/*context.drawTexture(RenderPipelines.GUI_TEXTURED, id, gx, gy, gx * sx, texH - gy * sy, gw, gh, rw, -rh, texW, texH, 0xFFFFFFFF);
+		*///?}
 	}
 }

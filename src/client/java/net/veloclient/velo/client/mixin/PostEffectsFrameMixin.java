@@ -25,6 +25,7 @@ public abstract class PostEffectsFrameMixin {
 		net.veloclient.velo.client.modules.rendering.ColorGradingModule.applyIfActive();
 		net.veloclient.velo.client.modules.rendering.MotionBlurModule.applyIfActive();
 		net.veloclient.velo.client.lyrics.LyricsPulse.applyIfActive();
+		net.veloclient.velo.client.gui.glass.HudFrost.apply();   // last: the glass HUD frosts the finished world picture
 	}
 }
 *///?} else if <26.1 {
@@ -41,6 +42,7 @@ public abstract class PostEffectsFrameMixin {
 		net.veloclient.velo.client.modules.rendering.ColorGradingModule.applyIfActive();
 		net.veloclient.velo.client.modules.rendering.MotionBlurModule.applyIfActive();
 		net.veloclient.velo.client.lyrics.LyricsPulse.applyIfActive();
+		net.veloclient.velo.client.gui.glass.HudFrost.apply();
 	}
 }
 //?} else {

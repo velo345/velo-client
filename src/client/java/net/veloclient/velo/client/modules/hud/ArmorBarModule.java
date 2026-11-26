@@ -110,7 +110,7 @@ public final class ArmorBarModule extends AbstractModule implements Configurable
 				new ConfigField.ColorField("Armor Color", () -> armorColor, v -> armorColor = v, false),
 				new ConfigField.ColorField("Empty Color (Velo Style)", () -> emptyColor, v -> emptyColor = v, true),
 				new ConfigField.ColorField("Outline Color (Velo Style)", () -> outlineColor, v -> outlineColor = v, true),
-				new ConfigField.ActionButtonField("Draw Custom Armor Icon (or import a PNG)...", () -> {
+				new ConfigField.ActionButtonField("Draw Custom Armor Icon...", () -> {
 					style = "Custom Drawing";
 					net.veloclient.velo.client.gui.StatusIconEditor.openFromSettings(KIND, "Armor Icon", armorColor);
 				}),

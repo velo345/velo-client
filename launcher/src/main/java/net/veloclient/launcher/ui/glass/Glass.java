@@ -200,6 +200,32 @@ public final class Glass {
 		});
 	}
 
+	private static boolean popupsWatched;
+
+	/**
+	 * Dropdowns, context menus and tooltips are little windows of their own, and their roots matched the page's ".root"
+	 * rule: a dark square behind the rounded menu showed as black corners (2026-11-26). Their roots stay see-through.
+	 */
+	public static void clearPopupBackdrops() {
+		if (popupsWatched) {
+			return;
+		}
+		popupsWatched = true;
+		javafx.stage.Window.getWindows().addListener((ListChangeListener<javafx.stage.Window>) change -> {
+			while (change.next()) {
+				for (javafx.stage.Window window : change.getAddedSubList()) {
+					if (window instanceof javafx.stage.PopupWindow && window.getScene() != null) {
+						window.getScene().setFill(javafx.scene.paint.Color.TRANSPARENT);
+						var root = window.getScene().getRoot();
+						if (!root.styleProperty().isBound()) {
+							root.setStyle((root.getStyle() == null ? "" : root.getStyle()) + ";-fx-background-color: transparent;");
+						}
+					}
+				}
+			}
+		});
+	}
+
 	/** Like {@link #applyTree}, but now - for a page that rebuilt its panels in place (no frame without glass). */
 	public static void applyNow(Node node) {
 		walk(node, 0);

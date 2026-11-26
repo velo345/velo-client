@@ -74,8 +74,9 @@ public final class HudFrameCache {
 	 * Gnetum's saving on the CPU without its full-screen blend on the GPU (the hotbar alone was 9% of a frame).
 	 */
 	public static boolean wholeHud() {
-		// HUD Style Glass blurs behind its panels every frame: the whole-HUD replay would skip that (flicker)
-		return allowed() && !net.veloclient.velo.client.modules.performance.HudCacheTuner.gnetumCaching() && !HudLook.glassBlur();
+		// HUD Style Glass: where its blur still runs inside the HUD pass, a replay would skip it (flicker)
+		return allowed() && !net.veloclient.velo.client.modules.performance.HudCacheTuner.gnetumCaching()
+				&& (net.veloclient.velo.client.gui.glass.HudFrost.supported() || !HudLook.glassBlur());
 	}
 
 	public static void invalidate() {

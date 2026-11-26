@@ -13,8 +13,10 @@ TYPES = [("Bug", "20"), ("Crash", "19"), ("Performance", "13"), ("Visual / UI", 
          ("Suggestion", "8"), ("Task", "0")]
 # (name, resolved, colour id)
 STATES = [("New", False, "2"), ("Confirmed", False, "13"), ("In Progress", False, "6"), ("Needs Info", False, "8"),
-          ("Fixed", True, "4"), ("Verified", True, "3"), ("Can't Reproduce", True, "0"), ("Duplicate", True, "0"),
+          ("Testing", False, "5"), ("Fixed", True, "4"), ("Verified", True, "3"), ("Can't Reproduce", True, "0"), ("Duplicate", True, "0"),
           ("Won't Fix", True, "0")]
+# Testing: done by us, testers check it; only after the tester phase it becomes Fixed / Verified
+COLUMNS = [["New"], ["Confirmed"], ["In Progress"], ["Needs Info"], ["Testing"], ["Fixed"], ["Verified"]]
 AREAS = ["Launcher", "Game", "Title Screen", "HUD & Modules", "Cosmetics", "Velo+", "Performance", "Clips & Rewind",
          "Friends & Party", "Store", "Velo World", "Installer & Updates", "Server", "Website"]
 PLATFORMS = ["Windows", "macOS", "Linux"]
@@ -181,8 +183,16 @@ def main():
             yt.post("savedQueries", {"name": name, "query": query}, "id")
     # the Velo Testing board: card colour = Type, swimlanes = Priority
     boards = {b["name"]: b["id"] for b in yt.get("agiles", "id,name", "$top=50")}
+    if "Velo Testing" in boards:
+        # a board made before a state existed: add its column (existing ones keep their id - they can't be deleted)
+        columns = yt.get(f"agiles/{boards['Velo Testing']}", "columnSettings(columns(id,fieldValues(name)))")["columnSettings"]["columns"]
+        have = {v["name"]: c["id"] for c in columns for v in c["fieldValues"]}
+        if any(c[0] not in have for c in COLUMNS):
+            yt.post(f"agiles/{boards['Velo Testing']}", {"columnSettings": {"columns": [
+                {**({"id": have[c[0]]} if c[0] in have else {}), "ordinal": i, "fieldValues": [{"name": n} for n in c]}
+                for i, c in enumerate(COLUMNS)]}}, "id")
     if "Velo Testing" not in boards:
-        columns = [["New"], ["Confirmed"], ["In Progress"], ["Needs Info"], ["Fixed"], ["Verified"]]
+        columns = COLUMNS
         boards["Velo Testing"] = yt.post("agiles", {
             "name": "Velo Testing", "projects": [{"id": pid}], "sprintsSettings": {"disableSprints": True},
             "columnSettings": {"field": {"id": proto["State"]}, "columns": [

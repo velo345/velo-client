@@ -234,6 +234,7 @@ public final class HudLook {
 	/** The menus' glass, for the HUD: a light tint over real blur (the blur goes behind every glass panel - see HudManager). */
 	public static void glassPanel(DrawContext context, int x, int y, int w, int h, int radius) {
 		record(context, x, y, w, h, radius);
+		net.veloclient.velo.client.gui.glass.HudFrost.behind(context, x, y, w, h, radius);
 		VeloDraw.fillRounded(context, x, y, w, h, radius, 0x5C141418);
 	}
 
