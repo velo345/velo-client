@@ -19,7 +19,7 @@ V=$(grep -E '^mod\.version' stonecutter.properties.toml | sed -E 's/.*"([^"]+)".
 REPO=velo345/velo-client
 TAG="v$V"
 NOTES="news/posts/$V/github-release.md"
-LEGACY="$HOME/.cache/velo-dl/v1.5.1/velo-client-1.2.0+mc1.8.9.jar"
+LEGACY=$(ls "$HOME"/.cache/velo-dl/v*/velo-client-1.2.0+mc1.8.9.jar 2>/dev/null | tail -1)
 SERVER_JAR=$(ls server/build/libs/*.jar 2>/dev/null | grep -v -- "-plain" | head -1 || true)
 VERSIONS=(1.21.1 1.21.10 1.21.11 26.1 26.2 26.3)
 
