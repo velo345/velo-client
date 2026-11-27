@@ -940,6 +940,8 @@ stonecutter parameters {
 			replace("GuiTextRenderState", "GuiTextRenderState")
 			replace("state.addText((", "state.addText((")
 			replace("real.addText(", "real.addText(")
+			replace("canvas.addText(", "canvas.addText(")
+			replace("RECORDER.addText(", "RECORDER.addText(")
 			replace("public void addText(net.minecraft.client.renderer.state.gui", "public void addText(net.minecraft.client.renderer.state.gui")
 			replace("public void forEachText(java.util", "public void forEachText(java.util")
 			replace("real.forEachText(", "real.forEachText(")

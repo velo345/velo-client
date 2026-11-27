@@ -93,7 +93,27 @@ public final class Popover {
 		};
 		popup.setX(x);
 		popup.setY(y);
+		frost(card, popup);
 		UiMotion.enter(card);
 		return popup;
+	}
+
+	/**
+	 * Real glass for a dropdown card: the page's blurred picture behind it (Glass, placed by screen position because the
+	 * popup is its own window) under a dark tint that keeps the text readable on any backdrop - the theme's own surface
+	 * colour is see-through in the glass design (owner, 2026-11-27: "kaum lesen").
+	 */
+	public static void frost(javafx.scene.layout.Pane card, javafx.stage.Window popup) {
+		try {
+			card.setStyle((card.getStyle() == null ? "" : card.getStyle()) + ";-fx-background-color: rgba(17, 12, 19, 0.74);");
+			net.veloclient.launcher.ui.glass.Glass.install(card, 14);
+			Runnable place = () -> net.veloclient.launcher.ui.glass.Glass.refresh(card);
+			popup.xProperty().addListener(o -> place.run());
+			popup.yProperty().addListener(o -> place.run());
+			card.layoutBoundsProperty().addListener(o -> place.run());
+			javafx.application.Platform.runLater(place);
+		} catch (RuntimeException e) {
+			// no frost then: the tint alone is still readable
+		}
 	}
 }

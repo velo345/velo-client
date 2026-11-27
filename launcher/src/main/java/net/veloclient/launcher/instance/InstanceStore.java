@@ -172,6 +172,7 @@ public final class InstanceStore {
 	}
 
 	public static void delete(Instance instance) {
+		net.veloclient.launcher.launch.InstantPlay.release(instance.id());
 		Path dir = InstancePaths.dir(instance.id());
 		if (!Files.exists(dir)) {
 			return;

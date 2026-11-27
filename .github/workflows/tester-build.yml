@@ -40,7 +40,7 @@ jobs:
 
       - name: Build the dev mod jars (everything in development)
         shell: bash
-        run: ./gradlew :1.21.1:build :1.21.10:build :1.21.11:build :26.1:build :26.2:build :26.3:build -PveloDev=true -q
+        run: ./gradlew :1.21.1:build :1.21.10:build :1.21.11:build :26.1:build :26.2:build :26.3:build -PveloDev=true -PtesterVersion="$TESTER_VERSION" -q
 
       - name: Build the Velo Client Tester launcher
         shell: bash

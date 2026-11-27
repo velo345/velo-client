@@ -31,7 +31,7 @@ public final class VeloMixinPlugin implements IMixinConfigPlugin {
 			"TurboSodiumRegionUpdateMixin", "TurboSodiumSpriteMarksMixin", "TurboSodiumFlatMovingMixin", "TurboFarmItemTickMixin",
 			"TurboFarmLightMixin", "TurboFarmMovingMixin", "TurboPacketHandleInvoker", "TurboPacketPacingMixin", "TurboPacketLightPacingMixin",
 			"TurboFontPrepareMixin", "TurboFontReloadMixin", "TurboEntityNameMemoMixin", "TurboEntityNameTagMixin",
-			"TurboHudStateAccessor", "TurboHudWholeMixin", "TurboHudVignetteMixin", "TurboSodiumParticleCullMixin",
+			"TurboHudStateAccessor", "TurboHudWholeMixin", "TurboHudCanvasMixin", "TurboHudVignetteMixin", "TurboSodiumParticleCullMixin",
 			"TurboSodiumParticleWriteMixin", "TurboEntityDisplayCullMixin", "TurboEntityVisFieldsMixin", "TurboEntityVisibilityMixin");
 
 	private boolean hasVulkan;

@@ -2,7 +2,9 @@ package net.veloclient.velo.client.mixin;
 
 import org.spongepowered.asm.mixin.Mixin;
 //? if >=26.2 {
-/*import org.spongepowered.asm.mixin.Shadow;
+/*import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -17,6 +19,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * level nothing can be frozen, so the normal partial tick is the right answer for that one frame. extractRenderState
  * reads the level once more (the block at the camera), so there the camera first gets Minecraft's level - what its next
  * update would set anyway.
+ *
+ * <p>The same frame without a PLAYER: extractRenderState asks {@code minecraft.player.isSpectator()} unchecked ("Render
+ * Frame: NullPointerException ... LocalPlayer.isSpectator() because this.minecraft.player is null", two crash reports
+ * from one player on 2026-11-25, only vanilla frames in the trace). No player is not a spectator.
  */
 //? if >=26.2 {
 /*@Mixin(net.minecraft.client.Camera.class)
@@ -36,6 +42,12 @@ public abstract class CameraLevelGuardMixin {
 				setLevel(current);
 			}
 		}
+	}
+
+	@WrapOperation(method = {"extractRenderState"}, at = @At(value = "INVOKE",
+			target = "Lnet/minecraft/client/player/LocalPlayer;isSpectator()Z"), require = 0)
+	private boolean velo$noPlayerIsNoSpectator(net.minecraft.client.player.LocalPlayer player, Operation<Boolean> original) {
+		return player != null && original.call(player);
 	}
 
 	@Inject(method = "getCameraEntityPartialTicks", at = @At("HEAD"), cancellable = true, require = 0)

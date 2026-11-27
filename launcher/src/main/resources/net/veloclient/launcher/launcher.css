@@ -2940,7 +2940,7 @@
 /* ---- Popovers (profile switcher, notifications, account menu) ---- */
 
 .popover {
-	-fx-background-color: -velo-surface-2;
+	-fx-background-color: rgba(24, 22, 28, 0.985);   /* same dark glass as the dropdown lists; the theme's surface token is see-through */
 	-fx-border-color: -velo-hairline-2;
 	-fx-background-radius: 14;
 	-fx-border-radius: 14;
@@ -3007,7 +3007,8 @@
 .row-hover:hover { -fx-background-color: rgba(255, 255, 255, 0.04); }
 
 .toast {
-	-fx-background-color: -velo-surface-3;
+	/* solid dark glass: the glass theme's surface tokens are 11 % white, which made toasts almost invisible (VELO-204) */
+	-fx-background-color: rgba(24, 22, 28, 0.97);
 	-fx-border-color: -velo-hairline-2;
 	-fx-background-radius: 12;
 	-fx-border-radius: 12;
@@ -4367,6 +4368,9 @@
 .partner-card { -fx-padding: 16; }
 .settings-card { -fx-padding: 18 20 12 20; }
 .dashed-tile { -fx-background-color: rgba(255,255,255,0.04); -fx-background-radius: 22; -fx-border-radius: 22; -fx-border-color: rgba(255,255,255,0.22); }
+/* the label was grey on the same grey as the tile */
+.dashed-tile .label { -fx-text-fill: rgba(255,255,255,0.9); -fx-font-weight: bold; }
+.dashed-tile:hover { -fx-background-color: rgba(255,255,255,0.08); -fx-border-color: rgba(255,255,255,0.4); }
 
 /* type */
 .t-title { -fx-font-family: "Geist"; -fx-font-weight: bold; -fx-font-size: 26px; -fx-text-fill: #ffffff; }

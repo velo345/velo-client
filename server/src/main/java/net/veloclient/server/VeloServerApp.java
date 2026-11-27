@@ -84,6 +84,21 @@ public final class VeloServerApp {
 		} catch (java.sql.SQLException e) {
 			throw new IOException("Couldn't open the stats database", e);
 		}
+		// The welcome coins were promised to every new player but ended with launch week: pay everybody who joined since and
+		// never got them (once - the ledger makes it idempotent), in the background so the start isn't held up.
+		if (store != null) {
+			StatsService accounts = stats;
+			Thread.ofVirtual().name("welcome-coins-catchup").start(() -> {
+				long from = store.config().launchBonus == null ? 0 : store.config().launchBonus.from;
+				int paid = 0;
+				for (String[] account : accounts.accountsSince(from)) {
+					if (store.launchBonus(account[0], account[1], Long.parseLong(account[2]))) {
+						paid++;
+					}
+				}
+				System.out.println("[store] Welcome coins catch-up: " + paid + " accounts paid");
+			});
+		}
 
 		// VELO_SERVER_BIND=127.0.0.1 behind nginx, so the plain-HTTP port isn't reachable from outside.
 		String bind = envOr("VELO_SERVER_BIND", null);

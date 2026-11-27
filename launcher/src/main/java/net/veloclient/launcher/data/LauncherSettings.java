@@ -49,8 +49,19 @@ public final class LauncherSettings {
 		public boolean autoUpdate = true;
 		/** Minimize the launcher once a game has started (it then frees its memory - see idle mode). */
 		public boolean minimizeOnLaunch = true;
+		/**
+		 * Instant Play (off by default): the game of the profile played last waits hidden at its title screen, so Play only
+		 * shows it. Costs about 1.5 GB of RAM while it waits - see {@code InstantPlay}.
+		 */
+		public boolean instantPlay;
 		/** AI Access: the game opens its local AI API (127.0.0.1) so AI agents can drive it - see the game's velo-rewind/AI.md. */
 		public boolean aiAccess;
+		/**
+		 * Windows only, on by default: the game starts one priority step above normal and Windows is asked not to throttle it
+		 * (power saving, timer resolution) - shorter loading and steadier frames next to a busy desktop, at the price of
+		 * taking a little more CPU from other programs. See {@code WindowsProcessBoost}.
+		 */
+		public boolean processBoost = true;
 		/** Linux: start the game in an invisible display (kwin_wayland --virtual or xvfb-run) while AI Access is on. */
 		public boolean aiHidden;
 		/** The API's token, the same for every profile and launch. */

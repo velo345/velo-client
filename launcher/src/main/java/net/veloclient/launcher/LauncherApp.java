@@ -388,6 +388,10 @@ public final class LauncherApp extends Application {
 		boolean firstStart = ensureDefaultProfile();
 		stage.show();
 		net.veloclient.launcher.launch.AppUpdate.started();
+		// screens.json from an older build: cleaned up now, not only when the Customize page is opened (VELO-202)
+		Thread.ofVirtual().start(net.veloclient.launcher.ui.CustomizeView::migrateAtStart);
+		// Instant Play upkeep: starts and renews the waiting game (does nothing while the setting is off)
+		net.veloclient.launcher.launch.InstantPlay.watch(() -> session);
 		if (AppVersion.DEV) {
 			net.veloclient.launcher.ui.TesterLogging.install();
 		}
@@ -639,6 +643,13 @@ public final class LauncherApp extends Application {
 		String tourDir = System.getProperty("velo.launcherTour");
 		if (tourDir != null && !tourDir.isBlank()) {
 			runScreenshotTour(java.nio.file.Path.of(tourDir));
+		}
+		// Dev-only (-Dvelo.tourPopover=<seconds>): opens the profile switcher that long after start, for a screenshot of the dropdown
+		String tourPopover = System.getProperty("velo.tourPopover");
+		if (tourPopover != null && !tourPopover.isBlank()) {
+			javafx.animation.PauseTransition pop = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(Double.parseDouble(tourPopover)));
+			pop.setOnFinished(e -> showProfileSwitcher(launchBar.playButton()));
+			pop.play();
 		}
 		String autoLaunch = System.getProperty("velo.autoLaunch");
 		if (autoLaunch != null && !autoLaunch.isBlank()) {
@@ -1156,6 +1167,7 @@ public final class LauncherApp extends Application {
 			homeArcade.save();
 		}
 		net.veloclient.launcher.ui.WindowPlacement.save(stage, windowChrome);
+		net.veloclient.launcher.launch.InstantPlay.shutdown();
 		// Tell the Velo server right away that the launcher went away (friends see it immediately).
 		net.veloclient.launcher.social.LauncherSocial.shutdown();
 	}
@@ -2755,7 +2767,11 @@ public final class LauncherApp extends Application {
 		b.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
 		b.setMaxWidth(150);
 		if (address.isEmpty()) {
-			StackPane homeIcon = new StackPane(net.veloclient.launcher.ui.Icons.icon("home", 13, Color.WHITE, 2.2));
+			javafx.scene.Node homeGlyph = net.veloclient.launcher.ui.Icons.icon("home", 13, Color.WHITE, 2.2);
+			// The house is bottom-heavy (roof is a thin tip, body is a block), so its bounding-box centre reads
+			// as too low inside the disc; lift it half a pixel for optical centring.
+			homeGlyph.setTranslateY(-0.5);
+			StackPane homeIcon = new StackPane(homeGlyph);
 			homeIcon.getStyleClass().add("home-chip-icon");
 			b.setGraphic(homeIcon);
 		} else {
@@ -3045,6 +3061,22 @@ public final class LauncherApp extends Application {
 					@Override
 					public void rebuild() {
 						showCustomize();
+					}
+
+					@Override
+					public double glassDarkness() {
+						return (net.veloclient.launcher.data.LauncherSettings.get().glassDarkness - 0.15) / 0.7;
+					}
+
+					@Override
+					public void setGlassDarkness(double value) {
+						var data = net.veloclient.launcher.data.LauncherSettings.get();
+						data.glassDarkness = 0.15 + value * 0.7;
+						net.veloclient.launcher.data.LauncherSettings.save(data);
+						if (backdrop != null) {
+							backdrop.setGlassAlpha(data.glassDarkness);
+						}
+						applyTheme();
 					}
 				});
 			}
@@ -5460,6 +5492,22 @@ public final class LauncherApp extends Application {
 			public void rebuild() {
 				showThemeEditor();
 			}
+
+			@Override
+			public double glassDarkness() {
+				return (net.veloclient.launcher.data.LauncherSettings.get().glassDarkness - 0.15) / 0.7;
+			}
+
+			@Override
+			public void setGlassDarkness(double value) {
+				var data = net.veloclient.launcher.data.LauncherSettings.get();
+				data.glassDarkness = 0.15 + value * 0.7;
+				net.veloclient.launcher.data.LauncherSettings.save(data);
+				if (backdrop != null) {
+					backdrop.setGlassAlpha(data.glassDarkness);
+				}
+				applyTheme();
+			}
 		}));
 	}
 
@@ -6105,6 +6153,7 @@ public final class LauncherApp extends Application {
 			// Refreshes velo-client's own jar from whatever is bundled in THIS running launcher build before every launch -
 			// otherwise a profile created under an older launcher would keep its older velo-client jar forever.
 			try {
+				net.veloclient.launcher.launch.InstantPlay.release(instance.id());   // its jars are about to be replaced
 				GameJars.installInto(InstancePaths.modsDir(instance.id()), GameVersion.byId(instance.mcVersion()));
 			} catch (RuntimeException e) {
 				LauncherLog.warn("Couldn't refresh the Velo jars - launching anyway", e);
@@ -7166,6 +7215,18 @@ public final class LauncherApp extends Application {
 			data.minimizeOnLaunch = minimize.isSelected();
 			net.veloclient.launcher.data.LauncherSettings.save(data);
 		});
+		javafx.scene.control.CheckBox instant = new javafx.scene.control.CheckBox();
+		instant.setSelected(net.veloclient.launcher.data.LauncherSettings.get().instantPlay);
+		instant.setOnAction(e -> {
+			net.veloclient.launcher.data.LauncherSettings.Data data = net.veloclient.launcher.data.LauncherSettings.get();
+			data.instantPlay = instant.isSelected();
+			net.veloclient.launcher.data.LauncherSettings.save(data);
+			if (data.instantPlay) {
+				net.veloclient.launcher.launch.InstantPlay.parkLater(session, 1_000);
+			} else {
+				Executors.newVirtualThreadPerTaskExecutor().submit(net.veloclient.launcher.launch.InstantPlay::shutdown);
+			}
+		});
 		javafx.scene.control.CheckBox performance = new javafx.scene.control.CheckBox();
 		performance.setSelected(net.veloclient.launcher.data.LauncherSettings.get().performanceMode);
 		performance.setOnAction(e -> {
@@ -7177,6 +7238,24 @@ public final class LauncherApp extends Application {
 				"The launcher draws at 30 frames a second (after a restart), wings show without their extra effects (moving parts,"
 						+ " glow, shine, particles) and previews without auras. In the game, the same is Performance Boost > Light Cosmetics.",
 				performance);
+		javafx.scene.control.CheckBox boost = new javafx.scene.control.CheckBox();
+		boost.setSelected(net.veloclient.launcher.data.LauncherSettings.get().processBoost);
+		boost.setOnAction(e -> {
+			net.veloclient.launcher.data.LauncherSettings.Data data = net.veloclient.launcher.data.LauncherSettings.get();
+			data.processBoost = boost.isSelected();
+			net.veloclient.launcher.data.LauncherSettings.save(data);
+		});
+		net.veloclient.launcher.ui.SettingsUi.row(updates, "Game priority boost (Windows)", "Shorter loading, steadier frames next to other programs - uses a bit more of your PC",
+				"Starts the game one priority step above normal and asks Windows not to slow it down (power saving, timer precision),"
+						+ " also while it loads behind other windows. It then takes a little more processor time from other programs - a browser,"
+						+ " Discord, a stream - and on a laptop it can mean slightly more power use and heat. Off: Windows decides, as before."
+						+ " Takes effect from the next game start. Windows only; does nothing elsewhere.", boost);
+		net.veloclient.launcher.ui.SettingsUi.row(updates, "Instant Play", "Play opens the game in a blink - it waits hidden in the background",
+				"The game of the profile you played last starts quietly after the launcher opens (and after each game) and rests at its"
+						+ " title screen; Play then just shows its window. It uses about 1.5 GB of RAM while it waits, runs at low priority,"
+						+ " only starts when plenty of memory is free, and is closed with the launcher. Playing another profile, joining"
+						+ " a server straight from the launcher, or changing mods or options starts the game the ordinary way."
+						+ " Minecraft 1.21.1 to 26.2. Off by default.", instant);
 		net.veloclient.launcher.ui.SettingsUi.row(updates, "Minimize when the game starts", "The launcher frees its memory while it's in the background",
 				"While minimized (or in the background with a game running) the launcher drops the page you were on, stops all animations"
 						+ " and empties its image caches, so it uses as little RAM and CPU as possible while you play.", minimize);
@@ -7205,7 +7284,7 @@ public final class LauncherApp extends Application {
 		Button themeButton = new Button("Theme editor");
 		themeButton.setGraphic(net.veloclient.launcher.ui.Icons.icon("palette", 15, Color.web("#E4E4E8")));
 		themeButton.setOnAction(e -> showThemeEditor());
-		net.veloclient.launcher.ui.SettingsUi.row(appearance, "Your own theme", "Accent, background, corners - with a live preview",
+		net.veloclient.launcher.ui.SettingsUi.row(appearance, "Your own theme", "Accent, text, glass and corners - with a live preview",
 				"Make your own colors and share them as a code.", themeButton);
 		appearance.getChildren().add(homeBackgroundRow());
 		javafx.scene.control.CheckBox animateHome = new javafx.scene.control.CheckBox();

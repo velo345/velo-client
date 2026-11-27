@@ -955,6 +955,7 @@ public final class ClientImport {
 				fraction.accept(base[0] / total);
 			}
 			if (options.mods() && source.modCount() > 0) {
+				net.veloclient.launcher.launch.InstantPlay.release(instanceId);
 				int[] result = importMods(source.modsDir(), InstancePaths.modsDir(instanceId), mcVersion, progress, f -> part.accept(3, f));
 				base[0] += 3;
 				done.add(result[0] + " mods" + (result[1] > 0 ? " (" + result[1] + " skipped - no Fabric build for " + mcVersion + ")" : ""));

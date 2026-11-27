@@ -59,6 +59,7 @@ public final class Glass {
 		}
 
 		Runnable update = () -> place(pane, frost, edge, clip);
+		pane.getProperties().put(KEY + ".update", update);
 		InvalidationListener relayout = o -> update.run();
 		pane.layoutBoundsProperty().addListener(relayout);
 		pane.localToSceneTransformProperty().addListener(relayout);
@@ -123,8 +124,20 @@ public final class Glass {
 			}
 			frost.setImage(backdrop.frostedProperty().get());
 		}
-		Bounds scene = pane.localToScene(local);
-		Bounds backdropScene = backdrop.localToScene(backdrop.getLayoutBounds());
+		Bounds scene;
+		Bounds backdropScene;
+		if (pane.getScene().getWindow() instanceof javafx.stage.PopupWindow) {
+			// a dropdown is a window of its own: its place in the page's picture comes from the screen, not from its scene
+			scene = pane.localToScreen(local);
+			backdropScene = backdrop.localToScreen(backdrop.getLayoutBounds());
+			if (scene == null || backdropScene == null) {
+				frost.setVisible(false);
+				return;
+			}
+		} else {
+			scene = pane.localToScene(local);
+			backdropScene = backdrop.localToScene(backdrop.getLayoutBounds());
+		}
 		double[] m = backdrop.mapping();
 		double scale = m[0], offsetX = m[1], offsetY = m[2], frostPerSource = m[3];
 		// window position -> source picture -> frosted picture (half size)
@@ -139,6 +152,13 @@ public final class Glass {
 		clip.setWidth(w);
 		clip.setHeight(h);
 		frost.setVisible(true);
+	}
+
+	/** Re-places the frost of a glass pane now (a dropdown that has just been shown and positioned). */
+	public static void refresh(Pane pane) {
+		if (pane.getProperties().get(KEY + ".update") instanceof Runnable update) {
+			update.run();
+		}
 	}
 
 	/** A copy of the panel's old frost over the new one, fading out with the backdrop (removed when done). */

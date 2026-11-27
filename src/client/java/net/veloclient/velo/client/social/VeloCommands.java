@@ -76,7 +76,7 @@ public final class VeloCommands {
 						openLater(() -> new net.veloclient.velo.client.gui.StaffModerationScreen(null, "world"));
 						return 1;
 					}))
-					.then(ClientCmd.argument("player", StringArgumentType.word()).suggests(PLAYERS).executes(context -> {
+					.then(ClientCmd.argument("player", new WordExcept("clips", "worlds")).suggests(PLAYERS).executes(context -> {
 						String target = context.getArgument("player", String.class);
 						openLater(() -> new net.veloclient.velo.client.gui.StaffScreen(null, target));
 						return 1;
@@ -101,6 +101,37 @@ public final class VeloCommands {
 						return 1;
 					})));
 		});
+	}
+
+	/**
+	 * A word argument that refuses the names of its sibling literals ("clips", "worlds"): with a plain word() Brigadier
+	 * saw "/velostaff clips" as matching both and logged an "Ambiguity between arguments" warning every time the command
+	 * tree was rebuilt (twice per chat open - hundreds of lines in one session, 2026-11-27).
+	 */
+	private static final class WordExcept implements com.mojang.brigadier.arguments.ArgumentType<String> {
+		private static final com.mojang.brigadier.exceptions.SimpleCommandExceptionType TAKEN =
+				new com.mojang.brigadier.exceptions.SimpleCommandExceptionType(() -> "That is a sub-command, not a player");
+		private final java.util.Set<String> refused;
+
+		WordExcept(String... refused) {
+			this.refused = java.util.Set.of(refused);
+		}
+
+		@Override
+		public String parse(com.mojang.brigadier.StringReader reader) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+			int start = reader.getCursor();
+			String word = reader.readUnquotedString();
+			if (refused.contains(word)) {
+				reader.setCursor(start);
+				throw TAKEN.createWithContext(reader);
+			}
+			return word;
+		}
+
+		@Override
+		public java.util.Collection<String> getExamples() {
+			return java.util.List.of("Steve", "Alex_01");
+		}
 	}
 
 	/** Screens open on the next tick: the chat screen closes itself right after a command and would close ours with it. */

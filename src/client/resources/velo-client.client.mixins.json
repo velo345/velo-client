@@ -6,6 +6,8 @@
 	"client": [
 		"ActionBarOverlayMixin",
 		"WindowFrontGrabMixin",
+		"ParkedWindowMixin",
+		"ParkedShowWindowMixin",
 		"PostEffectsFrameMixin",
 		"CameraLevelGuardMixin",
 		"AtmosphericFogMixin",
@@ -43,7 +45,6 @@
 		"TitleLogoMixin",
 		"TitlePanoramaMixin",
 		"PauseBlurMixin",
-		"GameRendererBlurInvoker",
 		"GlassBlurCaptureMixin",
 		"ClearLiquidsFogMixin",
 		"NoTotemPopAnimationMixin",

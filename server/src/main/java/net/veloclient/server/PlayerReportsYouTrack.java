@@ -343,6 +343,7 @@ final class PlayerReportsYouTrack {
 				int count = map.counts.getOrDefault(s.group(), 1) + 1;
 				YouTrack.setFields(issue, List.of(YouTrack.numberField("Occurrences", count),
 						YouTrack.enumField("Priority", count >= 10 ? "Critical" : count >= 3 ? "Major" : "Normal")));
+				YouTrack.tag(issue, YouTrack.versionTag(version(s)));
 				YouTrack.comment(issue, "Again: **" + nz(s.username()) + "**" + (s.auto() ? " (auto)" : "") + " on Velo " + nz(version(s))
 						+ (s.minecraft() != null ? ", Minecraft " + s.minecraft() : "") + " - report `" + s.id() + "` (" + count + " so far)");
 				if (live) {

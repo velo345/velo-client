@@ -76,6 +76,22 @@ final class StatsService {
 		return LocalDate.now(ZoneOffset.UTC).toString();
 	}
 
+	/** Every account whose first sign-in is at or after {@code from}: {uuid, username, firstSeen}. */
+	synchronized List<String[]> accountsSince(long from) {
+		List<String[]> out = new ArrayList<>();
+		try (PreparedStatement ps = connection.prepareStatement("SELECT uuid, username, first_seen FROM players WHERE first_seen >= ? ORDER BY first_seen")) {
+			ps.setLong(1, from);
+			try (ResultSet rs = ps.executeQuery()) {
+				while (rs.next()) {
+					out.add(new String[] {rs.getString(1), rs.getString(2), String.valueOf(rs.getLong(3))});
+				}
+			}
+		} catch (SQLException e) {
+			System.out.println("[stats] account list failed: " + e.getMessage());
+		}
+		return out;
+	}
+
 	/** When this account first signed in to Velo (0 if unknown). */
 	synchronized long firstSeen(String uuid) {
 		try (PreparedStatement ps = connection.prepareStatement("SELECT first_seen FROM players WHERE uuid = ?")) {

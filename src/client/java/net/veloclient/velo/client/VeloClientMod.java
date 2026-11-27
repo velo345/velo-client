@@ -69,6 +69,8 @@ public final class VeloClientMod implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		// Instant Play: a waiting (hidden) game watches for the launcher's signal to show its window.
+		net.veloclient.velo.client.util.ParkedGame.init();
 		// Cosmetics are per Minecraft account: the Velo launcher says which (-Dvelo.account), other launchers via --uuid.
 		if (net.veloclient.velo.config.VeloPaths.account() == null) {
 			String[] args = net.fabricmc.loader.api.FabricLoader.getInstance().getLaunchArguments(false);

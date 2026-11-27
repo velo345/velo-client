@@ -27,11 +27,36 @@ public abstract class SeamlessReloadMixin {
 	@Unique
 	private float velo$progress;
 
+	//? if <1.21.2 {
+	/*@Shadow @Final private java.util.function.Consumer<java.util.Optional<Throwable>> exceptionHandler;
+
+	// Minecraft 1.21.1 finishes the reload inside render() (1.21.2 and later do it in tick()) - and this mixin cancels render(),
+	// so on 1.21.1 the loading screen never ended: do what vanilla does when the reload is done.
+	@Unique
+	private void velo$completeReload() {
+		if (reloadCompleteTime == -1L && reload.isComplete()) {
+			try {
+				reload.throwException();
+				exceptionHandler.accept(java.util.Optional.empty());
+			} catch (Throwable t) {
+				exceptionHandler.accept(java.util.Optional.of(t));
+			}
+			reloadCompleteTime = net.minecraft.util.Util.getMeasuringTimeMs();
+			if (client.currentScreen != null) {
+				client.currentScreen.init(client, client.getWindow().getScaledWidth(), client.getWindow().getScaledHeight());
+			}
+		}
+	}
+	*///?}
+
 	@Inject(method = "render", at = @At("HEAD"), cancellable = true, require = 0)
 	private void velo$seamless(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
 		if (!reloading) {
 			if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.active()) {
 				ci.cancel();
+				//? if <1.21.2 {
+				/*velo$completeReload();
+				*///?}
 				float doneFor = reloadCompleteTime > -1L ? (net.minecraft.util.Util.getMeasuringTimeMs() - reloadCompleteTime) / 1000f : -1f;
 				if (net.veloclient.velo.client.modules.qol.VeloLoadingScreenModule.safeRender(context, reload.getProgress(), doneFor, offset -> {
 					if (client.currentScreen != null) {
@@ -56,6 +81,9 @@ public abstract class SeamlessReloadMixin {
 		if (reloadStartTime == -1L) {
 			reloadStartTime = net.minecraft.util.Util.getMeasuringTimeMs() - 1000L; // no grace period
 		}
+		//? if <1.21.2 {
+		/*velo$completeReload();
+		*///?}
 		if (reloadCompleteTime > -1L) {
 			client.setOverlay(null);
 			return;

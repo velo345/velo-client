@@ -86,6 +86,7 @@ public final class ModFixRelaunch {
 				Platform.runLater(() -> message.accept("Couldn't fix the mods", "That game didn't run from a Velo profile."));
 				return;
 			}
+			net.veloclient.launcher.launch.InstantPlay.release(instance.id());
 			Path mods = InstancePaths.modsDir(instance.id()).toAbsolutePath().normalize();
 			Path disabled = mods.resolveSibling("velo-disabled-mods");
 			List<String> moved = new ArrayList<>();

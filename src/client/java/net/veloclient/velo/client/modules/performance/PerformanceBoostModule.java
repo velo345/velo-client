@@ -93,6 +93,15 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 	public static volatile boolean turboParticleCull = true;
 	/** Velo Turbo: Velo's HUD modules redraw at most 360 times a second, frames in between reuse the draw list. */
 	public static volatile boolean hudFrameCache = true;
+	/** Velo Turbo HUD canvas: the HUD in its own texture, one quad per frame (26.2+, see HudCanvas). */
+	public static volatile boolean hudCanvas = true;
+	/** Velo Turbo "Terrain Culling Window" (Sodium 0.9, 26.2+): ms Sodium's culling may stay put while the camera moves a little; 0 = off. */
+	public static volatile int terrainReuseMs = Integer.getInteger("velo.terrainWindowMs", 60);
+	/** Velo Turbo "Leaf Culling Depth" (Sodium 0.9, 26.2+): leaf faces are only built when a non-leaf is within N blocks; 0 = vanilla. */
+	public static volatile int leafCullDepth = Integer.getInteger("velo.leafCullDepth", 0);
+	/** Profiling: setupTerrain calls that reused the lists / started a new anchor. */
+	public static int terrainReuseFrames;
+	public static int terrainReuseAnchors;
 	/**
 	 * Velo Turbo: incoming packets (chunk batches) spread over frames by a time budget. Off: two A/B rounds while moving
 	 * (2026-11-07) showed no change in average FPS or lows - single chunk packets are the slow part and can't be split.
@@ -597,6 +606,17 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 				new ConfigField.SliderField("Turbo Block Entities (chest, sign & banner distance)", 0.25, 1.0,
 						() -> turboBlockEntities, v -> turboBlockEntities = Math.round(v * 20) / 20.0,
 						v -> v >= 0.999 ? "Vanilla" : Math.round(v * 100) + "%"),
+				new ConfigField.SliderField("Terrain Culling Window (Sodium, ms)", 0, 150,
+						() -> terrainReuseMs, v -> terrainReuseMs = (int) (Math.round(v / 10.0) * 10),
+						v -> v < 5 ? "Off" : (int) Math.round(v / 10.0) * 10 + " ms"),
+				new ConfigField.SliderField("Leaf Culling Depth (Sodium, canopy layers)", 0, 4,
+						() -> leafCullDepth, v -> {
+							int depth = (int) Math.round(v);
+							if (depth != leafCullDepth) {
+								leafCullDepth = depth;
+								reloadRendering();
+							}
+						}, v -> v < 0.5 ? "Off" : (int) Math.round(v) + " layers"),
 				new ConfigField.HeaderField("Visuals"),
 				new ConfigField.ChoiceField("Particles", List.of("Minimal", "Decreased", "All"),
 						() -> particlesLabel(options.getParticles().getValue()),
@@ -621,7 +641,11 @@ public final class PerformanceBoostModule extends AbstractModule implements Conf
 						v -> VideoOptions.setChunkFade(v ? 0.75 : 0.0)),
 				new ConfigField.HeaderField("Velo Engine"),
 				new ConfigField.ToggleField("Fast Draw Path (GUI layering + Vulkan draw state)", () -> fastDrawPath, v -> fastDrawPath = v),
-				new ConfigField.ToggleField("HUD Caching (~20Hz overlay updates)", () -> hudCachingEnabled, v -> hudCachingEnabled = v)
+				new ConfigField.ToggleField("HUD Caching (~20Hz overlay updates)", () -> hudCachingEnabled, v -> hudCachingEnabled = v),
+				new ConfigField.ToggleField("HUD Canvas (the HUD in one texture, 26.2+)", () -> hudCanvas, v -> {
+					hudCanvas = v;
+					net.veloclient.velo.client.hud.HudFrameCache.invalidate();
+				})
 ));
 		if (VideoOptions.hasGraphicsBackendChoice()) {
 			fields.add(new ConfigField.ChoiceField("Graphics API (restart)", List.of("Default", "OpenGL", "Vulkan"),

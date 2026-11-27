@@ -7,6 +7,9 @@ public final class FrameCaps {
 	}
 
 	public static int apply(int vanilla) {
+		if (ParkedGame.waiting()) {
+			return ParkedGame.frameCap(vanilla);
+		}
 		if (WindowOcclusion.covered()) {
 			return Math.min(vanilla, WindowOcclusion.HIDDEN_FPS);
 		}

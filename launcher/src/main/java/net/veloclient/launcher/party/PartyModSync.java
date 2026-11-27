@@ -142,6 +142,7 @@ public final class PartyModSync {
 			String id = instance.id();
 			instance = InstanceStore.loadAll().stream().filter(i -> i.id().equals(id)).findFirst().orElse(instance);
 		}
+		net.veloclient.launcher.launch.InstantPlay.release(instance.id());
 		Path mods = InstancePaths.modsDir(instance.id());
 		Path backup = backupDir(instance).resolve("mods");
 		Files.createDirectories(mods);
@@ -219,6 +220,7 @@ public final class PartyModSync {
 			return;
 		}
 		status.accept("Restoring your mods");
+		net.veloclient.launcher.launch.InstantPlay.release(instance.id());
 		Path mods = InstancePaths.modsDir(instance.id());
 		Path backup = backupDir(instance).resolve("mods");
 		Files.createDirectories(mods);

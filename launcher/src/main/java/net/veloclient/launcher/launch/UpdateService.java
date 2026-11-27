@@ -722,6 +722,7 @@ public final class UpdateService {
 				log("Repair: " + instance.name() + " is running - left alone");
 				continue;
 			}
+			InstantPlay.release(instance.id());   // a hidden waiting game holds its jars
 			status.accept("Repairing " + instance.name() + "...");
 			Path mods = net.veloclient.launcher.instance.InstancePaths.modsDir(instance.id());
 			if (Files.isDirectory(mods)) {

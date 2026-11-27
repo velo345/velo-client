@@ -1600,6 +1600,29 @@ public final class CustomizeView {
 		Files.copy(source, pictureDir().resolve(slot + "." + (type.equals("jpeg") ? "jpg" : type)), StandardCopyOption.REPLACE_EXISTING);
 	}
 
+	/**
+	 * Brings an existing screens.json up to the current format at launcher start, so the game never reads an older file than
+	 * the one the Customize page would write: opening the page used to be what cleaned the options the new menus dropped
+	 * (layout, button styles...) - customizations made before an update only looked right in the game after that visit
+	 * (VELO-202). Does nothing without a file.
+	 */
+	public static void migrateAtStart() {
+		try {
+			if (TOUR_FILE != null || !Files.exists(file())) {
+				return;
+			}
+			String before = Files.readString(file(), StandardCharsets.UTF_8);
+			load();
+			String after = GSON.toJson(state);
+			if (!JsonParser.parseString(before).equals(JsonParser.parseString(after))) {
+				save();
+				net.veloclient.launcher.LauncherLog.info("Customize settings brought up to the current format");
+			}
+		} catch (Exception e) {
+			net.veloclient.launcher.LauncherLog.warn("Couldn't migrate the Customize settings", e);
+		}
+	}
+
 	private static void load() {
 		if (state != null) {
 			return;

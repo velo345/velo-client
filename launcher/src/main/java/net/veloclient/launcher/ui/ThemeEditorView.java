@@ -41,6 +41,11 @@ public final class ThemeEditorView {
 		void setActiveTheme(LauncherTheme theme);
 
 		void rebuild();
+
+		/** The glass launcher's panel darkness, 0..1 (Settings > Appearance has the same slider). */
+		double glassDarkness();
+
+		void setGlassDarkness(double value);
 	}
 
 	private static final int[] ACCENTS = {0xE0262E, 0xFF7A3D, 0xF7C04A, 0x22C17A, 0x2EC4B6, 0x4F7DFF, 0x8B6CFF, 0xF05AA8, 0xE6E6E6};
@@ -50,10 +55,27 @@ public final class ThemeEditorView {
 	}
 
 	public static Node build(Host host) {
-		HBox body = new HBox(28, themeList(host), controls(host), preview(host.activeTheme()));
-		HBox.setHgrow(body.getChildren().get(2), Priority.ALWAYS);
+		Node list = panel(themeList(host), 250);
+		Node controls = panel(controls(host), 400);
+		Node preview = panel(preview(host.activeTheme(), host.glassDarkness()), -1);
+		HBox body = new HBox(16, list, controls, preview);
+		HBox.setHgrow(preview, Priority.ALWAYS);
 		body.getStyleClass().add("page");
 		return body;
+	}
+
+	/** One column in a glass card, like every other page of the glass launcher. */
+	private static Node panel(Node content, double width) {
+		VBox card = new VBox(content);
+		card.getStyleClass().add("glass-panel");
+		card.setPadding(new Insets(18));
+		if (width > 0) {
+			card.setMinWidth(width);
+			card.setPrefWidth(width);
+			card.setMaxWidth(width);
+		}
+		VBox.setVgrow(content, Priority.ALWAYS);
+		return card;
 	}
 
 	// ---- Left: the list ----
@@ -207,20 +229,28 @@ public final class ThemeEditorView {
 		accents.getChildren().add(picker(t.accentStart(), c -> x -> copy(x, null, null, c, 0xFF000000 | darker(c & 0xFFFFFF), null, null, null, null, null), host));
 		box.getChildren().add(labeled("ACCENT", accents, LauncherTheme.toCssHex(t.accentStart())));
 
-		FlowPane grounds = new FlowPane(10, 10);
-		for (int ground : GROUNDS) {
-			grounds.getChildren().add(swatch(ground, (t.background() & 0xFFFFFF) == ground, () -> {
-				apply(host, x -> copy(x, 0xFF000000 | ground, 0xFF000000 | lift(ground, 9), null, null, null, null, null, null, null));
-				host.rebuild();
-			}));
-		}
-		grounds.getChildren().add(picker(t.background(), c -> x -> copy(x, c, 0xFF000000 | lift(c & 0xFFFFFF, 9), null, null, null, null, null, null, null), host));
-		box.getChildren().add(labeled("BACKGROUND", grounds, LauncherTheme.toCssHex(t.background())));
+		// The glass launcher draws its panels as tints of the picture behind them, so the theme's own background and panel
+		// colours no longer show anywhere - what is left to choose: accent, text colour, glass darkness, corners, speed.
+		box.getChildren().add(labeled("TEXT", colorField("Text colour", t.text(), c -> x -> copy(x, null, null, null, null, c, null, null, null, null), host)));
 
-		HBox colors = new HBox(18,
-				colorField("Panels", t.surface(), c -> x -> copy(x, null, c, null, null, null, null, null, null, null), host),
-				colorField("Text", t.text(), c -> x -> copy(x, null, null, null, null, c, null, null, null, null), host));
-		box.getChildren().add(labeled("FINE TUNING", colors));
+		Slider darkness = new Slider(0, 1, host.glassDarkness());
+		Label darknessValue = new Label(Math.round(darkness.getValue() * 100) + " %");
+		darknessValue.getStyleClass().add("t-mono");
+		darkness.valueProperty().addListener((o, a1, v) -> darknessValue.setText(Math.round(v.doubleValue() * 100) + " %"));
+		darkness.valueChangingProperty().addListener((obs, was, is) -> {
+			if (!is) {
+				host.setGlassDarkness(darkness.getValue());
+				host.rebuild();
+			}
+		});
+		HBox.setHgrow(darkness, Priority.ALWAYS);
+		HBox darknessRow = new HBox(12, darkness, darknessValue);
+		darknessRow.setAlignment(Pos.CENTER_LEFT);
+		box.getChildren().add(labeled("GLASS", darknessRow));
+		Label glassHint = new Label("How dark the panels are over the picture behind them. The picture itself is chosen in Settings > Appearance.");
+		glassHint.getStyleClass().add("t-muted");
+		glassHint.setWrapText(true);
+		box.getChildren().add(glassHint);
 
 		HBox corners = new HBox(2);
 		corners.getStyleClass().add("segment-bar");
@@ -329,30 +359,41 @@ public final class ThemeEditorView {
 
 	// ---- Right: a miniature launcher in the theme ----
 
-	private static Node preview(LauncherTheme t) {
-		int radius = Math.max(4, t.cornerRadius());
-		String bg = css(t.background());
-		String surface = css(lift(t.surface() & 0xFFFFFF, 0) | 0xFF000000);
+	/** The launcher as the glass design draws it: rail, hero, tiles and Play bar as see-through panels over a picture. */
+	private static Node preview(LauncherTheme t, double darknessValue) {
+		int radius = Math.max(6, t.cornerRadius() + 6);
+		int accentRgb = t.accentStart() & 0xFFFFFF;
 		String accent = css(t.accentStart());
 		String text = css(t.text());
-		String muted = LauncherTheme.toCssRgba((t.text() & 0xFFFFFF) | 0x88000000);
+		String muted = LauncherTheme.toCssRgba((t.text() & 0xFFFFFF) | 0x99000000);
 		String onAccent = t.onAccent() == 0xFFFFFFFF ? "white" : "#111111";
+		// the picture: the accent's colour sinking into black (a real backdrop is a pixel scene or the player's own picture)
+		int deep = mix(accentRgb, 0x000000, 0.80);
+		int mid = mix(accentRgb, 0x000000, 0.90);
+		double alpha = 0.18 + darknessValue * 0.5;
+		String glass = String.format(Locale.ROOT, "rgba(%d,%d,%d,%.2f)", (mid >> 16) & 0xFF, (mid >> 8) & 0xFF, mid & 0xFF, Math.min(0.9, alpha + 0.2));
+		String edge = "rgba(255,255,255,0.16)";
 
-		HBox top = new HBox(16);
-		top.setAlignment(Pos.CENTER_LEFT);
-		top.setPadding(new Insets(0, 14, 0, 14));
-		top.setMinHeight(40);
-		top.setStyle("-fx-border-color: transparent transparent rgba(255,255,255,0.07) transparent;");
-		String[] tabs = {"Home", "Library", "Store", "Locker"};
-		for (int i = 0; i < tabs.length; i++) {
-			Label tab = new Label(tabs[i]);
-			tab.setStyle("-fx-font-size: 11px; -fx-padding: 11 0 9 0; -fx-text-fill: " + (i == 0 ? text : muted) + ";"
-					+ (i == 0 ? " -fx-border-color: transparent transparent " + accent + " transparent; -fx-border-width: 0 0 2 0;" : ""));
-			top.getChildren().add(tab);
+		VBox rail = new VBox(10);
+		rail.setAlignment(Pos.TOP_CENTER);
+		rail.setPadding(new Insets(12, 0, 12, 0));
+		rail.setMinWidth(46);
+		rail.setMaxWidth(46);
+		rail.setStyle("-fx-background-color: " + glass + "; -fx-background-radius: " + radius + "; -fx-border-color: " + edge + "; -fx-border-radius: " + radius + ";");
+		String[] icons = {"home", "layers", "hanger", "store", "friends"};
+		for (int i = 0; i < icons.length; i++) {
+			StackPane icon = new StackPane(Icons.icon(icons[i], 15, Color.web(i == 0 ? css6(t.text()) : "#9A9AA6"), 2.0));
+			icon.setMinSize(32, 32);
+			icon.setMaxSize(32, 32);
+			if (i == 0) {
+				icon.setStyle("-fx-background-color: " + LauncherTheme.toCssRgba(accentRgb | 0x38000000) + "; -fx-background-radius: 10;");
+			}
+			rail.getChildren().add(icon);
 		}
+
 		StackPane hero = new StackPane();
-		hero.setMinHeight(150);
-		hero.setStyle("-fx-background-color: " + surface + "; -fx-background-radius: " + radius + ";");
+		hero.setMinHeight(130);
+		hero.setStyle("-fx-background-color: " + glass + "; -fx-background-radius: " + radius + "; -fx-border-color: " + edge + "; -fx-border-radius: " + radius + ";");
 		Label over = new Label("CONTINUE PLAYING");
 		over.setStyle("-fx-text-fill: " + accent + "; -fx-font-size: 9px; -fx-font-weight: bold;");
 		Label name = new Label("AsteriaSMP");
@@ -361,44 +402,58 @@ public final class ThemeEditorView {
 		heroText.setAlignment(Pos.BOTTOM_LEFT);
 		heroText.setPadding(new Insets(14));
 		hero.getChildren().add(heroText);
+
 		HBox tiles = new HBox(10);
 		for (int i = 0; i < 3; i++) {
 			Region tile = new Region();
-			tile.setMinHeight(66);
+			tile.setMinHeight(60);
 			HBox.setHgrow(tile, Priority.ALWAYS);
-			tile.setStyle("-fx-background-color: " + surface + "; -fx-background-radius: " + radius + ";"
-					+ (i == 2 ? " -fx-border-color: " + accent + "; -fx-border-radius: " + radius + ";" : ""));
+			tile.setStyle("-fx-background-color: " + glass + "; -fx-background-radius: " + radius + "; -fx-border-radius: " + radius + ";"
+					+ " -fx-border-color: " + (i == 2 ? accent : edge) + ";");
 			tiles.getChildren().add(tile);
 		}
 		Label chip = new Label("Velo+");
-		chip.setStyle("-fx-background-color: " + LauncherTheme.toCssRgba((t.accentStart() & 0xFFFFFF) | 0x26000000) + "; -fx-text-fill: " + accent
+		chip.setStyle("-fx-background-color: " + LauncherTheme.toCssRgba(accentRgb | 0x2E000000) + "; -fx-text-fill: " + accent
 				+ "; -fx-background-radius: 99; -fx-padding: 4 10 4 10; -fx-font-size: 11px; -fx-font-weight: bold;");
 		Label chip2 = new Label("Fabric 26.2");
-		chip2.setStyle("-fx-background-color: " + surface + "; -fx-text-fill: " + muted + "; -fx-background-radius: 99; -fx-padding: 4 10 4 10; -fx-font-size: 11px;");
-		VBox main = new VBox(12, hero, tiles, new HBox(8, chip, chip2));
-		main.setPadding(new Insets(14));
-		VBox.setVgrow(main, Priority.ALWAYS);
+		chip2.setStyle("-fx-background-color: rgba(255,255,255,0.10); -fx-text-fill: " + muted + "; -fx-background-radius: 99; -fx-padding: 4 10 4 10; -fx-font-size: 11px;");
+
 		Label play = new Label("PLAY");
-		play.setStyle("-fx-background-color: " + accent + "; -fx-text-fill: " + onAccent + "; -fx-background-radius: " + radius
-				+ "; -fx-padding: 9 28 9 28; -fx-font-family: 'Archivo SemiExpanded'; -fx-font-weight: bold; -fx-font-size: 12px;");
+		play.setStyle("-fx-background-color: " + accent + "; -fx-text-fill: " + onAccent + "; -fx-background-radius: 99"
+				+ "; -fx-padding: 9 30 9 30; -fx-font-family: 'Archivo SemiExpanded'; -fx-font-weight: bold; -fx-font-size: 12px;");
 		Label profile = new Label("AsteriaSMP");
 		profile.setStyle("-fx-text-fill: " + text + "; -fx-font-size: 12px; -fx-font-weight: bold;");
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 		HBox bar = new HBox(10, profile, spacer, play);
 		bar.setAlignment(Pos.CENTER_LEFT);
-		bar.setPadding(new Insets(10, 12, 10, 14));
-		bar.setStyle("-fx-background-color: " + surface + "; -fx-background-radius: 0 0 14 14;");
-		VBox mock = new VBox(top, main, bar);
-		mock.setStyle("-fx-background-color: " + bg + "; -fx-background-radius: 14; -fx-border-color: rgba(255,255,255,0.08); -fx-border-radius: 14;");
-		mock.setMinHeight(380);
-		mock.setMaxHeight(460);
+		bar.setPadding(new Insets(8, 10, 8, 16));
+		bar.setStyle("-fx-background-color: " + glass + "; -fx-background-radius: 99; -fx-border-color: " + edge + "; -fx-border-radius: 99;");
+
+		VBox main = new VBox(12, hero, tiles, new HBox(8, chip, chip2));
+		VBox.setVgrow(main, Priority.ALWAYS);
+		VBox right = new VBox(12, main, bar);
+		HBox.setHgrow(right, Priority.ALWAYS);
+		HBox mock = new HBox(12, rail, right);
+		mock.setPadding(new Insets(14));
+		mock.setStyle("-fx-background-color: linear-gradient(to bottom right, " + hex(deep) + " 0%, " + hex(mid) + " 55%, #07060a 100%);"
+				+ " -fx-background-radius: 16; -fx-border-color: rgba(255,255,255,0.10); -fx-border-radius: 16;");
+		mock.setMinHeight(400);
+		mock.setMaxHeight(470);
 		Label title = new Label("LIVE PREVIEW");
 		title.getStyleClass().add("popover-section");
 		title.setPadding(Insets.EMPTY);
 		VBox column = new VBox(12, title, mock);
 		column.setMinWidth(320);
 		return column;
+	}
+
+	private static String hex(int rgb) {
+		return String.format("#%06X", rgb & 0xFFFFFF);
+	}
+
+	private static String css6(int argb) {
+		return hex(argb);
 	}
 
 	private static String css(int argb) {
@@ -470,6 +525,13 @@ public final class ThemeEditorView {
 
 	private static int toArgb(Color c) {
 		return 0xFF000000 | ((int) Math.round(c.getRed() * 255) << 16) | ((int) Math.round(c.getGreen() * 255) << 8) | (int) Math.round(c.getBlue() * 255);
+	}
+
+	private static int mix(int rgb, int other, double t) {
+		int r = (int) Math.round(((rgb >> 16) & 0xFF) * (1 - t) + ((other >> 16) & 0xFF) * t);
+		int g = (int) Math.round(((rgb >> 8) & 0xFF) * (1 - t) + ((other >> 8) & 0xFF) * t);
+		int b = (int) Math.round((rgb & 0xFF) * (1 - t) + (other & 0xFF) * t);
+		return (r << 16) | (g << 8) | b;
 	}
 
 	private static int darker(int rgb) {

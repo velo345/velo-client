@@ -230,6 +230,10 @@ public final class EntityPreviewWidget extends ClickableWidget {
 	/*// 1.21.1 draws the entity itself inside the GUI pose; turned by setting its yaw for the one draw.
 	private static void drawRotatableEntity(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees, net.minecraft.entity.LivingEntity entity,
 			net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag wingsTag, boolean tagged) {
+		net.minecraft.entity.EntityPose oldPose = entity.getPose();
+		if (tagged && wingsTag != null && wingsTag.showcase() == net.veloclient.velo.client.cosmetics.wings.WingsPreview.Showcase.SNEAK) {
+			entity.setPose(net.minecraft.entity.EntityPose.CROUCHING);   // 1.21.1 draws the entity itself: only Sneak is posed there
+		}
 		float body = entity.bodyYaw, head = entity.headYaw, prevHead = entity.prevHeadYaw, yaw = entity.getYaw(), pitch = entity.getPitch();
 		entity.bodyYaw = 180f + yawDegrees;
 		entity.setYaw(180f + yawDegrees);
@@ -245,6 +249,7 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		entity.prevHeadYaw = prevHead;
 		entity.setYaw(yaw);
 		entity.setPitch(pitch);
+		entity.setPose(oldPose);
 	}
 
 	private static void drawMenuAvatar(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees,
@@ -268,6 +273,7 @@ public final class EntityPreviewWidget extends ClickableWidget {
 			biped.equippedLegsStack = net.minecraft.item.ItemStack.EMPTY;
 			biped.equippedFeetStack = net.minecraft.item.ItemStack.EMPTY;
 		}
+		showcasePose(state, tagged ? wingsTag : null);
 		if (state instanceof LivingEntityRenderState living) {
 			living.hurt = hurtNow;
 			living.bodyYaw = 180f + yawDegrees;
@@ -282,6 +288,47 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		context.addEntity(state, (float) size, position, worldRotation, tilt, x1, y1, x2, y2);
 	}
 
+	/**
+	 * A Store card's pose (Walk, Fly, Glide, Sneak, Swim) is the whole preview's pose, not only the wings': the body
+	 * crouches, swims, glides or swings its legs while the wings move to match. Until 2026-11 only the wings changed,
+	 * so a different pose looked like "the character stays the same" (VELO-205).
+	 */
+	private static void showcasePose(EntityRenderState state, net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag tag) {
+		if (tag == null || tag.showcase() == null) {
+			return;
+		}
+		var showcase = tag.showcase();
+		boolean sneak = showcase == net.veloclient.velo.client.cosmetics.wings.WingsPreview.Showcase.SNEAK;
+		boolean glide = showcase == net.veloclient.velo.client.cosmetics.wings.WingsPreview.Showcase.FLY
+				|| showcase == net.veloclient.velo.client.cosmetics.wings.WingsPreview.Showcase.GLIDE;
+		boolean swim = showcase == net.veloclient.velo.client.cosmetics.wings.WingsPreview.Showcase.SWIM;
+		boolean walk = showcase == net.veloclient.velo.client.cosmetics.wings.WingsPreview.Showcase.WALK;
+		float seconds = (System.nanoTime() / 1_000_000L) / 1000f;
+		if (state instanceof LivingEntityRenderState living) {
+			if (sneak) {
+				living.pose = EntityPose.CROUCHING;
+			} else if (glide) {
+				living.pose = EntityPose.GLIDING;
+			} else if (swim) {
+				living.pose = EntityPose.SWIMMING;
+				living.touchingWater = true;
+			}
+			if (walk || swim) {
+				living.limbSwingAnimationProgress = seconds * (swim ? 3f : 6f);
+				living.limbSwingAmplitude = swim ? 0.8f : 1f;
+			}
+		}
+		if (state instanceof net.minecraft.client.render.entity.state.BipedEntityRenderState biped) {
+			biped.isInSneakingPose = sneak;
+			biped.isGliding = glide;
+			biped.isSwimming = swim;
+			biped.leaningPitch = swim ? 1f : 0f;
+		}
+		if (state instanceof net.minecraft.client.render.entity.state.PlayerEntityRenderState player && glide) {
+			player.glidingTicks = 30f;
+		}
+	}
+
 	private static void drawMenuAvatar(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees,
 			net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag wingsTag, boolean tagged) {
 		Quaternionf worldRotation = new Quaternionf().rotateZ((float) Math.PI);
@@ -289,6 +336,7 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		if (tagged) {
 			net.veloclient.velo.client.cosmetics.wings.WingsPreview.tag(state, wingsTag);
 		}
+		showcasePose(state, tagged ? wingsTag : null);
 		state.bodyYaw = 180f + yawDegrees;
 		context.addEntity(state, (float) size, new Vector3f(0, MenuAvatar.HEIGHT / 2f, 0), worldRotation, new Quaternionf(), x1, y1, x2, y2);
 	}
@@ -323,6 +371,7 @@ public final class EntityPreviewWidget extends ClickableWidget {
 			humanoid.legsEquipment = net.minecraft.world.item.ItemStack.EMPTY;
 			humanoid.feetEquipment = net.minecraft.world.item.ItemStack.EMPTY;
 		}
+		showcasePose(state, tagged ? wingsTag : null);
 		if (state instanceof LivingEntityRenderState living) {
 			living.hasRedOverlay = hurtNow;
 			living.bodyRot = 180f + yawDegrees;
@@ -333,6 +382,43 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		context.entity(state, (float) size, position, worldRotation, tilt, x1, y1, x2, y2);
 	}
 
+	// A Store card's pose is the whole preview's pose, not only the wings' (VELO-205) - see the other version's copy.
+	private static void showcasePose(EntityRenderState state, net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag tag) {
+		if (tag == null || tag.showcase() == null) {
+			return;
+		}
+		var showcase = tag.showcase();
+		boolean sneak = showcase == net.veloclient.velo.client.cosmetics.wings.WingsPreview.Showcase.SNEAK;
+		boolean glide = showcase == net.veloclient.velo.client.cosmetics.wings.WingsPreview.Showcase.FLY
+				|| showcase == net.veloclient.velo.client.cosmetics.wings.WingsPreview.Showcase.GLIDE;
+		boolean swim = showcase == net.veloclient.velo.client.cosmetics.wings.WingsPreview.Showcase.SWIM;
+		boolean walk = showcase == net.veloclient.velo.client.cosmetics.wings.WingsPreview.Showcase.WALK;
+		float seconds = (System.nanoTime() / 1_000_000L) / 1000f;
+		if (state instanceof LivingEntityRenderState living) {
+			if (sneak) {
+				living.pose = net.minecraft.world.entity.Pose.CROUCHING;
+			} else if (glide) {
+				living.pose = net.minecraft.world.entity.Pose.FALL_FLYING;
+			} else if (swim) {
+				living.pose = net.minecraft.world.entity.Pose.SWIMMING;
+				living.isInWater = true;
+			}
+			if (walk || swim) {
+				living.walkAnimationPos = seconds * (swim ? 3f : 6f);
+				living.walkAnimationSpeed = swim ? 0.8f : 1f;
+			}
+		}
+		if (state instanceof net.minecraft.client.renderer.entity.state.HumanoidRenderState humanoid) {
+			humanoid.isCrouching = sneak;
+			humanoid.isFallFlying = glide;
+			humanoid.isVisuallySwimming = swim;
+			humanoid.swimAmount = swim ? 1f : 0f;
+		}
+		if (state instanceof net.minecraft.client.renderer.entity.state.AvatarRenderState avatar && glide) {
+			avatar.fallFlyingTimeInTicks = 30f;
+		}
+	}
+
 	private static void drawMenuAvatar(DrawContext context, int x1, int y1, int x2, int y2, int size, float yawDegrees,
 			net.veloclient.velo.client.cosmetics.wings.WingsPreview.Tag wingsTag, boolean tagged) {
 		Quaternionf worldRotation = new Quaternionf().rotateZ((float) Math.PI);
@@ -340,6 +426,7 @@ public final class EntityPreviewWidget extends ClickableWidget {
 		if (tagged) {
 			net.veloclient.velo.client.cosmetics.wings.WingsPreview.tag(state, wingsTag);
 		}
+		showcasePose(state, tagged ? wingsTag : null);
 		state.bodyRot = 180f + yawDegrees;
 		context.entity(state, (float) size, new Vector3f(0, MenuAvatar.HEIGHT / 2f, 0), worldRotation, new Quaternionf(), x1, y1, x2, y2);
 	}

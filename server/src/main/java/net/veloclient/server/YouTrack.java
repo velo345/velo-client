@@ -129,6 +129,7 @@ final class YouTrack {
 		for (String tag : tags) {
 			tag(id, tag);
 		}
+		tag(id, versionTag(texts.get("Velo Build")));
 		return id;
 	}
 
@@ -197,6 +198,11 @@ final class YouTrack {
 		for (String tag : tags) {
 			tag(id, tag);
 		}
+		for (JsonObject f : fieldList) {
+			if ("Velo Build".equals(f.get("name").getAsString()) && f.has("value")) {
+				tag(id, versionTag(f.get("value").getAsString()));
+			}
+		}
 		return id;
 	}
 
@@ -222,8 +228,45 @@ final class YouTrack {
 		}
 	}
 
-	/** Adds a tag (created by setup.py) to an issue. */
+	/**
+	 * The tag for a Velo version: "1.6.0.3" or "1.4.2+26.2" -> "v1.6.0.3" / "v1.4.2"; null for anything else (a bare
+	 * Minecraft version like "1.21.11" or "26.2" was written into Velo Build by older reports and is not a Velo version).
+	 */
+	static String versionTag(String raw) {
+		if (raw == null) {
+			return null;
+		}
+		java.util.regex.Matcher m = java.util.regex.Pattern.compile("^v?(\\d+)\\.(\\d+)\\.(\\d+)(\\.\\d+)?").matcher(raw.trim());
+		if (!m.find() || Integer.parseInt(m.group(2)) >= 20) {
+			return null;
+		}
+		return "v" + m.group(1) + "." + m.group(2) + "." + m.group(3) + (m.group(4) == null ? "" : m.group(4));
+	}
+
+	/** A version tag that doesn't exist yet: created for everyone to see, editable by the project team (like setup.py's). */
+	private static String createVersionTag(String name) throws IOException {
+		JsonObject body = new JsonObject();
+		body.addProperty("name", name);
+		JsonObject color = new JsonObject();
+		color.addProperty("id", "20");
+		body.add("color", color);
+		for (JsonElement g : call("GET", "groups?fields=id,name&$top=50", null).getAsJsonArray()) {
+			String group = g.getAsJsonObject().get("name").getAsString();
+			String key = group.equals("All Users") ? "visibleFor" : group.equals("Velo Client Team") ? "updateableBy" : null;
+			if (key != null) {
+				JsonObject ref = new JsonObject();
+				ref.addProperty("id", g.getAsJsonObject().get("id").getAsString());
+				body.add(key, ref);
+			}
+		}
+		return call("POST", "tags?fields=id", body).getAsJsonObject().get("id").getAsString();
+	}
+
+	/** Adds a tag (created by setup.py; version tags create themselves) to an issue. */
 	static void tag(String issue, String name) {
+		if (name == null || name.isBlank()) {
+			return;
+		}
 		try {
 			String tagId = TAGS.computeIfAbsent(name, n -> {
 				try {
@@ -231,6 +274,9 @@ final class YouTrack {
 						if (t.getAsJsonObject().get("name").getAsString().equals(n)) {
 							return t.getAsJsonObject().get("id").getAsString();
 						}
+					}
+					if (name.matches("v\\d+\\.\\d+\\.\\d+(\\.\\d+)?")) {
+						return createVersionTag(n);
 					}
 				} catch (IOException ignored) {
 					// no tag then

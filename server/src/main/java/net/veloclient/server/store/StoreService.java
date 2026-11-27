@@ -771,23 +771,26 @@ public final class StoreService {
 	}
 
 	/**
-	 * Launch week welcome gift: an account whose very first Velo sign-in ({@code firstSeen}) falls inside the launch window
-	 * gets the bonus coins once. Called after every verified sign-in; does nothing for everyone else.
+	 * The welcome coins: an account whose very first Velo sign-in ({@code firstSeen}) is inside the offer's window (since
+	 * launch, no end) gets the bonus coins once. Called after every verified sign-in and once at start for everyone who
+	 * missed it; does nothing for accounts that already got it.
 	 */
-	public void launchBonus(String uuid, String username, long firstSeen) {
+	public synchronized boolean launchBonus(String uuid, String username, long firstSeen) {
 		StoreConfig.LaunchBonus bonus = config.launchBonus;
-		if (bonus == null || bonus.coins <= 0 || firstSeen < bonus.from || firstSeen >= bonus.until) {
-			return;
+		if (bonus == null || bonus.coins <= 0 || firstSeen < bonus.from || bonus.until > 0 && firstSeen >= bonus.until) {
+			return false;
 		}
 		try {
 			if (db.hasLedgerReason(uuid, "launch_bonus")) {
-				return;
+				return false;
 			}
 			db.touchWallet(uuid, username);
 			db.adjust(uuid, bonus.coins, "launch_bonus", null, "launch");
 			System.out.println("[store] Launch bonus " + bonus.coins + " coins for " + username);
+			return true;
 		} catch (Exception e) {
 			System.out.println("[store] Launch bonus failed for " + username + ": " + e.getMessage());
+			return false;
 		}
 	}
 
@@ -837,7 +840,7 @@ public final class StoreService {
 	/** The launch offer for the public catalog (website / launcher), or null when there is none or it's over. */
 	public Map<String, Object> launchOffer() {
 		StoreConfig.LaunchBonus bonus = config.launchBonus;
-		if (bonus == null || bonus.coins <= 0 || System.currentTimeMillis() >= bonus.until) {
+		if (bonus == null || bonus.coins <= 0 || bonus.until > 0 && System.currentTimeMillis() >= bonus.until) {
 			return null;
 		}
 		return Map.of("coins", bonus.coins, "from", bonus.from, "until", bonus.until);

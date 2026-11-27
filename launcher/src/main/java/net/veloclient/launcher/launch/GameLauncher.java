@@ -53,6 +53,39 @@ public final class GameLauncher {
 
 	/** @param quickPlayServerAddress nullable "host:port" - when present, launches straight into that server via Mojang's Quick Play Multiplayer feature instead of to the title screen. */
 	public static LaunchResult launch(Instance instance, MinecraftSession session, LaunchProgressListener progressListener, String quickPlayServerAddress) throws IOException {
+		// Instant Play: a hidden game of this exact profile is already waiting at its title screen - show it.
+		LaunchResult adopted = InstantPlay.adopt(instance, session, quickPlayServerAddress);
+		if (adopted != null) {
+			progressListener.onPhase("Starting Minecraft...");
+			return adopted;
+		}
+		return launch(instance, session, progressListener, quickPlayServerAddress, false);
+	}
+
+	/** Instant Play: starts the game hidden (no window, low priority) so a later Play only has to show it. */
+	static LaunchResult launchParked(Instance instance, MinecraftSession session) throws IOException {
+		return launch(instance, session, new LaunchProgressListener() {
+			@Override
+			public void onPhase(String phase) {
+			}
+
+			@Override
+			public void onProgress(double fraction) {
+			}
+
+			@Override
+			public void onBytes(long done, long total) {
+			}
+		}, null, true);
+	}
+
+	/** The file whose existence tells a parked game to show its window (see the game's ParkedGame). */
+	static Path parkSignal(String instanceId, String runId) {
+		return InstancePaths.logsDir(instanceId).resolve("park_" + runId + ".signal");
+	}
+
+	private static LaunchResult launch(Instance instance, MinecraftSession session, LaunchProgressListener progressListener, String quickPlayServerAddress,
+			boolean parked) throws IOException {
 		// Every phase of a launch with its time in launcher.log - to see where a slow start goes before the game even runs.
 		long launchStart = System.nanoTime();
 		long[] phaseStart = {launchStart};
@@ -151,7 +184,7 @@ public final class GameLauncher {
 		JavaRuntimeProvider.JavaRuntime runtime = JavaRuntimeProvider.forVersion(vanilla, listener, exact);
 
 		listener.onPhase("Starting Minecraft...");
-		LaunchResult result = startProcess(instance, version, vanilla, fabric, libraries, clientJar, nativesDir, session, quickPlayServerAddress, runId, runtime);
+		LaunchResult result = startProcess(instance, version, vanilla, fabric, libraries, clientJar, nativesDir, session, quickPlayServerAddress, runId, runtime, parked);
 		net.veloclient.launcher.LauncherLog.info("[launch] game process started " + (System.nanoTime() - launchStart) / 1_000_000
 				+ " ms after Play (last phase " + (System.nanoTime() - phaseStart[0]) / 1_000_000 + " ms)");
 		return result;
@@ -188,7 +221,7 @@ public final class GameLauncher {
 
 	private static LaunchResult startProcess(Instance instance, GameVersion version, JsonObject vanilla, JsonObject fabric,
 			List<LibraryResolver.ResolvedLibrary> libraries, Path clientJar, Path nativesDir, MinecraftSession session,
-			String quickPlayServerAddress, String runId, JavaRuntimeProvider.JavaRuntime runtime) throws IOException {
+			String quickPlayServerAddress, String runId, JavaRuntimeProvider.JavaRuntime runtime, boolean parked) throws IOException {
 		String classpath = buildClasspath(libraries, clientJar);
 		String mainClass = fabric.get("mainClass").getAsString();
 		Path gameDir = InstancePaths.gameDir(instance.id());
@@ -283,7 +316,7 @@ public final class GameLauncher {
 		// AI flags only for a launch an AI asked for (--launch <profile> --ai): a normal Play click never gets them, so a
 		// hidden AI copy and a normal copy can run side by side (the global toggle used to hide every game and stop it
 		// taking the mouse).
-		AiLaunch ai = PENDING_AI.remove(instance.id());
+		AiLaunch ai = parked ? null : PENDING_AI.remove(instance.id());
 		int aiPort = 0;
 		if (ai != null) {
 			aiPort = freePort(ai.port() > 0 ? ai.port() : AI_PORT);
@@ -369,6 +402,11 @@ public final class GameLauncher {
 		command.add(mainClass);
 		command.addAll(gameArgs);
 
+		if (parked) {
+			// Instant Play: the game builds its window hidden, rests at the title screen and shows it when this file appears.
+			command.add(command.indexOf(mainClass), "-Dvelo.parkSignal=" + parkSignal(instance.id(), runId).toAbsolutePath());
+			command.add(command.indexOf(mainClass), "-Dvelo.parked=true");
+		}
 		if (ai != null) {
 			writeAiLaunch(instance, aiPort, ai.hidden());
 		}
@@ -402,7 +440,13 @@ public final class GameLauncher {
 			// idle GPU time into frames. Ignored by NVIDIA's driver and by Vulkan; a player's own setting wins.
 			builder.environment().putIfAbsent("mesa_glthread", "true");
 		}
-		return new LaunchResult(builder.start(), logFile, runId);
+		Process started = builder.start();
+		// Windows only: the game counts as the foreground job from its first millisecond (see WindowsProcessBoost).
+		String boosted = parked ? WindowsProcessBoost.apply(started.pid(), WindowsProcessBoost.Mode.PARKED) : WindowsProcessBoost.forPlaying(started.pid(), false);
+		if (!boosted.isEmpty()) {
+			net.veloclient.launcher.LauncherLog.info("Game process boosted: " + boosted);
+		}
+		return new LaunchResult(started, logFile, runId);
 	}
 
 	private static String buildClasspath(List<LibraryResolver.ResolvedLibrary> libraries, Path clientJar) {
@@ -457,6 +501,11 @@ public final class GameLauncher {
 	private static final java.util.Map<String, AiLaunch> PENDING_AI = new java.util.concurrent.ConcurrentHashMap<>();
 
 	/** The next launch of this profile is an AI launch (taken by {@link #launch} once). */
+	/** An AI-driven launch is queued for this profile (Instant Play never hands out its hidden game then). */
+	static boolean aiPending(String instanceId) {
+		return PENDING_AI.containsKey(instanceId);
+	}
+
 	public static void queueAiLaunch(String instanceId, AiLaunch ai) {
 		PENDING_AI.put(instanceId, ai);
 	}

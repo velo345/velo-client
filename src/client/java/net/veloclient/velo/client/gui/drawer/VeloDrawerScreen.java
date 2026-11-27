@@ -436,12 +436,12 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 	}
 
 	/**
-	 * One element as it is in game - except the one being hovered, dragged or resized: that one shows its example content
-	 * (an idle Media Player was an empty box being dragged around, 2026-11-26). Only that one, so opening the menu
-	 * mid-game never puts made-up values over the live HUD.
+	 * Every element with its example content while the menu is open, not only the hovered one (owner 2026-11-27: a widget
+	 * with no data right now - an idle Media Player, no target - is an empty box you can't see or aim at). The example
+	 * only replaces what would be empty; elements that have live data keep showing it.
 	 */
 	private void drawElement(DrawContext context, HudModule hud, float delta) {
-		boolean sample = hud == sampled || hud == dragging || hud == resizing;
+		boolean sample = true;
 		if (sample) {
 			net.veloclient.velo.client.hud.HudSample.begin();
 		}

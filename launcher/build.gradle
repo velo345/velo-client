@@ -343,7 +343,9 @@ tasks.register("jpackageDist") {
 		String appName = veloDev ? "Velo Client Tester" : "Velo Client Launcher"
 		String filePrefix = veloDev ? "velo-client-tester" : "velo-client-launcher"
 		// installers take at most three numbers; tester builds are 1.5.1.4 - the full one lives in version.properties
-		String packageVersion = launcherAppVersion.tokenize('.').take(3).join('.')
+		// ...except deb/rpm, which take the full number: a tester build 1.6.0.7 is then a different (newer) package than
+		// 1.6.0.3 for apt/dnf, which otherwise answers "already the newest version (1.6.0)" (2026-11-27)
+		String packageVersion = (isWindows || isMac) ? launcherAppVersion.tokenize('.').take(3).join('.') : launcherAppVersion
 		// jpackage bundles whatever JDK is running it - use that same JDK's own
 		// jpackage binary explicitly rather than "jpackage" off PATH, since a
 		// machine can have several JDKs installed with PATH pointing elsewhere

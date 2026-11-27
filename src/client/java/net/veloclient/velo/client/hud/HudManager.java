@@ -158,14 +158,6 @@ public final class HudManager {
 		if (net.veloclient.velo.client.redstone.RedstoneMode.active()) {
 			// Redstone Mode replaces the whole Velo HUD with its own overlay (Edit HUD Layout draws it itself).
 			if (!(net.veloclient.velo.client.hud.HudSample.active())) {
-				// glass: real blur behind its panels (where they were last frame), the world around stays sharp
-				if (!net.veloclient.velo.client.gui.glass.HudFrost.supported()   // else HudFrost does it before the HUD
-						&& net.veloclient.velo.client.util.ClientCompat.currentScreen() == null && net.veloclient.velo.client.gui.widget.VeloStyle.glass()
-						&& !net.veloclient.velo.client.modules.performance.HudCacheTuner.gnetumCaching()
-						&& !HudLook.rects().isEmpty() && net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
-					net.veloclient.velo.client.gui.glass.SharpFrame.blurHere(context);
-					net.veloclient.velo.client.gui.glass.SharpFrame.drawSharpExcept(context, screenWidth, screenHeight, HudLook.rects());
-				}
 				HudLook.beginRects();
 				try {
 					net.veloclient.velo.client.redstone.RmHud.render(context, screenWidth, screenHeight, tickDelta);
@@ -184,23 +176,7 @@ public final class HudManager {
 		// mode the recording already wraps the entire HUD (TurboHudWholeMixin) - the modules just draw into it.
 		var screen = net.veloclient.velo.client.util.ClientCompat.currentScreen();
 		// Tier Tagger's all-tiers ring: laid out now so its glass chips get the blur too
-		java.util.List<int[]> ringRects = net.veloclient.velo.client.tiers.TierRing.prepare(screenWidth, screenHeight);
-		boolean hudGlass = HudLook.glassBlur() && !HudLook.rects().isEmpty();
-		net.veloclient.velo.client.gui.glass.HudFrost.extra(ringRects);
-		// Where HudFrost can't run (1.21.1, 26.1): in this pass, but never while Gnetum caches the HUD: this pass is then drawn into Gnetum's own image, spread over several frames, and
-		// the full-screen sharp copy landed there on top of other HUD parts (sky over the HUD, reported 2026-11-26)
-		if (!net.veloclient.velo.client.gui.glass.HudFrost.supported() && screen == null && (hudGlass || !ringRects.isEmpty())
-				&& !net.veloclient.velo.client.modules.performance.HudCacheTuner.gnetumCaching()
-				&& net.veloclient.velo.client.gui.glass.SharpFrame.prepareBoth()) {
-			// HUD Style Glass: real blur behind the glass panels, the game around them stays sharp
-			java.util.List<int[]> rects = ringRects;
-			if (hudGlass) {
-				rects = new java.util.ArrayList<>(HudLook.rects());
-				rects.addAll(ringRects);
-			}
-			net.veloclient.velo.client.gui.glass.SharpFrame.blurHere(context);
-			net.veloclient.velo.client.gui.glass.SharpFrame.drawSharpExcept(context, screenWidth, screenHeight, rects);
-		}
+		net.veloclient.velo.client.tiers.TierRing.prepare(screenWidth, screenHeight);
 		if (screen instanceof net.veloclient.velo.client.gui.drawer.VeloDrawerScreen || screen instanceof net.veloclient.velo.client.gui.HudEditScreen) {
 			// the editors draw the HUD themselves, live: the (cached) copy under them lagged behind while dragging
 			net.veloclient.velo.client.social.NotificationOverlay.renderHud(context, screenWidth, screenHeight);

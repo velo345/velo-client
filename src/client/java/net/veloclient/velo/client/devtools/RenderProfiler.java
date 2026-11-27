@@ -45,6 +45,12 @@ public final class RenderProfiler {
 	private static final boolean AB_PARTICLES = "particles".equals(System.getProperty("velo.renderProfileAB"));
 	/** {@code -Dvelo.renderProfileAB=turbo}: flips the Velo Turbo master switch. */
 	private static final boolean AB_TURBO = "turbo".equals(System.getProperty("velo.renderProfileAB"));
+	/** {@code -Dvelo.renderProfileAB=canvas}: flips the HUD canvas (26.2+). */
+	/** {@code -Dvelo.renderProfileAB=terrain}: flips the Terrain Culling Window between 0 and 80 ms. */
+	private static final boolean AB_TERRAIN = "terrain".equals(System.getProperty("velo.renderProfileAB"));
+	/** {@code -Dvelo.renderProfileAB=all}: flips the HUD canvas and the terrain window together (old behaviour vs new). */
+	private static final boolean AB_ALL = "all".equals(System.getProperty("velo.renderProfileAB"));
+	private static final boolean AB_CANVAS = "canvas".equals(System.getProperty("velo.renderProfileAB"));
 
 	private static long frameStart;
 	private static long frames;
@@ -139,10 +145,12 @@ public final class RenderProfiler {
 					client.getGpuUtilizationPercentage(), client.getCurrentFps() * 1.0,
 					net.veloclient.velo.client.modules.performance.DecoupledPresent.shownFps()));
 			VeloClient.LOGGER.info(String.format(java.util.Locale.ROOT,
-					"Velo render profile [fast draw %s, particle cull %s, turbo %s] (avg/frame over 600): frame %.3f ms | extract %.3f ms | record terrain %.3f ms (%d draws) | wait acquire %.3f ms | submit+present %.3f ms | %d barriers",
+					"Velo render profile [fast draw %s, particle cull %s, turbo %s, hud canvas %s, terrain window %d] (avg/frame over 600): frame %.3f ms | extract %.3f ms | record terrain %.3f ms (%d draws) | wait acquire %.3f ms | submit+present %.3f ms | %d barriers",
 					net.veloclient.velo.client.modules.performance.PerformanceBoostModule.fastDrawPath ? "on" : "off",
 					net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turboParticleCull ? "on" : "off",
 					net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo ? "on" : "off",
+					net.veloclient.velo.client.modules.performance.PerformanceBoostModule.hudCanvas ? "on" : "off",
+					net.veloclient.velo.client.modules.performance.PerformanceBoostModule.terrainReuseMs,
 					frameNanos / 600e6, extractNanos / 600e6, terrainNanos / 600e6, terrainDraws / 600, acquireNanos / 600e6, presentNanos / 600e6, barriers / 600));
 			barriers = 0;
 			long pushes = fullPushes + partialPushes;
@@ -164,10 +172,26 @@ public final class RenderProfiler {
 			}
 			VeloClient.LOGGER.info("Velo render profile HUD cache: " + net.veloclient.velo.client.hud.HudFrameCache.replays + " replays, "
 					+ net.veloclient.velo.client.hud.HudFrameCache.records + " records");
+			VeloClient.LOGGER.info("Velo render profile terrain window: " + net.veloclient.velo.client.modules.performance.PerformanceBoostModule.terrainReuseFrames
+					+ " reused, " + net.veloclient.velo.client.modules.performance.PerformanceBoostModule.terrainReuseAnchors + " new anchors");
+			net.veloclient.velo.client.modules.performance.PerformanceBoostModule.terrainReuseFrames = 0;
+			net.veloclient.velo.client.modules.performance.PerformanceBoostModule.terrainReuseAnchors = 0;
 			net.veloclient.velo.client.hud.HudFrameCache.replays = 0;
 			net.veloclient.velo.client.hud.HudFrameCache.records = 0;
 			if (AB_TURBO) {
 				net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turbo ^= true;
+			}
+			if (AB_ALL) {
+				boolean on = !net.veloclient.velo.client.modules.performance.PerformanceBoostModule.hudCanvas;
+				net.veloclient.velo.client.modules.performance.PerformanceBoostModule.hudCanvas = on;
+				net.veloclient.velo.client.modules.performance.PerformanceBoostModule.terrainReuseMs = on ? 60 : 0;
+			}
+			if (AB_TERRAIN) {
+				net.veloclient.velo.client.modules.performance.PerformanceBoostModule.terrainReuseMs =
+						net.veloclient.velo.client.modules.performance.PerformanceBoostModule.terrainReuseMs > 0 ? 0 : 80;
+			}
+			if (AB_CANVAS) {
+				net.veloclient.velo.client.modules.performance.PerformanceBoostModule.hudCanvas ^= true;
 			}
 			if (AB_PARTICLES) {
 				net.veloclient.velo.client.modules.performance.PerformanceBoostModule.turboParticleCull ^= true;

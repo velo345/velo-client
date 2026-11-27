@@ -261,8 +261,8 @@ final class CrashAnalyzer {
 		if (culprit == null) {
 			culprit = stackCulprit(trace, byPackage, s::enabledById);
 		}
-		if (text.contains("java.lang.OutOfMemoryError")) {
-			culprit = null; // whatever happened to run when memory ran out isn't the cause
+		if (text.contains("java.lang.OutOfMemoryError") || text.contains("inotify instances")) {
+			culprit = null; // whatever happened to run when memory (or file-watch slots) ran out isn't the cause
 		}
 		// Only the error itself: every log of an Iris player mentions net.irisshaders and "shader" somewhere, which made
 		// unrelated crashes (a watchdog at shutdown...) read as "the shader pack crashed the game".
@@ -480,6 +480,19 @@ final class CrashAnalyzer {
 							+ " (Ctrl+B turns it back on in game).",
 					List.of(new Fix("Turn the narrator off", "Sets Narrator to Off in this profile's options", List.of(new Action.SetOption("narrator", "0")))),
 					List.of()));
+		}
+		// Linux: "User limit of inotify instances reached or too many open files" - every program that watches files
+		// (Discord, VS Code, file managers, other launchers...) holds slots out of ONE per-user pool of 128 by default. Mods
+		// that watch their config (Fzzy Config) crash the start when it is used up - the crash names the mod, but updating
+		// or removing it never helps (Velo owner, 2026-11-27: 300 leftover helper processes of test sessions).
+		if (text.contains("User limit of inotify instances reached") || text.contains("inotify instances reached")) {
+			issues.add(new Issue("inotify-limit", Severity.CRASH, "Linux ran out of file-watch slots",
+					"Programs on your PC use up the 128 file-watch slots Linux gives each user, so a mod that watches its config file"
+							+ " couldn't start. It is not a bug in that mod - updating it won't help. Close programs you don't need"
+							+ " (browsers, editors, other game launchers) and start again, or raise the limit once:"
+							+ " run \"sudo sysctl fs.inotify.max_user_instances=512\" (and put fs.inotify.max_user_instances=512 into"
+							+ " /etc/sysctl.d/99-inotify.conf to keep it after a restart).",
+					List.of(), List.of()));
 		}
 		// error code 4551 = ERROR_SYSTEM_INTEGRITY_POLICY: Smart App Control / App Control for Business blocked the DLL.
 		if (text.contains("error code = 4551") || text.contains("error code 4551")) {
@@ -836,7 +849,7 @@ final class CrashAnalyzer {
 
 	private static boolean resourceReload(String text) {
 		return text.contains("Reloading ResourceManager") && errorsOnly(text).contains("Exception") || text.contains("Caught error loading resourcepacks")
-				|| text.contains("Error loading resource pack");
+				|| text.contains("Error loading resource pack") || text.contains("Pack declares support for version newer than");
 	}
 
 	private static boolean isVelo(ModScanner.ModInfo mod) {

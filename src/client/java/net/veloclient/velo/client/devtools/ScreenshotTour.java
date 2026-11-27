@@ -333,6 +333,32 @@ public final class ScreenshotTour {
 				steps.add(new Object[] {100, (Runnable) () -> shot(client, "sky-horizon-1-game")});
 				steps.add(new Object[] {2, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))});
 				steps.add(new Object[] {40, (Runnable) () -> shot(client, "sky-horizon-2-pause")});
+				steps.add(new Object[] {2, (Runnable) () -> client.setScreen(null)});
+				steps.add(new Object[] {10, (Runnable) () -> {
+					drawer[0] = new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen();
+					client.setScreen(drawer[0]);
+					drawer[0].testExpanded(false);
+				}});
+				steps.add(new Object[] {40, (Runnable) () -> shot(client, "sky-horizon-3-rshift")});
+				steps.add(new Object[] {2, (Runnable) () -> drawer[0].testExpanded(true)});
+				steps.add(new Object[] {40, (Runnable) () -> shot(client, "sky-horizon-4-rshift-full")});
+				// vanilla Options (menu blur) over the horizon, without and with Custom Skybox
+				for (boolean box : new boolean[] {false, true}) {
+					steps.add(new Object[] {2, (Runnable) () -> {
+						client.setScreen(null);
+						ModuleRegistry.get("custom-skybox").ifPresent(m -> m.setEnabled(box));
+					}});
+					steps.add(new Object[] {40, (Runnable) () -> {
+						//? if <26.1 {
+						client.setScreen(new net.minecraft.client.gui.screen.option.OptionsScreen(null, client.options));
+						//?} else if <26.3 {
+						/*client.setScreen(new net.minecraft.client.gui.screens.options.OptionsScreen(null, client.options, false));
+						*///?} else {
+						/*client.setScreen(new net.minecraft.client.gui.screens.options.OptionsScreen(null, client.options));
+						*///?}
+					}});
+					steps.add(new Object[] {40, (Runnable) () -> shot(client, "sky-options-" + (box ? "box" : "vanilla"))});
+				}
 				yield steps;
 			}
 			case "perfboost" -> {

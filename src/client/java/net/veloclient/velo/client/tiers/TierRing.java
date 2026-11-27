@@ -255,7 +255,6 @@ public final class TierRing {
 		}
 		int r = radius(item.h());
 		int tint = net.veloclient.velo.client.gui.glass.GlassPrefs.tint(0x8C0C0C10);
-		net.veloclient.velo.client.gui.glass.HudFrost.behind(context, item.x(), item.y(), item.w(), item.h(), r);
 		VeloDraw.fillRounded(context, item.x(), item.y(), item.w(), item.h(), r, withAlpha(tint, (int) (((tint >>> 24) & 0xFF) * a / 255f)));
 		// soft top sheen
 		VeloDraw.fillRounded(context, item.x() + 1, item.y() + 1, item.w() - 2, item.h() / 2 - 1, Math.max(2, r - 1), withAlpha(0xFFFFFF, (int) (a * 0.05f)));

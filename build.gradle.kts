@@ -11,7 +11,10 @@ group = property("mod.group") as String
 // Dev build (./build-dev.sh or -PveloDev=true): unreleased features from src/dev ride inside the client jar, which is
 // versioned "<version>-dev" so it can never be mistaken for a release. Production builds never see src/dev.
 val veloDev = (findProperty("veloDev") as String?)?.toBoolean() == true
-version = "${property("mod.version")}${if (veloDev) "-dev" else ""}+${sc.current.version}"
+// Tester builds (CI passes -PtesterVersion=1.6.0.3 from the tag): the jar and the Fabric mod version carry the tester
+// build, so 1.6.0.1 and 1.6.0.3 are told apart in the file name, the mod list, crash reports and the in-game Tester screen.
+val testerVersion = (findProperty("testerVersion") as String?)?.takeIf { it.isNotBlank() }
+version = "${testerVersion ?: property("mod.version")}${if (veloDev) "-dev" else ""}+${sc.current.version}"
 
 base {
 	archivesName.set(property("mod.id") as String)
