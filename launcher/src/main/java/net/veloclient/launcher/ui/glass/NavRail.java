@@ -189,6 +189,7 @@ public final class NavRail extends Pane {
 		active = page == null ? "" : page;
 		buttons.forEach((id, button) -> {
 			boolean on = id.equals(active);
+			boolean was = button.getStyleClass().contains("nav-item-active");
 			button.getStyleClass().remove("nav-item-active");
 			if (on) {
 				button.getStyleClass().add("nav-item-active");
@@ -196,7 +197,21 @@ public final class NavRail extends Pane {
 			Node icon = button.getGraphic();
 			javafx.scene.shape.SVGPath path = Icons.pathOf(icon);
 			if (path != null) {
-				path.setStroke(on ? Color.web("#1A0A10") : Color.web("#F4EFEE"));
+				Color light = Color.web("#F4EFEE");
+				Color dark = Color.web("#1A0A10");
+				if (on == was || getScene() == null) {
+					path.setStroke(on ? dark : light);
+				} else {
+					// The icon follows the white pill: it turns dark when the pill has arrived under it (not at once, on the
+					// dark glass), and light again as the pill leaves (VELO-182).
+					javafx.animation.Timeline recolour = on
+							? new Timeline(new KeyFrame(Duration.ZERO, new KeyValue(path.strokeProperty(), light)),
+									new KeyFrame(Duration.millis(150), new KeyValue(path.strokeProperty(), light)),
+									new KeyFrame(Duration.millis(280), new KeyValue(path.strokeProperty(), dark)))
+							: new Timeline(new KeyFrame(Duration.ZERO, new KeyValue(path.strokeProperty(), dark)),
+									new KeyFrame(Duration.millis(110), new KeyValue(path.strokeProperty(), light)));
+					recolour.play();
+				}
 			}
 			button.setOpacity(on ? 1 : 0.72);
 		});

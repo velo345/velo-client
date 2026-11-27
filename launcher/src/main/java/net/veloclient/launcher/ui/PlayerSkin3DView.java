@@ -1114,7 +1114,7 @@ public final class PlayerSkin3DView {
 	private static void addQuad(MeshBuilder list, double[] a, double[] b, double[] c, double[] d, float u, float v, double[] normal) {
 		if (normal != null) {
 			double[] n = cross(sub(b, a), sub(c, a));
-			if (n[0] * normal[0] + n[1] * normal[1] + n[2] * normal[2] > 0) {
+			if (n[0] * normal[0] + n[1] * normal[1] + n[2] * normal[2] < 0) {
 				double[] swap = b;
 				b = d;
 				d = swap;

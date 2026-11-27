@@ -4877,7 +4877,7 @@
 .store-tabs { -fx-spacing: 0; }
 
 /* wings motion pills (Locker): no dark bar behind, glass pills, the active one white */
-.segment-bar { -fx-background-color: transparent; -fx-padding: 0; -fx-spacing: 6; }
+.segment-bar { -fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 0; -fx-spacing: 6; }
 .segmented-button {
 	-fx-background-color: -velo-glass-tint;
 	-fx-border-color: rgba(255,255,255,0.14);
@@ -5302,3 +5302,53 @@
    panel's round corners when it's highlighted */
 .friend-group-header { -fx-background-color: transparent; -fx-background-radius: 22 22 0 0; }
 .friend-row-last { -fx-background-radius: 0 0 21 21; }
+
+
+/* ---- VELO-182 (tester report): Home dock ---- */
+/* the Play button: no glow around it, and no outline ring that ignores the new corner radius */
+.home-play, .home-play:hover, .home-play:focused, .home-play:pressed, .home-play:default, .home-play:focused:hover {
+	-fx-background-radius: 22;
+	-fx-background-insets: 0;
+	-fx-border-width: 0;
+	-fx-border-color: transparent;
+	-fx-effect: null;
+	-fx-focus-color: transparent;
+	-fx-faint-focus-color: transparent;
+}
+.home-play:hover { -fx-background-color: -velo-accent-hover; }
+.home-play:pressed { -fx-background-color: -velo-accent-pressed; }
+/* the profile and Mods & packs buttons without their border (only a faint divider between them) */
+.home-profile-row { -fx-border-color: transparent; }
+.home-mods { -fx-border-color: transparent transparent transparent rgba(255, 255, 255, 0.06); }
+
+/* the bell / bug / window buttons on a dark glass pill (VELO-182) */
+.top-icons {
+	-fx-background-color: rgba(16, 14, 20, 0.5);
+	-fx-background-radius: 99;
+	-fx-border-color: rgba(255, 255, 255, 0.10);
+	-fx-border-radius: 99;
+	-fx-padding: 2 6 2 6;
+}
+
+/* The profile switcher and Mods & packs buttons on hover: the generic button hover added its own rounded border next to the
+   dock's divider (two lines instead of one). Hover only changes the fill here. */
+.home-switcher, .home-switcher:hover, .home-switcher:focused, .home-switcher:pressed {
+	-fx-border-color: transparent;
+	-fx-border-width: 0;
+	-fx-border-radius: 18 0 0 18;
+	-fx-background-radius: 18 0 0 18;
+	-fx-background-insets: 0;
+	-fx-focus-color: transparent;
+	-fx-faint-focus-color: transparent;
+}
+.home-switcher:hover { -fx-background-color: rgba(255, 255, 255, 0.06); }
+.home-mods, .home-mods:hover, .home-mods:focused, .home-mods:pressed {
+	-fx-border-color: transparent transparent transparent rgba(255, 255, 255, 0.06);
+	-fx-border-width: 0 0 0 1;
+	-fx-border-radius: 0 18 18 0;
+	-fx-background-radius: 0 18 18 0;
+	-fx-background-insets: 0;
+	-fx-focus-color: transparent;
+	-fx-faint-focus-color: transparent;
+}
+.home-mods:hover { -fx-background-color: rgba(255, 255, 255, 0.12); }

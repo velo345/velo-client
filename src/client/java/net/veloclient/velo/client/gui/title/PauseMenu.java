@@ -378,6 +378,7 @@ public final class PauseMenu {
 		int colX = rightSide ? width - margin - colW : margin;
 		navColor = look.color >= 0 ? 0xFF000000 | look.color : 0xFFE4E4E8;
 		context.getMatrices().pushMatrix();
+		MenuKit.sinkOffsetX = Math.round((rightSide ? 30f : -30f) * (1f - eased));   // the blur behind a panel slides with it (VELO-183)
 		context.getMatrices().translate((rightSide ? 30f : -30f) * (1f - eased), 0f);
 		int y = top;
 		// The logo centred on the word's capitals (Sora at this size draws its caps 2..16 below y).
@@ -389,7 +390,7 @@ public final class PauseMenu {
 		int backH = compact ? 20 : 24;
 		if (back != null) {
 			place(back, colX, y, colW, backH);
-			GLASS_RECTS.add(new int[] {colX, y, colW, backH, backH / 2});
+			GLASS_RECTS.add(new int[] {colX + MenuKit.sinkOffsetX, y, colW, backH, backH / 2});
 			float hover = MenuKit.hover(back, hovered(mouseX, mouseY, back));
 			int accent = MenuKit.accent();
 			boolean glass = net.veloclient.velo.client.gui.widget.VeloStyle.glass();
@@ -476,7 +477,7 @@ public final class PauseMenu {
 		if (leave != null) {
 			int ly = height - top - leaveH;
 			place(leave, colX, ly, colW, leaveH);
-			GLASS_RECTS.add(new int[] {colX, ly, colW, leaveH, leaveH / 2});
+			GLASS_RECTS.add(new int[] {colX + MenuKit.sinkOffsetX, ly, colW, leaveH, leaveH / 2});
 			float hover = MenuKit.hover(leave, hovered(mouseX, mouseY, leave));
 			if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
 				// glass pill; it only warms up red when you point at it
@@ -499,6 +500,7 @@ public final class PauseMenu {
 		}
 
 		context.getMatrices().popMatrix();
+		MenuKit.sinkOffsetX = 0;
 
 		// ---- Right column: cards ----
 		int cardW = clamp(Math.round(width * 0.26f), 160, 210);
@@ -526,6 +528,7 @@ public final class PauseMenu {
 			return;
 		}
 		context.getMatrices().pushMatrix();
+		MenuKit.sinkOffsetX = Math.round((rightSide ? -30f : 30f) * (1f - eased));
 		context.getMatrices().translate((rightSide ? -30f : 30f) * (1f - eased), 0f);
 		int cy = top;
 		cy = serverCard(context, renderer, cardX, cy, cardW);
@@ -566,6 +569,7 @@ public final class PauseMenu {
 			clip.place(0, 0, 0, 0, false);
 		}
 		context.getMatrices().popMatrix();
+		MenuKit.sinkOffsetX = 0;
 	}
 
 	/** A row's words: the real button's label, also through a stand-in. */

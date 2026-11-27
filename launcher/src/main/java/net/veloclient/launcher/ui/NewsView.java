@@ -146,7 +146,8 @@ public final class NewsView {
 		StackPane.setAlignment(text, Pos.BOTTOM_LEFT);
 		text.setMaxHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
 		StackPane card = new StackPane(cover, shade, text);
-		card.getStyleClass().addAll("tile", "motion-card");
+		// no-motion: the card grew on hover past the clip of the column it sits in (VELO-182)
+		card.getStyleClass().addAll("tile", "motion-card", "no-motion");
 		card.setMinHeight(150);
 		card.setOnMouseClicked(e -> onOpen.accept(post));
 		return card;

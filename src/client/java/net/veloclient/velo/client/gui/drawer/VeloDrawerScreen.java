@@ -202,6 +202,8 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 
 	private final StringBuilder search = new StringBuilder();
 	private boolean profileMenu;
+	/** The Pinned list in the panel is folded away (kept for the session). */
+	private static boolean pinsFolded;
 	private boolean moreMenu;
 	private ConfigField.ChoiceField dropdown;
 	private float[] dropdownAt;
@@ -1041,8 +1043,9 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		float w = tw(t) + 38f;
 		float x = (free - w) / 2f;
 		float y = (this.height - 66) / k - 26f + (1f - a) * 8f;   // above the hotbar and hearts
-		VeloDraw.shadow(c, Math.round(x), Math.round(y), Math.round(w), 22, 11, 10, 3, alpha(0x40000000, a));
-		rect(c, x, y, w, 22f, 11f, GLASS, a);
+		// one edge only: the drop shadow under it read as a second, older outline (VELO-187); a darker fill, so a bright block
+		// of the world behind it can't show through as a wedge at one end
+		rect(c, x, y, w, 22f, 11f, 0xD0141418, a);
 		VeloDraw.strokeRounded(c, x, y, w, 22f, 11f, 1f, alpha(GLASS_EDGE, a));
 		icon(c, "d_layout", x + 10f, y + 5f, 12f, TEXT_2, a);
 		text(c, t, x + 28f, y + 7f, TEXT_2, a);
@@ -1100,10 +1103,20 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		}
 		float dd = animTo("dropdownAnim", dropdown != null ? 1f : 0f, 16f);
 		if (dd > 0.02f && lastDropdown != null && lastDropdownAt != null) {
-			renderDropdown(c, a * dd, dd);
+			drawingOverlay = true;
+			try {
+				renderDropdown(c, a * dd, dd);
+			} finally {
+				drawingOverlay = false;
+			}
 		}
 		if (profileMenu) {
-			renderProfileMenu(c, a);
+			drawingOverlay = true;
+			try {
+				renderProfileMenu(c, a);
+			} finally {
+				drawingOverlay = false;
+			}
 		}
 	}
 
@@ -1274,7 +1287,14 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		}
 	}
 
+	/** Drawing a dropdown or the profile menu itself: only these may react to the mouse while one is open. */
+	private boolean drawingOverlay;
+
 	private boolean inside(float x, float y, float w, float h) {
+		// with a dropdown open, what is behind it must not light up under the cursor (VELO-187)
+		if (!drawingOverlay && overlayOpen()) {
+			return false;
+		}
 		return mouseU >= x && mouseU < x + w && mouseV >= y && mouseV < y + h;
 	}
 
@@ -1731,14 +1751,20 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		// pinned
 		float modulesTop = y - 3f;
 		List<Module> pins = QuickToggles.favorites();
-		text(c, R("Pinned"), x + 4f, y, TEXT_3, a);
+		// the header folds the pinned list away without unpinning anything (VELO-184)
+		boolean headHover = live && inside(x, y - 4f, w, 18f) && mouseV >= top && mouseV < top + height;
+		text(c, R("Pinned"), x + 4f, y, headHover ? TEXT_2 : TEXT_3, a);
+		icon(c, pinsFolded ? "d_chev_d" : "d_chev_u", x + w - 18f, y - 1f, 11f, headHover ? TEXT_2 : TEXT_3, a);
+		hit(live, top, height, x, y - 4f, w, 18f, () -> pinsFolded = !pinsFolded);
 		y += 14f;
-		if (pins.isEmpty()) {
-			text(c, fit("Pin modules from any category.", false, w - 8f), x + 4f, y + 4f, TEXT_3, a);
-			y += 22f;
-		}
-		for (Module m : pins) {
-			y = moduleRow(c, m, x, y, w, top, height, a, live, true);
+		if (!pinsFolded) {
+			if (pins.isEmpty()) {
+				text(c, fit("Pin modules from any category.", false, w - 8f), x + 4f, y + 4f, TEXT_3, a);
+				y += 22f;
+			}
+			for (Module m : pins) {
+				y = moduleRow(c, m, x, y, w, top, height, a, live, true);
+			}
 		}
 		y += 6f;
 		c.fill(Math.round(x + 4f), Math.round(y), Math.round(x + w - 4f), Math.round(y) + 1, alpha(0x1AFFFFFF, a));
@@ -1841,13 +1867,13 @@ public final class VeloDrawerScreen extends Screen implements net.veloclient.vel
 		rect(c, x, y, 34f, 34f, 11f, modOn ? acc() : 0x1FFFFFFF, a);
 		moduleIcon(c, m, x + 8f, y + 8f, 18f, modOn ? onAcc() : accIcon(), a);
 		text(c, fit(m.displayName(), true, w - 90f), x + 44f, y + 4f, WHITE, a);
-		List<Text> desc = wrap(m.description(), w - 90f, 2);
+		List<Text> desc = wrap(m.description(), w - 90f, 5);   // the whole description (VELO-187: it was cut after two lines)
 		for (int i = 0; i < desc.size(); i++) {
-			text(c, desc.get(i), x + 44f, y + 18f + i * 11f, TEXT_3, a);
+			text(c, desc.get(i), x + 44f, y + 18f + i * 13f, TEXT_3, a);   // 13 px apart: at 11 the lines almost touched
 		}
 		toggle(c, "mod:" + m.id(), x + w - 32f, y + 8f, modOn, a, true);
 		hit(live, top, height, x + w - 36f, y + 2f, 36f, 28f, () -> QuickToggles.toggle(m));
-		y += Math.max(44f, 24f + desc.size() * 11f) + 4f;
+		y += Math.max(44f, 24f + desc.size() * 13f) + 4f;
 
 		if (m instanceof net.veloclient.velo.client.gui.window.ModuleDashboard dash) {
 			y = renderStats(c, m, dash, x, y, w, a);

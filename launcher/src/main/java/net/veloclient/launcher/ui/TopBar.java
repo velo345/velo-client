@@ -159,6 +159,8 @@ public final class TopBar extends HBox {
 		bug.setOnAction(e -> BugReportDialog.show(bug.getScene().getWindow()));
 		HBox icons = new HBox(2, bellBox, bug);
 		icons.setAlignment(Pos.CENTER);
+		// a glass surface behind the icons: on a bright backdrop they were barely visible (VELO-182)
+		icons.getStyleClass().add("top-icons");
 		getChildren().add(icons);
 
 		// 2026-11-25 design: no search field in the bar - Ctrl+K opens it, it folds away again when left empty

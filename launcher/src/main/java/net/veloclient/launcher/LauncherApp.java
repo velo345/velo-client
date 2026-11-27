@@ -374,6 +374,7 @@ public final class LauncherApp extends Application {
 		chromeGap.setMinHeight(22);
 		chromeGap.setMaxHeight(22);
 		HBox.setMargin(chromeGap, new Insets(0, 4, 0, 6));
+		windowChrome.controls().getStyleClass().add("top-icons");
 		topBar.getChildren().addAll(chromeGap, windowChrome.controls());
 		layers.getStyleClass().add("window-frame");
 		windowChrome.maximizedProperty().addListener((o, a, max) -> layers.pseudoClassStateChanged(
@@ -1705,8 +1706,19 @@ public final class LauncherApp extends Application {
 		});
 		HBox footer = new HBox(8, library, create);
 		footer.setPadding(new Insets(8, 4, 2, 4));
-		list.getChildren().add(footer);
-		popup[0] = net.veloclient.launcher.ui.Popover.show(anchor, list, net.veloclient.launcher.ui.Popover.Side.ABOVE_LEFT, 340);
+		// Only as tall as the room above the dock: the list used to run down over the profile button and the Play button.
+		// More profiles than fit scroll inside the popup, the footer buttons stay in view below them.
+		javafx.geometry.Bounds anchorBounds = anchor.localToScreen(anchor.getBoundsInLocal());
+		double room = anchorBounds == null ? 420 : anchorBounds.getMinY() - stage.getY() - 90;
+		double maxList = Math.max(160, Math.min(440, room - 70));
+		ScrollPane listScroll = new ScrollPane(list);
+		listScroll.setFitToWidth(true);
+		listScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+		listScroll.setMaxHeight(maxList);
+		listScroll.setPrefViewportHeight(Math.min(maxList, list.prefHeight(300)));
+		listScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
+		VBox switcher = new VBox(4, listScroll, footer);
+		popup[0] = net.veloclient.launcher.ui.Popover.show(anchor, switcher, net.veloclient.launcher.ui.Popover.Side.ABOVE_LEFT, 340);
 	}
 
 	/** The Play button's chevron: launch the selected profile straight into one of the saved servers. */
@@ -2335,7 +2347,7 @@ public final class LauncherApp extends Application {
 			if (!show) {
 				adventOpen = false;
 				if (always && homeHero != null) {
-					net.veloclient.launcher.ui.Toasts.show(homeHero, "The Advent calendar opens on December 1");
+					net.veloclient.launcher.ui.Toasts.show(homeHero, "clock", "#9AA3B8", "The Advent calendar opens on December 1");
 				}
 				return;
 			}
@@ -2396,8 +2408,12 @@ public final class LauncherApp extends Application {
 		playCard.setPrefWidth(560);
 		Label footer = new Label("VELO " + AppVersion.VERSION.toUpperCase(java.util.Locale.ROOT) + "  ·  " + (session == null ? "SIGNED OUT" : "READY"));
 		footer.getStyleClass().add("home-footer");
+		// no version / READY line under the dock (VELO-182); the dock sits a little up, over the player's feet
+		footer.setVisible(false);
+		footer.setManaged(false);
 		VBox playColumn = new VBox(10, playCard, footer);
 		playColumn.setAlignment(Pos.TOP_CENTER);
+		playColumn.setTranslateY(-22);
 
 		VBox center = new VBox(0, topRow, lobby, playColumn);
 		center.setMinWidth(0);
@@ -2459,6 +2475,20 @@ public final class LauncherApp extends Application {
 
 		HBox layout = new HBox(24, center, rightScroll);
 		HBox.setHgrow(center, Priority.ALWAYS);
+		// The player and the Play dock sit in the middle of the WHOLE window, not of what is left beside the right column
+		// (VELO-182): shifted right by half of what the right column and the rail do not share.
+		Runnable centreOnWindow = () -> {
+			if (hero.getScene() == null || lobby.getScene() == null) {
+				return;
+			}
+			double left = hero.localToScene(0, 0).getX();
+			double shift = Math.max(0, Math.min(110, (rightScroll.getWidth() + 24 - left) / 2));
+			lobby.setTranslateX(shift);
+			playColumn.setTranslateX(shift);
+		};
+		hero.widthProperty().addListener((o, a, w) -> centreOnWindow.run());
+		hero.sceneProperty().addListener((o, a, scene) -> Platform.runLater(centreOnWindow));
+		Platform.runLater(centreOnWindow);
 		layout.setPadding(new Insets(0, 0, 4, 0));
 		hero.getChildren().addAll(fade, layout);
 		homeHero = hero;
@@ -2770,7 +2800,7 @@ public final class LauncherApp extends Application {
 			javafx.scene.Node homeGlyph = net.veloclient.launcher.ui.Icons.icon("home", 13, Color.WHITE, 2.2);
 			// The house is bottom-heavy (roof is a thin tip, body is a block), so its bounding-box centre reads
 			// as too low inside the disc; lift it half a pixel for optical centring.
-			homeGlyph.setTranslateY(-0.5);
+			homeGlyph.setTranslateY(-1.0);
 			StackPane homeIcon = new StackPane(homeGlyph);
 			homeIcon.getStyleClass().add("home-chip-icon");
 			b.setGraphic(homeIcon);

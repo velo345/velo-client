@@ -242,11 +242,13 @@ public final class MenuKit {
 	/** A glass card: soft shadow, dark translucent fill, hairline edge. */
 	/** When set (the pause menu, while it draws), every panel's rect is collected here - the blur goes behind them. */
 	public static java.util.List<int[]> panelSink;
+	/** The pause menu's slide-in offset while it draws a column: the blur behind a panel follows the panel (VELO-183). */
+	public static int sinkOffsetX;
 
 	public static void panel(DrawContext context, int x, int y, int w, int h, int radius) {
 		if (panelSink != null) {
 			boolean g = net.veloclient.velo.client.gui.widget.VeloStyle.glass();
-			panelSink.add(new int[] {x, y, w, h, g ? Math.round(net.veloclient.velo.client.gui.glass.GlassPrefs.radius(radius)) : radius});
+			panelSink.add(new int[] {x + sinkOffsetX, y, w, h, g ? Math.round(net.veloclient.velo.client.gui.glass.GlassPrefs.radius(radius)) : radius});
 		}
 		if (net.veloclient.velo.client.gui.widget.VeloStyle.glass()) {
 			// the glass of the menus: no drop shadow (it showed through), light edge, light along the top

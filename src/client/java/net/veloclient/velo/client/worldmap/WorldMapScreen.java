@@ -207,7 +207,8 @@ public final class WorldMapScreen extends VeloWindow {
 		int top = mapTop();
 		int bottom = mapBottom();
 
-		VeloDraw.fillRounded(context, left, top, right - left, bottom - top, 8, 0xFF0D0D10);
+		// not-yet-mapped parts: a dark tint you can look through, not a black hole (VELO-187)
+		VeloDraw.fillRounded(context, left, top, right - left, bottom - top, 8, 0xA00D0D12);
 		context.enableScissor(left, top, right, bottom);
 		MapStore store = store();
 		int regionsDrawn = 0;
@@ -488,6 +489,13 @@ public final class WorldMapScreen extends VeloWindow {
 		if (clickTeleportAvailable()) {
 			toggles.add(new Object[] {"Click to teleport", clickTeleport, (Runnable) () -> clickTeleport = !clickTeleport});
 		}
+		// a dark glass strip behind the toggles: over the map they were too see-through to read (VELO-187)
+		int stripLeft = rx;
+		for (Object[] toggle : toggles) {
+			stripLeft -= this.textRenderer.getWidth((String) toggle[0]) + 14 + 4;
+		}
+		int stripRight = contentX() + contentWidth() - 6;
+		VeloDraw.fillRounded(context, stripLeft - 4, cy - 3, stripRight - stripLeft + 8, 22, 8, 0xEC0B0B10);
 		for (Object[] toggle : toggles) {
 			String label = (String) toggle[0];
 			int w = this.textRenderer.getWidth(label) + 14;

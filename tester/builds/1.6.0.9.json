@@ -1,0 +1,532 @@
+{
+  "title": "Velo 1.6.0.9: your visual reports, fixed",
+  "summary": "Most of what you reported about the look of the launcher and the menus is fixed here, plus new Armor Bar options. The new points are at the top; what you already answered stays answered. Something still broken or ugly? Press \"Broken - report it\" and attach screenshots or clips. Please keep it private until the release.",
+  "changes": [
+    "Launcher Home: cleaner dock (no Play glow or ring, no extra borders, no version line), player and dock centred, sidebar icons recolour with the pill, glass pill behind the top-right buttons",
+    "Profile switcher: one clean hover edge; the popup stays above the dock and scrolls",
+    "The second skin layer in Home and Locker no longer renders darker than the base skin",
+    "Monochrome theme: Velo profile icons are black on white",
+    "Pause menu: the blur behind the panels slides in with them",
+    "R-Shift: nothing lights up behind an open dropdown, Pinned can be folded, full module descriptions, a cleaner hint pill",
+    "World map: readable view buttons, see-through unmapped area",
+    "Armor Bar: Move Up With Extra Hearts, Hide When the Server Hides the Hearts"
+  ],
+  "test": [
+    {
+      "group": "New in 1.6.0.9",
+      "id": "v9-dock",
+      "title": "Home dock and sidebar",
+      "how": "Launcher Home: no glow or ring around Play, no border on the profile and Mods & packs buttons, no version/READY line under the dock, the dock sits a little up and the player is centred on the whole window. Sidebar icons turn dark only when the white pill arrives. Bell, bug and window buttons sit on a glass pill. Does it all look clean?"
+    },
+    {
+      "group": "New in 1.6.0.9",
+      "id": "v9-dock-hover",
+      "title": "Profile switcher hover",
+      "how": "Hover the profile switcher and the Mods & packs button on Home: one clean edge, no double lines?"
+    },
+    {
+      "group": "New in 1.6.0.9",
+      "id": "v9-profile-popup",
+      "title": "Profile switcher popup",
+      "how": "Click the profile switcher with many profiles: does the list stay above the dock (not over the Play button) and scroll?"
+    },
+    {
+      "group": "New in 1.6.0.9",
+      "id": "v9-skin-layer",
+      "title": "Skin second layer",
+      "how": "Home and Locker: does the second skin layer (jacket, sleeves, hat) have the same colour as the base skin now, not darker?"
+    },
+    {
+      "group": "New in 1.6.0.9",
+      "id": "v9-mono-icons",
+      "title": "Monochrome profile icons",
+      "how": "Settings > Appearance > Monochrome: are the Velo profile icons black on a white tile, readable? Profiles with your own picture look as before?"
+    },
+    {
+      "group": "New in 1.6.0.9",
+      "id": "v9-pause-blur",
+      "title": "Pause menu opening",
+      "how": "Press Esc in a world a few times: does the blur behind the panels slide in together with them?"
+    },
+    {
+      "group": "New in 1.6.0.9",
+      "id": "v9-rshift-details",
+      "title": "R-Shift details",
+      "how": "Hover things behind an open dropdown (profile menu): nothing lights up. The Pinned header folds the list. Module pages show the whole description with clear spacing. The Drag elements hint has a single edge."
+    },
+    {
+      "group": "New in 1.6.0.9",
+      "id": "v9-worldmap",
+      "title": "World map buttons",
+      "how": "Open the world map: are Grid, Waypoints and Follow me readable on a dark strip, and the unmapped area a see-through dark tint?"
+    },
+    {
+      "group": "New in 1.6.0.9",
+      "id": "v9-armor",
+      "title": "Armor Bar options",
+      "how": "Armor Bar module: Move Up With Extra Hearts (golden hearts, more max health) and Hide When the Server Hides the Hearts (MCC Island and similar). Does the armor row clear all heart rows and disappear when the server hides the hearts?",
+      "modules": [
+        "armor-bar"
+      ]
+    },
+    {
+      "group": "New in 1.6.0.7",
+      "id": "v7-instant-play",
+      "title": "Instant Play",
+      "how": "Launcher Settings > Instant Play (off by default; AI Access must be off). Turn it on, wait about a minute, then press Play on the profile you played last. Does the game window appear within a second? Also try: change a mod or Graphics API first (it should start fresh and still be right), play another profile, join a server from the launcher. Does the right game always start?"
+    },
+    {
+      "group": "New in 1.6.0.7",
+      "id": "v7-boost",
+      "title": "Game priority boost (Windows)",
+      "how": "Windows only. Settings > Game priority boost is on by default. Start the game a few times, then once with it off: is loading shorter or the game steadier with it on? Anything worse (other programs slow, laptop hotter)?"
+    },
+    {
+      "group": "New in 1.6.0.7",
+      "id": "v7-hud-canvas",
+      "title": "HUD speed",
+      "how": "Performance Boost: HUD Canvas, Terrain Culling Window (Sodium) and Leaf Culling Depth. Play a minute in a forest and while turning fast: higher FPS, steadier frames? Any holes, missing terrain or leaves, flicker or HUD glitches?",
+      "modules": [
+        "performance-boost"
+      ]
+    },
+    {
+      "group": "New in 1.6.0.7",
+      "id": "v7-hud-plain",
+      "title": "HUD without frost",
+      "how": "The HUD is plain again (no frosted panels behind it). Move the camera between bright and dark backgrounds: any pixelated border around HUD widgets, or anything hard to read?"
+    },
+    {
+      "group": "New in 1.6.0.7",
+      "id": "v7-hud-samples",
+      "title": "Example content in R-Shift",
+      "how": "Open R-Shift and Edit HUD with a few modules that have no data right now (Media Player, target, effects). Is every widget shown with example content all the time, not only the hovered one?"
+    },
+    {
+      "group": "New in 1.6.0.7",
+      "id": "v7-theme-editor",
+      "title": "Theme editor",
+      "how": "Launcher > Settings > Appearance > Theme editor (or Customize). Does it look like the rest of the glass launcher, and does the live preview follow accent, text colour, glass darkness and corners?"
+    },
+    {
+      "group": "New in 1.6.0.7",
+      "id": "v7-dashed",
+      "title": "Create a theme tile",
+      "how": "Launcher > Settings > Appearance: is the text on the Create a theme tile readable now?"
+    },
+    {
+      "group": "New in 1.6.0.7",
+      "id": "v7-toasts",
+      "title": "Toasts and notifications",
+      "how": "Trigger a toast (e.g. add something to your Locker) and open the bell: are the notification cards readable over everything?"
+    },
+    {
+      "group": "New in 1.6.0.7",
+      "id": "v7-store-poses",
+      "title": "Store poses",
+      "how": "Game Store: pick a cloak or wings and switch the pose (Walk, Fly, Glide, Sneak, Swim). Does the whole character pose, not only the wings?"
+    },
+    {
+      "group": "New in 1.6.0.7",
+      "id": "v7-customize-update",
+      "title": "Customize after an update",
+      "how": "Velo+ Customize: set a look, update to this build, start the game without opening the Customize page. Is your look there right away?"
+    },
+    {
+      "group": "New in 1.6.0.7",
+      "id": "v7-dropdowns",
+      "title": "Launcher dropdowns",
+      "how": "Open the account menu, the profile picker and other dropdowns on busy pages: readable, no flicker?"
+    },
+    {
+      "group": "New in 1.6.0.7",
+      "id": "v7-update-name",
+      "title": "Update to this build",
+      "how": "Did the Tester launcher update itself to 1.6.0.7 (Linux: the .deb now has 1.6.0.7 in its name)? Anything odd after the restart?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v3-aura-feet",
+      "title": "Aura at your feet",
+      "how": "On Home, with your aura on: is there still a hard glowing line across the feet?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v3-tiers",
+      "title": "Tier Tagger again",
+      "how": "Play on a server with ranked PvP players (check the tab list too). Do tiers show? The tier site was down for a while earlier."
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v3-locker",
+      "title": "Locker previews",
+      "how": "In the Locker, switch between your full look, Cloaks and Wings, leave the page and come back. Does the 3D player stay instead of loading again?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v3-icons",
+      "title": "Coloured (rainbow) icons",
+      "how": "If icons look cyan/yellow/pink in the R-Shift menu or title screen: in the launcher turn off ImmediatelyFast in your profile's mods, start again, and tell us whether that fixes it. If not, try Gnetum, then BadOptimizations."
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-new-profile",
+      "title": "New profile from Home",
+      "how": "On Home, open the profile switcher and press New profile. Is the new profile selected afterwards?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-copy-profile",
+      "title": "Copied profile",
+      "how": "Duplicate a profile, restart the launcher and look at its mods. Is the Velo version the same as your other profiles?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-party-wave",
+      "title": "Party wave",
+      "how": "Invite a friend to a party. When they wave on Home, is their whole hand visible?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-friends",
+      "title": "Switching chats",
+      "how": "On Friends, click quickly between friends. Does anything flicker?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-store-tabs",
+      "title": "Store categories",
+      "how": "Open the Store. Is the category bar complete, with nothing cut off at the bottom and nothing that moves when you drag or scroll on it?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-dropdowns",
+      "title": "Dropdown menus",
+      "how": "Open Import on Profiles and the three dots on Servers. Rounded corners, no black squares?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-corners",
+      "title": "Friends and party chat",
+      "how": "Check Friends, the party chat on Home and the Black Friday bar. Any odd corners or off-centre bits?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-sky",
+      "title": "Sky behind menus",
+      "how": "Open Esc and R-Shift while looking at the sky and the horizon, also with Custom Skybox. Does the sky stay sharp and unchanged?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-hud-glass",
+      "title": "HUD (plain since 1.6.0.7)",
+      "how": "HUD Style: Glass. Is the HUD readable over any background now (the frost behind it was removed), and does nothing cover other HUD parts while you move around?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-rshift-drag",
+      "title": "Dragging HUD elements",
+      "how": "In R-Shift, drag the Media Player (nothing playing) and others. Can you see what you drag - all widgets show example content now?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-cloaks",
+      "title": "Store cloaks",
+      "how": "Open the Store's Cloaks in game. Do the cloaks look straight and complete?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-title",
+      "title": "Title screen buttons",
+      "how": "With any title font, are all button texts centred with their icons?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-fast-crystal",
+      "title": "Fast Crystal",
+      "how": "R-Shift > PvP > Fast Crystal. Turn it on and play a bit. Any crashes or input problems?"
+    },
+    {
+      "group": "New in 1.6.0.3",
+      "id": "v2-hearts-mcci",
+      "title": "Hearts on MCC Island",
+      "how": "If you play on MCC Island: with Velo's Hearts module on, do hearts the server hides stay hidden? If not, report it and attach latest.log."
+    },
+    {
+      "group": "Launcher",
+      "id": "home-look",
+      "title": "Home",
+      "how": "Open Home. No greeting text, the Play button only says Play, server chips under it are centred. If a sale is running, its strip sits at the very top. Does anything look cut off?"
+    },
+    {
+      "group": "Launcher",
+      "id": "glass-pages",
+      "title": "Switching pages",
+      "how": "Click through Home, Profiles, Locker, Store, Friends, Settings a few times. Do panels flicker grey/red or jump? Does the left sidebar change right away when you switch the theme in Settings?"
+    },
+    {
+      "group": "Launcher",
+      "id": "tour",
+      "title": "Setup guide + launcher tour",
+      "how": "On a fresh install, go through the setup guide: are all toggles and buttons readable? On your first Home visit after it, does the tour start? Nothing overlapping or off-centre?"
+    },
+    {
+      "group": "Launcher",
+      "id": "account-switch",
+      "title": "Switching accounts",
+      "how": "Switch the account in the launcher. Does only your player/name update instead of the whole window rebuilding or flickering?"
+    },
+    {
+      "group": "Launcher",
+      "id": "running-log",
+      "title": "Running game and its log",
+      "how": "Start a game and open it from Home > Running. Is the log readable, are warnings and errors coloured, does scrolling stay smooth?"
+    },
+    {
+      "group": "Launcher",
+      "id": "bundles",
+      "title": "Store bundles",
+      "how": "Store > Bundles. Do the new cards look right and show what's inside?"
+    },
+    {
+      "group": "Launcher",
+      "id": "skeletons",
+      "title": "Loading placeholders",
+      "how": "Open Locker, Media (screenshots) and Profiles right after starting the launcher. Do you see soft grey placeholders while things load instead of empty spots?"
+    },
+    {
+      "group": "Launcher",
+      "id": "home-player",
+      "title": "Your player on Home",
+      "how": "Start the launcher. Does your player wave once? Is the head or any cloak/aura cut off while it moves? Does the aura's ground ring sit at the feet?"
+    },
+    {
+      "group": "Launcher",
+      "id": "party-lobby",
+      "title": "Party lobby",
+      "how": "Invite a friend (the + button next to online friends on Home). Do they appear next to you in 3D with their cloak, wings and aura, wave when they join and wave + fade when they leave? Do you both move out of sync?"
+    },
+    {
+      "group": "Launcher",
+      "id": "party-chat",
+      "title": "Party chat + leaving",
+      "how": "In a party, write in the chat bottom right on Home. Does it arrive at your friend? Then press Leave in its header - are you out of the party?"
+    },
+    {
+      "group": "Launcher",
+      "id": "home-emotes",
+      "title": "Emotes on Home",
+      "how": "HOLD B on Home, move the mouse towards an emote (you don't need to be on it) and let go. Does it play? Do cloak and wings move with the body, also in a backflip?"
+    },
+    {
+      "group": "Launcher",
+      "id": "arcade",
+      "title": "Velo World / Snake / Blockfall",
+      "how": "On Home, click on an empty spot, then press W, A, S, D or an arrow key. Does the game take the whole window and the launcher fade away? Leave the game - does everything come back? In a party: leave the party while playing - is your player gone for the others?"
+    },
+    {
+      "group": "Launcher",
+      "id": "friends",
+      "title": "Friends and chat",
+      "how": "Friends page: open a chat, switch between friends quickly. Does anything flicker or show letters instead of faces? Does a chat open at the newest message without jumping?"
+    },
+    {
+      "group": "Launcher",
+      "id": "locker",
+      "title": "Locker",
+      "how": "Click through cloaks and outfits in the Locker. Does the 3D preview stay put instead of reloading on every click?"
+    },
+    {
+      "group": "Launcher",
+      "id": "store",
+      "title": "Store",
+      "how": "Store with the Monochrome theme: is the Velo+ tab readable? Does \"Unlock everything\" fit? Claim free coins in the rewards strip if there are any."
+    },
+    {
+      "group": "Launcher",
+      "id": "customize-look",
+      "title": "Customize > In-game look",
+      "how": "Velo+ Customize > In-game look: change accent, glass darkness, blur and corners. Start the game - do the in-game menus use your settings?"
+    },
+    {
+      "group": "Launcher",
+      "id": "discover",
+      "title": "Discover / partner servers",
+      "how": "Open Discover. Does LuckySMP show a real player count (not \"Offline\")?"
+    },
+    {
+      "group": "Launcher",
+      "id": "version-switch",
+      "title": "Changing Minecraft version",
+      "how": "On a profile, open the version picker and select another version. Is the Switch button first, the text after it?"
+    },
+    {
+      "group": "Launcher",
+      "id": "tester-window",
+      "title": "This Tester window",
+      "how": "Report a bug / idea: drag a screenshot, a clip and a .txt/.log file onto the page, send it. Open My reports - is it there with its number? Reply to it once."
+    },
+    {
+      "group": "Title screen & menus",
+      "id": "title-screen",
+      "title": "New title screen",
+      "how": "Start the game. Continue strip with your last server at the top, Singleplayer / Multiplayer, the bar (Realms, Mods, Rewind, Store, Discover), Options / Quit, small icons, your account bottom left. Is anything cut off, overlapping, or is a mod's button missing?"
+    },
+    {
+      "group": "Title screen & menus",
+      "id": "title-scene",
+      "title": "Space scene",
+      "how": "Watch the title screen for 30 seconds. Does the astronaut turn smoothly without a jump when the loop starts over? Any stutter?"
+    },
+    {
+      "group": "Title screen & menus",
+      "id": "title-account",
+      "title": "Account list",
+      "how": "Click your account bottom left on the title screen. Does the list open above it and can you switch accounts (if you have more than one in the launcher)?"
+    },
+    {
+      "group": "Title screen & menus",
+      "id": "rshift",
+      "title": "R-Shift menu",
+      "how": "In a world press R-Shift (the first time a short tour explains it). Grow the panel into the full menu and back, open a module's settings, drag a HUD module out. Smooth? FPS still fine while it's open?"
+    },
+    {
+      "group": "Title screen & menus",
+      "id": "edit-hud",
+      "title": "Edit HUD",
+      "how": "Full R-Shift menu > Edit HUD. Does the side panel slide away so you have the whole screen? Bring it back with the tab on the edge."
+    },
+    {
+      "group": "Title screen & menus",
+      "id": "theme",
+      "title": "Theme settings",
+      "how": "R-Shift > Settings > Theme: change accent colour, glass darkness, blur and roundness. Do all menus change right away?"
+    },
+    {
+      "group": "Title screen & menus",
+      "id": "pause",
+      "title": "Pause menu",
+      "how": "Press Esc in a world. Is only the area behind the glass panels blurred, the rest of the game clear?"
+    },
+    {
+      "group": "In game",
+      "id": "emote-wheel",
+      "title": "Emote wheel",
+      "how": "HOLD your emote key (default B), move the mouse towards an emote and let go. Does it play without clicking? Does text ever spill out? Does your cloak follow a backflip without snapping?",
+      "modules": [
+        "emotes"
+      ]
+    },
+    {
+      "group": "In game",
+      "id": "tier-tagger",
+      "title": "Tier Tagger",
+      "how": "Turn on Tier Tagger (it's off by default). On a PvP server, are tiers shown above heads and in the tab list? Look at a player and hold G - does the ring with all their tiers show up? Try \"Show my own tier\".",
+      "modules": [
+        "tier-tagger"
+      ]
+    },
+    {
+      "group": "In game",
+      "id": "hearts",
+      "title": "Hearts",
+      "how": "Hearts module with your own colour: take damage. Is the flash a lighter version of your colour (not Minecraft's white/red)?",
+      "modules": [
+        "hearts"
+      ]
+    },
+    {
+      "group": "In game",
+      "id": "clips",
+      "title": "Clips",
+      "how": "Play for at least 5 minutes, then save a clip (F8) a few times in a row. Do you get full-length clips every time? Open one: are Back / Folder / Share / Delete readable, does the player work?",
+      "modules": [
+        "clips"
+      ]
+    },
+    {
+      "group": "In game",
+      "id": "skybox",
+      "title": "Custom Skybox",
+      "how": "R-Shift > Custom Skybox. Turn around slowly - is there a line where the sky picture wraps around?",
+      "modules": [
+        "custom-skybox"
+      ]
+    },
+    {
+      "group": "In game",
+      "id": "fullbright",
+      "title": "Full Bright",
+      "how": "At night or in a cave toggle Full Bright. Is it really fully bright (not a night-vision tint)? Any flicker? Please try it on 1.21.11 and 26.2.",
+      "modules": [
+        "full-bright"
+      ]
+    },
+    {
+      "group": "In game",
+      "id": "sounds",
+      "title": "Interface sounds",
+      "how": "Click through menus, toggle modules, open/close R-Shift and the pause menu. Anything annoying, too loud, doubled or missing?"
+    },
+    {
+      "group": "In game",
+      "id": "title-continue",
+      "title": "Continue on the title screen",
+      "how": "Join a server, quit the game, start again. Does Continue show the right server name and icon, and does Play connect you there?"
+    },
+    {
+      "group": "In game",
+      "id": "hud-style",
+      "title": "HUD Style",
+      "how": "Set HUD Style to Glass. Do Keystrokes, Mouse Buttons and Server Display look right and centred?"
+    },
+    {
+      "group": "In game",
+      "id": "browser",
+      "title": "Velo Browser",
+      "how": "Open the Velo Browser, log in to a site, close and reopen the game - still logged in? Try the incognito toggle (purple bar)."
+    },
+    {
+      "group": "In game",
+      "id": "rewind-11",
+      "title": "Velo Rewind on 1.21.11",
+      "how": "Only on 1.21.11: record a few minutes with Velo Rewind, open the replay, scrub and export a short video.",
+      "modules": [
+        "rewind"
+      ]
+    },
+    {
+      "group": "In game",
+      "id": "cloaks",
+      "title": "Cloaks",
+      "how": "Wear a Velo cloak. Is your Minecraft cape gone under it? Is any cloak listed twice in the Locker?"
+    },
+    {
+      "group": "Performance & fixes",
+      "id": "start-time",
+      "title": "Game start",
+      "how": "Start the game a few times. Faster than before? Anything black, missing or crashing?"
+    },
+    {
+      "group": "Performance & fixes",
+      "id": "turbo-11",
+      "title": "Performance on 1.21.11",
+      "how": "Only on 1.21.11: play on a busy server or near farms. FPS compared to before?"
+    },
+    {
+      "group": "Performance & fixes",
+      "id": "low-latency",
+      "title": "Low Latency Mode",
+      "how": "R-Shift > Low Latency Mode on, play a bit. Does aiming feel more direct? A small FPS drop is expected.",
+      "modules": [
+        "low-latency"
+      ]
+    },
+    {
+      "group": "Performance & fixes",
+      "id": "keybinds",
+      "title": "Changing keybinds",
+      "how": "Velo keybinds: type in the search, click a keybind and press a letter. Does the letter end up in the search box?"
+    }
+  ]
+}
