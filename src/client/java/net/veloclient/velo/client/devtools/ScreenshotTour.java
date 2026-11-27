@@ -282,6 +282,25 @@ public final class ScreenshotTour {
 		return switch (name) {
 			// Sky checks (2026-11-26, owner: skybox over clouds / sky over the HUD / sky blurred behind menus): the same
 			// view with and without Custom Skybox - playing, pause menu, R-Shift, playing again.
+			// Release post shots (2026-11-27): the title screen, the R-Shift drawer compact and full, the pause menu.
+			case "rel16" -> {
+				var drawer = new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen[1];
+				yield List.of(
+						new Object[] {0, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.TitleScreen())},
+						new Object[] {45, (Runnable) () -> shot(client, "rel-title")},
+						new Object[] {2, (Runnable) () -> client.setScreen(null)},
+						new Object[] {40, (Runnable) () -> {
+							drawer[0] = new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen();
+							client.setScreen(drawer[0]);
+							drawer[0].testExpanded(false);
+						}},
+						new Object[] {40, (Runnable) () -> shot(client, "rel-rshift")},
+						new Object[] {2, (Runnable) () -> drawer[0].testExpanded(true)},
+						new Object[] {50, (Runnable) () -> shot(client, "rel-rshift-full")},
+						new Object[] {2, (Runnable) () -> client.setScreen(null)},
+						new Object[] {10, (Runnable) () -> client.setScreen(new net.minecraft.client.gui.screen.GameMenuScreen(true))},
+						new Object[] {45, (Runnable) () -> shot(client, "rel-pause")});
+			}
 			case "sky" -> {
 				List<Object[]> steps = new java.util.ArrayList<>();
 				var drawer = new net.veloclient.velo.client.gui.drawer.VeloDrawerScreen[1];

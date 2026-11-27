@@ -1,0 +1,127 @@
+{
+  "title": "Velo Client 1.6: A whole new look",
+  "summary": "All-new glass menus, a new launcher, a new title screen and a new Locker - plus Instant Play, Tier Tagger, a faster HUD and a long list of fixes.",
+  "tag": "Update",
+  "version": "1.6.0",
+  "accent": "#ff3b44",
+  "pinned": true,
+  "cover": "file:images/cover.jpg",
+  "blocks": [
+    {
+      "type": "text",
+      "text": "**Velo Client 1.6** gives the whole client a new face. Every menu, the launcher and the title screen now share one glass design: the game stays sharp, only the panels are frosted. Underneath, there is a pile of new features and fixes."
+    },
+    {
+      "type": "heading",
+      "text": "Glass menus"
+    },
+    {
+      "type": "image",
+      "image": "file:images/glass-menu.jpg",
+      "caption": "R-Shift grown into the full menu: category pills, module cards and live previews."
+    },
+    {
+      "type": "list",
+      "items": [
+        "**R-Shift is a glass drawer** - and the HUD editor at the same time: drag, scale and click HUD elements right there, slide it away, or grow it into the full menu",
+        "**Every Velo window** - Store, Locker, friends, the emote wheel, Redstone Mode - in the same glass look, opening from and returning to R-Shift",
+        "**Theme settings**: accent colour, glass darkness, blur and roundness, live in every menu",
+        "A new **HUD Style**: Glass, with real blur, for Keystrokes, Mouse Buttons and Server Display too"
+      ]
+    },
+    {
+      "type": "image",
+      "image": "file:images/drawer.jpg",
+      "caption": "The compact drawer: pinned modules, categories and features, the HUD stays visible."
+    },
+    {
+      "type": "heading",
+      "text": "Pause menu and title screen"
+    },
+    {
+      "type": "image",
+      "image": "file:images/pause.jpg",
+      "caption": "The new pause menu: strong blur only behind its panels, the game around stays clear."
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Pause menu in glass** with quick access to Velo menu, Store, Friends and a bug report",
+        "**New title screen** with your player, Realms, Mods, Rewind, Store and Discover",
+        "**Customize** (Velo+): your own look for the title, pause and loading screens"
+      ]
+    },
+    {
+      "type": "image",
+      "image": "file:images/title.jpg",
+      "caption": "The new title screen."
+    },
+    {
+      "type": "heading",
+      "text": "A new launcher"
+    },
+    {
+      "type": "image",
+      "image": "file:images/launcher-locker.jpg",
+      "caption": "The Locker: skin, cloaks, wings, auras, emotes and more - with a live 3D preview and poses."
+    },
+    {
+      "type": "list",
+      "items": [
+        "**New Home** with your 3D player, the games that are running, your friends and the news",
+        "**Glass pages** everywhere, a new **Theme editor**, and a cleaner Play dock",
+        "**Instant Play** (Settings, off by default): the game waits hidden at its title screen, so Play opens it at once",
+        "**Game priority boost** for Windows (on by default, can be turned off): faster loading and steadier frames next to other programs",
+        "The Linux .deb now carries the full version number"
+      ]
+    },
+    {
+      "type": "image",
+      "image": "file:images/launcher-store.jpg",
+      "caption": "The Store in the new look."
+    },
+    {
+      "type": "heading",
+      "text": "More in the game"
+    },
+    {
+      "type": "list",
+      "items": [
+        "**Tier Tagger**: PvPTiers and SubTiers tiers above heads and in the tab list",
+        "**Velo Turbo, Velo Rewind and the account switcher** now also on Minecraft 1.21.11",
+        "**Faster HUD** (HUD Canvas) and two Sodium options: Terrain Culling Window and Leaf Culling Depth",
+        "**Armor Bar** follows extra hearts and can hide when the server hides the hearts",
+        "**Cloud Sync** redesigned, with restore points by day"
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Store and coins"
+    },
+    {
+      "type": "list",
+      "items": [
+        "Cosmetics are **30% cheaper**, with more daily quests and a rewards strip with Claim buttons",
+        "**Velo+** gives 3,000 Velo Coins a month",
+        "**1,000 Velo Coins welcome gift** for every new account - and everyone who missed it got it paid"
+      ]
+    },
+    {
+      "type": "heading",
+      "text": "Fixes"
+    },
+    {
+      "type": "list",
+      "items": [
+        "Minecraft 1.21.1: the Velo loading screen finishes again",
+        "The Doctor knows the inotify limit crash and packs that need a newer Minecraft",
+        "Dozens of small visual fixes in the launcher and the menus, many of them from your reports"
+      ]
+    },
+    {
+      "type": "callout",
+      "text": "Thank you to everyone who tested 1.6 and sent reports - the build you are playing is yours too.",
+      "style": "info"
+    }
+  ]
+}
